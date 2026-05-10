@@ -66,16 +66,10 @@ fn next_prime_prev_prime_dh() {
 
 #[test]
 fn bezout_wilson_goldbach_dh() {
-    assert_eq!(
-        eval_string(r#"stringify(bezout(240, 46))"#),
-        "(2, -9, 47)"
-    );
+    assert_eq!(eval_string(r#"stringify(bezout(240, 46))"#), "(2, -9, 47)");
     assert_eq!(eval_string(r#"sprintf("%d", wilson_test(7))"#), "1");
     assert_eq!(eval_string(r#"sprintf("%d", wilson_test(8))"#), "0");
-    assert_eq!(
-        eval_string(r#"stringify(goldbach_pair(10))"#),
-        "(3, 7)"
-    );
+    assert_eq!(eval_string(r#"stringify(goldbach_pair(10))"#), "(3, 7)");
 }
 
 #[test]
@@ -93,15 +87,11 @@ fn voigt_profile_and_english_likeness_dh() {
 #[test]
 fn matrix_exp_skew_two_by_two_dh() {
     assert_eq!(
-        eval_string(
-            r#"my $m = matrix_exp([[0, -1], [1, 0]], 1); sprintf("%.15g", $m->[0][0])"#
-        ),
+        eval_string(r#"my $m = matrix_exp([[0, -1], [1, 0]], 1); sprintf("%.15g", $m->[0][0])"#),
         "0.54030230586814"
     );
     assert_eq!(
-        eval_string(
-            r#"my $m = matrix_exp([[0, -1], [1, 0]], 1); sprintf("%.15g", $m->[0][1])"#
-        ),
+        eval_string(r#"my $m = matrix_exp([[0, -1], [1, 0]], 1); sprintf("%.15g", $m->[0][1])"#),
         "-0.841470984807897"
     );
 }
@@ -120,14 +110,8 @@ fn polygamma_hurwitz_zeta_dh() {
 
 #[test]
 fn chinese_remainder_buckets_vs_flat_scalars_bug196_dh() {
-    assert_eq!(
-        eval_string(r#"sprintf("%d", crt([2, 3], [5, 7]))"#),
-        "17"
-    );
-    assert_eq!(
-        eval_string(r#"sprintf("%d", crt(2, 5, 3, 7))"#),
-        "2"
-    );
+    assert_eq!(eval_string(r#"sprintf("%d", crt([2, 3], [5, 7]))"#), "17");
+    assert_eq!(eval_string(r#"sprintf("%d", crt(2, 5, 3, 7))"#), "2");
 }
 
 #[test]
@@ -137,9 +121,7 @@ fn bond_convexity_modified_duration_dh() {
         "6.392000829"
     );
     assert_eq!(
-        eval_string(
-            r#"sprintf("%.10g", modified_duration_bond(100, 0.08, 5, 2, 0.06))"#
-        ),
+        eval_string(r#"sprintf("%.10g", modified_duration_bond(100, 0.08, 5, 2, 0.06))"#),
         "2.252095211"
     );
 }
@@ -188,10 +170,7 @@ fn continued_fraction_sqrt7_dh() {
 
 #[test]
 fn derangements_stirling_bernoulli_harmonic_bug198_dh() {
-    assert_eq!(
-        eval_string(r#"sprintf("%d", derangements(4))"#),
-        "36"
-    );
+    assert_eq!(eval_string(r#"sprintf("%d", derangements(4))"#), "36");
     assert_eq!(eval_string(r#"sprintf("%d", stirling2(5, 3))"#), "25");
     assert_eq!(
         eval_string(r#"sprintf("%.10g", bernoulli(4))"#),
@@ -205,10 +184,7 @@ fn derangements_stirling_bernoulli_harmonic_bug198_dh() {
 
 #[test]
 fn powmod_hypergeometric_1f1_dh() {
-    assert_eq!(
-        eval_string(r#"sprintf("%d", powmod(2, 10, 1000))"#),
-        "24"
-    );
+    assert_eq!(eval_string(r#"sprintf("%d", powmod(2, 10, 1000))"#), "24");
     assert_eq!(
         eval_string(r#"sprintf("%.10g", hypergeometric_1f1(1, 2, 0.5))"#),
         "1.297442541"
@@ -217,14 +193,8 @@ fn powmod_hypergeometric_1f1_dh() {
 
 #[test]
 fn crc32_murmur3_popcount_dh() {
-    assert_eq!(
-        eval_string(r#"sprintf("%u", crc32("hello"))"#),
-        "907060870"
-    );
-    assert_eq!(
-        eval_string(r#"sprintf("%u", murmur3("hello", 42))"#),
-        "0"
-    );
+    assert_eq!(eval_string(r#"sprintf("%u", crc32("hello"))"#), "907060870");
+    assert_eq!(eval_string(r#"sprintf("%u", murmur3("hello", 42))"#), "0");
     assert_eq!(eval_string(r#"sprintf("%d", popcount(255))"#), "8");
 }
 

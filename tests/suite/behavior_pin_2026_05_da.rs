@@ -20,7 +20,10 @@ fn eval_runtime_message(code: &str) -> String {
     let _guard = GLOBAL_FLAGS_LOCK.read();
     let program = stryke::parse(code).expect("parse");
     let mut interp = VMHelper::new();
-    interp.execute(&program).expect_err("expected runtime error").message
+    interp
+        .execute(&program)
+        .expect_err("expected runtime error")
+        .message
 }
 
 #[test]
@@ -99,18 +102,12 @@ fn topo_sort_adj_linear_dag_order_da() {
 
 #[test]
 fn max_flow_two_node_capacity_da() {
-    assert_eq!(
-        eval_int(r#"max_flow([[0, 5], [0, 0]], 0, 1)"#),
-        5
-    );
+    assert_eq!(eval_int(r#"max_flow([[0, 5], [0, 0]], 0, 1)"#), 5);
 }
 
 #[test]
 fn is_bipartite_graph_two_clique_da() {
-    assert_eq!(
-        eval_int(r#"is_bipartite_graph([[0, 1], [1, 0]])"#),
-        1
-    );
+    assert_eq!(eval_int(r#"is_bipartite_graph([[0, 1], [1, 0]])"#), 1);
 }
 
 #[test]
@@ -253,7 +250,10 @@ fn connected_components_two_cycle_da() {
 
 #[test]
 fn min_cut_triangle_graph_da() {
-    assert_eq!(eval_int(r#"min_cut([[0, 5, 0], [5, 0, 5], [0, 5, 0]], 0, 2)"#), 5);
+    assert_eq!(
+        eval_int(r#"min_cut([[0, 5, 0], [5, 0, 5], [0, 5, 0]], 0, 2)"#),
+        5
+    );
 }
 
 #[test]
@@ -351,10 +351,7 @@ fn ripemd160_blake2b_prefix_hex_from_hex_da() {
 
 #[test]
 fn trapz_simpson_evenly_spaced_y_with_dx_one_da() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", trapz([0, 1, 4], 1))"#),
-        "3"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", trapz([0, 1, 4], 1))"#), "3");
     assert_eq!(
         eval_string(r#"sprintf("%.10g", simpson([0, 1, 4], 1))"#),
         "2.666666667"
@@ -372,10 +369,7 @@ fn trapz_two_array_operands_second_becomes_dx_zero_da() {
 
 #[test]
 fn erf_lambert_airy_bessel_samples_da() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", erf(1))"#),
-        "0.8427007929"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", erf(1))"#), "0.8427007929");
     assert_eq!(
         eval_string(r#"sprintf("%.10g", lambert_w0(2))"#),
         "0.852605502"

@@ -18,10 +18,7 @@ fn trim_ascii_ws_cl() {
 
 #[test]
 fn words_splits_on_blank_lines_cl() {
-    assert_eq!(
-        eval_string(r#"join("|", words("a  b\nc"))"#),
-        "a|b|c"
-    );
+    assert_eq!(eval_string(r#"join("|", words("a  b\nc"))"#), "a|b|c");
 }
 
 #[test]
@@ -34,7 +31,10 @@ fn lc_uc_roundtrip_flags_cl() {
 
 #[test]
 fn title_case_simple_clause_cl() {
-    assert_eq!(eval_string(r#"title_case("a tale of two")"#), "A Tale Of Two");
+    assert_eq!(
+        eval_string(r#"title_case("a tale of two")"#),
+        "A Tale Of Two"
+    );
 }
 
 #[test]
@@ -59,10 +59,7 @@ fn reverse_variadic_three_ints_cl() {
 
 #[test]
 fn reverse_single_inline_arrayref_identity_shape_cl() {
-    assert_eq!(
-        eval_string(r#"stringify(reverse([1, 2, 3]))"#),
-        "[1, 2, 3]"
-    );
+    assert_eq!(eval_string(r#"stringify(reverse([1, 2, 3]))"#), "[1, 2, 3]");
 }
 
 #[test]
@@ -101,7 +98,10 @@ fn char_at_grapheme_index_order_cl() {
 
 #[test]
 fn code_point_at_second_beta_cl() {
-    assert_eq!(eval_string(r#"sprintf("%.0f", code_point_at("αβγ", 1))"#), "946");
+    assert_eq!(
+        eval_string(r#"sprintf("%.0f", code_point_at("αβγ", 1))"#),
+        "946"
+    );
 }
 
 #[test]
@@ -149,26 +149,17 @@ fn tr_lower_to_upper_cl() {
 
 #[test]
 fn split_join_on_spaces_cl() {
-    assert_eq!(
-        eval_string(r#"join("|", split(" ", "a b c"))"#),
-        "a|b|c"
-    );
+    assert_eq!(eval_string(r#"join("|", split(" ", "a b c"))"#), "a|b|c");
 }
 
 #[test]
 fn bind_match_all_digits_cl() {
-    assert_eq!(
-        eval_string(r#"(("007" =~ qr{^\d+$}) ? "1" : "0")"#),
-        "1"
-    );
+    assert_eq!(eval_string(r#"(("007" =~ qr{^\d+$}) ? "1" : "0")"#), "1");
 }
 
 #[test]
 fn bind_match_rejects_letter_cl() {
-    assert_eq!(
-        eval_string(r#"(("7a" =~ qr{^\d+$}) ? "1" : "0")"#),
-        "0"
-    );
+    assert_eq!(eval_string(r#"(("7a" =~ qr{^\d+$}) ? "1" : "0")"#), "0");
 }
 
 #[test]
@@ -205,7 +196,9 @@ fn hypot_34_cl() {
 #[test]
 fn gcd_lcm_small_cl() {
     assert_eq!(
-        eval_string(r#"(sprintf("%.0f", gcd(84, 30)) eq "6" && sprintf("%.0f", lcm(4, 6)) eq "12") ? "1" : "0""#),
+        eval_string(
+            r#"(sprintf("%.0f", gcd(84, 30)) eq "6" && sprintf("%.0f", lcm(4, 6)) eq "12") ? "1" : "0""#
+        ),
         "1"
     );
 }
@@ -248,7 +241,9 @@ fn trunc_toward_zero_negative_cl() {
 #[test]
 fn sign_triple_cl() {
     assert_eq!(
-        eval_string(r#"join(",", sprintf("%.0f", sign(-2)), sprintf("%.0f", sign(0)), sprintf("%.0f", sign(3)))"#),
+        eval_string(
+            r#"join(",", sprintf("%.0f", sign(-2)), sprintf("%.0f", sign(0)), sprintf("%.0f", sign(3)))"#
+        ),
         "-1,0,1"
     );
 }
@@ -260,18 +255,26 @@ fn abs_float_negative_cl() {
 
 #[test]
 fn d2r_180_cl() {
-    assert_eq!(eval_string(r#"sprintf("%.12g", d2r(180))"#), "3.14159265359");
+    assert_eq!(
+        eval_string(r#"sprintf("%.12g", d2r(180))"#),
+        "3.14159265359"
+    );
 }
 
 #[test]
 fn r2d_pi_cl() {
-    assert_eq!(eval_string(r#"sprintf("%.12g", r2d(3.141592653589793))"#), "180");
+    assert_eq!(
+        eval_string(r#"sprintf("%.12g", r2d(3.141592653589793))"#),
+        "180"
+    );
 }
 
 #[test]
 fn shl_shr_int_cl() {
     assert_eq!(
-        eval_string(r#"(sprintf("%.0f", shl(1, 4)) eq "16" && sprintf("%.0f", shr(16, 2)) eq "4") ? "1" : "0""#),
+        eval_string(
+            r#"(sprintf("%.0f", shl(1, 4)) eq "16" && sprintf("%.0f", shr(16, 2)) eq "4") ? "1" : "0""#
+        ),
         "1"
     );
 }
@@ -303,7 +306,10 @@ fn variance_and_stddev_sample_cl() {
 
 #[test]
 fn levenshtein_kitten_sitting_cl() {
-    assert_eq!(eval_string(r#"sprintf("%.0f", levenshtein("kitten", "sitting"))"#), "3");
+    assert_eq!(
+        eval_string(r#"sprintf("%.0f", levenshtein("kitten", "sitting"))"#),
+        "3"
+    );
 }
 
 #[test]
@@ -329,7 +335,10 @@ fn percentile_fifty_of_five_cl() {
 
 #[test]
 fn dot_product_small_cl() {
-    assert_eq!(eval_string(r#"sprintf("%.10g", dot_product([1, 2], [3, 4]))"#), "11");
+    assert_eq!(
+        eval_string(r#"sprintf("%.10g", dot_product([1, 2], [3, 4]))"#),
+        "11"
+    );
 }
 
 #[test]
@@ -446,7 +455,10 @@ fn asin_one_half_pi_cl() {
 
 #[test]
 fn atan2_one_one_quarter_pi_cl() {
-    assert_eq!(eval_string(r#"sprintf("%.10g", atan2(1, 1))"#), "0.7853981634");
+    assert_eq!(
+        eval_string(r#"sprintf("%.10g", atan2(1, 1))"#),
+        "0.7853981634"
+    );
 }
 
 #[test]

@@ -228,10 +228,7 @@ fn collatz_length_seven_ct() {
 
 #[test]
 fn chinese_remainder_two_moduli_ct() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.0f", crt([2, 3], [5, 7]))"#),
-        "17"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.0f", crt([2, 3], [5, 7]))"#), "17");
 }
 
 #[test]

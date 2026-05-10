@@ -412,6 +412,119 @@ fn builtin_spurt(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(data.len() as i64))
 }
 
+/// Collect paths from a flat arg list, flattening one level of array /
+/// arrayref. Used by `check` / `test` so callers can pass either varargs,
+/// `@files`, `\@files`, or `[...]` literal — all behave the same.
+fn collect_path_args(
+    args: &[PerlValue],
+    skip_last_hash: bool,
+) -> (Vec<String>, Option<&PerlValue>) {
+    let mut out: Vec<String> = Vec::with_capacity(args.len());
+    let mut opts: Option<&PerlValue> = None;
+    let last_idx = args.len().saturating_sub(1);
+    for (i, v) in args.iter().enumerate() {
+        if skip_last_hash && i == last_idx && is_http_opts_hash(v) {
+            opts = Some(v);
+            break;
+        }
+        if let Some(arr) = v.as_array_vec() {
+            for item in arr.iter() {
+                out.push(item.to_string());
+            }
+        } else if let Some(arr) = v.as_array_ref() {
+            for item in arr.read().iter() {
+                out.push(item.to_string());
+            }
+        } else {
+            out.push(v.to_string());
+        }
+    }
+    (out, opts)
+}
+
+/// `check` — In-process equivalent of `stryke check FILE...`. Parses,
+/// compiles and lints each path without executing it. Returns the exit
+/// code (0 on success, 1 on errors). Optional trailing hashref selects
+/// `quiet` / `json` / `no_interop` the same way the CLI does.
+///
+/// Faster than `system "stryke check $f"` because it skips the binary
+/// fork and reuses the parent process's parser/compiler.
+fn builtin_check_inner(
+    args: &[PerlValue],
+    force_no_interop: Option<bool>,
+) -> PerlResult<PerlValue> {
+    let (files, opts) = collect_path_args(args, true);
+    let quiet = opts
+        .map(|v| opt_hash_bool(v, "quiet") || opt_hash_bool(v, "q"))
+        .unwrap_or(false);
+    let json_output = opts.map(|v| opt_hash_bool(v, "json")).unwrap_or(false);
+    let no_interop = force_no_interop.or_else(|| {
+        opts.and_then(|v| {
+            if opt_hash_bool(v, "no_interop") || opt_hash_bool(v, "no-interop") {
+                Some(true)
+            } else {
+                None
+            }
+        })
+    });
+    Ok(PerlValue::integer(
+        crate::cli_runners::run_check(&files, quiet, json_output, no_interop) as i64,
+    ))
+}
+
+fn builtin_check(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    builtin_check_inner(args, None)
+}
+
+/// `check_no_interop` — Same as `check`, but pins **this thread** to
+/// `--no-interop` for the duration of the check via an RAII guard
+/// (`set_no_interop_mode_tls`). Sibling threads are unaffected, so the
+/// builtin is safe to call from `pmaps` workers in parallel.
+fn builtin_check_no_interop(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    builtin_check_inner(args, Some(true))
+}
+
+/// `test` — In-process equivalent of `stryke test FILE_OR_DIR...`. Each
+/// test file still runs in its own child `stryke` process so test state
+/// is isolated, but skipping the outer fork means a stryke session can
+/// call `test("t/")` directly without going through `system "stryke test t/"`.
+/// Forwards `-j N` from the parent process's argv to every child.
+/// Returns the exit code (0 = all pass, 1 = any failure).
+fn builtin_test_inner(args: &[PerlValue], force_no_interop: bool) -> PerlResult<PerlValue> {
+    let (targets, opts) = collect_path_args(args, true);
+    let opts_no_interop = opts
+        .map(|v| opt_hash_bool(v, "no_interop") || opt_hash_bool(v, "no-interop"))
+        .unwrap_or(false);
+    let quiet = opts
+        .map(|v| opt_hash_bool(v, "quiet") || opt_hash_bool(v, "q"))
+        .unwrap_or(false);
+    // Mode selectors. Default is `pool`. Mutually exclusive — checked
+    // in priority order: inproc > fork > pool.
+    let want_inproc = opts.map(|v| opt_hash_bool(v, "inproc")).unwrap_or(false);
+    let want_fork = opts.map(|v| opt_hash_bool(v, "fork")).unwrap_or(false);
+    let no_interop = force_no_interop || opts_no_interop;
+    let j = crate::cli_runners::parent_j_threads();
+    let exit = if want_inproc {
+        crate::cli_runners::run_tests_with_mode(&targets, j.as_deref(), no_interop, quiet, false)
+    } else if want_fork {
+        crate::cli_runners::run_tests_with_mode(&targets, j.as_deref(), no_interop, quiet, true)
+    } else {
+        crate::cli_runners::run_tests_pool(&targets, j.as_deref(), no_interop, quiet)
+    };
+    Ok(PerlValue::integer(exit as i64))
+}
+
+fn builtin_test(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    builtin_test_inner(args, false)
+}
+
+/// `test_no_interop` — Same as `test`, but forwards `--no-interop` to
+/// every spawned child stryke process so each test runs under stryke's
+/// bot-firewall mode (rejects Perl-isms, forces stryke idioms).
+fn builtin_test_no_interop(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    builtin_test_inner(args, true)
+}
+
 /// `copy` — Copy.
 fn builtin_copy(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     if args.len() < 2 {
@@ -550,6 +663,10 @@ pub(crate) fn try_builtin(
     let undef = PerlValue::UNDEF;
     match name {
         "basename" | "bn" => Some(builtin_basename(args)),
+        "check" => Some(builtin_check(args)),
+        "check_no_interop" | "check_ni" => Some(builtin_check_no_interop(args)),
+        "test" => Some(builtin_test(args)),
+        "test_no_interop" | "test_ni" => Some(builtin_test_no_interop(args)),
         "copy" => Some(builtin_copy(args, line)),
         "dirname" | "dn" => Some(builtin_dirname(args)),
         "fileparse" => Some(builtin_fileparse(interp, args, line)),
@@ -15755,6 +15872,19 @@ fn builtin_test_run(interp: &VMHelper, _args: &[PerlValue], _line: usize) -> Per
             );
         }
     }
+    // Roll the per-block counts into the run-wide totals BEFORE resetting,
+    // so external embedders (e.g. the worker-pool test runner reading
+    // counts after `execute()` returns) get the cumulative numbers even
+    // though the per-block counters get zeroed below for the next block.
+    interp
+        .test_pass_total
+        .fetch_add(pass, AtomicOrdering::Relaxed);
+    interp
+        .test_fail_total
+        .fetch_add(fail, AtomicOrdering::Relaxed);
+    interp
+        .test_skip_total
+        .fetch_add(skip, AtomicOrdering::Relaxed);
     // Reset counters so a follow-up `test_run` (rare but supported) starts fresh.
     interp.test_pass_count.store(0, AtomicOrdering::Relaxed);
     interp.test_fail_count.store(0, AtomicOrdering::Relaxed);

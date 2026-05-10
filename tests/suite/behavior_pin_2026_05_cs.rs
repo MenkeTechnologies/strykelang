@@ -45,10 +45,7 @@ fn soundex_smith_cs() {
 
 #[test]
 fn gelu_one_cs() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", gelu(1))"#),
-        "0.9135418956"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", gelu(1))"#), "0.9135418956");
 }
 
 #[test]
@@ -61,10 +58,7 @@ fn softplus_zero_is_ln2_cs() {
 
 #[test]
 fn elu_negative_one_cs() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", elu(-1))"#),
-        "-0.6321205588"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", elu(-1))"#), "-0.6321205588");
 }
 
 #[test]
@@ -83,10 +77,7 @@ fn pchisq_one_three_df_cs() {
 
 #[test]
 fn pt_zero_five_df_cs() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", pt(0, 5))"#),
-        "0.4999971122"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", pt(0, 5))"#), "0.4999971122");
 }
 
 #[test]
@@ -116,18 +107,12 @@ fn string_hamming_distance_bitstrings_cs() {
 
 #[test]
 fn hann_window_length_eight_first_sample_cs() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", first(hann(8)))"#),
-        "0"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", first(hann(8)))"#), "0");
 }
 
 #[test]
 fn lp_norm_two_matches_hypotenuse_cs() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", lp_norm([3, 4], 2))"#),
-        "5"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", lp_norm([3, 4], 2))"#), "5");
 }
 
 #[test]
@@ -145,26 +130,17 @@ fn smoothstep_midpoint_cs() {
 
 #[test]
 fn lerp_quarter_cs() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", lerp(0, 100, 0.25))"#),
-        "25"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", lerp(0, 100, 0.25))"#), "25");
 }
 
 #[test]
 fn saturate_clips_above_one_cs() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", saturate(1.5))"#),
-        "1"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", saturate(1.5))"#), "1");
 }
 
 #[test]
 fn clamp_scalar_between_bounds_cs() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", clamp(0, 10, 12))"#),
-        "10"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", clamp(0, 10, 12))"#), "10");
 }
 
 #[test]
@@ -177,26 +153,17 @@ fn clamp_list_variadic_cs() {
 
 #[test]
 fn cumsum_nonunit_steps_cs() {
-    assert_eq!(
-        eval_string(r#"stringify(cumsum([2, 3, 5]))"#),
-        "(2, 5, 10)"
-    );
+    assert_eq!(eval_string(r#"stringify(cumsum([2, 3, 5]))"#), "(2, 5, 10)");
 }
 
 #[test]
 fn median_odd_triple_cs() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", median([1, 2, 9]))"#),
-        "2"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", median([1, 2, 9]))"#), "2");
 }
 
 #[test]
 fn mad_simple_list_cs() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", mad([1, 2, 3, 10]))"#),
-        "2"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", mad([1, 2, 3, 10]))"#), "2");
 }
 
 #[test]

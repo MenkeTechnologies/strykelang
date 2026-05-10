@@ -18,10 +18,7 @@ fn hmac_sha256_ascii_key_message_cr() {
 
 #[test]
 fn lgamma_five_cr() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", lgamma(5))"#),
-        "3.17805383"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", lgamma(5))"#), "3.17805383");
 }
 
 #[test]
@@ -90,10 +87,7 @@ fn reject_even_cr() {
 
 #[test]
 fn string_take_while_charset_prefix_not_predicate_cr() {
-    assert_eq!(
-        eval_string(r#"string_take_while("aabbc", "ab")"#),
-        "aabb"
-    );
+    assert_eq!(eval_string(r#"string_take_while("aabbc", "ab")"#), "aabb");
 }
 
 #[test]
@@ -116,10 +110,7 @@ fn nth_zero_indexed_from_range_iterator_cr() {
 
 #[test]
 fn nth_inline_arrayref_undef_bug_cr() {
-    assert_eq!(
-        eval_string(r#"stringify(nth(1, [10, 20, 30]))"#),
-        "undef"
-    );
+    assert_eq!(eval_string(r#"stringify(nth(1, [10, 20, 30]))"#), "undef");
 }
 
 #[test]
@@ -166,10 +157,7 @@ fn is_even_is_odd_cr() {
 
 #[test]
 fn divmod_positive_cr() {
-    assert_eq!(
-        eval_string(r#"stringify(divmod(17, 5))"#),
-        "(3, 2)"
-    );
+    assert_eq!(eval_string(r#"stringify(divmod(17, 5))"#), "(3, 2)");
 }
 
 #[test]
@@ -214,38 +202,34 @@ fn bit_and_or_xor_cr() {
 
 #[test]
 fn sigmoid_zero_cr() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", sigmoid(0))"#),
-        "0.5"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", sigmoid(0))"#), "0.5");
 }
 
 #[test]
 fn relu_negative_zero_cr() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", relu(-3))"#),
-        "0"
-    );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", relu(3))"#),
-        "3"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", relu(-3))"#), "0");
+    assert_eq!(eval_string(r#"sprintf("%.10g", relu(3))"#), "3");
 }
 
 #[test]
 fn tanh_one_cr() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", tanh(1))"#),
-        "0.761594156"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", tanh(1))"#), "0.761594156");
 }
 
 #[test]
 fn softmax_two_logits_cr() {
     let out = eval_string(r#"stringify(softmax([0, 1]))"#);
     assert!(out.starts_with('(') && out.ends_with(')'), "got {:?}", out);
-    assert!(out.contains("0.2689414214") || out.contains("0.268941"), "got {:?}", out);
-    assert!(out.contains("0.7310585786") || out.contains("0.731058"), "got {:?}", out);
+    assert!(
+        out.contains("0.2689414214") || out.contains("0.268941"),
+        "got {:?}",
+        out
+    );
+    assert!(
+        out.contains("0.7310585786") || out.contains("0.731058"),
+        "got {:?}",
+        out
+    );
 }
 
 #[test]
@@ -266,10 +250,7 @@ fn mean_squared_error_lists_cr() {
 
 #[test]
 fn gcd_trailing_operands_ignored_two_arg_only_cr() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.0f", gcd(12, 18, 35))"#),
-        "6"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.0f", gcd(12, 18, 35))"#), "6");
 }
 
 #[test]
@@ -292,10 +273,7 @@ fn double_factorial_nine_cr() {
 
 #[test]
 fn rising_factorial_four_two_cr() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.0f", pochhammer(4, 2))"#),
-        "20"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.0f", pochhammer(4, 2))"#), "20");
 }
 
 #[test]
@@ -391,5 +369,8 @@ fn euler_totient_twelve_cr() {
 
 #[test]
 fn pentagonal_number_five_cr() {
-    assert_eq!(eval_string(r#"sprintf("%.0f", pentagonal_number(5))"#), "35");
+    assert_eq!(
+        eval_string(r#"sprintf("%.0f", pentagonal_number(5))"#),
+        "35"
+    );
 }

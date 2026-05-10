@@ -44,10 +44,7 @@ fn pmt_principal_first_slot_absurd_payment_bug_cz() {
 
 #[test]
 fn pmt_zero_rate_amortizes_principal_cz() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", pmt(0, 10, 1000))"#),
-        "-100"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", pmt(0, 10, 1000))"#), "-100");
 }
 
 #[test]
@@ -96,10 +93,7 @@ fn pnorm_qnorm_dnorm_pbinom_cz() {
         eval_string(r#"sprintf("%.10g", qnorm(0.975))"#),
         "1.960394917"
     );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", dnorm(0))"#),
-        "0.3989422804"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", dnorm(0))"#), "0.3989422804");
     assert_eq!(
         eval_string(r#"sprintf("%.10g", pbinom(5, 10, 0.5))"#),
         "0.623046875"
@@ -108,14 +102,8 @@ fn pnorm_qnorm_dnorm_pbinom_cz() {
 
 #[test]
 fn kb_bytes_roundtrip_cz() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", kb_to_bytes(1))"#),
-        "1024"
-    );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", bytes_to_kb(1024))"#),
-        "1"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", kb_to_bytes(1))"#), "1024");
+    assert_eq!(eval_string(r#"sprintf("%.10g", bytes_to_kb(1024))"#), "1");
 }
 
 #[test]
@@ -137,9 +125,7 @@ fn bond_convexity_semiannual_convention_five_arg_cz() {
 #[test]
 fn macaulay_duration_from_explicit_cashflows_cz() {
     assert_eq!(
-        eval_string(
-            r#"sprintf("%.10g", macaulay_duration([5, 5, 5, 5, 105], 0.04))"#,
-        ),
+        eval_string(r#"sprintf("%.10g", macaulay_duration([5, 5, 5, 5, 105], 0.04))"#,),
         "4.557086742"
     );
 }
@@ -159,10 +145,7 @@ fn modinv_modexp_crt_cz() {
         eval_string(r#"sprintf("%.10g", mod_exp(2, 10, 1000))"#),
         "24"
     );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", crt([2, 3], [3, 5]))"#),
-        "8"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", crt([2, 3], [3, 5]))"#), "8");
 }
 
 #[test]
@@ -182,10 +165,7 @@ fn bit_and_or_xor_cz() {
 
 #[test]
 fn percent_of_total_cz() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", percent(25, 200))"#),
-        "12.5"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", percent(25, 200))"#), "12.5");
 }
 
 #[test]
@@ -266,22 +246,13 @@ fn ppois_pexp_cz() {
 #[test]
 fn strip_prefix_suffix_cz() {
     assert_eq!(eval_string(r#"strip_prefix("::foo", "::")"#), "foo");
-    assert_eq!(
-        eval_string(r#"strip_suffix("foo.pl", ".pl")"#),
-        "foo"
-    );
+    assert_eq!(eval_string(r#"strip_suffix("foo.pl", ".pl")"#), "foo");
 }
 
 #[test]
 fn next_prev_prime_cz() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", next_prime(20))"#),
-        "23"
-    );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", prev_prime(20))"#),
-        "19"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", next_prime(20))"#), "23");
+    assert_eq!(eval_string(r#"sprintf("%.10g", prev_prime(20))"#), "19");
 }
 
 #[test]
@@ -296,8 +267,5 @@ fn roman_fourteen_roundtrip_cz() {
 #[test]
 fn html_encode_decode_ampersand_cz() {
     assert_eq!(eval_string(r#"html_encode("&")"#), "&amp;");
-    assert_eq!(
-        eval_string(r#"html_decode("&amp;")"#),
-        "&"
-    );
+    assert_eq!(eval_string(r#"html_decode("&amp;")"#), "&");
 }

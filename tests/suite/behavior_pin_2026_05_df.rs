@@ -15,10 +15,7 @@ use crate::common::*;
 
 #[test]
 fn gamma_polygamma_family_df() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", lgamma(5))"#),
-        "3.17805383"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", lgamma(5))"#), "3.17805383");
     assert_eq!(eval_string(r#"sprintf("%.10g", tgamma(5))"#), "24");
     assert_eq!(
         eval_string(r#"sprintf("%.10g", digamma(5))"#),
@@ -36,14 +33,8 @@ fn dnbinom_dgeom_dunif_df() {
         eval_string(r#"sprintf("%.10g", dnbinom(3, 2, 0.5))"#),
         "0.125"
     );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", dgeom(2, 0.5))"#),
-        "0.125"
-    );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", dunif(0.5, 0, 1))"#),
-        "1"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", dgeom(2, 0.5))"#), "0.125");
+    assert_eq!(eval_string(r#"sprintf("%.10g", dunif(0.5, 0, 1))"#), "1");
 }
 
 #[test]
@@ -87,15 +78,11 @@ fn matrix_rank_singular_df() {
 #[test]
 fn matrix_pinv_qr_eigen_df() {
     assert_eq!(
-        eval_string(
-            r#"my $p = matrix_pinv([[1, 2], [3, 4]]); sprintf("%.15g", $p->[0][0])"#
-        ),
+        eval_string(r#"my $p = matrix_pinv([[1, 2], [3, 4]]); sprintf("%.15g", $p->[0][0])"#),
         "-2"
     );
     assert_eq!(
-        eval_string(
-            r#"my $qr = qr_decompose([[1, 2], [3, 4]]); sprintf("%.15g", $qr->[0][0][0])"#
-        ),
+        eval_string(r#"my $qr = qr_decompose([[1, 2], [3, 4]]); sprintf("%.15g", $qr->[0][0][0])"#),
         "0.316227766016838"
     );
     assert_eq!(
@@ -193,15 +180,11 @@ fn wasserstein_haversine_df() {
 #[test]
 fn hellinger_bhattacharyya_df() {
     assert_eq!(
-        eval_string(
-            r#"sprintf("%.10g", hellinger_distance([0.5, 0.5], [0.25, 0.75]))"#
-        ),
+        eval_string(r#"sprintf("%.10g", hellinger_distance([0.5, 0.5], [0.25, 0.75]))"#),
         "0.1845919113"
     );
     assert_eq!(
-        eval_string(
-            r#"sprintf("%.10g", bhattacharyya_coefficient([0.5, 0.5], [0.25, 0.75]))"#
-        ),
+        eval_string(r#"sprintf("%.10g", bhattacharyya_coefficient([0.5, 0.5], [0.25, 0.75]))"#),
         "0.9659258263"
     );
 }
@@ -244,10 +227,7 @@ fn silhouette_davies_dbscan_df() {
 
 #[test]
 fn lerp_inv_lerp_smoothstep_remap_df() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", lerp(10, 20, 0.5))"#),
-        "15"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", lerp(10, 20, 0.5))"#), "15");
     assert_eq!(
         eval_string(r#"sprintf("%.10g", inv_lerp(10, 20, 15))"#),
         "0.5"
@@ -284,14 +264,8 @@ fn concordance_kendall_df() {
 
 #[test]
 fn inverse_hyperbolic_sinc_df() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", acosh(2))"#),
-        "1.316957897"
-    );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", asinh(1))"#),
-        "0.881373587"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", acosh(2))"#), "1.316957897");
+    assert_eq!(eval_string(r#"sprintf("%.10g", asinh(1))"#), "0.881373587");
     assert_eq!(
         eval_string(r#"sprintf("%.10g", atanh(0.5))"#),
         "0.5493061443"

@@ -667,6 +667,18 @@ pub struct VMHelper {
     pub test_pass_count: std::sync::atomic::AtomicUsize,
     pub test_fail_count: std::sync::atomic::AtomicUsize,
     pub test_skip_count: std::sync::atomic::AtomicUsize,
+    /// Cumulative-across-the-whole-run counters. The `test_pass_count` /
+    /// `test_fail_count` / `test_skip_count` triplet above is reset by
+    /// `test_run` after it prints its per-block summary, so external
+    /// embedders (the worker-pool test runner reading counts after
+    /// `execute()` returns) see 0 if any test in the file already
+    /// finished a `test_run` block. The `_total` counters are summed-in
+    /// by `test_run` *before* the reset, never themselves reset, and
+    /// give the harness an honest "how many assertions did this run
+    /// actually do" number.
+    pub test_pass_total: std::sync::atomic::AtomicUsize,
+    pub test_fail_total: std::sync::atomic::AtomicUsize,
+    pub test_skip_total: std::sync::atomic::AtomicUsize,
     /// Set to `true` by `test_run` when any assertion failed during the run.
     /// CLI driver (`main.rs`) reads this after `execute` returns and exits with
     /// code 1. Replaces the previous in-VM `std::process::exit(1)` which made
@@ -1526,6 +1538,9 @@ impl VMHelper {
             test_pass_count: std::sync::atomic::AtomicUsize::new(0),
             test_fail_count: std::sync::atomic::AtomicUsize::new(0),
             test_skip_count: std::sync::atomic::AtomicUsize::new(0),
+            test_pass_total: std::sync::atomic::AtomicUsize::new(0),
+            test_fail_total: std::sync::atomic::AtomicUsize::new(0),
+            test_skip_total: std::sync::atomic::AtomicUsize::new(0),
             test_run_failed: std::sync::atomic::AtomicBool::new(false),
             child_exit_status: 0,
             last_match: String::new(),
@@ -1869,6 +1884,9 @@ impl VMHelper {
             test_pass_count: std::sync::atomic::AtomicUsize::new(0),
             test_fail_count: std::sync::atomic::AtomicUsize::new(0),
             test_skip_count: std::sync::atomic::AtomicUsize::new(0),
+            test_pass_total: std::sync::atomic::AtomicUsize::new(0),
+            test_fail_total: std::sync::atomic::AtomicUsize::new(0),
+            test_skip_total: std::sync::atomic::AtomicUsize::new(0),
             test_run_failed: std::sync::atomic::AtomicBool::new(false),
             child_exit_status: self.child_exit_status,
             last_match: self.last_match.clone(),

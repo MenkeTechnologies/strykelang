@@ -3359,6 +3359,10 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "assert_near" | "anear" => "`assert_near` (alias `anear`) — assert that two floats are approximately equal within an epsilon tolerance (default 1e-9). Essential for floating-point comparisons.\n\n```perl\nassert_near 0.1 + 0.2, 0.3, 1e-10, \"float add\"\nanear $pi, 3.14159, 1e-5\n```",
         "assert_dies" | "adies" => "`assert_dies` (alias `adies`) — assert that a block throws an error. Passes if the block dies, fails if it returns normally.\n\n```perl\nassert_dies { die \"boom\" } \"should throw\"\nadies { 1 / 0 }\n```",
         "test_run" | "run_tests" => "`test_run` (alias `run_tests`) — print a test summary with pass/fail counts and exit with code 1 if any test failed. Call at the end of a test file to report results.\n\n```perl\n# ... assertions above ...\ntest_run   # prints summary, exits 1 on failure\n```",
+        "test" => "`test(FILE_OR_DIR, ...)` — run every `test_*.stk` / `t_*.stk` under each path through the **worker pool**. Same engine as `s t` on the CLI: pre-forks N persistent stryke `--test-worker` processes, dispatches paths via JSON over stdin/stdout, each worker `fork()`s a grandchild per test for full isolation, no per-test dyld cost. Returns the exit code (0 on all-pass, 1 on any failure). Optional trailing hashref selects mode: `{ fork => 1 }` for the legacy `posix_spawn`-per-test path, `{ inproc => 1 }` for single-process VM-per-test (fastest, hermetic only), `{ quiet => 1 }`, `{ no_interop => 1 }`.\n\n```perl\ntest(\"t/\")                                # default: worker pool\ntest([\"t/\", \"examples/\"], { quiet => 1 })\ntest(\"t/test_foo.stk\", { fork => 1 })     # opt back into per-test fork\nmy $rc = test(@dirs)                      # array flattens; rc = 0/1\n```",
+        "test_no_interop" | "test_ni" => "`test_no_interop(FILE_OR_DIR, ...)` (alias `test_ni`) — same as `test`, but pins each worker thread's TLS no-interop flag for the duration of the test (`set_no_interop_mode_tls`). Sibling `pmaps` workers don't race on a shared atomic. Forwards `--no-interop` to every spawned grandchild so each test runs under stryke's bot-firewall mode (rejects Perl-isms, forces stryke idioms).\n\n```perl\ntest_no_interop(\"t/\")\ntest_ni([\"t/a\", \"t/b\"], { quiet => 1 })\n```",
+        "check" => "`check(FILE, ...)` — in-process equivalent of `stryke check FILE...`. Parses, compiles, and lints each path without executing it. Returns the exit code (0 on success, 1 on errors). Optional trailing hashref: `{ quiet => 1 }`, `{ json => 1 }`, `{ no_interop => 1 }`.\n\nFaster than `system \"stryke check $f\"` because it skips the binary fork and reuses the parent process's parser/compiler. The lint pass is **not** a strict-vars enforcer — undefined-variable errors only fire on files that themselves do `use strict;`.\n\n```perl\nmy $rc = check(\"foo.stk\")                    # 0 = ok, 1 = errors\ncheck(\\@files, { quiet => 1 })               # arrayref + opts\nfor my $f (glob(\"src/*.stk\")) { check($f) or warn \"$f failed\" }\n```",
+        "check_no_interop" | "check_ni" => "`check_no_interop(FILE, ...)` (alias `check_ni`) — same as `check`, but pins **this thread** to `--no-interop` for the duration of the check via an RAII guard on the per-thread no-interop flag. Sibling threads are unaffected, so the builtin is safe to call from `pmaps` workers in parallel — no global-atomic race.\n\n```perl\ncheck_no_interop(\"foo.stk\")                  # rejects sub/say/$a/$b\npmaps { check_ni(_, { quiet => 1 }) } @files # parallel-safe, no race\n```",
 
         // ── AOP (aspect-oriented advice on user subs) ──
         "before" => "`before \"<glob>\" { ... }` — register advice that runs *before* every call to a sub whose name matches the glob pattern. Inside the body, `$INTERCEPT_NAME` holds the called sub's name and `@INTERCEPT_ARGS` holds the args.\n\nThe leading keyword only commits to advice parsing when followed by a string literal, so `before(...)` as a normal sub call still parses normally. Multiple `before` advices on the same name all fire in registration order. The advice cannot suppress the call (use `around` for that) and its return value is discarded.\n\n```perl\nbefore \"fetch\" { warn \"calling fetch with @INTERCEPT_ARGS\" }\nbefore \"log_*\" { $log_count++ }     # glob: any sub starting with log_\nbefore \"*\"      { trace($INTERCEPT_NAME) }   # every sub call\n```\n\nBodies are lowered to bytecode and dispatched through the VM (`run_block_region`), so `our $x` and other compile-time name resolutions work the same inside advice as outside it. The body's final statement must be an expression (same constraint as `map { }` block lowering); a literal `for`/`while`/`if` block or a literal `return` will be rejected at firing time.",
@@ -5504,6 +5508,15 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
             "assert_near",
             "assert_dies",
             "test_run",
+        ],
+    ),
+    (
+        "Test Runner (worker pool)",
+        &[
+            "test",
+            "test_no_interop",
+            "check",
+            "check_no_interop",
         ],
     ),
     (

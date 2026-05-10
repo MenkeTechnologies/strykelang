@@ -72,9 +72,7 @@ fn group_by_fn_first_grapheme_co() {
 #[test]
 fn partition_block_first_letter_co() {
     assert_eq!(
-        eval_string(
-            r#"stringify(partition { substr($_, 0, 1) eq "a" } qw(apple banana apricot))"#,
-        ),
+        eval_string(r#"stringify(partition { substr($_, 0, 1) eq "a" } qw(apple banana apricot))"#,),
         r#"(["apple", "apricot"], ["banana"])"#,
     );
 }
@@ -97,18 +95,12 @@ fn kurtosis_four_values_co() {
 
 #[test]
 fn rms_three_four_co() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.6g", rms([3, 4]))"#),
-        "3.53553"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.6g", rms([3, 4]))"#), "3.53553");
 }
 
 #[test]
 fn mean_arith_three_co() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.6g", mean([2, 4, 6]))"#),
-        "4"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.6g", mean([2, 4, 6]))"#), "4");
 }
 
 #[test]
@@ -129,7 +121,10 @@ fn weighted_mean_pair_co() {
 
 #[test]
 fn multinomial_coeff_5_2_3_co() {
-    assert_eq!(eval_string(r#"sprintf("%.0f", multinomial(5, 2, 3))"#), "10");
+    assert_eq!(
+        eval_string(r#"sprintf("%.0f", multinomial(5, 2, 3))"#),
+        "10"
+    );
 }
 
 #[test]
@@ -139,34 +134,22 @@ fn binomial_10_choose_3_co() {
 
 #[test]
 fn lgamma_five_co() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.6g", lgamma(5.0))"#),
-        "3.17805"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.6g", lgamma(5.0))"#), "3.17805");
 }
 
 #[test]
 fn tgamma_five_co() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.6g", tgamma(5.0))"#),
-        "24"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.6g", tgamma(5.0))"#), "24");
 }
 
 #[test]
 fn erf_one_co() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.6g", erf(1.0))"#),
-        "0.842701"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.6g", erf(1.0))"#), "0.842701");
 }
 
 #[test]
 fn erfc_one_co() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.6g", erfc(1.0))"#),
-        "0.157299"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.6g", erfc(1.0))"#), "0.157299");
 }
 
 #[test]
@@ -235,10 +218,7 @@ fn take_n_and_drop_n_co() {
 
 #[test]
 fn take_variadic_list_count_last_co() {
-    assert_eq!(
-        eval_string(r#"stringify(take(1, 2, 3, 4, 2))"#),
-        "(1, 2)"
-    );
+    assert_eq!(eval_string(r#"stringify(take(1, 2, 3, 4, 2))"#), "(1, 2)");
 }
 
 #[test]
@@ -277,10 +257,7 @@ fn intersperse_val_inserts_sep_co() {
 
 #[test]
 fn minmax_three_co() {
-    assert_eq!(
-        eval_string(r#"stringify(minmax([3, 1, 4]))"#),
-        "(1, 4)"
-    );
+    assert_eq!(eval_string(r#"stringify(minmax([3, 1, 4]))"#), "(1, 4)");
 }
 
 #[test]
@@ -293,10 +270,7 @@ fn zscore_above_mean_co() {
 
 #[test]
 fn rank_dense_rank_orders_co() {
-    assert_eq!(
-        eval_string(r#"stringify(rank([30, 10, 20]))"#),
-        "(3, 1, 2)"
-    );
+    assert_eq!(eval_string(r#"stringify(rank([30, 10, 20]))"#), "(3, 1, 2)");
     assert_eq!(
         eval_string(r#"stringify(dense_rank([30, 10, 20, 10]))"#),
         "(3, 1, 2, 1)"
@@ -337,18 +311,12 @@ fn outer_product_two_vectors_co() {
 
 #[test]
 fn clamp_value_to_bounds_co() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.6g", clamp(0, 5, 10))"#),
-        "5"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.6g", clamp(0, 5, 10))"#), "5");
 }
 
 #[test]
 fn hypot_three_four_co() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.6g", hypot(3, 4))"#),
-        "5"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.6g", hypot(3, 4))"#), "5");
 }
 
 #[test]
@@ -365,10 +333,7 @@ fn sign_and_copysign_co() {
 
 #[test]
 fn base64_roundtrip_ascii_co() {
-    assert_eq!(
-        eval_string(r#"base64_decode(base64_encode("hi"))"#),
-        "hi"
-    );
+    assert_eq!(eval_string(r#"base64_decode(base64_encode("hi"))"#), "hi");
 }
 
 #[test]

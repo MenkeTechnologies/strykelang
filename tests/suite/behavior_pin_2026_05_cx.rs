@@ -182,14 +182,8 @@ fn digits_digital_root_count_digits_cx() {
         eval_string(r#"stringify(digits_of(12345))"#),
         "(1, 2, 3, 4, 5)"
     );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", digital_root(999))"#),
-        "9"
-    );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", count_digits(999))"#),
-        "3"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", digital_root(999))"#), "9");
+    assert_eq!(eval_string(r#"sprintf("%.10g", count_digits(999))"#), "3");
 }
 
 #[test]
@@ -202,36 +196,18 @@ fn rotate_left_two_bracket_list_cx() {
 
 #[test]
 fn nth_prime_is_prime_fib_factorial_cx() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", nth_prime(10))"#),
-        "29"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", nth_prime(10))"#), "29");
     assert_eq!(eval_string(r#"sprintf("%.10g", is_prime(29))"#), "1");
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", fib(10))"#),
-        "55"
-    );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", factorial(6))"#),
-        "720"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", fib(10))"#), "55");
+    assert_eq!(eval_string(r#"sprintf("%.10g", factorial(6))"#), "720");
 }
 
 #[test]
 fn popcount_hamming_weight_gray_family_cx() {
     assert_eq!(eval_string(r#"sprintf("%.10g", popcount(7))"#), "3");
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", hamming_weight(15))"#),
-        "4"
-    );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", binary_to_gray(3))"#),
-        "2"
-    );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", gray_to_binary(2))"#),
-        "3"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", hamming_weight(15))"#), "4");
+    assert_eq!(eval_string(r#"sprintf("%.10g", binary_to_gray(3))"#), "2");
+    assert_eq!(eval_string(r#"sprintf("%.10g", gray_to_binary(2))"#), "3");
     assert_eq!(
         eval_string(r#"stringify(gray_code_sequence(3))"#),
         "(0, 1, 3, 2, 6, 7, 5, 4)"
@@ -240,18 +216,12 @@ fn popcount_hamming_weight_gray_family_cx() {
 
 #[test]
 fn clamp_min_max_value_order_cx() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", clamp(0, 5, 10))"#),
-        "5"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", clamp(0, 5, 10))"#), "5");
 }
 
 #[test]
 fn lerp_and_inverse_lerp_cx() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", lerp(0, 10, 0.25))"#),
-        "2.5"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", lerp(0, 10, 0.25))"#), "2.5");
     assert_eq!(
         eval_string(r#"sprintf("%.10g", inverse_lerp(2, 10, 6))"#),
         "0.5"
@@ -284,18 +254,9 @@ fn quartiles_and_iqr_cx() {
 
 #[test]
 fn euler_totient_sum_divisors_mobius_cx() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", euler_totient(10))"#),
-        "4"
-    );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", sum_divisors(12))"#),
-        "16"
-    );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", mobius(30))"#),
-        "-1"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", euler_totient(10))"#), "4");
+    assert_eq!(eval_string(r#"sprintf("%.10g", sum_divisors(12))"#), "16");
+    assert_eq!(eval_string(r#"sprintf("%.10g", mobius(30))"#), "-1");
 }
 
 #[test]
@@ -308,10 +269,7 @@ fn elem_indices_value_cx() {
 
 #[test]
 fn collatz_length_five_cx() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", collatz_length(5))"#),
-        "5"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", collatz_length(5))"#), "5");
 }
 
 #[test]
@@ -321,22 +279,13 @@ fn is_perfect_six_cx() {
 
 #[test]
 fn bell_number_four_stirling2_five_two_cx() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", bell_number(4))"#),
-        "15"
-    );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", stirling2(5, 2))"#),
-        "15"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", bell_number(4))"#), "15");
+    assert_eq!(eval_string(r#"sprintf("%.10g", stirling2(5, 2))"#), "15");
 }
 
 #[test]
 fn binomial_ten_three_cx() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", binomial(10, 3))"#),
-        "120"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", binomial(10, 3))"#), "120");
 }
 
 #[test]
@@ -349,10 +298,7 @@ fn merge_sorted_two_lists_cx() {
 
 #[test]
 fn base_convert_decimal_string_to_hex_cx() {
-    assert_eq!(
-        eval_string(r##"base_convert("255", 10, 16)"##),
-        "ff"
-    );
+    assert_eq!(eval_string(r##"base_convert("255", 10, 16)"##), "ff");
 }
 
 /// Missing explicit **`from=10`**, the digit string is parsed as **`from`** (**16**): **`"255"`** → **597** (**BUG-176**).
@@ -375,9 +321,7 @@ fn from_digits_decimal_assembly_cx() {
 #[test]
 fn polygon_area_triangle_simplices_cx() {
     assert_eq!(
-        eval_string(
-            r#"sprintf("%.10g", polygon_area([[0, 0], [2, 0], [2, 3]]))"#,
-        ),
+        eval_string(r#"sprintf("%.10g", polygon_area([[0, 0], [2, 0], [2, 3]]))"#,),
         "3"
     );
 }
@@ -408,10 +352,7 @@ fn cumsum_and_cumprod_cx() {
 
 #[test]
 fn mean_and_median_cx() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", mean([2, 4, 6]))"#),
-        "4"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", mean([2, 4, 6]))"#), "4");
     assert_eq!(
         eval_string(r#"sprintf("%.10g", median([1, 2, 3, 4]))"#),
         "2.5"
@@ -420,16 +361,7 @@ fn mean_and_median_cx() {
 
 #[test]
 fn signum_copysign_hypot_cx() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", signum(-3))"#),
-        "-1"
-    );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", copysign(1, -5))"#),
-        "-1"
-    );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", hypot(3, 4))"#),
-        "5"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", signum(-3))"#), "-1");
+    assert_eq!(eval_string(r#"sprintf("%.10g", copysign(1, -5))"#), "-1");
+    assert_eq!(eval_string(r#"sprintf("%.10g", hypot(3, 4))"#), "5");
 }

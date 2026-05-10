@@ -94,16 +94,17 @@ fn hypergeom_2f1_elliptic_e_k_dilog_dg() {
 #[test]
 fn convex_hull_polygon_triangle_dg() {
     assert_eq!(
-        eval_string(
-            r#"stringify(convex_hull_2d([[0, 0], [1, 0], [0, 1], [0.5, 0.5]]))"#
-        ),
+        eval_string(r#"stringify(convex_hull_2d([[0, 0], [1, 0], [0, 1], [0.5, 0.5]]))"#),
         "((0, 0), (1, 0), (0, 1))"
     );
     assert_eq!(
         eval_string(r#"sprintf("%.10g", polygon_area([[0, 0], [1, 0], [0, 1]]))"#),
         "0.5"
     );
-    assert_eq!(eval_string(r#"sprintf("%.10g", triangle_area_heron(3, 4, 5))"#), "6");
+    assert_eq!(
+        eval_string(r#"sprintf("%.10g", triangle_area_heron(3, 4, 5))"#),
+        "6"
+    );
 }
 
 #[test]
@@ -201,15 +202,11 @@ fn laplace_rayleigh_pdf_dg() {
 #[test]
 fn gmm_em_1d_gaussian_mix_dg() {
     assert_eq!(
-        eval_string(
-            r#"my $g = gmm_em_1d([1, 2, 3, 2, 1], 2, 10); sprintf("%.15g", $g->[0][0])"#
-        ),
+        eval_string(r#"my $g = gmm_em_1d([1, 2, 3, 2, 1], 2, 10); sprintf("%.15g", $g->[0][0])"#),
         "0.441638710566797"
     );
     assert_eq!(
-        eval_string(
-            r#"my $g = gmm_em_1d([1, 2, 3, 2, 1], 2, 10); sprintf("%.15g", $g->[1][0])"#
-        ),
+        eval_string(r#"my $g = gmm_em_1d([1, 2, 3, 2, 1], 2, 10); sprintf("%.15g", $g->[1][0])"#),
         "1.15525790328457"
     );
 }
@@ -307,9 +304,7 @@ fn vector_distances_mahalanobis_row_dg() {
         "0.6761904762"
     );
     assert_eq!(
-        eval_string(
-            r#"sprintf("%.10g", mahalanobis([[2, 3]], [0, 0], [[1, 0], [0, 1]]))"#
-        ),
+        eval_string(r#"sprintf("%.10g", mahalanobis([[2, 3]], [0, 0], [[1, 0], [0, 1]]))"#),
         "3.605551275"
     );
 }

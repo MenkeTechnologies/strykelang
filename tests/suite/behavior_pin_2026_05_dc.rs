@@ -44,18 +44,12 @@ fn modinv_crt_dc() {
         eval_string(r#"sprintf("%.10g", chinese_remainder([2, 3], [3, 5]))"#),
         "8"
     );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", crt([2, 3], [3, 5]))"#),
-        "8"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", crt([2, 3], [3, 5]))"#), "8");
 }
 
 #[test]
 fn prime_factors_next_prime_dc() {
-    assert_eq!(
-        eval_string(r#"stringify(prime_factors(12))"#),
-        "(2, 2, 3)"
-    );
+    assert_eq!(eval_string(r#"stringify(prime_factors(12))"#), "(2, 2, 3)");
     assert_eq!(eval_int(r#"next_prime(13)"#), 17);
 }
 
@@ -78,8 +72,14 @@ fn quartiles_iqr_mad_dc() {
         eval_string(r#"stringify(quartiles([1, 2, 3, 4, 5, 6, 7, 8]))"#),
         "(3, 5, 7)"
     );
-    assert_eq!(eval_string(r#"sprintf("%.10g", iqr([1, 2, 3, 4, 5, 6, 7, 100]))"#), "4");
-    assert_eq!(eval_string(r#"sprintf("%.10g", mad([1, 2, 3, 4, 5]))"#), "1");
+    assert_eq!(
+        eval_string(r#"sprintf("%.10g", iqr([1, 2, 3, 4, 5, 6, 7, 100]))"#),
+        "4"
+    );
+    assert_eq!(
+        eval_string(r#"sprintf("%.10g", mad([1, 2, 3, 4, 5]))"#),
+        "1"
+    );
 }
 
 #[test]
@@ -101,9 +101,7 @@ fn kmeans_two_clusters_silhouette_dc() {
         "(0, 1, 0, 1)"
     );
     assert_eq!(
-        eval_string(
-            r#"sprintf("%.10g", silhouette_score([[0, 0], [1, 0], [10, 0]], [0, 0, 1]))"#
-        ),
+        eval_string(r#"sprintf("%.10g", silhouette_score([[0, 0], [1, 0], [10, 0]], [0, 0, 1]))"#),
         "0.8944444444"
     );
 }
@@ -165,7 +163,10 @@ fn freq_wavelength_wavelength_freq_same_numeric_dc() {
 fn hz_to_midi_db_to_amp_huber_loss_dc() {
     assert_eq!(eval_string(r#"sprintf("%.10g", hz_to_midi(440))"#), "69");
     assert_eq!(eval_string(r#"sprintf("%.10g", db_to_amp(20))"#), "10");
-    assert_eq!(eval_string(r#"sprintf("%.10g", huber_loss(0.5, 1))"#), "0.125");
+    assert_eq!(
+        eval_string(r#"sprintf("%.10g", huber_loss(0.5, 1))"#),
+        "0.125"
+    );
 }
 
 #[test]
@@ -202,7 +203,10 @@ fn uuid_v4_len_and_version_token_dc() {
 
 #[test]
 fn parse_float_simple_dc() {
-    assert_eq!(eval_string(r#"sprintf("%.10g", parse_float("3.14"))"#), "3.14");
+    assert_eq!(
+        eval_string(r#"sprintf("%.10g", parse_float("3.14"))"#),
+        "3.14"
+    );
 }
 
 /// Three-scalar **`clamp`** call-shape (**BUG-151**): **`clamp(5, 0, 10)`** is read as **`clamp(min=5, max=0, …)`**, not “clamp **5** into **[0,10]**”.
@@ -263,7 +267,10 @@ fn cbrt_scalar_dc() {
 #[test]
 fn l2_norm_vector_dot_unit_vec_dc() {
     assert_eq!(eval_string(r#"sprintf("%.10g", l2_norm([3, 4]))"#), "5");
-    assert_eq!(eval_string(r#"sprintf("%.10g", vector_dot([1, 2], [3, 4]))"#), "11");
+    assert_eq!(
+        eval_string(r#"sprintf("%.10g", vector_dot([1, 2], [3, 4]))"#),
+        "11"
+    );
     assert_eq!(
         eval_string(r#"stringify(vec_normalize([3, 4]))"#),
         "[0.6, 0.8]"

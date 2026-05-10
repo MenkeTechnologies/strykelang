@@ -48,6 +48,7 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - [\[0x0A\] Examples](#0x0a-examples)
 - [\[0x0B\] Benchmarks](#0x0b-benchmarks)
 - [\[0x0C\] Development & CI](#0x0c-development--ci)
+- [\[0x0C-test\] Test Runner — Worker Pool Architecture](#0x0c-test-test-runner--worker-pool-architecture)
 - [\[0x0D\] Standalone Binaries (`stryke build`)](#0x0d-standalone-binaries-stryke-build)
 - [\[0x0E\] Inline Rust FFI (`rust { ... }`)](#0x0e-inline-rust-ffi-rust-----)
 - [\[0x0F\] Bytecode Cache (rkyv)](#0x0f-bytecode-cache-rkyv)
@@ -82,7 +83,7 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - **Three-tier regex** — Rust [`regex`](https://docs.rs/regex) → [`fancy-regex`](https://docs.rs/fancy-regex) (backrefs) → [`pcre2`](https://docs.rs/pcre2) (PCRE-only verbs).
 - **Bytecode VM + JIT** — match-dispatch interpreter with Cranelift block + linear-sub JIT (`src/vm.rs`, `src/jit.rs`).
 - **Rayon parallelism** — every parallel builtin uses work-stealing across all cores.
-- **8,590 standard library functions** (9,117 callable spellings including aliases) — largest bareword library of any language; clears Wolfram v14.3's estimated count by ~1,800
+- **8,564 standard library functions** (9,176 callable spellings including aliases) — largest bareword library of any language; clears Wolfram v14.3's estimated count by ~1,800
 - **31 MB single static binary** — `~/.cargo/bin/s` ships every builtin in one file, ~3.6 KB amortized per builtin, ~200&times; denser than Wolfram Engine per builtin/byte, sub-10 ms cold start
 
 ---
@@ -1927,6 +1928,66 @@ bash parity/run_parity.sh       # exact stdout/stderr parity vs system perl (20 
 - `Cargo.lock` is committed (CI uses `--locked`). If your global gitignore strips it, force-add updates: `git add -f Cargo.lock`.
 - Disable JIT: `STRYKE_NO_JIT=1` or `stryke --no-jit`.
 - Parity work is tracked in [`PARITY_ROADMAP.md`](parity/PARITY_ROADMAP.md).
+
+---
+
+## [0x0C-test] TEST RUNNER — WORKER POOL ARCHITECTURE
+
+`stryke test t/` (or `s t t/`, or the `test()` builtin) runs every `test_*.stk` / `t_*.stk` file under a directory. The default architecture is a **persistent worker pool with fork-on-receive**, modeled on `cargo-nextest`. Process-per-test isolation, no per-test dyld cost, ~5–7× faster than the legacy `posix_spawn`-per-test path on big corpora.
+
+```sh
+s t t/                                        # default: worker pool
+s t -j 8 t/                                   # 8 worker processes (default = num_cpus)
+s t -q t/                                     # quiet — suppress per-file output
+s t --no-interop t/                           # forward --no-interop to every test
+s t --fork t/                                 # legacy posix_spawn-per-test (slower, fully isolated)
+s t --inproc t/                               # single-process VM-per-test (fastest, hermetic only)
+test("t/")                                    # builtin form, same default
+test("t/", { fork => 1, quiet => 1 })         # builtin opt-out / opts
+test_no_interop("t/")                         # builtin variant, --no-interop pinned per worker thread
+```
+
+**Topology** at peak with `-j 18`: **1 parent + 18 worker processes + up to 18 grandchildren = up to 37 PIDs**, each visible in `ps`. The 18 OS threads in the parent are not workers themselves — they are **pump threads** dedicated to one worker process each, just shuttling JSON over stdin/stdout.
+
+```
+parent runner (1 PID)
+├── 18 OS pump threads (read JSON results, dispatch from shared crossbeam queue)
+├── 18 worker processes (`stryke --test-worker`, persistent, no test code ever runs here)
+│   └── on each request: fork() → grandchild
+│       └── runs test in fresh VMHelper, writes JSON to saved-stdout fd, _exit
+└── result aggregation under `print_lock` (per-block, no line tearing)
+```
+
+**Why three modes:**
+
+| Mode | Per-test cost | Isolation | When to use |
+|---|---|---|---|
+| **`--pool`** (default) | ~1 ms (fork-only) | full (own address space) | normal day-to-day |
+| `--fork` | ~9 ms (`posix_spawn` + dyld + crate static-init) | full | parity / debug |
+| `--inproc` | ~0 ms | shared parent process | hermetic corpora; fastest but tests can corrupt each other |
+
+**Wire protocol** ([`src/cli_runners.rs`](strykelang/cli_runners.rs)) — line-delimited JSON over stdin/stdout pipes:
+
+```
+parent → worker stdin : {"path":"/abs/path/test_foo.stk","no_interop":false,"chdir":"/abs/project_root"}
+worker → parent stdout: {"name":"test_foo.stk","passes":18,"fails":0,"failed":false,"detail":null,"stderr":"…"}
+```
+
+**Per-test fd dance in the grandchild** (so test output never corrupts the wire):
+1. `dup(1)` saves the parent-bound JSON pipe to a private fd.
+2. `dup2(devnull, 1)` — test code's `print` / `say` go to `/dev/null` (would otherwise be parsed by the parent as a malformed JSON response and desync the pool).
+3. `mkstemp("/tmp/stryke-test-XXXXXX")` + `unlink` + `dup2(tmp, 2)` — test stderr (the `✓`/`✗` checkmark lines from `test_run`) is captured to an anonymous tmp file (auto-deleted on `close`).
+4. Run the test in a fresh `VMHelper`; pass/fail counters live on the per-VM `test_pass_total` / `test_fail_total` atomics.
+5. `lseek` + `read` the tmp file into the JSON `stderr` field.
+6. `write` the JSON to the saved stdout fd, `_exit(0)`.
+
+**Counter accumulation:** the `test_run` builtin resets per-block counters after printing (so multiple `test_run` calls in one file work), so embedders read **`test_pass_total` + `test_pass_count`** — totals roll up before the reset; the residual `_count` is anything that never reached a `test_run`. Both live on the per-VM `VMHelper`.
+
+**`$0`:** in fork mode the OS sets `argv[0]` to the test path; in pool mode the runner sets `interp.program_name = file_str` so tests like `slurp($0)` (used by `test_narcissist.stk`) keep working.
+
+**Multi-root invocations** (`s t a/t b/t c.stk`): the runner groups tests by `project_root` (parent of `t/`), `chdir`s once per group, runs each group's tests in parallel, then moves to the next group. This keeps `require "./lib/Foo.stk"` working while staying parallel within a single project.
+
+**Stragglers:** `stryke test` uses a shared work-stealing queue, so workers naturally rebalance — no static partitioning. The wall-clock floor is the longest-running single test in the slowest worker's tail. Alphabetic ordering tends to put heavy tests late in the queue, so the visible "slowdown at the end" is just the queue draining unevenly. Shortest-job-first ordering would smooth this out but needs a per-test profile pass first.
 
 ---
 

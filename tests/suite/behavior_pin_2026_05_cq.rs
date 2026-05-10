@@ -7,10 +7,7 @@ use crate::common::*;
 
 #[test]
 fn qw_three_words_cq() {
-    assert_eq!(
-        eval_string(r#"stringify(qw(x y z))"#),
-        r#"("x", "y", "z")"#
-    );
+    assert_eq!(eval_string(r#"stringify(qw(x y z))"#), r#"("x", "y", "z")"#);
 }
 
 #[test]
@@ -31,26 +28,17 @@ fn fileparse_tmp_foo_txt_cq() {
 
 #[test]
 fn abs_float_cq() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", abs(-3.5))"#),
-        "3.5"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", abs(-3.5))"#), "3.5");
 }
 
 #[test]
 fn cbrt_twenty_seven_cq() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", cbrt(27))"#),
-        "3"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", cbrt(27))"#), "3");
 }
 
 #[test]
 fn hypot_two_args_pythagoras_cq() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", hypot(3, 4))"#),
-        "5"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", hypot(3, 4))"#), "5");
 }
 
 #[test]
@@ -63,18 +51,12 @@ fn hypot_extra_arg_ignored_cq() {
 
 #[test]
 fn bessel_j0_at_zero_cq() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", j0(0))"#),
-        "1.000000003"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", j0(0))"#), "1.000000003");
 }
 
 #[test]
 fn bessel_j1_at_one_cq() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", j1(1))"#),
-        "0.4400505857"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", j1(1))"#), "0.4400505857");
 }
 
 #[test]
@@ -100,18 +82,12 @@ fn acronym_phrase_cq() {
 
 #[test]
 fn initials_name_cq() {
-    assert_eq!(
-        eval_string(r#"initials("John F. Kennedy")"#),
-        "J.F.K."
-    );
+    assert_eq!(eval_string(r#"initials("John F. Kennedy")"#), "J.F.K.");
 }
 
 #[test]
 fn chars_graphemes_greek_cq() {
-    assert_eq!(
-        eval_string(r#"stringify(chars("αβ"))"#),
-        r#"("α", "β")"#
-    );
+    assert_eq!(eval_string(r#"stringify(chars("αβ"))"#), r#"("α", "β")"#);
 }
 
 #[test]
@@ -133,9 +109,7 @@ fn running_variance_prefix_cq() {
 #[test]
 fn running_reduce_implicit_slot_add_cq() {
     assert_eq!(
-        eval_string(
-            r#"stringify(running_reduce(sub { $_0 + $_1 }, [1, 2, 3, 4]))"#,
-        ),
+        eval_string(r#"stringify(running_reduce(sub { $_0 + $_1 }, [1, 2, 3, 4]))"#,),
         "(1, 3, 6, 10)"
     );
 }
@@ -143,9 +117,7 @@ fn running_reduce_implicit_slot_add_cq() {
 #[test]
 fn running_reduce_dollar_ab_zeros_after_first_bug_cq() {
     assert_eq!(
-        eval_string(
-            r#"stringify(running_reduce(sub { $a + $b }, [1, 2, 3, 4]))"#,
-        ),
+        eval_string(r#"stringify(running_reduce(sub { $a + $b }, [1, 2, 3, 4]))"#,),
         "(1, 0, 0, 0)"
     );
 }
@@ -177,9 +149,7 @@ fn unzip_alternating_pairs_cq() {
 #[test]
 fn partition_by_int_div_key_cq() {
     assert_eq!(
-        eval_string(
-            r#"stringify(partition_by(sub { int($_ / 2) }, [1, 2, 3, 4, 5, 6]))"#,
-        ),
+        eval_string(r#"stringify(partition_by(sub { int($_ / 2) }, [1, 2, 3, 4, 5, 6]))"#,),
         "([1], [2, 3], [4, 5], [6])"
     );
 }
@@ -262,22 +232,13 @@ fn clamp_list_per_element_cq() {
 
 #[test]
 fn acosh_one_cq() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", acosh(1))"#),
-        "0"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", acosh(1))"#), "0");
 }
 
 #[test]
 fn inverse_hyperbolic_at_zero_cq() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", asinh(0))"#),
-        "0"
-    );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", atanh(0))"#),
-        "0"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", asinh(0))"#), "0");
+    assert_eq!(eval_string(r#"sprintf("%.10g", atanh(0))"#), "0");
 }
 
 #[test]
@@ -376,26 +337,17 @@ fn bell_number_fourth_cq() {
 
 #[test]
 fn sinc_at_zero_cq() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", sinc(0))"#),
-        "1"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", sinc(0))"#), "1");
 }
 
 #[test]
 fn repeat_elem_triple_cq() {
-    assert_eq!(
-        eval_string(r#"stringify(repeat_elem(7, 3))"#),
-        "(7, 7, 7)"
-    );
+    assert_eq!(eval_string(r#"stringify(repeat_elem(7, 3))"#), "(7, 7, 7)");
 }
 
 #[test]
 fn sum_product_mean_list_cq() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", sum_list([1, 2, 3]))"#),
-        "6"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", sum_list([1, 2, 3]))"#), "6");
     assert_eq!(
         eval_string(r#"sprintf("%.10g", product_list([2, 3, 4]))"#),
         "24"

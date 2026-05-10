@@ -79,7 +79,10 @@ fn coalesce_skips_undef_cn() {
 
 #[test]
 fn parse_int_hex_with_radix_cn() {
-    assert_eq!(eval_string(r#"sprintf("%.0f", parse_int("ff", 16))"#), "255");
+    assert_eq!(
+        eval_string(r#"sprintf("%.0f", parse_int("ff", 16))"#),
+        "255"
+    );
 }
 
 #[test]
@@ -97,10 +100,7 @@ fn unpack_pack_unsigned_short_roundtrip_cn() {
 
 #[test]
 fn replace_regex_global_digits_cn() {
-    assert_eq!(
-        eval_string(r#"replace_regex("\\d", "X", "a1b2")"#),
-        "aXbX"
-    );
+    assert_eq!(eval_string(r#"replace_regex("\\d", "X", "a1b2")"#), "aXbX");
 }
 
 #[test]
@@ -276,10 +276,7 @@ fn similarity_abc_abd_cn() {
 
 #[test]
 fn common_prefix_ab_cn() {
-    assert_eq!(
-        eval_string(r#"common_prefix("abcdef", "abxy")"#),
-        "ab"
-    );
+    assert_eq!(eval_string(r#"common_prefix("abcdef", "abxy")"#), "ab");
 }
 
 #[test]
@@ -300,10 +297,7 @@ fn dedent_strips_common_leading_spaces_cn() {
 
 #[test]
 fn normalize_spaces_collapses_cn() {
-    assert_eq!(
-        eval_string(r#"normalize_spaces("  a   b  ")"#),
-        "a b"
-    );
+    assert_eq!(eval_string(r#"normalize_spaces("  a   b  ")"#), "a b");
 }
 
 #[test]
@@ -326,10 +320,7 @@ fn is_pangram_classic_cn() {
 
 #[test]
 fn median_odd_length_cn() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", median([1, 3, 10]))"#),
-        "3"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", median([1, 3, 10]))"#), "3");
 }
 
 #[test]

@@ -63,6 +63,7 @@ $~
 %c
 %d
 %e
+%k
 %limits
 %main::ENV
 %main::INC
@@ -74,6 +75,7 @@ $~
 %main::c
 %main::d
 %main::e
+%main::k
 %main::limits
 %main::p
 %main::parameters
@@ -91,6 +93,7 @@ $~
 %stryke::categories
 %stryke::descriptions
 %stryke::extensions
+%stryke::keywords
 %stryke::perl_compats
 %stryke::primaries
 %term
@@ -1334,6 +1337,9 @@ CORE::chebyshev_t
 CORE::chebyshev_u
 CORE::chebyt
 CORE::chebyu
+CORE::check
+CORE::check_ni
+CORE::check_no_interop
 CORE::chern_first_2d
 CORE::chern_pontryagin_4d_step
 CORE::chern_simons_action
@@ -8326,6 +8332,9 @@ CORE::tensor_symmetrize_two
 CORE::tensor_trace_index
 CORE::term_life_a_n_t
 CORE::terminal_velocity
+CORE::test
+CORE::test_ni
+CORE::test_no_interop
 CORE::test_run
 CORE::test_skip
 CORE::tetrahedral_number
@@ -9246,6 +9255,12 @@ DESTROY
 END
 INIT
 UNITCHECK
+__DATA__
+__END__
+__FILE__
+__LINE__
+__PACKAGE__
+__SUB__
 a0
 a12
 a256
@@ -9351,6 +9366,7 @@ af
 afalse
 affine_encrypt
 african_monsoon_index
+after
 after_n
 age_at_date
 age_at_z
@@ -9595,6 +9611,7 @@ arma_model_innovation
 arma_order_select
 arma_yw_fit
 armstrong_q
+around
 array_agg
 array_difference
 array_intersection
@@ -9697,6 +9714,7 @@ avogadro_constant
 avogadro_count
 avogadro_number
 avogadros_number
+await
 axis_angle_to_quat
 b2b
 b2gray
@@ -9790,6 +9808,7 @@ beat_frequency
 beat_to_seconds
 beaufort
 beer_lambert
+before
 before_n
 bekenstein_entropy_step
 bell_inequality_chsh
@@ -10349,6 +10368,7 @@ cast5_encrypt
 cat
 catalan
 catalan_constant
+catch
 categorical_cross_entropy
 categorical_sample
 catmull_rom_eval
@@ -10454,6 +10474,9 @@ chebyshev_t
 chebyshev_u
 chebyt
 chebyu
+check
+check_ni
+check_no_interop
 chern_first_2d
 chern_pontryagin_4d_step
 chern_simons_action
@@ -10573,6 +10596,7 @@ cmap
 cmb_temperature
 cmb_temperature_at_z
 cmd_exists
+cmp
 cmp_num
 cmp_str
 cmpr
@@ -10712,6 +10736,7 @@ contains_any
 contains_elem
 contcomp
 content_negotiate
+continue
 continued_fraction
 continued_fraction_sqrt
 continuous_compound
@@ -11136,8 +11161,10 @@ deep_clone
 deep_equal
 deep_merge
 deep_q_target
+default
 default_to
 defaultdict
+defer
 deferred_acceptance
 deferred_acceptance_step
 deficient_numbers
@@ -11693,6 +11720,7 @@ eps
 epsilon
 epsilon0
 epsilon_extinction
+eq
 eqidx
 eqrng
 equal_range
@@ -11797,6 +11825,7 @@ exppdf
 expt
 expval
 extended_euclid
+extends
 exterior_derivative_one_form
 extip
 extract_between
@@ -11909,6 +11938,7 @@ filter_ts
 filterfalse
 filtfilt_pad
 final
+finally
 find
 findInterval
 find_all
@@ -12193,6 +12223,7 @@ gcd
 gconst
 gd_min
 gdiff
+ge
 gegenbauer_c
 gelu
 gen
@@ -12563,6 +12594,7 @@ gruns
 gshow
 gss
 gst
+gt
 gtags
 gullstrand_painleve_step
 gumbel_cdf
@@ -12980,6 +13012,7 @@ imei_check
 imex_euler_step
 imex_theta_split
 impedance_rlc
+impl
 implicit_euler
 impulse
 impulse_response_n
@@ -13684,6 +13717,7 @@ lcsub
 ld_d
 ld_r_squared
 ldec
+le
 le_chatelier_dir
 leading_zeros
 leaky_relu
@@ -13925,6 +13959,7 @@ lsp_words
 lst_to_solar
 lstat
 lstsq
+lt
 lts
 lu_decompose
 lucas
@@ -13957,6 +13992,7 @@ lzw
 lzw_decode
 lzw_encode
 lzw_step_dict
+m
 m5
 m_to_feet
 m_to_miles
@@ -14608,6 +14644,7 @@ ncol
 ncurl
 ndiv
 ndivs
+ne
 ne_from_variance
 nearest_insertion_step
 nearest_neighbor_tour_step
@@ -15718,6 +15755,7 @@ print
 printf
 prisoners_dilemma_payoff
 prisoners_repeated_eq
+priv
 prm_node_connect
 probability_density
 probit_log_likelihood
@@ -15778,6 +15816,7 @@ pty_read
 pty_send
 pty_spawn
 pty_strip_ansi
+pub
 pubip
 public_goods_game_payoff
 pulse_pressure
@@ -15921,6 +15960,7 @@ quoted_printable_encode
 quotemeta
 qw
 qweibull
+qx
 r0_basic
 r2d
 r72
@@ -16391,6 +16431,7 @@ rydberg_energy
 rydberg_lambda
 ryu_takayanagi_step
 rz_gate
+s
 s1
 s224
 s256
@@ -17461,6 +17502,9 @@ tensor_symmetrize_two
 tensor_trace_index
 term_life_a_n_t
 terminal_velocity
+test
+test_ni
+test_no_interop
 test_run
 test_skip
 tetrahedral_number
@@ -17608,6 +17652,7 @@ tov_mass_limit
 tower_of_hanoi
 tpdf
 tplanck
+tr
 tr_mat
 trace
 trace_distance
@@ -17689,6 +17734,7 @@ trust_game_repayment
 truth_table
 truthful_mechanism_check
 truthy_count
+try
 try_fn
 try_fold
 ts_filter
@@ -18240,6 +18286,7 @@ wwrap
 www_auth_parse
 wyhash_mix
 wynn_epsilon
+x
 x25519_dh
 x25519_field_mul
 x25519_keygen
@@ -18264,6 +18311,7 @@ xmlforest
 xnpv
 xo
 xopen
+xor
 xor_bool
 xor_break_singlebyte
 xor_brute_keylen
@@ -18291,6 +18339,7 @@ xyz_to_lab
 xyz_to_rgb
 xz
 xz_decode
+y
 yamanouchi_word_count
 yaml_decode
 yaml_encode

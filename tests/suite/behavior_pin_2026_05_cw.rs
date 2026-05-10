@@ -249,9 +249,7 @@ fn mutual_information_joint_matrix_cw() {
 #[test]
 fn cross_entropy_arr_non_standard_formula_cw() {
     assert_eq!(
-        eval_string(
-            r#"sprintf("%.10g", cross_entropy_arr([0, 1, 0], [0.7, 0.2, 0.1]))"#,
-        ),
+        eval_string(r#"sprintf("%.10g", cross_entropy_arr([0, 1, 0], [0.7, 0.2, 0.1]))"#,),
         "1.609437912"
     );
 }
@@ -277,18 +275,9 @@ fn relu_sigmoid_softplus_gelu_swish_elu_cw() {
         eval_string(r#"sprintf("%.10g", softplus(1))"#),
         "1.313261688"
     );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", gelu(1))"#),
-        "0.9135418956"
-    );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", swish(1))"#),
-        "0.7310585786"
-    );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", elu(-1))"#),
-        "-0.6321205588"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", gelu(1))"#), "0.9135418956");
+    assert_eq!(eval_string(r#"sprintf("%.10g", swish(1))"#), "0.7310585786");
+    assert_eq!(eval_string(r#"sprintf("%.10g", elu(-1))"#), "-0.6321205588");
 }
 
 #[test]
@@ -322,9 +311,7 @@ fn cohen_kappa_brier_score_cw() {
 #[test]
 fn roc_auc_sklearn_style_example_cw() {
     assert_eq!(
-        eval_string(
-            r#"sprintf("%.10g", roc_auc([0.1, 0.4, 0.35, 0.8], [0, 0, 1, 1]))"#,
-        ),
+        eval_string(r#"sprintf("%.10g", roc_auc([0.1, 0.4, 0.35, 0.8], [0, 0, 1, 1]))"#,),
         "0.75"
     );
 }
@@ -343,7 +330,10 @@ fn gini_impurity_and_gini_coefficient_cw() {
         eval_string(r#"sprintf("%.10g", gini_impurity([10, 10]))"#),
         "0.5"
     );
-    assert_eq!(eval_string(r#"sprintf("%.10g", gini([1, 2, 3]))"#), "0.2222222222");
+    assert_eq!(
+        eval_string(r#"sprintf("%.10g", gini([1, 2, 3]))"#),
+        "0.2222222222"
+    );
 }
 
 #[test]
@@ -372,10 +362,7 @@ fn cummax_cummin_and_diff_cw() {
 
 #[test]
 fn one_hot_middle_class_cw() {
-    assert_eq!(
-        eval_string(r#"stringify(one_hot(1, 4))"#),
-        "(0, 1, 0, 0)"
-    );
+    assert_eq!(eval_string(r#"stringify(one_hot(1, 4))"#), "(0, 1, 0, 0)");
 }
 
 #[test]
@@ -422,5 +409,8 @@ fn mode_variadic_vs_single_arrayref_bug_cw() {
 
 #[test]
 fn mode_val_arrayref_finds_modal_cw() {
-    assert_eq!(eval_string(r#"sprintf("%.10g", mode_val([1, 2, 2, 3]))"#), "2");
+    assert_eq!(
+        eval_string(r#"sprintf("%.10g", mode_val([1, 2, 2, 3]))"#),
+        "2"
+    );
 }
