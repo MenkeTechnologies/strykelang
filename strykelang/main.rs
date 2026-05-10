@@ -1109,6 +1109,15 @@ fn main() {
 
     let args = expand_perl_bundled_argv(std::env::args().collect());
 
+    // `stryke --test-worker` — pool-worker mode: read test paths from
+    // stdin, fork per request, run test in-process in the child, write
+    // JSON result to stdout, child `_exit`s. The worker process stays
+    // hot across thousands of tests; only the forked grandchildren
+    // execute test bytecode.
+    if args.len() == 2 && args[1] == "--test-worker" {
+        process::exit(stryke::cli_runners::run_test_worker_loop());
+    }
+
     if args.len() == 2 && args[1] == "--remote-worker" {
         // Persistent v3 session loop: HELLO → SESSION_INIT → many JOBs → SHUTDOWN.
         // The basic v1 one-shot loop is still reachable via `--remote-worker-v1` for the
@@ -1406,205 +1415,73 @@ fn main() {
     if is_test_subcmd {
         let subcmd_idx = first_positional_idx.unwrap();
         let after_subcmd = subcmd_idx + 1;
-        let targets: Vec<String> = if after_subcmd < args.len() {
-            // Multiple targets supported; skip non-existent paths silently
+        // Strip flag-like words from positional targets — they can appear
+        // before or after the `test` keyword and aren't paths.
+        let raw_targets: Vec<String> = if after_subcmd < args.len() {
             args[after_subcmd..]
                 .iter()
-                .filter(|t| std::path::Path::new(t).exists())
+                .filter(|a| {
+                    let s = a.as_str();
+                    s != "--no-interop"
+                        && s != "--quiet"
+                        && s != "-q"
+                        && s != "--fork"
+                        && s != "--inproc"
+                        && s != "--pool"
+                })
                 .cloned()
                 .collect()
         } else {
-            // Search for t/ directory
-            if std::path::Path::new("t").is_dir() {
-                vec!["t".to_string()]
-            } else if std::path::Path::new("tests").is_dir() {
-                vec!["tests".to_string()]
-            } else {
-                eprintln!("stryke test: no t/ or tests/ directory found");
-                process::exit(1);
-            }
+            Vec::new()
         };
-        if targets.is_empty() {
-            eprintln!("stryke test: no valid paths found");
-            process::exit(1);
+        let j_threads = args
+            .iter()
+            .position(|a| a == "-j")
+            .and_then(|i| args.get(i + 1).cloned());
+        let no_interop = args.iter().any(|a| a == "--no-interop");
+        let quiet = args[subcmd_idx + 1..]
+            .iter()
+            .any(|a| a == "--quiet" || a == "-q");
+        // Three runner modes:
+        //   * default / `--pool` — worker pool of persistent stryke
+        //                  processes; each worker fork-on-receive per
+        //                  test. Tests stay isolated (each in its own
+        //                  forked child) and worker state stays clean
+        //                  (worker never runs test bytecode). Skips
+        //                  ~8ms of dyld + crate static-init per test;
+        //                  ~5× faster than `--fork` on big corpora.
+        //   * `--fork`   — legacy `posix_spawn` per test. Fully
+        //                  isolated, slowest, kept for parity / debug.
+        //   * `--inproc` — opt-in single-process VM-per-test on a
+        //                  worker thread. Fastest, but tests share
+        //                  parent address space → can leak state.
+        let want_fork = args.iter().any(|a| a == "--fork");
+        let want_inproc = args.iter().any(|a| a == "--inproc");
+        if want_inproc {
+            process::exit(stryke::cli_runners::run_tests_with_mode(
+                &raw_targets,
+                j_threads.as_deref(),
+                no_interop,
+                quiet,
+                false,
+            ));
         }
-        let mut test_files: Vec<String> = Vec::new();
-        for target in &targets {
-            let target_path = std::path::Path::new(target);
-            if target_path.is_dir() {
-                if let Ok(entries) = std::fs::read_dir(target_path) {
-                    for entry in entries.filter_map(|e| e.ok()) {
-                        let path = entry.path().to_string_lossy().to_string();
-                        let name = entry.file_name().to_string_lossy().to_string();
-                        if (name.starts_with("test_") || name.starts_with("t_"))
-                            && (name.ends_with(".stk")
-                                || name.ends_with(".st")
-                                || name.ends_with(".pl"))
-                        {
-                            test_files.push(path);
-                        }
-                    }
-                }
-            } else {
-                test_files.push(target.clone());
-            }
+        if want_fork {
+            process::exit(stryke::cli_runners::run_tests_with_mode(
+                &raw_targets,
+                j_threads.as_deref(),
+                no_interop,
+                quiet,
+                true,
+            ));
         }
-        test_files.sort();
-        test_files.dedup();
-        if test_files.is_empty() {
-            eprintln!("stryke test: no test files found");
-            process::exit(1);
-        }
-        let total = test_files.len();
-        let mut failed = 0;
-        let mut total_pass = 0usize;
-        let mut total_fail = 0usize;
-        let mut failure_details: Vec<(String, String)> = Vec::new();
-        eprintln!(
-            "\x1b[36mRunning {} test file{}\x1b[0m\n",
-            total,
-            if total == 1 { "" } else { "s" }
-        );
-        for f in &test_files {
-            let name = std::path::Path::new(f)
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_else(|| f.clone());
-            eprintln!("\x1b[1m── {} ──\x1b[0m", name);
-            // Resolve exe to absolute path. Try current_exe first, then
-            // canonicalize args[0], then fall back to bare args[0] (PATH lookup).
-            let exe = std::env::current_exe()
-                .ok()
-                .filter(|p| p.exists())
-                .or_else(|| std::fs::canonicalize(&args[0]).ok())
-                .unwrap_or_else(|| std::path::PathBuf::from(&args[0]));
-            let script_abs =
-                std::fs::canonicalize(f).unwrap_or_else(|_| std::path::PathBuf::from(f));
-            // Project root = parent of t/ directory, so `require "./lib/..."` works.
-            let project_root = script_abs
-                .parent() // t/
-                .and_then(|p| p.parent()) // project/
-                .unwrap_or(std::path::Path::new("."));
-            // Capture stderr to count assertions.
-            // Forward -j N to each test so parallel builtins use the thread pool.
-            let mut cmd = process::Command::new(&exe);
-            // Extract -j value from original args
-            if let Some(j_pos) = args.iter().position(|a| a == "-j") {
-                if let Some(n) = args.get(j_pos + 1) {
-                    cmd.arg("-j").arg(n);
-                }
-            }
-            let output = cmd
-                .arg(&script_abs)
-                .current_dir(project_root)
-                .stderr(process::Stdio::piped())
-                .output();
-            match output {
-                Ok(out) => {
-                    let stderr = String::from_utf8_lossy(&out.stderr);
-                    // Print the stderr (test output)
-                    eprint!("{}", stderr);
-                    // Collect failure lines for this file
-                    let mut file_failures: Vec<String> = Vec::new();
-                    // Count ✓ and ✗ in output (only lines starting with "  ✓" or "  ✗")
-                    for line in stderr.lines() {
-                        let trimmed = line.trim_start();
-                        if trimmed.starts_with("\x1b[32m✓\x1b[0m") || trimmed.starts_with("✓") {
-                            // Check it's not the summary "✓ All X tests" line
-                            if !trimmed.contains("All ") && !trimmed.contains(" passed") {
-                                total_pass += 1;
-                            }
-                        } else if trimmed.starts_with("\x1b[31m✗\x1b[0m")
-                            || trimmed.starts_with("✗")
-                        {
-                            // Check it's not the summary "✗ X of Y tests failed" line
-                            if !trimmed.contains(" of ") || !trimmed.contains(" failed") {
-                                total_fail += 1;
-                                file_failures.push(line.to_string());
-                            }
-                        }
-                    }
-                    // Count as failed if exit code non-zero OR any assertions failed
-                    let has_failures = !out.status.success() || !file_failures.is_empty();
-                    if has_failures {
-                        failed += 1;
-                        // Capture error output for summary
-                        let error_output: String = stderr
-                            .lines()
-                            .filter(|l| {
-                                let t = l.trim_start();
-                                t.starts_with("\x1b[31m✗")
-                                    || t.starts_with("✗")
-                                    || t.contains("error:")
-                                    || t.contains("Error:")
-                                    || t.contains("panicked")
-                                    || t.contains("FAILED")
-                                    || t.contains(" at ")
-                                        && (t.contains(" line ") || t.contains(".stk"))
-                            })
-                            .collect::<Vec<_>>()
-                            .join("\n");
-                        if !error_output.is_empty() {
-                            failure_details.push((name.clone(), error_output));
-                        } else if !file_failures.is_empty() {
-                            failure_details.push((name.clone(), file_failures.join("\n")));
-                        } else {
-                            failure_details.push((name.clone(), stderr.to_string()));
-                        }
-                    }
-                }
-                Err(e) => {
-                    eprintln!("  failed to run: {}", e);
-                    failed += 1;
-                    failure_details.push((name.clone(), format!("failed to run: {}", e)));
-                }
-            }
-            eprintln!();
-        }
-        let grand_total = total_pass + total_fail;
-        eprintln!("═══════════════════════════════");
-        if failed == 0 {
-            eprintln!(
-                "\x1b[32m✓ All {} test file{} passed ({} assertions)\x1b[0m",
-                total,
-                if total == 1 { "" } else { "s" },
-                grand_total
-            );
-            process::exit(0);
-        } else {
-            // Print failure summary at the bottom
-            eprintln!();
-            eprintln!(
-                "\x1b[1;31m════════════════════════════════════════════════════════════════\x1b[0m"
-            );
-            eprintln!("\x1b[1;31m                        FAILURES SUMMARY\x1b[0m");
-            eprintln!(
-                "\x1b[1;31m════════════════════════════════════════════════════════════════\x1b[0m"
-            );
-            for (file_name, details) in &failure_details {
-                eprintln!();
-                eprintln!("\x1b[1;33m── {} ──\x1b[0m", file_name);
-                for line in details.lines().take(20) {
-                    eprintln!("  {}", line);
-                }
-                if details.lines().count() > 20 {
-                    eprintln!("  ... ({} more lines)", details.lines().count() - 20);
-                }
-            }
-            eprintln!();
-            eprintln!(
-                "\x1b[1;31m════════════════════════════════════════════════════════════════\x1b[0m"
-            );
-            eprintln!(
-                "\x1b[31m✗ {} of {} test file{} failed ({} passed, {} failed)\x1b[0m",
-                failed,
-                total,
-                if total == 1 { "" } else { "s" },
-                total_pass,
-                total_fail
-            );
-            process::exit(1);
-        }
+        // Default = pool.
+        process::exit(stryke::cli_runners::run_tests_pool(
+            &raw_targets,
+            j_threads.as_deref(),
+            no_interop,
+            quiet,
+        ));
     }
 
     // `stryke serve PORT SCRIPT` or `stryke serve PORT -e CODE` subcommand.

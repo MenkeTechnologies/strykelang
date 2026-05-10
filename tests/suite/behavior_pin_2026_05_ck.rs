@@ -7,10 +7,7 @@ use crate::common::*;
 
 #[test]
 fn without_scalar_filters_by_string_equality_ck() {
-    assert_eq!(
-        eval_string(r#"stringify(without(2, [1, 2, 3]))"#),
-        "(1, 3)"
-    );
+    assert_eq!(eval_string(r#"stringify(without(2, [1, 2, 3]))"#), "(1, 3)");
 }
 
 #[test]
@@ -63,10 +60,7 @@ fn flatten_deep_scalar_mix_ck() {
 
 #[test]
 fn diff_successive_differences_ck() {
-    assert_eq!(
-        eval_string(r#"stringify(diff([1, 4, 9]))"#),
-        "(3, 5)"
-    );
+    assert_eq!(eval_string(r#"stringify(diff([1, 4, 9]))"#), "(3, 5)");
 }
 
 #[test]
@@ -98,9 +92,7 @@ fn list_union_two_lists_sorted_merge_ck() {
 #[test]
 fn multiset_difference_sorted_join_counts_ck() {
     assert_eq!(
-        eval_string(
-            r#"join(",", sort { $a cmp $b } multiset_difference([1, 1, 2, 3], [1, 2]))"#
-        ),
+        eval_string(r#"join(",", sort { $a cmp $b } multiset_difference([1, 1, 2, 3], [1, 2]))"#),
         "1,3"
     );
 }
@@ -108,9 +100,7 @@ fn multiset_difference_sorted_join_counts_ck() {
 #[test]
 fn multiset_intersection_sorted_join_counts_ck() {
     assert_eq!(
-        eval_string(
-            r#"join(",", sort { $a cmp $b } multiset_intersection([1, 1, 2], [1, 2, 2]))"#
-        ),
+        eval_string(r#"join(",", sort { $a cmp $b } multiset_intersection([1, 1, 2], [1, 2, 2]))"#),
         "1,2"
     );
 }

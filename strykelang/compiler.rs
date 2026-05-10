@@ -852,19 +852,30 @@ impl Compiler {
 
     /// Array names that are always bound at runtime (Perl built-ins) and must not trigger a
     /// `use strict 'vars'` compile error even though they're never `my`-declared.
+    /// Stryke topic-var arrays (`@_0`, `@_1`, …) are auto-bound inside any
+    /// block that takes positional arguments — exempt them too so
+    /// `$_1[0]` / `@_1[0]` / etc. compile under `use strict 'vars'`.
     fn strict_array_exempt(name: &str) -> bool {
-        matches!(
+        if matches!(
             name,
             "_" | "ARGV" | "INC" | "ENV" | "ISA" | "EXPORT" | "EXPORT_OK" | "EXPORT_FAIL"
-        )
+        ) {
+            return true;
+        }
+        name.starts_with('_') && name.len() > 1 && name[1..].chars().all(|c| c.is_ascii_digit())
     }
 
-    /// Hash names that are always bound at runtime.
+    /// Hash names that are always bound at runtime. Also exempts stryke
+    /// topic-var hashes (`%_0`, `%_1`, …) for symmetry with the scalar
+    /// and array forms.
     fn strict_hash_exempt(name: &str) -> bool {
-        matches!(
+        if matches!(
             name,
             "ENV" | "INC" | "SIG" | "EXPORT_TAGS" | "ISA" | "OVERLOAD" | "+" | "-" | "!" | "^H"
-        )
+        ) {
+            return true;
+        }
+        name.starts_with('_') && name.len() > 1 && name[1..].chars().all(|c| c.is_ascii_digit())
     }
 
     fn check_strict_array_access(&self, name: &str, line: usize) -> Result<(), CompileError> {

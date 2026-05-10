@@ -162,10 +162,7 @@ fn floyd_warshall_relaxation_min_dk() {
 
 #[test]
 fn astar_search_f_equals_g_plus_h_dk() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", astar_search(5, 2))"#),
-        "7"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", astar_search(5, 2))"#), "7");
 }
 
 #[test]
@@ -178,10 +175,7 @@ fn bidirectional_dijkstra_meeting_sum_dk() {
 
 #[test]
 fn prim_relaxation_min_key_dk() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", prim_step(5, 2))"#),
-        "2"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", prim_step(5, 2))"#), "2");
 }
 
 #[test]
@@ -212,18 +206,12 @@ fn yen_k_shortest_adds_spur_dk() {
 
 #[test]
 fn ida_star_next_threshold_dk() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", ida_star(4, 6))"#),
-        "6"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", ida_star(4, 6))"#), "6");
 }
 
 #[test]
 fn bfs_visit_count_branch_two_depth_three_dk() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", bfs_count(2, 3))"#),
-        "15"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", bfs_count(2, 3))"#), "15");
 }
 
 #[test]
@@ -306,10 +294,7 @@ fn chebyshev_u_degree_three_half_dk() {
 
 #[test]
 fn hermite_h_physicists_cubic_at_one_dk() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", hermite_h(3, 1))"#),
-        "-4"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", hermite_h(3, 1))"#), "-4");
 }
 
 #[test]

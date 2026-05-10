@@ -172,10 +172,7 @@ fn kinetic_energy_quarter_mass_cv() {
 
 #[test]
 fn standard_gravity_constant_cv() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", gravity())"#),
-        "9.80665"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", gravity())"#), "9.80665");
 }
 
 #[test]
@@ -196,10 +193,7 @@ fn brewster_angle_cv() {
 
 #[test]
 fn thin_lens_image_distance_cv() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", thin_lens(20, 10))"#),
-        "20"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", thin_lens(20, 10))"#), "20");
 }
 
 #[test]
@@ -228,10 +222,7 @@ fn rle_rld_roundtrip_cv() {
 
 #[test]
 fn pad_left_zeros_cv() {
-    assert_eq!(
-        eval_string(r#"pad_left("ab", 5, "0")"#),
-        "000ab"
-    );
+    assert_eq!(eval_string(r#"pad_left("ab", 5, "0")"#), "000ab");
 }
 
 #[test]

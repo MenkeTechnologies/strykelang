@@ -75,10 +75,7 @@ fn xxh32_hex_abc_cp() {
 
 #[test]
 fn xxh64_hex_abc_cp() {
-    assert_eq!(
-        eval_string(r#"xxh64("abc")"#),
-        "44bc2cf5ad770999"
-    );
+    assert_eq!(eval_string(r#"xxh64("abc")"#), "44bc2cf5ad770999");
 }
 
 #[test]
@@ -139,10 +136,7 @@ fn chebyshev_two_vectors_coerces_to_zero_bug_cp() {
 
 #[test]
 fn slope_four_coordinates_cp() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", slope(0, 0, 1, 2))"#),
-        "2"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", slope(0, 0, 1, 2))"#), "2");
 }
 
 #[test]
@@ -155,10 +149,7 @@ fn slope_with_two_vector_args_vertical_line_inf_bug_cp() {
 
 #[test]
 fn midpoint_four_coordinates_cp() {
-    assert_eq!(
-        eval_string(r#"stringify(midpoint(0, 0, 4, 6))"#),
-        "(2, 3)"
-    );
+    assert_eq!(eval_string(r#"stringify(midpoint(0, 0, 4, 6))"#), "(2, 3)");
 }
 
 #[test]
@@ -172,9 +163,7 @@ fn triangle_hypotenuse_three_four_cp() {
 #[test]
 fn polygon_area_axis_square_cp() {
     assert_eq!(
-        eval_string(
-            r#"sprintf("%.10g", polygon_area([[0, 0], [2, 0], [2, 2], [0, 2]]))"#,
-        ),
+        eval_string(r#"sprintf("%.10g", polygon_area([[0, 0], [2, 0], [2, 2], [0, 2]]))"#,),
         "4"
     );
 }
@@ -205,10 +194,7 @@ fn angle_between_deg_forty_five_cp() {
 
 #[test]
 fn d2r_and_r2d_roundtrip_cp() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", d2r(180))"#),
-        "3.141592654"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", d2r(180))"#), "3.141592654");
     assert_eq!(
         eval_string(r#"sprintf("%.10g", r2d(1.5707963267948966))"#),
         "90"
@@ -225,10 +211,7 @@ fn scan_numeric_prefix_sums_cp() {
 
 #[test]
 fn collapse_whitespace_cp() {
-    assert_eq!(
-        eval_string(r#"collapse_whitespace("a  b\t\tc")"#),
-        "a b c"
-    );
+    assert_eq!(eval_string(r#"collapse_whitespace("a  b\t\tc")"#), "a b c");
 }
 
 #[test]
@@ -285,10 +268,7 @@ fn before_n_and_after_n_cp() {
 
 #[test]
 fn hex_encode_decode_roundtrip_cp() {
-    assert_eq!(
-        eval_string(r#"hex_decode(hex_encode("ab"))"#),
-        "ab"
-    );
+    assert_eq!(eval_string(r#"hex_decode(hex_encode("ab"))"#), "ab");
 }
 
 #[test]
@@ -315,10 +295,7 @@ fn words_split_trim_cp() {
 
 #[test]
 fn is_sorted_nondecreasing_cp() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.0f", is_sorted([1, 2, 3]))"#),
-        "1"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.0f", is_sorted([1, 2, 3]))"#), "1");
 }
 
 #[test]
@@ -389,9 +366,7 @@ fn euclidean_distance_matches_alias_cp() {
 #[test]
 fn matrix_det_three_by_three_cp() {
     assert_eq!(
-        eval_string(
-            r#"sprintf("%.0f", det([[2, 0, 0], [0, 3, 0], [0, 0, 4]]))"#,
-        ),
+        eval_string(r#"sprintf("%.0f", det([[2, 0, 0], [0, 3, 0], [0, 0, 4]]))"#,),
         "24"
     );
 }

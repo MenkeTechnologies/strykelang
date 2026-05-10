@@ -127,10 +127,7 @@ fn graph_density_three_node_path_cy() {
 /// **`graph_density`** expects an **adjacency list**; numeric **`(4, 3)`** is **not** **|E|/C(n**—**2)** — **BUG-177**.
 #[test]
 fn graph_density_spurious_numeric_pair_yields_zero_bug_cy() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", graph_density(4, 3))"#),
-        "0"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", graph_density(4, 3))"#), "0");
 }
 
 #[test]
@@ -152,9 +149,7 @@ fn degree_centrality_triangle_cy() {
 #[test]
 fn pagerank_two_node_cycle_cy() {
     assert_eq!(
-        eval_string(
-            r#"stringify(pagerank([[1], [0]], 0.85, 10))"#,
-        ),
+        eval_string(r#"stringify(pagerank([[1], [0]], 0.85, 10))"#,),
         "(0.5, 0.5)"
     );
 }
@@ -184,10 +179,7 @@ fn lucas_pell_catalan_cy() {
 
 #[test]
 fn subfactorial_multinomial_multiset_count_cy() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", subfactorial(4))"#),
-        "9"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", subfactorial(4))"#), "9");
     assert_eq!(
         eval_string(r#"sprintf("%.10g", multinomial([2, 1, 1]))"#),
         "2"
@@ -205,9 +197,7 @@ fn centroid_unit_square_and_triangle_cy() {
         "(1, 1)"
     );
     assert_eq!(
-        eval_string(
-            r#"sprintf("%.10g", polygon_centroid([[0, 0], [2, 0], [2, 3]]))"#,
-        ),
+        eval_string(r#"sprintf("%.10g", polygon_centroid([[0, 0], [2, 0], [2, 3]]))"#,),
         "1.333333333"
     );
 }
@@ -230,15 +220,9 @@ fn beta_gamma_lgamma_erf_erfc_cy() {
         eval_string(r#"sprintf("%.10g", beta_fn(2, 3))"#),
         "0.08333333333"
     );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", lgamma(5))"#),
-        "3.17805383"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", lgamma(5))"#), "3.17805383");
     assert_eq!(eval_string(r#"sprintf("%.10g", gamma(5))"#), "24");
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", erf(1))"#),
-        "0.8427007929"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", erf(1))"#), "0.8427007929");
     assert_eq!(eval_string(r#"sprintf("%.10g", erfc(0))"#), "1");
 }
 
@@ -268,14 +252,8 @@ fn dft_four_real_impulses_cy() {
 
 #[test]
 fn slugify_title_camel_snake_cy() {
-    assert_eq!(
-        eval_string(r#"slugify("Hello World!")"#),
-        "hello-world"
-    );
-    assert_eq!(
-        eval_string(r#"title_case("hello world")"#),
-        "Hello World"
-    );
+    assert_eq!(eval_string(r#"slugify("Hello World!")"#), "hello-world");
+    assert_eq!(eval_string(r#"title_case("hello world")"#), "Hello World");
     assert_eq!(eval_string(r#"camel_case("foo_bar")"#), "fooBar");
     assert_eq!(eval_string(r#"snake_case("FooBar")"#), "foo_bar");
 }
@@ -283,9 +261,7 @@ fn slugify_title_camel_snake_cy() {
 #[test]
 fn xor_strings_first_byte_space_cy() {
     assert_eq!(
-        eval_string(
-            r#"sprintf("%.0f", ord(substr(xor_strings("abc", "ABC"), 0, 1)))"#,
-        ),
+        eval_string(r#"sprintf("%.0f", ord(substr(xor_strings("abc", "ABC"), 0, 1)))"#,),
         "32"
     );
 }
@@ -370,20 +346,11 @@ fn mahalanobis_nth_root_power_two_log2_trailing_zeros_cy() {
         eval_string(r#"sprintf("%.10g", mahalanobis_1d(5, 0, 4))"#),
         "6.25"
     );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", nth_root(27, 3))"#),
-        "3"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", nth_root(27, 3))"#), "3");
     assert_eq!(
         eval_string(r#"sprintf("%.10g", is_power_of_two(1024))"#),
         "1"
     );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", log2(1024))"#),
-        "10"
-    );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", trailing_zeros(8))"#),
-        "3"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", log2(1024))"#), "10");
+    assert_eq!(eval_string(r#"sprintf("%.10g", trailing_zeros(8))"#), "3");
 }

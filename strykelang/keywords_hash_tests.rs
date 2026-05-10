@@ -69,7 +69,10 @@ fn is_stryke_keyword_true_for_canonical_keywords() {
 fn is_stryke_keyword_false_for_callable_builtins() {
     // These are dispatch primaries, not keywords.
     for name in ["map", "grep", "print", "pmap", "to_json", "len"] {
-        assert!(!is_stryke_keyword(name), "{name} is a builtin, not a keyword");
+        assert!(
+            !is_stryke_keyword(name),
+            "{name} is a builtin, not a keyword"
+        );
     }
 }
 
@@ -126,10 +129,7 @@ fn aliases_and_keywords_are_disjoint() {
 fn all_contains_every_keyword() {
     let all = all_hash_map();
     for (name, _) in KEYWORDS {
-        assert!(
-            all.contains_key(*name),
-            "%all is missing keyword {name:?}",
-        );
+        assert!(all.contains_key(*name), "%all is missing keyword {name:?}",);
     }
 }
 

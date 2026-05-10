@@ -13,7 +13,10 @@ fn crc32_ascii_triple_cm() {
 
 #[test]
 fn adler32_ascii_triple_cm() {
-    assert_eq!(eval_string(r#"sprintf("%.0f", adler32("abc"))"#), "38600999");
+    assert_eq!(
+        eval_string(r#"sprintf("%.0f", adler32("abc"))"#),
+        "38600999"
+    );
 }
 
 #[test]
@@ -52,10 +55,7 @@ fn strip_html_tags_cm() {
 
 #[test]
 fn html_encode_entities_cm() {
-    assert_eq!(
-        eval_string(r#"html_encode("<&>")"#),
-        "&lt;&amp;&gt;"
-    );
+    assert_eq!(eval_string(r#"html_encode("<&>")"#), "&lt;&amp;&gt;");
 }
 
 #[test]
@@ -126,10 +126,7 @@ fn sprintf_binary_five_cm() {
 
 #[test]
 fn map_chr_sixty_five_sixty_six_cm() {
-    assert_eq!(
-        eval_string(r#"join("", map { chr($_) } (65, 66))"#),
-        "AB"
-    );
+    assert_eq!(eval_string(r#"join("", map { chr($_) } (65, 66))"#), "AB");
 }
 
 #[test]
@@ -158,7 +155,10 @@ fn contains_substr_oba_cm() {
 
 #[test]
 fn index_substr_oba_cm() {
-    assert_eq!(eval_string(r#"sprintf("%.0f", index("foobar", "oba"))"#), "2");
+    assert_eq!(
+        eval_string(r#"sprintf("%.0f", index("foobar", "oba"))"#),
+        "2"
+    );
 }
 
 #[test]
@@ -262,10 +262,7 @@ fn popcount_seven_cm() {
 
 #[test]
 fn gzip_gunzip_roundtrip_ascii_cm() {
-    assert_eq!(
-        eval_string(r#"gunzip(gzip("hello"))"#),
-        "hello"
-    );
+    assert_eq!(eval_string(r#"gunzip(gzip("hello"))"#), "hello");
 }
 
 #[test]
@@ -275,7 +272,10 @@ fn atbash_lowercase_cm() {
 
 #[test]
 fn edit_distance_ab_bc_cm() {
-    assert_eq!(eval_string(r#"sprintf("%.0f", edit_distance("ab", "bc"))"#), "2");
+    assert_eq!(
+        eval_string(r#"sprintf("%.0f", edit_distance("ab", "bc"))"#),
+        "2"
+    );
 }
 
 #[test]
@@ -342,10 +342,7 @@ fn title_case_single_word_cm() {
 
 #[test]
 fn json_bool_wire_true_cm() {
-    assert_eq!(
-        eval_string(r#"(to_json(true) =~ /true/) ? "1" : "0""#),
-        "1"
-    );
+    assert_eq!(eval_string(r#"(to_json(true) =~ /true/) ? "1" : "0""#), "1");
 }
 
 #[test]
@@ -364,9 +361,7 @@ fn crc32_separate_args_differs_from_concat_bug_cm() {
 #[test]
 fn matrix_mul_identity_two_cm() {
     assert_eq!(
-        eval_string(
-            r#"stringify(matrix_mul([[1, 0], [0, 1]], [[2, 3], [4, 5]]))"#
-        ),
+        eval_string(r#"stringify(matrix_mul([[1, 0], [0, 1]], [[2, 3], [4, 5]]))"#),
         "([2, 3], [4, 5])"
     );
 }
@@ -391,10 +386,7 @@ fn argmin_three_cm() {
 
 #[test]
 fn clamp01_unit_interval_helper_cm() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", clamp(0, 1, 1.5))"#),
-        "1"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", clamp(0, 1, 1.5))"#), "1");
 }
 
 #[test]

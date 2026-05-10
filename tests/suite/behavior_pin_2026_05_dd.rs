@@ -10,21 +10,18 @@ use crate::common::*;
 
 #[test]
 fn dbinom_pbinom_normal_student_t_dd() {
-    assert_eq!(eval_string(r#"sprintf("%.10g", dbinom(5, 10, 0.5))"#), "0.24609375");
+    assert_eq!(
+        eval_string(r#"sprintf("%.10g", dbinom(5, 10, 0.5))"#),
+        "0.24609375"
+    );
     assert_eq!(
         eval_string(r#"sprintf("%.10g", pbinom(4, 10, 0.5))"#),
         "0.376953125"
     );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", dnorm(0))"#),
-        "0.3989422804"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", dnorm(0))"#), "0.3989422804");
     assert_eq!(eval_string(r#"sprintf("%.10g", pnorm(0))"#), "0.5000000005");
     assert_eq!(eval_string(r#"sprintf("%.10g", qnorm(0.5))"#), "0");
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", dt(0, 5))"#),
-        "0.3796066898"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", dt(0, 5))"#), "0.3796066898");
     assert_eq!(
         eval_string(r#"sprintf("%.10g", pt(1.96, 10))"#),
         "0.9607823881"
@@ -124,14 +121,8 @@ fn ipv4_roundtrip_and_invalid_dd() {
 #[test]
 fn fmod_copysign_trunc_product_sum0_dd() {
     assert_eq!(eval_string(r#"sprintf("%.10g", fmod(7, 3))"#), "1");
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", copysign(1, -5))"#),
-        "-1"
-    );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", trunc(-2.7))"#),
-        "-2"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", copysign(1, -5))"#), "-1");
+    assert_eq!(eval_string(r#"sprintf("%.10g", trunc(-2.7))"#), "-2");
     // Lone **`[...]`** operand: **`product`** numifies the ref (**BUG-140**); comma factors multiply.
     assert_eq!(eval_string(r#"sprintf("%.10g", product([2, 3, 4]))"#), "0");
     assert_eq!(eval_string(r#"sprintf("%.10g", product(2, 3, 4))"#), "24");
@@ -186,19 +177,14 @@ fn cosine_canberra_distance_dd() {
 #[test]
 fn mahalanobis_two_row_obs_dd() {
     assert_eq!(
-        eval_string(
-            r#"sprintf("%.10g", mahalanobis([[0, 0]], [1, 1], [[1, 0], [0, 1]])->[0])"#
-        ),
+        eval_string(r#"sprintf("%.10g", mahalanobis([[0, 0]], [1, 1], [[1, 0], [0, 1]])->[0])"#),
         "1.414213562"
     );
 }
 
 #[test]
 fn rank_dense_rank_order_dd() {
-    assert_eq!(
-        eval_string(r#"stringify(rank([3, 1, 2]))"#),
-        "(3, 1, 2)"
-    );
+    assert_eq!(eval_string(r#"stringify(rank([3, 1, 2]))"#), "(3, 1, 2)");
     assert_eq!(
         eval_string(r#"stringify(dense_rank([3, 1, 2]))"#),
         "(3, 1, 2)"
@@ -225,10 +211,7 @@ fn argsort_permutation_dd() {
 fn log2_log10_exp_dd() {
     assert_eq!(eval_string(r#"sprintf("%.10g", log2(8))"#), "3");
     assert_eq!(eval_string(r#"sprintf("%.10g", log10(100))"#), "2");
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", exp(1))"#),
-        "2.718281828"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", exp(1))"#), "2.718281828");
 }
 
 #[test]
@@ -237,7 +220,10 @@ fn pascal_row_binomial_multinomial_dd() {
         eval_string(r#"stringify(pascal_row(4))"#),
         "(1, 4, 6, 4, 1)"
     );
-    assert_eq!(eval_string(r#"sprintf("%.0f", multinomial(6, [2, 2, 2]))"#), "90");
+    assert_eq!(
+        eval_string(r#"sprintf("%.0f", multinomial(6, [2, 2, 2]))"#),
+        "90"
+    );
 }
 
 #[test]
@@ -254,9 +240,7 @@ fn cross_entropy_categorical_dd() {
         "0.7135581778"
     );
     assert_eq!(
-        eval_string(
-            r#"sprintf("%.10g", categorical_cross_entropy([0, 1, 0], [0.2, 0.7, 0.1]))"#
-        ),
+        eval_string(r#"sprintf("%.10g", categorical_cross_entropy([0, 1, 0], [0.2, 0.7, 0.1]))"#),
         "0.118891648"
     );
 }

@@ -18,13 +18,25 @@ use std::process::Command;
 use crate::common::{eval_int, eval_string, GLOBAL_FLAGS_LOCK};
 
 fn stryke_binary() -> Option<PathBuf> {
-    for cand in ["target/release/stryke", "target/debug/stryke"] {
+    // Pick the freshest binary by mtime — prevents a stale `target/release/`
+    // from a previous build (kept around because dev builds use
+    // `cargo build` not `cargo build --release`) shadowing the actual
+    // working tree's `target/debug/`. CI / release builds still find
+    // their binary; the test author's daily `cargo test` doesn't run
+    // against a stranger's months-old release.
+    let cands = ["target/release/stryke", "target/debug/stryke"];
+    let mut best: Option<(PathBuf, std::time::SystemTime)> = None;
+    for cand in cands {
         let p = PathBuf::from(cand);
-        if p.exists() {
-            return Some(p);
+        if let Ok(meta) = std::fs::metadata(&p) {
+            if let Ok(m) = meta.modified() {
+                if best.as_ref().map_or(true, |(_, t)| m > *t) {
+                    best = Some((p, m));
+                }
+            }
         }
     }
-    None
+    best.map(|(p, _)| p)
 }
 
 fn run_doctor() -> Option<String> {

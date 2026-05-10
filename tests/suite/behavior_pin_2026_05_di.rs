@@ -39,9 +39,7 @@ fn euclidean_nd_triangle_3d_plane_dist_di() {
         "0.5"
     );
     assert_eq!(
-        eval_string(
-            r#"stringify(triangle_3d_normal([0, 0, 0], [1, 0, 0], [0, 1, 0]))"#
-        ),
+        eval_string(r#"stringify(triangle_3d_normal([0, 0, 0], [1, 0, 0], [0, 1, 0]))"#),
         "(0, 0, 1)"
     );
     assert_eq!(
@@ -78,15 +76,11 @@ fn hamming_weight_popcount_di() {
 #[test]
 fn graph_diameter_radius_triangle_di() {
     assert_eq!(
-        eval_string(
-            r#"sprintf("%d", graph_diameter([[0, 1, 1], [1, 0, 1], [1, 1, 0]]))"#
-        ),
+        eval_string(r#"sprintf("%d", graph_diameter([[0, 1, 1], [1, 0, 1], [1, 1, 0]]))"#),
         "1"
     );
     assert_eq!(
-        eval_string(
-            r#"sprintf("%d", graph_radius([[0, 1, 1], [1, 0, 1], [1, 1, 0]]))"#
-        ),
+        eval_string(r#"sprintf("%d", graph_radius([[0, 1, 1], [1, 0, 1], [1, 1, 0]]))"#),
         "1"
     );
 }
@@ -102,9 +96,7 @@ fn graph_density_path_adj_list_di() {
 #[test]
 fn floyd_warshall_three_node_di() {
     assert_eq!(
-        eval_string(
-            r#"stringify(floyd_warshall([[0, 3, 1e100], [3, 0, 1], [1e100, 1, 0]]))"#
-        ),
+        eval_string(r#"stringify(floyd_warshall([[0, 3, 1e100], [3, 0, 1], [1e100, 1, 0]]))"#),
         "((0, 3, 4), (3, 0, 1), (4, 1, 0))"
     );
 }
@@ -188,10 +180,7 @@ fn longest_increasing_subsequence_length_di() {
         eval_string(r#"sprintf("%d", longest_increasing([3, 1, 2, 4]))"#),
         "3"
     );
-    assert_eq!(
-        eval_string(r#"sprintf("%d", lis([3, 1, 2, 4]))"#),
-        "3"
-    );
+    assert_eq!(eval_string(r#"sprintf("%d", lis([3, 1, 2, 4]))"#), "3");
 }
 
 #[test]
@@ -200,10 +189,7 @@ fn kronecker_product_jacobi_levi_three_di() {
         eval_string(r#"stringify(kronecker_product([1, 2], [3, 4]))"#),
         "((3), (4), (6), (8))"
     );
-    assert_eq!(
-        eval_string(r#"sprintf("%d", jacobi_symbol(15, 7))"#),
-        "1"
-    );
+    assert_eq!(eval_string(r#"sprintf("%d", jacobi_symbol(15, 7))"#), "1");
     assert_eq!(
         eval_string(r#"sprintf("%d", levi_civita_three(0, 1, 2))"#),
         "1"
@@ -241,9 +227,7 @@ fn snowball_stem_english_codepoints_not_string_bug200_di() {
         "0"
     );
     assert_eq!(
-        eval_string(
-            r#"stringify(snowball_stem_english([114, 117, 110, 110, 105, 110, 103]))"#
-        ),
+        eval_string(r#"stringify(snowball_stem_english([114, 117, 110, 110, 105, 110, 103]))"#),
         "(114, 117, 110, 110)"
     );
 }

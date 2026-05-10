@@ -26,26 +26,17 @@ fn beta_binomial_and_hypergeometric_pins_de() {
         eval_string(r#"sprintf("%.10g", dhyper(1, 2, 2, 3))"#),
         "0.5"
     );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", dhyper(2, 5, 5, 8))"#),
-        "0"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", dhyper(2, 5, 5, 8))"#), "0");
 }
 
 #[test]
 fn qbinom_median_de() {
-    assert_eq!(
-        eval_string(r#"sprintf("%d", qbinom(0.5, 10, 0.5))"#),
-        "5"
-    );
+    assert_eq!(eval_string(r#"sprintf("%d", qbinom(0.5, 10, 0.5))"#), "5");
 }
 
 #[test]
 fn rbinom_two_arg_interprets_prob_as_size_bug190_de() {
-    assert_eq!(
-        eval_string(r#"stringify(rbinom(4, 0.5))"#),
-        "(0, 0, 0, 0)"
-    );
+    assert_eq!(eval_string(r#"stringify(rbinom(4, 0.5))"#), "(0, 0, 0, 0)");
 }
 
 #[test]
@@ -116,13 +107,17 @@ fn aic_bic_de() {
 #[test]
 fn total_variation_permutation_parity_de() {
     assert_eq!(
-        eval_string(
-            r#"sprintf("%.10g", total_variation_distance([0.5, 0.5], [0.6, 0.4]))"#
-        ),
+        eval_string(r#"sprintf("%.10g", total_variation_distance([0.5, 0.5], [0.6, 0.4]))"#),
         "0.1"
     );
-    assert_eq!(eval_string(r#"sprintf("%d", permutation_parity([1, 0, 2]))"#), "-1");
-    assert_eq!(eval_string(r#"sprintf("%d", permutation_parity([2, 0, 1]))"#), "1");
+    assert_eq!(
+        eval_string(r#"sprintf("%d", permutation_parity([1, 0, 2]))"#),
+        "-1"
+    );
+    assert_eq!(
+        eval_string(r#"sprintf("%d", permutation_parity([2, 0, 1]))"#),
+        "1"
+    );
 }
 
 #[test]
@@ -148,15 +143,11 @@ fn graph_centralities_triangle_de() {
         "0.5"
     );
     assert_eq!(
-        eval_string(
-            r#"sprintf("%.10g", degree_centrality([[0, 1, 1], [1, 0, 1], [1, 1, 0]]))"#
-        ),
+        eval_string(r#"sprintf("%.10g", degree_centrality([[0, 1, 1], [1, 0, 1], [1, 1, 0]]))"#),
         "1.5"
     );
     assert_eq!(
-        eval_string(
-            r#"sprintf("%.10g", closeness_centrality([[0, 1, 0], [1, 0, 1], [0, 1, 0]]))"#
-        ),
+        eval_string(r#"sprintf("%.10g", closeness_centrality([[0, 1, 0], [1, 0, 1], [0, 1, 0]]))"#),
         "1"
     );
     assert_eq!(
@@ -262,9 +253,7 @@ fn numerical_gradient_arrayref_callback_de() {
 #[test]
 fn numerical_gradient_my_x_at_wrong_grad_bug191_de() {
     assert_eq!(
-        eval_string(
-            r#"sprintf("%.10g", numerical_gradient(sub { my ($x) = @_; $x * $x }, [3]))"#
-        ),
+        eval_string(r#"sprintf("%.10g", numerical_gradient(sub { my ($x) = @_; $x * $x }, [3]))"#),
         "0"
     );
 }

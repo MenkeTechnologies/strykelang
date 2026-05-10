@@ -317,18 +317,12 @@ fn multinomial_coeff_four_two_one_one_dl() {
 
 #[test]
 fn stirling_second_partition_count_dl() {
-    assert_eq!(
-        eval_string(r#"sprintf("%d", stirling_second(5, 3))"#),
-        "25"
-    );
+    assert_eq!(eval_string(r#"sprintf("%d", stirling_second(5, 3))"#), "25");
 }
 
 #[test]
 fn binomial_ten_choose_four_dl() {
-    assert_eq!(
-        eval_string(r#"sprintf("%d", binomial(10, 4))"#),
-        "210"
-    );
+    assert_eq!(eval_string(r#"sprintf("%d", binomial(10, 4))"#), "210");
 }
 
 // ── Elliptic, polylog, special functions ─────────────────────────────────

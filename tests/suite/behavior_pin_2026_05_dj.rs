@@ -78,18 +78,13 @@ fn polynomial_fit_linear_perfect_dj() {
 
 #[test]
 fn signal_energy_sum_squares_dj() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", energy([0, 3, 4]))"#),
-        "25"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", energy([0, 3, 4]))"#), "25");
 }
 
 #[test]
 fn game_of_life_vertical_blinker_to_horizontal_dj() {
     assert_eq!(
-        eval_string(
-            r#"stringify(game_of_life_step([[0, 1, 0], [0, 1, 0], [0, 1, 0]]))"#
-        ),
+        eval_string(r#"stringify(game_of_life_step([[0, 1, 0], [0, 1, 0], [0, 1, 0]]))"#),
         "([0, 0, 0], [1, 1, 1], [0, 0, 0])"
     );
 }
@@ -161,10 +156,7 @@ fn ml_activations_leaky_hard_mish_dj() {
         "-0.2"
     );
     assert_eq!(eval_string(r#"sprintf("%.10g", hard_sigmoid(0))"#), "0.5");
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", mish(1))"#),
-        "0.8650983883"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", mish(1))"#), "0.8650983883");
 }
 
 #[test]
@@ -197,10 +189,7 @@ fn bmi_weight_kg_height_m_dj() {
 
 #[test]
 fn momentum_mass_times_velocity_dj() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", momentum(2, 3))"#),
-        "6"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", momentum(2, 3))"#), "6");
 }
 
 #[test]

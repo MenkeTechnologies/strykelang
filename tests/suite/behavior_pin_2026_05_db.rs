@@ -117,7 +117,10 @@ fn chebyshev_scalar_four_args_db() {
 #[test]
 fn lcs_length_edit_distance_db() {
     assert_eq!(eval_string(r#"stringify(lcs_length("abc", "ac"))"#), "2");
-    assert_eq!(eval_string(r#"stringify(edit_distance("abc", "def"))"#), "3");
+    assert_eq!(
+        eval_string(r#"stringify(edit_distance("abc", "def"))"#),
+        "3"
+    );
 }
 
 #[test]
@@ -130,10 +133,7 @@ fn confusion_counts_binary_db() {
 
 #[test]
 fn one_hot_softmax_sigmoid_relu_leaky_gelu_db() {
-    assert_eq!(
-        eval_string(r#"stringify(one_hot(2, 4))"#),
-        "(0, 0, 1, 0)"
-    );
+    assert_eq!(eval_string(r#"stringify(one_hot(2, 4))"#), "(0, 0, 1, 0)");
     assert_eq!(
         eval_string(r#"stringify(softmax([1, 2, 3]))"#),
         "(0.0900305731703805, 0.244728471054798, 0.665240955774822)"
@@ -152,7 +152,10 @@ fn gamma_beta_bessel_zeta_samples_db() {
     assert_eq!(eval_string(r#"sprintf("%.10g", factorial(5))"#), "120");
     assert_eq!(eval_string(r#"sprintf("%.10g", lgamma(5))"#), "3.17805383");
     assert_eq!(eval_string(r#"sprintf("%.10g", tgamma(5))"#), "24");
-    assert_eq!(eval_string(r#"sprintf("%.10g", digamma(2))"#), "0.4227843351");
+    assert_eq!(
+        eval_string(r#"sprintf("%.10g", digamma(2))"#),
+        "0.4227843351"
+    );
     assert_eq!(
         eval_string(r#"sprintf("%.10g", beta_fn(2, 3))"#),
         "0.08333333333"
@@ -341,9 +344,7 @@ fn argmax_argmin_percentile_rank_db() {
 #[test]
 fn winsorize_percent_first_bracket_list_db() {
     assert_eq!(
-        eval_string(
-            r#"join(",", winsorize(10, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]))"#
-        ),
+        eval_string(r#"join(",", winsorize(10, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]))"#),
         "2,2,3,4,5,6,7,8,9,10,11"
     );
 }
@@ -441,10 +442,7 @@ fn poisson_pmf_and_cdf_uniform_density_db() {
         eval_string(r#"sprintf("%.10g", ppois(3, 2))"#),
         "0.8571234605"
     );
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", dunif(0.25, 0, 1))"#),
-        "1"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", dunif(0.25, 0, 1))"#), "1");
     assert_eq!(
         eval_string(r#"sprintf("%.10g", punif(0.25, 0, 1))"#),
         "0.25"

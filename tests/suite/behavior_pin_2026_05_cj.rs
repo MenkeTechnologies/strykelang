@@ -156,10 +156,7 @@ fn permutations_k_equals_list_length_three_cj() {
 
 #[test]
 fn permutations_single_arrayref_numifies_to_zero_empty_bug_cj() {
-    assert_eq!(
-        eval_string(r#"stringify(permutations([1, 2, 3]))"#),
-        "()"
-    );
+    assert_eq!(eval_string(r#"stringify(permutations([1, 2, 3]))"#), "()");
 }
 
 #[test]
@@ -169,10 +166,7 @@ fn sliding_pairs_singleton_source_empty_cj() {
 
 #[test]
 fn window_n_wider_than_list_source_empty_cj() {
-    assert_eq!(
-        eval_string(r#"stringify(window_n(5, [1, 2, 3]))"#),
-        "()"
-    );
+    assert_eq!(eval_string(r#"stringify(window_n(5, [1, 2, 3]))"#), "()");
 }
 
 #[test]

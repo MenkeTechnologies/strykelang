@@ -16918,6 +16918,14 @@ impl Parser {
             | "web_t" | "web_load_locale" | "web_openapi"
             | "web_faker_int" | "web_faker_email" | "web_faker_name"
             | "web_faker_sentence" | "web_faker_paragraph"
+            // ── test runner ─────────────────────────────────────────────────
+            // In-process equivalents of `stryke check` / `stryke test`. The
+            // builtin form lets stryke programs (e.g. `exercism_run_all.stk`)
+            // call them directly without `system "stryke check $f"`, so
+            // `check_no_interop` from inside `pmaps` is fork-free and
+            // race-free (per-thread no-interop TLS override).
+            | "check" | "check_no_interop" | "check_ni"
+            | "test" | "test_no_interop" | "test_ni"
             => Some(name),
             _ => None,
         }

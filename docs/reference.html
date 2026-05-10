@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.12.21 · 8312 topics · 161 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.13.0 · 8320 topics · 162 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -322,12 +322,13 @@
         <li><a href="#ch-git">Git</a> <span class="chapter-count">10</span></li>
         <li><a href="#ch-system">System</a> <span class="chapter-count">13</span></li>
         <li><a href="#ch-testing">Testing</a> <span class="chapter-count">15</span></li>
+        <li><a href="#ch-test-runner-worker-pool">Test Runner (worker pool)</a> <span class="chapter-count">4</span></li>
         <li><a href="#ch-ai-primitives-docs-ai-primitives-md">AI primitives (docs/AI_PRIMITIVES.md)</a> <span class="chapter-count">79</span></li>
         <li><a href="#ch-mcp-model-context-protocol">MCP (Model Context Protocol)</a> <span class="chapter-count">13</span></li>
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">6712</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">6716</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -9907,6 +9908,42 @@ test_run   # prints summary, exits 1 on failure
 </code></pre>
       </article>
     </section>
+    <section class="tutorial-section" id="ch-test-runner-worker-pool">
+      <h2>Test Runner (worker pool)</h2>
+      <p class="chapter-meta">4 topics</p>
+      <article class="doc-entry" id="doc-test">
+        <h3><a class="doc-anchor" href="#doc-test">#</a> <code>test</code></h3>
+        <p><code>test(FILE_OR_DIR, ...)</code> — run every <code>test_*.stk</code> / <code>t_*.stk</code> under each path through the <strong>worker pool</strong>. Same engine as <code>s t</code> on the CLI: pre-forks N persistent stryke <code>--test-worker</code> processes, dispatches paths via JSON over stdin/stdout, each worker <code>fork()</code>s a grandchild per test for full isolation, no per-test dyld cost. Returns the exit code (0 on all-pass, 1 on any failure). Optional trailing hashref selects mode: <code>{ fork =&gt; 1 }</code> for the legacy <code>posix_spawn</code>-per-test path, <code>{ inproc =&gt; 1 }</code> for single-process VM-per-test (fastest, hermetic only), <code>{ quiet =&gt; 1 }</code>, <code>{ no_interop =&gt; 1 }</code>.</p>
+        <pre><code class="lang-perl">test(&quot;t/&quot;)                                # default: worker pool
+test([&quot;t/&quot;, &quot;examples/&quot;], { quiet =&gt; 1 })
+test(&quot;t/test_foo.stk&quot;, { fork =&gt; 1 })     # opt back into per-test fork
+my $rc = test(@dirs)                      # array flattens; rc = 0/1
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-test-no-interop">
+        <h3><a class="doc-anchor" href="#doc-test-no-interop">#</a> <code>test_no_interop</code></h3>
+        <p><code>test_no_interop(FILE_OR_DIR, ...)</code> (alias <code>test_ni</code>) — same as <code>test</code>, but pins each worker thread&#39;s TLS no-interop flag for the duration of the test (<code>set_no_interop_mode_tls</code>). Sibling <code>pmaps</code> workers don&#39;t race on a shared atomic. Forwards <code>--no-interop</code> to every spawned grandchild so each test runs under stryke&#39;s bot-firewall mode (rejects Perl-isms, forces stryke idioms).</p>
+        <pre><code class="lang-perl">test_no_interop(&quot;t/&quot;)
+test_ni([&quot;t/a&quot;, &quot;t/b&quot;], { quiet =&gt; 1 })
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-check">
+        <h3><a class="doc-anchor" href="#doc-check">#</a> <code>check</code></h3>
+        <p><code>check(FILE, ...)</code> — in-process equivalent of <code>stryke check FILE...</code>. Parses, compiles, and lints each path without executing it. Returns the exit code (0 on success, 1 on errors). Optional trailing hashref: <code>{ quiet =&gt; 1 }</code>, <code>{ json =&gt; 1 }</code>, <code>{ no_interop =&gt; 1 }</code>.</p>
+        <p>Faster than <code>system &quot;stryke check $f&quot;</code> because it skips the binary fork and reuses the parent process&#39;s parser/compiler. The lint pass is <strong>not</strong> a strict-vars enforcer — undefined-variable errors only fire on files that themselves do <code>use strict;</code>.</p>
+        <pre><code class="lang-perl">my $rc = check(&quot;foo.stk&quot;)                    # 0 = ok, 1 = errors
+check(\@files, { quiet =&gt; 1 })               # arrayref + opts
+for my $f (glob(&quot;src/*.stk&quot;)) { check($f) or warn &quot;$f failed&quot; }
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-check-no-interop">
+        <h3><a class="doc-anchor" href="#doc-check-no-interop">#</a> <code>check_no_interop</code></h3>
+        <p><code>check_no_interop(FILE, ...)</code> (alias <code>check_ni</code>) — same as <code>check</code>, but pins <strong>this thread</strong> to <code>--no-interop</code> for the duration of the check via an RAII guard on the per-thread no-interop flag. Sibling threads are unaffected, so the builtin is safe to call from <code>pmaps</code> workers in parallel — no global-atomic race.</p>
+        <pre><code class="lang-perl">check_no_interop(&quot;foo.stk&quot;)                  # rejects sub/say/$a/$b
+pmaps { check_ni(_, { quiet =&gt; 1 }) } @files # parallel-safe, no race
+</code></pre>
+      </article>
+    </section>
     <section class="tutorial-section" id="ch-ai-primitives-docs-ai-primitives-md">
       <h2>AI primitives (docs/AI_PRIMITIVES.md)</h2>
       <p class="chapter-meta">79 topics</p>
@@ -11596,7 +11633,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">6712 topics</p>
+      <p class="chapter-meta">6716 topics</p>
       <article class="doc-entry" id="doc-pc">
         <h3><a class="doc-anchor" href="#doc-pc">#</a> <code>%pc</code></h3>
         <p><code>parsec</code> (alias <code>pc</code>) — pc ≈ 3.086×10¹⁶ m ≈ 3.26 ly. Common astronomical distance unit.</p>
@@ -26454,6 +26491,15 @@ p escvel(1.989e30, 6.96e8)      # ~617 km/s (Sun)
 @list |&gt; map exppdf |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-extends">
+        <h3><a class="doc-anchor" href="#doc-extends">#</a> <code>extends</code></h3>
+        <p><code>extends</code> specifies parent classes for inheritance. Child classes inherit all fields and methods from parents.</p>
+        <pre><code class="lang-perl">class Animal { name: Str }
+class Dog extends Animal { breed: Str }
+class Hybrid extends Dog, Cat { }  # multiple inheritance
+</code></pre>
+        <p>Inherited fields appear first in construction order. Methods are resolved child-first (override pattern).</p>
+      </article>
       <article class="doc-entry" id="doc-exterior-derivative-one-form">
         <h3><a class="doc-anchor" href="#doc-exterior-derivative-one-form">#</a> <code>exterior_derivative_one_form</code></h3>
         <p><code>exterior_derivative_one_form</code> — batch 39 builtin.</p>
@@ -33221,6 +33267,17 @@ my $reconstructed = idft($spectrum)
 # or in a pipeline:
 @list |&gt; map impedance_rlc |&gt; p
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-impl">
+        <h3><a class="doc-anchor" href="#doc-impl">#</a> <code>impl</code></h3>
+        <p><code>impl</code> declares which traits a class implements.</p>
+        <pre><code class="lang-perl">trait Printable { fn to_str }
+class Item impl Printable {
+    name: Str
+    fn to_str { $self-&gt;name }
+}
+</code></pre>
+        <p>Multiple traits: <code>class X impl A, B, C { }</code></p>
       </article>
       <article class="doc-entry" id="doc-implicit-euler">
         <h3><a class="doc-anchor" href="#doc-implicit-euler">#</a> <code>implicit_euler</code></h3>
@@ -50042,6 +50099,17 @@ my @pred = @{predict($model, [4,5,6])}  # [8,10,12]
 @list |&gt; map prisoners_repeated_eq |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-priv">
+        <h3><a class="doc-anchor" href="#doc-priv">#</a> <code>priv</code></h3>
+        <p><code>priv</code> marks a field or method as private. Private members can only be accessed from within the class.</p>
+        <pre><code class="lang-perl">class Secret {
+    priv hidden: Int = 42
+    priv fn internal { }
+    pub fn reveal { $self-&gt;hidden }  # internal access ok
+}
+# $obj-&gt;hidden  # ERROR: field is private
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-prm-node-connect">
         <h3><a class="doc-anchor" href="#doc-prm-node-connect">#</a> <code>prm_node_connect</code></h3>
         <p><code>prm_node_connect</code> — batch 59 builtin.</p>
@@ -50247,6 +50315,15 @@ p projrange(100, 30)   # ~884 m
         <pre><code class="lang-perl">my $result = pttl $x 
 # or in a pipeline:
 @list |&gt; map pttl |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pub">
+        <h3><a class="doc-anchor" href="#doc-pub">#</a> <code>pub</code></h3>
+        <p><code>pub</code> marks a field or method as public (default visibility).</p>
+        <pre><code class="lang-perl">class Example {
+    pub name: Str       # explicitly public
+    pub fn greet { }    # explicitly public
+}
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-public-goods-game-payoff">

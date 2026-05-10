@@ -116,18 +116,12 @@ fn prime_factors_sixty_cu() {
 
 #[test]
 fn acosh_two_cu() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", acosh(2))"#),
-        "1.316957897"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", acosh(2))"#), "1.316957897");
 }
 
 #[test]
 fn asinh_one_cu() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.10g", asinh(1))"#),
-        "0.881373587"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.10g", asinh(1))"#), "0.881373587");
 }
 
 #[test]
@@ -198,10 +192,7 @@ fn chunk_n_size_first_cu() {
 /// Reversed **`(LIST, N)`** uses **`len(LIST)`** as chunk size and **`N`** as the only datum (**BUG-170**).
 #[test]
 fn chunk_n_list_first_yields_single_tail_chunk_bug_cu() {
-    assert_eq!(
-        eval_string(r#"stringify(chunk_n([1, 2, 3, 4], 2))"#),
-        "[2]"
-    );
+    assert_eq!(eval_string(r#"stringify(chunk_n([1, 2, 3, 4], 2))"#), "[2]");
 }
 
 #[test]
@@ -222,10 +213,7 @@ fn harmonic_number_ten_cu() {
 
 #[test]
 fn rank_order_three_cu() {
-    assert_eq!(
-        eval_string(r#"stringify(rank([3, 1, 2]))"#),
-        "(3, 1, 2)"
-    );
+    assert_eq!(eval_string(r#"stringify(rank([3, 1, 2]))"#), "(3, 1, 2)");
 }
 
 #[test]

@@ -49,10 +49,23 @@ pub struct StaticAnalyzer {
     errors: Vec<PerlError>,
     file: String,
     current_package: String,
+    /// When `false` (the `stryke check` default), strict-vars-style
+    /// "Global symbol \"$x\" requires explicit package name" errors are
+    /// suppressed — `stryke check` is a parse / compile gate, not a
+    /// strict-vars enforcer. Set to `true` only when the source itself
+    /// has `use strict;` (or `use strict 'vars';`), in which case we
+    /// emit so the analyzer surfaces the same diagnostics the runtime
+    /// would. Topic vars (`$_0`, `@_1`, …) and special vars (`$_`,
+    /// `@ARGV`, `%ENV`, …) stay exempt regardless.
+    strict_vars: bool,
 }
 
 impl StaticAnalyzer {
     pub fn new(file: &str) -> Self {
+        Self::with_strict_vars(file, false)
+    }
+
+    pub fn with_strict_vars(file: &str, strict_vars: bool) -> Self {
         let mut global = Scope::default();
         for name in ["_", "a", "b", "ARGV", "ENV", "SIG", "INC"] {
             global.declare_array(name);
@@ -71,6 +84,7 @@ impl StaticAnalyzer {
             errors: Vec::new(),
             file: file.to_string(),
             current_package: "main".to_string(),
+            strict_vars,
         }
     }
 
@@ -109,21 +123,21 @@ impl StaticAnalyzer {
     }
 
     fn is_scalar_defined(&self, name: &str) -> bool {
-        if is_special_var(name) {
+        if is_special_var(name) || is_topic_var(name) {
             return true;
         }
         self.scopes.iter().rev().any(|s| s.scalars.contains(name))
     }
 
     fn is_array_defined(&self, name: &str) -> bool {
-        if name == "_" || name == "ARGV" {
+        if is_special_var(name) || is_topic_var(name) {
             return true;
         }
         self.scopes.iter().rev().any(|s| s.arrays.contains(name))
     }
 
     fn is_hash_defined(&self, name: &str) -> bool {
-        if matches!(name, "ENV" | "SIG" | "INC") {
+        if is_special_var(name) || is_topic_var(name) {
             return true;
         }
         self.scopes.iter().rev().any(|s| s.hashes.contains(name))
@@ -504,21 +518,21 @@ impl StaticAnalyzer {
 
     fn analyze_expr(&mut self, expr: &Expr) {
         match &expr.kind {
-            ExprKind::ScalarVar(name) if !self.is_scalar_defined(name) => {
+            ExprKind::ScalarVar(name) if self.strict_vars && !self.is_scalar_defined(name) => {
                 self.error(
                     ErrorKind::UndefinedVariable,
                     format!("Global symbol \"${}\" requires explicit package name", name),
                     expr.line,
                 );
             }
-            ExprKind::ArrayVar(name) if !self.is_array_defined(name) => {
+            ExprKind::ArrayVar(name) if self.strict_vars && !self.is_array_defined(name) => {
                 self.error(
                     ErrorKind::UndefinedVariable,
                     format!("Global symbol \"@{}\" requires explicit package name", name),
                     expr.line,
                 );
             }
-            ExprKind::HashVar(name) if !self.is_hash_defined(name) => {
+            ExprKind::HashVar(name) if self.strict_vars && !self.is_hash_defined(name) => {
                 self.error(
                     ErrorKind::UndefinedVariable,
                     format!("Global symbol \"%{}\" requires explicit package name", name),
@@ -526,7 +540,10 @@ impl StaticAnalyzer {
                 );
             }
             ExprKind::ArrayElement { array, index } => {
-                if !self.is_array_defined(array) && !self.is_scalar_defined(array) {
+                if self.strict_vars
+                    && !self.is_array_defined(array)
+                    && !self.is_scalar_defined(array)
+                {
                     self.error(
                         ErrorKind::UndefinedVariable,
                         format!(
@@ -539,7 +556,8 @@ impl StaticAnalyzer {
                 self.analyze_expr(index);
             }
             ExprKind::HashElement { hash, key } => {
-                if !self.is_hash_defined(hash) && !self.is_scalar_defined(hash) {
+                if self.strict_vars && !self.is_hash_defined(hash) && !self.is_scalar_defined(hash)
+                {
                     self.error(
                         ErrorKind::UndefinedVariable,
                         format!("Global symbol \"%{}\" requires explicit package name", hash),
@@ -549,7 +567,7 @@ impl StaticAnalyzer {
                 self.analyze_expr(key);
             }
             ExprKind::ArraySlice { array, indices } => {
-                if !self.is_array_defined(array) {
+                if self.strict_vars && !self.is_array_defined(array) {
                     self.error(
                         ErrorKind::UndefinedVariable,
                         format!(
@@ -564,7 +582,7 @@ impl StaticAnalyzer {
                 }
             }
             ExprKind::HashSlice { hash, keys } => {
-                if !self.is_hash_defined(hash) {
+                if self.strict_vars && !self.is_hash_defined(hash) {
                     self.error(
                         ErrorKind::UndefinedVariable,
                         format!("Global symbol \"%{}\" requires explicit package name", hash),
@@ -688,7 +706,7 @@ impl StaticAnalyzer {
                 for part in parts {
                     match part {
                         StringPart::ScalarVar(name) => {
-                            if !self.is_scalar_defined(name) {
+                            if self.strict_vars && !self.is_scalar_defined(name) {
                                 self.error(
                                     ErrorKind::UndefinedVariable,
                                     format!(
@@ -700,7 +718,7 @@ impl StaticAnalyzer {
                             }
                         }
                         StringPart::ArrayVar(name) => {
-                            if !self.is_array_defined(name) {
+                            if self.strict_vars && !self.is_array_defined(name) {
                                 self.error(
                                     ErrorKind::UndefinedVariable,
                                     format!(
@@ -942,8 +960,31 @@ fn is_special_var(name: &str) -> bool {
     )
 }
 
+/// Stryke implicit closure-positional slots — `_0`, `_1`, …, `_99`. These
+/// are auto-bound inside any block that takes positional args (sort
+/// comparators, reduce blocks, sub bodies, map/grep blocks) and must never
+/// be flagged as undeclared by `stryke check` regardless of strict mode.
+/// Mirrors the scalar exemption at `vm_helper.rs:strict_scalar_exempt`,
+/// extended uniformly to scalar / array / hash sigils — `$_1`, `@_1[0]`,
+/// `%_1{k}` are all legitimate topic-var spellings.
+fn is_topic_var(name: &str) -> bool {
+    name.starts_with('_') && name.len() > 1 && name[1..].chars().all(|c| c.is_ascii_digit())
+}
+
 pub fn analyze_program(program: &Program, file: &str) -> PerlResult<()> {
     StaticAnalyzer::new(file).analyze(program)
+}
+
+/// Same as [`analyze_program`] but emits strict-vars-style undefined-symbol
+/// errors only when the source itself opted into strict (`use strict;`).
+/// `stryke check` calls this with `strict_vars = false` so the lint pass is
+/// a parse + compile gate, not a strict-vars enforcer.
+pub fn analyze_program_with_strict(
+    program: &Program,
+    file: &str,
+    strict_vars: bool,
+) -> PerlResult<()> {
+    StaticAnalyzer::with_strict_vars(file, strict_vars).analyze(program)
 }
 
 #[cfg(test)]
@@ -951,9 +992,15 @@ mod tests {
     use super::*;
     use crate::parse_with_file;
 
+    /// Test helper: run the analyzer with `strict_vars=true` so the
+    /// undefined-variable detection paths actually fire. The default
+    /// `analyze_program` entry point is lenient (parse + compile gate
+    /// for `stryke check` — strict-vars-style errors are gated on the
+    /// source actually doing `use strict;`); this helper exercises the
+    /// strict-on path that the rest of the tests below assume.
     fn lint(code: &str) -> PerlResult<()> {
         let prog = parse_with_file(code, "test.stk").expect("parse");
-        analyze_program(&prog, "test.stk")
+        analyze_program_with_strict(&prog, "test.stk", true)
     }
 
     #[test]

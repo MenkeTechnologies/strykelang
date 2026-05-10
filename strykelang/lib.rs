@@ -15,6 +15,7 @@ pub mod ast;
 pub mod builtins;
 pub mod bytecode;
 pub mod capture;
+pub mod cli_runners;
 pub mod cluster;
 pub mod compiler;
 pub mod controller;
@@ -103,6 +104,7 @@ use vm_helper::VMHelper;
 
 // ── Perl 5 strict-compat mode (`--compat`) ──────────────────────────────────
 
+use std::cell::Cell;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// When `true`, all stryke extensions are disabled and only stock Perl 5
@@ -110,10 +112,18 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// the parser, compiler, and interpreter.
 static COMPAT_MODE: AtomicBool = AtomicBool::new(false);
 
-/// When `true`, Perl-isms (`sub`, `say`, `reverse`) are rejected — forces
-/// idiomatic stryke (`fn`, `p`, `rev`). Used with `--no-interop` to train
-/// bots or enforce style.
-static NO_INTEROP_MODE: AtomicBool = AtomicBool::new(false);
+/// Process-wide default for no-interop mode. Set by `--no-interop` on the
+/// CLI. Threads without a thread-local override inherit this.
+static NO_INTEROP_DEFAULT: AtomicBool = AtomicBool::new(false);
+
+thread_local! {
+    /// Per-thread no-interop override.
+    /// `None` → use the process default; `Some(b)` → this thread's parser
+    /// sees `b` regardless of the default. Lets `check_no_interop` /
+    /// `test_no_interop` run from `pmaps` workers without racing siblings
+    /// on a shared atomic.
+    static NO_INTEROP_TLS: Cell<Option<bool>> = const { Cell::new(None) };
+}
 
 /// When `true`, integer arithmetic that overflows i64 promotes to `BigInt`
 /// instead of falling back to `f64`. Activated by `use bigint;` and
@@ -144,15 +154,33 @@ pub fn bigint_pragma() -> bool {
     BIGINT_PRAGMA.load(Ordering::Relaxed)
 }
 
-/// Enable no-interop mode (rejects Perl-isms, forces idiomatic stryke).
+/// Set the **process-wide default** for no-interop mode. Used by the CLI
+/// (`--no-interop`); threads without a thread-local override inherit it.
 pub fn set_no_interop_mode(on: bool) {
-    NO_INTEROP_MODE.store(on, Ordering::Relaxed);
+    NO_INTEROP_DEFAULT.store(on, Ordering::Relaxed);
 }
 
-/// Returns `true` when `--no-interop` is active.
+/// Set the **current thread's** no-interop override. `None` clears it;
+/// `Some(b)` pins this thread to `b`. Sibling threads are unaffected —
+/// the primitive that lets `check_no_interop` work safely from `pmaps`.
+pub fn set_no_interop_mode_tls(value: Option<bool>) {
+    NO_INTEROP_TLS.with(|c| c.set(value));
+}
+
+/// Read the current thread's no-interop override (without falling back).
+/// Used by RAII guards to save/restore.
+pub fn no_interop_mode_tls() -> Option<bool> {
+    NO_INTEROP_TLS.with(|c| c.get())
+}
+
+/// Effective no-interop flag for this thread: TLS override if set, else
+/// the process-wide default. Hot path — called from parser/lexer.
 #[inline]
 pub fn no_interop_mode() -> bool {
-    NO_INTEROP_MODE.load(Ordering::Relaxed)
+    if let Some(v) = NO_INTEROP_TLS.with(|c| c.get()) {
+        return v;
+    }
+    NO_INTEROP_DEFAULT.load(Ordering::Relaxed)
 }
 use value::PerlValue;
 
@@ -636,7 +664,12 @@ pub fn run_line_body(
 /// Also runs static analysis to detect undefined variables and subroutines.
 pub fn lint_program(program: &ast::Program, interp: &mut VMHelper) -> PerlResult<()> {
     interp.prepare_program_top_level(program)?;
-    static_analysis::analyze_program(program, &interp.file)?;
+    // Strict-vars-style "Global symbol …" errors fire only when the source
+    // itself has `use strict;` (or `use strict 'vars';`). `stryke check` on
+    // a script without strict is a parse + compile gate, not an undefined-
+    // variable enforcer. Topic vars (`$_0`, `@_1`, …) and special vars stay
+    // exempt regardless.
+    static_analysis::analyze_program_with_strict(program, &interp.file, interp.strict_vars)?;
     if interp.strict_refs || interp.strict_subs || interp.strict_vars {
         return Ok(());
     }
