@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+
+# Pinning tests for even more bugs from BUGS.md
+
+# Pinning test for BUG-124: csiszar_phi_div is not an unsigned phi-form
+my @p = (0.1, 0.9);
+my @q = (0.9, 0.1);
+my $cpd = csiszar_phi_div(@p, @q);
+# The bug says this can be negative. For these inputs, it should be.
+my $is_negative = $cpd < 0;
+aok($is_negative, "BUG-124: csiszar_phi_div should be negative for these inputs");
+
+
+# Pinning test for BUG-125: relative_entropy_kl vs kl_divergence
+my @p2 = (0.1, 0.9);
+my @q2 = (0.9, 0.1);
+my $re_kl = relative_entropy_kl(@p2, @q2);
+my $kl_div = kl_divergence(@p2, @q2);
+my $ln2 = log(2);
+
+# The bug says relative_entropy_kl is in bits, kl_divergence is in nats.
+# So, relative_entropy_kl * ln(2) should be approximately equal to kl_divergence.
+my $is_close = abs($re_kl * $ln2 - $kl_div) < 1e-9;
+aok($is_close, "BUG-125: relative_entropy_kl * ln(2) should be close to kl_divergence");
+
+
+# Pinning test for BUG-126: joint_entropy_step drops comma-arg tails
+# This function should only consider the first argument.
+my $jes = joint_entropy_step(0.5, 0.25, 0.25);
+# It should be the same as joint_entropy_step(0.5)
+my $jes_single = joint_entropy_step(0.5);
+
+aeq($jes, $jes_single, "BUG-126: joint_entropy_step should ignore trailing arguments");
+
+
+test_run

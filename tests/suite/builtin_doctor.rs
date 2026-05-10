@@ -30,7 +30,7 @@ fn stryke_binary() -> Option<PathBuf> {
         let p = PathBuf::from(cand);
         if let Ok(meta) = std::fs::metadata(&p) {
             if let Ok(m) = meta.modified() {
-                if best.as_ref().map_or(true, |(_, t)| m > *t) {
+                if best.as_ref().is_none_or(|(_, t)| m > *t) {
                     best = Some((p, m));
                 }
             }

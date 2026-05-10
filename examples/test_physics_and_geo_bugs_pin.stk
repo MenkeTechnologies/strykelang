@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+
+# Pinning tests for physics and geo bugs from BUGS.md
+
+# Pinning test for BUG-134: weber_number clamps a missing sigma
+# weber_number(rho, v, L, sigma)
+# Missing sigma should result in a very large number.
+my $weber_no_sigma = weber_number(1000, 10, 0.1);
+my $is_large = $weber_no_sigma > 1e30;
+aok($is_large, "BUG-134: weber_number with missing sigma should be very large");
+
+
+# Pinning test for BUG-135: dB_voltage missing reference
+# dB_voltage(V, V_in)
+# Missing V_in should result in a large dB value.
+my $db_no_ref = dB_voltage(1);
+my $is_large_db = $db_no_ref > 500;
+aok($is_large_db, "BUG-135: dB_voltage with missing reference should be very large");
+
+
+# Pinning test for BUG-136: geohash_neighbor is identity at precision 6
+my $hash = "dpz8"; # length 4, precision should be enough
+my $neighbor = geohash_neighbor($hash, "n");
+# The bug says it's an identity function for precision 6, should be for 4 too.
+aeq($hash, $neighbor, "BUG-136: geohash_neighbor should be identity at this precision");
+
+
+test_run

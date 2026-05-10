@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+
+# Pinning tests for Stryke features based on documentation learning
+# Compliance: docs/STYLE_GUIDE.md
+
+# 1. Namespaced Functions
+fn TestNamespace::multiply { _0 * _1 }
+TestNamespace::multiply(4, 5) |> aeq 20, "namespaced function multiply"
+
+# 2. Structs
+struct PointTest { x => Float, y => Float }
+my $pt = PointTest(x => 1.5, y => 2.5)
+$pt->x |> aeq 1.5, "struct field access x"
+$pt->y |> aeq 2.5, "struct field access y"
+$pt->x(3.0)
+$pt->x |> aeq 3.0, "struct field setter"
+
+# 3. Enums
+enum ResultStatus { Ok => Int, Err => Str }
+my $ok_res = ResultStatus::Ok(42)
+$ok_res |> str |> aeq "ResultStatus::Ok(42)", "enum stringify with data"
+
+# 4. Chained Comparisons (Raku-style)
+5 < 10 <= 10 < 20 |> aok "chained comparisons"
+0 == 0 < 1 |> aok "chained == and <"
+
+# 5. Pipe forward, list-ops, len
+(1, 2, 3) |> maps { _ * 3 } |> sum |> aeq 18, "maps and sum"
+(1, 2, 3) |> len |> aeq 3, "len operator on list"
+"hello" |> len |> aeq 5, "len operator on string"
+
+# 6. AI Primitives (Mocking)
+ai_mock_install("test prompt", "mocked response")
+ai("test prompt") |> aeq "mocked response", "ai mock call"
+
+test_run

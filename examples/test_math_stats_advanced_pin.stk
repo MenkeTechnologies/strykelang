@@ -1,0 +1,86 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Math-Advanced (2026-05-10): Advanced Math & Stats
+# Compliance: docs/STYLE_GUIDE.md
+# Documenting current behaviors (including known bugs from docs/BUGS.md)
+
+# BUG-120: cosine_distance with zero-length/zero-norm vector returns 1
+cosine_distance([0], [0]) |> aeq 1, "BUG-120: cosine_distance zero-norm returns 1"
+
+# BUG-121: median_absolute_deviation even-n spread
+# median of (1, 2, 100, 101) is treated as 100 (sorted[len/2])
+# abs(1-100)=99, abs(2-100)=98, abs(100-100)=0, abs(101-100)=1
+# sorted diffs: (0, 1, 98, 99) -> median is 98
+median_absolute_deviation(1, 2, 100, 101) |> aeq 98, "BUG-121: MAD even-n uses sorted[len/2]"
+
+# BUG-122: js_divergence (nats) vs jensen_shannon_div (bits)
+my $p = [0.1, 0.9]
+my $q = [0.2, 0.8]
+my $js_bits = jensen_shannon_div($p, $q)
+my $js_nats = js_div($p, $q)
+# js_nats should be js_bits * ln(2)
+($js_nats / $js_bits) |> sprintf("%.10f") |> aeq sprintf("%.10f", log(2)), "BUG-122: js_div (nats) vs jensen_shannon_div (bits)"
+
+# BUG-123: chi_squared_distance vs chisquare_metric (factor of 2)
+chi_squared_distance($p, $q) * 2 |> aeq chisquare_metric($p, $q), "BUG-123: chisquare_metric is twice chi_squared_distance"
+
+# BUG-125: relative_entropy_kl (bits) vs kl_divergence (nats)
+relative_entropy_kl($p, $q) * log(2) |> aeq kl_divergence($p, $q), "BUG-125: relative_entropy_kl (bits) vs kl_divergence (nats)"
+
+# BUG-126: Variadic tails ignored in many builtins
+# squared(3, 4) should ignore 4 and return 9
+squared(3, 4) |> aeq 9, "BUG-126: squared ignores variadic tail"
+# uniq(1, 1, 2, 2) |> aeq (1, 2), but if it ignores tails? 
+# Wait, BUG-126 says "uniq variadic deduplicates neighbors" but "single array bucket treated as atom".
+# Let's check uniq behavior from BUGS.md carefully.
+# "uniq_variadic_deduplicates_neighbors_ch", "uniq_single_array_bucket_treated_as_atom_ch"
+uniq(1, 1, 2, 2) |> len |> aeq 2, "uniq variadic works"
+# BUG-126/140: uniq single arrayref treated as atom, returns the array ref itself, len is original size
+uniq([1, 1, 2, 2]) |> len |> aeq 4, "BUG-126/140: uniq single arrayref treated as atom"
+
+# BUG-127: iota_range ignores args after first
+iota_range(5, 99) |> len |> aeq 5, "BUG-127: iota_range ignores second arg"
+
+# BUG-133: depreciation_double ignores salvage (middle arg)
+# depreciation_double(cost, salvage, life)
+# It uses cost (args[0]) and life (args[2]), skips args[1].
+depreciation_double(1000, 500, 10) |> aeq depreciation_double(1000, 0, 10), "BUG-133: depreciation_double ignores salvage"
+
+# BUG-140: sum/product skip arrayref innards
+sum([10, 11]) |> aeq 0, "BUG-140: sum([10, 11]) is 0"
+product([6, 7]) |> aeq 0, "BUG-140: product([6, 7]) is 0"
+
+# BUG-157: crc32 ignores all bytes after first arg
+crc32("a", "b") |> aeq crc32("a"), "BUG-157: crc32 ignores second arg"
+
+# BUG-167: gcd/lcm two-operand only
+gcd(12, 18, 35) |> aeq 6, "BUG-167: gcd ignores third arg"
+lcm(4, 6, 10) |> aeq 12, "BUG-167: lcm ignores third arg"
+
+# BUG-169: hhi uses first arg only if it's not an arrayref? 
+# "hhi(0.3, 0.3, 0.4) uses only 0.3 -> 0.3^2 = 0.09"
+hhi(0.3, 0.3, 0.4) |> aeq 0.09, "BUG-169: hhi variadic uses first share only"
+
+# BUG-170: moving_average window first
+# moving_average([1,2,3], 5) -> n=0->1, tail=[5], avg=5
+moving_average([1,2,3], 5) |> aeq 5, "BUG-170: moving_average swapped args"
+
+# BUG-176: base_convert(255, 16) parses "255" as base-16 -> 597
+base_convert(255, 16) |> aeq 597, "BUG-176: base_convert two-arg numeric parses as FROM radix"
+
+# BUG-180: format_percent(0.125) -> "0.1%"
+format_percent(0.125) |> aeq "0.1%", "BUG-180: format_percent does not scale"
+
+
+# BUG-183: binary_search needle first
+# binary_search([1, 3, 5], 5) -> target=[1,3,5]->num->3? list=[5] -> not found (-1)
+binary_search([1, 3, 5], 5) |> aeq -1, "BUG-183: binary_search swapped args"
+
+# BUG-188: datetime_strftime(EPOCH, FMT)
+# If swapped: datetime_strftime("%Y", 1234567890) -> num("%Y")->0 -> epoch 0
+# datetime_strftime(0, 1234567890) -> "1234567890" (literally uses epoch as FMT)
+# Wait, BUGS.md says: "yielding useless output (pinned string differs from a real strftime of that instant)"
+# Let's just pin that it's NOT what it should be if swapped, or just pin the current output.
+# I'll skip 188 for now as it's hard to predict exact string without knowing system timezone/etc.
+
+test_run

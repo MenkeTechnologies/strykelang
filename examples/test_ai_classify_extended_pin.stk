@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-R (2026-05-10): Extended AI Classify Tests
+# Compliance: docs/STYLE_GUIDE.md
+
+# ── AI Classify: Basic ───────────────────────────────────────────────────
+
+ai_mock_install("(?s)Classify each item below into exactly one of these labels: vehicle, animal, food", '["food", "animal", "vehicle", "food"]');
+
+my @items = ("apple", "dog", "car", "banana");
+my @labels = ("vehicle", "animal", "food");
+
+my $classified = ai_classify(\@items, "Classify these items", into => \@labels);
+
+join(",", @{$classified}) |> aeq "food,animal,vehicle,food", "ai_classify basic test";
+
+# ── AI Classify: Log Categorization ──────────────────────────────────────
+
+ai_mock_install("(?s)Classify each item below into exactly one of these labels: info, warning, error", '["error", "info", "error", "warning", "info"]');
+
+my @logs = (
+    "2026-05-10T10:00:00Z - NullPointerException",
+    "2026-05-10T10:01:00Z - User logged in",
+    "2026-05-10T10:02:00Z - Database connection failed",
+    "2026-05-10T10:03:00Z - Disk space is running low",
+    "2026-05-10T10:04:00Z - Request processed successfully"
+);
+my @log_levels = ("info", "warning", "error");
+
+my $classified_logs = ai_classify(\@logs, "Categorize these logs", into => \@log_levels);
+
+join(",", @{$classified_logs}) |> aeq "error,info,error,warning,info", "ai_classify log categorization";
+
+# ── AI Classify: Many Labels and Items ───────────────────────────────────
+
+ai_mock_install("(?s)Classify each item below into exactly one of these labels: fruit, vegetable, meat, dairy, grain, dessert", '["fruit", "vegetable", "meat", "dairy", "grain", "dessert", "fruit"]');
+
+my @many_items = ("apple", "broccoli", "chicken", "milk", "bread", "cake", "orange");
+my @many_labels = ("fruit", "vegetable", "meat", "dairy", "grain", "dessert");
+
+my $classified_many = ai_classify(\@many_items, "Classify these food items", into => \@many_labels);
+
+join(",", @{$classified_many}) |> aeq "fruit,vegetable,meat,dairy,grain,dessert,fruit", "ai_classify many labels and items";
+
+# ── AI Classify: Unclassifiable Items ────────────────────────────────────
+
+ai_mock_install("(?s)Classify each item below into exactly one of these labels: fruit, vegetable", '["fruit", "vegetable", null]');
+
+my @unclassifiable_items = ("apple", "carrot", "rock");
+my @unclassifiable_labels = ("fruit", "vegetable");
+
+my $classified_unclassifiable = ai_classify(\@unclassifiable_items, "Classify these items", into => \@unclassifiable_labels);
+
+join(",", map { $_ // "null" } @{$classified_unclassifiable}) |> aeq "fruit,vegetable,null", "ai_classify unclassifiable items";
+
+
+test_run

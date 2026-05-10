@@ -1,0 +1,51 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-X (2026-05-10): Advanced Web & Encoding
+# Compliance: docs/STYLE_GUIDE.md
+
+# ── 1. JWT (HS256) ─────────────────────────────────────────────────────────
+
+my $jwt_payload = +{ user_id => 42, role => "admin" }
+my $token = web_jwt_encode($jwt_payload)
+my $decoded = web_jwt_decode($token)
+$decoded->{user_id} |> aeq 42, "JWT encode/decode roundtrip"
+
+# ── 2. TOTP (RFC 6238) ─────────────────────────────────────────────────────
+
+my $secret = web_otp_secret()
+my $code = web_otp_generate($secret)
+web_otp_verify($secret, $code) |> aok "TOTP verify success"
+
+# ── 3. Faker ───────────────────────────────────────────────────────────────
+
+web_faker_name() |> maps { _ =~ /^\w+ \w+$/ } |> aok "Faker name format"
+web_faker_email() |> maps { _ =~ /@/ } |> aok "Faker email format"
+
+# ── 4. Markdown (Tiny subset) ──────────────────────────────────────────────
+
+"# Hello\n**bold**" |> web_markdown |> maps { _ =~ /<h1>Hello<\/h1>/ && _ =~ /<strong>bold<\/strong>/ } |> aok "Markdown rendering"
+
+# ── 5. CSV Export ──────────────────────────────────────────────────────────
+
+my @rows = (+{ id => 1, name => "Alice" }, +{ id => 2, name => "Bob" })
+web_csv(\@rows) |> maps { _ =~ /id,name/ && _ =~ /1,Alice/ } |> aok "CSV export arrayref"
+web_csv(@rows) |> maps { _ =~ /id,name/ && _ =~ /2,Bob/ } |> aok "CSV export flat list"
+
+# ── 6. Yield Content ───────────────────────────────────────────────────────
+
+web_content_for "sidebar", "<ul><li>Link</li></ul>"
+web_yield_content("sidebar") |> aeq "<ul><li>Link</li></ul>", "yield_content"
+
+# ── 7. Link/Button Helpers ─────────────────────────────────────────────────
+
+web_link_to("Home", "/", class => "nav") |> aeq '<a href="/" class="nav">Home</a>', "link_to helper"
+web_button_to("Del", "/p", method => "delete") |> maps { _ =~ /_method" value="delete"/ } |> aok "button_to delete"
+
+# ── 8. JSON:API ────────────────────────────────────────────────────────────
+
+my $row = +{ id => 10, title => "Stryke" }
+my $japi = web_jsonapi_resource("post", $row)
+$japi->{data}{type} |> aeq "post", "JSON:API resource type"
+$japi->{data}{attributes}{title} |> aeq "Stryke", "JSON:API resource attrs"
+
+test_run

@@ -1,0 +1,52 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-R (2026-05-10): Extended AI Match Tests
+# Compliance: docs/STYLE_GUIDE.md
+
+# ── AI Match: Strings ───────────────────────────────────────────────────
+
+ai_mock_install(
+    "Match items from the first list to items in the second list. For each item in the first list, output the index of the best match from the second list, or -1 for no good match. Hint: fruit similarity",
+    '[1, -1, 0]'
+);
+
+my @list1_string = ("apple", "banana", "grape");
+my @list2_string = ("grapefruit", "apple pie");
+my $matched_string = ai_match(\@list1_string, against => \@list2_string, hint => "fruit similarity");
+
+join(",", @{$matched_string}) |> aeq "1,-1,0", "ai_match strings";
+
+# ── AI Match: Numbers ───────────────────────────────────────────────────
+
+ai_mock_install(
+    "Match items from the first list to items in the second list. For each item in the first list, output the index of the best match from the second list, or -1 for no good match. Hint: closest number",
+    '[0, 2, -1]'
+);
+
+my @list1_numeric = (10, 20, 30);
+my @list2_numeric = (11, 2, 22);
+my $matched_numeric = ai_match(\@list1_numeric, against => \@list2_numeric, hint => "closest number");
+
+join(",", @{$matched_numeric}) |> aeq "0,2,-1", "ai_match numbers";
+
+# ── AI Match: By Hash Key ───────────────────────────────────────────────
+
+ai_mock_install(
+    "Match items from the first list to items in the second list. For each item in the first list, output the index of the best match from the second list, or -1 for no good match. Hint: similar name and age",
+    '[1, 0]'
+);
+
+my @list1_hash = (
+    +{ name => "Alice", age => 30 },
+    +{ name => "Bob", age => 25 }
+);
+my @list2_hash = (
+    +{ name => "Robert", age => 26 },
+    +{ name => "Alicia", age => 29 }
+);
+my $matched_hash = ai_match(\@list1_hash, against => \@list2_hash, hint => "similar name and age");
+
+join(",", @{$matched_hash}) |> aeq "1,0", "ai_match by hash key";
+
+
+test_run

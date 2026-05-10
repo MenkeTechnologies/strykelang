@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-W (2026-05-10): Parallel Guard & Mutation Safety
+# Compliance: docs/STYLE_GUIDE.md
+# Mandate: Captured variables cannot be modified unless mysync/oursync.
+
+# ── 1. Allowed Mutations (mysync/oursync) ─────────────────────────────────
+
+mysync $ms_count = 0
+pfor { $ms_count++ } (1:10)
+$ms_count |> aeq 10, "mysync scalar mutation allowed in pfor"
+
+oursync $os_count = 0
+fan 5 { $os_count += 2 }
+$os_count |> aeq 10, "oursync scalar mutation allowed in fan"
+
+# ── 2. Allowed Local Mutations ─────────────────────────────────────────────
+
+pfor {
+    my $local = 0
+    $local += 5
+    # No error since $local is block-local, not captured.
+} (1:1)
+aok 1, "block-local mutation allowed"
+
+# ── 3. Rejection of Captured Lexical Mutation ──────────────────────────────
+
+# We pin the error Kind for illegal mutations.
+# Since we are in a script, we use eval { } to catch runtime errors.
+my $captured = 0
+my $err_msg = ""
+eval {
+    # pfor is eager and propagates the first error it sees.
+    pfor { $captured = 1 } (1)
+}
+$@ |> maps { _ =~ /cannot assign to captured outer lexical/ } |> aok "pfor rejects captured lexical assignment"
+
+# ── 4. Aggregate Rejection ─────────────────────────────────────────────────
+
+my @captured_arr = (1)
+eval {
+    pfor { push @captured_arr, 2 } (1)
+}
+$@ |> maps { _ =~ /cannot assign to captured outer lexical/ } |> aok "pfor rejects captured aggregate mutation (push)"
+
+# ── 5. Package Variable Rejection ──────────────────────────────────────────
+
+$main::pkg_var = 0
+eval {
+    pfor { $main::pkg_var = 1 } (1)
+}
+$@ |> maps { _ =~ /declare `oursync` for shared package-global state/ } |> aok "pfor rejects captured package-var mutation"
+
+# ── 6. Allowed Topic Mutation ──────────────────────────────────────────────
+
+# The topic _ is specifically allowed to be mutated (it's a fresh binding per iteration)
+my @res = (1:3) |> pmap { _ *= 10; _ } |> collect |> sort
+join(",", @res) |> aeq "10,20,30", "topic _ mutation allowed in pmap"
+
+test_run

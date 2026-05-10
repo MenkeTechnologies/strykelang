@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+
+# Pinning tests for more kernel and list bugs from BUGS.md
+
+# Pinning test for BUG-137: box_blur_kernel radius
+# The bug says that box_blur_kernel(r) produces a (2r+1)x(2r+1) kernel.
+my $kernel = box_blur_kernel(3);
+# So for r=3, the size should be 7x7=49.
+aeq(len($kernel), 49, "BUG-137: box_blur_kernel(3) should produce a 49-element kernel");
+
+
+# Pinning test for BUG-138: clamp call-shape heuristic
+# clamp(11, 0, 10) becomes min=11, max=0, values [10], and 10 < 11 clamps to 11
+my $clamped = clamp(11, 0, 10);
+aeq($clamped, 11, "BUG-138: clamp(11, 0, 10) should be 11");
+
+
+# Pinning test for BUG-139: normalize always 0..1
+# normalize(OUT_MIN, OUT_MAX, LIST) is the documented form, but it's not implemented.
+# The implementation flattens all arguments and normalizes to 0..1.
+my @data = (100, 200, 300, 400, 500);
+my @normalized = normalize(0, 10, @data);
+# The min (0) and max (10) are treated as data points.
+# The data becomes (0, 10, 100, 200, 300, 400, 500).
+# The max value 500 should be normalized to 1.
+aeq(@normalized[-1], 1, "BUG-139: normalize should treat all args as data and normalize to 0..1");
+
+
+test_run

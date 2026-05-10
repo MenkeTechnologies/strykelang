@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+
+# Pinning tests for signal processing bugs from BUGS.md
+
+# Pinning test for BUG-127: iota_range ignores arguments after the first
+my @iota1 = iota_range(5, 99);
+my @iota2 = iota_range(5);
+aeq(join("", @iota1), join("", @iota2), "BUG-127: iota_range should ignore arguments after the first");
+
+
+# Pinning test for BUG-129: convolve_full returns size, not values
+my @a = (1, 2, 3);
+my @b = (4, 5);
+my $conv_full = convolve_full(@a, @b);
+aeq($conv_full, 1, "BUG-129: convolve_full should return 1");
+
+
+# Pinning test for BUG-130: detrend_linear returns slope, not samples
+my @data = (1, 2, 3, 4, 5);
+my $detrended = detrend_linear(@data);
+aeq($detrended, 0, "BUG-130: detrend_linear should return 0");
+
+
+test_run

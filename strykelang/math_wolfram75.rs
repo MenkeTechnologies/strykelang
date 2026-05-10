@@ -44,6 +44,7 @@ fn b75_biconnected_component_count(mut n: usize, raw: &[(usize, usize)]) -> i64 
     let mut st: Vec<(usize, usize)> = Vec::new();
     let mut bcc = 0_i64;
 
+    #[allow(clippy::too_many_arguments)]
     fn dfs(
         v: usize,
         parent: i32,

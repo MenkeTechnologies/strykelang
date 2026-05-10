@@ -11017,6 +11017,9 @@ impl VMHelper {
                             )
                             .into());
                         };
+                        // Save topic chain before sort — set_sort_pair writes to $_
+                        // which corrupts _< for subsequent pipeline stages.
+                        let saved_topic = self.scope.save_topic_chain();
                         let sub = sub.clone();
                         items.sort_by(|a, b| {
                             // `set_sort_pair` keeps Perl-style `$a`/`$b` package-
@@ -11038,11 +11041,15 @@ impl VMHelper {
                                 Err(_) => Ordering::Equal,
                             }
                         });
+                        self.scope.restore_topic_chain(saved_topic);
                     }
                     Some(SortComparator::Block(cmp_block)) => {
                         if let Some(mode) = detect_sort_block_fast(cmp_block) {
                             items.sort_by(|a, b| sort_magic_cmp(a, b, mode));
                         } else {
+                            // Save topic chain before sort — set_sort_pair writes to $_
+                            // which corrupts _< for subsequent pipeline stages.
+                            let saved_topic = self.scope.save_topic_chain();
                             let cmp_block = cmp_block.clone();
                             items.sort_by(|a, b| {
                                 self.scope.set_sort_pair(a.clone(), b.clone());
@@ -11060,6 +11067,7 @@ impl VMHelper {
                                     Err(_) => Ordering::Equal,
                                 }
                             });
+                            self.scope.restore_topic_chain(saved_topic);
                         }
                     }
                     None => {

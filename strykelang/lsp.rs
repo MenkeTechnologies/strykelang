@@ -5512,12 +5512,7 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
     ),
     (
         "Test Runner (worker pool)",
-        &[
-            "test",
-            "test_no_interop",
-            "check",
-            "check_no_interop",
-        ],
+        &["test", "test_no_interop", "check", "check_no_interop"],
     ),
     (
         "AI primitives (docs/AI_PRIMITIVES.md)",

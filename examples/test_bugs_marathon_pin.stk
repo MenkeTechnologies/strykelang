@@ -1,0 +1,73 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Bugs-Marathon (2026-05-10): Deep Bugs & Parity
+# Compliance: docs/STYLE_GUIDE.md
+
+# ── 1. Weak Refs (BUG-022) ────────────────────────────────────────────────
+
+# weaken and isweak exist but isweak is always false
+my $a_22 = [1]
+my $b_22 = $a_22
+weaken($b_22)
+isweak($b_22) |> maps { !_ } |> aok "BUG-022: isweak always false today"
+
+# ── 2. Match Position (BUG-038) ───────────────────────────────────────────
+
+my $s_38 = "abc"
+$s_38 =~ /a/g
+pos($s_38) |> maps { !defined(_) } |> aok "BUG-038: pos() is undef outside while loop"
+
+# ── 3. Math Constants (BUG-064) ───────────────────────────────────────────
+
+# pi/tau are builtins, PI/TAU/E are barewords (usually)
+pi |> maps { _ > 3.14 && _ < 3.15 } |> aok "pi builtin works"
+tau |> maps { _ > 6.28 && _ < 6.29 } |> aok "tau builtin works"
+# In --no-interop, barewords might fail or just stringify. 
+# Let's check what they do.
+tj(PI) |> aeq '"PI"', "BUG-064: PI is a bareword string"
+tj(E) |> aeq '"E"', "BUG-064: E is a bareword string"
+
+# ── 4. Prototype of Builtins (BUG-052) ────────────────────────────────────
+
+# Builtins have empty prototypes today
+prototype("push") |> aeq "", "BUG-052: prototype('push') is empty"
+
+# ── 5. Stress Primitives ──────────────────────────────────────────────────
+
+# stress_cpu(1) runs for 1 second and returns hash count
+my $hashes = stress_cpu(1)
+$hashes |> maps { _ > 0 } |> aok "stress_cpu(1) returns positive hash count"
+
+# ── 6. refaddr of repeated references (BUG-102) ───────────────────────────
+
+fn myff_102 { 1 }
+my $r1_102 = \&myff_102
+my $r2_102 = \&myff_102
+refaddr($r1_102) != refaddr($r2_102) |> aok "BUG-102: refaddr of repeated \\&fn differs"
+
+# ── 7. Single scalar destructure (BUG-101) ────────────────────────────────
+
+my @arr_101 = (10, 20, 30)
+my ($x_101) = @arr_101
+$x_101 |> aeq 3, "BUG-101: my ($x) = @arr returns count"
+
+# ── 8. to_json options (BUG-106) ──────────────────────────────────────────
+
+# to_json treats second arg as array element, not options hashref
+to_json({a => 1}, {pretty => 1}) |> aeq '[{"a":1},{"pretty":1}]', "BUG-106: to_json treats options as array element"
+
+# ── 9. BEGIN mutations lost (BUG-078) ─────────────────────────────────────
+
+our $log_78 = ""
+BEGIN { $main::log_78 .= "B" }
+$log_78 .= "M"
+# It seems in some contexts it stringifies to SCALAR(0x...)M
+$log_78 |> maps { _ =~ /SCALAR\(0x\w+\)M/ || _ eq "M" } |> aok "BUG-078: BEGIN mutations lost (or stringified bug)"
+
+# ── 10. List-form system (BUG-031) ────────────────────────────────────────
+
+# system(LIST) drops exit code in $?
+system("sh", "-c", "exit 7")
+$? |> aeq 0, "BUG-031: system(LIST) drops exit code"
+
+test_run
