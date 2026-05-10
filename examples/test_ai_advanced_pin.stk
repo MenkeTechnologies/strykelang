@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-R (2026-05-10): Advanced AI Primitives
+# Compliance: docs/STYLE_GUIDE.md
+
+# ── AI Sort ───────────────────────────────────────────────────────────────
+
+# Prompt: Sort these items by: alphabetical. Best/most-relevant first...
+ai_mock_install("(?s)Sort these items by: alphabetical", '[2, 1, 0]')
+my @items = qw(cherry banana apple)
+join(",", @{ ai_sort(\@items, "alphabetical") }) |> aeq "apple,banana,cherry", "ai_sort mock"
+
+# ── AI Dedupe ─────────────────────────────────────────────────────────────
+
+# Prompt: Group duplicates among these items (same fruit)...
+ai_mock_install("(?s)Group duplicates among these items \(same fruit\)", "[[0, 2], [1]]")
+my @dupes = qw(apple banana apple)
+join(",", @{ ai_dedupe(\@dupes, "same fruit") }) |> aeq "apple,banana", "ai_dedupe mock"
+
+# ── AI Classify ───────────────────────────────────────────────────────────
+
+# Prompt: Classify each item below into exactly one of these labels: fruit, other...
+ai_mock_install("(?s)Classify each item below into exactly one of these labels: fruit, other", '["fruit", "fruit", "other"]')
+my @to_class = qw(apple orange rock)
+join(",", @{ ai_classify(\@to_class, "food", into => ["fruit", "other"]) }) |> aeq "fruit,fruit,other", "ai_classify mock"
+
+# ── AI Translate ──────────────────────────────────────────────────────────
+
+ai_mock_install("(?i)Translate.*Spanish", "Hola")
+ai_translate("Hello", to => "Spanish") |> aeq "Hola", "ai_translate mock"
+
+# ── AI Summarize ──────────────────────────────────────────────────────────
+
+ai_mock_install("(?s)Summarize.*long text", "Short summary")
+ai_summarize("Very long text...", words => 2) |> aeq "Short summary", "ai_summarize mock"
+
+# ── AI Map ────────────────────────────────────────────────────────────────
+
+# Prompt: Apply this instruction to each item: uppercase...
+ai_mock_install("(?s)Apply this instruction to each item: uppercase", '["APPLE", "BANANA"]')
+join(",", @{ ai_map(["apple", "banana"], "uppercase") }) |> aeq "APPLE,BANANA", "ai_map mock"
+
+# ── AI Filter ─────────────────────────────────────────────────────────────
+
+# Prompt: Decide whether each item below matches this criterion: is edible...
+ai_mock_install("(?s)Decide whether each item below matches this criterion: is edible", '[true, false]')
+join(",", @{ ai_filter(["apple", "rock"], "is edible") }) |> aeq "apple", "ai_filter mock"
+
+test_run

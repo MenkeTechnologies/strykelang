@@ -41,7 +41,7 @@ pmaps {
 
     if ($err) {
         push @failed, +{ name => $name, err => $err }
-        ep "  FAIL $name [$err]"
+        p "  FAIL $name [$err]"
     } else {
         $pass++
         p "  OK   $name" unless $summary
@@ -50,9 +50,9 @@ pmaps {
 
 my $total = $pass + len(@failed)
 p ""
-p "exercism: $pass/$total passed (", len(@failed), " failed)"
+p "exercism: $pass/$total passed (#{len(@failed)} failed)"
 
-if (len(@failed)) {
+if (len @failed) {
     p "failed:"
     p "  $_->{name} [$_->{err}]" for @failed
     exit 1

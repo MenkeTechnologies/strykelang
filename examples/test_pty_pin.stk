@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-P (2026-05-10): Expect & PTY Automation
+# Compliance: docs/STYLE_GUIDE.md
+
+# ── Spawn & Send ───────────────────────────────────────────────────────────
+
+# We spawn 'cat' as a simple echo-like PTY process
+my $h = pty_spawn("cat")
+pty_send($h, "hello-stryke\n")
+pty_expect($h, qr/hello-stryke/, 5) |> aok "pty echo match"
+pty_close($h)
+
+# ── Table Form ─────────────────────────────────────────────────────────────
+
+my $h2 = pty_spawn("cat")
+pty_send($h2, "trigger\n")
+# Bare builtin returns +{matched=>"...", action=>$cv}
+my $res = pty_expect_table($h2, [
+    +{ re => qr/trigger/, do => fn { "got_it" } }
+], 5)
+$res->{matched} |> aeq "trigger", "pty table match"
+pty_close($h2)
+
+# ── ANSI Strip ─────────────────────────────────────────────────────────────
+
+pty_strip_ansi("\x1b[31mred\x1b[0m") |> aeq "red", "ansi strip"
+
+test_run

@@ -7828,14 +7828,15 @@ impl Parser {
         self.suppress_parenless_call = self.suppress_parenless_call.saturating_sub(1);
         let source_expr = source_expr?;
 
-        // Per-chunk stage chain: we want `result` to start as `$_` (topic)
-        // since the par_reduce runtime binds the chunk to the topic. The
-        // existing `pipe_rhs_wrap` path inits `result` to `$_[0]`, and
-        // par_reduce's runtime also declares `@_` = [chunk] for the
-        // worker invocation, so `$_[0]` == `$_` inside the block.
-        self.pipe_rhs_depth = self.pipe_rhs_depth.saturating_add(1);
+        // Per-chunk stage chain: stages operate on `@_` (the chunk elements)
+        // which the par_reduce runtime binds as the argument array. Use
+        // `pending_thread_input` to seed the stage chain with `@_`.
+        self.pending_thread_input = Some(Expr {
+            kind: ExprKind::ArrayVar("_".into()),
+            line,
+        });
         let chunk_chain = self.parse_thread_macro_inner(line, thread_last, None);
-        self.pipe_rhs_depth = self.pipe_rhs_depth.saturating_sub(1);
+        self.pending_thread_input = None;
         let chunk_chain = chunk_chain?;
 
         // `parse_thread_macro_inner` (under pipe_rhs_depth > 0) wraps its
@@ -12834,6 +12835,8 @@ impl Parser {
         // matching Perl 5: `perldoc -f print` / `-f say` say "If no arguments
         // are given, prints $_." (Same convention as the topic-default unary
         // builtins handled in `parse_one_arg_or_default`.)
+        // Use `parse_list_until_terminator_allow_pipe` so that `p @a |> sum`
+        // parses as `p(sum(@a))`, matching `~>` thread-first behavior.
         let args =
             if matches!(self.peek(), Token::LParen) && matches!(self.peek_at(1), Token::RParen) {
                 let line_topic = self.peek_line();
@@ -12844,7 +12847,7 @@ impl Parser {
                     line: line_topic,
                 }]
             } else {
-                self.parse_list_until_terminator()?
+                self.parse_list_until_terminator_allow_pipe()?
             };
         Ok(Expr {
             kind: make(handle, args),
@@ -17911,6 +17914,18 @@ impl Parser {
     }
 
     fn parse_list_until_terminator(&mut self) -> PerlResult<Vec<Expr>> {
+        self.parse_list_until_terminator_inner(false)
+    }
+
+    /// Variant of `parse_list_until_terminator` that allows `|>` within arguments.
+    /// Used by print-like statements (`p`, `say`, `print`, `printf`) so that
+    /// `p @a |> sum` parses as `p(sum(@a))` rather than `sum(p(@a))`, matching
+    /// the behavior of `~>` thread-first macro.
+    fn parse_list_until_terminator_allow_pipe(&mut self) -> PerlResult<Vec<Expr>> {
+        self.parse_list_until_terminator_inner(true)
+    }
+
+    fn parse_list_until_terminator_inner(&mut self, allow_pipe: bool) -> PerlResult<Vec<Expr>> {
         let mut args = Vec::new();
         // Line of the last consumed token (the keyword / function name that
         // triggered this arg parse).  Used for implicit-semicolon: if no args
@@ -17918,10 +17933,21 @@ impl Parser {
         // treat the newline as a statement boundary and stop.
         let call_line = self.prev_line();
         loop {
-            if matches!(
-                self.peek(),
-                Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof | Token::PipeForward
-            ) {
+            // When `allow_pipe` is false, `|>` terminates the list (preserving
+            // left-associativity for chains like `@a |> head 2 |> join "-"`).
+            // When true (print-like statements), `|>` is allowed within args.
+            let is_terminator = if allow_pipe {
+                matches!(
+                    self.peek(),
+                    Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof
+                )
+            } else {
+                matches!(
+                    self.peek(),
+                    Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof | Token::PipeForward
+                )
+            };
+            if is_terminator {
                 break;
             }
             // Check for postfix modifiers — stop before `expr for LIST` / `expr if COND` etc.
@@ -17942,9 +17968,14 @@ impl Parser {
             if args.is_empty() && self.peek_line() > call_line {
                 break;
             }
-            // Paren-less builtin args: `|>` terminates the whole call list, so
+            // When `allow_pipe` is true, pipe chains are consumed within each
+            // argument. When false, `|>` terminates the whole call list, so
             // individual args must not absorb a following `|>`.
-            args.push(self.parse_assign_expr_stop_at_pipe()?);
+            if allow_pipe {
+                args.push(self.parse_assign_expr()?);
+            } else {
+                args.push(self.parse_assign_expr_stop_at_pipe()?);
+            }
             if !self.eat(&Token::Comma) {
                 break;
             }

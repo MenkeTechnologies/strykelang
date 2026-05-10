@@ -1,50 +1,32 @@
 #!/usr/bin/env stryke
 
 # Pinning batch Native-H (2026-05-10): Specialized (AI, Stress, SQLite)
+# Compliance: docs/STYLE_GUIDE.md
 
 # ── AI Primitives (Extra) ──────────────────────────────────────────────────
 
-# ai_models (returns defaults in mock-only mode)
-my $models = ai_models("openai")
-assert_eq($models->[0], "mock-model-1", "ai_models mock-only first")
-
-# ai_image
+ai_models("openai")->[0] |> aeq "mock-model-1", "ai_models mock-only first"
 ai_mock_install("image", "BINARY_DATA")
-my $img = ai_image("cat")
-assert_eq($img, "BINARY_DATA", "ai_image mock")
+ai_image("cat") |> aeq "BINARY_DATA", "ai_image mock"
 
 # ── Stress Testing ─────────────────────────────────────────────────────────
 
-# We run short durations to avoid actual CPU load in tests
-my $c = stress_cpu(0.1)
-assert_ok($c >= 0, "stress_cpu returned hash count")
-
-my $m = stress_mem(1e6) # 1MB
-assert_eq($m, 1000000, "stress_mem returns bytes touched")
+stress_cpu(0.1) >= 0 |> aok "stress_cpu"
+stress_mem(1e6) |> aeq 1000000, "stress_mem returns bytes touched"
 
 # ── SQLite Builtin ─────────────────────────────────────────────────────────
 
 my $db = sqlite(":memory:")
 $db->exec("CREATE TABLE t(x INT)")
 $db->exec("INSERT INTO t VALUES (42)")
-my $res = $db->query("SELECT x FROM t")
-assert_eq($res->[0]{x}, 42, "sqlite memory db query")
+$db->query("SELECT x FROM t")->[0]{x} |> aeq 42, "sqlite query"
 
 # ── Number Theory & Stats (More) ───────────────────────────────────────────
 
-# next_prime
-assert_eq(next_prime(10), 11, "next_prime(10)")
-assert_eq(next_prime(11), 13, "next_prime(11)")
-
-# mode_val
-assert_eq(mode_val([1, 2, 2, 3]), 2, "mode_val on arrayref")
-
-# harmonic_mean
-my $hm = harmonic_mean(1, 2, 4) # 3 / (1 + 0.5 + 0.25) = 3 / 1.75 = 1.71428
-assert_ok(abs($hm - 1.714) < 0.01, "harmonic_mean calculation")
-
-# geometric_mean
-my $gm = geometric_mean(1, 2, 4) # (1*2*4)^(1/3) = 8^(1/3) = 2
-assert_eq($gm, 2, "geometric_mean calculation")
+next_prime(10) |> aeq 11, "next_prime(10)"
+next_prime(11) |> aeq 13, "next_prime(11)"
+mode_val([1, 2, 2, 3]) |> aeq 2, "mode_val on arrayref"
+harmonic_mean(1, 2, 4) |> map { abs(_ - 1.714) < 0.01 } |> aok "harmonic_mean"
+geometric_mean(1, 2, 4) |> aeq 2, "geometric_mean"
 
 test_run

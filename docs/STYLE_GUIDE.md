@@ -67,8 +67,46 @@ In a pipeline, parens are almost never needed because `|>` / `~>` already supply
 | DO | DON'T | Why |
 |---|---|---|
 | `p $x` | `print $x`, `print "$x\n"`, `say $x` | `p` is the canonical print-with-newline. One char vs five-to-seven. **`print` is rejected by `--no-interop`.** |
+| `warn "$msg"` | `print STDERR "$msg\n"` | `warn` is the stryke-and-Perl verb for stderr. Auto-appends `\n` if the message doesn't end with one. Catchable via `$SIG{__WARN__}`. |
 | `@xs \|> e p` | `for (@xs) { p $_ }` | Pipe-forward + `e` (each) collapses the loop to four chars after the pipe. |
+| `@xs \|> ep` | `@xs \|> e p` | `ep` = `e { p }` shorthand. **Goes to stdout, NOT stderr** — name is "each-print", not "err-print". |
 | `ddump $struct` | `use Data::Dumper; print Dumper($struct)` | Built-in pretty-printer; one bareword. |
+
+---
+
+## 1a. String interpolation — `#{ … }` / `${ … }` over `.` concat
+
+stryke supports four interpolation forms inside double-quoted strings. **Always interpolate; never build strings with `.` concatenation when interpolation reaches.**
+
+| Form | Example | Use when |
+|---|---|---|
+| `$name` | `"hello, $name!"` | Bare scalar; the cheapest form. |
+| `${name}` | `"file_${name}.txt"` | Bare scalar **with disambiguation** — when adjacent chars would extend the var name (`${name}_v2`, not `$name_v2` which looks for `$name_v2`). |
+| `#{ EXPR }` | `"x squared is #{$x * $x}"`, `"sum: #{sum @a}"`, `"page #{1 + $i}"` | Ruby-style interpolation of an **arbitrary expression** — math, function calls, method calls, anything. The only form that's not just-a-variable. |
+| `@arr` | `"items: @arr"` | Array interpolation (joined by `$"`, default `" "`). |
+
+| DO | DON'T | Why |
+|---|---|---|
+| `"hello, $name!"` | `"hello, " . $name . "!"` | Three concatenations vs zero; reads as one literal. |
+| `"x squared is #{$x * $x}"` | `"x squared is " . ($x * $x)` | `#{}` lets the expression sit inline; no parens-and-dots dance. |
+| `"sum: #{sum @a}"` | `"sum: " . sum(@a)` | Function calls work in `#{}`. |
+| `"file_${name}.txt"` | `"file_" . $name . ".txt"` | `${}` disambiguates when the next char would extend the var name. |
+| `"items: @arr"` | `"items: " . join(" ", @arr)` | Array interpolation auto-joins with `$"` (default space). |
+
+`.` concat is **only** correct when both sides are non-string-literals (`$a . $b` joining two variables) or when computing a string lazily across statements. Inside a single string-literal context, always interpolate.
+
+```stryke
+# RIGHT — interpolated
+my $name = "world"
+p "hello, $name!"
+p "sum is #{sum @nums}"
+p "page ${i}_of_${total}"
+
+# WRONG — concatenated
+p "hello, " . $name . "!"
+p "sum is " . sum(@nums)
+p "page " . $i . "_of_" . $total
+```
 
 ---
 
@@ -361,7 +399,7 @@ Mix freely. The placeholder `_` is always available and overrides the implicit p
 | DO | DON'T | Why |
 |---|---|---|
 | `@xs \|> e p` | `for my $x (@xs) { p $x }` | `e` is each-call; `e p` = call `p` on each element. |
-| `@xs \|> ep` | `for (@xs) { print STDERR "$_\n" }` | `ep` = each-`p`-stderr. |
+| `@xs \|> ep` | `@xs \|> e p` (when chained from a pipeline) | `ep` is shorthand for `e { p }` — each-then-print. **Equivalent to `e p`, both go to stdout.** |
 | `pmaps { … } @xs` | `[pmap { … } @xs]` then iterate | `pmaps` is the streaming parallel iter — lazy, no intermediate vec. |
 | `pgreps { … } @xs` | `[pgrep { … } @xs]` | Streaming parallel filter; same reason. |
 | `flat_maps`, `pflat_maps` | `flat_map { … } \|> e` | Stream variant; no list materialization. |

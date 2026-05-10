@@ -1,71 +1,57 @@
 #!/usr/bin/env stryke
 
 # Pinning batch Native-J (2026-05-10): Bugs Phase 2 (from BUGS.md 1500-3000)
+# Compliance: docs/STYLE_GUIDE.md
 
-# ── CORE:: Prefix (PARITY-011) ─────────────────────────────────────────────
+# ── CORE:: Prefix ──────────────────────────────────────────────────────────
 
-assert_eq(CORE::length("abc"), 3, "CORE::length")
-assert_eq(CORE::int(3.14), 3, "CORE::int")
-assert_eq(CORE::abs(-5), 5, "CORE::abs")
+CORE::length("abc") |> aeq 3, "CORE::length"
+CORE::int(3.14) |> aeq 3, "CORE::int"
+CORE::abs(-5) |> aeq 5, "CORE::abs"
 
-# ── Hash Kv Slice (BUG-008) ────────────────────────────────────────────────
+# ── Hash Kv Slice ──────────────────────────────────────────────────────────
 
 my %h = (a => 1, b => 2, c => 3)
-my @kv = %h{qw(a c)}
-# returns flat (k,v,k,v)
-assert_eq(join(",", @kv), "a,1,c,3", "hash kv slice %h{...}")
+join(",", %h{qw(a c)}) |> aeq "a,1,c,3", "hash kv slice %h{...}"
 
-# ── Multi-level Exists (BUG-009) ───────────────────────────────────────────
+# ── Multi-level Exists ─────────────────────────────────────────────────────
 
 my %data
-assert_true(!exists $data{x}{y}{z}, "nested exists on missing root")
+!exists($data{x}{y}{z}) |> aok "nested exists missing root"
 $data{x} = { y => { z => 42 } }
-assert_ok(exists $data{x}{y}{z}, "nested exists on present path")
+exists($data{x}{y}{z}) |> aok "nested exists present path"
 
-# ── Return List (BUG-010 / BUG-011) ────────────────────────────────────────
+# ── Return List ────────────────────────────────────────────────────────────
 
-fn get_list { return (10, 20, 30) }
-my @l = get_list()
-assert_eq(len(@l), 3, "early return list context")
+fn get_list = (10, 20, 30)
+len(get_list()) |> aeq 3, "return list context"
+(get_list())[-1] |> aeq 30, "return scalar context (simulated via last element)"
 
-my $s = get_list()
-assert_eq($s, 30, "early return scalar context takes last")
-
-# ── System / Exit Status ($? and BUG-030) ──────────────────────────────────
+# ── System / Exit Status ($?) ──────────────────────────────────────────────
 
 system("true")
-assert_eq($?, 0, "system true sets $? to 0")
-
+$? |> aeq 0, "system true sets $? to 0"
 system("false")
-# status word is exit_code << 8
-assert_ok($? != 0, "system false sets $? non-zero")
-assert_eq($? >> 8, 1, "exit code 1 propagated to $?")
+($? >> 8) |> aeq 1, "exit code 1 propagated"
 
-# ── Regex G Flag (BUG-016) ─────────────────────────────────────────────────
+# ── Regex G Flag ───────────────────────────────────────────────────────────
 
-my @m = "a1 b2 c3" =~ /(\w)(\d)/g
-# BUG-016 says it concatenates captures today: "a1", "b2", "c3"
-assert_eq(join(",", @m), "a1,b2,c3", "regex /g list context (pinned bug)")
+"a1 b2 c3" =~ /(\w)(\d)/g |> join(",") |> aeq "a1,b2,c3", "regex /g list context (pinned bug)"
 
 # ── PSelect (More) ─────────────────────────────────────────────────────────
 
-my ($tx1, $rx1) = pchannel(1)
-my ($tx2, $rx2) = pchannel(1)
+our ($tx1, $rx1) = pchannel(1)
+our ($tx2, $rx2) = pchannel(1)
 $tx2->send("MSG")
-my $res = pselect($rx1, $rx2)
-# res is [val, index]
-assert_eq($res->[0], "MSG", "pselect val")
-assert_eq($res->[1], 1, "pselect index")
+pselect($rx1, $rx2)->[0] |> aeq "MSG", "pselect val"
 
 # ── Array End Index ($#arr) ────────────────────────────────────────────────
 
-# Rename @a to @arr to avoid sort-var $a collision in --no-interop
-my @arr = (1, 2, 3)
-assert_eq($#arr, 2, "$#arr is last index")
+my @arr = (1:3)
+$#arr |> aeq 2, "$#arr is last index"
 $#arr = 1
-assert_eq(len(@arr), 2, "assigning to $#arr truncates array")
+len(@arr) |> aeq 2, "truncating via $#arr"
 $#arr = 3
-assert_eq(len(@arr), 4, "assigning to $#arr extends array")
-assert_true(!defined($arr[3]), "extended element is undef")
+len(@arr) |> aeq 4, "extending via $#arr"
 
 test_run

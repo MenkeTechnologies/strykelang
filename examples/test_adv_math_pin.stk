@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-T (2026-05-10): Advanced Math & Physics
+# Compliance: docs/STYLE_GUIDE.md
+
+# ── Bessel & Special Functions ─────────────────────────────────────────────
+
+bessel_j0(0) |> aeq 1, "bessel_j0(0)"
+bessel_j1(0) |> aeq 0, "bessel_j1(0)"
+bessel_i0(0) |> aeq 1, "bessel_i0(0)"
+bessel_k0(1) |> maps { _ > 0.4 && _ < 0.5 } |> aok "bessel_k0(1)"
+
+airy_ai(0) |> maps { abs(_ - 0.3550) < 0.001 } |> aok "airy_ai(0)"
+airy_bi(0) |> maps { abs(_ - 0.6149) < 0.001 } |> aok "airy_bi(0)"
+
+# ── Hypergeometric & Polylog ───────────────────────────────────────────────
+
+# li(2) = 1.045
+li(2) |> maps { abs(_ - 1.045) < 0.01 } |> aok "log_integral(2)"
+# polylog(2, 0.5) approx 0.582
+polylog(2, 0.5) |> maps { abs(_ - 0.582) < 0.01 } |> aok "polylog(2, 0.5)"
+
+# ── Quantum Primitives ─────────────────────────────────────────────────────
+
+# Pauli matrices trace
+# pauli_x = [[0,1],[1,0]] -> trace 0
+pauli_x() |> maps { _->[0][0] + _->[1][1] } |> aeq 0, "pauli_x trace 0"
+# bell_state(0) = |Phi+> = 1/sqrt(2)(|00> + |11>)
+# Returns as density matrix or vector? Pinned to doc/impl.
+bell_state(0) |> len |> aeq 4, "bell_state(0) vector length"
+
+# ── String Similarity (Extended) ───────────────────────────────────────────
+
+jaro_winkler("martha", "marhta") |> maps { _ > 0.9 } |> aok "jaro_winkler high"
+hamming_dist("101", "100") |> aeq 1, "hamming_dist"
+sorensen_dice("context", "contact") |> maps { _ > 0.5 && _ < 0.6 } |> aok "sorensen_dice"
+
+# ── Audio & DSP ────────────────────────────────────────────────────────────
+
+# a_weighting(1000) = 0 dB
+a_weighting(1000) |> aeq 0, "a_weighting(1000Hz)"
+
+test_run

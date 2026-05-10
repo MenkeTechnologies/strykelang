@@ -1,62 +1,49 @@
 #!/usr/bin/env stryke
 
 # Pinning batch Native-C (2026-05-10): Bugs & Parity (from BUGS.md)
+# Compliance: docs/STYLE_GUIDE.md
 
-# ── Magic String Increment (PARITY-001) ───────────────────────────────────
+# ── Magic String Increment ───────────────────────────────────────────────
 
-my $s1 = "z"
-$s1++
-assert_eq($s1, "aa", "magic inc z -> aa")
+fn my_inc($s) { $s++; $s }
+my_inc("z") |> aeq "aa", "magic inc z -> aa"
+my_inc("Az") |> aeq "Ba", "magic inc Az -> Ba"
+my_inc("") |> aeq "1", "magic inc empty -> 1"
 
-my $s2 = "Az"
-$s2++
-assert_eq($s2, "Ba", "magic inc Az -> Ba")
-
-my $s3 = ""
-$s3++
-assert_eq($s3, "1", "magic inc empty -> 1")
-
-# ── Vec Lvalue (PARITY-010) ────────────────────────────────────────────────
+# ── Vec Lvalue ─────────────────────────────────────────────────────────────
 
 my $bits = ""
 vec($bits, 0, 8) = 65
-assert_eq($bits, "A", "vec lvalue assignment")
+$bits |> aeq "A", "vec lvalue assignment"
 
-# ── Inf / NaN Numification (PARITY-015) ────────────────────────────────────
+# ── Inf / NaN Numification ────────────────────────────────────────────────
 
-my $inf = "Inf" + 0
-assert_eq("$inf", "Inf", "Inf numification and stringification")
+"Inf" + 0 |> tj |> aeq "inf", "Inf numification"
+sqrt(-1) |> tj |> aeq "NaN", "NaN stringification"
 
-my $nan = sqrt(-1)
-assert_eq("$nan", "NaN", "NaN stringification")
-
-# ── For In-place Mutation (BUG-019) ────────────────────────────────────────
+# ── For In-place Mutation ─────────────────────────────────────────────────
 
 my @list = (1, 2, 3)
-for (@list) { $_ *= 10 }
-assert_eq(join(",", @list), "10,20,30", "for loop in-place mutation")
+for (@list) { _ *= 10 }
+join(",", @list) |> aeq "10,20,30", "for loop in-place mutation"
 
-# ── Tail Binding (BUG-090) ──────────────────────────────────────────────────
+# ── Tail Binding ──────────────────────────────────────────────────────────
 
 my ($head, @tail) = (10, 20, 30, 40)
-assert_eq($head, 10, "head binding")
-assert_eq(join(",", @tail), "20,30,40", "tail binding")
+$head |> aeq 10, "head binding"
+join(",", @tail) |> aeq "20,30,40", "tail binding"
 
-# ── PSort with $_0, $_1 (BUG-116) ──────────────────────────────────────────
+# ── PSort with _0, _1 ────────────────────────────────────────────────────
 
-my @unsorted = (5, 2, 8, 1)
-my @sorted = @unsorted |> psort { $_0 <=> $_1 }
-assert_eq(join(",", @sorted), "1,2,5,8", "psort with \$_0, \$_1")
+(5, 2, 8, 1) |> psort { _0 <=> _1 } |> join(",") |> aeq "1,2,5,8", "psort with _0, _1"
 
-# ── Dijkstra Deterministic Order (BUG-201) ─────────────────────────────────
+# ── Dijkstra Deterministic Order ─────────────────────────────────────────
 
 my $graph = +{
     A => [["B", 1], ["C", 4]],
     B => [["C", 2]],
     C => []
 }
-my $dists = dijkstra($graph, "A")
-# Dijkstra returns a flattened list of pairs, sorted by key
-assert_eq(tj($dists), '["A",0,"B",1,"C",3]', "dijkstra deterministic JSON")
+dijkstra($graph, "A") |> tj |> aeq '["A",0,"B",1,"C",3]', "dijkstra deterministic JSON"
 
 test_run

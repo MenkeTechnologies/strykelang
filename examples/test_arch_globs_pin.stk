@@ -1,0 +1,37 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-Q (2026-05-10): Advanced Globs & Closure Architecture
+# Compliance: docs/STYLE_GUIDE.md
+
+# ── Zsh Glob Qualifiers ────────────────────────────────────────────────────
+
+my $tmp = tempdir()
+chdir $tmp
+spurt "file.txt", "content"
+mkdir "subdir"
+
+# (.) regular files
+glob("*(.)") |> join(",") |> aeq "file.txt", "glob qualifier (.)"
+# (/) directories
+glob("*(/)") |> join(",") |> aeq "subdir", "glob qualifier (/)"
+
+# (L) size: L+0 (non-empty) + (.) for regular file only
+glob("*(.L+0)") |> join(",") |> aeq "file.txt", "glob qualifier (.L+0)"
+
+# ── Closure Array Copying ──────────────────────────────────────────────────
+
+my @arr = (1, 2, 3)
+my $f = fn { push @arr, 4; len(@arr) }
+$f->() |> aeq 4, "closure mutates its copy"
+len(@arr) |> aeq 3, "outer array remains 3 (copied, not shared)"
+
+# ── AOP Final Expression ───────────────────────────────────────────────────
+
+fn target = 1
+around "target" {
+    my $x = proceed()
+    $x + 10
+}
+target() |> aeq 11, "AOP ends in expression"
+
+test_run

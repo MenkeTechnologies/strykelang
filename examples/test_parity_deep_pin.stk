@@ -1,57 +1,58 @@
 #!/usr/bin/env stryke
 
 # Pinning batch Native-K (2026-05-10): Parity Deep Dive (from BUGS.md)
+# Compliance: docs/STYLE_GUIDE.md
 
-# ── Vec Lvalue (PARITY-010) ────────────────────────────────────────────────
+# ── Vec Lvalue ─────────────────────────────────────────────────────────────
 
 my $s_v = ""
-vec($s_vec, 0, 8) = 65
-assert_eq($s_vec, "A", "vec 8-bit lvalue")
+vec($s_v, 0, 8) = 65
+$s_v |> aeq "A", "vec 8-bit lvalue"
 
-# ── Overload (PARITY-012) ──────────────────────────────────────────────────
+# ── Overload ───────────────────────────────────────────────────────────────
 
-package Box;
-# Anonymous fn works for overload in strict mode!
+package Box
+# Use ->{ } for hashref access in strict mode
+fn as_string = "Box(" . _0->{val} . ")"
+fn add = bless({ val => _0->{val} + _1->{val} }, "Box")
+
 use overload 
-    '""' => fn { "Box(" . $_[0]{val} . ")" },
-    '+'  => fn { bless { val => $_[0]{val} + $_[1]{val} }, ref($_[0]) };
+    '""' => "as_string",
+    '+'  => "add"
 
-package main;
-my $bx1 = bless { val => 10 }, "Box";
-my $bx2 = bless { val => 20 }, "Box";
-assert_eq("$bx1", "Box(10)", "overload stringify with anonymous fn")
+package main
+my $bx1 = bless({ val => 10 }, "Box")
+my $bx2 = bless({ val => 20 }, "Box")
+"$bx1" |> aeq "Box(10)", "overload stringify"
 my $bx3 = $bx1 + $bx2
-assert_eq("$bx3", "Box(30)", "overload + with anonymous fn")
+"$bx3" |> aeq "Box(30)", "overload +"
 
-# ── Caller (BUG-005) ───────────────────────────────────────────────────────
+# Verify anonymous fn in overload behavior
+package BoxAnon
+use overload '""' => fn { "Anon(" . _0->{val} . ")" }
+package main
+my $ba = bless({ val => 99 }, "BoxAnon")
+"$ba" |> aeq "Anon(99)", "overload anonymous fn"
 
-fn call_inner {
-    return (caller(0))[3]
-}
-fn call_outer {
-    call_inner()
-}
-# BUG-005 says this is undef today
-my $c_name = call_outer()
-assert_true(!defined($c_name), "caller(0)[3] is undef (pinned bug)")
+# ── Caller ─────────────────────────────────────────────────────────────────
 
-# ── Bless Arrayref Tag (BUG-002) ───────────────────────────────────────────
+fn call_inner = (caller(0))[3]
+fn call_outer = call_inner()
+!defined(call_outer()) |> aok "caller(0)[3] is undef (pinned bug)"
+
+# ── Bless Arrayref Tag ─────────────────────────────────────────────────────
 
 my $o_bless = bless [1,2], "MyClass"
-# BUG-002 says it shows HASH instead of ARRAY
-assert_ok("$o_bless" =~ /MyClass=HASH/, "bless arrayref stringifies with HASH (pinned bug)")
+"$o_bless" =~ /MyClass=HASH/ |> aok "bless arrayref HASH (pinned bug)"
 
-# ── Pipe Auto-deref (BUG-004) ──────────────────────────────────────────────
+# ── Pipe Auto-deref ────────────────────────────────────────────────────────
 
-# BUG-004 says [1..5] |> sum returns 0
-my $p_val = [1..5] |> sum
-assert_eq($p_val, 0, "pipe with arrayref does not auto-deref (pinned bug)")
+[1:5] |> sum |> aeq 0, "pipe arrayref no auto-deref (pinned bug)"
 
-# ── Chomp Array (BUG-006) ──────────────────────────────────────────────────
+# ── Chomp Array ────────────────────────────────────────────────────────────
 
 my @lines_chomp = ("a\n", "b\n")
-my $c_count = chomp @lines_chomp
-assert_eq($c_count, 2, "chomp @array returns element count (pinned bug)")
-assert_eq(join("|", @lines_chomp), "a|b", "chomp @array mutates elements (pinned behavior)")
+chomp(@lines_chomp) |> aeq 2, "chomp @array returns element count"
+join("|", @lines_chomp) |> aeq "a|b", "chomp @array mutates elements"
 
 test_run

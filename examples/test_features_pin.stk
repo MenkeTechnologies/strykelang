@@ -6,15 +6,15 @@
 # ── Pipelines ──────────────────────────────────────────────────────────────
 
 my @list = (1:10)
-~> @list filter { _ % 2 == 0 } maps { _ * _ } |> sum |> aeq 220, "Complex pipeline"
+~> @list filter { _ % 2 == 0 } map { _ * _ } |> sum |> aeq 220, "Complex pipeline"
 
 # ── AI Primitives (Mocked) ──────────────────────────────────────────────────
 
 ai_mock_install("(?i)joke", "Why did the chicken cross the road? To get to the other side.")
-ai "Tell me a joke" |> atrue >{ _ =~ /chicken/ }, "AI mock response"
+ai "Tell me a joke" |> maps { _ =~ /chicken/ } |> aok "AI mock response"
 
 ai_mock_install("extract", '{"status":"ok","code":200}')
-ai("extract status", schema => +{ status => "str", code => "int" }) |> ->{ status } |> aeq "ok", "AI extraction"
+ai("extract status", schema => +{ status => "str", code => "int" })->{status} |> aeq "ok", "AI extraction"
 
 # ── AOP (Around) ─────────────────────────────────────────────────────────────
 
@@ -25,19 +25,20 @@ target_fn(2) |> aeq 25, "AOP around + proceed"
 # ── Nested Implicit Parameters ─────────────────────────────────────────────
 
 my $matrix_sum = 0
-~> (1:2) maps {
+# Use map (list materializing) to ensure side effects happen
+(1:2) |> map {
     my $outer = _
-    ~> (1:2) maps { $matrix_sum += $outer + _ }
-} |> collect # drain iterator
+    (1:2) |> map { $matrix_sum += $outer + _ }
+}
 $matrix_sum |> aeq 12, "Nested loops with implicit _"
 
 # Sigil-free implicit nested
 my $s2 = 0
-~> (1:1) maps {
-    ~> (2:2) maps {
-        ~> (3:3) maps { $s2 = _ + _< + _<< }
+(1:1) |> map {
+    (2:2) |> map {
+        (3:3) |> map { $s2 = _ + _< + _<< }
     }
-} |> collect
+}
 $s2 |> aeq 6, "Triple nested implicit _ variants"
 
 # ── Parallel Collection Ops ────────────────────────────────────────────────
