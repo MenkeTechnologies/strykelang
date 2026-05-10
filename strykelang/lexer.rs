@@ -401,6 +401,25 @@ impl Lexer {
             self.pos = saved;
             return None;
         }
+        // Package-qualifier disambiguator: a 2-segment candidate
+        // `LETTERS::LETTERS` with no digits anywhere parses as IPv6
+        // (e.g. `d::ab` ≡ `d:0:0:0:0:0:0:ab`, `dead::beef`) but in
+        // Perl/stryke source it is overwhelmingly a package qualifier
+        // (`fn d::ab ($x) { ... }`, `Foo::Bar->method`). Real IPv6
+        // literals in source carry at least one decimal digit (`fe80::1`,
+        // `::1`, `1::dead`), which keeps them on the IPv6 path. Bare
+        // pure-letter forms are routed back through PackageSep.
+        if !candidate.chars().any(|c| c.is_ascii_digit()) {
+            let segments: Vec<&str> = candidate.split("::").collect();
+            if segments.len() == 2
+                && segments
+                    .iter()
+                    .all(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_alphabetic()))
+            {
+                self.pos = saved;
+                return None;
+            }
+        }
         Some(candidate)
     }
 

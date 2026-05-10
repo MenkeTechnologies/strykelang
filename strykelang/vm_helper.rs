@@ -9468,18 +9468,30 @@ impl VMHelper {
                         self.read_arrow_hash_element(val, key.as_str(), line)
                     }
                     DerefKind::Call => {
-                        // $coderef->(args) — args evaluated in list context so
-                        // `@a` / `(LIST)` flatten into the call list (matches
-                        // Perl's call list semantics; mirrors `FuncCall` arm).
+                        // $coderef->(args). BUG-037: explicit `@array` / `%hash`
+                        // arguments flatten into the call list (mirrors Perl's
+                        // call list semantics so `$f->(@_)` does not pass
+                        // `scalar(@_)`). Other arg shapes — `qw(...)`, list
+                        // expressions, function calls — keep the original
+                        // scalar-context evaluation so threading-style call
+                        // sites (`~> qw(a b c d) fn { ... }`) pass the LHS as
+                        // one threaded value rather than as flattened elements.
                         let val = self.eval_expr(expr)?;
                         if let ExprKind::List(ref arg_exprs) = index.kind {
                             let mut args = Vec::with_capacity(arg_exprs.len());
                             for a in arg_exprs {
-                                let v = self.eval_expr_ctx(a, WantarrayCtx::List)?;
-                                if let Some(items) = v.as_array_vec() {
-                                    args.extend(items);
+                                if matches!(
+                                    a.kind,
+                                    ExprKind::ArrayVar(_) | ExprKind::HashVar(_)
+                                ) {
+                                    let v = self.eval_expr_ctx(a, WantarrayCtx::List)?;
+                                    if let Some(items) = v.as_array_vec() {
+                                        args.extend(items);
+                                    } else {
+                                        args.push(v);
+                                    }
                                 } else {
-                                    args.push(v);
+                                    args.push(self.eval_expr(a)?);
                                 }
                             }
                             // Auto-deref ScalarRef for closure self-reference: $f->()
@@ -10567,15 +10579,24 @@ impl VMHelper {
                 let arg_vals = if *pass_caller_arglist {
                     self.scope.get_array("_")
                 } else {
-                    // List-context + array-flatten so `$f(@a)` and `$f(LIST)`
-                    // pass elements rather than the array as one cell.
+                    // BUG-037: explicit `@array` / `%hash` operands flatten
+                    // into the call list. Other arg shapes (qw, list exprs,
+                    // function calls) keep the scalar-context evaluation so
+                    // threading-style sites (`~> EXPR fn { ... }` desugars to
+                    // `IndirectCall { target: <fn>, args: [EXPR] }`) pass the
+                    // LHS as one threaded value rather than as flattened
+                    // elements.
                     let mut v = Vec::with_capacity(args.len());
                     for a in args {
-                        let val = self.eval_expr_ctx(a, WantarrayCtx::List)?;
-                        if let Some(items) = val.as_array_vec() {
-                            v.extend(items);
+                        if matches!(a.kind, ExprKind::ArrayVar(_) | ExprKind::HashVar(_)) {
+                            let val = self.eval_expr_ctx(a, WantarrayCtx::List)?;
+                            if let Some(items) = val.as_array_vec() {
+                                v.extend(items);
+                            } else {
+                                v.push(val);
+                            }
                         } else {
-                            v.push(val);
+                            v.push(self.eval_expr(a)?);
                         }
                     }
                     v
