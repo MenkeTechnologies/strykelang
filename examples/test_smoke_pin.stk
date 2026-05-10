@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-A (2026-05-10): Basic Arithmetic & Pipelines
+# Compliance: docs/STYLE_GUIDE.md
+
+1 + 1 |> aeq 2, "1+1=2"
+"foo" . "bar" |> aeq "foobar", "concat"
+
+# Chained comparisons (Raku-style)
+1 < 2 < 3 |> aok "1<2<3"
+
+# Parallel ops in scripts
+(1:5) |> pmap { _ * 2 } |> sum |> aeq 30, "pmap + sum"
+
+test_run

@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-E (2026-05-10): Advanced Types & Const (from BUGS.md)
+
+# ── Const and Frozen with Types (BUG-113) ──────────────────────────────────
+
+const my $x : Int = 42
+assert_eq($x, 42, "const my with type annotation")
+
+# ── Class Instances and Dereferencing (BUG-118 / BUG-114) ─────────────────
+
+class Point {
+    x : Int
+    y : Int
+}
+
+my $p = Point->new(x => 10, y => 20)
+assert_eq(ref($p), "Point", "ref() on class instance")
+
+# %$obj dereference (BUG-118)
+# Since we can't use $a/$b in --no-interop, we use sort with $_0/$_1 if needed
+my %fields = %$p
+my @k = keys(%fields) |> sort { $_0 cmp $_1 }
+assert_eq(join(",", @k), "x,y", "deref class instance keys")
+assert_eq($fields{x}, 10, "deref class instance value x")
+
+# ── Recursive Serialization (BUG-119) ───────────────────────────────────────
+
+class Node {
+    name : Str
+    child : Node
+}
+
+my $root = Node->new(
+    name => "parent",
+    child => Node->new(name => "child")
+)
+
+my $json = tj($root)
+assert_true($json =~ /"name":"parent"/, "recursive JSON - parent")
+
+test_run
