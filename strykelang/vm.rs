@@ -5118,9 +5118,28 @@ impl<'a> VM<'a> {
                             let s = self.interp.scope.get_scalar(real).to_string();
                             let chars: Vec<char> = s.chars().collect();
                             let n = chars.len() as i64;
-                            let mut from_i = from.to_int();
-                            let mut to_i = to.to_int();
                             let step_i = if step.is_undef() { 1 } else { step.to_int() };
+                            // Open slices: defaults depend on step direction
+                            // step > 0: from=0, to=n-1 (forward)
+                            // step < 0: from=n-1, to=0 (backward)
+                            let mut from_i = if from.is_undef() {
+                                if step_i >= 0 {
+                                    0
+                                } else {
+                                    n - 1
+                                }
+                            } else {
+                                from.to_int()
+                            };
+                            let mut to_i = if to.is_undef() {
+                                if step_i >= 0 {
+                                    n - 1
+                                } else {
+                                    0
+                                }
+                            } else {
+                                to.to_int()
+                            };
                             if from_i < 0 {
                                 from_i += n
                             }
@@ -5161,9 +5180,28 @@ impl<'a> VM<'a> {
                             if !s.is_empty() {
                                 let chars: Vec<char> = s.chars().collect();
                                 let n = chars.len() as i64;
-                                let mut from_i = from.to_int();
-                                let mut to_i = to.to_int();
                                 let step_i = if step.is_undef() { 1 } else { step.to_int() };
+                                // Open slices: defaults depend on step direction
+                                // step > 0: from=0, to=n-1 (forward)
+                                // step < 0: from=n-1, to=0 (backward)
+                                let mut from_i = if from.is_undef() {
+                                    if step_i >= 0 {
+                                        0
+                                    } else {
+                                        n - 1
+                                    }
+                                } else {
+                                    from.to_int()
+                                };
+                                let mut to_i = if to.is_undef() {
+                                    if step_i >= 0 {
+                                        n - 1
+                                    } else {
+                                        0
+                                    }
+                                } else {
+                                    to.to_int()
+                                };
                                 if from_i < 0 {
                                     from_i += n
                                 }
@@ -6851,6 +6889,9 @@ impl<'a> VM<'a> {
                     Op::SortWithBlock(block_idx) => {
                         let mut items = self.pop().to_list();
                         let idx = *block_idx as usize;
+                        // Save the topic chain before sort — set_sort_pair writes to $_
+                        // which would corrupt _< for subsequent pipeline stages (grep, map).
+                        let saved_topic = self.interp.scope.save_topic_chain();
                         if let Some(&(start, end)) =
                             self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
                         {
@@ -6877,6 +6918,7 @@ impl<'a> VM<'a> {
                                     }
                                 }
                             });
+                            self.interp.scope.restore_topic_chain(saved_topic);
                             if let Some(e) = sort_err {
                                 return Err(e);
                             }
@@ -6900,6 +6942,7 @@ impl<'a> VM<'a> {
                                     Err(_) => std::cmp::Ordering::Equal,
                                 }
                             });
+                            self.interp.scope.restore_topic_chain(saved_topic);
                             self.push(PerlValue::array(items));
                             Ok(())
                         }

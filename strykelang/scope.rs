@@ -1511,6 +1511,29 @@ impl Scope {
         let _ = self.set_scalar("_", a);
     }
 
+    /// Save the entire topic slot 0 chain (`$_`, `$_<`, `$_<<`, ...) so it can
+    /// be restored after a block that corrupts it (like `sort { ... }`).
+    /// Returns a 6-element array [level0..level5].
+    #[inline]
+    pub fn save_topic_chain(&self) -> [PerlValue; 6] {
+        [
+            self.get_scalar(&Self::topic_slot_key(0, 0)),
+            self.get_scalar(&Self::topic_slot_key(0, 1)),
+            self.get_scalar(&Self::topic_slot_key(0, 2)),
+            self.get_scalar(&Self::topic_slot_key(0, 3)),
+            self.get_scalar(&Self::topic_slot_key(0, 4)),
+            self.get_scalar(&Self::topic_slot_key(0, 5)),
+        ]
+    }
+
+    /// Restore the topic slot 0 chain from a previous [`save_topic_chain`] call.
+    #[inline]
+    pub fn restore_topic_chain(&mut self, saved: [PerlValue; 6]) {
+        for (level, val) in saved.into_iter().enumerate() {
+            self.declare_topic_slot(0, level, val);
+        }
+    }
+
     /// Register a `defer { BLOCK }` closure to run when this scope exits.
     #[inline]
     pub fn push_defer(&mut self, coderef: PerlValue) {

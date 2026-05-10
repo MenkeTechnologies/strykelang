@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+
+# Pinning tests for advanced Stryke features learned from docs
+# Compliance: docs/STYLE_GUIDE.md
+
+# 1. Polymorphic ranges
+my @int_range = 1:5
+@int_range |> len |> aeq 5, "integer range length"
+
+my @char_range = "a":"e"
+@char_range[0] |> aeq "a", "char range start"
+@char_range[4] |> aeq "e", "char range end"
+
+my @rev_char_range = "z":"x":-1
+@rev_char_range[0] |> aeq "z", "reverse char range start"
+@rev_char_range[2] |> aeq "x", "reverse char range end"
+@rev_char_range |> len |> aeq 3, "reverse char range length"
+
+# 2. Implicit variables in functional operators
+my @nums = (1, 2, 3)
+@nums |> maps { _ * 2 } |> sum |> aeq 12, "implicit _ in maps"
+@nums |> maps { _0 * 2 } |> sum |> aeq 12, "implicit _0 in maps"
+@nums |> maps { $_0 * 2 } |> sum |> aeq 12, "implicit $_0 in maps"
+
+# 3. psort and preduce with implicit variables
+my @unsorted = (3, 1, 2)
+@unsorted |> psort { _0 <=> _1 } |> aeq [1, 2, 3], "psort with _0 and _1"
+@unsorted |> psort { $_0 <=> $_1 } |> aeq [1, 2, 3], "psort with $_0 and $_1"
+
+my $reduced = @nums |> preduce { _0 + _1 }
+$reduced |> aeq 6, "preduce with _0 and _1"
+
+# 4. Builtin aliases and parallel functions
+my @data = (1, 2, 3, 4, 5)
+@data |> sum |> aeq 15, "sum builtin"
+@data |> pmap { _ * 2 } |> sum |> aeq 30, "pmap builtin"
+
+# 5. String increment and decrement
+my $str_inc = "a"
+$str_inc++
+$str_inc |> aeq "b", "string postfix increment"
+
+my $str_dec = "z"
+# Wait, string decrement might not be implemented as postfix in Perl but docs say magic string decrement is world first.
+# "z":"a":-1 was mentioned. Let's just test the range for now.
+my @dec_range = "z":"y":-1
+@dec_range |> len |> aeq 2, "magic string decrement in range"
+
+test_run

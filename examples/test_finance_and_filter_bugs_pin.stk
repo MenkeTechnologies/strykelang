@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+
+# Pinning tests for finance and filter bugs from BUGS.md
+
+# Pinning test for BUG-131: medfilt_1d is not a sliding-window median filter
+# It returns the global max of the flattened array, not the median.
+my @data = (10, 2, 8, 4, 6);
+my $median = medfilt_1d(@data);
+aeq($median, 10, "BUG-131: medfilt_1d should return the global max");
+
+
+# Pinning test for BUG-132: bs_delta is the call delta formula
+# bs_delta(S, K, T, r, v)
+my $delta = bs_delta(100, 100, 1, 0.05, 0.2);
+aok(abs($delta - 0.63683058600703) < 1e-9, "BUG-132: bs_delta should be pinned to a specific value");
+
+
+# Pinning test for BUG-133: depreciation_double ignores the salvage/middle operand
+# depreciation_double(cost, salvage, life)
+my $dep1 = depreciation_double(1000, 200, 5);
+my $dep2 = depreciation_double(1000, 100, 5);
+# Since the salvage value is ignored, the results should be the same.
+aeq($dep1, $dep2, "BUG-133: depreciation_double should ignore the salvage value");
+
+
+test_run

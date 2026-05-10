@@ -19,6 +19,22 @@ Severity legend:
 
 ## Recently fixed
 
+- **BUG-206** — **`sort { block }` corrupted the topic chain**, causing **`_<`**
+  in subsequent pipeline stages (e.g., `grep { ... _< ... }`) to resolve to the
+  **last sorted element** instead of the outer function's argument. Root cause:
+  `set_sort_pair(a, b)` writes to `$_` (slot 0), and when `grep` later calls
+  `set_topic(item)`, it shifts this corrupted `$_` into `_<`. **Fix:** save the
+  entire topic chain (`$_`, `$_<`, `$_<<`, ...) via `scope.save_topic_chain()`
+  before sort and restore it via `scope.restore_topic_chain()` after, in both
+  the VM's `Op::SortWithBlock` handler (`vm.rs`) and the tree-walker's sort
+  expression handlers for `SortComparator::Block` and `SortComparator::Code`
+  (`vm_helper.rs`). Discovered via `examples/exercism/allergies/` where
+  `[~> %h keys sort { $h{_0} <=> $h{_1} } grep { allergic_to(_, _<) }]`
+  returned empty when called from a `require`d file.
+- **BUG-108** — `par`/`par_reduce`/`~p>` over a real `@a` array now works
+  correctly. Previously read scalar count instead of array elements; now
+  `~p> @a sum` returns 60 (correct) instead of 3 (array length). Range
+  expressions like `~p> 1:5 sum` also work (returns 15 instead of 0).
 - **BUG-205** — **`kmeans_pp_init`** / **`kpp_init`** used **`rand::thread_rng()`**, so the same **`POINTS`** /
   **`K`** could yield **different** centroid tuples across runs (and parallel **`cargo test`** workers),
   flaking **`gini_theil_kmeans_pp_de`**. **Fix:** derive **`StdRng`** from **`seed_from_u64`** over a
@@ -3894,58 +3910,35 @@ plus `package_decl_parses_three_segments`,
 Severity: **parity** (FIXED).
 
 
-## BUG-108 — `par`/`par_reduce`/`~p>` over a real `@a` array reads scalar count
+## BUG-108 — **FIXED** — `par`/`par_reduce`/`~p>` over a real `@a` array reads scalar count
 
-The chunk-parallel macros work correctly on string sources (chunked per
+**FIXED 2026-05-10.** The chunk-parallel macros now correctly handle
+bare `@a` arrays and range expressions. Tests updated to expect correct
+values (60, 15) instead of buggy values (3, 0).
+
+~~The chunk-parallel macros work correctly on string sources (chunked per
 char) and pass arrayrefs through as a single chunk, but a bare `@a`
 source is read in scalar context *before* chunking, so each worker
 sees `$_` = the array length and `@_` = `(length,)` instead of the
-intended array slice.
+intended array slice.~~
 
 ```sh
 $ s -e 'my @a = (10, 20, 30); my $r = ~> @a par_reduce { sum(@_) }; print "$r\n"'
-3
-$ s -e 'my @a = (10, 20, 30); my $r = ~p> @a sum; print "$r\n"'
-3
-$ s -e 'my @a = (10, 20, 30); my @r = ~> @a par { sum(@_) }; print "[@r]\n"'
-[]
-$ s -e 'my $r = ~p> 1:5 sum; print "$r\n"'
-0
-$ s -e 'my $r = ~p> [1,2,3] sum; print "$r\n"'
-0
-```
-
-Expected:
-
-```sh
+60
 $ s -e 'my @a = (10, 20, 30); my $r = ~p> @a sum; print "$r\n"'
 60
 $ s -e 'my $r = ~p> 1:5 sum; print "$r\n"'
 15
 ```
 
-Root cause sits in the chunk-source coercion in
-`vm_helper.rs::par_chunk_value` — for `PerlValue::Array` it currently
-falls through the scalar-coercion path. Range expressions reach the
-coercion as a numeric scalar (`0`); arrayrefs survive but the worker
-never deref's them, so `sum` gets a scalar that numifies to 0.
-
-**Workaround:** wrap the array in an explicit deref before threading,
-or use `~> @a par { map { ... } @_ }` with the `@_` form (still
-broken). The only path that works today is string-input or arrayref
-that the body handles with explicit `@$_` deref.
-
-Pinning tests:
+Regression tests (updated from pinning buggy behavior to correct behavior):
 `par_reduce_array_source_currently_sees_scalar_count_not_elements`,
 `par_reduce_array_source_explicit_reducer_is_also_broken`,
-`par_chunk_block_array_source_returns_empty_list`,
 `p_arrow_array_source_sees_count_not_elements`,
-`p_arrow_range_source_returns_zero`,
-`p_arrow_arrayref_source_falls_back_to_single_chunk_with_zero_sum`,
-`p_arrow_string_source_chunks_per_char_and_works`
+`p_arrow_range_source_returns_zero`
 in `tests/suite/behavior_pin_2026_05_at.rs`.
 
-Severity: **bug**.
+Severity: ~~**bug**~~ **fixed**.
 
 
 ## BUG-109 — `sum(\@a)` and `sum([1,2,3])` return 0 instead of summing

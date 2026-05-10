@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-T (2026-05-10): Advanced Polymorphic Ranges
+# Compliance: docs/STYLE_GUIDE.md
+
+# 1. Roman Numerals (colon operator)
+("I":"V":1) |> join(",") |> aeq "I,II,III,IV,V", "roman range colon forward"
+("V":"I":-1) |> join(",") |> aeq "V,IV,III,II,I", "roman range colon reverse"
+
+# 2. Weekdays
+("Mon":"Fri":1) |> join(",") |> aeq "Mon,Tue,Wed,Thu,Fri", "weekday range"
+("Fri":"Mon":-1) |> join(",") |> aeq "Fri,Thu,Wed,Tue,Mon", "weekday range reverse"
+
+# 3. Month names
+("Jan":"Mar":1) |> join(",") |> aeq "Jan,Feb,Mar", "month range"
+
+# 4. Year-Month
+("2026-01":"2026-03":1) |> join(",") |> aeq "2026-01,2026-02,2026-03", "year-month range"
+
+# 5. Times (HH:MM)
+("10:00":"10:30":15) |> join(",") |> aeq "10:00,10:15,10:30", "time range 15m step"
+
+# 6. IPv4
+("192.168.0.1":"192.168.0.4":1) |> join(",") |> aeq "192.168.0.1,192.168.0.2,192.168.0.3,192.168.0.4", "ipv4 range"
+
+test_run

@@ -8469,6 +8469,8 @@ impl Parser {
                         if let ExprKind::ScalarVar(ref name) = expr.kind {
                             let name = name.clone();
                             self.advance();
+                            // Parse full expression to handle comma operator correctly:
+                            // `$a[1, 2]` evaluates comma expr (returns last value = 2)
                             let index = self.parse_expression()?;
                             self.expect(&Token::RBracket)?;
                             expr = Expr {
@@ -10915,15 +10917,30 @@ impl Parser {
                 })
             }
             "pfor" => {
-                let (block, list, progress) = self.parse_block_then_list_optional_progress()?;
-                Ok(Expr {
-                    kind: ExprKind::PForExpr {
-                        block,
-                        list: Box::new(list),
-                        progress: progress.map(Box::new),
-                    },
-                    line,
-                })
+                if matches!(self.peek(), Token::LParen) {
+                    self.expect(&Token::LParen)?;
+                    let list = self.parse_expression()?;
+                    self.expect(&Token::RParen)?;
+                    let block = self.parse_block()?;
+                    Ok(Expr {
+                        kind: ExprKind::PForExpr {
+                            block,
+                            list: Box::new(list),
+                            progress: None,
+                        },
+                        line,
+                    })
+                } else {
+                    let (block, list, progress) = self.parse_block_then_list_optional_progress()?;
+                    Ok(Expr {
+                        kind: ExprKind::PForExpr {
+                            block,
+                            list: Box::new(list),
+                            progress: progress.map(Box::new),
+                        },
+                        line,
+                    })
+                }
             }
             "par_lines" | "par_walk" => {
                 let args = self.parse_builtin_args()?;
@@ -17944,7 +17961,11 @@ impl Parser {
             } else {
                 matches!(
                     self.peek(),
-                    Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof | Token::PipeForward
+                    Token::Semicolon
+                        | Token::RBrace
+                        | Token::RParen
+                        | Token::Eof
+                        | Token::PipeForward
                 )
             };
             if is_terminator {

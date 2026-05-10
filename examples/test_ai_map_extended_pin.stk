@@ -1,0 +1,37 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-R (2026-05-10): Extended AI Map Tests
+# Compliance: docs/STYLE_GUIDE.md
+
+# ── AI Map: Uppercase Strings ───────────────────────────────────────────
+
+ai_mock_install("Apply this instruction to each item: uppercase", '["APPLE", "BANANA"]');
+
+my @items_string = ("apple", "banana");
+my $mapped_string = ai_map(\@items_string, "uppercase");
+
+join(",", @{$mapped_string}) |> aeq "APPLE,BANANA", "ai_map uppercase strings";
+
+# ── AI Map: Square Numbers ──────────────────────────────────────────────
+
+ai_mock_install("Apply this instruction to each item: square", '[1, 4, 9]');
+
+my @items_numeric = (1, 2, 3);
+my $mapped_numeric = ai_map(\@items_numeric, "square");
+
+join(",", @{$mapped_numeric}) |> aeq "1,4,9", "ai_map square numbers";
+
+# ── AI Map: Hash to String ──────────────────────────────────────────────
+
+ai_mock_install("Apply this instruction to each item: extract the name", '["Alice", "Bob"]');
+
+my @items_hash = (
+    +{ name => "Alice", age => 30 },
+    +{ name => "Bob", age => 25 }
+);
+my $mapped_hash = ai_map(\@items_hash, "extract the name");
+
+join(",", @{$mapped_hash}) |> aeq "Alice,Bob", "ai_map hash to string";
+
+
+test_run

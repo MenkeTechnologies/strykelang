@@ -256,7 +256,7 @@ pub fn descriptions_hash_map() -> indexmap::IndexMap<String, PerlValue> {
 /// dispatch primaries (`map`, `print`, `pmap`, …). Every entry must be
 /// alphabetized so `keys %k` is stable and `is_stryke_keyword`'s
 /// `binary_search` stays valid. Mirrors `parser.rs::RESERVED_FUNCTION_NAMES`
-/// + the statement-context handlers in `parser.rs::parse_statement` plus
+/// plus the statement-context handlers in `parser.rs::parse_statement` plus
 /// the compile-time pseudo-tokens (`__FILE__`, `__LINE__`, …).
 ///
 /// Categories: `control`, `decl`, `exception`, `phase`, `concurrency`,
@@ -17222,13 +17222,11 @@ fn builtin_cindex(args: &[PerlValue]) -> PerlResult<PerlValue> {
     // Walk the haystack codepoint-by-codepoint; on each codepoint
     // boundary check if the remaining slice starts with `need`. Keeps
     // the byte arithmetic out of the public coordinate system.
-    let mut cp_idx = 0usize;
     let mut byte_idx = 0usize;
-    for c in hay.chars() {
+    for (cp_idx, c) in hay.chars().enumerate() {
         if cp_idx >= from && hay[byte_idx..].starts_with(&need) {
             return Ok(PerlValue::integer(cp_idx as i64));
         }
-        cp_idx += 1;
         byte_idx += c.len_utf8();
     }
     // Tail position (one past last char) — `find "abc", ""` style with
@@ -17252,16 +17250,14 @@ fn builtin_crindex(args: &[PerlValue]) -> PerlResult<PerlValue> {
         return Ok(PerlValue::integer(from as i64));
     }
     let mut last: i64 = -1;
-    let mut cp_idx = 0usize;
     let mut byte_idx = 0usize;
-    for c in hay.chars() {
+    for (cp_idx, c) in hay.chars().enumerate() {
         if cp_idx > from {
             break;
         }
         if hay[byte_idx..].starts_with(&need) {
             last = cp_idx as i64;
         }
-        cp_idx += 1;
         byte_idx += c.len_utf8();
     }
     Ok(PerlValue::integer(last))

@@ -10,8 +10,8 @@ Every example pair is **DO / DON'T** with one-line rationale. The DON'T side is 
 
 Every other idiom is downstream of these. If a piece of stryke code violates any of them, it is wrong style, full stop.
 
-1. **`fn` not `sub`.** `sub` is Perl 5 baggage and is rejected by `--no-interop`. `fn` opens the topic-var protocol (`_`, `_N`, `_<`); `sub` doesn't.
-2. **`p` not `print`, never `say`.** `p` is the stryke verb, has the record separator built in, costs one character. Both `print` and `say` are rejected by `--no-interop`.
+1. **`fn` not `sub`.** `sub` is Perl 5 baggage and is rejected by `--no-interop`.
+2. **`p` not `print`, never `say`.** `p` is the stryke verb, has the record separator built in, costs one character. `say` is rejected by `--no-interop`.
 3. **Use `|>` / `~>` over nested calls.** `f(g(h(x)))` reads inside-out; `x |> h |> g |> f` reads left-to-right and shows up at the call site without diving the cursor through three closing parens. **Always pipeline.**
 4. **No semicolons at end of line.** stryke statement-terminates on newline. Trailing `;` is noise that visually weights every line. The only place `;` belongs is **between statements on the same line** (rare, e.g. C-style `for` headers): `for ($i = 0; $i < 10; $i++)`.
 5. **Implicit closure parameters always.** Never write `sub { my $x = shift; … }` or `fn { my ($a, $b) = @_; … }`. Use `_` for slot 0 and `_N` for slot N. Named params are only correct when the closure is a real top-level `fn` whose arity > 2 *and* the names carry meaning.
@@ -66,7 +66,7 @@ In a pipeline, parens are almost never needed because `|>` / `~>` already supply
 
 | DO | DON'T | Why |
 |---|---|---|
-| `p $x` | `print $x`, `print "$x\n"`, `say $x` | `p` is the canonical print-with-newline. One char vs five-to-seven. **`print` is rejected by `--no-interop`.** |
+| `p $x` | `print $x`, `print "$x\n"`, `say $x` | `p` is the canonical print-with-newline. One char vs five-to-seven. **`say` is rejected by `--no-interop`.** |
 | `warn "$msg"` | `print STDERR "$msg\n"` | `warn` is the stryke-and-Perl verb for stderr. Auto-appends `\n` if the message doesn't end with one. Catchable via `$SIG{__WARN__}`. |
 | `@xs \|> e p` | `for (@xs) { p $_ }` | Pipe-forward + `e` (each) collapses the loop to four chars after the pipe. |
 | `@xs \|> ep` | `@xs \|> e p` | `ep` = `e { p }` shorthand. **Goes to stdout, NOT stderr** — name is "each-print", not "err-print". |
@@ -424,7 +424,7 @@ Streaming variants (`pmaps`, `pgreps`, `pflat_maps`, `maps`, `greps`, `flat_maps
 | DO | DON'T | Why |
 |---|---|---|
 | `pmaps { f(_) } @xs` | spawn threads manually | `pmaps` rides rayon work-stealing; correct + faster. |
-| `mysync $count = 0` | shared mutex by hand | `mysync` is the stryke-shared-state primitive; lockless reads, lock-on-write. |
+| `mysync $count = 0` | shared mutex by hand | `mysync` and `oursync` are the stryke-shared-state primitive; lockless reads, lock-on-write. |
 | `pchannel` | hand-rolled mpsc | Built-in unbounded channel with select. |
 | `barrier($n)` | hand-rolled CountdownLatch | One call. |
 
@@ -611,9 +611,9 @@ stryke does **not** enforce `use strict;` by default — that's a Perl-ism. Topi
 | `Module::Sub::name` | namespaced functions | `fn Rosetta::Strings::reverse_words` |
 | `SCREAMING_SNAKE` | true constants | `const MAX_RETRIES = 3` |
 | `CamelCase` | class / struct / enum names | `class HttpClient`, `enum Color` |
-| short single-letter | only as block topic / loop index | `for $i (1:10)`, `>{ _ }` |
+| short single-letter | only as block topic / loop index | `for $i (1:10)`, `{ _ }` |
 
-**Never** name a function after a builtin. Always namespace if there's any chance of clash. Run `s 'p $stryke::builtins{your_name} // "free"'` to check.
+**Never** name a function after a builtin. Always namespace if there's any chance of clash. Run `s 'p $stryke::all{your_name} // "free"'` to check.
 
 ---
 

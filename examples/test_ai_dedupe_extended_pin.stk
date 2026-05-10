@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-R (2026-05-10): Extended AI Dedupe Tests
+# Compliance: docs/STYLE_GUIDE.md
+
+# ── AI Dedupe: Simple Strings ───────────────────────────────────────────
+
+ai_mock_install("Group duplicates among these items \(same fruit\)", '[[0, 2], [1]]');
+
+my @items_string = ("apple", "banana", "apple");
+my $deduped_string = ai_dedupe(\@items_string, "same fruit");
+
+join(",", @{$deduped_string}) |> aeq "apple,banana", "ai_dedupe simple strings";
+
+# ── AI Dedupe: Numbers ──────────────────────────────────────────────────
+
+ai_mock_install("Group duplicates among these items \(same number\)", '[[0, 3], [1, 4], [2]]');
+
+my @items_numeric = (1, 2, 3, 1, 2);
+my $deduped_numeric = ai_dedupe(\@items_numeric, "same number");
+
+join(",", @{$deduped_numeric}) |> aeq "1,2,3", "ai_dedupe numbers";
+
+# ── AI Dedupe: By Hash Key ────────────────────────────────────────────────
+
+ai_mock_install("Group duplicates among these items \(same city\)", '[[0, 2], [1]]');
+
+my @items_hash = (
+    +{ name => "Alice", city => "London" },
+    +{ name => "Bob", city => "New York" },
+    +{ name => "Charlie", city => "London" }
+);
+my $deduped_hash = ai_dedupe(\@items_hash, "same city");
+
+my @deduped_names = map { $_->{name} } @{$deduped_hash};
+join(",", @deduped_names) |> aeq "Alice,Bob", "ai_dedupe by hash key";
+
+
+test_run

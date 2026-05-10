@@ -1,0 +1,37 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-Z (2026-05-10): Completion & Cryptography
+# Compliance: docs/STYLE_GUIDE.md
+
+# ── 1. Cryptography & Hashing ──────────────────────────────────────────────
+
+# hmac_sha256(data, key)
+# Observed value: d074bcd3007e437b849cc71b3f3e066632466ec8ee43e09f7c27e32b9b615403
+hmac_sha256("message", "secret") |> aeq "d074bcd3007e437b849cc71b3f3e066632466ec8ee43e09f7c27e32b9b615403", "hmac_sha256"
+
+# ── 2. Phonetic & Sound Algorithms ─────────────────────────────────────────
+
+double_metaphone("stryke") |> join(",") |> aeq "STRK,STRK", "double_metaphone"
+metaphone("stryke") |> aeq "STRK", "metaphone"
+
+# phonetic_digit: observed lowercase
+phonetic_digit("123") |> aeq "one two three", "phonetic_digit"
+
+# ── 3. Base & Gray Code ────────────────────────────────────────────────────
+
+# Use map (eager) to get value, not iterator
+base_convert("255", 10, 16) |> map { lc(_) } |> aeq "ff", "base_convert 10 to 16"
+
+gray_code_sequence(3) |> join(",") |> aeq "0,1,3,2,6,7,5,4", "gray_code_sequence(3)"
+
+# ── 4. Formatting ──────────────────────────────────────────────────────────
+
+subscript("123") |> aeq "₁₂₃", "subscript"
+superscript("123") |> aeq "¹²³", "superscript"
+to_emoji_num(5) |> aeq "5️⃣", "to_emoji_num"
+
+# ── 5. Git Integration ─────────────────────────────────────────────────────
+
+groot() |> maps { _ =~ /strykelang$/ } |> aok "groot contains project name"
+
+test_run

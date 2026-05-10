@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+
+# Pinning tests for more math bugs from BUGS.md
+
+# Pinning test for BUG-121: median_absolute_deviation even-n spread
+# The bug states that for even-sized samples, it takes the upper of the two middle elements.
+my @data = (1, 2, 100, 101);
+my $mad = median_absolute_deviation(@data);
+# "median" is 100. Deviations: 99, 98, 0, 1. Median of deviations: 98.
+aeq($mad, 98, "BUG-121: median_absolute_deviation even-n spread");
+
+
+# Pinning test for BUG-122: js_divergence vs jensen_shannon_div
+my @p = (0.1, 0.9);
+my @q = (0.9, 0.1);
+my $jsd = jensen_shannon_div(@p, @q);
+my $js_div = js_div(@p, @q);
+
+# The bug states they differ by a factor of ln(2).
+# Let's just assert they are not equal for now.
+my $are_not_equal = abs($jsd - $js_div) > 1e-9;
+aok($are_not_equal, "BUG-122: js_divergence and jensen_shannon_div should not be equal");
+
+
+# Pinning test for BUG-123: chi_squared_distance vs chisquare_metric
+my @p2 = (0.1, 0.9);
+my @q2 = (0.9, 0.1);
+my $csd = chi_squared_distance(@p2, @q2);
+my $csm = chisquare_metric(@p2, @q2);
+
+# The bug states they differ by a factor of 2.
+my $is_factor_of_2 = abs($csm - 2 * $csd) < 1e-9;
+aok($is_factor_of_2, "BUG-123: chisquare_metric should be 2 * chi_squared_distance");
+
+
+test_run

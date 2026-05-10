@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-S (2026-05-10): AOP (Before/After/Around)
+# Compliance: docs/STYLE_GUIDE.md
+
+fn AOP_test::target($_0) { $_0 * 2 }
+
+oursync $before_fired = 0
+before "AOP_test::target" { $before_fired++ }
+
+oursync $after_fired = 0
+oursync $after_result = 0
+after "AOP_test::target" { $after_fired++; $after_result = $INTERCEPT_RESULT }
+
+oursync $around_fired = 0
+around "AOP_test::target" {
+    $around_fired++
+    my $res = proceed()
+    $res + 100
+}
+
+# First call
+AOP_test::target(10) |> aeq 120, "around transforms result"
+$before_fired |> aeq 1, "before fired"
+$after_fired |> aeq 1, "after fired"
+$after_result |> aeq 120, "after sees transformed result"
+
+# Test pattern match
+fn AOP_test::log_me { "ok" }
+oursync $pattern_fired = 0
+before "AOP_test::log_*" { $pattern_fired++ }
+AOP_test::log_me() |> aeq "ok", "target call"
+$pattern_fired |> aeq 1, "pattern before fired"
+
+test_run

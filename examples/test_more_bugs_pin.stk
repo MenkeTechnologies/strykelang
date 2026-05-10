@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+
+# Pinning tests for various bugs from BUGS.md
+
+# Pinning test for BUG-089: Closures capture outer-scope `my` vars by value
+my $val = 10;
+fn reader() {
+    my $local_val = $val;
+    $local_val = 20; # modify local copy
+    return $val; # return original outer scope value
+}
+
+my $read_val = reader();
+
+aeq($read_val, 10, "BUG-089: closure should read the original value");
+aeq($val, 10, "BUG-089: outer scope variable should not be modified");
+
+# Pinning test for BUG-037: Closure-captured coderefs flatten args
+fn call_it($code, @args) {
+    $code(@args);
+}
+
+my $sum = 0;
+fn summer(@nums) {
+    for my $n (@nums) {
+        $sum += $n;
+    }
+}
+
+call_it(\&summer, 1, 2, 3);
+
+# According to bug, @args is flattened to a scalar count, so summer receives `3` instead of `(1, 2, 3)`.
+# The loop `for my $n (3)` will execute once with $n=3.
+aeq($sum, 3, "BUG-037: captured coderef gets scalar count of args");
+
+
+# Pinning test for BUG-140: sum() on arrayref
+my $s = sum([10, 11, 12]);
+aeq($s, 0, "BUG-140: sum([10, 11, 12]) should be 0 (buggy behavior)");
+
+my $p = product([6, 7]);
+aeq($p, 0, "BUG-140: product([6, 7]) should be 0 (buggy behavior)");
+
+test_run

@@ -3295,6 +3295,14 @@ impl Compiler {
                     self.emit_op(Op::ArraySliceRange(idx), line, Some(root));
                     return Ok(());
                 }
+                // Open-ended slices like `$s[1:]`, `$s[:5]`, `$s[::2]`
+                if let ExprKind::SliceRange { from, to, step } = &index.kind {
+                    self.compile_optional_or_undef(from.as_deref())?;
+                    self.compile_optional_or_undef(to.as_deref())?;
+                    self.compile_optional_or_undef(step.as_deref())?;
+                    self.emit_op(Op::ArraySliceRange(idx), line, Some(root));
+                    return Ok(());
+                }
                 self.compile_expr(index)?;
                 self.emit_op(Op::GetArrayElem(idx), line, Some(root));
             }

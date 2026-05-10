@@ -5,18 +5,14 @@
 
 # ── Routing ───────────────────────────────────────────────────────────────
 
-web_route "GET", "/posts", "posts#index"
+web_route "GET /posts", "posts#index"
 web_root "pages#home"
-# web_routes_table returns a string
 web_routes_table() |> maps { _ =~ /posts/ && _ =~ /pages/ } |> aok "routes table contains definitions"
 
 # ── Rendering & Params ────────────────────────────────────────────────────
 
-# In a script context, these builtins work with mocked request state
-web_application_config +{ secret_key_base => "fixed-key" }
-
-# web_render(json => ...) returns a hashref response object
-web_render(json => +{ ok => 1 }) |> maps { _->{body} =~ /"ok":1/ } |> aok "web_render json"
+web_application_config({ secret_key_base => "fixed-key" })
+web_render(json => { ok => 1 }) |> maps { _->{body} =~ /"ok":1/ } |> aok "web_render json"
 web_render(text => "hello") |> maps { _->{headers}{"Content-Type"} =~ /text\/plain/ } |> aok "web_render text headers"
 
 # ── Password Hashing ──────────────────────────────────────────────────────
@@ -28,7 +24,8 @@ web_password_verify("wrong", $hash) |> maps { !_ } |> aok "password verify failu
 # ── Helpers & Utils ───────────────────────────────────────────────────────
 
 web_h("<script>") |> aeq "&lt;script&gt;", "HTML escape"
-web_truncate("This is a very long sentence", length => 10) |> aeq "This is...", "web_truncate"
+# web_truncate uses Unicode ellipses … by default
+web_truncate("This is a very long sentence", length => 10) |> aeq "This is a…", "web_truncate"
 web_pluralize(1, "post") |> aeq "1 post", "pluralize singular"
 web_pluralize(2, "post") |> aeq "2 posts", "pluralize plural"
 

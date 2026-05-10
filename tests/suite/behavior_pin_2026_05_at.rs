@@ -22,22 +22,18 @@ use crate::common::*;
 #[test]
 fn par_reduce_array_source_currently_sees_scalar_count_not_elements() {
     // `~> @a par_reduce { sum @_ }` — chunks should each get a slice of @a;
-    // the auto-merger should sum to 60. Currently returns 3 (the length of
-    // @a in scalar context) because the chunk worker reads @a as scalar.
-    // Pinning the bug; flip to 60 when fixed.
+    // the auto-merger should sum to 60. BUG FIXED: now returns correct value.
     assert_eq!(
         eval_int(r#"my @a = (10, 20, 30); ~> @a par_reduce { sum(@_) }"#),
-        3,
+        60,
     );
 }
 
 #[test]
 fn par_reduce_array_source_explicit_reducer_is_also_broken() {
-    // Two-block form should preserve the same array semantics. Currently
-    // the extract block sees a single element (the count) so the reducer
-    // never gets called (1-chunk fallback), returning empty.
+    // Two-block form should preserve the same array semantics. BUG FIXED.
     let out = eval_string(r#"my @a = (10, 20, 30); ~> @a par_reduce { sum(@_) } { $a + $b }"#);
-    assert_eq!(out, "3");
+    assert_eq!(out, "60");
 }
 
 #[test]
@@ -53,17 +49,14 @@ fn par_chunk_block_array_source_returns_empty_list() {
 
 #[test]
 fn p_arrow_array_source_sees_count_not_elements() {
-    // `~p> @a sum` — should return 60. Currently returns 3 because @a is
-    // read in scalar context before chunking.
-    assert_eq!(eval_int(r#"my @a = (10, 20, 30); ~p> @a sum"#), 3);
+    // `~p> @a sum` — should return 60. BUG FIXED.
+    assert_eq!(eval_int(r#"my @a = (10, 20, 30); ~p> @a sum"#), 60);
 }
 
 #[test]
 fn p_arrow_range_source_returns_zero() {
-    // `~p> 1:5 sum` — should return 15. Currently returns 0 because the
-    // range value is read in scalar context (which is the falsy / empty
-    // form of a range expression).
-    assert_eq!(eval_int(r#"~p> 1:5 sum"#), 0);
+    // `~p> 1:5 sum` — should return 15. BUG FIXED.
+    assert_eq!(eval_int(r#"~p> 1:5 sum"#), 15);
 }
 
 #[test]

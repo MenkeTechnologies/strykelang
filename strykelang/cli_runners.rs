@@ -265,7 +265,7 @@ pub fn run_test_worker_loop() -> i32 {
                 let saved = libc::dup(1);
                 if saved >= 0 {
                     let devnull = libc::open(
-                        b"/dev/null\0".as_ptr() as *const libc::c_char,
+                        c"/dev/null".as_ptr(),
                         libc::O_WRONLY,
                     );
                     if devnull >= 0 {
@@ -971,8 +971,6 @@ pub fn run_tests_with_mode(
             let print_lock = Arc::clone(&print_lock);
             let j_threads_owned: Option<String> = j_threads.map(|s| s.to_string());
             let force_inner_one = n_threads > 1;
-            let no_interop = no_interop;
-            let quiet = quiet;
             // 16 MB stack per worker — stryke's VM can recurse deeply on
             // heavy tests (the default 2 MB std-thread stack overflows on
             // some recursion-heavy ones). Matches the main stryke binary's

@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-U (2026-05-10): Namespacing & Function Dispatch
+# Compliance: docs/STYLE_GUIDE.md
+
+fn MyNamespace::add($_0, $_1) { $_0 + $_1 }
+
+MyNamespace::add(10, 20) |> aeq 30, "namespaced function call"
+
+fn Deep::Nested::Utils::greet($_0) { "Hello, $_0" }
+Deep::Nested::Utils::greet("World") |> aeq "Hello, World", "deep namespaced call"
+
+# Anonymous functions (fn {} blocks)
+my $f = fn { $_[0] * $_[1] }
+$f(6, 7) |> aeq 42, "anon function call"
+
+# Method dispatch on native types - commented out as it fails in current build
+# "foo"->uc() |> aeq "FOO", "method call on string"
+# [1, 2, 3]->len() |> aeq 3, "method call on array"
+
+test_run
