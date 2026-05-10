@@ -65,20 +65,34 @@ fn run_one_inproc(
         None
     };
     let file_str = script_abs.to_string_lossy().to_string();
-    let source = match std::fs::read_to_string(script_abs) {
-        Ok(s) => s,
-        Err(e) => {
-            let msg = format!("read failed: {}", e);
-            return (format!("  {}\n", msg), 0, 0, true, Some(msg));
-        }
+
+    // rkyv bytecode cache — same path the normal `stryke FILE` flow takes
+    // (main.rs:1770-1801, 1863-1868). On a hit we skip filesystem read +
+    // lex/parse/compile entirely; on a miss we hand the path to the
+    // interpreter so `try_vm_execute` saves the freshly compiled chunk.
+    // Test files re-run constantly during `stryke test` — without this,
+    // every run pays the full parse + compile cost.
+    let cached = crate::script_cache::try_load(script_abs);
+    let (program, cached_chunk, needs_cache_save) = if let Some(c) = cached {
+        (c.program, Some(c.chunk), false)
+    } else {
+        let source = match std::fs::read_to_string(script_abs) {
+            Ok(s) => s,
+            Err(e) => {
+                let msg = format!("read failed: {}", e);
+                return (format!("  {}\n", msg), 0, 0, true, Some(msg));
+            }
+        };
+        let program = match crate::parse_with_file(&source, &file_str) {
+            Ok(p) => p,
+            Err(e) => {
+                let msg = format!("{}", e);
+                return (format!("  {}\n", msg), 0, 0, true, Some(msg));
+            }
+        };
+        (program, None, true)
     };
-    let program = match crate::parse_with_file(&source, &file_str) {
-        Ok(p) => p,
-        Err(e) => {
-            let msg = format!("{}", e);
-            return (format!("  {}\n", msg), 0, 0, true, Some(msg));
-        }
-    };
+
     let mut interp = VMHelper::new();
     interp.set_file(&file_str);
     // `$0` — tests like `test_narcissist.stk` slurp their own source via
@@ -86,6 +100,12 @@ fn run_one_inproc(
     // when stryke is invoked as `stryke /path/to/test.stk`. In-process
     // we have to set it manually.
     interp.program_name = file_str.clone();
+    interp.cached_chunk = cached_chunk;
+    interp.cache_script_path = if needs_cache_save {
+        Some(script_abs.to_path_buf())
+    } else {
+        None
+    };
     let exec_result = interp.execute(&program);
     let _ = interp.run_global_teardown();
 

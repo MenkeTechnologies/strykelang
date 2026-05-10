@@ -327,6 +327,16 @@ pub fn run(cli: &Cli) {
             ReedlineEvent::MenuNext,
         ]),
     );
+    // Shift+Tab cycles backwards through the menu — pairs with Tab so the
+    // user does not need to reach for arrow keys to back up over a missed
+    // suggestion. (Up/Down/Left/Right are already bound to the matching
+    // Menu* events by `default_emacs_keybindings`.)
+    keybindings.add_binding(
+        KeyModifiers::SHIFT,
+        KeyCode::BackTab,
+        ReedlineEvent::MenuPrevious,
+    );
+    keybindings.add_binding(KeyModifiers::NONE, KeyCode::BackTab, ReedlineEvent::MenuPrevious);
 
     let history = match FileBackedHistory::with_file(5_000, history_path()) {
         Ok(h) => Box::new(h) as Box<dyn reedline::History>,
@@ -339,12 +349,15 @@ pub fn run(cli: &Cli) {
         }
     };
 
+    // `with_partial_completions(true)` made every Tab re-run
+    // `can_partially_complete`, which re-inserted the longest common prefix
+    // and re-ran the completer on each MenuNext — pinning the cursor near
+    // the top of the menu. Disabled so Tab is a pure "next suggestion" hop.
     let mut line_editor = Reedline::create()
         .with_completer(Box::new(completer))
         .with_menu(ReedlineMenu::EngineCompleter(Box::new(menu)))
         .with_edit_mode(Box::new(Emacs::new(keybindings)))
-        .with_history(history)
-        .with_partial_completions(true);
+        .with_history(history);
 
     let prompt = StrykePrompt {
         cmd_count: Arc::clone(&cmd_count),

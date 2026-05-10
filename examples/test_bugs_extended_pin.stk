@@ -22,11 +22,12 @@ $r_30 |> aeq 1, "BUG-030: system('false') returns 1 (exit code)"
 system("sh", "-c", "exit 7")
 $? |> aeq 0, "BUG-031: system(LIST) drops exit code in \$?"
 
-# BUG-037: Closure passing @_ as count
+# BUG-037 (FIXED): closure-wrapped coderef call now flattens @_ into the
+# call list (was returning scalar(@_) before the vm_helper fix).
 fn my_dbl_37($_0) { $_0 * 2 }
 my $f_37 = \&my_dbl_37
 my $h_37 = fn { $f_37->(@_) }
-$h_37(5) |> aeq 2, "BUG-037: closure passing @_ as count"
+$h_37(5) |> aeq 10, "BUG-037 (FIXED): closure passes \@_ flattened, not as count"
 
 # BUG-044: AOP after sees $? as 0
 fn payload_44 { 42 }
@@ -48,8 +49,8 @@ fn myff_88(&@) { my $cb = shift; len(@_) }
 my $res_88 = myff_88 { 1 } 5, 7
 $res_88 |> aeq 0, "BUG-088: block prototype drops trailing args"
 
-# BUG-109: sum(\@a) returns 0
+# BUG-109 (FIXED): sum(\@a) now sums via arrayref operand (was returning 0).
 my @a_109 = (1, 2, 3)
-sum(\@a_109) |> aeq 0, "BUG-109: sum(\\@a) returns 0"
+sum(\@a_109) |> aeq 6, "BUG-109 (FIXED): sum(\\@a) sums arrayref contents"
 
 test_run
