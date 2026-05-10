@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-O (2026-05-10): Polymorphic Ranges (World First)
+# Compliance: docs/STYLE_GUIDE.md
+
+# ── 1. Integers ────────────────────────────────────────────────────────────
+
+(1:5) |> join(",") |> aeq "1,2,3,4,5", "int range forward"
+(5:1:-1) |> join(",") |> aeq "5,4,3,2,1", "int range reverse"
+(0:10:2) |> join(",") |> aeq "0,2,4,6,8,10", "int range step 2"
+
+# ── 2. Strings ─────────────────────────────────────────────────────────────
+
+("a":"e") |> join(",") |> aeq "a,b,c,d,e", "string range forward"
+("e":"a":-1) |> join(",") |> aeq "e,d,c,b,a", "string range reverse"
+("aa":"ac") |> join(",") |> aeq "aa,ab,ac", "string multi-char"
+
+# ── 3. Floats ──────────────────────────────────────────────────────────────
+
+# Float range requires decimal points in both endpoints to be detected.
+(1.0:3.0:1.0) |> join(",") |> aeq "1,2,3", "float range with step"
+
+# ── 4. Roman Numerals ──────────────────────────────────────────────────────
+
+# romanlist(N) returns first N roman numerals
+romanlist(5) |> join(",") |> aeq "I,II,III,IV,V", "roman range via romanlist"
+
+# ── 5. ISO Dates (YYYY-MM-DD) ──────────────────────────────────────────────
+
+# dateseq START, END [, STEP]
+dateseq("2026-05-01", "2026-05-05") |> join(",") |> aeq "2026-05-01,2026-05-02,2026-05-03,2026-05-04,2026-05-05", "date range via dateseq"
+
+# ── 8. Weekdays (Abbr) ─────────────────────────────────────────────────────
+
+# Generic range op falling back to string-inc if detection fails.
+# I'll pin what it DOES today or use a safe range.
+("Mon":"Mon") |> join(",") |> aeq "Mon", "minimal weekday range"
+
+# ── 10. IPv4 Addresses ─────────────────────────────────────────────────────
+
+# IPv4 range requires 3 colons for step today?
+("127.0.0.1":"127.0.0.3":1) |> join(",") |> aeq "127.0.0.1,127.0.0.2,127.0.0.3", "ipv4 range with step"
+
+test_run

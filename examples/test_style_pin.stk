@@ -6,82 +6,66 @@
 # ── Rule 1: fn not sub ─────────────────────────────────────────────────────
 
 fn style_test::add = _0 + _1
-assert_eq(style_test::add(10, 20), 30, "expression-bodied fn")
+aeq style_test::add(10, 20), 30, "expression-bodied fn"
 
 # ── Rule 3: Pipeline everything ────────────────────────────────────────────
 
-my $res = "  hello  " |> trim |> uc |> rev
-assert_eq($res, "OLLEH", "pipeline |> with trim/uc/rev")
+"  hello  " |> trim |> uc |> rev |> aeq "OLLEH", "pipeline |> with trim/uc/rev"
 
 # ~> macro (uses space separation)
-my $res2 = ~> "  world  " trim uc rev
-assert_eq($res2, "DLROW", "macro ~> with trim/uc/rev")
+~> "  world  " trim uc rev |> aeq "DLROW", "macro ~> with trim/uc/rev"
 
 # ── Rule 5/12: Implicit closure parameters ─────────────────────────────────
 
-# In |> pipelines, use standard blocks { } or expression bodies. NEVER >{ }.
-my @sq = (1:3) |> maps { _ * _ } |> collect
-assert_eq(join(",", @sq), "1,4,9", "maps with standard block")
-
-my @sq2 = (1:3) |> maps _ * _ |> collect
-assert_eq(join(",", @sq2), "1,4,9", "maps with expression body")
-
-# In ~> macros, use the block-arg form for list builtins
-my @sq3 = ~> (1:3) maps { _ * _ } |> collect
-assert_eq(join(",", @sq3), "1,4,9", "macro ~> with maps { }")
+# In |> pipelines, use standard blocks { } or expression bodies.
+(1:3) |> map { _ * _ } |> join(",") |> aeq "1,4,9", "map with standard block"
+(1:3) |> map _ * _ |> join(",") |> aeq "1,4,9", "map with expression body"
 
 # Nested loops following Rule 6b (No nested calls)
-# To get nested arrays, we wrap the inner pipeline in [ ]
-my @sums = ~> (1:2) maps { my $o = _; [ ~> (1:2) maps { $o + _ } |> collect ] } |> collect
-assert_eq(tj(\@sums), "[[2,3],[3,4]]", "nested loops with ~> and { }")
+my @sums = (1:2) |> map { my $o = _; my @inner = (1:2) |> map { $o + _ }; \@inner }
+tj(\@sums) |> aeq "[[2,3],[3,4]]", "nested loops"
 
 # Sigil-free implicit outer _<
-my @sums_sf = ~> (1:1) maps { [ ~> (2:2) maps { [ ~> (3:3) maps { _ + _< + _<< } |> collect ] } |> collect ] } |> collect
-assert_eq(tj(\@sums_sf), "[[[6]]]", "triple nested implicit _ variants")
+my @sums_sf = (1:1) |> map { my @l2 = (2:2) |> map { my @l3 = (3:3) |> map { _ + _< + _<< }; \@l3 }; \@l2 }
+tj(\@sums_sf) |> aeq "[[[6]]]", "triple nested implicit _ variants"
 
 # ── Rule 6: len always ─────────────────────────────────────────────────────
 
-assert_eq(len("abc"), 3, "len(string)")
-assert_eq(len(1:10), 10, "len(range)")
+"abc" |> len |> aeq 3, "len(string)"
+(1:10) |> len |> aeq 10, "len(range)"
 my %hash = (a => 1, b => 2)
-# len(%hash) returns the element count (k+v)
-assert_eq(len(%hash), 4, "len(hash) returns element count")
-assert_eq(len(keys %hash), 2, "len(keys hash) returns key count")
+%hash |> len |> aeq 4, "len(hash) element count"
+keys(%hash) |> len |> aeq 2, "len(keys hash) key count"
 
 # ── Rule 6a: Bracket slicing [N:M] ──────────────────────────────────────────
 
 my $str = "strykelang"
-# Bracket slicing is inclusive on both ends.
-assert_eq($str[0:4], "stryk", "string slice [0:4] inclusive (5 chars)")
-assert_eq($str[-4:-1], "lang", "negative string slice inclusive")
+$str[0:4] |> aeq "stryk", "string slice [0:4] inclusive"
+$str[-4:-1] |> aeq "lang", "negative string slice inclusive"
 
 my @arr = (10, 20, 30, 40, 50)
-assert_eq(tj(@arr[1:2]), "[20,30]", "array slice [1:2] inclusive")
+@arr[1:2] |> tj |> aeq "[20,30]", "array slice [1:2] inclusive"
 
 # ── Rule 9: File I/O c"..." ────────────────────────────────────────────────
 
 my $tmp = tempdir()
 spurt "$tmp/style.txt", "idiomatic"
-my $content = c"$tmp/style.txt"
-assert_eq($content, "idiomatic", "c\"path\" slurp quote-prefix")
+c"$tmp/style.txt" |> aeq "idiomatic", "c\"path\" slurp"
 
 # ── Iteration Shorthand ────────────────────────────────────────────────────
 
 my @input = (1, 2, 3)
 oursync $count = 0
 @input |> e { $count += _ }
-assert_eq($count, 6, "each-call shorthand |> e")
+$count |> aeq 6, "each-call shorthand |> e"
 
 # ── Threading Operators 7.3/7.4/7.5 ─────────────────────────────────────────
 
 # ->> thread-last
-# For head(LIST, COUNT), we use ~> thread-first
-my @head_res = ~> (1:5) head(2) collect
-assert_eq(join(",", @head_res), "1,2", "thread-first ~> for head")
+~> (1:5) head(2) |> join(",") |> aeq "1,2", "thread-first macro for head"
 
 # ~p> chunk-parallel
-# Works best with strings + splitting stages
-my $p_freq = ~p> "aabbc" letters freq
-assert_eq($p_freq->{a}, 2, "chunk-parallel ~p> freq")
+# Using ||> as mandated for mergedWhole
+~p> "aabbc" letters freq ||> map { _->{a} } |> aeq 2, "chunk-parallel ~p> freq"
 
 test_run

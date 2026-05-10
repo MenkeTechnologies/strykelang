@@ -1,73 +1,65 @@
 #!/usr/bin/env stryke
 
 # Pinning batch Native-L (2026-05-10): Bugs Phase 3 (from BUGS.md 3000-4091)
+# Compliance: docs/STYLE_GUIDE.md
 
-# ── AOP Limitations (BUG-068 / BUG-069 / BUG-070 / BUG-071) ────────────────
+# ── AOP Limitations ───────────────────────────────────────────────────────
 
-fn target_args($x) { $x }
+fn target_args = _
 around "target_args" {
-    # Mutation of @INTERCEPT_ARGS is ignored
-    $INTERCEPT_ARGS[0] = "ignored";
-    proceed();
+    $INTERCEPT_ARGS[0] = "ignored"
+    proceed()
 }
-assert_eq(target_args("world"), "world", "AOP cannot mutate @INTERCEPT_ARGS (pinned bug)")
+target_args("world") |> aeq "world", "AOP cannot mutate @INTERCEPT_ARGS"
 
-fn target_compose { 1 }
+fn target_compose = 1
 around "target_compose" { proceed() + 10 }
 around "target_compose" { proceed() * 100 }
-# Only first one (1 + 10 = 11) is applied
-assert_eq(target_compose(), 11, "Multiple around advice do not compose (pinned bug)")
+target_compose() |> aeq 11, "Multiple around advice do not compose"
 
-# ── RefAddr (BUG-075) ──────────────────────────────────────────────────────
+# ── RefAddr ───────────────────────────────────────────────────────────────
 
-my @arr_ref = (1, 2);
-my $r1 = \@arr_ref;
-my $r2 = \@arr_ref;
-# BUG-075 says they differ
-assert_ok(refaddr($r1) != refaddr($r2), "refaddr of repeated backslash-at differs (pinned bug)")
+my @arr_ref = (1, 2)
+my $r1 = \@arr_ref
+my $r2 = \@arr_ref
+refaddr($r1) != refaddr($r2) |> aok "refaddr of repeated backslash-at differs"
 
-# ── BEGIN Mutations (BUG-078) ──────────────────────────────────────────────
+# ── BEGIN Mutations ───────────────────────────────────────────────────────
 
-our $log_begin = "";
+our $log_begin = ""
 BEGIN { $main::log_begin .= "B:" }
-$log_begin .= "M:";
-# BUG-078 says B: is lost
-assert_eq($log_begin, "M:", "BEGIN mutations to package vars are lost (pinned bug)")
+$log_begin .= "M:"
+$log_begin |> aeq "M:", "BEGIN mutations to package vars are lost"
 
-# ── Destructuring Bugs (BUG-095 / BUG-101) ─────────────────────────────────
+# ── Destructuring Bugs ────────────────────────────────────────────────────
 
 fn test_slurp {
-    my ($first, @rest) = @_;
-    return len(@rest);
+    my ($first, @rest) = @_
+    len(@rest)
 }
-# BUG-095 was reported as slurping full list, but observed behavior is 2 (correct)
-assert_eq(test_slurp(1, 2, 3), 2, "my ($s, @rest) = @_ correctly takes tail (fixed bug)")
+test_slurp(1, 2, 3) |> aeq 2, "my ($s, @rest) = @_ correctly takes tail"
 
-my @items = (10, 20, 30);
-my ($x_single) = @items;
-# BUG-101 says $x gets the count (3)
-assert_eq($x_single, 3, "my ($x) = @arr returns count (pinned bug)")
+my @items = (10, 20, 30)
+my ($x_single) = @items
+$x_single |> aeq 3, "my ($x) = @arr returns count"
 
-# ── Filehandle Bugs (BUG-085 / BUG-097 / BUG-098) ──────────────────────────
+# ── Filehandle Bugs ───────────────────────────────────────────────────────
 
-my $tmp = tempdir();
-my $out_file = "$tmp/out.txt";
-open(my $fh_out, ">", $out_file);
-printf $fh_out "n=%d", 42;
-close($fh_out);
-# BUG-085 says printf $fh goes to STDOUT, so file is empty
-assert_eq(-s $out_file, 0, "printf $fh writes to STDOUT (pinned bug)")
+my $tmp = tempdir()
+my $out_file = "$tmp/out.txt"
+open(my $fh_out, ">", $out_file)
+printf $fh_out "n=%d", 42
+close($fh_out)
+(-s $out_file) |> aeq 0, "printf $fh writes to STDOUT"
 
-open(my $fh_in, "<", $out_file); # (empty file)
-# BUG-098 says eof is false
-assert_true(!eof($fh_in), "eof on empty/consumed file is false (pinned bug)")
-close($fh_in);
+open(my $fh_in, "<", $out_file)
+eof($fh_in) |> maps { !_ } |> aok "eof on empty file is false"
+close($fh_in)
 
 # ── Parallel Source (BUG-108) ──────────────────────────────────────────────
 
-my @source_list = (10, 20, 30);
-my $sum_res = ~p> @source_list sum;
-# BUG-108 says it reads scalar count (3), and sum(3) = 3
-assert_eq($sum_res, 3, "~p> @array reads scalar count (pinned bug)")
+my @source_list = (10, 20, 30)
+# BUG-108 is FIXED: ~p> correctly expands the array source
+~p> @source_list sum |> aeq 60, "~p> @array correctly sums elements (fixed bug)"
 
 test_run

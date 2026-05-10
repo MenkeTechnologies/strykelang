@@ -11454,15 +11454,22 @@ impl VMHelper {
                 //   - number     → numeric `+`
                 //   - array/list → concat
                 //   - string     → concat
-                let list_val = self.eval_expr(list)?;
+                // Use List context so `@a` expands to its elements, not its length.
+                let list_val = self.eval_expr_ctx(list, WantarrayCtx::List)?;
                 let n_threads = rayon::current_num_threads().clamp(1, 8);
                 let chunks = par_chunk_value(&list_val, n_threads);
                 if chunks.len() < 2 {
-                    // Single-chunk fallback: bind input as both $_ and $_[0]
-                    // so blocks built via the pipe_rhs_wrap path (which uses
-                    // `$_[0]`) work the same as topic-style blocks.
-                    self.scope.declare_array("_", vec![list_val.clone()]);
-                    self.scope.set_topic(list_val);
+                    // Single-chunk fallback: bind the chunk elements to `@_`
+                    // (not wrapped) so `~p> @a sum` correctly passes all elements
+                    // to `sum(@_)`. Also set `$_` to the first element for
+                    // backwards compat with scalar-style blocks.
+                    let chunk_arr = match list_val.as_array_vec() {
+                        Some(arr) => arr,
+                        None => vec![list_val.clone()],
+                    };
+                    let first = chunk_arr.first().cloned().unwrap_or(PerlValue::UNDEF);
+                    self.scope.declare_array("_", chunk_arr);
+                    self.scope.set_topic(first);
                     return self.exec_block(extract_block);
                 }
                 let extract = extract_block.clone();
@@ -11482,13 +11489,16 @@ impl VMHelper {
                         local.scope.restore_capture(&scope_capture);
                         local.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
                         local.enable_parallel_guard();
-                        // Bind chunk as both `$_` (topic) and `$_[0]`.
-                        // The topic form is used by `par_reduce { letters
-                        // |> freq }` style blocks; the `$_[0]` form is
-                        // used when `~p>` lowers to `par_reduce` via the
-                        // pipe_rhs_wrap path.
-                        local.scope.declare_array("_", vec![chunk.clone()]);
-                        local.scope.set_topic(chunk);
+                        // Bind the chunk elements to `@_` (not wrapped) so
+                        // `~p> @a sum` correctly passes all elements to `sum(@_)`.
+                        // Also set `$_` to the first element for backwards compat.
+                        let chunk_arr = match chunk.as_array_vec() {
+                            Some(arr) => arr,
+                            None => vec![chunk.clone()],
+                        };
+                        let first = chunk_arr.first().cloned().unwrap_or(PerlValue::UNDEF);
+                        local.scope.declare_array("_", chunk_arr);
+                        local.scope.set_topic(first);
                         match local.exec_block(&extract) {
                             Ok(v) => v,
                             Err(e) => {

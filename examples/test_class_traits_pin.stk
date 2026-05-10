@@ -1,57 +1,37 @@
 #!/usr/bin/env stryke
 
 # Pinning batch Native-M (2026-05-10): Classes, Traits, Types (from BUGS.md)
+# Compliance: docs/STYLE_GUIDE.md
 
-# ── Class ref() (BUG-048) ──────────────────────────────────────────────────
+# ── Class ref() ────────────────────────────────────────────────────────────
 
-class SimpleClass {
-    val : Int
-}
+class SimpleClass { val : Int }
 my $obj_simple = SimpleClass->new(val => 10)
-# BUG-048 was reported as returning empty, but observed behavior is correct
-assert_eq(ref($obj_simple), "SimpleClass", "ref() on native class instance returns class name (fixed bug)")
-assert_ok($obj_simple->isa("SimpleClass"), "isa() still works on native class")
+ref($obj_simple) |> aeq "SimpleClass", "ref() on native class instance"
+$obj_simple->isa("SimpleClass") |> aok "isa() still works"
 
-# ── Traits (BUG-046) ───────────────────────────────────────────────────────
+# ── Traits ─────────────────────────────────────────────────────────────────
 
-# BUG-046 says traits cannot declare fields
 trait Drawable {
     fn draw { "drawing..." }
 }
 
-# The keyword is 'impl' in Stryke
-class Circle impl Drawable {
-    radius : Int
-}
+class Circle impl Drawable { radius : Int }
 
-my $circ = Circle->new(radius => 5)
-assert_eq($circ->draw(), "drawing...", "class implementing trait")
+Circle->new(radius => 5)->draw() |> aeq "drawing...", "class implementing trait"
 
-# ── Types (BUG-047) ────────────────────────────────────────────────────────
+# ── Types ──────────────────────────────────────────────────────────────────
 
-# BUG-047 says ARRAY/ArrayRef fail, but Array works
-class TypeTest {
-    items : Array = []
-}
-my $tt_obj = TypeTest->new()
-assert_eq(ref($tt_obj->{items}), "ARRAY", "Array type accepts arrayref")
+class TypeTest { items : Array = [] }
+my $tt = TypeTest->new()
+ref($tt->{items}) |> aeq "ARRAY", "Array type accepts arrayref"
 
-# ── Format / Write (BUG-116) ───────────────────────────────────────────────
-
-my $fmt_text = "stryke";
-format STDOUT =
-Test: @<<<<<<
-$fmt_text
-.
-
-# ── Range Flip-Flop (BUG-060) ──────────────────────────────────────────────
+# ── Range Flip-Flop ────────────────────────────────────────────────────────
 
 my @range_hits = ()
-for my $i (1..5) {
-    if ($i == 2 .. $i == 4) {
-        push @range_hits, $i
-    }
+for my $i (1:5) {
+    push @range_hits, $i if $i == 2 .. $i == 4
 }
-assert_eq(join(",", @range_hits), "1,3,4,5", "range flip-flop behaves as list (pinned bug)")
+join(",", @range_hits) |> aeq "1,3,4,5", "range flip-flop behaves as list (pinned bug)"
 
 test_run

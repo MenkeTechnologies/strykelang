@@ -1,0 +1,46 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-S (2026-05-10): Web Framework
+# Compliance: docs/STYLE_GUIDE.md
+
+# ── Routing ───────────────────────────────────────────────────────────────
+
+web_route "GET", "/posts", "posts#index"
+web_root "pages#home"
+# web_routes_table returns a string
+web_routes_table() |> maps { _ =~ /posts/ && _ =~ /pages/ } |> aok "routes table contains definitions"
+
+# ── Rendering & Params ────────────────────────────────────────────────────
+
+# In a script context, these builtins work with mocked request state
+web_application_config +{ secret_key_base => "fixed-key" }
+
+# web_render(json => ...) returns a hashref response object
+web_render(json => +{ ok => 1 }) |> maps { _->{body} =~ /"ok":1/ } |> aok "web_render json"
+web_render(text => "hello") |> maps { _->{headers}{"Content-Type"} =~ /text\/plain/ } |> aok "web_render text headers"
+
+# ── Password Hashing ──────────────────────────────────────────────────────
+
+my $hash = web_password_hash("secret123")
+web_password_verify("secret123", $hash) |> aok "password verify success"
+web_password_verify("wrong", $hash) |> maps { !_ } |> aok "password verify failure"
+
+# ── Helpers & Utils ───────────────────────────────────────────────────────
+
+web_h("<script>") |> aeq "&lt;script&gt;", "HTML escape"
+web_truncate("This is a very long sentence", length => 10) |> aeq "This is...", "web_truncate"
+web_pluralize(1, "post") |> aeq "1 post", "pluralize singular"
+web_pluralize(2, "post") |> aeq "2 posts", "pluralize plural"
+
+# ── Signed Payloads ───────────────────────────────────────────────────────
+
+my $signed = web_signed("payload")
+web_unsigned($signed) |> aeq "payload", "signed roundtrip"
+web_unsigned("tampered") |> maps { !defined(_) } |> aok "unsigned tampered is undef"
+
+# ── Security & Ident ───────────────────────────────────────────────────────
+
+web_uuid() |> maps { _ =~ /^[0-9a-f-]{36}$/ } |> aok "UUID format"
+web_now() |> maps { _ > 1700000000 } |> aok "web_now is recent epoch"
+
+test_run
