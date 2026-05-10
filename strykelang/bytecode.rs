@@ -58,6 +58,8 @@ pub enum Op {
     Rot,
     /// Pop one value; push [`PerlValue::scalar_context`] of that value (Perl aggregate rules).
     ValueScalarContext,
+    /// Pop list/array; push first element (or undef if empty). For `my ($x) = @arr`.
+    ListFirst,
 
     // ── Scalars (u16 = name pool index) ──
     GetScalar(u16),

@@ -235,8 +235,9 @@ fn product_variadic_three_co() {
 }
 
 #[test]
-fn product_lone_bracket_bucket_zero_bug_co() {
-    assert_eq!(eval_string(r#"sprintf("%.0f", product([2, 3, 4]))"#), "0");
+fn product_lone_bracket_bucket_works_co() {
+    // BUG-109/140 FIXED: product auto-derefs arrayrefs
+    assert_eq!(eval_string(r#"sprintf("%.0f", product([2, 3, 4]))"#), "24");
 }
 
 #[test]

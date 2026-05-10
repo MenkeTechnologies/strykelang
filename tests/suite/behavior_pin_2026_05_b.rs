@@ -192,10 +192,9 @@ fn pipe_with_paren_list_through_map() {
 }
 
 #[test]
-fn pipe_with_arrayref_into_sum_returns_zero_today() {
-    // BUG-004: pipe with an arrayref LHS does not auto-deref.
-    // `[1..5] |> sum` returns 0 instead of 15. Pinned at current value.
-    assert_eq!(eval_int(r#"[1..5] |> sum"#), 0);
+fn pipe_with_arrayref_into_sum_works() {
+    // BUG-109/140 FIXED: sum auto-derefs arrayrefs now.
+    assert_eq!(eval_int(r#"[1..5] |> sum"#), 15);
 }
 
 #[test]

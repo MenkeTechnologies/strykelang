@@ -19234,12 +19234,20 @@ fn builtin_combinations(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 /// `permutations N, LIST` — returns all N-element permutations (Python's itertools.permutations).
+/// Also accepts `permutations(ARRAYREF)` as shorthand for all permutations of the array.
 fn builtin_permutations(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let n = args
-        .first()
-        .map(|v| v.to_int().max(0) as usize)
-        .unwrap_or(0);
-    let xs = flatten_args(&args[1..]);
+    // Single arrayref arg: `permutations([1,2,3])` → all permutations
+    let (n, xs) = if args.len() == 1 && args[0].as_array_ref().is_some() {
+        let items = flatten_args(args);
+        (items.len(), items)
+    } else {
+        let n = args
+            .first()
+            .map(|v| v.to_int().max(0) as usize)
+            .unwrap_or(0);
+        let xs = flatten_args(&args[1..]);
+        (n, xs)
+    };
     if n == 0 || n > xs.len() {
         return Ok(PerlValue::array(vec![]));
     }

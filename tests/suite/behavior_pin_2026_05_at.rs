@@ -60,10 +60,9 @@ fn p_arrow_range_source_returns_zero() {
 }
 
 #[test]
-fn p_arrow_arrayref_source_falls_back_to_single_chunk_with_zero_sum() {
-    // `~p> [1,2,3] sum` — arrayref is wrapped as 1-chunk, but `sum` doesn't
-    // auto-deref the arrayref so the chunk's value is 0.
-    assert_eq!(eval_int(r#"~p> [1,2,3] sum"#), 0);
+fn p_arrow_arrayref_source_with_sum_works() {
+    // `~p> [1,2,3] sum` — BUG-109/140 FIXED: sum now auto-derefs arrayrefs.
+    assert_eq!(eval_int(r#"~p> [1,2,3] sum"#), 6);
 }
 
 #[test]
@@ -103,20 +102,18 @@ fn par_reduce_empty_array_returns_empty_for_numeric_extract() {
 
 // ── sum() and friends on arrayrefs ────────────────────────────────────────────
 //
-// BUG-AT-002 (BUGS.md): `sum(\@a)` and `sum([1,2,3])` return 0 instead of
-// summing the deref'd array. List-builtins that should auto-deref a single
-// arrayref argument currently treat it as a scalar (always-numeric-zero).
+// BUG-109/140 FIXED: sum/product/mean/median now auto-deref arrayrefs.
 
 #[test]
-fn sum_on_arrayref_returns_zero_not_sum() {
-    // `sum([1,2,3])` should return 6 once auto-deref lands. Currently 0.
-    assert_eq!(eval_int(r#"sum([1,2,3])"#), 0);
+fn sum_on_arrayref_returns_sum() {
+    // `sum([1,2,3])` returns 6 (auto-deref fixed).
+    assert_eq!(eval_int(r#"sum([1,2,3])"#), 6);
 }
 
 #[test]
-fn sum_on_array_ref_via_backslash_returns_zero() {
-    // `sum(\@a)` — same bug class.
-    assert_eq!(eval_int(r#"my @a = (10, 20, 30); sum(\@a)"#), 0);
+fn sum_on_array_ref_via_backslash_works() {
+    // `sum(\@a)` — fixed.
+    assert_eq!(eval_int(r#"my @a = (10, 20, 30); sum(\@a)"#), 60);
 }
 
 #[test]

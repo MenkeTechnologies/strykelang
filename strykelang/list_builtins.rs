@@ -443,6 +443,10 @@ fn sum(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
             for item in arr {
                 s += item.to_number();
             }
+        } else if let Some(arr_ref) = x.as_array_ref() {
+            for item in arr_ref.read().iter() {
+                s += item.to_number();
+            }
         } else {
             s += x.to_number();
         }
@@ -460,6 +464,10 @@ fn sum0(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
             }
         } else if let Some(arr) = x.as_array_vec() {
             for item in arr {
+                s += item.to_number();
+            }
+        } else if let Some(arr_ref) = x.as_array_ref() {
+            for item in arr_ref.read().iter() {
                 s += item.to_number();
             }
         } else {
@@ -481,6 +489,10 @@ fn product(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
             for item in arr {
                 p *= item.to_number();
             }
+        } else if let Some(arr_ref) = x.as_array_ref() {
+            for item in arr_ref.read().iter() {
+                p *= item.to_number();
+            }
         } else {
             p *= x.to_number();
         }
@@ -488,22 +500,46 @@ fn product(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
     Ok(PerlValue::float(p))
 }
 
+/// Flatten args: dereference array refs, expand arrays/iterators into a flat list of numbers.
+fn flatten_to_numbers(args: &[PerlValue]) -> Vec<f64> {
+    let mut out = Vec::new();
+    for x in args {
+        if x.is_iterator() {
+            let iter = x.clone().into_iterator();
+            while let Some(item) = iter.next_item() {
+                out.push(item.to_number());
+            }
+        } else if let Some(arr) = x.as_array_vec() {
+            for item in arr {
+                out.push(item.to_number());
+            }
+        } else if let Some(arr_ref) = x.as_array_ref() {
+            for item in arr_ref.read().iter() {
+                out.push(item.to_number());
+            }
+        } else {
+            out.push(x.to_number());
+        }
+    }
+    out
+}
+
 /// Arithmetic mean; empty list → `undef`.
 fn mean(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
-    if args.is_empty() {
+    let nums = flatten_to_numbers(args);
+    if nums.is_empty() {
         return Ok(PerlValue::UNDEF);
     }
-    let n = args.len() as f64;
-    let s: f64 = args.iter().map(|x| x.to_number()).sum();
-    Ok(PerlValue::float(s / n))
+    let s: f64 = nums.iter().sum();
+    Ok(PerlValue::float(s / nums.len() as f64))
 }
 
 /// Median (linear interpolation for even length). Empty list → `undef`.
 fn median(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
-    if args.is_empty() {
+    let mut v = flatten_to_numbers(args);
+    if v.is_empty() {
         return Ok(PerlValue::UNDEF);
     }
-    let mut v: Vec<f64> = args.iter().map(|x| x.to_number()).collect();
     v.sort_by(|a, b| a.total_cmp(b));
     let n = v.len();
     let mid = if n % 2 == 1 {

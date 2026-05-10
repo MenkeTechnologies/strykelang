@@ -110,15 +110,17 @@ fn partial_application_via_closure_works() {
     );
 }
 
-// ── BUG-037 — Closure-wrapped coderef call with `(SCALAR, @ARRAY)` mis-routes
+// ── BUG-037 — Closure-wrapped coderef call now flattens arrays correctly.
 //
-// Pinned at the failing value (4). Direct calls and same closure with element
-// access (`$arr[0]`) work; only the flatten form inside the closure fails.
+// Previously pinned at the failing value (4); regression guard since the fix
+// landed (vm_helper.rs `DerefKind::Call` + `IndirectCall` evaluate each arg in
+// list context and flatten array values into the call list).
 
 #[test]
 fn closure_calling_sigfn_via_coderef_with_array_arg_breaks_today() {
-    // `sub { $f->($first, @rest) }` where $f is `\&fn_with_sig` should pass
-    // both args. Today the array gets numified to its count.
+    // `sub { $f->($first, @rest) }` where $f is `\&fn_with_sig` passes both
+    // args; the `@rest` array flattens into the call list (was numified to
+    // its count before the fix).
     assert_eq!(
         eval_int(
             r#"fn myadd($x, $y) { $x + $y }
@@ -126,7 +128,7 @@ fn closure_calling_sigfn_via_coderef_with_array_arg_breaks_today() {
                my $g = sub { my $first = shift; my @rest = @_; $f->($first, @rest) };
                $g->(3, 4)"#
         ),
-        4
+        7
     );
 }
 
@@ -350,9 +352,9 @@ fn manual_curry_via_nested_sub_works() {
 
 #[test]
 fn closure_calling_coderef_with_at_underscore_flattens_to_count_today() {
-    // BUG-037 broader: any closure that calls a coderef with `@_` as
-    // argument passes `scalar(@_)` instead of flattening. So
-    // `sub { $f->(@_) }->(5)` returns `$f->(1)`, not `$f->(5)`.
+    // BUG-037 (FIXED) — closure that calls a coderef with `@_` as argument
+    // now flattens, so `sub { $f->(@_) }->(5)` invokes `$f->(5)` and returns
+    // 10. Regression guard since the vm_helper fix landed.
     assert_eq!(
         eval_int(
             r#"sub mydbl { my $x = shift; $x * 2 }
@@ -360,7 +362,7 @@ fn closure_calling_coderef_with_at_underscore_flattens_to_count_today() {
                my $h = sub { $f->(@_) };
                $h->(5)"#
         ),
-        2
+        10
     );
 }
 

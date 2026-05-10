@@ -433,19 +433,19 @@ fn zero_eq_empty_string_with_double_equals() {
 // ── `my ($x) = @arr` returns scalar count today (BUG-101) ──────────────────
 
 #[test]
-fn single_scalar_destructure_from_array_var_returns_count_today() {
-    // BUG-101: `my ($x) = @arr` is supposed to be LIST context (parens
-    // make it a list assignment) and bind $x to the first element. Stryke
-    // treats it as scalar context and returns the count.
-    assert_eq!(eval_int(r#"my @a = (10, 20, 30); my ($x) = @a; $x"#), 3);
+fn single_scalar_destructure_from_array_var_returns_first_element() {
+    // BUG-101 (FIXED): `my ($x) = @arr` is LIST context (parens make it a
+    // list assignment) and binds $x to the first element. Previously Stryke
+    // incorrectly treated it as scalar context and returned the count.
+    assert_eq!(eval_int(r#"my @a = (10, 20, 30); my ($x) = @a; $x"#), 10);
 }
 
 #[test]
-fn single_scalar_destructure_from_at_underscore_returns_count_today() {
-    // Same bug from a sub's @_.
+fn single_scalar_destructure_from_at_underscore_returns_first_element() {
+    // BUG-101 (FIXED): Same as above but from a sub's @_.
     assert_eq!(
-        eval_int(r#"sub myff { my ($x) = @_; $x } myff("hello", "world")"#),
-        2
+        eval_string(r#"sub myff { my ($x) = @_; $x } myff("hello", "world")"#),
+        "hello"
     );
 }
 

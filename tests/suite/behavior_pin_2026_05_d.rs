@@ -169,10 +169,8 @@ fn named_capture_hash_lists_keys() {
 // ── Slurp mode `$/` is broken today ──────────────────────────────────────────
 
 #[test]
-fn open_then_slurp_with_undef_separator_reads_only_first_line_today() {
-    // BUG-020: `local $/; <$fh>` should slurp the whole file. Today the
-    // separator-undef does not propagate into `<$fh>`, so the read still
-    // stops at the first newline (i.e., `local $/` is a no-op for this).
+fn open_then_slurp_with_undef_separator_reads_whole_file() {
+    // BUG-018 FIXED: `local $/; <$fh>` now slurps the whole file.
     let probe = std::env::temp_dir().join(format!("stryke_pin_slurp_{}", std::process::id()));
     std::fs::write(&probe, b"line1\nline2\n").unwrap();
     let probe_str = probe.to_string_lossy().to_string();
@@ -182,9 +180,8 @@ fn open_then_slurp_with_undef_separator_reads_only_first_line_today() {
     );
     let n = eval_int(&code);
     let _ = std::fs::remove_file(&probe);
-    // `line1\n` is 6 bytes; full file is 12. Pin "first-line only" until
-    // slurp is fixed.
-    assert_eq!(n, 6, "expected first-line-only read, got {}", n);
+    // Full file is 12 bytes ("line1\nline2\n")
+    assert_eq!(n, 12);
 }
 
 // ── `our` / `local` / `state` ────────────────────────────────────────────────
