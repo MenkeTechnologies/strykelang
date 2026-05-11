@@ -958,10 +958,12 @@ stryke-specific long flags:
 
 ### `getopts` builtin — Getopt::Long-style argv parsing
 
-For parsing your *own* script's argv (`@ARGV`), stryke ships a `getopts` builtin shaped after Perl's `Getopt::Long`. It returns a hash of canonical-name → value, and mutates the input arrayref in place so the leftover positional arguments stay behind.
+For parsing your *own* script's argv (`@ARGV`), stryke ships a `getopts` builtin shaped after Perl's `Getopt::Long`. It returns a hash of canonical-name → value, and removes consumed options from `@ARGV` so the leftover positional arguments stay behind.
+
+When called with just SPECS, `getopts` operates on `@ARGV` directly — no `\@ARGV` boilerplate needed:
 
 ```perl
-my %opts = %{ getopts(\@ARGV, [
+my %opts = %{ getopts([
     "verbose|v",         # bool flag (present = 1)
     "file|f=s",          # required string
     "count|n=i",         # required int
@@ -974,12 +976,18 @@ my %opts = %{ getopts(\@ARGV, [
 ]) };
 
 # Hash form lets each spec carry a default:
-my %opts = %{ getopts(\@ARGV, {
+my %opts = %{ getopts({
     "verbose|v" => 0,
     "count|n=i" => 10,
     "tag|t=s@"  => [],
 }) };
+
+# Explicit-array-ref form (parse a list other than @ARGV):
+my @args = ("--verbose", "file.txt");
+my %opts = %{ getopts(\@args, [ "verbose|v" ]) };
 ```
+
+The first argument is interpreted as follows: an array ref of spec strings or a hash ref of specs → operates on `@ARGV`; an array ref *followed by* a SPECS argument → explicit-argv form. The two-arg `(SPECS, META)` form is recognised when the second argument is a hash ref containing only `prog`/`desc`/`epilog` keys (see auto-help below).
 
 Spec language (subset of Perl's `Getopt::Long`):
 
@@ -1009,6 +1017,60 @@ Parsing rules:
 - Unknown options or type mismatches raise a runtime error.
 
 Defaults when an option is absent: bool / negatable bool / counter → `0`; `=s@` → empty arrayref; `=s%` → empty hashref; required scalars (`=s`/`=i`/`=f`) → not present in the returned hash unless given a default via the hash form.
+
+#### Per-option metadata + auto-`--help`
+
+The hash form also accepts a hashref *value* carrying per-option metadata (`help`, `default`, `required`, `metavar`). When any spec has a `help` string and the user hasn't claimed their own `--help`/`-h`, `getopts` intercepts `--help`/`-h` in the input, prints a formatted usage block to stdout, and `exit(0)`s.
+
+```perl
+my %opts = %{ getopts({
+    "verbose|v" => { help => "enable verbose output" },
+    "file|f=s"  => { help => "output path", default => "out.txt" },
+    "count|n=i" => { help => "iterations", required => 1 },
+    "tag|t=s@"  => { help => "tag (repeatable)" },
+    "color!"    => { help => "colored output" },
+}, {
+    prog   => "myscript",        # banner program name (default: argv[0] basename)
+    desc   => "do a thing",      # banner description line
+    epilog => "see docs",        # trailing line after the option list
+}) };
+```
+
+Metadata keys (D1 form):
+
+| Key        | Meaning                                                          |
+| ---        | ---                                                              |
+| `help`     | Help-text shown next to the option in `--help` output            |
+| `default`  | Default value if the option is not given                         |
+| `required` | Error at end of parse if the option (or its default) is missing  |
+| `metavar`  | Override the placeholder shown next to the option in help output |
+
+Scalar and hashref values can be mixed in the same spec hash — a bare scalar value is still treated as the `default`:
+
+```perl
+my %opts = %{ getopts({
+    "verbose|v" => 0,                                # default only (legacy form)
+    "file|f=s"  => { help => "output path" },        # D1 metadata
+}) };
+```
+
+`--help` output for the first example above:
+
+```
+Usage: myscript [OPTIONS]
+
+do a thing
+
+Options:
+  -v, --verbose        enable verbose output
+  -f, --file VALUE     output path (default: out.txt)
+  -n, --count N        iterations (required)
+  -t, --tag VALUE      tag (repeatable)
+  --color, --no-color  colored output
+  -h, --help           show this help and exit
+
+see docs
+```
 
 ---
 

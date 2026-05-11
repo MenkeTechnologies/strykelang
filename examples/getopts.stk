@@ -1,0 +1,46 @@
+#!/usr/bin/env stryke
+
+# Stryke getopts demo — Getopt::Long-style CLI flag parsing.
+#
+# Run any of:
+#   stryke examples/getopts.stk -- --help
+#   stryke examples/getopts.stk -- --verbose --file out.txt foo bar
+#   stryke examples/getopts.stk -- -vfx.txt --count=3 -t a -t b --define key=val baz
+#   stryke examples/getopts.stk -- --no-color
+#
+# The `--` separates stryke's own flags from the script's @ARGV.
+
+my %opts = %{ getopts({
+    "verbose|v"   => { help => "enable verbose output" },
+    "file|f=s"    => { help => "output path", default => "out.txt" },
+    "count|n=i"   => { help => "number of iterations", default => 1 },
+    "rate=f"      => { help => "rate (float)", default => 1.0 },
+    "out:s"       => { help => "optional output (defaults to empty)" },
+    "tag|t=s@"    => { help => "tag (repeatable)" },
+    "define|D=s%" => { help => "--define key=val (repeatable)" },
+    "debug+"      => { help => "increase debug verbosity (repeat to raise)" },
+    "color!"      => { help => "colored output (use --no-color to disable)", default => 1 },
+}, {
+    prog   => "getopts-demo",
+    desc   => "Demonstrates every getopts spec form on real argv.",
+    epilog => "All flags are optional. Anything after the last flag is positional.",
+}) }
+
+my @tags    = @{ $opts{tag} }
+my %defines = %{ $opts{define} }
+my $kv      = (sort keys %defines) |> maps { "$_=$defines{$_}" } |> join(", ", _)
+
+p "── parsed options ───────────────────────────"
+p "verbose : $opts{verbose}"
+p "file    : $opts{file}"
+p "count   : $opts{count}"
+p "rate    : $opts{rate}"
+p "out     : #{ $opts{out} // '(absent)' }"
+p "debug   : $opts{debug}"
+p "color   : $opts{color}"
+p "tags    : [@tags]"
+p "define  : {$kv}"
+
+p "── leftover \@ARGV ───────────────────────────"
+@ARGV |> mapi { p "  [$_1] $_0" }
+p "  (none)" unless @ARGV
