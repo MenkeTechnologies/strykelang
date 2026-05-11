@@ -269,6 +269,15 @@ my $x = 1; my $y = 2; p $x + $y # 3 — same line needs `;` between statements
 
 Run `stryke` with no arguments to enter a readline session: line editing, history (`~/.stryke/history`), tab completion for keywords, lexicals in scope, sub names, methods after `->` on blessed objects, and file paths. `exit`/`quit`/Ctrl-D leaves. Non-TTY stdin is read as a complete program.
 
+**Edit mode (emacs / vi):** the REPL defaults to emacs keybindings (Ctrl-A, Ctrl-E, etc.). To switch to vi modal editing (insert / normal modes, `Esc` to leave insert, `h`/`j`/`k`/`l` to navigate, etc.) drop this into `~/.stryke/config.toml`:
+
+```toml
+[repl]
+mode = "vi"   # or "emacs" (default)
+```
+
+`STRYKE_REPL_MODE=vi stryke` overrides the config for a single session — useful for sanity-checking either mode without editing the file.
+
 #### `__DATA__`
 
 A line whose trimmed text is exactly `__DATA__` ends the program; the trailing bytes are exposed via the `DATA` filehandle.
