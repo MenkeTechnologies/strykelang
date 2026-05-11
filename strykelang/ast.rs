@@ -1093,6 +1093,15 @@ pub enum ExprKind {
         reduce_block: Option<Block>,
         list: Box<Expr>,
     },
+    /// Distributed counterpart of [`ExprKind::ParReduceExpr`]. Same chunk-block
+    /// semantics (stages operate on `@_`) but chunks ship to a `RemoteCluster`
+    /// of SSH workers via the existing `cluster::run_cluster` dispatcher.
+    /// Built by `~d> on $cluster SOURCE stage1 stage2 ...`.
+    DistReduceExpr {
+        cluster: Box<Expr>,
+        extract_block: Block,
+        list: Box<Expr>,
+    },
     /// `par_lines PATH, fn { ... } [, progress => EXPR]` — optional stderr progress (per line).
     ParLinesExpr {
         path: Box<Expr>,

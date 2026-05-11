@@ -7895,6 +7895,81 @@ impl Parser {
         Ok(par_reduce)
     }
 
+    /// Parse `~d>` / `~d>>` distributed thread-macros. Same chunk-block
+    /// semantics as `~p>` (stages operate on `@_`) but chunks ship to a
+    /// `RemoteCluster` via the existing `cluster::run_cluster` dispatcher.
+    /// Syntax: `~d> on EXPR SOURCE stage1 stage2 ...`. The `on EXPR` slot
+    /// is required; without it the operator falls through to a syntax
+    /// error (no implicit default-cluster in v1).
+    fn parse_thread_macro_dist(&mut self, line: usize, thread_last: bool) -> PerlResult<Expr> {
+        // Required `on EXPR` — the cluster operand.
+        let on_ok = match self.peek() {
+            Token::Ident(ref s) if s == "on" => true,
+            _ => false,
+        };
+        if !on_ok {
+            return Err(
+                self.syntax_err("~d>: expected `on <cluster-expr>` after the operator", line)
+            );
+        }
+        self.advance(); // consume `on`
+                        // Parse cluster expr — same parse-rules as a thread-macro input
+                        // (avoid pulling stages into the cluster expression).
+        self.suppress_parenless_call = self.suppress_parenless_call.saturating_add(1);
+        // Without this, `on $cluster () map { … }` parses `()` as a postfix
+        // indirect call on `$cluster`, stealing the empty list meant as SOURCE.
+        // Zero-arg cluster from a scalar sub: `on ($factory())` or `on $f->()`.
+        self.suppress_indirect_paren_call =
+            self.suppress_indirect_paren_call.saturating_add(1);
+        let cluster_expr = self.parse_thread_input();
+        self.suppress_indirect_paren_call =
+            self.suppress_indirect_paren_call.saturating_sub(1);
+        self.suppress_parenless_call = self.suppress_parenless_call.saturating_sub(1);
+        let cluster_expr = cluster_expr?;
+
+        // Source list: same rules as `~p>` source.
+        self.suppress_parenless_call = self.suppress_parenless_call.saturating_add(1);
+        let source_expr = self.parse_thread_input();
+        self.suppress_parenless_call = self.suppress_parenless_call.saturating_sub(1);
+        let source_expr = source_expr?;
+
+        // Stage chain seeded with `@_` — matches `~p>` chunk-block
+        // semantics. The VM-side eval prepends `@_ = $_;` to the shipped
+        // block source so the remote agent's `set_topic(chunk_flat_array)`
+        // is reflected into `@_` before user stages run.
+        self.pending_thread_input = Some(Expr {
+            kind: ExprKind::ArrayVar("_".into()),
+            line,
+        });
+        let chunk_chain = self.parse_thread_macro_inner(line, thread_last, None);
+        self.pending_thread_input = None;
+        let chunk_chain = chunk_chain?;
+
+        let extract_block: Block = match chunk_chain.kind {
+            ExprKind::CodeRef { params: _, body } => body,
+            _ => vec![Statement {
+                label: None,
+                kind: StmtKind::Expression(chunk_chain),
+                line,
+            }],
+        };
+
+        let dist_reduce = Expr {
+            kind: ExprKind::DistReduceExpr {
+                cluster: Box::new(cluster_expr),
+                extract_block,
+                list: Box::new(source_expr),
+            },
+            line,
+        };
+
+        // `||>` / `|then|` boundary continuation, same as `~p>`.
+        if self.eat_chunk_par_split_boundary() {
+            return self.parse_thread_macro_continuation(dist_reduce, line, thread_last);
+        }
+        Ok(dist_reduce)
+    }
+
     /// Parse a `~>` / `~>>` continuation after a `||>` / `|then|`
     /// chunk-parallel-to-sequential boundary. Reuses
     /// `parse_thread_macro_inner` with `result_init: Some(prior)` so the
@@ -9098,8 +9173,14 @@ impl Parser {
                 // paren-less arg context. Save and restore no_pipe_forward_depth.
                 let saved_no_pipe = self.no_pipe_forward_depth;
                 self.no_pipe_forward_depth = 0;
+                // Thread-macro `on` may set `suppress_indirect_paren_call` so
+                // `on $c ()` does not steal `()`; inside explicit `(...)` use
+                // normal postfix-`(` rules (`on ($factory())`).
+                let saved_indirect = self.suppress_indirect_paren_call;
+                self.suppress_indirect_paren_call = 0;
                 let expr = self.parse_expression();
                 self.no_pipe_forward_depth = saved_no_pipe;
+                self.suppress_indirect_paren_call = saved_indirect;
                 let expr = expr?;
                 self.expect(&Token::RParen)?;
                 // Mark this paren as a list-constructor for the `x` operator
@@ -9190,6 +9271,14 @@ impl Parser {
             Token::ThreadArrowParLast => {
                 self.advance();
                 self.parse_thread_macro_chunk_par(line, true)
+            }
+            Token::ThreadArrowDist => {
+                self.advance();
+                self.parse_thread_macro_dist(line, false)
+            }
+            Token::ThreadArrowDistLast => {
+                self.advance();
+                self.parse_thread_macro_dist(line, true)
             }
             Token::Ident(ref name) => {
                 let name = name.clone();
@@ -19530,6 +19619,30 @@ mod tests {
     fn parse_map_expression() {
         let p = parse_ok("my @b = map { $_ * 2 } @a");
         assert_eq!(p.statements.len(), 1);
+    }
+
+    /// `on $cluster () …` must keep `()` as SOURCE (empty list), not postfix
+    /// indirect `($cluster)()` which leaves `map` as SOURCE and breaks parsing.
+    #[test]
+    fn parse_dist_thread_on_scalar_empty_list_source() {
+        let p = parse_ok("~d> on $c () map { _ * 2 }");
+        assert_eq!(p.statements.len(), 1);
+        let StmtKind::Expression(root) = &p.statements[0].kind else {
+            panic!("expected Expression statement");
+        };
+        let ExprKind::DistReduceExpr { cluster, list, .. } = &root.kind else {
+            panic!("expected DistReduceExpr, got {:?}", root.kind);
+        };
+        assert!(
+            matches!(cluster.kind, ExprKind::ScalarVar(ref s) if s == "c"),
+            "expected cluster $c, got {:?}",
+            cluster.kind
+        );
+        assert!(
+            matches!(list.kind, ExprKind::List(ref v) if v.is_empty()),
+            "expected empty list source, got {:?}",
+            list.kind
+        );
     }
 
     #[test]

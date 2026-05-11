@@ -131,6 +131,17 @@ pub enum Token {
     ThreadArrowPar,
     /// `~p>>` — parallel-chunk thread-last counterpart of `~p>`.
     ThreadArrowParLast,
+    /// `~d>` — **distributed** thread-first. Same chunk-block semantics as
+    /// `~p>` (each stage operates on `@_` = chunk elements), but the chunks
+    /// are shipped to remote workers on a cluster instead of local rayon
+    /// threads. Syntax: `~d> on $cluster SOURCE stage1 stage2 ...`.
+    /// Sugar for `dist_reduce on $cluster { stages } SOURCE`. Reuses the
+    /// existing `pmap_on` dispatcher (one ssh process per slot, JOB frames
+    /// flowing over a shared work queue, fault tolerance via retry).
+    ThreadArrowDist,
+    /// `~d>>` — distributed thread-last counterpart of `~d>` (insert threaded
+    /// value as last positional arg to each named stage).
+    ThreadArrowDistLast,
     /// Two-dot range / inclusive flip-flop (`..`).
     Range,
     /// Three-dot range / exclusive flip-flop (`...`); list expansion matches `..` (Perl).

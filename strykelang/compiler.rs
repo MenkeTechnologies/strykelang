@@ -5565,6 +5565,26 @@ impl Compiler {
                             Some(root),
                         );
                     }
+                    "cluster" => {
+                        // Each arg pushed in list context so an `@hosts`
+                        // operand flattens into individual slot specs and
+                        // a single bareword `cluster("host1:4")` arrives
+                        // as one string. `ClusterNew` mirrors the
+                        // tree-walker arm in `vm_helper::call_named_sub`.
+                        if args.is_empty() {
+                            return Err(CompileError::Unsupported(
+                                "cluster() expects at least one host/slot specifier".into(),
+                            ));
+                        }
+                        for arg in args {
+                            self.compile_expr_ctx(arg, WantarrayCtx::List)?;
+                        }
+                        self.emit_op(
+                            Op::CallBuiltin(BuiltinId::ClusterNew as u16, args.len() as u8),
+                            line,
+                            Some(root),
+                        );
+                    }
                     "pselect" => {
                         if args.is_empty() {
                             return Err(CompileError::Unsupported(
@@ -7681,10 +7701,13 @@ impl Compiler {
             }
 
             // ── Parallel extensions ──
-            ExprKind::ParExpr { .. } | ExprKind::ParReduceExpr { .. } => {
-                // `par { BLOCK }` and `par_reduce { extract } [{ merge }]`
-                // — bytecode VM has no dedicated opcodes; defer AST eval
-                // to the interpreter via `Op::EvalAstExpr`.
+            ExprKind::ParExpr { .. }
+            | ExprKind::ParReduceExpr { .. }
+            | ExprKind::DistReduceExpr { .. } => {
+                // `par { BLOCK }`, `par_reduce { extract } [{ merge }]`, and
+                // `~d>` (distributed thread macro) — bytecode VM has no
+                // dedicated opcodes; defer AST eval to the interpreter via
+                // `Op::EvalAstExpr`.
                 let idx = self.chunk.ast_eval_exprs.len() as u16;
                 self.chunk.ast_eval_exprs.push(root.clone());
                 self.emit_op(Op::EvalAstExpr(idx), line, Some(root));

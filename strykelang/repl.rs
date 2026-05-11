@@ -159,7 +159,11 @@ fn install_menu_bindings(keybindings: &mut Keybindings) {
         KeyCode::BackTab,
         ReedlineEvent::MenuPrevious,
     );
-    keybindings.add_binding(KeyModifiers::NONE, KeyCode::BackTab, ReedlineEvent::MenuPrevious);
+    keybindings.add_binding(
+        KeyModifiers::NONE,
+        KeyCode::BackTab,
+        ReedlineEvent::MenuPrevious,
+    );
 }
 
 fn build_static_completions() -> Vec<String> {

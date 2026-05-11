@@ -9480,10 +9480,7 @@ impl VMHelper {
                         if let ExprKind::List(ref arg_exprs) = index.kind {
                             let mut args = Vec::with_capacity(arg_exprs.len());
                             for a in arg_exprs {
-                                if matches!(
-                                    a.kind,
-                                    ExprKind::ArrayVar(_) | ExprKind::HashVar(_)
-                                ) {
+                                if matches!(a.kind, ExprKind::ArrayVar(_) | ExprKind::HashVar(_)) {
                                     let v = self.eval_expr_ctx(a, WantarrayCtx::List)?;
                                     if let Some(items) = v.as_array_vec() {
                                         args.extend(items);
@@ -11603,6 +11600,123 @@ impl VMHelper {
                 }
                 // Auto-merge.
                 Ok(par_reduce_auto_merge(per_chunk))
+            }
+            ExprKind::DistReduceExpr {
+                cluster,
+                extract_block,
+                list,
+            } => {
+                // Distributed counterpart of `~p>` — chunk the source list
+                // locally, ship each chunk as one JSON work-item via the
+                // existing `cluster::run_cluster` SSH dispatcher (one slot
+                // per ssh process, session_init once per slot, JOB frames
+                // over a shared queue, retry budget per chunk).
+                //
+                // Each remote worker receives one chunk (a JSON array) as
+                // `$_[0]`. We prepend `local @_ = @{$_[0]}` to the block so
+                // the user-supplied stage chain sees `@_` bound to the
+                // chunk's elements — identical surface to `~p>`'s extract
+                // block.
+                let cluster_pv = self.eval_expr(cluster)?;
+                let Some(remote_cluster) = cluster_pv.as_remote_cluster() else {
+                    return Err(PerlError::runtime(
+                        "~d>: expected cluster(...) value after `on`",
+                        line,
+                    )
+                    .into());
+                };
+                let list_val = self.eval_expr_ctx(list, WantarrayCtx::List)?;
+                let items_flat = list_val.to_list();
+                if items_flat.is_empty() {
+                    return Ok(PerlValue::array(vec![]));
+                }
+                let (scope_capture, atomic_arrays, atomic_hashes) =
+                    self.scope.capture_with_atomics();
+                if !atomic_arrays.is_empty() || !atomic_hashes.is_empty() {
+                    return Err(PerlError::runtime(
+                        "~d>: mysync/atomic capture is not supported for remote workers",
+                        line,
+                    )
+                    .into());
+                }
+                // Chunk size mirrors `~p>`'s heuristic: oversubscribe slots
+                // by 4× so faster slots can pull more work via the shared
+                // queue. Floor at 1, ceil at items.len() so we always get
+                // at least one chunk per slot when items < slots.
+                let n_slots = remote_cluster.slots.len().max(1);
+                let target_chunks = (n_slots * 4).min(items_flat.len()).max(1);
+                let chunk_size = items_flat.len().div_ceil(target_chunks);
+                let mut chunk_items: Vec<serde_json::Value> = Vec::new();
+                let mut chunk_jsons_buf: Vec<PerlValue> = Vec::new();
+                for item in items_flat.into_iter() {
+                    chunk_jsons_buf.push(item);
+                    if chunk_jsons_buf.len() >= chunk_size {
+                        let drained: Vec<PerlValue> = std::mem::take(&mut chunk_jsons_buf);
+                        let as_array = PerlValue::array(drained);
+                        chunk_items.push(
+                            crate::remote_wire::perl_to_json_value(&as_array)
+                                .map_err(|e| PerlError::runtime(e, line))?,
+                        );
+                    }
+                }
+                if !chunk_jsons_buf.is_empty() {
+                    let as_array = PerlValue::array(chunk_jsons_buf);
+                    chunk_items.push(
+                        crate::remote_wire::perl_to_json_value(&as_array)
+                            .map_err(|e| PerlError::runtime(e, line))?,
+                    );
+                }
+                // Drop scope entries that can't be JSON-marshalled (the
+                // `RemoteCluster` value itself, file handles, code refs,
+                // etc.). The remote worker doesn't need them — they're
+                // dispatcher-side context only. Any reference the user's
+                // stage block legitimately needs goes through this filter
+                // anyway, and a `RemoteCluster` in remote scope would be
+                // nonsensical (no controller to dispatch through there).
+                let cap_json: Vec<(String, serde_json::Value)> = scope_capture
+                    .iter()
+                    .filter_map(|(k, v)| {
+                        crate::remote_wire::perl_to_json_value(v)
+                            .ok()
+                            .map(|j| (k.clone(), j))
+                    })
+                    .collect();
+                let subs_prelude = crate::remote_wire::build_subs_prelude(&self.subs);
+                // Remote agent (`remote_wire::run_job_local`) sets `$_`
+                // to the chunk value (a flat array) but does NOT populate
+                // `@_`. Two bridges:
+                //   1. `@_ = $_;` prologue — make the user's `@_`-threaded
+                //      stage chain see the chunk's elements as an array
+                //      (matches `~p>` chunk-block surface).
+                //   2. Wrap the body in `[ ... ]` so the last expression's
+                //      list result survives the worker's scalar-context
+                //      block return + JSON round-trip. Without this,
+                //      `map { ... } @_` collapses to `scalar(@result) = N`
+                //      before serialization.
+                let user_block_src = crate::fmt::format_block(extract_block);
+                let block_src = format!("@_ = $_;\n[ {user_block_src} ]");
+                let result_values = crate::cluster::run_cluster(
+                    &remote_cluster,
+                    subs_prelude,
+                    block_src,
+                    cap_json,
+                    chunk_items,
+                )
+                .map_err(|e| PerlError::runtime(format!("~d> remote: {e}"), line))?;
+                // Each chunk's extract returns a value; flat-concat across
+                // chunks to mirror `~p>`'s auto-merge for list-shaped output.
+                // Scalar-shaped chunk results stay as one element each.
+                let mut merged: Vec<PerlValue> = Vec::new();
+                for v in result_values {
+                    if let Some(items) = v.as_array_vec() {
+                        merged.extend(items);
+                    } else if let Some(ar) = v.as_array_ref() {
+                        merged.extend(ar.read().iter().cloned());
+                    } else {
+                        merged.push(v);
+                    }
+                }
+                Ok(PerlValue::array(merged))
             }
             ExprKind::PForExpr {
                 block,
