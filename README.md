@@ -2597,7 +2597,7 @@ spec:
 `stryke lsp` (or `stryke --lsp`) runs an LSP server over stdio. Hooks into the existing parser, lexer, and symbol table — no separate analyzer to maintain. Surfaces:
 
 - **Diagnostics** on save (parse + compile errors with line / column / message)
-- **Hover docs** for builtins (`pmap`, `cluster`, `fetch_json`, `dataframe`, …) — including the parallel and cluster primitives from sections [\[0x03\]](#0x03-parallel-primitives) and [\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster), every Perl special variable (`$!`, `$@`, `$_`, `@_`, `@ARGV`, `%ENV`, `$1`..`$9`, `$^A`..`$^X`, `@+`/`@-`, …), the `__NAME__` compile-time tokens (`__END__`, `__DATA__`, `__FILE__`, `__LINE__`, `__PACKAGE__`, `__SUB__`), every phase block (`BEGIN`/`UNITCHECK`/`CHECK`/`INIT`/`END`/`BUILD`), and the reflection-hash short aliases (`%a`/`%b`/`%c`/`%d`/`%e`/`%k`/`%p`/`%pc`, `%parameters`, `%limits`, `%term`)
+- **Hover docs** for builtins (`pmap`, `cluster`, `fetch_json`, `dataframe`, …) — including the parallel and cluster primitives from sections [\[0x03\]](#0x03-parallel-primitives) and [\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster), every Perl special variable (`$!`, `$@`, `$_`, `@_`, `@ARGV`, `%ENV`, `$1`..`$9`, `$^A`..`$^X`, `@+`/`@-`, …), the `__NAME__` compile-time tokens (`__END__`, `__DATA__`, `__FILE__`, `__LINE__`, `__PACKAGE__`, `__SUB__`), every phase block (`BEGIN`/`UNITCHECK`/`CHECK`/`INIT`/`END`/`BUILD`), and the reflection-hash short aliases (`%a`/`%b`/`%c`/`%d`/`%e`/`%k`/`%o`/`%p`/`%pc`/`%v`, `%parameters`, `%limits`, `%term`)
 - **Symbol lookup** for subs and packages within the open file
 - **Completion** for built-in function names and the keywords listed in [\[0x08\]](#0x08-supported-perl-features)
 
@@ -2626,12 +2626,14 @@ in `src/lsp.rs` (for descriptions). No hand-maintained list, no stale counts.
 
 #### Hashes
 
-Nine hashes; every direct lookup (`$h{name}`) is **O(1)**. Forward maps:
+Eleven hashes; every direct lookup (`$h{name}`) is **O(1)**. Forward maps:
 
 | Long name | Short | Key → Value |
 | --- | --- | --- |
 | `%stryke::builtins` | `%b` | **primary** callable name → category (`"parallel"`, `"string"`, …). Primaries-only — clean unique-op count. No keywords. |
 | `%stryke::keywords` | `%k` | stryke language keyword → category (`"control"`, `"decl"`, `"exception"`, `"phase"`, `"concurrency"`, `"oo"`, `"operator"`, `"visibility"`). Disjoint from `%b`. |
+| `%stryke::operators` | `%o` | symbol operator spelling → category (`"arith"`, `"compare"`, `"logical"`, `"bitwise"`, `"assign"`, `"binding"`, `"pipeline"`, …). Word operators (`and`/`or`/`eq`/`cmp`) live in `%k`. |
+| `%stryke::special_vars` | `%v` | special variable spelling (sigil included) → category (`"error"`, `"regex-capture"`, `"caret"`, `"env"`, `"script"`, `"args"`, …). One hash covers every kind: `$!`, `@ARGV`, `%ENV`, `$^X`, `__FILE__`, etc. |
 | `%stryke::all` | `%all` | **every name** stryke recognizes — `%a + %b + %k`. Aliases inherit their primary's tag; keywords carry their `%k` category. Use this for `scalar keys %all`. |
 | `%stryke::perl_compats` | `%pc` | subset of `%b`: Perl 5 core only, name → category |
 | `%stryke::extensions` | `%e` | subset of `%b`: stryke-only, name → category |

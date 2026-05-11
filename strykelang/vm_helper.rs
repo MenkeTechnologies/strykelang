@@ -1449,15 +1449,19 @@ impl VMHelper {
 
         // Reflection hashes — populated from `build.rs`-generated tables so
         // they track the real parser/dispatcher/LSP without hand-maintenance.
-        // Seven hashes; all lookups are O(1). Forward maps:
-        //   %b  / %stryke::builtins      — name → category ("parallel", "string", …)
-        //   %pc / %stryke::perl_compats  — subset: Perl 5 core only
-        //   %e  / %stryke::extensions    — subset: stryke-only
-        //   %a  / %stryke::aliases       — alias → primary
-        //   %d  / %stryke::descriptions  — name → LSP one-liner (sparse)
+        // Eleven hashes; all lookups are O(1). Forward maps:
+        //   %b   / %stryke::builtins      — callable name → category ("parallel", "string", …)
+        //   %k   / %stryke::keywords      — language keyword → category ("control", "decl", …)
+        //   %o   / %stryke::operators     — symbol operator → category ("arith", "pipeline", …)
+        //   %v   / %stryke::special_vars  — special var spelling (sigil included) → category
+        //   %pc  / %stryke::perl_compats  — subset: Perl 5 core only
+        //   %e   / %stryke::extensions    — subset: stryke-only
+        //   %a   / %stryke::aliases       — alias → primary
+        //   %d   / %stryke::descriptions  — name → LSP one-liner (sparse)
+        //   %all / %stryke::all           — primaries + aliases + keywords (union)
         // Inverted indexes for constant-time reverse queries:
-        //   %c  / %stryke::categories    — category → arrayref of names
-        //   %p  / %stryke::primaries     — primary → arrayref of aliases
+        //   %c   / %stryke::categories    — category → arrayref of names
+        //   %p   / %stryke::primaries     — primary → arrayref of aliases
         //
         // `keys %perl_compats ∩ keys %extensions == ∅` by construction;
         // together they cover `keys %builtins`. Short aliases use the
@@ -1662,6 +1666,8 @@ impl VMHelper {
         let categories_map = crate::builtins::categories_hash_map();
         let primaries_map = crate::builtins::primaries_hash_map();
         let keywords_map = crate::builtins::keywords_hash_map();
+        let operators_map = crate::builtins::operators_hash_map();
+        let special_vars_map = crate::builtins::special_vars_hash_map();
         let all_map = crate::builtins::all_hash_map();
         self.scope
             .declare_hash_global_frozen("stryke::builtins", builtins_map.clone());
@@ -1680,6 +1686,10 @@ impl VMHelper {
         self.scope
             .declare_hash_global_frozen("stryke::keywords", keywords_map.clone());
         self.scope
+            .declare_hash_global_frozen("stryke::operators", operators_map.clone());
+        self.scope
+            .declare_hash_global_frozen("stryke::special_vars", special_vars_map.clone());
+        self.scope
             .declare_hash_global_frozen("stryke::all", all_map.clone());
         // Short aliases: only declare if no user-declared hash with that name
         // exists, to avoid overwriting `my %e` etc.
@@ -1692,6 +1702,8 @@ impl VMHelper {
             ("c", categories_map),
             ("p", primaries_map),
             ("k", keywords_map),
+            ("o", operators_map),
+            ("v", special_vars_map),
             ("all", all_map),
         ] {
             if !self.scope.any_frame_has_hash(name) {
@@ -2794,6 +2806,8 @@ impl VMHelper {
                 | "c"
                 | "p"
                 | "k"
+                | "o"
+                | "v"
                 | "all"
                 | "stryke::builtins"
                 | "stryke::perl_compats"
@@ -2803,6 +2817,8 @@ impl VMHelper {
                 | "stryke::categories"
                 | "stryke::primaries"
                 | "stryke::keywords"
+                | "stryke::operators"
+                | "stryke::special_vars"
                 | "stryke::all" => {
                     self.ensure_reflection_hashes();
                 }

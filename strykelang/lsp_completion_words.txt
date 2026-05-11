@@ -102,6 +102,7 @@ $~
 %e
 %k
 %limits
+%o
 %main::ENV
 %main::INC
 %main::SIG
@@ -114,11 +115,13 @@ $~
 %main::e
 %main::k
 %main::limits
+%main::o
 %main::p
 %main::parameters
 %main::pc
 %main::term
 %main::uname
+%main::v
 %overload::
 %p
 %parameters
@@ -131,10 +134,13 @@ $~
 %stryke::descriptions
 %stryke::extensions
 %stryke::keywords
+%stryke::operators
 %stryke::perl_compats
 %stryke::primaries
+%stryke::special_vars
 %term
 %uname
+%v
 @+
 @-
 @ARGV
