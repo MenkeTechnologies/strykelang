@@ -367,6 +367,259 @@ pub fn is_stryke_keyword(name: &str) -> bool {
     KEYWORDS.binary_search_by_key(&name, |(n, _)| *n).is_ok()
 }
 
+/// Operator symbol → category. Sigil characters, arithmetic, comparison,
+/// pipeline arrows, assignment forms, and other syntactic operators stryke
+/// recognises at the token level. Disjoint from `KEYWORDS` — word operators
+/// (`and`, `or`, `eq`, `cmp`, `x`, …) live in `KEYWORDS` with category
+/// `"operator"`; only symbol/punctuation operators appear here.
+///
+/// Sorted alphabetically by spelling (ASCII order) so `binary_search`
+/// stays valid. The exact spellings match what the lexer emits in
+/// `token.rs` (`Token::Plus` → `"+"`, `Token::ThreadArrowPar` → `"~>"`,
+/// `Token::DefinedOr` → `"//"`, …).
+///
+/// Categories:
+///   `arith`     — `+ - * / % **`
+///   `compare`   — `== != < > <= >= <=>`
+///   `logical`   — `&& || // ! ^^`
+///   `bitwise`   — `& | ^ ~ << >>`
+///   `assign`    — `= += -= *= /= %= **= .= &= |= ^= <<= >>= ||= &&= //= x= ~~=`
+///   `string`    — `. x`
+///   `binding`   — `=~ !~`
+///   `pipeline`  — `|> ~> ~|> ~p> ~d> ~>>` and last-stage variants
+///   `range`     — `.. ...`
+///   `arrow`     — `-> => ~~`
+///   `deref`     — `\` (reference-of)
+///   `inc`       — `++ --`
+///   `ternary`   — `? :`
+///   `sigil`     — `$ @ %` (also a modulo operator in expression context)
+///   `punct`     — `( ) [ ] { } , ; <>`
+pub const OPERATORS: &[(&str, &str)] = &[
+    ("!", "logical"),
+    ("!=", "compare"),
+    ("!~", "binding"),
+    ("$", "sigil"),
+    ("%", "sigil"),
+    ("%=", "assign"),
+    ("&", "bitwise"),
+    ("&&", "logical"),
+    ("&&=", "assign"),
+    ("&=", "assign"),
+    ("(", "punct"),
+    (")", "punct"),
+    ("*", "arith"),
+    ("**", "arith"),
+    ("**=", "assign"),
+    ("*=", "assign"),
+    ("+", "arith"),
+    ("++", "inc"),
+    ("+=", "assign"),
+    (",", "punct"),
+    ("-", "arith"),
+    ("--", "inc"),
+    ("-=", "assign"),
+    ("->", "arrow"),
+    (".", "string"),
+    ("..", "range"),
+    ("...", "range"),
+    (".=", "assign"),
+    ("/", "arith"),
+    ("//", "logical"),
+    ("//=", "assign"),
+    ("/=", "assign"),
+    (":", "ternary"),
+    (";", "punct"),
+    ("<", "compare"),
+    ("<<", "bitwise"),
+    ("<<=", "assign"),
+    ("<=", "compare"),
+    ("<=>", "compare"),
+    ("<>", "punct"),
+    ("=", "assign"),
+    ("==", "compare"),
+    ("=>", "arrow"),
+    ("=~", "binding"),
+    (">", "compare"),
+    (">=", "compare"),
+    (">>", "bitwise"),
+    (">>=", "assign"),
+    ("?", "ternary"),
+    ("@", "sigil"),
+    ("[", "punct"),
+    ("\\", "deref"),
+    ("]", "punct"),
+    ("^", "bitwise"),
+    ("^=", "assign"),
+    ("{", "punct"),
+    ("|", "bitwise"),
+    ("|=", "assign"),
+    ("|>", "pipeline"),
+    ("||", "logical"),
+    ("||=", "assign"),
+    ("}", "punct"),
+    ("~", "bitwise"),
+    ("~>", "pipeline"),
+    ("~>>", "pipeline"),
+    ("~>p", "pipeline"),
+    ("~d>", "pipeline"),
+    ("~p>", "pipeline"),
+    ("~|>", "pipeline"),
+    ("~~", "arrow"),
+];
+
+/// `%operators` (`%o`) — operator symbol → category. Mirrors `OPERATORS`.
+pub fn operators_hash_map() -> indexmap::IndexMap<String, PerlValue> {
+    OPERATORS
+        .iter()
+        .map(|(n, c)| (n.to_string(), PerlValue::string(c.to_string())))
+        .collect()
+}
+
+/// O(1) operator-symbol check.
+pub fn is_stryke_operator(name: &str) -> bool {
+    OPERATORS.binary_search_by_key(&name, |(n, _)| *n).is_ok()
+}
+
+/// Special variable spelling (sigil included) → category. Every entry has
+/// a matching LSP hover doc in `lsp.rs::doc_for_label_text`. Categories
+/// group related spellings so user code can filter by purpose:
+///
+///   `topic`         — `$_ @_ _`
+///   `error`         — `$! $@ $? $^E`
+///   `pid`           — `$$`
+///   `regex-match`   — `$& $' $` $+ $^N $^R`
+///   `regex-capture` — `$1`..`$9` `@+ @- @^CAPTURE @^CAPTURE_ALL`
+///   `io`            — `$, $\ $/ $" $. $| $~ $^A $^L $^F`
+///   `process`       — `$< $> $( $)`
+///   `args`          — `@ARGV $ARGV @F @INC %INC`
+///   `env`           — `%ENV`
+///   `signal`        — `%SIG`
+///   `script`        — `$0 __FILE__ __LINE__ __PACKAGE__ __SUB__`
+///   `caret`         — `$^C $^D $^H $^I $^M $^O $^P $^S $^T $^V $^W $^X %^H %^HOOK`
+///   `subscript`     — `$;`
+///   `version`       — `$stryke::VERSION`
+///   `reflection`    — `%a %b %c %d %e %k %p %pc %all %parameters %limits %term %uname %stryke::*`
+///   `format`        — `$~`
+///
+/// Sorted so `binary_search_by_key` is O(log N). Categories are *informational*
+/// — they let user code partition the reflection set without re-parsing
+/// the LSP doc table.
+pub const SPECIAL_VARS: &[(&str, &str)] = &[
+    ("$!", "error"),
+    ("$\"", "io"),
+    ("$$", "pid"),
+    ("$&", "regex-match"),
+    ("$'", "regex-match"),
+    ("$(", "process"),
+    ("$)", "process"),
+    ("$+", "regex-match"),
+    ("$,", "io"),
+    ("$.", "io"),
+    ("$/", "io"),
+    ("$0", "script"),
+    ("$1", "regex-capture"),
+    ("$2", "regex-capture"),
+    ("$3", "regex-capture"),
+    ("$4", "regex-capture"),
+    ("$5", "regex-capture"),
+    ("$6", "regex-capture"),
+    ("$7", "regex-capture"),
+    ("$8", "regex-capture"),
+    ("$9", "regex-capture"),
+    ("$;", "subscript"),
+    ("$<", "process"),
+    ("$>", "process"),
+    ("$?", "error"),
+    ("$@", "error"),
+    ("$ARGV", "args"),
+    ("$\\", "io"),
+    ("$^A", "io"),
+    ("$^C", "caret"),
+    ("$^D", "caret"),
+    ("$^E", "error"),
+    ("$^F", "io"),
+    ("$^H", "caret"),
+    ("$^I", "caret"),
+    ("$^L", "io"),
+    ("$^M", "caret"),
+    ("$^N", "regex-match"),
+    ("$^O", "caret"),
+    ("$^P", "caret"),
+    ("$^R", "regex-match"),
+    ("$^S", "caret"),
+    ("$^T", "caret"),
+    ("$^V", "caret"),
+    ("$^W", "caret"),
+    ("$^X", "caret"),
+    ("$_", "topic"),
+    ("$`", "regex-match"),
+    ("$a", "sort"),
+    ("$b", "sort"),
+    ("$stryke::VERSION", "version"),
+    ("$|", "io"),
+    ("$~", "format"),
+    ("%ENV", "env"),
+    ("%INC", "args"),
+    ("%SIG", "signal"),
+    ("%^H", "caret"),
+    ("%^HOOK", "caret"),
+    ("%a", "reflection"),
+    ("%all", "reflection"),
+    ("%b", "reflection"),
+    ("%c", "reflection"),
+    ("%d", "reflection"),
+    ("%e", "reflection"),
+    ("%k", "reflection"),
+    ("%limits", "reflection"),
+    ("%o", "reflection"),
+    ("%overload::", "reflection"),
+    ("%p", "reflection"),
+    ("%parameters", "reflection"),
+    ("%pc", "reflection"),
+    ("%stryke::aliases", "reflection"),
+    ("%stryke::all", "reflection"),
+    ("%stryke::builtins", "reflection"),
+    ("%stryke::categories", "reflection"),
+    ("%stryke::descriptions", "reflection"),
+    ("%stryke::extensions", "reflection"),
+    ("%stryke::keywords", "reflection"),
+    ("%stryke::operators", "reflection"),
+    ("%stryke::perl_compats", "reflection"),
+    ("%stryke::primaries", "reflection"),
+    ("%stryke::special_vars", "reflection"),
+    ("%term", "reflection"),
+    ("%uname", "reflection"),
+    ("%v", "reflection"),
+    ("@+", "regex-capture"),
+    ("@-", "regex-capture"),
+    ("@ARGV", "args"),
+    ("@F", "args"),
+    ("@INC", "args"),
+    ("@^CAPTURE", "regex-capture"),
+    ("@^CAPTURE_ALL", "regex-capture"),
+    ("@_", "topic"),
+    ("__FILE__", "script"),
+    ("__LINE__", "script"),
+    ("__PACKAGE__", "script"),
+    ("__SUB__", "script"),
+];
+
+/// `%special_vars` (`%v`) — special var spelling → category. Mirrors
+/// `SPECIAL_VARS`. The keys are the user-facing spelling *with* sigil
+/// (`"$!"`, `"@ARGV"`, `"%ENV"`, `"$^X"`, `"$stryke::VERSION"`,
+/// `"__FILE__"`) so a single hash covers every kind of special variable.
+pub fn special_vars_hash_map() -> indexmap::IndexMap<String, PerlValue> {
+    SPECIAL_VARS
+        .iter()
+        .map(|(n, c)| (n.to_string(), PerlValue::string(c.to_string())))
+        .collect()
+}
+
+/// O(1) special-variable check (sigil-included spelling).
+pub fn is_special_var(name: &str) -> bool {
+    SPECIAL_VARS.binary_search_by_key(&name, |(n, _)| *n).is_ok()
+}
+
 /// Returns `true` if `name` is a known builtin function (primary or alias).
 /// Used by CLI to implement `stryke BUILTIN` invocation (hierarchy: subcommand → builtin → script).
 pub fn is_builtin(name: &str) -> bool {
