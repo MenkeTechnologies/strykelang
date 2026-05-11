@@ -8552,6 +8552,11 @@ mod tests {
     }
 
     #[test]
+    fn compile_struct_method_fn_eq_shorthand() {
+        compile_snippet("struct CmpS { fn triple($n) = $n * 3 }").expect("compile");
+    }
+
+    #[test]
     fn compile_integer_literal_statement() {
         let chunk = compile_snippet("42;").expect("compile");
         assert!(chunk.ops.iter().any(|o| matches!(o, Op::LoadInt(42))));
