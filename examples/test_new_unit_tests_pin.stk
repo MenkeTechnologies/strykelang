@@ -1,0 +1,136 @@
+#!/usr/bin/env stryke
+
+# New Unit Tests for Stryke Features (2026-05-11)
+# Testing idiomatic Stryke extensions and parallel primitives.
+# Compliance: docs/STYLE_GUIDE.md
+# Mode: --no-interop
+
+# ── 1. Threading and Pipes ──────────────────────────────────────────────────
+
+# Basic pipe
+(1:5) |> sum |> aeq 15, "Pipe sum"
+
+# Threading macro ~>
+~> (1:10) grep { _ % 2 == 0 } map { _ * 2 } sum |> aeq 60, "Threading macro ~>"
+
+# Thread-last macro ~>>
+fn Math::subtract($x, $y) { $x - $y }
+~>> 10 Math::subtract(2) |> aeq -8, "Thread-last ~>> (10 - 2)"
+# Wait, ~>> 10 sub(2) -> sub(2, 10) = 2 - 10 = -8. Correct.
+
+# ── 2. Topic Variants and Positional Arguments ──────────────────────────────
+
+# Positional arguments _0, _1
+my $add3 = fn { _0 + _1 + _2 }
+$add3->(1, 2, 3) |> aeq 6, "Positional _0, _1, _2"
+
+# Outer scope topic _<
+my @r = ~> (1:2) map { 
+    my $outer = _
+    ~> (10:11) map { _ + _< } 
+} |> flatten
+@r |> join(",") |> aeq "11,12,12,13", "Outer scope topic _<"
+
+# Indexed outer topic _<2
+my @r2 = ~> (100:100) map {
+    ~> (10:10) map {
+        ~> (1:1) map { _ + _< + _<2 }
+    }
+} |> flatten
+@r2 |> join(",") |> aeq "111", "Indexed outer topic _<2"
+
+# ── 3. Language Extensions ──────────────────────────────────────────────────
+
+# Classes and Methods
+class Point {
+    x : Float
+    y : Float
+    fn mag_sq {
+        $self->x**2 + $self->y**2
+    }
+}
+
+my $p = Point(x => 3, y => 4)
+$p->mag_sq() |> aeq 25, "Class methods"
+
+# Enums and Match
+enum TrafficLight { Red, Yellow, Green }
+fn TrafficLight::action($c) {
+    match ($c) {
+        TrafficLight::Red    => "stop",
+        TrafficLight::Yellow => "caution",
+        TrafficLight::Green  => "go",
+    }
+}
+TrafficLight::action(TrafficLight::Red) |> aeq "stop", "Enum match"
+
+# Try/Catch
+my $caught = 0
+try {
+    die "error"
+} catch ($e) {
+    $caught = 1
+}
+$caught |> aok "Try/Catch works"
+
+# retry
+my $tries = 0
+retry { $tries++; die "fail" if $tries < 3; 42 } times => 5, backoff => none |> aeq 42, "retry works"
+$tries |> aeq 3, "retry count"
+
+# eval_timeout
+eval { eval_timeout 0.05 { sleep 0.2; 1 } }
+$@ |> aok "eval_timeout sets $@"
+
+# ── 3.5 len() for various types ─────────────────────────────────────────────
+
+len("abc") |> aeq 3, "len(string)"
+my @arr = (1, 2, 3);
+len(@arr) |> aeq 3, "len(array)"
+my %h = (a => 1, b => 2);
+len(keys %h) |> aeq 2, "len(hash)"
+
+
+# ── 4. Parallel Primitives ──────────────────────────────────────────────────
+
+# pmap and mysync
+mysync $sum = 0
+(1:100) |> pfor { $sum += _ }
+$sum |> aeq 5050, "pfor + mysync"
+
+# pgrep
+(1:10) |> pgrep { _ % 2 == 0 } |> len |> aeq 5, "pgrep length"
+
+# ── 5. AI Primitives (Mocked) ───────────────────────────────────────────────
+
+ai_mock_install qr/hello/, "hi there"
+ai("hello") |> aeq "hi there", "AI mock works"
+ai_mock_clear()
+
+# ── 6. Builtin Utilities ───────────────────────────────────────────────────
+
+# Frequencies
+"apple banana apple" |> words |> freq |> { _->{apple} } |> aeq 2, "freq"
+
+# Terminal Art
+(1, 5, 9) |> spark |> len |> aeq 3, "spark length"
+(1, 5, 9) |> spark |> { _ =~ /[█▁]/ } |> aok "spark content"
++{ a => 10, b => 20 } |> bars |> { len(_) > 0 } |> aok "bars returns something"
+
+# Raku-style chained comparisons
+(1 < 5 < 10) |> aok "Chained comparison 1 < 5 < 10"
+(10 > 5 > 1) |> aok "Chained comparison 10 > 5 > 1"
+
+# ── 7. Native Sets ─────────────────────────────────────────────────────────
+
+my $s = set(1, 2, 2, 3)
+$s->size() |> aeq 3, "Set size (deduped)"
+$s->has(2) |> aok "Set has element"
+
+# ── 8. Byte vs Codepoint coordinates ───────────────────────────────────────
+
+my $str = "a─b" # ─ is 3 bytes
+length($str) |> aeq 5, "Perl-compat length (bytes)"
+len($str)    |> aeq 3, "Stryke len (codepoints)"
+
+test_run
