@@ -11827,6 +11827,16 @@ fn perl_value_to_json_string(val: &PerlValue) -> String {
         let parts: Vec<String> = guard.iter().map(perl_value_to_json_string).collect();
         return format!("[{}]", parts.join(","));
     }
+    // Flat `PerlValue::array` (no ref wrapper) — `read_json` returns JSON
+    // arrays in this shape (native_data.rs:811), so a nested `"array": [...]`
+    // inside a JSON object reaches the serializer as a flat array. Without
+    // this branch the fallback would stringify it via `to_string()` (concat
+    // with empty `$,`) and wrap that in quotes — `[1,2,3]` would become
+    // `"123"` instead of `[1,2,3]`.
+    if let Some(items) = val.as_array_vec() {
+        let parts: Vec<String> = items.iter().map(perl_value_to_json_string).collect();
+        return format!("[{}]", parts.join(","));
+    }
     if let Some(hr) = val.as_hash_ref() {
         let guard = hr.read();
         let mut buf = String::from("{");
@@ -11875,7 +11885,7 @@ fn builtin_to_csv(args: &[PerlValue]) -> PerlResult<PerlValue> {
         for (k, v) in hr.read().iter() {
             buf.push_str(&csv_cell(k));
             buf.push(',');
-            buf.push_str(&csv_cell(&v.to_string()));
+            buf.push_str(&csv_value_cell(v));
             buf.push('\n');
         }
         return Ok(PerlValue::string(buf));
@@ -11918,12 +11928,7 @@ fn builtin_to_csv(args: &[PerlValue]) -> PerlResult<PerlValue> {
                 let guard = hr.read();
                 let cells: Vec<String> = headers
                     .iter()
-                    .map(|h| {
-                        guard
-                            .get(h)
-                            .map(|v| csv_cell(&v.to_string()))
-                            .unwrap_or_default()
-                    })
+                    .map(|h| guard.get(h).map(csv_value_cell).unwrap_or_default())
                     .collect();
                 buf.push_str(&cells.join(","));
                 buf.push('\n');
@@ -11937,8 +11942,7 @@ fn builtin_to_csv(args: &[PerlValue]) -> PerlResult<PerlValue> {
         let mut buf = String::new();
         for row in &rows {
             if let Some(ar) = row.as_array_ref() {
-                let cells: Vec<String> =
-                    ar.read().iter().map(|v| csv_cell(&v.to_string())).collect();
+                let cells: Vec<String> = ar.read().iter().map(csv_value_cell).collect();
                 buf.push_str(&cells.join(","));
                 buf.push('\n');
             }
@@ -11949,7 +11953,7 @@ fn builtin_to_csv(args: &[PerlValue]) -> PerlResult<PerlValue> {
     // Flat array of scalars → single column.
     let mut buf = String::new();
     for row in &rows {
-        buf.push_str(&csv_cell(&row.to_string()));
+        buf.push_str(&csv_value_cell(row));
         buf.push('\n');
     }
     Ok(PerlValue::string(buf))
@@ -11961,6 +11965,21 @@ fn csv_cell(s: &str) -> String {
         format!("\"{}\"", s.replace('"', "\"\""))
     } else {
         s.to_string()
+    }
+}
+
+/// Render a single CSV cell value. Nested arrayref / hashref / flat-array
+/// operands serialize to inline JSON so nothing leaks the `ARRAY(0x...)` /
+/// `HASH(0x...)` debug stringification or numifies-to-concat (`[1,2,3]` →
+/// `"123"`). Flat scalars take the plain `to_string()` path. The flat-array
+/// case matters because `read_json` returns JSON arrays as `PerlValue::array`
+/// (not `array_ref`), so nested-array values inside a JSON object reach
+/// `to_csv` in that shape.
+fn csv_value_cell(v: &PerlValue) -> String {
+    if v.as_array_ref().is_some() || v.as_hash_ref().is_some() || v.as_array_vec().is_some() {
+        csv_cell(&perl_value_to_json_string(v))
+    } else {
+        csv_cell(&v.to_string())
     }
 }
 

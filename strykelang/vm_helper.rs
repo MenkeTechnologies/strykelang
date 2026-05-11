@@ -11240,7 +11240,13 @@ impl VMHelper {
                     .transpose()?
                     .map(|v| v.is_true())
                     .unwrap_or(false);
-                let list_val = self.eval_expr(list)?;
+                // List context for the operand so `@_` / `@arr` flatten to
+                // their elements instead of numifying to the array length.
+                // Scalar context was producing `pmap{_*2}` over `@_` of size
+                // 13 → one iteration with `_=13` → `[26]` (chunk-size × 2)
+                // instead of 13 doubled values; same shape inside `~p>` chunk
+                // workers and at top level.
+                let list_val = self.eval_expr_ctx(list, WantarrayCtx::List)?;
                 if let Some(cluster_e) = on_cluster {
                     let cluster_val = self.eval_expr(cluster_e.as_ref())?;
                     return self.eval_pmap_remote(
