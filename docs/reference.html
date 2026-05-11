@@ -140,16 +140,16 @@
           <span class="sep">/</span>
           <span class="current">Reference</span>
           <span class="sep">/</span>
-          <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.13.5 · 8503 topics · 164 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.13.6 · 8507 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
         <button type="button" class="btn btn-secondary active" id="btnCrt" title="CRT scanline overlay">CRT</button>
         <button type="button" class="btn btn-secondary active" id="btnNeon" title="Neon border pulse">Neon</button>
         <a class="btn btn-secondary" href="index.html">Hub</a>
-        <a class="btn btn-secondary" href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a class="btn btn-secondary" href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
       </div>
     </div>
   </header>
@@ -330,7 +330,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">6832</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">6836</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -12279,7 +12279,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">6832 topics</p>
+      <p class="chapter-meta">6836 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$!</code></h3>
         <p><code>$!</code> — the OS error from the most recent system call, in stringified form (e.g. <code>&quot;No such file or directory&quot;</code>) or as an <code>errno</code> integer in numeric context. Set by <code>open</code>, <code>close</code>, <code>chdir</code>, <code>read</code>, <code>write</code>, and other syscalls when they fail. The value persists until the next failing call, so always check it *immediately* after the failing operation — intermediate clean Perl code does not touch it, but any subsequent syscall will.</p>
@@ -13062,6 +13062,20 @@ p $limits{regex_backtrack}
 </code></pre>
         <p>See also: stryke runtime / scheduler internals.</p>
       </article>
+      <article class="doc-entry" id="doc-o">
+        <h3><a class="doc-anchor" href="#doc-o">#</a> <code>%o</code></h3>
+        <p><code>%o</code> — short alias for <code>%stryke::operators</code>. Maps every symbol operator stryke recognises (arithmetic, comparison, bitwise, pipeline arrows, assignment forms, …) to its category string.</p>
+        <p>Key is the spelling as the lexer emits it (<code>&quot;+&quot;</code>, <code>&quot;&lt;=&gt;&quot;</code>, <code>&quot;//=&quot;</code>, <code>&quot;~&gt;&quot;</code>, <code>&quot;|&gt;&quot;</code>, <code>&quot;-&gt;&quot;</code>, <code>&quot;=~&quot;</code>, <code>&quot;...&quot;</code>); value is one of <code>arith</code>, <code>compare</code>, <code>logical</code>, <code>bitwise</code>, <code>assign</code>, <code>string</code>, <code>binding</code>, <code>pipeline</code>, <code>range</code>, <code>arrow</code>, <code>deref</code>, <code>inc</code>, <code>ternary</code>, <code>sigil</code>, <code>punct</code>. Word operators (<code>and</code>, <code>or</code>, <code>eq</code>, <code>cmp</code>, <code>x</code>, <code>not</code>) live in <code>%k</code> with category <code>&quot;operator&quot;</code>, not here.</p>
+        <pre><code class="lang-perl">p $o{&quot;+&quot;}                         # &quot;arith&quot;
+p $o{&quot;&lt;=&gt;&quot;}                       # &quot;compare&quot;
+p $o{&quot;|&gt;&quot;}                        # &quot;pipeline&quot;
+p $o{&quot;=~&quot;}                        # &quot;binding&quot;
+p scalar keys %o                  # total symbol-operator count
+keys %o |&gt; grep { $o{_} eq &quot;pipeline&quot; } |&gt; sort |&gt; e p
+keys %o |&gt; grep { $o{_} eq &quot;assign&quot; } |&gt; sort |&gt; e p
+</code></pre>
+        <p>See also: <code>%stryke::operators</code>, <code>%k</code> / <code>%stryke::keywords</code> (word operators), <code>%v</code> / <code>%stryke::special_vars</code>.</p>
+      </article>
       <article class="doc-entry" id="doc-overload">
         <h3><a class="doc-anchor" href="#doc-overload">#</a> <code>%overload::</code></h3>
         <p><code>%overload::</code> — the runtime symbol table of the <code>overload</code> package, exposing operator-overloading machinery (<code>overload::Method</code>, <code>overload::StrVal</code>, <code>overload::Overloaded</code>). Inspecting it tells you which packages have overloaded operators registered. Rarely accessed directly; use the <code>overload</code> pragma to register operators in your own classes.</p>
@@ -13148,6 +13162,16 @@ keys %stryke::keywords |&gt; sort |&gt; e p
 </code></pre>
         <p>See also: <code>%k</code> (short alias), <code>%stryke::builtins</code> (callable names rather than keywords).</p>
       </article>
+      <article class="doc-entry" id="doc-stryke-operators">
+        <h3><a class="doc-anchor" href="#doc-stryke-operators">#</a> <code>%stryke::operators</code></h3>
+        <p><code>%stryke::operators</code> (short: <code>%o</code>) — symbol operator spelling → category. Built from the <code>OPERATORS</code> table in <code>builtins.rs</code>, which mirrors the operator token set in <code>token.rs</code> (every <code>Token::Plus</code> / <code>Token::Spaceship</code> / <code>Token::ThreadArrow</code> …). Disjoint from <code>%stryke::keywords</code>: word operators (<code>and</code>, <code>or</code>, <code>eq</code>, <code>cmp</code>, <code>x</code>, <code>not</code>) appear in <code>%k</code> with category <code>&quot;operator&quot;</code>, while only symbol/punctuation operators appear here.</p>
+        <p>Categories: <code>arith</code>, <code>compare</code>, <code>logical</code>, <code>bitwise</code>, <code>assign</code>, <code>string</code>, <code>binding</code>, <code>pipeline</code>, <code>range</code>, <code>arrow</code>, <code>deref</code>, <code>inc</code>, <code>ternary</code>, <code>sigil</code>, <code>punct</code>.</p>
+        <pre><code class="lang-perl">p scalar keys %stryke::operators
+keys %stryke::operators |&gt; sort |&gt; e p
+keys %stryke::operators |&gt; grep { $stryke::operators{_} eq &quot;pipeline&quot; } |&gt; sort |&gt; e p
+</code></pre>
+        <p>See also: <code>%o</code> (short alias), <code>%stryke::keywords</code> (word operators), <code>%stryke::special_vars</code>.</p>
+      </article>
       <article class="doc-entry" id="doc-stryke-perl-compats">
         <h3><a class="doc-anchor" href="#doc-stryke-perl-compats">#</a> <code>%stryke::perl_compats</code></h3>
         <p><code>%stryke::perl_compats</code> (short: <code>%pc</code>) — Perl 5 core names only, name → category.</p>
@@ -13167,6 +13191,19 @@ p scalar @{ $p{basename} }      # how many aliases does basename have?
 keys %p |&gt; grep { scalar @{$p{_}} } |&gt; sort |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-stryke-special-vars">
+        <h3><a class="doc-anchor" href="#doc-stryke-special-vars">#</a> <code>%stryke::special_vars</code></h3>
+        <p><code>%stryke::special_vars</code> (short: <code>%v</code>) — special variable spelling → category. Every key carries its sigil (<code>&quot;$!&quot;</code>, <code>&quot;@ARGV&quot;</code>, <code>&quot;%ENV&quot;</code>, <code>&quot;$^X&quot;</code>, <code>&quot;$stryke::VERSION&quot;</code>, <code>&quot;__FILE__&quot;</code>) so a single hash covers scalar/array/hash/caret/compile-time forms uniformly. Every entry has a hand-written hover doc in <code>lsp.rs::doc_for_label_text</code>, so <code>exists $v{$name}</code> doubles as &quot;is this documented?&quot;.</p>
+        <p>Categories partition by purpose: <code>topic</code>, <code>error</code>, <code>pid</code>, <code>regex-match</code>, <code>regex-capture</code>, <code>io</code>, <code>process</code>, <code>args</code>, <code>env</code>, <code>signal</code>, <code>script</code>, <code>caret</code>, <code>subscript</code>, <code>version</code>, <code>reflection</code>, <code>format</code>, <code>sort</code>.</p>
+        <pre><code class="lang-perl">p scalar keys %stryke::special_vars
+p $stryke::special_vars{&#39;$!&#39;}                   # &quot;error&quot;
+p $stryke::special_vars{&#39;@ARGV&#39;}                # &quot;args&quot;
+p $stryke::special_vars{&#39;%ENV&#39;}                 # &quot;env&quot;
+p $stryke::special_vars{&#39;$^X&#39;}                  # &quot;caret&quot;
+keys %stryke::special_vars |&gt; grep { $stryke::special_vars{_} eq &quot;regex-capture&quot; } |&gt; sort |&gt; e p
+</code></pre>
+        <p>See also: <code>%v</code> (short alias), <code>%stryke::operators</code>, <code>%stryke::keywords</code>, <code>%stryke::builtins</code>.</p>
+      </article>
       <article class="doc-entry" id="doc-term">
         <h3><a class="doc-anchor" href="#doc-term">#</a> <code>%term</code></h3>
         <p><code>%term</code> — reflection hash describing the controlling terminal: width, height, color depth, capabilities (Unicode support, true-color, focus events, alternate screen). Populated lazily on first read by querying <code>tput</code> / <code>tcgetattr</code> / <code>TIOCGWINSZ</code>.</p>
@@ -13176,6 +13213,20 @@ p $term{color}             # &quot;truecolor&quot; / &quot;256&quot; / &quot;16&
 p keys %term |&gt; sort
 </code></pre>
         <p>See also: <code>%uname</code> (OS info), <code>term_width</code>/<code>term_height</code> builtins.</p>
+      </article>
+      <article class="doc-entry" id="doc-v">
+        <h3><a class="doc-anchor" href="#doc-v">#</a> <code>%v</code></h3>
+        <p><code>%v</code> — short alias for <code>%stryke::special_vars</code>. Maps every special variable spelling (sigil included) to its category.</p>
+        <p>One hash covers every kind of special variable: scalar (<code>$!</code>, <code>$_</code>, <code>$@</code>, <code>$1</code>..<code>$9</code>, <code>$^X</code>), array (<code>@_</code>, <code>@ARGV</code>, <code>@+</code>, <code>@-</code>, <code>@^CAPTURE</code>), hash (<code>%ENV</code>, <code>%INC</code>, <code>%SIG</code>, <code>%^H</code>), caret (<code>$^A</code>..<code>$^X</code>, <code>%^H</code>, <code>%^HOOK</code>), compile-time (<code>__FILE__</code>, <code>__LINE__</code>, <code>__PACKAGE__</code>, <code>__SUB__</code>), and version (<code>$stryke::VERSION</code>). Categories: <code>topic</code>, <code>error</code>, <code>pid</code>, <code>regex-match</code>, <code>regex-capture</code>, <code>io</code>, <code>process</code>, <code>args</code>, <code>env</code>, <code>signal</code>, <code>script</code>, <code>caret</code>, <code>subscript</code>, <code>version</code>, <code>reflection</code>, <code>format</code>, <code>sort</code>.</p>
+        <pre><code class="lang-perl">p $v{&#39;$!&#39;}                                # &quot;error&quot;
+p $v{&#39;@ARGV&#39;}                             # &quot;args&quot;
+p $v{&#39;$1&#39;}                                # &quot;regex-capture&quot;
+p scalar keys %v                          # total special-var count
+keys %v |&gt; grep { $v{_} eq &quot;caret&quot; } |&gt; sort |&gt; e p
+keys %v |&gt; grep { $v{_} eq &quot;regex-capture&quot; } |&gt; sort |&gt; e p
+</code></pre>
+        <p>Every key has a matching LSP hover entry, so <code>exists $v{$name}</code> doubles as &quot;is this special var documented?&quot;.</p>
+        <p>See also: <code>%stryke::special_vars</code>, <code>%o</code> / <code>%stryke::operators</code>, <code>%k</code> / <code>%stryke::keywords</code>.</p>
       </article>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>@+</code></h3>
