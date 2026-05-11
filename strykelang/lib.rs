@@ -30,6 +30,7 @@ pub mod error;
 mod fib_like_tail;
 pub mod fmt;
 pub mod format;
+pub mod getopts;
 mod jit;
 mod jwt;
 pub mod lexer;

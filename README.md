@@ -956,6 +956,59 @@ stryke-specific long flags:
 
 ![stryke -h](img/stryke-help.png)
 
+### `getopts` builtin — Getopt::Long-style argv parsing
+
+For parsing your *own* script's argv (`@ARGV`), stryke ships a `getopts` builtin shaped after Perl's `Getopt::Long`. It returns a hash of canonical-name → value, and mutates the input arrayref in place so the leftover positional arguments stay behind.
+
+```perl
+my %opts = %{ getopts(\@ARGV, [
+    "verbose|v",         # bool flag (present = 1)
+    "file|f=s",          # required string
+    "count|n=i",         # required int
+    "rate=f",            # required float
+    "out:s",             # optional string ("" if absent)
+    "tag|t=s@",          # repeatable → arrayref
+    "define|D=s%",       # --define key=val → hashref
+    "debug+",            # incremental: -ddd → 3
+    "color!",            # negatable: --no-color → 0
+]) };
+
+# Hash form lets each spec carry a default:
+my %opts = %{ getopts(\@ARGV, {
+    "verbose|v" => 0,
+    "count|n=i" => 10,
+    "tag|t=s@"  => [],
+}) };
+```
+
+Spec language (subset of Perl's `Getopt::Long`):
+
+| Spec        | Meaning                                                      |
+| ---         | ---                                                          |
+| `name`      | Bool flag, no argument                                       |
+| `n\|name`   | Same option, multiple names; first is canonical              |
+| `name=s`    | Required string arg                                          |
+| `name=i`    | Required int arg                                             |
+| `name=f`    | Required float arg                                           |
+| `name:s`    | Optional string (defaults to `""` if flag is given without)  |
+| `name:i`    | Optional int (defaults to `0`)                               |
+| `name:f`    | Optional float (defaults to `0.0`)                           |
+| `name=s@`   | Repeatable → arrayref (`=i@` / `=f@` typed)                  |
+| `name=s%`   | `--name key=val` → hashref (`=i%` / `=f%` typed)             |
+| `name!`     | Negatable bool; `--no-name` sets `0`                         |
+| `name+`     | Counter: each occurrence increments by 1                     |
+
+Parsing rules:
+
+- `--name`, `--name=value`, and `--name value` all accepted for long options.
+- `-n`, `-n value`, and `-nvalue` all accepted for short options.
+- `--` terminates option parsing; everything after is positional.
+- Numeric tokens (`-5`, `-3.14`) are treated as positionals.
+- The first non-option positional stops parsing (no intermixed mode in v1).
+- Unknown options or type mismatches raise a runtime error.
+
+Defaults when an option is absent: bool / negatable bool / counter → `0`; `=s@` → empty arrayref; `=s%` → empty hashref; required scalars (`=s`/`=i`/`=f`) → not present in the returned hash unless given a default via the hash form.
+
 ---
 
 ## [0x08] SUPPORTED PERL FEATURES
