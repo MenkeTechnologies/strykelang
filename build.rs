@@ -425,10 +425,13 @@ fn extract_lsp_descriptions(src: &str) -> Vec<(String, String)> {
         return Vec::new();
     };
     let after = &src[fn_pos..];
-    let Some(match_rel) = after.find("match key") else {
+    // `doc_for_label_text` has an inner `match key` (sigil-preserving arms with
+    // `=> Some("...")`); descriptions live in the outer `let md = match key`.
+    let anchor = "let md: &'static str = match key";
+    let Some(match_rel) = after.find(anchor) else {
         return Vec::new();
     };
-    let body_start = fn_pos + match_rel + "match key".len();
+    let body_start = fn_pos + match_rel + anchor.len();
     let bytes = src.as_bytes();
     let mut i = body_start;
     while i < src.len() && bytes[i] != b'{' {
