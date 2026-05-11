@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.13.4 · 8320 topics · 162 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.13.4 · 8321 topics · 163 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -300,6 +300,7 @@
         <li><a href="#ch-network-triad-analysis">Network Triad Analysis</a> <span class="chapter-count">3</span></li>
         <li><a href="#ch-misc-inverses">Misc Inverses</a> <span class="chapter-count">1</span></li>
         <li><a href="#ch-parallel-i-o">Parallel I/O</a> <span class="chapter-count">8</span></li>
+        <li><a href="#ch-cli-args">CLI / Args</a> <span class="chapter-count">1</span></li>
         <li><a href="#ch-file-i-o">File I/O</a> <span class="chapter-count">35</span></li>
         <li><a href="#ch-strings">Strings</a> <span class="chapter-count">26</span></li>
         <li><a href="#ch-arrays-hashes">Arrays &amp; Hashes</a> <span class="chapter-count">20</span></li>
@@ -6843,6 +6844,47 @@ my @big_recent = glob_par(&quot;**(.L+1m om[1,5])&quot;)  # 5 newest &gt;1MB fil
 my $logs = pwatch &quot;logs/*(.)&quot;, fn { p &quot;log updated: $_&quot; }
 my $cfg = pwatch &quot;./config&quot;, fn { reload_config() }
 sleep                                 # block forever
+</code></pre>
+      </article>
+    </section>
+    <section class="tutorial-section" id="ch-cli-args">
+      <h2>CLI / Args</h2>
+      <p class="chapter-meta">1 topics</p>
+      <article class="doc-entry" id="doc-getopts">
+        <h3><a class="doc-anchor" href="#doc-getopts">#</a> <code>getopts</code></h3>
+        <p><code>getopts(\@ARGV, SPECS)</code> — Getopt::Long-style CLI flag parser. Returns a hashref of canonical-name → value. Mutates <code>\@ARGV</code> in place so the leftover positionals stay behind.</p>
+        <p>Spec language (subset of Perl&#39;s <code>Getopt::Long</code>):</p>
+        <ul>
+          <li><code>name</code> — bool flag (present = 1)</li>
+          <li><code>name|alias|alias2</code> — same option, multiple names; first is canonical</li>
+          <li><code>name=s</code> / <code>name=i</code> / <code>name=f</code> — required string / int / float</li>
+          <li><code>name:s</code> / <code>name:i</code> / <code>name:f</code> — optional arg (defaults to <code>&quot;&quot;</code> / <code>0</code> / <code>0.0</code>)</li>
+          <li><code>name=s@</code> — repeatable → arrayref (also <code>=i@</code>, <code>=f@</code>)</li>
+          <li><code>name=s%</code> — <code>--name key=val</code> → hashref (also <code>=i%</code>, <code>=f%</code>)</li>
+          <li><code>name!</code> — negatable bool; <code>--no-name</code> sets <code>0</code></li>
+          <li><code>name+</code> — counter: each occurrence increments</li>
+        </ul>
+        <pre><code class="lang-perl">my %opts = %{ getopts(\@ARGV, [
+    &quot;verbose|v&quot;,
+    &quot;file|f=s&quot;,
+    &quot;count|n=i&quot;,
+    &quot;tag|t=s@&quot;,
+]) };
+
+# Hash form lets each spec carry a default:
+my %opts = %{ getopts(\@ARGV, {
+    &quot;verbose|v&quot; =&gt; 0,
+    &quot;count|n=i&quot; =&gt; 10,
+    &quot;tag|t=s@&quot;  =&gt; [],
+}) };
+</code></pre>
+        <p>Parsing rules: <code>--name</code>, <code>--name=value</code>, <code>--name value</code>, <code>-n</code>, <code>-n value</code>, <code>-nvalue</code> all accepted. Bundling: <code>-vDR</code> = <code>-v -D -R</code>; if a char takes an arg, the rest of the token is its value (<code>-vfx.txt</code> → <code>-v -f x.txt</code>). <code>--</code> terminates options; first non-option positional stops parsing. Unknown options or type mismatches raise a runtime error.</p>
+        <p>Per-option metadata + auto-<code>--help</code>: hash values may themselves be hashrefs carrying <code>{ help, default, required, metavar }</code>. When any spec has <code>help</code> text and the user hasn&#39;t claimed <code>--help</code>/<code>-h</code>, getopts intercepts <code>--help</code>/<code>-h</code>, prints a formatted usage block, and <code>exit(0)</code>s. Optional 3rd arg: <code>{ prog, desc, epilog }</code> controls the banner.</p>
+        <pre><code class="lang-perl">my %opts = %{ getopts(\@ARGV, {
+    &quot;verbose|v&quot; =&gt; { help =&gt; &quot;enable verbose&quot; },
+    &quot;file|f=s&quot;  =&gt; { help =&gt; &quot;output path&quot;, default =&gt; &quot;out.txt&quot; },
+    &quot;count|n=i&quot; =&gt; { help =&gt; &quot;iterations&quot;, required =&gt; 1 },
+}, { prog =&gt; &quot;myscript&quot;, desc =&gt; &quot;do a thing&quot; }) };
 </code></pre>
       </article>
     </section>

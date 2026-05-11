@@ -13537,6 +13537,8 @@ impl Parser {
             | "enumerate" | "with_index" | "shuffle" | "shuffled"| "heap"
             | "take_while" | "drop_while" | "skip_while" | "tap" | "peek" | "partition"
             | "zip_with" | "count_by" | "skip" | "first_or"
+            // ── cli / argv ──────────────────────────────────────────────────
+            | "getopts"
             // ── pipeline / string helpers ───────────────────────────────────
             | "input" | "lines" | "words" | "chars" | "cindex" | "crindex"
             | "digits" | "letters" | "letters_uc" | "letters_lc"

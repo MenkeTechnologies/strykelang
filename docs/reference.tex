@@ -222,9 +222,9 @@
   \apptocmd{\@title}{\par {\large #1 \par}}{}{}
 }
 \makeatother
-\subtitle{v0.13.0}
+\subtitle{v0.13.4}
 \author{MenkeTechnologies}
-\date{2026-05-10}
+\date{2026-05-11}
 
 \begin{document}
 \maketitle
@@ -10497,6 +10497,91 @@ to the watch-set selection upfront.
 \NormalTok{my $logs = pwatch "logs/*(.)", fn \{ p "log updated: $\_" \}}
 \NormalTok{my $cfg = pwatch "./config", fn \{ reload\_config() \}}
 \NormalTok{sleep                                 \# block forever}
+\end{Highlighting}
+\end{Shaded}
+
+\protect\phantomsection\label{ch-cli-args}
+\chapter{CLI / Args}\label{cli-args}
+
+1 topics
+
+\section{\texorpdfstring{\texttt{getopts}}{getopts}}\label{getopts}
+
+\texttt{getopts(\textbackslash{}@ARGV,\ SPECS)} --- Getopt::Long-style
+CLI flag parser. Returns a hashref of canonical-name → value. Mutates
+\texttt{\textbackslash{}@ARGV} in place so the leftover positionals stay
+behind.
+
+Spec language (subset of Perl\textquotesingle s \texttt{Getopt::Long}):
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{name} --- bool flag (present = 1)
+\item
+  \texttt{name\textbar{}alias\textbar{}alias2} --- same option, multiple
+  names; first is canonical
+\item
+  \texttt{name=s} / \texttt{name=i} / \texttt{name=f} --- required
+  string / int / float
+\item
+  \texttt{name:s} / \texttt{name:i} / \texttt{name:f} --- optional arg
+  (defaults to \texttt{""} / \texttt{0} / \texttt{0.0})
+\item
+  \texttt{name=s@} --- repeatable → arrayref (also \texttt{=i@},
+  \texttt{=f@})
+\item
+  \texttt{name=s\%} --- \texttt{-\/-name\ key=val} → hashref (also
+  \texttt{=i\%}, \texttt{=f\%})
+\item
+  \texttt{name!} --- negatable bool; \texttt{-\/-no-name} sets
+  \texttt{0}
+\item
+  \texttt{name+} --- counter: each occurrence increments
+\end{itemize}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my \%opts = \%\{ getopts(\textbackslash{}@ARGV, [}
+\NormalTok{    "verbose|v",}
+\NormalTok{    "file|f=s",}
+\NormalTok{    "count|n=i",}
+\NormalTok{    "tag|t=s@",}
+\NormalTok{]) \};}
+
+\NormalTok{\# Hash form lets each spec carry a default:}
+\NormalTok{my \%opts = \%\{ getopts(\textbackslash{}@ARGV, \{}
+\NormalTok{    "verbose|v" =\textgreater{} 0,}
+\NormalTok{    "count|n=i" =\textgreater{} 10,}
+\NormalTok{    "tag|t=s@"  =\textgreater{} [],}
+\NormalTok{\}) \};}
+\end{Highlighting}
+\end{Shaded}
+
+Parsing rules: \texttt{-\/-name}, \texttt{-\/-name=value},
+\texttt{-\/-name\ value}, \texttt{-n}, \texttt{-n\ value},
+\texttt{-nvalue} all accepted. Bundling: \texttt{-vDR} =
+\texttt{-v\ -D\ -R}; if a char takes an arg, the rest of the token is
+its value (\texttt{-vfx.txt} → \texttt{-v\ -f\ x.txt}). \texttt{-\/-}
+terminates options; first non-option positional stops parsing. Unknown
+options or type mismatches raise a runtime error.
+
+Per-option metadata + auto-\texttt{-\/-help}: hash values may themselves
+be hashrefs carrying
+\texttt{\{\ help,\ default,\ required,\ metavar\ \}}. When any spec has
+\texttt{help} text and the user hasn\textquotesingle t claimed
+\texttt{-\/-help}/\texttt{-h}, getopts intercepts
+\texttt{-\/-help}/\texttt{-h}, prints a formatted usage block, and
+\texttt{exit(0)}s. Optional 3rd arg:
+\texttt{\{\ prog,\ desc,\ epilog\ \}} controls the banner.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my \%opts = \%\{ getopts(\textbackslash{}@ARGV, \{}
+\NormalTok{    "verbose|v" =\textgreater{} \{ help =\textgreater{} "enable verbose" \},}
+\NormalTok{    "file|f=s"  =\textgreater{} \{ help =\textgreater{} "output path", default =\textgreater{} "out.txt" \},}
+\NormalTok{    "count|n=i" =\textgreater{} \{ help =\textgreater{} "iterations", required =\textgreater{} 1 \},}
+\NormalTok{\}, \{ prog =\textgreater{} "myscript", desc =\textgreater{} "do a thing" \}) \};}
 \end{Highlighting}
 \end{Shaded}
 

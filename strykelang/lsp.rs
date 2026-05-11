@@ -3363,7 +3363,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "test_no_interop" | "test_ni" => "`test_no_interop(FILE_OR_DIR, ...)` (alias `test_ni`) — same as `test`, but pins each worker thread's TLS no-interop flag for the duration of the test (`set_no_interop_mode_tls`). Sibling `pmaps` workers don't race on a shared atomic. Forwards `--no-interop` to every spawned grandchild so each test runs under stryke's bot-firewall mode (rejects Perl-isms, forces stryke idioms).\n\n```perl\ntest_no_interop(\"t/\")\ntest_ni([\"t/a\", \"t/b\"], { quiet => 1 })\n```",
         "check" => "`check(FILE, ...)` — in-process equivalent of `stryke check FILE...`. Parses, compiles, and lints each path without executing it. Returns the exit code (0 on success, 1 on errors). Optional trailing hashref: `{ quiet => 1 }`, `{ json => 1 }`, `{ no_interop => 1 }`.\n\nFaster than `system \"stryke check $f\"` because it skips the binary fork and reuses the parent process's parser/compiler. The lint pass is **not** a strict-vars enforcer — undefined-variable errors only fire on files that themselves do `use strict;`.\n\n```perl\nmy $rc = check(\"foo.stk\")                    # 0 = ok, 1 = errors\ncheck(\\@files, { quiet => 1 })               # arrayref + opts\nfor my $f (glob(\"src/*.stk\")) { check($f) or warn \"$f failed\" }\n```",
         "check_no_interop" | "check_ni" => "`check_no_interop(FILE, ...)` (alias `check_ni`) — same as `check`, but pins **this thread** to `--no-interop` for the duration of the check via an RAII guard on the per-thread no-interop flag. Sibling threads are unaffected, so the builtin is safe to call from `pmaps` workers in parallel — no global-atomic race.\n\n```perl\ncheck_no_interop(\"foo.stk\")                  # rejects sub/say/$a/$b\npmaps { check_ni(_, { quiet => 1 }) } @files # parallel-safe, no race\n```",
-        "getopts" => "`getopts(\\@ARGV, SPECS)` — Getopt::Long-style CLI flag parser. Returns a hashref of canonical-name → value. Mutates `\\@ARGV` in place so the leftover positionals stay behind.\n\nSpec language (subset of Perl's `Getopt::Long`):\n\n- `name` — bool flag (present = 1)\n- `name|alias|alias2` — same option, multiple names; first is canonical\n- `name=s` / `name=i` / `name=f` — required string / int / float\n- `name:s` / `name:i` / `name:f` — optional arg (defaults to `\"\"` / `0` / `0.0`)\n- `name=s@` — repeatable → arrayref (also `=i@`, `=f@`)\n- `name=s%` — `--name key=val` → hashref (also `=i%`, `=f%`)\n- `name!` — negatable bool; `--no-name` sets `0`\n- `name+` — counter: each occurrence increments\n\n```perl\nmy %opts = %{ getopts(\\@ARGV, [\n    \"verbose|v\",\n    \"file|f=s\",\n    \"count|n=i\",\n    \"tag|t=s@\",\n]) };\n\n# Hash form lets each spec carry a default:\nmy %opts = %{ getopts(\\@ARGV, {\n    \"verbose|v\" => 0,\n    \"count|n=i\" => 10,\n    \"tag|t=s@\"  => [],\n}) };\n```\n\nParsing rules: `--name`, `--name=value`, `--name value`, `-n`, `-n value`, `-nvalue` all accepted. Bundling: `-vDR` = `-v -D -R`; if a char takes an arg, the rest of the token is its value (`-vfx.txt` → `-v -f x.txt`). `--` terminates options; first non-option positional stops parsing. Unknown options or type mismatches raise a runtime error.",
+        "getopts" => "`getopts(SPECS [, META])` — Getopt::Long-style CLI flag parser. By default operates on `@ARGV` directly (no `\\@ARGV` needed), returning a hashref of canonical-name → value and leaving only the leftover positionals in `@ARGV`. Use `getopts(\\@argv, SPECS [, META])` to parse a list other than `@ARGV`.\n\nSpec language (subset of Perl's `Getopt::Long`):\n\n- `name` — bool flag (present = 1)\n- `name|alias|alias2` — same option, multiple names; first is canonical\n- `name=s` / `name=i` / `name=f` — required string / int / float\n- `name:s` / `name:i` / `name:f` — optional arg (defaults to `\"\"` / `0` / `0.0`)\n- `name=s@` — repeatable → arrayref (also `=i@`, `=f@`)\n- `name=s%` — `--name key=val` → hashref (also `=i%`, `=f%`)\n- `name!` — negatable bool; `--no-name` sets `0`\n- `name+` — counter: each occurrence increments\n\n```perl\nmy %opts = %{ getopts([\n    \"verbose|v\",\n    \"file|f=s\",\n    \"count|n=i\",\n    \"tag|t=s@\",\n]) };\n\n# Hash form lets each spec carry a default:\nmy %opts = %{ getopts({\n    \"verbose|v\" => 0,\n    \"count|n=i\" => 10,\n    \"tag|t=s@\"  => [],\n}) };\n\n# Explicit array ref (parse a list other than @ARGV):\nmy %opts = %{ getopts(\\@args, [ \"verbose|v\" ]) };\n```\n\nParsing rules: `--name`, `--name=value`, `--name value`, `-n`, `-n value`, `-nvalue` all accepted. Bundling: `-vDR` = `-v -D -R`; if a char takes an arg, the rest of the token is its value (`-vfx.txt` → `-v -f x.txt`). `--` terminates options; first non-option positional stops parsing. Unknown options or type mismatches raise a runtime error.\n\nPer-option metadata + auto-`--help`: hash values may themselves be hashrefs carrying `{ help, default, required, metavar }`. When any spec has `help` text and the user hasn't claimed `--help`/`-h`, getopts intercepts `--help`/`-h`, prints a formatted usage block, and `exit(0)`s. Optional `META` arg: `{ prog, desc, epilog }` controls the banner.\n\n```perl\nmy %opts = %{ getopts({\n    \"verbose|v\" => { help => \"enable verbose\" },\n    \"file|f=s\"  => { help => \"output path\", default => \"out.txt\" },\n    \"count|n=i\" => { help => \"iterations\", required => 1 },\n}, { prog => \"myscript\", desc => \"do a thing\" }) };\n```",
 
         // ── AOP (aspect-oriented advice on user subs) ──
         "before" => "`before \"<glob>\" { ... }` — register advice that runs *before* every call to a sub whose name matches the glob pattern. Inside the body, `$INTERCEPT_NAME` holds the called sub's name and `@INTERCEPT_ARGS` holds the args.\n\nThe leading keyword only commits to advice parsing when followed by a string literal, so `before(...)` as a normal sub call still parses normally. Multiple `before` advices on the same name all fire in registration order. The advice cannot suppress the call (use `around` for that) and its return value is discarded.\n\n```perl\nbefore \"fetch\" { warn \"calling fetch with @INTERCEPT_ARGS\" }\nbefore \"log_*\" { $log_count++ }     # glob: any sub starting with log_\nbefore \"*\"      { trace($INTERCEPT_NAME) }   # every sub call\n```\n\nBodies are lowered to bytecode and dispatched through the VM (`run_block_region`), so `our $x` and other compile-time name resolutions work the same inside advice as outside it. The body's final statement must be an expression (same constraint as `map { }` block lowering); a literal `for`/`while`/`if` block or a literal `return` will be rejected at firing time.",
@@ -5154,6 +5154,12 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
         ],
     ),
     (
+        "CLI / Args",
+        &[
+            "getopts",
+        ],
+    ),
+    (
         "File I/O",
         &[
             "open",
@@ -5171,7 +5177,6 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
             "slurp_raw",
             "read_bytes",
             "input",
-            "getopts",
             "read_lines",
             "append_file",
             "to_file",
@@ -6634,7 +6639,9 @@ mod completion_tests {
     #[test]
     fn builtin_docs_exist() {
         use super::doc_text_for;
-        let builtins = ["print", "say", "chomp", "length", "substr", "split", "join"];
+        let builtins = [
+            "print", "say", "chomp", "length", "substr", "split", "join", "getopts",
+        ];
         for b in builtins {
             assert!(doc_text_for(b).is_some(), "Doc for '{}' should exist", b);
         }

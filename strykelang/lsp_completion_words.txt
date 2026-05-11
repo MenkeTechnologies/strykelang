@@ -12278,6 +12278,7 @@ gethostname
 getlogin
 getnetbyname
 getnetent
+getopts
 getpeername
 getpgrp
 getppid

@@ -724,7 +724,7 @@ pub(crate) fn try_builtin(
         "ddump" | "dd" => Some(builtin_ddump(args)),
         "stringify" | "str" => Some(builtin_stringify(args)),
         "input" => Some(builtin_input(interp, args, line)),
-        "getopts" => Some(crate::getopts::builtin_getopts(args, line)),
+        "getopts" => Some(crate::getopts::builtin_getopts(interp, args, line)),
         "lines" | "ln" => Some(builtin_lines(interp, args)),
         "words" | "wd" => Some(builtin_words(interp, args)),
         "chars" | "ch" => Some(builtin_chars(interp, args)),
