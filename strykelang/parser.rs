@@ -4637,29 +4637,39 @@ impl Parser {
         Ok(())
     }
 
-    /// After `fn` + optional `(SIG)` + attrs: `{ ... }` or stryke-only `= EXPR` (one assign-level
-    /// expression; no top-level `,`). `sub` always requires `{ ... }`.
-    fn parse_fn_eq_body_or_block(&mut self, is_sub_keyword: bool) -> PerlResult<Block> {
-        if !is_sub_keyword && self.eat(&Token::Assign) {
-            let expr = self.parse_assign_expr()?;
-            if matches!(self.peek(), Token::Comma) {
-                return Err(self.syntax_err(
-                    "`fn ... =` allows only a single expression; use `fn ... { ... }` for multiple statements",
-                    self.peek_line(),
-                ));
-            }
-            let eline = expr.line;
-            self.eat(&Token::Semicolon);
-            let mut body = vec![Statement {
-                label: None,
-                kind: StmtKind::Expression(expr),
-                line: eline,
-            }];
-            Self::default_topic_for_sole_bareword(&mut body);
-            Ok(body)
-        } else {
-            self.parse_block()
+    /// After `fn` + optional `(SIG)` + attrs: stryke-only `= EXPR` (one assign-level expression;
+    /// no top-level `,` after the expression). Returns `None` if the next token is not `=`.
+    fn try_parse_fn_assign_shorthand_body(&mut self) -> PerlResult<Option<Block>> {
+        if !self.eat(&Token::Assign) {
+            return Ok(None);
         }
+        let expr = self.parse_assign_expr()?;
+        if matches!(self.peek(), Token::Comma) {
+            return Err(self.syntax_err(
+                "`fn ... =` allows only a single expression; use `fn ... { ... }` for multiple statements",
+                self.peek_line(),
+            ));
+        }
+        let eline = expr.line;
+        self.eat(&Token::Semicolon);
+        let mut body = vec![Statement {
+            label: None,
+            kind: StmtKind::Expression(expr),
+            line: eline,
+        }];
+        Self::default_topic_for_sole_bareword(&mut body);
+        Ok(Some(body))
+    }
+
+    /// After `fn` + optional `(SIG)` + attrs: `{ ... }` or stryke-only `= EXPR` (see
+    /// [`Self::try_parse_fn_assign_shorthand_body`]). `sub` always requires `{ ... }`.
+    fn parse_fn_eq_body_or_block(&mut self, is_sub_keyword: bool) -> PerlResult<Block> {
+        if !is_sub_keyword {
+            if let Some(block) = self.try_parse_fn_assign_shorthand_body()? {
+                return Ok(block);
+            }
+        }
+        self.parse_block()
     }
 
     fn parse_sub_decl(&mut self, is_sub_keyword: bool) -> PerlResult<Statement> {
@@ -4869,6 +4879,7 @@ impl Parser {
                 _ => false,
             };
             if is_method {
+                let is_sub_keyword = matches!(self.peek(), Token::Ident(ref s) if s == "sub");
                 self.advance(); // fn/sub
                 let method_name = match self.advance() {
                     (Token::Ident(n), _) => n,
@@ -4885,8 +4896,11 @@ impl Parser {
                 } else {
                     Vec::new()
                 };
-                // parse_block handles its own { } delimiters
-                let body = self.parse_block()?;
+                let body = if is_sub_keyword {
+                    self.parse_block()?
+                } else {
+                    self.parse_fn_eq_body_or_block(false)?
+                };
                 methods.push(crate::ast::StructMethod {
                     name: method_name,
                     params,
@@ -5145,8 +5159,10 @@ impl Parser {
                     Vec::new()
                 };
 
-                // Body is optional (abstract method in trait has no body)
-                let body = if matches!(self.peek(), Token::LBrace) {
+                // Body: `{ ... }`, or `= expr` (same rules as top-level `fn`), or omitted (abstract)
+                let body = if let Some(b) = self.try_parse_fn_assign_shorthand_body()? {
+                    Some(b)
+                } else if matches!(self.peek(), Token::LBrace) {
                     Some(self.parse_block()?)
                 } else {
                     None
@@ -5281,8 +5297,10 @@ impl Parser {
                 Vec::new()
             };
 
-            // Body is optional (no body = abstract/required method)
-            let body = if matches!(self.peek(), Token::LBrace) {
+            // Body: `{ ... }`, `= expr`, or omitted (required method)
+            let body = if let Some(b) = self.try_parse_fn_assign_shorthand_body()? {
+                Some(b)
+            } else if matches!(self.peek(), Token::LBrace) {
                 Some(self.parse_block()?)
             } else {
                 None
@@ -19283,6 +19301,93 @@ mod tests {
             StmtKind::SubDecl { name, .. } => assert_eq!(name, "foo"),
             _ => panic!("expected SubDecl"),
         }
+    }
+
+    #[test]
+    fn parse_class_method_expr_body_shorthand() {
+        let p = parse_ok("class X { fn adg = \"\" }");
+        match &p.statements[0].kind {
+            StmtKind::ClassDecl { def } => {
+                let m = def.method("adg").expect("adg method");
+                let body = m.body.as_ref().expect("body");
+                assert_eq!(body.len(), 1);
+                match &body[0].kind {
+                    StmtKind::Expression(e) => match &e.kind {
+                        ExprKind::String(s) => assert!(s.is_empty()),
+                        _ => panic!("expected string expr, got {:?}", e.kind),
+                    },
+                    _ => panic!("expected expression stmt"),
+                }
+            }
+            _ => panic!("expected ClassDecl"),
+        }
+    }
+
+    #[test]
+    fn parse_named_fn_eq_shorthand_with_sig() {
+        let p = parse_ok("fn add_one($x) = $x + 1");
+        match &p.statements[0].kind {
+            StmtKind::SubDecl { name, params, body, .. } => {
+                assert_eq!(name, "add_one");
+                assert_eq!(params.len(), 1);
+                assert_eq!(body.len(), 1);
+            }
+            _ => panic!("expected SubDecl"),
+        }
+    }
+
+    #[test]
+    fn parse_anon_fn_eq_shorthand_with_sig() {
+        let p = parse_ok("my $f = fn($x) = 23");
+        match &p.statements[0].kind {
+            StmtKind::My(decls) => {
+                let init = decls[0].initializer.as_ref().expect("initializer");
+                match &init.kind {
+                    ExprKind::CodeRef { params, body } => {
+                        assert_eq!(params.len(), 1);
+                        assert_eq!(body.len(), 1);
+                    }
+                    _ => panic!("expected CodeRef"),
+                }
+            }
+            _ => panic!("expected My"),
+        }
+    }
+
+    #[test]
+    fn parse_struct_method_eq_shorthand() {
+        let p = parse_ok("struct S { fn double($a) = $a * 2 }");
+        match &p.statements[0].kind {
+            StmtKind::StructDecl { def } => {
+                assert_eq!(def.methods.len(), 1);
+                assert_eq!(def.methods[0].name, "double");
+                assert_eq!(def.methods[0].body.len(), 1);
+            }
+            _ => panic!("expected StructDecl"),
+        }
+    }
+
+    #[test]
+    fn parse_trait_method_eq_shorthand() {
+        let p = parse_ok("trait T { fn k = 0 }");
+        match &p.statements[0].kind {
+            StmtKind::TraitDecl { def } => {
+                let m = def.method("k").expect("k");
+                let body = m.body.as_ref().expect("default body");
+                assert_eq!(body.len(), 1);
+            }
+            _ => panic!("expected TraitDecl"),
+        }
+    }
+
+    #[test]
+    fn parse_fn_eq_shorthand_rejects_top_level_comma() {
+        let msg = parse_err("fn z = 1, 2");
+        assert!(
+            msg.contains("single expression") || msg.contains("comma"),
+            "{}",
+            msg
+        );
     }
 
     #[test]

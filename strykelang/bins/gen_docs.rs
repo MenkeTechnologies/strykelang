@@ -127,16 +127,16 @@ fn build_page() -> String {
           <span class="sep">/</span>
           <span class="current">Reference</span>
           <span class="sep">/</span>
-          <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v{version} · {total_topics} topics · {chapter_count} chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v{version} · {total_topics} topics · {chapter_count} chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
         <button type="button" class="btn btn-secondary active" id="btnCrt" title="CRT scanline overlay">CRT</button>
         <button type="button" class="btn btn-secondary active" id="btnNeon" title="Neon border pulse">Neon</button>
         <a class="btn btn-secondary" href="index.html">Hub</a>
-        <a class="btn btn-secondary" href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a class="btn btn-secondary" href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
       </div>
     </div>
   </header>
