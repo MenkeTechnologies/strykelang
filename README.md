@@ -2597,7 +2597,7 @@ spec:
 `stryke lsp` (or `stryke --lsp`) runs an LSP server over stdio. Hooks into the existing parser, lexer, and symbol table — no separate analyzer to maintain. Surfaces:
 
 - **Diagnostics** on save (parse + compile errors with line / column / message)
-- **Hover docs** for builtins (`pmap`, `cluster`, `fetch_json`, `dataframe`, …) — including the parallel and cluster primitives from sections [\[0x03\]](#0x03-parallel-primitives) and [\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster)
+- **Hover docs** for builtins (`pmap`, `cluster`, `fetch_json`, `dataframe`, …) — including the parallel and cluster primitives from sections [\[0x03\]](#0x03-parallel-primitives) and [\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster), every Perl special variable (`$!`, `$@`, `$_`, `@_`, `@ARGV`, `%ENV`, `$1`..`$9`, `$^A`..`$^X`, `@+`/`@-`, …), the `__NAME__` compile-time tokens (`__END__`, `__DATA__`, `__FILE__`, `__LINE__`, `__PACKAGE__`, `__SUB__`), every phase block (`BEGIN`/`UNITCHECK`/`CHECK`/`INIT`/`END`/`BUILD`), and the reflection-hash short aliases (`%a`/`%b`/`%c`/`%d`/`%e`/`%k`/`%p`/`%pc`, `%parameters`, `%limits`, `%term`)
 - **Symbol lookup** for subs and packages within the open file
 - **Completion** for built-in function names and the keywords listed in [\[0x08\]](#0x08-supported-perl-features)
 
