@@ -28,9 +28,10 @@ use std::time::SystemTime;
 
 use nu_ansi_term::{Color as NuColor, Style};
 use reedline::{
-    default_emacs_keybindings, ColumnarMenu, Completer, Emacs, FileBackedHistory, KeyCode,
-    KeyModifiers, MenuBuilder, Prompt, PromptEditMode, PromptHistorySearch,
-    PromptHistorySearchStatus, Reedline, ReedlineEvent, ReedlineMenu, Signal, Span, Suggestion,
+    default_emacs_keybindings, default_vi_insert_keybindings, default_vi_normal_keybindings,
+    ColumnarMenu, Completer, EditMode, Emacs, FileBackedHistory, KeyCode, KeyModifiers,
+    Keybindings, MenuBuilder, Prompt, PromptEditMode, PromptHistorySearch,
+    PromptHistorySearchStatus, Reedline, ReedlineEvent, ReedlineMenu, Signal, Span, Suggestion, Vi,
 };
 
 use crate::Cli;
@@ -44,12 +45,121 @@ const EXTRA_KEYWORDS: &[&str] = &["deque", "heap", "ppool", "barrier", "bench", 
 
 const STRYKE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-fn history_path() -> std::path::PathBuf {
+fn stryke_dir() -> std::path::PathBuf {
     let dir = std::env::var_os("HOME")
         .map(|h| std::path::PathBuf::from(h).join(".stryke"))
         .unwrap_or_else(|| std::path::PathBuf::from(".stryke"));
     let _ = std::fs::create_dir_all(&dir);
-    dir.join("history")
+    dir
+}
+
+fn history_path() -> std::path::PathBuf {
+    stryke_dir().join("history")
+}
+
+fn config_path() -> std::path::PathBuf {
+    stryke_dir().join("config.toml")
+}
+
+/// Contents of the auto-seeded `~/.stryke/config.toml`. Every setting is
+/// commented out so the seeded file documents the schema without changing
+/// behavior — uncomment + edit a line to override the in-code default.
+const DEFAULT_CONFIG_TOML: &str = r#"# stryke runtime config — auto-generated on first launch.
+# Lines starting with `#` are comments. Uncomment + edit a line to
+# override the in-code default. Delete this file and stryke will
+# regenerate it on the next run.
+
+[repl]
+# Edit mode for the interactive REPL. Defaults to emacs.
+#
+#   "emacs" — Ctrl-A/Ctrl-E/Ctrl-K/etc., readline-style (default)
+#   "vi"    — modal editing; Esc → normal mode, i/a → insert,
+#             h/j/k/l navigation, dd/cc/yy/x, /-search, etc.
+#
+# Tab + Shift+Tab cycle the completion menu in either mode.
+# Override per-session with `STRYKE_REPL_MODE=vi stryke`.
+# mode = "emacs"
+"#;
+
+/// First-run seed: write `~/.stryke/config.toml` if it does not exist.
+/// Safe to call on every binary launch — no-op when the file is already
+/// there (and silent if the home directory is read-only). Honors
+/// `STRYKE_NO_CONFIG=1` for CI / sandbox environments that should not
+/// touch the user's home dir.
+pub fn ensure_default_config_seeded() {
+    if std::env::var_os("STRYKE_NO_CONFIG").is_some() {
+        return;
+    }
+    let path = config_path();
+    if path.exists() {
+        return;
+    }
+    // `stryke_dir()` already created the directory; ignore write failures
+    // (read-only homes, sandboxed PATH probes, parallel workers racing on
+    // the same path — losing the race just leaves the existing file).
+    let _ = std::fs::write(&path, DEFAULT_CONFIG_TOML);
+}
+
+/// REPL edit-mode selector. `Emacs` is the default; `Vi` enables reedline's
+/// two-mode insert/normal keybinding set with the standard `Esc` toggle.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum ReplMode {
+    Emacs,
+    Vi,
+}
+
+/// Resolve the REPL edit mode in this precedence:
+/// 1. `STRYKE_REPL_MODE=emacs|vi` env var (overrides everything; handy in
+///    tests / dotfile bootstrap before the config file exists).
+/// 2. `~/.stryke/config.toml` `[repl] mode = "vi"`.
+/// 3. Default `Emacs`.
+fn resolve_repl_mode() -> ReplMode {
+    if let Some(env) = std::env::var_os("STRYKE_REPL_MODE") {
+        let s = env.to_string_lossy().to_ascii_lowercase();
+        if s == "vi" || s == "vim" {
+            return ReplMode::Vi;
+        }
+        if s == "emacs" {
+            return ReplMode::Emacs;
+        }
+    }
+    let raw = match std::fs::read_to_string(config_path()) {
+        Ok(s) => s,
+        Err(_) => return ReplMode::Emacs,
+    };
+    let parsed: toml::Value = match toml::from_str(&raw) {
+        Ok(v) => v,
+        Err(_) => return ReplMode::Emacs,
+    };
+    let mode = parsed
+        .get("repl")
+        .and_then(|v| v.as_table())
+        .and_then(|t| t.get("mode"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("emacs");
+    match mode.to_ascii_lowercase().as_str() {
+        "vi" | "vim" => ReplMode::Vi,
+        _ => ReplMode::Emacs,
+    }
+}
+
+/// Apply the completion-menu Tab / Shift+Tab bindings to a keybinding set
+/// — shared so the bindings live on the emacs map AND the vi insert map.
+fn install_menu_bindings(keybindings: &mut Keybindings) {
+    keybindings.add_binding(
+        KeyModifiers::NONE,
+        KeyCode::Tab,
+        ReedlineEvent::UntilFound(vec![
+            ReedlineEvent::Menu("completion_menu".to_string()),
+            ReedlineEvent::MenuNext,
+        ]),
+    );
+    keybindings.add_binding(
+        KeyModifiers::SHIFT,
+        KeyCode::BackTab,
+        ReedlineEvent::MenuPrevious,
+    );
+    keybindings.add_binding(KeyModifiers::NONE, KeyCode::BackTab, ReedlineEvent::MenuPrevious);
 }
 
 fn build_static_completions() -> Vec<String> {
@@ -318,25 +428,25 @@ pub fn run(cli: &Cli) {
         .with_columns(4)
         .with_column_padding(2);
 
-    let mut keybindings = default_emacs_keybindings();
-    keybindings.add_binding(
-        KeyModifiers::NONE,
-        KeyCode::Tab,
-        ReedlineEvent::UntilFound(vec![
-            ReedlineEvent::Menu("completion_menu".to_string()),
-            ReedlineEvent::MenuNext,
-        ]),
-    );
-    // Shift+Tab cycles backwards through the menu — pairs with Tab so the
-    // user does not need to reach for arrow keys to back up over a missed
-    // suggestion. (Up/Down/Left/Right are already bound to the matching
-    // Menu* events by `default_emacs_keybindings`.)
-    keybindings.add_binding(
-        KeyModifiers::SHIFT,
-        KeyCode::BackTab,
-        ReedlineEvent::MenuPrevious,
-    );
-    keybindings.add_binding(KeyModifiers::NONE, KeyCode::BackTab, ReedlineEvent::MenuPrevious);
+    // Mode (emacs/vi) comes from `~/.stryke/config.toml` `[repl] mode = ...`
+    // or `STRYKE_REPL_MODE=vi` (env override). Menu navigation bindings
+    // attach to the active insert-mode keymap so completion behaves the same
+    // in either edit mode. Vi normal-mode keys (`h`/`j`/`k`/`l`, `dd`, etc.)
+    // come from reedline's `default_vi_normal_keybindings()` and stay
+    // untouched — only the insert map gains the menu shortcuts.
+    let edit_mode: Box<dyn EditMode> = match resolve_repl_mode() {
+        ReplMode::Emacs => {
+            let mut kb = default_emacs_keybindings();
+            install_menu_bindings(&mut kb);
+            Box::new(Emacs::new(kb))
+        }
+        ReplMode::Vi => {
+            let mut insert_kb = default_vi_insert_keybindings();
+            install_menu_bindings(&mut insert_kb);
+            let normal_kb = default_vi_normal_keybindings();
+            Box::new(Vi::new(insert_kb, normal_kb))
+        }
+    };
 
     let history = match FileBackedHistory::with_file(5_000, history_path()) {
         Ok(h) => Box::new(h) as Box<dyn reedline::History>,
@@ -356,7 +466,7 @@ pub fn run(cli: &Cli) {
     let mut line_editor = Reedline::create()
         .with_completer(Box::new(completer))
         .with_menu(ReedlineMenu::EngineCompleter(Box::new(menu)))
-        .with_edit_mode(Box::new(Emacs::new(keybindings)))
+        .with_edit_mode(edit_mode)
         .with_history(history);
 
     let prompt = StrykePrompt {

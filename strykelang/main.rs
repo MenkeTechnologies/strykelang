@@ -1107,6 +1107,13 @@ fn main() {
         }
     }
 
+    // First-run seed: write `~/.stryke/config.toml` if missing. Silent
+    // no-op when the file already exists or `STRYKE_NO_CONFIG` is set.
+    // Done before any subcommand dispatch so every entry point (REPL,
+    // script run, test pool worker, controller, ...) sees the same
+    // populated config dir on first launch.
+    repl::ensure_default_config_seeded();
+
     let args = expand_perl_bundled_argv(std::env::args().collect());
 
     // `stryke --test-worker` — pool-worker mode: read test paths from
