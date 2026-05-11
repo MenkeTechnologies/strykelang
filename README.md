@@ -1002,6 +1002,7 @@ Parsing rules:
 
 - `--name`, `--name=value`, and `--name value` all accepted for long options.
 - `-n`, `-n value`, and `-nvalue` all accepted for short options.
+- Bundling: `-vDR` is parsed as `-v -D -R`. If a char in the bundle takes an argument, the rest of the token becomes its value (`-vfx.txt` → `-v -f x.txt`). Bundling and `=` are mutually exclusive — `-X=value` is treated as a single short option name with an inline value.
 - `--` terminates option parsing; everything after is positional.
 - Numeric tokens (`-5`, `-3.14`) are treated as positionals.
 - The first non-option positional stops parsing (no intermixed mode in v1).

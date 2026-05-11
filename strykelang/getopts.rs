@@ -422,7 +422,7 @@ fn parse_argv(
             continue;
         }
 
-        // Short option: -X, -X value, -Xvalue
+        // Short option: -X, -X value, -Xvalue, -XYZ (bundled), -X=value
         if let Some(rest) = arg.strip_prefix('-') {
             if rest.is_empty() {
                 // Bare `-` is a positional (conventional stdin marker).
@@ -436,53 +436,91 @@ fn parse_argv(
                 i += 1;
                 continue;
             }
-            let (name, inline_val) = match rest.find('=') {
-                Some(eq) => (rest[..eq].to_string(), Some(rest[eq + 1..].to_string())),
-                None => {
-                    // Try first-char lookup with attached value: -nFOO
-                    let mut chars = rest.chars();
-                    let first = chars.next().unwrap();
-                    let key = first.to_string();
-                    let tail: String = chars.collect();
-                    if !tail.is_empty() {
-                        if let Some((_, s, _)) = find_spec(specs, &key) {
-                            if matches!(
-                                s.kind,
-                                ArgKind::Required(_)
-                                    | ArgKind::Optional(_)
-                                    | ArgKind::Array(_)
-                                    | ArgKind::Hash(_)
-                            ) {
-                                (key, Some(tail))
-                            } else {
-                                // Not an arg-taking option; treat the whole token as the name.
-                                (rest.to_string(), None)
-                            }
+
+            // `-X=value` form: handle as a single short option with inline value.
+            if let Some(eq) = rest.find('=') {
+                let name = rest[..eq].to_string();
+                let inline_val = Some(rest[eq + 1..].to_string());
+                let (_, spec, negated) = find_spec(specs, &name).ok_or_else(|| {
+                    PerlError::runtime(format!("getopts: unknown option -{}", name), line)
+                })?;
+                let display = render_opt(&name);
+                i = consume_option(
+                    &input,
+                    i,
+                    inline_val,
+                    spec,
+                    negated,
+                    &display,
+                    &mut out,
+                    line,
+                )?;
+                continue;
+            }
+
+            // Bundled short options: walk char-by-char.
+            // - Flag-style spec (Bool / NegBool / Counter): consume one char, continue.
+            // - Arg-taking spec (Required / Optional / Array / Hash): consume the
+            //   first char as the option name and the rest of the token (if any)
+            //   as the value; otherwise pull the next argv token.
+            let chars: Vec<char> = rest.chars().collect();
+            let mut idx = 0usize;
+            let mut advanced_outer = false;
+            while idx < chars.len() {
+                let key = chars[idx].to_string();
+                let (_, spec, negated) = find_spec(specs, &key).ok_or_else(|| {
+                    PerlError::runtime(format!("getopts: unknown option -{}", key), line)
+                })?;
+                let display = render_opt(&key);
+                match spec.kind {
+                    ArgKind::Bool | ArgKind::NegBool | ArgKind::Counter => {
+                        // No-arg flag in the middle (or only one) of a bundle.
+                        i = consume_option(
+                            &input,
+                            i,
+                            None,
+                            spec,
+                            negated,
+                            &display,
+                            &mut out,
+                            line,
+                        )?;
+                        // consume_option advanced `i` past the whole token; revert
+                        // that advance for all but the last char in the bundle so
+                        // the next char is parsed against the same input token.
+                        if idx + 1 < chars.len() {
+                            i -= 1;
                         } else {
-                            (rest.to_string(), None)
+                            advanced_outer = true;
                         }
-                    } else {
-                        (rest.to_string(), None)
+                        idx += 1;
+                    }
+                    ArgKind::Required(_)
+                    | ArgKind::Optional(_)
+                    | ArgKind::Array(_)
+                    | ArgKind::Hash(_) => {
+                        let tail: String = chars[idx + 1..].iter().collect();
+                        let inline_val = if tail.is_empty() { None } else { Some(tail) };
+                        i = consume_option(
+                            &input,
+                            i,
+                            inline_val,
+                            spec,
+                            negated,
+                            &display,
+                            &mut out,
+                            line,
+                        )?;
+                        advanced_outer = true;
+                        break;
                     }
                 }
-            };
-            let (_, spec, negated) = find_spec(specs, &name).ok_or_else(|| {
-                PerlError::runtime(
-                    format!("getopts: unknown option -{}", name),
-                    line,
-                )
-            })?;
-            let display = render_opt(&name);
-            i = consume_option(
-                &input,
-                i,
-                inline_val,
-                spec,
-                negated,
-                &display,
-                &mut out,
-                line,
-            )?;
+            }
+            if !advanced_outer {
+                // Defensive: should never reach here because at least one char in
+                // the bundle was consumed and either advanced `i` or broke out.
+                i += 1;
+            }
             continue;
         }
 
@@ -905,5 +943,51 @@ mod tests {
         let err = builtin_getopts(&[a, s], 1).unwrap_err();
         let msg = format!("{}", err);
         assert!(msg.contains("duplicate option name 'verbose'"), "msg was: {}", msg);
+    }
+
+    #[test]
+    fn bundled_short_bools() {
+        let a = argv(&["-vDR", "pos"]);
+        let s = specs(&["verbose|v", "debug|D", "recursive|R"]);
+        let out = builtin_getopts(&[a.clone(), s], 1).unwrap();
+        assert_eq!(hget(&out, "verbose").to_int(), 1);
+        assert_eq!(hget(&out, "debug").to_int(), 1);
+        assert_eq!(hget(&out, "recursive").to_int(), 1);
+        assert_eq!(leftover(&a), vec!["pos".to_string()]);
+    }
+
+    #[test]
+    fn bundled_short_with_trailing_arg_taking_inline() {
+        let a = argv(&["-vfx.txt"]);
+        let s = specs(&["verbose|v", "file|f=s"]);
+        let out = builtin_getopts(&[a, s], 1).unwrap();
+        assert_eq!(hget(&out, "verbose").to_int(), 1);
+        assert_eq!(hget(&out, "file").to_string(), "x.txt");
+    }
+
+    #[test]
+    fn bundled_short_with_trailing_arg_taking_separated() {
+        let a = argv(&["-vf", "x.txt"]);
+        let s = specs(&["verbose|v", "file|f=s"]);
+        let out = builtin_getopts(&[a, s], 1).unwrap();
+        assert_eq!(hget(&out, "verbose").to_int(), 1);
+        assert_eq!(hget(&out, "file").to_string(), "x.txt");
+    }
+
+    #[test]
+    fn bundled_counter_repeated_char() {
+        let a = argv(&["-vvv"]);
+        let s = specs(&["verbose|v+"]);
+        let out = builtin_getopts(&[a, s], 1).unwrap();
+        assert_eq!(hget(&out, "verbose").to_int(), 3);
+    }
+
+    #[test]
+    fn bundle_unknown_char_errors() {
+        let a = argv(&["-vXv"]);
+        let s = specs(&["verbose|v"]);
+        let err = builtin_getopts(&[a, s], 1).unwrap_err();
+        let msg = format!("{}", err);
+        assert!(msg.contains("unknown option -X"), "msg was: {}", msg);
     }
 }
