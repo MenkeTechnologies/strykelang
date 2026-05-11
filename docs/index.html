@@ -149,7 +149,7 @@
             <span class="sep">/</span>
             <a href="https://docs.rs/strykelang" target="_blank" rel="noopener noreferrer">docs.rs</a>
           </nav>
-          <p class="docs-build-line" id="strykeBuildLine">stryke v0.13.1 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 8,564 builtins (9,176 spellings)</p>
+          <p class="docs-build-line" id="strykeBuildLine">stryke v0.13.4 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 8,564 builtins (9,176 spellings)</p>
         </div>
         <div class="tutorial-toolbar">
           <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -378,6 +378,12 @@ s 'p to_yaml read_json "data.json"'</pre>
         <h3>~p&gt; chunk-parallel — top-N highlights</h3>
         <div class="oneliner">s 'my $h = ~p&gt; c("**.stk") letters freq; p (sort { $h-&gt;{$_1} &lt;=&gt; $h-&gt;{$_0} } keys %$h)[0..4]'  <span class="comment"># top 5 letters across .stk</span></div>
         <div class="oneliner">s 'my $h = ~p&gt; c("**.stk") words freq; p (sort { $h-&gt;{$_1} &lt;=&gt; $h-&gt;{$_0} } keys %$h)[0..9]'   <span class="comment"># top 10 words across .stk</span></div>
+
+        <h3>~d&gt; distributed — same surface, chunks ship over ssh</h3>
+        <div class="oneliner">s 'my $c = cluster("build1:8","build2:16"); my @h = ~d&gt; on $c c("**.stk") map { sha_256(slurp_raw($_)) }; say scalar @h'  <span class="comment"># hash every .stk in parallel across two hosts</span></div>
+        <div class="oneliner">s 'my $c = cluster("h1:4","h2:4"); my @r = ~d&gt; on $c 1:1_000_000 map { $_ * 2 }; say "$r[0] .. $r[-1]"'  <span class="comment"># source-order preserved across slots</span></div>
+        <div class="oneliner">s 'my $c = cluster("h1:8"); my @r = ~d&gt; on $c @urls map { fetch($_) } ||&gt; uniq sort'  <span class="comment"># ||&gt; switches back to sequential after the distributed stage</span></div>
+        <div class="oneliner">STRYKE_CLUSTER_LOCAL_BIN=$(which stryke) s 'my $c = cluster("localhost:4"); my @r = ~d&gt; on $c 1:100 map { $_ + 100 }; say "@r[0..4]"'  <span class="comment"># loopback bypass — verify ~d&gt; without ssh keys</span></div>
 
         <h3>par { BLOCK } — generic chunk wrapper</h3>
         <div class="oneliner">s 'my @a = ~&gt; "Hello, World 123" par { letters }; p "@a"'                          <span class="comment"># H e l l o W o r l d — letters per chunk</span></div>
@@ -1246,8 +1252,9 @@ p $d-&gt;isa("Cat")                      <span class="comment"># ""  (false)</sp
           <li><strong>Crypto / compression</strong> — <code>sha256</code>, <code>hmac_sha256</code>, <code>jwt_encode</code>/<code>decode</code>, <code>gzip</code> / <code>gunzip</code> / <code>zstd</code>.</li>
           <li><strong>Standalone binaries</strong> — <code>s build SCRIPT -o OUT</code> bakes a script into a self-contained executable.</li>
           <li><strong>Inline Rust FFI</strong> — <code>rust { pub extern "C" fn ... }</code> blocks compile to a cdylib on first run, dlopen + register as Perl-callable subs.</li>
-          <li><strong>Bytecode cache</strong> — single rkyv shard at <code>~/.stryke/scripts.rkyv</code>, <code>mmap</code> + zero-copy <code>ArchivedHashMap</code> lookup, skips lex/parse/compile on warm starts. <strong>11x faster per-process</strong> than the old SQLite cache. Disable with <code>STRYKE_CACHE=0</code>. <a href="../docs/CACHE_RKYV_MIGRATION.md">Migration story &amp; benchmarks →</a></li>
-          <li><strong>Distributed compute</strong> — <code>cluster([...])</code> builds an SSH worker pool; <code>pmap_on $cluster { } @list</code> fans a map across persistent remote workers with fault tolerance.</li>
+          <li><strong>Bytecode cache</strong> — single rkyv shard at <code>~/.stryke/scripts.rkyv</code>, <code>mmap</code> + zero-copy <code>ArchivedHashMap</code> lookup, skips lex/parse/compile on warm starts. <strong>11x faster per-process</strong> than the old SQLite cache. <code>stryke test FILE</code> participates in the same cache so test reruns skip compile too. Disable with <code>STRYKE_CACHE=0</code>. <a href="../docs/CACHE_RKYV_MIGRATION.md">Migration story &amp; benchmarks →</a></li>
+          <li><strong>Interactive REPL</strong> — reedline-based, line history at <code>~/.stryke/history</code>, columnar tab completion for keywords / lexicals / sub names / arrow methods on blessed objects. Edit mode (emacs/vi) configured via <code>~/.stryke/config.toml</code> <code>[repl] mode = "vi"</code> or per-session via <code>STRYKE_REPL_MODE=vi</code>. The config file is auto-seeded on first launch with all keys commented (documents the schema; default behavior unchanged until you uncomment).</li>
+          <li><strong>Distributed compute</strong> — <code>cluster([...])</code> builds an SSH worker pool; <code>pmap_on $cluster { } @list</code> fans an element-wise map across persistent remote workers; <code>~d&gt; on $cluster SRC stages</code> ships chunks of <code>SRC</code> to remote slots and runs the full stage chain per chunk (the <code>~p&gt;</code> surface, distributed). Both share the same dispatcher: ssh-per-slot handshake once, JOB frames per item, per-job retry, order-preserving collect.</li>
           <li><strong>Shared state</strong> — <code>mysync</code> declares atomic variables safe to mutate from parallel workers.</li>
           <li><strong>Language server</strong> — <code>s lsp</code> (or <code>s --lsp</code>) runs an LSP server over stdio with diagnostics, hover, completion. The nine reflection hashes above are part of the completion surface.</li>
         </ul>
@@ -1573,8 +1580,8 @@ STRYKE_CACHE=0 stryke app.stk  <span class="comment"># disable caching for this 
             </tr>
             <tr>
               <td><strong>Distributed compute as primitive</strong></td>
-              <td><code>cluster([...])</code> &middot; <code>pmap_on $c { } @list</code></td>
-              <td>Multi-host SSH worker pool as a language-level value; <code>pmap_on</code> fans a parallel map across persistent remote workers with fault tolerance. Not a framework, not a library — a builtin pair.</td>
+              <td><code>cluster([...])</code> &middot; <code>pmap_on $c { } @list</code> &middot; <code>~d&gt; on $c SRC stages</code></td>
+              <td>Multi-host SSH worker pool as a language-level value. <code>pmap_on</code> fans a parallel map across persistent remote workers with fault tolerance; <code>~d&gt;</code> is the same chunk-block thread-macro surface as <code>~p&gt;</code> but each chunk ships to a remote slot for chunk-aware distributed pipelines. Not a framework, not a library — a builtin triple.</td>
             </tr>
             <tr>
               <td><strong>AOT script binary deployment</strong></td>

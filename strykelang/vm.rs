@@ -9667,6 +9667,21 @@ impl<'a> VM<'a> {
                     .unwrap_or(1);
                 Ok(PerlValue::barrier(PerlBarrier(Arc::new(Barrier::new(n)))))
             }
+            Some(BuiltinId::ClusterNew) => {
+                // `cluster(HOST...)` — accepts one operand (flattened) or
+                // multiple (each is a slot spec). Same surface as the
+                // tree-walker arm in `vm_helper.rs` `call_named_sub`'s
+                // "cluster" case so `pmap_on` / `~d>` see identical
+                // `RemoteCluster` values from either dispatch path.
+                let items = if args.len() == 1 {
+                    args[0].to_list()
+                } else {
+                    args.clone()
+                };
+                let c = crate::value::RemoteCluster::from_list_args(&items)
+                    .map_err(|msg| PerlError::runtime(msg, line))?;
+                Ok(PerlValue::remote_cluster(std::sync::Arc::new(c)))
+            }
             Some(BuiltinId::Pipeline) => {
                 let mut items = Vec::new();
                 for v in args {

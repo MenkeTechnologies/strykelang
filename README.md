@@ -52,7 +52,7 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - [\[0x0D\] Standalone Binaries (`stryke build`)](#0x0d-standalone-binaries-stryke-build)
 - [\[0x0E\] Inline Rust FFI (`rust { ... }`)](#0x0e-inline-rust-ffi-rust-----)
 - [\[0x0F\] Bytecode Cache (rkyv)](#0x0f-bytecode-cache-rkyv)
-- [\[0x10\] Distributed `pmap_on` over SSH (`cluster`)](#0x10-distributed-pmap_on-over-ssh-cluster)
+- [\[0x10\] Distributed `pmap_on` / `~d>` over SSH (`cluster`)](#0x10-distributed-pmap_on-over-ssh-cluster)
 - [\[0x10a\] Infrastructure Load Testing](#0x10a-infrastructure-load-testing)
 - [\[0x10b\] Agent/Controller Architecture](#0x10b-agentcontroller-architecture)
 - [\[0x11\] Language Server (`stryke lsp`)](#0x11-language-server-stryke-lsp)
@@ -2135,7 +2135,7 @@ PATH                                                      PROG KB    BC KB
 
 ---
 
-## [0x10] DISTRIBUTED `pmap_on` OVER SSH (`cluster`)
+## [0x10] DISTRIBUTED `pmap_on` / `~d>` OVER SSH (`cluster`)
 
 Distribute a `pmap`-style fan-out across many machines via SSH. The dispatcher spawns one persistent `stryke --remote-worker` process per slot, performs a HELLO + SESSION_INIT handshake **once** per slot, then streams JOB frames over the same stdin/stdout. Pairs perfectly with `stryke build`: ship one binary to N hosts, fan the workload across them.
 
@@ -2154,6 +2154,30 @@ my @hashes = @big_files |> pmap_on $cluster { slurp_raw |> sha_256) }
 # pflat_map_on for one-to-many mapping
 my @lines = @log_paths |> pflat_map_on $cluster { split /\n/, slurp }
 ```
+
+#### Distributed thread macro `~d>`
+
+`~d>` is `~p>` (the parallel-chunk thread-first macro) but with each chunk shipped to a cluster worker instead of a local rayon thread. Same chunk-block surface — stages operate on `@_` (the chunk's elements) and the results merge in source order via the existing `pmap_on` dispatcher (one persistent ssh process per slot, JOB frames over a shared work queue, per-job retry budget).
+
+```perl
+my $cluster = cluster("build1:8", "build2:16")
+
+# Distributed equivalent of `~p> @big_files map { sha_256(slurp_raw($_)) }`:
+my @hashes = ~d> on $cluster @big_files map { sha_256(slurp_raw($_)) }
+
+# Source-order is preserved even though chunks finish out of order on remote
+# workers — the dispatcher tracks per-chunk seq numbers and merges by index.
+my @doubled = ~d> on $cluster 1:1_000_000 map { $_ * 2 }
+say "$doubled[0] .. $doubled[-1]"        # 2 .. 2000000
+```
+
+The `on $cluster` operand is required — no implicit default cluster in v1. Trailing `||>` / `|then|` boundary marker switches back to a sequential `~>` continuation operating on the auto-merged result, identical to `~p>`'s split-boundary semantics:
+
+```perl
+~d> on $cluster @urls map { fetch($_) } ||> uniq sort
+```
+
+For tests / debugging without an SSH host, `STRYKE_CLUSTER_LOCAL_BIN=/path/to/stryke` makes the cluster dispatcher spawn the worker locally instead of going through `ssh`. Slot `host` fields are ignored when this is set; useful for CI fixtures and single-machine end-to-end smoke tests.
 
 #### Cluster syntax
 

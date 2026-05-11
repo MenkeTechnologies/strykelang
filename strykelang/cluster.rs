@@ -347,21 +347,37 @@ impl SlotSession {
         init: &SessionInit,
         cluster: &RemoteCluster,
     ) -> Result<Self, String> {
-        // ssh -o ConnectTimeout=N HOST PE_PATH --remote-worker
-        let connect_timeout = (cluster.connect_timeout_ms / 1000).max(1);
-        let mut child = Command::new("ssh")
-            .arg("-o")
-            .arg(format!("ConnectTimeout={connect_timeout}"))
-            .arg("-o")
-            .arg("BatchMode=yes")
-            .arg(&slot.host)
-            .arg(&slot.pe_path)
-            .arg("--remote-worker")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| format!("spawn ssh: {e}"))?;
+        // Test-only bypass: `STRYKE_CLUSTER_LOCAL_BIN=path/to/stryke`
+        // spawns the worker locally instead of going through ssh. Used by
+        // the `~d>` and `pmap_on` test fixtures so we exercise the full
+        // session handshake + JOB-frame wire without requiring an sshd /
+        // ssh keys in CI. Slot `host` is ignored when this is set.
+        let local_override = std::env::var_os("STRYKE_CLUSTER_LOCAL_BIN");
+        let mut child = if let Some(bin) = local_override {
+            Command::new(bin)
+                .arg("--remote-worker")
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .map_err(|e| format!("spawn local worker: {e}"))?
+        } else {
+            // ssh -o ConnectTimeout=N HOST PE_PATH --remote-worker
+            let connect_timeout = (cluster.connect_timeout_ms / 1000).max(1);
+            Command::new("ssh")
+                .arg("-o")
+                .arg(format!("ConnectTimeout={connect_timeout}"))
+                .arg("-o")
+                .arg("BatchMode=yes")
+                .arg(&slot.host)
+                .arg(&slot.pe_path)
+                .arg("--remote-worker")
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .map_err(|e| format!("spawn ssh: {e}"))?
+        };
         let mut stdin = child
             .stdin
             .take()

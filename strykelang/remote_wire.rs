@@ -285,10 +285,31 @@ pub fn perl_to_json_value(v: &PerlValue) -> Result<serde_json::Value, String> {
         }
         return Ok(serde_json::Value::Array(out));
     }
+    // Arrayref / hashref carry the same shape as flat array / hash for
+    // JSON — there's no ref/value distinction over the wire. Without this
+    // branch a stage block that ends in `[ ... ]` (used by `~d>` to keep
+    // list shape across the worker's scalar-return boundary) would fail
+    // with "value not supported for remote pmap".
+    if let Some(ar) = v.as_array_ref() {
+        let guard = ar.read();
+        let mut out = Vec::with_capacity(guard.len());
+        for x in guard.iter() {
+            out.push(perl_to_json_value(x)?);
+        }
+        return Ok(serde_json::Value::Array(out));
+    }
     if let Some(h) = v.as_hash_map() {
         let mut m = serde_json::Map::new();
         for (k, val) in h {
             m.insert(k.clone(), perl_to_json_value(&val)?);
+        }
+        return Ok(serde_json::Value::Object(m));
+    }
+    if let Some(hr) = v.as_hash_ref() {
+        let guard = hr.read();
+        let mut m = serde_json::Map::new();
+        for (k, val) in guard.iter() {
+            m.insert(k.clone(), perl_to_json_value(val)?);
         }
         return Ok(serde_json::Value::Object(m));
     }

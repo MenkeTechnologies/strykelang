@@ -1940,6 +1940,20 @@ impl Lexer {
                     self.last_was_term = false;
                     return Ok(Token::ThreadArrowPar);
                 }
+                // `~d>` (distributed thread-first) / `~d>>` (thread-last) —
+                // mirrors `~p>` but each chunk is shipped to a remote worker
+                // on a cluster. Syntax: `~d> on $cluster SOURCE stages...`.
+                if self.peek() == Some('d') && self.peek_at(1) == Some('>') {
+                    self.advance(); // consume 'd'
+                    self.advance(); // consume first '>'
+                    if self.peek() == Some('>') {
+                        self.advance(); // consume second '>'
+                        self.last_was_term = false;
+                        return Ok(Token::ThreadArrowDistLast);
+                    }
+                    self.last_was_term = false;
+                    return Ok(Token::ThreadArrowDist);
+                }
                 self.last_was_term = false;
                 Ok(Token::BitNot)
             }

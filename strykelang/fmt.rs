@@ -1176,6 +1176,16 @@ pub fn format_expr(e: &Expr) -> String {
                 format_expr(list)
             ),
         },
+        ExprKind::DistReduceExpr {
+            cluster,
+            extract_block,
+            list,
+        } => format!(
+            "dist_reduce on {} {{ {} }} {}",
+            format_expr(cluster),
+            format_block_inline(extract_block),
+            format_expr(list)
+        ),
         ExprKind::PForExpr {
             block,
             list,

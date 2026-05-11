@@ -1017,6 +1017,13 @@ pub enum BuiltinId {
     Pselect,
     /// `barrier(N)` — thread barrier (`->wait`).
     BarrierNew,
+    /// `cluster(HOST_OR_LIST...)` — build a `RemoteCluster` value used as
+    /// the dispatch target by `pmap_on` / `~d>`. Operand shapes match
+    /// `RemoteCluster::from_list_args`: bare host (`"h1"`), host with
+    /// slot count (`"h1:4"`), host with explicit `pe_path`
+    /// (`"h1:3:/usr/local/bin/stryke"`), or a hash with tunables
+    /// (`{ job_timeout_ms => N, max_attempts => M, ... }`).
+    ClusterNew,
     /// `par_pipeline(...)` — list form: same as `pipeline` but parallel `filter`/`map` on `collect()`.
     ParPipeline,
     /// `glob_par(..., progress => EXPR)` — last stack arg is truthy progress flag.
