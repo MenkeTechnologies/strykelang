@@ -1,4 +1,4 @@
-// Batch 60 — actuarial science (Bowers et al., "Actuarial Mathematics" 2nd ed.):
+// actuarial science (Bowers et al., "Actuarial Mathematics" 2nd ed.):
 // life-table operations, annuity / insurance values, premiums, reserves,
 // credibility, ruin theory, run-off triangles.
 

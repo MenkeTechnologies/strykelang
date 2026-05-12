@@ -1,4 +1,4 @@
-// Batch 82 — High-utility primitives: time math (ISO 8601, business days, RRULE,
+// High-utility primitives: time math (ISO 8601, business days, RRULE,
 // liturgical), color spaces, validation checksums, KDE bandwidth + kernels.
 
 fn b82_to_floats(v: &StrykeValue) -> Vec<f64> {

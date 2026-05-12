@@ -1,4 +1,4 @@
-// Batch 48 — database internals, distributed systems, consensus, sketches.
+// database internals, distributed systems, consensus, sketches.
 
 fn b48_to_floats(v: &StrykeValue) -> Vec<f64> {
     arg_to_vec(v).iter().map(|x| x.to_number()).collect()

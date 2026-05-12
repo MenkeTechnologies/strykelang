@@ -1,4 +1,4 @@
-// Batch 35 — cryptanalysis, number theory deep, factorization, modular arithmetic.
+// cryptanalysis, number theory deep, factorization, modular arithmetic.
 
 // Modular exponentiation a^b mod n (i64-safe via u128)
 

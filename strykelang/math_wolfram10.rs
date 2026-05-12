@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Batch 10 — figurate / OEIS sequences, set-theoretic operations,
+// figurate / OEIS sequences, set-theoretic operations,
 // polynomial root-finding (Durand-Kerner, Lin-Bairstow), classic data-structure
 // algorithms (heap ops, segment tree, Fenwick), string-algorithm staples
 // (KMP failure function, Z-array, suffix array, Manacher, Rabin-Karp),

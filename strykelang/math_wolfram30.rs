@@ -1,4 +1,4 @@
-// Batch 30 — final mixed: astronomy, music, color, units, miscellaneous.
+// final mixed: astronomy, music, color, units, miscellaneous.
 
 // Distance modulus: m - M = 5 log10(d/10pc)
 // Apparent magnitude from absolute and distance

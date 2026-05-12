@@ -1,4 +1,4 @@
-// Batch 12 — physics/chemistry/biology/astronomy/engineering long tail.
+// physics/chemistry/biology/astronomy/engineering long tail.
 
 // ── Physics / classical ─────────────────────────────────────────────────────
 

@@ -1,4 +1,4 @@
-// Batch 57 — spreadsheet (Excel/Sheets) lookups + bond / loan financial math.
+// spreadsheet (Excel/Sheets) lookups + bond / loan financial math.
 
 fn b57_to_floats(v: &StrykeValue) -> Vec<f64> {
     arg_to_vec(v).iter().map(|x| x.to_number()).collect()

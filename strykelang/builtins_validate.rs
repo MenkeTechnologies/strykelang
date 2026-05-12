@@ -1,4 +1,4 @@
-//! Validation / input-check primitives (Phase 1, batch 5).
+//! Validation / input-check primitives.
 //!
 //! Every function takes `&[StrykeValue]` and returns `StrykeValue`.
 //! Predicates return `1` / `0` integers (stryke truthy/falsy). Format

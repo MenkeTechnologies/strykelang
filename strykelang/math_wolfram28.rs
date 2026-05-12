@@ -1,4 +1,4 @@
-// Batch 28 — geometry / topology / mesh / spatial.
+// geometry / topology / mesh / spatial.
 
 // Triangle area (Heron)
 fn builtin_triangle_area_heron(args: &[StrykeValue]) -> PerlResult<StrykeValue> {

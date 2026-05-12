@@ -1,4 +1,4 @@
-//! Batch 19: computer vision / image kernels, information retrieval,
+//! Computer vision / image kernels, information retrieval,
 //! distance metrics, Bayesian updates, RL primitives, color spaces,
 //! window functions, trie / Fenwick / union-find, network extras.
 

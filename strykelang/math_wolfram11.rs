@@ -1,4 +1,4 @@
-// Batch 11 — denser long-tail expansion: more sequences, more crypto helpers,
+// denser long-tail expansion: more sequences, more crypto helpers,
 // more linear algebra atoms, more stats, more probability, more strings.
 
 // ── Sequences ────────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-// Batch 39 — tensor calculus, GR, differential geometry, black holes, gravitational waves.
+// tensor calculus, GR, differential geometry, black holes, gravitational waves.
 
 fn b39_to_floats(v: &StrykeValue) -> Vec<f64> {
     arg_to_vec(v).iter().map(|x| x.to_number()).collect()

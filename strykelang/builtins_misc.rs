@@ -1,4 +1,4 @@
-//! Miscellaneous primitives (Phase 1, batch 9): BigInt ops + game/physics
+//! Miscellaneous primitives: BigInt ops + game/physics
 //! vectors + probabilistic data structures + audio synthesis basics +
 //! geo extras. Pure functions where possible; BigInt uses `num-bigint`.
 

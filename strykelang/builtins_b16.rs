@@ -1,4 +1,4 @@
-//! Batch 16: phonetic algorithms, geo projections, base58/base91,
+//! Phonetic algorithms, geo projections, base58/base91,
 //! astronomy, CRC variants, color blending, compression primitives.
 
 use crate::value::StrykeValue;

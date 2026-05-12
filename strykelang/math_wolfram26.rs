@@ -1,4 +1,4 @@
-// Batch 26 — cryptography deep: hash mixers, KDFs, PRNGs, ciphers, primality.
+// cryptography deep: hash mixers, KDFs, PRNGs, ciphers, primality.
 
 // FNV-1a 32-bit
 fn builtin_fnv1a_32(args: &[StrykeValue]) -> PerlResult<StrykeValue> {

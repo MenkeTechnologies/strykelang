@@ -1,4 +1,4 @@
-// Batch 41 — combinatorial optimization, graph algorithms, scheduling, packing.
+// combinatorial optimization, graph algorithms, scheduling, packing.
 
 fn b41_to_floats(v: &StrykeValue) -> Vec<f64> {
     arg_to_vec(v).iter().map(|x| x.to_number()).collect()

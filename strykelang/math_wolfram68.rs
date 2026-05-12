@@ -1,4 +1,4 @@
-// Batch 68 — compiler & parsing primitives: NFA/DFA conversion, regex builders,
+// compiler & parsing primitives: NFA/DFA conversion, regex builders,
 // LL/LR/LALR/Earley/PEG/Pratt parsers, SSA, dominators.
 
 fn b68_to_floats(v: &StrykeValue) -> Vec<f64> {

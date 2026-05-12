@@ -1,4 +1,4 @@
-// Batch 17 — sparse linear algebra, advanced geometry, more distributions.
+// sparse linear algebra, advanced geometry, more distributions.
 
 fn builtin_sparse_csr_build(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let m = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));

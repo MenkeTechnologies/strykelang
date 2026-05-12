@@ -976,7 +976,7 @@ pub(crate) fn try_builtin(
         "pfrequencies" | "pfreq" | "pfrq" => Some(builtin_pfrequencies(args)),
         "ddump" | "dd" => Some(builtin_ddump(args)),
         "perfview" | "pfv" => Some(builtin_perfview(args)),
-        // ── network / ip / cidr (Phase 1, batch 1: IP-address subset) ──
+        // ── network / ip / cidr (IP-address subset) ──
         "ip_parse" => Some(Ok(crate::builtins_net::ip_parse(args))),
         "ip_is_valid" => Some(Ok(crate::builtins_net::ip_is_valid(args))),
         "ip_version" => Some(Ok(crate::builtins_net::ip_version(args))),
@@ -1028,7 +1028,7 @@ pub(crate) fn try_builtin(
         "ipv6_teredo_extract" => Some(Ok(crate::builtins_net::ipv6_teredo_extract(args))),
         "ipv6_is_isatap" => Some(Ok(crate::builtins_net::ipv6_is_isatap(args))),
         "ipv6_isatap_extract" => Some(Ok(crate::builtins_net::ipv6_isatap_extract(args))),
-        // ── network / cidr (Phase 1, batch 2: CIDR math) ──
+        // ── network / cidr (CIDR math) ──
         "cidr_parse" => Some(Ok(crate::builtins_net::cidr_parse(args))),
         "cidr_valid_subnet" => Some(Ok(crate::builtins_net::cidr_valid_subnet(args))),
         "cidr_format" => Some(Ok(crate::builtins_net::cidr_format(args))),
@@ -1069,7 +1069,7 @@ pub(crate) fn try_builtin(
         "ip_random_in_cidr" => Some(Ok(crate::builtins_net::ip_random_in_cidr(args))),
         "cidr_compare" => Some(Ok(crate::builtins_net::cidr_compare(args))),
         "cidr_sort" => Some(Ok(crate::builtins_net::cidr_sort(args))),
-        // ── network / mac (Phase 1, batch 3: MAC address ops) ──
+        // ── network / mac (MAC address ops) ──
         "mac_parse" => Some(Ok(crate::builtins_net::mac_parse(args))),
         "mac_is_valid" => Some(Ok(crate::builtins_net::mac_is_valid(args))),
         "mac_normalize" => Some(Ok(crate::builtins_net::mac_normalize(args))),
@@ -1092,7 +1092,7 @@ pub(crate) fn try_builtin(
         "eui48_to_eui64" => Some(Ok(crate::builtins_net::eui48_to_eui64(args))),
         "eui64_to_eui48" => Some(Ok(crate::builtins_net::eui64_to_eui48(args))),
         "eui64_from_mac" => Some(Ok(crate::builtins_net::eui64_from_mac(args))),
-        // ── network / ports (Phase 1, batch 4a) ──
+        // ── network / ports ──
         "port_name" => Some(Ok(crate::builtins_net::port_name(args))),
         "port_is_well_known" => Some(Ok(crate::builtins_net::port_is_well_known(args))),
         "port_is_assigned" => Some(Ok(crate::builtins_net::port_is_assigned(args))),
@@ -1103,7 +1103,7 @@ pub(crate) fn try_builtin(
         "port_service_lookup" => Some(Ok(crate::builtins_net::port_service_lookup(args))),
         "port_parse_range" => Some(Ok(crate::builtins_net::port_parse_range(args))),
         "port_random_ephemeral" => Some(Ok(crate::builtins_net::port_random_ephemeral(args))),
-        // ── network / websocket (Phase 1, batch 4b) ──
+        // ── network / websocket ──
         "ws_handshake_key" => Some(Ok(crate::builtins_net::ws_handshake_key(args))),
         "ws_handshake_accept" => Some(Ok(crate::builtins_net::ws_handshake_accept(args))),
         "ws_mask" => Some(Ok(crate::builtins_net::ws_mask(args))),
@@ -1111,7 +1111,7 @@ pub(crate) fn try_builtin(
         "ws_frame_encode" => Some(Ok(crate::builtins_net::ws_frame_encode(args))),
         "ws_frame_decode" => Some(Ok(crate::builtins_net::ws_frame_decode(args))),
         "ws_close_frame" => Some(Ok(crate::builtins_net::ws_close_frame(args))),
-        // ── network / cookies (Phase 1, batch 4c) ──
+        // ── network / cookies ──
         "cookie_parse" => Some(Ok(crate::builtins_net::cookie_parse(args))),
         "cookie_format" => Some(Ok(crate::builtins_net::cookie_format(args))),
         "cookie_jar_new" => Some(Ok(crate::builtins_net::cookie_jar_new(args))),
@@ -1122,7 +1122,7 @@ pub(crate) fn try_builtin(
         "cookie_domain_matches" => Some(Ok(crate::builtins_net::cookie_domain_matches(args))),
         "cookie_path_matches" => Some(Ok(crate::builtins_net::cookie_path_matches(args))),
         "cookie_set_max_age" => Some(Ok(crate::builtins_net::cookie_set_max_age(args))),
-        // ── http / method / status / mime (Phase 1, batch 4d) ──
+        // ── http / method / status / mime ──
         "http_method_is_idempotent" => Some(Ok(crate::builtins_net::http_method_is_idempotent(args))),
         "http_method_is_safe" => Some(Ok(crate::builtins_net::http_method_is_safe(args))),
         "http_method_has_body" => Some(Ok(crate::builtins_net::http_method_has_body(args))),
@@ -1142,7 +1142,7 @@ pub(crate) fn try_builtin(
         "mime_is_audio" => Some(Ok(crate::builtins_net::mime_is_audio(args))),
         "mime_is_video" => Some(Ok(crate::builtins_net::mime_is_video(args))),
         "mime_is_application" => Some(Ok(crate::builtins_net::mime_is_application(args))),
-        // ── network / bandwidth / rtt (Phase 1, batch 4e) ──
+        // ── network / bandwidth / rtt ──
         "bandwidth_format" => Some(Ok(crate::builtins_net::bandwidth_format(args))),
         "bandwidth_parse" => Some(Ok(crate::builtins_net::bandwidth_parse(args))),
         "latency_ms" => Some(Ok(crate::builtins_net::latency_ms(args))),
@@ -1151,7 +1151,7 @@ pub(crate) fn try_builtin(
         "rtt_min" => Some(Ok(crate::builtins_net::rtt_min(args))),
         "rtt_max" => Some(Ok(crate::builtins_net::rtt_max(args))),
         "rtt_avg" => Some(Ok(crate::builtins_net::rtt_avg(args))),
-        // ── validation / input checks (Phase 1, batch 5) ──
+        // ── validation / input checks ──
         "is_alpha_only" => Some(Ok(crate::builtins_validate::is_alpha_only(args))),
         "is_alphanumeric_only" => Some(Ok(crate::builtins_validate::is_alphanumeric_only(args))),
         "is_numeric_only" => Some(Ok(crate::builtins_validate::is_numeric_only(args))),
@@ -1203,7 +1203,7 @@ pub(crate) fn try_builtin(
         "semver_increment_major" => Some(Ok(crate::builtins_validate::semver_increment_major(args))),
         "semver_increment_minor" => Some(Ok(crate::builtins_validate::semver_increment_minor(args))),
         "semver_increment_patch" => Some(Ok(crate::builtins_validate::semver_increment_patch(args))),
-        // ── math / number theory extras (Phase 1, batch 6a) ──
+        // ── math / number theory extras ──
         "extended_gcd" => Some(Ok(crate::builtins_mathx::extended_gcd(args))),
         "modinverse" => Some(Ok(crate::builtins_mathx::modinverse(args))),
         "modpow" => Some(Ok(crate::builtins_mathx::modpow(args))),
@@ -1229,7 +1229,7 @@ pub(crate) fn try_builtin(
         "perfect_number" => Some(Ok(crate::builtins_mathx::perfect_number(args))),
         "abundant" => Some(Ok(crate::builtins_mathx::abundant(args))),
         "deficient" => Some(Ok(crate::builtins_mathx::deficient(args))),
-        // ── random / sampling extras (Phase 1, batch 6b) ──
+        // ── random / sampling extras ──
         "random_bernoulli" => Some(Ok(crate::builtins_mathx::random_bernoulli(args))),
         "random_normal" => Some(Ok(crate::builtins_mathx::random_normal(args))),
         "random_lognormal" => Some(Ok(crate::builtins_mathx::random_lognormal(args))),
@@ -1246,7 +1246,7 @@ pub(crate) fn try_builtin(
         "seeded_rng" => Some(Ok(crate::builtins_mathx::seeded_rng(args))),
         "save_random_state" => Some(Ok(crate::builtins_mathx::save_random_state(args))),
         "restore_random_state" => Some(Ok(crate::builtins_mathx::restore_random_state(args))),
-        // ── complex / geom / color / trig (Phase 1, batch 7) ──
+        // ── complex / geom / color / trig ──
         "complex_new" => Some(Ok(crate::builtins_geom::complex_new(args))),
         "complex_real" => Some(Ok(crate::builtins_geom::complex_real(args))),
         "complex_imag" => Some(Ok(crate::builtins_geom::complex_imag(args))),
@@ -1331,7 +1331,7 @@ pub(crate) fn try_builtin(
         "cylindrical_to_cartesian" => Some(Ok(crate::builtins_geom::cylindrical_to_cartesian(args))),
         "cartesian_to_cylindrical" => Some(Ok(crate::builtins_geom::cartesian_to_cylindrical(args))),
         "versine_fn" => Some(Ok(crate::builtins_geom::versine_fn(args))),
-        // ── iterator + string-distance extras (Phase 1, batch 8) ──
+        // ── iterator + string-distance extras ──
         "triples" => Some(Ok(crate::builtins_iter::triples(args))),
         "n_tuples" => Some(Ok(crate::builtins_iter::n_tuples(args))),
         "peekable" => Some(Ok(crate::builtins_iter::peekable(args))),
@@ -5643,7 +5643,7 @@ pub(crate) fn try_builtin(
         }
         "golden_section" | "golden" | "gss" => Some(builtin_golden_section(interp, args, line)),
 
-        // ── Batch 3 callback-taking math builtins ─────────────────────────
+        // ── callback-taking math builtins ─────────────────────────
         "numerical_gradient" | "ngrad" => Some(builtin_numerical_gradient(interp, args, line)),
         "numerical_jacobian" | "njac" => Some(builtin_numerical_jacobian(interp, args, line)),
         "numerical_hessian" | "nhess" => Some(builtin_numerical_hessian(interp, args, line)),
@@ -5663,7 +5663,7 @@ pub(crate) fn try_builtin(
         }
         "adaptive_simpson" | "asimp" => Some(builtin_adaptive_simpson(interp, args, line)),
 
-        // ── Batch 4 callback-taking builtins ─────────────────────────────
+        // ── callback-taking builtins ─────────────────────────────
         "forward_diff" | "fdiff" => Some(builtin_forward_diff(interp, args, line)),
         "forward_diff_grad" | "fdiff_grad" => Some(builtin_forward_diff_grad(interp, args, line)),
         "rk45_dormand_prince" | "rk45" | "dopri5" => {
@@ -5673,7 +5673,7 @@ pub(crate) fn try_builtin(
         "heun_step" | "ode_heun" => Some(builtin_heun_step(interp, args, line)),
         "verlet_step" | "ode_verlet" => Some(builtin_verlet_step(interp, args, line)),
 
-        // ── Batch 5 callback-taking builtins ─────────────────────────────
+        // ── callback-taking builtins ─────────────────────────────
         "gauss_chebyshev_quad" | "gc_quad" => {
             Some(builtin_gauss_chebyshev_quad(interp, args, line))
         }
@@ -5696,7 +5696,7 @@ pub(crate) fn try_builtin(
             Some(builtin_finite_difference_5pt(interp, args, line))
         }
 
-        // ── Batch 6 callback-taking builtins ─────────────────────────────
+        // ── callback-taking builtins ─────────────────────────────
         "metropolis_hastings" | "mh_sampler" => {
             Some(builtin_metropolis_hastings(interp, args, line))
         }
@@ -5710,7 +5710,7 @@ pub(crate) fn try_builtin(
         "rk4" | "runge_kutta" | "rk4_ode" => Some(builtin_rk4(interp, args, line)),
         "euler_ode" | "euler_method" => Some(builtin_euler_ode(interp, args, line)),
 
-        // ── Batch 19 callback-taking builtins ────────────────────────────
+        // ── callback-taking builtins ────────────────────────────
         "boole_rule" | "boole_int" => Some(builtin_boole_rule(interp, args, line)),
         "gauss_legendre_5" | "gl5" => Some(builtin_gauss_legendre_5(interp, args, line)),
         "gauss_kronrod_15" | "gk15" => Some(builtin_gauss_kronrod_15(interp, args, line)),
@@ -6009,11 +6009,11 @@ pub(crate) fn try_builtin(
         "eta_quotient" => Some(builtin_eta_quotient(args)),
         "root_approximant" => Some(builtin_root_approximant(args)),
 
-        // ── Batch 3: optimization (no callback) ──────────────────────────
+        // ── optimization (no callback) ──────────────────────────
         "conjugate_gradient" | "cg_solve" => Some(builtin_conjugate_gradient(args)),
         "least_squares" | "lstsq" => Some(builtin_least_squares(args)),
 
-        // ── Batch 3: linear algebra extras ────────────────────────────────
+        // ── linear algebra extras ────────────────────────────────
         "lu_decompose" | "ludec" => Some(builtin_lu_decompose(args)),
         "qr_decompose" | "qrdec" => Some(builtin_qr_decompose(args)),
         "householder_reflector" => Some(builtin_householder_reflector(args)),
@@ -6022,14 +6022,14 @@ pub(crate) fn try_builtin(
         "back_substitute" | "backsub" => Some(builtin_back_substitute(args)),
         "hessenberg_reduce" | "hessen" => Some(builtin_hessenberg_reduce(args)),
 
-        // ── Batch 3: polynomial helpers ───────────────────────────────────
+        // ── polynomial helpers ───────────────────────────────────
         "poly_derivative" | "polyder" => Some(builtin_poly_derivative(args)),
         "poly_integrate" | "polyint" => Some(builtin_poly_integrate(args)),
         "poly_compose" => Some(builtin_poly_compose(args)),
         "poly_eval_horner" | "horner" => Some(builtin_poly_eval_horner(args)),
         "pade_approximant" | "pade" => Some(builtin_pade_approximant(args)),
 
-        // ── Batch 3: quaternions and 3D rotations ─────────────────────────
+        // ── quaternions and 3D rotations ─────────────────────────
         "quat_mul" => Some(builtin_quat_mul(args)),
         "quat_conj" => Some(builtin_quat_conj(args)),
         "quat_norm" => Some(builtin_quat_norm(args)),
@@ -6043,7 +6043,7 @@ pub(crate) fn try_builtin(
         "matrix_to_euler_zyx" => Some(builtin_matrix_to_euler_zyx(args)),
         "rotate_3d_vec" => Some(builtin_rotate_3d_vec(args)),
 
-        // ── Batch 3: information theory ───────────────────────────────────
+        // ── information theory ───────────────────────────────────
         "kl_divergence" | "kl_div" => Some(builtin_kl_divergence(args)),
         "js_divergence" | "js_div" => Some(builtin_js_divergence(args)),
         "mutual_information" | "mi" => Some(builtin_mutual_information(args)),
@@ -6051,7 +6051,7 @@ pub(crate) fn try_builtin(
         "renyi_entropy" => Some(builtin_renyi_entropy(args)),
         "tsallis_entropy" => Some(builtin_tsallis_entropy(args)),
 
-        // ── Batch 3: quantum primitives ──────────────────────────────────
+        // ── quantum primitives ──────────────────────────────────
         "pauli_x" => Some(builtin_pauli_x(args)),
         "pauli_y" => Some(builtin_pauli_y(args)),
         "pauli_z" => Some(builtin_pauli_z(args)),
@@ -6064,7 +6064,7 @@ pub(crate) fn try_builtin(
         "partial_trace" | "ptrace" => Some(builtin_partial_trace(args)),
         "von_neumann_entropy" | "vn_entropy" => Some(builtin_von_neumann_entropy(args)),
 
-        // ── Batch 3: stat mech ───────────────────────────────────────────
+        // ── stat mech ───────────────────────────────────────────
         "bose_einstein" => Some(builtin_bose_einstein(args)),
         "fermi_dirac" => Some(builtin_fermi_dirac(args)),
         "maxwell_boltzmann_speed" | "mb_speed" => Some(builtin_maxwell_boltzmann_speed(args)),
@@ -6073,7 +6073,7 @@ pub(crate) fn try_builtin(
         "boltzmann_factor" => Some(builtin_boltzmann_factor(args)),
         "einstein_specific_heat" | "einstein_cv" => Some(builtin_einstein_specific_heat(args)),
 
-        // ── Batch 3: optics ──────────────────────────────────────────────
+        // ── optics ──────────────────────────────────────────────
         "fresnel_reflection_te" => Some(builtin_fresnel_reflection_te(args)),
         "fresnel_reflection_tm" => Some(builtin_fresnel_reflection_tm(args)),
         "fresnel_transmission_te" => Some(builtin_fresnel_transmission_te(args)),
@@ -6082,7 +6082,7 @@ pub(crate) fn try_builtin(
         "abcd_free_space" => Some(builtin_abcd_free_space(args)),
         "gaussian_beam_q" => Some(builtin_gaussian_beam_q(args)),
 
-        // ── Batch 3: astrodynamics ───────────────────────────────────────
+        // ── astrodynamics ───────────────────────────────────────
         "kepler_solve" => Some(builtin_kepler_solve(args)),
         "true_to_eccentric" => Some(builtin_true_to_eccentric(args)),
         "eccentric_to_mean" => Some(builtin_eccentric_to_mean(args)),
@@ -6095,13 +6095,13 @@ pub(crate) fn try_builtin(
             Some(builtin_orbital_elements_to_state(args))
         }
 
-        // ── Batch 3: time series ─────────────────────────────────────────
+        // ── time series ─────────────────────────────────────────
         "kalman_step" | "kalman_filter" => Some(builtin_kalman_step(args)),
         "exponential_smoothing" | "exp_smooth" => Some(builtin_exponential_smoothing(args)),
         "holt_winters" => Some(builtin_holt_winters(args)),
         "arma_yw_fit" | "ar_yw" => Some(builtin_arma_yw_fit(args)),
 
-        // ── Batch 3: graph centrality ────────────────────────────────────
+        // ── graph centrality ────────────────────────────────────
         "pagerank" => Some(builtin_pagerank(args)),
         "betweenness_centrality" => Some(builtin_betweenness_centrality(args)),
         "closeness_centrality" => Some(builtin_closeness_centrality(args)),
@@ -6109,7 +6109,7 @@ pub(crate) fn try_builtin(
         "degree_centrality" => Some(builtin_degree_centrality(args)),
         "triangle_count" => Some(builtin_triangle_count(args)),
 
-        // ── Batch 3: random samplers ─────────────────────────────────────
+        // ── random samplers ─────────────────────────────────────
         "rgumbel" => Some(builtin_rgumbel(args)),
         "rfrechet" => Some(builtin_rfrechet(args)),
         "rrayleigh" => Some(builtin_rrayleigh(args)),
@@ -6117,12 +6117,12 @@ pub(crate) fn try_builtin(
         "rkumaraswamy" => Some(builtin_rkumaraswamy(args)),
         "rinverse_gamma" | "rinvgamma" => Some(builtin_rinverse_gamma(args)),
 
-        // ── Batch 3: 2D geometry ─────────────────────────────────────────
+        // ── 2D geometry ─────────────────────────────────────────
         "graham_scan" | "convex_hull_2d" => Some(builtin_graham_scan(args)),
         "line_line_intersect_2d" | "ll_intersect_2d" => Some(builtin_line_line_intersect_2d(args)),
         "point_segment_distance" | "p_seg_dist" => Some(builtin_point_segment_distance(args)),
 
-        // ── Batch 4: statistical tests ───────────────────────────────────
+        // ── statistical tests ───────────────────────────────────
         "bartlett_test" => Some(builtin_bartlett_test(args)),
         "levene_test" => Some(builtin_levene_test(args)),
         "fishers_exact_test_2x2" | "fishers_exact" => Some(builtin_fishers_exact_test_2x2(args)),
@@ -6138,7 +6138,7 @@ pub(crate) fn try_builtin(
         "ljung_box_test" | "ljung_box" => Some(builtin_ljung_box_test(args)),
         "durbin_watson_stat" | "durbin_watson" => Some(builtin_durbin_watson_stat(args)),
 
-        // ── Batch 4: distance metrics ────────────────────────────────────
+        // ── distance metrics ────────────────────────────────────
         "mahalanobis_distance" | "mahalanobis_dist" => Some(builtin_mahalanobis_distance(args)),
         "cosine_distance" => Some(builtin_cosine_distance(args)),
         "canberra_distance" => Some(builtin_canberra_distance(args)),
@@ -6146,7 +6146,7 @@ pub(crate) fn try_builtin(
         "l1_distance" => Some(builtin_manhattan_distance_w4(args)),
         "chi_squared_distance" => Some(builtin_chi_squared_distance(args)),
 
-        // ── Batch 4: more distributions ──────────────────────────────────
+        // ── more distributions ──────────────────────────────────
         "multivariate_normal_pdf" | "mvn_pdf" => Some(builtin_multivariate_normal_pdf(args)),
         "multivariate_normal_sample" | "rmvn" => Some(builtin_multivariate_normal_sample(args)),
         "dirichlet_pdf" => Some(builtin_dirichlet_pdf(args)),
@@ -6157,37 +6157,37 @@ pub(crate) fn try_builtin(
         "inverse_gaussian_sample" | "rwald" => Some(builtin_inverse_gaussian_sample(args)),
         "non_central_chi2_pdf" | "ncchi2_pdf" => Some(builtin_non_central_chi2_pdf(args)),
 
-        // ── Batch 4: matrix functions ────────────────────────────────────
+        // ── matrix functions ────────────────────────────────────
         "matrix_exp" | "expm" => Some(builtin_matrix_exp(args)),
         "matrix_log" | "logm" => Some(builtin_matrix_log(args)),
         "matrix_sqrt" | "sqrtm" => Some(builtin_matrix_sqrt(args)),
         "matrix_sin" | "sinm" => Some(builtin_matrix_sin(args)),
         "matrix_cos" | "cosm" => Some(builtin_matrix_cos(args)),
 
-        // ── Batch 4: GLM ─────────────────────────────────────────────────
+        // ── GLM ─────────────────────────────────────────────────
         "logistic_regression" | "logit_fit" => Some(builtin_logistic_regression(args)),
         "poisson_regression" => Some(builtin_poisson_regression(args)),
         "ridge_regression" | "ridge" => Some(builtin_ridge_regression(args)),
         "lasso_coord" | "lasso" => Some(builtin_lasso_coord(args)),
 
-        // ── Batch 4: bootstrap/resampling ────────────────────────────────
+        // ── bootstrap/resampling ────────────────────────────────
         "bootstrap_mean_ci" | "boot_mean_ci" => Some(builtin_bootstrap_mean_ci(args)),
         "jackknife_estimate" | "jackknife" => Some(builtin_jackknife_estimate(args)),
         "permutation_test_diff" | "perm_test_diff" => Some(builtin_permutation_test_diff(args)),
 
-        // ── Batch 4: time series extras ──────────────────────────────────
+        // ── time series extras ──────────────────────────────────
         "acf_at_lag" => Some(builtin_acf_at_lag(args)),
         "diff_op" => Some(builtin_diff_op(args)),
         "lag_op" => Some(builtin_lag_op(args)),
         "decompose_classical" | "decompose_ts" => Some(builtin_decompose_classical(args)),
 
-        // ── Batch 4: combinatorial generators ────────────────────────────
+        // ── combinatorial generators ────────────────────────────
         "combinations_list" => Some(builtin_combinations_list(args)),
         "permutations_list" => Some(builtin_permutations_list(args)),
         "cyclic_permutations" => Some(builtin_cyclic_permutations(args)),
         "subsets_of_size" => Some(builtin_subsets_of_size(args)),
 
-        // ── Batch 4: DP utilities ────────────────────────────────────────
+        // ── DP utilities ────────────────────────────────────────
         "longest_increasing_subseq" | "lis" => Some(builtin_longest_increasing_subseq(args)),
         "knapsack_01" | "knapsack" => Some(builtin_knapsack_01(args)),
         "subset_sum_target" | "subset_sum" => Some(builtin_subset_sum_target(args)),
@@ -6196,14 +6196,14 @@ pub(crate) fn try_builtin(
             Some(builtin_edit_distance_levenshtein(args))
         }
 
-        // ── Batch 4: ML metrics ──────────────────────────────────────────
+        // ── ML metrics ──────────────────────────────────────────
         "one_hot_encode" | "onehot" => Some(builtin_one_hot_encode(args)),
         "label_encode" => Some(builtin_label_encode(args)),
         "categorical_cross_entropy" | "cce" => Some(builtin_categorical_cross_entropy(args)),
         "classification_metrics" | "binary_metrics" => Some(builtin_classification_metrics(args)),
         "roc_auc" | "auroc" => Some(builtin_roc_auc(args)),
 
-        // ── Batch 4: DSP / image filters ─────────────────────────────────
+        // ── DSP / image filters ─────────────────────────────────
         "gaussian_blur_kernel" => Some(builtin_gaussian_blur_kernel(args)),
         "sobel_x" => Some(builtin_sobel_x(args)),
         "sobel_y" => Some(builtin_sobel_y(args)),
@@ -6211,18 +6211,18 @@ pub(crate) fn try_builtin(
         "prewitt_y" => Some(builtin_prewitt_y(args)),
         "laplacian_of_gaussian" | "log_kernel" => Some(builtin_laplacian_of_gaussian(args)),
 
-        // ── Batch 4: stochastic processes ────────────────────────────────
+        // ── stochastic processes ────────────────────────────────
         "brownian_path" | "wiener_path" => Some(builtin_brownian_path(args)),
         "geometric_brownian_path" | "gbm_path" => Some(builtin_geometric_brownian_path(args)),
         "poisson_process" => Some(builtin_poisson_process(args)),
         "random_walk_1d" => Some(builtin_random_walk_1d(args)),
 
-        // ── Batch 4: compression / info-theoretic ────────────────────────
+        // ── compression / info-theoretic ────────────────────────
         "lempel_ziv_complexity" | "lz_complexity" => Some(builtin_lempel_ziv_complexity(args)),
         "huffman_code_lengths" | "huffman" => Some(builtin_huffman_code_lengths(args)),
         "shannon_entropy_rate" | "block_entropy_rate" => Some(builtin_shannon_entropy_rate(args)),
 
-        // ── Batch 4: physics / quantum ───────────────────────────────────
+        // ── physics / quantum ───────────────────────────────────
         "planck_blackbody" | "blackbody" => Some(builtin_planck_blackbody(args)),
         "rayleigh_jeans" => Some(builtin_rayleigh_jeans(args)),
         "compton_shift" => Some(builtin_compton_shift(args)),
@@ -6231,7 +6231,7 @@ pub(crate) fn try_builtin(
             Some(builtin_hydrogen_radial_wavefunction(args))
         }
 
-        // ── Batch 4: number theory / algebra ─────────────────────────────
+        // ── number theory / algebra ─────────────────────────────
         "integer_log" | "ilog" => Some(builtin_integer_log(args)),
         "aks_primality" | "aks" => Some(builtin_aks_primality(args)),
         "elliptic_curve_add" | "ec_add" => Some(builtin_elliptic_curve_add(args)),
@@ -6240,17 +6240,17 @@ pub(crate) fn try_builtin(
             Some(builtin_bezout_coefficients(args))
         }
 
-        // ── Batch 5: CAS-lite ───────────────────────────────────────────
+        // ── CAS-lite ───────────────────────────────────────────
         "factor_quadratic" => Some(builtin_factor_quadratic(args)),
         "complete_square" => Some(builtin_complete_square(args)),
         "partial_fraction_simple" | "partial_fraction" => {
             Some(builtin_partial_fraction_simple(args))
         }
 
-        // ── Batch 5: optimization (no callback) ──────────────────────────
+        // ── optimization (no callback) ──────────────────────────
         "simplex_lp" | "lp_simplex" => Some(builtin_simplex_lp(args)),
 
-        // ── Batch 5: more distributions ──────────────────────────────────
+        // ── more distributions ──────────────────────────────────
         "gev_pdf" => Some(builtin_gev_pdf(args)),
         "gev_cdf" => Some(builtin_gev_cdf(args)),
         "gev_sample" | "rgev" => Some(builtin_gev_sample(args)),
@@ -6266,7 +6266,7 @@ pub(crate) fn try_builtin(
         "truncated_normal_pdf" => Some(builtin_truncated_normal_pdf(args)),
         "truncated_normal_sample" | "rtnorm" => Some(builtin_truncated_normal_sample(args)),
 
-        // ── Batch 5: clustering & dim reduction ──────────────────────────
+        // ── clustering & dim reduction ──────────────────────────
         "dbscan" => Some(builtin_dbscan(args)),
         "gmm_em_1d" | "gmm_1d" => Some(builtin_gmm_em_1d(args)),
         "silhouette_score" => Some(builtin_silhouette_score(args)),
@@ -6275,7 +6275,7 @@ pub(crate) fn try_builtin(
         "mds_2d" | "pcoa_2d" => Some(builtin_mds_2d(args)),
         "mean_shift" => Some(builtin_mean_shift(args)),
 
-        // ── Batch 5: NN primitives ───────────────────────────────────────
+        // ── NN primitives ───────────────────────────────────────
         "batch_norm" => Some(builtin_batch_norm(args)),
         "layer_norm" => Some(builtin_layer_norm(args)),
         "dropout_mask" => Some(builtin_dropout_mask(args)),
@@ -6286,31 +6286,31 @@ pub(crate) fn try_builtin(
         "glorot_init" | "xavier_init" => Some(builtin_glorot_init(args)),
         "he_init" | "kaiming_init" => Some(builtin_he_init(args)),
 
-        // ── Batch 5: time series advanced ────────────────────────────────
+        // ── time series advanced ────────────────────────────────
         "ewma" => Some(builtin_ewma(args)),
         "ccf" => Some(builtin_ccf(args)),
         "periodogram" => Some(builtin_periodogram(args)),
         "welch_psd" | "welch" => Some(builtin_welch_psd(args)),
         "lag_features" => Some(builtin_lag_features(args)),
 
-        // ── Batch 5: image processing ────────────────────────────────────
+        // ── image processing ────────────────────────────────────
         "median_filter_2d" => Some(builtin_median_filter_2d(args)),
         "threshold_otsu" | "otsu" => Some(builtin_threshold_otsu(args)),
         "histogram_equalize" | "hist_eq" => Some(builtin_histogram_equalize(args)),
         "erode_2d" => Some(builtin_erode_2d(args)),
         "dilate_2d" => Some(builtin_dilate_2d(args)),
 
-        // ── Batch 5: losses ──────────────────────────────────────────────
+        // ── losses ──────────────────────────────────────────────
         "mse_loss" => Some(builtin_mse_loss(args)),
         "mae_loss" => Some(builtin_mae_loss(args)),
         "huber_loss" => Some(builtin_huber_loss(args)),
 
-        // ── Batch 5: spatial / geographic ────────────────────────────────
+        // ── spatial / geographic ────────────────────────────────
         "vincenty_distance" | "vincenty" => Some(builtin_vincenty_distance(args)),
         "mercator_project" => Some(builtin_mercator_project(args)),
         "destination_from_bearing" | "dest_bearing" => Some(builtin_destination_from_bearing(args)),
 
-        // ── Batch 5: integer sequences ───────────────────────────────────
+        // ── integer sequences ───────────────────────────────────
         "recaman" | "recaman_seq" => Some(builtin_recaman(args)),
         "sylvester" | "sylvester_seq" => Some(builtin_sylvester(args)),
         "happy_q" | "is_happy" => Some(builtin_happy_q(args)),
@@ -6318,7 +6318,7 @@ pub(crate) fn try_builtin(
         "aliquot_sequence" => Some(builtin_aliquot_sequence(args)),
         "magic_constant" => Some(builtin_magic_constant(args)),
 
-        // ── Batch 5: graph metrics ───────────────────────────────────────
+        // ── graph metrics ───────────────────────────────────────
         "clustering_coefficient_local" | "cc_local" => {
             Some(builtin_clustering_coefficient_local(args))
         }
@@ -6333,7 +6333,7 @@ pub(crate) fn try_builtin(
             Some(builtin_preferential_attachment_score(args))
         }
 
-        // ── Batch 5: 3-D geometry ────────────────────────────────────────
+        // ── 3-D geometry ────────────────────────────────────────
         "triangle_3d_normal" => Some(builtin_triangle_3d_normal(args)),
         "triangle_3d_area" => Some(builtin_triangle_3d_area(args)),
         "tetrahedron_volume" => Some(builtin_tetrahedron_volume(args)),
@@ -6343,75 +6343,75 @@ pub(crate) fn try_builtin(
         "ray_sphere_intersect" => Some(builtin_ray_sphere_intersect(args)),
         "aabb_overlap" => Some(builtin_aabb_overlap(args)),
 
-        // ── Batch 5: classical iterative solvers ─────────────────────────
+        // ── classical iterative solvers ─────────────────────────
         "gauss_seidel" => Some(builtin_gauss_seidel(args)),
         "jacobi_iteration" | "jacobi_solve" => Some(builtin_jacobi_iteration(args)),
         "sor_solve" | "sor" => Some(builtin_sor_solve(args)),
         "thomas_tridiag_solve" | "thomas" => Some(builtin_thomas_tridiag_solve(args)),
 
-        // ── Batch 5: algebraic / crypto ──────────────────────────────────
+        // ── algebraic / crypto ──────────────────────────────────
         "tonelli_shanks_sqrt" | "tonelli_shanks" => Some(builtin_tonelli_shanks_sqrt(args)),
         "baby_step_giant_step" | "bsgs" => Some(builtin_baby_step_giant_step(args)),
         "pollard_rho_factor" | "pollard_rho" => Some(builtin_pollard_rho_factor(args)),
         "modular_lcm" | "mlcm" => Some(builtin_modular_lcm(args)),
         "crt_general" | "crt_arbitrary" => Some(builtin_crt_general(args)),
 
-        // ── Batch 5: physics / chemistry ─────────────────────────────────
+        // ── physics / chemistry ─────────────────────────────────
         "van_der_waals_p" | "vdw_pressure" => Some(builtin_van_der_waals_p(args)),
         "nernst_equation" | "nernst" => Some(builtin_nernst_equation(args)),
         "arrhenius_rate" | "arrhenius" => Some(builtin_arrhenius_rate(args)),
         "reduced_mass" => Some(builtin_reduced_mass(args)),
         "ph_to_concentration" | "ph_to_h" => Some(builtin_ph_to_concentration(args)),
 
-        // ── Batch 6: SDE non-callback ────────────────────────────────────
+        // ── SDE non-callback ────────────────────────────────────
         "ornstein_uhlenbeck_path" | "ou_path" => Some(builtin_ornstein_uhlenbeck_path(args)),
 
-        // ── Batch 6: HMM ─────────────────────────────────────────────────
+        // ── HMM ─────────────────────────────────────────────────
         "hmm_forward" => Some(builtin_hmm_forward(args)),
         "hmm_viterbi" => Some(builtin_hmm_viterbi(args)),
         "hmm_backward" => Some(builtin_hmm_backward(args)),
 
-        // ── Batch 6: survival ────────────────────────────────────────────
+        // ── survival ────────────────────────────────────────────
         "kaplan_meier" | "km_estimator" => Some(builtin_kaplan_meier(args)),
         "log_rank_test" => Some(builtin_log_rank_test(args)),
 
-        // ── Batch 6: alignment ───────────────────────────────────────────
+        // ── alignment ───────────────────────────────────────────
         "needleman_wunsch" | "nw_align" => Some(builtin_needleman_wunsch(args)),
         "smith_waterman" | "sw_align" => Some(builtin_smith_waterman(args)),
 
-        // ── Batch 6: chemistry ───────────────────────────────────────────
+        // ── chemistry ───────────────────────────────────────────
         "gibbs_free_energy" | "delta_g" => Some(builtin_gibbs_free_energy(args)),
         "henderson_hasselbalch" | "hh_eq" => Some(builtin_henderson_hasselbalch(args)),
         "radioactive_decay" => Some(builtin_radioactive_decay(args)),
         "half_life_to_constant" | "hl_to_lambda" => Some(builtin_half_life_to_constant(args)),
 
-        // ── Batch 6: control theory ──────────────────────────────────────
+        // ── control theory ──────────────────────────────────────
         "pid_step" => Some(builtin_pid_step(args)),
         "transfer_function_eval" | "tf_eval" => Some(builtin_transfer_function_eval(args)),
         "bode_magnitude_db" | "bode_mag_db" => Some(builtin_bode_magnitude_db(args)),
         "bode_phase_deg" | "bode_phase" => Some(builtin_bode_phase_deg(args)),
         "lqr_2x2" => Some(builtin_lqr_2x2(args)),
 
-        // ── Batch 6: game theory ─────────────────────────────────────────
+        // ── game theory ─────────────────────────────────────────
         "nash_eq_2x2" | "nash_2x2" => Some(builtin_nash_eq_2x2(args)),
         "shapley_value" => Some(builtin_shapley_value(args)),
         "expected_utility" => Some(builtin_expected_utility(args)),
 
-        // ── Batch 6: operations research ─────────────────────────────────
+        // ── operations research ─────────────────────────────────
         "hungarian_assignment" | "hungarian" => Some(builtin_hungarian_assignment(args)),
         "tsp_nearest_neighbor" | "tsp_nn" => Some(builtin_tsp_nearest_neighbor(args)),
         "vertex_cover_2approx" | "vc_2approx" => Some(builtin_vertex_cover_2approx(args)),
 
-        // ── Batch 6: PDE non-callback (laplace 2D Jacobi) ────────────────
+        // ── PDE non-callback (laplace 2D Jacobi) ────────────────
         "laplace_2d_jacobi" | "laplace_jacobi" => Some(builtin_laplace_2d_jacobi(args)),
 
-        // ── Batch 6: Bayesian conjugate ──────────────────────────────────
+        // ── Bayesian conjugate ──────────────────────────────────
         "beta_binomial_update" => Some(builtin_beta_binomial_update(args)),
         "normal_normal_update" => Some(builtin_normal_normal_update(args)),
         "gamma_poisson_update" => Some(builtin_gamma_poisson_update(args)),
         "dirichlet_multinomial_update" => Some(builtin_dirichlet_multinomial_update(args)),
 
-        // ── Batch 6: quantum gates ───────────────────────────────────────
+        // ── quantum gates ───────────────────────────────────────
         "hadamard_gate" | "h_gate" => Some(builtin_hadamard_gate(args)),
         "cnot_gate" | "cx_gate" => Some(builtin_cnot_gate(args)),
         "swap_gate" => Some(builtin_swap_gate(args)),
@@ -6421,67 +6421,67 @@ pub(crate) fn try_builtin(
         "s_gate" => Some(builtin_s_gate(args)),
         "t_gate" => Some(builtin_t_gate(args)),
 
-        // ── Batch 6: splines ─────────────────────────────────────────────
+        // ── splines ─────────────────────────────────────────────
         "bezier_eval" => Some(builtin_bezier_eval(args)),
         "catmull_rom_eval" | "cmr_eval" => Some(builtin_catmull_rom_eval(args)),
         "cubic_hermite_eval" | "ch_eval" => Some(builtin_cubic_hermite_eval(args)),
         "bspline_basis" | "nik_basis" => Some(builtin_bspline_basis(args)),
 
-        // ── Batch 6: music ───────────────────────────────────────────────
+        // ── music ───────────────────────────────────────────────
         "freq_to_midi" => Some(builtin_freq_to_midi(args)),
         "midi_to_freq" => Some(builtin_midi_to_freq(args)),
         "equal_temperament_freq" => Some(builtin_equal_temperament_freq(args)),
         "cents_difference" | "cents_diff" => Some(builtin_cents_difference(args)),
 
-        // ── Batch 6: astronomy ───────────────────────────────────────────
+        // ── astronomy ───────────────────────────────────────────
         "redshift_z" => Some(builtin_redshift_z(args)),
         "hubble_distance" => Some(builtin_hubble_distance(args)),
         "luminosity_distance" => Some(builtin_luminosity_distance(args)),
 
-        // ── Batch 6: fluid dynamics ──────────────────────────────────────
+        // ── fluid dynamics ──────────────────────────────────────
         "reynolds_number" => Some(builtin_reynolds_number(args)),
         "mach_number" => Some(builtin_mach_number(args)),
         "prandtl_number" => Some(builtin_prandtl_number(args)),
         "bernoulli_velocity" => Some(builtin_bernoulli_velocity(args)),
 
-        // ── Batch 6: more distributions ──────────────────────────────────
+        // ── more distributions ──────────────────────────────────
         "negative_binomial_pmf" | "nb_pmf" => Some(builtin_negative_binomial_pmf(args)),
         "hypergeometric_pmf" => Some(builtin_hypergeometric_pmf(args)),
         "beta_binomial_pmf" | "bb_pmf" => Some(builtin_beta_binomial_pmf(args)),
         "von_mises_pdf" | "vmf_pdf" => Some(builtin_von_mises_pdf(args)),
 
-        // ── Batch 6: random graphs ───────────────────────────────────────
+        // ── random graphs ───────────────────────────────────────
         "erdos_renyi_random" | "erdos_renyi" => Some(builtin_erdos_renyi_random(args)),
         "barabasi_albert_random" | "barabasi_albert" => Some(builtin_barabasi_albert_random(args)),
         "watts_strogatz_random" | "watts_strogatz" => Some(builtin_watts_strogatz_random(args)),
 
-        // ── Batch 6: color science ───────────────────────────────────────
+        // ── color science ───────────────────────────────────────
         "rgb_to_lab" => Some(builtin_rgb_to_lab(args)),
         "lab_to_rgb" => Some(builtin_lab_to_rgb(args)),
         "kelvin_to_rgb" | "color_temp_rgb" => Some(builtin_kelvin_to_rgb(args)),
 
-        // ── Batch 6: integer sequences ───────────────────────────────────
+        // ── integer sequences ───────────────────────────────────
         "bell_triangle" => Some(builtin_bell_triangle(args)),
         "surjection_count" => Some(builtin_surjection_count(args)),
         "distinct_partition_count" | "q_partition" => Some(builtin_distinct_partition_count(args)),
         "fibonacci_q" | "is_fib_number" => Some(builtin_fibonacci_q(args)),
 
-        // ── Batch 7: stats corrections ───────────────────────────────────
+        // ── stats corrections ───────────────────────────────────
         "bonferroni_correction" | "bonferroni" => Some(builtin_bonferroni_correction(args)),
         "benjamini_hochberg" | "bh_fdr" => Some(builtin_benjamini_hochberg(args)),
         "tukey_hsd" => Some(builtin_tukey_hsd(args)),
 
-        // ── Batch 7: divergences ─────────────────────────────────────────
+        // ── divergences ─────────────────────────────────────────
         "hellinger_distance" => Some(builtin_hellinger_distance(args)),
         "wasserstein_1d" | "earth_movers_1d" => Some(builtin_wasserstein_1d(args)),
         "chi_squared_divergence" => Some(builtin_chi_squared_divergence(args)),
 
-        // ── Batch 7: more distributions ──────────────────────────────────
+        // ── more distributions ──────────────────────────────────
         "beta_geometric_pmf" => Some(builtin_beta_geometric_pmf(args)),
         "generalized_gamma_pdf" | "gengamma_pdf" => Some(builtin_generalized_gamma_pdf(args)),
         "zip_pmf" | "zero_inflated_poisson_pmf" => Some(builtin_zip_pmf(args)),
 
-        // ── Batch 7: physics ─────────────────────────────────────────────
+        // ── physics ─────────────────────────────────────────────
         "stefan_boltzmann_luminosity" | "stellar_luminosity" => {
             Some(builtin_stefan_boltzmann_luminosity(args))
         }
@@ -6491,27 +6491,27 @@ pub(crate) fn try_builtin(
         "parallax_to_distance" => Some(builtin_parallax_to_distance(args)),
         "hawking_temperature" => Some(builtin_hawking_temperature(args)),
 
-        // ── Batch 7: astronomy ───────────────────────────────────────────
+        // ── astronomy ───────────────────────────────────────────
         "roche_limit" => Some(builtin_roche_limit(args)),
         "apparent_magnitude" => Some(builtin_apparent_magnitude(args)),
         "distance_modulus" => Some(builtin_distance_modulus(args)),
 
-        // ── Batch 7: chemistry ───────────────────────────────────────────
+        // ── chemistry ───────────────────────────────────────────
         "beer_lambert" | "absorbance" => Some(builtin_beer_lambert(args)),
         "rate_law_n" => Some(builtin_rate_law_n(args)),
         "freezing_point_depression" | "fpd" => Some(builtin_freezing_point_depression(args)),
 
-        // ── Batch 7: game theory ─────────────────────────────────────────
+        // ── game theory ─────────────────────────────────────────
         "mixed_nash_2x2" => Some(builtin_mixed_nash_2x2(args)),
         "minimax_2x2" => Some(builtin_minimax_2x2(args)),
 
-        // ── Batch 7: graphics ────────────────────────────────────────────
+        // ── graphics ────────────────────────────────────────────
         "barycentric_coords_2d" | "barycentric_2d" => Some(builtin_barycentric_coords_2d(args)),
         "bresenham_line" => Some(builtin_bresenham_line(args)),
         "bilinear_interp_2d" => Some(builtin_bilinear_interp_2d(args)),
         "point_in_polygon_2d" => Some(builtin_point_in_polygon_2d(args)),
 
-        // ── Batch 7: DSP ─────────────────────────────────────────────────
+        // ── DSP ─────────────────────────────────────────────────
         "hilbert_transform" => Some(builtin_hilbert_transform(args)),
         "cepstrum" => Some(builtin_cepstrum(args)),
         "butterworth_lowpass_coeffs" | "butter_lp" => {
@@ -6520,51 +6520,51 @@ pub(crate) fn try_builtin(
         "savitzky_golay_coeffs" | "sg_coeffs" => Some(builtin_savitzky_golay_coeffs(args)),
         "savitzky_golay_filter" | "sg_filter" => Some(builtin_savitzky_golay_filter(args)),
 
-        // ── Batch 7: image processing ────────────────────────────────────
+        // ── image processing ────────────────────────────────────
         "canny_edge_intensity" | "canny_intensity" => Some(builtin_canny_edge_intensity(args)),
         "bilateral_filter_basic" | "bilateral_filter" => Some(builtin_bilateral_filter_basic(args)),
 
-        // ── Batch 7: clustering ──────────────────────────────────────────
+        // ── clustering ──────────────────────────────────────────
         "kmeans_pp_init" | "kpp_init" => Some(builtin_kmeans_pp_init(args)),
         "elbow_score" | "wcss" => Some(builtin_elbow_score(args)),
 
-        // ── Batch 7: combinatorics ───────────────────────────────────────
+        // ── combinatorics ───────────────────────────────────────
         "young_tableaux_count" | "syt_count" => Some(builtin_young_tableaux_count(args)),
         "euler_alt_permutation" | "euler_zigzag" => Some(builtin_euler_alt_permutation(args)),
         "genocchi_number" => Some(builtin_genocchi_number(args)),
         "lattice_paths_count" => Some(builtin_lattice_paths_count(args)),
 
-        // ── Batch 7: number theory extras ────────────────────────────────
+        // ── number theory extras ────────────────────────────────
         "tetration" => Some(builtin_tetration(args)),
         "ackermann_limited" | "ackermann" => Some(builtin_ackermann_limited(args)),
         "perfect_power_q" => Some(builtin_perfect_power_q(args)),
         "b_smooth_q" => Some(builtin_b_smooth_q(args)),
 
-        // ── Batch 7: network metrics ─────────────────────────────────────
+        // ── network metrics ─────────────────────────────────────
         "k_core" => Some(builtin_k_core(args)),
         "rich_club_coefficient" | "rich_club" => Some(builtin_rich_club_coefficient(args)),
 
-        // ── Batch 7: crypto helpers ──────────────────────────────────────
+        // ── crypto helpers ──────────────────────────────────────
         "rsa_basic_encrypt" | "rsa_enc_int" => Some(builtin_rsa_basic_encrypt(args)),
         "rsa_basic_decrypt" | "rsa_dec_int" => Some(builtin_rsa_basic_decrypt(args)),
         "dh_shared_secret" => Some(builtin_dh_shared_secret(args)),
 
-        // ── Batch 7: quantum ─────────────────────────────────────────────
+        // ── quantum ─────────────────────────────────────────────
         "bell_state_phi_plus" | "bell_phi_plus" => Some(builtin_bell_state_phi_plus(args)),
         "bell_state_psi_minus" | "bell_psi_minus" => Some(builtin_bell_state_psi_minus(args)),
         "density_matrix_purity" | "rho_purity" => Some(builtin_density_matrix_purity(args)),
         "concurrence_2qubit" => Some(builtin_concurrence_2qubit(args)),
 
-        // ── Batch 7: 2D geometry ─────────────────────────────────────────
+        // ── 2D geometry ─────────────────────────────────────────
         "point_in_circle" => Some(builtin_point_in_circle(args)),
         "circle_circle_intersect_2d" => Some(builtin_circle_circle_intersect_2d(args)),
         "polygon_centroid" => Some(builtin_polygon_centroid(args)),
         "sutherland_hodgman_clip" | "sh_clip" => Some(builtin_sutherland_hodgman_clip(args)),
 
-        // ── Batch 7: time series ─────────────────────────────────────────
+        // ── time series ─────────────────────────────────────────
         "kalman_rts_smoother" | "rts_smoother" => Some(builtin_kalman_rts_smoother(args)),
 
-        // ── Batch 8: bioinformatics ──────────────────────────────────────
+        // ── bioinformatics ──────────────────────────────────────
         "gc_content" => Some(builtin_gc_content(args)),
         "codon_to_aa" => Some(builtin_codon_to_aa(args)),
         "reverse_complement_dna" | "rev_comp_dna" => Some(builtin_reverse_complement_dna(args)),
@@ -6572,91 +6572,91 @@ pub(crate) fn try_builtin(
         "blosum62_pair_score" | "blosum62" => Some(builtin_blosum62_pair_score(args)),
         "kmer_count" => Some(builtin_kmer_count(args)),
 
-        // ── Batch 8: geographic ──────────────────────────────────────────
+        // ── geographic ──────────────────────────────────────────
         "great_circle_bearing" | "gc_bearing" => Some(builtin_great_circle_bearing(args)),
         "midpoint_lat_lon" | "mid_geo" => Some(builtin_midpoint_lat_lon(args)),
         "utm_zone_for" => Some(builtin_utm_zone_for(args)),
         "area_polygon_lat_lon" | "geo_polygon_area" => Some(builtin_area_polygon_lat_lon(args)),
 
-        // ── Batch 8: finance ─────────────────────────────────────────────
+        // ── finance ─────────────────────────────────────────────
         "crr_binomial_option" | "crr_option" => Some(builtin_crr_binomial_option(args)),
         "bond_price_clean" => Some(builtin_bond_price_clean(args)),
         "bond_yield_to_maturity" | "bond_ytm" => Some(builtin_bond_yield_to_maturity(args)),
         "modified_duration_bond" => Some(builtin_modified_duration_bond(args)),
         "convexity_bond" | "bond_convexity" => Some(builtin_convexity_bond(args)),
 
-        // ── Batch 8: image quality ───────────────────────────────────────
+        // ── image quality ───────────────────────────────────────
         "ssim" => Some(builtin_ssim(args)),
         "psnr" => Some(builtin_psnr(args)),
         "mssim" => Some(builtin_mssim(args)),
 
-        // ── Batch 8: acoustics ───────────────────────────────────────────
+        // ── acoustics ───────────────────────────────────────────
         "db_spl_from_pa" | "db_spl" => Some(builtin_db_spl_from_pa(args)),
         "a_weighting_factor" | "a_weight" => Some(builtin_a_weighting_factor(args)),
         "octave_band_center" | "octave_center" => Some(builtin_octave_band_center(args)),
         "semitone_ratio" => Some(builtin_semitone_ratio(args)),
 
-        // ── Batch 8: genetics ────────────────────────────────────────────
+        // ── genetics ────────────────────────────────────────────
         "hardy_weinberg" => Some(builtin_hardy_weinberg(args)),
         "expected_heterozygosity" | "het_e" => Some(builtin_expected_heterozygosity(args)),
         "fst_simple" => Some(builtin_fst_simple(args)),
         "allele_frequencies" => Some(builtin_allele_frequencies(args)),
 
-        // ── Batch 8: epidemiology ────────────────────────────────────────
+        // ── epidemiology ────────────────────────────────────────
         "sir_step" => Some(builtin_sir_step(args)),
         "sir_r0" => Some(builtin_sir_r0(args)),
         "doubling_time" => Some(builtin_doubling_time(args)),
 
-        // ── Batch 8: economics ───────────────────────────────────────────
+        // ── economics ───────────────────────────────────────────
         "theil_index" => Some(builtin_theil_index(args)),
         "herfindahl_hirschman" | "hhi" => Some(builtin_herfindahl_hirschman(args)),
         "atkinson_index" => Some(builtin_atkinson_index(args)),
         "lorenz_curve_points" => Some(builtin_lorenz_curve_points(args)),
 
-        // ── Batch 8: APL/J primitives ────────────────────────────────────
+        // ── APL/J primitives ────────────────────────────────────
         "iota_range" | "iota" => Some(builtin_iota_range(args)),
         "reshape_array" | "reshape" => Some(builtin_reshape_array(args)),
         "grade_up" | "grade_asc" => Some(builtin_grade_up(args)),
         "grade_down" | "grade_desc" => Some(builtin_grade_down(args)),
 
-        // ── Batch 8: plasma physics ──────────────────────────────────────
+        // ── plasma physics ──────────────────────────────────────
         "plasma_frequency" | "omega_p" => Some(builtin_plasma_frequency(args)),
         "debye_length" | "lambda_d" => Some(builtin_debye_length(args)),
         "cyclotron_frequency" | "omega_c" => Some(builtin_cyclotron_frequency(args)),
         "larmor_radius" | "gyroradius" => Some(builtin_larmor_radius(args)),
 
-        // ── Batch 8: string similarity ───────────────────────────────────
+        // ── string similarity ───────────────────────────────────
         "jaro_winkler_similarity" | "jaro_winkler" => Some(builtin_jaro_winkler_similarity(args)),
         "metaphone_simple" => Some(builtin_metaphone_simple(args)),
 
-        // ── Batch 8: rating systems ──────────────────────────────────────
+        // ── rating systems ──────────────────────────────────────
         "elo_rating_update" | "elo" => Some(builtin_elo_rating_update(args)),
         "glicko_rating_update" | "glicko" => Some(builtin_glicko_rating_update(args)),
         "dice_sum_pmf" => Some(builtin_dice_sum_pmf(args)),
 
-        // ── Batch 8: effect sizes ────────────────────────────────────────
+        // ── effect sizes ────────────────────────────────────────
         "cohens_d" | "effect_size_d" => Some(builtin_cohens_d(args)),
         "cliff_delta" => Some(builtin_cliff_delta(args)),
         "vargha_delaney_a12" | "a12" => Some(builtin_vargha_delaney_a12(args)),
 
-        // ── Batch 8: control transient ───────────────────────────────────
+        // ── control transient ───────────────────────────────────
         "step_response_2nd_order" | "step_2nd" => Some(builtin_step_response_2nd_order(args)),
         "overshoot_2nd_order" | "overshoot_pct" => Some(builtin_overshoot_2nd_order(args)),
 
-        // ── Batch 8: matrix norms ────────────────────────────────────────
+        // ── matrix norms ────────────────────────────────────────
         "frobenius_norm" => Some(builtin_frobenius_norm(args)),
         "spectral_norm" | "operator_norm_2" => Some(builtin_spectral_norm(args)),
         "trace_matrix" | "tr_mat" => Some(builtin_trace_matrix(args)),
 
-        // ── Batch 8: networks ────────────────────────────────────────────
+        // ── networks ────────────────────────────────────────────
         "homophily_index" | "homophily" => Some(builtin_homophily_index(args)),
         "dyad_census" => Some(builtin_dyad_census(args)),
         "triad_census" => Some(builtin_triad_census(args)),
 
-        // ── Batch 8: misc ────────────────────────────────────────────────
+        // ── misc ────────────────────────────────────────────────
         "sigmoid_inverse" | "logit" => Some(builtin_sigmoid_inverse(args)),
 
-        // ── Batch 9: list/array helpers ──────────────────────────────────
+        // ── list/array helpers ──────────────────────────────────
         "partition_at" => Some(builtin_partition_at(args)),
         "drop_at" => Some(builtin_drop_at(args)),
         "insert_at_idx" => Some(builtin_insert_at_idx(args)),
@@ -6668,7 +6668,7 @@ pub(crate) fn try_builtin(
             Some(builtin_position_of_all_matching(args))
         }
 
-        // ── Batch 9: string helpers ──────────────────────────────────────
+        // ── string helpers ──────────────────────────────────────
         "string_take_first" => Some(builtin_string_take_first(args)),
         "string_take_last" => Some(builtin_string_take_last(args)),
         "string_drop_first" => Some(builtin_string_drop_first(args)),
@@ -6678,7 +6678,7 @@ pub(crate) fn try_builtin(
         "capitalize_words" | "title_words" => Some(builtin_capitalize_words(args)),
         "format_table_simple" | "ascii_table" => Some(builtin_format_table_simple(args)),
 
-        // ── Batch 9: date / calendar ─────────────────────────────────────
+        // ── date / calendar ─────────────────────────────────────
         "days_between" => Some(builtin_days_between(args)),
         "weeks_between" => Some(builtin_weeks_between(args)),
         "months_between" => Some(builtin_months_between(args)),
@@ -6690,13 +6690,13 @@ pub(crate) fn try_builtin(
         "chinese_zodiac" => Some(builtin_chinese_zodiac(args)),
         "iso_week_number" | "iso_week" => Some(builtin_iso_week_number(args)),
 
-        // ── Batch 9: accessibility colour ────────────────────────────────
+        // ── accessibility colour ────────────────────────────────
         "relative_luminance" | "wcag_luminance" => Some(builtin_relative_luminance(args)),
         "contrast_ratio_wcag" | "wcag_contrast" => Some(builtin_contrast_ratio_wcag(args)),
         "delta_e_76" | "delta_e" => Some(builtin_delta_e_76(args)),
         "color_blend_t" | "lerp_color" => Some(builtin_color_blend_t(args)),
 
-        // ── Batch 9: music theory ────────────────────────────────────────
+        // ── music theory ────────────────────────────────────────
         "chord_to_freqs" => Some(builtin_chord_to_freqs(args)),
         "scale_to_intervals" => Some(builtin_scale_to_intervals(args)),
         "interval_semitones" => Some(builtin_interval_semitones(args)),
@@ -6708,33 +6708,33 @@ pub(crate) fn try_builtin(
         "key_signature_for" => Some(builtin_key_signature_for(args)),
         "circle_of_fifths_step" => Some(builtin_circle_of_fifths_step(args)),
 
-        // ── Batch 9: astronomy ───────────────────────────────────────────
+        // ── astronomy ───────────────────────────────────────────
         "moon_phase" => Some(builtin_moon_phase(args)),
         "equation_of_time" => Some(builtin_equation_of_time(args)),
         "solar_declination" => Some(builtin_solar_declination(args)),
         "sidereal_day_period" => Some(builtin_sidereal_day_period(args)),
         "ecliptic_obliquity" => Some(builtin_ecliptic_obliquity(args)),
 
-        // ── Batch 9: permutations ────────────────────────────────────────
+        // ── permutations ────────────────────────────────────────
         "permutation_order" => Some(builtin_permutation_order(args)),
         "permutation_parity" | "perm_sign" => Some(builtin_permutation_parity(args)),
         "identity_permutation" => Some(builtin_identity_permutation(args)),
         "permutation_compose" | "perm_mul" => Some(builtin_permutation_compose(args)),
 
-        // ── Batch 9: linguistics ─────────────────────────────────────────
+        // ── linguistics ─────────────────────────────────────────
         "flesch_reading_ease" => Some(builtin_flesch_reading_ease(args)),
         "flesch_kincaid_grade" => Some(builtin_flesch_kincaid_grade(args)),
         "gunning_fog" => Some(builtin_gunning_fog(args)),
         "automated_readability_index" | "ari" => Some(builtin_automated_readability_index(args)),
         "lix" => Some(builtin_lix(args)),
 
-        // ── Batch 9: regression diagnostics ──────────────────────────────
+        // ── regression diagnostics ──────────────────────────────
         "adjusted_r_squared" | "adj_r2" => Some(builtin_adjusted_r_squared(args)),
         "aic" => Some(builtin_aic(args)),
         "bic" => Some(builtin_bic(args)),
         "residuals_compute" | "compute_residuals" => Some(builtin_residuals_compute(args)),
 
-        // ── Batch 9: combinatorial counts ────────────────────────────────
+        // ── combinatorial counts ────────────────────────────────
         "composition_count" => Some(builtin_composition_count(args)),
         "weak_composition_count" => Some(builtin_weak_composition_count(args)),
         "necklace_count" => Some(builtin_necklace_count(args)),
@@ -6743,13 +6743,13 @@ pub(crate) fn try_builtin(
             Some(builtin_multiset_permutations_count(args))
         }
 
-        // ── Batch 9: PRNG / hashing ──────────────────────────────────────
+        // ── PRNG / hashing ──────────────────────────────────────
         "pearson_hash_byte" | "pearson_hash" => Some(builtin_pearson_hash_byte(args)),
         "xorshift32_step" => Some(builtin_xorshift32_step(args)),
         "lcg_next_u32" => Some(builtin_lcg_next_u32(args)),
         "fisher_yates_shuffle" => Some(builtin_fisher_yates_shuffle(args)),
 
-        // ── Batch 10 ─────────────────────────────────────────────────────
+        // ── ─────────────────────────────────────────────────────
         "tetrahedral_number" => Some(builtin_tetrahedral_number(args)),
         "square_pyramidal_number" => Some(builtin_square_pyramidal_number(args)),
         "octahedral_number" => Some(builtin_octahedral_number(args)),
@@ -6793,7 +6793,7 @@ pub(crate) fn try_builtin(
         "rfc3339_parse" => Some(builtin_rfc3339_parse(args)),
         "iso_ordinal_date" | "ordinal_date" => Some(builtin_iso_ordinal_date(args)),
 
-        // ── Batch 11 ─────────────────────────────────────────────────────
+        // ── ─────────────────────────────────────────────────────
         "lazy_caterer" => Some(builtin_lazy_caterer(args)),
         "central_polygonal" => Some(builtin_central_polygonal(args)),
         "centered_square" => Some(builtin_centered_square(args)),
@@ -6858,7 +6858,7 @@ pub(crate) fn try_builtin(
         "string_split_at_first" => Some(builtin_string_split_at_first(args)),
         "string_partition_at_word" => Some(builtin_string_partition_at_word(args)),
 
-        // ── Batch 12: physics ────────────────────────────────────────────
+        // ── physics ────────────────────────────────────────────
         "relativistic_kinetic" => Some(builtin_relativistic_kinetic(args)),
         "lorentz_factor_v" => Some(builtin_lorentz_factor_v(args)),
         "doppler_relativistic" => Some(builtin_doppler_relativistic(args)),
@@ -6885,7 +6885,7 @@ pub(crate) fn try_builtin(
         "centripetal_accel" => Some(builtin_centripetal_accel(args)),
         "lens_focal_length" => Some(builtin_lens_focal_length(args)),
 
-        // ── Batch 12: chemistry ──────────────────────────────────────────
+        // ── chemistry ──────────────────────────────────────────
         "avogadros_number" => Some(builtin_avogadros_number(args)),
         "boltzmann_const" => Some(builtin_boltzmann_const(args)),
         "planck_const_h" => Some(builtin_planck_const_h(args)),
@@ -6901,7 +6901,7 @@ pub(crate) fn try_builtin(
         "atomic_radius_pm" => Some(builtin_atomic_radius_pm(args)),
         "de_broglie_wavelength_kg" => Some(builtin_de_broglie_wavelength_kg(args)),
 
-        // ── Batch 12: biology ────────────────────────────────────────────
+        // ── biology ────────────────────────────────────────────
         "lotka_volterra_step" => Some(builtin_lotka_volterra_step(args)),
         "michaelis_menten" => Some(builtin_michaelis_menten(args)),
         "hill_equation" => Some(builtin_hill_equation(args)),
@@ -6917,7 +6917,7 @@ pub(crate) fn try_builtin(
         "pulse_pressure" => Some(builtin_pulse_pressure(args)),
         "mean_arterial_pressure" | "map_bp" => Some(builtin_mean_arterial_pressure(args)),
 
-        // ── Batch 12: meteorology ────────────────────────────────────────
+        // ── meteorology ────────────────────────────────────────
         "dew_point_magnus" => Some(builtin_dew_point_magnus(args)),
         "heat_index_celsius" => Some(builtin_heat_index_celsius(args)),
         "wind_chill_celsius" => Some(builtin_wind_chill_celsius(args)),
@@ -6927,7 +6927,7 @@ pub(crate) fn try_builtin(
         "humidex" => Some(builtin_humidex(args)),
         "utci_simple" => Some(builtin_universal_thermal_climate_index_simple(args)),
 
-        // ── Batch 12: engineering ────────────────────────────────────────
+        // ── engineering ────────────────────────────────────────
         "resistance_parallel" | "r_parallel" => Some(builtin_resistance_parallel(args)),
         "resistance_series" | "r_series" => Some(builtin_resistance_series(args)),
         "capacitance_parallel" | "c_parallel" => Some(builtin_capacitance_parallel(args)),
@@ -6945,7 +6945,7 @@ pub(crate) fn try_builtin(
         "dB_voltage" | "db_voltage" => Some(builtin_dB_voltage(args)),
         "dB_power" | "db_power" => Some(builtin_dB_power(args)),
 
-        // ── Batch 13 ─────────────────────────────────────────────────────
+        // ── ─────────────────────────────────────────────────────
         "bfs_distances" => Some(builtin_bfs_distances(args)),
         "dfs_preorder" => Some(builtin_dfs_preorder(args)),
         "connected_components" => Some(builtin_connected_components(args)),
@@ -7007,7 +7007,7 @@ pub(crate) fn try_builtin(
         "grashof_number" => Some(builtin_grashof_number(args)),
         "nusselt_dittus_boelter" => Some(builtin_nusselt_dittus_boelter(args)),
 
-        // ── Batch 14 ─────────────────────────────────────────────────────
+        // ── ─────────────────────────────────────────────────────
         "mollweide_project" => Some(builtin_mollweide_project(args)),
         "robinson_project" => Some(builtin_robinson_project(args)),
         "sinusoidal_project" => Some(builtin_sinusoidal_project(args)),
@@ -7038,7 +7038,7 @@ pub(crate) fn try_builtin(
         "speck_round" => Some(builtin_speck_round(args)),
         "simon_round" => Some(builtin_simon_round(args)),
 
-        // ── Batch 15 ─────────────────────────────────────────────────────
+        // ── ─────────────────────────────────────────────────────
         "kepler_hyperbolic" => Some(builtin_kepler_hyperbolic(args)),
         "hohmann_dv1" => Some(builtin_hohmann_dv1(args)),
         "hohmann_dv2" => Some(builtin_hohmann_dv2(args)),
@@ -7079,7 +7079,7 @@ pub(crate) fn try_builtin(
         "quantum_relative_entropy" => Some(builtin_quantum_relative_entropy(args)),
         "qft_4_real" => Some(builtin_qft_4_real(args)),
 
-        // ── Batch 16 ─────────────────────────────────────────────────────
+        // ── ─────────────────────────────────────────────────────
         "bwt_encode" => Some(builtin_bwt_encode(args)),
         "bwt_decode" => Some(builtin_bwt_decode(args)),
         "mtf_encode" => Some(builtin_mtf_encode(args)),
@@ -7114,7 +7114,7 @@ pub(crate) fn try_builtin(
         "harmonic_seq_sum" => Some(builtin_harmonic_seq_sum(args)),
         "alternating_seq_sum" => Some(builtin_alternating_seq_sum(args)),
 
-        // ── Batch 17 ─────────────────────────────────────────────────────
+        // ── ─────────────────────────────────────────────────────
         "sparse_csr_build" => Some(builtin_sparse_csr_build(args)),
         "sparse_csr_mul_vec" => Some(builtin_sparse_csr_mul_vec(args)),
         "sparse_density" => Some(builtin_sparse_density(args)),
@@ -7152,7 +7152,7 @@ pub(crate) fn try_builtin(
         "log_gamma_simple" => Some(builtin_log_gamma_simple(args)),
         "inverse_chi2_pdf" => Some(builtin_inverse_chi2_pdf(args)),
 
-        // ── Batch 18 ─────────────────────────────────────────────────────
+        // ── ─────────────────────────────────────────────────────
         "poly1305_block_step" => Some(builtin_poly1305_block_step(args)),
         "x25519_field_mul" => Some(builtin_x25519_field_mul(args)),
         "curve25519_mul_simple" => Some(builtin_curve25519_mul_simple(args)),
@@ -7187,7 +7187,7 @@ pub(crate) fn try_builtin(
         "graph_count_paths_length_k" => Some(builtin_graph_count_paths_length_k(args)),
         "graph_pagerank_simple" => Some(builtin_graph_pagerank_simple(args)),
 
-        // ── Batch 19: numerical integration / ODE / root finding / optim ──
+        // ── numerical integration / ODE / root finding / optim ──
         "anderson_step" => Some(builtin_anderson_step(args)),
         "aberth_step" => Some(builtin_aberth_step(args)),
         "inverse_quad_interp" => Some(builtin_inverse_quad_interp(args)),
@@ -7209,7 +7209,7 @@ pub(crate) fn try_builtin(
         "sa_geometric_temp" => Some(builtin_sa_geometric_temp(args)),
         "acceptance_target" => Some(builtin_acceptance_target(args)),
 
-        // ── Batch 20: financial pricing models ───────────────────────────
+        // ── financial pricing models ───────────────────────────
         "bs_call" | "blackscholes_call" => Some(builtin_bs_call(args)),
         "bs_put" | "blackscholes_put" => Some(builtin_bs_put(args)),
         "bs_theta_call" => Some(builtin_bs_theta_call(args)),
@@ -7245,7 +7245,7 @@ pub(crate) fn try_builtin(
         "jensen_alpha" => Some(builtin_jensen_alpha(args)),
         "modified_sharpe" => Some(builtin_modified_sharpe(args)),
 
-        // ── Batch 21: chemistry ──────────────────────────────────────────
+        // ── chemistry ──────────────────────────────────────────
         "ph_from_h" => Some(builtin_ph_from_h(args)),
         "poh_from_oh" => Some(builtin_poh_from_oh(args)),
         "pka_from_ka" => Some(builtin_pka_from_ka(args)),
@@ -7293,7 +7293,7 @@ pub(crate) fn try_builtin(
         "photon_energy_lambda" => Some(builtin_photon_energy_lambda(args)),
         "de_broglie" => Some(builtin_de_broglie(args)),
 
-        // ── Batch 22: biology / ecology ──────────────────────────────────
+        // ── biology / ecology ──────────────────────────────────
         "logistic_growth_step" => Some(builtin_logistic_growth_step(args)),
         "logistic_growth_analytic" => Some(builtin_logistic_growth_analytic(args)),
         "gompertz_growth_step" => Some(builtin_gompertz_growth_step(args)),
@@ -7336,7 +7336,7 @@ pub(crate) fn try_builtin(
         "macarthur_wilson_extinction" => Some(builtin_macarthur_wilson_extinction(args)),
         "island_equilibrium" => Some(builtin_island_equilibrium(args)),
 
-        // ── Batch 23: EM / optics / relativity ───────────────────────────
+        // ── EM / optics / relativity ───────────────────────────
         "efield_point" => Some(builtin_efield_point(args)),
         "epotential_point" => Some(builtin_epotential_point(args)),
         "capacitor_charge" => Some(builtin_capacitor_charge(args)),
@@ -7388,7 +7388,7 @@ pub(crate) fn try_builtin(
         "grav_time_dilation" => Some(builtin_grav_time_dilation(args)),
         "grav_redshift" => Some(builtin_grav_redshift(args)),
 
-        // ── Batch 24: graph algorithms ───────────────────────────────────
+        // ── graph algorithms ───────────────────────────────────
         "kosaraju_scc" => Some(builtin_kosaraju_scc(args)),
         "bridges" => Some(builtin_bridges(args)),
         "max_flow_ek" => Some(builtin_max_flow_ek(args)),
@@ -7414,7 +7414,7 @@ pub(crate) fn try_builtin(
         "is_tree" => Some(builtin_is_tree(args)),
         "girth" => Some(builtin_girth(args)),
 
-        // ── Batch 25: signal processing ──────────────────────────────────
+        // ── signal processing ──────────────────────────────────
         "hamming_window" => Some(builtin_hamming_window(args)),
         "hann_window" => Some(builtin_hann_window(args)),
         "blackman_window" => Some(builtin_blackman_window(args)),
@@ -7449,7 +7449,7 @@ pub(crate) fn try_builtin(
         "a_law_decode" => Some(builtin_a_law_decode(args)),
         "chirp_linear" => Some(builtin_chirp_linear(args)),
 
-        // ── Batch 26: cryptography deep ──────────────────────────────────
+        // ── cryptography deep ──────────────────────────────────
         "fnv1a_32" => Some(builtin_fnv1a_32(args)),
         "fnv1a_64" => Some(builtin_fnv1a_64(args)),
         "sdbm_hash" => Some(builtin_sdbm_hash(args)),
@@ -7482,7 +7482,7 @@ pub(crate) fn try_builtin(
         "monobit_test" => Some(builtin_monobit_test(args)),
         "approximate_entropy" => Some(builtin_approximate_entropy(args)),
 
-        // ── Batch 27: ML extensions ──────────────────────────────────────
+        // ── ML extensions ──────────────────────────────────────
         "gini_impurity" => Some(builtin_gini_impurity(args)),
         "entropy_bits" => Some(builtin_entropy_bits(args)),
         "information_gain" => Some(builtin_information_gain(args)),
@@ -7516,7 +7516,7 @@ pub(crate) fn try_builtin(
         "zscore_norm" => Some(builtin_zscore_norm(args)),
         "robust_scale" => Some(builtin_robust_scale(args)),
 
-        // ── Batch 28: geometry / topology ────────────────────────────────
+        // ── geometry / topology ────────────────────────────────
         "triangle_area_heron" => Some(builtin_triangle_area_heron(args)),
         "triangle_area_pts" => Some(builtin_triangle_area_pts(args)),
         "triangle_inradius" => Some(builtin_triangle_inradius(args)),
@@ -7550,7 +7550,7 @@ pub(crate) fn try_builtin(
         "covariance_matrix_pts" => Some(builtin_covariance_matrix_pts(args)),
         "simplex_volume_3d" => Some(builtin_simplex_volume_3d(args)),
 
-        // ── Batch 29: special functions extra ────────────────────────────
+        // ── special functions extra ────────────────────────────
         "hyper2f1" => Some(builtin_hyper2f1(args)),
         "hyper1f1" => Some(builtin_hyper1f1(args)),
         "hyper0f1" => Some(builtin_hyper0f1(args)),
@@ -7594,7 +7594,7 @@ pub(crate) fn try_builtin(
         "bessel_jn_general" => Some(builtin_bessel_jn_general(args)),
         "bessel_in_general" => Some(builtin_bessel_in_general(args)),
 
-        // ── Batch 30: astronomy / music / color / units ──────────────────
+        // ── astronomy / music / color / units ──────────────────
         "absolute_magnitude" => Some(builtin_absolute_magnitude(args)),
         "pc_to_ly" => Some(builtin_pc_to_ly(args)),
         "ly_to_pc" => Some(builtin_ly_to_pc(args)),
@@ -7643,7 +7643,7 @@ pub(crate) fn try_builtin(
         "roman_decode" => Some(builtin_roman_decode(args)),
         "number_to_english" => Some(builtin_number_to_english(args)),
 
-        // ── Batch 31: cosmology / GR / FLRW ──────────────────────────────
+        // ── cosmology / GR / FLRW ──────────────────────────────
         "hubble_lcdm" => Some(builtin_hubble_lcdm(args)),
         "hubble_time" => Some(builtin_hubble_time(args)),
         "hubble_distance_si" => Some(builtin_hubble_distance_si(args)),
@@ -7703,7 +7703,7 @@ pub(crate) fn try_builtin(
         "cosmological_constant" => Some(builtin_cosmological_constant(args)),
         "planck_energy" => Some(builtin_planck_energy()),
 
-        // ── Batch 32: quantum mechanics deep ─────────────────────────────
+        // ── quantum mechanics deep ─────────────────────────────
         "pure_state_density" => Some(builtin_pure_state_density(args)),
         "purity" => Some(builtin_purity(args)),
         "linear_entropy" => Some(builtin_linear_entropy(args)),
@@ -7761,7 +7761,7 @@ pub(crate) fn try_builtin(
         "ramsey_visibility" => Some(builtin_ramsey_visibility(args)),
         "fermi_golden_rule" => Some(builtin_fermi_golden_rule(args)),
 
-        // ── Batch 33: bioinformatics deep ────────────────────────────────
+        // ── bioinformatics deep ────────────────────────────────
         "needleman_wunsch_score" => Some(builtin_needleman_wunsch_score(args)),
         "smith_waterman_score" => Some(builtin_smith_waterman_score(args)),
         "pam250_score" => Some(builtin_pam250_score(args)),
@@ -7811,7 +7811,7 @@ pub(crate) fn try_builtin(
         "coalescent_tree_length" => Some(builtin_coalescent_tree_length(args)),
         "nm_from_fst" => Some(builtin_nm_from_fst(args)),
 
-        // ── Batch 34: ODE advanced ───────────────────────────────────────
+        // ── ODE advanced ───────────────────────────────────────
         "bdf1_step" => Some(builtin_bdf1_step(args)),
         "bdf2_step" => Some(builtin_bdf2_step(args)),
         "bdf3_step" => Some(builtin_bdf3_step(args)),
@@ -7871,7 +7871,7 @@ pub(crate) fn try_builtin(
         "superbee_limiter" => Some(builtin_superbee_limiter(args)),
         "mc_limiter" => Some(builtin_mc_limiter(args)),
 
-        // ── Batch 35: cryptanalysis & number theory deep ─────────────────
+        // ── cryptanalysis & number theory deep ─────────────────
         "bsgs_discrete_log" => Some(builtin_bsgs_discrete_log(args)),
         "pollard_p_minus_1" => Some(builtin_pollard_p_minus_1(args)),
         "fermat_factor" => Some(builtin_fermat_factor(args)),
@@ -7908,7 +7908,7 @@ pub(crate) fn try_builtin(
         "gf256_multiply" => Some(builtin_gf256_multiply(args)),
         "hash_combine" => Some(builtin_hash_combine(args)),
 
-        // ── Batch 36: econometrics ───────────────────────────────────────
+        // ── econometrics ───────────────────────────────────────
         "arch_lm_test" => Some(builtin_arch_lm_test(args)),
         "breusch_pagan_test" => Some(builtin_breusch_pagan_test(args)),
         "white_robust_se" => Some(builtin_white_robust_se(args)),
@@ -7973,7 +7973,7 @@ pub(crate) fn try_builtin(
         "ma_model_likelihood" => Some(builtin_ma_model_likelihood(args)),
         "arma_model_innovation" => Some(builtin_arma_model_innovation(args)),
 
-        // ── Batch 37: algebraic topology, knot theory, lie algebras ──────
+        // ── algebraic topology, knot theory, lie algebras ──────
         "euler_char_complex" => Some(builtin_euler_char_complex(args)),
         "betti_zero" => Some(builtin_betti_zero(args)),
         "betti_one" => Some(builtin_betti_one(args)),
@@ -8072,7 +8072,7 @@ pub(crate) fn try_builtin(
         "geometric_intersection_number" => Some(builtin_geometric_intersection_number(args)),
         "algebraic_intersection_number" => Some(builtin_algebraic_intersection_number(args)),
 
-        // ── Batch 38: electrochemistry, batteries, fuel cells, corrosion ──
+        // ── electrochemistry, batteries, fuel cells, corrosion ──
         "nernst_potential_full" => Some(builtin_nernst_potential_full(args)),
         "electrode_potential_step" => Some(builtin_electrode_potential_step(args)),
         "exchange_current_density" => Some(builtin_exchange_current_density(args)),
@@ -8170,7 +8170,7 @@ pub(crate) fn try_builtin(
         "henderson_hasselbalch_solve" => Some(builtin_henderson_hasselbalch_solve(args)),
         "titration_endpoint_index" => Some(builtin_titration_endpoint_index(args)),
 
-        // ── Batch 39: tensor calculus, GR, differential geometry ─────────
+        // ── tensor calculus, GR, differential geometry ─────────
         "tensor_contract_two" => Some(builtin_tensor_contract_two(args)),
         "tensor_outer_two" => Some(builtin_tensor_outer_two(args)),
         "tensor_trace_index" => Some(builtin_tensor_trace_index(args)),
@@ -8273,7 +8273,7 @@ pub(crate) fn try_builtin(
         "ryu_takayanagi_step" => Some(builtin_ryu_takayanagi_step(args)),
         "swampland_distance_check" => Some(builtin_swampland_distance_check(args)),
 
-        // ── Batch 40: information theory, coding, signal processing, RL ──
+        // ── information theory, coding, signal processing, RL ──
         "conditional_entropy_step" => Some(builtin_conditional_entropy_step(args)),
         "joint_entropy_step" => Some(builtin_joint_entropy_step(args)),
         "relative_entropy_kl" => Some(builtin_relative_entropy_kl(args)),
@@ -8376,7 +8376,7 @@ pub(crate) fn try_builtin(
         "mfcc_coeff_step" => Some(builtin_mfcc_coeff_step(args)),
         "chroma_feature_step" => Some(builtin_chroma_feature_step(args)),
 
-        // ── Batch 41: combinatorial optimization, scheduling, packing ────
+        // ── combinatorial optimization, scheduling, packing ────
         "tsp_lower_bound_mst" => Some(builtin_tsp_lower_bound_mst(args)),
         "tsp_held_karp_step" => Some(builtin_tsp_held_karp_step(args)),
         "christofides_ratio_bound" => Some(builtin_christofides_ratio_bound(args)),
@@ -8479,7 +8479,7 @@ pub(crate) fn try_builtin(
         "mutation_bit_flip_prob" => Some(builtin_mutation_bit_flip_prob(args)),
         "roulette_wheel_select_index" => Some(builtin_roulette_wheel_select_index(args)),
 
-        // ── Batch 42: climate, fluids, atmospheric, geophysics ───────────
+        // ── climate, fluids, atmospheric, geophysics ───────────
         "stefan_boltzmann_radiation" => Some(builtin_stefan_boltzmann_radiation(args)),
         "emissivity_grey_body" => Some(builtin_emissivity_grey_body(args)),
         "albedo_blackbody_balance" => Some(builtin_albedo_blackbody_balance(args)),
@@ -8581,7 +8581,7 @@ pub(crate) fn try_builtin(
         "ice_age_milankovitch" => Some(builtin_ice_age_milankovitch(args)),
         "greenhouse_forcing_step" => Some(builtin_greenhouse_forcing_step(args)),
 
-        // ── Batch 43: game theory, mechanism design, social choice ───────
+        // ── game theory, mechanism design, social choice ───────
         "game_two_player_value" => Some(builtin_game_two_player_value(args)),
         "nash_equilibrium_pair" => Some(builtin_nash_equilibrium_pair(args)),
         "mixed_strategy_value" => Some(builtin_mixed_strategy_value(args)),
@@ -8685,7 +8685,7 @@ pub(crate) fn try_builtin(
         "ex_ante_value_check" => Some(builtin_ex_ante_value_check(args)),
         "common_knowledge_iterations" => Some(builtin_common_knowledge_iterations(args)),
 
-        // ── Batch 44: symbolic CAS, polynomials, decompositions, projections
+        // ── symbolic CAS, polynomials, decompositions, projections
         "cas_simplify_term" => Some(builtin_cas_simplify_term(args)),
         "cas_expand_two_terms" => Some(builtin_cas_expand_two_terms(args)),
         "cas_factor_quadratic" => Some(builtin_cas_factor_quadratic(args)),
@@ -8790,7 +8790,7 @@ pub(crate) fn try_builtin(
         "cas_polya_enumeration_step" => Some(builtin_cas_polya_enumeration_step(args)),
         "cas_burnside_count_step" => Some(builtin_cas_burnside_count_step(args)),
 
-        // ── Batch 45: ML primitives — activations, losses, optimizers ────
+        // ── ML primitives — activations, losses, optimizers ────
         "ml_relu_step" => Some(builtin_ml_relu_step(args)),
         "ml_leaky_relu_step" => Some(builtin_ml_leaky_relu_step(args)),
         "ml_elu_step" => Some(builtin_ml_elu_step(args)),
@@ -8895,7 +8895,7 @@ pub(crate) fn try_builtin(
         "ml_repetition_penalty" => Some(builtin_ml_repetition_penalty(args)),
         "ml_eos_logit_boost" => Some(builtin_ml_eos_logit_boost(args)),
 
-        // ── Batch 46: NLP — ranking, similarity, language models, attention
+        // ── NLP — ranking, similarity, language models, attention
         "nlp_bm25_score" => Some(builtin_nlp_bm25_score(args)),
         "nlp_tf_idf_step" => Some(builtin_nlp_tf_idf_step(args)),
         "nlp_okapi_score" => Some(builtin_nlp_okapi_score(args)),
@@ -9002,7 +9002,7 @@ pub(crate) fn try_builtin(
         "nlp_bigbird_step" => Some(builtin_nlp_bigbird_step(args)),
         "nlp_routing_attn_step" => Some(builtin_nlp_routing_attn_step(args)),
 
-        // ── Batch 47: graphics, geometry, ray tracing, BRDF, color, noise, SDF
+        // ── graphics, geometry, ray tracing, BRDF, color, noise, SDF
         "gfx_perspective_proj_x" => Some(builtin_gfx_perspective_proj_x(args)),
         "gfx_perspective_proj_y" => Some(builtin_gfx_perspective_proj_y(args)),
         "gfx_orthographic_proj" => Some(builtin_gfx_orthographic_proj(args)),
@@ -9127,7 +9127,7 @@ pub(crate) fn try_builtin(
         "gfx_signed_distance_sphere" => Some(builtin_gfx_signed_distance_sphere(args)),
         "gfx_signed_distance_capsule" => Some(builtin_gfx_signed_distance_capsule(args)),
 
-        // ── Batch 48: database internals, distributed systems, sketches ──
+        // ── database internals, distributed systems, sketches ──
         "db_b_tree_split" => Some(builtin_db_b_tree_split(args)),
         "db_b_tree_merge" => Some(builtin_db_b_tree_merge(args)),
         "db_lsm_compaction_step" => Some(builtin_db_lsm_compaction_step(args)),
@@ -9232,7 +9232,7 @@ pub(crate) fn try_builtin(
         "db_linearizability_check" => Some(builtin_db_linearizability_check(args)),
         "db_causal_consistency_check" => Some(builtin_db_causal_consistency_check(args)),
 
-        // ── Batch 49: networking — TCP, AQM, MIMO, queueing, channel ─────
+        // ── networking — TCP, AQM, MIMO, queueing, channel ─────
         "net_tcp_cwnd_step" => Some(builtin_net_tcp_cwnd_step(args)),
         "net_tcp_ssthresh_update" => Some(builtin_net_tcp_ssthresh_update(args)),
         "net_tcp_reno_step" => Some(builtin_net_tcp_reno_step(args)),
@@ -9338,7 +9338,7 @@ pub(crate) fn try_builtin(
         "net_utilization_law" => Some(builtin_net_utilization_law(args)),
         "net_forced_flow_law" => Some(builtin_net_forced_flow_law(args)),
 
-        // ── Batch 50: OS internals — schedulers, I/O, memory, power ──────
+        // ── OS internals — schedulers, I/O, memory, power ──────
         "os_priority_aging_step" => Some(builtin_os_priority_aging_step(args)),
         "os_mlfq_demote_step" => Some(builtin_os_mlfq_demote_step(args)),
         "os_mlfq_promote_step" => Some(builtin_os_mlfq_promote_step(args)),
@@ -9444,7 +9444,7 @@ pub(crate) fn try_builtin(
         "os_load_user_avg" => Some(builtin_os_load_user_avg(args)),
         "os_load_iowait_avg" => Some(builtin_os_load_iowait_avg(args)),
 
-        // ── Batch 51: security — KDFs, MFA, PKI, web sec, TLS, ciphers ───
+        // ── security — KDFs, MFA, PKI, web sec, TLS, ciphers ───
         "sec_argon2_memcost" => Some(builtin_sec_argon2_memcost(args)),
         "sec_argon2_timecost" => Some(builtin_sec_argon2_timecost(args)),
         "sec_argon2_parallelism" => Some(builtin_sec_argon2_parallelism(args)),
@@ -9718,7 +9718,7 @@ pub(crate) fn try_builtin(
         "cyber_circuit" => Some(builtin_cyber_circuit(args)),
         "cyber_skull" => Some(builtin_cyber_skull(args)),
         "cyber_eye" => Some(builtin_cyber_eye(args)),
-        // ── Batch 52: calendrical algorithms (Reingold & Dershowitz) ─────
+        // ── calendrical algorithms (Reingold & Dershowitz) ─────
         "fixed_from_gregorian" => Some(builtin_fixed_from_gregorian(args)),
         "gregorian_from_fixed" => Some(builtin_gregorian_from_fixed(args)),
         "fixed_from_julian" => Some(builtin_fixed_from_julian(args)),
@@ -9752,7 +9752,7 @@ pub(crate) fn try_builtin(
         "weekday_name_short" => Some(builtin_weekday_name_short(args)),
         "leap_year_gregorian" => Some(builtin_leap_year_gregorian(args)),
 
-        // ── Batch 53: R / SciPy distributions and tests ──────────────────
+        // ── R / SciPy distributions and tests ──────────────────
         "dnorm" => Some(builtin_dnorm(args)),
         "dt" => Some(builtin_dt(args)),
         "df_dist" => Some(builtin_df_dist(args)),
@@ -9769,7 +9769,7 @@ pub(crate) fn try_builtin(
         "wilcoxon" => Some(builtin_wilcoxon(args)),
         "kruskal_h" => Some(builtin_kruskal_h(args)),
 
-        // ── Batch 54: APL/J/K array primitives ───────────────────────────
+        // ── APL/J/K array primitives ───────────────────────────
         "iota_n" => Some(builtin_iota_n(args)),
         "reduce_axis" => Some(builtin_reduce_axis(args)),
         "scan_axis" => Some(builtin_scan_axis(args)),
@@ -9787,7 +9787,7 @@ pub(crate) fn try_builtin(
         "permute_idx" => Some(builtin_permute_idx(args)),
         "invert_perm" => Some(builtin_invert_perm(args)),
 
-        // ── Batch 55: astronomy / astrometry (Meeus + IAU) ───────────────
+        // ── astronomy / astrometry (Meeus + IAU) ───────────────
         "julian_day" => Some(builtin_julian_day(args)),
         "jd_to_calendar" => Some(builtin_jd_to_calendar(args)),
         "tt_to_tdb" => Some(builtin_tt_to_tdb(args)),
@@ -9819,7 +9819,7 @@ pub(crate) fn try_builtin(
         "strehl_ratio" => Some(builtin_strehl_ratio(args)),
         "au_to_km" => Some(builtin_au_to_km(args)),
 
-        // ── Batch 56: sports analytics — ratings & sabermetric ───────────
+        // ── sports analytics — ratings & sabermetric ───────────
         "elo_expected" => Some(builtin_elo_expected(args)),
         "elo_update" => Some(builtin_elo_update(args)),
         "glicko_rating" => Some(builtin_glicko_rating(args)),
@@ -9849,7 +9849,7 @@ pub(crate) fn try_builtin(
         "qbr_metric" => Some(builtin_qbr_metric(args)),
         "epa_per_play" => Some(builtin_epa_per_play(args)),
 
-        // ── Batch 57: Excel/Sheets lookups + bond/loan financial math ────
+        // ── Excel/Sheets lookups + bond/loan financial math ────
         "vlookup" => Some(builtin_vlookup(args)),
         "hlookup" => Some(builtin_hlookup(args)),
         "xlookup" => Some(builtin_xlookup(args)),
@@ -9884,7 +9884,7 @@ pub(crate) fn try_builtin(
         "reliability_diagram" => Some(builtin_reliability_diagram(args)),
         "taylor_diagram_score" => Some(builtin_taylor_diagram_score(args)),
 
-        // ── Batch 58: GIS — geohash, H3, S2, UTM, MGRS, projections ──────
+        // ── GIS — geohash, H3, S2, UTM, MGRS, projections ──────
         "geohash_neighbors" => Some(builtin_geohash_neighbors(args)),
         "h3_index" => Some(builtin_h3_index(args)),
         "h3_geo_to_h3" => Some(builtin_h3_geo_to_h3(args)),
@@ -9915,7 +9915,7 @@ pub(crate) fn try_builtin(
         "segment_distance_point" => Some(builtin_segment_distance_point(args)),
         "convex_hull_chan" => Some(builtin_convex_hull_chan(args)),
 
-        // ── Batch 59: robotics & control ─────────────────────────────────
+        // ── robotics & control ─────────────────────────────────
         "pid_anti_windup" => Some(builtin_pid_anti_windup(args)),
         "pid_ziegler_nichols" => Some(builtin_pid_ziegler_nichols(args)),
         "smith_predictor_step" => Some(builtin_smith_predictor_step(args)),
@@ -9945,7 +9945,7 @@ pub(crate) fn try_builtin(
         "rrt_star_rewire" => Some(builtin_rrt_star_rewire(args)),
         "prm_node_connect" => Some(builtin_prm_node_connect(args)),
 
-        // ── Batch 60: actuarial science ──────────────────────────────────
+        // ── actuarial science ──────────────────────────────────
         "life_expectancy_e0" => Some(builtin_life_expectancy_e0(args)),
         "force_of_mortality" => Some(builtin_force_of_mortality(args)),
         "select_ultimate" => Some(builtin_select_ultimate(args)),
@@ -9975,7 +9975,7 @@ pub(crate) fn try_builtin(
         "ibnr_estimate" => Some(builtin_ibnr_estimate(args)),
         "run_off_triangle_step" => Some(builtin_run_off_triangle_step(args)),
 
-        // ── Batch 61: epidemiology / public health ───────────────────────
+        // ── epidemiology / public health ───────────────────────
         "r_naught_basic" => Some(builtin_r_naught_basic(args)),
         "r_effective_t" => Some(builtin_r_effective_t(args)),
         "doubling_time_growth" => Some(builtin_doubling_time_growth(args)),
@@ -10004,7 +10004,7 @@ pub(crate) fn try_builtin(
         "cluster_attack_rate" => Some(builtin_cluster_attack_rate(args)),
         "transmission_pair_index" => Some(builtin_transmission_pair_index(args)),
 
-        // ── Batch 62: archive/encoding format primitives ─────────────────
+        // ── archive/encoding format primitives ─────────────────
         "tar_header_checksum" => Some(builtin_tar_header_checksum(args)),
         "tar_pad_512" => Some(builtin_tar_pad_512(args)),
         "tar_member_record" => Some(builtin_tar_member_record(args)),
@@ -10034,7 +10034,7 @@ pub(crate) fn try_builtin(
         "cbor_encode_uint" => Some(builtin_cbor_encode_uint(args)),
         "cbor_encode_str" => Some(builtin_cbor_encode_str(args)),
 
-        // ── Batch 63: chemistry & biochemistry ───────────────────────────
+        // ── chemistry & biochemistry ───────────────────────────
         "molecular_weight_compound" => Some(builtin_molecular_weight_compound(args)),
         "molarity_dilution" => Some(builtin_molarity_dilution(args)),
         "gas_constant_value" => Some(builtin_gas_constant_value(args)),
@@ -10064,7 +10064,7 @@ pub(crate) fn try_builtin(
         "spectroscopic_factor" => Some(builtin_spectroscopic_factor(args)),
         "avogadro_constant" => Some(builtin_avogadro_constant(args)),
 
-        // ── Batch 64: music theory ───────────────────────────────────────
+        // ── music theory ───────────────────────────────────────
         "cents_between_freqs" => Some(builtin_cents_between_freqs(args)),
         "note_name_from_midi" => Some(builtin_note_name_from_midi(args)),
         "interval_quality_size" => Some(builtin_interval_quality_size(args)),
@@ -10090,7 +10090,7 @@ pub(crate) fn try_builtin(
         "dynamics_db_level" => Some(builtin_dynamics_db_level(args)),
         "harmonics_partial" => Some(builtin_harmonics_partial(args)),
 
-        // ── Batch 65: geology, seismology, mineralogy ────────────────────
+        // ── geology, seismology, mineralogy ────────────────────
         "moment_magnitude_mw" => Some(builtin_moment_magnitude_mw(args)),
         "richter_local_ml" => Some(builtin_richter_local_ml(args)),
         "surface_wave_ms" => Some(builtin_surface_wave_ms(args)),
@@ -10115,7 +10115,7 @@ pub(crate) fn try_builtin(
         "gradient_geothermal" => Some(builtin_gradient_geothermal(args)),
         "heat_flow_radiogenic" => Some(builtin_heat_flow_radiogenic(args)),
 
-        // ── Batch 66: BLAS / LAPACK Level-1, -2, -3 primitives ───────────
+        // ── BLAS / LAPACK Level-1, -2, -3 primitives ───────────
         "dgemm" => Some(builtin_dgemm(args)),
         "sgemm" => Some(builtin_sgemm(args)),
         "zgemm" => Some(builtin_zgemm(args)),
@@ -10151,7 +10151,7 @@ pub(crate) fn try_builtin(
         "dgels" => Some(builtin_dgels(args)),
         "dgelsd" => Some(builtin_dgelsd(args)),
 
-        // ── Batch 67: logic, proof, SAT/SMT, type theory, model checking ─
+        // ── logic, proof, SAT/SMT, type theory, model checking ─
         "cnf_unit_propagate" => Some(builtin_cnf_unit_propagate(args)),
         "cnf_pure_literal_elim" => Some(builtin_cnf_pure_literal_elim(args)),
         "cnf_dpll_branch" => Some(builtin_cnf_dpll_branch(args)),
@@ -10185,7 +10185,7 @@ pub(crate) fn try_builtin(
         "sym_check" => Some(builtin_sym_check(args)),
         "trans_check" => Some(builtin_trans_check(args)),
 
-        // ── Batch 68: compilers / parsing ────────────────────────────────
+        // ── compilers / parsing ────────────────────────────────
         "nfa_to_dfa" => Some(builtin_nfa_to_dfa(args)),
         "subset_construction" => Some(builtin_subset_construction(args)),
         "dfa_minimize_hopcroft" => Some(builtin_dfa_minimize_hopcroft(args)),
@@ -10218,7 +10218,7 @@ pub(crate) fn try_builtin(
         "dom_tree_idom" => Some(builtin_dom_tree_idom(args)),
         "dominance_frontier" => Some(builtin_dominance_frontier(args)),
 
-        // ── Batch 69: computational linguistics ──────────────────────────
+        // ── computational linguistics ──────────────────────────
         "porter_stem_step" => Some(builtin_porter_stem_step(args)),
         "snowball_stem_english" => Some(builtin_snowball_stem_english(args)),
         "snowball_stem_french" => Some(builtin_snowball_stem_french(args)),
@@ -10249,7 +10249,7 @@ pub(crate) fn try_builtin(
         "head_finding_collins" => Some(builtin_head_finding_collins(args)),
         "tree_kernel_collins" => Some(builtin_tree_kernel_collins(args)),
 
-        // ── Batch 70: Postgres SQL strings, JSON, regex, aggregates ──────
+        // ── Postgres SQL strings, JSON, regex, aggregates ──────
         "btrim" => Some(builtin_btrim(args)),
         "translate" => Some(builtin_translate(args)),
         "ascii" => Some(builtin_ascii(args)),
@@ -10296,7 +10296,7 @@ pub(crate) fn try_builtin(
         "xmlforest" => Some(builtin_xmlforest(args)),
         "xmlagg" => Some(builtin_xmlagg(args)),
 
-        // ── Batch 71: Redis-flavour primitives ───────────────────────────
+        // ── Redis-flavour primitives ───────────────────────────
         "zadd" => Some(builtin_zadd(args)),
         "zrem" => Some(builtin_zrem(args)),
         "zrangebyscore" => Some(builtin_zrangebyscore(args)),
@@ -10363,7 +10363,7 @@ pub(crate) fn try_builtin(
         "debug_object" => Some(builtin_debug_object(args)),
         "cluster_slots" => Some(builtin_cluster_slots(args)),
 
-        // ── Batch 72: NumPy + scipy.special ──────────────────────────────
+        // ── NumPy + scipy.special ──────────────────────────────
         "argpartition" => Some(builtin_argpartition(args)),
         "bincount" => Some(builtin_bincount(args)),
         "nonzero_count" => Some(builtin_nonzero_count(args)),
@@ -10418,7 +10418,7 @@ pub(crate) fn try_builtin(
         "fmin_powell" => Some(builtin_fmin_powell(args)),
         "fmin_cobyla" => Some(builtin_fmin_cobyla(args)),
 
-        // ── Batch 73: economics, mechanism design, game theory ───────────
+        // ── economics, mechanism design, game theory ───────────
         "cobb_douglas" => Some(builtin_cobb_douglas(args)),
         "ces_production" => Some(builtin_ces_production(args)),
         "leontief_input" => Some(builtin_leontief_input(args)),
@@ -10467,7 +10467,7 @@ pub(crate) fn try_builtin(
         "did_estimator" => Some(builtin_did_estimator(args)),
         "rdd_estimate" => Some(builtin_rdd_estimate(args)),
 
-        // ── Batch 74: SciPy.signal — DSP filters, windows, transforms ────
+        // ── SciPy.signal — DSP filters, windows, transforms ────
         "hann_w" => Some(builtin_hann_w(args)),
         "hamming_w" => Some(builtin_hamming_w(args)),
         "blackman_w" => Some(builtin_blackman_w(args)),
@@ -10530,7 +10530,7 @@ pub(crate) fn try_builtin(
         "medfilt_1d" => Some(builtin_medfilt_1d(args)),
         "peak_widths_at" => Some(builtin_peak_widths_at(args)),
 
-        // ── Batch 75: NetworkX graph algorithms ──────────────────────────
+        // ── NetworkX graph algorithms ──────────────────────────
         "dijkstra_relax" => Some(builtin_dijkstra_relax(args)),
         "bellman_ford_relax" => Some(builtin_bellman_ford_relax(args)),
         "floyd_warshall_step" => Some(builtin_floyd_warshall_step(args)),
@@ -10600,7 +10600,7 @@ pub(crate) fn try_builtin(
         "random_walk_hitting" => Some(builtin_random_walk_hitting(args)),
         "simrank" => Some(builtin_simrank(args)),
 
-        // ── Batch 76: Pandas DataFrame ops ───────────────────────────────
+        // ── Pandas DataFrame ops ───────────────────────────────
         "df_groupby" => Some(builtin_df_groupby(args)),
         "df_aggregate" => Some(builtin_df_aggregate(args)),
         "df_apply" => Some(builtin_df_apply(args)),
@@ -10659,7 +10659,7 @@ pub(crate) fn try_builtin(
         "df_set_index" => Some(builtin_df_set_index(args)),
         "df_reset_index" => Some(builtin_df_reset_index(args)),
 
-        // ── Batch 77: PIL/OpenCV image processing ────────────────────────
+        // ── PIL/OpenCV image processing ────────────────────────
         "image_resize" => Some(builtin_image_resize(args)),
         "image_grayscale" => Some(builtin_image_grayscale(args)),
         "image_threshold" => Some(builtin_image_threshold(args)),
@@ -10712,7 +10712,7 @@ pub(crate) fn try_builtin(
         "image_emboss" => Some(builtin_image_emboss(args)),
         "image_motion_blur" => Some(builtin_image_motion_blur(args)),
 
-        // ── Batch 78: Statsmodels: time series, Kalman, GARCH, Holt-Winters, stationarity ─
+        // ── Statsmodels: time series, Kalman, GARCH, Holt-Winters, stationarity ─
         "arima_fit" => Some(builtin_arima_fit(args)),
         "arima_forecast" => Some(builtin_arima_forecast(args)),
         "arma_order_select" => Some(builtin_arma_order_select(args)),
@@ -10749,7 +10749,7 @@ pub(crate) fn try_builtin(
         "spectral_density_estimate" => Some(builtin_spectral_density_estimate(args)),
         "bayesian_step" => Some(builtin_bayesian_step(args)),
         "pivoted_cholesky_var" => Some(builtin_pivoted_cholesky_var(args)),
-        // ── Batch 79: sklearn ML primitives ─
+        // ── sklearn ML primitives ─
         "sk_logistic_predict" => Some(builtin_sk_logistic_predict(args)),
         "sk_logistic_fit" => Some(builtin_sk_logistic_fit(args)),
         "sk_random_forest_fit" => Some(builtin_sk_random_forest_fit(args)),
@@ -10794,7 +10794,7 @@ pub(crate) fn try_builtin(
         "sk_naive_bayes_predict" => Some(builtin_sk_naive_bayes_predict(args)),
         "sk_knn_predict" => Some(builtin_sk_knn_predict(args)),
         "sk_decision_tree_split" => Some(builtin_sk_decision_tree_split(args)),
-        // ── Batch 80: Quantum gates / circuits ─
+        // ── Quantum gates / circuits ─
         "qubit_x" => Some(builtin_qubit_x(args)),
         "qubit_y" => Some(builtin_qubit_y(args)),
         "qubit_z" => Some(builtin_qubit_z(args)),
@@ -10837,7 +10837,7 @@ pub(crate) fn try_builtin(
         "superdense_coding" => Some(builtin_superdense_coding(args)),
         "noise_model_depolarize" => Some(builtin_noise_model_depolarize(args)),
 
-        // ── Batch 81: Excel financials, hash families, compression encoders, URI/HTTP ─
+        // ── Excel financials, hash families, compression encoders, URI/HTTP ─
         "mirr_excel" => Some(builtin_mirr_excel(args)),
         "accrint" => Some(builtin_accrint(args)),
         "cumipmt" => Some(builtin_cumipmt(args)),
@@ -10893,7 +10893,7 @@ pub(crate) fn try_builtin(
         "if_none_match_check" => Some(builtin_if_none_match_check(args)),
         "digest_auth_quote" => Some(builtin_digest_auth_quote(args)),
         "www_auth_parse" => Some(builtin_www_auth_parse(args)),
-        // ── Batch 82: Time math, color spaces, validation checksums, KDE kernels ─
+        // ── Time math, color spaces, validation checksums, KDE kernels ─
         "iso8601_duration_parse" => Some(builtin_iso8601_duration_parse(args)),
         "iso8601_duration_to_seconds" => Some(builtin_iso8601_duration_to_seconds(args)),
         "rrule_next_occurrence" => Some(builtin_rrule_next_occurrence(args)),
@@ -18562,7 +18562,7 @@ fn builtin_flatten_deep(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Trig / math (batch 2)
+// Trig / math
 // ─────────────────────────────────────────────────────────────────────────
 /// `tan` — Unit conversion: `tan`.
 fn builtin_tan(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
@@ -18693,7 +18693,7 @@ fn builtin_wrap_around(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// String (batch 2)
+// String
 // ─────────────────────────────────────────────────────────────────────────
 fn rot_shift(s: &str, shift: i32) -> String {
     s.chars()
@@ -19030,7 +19030,7 @@ fn builtin_ends_with_any(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Predicates (batch 2)
+// Predicates
 // ─────────────────────────────────────────────────────────────────────────
 /// `is_pair` — Test whether the argument is pair. Returns 1 (true) or 0 (false).
 fn builtin_is_pair(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
@@ -19125,7 +19125,7 @@ fn builtin_is_permutation(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Collection (batch 2)
+// Collection
 // ─────────────────────────────────────────────────────────────────────────
 /// `first_eq` — First eq.
 fn builtin_first_eq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
@@ -19400,7 +19400,7 @@ fn builtin_random_sample(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Hash ops (batch 2)
+// Hash ops
 // ─────────────────────────────────────────────────────────────────────────
 /// `pick_keys` — Pick keys.
 fn builtin_pick_keys(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
@@ -19525,7 +19525,7 @@ fn builtin_remove_keys(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Date (batch 2)
+// Date
 // ─────────────────────────────────────────────────────────────────────────
 /// `today` — Today. Returns an integer.
 fn builtin_today() -> PerlResult<StrykeValue> {

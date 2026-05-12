@@ -1,5 +1,5 @@
-//! Quantitative builtins (Phase 1, batch 13): technical indicators,
-//! time-series ops, finance, optimization, numerical methods.
+//! Quantitative builtins: technical indicators, time-series ops,
+//! finance, optimization, numerical methods.
 //! Pure functions; deliberately compact implementations.
 
 use crate::value::StrykeValue;

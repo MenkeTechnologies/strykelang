@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Batch 9 — long-tail Mathematica/MATLAB/R/Python utilities: list/string
+// long-tail Mathematica/MATLAB/R/Python utilities: list/string
 // positional helpers, datetime navigation, calendar quirks (Easter, zodiac),
 // WCAG accessibility colour metrics, music theory (chords/scales/intervals),
 // astronomy (moon phase, equation of time), group / permutation primitives,

@@ -1,4 +1,4 @@
-// Batch 69 — computational linguistics: stemmers, phonetic encoders, POS
+// computational linguistics: stemmers, phonetic encoders, POS
 // taggers, dependency parsers, alignment.
 
 fn b69_to_codepoints(v: &StrykeValue) -> Vec<i64> {

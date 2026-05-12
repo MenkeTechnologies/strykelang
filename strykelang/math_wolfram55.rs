@@ -1,4 +1,4 @@
-// Batch 55 — astronomy / astrometry. Reference: Jean Meeus, "Astronomical
+// astronomy / astrometry. Reference: Jean Meeus, "Astronomical
 // Algorithms" 2nd ed., and IAU 2006/2000 conventions for precession/nutation.
 
 const B55_J2000: f64 = 2_451_545.0; // JD of 2000-01-01 12h TT

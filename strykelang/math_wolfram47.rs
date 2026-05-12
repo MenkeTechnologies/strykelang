@@ -1,4 +1,4 @@
-// Batch 47 — graphics, geometry, ray tracing, BRDF, color spaces, noise, SDF.
+// graphics, geometry, ray tracing, BRDF, color spaces, noise, SDF.
 
 fn b47_to_floats(v: &StrykeValue) -> Vec<f64> {
     arg_to_vec(v).iter().map(|x| x.to_number()).collect()

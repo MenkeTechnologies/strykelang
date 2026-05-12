@@ -1,4 +1,4 @@
-// Batch 49 — networking: TCP, AQM, queueing, MIMO, channel, queueing law.
+// networking: TCP, AQM, queueing, MIMO, channel, queueing law.
 
 fn b49_to_floats(v: &StrykeValue) -> Vec<f64> {
     arg_to_vec(v).iter().map(|x| x.to_number()).collect()

@@ -1,4 +1,4 @@
-// Batch 24 — graph algorithms: SCC, articulation, bridges, flow, matching, centrality.
+// graph algorithms: SCC, articulation, bridges, flow, matching, centrality.
 
 fn parse_adj_b24(v: &StrykeValue) -> Vec<Vec<usize>> {
     let outer = arg_to_vec(v);

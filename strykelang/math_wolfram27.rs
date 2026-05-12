@@ -1,4 +1,4 @@
-// Batch 27 — machine learning: trees, ensembles, activations, losses, metrics.
+// machine learning: trees, ensembles, activations, losses, metrics.
 
 // Gini impurity
 fn builtin_gini_impurity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {

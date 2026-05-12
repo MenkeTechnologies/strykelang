@@ -1,4 +1,4 @@
-// Batch 38 — electrochemistry, batteries, fuel cells, corrosion, electrolytes.
+// electrochemistry, batteries, fuel cells, corrosion, electrolytes.
 
 const B38_R_GAS: f64 = 8.314_462_618;
 const B38_F_FARADAY: f64 = 96_485.332_12;

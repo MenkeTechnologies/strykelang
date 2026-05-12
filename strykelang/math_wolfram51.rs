@@ -1,4 +1,4 @@
-// Batch 51 — security: KDFs, MFA, PKI, web security, TLS, ciphers.
+// security: KDFs, MFA, PKI, web security, TLS, ciphers.
 
 /// Argon2 memory cost m: chosen so that derivation takes ≥ target_ms on a known
 /// reference machine. RFC 9106 recommends m ≥ 2^16 KiB (=64 MiB) for Argon2id.

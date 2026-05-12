@@ -1,4 +1,4 @@
-// Batch 42 — climate, fluids, atmospheric science, geophysics, oscillation indices.
+// climate, fluids, atmospheric science, geophysics, oscillation indices.
 
 const B42_SIGMA: f64 = 5.670_374_419e-8;
 const B42_R_DRY: f64 = 287.058;

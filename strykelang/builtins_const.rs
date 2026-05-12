@@ -1,4 +1,4 @@
-//! Constants & distribution helpers (Phase 1, batch 11).
+//! Constants & distribution helpers.
 //! HTTP status codes return their numeric value. HTTP method names
 //! return their canonical uppercase form. Distribution PDF/quantile/
 //! sampler functions use the `statrs` crate.

@@ -1,4 +1,4 @@
-// Batch 45 — ML primitives: activations, losses, normalizations, optimizers, samplers.
+// ML primitives: activations, losses, normalizations, optimizers, samplers.
 
 fn b45_to_floats(v: &StrykeValue) -> Vec<f64> {
     arg_to_vec(v).iter().map(|x| x.to_number()).collect()

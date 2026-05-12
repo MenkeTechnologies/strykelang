@@ -1,4 +1,4 @@
-// Batch 78 — Statsmodels: time series (ARIMA, GARCH, Kalman, state-space),
+// Statsmodels: time series (ARIMA, GARCH, Kalman, state-space),
 // stationarity tests, autocovariance, smoothing.
 
 fn b78_to_floats(v: &StrykeValue) -> Vec<f64> {

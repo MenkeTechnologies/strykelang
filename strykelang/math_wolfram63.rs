@@ -1,4 +1,4 @@
-// Batch 63 — chemistry & biochemistry: stoichiometry, kinetics, equilibrium,
+// chemistry & biochemistry: stoichiometry, kinetics, equilibrium,
 // electrochemistry, spectroscopy, structural rules.
 
 const B63_R_GAS: f64 = 8.314_462_618;

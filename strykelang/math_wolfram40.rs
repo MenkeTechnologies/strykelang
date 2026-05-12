@@ -1,4 +1,4 @@
-// Batch 40 — information theory, coding, signal processing, RL, divergences.
+// information theory, coding, signal processing, RL, divergences.
 
 fn b40_to_floats(v: &StrykeValue) -> Vec<f64> {
     arg_to_vec(v).iter().map(|x| x.to_number()).collect()

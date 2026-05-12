@@ -1,4 +1,4 @@
-// Batch 43 — game theory, mechanism design, social choice, repeated games.
+// game theory, mechanism design, social choice, repeated games.
 
 fn b43_to_floats(v: &StrykeValue) -> Vec<f64> {
     arg_to_vec(v).iter().map(|x| x.to_number()).collect()

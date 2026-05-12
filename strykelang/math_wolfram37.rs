@@ -1,4 +1,4 @@
-// Batch 37 — algebraic topology, knot theory, lie algebras, representation theory.
+// algebraic topology, knot theory, lie algebras, representation theory.
 
 /// Euler characteristic of a CW-complex from face counts (alternating sum)
 fn builtin_euler_char_complex(args: &[StrykeValue]) -> PerlResult<StrykeValue> {

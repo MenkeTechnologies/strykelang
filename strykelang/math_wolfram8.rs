@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Batch 8 — cross-domain primitives mined from APL/J/K, MATLAB, Maple, R/CRAN,
+// cross-domain primitives mined from APL/J/K, MATLAB, Maple, R/CRAN,
 // Stata, BioPython, MetPy, Quantlib, scikit-image, librosa, NetworkX, ELO/Glicko
 // rating-systems literature, and standard physics/chemistry/finance references.
 // Layout: bioinformatics, geographic / map-projection helpers, fixed-income

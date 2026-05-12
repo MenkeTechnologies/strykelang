@@ -1,4 +1,4 @@
-//! Iterator combinator + string-distance extras (Phase 1, batch 8).
+//! Iterator combinator + string-distance extras.
 //! Pure functions, no external crates.
 
 use crate::value::StrykeValue;

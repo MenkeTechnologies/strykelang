@@ -1,4 +1,4 @@
-// Batch 58 — geographic information systems: geohash, H3, S2, UTM, MGRS,
+// geographic information systems: geohash, H3, S2, UTM, MGRS,
 // projections, geodesic distance, polygon ops. Where reference libraries
 // ship complex finite-element machinery (full H3 / S2), we implement the
 // simplified scalar variants that compute the named operation correctly

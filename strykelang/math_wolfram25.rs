@@ -1,4 +1,4 @@
-// Batch 25 — signal processing deep: windows, IIR/FIR designs, biquads, transforms.
+// signal processing deep: windows, IIR/FIR designs, biquads, transforms.
 
 // Hamming window
 fn builtin_hamming_window(args: &[StrykeValue]) -> PerlResult<StrykeValue> {

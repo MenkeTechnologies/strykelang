@@ -2705,7 +2705,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "eta_quotient" => "`eta_quotient PAIRS, Y` — Π η(d·iy)^{r_d} for [[d, r_d], …].",
         "root_approximant" => "`root_approximant X [, MAX_DENOM]` — best rational approximant (alias for `best_rational_approximation`).",
 
-        // ── Batch 3: vector calculus ────────────────────────────────────
+        // ── vector calculus ────────────────────────────────────
         "numerical_gradient" | "ngrad" => "`numerical_gradient F, POINT [, H]` — central-difference ∇f. F receives a single arrayref `$_[0]`.\n\n```perl\nfn quad { my @y = @{$_[0]}; $y[0]**2 + 2*$y[1]**2 }\nmy @g = ngrad(\\&quad, [3, 4])    # (6, 16)\n```",
         "numerical_jacobian" | "njac" => "`numerical_jacobian F, POINT [, H]` — Jacobian of vector-valued F.",
         "numerical_hessian" | "nhess" => "`numerical_hessian F, POINT [, H]` — symmetric Hessian via mixed second differences.",
@@ -2713,7 +2713,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "numerical_curl" | "ncurl" => "`numerical_curl F, POINT [, H]` — 3-D curl returned as `[c_x, c_y, c_z]`.",
         "numerical_laplacian" | "nlap" => "`numerical_laplacian F, POINT [, H]` — ∇²f.",
 
-        // ── Batch 3: optimization ───────────────────────────────────────
+        // ── optimization ───────────────────────────────────────
         "nelder_mead" | "simplex_min" => "`nelder_mead F, X0 [, MAX_ITER, TOL]` — Nelder-Mead simplex minimisation. Returns `[x*, f(x*)]`.",
         "gradient_descent" | "gd_min" => "`gradient_descent F, GRAD, X0 [, STEP, ITERS]` — fixed-step descent.",
         "bfgs_minimize" | "bfgs" => "`bfgs_minimize F, GRAD, X0 [, MAX_ITER, TOL]` — BFGS quasi-Newton with Armijo line search.",
@@ -2721,13 +2721,13 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "conjugate_gradient" | "cg_solve" => "`conjugate_gradient A, B` — CG for symmetric positive definite A x = b.",
         "least_squares" | "lstsq" => "`least_squares A, B` — solves A^T A x = A^T b.",
 
-        // ── Batch 3: integration ────────────────────────────────────────
+        // ── integration ────────────────────────────────────────
         "romberg" | "romberg_int" => "`romberg F, A, B [, LEVELS]` — Romberg integration. Doubles trapezoid then Richardson-extrapolates.",
         "gauss_legendre_quad" | "glquad" | "gl_quad" => "`gauss_legendre_quad F, A, B [, N]` — N-point Gauss-Legendre quadrature on [a, b] (default N=10).",
         "monte_carlo_integrate" | "mc_int" => "`monte_carlo_integrate F, A, B [, N]` — uniform Monte Carlo over [a, b] with N samples (default 10 000).",
         "adaptive_simpson" | "asimp" => "`adaptive_simpson F, A, B [, TOL, MAX_DEPTH]` — adaptive Simpson with Richardson tail.",
 
-        // ── Batch 3: LA extras ──────────────────────────────────────────
+        // ── LA extras ──────────────────────────────────────────
         "lu_decompose" | "ludec" => "`lu_decompose A` → `[L, U, P]` with P A = L U; P stored as a row-permutation vector.",
         "qr_decompose" | "qrdec" => "`qr_decompose A` → `[Q, R]` via Gram-Schmidt.",
         "householder_reflector" | "householder" => "`householder_reflector V` → I − 2 v v^T / (v · v).",
@@ -2736,14 +2736,14 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "back_substitute" | "backsub" => "`back_substitute U, B` — solve U x = b for upper-triangular U.",
         "hessenberg_reduce" | "hessen" => "`hessenberg_reduce A` — orthogonal Hessenberg form via Householder reflections.",
 
-        // ── Batch 3: polynomial helpers ─────────────────────────────────
+        // ── polynomial helpers ─────────────────────────────────
         "poly_derivative" | "polyder" => "`poly_derivative P` — coefficient-list derivative of polynomial P (low-to-high order).",
         "poly_integrate" | "polyint" => "`poly_integrate P [, C]` — antiderivative with constant C (default 0).",
         "poly_compose" => "`poly_compose P, Q` → coefficients of P(Q(x)).",
         "poly_eval_horner" | "horner" => "`poly_eval_horner P, X` — Horner-rule polynomial evaluation.",
         "pade_approximant" | "pade" => "`pade_approximant TAYLOR, M, N` → `[num, den]` Padé approximation.",
 
-        // ── Batch 3: quaternions ────────────────────────────────────────
+        // ── quaternions ────────────────────────────────────────
         "quat_mul" => "`quat_mul A, B` — Hamilton product (w, x, y, z).",
         "quat_conj" => "`quat_conj Q` — conjugate (w, -x, -y, -z).",
         "quat_norm" => "`quat_norm Q` — Euclidean norm.",
@@ -2757,7 +2757,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "matrix_to_euler_zyx" => "`matrix_to_euler_zyx R` → `[yaw, pitch, roll]`.",
         "rotate_3d_vec" => "`rotate_3d_vec Q, V` — apply quaternion rotation to a 3-vector.",
 
-        // ── Batch 3: information theory ─────────────────────────────────
+        // ── information theory ─────────────────────────────────
         "kl_divergence" | "kl_div" => "`kl_divergence P, Q` — D_KL(P || Q) in nats.",
         "js_divergence" | "js_div" => "`js_divergence P, Q` — Jensen-Shannon divergence.",
         "mutual_information" | "mi" => "`mutual_information JOINT` — I(X; Y) from a joint-probability matrix.",
@@ -2765,7 +2765,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "renyi_entropy" => "`renyi_entropy P [, ALPHA]` — Rényi entropy of order α (default 2).",
         "tsallis_entropy" => "`tsallis_entropy P [, Q]` — Tsallis entropy of order q (default 2).",
 
-        // ── Batch 3: quantum primitives ─────────────────────────────────
+        // ── quantum primitives ─────────────────────────────────
         "pauli_x" => "`pauli_x` — 2×2 σ_x matrix.",
         "pauli_y" => "`pauli_y` — 2×2 σ_y matrix encoded with [Re, Im] entries (since stryke matrices are real).",
         "pauli_z" => "`pauli_z` — 2×2 σ_z matrix.",
@@ -2778,7 +2778,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "partial_trace" | "ptrace" => "`partial_trace RHO, DIMS, KEEP` — partial trace over subsystems whose indices are not in KEEP.",
         "von_neumann_entropy" | "vn_entropy" => "`von_neumann_entropy RHO` — S(ρ) = -tr(ρ log ρ) for symmetric ρ.",
 
-        // ── Batch 3: stat mech ──────────────────────────────────────────
+        // ── stat mech ──────────────────────────────────────────
         "bose_einstein" => "`bose_einstein E, MU, KT` — 1 / (exp((E - μ)/kT) - 1).",
         "fermi_dirac" => "`fermi_dirac E, MU, KT` — 1 / (exp((E - μ)/kT) + 1).",
         "maxwell_boltzmann_speed" | "mb_speed" => "`maxwell_boltzmann_speed V, M, KT` — Maxwell-Boltzmann speed PDF.",
@@ -2787,7 +2787,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "boltzmann_factor" => "`boltzmann_factor E, KT` — exp(-E / kT).",
         "einstein_specific_heat" | "einstein_cv" => "`einstein_specific_heat T, THETA_E` — Einstein heat-capacity model (J / mol·K).",
 
-        // ── Batch 3: optics ─────────────────────────────────────────────
+        // ── optics ─────────────────────────────────────────────
         "fresnel_reflection_te" => "`fresnel_reflection_te THETA_I, N1, N2` — TE (s-polarisation) reflection coefficient.",
         "fresnel_reflection_tm" => "`fresnel_reflection_tm THETA_I, N1, N2` — TM (p-polarisation) reflection.",
         "fresnel_transmission_te" => "`fresnel_transmission_te THETA_I, N1, N2` — TE transmission.",
@@ -2796,7 +2796,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "abcd_free_space" => "`abcd_free_space D` — ABCD matrix for free-space propagation D.",
         "gaussian_beam_q" => "`gaussian_beam_q Z, W0, LAMBDA` → `[Re(q), Im(q)]` for a Gaussian beam at distance Z.",
 
-        // ── Batch 3: astrodynamics ──────────────────────────────────────
+        // ── astrodynamics ──────────────────────────────────────
         "kepler_solve" => "`kepler_solve M, E` — solve Kepler's equation M = E - e sin(E) by Newton iteration.",
         "true_to_eccentric" => "`true_to_eccentric NU, E` → eccentric anomaly E.",
         "eccentric_to_mean" => "`eccentric_to_mean E, ECC` → mean anomaly M.",
@@ -2807,13 +2807,13 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "orbital_period_kepler" => "`orbital_period_kepler A, MU` — T = 2π √(a³ / μ).",
         "orbital_elements_to_state" | "elem_to_state" => "`orbital_elements_to_state A, E, I, OM, W, NU, MU` → `[r_x, r_y, r_z, v_x, v_y, v_z]`.",
 
-        // ── Batch 3: time series ────────────────────────────────────────
+        // ── time series ────────────────────────────────────────
         "kalman_step" | "kalman_filter" => "`kalman_step X, P, F, H, Q, R, Z` → `[X', P']` — single Kalman predict-and-update step.",
         "exponential_smoothing" | "exp_smooth" => "`exponential_smoothing XS, ALPHA` — first-order EMA.",
         "holt_winters" => "`holt_winters XS, ALPHA, BETA, GAMMA, PERIOD` — additive triple exponential smoothing.",
         "arma_yw_fit" | "ar_yw" => "`arma_yw_fit XS, P` — Yule-Walker AR(p) coefficients via Levinson-Durbin.",
 
-        // ── Batch 3: graph centrality ───────────────────────────────────
+        // ── graph centrality ───────────────────────────────────
         "pagerank" => "`pagerank ADJ [, DAMPING, ITERS]` — PageRank via power iteration. Default damping 0.85, 100 iters.",
         "betweenness_centrality" => "`betweenness_centrality ADJ` — Brandes' algorithm (unweighted).",
         "closeness_centrality" => "`closeness_centrality ADJ` — closeness centrality. 0 for disconnected vertices.",
@@ -2821,7 +2821,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "degree_centrality" => "`degree_centrality ADJ` — degree / (n - 1).",
         "triangle_count" => "`triangle_count ADJ` — number of triangles incident at each vertex.",
 
-        // ── Batch 3: random samplers ────────────────────────────────────
+        // ── random samplers ────────────────────────────────────
         "rgumbel" => "`rgumbel MU, BETA` — Gumbel sample.",
         "rfrechet" => "`rfrechet ALPHA, S` — Fréchet sample.",
         "rrayleigh" => "`rrayleigh SIGMA` — Rayleigh sample.",
@@ -2829,16 +2829,16 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "rkumaraswamy" => "`rkumaraswamy A, B` — Kumaraswamy sample on (0, 1).",
         "rinverse_gamma" | "rinvgamma" => "`rinverse_gamma ALPHA, BETA` — inverse-gamma sample (Marsaglia-Tsang).",
 
-        // ── Batch 3: 2D geometry ────────────────────────────────────────
+        // ── 2D geometry ────────────────────────────────────────
         "graham_scan" | "convex_hull_2d" => "`graham_scan POINTS` — 2-D convex hull (CCW).",
         "line_line_intersect_2d" | "ll_intersect_2d" => "`line_line_intersect_2d P1, P2, P3, P4` → intersection `[x, y]` or undef when parallel.",
         "point_segment_distance" | "p_seg_dist" => "`point_segment_distance P, A, B` — Euclidean distance from P to segment AB.",
 
-        // ── Batch 4: auto-diff ──────────────────────────────────────────
+        // ── auto-diff ──────────────────────────────────────────
         "forward_diff" | "fdiff" => "`forward_diff F, X` — derivative of scalar f at scalar x (Julia ForwardDiff style; central-difference fallback).",
         "forward_diff_grad" | "fdiff_grad" => "`forward_diff_grad F, X_VEC` — gradient at vector x; alias for `numerical_gradient`.",
 
-        // ── Batch 4: stat tests ─────────────────────────────────────────
+        // ── stat tests ─────────────────────────────────────────
         "bartlett_test" => "`bartlett_test GROUPS` — Bartlett's k-sample variance equality test. Returns `[chi², df, p]`.",
         "levene_test" => "`levene_test GROUPS` — Levene's variance-equality test. Returns `[F, df1, df2, p]`.",
         "fishers_exact_test_2x2" | "fishers_exact" => "`fishers_exact_test_2x2 [[a, b], [c, d]]` — two-sided p-value.",
@@ -2852,7 +2852,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "ljung_box_test" | "ljung_box" => "`ljung_box_test XS [, H]` — autocorrelation test. Returns `[Q, h, p]`.",
         "durbin_watson_stat" | "durbin_watson" => "`durbin_watson_stat RESID` — DW autocorrelation statistic on residuals.",
 
-        // ── Batch 4: distance metrics ───────────────────────────────────
+        // ── distance metrics ───────────────────────────────────
         "mahalanobis_distance" | "mahalanobis_dist" => "`mahalanobis_distance X, MU, SIGMA` — √((x-μ)ᵀ Σ⁻¹ (x-μ)).",
         "cosine_distance" => "`cosine_distance A, B` — 1 − cos(A, B).",
         "canberra_distance" => "`canberra_distance A, B` — Σ |a-b| / (|a|+|b|).",
@@ -2860,7 +2860,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "l1_distance" => "`l1_distance A, B` — Manhattan / taxi-cab distance.",
         "chi_squared_distance" => "`chi_squared_distance A, B` — ½ Σ (a-b)² / (a+b).",
 
-        // ── Batch 4: more distributions ─────────────────────────────────
+        // ── more distributions ─────────────────────────────────
         "multivariate_normal_pdf" | "mvn_pdf" => "`multivariate_normal_pdf X, MU, SIGMA` — multivariate Gaussian PDF.",
         "multivariate_normal_sample" | "rmvn" => "`multivariate_normal_sample MU, SIGMA` — sample from MVN via Cholesky.",
         "dirichlet_pdf" => "`dirichlet_pdf X, ALPHA` — Dirichlet PDF on the simplex.",
@@ -2871,57 +2871,57 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "inverse_gaussian_sample" | "rwald" => "`inverse_gaussian_sample MU, LAMBDA` — Michael-Schucany-Haas.",
         "non_central_chi2_pdf" | "ncchi2_pdf" => "`non_central_chi2_pdf X, K, LAMBDA` — Series-form non-central χ² PDF.",
 
-        // ── Batch 4: matrix functions ───────────────────────────────────
+        // ── matrix functions ───────────────────────────────────
         "matrix_exp" | "expm" => "`matrix_exp A` — e^A via 13-term Padé + scaling-and-squaring.",
         "matrix_log" | "logm" => "`matrix_log A` — ln A via inverse scaling (Denman-Beavers SQRT) + Padé log.",
         "matrix_sqrt" | "sqrtm" => "`matrix_sqrt A` — A^(1/2) via Denman-Beavers iteration.",
         "matrix_sin" | "sinm" => "`matrix_sin A` — series form Σ (-1)^k A^(2k+1) / (2k+1)!.",
         "matrix_cos" | "cosm" => "`matrix_cos A` — series form Σ (-1)^k A^(2k) / (2k)!.",
 
-        // ── Batch 4: adaptive ODE ────────────────────────────────────────
+        // ── adaptive ODE ────────────────────────────────────────
         "rk45_dormand_prince" | "rk45" | "dopri5" => "`rk45_dormand_prince F, Y0, T0, T1, H0 [, TOL]` — adaptive Dormand-Prince. F receives `[t, y0, …]`.",
         "midpoint_step" | "ode_midpoint" => "`midpoint_step F, Y, T, H` — single explicit-midpoint step.",
         "heun_step" | "ode_heun" => "`heun_step F, Y, T, H` — improved-Euler / Heun step.",
         "verlet_step" | "ode_verlet" => "`verlet_step ACCEL, Q, P, T, H` — velocity-Verlet symplectic step.",
 
-        // ── Batch 4: GLM ────────────────────────────────────────────────
+        // ── GLM ────────────────────────────────────────────────
         "logistic_regression" | "logit_fit" => "`logistic_regression X, Y` — IRLS (no intercept added — supply column of ones).",
         "poisson_regression" => "`poisson_regression X, Y` — IRLS with log link.",
         "ridge_regression" | "ridge" => "`ridge_regression X, Y [, LAMBDA]` — Tikhonov-regularised LSQ.",
         "lasso_coord" | "lasso" => "`lasso_coord X, Y [, LAMBDA, MAX_ITER]` — coordinate-descent LASSO.",
 
-        // ── Batch 4: bootstrap ──────────────────────────────────────────
+        // ── bootstrap ──────────────────────────────────────────
         "bootstrap_mean_ci" | "boot_mean_ci" => "`bootstrap_mean_ci DATA [, B, ALPHA]` — percentile CI for the mean.",
         "jackknife_estimate" | "jackknife" => "`jackknife_estimate DATA` — leave-one-out SE of the mean.",
         "permutation_test_diff" | "perm_test_diff" => "`permutation_test_diff A, B [, N_ITER]` — two-sided p of mean difference.",
 
-        // ── Batch 4: time series extras ─────────────────────────────────
+        // ── time series extras ─────────────────────────────────
         "acf_at_lag" => "`acf_at_lag XS, LAG` — autocorrelation at one lag.",
         "diff_op" => "`diff_op XS [, LAG]` — y_t − y_{t-lag}.",
         "lag_op" => "`lag_op XS [, K]` — shift by k (NaN-pad).",
         "decompose_classical" | "decompose_ts" => "`decompose_classical XS [, PERIOD]` — additive [trend, season, residual].",
 
-        // ── Batch 4: combinatorial generators ───────────────────────────
+        // ── combinatorial generators ───────────────────────────
         "combinations_list" => "`combinations_list N, K` — all k-subsets of 0..n in lex order.",
         "permutations_list" => "`permutations_list N` — all permutations of 0..n via Heap's algorithm.",
         "cyclic_permutations" => "`cyclic_permutations ARR` — all rotations.",
         "subsets_of_size" => "`subsets_of_size ARR, K` — all k-subsets of an arbitrary array.",
 
-        // ── Batch 4: DP ─────────────────────────────────────────────────
+        // ── DP ─────────────────────────────────────────────────
         "longest_increasing_subseq" | "lis" => "`longest_increasing_subseq XS` — length only (O(n log n)).",
         "knapsack_01" | "knapsack" => "`knapsack_01 ITEMS, CAPACITY` — items as `[[w, v], …]`.",
         "subset_sum_target" | "subset_sum" => "`subset_sum_target ARR, T` — 1 if any subset sums to T.",
         "coin_change_min" | "coin_change_minimum" => "`coin_change_min COINS, N` — min number of coins to make N (-1 if impossible).",
         "edit_distance_levenshtein" | "edit_distance" => "`edit_distance A, B` — Levenshtein distance.",
 
-        // ── Batch 4: ML metrics ─────────────────────────────────────────
+        // ── ML metrics ─────────────────────────────────────────
         "one_hot_encode" | "onehot" => "`one_hot_encode LABELS [, N_CLASSES]` → n×K matrix.",
         "label_encode" => "`label_encode ARR` → `[indices, classes]`.",
         "categorical_cross_entropy" | "cce" => "`categorical_cross_entropy Y_TRUE, Y_PRED` — averaged over batch.",
         "classification_metrics" | "binary_metrics" => "`classification_metrics TP, FP, FN, TN` → `[acc, prec, recall, f1]`.",
         "roc_auc" | "auroc" => "`roc_auc SCORES, LABELS` — Mann-Whitney U / (n+ n−).",
 
-        // ── Batch 4: DSP / image ────────────────────────────────────────
+        // ── DSP / image ────────────────────────────────────────
         "gaussian_blur_kernel" => "`gaussian_blur_kernel SIGMA [, RADIUS]` — 1-D normalized kernel.",
         "sobel_x" => "`sobel_x` — horizontal Sobel kernel.",
         "sobel_y" => "`sobel_y` — vertical Sobel kernel.",
@@ -2929,37 +2929,37 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "prewitt_y" => "`prewitt_y` — vertical Prewitt.",
         "laplacian_of_gaussian" | "log_kernel" => "`laplacian_of_gaussian SIGMA` — 2-D LoG kernel.",
 
-        // ── Batch 4: stochastic ─────────────────────────────────────────
+        // ── stochastic ─────────────────────────────────────────
         "brownian_path" | "wiener_path" => "`brownian_path T, N` — discrete Wiener path on [0, T].",
         "geometric_brownian_path" | "gbm_path" => "`geometric_brownian_path S0, MU, SIGMA, T, N` — GBM sample path.",
         "poisson_process" => "`poisson_process LAMBDA, T` — homogeneous Poisson arrival times.",
         "random_walk_1d" => "`random_walk_1d N [, P]` — ±1 walk over N steps.",
 
-        // ── Batch 4: compression ────────────────────────────────────────
+        // ── compression ────────────────────────────────────────
         "lempel_ziv_complexity" | "lz_complexity" => "`lempel_ziv_complexity SEQ` — LZ76 production count.",
         "huffman_code_lengths" | "huffman" => "`huffman_code_lengths FREQS` — code-length per symbol.",
         "shannon_entropy_rate" | "block_entropy_rate" => "`shannon_entropy_rate SEQ [, M]` — H_m − H_{m-1} block estimate.",
 
-        // ── Batch 4: physics / quantum ──────────────────────────────────
+        // ── physics / quantum ──────────────────────────────────
         "planck_blackbody" | "blackbody" => "`planck_blackbody LAMBDA, T` — spectral radiance B(λ, T).",
         "rayleigh_jeans" => "`rayleigh_jeans LAMBDA, T` — long-wavelength approx.",
         "compton_shift" => "`compton_shift THETA` — photon wavelength shift Δλ = (h/m_e c)(1-cosθ).",
         "rydberg_energy" => "`rydberg_energy N` — hydrogen level energy −13.605693/n² eV.",
         "hydrogen_radial_wavefunction" | "h_rad_psi" => "`hydrogen_radial_wavefunction N, L, R` — atomic-units R_{n,l}(r).",
 
-        // ── Batch 4: number theory ──────────────────────────────────────
+        // ── number theory ──────────────────────────────────────
         "integer_log" | "ilog" => "`integer_log N [, BASE]` — largest k with base^k ≤ n.",
         "aks_primality" | "aks" => "`aks_primality N` — deterministic primality (perfect-power + small-factor + Miller-Rabin fallback).",
         "elliptic_curve_add" | "ec_add" => "`elliptic_curve_add P, Q, A, B` — group law on y² = x³ + a x + b. Identity = `[NaN, NaN]`.",
         "berlekamp_massey" | "bm_lfsr" => "`berlekamp_massey SEQ` — minimal-LFSR connection-polynomial coefficients.",
         "bezout_coefficients" | "bezout" | "extended_euclid" => "`bezout_coefficients A, B` → `[gcd, x, y]` with a x + b y = gcd.",
 
-        // ── Batch 5: CAS-lite ───────────────────────────────────────────
+        // ── CAS-lite ───────────────────────────────────────────
         "factor_quadratic" => "`factor_quadratic A, B, C` — real roots of a x² + b x + c = 0.",
         "complete_square" => "`complete_square A, B, C` → `[h, k]` for a (x-h)² + k.",
         "partial_fraction_simple" | "partial_fraction" => "`partial_fraction_simple NUM, ROOTS` — Heaviside cover-up residues.",
 
-        // ── Batch 5: more quadrature ────────────────────────────────────
+        // ── more quadrature ────────────────────────────────────
         "gauss_chebyshev_quad" | "gc_quad" => "`gauss_chebyshev_quad F [, N]` — ∫_{-1}^1 f(x)/√(1-x²) dx (default N=16).",
         "gauss_hermite_quad" | "gh_quad" => "`gauss_hermite_quad F [, N]` — ∫_{-∞}^∞ f(x) e^{-x²} dx (default N=20).",
         "gauss_laguerre_quad" | "glag_quad" => "`gauss_laguerre_quad F [, N]` — ∫_0^∞ f(x) e^{-x} dx (default N=20).",
@@ -2968,12 +2968,12 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "gauss_legendre_2d" | "gl_2d" => "`gauss_legendre_2d F, AX, BX, AY, BY [, N]` — Cartesian-product GL.",
         "monte_carlo_2d" | "mc_2d" => "`monte_carlo_2d F, AX, BX, AY, BY [, N]` — uniform Monte Carlo on a rectangle.",
 
-        // ── Batch 5: more optimization ──────────────────────────────────
+        // ── more optimization ──────────────────────────────────
         "simulated_annealing" | "sa_min" => "`simulated_annealing F, X0 [, T0, COOL, ITERS, STEP]` — Metropolis-Hastings minimisation.",
         "simplex_lp" | "lp_simplex" => "`simplex_lp C, A, B` — max cᵀx s.t. Ax ≤ b, x ≥ 0. Returns `[x, value]`.",
         "particle_swarm" | "pso_min" => "`particle_swarm F, BOUNDS, SWARM, ITERS` — constriction-coefficient PSO.",
 
-        // ── Batch 5: distributions ──────────────────────────────────────
+        // ── distributions ──────────────────────────────────────
         "gev_pdf" => "`gev_pdf X, MU, SIGMA, XI` — Generalised Extreme Value PDF.",
         "gev_cdf" => "`gev_cdf X, MU, SIGMA, XI` — GEV CDF.",
         "gev_sample" | "rgev" => "`gev_sample MU, SIGMA, XI` — GEV sample.",
@@ -2989,7 +2989,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "truncated_normal_pdf" => "`truncated_normal_pdf X, MU, SIGMA, LO, HI` — truncated-normal PDF.",
         "truncated_normal_sample" | "rtnorm" => "`truncated_normal_sample MU, SIGMA, LO, HI` — rejection sampler.",
 
-        // ── Batch 5: clustering ─────────────────────────────────────────
+        // ── clustering ─────────────────────────────────────────
         "dbscan" => "`dbscan POINTS, EPS, MIN_PTS` — density-based clustering. Returns label per point (-1 = noise).",
         "gmm_em_1d" | "gmm_1d" => "`gmm_em_1d DATA, K [, MAX_ITER]` — 1-D Gaussian-mixture EM. Returns `[π, μ, σ]`.",
         "silhouette_score" => "`silhouette_score POINTS, LABELS` — mean silhouette coefficient.",
@@ -2998,7 +2998,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "mds_2d" | "pcoa_2d" => "`mds_2d D` — classical multidimensional scaling on a distance matrix → 2-D coords.",
         "mean_shift" => "`mean_shift POINTS [, BANDWIDTH, MAX_ITER]` — non-parametric mode-seeking.",
 
-        // ── Batch 5: NN primitives ──────────────────────────────────────
+        // ── NN primitives ──────────────────────────────────────
         "batch_norm" => "`batch_norm XS [, EPS]` — zero-mean unit-variance normalisation.",
         "layer_norm" => "`layer_norm XS [, EPS]` — alias for batch_norm (per-sample reuse).",
         "dropout_mask" => "`dropout_mask N [, P]` — Bernoulli dropout mask scaled by 1/(1−p).",
@@ -3011,31 +3011,31 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "adam_step" => "`adam_step PARAM, GRAD, M, V, LR, B1, B2, EPS, T` → `[param', m', v']`.",
         "rmsprop_step" => "`rmsprop_step PARAM, GRAD, V, LR, DECAY, EPS` → `[param', v']`.",
 
-        // ── Batch 5: time series ────────────────────────────────────────
+        // ── time series ────────────────────────────────────────
         "ewma" => "`ewma XS [, ALPHA]` — exponentially-weighted moving average.",
         "ccf" => "`ccf XS, YS [, MAX_LAG]` — sample cross-correlation function over -L..L lags.",
         "periodogram" => "`periodogram XS` — squared-magnitude DFT / N (one-sided spectrum).",
         "welch_psd" | "welch" => "`welch_psd XS [, SEG_LEN, OVERLAP]` — Welch's PSD via Hann segments.",
         "lag_features" => "`lag_features XS, P` — design matrix of P lagged features.",
 
-        // ── Batch 5: image processing ───────────────────────────────────
+        // ── image processing ───────────────────────────────────
         "median_filter_2d" => "`median_filter_2d IMG [, RADIUS]` — denoising median filter.",
         "threshold_otsu" | "otsu" => "`threshold_otsu IMG` — Otsu's optimal threshold for 0..255 grayscale.",
         "histogram_equalize" | "hist_eq" => "`histogram_equalize IMG` — global histogram equalisation.",
         "erode_2d" => "`erode_2d IMG [, RADIUS]` — morphological erosion (square structuring element).",
         "dilate_2d" => "`dilate_2d IMG [, RADIUS]` — morphological dilation.",
 
-        // ── Batch 5: losses ─────────────────────────────────────────────
+        // ── losses ─────────────────────────────────────────────
         "mse_loss" => "`mse_loss A, B` — mean-squared error.",
         "mae_loss" => "`mae_loss A, B` — mean-absolute error.",
         "huber_loss" => "`huber_loss A, B [, DELTA]` — Huber loss (default δ=1).",
 
-        // ── Batch 5: spatial ────────────────────────────────────────────
+        // ── spatial ────────────────────────────────────────────
         "vincenty_distance" | "vincenty" => "`vincenty_distance LAT1, LON1, LAT2, LON2` — geodesic distance on WGS-84.",
         "mercator_project" => "`mercator_project LAT, LON [, R]` → `[x, y]` Mercator metres.",
         "destination_from_bearing" | "dest_bearing" => "`destination_from_bearing LAT, LON, BEARING_DEG, DIST_M [, R]` — spherical great-circle target.",
 
-        // ── Batch 5: integer sequences ──────────────────────────────────
+        // ── integer sequences ──────────────────────────────────
         "recaman" | "recaman_seq" => "`recaman N` — first N terms of Recamán's sequence.",
         "sylvester" | "sylvester_seq" => "`sylvester N` — Sylvester's sequence (a_n = a_{n-1}² − a_{n-1} + 1).",
         "happy_q" | "is_happy" => "`happy_q N` — 1 if N is a happy number.",
@@ -3043,7 +3043,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "aliquot_sequence" | "aliquot" => "`aliquot_sequence N [, MAX_STEPS]` — sum-of-proper-divisors trajectory.",
         "magic_constant" => "`magic_constant N` — n(n²+1)/2 (sum of any line of an n×n magic square).",
 
-        // ── Batch 5: graph metrics ──────────────────────────────────────
+        // ── graph metrics ──────────────────────────────────────
         "clustering_coefficient_local" | "cc_local" => "`clustering_coefficient_local ADJ` — local CC per vertex.",
         "clustering_coefficient_global" | "cc_global" => "`clustering_coefficient_global ADJ` — mean local CC.",
         "assortativity" => "`assortativity ADJ` — degree-degree correlation coefficient.",
@@ -3052,7 +3052,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "adamic_adar" => "`adamic_adar ADJ, U, V` — Σ 1/log(deg(w)) over common neighbours w.",
         "preferential_attachment_score" | "pa_score" => "`preferential_attachment_score ADJ, U, V` — deg(u)·deg(v).",
 
-        // ── Batch 5: 3-D geometry ───────────────────────────────────────
+        // ── 3-D geometry ───────────────────────────────────────
         "triangle_3d_normal" => "`triangle_3d_normal P1, P2, P3` — unit normal.",
         "triangle_3d_area" => "`triangle_3d_area P1, P2, P3` — area via cross product.",
         "tetrahedron_volume" => "`tetrahedron_volume A, B, C, D` — |det(B-A, C-A, D-A)|/6.",
@@ -3062,7 +3062,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "ray_sphere_intersect" => "`ray_sphere_intersect O, D, CENTER, RADIUS` — nearest non-negative t.",
         "aabb_overlap" => "`aabb_overlap A_MIN, A_MAX, B_MIN, B_MAX` — 1 if 3-D AABBs overlap.",
 
-        // ── Batch 5: iterative solvers ──────────────────────────────────
+        // ── iterative solvers ──────────────────────────────────
         "gauss_seidel" => "`gauss_seidel A, B [, MAX_ITER, TOL]` — Gauss-Seidel iterative solver.",
         "jacobi_iteration" | "jacobi_solve" => "`jacobi_iteration A, B [, MAX_ITER, TOL]` — Jacobi iteration.",
         "sor_solve" | "sor" => "`sor_solve A, B [, OMEGA, MAX_ITER, TOL]` — Successive Over-Relaxation.",
@@ -3070,77 +3070,77 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "richardson_extrapolation" | "richardson" => "`richardson_extrapolation F, H0 [, LEVELS]` — Romberg-style extrapolation.",
         "finite_difference_5pt" | "fd5pt" => "`finite_difference_5pt F, X [, H]` — five-point central derivative.",
 
-        // ── Batch 5: crypto / algebra ───────────────────────────────────
+        // ── crypto / algebra ───────────────────────────────────
         "tonelli_shanks_sqrt" | "tonelli_shanks" => "`tonelli_shanks_sqrt N, P` — modular square root mod prime p.",
         "baby_step_giant_step" | "bsgs" => "`baby_step_giant_step G, H, P` — discrete logarithm mod p.",
         "pollard_rho_factor" | "pollard_rho" => "`pollard_rho_factor N` — return a non-trivial factor of N.",
         "modular_lcm" | "mlcm" => "`modular_lcm XS` — LCM via gcd.",
         "crt_general" | "crt_arbitrary" => "`crt_general REMAINDERS, MODULI` — CRT over arbitrary (not coprime) moduli; -1 if infeasible.",
 
-        // ── Batch 5: physics / chemistry ────────────────────────────────
+        // ── physics / chemistry ────────────────────────────────
         "van_der_waals_p" | "vdw_pressure" => "`van_der_waals_p N, T, V, A, B` — pressure from Van der Waals equation.",
         "nernst_equation" | "nernst" => "`nernst_equation E0, N, T, Q` — half-cell potential.",
         "arrhenius_rate" | "arrhenius" => "`arrhenius_rate A, EA, T` — k = A exp(-Ea / RT).",
         "reduced_mass" => "`reduced_mass M1, M2` — μ = m1 m2 / (m1 + m2).",
         "ph_to_concentration" | "ph_to_h" => "`ph_to_concentration PH` — [H⁺] = 10^{-pH}.",
 
-        // ── Batch 6: MCMC ───────────────────────────────────────────────
+        // ── MCMC ───────────────────────────────────────────────
         "metropolis_hastings" | "mh_sampler" => "`metropolis_hastings LOG_PI, X0, SIGMA, ITERS [, BURN_IN]` — random-walk MH.",
         "gibbs_sampler_step" | "gibbs_step" => "`gibbs_sampler_step COND_SAMPLERS, X` — one Gibbs sweep over coordinates.",
 
-        // ── Batch 6: SDE ────────────────────────────────────────────────
+        // ── SDE ────────────────────────────────────────────────
         "euler_maruyama" | "em_sde" => "`euler_maruyama MU, SIGMA, X0, T0, T_END, N_STEPS` — Euler-Maruyama SDE integrator.",
         "milstein" | "milstein_sde" => "`milstein MU, SIGMA, SIGMA_X, X0, T0, T_END, N_STEPS` — Milstein scheme.",
         "ornstein_uhlenbeck_path" | "ou_path" => "`ornstein_uhlenbeck_path THETA, MU, SIGMA, X0, T, N` — exact OU sample path.",
 
-        // ── Batch 6: HMM ────────────────────────────────────────────────
+        // ── HMM ────────────────────────────────────────────────
         "hmm_forward" => "`hmm_forward PI, A, B, OBS` — log P(O | λ).",
         "hmm_viterbi" => "`hmm_viterbi PI, A, B, OBS` — most-likely state path.",
         "hmm_backward" => "`hmm_backward PI, A, B, OBS` — backward β matrix.",
 
-        // ── Batch 6: survival ───────────────────────────────────────────
+        // ── survival ───────────────────────────────────────────
         "kaplan_meier" | "km_estimator" => "`kaplan_meier TIMES, EVENTS` → matrix of [t, S(t)].",
         "log_rank_test" => "`log_rank_test T1, E1, T2, E2` → `[chi², p]`.",
 
-        // ── Batch 6: alignment ──────────────────────────────────────────
+        // ── alignment ──────────────────────────────────────────
         "needleman_wunsch" | "nw_align" => "`needleman_wunsch A, B [, MATCH, MISMATCH, GAP]` — global alignment score.",
         "smith_waterman" | "sw_align" => "`smith_waterman A, B [, MATCH, MISMATCH, GAP]` — best local-alignment score.",
 
-        // ── Batch 6: chemistry ──────────────────────────────────────────
+        // ── chemistry ──────────────────────────────────────────
         "gibbs_free_energy" | "delta_g" => "`gibbs_free_energy DH [, T, DS]` — ΔG = ΔH − TΔS.",
         "henderson_hasselbalch" | "hh_eq" => "`henderson_hasselbalch PKA, A_CONJ, HA` — pH = pKa + log10([A⁻]/[HA]).",
         "radioactive_decay" => "`radioactive_decay N0, LAMBDA, T` — N(t) = N₀ e^{-λt}.",
         "half_life_to_constant" | "hl_to_lambda" => "`half_life_to_constant T_HALF` — λ = ln 2 / t_½.",
 
-        // ── Batch 6: control theory ─────────────────────────────────────
+        // ── control theory ─────────────────────────────────────
         "pid_step" => "`pid_step STATE, KP, KI, KD, E, DT` → `[new_state, u]` (PID controller).",
         "transfer_function_eval" | "tf_eval" => "`transfer_function_eval NUM, DEN, OMEGA` → `[Re, Im]` of H(jω).",
         "bode_magnitude_db" | "bode_mag_db" => "`bode_magnitude_db NUM, DEN, OMEGA` — 20 log₁₀ |H(jω)|.",
         "bode_phase_deg" => "`bode_phase_deg NUM, DEN, OMEGA` — phase of H(jω) in degrees.",
         "lqr_2x2" => "`lqr_2x2 A, B, Q, R` — closed-form 2×2 continuous LQR. Returns `[K, P]`.",
 
-        // ── Batch 6: game theory ────────────────────────────────────────
+        // ── game theory ────────────────────────────────────────
         "nash_eq_2x2" | "nash_2x2" => "`nash_eq_2x2 P1, P2` — pure Nash equilibria of a 2×2 bimatrix game.",
         "shapley_value" => "`shapley_value N, V_TABLE` — Shapley values from characteristic-function vector.",
         "expected_utility" => "`expected_utility PROBS, PAYOFFS` — Σ p·u.",
 
-        // ── Batch 6: operations research ────────────────────────────────
+        // ── operations research ────────────────────────────────
         "hungarian_assignment" | "hungarian" => "`hungarian_assignment COST_MATRIX` — assignment + total cost. (Greedy heuristic; reduces to Hungarian for small instances.)",
         "tsp_nearest_neighbor" | "tsp_nn" => "`tsp_nearest_neighbor DIST_MATRIX` → `[tour, length]`.",
         "vertex_cover_2approx" | "vc_2approx" => "`vertex_cover_2approx ADJ` — 2-approximation greedy.",
 
-        // ── Batch 6: PDE ────────────────────────────────────────────────
+        // ── PDE ────────────────────────────────────────────────
         "heat_eq_1d" => "`heat_eq_1d F, A, B, NX, T, NT, ALPHA` — explicit FTCS heat-equation solver.",
         "wave_eq_1d" => "`wave_eq_1d F, A, B, NX, T, NT, C` — explicit wave-equation solver.",
         "laplace_2d_jacobi" | "laplace_jacobi" => "`laplace_2d_jacobi GRID [, MAX_ITER, TOL]` — Jacobi smoother on a Dirichlet grid.",
 
-        // ── Batch 6: Bayesian conjugate ─────────────────────────────────
+        // ── Bayesian conjugate ─────────────────────────────────
         "beta_binomial_update" => "`beta_binomial_update ALPHA, BETA, N, K` → posterior `[α', β']`.",
         "normal_normal_update" => "`normal_normal_update MU0, VAR0, N, YBAR, VAR_DATA` → `[μ_post, σ²_post]`.",
         "gamma_poisson_update" => "`gamma_poisson_update ALPHA, BETA, N, TOTAL_EVENTS` → `[α', β']`.",
         "dirichlet_multinomial_update" => "`dirichlet_multinomial_update ALPHA, COUNTS` → α + counts.",
 
-        // ── Batch 6: quantum gates ──────────────────────────────────────
+        // ── quantum gates ──────────────────────────────────────
         "hadamard_gate" | "h_gate" => "`hadamard_gate` — 2×2 Hadamard.",
         "cnot_gate" | "cx_gate" => "`cnot_gate` — 4×4 controlled-NOT.",
         "swap_gate" => "`swap_gate` — 4×4 SWAP.",
@@ -3150,52 +3150,52 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "s_gate" => "`s_gate` — phase(π/2).",
         "t_gate" => "`t_gate` — phase(π/4).",
 
-        // ── Batch 6: splines ────────────────────────────────────────────
+        // ── splines ────────────────────────────────────────────
         "bezier_eval" => "`bezier_eval CONTROL_PTS, T` — de Casteljau evaluation.",
         "catmull_rom_eval" | "cmr_eval" => "`catmull_rom_eval P0, P1, P2, P3, T` — uniform Catmull-Rom.",
         "cubic_hermite_eval" | "ch_eval" => "`cubic_hermite_eval P0, M0, P1, M1, T` — Hermite basis interpolation.",
         "bspline_basis" | "nik_basis" => "`bspline_basis I, K, T, KNOTS` — Cox-de Boor B-spline basis.",
 
-        // ── Batch 6: music ──────────────────────────────────────────────
+        // ── music ──────────────────────────────────────────────
         "freq_to_midi" => "`freq_to_midi F` — MIDI note number from frequency.",
         "midi_to_freq" => "`midi_to_freq M` — frequency from MIDI note.",
         "equal_temperament_freq" => "`equal_temperament_freq SEMITONES_ABOVE_A4` — 12-TET frequency.",
         "cents_difference" | "cents_diff" => "`cents_difference F1, F2` — 1200 log₂(F2/F1).",
 
-        // ── Batch 6: astronomy ──────────────────────────────────────────
+        // ── astronomy ──────────────────────────────────────────
         "redshift_z" => "`redshift_z LAMBDA_OBS, LAMBDA_EMIT` — z = λ_obs/λ_emit − 1.",
         "hubble_distance" => "`hubble_distance H0` — c / H₀ in Mpc.",
         "luminosity_distance" => "`luminosity_distance Z, H0, OMEGA_M, OMEGA_L` — flat ΛCDM (numeric).",
 
-        // ── Batch 6: fluid dynamics ─────────────────────────────────────
+        // ── fluid dynamics ─────────────────────────────────────
         "reynolds_number" => "`reynolds_number RHO, U, L, MU` — ρ U L / μ.",
         "mach_number" => "`mach_number U, C` — U / c.",
         "prandtl_number" => "`prandtl_number CP, MU, K` — c_p μ / k.",
         "bernoulli_velocity" => "`bernoulli_velocity P1, P2, RHO` — √(2(p₁ − p₂)/ρ).",
 
-        // ── Batch 6: distributions ──────────────────────────────────────
+        // ── distributions ──────────────────────────────────────
         "negative_binomial_pmf" | "nb_pmf" => "`negative_binomial_pmf K, R, P` — failures-before-rth-success PMF.",
         "hypergeometric_pmf" => "`hypergeometric_pmf N, K_POP, N_DRAWS, K_OBS` — finite-population PMF.",
         "beta_binomial_pmf" | "bb_pmf" => "`beta_binomial_pmf K, N, ALPHA, BETA` — beta-binomial PMF.",
         "von_mises_pdf" | "vmf_pdf" => "`von_mises_pdf THETA, MU, KAPPA` — circular Gaussian.",
 
-        // ── Batch 6: random graphs ──────────────────────────────────────
+        // ── random graphs ──────────────────────────────────────
         "erdos_renyi_random" | "erdos_renyi" => "`erdos_renyi_random N, P` — G(n, p) Bernoulli edge model.",
         "barabasi_albert_random" | "barabasi_albert" => "`barabasi_albert_random N, M` — preferential-attachment model.",
         "watts_strogatz_random" | "watts_strogatz" => "`watts_strogatz_random N, K, P` — small-world rewiring.",
 
-        // ── Batch 6: color science ──────────────────────────────────────
+        // ── color science ──────────────────────────────────────
         "rgb_to_lab" => "`rgb_to_lab R, G, B` — sRGB → CIE Lab.",
         "lab_to_rgb" => "`lab_to_rgb L, A, B` — CIE Lab → sRGB.",
         "kelvin_to_rgb" | "color_temp_rgb" => "`kelvin_to_rgb K` — black-body sRGB approximation (Tanner Helland).",
 
-        // ── Batch 6: integer sequences ──────────────────────────────────
+        // ── integer sequences ──────────────────────────────────
         "bell_triangle" => "`bell_triangle N` — first N+1 rows of the Bell / Aitken triangle.",
         "surjection_count" => "`surjection_count N, K` — k! · S(n, k).",
         "distinct_partition_count" | "q_partition" => "`distinct_partition_count N` — partitions of N into distinct parts.",
         "fibonacci_q" | "is_fib_number" => "`fibonacci_q N` — 1 if N is a Fibonacci number.",
 
-        // ── Batch 7 docs ────────────────────────────────────────────────
+        // ── docs ────────────────────────────────────────────────
         "bonferroni_correction" | "bonferroni" => "`bonferroni_correction PVALS` — Bonferroni-adjusted p-values (capped at 1).",
         "benjamini_hochberg" | "bh_fdr" => "`benjamini_hochberg PVALS` — BH FDR q-values.",
         "tukey_hsd" => "`tukey_hsd ALPHA, K, DF, MSE, N` — Tukey honestly-significant-difference critical bound.",
@@ -3255,7 +3255,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "sutherland_hodgman_clip" | "sh_clip" => "`sutherland_hodgman_clip SUBJECT, CLIP` — clip against convex CCW polygon.",
         "kalman_rts_smoother" | "rts_smoother" => "`kalman_rts_smoother X_HAT, P, X_PRED, P_PRED, F` — RTS smoothed means.",
 
-        // ── Batch 8 ─────────────────────────────────────────────────────
+        // ── ─────────────────────────────────────────────────────
         "gc_content" => "`gc_content SEQ` — fraction of G + C in DNA / RNA string.",
         "codon_to_aa" => "`codon_to_aa CODON` — single-letter amino-acid (or '*' / 'X').",
         "reverse_complement_dna" | "rev_comp_dna" => "`reverse_complement_dna SEQ` — DNA reverse complement.",
@@ -3798,6 +3798,10 @@ thread_local! {
 pub fn doc_text_for(label: &str) -> Option<&'static str> {
     // Hand-written entry takes priority.
     if let Some(md) = doc_for_label_text(label) {
+        return Some(md);
+    }
+    // Domain-grouped hand-written descriptions for newer builtins.
+    if let Some(md) = crate::lsp_docs_domains::doc_for_domain_label(label) {
         return Some(md);
     }
     // Auto-generated stub, cached with 'static lifetime via leak.

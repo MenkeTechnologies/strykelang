@@ -31,6 +31,7 @@ pub mod builtins_b18;
 pub mod builtins_b19;
 pub mod builtins_b20;
 pub mod builtins_b21;
+pub mod lsp_docs_domains;
 pub mod bytecode;
 pub mod capture;
 pub mod cli_runners;

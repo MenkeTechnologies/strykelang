@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Batch 6 — applied / domain-specific science staples not yet in stryke:
+// applied / domain-specific science staples not yet in stryke:
 // MCMC, SDE integrators, HMMs, survival analysis, bioinformatics alignment,
 // chemistry, control theory, game theory, operations research, numerical PDE,
 // Bayesian conjugate updates, quantum gates, splines, music/audio, astronomy,

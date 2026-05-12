@@ -1,4 +1,4 @@
-// Batch 81 — High-utility primitives: Excel financial extras, hash families,
+// High-utility primitives: Excel financial extras, hash families,
 // compression encoders, URI/URL ops, HTTP header helpers.
 
 fn b81_to_floats(v: &StrykeValue) -> Vec<f64> {

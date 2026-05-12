@@ -1,4 +1,4 @@
-// Batch 31 — cosmology, general relativity, FLRW universe, black holes.
+// cosmology, general relativity, FLRW universe, black holes.
 
 const C_LIGHT_B31: f64 = 2.99792458e8;
 const G_NEWTON_B31: f64 = 6.67430e-11;

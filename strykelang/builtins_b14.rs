@@ -1,4 +1,4 @@
-//! Batch 14: linear algebra (matrices), graph algorithms,
+//! Linear algebra (matrices), graph algorithms,
 //! calendar/date helpers, special math. Pure functions only.
 
 use crate::value::StrykeValue;

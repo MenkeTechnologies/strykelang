@@ -1,4 +1,4 @@
-// Batch 50 — OS internals: schedulers, I/O, memory, power, control groups.
+// OS internals: schedulers, I/O, memory, power, control groups.
 
 /// Priority aging step: prio_eff = prio_static + age_factor·age
 fn builtin_os_priority_aging_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {

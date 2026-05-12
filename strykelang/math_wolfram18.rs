@@ -1,4 +1,4 @@
-// Batch 18 — more crypto, more time series, more graph theory.
+// more crypto, more time series, more graph theory.
 
 // Poly1305 one-block step per RFC 8439 §2.5.1: acc = ((acc + block) * r) mod (2^130 - 5).
 // Uses 5×26-bit radix limbs so each schoolbook product fits in u64. r is clamped

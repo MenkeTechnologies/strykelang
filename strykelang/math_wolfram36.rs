@@ -1,4 +1,4 @@
-// Batch 36 — econometrics: regression diagnostics, time-series tests, panel data, MLE.
+// econometrics: regression diagnostics, time-series tests, panel data, MLE.
 
 // Helpers local to this batch
 fn b36_to_floats(v: &StrykeValue) -> Vec<f64> {

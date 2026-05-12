@@ -1,4 +1,4 @@
-// Batch 76 — Pandas DataFrame ops: aggregation, reshape, merge/join, time
+// Pandas DataFrame ops: aggregation, reshape, merge/join, time
 // series resample, NA handling, ranking, sorting, sampling.
 
 fn b76_to_floats(v: &StrykeValue) -> Vec<f64> {

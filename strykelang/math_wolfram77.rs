@@ -1,4 +1,4 @@
-// Batch 77 — PIL/OpenCV image processing: kernels, filters, morphology,
+// PIL/OpenCV image processing: kernels, filters, morphology,
 // histogram, edges, features, transforms.
 
 fn b77_to_floats(v: &StrykeValue) -> Vec<f64> {

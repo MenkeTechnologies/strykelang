@@ -1,4 +1,4 @@
-// Batch 56 — sports analytics: rating systems (Elo, Glicko, TrueSkill), baseball
+// sports analytics: rating systems (Elo, Glicko, TrueSkill), baseball
 // sabermetric (wOBA, FIP, BABIP, WPA), hockey (Corsi, Fenwick), basketball/football
 // summary metrics. Formulas from Glickman, Herbrich-Minka, FanGraphs guides.
 
