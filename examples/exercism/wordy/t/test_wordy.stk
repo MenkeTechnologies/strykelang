@@ -11,7 +11,7 @@ assert_eq Exercism::Wordy::answer("What is 1 plus 5 minus -2?"),                
 assert_eq Exercism::Wordy::answer("What is -3 plus 7?"),                         4,    "negative starting"
 assert_eq Exercism::Wordy::answer("What is 2 multiplied by -2 multiplied by 3?"),-12,  "chain mult"
 
-fn err { eval { Exercism::Wordy::answer($_[0]); 0 } || $@ }
+fn err { eval { Exercism::Wordy::answer(_); 0 } || $@ }
 assert_ok err("Who is the President of the United States?") =~ /unknown operation/, "non-question"
 assert_ok err("What is 1 plus plus 2?")                     =~ /syntax/,            "two ops in a row"
 

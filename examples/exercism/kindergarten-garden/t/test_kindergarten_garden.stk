@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./KindergartenGarden.stk"
 
-fn j { join(",", @{$_[0]}) }
+fn j { join(",", @{_}) }
 
 my $d = "VRCGVVRVCGGCCGVRGCVCGCGV\nVRCCCGCRRGVCGCRVVCVGCGCV"
 assert_eq j(Exercism::KindergartenGarden::plants($d, "Alice")),   "violets,radishes,violets,radishes",  "Alice"

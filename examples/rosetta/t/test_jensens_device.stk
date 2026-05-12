@@ -12,8 +12,8 @@ fn Rosetta::JensensDevice::sum($n, $term_func) {
 }
 
 # Example: Sum of i^2 for i=1..10
-my $sum_sq = Rosetta::JensensDevice::sum(10, sub {
-    my $i = $_[0]
+my $sum_sq = Rosetta::JensensDevice::sum(10, fn {
+    my $i = _
     $i * $i
 })
 

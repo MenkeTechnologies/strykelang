@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./RobotSimulator.stk"
 
-fn rs { my $r = $_[0]; "$r->{x},$r->{y},$r->{direction}" }
+fn rs { my $r = _; "$r->{x},$r->{y},$r->{direction}" }
 
 my $r = Exercism::RobotSimulator::new(0, 0, "north")
 assert_eq rs($r), "0,0,north", "initial state"

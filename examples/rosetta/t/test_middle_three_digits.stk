@@ -2,7 +2,7 @@
 # Rosetta Code: Middle three digits
 
 fn middle_three_digits {
-    my $n = $_[0]
+    my $n = _
     my $s = ~> $n abs >{ sprintf("%d", _) }
     my $len = length($s)
     

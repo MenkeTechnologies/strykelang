@@ -2,8 +2,8 @@
 # Rosetta Code: Pancake Sort
 
 fn flip {
-    my $list = $_[0]
-    my $k = $_[1]
+    my $list = _
+    my $k = _1
     my @arr = @$list
     my @sub = @arr[0..$k]
     my @flipped = ~> @sub rev
@@ -14,7 +14,7 @@ fn flip {
 }
 
 fn pancake_sort {
-    my $list = $_[0]
+    my $list = _
     my @arr = @$list
     my $n = len(@arr)
     

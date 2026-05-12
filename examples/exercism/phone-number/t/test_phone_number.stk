@@ -7,7 +7,7 @@ assert_eq Exercism::PhoneNumber::clean_number("223 456   7890"),  "2234567890", 
 assert_eq Exercism::PhoneNumber::clean_number("12234567890"),     "2234567890", "11-digit with country 1"
 assert_eq Exercism::PhoneNumber::clean_number("+1 (223) 456-7890"), "2234567890", "with country code"
 
-fn err { eval { Exercism::PhoneNumber::clean_number($_[0]); 0 } || $@ }
+fn err { eval { Exercism::PhoneNumber::clean_number(_); 0 } || $@ }
 
 assert_ok err("123456789")    =~ /incorrect number/, "9 digits"
 assert_ok err("321234567890") =~ /more than 11/,    "12 digits"

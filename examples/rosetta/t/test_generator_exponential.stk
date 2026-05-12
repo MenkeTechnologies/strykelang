@@ -45,8 +45,8 @@ fn Rosetta::GenExp::filter_gen($gen_squares, $gen_cubes) {
     }
 }
 
-my $squares = Rosetta::GenExp::seq_gen(fn { $_[0] ** 2 })
-my $cubes   = Rosetta::GenExp::seq_gen(fn { $_[0] ** 3 })
+my $squares = Rosetta::GenExp::seq_gen(fn { _ ** 2 })
+my $cubes   = Rosetta::GenExp::seq_gen(fn { _ ** 3 })
 
 my $filtered = Rosetta::GenExp::filter_gen($squares, $cubes)
 

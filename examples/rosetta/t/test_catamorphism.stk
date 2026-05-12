@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Catamorphism — folds.
 # Closures use named params so $a/$b are accumulator/element rather than
-# guessing at $_/$_[0] semantics.
+# guessing at $_/_ semantics.
 
 fn Rosetta::Cata::foldr($f, $z, @xs) {
     my $acc = $z

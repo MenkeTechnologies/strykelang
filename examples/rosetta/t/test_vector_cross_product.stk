@@ -2,8 +2,8 @@
 # Rosetta Code: Vector cross product
 
 fn Rosetta::CrossProduct::cross_product {
-    my $a = $_[0]
-    my $b = $_[1]
+    my $a = _
+    my $b = _1
     
     my @res = (
         $a->[1] * $b->[2] - $a->[2] * $b->[1],

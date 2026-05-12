@@ -2,9 +2,9 @@
 # Rosetta Code: Stooge Sort
 
 fn stooge_sort_recursive {
-    my $list = $_[0]
-    my $i = $_[1]
-    my $j = $_[2]
+    my $list = _
+    my $i = _1
+    my $j = _2
     my @arr = @$list
     
     if ($arr[$i] > $arr[$j]) {
@@ -24,7 +24,7 @@ fn stooge_sort_recursive {
 }
 
 fn stooge_sort {
-    my $list = $_[0]
+    my $list = _
     my @data = @$list
     my $n = len(@data)
     if ($n < 2) {

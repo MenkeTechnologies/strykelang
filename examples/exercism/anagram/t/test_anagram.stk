@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./Anagram.stk"
 
-fn j { join(",", @{Exercism::Anagram::match_anagrams($_[0], $_[1])}) }
+fn j { join(",", @{Exercism::Anagram::match_anagrams(_, _1)}) }
 
 assert_eq j("diaper",  ["hello","world","zombies","pants"]),      "",                 "no matches"
 assert_eq j("solemn",  ["lemons","cherry","melons"]),             "lemons,melons",    "detects two anagrams"
