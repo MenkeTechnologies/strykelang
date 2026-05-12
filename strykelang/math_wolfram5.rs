@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Cross-language parity batch 5 — additional Julia / R / Haskell / OCaml /
+// Cross-language parity — additional Julia / R / Haskell / OCaml /
 // scipy / SciPy.special / sklearn / statsmodels / OpenCV staples not yet in
 // stryke. Layout: CAS-lite, more quadrature, more optimization, more
 // distributions, clustering & dimensionality reduction, neural-net primitives,

@@ -13874,7 +13874,7 @@ impl Parser {
             | "str_huffman_encode" | "str_huffman_decode"
             | "str_compress_lzss" | "str_decompress_lzss"
             | "str_isogram" | "fold_case"
-            // ── batch 9 ──
+            // ── extras ──
             | "bignum_new" | "bignum_from_str" | "bignum_to_str" | "bignum_to_int"
             | "bignum_add" | "bignum_sub" | "bignum_mul" | "bignum_div" | "bignum_mod"
             | "bignum_pow" | "bignum_modpow" | "bignum_gcd" | "bignum_lcm"
@@ -13911,7 +13911,7 @@ impl Parser {
             | "bbox_contains" | "bbox_union" | "bbox_intersect"
             | "bbox_center" | "bbox_area"
             | "mercator_unproject" | "geohash_precision"
-            // ── batch 10 ──
+            // ── extras ──
             | "jq_get" | "jq_set" | "jq_delete" | "jq_select"
             | "jq_keys_at" | "jq_values_at" | "jq_length_at"
             | "jq_type" | "jq_has" | "jq_paths" | "jq_leaf_paths"
@@ -13943,7 +13943,7 @@ impl Parser {
             | "css_var_resolve" | "css_property_set" | "css_property_get"
             | "css_url_extract" | "css_import_extract" | "css_font_extract"
             | "selector_to_xpath" | "xpath_to_selector"
-            // ── batch 11 ──
+            // ── extras ──
             | "http_status_continue" | "http_status_switching_protocols"
             | "http_status_ok" | "http_status_created" | "http_status_accepted"
             | "http_status_no_content" | "http_status_partial_content"
@@ -13972,7 +13972,7 @@ impl Parser {
             | "qnorm" | "rnorm" | "qunif" | "runif"
             | "qbinom" | "rbinom" | "qgeom" | "rgeom" | "qhyper" | "rhyper"
             | "qchisq" | "rchisq" | "qf" | "rf" | "qt" | "rt"
-            // ── batch 12 ──
+            // ── extras ──
             | "currency_format" | "currency_parse" | "currency_round"
             | "currency_split_thousands" | "currency_code_to_symbol"
             | "currency_symbol_to_code" | "currency_convert" | "currency_rate"
@@ -14404,30 +14404,30 @@ impl Parser {
             | "copy_sign" | "cpsgn" | "fused_mul_add" | "fmadd"
             | "floor_mod" | "fmod" | "floor_div_op" | "fdivop"
             | "signum_of" | "sgnum" | "midpoint_of" | "midpt"
-            // ── Extended stdlib batch 3: Array Analysis ──────────────────────
+            // ── Extended stdlib: Array Analysis ──────────────────────
             | "longest_run" | "lrun" | "longest_increasing" | "linc"
             | "longest_decreasing" | "ldec" | "max_sum_subarray" | "maxsub"
             | "majority_element" | "majority" | "kth_largest" | "kthl"
             | "kth_smallest" | "kths" | "count_inversions" | "cinv"
             | "is_monotonic" | "ismono" | "equilibrium_index" | "eqidx"
-            // ── Extended stdlib batch 3: Set Operations ──────────────────────
+            // ── Extended stdlib: Set Operations ──────────────────────
             | "jaccard_index" | "jaccard" | "dice_coefficient" | "dicecoef"
             | "overlap_coefficient" | "overlapcoef"
             | "power_set" | "powerset" | "cartesian_power" | "cartpow"
-            // ── Extended stdlib batch 3: Advanced String ─────────────────────
+            // ── Extended stdlib: Advanced String ─────────────────────
             | "is_isogram" | "isiso" | "is_heterogram" | "ishet"
             | "hamdist" | "jaro_similarity" | "jarosim"
             | "longest_common_substring" | "lcsub"
             | "longest_common_subsequence" | "lcseq"
             | "count_words" | "wcount" | "count_lines" | "lcount"
             | "count_chars" | "ccount" | "count_bytes" | "bcount"
-            // ── Extended stdlib batch 3: More Math ───────────────────────────
+            // ── Extended stdlib: More Math ───────────────────────────
             | "binomial" | "binom" | "catalan" | "catn" | "pascal_row" | "pascrow"
             | "is_coprime" | "iscopr" | "euler_totient" | "etot"
             | "mobius" | "mob" | "is_squarefree" | "issqfr"
             | "digital_root" | "digroot" | "is_narcissistic" | "isnarc"
             | "is_harshad" | "isharsh" | "is_kaprekar" | "iskap"
-            // ── Extended stdlib batch 3: Date/Time Additional ────────────────
+            // ── Extended stdlib: Date/Time Additional ────────────────
             | "day_of_year" | "doy" | "week_of_year" | "woy"
             | "days_in_month_fn" | "daysinmo" | "is_valid_date" | "isvdate"
             | "age_in_years" | "ageyrs"
@@ -14530,7 +14530,7 @@ impl Parser {
             | "max_float" | "min_float" | "noop_val" | "nop" | "pass" | "pred" | "succ"
             | "tap_debug" | "to_bool" | "to_float" | "to_int" | "to_string" | "void"
             | "range_exclusive" | "range_inclusive"
-            // ── math / numeric (uncategorized batch) ────────────────────────────
+            // ── math / numeric extras ─────────────────────────────────────────
             | "aliquot_sum" | "autocorrelation" | "bell_number" | "cagr" | "coeff_of_variation"
             | "collatz_length" | "collatz_sequence" | "convolution"
             | "depreciation_double" | "depreciation_linear" | "discount" | "divisors"
@@ -14579,7 +14579,7 @@ impl Parser {
             | "max_drawdown" | "modified_duration" | "nper" | "num_periods" | "payback_period"
             | "pmt" | "pv" | "rule_of_72" | "sharpe_ratio" | "sortino_ratio"
             | "wacc" | "xirr"
-            // ── string processing (uncategorized batch) ─────────────────────────
+            // ── string processing extras ──────────────────────────────────────
             | "acronym" | "atbash" | "bigrams" | "camel_to_snake" | "char_frequencies"
             | "chunk_string" | "collapse_whitespace" | "dedent_text" | "indent_text"
             | "initials" | "leetspeak" | "mask_string" | "ngrams" | "pig_latin"
@@ -14599,11 +14599,11 @@ impl Parser {
             | "color_darken" | "color_distance" | "color_grayscale" | "color_invert"
             | "color_lighten" | "hsl_to_rgb" | "hsv_to_rgb" | "random_color"
             | "rgb_to_hsl" | "rgb_to_hsv"
-            // ── matrix operations (uncategorized batch) ─────────────────────────
+            // ── matrix operations extras ──────────────────────────────────────
             | "matrix_flatten" | "matrix_from_rows" | "matrix_hadamard" | "matrix_inverse"
             | "matrix_map" | "matrix_max" | "matrix_min" | "matrix_power" | "matrix_sum"
             | "matrix_transpose"
-            // ── array / list operations (uncategorized batch) ───────────────────
+            // ── array / list operations extras ────────────────────────────────
             | "binary_insert" | "bucket" | "clamp_array" | "group_consecutive_by"
             | "histogram" | "merge_sorted" | "next_permutation" | "normalize_array"
             | "normalize_range" | "peak_detect" | "range_compress" | "range_expand"
@@ -14615,7 +14615,7 @@ impl Parser {
             | "lowpass_filter" | "median_filter" | "normalize_signal" | "phase_spectrum"
             | "power_spectrum" | "resample" | "spectral_centroid" | "spectrogram" | "upsample"
             | "window_blackman" | "window_hamming" | "window_hann" | "window_kaiser"
-            // ── validation predicates (uncategorized batch) ─────────────────────
+            // ── validation predicates extras ──────────────────────────────────
             | "is_anagram" | "is_balanced_parens" | "is_control" | "is_numeric_string"
             | "is_pangram" | "is_printable" | "is_valid_cidr" | "is_valid_cron"
             | "is_valid_hex_color" | "is_valid_latitude" | "is_valid_longitude" | "is_valid_mime"
@@ -15485,7 +15485,7 @@ impl Parser {
             | "chezy_velocity" | "manning_velocity"
             | "froude_number" | "weber_number" | "grashof_number"
             | "nusselt_dittus_boelter"
-            // ── Batches 14-16 ─────────────────────────────────────────────
+            // ── more extensions ────────────────────────────────────────────
             | "mollweide_project" | "robinson_project" | "sinusoidal_project"
             | "equirectangular_project" | "lambert_azimuthal_project" | "albers_conic_project"
             | "geohash_encode" | "geohash_decode" | "geohash_neighbor" | "geohash_bbox"
@@ -15526,7 +15526,7 @@ impl Parser {
             | "aitken_delta_squared" | "wynn_epsilon"
             | "shanks_transform" | "levin_t_transform"
             | "harmonic_seq_sum" | "alternating_seq_sum"
-            // ── Batches 17-18 ─────────────────────────────────────────────
+            // ── more extensions (2) ────────────────────────────────────────
             | "sparse_csr_build" | "sparse_csr_mul_vec" | "sparse_density"
             | "lower_triangular_q" | "upper_triangular_q"
             | "diagonal_dominance_q" | "matrix_zero_q" | "matrix_identity_q"
@@ -15557,7 +15557,7 @@ impl Parser {
             | "graph_avg_clustering" | "graph_transitivity"
             | "graph_max_clique_brute" | "graph_independent_set_brute"
             | "graph_count_paths_length_k" | "graph_pagerank_simple"
-            // ── batch 19: integration / ODE / root finding / optimization ─
+            // ── integration / ODE / root finding / optimization ─
             | "boole_rule" | "boole_int"
             | "gauss_legendre_5" | "gl5"
             | "gauss_kronrod_15" | "gk15"
@@ -15582,7 +15582,7 @@ impl Parser {
             | "nelder_mead_reflect" | "nelder_mead_expand" | "nelder_mead_contract"
             | "sa_accept_prob" | "sa_boltzmann_temp" | "sa_cauchy_temp"
             | "sa_geometric_temp" | "acceptance_target"
-            // ── batch 20: financial pricing models ────────────────────────
+            // ── financial pricing models ────────────────────────
             | "bs_call" | "blackscholes_call" | "bs_put" | "blackscholes_put"
  | "bs_theta_call" | "bs_rho_call"
  | "bachelier_call" | "black76_call"
@@ -15597,7 +15597,7 @@ impl Parser {
             | "fx_forward" | "garman_kohlhagen_call" | "margrabe" | "stulz_min_call"
             | "sharpe_annualized"
             | "jensen_alpha" | "modified_sharpe"
-            // ── batch 21: chemistry ───────────────────────────────────────
+            // ── chemistry ───────────────────────────────────────
             | "ph_from_h" | "poh_from_oh" | "pka_from_ka"
  | "henderson_base"
             | "arrhenius_k" | "eyring_k"
@@ -15620,7 +15620,7 @@ impl Parser {
             | "osmotic_pressure" | "rydberg_lambda" | "bohr_radius_n"
             | "bohr_energy_ev" | "photon_energy_freq" | "photon_energy_lambda"
             | "de_broglie"
-            // ── batch 22: biology / ecology ───────────────────────────────
+            // ── biology / ecology ───────────────────────────────
  | "logistic_growth_step" | "logistic_growth_analytic"
             | "gompertz_growth_step" | "allee_growth_step"
  | "growth_rate_from_ratio"
@@ -15640,7 +15640,7 @@ impl Parser {
             | "q10" | "species_area" | "intrinsic_growth_rate"
             | "macarthur_wilson_immigration" | "macarthur_wilson_extinction"
             | "island_equilibrium"
-            // ── batch 23: EM / optics / relativity ────────────────────────
+            // ── EM / optics / relativity ────────────────────────
  | "efield_point" | "epotential_point"
  | "capacitor_charge"
             | "ohm_voltage" | "power_vi" | "power_i2r"
@@ -15668,7 +15668,7 @@ impl Parser {
             | "sound_db"
             | "alfven_speed"
             | "grav_time_dilation" | "grav_redshift"
-            // ── batch 24: graph algorithms ────────────────────────────────
+            // ── graph algorithms ────────────────────────────────
             | "kosaraju_scc" | "bridges"
             | "max_flow_ek" | "min_cut_value" | "hopcroft_karp"
 
@@ -15680,7 +15680,7 @@ impl Parser {
             | "greedy_coloring" | "chromatic_number_greedy"
             | "sum_degrees" | "avg_degree" | "max_degree"
             | "is_tree" | "girth"
-            // ── batch 25: signal processing ───────────────────────────────
+            // ── signal processing ───────────────────────────────
             | "hamming_window" | "hann_window" | "blackman_window"
             | "blackman_harris_window" | "bartlett_window" | "welch_window"
             | "kaiser_window" | "tukey_window" | "gaussian_window"
@@ -15694,7 +15694,7 @@ impl Parser {
             | "zero_pad" | "resample_nearest" | "resample_linear" | "quantize"
             | "mu_law_encode" | "mu_law_decode" | "a_law_encode" | "a_law_decode"
             | "chirp_linear"
-            // ── batch 26: cryptography deep ───────────────────────────────
+            // ── cryptography deep ───────────────────────────────
             | "fnv1a_32" | "fnv1a_64" | "sdbm_hash"
             | "siphash24"
             | "pbkdf2_hmac_step" | "scrypt_round" | "bcrypt_cost_iters"
@@ -15707,7 +15707,7 @@ impl Parser {
             | "letter_frequency" | "english_chi2" | "index_of_coincidence" | "kasiski_repeats"
             | "deterministic_prime" | "dh_shared" | "rsa_encrypt_simple"
             | "monobit_test" | "approximate_entropy"
-            // ── batch 27: ML extensions ───────────────────────────────────
+            // ── ML extensions ───────────────────────────────────
             | "gini_impurity" | "entropy_bits" | "information_gain" | "gain_ratio"
             | "nb_gaussian_likelihood" | "nb_bernoulli_likelihood" | "nb_multinomial_log_likelihood"
             | "adaboost_alpha" | "hinge_loss" | "squared_hinge"
@@ -15720,7 +15720,7 @@ impl Parser {
             | "tversky" | "mahalanobis_1d"
  | "one_hot" | "topk_indices"
             | "minmax_scale" | "zscore_norm" | "robust_scale"
-            // ── batch 28: geometry / topology ─────────────────────────────
+            // ── geometry / topology ─────────────────────────────
             | "triangle_area_heron" | "triangle_area_pts"
             | "triangle_inradius" | "triangle_circumradius"
             | "regular_ngon_area" | "regular_ngon_inradius" | "regular_ngon_circumradius"
@@ -15738,7 +15738,7 @@ impl Parser {
             | "euler_characteristic" | "genus_from_euler"
             | "spherical_triangle_area" | "polygon_with_holes_area" | "picks_theorem"
             | "centroid_nd" | "covariance_matrix_pts" | "simplex_volume_3d"
-            // ── batch 29: special functions extra ─────────────────────────
+            // ── special functions extra ─────────────────────────
             | "hyper2f1" | "hyper1f1" | "hyper0f1" | "pochhammer"
             | "mathieu_ce0" | "mathieu_se1" | "parabolic_d0" | "parabolic_d1"
             | "whittaker_m" | "struve_h0" | "struve_h1"
@@ -15757,7 +15757,7 @@ impl Parser {
             | "theta3" | "theta2"
             | "jacobi_sn_small_q" | "jacobi_cn_small_q" | "jacobi_dn_small_q"
             | "riemann_xi" | "bessel_jn_general" | "bessel_in_general"
-            // ── batch 30: astronomy / music / color / units ───────────────
+            // ── astronomy / music / color / units ───────────────
  | "absolute_magnitude"
             | "pc_to_ly" | "ly_to_pc" | "pc_to_au" | "au_to_m"
             | "solar_mass_to_kg" | "solar_luminosity_to_w"
@@ -15777,7 +15777,7 @@ impl Parser {
             | "bpm_to_midi_tick_us" | "iso226_phon_adjustment"
             | "db_to_amp" | "amp_to_db"
             | "roman_encode" | "roman_decode" | "number_to_english"
-            // ── batch 31: cosmology / GR / FLRW ───────────────────────────
+            // ── cosmology / GR / FLRW ───────────────────────────
             | "hubble_lcdm" | "hubble_time" | "hubble_distance_si" | "critical_density_si"
             | "comoving_distance" | "angular_diameter_distance"
             | "lookback_time" | "age_at_z" | "scale_factor" | "redshift_from_a"
@@ -15803,7 +15803,7 @@ impl Parser {
             | "friedmann_density_total" | "cosmological_constant"
 
  | "planck_energy"
-            // ── batch 32: quantum mechanics deep ──────────────────────────
+            // ── quantum mechanics deep ──────────────────────────
             | "pure_state_density" | "purity"
             | "linear_entropy" | "quantum_mutual_info"
  | "eof_from_concurrence"
@@ -15825,7 +15825,7 @@ impl Parser {
             | "tunneling_prob" | "gamow_factor" | "compton_wavelength" | "uncertainty_position"
             | "berry_phase_spin_half" | "zeno_survival" | "decoherence_time"
             | "ramsey_visibility" | "fermi_golden_rule"
-            // ── batch 33: bioinformatics deep ─────────────────────────────
+            // ── bioinformatics deep ─────────────────────────────
             | "needleman_wunsch_score" | "smith_waterman_score" | "pam250_score"
             | "tanimoto_bits" | "translate_dna" | "transcribe_dna_rna" | "reverse_transcribe"
             | "at_content" | "tm_wallace" | "tm_marmur" | "codon_adaptation_index"
@@ -15843,7 +15843,7 @@ impl Parser {
             | "henikoff_weight" | "hamming_protein" | "codon_usage_variance"
             | "dnds_ratio" | "mutation_rate" | "tajimas_d" | "wattersons_theta"
             | "coalescent_expected_time" | "coalescent_tree_length" | "nm_from_fst"
-            // ── batch 34: ODE advanced ────────────────────────────────────
+            // ── ODE advanced ────────────────────────────────────
             | "bdf1_step" | "bdf2_step" | "bdf3_step" | "bdf4_step" | "bdf5_step" | "bdf6_step"
             | "ab1_step" | "ab2_step" | "ab3_step"
             | "am2_step" | "am3_step" | "am4_step"
@@ -15864,7 +15864,7 @@ impl Parser {
             | "cfl_number" | "diffusion_stability"
             | "lax_friedrichs_flux" | "lax_wendroff_flux"
             | "van_leer_limiter" | "minmod_limiter" | "superbee_limiter" | "mc_limiter"
-            // ── batch 35: cryptanalysis & number theory deep ──────────────
+            // ── cryptanalysis & number theory deep ──────────────
             | "pollard_p_minus_1" | "fermat_factor"
             | "trial_smallest_factor" | "bsgs_discrete_log"
             | "mertens" | "liouville"
@@ -15880,7 +15880,7 @@ impl Parser {
             | "goldbach_pair" | "english_likeness" | "xor_break_singlebyte"
             | "bit_reverse_64"
             | "gf256_multiply" | "hash_combine"
-            // ── batch 36: econometrics ────────────────────────────────────
+            // ── econometrics ────────────────────────────────────
             | "arch_lm_test" | "breusch_pagan_test" | "white_robust_se"
             | "newey_west_se" | "hansen_j_test" | "gmm_moment_condition"
             | "hausman_test" | "breusch_godfrey_test" | "box_pierce_test"
@@ -15908,7 +15908,7 @@ impl Parser {
             | "random_walk_innovation" | "random_walk_drift_step"
             | "ar_model_likelihood" | "ma_model_likelihood"
             | "arma_model_innovation"
-            // ── batch 37: algebraic topology, knot theory, lie algebras ───
+            // ── algebraic topology, knot theory, lie algebras ───
             | "euler_char_complex" | "betti_zero" | "betti_one" | "betti_two"
             | "genus_surface" | "chern_first_2d" | "genus_curve_arith"
             | "genus_curve_geo" | "hodge_diamond_value" | "poincare_duality"
@@ -15953,7 +15953,7 @@ impl Parser {
             | "fintushel_stern_step" | "bauer_furuta_step"
             | "geometric_intersection_number"
             | "algebraic_intersection_number"
-            // ── batch 38: electrochemistry, batteries, fuel cells ─────────
+            // ── electrochemistry, batteries, fuel cells ─────────
             | "nernst_potential_full" | "electrode_potential_step"
             | "exchange_current_density" | "butler_volmer_current"
             | "tafel_anodic_current" | "tafel_cathodic_current"
@@ -16001,7 +16001,7 @@ impl Parser {
             | "osmotic_coefficient_pitzer" | "debye_huckel_screening_factor"
             | "ph_at_isoelectric" | "buffer_capacity_acid_base"
             | "henderson_hasselbalch_solve" | "titration_endpoint_index"
-            // ── batch 39: tensor calculus, GR, differential geometry ──────
+            // ── tensor calculus, GR, differential geometry ──────
             | "tensor_contract_two" | "tensor_outer_two" | "tensor_trace_index"
             | "tensor_symmetrize_two" | "tensor_antisymmetrize_two"
             | "levi_civita_three" | "levi_civita_four"
@@ -16053,7 +16053,7 @@ impl Parser {
             | "hawking_area_increase" | "unruh_temperature_full"
             | "bekenstein_entropy_step" | "holographic_entanglement_step"
             | "ryu_takayanagi_step" | "swampland_distance_check"
-            // ── batch 40: information theory, coding, signal processing ──
+            // ── information theory, coding, signal processing ──
             | "conditional_entropy_step" | "joint_entropy_step"
             | "relative_entropy_kl" | "mutual_information_step"
             | "chain_rule_entropy" | "fano_inequality_bound"
@@ -16104,7 +16104,7 @@ impl Parser {
             | "sinkhorn_iteration_step" | "sliced_wasserstein"
             | "gromov_wasserstein_step" | "spectral_signature_match"
             | "mfcc_coeff_step" | "chroma_feature_step"
-            // ── batch 41: combinatorial optimization, scheduling ──────────
+            // ── combinatorial optimization, scheduling ──────────
             | "tsp_lower_bound_mst" | "tsp_held_karp_step"
             | "christofides_ratio_bound" | "two_opt_swap_delta"
             | "or_opt_delta" | "three_opt_delta" | "lin_kernighan_step"
@@ -16155,7 +16155,7 @@ impl Parser {
             | "local_search_swap_step" | "tabu_search_move_score"
             | "simulated_annealing_step" | "genetic_crossover_one_point"
             | "mutation_bit_flip_prob" | "roulette_wheel_select_index"
-            // ── batch 42: climate, fluids, atmospheric ────────────────────
+            // ── climate, fluids, atmospheric ────────────────────
             | "stefan_boltzmann_radiation" | "emissivity_grey_body"
             | "albedo_blackbody_balance" | "solar_constant_at_distance"
             | "total_solar_irradiance_step" | "absorbed_short_wave"
@@ -16205,7 +16205,7 @@ impl Parser {
             | "co2_growth_rate_step" | "methane_growth_rate"
             | "aerosol_optical_depth" | "ice_age_milankovitch"
             | "greenhouse_forcing_step"
-            // ── batch 43: game theory, mechanism design, social choice ────
+            // ── game theory, mechanism design, social choice ────
             | "game_two_player_value" | "nash_equilibrium_pair"
             | "mixed_strategy_value" | "zero_sum_minmax"
             | "saddle_point_check" | "correlated_equilibrium_value"
@@ -16257,7 +16257,7 @@ impl Parser {
             | "tit_for_tat_step" | "prisoners_repeated_eq"
             | "mertens_zamir_step" | "ex_post_value_check"
             | "ex_ante_value_check" | "common_knowledge_iterations"
-            // ── batch 44: symbolic CAS, decompositions, projections ───────
+            // ── symbolic CAS, decompositions, projections ───────
             | "cas_simplify_term" | "cas_expand_two_terms"
             | "cas_factor_quadratic" | "cas_partial_fraction_simple"
             | "cas_polynomial_gcd_step" | "cas_polynomial_div_step"
@@ -16310,7 +16310,7 @@ impl Parser {
             | "cas_proj_soc_step" | "cas_proj_exp_cone"
             | "cas_dykstra_step" | "cas_alternating_projection"
             | "cas_polya_enumeration_step" | "cas_burnside_count_step"
-            // ── batch 45: ML primitives — activations, losses, optimizers ─
+            // ── ML primitives — activations, losses, optimizers ─
             | "ml_relu_step" | "ml_leaky_relu_step" | "ml_elu_step"
             | "ml_selu_step" | "ml_gelu_step" | "ml_swish_step"
             | "ml_mish_step" | "ml_softplus_step" | "ml_softsign_step"
@@ -16360,7 +16360,7 @@ impl Parser {
             | "ml_topk_argmax" | "ml_nucleus_sample_p"
             | "ml_temperature_decay" | "ml_repetition_penalty"
             | "ml_eos_logit_boost"
-            // ── batch 46: NLP — ranking, similarity, language models ──────
+            // ── NLP — ranking, similarity, language models ──────
             | "nlp_bm25_score" | "nlp_tf_idf_step" | "nlp_okapi_score"
             | "nlp_word_freq_value" | "nlp_doc_freq_step"
             | "nlp_inverse_doc_freq" | "nlp_cosine_similarity_two"
@@ -16411,7 +16411,7 @@ impl Parser {
             | "nlp_linformer_step" | "nlp_performer_step"
             | "nlp_reformer_step" | "nlp_longformer_step"
             | "nlp_bigbird_step" | "nlp_routing_attn_step"
-            // ── batch 47: graphics, geometry, ray tracing, BRDF, color ────
+            // ── graphics, geometry, ray tracing, BRDF, color ────
             | "gfx_perspective_proj_x" | "gfx_perspective_proj_y"
             | "gfx_orthographic_proj" | "gfx_view_matrix_step"
             | "gfx_lookat_forward" | "gfx_lookat_right" | "gfx_lookat_up"
@@ -16473,7 +16473,7 @@ impl Parser {
             | "gfx_curl_noise_step" | "gfx_gradient_noise_step"
             | "gfx_value_noise_step" | "gfx_signed_distance_box"
             | "gfx_signed_distance_sphere" | "gfx_signed_distance_capsule"
-            // ── batch 48: database internals, distributed systems ─────────
+            // ── database internals, distributed systems ─────────
             | "db_b_tree_split" | "db_b_tree_merge"
             | "db_lsm_compaction_step" | "db_skiplist_height_pick"
             | "db_bloom_filter_bit_index" | "db_cuckoo_filter_fingerprint"
@@ -16526,7 +16526,7 @@ impl Parser {
             | "db_async_commit_check" | "db_eventual_consistency_check"
             | "db_strong_consistency_check" | "db_linearizability_check"
             | "db_causal_consistency_check"
-            // ── batch 49: networking — TCP, AQM, MIMO, queueing ───────────
+            // ── networking — TCP, AQM, MIMO, queueing ───────────
             | "net_tcp_cwnd_step" | "net_tcp_ssthresh_update"
             | "net_tcp_reno_step" | "net_tcp_cubic_step"
             | "net_tcp_bbr_step" | "net_tcp_vegas_step"
@@ -16579,7 +16579,7 @@ impl Parser {
             | "net_engset_formula" | "net_little_law_l"
             | "net_throughput_law" | "net_response_time_law"
             | "net_utilization_law" | "net_forced_flow_law"
-            // ── batch 50: OS internals — schedulers, I/O, memory ──────────
+            // ── OS internals — schedulers, I/O, memory ──────────
             | "os_priority_aging_step" | "os_mlfq_demote_step"
             | "os_mlfq_promote_step" | "os_round_robin_quantum"
             | "os_completely_fair_vruntime" | "os_lottery_ticket_count"
@@ -16632,7 +16632,7 @@ impl Parser {
             | "os_psi_avg10_step" | "os_psi_avg60_step"
             | "os_psi_avg300_step" | "os_load_proc_avg"
             | "os_load_user_avg" | "os_load_iowait_avg"
-            // ── batch 51: security — KDFs, MFA, PKI, web sec, TLS ─────────
+            // ── security — KDFs, MFA, PKI, web sec, TLS ─────────
             | "sec_argon2_memcost" | "sec_argon2_timecost"
             | "sec_argon2_parallelism" | "sec_argon2_block_step"
             | "sec_pbkdf2_iter" | "sec_scrypt_n_param"
@@ -16686,7 +16686,7 @@ impl Parser {
             | "sec_aes_keyschedule_step" | "sec_des_round_step"
             | "sec_blowfish_round_step" | "sec_serpent_round_step"
             | "sec_twofish_round_step"
-            // ── batch 52: calendrical algorithms ──────────────────────────
+            // ── calendrical algorithms ──────────────────────────
             | "fixed_from_gregorian" | "gregorian_from_fixed"
             | "fixed_from_julian" | "julian_from_fixed"
             | "iso_week_date" | "hebrew_leap_year"
@@ -16704,20 +16704,20 @@ impl Parser {
             | "day_of_week_zeller" | "iso_day_number"
             | "weekday_name_short" | "leap_year_gregorian"
 
-            // ── batch 53: R / SciPy distributions and tests ───────────────
+            // ── R / SciPy distributions and tests ───────────────
             | "dnorm" | "dt" | "df_dist" | "dchisq"
             | "glm" | "aov" | "shapiro_wilk" | "anderson_darling"
             | "kolmogorov_smirnov" | "spearmanr" | "kendalltau" | "pearsonr"
             | "mannwhitneyu" | "wilcoxon" | "kruskal_h"
 
-            // ── batch 54: APL/J/K array primitives ────────────────────────
+            // ── APL/J/K array primitives ────────────────────────
             | "iota_n" | "reduce_axis" | "scan_axis" | "fold_axis"
             | "rotate_axis" | "transpose_axis" | "reshape_dim"
             | "encode_base" | "decode_base" | "nub_list" | "nub_count"
             | "membership_idx" | "deal_n_k" | "roll_n"
             | "permute_idx" | "invert_perm"
 
-            // ── batch 55: astronomy / astrometry ──────────────────────────
+            // ── astronomy / astrometry ──────────────────────────
             | "julian_day" | "jd_to_calendar" | "tt_to_tdb"
             | "ra_dec_to_alt_az" | "alt_az_to_ra_dec"
             | "precession_iau2006" | "nutation_iau2000a"
@@ -16730,7 +16730,7 @@ impl Parser {
             | "tle_mean_motion" | "sgp4_propagate_step" | "airy_disk_radius"
             | "rayleigh_criterion" | "strehl_ratio" | "au_to_km"
 
-            // ── batch 56: sports analytics — ratings & sabermetric ────────
+            // ── sports analytics — ratings & sabermetric ────────
             | "elo_expected" | "elo_update" | "glicko_rating"
             | "trueskill_update" | "trueskill_match_quality"
             | "pythagorean_expectation" | "war_above_replacement"
@@ -16741,7 +16741,7 @@ impl Parser {
             | "goals_above_avg" | "tackle_efficiency" | "yards_per_attempt"
             | "qbr_metric" | "epa_per_play"
 
-            // ── batch 57: Excel/Sheets + bond/loan financial ──────────────
+            // ── Excel/Sheets + bond/loan financial ──────────────
             | "vlookup" | "hlookup" | "xlookup" | "index_match"
             | "indirect" | "choose" | "offset"
             | "sumif" | "countif" | "averageif"
@@ -16754,7 +16754,7 @@ impl Parser {
             | "coupon_count" | "skill_score" | "reliability_diagram"
             | "taylor_diagram_score"
 
-            // ── batch 58: GIS — geohash, H3, S2, UTM, projections ─────────
+            // ── GIS — geohash, H3, S2, UTM, projections ─────────
             | "geohash_neighbors" | "h3_index" | "h3_geo_to_h3"
             | "h3_h3_to_geo" | "h3_k_ring" | "h3_neighbor" | "h3_resolution"
             | "s2_cell_id" | "s2_cell_at_lat_lng" | "s2_cell_neighbors"
@@ -16768,7 +16768,7 @@ impl Parser {
             | "point_in_polygon_winding" | "segment_intersection"
             | "segment_distance_point" | "convex_hull_chan"
 
-            // ── batch 59: robotics & control ──────────────────────────────
+            // ── robotics & control ──────────────────────────────
             | "pid_anti_windup" | "pid_ziegler_nichols"
             | "smith_predictor_step" | "lqr_gain_continuous"
             | "lqr_gain_discrete" | "lqg_step" | "h_infinity_norm"
@@ -16782,7 +16782,7 @@ impl Parser {
             | "path_dubins_lsl" | "path_dubins_rsr" | "path_reeds_shepp"
             | "rrt_extend" | "rrt_star_rewire" | "prm_node_connect"
 
-            // ── batch 60: actuarial science ───────────────────────────────
+            // ── actuarial science ───────────────────────────────
             | "life_expectancy_e0" | "force_of_mortality" | "select_ultimate"
             | "annuity_due_an" | "annuity_immediate_an"
             | "term_life_a_n_t" | "whole_life_a"
@@ -16797,7 +16797,7 @@ impl Parser {
             | "cramer_lundberg_step" | "bornhuetter_ferguson"
             | "chain_ladder_step" | "ibnr_estimate" | "run_off_triangle_step"
 
-            // ── batch 61: epidemiology / public health ────────────────────
+            // ── epidemiology / public health ────────────────────
             | "r_naught_basic" | "r_effective_t" | "doubling_time_growth"
             | "sirs_step" | "seirs_step" | "susceptible_to_infected"
             | "attack_rate" | "vaccination_coverage_required"
@@ -16811,7 +16811,7 @@ impl Parser {
             | "contact_tracing_eff" | "cluster_attack_rate"
             | "transmission_pair_index"
 
-            // ── batch 62: archive/encoding format primitives ──────────────
+            // ── archive/encoding format primitives ──────────────
             | "tar_header_checksum" | "tar_pad_512" | "tar_member_record"
             | "zip_local_header" | "zip_central_dir" | "zip_eocd"
             | "gzip_member_step" | "gzip_crc32_init" | "gzip_isize"
@@ -16825,7 +16825,7 @@ impl Parser {
             | "msgpack_pack_int" | "msgpack_pack_str"
             | "cbor_encode_uint" | "cbor_encode_str"
 
-            // ── batch 63: chemistry & biochemistry ────────────────────────
+            // ── chemistry & biochemistry ────────────────────────
             | "molecular_weight_compound" | "molarity_dilution"
             | "gas_constant_value" | "eyring_rate" | "van_t_hoff_kp"
             | "henderson_buffer" | "titration_ph_endpoint"
@@ -16840,7 +16840,7 @@ impl Parser {
             | "ramachandran_phi_psi" | "rg_radius_of_gyration"
             | "spectroscopic_factor" | "avogadro_constant"
 
-            // ── batch 64: music theory ────────────────────────────────────
+            // ── music theory ────────────────────────────────────
             | "cents_between_freqs" | "note_name_from_midi"
             | "interval_quality_size" | "scale_pitches_major"
             | "scale_pitches_minor" | "mode_pitches_dorian"
@@ -16853,7 +16853,7 @@ impl Parser {
             | "mean_tone_freq" | "werckmeister_iii" | "kirnberger_iii"
             | "dynamics_db_level" | "harmonics_partial"
 
-            // ── batch 65: geology, seismology, mineralogy ─────────────────
+            // ── geology, seismology, mineralogy ─────────────────
             | "moment_magnitude_mw" | "richter_local_ml"
             | "surface_wave_ms" | "body_wave_mb"
             | "gutenberg_richter_b" | "omori_aftershock"
@@ -16866,7 +16866,7 @@ impl Parser {
             | "pwave_velocity_depth" | "swave_velocity_depth"
             | "gradient_geothermal" | "heat_flow_radiogenic"
 
-            // ── batch 66: BLAS / LAPACK ───────────────────────────────────
+            // ── BLAS / LAPACK ───────────────────────────────────
             | "dgemm" | "sgemm" | "zgemm" | "cgemm"
             | "dgemv" | "sgemv" | "dtrsm" | "strsm"
             | "dgesv" | "dgetrf" | "dgeqrf" | "dgesvd"
@@ -16877,7 +16877,7 @@ impl Parser {
             | "dtbsv" | "dtrsv" | "ddrot" | "dgemm3m"
             | "dgels" | "dgelsd"
 
-            // ── batch 67: logic, proof, SAT/SMT, type theory ──────────────
+            // ── logic, proof, SAT/SMT, type theory ──────────────
             | "cnf_unit_propagate" | "cnf_pure_literal_elim"
             | "cnf_dpll_branch" | "dpll_clause_learning"
             | "two_watched_literals" | "walksat_step"
@@ -16893,7 +16893,7 @@ impl Parser {
             | "bisimulation_step" | "coq_tactic_apply"
             | "coq_unify_term" | "refl_check" | "sym_check" | "trans_check"
 
-            // ── batch 68: compilers / parsing ─────────────────────────────
+            // ── compilers / parsing ─────────────────────────────
             | "nfa_to_dfa" | "subset_construction"
             | "dfa_minimize_hopcroft" | "regex_to_nfa_thompson"
             | "glushkov_construction" | "brzozowski_derivative"
@@ -16909,7 +16909,7 @@ impl Parser {
             | "dfa_simulate_step" | "bytecode_disasm_step"
             | "ssa_phi_insert" | "dom_tree_idom" | "dominance_frontier"
 
-            // ── batch 69: computational linguistics ───────────────────────
+            // ── computational linguistics ───────────────────────
             | "porter_stem_step" | "snowball_stem_english"
             | "snowball_stem_french" | "lemmatize_wordnet"
             | "lemmatize_lemmy" | "stem_lancaster"
@@ -16926,7 +16926,7 @@ impl Parser {
             | "anaphora_distance" | "head_finding_collins"
             | "tree_kernel_collins"
 
-            // ── batch 70: Postgres SQL strings, JSON, aggregates ─────────
+            // ── Postgres SQL strings, JSON, aggregates ─────────
             | "btrim" | "translate" | "ascii"
             | "regexp_split" | "regexp_matches" | "regexp_replace"
             | "json_build_object" | "jsonb_set"
@@ -16947,7 +16947,7 @@ impl Parser {
             | "array_remove" | "array_replace"
             | "xmlforest" | "xmlagg"
 
-            // ── batch 71: Redis-flavour primitives ────────────────────────
+            // ── Redis-flavour primitives ────────────────────────
             | "zadd" | "zrem" | "zrangebyscore"
             | "zrank" | "zrevrank" | "zincrby"
             | "zcard" | "zcount" | "zlexcount"
@@ -16969,7 +16969,7 @@ impl Parser {
             | "xadd" | "xlen" | "xrange"
             | "object_encoding" | "debug_object" | "cluster_slots"
 
-            // ── batch 72: NumPy + scipy.special ──────────────────────────
+            // ── NumPy + scipy.special ──────────────────────────
             | "argpartition" | "bincount" | "nonzero_count"
             | "flatnonzero" | "searchsorted" | "digitize"
             | "histogram_bin_edges" | "unique_count"
@@ -16992,7 +16992,7 @@ impl Parser {
             | "root_brentq" | "root_newton" | "root_secant"
             | "fmin_powell" | "fmin_cobyla"
 
-            // ── batch 73: economics + game theory ─────────────────────────
+            // ── economics + game theory ─────────────────────────
             | "cobb_douglas" | "ces_production"
             | "leontief_input" | "leontief_output"
             | "slutsky_decompose"
@@ -17017,7 +17017,7 @@ impl Parser {
             | "price_elasticity" | "supply_elasticity"
             | "income_elasticity" | "engel_curve" | "cross_elasticity"
             | "diff_in_diff" | "did_estimator" | "rdd_estimate"
-            // ── batch 74: SciPy.signal — DSP filters, windows, transforms ──
+            // ── SciPy.signal — DSP filters, windows, transforms ──
             | "hann_w" | "hamming_w" | "blackman_w" | "barthann_w"
             | "nuttall_w" | "flattop_w" | "parzen_window" | "tukey_w"
             | "taylor_window" | "dpss_window" | "kaiserord_step"
@@ -17042,7 +17042,7 @@ impl Parser {
             | "upfirdn_step" | "resample_poly_step" | "decimate_step"
             | "savgol_coef" | "detrend_linear"
             | "wiener_filter" | "medfilt_1d" | "peak_widths_at"
-            // ── batch 75: NetworkX graph algorithms ───────────────────────
+            // ── NetworkX graph algorithms ───────────────────────
             | "dijkstra_relax" | "bellman_ford_relax"
             | "floyd_warshall_step" | "johnson_reweight"
             | "astar_search" | "bidirectional_dijkstra"
@@ -17076,7 +17076,7 @@ impl Parser {
             | "dominating_set_greedy" | "hamiltonian_path"
             | "min_steiner_tree" | "k_shortest_spanning"
             | "random_walk_hitting" | "simrank"
-            // ── batch 76: Pandas DataFrame ops ────────────────────────────
+            // ── Pandas DataFrame ops ────────────────────────────
             | "df_groupby" | "df_aggregate" | "df_apply"
             | "df_transform" | "df_pivot" | "df_pivot_table"
             | "df_melt" | "df_stack" | "df_unstack"
@@ -17096,7 +17096,7 @@ impl Parser {
             | "df_to_timedelta" | "df_to_numeric" | "df_eval"
             | "df_query" | "df_filter" | "df_drop_duplicates"
             | "df_duplicated" | "df_set_index" | "df_reset_index"
-            // ── batch 77: PIL/OpenCV image processing ─────────────────────
+            // ── PIL/OpenCV image processing ─────────────────────
             | "image_resize" | "image_grayscale" | "image_threshold"
             | "image_blur_gaussian" | "image_blur_box" | "image_sharpen"
             | "image_edge_canny" | "image_edge_sobel" | "image_edge_laplacian"
@@ -17114,7 +17114,7 @@ impl Parser {
             | "ransac_homography" | "optical_flow_lk" | "optical_flow_farneback"
             | "corner_subpix" | "image_rotate" | "image_flip_h"
             | "image_flip_v" | "image_emboss" | "image_motion_blur"
-            // ── batch 78: statsmodels ─
+            // ── statsmodels ─
             | "arima_fit" | "arima_forecast" | "arma_order_select"
             | "sarimax_fit" | "garch_fit" | "ewma_smooth"
             | "holt_winters_additive" | "holt_winters_multiplicative" | "kalman_filter_step"
@@ -17127,7 +17127,7 @@ impl Parser {
             | "exp_smooth_double" | "markov_switching_ar" | "markov_switching_mr"
             | "arch_lm" | "state_space_kalman" | "ucm_unobserved_components"
             | "spectral_density_estimate" | "bayesian_step" | "pivoted_cholesky_var"
-            // ── batch 79: sklearn ─
+            // ── sklearn ─
             | "sk_logistic_predict" | "sk_logistic_fit" | "sk_random_forest_fit"
             | "sk_gbt_fit" | "sk_xgb_fit" | "sk_lightgbm_fit"
             | "sk_svm_fit" | "sk_kmeans_fit" | "sk_dbscan_fit"
@@ -17143,7 +17143,7 @@ impl Parser {
             | "sk_mutual_info" | "sk_lda_topic" | "sk_nmf_topic"
             | "sk_word2vec_train" | "sk_doc2vec_train" | "sk_naive_bayes_predict"
             | "sk_knn_predict" | "sk_decision_tree_split"
-            // ── batch 80: quantum ─
+            // ── quantum ─
             | "qubit_x" | "qubit_y" | "qubit_z"
             | "qubit_h" | "qubit_s" | "qubit_t"
             | "qubit_rx" | "qubit_ry" | "qubit_rz"
@@ -17158,7 +17158,7 @@ impl Parser {
             | "ancilla_alloc" | "bloch_sphere_x" | "bloch_sphere_z"
             | "density_matrix_purity_q" | "entanglement_entropy" | "quantum_teleportation"
             | "superdense_coding" | "noise_model_depolarize"
-            // ── batch 81: b81-misc-utility ─
+            // ── b81-misc-utility ─
             | "mirr_excel" | "accrint" | "cumipmt"
             | "cumprinc" | "dollarde" | "dollarfr"
             | "received" | "yieldmat" | "yielddisc"
@@ -17178,7 +17178,7 @@ impl Parser {
             | "cache_control_parse" | "vary_match" | "content_negotiate"
             | "accept_lang_pick" | "range_header_parse" | "if_match_check"
             | "if_none_match_check" | "digest_auth_quote" | "www_auth_parse"
-            // ── batch 82: b82-misc-utility ─
+            // ── b82-misc-utility ─
             | "iso8601_duration_parse" | "iso8601_duration_to_seconds" | "rrule_next_occurrence"
             | "cron_next_fire" | "date_round_iso" | "week_number_iso"
             | "fiscal_year_us" | "age_at_date" | "easter_western"

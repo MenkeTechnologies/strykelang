@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Cross-language parity batch 4 — Julia / R / Haskell / OCaml staples that
+// Cross-language parity — Julia / R / Haskell / OCaml staples that
 // stryke didn't already cover. Layout: forward-mode auto-diff, statistical
 // tests, distance metrics, multivariate / non-central distributions, matrix
 // functions (exp/log/sqrt/sin/cos), adaptive ODE solvers, GLM (logistic /
