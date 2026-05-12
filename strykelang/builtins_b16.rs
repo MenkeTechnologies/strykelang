@@ -92,7 +92,8 @@ pub fn soundex_v1(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn soundex_v2(args: &[StrykeValue]) -> StrykeValue {
-    // Russell variant (refined): produces longer code, no length cap
+    // Apache "Refined Soundex" — finer-grained groups (1:BP 2:FV 3:CKS 4:GJ
+    // 5:QXZ 6:DT 7:L 8:MN 9:R), no length cap, vowels and H/W skipped.
     let s = arg_str(args, 0).unwrap_or_default().to_uppercase();
     let chars: Vec<char> = s.chars().filter(|c| c.is_ascii_alphabetic()).collect();
     if chars.is_empty() {
@@ -327,175 +328,6 @@ pub fn phonex(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(out)
 }
 
-pub fn double_metaphone_primary(args: &[StrykeValue]) -> StrykeValue {
-    // Simplified primary metaphone — preserves key transformations.
-    let s = arg_str(args, 0).unwrap_or_default().to_uppercase();
-    let mut chars: Vec<char> = s.chars().filter(|c| c.is_ascii_alphabetic()).collect();
-    if chars.is_empty() {
-        return StrykeValue::string(String::new());
-    }
-    // Skip silent leading letters
-    if chars.len() >= 2 {
-        let pair: String = chars[..2].iter().collect();
-        if matches!(pair.as_str(), "GN" | "KN" | "PN" | "WR" | "PS") {
-            chars.remove(0);
-        }
-    }
-    if chars[0] == 'X' {
-        chars[0] = 'S';
-    }
-    let mut out = String::new();
-    let mut i = 0;
-    let max = arg_i64(args, 1).unwrap_or(4).clamp(1, 10) as usize;
-    while i < chars.len() && out.len() < max {
-        let c = chars[i];
-        let next = chars.get(i + 1).copied();
-        match c {
-            'A' | 'E' | 'I' | 'O' | 'U' | 'Y'
-                if i == 0 => {
-                    out.push('A');
-                }
-            'B' => {
-                out.push('P');
-            }
-            'C' => {
-                if next == Some('H') {
-                    out.push('X');
-                    i += 1;
-                } else if next == Some('I') || next == Some('E') || next == Some('Y') {
-                    out.push('S');
-                } else {
-                    out.push('K');
-                }
-            }
-            'D' => {
-                if next == Some('G') {
-                    out.push('J');
-                    i += 1;
-                } else {
-                    out.push('T');
-                }
-            }
-            'F' | 'V' => out.push('F'),
-            'G' => {
-                if next == Some('H') {
-                    out.push('F');
-                    i += 1;
-                } else {
-                    out.push('K');
-                }
-            }
-            'H' => {
-                if matches!(next, Some('A' | 'E' | 'I' | 'O' | 'U' | 'Y')) {
-                    out.push('H');
-                }
-            }
-            'J' => out.push('J'),
-            'K' => {
-                if i == 0 && next == Some('N') {
-                    // skip
-                } else {
-                    out.push('K');
-                }
-            }
-            'L' => out.push('L'),
-            'M' => out.push('M'),
-            'N' => out.push('N'),
-            'P' => {
-                if next == Some('H') {
-                    out.push('F');
-                    i += 1;
-                } else {
-                    out.push('P');
-                }
-            }
-            'Q' => out.push('K'),
-            'R' => out.push('R'),
-            'S' => {
-                if next == Some('H') {
-                    out.push('X');
-                    i += 1;
-                } else {
-                    out.push('S');
-                }
-            }
-            'T' => {
-                if next == Some('H') {
-                    out.push('0');
-                    i += 1;
-                } else {
-                    out.push('T');
-                }
-            }
-            'W' => {
-                if matches!(next, Some('A' | 'E' | 'I' | 'O' | 'U')) {
-                    out.push('W');
-                }
-            }
-            'X' => out.push_str("KS"),
-            'Z' => out.push('S'),
-            _ => {}
-        }
-        i += 1;
-    }
-    out.truncate(max);
-    StrykeValue::string(out)
-}
-
-pub fn double_metaphone_secondary(args: &[StrykeValue]) -> StrykeValue {
-    // Secondary differs by alternate consonant maps; we treat C->S where primary uses K.
-    let s = arg_str(args, 0).unwrap_or_default().to_uppercase();
-    let mut chars: Vec<char> = s.chars().filter(|c| c.is_ascii_alphabetic()).collect();
-    if chars.is_empty() {
-        return StrykeValue::string(String::new());
-    }
-    if chars.len() >= 2 {
-        let pair: String = chars[..2].iter().collect();
-        if matches!(pair.as_str(), "GN" | "KN" | "PN" | "WR" | "PS") {
-            chars.remove(0);
-        }
-    }
-    if chars[0] == 'X' {
-        chars[0] = 'S';
-    }
-    let mut out = String::new();
-    let max = arg_i64(args, 1).unwrap_or(4).clamp(1, 10) as usize;
-    let mut i = 0;
-    while i < chars.len() && out.len() < max {
-        let c = chars[i];
-        let next = chars.get(i + 1).copied();
-        match c {
-            'A' | 'E' | 'I' | 'O' | 'U' | 'Y' if i == 0 => out.push('A'),
-            'C' => {
-                if next == Some('H') {
-                    out.push('K');
-                    i += 1;
-                } else {
-                    out.push('S');
-                }
-            }
-            'G' => {
-                if next == Some('H') {
-                    out.push('K');
-                    i += 1;
-                } else if next == Some('N') {
-                    // skip silent g
-                } else {
-                    out.push('J');
-                }
-            }
-            'J' => out.push('H'),
-            _ => {
-                let prim_result = double_metaphone_primary(&[StrykeValue::string(c.to_string()), StrykeValue::integer(1)]);
-                out.push_str(&prim_result.as_str_or_empty());
-            }
-        }
-        i += 1;
-    }
-    out.truncate(max);
-    StrykeValue::string(out)
-}
-
 pub fn match_rating_compare(args: &[StrykeValue]) -> StrykeValue {
     use crate::builtins_b16::match_rating_codex_impl as mrc;
     let s1 = arg_str(args, 0).unwrap_or_default();
@@ -614,26 +446,95 @@ pub fn mercator_unproject_lon(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn lambert_project(args: &[StrykeValue]) -> StrykeValue {
+    // Lambert Conformal Conic with one standard parallel `lat0`, on a sphere.
+    // n = sin(lat0); F = cos(lat0)·tan^n(π/4 + lat0/2)
+    // ρ(φ) = R·F / tan^n(π/4 + φ/2);  ρ₀ = ρ(lat0)
+    // x = ρ·sin(n·(λ − λ₀));  y = ρ₀ − ρ·cos(n·(λ − λ₀))
     let lat = arg_f64(args, 0).unwrap_or(0.0).to_radians();
     let lon = arg_f64(args, 1).unwrap_or(0.0).to_radians();
     let lat0 = arg_f64(args, 2).unwrap_or(0.0).to_radians();
     let lon0 = arg_f64(args, 3).unwrap_or(0.0).to_radians();
-    let r = 6371000.0;
-    let x = r * (lon - lon0) * lat0.cos();
-    let y = r * (lat - lat0);
+    let r = 6371000.0_f64;
+    let n = lat0.sin();
+    if n.abs() < 1e-9 {
+        // Degenerate cone at equator → fall back to equirectangular at lat0.
+        let x = r * (lon - lon0);
+        let y = r * (lat - lat0);
+        return arr_sv(vec![StrykeValue::float(x), StrykeValue::float(y)]);
+    }
+    let quarter = std::f64::consts::FRAC_PI_4;
+    let f = lat0.cos() * (quarter + lat0 / 2.0).tan().powf(n);
+    let rho = r * f / (quarter + lat / 2.0).tan().powf(n);
+    let rho0 = r * f / (quarter + lat0 / 2.0).tan().powf(n);
+    let theta = n * (lon - lon0);
+    let x = rho * theta.sin();
+    let y = rho0 - rho * theta.cos();
     arr_sv(vec![StrykeValue::float(x), StrykeValue::float(y)])
 }
 
+/// Initial bearing for the Vincenty inverse problem on the WGS84 ellipsoid.
+/// Iterates λ (longitude difference on the auxiliary sphere) until
+/// convergence, then computes the initial azimuth. Returns degrees in [0, 360).
+/// Falls back to spherical bearing for the antipodal case where Vincenty
+/// fails to converge. Use `great_circle_bearing` for the cheap spherical form.
 pub fn vincenty_bearing(args: &[StrykeValue]) -> StrykeValue {
     let lat1 = arg_f64(args, 0).unwrap_or(0.0).to_radians();
     let lon1 = arg_f64(args, 1).unwrap_or(0.0).to_radians();
     let lat2 = arg_f64(args, 2).unwrap_or(0.0).to_radians();
     let lon2 = arg_f64(args, 3).unwrap_or(0.0).to_radians();
-    let dlon = lon2 - lon1;
-    let y = dlon.sin() * lat2.cos();
-    let x = lat1.cos() * lat2.sin() - lat1.sin() * lat2.cos() * dlon.cos();
-    let brng = y.atan2(x).to_degrees();
-    StrykeValue::float((brng + 360.0) % 360.0)
+    let f = 1.0 / 298.257223563_f64;
+    let l = lon2 - lon1;
+    let u1 = ((1.0 - f) * lat1.tan()).atan();
+    let u2 = ((1.0 - f) * lat2.tan()).atan();
+    let sin_u1 = u1.sin();
+    let cos_u1 = u1.cos();
+    let sin_u2 = u2.sin();
+    let cos_u2 = u2.cos();
+    let mut lambda = l;
+    let mut sin_l: f64 = 0.0;
+    let mut cos_l: f64 = 0.0;
+    let mut converged = false;
+    for _ in 0..100 {
+        sin_l = lambda.sin();
+        cos_l = lambda.cos();
+        let sin_sigma = ((cos_u2 * sin_l).powi(2)
+            + (cos_u1 * sin_u2 - sin_u1 * cos_u2 * cos_l).powi(2))
+            .sqrt();
+        if sin_sigma == 0.0 {
+            return StrykeValue::float(0.0);
+        }
+        let cos_sigma = sin_u1 * sin_u2 + cos_u1 * cos_u2 * cos_l;
+        let sigma = sin_sigma.atan2(cos_sigma);
+        let sin_alpha = cos_u1 * cos_u2 * sin_l / sin_sigma;
+        let cos_sq_alpha = 1.0 - sin_alpha * sin_alpha;
+        let cos_2sigma_m = if cos_sq_alpha == 0.0 {
+            0.0
+        } else {
+            cos_sigma - 2.0 * sin_u1 * sin_u2 / cos_sq_alpha
+        };
+        let c = f / 16.0 * cos_sq_alpha * (4.0 + f * (4.0 - 3.0 * cos_sq_alpha));
+        let lambda_prev = lambda;
+        lambda = l
+            + (1.0 - c)
+                * f
+                * sin_alpha
+                * (sigma
+                    + c * sin_sigma
+                        * (cos_2sigma_m + c * cos_sigma * (-1.0 + 2.0 * cos_2sigma_m.powi(2))));
+        if (lambda - lambda_prev).abs() < 1e-12 {
+            converged = true;
+            break;
+        }
+    }
+    if !converged {
+        let dlon = lon2 - lon1;
+        let y = dlon.sin() * lat2.cos();
+        let x = lat1.cos() * lat2.sin() - lat1.sin() * lat2.cos() * dlon.cos();
+        return StrykeValue::float(y.atan2(x).to_degrees().rem_euclid(360.0));
+    }
+    let y = cos_u2 * sin_l;
+    let x = cos_u1 * sin_u2 - sin_u1 * cos_u2 * cos_l;
+    StrykeValue::float(y.atan2(x).to_degrees().rem_euclid(360.0))
 }
 
 pub fn destination_lat_lon(args: &[StrykeValue]) -> StrykeValue {
@@ -725,7 +626,8 @@ pub fn utm_to_lat_lon(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn geomag_declination(args: &[StrykeValue]) -> StrykeValue {
-    // Crude approximation using IGRF coefficients (truncated). Not WMM-accurate.
+    // Magnetic declination via a single-dipole model anchored at the geomagnetic
+    // north pole. Not WMM/IGRF-accurate; useful only for rough azimuth correction.
     let lat = arg_f64(args, 0).unwrap_or(0.0);
     let lon = arg_f64(args, 1).unwrap_or(0.0);
     let phi = lat.to_radians();
@@ -997,7 +899,12 @@ pub fn solar_noon_unix(args: &[StrykeValue]) -> StrykeValue {
     let lon = arg_f64(args, 0).unwrap_or(0.0);
     let unix = arg_i64(args, 1).unwrap_or(0);
     let day_start = unix - unix.rem_euclid(86400);
-    let noon = day_start + 43200 - (lon * 240.0) as i64;
+    // Day-of-year from the unix-day index (approximate, sufficient for EoT amplitude).
+    let day_of_year = ((day_start as f64 / 86400.0).rem_euclid(365.2422)).floor();
+    let b = 2.0 * std::f64::consts::PI * (day_of_year - 81.0) / 365.0;
+    // Equation of time in minutes (Spencer/Carruthers form, ±16 min amplitude).
+    let eot_min = 9.873 * (2.0 * b).sin() - 7.655 * b.sin();
+    let noon = day_start + 43200 - (lon * 240.0) as i64 - (eot_min * 60.0) as i64;
     StrykeValue::integer(noon)
 }
 
@@ -1010,14 +917,20 @@ pub fn moon_age_days(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(age)
 }
 
+/// Approximate Earth-Moon distance in km via the anomalistic cycle
+/// (perigee-to-perigee period 27.554 days). Modeled as a sinusoid between
+/// ~364,000 km (perigee) and ~406,000 km (apogee). Anchored at the
+/// 2000-01-19 20:00 UTC perigee. Accurate to a few thousand km; for
+/// observation-grade precision use a real ephemeris.
 pub fn moon_distance_km(args: &[StrykeValue]) -> StrykeValue {
     let unix = arg_i64(args, 0).unwrap_or(0);
-    let synodic = 27.554549878_f64;
-    let known_perigee_unix = 0_f64;
+    let anomalistic_days = 27.554549878_f64;
+    // Verified perigee: 2000-01-19 20:00 UTC → unix 948_312_000.
+    let known_perigee_unix = 948_312_000_f64;
     let days = (unix as f64 - known_perigee_unix) / 86400.0;
-    let phase = (days % synodic) / synodic * 2.0 * std::f64::consts::PI;
-    let dist = 385000.0 - 21000.0 * phase.cos();
-    StrykeValue::float(dist)
+    let phase = (days / anomalistic_days) * 2.0 * std::f64::consts::PI;
+    // Mean 384,400 km; amplitude ~21,000 km matches observed perigee/apogee bounds.
+    StrykeValue::float(384_400.0 - 21_000.0 * phase.cos())
 }
 
 pub fn season_of_year(args: &[StrykeValue]) -> StrykeValue {
@@ -1312,21 +1225,6 @@ pub fn gamma_uncorrect(args: &[StrykeValue]) -> StrykeValue {
     let v = arg_f64(args, 0).unwrap_or(0.0).clamp(0.0, 1.0);
     let gamma = arg_f64(args, 1).unwrap_or(2.2);
     StrykeValue::float(v.powf(gamma))
-}
-
-pub fn ase_palette_extract(args: &[StrykeValue]) -> StrykeValue {
-    // Simplified: treat input as array of RGB tuples, return unique colors
-    let arr = args.first().map(as_vec_sv).unwrap_or_default();
-    let mut seen = HashMap::new();
-    let mut out = Vec::new();
-    for c in arr {
-        let key = format!("{:?}", as_vec_sv(&c).iter().map(|x| x.to_int()).collect::<Vec<_>>());
-        if let std::collections::hash_map::Entry::Vacant(e) = seen.entry(key) {
-            e.insert(true);
-            out.push(c);
-        }
-    }
-    arr_sv(out)
 }
 
 // ══════════════════════════════════════════════════════════════════════

@@ -242,10 +242,6 @@ pub fn rna_reverse_complement(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(comp.chars().rev().collect())
 }
 
-pub fn rna_gc_content(args: &[StrykeValue]) -> StrykeValue {
-    dna_gc_content(args)
-}
-
 const AA_MW: &[(char, f64)] = &[
     ('A', 89.09), ('R', 174.20), ('N', 132.12), ('D', 133.10),
     ('C', 121.16), ('Q', 146.15), ('E', 147.13), ('G', 75.07),
@@ -502,33 +498,6 @@ pub fn sequence_similarity_pct(args: &[StrykeValue]) -> StrykeValue {
         .filter(|(x, y)| x == y || (group(*x) == group(*y) && group(*x) != 99))
         .count();
     StrykeValue::float(100.0 * similar as f64 / len as f64)
-}
-
-pub fn blast_kmer_index(args: &[StrykeValue]) -> StrykeValue {
-    dna_kmer_index(args)
-}
-
-pub fn profile_hmm_score(args: &[StrykeValue]) -> StrykeValue {
-    // Simplified: log-odds score under given match-state emission matrix
-    let seq = arg_str(args, 0).unwrap_or_default().to_uppercase();
-    let emit = args.get(1).map(as_matrix).unwrap_or_default();
-    let alphabet = arg_str(args, 2).unwrap_or_else(|| "ACGT".to_string());
-    if emit.is_empty() {
-        return StrykeValue::float(0.0);
-    }
-    let alpha_idx: HashMap<char, usize> = alphabet.chars().enumerate().map(|(i, c)| (c, i)).collect();
-    let mut score = 0.0;
-    for (state_i, c) in seq.chars().enumerate() {
-        if state_i >= emit.len() {
-            break;
-        }
-        if let Some(&j) = alpha_idx.get(&c) {
-            if j < emit[state_i].len() && emit[state_i][j] > 0.0 {
-                score += emit[state_i][j].ln();
-            }
-        }
-    }
-    StrykeValue::float(score)
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -1199,8 +1168,13 @@ pub fn plane_distance_to_point(args: &[StrykeValue]) -> StrykeValue {
     let point = unpack_vec3(args.first().unwrap_or(&StrykeValue::UNDEF));
     let normal = unpack_vec3(args.get(1).unwrap_or(&StrykeValue::UNDEF));
     let plane_point = unpack_vec3(args.get(2).unwrap_or(&StrykeValue::UNDEF));
+    let n_len = (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).sqrt();
+    if n_len < 1e-12 {
+        return StrykeValue::float(0.0);
+    }
     let diff = [point[0] - plane_point[0], point[1] - plane_point[1], point[2] - plane_point[2]];
-    StrykeValue::float(diff[0] * normal[0] + diff[1] * normal[1] + diff[2] * normal[2])
+    let dot = diff[0] * normal[0] + diff[1] * normal[1] + diff[2] * normal[2];
+    StrykeValue::float(dot / n_len)
 }
 
 pub fn plane_normalize(args: &[StrykeValue]) -> StrykeValue {
@@ -1242,10 +1216,6 @@ pub fn triangle_area_3d(args: &[StrykeValue]) -> StrykeValue {
         ab[0] * ac[1] - ab[1] * ac[0],
     ];
     StrykeValue::float(0.5 * (cross[0].powi(2) + cross[1].powi(2) + cross[2].powi(2)).sqrt())
-}
-
-pub fn ray_plane_intersect_2(args: &[StrykeValue]) -> StrykeValue {
-    ray_plane_intersect(args)
 }
 
 // ══════════════════════════════════════════════════════════════════════

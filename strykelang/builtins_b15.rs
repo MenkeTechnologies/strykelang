@@ -363,11 +363,6 @@ pub fn scale_melodic_minor(args: &[StrykeValue]) -> StrykeValue {
     scale_notes(chord_root_arg(args), &[2, 1, 2, 2, 2, 2, 1])
 }
 
-pub fn beats_per_bar(args: &[StrykeValue]) -> StrykeValue {
-    let num = arg_i64(args, 0).unwrap_or(4);
-    StrykeValue::integer(num)
-}
-
 pub fn seconds_per_beat(args: &[StrykeValue]) -> StrykeValue {
     let bpm = arg_f64(args, 0).unwrap_or(120.0).max(1.0);
     StrykeValue::float(60.0 / bpm)

@@ -1,6 +1,6 @@
 [package]
 name = "strykelang"
-version = "0.13.7"
+version = "0.13.8"
 edition = "2021"
 description = "A highly parallel Perl 5 interpreter written in Rust"
 license = "MIT"
@@ -95,7 +95,7 @@ siphasher = "1"
 rsa = "0.9"
 p256 = { version = "0.13", features = ["ecdsa", "ecdh"] }
 p384 = { version = "0.13", features = ["ecdsa", "ecdh"] }
-k256 = { version = "0.13", features = ["ecdsa"] }
+k256 = { version = "0.13", features = ["ecdsa", "schnorr"] }
 hkdf = "0.12"
 elliptic-curve = { version = "0.13", features = ["sec1"] }
 ecdsa = { version = "0.16", features = ["signing", "verifying"] }
@@ -144,6 +144,7 @@ jaq-json = { version = "2", features = ["serde"] }
 jaq-std = "3"
 num-traits = "0.2"
 num-bigint = "0.4"
+num-integer = "0.1"
 inferno = { version = "0.12", default-features = false }
 lsp-server = "0.7.9"
 lsp-types = "0.97.0"

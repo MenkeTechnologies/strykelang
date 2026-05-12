@@ -1145,18 +1145,20 @@ pub fn graph_closeness(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn graph_eigenvector_centrality(args: &[StrykeValue]) -> StrykeValue {
-    let g = args.first().map(adj_unweighted).unwrap_or_default();
+    // Power iteration on the (possibly weighted) adjacency matrix: x ← A·x / ‖A·x‖.
+    let g = args.first().map(adj_from_arg).unwrap_or_default();
+    let iters = arg_i64(args, 1).unwrap_or(100).max(1) as usize;
     let n = g.len();
     if n == 0 {
         return arr_f64(vec![]);
     }
     let mut x = vec![1.0 / (n as f64).sqrt(); n];
-    for _ in 0..100 {
+    for _ in 0..iters {
         let mut next = vec![0.0; n];
         for u in 0..n {
-            for &v in &g[u] {
+            for &(v, w) in &g[u] {
                 if v < n {
-                    next[v] += x[u];
+                    next[v] += w * x[u];
                 }
             }
         }
@@ -1167,7 +1169,11 @@ pub fn graph_eigenvector_centrality(args: &[StrykeValue]) -> StrykeValue {
         for v in &mut next {
             *v /= norm;
         }
+        let diff: f64 = x.iter().zip(next.iter()).map(|(a, b)| (a - b).abs()).sum();
         x = next;
+        if diff < 1e-12 {
+            break;
+        }
     }
     arr_f64(x)
 }
@@ -1546,6 +1552,14 @@ pub fn date_add_days(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or(StrykeValue::UNDEF)
 }
 
+fn last_day_of_month(year: i32, month: u32) -> u32 {
+    let (ny, nm) = if month == 12 { (year + 1, 1) } else { (year, month + 1) };
+    NaiveDate::from_ymd_opt(ny, nm, 1)
+        .and_then(|first_next| first_next.pred_opt())
+        .map(|d| d.day())
+        .unwrap_or(28)
+}
+
 pub fn date_add_months(args: &[StrykeValue]) -> StrykeValue {
     let d = parse_date_arg(args, 0);
     let n = arg_i64(args, 1).unwrap_or(0);
@@ -1553,7 +1567,8 @@ pub fn date_add_months(args: &[StrykeValue]) -> StrykeValue {
         let total = x.year() as i64 * 12 + x.month() as i64 - 1 + n;
         let ny = (total.div_euclid(12)) as i32;
         let nm = (total.rem_euclid(12)) as u32 + 1;
-        NaiveDate::from_ymd_opt(ny, nm, x.day().min(28))
+        let day = x.day().min(last_day_of_month(ny, nm));
+        NaiveDate::from_ymd_opt(ny, nm, day)
             .and_then(|d| d.and_hms_opt(x.hour(), x.minute(), x.second()))
             .map(|nd| Utc.from_utc_datetime(&nd))
     })
@@ -1565,7 +1580,9 @@ pub fn date_add_years(args: &[StrykeValue]) -> StrykeValue {
     let d = parse_date_arg(args, 0);
     let n = arg_i64(args, 1).unwrap_or(0) as i32;
     d.and_then(|x| {
-        NaiveDate::from_ymd_opt(x.year() + n, x.month(), x.day().min(28))
+        let ny = x.year() + n;
+        let day = x.day().min(last_day_of_month(ny, x.month()));
+        NaiveDate::from_ymd_opt(ny, x.month(), day)
             .and_then(|d| d.and_hms_opt(x.hour(), x.minute(), x.second()))
             .map(|nd| Utc.from_utc_datetime(&nd))
     })
@@ -1696,18 +1713,28 @@ pub fn date_str_to_unix(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::UNDEF
 }
 
+/// Approximate sunrise unix timestamp at (lat, lon) for the day containing
+/// `ts`. Uses the basic solar-geometry formula: solar declination from day
+/// of year, hour angle from `cos⁻¹(−tan(φ)·tan(δ))`, solar noon offset by
+/// longitude and equation-of-time. Skips atmospheric refraction and zenith
+/// correction — good to a few minutes; returns UNDEF for polar days/nights.
 pub fn sun_rise_unix(args: &[StrykeValue]) -> StrykeValue {
     let lat = arg_f64(args, 0).unwrap_or(0.0);
-    let _lon = arg_f64(args, 1).unwrap_or(0.0);
+    let lon = arg_f64(args, 1).unwrap_or(0.0);
     let ts = arg_i64(args, 2).unwrap_or(0);
     let d = Utc.timestamp_opt(ts, 0).single();
     if let Some(d) = d {
         let doy = d.ordinal() as f64;
         let lat_r = lat.to_radians();
         let decl = (23.44_f64).to_radians() * ((360.0 / 365.0) * (doy - 81.0)).to_radians().sin();
-        let cos_ha = (-lat_r.tan() * decl.tan()).clamp(-1.0, 1.0);
-        let ha = cos_ha.acos().to_degrees() / 15.0;
-        let solar_noon_utc = 12.0 - args.get(1).map(|v| v.to_number()).unwrap_or(0.0) / 15.0;
+        let arg = -lat_r.tan() * decl.tan();
+        if !(-1.0..=1.0).contains(&arg) {
+            return StrykeValue::UNDEF;
+        }
+        let ha = arg.acos().to_degrees() / 15.0;
+        let b = 2.0 * std::f64::consts::PI * (doy - 81.0) / 365.0;
+        let eot_h = (9.873 * (2.0 * b).sin() - 7.655 * b.sin()) / 60.0;
+        let solar_noon_utc = 12.0 - lon / 15.0 - eot_h;
         let rise_h = solar_noon_utc - ha;
         let hour = rise_h.floor() as i64;
         let min = ((rise_h - hour as f64) * 60.0) as i64;
@@ -1720,18 +1747,25 @@ pub fn sun_rise_unix(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::UNDEF
 }
 
+/// Approximate sunset unix timestamp at (lat, lon). Same simple solar
+/// geometry as `sun_rise_unix`; returns UNDEF for polar days/nights.
 pub fn sun_set_unix(args: &[StrykeValue]) -> StrykeValue {
     let lat = arg_f64(args, 0).unwrap_or(0.0);
-    let _lon = arg_f64(args, 1).unwrap_or(0.0);
+    let lon = arg_f64(args, 1).unwrap_or(0.0);
     let ts = arg_i64(args, 2).unwrap_or(0);
     let d = Utc.timestamp_opt(ts, 0).single();
     if let Some(d) = d {
         let doy = d.ordinal() as f64;
         let lat_r = lat.to_radians();
         let decl = (23.44_f64).to_radians() * ((360.0 / 365.0) * (doy - 81.0)).to_radians().sin();
-        let cos_ha = (-lat_r.tan() * decl.tan()).clamp(-1.0, 1.0);
-        let ha = cos_ha.acos().to_degrees() / 15.0;
-        let solar_noon_utc = 12.0 - args.get(1).map(|v| v.to_number()).unwrap_or(0.0) / 15.0;
+        let arg = -lat_r.tan() * decl.tan();
+        if !(-1.0..=1.0).contains(&arg) {
+            return StrykeValue::UNDEF;
+        }
+        let ha = arg.acos().to_degrees() / 15.0;
+        let b = 2.0 * std::f64::consts::PI * (doy - 81.0) / 365.0;
+        let eot_h = (9.873 * (2.0 * b).sin() - 7.655 * b.sin()) / 60.0;
+        let solar_noon_utc = 12.0 - lon / 15.0 - eot_h;
         let set_h = solar_noon_utc + ha;
         let hour = set_h.floor() as i64;
         let min = ((set_h - hour as f64) * 60.0) as i64;

@@ -209,10 +209,6 @@ pub fn fibonacci_matrix(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(result[0][1] as i64)
 }
 
-pub fn fibonacci_nth_fast(args: &[StrykeValue]) -> StrykeValue {
-    fibonacci_matrix(args)
-}
-
 pub fn lucas_nth(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0) as u64;
     if n == 0 {
@@ -838,31 +834,30 @@ pub fn chorus_simple(args: &[StrykeValue]) -> StrykeValue {
     arr_f64(out)
 }
 
-pub fn flanger_simple(args: &[StrykeValue]) -> StrykeValue {
-    chorus_simple(args)
-}
-
 pub fn phaser_simple(args: &[StrykeValue]) -> StrykeValue {
     let signal = args.first().map(as_vec_f64).unwrap_or_default();
     let rate_hz = arg_f64(args, 1).unwrap_or(0.5);
-    let depth = arg_f64(args, 2).unwrap_or(1.0);
+    let depth = arg_f64(args, 2).unwrap_or(1.0).clamp(0.0, 0.99);
     let sr = arg_f64(args, 3).unwrap_or(44100.0);
-    let n = signal.len();
     let two_pi = 2.0 * std::f64::consts::PI;
-    let mut prev = 0.0;
-    arr_f64(
-        signal
-            .iter()
-            .enumerate()
-            .map(|(i, &x)| {
-                let coef = depth * (two_pi * rate_hz * i as f64 / sr).sin();
-                let out = -coef * x + prev + coef * (if i > 0 { signal[i - 1] } else { 0.0 });
-                let _ = n;
-                prev = out;
-                out
-            })
-            .collect(),
-    )
+    let n = signal.len();
+    let mut out = Vec::with_capacity(n);
+    // 4-stage all-pass cascade with LFO-modulated coefficient (classic phaser topology).
+    let stages = 4_usize;
+    let mut prev_x = vec![0.0_f64; stages];
+    let mut prev_y = vec![0.0_f64; stages];
+    for (i, &x) in signal.iter().enumerate() {
+        let coef = depth * (two_pi * rate_hz * i as f64 / sr).sin();
+        let mut cur = x;
+        for s in 0..stages {
+            let y = -coef * cur + prev_x[s] + coef * prev_y[s];
+            prev_x[s] = cur;
+            prev_y[s] = y;
+            cur = y;
+        }
+        out.push(0.5 * x + 0.5 * cur);
+    }
+    arr_f64(out)
 }
 
 pub fn comb_filter(args: &[StrykeValue]) -> StrykeValue {
@@ -933,14 +928,6 @@ pub fn schroeder_reverb(args: &[StrykeValue]) -> StrykeValue {
     };
     let r = allpass(&allpass(&summed, 225, 0.5), 556, 0.5);
     arr_f64(r)
-}
-
-pub fn plate_reverb_simple(args: &[StrykeValue]) -> StrykeValue {
-    schroeder_reverb(args)
-}
-
-pub fn freeverb_lite(args: &[StrykeValue]) -> StrykeValue {
-    schroeder_reverb(args)
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -1162,19 +1149,62 @@ pub fn perlin_2d(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(lerp(lerp(aa, ba, u), lerp(ab, bb, u), v))
 }
 
+fn hash_xyz(x: i32, y: i32, z: i32) -> u32 {
+    let mut h = (x as u32)
+        .wrapping_mul(73856093)
+        ^ (y as u32).wrapping_mul(19349663)
+        ^ (z as u32).wrapping_mul(83492791);
+    h = h.wrapping_mul(2654435761);
+    h ^ (h >> 16)
+}
+
+fn perlin_grad3(hash: u32, x: f64, y: f64, z: f64) -> f64 {
+    // Ken Perlin's 12 standard gradient vectors.
+    let h = hash & 15;
+    let u = if h < 8 { x } else { y };
+    let v = if h < 4 {
+        y
+    } else if h == 12 || h == 14 {
+        x
+    } else {
+        z
+    };
+    (if h & 1 == 0 { u } else { -u }) + (if h & 2 == 0 { v } else { -v })
+}
+
 pub fn perlin_3d(args: &[StrykeValue]) -> StrykeValue {
-    // Use 2D perlin slice
     let x = arg_f64(args, 0).unwrap_or(0.0);
     let y = arg_f64(args, 1).unwrap_or(0.0);
     let z = arg_f64(args, 2).unwrap_or(0.0);
-    let a = perlin_2d(&[StrykeValue::float(x), StrykeValue::float(y)]).to_number();
-    let b = perlin_2d(&[StrykeValue::float(y), StrykeValue::float(z)]).to_number();
-    let c = perlin_2d(&[StrykeValue::float(x), StrykeValue::float(z)]).to_number();
-    StrykeValue::float((a + b + c) / 3.0)
+    let xi = x.floor() as i32;
+    let yi = y.floor() as i32;
+    let zi = z.floor() as i32;
+    let xf = x - xi as f64;
+    let yf = y - yi as f64;
+    let zf = z - zi as f64;
+    let u = fade(xf);
+    let v = fade(yf);
+    let w = fade(zf);
+    let n000 = perlin_grad3(hash_xyz(xi, yi, zi), xf, yf, zf);
+    let n100 = perlin_grad3(hash_xyz(xi + 1, yi, zi), xf - 1.0, yf, zf);
+    let n010 = perlin_grad3(hash_xyz(xi, yi + 1, zi), xf, yf - 1.0, zf);
+    let n110 = perlin_grad3(hash_xyz(xi + 1, yi + 1, zi), xf - 1.0, yf - 1.0, zf);
+    let n001 = perlin_grad3(hash_xyz(xi, yi, zi + 1), xf, yf, zf - 1.0);
+    let n101 = perlin_grad3(hash_xyz(xi + 1, yi, zi + 1), xf - 1.0, yf, zf - 1.0);
+    let n011 = perlin_grad3(hash_xyz(xi, yi + 1, zi + 1), xf, yf - 1.0, zf - 1.0);
+    let n111 = perlin_grad3(hash_xyz(xi + 1, yi + 1, zi + 1), xf - 1.0, yf - 1.0, zf - 1.0);
+    let nx00 = lerp(n000, n100, u);
+    let nx10 = lerp(n010, n110, u);
+    let nx01 = lerp(n001, n101, u);
+    let nx11 = lerp(n011, n111, u);
+    let nxy0 = lerp(nx00, nx10, v);
+    let nxy1 = lerp(nx01, nx11, v);
+    StrykeValue::float(lerp(nxy0, nxy1, w))
 }
 
 pub fn simplex_2d(args: &[StrykeValue]) -> StrykeValue {
-    // Simplified 2D simplex noise
+    // 2D simplex noise (Stefan Gustavson 2005): skew → triangular cell
+    // selection → unskewed gradient contributions weighted by t⁴.
     let x = arg_f64(args, 0).unwrap_or(0.0);
     let y = arg_f64(args, 1).unwrap_or(0.0);
     let f2 = 0.5 * (3.0_f64.sqrt() - 1.0);
@@ -1290,11 +1320,16 @@ pub fn hash_2d_int(args: &[StrykeValue]) -> StrykeValue {
 // RNG variants
 // ══════════════════════════════════════════════════════════════════════
 
+/// One step of Mulberry32 (Tommy Ettinger 2017). Pass the previous state
+/// as `seed`; the algorithm advances state by `+0x6D2B79F5`, then applies
+/// the permutation to produce the 32-bit output. To iterate, the caller
+/// tracks their own state and adds `0x6D2B79F5` between calls.
+/// Reference: `t ^= t + imul(t ^ t>>>7, t | 61); return t ^ t>>>14`.
 pub fn mulberry32_next(args: &[StrykeValue]) -> StrykeValue {
     let seed = arg_u64(args, 0).unwrap_or(0) as u32;
     let mut z = seed.wrapping_add(0x6D2B79F5);
     z = (z ^ (z >> 15)).wrapping_mul(z | 1);
-    z = z.wrapping_add(z ^ z.wrapping_shr(7).wrapping_mul(z | 61));
+    z ^= z.wrapping_add((z ^ (z >> 7)).wrapping_mul(z | 61));
     StrykeValue::integer((z ^ (z >> 14)) as i64)
 }
 
@@ -1310,11 +1345,12 @@ pub fn xorshift32_next(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn pcg32_next(args: &[StrykeValue]) -> StrykeValue {
+    // PCG32 (O'Neill 2014): output is derived from the OLD state via
+    // xorshifted-then-rotated bits; state then advances by `state·MUL + inc`.
     let state = arg_u64(args, 0).unwrap_or(0);
-    let inc = arg_u64(args, 1).unwrap_or(1) | 1;
-    let new_state = state.wrapping_mul(6364136223846793005).wrapping_add(inc);
-    let xorshifted = ((new_state >> 18) ^ new_state) >> 27;
-    let rot = (new_state >> 59) as u32;
+    let _inc = arg_u64(args, 1).unwrap_or(1) | 1;
+    let xorshifted = ((state >> 18) ^ state) >> 27;
+    let rot = (state >> 59) as u32;
     let result = (xorshifted as u32).rotate_right(rot);
     StrykeValue::integer(result as i64)
 }
