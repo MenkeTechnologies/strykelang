@@ -7140,6 +7140,18 @@ mod completion_tests {
     }
 
     #[test]
+    fn harris_response_doc_includes_structure_tensor() {
+        use super::doc_text_for;
+        let s = doc_text_for("harris_response").expect("harris_response documented");
+        assert!(
+            s.contains("structure tensor"),
+            "domain hover truncated; len={} …{:?}",
+            s.len(),
+            s.chars().rev().take(60).collect::<String>().chars().rev().collect::<String>()
+        );
+    }
+
+    #[test]
     fn utf16_col_to_byte_ascii() {
         let s = "hello";
         assert_eq!(utf16_col_to_byte_idx(s, 0), 0);
