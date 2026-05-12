@@ -47,7 +47,7 @@ my $o_bless = bless [1,2], "MyClass"
 
 # ── Pipe Auto-deref ────────────────────────────────────────────────────────
 
-[1:5] |> sum |> aeq 0, "pipe arrayref no auto-deref (pinned bug)"
+[1:5] |> sum |> aeq 15, "pipe arrayref auto-derefs (FIXED): sum(1..5) = 15"
 
 # ── Chomp Array ────────────────────────────────────────────────────────────
 
