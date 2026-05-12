@@ -15079,7 +15079,7 @@ p au / 1000      # ~149.6 million km
       </article>
       <article class="doc-entry" id="doc-atr">
         <h3><a class="doc-anchor" href="#doc-atr">#</a> <code>atr</code></h3>
-        <p><code>atr(highs, lows, closes, period=14) → array</code> — Average True Range (Wilder). True range = <code>max(high−low, |high−prev_close|, |low−prev_close|)</code>; smoothed by EMA-style recursion.</p>
+        <p><code>atr(highs, lows, closes, period=14) → array</code> — Average True Range (Wilder). True range = <code>max(high−low, |high−prev_close|, |low−prev_close|)</code>; smoothed with Wilder&#39;s recursion <code>ATR[i] = (ATR[i-1]·(p-1) + TR[i])/p</code>, seeded by mean of first <code>p</code> TRs.</p>
         <pre><code class="lang-perl">p atr(\@hi, \@lo, \@cl, 14)
 </code></pre>
       </article>
@@ -17990,7 +17990,7 @@ p bond_price(1000, 0.05, 0.06, 10)   # ~926 (discount)
       </article>
       <article class="doc-entry" id="doc-canny-edges-full">
         <h3><a class="doc-anchor" href="#doc-canny-edges-full">#</a> <code>canny_edges_full</code></h3>
-        <p><code>canny_edges_full(image, low=50, high=150) → matrix</code> — full Canny pipeline with non-max suppression + hysteresis.</p>
+        <p><code>canny_edges_full(image, low=50, high=150) → matrix</code> — full 4-stage Canny pipeline: 5×5 Gaussian blur (σ=1.4), Sobel gradient + atan2 angle (mod 180°), non-max suppression along gradient direction, double-threshold + 8-connected flood-fill hysteresis. Output is binary: 255 for strong/connected-to-strong pixels, 0 otherwise.</p>
       </article>
       <article class="doc-entry" id="doc-canny-edges-simple">
         <h3><a class="doc-anchor" href="#doc-canny-edges-simple">#</a> <code>canny_edges_simple</code></h3>
@@ -21453,7 +21453,7 @@ p $ci-&gt;{slope_lower}
       </article>
       <article class="doc-entry" id="doc-conv2d-apply">
         <h3><a class="doc-anchor" href="#doc-conv2d-apply">#</a> <code>conv2d_apply</code></h3>
-        <p><code>conv2d_apply(image, kernel) → matrix</code> — 2D convolution with zero-padding; output has same dimensions as input.</p>
+        <p><code>conv2d_apply(image, kernel) → matrix</code> — true mathematical 2D convolution: kernel is <strong>flipped</strong> in both axes before the sum-of-products. Zero-padded; output has same dimensions as input. Use <code>correlate2d</code> for the cross-correlation form (no flip).</p>
         <pre><code class="lang-perl">p conv2d_apply($img, gaussian_kernel(5, 1.0))
 </code></pre>
       </article>
@@ -22907,13 +22907,13 @@ p cyber_skull(&quot;large&quot;)   # large skull
       </article>
       <article class="doc-entry" id="doc-date-add-months">
         <h3><a class="doc-anchor" href="#doc-date-add-months">#</a> <code>date_add_months</code></h3>
-        <p><code>date_add_months(unix_or_iso, n) → int</code> — adds whole calendar months; clamps day to 28 to avoid invalid dates.</p>
+        <p><code>date_add_months(unix_or_iso, n) → int</code> — adds whole calendar months; clamps the day to the last valid day of the target month (so Jan 31 + 1mo → Feb 28/29, May 31 + 1mo → Jun 30).</p>
         <pre><code class="lang-perl">p date_add_months(&quot;2024-01-31&quot;, 1)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-date-add-years">
         <h3><a class="doc-anchor" href="#doc-date-add-years">#</a> <code>date_add_years</code></h3>
-        <p><code>date_add_years(unix_or_iso, n) → int</code> — adds whole calendar years; clamps to day 28 max.</p>
+        <p><code>date_add_years(unix_or_iso, n) → int</code> — adds whole calendar years; clamps Feb 29 to Feb 28 in non-leap target years; otherwise preserves the original day.</p>
         <pre><code class="lang-perl">p date_add_years(&quot;2024-02-29&quot;, 1)
 </code></pre>
       </article>
@@ -25713,8 +25713,8 @@ p doppler(440, 30, 0)    # ~405 Hz (ambulance receding)
       </article>
       <article class="doc-entry" id="doc-double-metaphone-primary">
         <h3><a class="doc-anchor" href="#doc-double-metaphone-primary">#</a> <code>double_metaphone_primary</code></h3>
-        <p><code>double_metaphone_primary(name, max=4) → string</code> — primary key from a simplified Double Metaphone.</p>
-        <pre><code class="lang-perl">p double_metaphone_primary(&quot;Schmidt&quot;)
+        <p><code>double_metaphone_primary</code> — operation <code>double metaphone primary</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p double_metaphone_primary $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-double-metaphone-secondary">
@@ -30848,8 +30848,8 @@ p gini(0, 0, 0, 100)   # ~0.75 (high inequality)
       </article>
       <article class="doc-entry" id="doc-graph-eigenvector-centrality">
         <h3><a class="doc-anchor" href="#doc-graph-eigenvector-centrality">#</a> <code>graph_eigenvector_centrality</code></h3>
-        <p><code>graph_eigenvector_centrality(adj_list, iters=100) → array</code> — power-iteration eigenvector centrality (largest eigenvalue eigenvector of adjacency).</p>
-        <pre><code class="lang-perl">p graph_eigenvector_centrality($g)
+        <p><code>graph_eigenvector_centrality(adj_list, iters=100) → array</code> — power-iteration eigenvector centrality on the (possibly weighted) adjacency matrix: <code>x ← A·x / ‖A·x‖</code>. Early-exits when <code>‖x_new − x_old‖₁ &lt; 1e-12</code>. Pass <code>iters</code> to cap iterations.</p>
+        <pre><code class="lang-perl">p graph_eigenvector_centrality($g, 100)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-graph-floyd-warshall">
@@ -31680,7 +31680,7 @@ p harmonic(100)  # 5.1874
       </article>
       <article class="doc-entry" id="doc-harris-response">
         <h3><a class="doc-anchor" href="#doc-harris-response">#</a> <code>harris_response</code></h3>
-        <p><code>harris_response(image, k=0.04) → matrix</code> — Harris corner response <code>det(M) - k·trace(M)²</code> per pixel.</p>
+        <p><code>harris_response(image, k=0.04) → matrix</code> — Harris corner response <code>det(M) − k·trace(M)²</code> per pixel. <code>M</code> is the 2×2 structure tensor <code>Σ_w [[Iₓ², IₓIᵧ], [IₓIᵧ, Iᵧ²]]</code> summed over a 3×3 window (without the window sum, <code>det(M)</code> would be identically zero per pixel and the response could not distinguish corners from edges).</p>
       </article>
       <article class="doc-entry" id="doc-hartle-thorne-metric">
         <h3><a class="doc-anchor" href="#doc-hartle-thorne-metric">#</a> <code>hartle_thorne_metric</code></h3>
@@ -33241,7 +33241,7 @@ my $ac_only = hpf(\@with_dc, 0.1)
       </article>
       <article class="doc-entry" id="doc-hurst-exponent">
         <h3><a class="doc-anchor" href="#doc-hurst-exponent">#</a> <code>hurst_exponent</code></h3>
-        <p><code>hurst_exponent(series) → number</code> — rescaled range estimate of long-memory exponent. <code>H ≈ 0.5</code> random walk; <code>&gt;0.5</code> trending; <code>&lt;0.5</code> mean-reverting.</p>
+        <p><code>hurst_exponent(series) → number</code> — multi-scale R/S analysis: subdivides the series into dyadic chunk sizes (8, 16, 32, …, n/2), averages rescaled-range <code>R/S</code> per size, then returns the OLS slope of <code>log(R/S)</code> vs <code>log(n)</code>. <code>H ≈ 0.5</code> random walk; <code>&gt;0.5</code> trending; <code>&lt;0.5</code> mean-reverting. Returns UNDEF if <code>n &lt; 16</code> or fewer than 2 dyadic scales fit.</p>
         <pre><code class="lang-perl">p hurst_exponent(\@returns)
 </code></pre>
       </article>
@@ -42952,23 +42952,23 @@ p powmod(3, 13, 50)    # 7
       </article>
       <article class="doc-entry" id="doc-money-add">
         <h3><a class="doc-anchor" href="#doc-money-add">#</a> <code>money_add</code></h3>
-        <p><code>money_add(a, b) → number</code> — add two amounts using integer cents to avoid float drift.</p>
+        <p><code>money_add(a, b) → number</code> — add two dollar amounts by converting each to integer cents via banker&#39;s rounding, summing in i64 (saturating), then dividing by 100. Avoids accumulated float drift.</p>
       </article>
       <article class="doc-entry" id="doc-money-compare">
         <h3><a class="doc-anchor" href="#doc-money-compare">#</a> <code>money_compare</code></h3>
-        <p><code>money_compare(a, b) → -1|0|1</code> — three-way compare on cents.</p>
+        <p><code>money_compare(a, b) → -1|0|1</code> — three-way compare after converting both to integer cents (banker&#39;s rounding). Avoids float-equality pitfalls.</p>
       </article>
       <article class="doc-entry" id="doc-money-div">
         <h3><a class="doc-anchor" href="#doc-money-div">#</a> <code>money_div</code></h3>
-        <p><code>money_div(amount, divisor) → number</code> — divide with banker&#39;s rounding.</p>
+        <p><code>money_div(amount, divisor) → number</code> — divide amount (in cents) by <code>divisor</code>, then round half-to-even back to cents. UNDEF on <code>divisor == 0</code>.</p>
       </article>
       <article class="doc-entry" id="doc-money-mul">
         <h3><a class="doc-anchor" href="#doc-money-mul">#</a> <code>money_mul</code></h3>
-        <p><code>money_mul(amount, factor) → number</code> — multiply with banker&#39;s rounding.</p>
+        <p><code>money_mul(amount, factor) → number</code> — multiply amount (in cents) by <code>factor</code>, then round half-to-even (banker&#39;s rounding) back to cents.</p>
       </article>
       <article class="doc-entry" id="doc-money-sub">
         <h3><a class="doc-anchor" href="#doc-money-sub">#</a> <code>money_sub</code></h3>
-        <p><code>money_sub(a, b) → number</code> — subtract amounts (integer cents).</p>
+        <p><code>money_sub(a, b) → number</code> — subtract dollar amounts in integer cents with banker&#39;s rounding on input.</p>
       </article>
       <article class="doc-entry" id="doc-monin-obukhov-length">
         <h3><a class="doc-anchor" href="#doc-monin-obukhov-length">#</a> <code>monin_obukhov_length</code></h3>
@@ -47841,7 +47841,7 @@ perfview(fastest =&gt; 1, top =&gt; 5) |&gt; to_csv |&gt; p
       </article>
       <article class="doc-entry" id="doc-perlin-3d">
         <h3><a class="doc-anchor" href="#doc-perlin-3d">#</a> <code>perlin_3d</code></h3>
-        <p><code>perlin_3d(x, y, z) → number</code> — 3D Perlin via averaged 2D slices.</p>
+        <p><code>perlin_3d(x, y, z) → number</code> — Ken Perlin&#39;s 3D gradient noise: looks up 8 corner gradients of the unit cube, computes dot products with offset vectors, trilinearly interpolates through <code>fade(xf, yf, zf)</code>. Range ~[-1, 1].</p>
       </article>
       <article class="doc-entry" id="doc-perm">
         <h3><a class="doc-anchor" href="#doc-perm">#</a> <code>perm</code></h3>
@@ -48033,7 +48033,7 @@ p pexp(5, 0.5)   # P(wait ≤ 5 with avg wait 2)
       </article>
       <article class="doc-entry" id="doc-phaser-simple">
         <h3><a class="doc-anchor" href="#doc-phaser-simple">#</a> <code>phaser_simple</code></h3>
-        <p><code>phaser_simple(signal, rate=0.5, depth=1, sr=44100) → array</code> — single all-pass-stage sweep approximation.</p>
+        <p><code>phaser_simple(signal, rate=0.5, depth=1, sr=44100) → array</code> — 4-stage all-pass cascade with LFO-modulated coefficient. Each stage runs <code>y[n] = -a·x[n] + x[n-1] + a·y[n-1]</code> where <code>a = depth·sin(2π·rate·t)</code>. Output is 50/50 wet/dry mix.</p>
       </article>
       <article class="doc-entry" id="doc-phasespec">
         <h3><a class="doc-anchor" href="#doc-phasespec">#</a> <code>phasespec</code></h3>
@@ -48616,7 +48616,7 @@ p pip(5, 5, @square)   # 0 (outside)
       </article>
       <article class="doc-entry" id="doc-polygon-offset">
         <h3><a class="doc-anchor" href="#doc-polygon-offset">#</a> <code>polygon_offset</code></h3>
-        <p><code>polygon_offset(points, d=1) → array</code> — outward offset by distance <code>d</code> along vertex normals.</p>
+        <p><code>polygon_offset(points, d=1) → array</code> — perpendicular-distance offset using the corner-bisector formula <code>vertex + d·(n1 + n2)/(1 + n1·n2)</code>, where <code>n1</code>, <code>n2</code> are the outward unit normals of the adjacent edges. Gives an exact perpendicular offset (not just <code>d</code>·bisector_dir); falls back to bisector direction when <code>1 + n1·n2 ≈ 0</code>.</p>
       </article>
       <article class="doc-entry" id="doc-polygon-orientation">
         <h3><a class="doc-anchor" href="#doc-polygon-orientation">#</a> <code>polygon_orientation</code></h3>
@@ -54893,7 +54893,7 @@ p simps(\@y, 0.01)  # ≈ 2.0
       </article>
       <article class="doc-entry" id="doc-simpson-integrate">
         <h3><a class="doc-anchor" href="#doc-simpson-integrate">#</a> <code>simpson_integrate</code></h3>
-        <p><code>simpson_integrate(ys, dx=1) → number</code> — composite Simpson&#39;s rule (1/3); requires odd number of samples for full accuracy.</p>
+        <p><code>simpson_integrate(ys, dx=1) → number</code> — composite Simpson&#39;s rule. Uses Simpson&#39;s 1/3 over even intervals; falls back to Simpson&#39;s 3/8 on the trailing 3 intervals when <code>n-1</code> is odd, so the rule is exact for any <code>n ≥ 3</code>. Falls back to trapezoidal for <code>n &lt; 3</code>.</p>
         <pre><code class="lang-perl">p simpson_integrate([0,1,4,9,16,25,36,49,64,81,100], 1)
 </code></pre>
       </article>
@@ -55741,7 +55741,7 @@ p softplus(10)  # ≈ 10
       </article>
       <article class="doc-entry" id="doc-solar-noon-unix">
         <h3><a class="doc-anchor" href="#doc-solar-noon-unix">#</a> <code>solar_noon_unix</code></h3>
-        <p><code>solar_noon_unix(longitude_deg, unix) → int</code> — unix timestamp of solar noon at given longitude for that date.</p>
+        <p><code>solar_noon_unix(longitude_deg, unix) → int</code> — unix timestamp of apparent solar noon at given longitude for that date. Applies the equation-of-time correction (<code>9.873·sin(2B) − 7.655·sin(B)</code> minutes, B from day-of-year).</p>
         <pre><code class="lang-perl">p solar_noon_unix(0, time())  # ~12:00 UTC for Greenwich
 </code></pre>
       </article>
@@ -57439,13 +57439,13 @@ p tpdf(2.228, 10)
       </article>
       <article class="doc-entry" id="doc-sun-rise-unix">
         <h3><a class="doc-anchor" href="#doc-sun-rise-unix">#</a> <code>sun_rise_unix</code></h3>
-        <p><code>sun_rise_unix(lat, lon, unix_today) → int</code> — sunrise unix timestamp at given coords for that date (NOAA-style approximation).</p>
+        <p><code>sun_rise_unix(lat, lon, unix_today) → int</code> — sunrise unix timestamp at given coords for that date. Uses solar declination from day-of-year, hour angle from <code>acos(−tan(φ)·tan(δ))</code>, and equation-of-time correction. Returns UNDEF for polar day/night (|−tan(φ)·tan(δ)| &gt; 1).</p>
         <pre><code class="lang-perl">p sun_rise_unix(37.7749, -122.4194, time())
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-sun-set-unix">
         <h3><a class="doc-anchor" href="#doc-sun-set-unix">#</a> <code>sun_set_unix</code></h3>
-        <p><code>sun_set_unix(lat, lon, unix_today) → int</code> — sunset unix timestamp at given coords for that date.</p>
+        <p><code>sun_set_unix(lat, lon, unix_today) → int</code> — sunset unix timestamp at given coords for that date. Same model as <code>sun_rise_unix</code> with EoT correction; returns UNDEF for polar day/night.</p>
         <pre><code class="lang-perl">p sun_set_unix(37.7749, -122.4194, time())
 </code></pre>
       </article>
@@ -58579,7 +58579,7 @@ p $allowed-&gt;contains(&quot;foo&quot;)
       </article>
       <article class="doc-entry" id="doc-tokenize-subword">
         <h3><a class="doc-anchor" href="#doc-tokenize-subword">#</a> <code>tokenize_subword</code></h3>
-        <p><code>tokenize_subword(s, max_len=4) → array</code> — character-n-gram subword tokenisation.</p>
+        <p><code>tokenize_subword(s, max_len=4) → array</code> — naive subword tokenisation: splits on non-alphanumeric boundaries, then chunks long words into pieces of at most <code>max_len</code> characters.</p>
       </article>
       <article class="doc-entry" id="doc-tokenize-word">
         <h3><a class="doc-anchor" href="#doc-tokenize-word">#</a> <code>tokenize_word</code></h3>
@@ -62051,7 +62051,7 @@ p @$zs   # (-1, 0, 1)
       </article>
       <article class="doc-entry" id="doc-zernike-radial">
         <h3><a class="doc-anchor" href="#doc-zernike-radial">#</a> <code>zernike_radial</code></h3>
-        <p><code>zernike_radial(n, m, rho) → number</code> — Zernike radial polynomial <code>R_n^m(ρ)</code>.</p>
+        <p><code>zernike_radial(n, m, rho) → number</code> — Zernike radial polynomial <code>R_n^|m|(ρ)</code>. Returns 0 if <code>(n−|m|)</code> is odd or <code>|m| &gt; n</code>. Negative <code>m</code> is accepted and uses <code>|m|</code> per the convention <code>R_n^m = R_n^{−m}</code>.</p>
       </article>
       <article class="doc-entry" id="doc-zero">
         <h3><a class="doc-anchor" href="#doc-zero">#</a> <code>zero</code></h3>
