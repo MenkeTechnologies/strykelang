@@ -329,7 +329,7 @@ fn luhn_valid(s: &str) -> bool {
             sum += d;
         }
     }
-    sum % 10 == 0
+    sum.is_multiple_of(10)
 }
 
 /// Compute the Luhn check digit for a partial number (digits without check).
@@ -517,7 +517,7 @@ fn isbn10_valid(s: &str) -> bool {
         };
         sum += v * (10 - i as u32);
     }
-    sum % 11 == 0
+    sum.is_multiple_of(11)
 }
 
 fn isbn13_valid(s: &str) -> bool {

@@ -385,7 +385,7 @@ pub fn bignum_random(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
     let bits = arg_i64(args, 0).unwrap_or(64).max(1) as u32;
     let mut rng = rand::thread_rng();
-    let mut bytes = vec![0u8; ((bits + 7) / 8) as usize];
+    let mut bytes = vec![0u8; bits.div_ceil(8) as usize];
     rng.fill(&mut bytes[..]);
     // Truncate to exact bit length
     let extra_bits = bytes.len() * 8 - bits as usize;
@@ -720,7 +720,7 @@ fn hash_bytes(s: &str, seed: u64) -> u64 {
 pub fn bloom_filter_new(args: &[StrykeValue]) -> StrykeValue {
     use indexmap::IndexMap;
     let size = arg_i64(args, 0).unwrap_or(1024).max(8) as usize;
-    let hashes = arg_i64(args, 1).unwrap_or(3).max(1).min(16) as usize;
+    let hashes = arg_i64(args, 1).unwrap_or(3).clamp(1, 16) as usize;
     let bits: Vec<StrykeValue> = (0..size).map(|_| StrykeValue::integer(0)).collect();
     let mut h: IndexMap<String, StrykeValue> = IndexMap::new();
     h.insert("kind".to_string(), StrykeValue::string("bloom".to_string()));
@@ -781,7 +781,7 @@ pub fn bloom_filter_contains(args: &[StrykeValue]) -> StrykeValue {
 pub fn count_min_sketch_new(args: &[StrykeValue]) -> StrykeValue {
     use indexmap::IndexMap;
     let width = arg_i64(args, 0).unwrap_or(2048).max(8) as usize;
-    let depth = arg_i64(args, 1).unwrap_or(5).max(1).min(20) as usize;
+    let depth = arg_i64(args, 1).unwrap_or(5).clamp(1, 20) as usize;
     let counts: Vec<StrykeValue> = (0..(width * depth))
         .map(|_| StrykeValue::integer(0))
         .collect();

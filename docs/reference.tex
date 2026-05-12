@@ -61618,7 +61618,7 @@ Smallest meaningful length in quantum mechanics.
 \texttt{lsp\_completion\_words} (alias \texttt{lsp\_words}) --- emits
 every name LSP tab-complete should know about, sorted ASCII. Three
 sources merged: (1) every callable bare-name spelling from
-\texttt{\%all} (\textasciitilde9k names, primaries + aliases), (2)
+\texttt{\%all} (\textasciitilde10.6k names, primaries + aliases), (2)
 sigil-prefixed live bindings (\texttt{\%a}, \texttt{\%all},
 \texttt{\%b}, \texttt{\%parameters}, \texttt{@ARGV}, \texttt{@INC},
 \texttt{@fpath}, \texttt{@path}, \texttt{\$\_},
@@ -61633,7 +61633,7 @@ the static analyzer (linter) and LSP completion provider.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{lsp\_words |\textgreater{} ep                                              \# browse everything}
-\NormalTok{p len(lsp\_words)                                              \# \textasciitilde{}18,000 entries}
+\NormalTok{p len(lsp\_words)                                              \# \textasciitilde{}19,000 entries}
 \NormalTok{\# Regenerate the on{-}disk snapshot:}
 \NormalTok{\# stryke {-}e \textquotesingle{}lsp\_words |\textgreater{} ep\textquotesingle{} \textgreater{} strykelang/lsp\_completion\_words.txt}
 \end{Highlighting}

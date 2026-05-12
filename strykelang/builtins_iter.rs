@@ -361,7 +361,7 @@ pub fn top_k_min_heap(args: &[StrykeValue]) -> StrykeValue {
         .into_iter()
         .map(|Reverse(n)| StrykeValue::integer(n))
         .collect();
-    out.sort_by(|a, b| b.to_int().cmp(&a.to_int()));
+    out.sort_by_key(|a| std::cmp::Reverse(a.to_int()));
     arr(out)
 }
 
@@ -382,7 +382,7 @@ pub fn bottom_k_max_heap(args: &[StrykeValue]) -> StrykeValue {
         }
     }
     let mut out: Vec<StrykeValue> = heap.into_iter().map(StrykeValue::integer).collect();
-    out.sort_by(|a, b| a.to_int().cmp(&b.to_int()));
+    out.sort_by_key(|a| a.to_int());
     arr(out)
 }
 
@@ -528,7 +528,7 @@ pub fn foldr1_iter(args: &[StrykeValue]) -> StrykeValue {
     }
     let mut acc = xs.last().unwrap().to_number();
     for x in xs.iter().rev().skip(1) {
-        acc = x.to_number() + acc;
+        acc += x.to_number();
     }
     StrykeValue::float(acc)
 }
@@ -718,7 +718,7 @@ pub fn match_rating(args: &[StrykeValue]) -> StrykeValue {
     let ca = mra_codex(&a);
     let cb = mra_codex(&b);
     let sum_len = ca.chars().count() + cb.chars().count();
-    let len_diff = (ca.chars().count() as i64 - cb.chars().count() as i64).abs() as usize;
+    let len_diff = (ca.chars().count() as i64 - cb.chars().count() as i64).unsigned_abs() as usize;
     if len_diff > 3 {
         return StrykeValue::integer(0);
     }
@@ -919,8 +919,8 @@ pub fn str_huffman_encode(args: &[StrykeValue]) -> StrykeValue {
     // Simplified: returns canonical-frequency-prefix Huffman as bit string.
     // For brevity, uses Vec-based binary heap.
     use indexmap::IndexMap;
-    use std::collections::BinaryHeap;
-    use std::cmp::Reverse;
+    
+    
     let s = arg_str(args);
     if s.is_empty() {
         return StrykeValue::string(String::new());
@@ -935,7 +935,7 @@ pub fn str_huffman_encode(args: &[StrykeValue]) -> StrykeValue {
     }
     // Build a flat code by sorting symbols and assigning prefix bits
     let mut sorted: Vec<(char, usize)> = freq.into_iter().collect();
-    sorted.sort_by(|a, b| b.1.cmp(&a.1));
+    sorted.sort_by_key(|a| std::cmp::Reverse(a.1));
     let mut codes: IndexMap<char, String> = IndexMap::new();
     for (i, (c, _)) in sorted.iter().enumerate() {
         // Variable-length: leading zeros plus a 1

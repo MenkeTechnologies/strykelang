@@ -5,6 +5,7 @@
 
 use crate::value::StrykeValue;
 
+#[allow(dead_code)]
 fn arg_str(args: &[StrykeValue]) -> String {
     args.first().map(|v| v.to_string()).unwrap_or_default()
 }
@@ -304,7 +305,7 @@ fn divisors_of(n: u64) -> Vec<u64> {
     let mut out = Vec::new();
     let mut i = 1u64;
     while i * i <= n {
-        if n % i == 0 {
+        if n.is_multiple_of(i) {
             out.push(i);
             if i != n / i {
                 out.push(n / i);
@@ -549,11 +550,11 @@ pub fn square_free(args: &[StrykeValue]) -> StrykeValue {
     }
     let mut p = 2u64;
     while p * p <= n {
-        if n % (p * p) == 0 {
+        if n.is_multiple_of(p * p) {
             return StrykeValue::integer(0);
         }
-        if n % p == 0 {
-            while n % p == 0 {
+        if n.is_multiple_of(p) {
+            while n.is_multiple_of(p) {
                 n /= p;
             }
         }
