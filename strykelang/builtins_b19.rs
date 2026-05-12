@@ -70,6 +70,9 @@ fn make_hash(pairs: Vec<(&str, StrykeValue)>) -> StrykeValue {
 // Computer vision / image kernels
 // ══════════════════════════════════════════════════════════════════════
 
+/// True mathematical 2D convolution: kernel flipped along both axes before
+/// the windowed multiply-add. For non-flipping cross-correlation (the common
+/// image-processing operation) use `correlate2d`.
 pub fn conv2d_apply(args: &[StrykeValue]) -> StrykeValue {
     let img = args.first().map(as_matrix).unwrap_or_default();
     let kernel = args.get(1).map(as_matrix).unwrap_or_default();
@@ -88,8 +91,9 @@ pub fn conv2d_apply(args: &[StrykeValue]) -> StrykeValue {
             let mut sum = 0.0;
             for ki in 0..kh {
                 for kj in 0..kw {
-                    let yy = i as isize + ki as isize - pad_y as isize;
-                    let xx = j as isize + kj as isize - pad_x as isize;
+                    // Convolution flips the kernel: index (kh-1-ki, kw-1-kj).
+                    let yy = i as isize + (kh - 1 - ki) as isize - pad_y as isize;
+                    let xx = j as isize + (kw - 1 - kj) as isize - pad_x as isize;
                     if yy >= 0 && yy < h as isize && xx >= 0 && xx < w as isize {
                         sum += img[yy as usize][xx as usize] * kernel[ki][kj];
                     }
@@ -122,10 +126,38 @@ pub fn conv1d_apply(args: &[StrykeValue]) -> StrykeValue {
     arr_f64(out)
 }
 
+/// 2D cross-correlation: no kernel flip. `out[i,j] = Σ img[i+ki,j+kj] · k[ki,kj]`.
+/// This is what most image-processing code calls "convolution" (e.g. OpenCV
+/// `filter2D`). For mathematical convolution use `conv2d_apply`.
 pub fn correlate2d(args: &[StrykeValue]) -> StrykeValue {
-    // Same as conv2d but without flipping the kernel — since our conv2d already
-    // doesn't flip, this is functionally identical for symmetric kernels.
-    conv2d_apply(args)
+    let img = args.first().map(as_matrix).unwrap_or_default();
+    let kernel = args.get(1).map(as_matrix).unwrap_or_default();
+    if img.is_empty() || kernel.is_empty() {
+        return matrix_to_sv(&[]);
+    }
+    let kh = kernel.len();
+    let kw = kernel[0].len();
+    let pad_y = kh / 2;
+    let pad_x = kw / 2;
+    let h = img.len();
+    let w = img[0].len();
+    let mut out = vec![vec![0.0_f64; w]; h];
+    for i in 0..h {
+        for j in 0..w {
+            let mut sum = 0.0;
+            for ki in 0..kh {
+                for kj in 0..kw {
+                    let yy = i as isize + ki as isize - pad_y as isize;
+                    let xx = j as isize + kj as isize - pad_x as isize;
+                    if yy >= 0 && yy < h as isize && xx >= 0 && xx < w as isize {
+                        sum += img[yy as usize][xx as usize] * kernel[ki][kj];
+                    }
+                }
+            }
+            out[i][j] = sum;
+        }
+    }
+    matrix_to_sv(&out)
 }
 
 pub fn gaussian_kernel(args: &[StrykeValue]) -> StrykeValue {
@@ -316,6 +348,10 @@ pub fn canny_edges_simple(args: &[StrykeValue]) -> StrykeValue {
     matrix_to_sv(&out)
 }
 
+/// Harris corner response: `det(M) − k·trace(M)²` where `M` is the
+/// 2×2 structure tensor `Σ_w [[Iₓ², IₓIᵧ], [IₓIᵧ, Iᵧ²]]` summed over a
+/// 3×3 window. Without the windowed sum `det(M)` is identically zero
+/// per pixel and the response would not distinguish corners from edges.
 pub fn harris_response(args: &[StrykeValue]) -> StrykeValue {
     let img = args.first().map(as_matrix).unwrap_or_default();
     let k = arg_f64(args, 1).unwrap_or(0.04);
@@ -324,23 +360,36 @@ pub fn harris_response(args: &[StrykeValue]) -> StrykeValue {
     }
     let h = img.len();
     let w = img[0].len();
-    let mut ix2 = vec![vec![0.0_f64; w]; h];
-    let mut iy2 = vec![vec![0.0_f64; w]; h];
-    let mut ixy = vec![vec![0.0_f64; w]; h];
+    if h < 3 || w < 3 {
+        return matrix_to_sv(&vec![vec![0.0_f64; w]; h]);
+    }
+    let mut ix = vec![vec![0.0_f64; w]; h];
+    let mut iy = vec![vec![0.0_f64; w]; h];
     for i in 1..h - 1 {
         for j in 1..w - 1 {
-            let dx = (img[i][j + 1] - img[i][j - 1]) / 2.0;
-            let dy = (img[i + 1][j] - img[i - 1][j]) / 2.0;
-            ix2[i][j] = dx * dx;
-            iy2[i][j] = dy * dy;
-            ixy[i][j] = dx * dy;
+            ix[i][j] = (img[i][j + 1] - img[i][j - 1]) / 2.0;
+            iy[i][j] = (img[i + 1][j] - img[i - 1][j]) / 2.0;
         }
     }
     let mut out = vec![vec![0.0_f64; w]; h];
-    for i in 1..h - 1 {
-        for j in 1..w - 1 {
-            let det = ix2[i][j] * iy2[i][j] - ixy[i][j] * ixy[i][j];
-            let trace = ix2[i][j] + iy2[i][j];
+    for i in 2..h - 2 {
+        for j in 2..w - 2 {
+            let mut sxx = 0.0_f64;
+            let mut syy = 0.0_f64;
+            let mut sxy = 0.0_f64;
+            for di in -1..=1_isize {
+                for dj in -1..=1_isize {
+                    let y = (i as isize + di) as usize;
+                    let x = (j as isize + dj) as usize;
+                    let dx = ix[y][x];
+                    let dy = iy[y][x];
+                    sxx += dx * dx;
+                    syy += dy * dy;
+                    sxy += dx * dy;
+                }
+            }
+            let det = sxx * syy - sxy * sxy;
+            let trace = sxx + syy;
             out[i][j] = det - k * trace * trace;
         }
     }
@@ -461,12 +510,32 @@ pub fn bm25_score(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn cosine_sim_sparse(args: &[StrykeValue]) -> StrykeValue {
-    let a = args.first().map(as_vec_f64).unwrap_or_default();
-    let b = args.get(1).map(as_vec_f64).unwrap_or_default();
-    let n = a.len().min(b.len());
-    let dot: f64 = (0..n).map(|i| a[i] * b[i]).sum();
-    let na: f64 = a.iter().map(|x| x * x).sum::<f64>().sqrt();
-    let nb: f64 = b.iter().map(|x| x * x).sum::<f64>().sqrt();
+    // Cosine similarity over sparse `[[index, value], ...]` representations.
+    // Computes the dot product over shared indices and the L2 norms of each
+    // sparse vector independently.
+    let parse_sparse = |v: &StrykeValue| -> Vec<(i64, f64)> {
+        as_vec_sv(v)
+            .iter()
+            .map(|pair| {
+                let xs = as_vec_sv(pair);
+                let idx = xs.first().map(|x| x.to_int()).unwrap_or(0);
+                let val = xs.get(1).map(|x| x.to_number()).unwrap_or(0.0);
+                (idx, val)
+            })
+            .collect()
+    };
+    let a = parse_sparse(args.first().unwrap_or(&StrykeValue::UNDEF));
+    let b = parse_sparse(args.get(1).unwrap_or(&StrykeValue::UNDEF));
+    if a.is_empty() || b.is_empty() {
+        return StrykeValue::float(0.0);
+    }
+    let mut b_map: std::collections::HashMap<i64, f64> = std::collections::HashMap::new();
+    for &(i, v) in &b {
+        *b_map.entry(i).or_insert(0.0) += v;
+    }
+    let dot: f64 = a.iter().map(|&(i, v)| v * b_map.get(&i).copied().unwrap_or(0.0)).sum();
+    let na: f64 = a.iter().map(|&(_, v)| v * v).sum::<f64>().sqrt();
+    let nb: f64 = b.iter().map(|&(_, v)| v * v).sum::<f64>().sqrt();
     if na < 1e-12 || nb < 1e-12 {
         return StrykeValue::float(0.0);
     }
@@ -821,10 +890,6 @@ pub fn softmax_choose(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer((probs.len() - 1) as i64)
 }
 
-pub fn boltzmann_choose(args: &[StrykeValue]) -> StrykeValue {
-    softmax_choose(args)
-}
-
 pub fn rl_n_step_return(args: &[StrykeValue]) -> StrykeValue {
     let rewards = args.first().map(as_vec_f64).unwrap_or_default();
     let gamma = arg_f64(args, 1).unwrap_or(0.9);
@@ -1058,7 +1123,8 @@ pub fn ciede94_color_distance(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn ciede2000_color_distance(args: &[StrykeValue]) -> StrykeValue {
-    // Simplified CIEDE2000 — full version is long; this is an accurate approximation.
+    // Full CIEDE2000 ΔE color distance per Sharma/Wu/Dalal 2005.
+    // Includes mean hue, T factor, R_T rotation, all weighting terms.
     let a = as_vec_f64(args.first().unwrap_or(&StrykeValue::UNDEF));
     let b = as_vec_f64(args.get(1).unwrap_or(&StrykeValue::UNDEF));
     if a.len() < 3 || b.len() < 3 {
@@ -1068,31 +1134,55 @@ pub fn ciede2000_color_distance(args: &[StrykeValue]) -> StrykeValue {
     let (l2, a2, b2) = rgb_to_lab_inner(b[0], b[1], b[2]);
     let c1 = (a1 * a1 + b1 * b1).sqrt();
     let c2 = (a2 * a2 + b2 * b2).sqrt();
-    let c_avg = (c1 + c2) / 2.0;
-    let g = 0.5 * (1.0 - (c_avg.powi(7) / (c_avg.powi(7) + 25f64.powi(7))).sqrt());
+    let c_bar = (c1 + c2) / 2.0;
+    let pow7_c = c_bar.powi(7);
+    let pow7_25 = 25f64.powi(7);
+    let g = 0.5 * (1.0 - (pow7_c / (pow7_c + pow7_25)).sqrt());
     let a1p = (1.0 + g) * a1;
     let a2p = (1.0 + g) * a2;
     let c1p = (a1p * a1p + b1 * b1).sqrt();
     let c2p = (a2p * a2p + b2 * b2).sqrt();
+    let h1p = if a1p == 0.0 && b1 == 0.0 { 0.0 } else { b1.atan2(a1p).to_degrees().rem_euclid(360.0) };
+    let h2p = if a2p == 0.0 && b2 == 0.0 { 0.0 } else { b2.atan2(a2p).to_degrees().rem_euclid(360.0) };
     let dl = l2 - l1;
-    let dc = c2p - c1p;
-    let h1p = b1.atan2(a1p).to_degrees().rem_euclid(360.0);
-    let h2p = b2.atan2(a2p).to_degrees().rem_euclid(360.0);
-    let dhp = if (h2p - h1p).abs() <= 180.0 {
+    let dcp = c2p - c1p;
+    let dhp = if c1p * c2p == 0.0 {
+        0.0
+    } else if (h2p - h1p).abs() <= 180.0 {
         h2p - h1p
-    } else if h2p > h1p {
+    } else if h2p - h1p > 180.0 {
         h2p - h1p - 360.0
     } else {
         h2p - h1p + 360.0
     };
-    let dh = 2.0 * (c1p * c2p).sqrt() * (dhp.to_radians() / 2.0).sin();
-    let l_avg = (l1 + l2) / 2.0;
-    let c_avg_p = (c1p + c2p) / 2.0;
-    let sl = 1.0 + 0.015 * (l_avg - 50.0).powi(2) / (20.0 + (l_avg - 50.0).powi(2)).sqrt();
-    let sc = 1.0 + 0.045 * c_avg_p;
-    let sh = 1.0 + 0.015 * c_avg_p;
-    let total = (dl / sl).powi(2) + (dc / sc).powi(2) + (dh / sh).powi(2);
-    StrykeValue::float(total.sqrt())
+    let dh_big = 2.0 * (c1p * c2p).sqrt() * (dhp.to_radians() / 2.0).sin();
+    let l_bar = (l1 + l2) / 2.0;
+    let c_bar_p = (c1p + c2p) / 2.0;
+    let h_bar_p = if c1p * c2p == 0.0 {
+        h1p + h2p
+    } else if (h1p - h2p).abs() <= 180.0 {
+        (h1p + h2p) / 2.0
+    } else if h1p + h2p < 360.0 {
+        (h1p + h2p + 360.0) / 2.0
+    } else {
+        (h1p + h2p - 360.0) / 2.0
+    };
+    let t = 1.0
+        - 0.17 * (h_bar_p - 30.0).to_radians().cos()
+        + 0.24 * (2.0 * h_bar_p).to_radians().cos()
+        + 0.32 * (3.0 * h_bar_p + 6.0).to_radians().cos()
+        - 0.20 * (4.0 * h_bar_p - 63.0).to_radians().cos();
+    let delta_theta_deg = 30.0 * (-((h_bar_p - 275.0) / 25.0).powi(2)).exp();
+    let pow7_cbp = c_bar_p.powi(7);
+    let r_c = 2.0 * (pow7_cbp / (pow7_cbp + pow7_25)).sqrt();
+    let r_t = -(2.0 * delta_theta_deg).to_radians().sin() * r_c;
+    let sl = 1.0 + 0.015 * (l_bar - 50.0).powi(2) / (20.0 + (l_bar - 50.0).powi(2)).sqrt();
+    let sc = 1.0 + 0.045 * c_bar_p;
+    let sh = 1.0 + 0.015 * c_bar_p * t;
+    let tl = dl / sl;
+    let tc = dcp / sc;
+    let th = dh_big / sh;
+    StrykeValue::float((tl * tl + tc * tc + th * th + r_t * tc * th).sqrt())
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -1566,8 +1656,14 @@ mod tests {
 
     #[test]
     fn cosine_sim_basic() {
-        let a = arr_f64(vec![1.0, 0.0, 0.0]);
-        let b = arr_f64(vec![1.0, 0.0, 0.0]);
+        let a = arr_sv(vec![arr_sv(vec![
+            StrykeValue::integer(0),
+            StrykeValue::float(1.0),
+        ])]);
+        let b = arr_sv(vec![arr_sv(vec![
+            StrykeValue::integer(0),
+            StrykeValue::float(1.0),
+        ])]);
         let r = cosine_sim_sparse(&[a, b]).to_number();
         assert!((r - 1.0).abs() < 1e-9);
     }

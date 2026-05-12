@@ -151,7 +151,9 @@ pub fn expectiminimax_value(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn mixed_strategy_2x2(args: &[StrykeValue]) -> StrykeValue {
-    // 2x2 game with row player payoff matrix [[a,b],[c,d]]
+    // 2x2 zero-sum game with row player payoff matrix [[a,b],[c,d]].
+    // For non-zero-sum games the col strategy formula is wrong; this only
+    // works when col's payoff = -row's payoff.
     let m = args.first().map(as_matrix).unwrap_or_default();
     if m.len() < 2 || m[0].len() < 2 || m[1].len() < 2 {
         return StrykeValue::UNDEF;
@@ -172,21 +174,40 @@ pub fn mixed_strategy_2x2(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 
-pub fn payoff_matrix(args: &[StrykeValue]) -> StrykeValue {
-    // Identity: pass through the matrix (for type-explicit construction)
-    let m = args.first().map(as_matrix).unwrap_or_default();
-    matrix_to_sv(&m)
-}
-
 pub fn zero_sum_value(args: &[StrykeValue]) -> StrykeValue {
-    // Use the maximin/minimax bound on a payoff matrix
+    // Zero-sum game value for row player's payoff matrix.
+    // Pure-strategy: maximin (row) == minmax (col) → that value.
+    // 2x2 with no saddle point: mixed-strategy value v = (a·d − b·c) / (a + d − b − c).
+    // Larger matrices with no saddle: UNDEF (caller must use LP).
     let m = args.first().map(as_matrix).unwrap_or_default();
     if m.is_empty() || m[0].is_empty() {
-        return StrykeValue::float(0.0);
+        return StrykeValue::UNDEF;
     }
-    let row_mins: Vec<f64> = m.iter().map(|r| r.iter().cloned().fold(f64::INFINITY, f64::min)).collect();
+    let cols = m.iter().map(|r| r.len()).min().unwrap_or(0);
+    if cols == 0 {
+        return StrykeValue::UNDEF;
+    }
+    let row_mins: Vec<f64> = m.iter().map(|r| r[..cols].iter().cloned().fold(f64::INFINITY, f64::min)).collect();
+    let col_maxs: Vec<f64> = (0..cols)
+        .map(|j| m.iter().map(|r| r[j]).fold(f64::NEG_INFINITY, f64::max))
+        .collect();
     let maximin = row_mins.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-    StrykeValue::float(maximin)
+    let minmax = col_maxs.iter().cloned().fold(f64::INFINITY, f64::min);
+    if (maximin - minmax).abs() < 1e-12 {
+        return StrykeValue::float(maximin);
+    }
+    if m.len() == 2 && cols == 2 {
+        let a = m[0][0];
+        let b = m[0][1];
+        let c = m[1][0];
+        let d = m[1][1];
+        let denom = a + d - b - c;
+        if denom.abs() < 1e-12 {
+            return StrykeValue::UNDEF;
+        }
+        return StrykeValue::float((a * d - b * c) / denom);
+    }
+    StrykeValue::UNDEF
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -267,7 +288,9 @@ pub fn tsp_2opt(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn lp_simplex_max(args: &[StrykeValue]) -> StrykeValue {
-    // Simplified LP max c^T x s.t. Ax <= b, x >= 0
+    // Revised simplex method for LP max c·x  subject to  Ax ≤ b, x ≥ 0.
+    // Builds the standard-form tableau with slack columns, then pivots
+    // until reduced costs are non-negative.
     let c = args.first().map(as_vec_f64).unwrap_or_default();
     let a_mat = args.get(1).map(as_matrix).unwrap_or_default();
     let b = args.get(2).map(as_vec_f64).unwrap_or_default();
@@ -413,10 +436,6 @@ pub fn edmonds_karp_max_flow(args: &[StrykeValue]) -> StrykeValue {
         flow += min_cap;
     }
     StrykeValue::float(flow)
-}
-
-pub fn ford_fulkerson_max_flow(args: &[StrykeValue]) -> StrykeValue {
-    edmonds_karp_max_flow(args)
 }
 
 pub fn matching_bipartite_greedy(args: &[StrykeValue]) -> StrykeValue {
@@ -599,10 +618,6 @@ pub fn ml_batch_norm(args: &[StrykeValue]) -> StrykeValue {
     let eps = arg_f64(args, 1).unwrap_or(1e-5);
     let std = (var + eps).sqrt();
     arr_f64(xs.iter().map(|x| (x - mean) / std).collect())
-}
-
-pub fn ml_layer_norm(args: &[StrykeValue]) -> StrykeValue {
-    ml_batch_norm(args)
 }
 
 pub fn ml_attention_score(args: &[StrykeValue]) -> StrykeValue {

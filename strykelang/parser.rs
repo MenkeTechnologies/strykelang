@@ -17532,7 +17532,7 @@ impl Parser {
             | "vincenty_bearing" | "z85_decode" | "z85_encode" | "zigzag_decode"
             | "zigzag_encode"
 
-            | "anova_one_way" | "beats_per_bar" | "binomial_test" | "bit_clz"
+            | "anova_one_way" | "binomial_test" | "bit_clz"
             | "bit_count_ones" | "bit_count_zeros" | "bit_ctz" | "bit_extract"
             | "bit_first_clear" | "bit_first_set" | "bit_insert" | "bit_last_clear"
             | "bit_last_set" | "bit_log2_int" | "bit_parity" | "bit_reverse_u16"

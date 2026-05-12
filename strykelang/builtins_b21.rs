@@ -122,7 +122,8 @@ pub fn glicko_volatility(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn trueskill_simple(args: &[StrykeValue]) -> StrykeValue {
-    // Simplified 1v1 TrueSkill update: returns new (mu, sigma).
+    // 1v1 TrueSkill update via the Gaussian belief-propagation formulas
+    // (v/w functions). Multi-team / team-vs-team is not handled.
     let mu_w = arg_f64(args, 0).unwrap_or(25.0);
     let sigma_w = arg_f64(args, 1).unwrap_or(25.0 / 3.0);
     let mu_l = arg_f64(args, 2).unwrap_or(25.0);
@@ -538,6 +539,9 @@ pub fn contour_area(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn contour_centroid(args: &[StrykeValue]) -> StrykeValue {
+    // Area centroid of the closed polygon defined by the contour points
+    // (OpenCV M10/M00, M01/M00 semantics). Falls back to vertex mean when
+    // the polygon is degenerate (zero signed area).
     let pts: Vec<(f64, f64)> = as_vec_sv(args.first().unwrap_or(&StrykeValue::UNDEF))
         .iter()
         .map(|p| {
@@ -549,8 +553,26 @@ pub fn contour_centroid(args: &[StrykeValue]) -> StrykeValue {
     if n == 0 {
         return arr_f64(vec![0.0, 0.0]);
     }
-    let (sx, sy): (f64, f64) = pts.iter().fold((0.0, 0.0), |acc, &(x, y)| (acc.0 + x, acc.1 + y));
-    arr_f64(vec![sx / n as f64, sy / n as f64])
+    if n < 3 {
+        let (sx, sy): (f64, f64) = pts.iter().fold((0.0, 0.0), |acc, &(x, y)| (acc.0 + x, acc.1 + y));
+        return arr_f64(vec![sx / n as f64, sy / n as f64]);
+    }
+    let mut a2 = 0.0_f64;
+    let mut cx = 0.0_f64;
+    let mut cy = 0.0_f64;
+    for i in 0..n {
+        let (x0, y0) = pts[i];
+        let (x1, y1) = pts[(i + 1) % n];
+        let cross = x0 * y1 - x1 * y0;
+        a2 += cross;
+        cx += (x0 + x1) * cross;
+        cy += (y0 + y1) * cross;
+    }
+    if a2.abs() < 1e-12 {
+        let (sx, sy): (f64, f64) = pts.iter().fold((0.0, 0.0), |acc, &(x, y)| (acc.0 + x, acc.1 + y));
+        return arr_f64(vec![sx / n as f64, sy / n as f64]);
+    }
+    arr_f64(vec![cx / (3.0 * a2), cy / (3.0 * a2)])
 }
 
 pub fn moment_image(args: &[StrykeValue]) -> StrykeValue {
@@ -607,13 +629,20 @@ pub fn hu_moments(args: &[StrykeValue]) -> StrykeValue {
     let h2 = (n20 - n02).powi(2) + 4.0 * n11.powi(2);
     let h3 = (n30 - 3.0 * n12).powi(2) + (3.0 * n21 - n03).powi(2);
     let h4 = (n30 + n12).powi(2) + (n21 + n03).powi(2);
-    arr_f64(vec![h1, h2, h3, h4])
+    let a = n30 + n12;
+    let b_ = n21 + n03;
+    let h5 = (n30 - 3.0 * n12) * a * (a * a - 3.0 * b_ * b_)
+        + (3.0 * n21 - n03) * b_ * (3.0 * a * a - b_ * b_);
+    let h6 = (n20 - n02) * (a * a - b_ * b_) + 4.0 * n11 * a * b_;
+    let h7 = (3.0 * n21 - n03) * a * (a * a - 3.0 * b_ * b_)
+        - (n30 - 3.0 * n12) * b_ * (3.0 * a * a - b_ * b_);
+    arr_f64(vec![h1, h2, h3, h4, h5, h6, h7])
 }
 
 pub fn zernike_radial(args: &[StrykeValue]) -> StrykeValue {
     // Zernike polynomial R_n^m(rho) for n,m integers
     let n = arg_i64(args, 0).unwrap_or(0).max(0) as usize;
-    let m = arg_i64(args, 1).unwrap_or(0).max(0).unsigned_abs() as usize;
+    let m = arg_i64(args, 1).unwrap_or(0).unsigned_abs() as usize;
     let rho = arg_f64(args, 2).unwrap_or(0.0).clamp(0.0, 1.0);
     if !(n - m).is_multiple_of(2) || m > n {
         return StrykeValue::float(0.0);
@@ -636,8 +665,12 @@ pub fn zernike_radial(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(sum)
 }
 
+/// Full Canny edge detector pipeline:
+/// 1. Gaussian blur (5×5, σ=1.4)
+/// 2. Sobel gradient magnitude + direction
+/// 3. Non-maximum suppression along gradient direction
+/// 4. Double-threshold classification (strong=255, weak=128)
 pub fn canny_edges_full(args: &[StrykeValue]) -> StrykeValue {
-    // Simplified Canny: blur -> sobel -> non-max -> threshold
     let img = args.first().map(as_matrix).unwrap_or_default();
     let low = arg_f64(args, 1).unwrap_or(50.0);
     let high = arg_f64(args, 2).unwrap_or(150.0);
@@ -646,13 +679,49 @@ pub fn canny_edges_full(args: &[StrykeValue]) -> StrykeValue {
     }
     let h = img.len();
     let w = img[0].len();
-    // Sobel gradient
+    // 1. Gaussian 5×5 blur (σ=1.4); symmetric kernel, no flip needed.
+    let sigma = 1.4_f64;
+    let mut g5 = [[0.0_f64; 5]; 5];
+    let mut g_sum = 0.0_f64;
+    for i in 0..5 {
+        for j in 0..5 {
+            let dx = i as f64 - 2.0;
+            let dy = j as f64 - 2.0;
+            g5[i][j] = (-(dx * dx + dy * dy) / (2.0 * sigma * sigma)).exp();
+            g_sum += g5[i][j];
+        }
+    }
+    for row in g5.iter_mut() {
+        for v in row.iter_mut() {
+            *v /= g_sum;
+        }
+    }
+    let mut blurred = vec![vec![0.0_f64; w]; h];
+    for i in 0..h {
+        for j in 0..w {
+            let mut acc = 0.0_f64;
+            for ki in 0..5 {
+                for kj in 0..5 {
+                    let y = i as isize + ki as isize - 2;
+                    let x = j as isize + kj as isize - 2;
+                    if (0..h as isize).contains(&y) && (0..w as isize).contains(&x) {
+                        acc += img[y as usize][x as usize] * g5[ki][kj];
+                    }
+                }
+            }
+            blurred[i][j] = acc;
+        }
+    }
+    // 2. Sobel gradient on the blurred image.
     let mut mag = vec![vec![0.0_f64; w]; h];
     let mut ang = vec![vec![0.0_f64; w]; h];
     for i in 1..h - 1 {
         for j in 1..w - 1 {
-            let gx = -img[i - 1][j - 1] + img[i - 1][j + 1] - 2.0 * img[i][j - 1] + 2.0 * img[i][j + 1] - img[i + 1][j - 1] + img[i + 1][j + 1];
-            let gy = -img[i - 1][j - 1] - 2.0 * img[i - 1][j] - img[i - 1][j + 1] + img[i + 1][j - 1] + 2.0 * img[i + 1][j] + img[i + 1][j + 1];
+            let gx = -blurred[i - 1][j - 1] + blurred[i - 1][j + 1]
+                - 2.0 * blurred[i][j - 1] + 2.0 * blurred[i][j + 1]
+                - blurred[i + 1][j - 1] + blurred[i + 1][j + 1];
+            let gy = -blurred[i - 1][j - 1] - 2.0 * blurred[i - 1][j] - blurred[i - 1][j + 1]
+                + blurred[i + 1][j - 1] + 2.0 * blurred[i + 1][j] + blurred[i + 1][j + 1];
             mag[i][j] = (gx * gx + gy * gy).sqrt();
             ang[i][j] = gy.atan2(gx).to_degrees().rem_euclid(180.0);
         }
@@ -674,11 +743,46 @@ pub fn canny_edges_full(args: &[StrykeValue]) -> StrykeValue {
             nms[i][j] = if mag[i][j] >= n1 && mag[i][j] >= n2 { mag[i][j] } else { 0.0 };
         }
     }
-    // Hysteresis
+    // Hysteresis: classify into strong/weak/none, then flood-fill weak pixels
+    // 8-connected to strong pixels into the strong set (kept = 255). Weak
+    // pixels not reachable from any strong are discarded (set to 0).
+    let mut label = vec![vec![0u8; w]; h]; // 0=none, 1=weak, 2=strong
+    let mut stack: Vec<(usize, usize)> = Vec::new();
+    for i in 0..h {
+        for j in 0..w {
+            if nms[i][j] >= high {
+                label[i][j] = 2;
+                stack.push((i, j));
+            } else if nms[i][j] >= low {
+                label[i][j] = 1;
+            }
+        }
+    }
+    while let Some((i, j)) = stack.pop() {
+        for di in -1..=1_isize {
+            for dj in -1..=1_isize {
+                if di == 0 && dj == 0 {
+                    continue;
+                }
+                let ni = i as isize + di;
+                let nj = j as isize + dj;
+                if ni < 0 || nj < 0 || ni >= h as isize || nj >= w as isize {
+                    continue;
+                }
+                let (ni, nj) = (ni as usize, nj as usize);
+                if label[ni][nj] == 1 {
+                    label[ni][nj] = 2;
+                    stack.push((ni, nj));
+                }
+            }
+        }
+    }
     let mut out = vec![vec![0.0_f64; w]; h];
     for i in 0..h {
         for j in 0..w {
-            out[i][j] = if nms[i][j] >= high { 255.0 } else if nms[i][j] >= low { 128.0 } else { 0.0 };
+            if label[i][j] == 2 {
+                out[i][j] = 255.0;
+            }
         }
     }
     matrix_to_sv(&out)
@@ -819,52 +923,6 @@ pub fn andrew_monotone_hull(args: &[StrykeValue]) -> StrykeValue {
     pts_pack(&lower)
 }
 
-pub fn weiler_atherton_clip(args: &[StrykeValue]) -> StrykeValue {
-    // Simplified: clip subject polygon by clip polygon using Sutherland-Hodgman fallback
-    let subject: Vec<(f64, f64)> = as_vec_sv(args.first().unwrap_or(&StrykeValue::UNDEF))
-        .iter()
-        .map(point_xy_pair)
-        .collect();
-    let clip: Vec<(f64, f64)> = as_vec_sv(args.get(1).unwrap_or(&StrykeValue::UNDEF))
-        .iter()
-        .map(point_xy_pair)
-        .collect();
-    if subject.is_empty() || clip.len() < 3 {
-        return pts_pack(&subject);
-    }
-    let mut output = subject;
-    for i in 0..clip.len() {
-        let edge_a = clip[i];
-        let edge_b = clip[(i + 1) % clip.len()];
-        let input = output.clone();
-        output.clear();
-        let inside = |p: (f64, f64)| {
-            (edge_b.0 - edge_a.0) * (p.1 - edge_a.1) - (edge_b.1 - edge_a.1) * (p.0 - edge_a.0) >= 0.0
-        };
-        for j in 0..input.len() {
-            let current = input[j];
-            let prev = input[(j + input.len() - 1) % input.len()];
-            if inside(current) {
-                if !inside(prev) {
-                    let dx = edge_b.0 - edge_a.0;
-                    let dy = edge_b.1 - edge_a.1;
-                    let t = ((edge_a.0 - prev.0) * dy - (edge_a.1 - prev.1) * dx)
-                        / ((current.0 - prev.0) * dy - (current.1 - prev.1) * dx);
-                    output.push((prev.0 + t * (current.0 - prev.0), prev.1 + t * (current.1 - prev.1)));
-                }
-                output.push(current);
-            } else if inside(prev) {
-                let dx = edge_b.0 - edge_a.0;
-                let dy = edge_b.1 - edge_a.1;
-                let t = ((edge_a.0 - prev.0) * dy - (edge_a.1 - prev.1) * dx)
-                    / ((current.0 - prev.0) * dy - (current.1 - prev.1) * dx);
-                output.push((prev.0 + t * (current.0 - prev.0), prev.1 + t * (current.1 - prev.1)));
-            }
-        }
-    }
-    pts_pack(&output)
-}
-
 pub fn liang_barsky_clip(args: &[StrykeValue]) -> StrykeValue {
     // Clip line segment against rectangle [xmin,ymin,xmax,ymax]
     let p1 = point_xy_pair(args.first().unwrap_or(&StrykeValue::UNDEF));
@@ -910,10 +968,6 @@ pub fn liang_barsky_clip(args: &[StrykeValue]) -> StrykeValue {
     let clipped_a = (p1.0 + u1 * dx, p1.1 + u1 * dy);
     let clipped_b = (p1.0 + u2 * dx, p1.1 + u2 * dy);
     arr_sv(vec![arr_f64(vec![clipped_a.0, clipped_a.1]), arr_f64(vec![clipped_b.0, clipped_b.1])])
-}
-
-pub fn cohen_sutherland_clip(args: &[StrykeValue]) -> StrykeValue {
-    liang_barsky_clip(args)
 }
 
 pub fn polygon_winding(args: &[StrykeValue]) -> StrykeValue {
@@ -973,6 +1027,11 @@ pub fn polygon_self_intersects(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn polygon_offset(args: &[StrykeValue]) -> StrykeValue {
+    // Perpendicular-distance offset using the corner-bisector formula:
+    // offset_vertex = vertex + d · (n1 + n2) / (1 + n1·n2)
+    // where n1, n2 are the outward unit normals of the adjacent edges.
+    // This gives an exact perpendicular offset d, not the naive d·bisector_dir
+    // (which under-offsets non-flat corners).
     let pts: Vec<(f64, f64)> = as_vec_sv(args.first().unwrap_or(&StrykeValue::UNDEF))
         .iter()
         .map(point_xy_pair)
@@ -987,20 +1046,26 @@ pub fn polygon_offset(args: &[StrykeValue]) -> StrykeValue {
         let prev = pts[(i + n - 1) % n];
         let cur = pts[i];
         let next = pts[(i + 1) % n];
-        let n1 = (cur.1 - prev.1, prev.0 - cur.0);
-        let n2 = (next.1 - cur.1, cur.0 - next.0);
-        let l1 = (n1.0 * n1.0 + n1.1 * n1.1).sqrt().max(1e-12);
-        let l2 = (n2.0 * n2.0 + n2.1 * n2.1).sqrt().max(1e-12);
-        let nx = (n1.0 / l1 + n2.0 / l2) / 2.0;
-        let ny = (n1.1 / l1 + n2.1 / l2) / 2.0;
-        let nl = (nx * nx + ny * ny).sqrt().max(1e-12);
-        out.push((cur.0 + d * nx / nl, cur.1 + d * ny / nl));
+        // Outward normal of edge prev→cur (CCW polygon): (dy, -dx) / |e|.
+        let e1 = (cur.0 - prev.0, cur.1 - prev.1);
+        let e2 = (next.0 - cur.0, next.1 - cur.1);
+        let l1 = (e1.0 * e1.0 + e1.1 * e1.1).sqrt().max(1e-12);
+        let l2 = (e2.0 * e2.0 + e2.1 * e2.1).sqrt().max(1e-12);
+        let n1 = (e1.1 / l1, -e1.0 / l1);
+        let n2 = (e2.1 / l2, -e2.0 / l2);
+        let dot = n1.0 * n2.0 + n1.1 * n2.1;
+        let denom = 1.0 + dot;
+        // Anti-spike clamp: if corner is near 180° reflex, fall back to bisector direction at distance d.
+        if denom.abs() < 1e-9 {
+            let bx = n1.0 + n2.0;
+            let by = n1.1 + n2.1;
+            let bl = (bx * bx + by * by).sqrt().max(1e-12);
+            out.push((cur.0 + d * bx / bl, cur.1 + d * by / bl));
+        } else {
+            out.push((cur.0 + d * (n1.0 + n2.0) / denom, cur.1 + d * (n1.1 + n2.1) / denom));
+        }
     }
     pts_pack(&out)
-}
-
-pub fn polygon_inflate(args: &[StrykeValue]) -> StrykeValue {
-    polygon_offset(args)
 }
 
 pub fn polygon_shrink(args: &[StrykeValue]) -> StrykeValue {
@@ -1165,8 +1230,10 @@ pub fn minkowski_sum_2d(args: &[StrykeValue]) -> StrykeValue {
     pts_pack(&out)
 }
 
-pub fn convex_hull_3d_simple(args: &[StrykeValue]) -> StrykeValue {
-    // Simplified: return convex hull points by quickhull-ish; here we project to XY and use 2D hull
+/// `convex_hull_3d(points) → array` — incremental 3D convex hull.
+/// Returns the unique hull vertices as `[x, y, z]` triples.
+/// Falls back gracefully for ≤4 input points (returns them all).
+pub fn convex_hull_3d(args: &[StrykeValue]) -> StrykeValue {
     let pts: Vec<(f64, f64, f64)> = as_vec_sv(args.first().unwrap_or(&StrykeValue::UNDEF))
         .iter()
         .map(|p| {
@@ -1178,11 +1245,159 @@ pub fn convex_hull_3d_simple(args: &[StrykeValue]) -> StrykeValue {
             )
         })
         .collect();
-    // For each axis-aligned face, compute 2D hull
-    let projected: Vec<(f64, f64)> = pts.iter().map(|&(x, y, _)| (x, y)).collect();
-    
-    andrew_monotone_hull(&[pts_pack(&projected)])
+    if pts.len() < 4 {
+        return arr_sv(
+            pts.into_iter()
+                .map(|(x, y, z)| arr_f64(vec![x, y, z]))
+                .collect(),
+        );
+    }
+    let n = pts.len();
+    // Each face is (a, b, c) — three indices into pts forming a CCW triangle
+    // when viewed from outside the hull.
+    type Face = (usize, usize, usize);
+    let cross = |u: (f64, f64, f64), v: (f64, f64, f64)| {
+        (u.1 * v.2 - u.2 * v.1, u.2 * v.0 - u.0 * v.2, u.0 * v.1 - u.1 * v.0)
+    };
+    let sub = |a: (f64, f64, f64), b: (f64, f64, f64)| (a.0 - b.0, a.1 - b.1, a.2 - b.2);
+    let dot = |u: (f64, f64, f64), v: (f64, f64, f64)| u.0 * v.0 + u.1 * v.1 + u.2 * v.2;
+    let face_outward = |f: &Face, p: (f64, f64, f64)| -> f64 {
+        let a = pts[f.0];
+        let b = pts[f.1];
+        let c = pts[f.2];
+        let n = cross(sub(b, a), sub(c, a));
+        dot(n, sub(p, a))
+    };
+    // Seed tetrahedron from the first four non-coplanar points.
+    let mut seed: Option<Face> = None;
+    let mut apex: Option<usize> = None;
+    'outer: for i in 0..n {
+        for j in i + 1..n {
+            for k in j + 1..n {
+                let a = pts[i];
+                let b = pts[j];
+                let c = pts[k];
+                let n_vec = cross(sub(b, a), sub(c, a));
+                let mag = (n_vec.0 * n_vec.0 + n_vec.1 * n_vec.1 + n_vec.2 * n_vec.2).sqrt();
+                if mag < 1e-9 {
+                    continue;
+                }
+                for l in 0..n {
+                    if l == i || l == j || l == k {
+                        continue;
+                    }
+                    let p = pts[l];
+                    let d = dot(n_vec, sub(p, a));
+                    if d.abs() > 1e-9 {
+                        seed = Some(if d > 0.0 { (i, k, j) } else { (i, j, k) });
+                        apex = Some(l);
+                        break 'outer;
+                    }
+                }
+            }
+        }
+    }
+    let (seed, apex) = match (seed, apex) {
+        (Some(s), Some(a)) => (s, a),
+        _ => {
+            // All points coplanar — return original points as a degenerate hull.
+            return arr_sv(
+                pts.into_iter()
+                    .map(|(x, y, z)| arr_f64(vec![x, y, z]))
+                    .collect(),
+            );
+        }
+    };
+    // Initial tetrahedron faces (4 triangles), all oriented to point outward
+    // from the centroid of the four seed points.
+    let (a, b, c) = seed;
+    let d = apex;
+    let centroid = (
+        (pts[a].0 + pts[b].0 + pts[c].0 + pts[d].0) / 4.0,
+        (pts[a].1 + pts[b].1 + pts[c].1 + pts[d].1) / 4.0,
+        (pts[a].2 + pts[b].2 + pts[c].2 + pts[d].2) / 4.0,
+    );
+    let mut faces: Vec<Face> = vec![(a, b, c), (a, c, d), (a, d, b), (b, d, c)];
+    for f in faces.iter_mut() {
+        if face_outward(f, centroid) > 0.0 {
+            std::mem::swap(&mut f.1, &mut f.2);
+        }
+    }
+    let mut on_hull = vec![false; n];
+    on_hull[a] = true;
+    on_hull[b] = true;
+    on_hull[c] = true;
+    on_hull[d] = true;
+    // Incrementally add each remaining point.
+    for p_idx in 0..n {
+        if on_hull[p_idx] {
+            continue;
+        }
+        let p = pts[p_idx];
+        // Find visible faces.
+        let visible: Vec<usize> = (0..faces.len())
+            .filter(|&i| face_outward(&faces[i], p) > 1e-9)
+            .collect();
+        if visible.is_empty() {
+            continue;
+        }
+        // Find horizon edges (edges of visible faces not shared with another visible face).
+        use std::collections::HashSet;
+        let mut edge_count: std::collections::HashMap<(usize, usize), i32> =
+            std::collections::HashMap::new();
+        for &fi in &visible {
+            let f = faces[fi];
+            for (u, v) in [(f.0, f.1), (f.1, f.2), (f.2, f.0)] {
+                let key = if u < v { (u, v) } else { (v, u) };
+                *edge_count.entry(key).or_insert(0) += 1;
+            }
+        }
+        let horizon: Vec<(usize, usize)> = edge_count
+            .into_iter()
+            .filter(|&(_, c)| c == 1)
+            .map(|(e, _)| e)
+            .collect();
+        // Remove visible faces.
+        let visible_set: HashSet<usize> = visible.into_iter().collect();
+        faces = faces
+            .into_iter()
+            .enumerate()
+            .filter(|(i, _)| !visible_set.contains(i))
+            .map(|(_, f)| f)
+            .collect();
+        // Add new faces from horizon to p_idx, oriented outward.
+        for (u, v) in horizon {
+            let mut new_face = (u, v, p_idx);
+            if face_outward(&new_face, centroid) > 0.0 {
+                std::mem::swap(&mut new_face.1, &mut new_face.2);
+            }
+            faces.push(new_face);
+        }
+        on_hull[p_idx] = true;
+    }
+    // Collect unique hull vertices in input order.
+    let mut hull_idxs: Vec<usize> = (0..n).filter(|&i| on_hull[i]).collect();
+    // Filter to vertices that actually appear in some face (incremental hull
+    // may include points not on the final hull).
+    let mut face_verts: HashSet<usize> = HashSet::new();
+    for f in &faces {
+        face_verts.insert(f.0);
+        face_verts.insert(f.1);
+        face_verts.insert(f.2);
+    }
+    hull_idxs.retain(|i| face_verts.contains(i));
+    arr_sv(
+        hull_idxs
+            .into_iter()
+            .map(|i| {
+                let (x, y, z) = pts[i];
+                arr_f64(vec![x, y, z])
+            })
+            .collect(),
+    )
 }
+
+use std::collections::HashSet;
 
 // ══════════════════════════════════════════════════════════════════════
 // Crypto primitives
@@ -1208,13 +1423,33 @@ pub fn rsa_modular_exp(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(b.modpow(&e, &m).to_string())
 }
 
+/// Textbook RSA keypair from two prime hints. Validates that p and q are
+/// both prime (trial division for the small primes this fits), that they
+/// differ, and that `gcd(e, (p-1)(q-1)) = 1` so the modular inverse exists.
+/// Returns `{n, e, d}` or UNDEF for invalid input.
+///
+/// Not cryptographically secure — uses i64 modulus, no padding (raw RSA),
+/// and small primes. Educational use only.
 pub fn rsa_keypair_simple(args: &[StrykeValue]) -> StrykeValue {
-    // Deterministic small RSA from two prime hints
-    let p_arg = arg_i64(args, 0).unwrap_or(61);
-    let q_arg = arg_i64(args, 1).unwrap_or(53);
-    let n = p_arg as i128 * q_arg as i128;
-    let phi = (p_arg as i128 - 1) * (q_arg as i128 - 1);
-    let e = 17_i128;
+    fn is_prime(n: i64) -> bool {
+        if n < 2 {
+            return false;
+        }
+        if n < 4 {
+            return true;
+        }
+        if n % 2 == 0 {
+            return false;
+        }
+        let mut k = 3_i64;
+        while k * k <= n {
+            if n % k == 0 {
+                return false;
+            }
+            k += 2;
+        }
+        true
+    }
     fn ext_gcd(a: i128, b: i128) -> (i128, i128, i128) {
         if a == 0 {
             return (b, 0, 1);
@@ -1222,8 +1457,31 @@ pub fn rsa_keypair_simple(args: &[StrykeValue]) -> StrykeValue {
         let (g, x, y) = ext_gcd(b % a, a);
         (g, y - (b / a) * x, x)
     }
-    let (_, x, _) = ext_gcd(e, phi);
-    let d = ((x % phi) + phi) % phi;
+    let p_arg = arg_i64(args, 0).unwrap_or(61);
+    let q_arg = arg_i64(args, 1).unwrap_or(53);
+    if !is_prime(p_arg) || !is_prime(q_arg) || p_arg == q_arg {
+        return StrykeValue::UNDEF;
+    }
+    let n = p_arg as i128 * q_arg as i128;
+    let phi = (p_arg as i128 - 1) * (q_arg as i128 - 1);
+    // Try e=65537 first (standard), fall back to 17 / 3 for very small phi.
+    let candidates = [65537_i128, 17, 3];
+    let mut chosen: Option<(i128, i128)> = None;
+    for &e in &candidates {
+        if e >= phi {
+            continue;
+        }
+        let (g, x, _) = ext_gcd(e, phi);
+        if g == 1 {
+            let d = ((x % phi) + phi) % phi;
+            chosen = Some((e, d));
+            break;
+        }
+    }
+    let (e, d) = match chosen {
+        Some(pair) => pair,
+        None => return StrykeValue::UNDEF,
+    };
     make_hash(vec![
         ("n", StrykeValue::integer(n as i64)),
         ("e", StrykeValue::integer(e as i64)),
@@ -1231,53 +1489,161 @@ pub fn rsa_keypair_simple(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 
+fn hex_decode(s: &str) -> Option<Vec<u8>> {
+    if !s.len().is_multiple_of(2) {
+        return None;
+    }
+    let mut out = Vec::with_capacity(s.len() / 2);
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    while i + 1 < bytes.len() {
+        let pair = std::str::from_utf8(&bytes[i..i + 2]).ok()?;
+        out.push(u8::from_str_radix(pair, 16).ok()?);
+        i += 2;
+    }
+    Some(out)
+}
+
+fn hex_encode(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        out.push_str(&format!("{b:02x}"));
+    }
+    out
+}
+
+/// Affine elliptic-curve point addition on the modular curve
+/// `y² ≡ x³ + a·x + b (mod p)` using arbitrary-precision modular arithmetic.
+/// Points are `[x, y]` decimal strings; identity is `[]`.
+///
+/// `ec_point_add(P, Q, a, p)` returns `P + Q` mod p, handling doubling
+/// (P == Q) and the additive identity correctly.
 pub fn ec_point_add(args: &[StrykeValue]) -> StrykeValue {
-    // Affine point addition on y^2 = x^3 + ax + b (mod p)
-    let p1 = as_vec_f64(args.first().unwrap_or(&StrykeValue::UNDEF));
-    let p2 = as_vec_f64(args.get(1).unwrap_or(&StrykeValue::UNDEF));
-    let a = arg_f64(args, 2).unwrap_or(0.0);
-    let prime = arg_f64(args, 3).unwrap_or(0.0);
-    let _ = a;
-    let _ = prime;
-    if p1.len() < 2 || p2.len() < 2 {
-        return arr_sv(vec![]);
+    use num_bigint::BigInt;
+    use num_integer::Integer;
+    use num_traits::{One, Zero};
+    fn parse_pt(v: &StrykeValue) -> Option<(BigInt, BigInt)> {
+        let xs = as_vec_sv(v);
+        if xs.len() < 2 {
+            return None;
+        }
+        let x = BigInt::parse_bytes(xs[0].as_str_or_empty().as_bytes(), 10)?;
+        let y = BigInt::parse_bytes(xs[1].as_str_or_empty().as_bytes(), 10)?;
+        Some((x, y))
     }
-    arr_f64(vec![p1[0] + p2[0], p1[1] + p2[1]])
+    fn modinv(a: &BigInt, m: &BigInt) -> Option<BigInt> {
+        let er = a.extended_gcd(m);
+        if !er.gcd.is_one() {
+            return None;
+        }
+        Some(er.x.mod_floor(m))
+    }
+    let p1 = args.first().and_then(parse_pt);
+    let p2 = args.get(1).and_then(parse_pt);
+    let a = arg_str(args, 2)
+        .and_then(|s| BigInt::parse_bytes(s.as_bytes(), 10))
+        .unwrap_or_else(BigInt::zero);
+    let prime = match arg_str(args, 3).and_then(|s| BigInt::parse_bytes(s.as_bytes(), 10)) {
+        Some(p) => p,
+        None => return arr_sv(vec![]),
+    };
+    let fmt_pt = |x: &BigInt, y: &BigInt| {
+        arr_sv(vec![StrykeValue::string(x.to_string()), StrykeValue::string(y.to_string())])
+    };
+    let (p1, p2) = match (p1, p2) {
+        (Some(p), Some(q)) => (p, q),
+        (Some(p), None) => return fmt_pt(&p.0, &p.1),
+        (None, Some(q)) => return fmt_pt(&q.0, &q.1),
+        _ => return arr_sv(vec![]),
+    };
+    let (x1, y1) = p1;
+    let (x2, y2) = p2;
+    let x1m = x1.mod_floor(&prime);
+    let x2m = x2.mod_floor(&prime);
+    if x1m == x2m {
+        if (&y1 + &y2).mod_floor(&prime).is_zero() {
+            return arr_sv(vec![]);
+        }
+        // Doubling: λ = (3x² + a) / (2y)  (mod p)
+        let num = (BigInt::from(3) * &x1 * &x1 + &a).mod_floor(&prime);
+        let den = (BigInt::from(2) * &y1).mod_floor(&prime);
+        let inv = match modinv(&den, &prime) {
+            Some(i) => i,
+            None => return arr_sv(vec![]),
+        };
+        let lam = (num * inv).mod_floor(&prime);
+        let x3 = (&lam * &lam - BigInt::from(2) * &x1).mod_floor(&prime);
+        let y3 = (&lam * (&x1 - &x3) - &y1).mod_floor(&prime);
+        return fmt_pt(&x3, &y3);
+    }
+    // Addition: λ = (y2 - y1) / (x2 - x1)
+    let num = (&y2 - &y1).mod_floor(&prime);
+    let den = (&x2 - &x1).mod_floor(&prime);
+    let inv = match modinv(&den, &prime) {
+        Some(i) => i,
+        None => return arr_sv(vec![]),
+    };
+    let lam = (num * inv).mod_floor(&prime);
+    let x3 = (&lam * &lam - &x1 - &x2).mod_floor(&prime);
+    let y3 = (&lam * (&x1 - &x3) - &y1).mod_floor(&prime);
+    fmt_pt(&x3, &y3)
 }
 
+/// EC point doubling on `y² ≡ x³ + a·x + b (mod p)`. Equivalent to
+/// `ec_point_add(P, P, a, p)`.
 pub fn ec_point_double(args: &[StrykeValue]) -> StrykeValue {
-    let p = as_vec_f64(args.first().unwrap_or(&StrykeValue::UNDEF));
-    if p.len() < 2 {
-        return arr_sv(vec![]);
-    }
-    arr_f64(vec![p[0] * 2.0, p[1] * 2.0])
+    let p = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
+    let a = args.get(1).cloned().unwrap_or(StrykeValue::UNDEF);
+    let prime = args.get(2).cloned().unwrap_or(StrykeValue::UNDEF);
+    ec_point_add(&[p.clone(), p, a, prime])
 }
 
+/// Real BIP-340 Schnorr signature over secp256k1.
+/// `schnorr_sign(msg, private_key_hex_32) → hex_signature_64`.
 pub fn schnorr_sign_simple(args: &[StrykeValue]) -> StrykeValue {
-    use sha2::{Digest, Sha256};
+    use k256::schnorr::{signature::Signer, Signature, SigningKey};
     let msg = arg_str(args, 0).unwrap_or_default();
-    let priv_key = arg_str(args, 1).unwrap_or_default();
-    let mut h = Sha256::new();
-    h.update(priv_key.as_bytes());
-    h.update(msg.as_bytes());
-    let r = h.finalize();
-    let mut h2 = Sha256::new();
-    h2.update(r);
-    h2.update(msg.as_bytes());
-    let s = h2.finalize();
-    use base64::Engine;
-    let r_b64 = base64::engine::general_purpose::STANDARD.encode(r);
-    let s_b64 = base64::engine::general_purpose::STANDARD.encode(s);
-    StrykeValue::string(format!("{r_b64}.{s_b64}"))
+    let priv_hex = arg_str(args, 1).unwrap_or_default();
+    let priv_bytes = match hex_decode(&priv_hex) {
+        Some(b) if b.len() == 32 => b,
+        _ => return StrykeValue::UNDEF,
+    };
+    let sk = match SigningKey::from_bytes(&priv_bytes) {
+        Ok(s) => s,
+        Err(_) => return StrykeValue::UNDEF,
+    };
+    let sig: Signature = sk.sign(msg.as_bytes());
+    StrykeValue::string(hex_encode(&sig.to_bytes()))
 }
 
+/// Real BIP-340 Schnorr signature verification.
+/// `schnorr_verify(msg, public_key_hex_32, signature_hex_64) → 0|1`.
 pub fn schnorr_verify_simple(args: &[StrykeValue]) -> StrykeValue {
+    use k256::schnorr::{signature::Verifier, Signature, VerifyingKey};
     let msg = arg_str(args, 0).unwrap_or_default();
-    let _pub_key = arg_str(args, 1).unwrap_or_default();
-    let sig = arg_str(args, 2).unwrap_or_default();
-    StrykeValue::integer(if !sig.is_empty() && !msg.is_empty() { 1 } else { 0 })
+    let pub_hex = arg_str(args, 1).unwrap_or_default();
+    let sig_hex = arg_str(args, 2).unwrap_or_default();
+    let pub_bytes = match hex_decode(&pub_hex) {
+        Some(b) if b.len() == 32 => b,
+        _ => return StrykeValue::integer(0),
+    };
+    let sig_bytes = match hex_decode(&sig_hex) {
+        Some(b) if b.len() == 64 => b,
+        _ => return StrykeValue::integer(0),
+    };
+    let vk = match VerifyingKey::from_bytes(&pub_bytes) {
+        Ok(k) => k,
+        Err(_) => return StrykeValue::integer(0),
+    };
+    let sig = match Signature::try_from(sig_bytes.as_slice()) {
+        Ok(s) => s,
+        Err(_) => return StrykeValue::integer(0),
+    };
+    StrykeValue::integer(i64::from(vk.verify(msg.as_bytes(), &sig).is_ok()))
 }
 
+/// Modular-exponentiation Diffie-Hellman: shared = `peer_public^our_private mod p`.
+/// All three arguments are decimal-string BigUInts.
 pub fn dh_compute_shared(args: &[StrykeValue]) -> StrykeValue {
     use num_bigint::BigUint;
     let private_key = arg_str(args, 0).unwrap_or_default();
@@ -1285,43 +1651,72 @@ pub fn dh_compute_shared(args: &[StrykeValue]) -> StrykeValue {
     let modulus = arg_str(args, 2).unwrap_or_default();
     let priv_n = BigUint::parse_bytes(private_key.as_bytes(), 10).unwrap_or_default();
     let pub_n = BigUint::parse_bytes(public_other.as_bytes(), 10).unwrap_or_default();
-    let mod_n = BigUint::parse_bytes(modulus.as_bytes(), 10).unwrap_or_else(|| BigUint::from(1u32));
-    if mod_n == BigUint::from(0u32) {
-        return StrykeValue::UNDEF;
-    }
+    let mod_n = match BigUint::parse_bytes(modulus.as_bytes(), 10) {
+        Some(v) if v > BigUint::from(1u32) => v,
+        _ => return StrykeValue::UNDEF,
+    };
     StrykeValue::string(pub_n.modpow(&priv_n, &mod_n).to_string())
 }
 
+/// Real Ed25519 keypair from a 32-byte hex seed. Returns `{private, public}`
+/// as hex strings using `ed25519-dalek`.
 pub fn ed25519_keypair_simple(args: &[StrykeValue]) -> StrykeValue {
-    use sha2::{Digest, Sha512};
-    let seed = arg_str(args, 0).unwrap_or_else(|| "default".to_string());
-    let hash = Sha512::digest(seed.as_bytes());
-    let priv_key: Vec<u8> = hash[..32].to_vec();
-    let pub_key: Vec<u8> = hash[32..].to_vec();
-    use base64::Engine;
+    use ed25519_dalek::SigningKey;
+    let seed_hex = arg_str(args, 0).unwrap_or_else(|| "0".repeat(64));
+    let seed_bytes = match hex_decode(&seed_hex) {
+        Some(b) if b.len() == 32 => b,
+        _ => return StrykeValue::UNDEF,
+    };
+    let mut arr = [0u8; 32];
+    arr.copy_from_slice(&seed_bytes);
+    let sk = SigningKey::from_bytes(&arr);
+    let vk = sk.verifying_key();
     make_hash(vec![
-        ("private", StrykeValue::string(base64::engine::general_purpose::STANDARD.encode(&priv_key))),
-        ("public", StrykeValue::string(base64::engine::general_purpose::STANDARD.encode(&pub_key))),
+        ("private", StrykeValue::string(hex_encode(sk.as_bytes()))),
+        ("public", StrykeValue::string(hex_encode(vk.as_bytes()))),
     ])
 }
 
+/// Real Ed25519 signature over the message. Returns a 64-byte hex string.
 pub fn ed25519_sign_simple(args: &[StrykeValue]) -> StrykeValue {
-    use sha2::{Digest, Sha512};
+    use ed25519_dalek::{Signer, SigningKey};
     let msg = arg_str(args, 0).unwrap_or_default();
-    let priv_key = arg_str(args, 1).unwrap_or_default();
-    let mut h = Sha512::new();
-    h.update(priv_key.as_bytes());
-    h.update(msg.as_bytes());
-    let sig = h.finalize();
-    use base64::Engine;
-    StrykeValue::string(base64::engine::general_purpose::STANDARD.encode(sig))
+    let priv_hex = arg_str(args, 1).unwrap_or_default();
+    let priv_bytes = match hex_decode(&priv_hex) {
+        Some(b) if b.len() == 32 => b,
+        _ => return StrykeValue::UNDEF,
+    };
+    let mut arr = [0u8; 32];
+    arr.copy_from_slice(&priv_bytes);
+    let sk = SigningKey::from_bytes(&arr);
+    let sig = sk.sign(msg.as_bytes());
+    StrykeValue::string(hex_encode(&sig.to_bytes()))
 }
 
+/// Real Ed25519 verification of a 64-byte signature against a 32-byte public key.
 pub fn ed25519_verify_simple(args: &[StrykeValue]) -> StrykeValue {
+    use ed25519_dalek::{Signature, Verifier, VerifyingKey};
     let msg = arg_str(args, 0).unwrap_or_default();
-    let _pub_key = arg_str(args, 1).unwrap_or_default();
-    let sig = arg_str(args, 2).unwrap_or_default();
-    StrykeValue::integer(if !sig.is_empty() && !msg.is_empty() { 1 } else { 0 })
+    let pub_hex = arg_str(args, 1).unwrap_or_default();
+    let sig_hex = arg_str(args, 2).unwrap_or_default();
+    let pub_bytes = match hex_decode(&pub_hex) {
+        Some(b) if b.len() == 32 => b,
+        _ => return StrykeValue::integer(0),
+    };
+    let sig_bytes = match hex_decode(&sig_hex) {
+        Some(b) if b.len() == 64 => b,
+        _ => return StrykeValue::integer(0),
+    };
+    let mut pub_arr = [0u8; 32];
+    pub_arr.copy_from_slice(&pub_bytes);
+    let vk = match VerifyingKey::from_bytes(&pub_arr) {
+        Ok(k) => k,
+        Err(_) => return StrykeValue::integer(0),
+    };
+    let mut sig_arr = [0u8; 64];
+    sig_arr.copy_from_slice(&sig_bytes);
+    let sig = Signature::from_bytes(&sig_arr);
+    StrykeValue::integer(i64::from(vk.verify(msg.as_bytes(), &sig).is_ok()))
 }
 
 // ══════════════════════════════════════════════════════════════════════

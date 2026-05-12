@@ -1,5 +1,6 @@
 //! Currency / ML / file-path / locale / channels.
-//! Pure functions where possible; channels are simplified stubs.
+//! Pure functions where possible. Channels honor capacity, oneshot auto-close,
+//! and subscriber cursors; timeout args are accepted but no-op in the single-thread VM.
 
 use crate::value::StrykeValue;
 use parking_lot::RwLock;
@@ -145,23 +146,6 @@ pub fn currency_symbol_to_code(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(code.to_string())
 }
 
-pub fn currency_convert(args: &[StrykeValue]) -> StrykeValue {
-    let amount = arg_f64(args, 0).unwrap_or(0.0);
-    let rate = arg_f64(args, 3).unwrap_or(1.0);
-    StrykeValue::float(amount * rate)
-}
-
-pub fn currency_rate(args: &[StrykeValue]) -> StrykeValue {
-    // Without live rates: return 1.0 for same code, otherwise undef.
-    let from = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let to = args.get(1).map(|v| v.to_string()).unwrap_or_default();
-    if from.eq_ignore_ascii_case(&to) {
-        StrykeValue::float(1.0)
-    } else {
-        StrykeValue::UNDEF
-    }
-}
-
 pub fn currency_iso_4217(args: &[StrykeValue]) -> StrykeValue {
     let code = arg_str(args).to_ascii_uppercase();
     let exists = currency_table().iter().any(|(c, _, _)| *c == code.as_str());
@@ -178,42 +162,56 @@ pub fn currency_decimal_places(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(places)
 }
 
+// Banker's rounding (round-half-to-even) on a real-valued cent count.
+fn bankers_round(x: f64) -> i64 {
+    let floor = x.floor();
+    let diff = x - floor;
+    if diff < 0.5 {
+        floor as i64
+    } else if diff > 0.5 {
+        (floor + 1.0) as i64
+    } else if (floor as i64) % 2 == 0 {
+        floor as i64
+    } else {
+        (floor + 1.0) as i64
+    }
+}
+
+fn to_cents(amount: f64) -> i64 {
+    bankers_round(amount * 100.0)
+}
+
 pub fn money_add(args: &[StrykeValue]) -> StrykeValue {
-    let a = arg_f64(args, 0).unwrap_or(0.0);
-    let b = arg_f64(args, 1).unwrap_or(0.0);
-    StrykeValue::float(a + b)
+    let a = to_cents(arg_f64(args, 0).unwrap_or(0.0));
+    let b = to_cents(arg_f64(args, 1).unwrap_or(0.0));
+    StrykeValue::float(a.saturating_add(b) as f64 / 100.0)
 }
 
 pub fn money_sub(args: &[StrykeValue]) -> StrykeValue {
-    let a = arg_f64(args, 0).unwrap_or(0.0);
-    let b = arg_f64(args, 1).unwrap_or(0.0);
-    StrykeValue::float(a - b)
+    let a = to_cents(arg_f64(args, 0).unwrap_or(0.0));
+    let b = to_cents(arg_f64(args, 1).unwrap_or(0.0));
+    StrykeValue::float(a.saturating_sub(b) as f64 / 100.0)
 }
 
 pub fn money_mul(args: &[StrykeValue]) -> StrykeValue {
-    let a = arg_f64(args, 0).unwrap_or(0.0);
-    let b = arg_f64(args, 1).unwrap_or(1.0);
-    StrykeValue::float(a * b)
+    let a = to_cents(arg_f64(args, 0).unwrap_or(0.0));
+    let factor = arg_f64(args, 1).unwrap_or(1.0);
+    StrykeValue::float(bankers_round(a as f64 * factor) as f64 / 100.0)
 }
 
 pub fn money_div(args: &[StrykeValue]) -> StrykeValue {
-    let a = arg_f64(args, 0).unwrap_or(0.0);
-    let b = arg_f64(args, 1).unwrap_or(1.0);
-    if b == 0.0 {
+    let a = to_cents(arg_f64(args, 0).unwrap_or(0.0));
+    let divisor = arg_f64(args, 1).unwrap_or(1.0);
+    if divisor == 0.0 {
         return StrykeValue::UNDEF;
     }
-    StrykeValue::float(a / b)
+    StrykeValue::float(bankers_round(a as f64 / divisor) as f64 / 100.0)
 }
 
 pub fn money_compare(args: &[StrykeValue]) -> StrykeValue {
-    let a = arg_f64(args, 0).unwrap_or(0.0);
-    let b = arg_f64(args, 1).unwrap_or(0.0);
-    use std::cmp::Ordering;
-    StrykeValue::integer(match a.partial_cmp(&b).unwrap_or(Ordering::Equal) {
-        Ordering::Less => -1,
-        Ordering::Equal => 0,
-        Ordering::Greater => 1,
-    })
+    let a = to_cents(arg_f64(args, 0).unwrap_or(0.0));
+    let b = to_cents(arg_f64(args, 1).unwrap_or(0.0));
+    StrykeValue::integer(if a < b { -1 } else if a > b { 1 } else { 0 })
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -234,28 +232,74 @@ pub fn tokenize_word(args: &[StrykeValue]) -> StrykeValue {
         .collect())
 }
 
-pub fn tokenize_subword(args: &[StrykeValue]) -> StrykeValue {
-    // Naive subword: split on non-letter boundaries, then break long words into 4-char chunks.
+/// `tokenize_bpe(text, merges_array) → array` — real Byte-Pair-Encoding
+/// tokenisation. Each word is split into individual characters, then the
+/// merges (provided as `[["a","b"], ...]` in order) are applied greedily
+/// until no more merges match. Returns the resulting token list.
+pub fn tokenize_bpe(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
+    let merges_raw = args.get(1).map(list_elements).unwrap_or_default();
+    // Build (left, right) → merged pairs preserving order; rank = position.
+    let mut ranks: indexmap::IndexMap<(String, String), usize> = indexmap::IndexMap::new();
+    for (i, pair_v) in merges_raw.iter().enumerate() {
+        let pair = list_elements(pair_v);
+        if pair.len() < 2 {
+            continue;
+        }
+        let a = pair[0].to_string();
+        let b = pair[1].to_string();
+        ranks.insert((a, b), i);
+    }
     let mut out: Vec<StrykeValue> = Vec::new();
-    for word in s.split(|c: char| !c.is_alphanumeric()) {
+    for word in s.split_whitespace() {
         if word.is_empty() {
             continue;
         }
-        if word.len() <= 4 {
-            out.push(StrykeValue::string(word.to_string()));
-        } else {
-            let chars: Vec<char> = word.chars().collect();
-            for c in chars.chunks(4) {
-                out.push(StrykeValue::string(c.iter().collect::<String>()));
+        let mut toks: Vec<String> = word.chars().map(|c| c.to_string()).collect();
+        loop {
+            let mut best: Option<(usize, usize)> = None; // (position, rank)
+            for i in 0..toks.len().saturating_sub(1) {
+                if let Some(&r) = ranks.get(&(toks[i].clone(), toks[i + 1].clone())) {
+                    if best.is_none_or(|(_, br)| r < br) {
+                        best = Some((i, r));
+                    }
+                }
             }
+            match best {
+                Some((pos, _)) => {
+                    let merged = format!("{}{}", toks[pos], toks[pos + 1]);
+                    toks[pos] = merged;
+                    toks.remove(pos + 1);
+                }
+                None => break,
+            }
+        }
+        for t in toks {
+            out.push(StrykeValue::string(t));
         }
     }
     arr(out)
 }
 
-pub fn tokenize_bpe(args: &[StrykeValue]) -> StrykeValue {
-    tokenize_subword(args)
+pub fn tokenize_subword(args: &[StrykeValue]) -> StrykeValue {
+    // Naive subword: split on non-letter boundaries, then break long words into max_len-char chunks.
+    let s = arg_str(args);
+    let max_len = arg_i64(args, 1).unwrap_or(4).max(1) as usize;
+    let mut out: Vec<StrykeValue> = Vec::new();
+    for word in s.split(|c: char| !c.is_alphanumeric()) {
+        if word.is_empty() {
+            continue;
+        }
+        let chars: Vec<char> = word.chars().collect();
+        if chars.len() <= max_len {
+            out.push(StrykeValue::string(word.to_string()));
+        } else {
+            for c in chars.chunks(max_len) {
+                out.push(StrykeValue::string(c.iter().collect::<String>()));
+            }
+        }
+    }
+    arr(out)
 }
 
 pub fn tokenize_sentencepiece(args: &[StrykeValue]) -> StrykeValue {
@@ -540,10 +584,6 @@ pub fn path_common_ancestor(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(common.join("/"))
 }
 
-pub fn path_strip_prefix(args: &[StrykeValue]) -> StrykeValue {
-    path_relative_to(args)
-}
-
 pub fn path_glob_match_regex(args: &[StrykeValue]) -> StrykeValue {
     let glob = arg_str(args);
     let pattern: String = glob
@@ -616,21 +656,108 @@ pub fn file_attr_get(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
 }
 
-pub fn file_attr_set(_args: &[StrykeValue]) -> StrykeValue {
-    StrykeValue::integer(0) // not supported
+/// `xattr_get(path, name) → string` — read an extended attribute via libc.
+/// macOS `getxattr` / Linux `getxattr`. Returns UTF-8 lossy of the byte value,
+/// or UNDEF if the attribute is missing.
+#[cfg(unix)]
+pub fn xattr_get(args: &[StrykeValue]) -> StrykeValue {
+    use std::ffi::CString;
+    let path = match CString::new(arg_str(args).as_bytes()) { Ok(c) => c, Err(_) => return StrykeValue::UNDEF };
+    let name_str = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let name = match CString::new(name_str.as_bytes()) { Ok(c) => c, Err(_) => return StrykeValue::UNDEF };
+    let mut buf = vec![0u8; 8192];
+    #[cfg(target_os = "macos")]
+    let n = unsafe {
+        libc::getxattr(
+            path.as_ptr(),
+            name.as_ptr(),
+            buf.as_mut_ptr() as *mut libc::c_void,
+            buf.len(),
+            0,
+            0,
+        )
+    };
+    #[cfg(target_os = "linux")]
+    let n = unsafe {
+        libc::getxattr(
+            path.as_ptr(),
+            name.as_ptr(),
+            buf.as_mut_ptr() as *mut libc::c_void,
+            buf.len(),
+        )
+    };
+    if n < 0 {
+        return StrykeValue::UNDEF;
+    }
+    buf.truncate(n as usize);
+    StrykeValue::string(String::from_utf8_lossy(&buf).into_owned())
 }
+#[cfg(not(unix))]
+pub fn xattr_get(_args: &[StrykeValue]) -> StrykeValue { StrykeValue::UNDEF }
 
-pub fn xattr_get(_args: &[StrykeValue]) -> StrykeValue {
-    StrykeValue::UNDEF
+/// `xattr_set(path, name, value) → 0|1` — set an extended attribute.
+/// Returns 1 on success, 0 on failure (errno preserved in `$!`).
+#[cfg(unix)]
+pub fn xattr_set(args: &[StrykeValue]) -> StrykeValue {
+    use std::ffi::CString;
+    let path = match CString::new(arg_str(args).as_bytes()) { Ok(c) => c, Err(_) => return StrykeValue::integer(0) };
+    let name_str = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let name = match CString::new(name_str.as_bytes()) { Ok(c) => c, Err(_) => return StrykeValue::integer(0) };
+    let value = args.get(2).map(|v| v.to_string()).unwrap_or_default();
+    let bytes = value.as_bytes();
+    #[cfg(target_os = "macos")]
+    let rc = unsafe {
+        libc::setxattr(
+            path.as_ptr(),
+            name.as_ptr(),
+            bytes.as_ptr() as *const libc::c_void,
+            bytes.len(),
+            0,
+            0,
+        )
+    };
+    #[cfg(target_os = "linux")]
+    let rc = unsafe {
+        libc::setxattr(
+            path.as_ptr(),
+            name.as_ptr(),
+            bytes.as_ptr() as *const libc::c_void,
+            bytes.len(),
+            0,
+        )
+    };
+    StrykeValue::integer(if rc == 0 { 1 } else { 0 })
 }
+#[cfg(not(unix))]
+pub fn xattr_set(_args: &[StrykeValue]) -> StrykeValue { StrykeValue::integer(0) }
 
-pub fn xattr_set(_args: &[StrykeValue]) -> StrykeValue {
-    StrykeValue::integer(0)
+/// `xattr_list(path) → array` — list all extended-attribute names.
+#[cfg(unix)]
+pub fn xattr_list(args: &[StrykeValue]) -> StrykeValue {
+    use std::ffi::CString;
+    let path = match CString::new(arg_str(args).as_bytes()) { Ok(c) => c, Err(_) => return arr(vec![]) };
+    let mut buf = vec![0u8; 16384];
+    #[cfg(target_os = "macos")]
+    let n = unsafe {
+        libc::listxattr(path.as_ptr(), buf.as_mut_ptr() as *mut i8, buf.len(), 0)
+    };
+    #[cfg(target_os = "linux")]
+    let n = unsafe {
+        libc::listxattr(path.as_ptr(), buf.as_mut_ptr() as *mut i8, buf.len())
+    };
+    if n <= 0 {
+        return arr(vec![]);
+    }
+    let slice = &buf[..n as usize];
+    let names: Vec<StrykeValue> = slice
+        .split(|b| *b == 0)
+        .filter(|s| !s.is_empty())
+        .map(|s| StrykeValue::string(String::from_utf8_lossy(s).into_owned()))
+        .collect();
+    arr(names)
 }
-
-pub fn xattr_list(_args: &[StrykeValue]) -> StrykeValue {
-    arr(vec![])
-}
+#[cfg(not(unix))]
+pub fn xattr_list(_args: &[StrykeValue]) -> StrykeValue { arr(vec![]) }
 
 pub fn file_chmod_string(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_str(args);
@@ -651,17 +778,29 @@ pub fn file_chmod_octal(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 
-pub fn file_locked(_args: &[StrykeValue]) -> StrykeValue {
-    StrykeValue::integer(0)
+/// `file_locked(path) → 0|1` — try a non-blocking `flock` shared lock;
+/// 1 if the file is currently locked by another process, 0 otherwise.
+#[cfg(unix)]
+pub fn file_locked(args: &[StrykeValue]) -> StrykeValue {
+    use std::os::unix::io::AsRawFd;
+    let path = arg_str(args);
+    let file = match std::fs::OpenOptions::new().read(true).open(&path) {
+        Ok(f) => f,
+        Err(_) => return StrykeValue::integer(0),
+    };
+    let fd = file.as_raw_fd();
+    // Non-blocking exclusive lock attempt.
+    let rc = unsafe { libc::flock(fd, libc::LOCK_EX | libc::LOCK_NB) };
+    if rc == 0 {
+        // We got the lock — the file wasn't held by anyone else. Release.
+        unsafe { libc::flock(fd, libc::LOCK_UN) };
+        StrykeValue::integer(0)
+    } else {
+        StrykeValue::integer(1)
+    }
 }
-
-pub fn file_acl_get(_args: &[StrykeValue]) -> StrykeValue {
-    arr(vec![])
-}
-
-pub fn file_acl_set(_args: &[StrykeValue]) -> StrykeValue {
-    StrykeValue::integer(0)
-}
+#[cfg(not(unix))]
+pub fn file_locked(_args: &[StrykeValue]) -> StrykeValue { StrykeValue::integer(0) }
 
 // ══════════════════════════════════════════════════════════════════════
 // Locale / i18n / BCP47
@@ -800,14 +939,6 @@ pub fn locale_canonical(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(parts.join("-"))
 }
 
-pub fn bcp47_parse(args: &[StrykeValue]) -> StrykeValue {
-    locale_parse(args)
-}
-
-pub fn bcp47_format(args: &[StrykeValue]) -> StrykeValue {
-    locale_format(args)
-}
-
 pub fn bcp47_validate(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args).replace('_', "-");
     let parts: Vec<&str> = s.split('-').collect();
@@ -842,10 +973,6 @@ pub fn locale_likely_subtags(args: &[StrykeValue]) -> StrykeValue {
         _ => return locale_canonical(args),
     };
     StrykeValue::string(canonical.to_string())
-}
-
-pub fn locale_minimize(args: &[StrykeValue]) -> StrykeValue {
-    locale_language(args)
 }
 
 pub fn locale_collation(args: &[StrykeValue]) -> StrykeValue {
@@ -1010,10 +1137,6 @@ pub fn country_phone_prefix(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(result.to_string())
 }
 
-pub fn country_currency(args: &[StrykeValue]) -> StrykeValue {
-    locale_currency(args)
-}
-
 pub fn country_languages(args: &[StrykeValue]) -> StrykeValue {
     let code = arg_str(args).to_ascii_uppercase();
     let langs: &[&str] = match code.as_str() {
@@ -1078,7 +1201,13 @@ pub fn language_name(args: &[StrykeValue]) -> StrykeValue {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// Channels / messaging (simplified stubs)
+// Channels / messaging
+//
+// Single-thread VM channels: kind ∈ {unbounded, bounded, sync, oneshot,
+// broadcast, subscriber}. Capacity is enforced for bounded; oneshot
+// auto-closes after one send; broadcast holds the full buffer and each
+// subscriber consumes via an independent cursor. Timeout args are accepted
+// but ignored (no blocking in a single-thread VM).
 // ══════════════════════════════════════════════════════════════════════
 
 fn mk_channel(kind: &str, cap: i64) -> StrykeValue {
@@ -1104,6 +1233,11 @@ pub fn channel_sync(_args: &[StrykeValue]) -> StrykeValue {
     mk_channel("sync", 0)
 }
 
+/// `channel_send_timeout(ch, value, [ms])` — send a value to the channel.
+/// Returns 1 on success, 0 if the channel is closed or full (bounded /
+/// sync channels with `capacity` ≥ 0 reject the send when at-capacity).
+/// The timeout is non-functional in the single-thread VM; behavior is
+/// equivalent to `channel_try_send` for capacity-honoring semantics.
 pub fn channel_send_timeout(args: &[StrykeValue]) -> StrykeValue {
     let Some(ch) = args.first().and_then(|v| v.as_hash_ref()) else {
         return StrykeValue::integer(0);
@@ -1113,21 +1247,76 @@ pub fn channel_send_timeout(args: &[StrykeValue]) -> StrykeValue {
     if g.get("closed").is_some_and(|v| v.is_true()) {
         return StrykeValue::integer(0);
     }
+    let cap = g
+        .get("capacity")
+        .map(|v| v.to_int())
+        .unwrap_or(-1);
+    let kind = g
+        .get("kind")
+        .map(|v| v.to_string())
+        .unwrap_or_default();
     let buf_v = g.get("buffer").cloned().unwrap_or(StrykeValue::UNDEF);
     drop(g);
-    if let Some(buf) = buf_v.as_array_ref() {
-        buf.write().push(val);
+    let Some(buf) = buf_v.as_array_ref() else {
+        return StrykeValue::integer(0);
+    };
+    let mut bw = buf.write();
+    // Capacity enforcement: -1 = unbounded; 0 = rendezvous (no buffering,
+    // always reject in a single-thread VM); n > 0 = bounded.
+    if cap == 0 {
+        return StrykeValue::integer(0);
+    }
+    if cap > 0 && (bw.len() as i64) >= cap {
+        return StrykeValue::integer(0);
+    }
+    bw.push(val);
+    // Oneshot auto-closes after the single permitted send.
+    if kind == "oneshot" {
+        drop(bw);
+        ch.write()
+            .insert("closed".to_string(), StrykeValue::integer(1));
     }
     StrykeValue::integer(1)
 }
 
+/// `channel_recv_timeout(ch, [ms])` — pull the next available value.
+/// Returns UNDEF when the channel is empty.
+///
+/// Subscriber-channel handling: when `ch.kind == "subscriber"`, the read
+/// uses an independent cursor into the parent broadcast channel's buffer,
+/// so each subscriber sees every published message exactly once.
 pub fn channel_recv_timeout(args: &[StrykeValue]) -> StrykeValue {
     let Some(ch) = args.first().and_then(|v| v.as_hash_ref()) else {
         return StrykeValue::UNDEF;
     };
-    let g = ch.read();
-    let buf_v = g.get("buffer").cloned().unwrap_or(StrykeValue::UNDEF);
-    drop(g);
+    let kind = ch
+        .read()
+        .get("kind")
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    if kind == "subscriber" {
+        let parent_v = ch.read().get("parent").cloned().unwrap_or(StrykeValue::UNDEF);
+        let cursor = ch.read().get("cursor").map(|v| v.to_int()).unwrap_or(0);
+        let parent = match parent_v.as_hash_ref() {
+            Some(p) => p,
+            None => return StrykeValue::UNDEF,
+        };
+        let buf_v = parent.read().get("buffer").cloned().unwrap_or(StrykeValue::UNDEF);
+        let buf = match buf_v.as_array_ref() {
+            Some(b) => b,
+            None => return StrykeValue::UNDEF,
+        };
+        let bg = buf.read();
+        if (cursor as usize) >= bg.len() {
+            return StrykeValue::UNDEF;
+        }
+        let val = bg[cursor as usize].clone();
+        drop(bg);
+        ch.write()
+            .insert("cursor".to_string(), StrykeValue::integer(cursor + 1));
+        return val;
+    }
+    let buf_v = ch.read().get("buffer").cloned().unwrap_or(StrykeValue::UNDEF);
     if let Some(buf) = buf_v.as_array_ref() {
         let mut bw = buf.write();
         if !bw.is_empty() {
@@ -1135,14 +1324,6 @@ pub fn channel_recv_timeout(args: &[StrykeValue]) -> StrykeValue {
         }
     }
     StrykeValue::UNDEF
-}
-
-pub fn channel_try_recv(args: &[StrykeValue]) -> StrykeValue {
-    channel_recv_timeout(args)
-}
-
-pub fn channel_try_send(args: &[StrykeValue]) -> StrykeValue {
-    channel_send_timeout(args)
 }
 
 pub fn channel_drain(args: &[StrykeValue]) -> StrykeValue {
@@ -1181,30 +1362,31 @@ pub fn broadcast_channel_new(args: &[StrykeValue]) -> StrykeValue {
     mk_channel("broadcast", cap)
 }
 
+/// `broadcast_channel_subscribe(broadcast_ch) → subscriber_ch` — create
+/// a new subscriber with an independent read cursor. Each subscriber sees
+/// every message published after it subscribed; messages are stored in
+/// the broadcast channel's shared buffer and read by cursor offset.
 pub fn broadcast_channel_subscribe(args: &[StrykeValue]) -> StrykeValue {
-    // Returns a new sub-channel hashref that aliases the same buffer.
-    let Some(ch) = args.first().cloned() else {
+    let Some(parent) = args.first().and_then(|v| v.as_hash_ref()) else {
         return StrykeValue::UNDEF;
     };
-    ch
+    let parent_buf_len = parent
+        .read()
+        .get("buffer")
+        .and_then(|v| v.as_array_ref().map(|a| a.read().len() as i64))
+        .unwrap_or(0);
+    use indexmap::IndexMap;
+    let mut h: IndexMap<String, StrykeValue> = IndexMap::new();
+    h.insert("kind".to_string(), StrykeValue::string("subscriber".to_string()));
+    h.insert("parent".to_string(), args.first().cloned().unwrap_or(StrykeValue::UNDEF));
+    // Read cursor starts at the current published count, so subscribers
+    // only receive messages from now on.
+    h.insert("cursor".to_string(), StrykeValue::integer(parent_buf_len));
+    StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
 }
 
-pub fn broadcast_channel_publish(args: &[StrykeValue]) -> StrykeValue {
-    channel_send_timeout(args)
-}
-
-pub fn mpsc_new(_args: &[StrykeValue]) -> StrykeValue {
-    mk_channel("mpsc", -1)
-}
-
-pub fn mpmc_new(_args: &[StrykeValue]) -> StrykeValue {
-    mk_channel("mpmc", -1)
-}
-
-pub fn spmc_new(_args: &[StrykeValue]) -> StrykeValue {
-    mk_channel("spmc", -1)
-}
-
+/// `oneshot_new()` — single-value rendezvous channel. After the first
+/// successful send, the channel is auto-closed and further sends fail.
 pub fn oneshot_new(_args: &[StrykeValue]) -> StrykeValue {
     mk_channel("oneshot", 1)
 }

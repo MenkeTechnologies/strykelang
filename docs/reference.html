@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.13.7 · 10065 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.13.8 · 10065 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -13706,8 +13706,8 @@ p $a[1]  # lag-1 autocorrelation
       </article>
       <article class="doc-entry" id="doc-adf-test">
         <h3><a class="doc-anchor" href="#doc-adf-test">#</a> <code>adf_test</code></h3>
-        <p><code>adf_test(series) → number</code> — augmented Dickey-Fuller-like statistic (simplified). Returns the regression coefficient on the lagged level; large negative values suggest stationarity.</p>
-        <pre><code class="lang-perl">p adf_test(\@returns)
+        <p><code>adf_test</code> — statistical test of <code>adf</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p adf_test $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-adf-test-stat">
@@ -14910,7 +14910,9 @@ p arithser(2, 3, 10)     # 155 (2+5+8+...+29)
       </article>
       <article class="doc-entry" id="doc-ase-palette-extract">
         <h3><a class="doc-anchor" href="#doc-ase-palette-extract">#</a> <code>ase_palette_extract</code></h3>
-        <p><code>ase_palette_extract(colors) → array</code> — deduplicate an RGB list while preserving order.</p>
+        <p><code>ase_palette_extract</code> — operation <code>ase palette extract</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p ase_palette_extract $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-asec">
         <h3><a class="doc-anchor" href="#doc-asec">#</a> <code>asec</code></h3>
@@ -15541,7 +15543,9 @@ p @$bb   # (0, 1, 5, 4)
       </article>
       <article class="doc-entry" id="doc-bcp47-format">
         <h3><a class="doc-anchor" href="#doc-bcp47-format">#</a> <code>bcp47_format</code></h3>
-        <p><code>bcp47_format(parts) → string</code> — assemble a BCP-47 tag from <code>{language, script?, region?, variants?}</code>.</p>
+        <p><code>bcp47_format</code> — operation <code>bcp47 format</code>. Category: *extras*.</p>
+        <pre><code class="lang-perl">p bcp47_format $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-bcp47-parse">
         <h3><a class="doc-anchor" href="#doc-bcp47-parse">#</a> <code>bcp47_parse</code></h3>
@@ -15629,12 +15633,6 @@ p @$bb   # (0, 1, 5, 4)
         <h3><a class="doc-anchor" href="#doc-beat-to-seconds">#</a> <code>beat_to_seconds</code></h3>
         <p><code>beat_to_seconds</code> — convert from <code>beat</code> to <code>seconds</code>. Category: *music theory*.</p>
         <pre><code class="lang-perl">p beat_to_seconds $value
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-beats-per-bar">
-        <h3><a class="doc-anchor" href="#doc-beats-per-bar">#</a> <code>beats_per_bar</code></h3>
-        <p><code>beats_per_bar(numerator) → int</code> — passes the time-signature numerator through.</p>
-        <pre><code class="lang-perl">p beats_per_bar(4)  # 4 (common time)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-beaufort">
@@ -16811,7 +16809,9 @@ p bernoulli(4)   # -0.0333
       </article>
       <article class="doc-entry" id="doc-blast-kmer-index">
         <h3><a class="doc-anchor" href="#doc-blast-kmer-index">#</a> <code>blast_kmer_index</code></h3>
-        <p><code>blast_kmer_index(seq, k=3) → hash</code> — k-mer position index used for BLAST-style seed lookups (alias for <code>dna_kmer_index</code>).</p>
+        <p><code>blast_kmer_index</code> — index of <code>blast kmer</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p blast_kmer_index $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-blessed">
         <h3><a class="doc-anchor" href="#doc-blessed">#</a> <code>blessed</code></h3>
@@ -17071,7 +17071,9 @@ p bernoulli(4)   # -0.0333
       </article>
       <article class="doc-entry" id="doc-boltzmann-choose">
         <h3><a class="doc-anchor" href="#doc-boltzmann-choose">#</a> <code>boltzmann_choose</code></h3>
-        <p><code>boltzmann_choose(logits, temperature=1, seed=0) → int</code> — alias for softmax_choose.</p>
+        <p><code>boltzmann_choose</code> — operation <code>boltzmann choose</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p boltzmann_choose $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-boltzmann-const">
         <h3><a class="doc-anchor" href="#doc-boltzmann-const">#</a> <code>boltzmann_const</code></h3>
@@ -17492,7 +17494,9 @@ p bond_price(1000, 0.05, 0.06, 10)   # ~926 (discount)
       </article>
       <article class="doc-entry" id="doc-broadcast-channel-publish">
         <h3><a class="doc-anchor" href="#doc-broadcast-channel-publish">#</a> <code>broadcast_channel_publish</code></h3>
-        <p><code>broadcast_channel_publish(ch, value) → 0|1</code> — publish to all current subscribers.</p>
+        <p><code>broadcast_channel_publish</code> — operation <code>broadcast channel publish</code>. Category: *extras*.</p>
+        <pre><code class="lang-perl">p broadcast_channel_publish $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-broadcast-channel-subscribe">
         <h3><a class="doc-anchor" href="#doc-broadcast-channel-subscribe">#</a> <code>broadcast_channel_subscribe</code></h3>
@@ -19212,11 +19216,15 @@ p @$c   # (1, 1)
       </article>
       <article class="doc-entry" id="doc-channel-try-recv">
         <h3><a class="doc-anchor" href="#doc-channel-try-recv">#</a> <code>channel_try_recv</code></h3>
-        <p><code>channel_try_recv(ch) → value|undef</code> — non-blocking receive; undef if empty.</p>
+        <p><code>channel_try_recv</code> — receive of <code>channel try</code>. Category: *extras*.</p>
+        <pre><code class="lang-perl">p channel_try_recv $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-channel-try-send">
         <h3><a class="doc-anchor" href="#doc-channel-try-send">#</a> <code>channel_try_send</code></h3>
-        <p><code>channel_try_send(ch, value) → 0|1</code> — non-blocking send; 0 if full.</p>
+        <p><code>channel_try_send</code> — send of <code>channel try</code>. Category: *extras*.</p>
+        <pre><code class="lang-perl">p channel_try_send $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-channel-unbounded">
         <h3><a class="doc-anchor" href="#doc-channel-unbounded">#</a> <code>channel_unbounded</code></h3>
@@ -20574,7 +20582,9 @@ p codon_to_amino_acid(&quot;TAA&quot;)  # * (stop)
       </article>
       <article class="doc-entry" id="doc-cohen-sutherland-clip">
         <h3><a class="doc-anchor" href="#doc-cohen-sutherland-clip">#</a> <code>cohen_sutherland_clip</code></h3>
-        <p><code>cohen_sutherland_clip(...) → [p1&#39;, p2&#39;]</code> — alias using Liang-Barsky internally.</p>
+        <p><code>cohen_sutherland_clip</code> — operation <code>cohen sutherland clip</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p cohen_sutherland_clip $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-coherence-xy">
         <h3><a class="doc-anchor" href="#doc-coherence-xy">#</a> <code>coherence_xy</code></h3>
@@ -21409,7 +21419,7 @@ p $ci-&gt;{slope_lower}
       </article>
       <article class="doc-entry" id="doc-contour-centroid">
         <h3><a class="doc-anchor" href="#doc-contour-centroid">#</a> <code>contour_centroid</code></h3>
-        <p><code>contour_centroid(points) → [x, y]</code> — arithmetic mean of vertex positions.</p>
+        <p><code>contour_centroid(points) → [x, y]</code> — area-weighted centroid of the closed polygon (<code>M10/M00, M01/M00</code> per OpenCV). Falls back to vertex mean if the polygon has zero signed area.</p>
       </article>
       <article class="doc-entry" id="doc-contour-find">
         <h3><a class="doc-anchor" href="#doc-contour-find">#</a> <code>contour_find</code></h3>
@@ -21453,9 +21463,17 @@ p $ci-&gt;{slope_lower}
         <pre><code class="lang-perl">p converge $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-convex-hull-3d">
+        <h3><a class="doc-anchor" href="#doc-convex-hull-3d">#</a> <code>convex_hull_3d</code></h3>
+        <p><code>convex_hull_3d</code> — operation <code>convex hull 3d</code>. Category: *uncategorized*.</p>
+        <pre><code class="lang-perl">p convex_hull_3d $x
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-convex-hull-3d-simple">
         <h3><a class="doc-anchor" href="#doc-convex-hull-3d-simple">#</a> <code>convex_hull_3d_simple</code></h3>
-        <p><code>convex_hull_3d_simple(points_3d) → array</code> — projects to XY then runs 2D hull. Returns 2D hull points (not full 3D hull).</p>
+        <p><code>convex_hull_3d_simple</code> — operation <code>convex hull 3d simple</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p convex_hull_3d_simple $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-convex-hull-chan">
         <h3><a class="doc-anchor" href="#doc-convex-hull-chan">#</a> <code>convex_hull_chan</code></h3>
@@ -21715,8 +21733,8 @@ p $ci-&gt;{slope_lower}
       </article>
       <article class="doc-entry" id="doc-cosine-sim-sparse">
         <h3><a class="doc-anchor" href="#doc-cosine-sim-sparse">#</a> <code>cosine_sim_sparse</code></h3>
-        <p><code>cosine_sim_sparse(a, b) → number</code> — cosine similarity for sparse-aligned vectors.</p>
-        <pre><code class="lang-perl">p cosine_sim_sparse([1,0,0], [1,0,0])  # 1
+        <p><code>cosine_sim_sparse(a, b) → number</code> — cosine similarity for sparse vectors. Each input is <code>[[index, value], ...]</code>; dot product is taken over shared indices and L2 norms over each sparse set.</p>
+        <pre><code class="lang-perl">p cosine_sim_sparse([[0,1],[5,2]], [[0,1],[5,2]])  # 1
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-cosine-similarity">
@@ -21963,7 +21981,9 @@ p $ci-&gt;{slope_lower}
       </article>
       <article class="doc-entry" id="doc-country-currency">
         <h3><a class="doc-anchor" href="#doc-country-currency">#</a> <code>country_currency</code></h3>
-        <p><code>country_currency(code) → string</code> — ISO 4217 currency code.</p>
+        <p><code>country_currency</code> — ISO 3166 country lookup <code>currency</code>. Category: *extras*.</p>
+        <pre><code class="lang-perl">p country_currency $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-country-languages">
         <h3><a class="doc-anchor" href="#doc-country-languages">#</a> <code>country_languages</code></h3>
@@ -22563,7 +22583,9 @@ my @F = @{cumtrapz(\@y)}  # [0, 1.5, 4.0, 7.5]
       </article>
       <article class="doc-entry" id="doc-currency-convert">
         <h3><a class="doc-anchor" href="#doc-currency-convert">#</a> <code>currency_convert</code></h3>
-        <p><code>currency_convert(amount, from, to, rate) → number</code> — apply exchange rate.</p>
+        <p><code>currency_convert</code> — currency / money helper <code>convert</code>. Category: *extras*.</p>
+        <pre><code class="lang-perl">p currency_convert $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-currency-decimal-places">
         <h3><a class="doc-anchor" href="#doc-currency-decimal-places">#</a> <code>currency_decimal_places</code></h3>
@@ -22585,7 +22607,9 @@ my @F = @{cumtrapz(\@y)}  # [0, 1.5, 4.0, 7.5]
       </article>
       <article class="doc-entry" id="doc-currency-rate">
         <h3><a class="doc-anchor" href="#doc-currency-rate">#</a> <code>currency_rate</code></h3>
-        <p><code>currency_rate(from, to) → number</code> — static-table example exchange rate.</p>
+        <p><code>currency_rate</code> — currency / money helper <code>rate</code>. Category: *extras*.</p>
+        <pre><code class="lang-perl">p currency_rate $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-currency-round">
         <h3><a class="doc-anchor" href="#doc-currency-round">#</a> <code>currency_round</code></h3>
@@ -25695,7 +25719,9 @@ p doppler(440, 30, 0)    # ~405 Hz (ambulance receding)
       </article>
       <article class="doc-entry" id="doc-double-metaphone-secondary">
         <h3><a class="doc-anchor" href="#doc-double-metaphone-secondary">#</a> <code>double_metaphone_secondary</code></h3>
-        <p><code>double_metaphone_secondary(name, max=4) → string</code> — secondary key (alternate consonant rules) for ambiguous spellings.</p>
+        <p><code>double_metaphone_secondary</code> — operation <code>double metaphone secondary</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p double_metaphone_secondary $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-double-q-learning-step">
         <h3><a class="doc-anchor" href="#doc-double-q-learning-step">#</a> <code>double_q_learning_step</code></h3>
@@ -27846,7 +27872,9 @@ $f = fenwick_update($f, 3, 5)
       </article>
       <article class="doc-entry" id="doc-fibonacci-nth-fast">
         <h3><a class="doc-anchor" href="#doc-fibonacci-nth-fast">#</a> <code>fibonacci_nth_fast</code></h3>
-        <p><code>fibonacci_nth_fast(n) → int</code> — alias for <code>fibonacci_matrix</code>.</p>
+        <p><code>fibonacci_nth_fast</code> — operation <code>fibonacci nth fast</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p fibonacci_nth_fast $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-fibonacci-retracement">
         <h3><a class="doc-anchor" href="#doc-fibonacci-retracement">#</a> <code>fibonacci_retracement</code></h3>
@@ -27892,11 +27920,15 @@ $f = fenwick_update($f, 3, 5)
       </article>
       <article class="doc-entry" id="doc-file-acl-get">
         <h3><a class="doc-anchor" href="#doc-file-acl-get">#</a> <code>file_acl_get</code></h3>
-        <p><code>file_acl_get(path) → string</code> — POSIX ACL string for path.</p>
+        <p><code>file_acl_get</code> — filesystem op <code>acl get</code>. Category: *extras*.</p>
+        <pre><code class="lang-perl">p file_acl_get $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-file-acl-set">
         <h3><a class="doc-anchor" href="#doc-file-acl-set">#</a> <code>file_acl_set</code></h3>
-        <p><code>file_acl_set(path, acl) → 0|1</code> — apply ACL spec.</p>
+        <p><code>file_acl_set</code> — filesystem op <code>acl set</code>. Category: *extras*.</p>
+        <pre><code class="lang-perl">p file_acl_set $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-file-atime">
         <h3><a class="doc-anchor" href="#doc-file-atime">#</a> <code>file_atime</code></h3>
@@ -27910,7 +27942,9 @@ $f = fenwick_update($f, 3, 5)
       </article>
       <article class="doc-entry" id="doc-file-attr-set">
         <h3><a class="doc-anchor" href="#doc-file-attr-set">#</a> <code>file_attr_set</code></h3>
-        <p><code>file_attr_set(path, attrs) → 0|1</code> — bulk-set attributes.</p>
+        <p><code>file_attr_set</code> — filesystem op <code>attr set</code>. Category: *extras*.</p>
+        <pre><code class="lang-perl">p file_attr_set $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-file-chmod-octal">
         <h3><a class="doc-anchor" href="#doc-file-chmod-octal">#</a> <code>file_chmod_octal</code></h3>
@@ -28327,7 +28361,9 @@ p &quot;min=$f-&gt;[0] Q1=$f-&gt;[1] med=$f-&gt;[2] Q3=$f-&gt;[3] max=$f-&gt;[4]
       </article>
       <article class="doc-entry" id="doc-flanger-simple">
         <h3><a class="doc-anchor" href="#doc-flanger-simple">#</a> <code>flanger_simple</code></h3>
-        <p><code>flanger_simple(...) → array</code> — alias for <code>chorus_simple</code> with typical flanger settings.</p>
+        <p><code>flanger_simple</code> — operation <code>flanger simple</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p flanger_simple $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-flat-band-potential">
         <h3><a class="doc-anchor" href="#doc-flat-band-potential">#</a> <code>flat_band_potential</code></h3>
@@ -28677,7 +28713,9 @@ p &quot;min=$f-&gt;[0] Q1=$f-&gt;[1] med=$f-&gt;[2] Q3=$f-&gt;[3] max=$f-&gt;[4]
       </article>
       <article class="doc-entry" id="doc-ford-fulkerson-max-flow">
         <h3><a class="doc-anchor" href="#doc-ford-fulkerson-max-flow">#</a> <code>ford_fulkerson_max_flow</code></h3>
-        <p><code>ford_fulkerson_max_flow(...) → number</code> — alias for <code>edmonds_karp_max_flow</code>.</p>
+        <p><code>ford_fulkerson_max_flow</code> — operation <code>ford fulkerson max flow</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p ford_fulkerson_max_flow $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-ford-fulkerson-step">
         <h3><a class="doc-anchor" href="#doc-ford-fulkerson-step">#</a> <code>ford_fulkerson_step</code></h3>
@@ -28823,7 +28861,9 @@ p &quot;min=$f-&gt;[0] Q1=$f-&gt;[1] med=$f-&gt;[2] Q3=$f-&gt;[3] max=$f-&gt;[4]
       </article>
       <article class="doc-entry" id="doc-freeverb-lite">
         <h3><a class="doc-anchor" href="#doc-freeverb-lite">#</a> <code>freeverb_lite</code></h3>
-        <p><code>freeverb_lite(signal) → array</code> — alias for <code>schroeder_reverb</code> with Freeverb-style routing.</p>
+        <p><code>freeverb_lite</code> — operation <code>freeverb lite</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p freeverb_lite $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-french-revolutionary-leap">
         <h3><a class="doc-anchor" href="#doc-french-revolutionary-leap">#</a> <code>french_revolutionary_leap</code></h3>
@@ -30814,7 +30854,7 @@ p gini(0, 0, 0, 100)   # ~0.75 (high inequality)
       </article>
       <article class="doc-entry" id="doc-graph-floyd-warshall">
         <h3><a class="doc-anchor" href="#doc-graph-floyd-warshall">#</a> <code>graph_floyd_warshall</code></h3>
-        <p><code>graph_floyd_warshall(matrix) → matrix</code> — all-pairs shortest paths. O(n³).</p>
+        <p><code>graph_floyd_warshall(matrix) → matrix</code> — all-pairs shortest paths via Floyd-Warshall (O(n³)). Input is an adjacency matrix where <code>0</code> indicates no edge and any non-zero value is the edge weight. Output cells are <code>Infinity</code> for unreachable pairs.</p>
         <pre><code class="lang-perl">p graph_floyd_warshall($adj_matrix)
 </code></pre>
       </article>
@@ -33109,7 +33149,7 @@ my $ac_only = hpf(\@with_dc, 0.1)
       </article>
       <article class="doc-entry" id="doc-hu-moments">
         <h3><a class="doc-anchor" href="#doc-hu-moments">#</a> <code>hu_moments</code></h3>
-        <p><code>hu_moments(image) → array</code> — first 4 Hu moment invariants (translation, scale, rotation invariant shape features).</p>
+        <p><code>hu_moments(image) → array</code> — all 7 Hu moment invariants (translation, scale, rotation invariant shape features). <code>h7</code> flips sign under reflection.</p>
       </article>
       <article class="doc-entry" id="doc-hubble-constant">
         <h3><a class="doc-anchor" href="#doc-hubble-constant">#</a> <code>hubble_constant</code></h3>
@@ -33323,11 +33363,11 @@ my $ac_only = hpf(\@with_dc, 0.1)
       </article>
       <article class="doc-entry" id="doc-hyperloglog-pp-add">
         <h3><a class="doc-anchor" href="#doc-hyperloglog-pp-add">#</a> <code>hyperloglog_pp_add</code></h3>
-        <p><code>hyperloglog_pp_add(hll, item) → hash</code> — fold an item into the sketch using FNV-1a hash.</p>
+        <p><code>hyperloglog_pp_add(hll, item) → hash</code> — fold an item into the sketch using 64-bit FNV-1a hash.</p>
       </article>
       <article class="doc-entry" id="doc-hyperloglog-pp-estimate">
         <h3><a class="doc-anchor" href="#doc-hyperloglog-pp-estimate">#</a> <code>hyperloglog_pp_estimate</code></h3>
-        <p><code>hyperloglog_pp_estimate(hll) → number</code> — estimated cardinality with small-range correction.</p>
+        <p><code>hyperloglog_pp_estimate(hll) → number</code> — estimated cardinality with linear-counting small-range correction.</p>
         <pre><code class="lang-perl">my $h = hyperloglog_pp_new(10)
 $h = hyperloglog_pp_add($h, &quot;item$_&quot;) for 1..1000
 p hyperloglog_pp_estimate($h)
@@ -33335,7 +33375,7 @@ p hyperloglog_pp_estimate($h)
       </article>
       <article class="doc-entry" id="doc-hyperloglog-pp-new">
         <h3><a class="doc-anchor" href="#doc-hyperloglog-pp-new">#</a> <code>hyperloglog_pp_new</code></h3>
-        <p><code>hyperloglog_pp_new(precision=14) → hash</code> — HyperLogLog++ sketch with <code>2^precision</code> registers.</p>
+        <p><code>hyperloglog_pp_new(precision=14) → hash</code> — HyperLogLog sketch with <code>2^precision</code> dense registers. (Lacks HLL++ sparse representation and bias-correction tables — counts within ~3% of standard HLL.)</p>
       </article>
       <article class="doc-entry" id="doc-hyperoperation">
         <h3><a class="doc-anchor" href="#doc-hyperoperation">#</a> <code>hyperoperation</code></h3>
@@ -37949,8 +37989,8 @@ p millerrabin(104730)     # 0 (composite)
       </article>
       <article class="doc-entry" id="doc-lag-series">
         <h3><a class="doc-anchor" href="#doc-lag-series">#</a> <code>lag_series</code></h3>
-        <p><code>lag_series(series, n=1) → array</code> — alias for <code>shift_series</code> with positive lag; produces the lagged form used in regression.</p>
-        <pre><code class="lang-perl">p lag_series(\@xs, 1)
+        <p><code>lag_series</code> — operation <code>lag series</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p lag_series $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-lagrange">
@@ -37991,7 +38031,7 @@ p millerrabin(104730)     # 0 (composite)
       </article>
       <article class="doc-entry" id="doc-lambert-project">
         <h3><a class="doc-anchor" href="#doc-lambert-project">#</a> <code>lambert_project</code></h3>
-        <p><code>lambert_project(lat, lon, lat0, lon0) → [x, y]</code> — equirectangular Lambert projection at parallel <code>lat0</code>.</p>
+        <p><code>lambert_project(lat, lon, lat0, lon0) → [x, y]</code> — Lambert Conformal Conic on a sphere with one standard parallel <code>lat0</code> and central meridian <code>lon0</code>. Degenerates to equirectangular when <code>lat0 ≈ 0</code>.</p>
         <pre><code class="lang-perl">p lambert_project(37, -122, 40, -100)
 </code></pre>
       </article>
@@ -39110,7 +39150,9 @@ load_avg |&gt; spark |&gt; p                   # sparkline of load
       </article>
       <article class="doc-entry" id="doc-locale-minimize">
         <h3><a class="doc-anchor" href="#doc-locale-minimize">#</a> <code>locale_minimize</code></h3>
-        <p><code>locale_minimize(locale) → string</code> — strip redundant subtags using CLDR minimization.</p>
+        <p><code>locale_minimize</code> — locale / CLDR helper <code>minimize</code>. Category: *extras*.</p>
+        <pre><code class="lang-perl">p locale_minimize $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-locale-number-format">
         <h3><a class="doc-anchor" href="#doc-locale-number-format">#</a> <code>locale_number_format</code></h3>
@@ -41781,7 +41823,7 @@ p mish(-1)   # -0.3034
       </article>
       <article class="doc-entry" id="doc-mixed-strategy-2x2">
         <h3><a class="doc-anchor" href="#doc-mixed-strategy-2x2">#</a> <code>mixed_strategy_2x2</code></h3>
-        <p><code>mixed_strategy_2x2(payoff) → {row_strategy, col_strategy}</code> — Nash equilibrium probabilities for a 2×2 row-payoff matrix.</p>
+        <p><code>mixed_strategy_2x2(payoff) → {row_strategy, col_strategy}</code> — Nash equilibrium probabilities for a 2×2 <strong>zero-sum</strong> game given the row player&#39;s payoff matrix <code>[[a,b],[c,d]]</code>. Returns row&#39;s prob of row 1 and col&#39;s prob of col 1. For non-zero-sum, both players&#39; payoff matrices are required and this function does not apply.</p>
         <pre><code class="lang-perl">p mixed_strategy_2x2([[1,-1],[-1,1]])  # 0.5/0.5
 </code></pre>
       </article>
@@ -42153,7 +42195,9 @@ p mish(-1)   # -0.3034
       </article>
       <article class="doc-entry" id="doc-ml-layer-norm">
         <h3><a class="doc-anchor" href="#doc-ml-layer-norm">#</a> <code>ml_layer_norm</code></h3>
-        <p><code>ml_layer_norm(xs, eps=1e-5) → array</code> — alias for batch_norm in the 1-D case.</p>
+        <p><code>ml_layer_norm</code> — ML inference primitive <code>layer norm</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p ml_layer_norm $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-ml-layer-norm-step">
         <h3><a class="doc-anchor" href="#doc-ml-layer-norm-step">#</a> <code>ml_layer_norm_step</code></h3>
@@ -43100,7 +43144,9 @@ p powmod(3, 13, 50)    # 7
       </article>
       <article class="doc-entry" id="doc-mpmc-new">
         <h3><a class="doc-anchor" href="#doc-mpmc-new">#</a> <code>mpmc_new</code></h3>
-        <p><code>mpmc_new() → channel</code> — multi-producer multi-consumer channel.</p>
+        <p><code>mpmc_new</code> — constructor of <code>mpmc</code>. Category: *extras*.</p>
+        <pre><code class="lang-perl">p mpmc_new $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-mpow">
         <h3><a class="doc-anchor" href="#doc-mpow">#</a> <code>mpow</code></h3>
@@ -43116,7 +43162,9 @@ p powmod(3, 13, 50)    # 7
       </article>
       <article class="doc-entry" id="doc-mpsc-new">
         <h3><a class="doc-anchor" href="#doc-mpsc-new">#</a> <code>mpsc_new</code></h3>
-        <p><code>mpsc_new() → channel</code> — multi-producer single-consumer channel.</p>
+        <p><code>mpsc_new</code> — constructor of <code>mpsc</code>. Category: *extras*.</p>
+        <pre><code class="lang-perl">p mpsc_new $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-mrow">
         <h3><a class="doc-anchor" href="#doc-mrow">#</a> <code>mrow</code></h3>
@@ -43300,7 +43348,7 @@ p powmod(3, 13, 50)    # 7
       </article>
       <article class="doc-entry" id="doc-mulberry32-next">
         <h3><a class="doc-anchor" href="#doc-mulberry32-next">#</a> <code>mulberry32_next</code></h3>
-        <p><code>mulberry32_next(seed) → int</code> — Mulberry32 PRNG step. Returns next 32-bit value.</p>
+        <p><code>mulberry32_next(seed) → int</code> — Mulberry32 PRNG (Tommy Ettinger 2017). Advances state by <code>+0x6D2B79F5</code> then permutes to 32 bits. To iterate, caller tracks state and adds <code>0x6D2B79F5</code> between calls.</p>
       </article>
       <article class="doc-entry" id="doc-muller">
         <h3><a class="doc-anchor" href="#doc-muller">#</a> <code>muller</code></h3>
@@ -45677,8 +45725,8 @@ printf &quot;elapsed: %d s\n&quot;, now - $start
       </article>
       <article class="doc-entry" id="doc-ode-euler">
         <h3><a class="doc-anchor" href="#doc-ode-euler">#</a> <code>ode_euler</code></h3>
-        <p><code>ode_euler(derivatives, dt=0.01) → array</code> — explicit Euler integration over pre-sampled derivative array.</p>
-        <pre><code class="lang-perl">p ode_euler(\@dx_dt, 0.1)
+        <p><code>ode_euler(derivatives, dt=0.01, y0=0) → array</code> — explicit Euler integration: <code>y[i+1] = y[i] + dt·f[i]</code> with initial condition <code>y0</code>. Returns a trajectory of length <code>len(derivatives) + 1</code>.</p>
+        <pre><code class="lang-perl">p ode_euler(\@dx_dt, 0.1, 1.0)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-ode-lsoda">
@@ -47355,7 +47403,9 @@ p page_size                              # 4096 (x86_64)
       </article>
       <article class="doc-entry" id="doc-path-strip-prefix">
         <h3><a class="doc-anchor" href="#doc-path-strip-prefix">#</a> <code>path_strip_prefix</code></h3>
-        <p><code>path_strip_prefix(path, prefix) → string</code> — remove <code>prefix</code> from the start of <code>path</code>.</p>
+        <p><code>path_strip_prefix</code> — path manipulation <code>strip prefix</code>. Category: *extras*.</p>
+        <pre><code class="lang-perl">p path_strip_prefix $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-path-with-extension">
         <h3><a class="doc-anchor" href="#doc-path-with-extension">#</a> <code>path_with_extension</code></h3>
@@ -47409,7 +47459,9 @@ p page_size                              # 4096 (x86_64)
       </article>
       <article class="doc-entry" id="doc-payoff-matrix">
         <h3><a class="doc-anchor" href="#doc-payoff-matrix">#</a> <code>payoff_matrix</code></h3>
-        <p><code>payoff_matrix(m) → matrix</code> — identity pass-through; clarifies intent in code.</p>
+        <p><code>payoff_matrix</code> — operation <code>payoff matrix</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p payoff_matrix $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-pbeta">
         <h3><a class="doc-anchor" href="#doc-pbeta">#</a> <code>pbeta</code></h3>
@@ -47474,7 +47526,7 @@ p page_size                              # 4096 (x86_64)
       </article>
       <article class="doc-entry" id="doc-pcg32-next">
         <h3><a class="doc-anchor" href="#doc-pcg32-next">#</a> <code>pcg32_next</code></h3>
-        <p><code>pcg32_next(state, inc) → int</code> — PCG32 step. Pass <code>(state·6364136223846793005 + inc)</code> for the next call.</p>
+        <p><code>pcg32_next(state, inc) → int</code> — PCG32 output for the current state (O&#39;Neill 2014). To iterate, compute the next state as <code>state·6364136223846793005 + inc</code> and call again. <code>inc</code> must be odd; it identifies the PCG stream and does not affect this call&#39;s output.</p>
       </article>
       <article class="doc-entry" id="doc-pcg32-step">
         <h3><a class="doc-anchor" href="#doc-pcg32-step">#</a> <code>pcg32_step</code></h3>
@@ -48299,7 +48351,9 @@ p pexp(5, 0.5)   # P(wait ≤ 5 with avg wait 2)
       </article>
       <article class="doc-entry" id="doc-plate-reverb-simple">
         <h3><a class="doc-anchor" href="#doc-plate-reverb-simple">#</a> <code>plate_reverb_simple</code></h3>
-        <p><code>plate_reverb_simple(signal) → array</code> — alias for <code>schroeder_reverb</code> with plate-like delays.</p>
+        <p><code>plate_reverb_simple</code> — operation <code>plate reverb simple</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p plate_reverb_simple $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-plethystic-substitution-value">
         <h3><a class="doc-anchor" href="#doc-plethystic-substitution-value">#</a> <code>plethystic_substitution_value</code></h3>
@@ -48550,7 +48604,9 @@ p pip(5, 5, @square)   # 0 (outside)
       </article>
       <article class="doc-entry" id="doc-polygon-inflate">
         <h3><a class="doc-anchor" href="#doc-polygon-inflate">#</a> <code>polygon_inflate</code></h3>
-        <p><code>polygon_inflate(points, d=1) → array</code> — alias for <code>polygon_offset</code> with positive <code>d</code>.</p>
+        <p><code>polygon_inflate</code> — 2D polygon op <code>inflate</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p polygon_inflate $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-polygon-is-convex">
         <h3><a class="doc-anchor" href="#doc-polygon-is-convex">#</a> <code>polygon_is_convex</code></h3>
@@ -49249,7 +49305,9 @@ p format_bytes(rss - $before) . &quot; allocated&quot;
       </article>
       <article class="doc-entry" id="doc-profile-hmm-score">
         <h3><a class="doc-anchor" href="#doc-profile-hmm-score">#</a> <code>profile_hmm_score</code></h3>
-        <p><code>profile_hmm_score(seq, emit_matrix, alphabet) → number</code> — log-odds emission score under a position-specific scoring matrix. Sum of <code>ln(emit[state][char_idx])</code>.</p>
+        <p><code>profile_hmm_score</code> — score of <code>profile hmm</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p profile_hmm_score $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-profit-margin-pct">
         <h3><a class="doc-anchor" href="#doc-profit-margin-pct">#</a> <code>profit_margin_pct</code></h3>
@@ -50625,7 +50683,9 @@ p r72(0.10)   # 7.2 years at 10%
       </article>
       <article class="doc-entry" id="doc-ray-plane-intersect-2">
         <h3><a class="doc-anchor" href="#doc-ray-plane-intersect-2">#</a> <code>ray_plane_intersect_2</code></h3>
-        <p><code>ray_plane_intersect_2(...) → number</code> — variant alias for <code>ray_plane_intersect</code>.</p>
+        <p><code>ray_plane_intersect_2</code> — ray-geometry intersection op <code>plane intersect 2</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p ray_plane_intersect_2 $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-raychaudhuri-step">
         <h3><a class="doc-anchor" href="#doc-raychaudhuri-step">#</a> <code>raychaudhuri_step</code></h3>
@@ -52096,7 +52156,9 @@ my $sol = rk4(fn { -$_[1] }, 0, 1, 0.1, 100)
       </article>
       <article class="doc-entry" id="doc-rna-gc-content">
         <h3><a class="doc-anchor" href="#doc-rna-gc-content">#</a> <code>rna_gc_content</code></h3>
-        <p><code>rna_gc_content(seq) → number</code> — alias for <code>dna_gc_content</code>.</p>
+        <p><code>rna_gc_content</code> — RNA sequence op <code>gc content</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p rna_gc_content $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-rna-hamming">
         <h3><a class="doc-anchor" href="#doc-rna-hamming">#</a> <code>rna_hamming</code></h3>
@@ -54790,8 +54852,8 @@ p swish(-2)  # -0.2384
       </article>
       <article class="doc-entry" id="doc-simple-returns">
         <h3><a class="doc-anchor" href="#doc-simple-returns">#</a> <code>simple_returns</code></h3>
-        <p><code>simple_returns(prices) → array</code> — <code>(p[i]/p[i-1]) - 1</code>. Multiplicative across time.</p>
-        <pre><code class="lang-perl">p simple_returns([100, 105, 102])
+        <p><code>simple_returns</code> — operation <code>simple returns</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p simple_returns $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-simplex-2d">
@@ -55866,7 +55928,7 @@ p sortino(\@returns, 0.0)   # penalizes only negative returns
       </article>
       <article class="doc-entry" id="doc-soundex-v2">
         <h3><a class="doc-anchor" href="#doc-soundex-v2">#</a> <code>soundex_v2</code></h3>
-        <p><code>soundex_v2(name) → string</code> — Russell refined variant (longer code, no length cap, finer place-of-articulation buckets).</p>
+        <p><code>soundex_v2(name) → string</code> — Apache Refined Soundex (longer code, no length cap, 9 finer-grained groups: BP, FV, CKS, GJ, QXZ, DT, L, MN, R).</p>
         <pre><code class="lang-perl">p soundex_v2(&quot;Robert&quot;)
 </code></pre>
       </article>
@@ -56241,7 +56303,9 @@ p spearman(\@x, \@y)   # high positive correlation
       </article>
       <article class="doc-entry" id="doc-spmc-new">
         <h3><a class="doc-anchor" href="#doc-spmc-new">#</a> <code>spmc_new</code></h3>
-        <p><code>spmc_new() → channel</code> — single-producer multi-consumer channel.</p>
+        <p><code>spmc_new</code> — constructor of <code>spmc</code>. Category: *extras*.</p>
+        <pre><code class="lang-perl">p spmc_new $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-spon">
         <h3><a class="doc-anchor" href="#doc-spon">#</a> <code>spon</code></h3>
@@ -60662,8 +60726,8 @@ p @$u   # (0.6, 0.8)
       </article>
       <article class="doc-entry" id="doc-volatility-realized">
         <h3><a class="doc-anchor" href="#doc-volatility-realized">#</a> <code>volatility_realized</code></h3>
-        <p><code>volatility_realized(returns) → number</code> — annualised realised volatility: <code>stddev · √252</code>. Alias for <code>volatility_annualized</code>.</p>
-        <pre><code class="lang-perl">p volatility_realized(\@daily_returns)
+        <p><code>volatility_realized</code> — operation <code>volatility realized</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p volatility_realized $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-voltage-divider">
@@ -60953,7 +61017,9 @@ p wavetable_synth(\@sine, 440, 44100, 0.1)
       </article>
       <article class="doc-entry" id="doc-weiler-atherton-clip">
         <h3><a class="doc-anchor" href="#doc-weiler-atherton-clip">#</a> <code>weiler_atherton_clip</code></h3>
-        <p><code>weiler_atherton_clip(subject, clip) → array</code> — polygon clipping against a clip polygon (simplified to Sutherland-Hodgman semantics).</p>
+        <p><code>weiler_atherton_clip</code> — operation <code>weiler atherton clip</code>. Category: *test runner*.</p>
+        <pre><code class="lang-perl">p weiler_atherton_clip $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-weingarten-map-step">
         <h3><a class="doc-anchor" href="#doc-weingarten-map-step">#</a> <code>weingarten_map_step</code></h3>
@@ -62025,7 +62091,7 @@ p @$zs   # (-1, 0, 1)
       </article>
       <article class="doc-entry" id="doc-zero-sum-value">
         <h3><a class="doc-anchor" href="#doc-zero-sum-value">#</a> <code>zero_sum_value</code></h3>
-        <p><code>zero_sum_value(payoff) → number</code> — maximin (security) value of a zero-sum game.</p>
+        <p><code>zero_sum_value(payoff) → number</code> — value of a two-player zero-sum game. Returns the saddle-point value when maximin == minmax, the 2×2 mixed-strategy value (ad − bc)/(a + d − b − c) otherwise, or UNDEF for larger matrices with no saddle (caller should use LP).</p>
       </article>
       <article class="doc-entry" id="doc-zeros">
         <h3><a class="doc-anchor" href="#doc-zeros">#</a> <code>zeros</code></h3>
