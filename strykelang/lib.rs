@@ -13,6 +13,7 @@ pub mod aop;
 pub mod aot;
 pub mod ast;
 pub mod builtins;
+pub mod builtins_net;
 pub mod bytecode;
 pub mod capture;
 pub mod cli_runners;

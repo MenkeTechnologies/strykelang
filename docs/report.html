@@ -268,7 +268,7 @@
           <tr><td style="color:var(--accent);">Tree Walker (vm_helper)</td><td><code>vm_helper</code></td><td class="num">21,688</td><td class="num">6.8%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:6.8%"></div></div></td><td>Tree-walking interpreter + runtime helpers: scope graph, error context, debugger hooks, special variables (<code>$_</code>, <code>$!</code>, <code>$/</code>, ...), reflection-hash population, package-stash refresh, AOP intercepts</td></tr>
           <tr><td style="color:var(--accent);">Parser</td><td><code>parser, ast, token</code></td><td class="num">21,982</td><td class="num">6.9%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:6.9%"></div></div></td><td>Recursive-descent parser, 198 <code>parse_*</code> functions, AST variants across multiple enums, operator precedence climbing (or/and/not at lowest tier per <code>perlop</code>), heredocs, prototype parsing, builtin-name whitelist</td></tr>
           <tr><td style="color:var(--accent);">AI / Web</td><td><code>ai, ai_sugar, web, web_orm, mcp</code></td><td class="num">13,367</td><td class="num">4.2%</td><td><div class="bar-wrap"><div class="bar-fill magenta" style="width:4.2%"></div></div></td><td>Anthropic / OpenAI client, tool-use protocol, AI sugar (<code>ai</code> as native verb), MCP server / client, web framework (route DSL, controllers, ORM, sessions, templates), JSON / form / multipart parsers</td></tr>
-          <tr><td style="color:var(--accent);">Value System</td><td><code>value, nanbox, scope, capture, convert, deconvert</code></td><td class="num">9,638</td><td class="num">3.0%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:3.0%"></div></div></td><td>NaN-boxed <code>PerlValue</code>: int / float / string / array / hash / code / regex / undef. Scoping (pad slots, closures, <code>local</code>/<code>my</code>/<code>our</code>/<code>oursync</code>), type coercion, capture cells</td></tr>
+          <tr><td style="color:var(--accent);">Value System</td><td><code>value, nanbox, scope, capture, convert, deconvert</code></td><td class="num">9,638</td><td class="num">3.0%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:3.0%"></div></div></td><td>NaN-boxed <code>StrykeValue</code>: int / float / string / array / hash / code / regex / undef. Scoping (pad slots, closures, <code>local</code>/<code>my</code>/<code>our</code>/<code>oursync</code>), type coercion, capture cells</td></tr>
           <tr><td style="color:var(--accent);">Codecs / Data</td><td><code>native_codec, native_data, map_stream, map_grep_fast, sort_fast</code></td><td class="num">6,409</td><td class="num">2.0%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:2.0%"></div></div></td><td>JSON / YAML / TOML / CSV / MessagePack encode-decode, streaming map/grep iterators, optimized sort</td></tr>
           <tr><td style="color:var(--accent);">Distribution</td><td><code>cluster, controller, agent, remote_wire, pkg/*, script_cache, pcache</code></td><td class="num">6,288</td><td class="num">2.0%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:2.0%"></div></div></td><td>Multi-host cluster execution, agent / controller protocol, wire format, package manager (<code>pkg</code> &mdash; manifest, lockfile, store, resolver), bytecode cache</td></tr>
           <tr><td style="color:var(--accent);">LSP</td><td><code>lsp</code></td><td class="num">6,903</td><td class="num">2.2%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:2.2%"></div></div></td><td>Language Server Protocol: hover descriptions, completion, diagnostics, go-to-definition, document symbols</td></tr>
@@ -313,7 +313,7 @@
           <tr><td>strykelang/jit.rs</td><td class="num">5,172</td><td>Cranelift JIT: IR generation, native code emission, deoptimization stubs, calling-convention bridge</td></tr>
           <tr><td>strykelang/crate_api_tests.rs</td><td class="num">5,164</td><td>Public crate-API test suite: validates the embeddable interface (<code>stryke::eval</code>, <code>VMHelper</code>, ...)</td></tr>
           <tr><td>strykelang/main.rs</td><td class="num">5,123</td><td>CLI: argv, script loading, one-liner mode (<code>-e</code>/<code>-E</code>/<code>-n</code>/<code>-p</code>), shebang dispatch, builtin-as-command</td></tr>
-          <tr><td>strykelang/value.rs</td><td class="num">4,547</td><td><code>PerlValue</code>: NaN-boxed union, conversions, stringify / numify, magic context handling</td></tr>
+          <tr><td>strykelang/value.rs</td><td class="num">4,547</td><td><code>StrykeValue</code>: NaN-boxed union, conversions, stringify / numify, magic context handling</td></tr>
           <tr><td>strykelang/web.rs</td><td class="num">3,554</td><td>Web framework: route DSL, controllers, sessions, cookies, flash, multipart parsing, static / template rendering</td></tr>
           <tr><td>strykelang/lexer.rs</td><td class="num">3,569</td><td>Tokenizer: heredocs, regex literals, <code>q/qq/qw/qr</code>, string interpolation, sigil disambiguation</td></tr>
           <tr><td>strykelang/native_codec.rs</td><td class="num">3,400</td><td>Built-in JSON / YAML / TOML / CSV / MessagePack encode-decode</td></tr>
@@ -374,7 +374,7 @@
     │  value.rs   │  │  scope.rs   │  │  parallel   │
     │  (4,547)    │  │  (3,085)    │  │  (4,212)    │
     │  NaN-boxed  │  │  my/local/  │  │  pmap/pgrep │
-    │  PerlValue  │  │  oursync    │  │  rayon work │
+    │  StrykeValue  │  │  oursync    │  │  rayon work │
     └─────────────┘  └─────────────┘  └─────────────┘</pre>
 
       <hr class="section-rule">
@@ -467,7 +467,7 @@
       <!-- SECTION 7: JIT                          -->
       <!-- ═══════════════════════════════════════ -->
       <h2 class="tutorial-title"><span class="step-hash">~</span>CRANELIFT JIT</h2>
-      <p class="tutorial-subtitle">Tier-2 compiler. The VM detects hot blocks (loops with stable types) and hands them to <code>jit.rs</code>, which lowers bytecode to Cranelift IR, then to native machine code. NaN-boxed <code>PerlValue</code> stays the same shape across tiers, so a JIT&rarr;VM deopt is frame-pointer-swap-and-go &mdash; no value re-boxing.</p>
+      <p class="tutorial-subtitle">Tier-2 compiler. The VM detects hot blocks (loops with stable types) and hands them to <code>jit.rs</code>, which lowers bytecode to Cranelift IR, then to native machine code. NaN-boxed <code>StrykeValue</code> stays the same shape across tiers, so a JIT&rarr;VM deopt is frame-pointer-swap-and-go &mdash; no value re-boxing.</p>
 
       <div class="feature-grid">
         <div class="feature-card"><h4>Cranelift Backend</h4><p>x86-64 + aarch64 native code generation. Same IR backend as Wasmtime &mdash; production-grade register allocator, optimizer, and code emitter.</p></div>
@@ -634,7 +634,7 @@
       <p class="tutorial-subtitle">Why stryke looks the way it does. Each call-out below is a decision the implementation could have gone either way on, with the rationale for the path taken.</p>
 
       <div class="feature-grid">
-        <div class="feature-card"><h4>NaN-Boxed PerlValue</h4><p>Every value is one 64-bit word. Tag bits live in the unused mantissa of an IEEE-754 NaN. Saves a pointer indirection on every read; keeps the JIT&rsquo;s register allocator happy with uniform value width.</p></div>
+        <div class="feature-card"><h4>NaN-Boxed StrykeValue</h4><p>Every value is one 64-bit word. Tag bits live in the unused mantissa of an IEEE-754 NaN. Saves a pointer indirection on every read; keeps the JIT&rsquo;s register allocator happy with uniform value width.</p></div>
         <div class="feature-card"><h4>Bytecode VM, Not Tree-Walker</h4><p>An AST tree-walker is simpler but pays a virtual-call cost per node. Bytecode collapses that into a dense dispatch loop, which the CPU&rsquo;s branch predictor can actually warm up to.</p></div>
         <div class="feature-card"><h4>Cranelift, Not LLVM</h4><p>LLVM gives slightly better steady-state code but compiles 10&times; slower and pulls in a giant C++ dependency. Cranelift is pure Rust, fast to compile, and ships in Wasmtime &mdash; production-tested.</p></div>
         <div class="feature-card"><h4>Rayon, Not Tokio</h4><p>Stryke parallelism is data-parallel, not async-IO-parallel. Rayon&rsquo;s work-stealing fits <code>pmap</code>/<code>pgrep</code> exactly; tokio&rsquo;s task model would force every callback into a future.</p></div>
