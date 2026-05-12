@@ -1,4 +1,4 @@
-// Batch 33 — bioinformatics deep: alignment, motifs, phylogenetics, structure.
+// bioinformatics deep: alignment, motifs, phylogenetics, structure.
 
 // Needleman-Wunsch global alignment score
 fn builtin_needleman_wunsch_score(args: &[StrykeValue]) -> PerlResult<StrykeValue> {

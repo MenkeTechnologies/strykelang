@@ -789,7 +789,7 @@ fn mac_to_eui64(mac: [u8; 6]) -> [u8; 8] {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// CIDR math (Phase 1, batch 2)
+// CIDR math
 // ══════════════════════════════════════════════════════════════════════
 
 /// Parsed CIDR (address + prefix length). Used internally; surfaced to
@@ -1947,7 +1947,7 @@ pub fn cidr_sort(args: &[StrykeValue]) -> StrykeValue {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// MAC address ops (Phase 1, batch 3)
+// MAC address ops
 // ══════════════════════════════════════════════════════════════════════
 //
 // Input forms accepted (all six octets, any case):
@@ -2259,7 +2259,7 @@ pub fn eui64_from_mac(args: &[StrykeValue]) -> StrykeValue {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// Ports (Phase 1, batch 4a)
+// Ports
 // ══════════════════════════════════════════════════════════════════════
 
 /// IANA port ranges. 0-1023 well-known, 1024-49151 registered/assigned,
@@ -2475,7 +2475,7 @@ pub fn port_random_ephemeral(_args: &[StrykeValue]) -> StrykeValue {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// WebSocket handshake / framing (Phase 1, batch 4b)
+// WebSocket handshake / framing
 // ══════════════════════════════════════════════════════════════════════
 
 const WS_MAGIC: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
@@ -2716,7 +2716,7 @@ pub fn ws_close_frame(args: &[StrykeValue]) -> StrykeValue {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// HTTP cookies (Phase 1, batch 4c)
+// HTTP cookies
 // ══════════════════════════════════════════════════════════════════════
 
 /// `cookie_parse(STR)` — parse a single `Set-Cookie` or `Cookie` header
@@ -2975,7 +2975,7 @@ pub fn cookie_set_max_age(args: &[StrykeValue]) -> StrykeValue {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// HTTP method / status / MIME helpers (Phase 1, batch 4d)
+// HTTP method / status / MIME helpers
 // ══════════════════════════════════════════════════════════════════════
 
 /// `http_method_is_idempotent(METHOD)` — RFC 9110 §9.2.2. Idempotent
@@ -3269,7 +3269,7 @@ pub fn mime_is_application(args: &[StrykeValue]) -> StrykeValue {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// Bandwidth / RTT formatting (Phase 1, batch 4e)
+// Bandwidth / RTT formatting
 // ══════════════════════════════════════════════════════════════════════
 
 /// `bandwidth_format(BPS)` — human-readable bandwidth string

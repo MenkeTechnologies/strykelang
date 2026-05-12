@@ -1,4 +1,4 @@
-// Batch 71 — Redis-flavour primitives: sorted sets, hashes, lists, sets,
+// Redis-flavour primitives: sorted sets, hashes, lists, sets,
 // expiration, hyperloglog, geo, streams.
 
 fn b71_to_floats(v: &StrykeValue) -> Vec<f64> {

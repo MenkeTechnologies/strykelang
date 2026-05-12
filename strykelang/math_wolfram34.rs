@@ -1,4 +1,4 @@
-// Batch 34 — ODE advanced: BDF, Gear, Rosenbrock, IMEX, stiff solvers, predictor-corrector.
+// ODE advanced: BDF, Gear, Rosenbrock, IMEX, stiff solvers, predictor-corrector.
 
 // BDF1 (implicit Euler) step (1 Newton iteration approximation)
 fn builtin_bdf1_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {

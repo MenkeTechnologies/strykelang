@@ -1,4 +1,4 @@
-//! Batch 15: bit manipulation, music theory, hash functions,
+//! Bit manipulation, music theory, hash functions,
 //! text utilities, statistical tests. Pure deterministic functions.
 
 use crate::value::StrykeValue;

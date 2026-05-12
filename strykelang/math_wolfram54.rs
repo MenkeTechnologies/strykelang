@@ -1,4 +1,4 @@
-// Batch 54 — APL/J/K array primitives: scalar/array reduce, scan, axis ops,
+// APL/J/K array primitives: scalar/array reduce, scan, axis ops,
 // base encoding, deal, permutation utilities.
 
 fn b54_to_floats(v: &StrykeValue) -> Vec<f64> {

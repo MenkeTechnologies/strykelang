@@ -1,4 +1,4 @@
-// Batch 52 — calendrical algorithms (Reingold & Dershowitz, "Calendrical
+// calendrical algorithms (Reingold & Dershowitz, "Calendrical
 // Calculations" 4th ed.). Reference epoch: RD = 0001-01-01 (Gregorian) → fixed 1.
 
 /// Gregorian: day-count from RD epoch given proleptic Gregorian (y, m, d).

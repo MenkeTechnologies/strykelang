@@ -1,4 +1,4 @@
-//! Batch 21: ratings/tournaments, image morphology, computational geometry 2D,
+//! Ratings/tournaments, image morphology, computational geometry 2D,
 //! crypto primitives, physics constants, case conversions, photography,
 //! unit conversions.
 

@@ -1,4 +1,4 @@
-//! HTML / JSON / XML / CSS primitives (Phase 1, batch 10).
+//! HTML / JSON / XML / CSS primitives.
 //! Uses `serde_json` and `scraper` (both already deps). XML/CSS ops
 //! that don't have a clean crate-backed implementation use lightweight
 //! regex/string parsing — pragmatic, not RFC-perfect.

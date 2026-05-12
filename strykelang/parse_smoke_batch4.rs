@@ -1,4 +1,4 @@
-//! Parse-only smoke tests (batch 4). Snippets that must parse.
+//! Parse-only smoke tests. Snippets that must parse.
 
 use crate::parse;
 

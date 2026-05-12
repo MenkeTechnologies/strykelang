@@ -1,4 +1,4 @@
-// Batch 79 — sklearn ML primitives: classifiers, regressors, clusterers,
+// sklearn ML primitives: classifiers, regressors, clusterers,
 // dimensionality reduction, preprocessing, model selection, metrics.
 
 fn b79_to_floats(v: &StrykeValue) -> Vec<f64> {

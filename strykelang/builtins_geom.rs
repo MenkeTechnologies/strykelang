@@ -1,5 +1,5 @@
 //! Geometric primitives, complex numbers, color-space extras, and
-//! trig extras (Phase 1, batch 7). Pure functions, no external crates.
+//! trig extras. Pure functions, no external crates.
 //!
 //! Complex numbers are represented as `{ re, im }` hashrefs. Points
 //! are 2-element arrays `[x, y]`; 3D points are `[x, y, z]`.

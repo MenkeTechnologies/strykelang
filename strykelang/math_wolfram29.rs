@@ -1,4 +1,4 @@
-// Batch 29 — special functions extra: hypergeometric, Mathieu, Whittaker, Kelvin, etc.
+// special functions extra: hypergeometric, Mathieu, Whittaker, Kelvin, etc.
 
 // 2F1 hypergeometric series ₂F₁(a,b;c;z) for |z|<1
 fn builtin_hyper2f1(args: &[StrykeValue]) -> PerlResult<StrykeValue> {

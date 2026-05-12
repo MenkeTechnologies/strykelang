@@ -1,4 +1,4 @@
-//! Batch 20: combinatorics, audio synthesis, search algorithms,
+//! Combinatorics, audio synthesis, search algorithms,
 //! physics 2D, noise generators, RNG variants, polygonal numbers.
 
 use crate::value::StrykeValue;

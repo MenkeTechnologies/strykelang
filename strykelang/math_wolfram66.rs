@@ -1,4 +1,4 @@
-// Batch 66 — Netlib BLAS / LAPACK Level-1, -2, -3 primitives. Names mirror
+// Netlib BLAS / LAPACK Level-1, -2, -3 primitives. Names mirror
 // dgemm / dgemv / daxpy etc. so users familiar with the reference API can
 // use them directly. Operates on flat row-major matrices represented as
 // arrays of floats.

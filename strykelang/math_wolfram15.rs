@@ -1,4 +1,4 @@
-// Batch 15 — astronomy/celestial mechanics, quantum gates and channels.
+// astronomy/celestial mechanics, quantum gates and channels.
 
 fn builtin_kepler_hyperbolic(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let m = f1(args); let e = args.get(1).map(|v| v.to_number()).unwrap_or(1.5);

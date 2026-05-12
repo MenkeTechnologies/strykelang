@@ -1,4 +1,4 @@
-//! Math / number theory / random extras (Phase 1, batch 6).
+//! Math / number theory / random extras.
 //!
 //! Pure functions over i64/u64 + a handful of `rand` / `statrs`-backed
 //! distribution samplers. Naming follows the audited proposal.

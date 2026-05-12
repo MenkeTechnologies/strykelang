@@ -1,4 +1,4 @@
-// Batch 44 — symbolic CAS, polynomial algebra, advanced linear algebra, decompositions.
+// symbolic CAS, polynomial algebra, advanced linear algebra, decompositions.
 
 fn b44_to_floats(v: &StrykeValue) -> Vec<f64> {
     arg_to_vec(v).iter().map(|x| x.to_number()).collect()

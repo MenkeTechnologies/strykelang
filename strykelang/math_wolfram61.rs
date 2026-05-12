@@ -1,4 +1,4 @@
-// Batch 61 — epidemiology / public health: compartmental ODEs (SIR/SEIR/SIRS),
+// epidemiology / public health: compartmental ODEs (SIR/SEIR/SIRS),
 // reproduction numbers, attack rate, herd immunity, mortality measures, RBA
 // effect estimates, contact tracing.
 

@@ -1,4 +1,4 @@
-// Batch 22 — biology / ecology / population dynamics / epidemiology.
+// biology / ecology / population dynamics / epidemiology.
 
 // Lotka-Volterra predator-prey step (returns next state [x, y])
 

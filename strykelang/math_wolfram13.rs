@@ -1,4 +1,4 @@
-// Batch 13 — graph algorithms, more strings, dates, calendar variants, tax/loan,
+// graph algorithms, more strings, dates, calendar variants, tax/loan,
 // fluid mechanics, optics, more PRNG.
 
 // ── Graph algorithms ────────────────────────────────────────────────────────

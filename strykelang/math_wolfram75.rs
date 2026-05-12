@@ -1,4 +1,4 @@
-// Batch 75 — NetworkX graph algorithms: shortest paths, MSTs, flows, cuts,
+// NetworkX graph algorithms: shortest paths, MSTs, flows, cuts,
 // centralities, communities, traversals, isomorphism.
 
 fn b75_to_floats(v: &StrykeValue) -> Vec<f64> {

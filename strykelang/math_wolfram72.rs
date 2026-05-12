@@ -1,4 +1,4 @@
-// Batch 72 — NumPy + scipy.special: array primitives, special functions,
+// NumPy + scipy.special: array primitives, special functions,
 // quadrature, ODE/root-finding, optimisation.
 
 fn b72_to_floats(v: &StrykeValue) -> Vec<f64> {

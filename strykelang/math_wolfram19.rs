@@ -1,4 +1,4 @@
-// Batch 19 — numerical integration deep, ODE solvers, root finding extras.
+// numerical integration deep, ODE solvers, root finding extras.
 
 // Composite Boole's rule (Newton-Cotes 4 panels)
 fn builtin_boole_rule(

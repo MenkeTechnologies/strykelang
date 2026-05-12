@@ -1,4 +1,4 @@
-// Batch 64 — music theory: pitch / interval algebra, scale & mode catalogues,
+// music theory: pitch / interval algebra, scale & mode catalogues,
 // chord identification, tuning systems, tempo conversions, harmonic series.
 
 fn b64_to_floats(v: &StrykeValue) -> Vec<f64> {

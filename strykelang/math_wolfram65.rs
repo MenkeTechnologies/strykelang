@@ -1,4 +1,4 @@
-// Batch 65 — geology, seismology, earthquake engineering, mineralogy.
+// geology, seismology, earthquake engineering, mineralogy.
 
 fn b65_to_floats(v: &StrykeValue) -> Vec<f64> {
     arg_to_vec(v).iter().map(|x| x.to_number()).collect()

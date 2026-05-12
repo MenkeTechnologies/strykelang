@@ -1,4 +1,4 @@
-// Batch 67 — logic, proof theory, SAT/SMT, type inference, model checking.
+// logic, proof theory, SAT/SMT, type inference, model checking.
 // Each fn implements one step of the named algorithm operating on flat-array
 // representations (clauses, terms, etc.).
 

@@ -1,4 +1,4 @@
-//! Batch 17: bioinformatics, 3D geometry, sequence alignment,
+//! Bioinformatics, 3D geometry, sequence alignment,
 //! file format header parsers, resampling, Markov chains.
 
 use crate::value::StrykeValue;

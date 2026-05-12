@@ -1,4 +1,4 @@
-//! Batch 18: game theory, ML inference primitives, operations research,
+//! Game theory, ML inference primitives, operations research,
 //! chemistry, language modeling, information-theoretic divergences.
 
 use crate::value::StrykeValue;

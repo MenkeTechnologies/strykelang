@@ -1,4 +1,4 @@
-// Batch 59 — robotics & control: PID variants, LQR, frequency-domain margins,
+// robotics & control: PID variants, LQR, frequency-domain margins,
 // IMU sensor fusion, kinematics, Dubins paths, sampling-based planners.
 
 fn b59_to_floats(v: &StrykeValue) -> Vec<f64> {

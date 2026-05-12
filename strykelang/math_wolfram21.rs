@@ -1,4 +1,4 @@
-// Batch 21 — chemistry: kinetics, equilibrium, gas laws, electrochem, thermo.
+// chemistry: kinetics, equilibrium, gas laws, electrochem, thermo.
 
 const R_GAS: f64 = 8.31446261815324; // J/(mol·K)
 const F_FARADAY: f64 = 96485.33212;  // C/mol

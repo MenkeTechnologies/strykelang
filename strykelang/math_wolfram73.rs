@@ -1,4 +1,4 @@
-// Batch 73 — micro/macro economics, mechanism design, game theory, auctions,
+// micro/macro economics, mechanism design, game theory, auctions,
 // econometric estimators.
 
 fn b73_to_floats(v: &StrykeValue) -> Vec<f64> {

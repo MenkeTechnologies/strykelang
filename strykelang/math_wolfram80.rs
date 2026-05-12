@@ -1,4 +1,4 @@
-// Batch 80 — Quantum computing primitives: Pauli gates, single-qubit rotations,
+// Quantum computing primitives: Pauli gates, single-qubit rotations,
 // two-qubit gates, measurement, state preparation, QFT, oracles.
 
 fn b80_to_floats(v: &StrykeValue) -> Vec<f64> {

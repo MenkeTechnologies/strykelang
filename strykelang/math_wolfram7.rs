@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Batch 7 — multiple-testing corrections, divergence/distance metrics, more
+// multiple-testing corrections, divergence/distance metrics, more
 // physics (radiation, photon, gravitation), more astronomy/cosmology, more
 // chemistry (Beer-Lambert, rate laws, colligative), mixed-strategy game
 // theory, computer graphics (barycentric, Bresenham, bilinear), DSP (Hilbert,

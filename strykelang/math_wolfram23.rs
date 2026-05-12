@@ -1,4 +1,4 @@
-// Batch 23 — electromagnetism, optics, special relativity, waves, plasma.
+// electromagnetism, optics, special relativity, waves, plasma.
 
 const C_LIGHT: f64 = 2.99792458e8;
 const EPS_0: f64 = 8.854187817e-12;

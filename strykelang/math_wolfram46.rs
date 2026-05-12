@@ -1,4 +1,4 @@
-// Batch 46 — NLP: ranking, similarity, edit distance, language models, attention variants.
+// NLP: ranking, similarity, edit distance, language models, attention variants.
 
 fn b46_to_floats(v: &StrykeValue) -> Vec<f64> {
     arg_to_vec(v).iter().map(|x| x.to_number()).collect()

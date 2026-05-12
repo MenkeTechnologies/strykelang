@@ -1,4 +1,4 @@
-// Batch 14 — geographic projections, geohash/MGRS/Plus, image filter kernels.
+// geographic projections, geohash/MGRS/Plus, image filter kernels.
 
 fn builtin_mollweide_project(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let lat = args.first().map(|v| v.to_number().to_radians()).unwrap_or(0.0);

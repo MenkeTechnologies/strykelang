@@ -1,4 +1,4 @@
-// Batch 70 — Postgres-flavour SQL string, JSON, regex, aggregate, full-text,
+// Postgres-flavour SQL string, JSON, regex, aggregate, full-text,
 // trigram-similarity primitives.
 
 fn b70_to_floats(v: &StrykeValue) -> Vec<f64> {

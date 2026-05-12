@@ -1,4 +1,4 @@
-// Batch 62 — archive/encoding format primitives: TAR/ZIP/GZIP/LZ4/Zstd/Brotli,
+// archive/encoding format primitives: TAR/ZIP/GZIP/LZ4/Zstd/Brotli,
 // Base32/58/85, quoted-printable, uuencode, modhex, percent-encode, punycode,
 // IDN, MessagePack, CBOR. Each fn implements a per-spec piece (header bytes,
 // alphabet lookup, framing, varint/group-of-5 encoder, etc.).

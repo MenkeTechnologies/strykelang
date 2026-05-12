@@ -1,4 +1,4 @@
-// Batch 32 — quantum mechanics deep: density matrices, channels, entanglement, decoherence.
+// quantum mechanics deep: density matrices, channels, entanglement, decoherence.
 
 // Pure state |ψ⟩⟨ψ| from amplitudes
 fn builtin_pure_state_density(args: &[StrykeValue]) -> PerlResult<StrykeValue> {

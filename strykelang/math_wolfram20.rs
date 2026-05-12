@@ -1,4 +1,4 @@
-// Batch 20 — financial pricing models, options, fixed income, exotics.
+// financial pricing models, options, fixed income, exotics.
 
 fn norm_cdf_b20(x: f64) -> f64 {
     0.5 * (1.0 + libm::erf(x / std::f64::consts::SQRT_2))

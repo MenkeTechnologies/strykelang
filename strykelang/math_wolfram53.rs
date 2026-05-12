@@ -1,4 +1,4 @@
-// Batch 53 — R/SciPy distributions and tests: pdf/cdf/quantile/inverse for
+// R/SciPy distributions and tests: pdf/cdf/quantile/inverse for
 // Normal, Student t, χ², F, plus rank-based and goodness-of-fit tests.
 
 fn b53_to_floats(v: &StrykeValue) -> Vec<f64> {

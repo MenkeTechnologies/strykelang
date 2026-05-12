@@ -1,4 +1,4 @@
-// Batch 74 — SciPy.signal: filter design (Butterworth/Chebyshev/Bessel/Elliptic/
+// SciPy.signal: filter design (Butterworth/Chebyshev/Bessel/Elliptic/
 // FIR), window functions, transform conversions (TF/ZPK/SOS), spectral analysis,
 // wavelets, convolution & correlation primitives.
 

@@ -1,4 +1,4 @@
-// Batch 16 — combinatorics on words, statistics deep, network analysis.
+// combinatorics on words, statistics deep, network analysis.
 
 fn builtin_bwt_encode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
