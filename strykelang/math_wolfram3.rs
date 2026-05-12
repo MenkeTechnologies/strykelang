@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Wolfram-Math parity, batch 3: vector calculus, optimization, numerical
+// Wolfram-Math parity: vector calculus, optimization, numerical
 // integration, LA extras, polynomial helpers, quaternions/3D rotations,
 // information theory, quantum primitives, stat mech, optics, astrodynamics,
 // time series, graph centrality, random samplers for new distributions, 2-D

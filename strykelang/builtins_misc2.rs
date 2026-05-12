@@ -1,4 +1,4 @@
-//! Misc batch 12: currency / ML / file-path / locale / channels.
+//! Currency / ML / file-path / locale / channels.
 //! Pure functions where possible; channels are simplified stubs.
 
 use crate::value::StrykeValue;

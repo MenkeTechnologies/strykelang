@@ -152,7 +152,7 @@ fn builtin_deceleration_q(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::float(0.5 * omega_m_z - omega_l_z))
 }
 
-// Schwarzschild radius (already exists in batch 23 but with different sig)
+// Schwarzschild radius (alternate signature)
 fn builtin_schwarzschild_radius_kg(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let m_kg = f1(args);
     Ok(StrykeValue::float(2.0 * G_NEWTON_B31 * m_kg / (C_LIGHT_B31 * C_LIGHT_B31)))

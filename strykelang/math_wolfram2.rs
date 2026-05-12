@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Wolfram-Math parity, batch 2: number-theory extras, combinatoric sequences,
+// Wolfram-Math parity: number-theory extras, combinatoric sequences,
 // linear-algebra extras, polynomial algebra, more distributions, Mathieu /
 // Heun, wavelets, graph extras, and misc fill-ins (Stieltjes, Gauss sum, etc).
 // Included alongside `math_wolfram.rs` from `builtins.rs`. Helpers `f1..f4`,

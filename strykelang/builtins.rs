@@ -1398,7 +1398,7 @@ pub(crate) fn try_builtin(
         "str_decompress_lzss" => Some(Ok(crate::builtins_iter::str_decompress_lzss(args))),
         "str_isogram" => Some(Ok(crate::builtins_iter::str_isogram(args))),
         "fold_case" => Some(Ok(crate::builtins_iter::fold_case(args))),
-        // ── batch 9: bignum + game + probabilistic + audio + geo ──
+        // ── bignum + game + probabilistic + audio + geo ──
         "bignum_new" => Some(Ok(crate::builtins_misc::bignum_new(args))),
         "bignum_from_str" => Some(Ok(crate::builtins_misc::bignum_from_str(args))),
         "bignum_to_str" => Some(Ok(crate::builtins_misc::bignum_to_str(args))),
@@ -1504,7 +1504,7 @@ pub(crate) fn try_builtin(
         "bbox_area" => Some(Ok(crate::builtins_misc::bbox_area(args))),
         "mercator_unproject" => Some(Ok(crate::builtins_misc::mercator_unproject(args))),
         "geohash_precision" => Some(Ok(crate::builtins_misc::geohash_precision(args))),
-        // ── batch 10: JSON jq / HTML / XML / CSS ──
+        // ── JSON jq / HTML / XML / CSS ──
         "jq_get" => Some(Ok(crate::builtins_data::jq_get(args))),
         "jq_set" => Some(Ok(crate::builtins_data::jq_set(args))),
         "jq_delete" => Some(Ok(crate::builtins_data::jq_delete(args))),
@@ -1597,7 +1597,7 @@ pub(crate) fn try_builtin(
         "css_font_extract" => Some(Ok(crate::builtins_data::css_font_extract(args))),
         "selector_to_xpath" => Some(Ok(crate::builtins_data::selector_to_xpath(args))),
         "xpath_to_selector" => Some(Ok(crate::builtins_data::xpath_to_selector(args))),
-        // ── batch 11: HTTP fillers + distribution d/q/r ──
+        // ── HTTP fillers + distribution d/q/r ──
         "http_status_continue" => Some(Ok(crate::builtins_const::http_status_continue(args))),
         "http_status_switching_protocols" => Some(Ok(crate::builtins_const::http_status_switching_protocols(args))),
         "http_status_ok" => Some(Ok(crate::builtins_const::http_status_ok(args))),
@@ -1686,7 +1686,7 @@ pub(crate) fn try_builtin(
         "rf" => Some(Ok(crate::builtins_const::rf(args))),
         "qt" => Some(Ok(crate::builtins_const::qt(args))),
         "rt" => Some(Ok(crate::builtins_const::rt(args))),
-        // ── batch 12: currency / ML / file-path / locale / channels ──
+        // ── currency / ML / file-path / locale / channels ──
         "currency_format" => Some(Ok(crate::builtins_misc2::currency_format(args))),
         "currency_parse" => Some(Ok(crate::builtins_misc2::currency_parse(args))),
         "currency_round" => Some(Ok(crate::builtins_misc2::currency_round(args))),
@@ -5111,7 +5111,7 @@ pub(crate) fn try_builtin(
         "floor_div_op" | "fdivop" => Some(builtin_floor_div_op(args)),
         "signum_of" | "sgnum" => Some(builtin_signum_of(args)),
         "midpoint_of" | "midpt" => Some(builtin_midpoint_of(args)),
-        // ── Extended stdlib batch 3: Array Analysis ──────────────────────────
+        // ── Extended stdlib: Array Analysis ──────────────────────────
         "longest_run" | "lrun" => Some(builtin_longest_run(args)),
         "longest_increasing" | "linc" => Some(builtin_longest_increasing(args)),
         "longest_decreasing" | "ldec" => Some(builtin_longest_decreasing(args)),
@@ -5122,13 +5122,13 @@ pub(crate) fn try_builtin(
         "count_inversions" | "cinv" => Some(builtin_count_inversions(args)),
         "is_monotonic" | "ismono" => Some(builtin_is_monotonic(args)),
         "equilibrium_index" | "eqidx" => Some(builtin_equilibrium_index(args)),
-        // ── Extended stdlib batch 3: Set Operations ──────────────────────────
+        // ── Extended stdlib: Set Operations ──────────────────────────
         "jaccard_index" | "jaccard" => Some(builtin_jaccard_index(args)),
         "dice_coefficient" | "dicecoef" => Some(builtin_dice_coefficient(args)),
         "overlap_coefficient" | "overlapcoef" => Some(builtin_overlap_coefficient(args)),
         "power_set" | "powerset" => Some(builtin_power_set(args)),
         "cartesian_power" | "cartpow" => Some(builtin_cartesian_power(args)),
-        // ── Extended stdlib batch 3: Advanced String ─────────────────────────
+        // ── Extended stdlib: Advanced String ─────────────────────────
         "is_isogram" | "isiso" => Some(builtin_is_isogram(interp, args)),
         "is_heterogram" | "ishet" => Some(builtin_is_heterogram(interp, args)),
         "hamdist" => Some(builtin_hamming_distance(args)),
@@ -5139,7 +5139,7 @@ pub(crate) fn try_builtin(
         "count_lines" | "lcount" => Some(builtin_count_lines(args)),
         "count_chars" | "ccount" => Some(builtin_count_chars(args)),
         "count_bytes" | "bcount" => Some(builtin_count_bytes(args)),
-        // ── Extended stdlib batch 3: More Math ───────────────────────────────
+        // ── Extended stdlib: More Math ───────────────────────────────
         "binomial" | "binom" => Some(builtin_binomial(args)),
         "catalan" | "catn" => Some(builtin_catalan(args)),
         "pascal_row" | "pascrow" => Some(builtin_pascal_row(args)),
@@ -5151,7 +5151,7 @@ pub(crate) fn try_builtin(
         "is_narcissistic" | "isnarc" => Some(builtin_is_narcissistic(args)),
         "is_harshad" | "isharsh" => Some(builtin_is_harshad(args)),
         "is_kaprekar" | "iskap" => Some(builtin_is_kaprekar(args)),
-        // ── Extended stdlib batch 3: Date/Time Additional ────────────────────
+        // ── Extended stdlib: Date/Time Additional ────────────────────
         "day_of_year" | "doy" => Some(builtin_day_of_year(args)),
         "week_of_year" | "woy" => Some(builtin_week_of_year(args)),
         "days_in_month_fn" | "daysinmo" => Some(builtin_days_in_month_fn(args)),
@@ -27431,7 +27431,7 @@ fn builtin_midpoint_of(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Extended stdlib batch 3: More Novel Functions
+// Extended stdlib: More Novel Functions
 // ─────────────────────────────────────────────────────────────────────────
 
 // ── Array Analysis ──────────────────────────────────────────────────────
@@ -28176,7 +28176,7 @@ fn builtin_age_in_years(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::integer(age.max(0)))
 }
 
-// End of batch 3
+// End of section
 // ─────────────────────────────────────────────────────────────────────────
 
 /// `zipmap` — Zipmap.
@@ -28578,7 +28578,7 @@ fn builtin_juxt3(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     ))))
 }
 
-// ── Missing impls from functional / matrix / regex / process / data structure batches ──
+// ── Missing impls from functional / matrix / regex / process / data structure groups ──
 /// `coalesce` — Coalesce.
 fn builtin_coalesce(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     for a in args {
