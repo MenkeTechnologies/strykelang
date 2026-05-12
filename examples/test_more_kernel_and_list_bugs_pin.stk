@@ -9,10 +9,11 @@ my $kernel = box_blur_kernel(3);
 aeq(len($kernel), 49, "BUG-137: box_blur_kernel(3) should produce a 49-element kernel");
 
 
-# Pinning test for BUG-138: clamp call-shape heuristic
-# clamp(11, 0, 10) becomes min=11, max=0, values [10], and 10 < 11 clamps to 11
+# BUG-138 (FIXED): clamp now normalizes its min/max bounds so callers can
+# pass them in either order. `clamp(11, 0, 10)` is interpreted as bounds
+# (0, 10) with value 10 → clamps to 10.
 my $clamped = clamp(11, 0, 10);
-aeq($clamped, 11, "BUG-138: clamp(11, 0, 10) should be 11");
+aeq($clamped, 10, "BUG-138 (FIXED): clamp(11, 0, 10) normalizes bounds → 10");
 
 
 # Pinning test for BUG-139: normalize always 0..1

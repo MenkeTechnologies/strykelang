@@ -56,6 +56,6 @@ class Trie {
     }
 }
 
-fn trie_new() {
+fn Trie::create() {
     Trie()->init()
 }

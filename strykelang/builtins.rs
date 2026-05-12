@@ -14211,7 +14211,7 @@ fn builtin_clamp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .iter()
         .flat_map(|a| a.map_flatten_outputs(true))
         .collect();
-    let (min_val, max_val, values) = if rest.is_empty() {
+    let (raw_min, raw_max, values) = if rest.is_empty() {
         // piped: (value, min, max)
         let min_v = args[1].to_number();
         let max_v = args[2].to_number();
@@ -14224,6 +14224,11 @@ fn builtin_clamp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         // direct: clamp(min, max, list...)
         (args[0].to_number(), args[1].to_number(), rest)
     };
+    // Normalize: if caller passed bounds in the wrong order (e.g. they meant
+    // clamp(value, lo, hi) instead of clamp(min, max, list)), swap so that
+    // min_val <= max_val. Saturating the result inside the actual interval is
+    // what every other clamp implementation does.
+    let (min_val, max_val) = if raw_min <= raw_max { (raw_min, raw_max) } else { (raw_max, raw_min) };
     let items: Vec<StrykeValue> = values
         .iter()
         .map(|v| {
@@ -28202,9 +28207,11 @@ fn builtin_format_number(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<
 }
 /// `format_percent` — Format the input as a human-readable percent string.
 fn builtin_format_percent(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    // Input is a fraction (0..1) by convention; scale to percent before
+    // formatting so format_percent(0.125) renders as "12.5%", not "0.1%".
     let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let places = args.get(1).map(|v| v.to_int() as usize).unwrap_or(1);
-    Ok(StrykeValue::string(format!("{:.*}%", places, x)))
+    Ok(StrykeValue::string(format!("{:.*}%", places, x * 100.0)))
 }
 /// `pad_number` — Pad number. Returns a string.
 fn builtin_pad_number(args: &[StrykeValue]) -> PerlResult<StrykeValue> {

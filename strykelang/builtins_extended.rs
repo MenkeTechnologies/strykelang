@@ -614,14 +614,30 @@ fn builtin_linear_regression(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// `moving_average WINDOW, LIST`.
 fn builtin_moving_average(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
-    let window = args
+    // Accept either (WINDOW, LIST...) — the Wolfram convention — or
+    // (LIST, WINDOW) — the pandas/numpy convention. When the first arg is
+    // an array or arrayref, treat it as the LIST and take the second arg as
+    // the WINDOW.
+    let (window, vals): (usize, Vec<f64>) = if args
         .first()
-        .map(|v| v.to_int().max(1) as usize)
-        .unwrap_or(3);
-    let vals: Vec<f64> = flatten_args(&args[1.min(args.len())..])
-        .iter()
-        .map(|v| v.to_number())
-        .collect();
+        .map(|v| v.as_array_vec().is_some() || v.as_array_ref().is_some())
+        .unwrap_or(false)
+    {
+        let list_arg = args[0].clone();
+        let win = args
+            .get(1)
+            .map(|v| v.to_int().max(1) as usize)
+            .unwrap_or(3);
+        let vs: Vec<f64> = flatten_args(&[list_arg]).iter().map(|v| v.to_number()).collect();
+        (win, vs)
+    } else {
+        let win = args.first().map(|v| v.to_int().max(1) as usize).unwrap_or(3);
+        let vs: Vec<f64> = flatten_args(&args[1.min(args.len())..])
+            .iter()
+            .map(|v| v.to_number())
+            .collect();
+        (win, vs)
+    };
     if vals.len() < window {
         return Ok(StrykeValue::array(vec![]));
     }

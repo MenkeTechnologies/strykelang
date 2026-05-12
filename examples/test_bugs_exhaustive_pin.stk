@@ -26,15 +26,16 @@ sum_list([10, 20]) |> aeq 30, "sum_list works correctly"
 len(chain_from([[1,2], [3,4]])) |> aeq 4, "chain_from length 4 (pinned behavior)"
 len(permutations([1,2,3])) |> aeq 18, "permutations(arrayref) sums len of each perm (3! · 3 = 18) when passed as varargs to len"
 len(without([1,2], ([1,2], 10, 20))) |> aeq 4, "without arrayref removes nothing (pinned behavior)"
-clamp(11, 0, 10) |> aeq 11, "clamp(11, 0, 10) returns 11 (bug)"
+clamp(11, 0, 10) |> aeq 10, "clamp(11, 0, 10) returns 10 (FIXED: bounds now normalized so swap order works)"
 seq(2, 5) |> aeq "2", "seq(2, 5) yields '2' (bug)"
 tj(parse_int("0xff")) |> aeq "null", "parse_int('0xff') is null without radix"
 percentile(0.5, (1:100)) |> aeq 1, "percentile(0.5) is min"
 quantile((1:100), 0.5) |> aeq 50.5, "quantile(0.5) is median"
-hhi(0.3, 0.3, 0.4) |> aeq 0.09, "hhi(0.3, 0.3, 0.4) is 0.3^2 (bug)"
-moving_average([1,2,3], 5) |> aeq 5, "moving_average([1,2,3], 5) is 5 (bug)"
+hhi(0.3, 0.3, 0.4) |> aeq 0.34, "hhi(0.3, 0.3, 0.4) = 0.34 (FIXED: sums squares of all share args, not just the first)"
+my @ma_empty = moving_average([1,2,3], 5)
+scalar(@ma_empty) |> aeq 0, "moving_average(LIST=[1,2,3], WINDOW=5) returns empty (FIXED: pandas-style LIST-first now supported; empty when window > len)"
 my $pb = pmt(10000, 1, 1)
 abs($pb) > 1000 |> aok "pmt principal first is absurd"
-format_percent(0.125) |> aeq "0.1%", "format_percent(0.125) is '0.1%' (bug)"
+format_percent(0.125) |> aeq "12.5%", "format_percent(0.125) = '12.5%' (FIXED: scales fraction to percent before formatting)"
 
 test_run

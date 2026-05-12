@@ -13,7 +13,7 @@ fn Rosetta::MatrixAdd::matrix_add {
     \@res
 }
 
-fn matrix_to_string {
+fn Rosetta::MatrixAdd::to_string {
     my $m = _
     my @rows = ~> @$m map { join(",", @$_) }
     join(";", @rows)
@@ -22,6 +22,6 @@ fn matrix_to_string {
 my $a = [[1, 2], [3, 4]]
 my $b = [[5, 6], [7, 8]]
 my $sum = Rosetta::MatrixAdd::matrix_add($a, $b)
-assert_eq matrix_to_string($sum), "6,8;10,12", "matrix add 2x2"
+assert_eq Rosetta::MatrixAdd::to_string($sum), "6,8;10,12", "matrix add 2x2"
 
 test_run

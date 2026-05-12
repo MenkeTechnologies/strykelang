@@ -5,58 +5,58 @@ require "./lib/oop.stk"
 
 # ── Basic struct ───────────────────────────────────────────────────
 
-my $p1 = make_point(3, 4)
+my $p1 = Point::new(3, 4)
 assert_eq $p1->x, 3, "point x"
 assert_eq $p1->y, 4, "point y"
 
-my $p2 = make_point(0, 0)
-assert_near calc_distance($p2, $p1), 5.0, 0.001, "point distance"
+my $p2 = Point::new(0, 0)
+assert_near Point::distance($p2, $p1), 5.0, 0.001, "point distance"
 
-my $p3 = point_add($p1, make_point(1, 1))
+my $p3 = Point::add($p1, Point::new(1, 1))
 assert_eq $p3->x, 4, "point add x"
 assert_eq $p3->y, 5, "point add y"
 
-my $p4 = point_scale($p1, 2)
+my $p4 = Point::scale($p1, 2)
 assert_eq $p4->x, 6, "point scale x"
 assert_eq $p4->y, 8, "point scale y"
 
 # ── Struct with defaults ───────────────────────────────────────────
 
-my $rect = make_rect(10, 5)
+my $rect = Rect::new(10, 5)
 assert_eq $rect->width, 10, "rect width"
 assert_eq $rect->height, 5, "rect height"
-assert_eq rect_area($rect), 50, "rect area"
-assert_eq rect_perimeter($rect), 30, "rect perimeter"
-assert_false rect_is_square($rect), "rect not square"
+assert_eq Rect::area($rect), 50, "rect area"
+assert_eq Rect::perimeter($rect), 30, "rect perimeter"
+assert_false Rect::is_square($rect), "rect not square"
 
-my $square = make_rect(5, 5)
-assert_ok rect_is_square($square), "rect is square"
+my $square = Rect::new(5, 5)
+assert_ok Rect::is_square($square), "rect is square"
 
 # ── Nested structs ─────────────────────────────────────────────────
 
-my $circle = make_circle(0, 0, 5)
+my $circle = Circle::new(0, 0, 5)
 assert_eq $circle->radius, 5, "circle radius"
 assert_eq $circle->center->x, 0, "circle center x"
 
-my $inside = make_point(2, 2)
-my $outside = make_point(10, 10)
-assert_ok circle_contains_point($circle, $inside), "point inside circle"
-assert_false circle_contains_point($circle, $outside), "point outside circle"
+my $inside = Point::new(2, 2)
+my $outside = Point::new(10, 10)
+assert_ok Circle::contains($circle, $inside), "point inside circle"
+assert_false Circle::contains($circle, $outside), "point outside circle"
 
-assert_near circle_area($circle), 78.54, 0.01, "circle area"
+assert_near Circle::area($circle), 78.54, 0.01, "circle area"
 
 # ── Struct with computed fields ────────────────────────────────────
 
-my $person = make_person("Alice", 25)
+my $person = Person::new("Alice", 25)
 assert_eq $person->name, "Alice", "person name"
 assert_eq $person->age, 25, "person age"
-assert_eq person_greet($person), "Hello, my name is Alice", "person greet"
-assert_ok person_is_adult($person), "person is adult"
+assert_eq Person::greet($person), "Hello, my name is Alice", "person greet"
+assert_ok Person::is_adult($person), "person is adult"
 
-my $child = make_person("Bob", 10)
-assert_false person_is_adult($child), "child not adult"
+my $child = Person::new("Bob", 10)
+assert_false Person::is_adult($child), "child not adult"
 
-my $older = person_birthday($person)
+my $older = Person::birthday($person)
 assert_eq $older->age, 26, "person birthday"
 assert_eq $older->name, "Alice", "birthday keeps name"
 
@@ -66,12 +66,12 @@ my $red = Color::Red()
 my $green = Color::Green()
 my $blue = Color::Blue()
 
-assert_eq color_name($red), "red", "color red"
-assert_eq color_name($green), "green", "color green"
-assert_eq color_name($blue), "blue", "color blue"
+assert_eq Color::name($red), "red", "color red"
+assert_eq Color::name($green), "green", "color green"
+assert_eq Color::name($blue), "blue", "color blue"
 
-assert_ok is_primary($red), "red is primary"
-assert_ok is_primary($green), "green is primary"
+assert_ok Color::is_primary($red), "red is primary"
+assert_ok Color::is_primary($green), "green is primary"
 
 # ── Status enum ────────────────────────────────────────────────────
 
@@ -80,22 +80,22 @@ my $running = Status::Running()
 my $done = Status::Done()
 my $failed = Status::Failed()
 
-assert_eq status_name($pending), "pending", "status pending"
-assert_eq status_name($running), "running", "status running"
-assert_eq status_name($done), "done", "status done"
-assert_eq status_name($failed), "failed", "status failed"
+assert_eq Status::name($pending), "pending", "status pending"
+assert_eq Status::name($running), "running", "status running"
+assert_eq Status::name($done), "done", "status done"
+assert_eq Status::name($failed), "failed", "status failed"
 
-assert_false status_is_complete($pending), "pending not complete"
-assert_false status_is_complete($running), "running not complete"
-assert_ok status_is_complete($done), "done is complete"
-assert_ok status_is_complete($failed), "failed is complete"
+assert_false Status::is_complete($pending), "pending not complete"
+assert_false Status::is_complete($running), "running not complete"
+assert_ok Status::is_complete($done), "done is complete"
+assert_ok Status::is_complete($failed), "failed is complete"
 
 # ── Builder pattern ────────────────────────────────────────────────
 
-my $builder = config_builder()
-$builder = config_with_host($builder, "example.com")
-$builder = config_with_port($builder, 3000)
-my $config = config_build($builder)
+my $builder = Config::builder()
+$builder = Config::with_host($builder, "example.com")
+$builder = Config::with_port($builder, 3000)
+my $config = Config::build($builder)
 
 assert_eq $config->host, "example.com", "config host"
 assert_eq $config->port, 3000, "config port"
@@ -103,24 +103,24 @@ assert_eq $config->timeout, 30, "config timeout default"
 
 # ── Complex struct operations ──────────────────────────────────────
 
-my $v1 = vec3_new(1, 2, 3)
-my $v2 = vec3_new(4, 5, 6)
+my $v1 = Vec3::new(1, 2, 3)
+my $v2 = Vec3::new(4, 5, 6)
 
 assert_eq $v1->x, 1, "vec3 x"
 assert_eq $v1->y, 2, "vec3 y"
 assert_eq $v1->z, 3, "vec3 z"
 
-my $sum = vec3_add($v1, $v2)
+my $sum = Vec3::add($v1, $v2)
 assert_eq $sum->x, 5, "vec3 add x"
 assert_eq $sum->y, 7, "vec3 add y"
 assert_eq $sum->z, 9, "vec3 add z"
 
-assert_eq vec3_dot($v1, $v2), 32, "vec3 dot"
+assert_eq Vec3::dot($v1, $v2), 32, "vec3 dot"
 
-my $unit = vec3_new(1, 0, 0)
-assert_near vec3_length($unit), 1.0, 0.001, "vec3 unit length"
+my $unit = Vec3::new(1, 0, 0)
+assert_near Vec3::length($unit), 1.0, 0.001, "vec3 unit length"
 
-my $norm = vec3_normalize(vec3_new(3, 0, 0))
+my $norm = Vec3::normalize(Vec3::new(3, 0, 0))
 assert_near $norm->x, 1.0, 0.001, "vec3 normalize x"
 assert_near $norm->y, 0.0, 0.001, "vec3 normalize y"
 
