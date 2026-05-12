@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./CustomSet.stk"
 
-fn j { join(",", sort @{$_[0]}) }
+fn j { join(",", sort @{_}) }
 
 assert_ok  Exercism::CustomSet::is_empty_set([]),                  "empty set"
 assert_ok !Exercism::CustomSet::is_empty_set([1]),                 "non-empty"

@@ -11,7 +11,7 @@ fn Deep::Nested::Utils::greet($_0) { "Hello, $_0" }
 Deep::Nested::Utils::greet("World") |> aeq "Hello, World", "deep namespaced call"
 
 # Anonymous functions (fn {} blocks)
-my $f = fn { $_[0] * $_[1] }
+my $f = fn { _ * _1 }
 $f(6, 7) |> aeq 42, "anon function call"
 
 # Method dispatch on native types - commented out as it fails in current build

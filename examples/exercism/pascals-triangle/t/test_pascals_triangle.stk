@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./PascalsTriangle.stk"
 
-fn fmt { join("|", map { join(",", @$_) } @{$_[0]}) }
+fn fmt { join("|", map { join(",", @$_) } @{_}) }
 
 assert_eq fmt(Exercism::PascalsTriangle::rows(0)),  "",          "zero rows"
 assert_eq fmt(Exercism::PascalsTriangle::rows(1)),  "1",         "one row"

@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.13.6 · 8507 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.13.6 · 8508 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -169,10 +169,10 @@
       <ul class="chapter-index">
         <li><a href="#ch-parallel-primitives">Parallel Primitives</a> <span class="chapter-count">18</span></li>
         <li><a href="#ch-shared-state-concurrency">Shared State &amp; Concurrency</a> <span class="chapter-count">11</span></li>
-        <li><a href="#ch-operators">Operators</a> <span class="chapter-count">66</span></li>
         <li><a href="#ch-pipeline-pipe-forward">Pipeline &amp; Pipe-Forward</a> <span class="chapter-count">13</span></li>
         <li><a href="#ch-streaming-iterators">Streaming Iterators</a> <span class="chapter-count">24</span></li>
         <li><a href="#ch-list-operations">List Operations</a> <span class="chapter-count">62</span></li>
+        <li><a href="#ch-operators">Operators</a> <span class="chapter-count">66</span></li>
         <li><a href="#ch-stryke-extensions">stryke Extensions</a> <span class="chapter-count">19</span></li>
         <li><a href="#ch-data-serialization">Data &amp; Serialization</a> <span class="chapter-count">45</span></li>
         <li><a href="#ch-http-networking">HTTP &amp; Networking</a> <span class="chapter-count">23</span></li>
@@ -330,7 +330,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">6836</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">6837</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -631,608 +631,6 @@ p $s-&gt;contains(2)                     # 1
 p $s-&gt;len                             # 3
 my $both = $s-&gt;union(set(3, 4, 5))
 </code></pre>
-      </article>
-    </section>
-    <section class="tutorial-section" id="ch-operators">
-      <h2>Operators</h2>
-      <p class="chapter-meta">66 topics</p>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>-&gt;</code></h3>
-        <p><strong>Arrow operator</strong> — method invocation on objects/classes and dereference of refs. The single most-used operator in Perl OOP and any code touching references.</p>
-        <pre><code class="lang-perl"># Method call (object or class):
-my $p = Point-&gt;new(x =&gt; 1, y =&gt; 2)
-p $p-&gt;x                                    # 1
-p Math::Utils-&gt;compute(@args)
-
-# Hash-ref dereference:
-my $cfg = { host =&gt; &quot;localhost&quot;, port =&gt; 5432 }
-p $cfg-&gt;{host}
-$cfg-&gt;{port} = 6543
-
-# Array-ref dereference:
-my $rows = [[1,2,3], [4,5,6]]
-p $rows-&gt;[1][2]                            # 6 (chained — implicit -&gt;)
-my $val = $rows-&gt;[0]-&gt;[2]                  # explicit form: 3
-
-# Code-ref invocation:
-my $f = fn ($x) { $x * 2 }
-p $f-&gt;(21)                                 # 42
-
-# Postfix-deref (modern):
-my @copy = $rows-&gt;@*                       # all elements
-my %env  = %ENV-&gt;%*                        # entire hash via slice
-</code></pre>
-        <p><strong>Chained arrow elision</strong> — between subscripts (<code>[..]</code>, <code>{..}</code>), <code>-&gt;</code> is optional: <code>$rows-&gt;[1][2]</code> ≡ <code>$rows-&gt;[1]-&gt;[2]</code>. The first arrow after a scalar variable is *required*; intermediate arrows can be omitted for chained subscripting only.</p>
-        <p>See also: <code>-&gt;&gt;</code> / <code>~&gt;&gt;</code> (thread-last macros — distinct operator), <code>bless</code>, <code>class</code>, <code>new</code>, <code>ref</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-new">
-        <h3><a class="doc-anchor" href="#doc-new">#</a> <code>new</code></h3>
-        <p><code>new</code> — the default constructor automatically provided for every <code>class</code> and <code>struct</code>. Called as <code>ClassName-&gt;new(field1 =&gt; v1, field2 =&gt; v2, ...)</code>. Returns a blessed object whose attribute storage is initialized from the named arguments. If the class defines a <code>BUILD</code> method, <code>new</code> runs it *after* attribute initialization but *before* returning, so <code>BUILD</code> can validate, derive fields, or attach external resources. A class never overrides <code>new</code> itself in stryke — to customize construction, define <code>BUILD</code> (post-init hook) instead.</p>
-        <p>Implementation: <code>vm_helper.rs:10686</code> — when <code>-&gt;new</code> is called and no user-defined <code>new</code> exists, the runtime dispatches to <code>builtin_new</code> which allocates the object, populates fields from the arglist, then calls <code>BUILD</code> via the C3 MRO if present.</p>
-        <pre><code class="lang-perl">class Point {
-    has &#39;x&#39; =&gt; (is =&gt; &#39;ro&#39;, default =&gt; 0)
-    has &#39;y&#39; =&gt; (is =&gt; &#39;ro&#39;, default =&gt; 0)
-}
-my $p = Point-&gt;new(x =&gt; 1.5, y =&gt; 2.0)
-p $p-&gt;x          # 1.5
-
-class Connection {
-    has &#39;host&#39; =&gt; (is =&gt; &#39;ro&#39;, required =&gt; 1)
-    has &#39;port&#39; =&gt; (is =&gt; &#39;ro&#39;, default =&gt; 5432)
-    fn BUILD($self, $args) {
-        die &quot;host required&quot; unless $self-&gt;host
-    }
-}
-my $c = Connection-&gt;new(host =&gt; &quot;db.example.com&quot;)
-</code></pre>
-        <p>See also: <code>BUILD</code> (post-init hook), <code>DESTROY</code> (destructor), <code>class</code>, <code>struct</code>, <code>bless</code>, <code>@ISA</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>$</code></h3>
-        <p><strong>Scalar sigil.</strong> <code>$name</code> accesses a scalar variable. <code>$ref</code> holds references. <code>$h{key}</code> accesses one hash value; <code>$a[idx]</code> accesses one array element (sigil reflects the *value being accessed*, not the container). For postfix-deref: <code>$ref-&gt;$*</code> (in stryke contexts that accept it).</p>
-        <pre><code class="lang-perl">my $x = 42                    # scalar declaration
-my @arr = (1, 2, 3)
-p $arr[0]                     # 1 — scalar context on @arr
-my %h = (k =&gt; &quot;v&quot;)
-p $h{k}                       # one value
-my $ref = \@arr               # reference, scalar holds it
-</code></pre>
-        <p>See also: <code>@</code> (array sigil), <code>%</code> (hash sigil), <code>\</code> (reference), <code>-&gt;</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>@</code></h3>
-        <p><strong>Array sigil.</strong> <code>@name</code> accesses an entire array. <code>@h{@keys}</code> is a hash slice (multiple values by key list). <code>@a[@idx]</code> is an array slice. <code>@_</code> is the implicit sub argument array. Stringified in double quotes by joining elements with <code>$&quot;</code> (space by default).</p>
-        <pre><code class="lang-perl">my @nums = (1, 2, 3)
-p scalar @nums            # 3 — length in scalar context
-p &quot;@nums&quot;                  # 1 2 3 — joined with $&quot;
-my @slice = @arr[1..3]    # array slice
-my @vals  = @h{qw(a b c)}  # hash slice
-</code></pre>
-        <p>See also: <code>$</code> (scalar sigil), <code>%</code> (hash sigil), <code>@_</code>, <code>$&quot;</code>, postfix-deref <code>-&gt;@*</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>%</code></h3>
-        <p><strong>Hash sigil / modulo operator</strong> — same character, two meanings disambiguated by context.</p>
-        <p><strong>As sigil</strong> (preceding a name): <code>%h</code> accesses the whole hash. <code>%ENV</code> is the env hash, <code>%h = (k1 =&gt; v1, k2 =&gt; v2)</code> declares one, <code>keys %h</code> / <code>values %h</code> / <code>each %h</code> iterate. The sigil reflects the *whole hash*; one value is <code>$h{k}</code> (scalar).</p>
-        <p><strong>As operator</strong> (between expressions): <code>$a % $b</code> is integer modulo (remainder); result takes the sign of the right operand.</p>
-        <pre><code class="lang-perl">my %cfg = (host =&gt; &quot;localhost&quot;, port =&gt; 5432)
-p keys %cfg               # hash iteration
-p 10 % 3                  # 1 — modulo
-p -7 % 3                  # 2 — Perl semantics: sign matches RHS
-</code></pre>
-        <p>See also: <code>$</code> (scalar), <code>@</code> (array), <code>%=</code>, <code>%ENV</code>, <code>%SIG</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>+</code></h3>
-        <p><strong>Addition / numeric coercion.</strong> <code>$a + $b</code> adds two numbers. Operands are coerced to numeric context — strings parse as <code>\d+(\.\d+)?</code> until a non-numeric character, so <code>&quot;5 apples&quot; + 3 == 8</code>. Use <code>.</code> (dot) for string concatenation; using <code>+</code> on intended-strings is a common bug since the strings parse to 0 silently under <code>no warnings</code>. As a unary prefix, <code>+EXPR</code> forces numeric context without changing value.</p>
-        <pre><code class="lang-perl">p 2 + 3                # 5
-p &quot;10x&quot; + 5            # 15 — leading digits parse
-p &quot;x10&quot; + 5            # 5  — leading non-digit → 0
-my $sum = sum(1:100)   # 5050
-</code></pre>
-        <p>See also: <code>-</code>, <code>*</code>, <code>/</code>, <code>+=</code> (compound assign), <code>.</code> (string concat).</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>-</code></h3>
-        <p><strong>Subtraction / unary minus / file-test operator.</strong> Binary: <code>$a - $b</code> subtracts numbers (same coercion rules as <code>+</code>). Unary: <code>-EXPR</code> negates. Special: <code>-X FILE</code> where <code>X</code> is a single letter is a file-test operator (<code>-e</code> exists, <code>-f</code> regular file, <code>-d</code> directory, <code>-r</code> readable, <code>-w</code> writable, <code>-x</code> executable, <code>-s</code> size in bytes, <code>-M</code> age in days, etc.).</p>
-        <pre><code class="lang-perl">p 10 - 3              # 7
-p -5 * 2               # -10
-if (-e $path) { p &quot;exists&quot; }
-if (-f $path &amp;&amp; -r _) { p &quot;readable file&quot; }   # _ reuses last stat
-</code></pre>
-        <p>See also: <code>+</code>, <code>-=</code>, file-test reference.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>*</code></h3>
-        <p><strong>Multiplication / glob deref.</strong> Binary: <code>$a * $b</code> multiplies numbers. In expression context (<code>*name</code>), references the typeglob for that name — rarely used directly; assigning <code>*alias = \&amp;func</code> installs an alias for the sub.</p>
-        <pre><code class="lang-perl">p 6 * 7              # 42
-my $area = $w * $h
-*shortcut = \&amp;long_function_name   # sub alias
-</code></pre>
-        <p>See also: <code>*=</code>, <code>**</code> (exponent), <code>x</code> (string/list repeat — NOT multiplication).</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>/</code></h3>
-        <p><strong>Division / regex delimiter.</strong> Binary: <code>$a / $b</code> divides as floats. Stryke uses true division — <code>5 / 2 == 2.5</code>, not 2. Use <code>int($a / $b)</code> or <code>intdiv($a, $b)</code> for integer division. In expression context, <code>/PATTERN/</code> opens a regex — context-dependent: after an operator or at statement start, <code>/</code> parses as regex; after a variable or value, it&#39;s division.</p>
-        <pre><code class="lang-perl">p 10 / 4               # 2.5
-p int(10 / 4)          # 2
-if ($s =~ /^\d+$/) { p &quot;all digits&quot; }
-</code></pre>
-        <p>See also: <code>*</code>, <code>%</code> (modulo), <code>/=</code>, regex syntax, <code>intdiv</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>**</code></h3>
-        <p><strong>Exponentiation.</strong> <code>$a ** $b</code> raises <code>$a</code> to the <code>$b</code>-th power. Floating-point throughout — <code>2 ** 10 == 1024</code>, <code>2 ** 0.5 == 1.414...</code>. Right-associative: <code>2 ** 3 ** 2 == 2 ** 9 == 512</code>. Negative bases with fractional exponents return NaN.</p>
-        <pre><code class="lang-perl">p 2 ** 10              # 1024
-p 2 ** 0.5             # 1.4142135623731
-p 2 ** 3 ** 2          # 512 (right-assoc)
-my $sq = $r ** 2
-</code></pre>
-        <p>See also: <code>**=</code>, <code>sqrt</code>, <code>exp</code>, <code>log</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>++</code></h3>
-        <p><strong>Increment.</strong> Postfix <code>$x++</code> returns the value and *then* increments; prefix <code>++$x</code> increments first and returns the new value. Works on integers, floats, and <strong>magic strings</strong> (<code>&quot;aa&quot;++ == &quot;ab&quot;</code>, <code>&quot;az&quot;++ == &quot;ba&quot;</code>, <code>&quot;Az&quot;++ == &quot;Ba&quot;</code>). String increment follows Perl&#39;s letter-roll rules — preserves case, rolls letters with carry into the next position.</p>
-        <pre><code class="lang-perl">my $n = 5
-p $n++                  # 5  (post: returns old)
-p $n                    # 6
-p ++$n                  # 7  (pre: returns new)
-
-my $s = &quot;Az&quot;
-$s++; p $s              # Ba — magic string increment
-</code></pre>
-        <p>See also: <code>--</code>, atomic <code>++</code> on <code>mysync</code> shared scalars (always atomic).</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>--</code></h3>
-        <p><strong>Decrement.</strong> Postfix <code>$x--</code> returns the value and *then* decrements; prefix <code>--$x</code> decrements first. Numeric-only — there is no magic-string *decrement* in Perl. On non-numeric strings, <code>--</code> coerces to 0 first then decrements.</p>
-        <pre><code class="lang-perl">my $n = 5
-p $n--                  # 5
-p $n                    # 4
-p --$n                  # 3
-</code></pre>
-        <p>See also: <code>++</code>, atomic <code>--</code> on <code>mysync</code> shared scalars.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>.</code></h3>
-        <p><strong>String concatenation.</strong> <code>$a . $b</code> glues two strings together. Both operands are coerced to string context. For multi-arg joins prefer <code>join &quot;&quot;, @parts</code> (faster, less typing); for building large strings prefer interpolation or <code>sprintf</code>. The <code>.</code> operator does <strong>not</strong> insert separators — <code>&quot;hello&quot; . &quot;world&quot; eq &quot;helloworld&quot;</code>.</p>
-        <pre><code class="lang-perl">my $name = &quot;world&quot;
-p &quot;hello &quot; . $name . &quot;!&quot;        # hello world!
-my $full = $first . &quot; &quot; . $last
-my $line = sprintf &quot;%-20s %d&quot;, $name, $count   # often clearer
-</code></pre>
-        <p>See also: <code>.=</code> (append assign), <code>x</code> (repeat), <code>join</code>, <code>sprintf</code>, interpolation.</p>
-      </article>
-      <article class="doc-entry" id="doc-x">
-        <h3><a class="doc-anchor" href="#doc-x">#</a> <code>x</code></h3>
-        <p><strong>Repeat operator.</strong> <code>STR x N</code> repeats a string N times; <code>(LIST) x N</code> repeats a list. The context of the LHS decides: scalar LHS → string repeat; list LHS (must be in parens) → list repeat. N is truncated to integer; negative or zero N produces empty.</p>
-        <pre><code class="lang-perl">p &quot;=&quot; x 20                        # ====================
-p &quot;ab&quot; x 3                        # ababab
-my @z = (0) x 10                  # ten zeros
-my @grid = ([0,0,0]) x 5           # five distinct rows (each is a new arrayref via shallow copy)
-</code></pre>
-        <p>See also: <code>.</code> (concat), <code>x=</code> (compound), <code>repeat</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>==</code></h3>
-        <p><strong>Numeric equality.</strong> Coerces both operands to numbers and compares. Use <code>eq</code> for strings — <code>&quot;10&quot; == &quot;10.0&quot;</code> is true, but <code>&quot;10&quot; eq &quot;10.0&quot;</code> is false. Float comparison with <code>==</code> is dangerous due to rounding; for tolerances use <code>abs($a - $b) &lt; $epsilon</code>.</p>
-        <pre><code class="lang-perl">p 5 == 5.0                # 1
-p &quot;10&quot; == 10              # 1 (numeric coercion)
-p &quot;foo&quot; == &quot;bar&quot;          # 1 (both → 0)  — common bug, use eq!
-if ($n == 0) { ... }
-</code></pre>
-        <p>See also: <code>!=</code>, <code>&lt;=&gt;</code>, <code>eq</code> (string equality), <code>near_eq</code> builtin for float tolerance.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>!=</code></h3>
-        <p><strong>Numeric inequality.</strong> Inverse of <code>==</code>. Use <code>ne</code> for strings.</p>
-        <pre><code class="lang-perl">p 5 != 6              # 1
-while ($i != $target) { ... }
-</code></pre>
-        <p>See also: <code>==</code>, <code>ne</code>, <code>&lt;=&gt;</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&lt;</code></h3>
-        <p><strong>Numeric less-than.</strong> Coerces to numbers. Use <code>lt</code> for strings.</p>
-        <pre><code class="lang-perl">p 3 &lt; 5                # 1
-if ($age &lt; 18) { ... }
-my @small = grep { _ &lt; 10 } @nums
-</code></pre>
-        <p>Stryke supports <strong>chained comparisons</strong> Raku-style: <code>1 &lt; $x &lt; 10</code> ≡ <code>(1 &lt; $x) &amp;&amp; ($x &lt; 10)</code>. See <code>chained_comparison</code>.</p>
-        <p>See also: <code>&gt;</code>, <code>&lt;=</code>, <code>&lt;=&gt;</code>, <code>lt</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&gt;</code></h3>
-        <p><strong>Numeric greater-than.</strong> Coerces to numbers. Use <code>gt</code> for strings.</p>
-        <pre><code class="lang-perl">p 7 &gt; 5               # 1
-my @big = grep { _ &gt; 100 } @vals
-</code></pre>
-        <p>Also the redirect operator in <code>open</code> (<code>open my $fh, &#39;&gt;&#39;, $path</code>) and the diamond closer (<code>&lt;$fh&gt;</code>).</p>
-        <p>See also: <code>&lt;</code>, <code>&gt;=</code>, <code>&lt;=&gt;</code>, <code>gt</code>, <code>chained_comparison</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&lt;=</code></h3>
-        <p><strong>Numeric less-than-or-equal.</strong> Use <code>le</code> for strings. Participates in chained comparisons: <code>0 &lt;= $i &lt; @arr</code>.</p>
-        <pre><code class="lang-perl">if (0 &lt;= $i &lt; scalar @arr) { p $arr[$i] }
-</code></pre>
-        <p>See also: <code>&lt;</code>, <code>&gt;=</code>, <code>&lt;=&gt;</code>, <code>le</code>, <code>chained_comparison</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&gt;=</code></h3>
-        <p><strong>Numeric greater-than-or-equal.</strong> Use <code>ge</code> for strings.</p>
-        <pre><code class="lang-perl">return if $count &gt;= $max
-</code></pre>
-        <p>See also: <code>&gt;</code>, <code>&lt;=</code>, <code>&lt;=&gt;</code>, <code>ge</code>, <code>chained_comparison</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&lt;=&gt;</code></h3>
-        <p><strong>Spaceship operator</strong> — numeric three-way compare. Returns -1, 0, or 1. The standard <code>sort</code> comparator for numeric sort.</p>
-        <pre><code class="lang-perl">my @sorted = sort { $a &lt;=&gt; $b } @nums        # ascending
-my @desc   = sort { $b &lt;=&gt; $a } @nums         # descending
-p 5 &lt;=&gt; 10                                     # -1
-p 10 &lt;=&gt; 10                                    # 0
-p 15 &lt;=&gt; 10                                    # 1
-</code></pre>
-        <p>See also: <code>cmp</code> (string version), <code>sort</code>, <code>$a</code>, <code>$b</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-eq">
-        <h3><a class="doc-anchor" href="#doc-eq">#</a> <code>eq</code></h3>
-        <p><strong>String equality.</strong> Compares operands as strings. <code>&quot;10&quot; eq &quot;10.0&quot;</code> is false. The string-context counterpart of <code>==</code>.</p>
-        <pre><code class="lang-perl">if ($cmd eq &quot;start&quot;) { ... }
-p &quot;abc&quot; eq &quot;abc&quot;                # 1
-p &quot;abc&quot; eq &quot;ABC&quot;                # &quot;&quot; (case matters)
-</code></pre>
-        <p>See also: <code>ne</code>, <code>cmp</code>, <code>==</code> (numeric), <code>lc</code>/<code>uc</code> for case-insensitive compare.</p>
-      </article>
-      <article class="doc-entry" id="doc-ne">
-        <h3><a class="doc-anchor" href="#doc-ne">#</a> <code>ne</code></h3>
-        <p><strong>String inequality.</strong> Inverse of <code>eq</code>.</p>
-        <pre><code class="lang-perl">next if $line ne &quot;&quot;
-</code></pre>
-        <p>See also: <code>eq</code>, <code>cmp</code>, <code>!=</code> (numeric).</p>
-      </article>
-      <article class="doc-entry" id="doc-lt">
-        <h3><a class="doc-anchor" href="#doc-lt">#</a> <code>lt</code></h3>
-        <p><strong>String less-than</strong> — lexicographic comparison. Use <code>&lt;</code> for numeric.</p>
-        <pre><code class="lang-perl">p &quot;apple&quot; lt &quot;banana&quot;           # 1
-my @sorted = sort { $a lt $b ? -1 : 1 } @words
-</code></pre>
-        <p>See also: <code>gt</code>, <code>le</code>, <code>cmp</code>, <code>&lt;</code> (numeric), <code>chained_comparison</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-le">
-        <h3><a class="doc-anchor" href="#doc-le">#</a> <code>le</code></h3>
-        <p><strong>String less-than-or-equal</strong> — lexicographic. Use <code>&lt;=</code> for numeric. Participates in chained comparisons.</p>
-        <p>See also: <code>lt</code>, <code>ge</code>, <code>cmp</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-gt">
-        <h3><a class="doc-anchor" href="#doc-gt">#</a> <code>gt</code></h3>
-        <p><strong>String greater-than</strong> — lexicographic.</p>
-        <pre><code class="lang-perl">p &quot;banana&quot; gt &quot;apple&quot;           # 1
-</code></pre>
-        <p>See also: <code>lt</code>, <code>ge</code>, <code>cmp</code>, <code>&gt;</code> (numeric).</p>
-      </article>
-      <article class="doc-entry" id="doc-ge">
-        <h3><a class="doc-anchor" href="#doc-ge">#</a> <code>ge</code></h3>
-        <p><strong>String greater-than-or-equal</strong> — lexicographic. Use <code>&gt;=</code> for numeric.</p>
-        <p>See also: <code>gt</code>, <code>le</code>, <code>cmp</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-cmp">
-        <h3><a class="doc-anchor" href="#doc-cmp">#</a> <code>cmp</code></h3>
-        <p><strong>String three-way compare</strong> — returns -1, 0, or 1. The standard <code>sort</code> comparator for string sort.</p>
-        <pre><code class="lang-perl">my @sorted = sort { $a cmp $b } @words      # case-sensitive
-my @ci     = sort { lc($a) cmp lc($b) } @words   # case-insensitive
-p &quot;alice&quot; cmp &quot;bob&quot;            # -1
-</code></pre>
-        <p>See also: <code>&lt;=&gt;</code> (numeric three-way), <code>eq</code>, <code>lt</code>, <code>gt</code>, <code>sort</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&amp;&amp;</code></h3>
-        <p><strong>Logical AND</strong> (high-precedence). Short-circuit: returns the <strong>first falsy operand</strong>, or the <strong>last operand if all truthy</strong>. Stryke (like Perl) doesn&#39;t return boolean — it returns the actual value, which makes idioms like <code>$default = $val &amp;&amp; transform($val)</code> work.</p>
-        <pre><code class="lang-perl">if ($x &gt; 0 &amp;&amp; $x &lt; 100) { ... }
-my $first = $a &amp;&amp; $b &amp;&amp; $c       # first truthy or last falsy
-</code></pre>
-        <p>Lower-precedence variant <code>and</code> binds looser than <code>=</code> so use it for control flow: <code>open $fh, $f and read_loop()</code>. See also: <code>||</code>, <code>//</code>, <code>and</code>, <code>!</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>||</code></h3>
-        <p><strong>Logical OR</strong> (high-precedence). Short-circuit: returns the <strong>first truthy operand</strong>, or the <strong>last operand if all falsy</strong>. The classic Perl default idiom: <code>my $x = $arg || &quot;default&quot;</code> — but watch out: <code>0</code>, <code>&quot;&quot;</code>, <code>&quot;0&quot;</code>, and <code>undef</code> are all falsy, so <code>||</code> falls through for legitimate zero values. Use <code>//</code> (defined-or) when only <code>undef</code> should trigger the fallback.</p>
-        <pre><code class="lang-perl">my $name = $user || &quot;guest&quot;
-my $val  = $count // 0          # better: only undef triggers fallback
-open $fh, $f or die $!           # `or` is the low-precedence form
-</code></pre>
-        <p>See also: <code>&amp;&amp;</code>, <code>//</code>, <code>or</code>, <code>defined</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>//</code></h3>
-        <p><strong>Defined-or operator.</strong> Returns the LHS if it is defined (even if <code>0</code> or <code>&quot;&quot;</code>), else the RHS. Distinct from <code>||</code> which treats all falsy values as &quot;use the fallback&quot;. Use <code>//</code> whenever you have a numeric default or want to distinguish absent values from explicit zero.</p>
-        <pre><code class="lang-perl">my $count = $opts{count} // 10        # 10 only if missing — 0 is allowed
-my $tag = $row-&gt;{label} // &quot;untagged&quot;
-return $cache{$key} //= compute($key)  # //= : assign only if undef
-</code></pre>
-        <p>See also: <code>||</code>, <code>defined</code>, <code>//=</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>!</code></h3>
-        <p><strong>Logical NOT</strong> (high-precedence). Returns 1 (true) if the operand is falsy, <code>&quot;&quot;</code> (false) if truthy. Lower-precedence variant <code>not</code> reads English-y; prefer <code>!</code> in expressions, <code>not</code> in conditions.</p>
-        <pre><code class="lang-perl">if (!$ok) { die &quot;failed&quot; }
-return unless not @items   # avoid double-negative — prefer `unless @items`
-my $inverse = !!$truthy    # !! coerces to canonical 1 / &quot;&quot;
-</code></pre>
-        <p>See also: <code>not</code>, <code>unless</code>, <code>&amp;&amp;</code>, <code>||</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-and">
-        <h3><a class="doc-anchor" href="#doc-and">#</a> <code>and</code></h3>
-        <p><strong>Low-precedence logical AND.</strong> Same short-circuit behaviour as <code>&amp;&amp;</code> but binds looser than <code>=</code>, <code>,</code>, and most other operators. Use for control-flow expressions where you&#39;d otherwise need parens: <code>$ok = read_file($path) and parse(...)</code> — but note this assigns to <code>$ok</code> ONLY the return of <code>read_file</code> (because <code>=</code> binds tighter than <code>and</code>). For value-binding use <code>&amp;&amp;</code>.</p>
-        <pre><code class="lang-perl">open $fh, &#39;&lt;&#39;, $f and read_loop($fh)   # control flow
-</code></pre>
-        <p>See also: <code>&amp;&amp;</code>, <code>or</code>, <code>not</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-or">
-        <h3><a class="doc-anchor" href="#doc-or">#</a> <code>or</code></h3>
-        <p><strong>Low-precedence logical OR.</strong> Same short-circuit behaviour as <code>||</code> but binds looser than <code>=</code>. The canonical idiom for <code>open ... or die</code>: <code>open my $fh, $path or die &quot;open: $!&quot;</code>. The whole <code>open</code> expression is evaluated, then <code>or die</code> runs only if open returned false.</p>
-        <pre><code class="lang-perl">open my $fh, &#39;&lt;&#39;, $f or die &quot;open: $!&quot;
-my $val = read_line() or last           # WRONG: assigns the read, not the fallback
-my $val = read_line() || last           # WRONG too — falsy values fall through
-# Use defined-or for value defaults:
-my $val = read_line() // last
-</code></pre>
-        <p>See also: <code>||</code>, <code>//</code>, <code>and</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-not">
-        <h3><a class="doc-anchor" href="#doc-not">#</a> <code>not</code></h3>
-        <p>Low-precedence logical negation — returns true if the expression is false, and false if it is true. Functionally identical to <code>!</code> but binds looser than almost everything, so <code>not $a == $b</code> is <code>not($a == $b)</code> rather than <code>(!$a) == $b</code>. Useful for readable boolean conditions.</p>
-        <pre><code class="lang-perl">if (not defined $val) {
-    p &quot;val is undef&quot;
-}
-my @missing = grep { not -e _ } @files
-@missing |&gt; e p
-p not 0    # 1
-p not 1    # (empty string)
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-xor">
-        <h3><a class="doc-anchor" href="#doc-xor">#</a> <code>xor</code></h3>
-        <p><strong>Low-precedence logical XOR.</strong> Returns true exactly when one operand is truthy and the other is falsy. No short-circuit (both sides always evaluated). Rarely used; if you find yourself wanting <code>xor</code> consider <code>($a ? 1 : 0) != ($b ? 1 : 0)</code> for clarity.</p>
-        <pre><code class="lang-perl">if ($admin xor $guest) { p &quot;exactly one role&quot; }
-</code></pre>
-        <p>See also: <code>&amp;&amp;</code>, <code>||</code>, <code>^</code> (bitwise xor).</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>=~</code></h3>
-        <p><strong>Regex bind</strong> — applies the right-side regex/transliteration/substitution to the left-side scalar. Returns success/match data in scalar context, captured groups in list context. Without <code>=~</code>, regex ops default to operating on <code>$_</code>.</p>
-        <pre><code class="lang-perl">if ($line =~ /^\s*#/) { ... }                    # match
-my ($host) = $url =~ m{^https?://([^/]+)}        # extract
-$text =~ s/foo/bar/g                              # substitute
-$str =~ tr/a-z/A-Z/                                # transliterate
-</code></pre>
-        <p>See also: <code>!~</code>, <code>m//</code>, <code>s///</code>, <code>tr///</code>, named captures (<code>(?&lt;name&gt;...)</code>, <code>%+</code>).</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>!~</code></h3>
-        <p><strong>Negated regex bind.</strong> True if the regex does NOT match.</p>
-        <pre><code class="lang-perl">next if $line !~ /^\s*\w/      # skip lines that don&#39;t start with a word
-</code></pre>
-        <p>See also: <code>=~</code>, <code>m//</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>..</code></h3>
-        <p><strong>Range operator.</strong> In list context, generates an inclusive integer or magic-string sequence: <code>1..5 == (1,2,3,4,5)</code>. In scalar/boolean context (rare — only in <code>while</code>/<code>if</code>), acts as a flip-flop state machine.</p>
-        <pre><code class="lang-perl">for (1..10) { p _ }
-my @letters = (&#39;a&#39;..&#39;z&#39;)        # magic string range
-my @rev = reverse 1..100
-</code></pre>
-        <p>Stryke convention: prefer <code>1:5</code> (colon-range, fully equivalent) since it doesn&#39;t visually clash with method/property access chains.</p>
-        <p>See also: <code>...</code> (three-dot range), <code>:</code> colon range, flip-flop in <code>while</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>...</code></h3>
-        <p><strong>Exclusive range / yada-yada.</strong> As an operator: <code>1...5</code> is the *exclusive* range (does not include the endpoint in some contexts) and the *flip-flop* operator with slightly different reset semantics than <code>..</code>. As a statement: <code>...</code> alone (the &quot;yada-yada&quot;) is a placeholder that compiles fine but dies at runtime — useful for sketching APIs.</p>
-        <pre><code class="lang-perl">fn not_yet_implemented { ... }       # yada-yada — dies if called
-</code></pre>
-        <p>See also: <code>..</code>, yada-yada placeholder.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>=&gt;</code></h3>
-        <p><strong>Fat comma</strong> — variant of <code>,</code> that auto-quotes the left operand if it looks like a bareword identifier. The canonical syntax for hash entries and named arguments since it self-documents which side is the key.</p>
-        <pre><code class="lang-perl">my %cfg = (
-    host   =&gt; &quot;localhost&quot;,     # &quot;host&quot; auto-quoted
-    port   =&gt; 5432,
-    debug  =&gt; 1,
-)
-open my $fh, &#39;&lt;&#39;, $path or die
-Class-&gt;new(name =&gt; &quot;alice&quot;, age =&gt; 30)
-</code></pre>
-        <p>With strict syntax, <code>,</code> and <code>=&gt;</code> are semantically equivalent EXCEPT for the auto-quoting. <code>1 =&gt; 2</code> is the same as <code>1 , 2</code>; the magic only fires on bareword LHS.</p>
-        <p>See also: <code>,</code>, hash declaration, named parameters.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>,</code></h3>
-        <p><strong>Comma operator / list separator.</strong> In list context, separates list elements. In scalar context (right-to-left), evaluates each expression for side effects and returns the rightmost (like C). The fat-comma <code>=&gt;</code> is a variant that auto-quotes bareword LHS.</p>
-        <pre><code class="lang-perl">my @x = (1, 2, 3)
-my %h = (a =&gt; 1, b =&gt; 2)
-for (my $i = 0, my $j = 10; $i &lt; 5; $i++, $j--) { ... }   # scalar context
-</code></pre>
-        <p>See also: <code>=&gt;</code>, list operators (<code>push</code>, <code>unshift</code>, …).</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>?:</code></h3>
-        <p><strong>Ternary conditional</strong> — <code>COND ? IF_TRUE : IF_FALSE</code>. Right-associative for chaining. Returns one of the two branches as an expression value, unlike <code>if</code>/<code>else</code> which is a statement. Stryke also accepts the <code>if</code>/<code>else</code> block form as an expression: <code>my $x = do { if (cond) { 1 } else { 2 } }</code>.</p>
-        <pre><code class="lang-perl">my $sign = $n &gt; 0 ? &quot;+&quot; : $n &lt; 0 ? &quot;-&quot; : &quot;0&quot;
-p $count == 1 ? &quot;$count item&quot; : &quot;$count items&quot;
-</code></pre>
-        <p>Binds looser than most operators; use parens around complex conditions for readability. See also: <code>if</code>/<code>else</code>, <code>match</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>\</code></h3>
-        <p><strong>Reference operator</strong> — takes a reference to a variable, sub, or value. <code>\$scalar</code>, <code>\@array</code>, <code>\%hash</code>, <code>\&amp;sub</code>, <code>\(...)</code>. References are scalars; deref with <code>$$ref</code> / <code>@$ref</code> / <code>%$ref</code> / <code>&amp;$ref</code> / <code>$ref-&gt;[i]</code> / <code>$ref-&gt;{k}</code> / <code>$ref-&gt;(...)</code>.</p>
-        <pre><code class="lang-perl">my @nums = (1, 2, 3)
-my $aref = \@nums
-p $$aref[0]                  # 1 (sigil-deref)
-p $aref-&gt;[0]                  # 1 (arrow-deref — preferred)
-p join &quot;,&quot;, @$aref            # 1,2,3
-
-my $code = \&amp;my_function
-$code-&gt;(42)
-</code></pre>
-        <p>Also <code>\(LIST)</code> returns a list of references — <code>\(@a, @b)</code> gives one ref per element, not a single ref to the list.</p>
-        <p>See also: <code>-&gt;</code>, <code>ref</code>, deref syntax, <code>bless</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&amp;</code></h3>
-        <p><strong>Bitwise AND</strong> (and prototype/sub-deref). On numbers, <code>$a &amp; $b</code> computes the bitwise AND. As a sigil prefix <code>&amp;name</code> calls a sub (in non-bareword contexts) or takes a coderef. With <code>\</code> makes a coderef: <code>\&amp;sub</code>.</p>
-        <pre><code class="lang-perl">p 0b1100 &amp; 0b1010            # 8 (0b1000)
-my $mask = $flags &amp; 0xFF
-my $code = \&amp;my_sub          # coderef
-</code></pre>
-        <p>See also: <code>|</code>, <code>^</code>, <code>~</code>, <code>&amp;&amp;</code>, <code>\&amp;</code> (coderef).</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>|</code></h3>
-        <p><strong>Bitwise OR.</strong> <code>$a | $b</code> ORs the bits. Also a regex alternation inside <code>/.../</code>. As a stream operator <code>||</code> is logical OR, <code>|&gt;</code> is pipe-forward.</p>
-        <pre><code class="lang-perl">p 0b1100 | 0b1010           # 14 (0b1110)
-my $flags = OPEN_READ | OPEN_NONBLOCK
-</code></pre>
-        <p>See also: <code>&amp;</code>, <code>^</code>, <code>~</code>, <code>||</code>, <code>|&gt;</code>, regex alternation.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>^</code></h3>
-        <p><strong>Bitwise XOR.</strong> <code>$a ^ $b</code> XORs the bits.</p>
-        <pre><code class="lang-perl">p 0b1100 ^ 0b1010           # 6 (0b0110)
-my $toggled = $bits ^ $mask
-</code></pre>
-        <p>See also: <code>&amp;</code>, <code>|</code>, <code>~</code>, <code>xor</code> (logical).</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>~</code></h3>
-        <p><strong>Bitwise NOT</strong> (unary). Flips every bit; works on integers. Also the prefix of stryke thread macros (<code>~&gt;</code>, <code>~p&gt;</code>, <code>~d&gt;</code>, etc.) — those are distinct multi-char operators, not <code>~</code> followed by something.</p>
-        <pre><code class="lang-perl">p ~0                        # -1 (all bits set on signed int)
-p ~0xFF                     # …higher bits set
-my $inverted = ~$mask &amp; 0xFFFF
-</code></pre>
-        <p>See also: <code>&amp;</code>, <code>|</code>, <code>^</code>, <code>!</code> (logical NOT), <code>~&gt;</code> / <code>~&gt;&gt;</code> / <code>~p&gt;</code> (distinct ops).</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&lt;&lt;</code></h3>
-        <p><strong>Left bit-shift / heredoc.</strong> As <code>$a &lt;&lt; $b</code>, shifts bits left by <code>$b</code> positions. As <code>&lt;&lt;TAG</code>, opens a heredoc (multi-line string literal terminated by <code>TAG</code> at start of line).</p>
-        <pre><code class="lang-perl">p 1 &lt;&lt; 10                    # 1024
-my $kb = $bytes &lt;&lt; 10
-my $sql = &lt;&lt;END
-    SELECT *
-    FROM users
-END
-</code></pre>
-        <p>See also: <code>&gt;&gt;</code>, <code>&lt;&lt;=</code>, heredoc syntax.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&gt;&gt;</code></h3>
-        <p><strong>Right bit-shift / file redirect.</strong> As <code>$a &gt;&gt; $b</code>, shifts bits right by <code>$b</code> positions. As a mode in <code>open</code>, <code>&gt;&gt;</code> opens for append.</p>
-        <pre><code class="lang-perl">p 1024 &gt;&gt; 2                  # 256
-my $exit_code = $? &gt;&gt; 8       # extract exit code from $?
-open my $fh, &#39;&gt;&gt;&#39;, &#39;log.txt&#39; or die
-</code></pre>
-        <p>See also: <code>&lt;&lt;</code>, <code>&gt;&gt;=</code>, <code>open</code> modes.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>=</code></h3>
-        <p><strong>Assignment.</strong> Returns the assigned value (so chained <code>$a = $b = 5</code> works). Context matters: <code>my @a = $scalar</code> copies the scalar&#39;s value into a one-element list; <code>my @a = @b</code> does list copy; <code>my $s = @a</code> gives the array&#39;s length in scalar context. The single most-used operator after <code>;</code>.</p>
-        <pre><code class="lang-perl">my $x = 42
-my ($a, $b, $c) = (1, 2, 3)        # list-destructure
-my ($first, @rest) = split /,/
-($a, $b) = ($b, $a)                  # swap
-my $len = @items                     # scalar context — count
-</code></pre>
-        <p>See also: <code>+=</code>, <code>-=</code>, <code>.=</code>, <code>//=</code>, <code>||=</code>, <code>&amp;&amp;=</code>, <code>my</code>, <code>our</code>, <code>local</code>, <code>state</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>+=</code></h3>
-        <p><strong>Add-assign.</strong> <code>$x += $y</code> ≡ <code>$x = $x + $y</code>. Atomic on <code>mysync</code> shared scalars.</p>
-        <pre><code class="lang-perl">my $total = 0
-$total += $_ for @nums
-mysync $sum = 0; fan 10000 { $sum += 1 }   # atomic — always 10000
-</code></pre>
-        <p>See also: <code>+</code>, <code>-=</code>, <code>*=</code>, etc.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>-=</code></h3>
-        <p><strong>Subtract-assign.</strong> <code>$x -= $y</code> ≡ <code>$x = $x - $y</code>. Atomic on <code>mysync</code> scalars.</p>
-        <p>See also: <code>-</code>, <code>+=</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>*=</code></h3>
-        <p><strong>Multiply-assign.</strong> <code>$x *= $y</code> ≡ <code>$x = $x * $y</code>.</p>
-        <p>See also: <code>*</code>, <code>**=</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>/=</code></h3>
-        <p><strong>Divide-assign.</strong> <code>$x /= $y</code> ≡ <code>$x = $x / $y</code>.</p>
-        <p>See also: <code>/</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>**=</code></h3>
-        <p><strong>Power-assign.</strong> <code>$x **= $y</code> ≡ <code>$x = $x ** $y</code>.</p>
-        <p>See also: <code>**</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>.=</code></h3>
-        <p><strong>Append-assign</strong> (string concat). <code>$s .= $more</code> ≡ <code>$s = $s . $more</code> but more efficient for large-string accumulators (single buffer growth, not realloc per concat). Atomic on <code>mysync</code> scalars.</p>
-        <pre><code class="lang-perl">my $buf = &quot;&quot;
-$buf .= $line for @lines
-mysync $log = &quot;&quot;; fan 100 { $log .= &quot;event\n&quot; }   # atomic
-</code></pre>
-        <p>See also: <code>.</code>, <code>+=</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-x">
-        <h3><a class="doc-anchor" href="#doc-x">#</a> <code>x=</code></h3>
-        <p><strong>Repeat-assign</strong> (string). <code>$s x= 3</code> ≡ <code>$s = $s x 3</code>.</p>
-        <pre><code class="lang-perl">my $bar = &quot;=&quot;; $bar x= 40        # forty equals signs
-</code></pre>
-        <p>See also: <code>x</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>||=</code></h3>
-        <p><strong>Or-assign.</strong> <code>$x ||= $default</code> ≡ <code>$x = $x || $default</code> — assigns the default only if <code>$x</code> is falsy. Watch out for legitimate falsy values like <code>0</code> and <code>&quot;&quot;</code>; prefer <code>//=</code> for those.</p>
-        <pre><code class="lang-perl">$opts{verbose} ||= 0
-$cache{$key} ||= compute($key)        # but: returns wrong thing if 0 is valid
-</code></pre>
-        <p>See also: <code>||</code>, <code>//=</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>//=</code></h3>
-        <p><strong>Defined-or assign.</strong> <code>$x //= $default</code> ≡ <code>$x = $x // $default</code> — assigns the default only if <code>$x</code> is <code>undef</code>. The right tool for memoization/cache-fill patterns.</p>
-        <pre><code class="lang-perl">$cache{$key} //= expensive_compute($key)
-$count{$word} //= 0; $count{$word}++
-</code></pre>
-        <p>See also: <code>//</code>, <code>||=</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&amp;&amp;=</code></h3>
-        <p><strong>And-assign.</strong> <code>$x &amp;&amp;= $val</code> ≡ <code>$x = $x &amp;&amp; $val</code> — assigns <code>$val</code> only if <code>$x</code> is truthy. Rare.</p>
-        <p>See also: <code>&amp;&amp;</code>, <code>||=</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>|=</code></h3>
-        <p><strong>Bitwise OR-assign.</strong> <code>$x |= 0x80</code> sets a bit. Atomic on <code>mysync</code> scalars.</p>
-        <p>See also: <code>|</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&amp;=</code></h3>
-        <p><strong>Bitwise AND-assign.</strong> <code>$x &amp;= 0xFF</code> masks to low byte.</p>
-        <p>See also: <code>&amp;</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>^=</code></h3>
-        <p><strong>Bitwise XOR-assign.</strong> <code>$x ^= $bit</code> toggles bits.</p>
-        <p>See also: <code>^</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&lt;&lt;=</code></h3>
-        <p><strong>Left-shift assign.</strong> <code>$x &lt;&lt;= 3</code> ≡ multiply by 8.</p>
-        <p>See also: <code>&lt;&lt;</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&gt;&gt;=</code></h3>
-        <p><strong>Right-shift assign.</strong> <code>$x &gt;&gt;= 3</code> ≡ integer-divide by 8.</p>
-        <p>See also: <code>&gt;&gt;</code>.</p>
       </article>
     </section>
     <section class="tutorial-section" id="ch-pipeline-pipe-forward">
@@ -2158,6 +1556,608 @@ p $cfg-&gt;{debug}      # 1 (overridden)
 p deep_equal([1, {a =&gt; 2}], [1, {a =&gt; 3}])   # 0
 p deq({x =&gt; [1,2]}, {x =&gt; [1,2]})            # 1
 </code></pre>
+      </article>
+    </section>
+    <section class="tutorial-section" id="ch-operators">
+      <h2>Operators</h2>
+      <p class="chapter-meta">66 topics</p>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>-&gt;</code></h3>
+        <p><strong>Arrow operator</strong> — method invocation on objects/classes and dereference of refs. The single most-used operator in Perl OOP and any code touching references.</p>
+        <pre><code class="lang-perl"># Method call (object or class):
+my $p = Point-&gt;new(x =&gt; 1, y =&gt; 2)
+p $p-&gt;x                                    # 1
+p Math::Utils-&gt;compute(@args)
+
+# Hash-ref dereference:
+my $cfg = { host =&gt; &quot;localhost&quot;, port =&gt; 5432 }
+p $cfg-&gt;{host}
+$cfg-&gt;{port} = 6543
+
+# Array-ref dereference:
+my $rows = [[1,2,3], [4,5,6]]
+p $rows-&gt;[1][2]                            # 6 (chained — implicit -&gt;)
+my $val = $rows-&gt;[0]-&gt;[2]                  # explicit form: 3
+
+# Code-ref invocation:
+my $f = fn ($x) { $x * 2 }
+p $f-&gt;(21)                                 # 42
+
+# Postfix-deref (modern):
+my @copy = $rows-&gt;@*                       # all elements
+my %env  = %ENV-&gt;%*                        # entire hash via slice
+</code></pre>
+        <p><strong>Chained arrow elision</strong> — between subscripts (<code>[..]</code>, <code>{..}</code>), <code>-&gt;</code> is optional: <code>$rows-&gt;[1][2]</code> ≡ <code>$rows-&gt;[1]-&gt;[2]</code>. The first arrow after a scalar variable is *required*; intermediate arrows can be omitted for chained subscripting only.</p>
+        <p>See also: <code>-&gt;&gt;</code> / <code>~&gt;&gt;</code> (thread-last macros — distinct operator), <code>bless</code>, <code>class</code>, <code>new</code>, <code>ref</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-new">
+        <h3><a class="doc-anchor" href="#doc-new">#</a> <code>new</code></h3>
+        <p><code>new</code> — the default constructor automatically provided for every <code>class</code> and <code>struct</code>. Called as <code>ClassName-&gt;new(field1 =&gt; v1, field2 =&gt; v2, ...)</code>. Returns a blessed object whose attribute storage is initialized from the named arguments. If the class defines a <code>BUILD</code> method, <code>new</code> runs it *after* attribute initialization but *before* returning, so <code>BUILD</code> can validate, derive fields, or attach external resources. A class never overrides <code>new</code> itself in stryke — to customize construction, define <code>BUILD</code> (post-init hook) instead.</p>
+        <p>Implementation: <code>vm_helper.rs:10686</code> — when <code>-&gt;new</code> is called and no user-defined <code>new</code> exists, the runtime dispatches to <code>builtin_new</code> which allocates the object, populates fields from the arglist, then calls <code>BUILD</code> via the C3 MRO if present.</p>
+        <pre><code class="lang-perl">class Point {
+    has &#39;x&#39; =&gt; (is =&gt; &#39;ro&#39;, default =&gt; 0)
+    has &#39;y&#39; =&gt; (is =&gt; &#39;ro&#39;, default =&gt; 0)
+}
+my $p = Point-&gt;new(x =&gt; 1.5, y =&gt; 2.0)
+p $p-&gt;x          # 1.5
+
+class Connection {
+    has &#39;host&#39; =&gt; (is =&gt; &#39;ro&#39;, required =&gt; 1)
+    has &#39;port&#39; =&gt; (is =&gt; &#39;ro&#39;, default =&gt; 5432)
+    fn BUILD($self, $args) {
+        die &quot;host required&quot; unless $self-&gt;host
+    }
+}
+my $c = Connection-&gt;new(host =&gt; &quot;db.example.com&quot;)
+</code></pre>
+        <p>See also: <code>BUILD</code> (post-init hook), <code>DESTROY</code> (destructor), <code>class</code>, <code>struct</code>, <code>bless</code>, <code>@ISA</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>$</code></h3>
+        <p><strong>Scalar sigil.</strong> <code>$name</code> accesses a scalar variable. <code>$ref</code> holds references. <code>$h{key}</code> accesses one hash value; <code>$a[idx]</code> accesses one array element (sigil reflects the *value being accessed*, not the container). For postfix-deref: <code>$ref-&gt;$*</code> (in stryke contexts that accept it).</p>
+        <pre><code class="lang-perl">my $x = 42                    # scalar declaration
+my @arr = (1, 2, 3)
+p $arr[0]                     # 1 — scalar context on @arr
+my %h = (k =&gt; &quot;v&quot;)
+p $h{k}                       # one value
+my $ref = \@arr               # reference, scalar holds it
+</code></pre>
+        <p>See also: <code>@</code> (array sigil), <code>%</code> (hash sigil), <code>\</code> (reference), <code>-&gt;</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>@</code></h3>
+        <p><strong>Array sigil.</strong> <code>@name</code> accesses an entire array. <code>@h{@keys}</code> is a hash slice (multiple values by key list). <code>@a[@idx]</code> is an array slice. <code>@_</code> is the implicit sub argument array. Stringified in double quotes by joining elements with <code>$&quot;</code> (space by default).</p>
+        <pre><code class="lang-perl">my @nums = (1, 2, 3)
+p scalar @nums            # 3 — length in scalar context
+p &quot;@nums&quot;                  # 1 2 3 — joined with $&quot;
+my @slice = @arr[1..3]    # array slice
+my @vals  = @h{qw(a b c)}  # hash slice
+</code></pre>
+        <p>See also: <code>$</code> (scalar sigil), <code>%</code> (hash sigil), <code>@_</code>, <code>$&quot;</code>, postfix-deref <code>-&gt;@*</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>%</code></h3>
+        <p><strong>Hash sigil / modulo operator</strong> — same character, two meanings disambiguated by context.</p>
+        <p><strong>As sigil</strong> (preceding a name): <code>%h</code> accesses the whole hash. <code>%ENV</code> is the env hash, <code>%h = (k1 =&gt; v1, k2 =&gt; v2)</code> declares one, <code>keys %h</code> / <code>values %h</code> / <code>each %h</code> iterate. The sigil reflects the *whole hash*; one value is <code>$h{k}</code> (scalar).</p>
+        <p><strong>As operator</strong> (between expressions): <code>$a % $b</code> is integer modulo (remainder); result takes the sign of the right operand.</p>
+        <pre><code class="lang-perl">my %cfg = (host =&gt; &quot;localhost&quot;, port =&gt; 5432)
+p keys %cfg               # hash iteration
+p 10 % 3                  # 1 — modulo
+p -7 % 3                  # 2 — Perl semantics: sign matches RHS
+</code></pre>
+        <p>See also: <code>$</code> (scalar), <code>@</code> (array), <code>%=</code>, <code>%ENV</code>, <code>%SIG</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>+</code></h3>
+        <p><strong>Addition / numeric coercion.</strong> <code>$a + $b</code> adds two numbers. Operands are coerced to numeric context — strings parse as <code>\d+(\.\d+)?</code> until a non-numeric character, so <code>&quot;5 apples&quot; + 3 == 8</code>. Use <code>.</code> (dot) for string concatenation; using <code>+</code> on intended-strings is a common bug since the strings parse to 0 silently under <code>no warnings</code>. As a unary prefix, <code>+EXPR</code> forces numeric context without changing value.</p>
+        <pre><code class="lang-perl">p 2 + 3                # 5
+p &quot;10x&quot; + 5            # 15 — leading digits parse
+p &quot;x10&quot; + 5            # 5  — leading non-digit → 0
+my $sum = sum(1:100)   # 5050
+</code></pre>
+        <p>See also: <code>-</code>, <code>*</code>, <code>/</code>, <code>+=</code> (compound assign), <code>.</code> (string concat).</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>-</code></h3>
+        <p><strong>Subtraction / unary minus / file-test operator.</strong> Binary: <code>$a - $b</code> subtracts numbers (same coercion rules as <code>+</code>). Unary: <code>-EXPR</code> negates. Special: <code>-X FILE</code> where <code>X</code> is a single letter is a file-test operator (<code>-e</code> exists, <code>-f</code> regular file, <code>-d</code> directory, <code>-r</code> readable, <code>-w</code> writable, <code>-x</code> executable, <code>-s</code> size in bytes, <code>-M</code> age in days, etc.).</p>
+        <pre><code class="lang-perl">p 10 - 3              # 7
+p -5 * 2               # -10
+if (-e $path) { p &quot;exists&quot; }
+if (-f $path &amp;&amp; -r _) { p &quot;readable file&quot; }   # _ reuses last stat
+</code></pre>
+        <p>See also: <code>+</code>, <code>-=</code>, file-test reference.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>*</code></h3>
+        <p><strong>Multiplication / glob deref.</strong> Binary: <code>$a * $b</code> multiplies numbers. In expression context (<code>*name</code>), references the typeglob for that name — rarely used directly; assigning <code>*alias = \&amp;func</code> installs an alias for the sub.</p>
+        <pre><code class="lang-perl">p 6 * 7              # 42
+my $area = $w * $h
+*shortcut = \&amp;long_function_name   # sub alias
+</code></pre>
+        <p>See also: <code>*=</code>, <code>**</code> (exponent), <code>x</code> (string/list repeat — NOT multiplication).</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>/</code></h3>
+        <p><strong>Division / regex delimiter.</strong> Binary: <code>$a / $b</code> divides as floats. Stryke uses true division — <code>5 / 2 == 2.5</code>, not 2. Use <code>int($a / $b)</code> or <code>intdiv($a, $b)</code> for integer division. In expression context, <code>/PATTERN/</code> opens a regex — context-dependent: after an operator or at statement start, <code>/</code> parses as regex; after a variable or value, it&#39;s division.</p>
+        <pre><code class="lang-perl">p 10 / 4               # 2.5
+p int(10 / 4)          # 2
+if ($s =~ /^\d+$/) { p &quot;all digits&quot; }
+</code></pre>
+        <p>See also: <code>*</code>, <code>%</code> (modulo), <code>/=</code>, regex syntax, <code>intdiv</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>**</code></h3>
+        <p><strong>Exponentiation.</strong> <code>$a ** $b</code> raises <code>$a</code> to the <code>$b</code>-th power. Floating-point throughout — <code>2 ** 10 == 1024</code>, <code>2 ** 0.5 == 1.414...</code>. Right-associative: <code>2 ** 3 ** 2 == 2 ** 9 == 512</code>. Negative bases with fractional exponents return NaN.</p>
+        <pre><code class="lang-perl">p 2 ** 10              # 1024
+p 2 ** 0.5             # 1.4142135623731
+p 2 ** 3 ** 2          # 512 (right-assoc)
+my $sq = $r ** 2
+</code></pre>
+        <p>See also: <code>**=</code>, <code>sqrt</code>, <code>exp</code>, <code>log</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>++</code></h3>
+        <p><strong>Increment.</strong> Postfix <code>$x++</code> returns the value and *then* increments; prefix <code>++$x</code> increments first and returns the new value. Works on integers, floats, and <strong>magic strings</strong> (<code>&quot;aa&quot;++ == &quot;ab&quot;</code>, <code>&quot;az&quot;++ == &quot;ba&quot;</code>, <code>&quot;Az&quot;++ == &quot;Ba&quot;</code>). String increment follows Perl&#39;s letter-roll rules — preserves case, rolls letters with carry into the next position.</p>
+        <pre><code class="lang-perl">my $n = 5
+p $n++                  # 5  (post: returns old)
+p $n                    # 6
+p ++$n                  # 7  (pre: returns new)
+
+my $s = &quot;Az&quot;
+$s++; p $s              # Ba — magic string increment
+</code></pre>
+        <p>See also: <code>--</code>, atomic <code>++</code> on <code>mysync</code> shared scalars (always atomic).</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>--</code></h3>
+        <p><strong>Decrement.</strong> Postfix <code>$x--</code> returns the value and *then* decrements; prefix <code>--$x</code> decrements first. Numeric-only — there is no magic-string *decrement* in Perl. On non-numeric strings, <code>--</code> coerces to 0 first then decrements.</p>
+        <pre><code class="lang-perl">my $n = 5
+p $n--                  # 5
+p $n                    # 4
+p --$n                  # 3
+</code></pre>
+        <p>See also: <code>++</code>, atomic <code>--</code> on <code>mysync</code> shared scalars.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>.</code></h3>
+        <p><strong>String concatenation.</strong> <code>$a . $b</code> glues two strings together. Both operands are coerced to string context. For multi-arg joins prefer <code>join &quot;&quot;, @parts</code> (faster, less typing); for building large strings prefer interpolation or <code>sprintf</code>. The <code>.</code> operator does <strong>not</strong> insert separators — <code>&quot;hello&quot; . &quot;world&quot; eq &quot;helloworld&quot;</code>.</p>
+        <pre><code class="lang-perl">my $name = &quot;world&quot;
+p &quot;hello &quot; . $name . &quot;!&quot;        # hello world!
+my $full = $first . &quot; &quot; . $last
+my $line = sprintf &quot;%-20s %d&quot;, $name, $count   # often clearer
+</code></pre>
+        <p>See also: <code>.=</code> (append assign), <code>x</code> (repeat), <code>join</code>, <code>sprintf</code>, interpolation.</p>
+      </article>
+      <article class="doc-entry" id="doc-x">
+        <h3><a class="doc-anchor" href="#doc-x">#</a> <code>x</code></h3>
+        <p><strong>Repeat operator.</strong> <code>STR x N</code> repeats a string N times; <code>(LIST) x N</code> repeats a list. The context of the LHS decides: scalar LHS → string repeat; list LHS (must be in parens) → list repeat. N is truncated to integer; negative or zero N produces empty.</p>
+        <pre><code class="lang-perl">p &quot;=&quot; x 20                        # ====================
+p &quot;ab&quot; x 3                        # ababab
+my @z = (0) x 10                  # ten zeros
+my @grid = ([0,0,0]) x 5           # five distinct rows (each is a new arrayref via shallow copy)
+</code></pre>
+        <p>See also: <code>.</code> (concat), <code>x=</code> (compound), <code>repeat</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>==</code></h3>
+        <p><strong>Numeric equality.</strong> Coerces both operands to numbers and compares. Use <code>eq</code> for strings — <code>&quot;10&quot; == &quot;10.0&quot;</code> is true, but <code>&quot;10&quot; eq &quot;10.0&quot;</code> is false. Float comparison with <code>==</code> is dangerous due to rounding; for tolerances use <code>abs($a - $b) &lt; $epsilon</code>.</p>
+        <pre><code class="lang-perl">p 5 == 5.0                # 1
+p &quot;10&quot; == 10              # 1 (numeric coercion)
+p &quot;foo&quot; == &quot;bar&quot;          # 1 (both → 0)  — common bug, use eq!
+if ($n == 0) { ... }
+</code></pre>
+        <p>See also: <code>!=</code>, <code>&lt;=&gt;</code>, <code>eq</code> (string equality), <code>near_eq</code> builtin for float tolerance.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>!=</code></h3>
+        <p><strong>Numeric inequality.</strong> Inverse of <code>==</code>. Use <code>ne</code> for strings.</p>
+        <pre><code class="lang-perl">p 5 != 6              # 1
+while ($i != $target) { ... }
+</code></pre>
+        <p>See also: <code>==</code>, <code>ne</code>, <code>&lt;=&gt;</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&lt;</code></h3>
+        <p><strong>Numeric less-than.</strong> Coerces to numbers. Use <code>lt</code> for strings.</p>
+        <pre><code class="lang-perl">p 3 &lt; 5                # 1
+if ($age &lt; 18) { ... }
+my @small = grep { _ &lt; 10 } @nums
+</code></pre>
+        <p>Stryke supports <strong>chained comparisons</strong> Raku-style: <code>1 &lt; $x &lt; 10</code> ≡ <code>(1 &lt; $x) &amp;&amp; ($x &lt; 10)</code>. See <code>chained_comparison</code>.</p>
+        <p>See also: <code>&gt;</code>, <code>&lt;=</code>, <code>&lt;=&gt;</code>, <code>lt</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&gt;</code></h3>
+        <p><strong>Numeric greater-than.</strong> Coerces to numbers. Use <code>gt</code> for strings.</p>
+        <pre><code class="lang-perl">p 7 &gt; 5               # 1
+my @big = grep { _ &gt; 100 } @vals
+</code></pre>
+        <p>Also the redirect operator in <code>open</code> (<code>open my $fh, &#39;&gt;&#39;, $path</code>) and the diamond closer (<code>&lt;$fh&gt;</code>).</p>
+        <p>See also: <code>&lt;</code>, <code>&gt;=</code>, <code>&lt;=&gt;</code>, <code>gt</code>, <code>chained_comparison</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&lt;=</code></h3>
+        <p><strong>Numeric less-than-or-equal.</strong> Use <code>le</code> for strings. Participates in chained comparisons: <code>0 &lt;= $i &lt; @arr</code>.</p>
+        <pre><code class="lang-perl">if (0 &lt;= $i &lt; scalar @arr) { p $arr[$i] }
+</code></pre>
+        <p>See also: <code>&lt;</code>, <code>&gt;=</code>, <code>&lt;=&gt;</code>, <code>le</code>, <code>chained_comparison</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&gt;=</code></h3>
+        <p><strong>Numeric greater-than-or-equal.</strong> Use <code>ge</code> for strings.</p>
+        <pre><code class="lang-perl">return if $count &gt;= $max
+</code></pre>
+        <p>See also: <code>&gt;</code>, <code>&lt;=</code>, <code>&lt;=&gt;</code>, <code>ge</code>, <code>chained_comparison</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&lt;=&gt;</code></h3>
+        <p><strong>Spaceship operator</strong> — numeric three-way compare. Returns -1, 0, or 1. The standard <code>sort</code> comparator for numeric sort.</p>
+        <pre><code class="lang-perl">my @sorted = sort { $a &lt;=&gt; $b } @nums        # ascending
+my @desc   = sort { $b &lt;=&gt; $a } @nums         # descending
+p 5 &lt;=&gt; 10                                     # -1
+p 10 &lt;=&gt; 10                                    # 0
+p 15 &lt;=&gt; 10                                    # 1
+</code></pre>
+        <p>See also: <code>cmp</code> (string version), <code>sort</code>, <code>$a</code>, <code>$b</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-eq">
+        <h3><a class="doc-anchor" href="#doc-eq">#</a> <code>eq</code></h3>
+        <p><strong>String equality.</strong> Compares operands as strings. <code>&quot;10&quot; eq &quot;10.0&quot;</code> is false. The string-context counterpart of <code>==</code>.</p>
+        <pre><code class="lang-perl">if ($cmd eq &quot;start&quot;) { ... }
+p &quot;abc&quot; eq &quot;abc&quot;                # 1
+p &quot;abc&quot; eq &quot;ABC&quot;                # &quot;&quot; (case matters)
+</code></pre>
+        <p>See also: <code>ne</code>, <code>cmp</code>, <code>==</code> (numeric), <code>lc</code>/<code>uc</code> for case-insensitive compare.</p>
+      </article>
+      <article class="doc-entry" id="doc-ne">
+        <h3><a class="doc-anchor" href="#doc-ne">#</a> <code>ne</code></h3>
+        <p><strong>String inequality.</strong> Inverse of <code>eq</code>.</p>
+        <pre><code class="lang-perl">next if $line ne &quot;&quot;
+</code></pre>
+        <p>See also: <code>eq</code>, <code>cmp</code>, <code>!=</code> (numeric).</p>
+      </article>
+      <article class="doc-entry" id="doc-lt">
+        <h3><a class="doc-anchor" href="#doc-lt">#</a> <code>lt</code></h3>
+        <p><strong>String less-than</strong> — lexicographic comparison. Use <code>&lt;</code> for numeric.</p>
+        <pre><code class="lang-perl">p &quot;apple&quot; lt &quot;banana&quot;           # 1
+my @sorted = sort { $a lt $b ? -1 : 1 } @words
+</code></pre>
+        <p>See also: <code>gt</code>, <code>le</code>, <code>cmp</code>, <code>&lt;</code> (numeric), <code>chained_comparison</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-le">
+        <h3><a class="doc-anchor" href="#doc-le">#</a> <code>le</code></h3>
+        <p><strong>String less-than-or-equal</strong> — lexicographic. Use <code>&lt;=</code> for numeric. Participates in chained comparisons.</p>
+        <p>See also: <code>lt</code>, <code>ge</code>, <code>cmp</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-gt">
+        <h3><a class="doc-anchor" href="#doc-gt">#</a> <code>gt</code></h3>
+        <p><strong>String greater-than</strong> — lexicographic.</p>
+        <pre><code class="lang-perl">p &quot;banana&quot; gt &quot;apple&quot;           # 1
+</code></pre>
+        <p>See also: <code>lt</code>, <code>ge</code>, <code>cmp</code>, <code>&gt;</code> (numeric).</p>
+      </article>
+      <article class="doc-entry" id="doc-ge">
+        <h3><a class="doc-anchor" href="#doc-ge">#</a> <code>ge</code></h3>
+        <p><strong>String greater-than-or-equal</strong> — lexicographic. Use <code>&gt;=</code> for numeric.</p>
+        <p>See also: <code>gt</code>, <code>le</code>, <code>cmp</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-cmp">
+        <h3><a class="doc-anchor" href="#doc-cmp">#</a> <code>cmp</code></h3>
+        <p><strong>String three-way compare</strong> — returns -1, 0, or 1. The standard <code>sort</code> comparator for string sort.</p>
+        <pre><code class="lang-perl">my @sorted = sort { $a cmp $b } @words      # case-sensitive
+my @ci     = sort { lc($a) cmp lc($b) } @words   # case-insensitive
+p &quot;alice&quot; cmp &quot;bob&quot;            # -1
+</code></pre>
+        <p>See also: <code>&lt;=&gt;</code> (numeric three-way), <code>eq</code>, <code>lt</code>, <code>gt</code>, <code>sort</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&amp;&amp;</code></h3>
+        <p><strong>Logical AND</strong> (high-precedence). Short-circuit: returns the <strong>first falsy operand</strong>, or the <strong>last operand if all truthy</strong>. Stryke (like Perl) doesn&#39;t return boolean — it returns the actual value, which makes idioms like <code>$default = $val &amp;&amp; transform($val)</code> work.</p>
+        <pre><code class="lang-perl">if ($x &gt; 0 &amp;&amp; $x &lt; 100) { ... }
+my $first = $a &amp;&amp; $b &amp;&amp; $c       # first truthy or last falsy
+</code></pre>
+        <p>Lower-precedence variant <code>and</code> binds looser than <code>=</code> so use it for control flow: <code>open $fh, $f and read_loop()</code>. See also: <code>||</code>, <code>//</code>, <code>and</code>, <code>!</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>||</code></h3>
+        <p><strong>Logical OR</strong> (high-precedence). Short-circuit: returns the <strong>first truthy operand</strong>, or the <strong>last operand if all falsy</strong>. The classic Perl default idiom: <code>my $x = $arg || &quot;default&quot;</code> — but watch out: <code>0</code>, <code>&quot;&quot;</code>, <code>&quot;0&quot;</code>, and <code>undef</code> are all falsy, so <code>||</code> falls through for legitimate zero values. Use <code>//</code> (defined-or) when only <code>undef</code> should trigger the fallback.</p>
+        <pre><code class="lang-perl">my $name = $user || &quot;guest&quot;
+my $val  = $count // 0          # better: only undef triggers fallback
+open $fh, $f or die $!           # `or` is the low-precedence form
+</code></pre>
+        <p>See also: <code>&amp;&amp;</code>, <code>//</code>, <code>or</code>, <code>defined</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>//</code></h3>
+        <p><strong>Defined-or operator.</strong> Returns the LHS if it is defined (even if <code>0</code> or <code>&quot;&quot;</code>), else the RHS. Distinct from <code>||</code> which treats all falsy values as &quot;use the fallback&quot;. Use <code>//</code> whenever you have a numeric default or want to distinguish absent values from explicit zero.</p>
+        <pre><code class="lang-perl">my $count = $opts{count} // 10        # 10 only if missing — 0 is allowed
+my $tag = $row-&gt;{label} // &quot;untagged&quot;
+return $cache{$key} //= compute($key)  # //= : assign only if undef
+</code></pre>
+        <p>See also: <code>||</code>, <code>defined</code>, <code>//=</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>!</code></h3>
+        <p><strong>Logical NOT</strong> (high-precedence). Returns 1 (true) if the operand is falsy, <code>&quot;&quot;</code> (false) if truthy. Lower-precedence variant <code>not</code> reads English-y; prefer <code>!</code> in expressions, <code>not</code> in conditions.</p>
+        <pre><code class="lang-perl">if (!$ok) { die &quot;failed&quot; }
+return unless not @items   # avoid double-negative — prefer `unless @items`
+my $inverse = !!$truthy    # !! coerces to canonical 1 / &quot;&quot;
+</code></pre>
+        <p>See also: <code>not</code>, <code>unless</code>, <code>&amp;&amp;</code>, <code>||</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-and">
+        <h3><a class="doc-anchor" href="#doc-and">#</a> <code>and</code></h3>
+        <p><strong>Low-precedence logical AND.</strong> Same short-circuit behaviour as <code>&amp;&amp;</code> but binds looser than <code>=</code>, <code>,</code>, and most other operators. Use for control-flow expressions where you&#39;d otherwise need parens: <code>$ok = read_file($path) and parse(...)</code> — but note this assigns to <code>$ok</code> ONLY the return of <code>read_file</code> (because <code>=</code> binds tighter than <code>and</code>). For value-binding use <code>&amp;&amp;</code>.</p>
+        <pre><code class="lang-perl">open $fh, &#39;&lt;&#39;, $f and read_loop($fh)   # control flow
+</code></pre>
+        <p>See also: <code>&amp;&amp;</code>, <code>or</code>, <code>not</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-or">
+        <h3><a class="doc-anchor" href="#doc-or">#</a> <code>or</code></h3>
+        <p><strong>Low-precedence logical OR.</strong> Same short-circuit behaviour as <code>||</code> but binds looser than <code>=</code>. The canonical idiom for <code>open ... or die</code>: <code>open my $fh, $path or die &quot;open: $!&quot;</code>. The whole <code>open</code> expression is evaluated, then <code>or die</code> runs only if open returned false.</p>
+        <pre><code class="lang-perl">open my $fh, &#39;&lt;&#39;, $f or die &quot;open: $!&quot;
+my $val = read_line() or last           # WRONG: assigns the read, not the fallback
+my $val = read_line() || last           # WRONG too — falsy values fall through
+# Use defined-or for value defaults:
+my $val = read_line() // last
+</code></pre>
+        <p>See also: <code>||</code>, <code>//</code>, <code>and</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-not">
+        <h3><a class="doc-anchor" href="#doc-not">#</a> <code>not</code></h3>
+        <p>Low-precedence logical negation — returns true if the expression is false, and false if it is true. Functionally identical to <code>!</code> but binds looser than almost everything, so <code>not $a == $b</code> is <code>not($a == $b)</code> rather than <code>(!$a) == $b</code>. Useful for readable boolean conditions.</p>
+        <pre><code class="lang-perl">if (not defined $val) {
+    p &quot;val is undef&quot;
+}
+my @missing = grep { not -e _ } @files
+@missing |&gt; e p
+p not 0    # 1
+p not 1    # (empty string)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-xor">
+        <h3><a class="doc-anchor" href="#doc-xor">#</a> <code>xor</code></h3>
+        <p><strong>Low-precedence logical XOR.</strong> Returns true exactly when one operand is truthy and the other is falsy. No short-circuit (both sides always evaluated). Rarely used; if you find yourself wanting <code>xor</code> consider <code>($a ? 1 : 0) != ($b ? 1 : 0)</code> for clarity.</p>
+        <pre><code class="lang-perl">if ($admin xor $guest) { p &quot;exactly one role&quot; }
+</code></pre>
+        <p>See also: <code>&amp;&amp;</code>, <code>||</code>, <code>^</code> (bitwise xor).</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>=~</code></h3>
+        <p><strong>Regex bind</strong> — applies the right-side regex/transliteration/substitution to the left-side scalar. Returns success/match data in scalar context, captured groups in list context. Without <code>=~</code>, regex ops default to operating on <code>$_</code>.</p>
+        <pre><code class="lang-perl">if ($line =~ /^\s*#/) { ... }                    # match
+my ($host) = $url =~ m{^https?://([^/]+)}        # extract
+$text =~ s/foo/bar/g                              # substitute
+$str =~ tr/a-z/A-Z/                                # transliterate
+</code></pre>
+        <p>See also: <code>!~</code>, <code>m//</code>, <code>s///</code>, <code>tr///</code>, named captures (<code>(?&lt;name&gt;...)</code>, <code>%+</code>).</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>!~</code></h3>
+        <p><strong>Negated regex bind.</strong> True if the regex does NOT match.</p>
+        <pre><code class="lang-perl">next if $line !~ /^\s*\w/      # skip lines that don&#39;t start with a word
+</code></pre>
+        <p>See also: <code>=~</code>, <code>m//</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>..</code></h3>
+        <p><strong>Range operator.</strong> In list context, generates an inclusive integer or magic-string sequence: <code>1..5 == (1,2,3,4,5)</code>. In scalar/boolean context (rare — only in <code>while</code>/<code>if</code>), acts as a flip-flop state machine.</p>
+        <pre><code class="lang-perl">for (1..10) { p _ }
+my @letters = (&#39;a&#39;..&#39;z&#39;)        # magic string range
+my @rev = reverse 1..100
+</code></pre>
+        <p>Stryke convention: prefer <code>1:5</code> (colon-range, fully equivalent) since it doesn&#39;t visually clash with method/property access chains.</p>
+        <p>See also: <code>...</code> (three-dot range), <code>:</code> colon range, flip-flop in <code>while</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>...</code></h3>
+        <p><strong>Exclusive range / yada-yada.</strong> As an operator: <code>1...5</code> is the *exclusive* range (does not include the endpoint in some contexts) and the *flip-flop* operator with slightly different reset semantics than <code>..</code>. As a statement: <code>...</code> alone (the &quot;yada-yada&quot;) is a placeholder that compiles fine but dies at runtime — useful for sketching APIs.</p>
+        <pre><code class="lang-perl">fn not_yet_implemented { ... }       # yada-yada — dies if called
+</code></pre>
+        <p>See also: <code>..</code>, yada-yada placeholder.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>=&gt;</code></h3>
+        <p><strong>Fat comma</strong> — variant of <code>,</code> that auto-quotes the left operand if it looks like a bareword identifier. The canonical syntax for hash entries and named arguments since it self-documents which side is the key.</p>
+        <pre><code class="lang-perl">my %cfg = (
+    host   =&gt; &quot;localhost&quot;,     # &quot;host&quot; auto-quoted
+    port   =&gt; 5432,
+    debug  =&gt; 1,
+)
+open my $fh, &#39;&lt;&#39;, $path or die
+Class-&gt;new(name =&gt; &quot;alice&quot;, age =&gt; 30)
+</code></pre>
+        <p>With strict syntax, <code>,</code> and <code>=&gt;</code> are semantically equivalent EXCEPT for the auto-quoting. <code>1 =&gt; 2</code> is the same as <code>1 , 2</code>; the magic only fires on bareword LHS.</p>
+        <p>See also: <code>,</code>, hash declaration, named parameters.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>,</code></h3>
+        <p><strong>Comma operator / list separator.</strong> In list context, separates list elements. In scalar context (right-to-left), evaluates each expression for side effects and returns the rightmost (like C). The fat-comma <code>=&gt;</code> is a variant that auto-quotes bareword LHS.</p>
+        <pre><code class="lang-perl">my @x = (1, 2, 3)
+my %h = (a =&gt; 1, b =&gt; 2)
+for (my $i = 0, my $j = 10; $i &lt; 5; $i++, $j--) { ... }   # scalar context
+</code></pre>
+        <p>See also: <code>=&gt;</code>, list operators (<code>push</code>, <code>unshift</code>, …).</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>?:</code></h3>
+        <p><strong>Ternary conditional</strong> — <code>COND ? IF_TRUE : IF_FALSE</code>. Right-associative for chaining. Returns one of the two branches as an expression value, unlike <code>if</code>/<code>else</code> which is a statement. Stryke also accepts the <code>if</code>/<code>else</code> block form as an expression: <code>my $x = do { if (cond) { 1 } else { 2 } }</code>.</p>
+        <pre><code class="lang-perl">my $sign = $n &gt; 0 ? &quot;+&quot; : $n &lt; 0 ? &quot;-&quot; : &quot;0&quot;
+p $count == 1 ? &quot;$count item&quot; : &quot;$count items&quot;
+</code></pre>
+        <p>Binds looser than most operators; use parens around complex conditions for readability. See also: <code>if</code>/<code>else</code>, <code>match</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>\</code></h3>
+        <p><strong>Reference operator</strong> — takes a reference to a variable, sub, or value. <code>\$scalar</code>, <code>\@array</code>, <code>\%hash</code>, <code>\&amp;sub</code>, <code>\(...)</code>. References are scalars; deref with <code>$$ref</code> / <code>@$ref</code> / <code>%$ref</code> / <code>&amp;$ref</code> / <code>$ref-&gt;[i]</code> / <code>$ref-&gt;{k}</code> / <code>$ref-&gt;(...)</code>.</p>
+        <pre><code class="lang-perl">my @nums = (1, 2, 3)
+my $aref = \@nums
+p $$aref[0]                  # 1 (sigil-deref)
+p $aref-&gt;[0]                  # 1 (arrow-deref — preferred)
+p join &quot;,&quot;, @$aref            # 1,2,3
+
+my $code = \&amp;my_function
+$code-&gt;(42)
+</code></pre>
+        <p>Also <code>\(LIST)</code> returns a list of references — <code>\(@a, @b)</code> gives one ref per element, not a single ref to the list.</p>
+        <p>See also: <code>-&gt;</code>, <code>ref</code>, deref syntax, <code>bless</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&amp;</code></h3>
+        <p><strong>Bitwise AND</strong> (and prototype/sub-deref). On numbers, <code>$a &amp; $b</code> computes the bitwise AND. As a sigil prefix <code>&amp;name</code> calls a sub (in non-bareword contexts) or takes a coderef. With <code>\</code> makes a coderef: <code>\&amp;sub</code>.</p>
+        <pre><code class="lang-perl">p 0b1100 &amp; 0b1010            # 8 (0b1000)
+my $mask = $flags &amp; 0xFF
+my $code = \&amp;my_sub          # coderef
+</code></pre>
+        <p>See also: <code>|</code>, <code>^</code>, <code>~</code>, <code>&amp;&amp;</code>, <code>\&amp;</code> (coderef).</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>|</code></h3>
+        <p><strong>Bitwise OR.</strong> <code>$a | $b</code> ORs the bits. Also a regex alternation inside <code>/.../</code>. As a stream operator <code>||</code> is logical OR, <code>|&gt;</code> is pipe-forward.</p>
+        <pre><code class="lang-perl">p 0b1100 | 0b1010           # 14 (0b1110)
+my $flags = OPEN_READ | OPEN_NONBLOCK
+</code></pre>
+        <p>See also: <code>&amp;</code>, <code>^</code>, <code>~</code>, <code>||</code>, <code>|&gt;</code>, regex alternation.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>^</code></h3>
+        <p><strong>Bitwise XOR.</strong> <code>$a ^ $b</code> XORs the bits.</p>
+        <pre><code class="lang-perl">p 0b1100 ^ 0b1010           # 6 (0b0110)
+my $toggled = $bits ^ $mask
+</code></pre>
+        <p>See also: <code>&amp;</code>, <code>|</code>, <code>~</code>, <code>xor</code> (logical).</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>~</code></h3>
+        <p><strong>Bitwise NOT</strong> (unary). Flips every bit; works on integers. Also the prefix of stryke thread macros (<code>~&gt;</code>, <code>~p&gt;</code>, <code>~d&gt;</code>, etc.) — those are distinct multi-char operators, not <code>~</code> followed by something.</p>
+        <pre><code class="lang-perl">p ~0                        # -1 (all bits set on signed int)
+p ~0xFF                     # …higher bits set
+my $inverted = ~$mask &amp; 0xFFFF
+</code></pre>
+        <p>See also: <code>&amp;</code>, <code>|</code>, <code>^</code>, <code>!</code> (logical NOT), <code>~&gt;</code> / <code>~&gt;&gt;</code> / <code>~p&gt;</code> (distinct ops).</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&lt;&lt;</code></h3>
+        <p><strong>Left bit-shift / heredoc.</strong> As <code>$a &lt;&lt; $b</code>, shifts bits left by <code>$b</code> positions. As <code>&lt;&lt;TAG</code>, opens a heredoc (multi-line string literal terminated by <code>TAG</code> at start of line).</p>
+        <pre><code class="lang-perl">p 1 &lt;&lt; 10                    # 1024
+my $kb = $bytes &lt;&lt; 10
+my $sql = &lt;&lt;END
+    SELECT *
+    FROM users
+END
+</code></pre>
+        <p>See also: <code>&gt;&gt;</code>, <code>&lt;&lt;=</code>, heredoc syntax.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&gt;&gt;</code></h3>
+        <p><strong>Right bit-shift / file redirect.</strong> As <code>$a &gt;&gt; $b</code>, shifts bits right by <code>$b</code> positions. As a mode in <code>open</code>, <code>&gt;&gt;</code> opens for append.</p>
+        <pre><code class="lang-perl">p 1024 &gt;&gt; 2                  # 256
+my $exit_code = $? &gt;&gt; 8       # extract exit code from $?
+open my $fh, &#39;&gt;&gt;&#39;, &#39;log.txt&#39; or die
+</code></pre>
+        <p>See also: <code>&lt;&lt;</code>, <code>&gt;&gt;=</code>, <code>open</code> modes.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>=</code></h3>
+        <p><strong>Assignment.</strong> Returns the assigned value (so chained <code>$a = $b = 5</code> works). Context matters: <code>my @a = $scalar</code> copies the scalar&#39;s value into a one-element list; <code>my @a = @b</code> does list copy; <code>my $s = @a</code> gives the array&#39;s length in scalar context. The single most-used operator after <code>;</code>.</p>
+        <pre><code class="lang-perl">my $x = 42
+my ($a, $b, $c) = (1, 2, 3)        # list-destructure
+my ($first, @rest) = split /,/
+($a, $b) = ($b, $a)                  # swap
+my $len = @items                     # scalar context — count
+</code></pre>
+        <p>See also: <code>+=</code>, <code>-=</code>, <code>.=</code>, <code>//=</code>, <code>||=</code>, <code>&amp;&amp;=</code>, <code>my</code>, <code>our</code>, <code>local</code>, <code>state</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>+=</code></h3>
+        <p><strong>Add-assign.</strong> <code>$x += $y</code> ≡ <code>$x = $x + $y</code>. Atomic on <code>mysync</code> shared scalars.</p>
+        <pre><code class="lang-perl">my $total = 0
+$total += $_ for @nums
+mysync $sum = 0; fan 10000 { $sum += 1 }   # atomic — always 10000
+</code></pre>
+        <p>See also: <code>+</code>, <code>-=</code>, <code>*=</code>, etc.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>-=</code></h3>
+        <p><strong>Subtract-assign.</strong> <code>$x -= $y</code> ≡ <code>$x = $x - $y</code>. Atomic on <code>mysync</code> scalars.</p>
+        <p>See also: <code>-</code>, <code>+=</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>*=</code></h3>
+        <p><strong>Multiply-assign.</strong> <code>$x *= $y</code> ≡ <code>$x = $x * $y</code>.</p>
+        <p>See also: <code>*</code>, <code>**=</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>/=</code></h3>
+        <p><strong>Divide-assign.</strong> <code>$x /= $y</code> ≡ <code>$x = $x / $y</code>.</p>
+        <p>See also: <code>/</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>**=</code></h3>
+        <p><strong>Power-assign.</strong> <code>$x **= $y</code> ≡ <code>$x = $x ** $y</code>.</p>
+        <p>See also: <code>**</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>.=</code></h3>
+        <p><strong>Append-assign</strong> (string concat). <code>$s .= $more</code> ≡ <code>$s = $s . $more</code> but more efficient for large-string accumulators (single buffer growth, not realloc per concat). Atomic on <code>mysync</code> scalars.</p>
+        <pre><code class="lang-perl">my $buf = &quot;&quot;
+$buf .= $line for @lines
+mysync $log = &quot;&quot;; fan 100 { $log .= &quot;event\n&quot; }   # atomic
+</code></pre>
+        <p>See also: <code>.</code>, <code>+=</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-x">
+        <h3><a class="doc-anchor" href="#doc-x">#</a> <code>x=</code></h3>
+        <p><strong>Repeat-assign</strong> (string). <code>$s x= 3</code> ≡ <code>$s = $s x 3</code>.</p>
+        <pre><code class="lang-perl">my $bar = &quot;=&quot;; $bar x= 40        # forty equals signs
+</code></pre>
+        <p>See also: <code>x</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>||=</code></h3>
+        <p><strong>Or-assign.</strong> <code>$x ||= $default</code> ≡ <code>$x = $x || $default</code> — assigns the default only if <code>$x</code> is falsy. Watch out for legitimate falsy values like <code>0</code> and <code>&quot;&quot;</code>; prefer <code>//=</code> for those.</p>
+        <pre><code class="lang-perl">$opts{verbose} ||= 0
+$cache{$key} ||= compute($key)        # but: returns wrong thing if 0 is valid
+</code></pre>
+        <p>See also: <code>||</code>, <code>//=</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>//=</code></h3>
+        <p><strong>Defined-or assign.</strong> <code>$x //= $default</code> ≡ <code>$x = $x // $default</code> — assigns the default only if <code>$x</code> is <code>undef</code>. The right tool for memoization/cache-fill patterns.</p>
+        <pre><code class="lang-perl">$cache{$key} //= expensive_compute($key)
+$count{$word} //= 0; $count{$word}++
+</code></pre>
+        <p>See also: <code>//</code>, <code>||=</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&amp;&amp;=</code></h3>
+        <p><strong>And-assign.</strong> <code>$x &amp;&amp;= $val</code> ≡ <code>$x = $x &amp;&amp; $val</code> — assigns <code>$val</code> only if <code>$x</code> is truthy. Rare.</p>
+        <p>See also: <code>&amp;&amp;</code>, <code>||=</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>|=</code></h3>
+        <p><strong>Bitwise OR-assign.</strong> <code>$x |= 0x80</code> sets a bit. Atomic on <code>mysync</code> scalars.</p>
+        <p>See also: <code>|</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&amp;=</code></h3>
+        <p><strong>Bitwise AND-assign.</strong> <code>$x &amp;= 0xFF</code> masks to low byte.</p>
+        <p>See also: <code>&amp;</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>^=</code></h3>
+        <p><strong>Bitwise XOR-assign.</strong> <code>$x ^= $bit</code> toggles bits.</p>
+        <p>See also: <code>^</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&lt;&lt;=</code></h3>
+        <p><strong>Left-shift assign.</strong> <code>$x &lt;&lt;= 3</code> ≡ multiply by 8.</p>
+        <p>See also: <code>&lt;&lt;</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>&gt;&gt;=</code></h3>
+        <p><strong>Right-shift assign.</strong> <code>$x &gt;&gt;= 3</code> ≡ integer-divide by 8.</p>
+        <p>See also: <code>&gt;&gt;</code>.</p>
       </article>
     </section>
     <section class="tutorial-section" id="ch-stryke-extensions">
@@ -12279,7 +12279,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">6836 topics</p>
+      <p class="chapter-meta">6837 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$!</code></h3>
         <p><code>$!</code> — the OS error from the most recent system call, in stringified form (e.g. <code>&quot;No such file or directory&quot;</code>) or as an <code>errno</code> integer in numeric context. Set by <code>open</code>, <code>close</code>, <code>chdir</code>, <code>read</code>, <code>write</code>, and other syscalls when they fail. The value persists until the next failing call, so always check it *immediately* after the failing operation — intermediate clean Perl code does not touch it, but any subsequent syscall will.</p>
@@ -12806,6 +12806,7 @@ p &quot;@xs&quot;   # 10 20 30
         <pre><code class="lang-text">spellings (all identical): _&lt;  $_&lt;  _0&lt;  $_0&lt;  _&lt;1  $_&lt;1  _0&lt;1  $_0&lt;1
 </code></pre>
         <p>Every <code>|&gt;</code> stage, <code>map</code>/<code>grep</code>/<code>fore</code> block, and <code>sort</code> block opens a new topic frame. Inside that frame the *current* topic is <code>_</code>/<code>$_</code>/<code>_0</code>/<code>$_0</code>; one chevron <code>&lt;</code> walks up one frame to the surrounding block&#39;s topic. Indexed form <code>_&lt;N</code> is sugar for <code>N</code> chevrons — <code>_&lt;1</code> ≡ <code>_&lt;</code>, more readable as ascent depth grows. Runtime cap: 5 frames (<code>parser.rs:1473</code>).</p>
+        <p>At the outermost iter (no enclosing topic frame), <code>_&lt;</code> is <strong>undef</strong> — strict ascent semantics, no fallback to current <code>_</code>. If you need the current frame&#39;s topic, write <code>_</code> directly.</p>
         <pre><code class="lang-perl">@rows |&gt; map {
     my @cells = @$_                # $_ is current row
     @cells |&gt; map { uc($_) . &quot;:&quot; . len($_&lt;) }
@@ -13038,7 +13039,7 @@ keys %b |&gt; grep { $b{_} eq &#39;parallel&#39; } |&gt; sort |&gt; e p
         <h3><a class="doc-anchor" href="#doc-d">#</a> <code>%d</code></h3>
         <p><code>%d</code> — short alias for <code>%stryke::descriptions</code>. Maps each callable name to its one-line summary (the first sentence of its LSP hover doc). Sparse — only names that have a hand-written hover doc appear, so <code>exists $d{$name}</code> doubles as &quot;is this documented?&quot;.</p>
         <pre><code class="lang-perl">p $d{pmap}                       # one-line summary of pmap
-p $d{to_json}                    # &quot;Serialize a PerlValue to a JSON string.&quot;
+p $d{to_json}                    # &quot;Serialize a StrykeValue to a JSON string.&quot;
 p scalar keys %d                 # count of documented ops
 keys %d |&gt; grep { $d{_} =~ /parallel/i } |&gt; sort |&gt; e p
 </code></pre>
@@ -13141,7 +13142,7 @@ keys %c |&gt; sort |&gt; p                 # all category names
         <p><code>%stryke::descriptions</code> (short: <code>%d</code>) — name → one-line summary.</p>
         <p>First sentence of each LSP hover doc (<code>doc_for_label_text</code>), harvested at build time. Sparse — only names that have a hover doc appear, so <code>exists $d{$name}</code> doubles as &quot;is this documented?&quot;.</p>
         <pre><code class="lang-perl">p $d{pmap}                                # one-line summary
-p $d{to_json}                             # &quot;Serialize a PerlValue to a JSON string.&quot;
+p $d{to_json}                             # &quot;Serialize a StrykeValue to a JSON string.&quot;
 p scalar keys %d                          # count of documented ops
 keys %d |&gt; grep { $d{_} =~ /parallel/i } |&gt; sort |&gt; p
 </code></pre>
@@ -50512,6 +50513,28 @@ p percentile_rank(90, @scores)   # ~90
 # or in a pipeline:
 @list |&gt; map perfnums |&gt; p
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-perfview">
+        <h3><a class="doc-anchor" href="#doc-perfview">#</a> <code>perfview</code></h3>
+        <p><code>perfview</code> (alias <code>pfv</code>) — read the wall-clock perf log written by stryke runs launched with the <code>--record</code> CLI flag (or with <code>STRYKE_RECORD=1</code> in the environment). Every recorded invocation writes one row to <code>~/.stryke/perf.sqlite</code> (path, argv, started_ns, duration_ns, exit_code, version, host, pid, parent_pid). <code>perfview</code> queries that table and returns an arrayref of hashrefs.</p>
+        <p>No args = top 20 slowest. Options pass as <code>key =&gt; value</code> pairs:</p>
+        <p><code>top =&gt; N</code>        — limit to N rows (default 20; pass <code>all =&gt; 1</code> for no limit) <code>name =&gt; &quot;SUB&quot;</code>   — substring filter on <code>path</code> <code>re =&gt; &quot;REGEX&quot;</code>   — regex filter on <code>path</code> (alias: <code>regex</code>) <code>path =&gt; &quot;/abs&quot;</code>  — exact-match filter on <code>path</code> <code>since =&gt; &quot;7d&quot;</code>   — only rows newer than 7d / 24h / 30m / 90s / 2w <code>slowest =&gt; 1</code>    — order by duration desc (default) <code>fastest =&gt; 1</code>    — order by duration asc <code>recent =&gt; 1</code>     — order by id desc (most recent first)</p>
+        <p>From the CLI, <code>s perfview</code> wraps the result in <code>ddump</code> so the table prints directly; from stryke code it composes with <code>grep</code> / <code>dd</code> / <code>to_csv</code> naturally.</p>
+        <pre><code class="lang-perl"># CLI quick view: top 20 slowest recorded runs
+# $ s --record t examples/rosetta/t                  # record one row per test file
+# $ s perfview                                        # show top 20 slowest
+# $ s perfview top 5                                  # top 5
+# $ s perfview name rosetta                           # filter by path substring
+
+# From stryke code:
+perfview(top =&gt; 10) |&gt; e { p &quot;$_-&gt;{duration_ms}ms  $_-&gt;{path}&quot; }
+perfview(name =&gt; &quot;rosetta&quot;, since =&gt; &quot;24h&quot;) |&gt; dd
+perfview(path =&gt; &quot;/abs/path/to/script.stk&quot;) |&gt; e { p $_-&gt;{duration_ns} }
+perfview(all =&gt; 1) |&gt; grep { $_-&gt;{exit_code} } |&gt; e p   # all failed runs
+perfview(fastest =&gt; 1, top =&gt; 5) |&gt; to_csv |&gt; p
+</code></pre>
+        <p>Schema columns returned: <code>id</code>, <code>path</code>, <code>argv</code>, <code>started_ns</code>, <code>duration_ns</code>, <code>duration_ms</code>, <code>exit_code</code>, <code>version</code>, <code>host</code>, <code>pid</code>, <code>parent_pid</code>. Auto-prunes rows older than 90 days every ~1000 inserts. SQLite is in WAL mode so <code>perfview</code> reads don&#39;t block concurrent parallel-test inserts.</p>
+        <p>See also: <code>--record</code> CLI flag, <code>~/.stryke/perf.sqlite</code>, <code>--profile</code> / <code>--flame</code> (per-function profiling within one script — orthogonal to wall-clock per-script recording).</p>
       </article>
       <article class="doc-entry" id="doc-perihelion-precession">
         <h3><a class="doc-anchor" href="#doc-perihelion-precession">#</a> <code>perihelion_precession</code></h3>

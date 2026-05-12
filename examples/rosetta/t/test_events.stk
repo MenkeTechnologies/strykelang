@@ -24,7 +24,7 @@ fn Rosetta::Events::emit($emitter, $event, $data) {
 
 my $emitter = RosettaEventsEmitter(+{})
 my $out = +{ received => undef }
-Rosetta::Events::on($emitter, "test", sub { $out->{received} = $_[0] })
+Rosetta::Events::on($emitter, "test", fn { $out->{received} = _ })
 Rosetta::Events::emit($emitter, "test", "Hello Events")
 
 assert_eq $out->{received}, "Hello Events", "Event received correctly"

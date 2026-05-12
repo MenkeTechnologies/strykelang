@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./GradeSchool.stk"
 
-fn fmt { join("|", map { join(",", @$_) } @{$_[0]}) }
+fn fmt { join("|", map { join(",", @$_) } @{_}) }
 
 my $s = Exercism::GradeSchool::new()
 assert_eq fmt(Exercism::GradeSchool::roster($s)), "", "empty roster"

@@ -2,13 +2,13 @@
 # Rosetta Code: Pythagorean Triples
 
 fn Rosetta::IsSquare::is_square {
-    my $n = $_[0]
+    my $n = _
     my $root = int($n ** 0.5)
     $root * $root == $n
 }
 
 fn pythagorean_triples {
-    my $max = $_[0]
+    my $max = _
     my @triples
     for my $a (1..$max) {
         for my $b ($a..$max) {

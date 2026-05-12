@@ -21,7 +21,7 @@ fn Rosetta::CsvData::add_column($csv, $col_name, $val_sub) {
 }
 
 my $csv = "Name,Age\nAlice,30\nBob,25"
-my $new_csv = Rosetta::CsvData::add_column($csv, "City", sub {
+my $new_csv = Rosetta::CsvData::add_column($csv, "City", fn {
     my ($line, $idx) = @_
     $idx == 0 ? "New York" : "London"
 })

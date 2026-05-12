@@ -4,7 +4,7 @@
 fn Rosetta::Web::start($port) {
     # spawn the server so we can test it
     spawn {
-        serve($port, sub {
+        serve($port, fn {
             my ($req) = @_
             "Hello World!"
         })

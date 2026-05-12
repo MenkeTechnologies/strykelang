@@ -2,7 +2,7 @@
 # Rosetta Code: Sum of Series
 
 fn sum_series {
-    my $m = $_[0]
+    my $m = _
     ~> (1..$m) map { 1 / (_ * _) } reduce { _0 + _1 }
 }
 

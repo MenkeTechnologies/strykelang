@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./Minesweeper.stk"
 
-fn j { join("\n", @{$_[0]}) }
+fn j { join("\n", @{_}) }
 
 assert_eq j(Exercism::Minesweeper::annotate([])),
     "",

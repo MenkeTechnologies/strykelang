@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./PythagoreanTriplet.stk"
 
-fn fmt { join("|", map { join(",", @$_) } @{$_[0]}) }
+fn fmt { join("|", map { join(",", @$_) } @{_}) }
 
 assert_ok  Exercism::PythagoreanTriplet::is_pythagorean(3, 4, 5),   "3-4-5 is pyth"
 assert_ok  Exercism::PythagoreanTriplet::is_pythagorean(5, 12, 13), "5-12-13"

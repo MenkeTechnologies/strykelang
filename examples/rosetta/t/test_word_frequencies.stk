@@ -2,7 +2,7 @@
 # Rosetta Code: Word frequency
 
 fn word_frequency {
-    my $s = $_[0]
+    my $s = _
     my $counts = {}
     my $l = lc($s)
     my @words = split(/[^a-z]+/, $l)

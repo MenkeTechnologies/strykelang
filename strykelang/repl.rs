@@ -411,9 +411,143 @@ impl Prompt for StrykePrompt {
     }
 }
 
+/// Visible (printable) width of a string that may contain ANSI CSI escape
+/// sequences. Counts every char outside the `ESC[...m` codes. Used by the
+/// banner box renderer so colored content pads to the right border
+/// regardless of how many invisible color toggles it carries.
+fn visible_width(s: &str) -> usize {
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    let mut w = 0usize;
+    while i < bytes.len() {
+        if bytes[i] == 0x1B && i + 1 < bytes.len() && bytes[i + 1] == b'[' {
+            // ESC [ ... letter — skip until the terminator (final byte
+            // in the @-~ range per ECMA-48; for SGR it's always `m`).
+            i += 2;
+            while i < bytes.len() && !(0x40..=0x7E).contains(&bytes[i]) {
+                i += 1;
+            }
+            i += 1;
+        } else {
+            // Char boundary walk; multi-byte UTF-8 counted as 1 col
+            // (good enough for the box-drawing chars and Latin labels
+            // we render — no East-Asian-Wide chars in the banner).
+            let step = std::str::from_utf8(&bytes[i..])
+                .ok()
+                .and_then(|s| s.chars().next())
+                .map(|c| c.len_utf8())
+                .unwrap_or(1);
+            w += 1;
+            i += step;
+        }
+    }
+    w
+}
+
+/// Print the stryke ASCII logo + stats box + tagline (the same banner
+/// shown by `stryke --help`). Single source of truth, shared by the REPL
+/// startup and the `--help` output. Every count is computed at runtime
+/// from the live reflection tables so the banner can never go stale.
+///
+/// Box rendering: every content row is built as a colored string, then
+/// padded to exactly `INNER` visible columns via [`visible_width`] —
+/// ANSI escapes don't inflate the count, so the right border lines up
+/// regardless of how many color toggles the row carries.
+pub fn print_cyberpunk_banner() {
+    let version = env!("CARGO_PKG_VERSION");
+    let cores = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1);
+
+    // Reflection-hash sizes — pulled live so re-running after a `cargo build`
+    // that adds builtins/keywords/operators reflects the new totals.
+    let n_builtins = stryke::builtins::builtins_hash_map().len();
+    let n_aliases = stryke::builtins::aliases_hash_map().len();
+    let n_keywords = stryke::builtins::keywords_hash_map().len();
+    let n_operators = stryke::builtins::operators_hash_map().len();
+    let n_special_vars = stryke::builtins::special_vars_hash_map().len();
+    let n_categories = stryke::builtins::categories_hash_map().len();
+    let n_primaries = stryke::builtins::primaries_hash_map().len();
+    let n_descriptions = stryke::builtins::descriptions_hash_map().len();
+    let n_perl_compats = stryke::builtins::perl_compats_hash_map().len();
+    let n_extensions = stryke::builtins::extensions_hash_map().len();
+    let n_all = stryke::builtins::all_hash_map().len();
+
+    // Memory totals via sysinfo (already a dep). `total_memory()` reports
+    // bytes on every backend. `available_memory()` accounts for cached
+    // pages on Linux / macOS — closer to what `vm_stat` / `top` show.
+    let (mem_total_gib, mem_avail_gib) = {
+        use sysinfo::System;
+        let mut sys = System::new();
+        sys.refresh_memory();
+        let total = sys.total_memory() as f64 / 1024.0 / 1024.0 / 1024.0;
+        let avail = sys.available_memory() as f64 / 1024.0 / 1024.0 / 1024.0;
+        (total, avail)
+    };
+
+    let os = std::env::consts::OS;
+    let arch = std::env::consts::ARCH;
+    let pid = std::process::id();
+
+    const C: &str = "\x1b[36m"; // cyan
+    const M: &str = "\x1b[35m"; // magenta
+    const R: &str = "\x1b[31m"; // red
+    const Y: &str = "\x1b[33m"; // yellow
+    const G: &str = "\x1b[32m"; // green
+    const N: &str = "\x1b[0m"; // reset
+
+    /// Box interior width (chars between the left and right `│`).
+    /// Matches the `─` count in the top/bottom rules below.
+    const INNER: usize = 64;
+
+    // Render one content row, padded with spaces so the closing `│`
+    // lands at exactly INNER visible columns from the opening `│`.
+    let row = |body: &str| {
+        let pad = INNER.saturating_sub(visible_width(body));
+        println!("{C} │{N}{body}{:pad$}{C}│{N}", "", pad = pad);
+    };
+
+    println!("{C} ███████╗████████╗██████╗ ██╗   ██╗██╗  ██╗███████╗{N}");
+    println!("{C} ██╔════╝╚══██╔══╝██╔══██╗╚██╗ ██╔╝██║ ██╔╝██╔════╝{N}");
+    println!("{M} ███████╗   ██║   ██████╔╝ ╚████╔╝ █████╔╝ █████╗  {N}");
+    println!("{M} ╚════██║   ██║   ██╔══██╗  ╚██╔╝  ██╔═██╗ ██╔══╝  {N}");
+    println!("{R} ███████║   ██║   ██║  ██║   ██║   ██║  ██╗███████╗{N}");
+    println!("{R} ╚══════╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚══════╝{N}");
+    println!("{C} ┌────────────────────────────────────────────────────────────────┐{N}");
+    row(&format!(
+        " {Y}SYSTEM{N}  status:{G} ONLINE {C}//{N} {Y}os:{N} {os} {Y}arch:{N} {arch} {Y}pid:{N} {pid}"
+    ));
+    row(&format!(
+        " {Y}CORES{N}   {cores}    {Y}MEM{N}  {mem_avail_gib:.1} {C}/{N} {mem_total_gib:.1} GiB available"
+    ));
+    println!("{C} ├────────────────────────────────────────────────────────────────┤{N}");
+    row(&format!(
+        " {Y}%b{N}  builtins   {n_builtins:<5}  {Y}%a{N}  aliases    {n_aliases:<5}  {Y}%all{N} {n_all:<5}"
+    ));
+    row(&format!(
+        " {Y}%k{N}  keywords   {n_keywords:<5}  {Y}%o{N}  operators  {n_operators:<5}  {Y}%v{N}   {n_special_vars:<5}"
+    ));
+    row(&format!(
+        " {Y}%pc{N} perl5 core {n_perl_compats:<5}  {Y}%e{N}  stryke ext {n_extensions:<5}  {Y}%d{N}   {n_descriptions:<5}"
+    ));
+    row(&format!(
+        " {Y}%c{N}  categories {n_categories:<5}  {Y}%p{N}  primaries  {n_primaries:<5}"
+    ));
+    println!("{C} └────────────────────────────────────────────────────────────────┘{N}");
+    println!("{M}  >> PARALLEL PERL5 INTERPRETER // RUST-POWERED v{version} <<{N}");
+}
+
 pub fn run(cli: &Cli) {
     let mut interp = VMHelper::new();
     crate::configure_interpreter(cli, &mut interp, "repl");
+
+    // Show the same cyberpunk banner that `stryke --help` displays, so a
+    // fresh REPL session looks like the rest of the CLI surface. Followed
+    // by a single hint line so newcomers know how to leave the REPL.
+    print_cyberpunk_banner();
+    println!();
+    println!("\x1b[2m  type `exit` or Ctrl-D to leave the REPL — Tab for completion\x1b[0m");
+    println!();
 
     let prelude = crate::module_prelude(cli);
     let static_words = build_static_completions();

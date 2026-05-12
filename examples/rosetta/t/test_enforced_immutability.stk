@@ -3,7 +3,7 @@
 
 fn Rosetta::Immutability::create_constant($val) {
     # Using a closure to enforce immutability of a value
-    sub { $val }
+    fn { $val }
 }
 
 my $const_42 = Rosetta::Immutability::create_constant(42)

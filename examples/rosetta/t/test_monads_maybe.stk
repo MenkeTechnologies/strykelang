@@ -27,7 +27,7 @@ fn Rosetta::MaybeMonad::calc($x, $y) {
     my $res1 = Rosetta::MaybeMonad::safe_div($x, $y)
     
     # Using bind logic
-    Rosetta::MaybeMonad::bind($res1, fn { Rosetta::MaybeMonad::safe_sqrt($_[0]) })
+    Rosetta::MaybeMonad::bind($res1, fn { Rosetta::MaybeMonad::safe_sqrt(_) })
 }
 
 # Test cases

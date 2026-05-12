@@ -348,28 +348,15 @@ fn expand_perl_bundled_token(arg: &str) -> Option<Vec<String>> {
 fn print_cyberpunk_help() {
     let version = env!("CARGO_PKG_VERSION");
     let bin = env!("CARGO_BIN_NAME");
-    let threads = std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(1);
 
     // ANSI color codes
     const C: &str = "\x1b[36m"; // cyan
     const M: &str = "\x1b[35m"; // magenta
-    const R: &str = "\x1b[31m"; // red
     const Y: &str = "\x1b[33m"; // yellow
     const G: &str = "\x1b[32m"; // green
     const N: &str = "\x1b[0m"; // reset
 
-    println!("{C} ███████╗████████╗██████╗ ██╗   ██╗██╗  ██╗███████╗{N}");
-    println!("{C} ██╔════╝╚══██╔══╝██╔══██╗╚██╗ ██╔╝██║ ██╔╝██╔════╝{N}");
-    println!("{M} ███████╗   ██║   ██████╔╝ ╚████╔╝ █████╔╝ █████╗  {N}");
-    println!("{M} ╚════██║   ██║   ██╔══██╗  ╚██╔╝  ██╔═██╗ ██╔══╝  {N}");
-    println!("{R} ███████║   ██║   ██║  ██║   ██║   ██║  ██╗███████╗{N}");
-    println!("{R} ╚══════╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚══════╝{N}");
-    println!("{C} ┌──────────────────────────────────────────────────┐{N}");
-    println!("{C} │ STATUS: ONLINE // CORES: {threads:<2} // SIGNAL: ██░      │{N}");
-    println!("{C} └──────────────────────────────────────────────────┘{N}");
-    println!("{M}  >> PARALLEL PERL5 INTERPRETER // RUST-POWERED v{version} <<{N}");
+    repl::print_cyberpunk_banner();
     println!();
     println!();
     println!("A highly parallel Perl 5 interpreter written in Rust");

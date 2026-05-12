@@ -2,7 +2,7 @@
 # Rosetta Code: Matrix Transpose
 
 fn Rosetta::Transpose::transpose {
-    my $m = $_[0]
+    my $m = _
     my $rows = len(@$m)
     my $cols = len(@{$m->[0]})
     my @res
@@ -17,7 +17,7 @@ fn Rosetta::Transpose::transpose {
 }
 
 fn matrix_to_string {
-    my $m = $_[0]
+    my $m = _
     my @rows
     for my $row (@$m) {
         push @rows, join(",", @$row)

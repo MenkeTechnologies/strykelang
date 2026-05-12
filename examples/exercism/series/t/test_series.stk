@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./Series.stk"
 
-fn j { join("|", @{Exercism::Series::slices({ series => $_[0], sliceLength => $_[1] })}) }
+fn j { join("|", @{Exercism::Series::slices({ series => _, sliceLength => _1 })}) }
 
 assert_eq j("01234", 1), "0|1|2|3|4",         "slices of one"
 assert_eq j("12", 2),    "12",                "slice length equal to series"

@@ -16,7 +16,7 @@ assert_eq Exercism::Triangle::kind(0.5, 0.4, 0.6), "scalene",     "scalene float
 
 # Validation
 fn err {
-    eval { Exercism::Triangle::kind($_[0], $_[1], $_[2]); 0 } || $@
+    eval { Exercism::Triangle::kind(_, _1, _2); 0 } || $@
 }
 assert_ok err(0, 0, 0)         =~ /TriangleError/, "all zero"
 assert_ok err(3, 4, -5)        =~ /TriangleError/, "negative side"
