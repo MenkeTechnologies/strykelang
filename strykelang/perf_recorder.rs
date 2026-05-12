@@ -303,7 +303,7 @@ pub fn prune_older_than(days: i64) -> Option<usize> {
 fn maybe_auto_prune() {
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    if n % 1000 == 0 && n > 0 {
+    if n.is_multiple_of(1000) && n > 0 {
         let _ = prune_older_than(90);
     }
 }
@@ -420,7 +420,7 @@ fn parent_pid() -> i64 {
 /// Inherited automatically by child stryke processes.
 pub fn recording_enabled_in_env() -> bool {
     std::env::var("STRYKE_RECORD")
-        .map(|v| !v.is_empty() && v != "0" && v.to_ascii_lowercase() != "false")
+        .map(|v| !v.is_empty() && v != "0" && !v.eq_ignore_ascii_case("false"))
         .unwrap_or(false)
 }
 

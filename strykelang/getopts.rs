@@ -454,7 +454,7 @@ fn parse_argv(
                 continue;
             }
             // Numeric (-5, -3.14) is a positional, not an option.
-            if rest.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+            if rest.chars().next().is_some_and(|c| c.is_ascii_digit()) {
                 leftover.push(StrykeValue::string(arg.clone()));
                 i += 1;
                 continue;

@@ -345,6 +345,7 @@ fn builtin_mahalanobis_1d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Soft-max normalization
 
 // Log-softmax
+#[allow(dead_code)]
 fn builtin_log_softmax(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();

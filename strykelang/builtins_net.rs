@@ -372,12 +372,13 @@ pub fn ip_is_global(args: &[StrykeValue]) -> StrykeValue {
                 }
         }
         IpAddr::V6(v6) => {
-            !v6.is_loopback()
-                && !v6.is_multicast()
-                && !v6.is_unspecified()
-                && (v6.segments()[0] & 0xffc0) != 0xfe80 // link-local
-                && (v6.segments()[0] & 0xfe00) != 0xfc00 // unique-local
-                && !(v6.segments()[0] == 0x2001 && v6.segments()[1] == 0x0db8) // doc
+            let segs = v6.segments();
+            !(v6.is_loopback()
+                || v6.is_multicast()
+                || v6.is_unspecified()
+                || (segs[0] & 0xffc0) == 0xfe80   // link-local
+                || (segs[0] & 0xfe00) == 0xfc00   // unique-local
+                || (segs[0] == 0x2001 && segs[1] == 0x0db8)) // doc
         }
     };
     b(not_special)
@@ -815,6 +816,7 @@ impl Cidr {
 
     /// The address (host bits NOT zeroed). Use `network_addr` for the
     /// network address with host bits zeroed.
+    #[allow(dead_code)]
     fn addr(self) -> IpAddr {
         match self {
             Cidr::V4 { addr, .. } => IpAddr::V4(addr),
@@ -2795,11 +2797,11 @@ pub fn cookie_format(args: &[StrykeValue]) -> StrykeValue {
             "secure" if v.is_true() => out.push_str("; Secure"),
             "http-only" if v.is_true() => out.push_str("; HttpOnly"),
             "max-age" => out.push_str(&format!("; Max-Age={}", v.to_int())),
-            "expires" => out.push_str(&format!("; Expires={}", v.to_string())),
-            "domain" => out.push_str(&format!("; Domain={}", v.to_string())),
-            "path" => out.push_str(&format!("; Path={}", v.to_string())),
-            "same-site" => out.push_str(&format!("; SameSite={}", v.to_string())),
-            _ => out.push_str(&format!("; {}={}", k, v.to_string())),
+            "expires" => out.push_str(&format!("; Expires={}", v)),
+            "domain" => out.push_str(&format!("; Domain={}", v)),
+            "path" => out.push_str(&format!("; Path={}", v)),
+            "same-site" => out.push_str(&format!("; SameSite={}", v)),
+            _ => out.push_str(&format!("; {}={}", k, v)),
         }
     }
     StrykeValue::string(out)

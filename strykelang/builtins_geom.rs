@@ -593,7 +593,10 @@ pub fn polygon_convex_hull_2d(args: &[StrykeValue]) -> StrykeValue {
 
 // ── Triangles ─────────────────────────────────────────────────────────
 
-fn triangle_pts(args: &[StrykeValue]) -> Option<((f64, f64), (f64, f64), (f64, f64))> {
+type Pt = (f64, f64);
+type Tri = (Pt, Pt, Pt);
+
+fn triangle_pts(args: &[StrykeValue]) -> Option<Tri> {
     let a = args.first().and_then(point_xy)?;
     let b = args.get(1).and_then(point_xy)?;
     let c = args.get(2).and_then(point_xy)?;

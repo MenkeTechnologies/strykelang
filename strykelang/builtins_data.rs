@@ -952,16 +952,16 @@ pub fn markdown_to_html(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let mut out = String::new();
     for line in s.lines() {
-        if line.starts_with("### ") {
-            out.push_str(&format!("<h3>{}</h3>\n", &line[4..]));
-        } else if line.starts_with("## ") {
-            out.push_str(&format!("<h2>{}</h2>\n", &line[3..]));
-        } else if line.starts_with("# ") {
-            out.push_str(&format!("<h1>{}</h1>\n", &line[2..]));
+        if let Some(rest) = line.strip_prefix("### ") {
+            out.push_str(&format!("<h3>{rest}</h3>\n"));
+        } else if let Some(rest) = line.strip_prefix("## ") {
+            out.push_str(&format!("<h2>{rest}</h2>\n"));
+        } else if let Some(rest) = line.strip_prefix("# ") {
+            out.push_str(&format!("<h1>{rest}</h1>\n"));
         } else if line.is_empty() {
-            out.push_str("\n");
+            out.push('\n');
         } else {
-            out.push_str(&format!("<p>{}</p>\n", line));
+            out.push_str(&format!("<p>{line}</p>\n"));
         }
     }
     StrykeValue::string(out)

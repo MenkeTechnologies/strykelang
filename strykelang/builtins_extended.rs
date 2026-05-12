@@ -693,6 +693,7 @@ fn builtin_normalize_array(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `cross_entropy P, Q`.
+#[allow(dead_code)]
 fn builtin_cross_entropy(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let p: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
@@ -712,6 +713,7 @@ fn builtin_cross_entropy(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `euclidean_distance A, B`.
+#[allow(dead_code)]
 fn builtin_euclidean_distance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let a: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
@@ -7687,6 +7689,7 @@ fn builtin_pnorm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `qnorm p [, mu, sigma]` — normal quantile (inverse CDF) via rational approximation.
+#[allow(dead_code)]
 fn builtin_qnorm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
     let mu = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -8592,6 +8595,7 @@ fn builtin_prcomp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // R base: distribution random generators (r-functions)
 // ─────────────────────────────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 fn builtin_rnorm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
     let mu = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -8614,6 +8618,7 @@ fn builtin_rnorm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     }
 }
 
+#[allow(dead_code)]
 fn builtin_runif(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -8630,6 +8635,7 @@ fn builtin_runif(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     }
 }
 
+#[allow(dead_code)]
 fn builtin_rexp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
     let rate = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -8648,6 +8654,7 @@ fn builtin_rexp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     }
 }
 
+#[allow(dead_code)]
 fn builtin_rbinom(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
     let size = args.get(1).map(|v| v.to_number() as usize).unwrap_or(1);
@@ -8667,6 +8674,7 @@ fn builtin_rbinom(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     }
 }
 
+#[allow(dead_code)]
 fn builtin_rpois(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
     let lambda = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -8695,6 +8703,7 @@ fn builtin_rpois(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     }
 }
 
+#[allow(dead_code)]
 fn builtin_rgeom(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
     let prob = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
@@ -8713,6 +8722,7 @@ fn builtin_rgeom(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     }
 }
 
+#[allow(dead_code)]
 fn builtin_rgamma(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
     let shape = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -8752,6 +8762,7 @@ fn builtin_rgamma(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     }
 }
 
+#[allow(dead_code)]
 fn builtin_rbeta(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -8781,6 +8792,7 @@ fn builtin_rbeta(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     }
 }
 
+#[allow(dead_code)]
 fn builtin_rchisq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
     let df = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -8793,6 +8805,7 @@ fn builtin_rchisq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     builtin_rgamma(&g_args)
 }
 
+#[allow(dead_code)]
 fn builtin_rt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
     let df = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -8813,6 +8826,7 @@ fn builtin_rt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     }
 }
 
+#[allow(dead_code)]
 fn builtin_rf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
     let d1 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -8835,6 +8849,7 @@ fn builtin_rf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     }
 }
 
+#[allow(dead_code)]
 fn builtin_rweibull(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
     let shape = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -8854,6 +8869,7 @@ fn builtin_rweibull(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     }
 }
 
+#[allow(dead_code)]
 fn builtin_rlnorm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
     let mu = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -8874,6 +8890,7 @@ fn builtin_rlnorm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     ))
 }
 
+#[allow(dead_code)]
 fn builtin_rcauchy(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
     let x0 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -8897,6 +8914,7 @@ fn builtin_rcauchy(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // R base: quantile functions (q-functions) — inverse CDFs
 // ─────────────────────────────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 fn builtin_qunif(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -8904,12 +8922,14 @@ fn builtin_qunif(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::float(a + p * (b - a)))
 }
 
+#[allow(dead_code)]
 fn builtin_qexp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
     let rate = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(-(1.0 - p).ln() / rate))
 }
 
+#[allow(dead_code)]
 fn builtin_qweibull(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
     let k = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -8917,6 +8937,7 @@ fn builtin_qweibull(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::float(lambda * (-(1.0 - p).ln()).powf(1.0 / k)))
 }
 
+#[allow(dead_code)]
 fn builtin_qlnorm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
     let mu = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -8925,6 +8946,7 @@ fn builtin_qlnorm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::float((mu + sigma * z).exp()))
 }
 
+#[allow(dead_code)]
 fn builtin_qcauchy(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
     let x0 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -9225,6 +9247,7 @@ fn builtin_lm_fit(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// `qgamma p, shape [, scale]` — gamma quantile via Newton iteration on pgamma.
+#[allow(dead_code)]
 fn builtin_qgamma(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
     let shape = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -9258,6 +9281,7 @@ fn builtin_qgamma(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `qbeta p, a, b` — beta quantile via Newton iteration on pbeta.
+#[allow(dead_code)]
 fn builtin_qbeta(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -9290,6 +9314,7 @@ fn builtin_qbeta(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `qchisq p, df` — chi-squared quantile.
+#[allow(dead_code)]
 fn builtin_qchisq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
     let df = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -9321,6 +9346,7 @@ fn builtin_qt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `qf p, d1, d2` — F-distribution quantile via Newton iteration.
+#[allow(dead_code)]
 fn builtin_qf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
     let d1 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -9353,6 +9379,7 @@ fn builtin_qf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `qbinom p, n, prob` — binomial quantile (smallest k where P(X<=k) >= p).
+#[allow(dead_code)]
 fn builtin_qbinom(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
     let n = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
@@ -9374,6 +9401,7 @@ fn builtin_qbinom(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `qpois p, lambda` — Poisson quantile (smallest k where P(X<=k) >= p).
+#[allow(dead_code)]
 fn builtin_qpois(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
     let lambda = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
