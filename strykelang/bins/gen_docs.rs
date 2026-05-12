@@ -4,7 +4,8 @@
 //! GitHub Pages.
 //!
 //! Source of truth: `stryke::lsp::DOC_CATEGORIES` (chapter → topic names)
-//! and `stryke::lsp::doc_text_for(topic)` (raw markdown). Topics not in
+//! and `stryke::lsp::doc_text_for(topic)` (raw markdown: `lsp.rs` plus
+//! `lsp_docs_domains.rs` fallbacks). Topics not in
 //! any `DOC_CATEGORIES` chapter land under a synthetic "Other" chapter so
 //! nothing silently vanishes.
 //!
@@ -545,3 +546,23 @@ const FOOT: &str = r#"  </main>
 </body>
 </html>
 "#;
+
+#[cfg(test)]
+mod tests {
+    use super::markdown_to_html;
+    use stryke::lsp::doc_text_for;
+
+    /// Regression: domain docs with many inline ` spans (e.g. tensor notation) must
+    /// survive `markdown_to_html` so `docs/reference.html` matches LSP hover text.
+    #[test]
+    fn harris_response_md_roundtrips_to_html() {
+        let md = doc_text_for("harris_response").expect("harris_response documented");
+        assert!(md.contains("structure tensor"), "doc_text_for: len={}", md.len());
+        let html = markdown_to_html(md);
+        assert!(
+            html.contains("structure tensor"),
+            "markdown_to_html: len={}",
+            html.len()
+        );
+    }
+}
