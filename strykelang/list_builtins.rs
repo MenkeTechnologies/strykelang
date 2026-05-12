@@ -71,7 +71,7 @@ use parking_lot::RwLock;
 use rand::seq::SliceRandom;
 use rand::Rng;
 
-use crate::value::{BlessedRef, HeapObject, PerlValue};
+use crate::value::{BlessedRef, HeapObject, StrykeValue};
 use crate::vm_helper::{ExecResult, VMHelper, WantarrayCtx};
 
 /// Dispatch a list builtin by bare name. Stryke exposes every list builtin as a
@@ -79,7 +79,7 @@ use crate::vm_helper::{ExecResult, VMHelper, WantarrayCtx};
 pub(crate) fn dispatch_by_name(
     interp: &mut VMHelper,
     name: &str,
-    args: &[PerlValue],
+    args: &[StrykeValue],
     want: WantarrayCtx,
 ) -> Option<ExecResult> {
     match name {
@@ -159,8 +159,8 @@ pub(crate) fn dispatch_by_name(
         "blessed" => Some(dispatch_ok(scalar_util_blessed(args.first()))),
         "refaddr" => Some(dispatch_ok(scalar_util_refaddr(args.first()))),
         "reftype" => Some(dispatch_ok(scalar_util_reftype(args.first()))),
-        "weaken" | "unweaken" => Some(dispatch_ok(Ok(PerlValue::UNDEF))),
-        "isweak" => Some(dispatch_ok(Ok(PerlValue::integer(0)))),
+        "weaken" | "unweaken" => Some(dispatch_ok(Ok(StrykeValue::UNDEF))),
+        "isweak" => Some(dispatch_ok(Ok(StrykeValue::integer(0)))),
         // Subname helpers — return the coderef unchanged.
         "set_subname" | "subname" => Some(dispatch_ok(sub_util_set_subname(args))),
         // UTF-8 codepoint passthrough.
@@ -170,43 +170,43 @@ pub(crate) fn dispatch_by_name(
 }
 
 /// `set_subname $name, $coderef` → returns `$coderef` (stryke does not rename closures).
-fn sub_util_set_subname(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
-    Ok(args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+fn sub_util_set_subname(args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
+    Ok(args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
 }
 
-fn utf8_unicode_to_native(arg: Option<&PerlValue>) -> crate::error::PerlResult<PerlValue> {
+fn utf8_unicode_to_native(arg: Option<&StrykeValue>) -> crate::error::PerlResult<StrykeValue> {
     let n = arg.map(|a| a.to_int()).unwrap_or(0);
-    Ok(PerlValue::integer(n))
+    Ok(StrykeValue::integer(n))
 }
 
-fn scalar_util_blessed(arg: Option<&PerlValue>) -> crate::error::PerlResult<PerlValue> {
+fn scalar_util_blessed(arg: Option<&StrykeValue>) -> crate::error::PerlResult<StrykeValue> {
     let Some(v) = arg else {
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     };
     Ok(v.as_blessed_ref()
-        .map(|b| PerlValue::string(b.class.clone()))
-        .unwrap_or(PerlValue::UNDEF))
+        .map(|b| StrykeValue::string(b.class.clone()))
+        .unwrap_or(StrykeValue::UNDEF))
 }
 
-fn scalar_util_refaddr(arg: Option<&PerlValue>) -> crate::error::PerlResult<PerlValue> {
+fn scalar_util_refaddr(arg: Option<&StrykeValue>) -> crate::error::PerlResult<StrykeValue> {
     let Some(v) = arg else {
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     };
     if v.is_undef() {
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     }
     if v.with_heap(|_| ()).is_none() {
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     }
-    Ok(PerlValue::integer(v.raw_bits() as i64))
+    Ok(StrykeValue::integer(v.raw_bits() as i64))
 }
 
-fn scalar_util_reftype(arg: Option<&PerlValue>) -> crate::error::PerlResult<PerlValue> {
+fn scalar_util_reftype(arg: Option<&StrykeValue>) -> crate::error::PerlResult<StrykeValue> {
     let Some(v) = arg else {
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     };
     if v.is_undef() {
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     }
     if let Some(b) = v.as_blessed_ref() {
         let inner = b.data.read().clone();
@@ -225,13 +225,13 @@ fn scalar_util_reftype(arg: Option<&PerlValue>) -> crate::error::PerlResult<Perl
             HeapObject::Regex(_, _, _) => Some("REGEXP"),
             _ => None,
         };
-        t.map(|s| PerlValue::string(s.to_string()))
+        t.map(|s| StrykeValue::string(s.to_string()))
     })
     .flatten()
-    .unwrap_or(PerlValue::UNDEF))
+    .unwrap_or(StrykeValue::UNDEF))
 }
 
-fn dispatch_ok(r: crate::error::PerlResult<PerlValue>) -> ExecResult {
+fn dispatch_ok(r: crate::error::PerlResult<StrykeValue>) -> ExecResult {
     match r {
         Ok(v) => Ok(v),
         Err(e) => Err(e.into()),
@@ -245,7 +245,7 @@ fn dispatch_ok(r: crate::error::PerlResult<PerlValue>) -> ExecResult {
 /// wrapping the result in a 1-element array in list context broke arithmetic
 /// (`0 + sum(...)` would numify the array ref to 1, while string interpolation
 /// happened to print the wrapped scalar). Always return the scalar.
-fn aggregate_wantarray(v: PerlValue, _want: WantarrayCtx) -> PerlValue {
+fn aggregate_wantarray(v: StrykeValue, _want: WantarrayCtx) -> StrykeValue {
     v
 }
 
@@ -256,9 +256,9 @@ enum MinMax {
     MaxStr,
 }
 
-fn minmax(args: &[PerlValue], mode: MinMax) -> crate::error::PerlResult<PerlValue> {
+fn minmax(args: &[StrykeValue], mode: MinMax) -> crate::error::PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     }
     let mut it = args.iter().cloned();
     let mut m = it.next().unwrap();
@@ -297,18 +297,18 @@ fn minmax(args: &[PerlValue], mode: MinMax) -> crate::error::PerlResult<PerlValu
     Ok(m)
 }
 
-fn uniq_with_want(args: &[PerlValue], want: WantarrayCtx) -> crate::error::PerlResult<PerlValue> {
+fn uniq_with_want(args: &[StrykeValue], want: WantarrayCtx) -> crate::error::PerlResult<StrykeValue> {
     let a = uniq_list(args)?;
     if want == WantarrayCtx::Scalar {
         if let Some(x) = a.as_array_vec() {
-            return Ok(PerlValue::integer(x.len() as i64));
+            return Ok(StrykeValue::integer(x.len() as i64));
         }
     }
     Ok(a)
 }
 
 /// Adjacent-unique like Perl 5 `uniq` (DWIM string/undef; refs compared by string form).
-fn uniq_list(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
+fn uniq_list(args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
     let mut out = Vec::new();
     let mut seen = std::collections::HashSet::new();
     for arg in args {
@@ -334,23 +334,23 @@ fn uniq_list(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
             }
         }
     }
-    Ok(PerlValue::array(out))
+    Ok(StrykeValue::array(out))
 }
 
 fn uniqstr_with_want(
-    args: &[PerlValue],
+    args: &[StrykeValue],
     want: WantarrayCtx,
-) -> crate::error::PerlResult<PerlValue> {
+) -> crate::error::PerlResult<StrykeValue> {
     let a = uniqstr_list(args)?;
     if want == WantarrayCtx::Scalar {
         if let Some(x) = a.as_array_vec() {
-            return Ok(PerlValue::integer(x.len() as i64));
+            return Ok(StrykeValue::integer(x.len() as i64));
         }
     }
     Ok(a)
 }
 
-fn uniqstr_list(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
+fn uniqstr_list(args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
     let mut out = Vec::new();
     let mut prev: Option<String> = None;
     let mut have = false;
@@ -362,35 +362,35 @@ fn uniqstr_list(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
             have = true;
         }
     }
-    Ok(PerlValue::array(out))
+    Ok(StrykeValue::array(out))
 }
 
 fn uniqint_with_want(
-    args: &[PerlValue],
+    args: &[StrykeValue],
     want: WantarrayCtx,
-) -> crate::error::PerlResult<PerlValue> {
+) -> crate::error::PerlResult<StrykeValue> {
     let a = uniqint_list(args)?;
     if want == WantarrayCtx::Scalar {
         if let Some(x) = a.as_array_vec() {
-            return Ok(PerlValue::integer(x.len() as i64));
+            return Ok(StrykeValue::integer(x.len() as i64));
         }
     }
     Ok(a)
 }
 
-fn uniqint_list(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
+fn uniqint_list(args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
     let mut out = Vec::new();
     let mut prev: Option<i64> = None;
     let mut have = false;
     for x in args {
         let n = x.to_int();
         if !have || prev != Some(n) {
-            out.push(PerlValue::integer(n));
+            out.push(StrykeValue::integer(n));
             prev = Some(n);
             have = true;
         }
     }
-    Ok(PerlValue::array(out))
+    Ok(StrykeValue::array(out))
 }
 
 fn num_eq(a: f64, b: f64) -> bool {
@@ -401,19 +401,19 @@ fn num_eq(a: f64, b: f64) -> bool {
 }
 
 fn uniqnum_with_want(
-    args: &[PerlValue],
+    args: &[StrykeValue],
     want: WantarrayCtx,
-) -> crate::error::PerlResult<PerlValue> {
+) -> crate::error::PerlResult<StrykeValue> {
     let a = uniqnum_list(args)?;
     if want == WantarrayCtx::Scalar {
         if let Some(x) = a.as_array_vec() {
-            return Ok(PerlValue::integer(x.len() as i64));
+            return Ok(StrykeValue::integer(x.len() as i64));
         }
     }
     Ok(a)
 }
 
-fn uniqnum_list(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
+fn uniqnum_list(args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
     let mut out = Vec::new();
     let mut prev: Option<f64> = None;
     let mut have = false;
@@ -425,12 +425,12 @@ fn uniqnum_list(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
             have = true;
         }
     }
-    Ok(PerlValue::array(out))
+    Ok(StrykeValue::array(out))
 }
 
-fn sum(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
+fn sum(args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     }
     let mut s = 0.0;
     for x in args {
@@ -451,10 +451,10 @@ fn sum(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
             s += x.to_number();
         }
     }
-    Ok(PerlValue::float(s))
+    Ok(StrykeValue::float(s))
 }
 
-fn sum0(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
+fn sum0(args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
     let mut s = 0.0;
     for x in args {
         if x.is_iterator() {
@@ -474,10 +474,10 @@ fn sum0(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
             s += x.to_number();
         }
     }
-    Ok(PerlValue::float(s))
+    Ok(StrykeValue::float(s))
 }
 
-fn product(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
+fn product(args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
     let mut p = 1.0;
     for x in args {
         if x.is_iterator() {
@@ -497,11 +497,11 @@ fn product(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
             p *= x.to_number();
         }
     }
-    Ok(PerlValue::float(p))
+    Ok(StrykeValue::float(p))
 }
 
 /// Flatten args: dereference array refs, expand arrays/iterators into a flat list of numbers.
-fn flatten_to_numbers(args: &[PerlValue]) -> Vec<f64> {
+fn flatten_to_numbers(args: &[StrykeValue]) -> Vec<f64> {
     let mut out = Vec::new();
     for x in args {
         if x.is_iterator() {
@@ -525,20 +525,20 @@ fn flatten_to_numbers(args: &[PerlValue]) -> Vec<f64> {
 }
 
 /// Arithmetic mean; empty list → `undef`.
-fn mean(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
+fn mean(args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
     let nums = flatten_to_numbers(args);
     if nums.is_empty() {
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     }
     let s: f64 = nums.iter().sum();
-    Ok(PerlValue::float(s / nums.len() as f64))
+    Ok(StrykeValue::float(s / nums.len() as f64))
 }
 
 /// Median (linear interpolation for even length). Empty list → `undef`.
-fn median(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
+fn median(args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
     let mut v = flatten_to_numbers(args);
     if v.is_empty() {
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     }
     v.sort_by(|a, b| a.total_cmp(b));
     let n = v.len();
@@ -547,15 +547,15 @@ fn median(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
     } else {
         (v[n / 2 - 1] + v[n / 2]) / 2.0
     };
-    Ok(PerlValue::float(mid))
+    Ok(StrykeValue::float(mid))
 }
 
 /// Values with highest frequency (ties all returned in list context). Empty list → `undef` / empty list.
-fn mode_with_want(args: &[PerlValue], want: WantarrayCtx) -> crate::error::PerlResult<PerlValue> {
+fn mode_with_want(args: &[StrykeValue], want: WantarrayCtx) -> crate::error::PerlResult<StrykeValue> {
     if args.is_empty() {
         return Ok(match want {
-            WantarrayCtx::List => PerlValue::array(vec![]),
-            WantarrayCtx::Scalar | WantarrayCtx::Void => PerlValue::UNDEF,
+            WantarrayCtx::List => StrykeValue::array(vec![]),
+            WantarrayCtx::Scalar | WantarrayCtx::Void => StrykeValue::UNDEF,
         });
     }
     let nums: Vec<f64> = args.iter().map(|x| x.to_number()).collect();
@@ -579,19 +579,19 @@ fn mode_with_want(args: &[PerlValue], want: WantarrayCtx) -> crate::error::PerlR
         }
         i = j;
     }
-    let modes: Vec<PerlValue> = mode_starts.into_iter().map(|ix| args[ix].clone()).collect();
-    let first = modes.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let modes: Vec<StrykeValue> = mode_starts.into_iter().map(|ix| args[ix].clone()).collect();
+    let first = modes.first().cloned().unwrap_or(StrykeValue::UNDEF);
     Ok(match want {
-        WantarrayCtx::List => PerlValue::array(modes),
+        WantarrayCtx::List => StrykeValue::array(modes),
         WantarrayCtx::Scalar => first,
-        WantarrayCtx::Void => PerlValue::UNDEF,
+        WantarrayCtx::Void => StrykeValue::UNDEF,
     })
 }
 
 /// Population variance (divide by N). Empty → `undef`; one element → `0`.
-fn variance(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
+fn variance(args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     }
     let n = args.len() as f64;
     let mean_v: f64 = args.iter().map(|x| x.to_number()).sum::<f64>() / n;
@@ -603,32 +603,32 @@ fn variance(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
         })
         .sum::<f64>()
         / n;
-    Ok(PerlValue::float(var))
+    Ok(StrykeValue::float(var))
 }
 
-fn stddev(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
+fn stddev(args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     }
     let var = variance(args)?;
-    Ok(PerlValue::float(var.to_number().sqrt()))
+    Ok(StrykeValue::float(var.to_number().sqrt()))
 }
 
 fn shuffle_native(
     interp: &mut VMHelper,
-    args: &[PerlValue],
-) -> crate::error::PerlResult<PerlValue> {
-    let mut v: Vec<PerlValue> = args.to_vec();
+    args: &[StrykeValue],
+) -> crate::error::PerlResult<StrykeValue> {
+    let mut v: Vec<StrykeValue> = args.to_vec();
     v.shuffle(&mut interp.rand_rng);
-    Ok(PerlValue::array(v))
+    Ok(StrykeValue::array(v))
 }
 
 /// `chunked LIST, N` — last argument is chunk size; preceding values are the list. Returns a list of
 /// arrayrefs (same shape as `zip` rows). Scalar context: number of chunks.
 fn chunked_with_want(
-    args: &[PerlValue],
+    args: &[StrykeValue],
     want: WantarrayCtx,
-) -> crate::error::PerlResult<PerlValue> {
+) -> crate::error::PerlResult<StrykeValue> {
     if args.is_empty() {
         return Err(crate::error::PerlError::runtime(
             "chunked: expected LIST, N",
@@ -638,26 +638,26 @@ fn chunked_with_want(
     // Last arg is always the chunk size N; everything before it is the list.
     // `chunked(3)` → N=3, empty list.  `chunked(@list, 2)` → N=2, list items.
     let n = args[args.len() - 1].to_int().max(0) as usize;
-    let items: Vec<PerlValue> = args[..args.len().saturating_sub(1)].to_vec();
+    let items: Vec<StrykeValue> = args[..args.len().saturating_sub(1)].to_vec();
     if n == 0 {
         return Ok(match want {
-            WantarrayCtx::Scalar => PerlValue::integer(0),
-            _ => PerlValue::array(vec![]),
+            WantarrayCtx::Scalar => StrykeValue::integer(0),
+            _ => StrykeValue::array(vec![]),
         });
     }
     let mut chunk_refs = Vec::new();
     let mut i = 0;
     while i < items.len() {
         let end = (i + n).min(items.len());
-        chunk_refs.push(PerlValue::array_ref(Arc::new(RwLock::new(
+        chunk_refs.push(StrykeValue::array_ref(Arc::new(RwLock::new(
             items[i..end].to_vec(),
         ))));
         i = end;
     }
     let n_chunks = chunk_refs.len() as i64;
-    let out = PerlValue::array(chunk_refs);
+    let out = StrykeValue::array(chunk_refs);
     Ok(match want {
-        WantarrayCtx::Scalar => PerlValue::integer(n_chunks),
+        WantarrayCtx::Scalar => StrykeValue::integer(n_chunks),
         _ => out,
     })
 }
@@ -666,9 +666,9 @@ fn chunked_with_want(
 /// sliding windows (step 1), each window an arrayref like [`chunked_with_want`]. No partial trailing
 /// windows. Scalar context: window count.
 fn windowed_with_want(
-    args: &[PerlValue],
+    args: &[StrykeValue],
     want: WantarrayCtx,
-) -> crate::error::PerlResult<PerlValue> {
+) -> crate::error::PerlResult<StrykeValue> {
     if args.is_empty() {
         return Err(crate::error::PerlError::runtime(
             "windowed: expected LIST, N",
@@ -680,35 +680,35 @@ fn windowed_with_want(
         (2usize, args[0].to_list())
     } else {
         let n = args[args.len() - 1].to_int().max(0) as usize;
-        let items: Vec<PerlValue> = args[..args.len().saturating_sub(1)].to_vec();
+        let items: Vec<StrykeValue> = args[..args.len().saturating_sub(1)].to_vec();
         (n, items)
     };
     if n == 0 || items.len() < n {
         return Ok(match want {
-            WantarrayCtx::Scalar => PerlValue::integer(0),
-            _ => PerlValue::array(vec![]),
+            WantarrayCtx::Scalar => StrykeValue::integer(0),
+            _ => StrykeValue::array(vec![]),
         });
     }
     let mut windows = Vec::new();
     for i in 0..=(items.len() - n) {
-        windows.push(PerlValue::array_ref(Arc::new(RwLock::new(
+        windows.push(StrykeValue::array_ref(Arc::new(RwLock::new(
             items[i..i + n].to_vec(),
         ))));
     }
     let nw = windows.len() as i64;
-    let out = PerlValue::array(windows);
+    let out = StrykeValue::array(windows);
     Ok(match want {
-        WantarrayCtx::Scalar => PerlValue::integer(nw),
+        WantarrayCtx::Scalar => StrykeValue::integer(nw),
         _ => out,
     })
 }
 
-fn sample_native(interp: &mut VMHelper, args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
+fn sample_native(interp: &mut VMHelper, args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Ok(PerlValue::array(vec![]));
+        return Ok(StrykeValue::array(vec![]));
     }
     let n = args[0].to_int().max(0) as usize;
-    let mut pool: Vec<PerlValue> = args[1..].to_vec();
+    let mut pool: Vec<StrykeValue> = args[1..].to_vec();
     let mut out = Vec::new();
     for _ in 0..n {
         if pool.is_empty() {
@@ -717,7 +717,7 @@ fn sample_native(interp: &mut VMHelper, args: &[PerlValue]) -> crate::error::Per
         let j = interp.rand_rng.gen_range(0..pool.len());
         out.push(pool.swap_remove(j));
     }
-    Ok(PerlValue::array(out))
+    Ok(StrykeValue::array(out))
 }
 
 #[derive(Clone, Copy)]
@@ -735,14 +735,14 @@ pub(crate) enum HeadTailTake {
 /// A single argument is treated as **N** with an empty list (`take(3)` → empty).
 /// List context: array slice; scalar context: last element of that slice, or `undef` if empty.
 pub(crate) fn head_tail_take_impl(
-    args: &[PerlValue],
+    args: &[StrykeValue],
     kind: HeadTailTake,
     want: WantarrayCtx,
-) -> crate::error::PerlResult<PerlValue> {
+) -> crate::error::PerlResult<StrykeValue> {
     if args.is_empty() {
         return Ok(match want {
-            WantarrayCtx::Scalar => PerlValue::UNDEF,
-            _ => PerlValue::array(vec![]),
+            WantarrayCtx::Scalar => StrykeValue::UNDEF,
+            _ => StrykeValue::array(vec![]),
         });
     }
     let (raw, list) = if args.len() == 1 {
@@ -775,7 +775,7 @@ pub(crate) fn head_tail_take_impl(
             }
         }
     };
-    let out: Vec<PerlValue> = match kind {
+    let out: Vec<StrykeValue> = match kind {
         HeadTailTake::Take | HeadTailTake::HeadByList => list.into_iter().take(take_n).collect(),
         HeadTailTake::TailByList => {
             let len = list.len();
@@ -784,8 +784,8 @@ pub(crate) fn head_tail_take_impl(
         }
     };
     Ok(match want {
-        WantarrayCtx::Scalar => out.last().cloned().unwrap_or(PerlValue::UNDEF),
-        _ => PerlValue::array(out),
+        WantarrayCtx::Scalar => out.last().cloned().unwrap_or(StrykeValue::UNDEF),
+        _ => StrykeValue::array(out),
     })
 }
 
@@ -793,13 +793,13 @@ pub(crate) fn head_tail_take_impl(
 /// **list values then count**: `tail(@l, N)`. One argument is the list with count defaulting to 1.
 /// When the list is a single string containing newlines, split into lines first (Rust [`str::lines`] rules).
 pub(crate) fn extension_tail_impl(
-    args: &[PerlValue],
+    args: &[StrykeValue],
     want: WantarrayCtx,
-) -> crate::error::PerlResult<PerlValue> {
+) -> crate::error::PerlResult<StrykeValue> {
     if args.is_empty() {
         return Ok(match want {
-            WantarrayCtx::Scalar => PerlValue::UNDEF,
-            _ => PerlValue::array(vec![]),
+            WantarrayCtx::Scalar => StrykeValue::UNDEF,
+            _ => StrykeValue::array(vec![]),
         });
     }
     // tail @l == tail @l, 1 — single arg is the list, count defaults to 1
@@ -808,7 +808,7 @@ pub(crate) fn extension_tail_impl(
     } else {
         args[args.len() - 1].to_int()
     };
-    let mut list: Vec<PerlValue> = if args.len() == 1 {
+    let mut list: Vec<StrykeValue> = if args.len() == 1 {
         args[0].to_list()
     } else {
         let mut list = Vec::new();
@@ -822,7 +822,7 @@ pub(crate) fn extension_tail_impl(
         if s.contains('\n') || s.contains('\r') {
             list = s
                 .lines()
-                .map(|ln| PerlValue::string(ln.to_string()))
+                .map(|ln| StrykeValue::string(ln.to_string()))
                 .collect();
         }
     }
@@ -830,10 +830,10 @@ pub(crate) fn extension_tail_impl(
     let take_n = raw.max(0).min(n).max(0) as usize;
     let len = list.len();
     let skip = len.saturating_sub(take_n);
-    let out: Vec<PerlValue> = list.into_iter().skip(skip).collect();
+    let out: Vec<StrykeValue> = list.into_iter().skip(skip).collect();
     Ok(match want {
-        WantarrayCtx::Scalar => out.last().cloned().unwrap_or(PerlValue::UNDEF),
-        _ => PerlValue::array(out),
+        WantarrayCtx::Scalar => out.last().cloned().unwrap_or(StrykeValue::UNDEF),
+        _ => StrykeValue::array(out),
     })
 }
 
@@ -841,13 +841,13 @@ pub(crate) fn extension_tail_impl(
 /// **list values then count**: `drop(@l, N)`. One argument is the list with count defaulting to 1.
 /// Same multiline-string line split as [`extension_tail_impl`].
 pub(crate) fn extension_drop_impl(
-    args: &[PerlValue],
+    args: &[StrykeValue],
     want: WantarrayCtx,
-) -> crate::error::PerlResult<PerlValue> {
+) -> crate::error::PerlResult<StrykeValue> {
     if args.is_empty() {
         return Ok(match want {
-            WantarrayCtx::Scalar => PerlValue::UNDEF,
-            _ => PerlValue::array(vec![]),
+            WantarrayCtx::Scalar => StrykeValue::UNDEF,
+            _ => StrykeValue::array(vec![]),
         });
     }
     // drop @l == drop @l, 1 — single arg is the list, count defaults to 1
@@ -856,7 +856,7 @@ pub(crate) fn extension_drop_impl(
     } else {
         args[args.len() - 1].to_int()
     };
-    let mut list: Vec<PerlValue> = if args.len() == 1 {
+    let mut list: Vec<StrykeValue> = if args.len() == 1 {
         args[0].to_list()
     } else {
         let mut list = Vec::new();
@@ -870,22 +870,22 @@ pub(crate) fn extension_drop_impl(
         if s.contains('\n') || s.contains('\r') {
             list = s
                 .lines()
-                .map(|ln| PerlValue::string(ln.to_string()))
+                .map(|ln| StrykeValue::string(ln.to_string()))
                 .collect();
         }
     }
     let n = list.len();
     let skip_n = raw.max(0).min(n as i64) as usize;
-    let out: Vec<PerlValue> = list.into_iter().skip(skip_n).collect();
+    let out: Vec<StrykeValue> = list.into_iter().skip(skip_n).collect();
     Ok(match want {
-        WantarrayCtx::Scalar => out.last().cloned().unwrap_or(PerlValue::UNDEF),
-        _ => PerlValue::array(out),
+        WantarrayCtx::Scalar => out.last().cloned().unwrap_or(StrykeValue::UNDEF),
+        _ => StrykeValue::array(out),
     })
 }
 
 fn reduce_like(
     interp: &mut VMHelper,
-    args: &[PerlValue],
+    args: &[StrykeValue],
     want: WantarrayCtx,
     reductions: bool,
 ) -> ExecResult {
@@ -899,21 +899,21 @@ fn reduce_like(
             .into());
         }
     };
-    let items: Vec<PerlValue> = args[1..].to_vec();
+    let items: Vec<StrykeValue> = args[1..].to_vec();
     if items.is_empty() {
         if reductions {
-            return Ok(PerlValue::array(vec![]));
+            return Ok(StrykeValue::array(vec![]));
         }
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     }
     if items.len() == 1 {
         if reductions {
-            return Ok(PerlValue::array(vec![items[0].clone()]));
+            return Ok(StrykeValue::array(vec![items[0].clone()]));
         }
         return Ok(items[0].clone());
     }
     let mut acc = items[0].clone();
-    let mut chain: Vec<PerlValue> = if reductions {
+    let mut chain: Vec<StrykeValue> = if reductions {
         vec![acc.clone()]
     } else {
         vec![]
@@ -927,9 +927,9 @@ fn reduce_like(
     }
     if reductions {
         if want == WantarrayCtx::Scalar {
-            return Ok(chain.last().cloned().unwrap_or(PerlValue::UNDEF));
+            return Ok(chain.last().cloned().unwrap_or(StrykeValue::UNDEF));
         }
-        return Ok(PerlValue::array(chain));
+        return Ok(StrykeValue::array(chain));
     }
     Ok(acc)
 }
@@ -943,7 +943,7 @@ enum AnyMode {
 
 fn any_all_none(
     interp: &mut VMHelper,
-    args: &[PerlValue],
+    args: &[StrykeValue],
     _want: WantarrayCtx,
     mode: AnyMode,
 ) -> ExecResult {
@@ -957,10 +957,10 @@ fn any_all_none(
             .into());
         }
     };
-    let items: Vec<PerlValue> = args[1..].to_vec();
+    let items: Vec<StrykeValue> = args[1..].to_vec();
     let empty_ok = matches!(mode, AnyMode::All | AnyMode::None);
     if items.is_empty() {
-        return Ok(PerlValue::integer(if empty_ok { 1 } else { 0 }));
+        return Ok(StrykeValue::integer(if empty_ok { 1 } else { 0 }));
     }
     for it in items {
         // Pass `it` as positional arg so stryke lambdas `fn ($x) { ... }`
@@ -969,14 +969,14 @@ fn any_all_none(
         let v = interp.call_sub(&code, vec![it], WantarrayCtx::Scalar, 0)?;
         let t = v.is_true();
         match mode {
-            AnyMode::Any if t => return Ok(PerlValue::integer(1)),
-            AnyMode::All if !t => return Ok(PerlValue::integer(0)),
-            AnyMode::None if t => return Ok(PerlValue::integer(0)),
-            AnyMode::NotAll if !t => return Ok(PerlValue::integer(1)),
+            AnyMode::Any if t => return Ok(StrykeValue::integer(1)),
+            AnyMode::All if !t => return Ok(StrykeValue::integer(0)),
+            AnyMode::None if t => return Ok(StrykeValue::integer(0)),
+            AnyMode::NotAll if !t => return Ok(StrykeValue::integer(1)),
             _ => {}
         }
     }
-    Ok(PerlValue::integer(match mode {
+    Ok(StrykeValue::integer(match mode {
         AnyMode::Any => 0,
         AnyMode::All => 1,
         AnyMode::None => 1,
@@ -984,7 +984,7 @@ fn any_all_none(
     }))
 }
 
-fn first_native(interp: &mut VMHelper, args: &[PerlValue], _want: WantarrayCtx) -> ExecResult {
+fn first_native(interp: &mut VMHelper, args: &[StrykeValue], _want: WantarrayCtx) -> ExecResult {
     let code = match args.first().and_then(|x| x.as_code_ref()) {
         Some(s) => s,
         _ => {
@@ -995,7 +995,7 @@ fn first_native(interp: &mut VMHelper, args: &[PerlValue], _want: WantarrayCtx) 
             .into());
         }
     };
-    let items: Vec<PerlValue> = args[1..].to_vec();
+    let items: Vec<StrykeValue> = args[1..].to_vec();
     for it in items {
         interp.scope.set_topic(it.clone());
         let v = interp.call_sub(&code, vec![it.clone()], WantarrayCtx::Scalar, 0)?;
@@ -1003,50 +1003,50 @@ fn first_native(interp: &mut VMHelper, args: &[PerlValue], _want: WantarrayCtx) 
             return Ok(it);
         }
     }
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-fn pairs_native(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
+fn pairs_native(args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
     let mut out = Vec::new();
     let mut i = 0;
     while i + 1 < args.len() {
         let row = vec![args[i].clone(), args[i + 1].clone()];
-        let ar = PerlValue::array_ref(Arc::new(RwLock::new(row)));
-        let b = PerlValue::blessed(Arc::new(BlessedRef::new_blessed("Pair".to_string(), ar)));
+        let ar = StrykeValue::array_ref(Arc::new(RwLock::new(row)));
+        let b = StrykeValue::blessed(Arc::new(BlessedRef::new_blessed("Pair".to_string(), ar)));
         out.push(b);
         i += 2;
     }
-    Ok(PerlValue::array(out))
+    Ok(StrykeValue::array(out))
 }
 
-fn unpairs_native(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
+fn unpairs_native(args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
     let mut out = Vec::new();
     for x in args {
         if let Some(r) = x.as_array_ref() {
             let g = r.read();
-            out.push(g.first().cloned().unwrap_or(PerlValue::UNDEF));
-            out.push(g.get(1).cloned().unwrap_or(PerlValue::UNDEF));
+            out.push(g.first().cloned().unwrap_or(StrykeValue::UNDEF));
+            out.push(g.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
         } else if let Some(b) = x.as_blessed_ref() {
             if b.class == "Pair" {
                 let d = b.data.read();
                 if let Some(r) = d.as_array_ref() {
                     let g = r.read();
-                    out.push(g.first().cloned().unwrap_or(PerlValue::UNDEF));
-                    out.push(g.get(1).cloned().unwrap_or(PerlValue::UNDEF));
+                    out.push(g.first().cloned().unwrap_or(StrykeValue::UNDEF));
+                    out.push(g.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
                 }
             } else {
-                out.push(PerlValue::UNDEF);
-                out.push(PerlValue::UNDEF);
+                out.push(StrykeValue::UNDEF);
+                out.push(StrykeValue::UNDEF);
             }
         } else {
-            out.push(PerlValue::UNDEF);
-            out.push(PerlValue::UNDEF);
+            out.push(StrykeValue::UNDEF);
+            out.push(StrykeValue::UNDEF);
         }
     }
-    Ok(PerlValue::array(out))
+    Ok(StrykeValue::array(out))
 }
 
-fn pairkeys_values(keys: bool, args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
+fn pairkeys_values(keys: bool, args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
     let mut out = Vec::new();
     let mut i = 0;
     while i + 1 < args.len() {
@@ -1057,7 +1057,7 @@ fn pairkeys_values(keys: bool, args: &[PerlValue]) -> crate::error::PerlResult<P
         });
         i += 2;
     }
-    Ok(PerlValue::array(out))
+    Ok(StrykeValue::array(out))
 }
 
 enum PairMode {
@@ -1068,7 +1068,7 @@ enum PairMode {
 
 fn pairgrep_map(
     interp: &mut VMHelper,
-    args: &[PerlValue],
+    args: &[StrykeValue],
     want: WantarrayCtx,
     mode: PairMode,
 ) -> ExecResult {
@@ -1082,7 +1082,7 @@ fn pairgrep_map(
             .into());
         }
     };
-    let flat: Vec<PerlValue> = args[1..].to_vec();
+    let flat: Vec<StrykeValue> = args[1..].to_vec();
     match mode {
         PairMode::Grep => {
             let mut out = Vec::new();
@@ -1099,9 +1099,9 @@ fn pairgrep_map(
                 i += 2;
             }
             if want == WantarrayCtx::Scalar {
-                return Ok(PerlValue::integer((out.len() / 2) as i64));
+                return Ok(StrykeValue::integer((out.len() / 2) as i64));
             }
-            Ok(PerlValue::array(out))
+            Ok(StrykeValue::array(out))
         }
         PairMode::Map => {
             let mut out = Vec::new();
@@ -1119,9 +1119,9 @@ fn pairgrep_map(
                 i += 2;
             }
             if want == WantarrayCtx::Scalar {
-                return Ok(PerlValue::integer(out.len() as i64));
+                return Ok(StrykeValue::integer(out.len() as i64));
             }
-            Ok(PerlValue::array(out))
+            Ok(StrykeValue::array(out))
         }
         PairMode::First => {
             let mut i = 0;
@@ -1132,28 +1132,28 @@ fn pairgrep_map(
                 let v = interp.call_sub(&code, vec![], WantarrayCtx::Scalar, 0)?;
                 if v.is_true() {
                     if want == WantarrayCtx::Scalar {
-                        return Ok(PerlValue::integer(1));
+                        return Ok(StrykeValue::integer(1));
                     }
-                    return Ok(PerlValue::array(vec![a, b]));
+                    return Ok(StrykeValue::array(vec![a, b]));
                 }
                 i += 2;
             }
             if want == WantarrayCtx::Scalar {
-                return Ok(PerlValue::integer(0));
+                return Ok(StrykeValue::integer(0));
             }
-            Ok(PerlValue::array(vec![]))
+            Ok(StrykeValue::array(vec![]))
         }
     }
 }
 
-fn pair_accessor(args: &[PerlValue], idx: usize) -> crate::error::PerlResult<PerlValue> {
+fn pair_accessor(args: &[StrykeValue], idx: usize) -> crate::error::PerlResult<StrykeValue> {
     let obj = args
         .first()
         .ok_or_else(|| crate::error::PerlError::runtime("Pair::key/value: missing invocant", 0))?;
     pair_field(obj, idx)
 }
 
-fn pair_field(obj: &PerlValue, idx: usize) -> crate::error::PerlResult<PerlValue> {
+fn pair_field(obj: &StrykeValue, idx: usize) -> crate::error::PerlResult<StrykeValue> {
     let b = obj
         .as_blessed_ref()
         .ok_or_else(|| crate::error::PerlError::runtime("Pair::method: not a pair object", 0))?;
@@ -1166,7 +1166,7 @@ fn pair_field(obj: &PerlValue, idx: usize) -> crate::error::PerlResult<PerlValue
     let d = b.data.read();
     if let Some(r) = d.as_array_ref() {
         let g = r.read();
-        return Ok(g.get(idx).cloned().unwrap_or(PerlValue::UNDEF));
+        return Ok(g.get(idx).cloned().unwrap_or(StrykeValue::UNDEF));
     }
     Err(crate::error::PerlError::runtime(
         "Pair: internal data is not an ARRAY reference",
@@ -1174,13 +1174,13 @@ fn pair_field(obj: &PerlValue, idx: usize) -> crate::error::PerlResult<PerlValue
     ))
 }
 
-fn pair_to_json(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
+fn pair_to_json(args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
     let obj = args
         .first()
         .ok_or_else(|| crate::error::PerlError::runtime("Pair::TO_JSON: missing invocant", 0))?;
     let k = pair_field(obj, 0)?;
     let v = pair_field(obj, 1)?;
-    Ok(PerlValue::array(vec![k, v]))
+    Ok(StrykeValue::array(vec![k, v]))
 }
 
 enum ZipMesh {
@@ -1190,10 +1190,10 @@ enum ZipMesh {
     MeshShortest,
 }
 
-fn zip_mesh(args: &[PerlValue], mode: ZipMesh) -> crate::error::PerlResult<PerlValue> {
-    let arrays: Vec<Vec<PerlValue>> = args.iter().map(arg_to_list).collect();
+fn zip_mesh(args: &[StrykeValue], mode: ZipMesh) -> crate::error::PerlResult<StrykeValue> {
+    let arrays: Vec<Vec<StrykeValue>> = args.iter().map(arg_to_list).collect();
     if arrays.is_empty() {
-        return Ok(PerlValue::array(vec![]));
+        return Ok(StrykeValue::array(vec![]));
     }
     let min_len = arrays.iter().map(|a| a.len()).min().unwrap_or(0);
     let max_len = arrays.iter().map(|a| a.len()).max().unwrap_or(0);
@@ -1207,25 +1207,25 @@ fn zip_mesh(args: &[PerlValue], mode: ZipMesh) -> crate::error::PerlResult<PerlV
             for i in 0..len {
                 let mut row = Vec::new();
                 for a in &arrays {
-                    row.push(a.get(i).cloned().unwrap_or(PerlValue::UNDEF));
+                    row.push(a.get(i).cloned().unwrap_or(StrykeValue::UNDEF));
                 }
-                out.push(PerlValue::array_ref(Arc::new(RwLock::new(row))));
+                out.push(StrykeValue::array_ref(Arc::new(RwLock::new(row))));
             }
-            Ok(PerlValue::array(out))
+            Ok(StrykeValue::array(out))
         }
         ZipMesh::MeshLongest | ZipMesh::MeshShortest => {
             let mut out = Vec::new();
             for i in 0..len {
                 for a in &arrays {
-                    out.push(a.get(i).cloned().unwrap_or(PerlValue::UNDEF));
+                    out.push(a.get(i).cloned().unwrap_or(StrykeValue::UNDEF));
                 }
             }
-            Ok(PerlValue::array(out))
+            Ok(StrykeValue::array(out))
         }
     }
 }
 
-fn arg_to_list(v: &PerlValue) -> Vec<PerlValue> {
+fn arg_to_list(v: &StrykeValue) -> Vec<StrykeValue> {
     if let Some(a) = v.as_array_vec() {
         a
     } else if let Some(r) = v.as_array_ref() {
@@ -1238,15 +1238,15 @@ fn arg_to_list(v: &PerlValue) -> Vec<PerlValue> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::value::PerlValue;
+    use crate::value::StrykeValue;
     use crate::vm_helper::{VMHelper, WantarrayCtx};
 
     fn call_native(
         interp: &mut VMHelper,
         name: &str,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         want: WantarrayCtx,
-    ) -> PerlValue {
+    ) -> StrykeValue {
         match dispatch_by_name(interp, name, args, want) {
             Some(Ok(v)) => v,
             Some(Err(e)) => panic!("{:?}", e),
@@ -1261,9 +1261,9 @@ mod tests {
             &mut i,
             "sum",
             &[
-                PerlValue::integer(1),
-                PerlValue::integer(2),
-                PerlValue::integer(3),
+                StrykeValue::integer(1),
+                StrykeValue::integer(2),
+                StrykeValue::integer(3),
             ],
             WantarrayCtx::Scalar,
         );
@@ -1271,7 +1271,7 @@ mod tests {
         let p = call_native(
             &mut i,
             "product",
-            &[PerlValue::integer(2), PerlValue::integer(3)],
+            &[StrykeValue::integer(2), StrykeValue::integer(3)],
             WantarrayCtx::Scalar,
         );
         assert_eq!(p.to_int(), 6);
@@ -1299,21 +1299,21 @@ mod tests {
         let mn = call_native(
             &mut i,
             "min",
-            &[PerlValue::float(3.0), PerlValue::float(1.0)],
+            &[StrykeValue::float(3.0), StrykeValue::float(1.0)],
             WantarrayCtx::Scalar,
         );
         assert_eq!(mn.to_int(), 1);
         let mx = call_native(
             &mut i,
             "max",
-            &[PerlValue::integer(3), PerlValue::integer(9)],
+            &[StrykeValue::integer(3), StrykeValue::integer(9)],
             WantarrayCtx::Scalar,
         );
         assert_eq!(mx.to_int(), 9);
         let ms = call_native(
             &mut i,
             "minstr",
-            &[PerlValue::string("z".into()), PerlValue::string("a".into())],
+            &[StrykeValue::string("z".into()), StrykeValue::string("a".into())],
             WantarrayCtx::Scalar,
         );
         assert_eq!(ms.to_string(), "a");
@@ -1327,9 +1327,9 @@ mod tests {
             &mut i,
             "mean",
             &[
-                PerlValue::integer(2),
-                PerlValue::integer(4),
-                PerlValue::integer(10),
+                StrykeValue::integer(2),
+                StrykeValue::integer(4),
+                StrykeValue::integer(10),
             ],
             WantarrayCtx::Scalar,
         );
@@ -1339,9 +1339,9 @@ mod tests {
             &mut i,
             "median",
             &[
-                PerlValue::integer(3),
-                PerlValue::integer(1),
-                PerlValue::integer(2),
+                StrykeValue::integer(3),
+                StrykeValue::integer(1),
+                StrykeValue::integer(2),
             ],
             WantarrayCtx::Scalar,
         );
@@ -1351,10 +1351,10 @@ mod tests {
             &mut i,
             "median",
             &[
-                PerlValue::integer(10),
-                PerlValue::integer(20),
-                PerlValue::integer(30),
-                PerlValue::integer(40),
+                StrykeValue::integer(10),
+                StrykeValue::integer(20),
+                StrykeValue::integer(30),
+                StrykeValue::integer(40),
             ],
             WantarrayCtx::Scalar,
         );
@@ -1364,10 +1364,10 @@ mod tests {
             &mut i,
             "mode",
             &[
-                PerlValue::integer(1),
-                PerlValue::integer(2),
-                PerlValue::integer(2),
-                PerlValue::integer(3),
+                StrykeValue::integer(1),
+                StrykeValue::integer(2),
+                StrykeValue::integer(2),
+                StrykeValue::integer(3),
             ],
             WantarrayCtx::Scalar,
         );
@@ -1377,11 +1377,11 @@ mod tests {
             &mut i,
             "mode",
             &[
-                PerlValue::integer(1),
-                PerlValue::integer(2),
-                PerlValue::integer(2),
-                PerlValue::integer(3),
-                PerlValue::integer(3),
+                StrykeValue::integer(1),
+                StrykeValue::integer(2),
+                StrykeValue::integer(2),
+                StrykeValue::integer(3),
+                StrykeValue::integer(3),
             ],
             WantarrayCtx::List,
         );
@@ -1393,7 +1393,7 @@ mod tests {
         let var_one = call_native(
             &mut i,
             "variance",
-            &[PerlValue::integer(5)],
+            &[StrykeValue::integer(5)],
             WantarrayCtx::Scalar,
         );
         assert_eq!(var_one.to_number(), 0.0);
@@ -1402,9 +1402,9 @@ mod tests {
             &mut i,
             "variance",
             &[
-                PerlValue::integer(2),
-                PerlValue::integer(4),
-                PerlValue::integer(6),
+                StrykeValue::integer(2),
+                StrykeValue::integer(4),
+                StrykeValue::integer(6),
             ],
             WantarrayCtx::Scalar,
         );
@@ -1413,7 +1413,7 @@ mod tests {
         let sd = call_native(
             &mut i,
             "stddev",
-            &[PerlValue::integer(0), PerlValue::integer(0)],
+            &[StrykeValue::integer(0), StrykeValue::integer(0)],
             WantarrayCtx::Scalar,
         );
         assert_eq!(sd.to_number(), 0.0);
@@ -1427,9 +1427,9 @@ mod tests {
         // `aggregate_wantarray` for the rationale.
         let mut i = VMHelper::new();
         let args_sum = [
-            PerlValue::integer(1),
-            PerlValue::integer(2),
-            PerlValue::integer(3),
+            StrykeValue::integer(1),
+            StrykeValue::integer(2),
+            StrykeValue::integer(3),
         ];
         let ls = call_native(&mut i, "sum", &args_sum, WantarrayCtx::List);
         assert!(ls.as_array_vec().is_none(), "sum should not wrap in array");
@@ -1438,7 +1438,7 @@ mod tests {
         let lp = call_native(
             &mut i,
             "product",
-            &[PerlValue::integer(2), PerlValue::integer(4)],
+            &[StrykeValue::integer(2), StrykeValue::integer(4)],
             WantarrayCtx::List,
         );
         assert!(
@@ -1450,14 +1450,14 @@ mod tests {
         let lmn = call_native(
             &mut i,
             "min",
-            &[PerlValue::integer(9), PerlValue::integer(2)],
+            &[StrykeValue::integer(9), StrykeValue::integer(2)],
             WantarrayCtx::List,
         );
         assert_eq!(lmn.to_int(), 2);
         let lmx = call_native(
             &mut i,
             "max",
-            &[PerlValue::integer(9), PerlValue::integer(2)],
+            &[StrykeValue::integer(9), StrykeValue::integer(2)],
             WantarrayCtx::List,
         );
         assert_eq!(lmx.to_int(), 9);
@@ -1477,9 +1477,9 @@ mod tests {
             &mut i,
             "uniq",
             &[
-                PerlValue::string("a".into()),
-                PerlValue::string("a".into()),
-                PerlValue::string("b".into()),
+                StrykeValue::string("a".into()),
+                StrykeValue::string("a".into()),
+                StrykeValue::string("b".into()),
             ],
             WantarrayCtx::List,
         );
@@ -1495,7 +1495,7 @@ mod tests {
         let u = call_native(
             &mut i,
             "uniqstr",
-            &[PerlValue::string("01".into()), PerlValue::integer(1)],
+            &[StrykeValue::string("01".into()), StrykeValue::integer(1)],
             WantarrayCtx::List,
         );
         let v = u.as_array_vec().expect("array");
@@ -1509,9 +1509,9 @@ mod tests {
             &mut i,
             "uniqint",
             &[
-                PerlValue::integer(2),
-                PerlValue::integer(2),
-                PerlValue::integer(3),
+                StrykeValue::integer(2),
+                StrykeValue::integer(2),
+                StrykeValue::integer(3),
             ],
             WantarrayCtx::List,
         );
@@ -1528,11 +1528,11 @@ mod tests {
             &mut i,
             "chunked",
             &[
-                PerlValue::integer(1),
-                PerlValue::integer(2),
-                PerlValue::integer(3),
-                PerlValue::integer(4),
-                PerlValue::integer(2),
+                StrykeValue::integer(1),
+                StrykeValue::integer(2),
+                StrykeValue::integer(3),
+                StrykeValue::integer(4),
+                StrykeValue::integer(2),
             ],
             WantarrayCtx::List,
         );
@@ -1553,10 +1553,10 @@ mod tests {
             &mut i,
             "chunked",
             &[
-                PerlValue::integer(1),
-                PerlValue::integer(2),
-                PerlValue::integer(3),
-                PerlValue::integer(2),
+                StrykeValue::integer(1),
+                StrykeValue::integer(2),
+                StrykeValue::integer(3),
+                StrykeValue::integer(2),
             ],
             WantarrayCtx::Scalar,
         );
@@ -1570,9 +1570,9 @@ mod tests {
             &mut i,
             "chunked",
             &[
-                PerlValue::integer(1),
-                PerlValue::integer(2),
-                PerlValue::integer(0),
+                StrykeValue::integer(1),
+                StrykeValue::integer(2),
+                StrykeValue::integer(0),
             ],
             WantarrayCtx::Scalar,
         );
@@ -1581,9 +1581,9 @@ mod tests {
             &mut i,
             "chunked",
             &[
-                PerlValue::integer(1),
-                PerlValue::integer(2),
-                PerlValue::integer(0),
+                StrykeValue::integer(1),
+                StrykeValue::integer(2),
+                StrykeValue::integer(0),
             ],
             WantarrayCtx::List,
         );
@@ -1592,7 +1592,7 @@ mod tests {
         let only_n = call_native(
             &mut i,
             "chunked",
-            &[PerlValue::integer(5)],
+            &[StrykeValue::integer(5)],
             WantarrayCtx::Scalar,
         );
         assert_eq!(only_n.to_int(), 0);
@@ -1605,9 +1605,9 @@ mod tests {
             &mut i,
             "chunked",
             &[
-                PerlValue::integer(1),
-                PerlValue::integer(2),
-                PerlValue::integer(99),
+                StrykeValue::integer(1),
+                StrykeValue::integer(2),
+                StrykeValue::integer(99),
             ],
             WantarrayCtx::List,
         );
@@ -1627,10 +1627,10 @@ mod tests {
             &mut i,
             "windowed",
             &[
-                PerlValue::integer(1),
-                PerlValue::integer(2),
-                PerlValue::integer(3),
-                PerlValue::integer(2),
+                StrykeValue::integer(1),
+                StrykeValue::integer(2),
+                StrykeValue::integer(3),
+                StrykeValue::integer(2),
             ],
             WantarrayCtx::List,
         );
@@ -1654,9 +1654,9 @@ mod tests {
             &mut i,
             "windowed",
             &[
-                PerlValue::integer(1),
-                PerlValue::integer(2),
-                PerlValue::integer(0),
+                StrykeValue::integer(1),
+                StrykeValue::integer(2),
+                StrykeValue::integer(0),
             ],
             WantarrayCtx::List,
         );
@@ -1670,9 +1670,9 @@ mod tests {
             &mut i,
             "windowed",
             &[
-                PerlValue::integer(1),
-                PerlValue::integer(2),
-                PerlValue::integer(5),
+                StrykeValue::integer(1),
+                StrykeValue::integer(2),
+                StrykeValue::integer(5),
             ],
             WantarrayCtx::Scalar,
         );
@@ -1686,10 +1686,10 @@ mod tests {
             &mut i,
             "windowed",
             &[
-                PerlValue::integer(10),
-                PerlValue::integer(20),
-                PerlValue::integer(30),
-                PerlValue::integer(3),
+                StrykeValue::integer(10),
+                StrykeValue::integer(20),
+                StrykeValue::integer(30),
+                StrykeValue::integer(3),
             ],
             WantarrayCtx::List,
         );
@@ -1709,10 +1709,10 @@ mod tests {
             &mut i,
             "head",
             &[
-                PerlValue::integer(10),
-                PerlValue::integer(20),
-                PerlValue::integer(30),
-                PerlValue::integer(2),
+                StrykeValue::integer(10),
+                StrykeValue::integer(20),
+                StrykeValue::integer(30),
+                StrykeValue::integer(2),
             ],
             WantarrayCtx::List,
         );
@@ -1723,10 +1723,10 @@ mod tests {
             &mut i,
             "head",
             &[
-                PerlValue::integer(10),
-                PerlValue::integer(20),
-                PerlValue::integer(30),
-                PerlValue::integer(2),
+                StrykeValue::integer(10),
+                StrykeValue::integer(20),
+                StrykeValue::integer(30),
+                StrykeValue::integer(2),
             ],
             WantarrayCtx::Scalar,
         );
@@ -1735,10 +1735,10 @@ mod tests {
             &mut i,
             "head",
             &[
-                PerlValue::integer(1),
-                PerlValue::integer(2),
-                PerlValue::integer(3),
-                PerlValue::integer(-1),
+                StrykeValue::integer(1),
+                StrykeValue::integer(2),
+                StrykeValue::integer(3),
+                StrykeValue::integer(-1),
             ],
             WantarrayCtx::List,
         );
@@ -1750,10 +1750,10 @@ mod tests {
             &mut i,
             "tail",
             &[
-                PerlValue::integer(10),
-                PerlValue::integer(20),
-                PerlValue::integer(30),
-                PerlValue::integer(2),
+                StrykeValue::integer(10),
+                StrykeValue::integer(20),
+                StrykeValue::integer(30),
+                StrykeValue::integer(2),
             ],
             WantarrayCtx::List,
         );
@@ -1764,10 +1764,10 @@ mod tests {
             &mut i,
             "tail",
             &[
-                PerlValue::integer(10),
-                PerlValue::integer(20),
-                PerlValue::integer(30),
-                PerlValue::integer(2),
+                StrykeValue::integer(10),
+                StrykeValue::integer(20),
+                StrykeValue::integer(30),
+                StrykeValue::integer(2),
             ],
             WantarrayCtx::Scalar,
         );
@@ -1781,10 +1781,10 @@ mod tests {
             &mut i,
             "pairkeys",
             &[
-                PerlValue::string("a".into()),
-                PerlValue::integer(1),
-                PerlValue::string("b".into()),
-                PerlValue::integer(2),
+                StrykeValue::string("a".into()),
+                StrykeValue::integer(1),
+                StrykeValue::string("b".into()),
+                StrykeValue::integer(2),
             ],
             WantarrayCtx::List,
         );
@@ -1796,10 +1796,10 @@ mod tests {
             &mut i,
             "pairvalues",
             &[
-                PerlValue::string("a".into()),
-                PerlValue::integer(1),
-                PerlValue::string("b".into()),
-                PerlValue::integer(2),
+                StrykeValue::string("a".into()),
+                StrykeValue::integer(1),
+                StrykeValue::string("b".into()),
+                StrykeValue::integer(2),
             ],
             WantarrayCtx::List,
         );
@@ -1815,8 +1815,8 @@ mod tests {
             &mut i,
             "zip_shortest",
             &[
-                PerlValue::array(vec![PerlValue::integer(1), PerlValue::integer(2)]),
-                PerlValue::array(vec![PerlValue::integer(10)]),
+                StrykeValue::array(vec![StrykeValue::integer(1), StrykeValue::integer(2)]),
+                StrykeValue::array(vec![StrykeValue::integer(10)]),
             ],
             WantarrayCtx::List,
         );
@@ -1836,8 +1836,8 @@ mod tests {
             &mut i,
             "mesh_shortest",
             &[
-                PerlValue::array(vec![PerlValue::integer(1), PerlValue::integer(2)]),
-                PerlValue::array(vec![PerlValue::integer(10), PerlValue::integer(20)]),
+                StrykeValue::array(vec![StrykeValue::integer(1), StrykeValue::integer(2)]),
+                StrykeValue::array(vec![StrykeValue::integer(10), StrykeValue::integer(20)]),
             ],
             WantarrayCtx::List,
         );
@@ -1855,7 +1855,7 @@ mod tests {
         let s = call_native(
             &mut i,
             "sample",
-            &[PerlValue::integer(3)],
+            &[StrykeValue::integer(3)],
             WantarrayCtx::List,
         );
         let v = s.as_array_vec().unwrap();
@@ -1865,18 +1865,18 @@ mod tests {
     #[test]
     fn sub_util_set_subname_returns_coderef_arg() {
         let mut i = VMHelper::new();
-        let cr = PerlValue::integer(42);
+        let cr = StrykeValue::integer(42);
         let out = call_native(
             &mut i,
             "set_subname",
-            &[PerlValue::string("main::foo".into()), cr.clone()],
+            &[StrykeValue::string("main::foo".into()), cr.clone()],
             WantarrayCtx::Scalar,
         );
         assert_eq!(out.to_int(), 42);
         let out2 = call_native(
             &mut i,
             "subname",
-            &[PerlValue::string("main::bar".into()), cr],
+            &[StrykeValue::string("main::bar".into()), cr],
             WantarrayCtx::Scalar,
         );
         assert_eq!(out2.to_int(), 42);

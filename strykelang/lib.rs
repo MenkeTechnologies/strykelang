@@ -63,6 +63,7 @@ pub mod perl_signal;
 pub mod pkg;
 mod pmap_progress;
 pub mod ppool;
+pub mod perf_recorder;
 pub mod profiler;
 pub mod pwatch;
 pub mod remote_wire;
@@ -183,7 +184,7 @@ pub fn no_interop_mode() -> bool {
     }
     NO_INTEROP_DEFAULT.load(Ordering::Relaxed)
 }
-use value::PerlValue;
+use value::StrykeValue;
 
 /// Parse a string of Perl code and return the AST.
 /// Pretty-print a parsed program as Perl-like source (`stryke --fmt`).
@@ -252,7 +253,7 @@ fn parse_with_file_inner(code: &str, file: &str, is_module: bool) -> PerlResult<
 /// Parse and execute a string of Perl code within an existing interpreter.
 /// Compile and execute via the bytecode VM.
 /// Uses [`VMHelper::file`] for both parse diagnostics and `__FILE__` during this execution.
-pub fn parse_and_run_string(code: &str, interp: &mut VMHelper) -> PerlResult<PerlValue> {
+pub fn parse_and_run_string(code: &str, interp: &mut VMHelper) -> PerlResult<StrykeValue> {
     let file = interp.file.clone();
     parse_and_run_string_in_file(code, interp, &file)
 }
@@ -263,7 +264,7 @@ pub fn parse_and_run_string_in_file(
     code: &str,
     interp: &mut VMHelper,
     file: &str,
-) -> PerlResult<PerlValue> {
+) -> PerlResult<StrykeValue> {
     parse_and_run_string_in_file_inner(code, interp, file, false)
 }
 
@@ -273,7 +274,7 @@ pub fn parse_and_run_module_in_file(
     code: &str,
     interp: &mut VMHelper,
     file: &str,
-) -> PerlResult<PerlValue> {
+) -> PerlResult<StrykeValue> {
     parse_and_run_string_in_file_inner(code, interp, file, true)
 }
 
@@ -282,7 +283,7 @@ fn parse_and_run_string_in_file_inner(
     interp: &mut VMHelper,
     file: &str,
     is_module: bool,
-) -> PerlResult<PerlValue> {
+) -> PerlResult<StrykeValue> {
     let program = if is_module {
         parse_module_with_file(code, file)?
     } else {
@@ -315,7 +316,7 @@ pub fn run_lsp_stdio() -> i32 {
 }
 
 /// Parse and execute a string of Perl code with a fresh interpreter.
-pub fn run(code: &str) -> PerlResult<PerlValue> {
+pub fn run(code: &str) -> PerlResult<StrykeValue> {
     let program = parse(code)?;
     let mut interp = VMHelper::new();
     let v = interp.execute(&program)?;
@@ -333,7 +334,7 @@ pub fn run(code: &str) -> PerlResult<PerlValue> {
 pub fn try_vm_execute(
     program: &ast::Program,
     interp: &mut VMHelper,
-) -> Option<PerlResult<PerlValue>> {
+) -> Option<PerlResult<StrykeValue>> {
     if let Err(e) = interp.prepare_program_top_level(program) {
         return Some(Err(e));
     }
@@ -379,7 +380,7 @@ pub fn try_vm_execute(
 /// Shared execution tail used by both the cache-hit and compile paths in
 /// [`try_vm_execute`]. Pulled out so the rkyv-cache fast path does not duplicate
 /// the flip-flop / BEGIN-END / struct-def wiring every VM run depends on.
-fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut VMHelper) -> PerlResult<PerlValue> {
+fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut VMHelper) -> PerlResult<StrykeValue> {
     interp.clear_flip_flop_state();
     interp.prepare_flip_flop_vm_slots(chunk.flip_flop_slots);
     if interp.disasm_bytecode {
@@ -478,10 +479,10 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut VMHelper) -> PerlResu
                 match interp.eval_expr(expr) {
                     Ok(v) => v,
                     Err(crate::vm_helper::FlowOrError::Error(e)) => return Err(e),
-                    Err(_) => crate::value::PerlValue::UNDEF,
+                    Err(_) => crate::value::StrykeValue::UNDEF,
                 }
             } else {
-                crate::value::PerlValue::UNDEF
+                crate::value::StrykeValue::UNDEF
             };
             let key = format!("{}::{}", def.name, sf.name);
             interp.scope.declare_scalar(&key, val);
@@ -504,10 +505,10 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut VMHelper) -> PerlResu
         // Set @ClassName::ISA so MRO/isa resolution works.
         if !def.extends.is_empty() {
             let isa_key = format!("{}::ISA", def.name);
-            let parents: Vec<crate::value::PerlValue> = def
+            let parents: Vec<crate::value::StrykeValue> = def
                 .extends
                 .iter()
-                .map(|p| crate::value::PerlValue::string(p.clone()))
+                .map(|p| crate::value::StrykeValue::string(p.clone()))
                 .collect();
             interp.scope.declare_array(&isa_key, parents);
         }
@@ -635,14 +636,14 @@ pub fn run_line_body(
         interp.line_number += 1;
         interp
             .scope
-            .set_topic(value::PerlValue::string(line_str.to_string()));
+            .set_topic(value::StrykeValue::string(line_str.to_string()));
 
         if interp.auto_split {
             let sep = interp.field_separator.as_deref().unwrap_or(" ");
             let re = regex::Regex::new(sep).unwrap_or_else(|_| regex::Regex::new(" ").unwrap());
-            let fields: Vec<value::PerlValue> = re
+            let fields: Vec<value::StrykeValue> = re
                 .split(line_str)
-                .map(|s| value::PerlValue::string(s.to_string()))
+                .map(|s| value::StrykeValue::string(s.to_string()))
                 .collect();
             interp.scope.set_array("F", fields)?;
         }

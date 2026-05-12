@@ -3,7 +3,7 @@
 use std::cell::Cell;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 
 static TRACE_ENABLED: AtomicBool = AtomicBool::new(false);
 
@@ -32,7 +32,7 @@ pub fn fan_worker_set_index(i: Option<i64>) {
 }
 
 /// Emit one line for a scalar mutation (mysync / atomic scalar).
-pub fn emit_scalar_mutation(var: &str, old: &PerlValue, new: &PerlValue) {
+pub fn emit_scalar_mutation(var: &str, old: &StrykeValue, new: &StrykeValue) {
     if !is_enabled() {
         return;
     }
@@ -49,7 +49,7 @@ mod tests {
     #[test]
     fn emit_scalar_mutation_noops_when_trace_disabled() {
         fan_worker_set_index(Some(0));
-        emit_scalar_mutation("x", &PerlValue::integer(1), &PerlValue::integer(2));
+        emit_scalar_mutation("x", &StrykeValue::integer(1), &StrykeValue::integer(2));
         fan_worker_set_index(None);
     }
 

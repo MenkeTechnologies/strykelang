@@ -35,11 +35,11 @@ pub struct Intercept {
 #[derive(Debug, Clone)]
 pub struct InterceptCtx {
     pub name: String,
-    pub args: Vec<crate::value::PerlValue>,
+    pub args: Vec<crate::value::StrykeValue>,
     /// Set true when `proceed()` runs the original.
     pub proceeded: bool,
     /// Captured return value of the original after `proceed()`.
-    pub retval: crate::value::PerlValue,
+    pub retval: crate::value::StrykeValue,
 }
 
 /// Glob match: `*` (any sequence), `?` (any one char), other chars literal.

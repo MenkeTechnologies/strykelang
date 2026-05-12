@@ -197,7 +197,7 @@ fn typed_param_with_bool_accepts_one_and_zero() {
 fn ref_of_stryke_class_instance_returns_class_name() {
     // BUG-048 (now FIXED): `ref($obj)` for a stryke `class C { ... }`
     // instance returned the empty string instead of the class name. The
-    // `ClassInst` arm was missing from `PerlValue::ref_type` — added it
+    // `ClassInst` arm was missing from `StrykeValue::ref_type` — added it
     // alongside the `StructInst` / `EnumInst` arms so `ref()` emits
     // `def.name` for class instances too.
     let out = eval_string(

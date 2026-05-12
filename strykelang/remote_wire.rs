@@ -40,7 +40,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::ast::Block;
-use crate::value::{PerlSub, PerlValue};
+use crate::value::{PerlSub, StrykeValue};
 use crate::vm_helper::{FlowOrError, VMHelper};
 
 /// Frame-kind discriminator. Stored as the first byte of every wire payload after the
@@ -265,7 +265,7 @@ pub fn decode_resp(bytes: &[u8]) -> Result<RemoteRespV1, String> {
     bincode::deserialize(bytes).map_err(|e| e.to_string())
 }
 
-pub fn perl_to_json_value(v: &PerlValue) -> Result<serde_json::Value, String> {
+pub fn perl_to_json_value(v: &StrykeValue) -> Result<serde_json::Value, String> {
     if v.is_undef() {
         return Ok(serde_json::Value::Null);
     }
@@ -319,39 +319,39 @@ pub fn perl_to_json_value(v: &PerlValue) -> Result<serde_json::Value, String> {
     ))
 }
 
-pub fn json_to_perl(v: &serde_json::Value) -> Result<PerlValue, String> {
+pub fn json_to_perl(v: &serde_json::Value) -> Result<StrykeValue, String> {
     Ok(match v {
-        serde_json::Value::Null => PerlValue::UNDEF,
-        serde_json::Value::Bool(b) => PerlValue::integer(if *b { 1 } else { 0 }),
+        serde_json::Value::Null => StrykeValue::UNDEF,
+        serde_json::Value::Bool(b) => StrykeValue::integer(if *b { 1 } else { 0 }),
         serde_json::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
-                PerlValue::integer(i)
+                StrykeValue::integer(i)
             } else if let Some(u) = n.as_u64() {
-                PerlValue::integer(u as i64)
+                StrykeValue::integer(u as i64)
             } else {
-                PerlValue::float(n.as_f64().unwrap_or(0.0))
+                StrykeValue::float(n.as_f64().unwrap_or(0.0))
             }
         }
-        serde_json::Value::String(s) => PerlValue::string(s.clone()),
+        serde_json::Value::String(s) => StrykeValue::string(s.clone()),
         serde_json::Value::Array(a) => {
             let mut items = Vec::with_capacity(a.len());
             for x in a {
                 items.push(json_to_perl(x)?);
             }
-            PerlValue::array(items)
+            StrykeValue::array(items)
         }
         serde_json::Value::Object(o) => {
             let mut map = indexmap::IndexMap::new();
             for (k, val) in o {
                 map.insert(k.clone(), json_to_perl(val)?);
             }
-            PerlValue::hash(map)
+            StrykeValue::hash(map)
         }
     })
 }
 
 pub fn capture_entries_to_json(
-    entries: &[(String, PerlValue)],
+    entries: &[(String, StrykeValue)],
 ) -> Result<Vec<(String, serde_json::Value)>, String> {
     let mut out = Vec::with_capacity(entries.len());
     for (k, v) in entries {
@@ -392,7 +392,7 @@ pub fn build_subs_prelude(subs: &HashMap<String, Arc<PerlSub>>) -> String {
 /// Run one job in-process (for tests / local debugging).
 pub fn run_job_local(job: &RemoteJobV1) -> RemoteRespV1 {
     let mut interp = VMHelper::new();
-    let cap: Vec<(String, PerlValue)> = match job
+    let cap: Vec<(String, StrykeValue)> = match job
         .capture
         .iter()
         .map(|(k, v)| json_to_perl(v).map(|pv| (k.clone(), pv)))
@@ -548,7 +548,7 @@ pub fn run_remote_worker_session() -> i32 {
     };
 
     // Restore captured lexicals once per session — they don't change across jobs.
-    let cap_pv: Vec<(String, PerlValue)> = match init
+    let cap_pv: Vec<(String, StrykeValue)> = match init
         .capture
         .iter()
         .map(|(k, v)| json_to_perl(v).map(|pv| (k.clone(), pv)))

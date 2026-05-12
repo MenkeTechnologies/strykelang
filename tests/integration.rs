@@ -14,7 +14,7 @@
 //! (`Interpreter` defaults and `execute`), `pchannel` (`send`/`recv`/`pselect` helpers), `parallel_trace` (fan worker / trace-noop paths), `profiler` (line/sub aggregation), `par_walk::collect_paths`, `perl_signal::poll`, lexer (`&`, `&&`/`||`/`+=`, `==`/`!=`,
 //! `**`/`..`, `q{}`, `qr//`, octal/binary, `-e` file tests, floats, `m//`, strings, `<=>`), `Scope`
 //! (arrays, hashes, atomics, `pop_frame` guard), `keyword_or_ident`, `PerlError` (including
-//! `DivisionByZero` display), `bytecode`/`Chunk`, `compiler` smoke, and `PerlValue` (`type_name`,
+//! `DivisionByZero` display), `bytecode`/`Chunk`, `compiler` smoke, and `StrykeValue` (`type_name`,
 //! `ref_type`, `Display`, empty-array
 //! truthiness). Integration covers `our`/`local`, subs with prototypes, builtins like `require`,
 //! regex (`=~` / `!~`), `eval { }`, and `split` with pattern delimiters. Run with `cargo test`.

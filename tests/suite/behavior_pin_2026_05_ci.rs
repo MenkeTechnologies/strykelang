@@ -3,7 +3,7 @@
 //! RLE helpers (`run_length_encode*` / `rld`), `take_n`/`rotate`/`swap_pairs`, `prepend`/`append_elem`/
 //! `contains_elem`/`index_of_elem`, `mean_list`/`min_list`/`max_list`/`span`/`product_list`, `pairs`,
 //! `inits`/`tails`, `list_count`; iterator pins (`enumerate`, `chunk`, `dedup`) vs `range`; documents
-//! **`PerlValue::to_list` / `flatten_args` / iterator helpers** footguns (**BUG-143**),
+//! **`StrykeValue::to_list` / `flatten_args` / iterator helpers** footguns (**BUG-143**),
 //! **`transpose` nested single-arg** (**BUG-144**), **`unzip_pairs(zip(...))`** (**BUG-145**).
 
 use crate::common::*;

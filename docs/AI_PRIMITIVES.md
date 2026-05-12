@@ -934,7 +934,7 @@ for my $f (@$files) { say "$f->{id}  $f->{filename}  $f->{purpose}" }
 ai_file_delete($f->{id}) or die "delete failed";
 ```
 
-Builtins: `ai_file_upload`, `ai_file_list`, `ai_file_get`, `ai_file_delete`. All return native hashrefs/arrayrefs (JSON → PerlValue conversion is recursive).
+Builtins: `ai_file_upload`, `ai_file_list`, `ai_file_get`, `ai_file_delete`. All return native hashrefs/arrayrefs (JSON → StrykeValue conversion is recursive).
 
 ### Phase 5 — Composition (months 10-12)
 

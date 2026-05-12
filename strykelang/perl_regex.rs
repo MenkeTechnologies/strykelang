@@ -3,7 +3,7 @@
 
 use std::sync::{Arc, LazyLock};
 
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 
 /// Matches exactly one Perl “word” character (`\w`), matching Perl `quotemeta` / `\Q…\E` rules.
 static PERL_WORD_ONE_CHAR: LazyLock<regex::Regex> =
@@ -269,13 +269,13 @@ impl<'a> Iterator for CaptureNames<'a> {
 }
 
 /// `$1`… flatten for `@^CAPTURE` / `^CAPTURE_ALL` rows.
-pub fn numbered_capture_flat(caps: &PerlCaptures<'_>) -> Vec<PerlValue> {
+pub fn numbered_capture_flat(caps: &PerlCaptures<'_>) -> Vec<StrykeValue> {
     let mut cap_flat = Vec::new();
     for i in 1..caps.len() {
         if let Some(m) = caps.get(i) {
-            cap_flat.push(PerlValue::string(m.text.to_string()));
+            cap_flat.push(StrykeValue::string(m.text.to_string()));
         } else {
-            cap_flat.push(PerlValue::UNDEF);
+            cap_flat.push(StrykeValue::UNDEF);
         }
     }
     cap_flat

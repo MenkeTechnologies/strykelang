@@ -33,7 +33,7 @@ use stryke::remote_wire::{
     frame_kind, read_typed_frame, send_msg, write_typed_frame, HelloAck, HelloMsg, JobMsg,
     JobRespMsg, SessionAck, SessionInit, PROTO_VERSION,
 };
-use stryke::value::{PerlSub, PerlValue};
+use stryke::value::{PerlSub, StrykeValue};
 
 fn tmp_path(tag: &str) -> PathBuf {
     std::env::temp_dir().join(format!(
@@ -108,9 +108,9 @@ fn spawn_local_worker() -> Child {
 #[test]
 fn perl_items_to_json_maps_scalars() {
     let items = vec![
-        PerlValue::integer(3),
-        PerlValue::integer(-1),
-        PerlValue::string("x".into()),
+        StrykeValue::integer(3),
+        StrykeValue::integer(-1),
+        StrykeValue::string("x".into()),
     ];
     let j = perl_items_to_json(&items).expect("marshal");
     assert_eq!(j.len(), 3);
@@ -121,7 +121,7 @@ fn perl_items_to_json_maps_scalars() {
 
 #[test]
 fn perl_items_to_json_rejects_code_reference_items() {
-    let cb = PerlValue::code_ref(Arc::new(PerlSub {
+    let cb = StrykeValue::code_ref(Arc::new(PerlSub {
         name: "cb".into(),
         params: vec![],
         body: vec![],

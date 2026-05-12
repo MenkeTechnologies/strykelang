@@ -18,7 +18,7 @@ use crate::perl_regex::PerlCompiledRegex;
 /// Handle returned by `async { ... }` / `spawn { ... }`; join with `await`.
 #[derive(Debug)]
 pub struct PerlAsyncTask {
-    pub(crate) result: Arc<Mutex<Option<PerlResult<PerlValue>>>>,
+    pub(crate) result: Arc<Mutex<Option<PerlResult<StrykeValue>>>>,
     pub(crate) join: Arc<Mutex<Option<std::thread::JoinHandle<()>>>>,
 }
 
@@ -33,14 +33,14 @@ impl Clone for PerlAsyncTask {
 
 impl PerlAsyncTask {
     /// Join the worker thread (once) and return the block's value or error.
-    pub fn await_result(&self) -> PerlResult<PerlValue> {
+    pub fn await_result(&self) -> PerlResult<StrykeValue> {
         if let Some(h) = self.join.lock().take() {
             let _ = h.join();
         }
         self.result
             .lock()
             .clone()
-            .unwrap_or_else(|| Ok(PerlValue::UNDEF))
+            .unwrap_or_else(|| Ok(StrykeValue::UNDEF))
     }
 }
 
@@ -50,10 +50,10 @@ impl PerlAsyncTask {
 /// stages (`rev`) wrap one; terminals (`e`/`fore`) consume one item at a time.
 pub trait PerlIterator: Send + Sync {
     /// Return the next item, or `None` when exhausted.
-    fn next_item(&self) -> Option<PerlValue>;
+    fn next_item(&self) -> Option<StrykeValue>;
 
     /// Collect all remaining items into a `Vec`.
-    fn collect_all(&self) -> Vec<PerlValue> {
+    fn collect_all(&self) -> Vec<StrykeValue> {
         let mut out = Vec::new();
         while let Some(v) = self.next_item() {
             out.push(v);
@@ -157,12 +157,12 @@ impl FsWalkIterator {
 }
 
 impl PerlIterator for FsWalkIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         loop {
             {
                 let mut buf = self.buf.lock();
                 if let Some((path, _)) = buf.pop() {
-                    return Some(PerlValue::string(path));
+                    return Some(StrykeValue::string(path));
                 }
             }
             if !self.refill() {
@@ -181,7 +181,7 @@ impl PerlIterator for FsWalkIterator {
 /// on this reversing the sequence (`a,b,c,d` → `d,c,b,a`).
 pub struct RevIterator {
     source: Arc<dyn PerlIterator>,
-    drained: Mutex<Option<Vec<PerlValue>>>,
+    drained: Mutex<Option<Vec<StrykeValue>>>,
 }
 
 impl RevIterator {
@@ -194,7 +194,7 @@ impl RevIterator {
 }
 
 impl PerlIterator for RevIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         let mut g = self.drained.lock();
         if g.is_none() {
             let mut buf = Vec::new();
@@ -219,12 +219,12 @@ pub struct PerlGenerator {
 }
 
 /// `Set->new` storage: canonical key → member value (insertion order preserved).
-pub type PerlSet = IndexMap<String, PerlValue>;
+pub type PerlSet = IndexMap<String, StrykeValue>;
 
 /// Min-heap ordered by a Perl comparator (`$a` / `$b` in scope, like `sort { }`).
 #[derive(Debug, Clone)]
 pub struct PerlHeap {
-    pub items: Vec<PerlValue>,
+    pub items: Vec<StrykeValue>,
     pub cmp: Arc<PerlSub>,
 }
 
@@ -247,8 +247,8 @@ pub struct RemoteSlot {
 mod cluster_parsing_tests {
     use super::*;
 
-    fn s(v: &str) -> PerlValue {
-        PerlValue::string(v.to_string())
+    fn s(v: &str) -> StrykeValue {
+        StrykeValue::string(v.to_string())
     }
 
     #[test]
@@ -298,9 +298,9 @@ mod cluster_parsing_tests {
     fn parses_hashref_slot_form() {
         let mut h = indexmap::IndexMap::new();
         h.insert("host".to_string(), s("data1"));
-        h.insert("slots".to_string(), PerlValue::integer(2));
+        h.insert("slots".to_string(), StrykeValue::integer(2));
         h.insert("stryke".to_string(), s("/opt/stryke"));
-        let c = RemoteCluster::from_list_args(&[PerlValue::hash(h)]).expect("parse");
+        let c = RemoteCluster::from_list_args(&[StrykeValue::hash(h)]).expect("parse");
         assert_eq!(c.slots.len(), 2);
         assert_eq!(c.slots[0].host, "data1");
         assert_eq!(c.slots[0].pe_path, "/opt/stryke");
@@ -309,10 +309,10 @@ mod cluster_parsing_tests {
     #[test]
     fn parses_trailing_tunables_hashref() {
         let mut tun = indexmap::IndexMap::new();
-        tun.insert("timeout".to_string(), PerlValue::integer(30));
-        tun.insert("retries".to_string(), PerlValue::integer(2));
-        tun.insert("connect_timeout".to_string(), PerlValue::integer(5));
-        let c = RemoteCluster::from_list_args(&[s("h1:1"), PerlValue::hash(tun)]).expect("parse");
+        tun.insert("timeout".to_string(), StrykeValue::integer(30));
+        tun.insert("retries".to_string(), StrykeValue::integer(2));
+        tun.insert("connect_timeout".to_string(), StrykeValue::integer(5));
+        let c = RemoteCluster::from_list_args(&[s("h1:1"), StrykeValue::hash(tun)]).expect("parse");
         // Tunables hash should NOT be treated as a slot.
         assert_eq!(c.slots.len(), 1);
         assert_eq!(c.job_timeout_ms, 30_000);
@@ -379,7 +379,7 @@ impl RemoteCluster {
     ///   only when its keys are all known tunable names so it cannot be confused with a slot)
     ///
     /// Backwards compatible with the basic v1 `"host:N"` syntax.
-    pub fn from_list_args(items: &[PerlValue]) -> Result<Self, String> {
+    pub fn from_list_args(items: &[StrykeValue]) -> Result<Self, String> {
         let mut slots: Vec<RemoteSlot> = Vec::new();
         let mut job_timeout_ms = Self::DEFAULT_JOB_TIMEOUT_MS;
         let mut max_attempts = Self::DEFAULT_MAX_ATTEMPTS;
@@ -526,7 +526,7 @@ pub struct CaptureResult {
 #[derive(Debug, Clone)]
 pub struct PerlDataFrame {
     pub columns: Vec<String>,
-    pub cols: Vec<Vec<PerlValue>>,
+    pub cols: Vec<Vec<StrykeValue>>,
     /// When set, `sum(col)` aggregates rows by this column.
     pub group_by: Option<String>,
 }
@@ -548,7 +548,7 @@ impl PerlDataFrame {
     }
 }
 
-/// Heap payload when [`PerlValue`] is not an immediate or raw [`f64`] bits.
+/// Heap payload when [`StrykeValue`] is not an immediate or raw [`f64`] bits.
 #[derive(Debug, Clone)]
 pub(crate) enum HeapObject {
     Integer(i64),
@@ -558,15 +558,15 @@ pub(crate) enum HeapObject {
     Float(f64),
     String(String),
     Bytes(Arc<Vec<u8>>),
-    Array(Vec<PerlValue>),
-    Hash(IndexMap<String, PerlValue>),
-    ArrayRef(Arc<RwLock<Vec<PerlValue>>>),
-    HashRef(Arc<RwLock<IndexMap<String, PerlValue>>>),
-    ScalarRef(Arc<RwLock<PerlValue>>),
+    Array(Vec<StrykeValue>),
+    Hash(IndexMap<String, StrykeValue>),
+    ArrayRef(Arc<RwLock<Vec<StrykeValue>>>),
+    HashRef(Arc<RwLock<IndexMap<String, StrykeValue>>>),
+    ScalarRef(Arc<RwLock<StrykeValue>>),
     /// Closure-capture cell: same `Arc<RwLock>` sharing as ScalarRef but transparently unwrapped
     /// by [`crate::scope::Scope::get_scalar_slot`] and [`crate::scope::Scope::get_scalar`].
     /// Created by [`crate::scope::Scope::capture`] to share lexical scalars between closures.
-    CaptureCell(Arc<RwLock<PerlValue>>),
+    CaptureCell(Arc<RwLock<StrykeValue>>),
     /// `\\$name` when `name` is a plain scalar variable — aliases that binding (Perl ref to lexical).
     ScalarBindingRef(String),
     /// `\\@name` — aliases the live array in [`crate::scope::Scope`] (same stash key as [`Op::GetArray`]).
@@ -578,13 +578,13 @@ pub(crate) enum HeapObject {
     Regex(Arc<PerlCompiledRegex>, String, String),
     Blessed(Arc<BlessedRef>),
     IOHandle(String),
-    Atomic(Arc<Mutex<PerlValue>>),
+    Atomic(Arc<Mutex<StrykeValue>>),
     Set(Arc<PerlSet>),
-    ChannelTx(Arc<Sender<PerlValue>>),
-    ChannelRx(Arc<Receiver<PerlValue>>),
+    ChannelTx(Arc<Sender<StrykeValue>>),
+    ChannelRx(Arc<Receiver<StrykeValue>>),
     AsyncTask(Arc<PerlAsyncTask>),
     Generator(Arc<PerlGenerator>),
-    Deque(Arc<Mutex<VecDeque<PerlValue>>>),
+    Deque(Arc<Mutex<VecDeque<StrykeValue>>>),
     Heap(Arc<Mutex<PerlHeap>>),
     Pipeline(Arc<Mutex<PipelineInner>>),
     Capture(Arc<CaptureResult>),
@@ -607,37 +607,37 @@ pub(crate) enum HeapObject {
 
 /// NaN-boxed value: one `u64` (immediates, raw float bits, or tagged heap pointer).
 #[repr(transparent)]
-pub struct PerlValue(pub(crate) u64);
+pub struct StrykeValue(pub(crate) u64);
 
-impl Default for PerlValue {
+impl Default for StrykeValue {
     fn default() -> Self {
         Self::UNDEF
     }
 }
 
-impl Clone for PerlValue {
+impl Clone for StrykeValue {
     fn clone(&self) -> Self {
         if nanbox::is_heap(self.0) {
             let arc = self.heap_arc();
             match &*arc {
                 HeapObject::Array(v) => {
-                    PerlValue::from_heap(Arc::new(HeapObject::Array(v.clone())))
+                    StrykeValue::from_heap(Arc::new(HeapObject::Array(v.clone())))
                 }
-                HeapObject::Hash(h) => PerlValue::from_heap(Arc::new(HeapObject::Hash(h.clone()))),
+                HeapObject::Hash(h) => StrykeValue::from_heap(Arc::new(HeapObject::Hash(h.clone()))),
                 HeapObject::String(s) => {
-                    PerlValue::from_heap(Arc::new(HeapObject::String(s.clone())))
+                    StrykeValue::from_heap(Arc::new(HeapObject::String(s.clone())))
                 }
-                HeapObject::Integer(n) => PerlValue::integer(*n),
-                HeapObject::Float(f) => PerlValue::float(*f),
-                _ => PerlValue::from_heap(Arc::clone(&arc)),
+                HeapObject::Integer(n) => StrykeValue::integer(*n),
+                HeapObject::Float(f) => StrykeValue::float(*f),
+                _ => StrykeValue::from_heap(Arc::clone(&arc)),
             }
         } else {
-            PerlValue(self.0)
+            StrykeValue(self.0)
         }
     }
 }
 
-impl PerlValue {
+impl StrykeValue {
     /// Stack duplicate (`Op::Dup`): share the outer heap [`Arc`] for arrays/hashes (COW on write),
     /// matching Perl temporaries; other heap payloads keep [`Clone`] semantics.
     #[inline]
@@ -646,12 +646,12 @@ impl PerlValue {
             let arc = self.heap_arc();
             match &*arc {
                 HeapObject::Array(_) | HeapObject::Hash(_) => {
-                    PerlValue::from_heap(Arc::clone(&arc))
+                    StrykeValue::from_heap(Arc::clone(&arc))
                 }
                 _ => self.clone(),
             }
         } else {
-            PerlValue(self.0)
+            StrykeValue(self.0)
         }
     }
 
@@ -668,14 +668,14 @@ impl PerlValue {
     #[inline]
     pub fn shallow_clone(&self) -> Self {
         if nanbox::is_heap(self.0) {
-            PerlValue::from_heap(self.heap_arc())
+            StrykeValue::from_heap(self.heap_arc())
         } else {
-            PerlValue(self.0)
+            StrykeValue(self.0)
         }
     }
 }
 
-impl Drop for PerlValue {
+impl Drop for StrykeValue {
     fn drop(&mut self) {
         if nanbox::is_heap(self.0) {
             unsafe {
@@ -686,7 +686,7 @@ impl Drop for PerlValue {
     }
 }
 
-impl fmt::Debug for PerlValue {
+impl fmt::Debug for StrykeValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{self}")
     }
@@ -723,7 +723,7 @@ pub struct PerlSub {
     pub params: Vec<SubSigParam>,
     pub body: Block,
     /// Captured lexical scope (for closures)
-    pub closure_env: Option<Vec<(String, PerlValue)>>,
+    pub closure_env: Option<Vec<(String, StrykeValue)>>,
     /// Prototype string from `sub name (PROTO) { }`, or `None`.
     pub prototype: Option<String>,
     /// When set, [`Interpreter::call_sub`](crate::vm_helper::VMHelper::call_sub) may evaluate
@@ -731,7 +731,7 @@ pub struct PerlSub {
     pub fib_like: Option<FibLikeRecAddPattern>,
 }
 
-/// Operations queued on a [`PerlValue::pipeline`](crate::value::PerlValue::pipeline) value until `collect()`.
+/// Operations queued on a [`StrykeValue::pipeline`](crate::value::StrykeValue::pipeline) value until `collect()`.
 #[derive(Debug, Clone)]
 pub enum PipelineOp {
     Filter(Arc<PerlSub>),
@@ -777,7 +777,7 @@ pub enum PipelineOp {
     },
     /// `preduce_init EXPR, { }` — scalar result; must be last before `collect()`.
     PReduceInit {
-        init: PerlValue,
+        init: StrykeValue,
         sub: Arc<PerlSub>,
         progress: bool,
     },
@@ -791,7 +791,7 @@ pub enum PipelineOp {
 
 #[derive(Debug)]
 pub struct PipelineInner {
-    pub source: Vec<PerlValue>,
+    pub source: Vec<StrykeValue>,
     pub ops: Vec<PipelineOp>,
     /// Set after `preduce` / `preduce_init` / `pmap_reduce` — no further `->` ops allowed.
     pub has_scalar_terminal: bool,
@@ -809,13 +809,13 @@ pub struct PipelineInner {
 #[derive(Debug)]
 pub struct BlessedRef {
     pub class: String,
-    pub data: RwLock<PerlValue>,
+    pub data: RwLock<StrykeValue>,
     /// When true, dropping does not enqueue `DESTROY` (temporary invocant built while running a destructor).
     pub(crate) suppress_destroy_queue: AtomicBool,
 }
 
 impl BlessedRef {
-    pub(crate) fn new_blessed(class: String, data: PerlValue) -> Self {
+    pub(crate) fn new_blessed(class: String, data: StrykeValue) -> Self {
         Self {
             class,
             data: RwLock::new(data),
@@ -824,7 +824,7 @@ impl BlessedRef {
     }
 
     /// Invocant for a running `DESTROY` — must not re-queue when dropped after the call.
-    pub(crate) fn new_for_destroy_invocant(class: String, data: PerlValue) -> Self {
+    pub(crate) fn new_for_destroy_invocant(class: String, data: StrykeValue) -> Self {
         Self {
             class,
             data: RwLock::new(data),
@@ -860,12 +860,12 @@ impl Drop for BlessedRef {
 #[derive(Debug)]
 pub struct StructInstance {
     pub def: Arc<StructDef>,
-    pub values: RwLock<Vec<PerlValue>>,
+    pub values: RwLock<Vec<StrykeValue>>,
 }
 
 impl StructInstance {
     /// Create a new struct instance with the given definition and values.
-    pub fn new(def: Arc<StructDef>, values: Vec<PerlValue>) -> Self {
+    pub fn new(def: Arc<StructDef>, values: Vec<StrykeValue>) -> Self {
         Self {
             def,
             values: RwLock::new(values),
@@ -874,13 +874,13 @@ impl StructInstance {
 
     /// Get a field value by index (clones the value).
     #[inline]
-    pub fn get_field(&self, idx: usize) -> Option<PerlValue> {
+    pub fn get_field(&self, idx: usize) -> Option<StrykeValue> {
         self.values.read().get(idx).cloned()
     }
 
     /// Set a field value by index.
     #[inline]
-    pub fn set_field(&self, idx: usize, val: PerlValue) {
+    pub fn set_field(&self, idx: usize, val: StrykeValue) {
         if let Some(slot) = self.values.write().get_mut(idx) {
             *slot = val;
         }
@@ -888,7 +888,7 @@ impl StructInstance {
 
     /// Get all field values (clones the vector).
     #[inline]
-    pub fn get_values(&self) -> Vec<PerlValue> {
+    pub fn get_values(&self) -> Vec<StrykeValue> {
         self.values.read().clone()
     }
 }
@@ -908,11 +908,11 @@ pub struct EnumInstance {
     pub def: Arc<EnumDef>,
     pub variant_idx: usize,
     /// Data carried by this variant. For variants with no data, this is UNDEF.
-    pub data: PerlValue,
+    pub data: StrykeValue,
 }
 
 impl EnumInstance {
-    pub fn new(def: Arc<EnumDef>, variant_idx: usize, data: PerlValue) -> Self {
+    pub fn new(def: Arc<EnumDef>, variant_idx: usize, data: StrykeValue) -> Self {
         Self {
             def,
             variant_idx,
@@ -939,13 +939,13 @@ impl Clone for EnumInstance {
 #[derive(Debug)]
 pub struct ClassInstance {
     pub def: Arc<ClassDef>,
-    pub values: RwLock<Vec<PerlValue>>,
+    pub values: RwLock<Vec<StrykeValue>>,
     /// Full ISA chain for this class (all ancestors, computed at instantiation).
     pub isa_chain: Vec<String>,
 }
 
 impl ClassInstance {
-    pub fn new(def: Arc<ClassDef>, values: Vec<PerlValue>) -> Self {
+    pub fn new(def: Arc<ClassDef>, values: Vec<StrykeValue>) -> Self {
         Self {
             def,
             values: RwLock::new(values),
@@ -955,7 +955,7 @@ impl ClassInstance {
 
     pub fn new_with_isa(
         def: Arc<ClassDef>,
-        values: Vec<PerlValue>,
+        values: Vec<StrykeValue>,
         isa_chain: Vec<String>,
     ) -> Self {
         Self {
@@ -972,31 +972,31 @@ impl ClassInstance {
     }
 
     #[inline]
-    pub fn get_field(&self, idx: usize) -> Option<PerlValue> {
+    pub fn get_field(&self, idx: usize) -> Option<StrykeValue> {
         self.values.read().get(idx).cloned()
     }
 
     #[inline]
-    pub fn set_field(&self, idx: usize, val: PerlValue) {
+    pub fn set_field(&self, idx: usize, val: StrykeValue) {
         if let Some(slot) = self.values.write().get_mut(idx) {
             *slot = val;
         }
     }
 
     #[inline]
-    pub fn get_values(&self) -> Vec<PerlValue> {
+    pub fn get_values(&self) -> Vec<StrykeValue> {
         self.values.read().clone()
     }
 
     /// Get field value by name (searches through class and parent hierarchies).
-    pub fn get_field_by_name(&self, name: &str) -> Option<PerlValue> {
+    pub fn get_field_by_name(&self, name: &str) -> Option<StrykeValue> {
         self.def
             .field_index(name)
             .and_then(|idx| self.get_field(idx))
     }
 
     /// Set field value by name.
-    pub fn set_field_by_name(&self, name: &str, val: PerlValue) -> bool {
+    pub fn set_field_by_name(&self, name: &str, val: StrykeValue) -> bool {
         if let Some(idx) = self.def.field_index(name) {
             self.set_field(idx, val);
             true
@@ -1016,13 +1016,13 @@ impl Clone for ClassInstance {
     }
 }
 
-impl PerlValue {
-    pub const UNDEF: PerlValue = PerlValue(nanbox::encode_imm_undef());
+impl StrykeValue {
+    pub const UNDEF: StrykeValue = StrykeValue(nanbox::encode_imm_undef());
 
     #[inline]
-    fn from_heap(arc: Arc<HeapObject>) -> PerlValue {
+    fn from_heap(arc: Arc<HeapObject>) -> StrykeValue {
         let ptr = Arc::into_raw(arc);
-        PerlValue(nanbox::encode_heap_ptr(ptr))
+        StrykeValue(nanbox::encode_heap_ptr(ptr))
     }
 
     #[inline]
@@ -1059,7 +1059,7 @@ impl PerlValue {
         self.0
     }
 
-    /// Reconstruct from [`Self::raw_bits`] (e.g. block JIT returning a full [`PerlValue`] encoding in `i64`).
+    /// Reconstruct from [`Self::raw_bits`] (e.g. block JIT returning a full [`StrykeValue`] encoding in `i64`).
     #[inline]
     pub(crate) fn from_raw_bits(bits: u64) -> Self {
         Self(bits)
@@ -1097,7 +1097,7 @@ impl PerlValue {
     #[inline]
     pub fn integer(n: i64) -> Self {
         if n >= i32::MIN as i64 && n <= i32::MAX as i64 {
-            PerlValue(nanbox::encode_imm_int32(n as i32))
+            StrykeValue(nanbox::encode_imm_int32(n as i32))
         } else {
             Self::from_heap(Arc::new(HeapObject::Integer(n)))
         }
@@ -1141,7 +1141,7 @@ impl PerlValue {
         if nanbox::float_needs_box(f) {
             Self::from_heap(Arc::new(HeapObject::Float(f)))
         } else {
-            PerlValue(f.to_bits())
+            StrykeValue(f.to_bits())
         }
     }
 
@@ -1156,11 +1156,11 @@ impl PerlValue {
     }
 
     #[inline]
-    pub fn array(v: Vec<PerlValue>) -> Self {
+    pub fn array(v: Vec<StrykeValue>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Array(v)))
     }
 
-    /// Wrap a lazy iterator as a PerlValue.
+    /// Wrap a lazy iterator as a StrykeValue.
     #[inline]
     pub fn iterator(it: Arc<dyn PerlIterator>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Iterator(it)))
@@ -1186,27 +1186,27 @@ impl PerlValue {
     }
 
     #[inline]
-    pub fn hash(h: IndexMap<String, PerlValue>) -> Self {
+    pub fn hash(h: IndexMap<String, StrykeValue>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Hash(h)))
     }
 
     #[inline]
-    pub fn array_ref(a: Arc<RwLock<Vec<PerlValue>>>) -> Self {
+    pub fn array_ref(a: Arc<RwLock<Vec<StrykeValue>>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::ArrayRef(a)))
     }
 
     #[inline]
-    pub fn hash_ref(h: Arc<RwLock<IndexMap<String, PerlValue>>>) -> Self {
+    pub fn hash_ref(h: Arc<RwLock<IndexMap<String, StrykeValue>>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::HashRef(h)))
     }
 
     #[inline]
-    pub fn scalar_ref(r: Arc<RwLock<PerlValue>>) -> Self {
+    pub fn scalar_ref(r: Arc<RwLock<StrykeValue>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::ScalarRef(r)))
     }
 
     #[inline]
-    pub fn capture_cell(r: Arc<RwLock<PerlValue>>) -> Self {
+    pub fn capture_cell(r: Arc<RwLock<StrykeValue>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::CaptureCell(r)))
     }
 
@@ -1259,7 +1259,7 @@ impl PerlValue {
 
     /// Hash lookup when this value is a plain `HeapObject::Hash` (not a ref).
     #[inline]
-    pub fn hash_get(&self, key: &str) -> Option<PerlValue> {
+    pub fn hash_get(&self, key: &str) -> Option<StrykeValue> {
         self.with_heap(|h| match h {
             HeapObject::Hash(h) => h.get(key).cloned(),
             _ => None,
@@ -1326,7 +1326,7 @@ impl PerlValue {
     }
 
     #[inline]
-    pub fn as_array_vec(&self) -> Option<Vec<PerlValue>> {
+    pub fn as_array_vec(&self) -> Option<Vec<StrykeValue>> {
         self.with_heap(|h| match h {
             HeapObject::Array(v) => Some(v.clone()),
             _ => None,
@@ -1337,7 +1337,7 @@ impl PerlValue {
     /// Expand a `map` / `flat_map` / `pflat_map` block result into list elements. Plain arrays
     /// expand; when `peel_array_ref`, a single ARRAY ref is dereferenced one level (stryke
     /// `flat_map` / `pflat_map`; stock `map` uses `peel_array_ref == false`).
-    pub fn map_flatten_outputs(&self, peel_array_ref: bool) -> Vec<PerlValue> {
+    pub fn map_flatten_outputs(&self, peel_array_ref: bool) -> Vec<StrykeValue> {
         if let Some(a) = self.as_array_vec() {
             return a;
         }
@@ -1353,7 +1353,7 @@ impl PerlValue {
     }
 
     #[inline]
-    pub fn as_hash_map(&self) -> Option<IndexMap<String, PerlValue>> {
+    pub fn as_hash_map(&self) -> Option<IndexMap<String, StrykeValue>> {
         self.with_heap(|h| match h {
             HeapObject::Hash(h) => Some(h.clone()),
             _ => None,
@@ -1389,7 +1389,7 @@ impl PerlValue {
     }
 
     #[inline]
-    pub fn as_atomic_arc(&self) -> Option<Arc<Mutex<PerlValue>>> {
+    pub fn as_atomic_arc(&self) -> Option<Arc<Mutex<StrykeValue>>> {
         self.with_heap(|h| match h {
             HeapObject::Atomic(a) => Some(Arc::clone(a)),
             _ => None,
@@ -1452,7 +1452,7 @@ impl PerlValue {
     }
 
     #[inline]
-    pub fn as_deque(&self) -> Option<Arc<Mutex<VecDeque<PerlValue>>>> {
+    pub fn as_deque(&self) -> Option<Arc<Mutex<VecDeque<StrykeValue>>>> {
         self.with_heap(|h| match h {
             HeapObject::Deque(d) => Some(Arc::clone(d)),
             _ => None,
@@ -1515,7 +1515,7 @@ impl PerlValue {
     }
 
     #[inline]
-    pub fn as_channel_tx(&self) -> Option<Arc<Sender<PerlValue>>> {
+    pub fn as_channel_tx(&self) -> Option<Arc<Sender<StrykeValue>>> {
         self.with_heap(|h| match h {
             HeapObject::ChannelTx(t) => Some(Arc::clone(t)),
             _ => None,
@@ -1524,7 +1524,7 @@ impl PerlValue {
     }
 
     #[inline]
-    pub fn as_channel_rx(&self) -> Option<Arc<Receiver<PerlValue>>> {
+    pub fn as_channel_rx(&self) -> Option<Arc<Receiver<StrykeValue>>> {
         self.with_heap(|h| match h {
             HeapObject::ChannelRx(r) => Some(Arc::clone(r)),
             _ => None,
@@ -1533,7 +1533,7 @@ impl PerlValue {
     }
 
     #[inline]
-    pub fn as_scalar_ref(&self) -> Option<Arc<RwLock<PerlValue>>> {
+    pub fn as_scalar_ref(&self) -> Option<Arc<RwLock<StrykeValue>>> {
         self.with_heap(|h| match h {
             HeapObject::ScalarRef(r) => Some(Arc::clone(r)),
             _ => None,
@@ -1543,7 +1543,7 @@ impl PerlValue {
 
     /// Returns the inner Arc if this is a [`HeapObject::CaptureCell`].
     #[inline]
-    pub fn as_capture_cell(&self) -> Option<Arc<RwLock<PerlValue>>> {
+    pub fn as_capture_cell(&self) -> Option<Arc<RwLock<StrykeValue>>> {
         self.with_heap(|h| match h {
             HeapObject::CaptureCell(r) => Some(Arc::clone(r)),
             _ => None,
@@ -1582,7 +1582,7 @@ impl PerlValue {
     }
 
     #[inline]
-    pub fn as_array_ref(&self) -> Option<Arc<RwLock<Vec<PerlValue>>>> {
+    pub fn as_array_ref(&self) -> Option<Arc<RwLock<Vec<StrykeValue>>>> {
         self.with_heap(|h| match h {
             HeapObject::ArrayRef(r) => Some(Arc::clone(r)),
             _ => None,
@@ -1591,7 +1591,7 @@ impl PerlValue {
     }
 
     #[inline]
-    pub fn as_hash_ref(&self) -> Option<Arc<RwLock<IndexMap<String, PerlValue>>>> {
+    pub fn as_hash_ref(&self) -> Option<Arc<RwLock<IndexMap<String, StrykeValue>>>> {
         self.with_heap(|h| match h {
             HeapObject::HashRef(r) => Some(Arc::clone(r)),
             _ => None,
@@ -1634,7 +1634,7 @@ impl PerlValue {
     }
 
     #[inline]
-    pub fn atomic(a: Arc<Mutex<PerlValue>>) -> Self {
+    pub fn atomic(a: Arc<Mutex<StrykeValue>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Atomic(a)))
     }
 
@@ -1644,12 +1644,12 @@ impl PerlValue {
     }
 
     #[inline]
-    pub fn channel_tx(tx: Arc<Sender<PerlValue>>) -> Self {
+    pub fn channel_tx(tx: Arc<Sender<StrykeValue>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::ChannelTx(tx)))
     }
 
     #[inline]
-    pub fn channel_rx(rx: Arc<Receiver<PerlValue>>) -> Self {
+    pub fn channel_rx(rx: Arc<Receiver<StrykeValue>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::ChannelRx(rx)))
     }
 
@@ -1664,7 +1664,7 @@ impl PerlValue {
     }
 
     #[inline]
-    pub fn deque(d: Arc<Mutex<VecDeque<PerlValue>>>) -> Self {
+    pub fn deque(d: Arc<Mutex<VecDeque<StrykeValue>>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Deque(d)))
     }
 
@@ -1804,7 +1804,7 @@ impl PerlValue {
     }
 
     #[inline]
-    pub fn unwrap_atomic(&self) -> PerlValue {
+    pub fn unwrap_atomic(&self) -> StrykeValue {
         if !nanbox::is_heap(self.0) {
             return self.clone();
         }
@@ -1856,10 +1856,10 @@ impl PerlValue {
     /// String concat with owned LHS: moves out a uniquely held heap string when possible
     /// ([`Self::into_string`]), then appends `rhs`. Used for `.=` and VM concat-append ops.
     #[inline]
-    pub(crate) fn concat_append_owned(self, rhs: &PerlValue) -> PerlValue {
+    pub(crate) fn concat_append_owned(self, rhs: &StrykeValue) -> StrykeValue {
         let mut s = self.into_string();
         rhs.append_to(&mut s);
-        PerlValue::string(s)
+        StrykeValue::string(s)
     }
 
     /// In-place repeated `.=` for the fused counted-loop superinstruction:
@@ -1907,7 +1907,7 @@ impl PerlValue {
     /// the caller must then fall back to [`Self::concat_append_owned`] so that a
     /// second handle to the same `Arc` never observes a torn midway write.
     #[inline]
-    pub(crate) fn try_concat_append_inplace(&mut self, rhs: &PerlValue) -> bool {
+    pub(crate) fn try_concat_append_inplace(&mut self, rhs: &StrykeValue) -> bool {
         if !nanbox::is_heap(self.0) {
             return false;
         }
@@ -1957,11 +1957,11 @@ impl PerlValue {
                     Arc::from_raw(nanbox::decode_heap_ptr::<HeapObject>(bits) as *mut HeapObject);
                 match Arc::try_unwrap(arc) {
                     Ok(HeapObject::String(s)) => return s,
-                    Ok(o) => return PerlValue::from_heap(Arc::new(o)).to_string(),
+                    Ok(o) => return StrykeValue::from_heap(Arc::new(o)).to_string(),
                     Err(arc) => {
                         return match &*arc {
                             HeapObject::String(s) => s.clone(),
-                            _ => PerlValue::from_heap(Arc::clone(&arc)).to_string(),
+                            _ => StrykeValue::from_heap(Arc::clone(&arc)).to_string(),
                         };
                     }
                 }
@@ -2118,47 +2118,47 @@ impl PerlValue {
         }
     }
 
-    pub fn ref_type(&self) -> PerlValue {
+    pub fn ref_type(&self) -> StrykeValue {
         if !nanbox::is_heap(self.0) {
-            return PerlValue::string(String::new());
+            return StrykeValue::string(String::new());
         }
         match unsafe { self.heap_ref() } {
             HeapObject::ArrayRef(_) | HeapObject::ArrayBindingRef(_) => {
-                PerlValue::string("ARRAY".into())
+                StrykeValue::string("ARRAY".into())
             }
             HeapObject::HashRef(_) | HeapObject::HashBindingRef(_) => {
-                PerlValue::string("HASH".into())
+                StrykeValue::string("HASH".into())
             }
             HeapObject::ScalarRef(_) | HeapObject::ScalarBindingRef(_) => {
-                PerlValue::string("SCALAR".into())
+                StrykeValue::string("SCALAR".into())
             }
-            HeapObject::CodeRef(_) => PerlValue::string("CODE".into()),
-            HeapObject::Regex(_, _, _) => PerlValue::string("Regexp".into()),
-            HeapObject::Atomic(_) => PerlValue::string("ATOMIC".into()),
-            HeapObject::Set(_) => PerlValue::string("Set".into()),
-            HeapObject::ChannelTx(_) => PerlValue::string("PCHANNEL::Tx".into()),
-            HeapObject::ChannelRx(_) => PerlValue::string("PCHANNEL::Rx".into()),
-            HeapObject::AsyncTask(_) => PerlValue::string("ASYNCTASK".into()),
-            HeapObject::Generator(_) => PerlValue::string("Generator".into()),
-            HeapObject::Deque(_) => PerlValue::string("Deque".into()),
-            HeapObject::Heap(_) => PerlValue::string("Heap".into()),
-            HeapObject::Pipeline(_) => PerlValue::string("Pipeline".into()),
-            HeapObject::DataFrame(_) => PerlValue::string("DataFrame".into()),
-            HeapObject::Capture(_) => PerlValue::string("Capture".into()),
-            HeapObject::Ppool(_) => PerlValue::string("Ppool".into()),
-            HeapObject::RemoteCluster(_) => PerlValue::string("Cluster".into()),
-            HeapObject::Barrier(_) => PerlValue::string("Barrier".into()),
-            HeapObject::SqliteConn(_) => PerlValue::string("SqliteConn".into()),
-            HeapObject::StructInst(s) => PerlValue::string(s.def.name.clone()),
-            HeapObject::EnumInst(e) => PerlValue::string(e.def.name.clone()),
-            HeapObject::ClassInst(c) => PerlValue::string(c.def.name.clone()),
-            HeapObject::Bytes(_) => PerlValue::string("BYTES".into()),
-            HeapObject::Blessed(b) => PerlValue::string(b.class.clone()),
-            _ => PerlValue::string(String::new()),
+            HeapObject::CodeRef(_) => StrykeValue::string("CODE".into()),
+            HeapObject::Regex(_, _, _) => StrykeValue::string("Regexp".into()),
+            HeapObject::Atomic(_) => StrykeValue::string("ATOMIC".into()),
+            HeapObject::Set(_) => StrykeValue::string("Set".into()),
+            HeapObject::ChannelTx(_) => StrykeValue::string("PCHANNEL::Tx".into()),
+            HeapObject::ChannelRx(_) => StrykeValue::string("PCHANNEL::Rx".into()),
+            HeapObject::AsyncTask(_) => StrykeValue::string("ASYNCTASK".into()),
+            HeapObject::Generator(_) => StrykeValue::string("Generator".into()),
+            HeapObject::Deque(_) => StrykeValue::string("Deque".into()),
+            HeapObject::Heap(_) => StrykeValue::string("Heap".into()),
+            HeapObject::Pipeline(_) => StrykeValue::string("Pipeline".into()),
+            HeapObject::DataFrame(_) => StrykeValue::string("DataFrame".into()),
+            HeapObject::Capture(_) => StrykeValue::string("Capture".into()),
+            HeapObject::Ppool(_) => StrykeValue::string("Ppool".into()),
+            HeapObject::RemoteCluster(_) => StrykeValue::string("Cluster".into()),
+            HeapObject::Barrier(_) => StrykeValue::string("Barrier".into()),
+            HeapObject::SqliteConn(_) => StrykeValue::string("SqliteConn".into()),
+            HeapObject::StructInst(s) => StrykeValue::string(s.def.name.clone()),
+            HeapObject::EnumInst(e) => StrykeValue::string(e.def.name.clone()),
+            HeapObject::ClassInst(c) => StrykeValue::string(c.def.name.clone()),
+            HeapObject::Bytes(_) => StrykeValue::string("BYTES".into()),
+            HeapObject::Blessed(b) => StrykeValue::string(b.class.clone()),
+            _ => StrykeValue::string(String::new()),
         }
     }
 
-    pub fn num_cmp(&self, other: &PerlValue) -> Ordering {
+    pub fn num_cmp(&self, other: &StrykeValue) -> Ordering {
         let a = self.to_number();
         let b = other.to_number();
         a.partial_cmp(&b).unwrap_or(Ordering::Equal)
@@ -2166,7 +2166,7 @@ impl PerlValue {
 
     /// String equality for `eq` / `cmp` without allocating when both sides are heap strings.
     #[inline]
-    pub fn str_eq(&self, other: &PerlValue) -> bool {
+    pub fn str_eq(&self, other: &StrykeValue) -> bool {
         if nanbox::is_heap(self.0) && nanbox::is_heap(other.0) {
             if let (HeapObject::String(a), HeapObject::String(b)) =
                 unsafe { (self.heap_ref(), other.heap_ref()) }
@@ -2177,7 +2177,7 @@ impl PerlValue {
         self.to_string() == other.to_string()
     }
 
-    pub fn str_cmp(&self, other: &PerlValue) -> Ordering {
+    pub fn str_cmp(&self, other: &StrykeValue) -> Ordering {
         if nanbox::is_heap(self.0) && nanbox::is_heap(other.0) {
             if let (HeapObject::String(a), HeapObject::String(b)) =
                 unsafe { (self.heap_ref(), other.heap_ref()) }
@@ -2189,7 +2189,7 @@ impl PerlValue {
     }
 
     /// Deep equality for struct fields (recursive).
-    pub fn struct_field_eq(&self, other: &PerlValue) -> bool {
+    pub fn struct_field_eq(&self, other: &StrykeValue) -> bool {
         if nanbox::is_imm_undef(self.0) && nanbox::is_imm_undef(other.0) {
             return true;
         }
@@ -2245,33 +2245,33 @@ impl PerlValue {
     }
 
     /// Deep clone a value (used for struct clone).
-    pub fn deep_clone(&self) -> PerlValue {
+    pub fn deep_clone(&self) -> StrykeValue {
         if !nanbox::is_heap(self.0) {
             return self.clone();
         }
         match unsafe { self.heap_ref() } {
-            HeapObject::Array(a) => PerlValue::array(a.iter().map(|v| v.deep_clone()).collect()),
+            HeapObject::Array(a) => StrykeValue::array(a.iter().map(|v| v.deep_clone()).collect()),
             HeapObject::ArrayRef(a) => {
-                let cloned: Vec<PerlValue> = a.read().iter().map(|v| v.deep_clone()).collect();
-                PerlValue::array_ref(Arc::new(RwLock::new(cloned)))
+                let cloned: Vec<StrykeValue> = a.read().iter().map(|v| v.deep_clone()).collect();
+                StrykeValue::array_ref(Arc::new(RwLock::new(cloned)))
             }
             HeapObject::Hash(h) => {
                 let mut cloned = IndexMap::new();
                 for (k, v) in h.iter() {
                     cloned.insert(k.clone(), v.deep_clone());
                 }
-                PerlValue::hash(cloned)
+                StrykeValue::hash(cloned)
             }
             HeapObject::HashRef(h) => {
                 let mut cloned = IndexMap::new();
                 for (k, v) in h.read().iter() {
                     cloned.insert(k.clone(), v.deep_clone());
                 }
-                PerlValue::hash_ref(Arc::new(RwLock::new(cloned)))
+                StrykeValue::hash_ref(Arc::new(RwLock::new(cloned)))
             }
             HeapObject::StructInst(s) => {
                 let new_values = s.get_values().iter().map(|v| v.deep_clone()).collect();
-                PerlValue::struct_inst(Arc::new(StructInstance::new(
+                StrykeValue::struct_inst(Arc::new(StructInstance::new(
                     Arc::clone(&s.def),
                     new_values,
                 )))
@@ -2280,7 +2280,7 @@ impl PerlValue {
         }
     }
 
-    pub fn to_list(&self) -> Vec<PerlValue> {
+    pub fn to_list(&self) -> Vec<StrykeValue> {
         if nanbox::is_imm_undef(self.0) {
             return vec![];
         }
@@ -2291,7 +2291,7 @@ impl PerlValue {
             HeapObject::Array(a) => a.clone(),
             HeapObject::Hash(h) => h
                 .iter()
-                .flat_map(|(k, v)| vec![PerlValue::string(k.clone()), v.clone()])
+                .flat_map(|(k, v)| vec![StrykeValue::string(k.clone()), v.clone()])
                 .collect(),
             HeapObject::Atomic(arc) => arc.lock().to_list(),
             HeapObject::Set(s) => s.values().cloned().collect(),
@@ -2307,7 +2307,7 @@ impl PerlValue {
         }
     }
 
-    pub fn scalar_context(&self) -> PerlValue {
+    pub fn scalar_context(&self) -> StrykeValue {
         if !nanbox::is_heap(self.0) {
             return self.clone();
         }
@@ -2315,29 +2315,29 @@ impl PerlValue {
             return arc.lock().scalar_context();
         }
         match unsafe { self.heap_ref() } {
-            HeapObject::Array(a) => PerlValue::integer(a.len() as i64),
+            HeapObject::Array(a) => StrykeValue::integer(a.len() as i64),
             HeapObject::Hash(h) => {
                 if h.is_empty() {
-                    PerlValue::integer(0)
+                    StrykeValue::integer(0)
                 } else {
-                    PerlValue::string(format!("{}/{}", h.len(), h.capacity()))
+                    StrykeValue::string(format!("{}/{}", h.len(), h.capacity()))
                 }
             }
-            HeapObject::Set(s) => PerlValue::integer(s.len() as i64),
-            HeapObject::Deque(d) => PerlValue::integer(d.lock().len() as i64),
-            HeapObject::Heap(h) => PerlValue::integer(h.lock().items.len() as i64),
-            HeapObject::Pipeline(p) => PerlValue::integer(p.lock().source.len() as i64),
+            HeapObject::Set(s) => StrykeValue::integer(s.len() as i64),
+            HeapObject::Deque(d) => StrykeValue::integer(d.lock().len() as i64),
+            HeapObject::Heap(h) => StrykeValue::integer(h.lock().items.len() as i64),
+            HeapObject::Pipeline(p) => StrykeValue::integer(p.lock().source.len() as i64),
             HeapObject::Capture(_)
             | HeapObject::Ppool(_)
             | HeapObject::RemoteCluster(_)
-            | HeapObject::Barrier(_) => PerlValue::integer(1),
-            HeapObject::Generator(_) => PerlValue::integer(1),
+            | HeapObject::Barrier(_) => StrykeValue::integer(1),
+            HeapObject::Generator(_) => StrykeValue::integer(1),
             _ => self.clone(),
         }
     }
 }
 
-impl fmt::Display for PerlValue {
+impl fmt::Display for StrykeValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if nanbox::is_imm_undef(self.0) {
             return Ok(());
@@ -2412,7 +2412,7 @@ impl fmt::Display for PerlValue {
                         f,
                         "{} => {}",
                         field.name,
-                        values.get(i).cloned().unwrap_or(PerlValue::UNDEF)
+                        values.get(i).cloned().unwrap_or(StrykeValue::UNDEF)
                     )?;
                 }
                 f.write_str(")")
@@ -2437,7 +2437,7 @@ impl fmt::Display for PerlValue {
                         f,
                         "{} => {}",
                         field.name,
-                        values.get(i).cloned().unwrap_or(PerlValue::UNDEF)
+                        values.get(i).cloned().unwrap_or(StrykeValue::UNDEF)
                     )?;
                 }
                 f.write_str(")")
@@ -2451,8 +2451,8 @@ impl fmt::Display for PerlValue {
     }
 }
 
-/// Stable key for set membership (dedup of `PerlValue` in this runtime).
-pub fn set_member_key(v: &PerlValue) -> String {
+/// Stable key for set membership (dedup of `StrykeValue` in this runtime).
+pub fn set_member_key(v: &StrykeValue) -> String {
     if nanbox::is_imm_undef(v.0) {
         return "u:".to_string();
     }
@@ -2571,56 +2571,56 @@ pub fn perl_mod_i64(a: i64, b: i64) -> i64 {
 /// overflow. In native mode, wraps (preserves current behavior). Either side
 /// already being a `BigInt` forces the BigInt path.
 #[inline]
-pub fn compat_mul(a: &PerlValue, b: &PerlValue) -> PerlValue {
+pub fn compat_mul(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
     if a.as_bigint().is_some() || b.as_bigint().is_some() {
-        return PerlValue::bigint(a.to_bigint() * b.to_bigint());
+        return StrykeValue::bigint(a.to_bigint() * b.to_bigint());
     }
     let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) else {
-        return PerlValue::float(a.to_number() * b.to_number());
+        return StrykeValue::float(a.to_number() * b.to_number());
     };
     if crate::compat_mode() || crate::bigint_pragma() {
         match x.checked_mul(y) {
-            Some(r) => PerlValue::integer(r),
-            None => PerlValue::bigint(BigInt::from(x) * BigInt::from(y)),
+            Some(r) => StrykeValue::integer(r),
+            None => StrykeValue::bigint(BigInt::from(x) * BigInt::from(y)),
         }
     } else {
-        PerlValue::integer(x.wrapping_mul(y))
+        StrykeValue::integer(x.wrapping_mul(y))
     }
 }
 
 #[inline]
-pub fn compat_add(a: &PerlValue, b: &PerlValue) -> PerlValue {
+pub fn compat_add(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
     if a.as_bigint().is_some() || b.as_bigint().is_some() {
-        return PerlValue::bigint(a.to_bigint() + b.to_bigint());
+        return StrykeValue::bigint(a.to_bigint() + b.to_bigint());
     }
     let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) else {
-        return PerlValue::float(a.to_number() + b.to_number());
+        return StrykeValue::float(a.to_number() + b.to_number());
     };
     if crate::compat_mode() || crate::bigint_pragma() {
         match x.checked_add(y) {
-            Some(r) => PerlValue::integer(r),
-            None => PerlValue::bigint(BigInt::from(x) + BigInt::from(y)),
+            Some(r) => StrykeValue::integer(r),
+            None => StrykeValue::bigint(BigInt::from(x) + BigInt::from(y)),
         }
     } else {
-        PerlValue::integer(x.wrapping_add(y))
+        StrykeValue::integer(x.wrapping_add(y))
     }
 }
 
 #[inline]
-pub fn compat_sub(a: &PerlValue, b: &PerlValue) -> PerlValue {
+pub fn compat_sub(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
     if a.as_bigint().is_some() || b.as_bigint().is_some() {
-        return PerlValue::bigint(a.to_bigint() - b.to_bigint());
+        return StrykeValue::bigint(a.to_bigint() - b.to_bigint());
     }
     let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) else {
-        return PerlValue::float(a.to_number() - b.to_number());
+        return StrykeValue::float(a.to_number() - b.to_number());
     };
     if crate::compat_mode() || crate::bigint_pragma() {
         match x.checked_sub(y) {
-            Some(r) => PerlValue::integer(r),
-            None => PerlValue::bigint(BigInt::from(x) - BigInt::from(y)),
+            Some(r) => StrykeValue::integer(r),
+            None => StrykeValue::bigint(BigInt::from(x) - BigInt::from(y)),
         }
     } else {
-        PerlValue::integer(x.wrapping_sub(y))
+        StrykeValue::integer(x.wrapping_sub(y))
     }
 }
 
@@ -2629,36 +2629,36 @@ pub fn compat_sub(a: &PerlValue, b: &PerlValue) -> PerlValue {
 /// works. Falls through to `f64::powf` for negative or non-integer
 /// exponents (matches Perl's behavior).
 #[inline]
-pub fn compat_pow(a: &PerlValue, b: &PerlValue) -> PerlValue {
+pub fn compat_pow(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
     let (Some(base), Some(exp)) = (a.as_integer(), b.as_integer()) else {
-        return PerlValue::float(a.to_number().powf(b.to_number()));
+        return StrykeValue::float(a.to_number().powf(b.to_number()));
     };
     let bigint_active = crate::compat_mode() || crate::bigint_pragma();
     if !bigint_active {
         // Native: do whatever the existing path does — fall back to float
         // (matches Perl's default i64-overflow-to-NV behavior).
-        return PerlValue::float((base as f64).powf(exp as f64));
+        return StrykeValue::float((base as f64).powf(exp as f64));
     }
     if exp < 0 {
-        return PerlValue::float((base as f64).powf(exp as f64));
+        return StrykeValue::float((base as f64).powf(exp as f64));
     }
     use num_traits::Pow;
     let result = BigInt::from(base).pow(exp as u32);
-    PerlValue::bigint(result)
+    StrykeValue::bigint(result)
 }
 
-pub fn set_from_elements<I: IntoIterator<Item = PerlValue>>(items: I) -> PerlValue {
+pub fn set_from_elements<I: IntoIterator<Item = StrykeValue>>(items: I) -> StrykeValue {
     let mut map = PerlSet::new();
     for v in items {
         let k = set_member_key(&v);
         map.insert(k, v);
     }
-    PerlValue::set(Arc::new(map))
+    StrykeValue::set(Arc::new(map))
 }
 
 /// Underlying set for union/intersection, including `mysync $s` (`Atomic` wrapping `Set`).
 #[inline]
-pub fn set_payload(v: &PerlValue) -> Option<Arc<PerlSet>> {
+pub fn set_payload(v: &StrykeValue) -> Option<Arc<PerlSet>> {
     if !nanbox::is_heap(v.0) {
         return None;
     }
@@ -2669,17 +2669,17 @@ pub fn set_payload(v: &PerlValue) -> Option<Arc<PerlSet>> {
     }
 }
 
-pub fn set_union(a: &PerlValue, b: &PerlValue) -> Option<PerlValue> {
+pub fn set_union(a: &StrykeValue, b: &StrykeValue) -> Option<StrykeValue> {
     let ia = set_payload(a)?;
     let ib = set_payload(b)?;
     let mut m = (*ia).clone();
     for (k, v) in ib.iter() {
         m.entry(k.clone()).or_insert_with(|| v.clone());
     }
-    Some(PerlValue::set(Arc::new(m)))
+    Some(StrykeValue::set(Arc::new(m)))
 }
 
-pub fn set_intersection(a: &PerlValue, b: &PerlValue) -> Option<PerlValue> {
+pub fn set_intersection(a: &StrykeValue, b: &StrykeValue) -> Option<StrykeValue> {
     let ia = set_payload(a)?;
     let ib = set_payload(b)?;
     let mut m = PerlSet::new();
@@ -2688,7 +2688,7 @@ pub fn set_intersection(a: &PerlValue, b: &PerlValue) -> Option<PerlValue> {
             m.insert(k.clone(), v.clone());
         }
     }
-    Some(PerlValue::set(Arc::new(m)))
+    Some(StrykeValue::set(Arc::new(m)))
 }
 fn parse_number(s: &str) -> f64 {
     let s = s.trim();
@@ -2830,7 +2830,7 @@ fn perl_str_looks_like_number_for_range(s: &str) -> bool {
 }
 
 /// Whether list-context `..` uses Perl's **numeric** counting (`pp_flop` `RANGE_IS_NUMERIC`).
-pub(crate) fn perl_list_range_pair_is_numeric(left: &PerlValue, right: &PerlValue) -> bool {
+pub(crate) fn perl_list_range_pair_is_numeric(left: &StrykeValue, right: &StrykeValue) -> bool {
     if left.is_integer_like() || left.is_float_like() {
         return true;
     }
@@ -3004,7 +3004,7 @@ fn perl_list_range_cur_bound(cur: &str, right_is_ascii: bool) -> usize {
     }
 }
 
-fn perl_list_range_expand_string_magic(from: PerlValue, to: PerlValue) -> Vec<PerlValue> {
+fn perl_list_range_expand_string_magic(from: StrykeValue, to: StrykeValue) -> Vec<StrykeValue> {
     let mut cur = from.into_string();
     let right = to.into_string();
     let right_ascii = right.is_ascii();
@@ -3020,7 +3020,7 @@ fn perl_list_range_expand_string_magic(from: PerlValue, to: PerlValue) -> Vec<Pe
         if cur_bound > max_bound {
             break;
         }
-        out.push(PerlValue::string(cur.clone()));
+        out.push(StrykeValue::string(cur.clone()));
         if cur == right {
             break;
         }
@@ -3033,12 +3033,12 @@ fn perl_list_range_expand_string_magic(from: PerlValue, to: PerlValue) -> Vec<Pe
 }
 
 /// Perl list-context `..` (`pp_flop`): numeric counting or magical string sequence.
-pub(crate) fn perl_list_range_expand(from: PerlValue, to: PerlValue) -> Vec<PerlValue> {
+pub(crate) fn perl_list_range_expand(from: StrykeValue, to: StrykeValue) -> Vec<StrykeValue> {
     if perl_list_range_pair_is_numeric(&from, &to) {
         let i = from.to_int();
         let j = to.to_int();
         if j >= i {
-            (i..=j).map(PerlValue::integer).collect()
+            (i..=j).map(StrykeValue::integer).collect()
         } else {
             Vec::new()
         }
@@ -3094,7 +3094,7 @@ fn u32_to_ipv4(n: u32) -> String {
 }
 
 /// IPv4 range with step.
-fn ipv4_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
+fn ipv4_range_stepped(from: &str, to: &str, step: i64) -> Vec<StrykeValue> {
     let Some(start) = ipv4_to_u32(from) else {
         return vec![];
     };
@@ -3105,13 +3105,13 @@ fn ipv4_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
     if step > 0 {
         let mut cur = start as i64;
         while cur <= end as i64 {
-            out.push(PerlValue::string(u32_to_ipv4(cur as u32)));
+            out.push(StrykeValue::string(u32_to_ipv4(cur as u32)));
             cur += step;
         }
     } else {
         let mut cur = start as i64;
         while cur >= end as i64 {
-            out.push(PerlValue::string(u32_to_ipv4(cur as u32)));
+            out.push(StrykeValue::string(u32_to_ipv4(cur as u32)));
             cur += step;
         }
     }
@@ -3142,7 +3142,7 @@ fn is_hex_source_literal(s: &str) -> bool {
 /// - Uppercase iff EITHER endpoint had any uppercase letter — once the user
 ///   types `0xFF` we keep the case for every value in the range, even when
 ///   the FROM endpoint (`0x00`) had no letters of its own to disambiguate.
-fn hex_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
+fn hex_range_stepped(from: &str, to: &str, step: i64) -> Vec<StrykeValue> {
     let from_body = &from[2..];
     let to_body = &to[2..];
     let Ok(start) = i64::from_str_radix(from_body, 16) else {
@@ -3169,7 +3169,7 @@ fn hex_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
         }
         let mut cur = start;
         while cur <= end {
-            out.push(PerlValue::string(format_one(cur, width, upper, prefix)));
+            out.push(StrykeValue::string(format_one(cur, width, upper, prefix)));
             if (end - cur) < step {
                 break;
             }
@@ -3181,7 +3181,7 @@ fn hex_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
         }
         let mut cur = start;
         while cur >= end {
-            out.push(PerlValue::string(format_one(cur, width, upper, prefix)));
+            out.push(StrykeValue::string(format_one(cur, width, upper, prefix)));
             if (cur - end) < (-step) {
                 break;
             }
@@ -3191,7 +3191,7 @@ fn hex_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
     out
 }
 
-fn ipv6_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
+fn ipv6_range_stepped(from: &str, to: &str, step: i64) -> Vec<StrykeValue> {
     let Ok(start) = from.parse::<std::net::Ipv6Addr>() else {
         return vec![];
     };
@@ -3208,7 +3208,7 @@ fn ipv6_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
         let step = step as u128;
         let mut cur = s;
         loop {
-            out.push(PerlValue::string(std::net::Ipv6Addr::from(cur).to_string()));
+            out.push(StrykeValue::string(std::net::Ipv6Addr::from(cur).to_string()));
             if cur == e || e.saturating_sub(cur) < step {
                 break;
             }
@@ -3221,7 +3221,7 @@ fn ipv6_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
         let step = (-step) as u128;
         let mut cur = s;
         loop {
-            out.push(PerlValue::string(std::net::Ipv6Addr::from(cur).to_string()));
+            out.push(StrykeValue::string(std::net::Ipv6Addr::from(cur).to_string()));
             if cur == e || cur.saturating_sub(e) < step {
                 break;
             }
@@ -3343,7 +3343,7 @@ fn add_days(mut year: i32, mut month: u32, mut day: u32, mut delta: i64) -> (i32
 }
 
 /// ISO date range with step (step = days).
-fn iso_date_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
+fn iso_date_range_stepped(from: &str, to: &str, step: i64) -> Vec<StrykeValue> {
     let Some((mut y, mut m, mut d)) = parse_iso_date(from) else {
         return vec![];
     };
@@ -3354,13 +3354,13 @@ fn iso_date_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
     let mut guard = 0;
     if step > 0 {
         while (y, m, d) <= (ey, em, ed) && guard < 50_000 {
-            out.push(PerlValue::string(format!("{:04}-{:02}-{:02}", y, m, d)));
+            out.push(StrykeValue::string(format!("{:04}-{:02}-{:02}", y, m, d)));
             (y, m, d) = add_days(y, m, d, step);
             guard += 1;
         }
     } else {
         while (y, m, d) >= (ey, em, ed) && guard < 50_000 {
-            out.push(PerlValue::string(format!("{:04}-{:02}-{:02}", y, m, d)));
+            out.push(StrykeValue::string(format!("{:04}-{:02}-{:02}", y, m, d)));
             (y, m, d) = add_days(y, m, d, step);
             guard += 1;
         }
@@ -3381,7 +3381,7 @@ fn add_months(mut year: i32, mut month: u32, delta: i64) -> (i32, u32) {
 }
 
 /// YYYY-MM range with step (step = months).
-fn year_month_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
+fn year_month_range_stepped(from: &str, to: &str, step: i64) -> Vec<StrykeValue> {
     let Some((mut y, mut m)) = parse_year_month(from) else {
         return vec![];
     };
@@ -3392,13 +3392,13 @@ fn year_month_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
     let mut guard = 0;
     if step > 0 {
         while (y, m) <= (ey, em) && guard < 50_000 {
-            out.push(PerlValue::string(format!("{:04}-{:02}", y, m)));
+            out.push(StrykeValue::string(format!("{:04}-{:02}", y, m)));
             (y, m) = add_months(y, m, step);
             guard += 1;
         }
     } else {
         while (y, m) >= (ey, em) && guard < 50_000 {
-            out.push(PerlValue::string(format!("{:04}-{:02}", y, m)));
+            out.push(StrykeValue::string(format!("{:04}-{:02}", y, m)));
             (y, m) = add_months(y, m, step);
             guard += 1;
         }
@@ -3438,7 +3438,7 @@ fn minutes_to_hhmm(mins: i32) -> String {
 }
 
 /// HH:MM time range with step (step = minutes).
-fn time_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
+fn time_range_stepped(from: &str, to: &str, step: i64) -> Vec<StrykeValue> {
     let Some(start) = parse_time_hhmm(from) else {
         return vec![];
     };
@@ -3450,14 +3450,14 @@ fn time_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
     if step > 0 {
         let mut cur = start;
         while cur <= end && guard < 50_000 {
-            out.push(PerlValue::string(minutes_to_hhmm(cur)));
+            out.push(StrykeValue::string(minutes_to_hhmm(cur)));
             cur += step as i32;
             guard += 1;
         }
     } else {
         let mut cur = start;
         while cur >= end && guard < 50_000 {
-            out.push(PerlValue::string(minutes_to_hhmm(cur)));
+            out.push(StrykeValue::string(minutes_to_hhmm(cur)));
             cur += step as i32;
             guard += 1;
         }
@@ -3493,7 +3493,7 @@ fn weekday_index(s: &str) -> Option<usize> {
 }
 
 /// Weekday range with step.
-fn weekday_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
+fn weekday_range_stepped(from: &str, to: &str, step: i64) -> Vec<StrykeValue> {
     let Some(start) = weekday_index(from) else {
         return vec![];
     };
@@ -3511,7 +3511,7 @@ fn weekday_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
             end as i64 + 7
         };
         while cur <= target {
-            out.push(PerlValue::string(names[(cur % 7) as usize].to_string()));
+            out.push(StrykeValue::string(names[(cur % 7) as usize].to_string()));
             cur += step;
         }
     } else {
@@ -3522,7 +3522,7 @@ fn weekday_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
             end as i64 - 7
         };
         while cur >= target {
-            out.push(PerlValue::string(
+            out.push(StrykeValue::string(
                 names[((cur % 7 + 7) % 7) as usize].to_string(),
             ));
             cur += step;
@@ -3566,7 +3566,7 @@ fn month_name_index(s: &str) -> Option<usize> {
 }
 
 /// Month name range with step.
-fn month_name_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
+fn month_name_range_stepped(from: &str, to: &str, step: i64) -> Vec<StrykeValue> {
     let Some(start) = month_name_index(from) else {
         return vec![];
     };
@@ -3584,7 +3584,7 @@ fn month_name_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
             end as i64 + 12
         };
         while cur <= target {
-            out.push(PerlValue::string(names[(cur % 12) as usize].to_string()));
+            out.push(StrykeValue::string(names[(cur % 12) as usize].to_string()));
             cur += step;
         }
     } else {
@@ -3595,7 +3595,7 @@ fn month_name_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
             end as i64 - 12
         };
         while cur >= target {
-            out.push(PerlValue::string(
+            out.push(StrykeValue::string(
                 names[((cur % 12 + 12) % 12) as usize].to_string(),
             ));
             cur += step;
@@ -3616,7 +3616,7 @@ fn is_float_pair(from: &str, to: &str) -> bool {
 }
 
 /// Float range with step.
-fn float_range_stepped(from: &str, to: &str, step: f64) -> Vec<PerlValue> {
+fn float_range_stepped(from: &str, to: &str, step: f64) -> Vec<StrykeValue> {
     let Ok(start) = from.parse::<f64>() else {
         return vec![];
     };
@@ -3635,7 +3635,7 @@ fn float_range_stepped(from: &str, to: &str, step: f64) -> Vec<PerlValue> {
             }
             // Round to avoid floating point noise
             let rounded = (cur * 1e12).round() / 1e12;
-            out.push(PerlValue::float(rounded));
+            out.push(StrykeValue::float(rounded));
             i += 1;
             guard += 1;
         }
@@ -3647,7 +3647,7 @@ fn float_range_stepped(from: &str, to: &str, step: f64) -> Vec<PerlValue> {
                 break;
             }
             let rounded = (cur * 1e12).round() / 1e12;
-            out.push(PerlValue::float(rounded));
+            out.push(StrykeValue::float(rounded));
             i += 1;
             guard += 1;
         }
@@ -3720,7 +3720,7 @@ fn int_to_roman(mut n: i64, lowercase: bool) -> Option<String> {
 }
 
 /// Expand a Roman numeral range with step.
-fn roman_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
+fn roman_range_stepped(from: &str, to: &str, step: i64) -> Vec<StrykeValue> {
     let Some(start) = roman_to_int(from) else {
         return vec![];
     };
@@ -3738,7 +3738,7 @@ fn roman_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
         let mut cur = start;
         while cur <= end {
             if let Some(r) = int_to_roman(cur, lowercase) {
-                out.push(PerlValue::string(r));
+                out.push(StrykeValue::string(r));
             }
             cur += step;
         }
@@ -3746,7 +3746,7 @@ fn roman_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
         let mut cur = start;
         while cur >= end {
             if let Some(r) = int_to_roman(cur, lowercase) {
-                out.push(PerlValue::string(r));
+                out.push(StrykeValue::string(r));
             }
             cur += step; // step is negative
         }
@@ -3757,10 +3757,10 @@ fn roman_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
 /// Stepped range expansion — polymorphic across many types (stryke world first!).
 /// Supports: integers, floats, strings, Roman numerals, dates, times, weekdays, months, IPv4.
 pub(crate) fn perl_list_range_expand_stepped(
-    from: PerlValue,
-    to: PerlValue,
-    step_val: PerlValue,
-) -> Vec<PerlValue> {
+    from: StrykeValue,
+    to: StrykeValue,
+    step_val: StrykeValue,
+) -> Vec<StrykeValue> {
     let from_str = from.to_string();
     let to_str = to.to_string();
 
@@ -3787,7 +3787,7 @@ pub(crate) fn perl_list_range_expand_stepped(
         if step_int > 0 {
             (i..=j)
                 .step_by(step_int as usize)
-                .map(PerlValue::integer)
+                .map(StrykeValue::integer)
                 .collect()
         } else {
             std::iter::successors(Some(i), |&x| {
@@ -3798,7 +3798,7 @@ pub(crate) fn perl_list_range_expand_stepped(
                     None
                 }
             })
-            .map(PerlValue::integer)
+            .map(StrykeValue::integer)
             .collect()
         }
     } else {
@@ -3863,7 +3863,7 @@ pub(crate) fn perl_list_range_expand_stepped(
 /// non-numeric strings, fractional floats, refs, and other non-integer types die.
 /// `where_` is the diagnostic context (`"start"`, `"stop"`, `"step"`).
 pub(crate) fn perl_slice_endpoint_to_strict_int(
-    v: &PerlValue,
+    v: &StrykeValue,
     where_: &str,
 ) -> Result<i64, String> {
     if let Some(n) = v.as_integer() {
@@ -3905,9 +3905,9 @@ pub(crate) fn perl_slice_endpoint_to_strict_int(
 /// Returns `Err(msg)` for non-integer endpoints or zero step — caller dies with that.
 pub(crate) fn compute_array_slice_indices(
     arr_len: i64,
-    from: &PerlValue,
-    to: &PerlValue,
-    step: &PerlValue,
+    from: &StrykeValue,
+    to: &StrykeValue,
+    step: &StrykeValue,
 ) -> Result<Vec<i64>, String> {
     let step_i = if step.is_undef() {
         1i64
@@ -3985,9 +3985,9 @@ pub(crate) fn compute_array_slice_indices(
 /// and die). Endpoints stringify to keys; expansion uses the polymorphic stepped-range
 /// machinery (numeric, magic-string-increment, Roman, etc.).
 pub(crate) fn compute_hash_slice_keys(
-    from: &PerlValue,
-    to: &PerlValue,
-    step: &PerlValue,
+    from: &StrykeValue,
+    to: &StrykeValue,
+    step: &StrykeValue,
 ) -> Result<Vec<String>, String> {
     if from.is_undef() || to.is_undef() {
         return Err(
@@ -3995,7 +3995,7 @@ pub(crate) fn compute_hash_slice_keys(
         );
     }
     let step_val = if step.is_undef() {
-        PerlValue::integer(1)
+        StrykeValue::integer(1)
     } else {
         step.clone()
     };
@@ -4004,10 +4004,10 @@ pub(crate) fn compute_hash_slice_keys(
 }
 
 fn perl_list_range_expand_string_magic_stepped(
-    from: PerlValue,
-    to: PerlValue,
+    from: StrykeValue,
+    to: StrykeValue,
     step: i64,
-) -> Vec<PerlValue> {
+) -> Vec<StrykeValue> {
     if step == 0 {
         return vec![];
     }
@@ -4032,7 +4032,7 @@ fn perl_list_range_expand_string_magic_stepped(
                 break;
             }
             if idx.is_multiple_of(step) {
-                out.push(PerlValue::string(cur.clone()));
+                out.push(StrykeValue::string(cur.clone()));
             }
             if cur == right {
                 break;
@@ -4056,7 +4056,7 @@ fn perl_list_range_expand_string_magic_stepped(
                 break;
             }
             if idx.is_multiple_of(step) {
-                out.push(PerlValue::string(cur.clone()));
+                out.push(StrykeValue::string(cur.clone()));
             }
             if cur == right {
                 break;
@@ -4077,21 +4077,21 @@ fn perl_list_range_expand_string_magic_stepped(
 
 impl PerlDataFrame {
     /// One row as a hashref (`$_` in `filter`).
-    pub fn row_hashref(&self, row: usize) -> PerlValue {
+    pub fn row_hashref(&self, row: usize) -> StrykeValue {
         let mut m = IndexMap::new();
         for (i, col) in self.columns.iter().enumerate() {
             m.insert(
                 col.clone(),
-                self.cols[i].get(row).cloned().unwrap_or(PerlValue::UNDEF),
+                self.cols[i].get(row).cloned().unwrap_or(StrykeValue::UNDEF),
             );
         }
-        PerlValue::hash_ref(Arc::new(RwLock::new(m)))
+        StrykeValue::hash_ref(Arc::new(RwLock::new(m)))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::PerlValue;
+    use super::StrykeValue;
     use crate::perl_regex::PerlCompiledRegex;
     use indexmap::IndexMap;
     use parking_lot::RwLock;
@@ -4100,54 +4100,54 @@ mod tests {
 
     #[test]
     fn undef_is_false() {
-        assert!(!PerlValue::UNDEF.is_true());
+        assert!(!StrykeValue::UNDEF.is_true());
     }
 
     #[test]
     fn string_zero_is_false() {
-        assert!(!PerlValue::string("0".into()).is_true());
-        assert!(PerlValue::string("00".into()).is_true());
+        assert!(!StrykeValue::string("0".into()).is_true());
+        assert!(StrykeValue::string("00".into()).is_true());
     }
 
     #[test]
     fn empty_string_is_false() {
-        assert!(!PerlValue::string(String::new()).is_true());
+        assert!(!StrykeValue::string(String::new()).is_true());
     }
 
     #[test]
     fn integer_zero_is_false_nonzero_true() {
-        assert!(!PerlValue::integer(0).is_true());
-        assert!(PerlValue::integer(-1).is_true());
+        assert!(!StrykeValue::integer(0).is_true());
+        assert!(StrykeValue::integer(-1).is_true());
     }
 
     #[test]
     fn float_zero_is_false_nonzero_true() {
-        assert!(!PerlValue::float(0.0).is_true());
-        assert!(PerlValue::float(0.1).is_true());
+        assert!(!StrykeValue::float(0.0).is_true());
+        assert!(StrykeValue::float(0.1).is_true());
     }
 
     #[test]
     fn num_cmp_orders_float_against_integer() {
         assert_eq!(
-            PerlValue::float(2.5).num_cmp(&PerlValue::integer(3)),
+            StrykeValue::float(2.5).num_cmp(&StrykeValue::integer(3)),
             Ordering::Less
         );
     }
 
     #[test]
     fn to_int_parses_leading_number_from_string() {
-        assert_eq!(PerlValue::string("42xyz".into()).to_int(), 42);
-        assert_eq!(PerlValue::string("  -3.7foo".into()).to_int(), -3);
+        assert_eq!(StrykeValue::string("42xyz".into()).to_int(), 42);
+        assert_eq!(StrykeValue::string("  -3.7foo".into()).to_int(), -3);
     }
 
     #[test]
     fn num_cmp_orders_as_numeric() {
         assert_eq!(
-            PerlValue::integer(2).num_cmp(&PerlValue::integer(11)),
+            StrykeValue::integer(2).num_cmp(&StrykeValue::integer(11)),
             Ordering::Less
         );
         assert_eq!(
-            PerlValue::string("2foo".into()).num_cmp(&PerlValue::string("11".into())),
+            StrykeValue::string("2foo".into()).num_cmp(&StrykeValue::string("11".into())),
             Ordering::Less
         );
     }
@@ -4155,31 +4155,31 @@ mod tests {
     #[test]
     fn str_cmp_orders_as_strings() {
         assert_eq!(
-            PerlValue::string("2".into()).str_cmp(&PerlValue::string("11".into())),
+            StrykeValue::string("2".into()).str_cmp(&StrykeValue::string("11".into())),
             Ordering::Greater
         );
     }
 
     #[test]
     fn str_eq_heap_strings_fast_path() {
-        let a = PerlValue::string("hello".into());
-        let b = PerlValue::string("hello".into());
+        let a = StrykeValue::string("hello".into());
+        let b = StrykeValue::string("hello".into());
         assert!(a.str_eq(&b));
-        assert!(!a.str_eq(&PerlValue::string("hell".into())));
+        assert!(!a.str_eq(&StrykeValue::string("hell".into())));
     }
 
     #[test]
     fn str_eq_fallback_matches_stringified_equality() {
-        let n = PerlValue::integer(42);
-        let s = PerlValue::string("42".into());
+        let n = StrykeValue::integer(42);
+        let s = StrykeValue::string("42".into());
         assert!(n.str_eq(&s));
-        assert!(!PerlValue::integer(1).str_eq(&PerlValue::string("2".into())));
+        assert!(!StrykeValue::integer(1).str_eq(&StrykeValue::string("2".into())));
     }
 
     #[test]
     fn str_cmp_heap_strings_fast_path() {
         assert_eq!(
-            PerlValue::string("a".into()).str_cmp(&PerlValue::string("b".into())),
+            StrykeValue::string("a".into()).str_cmp(&StrykeValue::string("b".into())),
             Ordering::Less
         );
     }
@@ -4187,37 +4187,37 @@ mod tests {
     #[test]
     fn scalar_context_array_and_hash() {
         let a =
-            PerlValue::array(vec![PerlValue::integer(1), PerlValue::integer(2)]).scalar_context();
+            StrykeValue::array(vec![StrykeValue::integer(1), StrykeValue::integer(2)]).scalar_context();
         assert_eq!(a.to_int(), 2);
         let mut h = IndexMap::new();
-        h.insert("a".into(), PerlValue::integer(1));
-        let sc = PerlValue::hash(h).scalar_context();
+        h.insert("a".into(), StrykeValue::integer(1));
+        let sc = StrykeValue::hash(h).scalar_context();
         assert!(sc.is_string_like());
     }
 
     #[test]
     fn to_list_array_hash_and_scalar() {
         assert_eq!(
-            PerlValue::array(vec![PerlValue::integer(7)])
+            StrykeValue::array(vec![StrykeValue::integer(7)])
                 .to_list()
                 .len(),
             1
         );
         let mut h = IndexMap::new();
-        h.insert("k".into(), PerlValue::integer(1));
-        let list = PerlValue::hash(h).to_list();
+        h.insert("k".into(), StrykeValue::integer(1));
+        let list = StrykeValue::hash(h).to_list();
         assert_eq!(list.len(), 2);
-        let one = PerlValue::integer(99).to_list();
+        let one = StrykeValue::integer(99).to_list();
         assert_eq!(one.len(), 1);
         assert_eq!(one[0].to_int(), 99);
     }
 
     #[test]
     fn type_name_and_ref_type_for_core_kinds() {
-        assert_eq!(PerlValue::integer(0).type_name(), "INTEGER");
-        assert_eq!(PerlValue::UNDEF.ref_type().to_string(), "");
+        assert_eq!(StrykeValue::integer(0).type_name(), "INTEGER");
+        assert_eq!(StrykeValue::UNDEF.ref_type().to_string(), "");
         assert_eq!(
-            PerlValue::array_ref(Arc::new(RwLock::new(vec![])))
+            StrykeValue::array_ref(Arc::new(RwLock::new(vec![])))
                 .ref_type()
                 .to_string(),
             "ARRAY"
@@ -4226,23 +4226,23 @@ mod tests {
 
     #[test]
     fn display_undef_is_empty_integer_is_decimal() {
-        assert_eq!(PerlValue::UNDEF.to_string(), "");
-        assert_eq!(PerlValue::integer(-7).to_string(), "-7");
+        assert_eq!(StrykeValue::UNDEF.to_string(), "");
+        assert_eq!(StrykeValue::integer(-7).to_string(), "-7");
     }
 
     #[test]
     fn empty_array_is_false_nonempty_is_true() {
-        assert!(!PerlValue::array(vec![]).is_true());
-        assert!(PerlValue::array(vec![PerlValue::integer(0)]).is_true());
+        assert!(!StrykeValue::array(vec![]).is_true());
+        assert!(StrykeValue::array(vec![StrykeValue::integer(0)]).is_true());
     }
 
     #[test]
     fn to_number_undef_and_non_numeric_refs_are_zero() {
         use super::PerlSub;
 
-        assert_eq!(PerlValue::UNDEF.to_number(), 0.0);
+        assert_eq!(StrykeValue::UNDEF.to_number(), 0.0);
         assert_eq!(
-            PerlValue::code_ref(Arc::new(PerlSub {
+            StrykeValue::code_ref(Arc::new(PerlSub {
                 name: "f".into(),
                 params: vec![],
                 body: vec![],
@@ -4258,18 +4258,18 @@ mod tests {
     #[test]
     fn append_to_builds_string_without_extra_alloc_for_int_and_string() {
         let mut buf = String::new();
-        PerlValue::integer(-12).append_to(&mut buf);
-        PerlValue::string("ab".into()).append_to(&mut buf);
+        StrykeValue::integer(-12).append_to(&mut buf);
+        StrykeValue::string("ab".into()).append_to(&mut buf);
         assert_eq!(buf, "-12ab");
         let mut u = String::new();
-        PerlValue::UNDEF.append_to(&mut u);
+        StrykeValue::UNDEF.append_to(&mut u);
         assert!(u.is_empty());
     }
 
     #[test]
     fn append_to_atomic_delegates_to_inner() {
         use parking_lot::Mutex;
-        let a = PerlValue::atomic(Arc::new(Mutex::new(PerlValue::string("z".into()))));
+        let a = StrykeValue::atomic(Arc::new(Mutex::new(StrykeValue::string("z".into()))));
         let mut buf = String::new();
         a.append_to(&mut buf);
         assert_eq!(buf, "z");
@@ -4278,43 +4278,43 @@ mod tests {
     #[test]
     fn unwrap_atomic_reads_inner_other_variants_clone() {
         use parking_lot::Mutex;
-        let a = PerlValue::atomic(Arc::new(Mutex::new(PerlValue::integer(9))));
+        let a = StrykeValue::atomic(Arc::new(Mutex::new(StrykeValue::integer(9))));
         assert_eq!(a.unwrap_atomic().to_int(), 9);
-        assert_eq!(PerlValue::integer(3).unwrap_atomic().to_int(), 3);
+        assert_eq!(StrykeValue::integer(3).unwrap_atomic().to_int(), 3);
     }
 
     #[test]
     fn is_atomic_only_true_for_atomic_variant() {
         use parking_lot::Mutex;
-        assert!(PerlValue::atomic(Arc::new(Mutex::new(PerlValue::UNDEF))).is_atomic());
-        assert!(!PerlValue::integer(0).is_atomic());
+        assert!(StrykeValue::atomic(Arc::new(Mutex::new(StrykeValue::UNDEF))).is_atomic());
+        assert!(!StrykeValue::integer(0).is_atomic());
     }
 
     #[test]
     fn as_str_only_on_string_variant() {
         assert_eq!(
-            PerlValue::string("x".into()).as_str(),
+            StrykeValue::string("x".into()).as_str(),
             Some("x".to_string())
         );
-        assert_eq!(PerlValue::integer(1).as_str(), None);
+        assert_eq!(StrykeValue::integer(1).as_str(), None);
     }
 
     #[test]
     fn as_str_or_empty_defaults_non_string() {
-        assert_eq!(PerlValue::string("z".into()).as_str_or_empty(), "z");
-        assert_eq!(PerlValue::integer(1).as_str_or_empty(), "");
+        assert_eq!(StrykeValue::string("z".into()).as_str_or_empty(), "z");
+        assert_eq!(StrykeValue::integer(1).as_str_or_empty(), "");
     }
 
     #[test]
     fn to_int_truncates_float_toward_zero() {
-        assert_eq!(PerlValue::float(3.9).to_int(), 3);
-        assert_eq!(PerlValue::float(-2.1).to_int(), -2);
+        assert_eq!(StrykeValue::float(3.9).to_int(), 3);
+        assert_eq!(StrykeValue::float(-2.1).to_int(), -2);
     }
 
     #[test]
     fn to_number_array_is_length() {
         assert_eq!(
-            PerlValue::array(vec![PerlValue::integer(1), PerlValue::integer(2)]).to_number(),
+            StrykeValue::array(vec![StrykeValue::integer(1), StrykeValue::integer(2)]).to_number(),
             2.0
         );
     }
@@ -4322,30 +4322,30 @@ mod tests {
     #[test]
     fn scalar_context_empty_hash_is_zero() {
         let h = IndexMap::new();
-        assert_eq!(PerlValue::hash(h).scalar_context().to_int(), 0);
+        assert_eq!(StrykeValue::hash(h).scalar_context().to_int(), 0);
     }
 
     #[test]
     fn scalar_context_nonhash_nonarray_clones() {
-        let v = PerlValue::integer(8);
+        let v = StrykeValue::integer(8);
         assert_eq!(v.scalar_context().to_int(), 8);
     }
 
     #[test]
     fn display_float_integer_like_omits_decimal() {
-        assert_eq!(PerlValue::float(4.0).to_string(), "4");
+        assert_eq!(StrykeValue::float(4.0).to_string(), "4");
     }
 
     #[test]
     fn display_array_concatenates_element_displays() {
-        let a = PerlValue::array(vec![PerlValue::integer(1), PerlValue::string("b".into())]);
+        let a = StrykeValue::array(vec![StrykeValue::integer(1), StrykeValue::string("b".into())]);
         assert_eq!(a.to_string(), "1b");
     }
 
     #[test]
     fn display_code_ref_includes_sub_name() {
         use super::PerlSub;
-        let c = PerlValue::code_ref(Arc::new(PerlSub {
+        let c = StrykeValue::code_ref(Arc::new(PerlSub {
             name: "foo".into(),
             params: vec![],
             body: vec![],
@@ -4358,7 +4358,7 @@ mod tests {
 
     #[test]
     fn display_regex_shows_non_capturing_prefix() {
-        let r = PerlValue::regex(
+        let r = StrykeValue::regex(
             PerlCompiledRegex::compile("x+").unwrap(),
             "x+".into(),
             "".into(),
@@ -4368,23 +4368,23 @@ mod tests {
 
     #[test]
     fn display_iohandle_is_name() {
-        assert_eq!(PerlValue::io_handle("STDOUT".into()).to_string(), "STDOUT");
+        assert_eq!(StrykeValue::io_handle("STDOUT".into()).to_string(), "STDOUT");
     }
 
     #[test]
     fn ref_type_blessed_uses_class_name() {
-        let b = PerlValue::blessed(Arc::new(super::BlessedRef::new_blessed(
+        let b = StrykeValue::blessed(Arc::new(super::BlessedRef::new_blessed(
             "Pkg".into(),
-            PerlValue::UNDEF,
+            StrykeValue::UNDEF,
         )));
         assert_eq!(b.ref_type().to_string(), "Pkg");
     }
 
     #[test]
     fn blessed_drop_enqueues_pending_destroy() {
-        let v = PerlValue::blessed(Arc::new(super::BlessedRef::new_blessed(
+        let v = StrykeValue::blessed(Arc::new(super::BlessedRef::new_blessed(
             "Z".into(),
-            PerlValue::integer(7),
+            StrykeValue::integer(7),
         )));
         drop(v);
         let q = crate::pending_destroy::take_queue();
@@ -4395,25 +4395,25 @@ mod tests {
 
     #[test]
     fn type_name_iohandle_is_glob() {
-        assert_eq!(PerlValue::io_handle("FH".into()).type_name(), "GLOB");
+        assert_eq!(StrykeValue::io_handle("FH".into()).type_name(), "GLOB");
     }
 
     #[test]
     fn empty_hash_is_false() {
-        assert!(!PerlValue::hash(IndexMap::new()).is_true());
+        assert!(!StrykeValue::hash(IndexMap::new()).is_true());
     }
 
     #[test]
     fn hash_nonempty_is_true() {
         let mut h = IndexMap::new();
-        h.insert("k".into(), PerlValue::UNDEF);
-        assert!(PerlValue::hash(h).is_true());
+        h.insert("k".into(), StrykeValue::UNDEF);
+        assert!(StrykeValue::hash(h).is_true());
     }
 
     #[test]
     fn num_cmp_equal_integers() {
         assert_eq!(
-            PerlValue::integer(5).num_cmp(&PerlValue::integer(5)),
+            StrykeValue::integer(5).num_cmp(&StrykeValue::integer(5)),
             Ordering::Equal
         );
     }
@@ -4422,43 +4422,43 @@ mod tests {
     fn str_cmp_compares_lexicographic_string_forms() {
         // Display forms "2" and "10" — string order differs from numeric order.
         assert_eq!(
-            PerlValue::integer(2).str_cmp(&PerlValue::integer(10)),
+            StrykeValue::integer(2).str_cmp(&StrykeValue::integer(10)),
             Ordering::Greater
         );
     }
 
     #[test]
     fn to_list_undef_empty() {
-        assert!(PerlValue::UNDEF.to_list().is_empty());
+        assert!(StrykeValue::UNDEF.to_list().is_empty());
     }
 
     #[test]
     fn unwrap_atomic_nested_atomic() {
         use parking_lot::Mutex;
-        let inner = PerlValue::atomic(Arc::new(Mutex::new(PerlValue::integer(2))));
-        let outer = PerlValue::atomic(Arc::new(Mutex::new(inner)));
+        let inner = StrykeValue::atomic(Arc::new(Mutex::new(StrykeValue::integer(2))));
+        let outer = StrykeValue::atomic(Arc::new(Mutex::new(inner)));
         assert_eq!(outer.unwrap_atomic().to_int(), 2);
     }
 
     #[test]
     fn errno_dual_parts_extracts_code_and_message() {
-        let v = PerlValue::errno_dual(-2, "oops".into());
+        let v = StrykeValue::errno_dual(-2, "oops".into());
         assert_eq!(v.errno_dual_parts(), Some((-2, "oops".into())));
     }
 
     #[test]
     fn errno_dual_parts_none_for_plain_string() {
-        assert!(PerlValue::string("hi".into()).errno_dual_parts().is_none());
+        assert!(StrykeValue::string("hi".into()).errno_dual_parts().is_none());
     }
 
     #[test]
     fn errno_dual_parts_none_for_integer() {
-        assert!(PerlValue::integer(1).errno_dual_parts().is_none());
+        assert!(StrykeValue::integer(1).errno_dual_parts().is_none());
     }
 
     #[test]
     fn errno_dual_numeric_context_uses_code_string_uses_msg() {
-        let v = PerlValue::errno_dual(5, "five".into());
+        let v = StrykeValue::errno_dual(5, "five".into());
         assert_eq!(v.to_int(), 5);
         assert_eq!(v.to_string(), "five");
     }
@@ -4467,7 +4467,7 @@ mod tests {
     fn list_range_alpha_joins_like_perl() {
         use super::perl_list_range_expand;
         let v =
-            perl_list_range_expand(PerlValue::string("a".into()), PerlValue::string("z".into()));
+            perl_list_range_expand(StrykeValue::string("a".into()), StrykeValue::string("z".into()));
         let s: String = v.iter().map(|x| x.to_string()).collect();
         assert_eq!(s, "abcdefghijklmnopqrstuvwxyz");
     }
@@ -4476,8 +4476,8 @@ mod tests {
     fn list_range_numeric_string_endpoints() {
         use super::perl_list_range_expand;
         let v = perl_list_range_expand(
-            PerlValue::string("9".into()),
-            PerlValue::string("11".into()),
+            StrykeValue::string("9".into()),
+            StrykeValue::string("11".into()),
         );
         assert_eq!(v.len(), 3);
         assert_eq!(
@@ -4490,8 +4490,8 @@ mod tests {
     fn list_range_leading_zero_is_string_mode() {
         use super::perl_list_range_expand;
         let v = perl_list_range_expand(
-            PerlValue::string("01".into()),
-            PerlValue::string("05".into()),
+            StrykeValue::string("01".into()),
+            StrykeValue::string("05".into()),
         );
         assert_eq!(v.len(), 5);
         assert_eq!(
@@ -4504,8 +4504,8 @@ mod tests {
     fn list_range_empty_to_letter_one_element() {
         use super::perl_list_range_expand;
         let v = perl_list_range_expand(
-            PerlValue::string(String::new()),
-            PerlValue::string("c".into()),
+            StrykeValue::string(String::new()),
+            StrykeValue::string("c".into()),
         );
         assert_eq!(v.len(), 1);
         assert_eq!(v[0].to_string(), "");
@@ -4526,11 +4526,11 @@ mod tests {
     fn test_boxed_numeric_stringification() {
         // Large integer outside i32 range
         let large_int = 10_000_000_000i64;
-        let v_int = PerlValue::integer(large_int);
+        let v_int = StrykeValue::integer(large_int);
         assert_eq!(v_int.to_string(), "10000000000");
 
         // Float that needs boxing (e.g. Infinity); Perl prints "Inf".
-        let v_inf = PerlValue::float(f64::INFINITY);
+        let v_inf = StrykeValue::float(f64::INFINITY);
         assert_eq!(v_inf.to_string(), "Inf");
     }
 

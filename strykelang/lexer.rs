@@ -628,8 +628,92 @@ impl Lexer {
 
     fn read_double_quoted_string(&mut self) -> PerlResult<Token> {
         self.advance(); // consume opening "
+        // Triple-quoted form: `"""..."""` — multi-line interpolating string.
+        // The opening `"` was just consumed; if the next two chars are also
+        // `"`, we're in triple-quote mode. Read until the closing `"""`,
+        // preserving raw newlines (no indent stripping). Interpolation
+        // (`$var`, `@arr`, `#{expr}`) flows through unchanged because the
+        // resulting `Token::DoubleString` body goes through the same
+        // downstream interpolator as a normal `"..."`.
+        if self.peek() == Some('"') && self.peek_at(1) == Some('"') {
+            self.advance(); // consume 2nd "
+            self.advance(); // consume 3rd "
+            let s = self.read_triple_quoted_body(true)?;
+            return Ok(Token::DoubleString(s));
+        }
         let s = self.read_escaped_until('"')?;
         Ok(Token::DoubleString(s))
+    }
+
+    /// Read the body of a triple-quoted string up to and including the
+    /// closing `"""`. `interpolate=true` honors backslash escapes the same
+    /// way `read_escaped_until` does (so `\n`, `\t`, `\\`, `\$`, `\@`,
+    /// `\"` etc. work inside `"""..."""`). `interpolate=false` is "raw"
+    /// mode: every byte is copied verbatim, including backslashes; the
+    /// only way out is a literal `"""`.
+    ///
+    /// Newlines are preserved verbatim — no indent stripping. The user
+    /// chose the indentation; we don't second-guess it.
+    fn read_triple_quoted_body(&mut self, interpolate: bool) -> PerlResult<String> {
+        let mut s = String::new();
+        loop {
+            // Check for closing `"""` at the current position.
+            if self.peek() == Some('"')
+                && self.peek_at(1) == Some('"')
+                && self.peek_at(2) == Some('"')
+            {
+                self.advance(); // 1st "
+                self.advance(); // 2nd "
+                self.advance(); // 3rd "
+                return Ok(s);
+            }
+            let c = match self.advance() {
+                Some(c) => c,
+                None => {
+                    return Err(self.syntax_err(
+                        "Unterminated triple-quoted string (missing closing \"\"\")",
+                        self.line,
+                    ))
+                }
+            };
+            if interpolate && c == '\\' {
+                // Handle escapes the same way single-line `"..."` does.
+                // Reuse the existing escape table by hand for the common
+                // cases; anything we don't recognise falls through as
+                // `\` followed by the next char (matching Perl's
+                // permissive double-quote escape behavior).
+                let next = self.advance();
+                match next {
+                    Some('n') => s.push('\n'),
+                    Some('t') => s.push('\t'),
+                    Some('r') => s.push('\r'),
+                    Some('\\') => s.push('\\'),
+                    Some('"') => s.push('"'),
+                    Some('$') => s.push(LITERAL_DOLLAR_IN_DQUOTE),
+                    Some('@') => s.push(LITERAL_AT_IN_DQUOTE),
+                    Some('0') => s.push('\0'),
+                    Some('a') => s.push('\x07'),
+                    Some('b') => s.push('\x08'),
+                    Some('f') => s.push('\x0C'),
+                    Some('e') => s.push('\x1B'),
+                    Some(other) => {
+                        s.push('\\');
+                        s.push(other);
+                    }
+                    None => {
+                        return Err(self.syntax_err(
+                            "Unterminated escape at end of triple-quoted string",
+                            self.line,
+                        ))
+                    }
+                }
+                continue;
+            }
+            if c == '\n' {
+                self.line += 1;
+            }
+            s.push(c);
+        }
     }
 
     fn read_escaped_until(&mut self, term: char) -> PerlResult<String> {
@@ -2187,6 +2271,23 @@ impl Lexer {
                         self.last_was_term = false;
                         return Ok(Token::FormatDecl { name: fname, lines });
                     }
+                    "r" if self.peek() == Some('"')
+                        && self.peek_at(1) == Some('"')
+                        && self.peek_at(2) == Some('"') =>
+                    {
+                        // `r"""..."""` — raw triple-quoted string. No
+                        // interpolation, no backslash escapes; every byte
+                        // is copied verbatim until the closing `"""`.
+                        // Only triggers when `r` is followed IMMEDIATELY
+                        // by three quotes — `r 5`, `r->foo`, `r(...)` etc.
+                        // still hit the generic identifier path below.
+                        self.advance(); // 1st "
+                        self.advance(); // 2nd "
+                        self.advance(); // 3rd "
+                        let s = self.read_triple_quoted_body(false)?;
+                        self.last_was_term = true;
+                        return Ok(Token::SingleString(s));
+                    }
                     "qw" => {
                         // After `->`, `qw` is a method name, not a quote-word list.
                         if self.prev_arrow {
@@ -2944,6 +3045,67 @@ mod tests {
         let mut l = Lexer::new(r#""hi""#);
         let t = l.tokenize().expect("tokenize");
         assert!(matches!(t[0].0, Token::DoubleString(ref s) if s == "hi"));
+    }
+
+    #[test]
+    fn tokenize_triple_quoted_interpolating_multiline() {
+        // `"""..."""` — interpolating triple-quote. Newlines preserved
+        // raw; interpolation flag stays on (Token::DoubleString flows
+        // through the regular string-interp pipeline downstream).
+        let mut l = Lexer::new("\"\"\"hello\nworld\nline\"\"\"");
+        let t = l.tokenize().expect("tokenize");
+        assert!(
+            matches!(t[0].0, Token::DoubleString(ref s) if s == "hello\nworld\nline"),
+            "got: {:?}",
+            t[0].0
+        );
+    }
+
+    #[test]
+    fn tokenize_triple_quoted_empty() {
+        let mut l = Lexer::new("\"\"\"\"\"\"");
+        let t = l.tokenize().expect("tokenize");
+        assert!(matches!(t[0].0, Token::DoubleString(ref s) if s.is_empty()));
+    }
+
+    #[test]
+    fn tokenize_triple_quoted_with_embedded_quotes() {
+        // Two consecutive `""` inside a `"""..."""` body should not
+        // close — only three `"""` in a row terminates.
+        let mut l = Lexer::new("\"\"\"a \"\" b\"\"\"");
+        let t = l.tokenize().expect("tokenize");
+        assert!(
+            matches!(t[0].0, Token::DoubleString(ref s) if s == "a \"\" b"),
+            "got: {:?}",
+            t[0].0
+        );
+    }
+
+    #[test]
+    fn tokenize_raw_triple_quoted() {
+        // `r"""..."""` — non-interpolating raw triple-quote. No escape
+        // processing: `\n` stays as the two literal chars `\` and `n`.
+        let mut l = Lexer::new("r\"\"\"raw \\n and $no_interp\"\"\"");
+        let t = l.tokenize().expect("tokenize");
+        assert!(
+            matches!(t[0].0, Token::SingleString(ref s) if s == "raw \\n and $no_interp"),
+            "got: {:?}",
+            t[0].0
+        );
+    }
+
+    #[test]
+    fn tokenize_r_bareword_not_triple_quote() {
+        // Lone `r` (not followed by `"""`) is still a plain identifier.
+        let mut l = Lexer::new("r => 5");
+        let t = l.tokenize().expect("tokenize");
+        assert!(matches!(t[0].0, Token::Ident(ref s) if s == "r"));
+    }
+
+    #[test]
+    fn tokenize_unterminated_triple_quote_errors() {
+        let mut l = Lexer::new("\"\"\"never closes");
+        assert!(l.tokenize().is_err());
     }
 
     #[test]

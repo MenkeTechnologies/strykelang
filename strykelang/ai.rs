@@ -34,7 +34,7 @@
 //! `model="claude-opus-4-5"`).
 
 use crate::error::PerlError;
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 use crate::vm_helper::{FlowOrError, VMHelper, WantarrayCtx};
 use indexmap::IndexMap;
 use parking_lot::Mutex;
@@ -219,7 +219,7 @@ fn mock_only_mode() -> bool {
 /// `ai $prompt, [system => "...", model => "...", max_tokens => N, ...]`
 /// — single-shot LLM call. Phase 0 has no tool/agent loop yet — that
 /// arrives with `tool fn` parser support in Phase 1.
-pub(crate) fn ai_prompt(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_prompt(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let prompt = args
         .first()
         .map(|v| v.to_string())
@@ -248,7 +248,7 @@ pub(crate) fn ai_prompt(args: &[PerlValue], line: usize) -> Result<PerlValue> {
             0.0,
             false,
         );
-        return Ok(PerlValue::string(resp));
+        return Ok(StrykeValue::string(resp));
     }
     if mock_only_mode() {
         return Err(PerlError::runtime(
@@ -275,7 +275,7 @@ pub(crate) fn ai_prompt(args: &[PerlValue], line: usize) -> Result<PerlValue> {
                 0.0,
                 true,
             );
-            return Ok(PerlValue::string(hit));
+            return Ok(StrykeValue::string(hit));
         }
         CACHE_MISSES.fetch_add(1, Ordering::Relaxed);
     }
@@ -401,11 +401,11 @@ pub(crate) fn ai_prompt(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         current_cost_usd(),
         false,
     );
-    Ok(PerlValue::string(result))
+    Ok(StrykeValue::string(result))
 }
 
-pub(crate) fn ai_stream_prompt(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    // Iter-context streaming: returns a PerlValue::iterator that yields
+pub(crate) fn ai_stream_prompt(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
+    // Iter-context streaming: returns a StrykeValue::iterator that yields
     // one text-delta chunk per `next()`. Scalar context still works
     // because stryke iterators stringify by collecting + joining.
     //
@@ -470,7 +470,7 @@ pub(crate) fn ai_stream_prompt(args: &[PerlValue], line: usize) -> Result<PerlVa
         done: parking_lot::Mutex::new(false),
         model,
     };
-    Ok(PerlValue::iterator(Arc::new(iter)))
+    Ok(StrykeValue::iterator(Arc::new(iter)))
 }
 
 struct AnthropicStreamIter {
@@ -480,7 +480,7 @@ struct AnthropicStreamIter {
 }
 
 impl crate::value::PerlIterator for AnthropicStreamIter {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         use std::io::BufRead;
         if *self.done.lock() {
             return None;
@@ -521,7 +521,7 @@ impl crate::value::PerlIterator for AnthropicStreamIter {
             match v["type"].as_str() {
                 Some("content_block_delta") => {
                     if let Some(t) = v["delta"]["text"].as_str() {
-                        return Some(PerlValue::string(t.to_string()));
+                        return Some(StrykeValue::string(t.to_string()));
                     }
                 }
                 Some("message_start") => {
@@ -543,25 +543,25 @@ impl crate::value::PerlIterator for AnthropicStreamIter {
 /// Mock-mode iterator: chunks a known string into character-sized
 /// pieces so tests can drive `for my $chunk in stream_prompt("...")`
 /// loops deterministically without the network.
-fn make_string_chunked_iter(s: String) -> PerlValue {
+fn make_string_chunked_iter(s: String) -> StrykeValue {
     struct Iter {
         chars: parking_lot::Mutex<std::collections::VecDeque<char>>,
     }
     impl crate::value::PerlIterator for Iter {
-        fn next_item(&self) -> Option<PerlValue> {
+        fn next_item(&self) -> Option<StrykeValue> {
             self.chars
                 .lock()
                 .pop_front()
-                .map(|c| PerlValue::string(c.to_string()))
+                .map(|c| StrykeValue::string(c.to_string()))
         }
     }
     let chars: std::collections::VecDeque<char> = s.chars().collect();
-    PerlValue::iterator(Arc::new(Iter {
+    StrykeValue::iterator(Arc::new(Iter {
         chars: parking_lot::Mutex::new(chars),
     }))
 }
 
-pub(crate) fn ai_chat(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_chat(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let messages = args
         .first()
         .ok_or_else(|| PerlError::runtime("chat: messages array required", line))?;
@@ -598,10 +598,10 @@ pub(crate) fn ai_chat(args: &[PerlValue], line: usize) -> Result<PerlValue> {
             sys.push_str(&format!("({}): {}", role, content));
         }
     }
-    let mut new_args: Vec<PerlValue> = vec![PerlValue::string(last_user)];
+    let mut new_args: Vec<StrykeValue> = vec![StrykeValue::string(last_user)];
     if !sys.is_empty() {
-        new_args.push(PerlValue::string("system".to_string()));
-        new_args.push(PerlValue::string(sys));
+        new_args.push(StrykeValue::string("system".to_string()));
+        new_args.push(StrykeValue::string(sys));
     }
     for v in &args[1..] {
         new_args.push(v.clone());
@@ -609,7 +609,7 @@ pub(crate) fn ai_chat(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     ai_prompt(&new_args, line)
 }
 
-pub(crate) fn ai_embed(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_embed(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let inputs: Vec<String> = if let Some(first) = args.first() {
         if let Some(arr) = first.as_array_ref() {
             arr.read().iter().map(|v| v.to_string()).collect()
@@ -622,12 +622,12 @@ pub(crate) fn ai_embed(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 
     if let Some(resp) = match_mock(&format!("embed:{}", inputs.join("|"))) {
         // Mock returns a comma-separated float string per text.
-        let vec: Vec<PerlValue> = resp
+        let vec: Vec<StrykeValue> = resp
             .split(',')
             .filter_map(|s| s.trim().parse::<f64>().ok())
-            .map(PerlValue::float)
+            .map(StrykeValue::float)
             .collect();
-        return Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        return Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
             vec,
         ))));
     }
@@ -660,7 +660,7 @@ pub(crate) fn ai_embed(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     }
 }
 
-pub(crate) fn ai_tokens_of(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_tokens_of(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     // Heuristic: ~4 chars per token, never < 1 for non-empty strings.
     let approx = if s.is_empty() {
@@ -668,47 +668,47 @@ pub(crate) fn ai_tokens_of(args: &[PerlValue], _line: usize) -> Result<PerlValue
     } else {
         s.chars().count().div_ceil(4).max(1) as i64
     };
-    Ok(PerlValue::integer(approx))
+    Ok(StrykeValue::integer(approx))
 }
 
-pub(crate) fn ai_cost(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_cost(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let mut h = IndexMap::new();
-    h.insert("usd".to_string(), PerlValue::float(current_cost_usd()));
+    h.insert("usd".to_string(), StrykeValue::float(current_cost_usd()));
     h.insert(
         "input_tokens".to_string(),
-        PerlValue::integer(INPUT_TOKENS.load(Ordering::Relaxed) as i64),
+        StrykeValue::integer(INPUT_TOKENS.load(Ordering::Relaxed) as i64),
     );
     h.insert(
         "output_tokens".to_string(),
-        PerlValue::integer(OUTPUT_TOKENS.load(Ordering::Relaxed) as i64),
+        StrykeValue::integer(OUTPUT_TOKENS.load(Ordering::Relaxed) as i64),
     );
     h.insert(
         "embed_tokens".to_string(),
-        PerlValue::integer(EMBED_TOKENS.load(Ordering::Relaxed) as i64),
+        StrykeValue::integer(EMBED_TOKENS.load(Ordering::Relaxed) as i64),
     );
     h.insert(
         "cache_creation_tokens".to_string(),
-        PerlValue::integer(CACHE_CREATION_TOKENS.load(Ordering::Relaxed) as i64),
+        StrykeValue::integer(CACHE_CREATION_TOKENS.load(Ordering::Relaxed) as i64),
     );
     h.insert(
         "cache_read_tokens".to_string(),
-        PerlValue::integer(CACHE_READ_TOKENS.load(Ordering::Relaxed) as i64),
+        StrykeValue::integer(CACHE_READ_TOKENS.load(Ordering::Relaxed) as i64),
     );
     h.insert(
         "cache_hits".to_string(),
-        PerlValue::integer(CACHE_HITS.load(Ordering::Relaxed) as i64),
+        StrykeValue::integer(CACHE_HITS.load(Ordering::Relaxed) as i64),
     );
     h.insert(
         "cache_misses".to_string(),
-        PerlValue::integer(CACHE_MISSES.load(Ordering::Relaxed) as i64),
+        StrykeValue::integer(CACHE_MISSES.load(Ordering::Relaxed) as i64),
     );
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
 }
 
 /// `ai_last_thinking()` → the extended-thinking block text from the
 /// most recent Anthropic call, or empty string if none.
-pub(crate) fn ai_last_thinking(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    Ok(PerlValue::string(last_thinking().lock().clone()))
+pub(crate) fn ai_last_thinking(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
+    Ok(StrykeValue::string(last_thinking().lock().clone()))
 }
 
 /// `ai_dashboard()` → ANSI-colored multi-line summary of cost/tokens/cache.
@@ -716,7 +716,7 @@ pub(crate) fn ai_last_thinking(_args: &[PerlValue], _line: usize) -> Result<Perl
 /// session: `print ai_dashboard()`. Pure output formatter — no side
 /// effects on counters. Color codes are stripped automatically when
 /// stdout is not a tty (so logs stay clean).
-pub(crate) fn ai_dashboard(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_dashboard(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let usd = current_cost_usd();
     let inp = INPUT_TOKENS.load(Ordering::Relaxed);
     let out = OUTPUT_TOKENS.load(Ordering::Relaxed);
@@ -804,7 +804,7 @@ pub(crate) fn ai_dashboard(_args: &[PerlValue], _line: usize) -> Result<PerlValu
         c_cyan = c_cyan,
         c_reset = c_reset
     ));
-    Ok(PerlValue::string(s))
+    Ok(StrykeValue::string(s))
 }
 
 /// `ai_pricing($model)` → hashref `+{ input => $usd_per_1k, output => $usd_per_1k }`.
@@ -812,32 +812,32 @@ pub(crate) fn ai_dashboard(_args: &[PerlValue], _line: usize) -> Result<PerlValu
 /// `ai_pricing("claude-opus-4-7")` etc. to see what an upcoming request will
 /// cost without sending it. Models we don't recognize fall back to the
 /// "sensible default" tier (Sonnet-class).
-pub(crate) fn ai_pricing(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_pricing(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let model = args
         .first()
         .map(|v| v.to_string())
         .unwrap_or_else(|| config().lock().model.clone());
     let (in_per_1k, out_per_1k) = price_per_1k_tokens(&model);
     let mut h = IndexMap::new();
-    h.insert("model".to_string(), PerlValue::string(model));
-    h.insert("input".to_string(), PerlValue::float(in_per_1k));
-    h.insert("output".to_string(), PerlValue::float(out_per_1k));
+    h.insert("model".to_string(), StrykeValue::string(model));
+    h.insert("input".to_string(), StrykeValue::float(in_per_1k));
+    h.insert("output".to_string(), StrykeValue::float(out_per_1k));
     h.insert(
         "input_per_1m".to_string(),
-        PerlValue::float(in_per_1k * 1000.0),
+        StrykeValue::float(in_per_1k * 1000.0),
     );
     h.insert(
         "output_per_1m".to_string(),
-        PerlValue::float(out_per_1k * 1000.0),
+        StrykeValue::float(out_per_1k * 1000.0),
     );
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
 }
 
 /// `ai_describe("path/or/url.png", style => "concise")` — convenience wrapper
 /// around `ai_vision` that asks for a description. `style => "concise"` (one
 /// sentence), `"detailed"` (paragraph), or any custom prompt suffix appended
 /// to "Describe this image".
-pub(crate) fn ai_describe(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_describe(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let img = args
         .first()
         .cloned()
@@ -852,13 +852,13 @@ pub(crate) fn ai_describe(args: &[PerlValue], line: usize) -> Result<PerlValue> 
         _ => ".",
     };
     let prompt = format!("Describe this image{}", suffix);
-    let mut vision_args: Vec<PerlValue> = vec![
-        PerlValue::string(prompt),
-        PerlValue::string("image".to_string()),
+    let mut vision_args: Vec<StrykeValue> = vec![
+        StrykeValue::string(prompt),
+        StrykeValue::string("image".to_string()),
         img,
     ];
     for (k, v) in opts.iter().filter(|(k, _)| k.as_str() != "style") {
-        vision_args.push(PerlValue::string(k.clone()));
+        vision_args.push(StrykeValue::string(k.clone()));
         vision_args.push(v.clone());
     }
     ai_vision(&vision_args, line)
@@ -876,22 +876,22 @@ fn is_tty_stdout() -> bool {
     }
 }
 
-pub(crate) fn ai_cache_clear(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_cache_clear(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     cache().lock().clear();
     CACHE_HITS.store(0, Ordering::Relaxed);
     CACHE_MISSES.store(0, Ordering::Relaxed);
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn ai_cache_size(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    Ok(PerlValue::integer(cache().lock().len() as i64))
+pub(crate) fn ai_cache_size(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
+    Ok(StrykeValue::integer(cache().lock().len() as i64))
 }
 
 /// `ai_mock_install("regex pattern", "response string")` — install a
 /// mock that intercepts any subsequent `ai`/`prompt` call whose prompt
 /// matches the regex. Stack-ordered: first match wins. Use
 /// `ai_mock_clear()` between tests.
-pub(crate) fn ai_mock_install(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_mock_install(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let pattern = args
         .first()
         .map(|v| v.to_string())
@@ -907,46 +907,46 @@ pub(crate) fn ai_mock_install(args: &[PerlValue], line: usize) -> Result<PerlVal
         )
     })?;
     mocks().lock().push((re, response));
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn ai_mock_clear(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_mock_clear(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     mocks().lock().clear();
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn ai_config_get(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_config_get(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let key = args.first().map(|v| v.to_string()).unwrap_or_default();
     let cfg = config().lock().clone();
     let v = match key.as_str() {
-        "provider" => PerlValue::string(cfg.provider),
-        "model" => PerlValue::string(cfg.model),
-        "api_key_env" => PerlValue::string(cfg.api_key_env),
-        "cache" => PerlValue::integer(if cfg.cache { 1 } else { 0 }),
-        "max_cost_run" => PerlValue::float(cfg.max_cost_run_usd),
-        "embed_provider" => PerlValue::string(cfg.embed_provider),
-        "embed_model" => PerlValue::string(cfg.embed_model),
-        "embed_api_key_env" => PerlValue::string(cfg.embed_api_key_env),
+        "provider" => StrykeValue::string(cfg.provider),
+        "model" => StrykeValue::string(cfg.model),
+        "api_key_env" => StrykeValue::string(cfg.api_key_env),
+        "cache" => StrykeValue::integer(if cfg.cache { 1 } else { 0 }),
+        "max_cost_run" => StrykeValue::float(cfg.max_cost_run_usd),
+        "embed_provider" => StrykeValue::string(cfg.embed_provider),
+        "embed_model" => StrykeValue::string(cfg.embed_model),
+        "embed_api_key_env" => StrykeValue::string(cfg.embed_api_key_env),
         "" => {
             // Return the whole config as a hashref.
             let mut h = IndexMap::new();
-            h.insert("provider".into(), PerlValue::string(cfg.provider));
-            h.insert("model".into(), PerlValue::string(cfg.model));
-            h.insert("api_key_env".into(), PerlValue::string(cfg.api_key_env));
+            h.insert("provider".into(), StrykeValue::string(cfg.provider));
+            h.insert("model".into(), StrykeValue::string(cfg.model));
+            h.insert("api_key_env".into(), StrykeValue::string(cfg.api_key_env));
             h.insert(
                 "cache".into(),
-                PerlValue::integer(if cfg.cache { 1 } else { 0 }),
+                StrykeValue::integer(if cfg.cache { 1 } else { 0 }),
             );
             h.insert(
                 "max_cost_run".into(),
-                PerlValue::float(cfg.max_cost_run_usd),
+                StrykeValue::float(cfg.max_cost_run_usd),
             );
             h.insert(
                 "embed_provider".into(),
-                PerlValue::string(cfg.embed_provider),
+                StrykeValue::string(cfg.embed_provider),
             );
-            h.insert("embed_model".into(), PerlValue::string(cfg.embed_model));
-            return Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+            h.insert("embed_model".into(), StrykeValue::string(cfg.embed_model));
+            return Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
         }
         other => {
             return Err(PerlError::runtime(
@@ -959,7 +959,7 @@ pub(crate) fn ai_config_get(args: &[PerlValue], _line: usize) -> Result<PerlValu
 }
 
 /// `ai_config_set("model", "claude-haiku-...")` — at-runtime override.
-pub(crate) fn ai_config_set(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_config_set(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 2 {
         return Err(PerlError::runtime(
             "ai_config_set: usage: ai_config_set(\"key\", value)",
@@ -985,7 +985,7 @@ pub(crate) fn ai_config_set(args: &[PerlValue], line: usize) -> Result<PerlValue
             ))
         }
     }
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 // ── Provider: Anthropic ───────────────────────────────────────────────
@@ -1181,7 +1181,7 @@ fn call_voyage_embed(
     model: &str,
     api_key_env: &str,
     line: usize,
-) -> Result<PerlValue> {
+) -> Result<StrykeValue> {
     let api_key = std::env::var(api_key_env)
         .map_err(|_| PerlError::runtime(format!("embed: ${} not set", api_key_env), line))?;
     let body = serde_json::json!({
@@ -1215,7 +1215,7 @@ fn call_openai_embed(
     model: &str,
     api_key_env: &str,
     line: usize,
-) -> Result<PerlValue> {
+) -> Result<StrykeValue> {
     let api_key = std::env::var(api_key_env)
         .map_err(|_| PerlError::runtime(format!("embed: ${} not set", api_key_env), line))?;
     let body = serde_json::json!({
@@ -1246,7 +1246,7 @@ fn call_openai_embed(
 /// the model runs on the user's hardware. The default model is
 /// `nomic-embed-text` — small, fast, English-tuned. Other models work as long
 /// as they're pulled into Ollama (`ollama pull mxbai-embed-large`, etc.).
-fn call_ollama_embed(inputs: &[String], model: &str, line: usize) -> Result<PerlValue> {
+fn call_ollama_embed(inputs: &[String], model: &str, line: usize) -> Result<StrykeValue> {
     let base = std::env::var("OLLAMA_HOST").unwrap_or_else(|_| "http://localhost:11434".into());
     let url = format!("{}/api/embed", base.trim_end_matches('/'));
     let model = if model.is_empty() || model == "voyage-3" || model.starts_with("text-embedding") {
@@ -1279,20 +1279,20 @@ fn call_ollama_embed(inputs: &[String], model: &str, line: usize) -> Result<Perl
     embeddings_response_to_perl(&serde_json::Value::Array(shaped))
 }
 
-fn embeddings_response_to_perl(data: &serde_json::Value) -> Result<PerlValue> {
+fn embeddings_response_to_perl(data: &serde_json::Value) -> Result<StrykeValue> {
     let arr = data
         .as_array()
         .ok_or_else(|| PerlError::runtime("embed: provider returned non-array data", 0))?;
-    let mut all: Vec<PerlValue> = Vec::with_capacity(arr.len());
+    let mut all: Vec<StrykeValue> = Vec::with_capacity(arr.len());
     for item in arr {
         let vec_arr = item["embedding"]
             .as_array()
             .ok_or_else(|| PerlError::runtime("embed: missing embedding array", 0))?;
-        let floats: Vec<PerlValue> = vec_arr
+        let floats: Vec<StrykeValue> = vec_arr
             .iter()
-            .filter_map(|x| x.as_f64().map(PerlValue::float))
+            .filter_map(|x| x.as_f64().map(StrykeValue::float))
             .collect();
-        all.push(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        all.push(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
             floats,
         ))));
     }
@@ -1300,14 +1300,14 @@ fn embeddings_response_to_perl(data: &serde_json::Value) -> Result<PerlValue> {
         // Single input → single embedding hashref.
         return Ok(all.into_iter().next().unwrap());
     }
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         all,
     ))))
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
-fn parse_opts(args: &[PerlValue]) -> IndexMap<String, PerlValue> {
+fn parse_opts(args: &[StrykeValue]) -> IndexMap<String, StrykeValue> {
     let mut out = IndexMap::new();
     let mut i = 0;
     while i + 1 < args.len() {
@@ -1317,21 +1317,21 @@ fn parse_opts(args: &[PerlValue]) -> IndexMap<String, PerlValue> {
     out
 }
 
-fn opt_str(opts: &IndexMap<String, PerlValue>, k: &str, default: &str) -> String {
+fn opt_str(opts: &IndexMap<String, StrykeValue>, k: &str, default: &str) -> String {
     opts.get(k)
         .map(|v| v.to_string())
         .unwrap_or_else(|| default.to_string())
 }
 
-fn opt_int(opts: &IndexMap<String, PerlValue>, k: &str, default: i64) -> i64 {
+fn opt_int(opts: &IndexMap<String, StrykeValue>, k: &str, default: i64) -> i64 {
     opts.get(k).map(|v| v.to_int()).unwrap_or(default)
 }
 
-fn opt_float(opts: &IndexMap<String, PerlValue>, k: &str, default: f64) -> f64 {
+fn opt_float(opts: &IndexMap<String, StrykeValue>, k: &str, default: f64) -> f64 {
     opts.get(k).map(|v| v.to_number()).unwrap_or(default)
 }
 
-fn opt_bool(opts: &IndexMap<String, PerlValue>, k: &str, default: bool) -> bool {
+fn opt_bool(opts: &IndexMap<String, StrykeValue>, k: &str, default: bool) -> bool {
     match opts.get(k) {
         Some(v) => v.to_int() != 0,
         None => default,
@@ -1368,7 +1368,7 @@ fn truncate(s: &str, n: usize) -> String {
 // `max_turns` is hit.
 
 impl VMHelper {
-    pub(crate) fn ai_agent(&mut self, args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    pub(crate) fn ai_agent(&mut self, args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
         let prompt = args
             .first()
             .map(|v| v.to_string())
@@ -1380,7 +1380,7 @@ impl VMHelper {
         //   2. Globally registered tools via `ai_register_tool(...)`.
         //   3. Attached MCP servers via `mcp_attach_to_ai(...)` when
         //      `auto_mcp => 1` is set (default on for v0).
-        let tools_list: Vec<PerlValue> = match opts.get("tools") {
+        let tools_list: Vec<StrykeValue> = match opts.get("tools") {
             Some(v) => v
                 .as_array_ref()
                 .map(|a| a.read().clone())
@@ -1410,7 +1410,7 @@ impl VMHelper {
         // Mock mode short-circuits the whole loop — tests want one
         // string response, not a multi-turn dance.
         if let Some(resp) = match_mock(&prompt) {
-            return Ok(PerlValue::string(resp));
+            return Ok(StrykeValue::string(resp));
         }
         if mock_only_mode() {
             return Err(PerlError::runtime(
@@ -1516,7 +1516,7 @@ impl VMHelper {
         timeout: i64,
         tools: &[CompiledTool],
         line: usize,
-    ) -> Result<PerlValue> {
+    ) -> Result<StrykeValue> {
         let key_env = config().lock().api_key_env.clone();
         let api_key = std::env::var(&key_env).map_err(|_| {
             PerlError::runtime(format!("ai_agent: ${} env var not set", key_env), line)
@@ -1629,10 +1629,10 @@ impl VMHelper {
 
             if stop_reason == "end_turn" || tool_results.is_empty() {
                 if !final_text.is_empty() {
-                    return Ok(PerlValue::string(final_text));
+                    return Ok(StrykeValue::string(final_text));
                 }
                 if stop_reason == "end_turn" {
-                    return Ok(PerlValue::string(String::new()));
+                    return Ok(StrykeValue::string(String::new()));
                 }
             }
 
@@ -1660,7 +1660,7 @@ impl VMHelper {
         timeout: i64,
         tools: &[CompiledTool],
         line: usize,
-    ) -> Result<PerlValue> {
+    ) -> Result<StrykeValue> {
         let api_key = std::env::var("OPENAI_API_KEY")
             .map_err(|_| PerlError::runtime("ai_agent: $OPENAI_API_KEY not set", line))?;
         let agent = ureq::AgentBuilder::new()
@@ -1767,7 +1767,7 @@ impl VMHelper {
             }
 
             // Final answer.
-            return Ok(PerlValue::string(
+            return Ok(StrykeValue::string(
                 msg["content"].as_str().unwrap_or("").to_string(),
             ));
         }
@@ -1813,11 +1813,11 @@ impl VMHelper {
         let arg_hash = json_to_perl(&input);
         let result = match self.call_sub(run_sub, vec![arg_hash], WantarrayCtx::Scalar, line) {
             Ok(v) => v,
-            Err(FlowOrError::Flow(_)) => PerlValue::UNDEF,
+            Err(FlowOrError::Flow(_)) => StrykeValue::UNDEF,
             Err(FlowOrError::Error(e)) => {
                 let mut em = IndexMap::new();
-                em.insert("error".to_string(), PerlValue::string(format!("{}", e)));
-                PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(em)))
+                em.insert("error".to_string(), StrykeValue::string(format!("{}", e)));
+                StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(em)))
             }
         };
 
@@ -1837,7 +1837,7 @@ struct CompiledTool {
     native_id: Option<i64>,
 }
 
-fn compile_tool(v: &PerlValue, line: usize) -> Result<CompiledTool> {
+fn compile_tool(v: &StrykeValue, line: usize) -> Result<CompiledTool> {
     let map = v
         .as_hash_map()
         .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
@@ -1855,7 +1855,7 @@ fn compile_tool(v: &PerlValue, line: usize) -> Result<CompiledTool> {
         .get("description")
         .map(|v| v.to_string())
         .unwrap_or_default();
-    let parameters = map.get("parameters").cloned().unwrap_or(PerlValue::UNDEF);
+    let parameters = map.get("parameters").cloned().unwrap_or(StrykeValue::UNDEF);
     let input_schema = parameters_to_json_schema(&parameters);
 
     // Built-in tool fast path: if `__native_tool_id__` is set, skip
@@ -1895,7 +1895,7 @@ fn compile_tool(v: &PerlValue, line: usize) -> Result<CompiledTool> {
     })
 }
 
-fn parameters_to_json_schema(v: &PerlValue) -> serde_json::Value {
+fn parameters_to_json_schema(v: &StrykeValue) -> serde_json::Value {
     // Accept either a plain hashref `{q => "string", limit => "int"}`
     // (treated as object schema with required fields) or a full
     // JSON-Schema-shaped hashref already (`{type: "object", properties:
@@ -1940,7 +1940,7 @@ fn parameters_to_json_schema(v: &PerlValue) -> serde_json::Value {
     })
 }
 
-fn perl_to_json_object(map: &IndexMap<String, PerlValue>) -> serde_json::Value {
+fn perl_to_json_object(map: &IndexMap<String, StrykeValue>) -> serde_json::Value {
     let mut out = serde_json::Map::new();
     for (k, v) in map {
         out.insert(k.clone(), perl_to_json(v));
@@ -1948,7 +1948,7 @@ fn perl_to_json_object(map: &IndexMap<String, PerlValue>) -> serde_json::Value {
     serde_json::Value::Object(out)
 }
 
-fn perl_to_json(v: &PerlValue) -> serde_json::Value {
+fn perl_to_json(v: &StrykeValue) -> serde_json::Value {
     if v.is_undef() {
         return serde_json::Value::Null;
     }
@@ -1976,30 +1976,30 @@ fn perl_to_json(v: &PerlValue) -> serde_json::Value {
     serde_json::Value::String(v.to_string())
 }
 
-fn json_to_perl(v: &serde_json::Value) -> PerlValue {
+fn json_to_perl(v: &serde_json::Value) -> StrykeValue {
     match v {
-        serde_json::Value::Null => PerlValue::UNDEF,
-        serde_json::Value::Bool(b) => PerlValue::integer(if *b { 1 } else { 0 }),
+        serde_json::Value::Null => StrykeValue::UNDEF,
+        serde_json::Value::Bool(b) => StrykeValue::integer(if *b { 1 } else { 0 }),
         serde_json::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
-                PerlValue::integer(i)
+                StrykeValue::integer(i)
             } else if let Some(f) = n.as_f64() {
-                PerlValue::float(f)
+                StrykeValue::float(f)
             } else {
-                PerlValue::UNDEF
+                StrykeValue::UNDEF
             }
         }
-        serde_json::Value::String(s) => PerlValue::string(s.clone()),
+        serde_json::Value::String(s) => StrykeValue::string(s.clone()),
         serde_json::Value::Array(arr) => {
-            let items: Vec<PerlValue> = arr.iter().map(json_to_perl).collect();
-            PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(items)))
+            let items: Vec<StrykeValue> = arr.iter().map(json_to_perl).collect();
+            StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(items)))
         }
         serde_json::Value::Object(obj) => {
             let mut m = IndexMap::new();
             for (k, v) in obj {
                 m.insert(k.clone(), json_to_perl(v));
             }
-            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
+            StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
         }
     }
 }
@@ -2010,7 +2010,7 @@ fn json_to_perl(v: &serde_json::Value) -> PerlValue {
 // asks for a JSON array of judgments. Falls back to per-item calls
 // when the batch parse fails (rare). Cost-conscious by construction.
 
-pub(crate) fn ai_filter(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_filter(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let (items, criterion, opts) = parse_collection_args(args, "ai_filter", line)?;
     let strs: Vec<String> = items.iter().map(|v| v.to_string()).collect();
     let prompt = format!(
@@ -2020,21 +2020,21 @@ pub(crate) fn ai_filter(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         criterion,
         numbered_list(&strs)
     );
-    let mut call_args = vec![PerlValue::string(prompt)];
+    let mut call_args = vec![StrykeValue::string(prompt)];
     forward_opts(&mut call_args, &opts);
     let raw = ai_prompt(&call_args, line)?.to_string();
     let bools = parse_json_array_of_bools(&raw, items.len());
-    let kept: Vec<PerlValue> = items
+    let kept: Vec<StrykeValue> = items
         .into_iter()
         .zip(bools.iter())
         .filter_map(|(v, b)| if *b { Some(v) } else { None })
         .collect();
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         kept,
     ))))
 }
 
-pub(crate) fn ai_map(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_map(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let (items, instruction, opts) = parse_collection_args(args, "ai_map", line)?;
     let strs: Vec<String> = items.iter().map(|v| v.to_string()).collect();
     let prompt = format!(
@@ -2044,16 +2044,16 @@ pub(crate) fn ai_map(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         instruction,
         numbered_list(&strs)
     );
-    let mut call_args = vec![PerlValue::string(prompt)];
+    let mut call_args = vec![StrykeValue::string(prompt)];
     forward_opts(&mut call_args, &opts);
     let raw = ai_prompt(&call_args, line)?.to_string();
     let strs = parse_json_array_of_strings(&raw, items.len());
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
-        strs.into_iter().map(PerlValue::string).collect(),
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        strs.into_iter().map(StrykeValue::string).collect(),
     ))))
 }
 
-pub(crate) fn ai_classify(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_classify(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let (items, _criterion, opts) = parse_collection_args(args, "ai_classify", line)?;
     let labels_v = opts.get("into").or_else(|| opts.get("labels")).cloned();
     let labels: Vec<String> = labels_v
@@ -2077,16 +2077,16 @@ pub(crate) fn ai_classify(args: &[PerlValue], line: usize) -> Result<PerlValue> 
         labels.join(", "),
         numbered_list(&strs)
     );
-    let mut call_args = vec![PerlValue::string(prompt)];
+    let mut call_args = vec![StrykeValue::string(prompt)];
     forward_opts(&mut call_args, &opts);
     let raw = ai_prompt(&call_args, line)?.to_string();
     let labs = parse_json_array_of_strings(&raw, items.len());
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
-        labs.into_iter().map(PerlValue::string).collect(),
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        labs.into_iter().map(StrykeValue::string).collect(),
     ))))
 }
 
-pub(crate) fn ai_match(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_match(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let item = args
         .first()
         .map(|v| v.to_string())
@@ -2100,12 +2100,12 @@ pub(crate) fn ai_match(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         "Does this item match the criterion {:?}? Reply ONLY with `true` or `false`.\nItem: {}",
         criterion, item
     );
-    let mut call_args = vec![PerlValue::string(prompt)];
+    let mut call_args = vec![StrykeValue::string(prompt)];
     forward_opts(&mut call_args, &opts);
     let raw = ai_prompt(&call_args, line)?
         .to_string()
         .to_ascii_lowercase();
-    Ok(PerlValue::integer(
+    Ok(StrykeValue::integer(
         if (raw.contains("true") && !raw.contains("false"))
             || raw.starts_with('y')
             || raw.starts_with("\"y")
@@ -2117,7 +2117,7 @@ pub(crate) fn ai_match(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     ))
 }
 
-pub(crate) fn ai_sort(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_sort(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let (items, criterion, opts) = parse_collection_args(args, "ai_sort", line)?;
     let strs: Vec<String> = items.iter().map(|v| v.to_string()).collect();
     let prompt = format!(
@@ -2128,11 +2128,11 @@ pub(crate) fn ai_sort(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         items.len() - 1,
         numbered_list(&strs)
     );
-    let mut call_args = vec![PerlValue::string(prompt)];
+    let mut call_args = vec![StrykeValue::string(prompt)];
     forward_opts(&mut call_args, &opts);
     let raw = ai_prompt(&call_args, line)?.to_string();
     let order = parse_json_array_of_ints(&raw);
-    let mut out: Vec<PerlValue> = Vec::with_capacity(items.len());
+    let mut out: Vec<StrykeValue> = Vec::with_capacity(items.len());
     let mut seen = std::collections::HashSet::new();
     for idx in order {
         if idx >= 0 && (idx as usize) < items.len() && seen.insert(idx) {
@@ -2146,12 +2146,12 @@ pub(crate) fn ai_sort(args: &[PerlValue], line: usize) -> Result<PerlValue> {
             out.push(v.clone());
         }
     }
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         out,
     ))))
 }
 
-pub(crate) fn ai_dedupe(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_dedupe(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let (items, hint, opts) = parse_collection_args(args, "ai_dedupe", line)?;
     let strs: Vec<String> = items.iter().map(|v| v.to_string()).collect();
     let prompt = format!(
@@ -2167,11 +2167,11 @@ pub(crate) fn ai_dedupe(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         },
         numbered_list(&strs)
     );
-    let mut call_args = vec![PerlValue::string(prompt)];
+    let mut call_args = vec![StrykeValue::string(prompt)];
     forward_opts(&mut call_args, &opts);
     let raw = ai_prompt(&call_args, line)?.to_string();
     let groups = parse_json_array_of_int_arrays(&raw);
-    let mut kept: Vec<PerlValue> = Vec::new();
+    let mut kept: Vec<StrykeValue> = Vec::new();
     for g in groups {
         if let Some(&first) = g.first() {
             if first >= 0 && (first as usize) < items.len() {
@@ -2183,16 +2183,16 @@ pub(crate) fn ai_dedupe(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         // Defensive — return originals if parse failed.
         kept = items;
     }
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         kept,
     ))))
 }
 
 fn parse_collection_args(
-    args: &[PerlValue],
+    args: &[StrykeValue],
     name: &str,
     line: usize,
-) -> Result<(Vec<PerlValue>, String, IndexMap<String, PerlValue>)> {
+) -> Result<(Vec<StrykeValue>, String, IndexMap<String, StrykeValue>)> {
     if args.len() < 2 {
         return Err(PerlError::runtime(
             format!(
@@ -2202,7 +2202,7 @@ fn parse_collection_args(
             line,
         ));
     }
-    let items: Vec<PerlValue> = if let Some(arr) = args[0].as_array_ref() {
+    let items: Vec<StrykeValue> = if let Some(arr) = args[0].as_array_ref() {
         arr.read().clone()
     } else {
         args[0].clone().to_list()
@@ -2212,7 +2212,7 @@ fn parse_collection_args(
     Ok((items, criterion, opts))
 }
 
-fn forward_opts(call_args: &mut Vec<PerlValue>, opts: &IndexMap<String, PerlValue>) {
+fn forward_opts(call_args: &mut Vec<StrykeValue>, opts: &IndexMap<String, StrykeValue>) {
     for k in &[
         "model",
         "system",
@@ -2222,7 +2222,7 @@ fn forward_opts(call_args: &mut Vec<PerlValue>, opts: &IndexMap<String, PerlValu
         "timeout",
     ] {
         if let Some(v) = opts.get(*k) {
-            call_args.push(PerlValue::string(k.to_string()));
+            call_args.push(StrykeValue::string(k.to_string()));
             call_args.push(v.clone());
         }
     }
@@ -2357,7 +2357,7 @@ fn parse_json_array_of_int_arrays(raw: &str) -> Vec<Vec<i64>> {
 // ── Vector ops ────────────────────────────────────────────────────────
 
 /// `vec_cosine(\@a, \@b)` — cosine similarity in `[-1, 1]`.
-pub(crate) fn vec_cosine(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn vec_cosine(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let a = floats_from(
         args.first()
             .ok_or_else(|| PerlError::runtime("vec_cosine: a required", line))?,
@@ -2381,15 +2381,15 @@ pub(crate) fn vec_cosine(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         nb += b[i] * b[i];
     }
     if na == 0.0 || nb == 0.0 {
-        return Ok(PerlValue::float(0.0));
+        return Ok(StrykeValue::float(0.0));
     }
-    Ok(PerlValue::float(dot / (na.sqrt() * nb.sqrt())))
+    Ok(StrykeValue::float(dot / (na.sqrt() * nb.sqrt())))
 }
 
 /// `vec_search(\@query, \@candidates, top_k => N)` — returns arrayref
 /// of `+{idx, score}` for the top-k cosine matches. Each candidate
 /// is itself an arrayref of floats (typical embedding shape).
-pub(crate) fn vec_search(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn vec_search(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let q = floats_from(
         args.first()
             .ok_or_else(|| PerlError::runtime("vec_search: query required", line))?,
@@ -2425,23 +2425,23 @@ pub(crate) fn vec_search(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
     scored.truncate(top_k);
 
-    let out: Vec<PerlValue> = scored
+    let out: Vec<StrykeValue> = scored
         .into_iter()
         .map(|(i, s)| {
             let mut m = IndexMap::new();
-            m.insert("idx".to_string(), PerlValue::integer(i as i64));
-            m.insert("score".to_string(), PerlValue::float(s));
-            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
+            m.insert("idx".to_string(), StrykeValue::integer(i as i64));
+            m.insert("score".to_string(), StrykeValue::float(s));
+            StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
         })
         .collect();
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         out,
     ))))
 }
 
 /// `vec_topk(\@scores, $k)` — utility: return the indexes of the
 /// k largest scalar scores.
-pub(crate) fn vec_topk(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn vec_topk(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let scores = floats_from(
         args.first()
             .ok_or_else(|| PerlError::runtime("vec_topk: scores required", line))?,
@@ -2450,16 +2450,16 @@ pub(crate) fn vec_topk(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     let mut indexed: Vec<(usize, f64)> = scores.into_iter().enumerate().collect();
     indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
     indexed.truncate(k);
-    let out: Vec<PerlValue> = indexed
+    let out: Vec<StrykeValue> = indexed
         .into_iter()
-        .map(|(i, _)| PerlValue::integer(i as i64))
+        .map(|(i, _)| StrykeValue::integer(i as i64))
         .collect();
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         out,
     ))))
 }
 
-fn floats_from(v: &PerlValue) -> Vec<f64> {
+fn floats_from(v: &StrykeValue) -> Vec<f64> {
     if let Some(arr) = v.as_array_ref() {
         return arr.read().iter().map(|x| x.to_number()).collect();
     }
@@ -2472,7 +2472,7 @@ fn floats_from(v: &PerlValue) -> Vec<f64> {
 /// estimate using the heuristic token count + the embedded price
 /// table. Output side is assumed to be 25% of input by default;
 /// override with `out_tokens => N`.
-pub(crate) fn ai_estimate(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_estimate(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let prompt = args.first().map(|v| v.to_string()).unwrap_or_default();
     let opts = parse_opts(&args[1.min(args.len())..]);
     let model = opt_str(&opts, "model", &config().lock().model);
@@ -2484,17 +2484,17 @@ pub(crate) fn ai_estimate(args: &[PerlValue], _line: usize) -> Result<PerlValue>
     let (in_per_1k, out_per_1k) = price_per_1k_tokens(&model);
     let usd = in_tokens / 1000.0 * in_per_1k + out_tokens / 1000.0 * out_per_1k;
     let mut h = IndexMap::new();
-    h.insert("usd".to_string(), PerlValue::float(usd));
+    h.insert("usd".to_string(), StrykeValue::float(usd));
     h.insert(
         "input_tokens".to_string(),
-        PerlValue::integer(in_tokens as i64),
+        StrykeValue::integer(in_tokens as i64),
     );
     h.insert(
         "output_tokens".to_string(),
-        PerlValue::integer(out_tokens as i64),
+        StrykeValue::integer(out_tokens as i64),
     );
-    h.insert("model".to_string(), PerlValue::string(model));
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
+    h.insert("model".to_string(), StrykeValue::string(model));
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
 }
 
 static ROUTING: OnceLock<Mutex<IndexMap<String, String>>> = OnceLock::new();
@@ -2504,28 +2504,28 @@ fn routing() -> &'static Mutex<IndexMap<String, String>> {
 }
 
 /// `ai_routing_get("embed")` → provider name or undef.
-pub(crate) fn ai_routing_get(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_routing_get(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let op = args.first().map(|v| v.to_string()).unwrap_or_default();
     if op.is_empty() {
         let g = routing().lock();
         let mut m = IndexMap::new();
         for (k, v) in g.iter() {
-            m.insert(k.clone(), PerlValue::string(v.clone()));
+            m.insert(k.clone(), StrykeValue::string(v.clone()));
         }
-        return Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m))));
+        return Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m))));
     }
     Ok(routing()
         .lock()
         .get(&op)
         .cloned()
-        .map(PerlValue::string)
-        .unwrap_or(PerlValue::UNDEF))
+        .map(StrykeValue::string)
+        .unwrap_or(StrykeValue::UNDEF))
 }
 
 /// `ai_routing_set("embed", "voyage")` — register a per-op provider
 /// override. Currently advisory; embeddings honor it; the agent
 /// loop uses the global default. Wires up in Phase 4.
-pub(crate) fn ai_routing_set(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_routing_set(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 2 {
         return Err(PerlError::runtime(
             "ai_routing_set: usage: ai_routing_set(\"op\", \"provider\")",
@@ -2535,7 +2535,7 @@ pub(crate) fn ai_routing_set(args: &[PerlValue], line: usize) -> Result<PerlValu
     let op = args[0].to_string();
     let provider = args[1].to_string();
     routing().lock().insert(op, provider);
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 #[derive(Clone, Debug)]
@@ -2591,44 +2591,44 @@ pub(crate) fn record_history(
 }
 
 /// `ai_history()` → arrayref of last 100 calls, oldest first.
-pub(crate) fn ai_history(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_history(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let g = history_slot().lock();
-    let items: Vec<PerlValue> = g
+    let items: Vec<StrykeValue> = g
         .iter()
         .map(|e| {
             let mut m = IndexMap::new();
-            m.insert("provider".into(), PerlValue::string(e.provider.clone()));
-            m.insert("model".into(), PerlValue::string(e.model.clone()));
-            m.insert("prompt".into(), PerlValue::string(e.prompt.clone()));
+            m.insert("provider".into(), StrykeValue::string(e.provider.clone()));
+            m.insert("model".into(), StrykeValue::string(e.model.clone()));
+            m.insert("prompt".into(), StrykeValue::string(e.prompt.clone()));
             m.insert(
                 "response_chars".into(),
-                PerlValue::integer(e.response_chars as i64),
+                StrykeValue::integer(e.response_chars as i64),
             );
             m.insert(
                 "input_tokens".into(),
-                PerlValue::integer(e.input_tokens as i64),
+                StrykeValue::integer(e.input_tokens as i64),
             );
             m.insert(
                 "output_tokens".into(),
-                PerlValue::integer(e.output_tokens as i64),
+                StrykeValue::integer(e.output_tokens as i64),
             );
-            m.insert("usd".into(), PerlValue::float(e.usd));
+            m.insert("usd".into(), StrykeValue::float(e.usd));
             m.insert(
                 "cache_hit".into(),
-                PerlValue::integer(if e.cache_hit { 1 } else { 0 }),
+                StrykeValue::integer(if e.cache_hit { 1 } else { 0 }),
             );
-            m.insert("unix_time".into(), PerlValue::integer(e.when_unix));
-            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
+            m.insert("unix_time".into(), StrykeValue::integer(e.when_unix));
+            StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
         })
         .collect();
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         items,
     ))))
 }
 
-pub(crate) fn ai_history_clear(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_history_clear(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     history_slot().lock().clear();
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 // ── Tool registry (Phase 1 sugar without `tool fn` parser keyword) ────
@@ -2642,7 +2642,7 @@ pub(crate) fn ai_history_clear(_args: &[PerlValue], _line: usize) -> Result<Perl
 pub(crate) struct RegisteredTool {
     pub name: String,
     pub description: String,
-    pub parameters: PerlValue,
+    pub parameters: StrykeValue,
     pub run_sub: Arc<crate::value::PerlSub>,
 }
 
@@ -2652,7 +2652,7 @@ pub(crate) fn registered_tools() -> &'static Mutex<Vec<RegisteredTool>> {
     REGISTERED.get_or_init(|| Mutex::new(Vec::new()))
 }
 
-pub(crate) fn ai_register_tool(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_register_tool(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 4 {
         return Err(PerlError::runtime(
             "ai_register_tool: usage: ai_register_tool(\"name\", \"desc\", +{p=>\"type\"}, sub { ... })",
@@ -2673,38 +2673,38 @@ pub(crate) fn ai_register_tool(args: &[PerlValue], line: usize) -> Result<PerlVa
         parameters: params,
         run_sub,
     });
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn ai_unregister_tool(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_unregister_tool(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let name = args.first().map(|v| v.to_string()).unwrap_or_default();
     let mut g = registered_tools().lock();
     let before = g.len();
     g.retain(|t| t.name != name);
-    Ok(PerlValue::integer((before - g.len()) as i64))
+    Ok(StrykeValue::integer((before - g.len()) as i64))
 }
 
-pub(crate) fn ai_clear_tools(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_clear_tools(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     registered_tools().lock().clear();
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn ai_tools_list(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_tools_list(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let g = registered_tools().lock();
-    let items: Vec<PerlValue> = g
+    let items: Vec<StrykeValue> = g
         .iter()
         .map(|t| {
             let mut m = IndexMap::new();
-            m.insert("name".into(), PerlValue::string(t.name.clone()));
+            m.insert("name".into(), StrykeValue::string(t.name.clone()));
             m.insert(
                 "description".into(),
-                PerlValue::string(t.description.clone()),
+                StrykeValue::string(t.description.clone()),
             );
             m.insert("parameters".into(), t.parameters.clone());
-            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
+            StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
         })
         .collect();
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         items,
     ))))
 }
@@ -2778,7 +2778,7 @@ fn blob_to_vec(blob: &[u8]) -> Vec<f32> {
 }
 
 fn embed_one(text: &str, line: usize) -> Result<Vec<f32>> {
-    let v = ai_embed(&[PerlValue::string(text.to_string())], line)?;
+    let v = ai_embed(&[StrykeValue::string(text.to_string())], line)?;
     // Single-input embed returns a flat array_ref of floats.
     let arr = v
         .as_array_ref()
@@ -2797,7 +2797,7 @@ fn embed_one(text: &str, line: usize) -> Result<Vec<f32>> {
     Ok(read.iter().map(|x| x.to_number() as f32).collect())
 }
 
-pub(crate) fn ai_memory_save(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_memory_save(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 2 {
         return Err(PerlError::runtime(
             "ai_memory_save: usage: ai_memory_save(\"id\", \"content\", metadata?, path?)",
@@ -2852,10 +2852,10 @@ pub(crate) fn ai_memory_save(args: &[PerlValue], line: usize) -> Result<PerlValu
             rusqlite::params![id, content, blob, metadata, now.to_string()],
         )
         .map_err(|e| PerlError::runtime(format!("ai_memory: insert: {}", e), line))?;
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn ai_memory_recall(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_memory_recall(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let query = args
         .first()
         .map(|v| v.to_string())
@@ -2918,24 +2918,24 @@ pub(crate) fn ai_memory_recall(args: &[PerlValue], line: usize) -> Result<PerlVa
     scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
     scored.truncate(top_k);
 
-    let out: Vec<PerlValue> = scored
+    let out: Vec<StrykeValue> = scored
         .into_iter()
         .map(|(i, score)| {
             let (id, content, _, meta) = &rows[i];
             let mut m = IndexMap::new();
-            m.insert("id".into(), PerlValue::string(id.clone()));
-            m.insert("content".into(), PerlValue::string(content.clone()));
-            m.insert("score".into(), PerlValue::float(score));
-            m.insert("metadata".into(), PerlValue::string(meta.clone()));
-            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
+            m.insert("id".into(), StrykeValue::string(id.clone()));
+            m.insert("content".into(), StrykeValue::string(content.clone()));
+            m.insert("score".into(), StrykeValue::float(score));
+            m.insert("metadata".into(), StrykeValue::string(meta.clone()));
+            StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
         })
         .collect();
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         out,
     ))))
 }
 
-pub(crate) fn ai_memory_forget(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_memory_forget(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let id = args
         .first()
         .map(|v| v.to_string())
@@ -2947,10 +2947,10 @@ pub(crate) fn ai_memory_forget(args: &[PerlValue], line: usize) -> Result<PerlVa
         .conn
         .execute("DELETE FROM ai_memory WHERE id = ?1", rusqlite::params![id])
         .map_err(|e| PerlError::runtime(format!("ai_memory: delete: {}", e), line))?;
-    Ok(PerlValue::integer(n as i64))
+    Ok(StrykeValue::integer(n as i64))
 }
 
-pub(crate) fn ai_memory_count(_args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_memory_count(_args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     ensure_memory(None)?;
     let g = memory().lock();
     let store = g.as_ref().expect("memory ensured above");
@@ -2958,10 +2958,10 @@ pub(crate) fn ai_memory_count(_args: &[PerlValue], line: usize) -> Result<PerlVa
         .conn
         .query_row("SELECT count(*) FROM ai_memory", [], |r| r.get(0))
         .map_err(|e| PerlError::runtime(format!("ai_memory: count: {}", e), line))?;
-    Ok(PerlValue::integer(n))
+    Ok(StrykeValue::integer(n))
 }
 
-pub(crate) fn ai_memory_clear(_args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_memory_clear(_args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     ensure_memory(None)?;
     let g = memory().lock();
     let store = g.as_ref().expect("memory ensured above");
@@ -2969,7 +2969,7 @@ pub(crate) fn ai_memory_clear(_args: &[PerlValue], line: usize) -> Result<PerlVa
         .conn
         .execute("DELETE FROM ai_memory", [])
         .map_err(|e| PerlError::runtime(format!("ai_memory: clear: {}", e), line))?;
-    Ok(PerlValue::integer(n as i64))
+    Ok(StrykeValue::integer(n as i64))
 }
 
 // Mock-embed helper: deterministic 32-dim hash so tests work offline.
@@ -3012,9 +3012,9 @@ fn mock_embedding(text: &str) -> Vec<f32> {
 impl VMHelper {
     pub(crate) fn ai_stream_with_callback(
         &mut self,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> Result<PerlValue> {
+    ) -> Result<StrykeValue> {
         let prompt = args
             .first()
             .map(|v| v.to_string())
@@ -3032,7 +3032,7 @@ impl VMHelper {
         // response by char so callbacks still fire deterministically.
         if let Some(resp) = match_mock(&prompt) {
             for c in resp.chars() {
-                let arg = PerlValue::string(c.to_string());
+                let arg = StrykeValue::string(c.to_string());
                 let _ = self.call_sub(
                     on_chunk_sub.as_ref().unwrap(),
                     vec![arg],
@@ -3040,7 +3040,7 @@ impl VMHelper {
                     line,
                 );
             }
-            return Ok(PerlValue::string(resp));
+            return Ok(StrykeValue::string(resp));
         }
         if mock_only_mode() {
             return Err(PerlError::runtime(
@@ -3120,7 +3120,7 @@ impl VMHelper {
                         full.push_str(t);
                         let _ = self.call_sub(
                             on_chunk_sub.as_ref().unwrap(),
-                            vec![PerlValue::string(t.to_string())],
+                            vec![StrykeValue::string(t.to_string())],
                             WantarrayCtx::Scalar,
                             line,
                         );
@@ -3156,7 +3156,7 @@ impl VMHelper {
             current_cost_usd(),
             false,
         );
-        Ok(PerlValue::string(full))
+        Ok(StrykeValue::string(full))
     }
 }
 
@@ -3164,10 +3164,10 @@ impl VMHelper {
     fn ai_stream_openai(
         &mut self,
         prompt: &str,
-        opts: IndexMap<String, PerlValue>,
+        opts: IndexMap<String, StrykeValue>,
         on_chunk_sub: &Arc<crate::value::PerlSub>,
         line: usize,
-    ) -> Result<PerlValue> {
+    ) -> Result<StrykeValue> {
         let model = opt_str(&opts, "model", &config().lock().model);
         let system = opt_str(&opts, "system", "");
         let max_tokens = opt_int(&opts, "max_tokens", 1024);
@@ -3238,7 +3238,7 @@ impl VMHelper {
                             full.push_str(delta);
                             let _ = self.call_sub(
                                 on_chunk_sub,
-                                vec![PerlValue::string(delta.to_string())],
+                                vec![StrykeValue::string(delta.to_string())],
                                 WantarrayCtx::Scalar,
                                 line,
                             );
@@ -3264,7 +3264,7 @@ impl VMHelper {
             current_cost_usd(),
             false,
         );
-        Ok(PerlValue::string(full))
+        Ok(StrykeValue::string(full))
     }
 }
 
@@ -3275,7 +3275,7 @@ impl VMHelper {
 // (Anthropic doesn't support `url` source directly; URLs are fetched
 // here and inlined as bytes).
 
-pub(crate) fn ai_vision(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_vision(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let prompt = args
         .first()
         .map(|v| v.to_string())
@@ -3300,7 +3300,7 @@ pub(crate) fn ai_vision(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     let timeout = opt_int(&opts, "timeout", 60);
 
     if let Some(resp) = match_mock(&prompt) {
-        return Ok(PerlValue::string(resp));
+        return Ok(StrykeValue::string(resp));
     }
     if mock_only_mode() {
         return Err(PerlError::runtime(
@@ -3371,10 +3371,10 @@ pub(crate) fn ai_vision(args: &[PerlValue], line: usize) -> Result<PerlValue> {
             }
         }
     }
-    Ok(PerlValue::string(out))
+    Ok(StrykeValue::string(out))
 }
 
-fn resolve_image_input(v: &PerlValue, line: usize) -> Result<(String, String)> {
+fn resolve_image_input(v: &StrykeValue, line: usize) -> Result<(String, String)> {
     use base64::Engine;
     let s = v.to_string();
     let (bytes, media_type) = if s.starts_with("http://") || s.starts_with("https://") {
@@ -3575,7 +3575,7 @@ fn call_gemini(
 /// `ai_transcribe($audio_path, model => "whisper-1", language => "en")`
 /// — speech-to-text via OpenAI's audio transcription endpoint. Returns
 /// a string. Accepts mp3/mp4/mpeg/mpga/m4a/wav/webm.
-pub(crate) fn ai_transcribe(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_transcribe(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let path = args.first().map(|v| v.to_string()).ok_or_else(|| {
         PerlError::runtime(
             "ai_transcribe: usage: ai_transcribe(\"path/to/audio.mp3\")",
@@ -3588,7 +3588,7 @@ pub(crate) fn ai_transcribe(args: &[PerlValue], line: usize) -> Result<PerlValue
     let timeout = opt_int(&opts, "timeout", 120);
 
     if let Some(resp) = match_mock(&format!("transcribe:{}", path)) {
-        return Ok(PerlValue::string(resp));
+        return Ok(StrykeValue::string(resp));
     }
     if mock_only_mode() {
         return Err(PerlError::runtime(
@@ -3641,7 +3641,7 @@ pub(crate) fn ai_transcribe(args: &[PerlValue], line: usize) -> Result<PerlValue
         .into_json()
         .map_err(|e| PerlError::runtime(format!("ai_transcribe: decode: {}", e), line))?;
     let text = json["text"].as_str().unwrap_or("").to_string();
-    Ok(PerlValue::string(text))
+    Ok(StrykeValue::string(text))
 }
 
 // ── TTS (OpenAI Audio Speech) ────────────────────────────────────────
@@ -3649,7 +3649,7 @@ pub(crate) fn ai_transcribe(args: &[PerlValue], line: usize) -> Result<PerlValue
 /// `ai_speak($text, voice => "alloy", model => "tts-1", output => "out.mp3")`
 /// — text-to-speech via OpenAI. Returns audio bytes (and optionally
 /// writes to `output` path).
-pub(crate) fn ai_speak(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_speak(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let text = args
         .first()
         .map(|v| v.to_string())
@@ -3666,7 +3666,7 @@ pub(crate) fn ai_speak(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         if !output.is_empty() {
             std::fs::write(&output, &fake).ok();
         }
-        return Ok(PerlValue::bytes(Arc::new(fake)));
+        return Ok(StrykeValue::bytes(Arc::new(fake)));
     }
     let api_key = std::env::var("OPENAI_API_KEY")
         .map_err(|_| PerlError::runtime("ai_speak: $OPENAI_API_KEY not set", line))?;
@@ -3692,7 +3692,7 @@ pub(crate) fn ai_speak(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         std::fs::write(&output, &buf)
             .map_err(|e| PerlError::runtime(format!("ai_speak: write {}: {}", output, e), line))?;
     }
-    Ok(PerlValue::bytes(Arc::new(buf)))
+    Ok(StrykeValue::bytes(Arc::new(buf)))
 }
 
 // ── Image generation (OpenAI Images) ─────────────────────────────────
@@ -3705,7 +3705,7 @@ pub(crate) fn ai_speak(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 // For OpenAI, both `gpt-image-1` and `dall-e-3` use the same endpoint with
 // different parameter sets. We default to `dall-e-3` because it doesn't
 // require organization verification.
-pub(crate) fn ai_image(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_image(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let prompt = args
         .first()
         .map(|v| v.to_string())
@@ -3724,7 +3724,7 @@ pub(crate) fn ai_image(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         if !output.is_empty() {
             std::fs::write(&output, &bytes).ok();
         }
-        return Ok(PerlValue::bytes(Arc::new(bytes)));
+        return Ok(StrykeValue::bytes(Arc::new(bytes)));
     }
     if mock_only_mode() {
         return Err(PerlError::runtime(
@@ -3802,7 +3802,7 @@ pub(crate) fn ai_image(args: &[PerlValue], line: usize) -> Result<PerlValue> {
                 PerlError::runtime(format!("ai_image: write {}: {}", output, e), line)
             })?;
         }
-        Ok(PerlValue::bytes(Arc::new(images.remove(0))))
+        Ok(StrykeValue::bytes(Arc::new(images.remove(0))))
     } else {
         if !output.is_empty() {
             for (i, b) in images.iter().enumerate() {
@@ -3816,11 +3816,11 @@ pub(crate) fn ai_image(args: &[PerlValue], line: usize) -> Result<PerlValue> {
                 })?;
             }
         }
-        let arr: Vec<PerlValue> = images
+        let arr: Vec<StrykeValue> = images
             .into_iter()
-            .map(|b| PerlValue::bytes(Arc::new(b)))
+            .map(|b| StrykeValue::bytes(Arc::new(b)))
             .collect();
-        Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
             arr,
         ))))
     }
@@ -3832,7 +3832,7 @@ pub(crate) fn ai_image(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 // — edit an existing image given a prompt + optional mask. Uses
 // OpenAI `/v1/images/edits` with multipart upload. The mask must be a
 // PNG with transparent regions marking the area to edit.
-pub(crate) fn ai_image_edit(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_image_edit(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let prompt = args
         .first()
         .map(|v| v.to_string())
@@ -3857,7 +3857,7 @@ pub(crate) fn ai_image_edit(args: &[PerlValue], line: usize) -> Result<PerlValue
         if !output.is_empty() {
             std::fs::write(&output, &bytes).ok();
         }
-        return Ok(PerlValue::bytes(Arc::new(bytes)));
+        return Ok(StrykeValue::bytes(Arc::new(bytes)));
     }
     if mock_only_mode() {
         return Err(PerlError::runtime(
@@ -3936,7 +3936,7 @@ pub(crate) fn ai_image_edit(args: &[PerlValue], line: usize) -> Result<PerlValue
 /// `ai_image_variation(image => "in.png", n => 4, size => "1024x1024", output => "out.png")`
 /// — generate variations of an existing image. OpenAI `/v1/images/variations`
 /// (DALL-E 2 only — gpt-image-1 doesn't expose a variations endpoint).
-pub(crate) fn ai_image_variation(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_image_variation(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let opts = parse_opts(args);
     let image_path = opt_str(&opts, "image", "");
     if image_path.is_empty() {
@@ -3953,7 +3953,7 @@ pub(crate) fn ai_image_variation(args: &[PerlValue], line: usize) -> Result<Perl
 
     if mock_only_mode() {
         let fake = b"MOCK_IMG_VAR".to_vec();
-        return Ok(PerlValue::bytes(Arc::new(fake)));
+        return Ok(StrykeValue::bytes(Arc::new(fake)));
     }
     let api_key = std::env::var("OPENAI_API_KEY")
         .map_err(|_| PerlError::runtime("ai_image_variation: $OPENAI_API_KEY not set", line))?;
@@ -4000,13 +4000,13 @@ pub(crate) fn ai_image_variation(args: &[PerlValue], line: usize) -> Result<Perl
 }
 
 /// Shared response handler for image generation/edit/variation. Returns
-/// PerlValue::bytes for n=1 or arrayref of bytes for n>1, optionally
+/// StrykeValue::bytes for n=1 or arrayref of bytes for n>1, optionally
 /// writing to `output` path (with `_1`/`_2`/... suffix when n>1).
 fn finalize_image_response(
     json: &serde_json::Value,
     output: &str,
     line: usize,
-) -> Result<PerlValue> {
+) -> Result<StrykeValue> {
     let data = json["data"].as_array().cloned().unwrap_or_default();
     if data.is_empty() {
         return Err(PerlError::runtime(
@@ -4039,7 +4039,7 @@ fn finalize_image_response(
             std::fs::write(output, &images[0])
                 .map_err(|e| PerlError::runtime(format!("image: write {}: {}", output, e), line))?;
         }
-        Ok(PerlValue::bytes(Arc::new(images.remove(0))))
+        Ok(StrykeValue::bytes(Arc::new(images.remove(0))))
     } else {
         if !output.is_empty() {
             for (i, b) in images.iter().enumerate() {
@@ -4052,11 +4052,11 @@ fn finalize_image_response(
                     .map_err(|e| PerlError::runtime(format!("image: write {}: {}", p, e), line))?;
             }
         }
-        let arr: Vec<PerlValue> = images
+        let arr: Vec<StrykeValue> = images
             .into_iter()
-            .map(|b| PerlValue::bytes(Arc::new(b)))
+            .map(|b| StrykeValue::bytes(Arc::new(b)))
             .collect();
-        Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
             arr,
         ))))
     }
@@ -4095,7 +4095,7 @@ fn base64_decode_lenient(s: &str) -> Option<Vec<u8>> {
 // `ai_models($provider)` returns an arrayref of model IDs available from
 // the given provider. Useful for autocompletion in tools and UIs that
 // want to surface the live model catalog.
-pub(crate) fn ai_models(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_models(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let provider = args
         .first()
         .map(|v| v.to_string())
@@ -4105,10 +4105,10 @@ pub(crate) fn ai_models(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 
     if mock_only_mode() {
         let mock = vec![
-            PerlValue::string("mock-model-1".to_string()),
-            PerlValue::string("mock-model-2".to_string()),
+            StrykeValue::string("mock-model-1".to_string()),
+            StrykeValue::string("mock-model-2".to_string()),
         ];
-        return Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        return Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
             mock,
         ))));
     }
@@ -4216,8 +4216,8 @@ pub(crate) fn ai_models(args: &[PerlValue], line: usize) -> Result<PerlValue> {
             ));
         }
     };
-    let arr: Vec<PerlValue> = ids.into_iter().map(PerlValue::string).collect();
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    let arr: Vec<StrykeValue> = ids.into_iter().map(StrykeValue::string).collect();
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         arr,
     ))))
 }
@@ -4285,7 +4285,7 @@ fn guess_media_type(path: &str) -> String {
 // parses + best-effort validates the result. Returns a hashref/arrayref
 // of typed values rather than a raw string.
 
-pub(crate) fn ai_extract(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_extract(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let prompt = args
         .first()
         .map(|v| v.to_string())
@@ -4313,12 +4313,12 @@ pub(crate) fn ai_extract(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     );
 
     // Forward all opts except `schema` and `context` to the underlying call.
-    let mut call_args = vec![PerlValue::string(full_prompt)];
+    let mut call_args = vec![StrykeValue::string(full_prompt)];
     for (k, v) in &opts {
         if k == "schema" || k == "context" {
             continue;
         }
-        call_args.push(PerlValue::string(k.clone()));
+        call_args.push(StrykeValue::string(k.clone()));
         call_args.push(v.clone());
     }
     let raw = ai_prompt(&call_args, line)?.to_string();
@@ -4336,7 +4336,7 @@ pub(crate) fn ai_extract(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     Ok(coerce_to_schema(&parsed, &schema_v))
 }
 
-fn describe_schema(v: &PerlValue) -> String {
+fn describe_schema(v: &StrykeValue) -> String {
     let map = match v
         .as_hash_map()
         .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
@@ -4400,7 +4400,7 @@ fn extract_first_json_object(s: &str) -> Option<&str> {
     None
 }
 
-fn coerce_to_schema(v: &serde_json::Value, schema: &PerlValue) -> PerlValue {
+fn coerce_to_schema(v: &serde_json::Value, schema: &StrykeValue) -> StrykeValue {
     let schema_map = schema
         .as_hash_map()
         .or_else(|| schema.as_hash_ref().map(|h| h.read().clone()));
@@ -4411,80 +4411,80 @@ fn coerce_to_schema(v: &serde_json::Value, schema: &PerlValue) -> PerlValue {
                 let raw = obj.get(k).cloned().unwrap_or(serde_json::Value::Null);
                 out.insert(k.clone(), coerce_value(&raw, &ty.to_string()));
             }
-            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(out)))
+            StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(out)))
         }
         _ => json_to_perl_helper(v),
     }
 }
 
-fn coerce_value(v: &serde_json::Value, ty: &str) -> PerlValue {
+fn coerce_value(v: &serde_json::Value, ty: &str) -> StrykeValue {
     match ty {
         "int" | "integer" | "Int" => match v {
-            serde_json::Value::Number(n) => PerlValue::integer(n.as_i64().unwrap_or(0)),
-            serde_json::Value::String(s) => PerlValue::integer(s.parse::<i64>().unwrap_or(0)),
-            serde_json::Value::Bool(b) => PerlValue::integer(if *b { 1 } else { 0 }),
-            _ => PerlValue::integer(0),
+            serde_json::Value::Number(n) => StrykeValue::integer(n.as_i64().unwrap_or(0)),
+            serde_json::Value::String(s) => StrykeValue::integer(s.parse::<i64>().unwrap_or(0)),
+            serde_json::Value::Bool(b) => StrykeValue::integer(if *b { 1 } else { 0 }),
+            _ => StrykeValue::integer(0),
         },
         "number" | "float" | "Float" | "Num" => match v {
-            serde_json::Value::Number(n) => PerlValue::float(n.as_f64().unwrap_or(0.0)),
-            serde_json::Value::String(s) => PerlValue::float(s.parse::<f64>().unwrap_or(0.0)),
-            _ => PerlValue::float(0.0),
+            serde_json::Value::Number(n) => StrykeValue::float(n.as_f64().unwrap_or(0.0)),
+            serde_json::Value::String(s) => StrykeValue::float(s.parse::<f64>().unwrap_or(0.0)),
+            _ => StrykeValue::float(0.0),
         },
         "bool" | "boolean" | "Bool" => match v {
-            serde_json::Value::Bool(b) => PerlValue::integer(if *b { 1 } else { 0 }),
+            serde_json::Value::Bool(b) => StrykeValue::integer(if *b { 1 } else { 0 }),
             serde_json::Value::Number(n) => {
-                PerlValue::integer(if n.as_i64().unwrap_or(0) != 0 { 1 } else { 0 })
+                StrykeValue::integer(if n.as_i64().unwrap_or(0) != 0 { 1 } else { 0 })
             }
-            serde_json::Value::String(s) => PerlValue::integer(
+            serde_json::Value::String(s) => StrykeValue::integer(
                 if matches!(s.to_lowercase().as_str(), "true" | "yes" | "1") {
                     1
                 } else {
                     0
                 },
             ),
-            _ => PerlValue::integer(0),
+            _ => StrykeValue::integer(0),
         },
         "array" | "list" => json_to_perl_helper(v),
         "object" | "hash" | "HashRef" => json_to_perl_helper(v),
         _ => match v {
-            serde_json::Value::String(s) => PerlValue::string(s.clone()),
-            serde_json::Value::Null => PerlValue::UNDEF,
-            other => PerlValue::string(other.to_string()),
+            serde_json::Value::String(s) => StrykeValue::string(s.clone()),
+            serde_json::Value::Null => StrykeValue::UNDEF,
+            other => StrykeValue::string(other.to_string()),
         },
     }
 }
 
-fn json_to_perl_helper(v: &serde_json::Value) -> PerlValue {
+fn json_to_perl_helper(v: &serde_json::Value) -> StrykeValue {
     match v {
-        serde_json::Value::Null => PerlValue::UNDEF,
-        serde_json::Value::Bool(b) => PerlValue::integer(if *b { 1 } else { 0 }),
+        serde_json::Value::Null => StrykeValue::UNDEF,
+        serde_json::Value::Bool(b) => StrykeValue::integer(if *b { 1 } else { 0 }),
         serde_json::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
-                PerlValue::integer(i)
+                StrykeValue::integer(i)
             } else if let Some(f) = n.as_f64() {
-                PerlValue::float(f)
+                StrykeValue::float(f)
             } else {
-                PerlValue::UNDEF
+                StrykeValue::UNDEF
             }
         }
-        serde_json::Value::String(s) => PerlValue::string(s.clone()),
+        serde_json::Value::String(s) => StrykeValue::string(s.clone()),
         serde_json::Value::Array(arr) => {
-            let items: Vec<PerlValue> = arr.iter().map(json_to_perl_helper).collect();
-            PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(items)))
+            let items: Vec<StrykeValue> = arr.iter().map(json_to_perl_helper).collect();
+            StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(items)))
         }
         serde_json::Value::Object(obj) => {
             let mut m = IndexMap::new();
             for (k, v) in obj {
                 m.insert(k.clone(), json_to_perl_helper(v));
             }
-            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
+            StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
         }
     }
 }
 
 // ── Convenience wrappers ──────────────────────────────────────────────
 
-pub(crate) fn ai_summarize(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_summarize(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let text = args
         .first()
         .map(|v| v.to_string())
@@ -4496,12 +4496,12 @@ pub(crate) fn ai_summarize(args: &[PerlValue], line: usize) -> Result<PerlValue>
          Text:\n{}",
         words, text
     );
-    let mut call_args = vec![PerlValue::string(prompt)];
+    let mut call_args = vec![StrykeValue::string(prompt)];
     forward_opts(&mut call_args, &opts);
     ai_prompt(&call_args, line)
 }
 
-pub(crate) fn ai_translate(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_translate(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let text = args
         .first()
         .map(|v| v.to_string())
@@ -4513,7 +4513,7 @@ pub(crate) fn ai_translate(args: &[PerlValue], line: usize) -> Result<PerlValue>
          Text:\n{}",
         target, text
     );
-    let mut call_args = vec![PerlValue::string(prompt)];
+    let mut call_args = vec![StrykeValue::string(prompt)];
     forward_opts(&mut call_args, &opts);
     ai_prompt(&call_args, line)
 }
@@ -4524,7 +4524,7 @@ pub(crate) fn ai_translate(args: &[PerlValue], line: usize) -> Result<PerlValue>
 /// program with a runtime error if cost during the block exceeds
 /// `$usd_max`. Restores the prior global cap on exit.
 impl VMHelper {
-    pub(crate) fn ai_budget(&mut self, args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    pub(crate) fn ai_budget(&mut self, args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
         let cap = args
             .first()
             .map(|v| v.to_number())
@@ -4553,7 +4553,7 @@ impl VMHelper {
                 }
                 Ok(v)
             }
-            Err(crate::vm_helper::FlowOrError::Flow(_)) => Ok(PerlValue::UNDEF),
+            Err(crate::vm_helper::FlowOrError::Flow(_)) => Ok(StrykeValue::UNDEF),
             Err(crate::vm_helper::FlowOrError::Error(e)) => Err(e),
         }
     }
@@ -4561,9 +4561,9 @@ impl VMHelper {
 
 pub(crate) fn ai_budget_dispatch(
     interp: &mut VMHelper,
-    args: &[PerlValue],
+    args: &[StrykeValue],
     line: usize,
-) -> Result<PerlValue> {
+) -> Result<StrykeValue> {
     interp.ai_budget(args, line)
 }
 
@@ -4572,7 +4572,7 @@ pub(crate) fn ai_budget_dispatch(
 /// `ai($prompt, pdf => $path|$url|$bytes)` — same shape as image
 /// vision, but builds an Anthropic `document` content block. Anthropic
 /// supports up to 32MB / 100 pages per PDF.
-pub(crate) fn ai_pdf(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_pdf(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let prompt = args
         .first()
         .map(|v| v.to_string())
@@ -4598,7 +4598,7 @@ pub(crate) fn ai_pdf(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     let timeout = opt_int(&opts, "timeout", 120);
 
     if let Some(resp) = match_mock(&prompt) {
-        return Ok(PerlValue::string(resp));
+        return Ok(StrykeValue::string(resp));
     }
     if mock_only_mode() {
         return Err(PerlError::runtime(
@@ -4681,7 +4681,7 @@ pub(crate) fn ai_pdf(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         }
     }
     *last_citations().lock() = citations;
-    Ok(PerlValue::string(out))
+    Ok(StrykeValue::string(out))
 }
 
 // ── Multi-document grounded responses ────────────────────────────────
@@ -4692,7 +4692,7 @@ pub(crate) fn ai_pdf(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 // is a path (PDF or text) or an inline string. The model's response
 // carries citations referencing each document by index. Use
 // `ai_citations()` to retrieve them after the call.
-pub(crate) fn ai_grounded(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_grounded(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let prompt = args
         .first()
         .map(|v| v.to_string())
@@ -4726,7 +4726,7 @@ pub(crate) fn ai_grounded(args: &[PerlValue], line: usize) -> Result<PerlValue> 
     }
 
     if let Some(resp) = match_mock(&prompt) {
-        return Ok(PerlValue::string(resp));
+        return Ok(StrykeValue::string(resp));
     }
     if mock_only_mode() {
         return Err(PerlError::runtime(
@@ -4796,7 +4796,7 @@ pub(crate) fn ai_grounded(args: &[PerlValue], line: usize) -> Result<PerlValue> 
         }
     }
     *last_citations().lock() = citations;
-    Ok(PerlValue::string(out))
+    Ok(StrykeValue::string(out))
 }
 
 /// Build one Anthropic content block from a document spec. Auto-detects:
@@ -4862,7 +4862,7 @@ fn build_document_block(spec: &str, title: Option<&str>, line: usize) -> Result<
 // order. Falls back to sequential calls when the batch endpoint is
 // unavailable or `STRYKE_AI_BATCH=sync` is set.
 
-pub(crate) fn ai_batch(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_batch(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let prompts_v = args
         .first()
         .ok_or_else(|| PerlError::runtime("ai_batch: prompt list required", line))?;
@@ -4872,7 +4872,7 @@ pub(crate) fn ai_batch(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         vec![prompts_v.to_string()]
     };
     if prompts.is_empty() {
-        return Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        return Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
             Vec::new(),
         ))));
     }
@@ -4899,28 +4899,28 @@ pub(crate) fn ai_batch(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 
 fn ai_batch_sequential(
     prompts: &[String],
-    opts: &IndexMap<String, PerlValue>,
+    opts: &IndexMap<String, StrykeValue>,
     line: usize,
-) -> Result<PerlValue> {
-    let mut out: Vec<PerlValue> = Vec::with_capacity(prompts.len());
+) -> Result<StrykeValue> {
+    let mut out: Vec<StrykeValue> = Vec::with_capacity(prompts.len());
     for p in prompts {
-        let mut call_args: Vec<PerlValue> = vec![PerlValue::string(p.clone())];
+        let mut call_args: Vec<StrykeValue> = vec![StrykeValue::string(p.clone())];
         for (k, v) in opts {
-            call_args.push(PerlValue::string(k.clone()));
+            call_args.push(StrykeValue::string(k.clone()));
             call_args.push(v.clone());
         }
         out.push(ai_prompt(&call_args, line)?);
     }
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         out,
     ))))
 }
 
 fn ai_batch_anthropic(
     prompts: &[String],
-    opts: &IndexMap<String, PerlValue>,
+    opts: &IndexMap<String, StrykeValue>,
     line: usize,
-) -> Result<PerlValue> {
+) -> Result<StrykeValue> {
     let model = opt_str(opts, "model", &config().lock().model);
     let system = opt_str(opts, "system", "");
     let max_tokens = opt_int(opts, "max_tokens", 1024);
@@ -5071,13 +5071,13 @@ fn ai_batch_anthropic(
         + total_output as f64 / 1000.0 * out_per_1k * 0.50;
     add_cost(cost);
 
-    let out: Vec<PerlValue> = (0..prompts.len())
+    let out: Vec<StrykeValue> = (0..prompts.len())
         .map(|i| {
             let cid = format!("req-{}", i);
-            PerlValue::string(by_id.get(&cid).cloned().unwrap_or_default())
+            StrykeValue::string(by_id.get(&cid).cloned().unwrap_or_default())
         })
         .collect();
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         out,
     ))))
 }
@@ -5090,11 +5090,11 @@ fn ai_batch_anthropic(
 // summary/answer slice. Without a cluster, falls back to a local
 // rayon parallel map.
 
-pub(crate) fn ai_pmap(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_pmap(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let items_v = args
         .first()
         .ok_or_else(|| PerlError::runtime("ai_pmap: items array required", line))?;
-    let items: Vec<PerlValue> = if let Some(arr) = items_v.as_array_ref() {
+    let items: Vec<StrykeValue> = if let Some(arr) = items_v.as_array_ref() {
         arr.read().clone()
     } else {
         items_v.clone().to_list()
@@ -5111,12 +5111,12 @@ pub(crate) fn ai_pmap(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     // collapses to a single ai_map call.
     let cluster_v = opts.get("cluster").cloned();
     if cluster_v.is_none() {
-        let mut call_args: Vec<PerlValue> = vec![items_v.clone(), PerlValue::string(instruction)];
+        let mut call_args: Vec<StrykeValue> = vec![items_v.clone(), StrykeValue::string(instruction)];
         for (k, v) in &opts {
             if k == "cluster" {
                 continue;
             }
-            call_args.push(PerlValue::string(k.clone()));
+            call_args.push(StrykeValue::string(k.clone()));
             call_args.push(v.clone());
         }
         return ai_map(&call_args, line);
@@ -5151,7 +5151,7 @@ pub(crate) fn ai_pmap(args: &[PerlValue], line: usize) -> Result<PerlValue> {
             .map_err(|e| PerlError::runtime(format!("ai_pmap: cluster: {}", e), line))?;
 
     // Concat shards.
-    let mut out: Vec<PerlValue> = Vec::with_capacity(items.len());
+    let mut out: Vec<StrykeValue> = Vec::with_capacity(items.len());
     for r in results {
         let arr = r
             .as_array_ref()
@@ -5159,12 +5159,12 @@ pub(crate) fn ai_pmap(args: &[PerlValue], line: usize) -> Result<PerlValue> {
             .unwrap_or_else(|| r.to_list());
         out.extend(arr);
     }
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         out,
     ))))
 }
 
-fn shard_items(items: &[PerlValue], n: usize) -> Vec<Vec<PerlValue>> {
+fn shard_items(items: &[StrykeValue], n: usize) -> Vec<Vec<StrykeValue>> {
     if n == 0 {
         return vec![items.to_vec()];
     }
@@ -5179,7 +5179,7 @@ fn shard_items(items: &[PerlValue], n: usize) -> Vec<Vec<PerlValue>> {
     out
 }
 
-fn perl_value_to_json(v: &PerlValue) -> serde_json::Value {
+fn perl_value_to_json(v: &StrykeValue) -> serde_json::Value {
     if v.is_undef() {
         return serde_json::Value::Null;
     }
@@ -5214,7 +5214,7 @@ fn sessions() -> &'static Mutex<IndexMap<u64, ChatSession>> {
     SESSIONS.get_or_init(|| Mutex::new(IndexMap::new()))
 }
 
-pub(crate) fn ai_session_new(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_session_new(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let opts = parse_opts(args);
     let cfg = config().lock().clone();
     let sess = ChatSession {
@@ -5226,15 +5226,15 @@ pub(crate) fn ai_session_new(args: &[PerlValue], _line: usize) -> Result<PerlVal
     let id = NEXT_SESSION_ID.fetch_add(1, Ordering::Relaxed);
     sessions().lock().insert(id, sess);
     let mut m = IndexMap::new();
-    m.insert("__session_id__".into(), PerlValue::integer(id as i64));
+    m.insert("__session_id__".into(), StrykeValue::integer(id as i64));
     m.insert(
         "model".into(),
-        PerlValue::string(opt_str(&opts, "model", &cfg.model)),
+        StrykeValue::string(opt_str(&opts, "model", &cfg.model)),
     );
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m))))
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m))))
 }
 
-pub(crate) fn ai_session_send(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_session_send(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let id = args
         .first()
         .and_then(|v| {
@@ -5266,29 +5266,29 @@ pub(crate) fn ai_session_send(args: &[PerlValue], line: usize) -> Result<PerlVal
         )
     };
 
-    // Build the messages array as PerlValues for the existing chat path.
-    let msg_list: Vec<PerlValue> = prior
+    // Build the messages array as StrykeValues for the existing chat path.
+    let msg_list: Vec<StrykeValue> = prior
         .iter()
         .map(|(role, content)| {
             let mut m = IndexMap::new();
-            m.insert("role".into(), PerlValue::string(role.clone()));
-            m.insert("content".into(), PerlValue::string(content.clone()));
-            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
+            m.insert("role".into(), StrykeValue::string(role.clone()));
+            m.insert("content".into(), StrykeValue::string(content.clone()));
+            StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
         })
         .collect();
-    let mut chat_args: Vec<PerlValue> = vec![PerlValue::array_ref(Arc::new(
+    let mut chat_args: Vec<StrykeValue> = vec![StrykeValue::array_ref(Arc::new(
         parking_lot::RwLock::new(msg_list),
     ))];
     if !system.is_empty() {
-        chat_args.push(PerlValue::string("system".into()));
-        chat_args.push(PerlValue::string(system));
+        chat_args.push(StrykeValue::string("system".into()));
+        chat_args.push(StrykeValue::string(system));
     }
-    chat_args.push(PerlValue::string("model".into()));
-    chat_args.push(PerlValue::string(model));
-    chat_args.push(PerlValue::string("provider".into()));
-    chat_args.push(PerlValue::string(provider));
+    chat_args.push(StrykeValue::string("model".into()));
+    chat_args.push(StrykeValue::string(model));
+    chat_args.push(StrykeValue::string("provider".into()));
+    chat_args.push(StrykeValue::string(provider));
     for (k, v) in &opts {
-        chat_args.push(PerlValue::string(k.clone()));
+        chat_args.push(StrykeValue::string(k.clone()));
         chat_args.push(v.clone());
     }
     let resp = ai_chat(&chat_args, line)?;
@@ -5301,10 +5301,10 @@ pub(crate) fn ai_session_send(args: &[PerlValue], line: usize) -> Result<PerlVal
             sess.messages.push(("assistant".into(), resp_str.clone()));
         }
     }
-    Ok(PerlValue::string(resp_str))
+    Ok(StrykeValue::string(resp_str))
 }
 
-pub(crate) fn ai_session_history(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_session_history(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let id = args
         .first()
         .and_then(|v| {
@@ -5320,22 +5320,22 @@ pub(crate) fn ai_session_history(args: &[PerlValue], line: usize) -> Result<Perl
             line,
         )
     })?;
-    let items: Vec<PerlValue> = sess
+    let items: Vec<StrykeValue> = sess
         .messages
         .iter()
         .map(|(role, content)| {
             let mut m = IndexMap::new();
-            m.insert("role".into(), PerlValue::string(role.clone()));
-            m.insert("content".into(), PerlValue::string(content.clone()));
-            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
+            m.insert("role".into(), StrykeValue::string(role.clone()));
+            m.insert("content".into(), StrykeValue::string(content.clone()));
+            StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
         })
         .collect();
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         items,
     ))))
 }
 
-pub(crate) fn ai_session_close(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_session_close(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let id = args
         .first()
         .and_then(|v| {
@@ -5345,10 +5345,10 @@ pub(crate) fn ai_session_close(args: &[PerlValue], line: usize) -> Result<PerlVa
         .and_then(|m| m.get("__session_id__").map(|v| v.to_int() as u64))
         .ok_or_else(|| PerlError::runtime("ai_session_close: session handle required", line))?;
     sessions().lock().shift_remove(&id);
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn ai_session_reset(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_session_reset(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let id = args
         .first()
         .and_then(|v| {
@@ -5361,13 +5361,13 @@ pub(crate) fn ai_session_reset(args: &[PerlValue], line: usize) -> Result<PerlVa
     if let Some(sess) = g.get_mut(&id) {
         sess.messages.clear();
     }
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 /// `ai_session_export($handle)` → JSON string capturing the session's
 /// system prompt, model, provider, and full message log. Pair with
 /// `ai_session_import($json)` to restore on a later run.
-pub(crate) fn ai_session_export(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_session_export(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let id = args
         .first()
         .and_then(|v| {
@@ -5387,14 +5387,14 @@ pub(crate) fn ai_session_export(args: &[PerlValue], line: usize) -> Result<PerlV
         "provider": sess.provider,
         "messages": sess.messages.iter().map(|(r, c)| serde_json::json!({"role": r, "content": c})).collect::<Vec<_>>(),
     });
-    Ok(PerlValue::string(json.to_string()))
+    Ok(StrykeValue::string(json.to_string()))
 }
 
 /// `ai_session_import($json)` → handle hashref. Inverse of
 /// `ai_session_export`. Allocates a fresh session id, populates it from the
 /// JSON body, returns a handle compatible with the rest of the
 /// `ai_session_*` surface.
-pub(crate) fn ai_session_import(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_session_import(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let s = args
         .first()
         .map(|v| v.to_string())
@@ -5422,21 +5422,21 @@ pub(crate) fn ai_session_import(args: &[PerlValue], line: usize) -> Result<PerlV
     let id = NEXT_SESSION_ID.fetch_add(1, Ordering::Relaxed);
     sessions().lock().insert(id, sess);
     let mut m = IndexMap::new();
-    m.insert("__session_id__".into(), PerlValue::integer(id as i64));
+    m.insert("__session_id__".into(), StrykeValue::integer(id as i64));
     m.insert(
         "model".into(),
-        PerlValue::string(json["model"].as_str().unwrap_or("").to_string()),
+        StrykeValue::string(json["model"].as_str().unwrap_or("").to_string()),
     );
     m.insert(
         "imported".into(),
-        PerlValue::integer(
+        StrykeValue::integer(
             json["messages"]
                 .as_array()
                 .map(|a| a.len() as i64)
                 .unwrap_or(0),
         ),
     );
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m))))
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m))))
 }
 
 // ── Prompt templates ──────────────────────────────────────────────────
@@ -5444,7 +5444,7 @@ pub(crate) fn ai_session_import(args: &[PerlValue], line: usize) -> Result<PerlV
 /// `ai_template("hello {name}, you are {age}", name => "world", age => 42)`
 /// → substitutes `{key}` placeholders. No code execution; pure string
 /// templating.
-pub(crate) fn ai_template(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_template(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let tmpl = args
         .first()
         .map(|v| v.to_string())
@@ -5479,7 +5479,7 @@ pub(crate) fn ai_template(args: &[PerlValue], line: usize) -> Result<PerlValue> 
         out.push(bytes[i] as char);
         i += 1;
     }
-    Ok(PerlValue::string(out))
+    Ok(StrykeValue::string(out))
 }
 
 // ── Retry / backoff (used by the call_anthropic / call_openai paths) ─
@@ -5551,21 +5551,21 @@ fn call_anthropic_with_retry(
 // They are NOT registered globally — pass them in explicitly so apps
 // stay in control of which tools any given agent has.
 
-pub(crate) fn web_search_tool(_args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_search_tool(_args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let mut m = IndexMap::new();
-    m.insert("name".into(), PerlValue::string("web_search".into()));
+    m.insert("name".into(), StrykeValue::string("web_search".into()));
     m.insert(
         "description".into(),
-        PerlValue::string(
+        StrykeValue::string(
             "Search the public web. Returns top results with title + url + snippet.".into(),
         ),
     );
     let mut params = IndexMap::new();
-    params.insert("q".into(), PerlValue::string("string".into()));
-    params.insert("limit".into(), PerlValue::string("int".into()));
+    params.insert("q".into(), StrykeValue::string("string".into()));
+    params.insert("limit".into(), StrykeValue::string("int".into()));
     m.insert(
         "parameters".into(),
-        PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(params))),
+        StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(params))),
     );
     m.insert(
         "__native_tool_id__".into(),
@@ -5584,21 +5584,21 @@ pub(crate) fn web_search_tool(_args: &[PerlValue], line: usize) -> Result<PerlVa
             run_web_search(&q, limit)
         }),
     );
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m))))
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m))))
 }
 
-pub(crate) fn fetch_url_tool(_args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn fetch_url_tool(_args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let mut m = IndexMap::new();
-    m.insert("name".into(), PerlValue::string("fetch_url".into()));
+    m.insert("name".into(), StrykeValue::string("fetch_url".into()));
     m.insert(
         "description".into(),
-        PerlValue::string("Fetch a URL via HTTP GET. Returns response body as text.".into()),
+        StrykeValue::string("Fetch a URL via HTTP GET. Returns response body as text.".into()),
     );
     let mut params = IndexMap::new();
-    params.insert("url".into(), PerlValue::string("string".into()));
+    params.insert("url".into(), StrykeValue::string("string".into()));
     m.insert(
         "parameters".into(),
-        PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(params))),
+        StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(params))),
     );
     m.insert(
         "__native_tool_id__".into(),
@@ -5611,21 +5611,21 @@ pub(crate) fn fetch_url_tool(_args: &[PerlValue], line: usize) -> Result<PerlVal
             run_fetch_url(&url)
         }),
     );
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m))))
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m))))
 }
 
-pub(crate) fn read_file_tool(_args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn read_file_tool(_args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let mut m = IndexMap::new();
-    m.insert("name".into(), PerlValue::string("read_file".into()));
+    m.insert("name".into(), StrykeValue::string("read_file".into()));
     m.insert(
         "description".into(),
-        PerlValue::string("Read a file from disk. Returns text contents.".into()),
+        StrykeValue::string("Read a file from disk. Returns text contents.".into()),
     );
     let mut params = IndexMap::new();
-    params.insert("path".into(), PerlValue::string("string".into()));
+    params.insert("path".into(), StrykeValue::string("string".into()));
     m.insert(
         "parameters".into(),
-        PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(params))),
+        StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(params))),
     );
     m.insert(
         "__native_tool_id__".into(),
@@ -5636,28 +5636,28 @@ pub(crate) fn read_file_tool(_args: &[PerlValue], line: usize) -> Result<PerlVal
                 .and_then(|m| m.get("path").map(|v| v.to_string()))
                 .unwrap_or_default();
             match std::fs::read_to_string(&path) {
-                Ok(s) => Ok(PerlValue::string(s)),
-                Err(e) => Ok(PerlValue::string(format!("read_file error: {}", e))),
+                Ok(s) => Ok(StrykeValue::string(s)),
+                Err(e) => Ok(StrykeValue::string(format!("read_file error: {}", e))),
             }
         }),
     );
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m))))
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m))))
 }
 
-pub(crate) fn run_code_tool(_args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn run_code_tool(_args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let mut m = IndexMap::new();
-    m.insert("name".into(), PerlValue::string("run_code".into()));
+    m.insert("name".into(), StrykeValue::string("run_code".into()));
     m.insert(
         "description".into(),
-        PerlValue::string(
+        StrykeValue::string(
             "Run a snippet of Python in a subprocess. 10s timeout. Returns stdout + stderr.".into(),
         ),
     );
     let mut params = IndexMap::new();
-    params.insert("code".into(), PerlValue::string("string".into()));
+    params.insert("code".into(), StrykeValue::string("string".into()));
     m.insert(
         "parameters".into(),
-        PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(params))),
+        StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(params))),
     );
     m.insert(
         "__native_tool_id__".into(),
@@ -5670,32 +5670,32 @@ pub(crate) fn run_code_tool(_args: &[PerlValue], line: usize) -> Result<PerlValu
             run_python(&code)
         }),
     );
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m))))
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m))))
 }
 
 /// Built-in tool specs carry a `__native_tool_id__` field instead of a
 /// `run` coderef. The agent loop's `compile_tool` recognises that
 /// marker and routes invocations through `NATIVE_TOOL_REGISTRY`
 /// directly, skipping the coderef path.
-fn wrap_native_tool<F>(_line: usize, f: F) -> PerlValue
+fn wrap_native_tool<F>(_line: usize, f: F) -> StrykeValue
 where
-    F: Fn(PerlValue) -> Result<PerlValue> + Send + Sync + 'static,
+    F: Fn(StrykeValue) -> Result<StrykeValue> + Send + Sync + 'static,
 {
     let mut g = native_tool_registry().lock();
     let id = g.len() as i64;
     g.insert(id, Arc::new(f));
     drop(g);
-    PerlValue::integer(id)
+    StrykeValue::integer(id)
 }
 
-type NativeToolFn = Arc<dyn Fn(PerlValue) -> Result<PerlValue> + Send + Sync + 'static>;
+type NativeToolFn = Arc<dyn Fn(StrykeValue) -> Result<StrykeValue> + Send + Sync + 'static>;
 static NATIVE_TOOL_REGISTRY: OnceLock<Mutex<IndexMap<i64, NativeToolFn>>> = OnceLock::new();
 
 pub(crate) fn native_tool_registry() -> &'static Mutex<IndexMap<i64, NativeToolFn>> {
     NATIVE_TOOL_REGISTRY.get_or_init(|| Mutex::new(IndexMap::new()))
 }
 
-pub(crate) fn invoke_native_tool(id: i64, arg: PerlValue, line: usize) -> Result<PerlValue> {
+pub(crate) fn invoke_native_tool(id: i64, arg: StrykeValue, line: usize) -> Result<StrykeValue> {
     let f = native_tool_registry().lock().get(&id).cloned();
     let Some(f) = f else {
         return Err(PerlError::runtime(
@@ -5706,7 +5706,7 @@ pub(crate) fn invoke_native_tool(id: i64, arg: PerlValue, line: usize) -> Result
     f(arg)
 }
 
-fn run_web_search(q: &str, limit: i64) -> Result<PerlValue> {
+fn run_web_search(q: &str, limit: i64) -> Result<StrykeValue> {
     // Honor BRAVE_SEARCH_API_KEY if set; otherwise fall back to a
     // DuckDuckGo HTML scrape (best-effort, public-data only).
     if let Ok(key) = std::env::var("BRAVE_SEARCH_API_KEY") {
@@ -5715,7 +5715,7 @@ fn run_web_search(q: &str, limit: i64) -> Result<PerlValue> {
     run_ddg_search(q, limit)
 }
 
-fn run_brave_search(q: &str, limit: i64, key: &str) -> Result<PerlValue> {
+fn run_brave_search(q: &str, limit: i64, key: &str) -> Result<StrykeValue> {
     let url = format!(
         "https://api.search.brave.com/res/v1/web/search?q={}&count={}",
         urlencoding(q),
@@ -5733,31 +5733,31 @@ fn run_brave_search(q: &str, limit: i64, key: &str) -> Result<PerlValue> {
     let json: serde_json::Value = resp
         .into_json()
         .map_err(|e| PerlError::runtime(format!("web_search: decode: {}", e), 0))?;
-    let mut out: Vec<PerlValue> = Vec::new();
+    let mut out: Vec<StrykeValue> = Vec::new();
     if let Some(results) = json["web"]["results"].as_array() {
         for r in results.iter().take(limit as usize) {
             let mut m = IndexMap::new();
             m.insert(
                 "title".into(),
-                PerlValue::string(r["title"].as_str().unwrap_or("").to_string()),
+                StrykeValue::string(r["title"].as_str().unwrap_or("").to_string()),
             );
             m.insert(
                 "url".into(),
-                PerlValue::string(r["url"].as_str().unwrap_or("").to_string()),
+                StrykeValue::string(r["url"].as_str().unwrap_or("").to_string()),
             );
             m.insert(
                 "snippet".into(),
-                PerlValue::string(r["description"].as_str().unwrap_or("").to_string()),
+                StrykeValue::string(r["description"].as_str().unwrap_or("").to_string()),
             );
-            out.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m))));
+            out.push(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m))));
         }
     }
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         out,
     ))))
 }
 
-fn run_ddg_search(q: &str, limit: i64) -> Result<PerlValue> {
+fn run_ddg_search(q: &str, limit: i64) -> Result<StrykeValue> {
     let url = format!("https://duckduckgo.com/html/?q={}", urlencoding(q));
     let agent = ureq::AgentBuilder::new()
         .timeout(Duration::from_secs(15))
@@ -5797,18 +5797,18 @@ fn run_ddg_search(q: &str, limit: i64) -> Result<PerlValue> {
                 .unwrap_or_default()
         })
         .collect();
-    let mut out: Vec<PerlValue> = Vec::new();
+    let mut out: Vec<StrykeValue> = Vec::new();
     for (i, (url, title)) in titles.iter().take(limit as usize).enumerate() {
         let mut m = IndexMap::new();
-        m.insert("title".into(), PerlValue::string(title.clone()));
-        m.insert("url".into(), PerlValue::string(url.clone()));
+        m.insert("title".into(), StrykeValue::string(title.clone()));
+        m.insert("url".into(), StrykeValue::string(url.clone()));
         m.insert(
             "snippet".into(),
-            PerlValue::string(snips.get(i).cloned().unwrap_or_default()),
+            StrykeValue::string(snips.get(i).cloned().unwrap_or_default()),
         );
-        out.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m))));
+        out.push(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m))));
     }
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         out,
     ))))
 }
@@ -5827,20 +5827,20 @@ fn urlencoding(s: &str) -> String {
     out
 }
 
-fn run_fetch_url(url: &str) -> Result<PerlValue> {
+fn run_fetch_url(url: &str) -> Result<StrykeValue> {
     let agent = ureq::AgentBuilder::new()
         .timeout(Duration::from_secs(30))
         .build();
     match agent.get(url).call() {
         Ok(r) => match r.into_string() {
-            Ok(s) => Ok(PerlValue::string(s)),
-            Err(e) => Ok(PerlValue::string(format!("fetch_url error: {}", e))),
+            Ok(s) => Ok(StrykeValue::string(s)),
+            Err(e) => Ok(StrykeValue::string(format!("fetch_url error: {}", e))),
         },
-        Err(e) => Ok(PerlValue::string(format!("fetch_url error: {}", e))),
+        Err(e) => Ok(StrykeValue::string(format!("fetch_url error: {}", e))),
     }
 }
 
-fn run_python(code: &str) -> Result<PerlValue> {
+fn run_python(code: &str) -> Result<StrykeValue> {
     use std::io::Write;
     use std::process::{Command, Stdio};
     let mut child = Command::new("python3")
@@ -5860,7 +5860,7 @@ fn run_python(code: &str) -> Result<PerlValue> {
         }
         if start.elapsed() > timeout {
             let _ = child.kill();
-            return Ok(PerlValue::string("run_code: timed out after 10s".into()));
+            return Ok(StrykeValue::string("run_code: timed out after 10s".into()));
         }
         std::thread::sleep(std::time::Duration::from_millis(20));
     }
@@ -5875,10 +5875,10 @@ fn run_python(code: &str) -> Result<PerlValue> {
         }
         combined.push_str(&String::from_utf8_lossy(&output.stderr));
     }
-    Ok(PerlValue::string(combined))
+    Ok(StrykeValue::string(combined))
 }
 
-fn resolve_pdf_input(v: &PerlValue, line: usize) -> Result<(String, String)> {
+fn resolve_pdf_input(v: &StrykeValue, line: usize) -> Result<(String, String)> {
     use base64::Engine;
     let s = v.to_string();
     let bytes = if s.starts_with("http://") || s.starts_with("https://") {
@@ -5916,40 +5916,40 @@ fn resolve_pdf_input(v: &PerlValue, line: usize) -> Result<(String, String)> {
 // entries pointing back into the source. We capture these into
 // `LAST_CITATIONS_BUF` during call_anthropic and surface them via this
 // builtin (analogous to `ai_last_thinking`).
-pub(crate) fn ai_citations(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_citations(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let cites = last_citations().lock().clone();
-    let arr: Vec<PerlValue> = cites
+    let arr: Vec<StrykeValue> = cites
         .iter()
         .map(|c| {
             let mut h = IndexMap::new();
             if let Some(t) = c["type"].as_str() {
-                h.insert("type".to_string(), PerlValue::string(t.to_string()));
+                h.insert("type".to_string(), StrykeValue::string(t.to_string()));
             }
             if let Some(t) = c["cited_text"].as_str() {
-                h.insert("text".to_string(), PerlValue::string(t.to_string()));
+                h.insert("text".to_string(), StrykeValue::string(t.to_string()));
             }
             if let Some(t) = c["document_title"].as_str() {
-                h.insert("title".to_string(), PerlValue::string(t.to_string()));
+                h.insert("title".to_string(), StrykeValue::string(t.to_string()));
             }
             if let Some(t) = c["document_index"].as_i64() {
-                h.insert("document_index".to_string(), PerlValue::integer(t));
+                h.insert("document_index".to_string(), StrykeValue::integer(t));
             }
             if let Some(t) = c["start_char_index"].as_i64() {
-                h.insert("start".to_string(), PerlValue::integer(t));
+                h.insert("start".to_string(), StrykeValue::integer(t));
             }
             if let Some(t) = c["end_char_index"].as_i64() {
-                h.insert("end".to_string(), PerlValue::integer(t));
+                h.insert("end".to_string(), StrykeValue::integer(t));
             }
             if let Some(t) = c["start_page_number"].as_i64() {
-                h.insert("start_page".to_string(), PerlValue::integer(t));
+                h.insert("start_page".to_string(), StrykeValue::integer(t));
             }
             if let Some(t) = c["end_page_number"].as_i64() {
-                h.insert("end_page".to_string(), PerlValue::integer(t));
+                h.insert("end_page".to_string(), StrykeValue::integer(t));
             }
-            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h)))
+            StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h)))
         })
         .collect();
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         arr,
     ))))
 }
@@ -5962,7 +5962,7 @@ pub(crate) fn ai_citations(_args: &[PerlValue], _line: usize) -> Result<PerlValu
 
 /// `ai_file_upload("path/to/file", purpose => "user_data")` →
 /// hashref with `id`, `bytes`, `created_at`, `filename`, `purpose`.
-pub(crate) fn ai_file_upload(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_file_upload(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let path = args
         .first()
         .map(|v| v.to_string())
@@ -5975,11 +5975,11 @@ pub(crate) fn ai_file_upload(args: &[PerlValue], line: usize) -> Result<PerlValu
         let mut h = IndexMap::new();
         h.insert(
             "id".to_string(),
-            PerlValue::string("file-mock-123".to_string()),
+            StrykeValue::string("file-mock-123".to_string()),
         );
-        h.insert("filename".to_string(), PerlValue::string(path.clone()));
-        h.insert("purpose".to_string(), PerlValue::string(purpose.clone()));
-        return Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+        h.insert("filename".to_string(), StrykeValue::string(path.clone()));
+        h.insert("purpose".to_string(), StrykeValue::string(purpose.clone()));
+        return Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
     }
     let key = std::env::var("OPENAI_API_KEY")
         .map_err(|_| PerlError::runtime("ai_file_upload: $OPENAI_API_KEY not set", line))?;
@@ -6017,13 +6017,13 @@ pub(crate) fn ai_file_upload(args: &[PerlValue], line: usize) -> Result<PerlValu
 }
 
 /// `ai_file_list()` → arrayref of file metadata hashrefs.
-pub(crate) fn ai_file_list(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_file_list(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let opts = parse_opts(args);
     let purpose = opt_str(&opts, "purpose", "");
     let timeout = opt_int(&opts, "timeout", 30);
 
     if mock_only_mode() {
-        return Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        return Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
             Vec::new(),
         ))));
     }
@@ -6045,14 +6045,14 @@ pub(crate) fn ai_file_list(args: &[PerlValue], line: usize) -> Result<PerlValue>
         .into_json()
         .map_err(|e| PerlError::runtime(format!("ai_file_list: decode: {}", e), line))?;
     let data = json["data"].as_array().cloned().unwrap_or_default();
-    let arr: Vec<PerlValue> = data.iter().map(json_to_perl_hash).collect();
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    let arr: Vec<StrykeValue> = data.iter().map(json_to_perl_hash).collect();
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         arr,
     ))))
 }
 
 /// `ai_file_delete($file_id)` → 1 if deleted, 0 otherwise.
-pub(crate) fn ai_file_delete(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_file_delete(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let id = args
         .first()
         .map(|v| v.to_string())
@@ -6061,7 +6061,7 @@ pub(crate) fn ai_file_delete(args: &[PerlValue], line: usize) -> Result<PerlValu
     let timeout = opt_int(&opts, "timeout", 30);
 
     if mock_only_mode() {
-        return Ok(PerlValue::integer(1));
+        return Ok(StrykeValue::integer(1));
     }
     let key = std::env::var("OPENAI_API_KEY")
         .map_err(|_| PerlError::runtime("ai_file_delete: $OPENAI_API_KEY not set", line))?;
@@ -6076,7 +6076,7 @@ pub(crate) fn ai_file_delete(args: &[PerlValue], line: usize) -> Result<PerlValu
     let json: serde_json::Value = resp
         .into_json()
         .map_err(|e| PerlError::runtime(format!("ai_file_delete: decode: {}", e), line))?;
-    Ok(PerlValue::integer(
+    Ok(StrykeValue::integer(
         if json["deleted"].as_bool().unwrap_or(false) {
             1
         } else {
@@ -6086,7 +6086,7 @@ pub(crate) fn ai_file_delete(args: &[PerlValue], line: usize) -> Result<PerlValu
 }
 
 /// `ai_file_get($file_id)` → metadata hashref.
-pub(crate) fn ai_file_get(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_file_get(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let id = args
         .first()
         .map(|v| v.to_string())
@@ -6096,8 +6096,8 @@ pub(crate) fn ai_file_get(args: &[PerlValue], line: usize) -> Result<PerlValue> 
 
     if mock_only_mode() {
         let mut h = IndexMap::new();
-        h.insert("id".to_string(), PerlValue::string(id));
-        return Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+        h.insert("id".to_string(), StrykeValue::string(id));
+        return Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
     }
     let key = std::env::var("OPENAI_API_KEY")
         .map_err(|_| PerlError::runtime("ai_file_get: $OPENAI_API_KEY not set", line))?;
@@ -6125,7 +6125,7 @@ const ANTHROPIC_FILES_BETA: &str = "files-api-2025-04-14";
 
 /// `ai_file_anthropic_upload("path/to/file.pdf")` → metadata hashref with
 /// `id`, `filename`, `mime_type`, `size_bytes`, `created_at`.
-pub(crate) fn ai_file_anthropic_upload(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_file_anthropic_upload(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let path = args
         .first()
         .map(|v| v.to_string())
@@ -6137,10 +6137,10 @@ pub(crate) fn ai_file_anthropic_upload(args: &[PerlValue], line: usize) -> Resul
         let mut h = IndexMap::new();
         h.insert(
             "id".to_string(),
-            PerlValue::string("file-anthropic-mock-1".to_string()),
+            StrykeValue::string("file-anthropic-mock-1".to_string()),
         );
-        h.insert("filename".to_string(), PerlValue::string(path.clone()));
-        return Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+        h.insert("filename".to_string(), StrykeValue::string(path.clone()));
+        return Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
     }
     let key = std::env::var("ANTHROPIC_API_KEY").map_err(|_| {
         PerlError::runtime("ai_file_anthropic_upload: $ANTHROPIC_API_KEY not set", line)
@@ -6182,11 +6182,11 @@ pub(crate) fn ai_file_anthropic_upload(args: &[PerlValue], line: usize) -> Resul
 }
 
 /// `ai_file_anthropic_list()` → arrayref of metadata hashrefs.
-pub(crate) fn ai_file_anthropic_list(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_file_anthropic_list(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let opts = parse_opts(args);
     let timeout = opt_int(&opts, "timeout", 30);
     if mock_only_mode() {
-        return Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        return Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
             Vec::new(),
         ))));
     }
@@ -6207,14 +6207,14 @@ pub(crate) fn ai_file_anthropic_list(args: &[PerlValue], line: usize) -> Result<
         .into_json()
         .map_err(|e| PerlError::runtime(format!("ai_file_anthropic_list: decode: {}", e), line))?;
     let data = json["data"].as_array().cloned().unwrap_or_default();
-    let arr: Vec<PerlValue> = data.iter().map(json_to_perl_hash).collect();
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    let arr: Vec<StrykeValue> = data.iter().map(json_to_perl_hash).collect();
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         arr,
     ))))
 }
 
 /// `ai_file_anthropic_delete($file_id)` → 1 on success, 0 otherwise.
-pub(crate) fn ai_file_anthropic_delete(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_file_anthropic_delete(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let id = args
         .first()
         .map(|v| v.to_string())
@@ -6222,7 +6222,7 @@ pub(crate) fn ai_file_anthropic_delete(args: &[PerlValue], line: usize) -> Resul
     let opts = parse_opts(&args[1..]);
     let timeout = opt_int(&opts, "timeout", 30);
     if mock_only_mode() {
-        return Ok(PerlValue::integer(1));
+        return Ok(StrykeValue::integer(1));
     }
     let key = std::env::var("ANTHROPIC_API_KEY").map_err(|_| {
         PerlError::runtime("ai_file_anthropic_delete: $ANTHROPIC_API_KEY not set", line)
@@ -6237,8 +6237,8 @@ pub(crate) fn ai_file_anthropic_delete(args: &[PerlValue], line: usize) -> Resul
         .set("anthropic-beta", ANTHROPIC_FILES_BETA)
         .call();
     match resp {
-        Ok(_) => Ok(PerlValue::integer(1)),
-        Err(_) => Ok(PerlValue::integer(0)),
+        Ok(_) => Ok(StrykeValue::integer(1)),
+        Err(_) => Ok(StrykeValue::integer(0)),
     }
 }
 
@@ -6248,7 +6248,7 @@ pub(crate) fn ai_file_anthropic_delete(args: &[PerlValue], line: usize) -> Resul
 // safety classifier. Returns `+{ flagged, categories => +{...},
 // scores => +{...} }`. Free endpoint — no token cost. Use it before
 // sending user-generated content to a generative model.
-pub(crate) fn ai_moderate(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_moderate(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let input = args
         .first()
         .map(|v| v.to_string())
@@ -6259,16 +6259,16 @@ pub(crate) fn ai_moderate(args: &[PerlValue], line: usize) -> Result<PerlValue> 
 
     if mock_only_mode() {
         let mut h = IndexMap::new();
-        h.insert("flagged".to_string(), PerlValue::integer(0));
+        h.insert("flagged".to_string(), StrykeValue::integer(0));
         h.insert(
             "categories".to_string(),
-            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(IndexMap::new()))),
+            StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(IndexMap::new()))),
         );
         h.insert(
             "scores".to_string(),
-            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(IndexMap::new()))),
+            StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(IndexMap::new()))),
         );
-        return Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+        return Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
     }
     let key = std::env::var("OPENAI_API_KEY")
         .map_err(|_| PerlError::runtime("ai_moderate: $OPENAI_API_KEY not set", line))?;
@@ -6295,7 +6295,7 @@ pub(crate) fn ai_moderate(args: &[PerlValue], line: usize) -> Result<PerlValue> 
     let mut h = IndexMap::new();
     h.insert(
         "flagged".to_string(),
-        PerlValue::integer(if result["flagged"].as_bool().unwrap_or(false) {
+        StrykeValue::integer(if result["flagged"].as_bool().unwrap_or(false) {
             1
         } else {
             0
@@ -6309,7 +6309,7 @@ pub(crate) fn ai_moderate(args: &[PerlValue], line: usize) -> Result<PerlValue> 
         "scores".to_string(),
         json_to_perl_hash(&result["category_scores"]),
     );
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
 }
 
 // ── Text chunking (for RAG) ──────────────────────────────────────────
@@ -6318,7 +6318,7 @@ pub(crate) fn ai_moderate(args: &[PerlValue], line: usize) -> Result<PerlValue> 
 // → arrayref of strings. Pure local logic — no API call. Tokens are
 // estimated as 4 chars each (matching `tokens_of`). Sentence mode
 // splits on `.!?` followed by whitespace, keeping punctuation.
-pub(crate) fn ai_chunk(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_chunk(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let text = args
         .first()
         .map(|v| v.to_string())
@@ -6333,8 +6333,8 @@ pub(crate) fn ai_chunk(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         "sentences" => chunk_by_sentences(&text, max_tokens * 4),
         _ => chunk_by_chars(&text, max_tokens * 4, overlap * 4),
     };
-    let arr: Vec<PerlValue> = chunks.into_iter().map(PerlValue::string).collect();
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    let arr: Vec<StrykeValue> = chunks.into_iter().map(StrykeValue::string).collect();
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         arr,
     ))))
 }
@@ -6415,7 +6415,7 @@ fn chunk_by_sentences(text: &str, max_chars: usize) -> Vec<String> {
 // request so the user finds out about auth or network issues at script
 // start instead of mid-flow. Returns `+{ ok, latency_ms, model }`.
 // Counts toward cost like any other call (typically <$0.001).
-pub(crate) fn ai_warm(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_warm(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let opts = parse_opts(args);
     let cfg = config().lock().clone();
     let provider = opt_str(&opts, "provider", &cfg.provider);
@@ -6423,35 +6423,35 @@ pub(crate) fn ai_warm(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
     let timeout = opt_int(&opts, "timeout", 15);
 
     let started = std::time::Instant::now();
-    let mut warm_args: Vec<PerlValue> = vec![PerlValue::string("hi".to_string())];
-    warm_args.push(PerlValue::string("max_tokens".to_string()));
-    warm_args.push(PerlValue::integer(1));
-    warm_args.push(PerlValue::string("model".to_string()));
-    warm_args.push(PerlValue::string(model.clone()));
-    warm_args.push(PerlValue::string("provider".to_string()));
-    warm_args.push(PerlValue::string(provider.clone()));
-    warm_args.push(PerlValue::string("timeout".to_string()));
-    warm_args.push(PerlValue::integer(timeout));
-    warm_args.push(PerlValue::string("cache".to_string()));
-    warm_args.push(PerlValue::integer(0));
+    let mut warm_args: Vec<StrykeValue> = vec![StrykeValue::string("hi".to_string())];
+    warm_args.push(StrykeValue::string("max_tokens".to_string()));
+    warm_args.push(StrykeValue::integer(1));
+    warm_args.push(StrykeValue::string("model".to_string()));
+    warm_args.push(StrykeValue::string(model.clone()));
+    warm_args.push(StrykeValue::string("provider".to_string()));
+    warm_args.push(StrykeValue::string(provider.clone()));
+    warm_args.push(StrykeValue::string("timeout".to_string()));
+    warm_args.push(StrykeValue::integer(timeout));
+    warm_args.push(StrykeValue::string("cache".to_string()));
+    warm_args.push(StrykeValue::integer(0));
 
     let result = ai_prompt(&warm_args, 0);
     let elapsed_ms = started.elapsed().as_millis() as i64;
     let mut h = IndexMap::new();
     match result {
         Ok(_) => {
-            h.insert("ok".to_string(), PerlValue::integer(1));
-            h.insert("error".to_string(), PerlValue::string(String::new()));
+            h.insert("ok".to_string(), StrykeValue::integer(1));
+            h.insert("error".to_string(), StrykeValue::string(String::new()));
         }
         Err(e) => {
-            h.insert("ok".to_string(), PerlValue::integer(0));
-            h.insert("error".to_string(), PerlValue::string(e.to_string()));
+            h.insert("ok".to_string(), StrykeValue::integer(0));
+            h.insert("error".to_string(), StrykeValue::string(e.to_string()));
         }
     }
-    h.insert("latency_ms".to_string(), PerlValue::integer(elapsed_ms));
-    h.insert("model".to_string(), PerlValue::string(model));
-    h.insert("provider".to_string(), PerlValue::string(provider));
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
+    h.insert("latency_ms".to_string(), StrykeValue::integer(elapsed_ms));
+    h.insert("model".to_string(), StrykeValue::string(model));
+    h.insert("provider".to_string(), StrykeValue::string(provider));
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
 }
 
 // ── Semantic comparison ──────────────────────────────────────────────
@@ -6460,7 +6460,7 @@ pub(crate) fn ai_warm(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
 // hashref `+{ winner, reason, scores => +{a, b} }`. The model picks a
 // winner (`"a"`, `"b"`, or `"tie"`) and rates each on the given criteria.
 // Single LLM call returns structured JSON.
-pub(crate) fn ai_compare(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn ai_compare(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let a = args
         .first()
         .map(|v| v.to_string())
@@ -6486,30 +6486,30 @@ pub(crate) fn ai_compare(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 
     if let Some(resp) = match_mock(&prompt) {
         let mut h = IndexMap::new();
-        h.insert("raw".to_string(), PerlValue::string(resp));
-        return Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+        h.insert("raw".to_string(), StrykeValue::string(resp));
+        return Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
     }
     if mock_only_mode() {
         let mut h = IndexMap::new();
-        h.insert("winner".to_string(), PerlValue::string("tie".to_string()));
+        h.insert("winner".to_string(), StrykeValue::string("tie".to_string()));
         h.insert(
             "reason".to_string(),
-            PerlValue::string("mock-only".to_string()),
+            StrykeValue::string("mock-only".to_string()),
         );
         let mut scores = IndexMap::new();
-        scores.insert("a".to_string(), PerlValue::float(scale as f64 / 2.0));
-        scores.insert("b".to_string(), PerlValue::float(scale as f64 / 2.0));
+        scores.insert("a".to_string(), StrykeValue::float(scale as f64 / 2.0));
+        scores.insert("b".to_string(), StrykeValue::float(scale as f64 / 2.0));
         h.insert(
             "scores".to_string(),
-            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(scores))),
+            StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(scores))),
         );
-        return Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+        return Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
     }
 
-    let prompt_args: Vec<PerlValue> = vec![
-        PerlValue::string(prompt),
-        PerlValue::string("max_tokens".to_string()),
-        PerlValue::integer(512),
+    let prompt_args: Vec<StrykeValue> = vec![
+        StrykeValue::string(prompt),
+        StrykeValue::string("max_tokens".to_string()),
+        StrykeValue::integer(512),
     ];
     let resp = ai_prompt(&prompt_args, line)?;
     let resp_str = resp.to_string();
@@ -6521,27 +6521,27 @@ pub(crate) fn ai_compare(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     let mut h = IndexMap::new();
     h.insert(
         "winner".to_string(),
-        PerlValue::string(json["winner"].as_str().unwrap_or("tie").to_string()),
+        StrykeValue::string(json["winner"].as_str().unwrap_or("tie").to_string()),
     );
     h.insert(
         "reason".to_string(),
-        PerlValue::string(json["reason"].as_str().unwrap_or("").to_string()),
+        StrykeValue::string(json["reason"].as_str().unwrap_or("").to_string()),
     );
     let mut scores = IndexMap::new();
     scores.insert(
         "a".to_string(),
-        PerlValue::float(json["score_a"].as_f64().unwrap_or(0.0)),
+        StrykeValue::float(json["score_a"].as_f64().unwrap_or(0.0)),
     );
     scores.insert(
         "b".to_string(),
-        PerlValue::float(json["score_b"].as_f64().unwrap_or(0.0)),
+        StrykeValue::float(json["score_b"].as_f64().unwrap_or(0.0)),
     );
     h.insert(
         "scores".to_string(),
-        PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(scores))),
+        StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(scores))),
     );
-    h.insert("raw".to_string(), PerlValue::string(resp_str));
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
+    h.insert("raw".to_string(), StrykeValue::string(resp_str));
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
 }
 
 /// Strip ```json fenced code blocks from a model response — best-effort
@@ -6564,39 +6564,39 @@ fn strip_json_fences(s: &str) -> &str {
     trimmed
 }
 
-/// Convert a JSON value into a PerlValue hashref for surfacing to user code.
+/// Convert a JSON value into a StrykeValue hashref for surfacing to user code.
 /// Nested objects / arrays become hashrefs / arrayrefs recursively. Scalars
-/// drop into PerlValue::{integer, float, string, true/false}.
-fn json_to_perl_hash(v: &serde_json::Value) -> PerlValue {
+/// drop into StrykeValue::{integer, float, string, true/false}.
+fn json_to_perl_hash(v: &serde_json::Value) -> StrykeValue {
     match v {
         serde_json::Value::Object(map) => {
             let mut h = IndexMap::new();
             for (k, val) in map {
                 h.insert(k.clone(), json_to_perl_value(val));
             }
-            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h)))
+            StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h)))
         }
         _ => json_to_perl_value(v),
     }
 }
 
-fn json_to_perl_value(v: &serde_json::Value) -> PerlValue {
+fn json_to_perl_value(v: &serde_json::Value) -> StrykeValue {
     match v {
-        serde_json::Value::Null => PerlValue::UNDEF,
-        serde_json::Value::Bool(b) => PerlValue::integer(if *b { 1 } else { 0 }),
+        serde_json::Value::Null => StrykeValue::UNDEF,
+        serde_json::Value::Bool(b) => StrykeValue::integer(if *b { 1 } else { 0 }),
         serde_json::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
-                PerlValue::integer(i)
+                StrykeValue::integer(i)
             } else if let Some(f) = n.as_f64() {
-                PerlValue::float(f)
+                StrykeValue::float(f)
             } else {
-                PerlValue::string(n.to_string())
+                StrykeValue::string(n.to_string())
             }
         }
-        serde_json::Value::String(s) => PerlValue::string(s.clone()),
+        serde_json::Value::String(s) => StrykeValue::string(s.clone()),
         serde_json::Value::Array(a) => {
-            let arr: Vec<PerlValue> = a.iter().map(json_to_perl_value).collect();
-            PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(arr)))
+            let arr: Vec<StrykeValue> = a.iter().map(json_to_perl_value).collect();
+            StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(arr)))
         }
         serde_json::Value::Object(_) => json_to_perl_hash(v),
     }

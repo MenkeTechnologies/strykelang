@@ -6,7 +6,7 @@ use crate::bytecode::{
     GP_START,
 };
 use crate::sort_fast::detect_sort_block_fast;
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 use crate::vm_helper::{assign_rhs_wantarray, VMHelper, WantarrayCtx};
 
 /// True when EXPR as the *tail* of a `map { … }` block would produce a different value in
@@ -702,8 +702,8 @@ impl Compiler {
         if let ExprKind::Regex(pattern, flags) = &cond.kind {
             let name_idx = self.chunk.intern_name("_");
             self.emit_get_scalar(name_idx, line, Some(cond));
-            let pat_idx = self.chunk.add_constant(PerlValue::string(pattern.clone()));
-            let flags_idx = self.chunk.add_constant(PerlValue::string(flags.clone()));
+            let pat_idx = self.chunk.add_constant(StrykeValue::string(pattern.clone()));
+            let flags_idx = self.chunk.add_constant(StrykeValue::string(flags.clone()));
             self.emit_op(Op::LoadRegex(pat_idx, flags_idx), line, Some(cond));
             self.emit_op(Op::RegexMatchDyn(false), line, Some(cond));
             Ok(())
@@ -1082,7 +1082,7 @@ impl Compiler {
             (false, false) => "postdecrement (--)",
         };
         let msg = format!("Can't modify {} dereference in {}", agg, op_str);
-        let idx = self.chunk.add_constant(PerlValue::string(msg));
+        let idx = self.chunk.add_constant(StrykeValue::string(msg));
         self.emit_op(Op::RuntimeErrorConst(idx), line, Some(root));
         // The op never returns; this LoadUndef is dead code but keeps any unreachable
         // `Pop` / rvalue consumer emitted by the enclosing dispatch well-formed.
@@ -1962,7 +1962,7 @@ impl Compiler {
     }
 
     /// `oursync $x` — package-global counterpart of `mysync`. Wraps the value in
-    /// `Arc<Mutex<PerlValue>>` (or `AtomicArray` / `AtomicHash`) like `mysync`, but
+    /// `Arc<Mutex<StrykeValue>>` (or `AtomicArray` / `AtomicHash`) like `mysync`, but
     /// keys the binding by the package-qualified stash name (`Pkg::x`) so all
     /// packages and parallel workers share one cell. Mirrors [`Self::emit_declare_our_scalar`]
     /// for name qualification + `register_declare_our_scalar` so later `$x` references
@@ -2734,7 +2734,7 @@ impl Compiler {
             }
             StmtKind::Package { name } => {
                 self.current_package = name.clone();
-                let val_idx = self.chunk.add_constant(PerlValue::string(name.clone()));
+                let val_idx = self.chunk.add_constant(StrykeValue::string(name.clone()));
                 let name_idx = self.chunk.intern_name("__PACKAGE__");
                 self.chunk.emit(Op::LoadConst(val_idx), line);
                 self.emit_set_scalar(name_idx, line, None);
@@ -3220,7 +3220,7 @@ impl Compiler {
             }
             ExprKind::String(s) => {
                 let processed = VMHelper::process_case_escapes(s);
-                let idx = self.chunk.add_constant(PerlValue::string(processed));
+                let idx = self.chunk.add_constant(StrykeValue::string(processed));
                 self.emit_op(Op::LoadConst(idx), line, Some(root));
             }
             ExprKind::Bareword(name) => {
@@ -3236,13 +3236,13 @@ impl Compiler {
             ExprKind::MagicConst(crate::ast::MagicConstKind::File) => {
                 let idx = self
                     .chunk
-                    .add_constant(PerlValue::string(self.source_file.clone()));
+                    .add_constant(StrykeValue::string(self.source_file.clone()));
                 self.emit_op(Op::LoadConst(idx), line, Some(root));
             }
             ExprKind::MagicConst(crate::ast::MagicConstKind::Line) => {
                 let idx = self
                     .chunk
-                    .add_constant(PerlValue::integer(root.line as i64));
+                    .add_constant(StrykeValue::integer(root.line as i64));
                 self.emit_op(Op::LoadConst(idx), line, Some(root));
             }
             ExprKind::MagicConst(crate::ast::MagicConstKind::Sub) => {
@@ -3271,7 +3271,7 @@ impl Compiler {
                 }
             }
             ExprKind::Typeglob(name) => {
-                let idx = self.chunk.add_constant(PerlValue::string(name.clone()));
+                let idx = self.chunk.add_constant(StrykeValue::string(name.clone()));
                 self.emit_op(Op::LoadConst(idx), line, Some(root));
             }
             ExprKind::TypeglobExpr(expr) => {
@@ -3405,7 +3405,7 @@ impl Compiler {
                             ExprKind::QW(words) => {
                                 for w in words {
                                     let cidx =
-                                        self.chunk.add_constant(PerlValue::string(w.clone()));
+                                        self.chunk.add_constant(StrykeValue::string(w.clone()));
                                     self.emit_op(Op::LoadConst(cidx), line, Some(root));
                                     self.emit_op(Op::GetHashElem(hash_idx), line, Some(root));
                                     total_keys += 1;
@@ -3437,9 +3437,9 @@ impl Compiler {
                     match &key_expr.kind {
                         ExprKind::QW(words) => {
                             for w in words {
-                                let kidx = self.chunk.add_constant(PerlValue::string(w.clone()));
+                                let kidx = self.chunk.add_constant(StrykeValue::string(w.clone()));
                                 self.emit_op(Op::LoadConst(kidx), line, Some(root));
-                                let kidx2 = self.chunk.add_constant(PerlValue::string(w.clone()));
+                                let kidx2 = self.chunk.add_constant(StrykeValue::string(w.clone()));
                                 self.emit_op(Op::LoadConst(kidx2), line, Some(root));
                                 self.emit_op(Op::GetHashElem(hash_idx), line, Some(root));
                                 total_pairs += 1;
@@ -4855,7 +4855,7 @@ impl Compiler {
                         self.emit_op(Op::Pop, line, Some(root));
                         let idx = self
                             .chunk
-                            .add_constant(PerlValue::string("assign to empty hash slice".into()));
+                            .add_constant(StrykeValue::string("assign to empty hash slice".into()));
                         self.emit_op(Op::RuntimeErrorConst(idx), line, Some(root));
                         self.emit_op(Op::LoadUndef, line, Some(root));
                         return Ok(());
@@ -4967,7 +4967,7 @@ impl Compiler {
                         self.emit_op(Op::Pop, line, Some(root));
                         let idx = self
                             .chunk
-                            .add_constant(PerlValue::string("assign to empty hash slice".into()));
+                            .add_constant(StrykeValue::string("assign to empty hash slice".into()));
                         self.emit_op(Op::RuntimeErrorConst(idx), line, Some(root));
                         self.emit_op(Op::LoadUndef, line, Some(root));
                         return Ok(());
@@ -5079,7 +5079,7 @@ impl Compiler {
                         if matches!(op, BinOp::DefinedOr | BinOp::LogOr | BinOp::LogAnd) {
                             self.compile_expr(value)?;
                             self.emit_op(Op::Pop, line, Some(root));
-                            let idx = self.chunk.add_constant(PerlValue::string(
+                            let idx = self.chunk.add_constant(StrykeValue::string(
                                 "assign to empty array slice".into(),
                             ));
                             self.emit_op(Op::RuntimeErrorConst(idx), line, Some(root));
@@ -5160,7 +5160,7 @@ impl Compiler {
                         self.emit_op(Op::Pop, line, Some(root));
                         let idx = self
                             .chunk
-                            .add_constant(PerlValue::string("assign to empty array slice".into()));
+                            .add_constant(StrykeValue::string("assign to empty array slice".into()));
                         self.emit_op(Op::RuntimeErrorConst(idx), line, Some(root));
                         self.emit_op(Op::LoadUndef, line, Some(root));
                         return Ok(());
@@ -5287,10 +5287,10 @@ impl Compiler {
                     (&from.kind, &to.kind)
                 {
                     let slot = self.chunk.alloc_flip_flop_slot();
-                    let lp_idx = self.chunk.add_constant(PerlValue::string(lp.clone()));
-                    let lf_idx = self.chunk.add_constant(PerlValue::string(lf.clone()));
-                    let rp_idx = self.chunk.add_constant(PerlValue::string(rp.clone()));
-                    let rf_idx = self.chunk.add_constant(PerlValue::string(rf.clone()));
+                    let lp_idx = self.chunk.add_constant(StrykeValue::string(lp.clone()));
+                    let lf_idx = self.chunk.add_constant(StrykeValue::string(lf.clone()));
+                    let rp_idx = self.chunk.add_constant(StrykeValue::string(rp.clone()));
+                    let rf_idx = self.chunk.add_constant(StrykeValue::string(rf.clone()));
                     self.emit_op(
                         Op::RegexFlipFlop(
                             slot,
@@ -5307,8 +5307,8 @@ impl Compiler {
                     (&from.kind, &to.kind)
                 {
                     let slot = self.chunk.alloc_flip_flop_slot();
-                    let lp_idx = self.chunk.add_constant(PerlValue::string(lp.clone()));
-                    let lf_idx = self.chunk.add_constant(PerlValue::string(lf.clone()));
+                    let lp_idx = self.chunk.add_constant(StrykeValue::string(lp.clone()));
+                    let lf_idx = self.chunk.add_constant(StrykeValue::string(lf.clone()));
                     self.emit_op(
                         Op::RegexEofFlipFlop(slot, u8::from(*exclusive), lp_idx, lf_idx),
                         line,
@@ -5323,15 +5323,15 @@ impl Compiler {
                     ));
                 } else if let ExprKind::Regex(lp, lf) = &from.kind {
                     let slot = self.chunk.alloc_flip_flop_slot();
-                    let lp_idx = self.chunk.add_constant(PerlValue::string(lp.clone()));
-                    let lf_idx = self.chunk.add_constant(PerlValue::string(lf.clone()));
+                    let lp_idx = self.chunk.add_constant(StrykeValue::string(lp.clone()));
+                    let lf_idx = self.chunk.add_constant(StrykeValue::string(lf.clone()));
                     if matches!(to.kind, ExprKind::Integer(_) | ExprKind::Float(_)) {
                         let line_target = match &to.kind {
                             ExprKind::Integer(n) => *n,
                             ExprKind::Float(f) => *f as i64,
                             _ => unreachable!(),
                         };
-                        let line_cidx = self.chunk.add_constant(PerlValue::integer(line_target));
+                        let line_cidx = self.chunk.add_constant(StrykeValue::integer(line_target));
                         self.emit_op(
                             Op::RegexFlipFlopDotLineRhs(
                                 slot,
@@ -6107,7 +6107,7 @@ impl Compiler {
             ExprKind::Unshift { array, values } => {
                 if let ExprKind::ArrayVar(name) = &array.kind {
                     let q = self.qualify_stash_array_name(name);
-                    let name_const = self.chunk.add_constant(PerlValue::string(q));
+                    let name_const = self.chunk.add_constant(StrykeValue::string(q));
                     self.emit_op(Op::LoadConst(name_const), line, Some(root));
                     for v in values {
                         self.compile_expr_ctx(v, WantarrayCtx::List)?;
@@ -6157,7 +6157,7 @@ impl Compiler {
                 self.emit_op(Op::WantarrayPush(ctx.as_byte()), line, Some(root));
                 if let ExprKind::ArrayVar(name) = &array.kind {
                     let q = self.qualify_stash_array_name(name);
-                    let name_const = self.chunk.add_constant(PerlValue::string(q));
+                    let name_const = self.chunk.add_constant(StrykeValue::string(q));
                     self.emit_op(Op::LoadConst(name_const), line, Some(root));
                     if let Some(o) = offset {
                         self.compile_expr(o)?;
@@ -6228,7 +6228,7 @@ impl Compiler {
                 // (e.g. `print scalar grep { } @x` — grep's result is a count, not a list).
                 self.compile_expr_ctx(inner, WantarrayCtx::Scalar)?;
                 // Then apply aggregate scalar semantics (set size, pipeline source len, …) —
-                // same as [`Op::ValueScalarContext`] / [`PerlValue::scalar_context`].
+                // same as [`Op::ValueScalarContext`] / [`StrykeValue::scalar_context`].
                 self.emit_op(Op::ValueScalarContext, line, Some(root));
             }
 
@@ -6512,7 +6512,7 @@ impl Compiler {
                 Some(pos_arg) => {
                     if let ExprKind::ScalarVar(name) = &pos_arg.kind {
                         let stor = self.scalar_storage_name_for_ops(name);
-                        let idx = self.chunk.add_constant(PerlValue::string(stor));
+                        let idx = self.chunk.add_constant(StrykeValue::string(stor));
                         self.emit_op(Op::LoadConst(idx), line, Some(root));
                     } else {
                         self.compile_expr(pos_arg)?;
@@ -6693,7 +6693,7 @@ impl Compiler {
                     let name_idx = self.chunk.intern_name(name);
                     self.emit_op(Op::LoadUndef, line, Some(root));
                     self.emit_declare_scalar(name_idx, line, false);
-                    let h_idx = self.chunk.add_constant(PerlValue::string(name.clone()));
+                    let h_idx = self.chunk.add_constant(StrykeValue::string(name.clone()));
                     self.emit_op(Op::LoadConst(h_idx), line, Some(root));
                     self.compile_expr(mode)?;
                     if let Some(f) = file {
@@ -6734,7 +6734,7 @@ impl Compiler {
                     BuiltinId::ReadLine
                 };
                 if let Some(h) = handle {
-                    let idx = self.chunk.add_constant(PerlValue::string(h.clone()));
+                    let idx = self.chunk.add_constant(StrykeValue::string(h.clone()));
                     self.emit_op(Op::LoadConst(idx), line, Some(root));
                     self.emit_op(Op::CallBuiltin(bid as u16, 1), line, Some(root));
                 } else {
@@ -7344,13 +7344,13 @@ impl Compiler {
                     }
                 });
                 if parts.is_empty() {
-                    let idx = self.chunk.add_constant(PerlValue::string(String::new()));
+                    let idx = self.chunk.add_constant(StrykeValue::string(String::new()));
                     self.emit_op(Op::LoadConst(idx), line, Some(root));
                 } else {
                     // `"$x"` is a single [`StringPart`] — still string context; must go through
                     // [`Op::Concat`] so operands are stringified (`use overload '""'`, etc.).
                     if !matches!(&parts[0], StringPart::Literal(_)) {
-                        let idx = self.chunk.add_constant(PerlValue::string(String::new()));
+                        let idx = self.chunk.add_constant(StrykeValue::string(String::new()));
                         self.emit_op(Op::LoadConst(idx), line, Some(root));
                     }
                     self.compile_string_part(&parts[0], line, Some(root))?;
@@ -7389,7 +7389,7 @@ impl Compiler {
             // ── QW ──
             ExprKind::QW(words) => {
                 for w in words {
-                    let idx = self.chunk.add_constant(PerlValue::string(w.clone()));
+                    let idx = self.chunk.add_constant(StrykeValue::string(w.clone()));
                     self.emit_op(Op::LoadConst(idx), line, Some(root));
                 }
                 self.emit_op(Op::MakeArray(words.len() as u16), line, Some(root));
@@ -7510,12 +7510,12 @@ impl Compiler {
                 delim: _,
             } => {
                 self.compile_expr(expr)?;
-                let pat_idx = self.chunk.add_constant(PerlValue::string(pattern.clone()));
-                let flags_idx = self.chunk.add_constant(PerlValue::string(flags.clone()));
+                let pat_idx = self.chunk.add_constant(StrykeValue::string(pattern.clone()));
+                let flags_idx = self.chunk.add_constant(StrykeValue::string(flags.clone()));
                 let pos_key_idx = if *scalar_g && flags.contains('g') {
                     if let ExprKind::ScalarVar(n) = &expr.kind {
                         let stor = self.scalar_storage_name_for_ops(n);
-                        self.chunk.add_constant(PerlValue::string(stor))
+                        self.chunk.add_constant(StrykeValue::string(stor))
                     } else {
                         u16::MAX
                     }
@@ -7537,11 +7537,11 @@ impl Compiler {
                 delim: _,
             } => {
                 self.compile_expr(expr)?;
-                let pat_idx = self.chunk.add_constant(PerlValue::string(pattern.clone()));
+                let pat_idx = self.chunk.add_constant(StrykeValue::string(pattern.clone()));
                 let repl_idx = self
                     .chunk
-                    .add_constant(PerlValue::string(replacement.clone()));
-                let flags_idx = self.chunk.add_constant(PerlValue::string(flags.clone()));
+                    .add_constant(StrykeValue::string(replacement.clone()));
+                let flags_idx = self.chunk.add_constant(StrykeValue::string(flags.clone()));
                 let lv_idx = self.chunk.add_lvalue_expr(expr.as_ref().clone());
                 self.emit_op(
                     Op::RegexSubst(pat_idx, repl_idx, flags_idx, lv_idx),
@@ -7557,9 +7557,9 @@ impl Compiler {
                 delim: _,
             } => {
                 self.compile_expr(expr)?;
-                let from_idx = self.chunk.add_constant(PerlValue::string(from.clone()));
-                let to_idx = self.chunk.add_constant(PerlValue::string(to.clone()));
-                let flags_idx = self.chunk.add_constant(PerlValue::string(flags.clone()));
+                let from_idx = self.chunk.add_constant(StrykeValue::string(from.clone()));
+                let to_idx = self.chunk.add_constant(StrykeValue::string(to.clone()));
+                let flags_idx = self.chunk.add_constant(StrykeValue::string(flags.clone()));
                 let lv_idx = self.chunk.add_lvalue_expr(expr.as_ref().clone());
                 self.emit_op(
                     Op::RegexTransliterate(from_idx, to_idx, flags_idx, lv_idx),
@@ -7574,8 +7574,8 @@ impl Compiler {
                     // Statement context: bare `/pat/;` is `$_ =~ /pat/` (Perl), not a discarded regex object.
                     self.compile_boolean_rvalue_condition(root)?;
                 } else {
-                    let pat_idx = self.chunk.add_constant(PerlValue::string(pattern.clone()));
-                    let flags_idx = self.chunk.add_constant(PerlValue::string(flags.clone()));
+                    let pat_idx = self.chunk.add_constant(StrykeValue::string(pattern.clone()));
+                    let flags_idx = self.chunk.add_constant(StrykeValue::string(flags.clone()));
                     self.emit_op(Op::LoadRegex(pat_idx, flags_idx), line, Some(root));
                 }
             }
@@ -8110,7 +8110,7 @@ impl Compiler {
     ) -> Result<(), CompileError> {
         match part {
             StringPart::Literal(s) => {
-                let idx = self.chunk.add_constant(PerlValue::string(s.clone()));
+                let idx = self.chunk.add_constant(StrykeValue::string(s.clone()));
                 self.emit_op(Op::LoadConst(idx), line, parent);
             }
             StringPart::ScalarVar(name) => {
@@ -8437,7 +8437,7 @@ impl Compiler {
                 match &inner_e.kind {
                     ExprKind::ScalarVar(name) => {
                         let stor = self.scalar_storage_name_for_ops(name);
-                        let idx = self.chunk.add_constant(PerlValue::string(stor));
+                        let idx = self.chunk.add_constant(StrykeValue::string(stor));
                         self.emit_op(Op::LoadConst(idx), line, ast);
                     }
                     _ => {

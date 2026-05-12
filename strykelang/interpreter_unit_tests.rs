@@ -2,7 +2,7 @@
 
 use crate::ast::StmtKind;
 use crate::parse;
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 use crate::vm_helper::VMHelper;
 
 #[test]
@@ -212,7 +212,7 @@ format STDOUT =
 fn list_separator_dollar_quote_roundtrips() {
     let mut i = VMHelper::new();
     assert_eq!(i.list_separator, " ");
-    i.set_special_var("\"", &PerlValue::string(",".into()))
+    i.set_special_var("\"", &StrykeValue::string(",".into()))
         .expect("set $\"");
     assert_eq!(i.get_special_var("\"").to_string(), ",");
     assert_eq!(i.list_separator, ",");
@@ -233,11 +233,11 @@ fn caret_regerror_preseeded_undef() {
 #[test]
 fn star_multiline_prepends_dotall_in_compile_regex() {
     let mut i = VMHelper::new();
-    i.set_special_var("*", &PerlValue::integer(1))
+    i.set_special_var("*", &StrykeValue::integer(1))
         .expect("set $*");
     let re = i.compile_regex("a.b", "", 1).expect("compile");
     assert!(re.is_match("a\nb"));
-    i.set_special_var("*", &PerlValue::integer(0))
+    i.set_special_var("*", &StrykeValue::integer(0))
         .expect("clear $*");
     let re2 = i.compile_regex("a.b", "", 1).expect("compile");
     assert!(!re2.is_match("a\nb"));
@@ -280,7 +280,7 @@ fn stash_array_caret_prefixed_stays_global() {
     let mut i = VMHelper::new();
     let _ = i
         .scope
-        .set_scalar("__PACKAGE__", PerlValue::string("Foo".into()));
+        .set_scalar("__PACKAGE__", StrykeValue::string("Foo".into()));
     assert_eq!(i.stash_array_name_for_package("^CAPTURE"), "^CAPTURE");
 }
 
@@ -295,7 +295,7 @@ fn at_is_dualvar_after_eval_failure() {
 #[test]
 fn at_dualvar_roundtrip_assignment() {
     let mut i = VMHelper::new();
-    let dv = PerlValue::errno_dual(7, "x".into());
+    let dv = StrykeValue::errno_dual(7, "x".into());
     i.set_special_var("@", &dv).expect("set $@");
     assert_eq!(i.eval_error_code, 7);
     assert_eq!(i.eval_error, "x");
@@ -327,7 +327,7 @@ fn set_eval_error_empty_string_clears_code() {
 #[test]
 fn at_set_special_plain_string_uses_code_one_when_nonnumeric() {
     let mut i = VMHelper::new();
-    i.set_special_var("@", &PerlValue::string("boom".into()))
+    i.set_special_var("@", &StrykeValue::string("boom".into()))
         .expect("set $@");
     assert_eq!(i.eval_error_code, 1);
     assert_eq!(i.eval_error, "boom");
@@ -336,7 +336,7 @@ fn at_set_special_plain_string_uses_code_one_when_nonnumeric() {
 #[test]
 fn at_set_special_integer_keeps_numeric_code_and_display_string() {
     let mut i = VMHelper::new();
-    i.set_special_var("@", &PerlValue::integer(99))
+    i.set_special_var("@", &StrykeValue::integer(99))
         .expect("set $@");
     assert_eq!(i.eval_error_code, 99);
     assert_eq!(i.eval_error, "99");
@@ -346,7 +346,7 @@ fn at_set_special_integer_keeps_numeric_code_and_display_string() {
 fn at_set_special_string_zero_still_gets_code_one() {
     // Non-empty message with numeric parse 0 → `set_special_var` bumps code to 1.
     let mut i = VMHelper::new();
-    i.set_special_var("@", &PerlValue::string("0".into()))
+    i.set_special_var("@", &StrykeValue::string("0".into()))
         .expect("set $@");
     assert_eq!(i.eval_error_code, 1);
     assert_eq!(i.eval_error, "0");

@@ -3,7 +3,7 @@
 use crate::common::*;
 use stryke::parse;
 use stryke::perl_bracket_version;
-use stryke::value::PerlValue;
+use stryke::value::StrykeValue;
 use stryke::vm_helper::VMHelper;
 
 #[test]
@@ -53,7 +53,7 @@ fn diamond_sets_argv_scalar() {
     let mut interp = VMHelper::new();
     interp
         .scope
-        .declare_array("ARGV", vec![PerlValue::string(path.clone())]);
+        .declare_array("ARGV", vec![StrykeValue::string(path.clone())]);
     let v = interp.execute(&program).expect("run");
     assert_eq!(v.to_int(), 6 + path.len() as i64);
     assert_eq!(interp.argv_current_file, path);

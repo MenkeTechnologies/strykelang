@@ -6,13 +6,13 @@
 
 const B58_R_EARTH_M: f64 = 6_378_137.0;
 
-fn b58_to_floats(v: &PerlValue) -> Vec<f64> {
+fn b58_to_floats(v: &StrykeValue) -> Vec<f64> {
     arg_to_vec(v).iter().map(|x| x.to_number()).collect()
 }
 
 /// Geohash neighbours: 8 cells around (lat, lng) at given precision. Returns
 /// flat array of [lat0, lng0, lat1, lng1, ...] for N, NE, E, SE, S, SW, W, NW.
-fn builtin_geohash_neighbors(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_geohash_neighbors(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let lat = f1(args);
     let lng = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let prec = args.get(2).map(|v| v.to_number()).unwrap_or(7.0).max(1.0);
@@ -21,15 +21,15 @@ fn builtin_geohash_neighbors(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let offsets = [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)];
     let mut out = Vec::with_capacity(16);
     for (dlat, dlng) in offsets {
-        out.push(PerlValue::float(lat + dlat as f64 * cell_lat));
-        out.push(PerlValue::float(lng + dlng as f64 * cell_lng));
+        out.push(StrykeValue::float(lat + dlat as f64 * cell_lat));
+        out.push(StrykeValue::float(lng + dlng as f64 * cell_lng));
     }
-    Ok(PerlValue::array(out))
+    Ok(StrykeValue::array(out))
 }
 
 /// Uber H3: hierarchical hex index packed as resolution*1e15 + x*1e8 + y, where
 /// (x, y) is the cube-coordinate of the hex containing (lat, lng) at given res.
-fn builtin_h3_index(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_h3_index(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let lat = f1(args);
     let lng = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let res = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0).clamp(0, 15);
@@ -38,36 +38,36 @@ fn builtin_h3_index(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r = (2.0 / 3.0 * lat) * scale;
     let qi = q.round() as i64;
     let ri = r.round() as i64;
-    Ok(PerlValue::integer(res * 1_000_000_000_000_000 + qi.rem_euclid(1_000_000) * 1_000_000 + ri.rem_euclid(1_000_000)))
+    Ok(StrykeValue::integer(res * 1_000_000_000_000_000 + qi.rem_euclid(1_000_000) * 1_000_000 + ri.rem_euclid(1_000_000)))
 }
 
 /// `h3_geo_to_h3`
-fn builtin_h3_geo_to_h3(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_h3_geo_to_h3(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     builtin_h3_index(args)
 }
 
 /// H3 → centroid lat/lng (inverse of h3_index packing).
-fn builtin_h3_h3_to_geo(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_h3_h3_to_geo(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let h = i1(args);
     let res = h / 1_000_000_000_000_000;
     let rest = h % 1_000_000_000_000_000;
     let qi = rest / 1_000_000;
     let ri = rest % 1_000_000;
     let scale = 0.5 * 3f64.sqrt() * 2f64.powi(res as i32);
-    if scale == 0.0 { return Ok(PerlValue::float(0.0)); }
+    if scale == 0.0 { return Ok(StrykeValue::float(0.0)); }
     let lat = ri as f64 / scale * 1.5;
     let lng = (qi as f64 / scale + lat / 3.0) * 3.0 / 3f64.sqrt();
-    Ok(PerlValue::float(lat * 1000.0 + lng))
+    Ok(StrykeValue::float(lat * 1000.0 + lng))
 }
 
 /// k-ring: number of hexes within distance k. = 1 + 6·(1 + 2 + ... + k) = 3k(k+1) + 1.
-fn builtin_h3_k_ring(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_h3_k_ring(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let k = i1(args).max(0);
-    Ok(PerlValue::integer(3 * k * (k + 1) + 1))
+    Ok(StrykeValue::integer(3 * k * (k + 1) + 1))
 }
 
 /// Direct neighbour at direction d ∈ {0..5}. Returns offset packed (dq, dr).
-fn builtin_h3_neighbor(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_h3_neighbor(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let h = i1(args);
     let dir = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0).rem_euclid(6);
     let dirs: [(i64, i64); 6] = [(1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1)];
@@ -76,17 +76,17 @@ fn builtin_h3_neighbor(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let rest = h % 1_000_000_000_000_000;
     let qi = rest / 1_000_000 + dq;
     let ri = rest % 1_000_000 + dr;
-    Ok(PerlValue::integer(res * 1_000_000_000_000_000 + qi.rem_euclid(1_000_000) * 1_000_000 + ri.rem_euclid(1_000_000)))
+    Ok(StrykeValue::integer(res * 1_000_000_000_000_000 + qi.rem_euclid(1_000_000) * 1_000_000 + ri.rem_euclid(1_000_000)))
 }
 
 /// H3 resolution from packed index.
-fn builtin_h3_resolution(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_h3_resolution(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let h = i1(args);
-    Ok(PerlValue::integer(h / 1_000_000_000_000_000))
+    Ok(StrykeValue::integer(h / 1_000_000_000_000_000))
 }
 
 /// S2: cell-id at level L for (lat, lng). Encode (face, i, j) as integer.
-fn builtin_s2_cell_id(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_s2_cell_id(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let lat = f1(args).to_radians();
     let lng = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
     let level = args.get(2).map(|v| v.to_number() as i64).unwrap_or(15).clamp(0, 30);
@@ -103,16 +103,16 @@ fn builtin_s2_cell_id(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = (y.atan() / (std::f64::consts::PI / 4.0) + 1.0) * 0.5;
     let i = (u * scale as f64).floor() as i64;
     let j = (v * scale as f64).floor() as i64;
-    Ok(PerlValue::integer(face * 100_000_000_000 + i.rem_euclid(1_000_000) * 1_000_000 + j.rem_euclid(1_000_000)))
+    Ok(StrykeValue::integer(face * 100_000_000_000 + i.rem_euclid(1_000_000) * 1_000_000 + j.rem_euclid(1_000_000)))
 }
 
 /// `s2_cell_at_lat_lng`
-fn builtin_s2_cell_at_lat_lng(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_s2_cell_at_lat_lng(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     builtin_s2_cell_id(args)
 }
 
 /// 8 face-adjacent S2 cells at the same level (returns neighbours' i,j packed).
-fn builtin_s2_cell_neighbors(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_s2_cell_neighbors(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let cell = i1(args);
     let face = cell / 100_000_000_000;
     let rest = cell % 100_000_000_000;
@@ -122,13 +122,13 @@ fn builtin_s2_cell_neighbors(args: &[PerlValue]) -> PerlResult<PerlValue> {
     for (di, dj) in [(0_i64, 1_i64), (1, 0), (0, -1), (-1, 0)] {
         let ni = (i + di).rem_euclid(1_000_000);
         let nj = (j + dj).rem_euclid(1_000_000);
-        out.push(PerlValue::integer(face * 100_000_000_000 + ni * 1_000_000 + nj));
+        out.push(StrykeValue::integer(face * 100_000_000_000 + ni * 1_000_000 + nj));
     }
-    Ok(PerlValue::array(out))
+    Ok(StrykeValue::array(out))
 }
 
 /// UTM forward: (lat, lng) → (zone, easting, northing). WGS84 reference.
-fn builtin_utm_from_lat_lng(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_utm_from_lat_lng(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let lat = f1(args);
     let lng = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let zone = ((lng + 180.0) / 6.0).floor() as i64 + 1;
@@ -153,11 +153,11 @@ fn builtin_utm_from_lat_lng(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let northing_no_offset = 0.9996 * (m + n * lat_r.tan() * (big_a * big_a / 2.0
         + (5.0 - t + 9.0 * c + 4.0 * c * c) * big_a.powi(4) / 24.0));
     let northing = if lat < 0.0 { northing_no_offset + 10_000_000.0 } else { northing_no_offset };
-    Ok(PerlValue::float(zone as f64 * 1e10 + easting + northing / 1e8))
+    Ok(StrykeValue::float(zone as f64 * 1e10 + easting + northing / 1e8))
 }
 
 /// UTM inverse: zone + easting + northing → lat, lng.
-fn builtin_utm_to_lat_lng(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_utm_to_lat_lng(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let zone = i1(args);
     let easting = args.get(1).map(|v| v.to_number()).unwrap_or(500_000.0);
     let northing = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -182,56 +182,56 @@ fn builtin_utm_to_lat_lng(args: &[PerlValue]) -> PerlResult<PerlValue> {
         + (5.0 - 2.0 * c1 + 28.0 * t1 - 3.0 * c1 * c1 + 8.0 * e2 / (1.0 - e2) + 24.0 * t1 * t1)
         * big_d.powi(5) / 120.0) / phi1.cos();
     let lng = lng0 + lng_r.to_degrees();
-    Ok(PerlValue::float(lat.to_degrees() * 1000.0 + lng))
+    Ok(StrykeValue::float(lat.to_degrees() * 1000.0 + lng))
 }
 
 /// MGRS encode: 5-digit precision, given UTM (zone, e, n).
-fn builtin_mgrs_encode(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_mgrs_encode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let zone = i1(args);
     let easting = args.get(1).map(|v| v.to_number()).unwrap_or(500_000.0);
     let northing = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
     let e_int = (easting % 100_000.0) as i64;
     let n_int = (northing % 100_000.0) as i64;
-    Ok(PerlValue::integer(zone * 1_000_000_000_000 + e_int * 100_000 + n_int))
+    Ok(StrykeValue::integer(zone * 1_000_000_000_000 + e_int * 100_000 + n_int))
 }
 
 /// `mgrs_decode`
-fn builtin_mgrs_decode(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_mgrs_decode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let m = i1(args);
     let zone = m / 1_000_000_000_000;
     let rest = m % 1_000_000_000_000;
     let e_part = rest / 100_000;
     let n_part = rest % 100_000;
-    Ok(PerlValue::integer(zone * 100_000_000 + e_part * 1000 + n_part))
+    Ok(StrykeValue::integer(zone * 100_000_000 + e_part * 1000 + n_part))
 }
 
 /// Web Mercator forward: (lat, lng) → (x, y) in [0, 1].
-fn builtin_lat_lng_to_xy_mercator(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_lat_lng_to_xy_mercator(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let lat = f1(args).to_radians().clamp(-1.484, 1.484);
     let lng = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let x = (lng + 180.0) / 360.0;
     let y = (1.0 - ((std::f64::consts::FRAC_PI_4 + lat / 2.0).tan()).ln() / std::f64::consts::PI) / 2.0;
-    Ok(PerlValue::float(x * 1000.0 + y))
+    Ok(StrykeValue::float(x * 1000.0 + y))
 }
 
 /// Lambert conformal conic (one standard parallel) forward.
-fn builtin_lat_lng_to_xy_lambert(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_lat_lng_to_xy_lambert(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let lat = f1(args).to_radians();
     let lng = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
     let lat0 = args.get(2).map(|v| v.to_number()).unwrap_or(45.0).to_radians();
     let lng0 = args.get(3).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
     let n = lat0.sin();
-    if n.abs() < 1e-9 { return Ok(PerlValue::float(0.0)); }
+    if n.abs() < 1e-9 { return Ok(StrykeValue::float(0.0)); }
     let f_l = (lat0.cos() * (std::f64::consts::FRAC_PI_4 + lat0 / 2.0).tan().powf(n)) / n;
     let rho = f_l / (std::f64::consts::FRAC_PI_4 + lat / 2.0).tan().powf(n);
     let theta = n * (lng - lng0);
     let x = rho * theta.sin();
     let y = f_l - rho * theta.cos();
-    Ok(PerlValue::float(x * 1000.0 + y))
+    Ok(StrykeValue::float(x * 1000.0 + y))
 }
 
 /// Haversine distance between two lat/lng pairs in metres.
-fn builtin_haversine_dist(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_haversine_dist(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let lat1 = f1(args).to_radians();
     let lng1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
     let lat2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
@@ -240,12 +240,12 @@ fn builtin_haversine_dist(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let dlng = lng2 - lng1;
     let a = (dlat / 2.0).sin().powi(2) + lat1.cos() * lat2.cos() * (dlng / 2.0).sin().powi(2);
     let c = 2.0 * a.sqrt().asin();
-    Ok(PerlValue::float(B58_R_EARTH_M * c))
+    Ok(StrykeValue::float(B58_R_EARTH_M * c))
 }
 
 /// Vincenty inverse for distance on WGS-84 ellipsoid (≤ 0.5 mm error). Iterates
 /// Vincenty's formula; falls back to haversine if non-convergent (antipodal).
-fn builtin_vincenty_dist(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_vincenty_dist(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let lat1 = f1(args).to_radians();
     let lng1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
     let lat2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
@@ -268,7 +268,7 @@ fn builtin_vincenty_dist(args: &[PerlValue]) -> PerlResult<PerlValue> {
         let (sin_l, cos_l) = (lambda.sin(), lambda.cos());
         sin_sigma = ((cos_u2 * sin_l).powi(2)
             + (cos_u1 * sin_u2 - sin_u1 * cos_u2 * cos_l).powi(2)).sqrt();
-        if sin_sigma == 0.0 { return Ok(PerlValue::float(0.0)); }
+        if sin_sigma == 0.0 { return Ok(StrykeValue::float(0.0)); }
         cos_sigma = sin_u1 * sin_u2 + cos_u1 * cos_u2 * cos_l;
         sigma = sin_sigma.atan2(cos_sigma);
         let sin_alpha = cos_u1 * cos_u2 * sin_l / sin_sigma;
@@ -290,11 +290,11 @@ fn builtin_vincenty_dist(args: &[PerlValue]) -> PerlResult<PerlValue> {
         * (cos_sigma * (-1.0 + 2.0 * cos_2sigma_m * cos_2sigma_m)
            - big_b / 6.0 * cos_2sigma_m * (-3.0 + 4.0 * sin_sigma * sin_sigma)
                   * (-3.0 + 4.0 * cos_2sigma_m * cos_2sigma_m)));
-    Ok(PerlValue::float(b * big_a * (sigma - delta_sigma)))
+    Ok(StrykeValue::float(b * big_a * (sigma - delta_sigma)))
 }
 
 /// Andoyer-Lambert: oblate-Earth distance, 30 m typical accuracy, no iteration.
-fn builtin_andoyer_dist(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_andoyer_dist(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let lat1 = f1(args).to_radians();
     let lng1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
     let lat2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
@@ -306,17 +306,17 @@ fn builtin_andoyer_dist(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let big_s = (big_g.sin() * big_l.cos()).powi(2) + (big_f.cos() * big_l.sin()).powi(2);
     let big_c = (big_g.cos() * big_l.cos()).powi(2) + (big_f.sin() * big_l.sin()).powi(2);
     let omega = (big_s / big_c).sqrt().atan();
-    if omega == 0.0 { return Ok(PerlValue::float(0.0)); }
+    if omega == 0.0 { return Ok(StrykeValue::float(0.0)); }
     let big_r = (big_s * big_c).sqrt() / omega;
     let big_d = 2.0 * omega * B58_R_EARTH_M;
     let big_h1 = (3.0 * big_r - 1.0) / (2.0 * big_c);
     let big_h2 = (3.0 * big_r + 1.0) / (2.0 * big_s);
-    Ok(PerlValue::float(big_d * (1.0 + f * big_h1 * (big_f.sin() * big_g.cos()).powi(2)
+    Ok(StrykeValue::float(big_d * (1.0 + f * big_h1 * (big_f.sin() * big_g.cos()).powi(2)
         - f * big_h2 * (big_f.cos() * big_g.sin()).powi(2))))
 }
 
 /// Constant-bearing (rhumb line) bearing.
-fn builtin_rhumb_line_bearing(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_rhumb_line_bearing(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let lat1 = f1(args).to_radians();
     let lng1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
     let lat2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
@@ -326,11 +326,11 @@ fn builtin_rhumb_line_bearing(args: &[PerlValue]) -> PerlResult<PerlValue> {
     if dlng < -std::f64::consts::PI { dlng += 2.0 * std::f64::consts::PI; }
     let dphi = ((std::f64::consts::FRAC_PI_4 + lat2 / 2.0).tan()
         / (std::f64::consts::FRAC_PI_4 + lat1 / 2.0).tan()).ln();
-    Ok(PerlValue::float((dlng.atan2(dphi).to_degrees() + 360.0).rem_euclid(360.0)))
+    Ok(StrykeValue::float((dlng.atan2(dphi).to_degrees() + 360.0).rem_euclid(360.0)))
 }
 
 /// Destination point given start, bearing (deg), distance (m).
-fn builtin_destination_point(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_destination_point(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let lat1 = f1(args).to_radians();
     let lng1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
     let bearing = args.get(2).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
@@ -339,52 +339,52 @@ fn builtin_destination_point(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let lat2 = (lat1.sin() * ang.cos() + lat1.cos() * ang.sin() * bearing.cos()).asin();
     let lng2 = lng1 + (bearing.sin() * ang.sin() * lat1.cos())
         .atan2(ang.cos() - lat1.sin() * lat2.sin());
-    Ok(PerlValue::float(lat2.to_degrees() * 1000.0 + lng2.to_degrees()))
+    Ok(StrykeValue::float(lat2.to_degrees() * 1000.0 + lng2.to_degrees()))
 }
 
 /// Slippy-tile (z, x, y) → centre lat/lng.
-fn builtin_tile_xyz_to_lat_lng(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_tile_xyz_to_lat_lng(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let z = i1(args);
     let x = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let y = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
     let n = 2f64.powi(z as i32);
     let lng = x / n * 360.0 - 180.0;
     let lat = (std::f64::consts::PI * (1.0 - 2.0 * y / n)).sinh().atan().to_degrees();
-    Ok(PerlValue::float(lat * 1000.0 + lng))
+    Ok(StrykeValue::float(lat * 1000.0 + lng))
 }
 
 /// (lat, lng) → tile (x, y) at zoom z.
-fn builtin_lat_lng_to_tile_xyz(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_lat_lng_to_tile_xyz(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let lat = f1(args).to_radians();
     let lng = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let z = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0);
     let n = 2f64.powi(z as i32);
     let x = ((lng + 180.0) / 360.0 * n).floor() as i64;
     let y = ((1.0 - lat.tan().asinh() / std::f64::consts::PI) / 2.0 * n).floor() as i64;
-    Ok(PerlValue::integer(z * 1_000_000_000 + x * 100_000 + y))
+    Ok(StrykeValue::integer(z * 1_000_000_000 + x * 100_000 + y))
 }
 
 /// Polygon winding order: 0=CCW, 1=CW. Computed from signed area sign.
-fn builtin_polygon_winding_order(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let pts = b58_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+fn builtin_polygon_winding_order(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let pts = b58_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let n = pts.len() / 2;
-    if n < 3 { return Ok(PerlValue::integer(-1)); }
+    if n < 3 { return Ok(StrykeValue::integer(-1)); }
     let mut sum = 0.0_f64;
     for i in 0..n {
         let (x1, y1) = (pts[2 * i], pts[2 * i + 1]);
         let (x2, y2) = (pts[2 * ((i + 1) % n)], pts[2 * ((i + 1) % n) + 1]);
         sum += (x2 - x1) * (y2 + y1);
     }
-    Ok(PerlValue::integer(if sum > 0.0 { 1 } else { 0 }))
+    Ok(StrykeValue::integer(if sum > 0.0 { 1 } else { 0 }))
 }
 
 /// Point-in-polygon by ray-casting.
-fn builtin_point_in_polygon_ray(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_point_in_polygon_ray(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let px = f1(args);
     let py = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let pts = b58_to_floats(args.get(2).unwrap_or(&PerlValue::array(vec![])));
+    let pts = b58_to_floats(args.get(2).unwrap_or(&StrykeValue::array(vec![])));
     let n = pts.len() / 2;
-    if n < 3 { return Ok(PerlValue::integer(0)); }
+    if n < 3 { return Ok(StrykeValue::integer(0)); }
     let mut inside = false;
     let mut j = n - 1;
     for i in 0..n {
@@ -395,16 +395,16 @@ fn builtin_point_in_polygon_ray(args: &[PerlValue]) -> PerlResult<PerlValue> {
         if intersect { inside = !inside; }
         j = i;
     }
-    Ok(PerlValue::integer(if inside { 1 } else { 0 }))
+    Ok(StrykeValue::integer(if inside { 1 } else { 0 }))
 }
 
 /// Point-in-polygon by winding number.
-fn builtin_point_in_polygon_winding(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_point_in_polygon_winding(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let px = f1(args);
     let py = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let pts = b58_to_floats(args.get(2).unwrap_or(&PerlValue::array(vec![])));
+    let pts = b58_to_floats(args.get(2).unwrap_or(&StrykeValue::array(vec![])));
     let n = pts.len() / 2;
-    if n < 3 { return Ok(PerlValue::integer(0)); }
+    if n < 3 { return Ok(StrykeValue::integer(0)); }
     let mut wn = 0_i64;
     for i in 0..n {
         let (x1, y1) = (pts[2 * i], pts[2 * i + 1]);
@@ -413,42 +413,42 @@ fn builtin_point_in_polygon_winding(args: &[PerlValue]) -> PerlResult<PerlValue>
             if y2 > py && (x2 - x1) * (py - y1) - (px - x1) * (y2 - y1) > 0.0 { wn += 1; }
         } else if y2 <= py && (x2 - x1) * (py - y1) - (px - x1) * (y2 - y1) < 0.0 { wn -= 1; }
     }
-    Ok(PerlValue::integer(if wn != 0 { 1 } else { 0 }))
+    Ok(StrykeValue::integer(if wn != 0 { 1 } else { 0 }))
 }
 
 /// Segment intersection: t parameter on first segment, ∞ if parallel.
-fn builtin_segment_intersection(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let p = b58_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
-    if p.len() < 8 { return Ok(PerlValue::float(f64::INFINITY)); }
+fn builtin_segment_intersection(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let p = b58_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
+    if p.len() < 8 { return Ok(StrykeValue::float(f64::INFINITY)); }
     let (x1, y1, x2, y2, x3, y3, x4, y4) = (p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7]);
     let denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-    if denom.abs() < 1e-12 { return Ok(PerlValue::float(f64::INFINITY)); }
-    Ok(PerlValue::float(((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom))
+    if denom.abs() < 1e-12 { return Ok(StrykeValue::float(f64::INFINITY)); }
+    Ok(StrykeValue::float(((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom))
 }
 
 /// Distance from point to segment AB.
-fn builtin_segment_distance_point(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let p = b58_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
-    if p.len() < 6 { return Ok(PerlValue::float(0.0)); }
+fn builtin_segment_distance_point(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let p = b58_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
+    if p.len() < 6 { return Ok(StrykeValue::float(0.0)); }
     let (px, py, ax, ay, bx, by) = (p[0], p[1], p[2], p[3], p[4], p[5]);
     let dx = bx - ax;
     let dy = by - ay;
     let len_sq = dx * dx + dy * dy;
-    if len_sq <= 0.0 { return Ok(PerlValue::float(((px - ax).powi(2) + (py - ay).powi(2)).sqrt())); }
+    if len_sq <= 0.0 { return Ok(StrykeValue::float(((px - ax).powi(2) + (py - ay).powi(2)).sqrt())); }
     let t = ((px - ax) * dx + (py - ay) * dy) / len_sq;
     let t = t.clamp(0.0, 1.0);
     let qx = ax + t * dx;
     let qy = ay + t * dy;
-    Ok(PerlValue::float(((px - qx).powi(2) + (py - qy).powi(2)).sqrt()))
+    Ok(StrykeValue::float(((px - qx).powi(2) + (py - qy).powi(2)).sqrt()))
 }
 
 /// Chan's algorithm convex-hull size: O(n log h). We give the actual hull size
 /// using Andrew's monotone chain (Chan reduces theoretical complexity for very
 /// large h-thin sets but produces the same hull).
-fn builtin_convex_hull_chan(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let pts = b58_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+fn builtin_convex_hull_chan(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let pts = b58_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let n = pts.len() / 2;
-    if n < 3 { return Ok(PerlValue::integer(n as i64)); }
+    if n < 3 { return Ok(StrykeValue::integer(n as i64)); }
     let mut p: Vec<(f64, f64)> = (0..n).map(|i| (pts[2 * i], pts[2 * i + 1])).collect();
     p.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal)
         .then_with(|| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)));
@@ -470,5 +470,5 @@ fn builtin_convex_hull_chan(args: &[PerlValue]) -> PerlResult<PerlValue> {
         hull.push(pt);
     }
     hull.pop();
-    Ok(PerlValue::integer(hull.len() as i64))
+    Ok(StrykeValue::integer(hull.len() as i64))
 }

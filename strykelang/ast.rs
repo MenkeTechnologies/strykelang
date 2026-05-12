@@ -522,8 +522,8 @@ impl PerlTypeName {
         }
     }
 
-    /// Strict runtime check: `Int` only integer-like [`PerlValue`](crate::value::PerlValue), `Str` only string, `Float` allows int or float.
-    pub fn check_value(&self, v: &crate::value::PerlValue) -> Result<(), String> {
+    /// Strict runtime check: `Int` only integer-like [`StrykeValue`](crate::value::StrykeValue), `Str` only string, `Float` allows int or float.
+    pub fn check_value(&self, v: &crate::value::StrykeValue) -> Result<(), String> {
         match self {
             Self::Int => {
                 if v.is_integer_like() {

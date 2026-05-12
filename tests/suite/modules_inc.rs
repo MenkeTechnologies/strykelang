@@ -1,6 +1,6 @@
 //! `@INC`, `%INC`, `require`, and `use` loading (pure stryke `.pm` files).
 
-use stryke::value::PerlValue;
+use stryke::value::StrykeValue;
 use stryke::vm_helper::VMHelper;
 use stryke::{parse, parse_and_run_string};
 
@@ -14,7 +14,7 @@ fn require_loads_pm_and_sets_inc() {
     let d = fixture_inc();
     interp.scope.declare_array(
         "INC",
-        vec![PerlValue::string(d), PerlValue::string(".".to_string())],
+        vec![StrykeValue::string(d), StrykeValue::string(".".to_string())],
     );
     let p = parse("require Trivial; Trivial::trivial_answer()").expect("parse");
     let v = interp.execute(&p).expect("run");
@@ -28,7 +28,7 @@ fn use_loads_module_and_second_require_is_noop() {
     let d = fixture_inc();
     interp.scope.declare_array(
         "INC",
-        vec![PerlValue::string(d), PerlValue::string(".".to_string())],
+        vec![StrykeValue::string(d), StrykeValue::string(".".to_string())],
     );
     // `use` runs in prepare (before main); module subs are visible in main body.
     let p = parse(
@@ -43,8 +43,8 @@ fn use_loads_module_and_second_require_is_noop() {
     interp2.scope.declare_array(
         "INC",
         vec![
-            PerlValue::string(fixture_inc()),
-            PerlValue::string(".".to_string()),
+            StrykeValue::string(fixture_inc()),
+            StrykeValue::string(".".to_string()),
         ],
     );
     let p2 = parse("require Trivial; require Trivial; 7").expect("parse");
@@ -58,8 +58,8 @@ fn use_trivial_qw_imports_symbol() {
     interp.scope.declare_array(
         "INC",
         vec![
-            PerlValue::string(fixture_inc()),
-            PerlValue::string(".".to_string()),
+            StrykeValue::string(fixture_inc()),
+            StrykeValue::string(".".to_string()),
         ],
     );
     let p = parse("use Trivial qw(trivial_answer); trivial_answer() + 1").expect("parse");
@@ -73,8 +73,8 @@ fn use_trivial_empty_list_does_not_import() {
     interp.scope.declare_array(
         "INC",
         vec![
-            PerlValue::string(fixture_inc()),
-            PerlValue::string(".".to_string()),
+            StrykeValue::string(fixture_inc()),
+            StrykeValue::string(".".to_string()),
         ],
     );
     let p = parse("use Trivial qw(); trivial_answer()").expect("parse");
@@ -87,8 +87,8 @@ fn use_trivial_rejects_symbol_not_in_export_ok() {
     interp.scope.declare_array(
         "INC",
         vec![
-            PerlValue::string(fixture_inc()),
-            PerlValue::string(".".to_string()),
+            StrykeValue::string(fixture_inc()),
+            StrykeValue::string(".".to_string()),
         ],
     );
     let p = parse("use Trivial qw(not_exported); 1").expect("parse");
@@ -101,8 +101,8 @@ fn use_exporter_default_imports_only_export() {
     interp.scope.declare_array(
         "INC",
         vec![
-            PerlValue::string(fixture_inc()),
-            PerlValue::string(".".to_string()),
+            StrykeValue::string(fixture_inc()),
+            StrykeValue::string(".".to_string()),
         ],
     );
     // @EXPORT lists trivial_answer; default import should define it in caller.
@@ -117,8 +117,8 @@ fn parse_and_run_string_nested_require_shares_inc() {
     interp.scope.declare_array(
         "INC",
         vec![
-            PerlValue::string(fixture_inc()),
-            PerlValue::string(".".to_string()),
+            StrykeValue::string(fixture_inc()),
+            StrykeValue::string(".".to_string()),
         ],
     );
     parse_and_run_string("require Trivial;", &mut interp).expect("req");

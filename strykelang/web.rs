@@ -16,7 +16,7 @@
 //! PASS 4 (next):         Migrations (create_table/add_column/Migrator).
 
 use crate::error::PerlError;
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 use crate::vm_helper::{FlowOrError, VMHelper};
 use indexmap::IndexMap;
 use parking_lot::Mutex;
@@ -47,7 +47,7 @@ struct Router {
 }
 
 static ROUTER: OnceLock<Mutex<Router>> = OnceLock::new();
-static APP_CONFIG: OnceLock<Mutex<IndexMap<String, PerlValue>>> = OnceLock::new();
+static APP_CONFIG: OnceLock<Mutex<IndexMap<String, StrykeValue>>> = OnceLock::new();
 
 #[derive(Clone, Default)]
 struct ControllerFilters {
@@ -72,7 +72,7 @@ fn router() -> &'static Mutex<Router> {
     ROUTER.get_or_init(|| Mutex::new(Router { routes: Vec::new() }))
 }
 
-fn app_config() -> &'static Mutex<IndexMap<String, PerlValue>> {
+fn app_config() -> &'static Mutex<IndexMap<String, StrykeValue>> {
     APP_CONFIG.get_or_init(|| Mutex::new(IndexMap::new()))
 }
 
@@ -85,8 +85,8 @@ fn app_config() -> &'static Mutex<IndexMap<String, PerlValue>> {
 
 #[derive(Default)]
 struct RequestState {
-    request: Option<PerlValue>,
-    params: IndexMap<String, PerlValue>,
+    request: Option<StrykeValue>,
+    params: IndexMap<String, StrykeValue>,
     status: u16,
     headers: Vec<(String, String)>,
     body: String,
@@ -103,11 +103,11 @@ struct RequestState {
     cookies_out: Vec<(String, String, CookieOpts)>,
     /// Session payload — read from a signed cookie at request start,
     /// re-serialized into the cookie at response time if mutated.
-    session: IndexMap<String, PerlValue>,
+    session: IndexMap<String, StrykeValue>,
     session_dirty: bool,
     /// Flash hashref — survives one redirect.
-    flash_in: IndexMap<String, PerlValue>,
-    flash_out: IndexMap<String, PerlValue>,
+    flash_in: IndexMap<String, StrykeValue>,
+    flash_out: IndexMap<String, StrykeValue>,
 }
 
 #[derive(Default, Clone, Debug)]
@@ -204,7 +204,7 @@ fn compile_pattern(path: &str) -> (String, Vec<String>) {
 
 // ── Route registration builtins ────────────────────────────────────────
 
-pub(crate) fn web_route(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_route(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 2 {
         return Err(PerlError::runtime(
             "web_route: usage: web_route(\"VERB /path\", \"controller#action\")",
@@ -232,10 +232,10 @@ pub(crate) fn web_route(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         captures,
         action,
     });
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn web_resources(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_resources(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.is_empty() {
         return Err(PerlError::runtime(
             "web_resources: usage: web_resources(\"posts\")",
@@ -267,16 +267,16 @@ pub(crate) fn web_resources(args: &[PerlValue], line: usize) -> Result<PerlValue
     ] {
         web_route(
             &[
-                PerlValue::string(format!("{} {}", verb, path)),
-                PerlValue::string(action),
+                StrykeValue::string(format!("{} {}", verb, path)),
+                StrykeValue::string(action),
             ],
             line,
         )?;
     }
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn web_root(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_root(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.is_empty() {
         return Err(PerlError::runtime(
             "web_root: usage: web_root(\"controller#action\")",
@@ -284,13 +284,13 @@ pub(crate) fn web_root(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         ));
     }
     web_route(
-        &[PerlValue::string("GET /".to_string()), args[0].clone()],
+        &[StrykeValue::string("GET /".to_string()), args[0].clone()],
         line,
     )
 }
 
-pub(crate) fn web_application_config(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    let cfg = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+pub(crate) fn web_application_config(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
+    let cfg = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let map = if let Some(hr) = cfg.as_hash_ref() {
         hr.read().clone()
     } else if let Some(hm) = cfg.as_hash_map() {
@@ -305,7 +305,7 @@ pub(crate) fn web_application_config(args: &[PerlValue], line: usize) -> Result<
     for (k, v) in map {
         g.insert(k, v);
     }
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 // ── Per-request render / redirect / JSON / params / request helpers ────
@@ -314,7 +314,7 @@ pub(crate) fn web_application_config(args: &[PerlValue], line: usize) -> Result<
 // `CURRENT` slot; the dispatcher reads `CURRENT` after the action returns
 // and emits the HTTP response.
 
-fn parse_render_opts(args: &[PerlValue]) -> IndexMap<String, PerlValue> {
+fn parse_render_opts(args: &[StrykeValue]) -> IndexMap<String, StrykeValue> {
     // `web_render(html => "...", status => 200)` — args is a flat list of
     // alternating key, value pairs. Build an IndexMap.
     let mut out = IndexMap::new();
@@ -330,13 +330,13 @@ fn parse_render_opts(args: &[PerlValue]) -> IndexMap<String, PerlValue> {
 
 pub(crate) fn web_render_dispatch(
     interp: &mut VMHelper,
-    args: &[PerlValue],
+    args: &[StrykeValue],
     line: usize,
-) -> Result<PerlValue> {
+) -> Result<StrykeValue> {
     interp.web_render(args, line)
 }
 
-pub(crate) fn web_redirect(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_redirect(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.is_empty() {
         return Err(PerlError::runtime(
             "web_redirect: usage: web_redirect(\"/path\")",
@@ -358,11 +358,11 @@ pub(crate) fn web_redirect(args: &[PerlValue], line: usize) -> Result<PerlValue>
         cur.body = format!("Redirecting to {}", url);
         cur.rendered = true;
     });
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn web_json(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let val = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+pub(crate) fn web_json(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
+    let val = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let body = crate::native_data::json_encode(&val).unwrap_or_else(|_| "null".to_string());
     let status = if args.len() >= 2 {
         args[1].to_int() as u16
@@ -378,10 +378,10 @@ pub(crate) fn web_json(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
         cur.body = body;
         cur.rendered = true;
     });
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn web_text(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_text(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let body = args.first().map(|v| v.to_string()).unwrap_or_default();
     let status = if args.len() >= 2 {
         args[1].to_int() as u16
@@ -394,32 +394,32 @@ pub(crate) fn web_text(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
         cur.body = body;
         cur.rendered = true;
     });
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn web_params(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_params(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let map = with_current(|cur| cur.params.clone());
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(map))))
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(map))))
 }
 
-pub(crate) fn web_request(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_request(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     Ok(with_current(|cur| {
-        cur.request.clone().unwrap_or(PerlValue::UNDEF)
+        cur.request.clone().unwrap_or(StrykeValue::UNDEF)
     }))
 }
 
 /// `web_before_action("authenticate", controller => "PostsController",
 /// only => ["edit", "update"], except => ["index"])` — register a
 /// before-filter that runs before each named action on the controller.
-pub(crate) fn web_before_action(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_before_action(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     register_filter(args, line, true)
 }
 
-pub(crate) fn web_after_action(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_after_action(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     register_filter(args, line, false)
 }
 
-fn register_filter(args: &[PerlValue], line: usize, before: bool) -> Result<PerlValue> {
+fn register_filter(args: &[StrykeValue], line: usize, before: bool) -> Result<StrykeValue> {
     let method = args
         .first()
         .map(|v| v.to_string())
@@ -456,10 +456,10 @@ fn register_filter(args: &[PerlValue], line: usize, before: bool) -> Result<Perl
     } else {
         f.after.push(entry);
     }
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-fn parse_opts(args: &[PerlValue]) -> IndexMap<String, PerlValue> {
+fn parse_opts(args: &[StrykeValue]) -> IndexMap<String, StrykeValue> {
     let mut out = IndexMap::new();
     let mut i = 0;
     while i + 1 < args.len() {
@@ -469,14 +469,14 @@ fn parse_opts(args: &[PerlValue]) -> IndexMap<String, PerlValue> {
     out
 }
 
-fn split_action_list(v: &PerlValue) -> Vec<String> {
+fn split_action_list(v: &StrykeValue) -> Vec<String> {
     if let Some(arr) = v.as_array_ref() {
         return arr.read().iter().map(|x| x.to_string()).collect();
     }
     v.clone().to_list().iter().map(|x| x.to_string()).collect()
 }
 
-pub(crate) fn web_routes_table(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_routes_table(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let r = router().lock();
     let mut out = String::new();
     out.push_str(&format!(
@@ -490,17 +490,17 @@ pub(crate) fn web_routes_table(_args: &[PerlValue], _line: usize) -> Result<Perl
     for r in &r.routes {
         out.push_str(&format!("{:<8}  {:<30}  {}\n", r.verb, r.pattern, r.action));
     }
-    Ok(PerlValue::string(out))
+    Ok(StrykeValue::string(out))
 }
 
 // ── Session / cookie / flash / strong-params / password ───────────────
 
-pub(crate) fn web_session(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_session(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let map = with_current(|cur| cur.session.clone());
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(map))))
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(map))))
 }
 
-pub(crate) fn web_session_set(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_session_set(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 2 {
         return Err(PerlError::runtime(
             "web_session_set: usage: web_session_set(\"key\", $value)",
@@ -513,25 +513,25 @@ pub(crate) fn web_session_set(args: &[PerlValue], line: usize) -> Result<PerlVal
         cur.session.insert(k, v);
         cur.session_dirty = true;
     });
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn web_session_get(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_session_get(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let k = args.first().map(|v| v.to_string()).unwrap_or_default();
     Ok(with_current(|cur| {
-        cur.session.get(&k).cloned().unwrap_or(PerlValue::UNDEF)
+        cur.session.get(&k).cloned().unwrap_or(StrykeValue::UNDEF)
     }))
 }
 
-pub(crate) fn web_session_clear(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_session_clear(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     with_current(|cur| {
         cur.session.clear();
         cur.session_dirty = true;
     });
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn web_set_cookie(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_set_cookie(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 2 {
         return Err(PerlError::runtime(
             "web_set_cookie: usage: web_set_cookie(\"name\", \"value\", path => \"/\", max_age => 3600, http_only => 1, secure => 1, same_site => \"Lax\")",
@@ -557,25 +557,25 @@ pub(crate) fn web_set_cookie(args: &[PerlValue], line: usize) -> Result<PerlValu
         i += 2;
     }
     with_current(|cur| cur.cookies_out.push((name, value, opts)));
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn web_cookies(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_cookies(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let map = with_current(|cur| {
         let mut out = IndexMap::new();
         for (k, v) in &cur.cookies_in {
-            out.insert(k.clone(), PerlValue::string(v.clone()));
+            out.insert(k.clone(), StrykeValue::string(v.clone()));
         }
         out
     });
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(map))))
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(map))))
 }
 
 /// Replaces the stub `web_flash`. Read the incoming flash, set the
 /// outgoing flash with `web_flash_set("notice", "Saved!")`. Outgoing
 /// flash is cleared after one redirect (the cookie's `Max-Age=0` is
 /// emitted otherwise).
-pub(crate) fn web_flash_set(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_flash_set(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 2 {
         return Err(PerlError::runtime(
             "web_flash_set: usage: web_flash_set(\"notice\", \"Saved!\")",
@@ -587,19 +587,19 @@ pub(crate) fn web_flash_set(args: &[PerlValue], line: usize) -> Result<PerlValue
     with_current(|cur| {
         cur.flash_out.insert(k, v);
     });
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn web_flash_get(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_flash_get(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let k = args.first().map(|v| v.to_string()).unwrap_or_default();
     Ok(with_current(|cur| {
-        cur.flash_in.get(&k).cloned().unwrap_or(PerlValue::UNDEF)
+        cur.flash_in.get(&k).cloned().unwrap_or(StrykeValue::UNDEF)
     }))
 }
 
 /// `web_permit($params, "title", "body")` → new hashref containing only
 /// those keys. Mirrors Rails strong params; rejects everything else.
-pub(crate) fn web_permit(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_permit(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.is_empty() {
         return Err(PerlError::runtime(
             "web_permit: usage: web_permit($params, \"key1\", \"key2\", ...)",
@@ -617,14 +617,14 @@ pub(crate) fn web_permit(args: &[PerlValue], line: usize) -> Result<PerlValue> {
             out.insert(k, v.clone());
         }
     }
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(out))))
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(out))))
 }
 
 /// SHA-256(salt + password), salt prefixed with `web1$saltHex$`. Not
 /// bcrypt — bcrypt would need a dependency. Strong-enough for stryke
 /// web v0; users wiring real auth can swap to bcrypt later via
 /// `crypt_util`.
-pub(crate) fn web_password_hash(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_password_hash(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let pw = args
         .first()
         .map(|v| v.to_string())
@@ -633,10 +633,10 @@ pub(crate) fn web_password_hash(args: &[PerlValue], line: usize) -> Result<PerlV
     let salt_hex = hex_encode(&salt);
     let combined = format!("{}{}", salt_hex, pw);
     let digest = sha256_hex(combined.as_bytes());
-    Ok(PerlValue::string(format!("web1${}${}", salt_hex, digest)))
+    Ok(StrykeValue::string(format!("web1${}${}", salt_hex, digest)))
 }
 
-pub(crate) fn web_password_verify(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_password_verify(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let pw = args
         .first()
         .map(|v| v.to_string())
@@ -647,13 +647,13 @@ pub(crate) fn web_password_verify(args: &[PerlValue], line: usize) -> Result<Per
         .ok_or_else(|| PerlError::runtime("web_password_verify: stored hash required", line))?;
     let parts: Vec<&str> = stored.splitn(3, '$').collect();
     if parts.len() != 3 || parts[0] != "web1" {
-        return Ok(PerlValue::integer(0));
+        return Ok(StrykeValue::integer(0));
     }
     let salt_hex = parts[1];
     let want = parts[2];
     let combined = format!("{}{}", salt_hex, pw);
     let got = sha256_hex(combined.as_bytes());
-    Ok(PerlValue::integer(
+    Ok(StrykeValue::integer(
         if constant_time_eq(got.as_bytes(), want.as_bytes()) {
             1
         } else {
@@ -740,19 +740,19 @@ fn unix_now() -> i64 {
         .unwrap_or(0)
 }
 
-pub(crate) fn web_cache_get(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_cache_get(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let key = args.first().map(|v| v.to_string()).unwrap_or_default();
     let now = unix_now();
     let map = cache_slot().lock();
     if let Some((val, expires)) = map.get(&key) {
         if expires.map(|e| e > now).unwrap_or(true) {
-            return Ok(PerlValue::string(val.clone()));
+            return Ok(StrykeValue::string(val.clone()));
         }
     }
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn web_cache_set(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_cache_set(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 2 {
         return Err(PerlError::runtime(
             "web_cache_set: usage: web_cache_set(\"key\", \"value\", ttl => 60)",
@@ -771,23 +771,23 @@ pub(crate) fn web_cache_set(args: &[PerlValue], line: usize) -> Result<PerlValue
     }
     let expires = ttl.map(|t| unix_now() + t);
     cache_slot().lock().insert(key, (val, expires));
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn web_cache_delete(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_cache_delete(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let key = args.first().map(|v| v.to_string()).unwrap_or_default();
     cache_slot().lock().shift_remove(&key);
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn web_cache_clear(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_cache_clear(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     cache_slot().lock().clear();
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 /// `web_t("welcome.title")` — translate from the loaded locale dict.
 /// Falls back to the key itself when not found so views never crash.
-pub(crate) fn web_t(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_t(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let key = args.first().map(|v| v.to_string()).unwrap_or_default();
     let lang = args
         .get(1)
@@ -796,16 +796,16 @@ pub(crate) fn web_t(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
     let dict = locale_slot().lock();
     if let Some(map) = dict.get(&lang) {
         if let Some(s) = map.get(&key) {
-            return Ok(PerlValue::string(s.clone()));
+            return Ok(StrykeValue::string(s.clone()));
         }
     }
-    Ok(PerlValue::string(key))
+    Ok(StrykeValue::string(key))
 }
 
 /// `web_load_locale("en", +{ "welcome.title" => "Hello" })` registers
 /// translations. Apps typically call this once at boot from a YAML/JSON
 /// file (or the seed step).
-pub(crate) fn web_load_locale(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_load_locale(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let lang = args
         .first()
         .map(|v| v.to_string())
@@ -822,12 +822,12 @@ pub(crate) fn web_load_locale(args: &[PerlValue], line: usize) -> Result<PerlVal
         flat.insert(k, v.to_string());
     }
     locale_slot().lock().insert(lang, flat);
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 /// `web_log("info", "request", $req)` — append to `log/$ENV.log`. Best-
 /// effort, never throws.
-pub(crate) fn web_log(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_log(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let level = args
         .first()
         .map(|v| v.to_string())
@@ -847,7 +847,7 @@ pub(crate) fn web_log(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
             use std::io::Write;
             f.write_all(line_str.as_bytes())
         });
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 fn current_iso_time() -> String {
@@ -859,7 +859,7 @@ fn current_iso_time() -> String {
 }
 
 /// `web_set_header("X-Frame-Options", "DENY")`.
-pub(crate) fn web_set_header(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_set_header(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 2 {
         return Err(PerlError::runtime(
             "web_set_header: usage: web_set_header(\"name\", \"value\")",
@@ -872,25 +872,25 @@ pub(crate) fn web_set_header(args: &[PerlValue], line: usize) -> Result<PerlValu
         cur.headers.retain(|(hk, _)| hk.to_lowercase() != k);
         cur.headers.push((k, v));
     });
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 /// `web_status(404)` — set status before render.
-pub(crate) fn web_status(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_status(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     if let Some(v) = args.first() {
         let n = v.to_int() as u16;
         with_current(|cur| cur.status = n);
     }
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 /// RFC4122-ish UUID v4 (time-seeded — fine for IDs, not crypto-strength).
-pub(crate) fn web_uuid(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_uuid(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let bytes = random_bytes(16);
     let mut hex = hex_encode(&bytes);
     hex.replace_range(12..13, "4");
     hex.replace_range(16..17, "8");
-    Ok(PerlValue::string(format!(
+    Ok(StrykeValue::string(format!(
         "{}-{}-{}-{}-{}",
         &hex[0..8],
         &hex[8..12],
@@ -901,31 +901,31 @@ pub(crate) fn web_uuid(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
 }
 
 /// Returns the current unix-seconds timestamp.
-pub(crate) fn web_now(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    Ok(PerlValue::integer(unix_now()))
+pub(crate) fn web_now(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
+    Ok(StrykeValue::integer(unix_now()))
 }
 
 /// `web_signed("payload")` returns `payload.HMAC` so the caller can
 /// hand the round-tripped value to `web_unsigned` without trusting the
 /// client. Used for one-click email links / password-reset tokens.
-pub(crate) fn web_signed(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_signed(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let payload = args.first().map(|v| v.to_string()).unwrap_or_default();
     let secret = secret_key();
     let mac = sha256_hex((secret + &payload).as_bytes());
-    Ok(PerlValue::string(format!("{}.{}", payload, &mac[..32])))
+    Ok(StrykeValue::string(format!("{}.{}", payload, &mac[..32])))
 }
 
-pub(crate) fn web_unsigned(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_unsigned(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let signed = args.first().map(|v| v.to_string()).unwrap_or_default();
     let Some((payload, mac)) = signed.rsplit_once('.') else {
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     };
     let secret = secret_key();
     let expected = sha256_hex((secret + payload).as_bytes());
     if constant_time_eq(mac.as_bytes(), &expected.as_bytes()[..32]) {
-        Ok(PerlValue::string(payload.to_string()))
+        Ok(StrykeValue::string(payload.to_string()))
     } else {
-        Ok(PerlValue::UNDEF)
+        Ok(StrykeValue::UNDEF)
     }
 }
 
@@ -942,7 +942,7 @@ fn secret_key() -> String {
 
 // ── JWT (HS256) ────────────────────────────────────────────────────────
 
-pub(crate) fn web_jwt_encode(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_jwt_encode(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let payload = args
         .first()
         .ok_or_else(|| PerlError::runtime("web_jwt_encode: payload (hashref) required", line))?;
@@ -956,35 +956,35 @@ pub(crate) fn web_jwt_encode(args: &[PerlValue], line: usize) -> Result<PerlValu
     }
     let header = r#"{"alg":"HS256","typ":"JWT"}"#;
     let header_b64 = base64url_encode(header.as_bytes());
-    let payload_val = PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(wrapped)));
+    let payload_val = StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(wrapped)));
     let payload_json =
         crate::native_data::json_encode(&payload_val).unwrap_or_else(|_| "{}".into());
     let payload_b64 = base64url_encode(payload_json.as_bytes());
     let signing_input = format!("{}.{}", header_b64, payload_b64);
     let mac = hmac_sha256_b64(&signing_input, &secret_key());
-    Ok(PerlValue::string(format!("{}.{}", signing_input, mac)))
+    Ok(StrykeValue::string(format!("{}.{}", signing_input, mac)))
 }
 
-pub(crate) fn web_jwt_decode(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_jwt_decode(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let token = args.first().map(|v| v.to_string()).unwrap_or_default();
     let parts: Vec<&str> = token.split('.').collect();
     if parts.len() != 3 {
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     }
     let signing_input = format!("{}.{}", parts[0], parts[1]);
     let want = hmac_sha256_b64(&signing_input, &secret_key());
     if !constant_time_eq(want.as_bytes(), parts[2].as_bytes()) {
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     }
     let payload_bytes = match base64url_decode(parts[1]) {
         Some(b) => b,
-        None => return Ok(PerlValue::UNDEF),
+        None => return Ok(StrykeValue::UNDEF),
     };
     let json = match std::str::from_utf8(&payload_bytes) {
         Ok(s) => s,
-        Err(_) => return Ok(PerlValue::UNDEF),
+        Err(_) => return Ok(StrykeValue::UNDEF),
     };
-    crate::native_data::json_decode(json).or(Ok(PerlValue::UNDEF))
+    crate::native_data::json_decode(json).or(Ok(StrykeValue::UNDEF))
 }
 
 fn hmac_sha256_b64(input: &str, key: &str) -> String {
@@ -1008,7 +1008,7 @@ fn rate_buckets() -> &'static Mutex<IndexMap<String, Vec<i64>>> {
     RATE_BUCKETS.get_or_init(|| Mutex::new(IndexMap::new()))
 }
 
-pub(crate) fn web_rate_limit(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_rate_limit(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 3 {
         return Err(PerlError::runtime(
             "web_rate_limit: usage: web_rate_limit(\"key\", limit_n, window_seconds)",
@@ -1023,23 +1023,23 @@ pub(crate) fn web_rate_limit(args: &[PerlValue], line: usize) -> Result<PerlValu
     let bucket = g.entry(key).or_default();
     bucket.retain(|t| now - t < window);
     if (bucket.len() as i64) >= limit {
-        return Ok(PerlValue::integer(0));
+        return Ok(StrykeValue::integer(0));
     }
     bucket.push(now);
-    Ok(PerlValue::integer(1))
+    Ok(StrykeValue::integer(1))
 }
 
 // ── TOTP (RFC 6238 — SHA1, 30s, 6 digits) ──────────────────────────────
 
-pub(crate) fn web_otp_secret(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_otp_secret(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     // 20 random bytes encoded as base32 (no padding) — what authenticator
     // apps expect.
     let bytes = random_bytes(20);
     let s = base32_encode(&bytes);
-    Ok(PerlValue::string(s))
+    Ok(StrykeValue::string(s))
 }
 
-pub(crate) fn web_otp_generate(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_otp_generate(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let secret_b32 = args
         .first()
         .map(|v| v.to_string())
@@ -1055,10 +1055,10 @@ pub(crate) fn web_otp_generate(args: &[PerlValue], line: usize) -> Result<PerlVa
     };
     let counter = (unix_now() / 30) as u64;
     let code = totp_code(&key, counter);
-    Ok(PerlValue::string(format!("{:06}", code)))
+    Ok(StrykeValue::string(format!("{:06}", code)))
 }
 
-pub(crate) fn web_otp_verify(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_otp_verify(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let secret_b32 = args
         .first()
         .map(|v| v.to_string())
@@ -1069,7 +1069,7 @@ pub(crate) fn web_otp_verify(args: &[PerlValue], line: usize) -> Result<PerlValu
         .ok_or_else(|| PerlError::runtime("web_otp_verify: code required", line))?;
     let key = match base32_decode(&secret_b32) {
         Some(k) => k,
-        None => return Ok(PerlValue::integer(0)),
+        None => return Ok(StrykeValue::integer(0)),
     };
     let counter = (unix_now() / 30) as u64;
     // Allow ±1 step (30s skew either side).
@@ -1077,10 +1077,10 @@ pub(crate) fn web_otp_verify(args: &[PerlValue], line: usize) -> Result<PerlValu
         let c = (counter as i64 + delta) as u64;
         let want = format!("{:06}", totp_code(&key, c));
         if constant_time_eq(want.as_bytes(), code.as_bytes()) {
-            return Ok(PerlValue::integer(1));
+            return Ok(StrykeValue::integer(1));
         }
     }
-    Ok(PerlValue::integer(0))
+    Ok(StrykeValue::integer(0))
 }
 
 fn totp_code(key: &[u8], counter: u64) -> u32 {
@@ -1108,7 +1108,7 @@ fn base32_decode(s: &str) -> Option<Vec<u8>> {
 
 // ── Faker ──────────────────────────────────────────────────────────────
 
-pub(crate) fn web_faker_name(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_faker_name(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let firsts = [
         "Alice", "Bob", "Carol", "Dan", "Eve", "Frank", "Grace", "Heidi", "Ivan", "Judy", "Kim",
         "Leo", "Mallory", "Niaj", "Olivia", "Peggy", "Quinn", "Rupert", "Sybil", "Trent", "Ursula",
@@ -1143,10 +1143,10 @@ pub(crate) fn web_faker_name(_args: &[PerlValue], _line: usize) -> Result<PerlVa
         "Zhang",
     ];
     let s = format!("{} {}", pick(&firsts), pick(&lasts));
-    Ok(PerlValue::string(s))
+    Ok(StrykeValue::string(s))
 }
 
-pub(crate) fn web_faker_email(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_faker_email(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let users = ["alice", "bob", "carol", "dan", "eve", "frank", "grace"];
     let domains = [
         "example.com",
@@ -1156,7 +1156,7 @@ pub(crate) fn web_faker_email(_args: &[PerlValue], _line: usize) -> Result<PerlV
         "mail.app",
     ];
     let n = (random_bytes(2)[0] as i64) % 1000;
-    Ok(PerlValue::string(format!(
+    Ok(StrykeValue::string(format!(
         "{}{}@{}",
         pick(&users),
         n,
@@ -1164,7 +1164,7 @@ pub(crate) fn web_faker_email(_args: &[PerlValue], _line: usize) -> Result<PerlV
     )))
 }
 
-pub(crate) fn web_faker_sentence(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_faker_sentence(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let words = [
         "stryke",
         "neon",
@@ -1201,10 +1201,10 @@ pub(crate) fn web_faker_sentence(_args: &[PerlValue], _line: usize) -> Result<Pe
         c.make_ascii_uppercase();
     }
     out.push('.');
-    Ok(PerlValue::string(out))
+    Ok(StrykeValue::string(out))
 }
 
-pub(crate) fn web_faker_paragraph(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_faker_paragraph(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let n = 3 + (random_bytes(1)[0] as usize % 4);
     let mut out = String::new();
     for i in 0..n {
@@ -1214,10 +1214,10 @@ pub(crate) fn web_faker_paragraph(_args: &[PerlValue], _line: usize) -> Result<P
         let s = web_faker_sentence(&[], 0)?.to_string();
         out.push_str(&s);
     }
-    Ok(PerlValue::string(out))
+    Ok(StrykeValue::string(out))
 }
 
-pub(crate) fn web_faker_int(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_faker_int(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let min = args.first().map(|v| v.to_int()).unwrap_or(0);
     let max = args.get(1).map(|v| v.to_int()).unwrap_or(100);
     let span = (max - min).max(1) as u64;
@@ -1226,7 +1226,7 @@ pub(crate) fn web_faker_int(args: &[PerlValue], _line: usize) -> Result<PerlValu
     for b in bytes {
         n = (n << 8) | (b as u64);
     }
-    Ok(PerlValue::integer(min + (n % span) as i64))
+    Ok(StrykeValue::integer(min + (n % span) as i64))
 }
 
 fn pick<'a>(arr: &'a [&'a str]) -> &'a str {
@@ -1240,9 +1240,9 @@ fn pick<'a>(arr: &'a [&'a str]) -> &'a str {
 // fenced code, paragraphs, lists. Enough for blog posts and docs without
 // pulling in a full crate.
 
-pub(crate) fn web_markdown(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_markdown(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let src = args.first().map(|v| v.to_string()).unwrap_or_default();
-    Ok(PerlValue::string(render_markdown(&src)))
+    Ok(StrykeValue::string(render_markdown(&src)))
 }
 
 fn render_markdown(src: &str) -> String {
@@ -1434,7 +1434,7 @@ fn find_close_marker(bytes: &[u8], from: usize, marker: &[u8]) -> Option<usize> 
 
 // ── HTTP cache (ETag / 304 Not Modified) ───────────────────────────────
 
-pub(crate) fn web_etag(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_etag(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let payload = args.first().map(|v| v.to_string()).unwrap_or_default();
     let etag = format!("\"{}\"", &sha256_hex(payload.as_bytes())[..16]);
     let inm = with_current(|cur| {
@@ -1453,22 +1453,22 @@ pub(crate) fn web_etag(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
                 cur.headers = vec![("etag".into(), etag.clone())];
                 cur.rendered = true;
             });
-            return Ok(PerlValue::integer(1));
+            return Ok(StrykeValue::integer(1));
         }
     }
     with_current(|cur| {
         cur.headers.push(("etag".into(), etag.clone()));
     });
-    Ok(PerlValue::integer(0))
+    Ok(StrykeValue::integer(0))
 }
 
 // ── CSV export ─────────────────────────────────────────────────────────
 
-pub(crate) fn web_csv(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_csv(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     // Accept either `web_csv(\@rows)` (array_ref) or `web_csv(@rows)`
     // (flat list of hashrefs) — both shapes occur naturally in stryke
     // depending on whether the caller has a ref or a list in hand.
-    let rows: Vec<PerlValue> = if args.len() == 1 {
+    let rows: Vec<StrykeValue> = if args.len() == 1 {
         if let Some(arr) = args[0].as_array_ref() {
             arr.read().clone()
         } else {
@@ -1495,7 +1495,7 @@ pub(crate) fn web_csv(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
         out.push_str(&cells.join(","));
         out.push('\n');
     }
-    Ok(PerlValue::string(out))
+    Ok(StrykeValue::string(out))
 }
 
 fn csv_field(s: &str) -> String {
@@ -1513,7 +1513,7 @@ thread_local! {
     static CONTENT_BLOCKS: RefCell<IndexMap<String, String>> = RefCell::new(IndexMap::new());
 }
 
-pub(crate) fn web_content_for(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_content_for(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 2 {
         return Err(PerlError::runtime(
             "web_content_for: usage: web_content_for(\"name\", \"<html>\")",
@@ -1525,13 +1525,13 @@ pub(crate) fn web_content_for(args: &[PerlValue], line: usize) -> Result<PerlVal
     CONTENT_BLOCKS.with(|c| {
         c.borrow_mut().insert(name, body);
     });
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn web_yield_content(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_yield_content(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let name = args.first().map(|v| v.to_string()).unwrap_or_default();
     let s = CONTENT_BLOCKS.with(|c| c.borrow().get(&name).cloned());
-    Ok(PerlValue::string(s.unwrap_or_default()))
+    Ok(StrykeValue::string(s.unwrap_or_default()))
 }
 
 // ── Render partial ─────────────────────────────────────────────────────
@@ -1544,9 +1544,9 @@ pub(crate) fn web_yield_content(args: &[PerlValue], _line: usize) -> Result<Perl
 impl VMHelper {
     pub(crate) fn web_render_partial(
         &mut self,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> Result<PerlValue> {
+    ) -> Result<StrykeValue> {
         let name = args.first().map(|v| v.to_string()).ok_or_else(|| {
             PerlError::runtime(
                 "web_render_partial: usage: web_render_partial(\"path\", locals_hashref)",
@@ -1580,13 +1580,13 @@ impl VMHelper {
                 line,
             )
         })?;
-        self.render_erb(&src, &locals, line).map(PerlValue::string)
+        self.render_erb(&src, &locals, line).map(StrykeValue::string)
     }
 }
 
 // ── Security headers / CSP ────────────────────────────────────────────
 
-pub(crate) fn web_security_headers(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_security_headers(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     with_current(|cur| {
         cur.headers.push(("x-frame-options".into(), "DENY".into()));
         cur.headers
@@ -1604,71 +1604,71 @@ pub(crate) fn web_security_headers(_args: &[PerlValue], _line: usize) -> Result<
             "geolocation=(), microphone=(), camera=()".into(),
         ));
     });
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 // ── OpenAPI route dump ─────────────────────────────────────────────────
 
-pub(crate) fn web_openapi(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_openapi(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let r = router().lock();
-    let mut paths: IndexMap<String, IndexMap<String, PerlValue>> = IndexMap::new();
+    let mut paths: IndexMap<String, IndexMap<String, StrykeValue>> = IndexMap::new();
     for route in &r.routes {
         let oas_path = openapi_path(&route.pattern);
         let entry = paths.entry(oas_path).or_default();
         let mut op = IndexMap::new();
         op.insert(
             "operationId".to_string(),
-            PerlValue::string(route.action.replace('#', "_")),
+            StrykeValue::string(route.action.replace('#', "_")),
         );
         op.insert(
             "summary".to_string(),
-            PerlValue::string(route.action.clone()),
+            StrykeValue::string(route.action.clone()),
         );
         op.insert(
             "responses".to_string(),
-            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new({
-                let mut m: IndexMap<String, PerlValue> = IndexMap::new();
+            StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new({
+                let mut m: IndexMap<String, StrykeValue> = IndexMap::new();
                 let mut ok = IndexMap::new();
                 ok.insert(
                     "description".to_string(),
-                    PerlValue::string("OK".to_string()),
+                    StrykeValue::string("OK".to_string()),
                 );
                 m.insert(
                     "200".to_string(),
-                    PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(ok))),
+                    StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(ok))),
                 );
                 m
             }))),
         );
         entry.insert(
             route.verb.to_lowercase(),
-            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(op))),
+            StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(op))),
         );
     }
-    let mut paths_out: IndexMap<String, PerlValue> = IndexMap::new();
+    let mut paths_out: IndexMap<String, StrykeValue> = IndexMap::new();
     for (k, v) in paths {
         paths_out.insert(
             k,
-            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(v))),
+            StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(v))),
         );
     }
     let mut info = IndexMap::new();
     info.insert(
         "title".to_string(),
-        PerlValue::string("stryke_web app".to_string()),
+        StrykeValue::string("stryke_web app".to_string()),
     );
-    info.insert("version".to_string(), PerlValue::string("1.0".into()));
+    info.insert("version".to_string(), StrykeValue::string("1.0".into()));
     let mut root = IndexMap::new();
-    root.insert("openapi".to_string(), PerlValue::string("3.0.3".into()));
+    root.insert("openapi".to_string(), StrykeValue::string("3.0.3".into()));
     root.insert(
         "info".to_string(),
-        PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(info))),
+        StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(info))),
     );
     root.insert(
         "paths".to_string(),
-        PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(paths_out))),
+        StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(paths_out))),
     );
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(
         root,
     ))))
 }
@@ -1699,7 +1699,7 @@ fn openapi_path(p: &str) -> String {
 
 // ── Token mint / consume (password resets, email verify links) ────────
 
-pub(crate) fn web_token_for(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_token_for(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let user_id = args
         .first()
         .map(|v| v.to_int())
@@ -1712,59 +1712,59 @@ pub(crate) fn web_token_for(args: &[PerlValue], line: usize) -> Result<PerlValue
     let exp = unix_now() + ttl;
     let payload = format!("{}|{}|{}", purpose, user_id, exp);
     let mac = sha256_hex((secret_key() + &payload).as_bytes());
-    Ok(PerlValue::string(format!(
+    Ok(StrykeValue::string(format!(
         "{}.{}",
         base64url_encode(payload.as_bytes()),
         &mac[..32]
     )))
 }
 
-pub(crate) fn web_token_consume(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_token_consume(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let token = args.first().map(|v| v.to_string()).unwrap_or_default();
     let purpose = args
         .get(1)
         .map(|v| v.to_string())
         .unwrap_or_else(|| "default".to_string());
     let Some((b64, mac)) = token.rsplit_once('.') else {
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     };
     let bytes = match base64url_decode(b64) {
         Some(b) => b,
-        None => return Ok(PerlValue::UNDEF),
+        None => return Ok(StrykeValue::UNDEF),
     };
     let payload = match std::str::from_utf8(&bytes) {
         Ok(s) => s,
-        Err(_) => return Ok(PerlValue::UNDEF),
+        Err(_) => return Ok(StrykeValue::UNDEF),
     };
     let want = sha256_hex((secret_key() + payload).as_bytes());
     if !constant_time_eq(mac.as_bytes(), &want.as_bytes()[..32]) {
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     }
     let parts: Vec<&str> = payload.splitn(3, '|').collect();
     if parts.len() != 3 {
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     }
     if parts[0] != purpose {
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     }
     let exp = parts[2].parse::<i64>().unwrap_or(0);
     if unix_now() > exp {
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     }
     let user_id = parts[1].parse::<i64>().unwrap_or(0);
-    Ok(PerlValue::integer(user_id))
+    Ok(StrykeValue::integer(user_id))
 }
 
 // ── Permissions / can ─────────────────────────────────────────────────
 
-pub(crate) fn web_can(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_can(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let action = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let user = args.get(1).cloned().unwrap_or(PerlValue::UNDEF);
+    let user = args.get(1).cloned().unwrap_or(StrykeValue::UNDEF);
     let user_map = user
         .as_hash_map()
         .or_else(|| user.as_hash_ref().map(|h| h.read().clone()));
     if user_map.is_none() {
-        return Ok(PerlValue::integer(0));
+        return Ok(StrykeValue::integer(0));
     }
     let user_map = user_map.unwrap();
     // Convention: admins can do anything; otherwise check `permissions`
@@ -1774,7 +1774,7 @@ pub(crate) fn web_can(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
         .map(|v| v.to_string())
         .unwrap_or_default();
     if role == "admin" || role == "owner" {
-        return Ok(PerlValue::integer(1));
+        return Ok(StrykeValue::integer(1));
     }
     let perms = user_map
         .get("permissions")
@@ -1783,14 +1783,14 @@ pub(crate) fn web_can(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
     let allowed = perms
         .split(',')
         .any(|p| p.trim() == action || p.trim() == "*");
-    Ok(PerlValue::integer(if allowed { 1 } else { 0 }))
+    Ok(StrykeValue::integer(if allowed { 1 } else { 0 }))
 }
 
 // ── JSON:API helpers ───────────────────────────────────────────────────
 
 /// `web_jsonapi_resource("posts", $row)` → wraps a single hashref into
 /// a JSON:API `{data: {type, id, attributes}}` envelope.
-pub(crate) fn web_jsonapi_resource(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_jsonapi_resource(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let kind = args
         .first()
         .map(|v| v.to_string())
@@ -1807,30 +1807,30 @@ pub(crate) fn web_jsonapi_resource(args: &[PerlValue], line: usize) -> Result<Pe
     attrs.shift_remove("id");
 
     let mut data = IndexMap::new();
-    data.insert("type".into(), PerlValue::string(kind));
-    data.insert("id".into(), PerlValue::string(id));
+    data.insert("type".into(), StrykeValue::string(kind));
+    data.insert("id".into(), StrykeValue::string(id));
     data.insert(
         "attributes".into(),
-        PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(attrs))),
+        StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(attrs))),
     );
     let mut envelope = IndexMap::new();
     envelope.insert(
         "data".into(),
-        PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(data))),
+        StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(data))),
     );
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(
         envelope,
     ))))
 }
 
 /// `web_jsonapi_collection("posts", $rows)` → wraps an array_ref of
 /// hashrefs into `{data: [{type, id, attributes}, ...], meta: {count}}`.
-pub(crate) fn web_jsonapi_collection(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_jsonapi_collection(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let kind = args
         .first()
         .map(|v| v.to_string())
         .ok_or_else(|| PerlError::runtime("web_jsonapi_collection: type required", line))?;
-    let rows: Vec<PerlValue> = match args.get(1) {
+    let rows: Vec<StrykeValue> = match args.get(1) {
         Some(v) => v
             .as_array_ref()
             .map(|a| a.read().clone())
@@ -1848,37 +1848,37 @@ pub(crate) fn web_jsonapi_collection(args: &[PerlValue], line: usize) -> Result<
         let mut attrs = map.clone();
         attrs.shift_remove("id");
         let mut entry = IndexMap::new();
-        entry.insert("type".into(), PerlValue::string(kind.clone()));
-        entry.insert("id".into(), PerlValue::string(id));
+        entry.insert("type".into(), StrykeValue::string(kind.clone()));
+        entry.insert("id".into(), StrykeValue::string(id));
         entry.insert(
             "attributes".into(),
-            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(attrs))),
+            StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(attrs))),
         );
-        wrapped.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(
+        wrapped.push(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(
             entry,
         ))));
     }
 
     let mut meta = IndexMap::new();
-    meta.insert("count".into(), PerlValue::integer(wrapped.len() as i64));
+    meta.insert("count".into(), StrykeValue::integer(wrapped.len() as i64));
 
     let mut envelope = IndexMap::new();
     envelope.insert(
         "data".into(),
-        PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(wrapped))),
+        StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(wrapped))),
     );
     envelope.insert(
         "meta".into(),
-        PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(meta))),
+        StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(meta))),
     );
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(
         envelope,
     ))))
 }
 
 /// `web_jsonapi_error(404, "not_found", "Post 42 missing")` →
 /// `{errors: [{status, code, title}]}` per JSON:API.
-pub(crate) fn web_jsonapi_error(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_jsonapi_error(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let status = args.first().map(|v| v.to_int()).unwrap_or(500);
     let code = args
         .get(1)
@@ -1889,17 +1889,17 @@ pub(crate) fn web_jsonapi_error(args: &[PerlValue], _line: usize) -> Result<Perl
         .map(|v| v.to_string())
         .unwrap_or_else(|| code.clone());
     let mut err = IndexMap::new();
-    err.insert("status".into(), PerlValue::string(status.to_string()));
-    err.insert("code".into(), PerlValue::string(code));
-    err.insert("title".into(), PerlValue::string(title));
+    err.insert("status".into(), StrykeValue::string(status.to_string()));
+    err.insert("code".into(), StrykeValue::string(code));
+    err.insert("title".into(), StrykeValue::string(title));
     let mut envelope = IndexMap::new();
     envelope.insert(
         "errors".into(),
-        PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(vec![
-            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(err))),
+        StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(vec![
+            StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(err))),
         ]))),
     );
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(
         envelope,
     ))))
 }
@@ -1907,7 +1907,7 @@ pub(crate) fn web_jsonapi_error(args: &[PerlValue], _line: usize) -> Result<Perl
 /// `web_bearer_token()` → returns the `Authorization: Bearer X` token
 /// from the request, or undef if missing/malformed. Pair with
 /// `web_jwt_decode` for token-auth APIs.
-pub(crate) fn web_bearer_token(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_bearer_token(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let auth = with_current(|cur| {
         cur.request
             .as_ref()
@@ -1917,16 +1917,16 @@ pub(crate) fn web_bearer_token(_args: &[PerlValue], _line: usize) -> Result<Perl
             .and_then(|m| m.get("authorization").map(|v| v.to_string()))
     });
     let Some(s) = auth else {
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     };
     let trimmed = s.trim();
     if let Some(rest) = trimmed.strip_prefix("Bearer ") {
-        return Ok(PerlValue::string(rest.trim().to_string()));
+        return Ok(StrykeValue::string(rest.trim().to_string()));
     }
     if let Some(rest) = trimmed.strip_prefix("bearer ") {
-        return Ok(PerlValue::string(rest.trim().to_string()));
+        return Ok(StrykeValue::string(rest.trim().to_string()));
     }
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 // ── View helpers ───────────────────────────────────────────────────────
@@ -1937,15 +1937,15 @@ pub(crate) fn web_bearer_token(_args: &[PerlValue], _line: usize) -> Result<Perl
 
 /// HTML-escape: `&` `<` `>` `"` `'`. Use everywhere user content lands
 /// inside HTML — `<%= web_h($post->{title}) %>`.
-pub(crate) fn web_h(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_h(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-    Ok(PerlValue::string(html_escape(&s)))
+    Ok(StrykeValue::string(html_escape(&s)))
 }
 
 /// `web_link_to(label, href, +{class => "btn"})` → `<a href="...">label</a>`
 /// with optional html-attribute hashref. The label is HTML-escaped; the
 /// href is attribute-escaped.
-pub(crate) fn web_link_to(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_link_to(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let label = args.first().map(|v| v.to_string()).unwrap_or_default();
     let href = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let attrs = collect_html_attrs_from_pairs(&args[args.len().min(2)..]);
@@ -1955,13 +1955,13 @@ pub(crate) fn web_link_to(args: &[PerlValue], _line: usize) -> Result<PerlValue>
     html.push('>');
     html.push_str(&html_escape(&label));
     html.push_str("</a>");
-    Ok(PerlValue::string(html))
+    Ok(StrykeValue::string(html))
 }
 
 /// `web_button_to(label, href, method => "delete")` → renders a form
 /// containing a single submit button. Used for non-GET destructive
 /// actions where a plain `<a>` would pollute the URL or be cached.
-pub(crate) fn web_button_to(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_button_to(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let label = args.first().map(|v| v.to_string()).unwrap_or_default();
     let action = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let opts = collect_kv_pairs(&args[args.len().min(2)..]);
@@ -1999,14 +1999,14 @@ pub(crate) fn web_button_to(args: &[PerlValue], _line: usize) -> Result<PerlValu
         ));
     }
     html.push_str("</form>");
-    Ok(PerlValue::string(html))
+    Ok(StrykeValue::string(html))
 }
 
 /// `web_form_with(url => "/posts", method => "post")` → opening `<form>`
 /// tag. Pair with `web_form_close` (or write `</form>` directly) at the
 /// end. Optional `_method` override for PATCH/PUT/DELETE rendered as a
 /// hidden input — same convention Rails uses.
-pub(crate) fn web_form_with(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_form_with(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let opts = collect_kv_pairs(args);
     let url = opts.get("url").map(|v| v.to_string()).unwrap_or_default();
     let method_raw = opts
@@ -2032,20 +2032,20 @@ pub(crate) fn web_form_with(args: &[PerlValue], _line: usize) -> Result<PerlValu
             attr_escape(&m)
         ));
     }
-    Ok(PerlValue::string(html))
+    Ok(StrykeValue::string(html))
 }
 
 /// Closing companion for `web_form_with` — emits `</form>`. Lets the
 /// caller stay symmetric instead of hardcoding the close tag.
-pub(crate) fn web_form_close(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    Ok(PerlValue::string("</form>".to_string()))
+pub(crate) fn web_form_close(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
+    Ok(StrykeValue::string("</form>".to_string()))
 }
 
 /// `web_text_field("title", $post->{title})` → `<input type="text" ...>`.
-pub(crate) fn web_text_field(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_text_field(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let name = args.first().map(|v| v.to_string()).unwrap_or_default();
     let value = args.get(1).map(|v| v.to_string()).unwrap_or_default();
-    Ok(PerlValue::string(format!(
+    Ok(StrykeValue::string(format!(
         "<input type=\"text\" name=\"{}\" value=\"{}\">",
         attr_escape(&name),
         attr_escape(&value)
@@ -2053,10 +2053,10 @@ pub(crate) fn web_text_field(args: &[PerlValue], _line: usize) -> Result<PerlVal
 }
 
 /// `web_text_area("body", $post->{body})` → `<textarea ...>...</textarea>`.
-pub(crate) fn web_text_area(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_text_area(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let name = args.first().map(|v| v.to_string()).unwrap_or_default();
     let value = args.get(1).map(|v| v.to_string()).unwrap_or_default();
-    Ok(PerlValue::string(format!(
+    Ok(StrykeValue::string(format!(
         "<textarea name=\"{}\">{}</textarea>",
         attr_escape(&name),
         html_escape(&value)
@@ -2065,14 +2065,14 @@ pub(crate) fn web_text_area(args: &[PerlValue], _line: usize) -> Result<PerlValu
 
 /// `web_check_box("published", $post->{published})` → checkbox plus a
 /// hidden `0` companion so an unchecked box still posts a value.
-pub(crate) fn web_check_box(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_check_box(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let name = args.first().map(|v| v.to_string()).unwrap_or_default();
     let truthy = args
         .get(1)
         .map(|v| v.to_int() != 0 && !v.to_string().is_empty() && v.to_string() != "0")
         .unwrap_or(false);
     let checked = if truthy { " checked" } else { "" };
-    Ok(PerlValue::string(format!(
+    Ok(StrykeValue::string(format!(
         "<input type=\"hidden\" name=\"{name}\" value=\"0\"><input type=\"checkbox\" name=\"{name}\" value=\"1\"{checked}>",
         name = attr_escape(&name),
         checked = checked
@@ -2082,8 +2082,8 @@ pub(crate) fn web_check_box(args: &[PerlValue], _line: usize) -> Result<PerlValu
 /// CSRF placeholder — emits a `<meta>` tag the form helpers can pair
 /// with `_csrf_token` hidden inputs. Real CSRF wiring lands when the
 /// session middleware ships.
-pub(crate) fn web_csrf_meta_tag(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    Ok(PerlValue::string(
+pub(crate) fn web_csrf_meta_tag(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
+    Ok(StrykeValue::string(
         "<meta name=\"csrf-token\" content=\"\">".to_string(),
     ))
 }
@@ -2091,7 +2091,7 @@ pub(crate) fn web_csrf_meta_tag(_args: &[PerlValue], _line: usize) -> Result<Per
 /// `web_stylesheet_link_tag("application")` → `<link rel="stylesheet" ...>`.
 /// Multiple names render multiple link tags. `media => "all"` is the
 /// default. Uses the Rails convention of looking under `/assets/`.
-pub(crate) fn web_stylesheet_link_tag(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_stylesheet_link_tag(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let mut out = String::new();
     let mut media = "all".to_string();
     let names: Vec<String> = args
@@ -2123,11 +2123,11 @@ pub(crate) fn web_stylesheet_link_tag(args: &[PerlValue], _line: usize) -> Resul
             attr_escape(&media)
         ));
     }
-    Ok(PerlValue::string(out))
+    Ok(StrykeValue::string(out))
 }
 
 /// `web_javascript_link_tag("application", defer => 1)` → `<script>` tags.
-pub(crate) fn web_javascript_link_tag(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_javascript_link_tag(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let mut out = String::new();
     let names: Vec<String> = args
         .iter()
@@ -2153,11 +2153,11 @@ pub(crate) fn web_javascript_link_tag(args: &[PerlValue], _line: usize) -> Resul
             if asyn { " async" } else { "" }
         ));
     }
-    Ok(PerlValue::string(out))
+    Ok(StrykeValue::string(out))
 }
 
 /// `web_image_tag("logo.png", alt => "logo")` → `<img src="..." alt="...">`.
-pub(crate) fn web_image_tag(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_image_tag(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let src = args.first().map(|v| v.to_string()).unwrap_or_default();
     let opts = collect_kv_pairs(&args[args.len().min(1)..]);
     let resolved = if src.starts_with('/') || src.starts_with("http") {
@@ -2174,12 +2174,12 @@ pub(crate) fn web_image_tag(args: &[PerlValue], _line: usize) -> Result<PerlValu
         push_attr(&mut html, "class", &class.to_string());
     }
     html.push('>');
-    Ok(PerlValue::string(html))
+    Ok(StrykeValue::string(html))
 }
 
 /// `web_truncate("long string", length => 30, omission => "…")` → cap a
 /// string for display. Defaults: 30 chars, ellipsis suffix.
-pub(crate) fn web_truncate(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_truncate(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let opts = collect_kv_pairs(&args[args.len().min(1)..]);
     let length = opts
@@ -2192,17 +2192,17 @@ pub(crate) fn web_truncate(args: &[PerlValue], _line: usize) -> Result<PerlValue
         .unwrap_or_else(|| "…".to_string());
     let chars: Vec<char> = s.chars().collect();
     if chars.len() <= length {
-        return Ok(PerlValue::string(s));
+        return Ok(StrykeValue::string(s));
     }
     let take = length.saturating_sub(omission.chars().count());
     let mut out: String = chars.iter().take(take).collect();
     out.push_str(&omission);
-    Ok(PerlValue::string(out))
+    Ok(StrykeValue::string(out))
 }
 
 /// `web_pluralize(3, "post")` → `"3 posts"`. Trivial English pluralizer
 /// — handles a few common irregulars; defers to `name + "s"` otherwise.
-pub(crate) fn web_pluralize(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_pluralize(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let n = args.first().map(|v| v.to_int()).unwrap_or(0);
     let word = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let plural = if n == 1 {
@@ -2226,7 +2226,7 @@ pub(crate) fn web_pluralize(args: &[PerlValue], _line: usize) -> Result<PerlValu
     } else {
         format!("{}s", word)
     };
-    Ok(PerlValue::string(format!("{} {}", n, plural)))
+    Ok(StrykeValue::string(format!("{} {}", n, plural)))
 }
 
 fn irregular_plural(word: &str) -> Option<&'static str> {
@@ -2246,9 +2246,9 @@ fn irregular_plural(word: &str) -> Option<&'static str> {
 /// `web_time_ago_in_words($timestamp)` — best-effort relative time
 /// string ("3 minutes ago", "yesterday"). Accepts ISO-8601-ish input
 /// from the timestamps `web_model_create` writes.
-pub(crate) fn web_time_ago_in_words(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_time_ago_in_words(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-    Ok(PerlValue::string(format_time_ago(&s)))
+    Ok(StrykeValue::string(format_time_ago(&s)))
 }
 
 fn format_time_ago(ts: &str) -> String {
@@ -2312,12 +2312,12 @@ fn parse_simple_iso(s: &str) -> Option<i64> {
 
 /// `web_flash()` returns the flash hashref. PASS 5 uses thread-local
 /// storage; multi-process flash needs cookie middleware.
-pub(crate) fn web_flash(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn web_flash(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let map = with_current(|cur| {
         cur.params.clone() // placeholder — flash slot is added in PASS 6 if user wants
     });
     let _ = map; // suppress unused if features change
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(
         IndexMap::new(),
     ))))
 }
@@ -2358,9 +2358,9 @@ fn push_attrs(html: &mut String, attrs: &IndexMap<String, String>) {
     }
 }
 
-/// Walk a tail of `[k1, v1, k2, v2, ...]` PerlValue args and turn it
+/// Walk a tail of `[k1, v1, k2, v2, ...]` StrykeValue args and turn it
 /// into an attribute map. Stops at first odd entry (no value pair).
-fn collect_html_attrs_from_pairs(args: &[PerlValue]) -> IndexMap<String, String> {
+fn collect_html_attrs_from_pairs(args: &[StrykeValue]) -> IndexMap<String, String> {
     let mut out = IndexMap::new();
     let mut i = 0;
     while i + 1 < args.len() {
@@ -2370,9 +2370,9 @@ fn collect_html_attrs_from_pairs(args: &[PerlValue]) -> IndexMap<String, String>
     out
 }
 
-/// Same as `collect_html_attrs_from_pairs` but keeps PerlValues so
+/// Same as `collect_html_attrs_from_pairs` but keeps StrykeValues so
 /// callers can switch on type (booleans for `defer`, etc.).
-fn collect_kv_pairs(args: &[PerlValue]) -> IndexMap<String, PerlValue> {
+fn collect_kv_pairs(args: &[StrykeValue]) -> IndexMap<String, StrykeValue> {
     let mut out = IndexMap::new();
     let mut i = 0;
     while i + 1 < args.len() {
@@ -2389,7 +2389,7 @@ impl VMHelper {
     /// `html`, `body`, `json`, `template`. The template branch reads the
     /// matching `.erb` file and runs it through the ERB engine below,
     /// optionally wrapping in `app/views/layouts/application.html.erb`.
-    pub(crate) fn web_render(&mut self, args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    pub(crate) fn web_render(&mut self, args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
         let opts = parse_render_opts(args);
         let status = opts.get("status").map(|v| v.to_int() as u16).unwrap_or(200);
         let (body, ct) = if let Some(v) = opts.get("json") {
@@ -2435,7 +2435,7 @@ impl VMHelper {
             cur.body = body;
             cur.rendered = true;
         });
-        Ok(PerlValue::UNDEF)
+        Ok(StrykeValue::UNDEF)
     }
 
     /// Render `.erb` from `app/views/<name>.html.erb`. If `layout` is
@@ -2445,7 +2445,7 @@ impl VMHelper {
     pub(crate) fn render_template(
         &mut self,
         name: &str,
-        locals: &IndexMap<String, PerlValue>,
+        locals: &IndexMap<String, StrykeValue>,
         layout: Option<&str>,
         line: usize,
     ) -> Result<String> {
@@ -2485,7 +2485,7 @@ impl VMHelper {
     pub(crate) fn render_erb(
         &mut self,
         src: &str,
-        locals: &IndexMap<String, PerlValue>,
+        locals: &IndexMap<String, StrykeValue>,
         line: usize,
     ) -> Result<String> {
         // Push a child scope, declare locals, then walk the template.
@@ -2572,9 +2572,9 @@ impl VMHelper {
 
     pub(crate) fn web_boot_application(
         &mut self,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> Result<PerlValue> {
+    ) -> Result<StrykeValue> {
         let port = args.first().map(|v| v.to_int()).unwrap_or(3000);
         if !(1..=65535).contains(&port) {
             return Err(PerlError::runtime(
@@ -2596,7 +2596,7 @@ impl VMHelper {
                 Err(e) => eprintln!("stryke web: accept: {}", e),
             }
         }
-        Ok(PerlValue::UNDEF)
+        Ok(StrykeValue::UNDEF)
     }
 
     /// Read one HTTP request off `stream`, route it, dispatch the matching
@@ -2625,7 +2625,7 @@ impl VMHelper {
         let (path, query) = raw_path.split_once('?').unwrap_or((raw_path, ""));
 
         // Headers.
-        let mut headers_map: IndexMap<String, PerlValue> = IndexMap::new();
+        let mut headers_map: IndexMap<String, StrykeValue> = IndexMap::new();
         let mut content_length: usize = 0;
         loop {
             let mut hline = String::new();
@@ -2642,7 +2642,7 @@ impl VMHelper {
                 if key == "content-length" {
                     content_length = val.parse().unwrap_or(0);
                 }
-                headers_map.insert(key, PerlValue::string(val));
+                headers_map.insert(key, StrykeValue::string(val));
             }
         }
 
@@ -2657,7 +2657,7 @@ impl VMHelper {
         };
 
         // Build params: query + body (form-urlencoded) + path captures.
-        let mut params: IndexMap<String, PerlValue> = IndexMap::new();
+        let mut params: IndexMap<String, StrykeValue> = IndexMap::new();
         parse_query(query, &mut params);
         if matches!(method.as_str(), "POST" | "PATCH" | "PUT") {
             // form-urlencoded only for now; JSON/multipart in a later pass.
@@ -2740,7 +2740,7 @@ impl VMHelper {
         // Built-in /openapi.json — serializes the live route table as
         // an OpenAPI 3.0 doc with no app code.
         if effective_method == "GET" && path == "/openapi.json" {
-            let doc = web_openapi(&[], 0).unwrap_or(PerlValue::UNDEF);
+            let doc = web_openapi(&[], 0).unwrap_or(StrykeValue::UNDEF);
             let body = crate::native_data::json_encode(&doc).unwrap_or_else(|_| "{}".into());
             return write_response(
                 &mut stream,
@@ -2792,10 +2792,10 @@ impl VMHelper {
                 return None;
             }
             let caps = r.re.captures(path)?;
-            let mut path_params: IndexMap<String, PerlValue> = IndexMap::new();
+            let mut path_params: IndexMap<String, StrykeValue> = IndexMap::new();
             for name in &r.captures {
                 if let Some(m) = caps.name(&format!("__{}__", name)) {
-                    path_params.insert(name.clone(), PerlValue::string(m.as_str().to_string()));
+                    path_params.insert(name.clone(), StrykeValue::string(m.as_str().to_string()));
                 }
             }
             Some((r.action.clone(), path_params))
@@ -2926,15 +2926,15 @@ impl VMHelper {
     fn invoke_action(
         &mut self,
         action: &str,
-        headers_map: &IndexMap<String, PerlValue>,
-        params: &IndexMap<String, PerlValue>,
+        headers_map: &IndexMap<String, StrykeValue>,
+        params: &IndexMap<String, StrykeValue>,
         method: &str,
         path: &str,
         query: &str,
         body: &str,
         cookies_in: IndexMap<String, String>,
-        session: IndexMap<String, PerlValue>,
-        flash_in: IndexMap<String, PerlValue>,
+        session: IndexMap<String, StrykeValue>,
+        flash_in: IndexMap<String, StrykeValue>,
         line: usize,
     ) -> DispatchResult {
         let (resource, act) = match action.split_once('#') {
@@ -3105,25 +3105,25 @@ impl VMHelper {
 // ── Helpers ────────────────────────────────────────────────────────────
 
 fn build_request_hash(
-    headers: &IndexMap<String, PerlValue>,
+    headers: &IndexMap<String, StrykeValue>,
     method: &str,
     path: &str,
     query: &str,
     body: &str,
-) -> PerlValue {
-    let mut req: IndexMap<String, PerlValue> = IndexMap::new();
-    req.insert("method".into(), PerlValue::string(method.to_string()));
-    req.insert("path".into(), PerlValue::string(path.to_string()));
-    req.insert("query".into(), PerlValue::string(query.to_string()));
-    req.insert("body".into(), PerlValue::string(body.to_string()));
+) -> StrykeValue {
+    let mut req: IndexMap<String, StrykeValue> = IndexMap::new();
+    req.insert("method".into(), StrykeValue::string(method.to_string()));
+    req.insert("path".into(), StrykeValue::string(path.to_string()));
+    req.insert("query".into(), StrykeValue::string(query.to_string()));
+    req.insert("body".into(), StrykeValue::string(body.to_string()));
     req.insert(
         "headers".into(),
-        PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(headers.clone()))),
+        StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(headers.clone()))),
     );
-    PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(req)))
+    StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(req)))
 }
 
-fn parse_query(s: &str, out: &mut IndexMap<String, PerlValue>) {
+fn parse_query(s: &str, out: &mut IndexMap<String, StrykeValue>) {
     if s.is_empty() {
         return;
     }
@@ -3134,7 +3134,7 @@ fn parse_query(s: &str, out: &mut IndexMap<String, PerlValue>) {
         let (k, v) = pair.split_once('=').unwrap_or((pair, ""));
         let k = url_decode(k);
         let v = url_decode(v);
-        out.insert(k, PerlValue::string(v));
+        out.insert(k, StrykeValue::string(v));
     }
 }
 
@@ -3366,7 +3366,7 @@ fn encode_set_cookie(name: &str, value: &str, opts: &CookieOpts) -> String {
     s
 }
 
-fn parse_cookie_header(headers: &IndexMap<String, PerlValue>) -> IndexMap<String, String> {
+fn parse_cookie_header(headers: &IndexMap<String, StrykeValue>) -> IndexMap<String, String> {
     let mut out = IndexMap::new();
     if let Some(v) = headers.get("cookie") {
         for pair in v.to_string().split(';') {
@@ -3382,21 +3382,21 @@ fn parse_cookie_header(headers: &IndexMap<String, PerlValue>) -> IndexMap<String
 /// Session cookie value is base64url-encoded JSON. No HMAC for v0 — flag
 /// the cookie HttpOnly + SameSite=Lax. PASS 8 wires HMAC-SHA256 signing
 /// using the `secret_key_base` from `web_application_config`.
-fn decode_session_cookie(cookies: &IndexMap<String, String>) -> IndexMap<String, PerlValue> {
+fn decode_session_cookie(cookies: &IndexMap<String, String>) -> IndexMap<String, StrykeValue> {
     cookies
         .get("_stryke_session")
         .and_then(|raw| decode_session_payload(raw))
         .unwrap_or_default()
 }
 
-fn decode_flash_cookie(cookies: &IndexMap<String, String>) -> IndexMap<String, PerlValue> {
+fn decode_flash_cookie(cookies: &IndexMap<String, String>) -> IndexMap<String, StrykeValue> {
     cookies
         .get("_stryke_flash")
         .and_then(|raw| decode_session_payload(raw))
         .unwrap_or_default()
 }
 
-fn decode_session_payload(raw: &str) -> Option<IndexMap<String, PerlValue>> {
+fn decode_session_payload(raw: &str) -> Option<IndexMap<String, StrykeValue>> {
     let bytes = base64url_decode(raw)?;
     let json = std::str::from_utf8(&bytes).ok()?;
     let v = crate::native_data::json_decode(json).ok()?;
@@ -3404,8 +3404,8 @@ fn decode_session_payload(raw: &str) -> Option<IndexMap<String, PerlValue>> {
         .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
 }
 
-fn encode_session_payload(map: &IndexMap<String, PerlValue>) -> String {
-    let val = PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(map.clone())));
+fn encode_session_payload(map: &IndexMap<String, StrykeValue>) -> String {
+    let val = StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(map.clone())));
     let json = crate::native_data::json_encode(&val).unwrap_or_else(|_| "{}".into());
     base64url_encode(json.as_bytes())
 }

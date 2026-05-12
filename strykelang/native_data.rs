@@ -14,10 +14,10 @@ use serde_json::Value as JsonValue;
 
 use crate::ast::StructDef;
 use crate::error::{PerlError, PerlResult};
-use crate::value::{HeapObject, PerlDataFrame, PerlValue, StructInstance};
+use crate::value::{HeapObject, PerlDataFrame, StrykeValue, StructInstance};
 
 /// Parallel row→hashref conversion after a sequential CSV parse (good CPU parallelism on wide files).
-pub(crate) fn par_csv_read(path: &str) -> PerlResult<PerlValue> {
+pub(crate) fn par_csv_read(path: &str) -> PerlResult<StrykeValue> {
     let mut rdr = csv::Reader::from_path(path)
         .map_err(|e| PerlError::runtime(format!("par_csv_read: {}: {}", path, e), 0))?;
     let headers: Vec<String> = rdr
@@ -30,25 +30,25 @@ pub(crate) fn par_csv_read(path: &str) -> PerlResult<PerlValue> {
     for rec in rdr.records() {
         raw_rows.push(rec.map_err(|e| PerlError::runtime(format!("par_csv_read: {}", e), 0))?);
     }
-    let rows: Vec<PerlValue> = raw_rows
+    let rows: Vec<StrykeValue> = raw_rows
         .into_par_iter()
         .map(|record| {
             let mut map = IndexMap::new();
             for (i, h) in headers.iter().enumerate() {
                 let cell = record.get(i).unwrap_or("");
-                map.insert(h.clone(), PerlValue::string(cell.to_string()));
+                map.insert(h.clone(), StrykeValue::string(cell.to_string()));
             }
-            PerlValue::hash_ref(Arc::new(RwLock::new(map)))
+            StrykeValue::hash_ref(Arc::new(RwLock::new(map)))
         })
         .collect();
-    Ok(PerlValue::array(rows))
+    Ok(StrykeValue::array(rows))
 }
 
 /// Columnar dataframe from a CSV path (header row + string cells; use `sum` etc. with numeric strings).
-pub(crate) fn dataframe_from_elements(val: &PerlValue) -> PerlResult<PerlValue> {
+pub(crate) fn dataframe_from_elements(val: &StrykeValue) -> PerlResult<StrykeValue> {
     let rows = val.map_flatten_outputs(true);
     if rows.is_empty() {
-        return Ok(PerlValue::dataframe(Arc::new(Mutex::new(PerlDataFrame {
+        return Ok(StrykeValue::dataframe(Arc::new(Mutex::new(PerlDataFrame {
             columns: vec![],
             cols: vec![],
             group_by: None,
@@ -60,16 +60,16 @@ pub(crate) fn dataframe_from_elements(val: &PerlValue) -> PerlResult<PerlValue> 
     if let Some(first_row_map) = first_row.as_hash_ref() {
         // List of hashrefs: use keys of the first row as columns
         let columns: Vec<String> = first_row_map.read().keys().cloned().collect();
-        let mut cols: Vec<Vec<PerlValue>> = (0..columns.len()).map(|_| Vec::new()).collect();
+        let mut cols: Vec<Vec<StrykeValue>> = (0..columns.len()).map(|_| Vec::new()).collect();
         for row_val in rows {
             if let Some(row_lock) = row_val.as_hash_ref() {
                 let row_map = row_lock.read();
                 for (i, col_name) in columns.iter().enumerate() {
-                    cols[i].push(row_map.get(col_name).cloned().unwrap_or(PerlValue::UNDEF));
+                    cols[i].push(row_map.get(col_name).cloned().unwrap_or(StrykeValue::UNDEF));
                 }
             }
         }
-        return Ok(PerlValue::dataframe(Arc::new(Mutex::new(PerlDataFrame {
+        return Ok(StrykeValue::dataframe(Arc::new(Mutex::new(PerlDataFrame {
             columns,
             cols,
             group_by: None,
@@ -78,16 +78,16 @@ pub(crate) fn dataframe_from_elements(val: &PerlValue) -> PerlResult<PerlValue> 
         // List of arrayrefs: first row is headers
         let first_row_arr = first_row_lock.read();
         let columns: Vec<String> = first_row_arr.iter().map(|v| v.to_string()).collect();
-        let mut cols: Vec<Vec<PerlValue>> = (0..columns.len()).map(|_| Vec::new()).collect();
+        let mut cols: Vec<Vec<StrykeValue>> = (0..columns.len()).map(|_| Vec::new()).collect();
         for row_val in rows.iter().skip(1) {
             if let Some(row_lock) = row_val.as_array_ref() {
                 let row_arr = row_lock.read();
                 for (i, col) in cols.iter_mut().enumerate().take(columns.len()) {
-                    col.push(row_arr.get(i).cloned().unwrap_or(PerlValue::UNDEF));
+                    col.push(row_arr.get(i).cloned().unwrap_or(StrykeValue::UNDEF));
                 }
             }
         }
-        return Ok(PerlValue::dataframe(Arc::new(Mutex::new(PerlDataFrame {
+        return Ok(StrykeValue::dataframe(Arc::new(Mutex::new(PerlDataFrame {
             columns,
             cols,
             group_by: None,
@@ -100,7 +100,7 @@ pub(crate) fn dataframe_from_elements(val: &PerlValue) -> PerlResult<PerlValue> 
     ))
 }
 
-pub(crate) fn dataframe_from_path(path: &str) -> PerlResult<PerlValue> {
+pub(crate) fn dataframe_from_path(path: &str) -> PerlResult<StrykeValue> {
     let mut rdr = csv::Reader::from_path(path)
         .map_err(|e| PerlError::runtime(format!("dataframe: {}: {}", path, e), 0))?;
     let headers: Vec<String> = rdr
@@ -110,12 +110,12 @@ pub(crate) fn dataframe_from_path(path: &str) -> PerlResult<PerlValue> {
         .map(|s| s.to_string())
         .collect();
     let ncols = headers.len();
-    let mut cols: Vec<Vec<PerlValue>> = (0..ncols).map(|_| Vec::new()).collect();
+    let mut cols: Vec<Vec<StrykeValue>> = (0..ncols).map(|_| Vec::new()).collect();
     for rec in rdr.records() {
         let record = rec.map_err(|e| PerlError::runtime(format!("dataframe: {}", e), 0))?;
         for (i, col) in cols.iter_mut().enumerate().take(ncols) {
             let cell = record.get(i).unwrap_or("");
-            col.push(PerlValue::string(cell.to_string()));
+            col.push(StrykeValue::string(cell.to_string()));
         }
     }
     let df = PerlDataFrame {
@@ -123,10 +123,10 @@ pub(crate) fn dataframe_from_path(path: &str) -> PerlResult<PerlValue> {
         cols,
         group_by: None,
     };
-    Ok(PerlValue::dataframe(Arc::new(Mutex::new(df))))
+    Ok(StrykeValue::dataframe(Arc::new(Mutex::new(df))))
 }
 
-pub(crate) fn csv_read(path: &str) -> PerlResult<PerlValue> {
+pub(crate) fn csv_read(path: &str) -> PerlResult<StrykeValue> {
     let mut rdr = csv::Reader::from_path(path)
         .map_err(|e| PerlError::runtime(format!("csv_read: {}: {}", path, e), 0))?;
     let headers: Vec<String> = rdr
@@ -141,19 +141,19 @@ pub(crate) fn csv_read(path: &str) -> PerlResult<PerlValue> {
         let mut map = IndexMap::new();
         for (i, h) in headers.iter().enumerate() {
             let cell = record.get(i).unwrap_or("");
-            map.insert(h.clone(), PerlValue::string(cell.to_string()));
+            map.insert(h.clone(), StrykeValue::string(cell.to_string()));
         }
-        rows.push(PerlValue::hash_ref(Arc::new(RwLock::new(map))));
+        rows.push(StrykeValue::hash_ref(Arc::new(RwLock::new(map))));
     }
-    Ok(PerlValue::array(rows))
+    Ok(StrykeValue::array(rows))
 }
 
 /// Writes rows as CSV. Each row is a hash or hashref; header row is the union of keys
 /// (first-seen order, then keys from later rows in order).
-pub(crate) fn csv_write(path: &str, rows: &[PerlValue]) -> PerlResult<PerlValue> {
+pub(crate) fn csv_write(path: &str, rows: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let mut header: Vec<String> = Vec::new();
     let mut seen = std::collections::HashSet::<String>::new();
-    let mut normalized: Vec<IndexMap<String, PerlValue>> = Vec::new();
+    let mut normalized: Vec<IndexMap<String, StrykeValue>> = Vec::new();
 
     for row in rows {
         let map = hash_like(row)?;
@@ -179,10 +179,10 @@ pub(crate) fn csv_write(path: &str, rows: &[PerlValue]) -> PerlResult<PerlValue>
     }
     wtr.flush()
         .map_err(|e| PerlError::runtime(format!("csv_write: {}", e), 0))?;
-    Ok(PerlValue::integer(normalized.len() as i64))
+    Ok(StrykeValue::integer(normalized.len() as i64))
 }
 
-fn hash_like(v: &PerlValue) -> PerlResult<IndexMap<String, PerlValue>> {
+fn hash_like(v: &StrykeValue) -> PerlResult<IndexMap<String, StrykeValue>> {
     if let Some(h) = v.as_hash_map() {
         return Ok(h);
     }
@@ -201,18 +201,18 @@ fn hash_like(v: &PerlValue) -> PerlResult<IndexMap<String, PerlValue>> {
     ))
 }
 
-pub(crate) fn sqlite_open(path: &str) -> PerlResult<PerlValue> {
+pub(crate) fn sqlite_open(path: &str) -> PerlResult<StrykeValue> {
     let conn = Connection::open(path)
         .map_err(|e| PerlError::runtime(format!("sqlite: {}: {}", path, e), 0))?;
-    Ok(PerlValue::sqlite_conn(Arc::new(Mutex::new(conn))))
+    Ok(StrykeValue::sqlite_conn(Arc::new(Mutex::new(conn))))
 }
 
 pub(crate) fn sqlite_dispatch(
     conn: &Arc<Mutex<Connection>>,
     method: &str,
-    args: &[PerlValue],
+    args: &[StrykeValue],
     line: usize,
-) -> PerlResult<PerlValue> {
+) -> PerlResult<StrykeValue> {
     let c = conn.lock();
     match method {
         "exec" => {
@@ -222,7 +222,7 @@ pub(crate) fn sqlite_dispatch(
             let sql = args[0].to_string();
             let params: Vec<Value> = args[1..].iter().map(perl_to_sql_value).collect();
             let n = exec_sql(&c, &sql, &params)?;
-            Ok(PerlValue::integer(n as i64))
+            Ok(StrykeValue::integer(n as i64))
         }
         "query" => {
             if args.is_empty() {
@@ -239,7 +239,7 @@ pub(crate) fn sqlite_dispatch(
                     line,
                 ));
             }
-            Ok(PerlValue::integer(c.last_insert_rowid()))
+            Ok(StrykeValue::integer(c.last_insert_rowid()))
         }
         _ => Err(PerlError::runtime(
             format!("unknown sqlite method: {}", method),
@@ -258,7 +258,7 @@ pub(crate) fn query_sql(
     sql: &str,
     params: &[Value],
     line: usize,
-) -> PerlResult<PerlValue> {
+) -> PerlResult<StrykeValue> {
     let mut stmt = conn
         .prepare(sql)
         .map_err(|e| PerlError::runtime(format!("sqlite query: {}", e), line))?;
@@ -286,12 +286,12 @@ pub(crate) fn query_sql(
                 .map_err(|e| PerlError::runtime(format!("sqlite query: {}", e), line))?;
             map.insert(col_name.clone(), sqlite_value_to_perl(v));
         }
-        rows_out.push(PerlValue::hash_ref(Arc::new(RwLock::new(map))));
+        rows_out.push(StrykeValue::hash_ref(Arc::new(RwLock::new(map))));
     }
-    Ok(PerlValue::array(rows_out))
+    Ok(StrykeValue::array(rows_out))
 }
 
-pub(crate) fn perl_to_sql_value(v: &PerlValue) -> Value {
+pub(crate) fn perl_to_sql_value(v: &StrykeValue) -> Value {
     if v.is_undef() {
         return Value::Null;
     }
@@ -310,13 +310,13 @@ pub(crate) fn perl_to_sql_value(v: &PerlValue) -> Value {
     Value::Text(v.to_string())
 }
 
-pub(crate) fn sqlite_value_to_perl(v: Value) -> PerlValue {
+pub(crate) fn sqlite_value_to_perl(v: Value) -> StrykeValue {
     match v {
-        Value::Null => PerlValue::UNDEF,
-        Value::Integer(i) => PerlValue::integer(i),
-        Value::Real(r) => PerlValue::float(r),
-        Value::Text(s) => PerlValue::string(s),
-        Value::Blob(b) => PerlValue::bytes(Arc::new(b)),
+        Value::Null => StrykeValue::UNDEF,
+        Value::Integer(i) => StrykeValue::integer(i),
+        Value::Real(r) => StrykeValue::float(r),
+        Value::Text(s) => StrykeValue::string(s),
+        Value::Blob(b) => StrykeValue::bytes(Arc::new(b)),
     }
 }
 
@@ -324,11 +324,11 @@ pub(crate) fn sqlite_value_to_perl(v: Value) -> PerlValue {
 /// Called from interpreter when constructing structs so default expressions can be evaluated.
 pub(crate) fn struct_new_with_defaults(
     def: &Arc<StructDef>,
-    provided: &[(String, PerlValue)],
-    defaults: &[Option<PerlValue>],
+    provided: &[(String, StrykeValue)],
+    defaults: &[Option<StrykeValue>],
     line: usize,
-) -> PerlResult<PerlValue> {
-    let mut values = vec![PerlValue::UNDEF; def.fields.len()];
+) -> PerlResult<StrykeValue> {
+    let mut values = vec![StrykeValue::UNDEF; def.fields.len()];
     for (k, v) in provided {
         let idx = def.field_index(k).ok_or_else(|| {
             PerlError::runtime(format!("struct {}: unknown field `{}`", def.name, k), line)
@@ -369,20 +369,20 @@ pub(crate) fn struct_new_with_defaults(
             }
         }
     }
-    Ok(PerlValue::struct_inst(Arc::new(StructInstance::new(
+    Ok(StrykeValue::struct_inst(Arc::new(StructInstance::new(
         Arc::clone(def),
         values,
     ))))
 }
 
 /// GET `url` and return the response body as a UTF-8 string (invalid UTF-8 is lossy).
-pub(crate) fn fetch(url: &str) -> PerlResult<PerlValue> {
+pub(crate) fn fetch(url: &str) -> PerlResult<StrykeValue> {
     let s = http_get_body(url)?;
-    Ok(PerlValue::string(s))
+    Ok(StrykeValue::string(s))
 }
 
-/// GET `url`, parse JSON, map to [`PerlValue`] (objects → `HashRef`, arrays → `Array`, etc.).
-pub(crate) fn fetch_json(url: &str) -> PerlResult<PerlValue> {
+/// GET `url`, parse JSON, map to [`StrykeValue`] (objects → `HashRef`, arrays → `Array`, etc.).
+pub(crate) fn fetch_json(url: &str) -> PerlResult<StrykeValue> {
     let s = http_get_body(url)?;
     let v: JsonValue = serde_json::from_str(&s)
         .map_err(|e| PerlError::runtime(format!("fetch_json: {}", e), 0))?;
@@ -397,32 +397,32 @@ fn http_get_body(url: &str) -> PerlResult<String> {
         .map_err(|e| PerlError::runtime(format!("fetch: {}", e), 0))
 }
 
-fn perl_hash_lookup(v: &PerlValue, key: &str) -> Option<PerlValue> {
+fn perl_hash_lookup(v: &StrykeValue, key: &str) -> Option<StrykeValue> {
     v.hash_get(key)
         .or_else(|| v.as_hash_ref().and_then(|r| r.read().get(key).cloned()))
 }
 
-fn perl_opt_lookup(opts: Option<&PerlValue>, key: &str) -> Option<PerlValue> {
+fn perl_opt_lookup(opts: Option<&StrykeValue>, key: &str) -> Option<StrykeValue> {
     let o = opts?;
     perl_hash_lookup(o, key)
 }
 
-fn perl_opt_bool(opts: Option<&PerlValue>, key: &str) -> bool {
+fn perl_opt_bool(opts: Option<&StrykeValue>, key: &str) -> bool {
     perl_opt_lookup(opts, key).is_some_and(|v| v.is_true())
 }
 
-fn perl_opt_u64(opts: Option<&PerlValue>, key: &str) -> Option<u64> {
+fn perl_opt_u64(opts: Option<&StrykeValue>, key: &str) -> Option<u64> {
     perl_opt_lookup(opts, key).map(|v| v.to_int().max(0) as u64)
 }
 
-fn body_bytes_from_perl(v: &PerlValue) -> Vec<u8> {
+fn body_bytes_from_perl(v: &StrykeValue) -> Vec<u8> {
     if let Some(b) = v.as_bytes_arc() {
         return b.as_ref().clone();
     }
     v.to_string().into_bytes()
 }
 
-fn headers_map_has_content_type(headers_val: &PerlValue) -> bool {
+fn headers_map_has_content_type(headers_val: &StrykeValue) -> bool {
     if let Some(m) = headers_val.as_hash_map() {
         return m.keys().any(|k| k.eq_ignore_ascii_case("content-type"));
     }
@@ -437,7 +437,7 @@ fn headers_map_has_content_type(headers_val: &PerlValue) -> bool {
 
 fn apply_request_headers(
     mut req: ureq::Request,
-    headers_val: &PerlValue,
+    headers_val: &StrykeValue,
 ) -> PerlResult<ureq::Request> {
     let pairs: Vec<(String, String)> = if let Some(m) = headers_val.as_hash_map() {
         m.iter().map(|(k, v)| (k.clone(), v.to_string())).collect()
@@ -463,7 +463,7 @@ fn apply_request_headers(
 /// (omit for 30s; `0` disables client timeout), `binary_response` (body as `BYTES` instead of decoded string).
 ///
 /// Returns a hashref: `status`, `status_text`, `headers` (hashref, lowercased names), `body`.
-pub(crate) fn http_request(url: &str, opts: Option<&PerlValue>) -> PerlResult<PerlValue> {
+pub(crate) fn http_request(url: &str, opts: Option<&StrykeValue>) -> PerlResult<StrykeValue> {
     let method = perl_opt_lookup(opts, "method")
         .map(|v| v.to_string())
         .filter(|s| !s.is_empty())
@@ -520,34 +520,34 @@ pub(crate) fn http_request(url: &str, opts: Option<&PerlValue>) -> PerlResult<Pe
     for n in names {
         let vals: Vec<&str> = resp.all(&n);
         if !vals.is_empty() {
-            hdr_map.insert(n, PerlValue::string(vals.join(", ")));
+            hdr_map.insert(n, StrykeValue::string(vals.join(", ")));
         }
     }
-    let headers_ref = PerlValue::hash_ref(Arc::new(RwLock::new(hdr_map)));
+    let headers_ref = StrykeValue::hash_ref(Arc::new(RwLock::new(hdr_map)));
 
     let body_val = if binary_response {
         let mut buf = Vec::new();
         resp.into_reader()
             .read_to_end(&mut buf)
             .map_err(|e| PerlError::runtime(format!("http_request: body read: {}", e), 0))?;
-        PerlValue::bytes(Arc::new(buf))
+        StrykeValue::bytes(Arc::new(buf))
     } else {
         let s = resp
             .into_string()
             .map_err(|e| PerlError::runtime(format!("http_request: body: {}", e), 0))?;
-        PerlValue::string(s)
+        StrykeValue::string(s)
     };
 
     let mut out = IndexMap::new();
-    out.insert("status".into(), PerlValue::integer(status as i64));
-    out.insert("status_text".into(), PerlValue::string(status_text));
+    out.insert("status".into(), StrykeValue::integer(status as i64));
+    out.insert("status_text".into(), StrykeValue::string(status_text));
     out.insert("headers".into(), headers_ref);
     out.insert("body".into(), body_val);
-    Ok(PerlValue::hash_ref(Arc::new(RwLock::new(out))))
+    Ok(StrykeValue::hash_ref(Arc::new(RwLock::new(out))))
 }
 
 /// Parse JSON from the `body` field of an [`http_request`] result hashref.
-pub(crate) fn http_response_json_body(res: &PerlValue) -> PerlResult<PerlValue> {
+pub(crate) fn http_response_json_body(res: &StrykeValue) -> PerlResult<StrykeValue> {
     let body = perl_hash_lookup(res, "body")
         .ok_or_else(|| PerlError::runtime("fetch_json: http response missing body", 0))?;
     let s = if let Some(b) = body.as_bytes_arc() {
@@ -558,14 +558,14 @@ pub(crate) fn http_response_json_body(res: &PerlValue) -> PerlResult<PerlValue> 
     json_decode(&s)
 }
 
-/// Serialize a [`PerlValue`] to a JSON string (arrays, hashes, refs, structs, scalars; not code/refs/IO).
-pub(crate) fn json_encode(v: &PerlValue) -> PerlResult<String> {
+/// Serialize a [`StrykeValue`] to a JSON string (arrays, hashes, refs, structs, scalars; not code/refs/IO).
+pub(crate) fn json_encode(v: &StrykeValue) -> PerlResult<String> {
     let j = perl_to_json_value(v)?;
     serde_json::to_string(&j).map_err(|e| PerlError::runtime(format!("json_encode: {}", e), 0))
 }
 
-/// Parse a JSON string into [`PerlValue`] (same mapping as [`fetch_json`]).
-pub(crate) fn json_decode(s: &str) -> PerlResult<PerlValue> {
+/// Parse a JSON string into [`StrykeValue`] (same mapping as [`fetch_json`]).
+pub(crate) fn json_decode(s: &str) -> PerlResult<StrykeValue> {
     let v: JsonValue = serde_json::from_str(s.trim())
         .map_err(|e| PerlError::runtime(format!("json_decode: {}", e), 0))?;
     Ok(json_to_perl(v))
@@ -576,7 +576,7 @@ pub(crate) fn json_decode(s: &str) -> PerlResult<PerlValue> {
 ///
 /// Returns `undef` if the filter yields no values, a single Perl value if it yields one output,
 /// or an array of values if it yields more than one (e.g. `.items[]`).
-pub(crate) fn json_jq(data: &PerlValue, filter_src: &str) -> PerlResult<PerlValue> {
+pub(crate) fn json_jq(data: &StrykeValue, filter_src: &str) -> PerlResult<StrykeValue> {
     let j = perl_to_json_value(data)?;
     let input: jaq_json::Val = serde_json::from_value(j)
         .map_err(|e| PerlError::runtime(format!("json_jq: could not convert input: {}", e), 0))?;
@@ -616,61 +616,61 @@ pub(crate) fn json_jq(data: &PerlValue, filter_src: &str) -> PerlResult<PerlValu
     }
 
     match results.len() {
-        0 => Ok(PerlValue::UNDEF),
+        0 => Ok(StrykeValue::UNDEF),
         1 => Ok(results.pop().expect("one")),
-        _ => Ok(PerlValue::array(results)),
+        _ => Ok(StrykeValue::array(results)),
     }
 }
 
-fn jaq_json_val_to_perl(v: jaq_json::Val) -> PerlResult<PerlValue> {
+fn jaq_json_val_to_perl(v: jaq_json::Val) -> PerlResult<StrykeValue> {
     use jaq_json::Val as Jv;
     match v {
-        Jv::Null => Ok(PerlValue::UNDEF),
-        Jv::Bool(b) => Ok(PerlValue::integer(i64::from(b))),
+        Jv::Null => Ok(StrykeValue::UNDEF),
+        Jv::Bool(b) => Ok(StrykeValue::integer(i64::from(b))),
         Jv::Num(n) => jaq_num_to_perl(n),
-        Jv::BStr(b) => Ok(PerlValue::string(String::from_utf8_lossy(&b).into_owned())),
-        Jv::TStr(b) => Ok(PerlValue::string(String::from_utf8_lossy(&b).into_owned())),
+        Jv::BStr(b) => Ok(StrykeValue::string(String::from_utf8_lossy(&b).into_owned())),
+        Jv::TStr(b) => Ok(StrykeValue::string(String::from_utf8_lossy(&b).into_owned())),
         Jv::Arr(a) => {
             let v = a.as_ref();
             let mut out = Vec::with_capacity(v.len());
             for x in v.iter() {
                 out.push(jaq_json_val_to_perl(x.clone())?);
             }
-            Ok(PerlValue::array(out))
+            Ok(StrykeValue::array(out))
         }
         Jv::Obj(o) => {
             let mut map = IndexMap::new();
             for (k, val) in o.iter() {
                 map.insert(k.to_string(), jaq_json_val_to_perl(val.clone())?);
             }
-            Ok(PerlValue::hash_ref(Arc::new(RwLock::new(map))))
+            Ok(StrykeValue::hash_ref(Arc::new(RwLock::new(map))))
         }
     }
 }
 
-fn jaq_num_to_perl(n: jaq_json::Num) -> PerlResult<PerlValue> {
+fn jaq_num_to_perl(n: jaq_json::Num) -> PerlResult<StrykeValue> {
     use jaq_json::Num as Jn;
     match n {
-        Jn::Int(i) => Ok(PerlValue::integer(i as i64)),
-        Jn::Float(f) => Ok(PerlValue::float(f)),
+        Jn::Int(i) => Ok(StrykeValue::integer(i as i64)),
+        Jn::Float(f) => Ok(StrykeValue::float(f)),
         Jn::BigInt(r) => {
             let bi = (*r).clone();
             if let Some(i) = bi.to_i64() {
-                Ok(PerlValue::integer(i))
+                Ok(StrykeValue::integer(i))
             } else if let Some(f) = bi.to_f64() {
-                Ok(PerlValue::float(f))
+                Ok(StrykeValue::float(f))
             } else {
-                Ok(PerlValue::string(bi.to_string()))
+                Ok(StrykeValue::string(bi.to_string()))
             }
         }
         Jn::Dec(s) => {
             let f: f64 = s.parse().unwrap_or(f64::NAN);
-            Ok(PerlValue::float(f))
+            Ok(StrykeValue::float(f))
         }
     }
 }
 
-pub(crate) fn perl_to_json_value(v: &PerlValue) -> PerlResult<JsonValue> {
+pub(crate) fn perl_to_json_value(v: &StrykeValue) -> PerlResult<JsonValue> {
     if v.is_undef() {
         return Ok(JsonValue::Null);
     }
@@ -794,27 +794,27 @@ pub(crate) fn perl_to_json_value(v: &PerlValue) -> PerlResult<JsonValue> {
     ))
 }
 
-fn json_to_perl(v: JsonValue) -> PerlValue {
+fn json_to_perl(v: JsonValue) -> StrykeValue {
     match v {
-        JsonValue::Null => PerlValue::UNDEF,
-        JsonValue::Bool(b) => PerlValue::integer(i64::from(b)),
+        JsonValue::Null => StrykeValue::UNDEF,
+        JsonValue::Bool(b) => StrykeValue::integer(i64::from(b)),
         JsonValue::Number(n) => {
             if let Some(i) = n.as_i64() {
-                PerlValue::integer(i)
+                StrykeValue::integer(i)
             } else if let Some(u) = n.as_u64() {
-                PerlValue::integer(u as i64)
+                StrykeValue::integer(u as i64)
             } else {
-                PerlValue::float(n.as_f64().unwrap_or(0.0))
+                StrykeValue::float(n.as_f64().unwrap_or(0.0))
             }
         }
-        JsonValue::String(s) => PerlValue::string(s),
-        JsonValue::Array(a) => PerlValue::array(a.into_iter().map(json_to_perl).collect()),
+        JsonValue::String(s) => StrykeValue::string(s),
+        JsonValue::Array(a) => StrykeValue::array(a.into_iter().map(json_to_perl).collect()),
         JsonValue::Object(o) => {
             let mut map = IndexMap::new();
             for (k, v) in o {
                 map.insert(k, json_to_perl(v));
             }
-            PerlValue::hash_ref(Arc::new(RwLock::new(map)))
+            StrykeValue::hash_ref(Arc::new(RwLock::new(map)))
         }
     }
 }
@@ -846,10 +846,10 @@ mod http_json_tests {
 
     #[test]
     fn json_encode_decode_roundtrip() {
-        let p = PerlValue::array(vec![
-            PerlValue::integer(1),
-            PerlValue::string("x".into()),
-            PerlValue::UNDEF,
+        let p = StrykeValue::array(vec![
+            StrykeValue::integer(1),
+            StrykeValue::string("x".into()),
+            StrykeValue::UNDEF,
         ]);
         let s = json_encode(&p).expect("encode");
         let back = json_decode(&s).expect("decode");
@@ -863,8 +863,8 @@ mod http_json_tests {
     #[test]
     fn json_encode_hash_roundtrip() {
         let mut m = IndexMap::new();
-        m.insert("a".into(), PerlValue::integer(2));
-        let p = PerlValue::hash(m);
+        m.insert("a".into(), StrykeValue::integer(2));
+        let p = StrykeValue::hash(m);
         let s = json_encode(&p).expect("encode");
         assert!(s.contains("\"a\""));
         let back = json_decode(&s).expect("decode");

@@ -69,7 +69,7 @@
 //! usage block, and `exit(0)`s.
 
 use crate::error::{PerlError, PerlResult};
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 use crate::vm_helper::VMHelper;
 use indexmap::IndexMap;
 use parking_lot::RwLock;
@@ -105,7 +105,7 @@ struct OptSpec {
     canonical: String,
     aliases: Vec<String>,
     kind: ArgKind,
-    default: Option<PerlValue>,
+    default: Option<StrykeValue>,
     help: Option<String>,
     required: bool,
     metavar: Option<String>,
@@ -231,16 +231,16 @@ fn parse_spec_string(spec: &str, line: usize) -> PerlResult<OptSpec> {
     })
 }
 
-fn coerce_scalar(raw: &str, ty: ScalarType, opt: &str, line: usize) -> PerlResult<PerlValue> {
+fn coerce_scalar(raw: &str, ty: ScalarType, opt: &str, line: usize) -> PerlResult<StrykeValue> {
     match ty {
-        ScalarType::Str => Ok(PerlValue::string(raw.to_string())),
-        ScalarType::Int => raw.parse::<i64>().map(PerlValue::integer).map_err(|_| {
+        ScalarType::Str => Ok(StrykeValue::string(raw.to_string())),
+        ScalarType::Int => raw.parse::<i64>().map(StrykeValue::integer).map_err(|_| {
             PerlError::runtime(
                 format!("getopts: option '{}' expects integer, got '{}'", opt, raw),
                 line,
             )
         }),
-        ScalarType::Float => raw.parse::<f64>().map(PerlValue::float).map_err(|_| {
+        ScalarType::Float => raw.parse::<f64>().map(StrykeValue::float).map_err(|_| {
             PerlError::runtime(
                 format!("getopts: option '{}' expects float, got '{}'", opt, raw),
                 line,
@@ -249,11 +249,11 @@ fn coerce_scalar(raw: &str, ty: ScalarType, opt: &str, line: usize) -> PerlResul
     }
 }
 
-fn zero_scalar(ty: ScalarType) -> PerlValue {
+fn zero_scalar(ty: ScalarType) -> StrykeValue {
     match ty {
-        ScalarType::Str => PerlValue::string(String::new()),
-        ScalarType::Int => PerlValue::integer(0),
-        ScalarType::Float => PerlValue::float(0.0),
+        ScalarType::Str => StrykeValue::string(String::new()),
+        ScalarType::Int => StrykeValue::integer(0),
+        ScalarType::Float => StrykeValue::float(0.0),
     }
 }
 
@@ -303,9 +303,9 @@ fn split_hash_kv(raw: &str, opt: &str, line: usize) -> PerlResult<(String, Strin
 }
 
 fn store_value(
-    out: &mut IndexMap<String, PerlValue>,
+    out: &mut IndexMap<String, StrykeValue>,
     spec: &OptSpec,
-    value: PerlValue,
+    value: StrykeValue,
     opt: &str,
     line: usize,
 ) -> PerlResult<()> {
@@ -313,7 +313,7 @@ fn store_value(
         ArgKind::Array(_) => {
             let entry = out
                 .entry(spec.canonical.clone())
-                .or_insert_with(|| PerlValue::array_ref(Arc::new(RwLock::new(Vec::new()))));
+                .or_insert_with(|| StrykeValue::array_ref(Arc::new(RwLock::new(Vec::new()))));
             let arc = entry.as_array_ref().ok_or_else(|| {
                 PerlError::runtime(
                     format!("getopts: option '{}' internal: not an array ref", opt),
@@ -325,7 +325,7 @@ fn store_value(
         ArgKind::Hash(_) => {
             let entry = out
                 .entry(spec.canonical.clone())
-                .or_insert_with(|| PerlValue::hash_ref(Arc::new(RwLock::new(IndexMap::new()))));
+                .or_insert_with(|| StrykeValue::hash_ref(Arc::new(RwLock::new(IndexMap::new()))));
             let arc = entry.as_hash_ref().ok_or_else(|| {
                 PerlError::runtime(
                     format!("getopts: option '{}' internal: not a hash ref", opt),
@@ -334,7 +334,7 @@ fn store_value(
             })?;
             // Hash entries are (key, val) where value is a 2-element array we
             // unpacked above; here we expect the caller to have given us a
-            // 2-element PerlValue::array of [k, v].
+            // 2-element StrykeValue::array of [k, v].
             if let Some(pair) = value.as_array_vec() {
                 if pair.len() == 2 {
                     arc.write().insert(pair[0].to_string(), pair[1].clone());
@@ -349,9 +349,9 @@ fn store_value(
         ArgKind::Counter => {
             let entry = out
                 .entry(spec.canonical.clone())
-                .or_insert_with(|| PerlValue::integer(0));
+                .or_insert_with(|| StrykeValue::integer(0));
             let n = entry.to_int();
-            *entry = PerlValue::integer(n + 1);
+            *entry = StrykeValue::integer(n + 1);
         }
         _ => {
             out.insert(spec.canonical.clone(), value);
@@ -363,32 +363,32 @@ fn store_value(
 /// Core parser. Mutates `argv` in place: on return it holds only the
 /// leftover positional arguments. Returns the hash of parsed options.
 fn parse_argv(
-    argv: &mut Vec<PerlValue>,
+    argv: &mut Vec<StrykeValue>,
     specs: &[OptSpec],
     line: usize,
-) -> PerlResult<IndexMap<String, PerlValue>> {
-    let mut out: IndexMap<String, PerlValue> = IndexMap::new();
+) -> PerlResult<IndexMap<String, StrykeValue>> {
+    let mut out: IndexMap<String, StrykeValue> = IndexMap::new();
 
     // Seed defaults: counters → 0, arrays → [], hashes → {}, NegBool → undef (only set if seen).
     for s in specs {
         match s.kind {
             ArgKind::Counter => {
-                out.insert(s.canonical.clone(), PerlValue::integer(0));
+                out.insert(s.canonical.clone(), StrykeValue::integer(0));
             }
             ArgKind::Array(_) => {
                 out.insert(
                     s.canonical.clone(),
-                    PerlValue::array_ref(Arc::new(RwLock::new(Vec::new()))),
+                    StrykeValue::array_ref(Arc::new(RwLock::new(Vec::new()))),
                 );
             }
             ArgKind::Hash(_) => {
                 out.insert(
                     s.canonical.clone(),
-                    PerlValue::hash_ref(Arc::new(RwLock::new(IndexMap::new()))),
+                    StrykeValue::hash_ref(Arc::new(RwLock::new(IndexMap::new()))),
                 );
             }
             ArgKind::Bool | ArgKind::NegBool => {
-                out.insert(s.canonical.clone(), PerlValue::integer(0));
+                out.insert(s.canonical.clone(), StrykeValue::integer(0));
             }
             _ => {}
         }
@@ -398,7 +398,7 @@ fn parse_argv(
     }
 
     let input: Vec<String> = argv.iter().map(|v| v.to_string()).collect();
-    let mut leftover: Vec<PerlValue> = Vec::new();
+    let mut leftover: Vec<StrykeValue> = Vec::new();
     let mut i = 0usize;
     while i < input.len() {
         let arg = &input[i];
@@ -407,7 +407,7 @@ fn parse_argv(
         if arg == "--" {
             i += 1;
             while i < input.len() {
-                leftover.push(PerlValue::string(input[i].clone()));
+                leftover.push(StrykeValue::string(input[i].clone()));
                 i += 1;
             }
             break;
@@ -417,7 +417,7 @@ fn parse_argv(
         if let Some(rest) = arg.strip_prefix("--") {
             if rest.is_empty() {
                 // `--` alone handled above; bare `--` shouldn't reach here, but treat as positional.
-                leftover.push(PerlValue::string(arg.clone()));
+                leftover.push(StrykeValue::string(arg.clone()));
                 i += 1;
                 continue;
             }
@@ -449,13 +449,13 @@ fn parse_argv(
         if let Some(rest) = arg.strip_prefix('-') {
             if rest.is_empty() {
                 // Bare `-` is a positional (conventional stdin marker).
-                leftover.push(PerlValue::string(arg.clone()));
+                leftover.push(StrykeValue::string(arg.clone()));
                 i += 1;
                 continue;
             }
             // Numeric (-5, -3.14) is a positional, not an option.
             if rest.chars().next().map_or(false, |c| c.is_ascii_digit()) {
-                leftover.push(PerlValue::string(arg.clone()));
+                leftover.push(StrykeValue::string(arg.clone()));
                 i += 1;
                 continue;
             }
@@ -548,10 +548,10 @@ fn parse_argv(
         }
 
         // Plain positional → stop parsing (no intermixed mode in v1).
-        leftover.push(PerlValue::string(arg.clone()));
+        leftover.push(StrykeValue::string(arg.clone()));
         i += 1;
         while i < input.len() {
-            leftover.push(PerlValue::string(input[i].clone()));
+            leftover.push(StrykeValue::string(input[i].clone()));
             i += 1;
         }
     }
@@ -568,7 +568,7 @@ fn consume_option(
     spec: &OptSpec,
     negated: bool,
     display: &str,
-    out: &mut IndexMap<String, PerlValue>,
+    out: &mut IndexMap<String, StrykeValue>,
     line: usize,
 ) -> PerlResult<usize> {
     // i currently points at the option token; advance past it.
@@ -581,7 +581,7 @@ fn consume_option(
                     line,
                 ));
             }
-            out.insert(spec.canonical.clone(), PerlValue::integer(1));
+            out.insert(spec.canonical.clone(), StrykeValue::integer(1));
         }
         ArgKind::NegBool => {
             if inline_val.is_some() {
@@ -592,7 +592,7 @@ fn consume_option(
             }
             out.insert(
                 spec.canonical.clone(),
-                PerlValue::integer(if negated { 0 } else { 1 }),
+                StrykeValue::integer(if negated { 0 } else { 1 }),
             );
         }
         ArgKind::Counter => {
@@ -602,7 +602,7 @@ fn consume_option(
                     line,
                 ));
             }
-            store_value(out, spec, PerlValue::UNDEF, display, line)?;
+            store_value(out, spec, StrykeValue::UNDEF, display, line)?;
         }
         ArgKind::Required(ty) | ArgKind::Array(ty) => {
             let raw = match inline_val {
@@ -661,7 +661,7 @@ fn consume_option(
             let (k, v) = split_hash_kv(&raw, display, line)?;
             let coerced = coerce_scalar(&v, ty, display, line)?;
             // Encode (k, v) as a 2-element array so store_value can unpack.
-            let pair = PerlValue::array(vec![PerlValue::string(k), coerced]);
+            let pair = StrykeValue::array(vec![StrykeValue::string(k), coerced]);
             // Reuse hash storage path.
             let _ = ty; // type already validated by coerce_scalar
             store_value(out, spec, pair, display, line)?;
@@ -677,7 +677,7 @@ struct HelpMeta {
     epilog: Option<String>,
 }
 
-fn parse_help_meta(v: &PerlValue, line: usize) -> PerlResult<HelpMeta> {
+fn parse_help_meta(v: &StrykeValue, line: usize) -> PerlResult<HelpMeta> {
     let h = v.as_hash_ref().ok_or_else(|| {
         PerlError::runtime(
             "getopts: third argument must be a hash ref { prog => ..., desc => ..., epilog => ... }",
@@ -704,7 +704,7 @@ fn parse_help_meta(v: &PerlValue, line: usize) -> PerlResult<HelpMeta> {
 /// Apply D1 metadata (a hashref value in the spec hash) to an `OptSpec`.
 fn apply_metadata(
     spec: &mut OptSpec,
-    meta: &Arc<RwLock<IndexMap<String, PerlValue>>>,
+    meta: &Arc<RwLock<IndexMap<String, StrykeValue>>>,
     line: usize,
 ) -> PerlResult<()> {
     for (k, v) in meta.read().iter() {
@@ -839,7 +839,7 @@ fn build_help_text(specs: &[OptSpec], meta: &HelpMeta, include_help_row: bool) -
     out
 }
 
-fn argv_requests_help(argv: &[PerlValue]) -> bool {
+fn argv_requests_help(argv: &[StrykeValue]) -> bool {
     for v in argv {
         let s = v.to_string();
         if s == "--" {
@@ -855,13 +855,13 @@ fn argv_requests_help(argv: &[PerlValue]) -> bool {
 /// True when every key in the hash is one of `prog`/`desc`/`description`/
 /// `epilog` (or the hash is empty). Used to distinguish a META hashref from
 /// a SPECS hashref at call sites that allow both.
-fn hash_is_meta_shaped(h: &Arc<RwLock<IndexMap<String, PerlValue>>>) -> bool {
+fn hash_is_meta_shaped(h: &Arc<RwLock<IndexMap<String, StrykeValue>>>) -> bool {
     let g = h.read();
     g.iter()
         .all(|(k, _)| matches!(k.as_str(), "prog" | "desc" | "description" | "epilog"))
 }
 
-fn parse_specs_value(specs_val: &PerlValue, line: usize) -> PerlResult<Vec<OptSpec>> {
+fn parse_specs_value(specs_val: &StrykeValue, line: usize) -> PerlResult<Vec<OptSpec>> {
     let mut specs: Vec<OptSpec> = Vec::new();
     if let Some(arr) = specs_val.as_array_ref() {
         for item in arr.read().iter() {
@@ -895,18 +895,18 @@ fn parse_specs_value(specs_val: &PerlValue, line: usize) -> PerlResult<Vec<OptSp
 /// Storage handle for the input argv. Either a borrowed `\@ARGV` array ref
 /// (mutated in place) or the interpreter's `@ARGV` resolved through scope.
 enum ArgvSink<'a> {
-    Ref(Arc<RwLock<Vec<PerlValue>>>),
+    Ref(Arc<RwLock<Vec<StrykeValue>>>),
     Scope(&'a mut VMHelper),
 }
 
 impl<'a> ArgvSink<'a> {
-    fn read(&self) -> Vec<PerlValue> {
+    fn read(&self) -> Vec<StrykeValue> {
         match self {
             ArgvSink::Ref(r) => r.read().clone(),
             ArgvSink::Scope(interp) => interp.scope.get_array("ARGV"),
         }
     }
-    fn write(&mut self, val: Vec<PerlValue>) -> PerlResult<()> {
+    fn write(&mut self, val: Vec<StrykeValue>) -> PerlResult<()> {
         match self {
             ArgvSink::Ref(r) => {
                 *r.write() = val;
@@ -944,9 +944,9 @@ impl<'a> ArgvSink<'a> {
 /// prints a formatted usage block to stdout, and calls `exit(0)`.
 pub fn builtin_getopts(
     interp: &mut VMHelper,
-    args: &[PerlValue],
+    args: &[StrykeValue],
     line: usize,
-) -> PerlResult<PerlValue> {
+) -> PerlResult<StrykeValue> {
     if args.is_empty() {
         return Err(PerlError::runtime(
             "getopts: usage: getopts(SPECS) | getopts(SPECS, META) | getopts(\\@ARGV, SPECS [, META])",
@@ -1055,33 +1055,33 @@ pub fn builtin_getopts(
         }
     }
 
-    Ok(PerlValue::hash_ref(Arc::new(RwLock::new(result))))
+    Ok(StrykeValue::hash_ref(Arc::new(RwLock::new(result))))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn argv(items: &[&str]) -> PerlValue {
-        let v: Vec<PerlValue> = items.iter().map(|s| PerlValue::string((*s).into())).collect();
-        PerlValue::array_ref(Arc::new(RwLock::new(v)))
+    fn argv(items: &[&str]) -> StrykeValue {
+        let v: Vec<StrykeValue> = items.iter().map(|s| StrykeValue::string((*s).into())).collect();
+        StrykeValue::array_ref(Arc::new(RwLock::new(v)))
     }
 
-    fn specs(items: &[&str]) -> PerlValue {
-        let v: Vec<PerlValue> = items.iter().map(|s| PerlValue::string((*s).into())).collect();
-        PerlValue::array_ref(Arc::new(RwLock::new(v)))
+    fn specs(items: &[&str]) -> StrykeValue {
+        let v: Vec<StrykeValue> = items.iter().map(|s| StrykeValue::string((*s).into())).collect();
+        StrykeValue::array_ref(Arc::new(RwLock::new(v)))
     }
 
-    fn hget(v: &PerlValue, k: &str) -> PerlValue {
+    fn hget(v: &StrykeValue, k: &str) -> StrykeValue {
         v.as_hash_ref()
             .expect("hash ref result")
             .read()
             .get(k)
             .cloned()
-            .unwrap_or(PerlValue::UNDEF)
+            .unwrap_or(StrykeValue::UNDEF)
     }
 
-    fn leftover(argv: &PerlValue) -> Vec<String> {
+    fn leftover(argv: &StrykeValue) -> Vec<String> {
         argv.as_array_ref()
             .expect("argv ref")
             .read()
@@ -1091,7 +1091,7 @@ mod tests {
     }
 
     /// Test wrapper: spin up a throwaway VMHelper and dispatch.
-    fn call(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    fn call(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         let mut interp = VMHelper::new();
         builtin_getopts(&mut interp, args, 1)
     }
@@ -1100,14 +1100,14 @@ mod tests {
     /// implicit-ARGV form, then returns `(result, leftover-@ARGV)`.
     fn call_with_argv(
         argv: &[&str],
-        args: &[PerlValue],
-    ) -> PerlResult<(PerlValue, Vec<String>)> {
+        args: &[StrykeValue],
+    ) -> PerlResult<(StrykeValue, Vec<String>)> {
         let mut interp = VMHelper::new();
         interp
             .scope
             .set_array(
                 "ARGV",
-                argv.iter().map(|s| PerlValue::string((*s).into())).collect(),
+                argv.iter().map(|s| StrykeValue::string((*s).into())).collect(),
             )
             .expect("seed @ARGV");
         let out = builtin_getopts(&mut interp, args, 1)?;
@@ -1264,13 +1264,13 @@ mod tests {
 
     #[test]
     fn defaults_via_hash_form() {
-        let h: IndexMap<String, PerlValue> = [
-            ("count|n=i".to_string(), PerlValue::integer(10)),
-            ("file|f=s".to_string(), PerlValue::string("out.txt".into())),
+        let h: IndexMap<String, StrykeValue> = [
+            ("count|n=i".to_string(), StrykeValue::integer(10)),
+            ("file|f=s".to_string(), StrykeValue::string("out.txt".into())),
         ]
         .into_iter()
         .collect();
-        let spec = PerlValue::hash_ref(Arc::new(RwLock::new(h)));
+        let spec = StrykeValue::hash_ref(Arc::new(RwLock::new(h)));
         let a = argv(&[]);
         let out = call(&[a, spec]).unwrap();
         assert_eq!(hget(&out, "count").to_int(), 10);
@@ -1355,21 +1355,21 @@ mod tests {
 
     // ── D1: hash-of-hashref metadata form ──────────────────────────────────
 
-    fn meta_spec(pairs: &[(&str, &[(&str, PerlValue)])]) -> PerlValue {
-        let outer: IndexMap<String, PerlValue> = pairs
+    fn meta_spec(pairs: &[(&str, &[(&str, StrykeValue)])]) -> StrykeValue {
+        let outer: IndexMap<String, StrykeValue> = pairs
             .iter()
             .map(|(k, meta_pairs)| {
-                let inner: IndexMap<String, PerlValue> = meta_pairs
+                let inner: IndexMap<String, StrykeValue> = meta_pairs
                     .iter()
                     .map(|(mk, mv)| ((*mk).to_string(), mv.clone()))
                     .collect();
                 (
                     (*k).to_string(),
-                    PerlValue::hash_ref(Arc::new(RwLock::new(inner))),
+                    StrykeValue::hash_ref(Arc::new(RwLock::new(inner))),
                 )
             })
             .collect();
-        PerlValue::hash_ref(Arc::new(RwLock::new(outer)))
+        StrykeValue::hash_ref(Arc::new(RwLock::new(outer)))
     }
 
     #[test]
@@ -1378,13 +1378,13 @@ mod tests {
             (
                 "file|f=s",
                 &[
-                    ("help", PerlValue::string("output path".into())),
-                    ("default", PerlValue::string("out.txt".into())),
+                    ("help", StrykeValue::string("output path".into())),
+                    ("default", StrykeValue::string("out.txt".into())),
                 ],
             ),
             (
                 "count|n=i",
-                &[("default", PerlValue::integer(10))],
+                &[("default", StrykeValue::integer(10))],
             ),
         ]);
         let a = argv(&[]);
@@ -1398,8 +1398,8 @@ mod tests {
         let s = meta_spec(&[(
             "file|f=s",
             &[
-                ("help", PerlValue::string("output".into())),
-                ("required", PerlValue::integer(1)),
+                ("help", StrykeValue::string("output".into())),
+                ("required", StrykeValue::integer(1)),
             ],
         )]);
         let a = argv(&[]);
@@ -1413,8 +1413,8 @@ mod tests {
         let s = meta_spec(&[(
             "file|f=s",
             &[
-                ("help", PerlValue::string("output".into())),
-                ("required", PerlValue::integer(1)),
+                ("help", StrykeValue::string("output".into())),
+                ("required", StrykeValue::integer(1)),
             ],
         )]);
         let a = argv(&["--file", "x.txt"]);
@@ -1426,19 +1426,19 @@ mod tests {
     fn d1_mixed_scalar_and_hashref_values() {
         // One entry uses bare-scalar default (legacy hash form); the other
         // uses hashref metadata (D1). They must coexist in one spec hash.
-        let mut h: IndexMap<String, PerlValue> = IndexMap::new();
-        h.insert("verbose|v".to_string(), PerlValue::integer(0));
-        let inner: IndexMap<String, PerlValue> = [(
+        let mut h: IndexMap<String, StrykeValue> = IndexMap::new();
+        h.insert("verbose|v".to_string(), StrykeValue::integer(0));
+        let inner: IndexMap<String, StrykeValue> = [(
             "help".to_string(),
-            PerlValue::string("output path".into()),
+            StrykeValue::string("output path".into()),
         )]
         .into_iter()
         .collect();
         h.insert(
             "file|f=s".to_string(),
-            PerlValue::hash_ref(Arc::new(RwLock::new(inner))),
+            StrykeValue::hash_ref(Arc::new(RwLock::new(inner))),
         );
-        let spec = PerlValue::hash_ref(Arc::new(RwLock::new(h)));
+        let spec = StrykeValue::hash_ref(Arc::new(RwLock::new(h)));
         let a = argv(&["--verbose", "--file=x.txt"]);
         let out = call(&[a, spec]).unwrap();
         assert_eq!(hget(&out, "verbose").to_int(), 1);
@@ -1449,7 +1449,7 @@ mod tests {
     fn d1_unknown_metadata_key_errors() {
         let s = meta_spec(&[(
             "file|f=s",
-            &[("nope", PerlValue::integer(1))],
+            &[("nope", StrykeValue::integer(1))],
         )]);
         let a = argv(&[]);
         let err = call(&[a, s]).unwrap_err();
@@ -1473,7 +1473,7 @@ mod tests {
                 canonical: "file".into(),
                 aliases: vec!["f".into()],
                 kind: ArgKind::Required(ScalarType::Str),
-                default: Some(PerlValue::string("out.txt".into())),
+                default: Some(StrykeValue::string("out.txt".into())),
                 help: Some("output path".into()),
                 required: false,
                 metavar: None,
@@ -1525,16 +1525,16 @@ mod tests {
 
     #[test]
     fn argv_requests_help_detects_both_forms() {
-        assert!(argv_requests_help(&[PerlValue::string("--help".into())]));
+        assert!(argv_requests_help(&[StrykeValue::string("--help".into())]));
         assert!(argv_requests_help(&[
-            PerlValue::string("-x".into()),
-            PerlValue::string("-h".into()),
+            StrykeValue::string("-x".into()),
+            StrykeValue::string("-h".into()),
         ]));
         assert!(!argv_requests_help(&[
-            PerlValue::string("--".into()),
-            PerlValue::string("--help".into()),
+            StrykeValue::string("--".into()),
+            StrykeValue::string("--help".into()),
         ]));
-        assert!(!argv_requests_help(&[PerlValue::string("--other".into())]));
+        assert!(!argv_requests_help(&[StrykeValue::string("--other".into())]));
     }
 
     #[test]
@@ -1544,11 +1544,11 @@ mod tests {
         let s = meta_spec(&[
             (
                 "verbose|v",
-                &[("help", PerlValue::string("verbose mode".into()))],
+                &[("help", StrykeValue::string("verbose mode".into()))],
             ),
             (
                 "help",
-                &[("help", PerlValue::string("custom help handling".into()))],
+                &[("help", StrykeValue::string("custom help handling".into()))],
             ),
         ]);
         let a = argv(&["--help"]);
@@ -1561,9 +1561,9 @@ mod tests {
     #[test]
     fn meta_unknown_key_errors() {
         let s = specs(&["verbose"]);
-        let mut m: IndexMap<String, PerlValue> = IndexMap::new();
-        m.insert("nope".into(), PerlValue::string("x".into()));
-        let meta = PerlValue::hash_ref(Arc::new(RwLock::new(m)));
+        let mut m: IndexMap<String, StrykeValue> = IndexMap::new();
+        m.insert("nope".into(), StrykeValue::string("x".into()));
+        let meta = StrykeValue::hash_ref(Arc::new(RwLock::new(m)));
         let a = argv(&[]);
         let err = call(&[a, s, meta]).unwrap_err();
         let msg = format!("{}", err);
@@ -1588,9 +1588,9 @@ mod tests {
     #[test]
     fn implicit_argv_with_meta_second_arg() {
         let s = specs(&["verbose|v"]);
-        let mut m: IndexMap<String, PerlValue> = IndexMap::new();
-        m.insert("prog".into(), PerlValue::string("demo".into()));
-        let meta = PerlValue::hash_ref(Arc::new(RwLock::new(m)));
+        let mut m: IndexMap<String, StrykeValue> = IndexMap::new();
+        m.insert("prog".into(), StrykeValue::string("demo".into()));
+        let meta = StrykeValue::hash_ref(Arc::new(RwLock::new(m)));
         let (out, left) =
             call_with_argv(&["-v", "rest"], &[s, meta]).unwrap();
         assert_eq!(hget(&out, "verbose").to_int(), 1);
@@ -1602,8 +1602,8 @@ mod tests {
         // An empty hashref as 2nd arg has zero keys, all of which are meta —
         // so this is the (SPECS, META) form. @ARGV is implicit.
         let s = specs(&["verbose|v"]);
-        let m: IndexMap<String, PerlValue> = IndexMap::new();
-        let meta = PerlValue::hash_ref(Arc::new(RwLock::new(m)));
+        let m: IndexMap<String, StrykeValue> = IndexMap::new();
+        let meta = StrykeValue::hash_ref(Arc::new(RwLock::new(m)));
         let (out, left) = call_with_argv(&["-v"], &[s, meta]).unwrap();
         assert_eq!(hget(&out, "verbose").to_int(), 1);
         assert!(left.is_empty());
@@ -1618,7 +1618,7 @@ mod tests {
             .scope
             .set_array(
                 "ARGV",
-                vec![PerlValue::string("should-be-untouched".into())],
+                vec![StrykeValue::string("should-be-untouched".into())],
             )
             .unwrap();
         let a = argv(&["--verbose"]);
@@ -1637,7 +1637,7 @@ mod tests {
         // SPECS as a hashref (D1 metadata form) with 1 arg → implicit @ARGV.
         let s = meta_spec(&[(
             "file|f=s",
-            &[("help", PerlValue::string("output".into()))],
+            &[("help", StrykeValue::string("output".into()))],
         )]);
         let (out, _left) = call_with_argv(&["--file=y.txt"], &[s]).unwrap();
         assert_eq!(hget(&out, "file").to_string(), "y.txt");

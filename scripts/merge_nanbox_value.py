@@ -8,7 +8,7 @@ BODY = ROOT / "scripts" / "nanbox_impl_body.rs"
 
 def main() -> None:
     s = VALUE.read_text()
-    i = s.find("impl PerlValue {")
+    i = s.find("impl StrykeValue {")
     j = s.find("\nfn parse_number")
     if i < 0 or j < 0:
         raise SystemExit(f"markers not found i={i} j={j}")

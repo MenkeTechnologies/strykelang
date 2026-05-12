@@ -6,18 +6,18 @@ use parking_lot::{Mutex, RwLock};
 
 use crate::ast::PerlTypeName;
 use crate::error::PerlError;
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 
 /// Thread-safe shared array for `mysync @a`.
 #[derive(Debug, Clone)]
-pub struct AtomicArray(pub Arc<Mutex<Vec<PerlValue>>>);
+pub struct AtomicArray(pub Arc<Mutex<Vec<StrykeValue>>>);
 
 /// Thread-safe shared hash for `mysync %h`.
 #[derive(Debug, Clone)]
-pub struct AtomicHash(pub Arc<Mutex<IndexMap<String, PerlValue>>>);
+pub struct AtomicHash(pub Arc<Mutex<IndexMap<String, StrykeValue>>>);
 
 type ScopeCaptureWithAtomics = (
-    Vec<(String, PerlValue)>,
+    Vec<(String, StrykeValue)>,
     Vec<(String, AtomicArray)>,
     Vec<(String, AtomicHash)>,
 );
@@ -26,7 +26,7 @@ type ScopeCaptureWithAtomics = (
 /// Aliased to keep the field declaration readable (clippy::type_complexity).
 type SharedHashEntry = (
     String,
-    Arc<parking_lot::RwLock<IndexMap<String, PerlValue>>>,
+    Arc<parking_lot::RwLock<IndexMap<String, StrykeValue>>>,
 );
 
 /// `main` is the default package — `$main::X` ≡ `$X`, `@main::INC` ≡
@@ -98,13 +98,13 @@ fn parse_positional_topic_slot(name: &str) -> Option<usize> {
 /// Saved bindings for `local $x` / `local @a` / `local %h` — restored on [`Scope::pop_frame`].
 #[derive(Clone, Debug)]
 enum LocalRestore {
-    Scalar(String, PerlValue),
-    Array(String, Vec<PerlValue>),
-    Hash(String, IndexMap<String, PerlValue>),
+    Scalar(String, StrykeValue),
+    Array(String, Vec<StrykeValue>),
+    Hash(String, IndexMap<String, StrykeValue>),
     /// `local $h{k}` — third is `None` if the key was absent before `local` (restore deletes the key).
-    HashElement(String, String, Option<PerlValue>),
+    HashElement(String, String, Option<StrykeValue>),
     /// `local $a[i]` — restore previous slot value (see [`Scope::local_set_array_element`]).
-    ArrayElement(String, i64, PerlValue),
+    ArrayElement(String, i64, StrykeValue),
 }
 
 /// A single lexical scope frame.
@@ -113,16 +113,16 @@ enum LocalRestore {
 /// hash overhead.
 #[derive(Debug, Clone)]
 struct Frame {
-    scalars: Vec<(String, PerlValue)>,
-    arrays: Vec<(String, Vec<PerlValue>)>,
+    scalars: Vec<(String, StrykeValue)>,
+    arrays: Vec<(String, Vec<StrykeValue>)>,
     /// Subroutine (or bootstrap) `@_` — stored separately so call paths can move the arg
     /// [`Vec`] into the frame without an extra copy via [`Frame::arrays`].
-    sub_underscore: Option<Vec<PerlValue>>,
-    hashes: Vec<(String, IndexMap<String, PerlValue>)>,
+    sub_underscore: Option<Vec<StrykeValue>>,
+    hashes: Vec<(String, IndexMap<String, StrykeValue>)>,
     /// Slot-indexed scalars for O(1) access from compiled subroutines.
     /// Compiler assigns `my $x` declarations a u8 slot index; the VM accesses
     /// `scalar_slots[idx]` directly without name lookup or frame walking.
-    scalar_slots: Vec<PerlValue>,
+    scalar_slots: Vec<StrykeValue>,
     /// Bare scalar name for each slot (same index as `scalar_slots`) — for [`Scope::capture`]
     /// / closures when the binding exists only in `scalar_slots`.
     scalar_slot_names: Vec<Option<String>>,
@@ -137,7 +137,7 @@ struct Frame {
     /// Arrays promoted to shared Arc-backed storage by `\@arr`.
     /// When a ref is taken, both the scope and the ref share the same Arc,
     /// so mutations through either path are visible. Re-declaration removes the entry.
-    shared_arrays: Vec<(String, Arc<parking_lot::RwLock<Vec<PerlValue>>>)>,
+    shared_arrays: Vec<(String, Arc<parking_lot::RwLock<Vec<StrykeValue>>>)>,
     /// Hashes promoted to shared Arc-backed storage by `\%hash`.
     shared_hashes: Vec<SharedHashEntry>,
     /// Thread-safe arrays from `mysync @a`
@@ -145,7 +145,7 @@ struct Frame {
     /// Thread-safe hashes from `mysync %h`
     atomic_hashes: Vec<(String, AtomicHash)>,
     /// `defer { BLOCK }` closures to run when this frame is popped (LIFO order).
-    defers: Vec<PerlValue>,
+    defers: Vec<StrykeValue>,
     /// True after the first [`Scope::set_topic`] call in this frame. Subsequent
     /// calls (the next iter of the SAME `map`/`grep`/etc.) skip the chain shift
     /// so `_<` keeps pointing at the enclosing scope's topic instead of rolling
@@ -211,7 +211,7 @@ impl Frame {
     }
 
     #[inline]
-    fn get_scalar(&self, name: &str) -> Option<&PerlValue> {
+    fn get_scalar(&self, name: &str) -> Option<&StrykeValue> {
         let name = strip_main_prefix(name).unwrap_or(name);
         if let Some(v) = self.get_scalar_from_slot(name) {
             return Some(v);
@@ -222,7 +222,7 @@ impl Frame {
     /// O(N) scan over slot names — only used by `get_scalar` fallback (name-based lookup);
     /// hot compiled paths use `get_scalar_slot(idx)` directly.
     #[inline]
-    fn get_scalar_from_slot(&self, name: &str) -> Option<&PerlValue> {
+    fn get_scalar_from_slot(&self, name: &str) -> Option<&StrykeValue> {
         let name = strip_main_prefix(name).unwrap_or(name);
         for (i, sn) in self.scalar_slot_names.iter().enumerate() {
             if let Some(ref n) = sn {
@@ -248,7 +248,7 @@ impl Frame {
     }
 
     #[inline]
-    fn set_scalar(&mut self, name: &str, val: PerlValue) {
+    fn set_scalar(&mut self, name: &str, val: StrykeValue) {
         let name = strip_main_prefix(name).unwrap_or(name);
         for (i, sn) in self.scalar_slot_names.iter().enumerate() {
             if let Some(ref n) = sn {
@@ -286,7 +286,7 @@ impl Frame {
     /// blocks would alias the iter value rather than the surrounding
     /// scope's topic.
     #[inline]
-    fn set_scalar_raw(&mut self, name: &str, val: PerlValue) {
+    fn set_scalar_raw(&mut self, name: &str, val: StrykeValue) {
         let name = strip_main_prefix(name).unwrap_or(name);
         for (i, sn) in self.scalar_slot_names.iter().enumerate() {
             if let Some(ref n) = sn {
@@ -306,7 +306,7 @@ impl Frame {
     }
 
     #[inline]
-    fn get_array(&self, name: &str) -> Option<&Vec<PerlValue>> {
+    fn get_array(&self, name: &str) -> Option<&Vec<StrykeValue>> {
         let name = strip_main_prefix(name).unwrap_or(name);
         if name == "_" {
             if let Some(ref v) = self.sub_underscore {
@@ -327,7 +327,7 @@ impl Frame {
     }
 
     #[inline]
-    fn get_array_mut(&mut self, name: &str) -> Option<&mut Vec<PerlValue>> {
+    fn get_array_mut(&mut self, name: &str) -> Option<&mut Vec<StrykeValue>> {
         let name = strip_main_prefix(name).unwrap_or(name);
         if name == "_" {
             return self.sub_underscore.as_mut();
@@ -339,7 +339,7 @@ impl Frame {
     }
 
     #[inline]
-    fn set_array(&mut self, name: &str, val: Vec<PerlValue>) {
+    fn set_array(&mut self, name: &str, val: Vec<StrykeValue>) {
         let name = strip_main_prefix(name).unwrap_or(name);
         if name == "_" {
             if let Some(pos) = self.arrays.iter().position(|(k, _)| k == name) {
@@ -356,7 +356,7 @@ impl Frame {
     }
 
     #[inline]
-    fn get_hash(&self, name: &str) -> Option<&IndexMap<String, PerlValue>> {
+    fn get_hash(&self, name: &str) -> Option<&IndexMap<String, StrykeValue>> {
         let name = strip_main_prefix(name).unwrap_or(name);
         self.hashes.iter().find(|(k, _)| k == name).map(|(_, v)| v)
     }
@@ -369,7 +369,7 @@ impl Frame {
     }
 
     #[inline]
-    fn get_hash_mut(&mut self, name: &str) -> Option<&mut IndexMap<String, PerlValue>> {
+    fn get_hash_mut(&mut self, name: &str) -> Option<&mut IndexMap<String, StrykeValue>> {
         let name = strip_main_prefix(name).unwrap_or(name);
         self.hashes
             .iter_mut()
@@ -378,7 +378,7 @@ impl Frame {
     }
 
     #[inline]
-    fn set_hash(&mut self, name: &str, val: IndexMap<String, PerlValue>) {
+    fn set_hash(&mut self, name: &str, val: IndexMap<String, StrykeValue>) {
         let name = strip_main_prefix(name).unwrap_or(name);
         if let Some(entry) = self.hashes.iter_mut().find(|(k, _)| k == name) {
             entry.1 = val;
@@ -560,7 +560,7 @@ impl Scope {
     /// Read scalar from slot — innermost binding for `slot` wins (same index can exist on nested
     /// frames; padding entries without [`Frame::owns_scalar_slot_index`] do not shadow outers).
     #[inline]
-    pub fn get_scalar_slot(&self, slot: u8) -> PerlValue {
+    pub fn get_scalar_slot(&self, slot: u8) -> StrykeValue {
         let idx = slot as usize;
         for frame in self.frames.iter().rev() {
             if idx < frame.scalar_slots.len() && frame.owns_scalar_slot_index(idx) {
@@ -573,12 +573,12 @@ impl Scope {
                 return val.clone();
             }
         }
-        PerlValue::UNDEF
+        StrykeValue::UNDEF
     }
 
     /// Write scalar to slot — innermost binding for `slot` wins (see [`Self::get_scalar_slot`]).
     #[inline]
-    pub fn set_scalar_slot(&mut self, slot: u8, val: PerlValue) {
+    pub fn set_scalar_slot(&mut self, slot: u8, val: StrykeValue) {
         let idx = slot as usize;
         let len = self.frames.len();
         for i in (0..len).rev() {
@@ -594,7 +594,7 @@ impl Scope {
             }
         }
         let top = self.frames.last_mut().unwrap();
-        top.scalar_slots.resize(idx + 1, PerlValue::UNDEF);
+        top.scalar_slots.resize(idx + 1, StrykeValue::UNDEF);
         if idx >= top.scalar_slot_names.len() {
             top.scalar_slot_names.resize(idx + 1, None);
         }
@@ -609,7 +609,7 @@ impl Scope {
     pub fn set_scalar_slot_checked(
         &mut self,
         slot: u8,
-        val: PerlValue,
+        val: StrykeValue,
         slot_name: Option<&str>,
     ) -> Result<(), PerlError> {
         if self.parallel_guard {
@@ -663,11 +663,11 @@ impl Scope {
     /// `name` (bare identifier, e.g. `x` for `$x`) is stored for [`Scope::capture`] when the
     /// binding is slot-only (no duplicate `frame.scalars` row).
     #[inline]
-    pub fn declare_scalar_slot(&mut self, slot: u8, val: PerlValue, name: Option<&str>) {
+    pub fn declare_scalar_slot(&mut self, slot: u8, val: StrykeValue, name: Option<&str>) {
         let idx = slot as usize;
         let frame = self.frames.last_mut().unwrap();
         if idx >= frame.scalar_slots.len() {
-            frame.scalar_slots.resize(idx + 1, PerlValue::UNDEF);
+            frame.scalar_slots.resize(idx + 1, StrykeValue::UNDEF);
         }
         frame.scalar_slots[idx] = val;
         if idx >= frame.scalar_slot_names.len() {
@@ -682,7 +682,7 @@ impl Scope {
 
     /// Slot-indexed `.=` — avoids frame walking and string comparison on every iteration.
     ///
-    /// Returns a [`PerlValue::shallow_clone`] (Arc::clone) of the stored value
+    /// Returns a [`StrykeValue::shallow_clone`] (Arc::clone) of the stored value
     /// rather than a full [`Clone`], which would deep-copy the entire `String`
     /// payload and turn a `$s .= "x"` loop into O(N²) memcpy.
     /// Repeated `$slot .= rhs` fused-loop fast path: locates the slot's frame once,
@@ -712,25 +712,25 @@ impl Scope {
         };
         let frame = &mut self.frames[fi];
         if idx >= frame.scalar_slots.len() {
-            frame.scalar_slots.resize(idx + 1, PerlValue::UNDEF);
+            frame.scalar_slots.resize(idx + 1, StrykeValue::UNDEF);
         }
         frame.scalar_slots[idx].try_concat_repeat_inplace(rhs, n)
     }
 
     /// Slow fallback for the fused string-append loop: clones the RHS into a new
-    /// `PerlValue::string` once and runs the existing `scalar_slot_concat_inplace`
+    /// `StrykeValue::string` once and runs the existing `scalar_slot_concat_inplace`
     /// path `n` times. Used by `Op::ConcatConstSlotLoop` when the slot is aliased
     /// and the in-place fast path rejected the mutation.
     #[inline]
     pub fn scalar_slot_concat_repeat_slow(&mut self, slot: u8, rhs: &str, n: usize) {
-        let pv = PerlValue::string(rhs.to_owned());
+        let pv = StrykeValue::string(rhs.to_owned());
         for _ in 0..n {
             let _ = self.scalar_slot_concat_inplace(slot, &pv);
         }
     }
 
     #[inline]
-    pub fn scalar_slot_concat_inplace(&mut self, slot: u8, rhs: &PerlValue) -> PerlValue {
+    pub fn scalar_slot_concat_inplace(&mut self, slot: u8, rhs: &StrykeValue) -> StrykeValue {
         let idx = slot as usize;
         let len = self.frames.len();
         let fi = {
@@ -751,7 +751,7 @@ impl Scope {
         };
         let frame = &mut self.frames[fi];
         if idx >= frame.scalar_slots.len() {
-            frame.scalar_slots.resize(idx + 1, PerlValue::UNDEF);
+            frame.scalar_slots.resize(idx + 1, StrykeValue::UNDEF);
         }
         // Fast path: when the slot holds the only `Arc<HeapObject::String>` handle,
         // extend the underlying `String` buffer in place — no Arc alloc, no full
@@ -763,7 +763,7 @@ impl Scope {
         if frame.scalar_slots[idx].try_concat_append_inplace(rhs) {
             return frame.scalar_slots[idx].shallow_clone();
         }
-        let new_val = std::mem::replace(&mut frame.scalar_slots[idx], PerlValue::UNDEF)
+        let new_val = std::mem::replace(&mut frame.scalar_slots[idx], StrykeValue::UNDEF)
             .concat_append_owned(rhs);
         let handle = new_val.shallow_clone();
         frame.scalar_slots[idx] = new_val;
@@ -817,7 +817,7 @@ impl Scope {
     }
 
     /// `local $name` — save current value, assign `val`; restore on `pop_frame`.
-    pub fn local_set_scalar(&mut self, name: &str, val: PerlValue) -> Result<(), PerlError> {
+    pub fn local_set_scalar(&mut self, name: &str, val: StrykeValue) -> Result<(), PerlError> {
         let old = self.get_scalar(name);
         if let Some(frame) = self.frames.last_mut() {
             frame
@@ -828,7 +828,7 @@ impl Scope {
     }
 
     /// `local @name` — not valid for `mysync` arrays.
-    pub fn local_set_array(&mut self, name: &str, val: Vec<PerlValue>) -> Result<(), PerlError> {
+    pub fn local_set_array(&mut self, name: &str, val: Vec<StrykeValue>) -> Result<(), PerlError> {
         if self.find_atomic_array(name).is_some() {
             return Err(PerlError::runtime(
                 "local cannot be used on mysync arrays",
@@ -849,7 +849,7 @@ impl Scope {
     pub fn local_set_hash(
         &mut self,
         name: &str,
-        val: IndexMap<String, PerlValue>,
+        val: IndexMap<String, StrykeValue>,
     ) -> Result<(), PerlError> {
         if self.find_atomic_hash(name).is_some() {
             return Err(PerlError::runtime(
@@ -872,7 +872,7 @@ impl Scope {
         &mut self,
         name: &str,
         key: &str,
-        val: PerlValue,
+        val: StrykeValue,
     ) -> Result<(), PerlError> {
         if self.find_atomic_hash(name).is_some() {
             return Err(PerlError::runtime(
@@ -902,7 +902,7 @@ impl Scope {
         &mut self,
         name: &str,
         index: i64,
-        val: PerlValue,
+        val: StrykeValue,
     ) -> Result<(), PerlError> {
         if self.find_atomic_array(name).is_some() {
             return Err(PerlError::runtime(
@@ -923,7 +923,7 @@ impl Scope {
     // ── Scalars ──
 
     #[inline]
-    pub fn declare_scalar(&mut self, name: &str, val: PerlValue) {
+    pub fn declare_scalar(&mut self, name: &str, val: StrykeValue) {
         let _ = self.declare_scalar_frozen(name, val, false, None);
     }
 
@@ -932,7 +932,7 @@ impl Scope {
     pub fn declare_scalar_frozen(
         &mut self,
         name: &str,
-        val: PerlValue,
+        val: StrykeValue,
         frozen: bool,
         ty: Option<PerlTypeName>,
     ) -> Result<(), PerlError> {
@@ -1012,7 +1012,7 @@ impl Scope {
     }
 
     #[inline]
-    pub fn get_scalar(&self, name: &str) -> PerlValue {
+    pub fn get_scalar(&self, name: &str) -> StrykeValue {
         // `$main::X` aliases the bare `$X` (default-package equivalence).
         if let Some(rest) = strip_main_prefix(name) {
             return self.get_scalar(rest);
@@ -1028,43 +1028,16 @@ impl Scope {
                 if let Some(arc) = val.as_capture_cell() {
                     return arc.read().clone();
                 }
-                // Topic-slot chain fallback: `_<`, `_<<`, … (and the `_N<+` /
-                // `_0<+` aliases) collapse to the current topic when the
-                // resolved chain entry is undef. The fallback only fires when
-                // the chain WAS established (some earlier `set_topic` declared
-                // an entry, possibly with undef from a pre-shift undef topic).
-                // Power-user pattern `$h->{_<}` reads as "outer iter's key" at
-                // the outermost map even with no enclosing closure to populate
-                // the chain. At never-shifted scopes (file scope), `_<` stays
-                // undef — preserving the existing fan-closure invariants.
-                if val.is_undef() && Self::is_topic_chain_name(name) {
-                    return self.get_scalar("_");
-                }
+                // Topic-slot chain (`_<`, `_<<`, `_N<+`, `_0<+`, …) reports
+                // the value at the requested ascent level verbatim. No
+                // fallback to current `_`: if no enclosing topic frame
+                // populated that level, the chain entry is undef and
+                // `_<` returns undef. This matches the documented
+                // semantics of "walk N frames up the topic chain".
                 return val.clone();
             }
         }
-        PerlValue::UNDEF
-    }
-
-    /// True for the topic-chain names that should fall back to `_` when undef:
-    /// `_<`, `_<<`, `_<<<`, `_<<<<` and the `_0<+` / `_N<+` aliases.
-    #[inline]
-    fn is_topic_chain_name(name: &str) -> bool {
-        let bytes = name.as_bytes();
-        if bytes.is_empty() || bytes[0] != b'_' {
-            return false;
-        }
-        let mut i = 1;
-        while i < bytes.len() && bytes[i].is_ascii_digit() {
-            i += 1;
-        }
-        if i >= bytes.len() || bytes[i] != b'<' {
-            return false;
-        }
-        while i < bytes.len() && bytes[i] == b'<' {
-            i += 1;
-        }
-        i == bytes.len()
+        StrykeValue::UNDEF
     }
 
     /// True for ANY topic-variant name: `_`, `_<+`, `_N`, `_N<+`. Matches
@@ -1156,7 +1129,7 @@ impl Scope {
     /// Get the raw scalar value WITHOUT unwrapping Atomic.
     /// Used by scope.capture() to preserve the Arc for sharing across threads.
     #[inline]
-    pub fn get_scalar_raw(&self, name: &str) -> PerlValue {
+    pub fn get_scalar_raw(&self, name: &str) -> StrykeValue {
         if let Some(rest) = strip_main_prefix(name) {
             return self.get_scalar_raw(rest);
         }
@@ -1165,7 +1138,7 @@ impl Scope {
                 return val.clone();
             }
         }
-        PerlValue::UNDEF
+        StrykeValue::UNDEF
     }
 
     /// Atomically read-modify-write a scalar. Holds the Mutex lock for
@@ -1176,8 +1149,8 @@ impl Scope {
     pub fn atomic_mutate(
         &mut self,
         name: &str,
-        f: impl FnOnce(&PerlValue) -> PerlValue,
-    ) -> Result<PerlValue, PerlError> {
+        f: impl FnOnce(&StrykeValue) -> StrykeValue,
+    ) -> Result<StrykeValue, PerlError> {
         for frame in self.frames.iter().rev() {
             if let Some(v) = frame.get_scalar(name) {
                 if let Some(arc) = v.as_atomic_arc() {
@@ -1204,8 +1177,8 @@ impl Scope {
     pub fn atomic_mutate_post(
         &mut self,
         name: &str,
-        f: impl FnOnce(&PerlValue) -> PerlValue,
-    ) -> Result<PerlValue, PerlError> {
+        f: impl FnOnce(&StrykeValue) -> StrykeValue,
+    ) -> Result<StrykeValue, PerlError> {
         for frame in self.frames.iter().rev() {
             if let Some(v) = frame.get_scalar(name) {
                 if let Some(arc) = v.as_atomic_arc() {
@@ -1227,15 +1200,15 @@ impl Scope {
     /// Append `rhs` to a scalar string in-place (no clone of the existing string).
     /// If the scalar is not yet a String, it is converted first.
     ///
-    /// The binding and the returned [`PerlValue`] share the same heap [`Arc`] via
-    /// [`PerlValue::shallow_clone`] on the store — a full [`Clone`] would deep-copy the
+    /// The binding and the returned [`StrykeValue`] share the same heap [`Arc`] via
+    /// [`StrykeValue::shallow_clone`] on the store — a full [`Clone`] would deep-copy the
     /// entire `String` each time and make repeated `.=` O(N²) in the total length.
     #[inline]
     pub fn scalar_concat_inplace(
         &mut self,
         name: &str,
-        rhs: &PerlValue,
-    ) -> Result<PerlValue, PerlError> {
+        rhs: &StrykeValue,
+    ) -> Result<StrykeValue, PerlError> {
         canon_main!(name);
         self.check_parallel_scalar_write(name)?;
         for frame in self.frames.iter_mut().rev() {
@@ -1244,7 +1217,7 @@ impl Scope {
                 // `into_string()` the wrapper (that would stringify the cell, not the payload).
                 if let Some(atomic_arc) = entry.1.as_atomic_arc() {
                     let mut guard = atomic_arc.lock();
-                    let inner = std::mem::replace(&mut *guard, PerlValue::UNDEF);
+                    let inner = std::mem::replace(&mut *guard, StrykeValue::UNDEF);
                     let new_val = inner.concat_append_owned(rhs);
                     *guard = new_val.shallow_clone();
                     return Ok(new_val);
@@ -1257,19 +1230,19 @@ impl Scope {
                 // Use `into_string` + `append_to` so heap strings take the `Arc::try_unwrap`
                 // fast path instead of `Display` / heap formatting on every `.=`.
                 let new_val =
-                    std::mem::replace(&mut entry.1, PerlValue::UNDEF).concat_append_owned(rhs);
+                    std::mem::replace(&mut entry.1, StrykeValue::UNDEF).concat_append_owned(rhs);
                 entry.1 = new_val.shallow_clone();
                 return Ok(new_val);
             }
         }
         // Variable not found — create as new string
-        let val = PerlValue::UNDEF.concat_append_owned(rhs);
+        let val = StrykeValue::UNDEF.concat_append_owned(rhs);
         self.frames[0].set_scalar(name, val.shallow_clone());
         Ok(val)
     }
 
     #[inline]
-    pub fn set_scalar(&mut self, name: &str, val: PerlValue) -> Result<(), PerlError> {
+    pub fn set_scalar(&mut self, name: &str, val: StrykeValue) -> Result<(), PerlError> {
         if let Some(rest) = strip_main_prefix(name) {
             return self.set_scalar(rest, val);
         }
@@ -1356,7 +1329,7 @@ impl Scope {
     /// matrix work — see `lexer.rs` for the lexing side and the user-visible
     /// rule "_< ≡ $_< ≡ _0< ≡ $_0<".
     #[inline]
-    fn declare_topic_slot(&mut self, slot: usize, level: usize, val: PerlValue) {
+    fn declare_topic_slot(&mut self, slot: usize, level: usize, val: StrykeValue) {
         // Use `set_scalar_raw` (frame method) so binding the topic does
         // NOT write through a closure-captured CaptureCell. Without this,
         // every per-iter HOF block call would clobber the surrounding
@@ -1397,7 +1370,7 @@ impl Scope {
     /// previous iter set" (which would roll). All previously-activated
     /// positional slots shift in lockstep on the first call.
     #[inline]
-    pub fn set_topic(&mut self, val: PerlValue) {
+    pub fn set_topic(&mut self, val: StrykeValue) {
         // Iteration re-entry detection: the per-frame `set_topic_called` flag
         // is true if a previous `set_topic` already shifted in this frame
         // (i.e. we're in the next iter of the SAME loop). Refresh `_` / `_0`
@@ -1413,7 +1386,7 @@ impl Scope {
         if already_shifted {
             self.declare_topic_slot(0, 0, val);
             for slot in 1..=self.max_active_slot {
-                self.declare_topic_slot(slot, 0, PerlValue::UNDEF);
+                self.declare_topic_slot(slot, 0, StrykeValue::UNDEF);
             }
             return;
         }
@@ -1422,7 +1395,7 @@ impl Scope {
         }
         self.shift_slot_chain(0, val);
         for slot in 1..=self.max_active_slot {
-            self.shift_slot_chain(slot, PerlValue::UNDEF);
+            self.shift_slot_chain(slot, StrykeValue::UNDEF);
         }
     }
 
@@ -1435,7 +1408,7 @@ impl Scope {
     /// from the caller fn so patterns like `grep _1, @$_` work without
     /// chain-ascent.
     #[inline]
-    pub fn set_topic_local(&mut self, val: PerlValue) {
+    pub fn set_topic_local(&mut self, val: StrykeValue) {
         self.declare_topic_slot(0, 0, val);
     }
 
@@ -1451,14 +1424,14 @@ impl Scope {
     /// older slots (the new "current" for an unbound slot is `undef`, so old
     /// values march through `_N<<<<` and eventually fall off the end).
     #[inline]
-    pub fn set_closure_args(&mut self, args: &[PerlValue]) {
+    pub fn set_closure_args(&mut self, args: &[StrykeValue]) {
         let n = args.len();
         if n == 0 {
             return;
         }
         let high = n.saturating_sub(1).max(self.max_active_slot);
         for slot in 0..=high {
-            let val = args.get(slot).cloned().unwrap_or(PerlValue::UNDEF);
+            let val = args.get(slot).cloned().unwrap_or(StrykeValue::UNDEF);
             self.shift_slot_chain(slot, val);
         }
         if n > 0 && n - 1 > self.max_active_slot {
@@ -1475,7 +1448,7 @@ impl Scope {
     /// at `_N<` would persist across multiple "no slot N here" frames and
     /// `_N<<<<<` would never reach 5 frames back.
     #[inline]
-    fn shift_slot_chain(&mut self, slot: usize, val: PerlValue) {
+    fn shift_slot_chain(&mut self, slot: usize, val: StrykeValue) {
         let l4 = self.get_scalar(&Self::topic_slot_key(slot, 4));
         let l3 = self.get_scalar(&Self::topic_slot_key(slot, 3));
         let l2 = self.get_scalar(&Self::topic_slot_key(slot, 2));
@@ -1498,7 +1471,7 @@ impl Scope {
     /// just work. Use this helper anywhere the legacy code wrote two adjacent
     /// `set_scalar("a", …); set_scalar("b", …)` lines.
     #[inline]
-    pub fn set_sort_pair(&mut self, a: PerlValue, b: PerlValue) {
+    pub fn set_sort_pair(&mut self, a: StrykeValue, b: StrykeValue) {
         let _ = self.set_scalar("a", a.clone());
         let _ = self.set_scalar("b", b.clone());
         let _ = self.set_scalar("_0", a.clone());
@@ -1515,7 +1488,7 @@ impl Scope {
     /// be restored after a block that corrupts it (like `sort { ... }`).
     /// Returns a 6-element array [level0..level5].
     #[inline]
-    pub fn save_topic_chain(&self) -> [PerlValue; 6] {
+    pub fn save_topic_chain(&self) -> [StrykeValue; 6] {
         [
             self.get_scalar(&Self::topic_slot_key(0, 0)),
             self.get_scalar(&Self::topic_slot_key(0, 1)),
@@ -1528,7 +1501,7 @@ impl Scope {
 
     /// Restore the topic slot 0 chain from a previous [`save_topic_chain`] call.
     #[inline]
-    pub fn restore_topic_chain(&mut self, saved: [PerlValue; 6]) {
+    pub fn restore_topic_chain(&mut self, saved: [StrykeValue; 6]) {
         for (level, val) in saved.into_iter().enumerate() {
             self.declare_topic_slot(0, level, val);
         }
@@ -1536,7 +1509,7 @@ impl Scope {
 
     /// Register a `defer { BLOCK }` closure to run when this scope exits.
     #[inline]
-    pub fn push_defer(&mut self, coderef: PerlValue) {
+    pub fn push_defer(&mut self, coderef: StrykeValue) {
         if let Some(frame) = self.frames.last_mut() {
             frame.defers.push(coderef);
         }
@@ -1545,7 +1518,7 @@ impl Scope {
     /// Take all deferred blocks from the current frame (for execution on scope exit).
     /// Returns them in reverse order (LIFO - last defer runs first).
     #[inline]
-    pub fn take_defers(&mut self) -> Vec<PerlValue> {
+    pub fn take_defers(&mut self) -> Vec<StrykeValue> {
         if let Some(frame) = self.frames.last_mut() {
             let mut defers = std::mem::take(&mut frame.defers);
             defers.reverse();
@@ -1557,7 +1530,7 @@ impl Scope {
 
     // ── Atomic array/hash declarations ──
 
-    pub fn declare_atomic_array(&mut self, name: &str, val: Vec<PerlValue>) {
+    pub fn declare_atomic_array(&mut self, name: &str, val: Vec<StrykeValue>) {
         canon_main!(name);
         if let Some(frame) = self.frames.last_mut() {
             frame
@@ -1566,7 +1539,7 @@ impl Scope {
         }
     }
 
-    pub fn declare_atomic_hash(&mut self, name: &str, val: IndexMap<String, PerlValue>) {
+    pub fn declare_atomic_hash(&mut self, name: &str, val: IndexMap<String, StrykeValue>) {
         canon_main!(name);
         if let Some(frame) = self.frames.last_mut() {
             frame
@@ -1602,15 +1575,15 @@ impl Scope {
     /// Remove `@_` from the innermost frame without cloning (move out of the frame `sub_underscore` field).
     /// Call sites restore with [`Self::declare_array`] before running a body that uses `shift` / `@_`.
     #[inline]
-    pub fn take_sub_underscore(&mut self) -> Option<Vec<PerlValue>> {
+    pub fn take_sub_underscore(&mut self) -> Option<Vec<StrykeValue>> {
         self.frames.last_mut()?.sub_underscore.take()
     }
 
-    pub fn declare_array(&mut self, name: &str, val: Vec<PerlValue>) {
+    pub fn declare_array(&mut self, name: &str, val: Vec<StrykeValue>) {
         self.declare_array_frozen(name, val, false);
     }
 
-    pub fn declare_array_frozen(&mut self, name: &str, val: Vec<PerlValue>, frozen: bool) {
+    pub fn declare_array_frozen(&mut self, name: &str, val: Vec<StrykeValue>, frozen: bool) {
         canon_main!(name);
         // Package stash names (`Foo::BAR`) live in the outermost frame so nested blocks/subs
         // cannot shadow `@C::ISA` with an empty array (breaks inheritance / SUPER).
@@ -1632,7 +1605,7 @@ impl Scope {
         }
     }
 
-    pub fn get_array(&self, name: &str) -> Vec<PerlValue> {
+    pub fn get_array(&self, name: &str) -> Vec<StrykeValue> {
         // `@main::X` aliases the bare `@X` because `main` is the default
         // package — `@main::INC` ≡ `@INC`, `@main::ARGV` ≡ `@ARGV`,
         // `@main::fpath` ≡ `@fpath`. The bare form is what's actually
@@ -1668,7 +1641,7 @@ impl Scope {
     /// Borrow the innermost binding for `name` when it is a plain [`Vec`] (not `mysync`).
     /// Used to pass `@_` to [`crate::list_builtins::native_dispatch`] without cloning the vector.
     #[inline]
-    pub fn get_array_borrow(&self, name: &str) -> Option<&[PerlValue]> {
+    pub fn get_array_borrow(&self, name: &str) -> Option<&[StrykeValue]> {
         if let Some(rest) = strip_main_prefix(name) {
             return self.get_array_borrow(rest);
         }
@@ -1732,14 +1705,14 @@ impl Scope {
     /// as an *element* inside a container (array/hash) — NOT for scalar assignment,
     /// where binding refs must stay live for aliasing.
     #[inline]
-    pub fn resolve_container_binding_ref(&self, val: PerlValue) -> PerlValue {
+    pub fn resolve_container_binding_ref(&self, val: StrykeValue) -> StrykeValue {
         if let Some(name) = val.as_array_binding_name() {
             let data = self.get_array(&name);
-            return PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(data)));
+            return StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(data)));
         }
         if let Some(name) = val.as_hash_binding_name() {
             let data = self.get_hash(&name);
-            return PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(data)));
+            return StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(data)));
         }
         val
     }
@@ -1750,7 +1723,7 @@ impl Scope {
     pub fn promote_array_to_shared(
         &mut self,
         name: &str,
-    ) -> Arc<parking_lot::RwLock<Vec<PerlValue>>> {
+    ) -> Arc<parking_lot::RwLock<Vec<StrykeValue>>> {
         // Atomic (mysync) arrays: snapshot current data into a separate Arc.
         // Can't share the Mutex-backed storage directly.
         if let Some(aa) = self.find_atomic_array(name) {
@@ -1783,7 +1756,7 @@ impl Scope {
     pub fn promote_hash_to_shared(
         &mut self,
         name: &str,
-    ) -> Arc<parking_lot::RwLock<IndexMap<String, PerlValue>>> {
+    ) -> Arc<parking_lot::RwLock<IndexMap<String, StrykeValue>>> {
         let idx = self.resolve_hash_frame_idx(name).unwrap_or_default();
         let frame = &mut self.frames[idx];
         if let Some(entry) = frame.shared_hashes.iter().find(|(k, _)| k == name) {
@@ -1802,7 +1775,7 @@ impl Scope {
     }
 
     /// Find the shared Arc for `@name`, if any.
-    fn find_shared_array(&self, name: &str) -> Option<Arc<parking_lot::RwLock<Vec<PerlValue>>>> {
+    fn find_shared_array(&self, name: &str) -> Option<Arc<parking_lot::RwLock<Vec<StrykeValue>>>> {
         let name = strip_main_prefix(name).unwrap_or(name);
         for frame in self.frames.iter().rev() {
             if let Some(entry) = frame.shared_arrays.iter().find(|(k, _)| k == name) {
@@ -1820,7 +1793,7 @@ impl Scope {
     fn find_shared_hash(
         &self,
         name: &str,
-    ) -> Option<Arc<parking_lot::RwLock<IndexMap<String, PerlValue>>>> {
+    ) -> Option<Arc<parking_lot::RwLock<IndexMap<String, StrykeValue>>>> {
         let name = strip_main_prefix(name).unwrap_or(name);
         for frame in self.frames.iter().rev() {
             if let Some(entry) = frame.shared_hashes.iter().find(|(k, _)| k == name) {
@@ -1833,7 +1806,7 @@ impl Scope {
         None
     }
 
-    pub fn get_array_mut(&mut self, name: &str) -> Result<&mut Vec<PerlValue>, PerlError> {
+    pub fn get_array_mut(&mut self, name: &str) -> Result<&mut Vec<StrykeValue>, PerlError> {
         // Note: can't return &mut into a Mutex. Callers needing atomic array
         // mutation should use atomic_array_mutate instead. For non-atomic arrays:
         if self.find_atomic_array(name).is_some() {
@@ -1852,7 +1825,7 @@ impl Scope {
     }
 
     /// Push to array — works for both regular and atomic arrays.
-    pub fn push_to_array(&mut self, name: &str, val: PerlValue) -> Result<(), PerlError> {
+    pub fn push_to_array(&mut self, name: &str, val: StrykeValue) -> Result<(), PerlError> {
         let val = self.resolve_container_binding_ref(val);
         if let Some(aa) = self.find_atomic_array(name) {
             aa.0.lock().push(val);
@@ -1867,7 +1840,7 @@ impl Scope {
     }
 
     /// Bulk `push @name, start..end-1` for the fused counted-loop superinstruction:
-    /// reserves the `Vec` once, then pushes `PerlValue::integer(i)` for `i in start..end`
+    /// reserves the `Vec` once, then pushes `StrykeValue::integer(i)` for `i in start..end`
     /// in a tight Rust loop. Atomic arrays take a single `lock().push()` burst.
     pub fn push_int_range_to_array(
         &mut self,
@@ -1883,35 +1856,35 @@ impl Scope {
             let mut g = aa.0.lock();
             g.reserve(count);
             for i in start..end {
-                g.push(PerlValue::integer(i));
+                g.push(StrykeValue::integer(i));
             }
             return Ok(());
         }
         let arr = self.get_array_mut(name)?;
         arr.reserve(count);
         for i in start..end {
-            arr.push(PerlValue::integer(i));
+            arr.push(StrykeValue::integer(i));
         }
         Ok(())
     }
 
     /// Pop from array — works for regular, shared, and atomic arrays.
-    pub fn pop_from_array(&mut self, name: &str) -> Result<PerlValue, PerlError> {
+    pub fn pop_from_array(&mut self, name: &str) -> Result<StrykeValue, PerlError> {
         if let Some(aa) = self.find_atomic_array(name) {
-            return Ok(aa.0.lock().pop().unwrap_or(PerlValue::UNDEF));
+            return Ok(aa.0.lock().pop().unwrap_or(StrykeValue::UNDEF));
         }
         if let Some(arc) = self.find_shared_array(name) {
-            return Ok(arc.write().pop().unwrap_or(PerlValue::UNDEF));
+            return Ok(arc.write().pop().unwrap_or(StrykeValue::UNDEF));
         }
-        Ok(self.get_array_mut(name)?.pop().unwrap_or(PerlValue::UNDEF))
+        Ok(self.get_array_mut(name)?.pop().unwrap_or(StrykeValue::UNDEF))
     }
 
     /// Shift from array — works for regular, shared, and atomic arrays.
-    pub fn shift_from_array(&mut self, name: &str) -> Result<PerlValue, PerlError> {
+    pub fn shift_from_array(&mut self, name: &str) -> Result<StrykeValue, PerlError> {
         if let Some(aa) = self.find_atomic_array(name) {
             let mut guard = aa.0.lock();
             return Ok(if guard.is_empty() {
-                PerlValue::UNDEF
+                StrykeValue::UNDEF
             } else {
                 guard.remove(0)
             });
@@ -1919,14 +1892,14 @@ impl Scope {
         if let Some(arc) = self.find_shared_array(name) {
             let mut arr = arc.write();
             return Ok(if arr.is_empty() {
-                PerlValue::UNDEF
+                StrykeValue::UNDEF
             } else {
                 arr.remove(0)
             });
         }
         let arr = self.get_array_mut(name)?;
         Ok(if arr.is_empty() {
-            PerlValue::UNDEF
+            StrykeValue::UNDEF
         } else {
             arr.remove(0)
         })
@@ -1940,11 +1913,11 @@ impl Scope {
         name: &str,
         off: usize,
         end: usize,
-        rep_vals: Vec<PerlValue>,
-    ) -> Result<Vec<PerlValue>, PerlError> {
+        rep_vals: Vec<StrykeValue>,
+    ) -> Result<Vec<StrykeValue>, PerlError> {
         if let Some(aa) = self.find_atomic_array(name) {
             let mut g = aa.0.lock();
-            let removed: Vec<PerlValue> = g.drain(off..end).collect();
+            let removed: Vec<StrykeValue> = g.drain(off..end).collect();
             for (i, v) in rep_vals.into_iter().enumerate() {
                 g.insert(off + i, v);
             }
@@ -1952,14 +1925,14 @@ impl Scope {
         }
         if let Some(arc) = self.find_shared_array(name) {
             let mut g = arc.write();
-            let removed: Vec<PerlValue> = g.drain(off..end).collect();
+            let removed: Vec<StrykeValue> = g.drain(off..end).collect();
             for (i, v) in rep_vals.into_iter().enumerate() {
                 g.insert(off + i, v);
             }
             return Ok(removed);
         }
         let arr = self.get_array_mut(name)?;
-        let removed: Vec<PerlValue> = arr.drain(off..end).collect();
+        let removed: Vec<StrykeValue> = arr.drain(off..end).collect();
         for (i, v) in rep_vals.into_iter().enumerate() {
             arr.insert(off + i, v);
         }
@@ -1991,7 +1964,7 @@ impl Scope {
         0
     }
 
-    pub fn set_array(&mut self, name: &str, val: Vec<PerlValue>) -> Result<(), PerlError> {
+    pub fn set_array(&mut self, name: &str, val: Vec<StrykeValue>) -> Result<(), PerlError> {
         if let Some(aa) = self.find_atomic_array(name) {
             *aa.0.lock() = val;
             return Ok(());
@@ -2013,7 +1986,7 @@ impl Scope {
 
     /// Direct element access — works for both regular and atomic arrays.
     #[inline]
-    pub fn get_array_element(&self, name: &str, index: i64) -> PerlValue {
+    pub fn get_array_element(&self, name: &str, index: i64) -> StrykeValue {
         canon_main!(name);
         if let Some(aa) = self.find_atomic_array(name) {
             let arr = aa.0.lock();
@@ -2022,7 +1995,7 @@ impl Scope {
             } else {
                 index as usize
             };
-            return arr.get(idx).cloned().unwrap_or(PerlValue::UNDEF);
+            return arr.get(idx).cloned().unwrap_or(StrykeValue::UNDEF);
         }
         if let Some(arc) = self.find_shared_array(name) {
             let arr = arc.read();
@@ -2031,7 +2004,7 @@ impl Scope {
             } else {
                 index as usize
             };
-            return arr.get(idx).cloned().unwrap_or(PerlValue::UNDEF);
+            return arr.get(idx).cloned().unwrap_or(StrykeValue::UNDEF);
         }
         for frame in self.frames.iter().rev() {
             if let Some(arr) = frame.get_array(name) {
@@ -2040,17 +2013,17 @@ impl Scope {
                 } else {
                     index as usize
                 };
-                return arr.get(idx).cloned().unwrap_or(PerlValue::UNDEF);
+                return arr.get(idx).cloned().unwrap_or(StrykeValue::UNDEF);
             }
         }
-        PerlValue::UNDEF
+        StrykeValue::UNDEF
     }
 
     pub fn set_array_element(
         &mut self,
         name: &str,
         index: i64,
-        val: PerlValue,
+        val: StrykeValue,
     ) -> Result<(), PerlError> {
         let val = self.resolve_container_binding_ref(val);
         if let Some(aa) = self.find_atomic_array(name) {
@@ -2061,7 +2034,7 @@ impl Scope {
                 index as usize
             };
             if idx >= arr.len() {
-                arr.resize(idx + 1, PerlValue::UNDEF);
+                arr.resize(idx + 1, StrykeValue::UNDEF);
             }
             arr[idx] = val;
             return Ok(());
@@ -2074,7 +2047,7 @@ impl Scope {
                 index as usize
             };
             if idx >= arr.len() {
-                arr.resize(idx + 1, PerlValue::UNDEF);
+                arr.resize(idx + 1, StrykeValue::UNDEF);
             }
             arr[idx] = val;
             return Ok(());
@@ -2087,7 +2060,7 @@ impl Scope {
             index as usize
         };
         if idx >= arr.len() {
-            arr.resize(idx + 1, PerlValue::UNDEF);
+            arr.resize(idx + 1, StrykeValue::UNDEF);
         }
         arr[idx] = val;
         Ok(())
@@ -2119,7 +2092,7 @@ impl Scope {
     }
 
     /// Perl `delete $a[$i]` — sets the element to `undef`, returns the previous value.
-    pub fn delete_array_element(&mut self, name: &str, index: i64) -> Result<PerlValue, PerlError> {
+    pub fn delete_array_element(&mut self, name: &str, index: i64) -> Result<StrykeValue, PerlError> {
         if let Some(aa) = self.find_atomic_array(name) {
             let mut arr = aa.0.lock();
             let idx = if index < 0 {
@@ -2128,10 +2101,10 @@ impl Scope {
                 index as usize
             };
             if idx >= arr.len() {
-                return Ok(PerlValue::UNDEF);
+                return Ok(StrykeValue::UNDEF);
             }
-            let old = arr.get(idx).cloned().unwrap_or(PerlValue::UNDEF);
-            arr[idx] = PerlValue::UNDEF;
+            let old = arr.get(idx).cloned().unwrap_or(StrykeValue::UNDEF);
+            arr[idx] = StrykeValue::UNDEF;
             return Ok(old);
         }
         let arr = self.get_array_mut(name)?;
@@ -2141,24 +2114,24 @@ impl Scope {
             index as usize
         };
         if idx >= arr.len() {
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
-        let old = arr.get(idx).cloned().unwrap_or(PerlValue::UNDEF);
-        arr[idx] = PerlValue::UNDEF;
+        let old = arr.get(idx).cloned().unwrap_or(StrykeValue::UNDEF);
+        arr[idx] = StrykeValue::UNDEF;
         Ok(old)
     }
 
     // ── Hashes ──
 
     #[inline]
-    pub fn declare_hash(&mut self, name: &str, val: IndexMap<String, PerlValue>) {
+    pub fn declare_hash(&mut self, name: &str, val: IndexMap<String, StrykeValue>) {
         self.declare_hash_frozen(name, val, false);
     }
 
     pub fn declare_hash_frozen(
         &mut self,
         name: &str,
-        val: IndexMap<String, PerlValue>,
+        val: IndexMap<String, StrykeValue>,
         frozen: bool,
     ) {
         canon_main!(name);
@@ -2173,7 +2146,7 @@ impl Scope {
     }
 
     /// Declare a hash in the bottom (global) frame, not the current lexical frame.
-    pub fn declare_hash_global(&mut self, name: &str, val: IndexMap<String, PerlValue>) {
+    pub fn declare_hash_global(&mut self, name: &str, val: IndexMap<String, StrykeValue>) {
         canon_main!(name);
         if let Some(frame) = self.frames.first_mut() {
             frame.set_hash(name, val);
@@ -2181,7 +2154,7 @@ impl Scope {
     }
 
     /// Declare a frozen hash in the bottom (global) frame — prevents user reassignment.
-    pub fn declare_hash_global_frozen(&mut self, name: &str, val: IndexMap<String, PerlValue>) {
+    pub fn declare_hash_global_frozen(&mut self, name: &str, val: IndexMap<String, StrykeValue>) {
         canon_main!(name);
         if let Some(frame) = self.frames.first_mut() {
             frame.set_hash(name, val);
@@ -2201,7 +2174,7 @@ impl Scope {
         self.frames.iter().any(|f| f.has_hash(name))
     }
 
-    pub fn get_hash(&self, name: &str) -> IndexMap<String, PerlValue> {
+    pub fn get_hash(&self, name: &str) -> IndexMap<String, StrykeValue> {
         // `%main::X` aliases the bare `%X` (default-package equivalence).
         if let Some(rest) = strip_main_prefix(name) {
             return self.get_hash(rest);
@@ -2260,7 +2233,7 @@ impl Scope {
     pub fn get_hash_mut(
         &mut self,
         name: &str,
-    ) -> Result<&mut IndexMap<String, PerlValue>, PerlError> {
+    ) -> Result<&mut IndexMap<String, StrykeValue>, PerlError> {
         if self.find_atomic_hash(name).is_some() {
             return Err(PerlError::runtime(
                 "get_hash_mut: use atomic path for mysync hashes",
@@ -2279,7 +2252,7 @@ impl Scope {
     pub fn set_hash(
         &mut self,
         name: &str,
-        val: IndexMap<String, PerlValue>,
+        val: IndexMap<String, StrykeValue>,
     ) -> Result<(), PerlError> {
         if let Some(ah) = self.find_atomic_hash(name) {
             *ah.0.lock() = val;
@@ -2297,20 +2270,20 @@ impl Scope {
     }
 
     #[inline]
-    pub fn get_hash_element(&self, name: &str, key: &str) -> PerlValue {
+    pub fn get_hash_element(&self, name: &str, key: &str) -> StrykeValue {
         canon_main!(name);
         if let Some(ah) = self.find_atomic_hash(name) {
-            return ah.0.lock().get(key).cloned().unwrap_or(PerlValue::UNDEF);
+            return ah.0.lock().get(key).cloned().unwrap_or(StrykeValue::UNDEF);
         }
         if let Some(arc) = self.find_shared_hash(name) {
-            return arc.read().get(key).cloned().unwrap_or(PerlValue::UNDEF);
+            return arc.read().get(key).cloned().unwrap_or(StrykeValue::UNDEF);
         }
         for frame in self.frames.iter().rev() {
             if let Some(hash) = frame.get_hash(name) {
-                return hash.get(key).cloned().unwrap_or(PerlValue::UNDEF);
+                return hash.get(key).cloned().unwrap_or(StrykeValue::UNDEF);
             }
         }
-        PerlValue::UNDEF
+        StrykeValue::UNDEF
     }
 
     /// Atomically read-modify-write a hash element. For atomic hashes, holds
@@ -2319,11 +2292,11 @@ impl Scope {
         &mut self,
         name: &str,
         key: &str,
-        f: impl FnOnce(&PerlValue) -> PerlValue,
-    ) -> Result<PerlValue, PerlError> {
+        f: impl FnOnce(&StrykeValue) -> StrykeValue,
+    ) -> Result<StrykeValue, PerlError> {
         if let Some(ah) = self.find_atomic_hash(name) {
             let mut guard = ah.0.lock();
-            let old = guard.get(key).cloned().unwrap_or(PerlValue::UNDEF);
+            let old = guard.get(key).cloned().unwrap_or(StrykeValue::UNDEF);
             let new_val = f(&old);
             guard.insert(key.to_string(), new_val.clone());
             return Ok(new_val);
@@ -2340,8 +2313,8 @@ impl Scope {
         &mut self,
         name: &str,
         index: i64,
-        f: impl FnOnce(&PerlValue) -> PerlValue,
-    ) -> Result<PerlValue, PerlError> {
+        f: impl FnOnce(&StrykeValue) -> StrykeValue,
+    ) -> Result<StrykeValue, PerlError> {
         if let Some(aa) = self.find_atomic_array(name) {
             let mut guard = aa.0.lock();
             let idx = if index < 0 {
@@ -2350,7 +2323,7 @@ impl Scope {
                 index as usize
             };
             if idx >= guard.len() {
-                guard.resize(idx + 1, PerlValue::UNDEF);
+                guard.resize(idx + 1, StrykeValue::UNDEF);
             }
             let old = guard[idx].clone();
             let new_val = f(&old);
@@ -2368,7 +2341,7 @@ impl Scope {
         &mut self,
         name: &str,
         key: &str,
-        val: PerlValue,
+        val: StrykeValue,
     ) -> Result<(), PerlError> {
         let val = self.resolve_container_binding_ref(val);
         // `$SIG{INT} = \&h` — lazily install the matching signal hook. Until Perl code touches
@@ -2409,7 +2382,7 @@ impl Scope {
             let mut buf = itoa::Buffer::new();
             for i in start..end {
                 let key = buf.format(i).to_owned();
-                g.insert(key, PerlValue::integer(i.wrapping_mul(k)));
+                g.insert(key, StrykeValue::integer(i.wrapping_mul(k)));
             }
             return Ok(());
         }
@@ -2418,18 +2391,18 @@ impl Scope {
         let mut buf = itoa::Buffer::new();
         for i in start..end {
             let key = buf.format(i).to_owned();
-            hash.insert(key, PerlValue::integer(i.wrapping_mul(k)));
+            hash.insert(key, StrykeValue::integer(i.wrapping_mul(k)));
         }
         Ok(())
     }
 
-    pub fn delete_hash_element(&mut self, name: &str, key: &str) -> Result<PerlValue, PerlError> {
+    pub fn delete_hash_element(&mut self, name: &str, key: &str) -> Result<StrykeValue, PerlError> {
         canon_main!(name);
         if let Some(ah) = self.find_atomic_hash(name) {
-            return Ok(ah.0.lock().shift_remove(key).unwrap_or(PerlValue::UNDEF));
+            return Ok(ah.0.lock().shift_remove(key).unwrap_or(StrykeValue::UNDEF));
         }
         let hash = self.get_hash_mut(name)?;
-        Ok(hash.shift_remove(key).unwrap_or(PerlValue::UNDEF))
+        Ok(hash.shift_remove(key).unwrap_or(StrykeValue::UNDEF))
     }
 
     #[inline]
@@ -2449,9 +2422,9 @@ impl Scope {
     /// Walk all values of the named hash with a visitor. Used by the fused
     /// `for my $k (keys %h) { $sum += $h{$k} }` op so the hot loop runs without
     /// cloning the entire map into a keys array (vs the un-fused shape, which
-    /// allocates one `PerlValue::string` per key).
+    /// allocates one `StrykeValue::string` per key).
     #[inline]
-    pub fn for_each_hash_value(&self, name: &str, mut visit: impl FnMut(&PerlValue)) {
+    pub fn for_each_hash_value(&self, name: &str, mut visit: impl FnMut(&StrykeValue)) {
         canon_main!(name);
         if let Some(ah) = self.find_atomic_hash(name) {
             let g = ah.0.lock();
@@ -2608,7 +2581,7 @@ impl Scope {
         out
     }
 
-    pub fn capture(&mut self) -> Vec<(String, PerlValue)> {
+    pub fn capture(&mut self) -> Vec<(String, StrykeValue)> {
         // Capture wraps simple scalars in CaptureCell so repeat calls of the
         // SAME closure share state internally (factory pattern: `sub { ++$n }`
         // counts up). Whether the OUTER scope's storage is updated to share
@@ -2646,7 +2619,7 @@ impl Scope {
                 if v.as_capture_cell().is_some() || v.as_scalar_ref().is_some() {
                     captured.push((format!("${}", k), v.clone()));
                 } else if v.is_simple_scalar() {
-                    let wrapped = PerlValue::capture_cell(Arc::new(RwLock::new(v.clone())));
+                    let wrapped = StrykeValue::capture_cell(Arc::new(RwLock::new(v.clone())));
                     *v = wrapped.clone();
                     captured.push((format!("${}", k), wrapped));
                 } else {
@@ -2679,7 +2652,7 @@ impl Scope {
                     let cap_val = if v.as_capture_cell().is_some() || v.as_scalar_ref().is_some() {
                         v.clone()
                     } else {
-                        let wrapped = PerlValue::capture_cell(Arc::new(RwLock::new(v.clone())));
+                        let wrapped = StrykeValue::capture_cell(Arc::new(RwLock::new(v.clone())));
                         if by_ref {
                             *v = wrapped.clone();
                         }
@@ -2693,9 +2666,9 @@ impl Scope {
                     continue;
                 }
                 if frame.frozen_arrays.contains(k) {
-                    captured.push((format!("@frozen:{}", k), PerlValue::array(v.clone())));
+                    captured.push((format!("@frozen:{}", k), StrykeValue::array(v.clone())));
                 } else {
-                    captured.push((format!("@{}", k), PerlValue::array(v.clone())));
+                    captured.push((format!("@{}", k), StrykeValue::array(v.clone())));
                 }
             }
             for (k, v) in &frame.hashes {
@@ -2703,21 +2676,21 @@ impl Scope {
                     continue;
                 }
                 if frame.frozen_hashes.contains(k) {
-                    captured.push((format!("%frozen:{}", k), PerlValue::hash(v.clone())));
+                    captured.push((format!("%frozen:{}", k), StrykeValue::hash(v.clone())));
                 } else {
-                    captured.push((format!("%{}", k), PerlValue::hash(v.clone())));
+                    captured.push((format!("%{}", k), StrykeValue::hash(v.clone())));
                 }
             }
             for (k, _aa) in &frame.atomic_arrays {
                 captured.push((
                     format!("@sync_{}", k),
-                    PerlValue::atomic(Arc::new(Mutex::new(PerlValue::string(String::new())))),
+                    StrykeValue::atomic(Arc::new(Mutex::new(StrykeValue::string(String::new())))),
                 ));
             }
             for (k, _ah) in &frame.atomic_hashes {
                 captured.push((
                     format!("%sync_{}", k),
-                    PerlValue::atomic(Arc::new(Mutex::new(PerlValue::string(String::new())))),
+                    StrykeValue::atomic(Arc::new(Mutex::new(StrykeValue::string(String::new())))),
                 ));
             }
         }
@@ -2743,9 +2716,9 @@ impl Scope {
                     continue;
                 }
                 if frame.frozen_arrays.contains(k) {
-                    scalars.push((format!("@frozen:{}", k), PerlValue::array(v.clone())));
+                    scalars.push((format!("@frozen:{}", k), StrykeValue::array(v.clone())));
                 } else {
-                    scalars.push((format!("@{}", k), PerlValue::array(v.clone())));
+                    scalars.push((format!("@{}", k), StrykeValue::array(v.clone())));
                 }
             }
             for (k, v) in &frame.hashes {
@@ -2753,9 +2726,9 @@ impl Scope {
                     continue;
                 }
                 if frame.frozen_hashes.contains(k) {
-                    scalars.push((format!("%frozen:{}", k), PerlValue::hash(v.clone())));
+                    scalars.push((format!("%frozen:{}", k), StrykeValue::hash(v.clone())));
                 } else {
-                    scalars.push((format!("%{}", k), PerlValue::hash(v.clone())));
+                    scalars.push((format!("%{}", k), StrykeValue::hash(v.clone())));
                 }
             }
             for (k, aa) in &frame.atomic_arrays {
@@ -2768,7 +2741,7 @@ impl Scope {
         (scalars, arrays, hashes)
     }
 
-    pub fn restore_capture(&mut self, captured: &[(String, PerlValue)]) {
+    pub fn restore_capture(&mut self, captured: &[(String, StrykeValue)]) {
         for (name, val) in captured {
             if let Some(rest) = name.strip_prefix("$slot:") {
                 // "$slot:INDEX:NAME" — restore into scalar_slots only.
@@ -2838,7 +2811,7 @@ impl Scope {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::value::PerlValue;
+    use crate::value::StrykeValue;
 
     #[test]
     fn missing_scalar_is_undef() {
@@ -2849,9 +2822,9 @@ mod tests {
     #[test]
     fn inner_frame_shadows_outer_scalar() {
         let mut s = Scope::new();
-        s.declare_scalar("a", PerlValue::integer(1));
+        s.declare_scalar("a", StrykeValue::integer(1));
         s.push_frame();
-        s.declare_scalar("a", PerlValue::integer(2));
+        s.declare_scalar("a", StrykeValue::integer(2));
         assert_eq!(s.get_scalar("a").to_int(), 2);
         s.pop_frame();
         assert_eq!(s.get_scalar("a").to_int(), 1);
@@ -2860,10 +2833,10 @@ mod tests {
     #[test]
     fn set_scalar_updates_innermost_binding() {
         let mut s = Scope::new();
-        s.declare_scalar("a", PerlValue::integer(1));
+        s.declare_scalar("a", StrykeValue::integer(1));
         s.push_frame();
-        s.declare_scalar("a", PerlValue::integer(2));
-        let _ = s.set_scalar("a", PerlValue::integer(99));
+        s.declare_scalar("a", StrykeValue::integer(2));
+        let _ = s.set_scalar("a", StrykeValue::integer(99));
         assert_eq!(s.get_scalar("a").to_int(), 99);
         s.pop_frame();
         assert_eq!(s.get_scalar("a").to_int(), 1);
@@ -2875,9 +2848,9 @@ mod tests {
         s.declare_array(
             "a",
             vec![
-                PerlValue::integer(10),
-                PerlValue::integer(20),
-                PerlValue::integer(30),
+                StrykeValue::integer(10),
+                StrykeValue::integer(20),
+                StrykeValue::integer(30),
             ],
         );
         assert_eq!(s.get_array_element("a", -1).to_int(), 30);
@@ -2887,7 +2860,7 @@ mod tests {
     fn set_array_element_extends_array_with_undef_gaps() {
         let mut s = Scope::new();
         s.declare_array("a", vec![]);
-        s.set_array_element("a", 2, PerlValue::integer(7)).unwrap();
+        s.set_array_element("a", 2, StrykeValue::integer(7)).unwrap();
         assert_eq!(s.get_array_element("a", 2).to_int(), 7);
         assert!(s.get_array_element("a", 0).is_undef());
     }
@@ -2895,7 +2868,7 @@ mod tests {
     #[test]
     fn capture_restore_roundtrip_scalar() {
         let mut s = Scope::new();
-        s.declare_scalar("n", PerlValue::integer(42));
+        s.declare_scalar("n", StrykeValue::integer(42));
         let cap = s.capture();
         let mut t = Scope::new();
         t.restore_capture(&cap);
@@ -2905,9 +2878,9 @@ mod tests {
     #[test]
     fn capture_restore_roundtrip_lexical_array_and_hash() {
         let mut s = Scope::new();
-        s.declare_array("a", vec![PerlValue::integer(1), PerlValue::integer(2)]);
+        s.declare_array("a", vec![StrykeValue::integer(1), StrykeValue::integer(2)]);
         let mut m = IndexMap::new();
-        m.insert("k".to_string(), PerlValue::integer(99));
+        m.insert("k".to_string(), StrykeValue::integer(99));
         s.declare_hash("h", m);
         let cap = s.capture();
         let mut t = Scope::new();
@@ -2920,11 +2893,11 @@ mod tests {
     fn hash_get_set_delete_exists() {
         let mut s = Scope::new();
         let mut m = IndexMap::new();
-        m.insert("k".to_string(), PerlValue::integer(1));
+        m.insert("k".to_string(), StrykeValue::integer(1));
         s.declare_hash("h", m);
         assert_eq!(s.get_hash_element("h", "k").to_int(), 1);
         assert!(s.exists_hash_element("h", "k"));
-        s.set_hash_element("h", "k", PerlValue::integer(99))
+        s.set_hash_element("h", "k", StrykeValue::integer(99))
             .unwrap();
         assert_eq!(s.get_hash_element("h", "k").to_int(), 99);
         let del = s.delete_hash_element("h", "k").unwrap();
@@ -2936,11 +2909,11 @@ mod tests {
     fn inner_frame_shadows_outer_hash_name() {
         let mut s = Scope::new();
         let mut outer = IndexMap::new();
-        outer.insert("k".to_string(), PerlValue::integer(1));
+        outer.insert("k".to_string(), StrykeValue::integer(1));
         s.declare_hash("h", outer);
         s.push_frame();
         let mut inner = IndexMap::new();
-        inner.insert("k".to_string(), PerlValue::integer(2));
+        inner.insert("k".to_string(), StrykeValue::integer(2));
         s.declare_hash("h", inner);
         assert_eq!(s.get_hash_element("h", "k").to_int(), 2);
         s.pop_frame();
@@ -2950,9 +2923,9 @@ mod tests {
     #[test]
     fn inner_frame_shadows_outer_array_name() {
         let mut s = Scope::new();
-        s.declare_array("a", vec![PerlValue::integer(1)]);
+        s.declare_array("a", vec![StrykeValue::integer(1)]);
         s.push_frame();
-        s.declare_array("a", vec![PerlValue::integer(2), PerlValue::integer(3)]);
+        s.declare_array("a", vec![StrykeValue::integer(2), StrykeValue::integer(3)]);
         assert_eq!(s.get_array_element("a", 1).to_int(), 3);
         s.pop_frame();
         assert_eq!(s.get_array_element("a", 0).to_int(), 1);
@@ -2961,7 +2934,7 @@ mod tests {
     #[test]
     fn pop_frame_never_removes_global_frame() {
         let mut s = Scope::new();
-        s.declare_scalar("x", PerlValue::integer(1));
+        s.declare_scalar("x", StrykeValue::integer(1));
         s.pop_frame();
         s.pop_frame();
         assert_eq!(s.get_scalar("x").to_int(), 1);
@@ -2999,8 +2972,8 @@ mod tests {
         let mut s = Scope::new();
         s.declare_array("a", vec![]);
         assert_eq!(s.array_len("a"), 0);
-        s.push_to_array("a", PerlValue::integer(1)).unwrap();
-        s.push_to_array("a", PerlValue::integer(2)).unwrap();
+        s.push_to_array("a", StrykeValue::integer(1)).unwrap();
+        s.push_to_array("a", StrykeValue::integer(2)).unwrap();
         assert_eq!(s.array_len("a"), 2);
         assert_eq!(s.pop_from_array("a").unwrap().to_int(), 2);
         assert_eq!(s.pop_from_array("a").unwrap().to_int(), 1);
@@ -3010,7 +2983,7 @@ mod tests {
     #[test]
     fn shift_from_array_drops_front() {
         let mut s = Scope::new();
-        s.declare_array("a", vec![PerlValue::integer(1), PerlValue::integer(2)]);
+        s.declare_array("a", vec![StrykeValue::integer(1), StrykeValue::integer(2)]);
         assert_eq!(s.shift_from_array("a").unwrap().to_int(), 1);
         assert_eq!(s.array_len("a"), 1);
     }
@@ -3022,10 +2995,10 @@ mod tests {
         let mut s = Scope::new();
         s.declare_scalar(
             "n",
-            PerlValue::atomic(Arc::new(Mutex::new(PerlValue::integer(10)))),
+            StrykeValue::atomic(Arc::new(Mutex::new(StrykeValue::integer(10)))),
         );
         let v = s
-            .atomic_mutate("n", |old| PerlValue::integer(old.to_int() + 5))
+            .atomic_mutate("n", |old| StrykeValue::integer(old.to_int() + 5))
             .expect("atomic_mutate on atomic-backed scalar must not fail");
         assert_eq!(v.to_int(), 15);
         assert_eq!(s.get_scalar("n").to_int(), 15);
@@ -3038,10 +3011,10 @@ mod tests {
         let mut s = Scope::new();
         s.declare_scalar(
             "n",
-            PerlValue::atomic(Arc::new(Mutex::new(PerlValue::integer(7)))),
+            StrykeValue::atomic(Arc::new(Mutex::new(StrykeValue::integer(7)))),
         );
         let old = s
-            .atomic_mutate_post("n", |v| PerlValue::integer(v.to_int() + 1))
+            .atomic_mutate_post("n", |v| StrykeValue::integer(v.to_int() + 1))
             .expect("atomic_mutate_post on atomic-backed scalar must not fail");
         assert_eq!(old.to_int(), 7);
         assert_eq!(s.get_scalar("n").to_int(), 8);
@@ -3054,7 +3027,7 @@ mod tests {
         let mut s = Scope::new();
         s.declare_scalar(
             "n",
-            PerlValue::atomic(Arc::new(Mutex::new(PerlValue::integer(3)))),
+            StrykeValue::atomic(Arc::new(Mutex::new(StrykeValue::integer(3)))),
         );
         assert!(s.get_scalar_raw("n").is_atomic());
         assert!(!s.get_scalar("n").is_atomic());
@@ -3063,7 +3036,7 @@ mod tests {
     #[test]
     fn missing_array_element_is_undef() {
         let mut s = Scope::new();
-        s.declare_array("a", vec![PerlValue::integer(1)]);
+        s.declare_array("a", vec![StrykeValue::integer(1)]);
         assert!(s.get_array_element("a", 99).is_undef());
     }
 
@@ -3073,12 +3046,12 @@ mod tests {
         use parking_lot::Mutex;
         use std::sync::Arc;
         let mut s = Scope::new();
-        let aa = AtomicArray(Arc::new(Mutex::new(vec![PerlValue::integer(1)])));
+        let aa = AtomicArray(Arc::new(Mutex::new(vec![StrykeValue::integer(1)])));
         let ah = AtomicHash(Arc::new(Mutex::new(IndexMap::new())));
         s.restore_atomics(&[("ax".into(), aa.clone())], &[("hx".into(), ah.clone())]);
         assert_eq!(s.get_array_element("ax", 0).to_int(), 1);
         assert_eq!(s.array_len("ax"), 1);
-        s.set_hash_element("hx", "k", PerlValue::integer(2))
+        s.set_hash_element("hx", "k", StrykeValue::integer(2))
             .unwrap();
         assert_eq!(s.get_hash_element("hx", "k").to_int(), 2);
     }

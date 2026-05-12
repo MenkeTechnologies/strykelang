@@ -19,7 +19,7 @@
 
 use crate::error::PerlError;
 use crate::native_data::{exec_sql, perl_to_sql_value, query_sql};
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 use crate::vm_helper::{FlowOrError, VMHelper};
 use indexmap::IndexMap;
 use parking_lot::Mutex;
@@ -71,7 +71,7 @@ fn parse_db_url(url: &str) -> Result<String> {
     Ok(url.to_string())
 }
 
-pub(crate) fn web_db_connect(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_db_connect(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let url = args
         .first()
         .map(|v| v.to_string())
@@ -91,16 +91,16 @@ pub(crate) fn web_db_connect(args: &[PerlValue], line: usize) -> Result<PerlValu
          PRAGMA synchronous = NORMAL;\n",
     );
     *db_slot().lock() = Some(conn);
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 // ── Raw SQL escape hatch ────────────────────────────────────────────────
 
-fn perl_args_as_sql(values: &[PerlValue]) -> Vec<rusqlite::types::Value> {
+fn perl_args_as_sql(values: &[StrykeValue]) -> Vec<rusqlite::types::Value> {
     values.iter().map(perl_to_sql_value).collect()
 }
 
-pub(crate) fn web_db_execute(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_db_execute(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let sql = args
         .first()
         .map(|v| v.to_string())
@@ -108,10 +108,10 @@ pub(crate) fn web_db_execute(args: &[PerlValue], line: usize) -> Result<PerlValu
     let bindings = bindings_from_arg(args.get(1));
     let bound = perl_args_as_sql(&bindings);
     let n = with_db(|c| exec_sql(c, &sql, &bound), line)?;
-    Ok(PerlValue::integer(n as i64))
+    Ok(StrykeValue::integer(n as i64))
 }
 
-pub(crate) fn web_db_query(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_db_query(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let sql = args
         .first()
         .map(|v| v.to_string())
@@ -122,7 +122,7 @@ pub(crate) fn web_db_query(args: &[PerlValue], line: usize) -> Result<PerlValue>
     Ok(wrap_array_as_ref(result))
 }
 
-fn bindings_from_arg(v: Option<&PerlValue>) -> Vec<PerlValue> {
+fn bindings_from_arg(v: Option<&StrykeValue>) -> Vec<StrykeValue> {
     match v {
         Some(arg) => arg
             .as_array_ref()
@@ -132,24 +132,24 @@ fn bindings_from_arg(v: Option<&PerlValue>) -> Vec<PerlValue> {
     }
 }
 
-fn wrap_array_as_ref(v: PerlValue) -> PerlValue {
+fn wrap_array_as_ref(v: StrykeValue) -> StrykeValue {
     if v.as_array_ref().is_some() {
         return v;
     }
     let list = v.to_list();
-    PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(list)))
+    StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(list)))
 }
 
 // ── Active-Record-shaped CRUD ───────────────────────────────────────────
 
-pub(crate) fn web_model_all(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_model_all(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let table = require_table(args.first(), "web_model_all", line)?;
     let sql = format!("SELECT * FROM {} ORDER BY id ASC", quote_ident(&table));
     let result = with_db(|c| query_sql(c, &sql, &[], line), line)?;
     Ok(wrap_array_as_ref(result))
 }
 
-pub(crate) fn web_model_find(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_model_find(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let table = require_table(args.first(), "web_model_find", line)?;
     let id = args
         .get(1)
@@ -163,7 +163,7 @@ pub(crate) fn web_model_find(args: &[PerlValue], line: usize) -> Result<PerlValu
     Ok(first_row_or_undef(rows))
 }
 
-pub(crate) fn web_model_where(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_model_where(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let table = require_table(args.first(), "web_model_where", line)?;
     let cond = args
         .get(1)
@@ -188,7 +188,7 @@ pub(crate) fn web_model_where(args: &[PerlValue], line: usize) -> Result<PerlVal
     Ok(wrap_array_as_ref(result))
 }
 
-pub(crate) fn web_model_create(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_model_create(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let table = require_table(args.first(), "web_model_create", line)?;
     let attrs = args
         .get(1)
@@ -212,8 +212,8 @@ pub(crate) fn web_model_create(args: &[PerlValue], line: usize) -> Result<PerlVa
     // on the server side. `id` left in if user supplied it explicitly.
     let now = current_timestamp();
     let mut working = attrs.clone();
-    working.insert("created_at".into(), PerlValue::string(now.clone()));
-    working.insert("updated_at".into(), PerlValue::string(now));
+    working.insert("created_at".into(), StrykeValue::string(now.clone()));
+    working.insert("updated_at".into(), StrykeValue::string(now));
 
     // Filter to columns that actually exist on the table — silently drops
     // unknowns so callers can pass `web_params()` without sanitising.
@@ -261,7 +261,7 @@ pub(crate) fn web_model_create(args: &[PerlValue], line: usize) -> Result<PerlVa
     Ok(first_row_or_undef(row))
 }
 
-pub(crate) fn web_model_update(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_model_update(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let table = require_table(args.first(), "web_model_update", line)?;
     let id = args
         .get(1)
@@ -280,10 +280,10 @@ pub(crate) fn web_model_update(args: &[PerlValue], line: usize) -> Result<PerlVa
         })?;
     let cols = table_columns(&table, line)?;
     let mut working = attrs.clone();
-    working.insert("updated_at".into(), PerlValue::string(current_timestamp()));
+    working.insert("updated_at".into(), StrykeValue::string(current_timestamp()));
     working.retain(|k, _| cols.iter().any(|c| c == k) && k != "id");
     if working.is_empty() {
-        return Ok(PerlValue::integer(0));
+        return Ok(StrykeValue::integer(0));
     }
     let mut sets = Vec::new();
     let mut bindings = Vec::new();
@@ -299,10 +299,10 @@ pub(crate) fn web_model_update(args: &[PerlValue], line: usize) -> Result<PerlVa
         bindings.len()
     );
     let n = with_db(|c| exec_sql(c, &sql, &bindings), line)?;
-    Ok(PerlValue::integer(n as i64))
+    Ok(StrykeValue::integer(n as i64))
 }
 
-pub(crate) fn web_model_destroy(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_model_destroy(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let table = require_table(args.first(), "web_model_destroy", line)?;
     let id = args
         .get(1)
@@ -310,13 +310,13 @@ pub(crate) fn web_model_destroy(args: &[PerlValue], line: usize) -> Result<PerlV
     let sql = format!("DELETE FROM {} WHERE id = ?1", quote_ident(&table));
     let bound = perl_args_as_sql(std::slice::from_ref(id));
     let n = with_db(|c| exec_sql(c, &sql, &bound), line)?;
-    Ok(PerlValue::integer(n as i64))
+    Ok(StrykeValue::integer(n as i64))
 }
 
 /// Soft delete — sets `deleted_at` to the current timestamp instead of
 /// removing the row. Pair with `web_model_visible` to filter them out
 /// of subsequent queries.
-pub(crate) fn web_model_soft_destroy(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_model_soft_destroy(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let table = require_table(args.first(), "web_model_soft_destroy", line)?;
     let id = args
         .get(1)
@@ -340,12 +340,12 @@ pub(crate) fn web_model_soft_destroy(args: &[PerlValue], line: usize) -> Result<
         perl_to_sql_value(id),
     ];
     let n = with_db(|c| exec_sql(c, &sql, &bound), line)?;
-    Ok(PerlValue::integer(n as i64))
+    Ok(StrykeValue::integer(n as i64))
 }
 
 /// Paginated SELECT: returns a hashref `{rows => [...], total => N,
 /// page => P, per_page => K, total_pages => …}`.
-pub(crate) fn web_model_paginate(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_model_paginate(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let table = require_table(args.first(), "web_model_paginate", line)?;
     let opts = parse_kv(&args[1.min(args.len())..]);
     let page = opts.get("page").map(|v| v.to_int().max(1)).unwrap_or(1);
@@ -385,16 +385,16 @@ pub(crate) fn web_model_paginate(args: &[PerlValue], line: usize) -> Result<Perl
 
     let mut out = IndexMap::new();
     out.insert("rows".to_string(), rows_ref);
-    out.insert("total".to_string(), PerlValue::integer(total));
-    out.insert("page".to_string(), PerlValue::integer(page));
-    out.insert("per_page".to_string(), PerlValue::integer(per_page));
-    out.insert("total_pages".to_string(), PerlValue::integer(total_pages));
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(out))))
+    out.insert("total".to_string(), StrykeValue::integer(total));
+    out.insert("page".to_string(), StrykeValue::integer(page));
+    out.insert("per_page".to_string(), StrykeValue::integer(per_page));
+    out.insert("total_pages".to_string(), StrykeValue::integer(total_pages));
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(out))))
 }
 
 /// LIKE-based search across one or more columns. `web_model_search("posts",
 /// "stryke", cols => ["title", "body"])` returns matching rows.
-pub(crate) fn web_model_search(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_model_search(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let table = require_table(args.first(), "web_model_search", line)?;
     let query = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let opts = parse_kv(&args[2.min(args.len())..]);
@@ -411,7 +411,7 @@ pub(crate) fn web_model_search(args: &[PerlValue], line: usize) -> Result<PerlVa
         ));
     };
     if cols.is_empty() {
-        return Ok(wrap_array_as_ref(PerlValue::array(Vec::new())));
+        return Ok(wrap_array_as_ref(StrykeValue::array(Vec::new())));
     }
     let where_clause = cols
         .iter()
@@ -433,7 +433,7 @@ pub(crate) fn web_model_search(args: &[PerlValue], line: usize) -> Result<PerlVa
 }
 
 /// `web_model_count("posts")` → row count.
-pub(crate) fn web_model_count(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_model_count(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let table = require_table(args.first(), "web_model_count", line)?;
     let sql = format!("SELECT count(*) AS c FROM {}", quote_ident(&table));
     let rows = with_db(|c| query_sql(c, &sql, &[], line), line)?;
@@ -443,11 +443,11 @@ pub(crate) fn web_model_count(args: &[PerlValue], line: usize) -> Result<PerlVal
         .and_then(|r| r.as_hash_ref())
         .and_then(|h| h.read().get("c").map(|v| v.to_int()))
         .unwrap_or(0);
-    Ok(PerlValue::integer(n))
+    Ok(StrykeValue::integer(n))
 }
 
 /// `web_model_first("posts")` / `web_model_last("posts")` — single-row helpers.
-pub(crate) fn web_model_first(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_model_first(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let table = require_table(args.first(), "web_model_first", line)?;
     let sql = format!(
         "SELECT * FROM {} ORDER BY id ASC LIMIT 1",
@@ -457,7 +457,7 @@ pub(crate) fn web_model_first(args: &[PerlValue], line: usize) -> Result<PerlVal
     Ok(first_row_or_undef(rows))
 }
 
-pub(crate) fn web_model_last(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_model_last(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let table = require_table(args.first(), "web_model_last", line)?;
     let sql = format!(
         "SELECT * FROM {} ORDER BY id DESC LIMIT 1",
@@ -469,7 +469,7 @@ pub(crate) fn web_model_last(args: &[PerlValue], line: usize) -> Result<PerlValu
 
 /// `web_model_increment("posts", id, "comments_count", 1)` — atomic
 /// `UPDATE … SET col = col + delta` for counter caches.
-pub(crate) fn web_model_increment(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_model_increment(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let table = require_table(args.first(), "web_model_increment", line)?;
     let id = args
         .get(1)
@@ -487,13 +487,13 @@ pub(crate) fn web_model_increment(args: &[PerlValue], line: usize) -> Result<Per
     );
     let bound = vec![rusqlite::types::Value::Integer(by), perl_to_sql_value(id)];
     let n = with_db(|c| exec_sql(c, &sql, &bound), line)?;
-    Ok(PerlValue::integer(n as i64))
+    Ok(StrykeValue::integer(n as i64))
 }
 
 /// `web_model_with("posts", "user")` — preload one belongs_to relation.
 /// Returns posts with `_user => +{...}` attached. Uses a single IN
 /// query to dodge n+1.
-pub(crate) fn web_model_with(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_model_with(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let table = require_table(args.first(), "web_model_with", line)?;
     let assoc = args
         .get(1)
@@ -511,7 +511,7 @@ pub(crate) fn web_model_with(args: &[PerlValue], line: usize) -> Result<PerlValu
                 .and_then(|h| h.read().get(&foreign_key).map(|v| v.to_int()))
         })
         .collect();
-    let mut by_id: IndexMap<i64, PerlValue> = IndexMap::new();
+    let mut by_id: IndexMap<i64, StrykeValue> = IndexMap::new();
     if !ids.is_empty() {
         let placeholders = (1..=ids.len())
             .map(|i| format!("?{}", i))
@@ -545,12 +545,12 @@ pub(crate) fn web_model_with(args: &[PerlValue], line: usize) -> Result<PerlValu
                     new_map.insert(format!("_{}", assoc), child.clone());
                 }
             }
-            out.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(
+            out.push(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(
                 new_map,
             ))));
         }
     }
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         out,
     ))))
 }
@@ -578,19 +578,19 @@ fn pluralize_simple(s: &str) -> String {
 /// `web_db_transaction` — opens a transaction, runs the BEGIN/COMMIT
 /// pair around the SQL string the caller passes, returning rollback on
 /// error. For multi-step txn use `web_db_execute("BEGIN")`/COMMIT.
-pub(crate) fn web_db_begin(_args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_db_begin(_args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     with_db(|c| exec_sql(c, "BEGIN", &[]), line)?;
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn web_db_commit(_args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_db_commit(_args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     with_db(|c| exec_sql(c, "COMMIT", &[]), line)?;
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn web_db_rollback(_args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_db_rollback(_args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     with_db(|c| exec_sql(c, "ROLLBACK", &[]), line)?;
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 // ── Validations ────────────────────────────────────────────────────────
@@ -600,7 +600,7 @@ pub(crate) fn web_db_rollback(_args: &[PerlValue], line: usize) -> Result<PerlVa
 // otherwise. Validators: `presence`, `length:MIN..MAX`, `format:REGEX`,
 // `numericality`, `inclusion:a|b|c`, `confirmation:other_field`.
 
-pub(crate) fn web_validate(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_validate(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let attrs = args
         .first()
         .and_then(|v| {
@@ -616,10 +616,10 @@ pub(crate) fn web_validate(args: &[PerlValue], line: usize) -> Result<PerlValue>
         })
         .ok_or_else(|| PerlError::runtime("web_validate: second arg must be a hashref", line))?;
 
-    let mut errors: IndexMap<String, PerlValue> = IndexMap::new();
+    let mut errors: IndexMap<String, StrykeValue> = IndexMap::new();
     for (field, spec_v) in &rules {
         let spec = spec_v.to_string();
-        let value = attrs.get(field).cloned().unwrap_or(PerlValue::UNDEF);
+        let value = attrs.get(field).cloned().unwrap_or(StrykeValue::UNDEF);
         let s = if value.is_undef() {
             String::new()
         } else {
@@ -634,10 +634,10 @@ pub(crate) fn web_validate(args: &[PerlValue], line: usize) -> Result<PerlValue>
             let err = check_one_validator(field, &s, &value, &attrs, kind, arg);
             if let Some(msg) = err {
                 errors.entry(field.clone()).or_insert_with(|| {
-                    PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(Vec::new())))
+                    StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(Vec::new())))
                 });
                 if let Some(arr) = errors.get(field).and_then(|v| v.as_array_ref()) {
-                    arr.write().push(PerlValue::string(msg));
+                    arr.write().push(StrykeValue::string(msg));
                 }
             }
         }
@@ -646,20 +646,20 @@ pub(crate) fn web_validate(args: &[PerlValue], line: usize) -> Result<PerlValue>
     let mut out = IndexMap::new();
     out.insert(
         "ok".to_string(),
-        PerlValue::integer(if errors.is_empty() { 1 } else { 0 }),
+        StrykeValue::integer(if errors.is_empty() { 1 } else { 0 }),
     );
     out.insert(
         "errors".to_string(),
-        PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(errors))),
+        StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(errors))),
     );
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(out))))
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(out))))
 }
 
 fn check_one_validator(
     field: &str,
     s: &str,
-    raw: &PerlValue,
-    attrs: &IndexMap<String, PerlValue>,
+    raw: &StrykeValue,
+    attrs: &IndexMap<String, StrykeValue>,
     kind: &str,
     arg: &str,
 ) -> Option<String> {
@@ -726,7 +726,7 @@ fn parse_range(s: &str) -> Option<(i64, i64)> {
     Some((a, b))
 }
 
-fn parse_kv(args: &[PerlValue]) -> IndexMap<String, PerlValue> {
+fn parse_kv(args: &[StrykeValue]) -> IndexMap<String, StrykeValue> {
     let mut out = IndexMap::new();
     let mut i = 0;
     while i + 1 < args.len() {
@@ -750,7 +750,7 @@ fn sanitize_order(s: &str) -> String {
 
 // ── Schema DSL (used inside migration up/down blocks) ───────────────────
 
-pub(crate) fn web_create_table(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_create_table(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let name = require_table(args.first(), "web_create_table", line)?;
     let cols = args
         .get(1)
@@ -775,17 +775,17 @@ pub(crate) fn web_create_table(args: &[PerlValue], line: usize) -> Result<PerlVa
         col_defs.join(", ")
     );
     with_db(|c| exec_sql(c, &sql, &[]), line)?;
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn web_drop_table(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_drop_table(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let name = require_table(args.first(), "web_drop_table", line)?;
     let sql = format!("DROP TABLE IF EXISTS {}", quote_ident(&name));
     with_db(|c| exec_sql(c, &sql, &[]), line)?;
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn web_add_column(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_add_column(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let table = require_table(args.first(), "web_add_column", line)?;
     let col = args
         .get(1)
@@ -802,10 +802,10 @@ pub(crate) fn web_add_column(args: &[PerlValue], line: usize) -> Result<PerlValu
         stryke_type_to_sql(&ty)
     );
     with_db(|c| exec_sql(c, &sql, &[]), line)?;
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn web_remove_column(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_remove_column(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let table = require_table(args.first(), "web_remove_column", line)?;
     let col = args
         .get(1)
@@ -818,7 +818,7 @@ pub(crate) fn web_remove_column(args: &[PerlValue], line: usize) -> Result<PerlV
         quote_ident(&col)
     );
     with_db(|c| exec_sql(c, &sql, &[]), line)?;
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 // ── Migrator ───────────────────────────────────────────────────────────
@@ -829,7 +829,7 @@ pub(crate) fn web_remove_column(args: &[PerlValue], line: usize) -> Result<PerlV
 // their `up` / `down` blocks in deterministic order.
 
 impl VMHelper {
-    pub(crate) fn web_migrate(&mut self, _args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    pub(crate) fn web_migrate(&mut self, _args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
         with_db(
             |c| {
                 exec_sql(
@@ -865,10 +865,10 @@ impl VMHelper {
             applied_now.push(version.clone());
             eprintln!("== {}: migrated", class_name);
         }
-        Ok(PerlValue::integer(applied_now.len() as i64))
+        Ok(StrykeValue::integer(applied_now.len() as i64))
     }
 
-    pub(crate) fn web_rollback(&mut self, _args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    pub(crate) fn web_rollback(&mut self, _args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
         let applied = applied_versions(line)?;
         let mut migrations = self.collect_migration_classes();
         migrations.sort_by(|a, b| b.0.cmp(&a.0)); // descending
@@ -888,9 +888,9 @@ impl VMHelper {
                 line,
             )?;
             eprintln!("== {}: rolled back", class_name);
-            return Ok(PerlValue::integer(1));
+            return Ok(StrykeValue::integer(1));
         }
-        Ok(PerlValue::integer(0))
+        Ok(StrykeValue::integer(0))
     }
 
     /// Walk `class_defs` looking for classes whose name matches a known
@@ -967,7 +967,7 @@ fn applied_versions(line: usize) -> Result<Vec<String>> {
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
-fn require_table(arg: Option<&PerlValue>, what: &str, line: usize) -> Result<String> {
+fn require_table(arg: Option<&StrykeValue>, what: &str, line: usize) -> Result<String> {
     let table = arg
         .map(|v| v.to_string())
         .ok_or_else(|| PerlError::runtime(format!("{}: table name required", what), line))?;
@@ -1048,9 +1048,9 @@ fn table_columns(table: &str, line: usize) -> Result<Vec<String>> {
     Ok(out)
 }
 
-fn first_row_or_undef(rows: PerlValue) -> PerlValue {
+fn first_row_or_undef(rows: StrykeValue) -> StrykeValue {
     let list = rows.to_list();
-    list.into_iter().next().unwrap_or(PerlValue::UNDEF)
+    list.into_iter().next().unwrap_or(StrykeValue::UNDEF)
 }
 
 // ── Background job queue ─────────────────────────────────────────────
@@ -1089,7 +1089,7 @@ CREATE TABLE IF NOT EXISTS jobs (\n\
 );\n\
 CREATE INDEX IF NOT EXISTS idx_jobs_status_queue ON jobs(status, queue, priority DESC, id);\n";
 
-pub(crate) fn web_jobs_init(_args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_jobs_init(_args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     with_db(
         |c| {
             c.execute_batch(JOBS_DDL)
@@ -1098,10 +1098,10 @@ pub(crate) fn web_jobs_init(_args: &[PerlValue], line: usize) -> Result<PerlValu
         },
         line,
     )?;
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn web_job_enqueue(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_job_enqueue(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let name = args
         .first()
         .map(|v| v.to_string())
@@ -1141,10 +1141,10 @@ pub(crate) fn web_job_enqueue(args: &[PerlValue], line: usize) -> Result<PerlVal
         },
         line,
     )?;
-    Ok(PerlValue::integer(id))
+    Ok(StrykeValue::integer(id))
 }
 
-pub(crate) fn web_job_dequeue(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_job_dequeue(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let kv = parse_kv(args);
     let queue = kv
         .get("queue")
@@ -1193,26 +1193,26 @@ pub(crate) fn web_job_dequeue(args: &[PerlValue], line: usize) -> Result<PerlVal
         line,
     )?;
     match row {
-        None => Ok(PerlValue::UNDEF),
+        None => Ok(StrykeValue::UNDEF),
         Some((id, name, args_json, attempts, max_attempts)) => {
             let mut h = IndexMap::new();
-            h.insert("id".to_string(), PerlValue::integer(id));
-            h.insert("name".to_string(), PerlValue::string(name));
+            h.insert("id".to_string(), StrykeValue::integer(id));
+            h.insert("name".to_string(), StrykeValue::string(name));
             h.insert(
                 "args_json".to_string(),
-                PerlValue::string(args_json.clone()),
+                StrykeValue::string(args_json.clone()),
             );
             // Provide pre-decoded args hashref/arrayref for ergonomic dispatch.
-            let parsed = crate::native_data::json_decode(&args_json).unwrap_or(PerlValue::UNDEF);
+            let parsed = crate::native_data::json_decode(&args_json).unwrap_or(StrykeValue::UNDEF);
             h.insert("args".to_string(), parsed);
-            h.insert("attempts".to_string(), PerlValue::integer(attempts));
-            h.insert("max_attempts".to_string(), PerlValue::integer(max_attempts));
-            Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
+            h.insert("attempts".to_string(), StrykeValue::integer(attempts));
+            h.insert("max_attempts".to_string(), StrykeValue::integer(max_attempts));
+            Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
         }
     }
 }
 
-pub(crate) fn web_job_complete(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_job_complete(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let id = args
         .first()
         .map(|v| v.to_int())
@@ -1229,10 +1229,10 @@ pub(crate) fn web_job_complete(args: &[PerlValue], line: usize) -> Result<PerlVa
         },
         line,
     )?;
-    Ok(PerlValue::integer(1))
+    Ok(StrykeValue::integer(1))
 }
 
-pub(crate) fn web_job_fail(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_job_fail(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let id = args
         .first()
         .map(|v| v.to_int())
@@ -1267,10 +1267,10 @@ pub(crate) fn web_job_fail(args: &[PerlValue], line: usize) -> Result<PerlValue>
         },
         line,
     )?;
-    Ok(PerlValue::string(new_status))
+    Ok(StrykeValue::string(new_status))
 }
 
-pub(crate) fn web_jobs_list(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_jobs_list(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let kv = parse_kv(args);
     let queue = kv.get("queue").map(|v| v.to_string());
     let status = kv.get("status").map(|v| v.to_string());
@@ -1290,7 +1290,7 @@ pub(crate) fn web_jobs_list(args: &[PerlValue], line: usize) -> Result<PerlValue
     sql.push_str(" ORDER BY id DESC LIMIT ?");
     binds.push(rusqlite::types::Value::Integer(limit));
 
-    let rows: Vec<PerlValue> = with_db(
+    let rows: Vec<StrykeValue> = with_db(
         |c| {
             let mut stmt = c
                 .prepare(&sql)
@@ -1314,7 +1314,7 @@ pub(crate) fn web_jobs_list(args: &[PerlValue], line: usize) -> Result<PerlValue
                     ))
                 })
                 .map_err(|e| PerlError::runtime(format!("web_jobs_list: {}", e), line))?;
-            let mut out: Vec<PerlValue> = Vec::new();
+            let mut out: Vec<StrykeValue> = Vec::new();
             for r in row_iter {
                 let (
                     id,
@@ -1331,39 +1331,39 @@ pub(crate) fn web_jobs_list(args: &[PerlValue], line: usize) -> Result<PerlValue
                     error,
                 ) = r.map_err(|e| PerlError::runtime(format!("web_jobs_list: {}", e), line))?;
                 let mut h = IndexMap::new();
-                h.insert("id".to_string(), PerlValue::integer(id));
-                h.insert("name".to_string(), PerlValue::string(name));
-                h.insert("args_json".to_string(), PerlValue::string(args_json));
-                h.insert("status".to_string(), PerlValue::string(status));
-                h.insert("queue".to_string(), PerlValue::string(queue));
-                h.insert("priority".to_string(), PerlValue::integer(priority));
-                h.insert("attempts".to_string(), PerlValue::integer(attempts));
-                h.insert("max_attempts".to_string(), PerlValue::integer(max_attempts));
-                h.insert("created_at".to_string(), PerlValue::string(created_at));
+                h.insert("id".to_string(), StrykeValue::integer(id));
+                h.insert("name".to_string(), StrykeValue::string(name));
+                h.insert("args_json".to_string(), StrykeValue::string(args_json));
+                h.insert("status".to_string(), StrykeValue::string(status));
+                h.insert("queue".to_string(), StrykeValue::string(queue));
+                h.insert("priority".to_string(), StrykeValue::integer(priority));
+                h.insert("attempts".to_string(), StrykeValue::integer(attempts));
+                h.insert("max_attempts".to_string(), StrykeValue::integer(max_attempts));
+                h.insert("created_at".to_string(), StrykeValue::string(created_at));
                 h.insert(
                     "locked_at".to_string(),
-                    locked_at.map(PerlValue::string).unwrap_or(PerlValue::UNDEF),
+                    locked_at.map(StrykeValue::string).unwrap_or(StrykeValue::UNDEF),
                 );
                 h.insert(
                     "ran_at".to_string(),
-                    ran_at.map(PerlValue::string).unwrap_or(PerlValue::UNDEF),
+                    ran_at.map(StrykeValue::string).unwrap_or(StrykeValue::UNDEF),
                 );
                 h.insert(
                     "error".to_string(),
-                    error.map(PerlValue::string).unwrap_or(PerlValue::UNDEF),
+                    error.map(StrykeValue::string).unwrap_or(StrykeValue::UNDEF),
                 );
-                out.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+                out.push(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
             }
             Ok(out)
         },
         line,
     )?;
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         rows,
     ))))
 }
 
-pub(crate) fn web_jobs_stats(_args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_jobs_stats(_args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let stats: IndexMap<String, i64> = with_db(
         |c| {
             let mut out = IndexMap::new();
@@ -1383,12 +1383,12 @@ pub(crate) fn web_jobs_stats(_args: &[PerlValue], line: usize) -> Result<PerlVal
     )?;
     let mut h = IndexMap::new();
     for (k, v) in stats {
-        h.insert(k, PerlValue::integer(v));
+        h.insert(k, StrykeValue::integer(v));
     }
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
 }
 
-pub(crate) fn web_job_purge(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn web_job_purge(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let kv = parse_kv(args);
     let status = kv
         .get("status")
@@ -1405,5 +1405,5 @@ pub(crate) fn web_job_purge(args: &[PerlValue], line: usize) -> Result<PerlValue
         },
         line,
     )?;
-    Ok(PerlValue::integer(n))
+    Ok(StrykeValue::integer(n))
 }

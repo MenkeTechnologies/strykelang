@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 
 use crate::pmap_progress::PmapProgress;
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 
 pub use crate::perl_decode::{
     decode_utf8_or_latin1, decode_utf8_or_latin1_line, decode_utf8_or_latin1_read_until,
@@ -353,84 +353,84 @@ pub fn filetest_age_days(path: &str, which: char) -> Option<f64> {
 }
 
 /// 13-element `stat` / `lstat` list (empty vector on failure).
-pub fn stat_path(path: &str, symlink: bool) -> PerlValue {
+pub fn stat_path(path: &str, symlink: bool) -> StrykeValue {
     let res = if symlink {
         std::fs::symlink_metadata(path)
     } else {
         std::fs::metadata(path)
     };
     match res {
-        Ok(meta) => PerlValue::array(perl_stat_from_metadata(&meta)),
-        Err(_) => PerlValue::array(vec![]),
+        Ok(meta) => StrykeValue::array(perl_stat_from_metadata(&meta)),
+        Err(_) => StrykeValue::array(vec![]),
     }
 }
 
-pub fn perl_stat_from_metadata(meta: &std::fs::Metadata) -> Vec<PerlValue> {
+pub fn perl_stat_from_metadata(meta: &std::fs::Metadata) -> Vec<StrykeValue> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
         vec![
-            PerlValue::integer(meta.dev() as i64),
-            PerlValue::integer(meta.ino() as i64),
-            PerlValue::integer(meta.mode() as i64),
-            PerlValue::integer(meta.nlink() as i64),
-            PerlValue::integer(meta.uid() as i64),
-            PerlValue::integer(meta.gid() as i64),
-            PerlValue::integer(meta.rdev() as i64),
-            PerlValue::integer(meta.len() as i64),
-            PerlValue::integer(meta.atime()),
-            PerlValue::integer(meta.mtime()),
-            PerlValue::integer(meta.ctime()),
-            PerlValue::integer(meta.blksize() as i64),
-            PerlValue::integer(meta.blocks() as i64),
+            StrykeValue::integer(meta.dev() as i64),
+            StrykeValue::integer(meta.ino() as i64),
+            StrykeValue::integer(meta.mode() as i64),
+            StrykeValue::integer(meta.nlink() as i64),
+            StrykeValue::integer(meta.uid() as i64),
+            StrykeValue::integer(meta.gid() as i64),
+            StrykeValue::integer(meta.rdev() as i64),
+            StrykeValue::integer(meta.len() as i64),
+            StrykeValue::integer(meta.atime()),
+            StrykeValue::integer(meta.mtime()),
+            StrykeValue::integer(meta.ctime()),
+            StrykeValue::integer(meta.blksize() as i64),
+            StrykeValue::integer(meta.blocks() as i64),
         ]
     }
     #[cfg(not(unix))]
     {
         let len = meta.len() as i64;
         vec![
-            PerlValue::integer(0),
-            PerlValue::integer(0),
-            PerlValue::integer(0),
-            PerlValue::integer(0),
-            PerlValue::integer(0),
-            PerlValue::integer(0),
-            PerlValue::integer(0),
-            PerlValue::integer(len),
-            PerlValue::integer(0),
-            PerlValue::integer(0),
-            PerlValue::integer(0),
-            PerlValue::integer(0),
-            PerlValue::integer(0),
+            StrykeValue::integer(0),
+            StrykeValue::integer(0),
+            StrykeValue::integer(0),
+            StrykeValue::integer(0),
+            StrykeValue::integer(0),
+            StrykeValue::integer(0),
+            StrykeValue::integer(0),
+            StrykeValue::integer(len),
+            StrykeValue::integer(0),
+            StrykeValue::integer(0),
+            StrykeValue::integer(0),
+            StrykeValue::integer(0),
+            StrykeValue::integer(0),
         ]
     }
 }
 
-pub fn link_hard(old: &str, new: &str) -> PerlValue {
-    PerlValue::integer(if std::fs::hard_link(old, new).is_ok() {
+pub fn link_hard(old: &str, new: &str) -> StrykeValue {
+    StrykeValue::integer(if std::fs::hard_link(old, new).is_ok() {
         1
     } else {
         0
     })
 }
 
-pub fn link_sym(old: &str, new: &str) -> PerlValue {
+pub fn link_sym(old: &str, new: &str) -> StrykeValue {
     #[cfg(unix)]
     {
         use std::os::unix::fs::symlink;
-        PerlValue::integer(if symlink(old, new).is_ok() { 1 } else { 0 })
+        StrykeValue::integer(if symlink(old, new).is_ok() { 1 } else { 0 })
     }
     #[cfg(not(unix))]
     {
         let _ = (old, new);
-        PerlValue::integer(0)
+        StrykeValue::integer(0)
     }
 }
 
-pub fn read_link(path: &str) -> PerlValue {
+pub fn read_link(path: &str) -> StrykeValue {
     match std::fs::read_link(path) {
-        Ok(p) => PerlValue::string(p.to_string_lossy().into_owned()),
-        Err(_) => PerlValue::UNDEF,
+        Ok(p) => StrykeValue::string(p.to_string_lossy().into_owned()),
+        Err(_) => StrykeValue::UNDEF,
     }
 }
 
@@ -491,7 +491,7 @@ pub fn canonpath_logical(path: &str) -> String {
 
 /// List file/directory names inside `dir` (non-recursive), sorted.
 /// Returns an empty list if `dir` cannot be read.
-pub fn list_files(dir: &str) -> PerlValue {
+pub fn list_files(dir: &str) -> StrykeValue {
     let mut names: Vec<String> = Vec::new();
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
@@ -501,13 +501,13 @@ pub fn list_files(dir: &str) -> PerlValue {
         }
     }
     names.sort();
-    PerlValue::array(names.into_iter().map(PerlValue::string).collect())
+    StrykeValue::array(names.into_iter().map(StrykeValue::string).collect())
 }
 
 /// List only regular file names inside `dir` (non-recursive), sorted.
 /// Excludes directories, symlinks, and special files.
 /// Returns an empty list if `dir` cannot be read.
-pub fn list_filesf(dir: &str) -> PerlValue {
+pub fn list_filesf(dir: &str) -> StrykeValue {
     let mut names: Vec<String> = Vec::new();
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
@@ -519,13 +519,13 @@ pub fn list_filesf(dir: &str) -> PerlValue {
         }
     }
     names.sort();
-    PerlValue::array(names.into_iter().map(PerlValue::string).collect())
+    StrykeValue::array(names.into_iter().map(StrykeValue::string).collect())
 }
 
 /// List only regular file paths under `dir` **recursively**, sorted.
 /// Returns relative paths from `dir` (e.g. `"sub/file.txt"`).
 /// Returns an empty list if `dir` cannot be read.
-pub fn list_filesf_recursive(dir: &str) -> PerlValue {
+pub fn list_filesf_recursive(dir: &str) -> StrykeValue {
     let root = std::path::Path::new(dir);
     let mut paths: Vec<String> = Vec::new();
     fn walk(base: &std::path::Path, rel: &str, out: &mut Vec<String>) {
@@ -555,12 +555,12 @@ pub fn list_filesf_recursive(dir: &str) -> PerlValue {
     }
     walk(root, "", &mut paths);
     paths.sort();
-    PerlValue::array(paths.into_iter().map(PerlValue::string).collect())
+    StrykeValue::array(paths.into_iter().map(StrykeValue::string).collect())
 }
 
 /// List only directory names inside `dir` (non-recursive), sorted.
 /// Returns an empty list if `dir` cannot be read.
-pub fn list_dirs(dir: &str) -> PerlValue {
+pub fn list_dirs(dir: &str) -> StrykeValue {
     let mut names: Vec<String> = Vec::new();
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
@@ -572,13 +572,13 @@ pub fn list_dirs(dir: &str) -> PerlValue {
         }
     }
     names.sort();
-    PerlValue::array(names.into_iter().map(PerlValue::string).collect())
+    StrykeValue::array(names.into_iter().map(StrykeValue::string).collect())
 }
 
 /// List subdirectory paths under `dir` **recursively**, sorted.
 /// Returns relative paths from `dir` (e.g. `"sub/nested"`).
 /// Returns an empty list if `dir` cannot be read.
-pub fn list_dirs_recursive(dir: &str) -> PerlValue {
+pub fn list_dirs_recursive(dir: &str) -> StrykeValue {
     let root = std::path::Path::new(dir);
     let mut paths: Vec<String> = Vec::new();
     fn walk(base: &std::path::Path, rel: &str, out: &mut Vec<String>) {
@@ -608,12 +608,12 @@ pub fn list_dirs_recursive(dir: &str) -> PerlValue {
     }
     walk(root, "", &mut paths);
     paths.sort();
-    PerlValue::array(paths.into_iter().map(PerlValue::string).collect())
+    StrykeValue::array(paths.into_iter().map(StrykeValue::string).collect())
 }
 
 /// List only symlink names inside `dir` (non-recursive), sorted.
 /// Returns an empty list if `dir` cannot be read.
-pub fn list_sym_links(dir: &str) -> PerlValue {
+pub fn list_sym_links(dir: &str) -> StrykeValue {
     let mut names: Vec<String> = Vec::new();
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
@@ -625,12 +625,12 @@ pub fn list_sym_links(dir: &str) -> PerlValue {
         }
     }
     names.sort();
-    PerlValue::array(names.into_iter().map(PerlValue::string).collect())
+    StrykeValue::array(names.into_iter().map(StrykeValue::string).collect())
 }
 
 /// List only Unix socket names inside `dir` (non-recursive), sorted.
 /// Returns an empty list if `dir` cannot be read or on non-Unix platforms.
-pub fn list_sockets(dir: &str) -> PerlValue {
+pub fn list_sockets(dir: &str) -> StrykeValue {
     let mut names: Vec<String> = Vec::new();
     #[cfg(unix)]
     {
@@ -647,12 +647,12 @@ pub fn list_sockets(dir: &str) -> PerlValue {
     }
     let _ = dir;
     names.sort();
-    PerlValue::array(names.into_iter().map(PerlValue::string).collect())
+    StrykeValue::array(names.into_iter().map(StrykeValue::string).collect())
 }
 
 /// List only named-pipe (FIFO) names inside `dir` (non-recursive), sorted.
 /// Returns an empty list if `dir` cannot be read or on non-Unix platforms.
-pub fn list_pipes(dir: &str) -> PerlValue {
+pub fn list_pipes(dir: &str) -> StrykeValue {
     let mut names: Vec<String> = Vec::new();
     #[cfg(unix)]
     {
@@ -669,12 +669,12 @@ pub fn list_pipes(dir: &str) -> PerlValue {
     }
     let _ = dir;
     names.sort();
-    PerlValue::array(names.into_iter().map(PerlValue::string).collect())
+    StrykeValue::array(names.into_iter().map(StrykeValue::string).collect())
 }
 
 /// List only block device names inside `dir` (non-recursive), sorted.
 /// Returns an empty list if `dir` cannot be read or on non-Unix platforms.
-pub fn list_block_devices(dir: &str) -> PerlValue {
+pub fn list_block_devices(dir: &str) -> StrykeValue {
     let mut names: Vec<String> = Vec::new();
     #[cfg(unix)]
     {
@@ -695,12 +695,12 @@ pub fn list_block_devices(dir: &str) -> PerlValue {
     }
     let _ = dir;
     names.sort();
-    PerlValue::array(names.into_iter().map(PerlValue::string).collect())
+    StrykeValue::array(names.into_iter().map(StrykeValue::string).collect())
 }
 
 /// List only executable file names inside `dir` (non-recursive), sorted.
 /// Returns an empty list if `dir` cannot be read.
-pub fn list_executables(dir: &str) -> PerlValue {
+pub fn list_executables(dir: &str) -> StrykeValue {
     let mut names: Vec<String> = Vec::new();
     #[cfg(unix)]
     {
@@ -735,12 +735,12 @@ pub fn list_executables(dir: &str) -> PerlValue {
     }
     let _ = dir;
     names.sort();
-    PerlValue::array(names.into_iter().map(PerlValue::string).collect())
+    StrykeValue::array(names.into_iter().map(StrykeValue::string).collect())
 }
 
 /// List only character device names inside `dir` (non-recursive), sorted.
 /// Returns an empty list if `dir` cannot be read or on non-Unix platforms.
-pub fn list_char_devices(dir: &str) -> PerlValue {
+pub fn list_char_devices(dir: &str) -> StrykeValue {
     let mut names: Vec<String> = Vec::new();
     #[cfg(unix)]
     {
@@ -761,10 +761,10 @@ pub fn list_char_devices(dir: &str) -> PerlValue {
     }
     let _ = dir;
     names.sort();
-    PerlValue::array(names.into_iter().map(PerlValue::string).collect())
+    StrykeValue::array(names.into_iter().map(StrykeValue::string).collect())
 }
 
-pub fn glob_patterns(patterns: &[String]) -> PerlValue {
+pub fn glob_patterns(patterns: &[String]) -> StrykeValue {
     let mut paths: Vec<String> = Vec::new();
     for pat in patterns {
         if !pattern_is_glob(pat) {
@@ -777,20 +777,20 @@ pub fn glob_patterns(patterns: &[String]) -> PerlValue {
     }
     paths.sort();
     paths.dedup();
-    PerlValue::array(paths.into_iter().map(PerlValue::string).collect())
+    StrykeValue::array(paths.into_iter().map(StrykeValue::string).collect())
 }
 
 /// Parallel recursive glob: same pattern semantics as [`glob_patterns`], but walks the
 /// filesystem with rayon per directory (and parallelizes across patterns).
-pub fn glob_par_patterns(patterns: &[String]) -> PerlValue {
+pub fn glob_par_patterns(patterns: &[String]) -> StrykeValue {
     glob_par_patterns_inner(patterns, None)
 }
 
 /// Same as [`glob_par_patterns`], with a stderr progress bar (one tick per pattern) when
 /// `progress` is true.
-pub fn glob_par_patterns_with_progress(patterns: &[String], progress: bool) -> PerlValue {
+pub fn glob_par_patterns_with_progress(patterns: &[String], progress: bool) -> StrykeValue {
     if patterns.is_empty() {
-        return PerlValue::array(Vec::new());
+        return StrykeValue::array(Vec::new());
     }
     let pmap = PmapProgress::new(progress, patterns.len());
     let v = glob_par_patterns_inner(patterns, Some(&pmap));
@@ -798,7 +798,7 @@ pub fn glob_par_patterns_with_progress(patterns: &[String], progress: bool) -> P
     v
 }
 
-fn glob_par_patterns_inner(patterns: &[String], progress: Option<&PmapProgress>) -> PerlValue {
+fn glob_par_patterns_inner(patterns: &[String], progress: Option<&PmapProgress>) -> StrykeValue {
     // Parallelize across patterns. Each pattern goes through `zsh::glob::glob`
     // single-threaded so the full qualifier machinery is available; intra-
     // pattern parallelism is sacrificed in exchange for `(/)`, `(.)`, `(om)`,
@@ -820,7 +820,7 @@ fn glob_par_patterns_inner(patterns: &[String], progress: Option<&PmapProgress>)
     let mut paths: Vec<String> = out.into_iter().map(normalize_glob_path_display).collect();
     paths.sort();
     paths.dedup();
-    PerlValue::array(paths.into_iter().map(PerlValue::string).collect())
+    StrykeValue::array(paths.into_iter().map(StrykeValue::string).collect())
 }
 
 /// Display form for glob results. Pass-through — zshrs is authoritative
@@ -832,8 +832,8 @@ fn normalize_glob_path_display(s: String) -> String {
 }
 
 /// `rename OLD, NEW` — 1 on success, 0 on failure (Perl-style).
-pub fn rename_paths(old: &str, new: &str) -> PerlValue {
-    PerlValue::integer(if std::fs::rename(old, new).is_ok() {
+pub fn rename_paths(old: &str, new: &str) -> StrykeValue {
+    StrykeValue::integer(if std::fs::rename(old, new).is_ok() {
         1
     } else {
         0
@@ -883,8 +883,8 @@ fn try_move_path(from: &str, to: &str) -> io::Result<()> {
 
 /// `move OLD, NEW` / `mv` — like `rename`, but on cross-device failure copies the file then removes
 /// the source (directories not supported for cross-device).
-pub fn move_path(from: &str, to: &str) -> PerlValue {
-    PerlValue::integer(if try_move_path(from, to).is_ok() {
+pub fn move_path(from: &str, to: &str) -> StrykeValue {
+    StrykeValue::integer(if try_move_path(from, to).is_ok() {
         1
     } else {
         0
@@ -1011,7 +1011,7 @@ pub fn spurt_path(path: &str, data: &[u8], mkdir_parents: bool, atomic: bool) ->
 
 /// `copy FROM, TO` — 1 on success, 0 on failure. When `preserve_metadata`, best-effort copy of
 /// access/modification times from the source (after a successful byte copy).
-pub fn copy_file(from: &str, to: &str, preserve_metadata: bool) -> PerlValue {
+pub fn copy_file(from: &str, to: &str, preserve_metadata: bool) -> StrykeValue {
     let times = if preserve_metadata {
         std::fs::metadata(from).ok().map(|src_meta| {
             let at = src_meta
@@ -1032,12 +1032,12 @@ pub fn copy_file(from: &str, to: &str, preserve_metadata: bool) -> PerlValue {
         None
     };
     if std::fs::copy(from, to).is_err() {
-        return PerlValue::integer(0);
+        return StrykeValue::integer(0);
     }
     if let Some((at, mt)) = times {
         let _ = utime_paths(at, mt, &[to.to_string()]);
     }
-    PerlValue::integer(1)
+    StrykeValue::integer(1)
 }
 
 /// [`std::path::Path::file_name`] as a string (empty if none).

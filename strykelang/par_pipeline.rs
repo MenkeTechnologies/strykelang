@@ -13,7 +13,7 @@ use parking_lot::Mutex;
 
 use crate::error::{PerlError, PerlResult};
 use crate::scope::{AtomicArray, AtomicHash};
-use crate::value::{PerlSub, PerlValue};
+use crate::value::{PerlSub, StrykeValue};
 use crate::vm_helper::{Flow, FlowOrError, VMHelper};
 
 struct ParPipelineSpec {
@@ -23,7 +23,7 @@ struct ParPipelineSpec {
     buffer: usize,
 }
 
-fn list_from_value(v: &PerlValue) -> Vec<PerlValue> {
+fn list_from_value(v: &StrykeValue) -> Vec<StrykeValue> {
     if let Some(a) = v.as_array_vec() {
         return a;
     }
@@ -34,7 +34,7 @@ fn list_from_value(v: &PerlValue) -> Vec<PerlValue> {
 }
 
 /// `true` when args are the named `source => …, stages => …, workers => …` form (even length, all three keys present).
-pub(crate) fn is_named_par_pipeline_args(args: &[PerlValue]) -> bool {
+pub(crate) fn is_named_par_pipeline_args(args: &[StrykeValue]) -> bool {
     if args.len() < 6 || !args.len().is_multiple_of(2) {
         return false;
     }
@@ -52,14 +52,14 @@ pub(crate) fn is_named_par_pipeline_args(args: &[PerlValue]) -> bool {
     has_source && has_stages && has_workers
 }
 
-fn parse_args(args: &[PerlValue]) -> Result<ParPipelineSpec, PerlError> {
+fn parse_args(args: &[StrykeValue]) -> Result<ParPipelineSpec, PerlError> {
     if args.len() < 6 || !args.len().is_multiple_of(2) {
         return Err(PerlError::runtime(
             "par_pipeline: expected pairs source => CODE, stages => [...], workers => [...], optional buffer => N",
             0,
         ));
     }
-    let mut map: HashMap<String, PerlValue> = HashMap::new();
+    let mut map: HashMap<String, StrykeValue> = HashMap::new();
     for chunk in args.chunks(2) {
         let key = chunk[0].to_string();
         map.insert(key, chunk[1].clone());
@@ -123,11 +123,11 @@ fn flow_err_msg(e: FlowOrError) -> String {
 fn run_worker(
     sub: Arc<PerlSub>,
     subs: HashMap<String, Arc<PerlSub>>,
-    capture: Vec<(String, PerlValue)>,
+    capture: Vec<(String, StrykeValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,
-    rx: Receiver<PerlValue>,
-    tx_out: Option<Sender<PerlValue>>,
+    rx: Receiver<StrykeValue>,
+    tx_out: Option<Sender<StrykeValue>>,
     err: Arc<Mutex<Option<String>>>,
     last_stage_counter: Option<Arc<AtomicUsize>>,
 ) {
@@ -176,10 +176,10 @@ fn run_worker(
 fn run_source(
     source: Arc<PerlSub>,
     subs: HashMap<String, Arc<PerlSub>>,
-    capture: Vec<(String, PerlValue)>,
+    capture: Vec<(String, StrykeValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,
-    tx: Sender<PerlValue>,
+    tx: Sender<StrykeValue>,
     err: Arc<Mutex<Option<String>>>,
 ) {
     let mut interp = VMHelper::new();
@@ -225,9 +225,9 @@ fn run_source(
 /// Returns the number of items processed by the **last** stage (scalar).
 pub(crate) fn run_par_pipeline(
     interp: &mut VMHelper,
-    args: &[PerlValue],
+    args: &[StrykeValue],
     line: usize,
-) -> PerlResult<PerlValue> {
+) -> PerlResult<StrykeValue> {
     use rayon::prelude::*;
 
     let spec = parse_args(args)?;
@@ -278,7 +278,7 @@ pub(crate) fn run_par_pipeline(
             .into_par_iter()
             .map(|item| {
                 if err_w.lock().is_some() {
-                    return PerlValue::UNDEF;
+                    return StrykeValue::UNDEF;
                 }
                 let mut local_interp = VMHelper::new();
                 local_interp.subs = subs_w.clone();
@@ -303,7 +303,7 @@ pub(crate) fn run_par_pipeline(
                         if g.is_none() {
                             *g = Some(flow_err_msg(e));
                         }
-                        PerlValue::UNDEF
+                        StrykeValue::UNDEF
                     }
                 }
             })
@@ -314,7 +314,7 @@ pub(crate) fn run_par_pipeline(
     if let Some(msg) = err_msg {
         return Err(PerlError::runtime(msg, line));
     }
-    Ok(PerlValue::integer(items.len() as i64))
+    Ok(StrykeValue::integer(items.len() as i64))
 }
 
 /// Worker loop for `~s>` / `~s>>` stages. Differs from `run_worker` in two
@@ -334,13 +334,13 @@ pub(crate) fn run_par_pipeline(
 fn run_thread_par_worker(
     sub: Arc<PerlSub>,
     subs: HashMap<String, Arc<PerlSub>>,
-    capture: Vec<(String, PerlValue)>,
+    capture: Vec<(String, StrykeValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,
-    rx: Receiver<PerlValue>,
-    tx_out: Option<Sender<PerlValue>>,
+    rx: Receiver<StrykeValue>,
+    tx_out: Option<Sender<StrykeValue>>,
     err: Arc<Mutex<Option<String>>>,
-    last_stage_collector: Option<Arc<Mutex<Vec<PerlValue>>>>,
+    last_stage_collector: Option<Arc<Mutex<Vec<StrykeValue>>>>,
 ) {
     while let Ok(item) = rx.recv() {
         if err.lock().is_some() {
@@ -375,7 +375,7 @@ fn run_thread_par_worker(
         // `map { ... }` (which returns an array-ref in scalar context)
         // propagates each element. Plain scalars come back as a single-
         // element vec.
-        let items: Vec<PerlValue> = if raw.is_undef() {
+        let items: Vec<StrykeValue> = if raw.is_undef() {
             Vec::new() // filter / drop semantics
         } else {
             raw.map_flatten_outputs(true)
@@ -410,11 +410,11 @@ fn run_thread_par_worker(
 /// and our stages already use `$_` (topic) which is position-agnostic.
 pub(crate) fn run_thread_par(
     interp: &mut VMHelper,
-    source_value: PerlValue,
+    source_value: StrykeValue,
     stage_closures: Vec<Arc<PerlSub>>,
     _thread_last: bool,
     line: usize,
-) -> PerlResult<PerlValue> {
+) -> PerlResult<StrykeValue> {
     if stage_closures.is_empty() {
         return Err(PerlError::runtime(
             "~s>: requires at least one stage after the source",
@@ -432,13 +432,13 @@ pub(crate) fn run_thread_par(
     // `AtomicUsize` count and the macro returned the count instead of
     // the values, which made `join(',', ~s> [1,2,3] map {…})` return
     // "3" instead of "2,4,6".
-    let collected: Arc<Mutex<Vec<PerlValue>>> = Arc::new(Mutex::new(Vec::new()));
+    let collected: Arc<Mutex<Vec<StrykeValue>>> = Arc::new(Mutex::new(Vec::new()));
 
     // Materialise source into a Vec the source-feeder thread will iterate.
-    let items: Vec<PerlValue> = source_value.map_flatten_outputs(true);
+    let items: Vec<StrykeValue> = source_value.map_flatten_outputs(true);
 
-    let mut txs: Vec<Sender<PerlValue>> = Vec::with_capacity(k);
-    let mut rxs: Vec<Receiver<PerlValue>> = Vec::with_capacity(k);
+    let mut txs: Vec<Sender<StrykeValue>> = Vec::with_capacity(k);
+    let mut rxs: Vec<Receiver<StrykeValue>> = Vec::with_capacity(k);
     for _ in 0..k {
         let (tx, rx) = bounded(cap);
         txs.push(tx);
@@ -497,7 +497,7 @@ pub(crate) fn run_thread_par(
         return Err(PerlError::runtime(msg, line));
     }
     let out = std::mem::take(&mut *collected.lock());
-    Ok(PerlValue::array(out))
+    Ok(StrykeValue::array(out))
 }
 
 /// Run a **streaming** parallel pipeline: items flow through bounded channels
@@ -505,9 +505,9 @@ pub(crate) fn run_thread_par(
 /// Returns the number of items processed by the **last** stage (scalar).
 pub(crate) fn run_par_pipeline_streaming(
     interp: &mut VMHelper,
-    args: &[PerlValue],
+    args: &[StrykeValue],
     line: usize,
-) -> PerlResult<PerlValue> {
+) -> PerlResult<StrykeValue> {
     let spec = parse_args(args)?;
     let k = spec.stages.len();
     let cap = spec.buffer;
@@ -517,8 +517,8 @@ pub(crate) fn run_par_pipeline_streaming(
     let err: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
     let processed = Arc::new(AtomicUsize::new(0));
 
-    let mut txs: Vec<Sender<PerlValue>> = Vec::with_capacity(k);
-    let mut rxs: Vec<Receiver<PerlValue>> = Vec::with_capacity(k);
+    let mut txs: Vec<Sender<StrykeValue>> = Vec::with_capacity(k);
+    let mut rxs: Vec<Receiver<StrykeValue>> = Vec::with_capacity(k);
     for _ in 0..k {
         let (tx, rx) = bounded(cap);
         txs.push(tx);
@@ -580,13 +580,13 @@ pub(crate) fn run_par_pipeline_streaming(
         return Err(PerlError::runtime(msg, line));
     }
     let n = processed.load(Ordering::SeqCst);
-    Ok(PerlValue::integer(n as i64))
+    Ok(StrykeValue::integer(n as i64))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::value::PerlValue;
+    use crate::value::StrykeValue;
     use std::thread;
 
     /// Two-stage wiring must forward items (regression: multi-stage used to deadlock).
@@ -594,8 +594,8 @@ mod tests {
     fn two_stage_channel_forwarding() {
         let k = 2usize;
         let cap = 8usize;
-        let mut txs: Vec<Sender<PerlValue>> = Vec::with_capacity(k);
-        let mut rxs: Vec<Receiver<PerlValue>> = Vec::with_capacity(k);
+        let mut txs: Vec<Sender<StrykeValue>> = Vec::with_capacity(k);
+        let mut rxs: Vec<Receiver<StrykeValue>> = Vec::with_capacity(k);
         for _ in 0..k {
             let (tx, rx) = bounded(cap);
             txs.push(tx);
@@ -607,7 +607,7 @@ mod tests {
 
         thread::scope(|scope| {
             scope.spawn(move || {
-                let _ = tx0.send(PerlValue::integer(7));
+                let _ = tx0.send(StrykeValue::integer(7));
             });
             for stage_idx in 0..k {
                 let rx = rxs[stage_idx].clone();

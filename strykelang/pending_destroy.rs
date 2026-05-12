@@ -13,14 +13,14 @@
 
 use std::cell::RefCell;
 
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 
 thread_local! {
-    static PENDING: RefCell<Vec<(String, PerlValue)>> = const { RefCell::new(Vec::new()) };
+    static PENDING: RefCell<Vec<(String, StrykeValue)>> = const { RefCell::new(Vec::new()) };
     static NEEDS_VM_SYNC: RefCell<bool> = const { RefCell::new(false) };
 }
 
-pub(crate) fn enqueue(class: String, payload: PerlValue) {
+pub(crate) fn enqueue(class: String, payload: StrykeValue) {
     PENDING.with(|p| p.borrow_mut().push((class, payload)));
     NEEDS_VM_SYNC.with(|f| *f.borrow_mut() = true);
 }
@@ -31,7 +31,7 @@ pub(crate) fn pending_destroy_vm_sync_needed() -> bool {
     NEEDS_VM_SYNC.with(|f| *f.borrow())
 }
 
-pub(crate) fn take_queue() -> Vec<(String, PerlValue)> {
+pub(crate) fn take_queue() -> Vec<(String, StrykeValue)> {
     NEEDS_VM_SYNC.with(|f| *f.borrow_mut() = false);
     PENDING.with(|p| std::mem::take(&mut *p.borrow_mut()))
 }

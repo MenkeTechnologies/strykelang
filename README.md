@@ -79,7 +79,7 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - **All zsh glob qualifiers in a scripting language** — world-first. Every qualifier from zsh's `zshexpn(1)` works wherever stryke takes a glob (`glob`, `glob_par`, `slurp`/`c`/`cat`, `pwatch`, `<...>`, `par_find_files`): file-type, permission, ownership, size/links/time numerics, sort + descending sort, `[N,M]` selection, `(N)` null-glob, `(D)` dotfiles, `(F)` non-empty dir, `(f<bits>)` mode match, `(d<N>)` device, `(e'CMD')` eval, `(P…)`/`(Q…)` join words, `^` negate, `-` follow-symlinks toggle, `,` OR, `:` colon modifiers. Backed by the zshrs glob engine — single source of truth, zero stryke-side reimplementation.
 - **Package manager** — Cargo-shaped `stryke.toml` + `stryke.lock`, `s add`/`s install`/`s tree` resolver, hash-pinned reproducible builds ([§ 0x14](#0x14-package-manager))
 - **New Parallel Subroutines and |> Pipeline Syntactic Sugar**
-- **Runtime values** — `PerlValue` is a NaN-boxed `u64`: immediates (`undef`, `i32`, raw `f64` bits) and tagged `Arc<HeapObject>` pointers for big ints, strings, arrays, hashes, refs, regexes, atomics, channels.
+- **Runtime values** — `StrykeValue` is a NaN-boxed `u64`: immediates (`undef`, `i32`, raw `f64` bits) and tagged `Arc<HeapObject>` pointers for big ints, strings, arrays, hashes, refs, regexes, atomics, channels.
 - **Three-tier regex** — Rust [`regex`](https://docs.rs/regex) → [`fancy-regex`](https://docs.rs/fancy-regex) (backrefs) → [`pcre2`](https://docs.rs/pcre2) (PCRE-only verbs).
 - **Bytecode VM + JIT** — match-dispatch interpreter with Cranelift block + linear-sub JIT (`src/vm.rs`, `src/jit.rs`).
 - **Rayon parallelism** — every parallel builtin uses work-stealing across all cores.
@@ -929,6 +929,7 @@ stryke-specific long flags:
 | `--fmt` | Pretty-print parsed Perl to stdout and exit |
 | `--profile` | Wall-clock profile: per-line + per-sub timings on stderr |
 | `--flame` | Flamegraph: colored terminal bars when interactive, SVG when piped (`stryke --flame x.stk > flame.svg`) |
+| `--record` | Record one row per stryke run (wall-clock, exit code, argv) to `~/.stryke/perf.sqlite`. Inherits to child processes via `STRYKE_RECORD=1` env, so `s --record t TESTS...` records one row per test file. Query via the `perfview` builtin. |
 | `--no-jit` | Disable Cranelift JIT (bytecode interpreter only) |
 | `--compat` | Perl 5 strict-compatibility mode: disable all stryke extensions (`\|>`, `struct`, `enum`, `match`, `pmap`, `#{expr}`, etc.) |
 | `--no-interop` | Reject Perl-isms (`sub`, `say`, `reverse`, `scalar`, `$a`/`$b` outside sort blocks); force idiomatic stryke (`fn`, `p`, `rev`, `len`, `$_0`/`$_1`). See [\[0x08a\]](#0x08a-no-interop-mode) |
@@ -1151,6 +1152,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **`use strict`** — refs/subs/vars modes (per-mode `use strict 'refs'` etc.). `strict refs` rejects symbolic derefs at runtime; `strict vars` requires a visible binding.
 - **`BEGIN` / `UNITCHECK` / `CHECK` / `INIT` / `END`** — Perl order; `${^GLOBAL_PHASE}` matches Perl.
 - **String interpolation** — `$var` `#{23 * 52}`, `$h{k}`, `$a[i]`, `@a`, `@a[slice]` (joined with `$"`), `$#a` in slice indices, `$0`, `$1..$n`. Escapes: `\n \r \t \a \b \f \e \0`, `\x{hex}`, `\xHH`, `\u{hex}`, `\o{oct}`, `\NNN` (octal), `\cX` (control), `\N{U+hex}`, `\N{UNICODE NAME}`, `\U..\E`, `\L..\E`, `\u`, `\l`, `\Q..\E`.
+- **Triple-quoted strings** — `"""..."""` for interpolating multiline strings (same `$var`/`@arr`/`#{expr}`/escape rules as `"..."`); raw newlines preserved verbatim, no indent stripping. `r"""..."""` is the raw form: zero interpolation, zero backslash escapes — every byte copied literally until the closing `"""`. `""` (two quotes) inside the body does NOT close — only `"""` does.
 - **`__FILE__` / `__LINE__`** — compile-time literals.
 - Heredocs `<<EOF`, POD skipping, shebang handling, `qw()/q()/qq()` with paired delimiters.
 - **Special variables** — large set of `${^NAME}` scalars pre-seeded; see [`SPECIAL_VARIABLES.md`](parity/SPECIAL_VARIABLES.md). Still missing vs Perl 5: `English`, full `$^V` as a version object.
@@ -2179,7 +2181,7 @@ p fib 50             # 12586269025
 
 **Requirements**: `rustc` must be on `PATH`. First-run compile costs ~1 second; subsequent runs hit the cache and pay only `dlopen` (~10 ms). `#[no_mangle]` is auto-inserted by the wrapper — you don't need to write it. The body is `#![crate_type = "cdylib"]` with `use std::os::raw::c_char; use std::ffi::{CStr, CString};` already in scope.
 
-**How it works** ([`src/rust_sugar.rs`](src/rust_sugar.rs), [`src/rust_ffi.rs`](src/rust_ffi.rs)): the source-level pre-pass desugars every top-level `rust { ... }` into a `BEGIN { __stryke_rust_compile("<base64 body>", $line); }` call. The `__stryke_rust_compile` builtin hashes the body, compiles via `rustc --edition=2021 -O` if the cache is cold, `libc::dlopen`s the result, `dlsym`s each detected signature, and stores the raw symbol + arity/type tag in a process-global registry. Calls from Perl flow through a fallback arm in [`crate::builtins::try_builtin`] that dispatches on the signature tag via direct function-pointer transmute — no libffi dep, no per-call alloc, no marshalling overhead beyond the `PerlValue::to_int` / `to_number` / `to_string` calls you'd do for any builtin.
+**How it works** ([`src/rust_sugar.rs`](src/rust_sugar.rs), [`src/rust_ffi.rs`](src/rust_ffi.rs)): the source-level pre-pass desugars every top-level `rust { ... }` into a `BEGIN { __stryke_rust_compile("<base64 body>", $line); }` call. The `__stryke_rust_compile` builtin hashes the body, compiles via `rustc --edition=2021 -O` if the cache is cold, `libc::dlopen`s the result, `dlsym`s each detected signature, and stores the raw symbol + arity/type tag in a process-global registry. Calls from Perl flow through a fallback arm in [`crate::builtins::try_builtin`] that dispatches on the signature tag via direct function-pointer transmute — no libffi dep, no per-call alloc, no marshalling overhead beyond the `StrykeValue::to_int` / `to_number` / `to_string` calls you'd do for any builtin.
 
 **Combine with AOT for zero-friction deployment:** `stryke build script.stk -o prog` bakes the Perl source — which includes the `rust { ... }` block — into a standalone binary. The FFI compile still happens on first run of `./prog`, but the user only needs `rustc` once, then the `~/.cache/stryke/ffi/` entry is permanent.
 
@@ -2243,7 +2245,7 @@ PATH                                                      PROG KB    BC KB
 - Bypassed for `-e` / `-E` one-liners (overhead > benefit for tiny scripts)
 - Bypassed for `-n` / `-p` / `--lint` / `--check` / `--ast` / `--fmt` / `--profile` modes
 
-**Format:** rkyv-archived `ScriptShard { header, entries: HashMap<path, ScriptEntry> }`. Entries hold per-script `(mtime_secs, mtime_nsecs, binary_mtime_at_cache, cached_at_secs, program_blob, chunk_blob)`. Inner blobs use bincode for now (`PerlValue`'s `Arc`-shared graph isn't trivially zero-copy archivable yet — phase 2 will derive `Archive` directly on `Chunk` / `Program` for full zero-copy load). Writes go through `flock` on `scripts.rkyv.lock` and atomic rename of a tmp file.
+**Format:** rkyv-archived `ScriptShard { header, entries: HashMap<path, ScriptEntry> }`. Entries hold per-script `(mtime_secs, mtime_nsecs, binary_mtime_at_cache, cached_at_secs, program_blob, chunk_blob)`. Inner blobs use bincode for now (`StrykeValue`'s `Arc`-shared graph isn't trivially zero-copy archivable yet — phase 2 will derive `Archive` directly on `Chunk` / `Program` for full zero-copy load). Writes go through `flock` on `scripts.rkyv.lock` and atomic rename of a tmp file.
 
 **Aligned with zshrs:** same rkyv shard pattern (`zshrs/src/daemon/shard.rs`) — `mmap` + `check_archived_root` + zero-copy `ArchivedHashMap` lookup. zshrs uses per-source-tree shards with a daemon; stryke uses a single global shard since scripts are individually invoked.
 
@@ -2376,7 +2378,7 @@ stryke --remote-worker-v1                # legacy one-shot session for compat te
 #### Limitations (v1)
 
 - **Unix only** — hardcoded `ssh`, hardcoded POSIX dlopen path. Windows would need a similar shim.
-- **JSON-marshalled values** — `serde_json` round-trip loses bigints, blessed refs, and other heap-only `PerlValue` payloads. The supported types are: undef, bool, i64, f64, string, array, hash. Anything outside that returns an error from `pmap_on`.
+- **JSON-marshalled values** — `serde_json` round-trip loses bigints, blessed refs, and other heap-only `StrykeValue` payloads. The supported types are: undef, bool, i64, f64, string, array, hash. Anything outside that returns an error from `pmap_on`.
 - **`mysync` / atomic capture is rejected** — shared state across remote workers can't honour the cross-process mutex semantics in v1. Use the result list and aggregate locally.
 - **No streaming results** — the dispatcher buffers the full result vector before returning. For huge fan-outs this is the next thing to fix (likely via `pchannel` integration).
 - **No SSH connection pool across calls** — each `pmap_on` invocation builds fresh sessions. Subsequent `pmap_on` calls in the same script reconnect from scratch.

@@ -11,15 +11,15 @@ use crossbeam::channel::{unbounded, Receiver, Sender};
 
 use crate::error::{PerlError, PerlResult};
 use crate::scope::{AtomicArray, AtomicHash};
-use crate::value::{PerlPpool, PerlSub, PerlValue};
+use crate::value::{PerlPpool, PerlSub, StrykeValue};
 use crate::vm_helper::{Flow, FlowOrError, VMHelper};
 
 /// Shared pool state (jobs in, results out-of-order; `PerlPpool::collect` reorders).
 pub struct PpoolInner {
     /// `None` after the pool is shut down.
     pub(crate) job_tx: Mutex<Option<Sender<PoolJob>>>,
-    result_rx: Mutex<Receiver<(u64, PerlValue)>>,
-    pending: Mutex<VecDeque<(u64, PerlValue)>>,
+    result_rx: Mutex<Receiver<(u64, StrykeValue)>>,
+    pending: Mutex<VecDeque<(u64, StrykeValue)>>,
     pub(crate) next_order: AtomicU64,
     collect_from: AtomicU64,
     workers: Mutex<Option<Vec<JoinHandle<()>>>>,
@@ -28,9 +28,9 @@ pub struct PpoolInner {
 pub(crate) struct PoolJob {
     order: u64,
     sub: Arc<PerlSub>,
-    arg: PerlValue,
+    arg: StrykeValue,
     subs: HashMap<String, Arc<PerlSub>>,
-    capture: Vec<(String, PerlValue)>,
+    capture: Vec<(String, StrykeValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,
 }
@@ -39,9 +39,9 @@ impl PerlPpool {
     pub(crate) fn submit(
         &self,
         interp: &mut VMHelper,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         if args.is_empty() {
             return Err(PerlError::runtime(
                 "submit() expects a code reference and optional argument for $_",
@@ -84,18 +84,18 @@ impl PerlPpool {
         sender
             .send(job)
             .map_err(|_| PerlError::runtime("ppool: submit failed (pool shut down)", line))?;
-        Ok(PerlValue::UNDEF)
+        Ok(StrykeValue::UNDEF)
     }
 
-    pub(crate) fn collect(&self, line: usize) -> PerlResult<PerlValue> {
+    pub(crate) fn collect(&self, line: usize) -> PerlResult<StrykeValue> {
         let start = self.0.collect_from.load(Ordering::SeqCst);
         let end = self.0.next_order.load(Ordering::SeqCst);
         let n = (end - start) as usize;
         if n == 0 {
-            return Ok(PerlValue::array(vec![]));
+            return Ok(StrykeValue::array(vec![]));
         }
 
-        let mut slots: Vec<Option<PerlValue>> = vec![None; n];
+        let mut slots: Vec<Option<StrykeValue>> = vec![None; n];
         let mut count = 0usize;
 
         {
@@ -148,11 +148,11 @@ impl PerlPpool {
         }
 
         self.0.collect_from.store(end, Ordering::SeqCst);
-        let out: Vec<PerlValue> = slots
+        let out: Vec<StrykeValue> = slots
             .into_iter()
-            .map(|s| s.unwrap_or(PerlValue::UNDEF))
+            .map(|s| s.unwrap_or(StrykeValue::UNDEF))
             .collect();
-        Ok(PerlValue::array(out))
+        Ok(StrykeValue::array(out))
     }
 }
 
@@ -171,7 +171,7 @@ impl Drop for PpoolInner {
     }
 }
 
-fn worker_loop(job_rx: Receiver<PoolJob>, result_tx: Sender<(u64, PerlValue)>) {
+fn worker_loop(job_rx: Receiver<PoolJob>, result_tx: Sender<(u64, StrykeValue)>) {
     while let Ok(job) = job_rx.recv() {
         let mut interp = VMHelper::new();
         interp.subs = job.subs;
@@ -188,7 +188,7 @@ fn worker_loop(job_rx: Receiver<PoolJob>, result_tx: Sender<(u64, PerlValue)>) {
         let val = match interp.exec_block_no_scope(&job.sub.body) {
             Ok(v) => v,
             Err(FlowOrError::Flow(Flow::Return(v))) => v,
-            Err(_) => PerlValue::UNDEF,
+            Err(_) => StrykeValue::UNDEF,
         };
         interp.scope_pop_hook();
         let _ = result_tx.send((job.order, val));
@@ -197,10 +197,10 @@ fn worker_loop(job_rx: Receiver<PoolJob>, result_tx: Sender<(u64, PerlValue)>) {
 
 /// Create a pool with `workers` OS threads (clamped to 1..=256). Each thread runs jobs
 /// sequentially; new [`VMHelper`] values are constructed per job (cheap vs thread spawn).
-pub fn create_pool(workers: usize) -> PerlResult<PerlValue> {
+pub fn create_pool(workers: usize) -> PerlResult<StrykeValue> {
     let workers = workers.clamp(1, 256);
     let (job_tx, job_rx): (Sender<PoolJob>, Receiver<PoolJob>) = unbounded();
-    type ResultMsg = (u64, PerlValue);
+    type ResultMsg = (u64, StrykeValue);
     let (result_tx, result_rx): (Sender<ResultMsg>, Receiver<ResultMsg>) = unbounded();
 
     let mut handles = Vec::with_capacity(workers);
@@ -221,7 +221,7 @@ pub fn create_pool(workers: usize) -> PerlResult<PerlValue> {
         workers: Mutex::new(Some(handles)),
     });
 
-    Ok(PerlValue::ppool(PerlPpool(inner)))
+    Ok(StrykeValue::ppool(PerlPpool(inner)))
 }
 
 #[cfg(test)]
@@ -241,7 +241,7 @@ mod tests {
             _ => panic!("expected block"),
         };
 
-        let sub_val = PerlValue::code_ref(Arc::new(PerlSub {
+        let sub_val = StrykeValue::code_ref(Arc::new(PerlSub {
             name: "anon".to_string(),
             params: vec![],
             body,
@@ -251,7 +251,7 @@ mod tests {
         }));
 
         for i in 1..=5 {
-            pool.submit(&mut interp, &[sub_val.clone(), PerlValue::integer(i)], 1)
+            pool.submit(&mut interp, &[sub_val.clone(), StrykeValue::integer(i)], 1)
                 .expect("submit");
         }
 

@@ -29,7 +29,7 @@
 //! operands constant-fold or the exponent is constant in that range and the base is an integer path
 //! (dynamic base from slot/plain/arg reads that materialize as `i64`),
 //! [`Op::Pop`], [`Op::Dup`], [`Op::Swap`], [`Op::Rot`], optional trailing [`Op::Halt`], [`Op::LoadConst`] when the pool entry is
-//! an integer or float ([`PerlValue::as_integer`] / [`PerlValue::as_float`]), [`Op::BitAnd`]/[`Op::BitOr`]
+//! an integer or float ([`StrykeValue::as_integer`] / [`StrykeValue::as_float`]), [`Op::BitAnd`]/[`Op::BitOr`]
 //! (same integer path as the VM when operands are not set values).
 //!
 //! [`Op::DeclareScalarSlot`], [`Op::PreIncSlot`] / [`Op::PostIncSlot`] / [`Op::PreDecSlot`] /
@@ -37,7 +37,7 @@
 //! [`Op::GetScalarPlain`] / [`Op::SetScalarPlain`] / [`Op::SetScalarKeepPlain`] /
 //! [`Op::PreInc`] / [`Op::PostInc`] / [`Op::PreDec`] / [`Op::PostDec`] (name-based inc/dec) /
 //! [`Op::GetArg`] are
-//! JIT’d when every referenced index materializes as `i64` via [`PerlValue::as_integer`].
+//! JIT’d when every referenced index materializes as `i64` via [`StrykeValue::as_integer`].
 //! Slot and plain-name writes update dense `i64` tables; the VM copies written indices back into
 //! the scope after native execution. Cranelift functions use a fixed triple `(*slot, *plain, *arg)`
 //! when any table is needed.
@@ -63,7 +63,7 @@
 //! opcodes so validation bails to the interpreter. [`stryke_jit_concat_bits`] /
 //! [`stryke_jit_string_cmp_bits`] remain for a future lowering.
 //! `LoadUndef` is JIT’d as full nanbox bits; the return
-//! path uses `PerlValue::from_raw_bits` when the abstract result is [`Cell::Undef`].
+//! path uses `StrykeValue::from_raw_bits` when the abstract result is [`Cell::Undef`].
 //!
 //! ## Subroutine block JIT call-out (`Op::Call`)
 //! Same ABI as linear: jitable [`Op::Call`] to a compiled stack-args scalar sub emits a call to
@@ -74,7 +74,7 @@
 //! [`Op::JumpIfDefinedKeep`]: constant [`Cell::Const`] / [`Cell::ConstF`] tops compile to an
 //! unconditional jump (fall-through is dead). When the abstract top is [`Cell::Dyn`] immediately after
 //! [`Op::GetScalarSlot`] / [`Op::GetScalarPlain`] / [`Op::GetArg`], the block JIT uses **raw-buffer
-//! mode**: slot/plain/arg `i64` tables carry [`PerlValue::raw_bits`] (sign reinterpretation), loads
+//! mode**: slot/plain/arg `i64` tables carry [`StrykeValue::raw_bits`] (sign reinterpretation), loads
 //! preserve `undef`, and the terminator calls [`stryke_jit_is_defined_raw_bits`]. That mode rejects
 //! arithmetic and most other data ops so stack values stay valid NaN-box encodings. Other [`Cell::Dyn`]
 //! / [`Cell::DynF`] shapes still fall back to the interpreter.
@@ -117,7 +117,7 @@ use cranelift_module::{default_libcall_names, Linkage, Module};
 
 use crate::bytecode::Op;
 use crate::nanbox;
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 use crate::vm_helper::WantarrayCtx;
 
 type LinearFn0 = unsafe extern "C" fn() -> i64;
@@ -154,7 +154,7 @@ pub(crate) struct LinearJit {
     #[allow(dead_code)]
     module: JITModule,
     run: LinearRun,
-    /// When true, the `i64` return is a full nanbox (`PerlValue::from_raw_bits`), not `PerlValue::integer`.
+    /// When true, the `i64` return is a full nanbox (`StrykeValue::from_raw_bits`), not `StrykeValue::integer`.
     ret_nanboxed: bool,
 }
 
@@ -163,21 +163,21 @@ enum JitResult {
     Float(f64),
 }
 
-fn jit_result_to_perl(j: JitResult, ret_nanboxed: bool) -> PerlValue {
+fn jit_result_to_perl(j: JitResult, ret_nanboxed: bool) -> StrykeValue {
     match j {
-        JitResult::Int(n) if ret_nanboxed => PerlValue::from_raw_bits(n as u64),
-        JitResult::Int(n) => PerlValue::integer(n),
-        JitResult::Float(f) => PerlValue::float(f),
+        JitResult::Int(n) if ret_nanboxed => StrykeValue::from_raw_bits(n as u64),
+        JitResult::Int(n) => StrykeValue::integer(n),
+        JitResult::Float(f) => StrykeValue::float(f),
     }
 }
 
-fn jit_block_result_to_perl(j: JitResult, mode: BlockJitBufferMode) -> PerlValue {
+fn jit_block_result_to_perl(j: JitResult, mode: BlockJitBufferMode) -> StrykeValue {
     match (j, mode) {
-        (JitResult::Int(n), BlockJitBufferMode::I64AsPerlValueBits) => {
-            PerlValue::from_raw_bits(n as u64)
+        (JitResult::Int(n), BlockJitBufferMode::I64AsStrykeValueBits) => {
+            StrykeValue::from_raw_bits(n as u64)
         }
-        (JitResult::Int(n), BlockJitBufferMode::I64AsInteger) => PerlValue::integer(n),
-        (JitResult::Float(f), _) => PerlValue::float(f),
+        (JitResult::Int(n), BlockJitBufferMode::I64AsInteger) => StrykeValue::integer(n),
+        (JitResult::Float(f), _) => StrykeValue::float(f),
     }
 }
 
@@ -205,7 +205,7 @@ impl LinearJit {
         }
     }
 
-    fn result_to_perl(&self, j: JitResult) -> PerlValue {
+    fn result_to_perl(&self, j: JitResult) -> StrykeValue {
         jit_result_to_perl(j, self.ret_nanboxed)
     }
 }
@@ -243,7 +243,7 @@ pub extern "C" fn stryke_jit_fmod_f64(a: f64, b: f64) -> f64 {
 }
 
 /// Linear JIT (`emit_data_op` with `needs_raw_bits == false`) keeps small integers as **plain** `i64`
-/// stack slots. [`PerlValue::from_raw_bits`] must not see those (e.g. `1` is valid float bits, not int `1`).
+/// stack slots. [`StrykeValue::from_raw_bits`] must not see those (e.g. `1` is valid float bits, not int `1`).
 /// Heap strings / concat results and tagged immediates pass through unchanged.
 #[inline]
 pub(crate) fn perl_value_bits_from_jit_string_operand(n: i64) -> u64 {
@@ -251,13 +251,13 @@ pub(crate) fn perl_value_bits_from_jit_string_operand(n: i64) -> u64 {
     if nanbox::is_heap(u) || nanbox::is_imm(u) {
         return u;
     }
-    PerlValue::integer(n).raw_bits()
+    StrykeValue::integer(n).raw_bits()
 }
 
-/// `!` on a value that is interpreted as integer (`PerlValue::integer(n)`), matching `Op::LogNot` + stack.
+/// `!` on a value that is interpreted as integer (`StrykeValue::integer(n)`), matching `Op::LogNot` + stack.
 #[no_mangle]
 pub extern "C" fn stryke_jit_lognot_i64(n: i64) -> i64 {
-    if PerlValue::integer(n).is_true() {
+    if StrykeValue::integer(n).is_true() {
         0
     } else {
         1
@@ -267,51 +267,51 @@ pub extern "C" fn stryke_jit_lognot_i64(n: i64) -> i64 {
 /// String concatenation (`.`) — operands are Perl nanbox bits or linear-JIT plain integers (`a` then `b`).
 #[no_mangle]
 pub extern "C" fn stryke_jit_concat_bits(a: i64, b: i64) -> i64 {
-    let pa = PerlValue::from_raw_bits(perl_value_bits_from_jit_string_operand(a));
-    let pb = PerlValue::from_raw_bits(perl_value_bits_from_jit_string_operand(b));
+    let pa = StrykeValue::from_raw_bits(perl_value_bits_from_jit_string_operand(a));
+    let pb = StrykeValue::from_raw_bits(perl_value_bits_from_jit_string_operand(b));
     let mut s = pa.into_string();
     pb.append_to(&mut s);
-    PerlValue::string(s).raw_bits() as i64
+    StrykeValue::string(s).raw_bits() as i64
 }
 
 /// String compares — `kind` 1=`StrEq`, 2=`StrNe`, 3=`StrCmp`, 4–7=`StrLt`/`StrGt`/`StrLe`/`StrGe`.
 #[no_mangle]
 pub extern "C" fn stryke_jit_string_cmp_bits(a: i64, b: i64, kind: i32) -> i64 {
     use std::cmp::Ordering;
-    let pa = PerlValue::from_raw_bits(perl_value_bits_from_jit_string_operand(a));
-    let pb = PerlValue::from_raw_bits(perl_value_bits_from_jit_string_operand(b));
+    let pa = StrykeValue::from_raw_bits(perl_value_bits_from_jit_string_operand(a));
+    let pb = StrykeValue::from_raw_bits(perl_value_bits_from_jit_string_operand(b));
     match kind {
-        1 => PerlValue::integer(i64::from(pa.str_eq(&pb))).raw_bits() as i64,
-        2 => PerlValue::integer(i64::from(!pa.str_eq(&pb))).raw_bits() as i64,
+        1 => StrykeValue::integer(i64::from(pa.str_eq(&pb))).raw_bits() as i64,
+        2 => StrykeValue::integer(i64::from(!pa.str_eq(&pb))).raw_bits() as i64,
         3 => {
             let o = pa.str_cmp(&pb);
-            PerlValue::integer(match o {
+            StrykeValue::integer(match o {
                 Ordering::Less => -1,
                 Ordering::Equal => 0,
                 Ordering::Greater => 1,
             })
             .raw_bits() as i64
         }
-        4 => PerlValue::integer(i64::from(pa.str_cmp(&pb) == Ordering::Less)).raw_bits() as i64,
-        5 => PerlValue::integer(i64::from(pa.str_cmp(&pb) == Ordering::Greater)).raw_bits() as i64,
-        6 => PerlValue::integer(i64::from(matches!(
+        4 => StrykeValue::integer(i64::from(pa.str_cmp(&pb) == Ordering::Less)).raw_bits() as i64,
+        5 => StrykeValue::integer(i64::from(pa.str_cmp(&pb) == Ordering::Greater)).raw_bits() as i64,
+        6 => StrykeValue::integer(i64::from(matches!(
             pa.str_cmp(&pb),
             Ordering::Less | Ordering::Equal
         )))
         .raw_bits() as i64,
-        7 => PerlValue::integer(i64::from(matches!(
+        7 => StrykeValue::integer(i64::from(matches!(
             pa.str_cmp(&pb),
             Ordering::Greater | Ordering::Equal
         )))
         .raw_bits() as i64,
-        _ => PerlValue::UNDEF.raw_bits() as i64,
+        _ => StrykeValue::UNDEF.raw_bits() as i64,
     }
 }
 
-/// `defined` for a value transported as [`PerlValue::raw_bits`] in an `i64` stack slot (block JIT raw-buffer mode).
+/// `defined` for a value transported as [`StrykeValue::raw_bits`] in an `i64` stack slot (block JIT raw-buffer mode).
 #[no_mangle]
 pub extern "C" fn stryke_jit_is_defined_raw_bits(bits: i64) -> i64 {
-    if PerlValue::from_raw_bits(bits as u64).is_undef() {
+    if StrykeValue::from_raw_bits(bits as u64).is_undef() {
         0
     } else {
         1
@@ -569,9 +569,9 @@ fn branch_stack_to_block_args(
     Some(out)
 }
 
-/// Cache key for compiled JIT functions. [`Op::LoadConst`] hashes [`PerlValue::raw_bits`]
+/// Cache key for compiled JIT functions. [`Op::LoadConst`] hashes [`StrykeValue::raw_bits`]
 /// so different constant pool payloads cannot collide at the same index.
-fn hash_ops(ops: &[Op], constants: &[PerlValue]) -> u64 {
+fn hash_ops(ops: &[Op], constants: &[StrykeValue]) -> u64 {
     let mut h = DefaultHasher::new();
     ops.len().hash(&mut h);
     for op in ops {
@@ -724,7 +724,7 @@ fn hash_ops(ops: &[Op], constants: &[PerlValue]) -> u64 {
 /// Block JIT cache key: [`hash_ops`] plus `sub_entries` so different compiled-sub tables cannot collide.
 fn hash_block_cache_key(
     ops: &[Op],
-    constants: &[PerlValue],
+    constants: &[StrykeValue],
     sub_entries: &[(u16, usize, bool)],
 ) -> u64 {
     let mut h = DefaultHasher::new();
@@ -749,11 +749,11 @@ fn ops_before_halt(ops: &[Op]) -> &[Op] {
 pub(crate) enum Cell {
     Const(i64),
     Dyn,
-    /// String result from [`Op::Concat`] — return value is full nanbox bits (not `PerlValue::integer`).
+    /// String result from [`Op::Concat`] — return value is full nanbox bits (not `StrykeValue::integer`).
     DynStr,
     ConstF(f64),
     DynF,
-    /// [`Op::LoadUndef`] — stack carries [`PerlValue::UNDEF`] nanbox bits (see [`LinearJit::ret_nanboxed`]).
+    /// [`Op::LoadUndef`] — stack carries [`StrykeValue::UNDEF`] nanbox bits (see [`LinearJit::ret_nanboxed`]).
     Undef,
 }
 
@@ -860,7 +860,7 @@ fn fold_cmp_cell(op: &Op, a: Cell, b: Cell) -> Cell {
 fn simulate_one_op(
     op: &Op,
     stack: &mut Vec<Cell>,
-    constants: &[PerlValue],
+    constants: &[StrykeValue],
     sub_entries: Option<&[(u16, usize, bool)]>,
 ) -> Option<()> {
     match op {
@@ -1101,7 +1101,7 @@ fn simulate_one_op(
                 return None;
             }
             stack.push(match a {
-                Cell::Const(n) => Cell::Const(if PerlValue::integer(n).is_true() {
+                Cell::Const(n) => Cell::Const(if StrykeValue::integer(n).is_true() {
                     0
                 } else {
                     1
@@ -1181,7 +1181,7 @@ fn simulate_one_op(
 
 fn validate_linear_seq(
     seq: &[Op],
-    constants: &[PerlValue],
+    constants: &[StrykeValue],
     sub_entries: Option<&[(u16, usize, bool)]>,
 ) -> bool {
     if seq.is_empty() {
@@ -1200,7 +1200,7 @@ fn validate_linear_seq(
 }
 
 /// Linear sequence for a void `return;` — stack must be empty after the last op (no `Return`/`ReturnValue` in `seq`).
-fn validate_linear_void_seq(seq: &[Op], constants: &[PerlValue]) -> bool {
+fn validate_linear_void_seq(seq: &[Op], constants: &[StrykeValue]) -> bool {
     let mut stack: Vec<Cell> = Vec::new();
     for op in seq {
         if simulate_one_op(op, &mut stack, constants, None).is_none() {
@@ -1215,7 +1215,7 @@ fn validate_linear_void_seq(seq: &[Op], constants: &[PerlValue]) -> bool {
 
 fn linear_result_cell_seq(
     seq: &[Op],
-    constants: &[PerlValue],
+    constants: &[StrykeValue],
     sub_entries: Option<&[(u16, usize, bool)]>,
 ) -> Option<Cell> {
     let mut stack: Vec<Cell> = Vec::new();
@@ -1256,13 +1256,13 @@ fn needs_table(seq: &[Op]) -> bool {
     })
 }
 
-fn compile_linear(ops: &[Op], constants: &[PerlValue]) -> Option<LinearJit> {
+fn compile_linear(ops: &[Op], constants: &[StrykeValue]) -> Option<LinearJit> {
     compile_linear_ops(ops_before_halt(ops), constants, &[])
 }
 
 fn compile_linear_ops(
     seq: &[Op],
-    constants: &[PerlValue],
+    constants: &[StrykeValue],
     sub_entries: &[(u16, usize, bool)],
 ) -> Option<LinearJit> {
     if !validate_linear_seq(seq, constants, Some(sub_entries)) {
@@ -1530,7 +1530,7 @@ fn compile_linear_ops(
 }
 
 /// Subroutine body that ends with [`Op::Return`] — stack empty; native code returns `undef` nanbox bits.
-fn compile_linear_void_ops(seq: &[Op], constants: &[PerlValue]) -> Option<LinearJit> {
+fn compile_linear_void_ops(seq: &[Op], constants: &[StrykeValue]) -> Option<LinearJit> {
     if !seq.is_empty() && !validate_linear_void_seq(seq, constants) {
         return None;
     }
@@ -1664,7 +1664,7 @@ fn compile_linear_void_ops(seq: &[Op], constants: &[PerlValue]) -> Option<Linear
         if !stack.is_empty() {
             return None;
         }
-        let undef_bits = PerlValue::UNDEF.raw_bits() as i64;
+        let undef_bits = StrykeValue::UNDEF.raw_bits() as i64;
         let ret = bcx.ins().iconst(types::I64, undef_bits);
         bcx.ins().return_(&[ret]);
         bcx.seal_all_blocks();
@@ -1694,7 +1694,7 @@ fn compile_linear_void_ops(seq: &[Op], constants: &[PerlValue]) -> Option<Linear
     })
 }
 
-fn hash_linear_sub_key(seq: &[Op], constants: &[PerlValue], void: bool) -> u64 {
+fn hash_linear_sub_key(seq: &[Op], constants: &[StrykeValue], void: bool) -> u64 {
     let mut h = DefaultHasher::new();
     void.hash(&mut h);
     hash_ops(seq, constants).hash(&mut h);
@@ -1717,7 +1717,7 @@ fn sub_block_validate_fail_cache() -> &'static Mutex<HashSet<u64>> {
 
 fn hash_sub_block_validate_key(
     ops: &[Op],
-    constants: &[PerlValue],
+    constants: &[StrykeValue],
     term: SubTerminator,
     sub_entries: &[(u16, usize, bool)],
 ) -> u64 {
@@ -1768,8 +1768,8 @@ pub(crate) fn linear_slot_ops_max_index(ops: &[Op]) -> Option<u8> {
     max_scalar_slot_index(ops_before_halt(ops))
 }
 
-/// When building the dense `i64` slot buffer for the JIT, [`PerlValue::as_integer`] is `None` for
-/// `undef`. It is still safe to prefill that slot as `0` (matching [`PerlValue::to_int`] on undef)
+/// When building the dense `i64` slot buffer for the JIT, [`StrykeValue::as_integer`] is `None` for
+/// `undef`. It is still safe to prefill that slot as `0` (matching [`StrykeValue::to_int`] on undef)
 /// when no [`Op::GetScalarSlot`] for `slot` runs **before** the slot is written in this linear
 /// sequence (e.g. `DeclareScalarSlot` / inc-dec / set). Otherwise the VM must stay on the
 /// interpreter so `GetScalarSlot` can observe real `undef`.
@@ -1905,24 +1905,24 @@ fn linear_needs_args(seq: &[Op]) -> bool {
 /// [`Op::SetScalarSlotKeep`], [`Op::DeclareScalarSlot`], or slot [`Op::PreIncSlot`] /
 /// [`Op::PostIncSlot`] / [`Op::PreDecSlot`] / [`Op::PostDecSlot`], pass `Some` **mutable** slice
 /// whose length is `max(slot_index) + 1` and whose `i` entries are the slot values as `i64`
-/// (same as [`PerlValue::as_integer`], with [`crate::jit::slot_undef_prefill_ok`] handling for
+/// (same as [`StrykeValue::as_integer`], with [`crate::jit::slot_undef_prefill_ok`] handling for
 /// `undef` where documented). Slot writes update this buffer in place.
 ///
 /// When it contains [`Op::GetScalarPlain`], pass `Some` slice whose length is
-/// `max(name_index) + 1` with `PerlValue::as_integer` of `scope.get_scalar` for each name index.
+/// `max(name_index) + 1` with `StrykeValue::as_integer` of `scope.get_scalar` for each name index.
 ///
 /// When it contains [`Op::GetArg`], pass `Some` slice whose length is `max(arg_index) + 1` with
-/// `PerlValue::as_integer` of each `stack[call_frame.stack_base + i]` (compiled-sub integer args).
+/// `StrykeValue::as_integer` of each `stack[call_frame.stack_base + i]` (compiled-sub integer args).
 ///
 /// `constants` must be the chunk’s constant pool: [`Op::LoadConst`] is only JIT’d when
-/// `constants[idx]` is materializable as `i64` via [`PerlValue::as_integer`].
+/// `constants[idx]` is materializable as `i64` via [`StrykeValue::as_integer`].
 pub(crate) fn try_run_linear_ops(
     ops: &[Op],
     mut slot_i64: Option<&mut [i64]>,
     mut plain_i64: Option<&mut [i64]>,
     arg_i64: Option<&[i64]>,
-    constants: &[PerlValue],
-) -> Option<PerlValue> {
+    constants: &[StrykeValue],
+) -> Option<StrykeValue> {
     let seq = ops_before_halt(ops);
     if let Some(max) = max_scalar_slot_index(seq) {
         let sl = slot_i64.as_mut()?;
@@ -2125,10 +2125,10 @@ pub(crate) fn try_run_linear_sub(
     mut slot_i64: Option<&mut [i64]>,
     mut plain_i64: Option<&mut [i64]>,
     arg_i64: Option<&[i64]>,
-    constants: &[PerlValue],
+    constants: &[StrykeValue],
     sub_entries: &[(u16, usize, bool)],
     vm: *mut c_void,
-) -> Option<PerlValue> {
+) -> Option<StrykeValue> {
     let (seq, term) = sub_entry_segment(ops, entry_ip)?;
     if segment_blocks_subroutine_linear_jit(seq, sub_entries) {
         return None;
@@ -2297,10 +2297,10 @@ fn is_block_data_op(op: &Op, sub_entries: &[(u16, usize, bool)]) -> bool {
 /// How to fill VM `i64` buffers for [`try_run_block_ops`].
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum BlockJitBufferMode {
-    /// `PerlValue::as_integer()`-style scalars; `undef` uses prefills where applicable.
+    /// `StrykeValue::as_integer()`-style scalars; `undef` uses prefills where applicable.
     I64AsInteger,
-    /// [`PerlValue::raw_bits`] as `i64` (sign reinterpretation); preserves `undef` vs defined.
-    I64AsPerlValueBits,
+    /// [`StrykeValue::raw_bits`] as `i64` (sign reinterpretation); preserves `undef` vs defined.
+    I64AsStrykeValueBits,
 }
 
 /// How every control-flow path exits a block JIT program (main eval vs subroutine).
@@ -2326,7 +2326,7 @@ pub(crate) struct ValidatedBlockCfg {
 impl ValidatedBlockCfg {
     pub(crate) fn buffer_mode(&self) -> BlockJitBufferMode {
         if self.needs_raw_value_buffers {
-            BlockJitBufferMode::I64AsPerlValueBits
+            BlockJitBufferMode::I64AsStrykeValueBits
         } else {
             BlockJitBufferMode::I64AsInteger
         }
@@ -2336,7 +2336,7 @@ impl ValidatedBlockCfg {
 /// [`validate_block_cfg`] exposed for [`crate::vm::VM::execute`] so slot/plain/arg buffers match compilation.
 pub(crate) fn block_jit_validate(
     ops: &[Op],
-    constants: &[PerlValue],
+    constants: &[StrykeValue],
     sub_entries: &[(u16, usize, bool)],
 ) -> Option<ValidatedBlockCfg> {
     validate_block_cfg(ops, constants, BlockCfgMode::EvalMain, sub_entries)
@@ -2345,7 +2345,7 @@ pub(crate) fn block_jit_validate(
 /// Block JIT validation for a subroutine body ending in [`Op::Return`] or [`Op::ReturnValue`].
 pub(crate) fn block_jit_validate_sub(
     ops: &[Op],
-    constants: &[PerlValue],
+    constants: &[StrykeValue],
     term: SubTerminator,
     sub_entries: &[(u16, usize, bool)],
 ) -> Option<ValidatedBlockCfg> {
@@ -2370,8 +2370,8 @@ pub(crate) fn block_jit_validate_sub(
     r
 }
 
-/// Restrictions so stack slots stay valid [`PerlValue`] NaN-box encodings in raw-buffer mode.
-fn enforce_raw_jit_program(ops: &[Op], constants: &[PerlValue]) -> Option<()> {
+/// Restrictions so stack slots stay valid [`StrykeValue`] NaN-box encodings in raw-buffer mode.
+fn enforce_raw_jit_program(ops: &[Op], constants: &[StrykeValue]) -> Option<()> {
     for (i, op) in ops.iter().enumerate() {
         match op {
             Op::GetScalarSlot(_) | Op::GetScalarPlain(_) | Op::GetArg(_) => {
@@ -2455,7 +2455,7 @@ enum BlockCfgMode {
 /// Returns `None` when any op is unsupported or the CFG is inconsistent.
 fn validate_block_cfg(
     ops: &[Op],
-    constants: &[PerlValue],
+    constants: &[StrykeValue],
     mode: BlockCfgMode,
     sub_entries: &[(u16, usize, bool)],
 ) -> Option<ValidatedBlockCfg> {
@@ -2743,16 +2743,16 @@ fn emit_data_op(
     lognot_ref: Option<cranelift_codegen::ir::FuncRef>,
     concat_ref: Option<cranelift_codegen::ir::FuncRef>,
     string_cmp_ref: Option<cranelift_codegen::ir::FuncRef>,
-    constants: &[PerlValue],
+    constants: &[StrykeValue],
 ) -> Option<()> {
     match op {
         Op::LoadUndef => {
-            let bits = PerlValue::UNDEF.raw_bits() as i64;
+            let bits = StrykeValue::UNDEF.raw_bits() as i64;
             stack.push((bcx.ins().iconst(types::I64, bits), JitTy::Int));
         }
         Op::LoadInt(n) => {
             let bits = if needs_raw_bits {
-                PerlValue::integer(*n).raw_bits() as i64
+                StrykeValue::integer(*n).raw_bits() as i64
             } else {
                 *n
             };
@@ -2762,7 +2762,7 @@ fn emit_data_op(
             let pv = constants.get(*idx as usize)?;
             if let Some(n) = pv.as_integer() {
                 let bits = if needs_raw_bits {
-                    PerlValue::integer(n).raw_bits() as i64
+                    StrykeValue::integer(n).raw_bits() as i64
                 } else {
                     n
                 };
@@ -3235,7 +3235,7 @@ fn emit_data_op(
 fn compile_blocks_validated(
     validated: ValidatedBlockCfg,
     ops: &[Op],
-    constants: &[PerlValue],
+    constants: &[StrykeValue],
     sub_entries: &[(u16, usize, bool)],
 ) -> Option<LinearJit> {
     let cfg = validated.cfg;
@@ -3649,7 +3649,7 @@ fn compile_blocks_validated(
                         let BlockExit::ReturnVoid = exit else {
                             return None;
                         };
-                        let bits = PerlValue::UNDEF.raw_bits() as i64;
+                        let bits = StrykeValue::UNDEF.raw_bits() as i64;
                         let ret = bcx.ins().iconst(types::I64, bits);
                         bcx.ins().return_(&[ret]);
                         terminated = true;
@@ -3801,7 +3801,7 @@ pub(crate) fn block_slot_undef_prefill_ok(ops: &[Op], slot: u8) -> bool {
 }
 
 /// Try to compile and run `ops` as a block-structured program (loops/conditionals).
-/// Returns `Some` with an integer or float [`PerlValue`] on success, `None` to fall back to the interpreter.
+/// Returns `Some` with an integer or float [`StrykeValue`] on success, `None` to fall back to the interpreter.
 ///
 /// When [`crate::vm::VM::execute`] already ran [`block_jit_validate`], pass the result as
 /// `validated_cfg: Some(...)` so CFG validation is not repeated. Pass the VM pointer when the
@@ -3812,11 +3812,11 @@ pub(crate) fn try_run_block_ops(
     mut slot_i64: Option<&mut [i64]>,
     mut plain_i64: Option<&mut [i64]>,
     arg_i64: Option<&[i64]>,
-    constants: &[PerlValue],
+    constants: &[StrykeValue],
     validated_cfg: Option<ValidatedBlockCfg>,
     vm: *mut c_void,
     sub_entries: &[(u16, usize, bool)],
-) -> Option<(PerlValue, BlockJitBufferMode)> {
+) -> Option<(StrykeValue, BlockJitBufferMode)> {
     let validated = match validated_cfg {
         Some(v) => v,
         None => validate_block_cfg(ops, constants, BlockCfgMode::EvalMain, sub_entries)?,
@@ -3887,7 +3887,7 @@ pub(crate) fn try_run_block_ops(
 mod tests {
     use super::*;
     use crate::bytecode::Chunk;
-    use crate::value::PerlValue;
+    use crate::value::StrykeValue;
 
     #[test]
     fn jit_add_mul_chain() {
@@ -4209,7 +4209,7 @@ mod tests {
 
     #[test]
     fn jit_load_const_add() {
-        let pool = [PerlValue::integer(40)];
+        let pool = [StrykeValue::integer(40)];
         let ops = vec![Op::LoadConst(0), Op::LoadInt(2), Op::Add, Op::Halt];
         let v = try_run_linear_ops(&ops, None, None, None, &pool).expect("jit");
         assert_eq!(v.to_int(), 42);
@@ -4217,7 +4217,7 @@ mod tests {
 
     #[test]
     fn jit_rejects_non_integer_load_const() {
-        let pool = [PerlValue::string("x".into())];
+        let pool = [StrykeValue::string("x".into())];
         let ops = vec![Op::LoadConst(0), Op::Halt];
         assert!(try_run_linear_ops(&ops, None, None, None, &pool).is_none());
     }
@@ -4343,7 +4343,7 @@ mod tests {
         use crate::vm_helper::VMHelper;
 
         let mut c = Chunk::new();
-        let idx = c.add_constant(PerlValue::integer(40));
+        let idx = c.add_constant(StrykeValue::integer(40));
         c.emit(Op::LoadConst(idx), 1);
         c.emit(Op::LoadInt(2), 1);
         c.emit(Op::Add, 1);
@@ -4366,7 +4366,7 @@ mod tests {
         c.emit(Op::Add, 1);
         c.emit(Op::Halt, 1);
         let mut interp = VMHelper::new();
-        interp.scope.declare_scalar("v", PerlValue::integer(40));
+        interp.scope.declare_scalar("v", StrykeValue::integer(40));
         let mut vm = VM::new(&c, &mut interp);
         let v = vm.execute().expect("vm");
         assert_eq!(v.to_int(), 42);
@@ -4647,8 +4647,8 @@ mod tests {
     #[test]
     fn hash_ops_load_const_distinct_pool_payload() {
         let ops = vec![Op::LoadConst(0), Op::Halt];
-        let h1 = hash_ops(&ops, &[PerlValue::float(1.0)]);
-        let h2 = hash_ops(&ops, &[PerlValue::float(2.0)]);
+        let h1 = hash_ops(&ops, &[StrykeValue::float(1.0)]);
+        let h2 = hash_ops(&ops, &[StrykeValue::float(2.0)]);
         assert_ne!(h1, h2);
     }
 
@@ -4706,7 +4706,7 @@ mod tests {
             Op::Halt,
             Op::Halt,
         ];
-        let mut slots = [PerlValue::UNDEF.raw_bits() as i64];
+        let mut slots = [StrykeValue::UNDEF.raw_bits() as i64];
         let (v, mode) = try_run_block_ops(
             &ops,
             Some(&mut slots),
@@ -4718,10 +4718,10 @@ mod tests {
             &[],
         )
         .expect("jit");
-        assert_eq!(mode, BlockJitBufferMode::I64AsPerlValueBits);
+        assert_eq!(mode, BlockJitBufferMode::I64AsStrykeValueBits);
         assert_eq!(v.to_int(), 0);
 
-        let mut slots = [PerlValue::integer(42).raw_bits() as i64];
+        let mut slots = [StrykeValue::integer(42).raw_bits() as i64];
         let (v, mode) = try_run_block_ops(
             &ops,
             Some(&mut slots),
@@ -4733,7 +4733,7 @@ mod tests {
             &[],
         )
         .expect("jit");
-        assert_eq!(mode, BlockJitBufferMode::I64AsPerlValueBits);
+        assert_eq!(mode, BlockJitBufferMode::I64AsStrykeValueBits);
         assert_eq!(v.to_int(), 42);
     }
 
@@ -4746,7 +4746,7 @@ mod tests {
             Op::Halt,
             Op::Halt,
         ];
-        let mut plain = [PerlValue::UNDEF.raw_bits() as i64];
+        let mut plain = [StrykeValue::UNDEF.raw_bits() as i64];
         let (v, mode) = try_run_block_ops(
             &ops,
             None,
@@ -4758,10 +4758,10 @@ mod tests {
             &[],
         )
         .expect("jit");
-        assert_eq!(mode, BlockJitBufferMode::I64AsPerlValueBits);
+        assert_eq!(mode, BlockJitBufferMode::I64AsStrykeValueBits);
         assert_eq!(v.to_int(), 0);
 
-        let mut plain = [PerlValue::integer(7).raw_bits() as i64];
+        let mut plain = [StrykeValue::integer(7).raw_bits() as i64];
         let (v, mode) = try_run_block_ops(
             &ops,
             None,
@@ -4773,7 +4773,7 @@ mod tests {
             &[],
         )
         .expect("jit");
-        assert_eq!(mode, BlockJitBufferMode::I64AsPerlValueBits);
+        assert_eq!(mode, BlockJitBufferMode::I64AsStrykeValueBits);
         assert_eq!(v.to_int(), 7);
     }
 
@@ -4786,7 +4786,7 @@ mod tests {
             Op::Halt,
             Op::Halt,
         ];
-        let args = [PerlValue::UNDEF.raw_bits() as i64];
+        let args = [StrykeValue::UNDEF.raw_bits() as i64];
         let (v, mode) = try_run_block_ops(
             &ops,
             None,
@@ -4798,10 +4798,10 @@ mod tests {
             &[],
         )
         .expect("jit");
-        assert_eq!(mode, BlockJitBufferMode::I64AsPerlValueBits);
+        assert_eq!(mode, BlockJitBufferMode::I64AsStrykeValueBits);
         assert_eq!(v.to_int(), 0);
 
-        let args = [PerlValue::integer(99).raw_bits() as i64];
+        let args = [StrykeValue::integer(99).raw_bits() as i64];
         let (v, mode) = try_run_block_ops(
             &ops,
             None,
@@ -4813,7 +4813,7 @@ mod tests {
             &[],
         )
         .expect("jit");
-        assert_eq!(mode, BlockJitBufferMode::I64AsPerlValueBits);
+        assert_eq!(mode, BlockJitBufferMode::I64AsStrykeValueBits);
         assert_eq!(v.to_int(), 99);
     }
 
@@ -5162,7 +5162,7 @@ mod tests {
         c.emit(Op::SetScalarKeepPlain(idx), 1);
         c.emit(Op::Halt, 1);
         let mut interp = VMHelper::new();
-        interp.scope.declare_scalar("x", PerlValue::integer(0));
+        interp.scope.declare_scalar("x", StrykeValue::integer(0));
         let mut vm = VM::new(&c, &mut interp);
         let v = vm.execute().expect("vm");
         assert_eq!(v.to_int(), 42);

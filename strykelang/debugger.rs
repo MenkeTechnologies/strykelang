@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use std::io::{self, BufRead, Write};
 
 use crate::scope::Scope;
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 
 /// Debugger state, shared between VM and interpreter.
 pub struct Debugger {
@@ -459,7 +459,7 @@ pub enum DebugAction {
     Prompt,
 }
 
-fn format_value(val: &PerlValue) -> String {
+fn format_value(val: &StrykeValue) -> String {
     if val.is_undef() {
         "undef".to_string()
     } else if let Some(s) = val.as_str() {
@@ -611,42 +611,42 @@ mod tests {
 
     #[test]
     fn format_value_undef() {
-        assert_eq!(format_value(&PerlValue::UNDEF), "undef");
+        assert_eq!(format_value(&StrykeValue::UNDEF), "undef");
     }
 
     #[test]
     fn format_value_integer() {
-        assert_eq!(format_value(&PerlValue::integer(42)), "42");
-        assert_eq!(format_value(&PerlValue::integer(-100)), "-100");
+        assert_eq!(format_value(&StrykeValue::integer(42)), "42");
+        assert_eq!(format_value(&StrykeValue::integer(-100)), "-100");
     }
 
     #[test]
     fn format_value_float() {
         // Use a non-PI-approximation literal to dodge clippy::approx_constant.
-        let f = format_value(&PerlValue::float(2.71));
+        let f = format_value(&StrykeValue::float(2.71));
         assert!(f.starts_with("2.71"));
     }
 
     #[test]
     fn format_value_string() {
         assert_eq!(
-            format_value(&PerlValue::string("hello".into())),
+            format_value(&StrykeValue::string("hello".into())),
             "\"hello\""
         );
     }
 
     #[test]
     fn format_value_numeric_string() {
-        assert_eq!(format_value(&PerlValue::string("42".into())), "42");
-        assert_eq!(format_value(&PerlValue::string("3.14".into())), "3.14");
+        assert_eq!(format_value(&StrykeValue::string("42".into())), "42");
+        assert_eq!(format_value(&StrykeValue::string("3.14".into())), "3.14");
     }
 
     #[test]
     fn format_value_array() {
-        let arr = PerlValue::array(vec![
-            PerlValue::integer(1),
-            PerlValue::integer(2),
-            PerlValue::integer(3),
+        let arr = StrykeValue::array(vec![
+            StrykeValue::integer(1),
+            StrykeValue::integer(2),
+            StrykeValue::integer(3),
         ]);
         assert_eq!(format_value(&arr), "[1, 2, 3]");
     }

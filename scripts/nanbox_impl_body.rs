@@ -1,10 +1,10 @@
-impl PerlValue {
-    pub const UNDEF: PerlValue = PerlValue(nanbox::encode_imm_undef());
+impl StrykeValue {
+    pub const UNDEF: StrykeValue = StrykeValue(nanbox::encode_imm_undef());
 
     #[inline]
-    fn from_heap(arc: Arc<HeapObject>) -> PerlValue {
+    fn from_heap(arc: Arc<HeapObject>) -> StrykeValue {
         let ptr = Arc::into_raw(arc);
-        PerlValue(nanbox::encode_heap_ptr(ptr))
+        StrykeValue(nanbox::encode_heap_ptr(ptr))
     }
 
     #[inline]
@@ -20,7 +20,7 @@ impl PerlValue {
     #[inline]
     pub fn integer(n: i64) -> Self {
         if n >= i32::MIN as i64 && n <= i32::MAX as i64 {
-            PerlValue(nanbox::encode_imm_int32(n as i32))
+            StrykeValue(nanbox::encode_imm_int32(n as i32))
         } else {
             Self::from_heap(Arc::new(HeapObject::Integer(n)))
         }
@@ -31,7 +31,7 @@ impl PerlValue {
         if nanbox::float_needs_box(f) {
             Self::from_heap(Arc::new(HeapObject::Float(f)))
         } else {
-            PerlValue(f.to_bits())
+            StrykeValue(f.to_bits())
         }
     }
 
@@ -46,27 +46,27 @@ impl PerlValue {
     }
 
     #[inline]
-    pub fn array(v: Vec<PerlValue>) -> Self {
+    pub fn array(v: Vec<StrykeValue>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Array(v)))
     }
 
     #[inline]
-    pub fn hash(h: IndexMap<String, PerlValue>) -> Self {
+    pub fn hash(h: IndexMap<String, StrykeValue>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Hash(h)))
     }
 
     #[inline]
-    pub fn array_ref(a: Arc<RwLock<Vec<PerlValue>>>) -> Self {
+    pub fn array_ref(a: Arc<RwLock<Vec<StrykeValue>>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::ArrayRef(a)))
     }
 
     #[inline]
-    pub fn hash_ref(h: Arc<RwLock<IndexMap<String, PerlValue>>>) -> Self {
+    pub fn hash_ref(h: Arc<RwLock<IndexMap<String, StrykeValue>>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::HashRef(h)))
     }
 
     #[inline]
-    pub fn scalar_ref(r: Arc<RwLock<PerlValue>>) -> Self {
+    pub fn scalar_ref(r: Arc<RwLock<StrykeValue>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::ScalarRef(r)))
     }
 
@@ -105,7 +105,7 @@ impl PerlValue {
     }
 
     #[inline]
-    pub fn atomic(a: Arc<Mutex<PerlValue>>) -> Self {
+    pub fn atomic(a: Arc<Mutex<StrykeValue>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Atomic(a)))
     }
 
@@ -115,12 +115,12 @@ impl PerlValue {
     }
 
     #[inline]
-    pub fn channel_tx(tx: Arc<Sender<PerlValue>>) -> Self {
+    pub fn channel_tx(tx: Arc<Sender<StrykeValue>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::ChannelTx(tx)))
     }
 
     #[inline]
-    pub fn channel_rx(rx: Arc<Receiver<PerlValue>>) -> Self {
+    pub fn channel_rx(rx: Arc<Receiver<StrykeValue>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::ChannelRx(rx)))
     }
 
@@ -130,7 +130,7 @@ impl PerlValue {
     }
 
     #[inline]
-    pub fn deque(d: Arc<Mutex<VecDeque<PerlValue>>>) -> Self {
+    pub fn deque(d: Arc<Mutex<VecDeque<StrykeValue>>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Deque(d)))
     }
 
@@ -227,7 +227,7 @@ impl PerlValue {
     }
 
     #[inline]
-    pub fn unwrap_atomic(&self) -> PerlValue {
+    pub fn unwrap_atomic(&self) -> StrykeValue {
         if !nanbox::is_heap(self.0) {
             return self.clone();
         }
@@ -293,11 +293,11 @@ impl PerlValue {
                     Arc::from_raw(nanbox::decode_heap_ptr::<HeapObject>(bits) as *mut HeapObject);
                 match Arc::try_unwrap(arc) {
                     Ok(HeapObject::String(s)) => return s,
-                    Ok(o) => return PerlValue::from_heap(Arc::new(o)).to_string(),
+                    Ok(o) => return StrykeValue::from_heap(Arc::new(o)).to_string(),
                     Err(arc) => {
                         return match &*arc {
                             HeapObject::String(s) => s.clone(),
-                            _ => PerlValue::from_heap(Arc::clone(&arc)).to_string(),
+                            _ => StrykeValue::from_heap(Arc::clone(&arc)).to_string(),
                         };
                     }
                 }
@@ -423,47 +423,47 @@ impl PerlValue {
         }
     }
 
-    pub fn ref_type(&self) -> PerlValue {
+    pub fn ref_type(&self) -> StrykeValue {
         if !nanbox::is_heap(self.0) {
-            return PerlValue::string(String::new());
+            return StrykeValue::string(String::new());
         }
         let arc = self.heap_arc();
         match &*arc {
-            HeapObject::ArrayRef(_) => PerlValue::string("ARRAY".into()),
-            HeapObject::HashRef(_) => PerlValue::string("HASH".into()),
-            HeapObject::ScalarRef(_) => PerlValue::string("SCALAR".into()),
-            HeapObject::CodeRef(_) => PerlValue::string("CODE".into()),
-            HeapObject::Regex(_, _, _) => PerlValue::string("Regexp".into()),
-            HeapObject::Atomic(_) => PerlValue::string("ATOMIC".into()),
-            HeapObject::Set(_) => PerlValue::string("Set".into()),
-            HeapObject::ChannelTx(_) => PerlValue::string("PCHANNEL::Tx".into()),
-            HeapObject::ChannelRx(_) => PerlValue::string("PCHANNEL::Rx".into()),
-            HeapObject::AsyncTask(_) => PerlValue::string("ASYNCTASK".into()),
-            HeapObject::Deque(_) => PerlValue::string("Deque".into()),
-            HeapObject::Heap(_) => PerlValue::string("Heap".into()),
-            HeapObject::Pipeline(_) => PerlValue::string("Pipeline".into()),
-            HeapObject::Capture(_) => PerlValue::string("Capture".into()),
-            HeapObject::Ppool(_) => PerlValue::string("Ppool".into()),
-            HeapObject::Barrier(_) => PerlValue::string("Barrier".into()),
-            HeapObject::SqliteConn(_) => PerlValue::string("SqliteConn".into()),
-            HeapObject::StructInst(s) => PerlValue::string(s.def.name.clone()),
-            HeapObject::Bytes(_) => PerlValue::string("BYTES".into()),
-            HeapObject::Blessed(b) => PerlValue::string(b.class.clone()),
-            _ => PerlValue::string(String::new()),
+            HeapObject::ArrayRef(_) => StrykeValue::string("ARRAY".into()),
+            HeapObject::HashRef(_) => StrykeValue::string("HASH".into()),
+            HeapObject::ScalarRef(_) => StrykeValue::string("SCALAR".into()),
+            HeapObject::CodeRef(_) => StrykeValue::string("CODE".into()),
+            HeapObject::Regex(_, _, _) => StrykeValue::string("Regexp".into()),
+            HeapObject::Atomic(_) => StrykeValue::string("ATOMIC".into()),
+            HeapObject::Set(_) => StrykeValue::string("Set".into()),
+            HeapObject::ChannelTx(_) => StrykeValue::string("PCHANNEL::Tx".into()),
+            HeapObject::ChannelRx(_) => StrykeValue::string("PCHANNEL::Rx".into()),
+            HeapObject::AsyncTask(_) => StrykeValue::string("ASYNCTASK".into()),
+            HeapObject::Deque(_) => StrykeValue::string("Deque".into()),
+            HeapObject::Heap(_) => StrykeValue::string("Heap".into()),
+            HeapObject::Pipeline(_) => StrykeValue::string("Pipeline".into()),
+            HeapObject::Capture(_) => StrykeValue::string("Capture".into()),
+            HeapObject::Ppool(_) => StrykeValue::string("Ppool".into()),
+            HeapObject::Barrier(_) => StrykeValue::string("Barrier".into()),
+            HeapObject::SqliteConn(_) => StrykeValue::string("SqliteConn".into()),
+            HeapObject::StructInst(s) => StrykeValue::string(s.def.name.clone()),
+            HeapObject::Bytes(_) => StrykeValue::string("BYTES".into()),
+            HeapObject::Blessed(b) => StrykeValue::string(b.class.clone()),
+            _ => StrykeValue::string(String::new()),
         }
     }
 
-    pub fn num_cmp(&self, other: &PerlValue) -> Ordering {
+    pub fn num_cmp(&self, other: &StrykeValue) -> Ordering {
         let a = self.to_number();
         let b = other.to_number();
         a.partial_cmp(&b).unwrap_or(Ordering::Equal)
     }
 
-    pub fn str_cmp(&self, other: &PerlValue) -> Ordering {
+    pub fn str_cmp(&self, other: &StrykeValue) -> Ordering {
         self.to_string().cmp(&other.to_string())
     }
 
-    pub fn to_list(&self) -> Vec<PerlValue> {
+    pub fn to_list(&self) -> Vec<StrykeValue> {
         if nanbox::is_imm_undef(self.0) {
             return vec![];
         }
@@ -475,7 +475,7 @@ impl PerlValue {
             HeapObject::Array(a) => a.clone(),
             HeapObject::Hash(h) => h
                 .iter()
-                .flat_map(|(k, v)| vec![PerlValue::string(k.clone()), v.clone()])
+                .flat_map(|(k, v)| vec![StrykeValue::string(k.clone()), v.clone()])
                 .collect(),
             HeapObject::Atomic(arc) => arc.lock().to_list(),
             HeapObject::Set(s) => s.values().cloned().collect(),
@@ -484,33 +484,33 @@ impl PerlValue {
         }
     }
 
-    pub fn scalar_context(&self) -> PerlValue {
+    pub fn scalar_context(&self) -> StrykeValue {
         if !nanbox::is_heap(self.0) {
             return self.clone();
         }
         let arc = self.heap_arc();
         match &*arc {
-            HeapObject::Array(a) => PerlValue::integer(a.len() as i64),
+            HeapObject::Array(a) => StrykeValue::integer(a.len() as i64),
             HeapObject::Hash(h) => {
                 if h.is_empty() {
-                    PerlValue::integer(0)
+                    StrykeValue::integer(0)
                 } else {
-                    PerlValue::string(format!("{}/{}", h.len(), h.capacity()))
+                    StrykeValue::string(format!("{}/{}", h.len(), h.capacity()))
                 }
             }
-            HeapObject::Set(s) => PerlValue::integer(s.len() as i64),
-            HeapObject::Deque(d) => PerlValue::integer(d.lock().len() as i64),
-            HeapObject::Heap(h) => PerlValue::integer(h.lock().items.len() as i64),
-            HeapObject::Pipeline(p) => PerlValue::integer(p.lock().source.len() as i64),
+            HeapObject::Set(s) => StrykeValue::integer(s.len() as i64),
+            HeapObject::Deque(d) => StrykeValue::integer(d.lock().len() as i64),
+            HeapObject::Heap(h) => StrykeValue::integer(h.lock().items.len() as i64),
+            HeapObject::Pipeline(p) => StrykeValue::integer(p.lock().source.len() as i64),
             HeapObject::Capture(_) | HeapObject::Ppool(_) | HeapObject::Barrier(_) => {
-                PerlValue::integer(1)
+                StrykeValue::integer(1)
             }
             _ => self.clone(),
         }
     }
 }
 
-impl fmt::Display for PerlValue {
+impl fmt::Display for StrykeValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if nanbox::is_imm_undef(self.0) {
             return Ok(());
@@ -573,8 +573,8 @@ impl fmt::Display for PerlValue {
     }
 }
 
-/// Stable key for set membership (dedup of `PerlValue` in this runtime).
-pub fn set_member_key(v: &PerlValue) -> String {
+/// Stable key for set membership (dedup of `StrykeValue` in this runtime).
+pub fn set_member_key(v: &StrykeValue) -> String {
     if nanbox::is_imm_undef(v.0) {
         return "u:".to_string();
     }
@@ -653,18 +653,18 @@ pub fn set_member_key(v: &PerlValue) -> String {
     }
 }
 
-pub fn set_from_elements<I: IntoIterator<Item = PerlValue>>(items: I) -> PerlValue {
+pub fn set_from_elements<I: IntoIterator<Item = StrykeValue>>(items: I) -> StrykeValue {
     let mut map = PerlSet::new();
     for v in items {
         let k = set_member_key(&v);
         map.insert(k, v);
     }
-    PerlValue::set(Arc::new(map))
+    StrykeValue::set(Arc::new(map))
 }
 
 /// Underlying set for union/intersection, including `mysync $s` (`Atomic` wrapping `Set`).
 #[inline]
-pub fn set_payload(v: &PerlValue) -> Option<Arc<PerlSet>> {
+pub fn set_payload(v: &StrykeValue) -> Option<Arc<PerlSet>> {
     if !nanbox::is_heap(v.0) {
         return None;
     }
@@ -676,17 +676,17 @@ pub fn set_payload(v: &PerlValue) -> Option<Arc<PerlSet>> {
     }
 }
 
-pub fn set_union(a: &PerlValue, b: &PerlValue) -> Option<PerlValue> {
+pub fn set_union(a: &StrykeValue, b: &StrykeValue) -> Option<StrykeValue> {
     let ia = set_payload(a)?;
     let ib = set_payload(b)?;
     let mut m = (*ia).clone();
     for (k, v) in ib.iter() {
         m.entry(k.clone()).or_insert_with(|| v.clone());
     }
-    Some(PerlValue::set(Arc::new(m)))
+    Some(StrykeValue::set(Arc::new(m)))
 }
 
-pub fn set_intersection(a: &PerlValue, b: &PerlValue) -> Option<PerlValue> {
+pub fn set_intersection(a: &StrykeValue, b: &StrykeValue) -> Option<StrykeValue> {
     let ia = set_payload(a)?;
     let ib = set_payload(b)?;
     let mut m = PerlSet::new();
@@ -695,5 +695,5 @@ pub fn set_intersection(a: &PerlValue, b: &PerlValue) -> Option<PerlValue> {
             m.insert(k.clone(), v.clone());
         }
     }
-    Some(PerlValue::set(Arc::new(m)))
+    Some(StrykeValue::set(Arc::new(m)))
 }

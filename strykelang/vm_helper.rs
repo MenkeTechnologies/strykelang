@@ -34,30 +34,30 @@ use crate::scope::Scope;
 use crate::sort_fast::{detect_sort_block_fast, sort_magic_cmp};
 use crate::value::{
     perl_list_range_expand, CaptureResult, PerlAsyncTask, PerlBarrier, PerlDataFrame,
-    PerlGenerator, PerlHeap, PerlPpool, PerlSub, PerlValue, PipelineInner, PipelineOp,
+    PerlGenerator, PerlHeap, PerlPpool, PerlSub, StrykeValue, PipelineInner, PipelineOp,
     RemoteCluster,
 };
 
 /// Merge two counting-hash accumulators (parallel `preduce_init` partials).
 /// Returns a hashref so arrow deref (`$acc->{k}`) stays valid after parallel merge.
 pub(crate) fn preduce_init_merge_maps(
-    mut acc: IndexMap<String, PerlValue>,
-    b: IndexMap<String, PerlValue>,
-) -> PerlValue {
+    mut acc: IndexMap<String, StrykeValue>,
+    b: IndexMap<String, StrykeValue>,
+) -> StrykeValue {
     for (k, v2) in b {
         acc.entry(k)
-            .and_modify(|v1| *v1 = PerlValue::float(v1.to_number() + v2.to_number()))
+            .and_modify(|v1| *v1 = StrykeValue::float(v1.to_number() + v2.to_number()))
             .or_insert(v2);
     }
-    PerlValue::hash_ref(Arc::new(RwLock::new(acc)))
+    StrykeValue::hash_ref(Arc::new(RwLock::new(acc)))
 }
 
 /// `(off, end)` for `splice` / `arr.drain(off..end)` — Perl negative OFFSET/LENGTH; clamps offset to array length.
 #[inline]
 fn splice_compute_range(
     arr_len: usize,
-    offset_val: &PerlValue,
-    length_val: &PerlValue,
+    offset_val: &StrykeValue,
+    length_val: &StrykeValue,
 ) -> (usize, usize) {
     let off_i = offset_val.to_int();
     let off = if off_i < 0 {
@@ -83,12 +83,12 @@ fn splice_compute_range(
 /// Combine two partial results from `preduce_init`: hash/hashref maps add per-key counts; otherwise
 /// the fold block is invoked with `$a` / `$b` as the two partial accumulators (associative combine).
 pub(crate) fn merge_preduce_init_partials(
-    a: PerlValue,
-    b: PerlValue,
+    a: StrykeValue,
+    b: StrykeValue,
     block: &Block,
     subs: &HashMap<String, Arc<PerlSub>>,
-    scope_capture: &[(String, PerlValue)],
-) -> PerlValue {
+    scope_capture: &[(String, StrykeValue)],
+) -> StrykeValue {
     if let (Some(m1), Some(m2)) = (a.as_hash_map(), b.as_hash_map()) {
         return preduce_init_merge_maps(m1, m2);
     }
@@ -119,29 +119,29 @@ pub(crate) fn merge_preduce_init_partials(
     local_interp.scope.set_sort_pair(a, b);
     match local_interp.exec_block(block) {
         Ok(val) => val,
-        Err(_) => PerlValue::UNDEF,
+        Err(_) => StrykeValue::UNDEF,
     }
 }
 
 /// Seed each parallel chunk from `init` without sharing mutable hashref storage (plain `clone` on
 /// `HashRef` reuses the same `Arc<RwLock<…>>`).
-pub(crate) fn preduce_init_fold_identity(init: &PerlValue) -> PerlValue {
+pub(crate) fn preduce_init_fold_identity(init: &StrykeValue) -> StrykeValue {
     if let Some(m) = init.as_hash_map() {
-        return PerlValue::hash(m.clone());
+        return StrykeValue::hash(m.clone());
     }
     if let Some(r) = init.as_hash_ref() {
-        return PerlValue::hash_ref(Arc::new(RwLock::new(r.read().clone())));
+        return StrykeValue::hash_ref(Arc::new(RwLock::new(r.read().clone())));
     }
     init.clone()
 }
 
 pub(crate) fn fold_preduce_init_step(
     subs: &HashMap<String, Arc<PerlSub>>,
-    scope_capture: &[(String, PerlValue)],
+    scope_capture: &[(String, StrykeValue)],
     block: &Block,
-    acc: PerlValue,
-    item: PerlValue,
-) -> PerlValue {
+    acc: StrykeValue,
+    item: StrykeValue,
+) -> StrykeValue {
     let mut local_interp = VMHelper::new();
     local_interp.subs = subs.clone();
     local_interp.scope.restore_capture(scope_capture);
@@ -152,7 +152,7 @@ pub(crate) fn fold_preduce_init_step(
     local_interp.scope.set_sort_pair(acc, item);
     match local_interp.exec_block(block) {
         Ok(val) => val,
-        Err(_) => PerlValue::UNDEF,
+        Err(_) => StrykeValue::UNDEF,
     }
 }
 
@@ -168,16 +168,16 @@ pub const FEAT_UNICODE_STRINGS: u64 = 1 << 3;
 /// Flow control signals propagated via Result.
 #[derive(Debug)]
 pub(crate) enum Flow {
-    Return(PerlValue),
+    Return(StrykeValue),
     Last(Option<String>),
     Next(Option<String>),
     Redo(Option<String>),
-    Yield(PerlValue),
+    Yield(StrykeValue),
     /// `goto &sub` — tail-call: replace current sub with the named one, keeping @_.
     GotoSub(String),
 }
 
-pub(crate) type ExecResult = Result<PerlValue, FlowOrError>;
+pub(crate) type ExecResult = Result<StrykeValue, FlowOrError>;
 
 #[derive(Debug)]
 pub(crate) enum FlowOrError {
@@ -199,8 +199,8 @@ impl From<Flow> for FlowOrError {
 
 /// Bindings introduced by a successful algebraic [`MatchPattern`] (scalar vs array).
 enum PatternBinding {
-    Scalar(String, PerlValue),
-    Array(String, Vec<PerlValue>),
+    Scalar(String, StrykeValue),
+    Array(String, Vec<StrykeValue>),
 }
 
 /// Perl `$]` — numeric language level (`5 + minor/1000 + patch/1_000_000`).
@@ -231,20 +231,20 @@ fn cached_executable_path() -> String {
         .clone()
 }
 
-fn build_term_hash() -> IndexMap<String, PerlValue> {
+fn build_term_hash() -> IndexMap<String, StrykeValue> {
     let mut m = IndexMap::new();
     m.insert(
         "TERM".into(),
-        PerlValue::string(std::env::var("TERM").unwrap_or_default()),
+        StrykeValue::string(std::env::var("TERM").unwrap_or_default()),
     );
     m.insert(
         "COLORTERM".into(),
-        PerlValue::string(std::env::var("COLORTERM").unwrap_or_default()),
+        StrykeValue::string(std::env::var("COLORTERM").unwrap_or_default()),
     );
 
     let (rows, cols) = term_size();
-    m.insert("rows".into(), PerlValue::integer(rows));
-    m.insert("cols".into(), PerlValue::integer(cols));
+    m.insert("rows".into(), StrykeValue::integer(rows));
+    m.insert("cols".into(), StrykeValue::integer(cols));
 
     #[cfg(unix)]
     let is_tty = unsafe { libc::isatty(1) != 0 };
@@ -252,7 +252,7 @@ fn build_term_hash() -> IndexMap<String, PerlValue> {
     let is_tty = false;
     m.insert(
         "is_tty".into(),
-        PerlValue::integer(if is_tty { 1 } else { 0 }),
+        StrykeValue::integer(if is_tty { 1 } else { 0 }),
     );
 
     m
@@ -280,7 +280,7 @@ fn term_size() -> (i64, i64) {
 }
 
 #[cfg(unix)]
-fn build_uname_hash() -> IndexMap<String, PerlValue> {
+fn build_uname_hash() -> IndexMap<String, StrykeValue> {
     fn uts_field(slice: &[libc::c_char]) -> String {
         let n = slice.iter().take_while(|&&c| c != 0).count();
         let bytes: Vec<u8> = slice[..n].iter().map(|&c| c as u8).collect();
@@ -291,30 +291,30 @@ fn build_uname_hash() -> IndexMap<String, PerlValue> {
     if unsafe { libc::uname(&mut uts) } == 0 {
         m.insert(
             "sysname".into(),
-            PerlValue::string(uts_field(uts.sysname.as_slice())),
+            StrykeValue::string(uts_field(uts.sysname.as_slice())),
         );
         m.insert(
             "nodename".into(),
-            PerlValue::string(uts_field(uts.nodename.as_slice())),
+            StrykeValue::string(uts_field(uts.nodename.as_slice())),
         );
         m.insert(
             "release".into(),
-            PerlValue::string(uts_field(uts.release.as_slice())),
+            StrykeValue::string(uts_field(uts.release.as_slice())),
         );
         m.insert(
             "version".into(),
-            PerlValue::string(uts_field(uts.version.as_slice())),
+            StrykeValue::string(uts_field(uts.version.as_slice())),
         );
         m.insert(
             "machine".into(),
-            PerlValue::string(uts_field(uts.machine.as_slice())),
+            StrykeValue::string(uts_field(uts.machine.as_slice())),
         );
     }
     m
 }
 
 #[cfg(unix)]
-fn build_limits_hash() -> IndexMap<String, PerlValue> {
+fn build_limits_hash() -> IndexMap<String, StrykeValue> {
     use libc::{getrlimit, rlimit, RLIM_INFINITY};
     #[cfg(target_os = "linux")]
     type RlimitResource = libc::__rlimit_resource_t;
@@ -343,34 +343,34 @@ fn build_limits_hash() -> IndexMap<String, PerlValue> {
     }
     let mut m = IndexMap::new();
     let (cur, max) = get_limit(libc::RLIMIT_NOFILE);
-    m.insert("nofile".into(), PerlValue::integer(cur));
-    m.insert("nofile_max".into(), PerlValue::integer(max));
+    m.insert("nofile".into(), StrykeValue::integer(cur));
+    m.insert("nofile_max".into(), StrykeValue::integer(max));
     let (cur, max) = get_limit(libc::RLIMIT_STACK);
-    m.insert("stack".into(), PerlValue::integer(cur));
-    m.insert("stack_max".into(), PerlValue::integer(max));
+    m.insert("stack".into(), StrykeValue::integer(cur));
+    m.insert("stack_max".into(), StrykeValue::integer(max));
     let (cur, max) = get_limit(libc::RLIMIT_AS);
-    m.insert("as".into(), PerlValue::integer(cur));
-    m.insert("as_max".into(), PerlValue::integer(max));
+    m.insert("as".into(), StrykeValue::integer(cur));
+    m.insert("as_max".into(), StrykeValue::integer(max));
     let (cur, max) = get_limit(libc::RLIMIT_DATA);
-    m.insert("data".into(), PerlValue::integer(cur));
-    m.insert("data_max".into(), PerlValue::integer(max));
+    m.insert("data".into(), StrykeValue::integer(cur));
+    m.insert("data_max".into(), StrykeValue::integer(max));
     let (cur, max) = get_limit(libc::RLIMIT_FSIZE);
-    m.insert("fsize".into(), PerlValue::integer(cur));
-    m.insert("fsize_max".into(), PerlValue::integer(max));
+    m.insert("fsize".into(), StrykeValue::integer(cur));
+    m.insert("fsize_max".into(), StrykeValue::integer(max));
     let (cur, max) = get_limit(libc::RLIMIT_CORE);
-    m.insert("core".into(), PerlValue::integer(cur));
-    m.insert("core_max".into(), PerlValue::integer(max));
+    m.insert("core".into(), StrykeValue::integer(cur));
+    m.insert("core_max".into(), StrykeValue::integer(max));
     let (cur, max) = get_limit(libc::RLIMIT_CPU);
-    m.insert("cpu".into(), PerlValue::integer(cur));
-    m.insert("cpu_max".into(), PerlValue::integer(max));
+    m.insert("cpu".into(), StrykeValue::integer(cur));
+    m.insert("cpu_max".into(), StrykeValue::integer(max));
     let (cur, max) = get_limit(libc::RLIMIT_NPROC);
-    m.insert("nproc".into(), PerlValue::integer(cur));
-    m.insert("nproc_max".into(), PerlValue::integer(max));
+    m.insert("nproc".into(), StrykeValue::integer(cur));
+    m.insert("nproc_max".into(), StrykeValue::integer(max));
     #[cfg(target_os = "linux")]
     {
         let (cur, max) = get_limit(libc::RLIMIT_MEMLOCK);
-        m.insert("memlock".into(), PerlValue::integer(cur));
-        m.insert("memlock_max".into(), PerlValue::integer(max));
+        m.insert("memlock".into(), StrykeValue::integer(cur));
+        m.insert("memlock_max".into(), StrykeValue::integer(max));
     }
     m
 }
@@ -524,14 +524,14 @@ pub(crate) fn assign_rhs_wantarray(target: &Expr) -> WantarrayCtx {
 /// Memoized inputs + result for a non-`g` `regex_match_execute` call. Populated on every
 /// successful match and consulted at the top of the next call; on exact-match (same pattern,
 /// flags, multiline, and haystack content) we skip regex execution + capture-var scope population
-/// entirely, replaying the stored `PerlValue` result. See [`VMHelper::regex_match_memo`].
+/// entirely, replaying the stored `StrykeValue` result. See [`VMHelper::regex_match_memo`].
 #[derive(Clone)]
 pub(crate) struct RegexMatchMemo {
     pub pattern: String,
     pub flags: String,
     pub multiline: bool,
     pub haystack: String,
-    pub result: PerlValue,
+    pub result: StrykeValue,
 }
 
 /// State for scalar `..` / `...` (key: `Expr` address).
@@ -600,11 +600,11 @@ pub struct VMHelper {
     /// Numeric side of `$@` dualvar (`0` when cleared; `1` for typical exception strings; or explicit code from assignment / dualvar).
     pub eval_error_code: i32,
     /// When `die` is called with a ref argument, the ref value is preserved here.
-    pub eval_error_value: Option<PerlValue>,
+    pub eval_error_value: Option<StrykeValue>,
     /// @ARGV
     pub argv: Vec<String>,
     /// %ENV (mirrors `scope` hash `"ENV"` after [`Self::materialize_env_if_needed`])
-    pub env: IndexMap<String, PerlValue>,
+    pub env: IndexMap<String, StrykeValue>,
     /// False until first [`Self::materialize_env_if_needed`] (defers `std::env::vars()` cost).
     pub env_materialized: bool,
     /// $0
@@ -755,7 +755,7 @@ pub struct VMHelper {
     /// Offsets for Perl `m//g` in scalar context (`pos`), keyed by scalar name (`"_"` for `$_`).
     pub(crate) regex_pos: HashMap<String, Option<usize>>,
     /// Persistent storage for `state` variables, keyed by "line:name".
-    pub(crate) state_vars: HashMap<String, PerlValue>,
+    pub(crate) state_vars: HashMap<String, StrykeValue>,
     /// Per-frame tracking of state variable bindings: (var_name, state_key).
     pub(crate) state_bindings_stack: Vec<Vec<(String, String)>>,
     /// PRNG for `rand` / `srand` (matches Perl-style seeding, not crypto).
@@ -786,17 +786,17 @@ pub struct VMHelper {
     /// Virtual modules: path → source (for AOT bundles). Checked before filesystem in `require`.
     pub(crate) virtual_modules: HashMap<String, String>,
     /// `tie %name, ...` — object that implements FETCH/STORE for that hash.
-    pub(crate) tied_hashes: HashMap<String, PerlValue>,
+    pub(crate) tied_hashes: HashMap<String, StrykeValue>,
     /// `tie $name` — TIESCALAR object for FETCH/STORE.
-    pub(crate) tied_scalars: HashMap<String, PerlValue>,
+    pub(crate) tied_scalars: HashMap<String, StrykeValue>,
     /// `tie @name` — TIEARRAY object for FETCH/STORE (indexed).
-    pub(crate) tied_arrays: HashMap<String, PerlValue>,
+    pub(crate) tied_arrays: HashMap<String, StrykeValue>,
     /// `use overload` — class → Perl overload key → short method name in that package.
     pub(crate) overload_table: HashMap<String, HashMap<String, String>>,
     /// `format NAME =` bodies (parsed) keyed `Package::NAME`.
     pub(crate) format_templates: HashMap<String, Arc<crate::format::FormatTemplate>>,
     /// `${^NAME}` scalars not stored in dedicated fields (default `undef`; assign may stash).
-    pub(crate) special_caret_scalars: HashMap<String, PerlValue>,
+    pub(crate) special_caret_scalars: HashMap<String, StrykeValue>,
     /// `$%` — format output page number.
     pub format_page_number: i64,
     /// `$=` — format lines per page.
@@ -831,7 +831,7 @@ pub struct VMHelper {
     /// Mirrors `glob_restore_frames`: one Vec per scope frame; on `scope_pop_hook` each
     /// `(name, old_value)` is replayed via `set_special_var` so the underlying interpreter
     /// state (`self.irs` / `self.ofs` / etc.) restores when a `{ local $X = … }` block exits.
-    pub(crate) special_var_restore_frames: Vec<Vec<(String, PerlValue)>>,
+    pub(crate) special_var_restore_frames: Vec<Vec<(String, StrykeValue)>>,
     /// `use English` — long names ([`crate::english::scalar_alias`]) map to short special scalars.
     /// Lazy-init flag: reflection hashes (`%b`, `%stryke::builtins`, etc.)
     /// are only built on first access to avoid startup cost.
@@ -1394,27 +1394,27 @@ pub(crate) enum CaptureAllMode {
 impl VMHelper {
     pub fn new() -> Self {
         let mut scope = Scope::new();
-        scope.declare_array("INC", vec![PerlValue::string(".".to_string())]);
+        scope.declare_array("INC", vec![StrykeValue::string(".".to_string())]);
         scope.declare_hash("INC", IndexMap::new());
         scope.declare_array("ARGV", vec![]);
         scope.declare_array("_", vec![]);
 
         // @path / @p — $PATH split by OS path separator, frozen (immutable)
-        let path_vec: Vec<PerlValue> = std::env::var("PATH")
+        let path_vec: Vec<StrykeValue> = std::env::var("PATH")
             .unwrap_or_default()
             .split(if cfg!(windows) { ';' } else { ':' })
             .filter(|s| !s.is_empty())
-            .map(|p| PerlValue::string(p.to_string()))
+            .map(|p| StrykeValue::string(p.to_string()))
             .collect();
         scope.declare_array_frozen("path", path_vec.clone(), true);
         scope.declare_array_frozen("p", path_vec, true);
 
         // @fpath / @f — $FPATH (zsh function path) split by ':', frozen
-        let fpath_vec: Vec<PerlValue> = std::env::var("FPATH")
+        let fpath_vec: Vec<StrykeValue> = std::env::var("FPATH")
             .unwrap_or_default()
             .split(':')
             .filter(|s| !s.is_empty())
-            .map(|p| PerlValue::string(p.to_string()))
+            .map(|p| StrykeValue::string(p.to_string()))
             .collect();
         scope.declare_array_frozen("fpath", fpath_vec.clone(), true);
         scope.declare_array_frozen("f", fpath_vec, true);
@@ -1471,14 +1471,14 @@ impl VMHelper {
         // eagerly since it's trivial.
         scope.declare_scalar(
             "stryke::VERSION",
-            PerlValue::string(env!("CARGO_PKG_VERSION").to_string()),
+            StrykeValue::string(env!("CARGO_PKG_VERSION").to_string()),
         );
         scope.declare_array("-", vec![]);
         scope.declare_array("+", vec![]);
         scope.declare_array("^CAPTURE", vec![]);
         scope.declare_array("^CAPTURE_ALL", vec![]);
         scope.declare_hash("^HOOK", IndexMap::new());
-        scope.declare_scalar("~", PerlValue::string("STDOUT".to_string()));
+        scope.declare_scalar("~", StrykeValue::string("STDOUT".to_string()));
 
         let script_start_time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -1487,9 +1487,9 @@ impl VMHelper {
 
         let executable_path = cached_executable_path();
 
-        let mut special_caret_scalars: HashMap<String, PerlValue> = HashMap::new();
+        let mut special_caret_scalars: HashMap<String, StrykeValue> = HashMap::new();
         for name in crate::special_vars::PERL5_DOCUMENTED_CARET_NAMES {
-            special_caret_scalars.insert(format!("^{}", name), PerlValue::UNDEF);
+            special_caret_scalars.insert(format!("^{}", name), StrykeValue::UNDEF);
         }
 
         let mut s = Self {
@@ -1727,10 +1727,10 @@ impl VMHelper {
     /// is always current — the user never needs to call this directly.
     pub fn refresh_parameters_hash(&mut self) {
         let pairs = self.scope.parameters_pairs();
-        let mut h: indexmap::IndexMap<String, PerlValue> =
+        let mut h: indexmap::IndexMap<String, StrykeValue> =
             indexmap::IndexMap::with_capacity(pairs.len());
         for (name, kind) in pairs {
-            h.insert(name, PerlValue::string(kind.to_string()));
+            h.insert(name, StrykeValue::string(kind.to_string()));
         }
         // declare_hash_global_frozen overwrites unconditionally, so each
         // refresh replaces the prior snapshot.
@@ -1749,17 +1749,17 @@ impl VMHelper {
     pub fn refresh_package_stashes(&mut self) {
         use indexmap::IndexMap;
 
-        let mut by_pkg: std::collections::HashMap<String, IndexMap<String, PerlValue>> =
+        let mut by_pkg: std::collections::HashMap<String, IndexMap<String, StrykeValue>> =
             std::collections::HashMap::new();
 
         let record =
             |pkg: &str,
              sym: &str,
              kind: &str,
-             map: &mut std::collections::HashMap<String, IndexMap<String, PerlValue>>| {
+             map: &mut std::collections::HashMap<String, IndexMap<String, StrykeValue>>| {
                 map.entry(pkg.to_string())
                     .or_default()
-                    .insert(sym.to_string(), PerlValue::string(kind.to_string()));
+                    .insert(sym.to_string(), StrykeValue::string(kind.to_string()));
             };
 
         // Subs: keys like "main::foo" / "Foo::Bar::baz".
@@ -1999,10 +1999,10 @@ impl VMHelper {
     pub(crate) fn eval_par_list_call(
         &mut self,
         name: &str,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         ctx: WantarrayCtx,
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         match name {
             "puniq" => {
                 let (list_src, show_prog) = match args.len() {
@@ -2022,9 +2022,9 @@ impl VMHelper {
                 let out = crate::par_list::puniq_run(list, n_threads, &pmap_progress);
                 pmap_progress.finish();
                 if ctx == WantarrayCtx::List {
-                    Ok(PerlValue::array(out))
+                    Ok(StrykeValue::array(out))
                 } else {
-                    Ok(PerlValue::integer(out.len() as i64))
+                    Ok(StrykeValue::integer(out.len() as i64))
                 }
             }
             "pfirst" => {
@@ -2047,7 +2047,7 @@ impl VMHelper {
                 let sub = sub.clone();
                 let list = list_src.to_list();
                 if list.is_empty() {
-                    return Ok(PerlValue::UNDEF);
+                    return Ok(StrykeValue::UNDEF);
                 }
                 let pmap_progress = PmapProgress::new(show_prog, list.len());
                 let subs = self.subs.clone();
@@ -2068,7 +2068,7 @@ impl VMHelper {
                     }
                 });
                 pmap_progress.finish();
-                Ok(out.unwrap_or(PerlValue::UNDEF))
+                Ok(out.unwrap_or(StrykeValue::UNDEF))
             }
             "pany" => {
                 let (code_val, list_src, show_prog) = match args.len() {
@@ -2108,7 +2108,7 @@ impl VMHelper {
                     }
                 });
                 pmap_progress.finish();
-                Ok(PerlValue::integer(if b { 1 } else { 0 }))
+                Ok(StrykeValue::integer(if b { 1 } else { 0 }))
             }
             _ => Err(PerlError::runtime(
                 format!("internal: unknown par_list builtin {name}"),
@@ -2153,7 +2153,7 @@ impl VMHelper {
     /// and host aliases in *your* config are missing. When **`SUDO_USER`** is set and the effective
     /// uid is **0**, we set **`HOME`** for this subprocess to **`SUDO_USER`'s** passwd home so your
     /// `~/.ssh/config` and keys apply.
-    pub(crate) fn ssh_builtin_execute(&mut self, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    pub(crate) fn ssh_builtin_execute(&mut self, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         use std::process::Command;
         let mut cmd = Command::new("ssh");
         #[cfg(unix)]
@@ -2178,11 +2178,11 @@ impl VMHelper {
         match cmd.status() {
             Ok(s) => {
                 self.record_child_exit_status(s);
-                Ok(PerlValue::integer(s.code().unwrap_or(-1) as i64))
+                Ok(StrykeValue::integer(s.code().unwrap_or(-1) as i64))
             }
             Err(e) => {
                 self.apply_io_error_to_errno(&e);
-                Ok(PerlValue::integer(-1))
+                Ok(StrykeValue::integer(-1))
             }
         }
     }
@@ -2268,11 +2268,11 @@ impl VMHelper {
         &mut self,
         target_kind: u8,
         target_name: &str,
-        class_and_args: Vec<PerlValue>,
+        class_and_args: Vec<StrykeValue>,
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         let mut it = class_and_args.into_iter();
-        let class = it.next().unwrap_or(PerlValue::UNDEF);
+        let class = it.next().unwrap_or(StrykeValue::UNDEF);
         let pkg = class.to_string();
         let pkg = pkg.trim_matches(|c| c == '\'' || c == '"').to_string();
         let tie_ctor = match target_kind {
@@ -2287,11 +2287,11 @@ impl VMHelper {
             .get(&tie_fn)
             .cloned()
             .ok_or_else(|| PerlError::runtime(format!("tie: cannot find &{}", tie_fn), line))?;
-        let mut call_args = vec![PerlValue::string(pkg.clone())];
+        let mut call_args = vec![StrykeValue::string(pkg.clone())];
         call_args.extend(it);
         let obj = match self.call_sub(&sub, call_args, WantarrayCtx::Scalar, line) {
             Ok(v) => v,
-            Err(FlowOrError::Flow(_)) => PerlValue::UNDEF,
+            Err(FlowOrError::Flow(_)) => StrykeValue::UNDEF,
             Err(FlowOrError::Error(e)) => return Err(e),
         };
         match target_kind {
@@ -2307,7 +2307,7 @@ impl VMHelper {
             }
             _ => return Err(PerlError::runtime("tie: invalid target kind", line)),
         }
-        Ok(PerlValue::UNDEF)
+        Ok(StrykeValue::UNDEF)
     }
 
     /// Immediate parents from live `@Class::ISA` (no cached MRO — changes take effect on next method lookup).
@@ -2680,8 +2680,8 @@ impl VMHelper {
             let prev = slot;
             let _ = self
                 .scope
-                .set_hash_element("SIG", "__WARN__", PerlValue::UNDEF);
-            let arg = PerlValue::string(msg.to_string());
+                .set_hash_element("SIG", "__WARN__", StrykeValue::UNDEF);
+            let arg = StrykeValue::string(msg.to_string());
             let r = self.call_sub(&sub, vec![arg], WantarrayCtx::Void, line);
             let _ = self.scope.set_hash_element("SIG", "__WARN__", prev);
             return match r {
@@ -2706,8 +2706,8 @@ impl VMHelper {
             let prev = slot;
             let _ = self
                 .scope
-                .set_hash_element("SIG", "__DIE__", PerlValue::UNDEF);
-            let arg = PerlValue::string(msg.to_string());
+                .set_hash_element("SIG", "__DIE__", StrykeValue::UNDEF);
+            let arg = StrykeValue::string(msg.to_string());
             let r = self.call_sub(&sub, vec![arg], WantarrayCtx::Void, line);
             let _ = self.scope.set_hash_element("SIG", "__DIE__", prev);
             return match r {
@@ -2740,7 +2740,7 @@ impl VMHelper {
             return;
         }
         self.env = std::env::vars()
-            .map(|(k, v)| (k, PerlValue::string(v)))
+            .map(|(k, v)| (k, StrykeValue::string(v)))
             .collect();
         self.scope
             .set_hash("ENV", self.env.clone())
@@ -2830,7 +2830,7 @@ impl VMHelper {
     /// `exists $href->{k}` / `exists $obj->{k}` — container is a hash ref or blessed hash-like value.
     pub(crate) fn exists_arrow_hash_element(
         &self,
-        container: PerlValue,
+        container: StrykeValue,
         key: &str,
         line: usize,
     ) -> PerlResult<bool> {
@@ -2860,21 +2860,21 @@ impl VMHelper {
     /// `delete $href->{k}` / `delete $obj->{k}` — same container rules as [`Self::exists_arrow_hash_element`].
     pub(crate) fn delete_arrow_hash_element(
         &self,
-        container: PerlValue,
+        container: StrykeValue,
         key: &str,
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         if let Some(r) = container.as_hash_ref() {
-            return Ok(r.write().shift_remove(key).unwrap_or(PerlValue::UNDEF));
+            return Ok(r.write().shift_remove(key).unwrap_or(StrykeValue::UNDEF));
         }
         if let Some(b) = container.as_blessed_ref() {
             let mut data = b.data.write();
             if let Some(r) = data.as_hash_ref() {
-                return Ok(r.write().shift_remove(key).unwrap_or(PerlValue::UNDEF));
+                return Ok(r.write().shift_remove(key).unwrap_or(StrykeValue::UNDEF));
             }
             if let Some(mut map) = data.as_hash_map() {
-                let v = map.shift_remove(key).unwrap_or(PerlValue::UNDEF);
-                *data = PerlValue::hash(map);
+                let v = map.shift_remove(key).unwrap_or(StrykeValue::UNDEF);
+                *data = StrykeValue::hash(map);
                 return Ok(v);
             }
             return Err(PerlError::runtime(
@@ -2891,7 +2891,7 @@ impl VMHelper {
     /// `exists $aref->[$i]` — plain array ref only (same index rules as [`Self::read_arrow_array_element`]).
     pub(crate) fn exists_arrow_array_element(
         &self,
-        container: PerlValue,
+        container: StrykeValue,
         idx: i64,
         line: usize,
     ) -> PerlResult<bool> {
@@ -2913,10 +2913,10 @@ impl VMHelper {
     /// `delete $aref->[$i]` — sets element to undef, returns previous value (Perl array `delete`).
     pub(crate) fn delete_arrow_array_element(
         &self,
-        container: PerlValue,
+        container: StrykeValue,
         idx: i64,
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         if let Some(a) = container.as_array_ref() {
             let mut arr = a.write();
             let i = if idx < 0 {
@@ -2925,10 +2925,10 @@ impl VMHelper {
                 idx as usize
             };
             if i >= arr.len() {
-                return Ok(PerlValue::UNDEF);
+                return Ok(StrykeValue::UNDEF);
             }
-            let old = arr.get(i).cloned().unwrap_or(PerlValue::UNDEF);
-            arr[i] = PerlValue::UNDEF;
+            let old = arr.get(i).cloned().unwrap_or(StrykeValue::UNDEF);
+            arr[i] = StrykeValue::UNDEF;
             return Ok(old);
         }
         Err(PerlError::runtime(
@@ -3243,7 +3243,7 @@ impl VMHelper {
     }
 
     /// After `our @EXPORT` / `our @EXPORT_OK` in a package, record lists for `use`.
-    fn record_exporter_our_array_name(&mut self, name: &str, items: &[PerlValue]) {
+    fn record_exporter_our_array_name(&mut self, name: &str, items: &[StrykeValue]) {
         if name != "EXPORT" && name != "EXPORT_OK" {
             return;
         }
@@ -3520,7 +3520,7 @@ impl VMHelper {
     }
 
     /// `require EXPR` — load once, record `%INC`, return `1` on success.
-    pub(crate) fn require_execute(&mut self, spec: &str, line: usize) -> PerlResult<PerlValue> {
+    pub(crate) fn require_execute(&mut self, spec: &str, line: usize) -> PerlResult<StrykeValue> {
         let t = spec.trim();
         if t.is_empty() {
             return Err(PerlError::runtime("require: empty argument", line));
@@ -3528,21 +3528,21 @@ impl VMHelper {
         match t {
             "strict" => {
                 self.apply_use_strict(&[], line)?;
-                return Ok(PerlValue::integer(1));
+                return Ok(StrykeValue::integer(1));
             }
             "utf8" => {
                 self.utf8_pragma = true;
-                return Ok(PerlValue::integer(1));
+                return Ok(StrykeValue::integer(1));
             }
             "feature" | "v5" => {
-                return Ok(PerlValue::integer(1));
+                return Ok(StrykeValue::integer(1));
             }
             "warnings" => {
                 self.warnings = true;
-                return Ok(PerlValue::integer(1));
+                return Ok(StrykeValue::integer(1));
             }
             "threads" | "Thread::Pool" | "Parallel::ForkManager" => {
-                return Ok(PerlValue::integer(1));
+                return Ok(StrykeValue::integer(1));
             }
             _ => {}
         }
@@ -3554,7 +3554,7 @@ impl VMHelper {
             return self.require_relative_path(p, line);
         }
         if Self::looks_like_version_only(t) {
-            return Ok(PerlValue::integer(1));
+            return Ok(StrykeValue::integer(1));
         }
         let relpath = Self::module_spec_to_relpath(t);
         self.require_from_inc(&relpath, line)
@@ -3571,7 +3571,7 @@ impl VMHelper {
         };
         let r = self.call_sub(
             sub.as_ref(),
-            vec![PerlValue::string(path.to_string())],
+            vec![StrykeValue::string(path.to_string())],
             WantarrayCtx::Scalar,
             line,
         );
@@ -3589,11 +3589,11 @@ impl VMHelper {
         }
     }
 
-    fn require_absolute_path(&mut self, path: &Path, line: usize) -> PerlResult<PerlValue> {
+    fn require_absolute_path(&mut self, path: &Path, line: usize) -> PerlResult<StrykeValue> {
         let canon = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
         let key = canon.to_string_lossy().into_owned();
         if self.scope.exists_hash_element("INC", &key) {
-            return Ok(PerlValue::integer(1));
+            return Ok(StrykeValue::integer(1));
         }
         self.invoke_require_hook("require__before", &key, line)?;
         let code = read_file_text_perl_compat(&canon).map_err(|e| {
@@ -3604,16 +3604,16 @@ impl VMHelper {
         })?;
         let code = crate::data_section::strip_perl_end_marker(&code);
         self.scope
-            .set_hash_element("INC", &key, PerlValue::string(key.clone()))?;
+            .set_hash_element("INC", &key, StrykeValue::string(key.clone()))?;
         let saved_pkg = self.scope.get_scalar("__PACKAGE__");
         let r = crate::parse_and_run_module_in_file(code, self, &key);
         let _ = self.scope.set_scalar("__PACKAGE__", saved_pkg);
         r?;
         self.invoke_require_hook("require__after", &key, line)?;
-        Ok(PerlValue::integer(1))
+        Ok(StrykeValue::integer(1))
     }
 
-    fn require_relative_path(&mut self, path: &Path, line: usize) -> PerlResult<PerlValue> {
+    fn require_relative_path(&mut self, path: &Path, line: usize) -> PerlResult<StrykeValue> {
         if !path.exists() {
             return Err(PerlError::runtime(
                 format!(
@@ -3626,9 +3626,9 @@ impl VMHelper {
         self.require_absolute_path(path, line)
     }
 
-    fn require_from_inc(&mut self, relpath: &str, line: usize) -> PerlResult<PerlValue> {
+    fn require_from_inc(&mut self, relpath: &str, line: usize) -> PerlResult<StrykeValue> {
         if self.scope.exists_hash_element("INC", relpath) {
-            return Ok(PerlValue::integer(1));
+            return Ok(StrykeValue::integer(1));
         }
         self.invoke_require_hook("require__before", relpath, line)?;
 
@@ -3648,13 +3648,13 @@ impl VMHelper {
             let abs = found.canonicalize().unwrap_or(found);
             let abs_s = abs.to_string_lossy().into_owned();
             self.scope
-                .set_hash_element("INC", relpath, PerlValue::string(abs_s.clone()))?;
+                .set_hash_element("INC", relpath, StrykeValue::string(abs_s.clone()))?;
             let saved_pkg = self.scope.get_scalar("__PACKAGE__");
             let r = crate::parse_and_run_module_in_file(code, self, &abs_s);
             let _ = self.scope.set_scalar("__PACKAGE__", saved_pkg);
             r?;
             self.invoke_require_hook("require__after", relpath, line)?;
-            return Ok(PerlValue::integer(1));
+            return Ok(StrykeValue::integer(1));
         }
 
         // Check virtual modules first (AOT bundles).
@@ -3663,14 +3663,14 @@ impl VMHelper {
             self.scope.set_hash_element(
                 "INC",
                 relpath,
-                PerlValue::string(format!("(virtual)/{}", relpath)),
+                StrykeValue::string(format!("(virtual)/{}", relpath)),
             )?;
             let saved_pkg = self.scope.get_scalar("__PACKAGE__");
             let r = crate::parse_and_run_module_in_file(code, self, relpath);
             let _ = self.scope.set_scalar("__PACKAGE__", saved_pkg);
             r?;
             self.invoke_require_hook("require__after", relpath, line)?;
-            return Ok(PerlValue::integer(1));
+            return Ok(StrykeValue::integer(1));
         }
 
         for dir in self.inc_directories() {
@@ -3686,13 +3686,13 @@ impl VMHelper {
                 let abs = full.canonicalize().unwrap_or(full);
                 let abs_s = abs.to_string_lossy().into_owned();
                 self.scope
-                    .set_hash_element("INC", relpath, PerlValue::string(abs_s.clone()))?;
+                    .set_hash_element("INC", relpath, StrykeValue::string(abs_s.clone()))?;
                 let saved_pkg = self.scope.get_scalar("__PACKAGE__");
                 let r = crate::parse_and_run_module_in_file(code, self, &abs_s);
                 let _ = self.scope.set_scalar("__PACKAGE__", saved_pkg);
                 r?;
                 self.invoke_require_hook("require__after", relpath, line)?;
-                return Ok(PerlValue::integer(1));
+                return Ok(StrykeValue::integer(1));
             }
         }
         Err(PerlError::runtime(
@@ -3818,8 +3818,8 @@ impl VMHelper {
             let key = n.trim_start_matches('@');
             if key.eq_ignore_ascii_case("PATH") {
                 let path_env = std::env::var("PATH").unwrap_or_default();
-                let path_vec: Vec<PerlValue> = std::env::split_paths(&path_env)
-                    .map(|p| PerlValue::string(p.to_string_lossy().into_owned()))
+                let path_vec: Vec<StrykeValue> = std::env::split_paths(&path_env)
+                    .map(|p| StrykeValue::string(p.to_string_lossy().into_owned()))
                     .collect();
                 let aname = self.stash_array_name_for_package("PATH");
                 self.scope.declare_array(&aname, path_vec);
@@ -3908,7 +3908,7 @@ impl VMHelper {
         Ok(())
     }
 
-    fn install_constant_sub(&mut self, name: &str, val: &PerlValue, line: usize) -> PerlResult<()> {
+    fn install_constant_sub(&mut self, name: &str, val: &StrykeValue, line: usize) -> PerlResult<()> {
         let key = self.qualify_sub_key(name);
         let ret_expr = self.perl_value_to_const_literal_expr(val, line)?;
         let body = vec![Statement {
@@ -3931,7 +3931,7 @@ impl VMHelper {
     }
 
     /// Build a literal expression for `return EXPR` in a constant sub (scalar/aggregate only).
-    fn perl_value_to_const_literal_expr(&self, v: &PerlValue, line: usize) -> PerlResult<Expr> {
+    fn perl_value_to_const_literal_expr(&self, v: &StrykeValue, line: usize) -> PerlResult<Expr> {
         if v.is_undef() {
             return Ok(Expr {
                 kind: ExprKind::Undef,
@@ -4029,7 +4029,7 @@ impl VMHelper {
                 StmtKind::Package { name } => {
                     let _ = self
                         .scope
-                        .set_scalar("__PACKAGE__", PerlValue::string(name.clone()));
+                        .set_scalar("__PACKAGE__", StrykeValue::string(name.clone()));
                 }
                 StmtKind::SubDecl {
                     name,
@@ -4092,7 +4092,7 @@ impl VMHelper {
         mode_s: String,
         file_opt: Option<String>,
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         // Perl two-arg `open $fh, EXPR` when EXPR is a single string:
         // - leading `|`  → pipe to command (write to child's stdin)
         // - trailing `|` → pipe from command (read child's stdout)
@@ -4154,7 +4154,7 @@ impl VMHelper {
                     Ok(f) => f,
                     Err(e) => {
                         self.apply_io_error_to_errno(&e);
-                        return Ok(PerlValue::integer(0));
+                        return Ok(StrykeValue::integer(0));
                     }
                 };
                 let shared = Arc::new(Mutex::new(file));
@@ -4170,7 +4170,7 @@ impl VMHelper {
                     Ok(f) => f,
                     Err(e) => {
                         self.apply_io_error_to_errno(&e);
-                        return Ok(PerlValue::integer(0));
+                        return Ok(StrykeValue::integer(0));
                     }
                 };
                 let shared = Arc::new(Mutex::new(file));
@@ -4190,7 +4190,7 @@ impl VMHelper {
                     Ok(f) => f,
                     Err(e) => {
                         self.apply_io_error_to_errno(&e);
-                        return Ok(PerlValue::integer(0));
+                        return Ok(StrykeValue::integer(0));
                     }
                 };
                 let shared = Arc::new(Mutex::new(file));
@@ -4208,11 +4208,11 @@ impl VMHelper {
                 ));
             }
         }
-        Ok(PerlValue::io_handle(handle_return))
+        Ok(StrykeValue::io_handle(handle_return))
     }
 
     /// `group_by` / `chunk_by` — consecutive runs where the key (block or `EXPR` with `$_`)
-    /// matches the previous key under [`PerlValue::str_eq`]. Returns a list of arrayrefs
+    /// matches the previous key under [`StrykeValue::str_eq`]. Returns a list of arrayrefs
     /// (same outer shape as `chunked`).
     pub(crate) fn eval_chunk_by_builtin(
         &mut self,
@@ -4233,16 +4233,16 @@ impl VMHelper {
                     .into());
                 };
                 let sub = sub.clone();
-                let mut chunks: Vec<PerlValue> = Vec::new();
-                let mut run: Vec<PerlValue> = Vec::new();
-                let mut prev_key: Option<PerlValue> = None;
+                let mut chunks: Vec<StrykeValue> = Vec::new();
+                let mut run: Vec<StrykeValue> = Vec::new();
+                let mut prev_key: Option<StrykeValue> = None;
                 for item in list {
                     self.scope.set_topic(item.clone());
                     let key = match self.call_sub(&sub, vec![], WantarrayCtx::Scalar, line) {
                         Ok(k) => k,
                         Err(FlowOrError::Error(e)) => return Err(FlowOrError::Error(e)),
                         Err(FlowOrError::Flow(Flow::Return(v))) => v,
-                        Err(_) => PerlValue::UNDEF,
+                        Err(_) => StrykeValue::UNDEF,
                     };
                     match &prev_key {
                         None => {
@@ -4253,7 +4253,7 @@ impl VMHelper {
                             if key.str_eq(pk) {
                                 run.push(item);
                             } else {
-                                chunks.push(PerlValue::array_ref(Arc::new(RwLock::new(
+                                chunks.push(StrykeValue::array_ref(Arc::new(RwLock::new(
                                     std::mem::take(&mut run),
                                 ))));
                                 run.push(item);
@@ -4263,14 +4263,14 @@ impl VMHelper {
                     }
                 }
                 if !run.is_empty() {
-                    chunks.push(PerlValue::array_ref(Arc::new(RwLock::new(run))));
+                    chunks.push(StrykeValue::array_ref(Arc::new(RwLock::new(run))));
                 }
                 chunks
             }
             _ => {
-                let mut chunks: Vec<PerlValue> = Vec::new();
-                let mut run: Vec<PerlValue> = Vec::new();
-                let mut prev_key: Option<PerlValue> = None;
+                let mut chunks: Vec<StrykeValue> = Vec::new();
+                let mut run: Vec<StrykeValue> = Vec::new();
+                let mut prev_key: Option<StrykeValue> = None;
                 for item in list {
                     self.scope.set_topic(item.clone());
                     let key = self.eval_expr_ctx(key_spec, WantarrayCtx::Scalar)?;
@@ -4283,7 +4283,7 @@ impl VMHelper {
                             if key.str_eq(pk) {
                                 run.push(item);
                             } else {
-                                chunks.push(PerlValue::array_ref(Arc::new(RwLock::new(
+                                chunks.push(StrykeValue::array_ref(Arc::new(RwLock::new(
                                     std::mem::take(&mut run),
                                 ))));
                                 run.push(item);
@@ -4293,15 +4293,15 @@ impl VMHelper {
                     }
                 }
                 if !run.is_empty() {
-                    chunks.push(PerlValue::array_ref(Arc::new(RwLock::new(run))));
+                    chunks.push(StrykeValue::array_ref(Arc::new(RwLock::new(run))));
                 }
                 chunks
             }
         };
         Ok(match ctx {
-            WantarrayCtx::List => PerlValue::array(chunks),
-            WantarrayCtx::Scalar => PerlValue::integer(chunks.len() as i64),
-            WantarrayCtx::Void => PerlValue::UNDEF,
+            WantarrayCtx::List => StrykeValue::array(chunks),
+            WantarrayCtx::Scalar => StrykeValue::integer(chunks.len() as i64),
+            WantarrayCtx::Void => StrykeValue::UNDEF,
         })
     }
 
@@ -4309,9 +4309,9 @@ impl VMHelper {
     pub(crate) fn list_higher_order_block_builtin(
         &mut self,
         name: &str,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         match self.list_higher_order_block_builtin_exec(name, args, line) {
             Ok(v) => Ok(v),
             Err(FlowOrError::Error(e)) => Err(e),
@@ -4326,7 +4326,7 @@ impl VMHelper {
     fn list_higher_order_block_builtin_exec(
         &mut self,
         name: &str,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
     ) -> ExecResult {
         if args.is_empty() {
@@ -4342,17 +4342,17 @@ impl VMHelper {
             .into());
         };
         let sub = sub.clone();
-        let items: Vec<PerlValue> = args[1..].to_vec();
+        let items: Vec<StrykeValue> = args[1..].to_vec();
         if matches!(name, "tap" | "peek") && items.len() == 1 {
             if let Some(p) = items[0].as_pipeline() {
                 self.pipeline_push(&p, PipelineOp::Tap(sub), line)?;
-                return Ok(PerlValue::pipeline(Arc::clone(&p)));
+                return Ok(StrykeValue::pipeline(Arc::clone(&p)));
             }
             let v = &items[0];
             if v.is_iterator() || v.as_array_vec().is_some() {
                 let source = crate::map_stream::into_pull_iter(v.clone());
                 let (capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
-                return Ok(PerlValue::iterator(Arc::new(
+                return Ok(StrykeValue::iterator(Arc::new(
                     crate::map_stream::TapIterator::new(
                         source,
                         sub,
@@ -4386,9 +4386,9 @@ impl VMHelper {
                     out.push(item);
                 }
                 Ok(match wa {
-                    WantarrayCtx::List => PerlValue::array(out),
-                    WantarrayCtx::Scalar => PerlValue::integer(out.len() as i64),
-                    WantarrayCtx::Void => PerlValue::UNDEF,
+                    WantarrayCtx::List => StrykeValue::array(out),
+                    WantarrayCtx::Scalar => StrykeValue::integer(out.len() as i64),
+                    WantarrayCtx::Void => StrykeValue::UNDEF,
                 })
             }
             "drop_while" | "skip_while" => {
@@ -4404,9 +4404,9 @@ impl VMHelper {
                 }
                 let rest = items[i..].to_vec();
                 Ok(match wa {
-                    WantarrayCtx::List => PerlValue::array(rest),
-                    WantarrayCtx::Scalar => PerlValue::integer(rest.len() as i64),
-                    WantarrayCtx::Void => PerlValue::UNDEF,
+                    WantarrayCtx::List => StrykeValue::array(rest),
+                    WantarrayCtx::Scalar => StrykeValue::integer(rest.len() as i64),
+                    WantarrayCtx::Void => StrykeValue::UNDEF,
                 })
             }
             "reject" | "grepv" => {
@@ -4420,17 +4420,17 @@ impl VMHelper {
                     }
                 }
                 Ok(match wa {
-                    WantarrayCtx::List => PerlValue::array(out),
-                    WantarrayCtx::Scalar => PerlValue::integer(out.len() as i64),
-                    WantarrayCtx::Void => PerlValue::UNDEF,
+                    WantarrayCtx::List => StrykeValue::array(out),
+                    WantarrayCtx::Scalar => StrykeValue::integer(out.len() as i64),
+                    WantarrayCtx::Void => StrykeValue::UNDEF,
                 })
             }
             "tap" | "peek" => {
                 let _ = self.call_sub(&sub, items.clone(), WantarrayCtx::Void, line)?;
                 Ok(match wa {
-                    WantarrayCtx::List => PerlValue::array(items),
-                    WantarrayCtx::Scalar => PerlValue::integer(items.len() as i64),
-                    WantarrayCtx::Void => PerlValue::UNDEF,
+                    WantarrayCtx::List => StrykeValue::array(items),
+                    WantarrayCtx::Scalar => StrykeValue::integer(items.len() as i64),
+                    WantarrayCtx::Void => StrykeValue::UNDEF,
                 })
             }
             "partition" => {
@@ -4446,16 +4446,16 @@ impl VMHelper {
                         no.push(item);
                     }
                 }
-                let yes_ref = PerlValue::array_ref(Arc::new(RwLock::new(yes)));
-                let no_ref = PerlValue::array_ref(Arc::new(RwLock::new(no)));
+                let yes_ref = StrykeValue::array_ref(Arc::new(RwLock::new(yes)));
+                let no_ref = StrykeValue::array_ref(Arc::new(RwLock::new(no)));
                 Ok(match wa {
-                    WantarrayCtx::List => PerlValue::array(vec![yes_ref, no_ref]),
-                    WantarrayCtx::Scalar => PerlValue::integer(2),
-                    WantarrayCtx::Void => PerlValue::UNDEF,
+                    WantarrayCtx::List => StrykeValue::array(vec![yes_ref, no_ref]),
+                    WantarrayCtx::Scalar => StrykeValue::integer(2),
+                    WantarrayCtx::Void => StrykeValue::UNDEF,
                 })
             }
             "min_by" => {
-                let mut best: Option<(PerlValue, PerlValue)> = None;
+                let mut best: Option<(StrykeValue, StrykeValue)> = None;
                 for item in items {
                     self.scope.set_topic(item.clone());
                     let key =
@@ -4471,10 +4471,10 @@ impl VMHelper {
                         }
                     });
                 }
-                Ok(best.map(|(v, _)| v).unwrap_or(PerlValue::UNDEF))
+                Ok(best.map(|(v, _)| v).unwrap_or(StrykeValue::UNDEF))
             }
             "max_by" => {
-                let mut best: Option<(PerlValue, PerlValue)> = None;
+                let mut best: Option<(StrykeValue, StrykeValue)> = None;
                 for item in items {
                     self.scope.set_topic(item.clone());
                     let key =
@@ -4490,13 +4490,13 @@ impl VMHelper {
                         }
                     });
                 }
-                Ok(best.map(|(v, _)| v).unwrap_or(PerlValue::UNDEF))
+                Ok(best.map(|(v, _)| v).unwrap_or(StrykeValue::UNDEF))
             }
             "zip_with" => {
                 // zip_with { BLOCK } \@a, \@b — apply block to paired elements
                 // Flatten items, then treat each array ref/binding as a separate list.
-                let flat: Vec<PerlValue> = items.into_iter().flat_map(|a| a.to_list()).collect();
-                let refs: Vec<Vec<PerlValue>> = flat
+                let flat: Vec<StrykeValue> = items.into_iter().flat_map(|a| a.to_list()).collect();
+                let refs: Vec<Vec<StrykeValue>> = flat
                     .iter()
                     .map(|el| {
                         if let Some(ar) = el.as_array_ref() {
@@ -4511,17 +4511,17 @@ impl VMHelper {
                 let max_len = refs.iter().map(|l| l.len()).max().unwrap_or(0);
                 let mut out = Vec::with_capacity(max_len);
                 for i in 0..max_len {
-                    let pair: Vec<PerlValue> = refs
+                    let pair: Vec<StrykeValue> = refs
                         .iter()
-                        .map(|l| l.get(i).cloned().unwrap_or(PerlValue::UNDEF))
+                        .map(|l| l.get(i).cloned().unwrap_or(StrykeValue::UNDEF))
                         .collect();
                     let result = self.call_sub(&sub, pair, WantarrayCtx::Scalar, line)?;
                     out.push(result);
                 }
                 Ok(match wa {
-                    WantarrayCtx::List => PerlValue::array(out),
-                    WantarrayCtx::Scalar => PerlValue::integer(out.len() as i64),
-                    WantarrayCtx::Void => PerlValue::UNDEF,
+                    WantarrayCtx::List => StrykeValue::array(out),
+                    WantarrayCtx::Scalar => StrykeValue::integer(out.len() as i64),
+                    WantarrayCtx::Void => StrykeValue::UNDEF,
                 })
             }
             "count_by" => {
@@ -4530,10 +4530,10 @@ impl VMHelper {
                     self.scope.set_topic(item.clone());
                     let key = self.call_sub(&sub, vec![], WantarrayCtx::Scalar, line)?;
                     let k = key.to_string();
-                    let entry = counts.entry(k).or_insert(PerlValue::integer(0));
-                    *entry = PerlValue::integer(entry.to_int() + 1);
+                    let entry = counts.entry(k).or_insert(StrykeValue::integer(0));
+                    *entry = StrykeValue::integer(entry.to_int() + 1);
                 }
-                Ok(PerlValue::hash_ref(Arc::new(RwLock::new(counts))))
+                Ok(StrykeValue::hash_ref(Arc::new(RwLock::new(counts))))
             }
             _ => Err(PerlError::runtime(
                 format!("internal: unknown list block builtin `{name}`"),
@@ -4546,9 +4546,9 @@ impl VMHelper {
     /// `rmdir LIST` — remove empty directories; returns count removed.
     pub(crate) fn builtin_rmdir_execute(
         &mut self,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         _line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         let mut count = 0i64;
         for a in args {
             let p = a.to_string();
@@ -4559,25 +4559,25 @@ impl VMHelper {
                 count += 1;
             }
         }
-        Ok(PerlValue::integer(count))
+        Ok(StrykeValue::integer(count))
     }
 
     /// `touch FILE, ...` — create if absent, update timestamps to now.
     pub(crate) fn builtin_touch_execute(
         &mut self,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         _line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         let paths: Vec<String> = args.iter().map(|v| v.to_string()).collect();
-        Ok(PerlValue::integer(crate::perl_fs::touch_paths(&paths)))
+        Ok(StrykeValue::integer(crate::perl_fs::touch_paths(&paths)))
     }
 
     /// `utime ATIME, MTIME, LIST`
     pub(crate) fn builtin_utime_execute(
         &mut self,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         if args.len() < 3 {
             return Err(PerlError::runtime(
                 "utime requires at least three arguments (atime, mtime, files...)",
@@ -4595,26 +4595,26 @@ impl VMHelper {
                 line,
             ));
         }
-        Ok(PerlValue::integer(n))
+        Ok(StrykeValue::integer(n))
     }
 
     /// `umask EXPR` / `umask()` — returns previous mask when setting; current mask when called with no arguments.
     pub(crate) fn builtin_umask_execute(
         &mut self,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         #[cfg(unix)]
         {
             let _ = line;
             if args.is_empty() {
                 let cur = unsafe { libc::umask(0) };
                 unsafe { libc::umask(cur) };
-                return Ok(PerlValue::integer(cur as i64));
+                return Ok(StrykeValue::integer(cur as i64));
             }
             let new_m = args[0].to_int() as libc::mode_t;
             let old = unsafe { libc::umask(new_m) };
-            Ok(PerlValue::integer(old as i64))
+            Ok(StrykeValue::integer(old as i64))
         }
         #[cfg(not(unix))]
         {
@@ -4629,17 +4629,17 @@ impl VMHelper {
     /// `getcwd` — current directory or undef on failure.
     pub(crate) fn builtin_getcwd_execute(
         &mut self,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         if !args.is_empty() {
             return Err(PerlError::runtime("getcwd takes no arguments", line));
         }
         match std::env::current_dir() {
-            Ok(p) => Ok(PerlValue::string(p.to_string_lossy().into_owned())),
+            Ok(p) => Ok(StrykeValue::string(p.to_string_lossy().into_owned())),
             Err(e) => {
                 self.apply_io_error_to_errno(&e);
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
         }
     }
@@ -4647,9 +4647,9 @@ impl VMHelper {
     /// `realpath PATH` — [`std::fs::canonicalize`]; sets `$!` / errno on failure, returns undef.
     pub(crate) fn builtin_realpath_execute(
         &mut self,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         let path = args
             .first()
             .ok_or_else(|| PerlError::runtime("realpath: need path", line))?
@@ -4658,10 +4658,10 @@ impl VMHelper {
             return Err(PerlError::runtime("realpath: need path", line));
         }
         match crate::perl_fs::realpath_resolved(&path) {
-            Ok(s) => Ok(PerlValue::string(s)),
+            Ok(s) => Ok(StrykeValue::string(s)),
             Err(e) => {
                 self.apply_io_error_to_errno(&e);
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
         }
     }
@@ -4669,9 +4669,9 @@ impl VMHelper {
     /// `pipe READHANDLE, WRITEHANDLE` — install OS pipe ends as buffered read / write handles (Unix).
     pub(crate) fn builtin_pipe_execute(
         &mut self,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         if args.len() != 2 {
             return Err(PerlError::runtime(
                 "pipe requires exactly two arguments",
@@ -4692,7 +4692,7 @@ impl VMHelper {
             if unsafe { libc::pipe(fds.as_mut_ptr()) } != 0 {
                 let e = std::io::Error::last_os_error();
                 self.apply_io_error_to_errno(&e);
-                return Ok(PerlValue::integer(0));
+                return Ok(StrykeValue::integer(0));
             }
             let read_file = unsafe { File::from_raw_fd(fds[0]) };
             let write_file = unsafe { File::from_raw_fd(fds[1]) };
@@ -4715,7 +4715,7 @@ impl VMHelper {
             self.output_handles
                 .insert(write_name, Box::new(IoSharedFileWrite(write_shared)));
 
-            Ok(PerlValue::integer(1))
+            Ok(StrykeValue::integer(1))
         }
         #[cfg(not(unix))]
         {
@@ -4727,7 +4727,7 @@ impl VMHelper {
         }
     }
 
-    pub(crate) fn close_builtin_execute(&mut self, name: String) -> PerlResult<PerlValue> {
+    pub(crate) fn close_builtin_execute(&mut self, name: String) -> PerlResult<StrykeValue> {
         self.output_handles.remove(&name);
         self.input_handles.remove(&name);
         self.io_file_slots.remove(&name);
@@ -4736,7 +4736,7 @@ impl VMHelper {
                 self.record_child_exit_status(st);
             }
         }
-        Ok(PerlValue::integer(1))
+        Ok(StrykeValue::integer(1))
     }
 
     pub(crate) fn has_input_handle(&self, name: &str) -> bool {
@@ -4755,11 +4755,11 @@ impl VMHelper {
     /// not [`ExprKind::Eof`]).
     pub(crate) fn eof_builtin_execute(
         &self,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         match args.len() {
-            0 => Ok(PerlValue::integer(if self.eof_without_arg_is_true() {
+            0 => Ok(StrykeValue::integer(if self.eof_without_arg_is_true() {
                 1
             } else {
                 0
@@ -4767,7 +4767,7 @@ impl VMHelper {
             1 => {
                 let name = args[0].to_string();
                 let at_eof = !self.has_input_handle(&name);
-                Ok(PerlValue::integer(if at_eof { 1 } else { 0 }))
+                Ok(StrykeValue::integer(if at_eof { 1 } else { 0 }))
             }
             _ => Err(PerlError::runtime("eof: too many arguments", line)),
         }
@@ -4775,18 +4775,18 @@ impl VMHelper {
 
     /// `study EXPR` — Perl returns `1` for non-empty strings and a defined empty value (numifies to
     /// `0`, stringifies to `""`) for `""`.
-    pub(crate) fn study_return_value(s: &str) -> PerlValue {
+    pub(crate) fn study_return_value(s: &str) -> StrykeValue {
         if s.is_empty() {
-            PerlValue::string(String::new())
+            StrykeValue::string(String::new())
         } else {
-            PerlValue::integer(1)
+            StrykeValue::integer(1)
         }
     }
 
     pub(crate) fn readline_builtin_execute(
         &mut self,
         handle: Option<&str>,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         // `<>` / `readline` with no handle: iterate `@ARGV` files, else stdin.
         if handle.is_none() {
             let argv = self.scope.get_array("ARGV");
@@ -4808,7 +4808,7 @@ impl VMHelper {
                             }
                         }
                         if self.diamond_reader.is_none() {
-                            return Ok(PerlValue::UNDEF);
+                            return Ok(StrykeValue::UNDEF);
                         }
                     }
                     let mut line_str = String::new();
@@ -4846,7 +4846,7 @@ impl VMHelper {
                         }
                         Ok(_) => {
                             self.bump_line_for_handle(&self.argv_current_file.clone());
-                            return Ok(PerlValue::string(line_str));
+                            return Ok(StrykeValue::string(line_str));
                         }
                         Err(e) => {
                             self.apply_io_error_to_errno(&e);
@@ -4870,7 +4870,7 @@ impl VMHelper {
                     "<STDIN>".to_string()
                 };
                 self.bump_line_for_handle("STDIN");
-                return Ok(PerlValue::string(queued));
+                return Ok(StrykeValue::string(queued));
             }
             let r: Result<usize, io::Error> = if self.open_pragma_utf8 {
                 let mut buf = Vec::new();
@@ -4893,7 +4893,7 @@ impl VMHelper {
                 }
             };
             match r {
-                Ok(0) => Ok(PerlValue::UNDEF),
+                Ok(0) => Ok(StrykeValue::UNDEF),
                 Ok(_) => {
                     self.last_stdin_die_bracket = if handle.is_none() {
                         "<>".to_string()
@@ -4901,11 +4901,11 @@ impl VMHelper {
                         "<STDIN>".to_string()
                     };
                     self.bump_line_for_handle("STDIN");
-                    Ok(PerlValue::string(line_str))
+                    Ok(StrykeValue::string(line_str))
                 }
                 Err(e) => {
                     self.apply_io_error_to_errno(&e);
-                    Ok(PerlValue::UNDEF)
+                    Ok(StrykeValue::UNDEF)
                 }
             }
         } else if let Some(reader) = self.input_handles.get_mut(handle_name) {
@@ -4947,18 +4947,18 @@ impl VMHelper {
                 }
             };
             match r {
-                Ok(0) => Ok(PerlValue::UNDEF),
+                Ok(0) => Ok(StrykeValue::UNDEF),
                 Ok(_) => {
                     self.bump_line_for_handle(handle_name);
-                    Ok(PerlValue::string(line_str))
+                    Ok(StrykeValue::string(line_str))
                 }
                 Err(e) => {
                     self.apply_io_error_to_errno(&e);
-                    Ok(PerlValue::UNDEF)
+                    Ok(StrykeValue::UNDEF)
                 }
             }
         } else {
-            Ok(PerlValue::UNDEF)
+            Ok(StrykeValue::UNDEF)
         }
     }
 
@@ -4966,7 +4966,7 @@ impl VMHelper {
     pub(crate) fn readline_builtin_execute_list(
         &mut self,
         handle: Option<&str>,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         let mut lines = Vec::new();
         loop {
             let v = self.readline_builtin_execute(handle)?;
@@ -4975,10 +4975,10 @@ impl VMHelper {
             }
             lines.push(v);
         }
-        Ok(PerlValue::array(lines))
+        Ok(StrykeValue::array(lines))
     }
 
-    pub(crate) fn opendir_handle(&mut self, handle: &str, path: &str) -> PerlValue {
+    pub(crate) fn opendir_handle(&mut self, handle: &str, path: &str) -> StrykeValue {
         match std::fs::read_dir(path) {
             Ok(rd) => {
                 let entries: Vec<String> = rd
@@ -4986,74 +4986,74 @@ impl VMHelper {
                     .collect();
                 self.dir_handles
                     .insert(handle.to_string(), DirHandleState { entries, pos: 0 });
-                PerlValue::integer(1)
+                StrykeValue::integer(1)
             }
             Err(e) => {
                 self.apply_io_error_to_errno(&e);
-                PerlValue::integer(0)
+                StrykeValue::integer(0)
             }
         }
     }
 
-    pub(crate) fn readdir_handle(&mut self, handle: &str) -> PerlValue {
+    pub(crate) fn readdir_handle(&mut self, handle: &str) -> StrykeValue {
         if let Some(dh) = self.dir_handles.get_mut(handle) {
             if dh.pos < dh.entries.len() {
                 let s = dh.entries[dh.pos].clone();
                 dh.pos += 1;
-                PerlValue::string(s)
+                StrykeValue::string(s)
             } else {
-                PerlValue::UNDEF
+                StrykeValue::UNDEF
             }
         } else {
-            PerlValue::UNDEF
+            StrykeValue::UNDEF
         }
     }
 
     /// List-context `readdir`: all directory entries not yet consumed (advances cursor to end).
-    pub(crate) fn readdir_handle_list(&mut self, handle: &str) -> PerlValue {
+    pub(crate) fn readdir_handle_list(&mut self, handle: &str) -> StrykeValue {
         if let Some(dh) = self.dir_handles.get_mut(handle) {
-            let rest: Vec<PerlValue> = dh.entries[dh.pos..]
+            let rest: Vec<StrykeValue> = dh.entries[dh.pos..]
                 .iter()
                 .cloned()
-                .map(PerlValue::string)
+                .map(StrykeValue::string)
                 .collect();
             dh.pos = dh.entries.len();
-            PerlValue::array(rest)
+            StrykeValue::array(rest)
         } else {
-            PerlValue::array(Vec::new())
+            StrykeValue::array(Vec::new())
         }
     }
 
-    pub(crate) fn closedir_handle(&mut self, handle: &str) -> PerlValue {
-        PerlValue::integer(if self.dir_handles.remove(handle).is_some() {
+    pub(crate) fn closedir_handle(&mut self, handle: &str) -> StrykeValue {
+        StrykeValue::integer(if self.dir_handles.remove(handle).is_some() {
             1
         } else {
             0
         })
     }
 
-    pub(crate) fn rewinddir_handle(&mut self, handle: &str) -> PerlValue {
+    pub(crate) fn rewinddir_handle(&mut self, handle: &str) -> StrykeValue {
         if let Some(dh) = self.dir_handles.get_mut(handle) {
             dh.pos = 0;
-            PerlValue::integer(1)
+            StrykeValue::integer(1)
         } else {
-            PerlValue::integer(0)
+            StrykeValue::integer(0)
         }
     }
 
-    pub(crate) fn telldir_handle(&mut self, handle: &str) -> PerlValue {
+    pub(crate) fn telldir_handle(&mut self, handle: &str) -> StrykeValue {
         self.dir_handles
             .get(handle)
-            .map(|dh| PerlValue::integer(dh.pos as i64))
-            .unwrap_or(PerlValue::UNDEF)
+            .map(|dh| StrykeValue::integer(dh.pos as i64))
+            .unwrap_or(StrykeValue::UNDEF)
     }
 
-    pub(crate) fn seekdir_handle(&mut self, handle: &str, pos: usize) -> PerlValue {
+    pub(crate) fn seekdir_handle(&mut self, handle: &str, pos: usize) -> StrykeValue {
         if let Some(dh) = self.dir_handles.get_mut(handle) {
             dh.pos = pos.min(dh.entries.len());
-            PerlValue::integer(1)
+            StrykeValue::integer(1)
         } else {
-            PerlValue::integer(0)
+            StrykeValue::integer(0)
         }
     }
 
@@ -5104,28 +5104,28 @@ impl VMHelper {
             }
         }
         self.scope
-            .set_scalar("&", PerlValue::string(self.last_match.clone()))?;
+            .set_scalar("&", StrykeValue::string(self.last_match.clone()))?;
         self.scope
-            .set_scalar("`", PerlValue::string(self.prematch.clone()))?;
+            .set_scalar("`", StrykeValue::string(self.prematch.clone()))?;
         self.scope
-            .set_scalar("'", PerlValue::string(self.postmatch.clone()))?;
+            .set_scalar("'", StrykeValue::string(self.postmatch.clone()))?;
         self.scope
-            .set_scalar("+", PerlValue::string(self.last_paren_match.clone()))?;
+            .set_scalar("+", StrykeValue::string(self.last_paren_match.clone()))?;
         for i in 1..caps.len() {
             if let Some(m) = caps.get(i) {
                 self.scope
-                    .set_scalar(&i.to_string(), PerlValue::string(m.text.to_string()))?;
+                    .set_scalar(&i.to_string(), StrykeValue::string(m.text.to_string()))?;
             }
         }
-        let mut start_arr = vec![PerlValue::integer(s0 as i64)];
-        let mut end_arr = vec![PerlValue::integer(e0 as i64)];
+        let mut start_arr = vec![StrykeValue::integer(s0 as i64)];
+        let mut end_arr = vec![StrykeValue::integer(e0 as i64)];
         for i in 1..caps.len() {
             if let Some(m) = caps.get(i) {
-                start_arr.push(PerlValue::integer((offset + m.start) as i64));
-                end_arr.push(PerlValue::integer((offset + m.end) as i64));
+                start_arr.push(StrykeValue::integer((offset + m.start) as i64));
+                end_arr.push(StrykeValue::integer((offset + m.end) as i64));
             } else {
-                start_arr.push(PerlValue::integer(-1));
-                end_arr.push(PerlValue::integer(-1));
+                start_arr.push(StrykeValue::integer(-1));
+                end_arr.push(StrykeValue::integer(-1));
             }
         }
         self.scope.set_array("-", start_arr)?;
@@ -5133,7 +5133,7 @@ impl VMHelper {
         let mut named = IndexMap::new();
         for name in re.capture_names().flatten() {
             if let Some(m) = caps.name(name) {
-                named.insert(name.to_string(), PerlValue::string(m.text.to_string()));
+                named.insert(name.to_string(), StrykeValue::string(m.text.to_string()));
             }
         }
         self.scope.set_hash("+", named.clone())?;
@@ -5142,7 +5142,7 @@ impl VMHelper {
         for (name, val) in &named {
             named_minus.insert(
                 name.clone(),
-                PerlValue::array_ref(Arc::new(RwLock::new(vec![val.clone()]))),
+                StrykeValue::array_ref(Arc::new(RwLock::new(vec![val.clone()]))),
             );
         }
         self.scope.set_hash("-", named_minus)?;
@@ -5154,7 +5154,7 @@ impl VMHelper {
             }
             CaptureAllMode::Append => {
                 let mut rows = self.scope.get_array("^CAPTURE_ALL");
-                rows.push(PerlValue::array(cap_flat));
+                rows.push(StrykeValue::array(cap_flat));
                 self.scope.set_array("^CAPTURE_ALL", rows)?;
             }
             CaptureAllMode::Skip => {}
@@ -5204,14 +5204,14 @@ impl VMHelper {
     /// prints `[]` when `$.` hasn't reached the left bound. True values are sequence numbers
     /// starting at `1`; the result on the closing line of an exclusive `...` has `E0` appended
     /// (represented here as the string `"<n>E0"`). Callers that need the numeric form still
-    /// get `0` / `N` from [`PerlValue::to_int`].
+    /// get `0` / `N` from [`StrykeValue::to_int`].
     pub(crate) fn scalar_flip_flop_eval(
         &mut self,
         left: i64,
         right: i64,
         slot: usize,
         exclusive: bool,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         if self.flip_flop_active.len() <= slot {
             self.flip_flop_active.resize(slot + 1, false);
         }
@@ -5240,13 +5240,13 @@ impl VMHelper {
                     *excl_left = None;
                     if dot == right {
                         *active = false;
-                        return Ok(PerlValue::string(format!("{}E0", *seq)));
+                        return Ok(StrykeValue::string(format!("{}E0", *seq)));
                     }
                 }
-                return Ok(PerlValue::string(seq.to_string()));
+                return Ok(StrykeValue::string(seq.to_string()));
             }
             *last_dot = Some(dot);
-            return Ok(PerlValue::string(String::new()));
+            return Ok(StrykeValue::string(String::new()));
         }
         // Already active: increment the sequence once per new `$.`, so a second evaluation on
         // the same line reads the same number (matches Perl `pp_flop`).
@@ -5260,14 +5260,14 @@ impl VMHelper {
                 *active = false;
                 *excl_left = None;
                 *seq = 0;
-                return Ok(PerlValue::string(format!("{}E0", cur_seq)));
+                return Ok(StrykeValue::string(format!("{}E0", cur_seq)));
             }
         } else if dot == right {
             *active = false;
             *seq = 0;
-            return Ok(PerlValue::string(format!("{}E0", cur_seq)));
+            return Ok(StrykeValue::string(format!("{}E0", cur_seq)));
         }
-        Ok(PerlValue::string(cur_seq.to_string()))
+        Ok(StrykeValue::string(cur_seq.to_string()))
     }
 
     fn regex_flip_flop_transition(
@@ -5317,7 +5317,7 @@ impl VMHelper {
         slot: usize,
         exclusive: bool,
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         let dot = self.scalar_flipflop_dot_line();
         let subject = self.scope.get_scalar("_").to_string();
         let left_re = self
@@ -5346,7 +5346,7 @@ impl VMHelper {
         }
         let active = &mut self.flip_flop_active[slot];
         let excl_left = &mut self.flip_flop_exclusive_left_line[slot];
-        Ok(PerlValue::integer(Self::regex_flip_flop_transition(
+        Ok(StrykeValue::integer(Self::regex_flip_flop_transition(
             active, excl_left, exclusive, dot, left_m, right_m,
         )))
     }
@@ -5360,7 +5360,7 @@ impl VMHelper {
         exclusive: bool,
         line: usize,
         right_m: bool,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         let dot = self.scalar_flipflop_dot_line();
         let subject = self.scope.get_scalar("_").to_string();
         let left_re = self
@@ -5380,7 +5380,7 @@ impl VMHelper {
         }
         let active = &mut self.flip_flop_active[slot];
         let excl_left = &mut self.flip_flop_exclusive_left_line[slot];
-        Ok(PerlValue::integer(Self::regex_flip_flop_transition(
+        Ok(StrykeValue::integer(Self::regex_flip_flop_transition(
             active, excl_left, exclusive, dot, left_m, right_m,
         )))
     }
@@ -5394,7 +5394,7 @@ impl VMHelper {
         exclusive: bool,
         line: usize,
         rhs_line: i64,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         let dot = self.scalar_flipflop_dot_line();
         let subject = self.scope.get_scalar("_").to_string();
         let left_re = self
@@ -5415,7 +5415,7 @@ impl VMHelper {
         }
         let active = &mut self.flip_flop_active[slot];
         let excl_left = &mut self.flip_flop_exclusive_left_line[slot];
-        Ok(PerlValue::integer(Self::regex_flip_flop_transition(
+        Ok(StrykeValue::integer(Self::regex_flip_flop_transition(
             active, excl_left, exclusive, dot, left_m, right_m,
         )))
     }
@@ -5431,7 +5431,7 @@ impl VMHelper {
         slot: usize,
         exclusive: bool,
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         let dot = self.scalar_flipflop_dot_line();
         let subject = self.scope.get_scalar("_").to_string();
         let left_re = self
@@ -5452,7 +5452,7 @@ impl VMHelper {
         }
         let active = &mut self.flip_flop_active[slot];
         let excl_left = &mut self.flip_flop_exclusive_left_line[slot];
-        Ok(PerlValue::integer(Self::regex_flip_flop_transition(
+        Ok(StrykeValue::integer(Self::regex_flip_flop_transition(
             active, excl_left, exclusive, dot, left_m, right_m,
         )))
     }
@@ -5462,7 +5462,7 @@ impl VMHelper {
     /// Returns bytes read count (or error). Called from VM's ReadIntoVar op.
     pub(crate) fn builtin_read_into(
         &mut self,
-        fh_val: PerlValue,
+        fh_val: StrykeValue,
         var_name: &str,
         length: usize,
         line: usize,
@@ -5481,11 +5481,11 @@ impl VMHelper {
         };
         buf.truncate(n);
         let read_str = crate::perl_fs::decode_utf8_or_latin1(&buf);
-        let _ = self.scope.set_scalar(var_name, PerlValue::string(read_str));
-        Ok(PerlValue::integer(n as i64))
+        let _ = self.scope.set_scalar(var_name, StrykeValue::string(read_str));
+        Ok(StrykeValue::integer(n as i64))
     }
 
-    pub(crate) fn chomp_inplace_execute(&mut self, val: PerlValue, target: &Expr) -> ExecResult {
+    pub(crate) fn chomp_inplace_execute(&mut self, val: StrykeValue, target: &Expr) -> ExecResult {
         // Perl's `chomp` on `@arr` / `%hash` iterates and chomps every
         // element in place, returning the *total count* of newlines
         // removed. Pre-fix this collapsed the array/hash to its
@@ -5502,17 +5502,17 @@ impl VMHelper {
                         s.pop();
                         total += 1;
                     }
-                    new_arr.push(PerlValue::string(s));
+                    new_arr.push(StrykeValue::string(s));
                 }
                 self.scope
                     .set_array(name, new_arr)
                     .map_err(FlowOrError::Error)?;
-                return Ok(PerlValue::integer(total));
+                return Ok(StrykeValue::integer(total));
             }
             ExprKind::HashVar(name) => {
                 let h = self.scope.get_hash(name);
                 let mut total = 0i64;
-                let mut new_h: indexmap::IndexMap<String, PerlValue> =
+                let mut new_h: indexmap::IndexMap<String, StrykeValue> =
                     indexmap::IndexMap::with_capacity(h.len());
                 for (k, v) in h {
                     let mut s = v.to_string();
@@ -5520,12 +5520,12 @@ impl VMHelper {
                         s.pop();
                         total += 1;
                     }
-                    new_h.insert(k, PerlValue::string(s));
+                    new_h.insert(k, StrykeValue::string(s));
                 }
                 self.scope
                     .set_hash(name, new_h)
                     .map_err(FlowOrError::Error)?;
-                return Ok(PerlValue::integer(total));
+                return Ok(StrykeValue::integer(total));
             }
             _ => {}
         }
@@ -5536,12 +5536,12 @@ impl VMHelper {
         } else {
             0i64
         };
-        self.assign_value(target, PerlValue::string(s))?;
-        Ok(PerlValue::integer(removed))
+        self.assign_value(target, StrykeValue::string(s))?;
+        Ok(StrykeValue::integer(removed))
     }
 
     /// Shared `chop` implementation (mutates `target`).
-    pub(crate) fn chop_inplace_execute(&mut self, val: PerlValue, target: &Expr) -> ExecResult {
+    pub(crate) fn chop_inplace_execute(&mut self, val: StrykeValue, target: &Expr) -> ExecResult {
         // Perl's `chop @arr` / `chop %hash` chops every element in
         // place and returns the *last character chopped*. Without
         // this branch the call stringified the whole container,
@@ -5550,14 +5550,14 @@ impl VMHelper {
         match &target.kind {
             ExprKind::ArrayVar(name) => {
                 let arr = self.scope.get_array(name);
-                let mut last = PerlValue::UNDEF;
+                let mut last = StrykeValue::UNDEF;
                 let mut new_arr = Vec::with_capacity(arr.len());
                 for v in arr {
                     let mut s = v.to_string();
                     if let Some(c) = s.pop() {
-                        last = PerlValue::string(c.to_string());
+                        last = StrykeValue::string(c.to_string());
                     }
-                    new_arr.push(PerlValue::string(s));
+                    new_arr.push(StrykeValue::string(s));
                 }
                 self.scope
                     .set_array(name, new_arr)
@@ -5566,15 +5566,15 @@ impl VMHelper {
             }
             ExprKind::HashVar(name) => {
                 let h = self.scope.get_hash(name);
-                let mut last = PerlValue::UNDEF;
-                let mut new_h: indexmap::IndexMap<String, PerlValue> =
+                let mut last = StrykeValue::UNDEF;
+                let mut new_h: indexmap::IndexMap<String, StrykeValue> =
                     indexmap::IndexMap::with_capacity(h.len());
                 for (k, v) in h {
                     let mut s = v.to_string();
                     if let Some(c) = s.pop() {
-                        last = PerlValue::string(c.to_string());
+                        last = StrykeValue::string(c.to_string());
                     }
-                    new_h.insert(k, PerlValue::string(s));
+                    new_h.insert(k, StrykeValue::string(s));
                 }
                 self.scope
                     .set_hash(name, new_h)
@@ -5586,9 +5586,9 @@ impl VMHelper {
         let mut s = val.to_string();
         let chopped = s
             .pop()
-            .map(|c| PerlValue::string(c.to_string()))
-            .unwrap_or(PerlValue::UNDEF);
-        self.assign_value(target, PerlValue::string(s))?;
+            .map(|c| StrykeValue::string(c.to_string()))
+            .unwrap_or(StrykeValue::UNDEF);
+        self.assign_value(target, StrykeValue::string(s))?;
         Ok(chopped)
     }
 
@@ -5647,7 +5647,7 @@ impl VMHelper {
             }
             if start > s.len() {
                 self.regex_pos.insert(key, None);
-                return Ok(PerlValue::integer(0));
+                return Ok(StrykeValue::integer(0));
             }
             let sub = s.get(start..).unwrap_or("");
             if let Some(caps) = re.captures(sub) {
@@ -5655,51 +5655,51 @@ impl VMHelper {
                 let abs_end = start + overall.end;
                 self.regex_pos.insert(key, Some(abs_end));
                 self.apply_regex_captures(&s, start, &re, &caps, CaptureAllMode::Append)?;
-                Ok(PerlValue::integer(1))
+                Ok(StrykeValue::integer(1))
             } else {
                 self.regex_pos.insert(key, None);
-                Ok(PerlValue::integer(0))
+                Ok(StrykeValue::integer(0))
             }
         } else if flags.contains('g') {
             let mut rows = Vec::new();
             let mut last_caps: Option<PerlCaptures<'_>> = None;
             for caps in re.captures_iter(&s) {
-                rows.push(PerlValue::array(crate::perl_regex::numbered_capture_flat(
+                rows.push(StrykeValue::array(crate::perl_regex::numbered_capture_flat(
                     &caps,
                 )));
                 last_caps = Some(caps);
             }
             self.scope.set_array("^CAPTURE_ALL", rows)?;
-            let matches: Vec<PerlValue> = match &*re {
+            let matches: Vec<StrykeValue> = match &*re {
                 PerlCompiledRegex::Rust(r) => r
                     .find_iter(&s)
-                    .map(|m| PerlValue::string(m.as_str().to_string()))
+                    .map(|m| StrykeValue::string(m.as_str().to_string()))
                     .collect(),
                 PerlCompiledRegex::Fancy(r) => r
                     .find_iter(&s)
                     .filter_map(|m| m.ok())
-                    .map(|m| PerlValue::string(m.as_str().to_string()))
+                    .map(|m| StrykeValue::string(m.as_str().to_string()))
                     .collect(),
                 PerlCompiledRegex::Pcre2(r) => r
                     .find_iter(s.as_bytes())
                     .filter_map(|m| m.ok())
                     .map(|m| {
                         let t = s.get(m.start()..m.end()).unwrap_or("");
-                        PerlValue::string(t.to_string())
+                        StrykeValue::string(t.to_string())
                     })
                     .collect(),
             };
             if matches.is_empty() {
-                Ok(PerlValue::integer(0))
+                Ok(StrykeValue::integer(0))
             } else {
                 if let Some(caps) = last_caps {
                     self.apply_regex_captures(&s, 0, &re, &caps, CaptureAllMode::Skip)?;
                 }
-                Ok(PerlValue::array(matches))
+                Ok(StrykeValue::array(matches))
             }
         } else if let Some(caps) = re.captures(&s) {
             self.apply_regex_captures(&s, 0, &re, &caps, CaptureAllMode::Empty)?;
-            let result = PerlValue::integer(1);
+            let result = StrykeValue::integer(1);
             self.regex_match_memo = Some(RegexMatchMemo {
                 pattern: pattern.to_string(),
                 flags: flags.to_string(),
@@ -5710,7 +5710,7 @@ impl VMHelper {
             self.regex_capture_scope_fresh = true;
             Ok(result)
         } else {
-            let result = PerlValue::integer(0);
+            let result = StrykeValue::integer(0);
             // Memoize negative results too — they don't set capture vars, so scope_fresh stays true.
             self.regex_match_memo = Some(RegexMatchMemo {
                 pattern: pattern.to_string(),
@@ -5778,7 +5778,7 @@ impl VMHelper {
             let mut rows = Vec::new();
             let mut last = None;
             for caps in re.captures_iter(&s) {
-                rows.push(PerlValue::array(crate::perl_regex::numbered_capture_flat(
+                rows.push(StrykeValue::array(crate::perl_regex::numbered_capture_flat(
                     &caps,
                 )));
                 last = Some(caps);
@@ -5805,15 +5805,15 @@ impl VMHelper {
         };
         if flags.contains('r') {
             // /r — non-destructive: return the modified string, leave target unchanged
-            Ok(PerlValue::string(new_s))
+            Ok(StrykeValue::string(new_s))
         } else {
-            self.assign_value(target, PerlValue::string(new_s))?;
-            Ok(PerlValue::integer(count as i64))
+            self.assign_value(target, StrykeValue::string(new_s))?;
+            Ok(StrykeValue::integer(count as i64))
         }
     }
 
     /// Run the `s///…e…` replacement side: `e_count` stacked `eval`s like Perl (each round parses
-    /// and executes the string; the next round uses [`PerlValue::to_string`] of the prior value).
+    /// and executes the string; the next round uses [`StrykeValue::to_string`] of the prior value).
     fn regex_subst_run_eval_rounds(&mut self, replacement: &str, e_count: usize) -> ExecResult {
         let prep_source = |raw: &str| -> String {
             let mut code = raw.trim().to_string();
@@ -5823,7 +5823,7 @@ impl VMHelper {
             code
         };
         let mut cur = prep_source(replacement);
-        let mut last = PerlValue::UNDEF;
+        let mut last = StrykeValue::UNDEF;
         for round in 0..e_count {
             last = crate::parse_and_run_string(&cur, self)?;
             if round + 1 < e_count {
@@ -5860,17 +5860,17 @@ impl VMHelper {
                 out.push_str(&repl_val.to_string());
                 last = m0.end;
                 count += 1;
-                rows.push(PerlValue::array(crate::perl_regex::numbered_capture_flat(
+                rows.push(StrykeValue::array(crate::perl_regex::numbered_capture_flat(
                     &caps,
                 )));
             }
             self.scope.set_array("^CAPTURE_ALL", rows)?;
             out.push_str(&s[last..]);
             if flags.contains('r') {
-                return Ok(PerlValue::string(out));
+                return Ok(StrykeValue::string(out));
             }
-            self.assign_value(target, PerlValue::string(out))?;
-            return Ok(PerlValue::integer(count as i64));
+            self.assign_value(target, StrykeValue::string(out))?;
+            return Ok(StrykeValue::integer(count as i64));
         }
         if let Some(caps) = re.captures(&s) {
             let m0 = caps.get(0).expect("regex capture 0");
@@ -5881,16 +5881,16 @@ impl VMHelper {
             out.push_str(&repl_val.to_string());
             out.push_str(&s[m0.end..]);
             if flags.contains('r') {
-                return Ok(PerlValue::string(out));
+                return Ok(StrykeValue::string(out));
             }
-            self.assign_value(target, PerlValue::string(out))?;
-            return Ok(PerlValue::integer(1));
+            self.assign_value(target, StrykeValue::string(out))?;
+            return Ok(StrykeValue::integer(1));
         }
         if flags.contains('r') {
-            return Ok(PerlValue::string(s));
+            return Ok(StrykeValue::string(s));
         }
-        self.assign_value(target, PerlValue::string(s))?;
-        Ok(PerlValue::integer(0))
+        self.assign_value(target, StrykeValue::string(s))?;
+        Ok(StrykeValue::integer(0))
     }
 
     /// Shared `tr///` implementation.
@@ -5931,10 +5931,10 @@ impl VMHelper {
             .collect();
         if flags.contains('r') {
             // /r — non-destructive: return the modified string, leave target unchanged
-            Ok(PerlValue::string(new_s))
+            Ok(StrykeValue::string(new_s))
         } else {
-            self.assign_value(target, PerlValue::string(new_s))?;
-            Ok(PerlValue::integer(count))
+            self.assign_value(target, StrykeValue::string(new_s))?;
+            Ok(StrykeValue::integer(count))
         }
     }
 
@@ -5965,9 +5965,9 @@ impl VMHelper {
     /// `splice @array, offset, length, LIST` — used by the VM `CallBuiltin(Splice)` path.
     pub(crate) fn splice_builtin_execute(
         &mut self,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         if args.is_empty() {
             return Err(PerlError::runtime("splice: missing array", line));
         }
@@ -5976,31 +5976,31 @@ impl VMHelper {
         let offset_val = args
             .get(1)
             .cloned()
-            .unwrap_or_else(|| PerlValue::integer(0));
+            .unwrap_or_else(|| StrykeValue::integer(0));
         let length_val = match args.get(2) {
-            None => PerlValue::UNDEF,
+            None => StrykeValue::UNDEF,
             Some(v) => v.clone(),
         };
         let (off, end) = splice_compute_range(arr_len, &offset_val, &length_val);
-        let rep_vals: Vec<PerlValue> = args.iter().skip(3).cloned().collect();
+        let rep_vals: Vec<StrykeValue> = args.iter().skip(3).cloned().collect();
         let removed = self.scope.splice_in_place(&arr_name, off, end, rep_vals)?;
         Ok(match self.wantarray_kind {
-            WantarrayCtx::Scalar => removed.last().cloned().unwrap_or(PerlValue::UNDEF),
-            WantarrayCtx::List | WantarrayCtx::Void => PerlValue::array(removed),
+            WantarrayCtx::Scalar => removed.last().cloned().unwrap_or(StrykeValue::UNDEF),
+            WantarrayCtx::List | WantarrayCtx::Void => StrykeValue::array(removed),
         })
     }
 
     /// `unshift @array, LIST` — VM `CallBuiltin(Unshift)`.
     pub(crate) fn unshift_builtin_execute(
         &mut self,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         if args.is_empty() {
             return Err(PerlError::runtime("unshift: missing array", line));
         }
         let arr_name = args[0].to_string();
-        let mut flat_vals: Vec<PerlValue> = Vec::new();
+        let mut flat_vals: Vec<StrykeValue> = Vec::new();
         for a in args.iter().skip(1) {
             if let Some(items) = a.as_array_vec() {
                 flat_vals.extend(items);
@@ -6012,7 +6012,7 @@ impl VMHelper {
         for (i, v) in flat_vals.into_iter().enumerate() {
             arr.insert(i, v);
         }
-        Ok(PerlValue::integer(arr.len() as i64))
+        Ok(StrykeValue::integer(arr.len() as i64))
     }
 
     /// Random fractional value like Perl `rand`: `[0, upper)` when `upper > 0`,
@@ -6109,13 +6109,13 @@ impl VMHelper {
             .saturating_sub(1)
             .min(n - 1);
         let p99_ms = sorted[p99_idx];
-        Ok(PerlValue::string(format!(
+        Ok(StrykeValue::string(format!(
             "bench: n={} min={:.6}ms mean={:.6}ms p99={:.6}ms",
             n, min_ms, mean, p99_ms
         )))
     }
 
-    pub fn execute(&mut self, program: &Program) -> PerlResult<PerlValue> {
+    pub fn execute(&mut self, program: &Program) -> PerlResult<StrykeValue> {
         // Snapshot the (possibly empty) class registry into the
         // thread-local that the free-function serializers consult, so
         // that `to_json($obj)` can resolve inheritance fields without
@@ -6125,7 +6125,7 @@ impl VMHelper {
         // `-n`/`-p`: compile and run only the prelude, store chunk for per-line re-execution.
         if self.line_mode_skip_main {
             crate::compile_and_run_prelude(program, self)?;
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         crate::try_vm_execute(program, self)
             .expect("VM compilation must succeed — all execution is VM-only")
@@ -6163,7 +6163,7 @@ impl VMHelper {
                 let Some(sub) = self.subs.get(&fq).cloned() else {
                     continue;
                 };
-                let inv = PerlValue::blessed(Arc::new(
+                let inv = StrykeValue::blessed(Arc::new(
                     crate::value::BlessedRef::new_for_destroy_invocant(class, payload),
                 ));
                 match self.call_sub(&sub, vec![inv], WantarrayCtx::Void, line) {
@@ -6213,7 +6213,7 @@ impl VMHelper {
             }
         }
         let mut pc = 0usize;
-        let mut last = PerlValue::UNDEF;
+        let mut last = StrykeValue::UNDEF;
         let last_idx = block.len().saturating_sub(1);
         while pc < block.len() {
             if let StmtKind::Goto { target } = &block[pc].kind {
@@ -6254,7 +6254,7 @@ impl VMHelper {
         tail: WantarrayCtx,
     ) -> ExecResult {
         if block.is_empty() {
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         let last_i = block.len() - 1;
         for (i, stmt) in block.iter().enumerate() {
@@ -6267,11 +6267,11 @@ impl VMHelper {
                 };
             }
         }
-        Ok(PerlValue::UNDEF)
+        Ok(StrykeValue::UNDEF)
     }
 
-    /// Spawn `block` on a worker thread; returns an [`PerlValue::AsyncTask`] handle (`async { }` / `spawn { }`).
-    pub(crate) fn spawn_async_block(&self, block: &Block) -> PerlValue {
+    /// Spawn `block` on a worker thread; returns an [`StrykeValue::AsyncTask`] handle (`async { }` / `spawn { }`).
+    pub(crate) fn spawn_async_block(&self, block: &Block) -> StrykeValue {
         use parking_lot::Mutex as ParkMutex;
 
         let block = block.clone();
@@ -6292,12 +6292,12 @@ impl VMHelper {
                 Err(FlowOrError::Flow(Flow::Yield(_))) => {
                     Err(PerlError::runtime("yield inside async/spawn block", 0))
                 }
-                Err(FlowOrError::Flow(_)) => Ok(PerlValue::UNDEF),
+                Err(FlowOrError::Flow(_)) => Ok(StrykeValue::UNDEF),
             };
             *result2.lock() = Some(r);
         });
         *join.lock() = Some(h);
-        PerlValue::async_task(Arc::new(PerlAsyncTask { result, join }))
+        StrykeValue::async_task(Arc::new(PerlAsyncTask { result, join }))
     }
 
     /// `eval_timeout SECS { ... }` — run block on another thread; this thread waits (no Unix signals).
@@ -6319,7 +6319,7 @@ impl VMHelper {
         let env = self.env.clone();
         let argv = self.argv.clone();
         let inc = self.scope.get_array("INC");
-        let (tx, rx) = channel::<PerlResult<PerlValue>>();
+        let (tx, rx) = channel::<PerlResult<StrykeValue>>();
         let _handle = std::thread::spawn(move || {
             let mut interp = VMHelper::new();
             interp.subs = subs;
@@ -6329,7 +6329,7 @@ impl VMHelper {
             interp.argv = argv.clone();
             interp.scope.declare_array(
                 "ARGV",
-                argv.iter().map(|s| PerlValue::string(s.clone())).collect(),
+                argv.iter().map(|s| StrykeValue::string(s.clone())).collect(),
             );
             for (k, v) in env {
                 interp
@@ -6341,13 +6341,13 @@ impl VMHelper {
             interp.scope.restore_capture(&scalars);
             interp.scope.restore_atomics(&aar, &ahash);
             interp.enable_parallel_guard();
-            let out: PerlResult<PerlValue> = match interp.exec_block(&block) {
+            let out: PerlResult<StrykeValue> = match interp.exec_block(&block) {
                 Ok(v) => Ok(v),
                 Err(FlowOrError::Error(e)) => Err(e),
                 Err(FlowOrError::Flow(Flow::Yield(_))) => {
                     Err(PerlError::runtime("yield inside eval_timeout block", 0))
                 }
-                Err(FlowOrError::Flow(_)) => Ok(PerlValue::UNDEF),
+                Err(FlowOrError::Flow(_)) => Ok(StrykeValue::UNDEF),
             };
             let _ = tx.send(out);
         });
@@ -6372,7 +6372,7 @@ impl VMHelper {
     }
 
     fn exec_given_body(&mut self, body: &Block) -> ExecResult {
-        let mut last = PerlValue::UNDEF;
+        let mut last = StrykeValue::UNDEF;
         for stmt in body {
             match &stmt.kind {
                 StmtKind::When { cond, body: wb } => {
@@ -6394,7 +6394,7 @@ impl VMHelper {
     /// `given` after the topic has been evaluated to a value (VM bytecode path or direct use).
     pub(crate) fn exec_given_with_topic_value(
         &mut self,
-        topic: PerlValue,
+        topic: StrykeValue,
         body: &Block,
     ) -> ExecResult {
         self.scope_push_hook();
@@ -6430,7 +6430,7 @@ impl VMHelper {
         }
     }
 
-    fn smartmatch_when(&self, topic: &PerlValue, c: &PerlValue) -> bool {
+    fn smartmatch_when(&self, topic: &StrykeValue, c: &StrykeValue) -> bool {
         if let Some(re) = c.as_regex() {
             return re.is_match(&topic.to_string());
         }
@@ -6515,12 +6515,12 @@ impl VMHelper {
             ExprKind::ArrayVar(name) => {
                 self.check_strict_array_var(name, line)?;
                 let aname = self.stash_array_name_for_package(name);
-                Ok(PerlValue::array_binding_ref(aname))
+                Ok(StrykeValue::array_binding_ref(aname))
             }
             ExprKind::HashVar(name) => {
                 self.check_strict_hash_var(name, line)?;
                 self.touch_env_hash(name);
-                Ok(PerlValue::hash_binding_ref(name.clone()))
+                Ok(StrykeValue::hash_binding_ref(name.clone()))
             }
             _ => self.eval_expr(subject),
         }
@@ -6529,7 +6529,7 @@ impl VMHelper {
     /// Algebraic `match` after the subject has been evaluated (VM bytecode path).
     pub(crate) fn eval_algebraic_match_with_subject_value(
         &mut self,
-        val: PerlValue,
+        val: StrykeValue,
         arms: &[MatchArm],
         line: usize,
     ) -> ExecResult {
@@ -6628,7 +6628,7 @@ impl VMHelper {
         .into())
     }
 
-    fn parse_duration_seconds(pv: &PerlValue) -> Option<f64> {
+    fn parse_duration_seconds(pv: &StrykeValue) -> Option<f64> {
         let s = pv.to_string();
         let s = s.trim();
         if let Some(rest) = s.strip_suffix("ms") {
@@ -6735,13 +6735,13 @@ impl VMHelper {
     }
 
     /// `->next` on a `gen { }` value: two-element **array ref** `(value, more)`; `more` is 0 when done.
-    pub(crate) fn generator_next(&mut self, gen: &Arc<PerlGenerator>) -> PerlResult<PerlValue> {
-        let pair = |value: PerlValue, more: i64| {
-            PerlValue::array_ref(Arc::new(RwLock::new(vec![value, PerlValue::integer(more)])))
+    pub(crate) fn generator_next(&mut self, gen: &Arc<PerlGenerator>) -> PerlResult<StrykeValue> {
+        let pair = |value: StrykeValue, more: i64| {
+            StrykeValue::array_ref(Arc::new(RwLock::new(vec![value, StrykeValue::integer(more)])))
         };
         let mut exhausted = gen.exhausted.lock();
         if *exhausted {
-            return Ok(pair(PerlValue::UNDEF, 0));
+            return Ok(pair(StrykeValue::UNDEF, 0));
         }
         let mut pc = gen.pc.lock();
         let mut scope_started = gen.scope_started.lock();
@@ -6751,7 +6751,7 @@ impl VMHelper {
                 *scope_started = false;
             }
             *exhausted = true;
-            return Ok(pair(PerlValue::UNDEF, 0));
+            return Ok(pair(StrykeValue::UNDEF, 0));
         }
         if !*scope_started {
             self.scope_push_hook();
@@ -6800,12 +6800,12 @@ impl VMHelper {
             *scope_started = false;
         }
         *exhausted = true;
-        Ok(pair(PerlValue::UNDEF, 0))
+        Ok(pair(StrykeValue::UNDEF, 0))
     }
 
     fn match_pattern_try(
         &mut self,
-        subject: &PerlValue,
+        subject: &StrykeValue,
         pattern: &MatchPattern,
         line: usize,
     ) -> Result<Option<Vec<PatternBinding>>, FlowOrError> {
@@ -6855,7 +6855,7 @@ impl VMHelper {
     /// If the expression is a BitOr chain, recursively check if subject matches any alternative.
     fn match_pattern_value_alternation(
         &mut self,
-        subject: &PerlValue,
+        subject: &StrykeValue,
         expr: &Expr,
         _line: usize,
     ) -> Result<bool, FlowOrError> {
@@ -6875,7 +6875,7 @@ impl VMHelper {
     }
 
     /// Array value for algebraic `match`, including `\@name` array references (binding refs).
-    fn match_subject_as_array(&self, v: &PerlValue) -> Option<Vec<PerlValue>> {
+    fn match_subject_as_array(&self, v: &StrykeValue) -> Option<Vec<StrykeValue>> {
         if let Some(a) = v.as_array_vec() {
             return Some(a);
         }
@@ -6888,7 +6888,7 @@ impl VMHelper {
         None
     }
 
-    fn match_subject_as_hash(&mut self, v: &PerlValue) -> Option<IndexMap<String, PerlValue>> {
+    fn match_subject_as_hash(&mut self, v: &StrykeValue) -> Option<IndexMap<String, StrykeValue>> {
         if let Some(h) = v.as_hash_map() {
             return Some(h);
         }
@@ -6906,10 +6906,10 @@ impl VMHelper {
     /// array to expand, like [`Self::eval_hash_slice_key_components`]). Shared by VM [`Op::HashSliceDeref`](crate::bytecode::Op::HashSliceDeref).
     pub(crate) fn hash_slice_deref_values(
         &mut self,
-        container: &PerlValue,
-        key_values: &[PerlValue],
+        container: &StrykeValue,
+        key_values: &[StrykeValue],
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         let h = if let Some(m) = self.match_subject_as_hash(container) {
             m
         } else {
@@ -6927,31 +6927,31 @@ impl VMHelper {
                 vec![kv.to_string()]
             };
             for k in key_strings {
-                result.push(h.get(&k).cloned().unwrap_or(PerlValue::UNDEF));
+                result.push(h.get(&k).cloned().unwrap_or(StrykeValue::UNDEF));
             }
         }
-        Ok(PerlValue::array(result))
+        Ok(StrykeValue::array(result))
     }
 
     /// Single-key write for a hash slice container (hash ref or package hash name).
     /// Perl applies slice updates (`+=`, `++`, …) only to the **last** key for multi-key slices.
     pub(crate) fn assign_hash_slice_one_key(
         &mut self,
-        container: PerlValue,
+        container: StrykeValue,
         key: &str,
-        val: PerlValue,
+        val: StrykeValue,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         if let Some(r) = container.as_hash_ref() {
             r.write().insert(key.to_string(), val);
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         if let Some(name) = container.as_hash_binding_name() {
             self.touch_env_hash(&name);
             self.scope
                 .set_hash_element(&name, key, val)
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         if let Some(s) = container.as_str() {
             self.touch_env_hash(&s);
@@ -6968,7 +6968,7 @@ impl VMHelper {
             self.scope
                 .set_hash_element(&s, key, val)
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         Err(PerlError::runtime(
             "Hash slice assignment needs a hash or hash reference value",
@@ -6982,10 +6982,10 @@ impl VMHelper {
     pub(crate) fn assign_named_hash_slice(
         &mut self,
         hash: &str,
-        key_values: Vec<PerlValue>,
-        val: PerlValue,
+        key_values: Vec<StrykeValue>,
+        val: StrykeValue,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         self.touch_env_hash(hash);
         let mut ks: Vec<String> = Vec::new();
         for kv in key_values {
@@ -7000,22 +7000,22 @@ impl VMHelper {
         }
         let items = val.to_list();
         for (i, k) in ks.iter().enumerate() {
-            let v = items.get(i).cloned().unwrap_or(PerlValue::UNDEF);
+            let v = items.get(i).cloned().unwrap_or(StrykeValue::UNDEF);
             self.scope
                 .set_hash_element(hash, k, v)
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
         }
-        Ok(PerlValue::UNDEF)
+        Ok(StrykeValue::UNDEF)
     }
 
     /// `@$href{k1,k2} = LIST` — shared by VM [`Op::SetHashSliceDeref`](crate::bytecode::Op::SetHashSliceDeref) and [`Self::assign_value`].
     pub(crate) fn assign_hash_slice_deref(
         &mut self,
-        container: PerlValue,
-        key_values: Vec<PerlValue>,
-        val: PerlValue,
+        container: StrykeValue,
+        key_values: Vec<StrykeValue>,
+        val: StrykeValue,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         let mut ks: Vec<String> = Vec::new();
         for kv in key_values {
             if let Some(vv) = kv.as_array_vec() {
@@ -7031,20 +7031,20 @@ impl VMHelper {
         if let Some(r) = container.as_hash_ref() {
             let mut h = r.write();
             for (i, k) in ks.iter().enumerate() {
-                let v = items.get(i).cloned().unwrap_or(PerlValue::UNDEF);
+                let v = items.get(i).cloned().unwrap_or(StrykeValue::UNDEF);
                 h.insert(k.clone(), v);
             }
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         if let Some(name) = container.as_hash_binding_name() {
             self.touch_env_hash(&name);
             for (i, k) in ks.iter().enumerate() {
-                let v = items.get(i).cloned().unwrap_or(PerlValue::UNDEF);
+                let v = items.get(i).cloned().unwrap_or(StrykeValue::UNDEF);
                 self.scope
                     .set_hash_element(&name, k, v)
                     .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
             }
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         if let Some(s) = container.as_str() {
             if self.strict_refs {
@@ -7059,12 +7059,12 @@ impl VMHelper {
             }
             self.touch_env_hash(&s);
             for (i, k) in ks.iter().enumerate() {
-                let v = items.get(i).cloned().unwrap_or(PerlValue::UNDEF);
+                let v = items.get(i).cloned().unwrap_or(StrykeValue::UNDEF);
                 self.scope
                     .set_hash_element(&s, k, v)
                     .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
             }
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         Err(PerlError::runtime(
             "Hash slice assignment needs a hash or hash reference value",
@@ -7077,18 +7077,18 @@ impl VMHelper {
     /// Perl 5 applies the compound op only to the **last** slice element.
     pub(crate) fn compound_assign_hash_slice_deref(
         &mut self,
-        container: PerlValue,
-        key_values: Vec<PerlValue>,
+        container: StrykeValue,
+        key_values: Vec<StrykeValue>,
         op: BinOp,
-        rhs: PerlValue,
+        rhs: StrykeValue,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         let old_list = self.hash_slice_deref_values(&container, &key_values, line)?;
         let last_old = old_list
             .to_list()
             .last()
             .cloned()
-            .unwrap_or(PerlValue::UNDEF);
+            .unwrap_or(StrykeValue::UNDEF);
         let new_val = self.eval_binop(op, &last_old, &rhs, line)?;
         let mut ks: Vec<String> = Vec::new();
         for kv in &key_values {
@@ -7113,21 +7113,21 @@ impl VMHelper {
     /// `kind` byte: 0 = PreInc, 1 = PreDec, 2 = PostInc, 3 = PostDec.
     pub(crate) fn hash_slice_deref_inc_dec(
         &mut self,
-        container: PerlValue,
-        key_values: Vec<PerlValue>,
+        container: StrykeValue,
+        key_values: Vec<StrykeValue>,
         kind: u8,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         let old_list = self.hash_slice_deref_values(&container, &key_values, line)?;
         let last_old = old_list
             .to_list()
             .last()
             .cloned()
-            .unwrap_or(PerlValue::UNDEF);
+            .unwrap_or(StrykeValue::UNDEF);
         let new_val = if kind & 1 == 0 {
-            PerlValue::integer(last_old.to_int() + 1)
+            StrykeValue::integer(last_old.to_int() + 1)
         } else {
-            PerlValue::integer(last_old.to_int() - 1)
+            StrykeValue::integer(last_old.to_int() - 1)
         };
         let mut ks: Vec<String> = Vec::new();
         for kv in &key_values {
@@ -7144,7 +7144,7 @@ impl VMHelper {
         Ok(if kind < 2 { new_val } else { last_old })
     }
 
-    fn hash_slice_named_values(&mut self, hash: &str, key_values: &[PerlValue]) -> PerlValue {
+    fn hash_slice_named_values(&mut self, hash: &str, key_values: &[StrykeValue]) -> StrykeValue {
         self.touch_env_hash(hash);
         let h = self.scope.get_hash(hash);
         let mut result = Vec::new();
@@ -7155,27 +7155,27 @@ impl VMHelper {
                 vec![kv.to_string()]
             };
             for k in key_strings {
-                result.push(h.get(&k).cloned().unwrap_or(PerlValue::UNDEF));
+                result.push(h.get(&k).cloned().unwrap_or(StrykeValue::UNDEF));
             }
         }
-        PerlValue::array(result)
+        StrykeValue::array(result)
     }
 
     /// `@h{k1,k2} OP= rhs` on a stash hash — shared by VM [`crate::bytecode::Op::NamedHashSliceCompound`].
     pub(crate) fn compound_assign_named_hash_slice(
         &mut self,
         hash: &str,
-        key_values: Vec<PerlValue>,
+        key_values: Vec<StrykeValue>,
         op: BinOp,
-        rhs: PerlValue,
+        rhs: StrykeValue,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         let old_list = self.hash_slice_named_values(hash, &key_values);
         let last_old = old_list
             .to_list()
             .last()
             .cloned()
-            .unwrap_or(PerlValue::UNDEF);
+            .unwrap_or(StrykeValue::UNDEF);
         let new_val = self.eval_binop(op, &last_old, &rhs, line)?;
         let mut ks: Vec<String> = Vec::new();
         for kv in &key_values {
@@ -7189,7 +7189,7 @@ impl VMHelper {
             return Err(PerlError::runtime("assign to empty hash slice", line).into());
         }
         let last_key = ks.last().expect("non-empty ks");
-        let container = PerlValue::string(hash.to_string());
+        let container = StrykeValue::string(hash.to_string());
         self.assign_hash_slice_one_key(container, last_key, new_val.clone(), line)?;
         Ok(new_val)
     }
@@ -7198,20 +7198,20 @@ impl VMHelper {
     pub(crate) fn named_hash_slice_inc_dec(
         &mut self,
         hash: &str,
-        key_values: Vec<PerlValue>,
+        key_values: Vec<StrykeValue>,
         kind: u8,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         let old_list = self.hash_slice_named_values(hash, &key_values);
         let last_old = old_list
             .to_list()
             .last()
             .cloned()
-            .unwrap_or(PerlValue::UNDEF);
+            .unwrap_or(StrykeValue::UNDEF);
         let new_val = if kind & 1 == 0 {
-            PerlValue::integer(last_old.to_int() + 1)
+            StrykeValue::integer(last_old.to_int() + 1)
         } else {
-            PerlValue::integer(last_old.to_int() - 1)
+            StrykeValue::integer(last_old.to_int() - 1)
         };
         let mut ks: Vec<String> = Vec::new();
         for kv in &key_values {
@@ -7224,14 +7224,14 @@ impl VMHelper {
         let last_key = ks.last().ok_or_else(|| {
             PerlError::runtime("Hash slice increment needs at least one key", line)
         })?;
-        let container = PerlValue::string(hash.to_string());
+        let container = StrykeValue::string(hash.to_string());
         self.assign_hash_slice_one_key(container, last_key, new_val.clone(), line)?;
         Ok(if kind < 2 { new_val } else { last_old })
     }
 
     fn match_array_pattern_elems(
         &mut self,
-        arr: &[PerlValue],
+        arr: &[StrykeValue],
         elems: &[MatchArrayElem],
         line: usize,
     ) -> Result<Option<Vec<PatternBinding>>, FlowOrError> {
@@ -7291,7 +7291,7 @@ impl VMHelper {
 
     fn match_hash_pattern_pairs(
         &mut self,
-        h: &IndexMap<String, PerlValue>,
+        h: &IndexMap<String, StrykeValue>,
         pairs: &[MatchHashPair],
         _line: usize,
     ) -> Result<Option<Vec<PatternBinding>>, FlowOrError> {
@@ -7376,7 +7376,7 @@ impl VMHelper {
                 if let Some(eb) = else_block {
                     return self.exec_block(eb);
                 }
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             StmtKind::Unless {
                 condition,
@@ -7389,7 +7389,7 @@ impl VMHelper {
                 if let Some(eb) = else_block {
                     return self.exec_block(eb);
                 }
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             StmtKind::While {
                 condition,
@@ -7429,7 +7429,7 @@ impl VMHelper {
                         let _ = self.exec_block_smart(cb);
                     }
                 }
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             StmtKind::Until {
                 condition,
@@ -7469,7 +7469,7 @@ impl VMHelper {
                         let _ = self.exec_block_smart(cb);
                     }
                 }
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             StmtKind::DoWhile { body, condition } => {
                 loop {
@@ -7478,7 +7478,7 @@ impl VMHelper {
                         break;
                     }
                 }
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             StmtKind::For {
                 init,
@@ -7536,7 +7536,7 @@ impl VMHelper {
                     }
                 }
                 self.scope_pop_hook();
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             StmtKind::Foreach {
                 var,
@@ -7548,7 +7548,7 @@ impl VMHelper {
                 let list_val = self.eval_expr_ctx(list, WantarrayCtx::List)?;
                 let items = list_val.to_list();
                 self.scope_push_hook();
-                self.scope.declare_scalar(var, PerlValue::UNDEF);
+                self.scope.declare_scalar(var, StrykeValue::UNDEF);
                 self.english_note_lexical_scalar(var);
                 let mut i = 0usize;
                 'outer: while i < items.len() {
@@ -7589,7 +7589,7 @@ impl VMHelper {
                     i += 1;
                 }
                 self.scope_pop_hook();
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             StmtKind::SubDecl {
                 name,
@@ -7614,7 +7614,7 @@ impl VMHelper {
                 };
                 sub.fib_like = crate::fib_like_tail::detect_fib_like_recursive_add(&sub);
                 self.subs.insert(key, Arc::new(sub));
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             StmtKind::StructDecl { def } => {
                 if self.struct_defs.contains_key(&def.name) {
@@ -7626,7 +7626,7 @@ impl VMHelper {
                 }
                 self.struct_defs
                     .insert(def.name.clone(), Arc::new(def.clone()));
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             StmtKind::EnumDecl { def } => {
                 if self.enum_defs.contains_key(&def.name) {
@@ -7638,7 +7638,7 @@ impl VMHelper {
                 }
                 self.enum_defs
                     .insert(def.name.clone(), Arc::new(def.clone()));
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             StmtKind::ClassDecl { def } => {
                 if self.class_defs.contains_key(&def.name) {
@@ -7729,7 +7729,7 @@ impl VMHelper {
                     let val = if let Some(ref expr) = sf.default {
                         self.eval_expr(expr)?
                     } else {
-                        PerlValue::UNDEF
+                        StrykeValue::UNDEF
                     };
                     let key = format!("{}::{}", def.name, sf.name);
                     self.scope.declare_scalar(&key, val);
@@ -7752,10 +7752,10 @@ impl VMHelper {
                 // Set @ClassName::ISA so MRO/isa resolution works.
                 if !def.extends.is_empty() {
                     let isa_key = format!("{}::ISA", def.name);
-                    let parents: Vec<PerlValue> = def
+                    let parents: Vec<StrykeValue> = def
                         .extends
                         .iter()
-                        .map(|p| PerlValue::string(p.clone()))
+                        .map(|p| StrykeValue::string(p.clone()))
                         .collect();
                     self.scope.declare_array(&isa_key, parents);
                 }
@@ -7766,7 +7766,7 @@ impl VMHelper {
                 // thread-local registry so `to_json($obj)` etc. can walk
                 // its inheritance chain.
                 crate::serialize_normalize::register_class_def(arc_def);
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             StmtKind::TraitDecl { def } => {
                 if self.trait_defs.contains_key(&def.name) {
@@ -7778,7 +7778,7 @@ impl VMHelper {
                 }
                 self.trait_defs
                     .insert(def.name.clone(), Arc::new(def.clone()));
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             StmtKind::My(decls) | StmtKind::Our(decls) => {
                 let is_our = matches!(&stmt.kind, StmtKind::Our(_));
@@ -7794,7 +7794,7 @@ impl VMHelper {
                     for decl in decls {
                         match decl.sigil {
                             Sigil::Scalar => {
-                                let v = items.get(idx).cloned().unwrap_or(PerlValue::UNDEF);
+                                let v = items.get(idx).cloned().unwrap_or(StrykeValue::UNDEF);
                                 let skey = if is_our {
                                     self.stash_scalar_name_for_package(&decl.name)
                                 } else {
@@ -7814,7 +7814,7 @@ impl VMHelper {
                             }
                             Sigil::Array => {
                                 // Array slurps remaining elements
-                                let rest: Vec<PerlValue> = items[idx..].to_vec();
+                                let rest: Vec<StrykeValue> = items[idx..].to_vec();
                                 idx = items.len();
                                 if is_our {
                                     self.record_exporter_our_array_name(&decl.name, &rest);
@@ -7823,7 +7823,7 @@ impl VMHelper {
                                 self.scope.declare_array(&aname, rest);
                             }
                             Sigil::Hash => {
-                                let rest: Vec<PerlValue> = items[idx..].to_vec();
+                                let rest: Vec<StrykeValue> = items[idx..].to_vec();
                                 idx = items.len();
                                 let mut map = IndexMap::new();
                                 let mut i = 0;
@@ -7870,7 +7870,7 @@ impl VMHelper {
                                     };
                                     self.scope.declare_scalar_frozen(
                                         &skey,
-                                        PerlValue::UNDEF,
+                                        StrykeValue::UNDEF,
                                         decl.frozen,
                                         decl.type_annotation.clone(),
                                     )?;
@@ -7913,12 +7913,12 @@ impl VMHelper {
                             let v = self.eval_expr_ctx(init, ctx)?;
                             // my ($x) = @arr → extract first element from list
                             if decl.sigil == Sigil::Scalar && decl.list_context {
-                                v.to_list().first().cloned().unwrap_or(PerlValue::UNDEF)
+                                v.to_list().first().cloned().unwrap_or(StrykeValue::UNDEF)
                             } else {
                                 v
                             }
                         } else {
-                            PerlValue::UNDEF
+                            StrykeValue::UNDEF
                         };
                         match decl.sigil {
                             Sigil::Typeglob => {
@@ -7968,7 +7968,7 @@ impl VMHelper {
                         }
                     }
                 }
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             StmtKind::State(decls) => {
                 // `state` variables persist across subroutine calls.
@@ -7985,7 +7985,7 @@ impl VMHelper {
                                 let val = if let Some(init) = &decl.initializer {
                                     self.eval_expr(init)?
                                 } else {
-                                    PerlValue::UNDEF
+                                    StrykeValue::UNDEF
                                 };
                                 self.state_vars.insert(state_key.clone(), val.clone());
                                 self.scope.declare_scalar(&decl.name, val);
@@ -8000,7 +8000,7 @@ impl VMHelper {
                             let val = if let Some(init) = &decl.initializer {
                                 self.eval_expr(init)?
                             } else {
-                                PerlValue::UNDEF
+                                StrykeValue::UNDEF
                             };
                             match decl.sigil {
                                 Sigil::Array => self.scope.declare_array(&decl.name, val.to_list()),
@@ -8019,7 +8019,7 @@ impl VMHelper {
                         }
                     }
                 }
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             StmtKind::Local(decls) => {
                 if decls.len() > 1 && decls[0].initializer.is_some() {
@@ -8032,17 +8032,17 @@ impl VMHelper {
                     for decl in decls {
                         match decl.sigil {
                             Sigil::Scalar => {
-                                let v = items.get(idx).cloned().unwrap_or(PerlValue::UNDEF);
+                                let v = items.get(idx).cloned().unwrap_or(StrykeValue::UNDEF);
                                 idx += 1;
                                 self.scope.local_set_scalar(&decl.name, v)?;
                             }
                             Sigil::Array => {
-                                let rest: Vec<PerlValue> = items[idx..].to_vec();
+                                let rest: Vec<StrykeValue> = items[idx..].to_vec();
                                 idx = items.len();
                                 self.scope.local_set_array(&decl.name, rest)?;
                             }
                             Sigil::Hash => {
-                                let rest: Vec<PerlValue> = items[idx..].to_vec();
+                                let rest: Vec<StrykeValue> = items[idx..].to_vec();
                                 idx = items.len();
                                 if decl.name == "ENV" {
                                     self.materialize_env_if_needed();
@@ -8066,7 +8066,7 @@ impl VMHelper {
                     }
                     Ok(val)
                 } else {
-                    let mut last_val = PerlValue::UNDEF;
+                    let mut last_val = StrykeValue::UNDEF;
                     for decl in decls {
                         let val = if let Some(init) = &decl.initializer {
                             let ctx = match decl.sigil {
@@ -8075,7 +8075,7 @@ impl VMHelper {
                             };
                             self.eval_expr_ctx(init, ctx)?
                         } else {
-                            PerlValue::UNDEF
+                            StrykeValue::UNDEF
                         };
                         last_val = val.clone();
                         match decl.sigil {
@@ -8158,7 +8158,7 @@ impl VMHelper {
                             None
                         };
                         self.local_declare_typeglob(name, rhs.as_deref(), stmt.line)?;
-                        return Ok(PerlValue::UNDEF);
+                        return Ok(StrykeValue::UNDEF);
                     }
                     ExprKind::Deref {
                         expr,
@@ -8171,7 +8171,7 @@ impl VMHelper {
                             None
                         };
                         self.local_declare_typeglob(lhs.as_str(), rhs.as_deref(), stmt.line)?;
-                        return Ok(PerlValue::UNDEF);
+                        return Ok(StrykeValue::UNDEF);
                     }
                     ExprKind::TypeglobExpr(e) => {
                         let lhs = self.eval_expr(e)?.to_string();
@@ -8181,7 +8181,7 @@ impl VMHelper {
                             None
                         };
                         self.local_declare_typeglob(lhs.as_str(), rhs.as_deref(), stmt.line)?;
-                        return Ok(PerlValue::UNDEF);
+                        return Ok(StrykeValue::UNDEF);
                     }
                     _ => {}
                 }
@@ -8192,7 +8192,7 @@ impl VMHelper {
                     };
                     self.eval_expr_ctx(init, ctx)?
                 } else {
-                    PerlValue::UNDEF
+                    StrykeValue::UNDEF
                 };
                 match &target.kind {
                     ExprKind::ScalarVar(name) => {
@@ -8253,7 +8253,7 @@ impl VMHelper {
                     let val = if let Some(init) = &decl.initializer {
                         self.eval_expr(init)?
                     } else {
-                        PerlValue::UNDEF
+                        StrykeValue::UNDEF
                     };
                     match decl.sigil {
                         Sigil::Typeglob => {
@@ -8269,7 +8269,7 @@ impl VMHelper {
                             let stored = if val.is_mysync_deque_or_heap() {
                                 val
                             } else {
-                                PerlValue::atomic(std::sync::Arc::new(parking_lot::Mutex::new(val)))
+                                StrykeValue::atomic(std::sync::Arc::new(parking_lot::Mutex::new(val)))
                             };
                             self.scope.declare_scalar(&decl.name, stored);
                         }
@@ -8288,7 +8288,7 @@ impl VMHelper {
                         }
                     }
                 }
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             StmtKind::OurSync(decls) => {
                 // The fan/pmap/pfor workers execute closure bodies via this tree-walker
@@ -8301,7 +8301,7 @@ impl VMHelper {
                     let val = if let Some(init) = &decl.initializer {
                         self.eval_expr(init)?
                     } else {
-                        PerlValue::UNDEF
+                        StrykeValue::UNDEF
                     };
                     match decl.sigil {
                         Sigil::Typeglob => {
@@ -8316,7 +8316,7 @@ impl VMHelper {
                             let stored = if val.is_mysync_deque_or_heap() {
                                 val
                             } else {
-                                PerlValue::atomic(std::sync::Arc::new(parking_lot::Mutex::new(val)))
+                                StrykeValue::atomic(std::sync::Arc::new(parking_lot::Mutex::new(val)))
                             };
                             self.scope.declare_scalar(&stash, stored);
                             self.english_note_lexical_scalar(&decl.name);
@@ -8344,27 +8344,27 @@ impl VMHelper {
                         }
                     }
                 }
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             StmtKind::Package { name } => {
                 // Minimal package support — just set a variable
                 let _ = self
                     .scope
-                    .set_scalar("__PACKAGE__", PerlValue::string(name.clone()));
-                Ok(PerlValue::UNDEF)
+                    .set_scalar("__PACKAGE__", StrykeValue::string(name.clone()));
+                Ok(StrykeValue::UNDEF)
             }
-            StmtKind::UsePerlVersion { .. } => Ok(PerlValue::UNDEF),
+            StmtKind::UsePerlVersion { .. } => Ok(StrykeValue::UNDEF),
             StmtKind::Use { .. } => {
                 // Handled in `prepare_program_top_level` before BEGIN / main.
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             StmtKind::UseOverload { pairs } => {
                 self.install_use_overload_pairs(pairs);
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             StmtKind::No { .. } => {
                 // Handled in `prepare_program_top_level` (same phase as `use`).
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             StmtKind::Return(val) => {
                 let v = if let Some(e) = val {
@@ -8373,7 +8373,7 @@ impl VMHelper {
                     // than collapsing to a scalar flip-flop / count (`perlsyn` `return`).
                     self.eval_expr_ctx(e, self.wantarray_kind)?
                 } else {
-                    PerlValue::UNDEF
+                    StrykeValue::UNDEF
                 };
                 Err(Flow::Return(v).into())
             }
@@ -8385,8 +8385,8 @@ impl VMHelper {
             | StmtKind::UnitCheck(_)
             | StmtKind::Check(_)
             | StmtKind::Init(_)
-            | StmtKind::End(_) => Ok(PerlValue::UNDEF),
-            StmtKind::Empty => Ok(PerlValue::UNDEF),
+            | StmtKind::End(_) => Ok(StrykeValue::UNDEF),
+            StmtKind::Empty => Ok(StrykeValue::UNDEF),
             StmtKind::Goto { target } => {
                 // goto &sub — tail call
                 if let ExprKind::SubroutineRef(name) = &target.kind {
@@ -8438,7 +8438,7 @@ impl VMHelper {
                     }
                     self.scope_push_hook();
                     self.scope
-                        .declare_scalar(catch_var, PerlValue::string(e.to_string()));
+                        .declare_scalar(catch_var, StrykeValue::string(e.to_string()));
                     self.english_note_lexical_scalar(catch_var);
                     let r = self.exec_block(catch_block);
                     self.scope_pop_hook();
@@ -8457,7 +8457,7 @@ impl VMHelper {
             .into()),
             StmtKind::FormatDecl { .. } => {
                 // Registered in `prepare_program_top_level`; no per-statement runtime effect.
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             StmtKind::AdviceDecl {
                 kind,
@@ -8478,7 +8478,7 @@ impl VMHelper {
                     body: body.clone(),
                     body_block_idx: u16::MAX,
                 });
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             StmtKind::Continue(block) => self.exec_block_smart(block),
         }
@@ -8496,8 +8496,8 @@ impl VMHelper {
         &mut self,
         name: &str,
         op: BinOp,
-        rhs: PerlValue,
-    ) -> Result<PerlValue, PerlError> {
+        rhs: StrykeValue,
+    ) -> Result<StrykeValue, PerlError> {
         if op == BinOp::Concat {
             return self.scope.scalar_concat_inplace(name, &rhs);
         }
@@ -8505,47 +8505,47 @@ impl VMHelper {
             .atomic_mutate(name, |old| Self::compound_scalar_binop(old, op, &rhs))
     }
 
-    fn compound_scalar_binop(old: &PerlValue, op: BinOp, rhs: &PerlValue) -> PerlValue {
+    fn compound_scalar_binop(old: &StrykeValue, op: BinOp, rhs: &StrykeValue) -> StrykeValue {
         match op {
             BinOp::Add => {
                 if let (Some(a), Some(b)) = (old.as_integer(), rhs.as_integer()) {
-                    PerlValue::integer(a.wrapping_add(b))
+                    StrykeValue::integer(a.wrapping_add(b))
                 } else {
-                    PerlValue::float(old.to_number() + rhs.to_number())
+                    StrykeValue::float(old.to_number() + rhs.to_number())
                 }
             }
             BinOp::Sub => {
                 if let (Some(a), Some(b)) = (old.as_integer(), rhs.as_integer()) {
-                    PerlValue::integer(a.wrapping_sub(b))
+                    StrykeValue::integer(a.wrapping_sub(b))
                 } else {
-                    PerlValue::float(old.to_number() - rhs.to_number())
+                    StrykeValue::float(old.to_number() - rhs.to_number())
                 }
             }
             BinOp::Mul => {
                 if let (Some(a), Some(b)) = (old.as_integer(), rhs.as_integer()) {
-                    PerlValue::integer(a.wrapping_mul(b))
+                    StrykeValue::integer(a.wrapping_mul(b))
                 } else {
-                    PerlValue::float(old.to_number() * rhs.to_number())
+                    StrykeValue::float(old.to_number() * rhs.to_number())
                 }
             }
             BinOp::BitAnd => {
                 if let Some(s) = crate::value::set_intersection(old, rhs) {
                     s
                 } else {
-                    PerlValue::integer(old.to_int() & rhs.to_int())
+                    StrykeValue::integer(old.to_int() & rhs.to_int())
                 }
             }
             BinOp::BitOr => {
                 if let Some(s) = crate::value::set_union(old, rhs) {
                     s
                 } else {
-                    PerlValue::integer(old.to_int() | rhs.to_int())
+                    StrykeValue::integer(old.to_int() | rhs.to_int())
                 }
             }
-            BinOp::BitXor => PerlValue::integer(old.to_int() ^ rhs.to_int()),
-            BinOp::ShiftLeft => PerlValue::integer(old.to_int() << rhs.to_int()),
-            BinOp::ShiftRight => PerlValue::integer(old.to_int() >> rhs.to_int()),
-            BinOp::Div => PerlValue::float(old.to_number() / rhs.to_number()),
+            BinOp::BitXor => StrykeValue::integer(old.to_int() ^ rhs.to_int()),
+            BinOp::ShiftLeft => StrykeValue::integer(old.to_int() << rhs.to_int()),
+            BinOp::ShiftRight => StrykeValue::integer(old.to_int() >> rhs.to_int()),
+            BinOp::Div => StrykeValue::float(old.to_number() / rhs.to_number()),
             BinOp::Mod => {
                 // Return 0 on b==0 silently — this helper is the
                 // `$x OP= rhs` atomic-mutate path which can't propagate
@@ -8553,12 +8553,12 @@ impl VMHelper {
                 // `ErrorKind::DivisionByZero`.
                 let b = rhs.to_int();
                 if b == 0 {
-                    PerlValue::integer(0)
+                    StrykeValue::integer(0)
                 } else {
-                    PerlValue::integer(crate::value::perl_mod_i64(old.to_int(), b))
+                    StrykeValue::integer(crate::value::perl_mod_i64(old.to_int(), b))
                 }
             }
-            BinOp::Pow => PerlValue::float(old.to_number().powf(rhs.to_number())),
+            BinOp::Pow => StrykeValue::float(old.to_number().powf(rhs.to_number())),
             BinOp::LogOr => {
                 if old.is_true() {
                     old.clone()
@@ -8580,7 +8580,7 @@ impl VMHelper {
                     old.clone()
                 }
             }
-            _ => PerlValue::float(old.to_number() + rhs.to_number()),
+            _ => StrykeValue::float(old.to_number() + rhs.to_number()),
         }
     }
 
@@ -8609,7 +8609,7 @@ impl VMHelper {
     /// Symbolic ref deref (`$$r`, `@{...}`, `%{...}`, `*{...}`) — shared by [`Self::eval_expr_ctx`] and the VM.
     pub(crate) fn symbolic_deref(
         &mut self,
-        val: PerlValue,
+        val: StrykeValue,
         kind: Sigil,
         line: usize,
     ) -> ExecResult {
@@ -8623,17 +8623,17 @@ impl VMHelper {
                 }
                 // `${$cref}` / `$$href{k}` outer deref — array or hash ref (incl. binding refs).
                 if let Some(r) = val.as_array_ref() {
-                    return Ok(PerlValue::array(r.read().clone()));
+                    return Ok(StrykeValue::array(r.read().clone()));
                 }
                 if let Some(name) = val.as_array_binding_name() {
-                    return Ok(PerlValue::array(self.scope.get_array(&name)));
+                    return Ok(StrykeValue::array(self.scope.get_array(&name)));
                 }
                 if let Some(r) = val.as_hash_ref() {
-                    return Ok(PerlValue::hash(r.read().clone()));
+                    return Ok(StrykeValue::hash(r.read().clone()));
                 }
                 if let Some(name) = val.as_hash_binding_name() {
                     self.touch_env_hash(&name);
-                    return Ok(PerlValue::hash(self.scope.get_hash(&name)));
+                    return Ok(StrykeValue::hash(self.scope.get_hash(&name)));
                 }
                 if let Some(s) = val.as_str() {
                     if self.strict_refs {
@@ -8652,10 +8652,10 @@ impl VMHelper {
             }
             Sigil::Array => {
                 if let Some(r) = val.as_array_ref() {
-                    return Ok(PerlValue::array(r.read().clone()));
+                    return Ok(StrykeValue::array(r.read().clone()));
                 }
                 if let Some(name) = val.as_array_binding_name() {
-                    return Ok(PerlValue::array(self.scope.get_array(&name)));
+                    return Ok(StrykeValue::array(self.scope.get_array(&name)));
                 }
                 if val.is_undef() {
                     if self.strict_refs {
@@ -8665,7 +8665,7 @@ impl VMHelper {
                         )
                         .into());
                     }
-                    return Ok(PerlValue::array(vec![]));
+                    return Ok(StrykeValue::array(vec![]));
                 }
                 // Plain primitive scalar (int, float, string): under no-strict, perl
                 // treats this as a symbolic ref `@{$val_as_string}` and silently
@@ -8684,17 +8684,17 @@ impl VMHelper {
                         )
                         .into());
                     }
-                    return Ok(PerlValue::array(self.scope.get_array(&s)));
+                    return Ok(StrykeValue::array(self.scope.get_array(&s)));
                 }
                 Err(PerlError::runtime("Can't dereference non-reference as array", line).into())
             }
             Sigil::Hash => {
                 if let Some(r) = val.as_hash_ref() {
-                    return Ok(PerlValue::hash(r.read().clone()));
+                    return Ok(StrykeValue::hash(r.read().clone()));
                 }
                 if let Some(name) = val.as_hash_binding_name() {
                     self.touch_env_hash(&name);
-                    return Ok(PerlValue::hash(self.scope.get_hash(&name)));
+                    return Ok(StrykeValue::hash(self.scope.get_hash(&name)));
                 }
                 // Stryke `class C { ... }` instances answer to `%$obj` by
                 // flattening their field name/value pairs — the same shape
@@ -8712,7 +8712,7 @@ impl VMHelper {
                             map.insert(name.clone(), v.clone());
                         }
                     }
-                    return Ok(PerlValue::hash(map));
+                    return Ok(StrykeValue::hash(map));
                 }
                 // Same for stryke `struct S { ... }` instances — keep them
                 // introspectable through the Perl-style hash-deref idiom.
@@ -8724,7 +8724,7 @@ impl VMHelper {
                             map.insert(field.name.clone(), v.clone());
                         }
                     }
-                    return Ok(PerlValue::hash(map));
+                    return Ok(StrykeValue::hash(map));
                 }
                 // Blessed-ref escape hatch: when the inner data is a hash,
                 // unwrap and treat the deref as if it targeted the inner
@@ -8733,10 +8733,10 @@ impl VMHelper {
                 if let Some(b) = val.as_blessed_ref() {
                     let inner = b.data.read().clone();
                     if let Some(r) = inner.as_hash_ref() {
-                        return Ok(PerlValue::hash(r.read().clone()));
+                        return Ok(StrykeValue::hash(r.read().clone()));
                     }
                     if let Some(h) = inner.as_hash_map() {
-                        return Ok(PerlValue::hash(h));
+                        return Ok(StrykeValue::hash(h));
                     }
                 }
                 if val.is_undef() {
@@ -8747,7 +8747,7 @@ impl VMHelper {
                         )
                         .into());
                     }
-                    return Ok(PerlValue::hash(IndexMap::new()));
+                    return Ok(StrykeValue::hash(IndexMap::new()));
                 }
                 if val.is_integer_like() || val.is_float_like() || val.is_string_like() {
                     let s = val.to_string();
@@ -8762,36 +8762,36 @@ impl VMHelper {
                         .into());
                     }
                     self.touch_env_hash(&s);
-                    return Ok(PerlValue::hash(self.scope.get_hash(&s)));
+                    return Ok(StrykeValue::hash(self.scope.get_hash(&s)));
                 }
                 Err(PerlError::runtime("Can't dereference non-reference as hash", line).into())
             }
             Sigil::Typeglob => {
                 if let Some(s) = val.as_str() {
-                    return Ok(PerlValue::string(self.resolve_io_handle_name(&s)));
+                    return Ok(StrykeValue::string(self.resolve_io_handle_name(&s)));
                 }
                 Err(PerlError::runtime("Can't dereference non-reference as typeglob", line).into())
             }
         }
     }
 
-    /// `qq` list join expects a plain array; if a bare [`PerlValue::array_ref`] reaches join, peel
+    /// `qq` list join expects a plain array; if a bare [`StrykeValue::array_ref`] reaches join, peel
     /// one level so elements stringify like Perl (`"@$r"`).
     #[inline]
-    pub(crate) fn peel_array_ref_for_list_join(&self, v: PerlValue) -> PerlValue {
+    pub(crate) fn peel_array_ref_for_list_join(&self, v: StrykeValue) -> StrykeValue {
         if let Some(r) = v.as_array_ref() {
-            return PerlValue::array(r.read().clone());
+            return StrykeValue::array(r.read().clone());
         }
         v
     }
 
     /// `\@{EXPR}` / alias of an existing array ref — shared by [`crate::bytecode::Op::MakeArrayRefAlias`].
-    pub(crate) fn make_array_ref_alias(&self, val: PerlValue, line: usize) -> ExecResult {
+    pub(crate) fn make_array_ref_alias(&self, val: StrykeValue, line: usize) -> ExecResult {
         if let Some(a) = val.as_array_ref() {
-            return Ok(PerlValue::array_ref(Arc::clone(&a)));
+            return Ok(StrykeValue::array_ref(Arc::clone(&a)));
         }
         if let Some(name) = val.as_array_binding_name() {
-            return Ok(PerlValue::array_binding_ref(name));
+            return Ok(StrykeValue::array_binding_ref(name));
         }
         if let Some(s) = val.as_str() {
             if self.strict_refs {
@@ -8804,7 +8804,7 @@ impl VMHelper {
                 )
                 .into());
             }
-            return Ok(PerlValue::array_binding_ref(s.to_string()));
+            return Ok(StrykeValue::array_binding_ref(s.to_string()));
         }
         if let Some(r) = val.as_scalar_ref() {
             let inner = r.read().clone();
@@ -8814,12 +8814,12 @@ impl VMHelper {
     }
 
     /// `\%{EXPR}` — shared by [`crate::bytecode::Op::MakeHashRefAlias`].
-    pub(crate) fn make_hash_ref_alias(&self, val: PerlValue, line: usize) -> ExecResult {
+    pub(crate) fn make_hash_ref_alias(&self, val: StrykeValue, line: usize) -> ExecResult {
         if let Some(h) = val.as_hash_ref() {
-            return Ok(PerlValue::hash_ref(Arc::clone(&h)));
+            return Ok(StrykeValue::hash_ref(Arc::clone(&h)));
         }
         if let Some(name) = val.as_hash_binding_name() {
-            return Ok(PerlValue::hash_binding_ref(name));
+            return Ok(StrykeValue::hash_binding_ref(name));
         }
         if let Some(s) = val.as_str() {
             if self.strict_refs {
@@ -8832,7 +8832,7 @@ impl VMHelper {
                 )
                 .into());
             }
-            return Ok(PerlValue::hash_binding_ref(s.to_string()));
+            return Ok(StrykeValue::hash_binding_ref(s.to_string()));
         }
         if let Some(r) = val.as_scalar_ref() {
             let inner = r.read().clone();
@@ -8932,15 +8932,15 @@ impl VMHelper {
     pub(crate) fn eval_expr_ctx(&mut self, expr: &Expr, ctx: WantarrayCtx) -> ExecResult {
         let line = expr.line;
         match &expr.kind {
-            ExprKind::Integer(n) => Ok(PerlValue::integer(*n)),
-            ExprKind::Float(f) => Ok(PerlValue::float(*f)),
+            ExprKind::Integer(n) => Ok(StrykeValue::integer(*n)),
+            ExprKind::Float(f) => Ok(StrykeValue::float(*f)),
             ExprKind::String(s) => {
                 let processed = Self::process_case_escapes(s);
-                Ok(PerlValue::string(processed))
+                Ok(StrykeValue::string(processed))
             }
             ExprKind::Bareword(s) => {
                 if s == "__PACKAGE__" {
-                    return Ok(PerlValue::string(self.current_package()));
+                    return Ok(StrykeValue::string(self.current_package()));
                 }
                 if let Some(sub) = self.resolve_sub_by_name(s) {
                     return self.call_sub(&sub, vec![], ctx, line);
@@ -8949,16 +8949,16 @@ impl VMHelper {
                 if let Some(r) = crate::builtins::try_builtin(self, s, &[], line) {
                     return r.map_err(Into::into);
                 }
-                Ok(PerlValue::string(s.clone()))
+                Ok(StrykeValue::string(s.clone()))
             }
-            ExprKind::Undef => Ok(PerlValue::UNDEF),
-            ExprKind::MagicConst(MagicConstKind::File) => Ok(PerlValue::string(self.file.clone())),
-            ExprKind::MagicConst(MagicConstKind::Line) => Ok(PerlValue::integer(expr.line as i64)),
+            ExprKind::Undef => Ok(StrykeValue::UNDEF),
+            ExprKind::MagicConst(MagicConstKind::File) => Ok(StrykeValue::string(self.file.clone())),
+            ExprKind::MagicConst(MagicConstKind::Line) => Ok(StrykeValue::integer(expr.line as i64)),
             ExprKind::MagicConst(MagicConstKind::Sub) => {
                 if let Some(sub) = self.current_sub_stack.last().cloned() {
-                    Ok(PerlValue::code_ref(sub))
+                    Ok(StrykeValue::code_ref(sub))
                 } else {
-                    Ok(PerlValue::UNDEF)
+                    Ok(StrykeValue::UNDEF)
                 }
             }
             ExprKind::Regex(pattern, flags) => {
@@ -8969,11 +8969,11 @@ impl VMHelper {
                     self.regex_match_execute(s, pattern, flags, false, "_", line)
                 } else {
                     let re = self.compile_regex(pattern, flags, line)?;
-                    Ok(PerlValue::regex(re, pattern.clone(), flags.clone()))
+                    Ok(StrykeValue::regex(re, pattern.clone(), flags.clone()))
                 }
             }
-            ExprKind::QW(words) => Ok(PerlValue::array(
-                words.iter().map(|w| PerlValue::string(w.clone())).collect(),
+            ExprKind::QW(words) => Ok(StrykeValue::array(
+                words.iter().map(|w| StrykeValue::string(w.clone())).collect(),
             )),
 
             // Interpolated strings
@@ -9033,7 +9033,7 @@ impl VMHelper {
                     }
                 }
                 let result = Self::process_case_escapes(&raw_result);
-                Ok(PerlValue::string(result))
+                Ok(StrykeValue::string(result))
             }
 
             // Variables
@@ -9057,16 +9057,16 @@ impl VMHelper {
                 let aname = self.stash_array_name_for_package(name);
                 let arr = self.scope.get_array(&aname);
                 if ctx == WantarrayCtx::List {
-                    Ok(PerlValue::array(arr))
+                    Ok(StrykeValue::array(arr))
                 } else {
-                    Ok(PerlValue::integer(arr.len() as i64))
+                    Ok(StrykeValue::integer(arr.len() as i64))
                 }
             }
             ExprKind::HashVar(name) => {
                 self.check_strict_hash_var(name, line)?;
                 self.touch_env_hash(name);
                 let h = self.scope.get_hash(name);
-                let pv = PerlValue::hash(h);
+                let pv = StrykeValue::hash(h);
                 if ctx == WantarrayCtx::List {
                     Ok(pv)
                 } else {
@@ -9075,12 +9075,12 @@ impl VMHelper {
             }
             ExprKind::Typeglob(name) => {
                 let n = self.resolve_io_handle_name(name);
-                Ok(PerlValue::string(n))
+                Ok(StrykeValue::string(n))
             }
             ExprKind::TypeglobExpr(e) => {
                 let name = self.eval_expr(e)?.to_string();
                 let n = self.resolve_io_handle_name(&name);
-                Ok(PerlValue::string(n))
+                Ok(StrykeValue::string(n))
             }
             ExprKind::ArrayElement { array, index } => {
                 // Stryke string-index sugar: bareword `_[N]` parses to an
@@ -9131,7 +9131,7 @@ impl VMHelper {
                                 i += step_i;
                             }
                         }
-                        return Ok(PerlValue::string(out));
+                        return Ok(StrykeValue::string(out));
                     }
                     let idx = self.eval_expr(index)?.to_int();
                     let n = s.chars().count() as i64;
@@ -9139,10 +9139,10 @@ impl VMHelper {
                     return Ok(if i >= 0 && i < n {
                         s.chars()
                             .nth(i as usize)
-                            .map(|c| PerlValue::string(c.to_string()))
-                            .unwrap_or(PerlValue::UNDEF)
+                            .map(|c| StrykeValue::string(c.to_string()))
+                            .unwrap_or(StrykeValue::UNDEF)
                     } else {
-                        PerlValue::UNDEF
+                        StrykeValue::UNDEF
                     });
                 }
                 self.check_strict_array_var(array, line)?;
@@ -9199,7 +9199,7 @@ impl VMHelper {
                                         i += step_i;
                                     }
                                 }
-                                return Ok(PerlValue::string(out));
+                                return Ok(StrykeValue::string(out));
                             }
                         }
                     }
@@ -9213,7 +9213,7 @@ impl VMHelper {
                         .unwrap_or_default();
                     let full = format!("{}::FETCH", class);
                     if let Some(sub) = self.subs.get(&full).cloned() {
-                        let arg_vals = vec![obj, PerlValue::integer(idx)];
+                        let arg_vals = vec![obj, StrykeValue::integer(idx)];
                         return self.call_sub(&sub, arg_vals, ctx, line);
                     }
                 }
@@ -9234,10 +9234,10 @@ impl VMHelper {
                             let i = if idx < 0 { idx + n } else { idx };
                             if i >= 0 && i < n {
                                 if let Some(c) = s.chars().nth(i as usize) {
-                                    return Ok(PerlValue::string(c.to_string()));
+                                    return Ok(StrykeValue::string(c.to_string()));
                                 }
                             }
-                            return Ok(PerlValue::UNDEF);
+                            return Ok(StrykeValue::UNDEF);
                         }
                     }
                 }
@@ -9254,7 +9254,7 @@ impl VMHelper {
                         .unwrap_or_default();
                     let full = format!("{}::FETCH", class);
                     if let Some(sub) = self.subs.get(&full).cloned() {
-                        let arg_vals = vec![obj, PerlValue::string(k)];
+                        let arg_vals = vec![obj, StrykeValue::string(k)];
                         return self.call_sub(&sub, arg_vals, ctx, line);
                     }
                 }
@@ -9268,7 +9268,7 @@ impl VMHelper {
                 for idx in flat {
                     result.push(self.scope.get_array_element(&aname, idx));
                 }
-                Ok(PerlValue::array(result))
+                Ok(StrykeValue::array(result))
             }
             ExprKind::HashSlice { hash, keys } => {
                 self.check_strict_hash_var(hash, line)?;
@@ -9279,7 +9279,7 @@ impl VMHelper {
                         result.push(self.scope.get_hash_element(hash, &k));
                     }
                 }
-                Ok(PerlValue::array(result))
+                Ok(StrykeValue::array(result))
             }
             ExprKind::HashKvSlice { hash, keys } => {
                 // `%h{KEYS}` — Perl 5.20+ key-value slice. Returns a flat
@@ -9290,11 +9290,11 @@ impl VMHelper {
                 for key_expr in keys {
                     for k in self.eval_hash_slice_key_components(key_expr)? {
                         let v = self.scope.get_hash_element(hash, &k);
-                        result.push(PerlValue::string(k));
+                        result.push(StrykeValue::string(k));
                         result.push(v);
                     }
                 }
-                Ok(PerlValue::array(result))
+                Ok(StrykeValue::array(result))
             }
             ExprKind::HashSliceDeref { container, keys } => {
                 let hv = self.eval_expr(container)?;
@@ -9323,12 +9323,12 @@ impl VMHelper {
                     } else {
                         idx as usize
                     };
-                    out.push(items.get(i).cloned().unwrap_or(PerlValue::UNDEF));
+                    out.push(items.get(i).cloned().unwrap_or(StrykeValue::UNDEF));
                 }
-                let arr = PerlValue::array(out);
+                let arr = StrykeValue::array(out);
                 if ctx != WantarrayCtx::List {
                     let v = arr.to_list();
-                    Ok(v.last().cloned().unwrap_or(PerlValue::UNDEF))
+                    Ok(v.last().cloned().unwrap_or(StrykeValue::UNDEF))
                 } else {
                     Ok(arr)
                 }
@@ -9336,19 +9336,19 @@ impl VMHelper {
 
             // References
             ExprKind::ScalarRef(inner) => match &inner.kind {
-                ExprKind::ScalarVar(name) => Ok(PerlValue::scalar_binding_ref(name.clone())),
+                ExprKind::ScalarVar(name) => Ok(StrykeValue::scalar_binding_ref(name.clone())),
                 ExprKind::ArrayVar(name) => {
                     self.check_strict_array_var(name, line)?;
                     let aname = self.stash_array_name_for_package(name);
                     // Promote the scope's array to shared Arc-backed storage.
                     // Both the scope and the returned ref share the same Arc.
                     let arc = self.scope.promote_array_to_shared(&aname);
-                    Ok(PerlValue::array_ref(arc))
+                    Ok(StrykeValue::array_ref(arc))
                 }
                 ExprKind::HashVar(name) => {
                     self.check_strict_hash_var(name, line)?;
                     let arc = self.scope.promote_hash_to_shared(name);
-                    Ok(PerlValue::hash_ref(arc))
+                    Ok(StrykeValue::hash_ref(arc))
                 }
                 ExprKind::Deref {
                     expr: e,
@@ -9366,15 +9366,15 @@ impl VMHelper {
                 }
                 ExprKind::ArraySlice { .. } | ExprKind::HashSlice { .. } => {
                     let list = self.eval_expr_ctx(inner, WantarrayCtx::List)?;
-                    Ok(PerlValue::array_ref(Arc::new(RwLock::new(list.to_list()))))
+                    Ok(StrykeValue::array_ref(Arc::new(RwLock::new(list.to_list()))))
                 }
                 ExprKind::HashSliceDeref { .. } => {
                     let list = self.eval_expr_ctx(inner, WantarrayCtx::List)?;
-                    Ok(PerlValue::array_ref(Arc::new(RwLock::new(list.to_list()))))
+                    Ok(StrykeValue::array_ref(Arc::new(RwLock::new(list.to_list()))))
                 }
                 _ => {
                     let val = self.eval_expr(inner)?;
-                    Ok(PerlValue::scalar_ref(Arc::new(RwLock::new(val))))
+                    Ok(StrykeValue::scalar_ref(Arc::new(RwLock::new(val))))
                 }
             },
             ExprKind::ArrayRef(elems) => {
@@ -9391,7 +9391,7 @@ impl VMHelper {
                         arr.push(v);
                     }
                 }
-                Ok(PerlValue::array_ref(Arc::new(RwLock::new(arr))))
+                Ok(StrykeValue::array_ref(Arc::new(RwLock::new(arr))))
             }
             ExprKind::HashRef(pairs) => {
                 // `{ KEY => VAL, ... }` — keys are scalar-context, but values are list-context
@@ -9413,11 +9413,11 @@ impl VMHelper {
                         map.insert(key_str, val);
                     }
                 }
-                Ok(PerlValue::hash_ref(Arc::new(RwLock::new(map))))
+                Ok(StrykeValue::hash_ref(Arc::new(RwLock::new(map))))
             }
             ExprKind::CodeRef { params, body } => {
                 let captured = self.scope.capture();
-                Ok(PerlValue::code_ref(Arc::new(PerlSub {
+                Ok(StrykeValue::code_ref(Arc::new(PerlSub {
                     name: "__ANON__".to_string(),
                     params: params.clone(),
                     body: body.clone(),
@@ -9431,20 +9431,20 @@ impl VMHelper {
                 let sub = self.resolve_sub_by_name(name).ok_or_else(|| {
                     PerlError::runtime(self.undefined_subroutine_resolve_message(name), line)
                 })?;
-                Ok(PerlValue::code_ref(sub))
+                Ok(StrykeValue::code_ref(sub))
             }
             ExprKind::DynamicSubCodeRef(expr) => {
                 let name = self.eval_expr(expr)?.to_string();
                 let sub = self.resolve_sub_by_name(&name).ok_or_else(|| {
                     PerlError::runtime(self.undefined_subroutine_resolve_message(&name), line)
                 })?;
-                Ok(PerlValue::code_ref(sub))
+                Ok(StrykeValue::code_ref(sub))
             }
             ExprKind::Deref { expr, kind } => {
                 if ctx != WantarrayCtx::List && matches!(kind, Sigil::Array) {
                     let val = self.eval_expr(expr)?;
                     let n = self.array_deref_len(val, line)?;
-                    return Ok(PerlValue::integer(n));
+                    return Ok(StrykeValue::integer(n));
                 }
                 if ctx != WantarrayCtx::List && matches!(kind, Sigil::Hash) {
                     let val = self.eval_expr(expr)?;
@@ -9468,10 +9468,10 @@ impl VMHelper {
                                     line,
                                 )?);
                             }
-                            let arr = PerlValue::array(out);
+                            let arr = StrykeValue::array(out);
                             if ctx != WantarrayCtx::List {
                                 let v = arr.to_list();
-                                return Ok(v.last().cloned().unwrap_or(PerlValue::UNDEF));
+                                return Ok(v.last().cloned().unwrap_or(StrykeValue::UNDEF));
                             }
                             return Ok(arr);
                         }
@@ -9541,13 +9541,13 @@ impl VMHelper {
                         let s = lv.to_string();
                         let pat = rv.to_string();
                         let m = self.regex_match_execute(s, &pat, "", false, "_", line)?;
-                        return Ok(PerlValue::integer(if m.is_true() { 0 } else { 1 }));
+                        return Ok(StrykeValue::integer(if m.is_true() { 0 } else { 1 }));
                     }
                     BinOp::LogAnd | BinOp::LogAndWord => {
                         match &left.kind {
                             ExprKind::Regex(_, _) => {
                                 if !self.eval_boolean_rvalue_condition(left)? {
-                                    return Ok(PerlValue::string(String::new()));
+                                    return Ok(StrykeValue::string(String::new()));
                                 }
                             }
                             _ => {
@@ -9558,7 +9558,7 @@ impl VMHelper {
                             }
                         }
                         return match &right.kind {
-                            ExprKind::Regex(_, _) => Ok(PerlValue::integer(
+                            ExprKind::Regex(_, _) => Ok(StrykeValue::integer(
                                 if self.eval_boolean_rvalue_condition(right)? {
                                     1
                                 } else {
@@ -9572,7 +9572,7 @@ impl VMHelper {
                         match &left.kind {
                             ExprKind::Regex(_, _) => {
                                 if self.eval_boolean_rvalue_condition(left)? {
-                                    return Ok(PerlValue::integer(1));
+                                    return Ok(StrykeValue::integer(1));
                                 }
                             }
                             _ => {
@@ -9583,7 +9583,7 @@ impl VMHelper {
                             }
                         }
                         return match &right.kind {
-                            ExprKind::Regex(_, _) => Ok(PerlValue::integer(
+                            ExprKind::Regex(_, _) => Ok(StrykeValue::integer(
                                 if self.eval_boolean_rvalue_condition(right)? {
                                     1
                                 } else {
@@ -9662,7 +9662,7 @@ impl VMHelper {
                         let n = self.resolved_scalar_storage_name(name);
                         return Ok(self
                             .scope
-                            .atomic_mutate(&n, |v| PerlValue::integer(v.to_int() - 1))
+                            .atomic_mutate(&n, |v| StrykeValue::integer(v.to_int() - 1))
                             .map_err(|e| e.at_line(line))?);
                     }
                     if let ExprKind::Deref { kind, .. } = &expr.kind {
@@ -9696,7 +9696,7 @@ impl VMHelper {
                         }
                     }
                     let val = self.eval_expr(expr)?;
-                    let new_val = PerlValue::integer(val.to_int() - 1);
+                    let new_val = StrykeValue::integer(val.to_int() - 1);
                     self.assign_value(expr, new_val.clone())?;
                     Ok(new_val)
                 }
@@ -9709,7 +9709,7 @@ impl VMHelper {
                                 let s = topic.to_string();
                                 let v =
                                     self.regex_match_execute(s, pattern, flags, false, "_", rl)?;
-                                return Ok(PerlValue::integer(if v.is_true() { 0 } else { 1 }));
+                                return Ok(StrykeValue::integer(if v.is_true() { 0 } else { 1 }));
                             }
                         }
                         _ => {}
@@ -9721,31 +9721,31 @@ impl VMHelper {
                                 return r;
                             }
                             if let Some(n) = val.as_integer() {
-                                Ok(PerlValue::integer(-n))
+                                Ok(StrykeValue::integer(-n))
                             } else {
-                                Ok(PerlValue::float(-val.to_number()))
+                                Ok(StrykeValue::float(-val.to_number()))
                             }
                         }
                         UnaryOp::LogNot => {
                             if let Some(r) = self.try_overload_unary_dispatch("bool", &val, line) {
                                 let pv = r?;
-                                return Ok(PerlValue::integer(if pv.is_true() { 0 } else { 1 }));
+                                return Ok(StrykeValue::integer(if pv.is_true() { 0 } else { 1 }));
                             }
-                            Ok(PerlValue::integer(if val.is_true() { 0 } else { 1 }))
+                            Ok(StrykeValue::integer(if val.is_true() { 0 } else { 1 }))
                         }
-                        UnaryOp::BitNot => Ok(PerlValue::integer(!val.to_int())),
+                        UnaryOp::BitNot => Ok(StrykeValue::integer(!val.to_int())),
                         UnaryOp::LogNotWord => {
                             if let Some(r) = self.try_overload_unary_dispatch("bool", &val, line) {
                                 let pv = r?;
-                                return Ok(PerlValue::integer(if pv.is_true() { 0 } else { 1 }));
+                                return Ok(StrykeValue::integer(if pv.is_true() { 0 } else { 1 }));
                             }
-                            Ok(PerlValue::integer(if val.is_true() { 0 } else { 1 }))
+                            Ok(StrykeValue::integer(if val.is_true() { 0 } else { 1 }))
                         }
                         UnaryOp::Ref => {
                             if let ExprKind::ScalarVar(name) = &expr.kind {
-                                return Ok(PerlValue::scalar_binding_ref(name.clone()));
+                                return Ok(StrykeValue::scalar_binding_ref(name.clone()));
                             }
-                            Ok(PerlValue::scalar_ref(Arc::new(RwLock::new(val))))
+                            Ok(StrykeValue::scalar_ref(Arc::new(RwLock::new(val))))
                         }
                         _ => unreachable!(),
                     }
@@ -9758,9 +9758,9 @@ impl VMHelper {
                 if let ExprKind::ScalarVar(name) = &expr.kind {
                     self.check_strict_scalar_var(name, line)?;
                     let n = self.resolved_scalar_storage_name(name);
-                    let f: fn(&PerlValue) -> PerlValue = match op {
+                    let f: fn(&StrykeValue) -> StrykeValue = match op {
                         PostfixOp::Increment => |v| perl_inc(v),
-                        PostfixOp::Decrement => |v| PerlValue::integer(v.to_int() - 1),
+                        PostfixOp::Decrement => |v| StrykeValue::integer(v.to_int() - 1),
                     };
                     return Ok(self
                         .scope
@@ -9810,7 +9810,7 @@ impl VMHelper {
                 let old = val.clone();
                 let new_val = match op {
                     PostfixOp::Increment => perl_inc(&val),
-                    PostfixOp::Decrement => PerlValue::integer(val.to_int() - 1),
+                    PostfixOp::Decrement => StrykeValue::integer(val.to_int() - 1),
                 };
                 self.assign_value(expr, new_val)?;
                 Ok(old)
@@ -9870,24 +9870,24 @@ impl VMHelper {
                     return Ok(self.scope.atomic_hash_mutate(hash, &k, |old| match op {
                         BinOp::Add => {
                             if let (Some(a), Some(b)) = (old.as_integer(), rhs.as_integer()) {
-                                PerlValue::integer(a.wrapping_add(b))
+                                StrykeValue::integer(a.wrapping_add(b))
                             } else {
-                                PerlValue::float(old.to_number() + rhs.to_number())
+                                StrykeValue::float(old.to_number() + rhs.to_number())
                             }
                         }
                         BinOp::Sub => {
                             if let (Some(a), Some(b)) = (old.as_integer(), rhs.as_integer()) {
-                                PerlValue::integer(a.wrapping_sub(b))
+                                StrykeValue::integer(a.wrapping_sub(b))
                             } else {
-                                PerlValue::float(old.to_number() - rhs.to_number())
+                                StrykeValue::float(old.to_number() - rhs.to_number())
                             }
                         }
                         BinOp::Concat => {
                             let mut s = old.to_string();
                             rhs.append_to(&mut s);
-                            PerlValue::string(s)
+                            StrykeValue::string(s)
                         }
-                        _ => PerlValue::float(old.to_number() + rhs.to_number()),
+                        _ => StrykeValue::float(old.to_number() + rhs.to_number()),
                     })?);
                 }
                 // For array element targets: $a[i] += 1
@@ -9898,26 +9898,26 @@ impl VMHelper {
                     return Ok(self.scope.atomic_array_mutate(array, idx, |old| match op {
                         BinOp::Add => {
                             if let (Some(a), Some(b)) = (old.as_integer(), rhs.as_integer()) {
-                                PerlValue::integer(a.wrapping_add(b))
+                                StrykeValue::integer(a.wrapping_add(b))
                             } else {
-                                PerlValue::float(old.to_number() + rhs.to_number())
+                                StrykeValue::float(old.to_number() + rhs.to_number())
                             }
                         }
                         BinOp::Sub => {
                             if let (Some(a), Some(b)) = (old.as_integer(), rhs.as_integer()) {
-                                PerlValue::integer(a.wrapping_sub(b))
+                                StrykeValue::integer(a.wrapping_sub(b))
                             } else {
-                                PerlValue::float(old.to_number() - rhs.to_number())
+                                StrykeValue::float(old.to_number() - rhs.to_number())
                             }
                         }
                         BinOp::Mul => {
                             if let (Some(a), Some(b)) = (old.as_integer(), rhs.as_integer()) {
-                                PerlValue::integer(a.wrapping_mul(b))
+                                StrykeValue::integer(a.wrapping_mul(b))
                             } else {
-                                PerlValue::float(old.to_number() * rhs.to_number())
+                                StrykeValue::float(old.to_number() * rhs.to_number())
                             }
                         }
-                        BinOp::Div => PerlValue::float(old.to_number() / rhs.to_number()),
+                        BinOp::Div => StrykeValue::float(old.to_number() / rhs.to_number()),
                         BinOp::Mod => {
                             // Perl `%` is floored-division (sign-of-divisor),
                             // not Rust's `%` (sign-of-dividend) nor
@@ -9926,23 +9926,23 @@ impl VMHelper {
                             let a = old.to_int();
                             let b = rhs.to_int();
                             if b == 0 {
-                                PerlValue::integer(0)
+                                StrykeValue::integer(0)
                             } else {
-                                PerlValue::integer(crate::value::perl_mod_i64(a, b))
+                                StrykeValue::integer(crate::value::perl_mod_i64(a, b))
                             }
                         }
                         BinOp::Concat => {
                             let mut s = old.to_string();
                             rhs.append_to(&mut s);
-                            PerlValue::string(s)
+                            StrykeValue::string(s)
                         }
-                        BinOp::Pow => PerlValue::float(old.to_number().powf(rhs.to_number())),
-                        BinOp::BitAnd => PerlValue::integer(old.to_int() & rhs.to_int()),
-                        BinOp::BitOr => PerlValue::integer(old.to_int() | rhs.to_int()),
-                        BinOp::BitXor => PerlValue::integer(old.to_int() ^ rhs.to_int()),
-                        BinOp::ShiftLeft => PerlValue::integer(old.to_int() << rhs.to_int()),
-                        BinOp::ShiftRight => PerlValue::integer(old.to_int() >> rhs.to_int()),
-                        _ => PerlValue::float(old.to_number() + rhs.to_number()),
+                        BinOp::Pow => StrykeValue::float(old.to_number().powf(rhs.to_number())),
+                        BinOp::BitAnd => StrykeValue::integer(old.to_int() & rhs.to_int()),
+                        BinOp::BitOr => StrykeValue::integer(old.to_int() | rhs.to_int()),
+                        BinOp::BitXor => StrykeValue::integer(old.to_int() ^ rhs.to_int()),
+                        BinOp::ShiftLeft => StrykeValue::integer(old.to_int() << rhs.to_int()),
+                        BinOp::ShiftRight => StrykeValue::integer(old.to_int() >> rhs.to_int()),
+                        _ => StrykeValue::float(old.to_number() + rhs.to_number()),
                     })?);
                 }
                 if let ExprKind::HashSliceDeref { container, keys } = &target.kind {
@@ -10021,7 +10021,7 @@ impl VMHelper {
                         } else if step_val > 0 {
                             (from_i..=to_i)
                                 .step_by(step_val as usize)
-                                .map(PerlValue::integer)
+                                .map(StrykeValue::integer)
                                 .collect()
                         } else {
                             std::iter::successors(Some(from_i), |&x| {
@@ -10032,13 +10032,13 @@ impl VMHelper {
                                     None
                                 }
                             })
-                            .map(PerlValue::integer)
+                            .map(StrykeValue::integer)
                             .collect()
                         };
-                        Ok(PerlValue::array(list))
+                        Ok(StrykeValue::array(list))
                     } else {
                         let list = perl_list_range_expand(f, t);
-                        Ok(PerlValue::array(list))
+                        Ok(StrykeValue::array(list))
                     }
                 } else {
                     let key = std::ptr::from_ref(expr) as usize;
@@ -10070,7 +10070,7 @@ impl VMHelper {
                             let left_m = left_re.is_match(&subject);
                             let right_m = right_re.is_match(&subject);
                             let st = self.flip_flop_tree.entry(key).or_default();
-                            Ok(PerlValue::integer(Self::regex_flip_flop_transition(
+                            Ok(StrykeValue::integer(Self::regex_flip_flop_transition(
                                 &mut st.active,
                                 &mut st.exclusive_left_line,
                                 *exclusive,
@@ -10094,7 +10094,7 @@ impl VMHelper {
                             let left_m = left_re.is_match(&subject);
                             let right_m = self.eof_without_arg_is_true();
                             let st = self.flip_flop_tree.entry(key).or_default();
-                            Ok(PerlValue::integer(Self::regex_flip_flop_transition(
+                            Ok(StrykeValue::integer(Self::regex_flip_flop_transition(
                                 &mut st.active,
                                 &mut st.exclusive_left_line,
                                 *exclusive,
@@ -10122,7 +10122,7 @@ impl VMHelper {
                             let left_m = left_re.is_match(&subject);
                             let right_m = dot == right;
                             let st = self.flip_flop_tree.entry(key).or_default();
-                            Ok(PerlValue::integer(Self::regex_flip_flop_transition(
+                            Ok(StrykeValue::integer(Self::regex_flip_flop_transition(
                                 &mut st.active,
                                 &mut st.exclusive_left_line,
                                 *exclusive,
@@ -10152,7 +10152,7 @@ impl VMHelper {
                             let left_m = left_re.is_match(&subject);
                             let right_m = self.eval_boolean_rvalue_condition(to)?;
                             let st = self.flip_flop_tree.entry(key).or_default();
-                            Ok(PerlValue::integer(Self::regex_flip_flop_transition(
+                            Ok(StrykeValue::integer(Self::regex_flip_flop_transition(
                                 &mut st.active,
                                 &mut st.exclusive_left_line,
                                 *exclusive,
@@ -10177,9 +10177,9 @@ impl VMHelper {
                                             st.active = false;
                                         }
                                     }
-                                    return Ok(PerlValue::integer(1));
+                                    return Ok(StrykeValue::integer(1));
                                 }
-                                return Ok(PerlValue::integer(0));
+                                return Ok(StrykeValue::integer(0));
                             }
                             if let Some(ll) = st.exclusive_left_line {
                                 if dot == right && dot > ll {
@@ -10189,7 +10189,7 @@ impl VMHelper {
                             } else if dot == right {
                                 st.active = false;
                             }
-                            Ok(PerlValue::integer(1))
+                            Ok(StrykeValue::integer(1))
                         }
                     }
                 }
@@ -10227,7 +10227,7 @@ impl VMHelper {
                 } else {
                     perl_list_range_expand(f, t)
                 };
-                Ok(PerlValue::array(list))
+                Ok(StrykeValue::array(list))
             }
 
             // Repeat — see `ast.rs` `ExprKind::Repeat` for the list/scalar split.
@@ -10243,16 +10243,16 @@ impl VMHelper {
                     self.wantarray_kind = WantarrayCtx::List;
                     let val = self.eval_expr_ctx(expr, WantarrayCtx::List)?;
                     self.wantarray_kind = saved;
-                    let items: Vec<PerlValue> = val.as_array_vec().unwrap_or_else(|| vec![val]);
+                    let items: Vec<StrykeValue> = val.as_array_vec().unwrap_or_else(|| vec![val]);
                     let mut result = Vec::with_capacity(items.len() * n);
                     for _ in 0..n {
                         result.extend(items.iter().cloned());
                     }
-                    Ok(PerlValue::array(result))
+                    Ok(StrykeValue::array(result))
                 } else {
                     // `EXPR x N` — scalar string repetition.
                     let val = self.eval_expr(expr)?;
-                    Ok(PerlValue::string(val.to_string().repeat(n)))
+                    Ok(StrykeValue::string(val.to_string().repeat(n)))
                 }
             }
 
@@ -10284,17 +10284,17 @@ impl VMHelper {
                 })?;
                 Ok(match first.sigil {
                     Sigil::Scalar => self.scope.get_scalar(&first.name),
-                    Sigil::Array => PerlValue::array(self.scope.get_array(&first.name)),
+                    Sigil::Array => StrykeValue::array(self.scope.get_array(&first.name)),
                     Sigil::Hash => {
                         let h = self.scope.get_hash(&first.name);
-                        let mut flat: Vec<PerlValue> = Vec::with_capacity(h.len() * 2);
+                        let mut flat: Vec<StrykeValue> = Vec::with_capacity(h.len() * 2);
                         for (k, v) in h {
-                            flat.push(PerlValue::string(k));
+                            flat.push(StrykeValue::string(k));
                             flat.push(v);
                         }
-                        PerlValue::array(flat)
+                        StrykeValue::array(flat)
                     }
-                    Sigil::Typeglob => PerlValue::UNDEF,
+                    Sigil::Typeglob => StrykeValue::UNDEF,
                 })
             }
 
@@ -10342,13 +10342,13 @@ impl VMHelper {
                         existing.push_str(&read_str);
                         let _ = self
                             .scope
-                            .set_scalar(&var_name, PerlValue::string(existing));
+                            .set_scalar(&var_name, StrykeValue::string(existing));
                     } else {
                         let _ = self
                             .scope
-                            .set_scalar(&var_name, PerlValue::string(read_str));
+                            .set_scalar(&var_name, StrykeValue::string(read_str));
                     }
-                    return Ok(PerlValue::integer(n as i64));
+                    return Ok(StrykeValue::integer(n as i64));
                 }
                 if matches!(dispatch_name, "group_by" | "chunk_by") {
                     if args.len() != 2 {
@@ -10655,7 +10655,7 @@ impl VMHelper {
                             let target = arg_vals.get(1).map(|v| v.to_string()).unwrap_or_default();
                             let mro = self.mro_linearize(&class);
                             let result = mro.iter().any(|c| c == &target);
-                            return Ok(PerlValue::integer(if result { 1 } else { 0 }));
+                            return Ok(StrykeValue::integer(if result { 1 } else { 0 }));
                         }
                         "can" => {
                             let target_method =
@@ -10665,7 +10665,7 @@ impl VMHelper {
                                 .and_then(|fq| self.subs.get(&fq))
                                 .is_some();
                             if found {
-                                return Ok(PerlValue::code_ref(Arc::new(PerlSub {
+                                return Ok(StrykeValue::code_ref(Arc::new(PerlSub {
                                     name: target_method,
                                     params: vec![],
                                     body: vec![],
@@ -10674,14 +10674,14 @@ impl VMHelper {
                                     fib_like: None,
                                 })));
                             } else {
-                                return Ok(PerlValue::UNDEF);
+                                return Ok(StrykeValue::UNDEF);
                             }
                         }
                         "DOES" => {
                             let target = arg_vals.get(1).map(|v| v.to_string()).unwrap_or_default();
                             let mro = self.mro_linearize(&class);
                             let result = mro.iter().any(|c| c == &target);
-                            return Ok(PerlValue::integer(if result { 1 } else { 0 }));
+                            return Ok(StrykeValue::integer(if result { 1 } else { 0 }));
                         }
                         _ => {}
                     }
@@ -10781,7 +10781,7 @@ impl VMHelper {
                     msg.push('\n');
                 }
                 self.fire_pseudosig_warn(&msg, line)?;
-                Ok(PerlValue::integer(1))
+                Ok(StrykeValue::integer(1))
             }
 
             // Regex
@@ -10798,11 +10798,11 @@ impl VMHelper {
                     let re = self.compile_regex(pattern, flags, line)?;
                     let global = flags.contains('g');
                     if global {
-                        return Ok(PerlValue::iterator(std::sync::Arc::new(
+                        return Ok(StrykeValue::iterator(std::sync::Arc::new(
                             crate::map_stream::MatchGlobalStreamIterator::new(source, re),
                         )));
                     } else {
-                        return Ok(PerlValue::iterator(std::sync::Arc::new(
+                        return Ok(StrykeValue::iterator(std::sync::Arc::new(
                             crate::map_stream::MatchStreamIterator::new(source, re),
                         )));
                     }
@@ -10826,7 +10826,7 @@ impl VMHelper {
                     let source = crate::map_stream::into_pull_iter(val);
                     let re = self.compile_regex(pattern, flags, line)?;
                     let global = flags.contains('g');
-                    return Ok(PerlValue::iterator(std::sync::Arc::new(
+                    return Ok(StrykeValue::iterator(std::sync::Arc::new(
                         crate::map_stream::SubstStreamIterator::new(
                             source,
                             re,
@@ -10855,7 +10855,7 @@ impl VMHelper {
                 let val = self.eval_expr(expr)?;
                 if val.is_iterator() {
                     let source = crate::map_stream::into_pull_iter(val);
-                    return Ok(PerlValue::iterator(std::sync::Arc::new(
+                    return Ok(StrykeValue::iterator(std::sync::Arc::new(
                         crate::map_stream::TransliterateStreamIterator::new(
                             source, from, to, flags,
                         ),
@@ -10886,7 +10886,7 @@ impl VMHelper {
                     if ctx == WantarrayCtx::List {
                         return Ok(out);
                     }
-                    return Ok(PerlValue::integer(out.to_list().len() as i64));
+                    return Ok(StrykeValue::integer(out.to_list().len() as i64));
                 }
                 let items = list_val.to_list();
                 if items.len() == 1 {
@@ -10900,7 +10900,7 @@ impl VMHelper {
                         }
                         let sub = self.anon_coderef_from_block(block);
                         self.pipeline_push(&p, PipelineOp::Map(sub), line)?;
-                        return Ok(PerlValue::pipeline(Arc::clone(&p)));
+                        return Ok(StrykeValue::pipeline(Arc::clone(&p)));
                     }
                 }
                 // `map { BLOCK } LIST` evaluates BLOCK in list context so its tail statement's
@@ -10914,9 +10914,9 @@ impl VMHelper {
                     result.extend(val.map_flatten_outputs(*flatten_array_refs));
                 }
                 if ctx == WantarrayCtx::List {
-                    Ok(PerlValue::array(result))
+                    Ok(StrykeValue::array(result))
                 } else {
-                    Ok(PerlValue::integer(result.len() as i64))
+                    Ok(StrykeValue::integer(result.len() as i64))
                 }
             }
             ExprKind::ForEachExpr { block, list } => {
@@ -10930,7 +10930,7 @@ impl VMHelper {
                         self.scope.set_topic(item);
                         self.exec_block(block)?;
                     }
-                    return Ok(PerlValue::integer(count));
+                    return Ok(StrykeValue::integer(count));
                 }
                 let items = list_val.to_list();
                 let count = items.len();
@@ -10938,7 +10938,7 @@ impl VMHelper {
                     self.scope.set_topic(item);
                     self.exec_block(block)?;
                 }
-                Ok(PerlValue::integer(count as i64))
+                Ok(StrykeValue::integer(count as i64))
             }
             ExprKind::MapExprComma {
                 expr,
@@ -10953,7 +10953,7 @@ impl VMHelper {
                     if ctx == WantarrayCtx::List {
                         return Ok(out);
                     }
-                    return Ok(PerlValue::integer(out.to_list().len() as i64));
+                    return Ok(StrykeValue::integer(out.to_list().len() as i64));
                 }
                 let items = list_val.to_list();
                 let mut result = Vec::new();
@@ -10981,9 +10981,9 @@ impl VMHelper {
                     result.extend(val.map_flatten_outputs(*flatten_array_refs));
                 }
                 if ctx == WantarrayCtx::List {
-                    Ok(PerlValue::array(result))
+                    Ok(StrykeValue::array(result))
                 } else {
-                    Ok(PerlValue::integer(result.len() as i64))
+                    Ok(StrykeValue::integer(result.len() as i64))
                 }
             }
             ExprKind::GrepExpr {
@@ -10997,14 +10997,14 @@ impl VMHelper {
                     if ctx == WantarrayCtx::List {
                         return Ok(out);
                     }
-                    return Ok(PerlValue::integer(out.to_list().len() as i64));
+                    return Ok(StrykeValue::integer(out.to_list().len() as i64));
                 }
                 let items = list_val.to_list();
                 if items.len() == 1 {
                     if let Some(p) = items[0].as_pipeline() {
                         let sub = self.anon_coderef_from_block(block);
                         self.pipeline_push(&p, PipelineOp::Filter(sub), line)?;
-                        return Ok(PerlValue::pipeline(Arc::clone(&p)));
+                        return Ok(StrykeValue::pipeline(Arc::clone(&p)));
                     }
                 }
                 let mut result = Vec::new();
@@ -11023,9 +11023,9 @@ impl VMHelper {
                     }
                 }
                 if ctx == WantarrayCtx::List {
-                    Ok(PerlValue::array(result))
+                    Ok(StrykeValue::array(result))
                 } else {
-                    Ok(PerlValue::integer(result.len() as i64))
+                    Ok(StrykeValue::integer(result.len() as i64))
                 }
             }
             ExprKind::GrepExprComma {
@@ -11039,7 +11039,7 @@ impl VMHelper {
                     if ctx == WantarrayCtx::List {
                         return Ok(out);
                     }
-                    return Ok(PerlValue::integer(out.to_list().len() as i64));
+                    return Ok(StrykeValue::integer(out.to_list().len() as i64));
                 }
                 let items = list_val.to_list();
                 let mut result = Vec::new();
@@ -11072,9 +11072,9 @@ impl VMHelper {
                     }
                 }
                 if ctx == WantarrayCtx::List {
-                    Ok(PerlValue::array(result))
+                    Ok(StrykeValue::array(result))
                 } else {
-                    Ok(PerlValue::integer(result.len() as i64))
+                    Ok(StrykeValue::integer(result.len() as i64))
                 }
             }
             ExprKind::SortExpr { cmp, list } => {
@@ -11147,13 +11147,13 @@ impl VMHelper {
                         items.sort_by_key(|a| a.to_string());
                     }
                 }
-                Ok(PerlValue::array(items))
+                Ok(StrykeValue::array(items))
             }
             ExprKind::Rev(expr) => {
                 // Eval in scalar context first to preserve set/hash/array ref types
                 let val = self.eval_expr_ctx(expr, WantarrayCtx::Scalar)?;
                 if val.is_iterator() {
-                    return Ok(PerlValue::iterator(Arc::new(
+                    return Ok(StrykeValue::iterator(Arc::new(
                         crate::value::RevIterator::new(val.into_iterator()),
                     )));
                 }
@@ -11162,43 +11162,43 @@ impl VMHelper {
                     for (k, v) in s.iter().rev() {
                         out.insert(k.clone(), v.clone());
                     }
-                    return Ok(PerlValue::set(Arc::new(out)));
+                    return Ok(StrykeValue::set(Arc::new(out)));
                 }
                 if let Some(ar) = val.as_array_ref() {
                     let items: Vec<_> = ar.read().iter().rev().cloned().collect();
-                    return Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+                    return Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
                         items,
                     ))));
                 }
                 if let Some(hr) = val.as_hash_ref() {
-                    let mut out: indexmap::IndexMap<String, PerlValue> = indexmap::IndexMap::new();
+                    let mut out: indexmap::IndexMap<String, StrykeValue> = indexmap::IndexMap::new();
                     for (k, v) in hr.read().iter() {
-                        out.insert(v.to_string(), PerlValue::string(k.clone()));
+                        out.insert(v.to_string(), StrykeValue::string(k.clone()));
                     }
-                    return Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(out))));
+                    return Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(out))));
                 }
                 // Re-eval in list context for bare arrays/hashes
                 let val = self.eval_expr_ctx(expr, WantarrayCtx::List)?;
                 if let Some(hm) = val.as_hash_map() {
-                    let mut out: indexmap::IndexMap<String, PerlValue> = indexmap::IndexMap::new();
+                    let mut out: indexmap::IndexMap<String, StrykeValue> = indexmap::IndexMap::new();
                     for (k, v) in hm.iter() {
-                        out.insert(v.to_string(), PerlValue::string(k.clone()));
+                        out.insert(v.to_string(), StrykeValue::string(k.clone()));
                     }
-                    return Ok(PerlValue::hash(out));
+                    return Ok(StrykeValue::hash(out));
                 }
                 if val.as_array_vec().is_some() {
                     let mut items = val.to_list();
                     items.reverse();
-                    Ok(PerlValue::array(items))
+                    Ok(StrykeValue::array(items))
                 } else {
                     let items = val.to_list();
                     if items.len() > 1 {
                         let mut items = items;
                         items.reverse();
-                        Ok(PerlValue::array(items))
+                        Ok(StrykeValue::array(items))
                     } else {
                         let s = val.to_string();
-                        Ok(PerlValue::string(s.chars().rev().collect()))
+                        Ok(StrykeValue::string(s.chars().rev().collect()))
                     }
                 }
             }
@@ -11208,12 +11208,12 @@ impl VMHelper {
                     WantarrayCtx::List => {
                         let mut items = val.to_list();
                         items.reverse();
-                        Ok(PerlValue::array(items))
+                        Ok(StrykeValue::array(items))
                     }
                     _ => {
                         let items = val.to_list();
                         let s: String = items.iter().map(|v| v.to_string()).collect();
-                        Ok(PerlValue::string(s.chars().rev().collect()))
+                        Ok(StrykeValue::string(s.chars().rev().collect()))
                     }
                 }
             }
@@ -11275,7 +11275,7 @@ impl VMHelper {
                     let source = crate::map_stream::into_pull_iter(list_val);
                     let sub = self.anon_coderef_from_block(block);
                     let (capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
-                    return Ok(PerlValue::iterator(Arc::new(
+                    return Ok(StrykeValue::iterator(Arc::new(
                         crate::map_stream::PMapStreamIterator::new(
                             source,
                             sub,
@@ -11295,7 +11295,7 @@ impl VMHelper {
                 let pmap_progress = PmapProgress::new(show_progress, items.len());
 
                 if *flat_outputs {
-                    let mut indexed: Vec<(usize, Vec<PerlValue>)> = items
+                    let mut indexed: Vec<(usize, Vec<StrykeValue>)> = items
                         .into_par_iter()
                         .enumerate()
                         .map(|(i, item)| {
@@ -11309,7 +11309,7 @@ impl VMHelper {
                             local_interp.scope.set_topic(item);
                             let val = match local_interp.exec_block(&block) {
                                 Ok(val) => val,
-                                Err(_) => PerlValue::UNDEF,
+                                Err(_) => StrykeValue::UNDEF,
                             };
                             let chunk = val.map_flatten_outputs(true);
                             pmap_progress.tick();
@@ -11318,11 +11318,11 @@ impl VMHelper {
                         .collect();
                     pmap_progress.finish();
                     indexed.sort_by_key(|(i, _)| *i);
-                    let results: Vec<PerlValue> =
+                    let results: Vec<StrykeValue> =
                         indexed.into_iter().flat_map(|(_, v)| v).collect();
-                    Ok(PerlValue::array(results))
+                    Ok(StrykeValue::array(results))
                 } else {
-                    let results: Vec<PerlValue> = items
+                    let results: Vec<StrykeValue> = items
                         .into_par_iter()
                         .map(|item| {
                             let mut local_interp = VMHelper::new();
@@ -11335,14 +11335,14 @@ impl VMHelper {
                             local_interp.scope.set_topic(item);
                             let val = match local_interp.exec_block(&block) {
                                 Ok(val) => val,
-                                Err(_) => PerlValue::UNDEF,
+                                Err(_) => StrykeValue::UNDEF,
                             };
                             pmap_progress.tick();
                             val
                         })
                         .collect();
                     pmap_progress.finish();
-                    Ok(PerlValue::array(results))
+                    Ok(StrykeValue::array(results))
                 }
             }
             ExprKind::PMapChunkedExpr {
@@ -11365,7 +11365,7 @@ impl VMHelper {
                 let (scope_capture, atomic_arrays, atomic_hashes) =
                     self.scope.capture_with_atomics();
 
-                let indexed_chunks: Vec<(usize, Vec<PerlValue>)> = items
+                let indexed_chunks: Vec<(usize, Vec<StrykeValue>)> = items
                     .chunks(chunk_n)
                     .enumerate()
                     .map(|(i, c)| (i, c.to_vec()))
@@ -11374,7 +11374,7 @@ impl VMHelper {
                 let n_chunks = indexed_chunks.len();
                 let pmap_progress = PmapProgress::new(show_progress, n_chunks);
 
-                let mut chunk_results: Vec<(usize, Vec<PerlValue>)> = indexed_chunks
+                let mut chunk_results: Vec<(usize, Vec<StrykeValue>)> = indexed_chunks
                     .into_par_iter()
                     .map(|(chunk_idx, chunk)| {
                         let mut local_interp = VMHelper::new();
@@ -11389,7 +11389,7 @@ impl VMHelper {
                             local_interp.scope.set_topic(item);
                             match local_interp.exec_block(&block) {
                                 Ok(val) => out.push(val),
-                                Err(_) => out.push(PerlValue::UNDEF),
+                                Err(_) => out.push(StrykeValue::UNDEF),
                             }
                         }
                         pmap_progress.tick();
@@ -11399,9 +11399,9 @@ impl VMHelper {
 
                 pmap_progress.finish();
                 chunk_results.sort_by_key(|(i, _)| *i);
-                let results: Vec<PerlValue> =
+                let results: Vec<StrykeValue> =
                     chunk_results.into_iter().flat_map(|(_, v)| v).collect();
-                Ok(PerlValue::array(results))
+                Ok(StrykeValue::array(results))
             }
             ExprKind::PGrepExpr {
                 block,
@@ -11420,7 +11420,7 @@ impl VMHelper {
                     let source = crate::map_stream::into_pull_iter(list_val);
                     let sub = self.anon_coderef_from_block(block);
                     let (capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
-                    return Ok(PerlValue::iterator(Arc::new(
+                    return Ok(StrykeValue::iterator(Arc::new(
                         crate::map_stream::PGrepStreamIterator::new(
                             source,
                             sub,
@@ -11438,7 +11438,7 @@ impl VMHelper {
                     self.scope.capture_with_atomics();
                 let pmap_progress = PmapProgress::new(show_progress, items.len());
 
-                let results: Vec<PerlValue> = items
+                let results: Vec<StrykeValue> = items
                     .into_par_iter()
                     .filter_map(|item| {
                         let mut local_interp = VMHelper::new();
@@ -11462,7 +11462,7 @@ impl VMHelper {
                     })
                     .collect();
                 pmap_progress.finish();
-                Ok(PerlValue::array(results))
+                Ok(StrykeValue::array(results))
             }
             ExprKind::ParExpr { block, list } => {
                 // Generic parallel-chunk wrapper: split input on a sensible
@@ -11491,7 +11491,7 @@ impl VMHelper {
                     self.scope.capture_with_atomics();
                 let first_err: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
                 let err_w = Arc::clone(&first_err);
-                let per_chunk: Vec<Vec<PerlValue>> = chunks
+                let per_chunk: Vec<Vec<StrykeValue>> = chunks
                     .into_par_iter()
                     .map(|chunk| {
                         if err_w.lock().is_some() {
@@ -11525,7 +11525,7 @@ impl VMHelper {
                 for v in per_chunk {
                     out.extend(v);
                 }
-                Ok(PerlValue::array(out))
+                Ok(StrykeValue::array(out))
             }
             ExprKind::ParReduceExpr {
                 extract_block,
@@ -11554,7 +11554,7 @@ impl VMHelper {
                         Some(arr) => arr,
                         None => vec![list_val.clone()],
                     };
-                    let first = chunk_arr.first().cloned().unwrap_or(PerlValue::UNDEF);
+                    let first = chunk_arr.first().cloned().unwrap_or(StrykeValue::UNDEF);
                     self.scope.declare_array("_", chunk_arr);
                     self.scope.set_topic(first);
                     return self.exec_block(extract_block);
@@ -11565,11 +11565,11 @@ impl VMHelper {
                     self.scope.capture_with_atomics();
                 let first_err: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
                 let err_w = Arc::clone(&first_err);
-                let per_chunk: Vec<PerlValue> = chunks
+                let per_chunk: Vec<StrykeValue> = chunks
                     .into_par_iter()
                     .map(|chunk| {
                         if err_w.lock().is_some() {
-                            return PerlValue::UNDEF;
+                            return StrykeValue::UNDEF;
                         }
                         let mut local = VMHelper::new();
                         local.subs = subs.clone();
@@ -11583,7 +11583,7 @@ impl VMHelper {
                             Some(arr) => arr,
                             None => vec![chunk.clone()],
                         };
-                        let first = chunk_arr.first().cloned().unwrap_or(PerlValue::UNDEF);
+                        let first = chunk_arr.first().cloned().unwrap_or(StrykeValue::UNDEF);
                         local.scope.declare_array("_", chunk_arr);
                         local.scope.set_topic(first);
                         match local.exec_block(&extract) {
@@ -11593,7 +11593,7 @@ impl VMHelper {
                                 if g.is_none() {
                                     *g = Some(format!("par_reduce: {:?}", e));
                                 }
-                                PerlValue::UNDEF
+                                StrykeValue::UNDEF
                             }
                         }
                     })
@@ -11602,7 +11602,7 @@ impl VMHelper {
                     return Err(FlowOrError::Error(PerlError::runtime(msg, line)));
                 }
                 if per_chunk.is_empty() {
-                    return Ok(PerlValue::UNDEF);
+                    return Ok(StrykeValue::UNDEF);
                 }
                 // Explicit reducer: pairwise via user block with $a/$b bound.
                 if let Some(rb) = reduce_block {
@@ -11644,7 +11644,7 @@ impl VMHelper {
                 let list_val = self.eval_expr_ctx(list, WantarrayCtx::List)?;
                 let items_flat = list_val.to_list();
                 if items_flat.is_empty() {
-                    return Ok(PerlValue::array(vec![]));
+                    return Ok(StrykeValue::array(vec![]));
                 }
                 let (scope_capture, atomic_arrays, atomic_hashes) =
                     self.scope.capture_with_atomics();
@@ -11663,12 +11663,12 @@ impl VMHelper {
                 let target_chunks = (n_slots * 4).min(items_flat.len()).max(1);
                 let chunk_size = items_flat.len().div_ceil(target_chunks);
                 let mut chunk_items: Vec<serde_json::Value> = Vec::new();
-                let mut chunk_jsons_buf: Vec<PerlValue> = Vec::new();
+                let mut chunk_jsons_buf: Vec<StrykeValue> = Vec::new();
                 for item in items_flat.into_iter() {
                     chunk_jsons_buf.push(item);
                     if chunk_jsons_buf.len() >= chunk_size {
-                        let drained: Vec<PerlValue> = std::mem::take(&mut chunk_jsons_buf);
-                        let as_array = PerlValue::array(drained);
+                        let drained: Vec<StrykeValue> = std::mem::take(&mut chunk_jsons_buf);
+                        let as_array = StrykeValue::array(drained);
                         chunk_items.push(
                             crate::remote_wire::perl_to_json_value(&as_array)
                                 .map_err(|e| PerlError::runtime(e, line))?,
@@ -11676,7 +11676,7 @@ impl VMHelper {
                     }
                 }
                 if !chunk_jsons_buf.is_empty() {
-                    let as_array = PerlValue::array(chunk_jsons_buf);
+                    let as_array = StrykeValue::array(chunk_jsons_buf);
                     chunk_items.push(
                         crate::remote_wire::perl_to_json_value(&as_array)
                             .map_err(|e| PerlError::runtime(e, line))?,
@@ -11722,7 +11722,7 @@ impl VMHelper {
                 // Each chunk's extract returns a value; flat-concat across
                 // chunks to mirror `~p>`'s auto-merge for list-shaped output.
                 // Scalar-shaped chunk results stay as one element each.
-                let mut merged: Vec<PerlValue> = Vec::new();
+                let mut merged: Vec<StrykeValue> = Vec::new();
                 for v in result_values {
                     if let Some(items) = v.as_array_vec() {
                         merged.extend(items);
@@ -11732,7 +11732,7 @@ impl VMHelper {
                         merged.push(v);
                     }
                 }
-                Ok(PerlValue::array(merged))
+                Ok(StrykeValue::array(merged))
             }
             ExprKind::PForExpr {
                 block,
@@ -11788,7 +11788,7 @@ impl VMHelper {
                 if let Some(e) = first_err.lock().take() {
                     return Err(FlowOrError::Error(e));
                 }
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             ExprKind::FanExpr {
                 count,
@@ -11814,7 +11814,7 @@ impl VMHelper {
                 let fan_progress = FanProgress::new(show_progress, n);
                 if *capture {
                     if n == 0 {
-                        return Ok(PerlValue::array(Vec::new()));
+                        return Ok(StrykeValue::array(Vec::new()));
                     }
                     let pairs: Vec<(usize, ExecResult)> = (0..n)
                         .into_par_iter()
@@ -11828,7 +11828,7 @@ impl VMHelper {
                                 .scope
                                 .restore_atomics(&atomic_arrays, &atomic_hashes);
                             local_interp.enable_parallel_guard();
-                            local_interp.scope.set_topic(PerlValue::integer(i as i64));
+                            local_interp.scope.set_topic(StrykeValue::integer(i as i64));
                             crate::parallel_trace::fan_worker_set_index(Some(i as i64));
                             let res = local_interp.exec_block(&block);
                             crate::parallel_trace::fan_worker_set_index(None);
@@ -11846,7 +11846,7 @@ impl VMHelper {
                             Err(e) => return Err(e),
                         }
                     }
-                    return Ok(PerlValue::array(out));
+                    return Ok(StrykeValue::array(out));
                 }
                 let first_err: Arc<Mutex<Option<PerlError>>> = Arc::new(Mutex::new(None));
                 (0..n).into_par_iter().for_each(|i| {
@@ -11862,7 +11862,7 @@ impl VMHelper {
                         .scope
                         .restore_atomics(&atomic_arrays, &atomic_hashes);
                     local_interp.enable_parallel_guard();
-                    local_interp.scope.set_topic(PerlValue::integer(i as i64));
+                    local_interp.scope.set_topic(StrykeValue::integer(i as i64));
                     crate::parallel_trace::fan_worker_set_index(Some(i as i64));
                     match local_interp.exec_block(&block) {
                         Ok(_) => {}
@@ -11887,7 +11887,7 @@ impl VMHelper {
                 if let Some(e) = first_err.lock().take() {
                     return Err(FlowOrError::Error(e));
                 }
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             ExprKind::RetryBlock {
                 body,
@@ -11908,7 +11908,7 @@ impl VMHelper {
                     scope_started: Mutex::new(false),
                     exhausted: Mutex::new(false),
                 });
-                Ok(PerlValue::generator(g))
+                Ok(StrykeValue::generator(g))
             }
             ExprKind::Yield(e) => {
                 if !self.in_generator {
@@ -11967,7 +11967,7 @@ impl VMHelper {
                 let start = std::time::Instant::now();
                 self.exec_block(body)?;
                 let ms = start.elapsed().as_secs_f64() * 1000.0;
-                Ok(PerlValue::float(ms))
+                Ok(StrykeValue::float(ms))
             }
             ExprKind::Bench { body, times } => {
                 let n = self.eval_expr(times)?.to_int();
@@ -11991,7 +11991,7 @@ impl VMHelper {
             ExprKind::Slurp(e) => {
                 let path = self.eval_expr(e)?.to_string();
                 crate::perl_fs::read_file_text_or_glob(&path)
-                    .map(PerlValue::string)
+                    .map(StrykeValue::string)
                     .map_err(|e| {
                         FlowOrError::Error(PerlError::runtime(format!("slurp: {}", e), line))
                     })
@@ -12009,7 +12009,7 @@ impl VMHelper {
                 let exitcode = output.status.code().unwrap_or(-1) as i64;
                 let stdout = decode_utf8_or_latin1(&output.stdout);
                 let stderr = decode_utf8_or_latin1(&output.stderr);
-                Ok(PerlValue::capture(Arc::new(CaptureResult {
+                Ok(StrykeValue::capture(Arc::new(CaptureResult {
                     stdout,
                     stderr,
                     exitcode,
@@ -12027,7 +12027,7 @@ impl VMHelper {
                         FlowOrError::Error(PerlError::runtime(format!("fetch_url: {}", e), line))
                     })
                     .and_then(|r| {
-                        r.into_string().map(PerlValue::string).map_err(|e| {
+                        r.into_string().map(StrykeValue::string).map_err(|e| {
                             FlowOrError::Error(PerlError::runtime(
                                 format!("fetch_url: {}", e),
                                 line,
@@ -12090,14 +12090,14 @@ impl VMHelper {
                 }
                 pmap_progress.tick();
                 pmap_progress.finish();
-                Ok(PerlValue::array(items))
+                Ok(StrykeValue::array(items))
             }
 
             ExprKind::ReduceExpr { block, list } => {
                 let list_val = self.eval_expr(list)?;
                 let items = list_val.to_list();
                 if items.is_empty() {
-                    return Ok(PerlValue::UNDEF);
+                    return Ok(StrykeValue::UNDEF);
                 }
                 if items.len() == 1 {
                     return Ok(items.into_iter().next().unwrap());
@@ -12113,7 +12113,7 @@ impl VMHelper {
                     local_interp.scope.set_sort_pair(acc, b);
                     acc = match local_interp.exec_block(&block) {
                         Ok(val) => val,
-                        Err(_) => PerlValue::UNDEF,
+                        Err(_) => StrykeValue::UNDEF,
                     };
                 }
                 Ok(acc)
@@ -12133,7 +12133,7 @@ impl VMHelper {
                 let list_val = self.eval_expr(list)?;
                 let items = list_val.to_list();
                 if items.is_empty() {
-                    return Ok(PerlValue::UNDEF);
+                    return Ok(StrykeValue::UNDEF);
                 }
                 if items.len() == 1 {
                     return Ok(items.into_iter().next().unwrap());
@@ -12156,11 +12156,11 @@ impl VMHelper {
                         local_interp.scope.set_sort_pair(a, b);
                         match local_interp.exec_block(&block) {
                             Ok(val) => val,
-                            Err(_) => PerlValue::UNDEF,
+                            Err(_) => StrykeValue::UNDEF,
                         }
                     });
                 pmap_progress.finish();
-                Ok(result.unwrap_or(PerlValue::UNDEF))
+                Ok(result.unwrap_or(StrykeValue::UNDEF))
             }
 
             ExprKind::PReduceInitExpr {
@@ -12184,7 +12184,7 @@ impl VMHelper {
                 let block = block.clone();
                 let subs = self.subs.clone();
                 let scope_capture = self.scope.capture();
-                let cap: &[(String, PerlValue)] = scope_capture.as_slice();
+                let cap: &[(String, StrykeValue)] = scope_capture.as_slice();
                 if items.len() == 1 {
                     return Ok(fold_preduce_init_step(
                         &subs,
@@ -12227,7 +12227,7 @@ impl VMHelper {
                 let list_val = self.eval_expr(list)?;
                 let items = list_val.to_list();
                 if items.is_empty() {
-                    return Ok(PerlValue::UNDEF);
+                    return Ok(StrykeValue::UNDEF);
                 }
                 let map_block = map_block.clone();
                 let reduce_block = reduce_block.clone();
@@ -12240,7 +12240,7 @@ impl VMHelper {
                     local_interp.scope.set_topic(items[0].clone());
                     return match local_interp.exec_block_no_scope(&map_block) {
                         Ok(v) => Ok(v),
-                        Err(_) => Ok(PerlValue::UNDEF),
+                        Err(_) => Ok(StrykeValue::UNDEF),
                     };
                 }
                 let pmap_progress = PmapProgress::new(show_progress, items.len());
@@ -12253,7 +12253,7 @@ impl VMHelper {
                         local_interp.scope.set_topic(item);
                         let val = match local_interp.exec_block_no_scope(&map_block) {
                             Ok(val) => val,
-                            Err(_) => PerlValue::UNDEF,
+                            Err(_) => StrykeValue::UNDEF,
                         };
                         pmap_progress.tick();
                         val
@@ -12265,11 +12265,11 @@ impl VMHelper {
                         local_interp.scope.set_sort_pair(a, b);
                         match local_interp.exec_block_no_scope(&reduce_block) {
                             Ok(val) => val,
-                            Err(_) => PerlValue::UNDEF,
+                            Err(_) => StrykeValue::UNDEF,
                         }
                     });
                 pmap_progress.finish();
-                Ok(result.unwrap_or(PerlValue::UNDEF))
+                Ok(result.unwrap_or(StrykeValue::UNDEF))
             }
 
             ExprKind::PcacheExpr {
@@ -12290,7 +12290,7 @@ impl VMHelper {
                 let scope_capture = self.scope.capture();
                 let cache = &*crate::pcache::GLOBAL_PCACHE;
                 let pmap_progress = PmapProgress::new(show_progress, items.len());
-                let results: Vec<PerlValue> = items
+                let results: Vec<StrykeValue> = items
                     .into_par_iter()
                     .map(|item| {
                         let k = crate::pcache::cache_key(&item);
@@ -12304,7 +12304,7 @@ impl VMHelper {
                         local_interp.scope.set_topic(item.clone());
                         let val = match local_interp.exec_block_no_scope(&block) {
                             Ok(v) => v,
-                            Err(_) => PerlValue::UNDEF,
+                            Err(_) => StrykeValue::UNDEF,
                         };
                         cache.insert(k, val.clone());
                         pmap_progress.tick();
@@ -12312,7 +12312,7 @@ impl VMHelper {
                     })
                     .collect();
                 pmap_progress.finish();
-                Ok(PerlValue::array(results))
+                Ok(StrykeValue::array(results))
             }
 
             ExprKind::PselectExpr { receivers, timeout } => {
@@ -12363,7 +12363,7 @@ impl VMHelper {
                     Ok(keys)
                 } else {
                     let n = keys.as_array_vec().map(|a| a.len()).unwrap_or(0);
-                    Ok(PerlValue::integer(n as i64))
+                    Ok(StrykeValue::integer(n as i64))
                 }
             }
             ExprKind::Values(expr) => {
@@ -12373,12 +12373,12 @@ impl VMHelper {
                     Ok(vals)
                 } else {
                     let n = vals.as_array_vec().map(|a| a.len()).unwrap_or(0);
-                    Ok(PerlValue::integer(n as i64))
+                    Ok(StrykeValue::integer(n as i64))
                 }
             }
             ExprKind::Each(_) => {
                 // Simplified: returns empty list (full iterator state would need more work)
-                Ok(PerlValue::array(vec![]))
+                Ok(StrykeValue::array(vec![]))
             }
 
             // String ops
@@ -12393,12 +12393,12 @@ impl VMHelper {
             ExprKind::Length(expr) => {
                 let val = self.eval_expr(expr)?;
                 Ok(if let Some(a) = val.as_array_vec() {
-                    PerlValue::integer(a.len() as i64)
+                    StrykeValue::integer(a.len() as i64)
                 } else if let Some(h) = val.as_hash_map() {
-                    PerlValue::integer(h.len() as i64)
+                    StrykeValue::integer(h.len() as i64)
                 } else if let Some(b) = val.as_bytes_arc() {
                     // Raw byte buffer: always byte count, regardless of utf8 pragma.
-                    PerlValue::integer(b.len() as i64)
+                    StrykeValue::integer(b.len() as i64)
                 } else {
                     let s = val.to_string();
                     let n = if self.utf8_pragma {
@@ -12406,7 +12406,7 @@ impl VMHelper {
                     } else {
                         s.len()
                     };
-                    PerlValue::integer(n as i64)
+                    StrykeValue::integer(n as i64)
                 })
             }
             ExprKind::Substr {
@@ -12434,7 +12434,7 @@ impl VMHelper {
                     0
                 };
                 let result = s[pos..].find(&sub).map(|i| (i + pos) as i64).unwrap_or(-1);
-                Ok(PerlValue::integer(result))
+                Ok(StrykeValue::integer(result))
             }
             ExprKind::Rindex {
                 string,
@@ -12450,7 +12450,7 @@ impl VMHelper {
                 };
                 let search = &s[..end.min(s.len())];
                 let result = search.rfind(&sub).map(|i| i as i64).unwrap_or(-1);
-                Ok(PerlValue::integer(result))
+                Ok(StrykeValue::integer(result))
             }
             ExprKind::Sprintf { format, args } => {
                 let fmt = self.eval_expr(format)?.to_string();
@@ -12466,7 +12466,7 @@ impl VMHelper {
                     }
                 }
                 let s = self.perl_sprintf_stringify(&fmt, &arg_vals, line)?;
-                Ok(PerlValue::string(s))
+                Ok(StrykeValue::string(s))
             }
             ExprKind::JoinExpr { separator, list } => {
                 let sep = self.eval_expr(separator)?.to_string();
@@ -12512,7 +12512,7 @@ impl VMHelper {
                 for v in &items {
                     strs.push(self.stringify_value(v.clone(), line)?);
                 }
-                Ok(PerlValue::string(strs.join(&sep)))
+                Ok(StrykeValue::string(strs.join(&sep)))
             }
             ExprKind::SplitExpr {
                 pattern,
@@ -12564,8 +12564,8 @@ impl VMHelper {
                     }
                 }
 
-                Ok(PerlValue::array(
-                    parts.into_iter().map(PerlValue::string).collect(),
+                Ok(StrykeValue::array(
+                    parts.into_iter().map(StrykeValue::string).collect(),
                 ))
             }
 
@@ -12575,56 +12575,56 @@ impl VMHelper {
                 if let Some(r) = self.try_overload_unary_dispatch("abs", &val, line) {
                     return r;
                 }
-                Ok(PerlValue::float(val.to_number().abs()))
+                Ok(StrykeValue::float(val.to_number().abs()))
             }
             ExprKind::Int(expr) => {
                 let val = self.eval_expr(expr)?;
-                Ok(PerlValue::integer(val.to_number() as i64))
+                Ok(StrykeValue::integer(val.to_number() as i64))
             }
             ExprKind::Sqrt(expr) => {
                 let val = self.eval_expr(expr)?;
-                Ok(PerlValue::float(val.to_number().sqrt()))
+                Ok(StrykeValue::float(val.to_number().sqrt()))
             }
             ExprKind::Sin(expr) => {
                 let val = self.eval_expr(expr)?;
-                Ok(PerlValue::float(val.to_number().sin()))
+                Ok(StrykeValue::float(val.to_number().sin()))
             }
             ExprKind::Cos(expr) => {
                 let val = self.eval_expr(expr)?;
-                Ok(PerlValue::float(val.to_number().cos()))
+                Ok(StrykeValue::float(val.to_number().cos()))
             }
             ExprKind::Atan2 { y, x } => {
                 let yv = self.eval_expr(y)?.to_number();
                 let xv = self.eval_expr(x)?.to_number();
-                Ok(PerlValue::float(yv.atan2(xv)))
+                Ok(StrykeValue::float(yv.atan2(xv)))
             }
             ExprKind::Exp(expr) => {
                 let val = self.eval_expr(expr)?;
-                Ok(PerlValue::float(val.to_number().exp()))
+                Ok(StrykeValue::float(val.to_number().exp()))
             }
             ExprKind::Log(expr) => {
                 let val = self.eval_expr(expr)?;
-                Ok(PerlValue::float(val.to_number().ln()))
+                Ok(StrykeValue::float(val.to_number().ln()))
             }
             ExprKind::Rand(upper) => {
                 let u = match upper {
                     Some(e) => self.eval_expr(e)?.to_number(),
                     None => 1.0,
                 };
-                Ok(PerlValue::float(self.perl_rand(u)))
+                Ok(StrykeValue::float(self.perl_rand(u)))
             }
             ExprKind::Srand(seed) => {
                 let s = match seed {
                     Some(e) => Some(self.eval_expr(e)?.to_number()),
                     None => None,
                 };
-                Ok(PerlValue::integer(self.perl_srand(s)))
+                Ok(StrykeValue::integer(self.perl_srand(s)))
             }
             ExprKind::Hex(expr) => {
                 let val = self.eval_expr(expr)?.to_string();
                 let clean = val.trim().trim_start_matches("0x").trim_start_matches("0X");
                 let n = i64::from_str_radix(clean, 16).unwrap_or(0);
-                Ok(PerlValue::integer(n))
+                Ok(StrykeValue::integer(n))
             }
             ExprKind::Oct(expr) => {
                 let val = self.eval_expr(expr)?.to_string();
@@ -12638,14 +12638,14 @@ impl VMHelper {
                 } else {
                     i64::from_str_radix(s.trim_start_matches('0'), 8).unwrap_or(0)
                 };
-                Ok(PerlValue::integer(n))
+                Ok(StrykeValue::integer(n))
             }
 
             // Case
-            ExprKind::Lc(expr) => Ok(PerlValue::string(
+            ExprKind::Lc(expr) => Ok(StrykeValue::string(
                 self.eval_expr(expr)?.to_string().to_lowercase(),
             )),
-            ExprKind::Uc(expr) => Ok(PerlValue::string(
+            ExprKind::Uc(expr) => Ok(StrykeValue::string(
                 self.eval_expr(expr)?.to_string().to_uppercase(),
             )),
             ExprKind::Lcfirst(expr) => {
@@ -12655,7 +12655,7 @@ impl VMHelper {
                     Some(c) => c.to_lowercase().to_string() + chars.as_str(),
                     None => String::new(),
                 };
-                Ok(PerlValue::string(result))
+                Ok(StrykeValue::string(result))
             }
             ExprKind::Ucfirst(expr) => {
                 let s = self.eval_expr(expr)?.to_string();
@@ -12664,15 +12664,15 @@ impl VMHelper {
                     Some(c) => c.to_uppercase().to_string() + chars.as_str(),
                     None => String::new(),
                 };
-                Ok(PerlValue::string(result))
+                Ok(StrykeValue::string(result))
             }
-            ExprKind::Fc(expr) => Ok(PerlValue::string(default_case_fold_str(
+            ExprKind::Fc(expr) => Ok(StrykeValue::string(default_case_fold_str(
                 &self.eval_expr(expr)?.to_string(),
             ))),
             ExprKind::Crypt { plaintext, salt } => {
                 let p = self.eval_expr(plaintext)?.to_string();
                 let sl = self.eval_expr(salt)?.to_string();
-                Ok(PerlValue::string(perl_crypt(&p, &sl)))
+                Ok(StrykeValue::string(perl_crypt(&p, &sl)))
             }
             ExprKind::Pos(e) => {
                 let key = match e {
@@ -12687,8 +12687,8 @@ impl VMHelper {
                     .get(&key)
                     .copied()
                     .flatten()
-                    .map(|p| PerlValue::integer(p as i64))
-                    .unwrap_or(PerlValue::UNDEF))
+                    .map(|p| StrykeValue::integer(p as i64))
+                    .unwrap_or(StrykeValue::UNDEF))
             }
             ExprKind::Study(expr) => {
                 let s = self.eval_expr(expr)?.to_string();
@@ -12700,10 +12700,10 @@ impl VMHelper {
                 // Perl: `defined &foo` / `defined &Pkg::name` — true iff the subroutine exists (no call).
                 if let ExprKind::SubroutineRef(name) = &expr.kind {
                     let exists = self.resolve_sub_by_name(name).is_some();
-                    return Ok(PerlValue::integer(if exists { 1 } else { 0 }));
+                    return Ok(StrykeValue::integer(if exists { 1 } else { 0 }));
                 }
                 let val = self.eval_expr(expr)?;
-                Ok(PerlValue::integer(if val.is_undef() { 0 } else { 1 }))
+                Ok(StrykeValue::integer(if val.is_undef() { 0 } else { 1 }))
             }
             ExprKind::Ref(expr) => {
                 let val = self.eval_expr(expr)?;
@@ -12717,13 +12717,13 @@ impl VMHelper {
             // Char
             ExprKind::Chr(expr) => {
                 let n = self.eval_expr(expr)?.to_int() as u32;
-                Ok(PerlValue::string(
+                Ok(StrykeValue::string(
                     char::from_u32(n).map(|c| c.to_string()).unwrap_or_default(),
                 ))
             }
             ExprKind::Ord(expr) => {
                 let s = self.eval_expr(expr)?.to_string();
-                Ok(PerlValue::integer(
+                Ok(StrykeValue::integer(
                     s.chars().next().map(|c| c as i64).unwrap_or(0),
                 ))
             }
@@ -12737,7 +12737,7 @@ impl VMHelper {
             ExprKind::Open { handle, mode, file } => {
                 if let ExprKind::OpenMyHandle { name } = &handle.kind {
                     self.scope
-                        .declare_scalar_frozen(name, PerlValue::UNDEF, false, None)?;
+                        .declare_scalar_frozen(name, StrykeValue::UNDEF, false, None)?;
                     self.english_note_lexical_scalar(name);
                     let mode_s = self.eval_expr(mode)?.to_string();
                     let file_opt = if let Some(f) = file {
@@ -12818,18 +12818,18 @@ impl VMHelper {
                     #[cfg(unix)]
                     {
                         return match crate::perl_fs::filetest_age_days(&path, *op) {
-                            Some(days) => Ok(PerlValue::float(days)),
-                            None => Ok(PerlValue::UNDEF),
+                            Some(days) => Ok(StrykeValue::float(days)),
+                            None => Ok(StrykeValue::UNDEF),
                         };
                     }
                     #[cfg(not(unix))]
-                    return Ok(PerlValue::UNDEF);
+                    return Ok(StrykeValue::UNDEF);
                 }
                 // -s returns file size (or undef on error)
                 if *op == 's' {
                     return match std::fs::metadata(&path) {
-                        Ok(m) => Ok(PerlValue::integer(m.len() as i64)),
-                        Err(_) => Ok(PerlValue::UNDEF),
+                        Ok(m) => Ok(StrykeValue::integer(m.len() as i64)),
+                        Err(_) => Ok(StrykeValue::UNDEF),
                     };
                 }
                 let result = match op {
@@ -12905,7 +12905,7 @@ impl VMHelper {
                     'B' => crate::perl_fs::filetest_is_binary(&path),
                     _ => false,
                 };
-                Ok(PerlValue::integer(if result { 1 } else { 0 }))
+                Ok(StrykeValue::integer(if result { 1 } else { 0 }))
             }
 
             // System
@@ -12915,7 +12915,7 @@ impl VMHelper {
                     cmd_args.push(self.eval_expr(a)?.to_string());
                 }
                 if cmd_args.is_empty() {
-                    return Ok(PerlValue::integer(-1));
+                    return Ok(StrykeValue::integer(-1));
                 }
                 let status = Command::new("sh")
                     .arg("-c")
@@ -12924,11 +12924,11 @@ impl VMHelper {
                 match status {
                     Ok(s) => {
                         self.record_child_exit_status(s);
-                        Ok(PerlValue::integer(s.code().unwrap_or(-1) as i64))
+                        Ok(StrykeValue::integer(s.code().unwrap_or(-1) as i64))
                     }
                     Err(e) => {
                         self.apply_io_error_to_errno(&e);
-                        Ok(PerlValue::integer(-1))
+                        Ok(StrykeValue::integer(-1))
                     }
                 }
             }
@@ -12938,7 +12938,7 @@ impl VMHelper {
                     cmd_args.push(self.eval_expr(a)?.to_string());
                 }
                 if cmd_args.is_empty() {
-                    return Ok(PerlValue::integer(-1));
+                    return Ok(StrykeValue::integer(-1));
                 }
                 let status = Command::new("sh")
                     .arg("-c")
@@ -12948,7 +12948,7 @@ impl VMHelper {
                     Ok(s) => std::process::exit(s.code().unwrap_or(-1)),
                     Err(e) => {
                         self.apply_io_error_to_errno(&e);
-                        Ok(PerlValue::integer(-1))
+                        Ok(StrykeValue::integer(-1))
                     }
                 }
             }
@@ -12962,7 +12962,7 @@ impl VMHelper {
                         }
                         Err(FlowOrError::Error(e)) => {
                             self.set_eval_error_from_perl_error(&e);
-                            Ok(PerlValue::UNDEF)
+                            Ok(StrykeValue::UNDEF)
                         }
                         Err(FlowOrError::Flow(f)) => Err(FlowOrError::Flow(f)),
                     },
@@ -12976,7 +12976,7 @@ impl VMHelper {
                             }
                             Err(e) => {
                                 self.set_eval_error(e.to_string());
-                                Ok(PerlValue::UNDEF)
+                                Ok(StrykeValue::UNDEF)
                             }
                         }
                     }
@@ -12996,13 +12996,13 @@ impl VMHelper {
                                 Ok(v) => Ok(v),
                                 Err(e) => {
                                     self.set_eval_error(e.to_string());
-                                    Ok(PerlValue::UNDEF)
+                                    Ok(StrykeValue::UNDEF)
                                 }
                             }
                         }
                         Err(e) => {
                             self.apply_io_error_to_errno(&e);
-                            Ok(PerlValue::UNDEF)
+                            Ok(StrykeValue::UNDEF)
                         }
                     }
                 }
@@ -13023,20 +13023,20 @@ impl VMHelper {
             ExprKind::Chdir(expr) => {
                 let path = self.eval_expr(expr)?.to_string();
                 match std::env::set_current_dir(&path) {
-                    Ok(_) => Ok(PerlValue::integer(1)),
+                    Ok(_) => Ok(StrykeValue::integer(1)),
                     Err(e) => {
                         self.apply_io_error_to_errno(&e);
-                        Ok(PerlValue::integer(0))
+                        Ok(StrykeValue::integer(0))
                     }
                 }
             }
             ExprKind::Mkdir { path, mode: _ } => {
                 let p = self.eval_expr(path)?.to_string();
                 match std::fs::create_dir(&p) {
-                    Ok(_) => Ok(PerlValue::integer(1)),
+                    Ok(_) => Ok(StrykeValue::integer(1)),
                     Err(e) => {
                         self.apply_io_error_to_errno(&e);
-                        Ok(PerlValue::integer(0))
+                        Ok(StrykeValue::integer(0))
                     }
                 }
             }
@@ -13048,7 +13048,7 @@ impl VMHelper {
                         count += 1;
                     }
                 }
-                Ok(PerlValue::integer(count))
+                Ok(StrykeValue::integer(count))
             }
             ExprKind::Rename { old, new } => {
                 let o = self.eval_expr(old)?.to_string();
@@ -13061,7 +13061,7 @@ impl VMHelper {
                 for a in &args[1..] {
                     paths.push(self.eval_expr(a)?.to_string());
                 }
-                Ok(PerlValue::integer(crate::perl_fs::chmod_paths(
+                Ok(StrykeValue::integer(crate::perl_fs::chmod_paths(
                     &paths, mode,
                 )))
             }
@@ -13072,7 +13072,7 @@ impl VMHelper {
                 for a in &args[2..] {
                     paths.push(self.eval_expr(a)?.to_string());
                 }
-                Ok(PerlValue::integer(crate::perl_fs::chown_paths(
+                Ok(StrykeValue::integer(crate::perl_fs::chown_paths(
                     &paths, uid, gid,
                 )))
             }
@@ -13120,7 +13120,7 @@ impl VMHelper {
                 } else {
                     self.eval_expr(&args[0])?.to_string()
                 };
-                Ok(PerlValue::iterator(Arc::new(
+                Ok(StrykeValue::iterator(Arc::new(
                     crate::value::FsWalkIterator::new(&dir, true),
                 )))
             }
@@ -13138,7 +13138,7 @@ impl VMHelper {
                 } else {
                     self.eval_expr(&args[0])?.to_string()
                 };
-                Ok(PerlValue::iterator(Arc::new(
+                Ok(StrykeValue::iterator(Arc::new(
                     crate::value::FsWalkIterator::new(&dir, false),
                 )))
             }
@@ -13216,7 +13216,7 @@ impl VMHelper {
             }
             ExprKind::ParSed { args, progress } => {
                 let has_progress = progress.is_some();
-                let mut vals: Vec<PerlValue> = Vec::new();
+                let mut vals: Vec<StrykeValue> = Vec::new();
                 for a in args {
                     vals.push(self.eval_expr(a)?);
                 }
@@ -13232,22 +13232,22 @@ impl VMHelper {
                 } else {
                     self.scope.get_scalar("__PACKAGE__").to_string()
                 };
-                Ok(PerlValue::blessed(Arc::new(
+                Ok(StrykeValue::blessed(Arc::new(
                     crate::value::BlessedRef::new_blessed(class_name, val),
                 )))
             }
             ExprKind::Caller(_) => {
                 // Simplified: return package, file, line
-                Ok(PerlValue::array(vec![
-                    PerlValue::string("main".into()),
-                    PerlValue::string(self.file.clone()),
-                    PerlValue::integer(line as i64),
+                Ok(StrykeValue::array(vec![
+                    StrykeValue::string("main".into()),
+                    StrykeValue::string(self.file.clone()),
+                    StrykeValue::integer(line as i64),
                 ]))
             }
             ExprKind::Wantarray => Ok(match self.wantarray_kind {
-                WantarrayCtx::Void => PerlValue::UNDEF,
-                WantarrayCtx::Scalar => PerlValue::integer(0),
-                WantarrayCtx::List => PerlValue::integer(1),
+                WantarrayCtx::Void => StrykeValue::UNDEF,
+                WantarrayCtx::Scalar => StrykeValue::integer(0),
+                WantarrayCtx::List => StrykeValue::integer(1),
             }),
 
             ExprKind::List(exprs) => {
@@ -13260,7 +13260,7 @@ impl VMHelper {
                         }
                         return self.eval_expr(last);
                     } else {
-                        return Ok(PerlValue::UNDEF);
+                        return Ok(StrykeValue::UNDEF);
                     }
                 }
                 let mut vals = Vec::new();
@@ -13275,7 +13275,7 @@ impl VMHelper {
                 if vals.len() == 1 {
                     Ok(vals.pop().unwrap())
                 } else {
-                    Ok(PerlValue::array(vals))
+                    Ok(StrykeValue::array(vals))
                 }
             }
 
@@ -13284,14 +13284,14 @@ impl VMHelper {
                 if self.eval_postfix_condition(condition)? {
                     self.eval_expr(expr)
                 } else {
-                    Ok(PerlValue::UNDEF)
+                    Ok(StrykeValue::UNDEF)
                 }
             }
             ExprKind::PostfixUnless { expr, condition } => {
                 if !self.eval_postfix_condition(condition)? {
                     self.eval_expr(expr)
                 } else {
-                    Ok(PerlValue::UNDEF)
+                    Ok(StrykeValue::UNDEF)
                 }
             }
             ExprKind::PostfixWhile { expr, condition } => {
@@ -13301,7 +13301,7 @@ impl VMHelper {
                     &expr.kind,
                     ExprKind::Do(inner) if matches!(inner.kind, ExprKind::CodeRef { .. })
                 );
-                let mut last = PerlValue::UNDEF;
+                let mut last = StrykeValue::UNDEF;
                 if is_do_block {
                     loop {
                         last = self.eval_expr(expr)?;
@@ -13324,7 +13324,7 @@ impl VMHelper {
                     &expr.kind,
                     ExprKind::Do(inner) if matches!(inner.kind, ExprKind::CodeRef { .. })
                 );
-                let mut last = PerlValue::UNDEF;
+                let mut last = StrykeValue::UNDEF;
                 if is_do_block {
                     loop {
                         last = self.eval_expr(expr)?;
@@ -13344,7 +13344,7 @@ impl VMHelper {
             }
             ExprKind::PostfixForeach { expr, list } => {
                 let items = self.eval_expr_ctx(list, WantarrayCtx::List)?.to_list();
-                let mut last = PerlValue::UNDEF;
+                let mut last = StrykeValue::UNDEF;
                 for item in items {
                     self.scope.set_topic(item);
                     last = self.eval_expr(expr)?;
@@ -13391,7 +13391,7 @@ impl VMHelper {
     /// String context for blessed objects with `overload '""'`.
     pub(crate) fn stringify_value(
         &mut self,
-        v: PerlValue,
+        v: StrykeValue,
         line: usize,
     ) -> Result<String, FlowOrError> {
         if let Some(r) = self.try_overload_stringify(&v, line) {
@@ -13405,19 +13405,19 @@ impl VMHelper {
     pub(crate) fn perl_sprintf_stringify(
         &mut self,
         fmt: &str,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
     ) -> Result<String, FlowOrError> {
         // Step 1: build the output and collect any `%n` store-targets.
         let (out, pending_n) = {
-            let mut stringify = |v: &PerlValue| -> Result<String, FlowOrError> {
+            let mut stringify = |v: &StrykeValue| -> Result<String, FlowOrError> {
                 self.stringify_value(v.clone(), line)
             };
             perl_sprintf_format_full(fmt, args, &mut stringify)?
         };
         // Step 2: apply any `%n` writes through the proper scope path.
         for (target, count) in pending_n {
-            self.assign_scalar_ref_deref(target, PerlValue::integer(count), line)?;
+            self.assign_scalar_ref_deref(target, StrykeValue::integer(count), line)?;
         }
         Ok(out)
     }
@@ -13469,7 +13469,7 @@ impl VMHelper {
     /// Resolve `write FH` / `write $fh` — same handle shapes as `$fh->print` ([`Self::try_native_method`]).
     pub(crate) fn resolve_write_output_handle(
         &self,
-        v: &PerlValue,
+        v: &StrykeValue,
         line: usize,
     ) -> PerlResult<String> {
         if let Some(n) = v.as_io_handle_name() {
@@ -13498,9 +13498,9 @@ impl VMHelper {
     /// that handle like `write FH`.
     pub(crate) fn write_format_execute(
         &mut self,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         let handle_name = match args.len() {
             0 => self.default_print_handle.clone(),
             1 => self.resolve_write_output_handle(&args[0], line)?,
@@ -13531,12 +13531,12 @@ impl VMHelper {
                 FlowOrError::Flow(_) => PerlError::runtime("write: unexpected control flow", line),
             })?;
         self.write_formatted_print(handle_name.as_str(), &out, line)?;
-        Ok(PerlValue::integer(1))
+        Ok(StrykeValue::integer(1))
     }
 
     pub(crate) fn try_overload_stringify(
         &mut self,
-        v: &PerlValue,
+        v: &StrykeValue,
         line: usize,
     ) -> Option<ExecResult> {
         // Native class instance: look for method named '""' or 'stringify'
@@ -13590,8 +13590,8 @@ impl VMHelper {
     pub(crate) fn try_overload_binop(
         &mut self,
         op: BinOp,
-        lv: &PerlValue,
-        rv: &PerlValue,
+        lv: &StrykeValue,
+        rv: &StrykeValue,
         line: usize,
     ) -> Option<ExecResult> {
         let key = Self::overload_key_for_binop(op)?;
@@ -13634,7 +13634,7 @@ impl VMHelper {
             let sub = self.subs.get(&fq)?.clone();
             return Some(self.call_sub(
                 &sub,
-                vec![invocant, other, PerlValue::string(key.to_string())],
+                vec![invocant, other, StrykeValue::string(key.to_string())],
                 WantarrayCtx::Scalar,
                 line,
             ));
@@ -13650,7 +13650,7 @@ impl VMHelper {
     pub(crate) fn try_overload_unary_dispatch(
         &mut self,
         op_key: &str,
-        val: &PerlValue,
+        val: &StrykeValue,
         line: usize,
     ) -> Option<ExecResult> {
         // Native class instance: look for op_neg, op_bool, op_abs, op_numify
@@ -13684,7 +13684,7 @@ impl VMHelper {
             let sub = self.subs.get(&fq)?.clone();
             return Some(self.call_sub(
                 &sub,
-                vec![val.clone(), PerlValue::string(op_key.to_string())],
+                vec![val.clone(), StrykeValue::string(op_key.to_string())],
                 WantarrayCtx::Scalar,
                 line,
             ));
@@ -13696,8 +13696,8 @@ impl VMHelper {
     fn eval_binop(
         &mut self,
         op: BinOp,
-        lv: &PerlValue,
-        rv: &PerlValue,
+        lv: &StrykeValue,
+        rv: &StrykeValue,
         _line: usize,
     ) -> ExecResult {
         Ok(match op {
@@ -13705,23 +13705,23 @@ impl VMHelper {
             // Perl `+` is numeric addition only; string concatenation is `.`.
             BinOp::Add => {
                 if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
-                    PerlValue::integer(a.wrapping_add(b))
+                    StrykeValue::integer(a.wrapping_add(b))
                 } else {
-                    PerlValue::float(lv.to_number() + rv.to_number())
+                    StrykeValue::float(lv.to_number() + rv.to_number())
                 }
             }
             BinOp::Sub => {
                 if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
-                    PerlValue::integer(a.wrapping_sub(b))
+                    StrykeValue::integer(a.wrapping_sub(b))
                 } else {
-                    PerlValue::float(lv.to_number() - rv.to_number())
+                    StrykeValue::float(lv.to_number() - rv.to_number())
                 }
             }
             BinOp::Mul => {
                 if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
-                    PerlValue::integer(a.wrapping_mul(b))
+                    StrykeValue::integer(a.wrapping_mul(b))
                 } else {
-                    PerlValue::float(lv.to_number() * rv.to_number())
+                    StrykeValue::float(lv.to_number() * rv.to_number())
                 }
             }
             BinOp::Div => {
@@ -13732,9 +13732,9 @@ impl VMHelper {
                         );
                     }
                     if a % b == 0 {
-                        PerlValue::integer(a / b)
+                        StrykeValue::integer(a / b)
                     } else {
-                        PerlValue::float(a as f64 / b as f64)
+                        StrykeValue::float(a as f64 / b as f64)
                     }
                 } else {
                     let d = rv.to_number();
@@ -13743,7 +13743,7 @@ impl VMHelper {
                             PerlError::division_by_zero("Illegal division by zero", _line).into(),
                         );
                     }
-                    PerlValue::float(lv.to_number() / d)
+                    StrykeValue::float(lv.to_number() / d)
                 }
             }
             BinOp::Mod => {
@@ -13751,7 +13751,7 @@ impl VMHelper {
                 if d == 0 {
                     return Err(PerlError::division_by_zero("Illegal modulus zero", _line).into());
                 }
-                PerlValue::integer(crate::value::perl_mod_i64(lv.to_int(), d))
+                StrykeValue::integer(crate::value::perl_mod_i64(lv.to_int(), d))
             }
             BinOp::Pow => {
                 // Under `--compat` or `use bigint;`, `compat_pow` promotes
@@ -13764,45 +13764,45 @@ impl VMHelper {
                         .then(|| u32::try_from(b).ok())
                         .flatten()
                         .and_then(|bu| a.checked_pow(bu))
-                        .map(PerlValue::integer);
-                    int_pow.unwrap_or_else(|| PerlValue::float(lv.to_number().powf(rv.to_number())))
+                        .map(StrykeValue::integer);
+                    int_pow.unwrap_or_else(|| StrykeValue::float(lv.to_number().powf(rv.to_number())))
                 } else {
-                    PerlValue::float(lv.to_number().powf(rv.to_number()))
+                    StrykeValue::float(lv.to_number().powf(rv.to_number()))
                 }
             }
             BinOp::Concat => {
                 let mut s = String::new();
                 lv.append_to(&mut s);
                 rv.append_to(&mut s);
-                PerlValue::string(s)
+                StrykeValue::string(s)
             }
             BinOp::NumEq => {
                 // Struct equality: compare all fields
                 if let (Some(a), Some(b)) = (lv.as_struct_inst(), rv.as_struct_inst()) {
                     if a.def.name != b.def.name {
-                        PerlValue::integer(0)
+                        StrykeValue::integer(0)
                     } else {
                         let av = a.get_values();
                         let bv = b.get_values();
                         let eq = av.len() == bv.len()
                             && av.iter().zip(bv.iter()).all(|(x, y)| x.struct_field_eq(y));
-                        PerlValue::integer(if eq { 1 } else { 0 })
+                        StrykeValue::integer(if eq { 1 } else { 0 })
                     }
                 } else if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
-                    PerlValue::integer(if a == b { 1 } else { 0 })
+                    StrykeValue::integer(if a == b { 1 } else { 0 })
                 } else if !crate::compat_mode() && both_non_numeric_strings_iv(lv, rv) {
                     // Stryke (non-compat) sugar: `==` falls back to string
                     // compare when both operands are non-numeric strings, so
                     // `"G" == "G"` is true (Perl's `0 == 0` numeric is also
                     // true here, but `"G" == "T"` is false in stryke vs
                     // also-true in Perl). See `Op::NumEq` in vm.rs.
-                    PerlValue::integer(if lv.to_string() == rv.to_string() {
+                    StrykeValue::integer(if lv.to_string() == rv.to_string() {
                         1
                     } else {
                         0
                     })
                 } else {
-                    PerlValue::integer(if lv.to_number() == rv.to_number() {
+                    StrykeValue::integer(if lv.to_number() == rv.to_number() {
                         1
                     } else {
                         0
@@ -13811,15 +13811,15 @@ impl VMHelper {
             }
             BinOp::NumNe => {
                 if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
-                    PerlValue::integer(if a != b { 1 } else { 0 })
+                    StrykeValue::integer(if a != b { 1 } else { 0 })
                 } else if !crate::compat_mode() && both_non_numeric_strings_iv(lv, rv) {
-                    PerlValue::integer(if lv.to_string() != rv.to_string() {
+                    StrykeValue::integer(if lv.to_string() != rv.to_string() {
                         1
                     } else {
                         0
                     })
                 } else {
-                    PerlValue::integer(if lv.to_number() != rv.to_number() {
+                    StrykeValue::integer(if lv.to_number() != rv.to_number() {
                         1
                     } else {
                         0
@@ -13828,9 +13828,9 @@ impl VMHelper {
             }
             BinOp::NumLt => {
                 if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
-                    PerlValue::integer(if a < b { 1 } else { 0 })
+                    StrykeValue::integer(if a < b { 1 } else { 0 })
                 } else {
-                    PerlValue::integer(if lv.to_number() < rv.to_number() {
+                    StrykeValue::integer(if lv.to_number() < rv.to_number() {
                         1
                     } else {
                         0
@@ -13839,9 +13839,9 @@ impl VMHelper {
             }
             BinOp::NumGt => {
                 if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
-                    PerlValue::integer(if a > b { 1 } else { 0 })
+                    StrykeValue::integer(if a > b { 1 } else { 0 })
                 } else {
-                    PerlValue::integer(if lv.to_number() > rv.to_number() {
+                    StrykeValue::integer(if lv.to_number() > rv.to_number() {
                         1
                     } else {
                         0
@@ -13850,9 +13850,9 @@ impl VMHelper {
             }
             BinOp::NumLe => {
                 if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
-                    PerlValue::integer(if a <= b { 1 } else { 0 })
+                    StrykeValue::integer(if a <= b { 1 } else { 0 })
                 } else {
-                    PerlValue::integer(if lv.to_number() <= rv.to_number() {
+                    StrykeValue::integer(if lv.to_number() <= rv.to_number() {
                         1
                     } else {
                         0
@@ -13861,9 +13861,9 @@ impl VMHelper {
             }
             BinOp::NumGe => {
                 if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
-                    PerlValue::integer(if a >= b { 1 } else { 0 })
+                    StrykeValue::integer(if a >= b { 1 } else { 0 })
                 } else {
-                    PerlValue::integer(if lv.to_number() >= rv.to_number() {
+                    StrykeValue::integer(if lv.to_number() >= rv.to_number() {
                         1
                     } else {
                         0
@@ -13872,7 +13872,7 @@ impl VMHelper {
             }
             BinOp::Spaceship => {
                 if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
-                    PerlValue::integer(if a < b {
+                    StrykeValue::integer(if a < b {
                         -1
                     } else if a > b {
                         1
@@ -13882,7 +13882,7 @@ impl VMHelper {
                 } else {
                     let a = lv.to_number();
                     let b = rv.to_number();
-                    PerlValue::integer(if a < b {
+                    StrykeValue::integer(if a < b {
                         -1
                     } else if a > b {
                         1
@@ -13891,39 +13891,39 @@ impl VMHelper {
                     })
                 }
             }
-            BinOp::StrEq => PerlValue::integer(if lv.to_string() == rv.to_string() {
+            BinOp::StrEq => StrykeValue::integer(if lv.to_string() == rv.to_string() {
                 1
             } else {
                 0
             }),
-            BinOp::StrNe => PerlValue::integer(if lv.to_string() != rv.to_string() {
+            BinOp::StrNe => StrykeValue::integer(if lv.to_string() != rv.to_string() {
                 1
             } else {
                 0
             }),
-            BinOp::StrLt => PerlValue::integer(if lv.to_string() < rv.to_string() {
+            BinOp::StrLt => StrykeValue::integer(if lv.to_string() < rv.to_string() {
                 1
             } else {
                 0
             }),
-            BinOp::StrGt => PerlValue::integer(if lv.to_string() > rv.to_string() {
+            BinOp::StrGt => StrykeValue::integer(if lv.to_string() > rv.to_string() {
                 1
             } else {
                 0
             }),
-            BinOp::StrLe => PerlValue::integer(if lv.to_string() <= rv.to_string() {
+            BinOp::StrLe => StrykeValue::integer(if lv.to_string() <= rv.to_string() {
                 1
             } else {
                 0
             }),
-            BinOp::StrGe => PerlValue::integer(if lv.to_string() >= rv.to_string() {
+            BinOp::StrGe => StrykeValue::integer(if lv.to_string() >= rv.to_string() {
                 1
             } else {
                 0
             }),
             BinOp::StrCmp => {
                 let cmp = lv.to_string().cmp(&rv.to_string());
-                PerlValue::integer(match cmp {
+                StrykeValue::integer(match cmp {
                     std::cmp::Ordering::Less => -1,
                     std::cmp::Ordering::Greater => 1,
                     std::cmp::Ordering::Equal => 0,
@@ -13933,19 +13933,19 @@ impl VMHelper {
                 if let Some(s) = crate::value::set_intersection(lv, rv) {
                     s
                 } else {
-                    PerlValue::integer(lv.to_int() & rv.to_int())
+                    StrykeValue::integer(lv.to_int() & rv.to_int())
                 }
             }
             BinOp::BitOr => {
                 if let Some(s) = crate::value::set_union(lv, rv) {
                     s
                 } else {
-                    PerlValue::integer(lv.to_int() | rv.to_int())
+                    StrykeValue::integer(lv.to_int() | rv.to_int())
                 }
             }
-            BinOp::BitXor => PerlValue::integer(lv.to_int() ^ rv.to_int()),
-            BinOp::ShiftLeft => PerlValue::integer(lv.to_int() << rv.to_int()),
-            BinOp::ShiftRight => PerlValue::integer(lv.to_int() >> rv.to_int()),
+            BinOp::BitXor => StrykeValue::integer(lv.to_int() ^ rv.to_int()),
+            BinOp::ShiftLeft => StrykeValue::integer(lv.to_int() << rv.to_int()),
+            BinOp::ShiftRight => StrykeValue::integer(lv.to_int() >> rv.to_int()),
             // These should have been handled by short-circuit above
             BinOp::LogAnd
             | BinOp::LogOr
@@ -13987,12 +13987,12 @@ impl VMHelper {
     /// `$$r++` / `$$r--` — returns old value; shared by the VM.
     pub(crate) fn symbolic_scalar_ref_postfix(
         &mut self,
-        ref_val: PerlValue,
+        ref_val: StrykeValue,
         decrement: bool,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         let old = self.symbolic_deref(ref_val.clone(), Sigil::Scalar, line)?;
-        let new_val = PerlValue::integer(old.to_int() + if decrement { -1 } else { 1 });
+        let new_val = StrykeValue::integer(old.to_int() + if decrement { -1 } else { 1 });
         self.assign_scalar_ref_deref(ref_val, new_val, line)?;
         Ok(old)
     }
@@ -14001,18 +14001,18 @@ impl VMHelper {
     /// [`Self::assign_value`] and the VM.
     pub(crate) fn assign_scalar_ref_deref(
         &mut self,
-        ref_val: PerlValue,
-        val: PerlValue,
+        ref_val: StrykeValue,
+        val: StrykeValue,
         line: usize,
     ) -> ExecResult {
         if let Some(name) = ref_val.as_scalar_binding_name() {
             self.set_special_var(&name, &val)
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         if let Some(r) = ref_val.as_scalar_ref() {
             *r.write() = val;
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         // Plain primitive scalar value: under no-strict, perl symbolic-derefs
         // through the string. With `strict 'refs'`, emit perl's exact diagnostic.
@@ -14030,7 +14030,7 @@ impl VMHelper {
             }
             self.set_special_var(&s, &val)
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         Err(PerlError::runtime("Can't assign to non-scalar reference", line).into())
     }
@@ -14038,19 +14038,19 @@ impl VMHelper {
     /// `@{ EXPR } = LIST` — array ref or package name string (mirrors [`Self::symbolic_deref`] for [`Sigil::Array`]).
     pub(crate) fn assign_symbolic_array_ref_deref(
         &mut self,
-        ref_val: PerlValue,
-        val: PerlValue,
+        ref_val: StrykeValue,
+        val: StrykeValue,
         line: usize,
     ) -> ExecResult {
         if let Some(a) = ref_val.as_array_ref() {
             *a.write() = val.to_list();
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         if let Some(name) = ref_val.as_array_binding_name() {
             self.scope
                 .set_array(&name, val.to_list())
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         if let Some(s) = ref_val.as_str() {
             if self.strict_refs {
@@ -14066,7 +14066,7 @@ impl VMHelper {
             self.scope
                 .set_array(&s, val.to_list())
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         Err(PerlError::runtime("Can't assign to non-array reference", line).into())
     }
@@ -14075,8 +14075,8 @@ impl VMHelper {
     /// [`Self::assign_typeglob_value`] or glob-to-glob copy via [`Self::copy_typeglob_slots`].
     pub(crate) fn assign_symbolic_typeglob_ref_deref(
         &mut self,
-        ref_val: PerlValue,
-        val: PerlValue,
+        ref_val: StrykeValue,
+        val: StrykeValue,
         line: usize,
     ) -> ExecResult {
         let lhs_name = if let Some(s) = ref_val.as_str() {
@@ -14107,14 +14107,14 @@ impl VMHelper {
         let rhs_key = val.to_string();
         self.copy_typeglob_slots(&lhs_name, &rhs_key, line)
             .map_err(FlowOrError::Error)?;
-        Ok(PerlValue::UNDEF)
+        Ok(StrykeValue::UNDEF)
     }
 
     /// `%{ EXPR } = LIST` — hash ref or package name string (mirrors [`Self::symbolic_deref`] for [`Sigil::Hash`]).
     pub(crate) fn assign_symbolic_hash_ref_deref(
         &mut self,
-        ref_val: PerlValue,
-        val: PerlValue,
+        ref_val: StrykeValue,
+        val: StrykeValue,
         line: usize,
     ) -> ExecResult {
         let items = val.to_list();
@@ -14126,14 +14126,14 @@ impl VMHelper {
         }
         if let Some(h) = ref_val.as_hash_ref() {
             *h.write() = map;
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         if let Some(name) = ref_val.as_hash_binding_name() {
             self.touch_env_hash(&name);
             self.scope
                 .set_hash(&name, map)
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         if let Some(s) = ref_val.as_str() {
             if self.strict_refs {
@@ -14150,7 +14150,7 @@ impl VMHelper {
             self.scope
                 .set_hash(&s, map)
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         Err(PerlError::runtime("Can't assign to non-hash reference", line).into())
     }
@@ -14158,34 +14158,34 @@ impl VMHelper {
     /// `$href->{key} = $val` and blessed hash slots — shared by [`Self::assign_value`] and the VM.
     pub(crate) fn assign_arrow_hash_deref(
         &mut self,
-        container: PerlValue,
+        container: StrykeValue,
         key: String,
-        val: PerlValue,
+        val: StrykeValue,
         line: usize,
     ) -> ExecResult {
         if let Some(b) = container.as_blessed_ref() {
             let mut data = b.data.write();
             if let Some(r) = data.as_hash_ref() {
                 r.write().insert(key, val);
-                return Ok(PerlValue::UNDEF);
+                return Ok(StrykeValue::UNDEF);
             }
             if let Some(mut map) = data.as_hash_map() {
                 map.insert(key, val);
-                *data = PerlValue::hash(map);
-                return Ok(PerlValue::UNDEF);
+                *data = StrykeValue::hash(map);
+                return Ok(StrykeValue::UNDEF);
             }
             return Err(PerlError::runtime("Can't assign into non-hash blessed ref", line).into());
         }
         if let Some(r) = container.as_hash_ref() {
             r.write().insert(key, val);
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         if let Some(name) = container.as_hash_binding_name() {
             self.touch_env_hash(&name);
             self.scope
                 .set_hash_element(&name, &key, val)
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         Err(PerlError::runtime("Can't assign to arrow hash deref on non-hash(-ref)", line).into())
     }
@@ -14196,7 +14196,7 @@ impl VMHelper {
         &mut self,
         expr: &Expr,
         _line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         match &expr.kind {
             ExprKind::Deref {
                 expr: inner,
@@ -14211,7 +14211,7 @@ impl VMHelper {
         &mut self,
         expr: &Expr,
         _line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         match &expr.kind {
             ExprKind::Deref {
                 expr: inner,
@@ -14224,10 +14224,10 @@ impl VMHelper {
     /// Read `$aref->[$i]` — same indexing as the VM [`crate::bytecode::Op::ArrowArray`].
     pub(crate) fn read_arrow_array_element(
         &self,
-        container: PerlValue,
+        container: StrykeValue,
         idx: i64,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         if let Some(a) = container.as_array_ref() {
             let arr = a.read();
             let i = if idx < 0 {
@@ -14235,7 +14235,7 @@ impl VMHelper {
             } else {
                 idx as usize
             };
-            return Ok(arr.get(i).cloned().unwrap_or(PerlValue::UNDEF));
+            return Ok(arr.get(i).cloned().unwrap_or(StrykeValue::UNDEF));
         }
         if let Some(name) = container.as_array_binding_name() {
             return Ok(self.scope.get_array_element(&name, idx));
@@ -14246,7 +14246,7 @@ impl VMHelper {
             } else {
                 idx as usize
             };
-            return Ok(arr.get(i).cloned().unwrap_or(PerlValue::UNDEF));
+            return Ok(arr.get(i).cloned().unwrap_or(StrykeValue::UNDEF));
         }
         // Blessed arrayref (e.g. `Pair`) — `pairs` returns blessed `Pair` objects that
         // can be indexed via `$_->[0]` / `$_->[1]`.
@@ -14259,7 +14259,7 @@ impl VMHelper {
                 } else {
                     idx as usize
                 };
-                return Ok(arr.get(i).cloned().unwrap_or(PerlValue::UNDEF));
+                return Ok(arr.get(i).cloned().unwrap_or(StrykeValue::UNDEF));
             }
         }
         Err(PerlError::runtime("Can't use arrow deref on non-array-ref", line).into())
@@ -14268,13 +14268,13 @@ impl VMHelper {
     /// Read `$href->{key}` — same as the VM [`crate::bytecode::Op::ArrowHash`].
     pub(crate) fn read_arrow_hash_element(
         &mut self,
-        container: PerlValue,
+        container: StrykeValue,
         key: &str,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         if let Some(r) = container.as_hash_ref() {
             let h = r.read();
-            return Ok(h.get(key).cloned().unwrap_or(PerlValue::UNDEF));
+            return Ok(h.get(key).cloned().unwrap_or(StrykeValue::UNDEF));
         }
         if let Some(name) = container.as_hash_binding_name() {
             self.touch_env_hash(&name);
@@ -14287,7 +14287,7 @@ impl VMHelper {
             }
             if let Some(r) = data.as_hash_ref() {
                 let h = r.read();
-                return Ok(h.get(key).cloned().unwrap_or(PerlValue::UNDEF));
+                return Ok(h.get(key).cloned().unwrap_or(StrykeValue::UNDEF));
             }
             return Err(PerlError::runtime(
                 "Can't access hash field on non-hash blessed ref",
@@ -14298,7 +14298,7 @@ impl VMHelper {
         // Struct field access via hash deref syntax: $struct->{field}
         if let Some(s) = container.as_struct_inst() {
             if let Some(idx) = s.def.field_index(key) {
-                return Ok(s.get_field(idx).unwrap_or(PerlValue::UNDEF));
+                return Ok(s.get_field(idx).unwrap_or(StrykeValue::UNDEF));
             }
             return Err(PerlError::runtime(
                 format!("struct {} has no field `{}`", s.def.name, key),
@@ -14309,7 +14309,7 @@ impl VMHelper {
         // Class instance field access via hash deref: $obj->{field}
         if let Some(c) = container.as_class_inst() {
             if let Some(idx) = c.def.field_index(key) {
-                return Ok(c.get_field(idx).unwrap_or(PerlValue::UNDEF));
+                return Ok(c.get_field(idx).unwrap_or(StrykeValue::UNDEF));
             }
             return Err(PerlError::runtime(
                 format!("class {} has no field `{}`", c.def.name, key),
@@ -14323,13 +14323,13 @@ impl VMHelper {
     /// `$aref->[$i]++` / `$aref->[$i]--` — returns old value; shared by the VM.
     pub(crate) fn arrow_array_postfix(
         &mut self,
-        container: PerlValue,
+        container: StrykeValue,
         idx: i64,
         decrement: bool,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         let old = self.read_arrow_array_element(container.clone(), idx, line)?;
-        let new_val = PerlValue::integer(old.to_int() + if decrement { -1 } else { 1 });
+        let new_val = StrykeValue::integer(old.to_int() + if decrement { -1 } else { 1 });
         self.assign_arrow_array_deref(container, idx, new_val, line)?;
         Ok(old)
     }
@@ -14337,13 +14337,13 @@ impl VMHelper {
     /// `$href->{k}++` / `$href->{k}--` — returns old value; shared by the VM.
     pub(crate) fn arrow_hash_postfix(
         &mut self,
-        container: PerlValue,
+        container: StrykeValue,
         key: String,
         decrement: bool,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         let old = self.read_arrow_hash_element(container.clone(), key.as_str(), line)?;
-        let new_val = PerlValue::integer(old.to_int() + if decrement { -1 } else { 1 });
+        let new_val = StrykeValue::integer(old.to_int() + if decrement { -1 } else { 1 });
         self.assign_arrow_hash_deref(container, key, new_val, line)?;
         Ok(old)
     }
@@ -14360,9 +14360,9 @@ impl VMHelper {
         name: &str,
         want: WantarrayCtx,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         if name == "__PACKAGE__" {
-            return Ok(PerlValue::string(self.current_package()));
+            return Ok(StrykeValue::string(self.current_package()));
         }
         if let Some(sub) = self.resolve_sub_by_name(name) {
             return self.call_sub(&sub, vec![], want, line);
@@ -14371,7 +14371,7 @@ impl VMHelper {
         if let Some(r) = crate::builtins::try_builtin(self, name, &[], line) {
             return r.map_err(Into::into);
         }
-        Ok(PerlValue::string(name.to_string()))
+        Ok(StrykeValue::string(name.to_string()))
     }
 
     /// `@$aref[i1,i2,...]` rvalue — read a slice through an array reference as a list.
@@ -14379,16 +14379,16 @@ impl VMHelper {
     /// compound / inc-dec / assign helpers below.
     pub(crate) fn arrow_array_slice_values(
         &mut self,
-        container: PerlValue,
+        container: StrykeValue,
         indices: &[i64],
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         let mut out = Vec::with_capacity(indices.len());
         for &idx in indices {
             let v = self.read_arrow_array_element(container.clone(), idx, line)?;
             out.push(v);
         }
-        Ok(PerlValue::array(out))
+        Ok(StrykeValue::array(out))
     }
 
     /// `@$aref[i1,i2,...] = LIST` — element-wise assignment for
@@ -14396,20 +14396,20 @@ impl VMHelper {
     /// [`crate::bytecode::Op::SetArrowArraySlice`].
     pub(crate) fn assign_arrow_array_slice(
         &mut self,
-        container: PerlValue,
+        container: StrykeValue,
         indices: Vec<i64>,
-        val: PerlValue,
+        val: StrykeValue,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         if indices.is_empty() {
             return Err(PerlError::runtime("assign to empty array slice", line).into());
         }
         let vals = val.to_list();
         for (i, idx) in indices.iter().enumerate() {
-            let v = vals.get(i).cloned().unwrap_or(PerlValue::UNDEF);
+            let v = vals.get(i).cloned().unwrap_or(StrykeValue::UNDEF);
             self.assign_arrow_array_deref(container.clone(), *idx, v, line)?;
         }
-        Ok(PerlValue::UNDEF)
+        Ok(StrykeValue::UNDEF)
     }
 
     /// Flatten `@a[IX,...]` subscripts to integer indices (range / list specs expand like the VM).
@@ -14443,32 +14443,32 @@ impl VMHelper {
         &mut self,
         stash_array_name: &str,
         indices: Vec<i64>,
-        val: PerlValue,
+        val: StrykeValue,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         if indices.is_empty() {
             return Err(PerlError::runtime("assign to empty array slice", line).into());
         }
         let vals = val.to_list();
         for (i, idx) in indices.iter().enumerate() {
-            let v = vals.get(i).cloned().unwrap_or(PerlValue::UNDEF);
+            let v = vals.get(i).cloned().unwrap_or(StrykeValue::UNDEF);
             self.scope
                 .set_array_element(stash_array_name, *idx, v)
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
         }
-        Ok(PerlValue::UNDEF)
+        Ok(StrykeValue::UNDEF)
     }
 
     /// `@$aref[i1,i2,...] OP= rhs` — Perl 5 applies the compound op only to the **last** index.
     /// Shared by VM [`crate::bytecode::Op::ArrowArraySliceCompound`].
     pub(crate) fn compound_assign_arrow_array_slice(
         &mut self,
-        container: PerlValue,
+        container: StrykeValue,
         indices: Vec<i64>,
         op: BinOp,
-        rhs: PerlValue,
+        rhs: StrykeValue,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         if indices.is_empty() {
             return Err(PerlError::runtime("assign to empty array slice", line).into());
         }
@@ -14485,11 +14485,11 @@ impl VMHelper {
     /// Shared by VM [`crate::bytecode::Op::ArrowArraySliceIncDec`].
     pub(crate) fn arrow_array_slice_inc_dec(
         &mut self,
-        container: PerlValue,
+        container: StrykeValue,
         indices: Vec<i64>,
         kind: u8,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         if indices.is_empty() {
             return Err(
                 PerlError::runtime("array slice increment needs at least one index", line).into(),
@@ -14498,9 +14498,9 @@ impl VMHelper {
         let last_idx = *indices.last().expect("non-empty indices");
         let last_old = self.read_arrow_array_element(container.clone(), last_idx, line)?;
         let new_val = if kind & 1 == 0 {
-            PerlValue::integer(last_old.to_int() + 1)
+            StrykeValue::integer(last_old.to_int() + 1)
         } else {
-            PerlValue::integer(last_old.to_int() - 1)
+            StrykeValue::integer(last_old.to_int() - 1)
         };
         self.assign_arrow_array_deref(container, last_idx, new_val.clone(), line)?;
         Ok(if kind < 2 { new_val } else { last_old })
@@ -14514,15 +14514,15 @@ impl VMHelper {
         indices: Vec<i64>,
         kind: u8,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         let last_idx = *indices.last().ok_or_else(|| {
             PerlError::runtime("array slice increment needs at least one index", line)
         })?;
         let last_old = self.scope.get_array_element(stash_array_name, last_idx);
         let new_val = if kind & 1 == 0 {
-            PerlValue::integer(last_old.to_int() + 1)
+            StrykeValue::integer(last_old.to_int() + 1)
         } else {
-            PerlValue::integer(last_old.to_int() - 1)
+            StrykeValue::integer(last_old.to_int() - 1)
         };
         self.scope
             .set_array_element(stash_array_name, last_idx, new_val.clone())
@@ -14536,9 +14536,9 @@ impl VMHelper {
         stash_array_name: &str,
         indices: Vec<i64>,
         op: BinOp,
-        rhs: PerlValue,
+        rhs: StrykeValue,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         if indices.is_empty() {
             return Err(PerlError::runtime("assign to empty array slice", line).into());
         }
@@ -14554,9 +14554,9 @@ impl VMHelper {
     /// `$aref->[$i] = $val` — shared by [`Self::assign_value`] and the VM.
     pub(crate) fn assign_arrow_array_deref(
         &mut self,
-        container: PerlValue,
+        container: StrykeValue,
         idx: i64,
-        val: PerlValue,
+        val: StrykeValue,
         line: usize,
     ) -> ExecResult {
         if let Some(a) = container.as_array_ref() {
@@ -14567,16 +14567,16 @@ impl VMHelper {
                 idx as usize
             };
             if i >= arr.len() {
-                arr.resize(i + 1, PerlValue::UNDEF);
+                arr.resize(i + 1, StrykeValue::UNDEF);
             }
             arr[i] = val;
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         if let Some(name) = container.as_array_binding_name() {
             self.scope
                 .set_array_element(&name, idx, val)
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         Err(PerlError::runtime("Can't assign to arrow array deref on non-array-ref", line).into())
     }
@@ -14585,7 +14585,7 @@ impl VMHelper {
     pub(crate) fn assign_typeglob_value(
         &mut self,
         name: &str,
-        val: PerlValue,
+        val: StrykeValue,
         line: usize,
     ) -> ExecResult {
         let sub = if let Some(c) = val.as_code_ref() {
@@ -14598,7 +14598,7 @@ impl VMHelper {
         if let Some(sub) = sub {
             let lhs_sub = self.qualify_typeglob_sub_key(name);
             self.subs.insert(lhs_sub, sub);
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         Err(PerlError::runtime(
             "typeglob assignment requires a subroutine reference (e.g. *foo = \\&bar) or another typeglob (*foo = *bar)",
@@ -14607,7 +14607,7 @@ impl VMHelper {
         .into())
     }
 
-    fn assign_value(&mut self, target: &Expr, val: PerlValue) -> ExecResult {
+    fn assign_value(&mut self, target: &Expr, val: StrykeValue) -> ExecResult {
         match &target.kind {
             // `substr($s, $o, $l) = $rhs` — equivalent to the 4-arg form
             // `substr($s, $o, $l, $rhs)`. Evaluate the offset/length
@@ -14643,8 +14643,8 @@ impl VMHelper {
                 new_s.push_str(&s[..start]);
                 new_s.push_str(&val.to_string());
                 new_s.push_str(&s[end..]);
-                self.assign_value(string, PerlValue::string(new_s))?;
-                Ok(PerlValue::UNDEF)
+                self.assign_value(string, StrykeValue::string(new_s))?;
+                Ok(StrykeValue::UNDEF)
             }
             // `(my $copy = $orig) =~ s/.../.../` — at this point the
             // MyExpr has already been evaluated as a side-effect of
@@ -14664,11 +14664,11 @@ impl VMHelper {
                         let stor = self.tree_scalar_storage_name(&first.name);
                         self.set_special_var(&stor, &val)
                             .map_err(|e| FlowOrError::Error(e.at_line(target.line)))?;
-                        Ok(PerlValue::UNDEF)
+                        Ok(StrykeValue::UNDEF)
                     }
                     Sigil::Array => {
                         self.scope.set_array(&first.name, val.to_list())?;
-                        Ok(PerlValue::UNDEF)
+                        Ok(StrykeValue::UNDEF)
                     }
                     Sigil::Hash => {
                         let items = val.to_list();
@@ -14679,9 +14679,9 @@ impl VMHelper {
                             i += 2;
                         }
                         self.scope.set_hash(&first.name, map)?;
-                        Ok(PerlValue::UNDEF)
+                        Ok(StrykeValue::UNDEF)
                     }
-                    Sigil::Typeglob => Ok(PerlValue::UNDEF),
+                    Sigil::Typeglob => Ok(StrykeValue::UNDEF),
                 }
             }
             ExprKind::ScalarVar(name) => {
@@ -14706,15 +14706,15 @@ impl VMHelper {
                             WantarrayCtx::Scalar,
                             target.line,
                         ) {
-                            Ok(_) => Ok(PerlValue::UNDEF),
-                            Err(FlowOrError::Flow(_)) => Ok(PerlValue::UNDEF),
+                            Ok(_) => Ok(StrykeValue::UNDEF),
+                            Err(FlowOrError::Flow(_)) => Ok(StrykeValue::UNDEF),
                             Err(FlowOrError::Error(e)) => Err(FlowOrError::Error(e)),
                         };
                     }
                 }
                 self.set_special_var(&stor, &val)
                     .map_err(|e| FlowOrError::Error(e.at_line(target.line)))?;
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             ExprKind::ArrayVar(name) => {
                 if self.scope.is_array_frozen(name) {
@@ -14738,7 +14738,7 @@ impl VMHelper {
                     .into());
                 }
                 self.scope.set_array(name, val.to_list())?;
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             ExprKind::HashVar(name) => {
                 if self.strict_vars && !name.contains("::") && !self.scope.hash_binding_exists(name)
@@ -14760,7 +14760,7 @@ impl VMHelper {
                     i += 2;
                 }
                 self.scope.set_hash(name, map)?;
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             ExprKind::ArrayElement { array, index } => {
                 if self.strict_vars
@@ -14792,21 +14792,21 @@ impl VMHelper {
                         .unwrap_or_default();
                     let full = format!("{}::STORE", class);
                     if let Some(sub) = self.subs.get(&full).cloned() {
-                        let arg_vals = vec![obj, PerlValue::integer(idx), val];
+                        let arg_vals = vec![obj, StrykeValue::integer(idx), val];
                         return match self.call_sub(
                             &sub,
                             arg_vals,
                             WantarrayCtx::Scalar,
                             target.line,
                         ) {
-                            Ok(_) => Ok(PerlValue::UNDEF),
-                            Err(FlowOrError::Flow(_)) => Ok(PerlValue::UNDEF),
+                            Ok(_) => Ok(StrykeValue::UNDEF),
+                            Err(FlowOrError::Flow(_)) => Ok(StrykeValue::UNDEF),
                             Err(FlowOrError::Error(e)) => Err(FlowOrError::Error(e)),
                         };
                     }
                 }
                 self.scope.set_array_element(&aname, idx, val)?;
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             ExprKind::ArraySlice { array, indices } => {
                 if indices.is_empty() {
@@ -14853,21 +14853,21 @@ impl VMHelper {
                         .unwrap_or_default();
                     let full = format!("{}::STORE", class);
                     if let Some(sub) = self.subs.get(&full).cloned() {
-                        let arg_vals = vec![obj, PerlValue::string(k), val];
+                        let arg_vals = vec![obj, StrykeValue::string(k), val];
                         return match self.call_sub(
                             &sub,
                             arg_vals,
                             WantarrayCtx::Scalar,
                             target.line,
                         ) {
-                            Ok(_) => Ok(PerlValue::UNDEF),
-                            Err(FlowOrError::Flow(_)) => Ok(PerlValue::UNDEF),
+                            Ok(_) => Ok(StrykeValue::UNDEF),
+                            Err(FlowOrError::Flow(_)) => Ok(StrykeValue::UNDEF),
                             Err(FlowOrError::Error(e)) => Err(FlowOrError::Error(e)),
                         };
                     }
                 }
                 self.scope.set_hash_element(hash, &k, val)?;
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             ExprKind::HashSlice { hash, keys } => {
                 if keys.is_empty() {
@@ -14934,7 +14934,7 @@ impl VMHelper {
                             target.line,
                         )?;
                     }
-                    return Ok(PerlValue::UNDEF);
+                    return Ok(StrykeValue::UNDEF);
                 }
                 Err(
                     PerlError::runtime("assign to list slice: unsupported base", target.line)
@@ -14968,7 +14968,7 @@ impl VMHelper {
                             target.line,
                         )?;
                     }
-                    return Ok(PerlValue::UNDEF);
+                    return Ok(StrykeValue::UNDEF);
                 }
                 let idx = self.eval_expr(index)?.to_int();
                 self.assign_arrow_array_deref(container, idx, val, target.line)
@@ -15023,22 +15023,22 @@ impl VMHelper {
                     let u = val.to_int().max(0) as usize;
                     self.regex_pos.insert(key, Some(u));
                 }
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             // List assignment: `($a, $b, ...) = (val1, val2, ...)`
             // RHS is already fully evaluated — distribute elements to targets.
             ExprKind::List(targets) => {
                 let items = val.to_list();
                 for (i, t) in targets.iter().enumerate() {
-                    let v = items.get(i).cloned().unwrap_or(PerlValue::UNDEF);
+                    let v = items.get(i).cloned().unwrap_or(StrykeValue::UNDEF);
                     self.assign_value(t, v)?;
                 }
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             // `($f = EXPR) =~ s///` — assignment returns the target as an lvalue;
             // write the substitution result back to the assignment target.
             ExprKind::Assign { target, .. } => self.assign_value(target, val),
-            _ => Ok(PerlValue::UNDEF),
+            _ => Ok(StrykeValue::UNDEF),
         }
     }
 
@@ -15163,7 +15163,7 @@ impl VMHelper {
             || crate::english::is_known_alias(name)
     }
 
-    pub(crate) fn get_special_var(&self, name: &str) -> PerlValue {
+    pub(crate) fn get_special_var(&self, name: &str) -> StrykeValue {
         // AWK-style aliases always available (no `-MEnglish` needed) — disabled in --compat
         let name = if !crate::compat_mode() {
             match name {
@@ -15173,7 +15173,7 @@ impl VMHelper {
                 "ORS" => "\\",
                 "NF" => {
                     let len = self.scope.array_len("F");
-                    return PerlValue::integer(len as i64);
+                    return StrykeValue::integer(len as i64);
                 }
                 _ => self.english_scalar_name(name),
             }
@@ -15181,37 +15181,37 @@ impl VMHelper {
             self.english_scalar_name(name)
         };
         match name {
-            "$$" => PerlValue::integer(std::process::id() as i64),
+            "$$" => StrykeValue::integer(std::process::id() as i64),
             "_" => self.scope.get_scalar("_"),
-            "^MATCH" => PerlValue::string(self.last_match.clone()),
-            "^PREMATCH" => PerlValue::string(self.prematch.clone()),
-            "^POSTMATCH" => PerlValue::string(self.postmatch.clone()),
-            "^LAST_SUBMATCH_RESULT" => PerlValue::string(self.last_paren_match.clone()),
-            "0" => PerlValue::string(self.program_name.clone()),
-            "!" => PerlValue::errno_dual(self.errno_code, self.errno.clone()),
+            "^MATCH" => StrykeValue::string(self.last_match.clone()),
+            "^PREMATCH" => StrykeValue::string(self.prematch.clone()),
+            "^POSTMATCH" => StrykeValue::string(self.postmatch.clone()),
+            "^LAST_SUBMATCH_RESULT" => StrykeValue::string(self.last_paren_match.clone()),
+            "0" => StrykeValue::string(self.program_name.clone()),
+            "!" => StrykeValue::errno_dual(self.errno_code, self.errno.clone()),
             "@" => {
                 if let Some(ref v) = self.eval_error_value {
                     v.clone()
                 } else {
-                    PerlValue::errno_dual(self.eval_error_code, self.eval_error.clone())
+                    StrykeValue::errno_dual(self.eval_error_code, self.eval_error.clone())
                 }
             }
             "/" => match &self.irs {
-                Some(s) => PerlValue::string(s.clone()),
-                None => PerlValue::UNDEF,
+                Some(s) => StrykeValue::string(s.clone()),
+                None => StrykeValue::UNDEF,
             },
-            "\\" => PerlValue::string(self.ors.clone()),
-            "," => PerlValue::string(self.ofs.clone()),
+            "\\" => StrykeValue::string(self.ors.clone()),
+            "," => StrykeValue::string(self.ofs.clone()),
             "." => {
                 // Perl: `$.` is undefined until a line is read (or `-n`/`-p` advances `line_number`).
                 if self.last_readline_handle.is_empty() {
                     if self.line_number == 0 {
-                        PerlValue::UNDEF
+                        StrykeValue::UNDEF
                     } else {
-                        PerlValue::integer(self.line_number)
+                        StrykeValue::integer(self.line_number)
                     }
                 } else {
-                    PerlValue::integer(
+                    StrykeValue::integer(
                         *self
                             .handle_line_numbers
                             .get(&self.last_readline_handle)
@@ -15219,67 +15219,67 @@ impl VMHelper {
                     )
                 }
             }
-            "]" => PerlValue::float(perl_bracket_version()),
-            ";" => PerlValue::string(self.subscript_sep.clone()),
-            "ARGV" => PerlValue::string(self.argv_current_file.clone()),
-            "^I" => PerlValue::string(self.inplace_edit.clone()),
-            "^D" => PerlValue::integer(self.debug_flags),
-            "^P" => PerlValue::integer(self.perl_debug_flags),
-            "^S" => PerlValue::integer(if self.eval_nesting > 0 { 1 } else { 0 }),
-            "^W" => PerlValue::integer(if self.warnings { 1 } else { 0 }),
-            "^O" => PerlValue::string(perl_osname()),
-            "^T" => PerlValue::integer(self.script_start_time),
-            "^V" => PerlValue::string(perl_version_v_string()),
-            "^E" => PerlValue::string(extended_os_error_string()),
-            "^H" => PerlValue::integer(self.compile_hints),
-            "^WARNING_BITS" => PerlValue::integer(self.warning_bits),
-            "^GLOBAL_PHASE" => PerlValue::string(self.global_phase.clone()),
-            "<" | ">" => PerlValue::integer(unix_id_for_special(name)),
-            "(" | ")" => PerlValue::string(unix_group_list_for_special(name)),
-            "?" => PerlValue::integer(self.child_exit_status),
-            "|" => PerlValue::integer(if self.output_autoflush { 1 } else { 0 }),
-            "\"" => PerlValue::string(self.list_separator.clone()),
-            "+" => PerlValue::string(self.last_paren_match.clone()),
-            "%" => PerlValue::integer(self.format_page_number),
-            "=" => PerlValue::integer(self.format_lines_per_page),
-            "-" => PerlValue::integer(self.format_lines_left),
-            ":" => PerlValue::string(self.format_line_break_chars.clone()),
-            "*" => PerlValue::integer(if self.multiline_match { 1 } else { 0 }),
-            "^" => PerlValue::string(self.format_top_name.clone()),
-            "INC" => PerlValue::integer(self.inc_hook_index),
-            "^A" => PerlValue::string(self.accumulator_format.clone()),
-            "^C" => PerlValue::integer(if self.sigint_pending_caret.replace(false) {
+            "]" => StrykeValue::float(perl_bracket_version()),
+            ";" => StrykeValue::string(self.subscript_sep.clone()),
+            "ARGV" => StrykeValue::string(self.argv_current_file.clone()),
+            "^I" => StrykeValue::string(self.inplace_edit.clone()),
+            "^D" => StrykeValue::integer(self.debug_flags),
+            "^P" => StrykeValue::integer(self.perl_debug_flags),
+            "^S" => StrykeValue::integer(if self.eval_nesting > 0 { 1 } else { 0 }),
+            "^W" => StrykeValue::integer(if self.warnings { 1 } else { 0 }),
+            "^O" => StrykeValue::string(perl_osname()),
+            "^T" => StrykeValue::integer(self.script_start_time),
+            "^V" => StrykeValue::string(perl_version_v_string()),
+            "^E" => StrykeValue::string(extended_os_error_string()),
+            "^H" => StrykeValue::integer(self.compile_hints),
+            "^WARNING_BITS" => StrykeValue::integer(self.warning_bits),
+            "^GLOBAL_PHASE" => StrykeValue::string(self.global_phase.clone()),
+            "<" | ">" => StrykeValue::integer(unix_id_for_special(name)),
+            "(" | ")" => StrykeValue::string(unix_group_list_for_special(name)),
+            "?" => StrykeValue::integer(self.child_exit_status),
+            "|" => StrykeValue::integer(if self.output_autoflush { 1 } else { 0 }),
+            "\"" => StrykeValue::string(self.list_separator.clone()),
+            "+" => StrykeValue::string(self.last_paren_match.clone()),
+            "%" => StrykeValue::integer(self.format_page_number),
+            "=" => StrykeValue::integer(self.format_lines_per_page),
+            "-" => StrykeValue::integer(self.format_lines_left),
+            ":" => StrykeValue::string(self.format_line_break_chars.clone()),
+            "*" => StrykeValue::integer(if self.multiline_match { 1 } else { 0 }),
+            "^" => StrykeValue::string(self.format_top_name.clone()),
+            "INC" => StrykeValue::integer(self.inc_hook_index),
+            "^A" => StrykeValue::string(self.accumulator_format.clone()),
+            "^C" => StrykeValue::integer(if self.sigint_pending_caret.replace(false) {
                 1
             } else {
                 0
             }),
-            "^F" => PerlValue::integer(self.max_system_fd),
-            "^L" => PerlValue::string(self.formfeed_string.clone()),
-            "^M" => PerlValue::string(self.emergency_memory.clone()),
-            "^N" => PerlValue::string(self.last_subpattern_name.clone()),
-            "^X" => PerlValue::string(self.executable_path.clone()),
+            "^F" => StrykeValue::integer(self.max_system_fd),
+            "^L" => StrykeValue::string(self.formfeed_string.clone()),
+            "^M" => StrykeValue::string(self.emergency_memory.clone()),
+            "^N" => StrykeValue::string(self.last_subpattern_name.clone()),
+            "^X" => StrykeValue::string(self.executable_path.clone()),
             // perlvar ${^…} — stubs with sane defaults where Perl exposes constants.
-            "^TAINT" | "^TAINTED" => PerlValue::integer(0),
-            "^UNICODE" => PerlValue::integer(if self.utf8_pragma { 1 } else { 0 }),
-            "^OPEN" => PerlValue::integer(if self.open_pragma_utf8 { 1 } else { 0 }),
-            "^UTF8LOCALE" => PerlValue::integer(0),
-            "^UTF8CACHE" => PerlValue::integer(-1),
+            "^TAINT" | "^TAINTED" => StrykeValue::integer(0),
+            "^UNICODE" => StrykeValue::integer(if self.utf8_pragma { 1 } else { 0 }),
+            "^OPEN" => StrykeValue::integer(if self.open_pragma_utf8 { 1 } else { 0 }),
+            "^UTF8LOCALE" => StrykeValue::integer(0),
+            "^UTF8CACHE" => StrykeValue::integer(-1),
             _ if name.starts_with('^') && name.len() > 1 => self
                 .special_caret_scalars
                 .get(name)
                 .cloned()
-                .unwrap_or(PerlValue::UNDEF),
+                .unwrap_or(StrykeValue::UNDEF),
             _ if name.starts_with('#') && name.len() > 1 => {
                 let arr = &name[1..];
                 let aname = self.stash_array_name_for_package(arr);
                 let len = self.scope.array_len(&aname);
-                PerlValue::integer(len as i64 - 1)
+                StrykeValue::integer(len as i64 - 1)
             }
             _ => self.scope.get_scalar(name),
         }
     }
 
-    pub(crate) fn set_special_var(&mut self, name: &str, val: &PerlValue) -> Result<(), PerlError> {
+    pub(crate) fn set_special_var(&mut self, name: &str, val: &StrykeValue) -> Result<(), PerlError> {
         let name = self.english_scalar_name(name);
         match name {
             "!" => {
@@ -15394,7 +15394,7 @@ impl VMHelper {
                     (new_last as usize) + 1
                 };
                 let mut current = self.scope.get_array(&aname);
-                current.resize(new_len, PerlValue::UNDEF);
+                current.resize(new_len, StrykeValue::UNDEF);
                 self.scope.set_array(&aname, current)?;
             }
             _ => self.scope.set_scalar(name, val.clone())?,
@@ -15423,7 +15423,7 @@ impl VMHelper {
     fn try_eval_array_deref_container(
         &mut self,
         expr: &Expr,
-    ) -> Result<Option<PerlValue>, FlowOrError> {
+    ) -> Result<Option<StrykeValue>, FlowOrError> {
         let e = Self::peel_array_builtin_operand(expr);
         if let ExprKind::Deref {
             expr: inner,
@@ -15438,13 +15438,13 @@ impl VMHelper {
     /// Evaluate `inner` and return an array ref, auto-vivifying when the result is undef
     /// and `inner` denotes a writable lvalue (scalar var, hash element, array element).
     /// Mirrors Perl 5: `push @{$h{k}}, $x` creates `$h{k}` as an arrayref on demand.
-    fn eval_or_autoviv_array_ref(&mut self, inner: &Expr) -> Result<PerlValue, FlowOrError> {
+    fn eval_or_autoviv_array_ref(&mut self, inner: &Expr) -> Result<StrykeValue, FlowOrError> {
         let line = inner.line;
         let val = self.eval_expr(inner)?;
         if !val.is_undef() {
             return Ok(val);
         }
-        let new_ref = PerlValue::array_ref(Arc::new(RwLock::new(Vec::new())));
+        let new_ref = StrykeValue::array_ref(Arc::new(RwLock::new(Vec::new())));
         match &inner.kind {
             ExprKind::ScalarVar(name) => {
                 self.scope
@@ -15485,11 +15485,11 @@ impl VMHelper {
     pub(crate) fn package_version_scalar(
         &mut self,
         package: &str,
-    ) -> PerlResult<Option<PerlValue>> {
+    ) -> PerlResult<Option<StrykeValue>> {
         let saved_pkg = self.scope.get_scalar("__PACKAGE__");
         let _ = self
             .scope
-            .set_scalar("__PACKAGE__", PerlValue::string(package.to_string()));
+            .set_scalar("__PACKAGE__", StrykeValue::string(package.to_string()));
         let ver = self.get_special_var("VERSION");
         let _ = self.scope.set_scalar("__PACKAGE__", saved_pkg);
         Ok(if ver.is_undef() { None } else { Some(ver) })
@@ -15522,7 +15522,7 @@ impl VMHelper {
     pub(crate) fn try_autoload_call(
         &mut self,
         missing_name: &str,
-        args: Vec<PerlValue>,
+        args: Vec<StrykeValue>,
         line: usize,
         want: WantarrayCtx,
         method_invocant_class: Option<&str>,
@@ -15542,14 +15542,14 @@ impl VMHelper {
         let sub = self.resolve_autoload_sub(start_pkg)?;
         if let Err(e) = self
             .scope
-            .set_scalar("AUTOLOAD", PerlValue::string(full.clone()))
+            .set_scalar("AUTOLOAD", StrykeValue::string(full.clone()))
         {
             return Some(Err(e.into()));
         }
         Some(self.call_sub(&sub, args, want, line))
     }
 
-    pub(crate) fn with_topic_default_args(&self, args: Vec<PerlValue>) -> Vec<PerlValue> {
+    pub(crate) fn with_topic_default_args(&self, args: Vec<StrykeValue>) -> Vec<StrykeValue> {
         if args.is_empty() {
             vec![self.scope.get_scalar("_").clone()]
         } else {
@@ -15561,8 +15561,8 @@ impl VMHelper {
     /// and [`crate::bytecode::Op::IndirectCall`].
     pub(crate) fn dispatch_indirect_call(
         &mut self,
-        target: PerlValue,
-        arg_vals: Vec<PerlValue>,
+        target: StrykeValue,
+        arg_vals: Vec<StrykeValue>,
         want: WantarrayCtx,
         line: usize,
     ) -> ExecResult {
@@ -15582,7 +15582,7 @@ impl VMHelper {
     pub(crate) fn call_bare_list_builtin(
         &mut self,
         name: &str,
-        args: Vec<PerlValue>,
+        args: Vec<StrykeValue>,
         line: usize,
         want: WantarrayCtx,
     ) -> ExecResult {
@@ -15616,7 +15616,7 @@ impl VMHelper {
     fn call_named_sub(
         &mut self,
         name: &str,
-        args: Vec<PerlValue>,
+        args: Vec<StrykeValue>,
         line: usize,
         want: WantarrayCtx,
     ) -> ExecResult {
@@ -15644,7 +15644,7 @@ impl VMHelper {
                 if !args.is_empty() {
                     return Err(PerlError::runtime("deque() takes no arguments", line).into());
                 }
-                Ok(PerlValue::deque(Arc::new(Mutex::new(VecDeque::new()))))
+                Ok(StrykeValue::deque(Arc::new(Mutex::new(VecDeque::new()))))
             }
             "defer__internal" => {
                 if args.len() != 1 {
@@ -15655,7 +15655,7 @@ impl VMHelper {
                     .into());
                 }
                 self.scope.push_defer(args[0].clone());
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             "heap" => {
                 if args.len() != 1 {
@@ -15664,7 +15664,7 @@ impl VMHelper {
                     );
                 }
                 if let Some(sub) = args[0].as_code_ref() {
-                    Ok(PerlValue::heap(Arc::new(Mutex::new(PerlHeap {
+                    Ok(StrykeValue::heap(Arc::new(Mutex::new(PerlHeap {
                         items: Vec::new(),
                         cmp: Arc::clone(&sub),
                     }))))
@@ -15681,7 +15681,7 @@ impl VMHelper {
                         items.push(v);
                     }
                 }
-                Ok(PerlValue::pipeline(Arc::new(Mutex::new(PipelineInner {
+                Ok(StrykeValue::pipeline(Arc::new(Mutex::new(PipelineInner {
                     source: items,
                     ops: Vec::new(),
                     has_scalar_terminal: false,
@@ -15724,7 +15724,7 @@ impl VMHelper {
                     .into());
                 }
                 let n = args[0].to_int().max(1) as usize;
-                Ok(PerlValue::barrier(PerlBarrier(Arc::new(Barrier::new(n)))))
+                Ok(StrykeValue::barrier(PerlBarrier(Arc::new(Barrier::new(n)))))
             }
             "cluster" => {
                 let items = if args.len() == 1 {
@@ -15734,7 +15734,7 @@ impl VMHelper {
                 };
                 let c = RemoteCluster::from_list_args(&items)
                     .map_err(|msg| PerlError::runtime(msg, line))?;
-                Ok(PerlValue::remote_cluster(Arc::new(c)))
+                Ok(StrykeValue::remote_cluster(Arc::new(c)))
             }
             _ => {
                 // Late static binding: static::method() resolves to runtime class of $self
@@ -15845,7 +15845,7 @@ impl VMHelper {
     pub(crate) fn struct_construct(
         &mut self,
         def: &Arc<StructDef>,
-        args: Vec<PerlValue>,
+        args: Vec<StrykeValue>,
         line: usize,
     ) -> ExecResult {
         // Detect if args are named (key => value pairs) or positional
@@ -15897,7 +15897,7 @@ impl VMHelper {
     pub(crate) fn class_construct(
         &mut self,
         def: &Arc<ClassDef>,
-        args: Vec<PerlValue>,
+        args: Vec<StrykeValue>,
         _line: usize,
     ) -> ExecResult {
         use crate::value::ClassInstance;
@@ -15922,7 +15922,7 @@ impl VMHelper {
                 all_fields.iter().any(|(name, _, _)| name == &s)
             });
 
-        let provided: Vec<(String, PerlValue)> = if is_named {
+        let provided: Vec<(String, StrykeValue)> = if is_named {
             let mut pairs = Vec::new();
             let mut i = 0;
             while i + 1 < args.len() {
@@ -15948,7 +15948,7 @@ impl VMHelper {
             } else if let Some(ref expr) = default {
                 self.eval_expr(expr)?
             } else {
-                PerlValue::UNDEF
+                StrykeValue::UNDEF
             };
             ty.check_value(&val).map_err(|msg| {
                 PerlError::type_error(
@@ -15961,7 +15961,7 @@ impl VMHelper {
 
         // Compute full ISA chain for type checking
         let isa_chain = self.mro_linearize(&def.name);
-        let instance = PerlValue::class_inst(Arc::new(ClassInstance::new_with_isa(
+        let instance = StrykeValue::class_inst(Arc::new(ClassInstance::new_with_isa(
             Arc::clone(def),
             values,
             isa_chain,
@@ -16006,7 +16006,7 @@ impl VMHelper {
     /// undef, code refs, regex refs, blessed-non-hash refs, …) round-trip
     /// unchanged. Used by `$obj->to_hash_rec` for both class and struct
     /// receivers.
-    pub(crate) fn deep_to_hash_value(&self, v: &PerlValue) -> PerlValue {
+    pub(crate) fn deep_to_hash_value(&self, v: &StrykeValue) -> StrykeValue {
         // Class instance: hashref of fields, recursing into each value.
         if let Some(c) = v.as_class_inst() {
             let all_fields = self.collect_class_fields_full(&c.def);
@@ -16017,7 +16017,7 @@ impl VMHelper {
                     map.insert(name.clone(), self.deep_to_hash_value(elem));
                 }
             }
-            return PerlValue::hash_ref(Arc::new(RwLock::new(map)));
+            return StrykeValue::hash_ref(Arc::new(RwLock::new(map)));
         }
         // Struct instance: same shape, declaration order.
         if let Some(s) = v.as_struct_inst() {
@@ -16028,7 +16028,7 @@ impl VMHelper {
                     map.insert(field.name.clone(), self.deep_to_hash_value(elem));
                 }
             }
-            return PerlValue::hash_ref(Arc::new(RwLock::new(map)));
+            return StrykeValue::hash_ref(Arc::new(RwLock::new(map)));
         }
         // Hashref: clone keys, recurse into values.
         if let Some(r) = v.as_hash_ref() {
@@ -16037,13 +16037,13 @@ impl VMHelper {
             for (k, val) in inner.into_iter() {
                 map.insert(k, self.deep_to_hash_value(&val));
             }
-            return PerlValue::hash_ref(Arc::new(RwLock::new(map)));
+            return StrykeValue::hash_ref(Arc::new(RwLock::new(map)));
         }
         // Arrayref: recurse into elements.
         if let Some(r) = v.as_array_ref() {
             let inner = r.read().clone();
-            let out: Vec<PerlValue> = inner.iter().map(|e| self.deep_to_hash_value(e)).collect();
-            return PerlValue::array_ref(Arc::new(RwLock::new(out)));
+            let out: Vec<StrykeValue> = inner.iter().map(|e| self.deep_to_hash_value(e)).collect();
+            return StrykeValue::array_ref(Arc::new(RwLock::new(out)));
         }
         // Everything else (scalars, blessed refs, code refs, enums, …)
         // round-trips unchanged. Enum instances stringify naturally
@@ -16164,7 +16164,7 @@ impl VMHelper {
         &mut self,
         def: &Arc<EnumDef>,
         variant_name: &str,
-        args: Vec<PerlValue>,
+        args: Vec<StrykeValue>,
         line: usize,
     ) -> ExecResult {
         let variant_idx = def.variant_index(variant_name).ok_or_else(|| {
@@ -16188,7 +16188,7 @@ impl VMHelper {
             if args.len() == 1 {
                 args.into_iter().next().unwrap()
             } else {
-                PerlValue::array(args)
+                StrykeValue::array(args)
             }
         } else {
             if !args.is_empty() {
@@ -16201,10 +16201,10 @@ impl VMHelper {
                 )
                 .into());
             }
-            PerlValue::UNDEF
+            StrykeValue::UNDEF
         };
         let inst = crate::value::EnumInstance::new(Arc::clone(def), variant_idx, data);
-        Ok(PerlValue::enum_inst(Arc::new(inst)))
+        Ok(StrykeValue::enum_inst(Arc::new(inst)))
     }
 
     /// True if `name` is a registered or standard process-global handle.
@@ -16221,9 +16221,9 @@ impl VMHelper {
         &mut self,
         name: &str,
         method: &str,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         match method {
             "print" => self.io_handle_print(name, args, false, line),
             "say" => self.io_handle_print(name, args, true, line),
@@ -16248,7 +16248,7 @@ impl VMHelper {
                     return Err(PerlError::runtime("eof: too many arguments", line));
                 }
                 let at_eof = !self.has_input_handle(name);
-                Ok(PerlValue::integer(if at_eof { 1 } else { 0 }))
+                Ok(StrykeValue::integer(if at_eof { 1 } else { 0 }))
             }
             "getc" => {
                 if !args.is_empty() {
@@ -16257,7 +16257,7 @@ impl VMHelper {
                 match crate::builtins::try_builtin(
                     self,
                     "getc",
-                    &[PerlValue::string(name.to_string())],
+                    &[StrykeValue::string(name.to_string())],
                     line,
                 ) {
                     Some(r) => r,
@@ -16267,7 +16267,7 @@ impl VMHelper {
             "binmode" => match crate::builtins::try_builtin(
                 self,
                 "binmode",
-                &[PerlValue::string(name.to_string())],
+                &[StrykeValue::string(name.to_string())],
                 line,
             ) {
                 Some(r) => r,
@@ -16276,7 +16276,7 @@ impl VMHelper {
             "fileno" => match crate::builtins::try_builtin(
                 self,
                 "fileno",
-                &[PerlValue::string(name.to_string())],
+                &[StrykeValue::string(name.to_string())],
                 line,
             ) {
                 Some(r) => r,
@@ -16295,7 +16295,7 @@ impl VMHelper {
         }
     }
 
-    fn io_handle_flush(&mut self, handle_name: &str, line: usize) -> PerlResult<PerlValue> {
+    fn io_handle_flush(&mut self, handle_name: &str, line: usize) -> PerlResult<StrykeValue> {
         match handle_name {
             "STDOUT" => {
                 let _ = IoWrite::flush(&mut io::stdout());
@@ -16314,16 +16314,16 @@ impl VMHelper {
                 }
             }
         }
-        Ok(PerlValue::integer(1))
+        Ok(StrykeValue::integer(1))
     }
 
     fn io_handle_print(
         &mut self,
         handle_name: &str,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         newline: bool,
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         if newline && (self.feature_bits & FEAT_SAY) == 0 {
             return Err(PerlError::runtime(
                 "say() is disabled (enable with use feature 'say' or use feature ':5.10')",
@@ -16348,7 +16348,7 @@ impl VMHelper {
         output.push_str(&self.ors);
 
         self.write_formatted_print(handle_name, &output, line)?;
-        Ok(PerlValue::integer(1))
+        Ok(StrykeValue::integer(1))
     }
 
     /// Write a fully formatted `print`/`say` record (`LIST`, optional `say` newline, `$\`) to a handle.
@@ -16392,10 +16392,10 @@ impl VMHelper {
     fn io_handle_printf(
         &mut self,
         handle_name: &str,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<PerlValue> {
-        let (fmt, rest): (String, &[PerlValue]) = if args.is_empty() {
+    ) -> PerlResult<StrykeValue> {
+        let (fmt, rest): (String, &[StrykeValue]) = if args.is_empty() {
             let s = match self.stringify_value(self.scope.get_scalar("_").clone(), line) {
                 Ok(s) => s,
                 Err(FlowOrError::Error(e)) => return Err(e),
@@ -16447,17 +16447,17 @@ impl VMHelper {
                 }
             }
         }
-        Ok(PerlValue::integer(1))
+        Ok(StrykeValue::integer(1))
     }
 
     /// `deque` / `heap` method dispatch (`$q->push_back`, `$pq->pop`, …).
     pub(crate) fn try_native_method(
         &mut self,
-        receiver: &PerlValue,
+        receiver: &StrykeValue,
         method: &str,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> Option<PerlResult<PerlValue>> {
+    ) -> Option<PerlResult<StrykeValue>> {
         if let Some(name) = receiver.as_io_handle_name() {
             return Some(self.io_handle_method(&name, method, args, line));
         }
@@ -16474,7 +16474,7 @@ impl VMHelper {
             if let Some(idx) = s.def.field_index(method) {
                 match args.len() {
                     0 => {
-                        return Some(Ok(s.get_field(idx).unwrap_or(PerlValue::UNDEF)));
+                        return Some(Ok(s.get_field(idx).unwrap_or(StrykeValue::UNDEF)));
                     }
                     1 => {
                         let field = &s.def.fields[idx];
@@ -16529,7 +16529,7 @@ impl VMHelper {
                         }
                         i += 2;
                     }
-                    return Some(Ok(PerlValue::struct_inst(Arc::new(
+                    return Some(Ok(StrykeValue::struct_inst(Arc::new(
                         crate::value::StructInstance::new(Arc::clone(&s.def), new_values),
                     ))));
                 }
@@ -16546,7 +16546,7 @@ impl VMHelper {
                     for (i, field) in s.def.fields.iter().enumerate() {
                         map.insert(field.name.clone(), values[i].clone());
                     }
-                    return Some(Ok(PerlValue::hash_ref(Arc::new(RwLock::new(map)))));
+                    return Some(Ok(StrykeValue::hash_ref(Arc::new(RwLock::new(map)))));
                 }
                 "to_hash_rec" | "to_hash_deep" => {
                     // Like to_hash but recurse: nested struct/class/hash/
@@ -16567,13 +16567,13 @@ impl VMHelper {
                             line,
                         )));
                     }
-                    let names: Vec<PerlValue> = s
+                    let names: Vec<StrykeValue> = s
                         .def
                         .fields
                         .iter()
-                        .map(|f| PerlValue::string(f.name.clone()))
+                        .map(|f| StrykeValue::string(f.name.clone()))
                         .collect();
-                    return Some(Ok(PerlValue::array(names)));
+                    return Some(Ok(StrykeValue::array(names)));
                 }
                 "clone" => {
                     // Clone: $p->clone deep copies
@@ -16584,7 +16584,7 @@ impl VMHelper {
                         )));
                     }
                     let new_values = s.get_values().iter().map(|v| v.deep_clone()).collect();
-                    return Some(Ok(PerlValue::struct_inst(Arc::new(
+                    return Some(Ok(StrykeValue::struct_inst(Arc::new(
                         crate::value::StructInstance::new(Arc::clone(&s.def), new_values),
                     ))));
                 }
@@ -16665,7 +16665,7 @@ impl VMHelper {
 
                 match args.len() {
                     0 => {
-                        return Some(Ok(c.get_field(idx).unwrap_or(PerlValue::UNDEF)));
+                        return Some(Ok(c.get_field(idx).unwrap_or(StrykeValue::UNDEF)));
                     }
                     1 => {
                         let new_val = args[0].clone();
@@ -16715,7 +16715,7 @@ impl VMHelper {
                         }
                         i += 2;
                     }
-                    return Some(Ok(PerlValue::class_inst(Arc::new(
+                    return Some(Ok(StrykeValue::class_inst(Arc::new(
                         crate::value::ClassInstance::new_with_isa(
                             Arc::clone(&c.def),
                             new_values,
@@ -16737,7 +16737,7 @@ impl VMHelper {
                             map.insert(name.clone(), v.clone());
                         }
                     }
-                    return Some(Ok(PerlValue::hash_ref(Arc::new(RwLock::new(map)))));
+                    return Some(Ok(StrykeValue::hash_ref(Arc::new(RwLock::new(map)))));
                 }
                 "to_hash_rec" | "to_hash_deep" => {
                     // Recursive flatten: nested class/struct/hash/array
@@ -16759,11 +16759,11 @@ impl VMHelper {
                             line,
                         )));
                     }
-                    let names: Vec<PerlValue> = all_fields
+                    let names: Vec<StrykeValue> = all_fields
                         .iter()
-                        .map(|(name, _, _)| PerlValue::string(name.clone()))
+                        .map(|(name, _, _)| StrykeValue::string(name.clone()))
                         .collect();
-                    return Some(Ok(PerlValue::array(names)));
+                    return Some(Ok(StrykeValue::array(names)));
                 }
                 "clone" => {
                     if !args.is_empty() {
@@ -16773,7 +16773,7 @@ impl VMHelper {
                         )));
                     }
                     let new_values = c.get_values().iter().map(|v| v.deep_clone()).collect();
-                    return Some(Ok(PerlValue::class_inst(Arc::new(
+                    return Some(Ok(StrykeValue::class_inst(Arc::new(
                         crate::value::ClassInstance::new_with_isa(
                             Arc::clone(&c.def),
                             new_values,
@@ -16788,9 +16788,9 @@ impl VMHelper {
                     let class_name = args[0].to_string();
                     let is_a = c.isa(&class_name);
                     return Some(Ok(if is_a {
-                        PerlValue::integer(1)
+                        StrykeValue::integer(1)
                     } else {
-                        PerlValue::string(String::new())
+                        StrykeValue::string(String::new())
                     }));
                 }
                 "does" => {
@@ -16800,9 +16800,9 @@ impl VMHelper {
                     let trait_name = args[0].to_string();
                     let implements = c.def.implements.contains(&trait_name);
                     return Some(Ok(if implements {
-                        PerlValue::integer(1)
+                        StrykeValue::integer(1)
                     } else {
-                        PerlValue::string(String::new())
+                        StrykeValue::string(String::new())
                     }));
                 }
                 "methods" => {
@@ -16811,8 +16811,8 @@ impl VMHelper {
                     }
                     let mut names = Vec::new();
                     self.collect_class_method_names(&c.def, &mut names);
-                    let values: Vec<PerlValue> = names.into_iter().map(PerlValue::string).collect();
-                    return Some(Ok(PerlValue::array(values)));
+                    let values: Vec<StrykeValue> = names.into_iter().map(StrykeValue::string).collect();
+                    return Some(Ok(StrykeValue::array(values)));
                 }
                 "superclass" => {
                     if !args.is_empty() {
@@ -16821,13 +16821,13 @@ impl VMHelper {
                             line,
                         )));
                     }
-                    let parents: Vec<PerlValue> = c
+                    let parents: Vec<StrykeValue> = c
                         .def
                         .extends
                         .iter()
-                        .map(|s| PerlValue::string(s.clone()))
+                        .map(|s| StrykeValue::string(s.clone()))
                         .collect();
-                    return Some(Ok(PerlValue::array(parents)));
+                    return Some(Ok(StrykeValue::array(parents)));
                 }
                 "destroy" => {
                     // Explicit destructor call — runs DESTROY chain child-first
@@ -16841,7 +16841,7 @@ impl VMHelper {
                             Err(_) => {}
                         }
                     }
-                    return Some(Ok(PerlValue::UNDEF));
+                    return Some(Ok(StrykeValue::UNDEF));
                 }
                 _ => {}
             }
@@ -16956,9 +16956,9 @@ impl VMHelper {
         &mut self,
         d: Arc<Mutex<PerlDataFrame>>,
         method: &str,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         match method {
             "nrow" | "nrows" => {
                 if !args.is_empty() {
@@ -16967,7 +16967,7 @@ impl VMHelper {
                         line,
                     ));
                 }
-                Ok(PerlValue::integer(d.lock().nrows() as i64))
+                Ok(StrykeValue::integer(d.lock().nrows() as i64))
             }
             "ncol" | "ncols" => {
                 if !args.is_empty() {
@@ -16976,7 +16976,7 @@ impl VMHelper {
                         line,
                     ));
                 }
-                Ok(PerlValue::integer(d.lock().ncols() as i64))
+                Ok(StrykeValue::integer(d.lock().ncols() as i64))
             }
             "filter" => {
                 if args.len() != 1 {
@@ -17009,7 +17009,7 @@ impl VMHelper {
                     *row_keep = pass;
                 }
                 let columns = df_guard.columns.clone();
-                let cols: Vec<Vec<PerlValue>> = (0..df_guard.ncols())
+                let cols: Vec<Vec<StrykeValue>> = (0..df_guard.ncols())
                     .map(|i| {
                         let mut out = Vec::new();
                         for (r, pass_row) in keep.iter().enumerate().take(n) {
@@ -17027,7 +17027,7 @@ impl VMHelper {
                     cols,
                     group_by,
                 };
-                Ok(PerlValue::dataframe(Arc::new(Mutex::new(new_df))))
+                Ok(StrykeValue::dataframe(Arc::new(Mutex::new(new_df))))
             }
             "group_by" => {
                 if args.len() != 1 {
@@ -17049,7 +17049,7 @@ impl VMHelper {
                     cols: inner.cols.clone(),
                     group_by: Some(key),
                 };
-                Ok(PerlValue::dataframe(Arc::new(Mutex::new(new_df))))
+                Ok(StrykeValue::dataframe(Arc::new(Mutex::new(new_df))))
             }
             "sum" => {
                 if args.len() != 1 {
@@ -17083,8 +17083,8 @@ impl VMHelper {
                         let keys: Vec<String> = acc.keys().cloned().collect();
                         let sums: Vec<f64> = acc.values().copied().collect();
                         let cols = vec![
-                            keys.into_iter().map(PerlValue::string).collect(),
-                            sums.into_iter().map(PerlValue::float).collect(),
+                            keys.into_iter().map(StrykeValue::string).collect(),
+                            sums.into_iter().map(StrykeValue::float).collect(),
                         ];
                         let columns = vec![gcol.clone(), format!("sum_{}", col_name)];
                         let out = PerlDataFrame {
@@ -17092,13 +17092,13 @@ impl VMHelper {
                             cols,
                             group_by: None,
                         };
-                        Ok(PerlValue::dataframe(Arc::new(Mutex::new(out))))
+                        Ok(StrykeValue::dataframe(Arc::new(Mutex::new(out))))
                     }
                     None => {
                         let total: f64 = (0..inner.nrows())
                             .map(|r| inner.cols[val_idx][r].to_number())
                             .sum();
-                        Ok(PerlValue::float(total))
+                        Ok(StrykeValue::float(total))
                     }
                 }
             }
@@ -17114,9 +17114,9 @@ impl VMHelper {
         &self,
         s: Arc<crate::value::PerlSet>,
         method: &str,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         match method {
             "has" | "contains" | "member" => {
                 if args.len() != 1 {
@@ -17126,19 +17126,19 @@ impl VMHelper {
                     ));
                 }
                 let k = crate::value::set_member_key(&args[0]);
-                Ok(PerlValue::integer(if s.contains_key(&k) { 1 } else { 0 }))
+                Ok(StrykeValue::integer(if s.contains_key(&k) { 1 } else { 0 }))
             }
             "size" | "len" | "count" => {
                 if !args.is_empty() {
                     return Err(PerlError::runtime("set->size takes no arguments", line));
                 }
-                Ok(PerlValue::integer(s.len() as i64))
+                Ok(StrykeValue::integer(s.len() as i64))
             }
             "values" | "list" | "elements" => {
                 if !args.is_empty() {
                     return Err(PerlError::runtime("set->values takes no arguments", line));
                 }
-                Ok(PerlValue::array(s.values().cloned().collect()))
+                Ok(StrykeValue::array(s.values().cloned().collect()))
             }
             _ => Err(PerlError::runtime(
                 format!("Unknown method for set: {}", method),
@@ -17149,29 +17149,29 @@ impl VMHelper {
 
     fn deque_method(
         &mut self,
-        d: Arc<Mutex<VecDeque<PerlValue>>>,
+        d: Arc<Mutex<VecDeque<StrykeValue>>>,
         method: &str,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         match method {
             "push_back" => {
                 if args.len() != 1 {
                     return Err(PerlError::runtime("push_back expects 1 argument", line));
                 }
                 d.lock().push_back(args[0].clone());
-                Ok(PerlValue::integer(d.lock().len() as i64))
+                Ok(StrykeValue::integer(d.lock().len() as i64))
             }
             "push_front" => {
                 if args.len() != 1 {
                     return Err(PerlError::runtime("push_front expects 1 argument", line));
                 }
                 d.lock().push_front(args[0].clone());
-                Ok(PerlValue::integer(d.lock().len() as i64))
+                Ok(StrykeValue::integer(d.lock().len() as i64))
             }
-            "pop_back" => Ok(d.lock().pop_back().unwrap_or(PerlValue::UNDEF)),
-            "pop_front" => Ok(d.lock().pop_front().unwrap_or(PerlValue::UNDEF)),
-            "size" | "len" => Ok(PerlValue::integer(d.lock().len() as i64)),
+            "pop_back" => Ok(d.lock().pop_back().unwrap_or(StrykeValue::UNDEF)),
+            "pop_front" => Ok(d.lock().pop_front().unwrap_or(StrykeValue::UNDEF)),
+            "size" | "len" => Ok(StrykeValue::integer(d.lock().len() as i64)),
             _ => Err(PerlError::runtime(
                 format!("Unknown method for deque: {}", method),
                 line,
@@ -17183,9 +17183,9 @@ impl VMHelper {
         &mut self,
         h: Arc<Mutex<PerlHeap>>,
         method: &str,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         match method {
             "push" => {
                 if args.len() != 1 {
@@ -17198,12 +17198,12 @@ impl VMHelper {
                 drop(g);
                 let mut g = h.lock();
                 self.heap_sift_up(&mut g.items, &cmp, n);
-                Ok(PerlValue::integer(g.items.len() as i64))
+                Ok(StrykeValue::integer(g.items.len() as i64))
             }
             "pop" => {
                 let mut g = h.lock();
                 if g.items.is_empty() {
-                    return Ok(PerlValue::UNDEF);
+                    return Ok(StrykeValue::UNDEF);
                 }
                 let cmp = g.cmp.clone();
                 let n = g.items.len();
@@ -17214,7 +17214,7 @@ impl VMHelper {
                 }
                 Ok(v)
             }
-            "peek" => Ok(h.lock().items.first().cloned().unwrap_or(PerlValue::UNDEF)),
+            "peek" => Ok(h.lock().items.first().cloned().unwrap_or(StrykeValue::UNDEF)),
             _ => Err(PerlError::runtime(
                 format!("Unknown method for heap: {}", method),
                 line,
@@ -17226,9 +17226,9 @@ impl VMHelper {
         &mut self,
         pool: PerlPpool,
         method: &str,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         match method {
             "submit" => pool.submit(self, args, line),
             "collect" => {
@@ -17248,16 +17248,16 @@ impl VMHelper {
         &self,
         barrier: PerlBarrier,
         method: &str,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         match method {
             "wait" => {
                 if !args.is_empty() {
                     return Err(PerlError::runtime("wait() takes no arguments", line));
                 }
                 let _ = barrier.0.wait();
-                Ok(PerlValue::integer(1))
+                Ok(StrykeValue::integer(1))
             }
             _ => Err(PerlError::runtime(
                 format!("Unknown method for barrier: {}", method),
@@ -17270,9 +17270,9 @@ impl VMHelper {
         &self,
         c: Arc<CaptureResult>,
         method: &str,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         if !args.is_empty() {
             return Err(PerlError::runtime(
                 format!("capture: {} takes no arguments", method),
@@ -17280,10 +17280,10 @@ impl VMHelper {
             ));
         }
         match method {
-            "stdout" => Ok(PerlValue::string(c.stdout.clone())),
-            "stderr" => Ok(PerlValue::string(c.stderr.clone())),
-            "exitcode" => Ok(PerlValue::integer(c.exitcode)),
-            "failed" => Ok(PerlValue::integer(if c.exitcode != 0 { 1 } else { 0 })),
+            "stdout" => Ok(StrykeValue::string(c.stdout.clone())),
+            "stderr" => Ok(StrykeValue::string(c.stderr.clone())),
+            "exitcode" => Ok(StrykeValue::integer(c.exitcode)),
+            "failed" => Ok(StrykeValue::integer(if c.exitcode != 0 { 1 } else { 0 })),
             _ => Err(PerlError::runtime(
                 format!("Unknown method for capture: {}", method),
                 line,
@@ -17293,9 +17293,9 @@ impl VMHelper {
 
     pub(crate) fn builtin_par_pipeline_stream(
         &mut self,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         _line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         let mut items = Vec::new();
         for v in args {
             if let Some(a) = v.as_array_vec() {
@@ -17304,7 +17304,7 @@ impl VMHelper {
                 items.push(v.clone());
             }
         }
-        Ok(PerlValue::pipeline(Arc::new(Mutex::new(PipelineInner {
+        Ok(StrykeValue::pipeline(Arc::new(Mutex::new(PipelineInner {
             source: items,
             ops: Vec::new(),
             has_scalar_terminal: false,
@@ -17319,9 +17319,9 @@ impl VMHelper {
     /// that wires ops through bounded channels on `collect()`.
     pub(crate) fn builtin_par_pipeline_stream_new(
         &mut self,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         _line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         let mut items = Vec::new();
         let mut workers: usize = 0;
         let mut buffer: usize = 256;
@@ -17345,7 +17345,7 @@ impl VMHelper {
                 i += 1;
             }
         }
-        Ok(PerlValue::pipeline(Arc::new(Mutex::new(PipelineInner {
+        Ok(StrykeValue::pipeline(Arc::new(Mutex::new(PipelineInner {
             source: items,
             ops: Vec::new(),
             has_scalar_terminal: false,
@@ -17401,9 +17401,9 @@ impl VMHelper {
 
     pub(crate) fn builtin_collect_execute(
         &mut self,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         if args.is_empty() {
             return Err(PerlError::runtime(
                 "collect() expects at least one argument",
@@ -17416,9 +17416,9 @@ impl VMHelper {
             if let Some(p) = args[0].as_pipeline() {
                 return self.pipeline_collect(&p, line);
             }
-            return Ok(PerlValue::array(args[0].to_list()));
+            return Ok(StrykeValue::array(args[0].to_list()));
         }
-        Ok(PerlValue::array(args.to_vec()))
+        Ok(StrykeValue::array(args.to_vec()))
     }
 
     pub(crate) fn pipeline_push(
@@ -17447,7 +17447,7 @@ impl VMHelper {
     }
 
     fn pipeline_parse_sub_progress(
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
         name: &str,
     ) -> PerlResult<(Arc<PerlSub>, bool)> {
@@ -17480,9 +17480,9 @@ impl VMHelper {
         &mut self,
         p: Arc<Mutex<PipelineInner>>,
         method: &str,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         match method {
             "filter" | "f" | "grep" => {
                 if args.len() != 1 {
@@ -17498,7 +17498,7 @@ impl VMHelper {
                     ));
                 };
                 self.pipeline_push(&p, PipelineOp::Filter(sub), line)?;
-                Ok(PerlValue::pipeline(Arc::clone(&p)))
+                Ok(StrykeValue::pipeline(Arc::clone(&p)))
             }
             "map" => {
                 if args.len() != 1 {
@@ -17514,7 +17514,7 @@ impl VMHelper {
                     ));
                 };
                 self.pipeline_push(&p, PipelineOp::Map(sub), line)?;
-                Ok(PerlValue::pipeline(Arc::clone(&p)))
+                Ok(StrykeValue::pipeline(Arc::clone(&p)))
             }
             "tap" | "peek" => {
                 if args.len() != 1 {
@@ -17530,7 +17530,7 @@ impl VMHelper {
                     ));
                 };
                 self.pipeline_push(&p, PipelineOp::Tap(sub), line)?;
-                Ok(PerlValue::pipeline(Arc::clone(&p)))
+                Ok(StrykeValue::pipeline(Arc::clone(&p)))
             }
             "take" => {
                 if args.len() != 1 {
@@ -17538,22 +17538,22 @@ impl VMHelper {
                 }
                 let n = args[0].to_int();
                 self.pipeline_push(&p, PipelineOp::Take(n), line)?;
-                Ok(PerlValue::pipeline(Arc::clone(&p)))
+                Ok(StrykeValue::pipeline(Arc::clone(&p)))
             }
             "pmap" => {
                 let (sub, progress) = Self::pipeline_parse_sub_progress(args, line, "pmap")?;
                 self.pipeline_push(&p, PipelineOp::PMap { sub, progress }, line)?;
-                Ok(PerlValue::pipeline(Arc::clone(&p)))
+                Ok(StrykeValue::pipeline(Arc::clone(&p)))
             }
             "pgrep" => {
                 let (sub, progress) = Self::pipeline_parse_sub_progress(args, line, "pgrep")?;
                 self.pipeline_push(&p, PipelineOp::PGrep { sub, progress }, line)?;
-                Ok(PerlValue::pipeline(Arc::clone(&p)))
+                Ok(StrykeValue::pipeline(Arc::clone(&p)))
             }
             "pfor" => {
                 let (sub, progress) = Self::pipeline_parse_sub_progress(args, line, "pfor")?;
                 self.pipeline_push(&p, PipelineOp::PFor { sub, progress }, line)?;
-                Ok(PerlValue::pipeline(Arc::clone(&p)))
+                Ok(StrykeValue::pipeline(Arc::clone(&p)))
             }
             "pmap_chunked" => {
                 if args.len() < 2 {
@@ -17585,7 +17585,7 @@ impl VMHelper {
                     },
                     line,
                 )?;
-                Ok(PerlValue::pipeline(Arc::clone(&p)))
+                Ok(StrykeValue::pipeline(Arc::clone(&p)))
             }
             "psort" => {
                 let (cmp, progress) = match args.len() {
@@ -17614,17 +17614,17 @@ impl VMHelper {
                     }
                 };
                 self.pipeline_push(&p, PipelineOp::PSort { cmp, progress }, line)?;
-                Ok(PerlValue::pipeline(Arc::clone(&p)))
+                Ok(StrykeValue::pipeline(Arc::clone(&p)))
             }
             "pcache" => {
                 let (sub, progress) = Self::pipeline_parse_sub_progress(args, line, "pcache")?;
                 self.pipeline_push(&p, PipelineOp::PCache { sub, progress }, line)?;
-                Ok(PerlValue::pipeline(Arc::clone(&p)))
+                Ok(StrykeValue::pipeline(Arc::clone(&p)))
             }
             "preduce" => {
                 let (sub, progress) = Self::pipeline_parse_sub_progress(args, line, "preduce")?;
                 self.pipeline_push(&p, PipelineOp::PReduce { sub, progress }, line)?;
-                Ok(PerlValue::pipeline(Arc::clone(&p)))
+                Ok(StrykeValue::pipeline(Arc::clone(&p)))
             }
             "preduce_init" => {
                 if args.len() < 2 {
@@ -17656,7 +17656,7 @@ impl VMHelper {
                     },
                     line,
                 )?;
-                Ok(PerlValue::pipeline(Arc::clone(&p)))
+                Ok(StrykeValue::pipeline(Arc::clone(&p)))
             }
             "pmap_reduce" => {
                 if args.len() < 2 {
@@ -17693,7 +17693,7 @@ impl VMHelper {
                     },
                     line,
                 )?;
-                Ok(PerlValue::pipeline(Arc::clone(&p)))
+                Ok(StrykeValue::pipeline(Arc::clone(&p)))
             }
             "collect" => {
                 if !args.is_empty() {
@@ -17718,7 +17718,7 @@ impl VMHelper {
                         ));
                     }
                     self.pipeline_push(&p, PipelineOp::Map(sub), line)?;
-                    Ok(PerlValue::pipeline(Arc::clone(&p)))
+                    Ok(StrykeValue::pipeline(Arc::clone(&p)))
                 } else {
                     Err(PerlError::runtime(
                         format!("Unknown method for pipeline: {}", method),
@@ -17731,14 +17731,14 @@ impl VMHelper {
 
     fn pipeline_parallel_map(
         &mut self,
-        items: Vec<PerlValue>,
+        items: Vec<StrykeValue>,
         sub: &Arc<PerlSub>,
         progress: bool,
-    ) -> Vec<PerlValue> {
+    ) -> Vec<StrykeValue> {
         let subs = self.subs.clone();
         let (scope_capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
         let pmap_progress = PmapProgress::new(progress, items.len());
-        let results: Vec<PerlValue> = items
+        let results: Vec<StrykeValue> = items
             .into_par_iter()
             .map(|item| {
                 let mut local_interp = VMHelper::new();
@@ -17752,7 +17752,7 @@ impl VMHelper {
                 local_interp.scope_push_hook();
                 let val = match local_interp.exec_block_no_scope(&sub.body) {
                     Ok(val) => val,
-                    Err(_) => PerlValue::UNDEF,
+                    Err(_) => StrykeValue::UNDEF,
                 };
                 local_interp.scope_pop_hook();
                 pmap_progress.tick();
@@ -17766,16 +17766,16 @@ impl VMHelper {
     /// Order-preserving parallel filter for `par_pipeline(LIST)` (same capture rules as `pgrep`).
     fn pipeline_par_stream_filter(
         &mut self,
-        items: Vec<PerlValue>,
+        items: Vec<StrykeValue>,
         sub: &Arc<PerlSub>,
-    ) -> Vec<PerlValue> {
+    ) -> Vec<StrykeValue> {
         if items.is_empty() {
             return items;
         }
         let subs = self.subs.clone();
         let (scope_capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
-        let indexed: Vec<(usize, PerlValue)> = items.into_iter().enumerate().collect();
-        let mut kept: Vec<(usize, PerlValue)> = indexed
+        let indexed: Vec<(usize, StrykeValue)> = items.into_iter().enumerate().collect();
+        let mut kept: Vec<(usize, StrykeValue)> = indexed
             .into_par_iter()
             .filter_map(|(i, item)| {
                 let mut local_interp = VMHelper::new();
@@ -17806,16 +17806,16 @@ impl VMHelper {
     /// Order-preserving parallel map for `par_pipeline(LIST)` (same capture rules as `pmap`).
     fn pipeline_par_stream_map(
         &mut self,
-        items: Vec<PerlValue>,
+        items: Vec<StrykeValue>,
         sub: &Arc<PerlSub>,
-    ) -> Vec<PerlValue> {
+    ) -> Vec<StrykeValue> {
         if items.is_empty() {
             return items;
         }
         let subs = self.subs.clone();
         let (scope_capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
-        let indexed: Vec<(usize, PerlValue)> = items.into_iter().enumerate().collect();
-        let mut mapped: Vec<(usize, PerlValue)> = indexed
+        let indexed: Vec<(usize, StrykeValue)> = items.into_iter().enumerate().collect();
+        let mut mapped: Vec<(usize, StrykeValue)> = indexed
             .into_par_iter()
             .map(|(i, item)| {
                 let mut local_interp = VMHelper::new();
@@ -17829,7 +17829,7 @@ impl VMHelper {
                 local_interp.scope_push_hook();
                 let val = match local_interp.exec_block_no_scope(&sub.body) {
                     Ok(val) => val,
-                    Err(_) => PerlValue::UNDEF,
+                    Err(_) => StrykeValue::UNDEF,
                 };
                 local_interp.scope_pop_hook();
                 (i, val)
@@ -17843,7 +17843,7 @@ impl VMHelper {
         &mut self,
         p: &Arc<Mutex<PipelineInner>>,
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         let (mut v, ops, par_stream, streaming, streaming_workers, streaming_buffer) = {
             let g = p.lock();
             (
@@ -17902,7 +17902,7 @@ impl VMHelper {
                             }
                             let mapped = match self.exec_block_no_scope(&sub.body) {
                                 Ok(val) => val,
-                                Err(_) => PerlValue::UNDEF,
+                                Err(_) => StrykeValue::UNDEF,
                             };
                             self.scope_pop_hook();
                             out.push(mapped);
@@ -18016,14 +18016,14 @@ impl VMHelper {
                     let subs = self.subs.clone();
                     let (scope_capture, atomic_arrays, atomic_hashes) =
                         self.scope.capture_with_atomics();
-                    let indexed_chunks: Vec<(usize, Vec<PerlValue>)> = v
+                    let indexed_chunks: Vec<(usize, Vec<StrykeValue>)> = v
                         .chunks(chunk_n)
                         .enumerate()
                         .map(|(i, c)| (i, c.to_vec()))
                         .collect();
                     let n_chunks = indexed_chunks.len();
                     let pmap_progress = PmapProgress::new(progress, n_chunks);
-                    let mut chunk_results: Vec<(usize, Vec<PerlValue>)> = indexed_chunks
+                    let mut chunk_results: Vec<(usize, Vec<StrykeValue>)> = indexed_chunks
                         .into_par_iter()
                         .map(|(chunk_idx, chunk)| {
                             let mut local_interp = VMHelper::new();
@@ -18044,7 +18044,7 @@ impl VMHelper {
                                     }
                                     Err(_) => {
                                         local_interp.scope_pop_hook();
-                                        out.push(PerlValue::UNDEF);
+                                        out.push(StrykeValue::UNDEF);
                                     }
                                 }
                             }
@@ -18120,7 +18120,7 @@ impl VMHelper {
                             local_interp.scope_push_hook();
                             let val = match local_interp.exec_block_no_scope(&sub.body) {
                                 Ok(v) => v,
-                                Err(_) => PerlValue::UNDEF,
+                                Err(_) => StrykeValue::UNDEF,
                             };
                             local_interp.scope_pop_hook();
                             cache.insert(k, val.clone());
@@ -18132,7 +18132,7 @@ impl VMHelper {
                 }
                 PipelineOp::PReduce { sub, progress } => {
                     if v.is_empty() {
-                        return Ok(PerlValue::UNDEF);
+                        return Ok(StrykeValue::UNDEF);
                     }
                     if v.len() == 1 {
                         return Ok(v.into_iter().next().unwrap());
@@ -18155,11 +18155,11 @@ impl VMHelper {
                             local_interp.scope.set_sort_pair(a, b);
                             match local_interp.exec_block(&block) {
                                 Ok(val) => val,
-                                Err(_) => PerlValue::UNDEF,
+                                Err(_) => StrykeValue::UNDEF,
                             }
                         });
                     pmap_progress.finish();
-                    return Ok(result.unwrap_or(PerlValue::UNDEF));
+                    return Ok(result.unwrap_or(StrykeValue::UNDEF));
                 }
                 PipelineOp::PReduceInit {
                     init,
@@ -18172,7 +18172,7 @@ impl VMHelper {
                     let block = sub.body.clone();
                     let subs = self.subs.clone();
                     let scope_capture = self.scope.capture();
-                    let cap: &[(String, PerlValue)] = scope_capture.as_slice();
+                    let cap: &[(String, StrykeValue)] = scope_capture.as_slice();
                     if v.len() == 1 {
                         return Ok(fold_preduce_init_step(
                             &subs,
@@ -18205,7 +18205,7 @@ impl VMHelper {
                     progress,
                 } => {
                     if v.is_empty() {
-                        return Ok(PerlValue::UNDEF);
+                        return Ok(StrykeValue::UNDEF);
                     }
                     let map_block = map.body.clone();
                     let reduce_block = reduce.body.clone();
@@ -18218,7 +18218,7 @@ impl VMHelper {
                         local_interp.scope.set_topic(v[0].clone());
                         return match local_interp.exec_block_no_scope(&map_block) {
                             Ok(val) => Ok(val),
-                            Err(_) => Ok(PerlValue::UNDEF),
+                            Err(_) => Ok(StrykeValue::UNDEF),
                         };
                     }
                     let pmap_progress = PmapProgress::new(progress, v.len());
@@ -18231,7 +18231,7 @@ impl VMHelper {
                             local_interp.scope.set_topic(item);
                             let val = match local_interp.exec_block_no_scope(&map_block) {
                                 Ok(val) => val,
-                                Err(_) => PerlValue::UNDEF,
+                                Err(_) => StrykeValue::UNDEF,
                             };
                             pmap_progress.tick();
                             val
@@ -18243,27 +18243,27 @@ impl VMHelper {
                             local_interp.scope.set_sort_pair(a, b);
                             match local_interp.exec_block_no_scope(&reduce_block) {
                                 Ok(val) => val,
-                                Err(_) => PerlValue::UNDEF,
+                                Err(_) => StrykeValue::UNDEF,
                             }
                         });
                     pmap_progress.finish();
-                    return Ok(result.unwrap_or(PerlValue::UNDEF));
+                    return Ok(result.unwrap_or(StrykeValue::UNDEF));
                 }
             }
         }
-        Ok(PerlValue::array(v))
+        Ok(StrykeValue::array(v))
     }
 
     /// Streaming collect: wire pipeline ops through bounded channels so items flow
     /// between stages concurrently.  Order is **not** preserved.
     fn pipeline_collect_streaming(
         &mut self,
-        source: Vec<PerlValue>,
+        source: Vec<StrykeValue>,
         ops: &[PipelineOp],
         workers_per_stage: usize,
         buffer: usize,
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         use crossbeam::channel::{bounded, Receiver, Sender};
 
         // Validate: reject ops that require all items (can't stream).
@@ -18290,7 +18290,7 @@ impl VMHelper {
         // Supported: Filter, Map, Take, PMap, PGrep, PFor, PCache.
         let streamable_ops: Vec<&PipelineOp> = ops.iter().collect();
         if streamable_ops.is_empty() {
-            return Ok(PerlValue::array(source));
+            return Ok(StrykeValue::array(source));
         }
 
         let n_stages = streamable_ops.len();
@@ -18306,7 +18306,7 @@ impl VMHelper {
         // channel[0]: source → stage 0
         // channel[i]: stage i-1 → stage i
         // channel[n_stages]: stage n_stages-1 → collector
-        let mut channels: Vec<(Sender<PerlValue>, Receiver<PerlValue>)> =
+        let mut channels: Vec<(Sender<StrykeValue>, Receiver<StrykeValue>)> =
             (0..=n_stages).map(|_| bounded(buffer)).collect();
 
         let err: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
@@ -18317,7 +18317,7 @@ impl VMHelper {
         // Stage i reads from channels[i].1 and writes to channels[i+1].0.
         let source_tx = channels[0].0.clone();
         let result_rx = channels[n_stages].1.clone();
-        let results: Arc<Mutex<Vec<PerlValue>>> = Arc::new(Mutex::new(Vec::new()));
+        let results: Arc<Mutex<Vec<StrykeValue>>> = Arc::new(Mutex::new(Vec::new()));
 
         std::thread::scope(|scope| {
             // Collector thread: drain results concurrently to avoid deadlock
@@ -18403,7 +18403,7 @@ impl VMHelper {
                                     interp.scope_push_hook();
                                     let mapped = match interp.exec_block_no_scope(&sub.body) {
                                         Ok(val) => val,
-                                        Err(_) => PerlValue::UNDEF,
+                                        Err(_) => StrykeValue::UNDEF,
                                     };
                                     interp.scope_pop_hook();
                                     if tx.send(mapped).is_err() {
@@ -18540,7 +18540,7 @@ impl VMHelper {
                                         interp.scope_push_hook();
                                         let v = match interp.exec_block_no_scope(&sub.body) {
                                             Ok(v) => v,
-                                            Err(_) => PerlValue::UNDEF,
+                                            Err(_) => StrykeValue::UNDEF,
                                         };
                                         interp.scope_pop_hook();
                                         crate::pcache::GLOBAL_PCACHE.insert(k, v.clone());
@@ -18570,10 +18570,10 @@ impl VMHelper {
         }
 
         let results = std::mem::take(&mut *results.lock());
-        Ok(PerlValue::array(results))
+        Ok(StrykeValue::array(results))
     }
 
-    fn heap_compare(&mut self, cmp: &Arc<PerlSub>, a: &PerlValue, b: &PerlValue) -> Ordering {
+    fn heap_compare(&mut self, cmp: &Arc<PerlSub>, a: &StrykeValue, b: &StrykeValue) -> Ordering {
         self.scope_push_hook();
         if let Some(ref env) = cmp.closure_env {
             self.scope.restore_capture(env);
@@ -18596,7 +18596,7 @@ impl VMHelper {
         ord
     }
 
-    fn heap_sift_up(&mut self, items: &mut [PerlValue], cmp: &Arc<PerlSub>, mut i: usize) {
+    fn heap_sift_up(&mut self, items: &mut [StrykeValue], cmp: &Arc<PerlSub>, mut i: usize) {
         while i > 0 {
             let p = (i - 1) / 2;
             if self.heap_compare(cmp, &items[i], &items[p]) != Ordering::Less {
@@ -18607,7 +18607,7 @@ impl VMHelper {
         }
     }
 
-    fn heap_sift_down(&mut self, items: &mut [PerlValue], cmp: &Arc<PerlSub>, mut i: usize) {
+    fn heap_sift_down(&mut self, items: &mut [StrykeValue], cmp: &Arc<PerlSub>, mut i: usize) {
         let n = items.len();
         loop {
             let mut sm = i;
@@ -18629,9 +18629,9 @@ impl VMHelper {
 
     fn hash_for_signature_destruct(
         &mut self,
-        v: &PerlValue,
+        v: &StrykeValue,
         line: usize,
-    ) -> PerlResult<IndexMap<String, PerlValue>> {
+    ) -> PerlResult<IndexMap<String, StrykeValue>> {
         let Some(m) = self.match_subject_as_hash(v) else {
             return Err(PerlError::runtime(
                 format!(
@@ -18648,7 +18648,7 @@ impl VMHelper {
     pub(crate) fn apply_sub_signature(
         &mut self,
         sub: &PerlSub,
-        argv: &[PerlValue],
+        argv: &[StrykeValue],
         line: usize,
     ) -> PerlResult<()> {
         if sub.params.is_empty() {
@@ -18672,7 +18672,7 @@ impl VMHelper {
                             }
                         }
                     } else {
-                        PerlValue::UNDEF
+                        StrykeValue::UNDEF
                     };
                     i += 1;
                     if let Some(t) = ty {
@@ -18687,7 +18687,7 @@ impl VMHelper {
                     self.scope.declare_scalar(n, val);
                 }
                 SubSigParam::Array(name, default) => {
-                    let rest: Vec<PerlValue> = if i < argv.len() {
+                    let rest: Vec<StrykeValue> = if i < argv.len() {
                         let r = argv[i..].to_vec();
                         i = argv.len();
                         r
@@ -18710,7 +18710,7 @@ impl VMHelper {
                     self.scope.declare_array(&aname, rest);
                 }
                 SubSigParam::Hash(name, default) => {
-                    let rest: Vec<PerlValue> = if i < argv.len() {
+                    let rest: Vec<StrykeValue> = if i < argv.len() {
                         let r = argv[i..].to_vec();
                         i = argv.len();
                         r
@@ -18738,7 +18738,7 @@ impl VMHelper {
                     self.scope.declare_hash(name, map);
                 }
                 SubSigParam::ArrayDestruct(elems) => {
-                    let arg = argv.get(i).cloned().unwrap_or(PerlValue::UNDEF);
+                    let arg = argv.get(i).cloned().unwrap_or(StrykeValue::UNDEF);
                     i += 1;
                     let Some(arr) = self.match_subject_as_array(&arg) else {
                         return Err(PerlError::runtime(
@@ -18777,11 +18777,11 @@ impl VMHelper {
                     }
                 }
                 SubSigParam::HashDestruct(pairs) => {
-                    let arg = argv.get(i).cloned().unwrap_or(PerlValue::UNDEF);
+                    let arg = argv.get(i).cloned().unwrap_or(StrykeValue::UNDEF);
                     i += 1;
                     let map = self.hash_for_signature_destruct(&arg, line)?;
                     for (key, varname) in pairs {
-                        let v = map.get(key).cloned().unwrap_or(PerlValue::UNDEF);
+                        let v = map.get(key).cloned().unwrap_or(StrykeValue::UNDEF);
                         let n = self.english_scalar_name(varname);
                         self.scope.declare_scalar(n, v);
                     }
@@ -18797,12 +18797,12 @@ impl VMHelper {
     pub(crate) fn try_hof_dispatch(
         &mut self,
         sub: &PerlSub,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         want: WantarrayCtx,
         line: usize,
     ) -> Option<ExecResult> {
         let env = sub.closure_env.as_ref()?;
-        fn env_get<'a>(env: &'a [(String, PerlValue)], key: &str) -> Option<&'a PerlValue> {
+        fn env_get<'a>(env: &'a [(String, StrykeValue)], key: &str) -> Option<&'a StrykeValue> {
             env.iter().find(|(k, _)| k == key).map(|(_, v)| v)
         }
 
@@ -18810,7 +18810,7 @@ impl VMHelper {
             // ── compose: right-to-left function application ──
             "__comp__" => {
                 let fns = env_get(env, "__comp_fns__")?.to_list();
-                let mut val = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+                let mut val = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
                 for f in fns.iter().rev() {
                     match self.dispatch_indirect_call(f.clone(), vec![val], want, line) {
                         Ok(v) => val = v,
@@ -18831,7 +18831,7 @@ impl VMHelper {
                         Err(e) => return Some(Err(e)),
                     }
                 }
-                Some(Ok(PerlValue::array(results)))
+                Some(Ok(StrykeValue::array(results)))
             }
             // ── partial: prepend bound args ──
             "__partial__" => {
@@ -18845,7 +18845,7 @@ impl VMHelper {
             "__complement__" => {
                 let fn_val = env_get(env, "__complement_fn__")?.clone();
                 match self.dispatch_indirect_call(fn_val, args.to_vec(), want, line) {
-                    Ok(v) => Some(Ok(PerlValue::integer(if v.is_true() { 0 } else { 1 }))),
+                    Ok(v) => Some(Ok(StrykeValue::integer(if v.is_true() { 0 } else { 1 }))),
                     Err(e) => Some(Err(e)),
                 }
             }
@@ -18907,14 +18907,14 @@ impl VMHelper {
                             ("__curry_fn__".to_string(), fn_val),
                             (
                                 "__curry_arity__".to_string(),
-                                PerlValue::integer(arity as i64),
+                                StrykeValue::integer(arity as i64),
                             ),
-                            ("__curry_bound__".to_string(), PerlValue::array(all)),
+                            ("__curry_bound__".to_string(), StrykeValue::array(all)),
                         ]),
                         prototype: None,
                         fib_like: None,
                     };
-                    Some(Ok(PerlValue::code_ref(Arc::new(curry_sub))))
+                    Some(Ok(StrykeValue::code_ref(Arc::new(curry_sub))))
                 }
             }
             // ── once: call once, cache forever ──
@@ -18923,7 +18923,7 @@ impl VMHelper {
                 if let Some(href) = cache_ref.as_hash_ref() {
                     let r = href.read();
                     if r.contains_key("done") {
-                        return Some(Ok(r.get("val").cloned().unwrap_or(PerlValue::UNDEF)));
+                        return Some(Ok(r.get("val").cloned().unwrap_or(StrykeValue::UNDEF)));
                     }
                 }
                 let fn_val = env_get(env, "__once_fn__")?.clone();
@@ -18931,7 +18931,7 @@ impl VMHelper {
                     Ok(v) => {
                         if let Some(href) = cache_ref.as_hash_ref() {
                             let mut w = href.write();
-                            w.insert("done".to_string(), PerlValue::integer(1));
+                            w.insert("done".to_string(), StrykeValue::integer(1));
                             w.insert("val".to_string(), v.clone());
                         }
                         Some(Ok(v))
@@ -18946,7 +18946,7 @@ impl VMHelper {
     pub(crate) fn call_sub(
         &mut self,
         sub: &PerlSub,
-        args: Vec<PerlValue>,
+        args: Vec<StrykeValue>,
         want: WantarrayCtx,
         line: usize,
     ) -> ExecResult {
@@ -18962,7 +18962,7 @@ impl VMHelper {
     fn call_sub_with_package(
         &mut self,
         sub: &PerlSub,
-        args: Vec<PerlValue>,
+        args: Vec<StrykeValue>,
         want: WantarrayCtx,
         _line: usize,
         home_package: Option<String>,
@@ -18984,13 +18984,13 @@ impl VMHelper {
         // overwrite our home-package switch.
         if let Some(pkg) = home_package {
             self.scope
-                .declare_scalar("__PACKAGE__", PerlValue::string(pkg));
+                .declare_scalar("__PACKAGE__", StrykeValue::string(pkg));
         }
         // Set $_0, $_1, $_2, ... for all args, and $_ to first arg
         // so `>{ $_ + 1 }` works instead of requiring `>{ $_[0] + 1 }`
         // Must be AFTER restore_capture so we don't get shadowed by captured $_
         self.scope.set_closure_args(&args);
-        // Move `@_` out so `fib_like` / hof dispatch take `&[PerlValue]` without cloning.
+        // Move `@_` out so `fib_like` / hof dispatch take `&[StrykeValue]` without cloning.
         let argv = self.scope.take_sub_underscore().unwrap_or_default();
         self.apply_sub_signature(sub, &argv, _line)?;
         let saved = self.wantarray_kind;
@@ -19019,7 +19019,7 @@ impl VMHelper {
                     self.wantarray_kind = saved;
                     self.scope_pop_hook();
                     self.current_sub_stack.pop();
-                    return Ok(PerlValue::integer(n));
+                    return Ok(StrykeValue::integer(n));
                 }
             }
         }
@@ -19083,7 +19083,7 @@ impl VMHelper {
         &mut self,
         body: &Block,
         params: &[SubSigParam],
-        args: Vec<PerlValue>,
+        args: Vec<StrykeValue>,
         line: usize,
     ) -> ExecResult {
         self.scope_push_hook();
@@ -19092,10 +19092,16 @@ impl VMHelper {
         if let Some(self_val) = args.first() {
             self.scope.declare_scalar("self", self_val.clone());
         }
-        // Set $_0, $_1, etc. for all args
-        self.scope.set_closure_args(&args);
+        // Set $_0, $_1, etc. for the EXPLICIT args (skip $self at args[0]) so
+        // `fn tom { _ * 2 }; obj->tom(99)` works identically to the standalone
+        // `fn tom { _ * 2 }; tom(99)` — both treat the first EXPLICIT arg as
+        // the topic. `$self` stays accessible via the dedicated `$self` binding
+        // above and via `$_[0]` (full `@_` retained).
+        if args.len() > 1 {
+            self.scope.set_closure_args(&args[1..]);
+        }
         // Apply signature if provided - skip the first arg ($self) for user params
-        let user_args: Vec<PerlValue> = args.iter().skip(1).cloned().collect();
+        let user_args: Vec<StrykeValue> = args.iter().skip(1).cloned().collect();
         self.apply_params_to_argv(params, &user_args, line)?;
         let result = self.exec_block_no_scope(body);
         self.scope_pop_hook();
@@ -19111,7 +19117,7 @@ impl VMHelper {
         &mut self,
         body: &Block,
         params: &[SubSigParam],
-        args: Vec<PerlValue>,
+        args: Vec<StrykeValue>,
         line: usize,
     ) -> ExecResult {
         self.call_class_method_inner(body, params, args, line, false)
@@ -19122,7 +19128,7 @@ impl VMHelper {
         &mut self,
         body: &Block,
         params: &[SubSigParam],
-        args: Vec<PerlValue>,
+        args: Vec<StrykeValue>,
         line: usize,
     ) -> ExecResult {
         self.call_class_method_inner(body, params, args, line, true)
@@ -19132,7 +19138,7 @@ impl VMHelper {
         &mut self,
         body: &Block,
         params: &[SubSigParam],
-        args: Vec<PerlValue>,
+        args: Vec<StrykeValue>,
         line: usize,
         is_static: bool,
     ) -> ExecResult {
@@ -19144,10 +19150,19 @@ impl VMHelper {
                 self.scope.declare_scalar("self", self_val.clone());
             }
         }
-        // Set $_0, $_1, etc. for all args
-        self.scope.set_closure_args(&args);
+        // Set $_0, $_1, etc. for the EXPLICIT args. For instance methods skip
+        // args[0] (which is $self) so `fn tom { _ * 2 }; obj->tom(99)` behaves
+        // the same as `fn tom { _ * 2 }; tom(99)` — both treat the first
+        // EXPLICIT arg as the topic. `$self` is still accessible via the
+        // dedicated `$self` binding above and via `$_[0]` (full `@_` retained).
+        // Static methods have no `$self`, so the full args list IS the topic.
+        if is_static {
+            self.scope.set_closure_args(&args);
+        } else if args.len() > 1 {
+            self.scope.set_closure_args(&args[1..]);
+        }
         // Apply signature: skip first arg ($self) only for instance methods
-        let user_args: Vec<PerlValue> = if is_static {
+        let user_args: Vec<StrykeValue> = if is_static {
             args.clone()
         } else {
             args.iter().skip(1).cloned().collect()
@@ -19166,7 +19181,7 @@ impl VMHelper {
     fn apply_params_to_argv(
         &mut self,
         params: &[SubSigParam],
-        argv: &[PerlValue],
+        argv: &[StrykeValue],
         line: usize,
     ) -> PerlResult<()> {
         let mut i = 0;
@@ -19187,7 +19202,7 @@ impl VMHelper {
                             }
                         }
                     } else {
-                        PerlValue::UNDEF
+                        StrykeValue::UNDEF
                     };
                     i += 1;
                     if let Some(ty) = ty_opt {
@@ -19202,7 +19217,7 @@ impl VMHelper {
                     self.scope.declare_scalar(n, v);
                 }
                 SubSigParam::Array(name, default) => {
-                    let rest: Vec<PerlValue> = if i < argv.len() {
+                    let rest: Vec<StrykeValue> = if i < argv.len() {
                         let r = argv[i..].to_vec();
                         i = argv.len();
                         r
@@ -19225,7 +19240,7 @@ impl VMHelper {
                     self.scope.declare_array(&aname, rest);
                 }
                 SubSigParam::Hash(name, default) => {
-                    let rest: Vec<PerlValue> = if i < argv.len() {
+                    let rest: Vec<StrykeValue> = if i < argv.len() {
                         let r = argv[i..].to_vec();
                         i = argv.len();
                         r
@@ -19253,7 +19268,7 @@ impl VMHelper {
                     self.scope.declare_hash(name, map);
                 }
                 SubSigParam::ArrayDestruct(elems) => {
-                    let arg = argv.get(i).cloned().unwrap_or(PerlValue::UNDEF);
+                    let arg = argv.get(i).cloned().unwrap_or(StrykeValue::UNDEF);
                     i += 1;
                     let Some(arr) = self.match_subject_as_array(&arg) else {
                         return Err(PerlError::runtime(
@@ -19291,11 +19306,11 @@ impl VMHelper {
                     }
                 }
                 SubSigParam::HashDestruct(pairs) => {
-                    let arg = argv.get(i).cloned().unwrap_or(PerlValue::UNDEF);
+                    let arg = argv.get(i).cloned().unwrap_or(StrykeValue::UNDEF);
                     i += 1;
                     let map = self.hash_for_signature_destruct(&arg, line)?;
                     for (key, varname) in pairs {
-                        let v = map.get(key).cloned().unwrap_or(PerlValue::UNDEF);
+                        let v = map.get(key).cloned().unwrap_or(StrykeValue::UNDEF);
                         let n = self.english_scalar_name(varname);
                         self.scope.declare_scalar(n, v);
                     }
@@ -19305,7 +19320,7 @@ impl VMHelper {
         Ok(())
     }
 
-    fn builtin_new(&mut self, class: &str, args: Vec<PerlValue>, line: usize) -> ExecResult {
+    fn builtin_new(&mut self, class: &str, args: Vec<StrykeValue>, line: usize) -> ExecResult {
         if class == "Set" {
             return Ok(crate::value::set_from_elements(args.into_iter().skip(1)));
         }
@@ -19340,7 +19355,7 @@ impl VMHelper {
         // `args[0]` (the class-name receiver) since `class_construct`
         // expects user args only.
         if let Some(def) = self.class_defs.get(class).cloned() {
-            let user_args: Vec<PerlValue> = args.into_iter().skip(1).collect();
+            let user_args: Vec<StrykeValue> = args.into_iter().skip(1).collect();
             return self.class_construct(&def, user_args, line);
         }
         // Default OO constructor: Class->new(%args) → bless {%args}, class
@@ -19352,8 +19367,8 @@ impl VMHelper {
             map.insert(k, v);
             i += 2;
         }
-        Ok(PerlValue::blessed(Arc::new(
-            crate::value::BlessedRef::new_blessed(class.to_string(), PerlValue::hash(map)),
+        Ok(StrykeValue::blessed(Arc::new(
+            crate::value::BlessedRef::new_blessed(class.to_string(), StrykeValue::hash(map)),
         )))
     }
 
@@ -19399,7 +19414,7 @@ impl VMHelper {
         let handle_name =
             self.resolve_io_handle_name(handle.unwrap_or(self.default_print_handle.as_str()));
         self.write_formatted_print(handle_name.as_str(), &output, line)?;
-        Ok(PerlValue::integer(1))
+        Ok(StrykeValue::integer(1))
     }
 
     fn exec_printf(&mut self, handle: Option<&str>, args: &[Expr], line: usize) -> ExecResult {
@@ -19447,7 +19462,7 @@ impl VMHelper {
                 }
             }
         }
-        Ok(PerlValue::integer(1))
+        Ok(StrykeValue::integer(1))
     }
 
     /// `substr` with optional replacement — mutates `string` when `replacement` is `Some` (also used by VM).
@@ -19458,7 +19473,7 @@ impl VMHelper {
         length: Option<&Expr>,
         replacement: Option<&Expr>,
         _line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         let s = self.eval_expr(string)?.to_string();
         let off = self.eval_expr(offset)?.to_int();
         let start = if off < 0 {
@@ -19486,9 +19501,9 @@ impl VMHelper {
             new_s.push_str(&s[..start]);
             new_s.push_str(&rep_s);
             new_s.push_str(&s[end..]);
-            self.assign_value(string, PerlValue::string(new_s))?;
+            self.assign_value(string, StrykeValue::string(new_s))?;
         }
-        Ok(PerlValue::string(result))
+        Ok(StrykeValue::string(result))
     }
 
     pub(crate) fn eval_push_expr(
@@ -19496,14 +19511,14 @@ impl VMHelper {
         array: &Expr,
         values: &[Expr],
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         if let Some(aref) = self.try_eval_array_deref_container(array)? {
             for v in values {
                 let val = self.eval_expr_ctx(v, WantarrayCtx::List)?;
                 self.push_array_deref_value(aref.clone(), val, line)?;
             }
             let len = self.array_deref_len(aref, line)?;
-            return Ok(PerlValue::integer(len));
+            return Ok(StrykeValue::integer(len));
         }
         let arr_name = self.extract_array_name(Self::peel_array_builtin_operand(array))?;
         if self.scope.is_array_frozen(&arr_name) {
@@ -19528,14 +19543,14 @@ impl VMHelper {
             }
         }
         let len = self.scope.array_len(&arr_name);
-        Ok(PerlValue::integer(len as i64))
+        Ok(StrykeValue::integer(len as i64))
     }
 
     pub(crate) fn eval_pop_expr(
         &mut self,
         array: &Expr,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         if let Some(aref) = self.try_eval_array_deref_container(array)? {
             return self.pop_array_deref(aref, line);
         }
@@ -19549,7 +19564,7 @@ impl VMHelper {
         &mut self,
         array: &Expr,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         if let Some(aref) = self.try_eval_array_deref_container(array)? {
             return self.shift_array_deref(aref, line);
         }
@@ -19564,7 +19579,7 @@ impl VMHelper {
         array: &Expr,
         values: &[Expr],
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         if let Some(aref) = self.try_eval_array_deref_container(array)? {
             let mut vals = Vec::new();
             for v in values {
@@ -19576,7 +19591,7 @@ impl VMHelper {
                 }
             }
             let len = self.unshift_array_deref_multi(aref, vals, line)?;
-            return Ok(PerlValue::integer(len));
+            return Ok(StrykeValue::integer(len));
         }
         let arr_name = self.extract_array_name(Self::peel_array_builtin_operand(array))?;
         let mut vals = Vec::new();
@@ -19596,14 +19611,14 @@ impl VMHelper {
             arr.insert(i, v);
         }
         let len = arr.len();
-        Ok(PerlValue::integer(len as i64))
+        Ok(StrykeValue::integer(len as i64))
     }
 
     /// One `push` element onto an array ref or package array name (symbolic `@{"Pkg::A"}`).
     pub(crate) fn push_array_deref_value(
         &mut self,
-        arr_ref: PerlValue,
-        val: PerlValue,
+        arr_ref: StrykeValue,
+        val: StrykeValue,
         line: usize,
     ) -> Result<(), FlowOrError> {
         // Resolve binding refs in the value being stored so they snapshot
@@ -19662,7 +19677,7 @@ impl VMHelper {
 
     pub(crate) fn array_deref_len(
         &self,
-        arr_ref: PerlValue,
+        arr_ref: StrykeValue,
         line: usize,
     ) -> Result<i64, FlowOrError> {
         if let Some(r) = arr_ref.as_array_ref() {
@@ -19689,12 +19704,12 @@ impl VMHelper {
 
     pub(crate) fn pop_array_deref(
         &mut self,
-        arr_ref: PerlValue,
+        arr_ref: StrykeValue,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         if let Some(r) = arr_ref.as_array_ref() {
             let mut w = r.write();
-            return Ok(w.pop().unwrap_or(PerlValue::UNDEF));
+            return Ok(w.pop().unwrap_or(StrykeValue::UNDEF));
         }
         if let Some(name) = arr_ref.as_array_binding_name() {
             return self
@@ -19723,13 +19738,13 @@ impl VMHelper {
 
     pub(crate) fn shift_array_deref(
         &mut self,
-        arr_ref: PerlValue,
+        arr_ref: StrykeValue,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         if let Some(r) = arr_ref.as_array_ref() {
             let mut w = r.write();
             return Ok(if w.is_empty() {
-                PerlValue::UNDEF
+                StrykeValue::UNDEF
             } else {
                 w.remove(0)
             });
@@ -19761,11 +19776,11 @@ impl VMHelper {
 
     pub(crate) fn unshift_array_deref_multi(
         &mut self,
-        arr_ref: PerlValue,
-        vals: Vec<PerlValue>,
+        arr_ref: StrykeValue,
+        vals: Vec<StrykeValue>,
         line: usize,
     ) -> Result<i64, FlowOrError> {
-        let mut flat: Vec<PerlValue> = Vec::new();
+        let mut flat: Vec<StrykeValue> = Vec::new();
         for v in vals {
             if let Some(items) = v.as_array_vec() {
                 flat.extend(items);
@@ -19818,24 +19833,24 @@ impl VMHelper {
     /// / compiler wraps `splice` like other context-sensitive builtins).
     pub(crate) fn splice_array_deref(
         &mut self,
-        aref: PerlValue,
-        offset_val: PerlValue,
-        length_val: PerlValue,
-        rep_vals: Vec<PerlValue>,
+        aref: StrykeValue,
+        offset_val: StrykeValue,
+        length_val: StrykeValue,
+        rep_vals: Vec<StrykeValue>,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         let ctx = self.wantarray_kind;
         if let Some(r) = aref.as_array_ref() {
             let arr_len = r.read().len();
             let (off, end) = splice_compute_range(arr_len, &offset_val, &length_val);
             let mut w = r.write();
-            let removed: Vec<PerlValue> = w.drain(off..end).collect();
+            let removed: Vec<StrykeValue> = w.drain(off..end).collect();
             for (i, v) in rep_vals.into_iter().enumerate() {
                 w.insert(off + i, v);
             }
             return Ok(match ctx {
-                WantarrayCtx::Scalar => removed.last().cloned().unwrap_or(PerlValue::UNDEF),
-                WantarrayCtx::List | WantarrayCtx::Void => PerlValue::array(removed),
+                WantarrayCtx::Scalar => removed.last().cloned().unwrap_or(StrykeValue::UNDEF),
+                WantarrayCtx::List | WantarrayCtx::Void => StrykeValue::array(removed),
             });
         }
         if let Some(name) = aref.as_array_binding_name() {
@@ -19846,8 +19861,8 @@ impl VMHelper {
                 .splice_in_place(&name, off, end, rep_vals)
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
             return Ok(match ctx {
-                WantarrayCtx::Scalar => removed.last().cloned().unwrap_or(PerlValue::UNDEF),
-                WantarrayCtx::List | WantarrayCtx::Void => PerlValue::array(removed),
+                WantarrayCtx::Scalar => removed.last().cloned().unwrap_or(StrykeValue::UNDEF),
+                WantarrayCtx::List | WantarrayCtx::Void => StrykeValue::array(removed),
             });
         }
         if let Some(s) = aref.as_str() {
@@ -19868,8 +19883,8 @@ impl VMHelper {
                 .splice_in_place(&s, off, end, rep_vals)
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
             return Ok(match ctx {
-                WantarrayCtx::Scalar => removed.last().cloned().unwrap_or(PerlValue::UNDEF),
-                WantarrayCtx::List | WantarrayCtx::Void => PerlValue::array(removed),
+                WantarrayCtx::Scalar => removed.last().cloned().unwrap_or(StrykeValue::UNDEF),
+                WantarrayCtx::List | WantarrayCtx::Void => StrykeValue::array(removed),
             });
         }
         Err(PerlError::runtime("splice argument is not an ARRAY reference", line).into())
@@ -19883,17 +19898,17 @@ impl VMHelper {
         replacement: &[Expr],
         ctx: WantarrayCtx,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         if let Some(aref) = self.try_eval_array_deref_container(array)? {
             let offset_val = if let Some(o) = offset {
                 self.eval_expr(o)?
             } else {
-                PerlValue::integer(0)
+                StrykeValue::integer(0)
             };
             let length_val = if let Some(l) = length {
                 self.eval_expr(l)?
             } else {
-                PerlValue::UNDEF
+                StrykeValue::UNDEF
             };
             let mut rep_vals = Vec::new();
             for r in replacement {
@@ -19910,12 +19925,12 @@ impl VMHelper {
         let offset_val = if let Some(o) = offset {
             self.eval_expr(o)?
         } else {
-            PerlValue::integer(0)
+            StrykeValue::integer(0)
         };
         let length_val = if let Some(l) = length {
             self.eval_expr(l)?
         } else {
-            PerlValue::UNDEF
+            StrykeValue::UNDEF
         };
         let (off, end) = splice_compute_range(arr_len, &offset_val, &length_val);
         let mut rep_vals = Vec::new();
@@ -19927,22 +19942,22 @@ impl VMHelper {
             .splice_in_place(&arr_name, off, end, rep_vals)
             .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
         Ok(match ctx {
-            WantarrayCtx::Scalar => removed.last().cloned().unwrap_or(PerlValue::UNDEF),
-            WantarrayCtx::List | WantarrayCtx::Void => PerlValue::array(removed),
+            WantarrayCtx::Scalar => removed.last().cloned().unwrap_or(StrykeValue::UNDEF),
+            WantarrayCtx::List | WantarrayCtx::Void => StrykeValue::array(removed),
         })
     }
 
     /// Result of `keys EXPR` after `EXPR` has been evaluated (VM opcode path or tests).
-    pub(crate) fn keys_from_value(val: PerlValue, line: usize) -> Result<PerlValue, FlowOrError> {
+    pub(crate) fn keys_from_value(val: StrykeValue, line: usize) -> Result<StrykeValue, FlowOrError> {
         if let Some(h) = val.as_hash_map() {
-            Ok(PerlValue::array(
-                h.keys().map(|k| PerlValue::string(k.clone())).collect(),
+            Ok(StrykeValue::array(
+                h.keys().map(|k| StrykeValue::string(k.clone())).collect(),
             ))
         } else if let Some(r) = val.as_hash_ref() {
-            Ok(PerlValue::array(
+            Ok(StrykeValue::array(
                 r.read()
                     .keys()
-                    .map(|k| PerlValue::string(k.clone()))
+                    .map(|k| StrykeValue::string(k.clone()))
                     .collect(),
             ))
         } else {
@@ -19954,7 +19969,7 @@ impl VMHelper {
         &mut self,
         expr: &Expr,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         // Operand must be evaluated in list context so `%h` stays a hash (scalar context would
         // apply `scalar %h`, not a hash value — breaks `keys` / `values` / `each` fallbacks).
         let val = self.eval_expr_ctx(expr, WantarrayCtx::List)?;
@@ -19962,11 +19977,11 @@ impl VMHelper {
     }
 
     /// Result of `values EXPR` after `EXPR` has been evaluated.
-    pub(crate) fn values_from_value(val: PerlValue, line: usize) -> Result<PerlValue, FlowOrError> {
+    pub(crate) fn values_from_value(val: StrykeValue, line: usize) -> Result<StrykeValue, FlowOrError> {
         if let Some(h) = val.as_hash_map() {
-            Ok(PerlValue::array(h.values().cloned().collect()))
+            Ok(StrykeValue::array(h.values().cloned().collect()))
         } else if let Some(r) = val.as_hash_ref() {
-            Ok(PerlValue::array(r.read().values().cloned().collect()))
+            Ok(StrykeValue::array(r.read().values().cloned().collect()))
         } else {
             Err(PerlError::runtime("values requires hash", line).into())
         }
@@ -19976,7 +19991,7 @@ impl VMHelper {
         &mut self,
         expr: &Expr,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         let val = self.eval_expr_ctx(expr, WantarrayCtx::List)?;
         Self::values_from_value(val, line)
     }
@@ -19985,7 +20000,7 @@ impl VMHelper {
         &mut self,
         expr: &Expr,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         match &expr.kind {
             ExprKind::HashElement { hash, key } => {
                 let k = self.eval_expr(key)?.to_string();
@@ -19999,7 +20014,7 @@ impl VMHelper {
                     if let Some(sub) = self.subs.get(&full).cloned() {
                         return self.call_sub(
                             &sub,
-                            vec![obj, PerlValue::string(k)],
+                            vec![obj, StrykeValue::string(k)],
                             WantarrayCtx::Scalar,
                             line,
                         );
@@ -20053,7 +20068,7 @@ impl VMHelper {
     /// derefs into undef (instead of erroring). Used by
     /// [`Self::eval_exists_operand`] so `exists $h{x}{y}{z}` returns 0 for
     /// any missing level. (BUG-009)
-    fn eval_expr_exists_mode(&mut self, expr: &Expr) -> Result<PerlValue, FlowOrError> {
+    fn eval_expr_exists_mode(&mut self, expr: &Expr) -> Result<StrykeValue, FlowOrError> {
         match &expr.kind {
             ExprKind::ArrowDeref {
                 expr: inner,
@@ -20062,17 +20077,17 @@ impl VMHelper {
             } => {
                 let inner_val = self.eval_expr_exists_mode(inner)?;
                 if inner_val.is_undef() {
-                    return Ok(PerlValue::UNDEF);
+                    return Ok(StrykeValue::UNDEF);
                 }
                 if let Some(r) = inner_val.as_hash_ref() {
                     let k = self.eval_expr(index)?.to_string();
-                    return Ok(r.read().get(&k).cloned().unwrap_or(PerlValue::UNDEF));
+                    return Ok(r.read().get(&k).cloned().unwrap_or(StrykeValue::UNDEF));
                 }
                 if let Some(b) = inner_val.as_blessed_ref() {
                     let data = b.data.read();
                     if let Some(r) = data.as_hash_ref() {
                         let k = self.eval_expr(index)?.to_string();
-                        return Ok(r.read().get(&k).cloned().unwrap_or(PerlValue::UNDEF));
+                        return Ok(r.read().get(&k).cloned().unwrap_or(StrykeValue::UNDEF));
                     }
                 }
                 // Struct / class instance — look up the field by name and
@@ -20081,18 +20096,18 @@ impl VMHelper {
                 if let Some(s) = inner_val.as_struct_inst() {
                     let k = self.eval_expr(index)?.to_string();
                     if let Some(idx) = s.def.field_index(&k) {
-                        return Ok(s.get_field(idx).unwrap_or(PerlValue::UNDEF));
+                        return Ok(s.get_field(idx).unwrap_or(StrykeValue::UNDEF));
                     }
-                    return Ok(PerlValue::UNDEF);
+                    return Ok(StrykeValue::UNDEF);
                 }
                 if let Some(c) = inner_val.as_class_inst() {
                     let k = self.eval_expr(index)?.to_string();
                     if let Some(idx) = c.def.field_index(&k) {
-                        return Ok(c.get_field(idx).unwrap_or(PerlValue::UNDEF));
+                        return Ok(c.get_field(idx).unwrap_or(StrykeValue::UNDEF));
                     }
-                    return Ok(PerlValue::UNDEF);
+                    return Ok(StrykeValue::UNDEF);
                 }
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             ExprKind::ArrowDeref {
                 expr: inner,
@@ -20101,7 +20116,7 @@ impl VMHelper {
             } => {
                 let inner_val = self.eval_expr_exists_mode(inner)?;
                 if inner_val.is_undef() {
-                    return Ok(PerlValue::UNDEF);
+                    return Ok(StrykeValue::UNDEF);
                 }
                 if let Some(r) = inner_val.as_array_ref() {
                     let idx = self.eval_expr(index)?.to_int();
@@ -20111,9 +20126,9 @@ impl VMHelper {
                     } else {
                         idx as usize
                     };
-                    return Ok(arr.get(i).cloned().unwrap_or(PerlValue::UNDEF));
+                    return Ok(arr.get(i).cloned().unwrap_or(StrykeValue::UNDEF));
                 }
-                Ok(PerlValue::UNDEF)
+                Ok(StrykeValue::UNDEF)
             }
             _ => self.eval_expr(expr),
         }
@@ -20123,7 +20138,7 @@ impl VMHelper {
         &mut self,
         expr: &Expr,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         match &expr.kind {
             ExprKind::HashElement { hash, key } => {
                 let k = self.eval_expr(key)?.to_string();
@@ -20137,13 +20152,13 @@ impl VMHelper {
                     if let Some(sub) = self.subs.get(&full).cloned() {
                         return self.call_sub(
                             &sub,
-                            vec![obj, PerlValue::string(k)],
+                            vec![obj, StrykeValue::string(k)],
                             WantarrayCtx::Scalar,
                             line,
                         );
                     }
                 }
-                Ok(PerlValue::integer(
+                Ok(StrykeValue::integer(
                     if self.scope.exists_hash_element(hash, &k) {
                         1
                     } else {
@@ -20155,7 +20170,7 @@ impl VMHelper {
                 self.check_strict_array_var(array, line)?;
                 let idx = self.eval_expr(index)?.to_int();
                 let aname = self.stash_array_name_for_package(array);
-                Ok(PerlValue::integer(
+                Ok(StrykeValue::integer(
                     if self.scope.exists_array_element(&aname, idx) {
                         1
                     } else {
@@ -20175,13 +20190,13 @@ impl VMHelper {
                 // for any missing level. (BUG-009)
                 let container = match self.eval_expr_exists_mode(inner) {
                     Ok(v) => v,
-                    Err(_) => return Ok(PerlValue::integer(0)),
+                    Err(_) => return Ok(StrykeValue::integer(0)),
                 };
                 if container.is_undef() {
-                    return Ok(PerlValue::integer(0));
+                    return Ok(StrykeValue::integer(0));
                 }
                 let yes = self.exists_arrow_hash_element(container, &k, line)?;
-                Ok(PerlValue::integer(if yes { 1 } else { 0 }))
+                Ok(StrykeValue::integer(if yes { 1 } else { 0 }))
             }
             ExprKind::ArrowDeref {
                 expr: inner,
@@ -20197,14 +20212,14 @@ impl VMHelper {
                 }
                 let container = match self.eval_expr_exists_mode(inner) {
                     Ok(v) => v,
-                    Err(_) => return Ok(PerlValue::integer(0)),
+                    Err(_) => return Ok(StrykeValue::integer(0)),
                 };
                 if container.is_undef() {
-                    return Ok(PerlValue::integer(0));
+                    return Ok(StrykeValue::integer(0));
                 }
                 let idx = self.eval_expr(index)?.to_int();
                 let yes = self.exists_arrow_array_element(container, idx, line)?;
-                Ok(PerlValue::integer(if yes { 1 } else { 0 }))
+                Ok(StrykeValue::integer(if yes { 1 } else { 0 }))
             }
             _ => Err(PerlError::runtime("exists requires hash or array element", line).into()),
         }
@@ -20219,13 +20234,13 @@ impl VMHelper {
     /// the new path amortizes the handshake across the whole map.
     pub(crate) fn eval_pmap_remote(
         &mut self,
-        cluster_pv: PerlValue,
-        list_pv: PerlValue,
+        cluster_pv: StrykeValue,
+        list_pv: StrykeValue,
         show_progress: bool,
         block: &Block,
         flat_outputs: bool,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         let Some(cluster) = cluster_pv.as_remote_cluster() else {
             return Err(PerlError::runtime("pmap_on: expected cluster(...) value", line).into());
         };
@@ -20257,13 +20272,13 @@ impl VMHelper {
         pmap_progress.finish();
 
         if flat_outputs {
-            let flattened: Vec<PerlValue> = result_values
+            let flattened: Vec<StrykeValue> = result_values
                 .into_iter()
                 .flat_map(|v| v.map_flatten_outputs(true))
                 .collect();
-            Ok(PerlValue::array(flattened))
+            Ok(StrykeValue::array(flattened))
         } else {
-            Ok(PerlValue::array(result_values))
+            Ok(StrykeValue::array(result_values))
         }
     }
 
@@ -20274,7 +20289,7 @@ impl VMHelper {
         callback: &Expr,
         progress: Option<&Expr>,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         let show_progress = progress
             .map(|p| self.eval_expr(p))
             .transpose()?
@@ -20303,7 +20318,7 @@ impl VMHelper {
         };
         let data: &[u8] = &mmap;
         if data.is_empty() {
-            return Ok(PerlValue::UNDEF);
+            return Ok(StrykeValue::UNDEF);
         }
         let line_total = crate::par_lines::line_count_bytes(data);
         let pmap_progress = PmapProgress::new(show_progress, line_total);
@@ -20330,7 +20345,7 @@ impl VMHelper {
                     .scope
                     .restore_atomics(&atomic_arrays, &atomic_hashes);
                 local_interp.enable_parallel_guard();
-                local_interp.scope.set_topic(PerlValue::string(line_str));
+                local_interp.scope.set_topic(StrykeValue::string(line_str));
                 match local_interp.call_sub(&sub, vec![], WantarrayCtx::Void, line) {
                     Ok(_) => {}
                     Err(e) => return Err(e),
@@ -20344,7 +20359,7 @@ impl VMHelper {
             Ok(())
         })?;
         pmap_progress.finish();
-        Ok(PerlValue::UNDEF)
+        Ok(StrykeValue::UNDEF)
     }
 
     /// `par_walk PATH, sub { } [, progress => EXPR]` — parallel recursive directory walk (also used by VM).
@@ -20354,7 +20369,7 @@ impl VMHelper {
         callback: &Expr,
         progress: Option<&Expr>,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         let show_progress = progress
             .map(|p| self.eval_expr(p))
             .transpose()?
@@ -20393,7 +20408,7 @@ impl VMHelper {
                     .scope
                     .restore_atomics(&atomic_arrays, &atomic_hashes);
                 local_interp.enable_parallel_guard();
-                local_interp.scope.set_topic(PerlValue::string(s));
+                local_interp.scope.set_topic(StrykeValue::string(s));
                 match local_interp.call_sub(sub.as_ref(), vec![], WantarrayCtx::Void, line) {
                     Ok(_) => {}
                     Err(e) => return Err(e),
@@ -20415,16 +20430,16 @@ impl VMHelper {
                 )?;
             }
         }
-        Ok(PerlValue::UNDEF)
+        Ok(StrykeValue::UNDEF)
     }
 
     /// `par_sed(PATTERN, REPLACEMENT, FILES...)` — parallel in-place regex substitution per file (`g` semantics).
     pub(crate) fn builtin_par_sed(
         &mut self,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
         has_progress: bool,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         let show_progress = if has_progress {
             args.last().map(|v| v.is_true()).unwrap_or(false)
         } else {
@@ -20473,7 +20488,7 @@ impl VMHelper {
             Ok(())
         })?;
         pmap.finish();
-        Ok(PerlValue::integer(
+        Ok(StrykeValue::integer(
             touched.load(std::sync::atomic::Ordering::Relaxed) as i64,
         ))
     }
@@ -20484,7 +20499,7 @@ impl VMHelper {
         path: &Expr,
         callback: &Expr,
         line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
+    ) -> Result<StrykeValue, FlowOrError> {
         let pattern_s = self.eval_expr(path)?.to_string();
         let cb_val = self.eval_expr(callback)?;
         let sub = if let Some(s) = cb_val.as_code_ref() {
@@ -20752,7 +20767,7 @@ impl VMHelper {
 /// Mirrors `vm.rs::both_non_numeric_strings`. Used by the tree-walker's
 /// `==` / `!=` to decide whether to fall back to string compare in
 /// stryke non-compat mode.
-fn both_non_numeric_strings_iv(a: &PerlValue, b: &PerlValue) -> bool {
+fn both_non_numeric_strings_iv(a: &StrykeValue, b: &StrykeValue) -> bool {
     if !a.is_string_like() || !b.is_string_like() {
         return false;
     }
@@ -20769,7 +20784,7 @@ fn par_walk_invoke_entry(
     path: &Path,
     sub: &Arc<PerlSub>,
     subs: &HashMap<String, Arc<PerlSub>>,
-    scope_capture: &[(String, PerlValue)],
+    scope_capture: &[(String, StrykeValue)],
     atomic_arrays: &[(String, crate::scope::AtomicArray)],
     atomic_hashes: &[(String, crate::scope::AtomicHash)],
     line: usize,
@@ -20782,7 +20797,7 @@ fn par_walk_invoke_entry(
         .scope
         .restore_atomics(atomic_arrays, atomic_hashes);
     local_interp.enable_parallel_guard();
-    local_interp.scope.set_topic(PerlValue::string(s));
+    local_interp.scope.set_topic(StrykeValue::string(s));
     local_interp.call_sub(sub.as_ref(), vec![], WantarrayCtx::Void, line)?;
     Ok(())
 }
@@ -20791,7 +20806,7 @@ fn par_walk_recursive(
     path: &Path,
     sub: &Arc<PerlSub>,
     subs: &HashMap<String, Arc<PerlSub>>,
-    scope_capture: &[(String, PerlValue)],
+    scope_capture: &[(String, StrykeValue)],
     atomic_arrays: &[(String, crate::scope::AtomicArray)],
     atomic_hashes: &[(String, crate::scope::AtomicHash)],
     line: usize,
@@ -20857,21 +20872,21 @@ fn par_walk_recursive(
 /// - When a carry exits the leftmost letter, a fresh `a` or `A` is
 ///   prepended (case-matched to the first character of the original).
 ///
-/// Split a `PerlValue` into approximately `n_threads` chunks for the
+/// Split a `StrykeValue` into approximately `n_threads` chunks for the
 /// `par { BLOCK }` runtime. Strings are partitioned on UTF-8 char-aligned
 /// byte boundaries; arrays/lists on element boundaries. Other scalar
 /// types (int, float, undef, ref) return a single-chunk Vec containing
 /// the value unchanged — the caller should handle this fallback.
 ///
-/// Returned chunks are themselves `PerlValue` so the worker can bind
+/// Returned chunks are themselves `StrykeValue` so the worker can bind
 /// each to `$_` and invoke the user's block.
-fn par_chunk_value(v: &PerlValue, n_threads: usize) -> Vec<PerlValue> {
+fn par_chunk_value(v: &StrykeValue, n_threads: usize) -> Vec<StrykeValue> {
     let n = n_threads.max(1);
     // String input: split on char boundaries.
     if let Some(s) = v.as_str() {
         let bytes = s.as_bytes();
         if bytes.len() < 16_384 || n < 2 {
-            return vec![PerlValue::string(s)];
+            return vec![StrykeValue::string(s)];
         }
         let target = bytes.len().div_ceil(n);
         let mut splits = vec![0usize];
@@ -20889,31 +20904,31 @@ fn par_chunk_value(v: &PerlValue, n_threads: usize) -> Vec<PerlValue> {
             .windows(2)
             .map(|w| {
                 let chunk = std::str::from_utf8(&bytes[w[0]..w[1]]).unwrap_or("");
-                PerlValue::string(chunk.to_string())
+                StrykeValue::string(chunk.to_string())
             })
             .collect();
     }
     // Array / list input: split on element boundaries.
     if let Some(arr) = v.as_array_vec() {
         if arr.len() < 32 || n < 2 {
-            return vec![PerlValue::array(arr)];
+            return vec![StrykeValue::array(arr)];
         }
         let target = arr.len().div_ceil(n);
         let mut chunks = Vec::with_capacity(n);
         for slice in arr.chunks(target) {
-            chunks.push(PerlValue::array(slice.to_vec()));
+            chunks.push(StrykeValue::array(slice.to_vec()));
         }
         return chunks;
     }
     if let Some(arr_ref) = v.as_array_ref() {
         let arr = arr_ref.read().clone();
         if arr.len() < 32 || n < 2 {
-            return vec![PerlValue::array(arr)];
+            return vec![StrykeValue::array(arr)];
         }
         let target = arr.len().div_ceil(n);
         let mut chunks = Vec::with_capacity(n);
         for slice in arr.chunks(target) {
-            chunks.push(PerlValue::array(slice.to_vec()));
+            chunks.push(StrykeValue::array(slice.to_vec()));
         }
         return chunks;
     }
@@ -20930,9 +20945,9 @@ fn par_chunk_value(v: &PerlValue, n_threads: usize) -> Vec<PerlValue> {
 /// - **Array / list** → concat
 /// - **String** → concat
 /// - **Anything else** → return chunks as a flat array (caller can post-process)
-fn par_reduce_auto_merge(chunks: Vec<PerlValue>) -> PerlValue {
+fn par_reduce_auto_merge(chunks: Vec<StrykeValue>) -> StrykeValue {
     if chunks.is_empty() {
-        return PerlValue::UNDEF;
+        return StrykeValue::UNDEF;
     }
     let first = &chunks[0];
     // Hash<number> add-merge.
@@ -20947,24 +20962,24 @@ fn par_reduce_auto_merge(chunks: Vec<PerlValue>) -> PerlValue {
         }
         // Round-trip integer values back to integers so `freq`-style
         // hashes stay integer-typed downstream.
-        let mut indexmap_out: indexmap::IndexMap<String, PerlValue> = indexmap::IndexMap::new();
+        let mut indexmap_out: indexmap::IndexMap<String, StrykeValue> = indexmap::IndexMap::new();
         for (k, v) in out {
             let pv = if v == v.trunc() && v.abs() < 1e15 {
-                PerlValue::integer(v as i64)
+                StrykeValue::integer(v as i64)
             } else {
-                PerlValue::float(v)
+                StrykeValue::float(v)
             };
             indexmap_out.insert(k, pv);
         }
-        return PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(indexmap_out)));
+        return StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(indexmap_out)));
     }
     // Numeric add-merge (int or float).
     if first.is_integer_like() || first.is_float_like() {
         let s: f64 = chunks.iter().map(|v| v.to_number()).sum();
         if s == s.trunc() && s.abs() < 1e15 {
-            return PerlValue::integer(s as i64);
+            return StrykeValue::integer(s as i64);
         }
-        return PerlValue::float(s);
+        return StrykeValue::float(s);
     }
     // Array concat.
     if first.as_array_vec().is_some() || first.as_array_ref().is_some() {
@@ -20972,7 +20987,7 @@ fn par_reduce_auto_merge(chunks: Vec<PerlValue>) -> PerlValue {
         for v in &chunks {
             out.extend(v.map_flatten_outputs(true));
         }
-        return PerlValue::array(out);
+        return StrykeValue::array(out);
     }
     // String concat.
     if first.is_string_like() {
@@ -20980,10 +20995,10 @@ fn par_reduce_auto_merge(chunks: Vec<PerlValue>) -> PerlValue {
         for v in &chunks {
             out.push_str(&v.to_string());
         }
-        return PerlValue::string(out);
+        return StrykeValue::string(out);
     }
     // Fallback: flat list of chunk results.
-    PerlValue::array(chunks)
+    StrykeValue::array(chunks)
 }
 
 /// Decrement has no magic counterpart in Perl 5; this helper is for `++`
@@ -21058,13 +21073,13 @@ fn perl_magic_str_inc(s: &str) -> Option<String> {
 /// `++$x` semantics: try magic string increment first when the value is
 /// already a string; fall back to a numeric +1 for everything else
 /// (integers, floats, undef, plain numeric strings).
-pub(crate) fn perl_inc(v: &PerlValue) -> PerlValue {
+pub(crate) fn perl_inc(v: &StrykeValue) -> StrykeValue {
     if let Some(s) = v.as_str() {
         if let Some(new_s) = perl_magic_str_inc(&s) {
-            return PerlValue::string(new_s);
+            return StrykeValue::string(new_s);
         }
     }
-    PerlValue::integer(v.to_int() + 1)
+    StrykeValue::integer(v.to_int() + 1)
 }
 
 fn perl_exponent_form(rust_repr: &str, upper: bool) -> String {
@@ -21194,21 +21209,21 @@ fn perl_g_form(n: f64, prec: usize, upper: bool) -> String {
 /// can ignore the second tuple element.
 pub(crate) fn perl_sprintf_format_full<F>(
     fmt: &str,
-    args: &[PerlValue],
+    args: &[StrykeValue],
     string_for_s: &mut F,
-) -> Result<(String, Vec<(PerlValue, i64)>), FlowOrError>
+) -> Result<(String, Vec<(StrykeValue, i64)>), FlowOrError>
 where
-    F: FnMut(&PerlValue) -> Result<String, FlowOrError>,
+    F: FnMut(&StrykeValue) -> Result<String, FlowOrError>,
 {
-    let mut pending_n: Vec<(PerlValue, i64)> = Vec::new();
+    let mut pending_n: Vec<(StrykeValue, i64)> = Vec::new();
     let mut result = String::new();
     let mut arg_idx = 0;
     let chars: Vec<char> = fmt.chars().collect();
     let mut i = 0;
 
     // Helper to consume the next arg as an i64 (used for `*` width / precision).
-    let take_arg_int = |args: &[PerlValue], idx: &mut usize| -> i64 {
-        let v = args.get(*idx).cloned().unwrap_or(PerlValue::UNDEF);
+    let take_arg_int = |args: &[StrykeValue], idx: &mut usize| -> i64 {
+        let v = args.get(*idx).cloned().unwrap_or(StrykeValue::UNDEF);
         *idx += 1;
         v.to_int()
     };
@@ -21265,7 +21280,7 @@ where
                 vector_sep = Some(".".to_string());
                 i += 1;
             } else if i + 1 < chars.len() && chars[i] == '*' && chars[i + 1] == 'v' {
-                let sep_arg = args.get(arg_idx).cloned().unwrap_or(PerlValue::UNDEF);
+                let sep_arg = args.get(arg_idx).cloned().unwrap_or(StrykeValue::UNDEF);
                 arg_idx += 1;
                 vector_sep = Some(sep_arg.to_string());
                 i += 2;
@@ -21319,9 +21334,9 @@ where
             // value we format. Either way the index resolution is the
             // same: positional or sequential.
             let arg = if let Some(idx) = positional {
-                args.get(idx).cloned().unwrap_or(PerlValue::UNDEF)
+                args.get(idx).cloned().unwrap_or(StrykeValue::UNDEF)
             } else {
-                let v = args.get(arg_idx).cloned().unwrap_or(PerlValue::UNDEF);
+                let v = args.get(arg_idx).cloned().unwrap_or(StrykeValue::UNDEF);
                 arg_idx += 1;
                 v
             };

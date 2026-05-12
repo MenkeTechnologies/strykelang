@@ -1,15 +1,15 @@
 //! Tests for stryke list builtins (sum, min, max, uniq, reduce, zip, pairs, ...)
 //! for `%INC` / `require`. Use `Interpreter::new()` so subs are registered (tests may add `vendor/perl` to `@INC`).
 
-use stryke::value::PerlValue;
+use stryke::value::StrykeValue;
 use stryke::vm_helper::VMHelper;
 use stryke::{parse, vendor_perl_inc_path};
 
 fn with_vendor_inc() -> VMHelper {
     let mut interp = VMHelper::new();
     let dirs = vec![
-        PerlValue::string(vendor_perl_inc_path().to_string_lossy().into_owned()),
-        PerlValue::string(".".to_string()),
+        StrykeValue::string(vendor_perl_inc_path().to_string_lossy().into_owned()),
+        StrykeValue::string(".".to_string()),
     ];
     // Mirror driver: vendor shadows system paths; tests stay valid without invoking `main`.
     interp.scope.declare_array("INC", dirs);

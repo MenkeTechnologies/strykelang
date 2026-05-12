@@ -69,7 +69,7 @@ Severity legend:
   instances as opaque scalars and emitted the receiver's `Display`
   stringification (`"Outer(name => x, inner => Inner(v => 7))"`)
   wrapped in the target format. Root cause: serializers worked off the
-  raw `PerlValue` tree without any recursive flatten step. Fix: new
+  raw `StrykeValue` tree without any recursive flatten step. Fix: new
   `strykelang/serialize_normalize.rs` module exposes `deep_normalize`
   — recursively converts ClassInstance / StructInstance / EnumInstance
   / nested HashRef / ArrayRef into plain hashref/arrayref shapes the
@@ -162,7 +162,7 @@ Severity legend:
   a `ClassInstance`, which cascaded into three visible bugs:
   (1) `$self->{field}` inside instance methods couldn't find class
   fields; (2) `ref($self)` returned the empty string because
-  `PerlValue::ref_type` had no `ClassInst` arm; (3) `typed my $b : C =
+  `StrykeValue::ref_type` had no `ClassInst` arm; (3) `typed my $b : C =
   C->new` always failed the runtime type check. Fixes:
   - `vm.rs::run_method_op` now checks `class_defs` before the
     Perl-blessed-hashref fallback and routes through `class_construct`
@@ -769,7 +769,7 @@ Pins: **`frequencies_whole_string_counts_as_one_key_ch`**, **`frequencies_chars_
 
 ## BUG-142 — **`chain_from([[...],[...]])`** leaves inner **`ARRAYREF`** buckets as opaque atoms — **`bug`**
 
-`builtin_chain_from` does `flatten_args` then **`item.to_list()`** per segment. **`PerlValue::to_list`**
+`builtin_chain_from` does `flatten_args` then **`item.to_list()`** per segment. **`StrykeValue::to_list`**
 only expands **`HeapObject::Array`** (`Array` storages); a typical literal inner **`[..., ...]`**
 is stored as **`ArrayRef`** (RW handle), whose **`to_list`** arm falls through **`_ ⇒
 vec![self.clone()]`**. A single outer array argument **`([[1,2],[3]])`** therefore concatenates **four**
@@ -780,11 +780,11 @@ Pins: **`chain_from_variadic_top_level_lists_concat_ch`**,
 **`chain_from_single_outer_arrayref_leaves_inner_lists_unmerged_bug_ch`** in
 **`tests/suite/behavior_pin_2026_05_ch.rs`**.
 
-## BUG-143 — **`PerlValue::to_list` + iterator plumbing** treat many **`ARRAYREF`** / “one arg” shapes as **atoms** — **`bug` / `polish`**
+## BUG-143 — **`StrykeValue::to_list` + iterator plumbing** treat many **`ARRAYREF`** / “one arg” shapes as **atoms** — **`bug` / `polish`**
 
-- **`HeapObject::ArrayRef`** (typical literal **`[ … ]`**) falls through **`PerlValue::to_list`’s `_` arm** and becomes a **single opaque cell** instead of cloning the inner vector (unlike **`HeapObject::Array`**). Any helper that only calls **`to_list()`** (rather than **`map_flatten_outputs`**) mis-counts operands: pinned for **`head`** / **`tail`** / **`drop`** / **`take`** with **`head([1,2,3], 2)`**.
+- **`HeapObject::ArrayRef`** (typical literal **`[ … ]`**) falls through **`StrykeValue::to_list`’s `_` arm** and becomes a **single opaque cell** instead of cloning the inner vector (unlike **`HeapObject::Array`**). Any helper that only calls **`to_list()`** (rather than **`map_flatten_outputs`**) mis-counts operands: pinned for **`head`** / **`tail`** / **`drop`** / **`take`** with **`head([1,2,3], 2)`**.
 - Streaming builtins that special-case “one non-iterator argument” still route through **`into_pull_iter`**: that path also uses **`to_list`**, so **`ARRAYREF` sources** expose **one streamed item** (breaks **`chunk(2, [...])`** expectations). Variadic / iterator call shapes work today — e.g. **`chunk(2, range(1, 5))`**, **`dedup(1, 1, 2)`**.
-- **`enumerate`**, **`dedup`**, **`chunk`**: when passed a **single** list argument, the implementation wraps **`PerlValue::array(args.to_vec())`** for the pull source, so **`enumerate([a,b])`** yields **one** indexed row **`[0, list]`** (the whole list as the item) rather than per-element indices (contrast **`enumerate(range(1, 3))`**).
+- **`enumerate`**, **`dedup`**, **`chunk`**: when passed a **single** list argument, the implementation wraps **`StrykeValue::array(args.to_vec())`** for the pull source, so **`enumerate([a,b])`** yields **one** indexed row **`[0, list]`** (the whole list as the item) rather than per-element indices (contrast **`enumerate(range(1, 3))`**).
 - **`PerlIterator::collect_all` on `CycleIterator` is intentionally `vec![]`** (infinite source guard), but **`flatten_args` / `map_flatten_outputs` call `collect_all`** for iterators — so compositions like **`take_n(6, cycle([1, 2, 3]))`** materialize **`()`** today.
 
 Pins throughout **`tests/suite/behavior_pin_2026_05_ci.rs`** (file module doc enumerates the **`_ci`** suffix names).
@@ -1007,7 +1007,7 @@ in **`tests/suite/behavior_pin_2026_05_cr.rs`**.
 
 ## BUG-166 — **`nth(N, ARRAYREF)`** often returns **`undef`** because **`to_list`** does not unpack **`ArrayRef`** — **`bug`**
 
-**`builtin_nth`** falls back to **`v.to_list()`** for non-iterators. **`PerlValue::to_list`** expands
+**`builtin_nth`** falls back to **`v.to_list()`** for non-iterators. **`StrykeValue::to_list`** expands
 **`HeapObject::Array`** but **`HeapObject::ArrayRef`** hits the default arm and becomes a **one-element list**
 containing the ref itself, so any positive index reads **`undef`**. **`nth(N, range(...))`** still works
 because **`range`** yields an iterator.
@@ -1090,7 +1090,7 @@ Pins: **`mode_variadic_vs_single_arrayref_bug_cw`**, **`mode_val_arrayref_finds_
 
 ## BUG-174 — **`windowed` / `chunked`** treat a **bracket list** **`[LIST], N`** as a **single** list cell — **`polish`**
 
-**`windowed_with_want`** / chunked sibling (**`list_builtins.rs`**) split **`args[..len−1]`** into raw **`PerlValue`** cells without
+**`windowed_with_want`** / chunked sibling (**`list_builtins.rs`**) split **`args[..len−1]`** into raw **`StrykeValue`** cells without
 **`flatten_args`** / **`to_list()`**. A **tuple** **`(1, 2, 3, 4)`** (or comma-arg tails) supplies **four** scalar slots, but **`[1, 2,
 3, 4]`** is **one** slot whose length is **`1`**, so **`N > len`** and the list result is empty (**`windowed`**) or a single outer chunk
 (**`chunked`**). Prefer **`windowed((…), N)`** (or **`LIST |> windowed(N)`** per compiler message) when the list is one grouped value.
@@ -1541,7 +1541,7 @@ Tests: `vec_lvalue_byte_assignment`, `vec_read_8_bit`,
 `vec_read_zero_pads_past_end`.
 
 Known limitation: writes that produce non-UTF-8 bytes (e.g.,
-`vec($s, 7, 1) = 1` → byte 0x80) round-trip through `PerlValue::bytes`,
+`vec($s, 7, 1) = 1` → byte 0x80) round-trip through `StrykeValue::bytes`,
 but downstream `substr` / `ord` on those byte values still apply
 UTF-8/Latin-1 decoding, which can corrupt single-byte indexing. This is
 the same string-vs-bytes interaction that affects `pack` output.
