@@ -1,4 +1,4 @@
-//! NaN-boxed `u64` for [`crate::value::PerlValue`]: immediates in `0x7FF8…`, heap pointers in `0x7FF9…`.
+//! NaN-boxed `u64` for [`crate::value::StrykeValue`]: immediates in `0x7FF8…`, heap pointers in `0x7FF9…`.
 
 /// Base for immediate tags (quiet NaN).
 pub(crate) const QNAN_IMM: u64 = 0x7FF8_0000_0000_0000;

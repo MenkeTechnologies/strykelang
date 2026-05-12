@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 
-use stryke::value::{PerlValue, RemoteCluster, RemoteSlot};
+use stryke::value::{StrykeValue, RemoteCluster, RemoteSlot};
 use stryke::vm_helper::VMHelper;
 
 /// `STRYKE_CLUSTER_LOCAL_BIN` is process-global; serialize tests that set it
@@ -45,7 +45,7 @@ impl Drop for EnvGuard {
     }
 }
 
-fn build_local_cluster(n_slots: usize) -> PerlValue {
+fn build_local_cluster(n_slots: usize) -> StrykeValue {
     let slots = (0..n_slots)
         .map(|i| RemoteSlot {
             host: format!("local-{i}"),
@@ -58,12 +58,12 @@ fn build_local_cluster(n_slots: usize) -> PerlValue {
         max_attempts: RemoteCluster::DEFAULT_MAX_ATTEMPTS,
         connect_timeout_ms: 10_000,
     };
-    PerlValue::remote_cluster(Arc::new(c))
+    StrykeValue::remote_cluster(Arc::new(c))
 }
 
 /// Set up the env override, declare `$c` in scope as a local-loopback
 /// cluster, parse + run `code`, return the result.
-fn run_with_local_cluster(n_slots: usize, code: &str) -> PerlValue {
+fn run_with_local_cluster(n_slots: usize, code: &str) -> StrykeValue {
     let _lock = LOCAL_BIN_LOCK.lock();
     let _guard = EnvGuard::set("STRYKE_CLUSTER_LOCAL_BIN", env!("CARGO_BIN_EXE_st"));
     let mut interp = VMHelper::new();
@@ -106,7 +106,7 @@ fn dist_thread_preserves_source_order_across_chunks() {
 #[test]
 fn dist_thread_empty_source_returns_empty() {
     let v = run_with_local_cluster(2, "~d> on $c () map { _ * 2 }");
-    let got: Vec<PerlValue> = v
+    let got: Vec<StrykeValue> = v
         .as_array_vec()
         .or_else(|| v.as_array_ref().map(|a| a.read().clone()))
         .expect("empty list");

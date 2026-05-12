@@ -16,7 +16,7 @@
 
 use libfuzzer_sys::fuzz_target;
 use stryke::pack::{perl_pack, perl_unpack};
-use stryke::value::PerlValue;
+use stryke::value::StrykeValue;
 
 fuzz_target!(|data: &[u8]| {
     if data.len() < 4 {
@@ -37,11 +37,11 @@ fuzz_target!(|data: &[u8]| {
         // pack: first arg is template, then `n_values` payload values (alternate
         // strings and ints derived from `payload`).
         let mut args = Vec::with_capacity(1 + n_values);
-        args.push(PerlValue::string(template.to_string()));
+        args.push(StrykeValue::string(template.to_string()));
         for i in 0..n_values {
             let chunk = payload.get(i * 4..(i + 1) * 4).unwrap_or(payload);
             if chunk.is_empty() {
-                args.push(PerlValue::integer(0));
+                args.push(StrykeValue::integer(0));
             } else if i & 1 == 0 {
                 let v = i32::from_le_bytes([
                     *chunk.first().unwrap_or(&0),
@@ -49,9 +49,9 @@ fuzz_target!(|data: &[u8]| {
                     *chunk.get(2).unwrap_or(&0),
                     *chunk.get(3).unwrap_or(&0),
                 ]);
-                args.push(PerlValue::integer(v as i64));
+                args.push(StrykeValue::integer(v as i64));
             } else {
-                args.push(PerlValue::string(
+                args.push(StrykeValue::string(
                     String::from_utf8_lossy(chunk).into_owned(),
                 ));
             }
@@ -61,8 +61,8 @@ fuzz_target!(|data: &[u8]| {
         // unpack: template + a single payload string.
         let payload_str = String::from_utf8_lossy(payload).into_owned();
         let args = vec![
-            PerlValue::string(template.to_string()),
-            PerlValue::string(payload_str),
+            StrykeValue::string(template.to_string()),
+            StrykeValue::string(payload_str),
         ];
         let _ = perl_unpack(&args, 0);
     }

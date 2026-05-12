@@ -1,7 +1,7 @@
 // Batch 33 — bioinformatics deep: alignment, motifs, phylogenetics, structure.
 
 // Needleman-Wunsch global alignment score
-fn builtin_needleman_wunsch_score(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_needleman_wunsch_score(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let a = args.first().map(|v| v.to_string()).unwrap_or_default();
     let b = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let match_s = args.get(2).map(|v| v.to_number() as i32).unwrap_or(1);
@@ -20,11 +20,11 @@ fn builtin_needleman_wunsch_score(args: &[PerlValue]) -> PerlResult<PerlValue> {
             dp[i][j] = (dp[i - 1][j - 1] + s).max(dp[i - 1][j] + gap).max(dp[i][j - 1] + gap);
         }
     }
-    Ok(PerlValue::integer(dp[m][n] as i64))
+    Ok(StrykeValue::integer(dp[m][n] as i64))
 }
 
 // Smith-Waterman local alignment score
-fn builtin_smith_waterman_score(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_smith_waterman_score(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let a = args.first().map(|v| v.to_string()).unwrap_or_default();
     let b = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let match_s = args.get(2).map(|v| v.to_number() as i32).unwrap_or(2);
@@ -46,29 +46,29 @@ fn builtin_smith_waterman_score(args: &[PerlValue]) -> PerlResult<PerlValue> {
             if dp[i][j] > best { best = dp[i][j]; }
         }
     }
-    Ok(PerlValue::integer(best as i64))
+    Ok(StrykeValue::integer(best as i64))
 }
 
 // PAM250 substitution score (simplified diagonal/off)
-fn builtin_pam250_score(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_pam250_score(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let a = args.first().map(|v| v.to_string().to_ascii_uppercase()).unwrap_or_default();
     let b = args.get(1).map(|v| v.to_string().to_ascii_uppercase()).unwrap_or_default();
-    if a.is_empty() || b.is_empty() { return Ok(PerlValue::integer(0)); }
+    if a.is_empty() || b.is_empty() { return Ok(StrykeValue::integer(0)); }
     let ca = a.chars().next().unwrap();
     let cb = b.chars().next().unwrap();
     let same_group = |g: &str| g.contains(ca) && g.contains(cb);
-    if ca == cb { Ok(PerlValue::integer(7)) }
-    else if same_group("ILMV") { Ok(PerlValue::integer(3)) }
-    else if same_group("FYW") { Ok(PerlValue::integer(4)) }
-    else if same_group("DE") || same_group("KR") { Ok(PerlValue::integer(3)) }
-    else { Ok(PerlValue::integer(-2)) }
+    if ca == cb { Ok(StrykeValue::integer(7)) }
+    else if same_group("ILMV") { Ok(StrykeValue::integer(3)) }
+    else if same_group("FYW") { Ok(StrykeValue::integer(4)) }
+    else if same_group("DE") || same_group("KR") { Ok(StrykeValue::integer(3)) }
+    else { Ok(StrykeValue::integer(-2)) }
 }
 
 // Tanimoto / Jaccard for fingerprints (bit vectors as 0/1 arrays)
-fn builtin_tanimoto_bits(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let a: Vec<i64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+fn builtin_tanimoto_bits(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let a: Vec<i64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number() as i64).collect();
-    let b: Vec<i64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+    let b: Vec<i64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number() as i64).collect();
     let n = a.len().min(b.len());
     let mut and_c = 0_i64;
@@ -77,12 +77,12 @@ fn builtin_tanimoto_bits(args: &[PerlValue]) -> PerlResult<PerlValue> {
         if a[i] != 0 && b[i] != 0 { and_c += 1; }
         if a[i] != 0 || b[i] != 0 { or_c += 1; }
     }
-    if or_c == 0 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float(and_c as f64 / or_c as f64))
+    if or_c == 0 { return Ok(StrykeValue::float(0.0)); }
+    Ok(StrykeValue::float(and_c as f64 / or_c as f64))
 }
 
 // Translate DNA sequence to protein (ignores ambiguity)
-fn builtin_translate_dna(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_translate_dna(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string().to_ascii_uppercase()).unwrap_or_default();
     let table = [
         ("TTT", 'F'), ("TTC", 'F'), ("TTA", 'L'), ("TTG", 'L'),
@@ -110,23 +110,23 @@ fn builtin_translate_dna(args: &[PerlValue]) -> PerlResult<PerlValue> {
         let codon = std::str::from_utf8(chunk).unwrap_or("");
         protein.push(*m.get(codon).unwrap_or(&'X'));
     }
-    Ok(PerlValue::string(protein))
+    Ok(StrykeValue::string(protein))
 }
 
 // Transcribe DNA → RNA (T→U)
-fn builtin_transcribe_dna_rna(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_transcribe_dna_rna(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-    Ok(PerlValue::string(s.replace('T', "U").replace('t', "u")))
+    Ok(StrykeValue::string(s.replace('T', "U").replace('t', "u")))
 }
 
 // Reverse-transcribe RNA → DNA
-fn builtin_reverse_transcribe(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_reverse_transcribe(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-    Ok(PerlValue::string(s.replace('U', "T").replace('u', "t")))
+    Ok(StrykeValue::string(s.replace('U', "T").replace('u', "t")))
 }
 
 // AT content (fraction)
-fn builtin_at_content(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_at_content(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let mut total = 0;
     let mut at = 0;
@@ -137,32 +137,32 @@ fn builtin_at_content(args: &[PerlValue]) -> PerlResult<PerlValue> {
             if u == 'A' || u == 'T' || u == 'U' { at += 1; }
         }
     }
-    if total == 0 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float(at as f64 / total as f64))
+    if total == 0 { return Ok(StrykeValue::float(0.0)); }
+    Ok(StrykeValue::float(at as f64 / total as f64))
 }
 
 // Melting temperature Tm (Wallace rule, short oligos)
-fn builtin_tm_wallace(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_tm_wallace(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string().to_ascii_uppercase()).unwrap_or_default();
     let at = s.chars().filter(|c| matches!(c, 'A' | 'T')).count() as f64;
     let gc = s.chars().filter(|c| matches!(c, 'G' | 'C')).count() as f64;
-    Ok(PerlValue::float(2.0 * at + 4.0 * gc))
+    Ok(StrykeValue::float(2.0 * at + 4.0 * gc))
 }
 
 // Tm Marmur-Schildkraut (long oligos / DNA)
-fn builtin_tm_marmur(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_tm_marmur(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string().to_ascii_uppercase()).unwrap_or_default();
     let total = s.chars().filter(|c| c.is_ascii_alphabetic()).count() as f64;
-    if total == 0.0 { return Ok(PerlValue::float(0.0)); }
+    if total == 0.0 { return Ok(StrykeValue::float(0.0)); }
     let gc = s.chars().filter(|c| matches!(c, 'G' | 'C')).count() as f64;
     let gc_pct = 100.0 * gc / total;
-    Ok(PerlValue::float(0.41 * gc_pct + 81.5 - 600.0 / total))
+    Ok(StrykeValue::float(0.41 * gc_pct + 81.5 - 600.0 / total))
 }
 
 // Codon adaptation index (CAI) given codon weights
-fn builtin_codon_adaptation_index(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_codon_adaptation_index(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string().to_ascii_uppercase()).unwrap_or_default();
-    let weights = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF));
+    let weights = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     let weight_map: std::collections::HashMap<String, f64> = weights.chunks(2)
         .filter(|c| c.len() == 2)
         .map(|c| (c[0].to_string(), c[1].to_number()))
@@ -180,12 +180,12 @@ fn builtin_codon_adaptation_index(args: &[PerlValue]) -> PerlResult<PerlValue> {
             }
         }
     }
-    if count == 0 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float((log_sum / count as f64).exp()))
+    if count == 0 { return Ok(StrykeValue::float(0.0)); }
+    Ok(StrykeValue::float((log_sum / count as f64).exp()))
 }
 
 // k-mer Jaccard similarity
-fn builtin_kmer_jaccard(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_kmer_jaccard(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let a = args.first().map(|v| v.to_string()).unwrap_or_default();
     let b = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let k = args.get(2).map(|v| v.to_number() as usize).unwrap_or(3).max(1);
@@ -198,12 +198,12 @@ fn builtin_kmer_jaccard(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let sb = to_set(&b);
     let inter = sa.intersection(&sb).count();
     let uni = sa.union(&sb).count();
-    if uni == 0 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float(inter as f64 / uni as f64))
+    if uni == 0 { return Ok(StrykeValue::float(0.0)); }
+    Ok(StrykeValue::float(inter as f64 / uni as f64))
 }
 
 // Shannon information of sequence (bits per base)
-fn builtin_sequence_shannon_info(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_sequence_shannon_info(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let mut counts: std::collections::HashMap<char, usize> = std::collections::HashMap::new();
     let mut total = 0_usize;
@@ -211,19 +211,19 @@ fn builtin_sequence_shannon_info(args: &[PerlValue]) -> PerlResult<PerlValue> {
         *counts.entry(c.to_ascii_uppercase()).or_default() += 1;
         total += 1;
     }
-    if total == 0 { return Ok(PerlValue::float(0.0)); }
+    if total == 0 { return Ok(StrykeValue::float(0.0)); }
     let h: f64 = counts.values().map(|&c| {
         let p = c as f64 / total as f64;
         -p * p.log2()
     }).sum();
-    Ok(PerlValue::float(h))
+    Ok(StrykeValue::float(h))
 }
 
 // Position weight matrix score for sequence given log-odds matrix (rows=positions, cols=A,C,G,T order)
-fn builtin_pwm_score(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_pwm_score(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string().to_ascii_uppercase()).unwrap_or_default();
-    let pwm = matrix_from_value(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF));
-    if pwm.is_empty() || pwm[0].len() < 4 { return Ok(PerlValue::float(0.0)); }
+    let pwm = matrix_from_value(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
+    if pwm.is_empty() || pwm[0].len() < 4 { return Ok(StrykeValue::float(0.0)); }
     let mut score = 0.0;
     for (i, c) in s.chars().enumerate() {
         if i >= pwm.len() { break; }
@@ -233,33 +233,33 @@ fn builtin_pwm_score(args: &[PerlValue]) -> PerlResult<PerlValue> {
         };
         score += pwm[i][col];
     }
-    Ok(PerlValue::float(score))
+    Ok(StrykeValue::float(score))
 }
 
 // Shannon entropy of multiple sequence alignment column (probabilities)
-fn builtin_msa_column_entropy(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let probs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+fn builtin_msa_column_entropy(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let probs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let h: f64 = probs.iter().filter(|&&p| p > 0.0)
         .map(|&p| -p * p.log2()).sum();
-    Ok(PerlValue::float(h))
+    Ok(StrykeValue::float(h))
 }
 
 // Sequence logo information content (bits) per column
-fn builtin_seq_logo_information(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let probs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+fn builtin_seq_logo_information(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let probs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let alphabet = args.get(1).map(|v| v.to_number() as usize).unwrap_or(4).max(2);
     let max_h = (alphabet as f64).log2();
     let h: f64 = probs.iter().filter(|&&p| p > 0.0)
         .map(|&p| -p * p.log2()).sum();
-    Ok(PerlValue::float(max_h - h))
+    Ok(StrykeValue::float(max_h - h))
 }
 
 // Levenshtein distance (general string edit)
 
 // Damerau-Levenshtein
-fn builtin_damerau_levenshtein(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_damerau_levenshtein(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let a = args.first().map(|v| v.to_string()).unwrap_or_default();
     let b = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let av: Vec<char> = a.chars().collect();
@@ -278,11 +278,11 @@ fn builtin_damerau_levenshtein(args: &[PerlValue]) -> PerlResult<PerlValue> {
             }
         }
     }
-    Ok(PerlValue::integer(dp[m][n] as i64))
+    Ok(StrykeValue::integer(dp[m][n] as i64))
 }
 
 // Longest common subsequence length
-fn builtin_lcs_length(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_lcs_length(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let a = args.first().map(|v| v.to_string()).unwrap_or_default();
     let b = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let av: Vec<char> = a.chars().collect();
@@ -296,18 +296,18 @@ fn builtin_lcs_length(args: &[PerlValue]) -> PerlResult<PerlValue> {
             else { dp[i][j] = dp[i - 1][j].max(dp[i][j - 1]); }
         }
     }
-    Ok(PerlValue::integer(dp[m][n] as i64))
+    Ok(StrykeValue::integer(dp[m][n] as i64))
 }
 
 // Longest common substring
 
 // Hirschberg space-efficient LCS length (same result, different algorithm)
-fn builtin_hirschberg_lcs_length(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_hirschberg_lcs_length(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     builtin_lcs_length(args)
 }
 
 // Number of common k-mers
-fn builtin_common_kmers(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_common_kmers(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let a = args.first().map(|v| v.to_string()).unwrap_or_default();
     let b = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let k = args.get(2).map(|v| v.to_number() as usize).unwrap_or(4).max(1);
@@ -323,165 +323,165 @@ fn builtin_common_kmers(args: &[PerlValue]) -> PerlResult<PerlValue> {
             if sa.contains(&b[i..i + k]) { count += 1; }
         }
     }
-    Ok(PerlValue::integer(count as i64))
+    Ok(StrykeValue::integer(count as i64))
 }
 
 // Phylogenetic distance from sequence identity (Jukes-Cantor)
-fn builtin_jukes_cantor_distance(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_jukes_cantor_distance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let identity = f1(args).clamp(0.0, 1.0);
     let p = 1.0 - identity;
-    if p >= 0.75 { return Ok(PerlValue::float(f64::INFINITY)); }
-    Ok(PerlValue::float(-0.75 * (1.0 - 4.0 * p / 3.0).max(1e-15).ln()))
+    if p >= 0.75 { return Ok(StrykeValue::float(f64::INFINITY)); }
+    Ok(StrykeValue::float(-0.75 * (1.0 - 4.0 * p / 3.0).max(1e-15).ln()))
 }
 
 // Kimura 2-parameter distance (transitions ts, transversions tv as fractions)
-fn builtin_kimura_2p_distance(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_kimura_2p_distance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let ts = f1(args).clamp(0.0, 1.0);
     let tv = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).clamp(0.0, 1.0);
     let term1 = 1.0 - 2.0 * ts - tv;
     let term2 = 1.0 - 2.0 * tv;
-    if term1 <= 0.0 || term2 <= 0.0 { return Ok(PerlValue::float(f64::INFINITY)); }
-    Ok(PerlValue::float(-0.5 * term1.ln() - 0.25 * term2.ln()))
+    if term1 <= 0.0 || term2 <= 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
+    Ok(StrykeValue::float(-0.5 * term1.ln() - 0.25 * term2.ln()))
 }
 
 // Felsenstein pruning step (for binary tree, log-likelihood at internal node)
-fn builtin_felsenstein_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let p_left: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+fn builtin_felsenstein_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let p_left: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
-    let p_right: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+    let p_right: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let n = p_left.len().min(p_right.len());
-    let out: Vec<PerlValue> = (0..n).map(|i| PerlValue::float(p_left[i] * p_right[i])).collect();
-    Ok(PerlValue::array(out))
+    let out: Vec<StrykeValue> = (0..n).map(|i| StrykeValue::float(p_left[i] * p_right[i])).collect();
+    Ok(StrykeValue::array(out))
 }
 
 // Branch length from substitutions and length
-fn builtin_branch_length_substitutions(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_branch_length_substitutions(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let subs = f1(args);
     let length = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    if length == 0.0 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float(subs / length))
+    if length == 0.0 { return Ok(StrykeValue::float(0.0)); }
+    Ok(StrykeValue::float(subs / length))
 }
 
 // Number of trees on n labeled tips (rooted): (2n-3)!! for unrooted
-fn builtin_num_unrooted_trees(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_num_unrooted_trees(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n = i1(args);
-    if n < 3 { return Ok(PerlValue::integer(1)); }
+    if n < 3 { return Ok(StrykeValue::integer(1)); }
     let mut prod = 1_i128;
     for k in 1..n - 1 { prod *= (2 * k - 1) as i128; }
-    Ok(PerlValue::integer(prod as i64))
+    Ok(StrykeValue::integer(prod as i64))
 }
 
 // Bayesian posterior given prior and likelihood (single hypothesis, evidence)
-fn builtin_bayes_posterior(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_bayes_posterior(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let prior = f1(args);
     let likelihood = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let evidence = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
-    if evidence == 0.0 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float(prior * likelihood / evidence))
+    if evidence == 0.0 { return Ok(StrykeValue::float(0.0)); }
+    Ok(StrykeValue::float(prior * likelihood / evidence))
 }
 
 // Hardy-Weinberg expected genotype counts (n = pop size)
-fn builtin_hw_expected_counts(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_hw_expected_counts(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let p = f1(args).clamp(0.0, 1.0);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(100.0);
     let q = 1.0 - p;
-    Ok(PerlValue::array(vec![
-        PerlValue::float(n * p * p),
-        PerlValue::float(n * 2.0 * p * q),
-        PerlValue::float(n * q * q),
+    Ok(StrykeValue::array(vec![
+        StrykeValue::float(n * p * p),
+        StrykeValue::float(n * 2.0 * p * q),
+        StrykeValue::float(n * q * q),
     ]))
 }
 
 // Allele frequency from genotype counts (AA, AB, BB)
-fn builtin_allele_frequency(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_allele_frequency(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let aa = f1(args);
     let ab = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let bb = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
     let total = aa + ab + bb;
-    if total == 0.0 { return Ok(PerlValue::float(0.5)); }
-    Ok(PerlValue::float((2.0 * aa + ab) / (2.0 * total)))
+    if total == 0.0 { return Ok(StrykeValue::float(0.5)); }
+    Ok(StrykeValue::float((2.0 * aa + ab) / (2.0 * total)))
 }
 
 // Linkage disequilibrium D = p_AB - p_A·p_B
-fn builtin_ld_d(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_ld_d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let p_ab = f1(args);
     let p_a = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
     let p_b = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
-    Ok(PerlValue::float(p_ab - p_a * p_b))
+    Ok(StrykeValue::float(p_ab - p_a * p_b))
 }
 
 // LD r² statistic
-fn builtin_ld_r_squared(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_ld_r_squared(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let d = f1(args);
     let p_a = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
     let p_b = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
     let denom = p_a * (1.0 - p_a) * p_b * (1.0 - p_b);
-    if denom <= 0.0 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float(d * d / denom))
+    if denom <= 0.0 { return Ok(StrykeValue::float(0.0)); }
+    Ok(StrykeValue::float(d * d / denom))
 }
 
 // FST (Wright) from heterozygosities
 
 // Heterozygosity 2pq
-fn builtin_heterozygosity(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_heterozygosity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let p = f1(args).clamp(0.0, 1.0);
-    Ok(PerlValue::float(2.0 * p * (1.0 - p)))
+    Ok(StrykeValue::float(2.0 * p * (1.0 - p)))
 }
 
 // Effective population size from variance Ne = (1/(2Vp))·F
-fn builtin_ne_from_variance(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_ne_from_variance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let var_p = f1(args);
     let p = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
     let q = 1.0 - p;
-    if var_p == 0.0 { return Ok(PerlValue::float(f64::INFINITY)); }
-    Ok(PerlValue::float(p * q / (2.0 * var_p)))
+    if var_p == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
+    Ok(StrykeValue::float(p * q / (2.0 * var_p)))
 }
 
 // Ploidy expected from coverage uniformity
-fn builtin_expected_coverage(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_expected_coverage(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n_reads = f1(args);
     let read_len = args.get(1).map(|v| v.to_number()).unwrap_or(150.0);
     let genome_len = args.get(2).map(|v| v.to_number()).unwrap_or(3e9);
-    if genome_len == 0.0 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float(n_reads * read_len / genome_len))
+    if genome_len == 0.0 { return Ok(StrykeValue::float(0.0)); }
+    Ok(StrykeValue::float(n_reads * read_len / genome_len))
 }
 
 // Lander-Waterman expected coverage gap distribution mean
-fn builtin_lander_waterman_gaps(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_lander_waterman_gaps(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let coverage = f1(args);
-    Ok(PerlValue::float((-coverage).exp()))
+    Ok(StrykeValue::float((-coverage).exp()))
 }
 
 // FDR Benjamini-Hochberg adjusted p-value (single rank)
-fn builtin_bh_adjusted_p(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_bh_adjusted_p(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let p_value = f1(args);
     let rank = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let total = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
-    if rank == 0.0 { return Ok(PerlValue::float(p_value)); }
-    Ok(PerlValue::float((p_value * total / rank).min(1.0)))
+    if rank == 0.0 { return Ok(StrykeValue::float(p_value)); }
+    Ok(StrykeValue::float((p_value * total / rank).min(1.0)))
 }
 
 // Bonferroni correction
 #[allow(dead_code)]
-fn builtin_bonferroni(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_bonferroni(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let p = f1(args);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    Ok(PerlValue::float((p * n).min(1.0)))
+    Ok(StrykeValue::float((p * n).min(1.0)))
 }
 
 // Z-score for a count vs expected
-fn builtin_zscore_count(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_zscore_count(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let observed = f1(args);
     let expected = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let stddev = args.get(2).map(|v| v.to_number()).unwrap_or(1.0).max(1e-12);
-    Ok(PerlValue::float((observed - expected) / stddev))
+    Ok(StrykeValue::float((observed - expected) / stddev))
 }
 
 // Hypergeometric PMF (small N, exact)
 
 // GO term enrichment p-value (one-sided hypergeometric)
-fn builtin_go_enrichment_p(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_go_enrichment_p(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n_total = i1(args).max(1);
     let k_success = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     let n_draw = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -495,13 +495,13 @@ fn builtin_go_enrichment_p(args: &[PerlValue]) -> PerlResult<PerlValue> {
         r
     }
     let denom = binom(n_total, n_draw);
-    if denom == 0.0 { return Ok(PerlValue::float(0.0)); }
+    if denom == 0.0 { return Ok(StrykeValue::float(0.0)); }
     let mut p = 0.0;
     let max_k = k_success.min(n_draw);
     for k in k_obs..=max_k {
         p += binom(k_success, k) * binom(n_total - k_success, n_draw - k) / denom;
     }
-    Ok(PerlValue::float(p.clamp(0.0, 1.0)))
+    Ok(StrykeValue::float(p.clamp(0.0, 1.0)))
 }
 
 // BLOSUM45 substitution score (Henikoff & Henikoff 1992): log-odds matrix from
@@ -510,7 +510,7 @@ fn builtin_go_enrichment_p(args: &[PerlValue]) -> PerlResult<PerlValue> {
 // off-diagonal scores: identical=10, same group=4, hydrophobic↔hydrophobic=2,
 // otherwise mismatch ranges from −3 to 1. Distinct from PAM250 (different
 // underlying corpus and target identity threshold). Args: class_a, class_b (0..5).
-fn builtin_blosum45_score(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_blosum45_score(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let a = i1(args).max(0) as usize;
     let b = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0).max(0) as usize;
     const M: [[i64; 6]; 6] = [
@@ -521,91 +521,91 @@ fn builtin_blosum45_score(args: &[PerlValue]) -> PerlResult<PerlValue> {
         [-2, -3,  0,  1,  7, -3],
         [-2, -1, -2, -2, -3,  8],
     ];
-    if a >= 6 || b >= 6 { return Ok(PerlValue::integer(0)); }
-    Ok(PerlValue::integer(M[a][b]))
+    if a >= 6 || b >= 6 { return Ok(StrykeValue::integer(0)); }
+    Ok(StrykeValue::integer(M[a][b]))
 }
 
 // Sequence weight (Henikoff)
-fn builtin_henikoff_weight(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_henikoff_weight(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n_distinct = f1(args);
     let r_count = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    if n_distinct == 0.0 || r_count == 0.0 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float(1.0 / (n_distinct * r_count)))
+    if n_distinct == 0.0 || r_count == 0.0 { return Ok(StrykeValue::float(0.0)); }
+    Ok(StrykeValue::float(1.0 / (n_distinct * r_count)))
 }
 
 // Hamming distance for protein sequences
-fn builtin_hamming_protein(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_hamming_protein(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let a = args.first().map(|v| v.to_string()).unwrap_or_default();
     let b = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let count = a.chars().zip(b.chars()).filter(|(x, y)| x != y).count();
     let extra = (a.chars().count() as i64 - b.chars().count() as i64).abs();
-    Ok(PerlValue::integer(count as i64 + extra))
+    Ok(StrykeValue::integer(count as i64 + extra))
 }
 
 // Codon usage variance (deviation from uniform)
-fn builtin_codon_usage_variance(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let freqs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+fn builtin_codon_usage_variance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let freqs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let n = freqs.len() as f64;
-    if n <= 0.0 { return Ok(PerlValue::float(0.0)); }
+    if n <= 0.0 { return Ok(StrykeValue::float(0.0)); }
     let mean = 1.0 / n;
     let var: f64 = freqs.iter().map(|&f| (f - mean).powi(2)).sum::<f64>() / n;
-    Ok(PerlValue::float(var))
+    Ok(StrykeValue::float(var))
 }
 
 // Synonymous-to-nonsynonymous (dN/dS) ratio (rough)
-fn builtin_dnds_ratio(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_dnds_ratio(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let dn = f1(args);
     let ds = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    if ds == 0.0 { return Ok(PerlValue::float(f64::INFINITY)); }
-    Ok(PerlValue::float(dn / ds))
+    if ds == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
+    Ok(StrykeValue::float(dn / ds))
 }
 
 // Mutation rate per generation (mu)
-fn builtin_mutation_rate(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_mutation_rate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n_mutations = f1(args);
     let n_sites = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    if n_sites == 0.0 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float(n_mutations / n_sites))
+    if n_sites == 0.0 { return Ok(StrykeValue::float(0.0)); }
+    Ok(StrykeValue::float(n_mutations / n_sites))
 }
 
 // Tajima's D (rough simplified)
-fn builtin_tajimas_d(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_tajimas_d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let pi_est = f1(args);
     let theta_w = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let var_d = args.get(2).map(|v| v.to_number()).unwrap_or(1.0).max(1e-12);
-    Ok(PerlValue::float((pi_est - theta_w) / var_d.sqrt()))
+    Ok(StrykeValue::float((pi_est - theta_w) / var_d.sqrt()))
 }
 
 // Watterson's theta from segregating sites
-fn builtin_wattersons_theta(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_wattersons_theta(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let s = f1(args);
     let n = args.get(1).map(|v| v.to_number() as i64).unwrap_or(2);
     let mut a_n = 0.0;
     for k in 1..n { a_n += 1.0 / k as f64; }
-    if a_n == 0.0 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float(s / a_n))
+    if a_n == 0.0 { return Ok(StrykeValue::float(0.0)); }
+    Ok(StrykeValue::float(s / a_n))
 }
 
 // Coalescent time expectation E[T_n] = 2/(n(n-1))
-fn builtin_coalescent_expected_time(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_coalescent_expected_time(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n = f1(args);
-    if n <= 1.0 { return Ok(PerlValue::float(f64::INFINITY)); }
-    Ok(PerlValue::float(2.0 / (n * (n - 1.0))))
+    if n <= 1.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
+    Ok(StrykeValue::float(2.0 / (n * (n - 1.0))))
 }
 
 // Total tree length expectation
-fn builtin_coalescent_tree_length(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_coalescent_tree_length(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n = i1(args).max(2);
     let mut total = 0.0;
     for k in 2..=n {
         total += k as f64 * 2.0 / (k as f64 * (k as f64 - 1.0));
     }
-    Ok(PerlValue::float(total))
+    Ok(StrykeValue::float(total))
 }
 
 // Effective Migration rate Nm from FST
-fn builtin_nm_from_fst(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_nm_from_fst(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let fst = f1(args).clamp(1e-9, 0.999);
-    Ok(PerlValue::float((1.0 - fst) / (4.0 * fst)))
+    Ok(StrykeValue::float((1.0 - fst) / (4.0 * fst)))
 }

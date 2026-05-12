@@ -58,7 +58,7 @@ use parking_lot::Mutex;
 use sha2::{Digest, Sha256};
 
 use crate::error::{PerlError, PerlResult};
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 
 /// One registered FFI entry: a function signature kind + a raw symbol pointer.
 /// The dylib handle is kept alive in [`FFI_REGISTRY::libs`] so `sym` stays valid.
@@ -137,7 +137,7 @@ fn registry() -> &'static Arc<Mutex<Registry>> {
 
 /// Lookup hook: returns `Some(Ok(result))` if `name` is a registered FFI function,
 /// `None` otherwise. Called from [`crate::builtins::try_builtin`]'s fallback arm.
-pub fn try_call(name: &str, args: &[PerlValue], line: usize) -> Option<PerlResult<PerlValue>> {
+pub fn try_call(name: &str, args: &[StrykeValue], line: usize) -> Option<PerlResult<StrykeValue>> {
     let entry = {
         let guard = registry().lock();
         guard.entries.get(name).cloned()?
@@ -521,7 +521,7 @@ fn is_c_str_ptr(t: &str) -> bool {
     t == "*constc_char" || t == "*mutc_char"
 }
 
-fn invoke(name: &str, entry: &FfiEntry, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+fn invoke(name: &str, entry: &FfiEntry, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     let expected = entry.sig.arity();
     if args.len() != expected {
         return Err(PerlError::runtime(
@@ -542,19 +542,19 @@ fn invoke(name: &str, entry: &FfiEntry, args: &[PerlValue], line: usize) -> Perl
         match entry.sig {
             FfiSig::I0 => {
                 let f: extern "C" fn() -> i64 = std::mem::transmute(entry.sym);
-                Ok(PerlValue::integer(f()))
+                Ok(StrykeValue::integer(f()))
             }
             FfiSig::I1 => {
                 let f: extern "C" fn(i64) -> i64 = std::mem::transmute(entry.sym);
-                Ok(PerlValue::integer(f(args[0].to_int())))
+                Ok(StrykeValue::integer(f(args[0].to_int())))
             }
             FfiSig::I2 => {
                 let f: extern "C" fn(i64, i64) -> i64 = std::mem::transmute(entry.sym);
-                Ok(PerlValue::integer(f(args[0].to_int(), args[1].to_int())))
+                Ok(StrykeValue::integer(f(args[0].to_int(), args[1].to_int())))
             }
             FfiSig::I3 => {
                 let f: extern "C" fn(i64, i64, i64) -> i64 = std::mem::transmute(entry.sym);
-                Ok(PerlValue::integer(f(
+                Ok(StrykeValue::integer(f(
                     args[0].to_int(),
                     args[1].to_int(),
                     args[2].to_int(),
@@ -562,7 +562,7 @@ fn invoke(name: &str, entry: &FfiEntry, args: &[PerlValue], line: usize) -> Perl
             }
             FfiSig::I4 => {
                 let f: extern "C" fn(i64, i64, i64, i64) -> i64 = std::mem::transmute(entry.sym);
-                Ok(PerlValue::integer(f(
+                Ok(StrykeValue::integer(f(
                     args[0].to_int(),
                     args[1].to_int(),
                     args[2].to_int(),
@@ -571,22 +571,22 @@ fn invoke(name: &str, entry: &FfiEntry, args: &[PerlValue], line: usize) -> Perl
             }
             FfiSig::F0 => {
                 let f: extern "C" fn() -> f64 = std::mem::transmute(entry.sym);
-                Ok(PerlValue::float(f()))
+                Ok(StrykeValue::float(f()))
             }
             FfiSig::F1 => {
                 let f: extern "C" fn(f64) -> f64 = std::mem::transmute(entry.sym);
-                Ok(PerlValue::float(f(args[0].to_number())))
+                Ok(StrykeValue::float(f(args[0].to_number())))
             }
             FfiSig::F2 => {
                 let f: extern "C" fn(f64, f64) -> f64 = std::mem::transmute(entry.sym);
-                Ok(PerlValue::float(f(
+                Ok(StrykeValue::float(f(
                     args[0].to_number(),
                     args[1].to_number(),
                 )))
             }
             FfiSig::F3 => {
                 let f: extern "C" fn(f64, f64, f64) -> f64 = std::mem::transmute(entry.sym);
-                Ok(PerlValue::float(f(
+                Ok(StrykeValue::float(f(
                     args[0].to_number(),
                     args[1].to_number(),
                     args[2].to_number(),
@@ -597,7 +597,7 @@ fn invoke(name: &str, entry: &FfiEntry, args: &[PerlValue], line: usize) -> Perl
                 let c = CString::new(s)
                     .map_err(|e| PerlError::runtime(format!("rust FFI: arg nul: {}", e), line))?;
                 let f: extern "C" fn(*const c_char) -> i64 = std::mem::transmute(entry.sym);
-                Ok(PerlValue::integer(f(c.as_ptr())))
+                Ok(StrykeValue::integer(f(c.as_ptr())))
             }
             FfiSig::StrToStr => {
                 let s = args[0].to_string();
@@ -607,10 +607,10 @@ fn invoke(name: &str, entry: &FfiEntry, args: &[PerlValue], line: usize) -> Perl
                     std::mem::transmute(entry.sym);
                 let ret = f(c.as_ptr());
                 if ret.is_null() {
-                    return Ok(PerlValue::UNDEF);
+                    return Ok(StrykeValue::UNDEF);
                 }
                 let cs = CStr::from_ptr(ret);
-                Ok(PerlValue::string(cs.to_string_lossy().into_owned()))
+                Ok(StrykeValue::string(cs.to_string_lossy().into_owned()))
             }
         }
     }

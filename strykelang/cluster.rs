@@ -54,7 +54,7 @@ use crate::remote_wire::{
     frame_kind, perl_to_json_value, read_typed_frame, send_msg, HelloAck, HelloMsg, JobMsg,
     JobRespMsg, SessionAck, SessionInit, PROTO_VERSION,
 };
-use crate::value::{PerlValue, RemoteCluster, RemoteSlot};
+use crate::value::{StrykeValue, RemoteCluster, RemoteSlot};
 
 /// One unit of work tracked by the dispatcher. Carries the original sequence number for
 /// order-preserving result collection plus an attempt counter for retry accounting.
@@ -70,7 +70,7 @@ pub struct DispatchJob {
 #[derive(Debug)]
 pub struct DispatchResult {
     pub seq: u64,
-    pub outcome: Result<PerlValue, String>,
+    pub outcome: Result<StrykeValue, String>,
 }
 
 /// Run a `pmap_on` against a [`RemoteCluster`]. Blocks until every job has either succeeded
@@ -86,7 +86,7 @@ pub fn run_cluster(
     block_src: String,
     capture: Vec<(String, serde_json::Value)>,
     items: Vec<serde_json::Value>,
-) -> Result<Vec<PerlValue>, String> {
+) -> Result<Vec<StrykeValue>, String> {
     if items.is_empty() {
         return Ok(Vec::new());
     }
@@ -157,7 +157,7 @@ pub fn run_cluster(
 
     // Collect results in seq order. We allocate the full vector up-front and assign by
     // index so we don't depend on receive order — slot threads complete jobs in any order.
-    let mut results: Vec<Option<Result<PerlValue, String>>> =
+    let mut results: Vec<Option<Result<StrykeValue, String>>> =
         (0..items.len()).map(|_| None).collect();
     let mut received = 0usize;
     while received < items.len() {
@@ -499,7 +499,7 @@ impl SlotSession {
     }
 }
 
-/// Convenience: marshal a `Vec<PerlValue>` into the JSON values the dispatcher needs.
-pub fn perl_items_to_json(items: &[PerlValue]) -> Result<Vec<serde_json::Value>, String> {
+/// Convenience: marshal a `Vec<StrykeValue>` into the JSON values the dispatcher needs.
+pub fn perl_items_to_json(items: &[StrykeValue]) -> Result<Vec<serde_json::Value>, String> {
     items.iter().map(perl_to_json_value).collect()
 }

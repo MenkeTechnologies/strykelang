@@ -9,7 +9,7 @@ use std::sync::Arc;
 use rayon::prelude::*;
 
 use crate::pmap_progress::PmapProgress;
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 
 #[inline]
 fn partition_bucket(key: &str, p: usize) -> usize {
@@ -21,7 +21,7 @@ fn partition_bucket(key: &str, p: usize) -> usize {
     (h.finish() as usize) % p
 }
 
-fn puniq_sequential_with_progress(list: Vec<PerlValue>, progress: &PmapProgress) -> Vec<PerlValue> {
+fn puniq_sequential_with_progress(list: Vec<StrykeValue>, progress: &PmapProgress) -> Vec<StrykeValue> {
     let mut seen = HashSet::<String>::new();
     let mut out = Vec::new();
     for v in list {
@@ -35,17 +35,17 @@ fn puniq_sequential_with_progress(list: Vec<PerlValue>, progress: &PmapProgress)
 }
 
 fn puniq_parallel_buckets(
-    list: Vec<PerlValue>,
+    list: Vec<StrykeValue>,
     p: usize,
     progress: &PmapProgress,
-) -> Vec<PerlValue> {
-    let mut buckets: Vec<Vec<(usize, PerlValue, String)>> = vec![vec![]; p];
+) -> Vec<StrykeValue> {
+    let mut buckets: Vec<Vec<(usize, StrykeValue, String)>> = vec![vec![]; p];
     for (i, v) in list.into_iter().enumerate() {
         let k = v.to_string();
         let b = partition_bucket(&k, p);
         buckets[b].push((i, v, k));
     }
-    let partials: Vec<Vec<(usize, PerlValue)>> = buckets
+    let partials: Vec<Vec<(usize, StrykeValue)>> = buckets
         .into_par_iter()
         .map(|mut bucket| {
             bucket.sort_by_key(|(i, _, _)| *i);
@@ -60,17 +60,17 @@ fn puniq_parallel_buckets(
             out
         })
         .collect();
-    let mut merged: Vec<(usize, PerlValue)> = partials.into_iter().flatten().collect();
+    let mut merged: Vec<(usize, StrykeValue)> = partials.into_iter().flatten().collect();
     merged.sort_by_key(|(i, _)| *i);
     merged.into_iter().map(|(_, v)| v).collect()
 }
 
-/// Hash-partition parallel distinct: first occurrence order, key = [`PerlValue::to_string`].
+/// Hash-partition parallel distinct: first occurrence order, key = [`StrykeValue::to_string`].
 pub(crate) fn puniq_run(
-    list: Vec<PerlValue>,
+    list: Vec<StrykeValue>,
     num_partitions: usize,
     progress: &PmapProgress,
-) -> Vec<PerlValue> {
+) -> Vec<StrykeValue> {
     let n = list.len();
     if n == 0 {
         return vec![];
@@ -85,9 +85,9 @@ pub(crate) fn puniq_run(
 
 /// Short-circuit parallel `any { }` — stops doing useful work once a match is found (best-effort).
 pub(crate) fn pany_run(
-    list: Vec<PerlValue>,
+    list: Vec<StrykeValue>,
     progress: &PmapProgress,
-    test: impl Fn(PerlValue) -> bool + Sync + Send,
+    test: impl Fn(StrykeValue) -> bool + Sync + Send,
 ) -> bool {
     let found = AtomicBool::new(false);
     list.into_par_iter().for_each(|item| {
@@ -101,10 +101,10 @@ pub(crate) fn pany_run(
 
 /// Parallel `first { }` preserving **lowest list index** among truthy block results.
 pub(crate) fn pfirst_run(
-    list: Vec<PerlValue>,
+    list: Vec<StrykeValue>,
     progress: &PmapProgress,
-    test: impl Fn(PerlValue) -> bool + Sync + Send,
-) -> Option<PerlValue> {
+    test: impl Fn(StrykeValue) -> bool + Sync + Send,
+) -> Option<StrykeValue> {
     if list.is_empty() {
         return None;
     }
@@ -140,16 +140,16 @@ pub(crate) fn pfirst_run(
 mod tests {
     use super::*;
     use crate::pmap_progress::PmapProgress;
-    use crate::value::PerlValue;
+    use crate::value::StrykeValue;
 
     #[test]
     fn test_puniq_run_sequential() {
         let list = vec![
-            PerlValue::integer(1),
-            PerlValue::integer(2),
-            PerlValue::integer(1),
-            PerlValue::integer(3),
-            PerlValue::integer(2),
+            StrykeValue::integer(1),
+            StrykeValue::integer(2),
+            StrykeValue::integer(1),
+            StrykeValue::integer(3),
+            StrykeValue::integer(2),
         ];
         let progress = PmapProgress::new(false, list.len());
         let result = puniq_run(list, 1, &progress);
@@ -162,14 +162,14 @@ mod tests {
     #[test]
     fn test_puniq_run_parallel() {
         let list = vec![
-            PerlValue::integer(1),
-            PerlValue::integer(2),
-            PerlValue::integer(1),
-            PerlValue::integer(3),
-            PerlValue::integer(2),
-            PerlValue::integer(4),
-            PerlValue::integer(1),
-            PerlValue::integer(5),
+            StrykeValue::integer(1),
+            StrykeValue::integer(2),
+            StrykeValue::integer(1),
+            StrykeValue::integer(3),
+            StrykeValue::integer(2),
+            StrykeValue::integer(4),
+            StrykeValue::integer(1),
+            StrykeValue::integer(5),
         ];
         // Ensure n >= p * 4 to trigger parallel path
         let progress = PmapProgress::new(false, list.len());
@@ -185,9 +185,9 @@ mod tests {
     #[test]
     fn test_pany_run() {
         let list = vec![
-            PerlValue::integer(1),
-            PerlValue::integer(2),
-            PerlValue::integer(3),
+            StrykeValue::integer(1),
+            StrykeValue::integer(2),
+            StrykeValue::integer(3),
         ];
         let progress = PmapProgress::new(false, list.len());
         assert!(pany_run(list.clone(), &progress, |v| v.to_int() == 2));
@@ -197,10 +197,10 @@ mod tests {
     #[test]
     fn test_pfirst_run() {
         let list = vec![
-            PerlValue::integer(1),
-            PerlValue::integer(2),
-            PerlValue::integer(3),
-            PerlValue::integer(2),
+            StrykeValue::integer(1),
+            StrykeValue::integer(2),
+            StrykeValue::integer(3),
+            StrykeValue::integer(2),
         ];
         let progress = PmapProgress::new(false, list.len());
         let res = pfirst_run(list.clone(), &progress, |v| v.to_int() == 2);
@@ -213,10 +213,10 @@ mod tests {
     #[test]
     fn test_pfirst_run_lowest_index() {
         let list = vec![
-            PerlValue::integer(10),
-            PerlValue::integer(20),
-            PerlValue::integer(30),
-            PerlValue::integer(20),
+            StrykeValue::integer(10),
+            StrykeValue::integer(20),
+            StrykeValue::integer(30),
+            StrykeValue::integer(20),
         ];
         let progress = PmapProgress::new(false, list.len());
         // Both 20s match, but it should return the one at index 1, not index 3.

@@ -3,7 +3,7 @@
 // Poly1305 one-block step per RFC 8439 §2.5.1: acc = ((acc + block) * r) mod (2^130 - 5).
 // Uses 5×26-bit radix limbs so each schoolbook product fits in u64. r is clamped
 // per RFC (clear bits 24,25,26,27,28,29,30,31 within each 32-bit word).
-fn builtin_poly1305_block_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_poly1305_block_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let acc_in = i1(args) as u128;
     let block_in = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0) as u128;
     let r_in = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0) as u128;
@@ -44,12 +44,12 @@ fn builtin_poly1305_block_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     h[1] = h[1].wrapping_add(extra);
     let acc = (h[0] as u128) | ((h[1] as u128) << 26) | ((h[2] as u128) << 52)
             | ((h[3] as u128) << 78) | ((h[4] as u128) << 104);
-    Ok(PerlValue::integer(acc as i64))
+    Ok(StrykeValue::integer(acc as i64))
 }
 // X25519 field multiplication mod 2²⁵⁵-19 using 5×51-bit radix limbs (DJB form).
 // Schoolbook multiply produces 9 limb products, each 102-bit; reduce by replacing
 // limb_i (i ≥ 5) with 19·limb_{i-5} per the Curve25519 prime identity 2²⁵⁵ ≡ 19.
-fn builtin_x25519_field_mul(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_x25519_field_mul(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let a_lo = i1(args) as u128;
     let b_lo = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0) as u128;
     fn limbs51(x: u128) -> [u64; 5] {
@@ -91,60 +91,60 @@ fn builtin_x25519_field_mul(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let cc = h[0] >> 51; h[0] &= m51;
     h[1] = h[1].wrapping_add(cc);
     let lower = (h[0] as u128) | ((h[1] as u128) << 51);
-    Ok(PerlValue::integer(lower as i64))
+    Ok(StrykeValue::integer(lower as i64))
 }
-fn builtin_curve25519_mul_simple(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_curve25519_mul_simple(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     builtin_x25519_field_mul(args)
 }
-fn builtin_secp256k1_y_recover(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_secp256k1_y_recover(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let x = f1(args);
     let y2 = x.powi(3) + 7.0;
-    Ok(PerlValue::float(y2.max(0.0).sqrt()))
+    Ok(StrykeValue::float(y2.max(0.0).sqrt()))
 }
-fn builtin_hmac_step_xor(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_hmac_step_xor(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let key = args.first().map(|v| v.to_string()).unwrap_or_default();
     let pad = args.get(1).map(|v| v.to_number() as u8).unwrap_or(0x36);
     let out: Vec<u8> = key.bytes().map(|b| b ^ pad).collect();
-    Ok(PerlValue::string(String::from_utf8_lossy(&out).into_owned()))
+    Ok(StrykeValue::string(String::from_utf8_lossy(&out).into_owned()))
 }
-fn builtin_pkcs7_pad(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_pkcs7_pad(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let block = args.get(1).map(|v| v.to_number() as usize).unwrap_or(16);
     let pad_len = block - (s.len() % block);
     let mut out = s.into_bytes();
     for _ in 0..pad_len { out.push(pad_len as u8); }
-    Ok(PerlValue::string(String::from_utf8_lossy(&out).into_owned()))
+    Ok(StrykeValue::string(String::from_utf8_lossy(&out).into_owned()))
 }
-fn builtin_pkcs7_unpad(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_pkcs7_unpad(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let bytes = s.as_bytes();
     let n = bytes.len();
-    if n == 0 { return Ok(PerlValue::string(s)); }
+    if n == 0 { return Ok(StrykeValue::string(s)); }
     let pad = bytes[n - 1] as usize;
-    if pad <= n { Ok(PerlValue::string(String::from_utf8_lossy(&bytes[..n - pad]).into_owned())) }
-    else { Ok(PerlValue::string(s)) }
+    if pad <= n { Ok(StrykeValue::string(String::from_utf8_lossy(&bytes[..n - pad]).into_owned())) }
+    else { Ok(StrykeValue::string(s)) }
 }
-fn builtin_xor_byte_string(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_xor_byte_string(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let a = args.first().map(|v| v.to_string()).unwrap_or_default();
     let b = args.get(1).map(|v| v.to_string()).unwrap_or_default();
-    let bv = b.as_bytes(); if bv.is_empty() { return Ok(PerlValue::string(a)); }
+    let bv = b.as_bytes(); if bv.is_empty() { return Ok(StrykeValue::string(a)); }
     let out: Vec<u8> = a.bytes().enumerate().map(|(i, c)| c ^ bv[i % bv.len()]).collect();
-    Ok(PerlValue::string(String::from_utf8_lossy(&out).into_owned()))
+    Ok(StrykeValue::string(String::from_utf8_lossy(&out).into_owned()))
 }
-fn builtin_atbash_cipher(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_atbash_cipher(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let out: String = s.chars().map(|c| {
         if c.is_ascii_uppercase() { (b'Z' - (c as u8 - b'A')) as char }
         else if c.is_ascii_lowercase() { (b'z' - (c as u8 - b'a')) as char }
         else { c }
     }).collect();
-    Ok(PerlValue::string(out))
+    Ok(StrykeValue::string(out))
 }
-fn builtin_vigenere_encrypt(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_vigenere_encrypt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let key = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let kbytes: Vec<u8> = key.bytes().filter(|c| c.is_ascii_alphabetic()).map(|c| c.to_ascii_uppercase() - b'A').collect();
-    if kbytes.is_empty() { return Ok(PerlValue::string(s)); }
+    if kbytes.is_empty() { return Ok(StrykeValue::string(s)); }
     let mut k = 0_usize;
     let out: String = s.chars().map(|c| {
         if c.is_ascii_alphabetic() {
@@ -154,13 +154,13 @@ fn builtin_vigenere_encrypt(args: &[PerlValue]) -> PerlResult<PerlValue> {
             ((c as u8 - base + shift) % 26 + base) as char
         } else { c }
     }).collect();
-    Ok(PerlValue::string(out))
+    Ok(StrykeValue::string(out))
 }
-fn builtin_vigenere_decrypt(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_vigenere_decrypt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let key = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let kbytes: Vec<u8> = key.bytes().filter(|c| c.is_ascii_alphabetic()).map(|c| c.to_ascii_uppercase() - b'A').collect();
-    if kbytes.is_empty() { return Ok(PerlValue::string(s)); }
+    if kbytes.is_empty() { return Ok(StrykeValue::string(s)); }
     let mut k = 0_usize;
     let out: String = s.chars().map(|c| {
         if c.is_ascii_alphabetic() {
@@ -170,9 +170,9 @@ fn builtin_vigenere_decrypt(args: &[PerlValue]) -> PerlResult<PerlValue> {
             ((c as u8 - base + 26 - shift) % 26 + base) as char
         } else { c }
     }).collect();
-    Ok(PerlValue::string(out))
+    Ok(StrykeValue::string(out))
 }
-fn builtin_xor_brute_keylen(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_xor_brute_keylen(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let bytes = s.as_bytes();
     let n = bytes.len();
@@ -187,50 +187,50 @@ fn builtin_xor_brute_keylen(args: &[PerlValue]) -> PerlResult<PerlValue> {
         let score = if count > 0.0 { hd / count / keylen as f64 } else { f64::INFINITY };
         if score < best_score { best_score = score; best_len = keylen; }
     }
-    Ok(PerlValue::integer(best_len as i64))
+    Ok(StrykeValue::integer(best_len as i64))
 }
 
 // Time series advanced
-fn builtin_arima_diff(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+fn builtin_arima_diff(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let d = args.get(1).map(|v| v.to_number() as usize).unwrap_or(1);
     let mut cur = xs.clone();
     for _ in 0..d {
         cur = (1..cur.len()).map(|i| cur[i] - cur[i - 1]).collect();
     }
-    Ok(PerlValue::array(cur.into_iter().map(PerlValue::float).collect()))
+    Ok(StrykeValue::array(cur.into_iter().map(StrykeValue::float).collect()))
 }
-fn builtin_seasonal_diff(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+fn builtin_seasonal_diff(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let s = args.get(1).map(|v| v.to_number() as usize).unwrap_or(12);
-    let out: Vec<PerlValue> = (s..xs.len()).map(|i| PerlValue::float(xs[i] - xs[i - s])).collect();
-    Ok(PerlValue::array(out))
+    let out: Vec<StrykeValue> = (s..xs.len()).map(|i| StrykeValue::float(xs[i] - xs[i - s])).collect();
+    Ok(StrykeValue::array(out))
 }
-fn builtin_garch_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_garch_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let omega = f1(args); let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let beta = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
     let prev_var = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
     let prev_ret = args.get(4).map(|v| v.to_number()).unwrap_or(0.0);
-    Ok(PerlValue::float(omega + alpha * prev_ret * prev_ret + beta * prev_var))
+    Ok(StrykeValue::float(omega + alpha * prev_ret * prev_ret + beta * prev_var))
 }
-fn builtin_egarch_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_egarch_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let omega = f1(args); let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let beta = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
     let gamma = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
     let prev_log_var = args.get(4).map(|v| v.to_number()).unwrap_or(0.0);
     let prev_z = args.get(5).map(|v| v.to_number()).unwrap_or(0.0);
-    Ok(PerlValue::float(omega + alpha * (prev_z.abs() - (2.0 / std::f64::consts::PI).sqrt()) + gamma * prev_z + beta * prev_log_var))
+    Ok(StrykeValue::float(omega + alpha * (prev_z.abs() - (2.0 / std::f64::consts::PI).sqrt()) + gamma * prev_z + beta * prev_log_var))
 }
-fn builtin_realized_volatility(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let returns: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+fn builtin_realized_volatility(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let returns: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let s: f64 = returns.iter().map(|r| r * r).sum();
-    Ok(PerlValue::float(s.sqrt()))
+    Ok(StrykeValue::float(s.sqrt()))
 }
-fn builtin_max_drawdown_arr(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+fn builtin_max_drawdown_arr(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let mut peak = xs.first().copied().unwrap_or(0.0);
     let mut mdd = 0.0_f64;
@@ -239,62 +239,62 @@ fn builtin_max_drawdown_arr(args: &[PerlValue]) -> PerlResult<PerlValue> {
         let dd = if peak.abs() > 1e-30 { (peak - x) / peak } else { 0.0 };
         if dd > mdd { mdd = dd; }
     }
-    Ok(PerlValue::float(mdd))
+    Ok(StrykeValue::float(mdd))
 }
-fn builtin_calmar_ratio(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_calmar_ratio(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let cagr = f1(args); let mdd = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).max(1e-30);
-    Ok(PerlValue::float(cagr / mdd))
+    Ok(StrykeValue::float(cagr / mdd))
 }
-fn builtin_omega_ratio(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let returns: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+fn builtin_omega_ratio(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let returns: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let threshold = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let pos: f64 = returns.iter().filter(|&&r| r > threshold).map(|r| r - threshold).sum();
     let neg: f64 = returns.iter().filter(|&&r| r < threshold).map(|r| threshold - r).sum::<f64>().max(1e-30);
-    Ok(PerlValue::float(pos / neg))
+    Ok(StrykeValue::float(pos / neg))
 }
-fn builtin_kelly_criterion(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_kelly_criterion(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let p = f1(args); let b = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    Ok(PerlValue::float((p * (b + 1.0) - 1.0) / b))
+    Ok(StrykeValue::float((p * (b + 1.0) - 1.0) / b))
 }
-fn builtin_var_historical(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let mut returns: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+fn builtin_var_historical(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let mut returns: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(0.05);
     returns.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let idx = (alpha * returns.len() as f64) as usize;
-    Ok(PerlValue::float(-returns.get(idx).copied().unwrap_or(0.0)))
+    Ok(StrykeValue::float(-returns.get(idx).copied().unwrap_or(0.0)))
 }
-fn builtin_cvar_historical(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let mut returns: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+fn builtin_cvar_historical(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let mut returns: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(0.05);
     returns.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let n = (alpha * returns.len() as f64) as usize;
-    if n == 0 { return Ok(PerlValue::float(0.0)); }
+    if n == 0 { return Ok(StrykeValue::float(0.0)); }
     let cvar: f64 = returns[..n].iter().sum::<f64>() / n as f64;
-    Ok(PerlValue::float(-cvar))
+    Ok(StrykeValue::float(-cvar))
 }
 
 // Graph extras
-fn builtin_graph_degree_distribution(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let adj = parse_adj_list(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+fn builtin_graph_degree_distribution(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let adj = parse_adj_list(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let mut counts: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
     for nbrs in &adj { *counts.entry(nbrs.len()).or_insert(0) += 1; }
     let mut keys: Vec<usize> = counts.keys().copied().collect();
     keys.sort();
-    let pairs: Vec<PerlValue> = keys.into_iter().map(|d| PerlValue::array(vec![
-        PerlValue::integer(d as i64), PerlValue::integer(counts[&d] as i64),
+    let pairs: Vec<StrykeValue> = keys.into_iter().map(|d| StrykeValue::array(vec![
+        StrykeValue::integer(d as i64), StrykeValue::integer(counts[&d] as i64),
     ])).collect();
-    Ok(PerlValue::array(pairs))
+    Ok(StrykeValue::array(pairs))
 }
-fn builtin_graph_count_edges(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let adj = parse_adj_list(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+fn builtin_graph_count_edges(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let adj = parse_adj_list(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let total: usize = adj.iter().map(|nbrs| nbrs.len()).sum();
-    Ok(PerlValue::integer((total / 2) as i64))
+    Ok(StrykeValue::integer((total / 2) as i64))
 }
-fn builtin_graph_bipartite_match_simple(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let adj = parse_adj_list(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+fn builtin_graph_bipartite_match_simple(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let adj = parse_adj_list(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = adj.len();
     let mut matched = vec![-1_i64; n];
     let mut count = 0_i64;
@@ -307,20 +307,20 @@ fn builtin_graph_bipartite_match_simple(args: &[PerlValue]) -> PerlResult<PerlVa
             }
         }
     }
-    Ok(PerlValue::integer(count))
+    Ok(StrykeValue::integer(count))
 }
-fn builtin_graph_count_triangles(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let adj = parse_adj_list(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+fn builtin_graph_count_triangles(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let adj = parse_adj_list(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = adj.len();
     let sets: Vec<std::collections::HashSet<usize>> = adj.iter().map(|n| n.iter().copied().collect()).collect();
     let mut t = 0_i64;
     for i in 0..n { for &j in &adj[i] { if j > i {
         for &k in &adj[j] { if k > j && sets[i].contains(&k) { t += 1; } }
     }}}
-    Ok(PerlValue::integer(t))
+    Ok(StrykeValue::integer(t))
 }
-fn builtin_graph_avg_clustering(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let adj = parse_adj_list(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+fn builtin_graph_avg_clustering(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let adj = parse_adj_list(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = adj.len();
     let sets: Vec<std::collections::HashSet<usize>> = adj.iter().map(|n| n.iter().copied().collect()).collect();
     let mut total = 0.0_f64;
@@ -335,10 +335,10 @@ fn builtin_graph_avg_clustering(args: &[PerlValue]) -> PerlResult<PerlValue> {
         total += 2.0 * tri as f64 / (k * (k - 1)) as f64;
         count += 1;
     }
-    Ok(PerlValue::float(if count == 0 { 0.0 } else { total / count as f64 }))
+    Ok(StrykeValue::float(if count == 0 { 0.0 } else { total / count as f64 }))
 }
-fn builtin_graph_transitivity(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let adj = parse_adj_list(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+fn builtin_graph_transitivity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let adj = parse_adj_list(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = adj.len();
     let sets: Vec<std::collections::HashSet<usize>> = adj.iter().map(|n| n.iter().copied().collect()).collect();
     let mut tri = 0_i64; let mut tris = 0_i64;
@@ -349,13 +349,13 @@ fn builtin_graph_transitivity(args: &[PerlValue]) -> PerlResult<PerlValue> {
             if u < v && sets[u].contains(&v) { tri += 1; }
         }}
     }
-    if tris == 0 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float(3.0 * tri as f64 / tris as f64))
+    if tris == 0 { return Ok(StrykeValue::float(0.0)); }
+    Ok(StrykeValue::float(3.0 * tri as f64 / tris as f64))
 }
-fn builtin_graph_max_clique_brute(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let adj = parse_adj_list(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+fn builtin_graph_max_clique_brute(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let adj = parse_adj_list(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = adj.len();
-    if n > 20 { return Ok(PerlValue::integer(0)); }
+    if n > 20 { return Ok(StrykeValue::integer(0)); }
     let sets: Vec<std::collections::HashSet<usize>> = adj.iter().map(|n| n.iter().copied().collect()).collect();
     let mut best = 0_i64;
     for mask in 0u64..(1u64 << n) {
@@ -370,12 +370,12 @@ fn builtin_graph_max_clique_brute(args: &[PerlValue]) -> PerlResult<PerlValue> {
         }
         if clique { best = bits; }
     }
-    Ok(PerlValue::integer(best))
+    Ok(StrykeValue::integer(best))
 }
-fn builtin_graph_independent_set_brute(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let adj = parse_adj_list(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+fn builtin_graph_independent_set_brute(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let adj = parse_adj_list(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = adj.len();
-    if n > 20 { return Ok(PerlValue::integer(0)); }
+    if n > 20 { return Ok(StrykeValue::integer(0)); }
     let sets: Vec<std::collections::HashSet<usize>> = adj.iter().map(|n| n.iter().copied().collect()).collect();
     let mut best = 0_i64;
     for mask in 0u64..(1u64 << n) {
@@ -390,10 +390,10 @@ fn builtin_graph_independent_set_brute(args: &[PerlValue]) -> PerlResult<PerlVal
         }
         if indep { best = bits; }
     }
-    Ok(PerlValue::integer(best))
+    Ok(StrykeValue::integer(best))
 }
-fn builtin_graph_count_paths_length_k(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let adj = parse_adj_list(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+fn builtin_graph_count_paths_length_k(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let adj = parse_adj_list(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let k = args.get(1).map(|v| v.to_number() as usize).unwrap_or(2);
     let n = adj.len();
     let mut a = vec![vec![0_i64; n]; n];
@@ -407,13 +407,13 @@ fn builtin_graph_count_paths_length_k(args: &[PerlValue]) -> PerlResult<PerlValu
         b = next;
     }
     let total: i64 = b.iter().flatten().sum();
-    Ok(PerlValue::integer(total))
+    Ok(StrykeValue::integer(total))
 }
-fn builtin_graph_pagerank_simple(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let adj = parse_adj_list(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+fn builtin_graph_pagerank_simple(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let adj = parse_adj_list(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let damping = args.get(1).map(|v| v.to_number()).unwrap_or(0.85);
     let n = adj.len();
-    if n == 0 { return Ok(PerlValue::array(vec![])); }
+    if n == 0 { return Ok(StrykeValue::array(vec![])); }
     let mut rank = vec![1.0 / n as f64; n];
     for _ in 0..100 {
         let mut nr = vec![(1.0 - damping) / n as f64; n];
@@ -424,5 +424,5 @@ fn builtin_graph_pagerank_simple(args: &[PerlValue]) -> PerlResult<PerlValue> {
         }
         rank = nr;
     }
-    Ok(PerlValue::array(rank.into_iter().map(PerlValue::float).collect()))
+    Ok(StrykeValue::array(rank.into_iter().map(StrykeValue::float).collect()))
 }

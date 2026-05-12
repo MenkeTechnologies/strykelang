@@ -259,6 +259,19 @@ pub fn run_test_worker_loop() -> i32 {
         if pid == 0 {
             // ── Child: run one test, write result, exit ────────────────
             //
+            // Per-test perf recording: capture start time now if the
+            // parent enabled `--record`. Child `_exit`s so atexit doesn't
+            // fire; we insert one perf row explicitly before exit below.
+            let perf_start = if crate::perf_recorder::recording_enabled_in_env() {
+                Some((
+                    std::time::Instant::now(),
+                    crate::perf_recorder::now_ns(),
+                    req.path.clone(),
+                ))
+            } else {
+                None
+            };
+
             // Wire-protocol firewall + per-test stderr capture.
             //
             // (1) Stdout (fd 1) goes through the worker's pipe to the
@@ -364,6 +377,25 @@ pub fn run_test_worker_loop() -> i32 {
                     libc::close(saved_stdout);
                 }
             }
+            // Per-test perf record: insert one SQLite row before _exit so
+            // `s --record t TESTS...` produces one row per test file even
+            // though the forked child skips atexit handlers below.
+            if let Some((started_at, started_ns, path)) = perf_start {
+                let duration_ns = started_at.elapsed().as_nanos() as i64;
+                let row = crate::perf_recorder::RunRow {
+                    path,
+                    argv: Vec::new(),
+                    started_ns,
+                    duration_ns,
+                    exit_code: if file_failed { 1 } else { 0 },
+                    version: env!("CARGO_PKG_VERSION").to_string(),
+                    host: String::new(),
+                    pid: std::process::id() as i64,
+                    parent_pid: unsafe { libc::getppid() as i64 },
+                };
+                let _ = crate::perf_recorder::insert(&row);
+            }
+
             // `_exit` skips Rust's atexit / Drop chain, which is correct
             // for a forked child — running parent destructors here
             // would close fds the parent still needs and double-free

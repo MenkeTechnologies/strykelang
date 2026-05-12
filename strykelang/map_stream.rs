@@ -8,16 +8,16 @@ use parking_lot::Mutex;
 use crate::ast::Expr;
 use crate::error::{PerlError, PerlResult};
 use crate::scope::{AtomicArray, AtomicHash};
-use crate::value::{PerlIterator, PerlSub, PerlValue, PipelineOp};
+use crate::value::{PerlIterator, PerlSub, StrykeValue, PipelineOp};
 use crate::vm_helper::{FlowOrError, VMHelper, WantarrayCtx};
 
 struct VecPullIter {
-    items: Arc<Vec<PerlValue>>,
+    items: Arc<Vec<StrykeValue>>,
     i: Mutex<usize>,
 }
 
 impl VecPullIter {
-    fn new(items: Vec<PerlValue>) -> Self {
+    fn new(items: Vec<StrykeValue>) -> Self {
         Self {
             items: Arc::new(items),
             i: Mutex::new(0),
@@ -26,7 +26,7 @@ impl VecPullIter {
 }
 
 impl PerlIterator for VecPullIter {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         let mut i = self.i.lock();
         if *i < self.items.len() {
             let v = self.items[*i].clone();
@@ -38,7 +38,7 @@ impl PerlIterator for VecPullIter {
     }
 }
 
-pub(crate) fn into_pull_iter(val: PerlValue) -> Arc<dyn PerlIterator> {
+pub(crate) fn into_pull_iter(val: StrykeValue) -> Arc<dyn PerlIterator> {
     if val.is_iterator() {
         val.into_iterator()
     } else {
@@ -53,10 +53,10 @@ enum MapStreamMode {
 
 pub(crate) struct MapStreamIterator {
     source: Arc<dyn PerlIterator>,
-    pending: Mutex<VecDeque<PerlValue>>,
+    pending: Mutex<VecDeque<StrykeValue>>,
     mode: MapStreamMode,
     interp: Mutex<VMHelper>,
-    _capture: Vec<(String, PerlValue)>,
+    _capture: Vec<(String, StrykeValue)>,
     _atomic_arrays: Vec<(String, AtomicArray)>,
     _atomic_hashes: Vec<(String, AtomicHash)>,
     peel: bool,
@@ -67,7 +67,7 @@ impl MapStreamIterator {
         source: Arc<dyn PerlIterator>,
         sub: Arc<PerlSub>,
         subs: std::collections::HashMap<String, Arc<PerlSub>>,
-        capture: Vec<(String, PerlValue)>,
+        capture: Vec<(String, StrykeValue)>,
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
         peel: bool,
@@ -92,7 +92,7 @@ impl MapStreamIterator {
         source: Arc<dyn PerlIterator>,
         expr: Arc<Expr>,
         subs: std::collections::HashMap<String, Arc<PerlSub>>,
-        capture: Vec<(String, PerlValue)>,
+        capture: Vec<(String, StrykeValue)>,
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
         peel: bool,
@@ -189,7 +189,7 @@ impl MapStreamIterator {
 }
 
 impl PerlIterator for MapStreamIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         loop {
             {
                 let mut q = self.pending.lock();
@@ -215,7 +215,7 @@ pub(crate) struct FilterStreamIterator {
     source: Arc<dyn PerlIterator>,
     mode: FilterStreamMode,
     interp: Mutex<VMHelper>,
-    _capture: Vec<(String, PerlValue)>,
+    _capture: Vec<(String, StrykeValue)>,
     _atomic_arrays: Vec<(String, AtomicArray)>,
     _atomic_hashes: Vec<(String, AtomicHash)>,
 }
@@ -225,7 +225,7 @@ impl FilterStreamIterator {
         source: Arc<dyn PerlIterator>,
         sub: Arc<PerlSub>,
         subs: std::collections::HashMap<String, Arc<PerlSub>>,
-        capture: Vec<(String, PerlValue)>,
+        capture: Vec<(String, StrykeValue)>,
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
     ) -> Self {
@@ -247,7 +247,7 @@ impl FilterStreamIterator {
         source: Arc<dyn PerlIterator>,
         expr: Arc<Expr>,
         subs: std::collections::HashMap<String, Arc<PerlSub>>,
-        capture: Vec<(String, PerlValue)>,
+        capture: Vec<(String, StrykeValue)>,
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
     ) -> Self {
@@ -267,7 +267,7 @@ impl FilterStreamIterator {
 }
 
 impl PerlIterator for FilterStreamIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         while let Some(item) = self.source.next_item() {
             let mut interp = self.interp.lock();
             // Block-form: full `set_topic` (chain shift); EXPR-form: just
@@ -330,28 +330,28 @@ impl VMHelper {
     /// Lazy `filter { }` / `filter EXPR` iterator (or push `->filter` onto a lone pipeline).
     pub(crate) fn filter_stream_block_output(
         &mut self,
-        list_val: PerlValue,
+        list_val: StrykeValue,
         block: &crate::ast::Block,
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         if let Some(p) = list_val.as_pipeline() {
             let sub = self.anon_coderef_from_block(block);
             self.pipeline_push(&p, PipelineOp::Filter(sub), line)?;
-            return Ok(PerlValue::pipeline(Arc::clone(&p)));
+            return Ok(StrykeValue::pipeline(Arc::clone(&p)));
         }
         if let Some(items) = list_val.as_array_vec() {
             if items.len() == 1 {
                 if let Some(p) = items[0].as_pipeline() {
                     let sub = self.anon_coderef_from_block(block);
                     self.pipeline_push(&p, PipelineOp::Filter(sub), line)?;
-                    return Ok(PerlValue::pipeline(Arc::clone(&p)));
+                    return Ok(StrykeValue::pipeline(Arc::clone(&p)));
                 }
             }
         }
         let source = into_pull_iter(list_val);
         let (capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
         let sub = self.anon_coderef_from_block(block);
-        Ok(PerlValue::iterator(Arc::new(
+        Ok(StrykeValue::iterator(Arc::new(
             FilterStreamIterator::new_block(
                 source,
                 sub,
@@ -366,10 +366,10 @@ impl VMHelper {
     /// Lazy `filter EXPR, LIST` iterator.
     pub(crate) fn filter_stream_expr_output(
         &mut self,
-        list_val: PerlValue,
+        list_val: StrykeValue,
         expr: &Expr,
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         if list_val.as_pipeline().is_some()
             || list_val
                 .as_array_vec()
@@ -383,7 +383,7 @@ impl VMHelper {
         }
         let source = into_pull_iter(list_val);
         let (capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
-        Ok(PerlValue::iterator(Arc::new(
+        Ok(StrykeValue::iterator(Arc::new(
             FilterStreamIterator::new_expr(
                 source,
                 Arc::new(expr.clone()),
@@ -395,26 +395,26 @@ impl VMHelper {
         )))
     }
 
-    /// Build lazy `maps` / `maps { }` iterator (or push a stage onto a lone [`PerlValue::pipeline`]).
+    /// Build lazy `maps` / `maps { }` iterator (or push a stage onto a lone [`StrykeValue::pipeline`]).
     pub(crate) fn map_stream_block_output(
         &mut self,
-        list_val: PerlValue,
+        list_val: StrykeValue,
         block: &crate::ast::Block,
         peel: bool,
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         if !peel {
             if let Some(p) = list_val.as_pipeline() {
                 let sub = self.anon_coderef_from_block(block);
                 self.pipeline_push(&p, PipelineOp::Map(sub), line)?;
-                return Ok(PerlValue::pipeline(Arc::clone(&p)));
+                return Ok(StrykeValue::pipeline(Arc::clone(&p)));
             }
             if let Some(items) = list_val.as_array_vec() {
                 if items.len() == 1 {
                     if let Some(p) = items[0].as_pipeline() {
                         let sub = self.anon_coderef_from_block(block);
                         self.pipeline_push(&p, PipelineOp::Map(sub), line)?;
-                        return Ok(PerlValue::pipeline(Arc::clone(&p)));
+                        return Ok(StrykeValue::pipeline(Arc::clone(&p)));
                     }
                 }
             }
@@ -433,7 +433,7 @@ impl VMHelper {
         let source = into_pull_iter(list_val);
         let (capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
         let sub = self.anon_coderef_from_block(block);
-        Ok(PerlValue::iterator(Arc::new(MapStreamIterator::new_block(
+        Ok(StrykeValue::iterator(Arc::new(MapStreamIterator::new_block(
             source,
             sub,
             self.subs.clone(),
@@ -447,11 +447,11 @@ impl VMHelper {
     /// Build lazy `maps EXPR, LIST` iterator.
     pub(crate) fn map_stream_expr_output(
         &mut self,
-        list_val: PerlValue,
+        list_val: StrykeValue,
         expr: &Expr,
         peel: bool,
         line: usize,
-    ) -> PerlResult<PerlValue> {
+    ) -> PerlResult<StrykeValue> {
         if list_val.as_pipeline().is_some()
             || list_val
                 .as_array_vec()
@@ -469,7 +469,7 @@ impl VMHelper {
         }
         let source = into_pull_iter(list_val);
         let (capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
-        Ok(PerlValue::iterator(Arc::new(MapStreamIterator::new_expr(
+        Ok(StrykeValue::iterator(Arc::new(MapStreamIterator::new_expr(
             source,
             Arc::new(expr.clone()),
             self.subs.clone(),
@@ -497,7 +497,7 @@ impl TakeIterator {
 }
 
 impl PerlIterator for TakeIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         let mut rem = self.remaining.lock();
         if *rem == 0 {
             return None;
@@ -527,7 +527,7 @@ impl SkipIterator {
 }
 
 impl PerlIterator for SkipIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         {
             let mut skip = self.to_skip.lock();
             while *skip > 0 {
@@ -555,13 +555,13 @@ impl EnumerateIterator {
 }
 
 impl PerlIterator for EnumerateIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         let item = self.source.next_item()?;
         let mut i = self.idx.lock();
         let idx = *i;
         *i += 1;
-        Some(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
-            vec![PerlValue::integer(idx as i64), item],
+        Some(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
+            vec![StrykeValue::integer(idx as i64), item],
         ))))
     }
 }
@@ -582,7 +582,7 @@ impl ChunkIterator {
 }
 
 impl PerlIterator for ChunkIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         let mut chunk = Vec::with_capacity(self.size);
         for _ in 0..self.size {
             match self.source.next_item() {
@@ -593,7 +593,7 @@ impl PerlIterator for ChunkIterator {
         if chunk.is_empty() {
             None
         } else {
-            Some(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+            Some(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
                 chunk,
             ))))
         }
@@ -616,7 +616,7 @@ impl DedupIterator {
 }
 
 impl PerlIterator for DedupIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         loop {
             let item = self.source.next_item()?;
             let s = item.to_string();
@@ -657,14 +657,14 @@ impl RangeIterator {
 }
 
 impl PerlIterator for RangeIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         let mut cur = self.current.lock();
         if (self.step > 0 && *cur > self.end) || (self.step < 0 && *cur < self.end) {
             return None;
         }
         let val = *cur;
         *cur += self.step;
-        Some(PerlValue::integer(val))
+        Some(StrykeValue::integer(val))
     }
 }
 
@@ -674,7 +674,7 @@ pub(crate) struct TakeWhileIterator {
     source: Arc<dyn PerlIterator>,
     sub: Arc<PerlSub>,
     interp: Mutex<VMHelper>,
-    capture: Vec<(String, PerlValue)>,
+    capture: Vec<(String, StrykeValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,
     done: Mutex<bool>,
@@ -686,7 +686,7 @@ impl TakeWhileIterator {
         source: Arc<dyn PerlIterator>,
         sub: Arc<PerlSub>,
         subs: std::collections::HashMap<String, Arc<PerlSub>>,
-        capture: Vec<(String, PerlValue)>,
+        capture: Vec<(String, StrykeValue)>,
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
     ) -> Self {
@@ -707,7 +707,7 @@ impl TakeWhileIterator {
 }
 
 impl PerlIterator for TakeWhileIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         if *self.done.lock() {
             return None;
         }
@@ -733,7 +733,7 @@ pub(crate) struct SkipWhileIterator {
     source: Arc<dyn PerlIterator>,
     sub: Arc<PerlSub>,
     interp: Mutex<VMHelper>,
-    capture: Vec<(String, PerlValue)>,
+    capture: Vec<(String, StrykeValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,
     skipping: Mutex<bool>,
@@ -745,7 +745,7 @@ impl SkipWhileIterator {
         source: Arc<dyn PerlIterator>,
         sub: Arc<PerlSub>,
         subs: std::collections::HashMap<String, Arc<PerlSub>>,
-        capture: Vec<(String, PerlValue)>,
+        capture: Vec<(String, StrykeValue)>,
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
     ) -> Self {
@@ -766,7 +766,7 @@ impl SkipWhileIterator {
 }
 
 impl PerlIterator for SkipWhileIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         loop {
             let item = self.source.next_item()?;
             let still_skipping = *self.skipping.lock();
@@ -791,7 +791,7 @@ pub(crate) struct TapIterator {
     source: Arc<dyn PerlIterator>,
     sub: Arc<PerlSub>,
     interp: Mutex<VMHelper>,
-    _capture: Vec<(String, PerlValue)>,
+    _capture: Vec<(String, StrykeValue)>,
     _atomic_arrays: Vec<(String, AtomicArray)>,
     _atomic_hashes: Vec<(String, AtomicHash)>,
 }
@@ -801,7 +801,7 @@ impl TapIterator {
         source: Arc<dyn PerlIterator>,
         sub: Arc<PerlSub>,
         subs: std::collections::HashMap<String, Arc<PerlSub>>,
-        capture: Vec<(String, PerlValue)>,
+        capture: Vec<(String, StrykeValue)>,
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
     ) -> Self {
@@ -821,7 +821,7 @@ impl TapIterator {
 }
 
 impl PerlIterator for TapIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         let item = self.source.next_item()?;
         let mut interp = self.interp.lock();
         interp.scope.set_topic(item.clone());
@@ -847,7 +847,7 @@ impl TeeIterator {
 }
 
 impl PerlIterator for TeeIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         use std::io::Write;
         let item = self.source.next_item()?;
         let s = item.to_string();
@@ -871,7 +871,7 @@ impl GrepVIterator {
 }
 
 impl PerlIterator for GrepVIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         while let Some(item) = self.source.next_item() {
             if !self.re.is_match(&item.to_string()) {
                 return Some(item);
@@ -893,10 +893,10 @@ impl TrimIterator {
 }
 
 impl PerlIterator for TrimIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         self.source
             .next_item()
-            .map(|v| PerlValue::string(v.to_string().trim().to_string()))
+            .map(|v| StrykeValue::string(v.to_string().trim().to_string()))
     }
 }
 
@@ -913,15 +913,15 @@ impl PluckIterator {
 }
 
 impl PerlIterator for PluckIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         self.source.next_item().map(|v| {
             if let Some(hr) = v.as_hash_ref() {
                 hr.read()
                     .get(&self.key)
                     .cloned()
-                    .unwrap_or(PerlValue::UNDEF)
+                    .unwrap_or(StrykeValue::UNDEF)
             } else {
-                PerlValue::UNDEF
+                StrykeValue::UNDEF
             }
         })
     }
@@ -929,15 +929,15 @@ impl PerlIterator for PluckIterator {
 
 /// Streaming `lines` — yields lines from a string (splits on newlines).
 pub(crate) struct LinesIterator {
-    lines: Arc<Vec<PerlValue>>,
+    lines: Arc<Vec<StrykeValue>>,
     idx: Mutex<usize>,
 }
 
 impl LinesIterator {
     pub(crate) fn new(s: &str) -> Self {
-        let lines: Vec<PerlValue> = s
+        let lines: Vec<StrykeValue> = s
             .lines()
-            .map(|l| PerlValue::string(l.to_string()))
+            .map(|l| StrykeValue::string(l.to_string()))
             .collect();
         Self {
             lines: Arc::new(lines),
@@ -947,7 +947,7 @@ impl LinesIterator {
 }
 
 impl PerlIterator for LinesIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         let mut i = self.idx.lock();
         if *i < self.lines.len() {
             let v = self.lines[*i].clone();
@@ -961,15 +961,15 @@ impl PerlIterator for LinesIterator {
 
 /// Streaming `words` — yields words from a string (splits on whitespace).
 pub(crate) struct WordsIterator {
-    words: Arc<Vec<PerlValue>>,
+    words: Arc<Vec<StrykeValue>>,
     idx: Mutex<usize>,
 }
 
 impl WordsIterator {
     pub(crate) fn new(s: &str) -> Self {
-        let words: Vec<PerlValue> = s
+        let words: Vec<StrykeValue> = s
             .split_whitespace()
-            .map(|w| PerlValue::string(w.to_string()))
+            .map(|w| StrykeValue::string(w.to_string()))
             .collect();
         Self {
             words: Arc::new(words),
@@ -979,7 +979,7 @@ impl WordsIterator {
 }
 
 impl PerlIterator for WordsIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         let mut i = self.idx.lock();
         if *i < self.words.len() {
             let v = self.words[*i].clone();
@@ -993,15 +993,15 @@ impl PerlIterator for WordsIterator {
 
 /// Streaming `chars` — yields characters from a string.
 pub(crate) struct CharsIterator {
-    chars: Arc<Vec<PerlValue>>,
+    chars: Arc<Vec<StrykeValue>>,
     idx: Mutex<usize>,
 }
 
 impl CharsIterator {
     pub(crate) fn new(s: &str) -> Self {
-        let chars: Vec<PerlValue> = s
+        let chars: Vec<StrykeValue> = s
             .chars()
-            .map(|c| PerlValue::string(c.to_string()))
+            .map(|c| StrykeValue::string(c.to_string()))
             .collect();
         Self {
             chars: Arc::new(chars),
@@ -1011,7 +1011,7 @@ impl CharsIterator {
 }
 
 impl PerlIterator for CharsIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         let mut i = self.idx.lock();
         if *i < self.chars.len() {
             let v = self.chars[*i].clone();
@@ -1035,7 +1035,7 @@ impl CompactIterator {
 }
 
 impl PerlIterator for CompactIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         while let Some(item) = self.source.next_item() {
             if !item.is_undef() && !item.to_string().is_empty() {
                 return Some(item);
@@ -1051,7 +1051,7 @@ pub(crate) struct RejectIterator {
     source: Arc<dyn PerlIterator>,
     sub: Arc<PerlSub>,
     interp: Mutex<VMHelper>,
-    capture: Vec<(String, PerlValue)>,
+    capture: Vec<(String, StrykeValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,
 }
@@ -1062,7 +1062,7 @@ impl RejectIterator {
         source: Arc<dyn PerlIterator>,
         sub: Arc<PerlSub>,
         subs: std::collections::HashMap<String, Arc<PerlSub>>,
-        capture: Vec<(String, PerlValue)>,
+        capture: Vec<(String, StrykeValue)>,
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
     ) -> Self {
@@ -1082,7 +1082,7 @@ impl RejectIterator {
 }
 
 impl PerlIterator for RejectIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         while let Some(item) = self.source.next_item() {
             let mut interp = self.interp.lock();
             interp.scope.set_topic(item.clone());
@@ -1113,7 +1113,7 @@ impl ConcatIterator {
 }
 
 impl PerlIterator for ConcatIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         loop {
             let idx = *self.current_idx.lock();
             if idx >= self.sources.len() {
@@ -1141,7 +1141,7 @@ impl StdinIterator {
 }
 
 impl PerlIterator for StdinIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         use std::io::BufRead;
         let mut reader = self.reader.lock();
         let mut line = String::new();
@@ -1154,7 +1154,7 @@ impl PerlIterator for StdinIterator {
                         line.pop();
                     }
                 }
-                Some(PerlValue::string(line))
+                Some(StrykeValue::string(line))
             }
             Err(_) => None,
         }
@@ -1183,17 +1183,17 @@ impl<F> PerlIterator for MapFnIterator<F>
 where
     F: Fn(String) -> String + Send + Sync,
 {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         self.source
             .next_item()
-            .map(|v| PerlValue::string((self.f)(v.to_string())))
+            .map(|v| StrykeValue::string((self.f)(v.to_string())))
     }
 }
 
 /// Streaming `lines` over an iterator — flat-maps each element's lines.
 pub(crate) struct LinesFlatMapIterator {
     source: Arc<dyn PerlIterator>,
-    pending: Mutex<VecDeque<PerlValue>>,
+    pending: Mutex<VecDeque<StrykeValue>>,
 }
 
 impl LinesFlatMapIterator {
@@ -1206,7 +1206,7 @@ impl LinesFlatMapIterator {
 }
 
 impl PerlIterator for LinesFlatMapIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         loop {
             {
                 let mut q = self.pending.lock();
@@ -1218,7 +1218,7 @@ impl PerlIterator for LinesFlatMapIterator {
             let s = item.to_string();
             let mut q = self.pending.lock();
             for line in s.lines() {
-                q.push_back(PerlValue::string(line.to_string()));
+                q.push_back(StrykeValue::string(line.to_string()));
             }
             if !q.is_empty() {
                 return q.pop_front();
@@ -1230,7 +1230,7 @@ impl PerlIterator for LinesFlatMapIterator {
 /// Streaming `words` over an iterator — flat-maps each element's words.
 pub(crate) struct WordsFlatMapIterator {
     source: Arc<dyn PerlIterator>,
-    pending: Mutex<VecDeque<PerlValue>>,
+    pending: Mutex<VecDeque<StrykeValue>>,
 }
 
 impl WordsFlatMapIterator {
@@ -1243,7 +1243,7 @@ impl WordsFlatMapIterator {
 }
 
 impl PerlIterator for WordsFlatMapIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         loop {
             {
                 let mut q = self.pending.lock();
@@ -1255,7 +1255,7 @@ impl PerlIterator for WordsFlatMapIterator {
             let s = item.to_string();
             let mut q = self.pending.lock();
             for word in s.split_whitespace() {
-                q.push_back(PerlValue::string(word.to_string()));
+                q.push_back(StrykeValue::string(word.to_string()));
             }
             if !q.is_empty() {
                 return q.pop_front();
@@ -1267,7 +1267,7 @@ impl PerlIterator for WordsFlatMapIterator {
 /// Streaming `chars` over an iterator — flat-maps each element's characters.
 pub(crate) struct CharsFlatMapIterator {
     source: Arc<dyn PerlIterator>,
-    pending: Mutex<VecDeque<PerlValue>>,
+    pending: Mutex<VecDeque<StrykeValue>>,
 }
 
 impl CharsFlatMapIterator {
@@ -1280,7 +1280,7 @@ impl CharsFlatMapIterator {
 }
 
 impl PerlIterator for CharsFlatMapIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         loop {
             {
                 let mut q = self.pending.lock();
@@ -1292,7 +1292,7 @@ impl PerlIterator for CharsFlatMapIterator {
             let s = item.to_string();
             let mut q = self.pending.lock();
             for c in s.chars() {
-                q.push_back(PerlValue::string(c.to_string()));
+                q.push_back(StrykeValue::string(c.to_string()));
             }
             if !q.is_empty() {
                 return q.pop_front();
@@ -1326,7 +1326,7 @@ impl SubstStreamIterator {
 }
 
 impl PerlIterator for SubstStreamIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         self.source.next_item().map(|v| {
             let s = v.to_string();
             let result = if self.global {
@@ -1334,7 +1334,7 @@ impl PerlIterator for SubstStreamIterator {
             } else {
                 self.re.replace(&s, &self.replacement)
             };
-            PerlValue::string(result)
+            StrykeValue::string(result)
         })
     }
 }
@@ -1365,7 +1365,7 @@ impl TransliterateStreamIterator {
 }
 
 impl PerlIterator for TransliterateStreamIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         self.source.next_item().map(|v| {
             let s = v.to_string();
             let result = transliterate_string(
@@ -1376,7 +1376,7 @@ impl PerlIterator for TransliterateStreamIterator {
                 self.delete,
                 self.squash,
             );
-            PerlValue::string(result)
+            StrykeValue::string(result)
         })
     }
 }
@@ -1439,26 +1439,26 @@ impl MatchStreamIterator {
 }
 
 impl PerlIterator for MatchStreamIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         self.source.next_item().map(|v| {
             let s = v.to_string();
             if let Some(caps) = self.re.captures(&s) {
                 let len = caps.len();
                 if len > 1 {
-                    let captures: Vec<PerlValue> = (1..len)
+                    let captures: Vec<StrykeValue> = (1..len)
                         .map(|i| match caps.get(i) {
-                            Some(m) => PerlValue::string(m.text.to_string()),
-                            None => PerlValue::UNDEF,
+                            Some(m) => StrykeValue::string(m.text.to_string()),
+                            None => StrykeValue::UNDEF,
                         })
                         .collect();
-                    PerlValue::array(captures)
+                    StrykeValue::array(captures)
                 } else if let Some(m) = caps.get(0) {
-                    PerlValue::string(m.text.to_string())
+                    StrykeValue::string(m.text.to_string())
                 } else {
-                    PerlValue::UNDEF
+                    StrykeValue::UNDEF
                 }
             } else {
-                PerlValue::UNDEF
+                StrykeValue::UNDEF
             }
         })
     }
@@ -1468,7 +1468,7 @@ impl PerlIterator for MatchStreamIterator {
 pub(crate) struct MatchGlobalStreamIterator {
     source: Arc<dyn PerlIterator>,
     re: Arc<crate::perl_regex::PerlCompiledRegex>,
-    pending: Mutex<VecDeque<PerlValue>>,
+    pending: Mutex<VecDeque<StrykeValue>>,
 }
 
 impl MatchGlobalStreamIterator {
@@ -1485,7 +1485,7 @@ impl MatchGlobalStreamIterator {
 }
 
 impl PerlIterator for MatchGlobalStreamIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         loop {
             {
                 let mut q = self.pending.lock();
@@ -1501,11 +1501,11 @@ impl PerlIterator for MatchGlobalStreamIterator {
                 if len > 1 {
                     for i in 1..len {
                         if let Some(m) = caps.get(i) {
-                            q.push_back(PerlValue::string(m.text.to_string()));
+                            q.push_back(StrykeValue::string(m.text.to_string()));
                         }
                     }
                 } else if let Some(m) = caps.get(0) {
-                    q.push_back(PerlValue::string(m.text.to_string()));
+                    q.push_back(StrykeValue::string(m.text.to_string()));
                 }
             }
             if !q.is_empty() {
@@ -1527,7 +1527,7 @@ impl PerlIterator for MatchGlobalStreamIterator {
 /// dispatches them to rayon, and pushes results through a bounded channel so
 /// the consumer sees output immediately.
 pub(crate) struct PMapStreamIterator {
-    rx: crossbeam::channel::Receiver<PerlValue>,
+    rx: crossbeam::channel::Receiver<StrykeValue>,
     // Keep the handle so the background thread is joined on drop.
     _handle: Option<std::thread::JoinHandle<()>>,
 }
@@ -1537,17 +1537,17 @@ impl PMapStreamIterator {
         source: Arc<dyn PerlIterator>,
         sub: Arc<PerlSub>,
         subs: std::collections::HashMap<String, Arc<PerlSub>>,
-        capture: Vec<(String, PerlValue)>,
+        capture: Vec<(String, StrykeValue)>,
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
         peel: bool,
     ) -> Self {
-        let (tx, rx) = crossbeam::channel::bounded::<PerlValue>(256);
+        let (tx, rx) = crossbeam::channel::bounded::<StrykeValue>(256);
         let handle = std::thread::spawn(move || {
             // Persistent worker threads — each creates ONE Interpreter and
             // reuses it, avoiding the Interpreter::new() cost per item.
             let n_workers = rayon::current_num_threads().max(1);
-            let (work_tx, work_rx) = crossbeam::channel::bounded::<PerlValue>(n_workers * 2);
+            let (work_tx, work_rx) = crossbeam::channel::bounded::<StrykeValue>(n_workers * 2);
             let work_rx = Arc::new(work_rx);
 
             let mut workers = Vec::with_capacity(n_workers);
@@ -1576,7 +1576,7 @@ impl PMapStreamIterator {
                                 }
                             }
                             Err(_) => {
-                                let _ = tx.send(PerlValue::UNDEF);
+                                let _ = tx.send(StrykeValue::UNDEF);
                             }
                         }
                     }
@@ -1602,14 +1602,14 @@ impl PMapStreamIterator {
 }
 
 impl PerlIterator for PMapStreamIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         self.rx.recv().ok()
     }
 }
 
 /// `pgreps { BLOCK } LIST` — parallel grep that returns a lazy iterator.
 pub(crate) struct PGrepStreamIterator {
-    rx: crossbeam::channel::Receiver<PerlValue>,
+    rx: crossbeam::channel::Receiver<StrykeValue>,
     _handle: Option<std::thread::JoinHandle<()>>,
 }
 
@@ -1618,14 +1618,14 @@ impl PGrepStreamIterator {
         source: Arc<dyn PerlIterator>,
         sub: Arc<PerlSub>,
         subs: std::collections::HashMap<String, Arc<PerlSub>>,
-        capture: Vec<(String, PerlValue)>,
+        capture: Vec<(String, StrykeValue)>,
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
     ) -> Self {
-        let (tx, rx) = crossbeam::channel::bounded::<PerlValue>(256);
+        let (tx, rx) = crossbeam::channel::bounded::<StrykeValue>(256);
         let handle = std::thread::spawn(move || {
             let n_workers = rayon::current_num_threads().max(1);
-            let (work_tx, work_rx) = crossbeam::channel::bounded::<PerlValue>(n_workers * 2);
+            let (work_tx, work_rx) = crossbeam::channel::bounded::<StrykeValue>(n_workers * 2);
             let work_rx = Arc::new(work_rx);
 
             let mut workers = Vec::with_capacity(n_workers);
@@ -1674,7 +1674,7 @@ impl PGrepStreamIterator {
 }
 
 impl PerlIterator for PGrepStreamIterator {
-    fn next_item(&self) -> Option<PerlValue> {
+    fn next_item(&self) -> Option<StrykeValue> {
         self.rx.recv().ok()
     }
 }
@@ -1682,14 +1682,14 @@ impl PerlIterator for PGrepStreamIterator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::value::PerlValue;
+    use crate::value::StrykeValue;
 
     #[test]
     fn test_vec_pull_iter() {
         let items = vec![
-            PerlValue::integer(1),
-            PerlValue::integer(2),
-            PerlValue::integer(3),
+            StrykeValue::integer(1),
+            StrykeValue::integer(2),
+            StrykeValue::integer(3),
         ];
         let iter = VecPullIter::new(items);
         assert_eq!(iter.next_item().unwrap().to_int(), 1);
@@ -1701,9 +1701,9 @@ mod tests {
     #[test]
     fn test_take_iterator() {
         let source = Arc::new(VecPullIter::new(vec![
-            PerlValue::integer(1),
-            PerlValue::integer(2),
-            PerlValue::integer(3),
+            StrykeValue::integer(1),
+            StrykeValue::integer(2),
+            StrykeValue::integer(3),
         ]));
         let iter = TakeIterator::new(source, 2);
         assert_eq!(iter.next_item().unwrap().to_int(), 1);
@@ -1714,9 +1714,9 @@ mod tests {
     #[test]
     fn test_skip_iterator() {
         let source = Arc::new(VecPullIter::new(vec![
-            PerlValue::integer(1),
-            PerlValue::integer(2),
-            PerlValue::integer(3),
+            StrykeValue::integer(1),
+            StrykeValue::integer(2),
+            StrykeValue::integer(3),
         ]));
         let iter = SkipIterator::new(source, 1);
         assert_eq!(iter.next_item().unwrap().to_int(), 2);
@@ -1742,8 +1742,8 @@ mod tests {
     #[test]
     fn test_enumerate_iterator() {
         let source = Arc::new(VecPullIter::new(vec![
-            PerlValue::string("a".into()),
-            PerlValue::string("b".into()),
+            StrykeValue::string("a".into()),
+            StrykeValue::string("b".into()),
         ]));
         let iter = EnumerateIterator::new(source);
 
@@ -1765,12 +1765,12 @@ mod tests {
     #[test]
     fn test_dedup_iterator() {
         let source = Arc::new(VecPullIter::new(vec![
-            PerlValue::integer(1),
-            PerlValue::integer(1),
-            PerlValue::integer(2),
-            PerlValue::integer(2),
-            PerlValue::integer(2),
-            PerlValue::integer(1),
+            StrykeValue::integer(1),
+            StrykeValue::integer(1),
+            StrykeValue::integer(2),
+            StrykeValue::integer(2),
+            StrykeValue::integer(2),
+            StrykeValue::integer(1),
         ]));
         let iter = DedupIterator::new(source);
         assert_eq!(iter.next_item().unwrap().to_int(), 1);
@@ -1782,10 +1782,10 @@ mod tests {
     #[test]
     fn test_compact_iterator() {
         let source = Arc::new(VecPullIter::new(vec![
-            PerlValue::integer(1),
-            PerlValue::UNDEF,
-            PerlValue::string("".into()),
-            PerlValue::integer(2),
+            StrykeValue::integer(1),
+            StrykeValue::UNDEF,
+            StrykeValue::string("".into()),
+            StrykeValue::integer(2),
         ]));
         let iter = CompactIterator::new(source);
         assert_eq!(iter.next_item().unwrap().to_int(), 1);

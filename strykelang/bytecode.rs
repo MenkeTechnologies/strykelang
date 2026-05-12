@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::ast::{
     AdviceKind, Block, ClassDef, EnumDef, Expr, MatchArm, StructDef, SubSigParam, TraitDef,
 };
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 
 /// `splice` operand tuple: array expr, offset, length, replacement list (see [`Chunk::splice_expr_entries`]).
 pub(crate) type SpliceExprEntry = (Expr, Option<Expr>, Option<Expr>, Vec<Expr>);
@@ -52,11 +52,11 @@ pub enum Op {
     Dup,
     /// Duplicate the top two stack values: \[a, b\] (b on top) → \[a, b, a, b\].
     Dup2,
-    /// Swap the top two stack values (PerlValue).
+    /// Swap the top two stack values (StrykeValue).
     Swap,
     /// Rotate the top three values upward (FORTH `rot`): `[a, b, c]` (c on top) → `[b, c, a]`.
     Rot,
-    /// Pop one value; push [`PerlValue::scalar_context`] of that value (Perl aggregate rules).
+    /// Pop one value; push [`StrykeValue::scalar_context`] of that value (Perl aggregate rules).
     ValueScalarContext,
     /// Pop list/array; push first element (or undef if empty). For `my ($x) = @arr`.
     ListFirst,
@@ -104,10 +104,10 @@ pub enum Op {
     PopArray(u16),   // → popped value
     ShiftArray(u16), // → shifted value
     ArrayLen(u16),   // → integer length
-    /// Pop index spec (scalar or array from [`Op::Range`]); push one `PerlValue::array` of elements
+    /// Pop index spec (scalar or array from [`Op::Range`]); push one `StrykeValue::array` of elements
     /// read from the named array. Used for `@name[...]` slice rvalues.
     ArraySlicePart(u16),
-    /// Push `array[start..]` as a `PerlValue::array`. Used for slurpy-tail
+    /// Push `array[start..]` as a `StrykeValue::array`. Used for slurpy-tail
     /// destructure: `my ($a, $b, @rest) = LIST` reads `tmp[2..]` into
     /// `@rest`. (BUG-090) — operands: `(name_idx, start)`.
     GetArrayFromIndex(u16, u16),
@@ -192,12 +192,12 @@ pub enum Op {
 
     // ── String ──
     Concat,
-    /// Pop array (or value coerced with [`PerlValue::to_list`]), join element strings with
+    /// Pop array (or value coerced with [`StrykeValue::to_list`]), join element strings with
     /// [`Interpreter::list_separator`] (`$"`), push one string. Used for `@a` in `"` / `qq`.
     ArrayStringifyListSep,
     StringRepeat,
-    /// Pop count (top), pop list (below — flattened to `Vec<PerlValue>` via
-    /// [`PerlValue::as_array_vec`] or wrapped as a 1-elt list), push the list
+    /// Pop count (top), pop list (below — flattened to `Vec<StrykeValue>` via
+    /// [`StrykeValue::as_array_vec`] or wrapped as a 1-elt list), push the list
     /// repeated `count` times. Backs `(LIST) x N` / `qw(...) x N`. See
     /// `compiler.rs` `ExprKind::Repeat` for the parser-level discrimination.
     ListRepeat,
@@ -420,7 +420,7 @@ pub enum Op {
     /// left pattern, left flags, rhs expr index.
     RegexFlipFlopExprRhs(u16, u8, u16, u16, u16),
     /// Regex `..` / `...` with a numeric right operand (Perl: right bound is [`Interpreter::scalar_flipflop_dot_line`]
-    /// vs literal line). Constant pool index holds the RHS line as [`PerlValue::integer`]. Operand order:
+    /// vs literal line). Constant pool index holds the RHS line as [`StrykeValue::integer`]. Operand order:
     /// `slot`, `exclusive`, left pattern, left flags, rhs line constant index.
     RegexFlipFlopDotLineRhs(u16, u8, u16, u16, u16),
 
@@ -453,7 +453,7 @@ pub enum Op {
     // ── Block-based operations (u16 = index into chunk.blocks) ──
     /// map { BLOCK } @list — block_idx; stack: \[list\] → \[mapped\]
     MapWithBlock(u16),
-    /// flat_map { BLOCK } @list — like [`Op::MapWithBlock`] but peels one ARRAY ref per iteration ([`PerlValue::map_flatten_outputs`])
+    /// flat_map { BLOCK } @list — like [`Op::MapWithBlock`] but peels one ARRAY ref per iteration ([`StrykeValue::map_flatten_outputs`])
     FlatMapWithBlock(u16),
     /// grep { BLOCK } @list — block_idx; stack: \[list\] → \[filtered\]
     GrepWithBlock(u16),
@@ -569,7 +569,7 @@ pub enum Op {
     /// (const_idx, s_slot, i_slot, i32_limit)
     ConcatConstSlotLoop(u16, u8, u8, i32),
     /// Fused array-push counted loop: `while $i < limit { push @a, $i; $i += 1 }` — reserves the
-    /// target `Vec` once and pushes `PerlValue::integer(i)` in a tight Rust loop. Emitted when
+    /// target `Vec` once and pushes `StrykeValue::integer(i)` in a tight Rust loop. Emitted when
     /// the loop body is exactly `GetScalarSlot(i) + PushArray(arr) + ArrayLen(arr) + Pop +
     /// SlotIncLtIntJumpBack(i, limit, body_target)` with `body_target` pointing at the
     /// `GetScalarSlot` (i.e. the body is one `push` statement whose return is discarded).
@@ -809,7 +809,7 @@ pub enum Op {
     CatchReceive(u16),
 
     // ── `mysync` (thread-safe shared bindings; see [`StmtKind::MySync`]) ──
-    /// Stack: `[init]` → `[]`. Declares `${name}` as `PerlValue::atomic` (or deque/heap unwrapped).
+    /// Stack: `[init]` → `[]`. Declares `${name}` as `StrykeValue::atomic` (or deque/heap unwrapped).
     DeclareMySyncScalar(u16),
     /// Stack: `[init_list]` → `[]`. Declares `@name` as atomic array.
     DeclareMySyncArray(u16),
@@ -817,7 +817,7 @@ pub enum Op {
     DeclareMySyncHash(u16),
     // ── `oursync` (package-global thread-safe shared bindings; see [`StmtKind::OurSync`]) ──
     /// Stack: `[init]` → `[]`. `name_idx` is the package-qualified key (`Pkg::name`).
-    /// Declares the binding in the **global frame** as `PerlValue::atomic` (or deque/heap unwrapped),
+    /// Declares the binding in the **global frame** as `StrykeValue::atomic` (or deque/heap unwrapped),
     /// so all packages and parallel workers share one cell.
     DeclareOurSyncScalar(u16),
     /// Stack: `[init_list]` → `[]`. `name_idx` is the package-qualified array key (`Pkg::name`).
@@ -1094,7 +1094,7 @@ pub struct Chunk {
     pub ops: Vec<Op>,
     /// Constant pool: string literals, regex patterns, etc.
     #[serde(with = "crate::script_cache::constants_pool_codec")]
-    pub constants: Vec<PerlValue>,
+    pub constants: Vec<StrykeValue>,
     /// Name pool: variable names, sub names (interned/deduped).
     pub names: Vec<String>,
     /// Source line for each op (parallel array for error reporting).
@@ -1475,7 +1475,7 @@ impl Chunk {
     }
 
     /// Add a constant to the pool, returning its index.
-    pub fn add_constant(&mut self, val: PerlValue) -> u16 {
+    pub fn add_constant(&mut self, val: StrykeValue) -> u16 {
         // Dedup string constants
         if let Some(ref s) = val.as_str() {
             for (i, c) in self.constants.iter().enumerate() {
@@ -2235,8 +2235,8 @@ mod tests {
     #[test]
     fn add_constant_dedups_identical_strings() {
         let mut c = Chunk::new();
-        let a = c.add_constant(PerlValue::string("x".into()));
-        let b = c.add_constant(PerlValue::string("x".into()));
+        let a = c.add_constant(StrykeValue::string("x".into()));
+        let b = c.add_constant(StrykeValue::string("x".into()));
         assert_eq!(a, b);
         assert_eq!(c.constants.len(), 1);
     }
@@ -2244,8 +2244,8 @@ mod tests {
     #[test]
     fn add_constant_distinct_strings_different_indices() {
         let mut c = Chunk::new();
-        let a = c.add_constant(PerlValue::string("a".into()));
-        let b = c.add_constant(PerlValue::string("b".into()));
+        let a = c.add_constant(StrykeValue::string("a".into()));
+        let b = c.add_constant(StrykeValue::string("b".into()));
         assert_ne!(a, b);
         assert_eq!(c.constants.len(), 2);
     }
@@ -2253,8 +2253,8 @@ mod tests {
     #[test]
     fn add_constant_non_string_no_dedup_scan() {
         let mut c = Chunk::new();
-        let a = c.add_constant(PerlValue::integer(1));
-        let b = c.add_constant(PerlValue::integer(1));
+        let a = c.add_constant(StrykeValue::integer(1));
+        let b = c.add_constant(StrykeValue::integer(1));
         assert_ne!(a, b);
         assert_eq!(c.constants.len(), 2);
     }

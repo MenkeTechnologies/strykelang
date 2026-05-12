@@ -4706,12 +4706,16 @@ fn underscore_bareword_in_hashref_fat_comma_resolves_to_topic() {
 }
 
 #[test]
-fn underscore_bareword_in_hash_subscript_resolves_to_topic() {
+fn underscore_bareword_in_hash_subscript_reads_chain_not_literal() {
     // `$h{_<}` was autoquoting `_<` to literal "_<"; topic-slot barewords
-    // must read through to the chain value.
+    // must read through to the chain value (which is undef at the
+    // outermost iter, so the hash lookup misses). The point of this test
+    // is that `_<` is not stringified to `"_<"` — `$h{_<}` is undef
+    // because `_<` itself is undef, not because the literal key `"_<"`
+    // is absent.
     assert_eq!(
-        ri(r#"my %h = (k1 => 7); my @r = map { $h{_<} } "k1"; $r[0]"#),
-        7
+        rs(r#"my %h = (k1 => 7, "_<" => 99); my @r = map { defined($h{_<}) ? "defined" : "undef" } "k1"; $r[0]"#),
+        "undef"
     );
 }
 
@@ -4867,16 +4871,20 @@ fn outer_topic_in_plain_nested_map() {
 }
 
 #[test]
-fn outer_topic_chain_falls_back_to_topic_at_outermost_iter() {
-    // `$m->{_<}` at the outer-map body level: with no enclosing closure
-    // populating the chain, `_<` falls back to `_` (the iteration key).
+fn outer_topic_chain_is_undef_at_outermost_iter() {
+    // At the outermost iter there is no enclosing topic frame to ascend
+    // to, so `_<` is undef. (Earlier stryke used to fall back to `_` here;
+    // that fallback was removed because it made `_<` mean different things
+    // depending on how deeply you'd nested, breaking the documented
+    // "walk N frames up" semantics.) To reach the iter key from inside
+    // the block, use `_` directly.
     assert_eq!(
         rs(r#"
             my %m = (k => 100);
-            my @r = map { $m{_<} } "k";
+            my @r = map { defined(_<) ? "defined" : "undef" } "k";
             $r[0]
         "#),
-        "100"
+        "undef"
     );
 }
 

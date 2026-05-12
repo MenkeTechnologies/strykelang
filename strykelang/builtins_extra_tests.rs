@@ -246,8 +246,8 @@ fn test_thread_macro_streaming_basic() {
     // the *count* of emitted items, so `join(',', ~s> [1,2,3] map {…})`
     // gave "3" instead of "2,4,6". Fix in `par_pipeline.rs::
     // run_thread_par`: replaced the `AtomicUsize` counter with an
-    // `Arc<Mutex<Vec<PerlValue>>>` collector and return
-    // `PerlValue::array(collected)`.
+    // `Arc<Mutex<Vec<StrykeValue>>>` collector and return
+    // `StrykeValue::array(collected)`.
 
     // Basic streaming map: emits each transformed item.
     assert_eq!(

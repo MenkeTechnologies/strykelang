@@ -1,7 +1,7 @@
 //! Free-function recursive flatten of stryke `ClassInstance` /
 //! `StructInstance` values into plain hashref / arrayref trees, for use
 //! by serializers (`to_json`, `to_xml`, `to_yaml`, `to_toml`, `to_html`,
-//! `ddump`) that take `&[PerlValue]` and don't have a `&VMHelper` to
+//! `ddump`) that take `&[StrykeValue]` and don't have a `&VMHelper` to
 //! consult.
 //!
 //! Inheritance fields (parents declared via `extends`) are looked up
@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::ast::ClassDef;
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 
 thread_local! {
     /// Per-thread registry of class definitions, keyed by class name.
@@ -75,7 +75,7 @@ fn class_field_names(def: &ClassDef) -> Vec<String> {
 /// The intent is "make this value JSON-serializable end-to-end" — call
 /// it once at the top of every serializer that doesn't already know
 /// about stryke-native OO instances.
-pub fn deep_normalize(v: &PerlValue) -> PerlValue {
+pub fn deep_normalize(v: &StrykeValue) -> StrykeValue {
     if let Some(c) = v.as_class_inst() {
         let names = class_field_names(&c.def);
         let values = c.get_values();
@@ -87,7 +87,7 @@ pub fn deep_normalize(v: &PerlValue) -> PerlValue {
         for i in 0..n {
             map.insert(names[i].clone(), deep_normalize(&values[i]));
         }
-        return PerlValue::hash_ref(Arc::new(RwLock::new(map)));
+        return StrykeValue::hash_ref(Arc::new(RwLock::new(map)));
     }
     if let Some(s) = v.as_struct_inst() {
         let values = s.get_values();
@@ -97,7 +97,7 @@ pub fn deep_normalize(v: &PerlValue) -> PerlValue {
                 map.insert(field.name.clone(), deep_normalize(elem));
             }
         }
-        return PerlValue::hash_ref(Arc::new(RwLock::new(map)));
+        return StrykeValue::hash_ref(Arc::new(RwLock::new(map)));
     }
     if let Some(e) = v.as_enum_inst() {
         // Enum: emit `{ variant => "Name", value => recursive(payload) }`
@@ -106,12 +106,12 @@ pub fn deep_normalize(v: &PerlValue) -> PerlValue {
         let mut map = IndexMap::new();
         map.insert(
             "variant".to_string(),
-            PerlValue::string(e.variant_name().to_string()),
+            StrykeValue::string(e.variant_name().to_string()),
         );
         if !e.data.is_undef() {
             map.insert("value".to_string(), deep_normalize(&e.data));
         }
-        return PerlValue::hash_ref(Arc::new(RwLock::new(map)));
+        return StrykeValue::hash_ref(Arc::new(RwLock::new(map)));
     }
     if let Some(r) = v.as_hash_ref() {
         let inner = r.read().clone();
@@ -119,21 +119,21 @@ pub fn deep_normalize(v: &PerlValue) -> PerlValue {
         for (k, val) in inner.into_iter() {
             map.insert(k, deep_normalize(&val));
         }
-        return PerlValue::hash_ref(Arc::new(RwLock::new(map)));
+        return StrykeValue::hash_ref(Arc::new(RwLock::new(map)));
     }
     if let Some(r) = v.as_array_ref() {
         let inner = r.read().clone();
-        let out: Vec<PerlValue> = inner.iter().map(deep_normalize).collect();
-        return PerlValue::array_ref(Arc::new(RwLock::new(out)));
+        let out: Vec<StrykeValue> = inner.iter().map(deep_normalize).collect();
+        return StrykeValue::array_ref(Arc::new(RwLock::new(out)));
     }
     v.clone()
 }
 
 /// Convenience: normalize the first arg in place and return a Vec the
 /// caller can hand to its existing serializer logic. Use when the
-/// serializer takes `&[PerlValue]` and only the first element is the
+/// serializer takes `&[StrykeValue]` and only the first element is the
 /// data to serialize.
-pub fn normalize_args_head(args: &[PerlValue]) -> Vec<PerlValue> {
+pub fn normalize_args_head(args: &[StrykeValue]) -> Vec<StrykeValue> {
     if args.is_empty() {
         return Vec::new();
     }

@@ -3,7 +3,7 @@
 use std::cmp::Ordering;
 
 use crate::ast::{BinOp, Block, Expr, ExprKind, StmtKind};
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SortBlockFast {
@@ -58,7 +58,7 @@ pub fn detect_sort_block_fast(block: &Block) -> Option<SortBlockFast> {
 }
 
 #[inline]
-pub fn sort_magic_cmp(a: &PerlValue, b: &PerlValue, mode: SortBlockFast) -> Ordering {
+pub fn sort_magic_cmp(a: &StrykeValue, b: &StrykeValue, mode: SortBlockFast) -> Ordering {
     match mode {
         SortBlockFast::Numeric => a
             .to_number()
@@ -156,9 +156,9 @@ mod tests {
 
     #[test]
     fn sort_magic_cmp_numeric_ordering() {
-        use crate::value::PerlValue;
-        let a = PerlValue::integer(1);
-        let b = PerlValue::integer(2);
+        use crate::value::StrykeValue;
+        let a = StrykeValue::integer(1);
+        let b = StrykeValue::integer(2);
         assert_eq!(
             sort_magic_cmp(&a, &b, SortBlockFast::Numeric),
             std::cmp::Ordering::Less
@@ -171,9 +171,9 @@ mod tests {
 
     #[test]
     fn sort_magic_cmp_string_ordering() {
-        use crate::value::PerlValue;
-        let a = PerlValue::string("a".into());
-        let b = PerlValue::string("z".into());
+        use crate::value::StrykeValue;
+        let a = StrykeValue::string("a".into());
+        let b = StrykeValue::string("z".into());
         assert_eq!(
             sort_magic_cmp(&a, &b, SortBlockFast::String),
             std::cmp::Ordering::Less

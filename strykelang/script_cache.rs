@@ -12,7 +12,7 @@
 //!   ScriptEntry { mtime_secs, mtime_nsecs, binary_mtime_at_cache, cached_at_secs,
 //!                 program_blob: `Vec<u8>`, chunk_blob: `Vec<u8>` }
 //!
-//! Inner `program_blob` / `chunk_blob` are bincode for now — `PerlValue`'s
+//! Inner `program_blob` / `chunk_blob` are bincode for now — `StrykeValue`'s
 //! Arc-shared graph and the `CacheConst` adapter aren't trivially rkyv-archivable,
 //! so phase 1 keeps that codec inside the rkyv outer container. Phase 2 can
 //! derive `Archive` directly on `Chunk` / `Program` for true zero-copy load.
@@ -46,7 +46,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::ast::Program;
 use crate::bytecode::Chunk;
 use crate::error::{PerlError, PerlResult};
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 
 /// Magic header bytes — fail-fast if a wrong-format file is mmap'd.
 pub const SHARD_MAGIC: u32 = 0x53545259; // "STRY"
@@ -83,10 +83,10 @@ pub struct ScriptShard {
     pub entries: HashMap<String, ScriptEntry>,
 }
 
-// ── Constant pool codec for serializing PerlValues in the inner bincode blob ─
+// ── Constant pool codec for serializing StrykeValues in the inner bincode blob ─
 //
-// The inner `chunk_blob` still uses bincode, and `Chunk.constants: Vec<PerlValue>`
-// can't serialize directly because `PerlValue` is an Arc-shared heap graph. This
+// The inner `chunk_blob` still uses bincode, and `Chunk.constants: Vec<StrykeValue>`
+// can't serialize directly because `StrykeValue` is an Arc-shared heap graph. This
 // codec is referenced by `bytecode.rs:1067` via `#[serde(with = ...)]` and only
 // needs to handle the constants the compiler actually pools — `Undef`, ints,
 // floats, strings.
@@ -100,7 +100,7 @@ enum CacheConst {
     Str(String),
 }
 
-fn cache_const_from_perl(v: &PerlValue) -> Result<CacheConst, String> {
+fn cache_const_from_perl(v: &StrykeValue) -> Result<CacheConst, String> {
     if v.is_undef() {
         return Ok(CacheConst::Undef);
     }
@@ -119,19 +119,19 @@ fn cache_const_from_perl(v: &PerlValue) -> Result<CacheConst, String> {
     ))
 }
 
-fn perl_from_cache_const(c: CacheConst) -> PerlValue {
+fn perl_from_cache_const(c: CacheConst) -> StrykeValue {
     match c {
-        CacheConst::Undef => PerlValue::UNDEF,
-        CacheConst::Int(n) => PerlValue::integer(n),
-        CacheConst::Float(f) => PerlValue::float(f),
-        CacheConst::Str(s) => PerlValue::string(s),
+        CacheConst::Undef => StrykeValue::UNDEF,
+        CacheConst::Int(n) => StrykeValue::integer(n),
+        CacheConst::Float(f) => StrykeValue::float(f),
+        CacheConst::Str(s) => StrykeValue::string(s),
     }
 }
 
 pub mod constants_pool_codec {
     use super::*;
 
-    pub fn serialize<S>(values: &Vec<PerlValue>, ser: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(values: &Vec<StrykeValue>, ser: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -143,7 +143,7 @@ pub mod constants_pool_codec {
         out.serialize(ser)
     }
 
-    pub fn deserialize<'de, D>(de: D) -> Result<Vec<PerlValue>, D::Error>
+    pub fn deserialize<'de, D>(de: D) -> Result<Vec<StrykeValue>, D::Error>
     where
         D: Deserializer<'de>,
     {

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 
 #[derive(Debug, Clone)]
 pub struct PerlError {
@@ -10,7 +10,7 @@ pub struct PerlError {
     pub file: String,
     /// When `die` is called with a ref argument, the original value is preserved here
     /// so that `$@` can hold the ref (not just its stringification).
-    pub die_value: Option<PerlValue>,
+    pub die_value: Option<StrykeValue>,
     /// For Syntax errors, optional suffix shown after `at -e line N`. Perl
     /// emits `, near "TOKEN"` or `, at EOF` depending on where the parse
     /// failed; absent (`None`) yields the standard period-terminated form.
@@ -86,7 +86,7 @@ impl PerlError {
         Self::new(ErrorKind::DivisionByZero, message, line, "-e")
     }
 
-    pub fn die_with_value(value: PerlValue, message: String, line: usize) -> Self {
+    pub fn die_with_value(value: StrykeValue, message: String, line: usize) -> Self {
         let mut e = Self::new(ErrorKind::Die, message, line, "-e");
         e.die_value = Some(value);
         e

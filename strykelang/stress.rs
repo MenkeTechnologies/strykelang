@@ -16,7 +16,7 @@
 //!   * Honors a duration in seconds (default 5s, max ~3600s)
 
 use crate::error::PerlError;
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 use indexmap::IndexMap;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::Arc;
@@ -30,7 +30,7 @@ fn cores() -> usize {
         .unwrap_or(1)
 }
 
-fn duration_arg(args: &[PerlValue], default_secs: f64) -> Duration {
+fn duration_arg(args: &[StrykeValue], default_secs: f64) -> Duration {
     let secs = args
         .first()
         .map(|v| v.to_number())
@@ -39,15 +39,15 @@ fn duration_arg(args: &[PerlValue], default_secs: f64) -> Duration {
     Duration::from_secs_f64(secs)
 }
 
-fn hash_to_perl(map: IndexMap<String, PerlValue>) -> PerlValue {
-    PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(map)))
+fn hash_to_perl(map: IndexMap<String, StrykeValue>) -> StrykeValue {
+    StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(map)))
 }
 
 // ── Compute kernels ────────────────────────────────────────────────────
 
 /// `stress_fp(secs)` — float matrix-multiply pinning every core.
 /// Returns total FLOPs (approx — counts inner adds).
-pub(crate) fn stress_fp(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_fp(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let dur = duration_arg(args, 5.0);
     let n = cores();
     let total = AtomicI64::new(0);
@@ -83,12 +83,12 @@ pub(crate) fn stress_fp(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
             });
         }
     });
-    Ok(PerlValue::integer(total.load(Ordering::Relaxed)))
+    Ok(StrykeValue::integer(total.load(Ordering::Relaxed)))
 }
 
 /// `stress_int(secs)` — integer pipeline pinning every core.
 /// Returns ops completed.
-pub(crate) fn stress_int(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_int(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let dur = duration_arg(args, 5.0);
     let n = cores();
     let total = AtomicI64::new(0);
@@ -113,13 +113,13 @@ pub(crate) fn stress_int(args: &[PerlValue], _line: usize) -> Result<PerlValue> 
             });
         }
     });
-    Ok(PerlValue::integer(total.load(Ordering::Relaxed)))
+    Ok(StrykeValue::integer(total.load(Ordering::Relaxed)))
 }
 
 /// `stress_cache(secs, kb)` — pound a working set of `kb` KiB per core
 /// in random order, intended to thrash the chosen cache level. Default
 /// `kb=1024` (~ L2/L3 boundary on most CPUs).
-pub(crate) fn stress_cache(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_cache(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let dur = duration_arg(args, 5.0);
     let kb = args.get(1).map(|v| v.to_int()).unwrap_or(1024).max(8);
     let bytes = (kb as usize) * 1024;
@@ -148,12 +148,12 @@ pub(crate) fn stress_cache(args: &[PerlValue], _line: usize) -> Result<PerlValue
             });
         }
     });
-    Ok(PerlValue::integer(total.load(Ordering::Relaxed)))
+    Ok(StrykeValue::integer(total.load(Ordering::Relaxed)))
 }
 
 /// `stress_branch(secs)` — branch-predictor torture: data-dependent
 /// branches on pseudorandom data.
-pub(crate) fn stress_branch(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_branch(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let dur = duration_arg(args, 5.0);
     let n = cores();
     let total = AtomicI64::new(0);
@@ -186,12 +186,12 @@ pub(crate) fn stress_branch(args: &[PerlValue], _line: usize) -> Result<PerlValu
             });
         }
     });
-    Ok(PerlValue::integer(total.load(Ordering::Relaxed)))
+    Ok(StrykeValue::integer(total.load(Ordering::Relaxed)))
 }
 
 /// `stress_sort(secs, n)` — repeatedly sort an `n`-element vector per
 /// core. `n` defaults to 100k.
-pub(crate) fn stress_sort(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_sort(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let dur = duration_arg(args, 5.0);
     let n_elems = args.get(1).map(|v| v.to_int()).unwrap_or(100_000).max(16) as usize;
     let cores_n = cores();
@@ -219,13 +219,13 @@ pub(crate) fn stress_sort(args: &[PerlValue], _line: usize) -> Result<PerlValue>
             });
         }
     });
-    Ok(PerlValue::integer(total.load(Ordering::Relaxed)))
+    Ok(StrykeValue::integer(total.load(Ordering::Relaxed)))
 }
 
 // ── Memory kernels ────────────────────────────────────────────────────
 
 /// `stress_alloc(secs, size_kb)` — small-alloc churn. Default 64KB allocs.
-pub(crate) fn stress_alloc(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_alloc(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let dur = duration_arg(args, 5.0);
     let size = (args.get(1).map(|v| v.to_int()).unwrap_or(64).max(1) as usize) * 1024;
     let n = cores();
@@ -245,12 +245,12 @@ pub(crate) fn stress_alloc(args: &[PerlValue], _line: usize) -> Result<PerlValue
             });
         }
     });
-    Ok(PerlValue::integer(total.load(Ordering::Relaxed)))
+    Ok(StrykeValue::integer(total.load(Ordering::Relaxed)))
 }
 
 /// `stress_mmap(secs, mb)` — mmap a `mb` MiB anon region per core and
 /// touch every page repeatedly. Default 256MB.
-pub(crate) fn stress_mmap(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_mmap(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let dur = duration_arg(args, 5.0);
     let mb = args.get(1).map(|v| v.to_int()).unwrap_or(256).max(1) as usize;
     let n = cores();
@@ -277,7 +277,7 @@ pub(crate) fn stress_mmap(args: &[PerlValue], line: usize) -> Result<PerlValue> 
         }
     });
     let _ = line;
-    Ok(PerlValue::integer(total.load(Ordering::Relaxed)))
+    Ok(StrykeValue::integer(total.load(Ordering::Relaxed)))
 }
 
 // ── Disk kernels ──────────────────────────────────────────────────────
@@ -285,7 +285,7 @@ pub(crate) fn stress_mmap(args: &[PerlValue], line: usize) -> Result<PerlValue> 
 /// `stress_disk(path, secs, mb_per_write)` — sustained sequential write
 /// then fsync then read across all cores. Each core writes/reads its own
 /// file in `path` (or /tmp).
-pub(crate) fn stress_disk(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_disk(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     use std::fs;
     use std::io::Write;
     let path = args
@@ -319,12 +319,12 @@ pub(crate) fn stress_disk(args: &[PerlValue], _line: usize) -> Result<PerlValue>
             });
         }
     });
-    Ok(PerlValue::integer(total.load(Ordering::Relaxed)))
+    Ok(StrykeValue::integer(total.load(Ordering::Relaxed)))
 }
 
 /// `stress_iops(path, secs, block_kb)` — small random reads/writes
 /// against per-core scratch files. Default block=4KB.
-pub(crate) fn stress_iops(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_iops(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     use std::fs::OpenOptions;
     use std::io::{Read, Seek, SeekFrom, Write};
     let path = args
@@ -375,7 +375,7 @@ pub(crate) fn stress_iops(args: &[PerlValue], _line: usize) -> Result<PerlValue>
             });
         }
     });
-    Ok(PerlValue::integer(total.load(Ordering::Relaxed)))
+    Ok(StrykeValue::integer(total.load(Ordering::Relaxed)))
 }
 
 // ── Network kernels ──────────────────────────────────────────────────
@@ -383,7 +383,7 @@ pub(crate) fn stress_iops(args: &[PerlValue], _line: usize) -> Result<PerlValue>
 /// `stress_net(target, secs, conns)` — open `conns` TCP connections per
 /// core to `target` (`host:port`), pump bytes until duration elapses.
 /// Returns total bytes sent.
-pub(crate) fn stress_net(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_net(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     use std::io::Write;
     use std::net::TcpStream;
     let target = args.first().map(|v| v.to_string()).ok_or_else(|| {
@@ -419,12 +419,12 @@ pub(crate) fn stress_net(args: &[PerlValue], line: usize) -> Result<PerlValue> {
             });
         }
     });
-    Ok(PerlValue::integer(total.load(Ordering::Relaxed)))
+    Ok(StrykeValue::integer(total.load(Ordering::Relaxed)))
 }
 
 /// `stress_http(url, secs, conns)` — HTTP GET storm. Counts successful
 /// 2xx responses across cores.
-pub(crate) fn stress_http(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_http(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let url = args.first().map(|v| v.to_string()).ok_or_else(|| {
         PerlError::runtime(
             "stress_http: usage: stress_http(\"http://...\", secs, conns)",
@@ -458,12 +458,12 @@ pub(crate) fn stress_http(args: &[PerlValue], line: usize) -> Result<PerlValue> 
             });
         }
     });
-    Ok(PerlValue::integer(total.load(Ordering::Relaxed)))
+    Ok(StrykeValue::integer(total.load(Ordering::Relaxed)))
 }
 
 /// `stress_dns(host, secs)` — DNS lookup storm. Returns successful
 /// resolves count.
-pub(crate) fn stress_dns(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_dns(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let host = args.first().map(|v| v.to_string()).ok_or_else(|| {
         PerlError::runtime(
             "stress_dns: usage: stress_dns(\"host.example.com\", secs)",
@@ -494,7 +494,7 @@ pub(crate) fn stress_dns(args: &[PerlValue], line: usize) -> Result<PerlValue> {
             });
         }
     });
-    Ok(PerlValue::integer(total.load(Ordering::Relaxed)))
+    Ok(StrykeValue::integer(total.load(Ordering::Relaxed)))
 }
 
 // ── Process / Thread churn ────────────────────────────────────────────
@@ -502,7 +502,7 @@ pub(crate) fn stress_dns(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 /// `stress_fork(secs)` — fork + immediate exit churn. Returns
 /// completed forks.
 #[cfg(unix)]
-pub(crate) fn stress_fork(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_fork(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let dur = duration_arg(args, 5.0);
     let n = cores();
     let total = AtomicI64::new(0);
@@ -527,17 +527,17 @@ pub(crate) fn stress_fork(args: &[PerlValue], _line: usize) -> Result<PerlValue>
             });
         }
     });
-    Ok(PerlValue::integer(total.load(Ordering::Relaxed)))
+    Ok(StrykeValue::integer(total.load(Ordering::Relaxed)))
 }
 
 #[cfg(not(unix))]
-pub(crate) fn stress_fork(_args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_fork(_args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     Err(PerlError::runtime("stress_fork: unix-only", line))
 }
 
 /// `stress_thread(secs, count)` — thread spawn/join churn. Each round
 /// spawns `count` threads (default 64) and joins them.
-pub(crate) fn stress_thread(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_thread(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let dur = duration_arg(args, 5.0);
     let count = args.get(1).map(|v| v.to_int()).unwrap_or(64).max(1) as usize;
     let total = AtomicI64::new(0);
@@ -555,13 +555,13 @@ pub(crate) fn stress_thread(args: &[PerlValue], _line: usize) -> Result<PerlValu
         }
         total.fetch_add(count as i64, Ordering::Relaxed);
     }
-    Ok(PerlValue::integer(total.load(Ordering::Relaxed)))
+    Ok(StrykeValue::integer(total.load(Ordering::Relaxed)))
 }
 
 // ── Crypto / compress / regex / json kernels ──────────────────────────
 
 /// `stress_aes(secs)` — AES-128 round trip across cores. Returns ops.
-pub(crate) fn stress_aes(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_aes(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     use aes::cipher::{generic_array::GenericArray, BlockEncrypt, KeyInit};
     use aes::Aes128;
     let dur = duration_arg(args, 5.0);
@@ -585,12 +585,12 @@ pub(crate) fn stress_aes(args: &[PerlValue], _line: usize) -> Result<PerlValue> 
             });
         }
     });
-    Ok(PerlValue::integer(total.load(Ordering::Relaxed)))
+    Ok(StrykeValue::integer(total.load(Ordering::Relaxed)))
 }
 
 /// `stress_compress(secs, kb)` — gzip compress + decompress payload of
 /// `kb` KiB per core. Default 1MB. Returns round-trips.
-pub(crate) fn stress_compress(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_compress(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     use flate2::read::GzDecoder;
     use flate2::write::GzEncoder;
     use flate2::Compression;
@@ -629,12 +629,12 @@ pub(crate) fn stress_compress(args: &[PerlValue], _line: usize) -> Result<PerlVa
             });
         }
     });
-    Ok(PerlValue::integer(total.load(Ordering::Relaxed)))
+    Ok(StrykeValue::integer(total.load(Ordering::Relaxed)))
 }
 
 /// `stress_regex(secs)` — pathological backtracking regex against
 /// generated input. Tests parser worst-case.
-pub(crate) fn stress_regex(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_regex(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let dur = duration_arg(args, 5.0);
     let n = cores();
     let total = AtomicI64::new(0);
@@ -667,12 +667,12 @@ pub(crate) fn stress_regex(args: &[PerlValue], _line: usize) -> Result<PerlValue
             });
         }
     });
-    Ok(PerlValue::integer(total.load(Ordering::Relaxed)))
+    Ok(StrykeValue::integer(total.load(Ordering::Relaxed)))
 }
 
 /// `stress_json(secs, kb)` — encode + decode a `kb` KiB JSON object per
 /// core. Default 256KB.
-pub(crate) fn stress_json(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_json(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let dur = duration_arg(args, 5.0);
     let kb = args.get(1).map(|v| v.to_int()).unwrap_or(256).max(1) as usize;
     let n = cores();
@@ -701,7 +701,7 @@ pub(crate) fn stress_json(args: &[PerlValue], _line: usize) -> Result<PerlValue>
             });
         }
     });
-    Ok(PerlValue::integer(total.load(Ordering::Relaxed)))
+    Ok(StrykeValue::integer(total.load(Ordering::Relaxed)))
 }
 
 // ── Pattern controllers (burst / ramp / oscillate) ────────────────────
@@ -709,7 +709,7 @@ pub(crate) fn stress_json(args: &[PerlValue], _line: usize) -> Result<PerlValue>
 /// `stress_burst(workload_name, on_secs, off_secs, total_secs)` — run
 /// the named stress kernel for `on_secs`, sleep `off_secs`, repeat
 /// until `total_secs` elapsed. Returns total iterations.
-pub(crate) fn stress_burst(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_burst(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let name = args
         .first()
         .map(|v| v.to_string())
@@ -727,12 +727,12 @@ pub(crate) fn stress_burst(args: &[PerlValue], line: usize) -> Result<PerlValue>
             std::thread::sleep(Duration::from_secs_f64(off));
         }
     }
-    Ok(PerlValue::integer(iters))
+    Ok(StrykeValue::integer(iters))
 }
 
 /// `stress_ramp(workload, start_pct, end_pct, total_secs)` — duty-cycle
 /// ramp. `pct` is the *on* fraction of each 1-second tick.
-pub(crate) fn stress_ramp(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_ramp(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let name = args
         .first()
         .map(|v| v.to_string())
@@ -754,12 +754,12 @@ pub(crate) fn stress_ramp(args: &[PerlValue], line: usize) -> Result<PerlValue> 
             std::thread::sleep(Duration::from_secs_f64(off));
         }
     }
-    Ok(PerlValue::integer(ticks))
+    Ok(StrykeValue::integer(ticks))
 }
 
 /// `stress_oscillate(workload, period_secs, total_secs)` — sinusoidal
 /// duty cycle: on/off pattern with period `period_secs`.
-pub(crate) fn stress_oscillate(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_oscillate(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let name = args
         .first()
         .map(|v| v.to_string())
@@ -783,11 +783,11 @@ pub(crate) fn stress_oscillate(args: &[PerlValue], line: usize) -> Result<PerlVa
             std::thread::sleep(Duration::from_secs_f64(off));
         }
     }
-    Ok(PerlValue::integer(ticks))
+    Ok(StrykeValue::integer(ticks))
 }
 
-fn run_named_stress(name: &str, secs: f64, line: usize) -> Result<PerlValue> {
-    let arg = vec![PerlValue::float(secs)];
+fn run_named_stress(name: &str, secs: f64, line: usize) -> Result<StrykeValue> {
+    let arg = vec![StrykeValue::float(secs)];
     match name {
         "fp" | "stress_fp" => stress_fp(&arg, line),
         "int" | "stress_int" => stress_int(&arg, line),
@@ -814,16 +814,16 @@ fn run_named_stress(name: &str, secs: f64, line: usize) -> Result<PerlValue> {
 
 /// `stress_all(secs)` — run every kernel above in parallel for `secs`.
 /// Returns a hashref of per-kernel counts. The biggest hammer in the box.
-pub(crate) fn stress_all(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_all(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let secs = args.first().map(|v| v.to_number()).unwrap_or(5.0).max(0.05);
-    let arg = vec![PerlValue::float(secs)];
+    let arg = vec![StrykeValue::float(secs)];
     let started = Instant::now();
 
     // Run each kernel on its own scoped thread so they all hit
     // simultaneously. Each kernel internally already pins all cores —
     // running them concurrently means oversubscription, which is the
     // point: fight for cycles, cache, mem, fd, etc.
-    let mut out: IndexMap<String, PerlValue> = IndexMap::new();
+    let mut out: IndexMap<String, StrykeValue> = IndexMap::new();
     macro_rules! run {
         ($key:expr, $f:expr) => {
             out.insert($key.to_string(), $f(&arg, line)?);
@@ -844,64 +844,64 @@ pub(crate) fn stress_all(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         out.insert(
             "fp".to_string(),
             h_fp.join()
-                .unwrap_or(Ok(PerlValue::UNDEF))
-                .unwrap_or(PerlValue::UNDEF),
+                .unwrap_or(Ok(StrykeValue::UNDEF))
+                .unwrap_or(StrykeValue::UNDEF),
         );
         out.insert(
             "int".to_string(),
             h_int
                 .join()
-                .unwrap_or(Ok(PerlValue::UNDEF))
-                .unwrap_or(PerlValue::UNDEF),
+                .unwrap_or(Ok(StrykeValue::UNDEF))
+                .unwrap_or(StrykeValue::UNDEF),
         );
         out.insert(
             "cache".to_string(),
             h_cache
                 .join()
-                .unwrap_or(Ok(PerlValue::UNDEF))
-                .unwrap_or(PerlValue::UNDEF),
+                .unwrap_or(Ok(StrykeValue::UNDEF))
+                .unwrap_or(StrykeValue::UNDEF),
         );
         out.insert(
             "branch".to_string(),
             h_branch
                 .join()
-                .unwrap_or(Ok(PerlValue::UNDEF))
-                .unwrap_or(PerlValue::UNDEF),
+                .unwrap_or(Ok(StrykeValue::UNDEF))
+                .unwrap_or(StrykeValue::UNDEF),
         );
         out.insert(
             "sort".to_string(),
             h_sort
                 .join()
-                .unwrap_or(Ok(PerlValue::UNDEF))
-                .unwrap_or(PerlValue::UNDEF),
+                .unwrap_or(Ok(StrykeValue::UNDEF))
+                .unwrap_or(StrykeValue::UNDEF),
         );
         out.insert(
             "alloc".to_string(),
             h_alloc
                 .join()
-                .unwrap_or(Ok(PerlValue::UNDEF))
-                .unwrap_or(PerlValue::UNDEF),
+                .unwrap_or(Ok(StrykeValue::UNDEF))
+                .unwrap_or(StrykeValue::UNDEF),
         );
         out.insert(
             "aes".to_string(),
             h_aes
                 .join()
-                .unwrap_or(Ok(PerlValue::UNDEF))
-                .unwrap_or(PerlValue::UNDEF),
+                .unwrap_or(Ok(StrykeValue::UNDEF))
+                .unwrap_or(StrykeValue::UNDEF),
         );
         out.insert(
             "regex".to_string(),
             h_regex
                 .join()
-                .unwrap_or(Ok(PerlValue::UNDEF))
-                .unwrap_or(PerlValue::UNDEF),
+                .unwrap_or(Ok(StrykeValue::UNDEF))
+                .unwrap_or(StrykeValue::UNDEF),
         );
         out.insert(
             "json".to_string(),
             h_json
                 .join()
-                .unwrap_or(Ok(PerlValue::UNDEF))
-                .unwrap_or(PerlValue::UNDEF),
+                .unwrap_or(Ok(StrykeValue::UNDEF))
+                .unwrap_or(StrykeValue::UNDEF),
         );
     });
     // Compress + thread are heavier — run sequentially after.
@@ -909,9 +909,9 @@ pub(crate) fn stress_all(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     run!("thread", stress_thread);
     out.insert(
         "duration".to_string(),
-        PerlValue::float(started.elapsed().as_secs_f64()),
+        StrykeValue::float(started.elapsed().as_secs_f64()),
     );
-    out.insert("cores".to_string(), PerlValue::integer(cores() as i64));
+    out.insert("cores".to_string(), StrykeValue::integer(cores() as i64));
     Ok(hash_to_perl(out))
 }
 
@@ -920,17 +920,17 @@ pub(crate) fn stress_all(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 /// `stress_temp()` — best-effort CPU temperature in °C. Reads
 /// `/sys/class/thermal/thermal_zone*/temp` on Linux. Returns the
 /// hottest zone or undef when unavailable.
-pub(crate) fn stress_temp(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_temp(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     if let Some(t) = read_hottest_thermal_zone() {
-        return Ok(PerlValue::float(t));
+        return Ok(StrykeValue::float(t));
     }
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 /// `stress_thermal_zones()` — arrayref of `+{name, temp_c}` entries
 /// from every readable thermal zone.
-pub(crate) fn stress_thermal_zones(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let mut out: Vec<PerlValue> = Vec::new();
+pub(crate) fn stress_thermal_zones(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
+    let mut out: Vec<StrykeValue> = Vec::new();
     if let Ok(entries) = std::fs::read_dir("/sys/class/thermal") {
         for e in entries.flatten() {
             let path = e.path();
@@ -951,14 +951,14 @@ pub(crate) fn stress_thermal_zones(_args: &[PerlValue], _line: usize) -> Result<
                 .to_string();
             if let Ok(milli) = raw.trim().parse::<f64>() {
                 let mut m = IndexMap::new();
-                m.insert("name".into(), PerlValue::string(name));
-                m.insert("kind".into(), PerlValue::string(kind));
-                m.insert("temp_c".into(), PerlValue::float(milli / 1000.0));
+                m.insert("name".into(), StrykeValue::string(name));
+                m.insert("kind".into(), StrykeValue::string(kind));
+                m.insert("temp_c".into(), StrykeValue::float(milli / 1000.0));
                 out.push(hash_to_perl(m));
             }
         }
     }
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         out,
     ))))
 }
@@ -987,7 +987,7 @@ fn read_hottest_thermal_zone() -> Option<f64> {
 
 /// `stress_freq()` — current CPU frequency in MHz, averaged across
 /// cpufreq cpus. Linux-only via `/sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq`.
-pub(crate) fn stress_freq(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_freq(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let mut total_khz: f64 = 0.0;
     let mut n: f64 = 0.0;
     if let Ok(entries) = std::fs::read_dir("/sys/devices/system/cpu") {
@@ -1009,28 +1009,28 @@ pub(crate) fn stress_freq(_args: &[PerlValue], _line: usize) -> Result<PerlValue
         }
     }
     if n > 0.0 {
-        return Ok(PerlValue::float(total_khz / n / 1000.0));
+        return Ok(StrykeValue::float(total_khz / n / 1000.0));
     }
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 /// `stress_throttled()` — best-effort thermal-throttling indicator.
 /// On Linux, returns 1 when current freq is < 80% of `cpuinfo_max_freq`
 /// AND a thermal zone reads > 80°C. Otherwise 0. Returns undef when
 /// the data isn't available.
-pub(crate) fn stress_throttled(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_throttled(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let cur = match read_avg_freq_khz() {
         Some(v) => v,
-        None => return Ok(PerlValue::UNDEF),
+        None => return Ok(StrykeValue::UNDEF),
     };
     let max = match read_max_freq_khz() {
         Some(v) => v,
-        None => return Ok(PerlValue::UNDEF),
+        None => return Ok(StrykeValue::UNDEF),
     };
     let temp = read_hottest_thermal_zone();
     let freq_low = max > 0.0 && cur / max < 0.80;
     let hot = temp.map(|t| t > 80.0).unwrap_or(false);
-    Ok(PerlValue::integer(if freq_low && hot { 1 } else { 0 }))
+    Ok(StrykeValue::integer(if freq_low && hot { 1 } else { 0 }))
 }
 
 fn read_avg_freq_khz() -> Option<f64> {
@@ -1077,58 +1077,58 @@ fn read_max_freq_khz() -> Option<f64> {
 }
 
 /// `stress_load()` — three load averages as `+{m1, m5, m15}`.
-pub(crate) fn stress_load(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_load(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let mut buf = [0f64; 3];
     let n = unsafe { libc::getloadavg(buf.as_mut_ptr(), 3) };
     let mut m = IndexMap::new();
     if n >= 1 {
-        m.insert("m1".into(), PerlValue::float(buf[0]));
+        m.insert("m1".into(), StrykeValue::float(buf[0]));
     }
     if n >= 2 {
-        m.insert("m5".into(), PerlValue::float(buf[1]));
+        m.insert("m5".into(), StrykeValue::float(buf[1]));
     }
     if n >= 3 {
-        m.insert("m15".into(), PerlValue::float(buf[2]));
+        m.insert("m15".into(), StrykeValue::float(buf[2]));
     }
     Ok(hash_to_perl(m))
 }
 
 /// `stress_meminfo()` — a hashref of system memory in bytes.
-pub(crate) fn stress_meminfo(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_meminfo(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     use sysinfo::System;
     let mut sys = System::new();
     sys.refresh_memory();
     let mut m = IndexMap::new();
     m.insert(
         "total_bytes".into(),
-        PerlValue::integer(sys.total_memory() as i64),
+        StrykeValue::integer(sys.total_memory() as i64),
     );
     m.insert(
         "used_bytes".into(),
-        PerlValue::integer(sys.used_memory() as i64),
+        StrykeValue::integer(sys.used_memory() as i64),
     );
     m.insert(
         "free_bytes".into(),
-        PerlValue::integer(sys.free_memory() as i64),
+        StrykeValue::integer(sys.free_memory() as i64),
     );
     m.insert(
         "available_bytes".into(),
-        PerlValue::integer(sys.available_memory() as i64),
+        StrykeValue::integer(sys.available_memory() as i64),
     );
     m.insert(
         "swap_total_bytes".into(),
-        PerlValue::integer(sys.total_swap() as i64),
+        StrykeValue::integer(sys.total_swap() as i64),
     );
     m.insert(
         "swap_used_bytes".into(),
-        PerlValue::integer(sys.used_swap() as i64),
+        StrykeValue::integer(sys.used_swap() as i64),
     );
     Ok(hash_to_perl(m))
 }
 
 /// `stress_cores()` — number of logical cores the runtime sees.
-pub(crate) fn stress_cores(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    Ok(PerlValue::integer(cores() as i64))
+pub(crate) fn stress_cores(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
+    Ok(StrykeValue::integer(cores() as i64))
 }
 
 // ── Watchdog / kill switch ───────────────────────────────────────────
@@ -1138,19 +1138,19 @@ static GLOBAL_KILL: AtomicBool = AtomicBool::new(false);
 /// `stress_arm_kill_switch(secs)` — register a global kill flag that
 /// flips after `secs`. Cooperative — kernels still need to check it
 /// at their next loop boundary, but it gives apps a deadman switch.
-pub(crate) fn stress_arm_kill_switch(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_arm_kill_switch(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let secs = args.first().map(|v| v.to_number()).unwrap_or(60.0);
     GLOBAL_KILL.store(false, Ordering::Relaxed);
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_secs_f64(secs.max(0.0)));
         GLOBAL_KILL.store(true, Ordering::Relaxed);
     });
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 /// `stress_killed()` → 1 if the kill switch tripped.
-pub(crate) fn stress_killed(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    Ok(PerlValue::integer(if GLOBAL_KILL.load(Ordering::Relaxed) {
+pub(crate) fn stress_killed(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
+    Ok(StrykeValue::integer(if GLOBAL_KILL.load(Ordering::Relaxed) {
         1
     } else {
         0
@@ -1158,9 +1158,9 @@ pub(crate) fn stress_killed(_args: &[PerlValue], _line: usize) -> Result<PerlVal
 }
 
 /// `stress_disarm_kill_switch()` — reset the kill flag.
-pub(crate) fn stress_disarm_kill_switch(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_disarm_kill_switch(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     GLOBAL_KILL.store(false, Ordering::Relaxed);
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 // ── Metrics history ───────────────────────────────────────────────────
@@ -1195,7 +1195,7 @@ fn now_ms() -> i64 {
 /// `stress_metrics_record($name, $value, label1 => "...", label2 => "...")`
 /// — append one sample to the metrics history. Value is coerced to f64.
 /// Labels are stored as strings; integer/float labels stringify.
-pub(crate) fn stress_metrics_record(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_metrics_record(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let name = args
         .first()
         .map(|v| v.to_string())
@@ -1216,24 +1216,24 @@ pub(crate) fn stress_metrics_record(args: &[PerlValue], line: usize) -> Result<P
         value,
         labels,
     });
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 /// `stress_metrics_clear()` — wipe the history.
-pub(crate) fn stress_metrics_clear(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_metrics_clear(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     metrics().lock().clear();
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 /// `stress_metrics_count()` — number of samples currently in the history.
-pub(crate) fn stress_metrics_count(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    Ok(PerlValue::integer(metrics().lock().len() as i64))
+pub(crate) fn stress_metrics_count(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
+    Ok(StrykeValue::integer(metrics().lock().len() as i64))
 }
 
 /// `stress_metrics_export($path, format => "csv"|"json")` — write the
 /// history to disk. JSON is one-array-of-objects; CSV has the columns
 /// `ts_ms,name,value,labels` where labels is a `k=v;k=v` pack.
-pub(crate) fn stress_metrics_export(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_metrics_export(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let path = args
         .first()
         .map(|v| v.to_string())
@@ -1264,27 +1264,27 @@ pub(crate) fn stress_metrics_export(args: &[PerlValue], line: usize) -> Result<P
             line,
         )
     })?;
-    Ok(PerlValue::integer(g.len() as i64))
+    Ok(StrykeValue::integer(g.len() as i64))
 }
 
 /// `stress_metrics_prometheus()` → string in Prometheus text exposition
 /// format. Suitable for serving from a `/metrics` endpoint with no
 /// additional formatting.
-pub(crate) fn stress_metrics_prometheus(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_metrics_prometheus(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let g = metrics().lock();
-    Ok(PerlValue::string(format_prometheus(&g)))
+    Ok(StrykeValue::string(format_prometheus(&g)))
 }
 
 /// `stress_metrics_json()` → JSON string of the entire history.
-pub(crate) fn stress_metrics_json(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_metrics_json(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let g = metrics().lock();
-    Ok(PerlValue::string(format_json(&g)))
+    Ok(StrykeValue::string(format_json(&g)))
 }
 
 /// `stress_metrics_csv()` → CSV string of the entire history.
-pub(crate) fn stress_metrics_csv(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_metrics_csv(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let g = metrics().lock();
-    Ok(PerlValue::string(format_csv(&g)))
+    Ok(StrykeValue::string(format_csv(&g)))
 }
 
 /// `stress_metrics_watch(field => "stress_temp", interval_ms => 1000, max_ticks => 60)`
@@ -1292,11 +1292,11 @@ pub(crate) fn stress_metrics_csv(_args: &[PerlValue], _line: usize) -> Result<Pe
 /// reads the latest sample matching `field` and appends its value.
 /// When `field` is omitted, returns the running cost-style summary
 /// (currently only the count of samples per name).
-pub(crate) fn stress_metrics_watch(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn stress_metrics_watch(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let mut field = String::new();
     let mut interval_ms: i64 = 1000;
     let mut max_ticks: i64 = 60;
-    let mut on_tick: Option<PerlValue> = None;
+    let mut on_tick: Option<StrykeValue> = None;
     let mut i = 0;
     while i + 1 < args.len() {
         let key = args[i].to_string();
@@ -1317,7 +1317,7 @@ pub(crate) fn stress_metrics_watch(args: &[PerlValue], line: usize) -> Result<Pe
         ));
     }
     let interval = Duration::from_millis(interval_ms.max(1) as u64);
-    let mut out: Vec<PerlValue> = Vec::with_capacity(max_ticks.max(0) as usize);
+    let mut out: Vec<StrykeValue> = Vec::with_capacity(max_ticks.max(0) as usize);
     let mut last_ts_seen: i64 = 0;
     for _ in 0..max_ticks.max(0) {
         std::thread::sleep(interval);
@@ -1330,7 +1330,7 @@ pub(crate) fn stress_metrics_watch(args: &[PerlValue], line: usize) -> Result<Pe
         drop(g);
         if let Some(s) = latest {
             last_ts_seen = s.ts_ms;
-            let v = PerlValue::float(s.value);
+            let v = StrykeValue::float(s.value);
             out.push(v.clone());
             if let Some(_cb) = &on_tick {
                 // Callback dispatch goes through the interpreter caller;
@@ -1343,7 +1343,7 @@ pub(crate) fn stress_metrics_watch(args: &[PerlValue], line: usize) -> Result<Pe
             break;
         }
     }
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         out,
     ))))
 }
@@ -1481,7 +1481,7 @@ fn prom_safe_name(s: &str) -> String {
 /// `audit_log("event_name", k1 => v1, k2 => v2, ...)` — append one
 /// JSONL line. Returns 1 on success, 0 on failure (does not throw —
 /// audit failures must never crash the program).
-pub(crate) fn audit_log(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn audit_log(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let event = args
         .first()
         .map(|v| v.to_string())
@@ -1534,19 +1534,19 @@ pub(crate) fn audit_log(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
     {
         Ok(mut f) => {
             let ok = f.write_all(line_str.as_bytes()).is_ok();
-            Ok(PerlValue::integer(if ok { 1 } else { 0 }))
+            Ok(StrykeValue::integer(if ok { 1 } else { 0 }))
         }
-        Err(_) => Ok(PerlValue::integer(0)),
+        Err(_) => Ok(StrykeValue::integer(0)),
     }
 }
 
 /// `audit_log_path()` → the path the next `audit_log` call will write to.
-pub(crate) fn audit_log_path(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn audit_log_path(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let path = std::env::var("STRYKE_AUDIT_LOG").unwrap_or_else(|_| {
         let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
         format!("{}/.stryke/audit.log", home)
     });
-    Ok(PerlValue::string(path))
+    Ok(StrykeValue::string(path))
 }
 
 fn iso8601_from_ms(ms: i64) -> String {

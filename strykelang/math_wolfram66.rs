@@ -3,16 +3,16 @@
 // use them directly. Operates on flat row-major matrices represented as
 // arrays of floats.
 
-fn b66_to_floats(v: &PerlValue) -> Vec<f64> {
+fn b66_to_floats(v: &StrykeValue) -> Vec<f64> {
     arg_to_vec(v).iter().map(|x| x.to_number()).collect()
 }
 
 /// dgemm: C = α·A·B + β·C. Args: A (flat m·k), B (flat k·n), C (flat m·n),
 /// m, k, n, α, β. Returns C as flat array.
-fn builtin_dgemm(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let a = b66_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
-    let b = b66_to_floats(args.get(1).unwrap_or(&PerlValue::array(vec![])));
-    let mut c = b66_to_floats(args.get(2).unwrap_or(&PerlValue::array(vec![])));
+fn builtin_dgemm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let a = b66_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
+    let b = b66_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
+    let mut c = b66_to_floats(args.get(2).unwrap_or(&StrykeValue::array(vec![])));
     let m = args.get(3).map(|v| v.to_number() as usize).unwrap_or(0);
     let k = args.get(4).map(|v| v.to_number() as usize).unwrap_or(0);
     let n = args.get(5).map(|v| v.to_number() as usize).unwrap_or(0);
@@ -26,19 +26,19 @@ fn builtin_dgemm(args: &[PerlValue]) -> PerlResult<PerlValue> {
             c[i * n + j] = alpha * s + beta * c[i * n + j];
         }
     }
-    Ok(PerlValue::array(c.into_iter().map(PerlValue::float).collect()))
+    Ok(StrykeValue::array(c.into_iter().map(StrykeValue::float).collect()))
 }
 
 /// sgemm: identical math, single-precision-style (we use f64 throughout).
-fn builtin_sgemm(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_sgemm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     builtin_dgemm(args)
 }
 
 /// zgemm/cgemm: complex GEMM accept interleaved real/imag arrays. Real-pair
 /// layout (a₀_re, a₀_im, a₁_re, a₁_im, ...). Returns interleaved C.
-fn builtin_zgemm(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let a = b66_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
-    let b = b66_to_floats(args.get(1).unwrap_or(&PerlValue::array(vec![])));
+fn builtin_zgemm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let a = b66_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
+    let b = b66_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let m = args.get(3).map(|v| v.to_number() as usize).unwrap_or(0);
     let k = args.get(4).map(|v| v.to_number() as usize).unwrap_or(0);
     let n = args.get(5).map(|v| v.to_number() as usize).unwrap_or(0);
@@ -58,19 +58,19 @@ fn builtin_zgemm(args: &[PerlValue]) -> PerlResult<PerlValue> {
             c[2 * (i * n + j) + 1] = si;
         }
     }
-    Ok(PerlValue::array(c.into_iter().map(PerlValue::float).collect()))
+    Ok(StrykeValue::array(c.into_iter().map(StrykeValue::float).collect()))
 }
 
 /// `cgemm`
-fn builtin_cgemm(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_cgemm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     builtin_zgemm(args)
 }
 
 /// dgemv: y = α·A·x + β·y. Args: A (flat m·n), x (n), y (m), m, n, α, β.
-fn builtin_dgemv(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let a = b66_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
-    let x = b66_to_floats(args.get(1).unwrap_or(&PerlValue::array(vec![])));
-    let mut y = b66_to_floats(args.get(2).unwrap_or(&PerlValue::array(vec![])));
+fn builtin_dgemv(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let a = b66_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
+    let x = b66_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
+    let mut y = b66_to_floats(args.get(2).unwrap_or(&StrykeValue::array(vec![])));
     let m = args.get(3).map(|v| v.to_number() as usize).unwrap_or(0);
     let n = args.get(4).map(|v| v.to_number() as usize).unwrap_or(0);
     let alpha = args.get(5).map(|v| v.to_number()).unwrap_or(1.0);
@@ -81,19 +81,19 @@ fn builtin_dgemv(args: &[PerlValue]) -> PerlResult<PerlValue> {
         for j in 0..n { s += a[i * n + j] * x[j]; }
         y[i] = alpha * s + beta * y[i];
     }
-    Ok(PerlValue::array(y.into_iter().map(PerlValue::float).collect()))
+    Ok(StrykeValue::array(y.into_iter().map(StrykeValue::float).collect()))
 }
 
 /// `sgemv`
-fn builtin_sgemv(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_sgemv(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     builtin_dgemv(args)
 }
 
 /// dtrsm: solve A·X = α·B with A triangular (upper, unit-diagonal). Args: A
 /// (m·m flat), B (m·n flat), m, n, α, side (0=left), uplo (0=upper).
-fn builtin_dtrsm(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let a = b66_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
-    let mut b = b66_to_floats(args.get(1).unwrap_or(&PerlValue::array(vec![])));
+fn builtin_dtrsm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let a = b66_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
+    let mut b = b66_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let m = args.get(2).map(|v| v.to_number() as usize).unwrap_or(0);
     let n = args.get(3).map(|v| v.to_number() as usize).unwrap_or(0);
     let alpha = args.get(4).map(|v| v.to_number()).unwrap_or(1.0);
@@ -102,22 +102,22 @@ fn builtin_dtrsm(args: &[PerlValue]) -> PerlResult<PerlValue> {
             let mut s = alpha * b[i * n + j];
             for p in (i + 1)..m { s -= a[i * m + p] * b[p * n + j]; }
             let aii = a[i * m + i];
-            if aii.abs() < 1e-15 { return Ok(PerlValue::array(b.into_iter().map(PerlValue::float).collect())); }
+            if aii.abs() < 1e-15 { return Ok(StrykeValue::array(b.into_iter().map(StrykeValue::float).collect())); }
             b[i * n + j] = s / aii;
         }
     }
-    Ok(PerlValue::array(b.into_iter().map(PerlValue::float).collect()))
+    Ok(StrykeValue::array(b.into_iter().map(StrykeValue::float).collect()))
 }
 
 /// `strsm`
-fn builtin_strsm(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_strsm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     builtin_dtrsm(args)
 }
 
 /// dgesv: solve A·X = B by partial-pivot LU. Returns X flat.
-fn builtin_dgesv(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let mut a = b66_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
-    let mut b = b66_to_floats(args.get(1).unwrap_or(&PerlValue::array(vec![])));
+fn builtin_dgesv(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let mut a = b66_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
+    let mut b = b66_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let n = args.get(2).map(|v| v.to_number() as usize).unwrap_or(0);
     for k in 0..n {
         let mut max_row = k;
@@ -125,7 +125,7 @@ fn builtin_dgesv(args: &[PerlValue]) -> PerlResult<PerlValue> {
             if a[i * n + k].abs() > a[max_row * n + k].abs() { max_row = i; }
         }
         if a[max_row * n + k].abs() < 1e-15 {
-            return Ok(PerlValue::array(b.into_iter().map(PerlValue::float).collect()));
+            return Ok(StrykeValue::array(b.into_iter().map(StrykeValue::float).collect()));
         }
         if max_row != k {
             for j in 0..n { a.swap(k * n + j, max_row * n + j); }
@@ -143,12 +143,12 @@ fn builtin_dgesv(args: &[PerlValue]) -> PerlResult<PerlValue> {
         for j in (i + 1)..n { s -= a[i * n + j] * x[j]; }
         x[i] = s / a[i * n + i];
     }
-    Ok(PerlValue::array(x.into_iter().map(PerlValue::float).collect()))
+    Ok(StrykeValue::array(x.into_iter().map(StrykeValue::float).collect()))
 }
 
 /// dgetrf: LU factorisation in-place. Returns A interleaved with L and U.
-fn builtin_dgetrf(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let mut a = b66_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+fn builtin_dgetrf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let mut a = b66_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let n = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
     for k in 0..n {
         let pivot = a[k * n + k];
@@ -159,14 +159,14 @@ fn builtin_dgetrf(args: &[PerlValue]) -> PerlResult<PerlValue> {
             for j in (k + 1)..n { a[i * n + j] -= factor * a[k * n + j]; }
         }
     }
-    Ok(PerlValue::array(a.into_iter().map(PerlValue::float).collect()))
+    Ok(StrykeValue::array(a.into_iter().map(StrykeValue::float).collect()))
 }
 
 /// dgeqrf: QR factorisation via classical Gram-Schmidt (m × n). Returns flat Q
 /// (m × n) followed by R (n × n). For full LAPACK-quality QR, use Householder
 /// reflectors; this is the simpler GS variant.
-fn builtin_dgeqrf(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let a = b66_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+fn builtin_dgeqrf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let a = b66_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let m = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
     let n = args.get(2).map(|v| v.to_number() as usize).unwrap_or(0);
     let mut q = vec![0.0_f64; m * n];
@@ -188,15 +188,15 @@ fn builtin_dgeqrf(args: &[PerlValue]) -> PerlResult<PerlValue> {
         for i in 0..m { q[i * n + k] = v[i]; }
     }
     let mut out = q; out.extend(r);
-    Ok(PerlValue::array(out.into_iter().map(PerlValue::float).collect()))
+    Ok(StrykeValue::array(out.into_iter().map(StrykeValue::float).collect()))
 }
 
 /// dgesvd: compute leading singular value via power iteration on A^TA.
-fn builtin_dgesvd(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let a = b66_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+fn builtin_dgesvd(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let a = b66_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let m = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
     let n = args.get(2).map(|v| v.to_number() as usize).unwrap_or(0);
-    if m == 0 || n == 0 { return Ok(PerlValue::float(0.0)); }
+    if m == 0 || n == 0 { return Ok(StrykeValue::float(0.0)); }
     let mut x = vec![1.0_f64 / (n as f64).sqrt(); n];
     let mut sigma = 0.0_f64;
     for _ in 0..200 {
@@ -215,14 +215,14 @@ fn builtin_dgesvd(args: &[PerlValue]) -> PerlResult<PerlValue> {
         if (new_sigma - sigma).abs() < 1e-12 { sigma = new_sigma; break; }
         sigma = new_sigma;
     }
-    Ok(PerlValue::float(sigma))
+    Ok(StrykeValue::float(sigma))
 }
 
 /// dsyevd: compute leading eigenvalue of symmetric matrix via power iteration.
-fn builtin_dsyevd(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let a = b66_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+fn builtin_dsyevd(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let a = b66_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let n = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
-    if n == 0 { return Ok(PerlValue::float(0.0)); }
+    if n == 0 { return Ok(StrykeValue::float(0.0)); }
     let mut x = vec![1.0_f64 / (n as f64).sqrt(); n];
     let mut lambda = 0.0_f64;
     for _ in 0..200 {
@@ -236,17 +236,17 @@ fn builtin_dsyevd(args: &[PerlValue]) -> PerlResult<PerlValue> {
         if (norm - lambda).abs() < 1e-12 { lambda = norm; break; }
         lambda = norm;
     }
-    Ok(PerlValue::float(lambda))
+    Ok(StrykeValue::float(lambda))
 }
 
 /// dpotrf: Cholesky factorisation A = L·L^T (lower). In-place.
-fn builtin_dpotrf(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let mut a = b66_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+fn builtin_dpotrf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let mut a = b66_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let n = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
     for j in 0..n {
         let mut s = a[j * n + j];
         for k in 0..j { s -= a[j * n + k] * a[j * n + k]; }
-        if s <= 0.0 { return Ok(PerlValue::array(a.into_iter().map(PerlValue::float).collect())); }
+        if s <= 0.0 { return Ok(StrykeValue::array(a.into_iter().map(StrykeValue::float).collect())); }
         a[j * n + j] = s.sqrt();
         for i in (j + 1)..n {
             let mut t = a[i * n + j];
@@ -254,62 +254,62 @@ fn builtin_dpotrf(args: &[PerlValue]) -> PerlResult<PerlValue> {
             a[i * n + j] = t / a[j * n + j];
         }
     }
-    Ok(PerlValue::array(a.into_iter().map(PerlValue::float).collect()))
+    Ok(StrykeValue::array(a.into_iter().map(StrykeValue::float).collect()))
 }
 
 /// daxpy: y ← α·x + y.
-fn builtin_daxpy(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_daxpy(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let alpha = f1(args);
-    let x = b66_to_floats(args.get(1).unwrap_or(&PerlValue::array(vec![])));
-    let mut y = b66_to_floats(args.get(2).unwrap_or(&PerlValue::array(vec![])));
+    let x = b66_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
+    let mut y = b66_to_floats(args.get(2).unwrap_or(&StrykeValue::array(vec![])));
     let n = x.len().min(y.len());
     for i in 0..n { y[i] += alpha * x[i]; }
-    Ok(PerlValue::array(y.into_iter().map(PerlValue::float).collect()))
+    Ok(StrykeValue::array(y.into_iter().map(StrykeValue::float).collect()))
 }
 
 /// ddot: x · y.
-fn builtin_ddot(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let x = b66_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
-    let y = b66_to_floats(args.get(1).unwrap_or(&PerlValue::array(vec![])));
+fn builtin_ddot(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let x = b66_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
+    let y = b66_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let n = x.len().min(y.len());
-    Ok(PerlValue::float((0..n).map(|i| x[i] * y[i]).sum()))
+    Ok(StrykeValue::float((0..n).map(|i| x[i] * y[i]).sum()))
 }
 
 /// dnrm2: ||x||₂.
-fn builtin_dnrm2(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let x = b66_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
-    Ok(PerlValue::float(x.iter().map(|v| v * v).sum::<f64>().sqrt()))
+fn builtin_dnrm2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let x = b66_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
+    Ok(StrykeValue::float(x.iter().map(|v| v * v).sum::<f64>().sqrt()))
 }
 
 /// dscal: x ← α·x.
-fn builtin_dscal(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_dscal(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let alpha = f1(args);
-    let mut x = b66_to_floats(args.get(1).unwrap_or(&PerlValue::array(vec![])));
+    let mut x = b66_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     for v in x.iter_mut() { *v *= alpha; }
-    Ok(PerlValue::array(x.into_iter().map(PerlValue::float).collect()))
+    Ok(StrykeValue::array(x.into_iter().map(StrykeValue::float).collect()))
 }
 
 /// dasum: Σ |x_i|.
-fn builtin_dasum(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let x = b66_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
-    Ok(PerlValue::float(x.iter().map(|v| v.abs()).sum()))
+fn builtin_dasum(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let x = b66_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
+    Ok(StrykeValue::float(x.iter().map(|v| v.abs()).sum()))
 }
 
 /// idamax: argmax |x_i| (1-based per BLAS convention).
-fn builtin_idamax(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let x = b66_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
-    if x.is_empty() { return Ok(PerlValue::integer(0)); }
+fn builtin_idamax(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let x = b66_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
+    if x.is_empty() { return Ok(StrykeValue::integer(0)); }
     let mut best = (0_usize, x[0].abs());
     for (i, &v) in x.iter().enumerate() {
         if v.abs() > best.1 { best = (i, v.abs()); }
     }
-    Ok(PerlValue::integer(best.0 as i64 + 1))
+    Ok(StrykeValue::integer(best.0 as i64 + 1))
 }
 
 /// dsyrk: C = α·A·A^T + β·C (C symmetric).
-fn builtin_dsyrk(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let a = b66_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
-    let mut c = b66_to_floats(args.get(1).unwrap_or(&PerlValue::array(vec![])));
+fn builtin_dsyrk(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let a = b66_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
+    let mut c = b66_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let n = args.get(2).map(|v| v.to_number() as usize).unwrap_or(0);
     let k = args.get(3).map(|v| v.to_number() as usize).unwrap_or(0);
     let alpha = args.get(4).map(|v| v.to_number()).unwrap_or(1.0);
@@ -324,80 +324,80 @@ fn builtin_dsyrk(args: &[PerlValue]) -> PerlResult<PerlValue> {
             c[j * n + i] = val;
         }
     }
-    Ok(PerlValue::array(c.into_iter().map(PerlValue::float).collect()))
+    Ok(StrykeValue::array(c.into_iter().map(StrykeValue::float).collect()))
 }
 
 /// dgerqf: RQ factorisation. We implement via reverse-row QR.
-fn builtin_dgerqf(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_dgerqf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     builtin_dgeqrf(args)
 }
 
 /// dorgqr: form explicit Q from QR. We already returned Q in dgeqrf.
-fn builtin_dorgqr(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_dorgqr(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     builtin_dgeqrf(args)
 }
 
 /// dorglq: form Q from LQ. Mirror of dorgqr.
-fn builtin_dorglq(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_dorglq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     builtin_dgeqrf(args)
 }
 
 /// drot: apply Givens rotation (c, s) to (x, y). Returns 2-vector.
-fn builtin_drot(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_drot(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let x = f1(args);
     let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
     let s = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
-    Ok(PerlValue::array(vec![PerlValue::float(c * x + s * y), PerlValue::float(-s * x + c * y)]))
+    Ok(StrykeValue::array(vec![StrykeValue::float(c * x + s * y), StrykeValue::float(-s * x + c * y)]))
 }
 
 /// drotg: construct Givens rotation cos/sin from (a, b).
-fn builtin_drotg(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_drotg(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    if b == 0.0 { return Ok(PerlValue::array(vec![PerlValue::float(1.0), PerlValue::float(0.0)])); }
-    if a == 0.0 { return Ok(PerlValue::array(vec![PerlValue::float(0.0), PerlValue::float(1.0)])); }
+    if b == 0.0 { return Ok(StrykeValue::array(vec![StrykeValue::float(1.0), StrykeValue::float(0.0)])); }
+    if a == 0.0 { return Ok(StrykeValue::array(vec![StrykeValue::float(0.0), StrykeValue::float(1.0)])); }
     let r = (a * a + b * b).sqrt();
-    Ok(PerlValue::array(vec![PerlValue::float(a / r), PerlValue::float(b / r)]))
+    Ok(StrykeValue::array(vec![StrykeValue::float(a / r), StrykeValue::float(b / r)]))
 }
 
 /// dpbsv: solve banded SPD A·X = B with bandwidth kd. Reduce to tridiag-like.
-fn builtin_dpbsv(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_dpbsv(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     builtin_dgesv(args)
 }
 
 /// dgbsv: general banded solve.
-fn builtin_dgbsv(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_dgbsv(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     builtin_dgesv(args)
 }
 
 /// dtbsv: triangular banded solve.
-fn builtin_dtbsv(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_dtbsv(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     builtin_dtrsm(args)
 }
 
 /// dtrsv: triangular solve A·x = b.
-fn builtin_dtrsv(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_dtrsv(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     builtin_dtrsm(args)
 }
 
 /// ddrot: column-rotation variant (alias).
-fn builtin_ddrot(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_ddrot(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     builtin_drot(args)
 }
 
 /// dgemm3m: complex GEMM via 3-multiply Karatsuba. Identical interface.
-fn builtin_dgemm3m(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_dgemm3m(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     builtin_zgemm(args)
 }
 
 /// dgels: least-squares min ||Ax − b||₂ via QR. Returns x.
-fn builtin_dgels(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let a = b66_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
-    let b = b66_to_floats(args.get(1).unwrap_or(&PerlValue::array(vec![])));
+fn builtin_dgels(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let a = b66_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
+    let b = b66_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let m = args.get(2).map(|v| v.to_number() as usize).unwrap_or(0);
     let n = args.get(3).map(|v| v.to_number() as usize).unwrap_or(0);
-    if m < n { return Ok(PerlValue::array(vec![])); }
+    if m < n { return Ok(StrykeValue::array(vec![])); }
     let mut ata = vec![0.0_f64; n * n];
     for i in 0..n {
         for j in 0..n {
@@ -406,16 +406,16 @@ fn builtin_dgels(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }
     let mut atb = vec![0.0_f64; n];
     for i in 0..n { for k in 0..m { atb[i] += a[k * n + i] * b[k]; } }
-    let solve_args: Vec<PerlValue> = vec![
-        PerlValue::array(ata.into_iter().map(PerlValue::float).collect()),
-        PerlValue::array(atb.into_iter().map(PerlValue::float).collect()),
-        PerlValue::integer(n as i64),
+    let solve_args: Vec<StrykeValue> = vec![
+        StrykeValue::array(ata.into_iter().map(StrykeValue::float).collect()),
+        StrykeValue::array(atb.into_iter().map(StrykeValue::float).collect()),
+        StrykeValue::integer(n as i64),
     ];
     builtin_dgesv(&solve_args)
 }
 
 /// dgelsd: SVD-based least squares (we delegate to the QR-based solver since
 /// our SVD only computes σ_max).
-fn builtin_dgelsd(args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_dgelsd(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     builtin_dgels(args)
 }

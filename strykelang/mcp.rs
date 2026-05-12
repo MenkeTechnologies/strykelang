@@ -29,7 +29,7 @@
 //!   * `mcp_attached()`                              — list of attached IDs
 
 use crate::error::PerlError;
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 use indexmap::IndexMap;
 use parking_lot::Mutex;
 use std::io::{BufRead, BufReader, Write};
@@ -80,7 +80,7 @@ fn attached() -> &'static Mutex<Vec<u64>> {
     ATTACHED.get_or_init(|| Mutex::new(Vec::new()))
 }
 
-fn lookup(handle: &PerlValue, line: usize) -> Result<Arc<Mutex<McpHandle>>> {
+fn lookup(handle: &StrykeValue, line: usize) -> Result<Arc<Mutex<McpHandle>>> {
     let map = handle
         .as_hash_map()
         .or_else(|| handle.as_hash_ref().map(|h| h.read().clone()))
@@ -96,24 +96,24 @@ fn lookup(handle: &PerlValue, line: usize) -> Result<Arc<Mutex<McpHandle>>> {
         .ok_or_else(|| PerlError::runtime(format!("mcp: handle id {} not found", id), line))
 }
 
-fn handle_id(v: &PerlValue) -> Option<u64> {
+fn handle_id(v: &StrykeValue) -> Option<u64> {
     let map = v
         .as_hash_map()
         .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))?;
     map.get("__mcp_id__").map(|v| v.to_int() as u64)
 }
 
-fn make_handle_value(id: u64, name: &str) -> PerlValue {
+fn make_handle_value(id: u64, name: &str) -> StrykeValue {
     let mut m = IndexMap::new();
-    m.insert("__mcp_id__".to_string(), PerlValue::integer(id as i64));
-    m.insert("__mcp__".to_string(), PerlValue::integer(1));
-    m.insert("name".to_string(), PerlValue::string(name.to_string()));
-    PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
+    m.insert("__mcp_id__".to_string(), StrykeValue::integer(id as i64));
+    m.insert("__mcp__".to_string(), StrykeValue::integer(1));
+    m.insert("name".to_string(), StrykeValue::string(name.to_string()));
+    StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
 }
 
 // ── mcp_connect ───────────────────────────────────────────────────────
 
-pub(crate) fn mcp_connect(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn mcp_connect(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let url = args.first().map(|v| v.to_string()).ok_or_else(|| {
         PerlError::runtime("mcp_connect: usage: mcp_connect(\"stdio:CMD ARGS\")", line)
     })?;
@@ -211,7 +211,7 @@ pub(crate) fn mcp_connect(args: &[PerlValue], line: usize) -> Result<PerlValue> 
 
 // ── mcp_tools / mcp_resources / mcp_prompts ──────────────────────────
 
-pub(crate) fn mcp_tools(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn mcp_tools(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h = lookup(
         args.first()
             .ok_or_else(|| PerlError::runtime("mcp_tools: handle required", line))?,
@@ -230,7 +230,7 @@ pub(crate) fn mcp_tools(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     Ok(json_array_to_perl(&list))
 }
 
-pub(crate) fn mcp_resources(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn mcp_resources(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h = lookup(
         args.first()
             .ok_or_else(|| PerlError::runtime("mcp_resources: handle required", line))?,
@@ -249,7 +249,7 @@ pub(crate) fn mcp_resources(args: &[PerlValue], line: usize) -> Result<PerlValue
     Ok(json_array_to_perl(&list))
 }
 
-pub(crate) fn mcp_prompts(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn mcp_prompts(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h = lookup(
         args.first()
             .ok_or_else(|| PerlError::runtime("mcp_prompts: handle required", line))?,
@@ -270,7 +270,7 @@ pub(crate) fn mcp_prompts(args: &[PerlValue], line: usize) -> Result<PerlValue> 
 
 // ── mcp_call ──────────────────────────────────────────────────────────
 
-pub(crate) fn mcp_call(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn mcp_call(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h = lookup(
         args.first()
             .ok_or_else(|| PerlError::runtime("mcp_call: handle required", line))?,
@@ -280,7 +280,7 @@ pub(crate) fn mcp_call(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         .get(1)
         .map(|v| v.to_string())
         .ok_or_else(|| PerlError::runtime("mcp_call: tool name required", line))?;
-    let tool_args_v = args.get(2).cloned().unwrap_or(PerlValue::UNDEF);
+    let tool_args_v = args.get(2).cloned().unwrap_or(StrykeValue::UNDEF);
     let arguments = perl_to_json(&tool_args_v);
     let v = call_method(
         &h,
@@ -294,7 +294,7 @@ pub(crate) fn mcp_call(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     Ok(json_to_perl(&v))
 }
 
-pub(crate) fn mcp_resource(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn mcp_resource(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h = lookup(
         args.first()
             .ok_or_else(|| PerlError::runtime("mcp_resource: handle required", line))?,
@@ -313,7 +313,7 @@ pub(crate) fn mcp_resource(args: &[PerlValue], line: usize) -> Result<PerlValue>
     Ok(json_to_perl(&v))
 }
 
-pub(crate) fn mcp_prompt(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn mcp_prompt(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h = lookup(
         args.first()
             .ok_or_else(|| PerlError::runtime("mcp_prompt: handle required", line))?,
@@ -323,7 +323,7 @@ pub(crate) fn mcp_prompt(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         .get(1)
         .map(|v| v.to_string())
         .ok_or_else(|| PerlError::runtime("mcp_prompt: name required", line))?;
-    let prompt_args_v = args.get(2).cloned().unwrap_or(PerlValue::UNDEF);
+    let prompt_args_v = args.get(2).cloned().unwrap_or(StrykeValue::UNDEF);
     let arguments = perl_to_json(&prompt_args_v);
     let v = call_method(
         &h,
@@ -339,7 +339,7 @@ pub(crate) fn mcp_prompt(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 
 // ── mcp_close ─────────────────────────────────────────────────────────
 
-pub(crate) fn mcp_close(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn mcp_close(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h_v = args
         .first()
         .ok_or_else(|| PerlError::runtime("mcp_close: handle required", line))?;
@@ -359,12 +359,12 @@ pub(crate) fn mcp_close(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         registry().lock().shift_remove(&id);
         attached().lock().retain(|x| *x != id);
     }
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 // ── Auto-attach to ai ─────────────────────────────────────────────────
 
-pub(crate) fn mcp_attach_to_ai(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn mcp_attach_to_ai(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h_v = args
         .first()
         .ok_or_else(|| PerlError::runtime("mcp_attach_to_ai: handle required", line))?;
@@ -374,22 +374,22 @@ pub(crate) fn mcp_attach_to_ai(args: &[PerlValue], line: usize) -> Result<PerlVa
     if !g.contains(&id) {
         g.push(id);
     }
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn mcp_detach_from_ai(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub(crate) fn mcp_detach_from_ai(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h_v = args
         .first()
         .ok_or_else(|| PerlError::runtime("mcp_detach_from_ai: handle required", line))?;
     let id = handle_id(h_v)
         .ok_or_else(|| PerlError::runtime("mcp_detach_from_ai: handle id missing", line))?;
     attached().lock().retain(|x| *x != id);
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
-pub(crate) fn mcp_attached(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub(crate) fn mcp_attached(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let g = attached().lock();
-    let items: Vec<PerlValue> = g
+    let items: Vec<StrykeValue> = g
         .iter()
         .filter_map(|id| {
             let reg = registry().lock();
@@ -399,7 +399,7 @@ pub(crate) fn mcp_attached(_args: &[PerlValue], _line: usize) -> Result<PerlValu
             })
         })
         .collect();
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
         items,
     ))))
 }
@@ -470,7 +470,7 @@ pub(crate) fn call_attached_tool(
 
 // ── HTTP MCP transport ───────────────────────────────────────────────
 
-fn mcp_connect_http(url: &str, name: &str, line: usize) -> Result<PerlValue> {
+fn mcp_connect_http(url: &str, name: &str, line: usize) -> Result<StrykeValue> {
     let bearer = std::env::var("MCP_BEARER_TOKEN").ok();
     let agent = ureq::AgentBuilder::new()
         .timeout(std::time::Duration::from_secs(30))
@@ -705,40 +705,40 @@ fn rpc_recv(
     }
 }
 
-// ── JSON ↔ PerlValue helpers (duplicated locally to avoid pulling in
+// ── JSON ↔ StrykeValue helpers (duplicated locally to avoid pulling in
 // ai.rs internals). ───────────────────────────────────────────────────
 
-fn json_array_to_perl(arr: &[serde_json::Value]) -> PerlValue {
-    let items: Vec<PerlValue> = arr.iter().map(json_to_perl).collect();
-    PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(items)))
+fn json_array_to_perl(arr: &[serde_json::Value]) -> StrykeValue {
+    let items: Vec<StrykeValue> = arr.iter().map(json_to_perl).collect();
+    StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(items)))
 }
 
-fn json_to_perl(v: &serde_json::Value) -> PerlValue {
+fn json_to_perl(v: &serde_json::Value) -> StrykeValue {
     match v {
-        serde_json::Value::Null => PerlValue::UNDEF,
-        serde_json::Value::Bool(b) => PerlValue::integer(if *b { 1 } else { 0 }),
+        serde_json::Value::Null => StrykeValue::UNDEF,
+        serde_json::Value::Bool(b) => StrykeValue::integer(if *b { 1 } else { 0 }),
         serde_json::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
-                PerlValue::integer(i)
+                StrykeValue::integer(i)
             } else if let Some(f) = n.as_f64() {
-                PerlValue::float(f)
+                StrykeValue::float(f)
             } else {
-                PerlValue::UNDEF
+                StrykeValue::UNDEF
             }
         }
-        serde_json::Value::String(s) => PerlValue::string(s.clone()),
+        serde_json::Value::String(s) => StrykeValue::string(s.clone()),
         serde_json::Value::Array(arr) => json_array_to_perl(arr),
         serde_json::Value::Object(obj) => {
             let mut m = IndexMap::new();
             for (k, v) in obj {
                 m.insert(k.clone(), json_to_perl(v));
             }
-            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
+            StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
         }
     }
 }
 
-fn perl_to_json(v: &PerlValue) -> serde_json::Value {
+fn perl_to_json(v: &StrykeValue) -> serde_json::Value {
     if v.is_undef() {
         return serde_json::Value::Null;
     }
@@ -789,7 +789,7 @@ fn perl_to_json(v: &PerlValue) -> serde_json::Value {
 // binary's interactive state — only call it from a dedicated MCP
 // server entry point.
 
-use crate::value::{PerlSub, PerlValue as PV};
+use crate::value::{PerlSub, StrykeValue as PV};
 use crate::vm_helper::{FlowOrError, VMHelper, WantarrayCtx};
 
 struct ServerTool {
@@ -802,21 +802,21 @@ struct ServerTool {
 impl crate::vm_helper::VMHelper {
     pub(crate) fn mcp_server_start(
         &mut self,
-        args: &[PerlValue],
+        args: &[StrykeValue],
         line: usize,
-    ) -> Result<PerlValue> {
+    ) -> Result<StrykeValue> {
         let name = args.first().map(|v| v.to_string()).ok_or_else(|| {
             PerlError::runtime(
                 "mcp_server_start: usage: mcp_server_start(\"name\", +{tools => [...]})",
                 line,
             )
         })?;
-        let opts_v = args.get(1).cloned().unwrap_or(PerlValue::UNDEF);
+        let opts_v = args.get(1).cloned().unwrap_or(StrykeValue::UNDEF);
         let opts = opts_v
             .as_hash_map()
             .or_else(|| opts_v.as_hash_ref().map(|h| h.read().clone()))
             .unwrap_or_default();
-        let tools_v = opts.get("tools").cloned().unwrap_or(PerlValue::UNDEF);
+        let tools_v = opts.get("tools").cloned().unwrap_or(StrykeValue::UNDEF);
         let tools_list = tools_v
             .as_array_ref()
             .map(|a| a.read().clone())
@@ -833,9 +833,9 @@ impl crate::vm_helper::VMHelper {
 
 pub(crate) fn mcp_server_start_dispatch(
     interp: &mut VMHelper,
-    args: &[PerlValue],
+    args: &[StrykeValue],
     line: usize,
-) -> Result<PerlValue> {
+) -> Result<StrykeValue> {
     interp.mcp_server_start(args, line)
 }
 
@@ -847,9 +847,9 @@ pub(crate) fn mcp_server_start_dispatch(
 /// chance to register its tools.
 pub(crate) fn mcp_serve_registered_tools(
     interp: &mut VMHelper,
-    args: &[PerlValue],
+    args: &[StrykeValue],
     line: usize,
-) -> Result<PerlValue> {
+) -> Result<StrykeValue> {
     let name = args
         .first()
         .map(|v| v.to_string())
@@ -875,13 +875,13 @@ pub(crate) fn mcp_serve_registered_tools(
 
 pub(crate) fn mcp_serve_registered_tools_dispatch(
     interp: &mut VMHelper,
-    args: &[PerlValue],
+    args: &[StrykeValue],
     line: usize,
-) -> Result<PerlValue> {
+) -> Result<StrykeValue> {
     mcp_serve_registered_tools(interp, args, line)
 }
 
-fn compile_server_tool(v: &PerlValue, line: usize) -> Result<ServerTool> {
+fn compile_server_tool(v: &StrykeValue, line: usize) -> Result<ServerTool> {
     let map = v
         .as_hash_map()
         .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
@@ -899,7 +899,7 @@ fn compile_server_tool(v: &PerlValue, line: usize) -> Result<ServerTool> {
         .get("description")
         .map(|v| v.to_string())
         .unwrap_or_default();
-    let parameters = map.get("parameters").cloned().unwrap_or(PerlValue::UNDEF);
+    let parameters = map.get("parameters").cloned().unwrap_or(StrykeValue::UNDEF);
     let run_v = map.get("run").ok_or_else(|| {
         PerlError::runtime(
             format!("mcp_server_start: tool `{}` missing run coderef", name),
@@ -920,7 +920,7 @@ fn compile_server_tool(v: &PerlValue, line: usize) -> Result<ServerTool> {
     })
 }
 
-fn server_params_to_schema(v: &PerlValue) -> serde_json::Value {
+fn server_params_to_schema(v: &StrykeValue) -> serde_json::Value {
     let map = match v
         .as_hash_map()
         .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
@@ -964,7 +964,7 @@ fn run_stdio_server(
     name: &str,
     tools: &[ServerTool],
     line: usize,
-) -> Result<PerlValue> {
+) -> Result<StrykeValue> {
     use std::io::{stdin, stdout, BufRead, BufWriter, Write};
 
     let stdin = stdin();
@@ -1068,7 +1068,7 @@ fn run_stdio_server(
         let _ = out.flush();
     }
     let _ = PV::UNDEF;
-    Ok(PerlValue::UNDEF)
+    Ok(StrykeValue::UNDEF)
 }
 
 // Minimal shell-split for `stdio:CMD ARGS` — same shape as perl_pty.

@@ -1002,11 +1002,11 @@ pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut VMHelper, filename: 
                 if let Some((name, val)) = switch.split_once('=') {
                     let _ = interp
                         .scope
-                        .set_scalar(name, stryke::value::PerlValue::string(val.to_string()));
+                        .set_scalar(name, stryke::value::StrykeValue::string(val.to_string()));
                 } else {
                     let _ = interp
                         .scope
-                        .set_scalar(switch, stryke::value::PerlValue::integer(1));
+                        .set_scalar(switch, stryke::value::StrykeValue::integer(1));
                 }
             }
         }
@@ -1017,7 +1017,7 @@ pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut VMHelper, filename: 
     interp.scope.declare_array(
         "ARGV",
         argv.into_iter()
-            .map(stryke::value::PerlValue::string)
+            .map(stryke::value::StrykeValue::string)
             .collect(),
     );
 
@@ -1052,9 +1052,9 @@ pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut VMHelper, filename: 
         stryke::perl_inc::push_unique_string_paths(&mut inc_paths, extra);
     }
     stryke::perl_inc::push_unique_string_paths(&mut inc_paths, vec![".".to_string()]);
-    let inc_dirs: Vec<stryke::value::PerlValue> = inc_paths
+    let inc_dirs: Vec<stryke::value::StrykeValue> = inc_paths
         .into_iter()
-        .map(stryke::value::PerlValue::string)
+        .map(stryke::value::StrykeValue::string)
         .collect();
     interp.scope.declare_array("INC", inc_dirs);
 
@@ -1114,7 +1114,30 @@ fn main() {
     // populated config dir on first launch.
     repl::ensure_default_config_seeded();
 
-    let args = expand_perl_bundled_argv(std::env::args().collect());
+    let mut args = expand_perl_bundled_argv(std::env::args().collect());
+
+    // `--record` — opt-in wall-clock recording. Strip the flag from argv
+    // (so downstream parsing doesn't choke on it), set `STRYKE_RECORD=1`
+    // so child processes (test workers, spawned scripts) inherit the
+    // request, then install the perf recorder. Child stryke processes
+    // spawned by `s --record t TESTS...` see only the inherited env var
+    // (not `--record` in their own argv) and still record one row per
+    // invocation. The atexit handler fires for every exit path including
+    // `process::exit(N)`.
+    let record_requested = {
+        let pos = args.iter().position(|a| a == "--record");
+        if let Some(i) = pos {
+            args.remove(i);
+            std::env::set_var("STRYKE_RECORD", "1");
+            true
+        } else {
+            false
+        }
+    };
+    if record_requested || stryke::perf_recorder::recording_enabled_in_env() {
+        let path = stryke::perf_recorder::classify_invocation(&args);
+        stryke::perf_recorder::install(path, args.clone());
+    }
 
     // `stryke --test-worker` — pool-worker mode: read test paths from
     // stdin, fork per request, run test in-process in the child, write
@@ -2009,12 +2032,12 @@ fn run_embedded_script(embedded: stryke::aot::EmbeddedScript, argv: Vec<String>)
     interp.scope.declare_array(
         "ARGV",
         argv.into_iter()
-            .map(stryke::value::PerlValue::string)
+            .map(stryke::value::StrykeValue::string)
             .collect(),
     );
     interp.scope.declare_array(
         "INC",
-        vec![stryke::value::PerlValue::string(".".to_string())],
+        vec![stryke::value::StrykeValue::string(".".to_string())],
     );
     match interp.execute(&program) {
         Ok(_) => {
@@ -2071,12 +2094,12 @@ fn run_embedded_bundle(bundle: stryke::aot::EmbeddedBundle, argv: Vec<String>) -
     interp.scope.declare_array(
         "ARGV",
         argv.into_iter()
-            .map(stryke::value::PerlValue::string)
+            .map(stryke::value::StrykeValue::string)
             .collect(),
     );
     interp.scope.declare_array(
         "INC",
-        vec![stryke::value::PerlValue::string(".".to_string())],
+        vec![stryke::value::StrykeValue::string(".".to_string())],
     );
 
     for (path, source) in &bundle.files {
@@ -2115,19 +2138,27 @@ fn run_embedded_bundle(bundle: stryke::aot::EmbeddedBundle, argv: Vec<String>) -
 /// `stryke BUILTIN [ARGS...]` — invoke a builtin function directly from CLI.
 /// Hierarchy: subcommand → builtin → script. Use `--script` to force script lookup.
 fn run_builtin_subcommand(name: &str, argv: &[String]) -> i32 {
-    use stryke::value::PerlValue;
+    use stryke::value::StrykeValue;
     use stryke::vm_helper::VMHelper;
 
     let mut interp = VMHelper::new();
-    let argv_values: Vec<PerlValue> = argv.iter().map(|s| PerlValue::string(s.clone())).collect();
+    let argv_values: Vec<StrykeValue> = argv.iter().map(|s| StrykeValue::string(s.clone())).collect();
     let _ = interp.scope.set_array("ARGV", argv_values);
 
     // Wrap in `p(...)` to print the result — most builtins return values without printing.
     // Exceptions like `pin`/`fire_and_forget` loop forever and print to stderr anyway.
-    let code = if argv.is_empty() {
-        format!("p {}()", name)
+    // Ref-returning reflection builtins (`perfview`, …) wrap in `ddump` first so the
+    // CLI shows the data structure rather than the `ARRAY(0x...)` / `HASH(0x...)` pointer.
+    let wrap_dd = matches!(name, "perfview" | "pfv");
+    let inner = if argv.is_empty() {
+        format!("{}()", name)
     } else {
-        format!("p {}(@ARGV)", name)
+        format!("{}(@ARGV)", name)
+    };
+    let code = if wrap_dd {
+        format!("p ddump({})", inner)
+    } else {
+        format!("p {}", inner)
     };
 
     let program = match stryke::parse_with_file(&code, "-e") {

@@ -23,11 +23,11 @@ def infer_doc(fn_name: str, body: str, sig: str) -> str:
 
     # Detect return type from body
     returns_bool = "bool_iv(" in body
-    returns_float = "PerlValue::float(" in body
-    returns_int = "PerlValue::integer(" in body and not returns_bool
-    returns_string = "PerlValue::string(" in body
-    returns_array = "PerlValue::array(" in body or "PerlValue::array_ref(" in body
-    returns_undef_on_fail = "PerlValue::UNDEF" in body
+    returns_float = "StrykeValue::float(" in body
+    returns_int = "StrykeValue::integer(" in body and not returns_bool
+    returns_string = "StrykeValue::string(" in body
+    returns_array = "StrykeValue::array(" in body or "StrykeValue::array_ref(" in body
+    returns_undef_on_fail = "StrykeValue::UNDEF" in body
 
     # Detect topic default
     uses_topic = "first_arg_or_topic" in body

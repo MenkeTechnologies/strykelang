@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use crate::error::{PerlError, PerlResult};
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 
 #[derive(Clone, Copy, Debug)]
 enum Repeat {
@@ -86,7 +86,7 @@ fn repeat_fixed(r: Repeat, one: usize) -> Result<usize, String> {
     }
 }
 
-fn take_arg<'a>(args: &mut &'a [PerlValue]) -> Result<&'a PerlValue, String> {
+fn take_arg<'a>(args: &mut &'a [StrykeValue]) -> Result<&'a StrykeValue, String> {
     if args.is_empty() {
         return Err("not enough arguments".into());
     }
@@ -96,19 +96,19 @@ fn take_arg<'a>(args: &mut &'a [PerlValue]) -> Result<&'a PerlValue, String> {
 }
 
 /// `pack TEMPLATE, LIST`
-pub fn perl_pack(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+pub fn perl_pack(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.is_empty() {
         return Err(PerlError::runtime("pack: not enough arguments", line));
     }
     let template = args[0].to_string();
     let mut rest = &args[1..];
     match pack_impl(&template, &mut rest) {
-        Ok(bytes) => Ok(PerlValue::bytes(Arc::new(bytes))),
+        Ok(bytes) => Ok(StrykeValue::bytes(Arc::new(bytes))),
         Err(msg) => Err(PerlError::runtime(format!("pack: {}", msg), line)),
     }
 }
 
-fn pack_impl(template: &str, args: &mut &[PerlValue]) -> Result<Vec<u8>, String> {
+fn pack_impl(template: &str, args: &mut &[StrykeValue]) -> Result<Vec<u8>, String> {
     let tokens = tokenize(template)?;
     let mut buf = Vec::new();
     for t in tokens {
@@ -370,7 +370,7 @@ fn pack_impl(template: &str, args: &mut &[PerlValue]) -> Result<Vec<u8>, String>
 }
 
 /// `unpack TEMPLATE, SCALAR`
-pub fn perl_unpack(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+pub fn perl_unpack(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.len() < 2 {
         return Err(PerlError::runtime("unpack: not enough arguments", line));
     }
@@ -381,14 +381,14 @@ pub fn perl_unpack(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
             if vals.len() == 1 {
                 Ok(vals.into_iter().next().unwrap())
             } else {
-                Ok(PerlValue::array(vals))
+                Ok(StrykeValue::array(vals))
             }
         }
         Err(msg) => Err(PerlError::runtime(format!("unpack: {}", msg), line)),
     }
 }
 
-fn value_to_bytes(v: &PerlValue) -> Result<Vec<u8>, String> {
+fn value_to_bytes(v: &StrykeValue) -> Result<Vec<u8>, String> {
     if let Some(b) = v.as_bytes_arc() {
         return Ok((*b).clone());
     }
@@ -484,7 +484,7 @@ fn unpack_width(op: char, repeat: Repeat) -> Result<Option<usize>, String> {
     }
 }
 
-fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
+fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<StrykeValue>, String> {
     let tokens = tokenize(template)?;
     let mut pos = 0usize;
     let mut out = Vec::new();
@@ -511,7 +511,7 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
                     // a: return raw bytes including NULs
                     String::from_utf8_lossy(slice).to_string()
                 };
-                out.push(PerlValue::string(s));
+                out.push(StrykeValue::string(s));
             }
             'Z' => {
                 let rest = data.get(pos..).unwrap_or(&[]);
@@ -521,7 +521,7 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
                         let chunk = &rest[..take];
                         pos += take;
                         let endz = chunk.iter().position(|&b| b == 0).unwrap_or(chunk.len());
-                        out.push(PerlValue::string(
+                        out.push(StrykeValue::string(
                             String::from_utf8_lossy(&chunk[..endz]).to_string(),
                         ));
                     }
@@ -529,7 +529,7 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
                         let endz = rest.iter().position(|&b| b == 0).unwrap_or(rest.len());
                         let s = String::from_utf8_lossy(&rest[..endz]).to_string();
                         pos += endz + 1;
-                        out.push(PerlValue::string(s));
+                        out.push(StrykeValue::string(s));
                     }
                 }
             }
@@ -554,7 +554,7 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
                         hex.truncate(n);
                     }
                 }
-                out.push(PerlValue::string(hex));
+                out.push(StrykeValue::string(hex));
             }
             'N' => {
                 let count = match t.repeat {
@@ -567,7 +567,7 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
                     }
                     let v = u32::from_be_bytes(data[pos..pos + 4].try_into().unwrap());
                     pos += 4;
-                    out.push(PerlValue::integer(v as i64));
+                    out.push(StrykeValue::integer(v as i64));
                 }
             }
             'n' => {
@@ -581,7 +581,7 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
                     }
                     let v = u16::from_be_bytes(data[pos..pos + 2].try_into().unwrap());
                     pos += 2;
-                    out.push(PerlValue::integer(v as i64));
+                    out.push(StrykeValue::integer(v as i64));
                 }
             }
             'V' => {
@@ -595,7 +595,7 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
                     }
                     let v = u32::from_le_bytes(data[pos..pos + 4].try_into().unwrap());
                     pos += 4;
-                    out.push(PerlValue::integer(v as i64));
+                    out.push(StrykeValue::integer(v as i64));
                 }
             }
             'v' => {
@@ -609,13 +609,13 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
                     }
                     let v = u16::from_le_bytes(data[pos..pos + 2].try_into().unwrap());
                     pos += 2;
-                    out.push(PerlValue::integer(v as i64));
+                    out.push(StrykeValue::integer(v as i64));
                 }
             }
             'C' => match t.repeat {
                 Repeat::Star => {
                     while pos < data.len() {
-                        out.push(PerlValue::integer(data[pos] as i64));
+                        out.push(StrykeValue::integer(data[pos] as i64));
                         pos += 1;
                     }
                 }
@@ -627,7 +627,7 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
                         }
                         let v = data[pos];
                         pos += 1;
-                        out.push(PerlValue::integer(v as i64));
+                        out.push(StrykeValue::integer(v as i64));
                     }
                 }
             },
@@ -642,7 +642,7 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
                     }
                     let v = u64::from_ne_bytes(data[pos..pos + 8].try_into().unwrap());
                     pos += 8;
-                    out.push(PerlValue::integer(v as i64));
+                    out.push(StrykeValue::integer(v as i64));
                 }
             }
             'q' => {
@@ -656,7 +656,7 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
                     }
                     let v = i64::from_ne_bytes(data[pos..pos + 8].try_into().unwrap());
                     pos += 8;
-                    out.push(PerlValue::integer(v));
+                    out.push(StrykeValue::integer(v));
                 }
             }
             'w' => {
@@ -679,7 +679,7 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
                             break;
                         }
                     }
-                    out.push(PerlValue::integer(val as i64));
+                    out.push(StrykeValue::integer(val as i64));
                     decoded += 1;
                 }
             }
@@ -694,7 +694,7 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
                     }
                     let v = i32::from_ne_bytes(data[pos..pos + 4].try_into().unwrap());
                     pos += 4;
-                    out.push(PerlValue::integer(v as i64));
+                    out.push(StrykeValue::integer(v as i64));
                 }
             }
             'I' => {
@@ -708,7 +708,7 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
                     }
                     let v = u32::from_ne_bytes(data[pos..pos + 4].try_into().unwrap());
                     pos += 4;
-                    out.push(PerlValue::integer(v as i64));
+                    out.push(StrykeValue::integer(v as i64));
                 }
             }
             'l' => {
@@ -722,7 +722,7 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
                     }
                     let v = i32::from_ne_bytes(data[pos..pos + 4].try_into().unwrap());
                     pos += 4;
-                    out.push(PerlValue::integer(v as i64));
+                    out.push(StrykeValue::integer(v as i64));
                 }
             }
             'L' => {
@@ -736,7 +736,7 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
                     }
                     let v = u32::from_ne_bytes(data[pos..pos + 4].try_into().unwrap());
                     pos += 4;
-                    out.push(PerlValue::integer(v as i64));
+                    out.push(StrykeValue::integer(v as i64));
                 }
             }
             's' => {
@@ -750,7 +750,7 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
                     }
                     let v = i16::from_ne_bytes(data[pos..pos + 2].try_into().unwrap());
                     pos += 2;
-                    out.push(PerlValue::integer(v as i64));
+                    out.push(StrykeValue::integer(v as i64));
                 }
             }
             'S' => {
@@ -764,7 +764,7 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
                     }
                     let v = u16::from_ne_bytes(data[pos..pos + 2].try_into().unwrap());
                     pos += 2;
-                    out.push(PerlValue::integer(v as i64));
+                    out.push(StrykeValue::integer(v as i64));
                 }
             }
             'f' => {
@@ -778,7 +778,7 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
                     }
                     let v = f32::from_ne_bytes(data[pos..pos + 4].try_into().unwrap());
                     pos += 4;
-                    out.push(PerlValue::float(v as f64));
+                    out.push(StrykeValue::float(v as f64));
                 }
             }
             'd' => {
@@ -792,7 +792,7 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
                     }
                     let v = f64::from_ne_bytes(data[pos..pos + 8].try_into().unwrap());
                     pos += 8;
-                    out.push(PerlValue::float(v));
+                    out.push(StrykeValue::float(v));
                 }
             }
             'x' => {
@@ -819,18 +819,18 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
-    fn pack_bytes(template: &str, args: &[PerlValue]) -> Vec<u8> {
-        let mut v = vec![PerlValue::string(template.into())];
+    fn pack_bytes(template: &str, args: &[StrykeValue]) -> Vec<u8> {
+        let mut v = vec![StrykeValue::string(template.into())];
         v.extend_from_slice(args);
         let p = perl_pack(&v, 0).expect("pack");
         p.as_bytes_arc().expect("bytes").as_ref().clone()
     }
 
-    fn unpack_vals(template: &str, data: &[u8]) -> Vec<PerlValue> {
+    fn unpack_vals(template: &str, data: &[u8]) -> Vec<StrykeValue> {
         let u = perl_unpack(
             &[
-                PerlValue::string(template.into()),
-                PerlValue::bytes(Arc::new(data.to_vec())),
+                StrykeValue::string(template.into()),
+                StrykeValue::bytes(Arc::new(data.to_vec())),
             ],
             0,
         )
@@ -844,7 +844,7 @@ mod tests {
 
     #[test]
     fn tokenize_rejects_unsupported_type() {
-        let e = perl_pack(&[PerlValue::string("C X".into()), PerlValue::integer(1)], 0)
+        let e = perl_pack(&[StrykeValue::string("C X".into()), StrykeValue::integer(1)], 0)
             .expect_err("unsupported");
         assert!(
             e.message.contains("unsupported pack type"),
@@ -856,11 +856,11 @@ mod tests {
     #[test]
     fn pack_a_pads_with_nul_a_pads_with_space() {
         assert_eq!(
-            pack_bytes("a3", &[PerlValue::string("a".into())]),
+            pack_bytes("a3", &[StrykeValue::string("a".into())]),
             vec![b'a', 0, 0]
         );
         assert_eq!(
-            pack_bytes("A3", &[PerlValue::string("a".into())]),
+            pack_bytes("A3", &[StrykeValue::string("a".into())]),
             vec![b'a', b' ', b' ']
         );
     }
@@ -868,23 +868,23 @@ mod tests {
     #[test]
     fn pack_z_one_appends_nul() {
         assert_eq!(
-            pack_bytes("Z", &[PerlValue::string("ab".into())]),
+            pack_bytes("Z", &[StrykeValue::string("ab".into())]),
             vec![b'a', b'b', 0]
         );
     }
 
     #[test]
     fn pack_z_count_truncates_or_pads() {
-        let b = pack_bytes("Z4", &[PerlValue::string("abcdef".into())]);
+        let b = pack_bytes("Z4", &[StrykeValue::string("abcdef".into())]);
         assert_eq!(b, vec![b'a', b'b', b'c', 0]);
-        let b2 = pack_bytes("Z6", &[PerlValue::string("ab".into())]);
+        let b2 = pack_bytes("Z6", &[StrykeValue::string("ab".into())]);
         assert_eq!(b2, vec![b'a', b'b', 0, 0, 0, 0]);
     }
 
     #[test]
     fn pack_h_one_nibble_pair() {
         assert_eq!(
-            pack_bytes("H", &[PerlValue::string("ff".into())]),
+            pack_bytes("H", &[StrykeValue::string("ff".into())]),
             vec![255]
         );
     }
@@ -892,7 +892,7 @@ mod tests {
     #[test]
     fn pack_h_two_nibbles_from_template_count() {
         assert_eq!(
-            pack_bytes("H4", &[PerlValue::string("dead".into())]),
+            pack_bytes("H4", &[StrykeValue::string("dead".into())]),
             vec![0xde, 0xad]
         );
     }
@@ -900,7 +900,7 @@ mod tests {
     #[test]
     fn pack_h_rejects_odd_hex_length() {
         let e = perl_pack(
-            &[PerlValue::string("H".into()), PerlValue::string("f".into())],
+            &[StrykeValue::string("H".into()), StrykeValue::string("f".into())],
             0,
         )
         .expect_err("short hex");
@@ -914,7 +914,7 @@ mod tests {
     #[test]
     fn pack_h_star_ignores_non_hex_separators() {
         assert_eq!(
-            pack_bytes("H*", &[PerlValue::string("DE-AD".into())]),
+            pack_bytes("H*", &[StrykeValue::string("DE-AD".into())]),
             vec![0xde, 0xad]
         );
     }
@@ -923,7 +923,7 @@ mod tests {
     fn pack_x_inserts_zeros() {
         assert_eq!(pack_bytes("x3", &[]), vec![0, 0, 0]);
         assert_eq!(
-            pack_bytes("C x2 C", &[PerlValue::integer(1), PerlValue::integer(2)]),
+            pack_bytes("C x2 C", &[StrykeValue::integer(1), StrykeValue::integer(2)]),
             vec![1, 0, 0, 2]
         );
     }
@@ -932,8 +932,8 @@ mod tests {
     fn pack_star_rejects_a() {
         let e = perl_pack(
             &[
-                PerlValue::string("a*".into()),
-                PerlValue::string("x".into()),
+                StrykeValue::string("a*".into()),
+                StrykeValue::string("x".into()),
             ],
             0,
         )
@@ -943,7 +943,7 @@ mod tests {
 
     #[test]
     fn pack_not_enough_arguments() {
-        let e = perl_pack(&[PerlValue::string("C C".into()), PerlValue::integer(1)], 0)
+        let e = perl_pack(&[StrykeValue::string("C C".into()), StrykeValue::integer(1)], 0)
             .expect_err("short");
         assert!(e.message.contains("not enough"), "{}", e.message);
     }
@@ -958,8 +958,8 @@ mod tests {
     fn unpack_n_v() {
         let be = perl_pack(
             &[
-                PerlValue::string("N".into()),
-                PerlValue::integer(0x01020304),
+                StrykeValue::string("N".into()),
+                StrykeValue::integer(0x01020304),
             ],
             0,
         )
@@ -969,8 +969,8 @@ mod tests {
 
         let le = perl_pack(
             &[
-                PerlValue::string("V".into()),
-                PerlValue::integer(0x01020304),
+                StrykeValue::string("V".into()),
+                StrykeValue::integer(0x01020304),
             ],
             0,
         )
@@ -980,8 +980,8 @@ mod tests {
 
         let u = perl_unpack(
             &[
-                PerlValue::string("N".into()),
-                PerlValue::bytes(Arc::new(vec![0, 0, 0, 42])),
+                StrykeValue::string("N".into()),
+                StrykeValue::bytes(Arc::new(vec![0, 0, 0, 42])),
             ],
             0,
         )
@@ -993,9 +993,9 @@ mod tests {
     fn pack_c_star_roundtrip() {
         let p = perl_pack(
             &[
-                PerlValue::string("C*".into()),
-                PerlValue::integer(65),
-                PerlValue::integer(66),
+                StrykeValue::string("C*".into()),
+                StrykeValue::integer(65),
+                StrykeValue::integer(66),
             ],
             0,
         )
@@ -1003,8 +1003,8 @@ mod tests {
         let b = p.as_bytes_arc().expect("expected Bytes");
         let u = perl_unpack(
             &[
-                PerlValue::string("C*".into()),
-                PerlValue::bytes(Arc::clone(&b)),
+                StrykeValue::string("C*".into()),
+                StrykeValue::bytes(Arc::clone(&b)),
             ],
             0,
         )
@@ -1029,8 +1029,8 @@ mod tests {
     fn unpack_n_reports_short_buffer() {
         let e = perl_unpack(
             &[
-                PerlValue::string("N".into()),
-                PerlValue::bytes(Arc::new(vec![1, 2])),
+                StrykeValue::string("N".into()),
+                StrykeValue::bytes(Arc::new(vec![1, 2])),
             ],
             0,
         )
@@ -1047,7 +1047,7 @@ mod tests {
 
     #[test]
     fn pack_n_star_consumes_all_remaining_args() {
-        let b = pack_bytes("N*", &[PerlValue::integer(1), PerlValue::integer(2)]);
+        let b = pack_bytes("N*", &[StrykeValue::integer(1), StrykeValue::integer(2)]);
         assert_eq!(b.len(), 8);
         let v = unpack_vals("N*", &b);
         assert_eq!(v.len(), 2);
@@ -1057,14 +1057,14 @@ mod tests {
 
     #[test]
     fn pack_n2_two_big_endian_words() {
-        let b = pack_bytes("N2", &[PerlValue::integer(1), PerlValue::integer(2)]);
+        let b = pack_bytes("N2", &[StrykeValue::integer(1), StrykeValue::integer(2)]);
         assert_eq!(b, vec![0, 0, 0, 1, 0, 0, 0, 2]);
     }
 
     #[test]
     fn pack_v_and_n_endian_differ() {
-        let le = pack_bytes("v", &[PerlValue::integer(0x0102)]);
-        let be = pack_bytes("n", &[PerlValue::integer(0x0102)]);
+        let le = pack_bytes("v", &[StrykeValue::integer(0x0102)]);
+        let be = pack_bytes("n", &[StrykeValue::integer(0x0102)]);
         assert_eq!(le, vec![0x02, 0x01]);
         assert_eq!(be, vec![0x01, 0x02]);
     }
@@ -1072,7 +1072,7 @@ mod tests {
     #[test]
     fn pack_q_signed_roundtrip() {
         let n = -42i64;
-        let b = pack_bytes("q", &[PerlValue::integer(n)]);
+        let b = pack_bytes("q", &[StrykeValue::integer(n)]);
         assert_eq!(b.len(), 8);
         let v = unpack_vals("q", &b);
         assert_eq!(v[0].to_int(), n);
@@ -1082,8 +1082,8 @@ mod tests {
     fn unpack_from_string_scalar_accepted() {
         let u = perl_unpack(
             &[
-                PerlValue::string("C".into()),
-                PerlValue::string("\x07".into()),
+                StrykeValue::string("C".into()),
+                StrykeValue::string("\x07".into()),
             ],
             0,
         )
@@ -1093,7 +1093,7 @@ mod tests {
 
     #[test]
     fn unpack_rejects_non_string_data() {
-        let e = perl_unpack(&[PerlValue::string("C".into()), PerlValue::integer(99)], 0)
+        let e = perl_unpack(&[StrykeValue::string("C".into()), StrykeValue::integer(99)], 0)
             .expect_err("type");
         assert!(e.message.contains("string or packed"), "{}", e.message);
     }
@@ -1101,7 +1101,7 @@ mod tests {
     #[test]
     fn whitespace_in_template_is_skipped() {
         assert_eq!(
-            pack_bytes("C  C", &[PerlValue::integer(1), PerlValue::integer(2)]),
+            pack_bytes("C  C", &[StrykeValue::integer(1), StrykeValue::integer(2)]),
             vec![1, 2]
         );
     }
@@ -1117,7 +1117,7 @@ mod tests {
             (16384, vec![0x81, 0x80, 0x00]),
         ];
         for (val, expected) in cases {
-            let b = pack_bytes("w", &[PerlValue::integer(val)]);
+            let b = pack_bytes("w", &[StrykeValue::integer(val)]);
             assert_eq!(b, expected, "pack failed for {}", val);
             let u = unpack_vals("w", &b);
             assert_eq!(u[0].to_int(), val, "unpack failed for {}", val);
@@ -1129,12 +1129,12 @@ mod tests {
         let f_val = 1.25f32;
         let d_val = std::f64::consts::PI;
 
-        let b_f = pack_bytes("f", &[PerlValue::float(f_val as f64)]);
+        let b_f = pack_bytes("f", &[StrykeValue::float(f_val as f64)]);
         assert_eq!(b_f.len(), 4);
         let u_f = unpack_vals("f", &b_f);
         assert!((u_f[0].to_number() - f_val as f64).abs() < 1e-7);
 
-        let b_d = pack_bytes("d", &[PerlValue::float(d_val)]);
+        let b_d = pack_bytes("d", &[StrykeValue::float(d_val)]);
         assert_eq!(b_d.len(), 8);
         let u_d = unpack_vals("d", &b_d);
         assert_eq!(u_d[0].to_number(), d_val);
@@ -1143,29 +1143,29 @@ mod tests {
     #[test]
     fn test_pack_unpack_native_types() {
         // s (signed 16), S (unsigned 16)
-        let b_s = pack_bytes("s", &[PerlValue::integer(-32768)]);
+        let b_s = pack_bytes("s", &[StrykeValue::integer(-32768)]);
         assert_eq!(b_s.len(), 2);
         assert_eq!(unpack_vals("s", &b_s)[0].to_int(), -32768);
 
-        let b_s_u16 = pack_bytes("S", &[PerlValue::integer(65535)]);
+        let b_s_u16 = pack_bytes("S", &[StrykeValue::integer(65535)]);
         assert_eq!(b_s_u16.len(), 2);
         assert_eq!(unpack_vals("S", &b_s_u16)[0].to_int(), 65535);
 
         // i (native signed int), I (native unsigned int) - usually 4 bytes
-        let b_i = pack_bytes("i", &[PerlValue::integer(-123456)]);
+        let b_i = pack_bytes("i", &[StrykeValue::integer(-123456)]);
         assert_eq!(b_i.len(), 4);
         assert_eq!(unpack_vals("i", &b_i)[0].to_int(), -123456);
 
-        let b_i_u32 = pack_bytes("I", &[PerlValue::integer(123456)]);
+        let b_i_u32 = pack_bytes("I", &[StrykeValue::integer(123456)]);
         assert_eq!(b_i_u32.len(), 4);
         assert_eq!(unpack_vals("I", &b_i_u32)[0].to_int(), 123456);
 
         // l (32-bit signed), L (32-bit unsigned)
-        let b_l = pack_bytes("l", &[PerlValue::integer(-2147483648)]);
+        let b_l = pack_bytes("l", &[StrykeValue::integer(-2147483648)]);
         assert_eq!(b_l.len(), 4);
         assert_eq!(unpack_vals("l", &b_l)[0].to_int(), -2147483648);
 
-        let b_l_u32 = pack_bytes("L", &[PerlValue::integer(4294967295)]);
+        let b_l_u32 = pack_bytes("L", &[StrykeValue::integer(4294967295)]);
         assert_eq!(b_l_u32.len(), 4);
         assert_eq!(unpack_vals("L", &b_l_u32)[0].to_int(), 4294967295);
     }
@@ -1192,7 +1192,7 @@ mod tests {
 
     #[test]
     fn test_pack_unpack_z_star() {
-        let b = pack_bytes("Z*", &[PerlValue::string("hello".into())]);
+        let b = pack_bytes("Z*", &[StrykeValue::string("hello".into())]);
         assert_eq!(b, b"hello\0");
         let v = unpack_vals("Z*", &b);
         assert_eq!(v[0].to_string(), "hello");

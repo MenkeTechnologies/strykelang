@@ -2,7 +2,7 @@
 
 **Decision:** stryke's bytecode cache moved from a SQLite database to a single rkyv-archived shard.
 **Result:** 11x faster per-process cache hit (p50: 241 µs → 22 µs). 3.2x bigger on disk. Aligned with zshrs.
-**Status:** Phase 1 (SQLite → rkyv shard with bincode-encoded Program/Chunk inner blobs) is complete and live in `strykelang/script_cache.rs`. Phase 2 (zero-copy on inner `PerlValue`/`Chunk`/`Program`) remains deferred — see [What's deferred](#whats-deferred-phase-2).
+**Status:** Phase 1 (SQLite → rkyv shard with bincode-encoded Program/Chunk inner blobs) is complete and live in `strykelang/script_cache.rs`. Phase 2 (zero-copy on inner `StrykeValue`/`Chunk`/`Program`) remains deferred — see [What's deferred](#whats-deferred-phase-2).
 
 ## Status quo (pre-migration)
 
@@ -60,7 +60,7 @@ Per the project framing: stryke is the second-priority project after zshrs, and 
 | Concurrency | SQLite WAL multi-reader | `flock` on `scripts.rkyv.lock` for exclusive writes; lockless reads |
 | Process state | One `Connection` per `Mutex<ScriptCache>` | One `Mmap` per `parking_lot::Mutex<Option<MmappedShard>>`, lazy-initialized |
 
-The public API (`try_load`, `try_save`, `stats`, `clear`, `evict_stale`, `list_scripts`, `ScriptCache::open` / `get` / `put`) is preserved byte-for-byte. The only call-site rename was `Interpreter::sqlite_cache_script_path` → `cache_script_path`. The env var `STRYKE_SQLITE_CACHE` → `STRYKE_CACHE`. `bytecode.rs:1067` still uses `crate::script_cache::constants_pool_codec` to serialize `Vec<PerlValue>` constants in the inner bincode blob (the `PerlValue` Arc-shared graph still isn't trivially rkyv-archivable).
+The public API (`try_load`, `try_save`, `stats`, `clear`, `evict_stale`, `list_scripts`, `ScriptCache::open` / `get` / `put`) is preserved byte-for-byte. The only call-site rename was `Interpreter::sqlite_cache_script_path` → `cache_script_path`. The env var `STRYKE_SQLITE_CACHE` → `STRYKE_CACHE`. `bytecode.rs:1067` still uses `crate::script_cache::constants_pool_codec` to serialize `Vec<StrykeValue>` constants in the inner bincode blob (the `StrykeValue` Arc-shared graph still isn't trivially rkyv-archivable).
 
 ## Measured results
 
@@ -133,9 +133,9 @@ The current rkyv shard wraps **bincode-encoded** Program/Chunk bytes. To get tru
 
 - `bytecode.rs` — `Chunk`, `Op`, `Block`, `BlockBytecodeRange`, the constant pool entry type
 - `ast.rs` — entire `Program`, `Stmt`/`Expr` enum graph
-- `value.rs` — `PerlValue`, which is the hard one
+- `value.rs` — `StrykeValue`, which is the hard one
 
-`PerlValue` is `Arc`-shared heap-pointed (interior mutability via `Arc<RwLock<...>>`). rkyv's zero-copy contract requires the on-disk byte layout to match the in-memory layout. Arc isn't archivable in zero-copy form. The current code already side-steps this for SQLite via the `CacheConst` adapter (only `Undef`/`Int`/`Float`/`Str` constants make it into the cache); the same adapter pattern would extend to phase 2 but applied to the whole graph.
+`StrykeValue` is `Arc`-shared heap-pointed (interior mutability via `Arc<RwLock<...>>`). rkyv's zero-copy contract requires the on-disk byte layout to match the in-memory layout. Arc isn't archivable in zero-copy form. The current code already side-steps this for SQLite via the `CacheConst` adapter (only `Undef`/`Int`/`Float`/`Str` constants make it into the cache); the same adapter pattern would extend to phase 2 but applied to the whole graph.
 
 Estimated win from phase 2: skip ~1-3 µs of bincode-decode per cache hit on top of the current rkyv savings. Probably not worth the derive churn until the hit cost actually shows up as a bottleneck somewhere.
 

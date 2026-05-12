@@ -6,36 +6,36 @@ use std::time::Duration;
 use crossbeam::channel::{self, Receiver, Select};
 
 use crate::error::{PerlError, PerlResult};
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 
 /// `pchannel()` — two-element list `(tx, rx)` for `my ($tx, $rx) = pchannel`.
-pub fn create_pair() -> PerlValue {
+pub fn create_pair() -> StrykeValue {
     let (tx, rx) = channel::unbounded();
-    PerlValue::array(vec![
-        PerlValue::channel_tx(Arc::new(tx)),
-        PerlValue::channel_rx(Arc::new(rx)),
+    StrykeValue::array(vec![
+        StrykeValue::channel_tx(Arc::new(tx)),
+        StrykeValue::channel_rx(Arc::new(rx)),
     ])
 }
 
 /// `pchannel(N)` — bounded channel capacity `N`.
-pub fn create_bounded_pair(capacity: usize) -> PerlValue {
+pub fn create_bounded_pair(capacity: usize) -> StrykeValue {
     let (tx, rx) = channel::bounded(capacity);
-    PerlValue::array(vec![
-        PerlValue::channel_tx(Arc::new(tx)),
-        PerlValue::channel_rx(Arc::new(rx)),
+    StrykeValue::array(vec![
+        StrykeValue::channel_tx(Arc::new(tx)),
+        StrykeValue::channel_rx(Arc::new(rx)),
     ])
 }
 
 /// Multiplexed receive — `crossbeam_channel::Select` over several `pchannel` receivers.
 /// Returns `(value, index)` where `index` is **0-based** (first argument is `0`), like Go's `select`.
-pub fn pselect_recv(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+pub fn pselect_recv(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.is_empty() {
         return Err(PerlError::runtime(
             "pselect() expects at least one pchannel receiver",
             line,
         ));
     }
-    let mut rx_owned: Vec<Arc<Receiver<PerlValue>>> = Vec::with_capacity(args.len());
+    let mut rx_owned: Vec<Arc<Receiver<StrykeValue>>> = Vec::with_capacity(args.len());
     for v in args {
         if let Some(rx) = v.as_channel_rx() {
             rx_owned.push(rx);
@@ -46,7 +46,7 @@ pub fn pselect_recv(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
             ));
         }
     }
-    let rx_refs: Vec<&Receiver<PerlValue>> = rx_owned.iter().map(|a| a.as_ref()).collect();
+    let rx_refs: Vec<&Receiver<StrykeValue>> = rx_owned.iter().map(|a| a.as_ref()).collect();
     let mut sel = Select::new();
     for r in &rx_refs {
         sel.recv(r);
@@ -55,17 +55,17 @@ pub fn pselect_recv(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     let idx = oper.index();
     let val = match oper.recv(rx_refs[idx]) {
         Ok(v) => v,
-        Err(_) => PerlValue::UNDEF,
+        Err(_) => StrykeValue::UNDEF,
     };
-    Ok(PerlValue::array(vec![val, PerlValue::integer(idx as i64)]))
+    Ok(StrykeValue::array(vec![val, StrykeValue::integer(idx as i64)]))
 }
 
 /// Like [`pselect_recv`], with optional overall timeout. On timeout returns `(undef, -1)`.
 pub fn pselect_recv_with_optional_timeout(
-    args: &[PerlValue],
+    args: &[StrykeValue],
     timeout: Option<Duration>,
     line: usize,
-) -> PerlResult<PerlValue> {
+) -> PerlResult<StrykeValue> {
     if args.is_empty() {
         return Err(PerlError::runtime(
             "pselect() expects at least one pchannel receiver",
@@ -76,7 +76,7 @@ pub fn pselect_recv_with_optional_timeout(
         return pselect_recv(args, line);
     }
     let duration = timeout.unwrap();
-    let mut rx_owned: Vec<Arc<Receiver<PerlValue>>> = Vec::with_capacity(args.len());
+    let mut rx_owned: Vec<Arc<Receiver<StrykeValue>>> = Vec::with_capacity(args.len());
     for v in args {
         if let Some(rx) = v.as_channel_rx() {
             rx_owned.push(rx);
@@ -87,33 +87,33 @@ pub fn pselect_recv_with_optional_timeout(
             ));
         }
     }
-    let rx_refs: Vec<&Receiver<PerlValue>> = rx_owned.iter().map(|a| a.as_ref()).collect();
+    let rx_refs: Vec<&Receiver<StrykeValue>> = rx_owned.iter().map(|a| a.as_ref()).collect();
     let mut sel = Select::new();
     for r in &rx_refs {
         sel.recv(r);
     }
     let oper = sel.select_timeout(duration);
     let Ok(oper) = oper else {
-        return Ok(PerlValue::array(vec![
-            PerlValue::UNDEF,
-            PerlValue::integer(-1),
+        return Ok(StrykeValue::array(vec![
+            StrykeValue::UNDEF,
+            StrykeValue::integer(-1),
         ]));
     };
     let idx = oper.index();
     let val = match oper.recv(rx_refs[idx]) {
         Ok(v) => v,
-        Err(_) => PerlValue::UNDEF,
+        Err(_) => StrykeValue::UNDEF,
     };
-    Ok(PerlValue::array(vec![val, PerlValue::integer(idx as i64)]))
+    Ok(StrykeValue::array(vec![val, StrykeValue::integer(idx as i64)]))
 }
 
 /// `$tx->send($v)` and `$rx->recv` without package subs.
 pub fn dispatch_method(
-    receiver: &PerlValue,
+    receiver: &StrykeValue,
     method: &str,
-    args: &[PerlValue],
+    args: &[StrykeValue],
     line: usize,
-) -> Option<PerlResult<PerlValue>> {
+) -> Option<PerlResult<StrykeValue>> {
     if method == "send" {
         if let Some(tx) = receiver.as_channel_tx() {
             if args.len() != 1 {
@@ -123,7 +123,7 @@ pub fn dispatch_method(
                 )));
             }
             let ok = tx.send(args[0].clone()).is_ok();
-            return Some(Ok(PerlValue::integer(if ok { 1 } else { 0 })));
+            return Some(Ok(StrykeValue::integer(if ok { 1 } else { 0 })));
         }
     }
     if method == "recv" {
@@ -136,7 +136,7 @@ pub fn dispatch_method(
             }
             return Some(Ok(match rx.recv() {
                 Ok(v) => v,
-                Err(_) => PerlValue::UNDEF,
+                Err(_) => StrykeValue::UNDEF,
             }));
         }
     }
@@ -148,7 +148,7 @@ mod tests {
     use super::*;
     use crate::error::ErrorKind;
 
-    fn pair_elems(pair: &PerlValue) -> (PerlValue, PerlValue) {
+    fn pair_elems(pair: &StrykeValue) -> (StrykeValue, StrykeValue) {
         let v = pair.as_array_vec().expect("pchannel pair");
         assert_eq!(v.len(), 2);
         (v[0].clone(), v[1].clone())
@@ -158,7 +158,7 @@ mod tests {
     fn create_pair_send_recv_roundtrip() {
         let pair = create_pair();
         let (tx, rx) = pair_elems(&pair);
-        let sent = dispatch_method(&tx, "send", &[PerlValue::integer(7)], 1)
+        let sent = dispatch_method(&tx, "send", &[StrykeValue::integer(7)], 1)
             .expect("dispatch")
             .expect("send");
         assert_eq!(sent.to_int(), 1);
@@ -172,7 +172,7 @@ mod tests {
     fn create_bounded_pair_send_recv() {
         let pair = create_bounded_pair(2);
         let (tx, rx) = pair_elems(&pair);
-        dispatch_method(&tx, "send", &[PerlValue::integer(1)], 1)
+        dispatch_method(&tx, "send", &[StrykeValue::integer(1)], 1)
             .unwrap()
             .unwrap();
         let v = dispatch_method(&rx, "recv", &[], 1).unwrap().unwrap();
@@ -187,7 +187,7 @@ mod tests {
 
     #[test]
     fn pselect_recv_rejects_non_receiver() {
-        let e = pselect_recv(&[PerlValue::integer(0)], 1).unwrap_err();
+        let e = pselect_recv(&[StrykeValue::integer(0)], 1).unwrap_err();
         assert_eq!(e.kind, ErrorKind::Runtime);
     }
 
@@ -195,7 +195,7 @@ mod tests {
     fn pselect_recv_delivers_from_one_ready_channel() {
         let p = create_pair();
         let (tx, rx) = pair_elems(&p);
-        dispatch_method(&tx, "send", &[PerlValue::integer(99)], 1)
+        dispatch_method(&tx, "send", &[StrykeValue::integer(99)], 1)
             .unwrap()
             .unwrap();
         let out = pselect_recv(&[rx], 1).expect("pselect");
@@ -230,7 +230,7 @@ mod tests {
     fn dispatch_recv_with_args_is_error() {
         let pair = create_pair();
         let (_tx, rx) = pair_elems(&pair);
-        let e = dispatch_method(&rx, "recv", &[PerlValue::integer(1)], 1)
+        let e = dispatch_method(&rx, "recv", &[StrykeValue::integer(1)], 1)
             .expect("some")
             .unwrap_err();
         assert_eq!(e.kind, ErrorKind::Runtime);

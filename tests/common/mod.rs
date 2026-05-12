@@ -3,7 +3,7 @@
 
 use parking_lot::RwLock;
 use stryke::error::ErrorKind;
-use stryke::value::PerlValue;
+use stryke::value::StrykeValue;
 use stryke::vm_helper::VMHelper;
 
 /// Reader/writer lock around mutations of process-global flags
@@ -36,7 +36,7 @@ pub fn with_global_flags<R>(f: impl FnOnce() -> R) -> R {
 
 /// Like [`eval`] but does NOT acquire the global-flags lock. Caller
 /// must already hold the write lock via [`with_global_flags`].
-pub fn eval_locked(code: &str) -> PerlValue {
+pub fn eval_locked(code: &str) -> StrykeValue {
     let program = stryke::parse(code).expect("parse failed");
     let mut interp = VMHelper::new();
     interp.execute(&program).expect("execution failed")
@@ -55,7 +55,7 @@ pub fn eval_err_kind_locked(code: &str) -> ErrorKind {
 }
 
 /// Parse and execute Perl code; panics on parse or runtime error.
-pub fn eval(code: &str) -> PerlValue {
+pub fn eval(code: &str) -> StrykeValue {
     let _guard = GLOBAL_FLAGS_LOCK.read();
     let program = stryke::parse(code).expect("parse failed");
     let mut interp = VMHelper::new();

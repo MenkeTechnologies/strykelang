@@ -8,7 +8,7 @@ use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 
 use crate::error::{PerlError, PerlResult};
 use crate::scope::{AtomicArray, AtomicHash};
-use crate::value::{PerlSub, PerlValue};
+use crate::value::{PerlSub, StrykeValue};
 use crate::vm_helper::{VMHelper, WantarrayCtx};
 
 /// Expand `pattern`, register native watches, then block dispatching each matching path to `sub` on a
@@ -17,11 +17,11 @@ pub fn run_pwatch(
     pattern: &str,
     sub: Arc<PerlSub>,
     subs: HashMap<String, Arc<PerlSub>>,
-    scalars: Vec<(String, PerlValue)>,
+    scalars: Vec<(String, StrykeValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,
     line: usize,
-) -> PerlResult<PerlValue> {
+) -> PerlResult<StrykeValue> {
     // pwatch's runtime matcher (`gpat.matches`) runs on every filesystem
     // event, so it can only check pattern shape — not stat-based qualifiers
     // like `(/)`. Strip the trailing qualifier suffix via zshrs's parser so
@@ -137,7 +137,7 @@ pub fn run_pwatch(
                         local_interp.scope.restore_capture(&scalars);
                         local_interp.scope.restore_atomics(&aa, &ah);
                         local_interp.enable_parallel_guard();
-                        local_interp.scope.set_topic(PerlValue::string(path_string));
+                        local_interp.scope.set_topic(StrykeValue::string(path_string));
                         let _ = local_interp.call_sub(&sub, vec![], WantarrayCtx::Void, line);
                     });
                 }

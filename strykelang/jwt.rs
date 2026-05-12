@@ -8,14 +8,14 @@ use crate::native_codec::{
     base64url_decode, base64url_encode, hmac_sha256_raw, hmac_sha256_verify_raw,
 };
 use crate::native_data::{json_decode, json_encode};
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 
 pub(crate) fn jwt_encode(
-    payload: &PerlValue,
-    secret: &PerlValue,
+    payload: &StrykeValue,
+    secret: &StrykeValue,
     alg: &str,
     line: usize,
-) -> PerlResult<PerlValue> {
+) -> PerlResult<StrykeValue> {
     if alg != "HS256" {
         return Err(PerlError::runtime(
             format!("jwt_encode: only alg HS256 is supported (got {alg})"),
@@ -29,12 +29,12 @@ pub(crate) fn jwt_encode(
     let payload_str = json_encode(payload)?;
     let payload_b64 = base64url_encode(payload_str.as_bytes());
     let signing_input = format!("{header_b64}.{payload_b64}");
-    let sig = hmac_sha256_raw(secret, &PerlValue::string(signing_input.clone()))?;
+    let sig = hmac_sha256_raw(secret, &StrykeValue::string(signing_input.clone()))?;
     let sig_b64 = base64url_encode(&sig);
-    Ok(PerlValue::string(format!("{signing_input}.{sig_b64}")))
+    Ok(StrykeValue::string(format!("{signing_input}.{sig_b64}")))
 }
 
-pub(crate) fn jwt_decode(token: &str, secret: &PerlValue, line: usize) -> PerlResult<PerlValue> {
+pub(crate) fn jwt_decode(token: &str, secret: &StrykeValue, line: usize) -> PerlResult<StrykeValue> {
     let parts: Vec<&str> = token.trim().split('.').collect();
     if parts.len() != 3 {
         return Err(PerlError::runtime(
@@ -47,7 +47,7 @@ pub(crate) fn jwt_decode(token: &str, secret: &PerlValue, line: usize) -> PerlRe
     }
     let signing_input = format!("{}.{}", parts[0], parts[1]);
     let sig = base64url_decode(parts[2])?;
-    hmac_sha256_verify_raw(secret, &PerlValue::string(signing_input), &sig)
+    hmac_sha256_verify_raw(secret, &StrykeValue::string(signing_input), &sig)
         .map_err(|_| PerlError::runtime("jwt_decode: signature verification failed", line))?;
 
     let header_bytes = base64url_decode(parts[0])?;
@@ -104,7 +104,7 @@ fn jwt_claim_time(v: &JsonValue, line: usize) -> PerlResult<i64> {
     ))
 }
 
-pub(crate) fn jwt_decode_unsafe(token: &str, line: usize) -> PerlResult<PerlValue> {
+pub(crate) fn jwt_decode_unsafe(token: &str, line: usize) -> PerlResult<StrykeValue> {
     let parts: Vec<&str> = token.trim().split('.').collect();
     if parts.len() != 3 {
         return Err(PerlError::runtime(
@@ -124,26 +124,26 @@ pub(crate) fn jwt_decode_unsafe(token: &str, line: usize) -> PerlResult<PerlValu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::value::PerlValue;
+    use crate::value::StrykeValue;
 
     #[test]
     fn test_jwt_roundtrip() {
-        let payload = PerlValue::hash(
+        let payload = StrykeValue::hash(
             [
                 (
                     "sub".to_string(),
-                    PerlValue::string("1234567890".to_string()),
+                    StrykeValue::string("1234567890".to_string()),
                 ),
                 (
                     "name".to_string(),
-                    PerlValue::string("John Doe".to_string()),
+                    StrykeValue::string("John Doe".to_string()),
                 ),
-                ("admin".to_string(), PerlValue::integer(1)),
+                ("admin".to_string(), StrykeValue::integer(1)),
             ]
             .into_iter()
             .collect(),
         );
-        let secret = PerlValue::string("secret".to_string());
+        let secret = StrykeValue::string("secret".to_string());
 
         let token = jwt_encode(&payload, &secret, "HS256", 0).unwrap();
         let token_str = token.to_string();
@@ -159,12 +159,12 @@ mod tests {
 
     #[test]
     fn test_jwt_decode_unsafe() {
-        let payload = PerlValue::hash(
-            [("foo".to_string(), PerlValue::string("bar".to_string()))]
+        let payload = StrykeValue::hash(
+            [("foo".to_string(), StrykeValue::string("bar".to_string()))]
                 .into_iter()
                 .collect(),
         );
-        let secret = PerlValue::string("secret".to_string());
+        let secret = StrykeValue::string("secret".to_string());
         let token = jwt_encode(&payload, &secret, "HS256", 0).unwrap();
         let token_str = token.to_string();
 
@@ -176,12 +176,12 @@ mod tests {
 
     #[test]
     fn test_jwt_invalid_signature() {
-        let payload = PerlValue::hash(
-            [("foo".to_string(), PerlValue::string("bar".to_string()))]
+        let payload = StrykeValue::hash(
+            [("foo".to_string(), StrykeValue::string("bar".to_string()))]
                 .into_iter()
                 .collect(),
         );
-        let secret = PerlValue::string("secret".to_string());
+        let secret = StrykeValue::string("secret".to_string());
         let token = jwt_encode(&payload, &secret, "HS256", 0).unwrap();
         let mut token_str = token.to_string();
 
@@ -195,12 +195,12 @@ mod tests {
     #[test]
     fn test_jwt_expiration() {
         let now = Utc::now().timestamp();
-        let payload = PerlValue::hash(
-            [("exp".to_string(), PerlValue::integer(now - 10))]
+        let payload = StrykeValue::hash(
+            [("exp".to_string(), StrykeValue::integer(now - 10))]
                 .into_iter()
                 .collect(),
         );
-        let secret = PerlValue::string("secret".to_string());
+        let secret = StrykeValue::string("secret".to_string());
         let token = jwt_encode(&payload, &secret, "HS256", 0).unwrap();
 
         let res = jwt_decode(&token.to_string(), &secret, 0);

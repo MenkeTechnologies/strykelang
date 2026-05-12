@@ -490,7 +490,7 @@ fn const_my_typed_str_rejects_int() {
 // instead of a `ClassInstance`. That broke three things at once:
 // (1) `$self->{field}` on the receiver couldn't find the class fields,
 // (2) `ref($self)` returned empty (the `ClassInst` arm was missing from
-//     `PerlValue::ref_type`),
+//     `StrykeValue::ref_type`),
 // (3) `typed my $b : Box = Box->new` always failed the runtime type check.
 //
 // The fix had to be applied in three places: `vm_helper::builtin_new` (tree

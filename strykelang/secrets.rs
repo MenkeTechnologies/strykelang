@@ -14,7 +14,7 @@
 //! protected" lie when no key was set.
 
 use crate::error::PerlError;
-use crate::value::PerlValue;
+use crate::value::StrykeValue;
 use aes_gcm::aead::Aead;
 use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
 use base64::Engine;
@@ -24,7 +24,7 @@ type Result<T> = std::result::Result<T, PerlError>;
 const KEY_LEN: usize = 32;
 const NONCE_LEN: usize = 12;
 
-fn parse_opts(args: &[PerlValue]) -> indexmap::IndexMap<String, PerlValue> {
+fn parse_opts(args: &[StrykeValue]) -> indexmap::IndexMap<String, StrykeValue> {
     let mut out = indexmap::IndexMap::new();
     let mut i = 0;
     while i + 1 < args.len() {
@@ -93,7 +93,7 @@ fn random_bytes(n: usize) -> Vec<u8> {
 
 /// `secrets_encrypt($plaintext, key => $key)` → base64 string of
 /// `nonce(12) || ciphertext || tag(16)`. AES-256-GCM under the hood.
-pub fn secrets_encrypt(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub fn secrets_encrypt(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let plain = args
         .first()
         .map(|v| v.to_string())
@@ -116,7 +116,7 @@ pub fn secrets_encrypt(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     let mut out = Vec::with_capacity(NONCE_LEN + ciphertext.len());
     out.extend_from_slice(&nonce_bytes);
     out.extend_from_slice(&ciphertext);
-    Ok(PerlValue::string(
+    Ok(StrykeValue::string(
         base64::engine::general_purpose::STANDARD.encode(&out),
     ))
 }
@@ -124,7 +124,7 @@ pub fn secrets_encrypt(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 /// `secrets_decrypt($b64_envelope, key => $key)` → plaintext string.
 /// Returns undef on auth failure rather than throwing — secrets code
 /// often wants to fall through to a "not yet provisioned" branch.
-pub fn secrets_decrypt(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub fn secrets_decrypt(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let envelope = args
         .first()
         .map(|v| v.to_string())
@@ -138,28 +138,28 @@ pub fn secrets_decrypt(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 
     let raw = match base64::engine::general_purpose::STANDARD.decode(envelope.as_bytes()) {
         Ok(r) => r,
-        Err(_) => return Ok(PerlValue::UNDEF),
+        Err(_) => return Ok(StrykeValue::UNDEF),
     };
     if raw.len() < NONCE_LEN + 16 {
-        return Ok(PerlValue::UNDEF);
+        return Ok(StrykeValue::UNDEF);
     }
     let cipher = Aes256Gcm::new_from_slice(&key_bytes)
         .map_err(|e| PerlError::runtime(format!("secrets_decrypt: key init: {}", e), line))?;
     let nonce = Nonce::from_slice(&raw[..NONCE_LEN]);
     let pt = match cipher.decrypt(nonce, &raw[NONCE_LEN..]) {
         Ok(p) => p,
-        Err(_) => return Ok(PerlValue::UNDEF),
+        Err(_) => return Ok(StrykeValue::UNDEF),
     };
     match String::from_utf8(pt) {
-        Ok(s) => Ok(PerlValue::string(s)),
-        Err(_) => Ok(PerlValue::UNDEF),
+        Ok(s) => Ok(StrykeValue::string(s)),
+        Err(_) => Ok(StrykeValue::UNDEF),
     }
 }
 
 /// `secrets_random_key()` → fresh 32-byte AES-256 key as base64.
-pub fn secrets_random_key(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+pub fn secrets_random_key(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let bytes = random_bytes(KEY_LEN);
-    Ok(PerlValue::string(
+    Ok(StrykeValue::string(
         base64::engine::general_purpose::STANDARD.encode(&bytes),
     ))
 }
@@ -169,7 +169,7 @@ pub fn secrets_random_key(_args: &[PerlValue], _line: usize) -> Result<PerlValue
 /// 600k iterations matches the OWASP 2024 recommendation. Use the
 /// same salt every time you derive the same key (the salt is not
 /// secret; persist it alongside the encrypted blob).
-pub fn secrets_kdf(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+pub fn secrets_kdf(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     use hmac::Hmac;
     use sha2::Sha256;
     let password = args
@@ -189,7 +189,7 @@ pub fn secrets_kdf(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     let mut out = [0u8; KEY_LEN];
     pbkdf2::pbkdf2::<Hmac<Sha256>>(password.as_bytes(), salt.as_bytes(), iterations, &mut out)
         .map_err(|e| PerlError::runtime(format!("secrets_kdf: {}", e), line))?;
-    Ok(PerlValue::string(
+    Ok(StrykeValue::string(
         base64::engine::general_purpose::STANDARD.encode(out),
     ))
 }
