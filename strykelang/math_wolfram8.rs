@@ -630,9 +630,12 @@ fn builtin_theil_index(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Herfindahl-Hirschman index from market shares (in [0, 1]).
+/// Accepts either a single arrayref `hhi([s1, s2, ...])` or a flat varargs
+/// form `hhi(s1, s2, ...)` and sums the squares of every share.
 fn builtin_herfindahl_hirschman(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
-    let shares: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
+    let shares: Vec<f64> = args
         .iter()
+        .flat_map(|a| arg_to_vec(a))
         .map(|v| v.to_number())
         .collect();
     let s: f64 = shares.iter().map(|x| x * x).sum();

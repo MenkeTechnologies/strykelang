@@ -1,24 +1,27 @@
 # lib/oop.stk — classes, methods, structs, enums
+# Every helper is namespaced under its type (`Point::`, `Rect::`, `Circle::`,
+# `Person::`, `Color::`, `Status::`, `Config::`, `Vec3::`) to avoid shadowing
+# stryke builtins (e.g. `rect_area`, `circle_area`, `vec3_add`, `trie_new`).
 
 # ── Basic struct ───────────────────────────────────────────────────
 
 struct Point { x, y }
 
-fn make_point($x, $y) {
+fn Point::new($x, $y) {
     Point($x, $y)
 }
 
-fn calc_distance($p1, $p2) {
+fn Point::distance($p1, $p2) {
     my $dx = $p2->x - $p1->x
     my $dy = $p2->y - $p1->y
     sqrt($dx * $dx + $dy * $dy)
 }
 
-fn point_add($p1, $p2) {
+fn Point::add($p1, $p2) {
     Point($p1->x + $p2->x, $p1->y + $p2->y)
 }
 
-fn point_scale($p, $factor) {
+fn Point::scale($p, $factor) {
     Point($p->x * $factor, $p->y * $factor)
 }
 
@@ -26,19 +29,19 @@ fn point_scale($p, $factor) {
 
 struct Rectangle { width=0, height=0 }
 
-fn make_rect($w, $h) {
+fn Rect::new($w, $h) {
     Rectangle($w, $h)
 }
 
-fn rect_area($r) {
+fn Rect::area($r) {
     $r->width * $r->height
 }
 
-fn rect_perimeter($r) {
+fn Rect::perimeter($r) {
     2 * ($r->width + $r->height)
 }
 
-fn rect_is_square($r) {
+fn Rect::is_square($r) {
     $r->width == $r->height ? 1 : 0
 }
 
@@ -46,16 +49,16 @@ fn rect_is_square($r) {
 
 struct Circle { center, radius }
 
-fn make_circle($cx, $cy, $r) {
+fn Circle::new($cx, $cy, $r) {
     my $center = Point($cx, $cy)
     Circle($center, $r)
 }
 
-fn circle_area($c) {
+fn Circle::area($c) {
     3.14159 * $c->radius * $c->radius
 }
 
-fn circle_contains_point($c, $p) {
+fn Circle::contains($c, $p) {
     my $dx = $p->x - $c->center->x
     my $dy = $p->y - $c->center->y
     my $dist = sqrt($dx * $dx + $dy * $dy)
@@ -66,19 +69,19 @@ fn circle_contains_point($c, $p) {
 
 struct Person { name, age }
 
-fn make_person($name, $age) {
+fn Person::new($name, $age) {
     Person($name, $age)
 }
 
-fn person_greet($p) {
+fn Person::greet($p) {
     "Hello, my name is " . $p->name
 }
 
-fn person_is_adult($p) {
+fn Person::is_adult($p) {
     $p->age >= 18 ? 1 : 0
 }
 
-fn person_birthday($p) {
+fn Person::birthday($p) {
     Person($p->name, $p->age + 1)
 }
 
@@ -86,7 +89,7 @@ fn person_birthday($p) {
 
 enum Color { Red, Green, Blue }
 
-fn color_name($c) {
+fn Color::name($c) {
     match ($c) {
         Color::Red() => "red"
         Color::Green() => "green"
@@ -95,7 +98,7 @@ fn color_name($c) {
     }
 }
 
-fn is_primary($c) {
+fn Color::is_primary($c) {
     match ($c) {
         Color::Red() => 1
         Color::Green() => 1
@@ -108,7 +111,7 @@ fn is_primary($c) {
 
 enum Status { Pending, Running, Done, Failed }
 
-fn status_name($s) {
+fn Status::name($s) {
     match ($s) {
         Status::Pending() => "pending"
         Status::Running() => "running"
@@ -118,7 +121,7 @@ fn status_name($s) {
     }
 }
 
-fn status_is_complete($s) {
+fn Status::is_complete($s) {
     match ($s) {
         Status::Done() => 1
         Status::Failed() => 1
@@ -126,31 +129,7 @@ fn status_is_complete($s) {
     }
 }
 
-# ── Builder pattern with struct ────────────────────────────────────
-
-struct Config { host, port, timeout }
-
-fn config_builder {
-    { host => "localhost", port => 8080, timeout => 30 }
-}
-
-fn config_with_host($builder, $host) {
-    $builder->{host} = $host
-    $builder
-}
-
-fn config_with_port($builder, $port) {
-    $builder->{port} = $port
-    $builder
-}
-
-fn config_build($builder) {
-    Config($builder->{host}, $builder->{port}, $builder->{timeout})
-}
-
-# ── Status transitions ─────────────────────────────────────────────
-
-fn status_next($s) {
+fn Status::next($s) {
     match ($s) {
         Status::Pending() => Status::Running
         Status::Running() => Status::Done
@@ -158,28 +137,52 @@ fn status_next($s) {
     }
 }
 
+# ── Builder pattern with struct ────────────────────────────────────
+
+struct Config { host, port, timeout }
+
+fn Config::builder {
+    { host => "localhost", port => 8080, timeout => 30 }
+}
+
+fn Config::with_host($builder, $host) {
+    $builder->{host} = $host
+    $builder
+}
+
+fn Config::with_port($builder, $port) {
+    $builder->{port} = $port
+    $builder
+}
+
+fn Config::build($builder) {
+    Config($builder->{host}, $builder->{port}, $builder->{timeout})
+}
+
 # ── Complex struct operations ──────────────────────────────────────
+# `Vec3::*` is struct-based 3D vector OOP. Distinct from stryke's built-in
+# arrayref `vec3_*` family (which operates on `[x, y, z]` lists, not structs).
 
 struct Vector3 { x, y, z }
 
-fn vec3_new($x, $y, $z) {
+fn Vec3::new($x, $y, $z) {
     Vector3($x, $y, $z)
 }
 
-fn vec3_add($v1, $v2) {
+fn Vec3::add($v1, $v2) {
     Vector3($v1->x + $v2->x, $v1->y + $v2->y, $v1->z + $v2->z)
 }
 
-fn vec3_dot($v1, $v2) {
+fn Vec3::dot($v1, $v2) {
     $v1->x * $v2->x + $v1->y * $v2->y + $v1->z * $v2->z
 }
 
-fn vec3_length($v) {
+fn Vec3::length($v) {
     sqrt($v->x * $v->x + $v->y * $v->y + $v->z * $v->z)
 }
 
-fn vec3_normalize($v) {
-    my $len = vec3_length($v)
+fn Vec3::normalize($v) {
+    my $len = Vec3::length($v)
     if ($len > 0) {
         Vector3($v->x / $len, $v->y / $len, $v->z / $len)
     } else {

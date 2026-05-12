@@ -23,7 +23,10 @@ fn Rosetta::IsPrime::is_prime($n) {
     }
 }
 
-fn primorial($n) {
+# Pn = product of the FIRST n primes (Rosetta's convention), distinct from
+# stryke's built-in `primorial(n) = product of all primes ≤ n`. Lives under
+# `Rosetta::Primorial::pn` to avoid the builtin shadow.
+fn Rosetta::Primorial::pn($n) {
     if ($n == 0) {
         1
     } else {
@@ -39,12 +42,12 @@ fn primorial($n) {
     }
 }
 
-assert_eq primorial(0), 1, "P0"
-assert_eq primorial(1), 2, "P1"
-assert_eq primorial(2), 6, "P2 (2*3)"
-assert_eq primorial(3), 30, "P3 (2*3*5)"
-assert_eq primorial(5), 2310, "P5"
+assert_eq Rosetta::Primorial::pn(0), 1, "P0"
+assert_eq Rosetta::Primorial::pn(1), 2, "P1"
+assert_eq Rosetta::Primorial::pn(2), 6, "P2 (2*3)"
+assert_eq Rosetta::Primorial::pn(3), 30, "P3 (2*3*5)"
+assert_eq Rosetta::Primorial::pn(5), 2310, "P5"
 
-5 |> primorial |> assert_eq(2310, "pipe primorial")
+5 |> Rosetta::Primorial::pn |> assert_eq(2310, "pipe Rosetta::Primorial::pn")
 
 test_run

@@ -57,19 +57,20 @@ crc32("a", "b") |> aeq crc32("a"), "BUG-157: crc32 ignores second arg"
 gcd(12, 18, 35) |> aeq 6, "BUG-167: gcd ignores third arg"
 lcm(4, 6, 10) |> aeq 12, "BUG-167: lcm ignores third arg"
 
-# BUG-169: hhi uses first arg only if it's not an arrayref? 
-# "hhi(0.3, 0.3, 0.4) uses only 0.3 -> 0.3^2 = 0.09"
-hhi(0.3, 0.3, 0.4) |> aeq 0.09, "BUG-169: hhi variadic uses first share only"
+# BUG-169 (FIXED): hhi now sums squares of every share argument, not just
+# the first. `hhi(0.3, 0.3, 0.4) = 0.09 + 0.09 + 0.16 = 0.34`.
+hhi(0.3, 0.3, 0.4) |> aeq 0.34, "BUG-169 (FIXED): hhi variadic sums squares of all shares"
 
-# BUG-170: moving_average window first
-# moving_average([1,2,3], 5) -> n=0->1, tail=[5], avg=5
-moving_average([1,2,3], 5) |> aeq 5, "BUG-170: moving_average swapped args"
+# BUG-170 (FIXED): moving_average now accepts either (WINDOW, LIST) or
+# (LIST, WINDOW). When WINDOW > len, returns an empty list.
+my @ma_170 = moving_average([1,2,3], 5)
+scalar(@ma_170) |> aeq 0, "BUG-170 (FIXED): moving_average(LIST, WINDOW); WINDOW > len → empty"
 
 # BUG-176: base_convert(255, 16) parses "255" as base-16 -> 597
 base_convert(255, 16) |> aeq 597, "BUG-176: base_convert two-arg numeric parses as FROM radix"
 
-# BUG-180: format_percent(0.125) -> "0.1%"
-format_percent(0.125) |> aeq "0.1%", "BUG-180: format_percent does not scale"
+# BUG-180 (FIXED): format_percent now scales fraction to percent.
+format_percent(0.125) |> aeq "12.5%", "BUG-180 (FIXED): format_percent(0.125) → '12.5%'"
 
 
 # BUG-183: binary_search needle first
