@@ -34,11 +34,12 @@ call_it(\&summer, 1, 2, 3);
 aeq($sum, 3, "BUG-037: captured coderef gets scalar count of args");
 
 
-# Pinning test for BUG-140: sum() on arrayref
+# BUG-140 (FIXED): sum() and product() now unwrap arrayref arguments instead
+# of returning 0. `sum([10,11,12])` returns 33; `product([6,7])` returns 42.
 my $s = sum([10, 11, 12]);
-aeq($s, 0, "BUG-140: sum([10, 11, 12]) should be 0 (buggy behavior)");
+aeq($s, 33, "BUG-140 (FIXED): sum([10, 11, 12]) unwraps arrayref");
 
 my $p = product([6, 7]);
-aeq($p, 0, "BUG-140: product([6, 7]) should be 0 (buggy behavior)");
+aeq($p, 42, "BUG-140 (FIXED): product([6, 7]) unwraps arrayref");
 
 test_run

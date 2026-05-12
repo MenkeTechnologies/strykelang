@@ -8,11 +8,11 @@ my ($x_90, @y_90) = (1, 2, 3)
 $x_90 |> aeq 1, "BUG-090: head binds correctly"
 @y_90 |> len |> aeq 2, "BUG-090: tail binds correctly"
 
-# BUG-101: my ($x_101) = @arr returns first element
+# BUG-101 (FIXED): my ($x) = @arr now binds the first element correctly
+# (was returning scalar count).
 my @arr_101 = (10, 20, 30)
 my ($first_101) = @arr_101
-# BUG-101: it currently returns the scalar count (3)
-$first_101 |> aeq 3, 'BUG-101: my ($x) = @arr returns scalar count (BUG)'
+$first_101 |> aeq 10, 'BUG-101 (FIXED): my ($x) = @arr binds first element'
 
 # BUG-110: use strict followed by fn on next line
 use strict

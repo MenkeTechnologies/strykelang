@@ -46,9 +46,9 @@ iota_range(5, 99) |> len |> aeq 5, "BUG-127: iota_range ignores second arg"
 # It uses cost (args[0]) and life (args[2]), skips args[1].
 depreciation_double(1000, 500, 10) |> aeq depreciation_double(1000, 0, 10), "BUG-133: depreciation_double ignores salvage"
 
-# BUG-140: sum/product skip arrayref innards
-sum([10, 11]) |> aeq 0, "BUG-140: sum([10, 11]) is 0"
-product([6, 7]) |> aeq 0, "BUG-140: product([6, 7]) is 0"
+# BUG-140 (FIXED): sum/product now unwrap arrayrefs correctly
+sum([10, 11]) |> aeq 21, "BUG-140 (FIXED): sum([10, 11]) = 21"
+product([6, 7]) |> aeq 42, "BUG-140 (FIXED): product([6, 7]) = 42"
 
 # BUG-157: crc32 ignores all bytes after first arg
 crc32("a", "b") |> aeq crc32("a"), "BUG-157: crc32 ignores second arg"
