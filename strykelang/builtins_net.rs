@@ -2256,6 +2256,1140 @@ pub fn eui64_from_mac(args: &[StrykeValue]) -> StrykeValue {
     eui48_to_eui64(args)
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// Ports (Phase 1, batch 4a)
+// ══════════════════════════════════════════════════════════════════════
+
+/// IANA port ranges. 0-1023 well-known, 1024-49151 registered/assigned,
+/// 49152-65535 dynamic/ephemeral.
+fn port_in_range(args: &[StrykeValue], lo: u16, hi: u16) -> StrykeValue {
+    let p = match args.first().map(|v| v.to_int()) {
+        Some(n) if (0..=65535).contains(&n) => n as u16,
+        _ => return StrykeValue::UNDEF,
+    };
+    b(p >= lo && p <= hi)
+}
+
+/// `port_is_well_known(N)` — 1 if N ∈ 0..=1023 (system ports).
+pub fn port_is_well_known(args: &[StrykeValue]) -> StrykeValue {
+    port_in_range(args, 0, 1023)
+}
+
+/// `port_is_assigned(N)` / `port_is_registered(N)` — 1 if N ∈ 1024..=49151.
+pub fn port_is_assigned(args: &[StrykeValue]) -> StrykeValue {
+    port_in_range(args, 1024, 49151)
+}
+
+/// `port_is_registered(N)` — alias for `port_is_assigned`.
+pub fn port_is_registered(args: &[StrykeValue]) -> StrykeValue {
+    port_is_assigned(args)
+}
+
+/// `port_is_ephemeral(N)` / `port_is_dynamic(N)` — 1 if N ∈ 49152..=65535.
+pub fn port_is_ephemeral(args: &[StrykeValue]) -> StrykeValue {
+    port_in_range(args, 49152, 65535)
+}
+
+/// `port_is_dynamic(N)` — alias for `port_is_ephemeral`.
+pub fn port_is_dynamic(args: &[StrykeValue]) -> StrykeValue {
+    port_is_ephemeral(args)
+}
+
+/// Compact well-known port → service map (only the most common ones —
+/// for the full IANA list, ship a separate registry crate).
+fn port_to_service_table() -> &'static [(u16, &'static str)] {
+    &[
+        (7, "echo"),
+        (9, "discard"),
+        (13, "daytime"),
+        (17, "qotd"),
+        (19, "chargen"),
+        (20, "ftp-data"),
+        (21, "ftp"),
+        (22, "ssh"),
+        (23, "telnet"),
+        (25, "smtp"),
+        (37, "time"),
+        (43, "whois"),
+        (49, "tacacs"),
+        (53, "dns"),
+        (67, "dhcp-server"),
+        (68, "dhcp-client"),
+        (69, "tftp"),
+        (70, "gopher"),
+        (79, "finger"),
+        (80, "http"),
+        (88, "kerberos"),
+        (109, "pop2"),
+        (110, "pop3"),
+        (111, "rpcbind"),
+        (113, "ident"),
+        (119, "nntp"),
+        (123, "ntp"),
+        (135, "msrpc"),
+        (137, "netbios-ns"),
+        (138, "netbios-dgm"),
+        (139, "netbios-ssn"),
+        (143, "imap"),
+        (161, "snmp"),
+        (162, "snmptrap"),
+        (179, "bgp"),
+        (194, "irc"),
+        (220, "imap3"),
+        (389, "ldap"),
+        (443, "https"),
+        (445, "smb"),
+        (465, "smtps"),
+        (500, "isakmp"),
+        (512, "exec"),
+        (513, "login"),
+        (514, "syslog"),
+        (515, "lpd"),
+        (520, "rip"),
+        (530, "rpc"),
+        (543, "klogin"),
+        (544, "kshell"),
+        (548, "afp"),
+        (554, "rtsp"),
+        (587, "submission"),
+        (631, "ipp"),
+        (636, "ldaps"),
+        (873, "rsync"),
+        (993, "imaps"),
+        (995, "pop3s"),
+        (1080, "socks"),
+        (1194, "openvpn"),
+        (1433, "mssql"),
+        (1521, "oracle"),
+        (1701, "l2tp"),
+        (1723, "pptp"),
+        (1812, "radius-auth"),
+        (1813, "radius-acct"),
+        (2049, "nfs"),
+        (3128, "squid"),
+        (3306, "mysql"),
+        (3389, "rdp"),
+        (3690, "svn"),
+        (4369, "epmd"),
+        (5060, "sip"),
+        (5061, "sips"),
+        (5432, "postgres"),
+        (5672, "amqp"),
+        (5800, "vnc-http"),
+        (5900, "vnc"),
+        (6379, "redis"),
+        (6443, "kubernetes"),
+        (6667, "irc"),
+        (8080, "http-alt"),
+        (8443, "https-alt"),
+        (9090, "prometheus"),
+        (9092, "kafka"),
+        (9200, "elasticsearch"),
+        (9418, "git"),
+        (11211, "memcached"),
+        (15672, "rabbitmq-mgmt"),
+        (27017, "mongodb"),
+        (50000, "sap"),
+    ]
+}
+
+/// `port_to_service(N)` — service name for known port, empty otherwise.
+pub fn port_to_service(args: &[StrykeValue]) -> StrykeValue {
+    let n = args
+        .first()
+        .map(|v| v.to_int())
+        .filter(|n| (0..=65535).contains(n))
+        .map(|n| n as u16);
+    let Some(port) = n else {
+        return StrykeValue::UNDEF;
+    };
+    let name = port_to_service_table()
+        .iter()
+        .find(|(p, _)| *p == port)
+        .map(|(_, n)| *n)
+        .unwrap_or("");
+    StrykeValue::string(name.to_string())
+}
+
+/// `port_name(N)` — alias of `port_to_service`.
+pub fn port_name(args: &[StrykeValue]) -> StrykeValue {
+    port_to_service(args)
+}
+
+/// `port_service_lookup(NAME)` — service name → port, undef if unknown.
+pub fn port_service_lookup(args: &[StrykeValue]) -> StrykeValue {
+    let needle = arg_str(args);
+    let needle = needle.trim().to_ascii_lowercase();
+    if needle.is_empty() {
+        return StrykeValue::UNDEF;
+    }
+    for (p, n) in port_to_service_table() {
+        if *n == needle {
+            return StrykeValue::integer(*p as i64);
+        }
+    }
+    StrykeValue::UNDEF
+}
+
+/// `port_parse_range("8000-8080")` — arrayref of port numbers.
+/// Accepts a single port too. Single comma-list: `"22,80,443"`.
+pub fn port_parse_range(args: &[StrykeValue]) -> StrykeValue {
+    use parking_lot::RwLock;
+    use std::sync::Arc;
+    let s = arg_str(args);
+    let mut out: Vec<StrykeValue> = Vec::new();
+    for part in s.split([',', ' ']) {
+        let part = part.trim();
+        if part.is_empty() {
+            continue;
+        }
+        if let Some((lo, hi)) = part.split_once('-') {
+            let (lo, hi) = (lo.trim().parse::<u32>().ok(), hi.trim().parse::<u32>().ok());
+            if let (Some(lo), Some(hi)) = (lo, hi) {
+                if lo <= hi && hi <= 65535 {
+                    for p in lo..=hi {
+                        out.push(StrykeValue::integer(p as i64));
+                    }
+                }
+            }
+        } else if let Ok(p) = part.parse::<u32>() {
+            if p <= 65535 {
+                out.push(StrykeValue::integer(p as i64));
+            }
+        }
+    }
+    if out.is_empty() {
+        return StrykeValue::UNDEF;
+    }
+    StrykeValue::array_ref(Arc::new(RwLock::new(out)))
+}
+
+/// `port_random_ephemeral()` — random port in 49152..=65535.
+pub fn port_random_ephemeral(_args: &[StrykeValue]) -> StrykeValue {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    let p: u16 = rng.gen_range(49152..=65535);
+    StrykeValue::integer(p as i64)
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// WebSocket handshake / framing (Phase 1, batch 4b)
+// ══════════════════════════════════════════════════════════════════════
+
+const WS_MAGIC: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
+/// `ws_handshake_key()` — random 16-byte client key, base64-encoded.
+/// Used as the `Sec-WebSocket-Key` request header value.
+pub fn ws_handshake_key(_args: &[StrykeValue]) -> StrykeValue {
+    use base64::Engine;
+    use rand::RngCore;
+    let mut bytes = [0u8; 16];
+    rand::thread_rng().fill_bytes(&mut bytes);
+    StrykeValue::string(base64::engine::general_purpose::STANDARD.encode(bytes))
+}
+
+/// `ws_handshake_accept(KEY)` — server's response token (base64 of
+/// SHA-1 of `key + magic`). Returns the `Sec-WebSocket-Accept` header
+/// value. RFC 6455 §1.3.
+pub fn ws_handshake_accept(args: &[StrykeValue]) -> StrykeValue {
+    use base64::Engine;
+    use sha1::{Digest, Sha1};
+    let key = arg_str(args);
+    let key = key.trim();
+    if key.is_empty() {
+        return StrykeValue::UNDEF;
+    }
+    let mut h = Sha1::new();
+    h.update(key.as_bytes());
+    h.update(WS_MAGIC.as_bytes());
+    let digest = h.finalize();
+    StrykeValue::string(base64::engine::general_purpose::STANDARD.encode(digest))
+}
+
+/// `ws_mask(\@payload, MASK_KEY)` — apply 4-byte mask to payload bytes
+/// (XOR each byte with `mask[i % 4]`). RFC 6455 §5.3.
+pub fn ws_mask(args: &[StrykeValue]) -> StrykeValue {
+    use parking_lot::RwLock;
+    use std::sync::Arc;
+    let Some(arr) = args.first().and_then(|v| v.as_array_ref()) else {
+        return StrykeValue::UNDEF;
+    };
+    let Some(mask) = args.get(1).and_then(|v| v.as_array_ref()) else {
+        return StrykeValue::UNDEF;
+    };
+    let mg = mask.read();
+    if mg.len() != 4 {
+        return StrykeValue::UNDEF;
+    }
+    let mk: [u8; 4] = [
+        mg[0].to_int() as u8,
+        mg[1].to_int() as u8,
+        mg[2].to_int() as u8,
+        mg[3].to_int() as u8,
+    ];
+    drop(mg);
+    let g = arr.read();
+    let out: Vec<StrykeValue> = g
+        .iter()
+        .enumerate()
+        .map(|(i, v)| StrykeValue::integer(((v.to_int() as u8) ^ mk[i % 4]) as i64))
+        .collect();
+    StrykeValue::array_ref(Arc::new(RwLock::new(out)))
+}
+
+/// `ws_unmask(\@payload, MASK_KEY)` — XOR is symmetric, so unmasking
+/// is the same op as masking. Provided for verb pairing.
+pub fn ws_unmask(args: &[StrykeValue]) -> StrykeValue {
+    ws_mask(args)
+}
+
+/// `ws_frame_encode(OPCODE, \@payload, FIN, MASK_KEY?)` — build a raw
+/// WebSocket frame as an arrayref of bytes. MASK_KEY is optional;
+/// supply 4 bytes for client→server frames, omit for server→client.
+/// Supports payload lengths up to u64.
+pub fn ws_frame_encode(args: &[StrykeValue]) -> StrykeValue {
+    use parking_lot::RwLock;
+    use std::sync::Arc;
+    let opcode = args.first().map(|v| v.to_int()).unwrap_or(1) as u8 & 0x0f;
+    let Some(payload_arr) = args.get(1).and_then(|v| v.as_array_ref()) else {
+        return StrykeValue::UNDEF;
+    };
+    let fin = args.get(2).map(|v| v.is_true()).unwrap_or(true);
+    let mask_key: Option<[u8; 4]> = args
+        .get(3)
+        .and_then(|v| v.as_array_ref())
+        .and_then(|arr| {
+            let g = arr.read();
+            if g.len() != 4 {
+                return None;
+            }
+            Some([
+                g[0].to_int() as u8,
+                g[1].to_int() as u8,
+                g[2].to_int() as u8,
+                g[3].to_int() as u8,
+            ])
+        });
+    let payload: Vec<u8> = payload_arr.read().iter().map(|v| v.to_int() as u8).collect();
+    let mut frame: Vec<u8> = Vec::with_capacity(payload.len() + 14);
+    let byte0 = (if fin { 0x80 } else { 0x00 }) | opcode;
+    frame.push(byte0);
+    let mask_bit = if mask_key.is_some() { 0x80 } else { 0x00 };
+    let len = payload.len();
+    if len < 126 {
+        frame.push(mask_bit | (len as u8));
+    } else if len < 65536 {
+        frame.push(mask_bit | 126);
+        frame.extend_from_slice(&(len as u16).to_be_bytes());
+    } else {
+        frame.push(mask_bit | 127);
+        frame.extend_from_slice(&(len as u64).to_be_bytes());
+    }
+    if let Some(mk) = mask_key {
+        frame.extend_from_slice(&mk);
+        for (i, b) in payload.iter().enumerate() {
+            frame.push(b ^ mk[i % 4]);
+        }
+    } else {
+        frame.extend_from_slice(&payload);
+    }
+    let elems: Vec<StrykeValue> = frame.into_iter().map(|b| StrykeValue::integer(b as i64)).collect();
+    StrykeValue::array_ref(Arc::new(RwLock::new(elems)))
+}
+
+/// `ws_frame_decode(\@bytes)` — parse a raw WebSocket frame. Returns
+/// `{ fin, opcode, masked, payload_len, payload, mask_key }` as a
+/// hashref, or undef on incomplete/invalid input.
+pub fn ws_frame_decode(args: &[StrykeValue]) -> StrykeValue {
+    use indexmap::IndexMap;
+    use parking_lot::RwLock;
+    use std::sync::Arc;
+    let Some(arr) = args.first().and_then(|v| v.as_array_ref()) else {
+        return StrykeValue::UNDEF;
+    };
+    let bytes: Vec<u8> = arr.read().iter().map(|v| v.to_int() as u8).collect();
+    if bytes.len() < 2 {
+        return StrykeValue::UNDEF;
+    }
+    let byte0 = bytes[0];
+    let byte1 = bytes[1];
+    let fin = (byte0 & 0x80) != 0;
+    let opcode = byte0 & 0x0f;
+    let masked = (byte1 & 0x80) != 0;
+    let len7 = byte1 & 0x7f;
+    let mut idx = 2usize;
+    let payload_len: u64 = match len7 {
+        126 => {
+            if bytes.len() < idx + 2 {
+                return StrykeValue::UNDEF;
+            }
+            let l = u16::from_be_bytes([bytes[idx], bytes[idx + 1]]) as u64;
+            idx += 2;
+            l
+        }
+        127 => {
+            if bytes.len() < idx + 8 {
+                return StrykeValue::UNDEF;
+            }
+            let mut b8 = [0u8; 8];
+            b8.copy_from_slice(&bytes[idx..idx + 8]);
+            idx += 8;
+            u64::from_be_bytes(b8)
+        }
+        n => n as u64,
+    };
+    let mask_key: Option<[u8; 4]> = if masked {
+        if bytes.len() < idx + 4 {
+            return StrykeValue::UNDEF;
+        }
+        let mk = [bytes[idx], bytes[idx + 1], bytes[idx + 2], bytes[idx + 3]];
+        idx += 4;
+        Some(mk)
+    } else {
+        None
+    };
+    if bytes.len() < idx + payload_len as usize {
+        return StrykeValue::UNDEF;
+    }
+    let payload: Vec<u8> = match mask_key {
+        Some(mk) => bytes[idx..idx + payload_len as usize]
+            .iter()
+            .enumerate()
+            .map(|(i, b)| b ^ mk[i % 4])
+            .collect(),
+        None => bytes[idx..idx + payload_len as usize].to_vec(),
+    };
+    let mut h: IndexMap<String, StrykeValue> = IndexMap::new();
+    h.insert("fin".to_string(), b(fin));
+    h.insert("opcode".to_string(), StrykeValue::integer(opcode as i64));
+    h.insert("masked".to_string(), b(masked));
+    h.insert(
+        "payload_len".to_string(),
+        StrykeValue::integer(payload_len as i64),
+    );
+    let payload_elems: Vec<StrykeValue> = payload
+        .into_iter()
+        .map(|b| StrykeValue::integer(b as i64))
+        .collect();
+    h.insert(
+        "payload".to_string(),
+        StrykeValue::array_ref(Arc::new(RwLock::new(payload_elems))),
+    );
+    if let Some(mk) = mask_key {
+        let mk_elems: Vec<StrykeValue> = mk
+            .iter()
+            .map(|b| StrykeValue::integer(*b as i64))
+            .collect();
+        h.insert(
+            "mask_key".to_string(),
+            StrykeValue::array_ref(Arc::new(RwLock::new(mk_elems))),
+        );
+    }
+    StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
+}
+
+/// `ws_close_frame(CODE, REASON?)` — build an opcode-0x8 close frame
+/// per RFC 6455 §5.5.1. CODE is a u16 status (1000=normal, 1001=going
+/// away, 1011=server error, etc.), REASON is an optional UTF-8 string.
+pub fn ws_close_frame(args: &[StrykeValue]) -> StrykeValue {
+    use parking_lot::RwLock;
+    use std::sync::Arc;
+    let code = args.first().map(|v| v.to_int()).unwrap_or(1000) as u16;
+    let reason = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let mut payload: Vec<u8> = Vec::new();
+    payload.extend_from_slice(&code.to_be_bytes());
+    payload.extend_from_slice(reason.as_bytes());
+    // Frame: FIN=1, opcode=8 (close), no mask, payload as above
+    let mut frame: Vec<u8> = Vec::with_capacity(payload.len() + 4);
+    frame.push(0x88); // FIN + opcode 8
+    if payload.len() < 126 {
+        frame.push(payload.len() as u8);
+    } else {
+        frame.push(126);
+        frame.extend_from_slice(&(payload.len() as u16).to_be_bytes());
+    }
+    frame.extend_from_slice(&payload);
+    let elems: Vec<StrykeValue> = frame.into_iter().map(|b| StrykeValue::integer(b as i64)).collect();
+    StrykeValue::array_ref(Arc::new(RwLock::new(elems)))
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// HTTP cookies (Phase 1, batch 4c)
+// ══════════════════════════════════════════════════════════════════════
+
+/// `cookie_parse(STR)` — parse a single `Set-Cookie` or `Cookie` header
+/// value into a hashref of attributes. Keys: `name`, `value`,
+/// `domain`, `path`, `expires`, `max-age`, `secure`, `http-only`,
+/// `same-site`.
+pub fn cookie_parse(args: &[StrykeValue]) -> StrykeValue {
+    use indexmap::IndexMap;
+    use parking_lot::RwLock;
+    use std::sync::Arc;
+    let s = arg_str(args);
+    let mut parts = s.split(';');
+    let first = match parts.next() {
+        Some(p) => p.trim(),
+        None => return StrykeValue::UNDEF,
+    };
+    let (name, value) = match first.split_once('=') {
+        Some((n, v)) => (n.trim().to_string(), v.trim().to_string()),
+        None => (first.to_string(), String::new()),
+    };
+    let mut h: IndexMap<String, StrykeValue> = IndexMap::new();
+    h.insert("name".to_string(), StrykeValue::string(name));
+    h.insert("value".to_string(), StrykeValue::string(value));
+    for attr in parts {
+        let attr = attr.trim();
+        if attr.is_empty() {
+            continue;
+        }
+        let (k, v) = match attr.split_once('=') {
+            Some((k, v)) => (k.trim().to_ascii_lowercase(), v.trim().to_string()),
+            None => (attr.to_ascii_lowercase(), String::new()),
+        };
+        match k.as_str() {
+            "secure" => {
+                h.insert("secure".to_string(), b(true));
+            }
+            "httponly" => {
+                h.insert("http-only".to_string(), b(true));
+            }
+            "max-age" => {
+                if let Ok(n) = v.parse::<i64>() {
+                    h.insert("max-age".to_string(), StrykeValue::integer(n));
+                }
+            }
+            "samesite" => {
+                h.insert("same-site".to_string(), StrykeValue::string(v));
+            }
+            _ => {
+                h.insert(k, StrykeValue::string(v));
+            }
+        }
+    }
+    StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
+}
+
+/// `cookie_format(\%cookie)` — render a hashref back to a Set-Cookie
+/// header string.
+pub fn cookie_format(args: &[StrykeValue]) -> StrykeValue {
+    let Some(h) = args.first().and_then(|v| v.as_hash_ref()) else {
+        return StrykeValue::UNDEF;
+    };
+    let g = h.read();
+    let name = g
+        .get("name")
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    let value = g
+        .get("value")
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    if name.is_empty() {
+        return StrykeValue::UNDEF;
+    }
+    let mut out = format!("{}={}", name, value);
+    for (k, v) in g.iter() {
+        match k.as_str() {
+            "name" | "value" => continue,
+            "secure" if v.is_true() => out.push_str("; Secure"),
+            "http-only" if v.is_true() => out.push_str("; HttpOnly"),
+            "max-age" => out.push_str(&format!("; Max-Age={}", v.to_int())),
+            "expires" => out.push_str(&format!("; Expires={}", v.to_string())),
+            "domain" => out.push_str(&format!("; Domain={}", v.to_string())),
+            "path" => out.push_str(&format!("; Path={}", v.to_string())),
+            "same-site" => out.push_str(&format!("; SameSite={}", v.to_string())),
+            _ => out.push_str(&format!("; {}={}", k, v.to_string())),
+        }
+    }
+    StrykeValue::string(out)
+}
+
+/// `cookie_jar_new()` — empty hashref of `name → cookie hashref`.
+pub fn cookie_jar_new(_args: &[StrykeValue]) -> StrykeValue {
+    use indexmap::IndexMap;
+    use parking_lot::RwLock;
+    use std::sync::Arc;
+    StrykeValue::hash_ref(Arc::new(RwLock::new(IndexMap::new())))
+}
+
+/// `cookie_jar_add(\%jar, COOKIE_STR_OR_HASHREF)` — add a cookie
+/// to the jar. Returns 1 on success.
+pub fn cookie_jar_add(args: &[StrykeValue]) -> StrykeValue {
+    let Some(jar) = args.first().and_then(|v| v.as_hash_ref()) else {
+        return StrykeValue::UNDEF;
+    };
+    let cookie_val = args.get(1).cloned().unwrap_or(StrykeValue::UNDEF);
+    let parsed = if cookie_val.as_hash_ref().is_some() {
+        cookie_val
+    } else {
+        cookie_parse(&[cookie_val])
+    };
+    let Some(parsed_h) = parsed.as_hash_ref() else {
+        return b(false);
+    };
+    let name = parsed_h
+        .read()
+        .get("name")
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    if name.is_empty() {
+        return b(false);
+    }
+    jar.write().insert(name, parsed);
+    b(true)
+}
+
+/// `cookie_jar_get(\%jar, NAME)` — cookie hashref by name, or undef.
+pub fn cookie_jar_get(args: &[StrykeValue]) -> StrykeValue {
+    let Some(jar) = args.first().and_then(|v| v.as_hash_ref()) else {
+        return StrykeValue::UNDEF;
+    };
+    let name = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let g = jar.read();
+    g.get(&name).cloned().unwrap_or(StrykeValue::UNDEF)
+}
+
+/// `cookie_is_session(\%cookie)` — 1 if cookie has no `Expires` and no
+/// `Max-Age` (i.e. dies with the browser session).
+pub fn cookie_is_session(args: &[StrykeValue]) -> StrykeValue {
+    let Some(h) = args.first().and_then(|v| v.as_hash_ref()) else {
+        return StrykeValue::UNDEF;
+    };
+    let g = h.read();
+    let has_expires = g.get("expires").is_some_and(|v| !v.is_undef());
+    let has_max_age = g.get("max-age").is_some_and(|v| !v.is_undef());
+    b(!has_expires && !has_max_age)
+}
+
+/// `cookie_is_expired(\%cookie, NOW_UNIX)` — 1 if cookie's max-age or
+/// expires indicates it's already past. NOW_UNIX optional (defaults to
+/// `time()`).
+pub fn cookie_is_expired(args: &[StrykeValue]) -> StrykeValue {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let Some(h) = args.first().and_then(|v| v.as_hash_ref()) else {
+        return StrykeValue::UNDEF;
+    };
+    let now = args
+        .get(1)
+        .map(|v| v.to_int())
+        .unwrap_or_else(|| {
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0)
+        });
+    let g = h.read();
+    // Max-Age takes precedence over Expires per RFC 6265
+    if let Some(ma) = g.get("max-age") {
+        let secs = ma.to_int();
+        if secs <= 0 {
+            return b(true);
+        }
+        // We don't know the cookie's creation time, so use the
+        // `created_at` field if present; otherwise treat as fresh.
+        let created = g
+            .get("created_at")
+            .map(|v| v.to_int())
+            .unwrap_or(now);
+        return b(now >= created + secs);
+    }
+    if let Some(exp) = g.get("expires") {
+        let exp_str = exp.to_string();
+        // Accept either Unix epoch int or RFC 7231 string parsed by chrono.
+        if let Ok(epoch) = exp_str.parse::<i64>() {
+            return b(now >= epoch);
+        }
+        if let Ok(dt) = chrono::DateTime::parse_from_rfc2822(&exp_str) {
+            return b(now >= dt.timestamp());
+        }
+    }
+    b(false)
+}
+
+/// `cookie_domain_matches(\%cookie, HOST)` — RFC 6265 §5.1.3 domain
+/// matching: cookie's Domain is a suffix of HOST (case-insensitive),
+/// or exact match.
+pub fn cookie_domain_matches(args: &[StrykeValue]) -> StrykeValue {
+    let Some(h) = args.first().and_then(|v| v.as_hash_ref()) else {
+        return StrykeValue::UNDEF;
+    };
+    let host = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let g = h.read();
+    let domain = g
+        .get("domain")
+        .map(|v| v.to_string().trim_start_matches('.').to_ascii_lowercase())
+        .unwrap_or_default();
+    let host = host.to_ascii_lowercase();
+    if domain.is_empty() {
+        return b(false);
+    }
+    if host == domain {
+        return b(true);
+    }
+    if host.ends_with(&format!(".{}", domain)) {
+        return b(true);
+    }
+    b(false)
+}
+
+/// `cookie_path_matches(\%cookie, REQUEST_PATH)` — RFC 6265 §5.1.4
+/// path-match: cookie path is `/` or is a prefix of REQUEST_PATH on a
+/// `/` boundary.
+pub fn cookie_path_matches(args: &[StrykeValue]) -> StrykeValue {
+    let Some(h) = args.first().and_then(|v| v.as_hash_ref()) else {
+        return StrykeValue::UNDEF;
+    };
+    let req_path = args.get(1).map(|v| v.to_string()).unwrap_or_else(|| "/".to_string());
+    let g = h.read();
+    let path = g
+        .get("path")
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "/".to_string());
+    if path == "/" {
+        return b(true);
+    }
+    if req_path == path {
+        return b(true);
+    }
+    let needle = if path.ends_with('/') {
+        path.clone()
+    } else {
+        format!("{}/", path)
+    };
+    b(req_path.starts_with(&needle))
+}
+
+/// `cookie_set_max_age(\%cookie, SECS)` — set the cookie's Max-Age.
+/// Mutates the hashref in place; returns 1.
+pub fn cookie_set_max_age(args: &[StrykeValue]) -> StrykeValue {
+    let Some(h) = args.first().and_then(|v| v.as_hash_ref()) else {
+        return StrykeValue::UNDEF;
+    };
+    let secs = args.get(1).map(|v| v.to_int()).unwrap_or(0);
+    h.write()
+        .insert("max-age".to_string(), StrykeValue::integer(secs));
+    b(true)
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// HTTP method / status / MIME helpers (Phase 1, batch 4d)
+// ══════════════════════════════════════════════════════════════════════
+
+/// `http_method_is_idempotent(METHOD)` — RFC 9110 §9.2.2. Idempotent
+/// methods: GET, HEAD, OPTIONS, PUT, DELETE, TRACE.
+pub fn http_method_is_idempotent(args: &[StrykeValue]) -> StrykeValue {
+    let m = arg_str(args).to_ascii_uppercase();
+    b(matches!(
+        m.as_str(),
+        "GET" | "HEAD" | "OPTIONS" | "PUT" | "DELETE" | "TRACE"
+    ))
+}
+
+/// `http_method_is_safe(METHOD)` — RFC 9110 §9.2.1. Safe methods don't
+/// modify server state: GET, HEAD, OPTIONS, TRACE.
+pub fn http_method_is_safe(args: &[StrykeValue]) -> StrykeValue {
+    let m = arg_str(args).to_ascii_uppercase();
+    b(matches!(m.as_str(), "GET" | "HEAD" | "OPTIONS" | "TRACE"))
+}
+
+/// `http_method_has_body(METHOD)` — methods that typically carry a
+/// request body: POST, PUT, PATCH.
+pub fn http_method_has_body(args: &[StrykeValue]) -> StrykeValue {
+    let m = arg_str(args).to_ascii_uppercase();
+    b(matches!(m.as_str(), "POST" | "PUT" | "PATCH"))
+}
+
+/// `http_status_class(N)` — first digit of the status code (1-5),
+/// undef if out of range.
+pub fn http_status_class(args: &[StrykeValue]) -> StrykeValue {
+    let n = args.first().map(|v| v.to_int()).unwrap_or(0);
+    if (100..=599).contains(&n) {
+        StrykeValue::integer(n / 100)
+    } else {
+        StrykeValue::UNDEF
+    }
+}
+
+/// `http_status_is_informational(N)` — 100..=199.
+pub fn http_status_is_informational(args: &[StrykeValue]) -> StrykeValue {
+    let n = args.first().map(|v| v.to_int()).unwrap_or(0);
+    b((100..200).contains(&n))
+}
+
+/// `http_status_is_success(N)` — 200..=299.
+pub fn http_status_is_success(args: &[StrykeValue]) -> StrykeValue {
+    let n = args.first().map(|v| v.to_int()).unwrap_or(0);
+    b((200..300).contains(&n))
+}
+
+/// `http_status_is_redirect(N)` — 300..=399.
+pub fn http_status_is_redirect(args: &[StrykeValue]) -> StrykeValue {
+    let n = args.first().map(|v| v.to_int()).unwrap_or(0);
+    b((300..400).contains(&n))
+}
+
+/// `http_status_is_client_error(N)` — 400..=499.
+pub fn http_status_is_client_error(args: &[StrykeValue]) -> StrykeValue {
+    let n = args.first().map(|v| v.to_int()).unwrap_or(0);
+    b((400..500).contains(&n))
+}
+
+/// `http_status_is_server_error(N)` — 500..=599.
+pub fn http_status_is_server_error(args: &[StrykeValue]) -> StrykeValue {
+    let n = args.first().map(|v| v.to_int()).unwrap_or(0);
+    b((500..600).contains(&n))
+}
+
+/// `http_status_text(N)` — canonical reason phrase per RFC 9110.
+pub fn http_status_text(args: &[StrykeValue]) -> StrykeValue {
+    let n = args.first().map(|v| v.to_int()).unwrap_or(0);
+    let s = match n {
+        100 => "Continue",
+        101 => "Switching Protocols",
+        102 => "Processing",
+        103 => "Early Hints",
+        200 => "OK",
+        201 => "Created",
+        202 => "Accepted",
+        203 => "Non-Authoritative Information",
+        204 => "No Content",
+        205 => "Reset Content",
+        206 => "Partial Content",
+        207 => "Multi-Status",
+        208 => "Already Reported",
+        226 => "IM Used",
+        300 => "Multiple Choices",
+        301 => "Moved Permanently",
+        302 => "Found",
+        303 => "See Other",
+        304 => "Not Modified",
+        307 => "Temporary Redirect",
+        308 => "Permanent Redirect",
+        400 => "Bad Request",
+        401 => "Unauthorized",
+        402 => "Payment Required",
+        403 => "Forbidden",
+        404 => "Not Found",
+        405 => "Method Not Allowed",
+        406 => "Not Acceptable",
+        407 => "Proxy Authentication Required",
+        408 => "Request Timeout",
+        409 => "Conflict",
+        410 => "Gone",
+        411 => "Length Required",
+        412 => "Precondition Failed",
+        413 => "Content Too Large",
+        414 => "URI Too Long",
+        415 => "Unsupported Media Type",
+        416 => "Range Not Satisfiable",
+        417 => "Expectation Failed",
+        418 => "I'm a teapot",
+        421 => "Misdirected Request",
+        422 => "Unprocessable Content",
+        423 => "Locked",
+        424 => "Failed Dependency",
+        425 => "Too Early",
+        426 => "Upgrade Required",
+        428 => "Precondition Required",
+        429 => "Too Many Requests",
+        431 => "Request Header Fields Too Large",
+        451 => "Unavailable For Legal Reasons",
+        500 => "Internal Server Error",
+        501 => "Not Implemented",
+        502 => "Bad Gateway",
+        503 => "Service Unavailable",
+        504 => "Gateway Timeout",
+        505 => "HTTP Version Not Supported",
+        506 => "Variant Also Negotiates",
+        507 => "Insufficient Storage",
+        508 => "Loop Detected",
+        510 => "Not Extended",
+        511 => "Network Authentication Required",
+        _ => "",
+    };
+    if s.is_empty() {
+        StrykeValue::UNDEF
+    } else {
+        StrykeValue::string(s.to_string())
+    }
+}
+
+/// `http_date_parse(STR)` — parse an HTTP date (RFC 7231 IMF-fixdate,
+/// RFC 850, or asctime() form) → unix epoch.
+pub fn http_date_parse(args: &[StrykeValue]) -> StrykeValue {
+    let s = arg_str(args);
+    let s = s.trim();
+    // Try RFC 2822 / IMF-fixdate first
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc2822(s) {
+        return StrykeValue::integer(dt.timestamp());
+    }
+    // Try ANSI C asctime() format: "Sun Nov  6 08:49:37 1994"
+    if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(s, "%a %b %e %T %Y") {
+        return StrykeValue::integer(dt.and_utc().timestamp());
+    }
+    // RFC 850: "Sunday, 06-Nov-94 08:49:37 GMT"
+    if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(s, "%A, %d-%b-%y %T GMT") {
+        return StrykeValue::integer(dt.and_utc().timestamp());
+    }
+    StrykeValue::UNDEF
+}
+
+/// `http_date_format(EPOCH)` — format unix epoch as IMF-fixdate
+/// per RFC 7231 (e.g., `"Sun, 06 Nov 1994 08:49:37 GMT"`).
+pub fn http_date_format(args: &[StrykeValue]) -> StrykeValue {
+    let n = args.first().map(|v| v.to_int()).unwrap_or(0);
+    let dt = chrono::DateTime::<chrono::Utc>::from_timestamp(n, 0);
+    match dt {
+        Some(d) => StrykeValue::string(d.format("%a, %d %b %Y %H:%M:%S GMT").to_string()),
+        None => StrykeValue::UNDEF,
+    }
+}
+
+/// MIME type ↔ extension table (compact — common subset).
+fn mime_table() -> &'static [(&'static str, &'static str)] {
+    &[
+        ("html", "text/html"),
+        ("htm", "text/html"),
+        ("css", "text/css"),
+        ("js", "application/javascript"),
+        ("mjs", "application/javascript"),
+        ("json", "application/json"),
+        ("xml", "application/xml"),
+        ("txt", "text/plain"),
+        ("md", "text/markdown"),
+        ("csv", "text/csv"),
+        ("tsv", "text/tab-separated-values"),
+        ("yaml", "application/yaml"),
+        ("yml", "application/yaml"),
+        ("toml", "application/toml"),
+        ("pdf", "application/pdf"),
+        ("zip", "application/zip"),
+        ("tar", "application/x-tar"),
+        ("gz", "application/gzip"),
+        ("bz2", "application/x-bzip2"),
+        ("xz", "application/x-xz"),
+        ("zst", "application/zstd"),
+        ("7z", "application/x-7z-compressed"),
+        ("png", "image/png"),
+        ("jpg", "image/jpeg"),
+        ("jpeg", "image/jpeg"),
+        ("gif", "image/gif"),
+        ("webp", "image/webp"),
+        ("svg", "image/svg+xml"),
+        ("ico", "image/x-icon"),
+        ("bmp", "image/bmp"),
+        ("tiff", "image/tiff"),
+        ("avif", "image/avif"),
+        ("heic", "image/heic"),
+        ("mp3", "audio/mpeg"),
+        ("wav", "audio/wav"),
+        ("ogg", "audio/ogg"),
+        ("flac", "audio/flac"),
+        ("aac", "audio/aac"),
+        ("m4a", "audio/mp4"),
+        ("opus", "audio/opus"),
+        ("mp4", "video/mp4"),
+        ("mov", "video/quicktime"),
+        ("webm", "video/webm"),
+        ("mkv", "video/x-matroska"),
+        ("avi", "video/x-msvideo"),
+        ("woff", "font/woff"),
+        ("woff2", "font/woff2"),
+        ("ttf", "font/ttf"),
+        ("otf", "font/otf"),
+        ("wasm", "application/wasm"),
+        ("rs", "text/x-rust"),
+        ("py", "text/x-python"),
+        ("pl", "application/x-perl"),
+        ("stk", "text/x-stryke"),
+    ]
+}
+
+/// `mime_type_for_extension(EXT)` — `"png"` → `"image/png"`. EXT may
+/// include or omit the leading dot. Returns empty string when unknown.
+pub fn mime_type_for_extension(args: &[StrykeValue]) -> StrykeValue {
+    let ext = arg_str(args);
+    let ext = ext.trim().trim_start_matches('.').to_ascii_lowercase();
+    let found = mime_table()
+        .iter()
+        .find(|(e, _)| *e == ext)
+        .map(|(_, m)| *m)
+        .unwrap_or("");
+    StrykeValue::string(found.to_string())
+}
+
+/// `mime_extension_for_type(MIME)` — `"image/png"` → `"png"`. Returns
+/// empty string when unknown. First match wins for types with multiple
+/// extensions (e.g., `image/jpeg` → `jpg`).
+pub fn mime_extension_for_type(args: &[StrykeValue]) -> StrykeValue {
+    let mime = arg_str(args).trim().to_ascii_lowercase();
+    let found = mime_table()
+        .iter()
+        .find(|(_, m)| *m == mime)
+        .map(|(e, _)| *e)
+        .unwrap_or("");
+    StrykeValue::string(found.to_string())
+}
+
+/// `mime_is_text(MIME)` — 1 if the type starts with `"text/"` or is
+/// one of the well-known text MIMEs (json, javascript, xml, yaml, toml).
+pub fn mime_is_text(args: &[StrykeValue]) -> StrykeValue {
+    let m = arg_str(args).to_ascii_lowercase();
+    b(m.starts_with("text/")
+        || m.starts_with("application/json")
+        || m.starts_with("application/javascript")
+        || m.starts_with("application/xml")
+        || m.starts_with("application/yaml")
+        || m.starts_with("application/toml")
+        || m.starts_with("application/x-")
+            && (m.contains("rust") || m.contains("python") || m.contains("perl")))
+}
+
+/// `mime_is_image(MIME)` — 1 if the type starts with `"image/"`.
+pub fn mime_is_image(args: &[StrykeValue]) -> StrykeValue {
+    b(arg_str(args).to_ascii_lowercase().starts_with("image/"))
+}
+
+/// `mime_is_audio(MIME)` — 1 if the type starts with `"audio/"`.
+pub fn mime_is_audio(args: &[StrykeValue]) -> StrykeValue {
+    b(arg_str(args).to_ascii_lowercase().starts_with("audio/"))
+}
+
+/// `mime_is_video(MIME)` — 1 if the type starts with `"video/"`.
+pub fn mime_is_video(args: &[StrykeValue]) -> StrykeValue {
+    b(arg_str(args).to_ascii_lowercase().starts_with("video/"))
+}
+
+/// `mime_is_application(MIME)` — 1 if the type starts with `"application/"`.
+pub fn mime_is_application(args: &[StrykeValue]) -> StrykeValue {
+    b(arg_str(args).to_ascii_lowercase().starts_with("application/"))
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Bandwidth / RTT formatting (Phase 1, batch 4e)
+// ══════════════════════════════════════════════════════════════════════
+
+/// `bandwidth_format(BPS)` — human-readable bandwidth string
+/// (e.g., `1_500_000` → `"1.5 Mbps"`).
+pub fn bandwidth_format(args: &[StrykeValue]) -> StrykeValue {
+    let bps = args.first().map(|v| v.to_int()).unwrap_or(0) as f64;
+    let (val, unit) = if bps >= 1e12 {
+        (bps / 1e12, "Tbps")
+    } else if bps >= 1e9 {
+        (bps / 1e9, "Gbps")
+    } else if bps >= 1e6 {
+        (bps / 1e6, "Mbps")
+    } else if bps >= 1e3 {
+        (bps / 1e3, "Kbps")
+    } else {
+        (bps, "bps")
+    };
+    StrykeValue::string(format!("{:.1} {}", val, unit))
+}
+
+/// `bandwidth_parse(STR)` — inverse: `"1.5 Mbps"` → `1500000`. Accepts
+/// `bps/kbps/mbps/gbps/tbps` case-insensitively. Returns undef on parse
+/// failure.
+pub fn bandwidth_parse(args: &[StrykeValue]) -> StrykeValue {
+    let s = arg_str(args);
+    let s = s.trim();
+    let mut split_at = s.len();
+    for (i, c) in s.char_indices() {
+        if c.is_ascii_alphabetic() {
+            split_at = i;
+            break;
+        }
+    }
+    let (num_part, unit_part) = s.split_at(split_at);
+    let Ok(num) = num_part.trim().parse::<f64>() else {
+        return StrykeValue::UNDEF;
+    };
+    let mult = match unit_part.trim().to_ascii_lowercase().as_str() {
+        "bps" | "" => 1.0,
+        "kbps" => 1e3,
+        "mbps" => 1e6,
+        "gbps" => 1e9,
+        "tbps" => 1e12,
+        _ => return StrykeValue::UNDEF,
+    };
+    StrykeValue::integer((num * mult) as i64)
+}
+
+/// Collect numeric latencies from arg or single arg array.
+fn collect_latencies(args: &[StrykeValue]) -> Vec<f64> {
+    if let Some(arr) = args.first().and_then(|v| v.as_array_ref()) {
+        arr.read().iter().map(|v| v.to_number()).collect()
+    } else {
+        args.iter().map(|v| v.to_number()).collect()
+    }
+}
+
+/// `latency_ms(SECONDS)` — convert seconds → milliseconds.
+pub fn latency_ms(args: &[StrykeValue]) -> StrykeValue {
+    let s = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    StrykeValue::float(s * 1000.0)
+}
+
+/// `packet_loss(SENT, LOST)` — loss percentage as f64 in `[0.0, 100.0]`.
+pub fn packet_loss(args: &[StrykeValue]) -> StrykeValue {
+    let sent = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let lost = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    if sent <= 0.0 {
+        return StrykeValue::float(0.0);
+    }
+    StrykeValue::float((lost / sent) * 100.0)
+}
+
+/// `jitter_ms(\@samples_ms)` — RFC 3550 inter-arrival jitter estimate
+/// (smoothed mean absolute diff of consecutive samples). Input is a
+/// list of latency samples in milliseconds.
+pub fn jitter_ms(args: &[StrykeValue]) -> StrykeValue {
+    let samples = collect_latencies(args);
+    if samples.len() < 2 {
+        return StrykeValue::float(0.0);
+    }
+    let mut j = 0.0f64;
+    for i in 1..samples.len() {
+        let d = (samples[i] - samples[i - 1]).abs();
+        j += (d - j) / 16.0;
+    }
+    StrykeValue::float(j)
+}
+
+/// `rtt_min(\@samples_ms)` — minimum sample.
+pub fn rtt_min(args: &[StrykeValue]) -> StrykeValue {
+    let s = collect_latencies(args);
+    s.into_iter()
+        .fold(f64::INFINITY, |a, b| a.min(b))
+        .pipe(|v| if v.is_infinite() { StrykeValue::UNDEF } else { StrykeValue::float(v) })
+}
+
+/// `rtt_max(\@samples_ms)` — maximum sample.
+pub fn rtt_max(args: &[StrykeValue]) -> StrykeValue {
+    let s = collect_latencies(args);
+    s.into_iter()
+        .fold(f64::NEG_INFINITY, |a, b| a.max(b))
+        .pipe(|v| if v.is_infinite() { StrykeValue::UNDEF } else { StrykeValue::float(v) })
+}
+
+/// `rtt_avg(\@samples_ms)` — arithmetic mean.
+pub fn rtt_avg(args: &[StrykeValue]) -> StrykeValue {
+    let s = collect_latencies(args);
+    if s.is_empty() {
+        return StrykeValue::UNDEF;
+    }
+    let sum: f64 = s.iter().sum();
+    StrykeValue::float(sum / s.len() as f64)
+}
+
+trait Pipe: Sized {
+    fn pipe<U, F: FnOnce(Self) -> U>(self, f: F) -> U {
+        f(self)
+    }
+}
+impl<T> Pipe for T {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
