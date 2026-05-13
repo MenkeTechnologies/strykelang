@@ -13,10 +13,11 @@ $s_v |> aeq "A", "vec 8-bit lvalue"
 
 package Box
 # Use ->{ } for hashref access in strict mode
+# fn defined inside `package Box` are auto-namespaced as Box::as_string / Box::add.
 fn as_string = "Box(" . _0->{val} . ")"
 fn add = bless({ val => _0->{val} + _1->{val} }, "Box")
 
-use overload 
+use overload
     '""' => "as_string",
     '+'  => "add"
 
@@ -36,9 +37,9 @@ my $ba = bless({ val => 99 }, "BoxAnon")
 
 # ── Caller ─────────────────────────────────────────────────────────────────
 
-fn call_inner = (caller(0))[3]
-fn call_outer = call_inner()
-!defined(call_outer()) |> aok "caller(0)[3] is undef (pinned bug)"
+fn Pin::ParityDeep::call_inner = (caller(0))[3]
+fn Pin::ParityDeep::call_outer = Pin::ParityDeep::call_inner()
+!defined(Pin::ParityDeep::call_outer()) |> aok "caller(0)[3] is undef (pinned bug)"
 
 # ── Bless Arrayref Tag ─────────────────────────────────────────────────────
 

@@ -5,17 +5,17 @@
 
 # ── AOP Limitations ───────────────────────────────────────────────────────
 
-fn target_args = _
-around "target_args" {
+fn Pin::BugsPhase3::target_args = _
+around "Pin::BugsPhase3::target_args" {
     $INTERCEPT_ARGS[0] = "ignored"
     proceed()
 }
-target_args("world") |> aeq "world", "AOP cannot mutate @INTERCEPT_ARGS"
+Pin::BugsPhase3::target_args("world") |> aeq "world", "AOP cannot mutate @INTERCEPT_ARGS"
 
-fn target_compose = 1
-around "target_compose" { proceed() + 10 }
-around "target_compose" { proceed() * 100 }
-target_compose() |> aeq 11, "Multiple around advice do not compose"
+fn Pin::BugsPhase3::target_compose = 1
+around "Pin::BugsPhase3::target_compose" { proceed() + 10 }
+around "Pin::BugsPhase3::target_compose" { proceed() * 100 }
+Pin::BugsPhase3::target_compose() |> aeq 11, "Multiple around advice do not compose"
 
 # ── RefAddr ───────────────────────────────────────────────────────────────
 
@@ -33,11 +33,11 @@ $log_begin |> aeq "M:", "BEGIN mutations to package vars are lost"
 
 # ── Destructuring Bugs ────────────────────────────────────────────────────
 
-fn test_slurp {
+fn Pin::BugsPhase3::test_slurp {
     my ($first, @rest) = @_
     len(@rest)
 }
-test_slurp(1, 2, 3) |> aeq 2, "my ($s, @rest) = @_ correctly takes tail"
+Pin::BugsPhase3::test_slurp(1, 2, 3) |> aeq 2, "my ($s, @rest) = @_ correctly takes tail"
 
 my @items = (10, 20, 30)
 my ($x_single) = @items

@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Poker hand analyser
 
-fn card_value($c) {
+fn Rosetta::PokerHand::card_value($c) {
     my $v = substr($c, 0, length($c)-1)
     if ($v eq "A") { 14 }
     elsif ($v eq "K") { 13 }
@@ -11,14 +11,14 @@ fn card_value($c) {
     else { int($v) }
 }
 
-fn card_suit($c) {
+fn Rosetta::PokerHand::card_suit($c) {
     substr($c, length($c)-1, 1)
 }
 
-fn analyze_hand(@cards) {
-    my @raw_vals = ~> @cards map { card_value(_) }
+fn Rosetta::PokerHand::analyze_hand(@cards) {
+    my @raw_vals = ~> @cards map { Rosetta::PokerHand::card_value(_) }
     my @vals = sort { _0 <=> _1 } @raw_vals
-    my @suits = ~> @cards map { card_suit(_) }
+    my @suits = ~> @cards map { Rosetta::PokerHand::card_suit(_) }
     
     my $is_flush = 0
     my %suit_counts
@@ -65,16 +65,16 @@ fn analyze_hand(@cards) {
     $res
 }
 
-assert_eq analyze_hand("AS", "KS", "QS", "JS", "TS"), "straight flush", "royal flush"
-assert_eq analyze_hand("2H", "3H", "4H", "5H", "6H"), "straight flush", "straight flush"
-assert_eq analyze_hand("AS", "AD", "AH", "AC", "2D"), "four of a kind", "four of a kind"
-assert_eq analyze_hand("2S", "2D", "2H", "3C", "3D"), "full house", "full house"
-assert_eq analyze_hand("2S", "4S", "6S", "8S", "TS"), "flush", "flush"
-assert_eq analyze_hand("2S", "3D", "4H", "5C", "6S"), "straight", "straight"
-assert_eq analyze_hand("AS", "2D", "3H", "4C", "5S"), "straight", "ace-low straight"
-assert_eq analyze_hand("2S", "2D", "2H", "3C", "4D"), "three of a kind", "three of a kind"
-assert_eq analyze_hand("2S", "2D", "3H", "3C", "4D"), "two pair", "two pair"
-assert_eq analyze_hand("2S", "2D", "3H", "4C", "5D"), "one pair", "one pair"
-assert_eq analyze_hand("2S", "3D", "5H", "7C", "9D"), "high card", "high card"
+assert_eq Rosetta::PokerHand::analyze_hand("AS", "KS", "QS", "JS", "TS"), "straight flush", "royal flush"
+assert_eq Rosetta::PokerHand::analyze_hand("2H", "3H", "4H", "5H", "6H"), "straight flush", "straight flush"
+assert_eq Rosetta::PokerHand::analyze_hand("AS", "AD", "AH", "AC", "2D"), "four of a kind", "four of a kind"
+assert_eq Rosetta::PokerHand::analyze_hand("2S", "2D", "2H", "3C", "3D"), "full house", "full house"
+assert_eq Rosetta::PokerHand::analyze_hand("2S", "4S", "6S", "8S", "TS"), "flush", "flush"
+assert_eq Rosetta::PokerHand::analyze_hand("2S", "3D", "4H", "5C", "6S"), "straight", "straight"
+assert_eq Rosetta::PokerHand::analyze_hand("AS", "2D", "3H", "4C", "5S"), "straight", "ace-low straight"
+assert_eq Rosetta::PokerHand::analyze_hand("2S", "2D", "2H", "3C", "4D"), "three of a kind", "three of a kind"
+assert_eq Rosetta::PokerHand::analyze_hand("2S", "2D", "3H", "3C", "4D"), "two pair", "two pair"
+assert_eq Rosetta::PokerHand::analyze_hand("2S", "2D", "3H", "4C", "5D"), "one pair", "one pair"
+assert_eq Rosetta::PokerHand::analyze_hand("2S", "3D", "5H", "7C", "9D"), "high card", "high card"
 
 test_run

@@ -3,7 +3,7 @@
 # Stryke Parallel Cache (pcache) Demo
 # Shows how to memoize expensive operations across parallel threads
 
-fn expensive_calc($n) {
+fn Demo::PCache::expensive_calc($n) {
     p "  [CALC] Computing result for $n..."
     sleep 0.5 # Simulate heavy load
     $n * $n * $n
@@ -17,8 +17,8 @@ p "Using pcache to avoid redundant calculations:"
 
 my $start = now_ns()
 
-# pcache ensures that expensive_calc($n) is only run once for each unique $n
-my @results = pcache { expensive_calc } @inputs
+# pcache ensures that Demo::PCache::expensive_calc($n) is only run once for each unique $n
+my @results = pcache { Demo::PCache::expensive_calc } @inputs
 
 my $end = now_ns()
 my $duration = ($end - $start) / 1_000_000_000

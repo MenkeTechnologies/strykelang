@@ -30,7 +30,7 @@ fn Rosetta::Repunit::repunit($n) {
     $r
 }
 
-fn is_repunit_prime($n) {
+fn Rosetta::RepunitPrime::is_repunit_prime($n) {
     if (!Rosetta::Repunit::isPrime($n)) {
         0
     } else {
@@ -39,10 +39,10 @@ fn is_repunit_prime($n) {
     }
 }
 
-assert_ok is_repunit_prime(2), "R2 = 11 is prime"
-assert_ok !is_repunit_prime(3), "R3 = 111 is not (3*37)"
-assert_ok !is_repunit_prime(5), "R5 = 11111 is not (41*271)"
+assert_ok Rosetta::RepunitPrime::is_repunit_prime(2), "R2 = 11 is prime"
+assert_ok !Rosetta::RepunitPrime::is_repunit_prime(3), "R3 = 111 is not (3*37)"
+assert_ok !Rosetta::RepunitPrime::is_repunit_prime(5), "R5 = 11111 is not (41*271)"
 
-2 |> is_repunit_prime |> assert_ok("pipe Rosetta::Repunit::repunit prime")
+2 |> Rosetta::RepunitPrime::is_repunit_prime |> assert_ok("pipe Rosetta::Repunit::repunit prime")
 
 test_run

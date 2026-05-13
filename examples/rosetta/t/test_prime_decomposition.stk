@@ -15,7 +15,7 @@ fn Rosetta::PrimeFactors::prime_factors($n) {
     @factors
 }
 
-fn is_prime_via_factors($n) {
+fn Rosetta::PrimeDecomposition::is_prime_via_factors($n) {
     if ($n < 2) {
         0
     } else {
@@ -39,8 +39,8 @@ assert_eq len(@f1), 0, "1 has no prime factors"
 my @f84 = Rosetta::PrimeFactors::prime_factors(84)
 assert_eq join("*", @f84), "2*2*3*7", "84 = 2*2*3*7"
 
-assert_ok is_prime_via_factors(17), "17 is prime"
-assert_ok is_prime_via_factors(97), "97 is prime"
-assert_ok !is_prime_via_factors(100), "100 is not prime"
+assert_ok Rosetta::PrimeDecomposition::is_prime_via_factors(17), "17 is prime"
+assert_ok Rosetta::PrimeDecomposition::is_prime_via_factors(97), "97 is prime"
+assert_ok !Rosetta::PrimeDecomposition::is_prime_via_factors(100), "100 is not prime"
 
 test_run

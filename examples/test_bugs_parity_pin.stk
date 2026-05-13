@@ -5,10 +5,10 @@
 
 # ── Magic String Increment ───────────────────────────────────────────────
 
-fn my_inc($s) { $s++; $s }
-my_inc("z") |> aeq "aa", "magic inc z -> aa"
-my_inc("Az") |> aeq "Ba", "magic inc Az -> Ba"
-my_inc("") |> aeq "1", "magic inc empty -> 1"
+fn Pin::BugsParity::my_inc($s) { $s++; $s }
+Pin::BugsParity::my_inc("z") |> aeq "aa", "magic inc z -> aa"
+Pin::BugsParity::my_inc("Az") |> aeq "Ba", "magic inc Az -> Ba"
+Pin::BugsParity::my_inc("") |> aeq "1", "magic inc empty -> 1"
 
 # ── Vec Lvalue ─────────────────────────────────────────────────────────────
 

@@ -11,7 +11,7 @@ fn Rosetta::Rev::rev(@arr) {
     @reversed
 }
 
-fn fib_seq_until($max) {
+fn Rosetta::Zeckendorf::fib_seq_until($max) {
     my @fibs
     my ($a, $b) = (1, 2)
     while ($a <= $max) {
@@ -21,11 +21,11 @@ fn fib_seq_until($max) {
     @fibs
 }
 
-fn zeckendorf($n) {
+fn Rosetta::Zeckendorf::zeckendorf($n) {
     if ($n == 0) {
         return ()
     }
-    my @fibs = Rosetta::Rev::rev(fib_seq_until($n))
+    my @fibs = Rosetta::Rev::rev(Rosetta::Zeckendorf::fib_seq_until($n))
     my @result
     for my $fib (@fibs) {
         if ($n >= $fib) {
@@ -37,16 +37,16 @@ fn zeckendorf($n) {
     @rev_res
 }
 
-my @z100 = zeckendorf(100)
-join(",", @z100) |> assert_eq("3,8,89", "zeckendorf(100)")
+my @z100 = Rosetta::Zeckendorf::zeckendorf(100)
+join(",", @z100) |> assert_eq("3,8,89", "Rosetta::Zeckendorf::zeckendorf(100)")
 
-my @z20 = zeckendorf(20)
-join(",", @z20) |> assert_eq("2,5,13", "zeckendorf(20)")
+my @z20 = Rosetta::Zeckendorf::zeckendorf(20)
+join(",", @z20) |> assert_eq("2,5,13", "Rosetta::Zeckendorf::zeckendorf(20)")
 
-my @z0 = zeckendorf(0)
-assert_eq(len(@z0), 0, "zeckendorf(0)")
+my @z0 = Rosetta::Zeckendorf::zeckendorf(0)
+assert_eq(len(@z0), 0, "Rosetta::Zeckendorf::zeckendorf(0)")
 
-my @z8 = zeckendorf(8)
-join(",", @z8) |> assert_eq("8", "zeckendorf(8)")
+my @z8 = Rosetta::Zeckendorf::zeckendorf(8)
+join(",", @z8) |> assert_eq("8", "Rosetta::Zeckendorf::zeckendorf(8)")
 
 test_run

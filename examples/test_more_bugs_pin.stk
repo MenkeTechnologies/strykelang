@@ -4,32 +4,32 @@
 
 # Pinning test for BUG-089: Closures capture outer-scope `my` vars by value
 my $val = 10;
-fn reader() {
+fn Pin::MoreBugs::reader() {
     my $local_val = $val;
     $local_val = 20; # modify local copy
     return $val; # return original outer scope value
 }
 
-my $read_val = reader();
+my $read_val = Pin::MoreBugs::reader();
 
 aeq($read_val, 10, "BUG-089: closure should read the original value");
 aeq($val, 10, "BUG-089: outer scope variable should not be modified");
 
 # Pinning test for BUG-037: Closure-captured coderefs flatten args
-fn call_it($code, @args) {
+fn Pin::MoreBugs::call_it($code, @args) {
     $code(@args);
 }
 
 my $sum = 0;
-fn summer(@nums) {
+fn Pin::MoreBugs::summer(@nums) {
     for my $n (@nums) {
         $sum += $n;
     }
 }
 
-call_it(\&summer, 1, 2, 3);
+Pin::MoreBugs::call_it(\&Pin::MoreBugs::summer, 1, 2, 3);
 
-# According to bug, @args is flattened to a scalar count, so summer receives `3` instead of `(1, 2, 3)`.
+# According to bug, @args is flattened to a scalar count, so Pin::MoreBugs::summer receives `3` instead of `(1, 2, 3)`.
 # The loop `for my $n (3)` will execute once with $n=3.
 aeq($sum, 3, "BUG-037: captured coderef gets scalar count of args");
 

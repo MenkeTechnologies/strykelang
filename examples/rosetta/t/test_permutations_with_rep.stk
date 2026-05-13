@@ -1,12 +1,12 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Permutations with repetitions
 
-fn perms_with_rep($list, $k) {
+fn Rosetta::PermutationsWithRep::perms_with_rep($list, $k) {
     if ($k == 0) {
         return [[]]
     }
     my @res
-    my $sub = perms_with_rep($list, $k - 1)
+    my $sub = Rosetta::PermutationsWithRep::perms_with_rep($list, $k - 1)
     for my $item (@$list) {
         for my $s (@$sub) {
             my @c = ($item, @$s)
@@ -17,7 +17,7 @@ fn perms_with_rep($list, $k) {
 }
 
 my @input = (1, 2)
-my $res = perms_with_rep(\@input, 2)
+my $res = Rosetta::PermutationsWithRep::perms_with_rep(\@input, 2)
 
 # Expected: (1,1), (1,2), (2,1), (2,2)
 assert_eq len(@$res), 4, "perms with rep count"

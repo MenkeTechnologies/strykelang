@@ -3,7 +3,7 @@
 # Stryke Concurrency Demo
 # Demonstrates async, spawn, and await
 
-fn slow_operation($n, $delay) {
+fn Demo::Concurrency::slow_operation($n, $delay) {
     sleep $delay
     $n * $n
 }
@@ -11,8 +11,8 @@ fn slow_operation($n, $delay) {
 p "Starting async tasks..."
 
 # async returns a handle
-my $task1 = async { slow_operation(10, 0.5) }
-my $task2 = spawn { slow_operation(20, 1.0) } # spawn is an alias for async
+my $task1 = async { Demo::Concurrency::slow_operation(10, 0.5) }
+my $task2 = spawn { Demo::Concurrency::slow_operation(20, 1.0) } # spawn is an alias for async
 
 p "Tasks are running in the background. Doing other work..."
 my $sum = 0
@@ -30,7 +30,7 @@ p "Task 2 result: $res2"
 p "\nRunning multiple parallel tasks..."
 my @task_list = map {
     my $val = _
-    async { slow_operation($val, 0.2) }
+    async { Demo::Concurrency::slow_operation($val, 0.2) }
 } (1:5)
 
 my @results = map { await _ } @task_list

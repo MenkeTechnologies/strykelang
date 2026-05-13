@@ -20,7 +20,7 @@ fn Rosetta::IsPrime::is_prime($n) {
     }
 }
 
-fn is_prime_triplet($p) {
+fn Rosetta::PrimeTriplets::is_prime_triplet($p) {
     if (!Rosetta::IsPrime::is_prime($p)) {
         0
     } else {
@@ -36,12 +36,12 @@ fn is_prime_triplet($p) {
     }
 }
 
-assert_ok is_prime_triplet(5), "5 is triplet (5, 7, 11)"
-assert_ok is_prime_triplet(7), "7 is triplet (7, 11, 13)"
-assert_ok is_prime_triplet(11), "11 is triplet (11, 13, 17)"
-assert_ok !is_prime_triplet(2), "2 is not (2, 4, 8) not prime"
-assert_ok !is_prime_triplet(3), "3 is not (3, 5, 9) 9 not prime"
+assert_ok Rosetta::PrimeTriplets::is_prime_triplet(5), "5 is triplet (5, 7, 11)"
+assert_ok Rosetta::PrimeTriplets::is_prime_triplet(7), "7 is triplet (7, 11, 13)"
+assert_ok Rosetta::PrimeTriplets::is_prime_triplet(11), "11 is triplet (11, 13, 17)"
+assert_ok !Rosetta::PrimeTriplets::is_prime_triplet(2), "2 is not (2, 4, 8) not prime"
+assert_ok !Rosetta::PrimeTriplets::is_prime_triplet(3), "3 is not (3, 5, 9) 9 not prime"
 
-5 |> is_prime_triplet |> assert_ok("pipe prime triplet")
+5 |> Rosetta::PrimeTriplets::is_prime_triplet |> assert_ok("pipe prime triplet")
 
 test_run

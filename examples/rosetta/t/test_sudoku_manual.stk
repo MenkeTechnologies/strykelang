@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Sudoku Solver (4x4 Manual)
 
-fn is_valid($grid, $r, $c, $v) {
+fn Rosetta::SudokuManual::is_valid($grid, $r, $c, $v) {
     for my $i (0..3) {
         if ($grid->[$r]->[$i] == $v) { return 0 }
         if ($grid->[$i]->[$c] == $v) { return 0 }
@@ -21,7 +21,7 @@ fn Rosetta::Solve::solve($grid) {
         for my $c (0..3) {
             if ($grid->[$r]->[$c] == 0) {
                 for my $v (1..4) {
-                    if (is_valid($grid, $r, $c, $v)) {
+                    if (Rosetta::SudokuManual::is_valid($grid, $r, $c, $v)) {
                         $grid->[$r]->[$c] = $v
                         if (Rosetta::Solve::solve($grid)) { return 1 }
                         $grid->[$r]->[$c] = 0
@@ -34,13 +34,13 @@ fn Rosetta::Solve::solve($grid) {
     1
 }
 
-fn get_test_grids {
+fn Rosetta::SudokuManual::get_test_grids {
     my @g1 = ([0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0])
     my @g2 = ([0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0])
     (\@g1, \@g2)
 }
 
-my @grids = get_test_grids()
+my @grids = Rosetta::SudokuManual::get_test_grids()
 my $grid = $grids[0]
 
 if (Rosetta::Solve::solve($grid)) {

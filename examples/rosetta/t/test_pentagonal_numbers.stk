@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Pentagonal numbers
 
-fn pentagonal($n) {
+fn Rosetta::PentagonalNumbers::pentagonal($n) {
     int($n * (3 * $n - 1) / 2)
 }
 
@@ -15,18 +15,18 @@ fn Rosetta::IsPentagonal::is_pentagonal($n) {
     }
 }
 
-assert_eq pentagonal(1), 1, "P1"
-assert_eq pentagonal(2), 5, "P2"
-assert_eq pentagonal(3), 12, "P3"
-assert_eq pentagonal(4), 22, "P4"
-assert_eq pentagonal(5), 35, "P5"
+assert_eq Rosetta::PentagonalNumbers::pentagonal(1), 1, "P1"
+assert_eq Rosetta::PentagonalNumbers::pentagonal(2), 5, "P2"
+assert_eq Rosetta::PentagonalNumbers::pentagonal(3), 12, "P3"
+assert_eq Rosetta::PentagonalNumbers::pentagonal(4), 22, "P4"
+assert_eq Rosetta::PentagonalNumbers::pentagonal(5), 35, "P5"
 
-assert_ok Rosetta::IsPentagonal::is_pentagonal(1), "1 is pentagonal"
-assert_ok Rosetta::IsPentagonal::is_pentagonal(5), "5 is pentagonal"
-assert_ok Rosetta::IsPentagonal::is_pentagonal(35), "35 is pentagonal"
+assert_ok Rosetta::IsPentagonal::is_pentagonal(1), "1 is Rosetta::PentagonalNumbers::pentagonal"
+assert_ok Rosetta::IsPentagonal::is_pentagonal(5), "5 is Rosetta::PentagonalNumbers::pentagonal"
+assert_ok Rosetta::IsPentagonal::is_pentagonal(35), "35 is Rosetta::PentagonalNumbers::pentagonal"
 assert_ok !Rosetta::IsPentagonal::is_pentagonal(2), "2 is not"
 assert_ok !Rosetta::IsPentagonal::is_pentagonal(7), "7 is not"
 
-35 |> Rosetta::IsPentagonal::is_pentagonal |> assert_ok("pipe pentagonal")
+35 |> Rosetta::IsPentagonal::is_pentagonal |> assert_ok("pipe Rosetta::PentagonalNumbers::pentagonal")
 
 test_run

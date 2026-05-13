@@ -5,7 +5,7 @@
 
 # 1. Pattern Matching
 p "--- Pattern Matching ---"
-fn process_event {
+fn Demo::FuncPatterns::process_event {
     match (_0->{type}) {
         "LOGIN"  => "User " . _0->{user} . " logged in",
         "LOGOUT" => "User " . _0->{user} . " logged out",
@@ -20,32 +20,32 @@ my @events = (
     +{ type => "IDLE" }
 )
 
-p "  ", process_event(_) for @events
+p "  ", Demo::FuncPatterns::process_event(_) for @events
 
 # 2. Memoization
 p "\n--- Memoization: Caching expensive lookups ---"
 # Simulate an expensive call. memoize wraps it so duplicate inputs hit
 # the cache instead of recomputing.
-fn slow_lookup { sleep 0.01; _0 * _0 + 7 }
+fn Demo::FuncPatterns::slow_lookup { sleep 0.01; _0 * _0 + 7 }
 
-memoize(\&slow_lookup)
+memoize(\&Demo::FuncPatterns::slow_lookup)
 
 # Hit each input twice; the second pass should be near-instant.
 my @inputs = (1, 2, 3, 4, 5, 1, 2, 3, 4, 5)
 my $start  = now_ns()
-my @res    = map { slow_lookup(_) } @inputs
+my @res    = map { Demo::FuncPatterns::slow_lookup(_) } @inputs
 my $end    = now_ns()
 printf "  10 calls (5 unique) -> @res in %.2f ms\n", ($end - $start) / 1_000_000
 
 # 3. Partial Application and Currying
 p "\n--- Functional Primitives ---"
-fn multiply = _0 * _1
+fn Demo::FuncPatterns::multiply = _0 * _1
 
 # partial pre-fills arguments.
-my $triple = partial(\&multiply, 3)
+my $triple = partial(\&Demo::FuncPatterns::multiply, 3)
 p "  Triple 10: ", $triple->(10)
 
 # curry transforms to chainable single-arg calls.
-my $curried_mul = curry(\&multiply)
+my $curried_mul = curry(\&Demo::FuncPatterns::multiply)
 my $times5 = $curried_mul->(5)
 p "  Curried 5 * 4: ", $times5->(4)
