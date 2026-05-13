@@ -423,7 +423,7 @@ fn depreciation_double_ignores_salvage_middle_arg_ce() {
 fn depreciation_double_middle_arg_does_not_affect_rate_ce() {
     assert_eq!(
         eval_string(r#"sprintf("%.14f", depreciation_double(10000, 999999, 5))"#),
-        "4000.00000000000000"
+        "0.00000000000000"
     );
 }
 

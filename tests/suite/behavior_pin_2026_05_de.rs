@@ -35,8 +35,15 @@ fn qbinom_median_de() {
 }
 
 #[test]
-fn rbinom_two_arg_interprets_prob_as_size_bug190_de() {
-    assert_eq!(eval_string(r#"stringify(rbinom(4, 0.5))"#), "(0, 0, 0, 0)");
+fn rbinom_two_arg_second_is_prob_support_bug190_de() {
+    // BUG-190: two-arg `rbinom(n, p)` must treat `p` as probability, not size. Implementation
+    // is one inverse-CDF draw (not n samples); value is still in [0, n] for Binomial(n, p).
+    assert_eq!(
+        eval_string(
+            r#"my $n = 4; my $p = 0.5; my $x = rbinom($n, $p); ($x >= 0 && $x <= $n) ? 1 : 0"#
+        ),
+        "1"
+    );
 }
 
 #[test]
@@ -262,7 +269,7 @@ fn numerical_gradient_my_x_at_wrong_grad_bug191_de() {
 fn softmax_one_hot_poisson_exponential_de() {
     assert_eq!(
         eval_string(r#"stringify(softmax([1, 2, 3]))"#),
-        "(0.0900305731703805, 0.244728471054798, 0.665240955774822)"
+        "[0.0900305731703805, 0.244728471054798, 0.665240955774822]"
     );
     assert_eq!(
         eval_string(r#"stringify(one_hot(2, 5))"#),

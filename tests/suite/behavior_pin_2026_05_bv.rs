@@ -174,7 +174,7 @@ fn interquartile_range_bv() {
 fn median_absolute_deviation_bv() {
     assert_eq!(
         eval_string(r#"sprintf("%.4f", mad(1, 2, 9, 10))"#),
-        "7.0000"
+        "4.0000"
     );
 }
 

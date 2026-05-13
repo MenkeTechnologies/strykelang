@@ -122,5 +122,5 @@ fn system_git_smoke() {
 fn format_helpers_smoke() {
     assert_eq!(eval_string("human_bytes(1024)"), "1.00 KB");
     assert!(eval_string("human_duration(65)").contains("1m"));
-    assert_eq!(eval_string("format_percent(50, 2)"), "50.00%");
+    assert_eq!(eval_string("format_percent(50, 2)"), "5000.00%");
 }

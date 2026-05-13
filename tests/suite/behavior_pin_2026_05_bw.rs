@@ -97,7 +97,7 @@ fn rmse_aligned_with_mse_bw() {
 fn median_absolute_deviation_sorted_quartet_bw() {
     assert_eq!(
         eval_string(r#"sprintf("%.10f", median_absolute_deviation(1, 2, 9, 10))"#),
-        "7.0000000000"
+        "4.0000000000"
     );
 }
 

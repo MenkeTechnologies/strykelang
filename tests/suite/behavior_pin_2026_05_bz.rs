@@ -43,7 +43,7 @@ fn herfindahl_hirschman_normalized_quarter_shares_array_bz() {
 fn hhi_variadic_trailing_shares_use_first_squared_only_tail_bz() {
     assert_eq!(
         eval_string(r#"sprintf("%.12f", hhi(0.25, 0.25, 0.25, 0.25))"#),
-        "0.062500000000"
+        "0.250000000000"
     );
 }
 

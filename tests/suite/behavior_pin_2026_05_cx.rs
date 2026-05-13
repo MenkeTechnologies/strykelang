@@ -56,7 +56,7 @@ fn trimmed_mean_twenty_percent_trim_cx() {
 fn trimmed_mean_list_first_yields_mean_of_tail_only_bug_cx() {
     assert_eq!(
         eval_string(r#"sprintf("%.10g", trimmed_mean([1, 2, 3, 4, 100], 20))"#),
-        "20"
+        "3"
     );
 }
 

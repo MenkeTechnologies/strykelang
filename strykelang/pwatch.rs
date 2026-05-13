@@ -7,7 +7,6 @@ use std::sync::Arc;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 
 use crate::error::{PerlError, PerlResult};
-use crate::perl_fs::StrykeGlobOptsGuard;
 use crate::scope::{AtomicArray, AtomicHash};
 use crate::value::{PerlSub, StrykeValue};
 use crate::vm_helper::{VMHelper, WantarrayCtx};
@@ -27,13 +26,12 @@ pub fn run_pwatch(
     // event, so it can only check pattern shape — not stat-based qualifiers
     // like `(/)`. Strip the trailing qualifier suffix via zshrs's parser so
     // the pattern half can feed `glob::Pattern`; the qualifier still applies
-    // during initial expansion via `zsh::glob::glob` + stryke glob options below.
+    // during initial expansion via [`crate::perl_fs::stryke_glob`] below.
     let (pattern_no_qual, _qual) = zsh::glob::split_qualifier(pattern);
     let gpat = glob::Pattern::new(pattern_no_qual)
         .map_err(|e| PerlError::runtime(format!("pwatch: invalid glob pattern: {}", e), line))?;
 
-    let _opts = StrykeGlobOptsGuard::new();
-    let expanded: Vec<PathBuf> = zsh::glob::glob(pattern)
+    let expanded: Vec<PathBuf> = crate::perl_fs::stryke_glob(pattern)
         .into_iter()
         .map(PathBuf::from)
         .collect();

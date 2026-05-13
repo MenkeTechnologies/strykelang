@@ -17405,7 +17405,7 @@ impl Parser {
             | "constants_planck_hbar" | "constants_planck" | "constants_proton_mass" | "constants_rydberg"
             | "constants_solar_mass" | "constants_solar_radius" | "constants_speed_of_light" | "constants_stefan_boltzmann"
             | "contour_area" | "contour_centroid" | "contour_find" | "contour_perimeter"
-            | "convex_hull_3d_simple" | "crop_factor" | "delaunay_triangulate_2d" | "depth_of_field_far"
+            | "convex_hull_3d" | "convex_hull_3d_simple" | "crop_factor" | "delaunay_triangulate_2d" | "depth_of_field_far"
             | "depth_of_field_near" | "dh_compute_shared" | "dilation_2d" | "ec_point_add"
             | "ec_point_double" | "ed25519_keypair_simple" | "ed25519_sign_simple" | "ed25519_verify_simple"
             | "erosion_2d" | "exposure_value" | "field_of_view" | "focal_length_35mm_equiv"

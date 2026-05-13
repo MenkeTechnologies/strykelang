@@ -8,8 +8,17 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 
+use parking_lot::Mutex;
 use crate::pmap_progress::PmapProgress;
 use crate::value::StrykeValue;
+
+/// zshrs `glob()` and [`StrykeGlobOptsGuard`] both touch zshrs process-global option
+/// state. `glob_par` invokes `stryke_glob` from rayon workers while other threads run
+/// plain `glob` — interleaved guard `new`/`Drop` corrupts `bareglobqual` / `nullglob`
+/// and breaks qualifier parsing (e.g. `(N)`), yielding mass false positives. Serialize
+/// the option snapshot + expansion critical section (same cost order as one glob at a
+/// time; `glob_par` still parallelizes unrelated work outside zsh).
+static ZSH_GLOB_GLOBAL_MUTEX: Mutex<()> = Mutex::new(());
 
 /// Keys touched by [`StrykeGlobOptsGuard`] — must match restore in `Drop`.
 const STRYKE_GLOB_OPT_KEYS: &[&str] = &[
@@ -83,7 +92,7 @@ pub fn read_file_text_perl_compat(path: impl AsRef<Path>) -> io::Result<String> 
 /// of echoing the literal pattern back. `globstarshort` makes `**.stk` match every
 /// `.stk` file at any depth; `braceccl` enables `{a,b,c}` / `{abc}` brace expansion
 /// — wired through zshrs's global option store like stock zsh.
-fn stryke_glob(pattern: &str) -> Vec<String> {
+pub(crate) fn stryke_glob(pattern: &str) -> Vec<String> {
     // zshrs glob fails to match wildcards behind a leading `./` (works for
     // literal filenames but not patterns like `./lib/*.stk`). Strip the
     // prefix before delegating, then re-prepend it to each result so callers
@@ -94,8 +103,11 @@ fn stryke_glob(pattern: &str) -> Vec<String> {
     } else {
         (pattern, false)
     };
-    let _opts = StrykeGlobOptsGuard::new();
-    let results = zsh::glob::glob(stripped);
+    let results = {
+        let _lock = ZSH_GLOB_GLOBAL_MUTEX.lock();
+        let _opts = StrykeGlobOptsGuard::new();
+        zsh::glob::glob(stripped)
+    };
     if had_dot_slash {
         results
             .into_iter()

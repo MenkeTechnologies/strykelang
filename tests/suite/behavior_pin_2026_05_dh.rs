@@ -170,7 +170,7 @@ fn continued_fraction_sqrt7_dh() {
 
 #[test]
 fn derangements_stirling_bernoulli_harmonic_bug198_dh() {
-    assert_eq!(eval_string(r#"sprintf("%d", derangements(4))"#), "36");
+    assert_eq!(eval_string(r#"sprintf("%d", derangements(4))"#), "9");
     assert_eq!(eval_string(r#"sprintf("%d", stirling2(5, 3))"#), "25");
     assert_eq!(
         eval_string(r#"sprintf("%.10g", bernoulli(4))"#),

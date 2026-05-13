@@ -14,7 +14,7 @@ fn without_scalar_filters_by_string_equality_ck() {
 fn without_arrayref_first_compare_ref_display_no_drops_bug_ck() {
     assert_eq!(
         eval_string(r#"stringify(without([2, 9], [1, 2, 3, 9]))"#),
-        "(1, 2, 3, 9)"
+        "(1, 3)"
     );
 }
 

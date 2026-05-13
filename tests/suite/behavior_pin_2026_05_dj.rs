@@ -31,7 +31,7 @@ fn prim_mst_single_edge_k2_dj() {
 fn prim_mst_disconnected_all_zero_matrix_bug202_dj() {
     assert_eq!(
         eval_string(r#"sprintf("%.10g", prim_mst([[0, 0], [0, 0]]))"#),
-        "0"
+        "inf"
     );
 }
 
@@ -40,7 +40,7 @@ fn prim_mst_disconnected_all_zero_matrix_bug202_dj() {
 fn prim_mst_path_plus_isolated_vertex_silent_bug202_dj() {
     assert_eq!(
         eval_string(r#"sprintf("%.10g", prim_mst([[0, 1, 0], [1, 0, 0], [0, 0, 0]]))"#),
-        "1"
+        "inf"
     );
 }
 

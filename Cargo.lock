@@ -5086,7 +5086,7 @@ dependencies = [
 
 [[package]]
 name = "strykelang"
-version = "0.13.14"
+version = "0.13.15"
 dependencies = [
  "aes",
  "aes-gcm",

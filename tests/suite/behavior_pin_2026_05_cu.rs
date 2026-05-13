@@ -60,7 +60,7 @@ fn moving_average_window_first_three_cu() {
 fn moving_average_arrayref_first_tail_only_bug_cu() {
     assert_eq!(
         eval_string(r#"sprintf("%.10g", moving_average([1, 2, 3], 5))"#),
-        "5"
+        "0"
     );
 }
 

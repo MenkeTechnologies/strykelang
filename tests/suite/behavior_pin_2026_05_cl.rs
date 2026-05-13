@@ -422,7 +422,7 @@ fn clamp_scalar_inside_range_cl() {
 
 #[test]
 fn clamp_value_min_max_order_misread_as_min_max_list_bug_cl() {
-    assert_eq!(eval_string(r#"sprintf("%.0f", clamp(11, 0, 10))"#), "11");
+    assert_eq!(eval_string(r#"sprintf("%.0f", clamp(11, 0, 10))"#), "10");
 }
 
 #[test]

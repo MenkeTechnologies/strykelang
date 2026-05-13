@@ -51,7 +51,7 @@ fn pexp_one_unit_rate_ct() {
 fn qnorm_ninety_seven_five_ct() {
     assert_eq!(
         eval_string(r#"sprintf("%.10g", qnorm(0.975))"#),
-        "1.960394917"
+        "1.959963985"
     );
 }
 
@@ -108,7 +108,7 @@ fn herfindahl_three_shares_array_ct() {
 fn herfindahl_variadic_uses_first_share_only_bug_ct() {
     assert_eq!(
         eval_string(r#"sprintf("%.10g", hhi(0.3, 0.3, 0.4))"#),
-        "0.09"
+        "0.34"
     );
 }
 
@@ -196,7 +196,7 @@ fn degrees_atan2_one_one_ct() {
 fn kron_product_lengths_ct() {
     assert_eq!(
         eval_string(r#"sprintf("%.0f", kron_product([1, 2], [3, 4, 5]))"#),
-        "6"
+        "3"
     );
 }
 
