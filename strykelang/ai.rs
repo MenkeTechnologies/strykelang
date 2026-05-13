@@ -5111,7 +5111,8 @@ pub(crate) fn ai_pmap(args: &[StrykeValue], line: usize) -> Result<StrykeValue> 
     // collapses to a single ai_map call.
     let cluster_v = opts.get("cluster").cloned();
     if cluster_v.is_none() {
-        let mut call_args: Vec<StrykeValue> = vec![items_v.clone(), StrykeValue::string(instruction)];
+        let mut call_args: Vec<StrykeValue> =
+            vec![items_v.clone(), StrykeValue::string(instruction)];
         for (k, v) in &opts {
             if k == "cluster" {
                 continue;

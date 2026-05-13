@@ -257,10 +257,11 @@ enum MinMax {
 }
 
 fn minmax(args: &[StrykeValue], mode: MinMax) -> crate::error::PerlResult<StrykeValue> {
-    if args.is_empty() {
+    let flat = flatten_to_values(args);
+    if flat.is_empty() {
         return Ok(StrykeValue::UNDEF);
     }
-    let mut it = args.iter().cloned();
+    let mut it = flat.into_iter();
     let mut m = it.next().unwrap();
     for x in it {
         m = match mode {
@@ -297,7 +298,10 @@ fn minmax(args: &[StrykeValue], mode: MinMax) -> crate::error::PerlResult<Stryke
     Ok(m)
 }
 
-fn uniq_with_want(args: &[StrykeValue], want: WantarrayCtx) -> crate::error::PerlResult<StrykeValue> {
+fn uniq_with_want(
+    args: &[StrykeValue],
+    want: WantarrayCtx,
+) -> crate::error::PerlResult<StrykeValue> {
     let a = uniq_list(args)?;
     if want == WantarrayCtx::Scalar {
         if let Some(x) = a.as_array_vec() {
@@ -500,6 +504,26 @@ fn product(args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
     Ok(StrykeValue::float(p))
 }
 
+/// Flatten args: dereference array refs, expand arrays/iterators into a flat list of values.
+fn flatten_to_values(args: &[StrykeValue]) -> Vec<StrykeValue> {
+    let mut out = Vec::new();
+    for x in args {
+        if x.is_iterator() {
+            let iter = x.clone().into_iterator();
+            while let Some(item) = iter.next_item() {
+                out.push(item);
+            }
+        } else if let Some(arr) = x.as_array_vec() {
+            out.extend(arr);
+        } else if let Some(arr_ref) = x.as_array_ref() {
+            out.extend(arr_ref.read().iter().cloned());
+        } else {
+            out.push(x.clone());
+        }
+    }
+    out
+}
+
 /// Flatten args: dereference array refs, expand arrays/iterators into a flat list of numbers.
 fn flatten_to_numbers(args: &[StrykeValue]) -> Vec<f64> {
     let mut out = Vec::new();
@@ -551,15 +575,19 @@ fn median(args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
 }
 
 /// Values with highest frequency (ties all returned in list context). Empty list → `undef` / empty list.
-fn mode_with_want(args: &[StrykeValue], want: WantarrayCtx) -> crate::error::PerlResult<StrykeValue> {
-    if args.is_empty() {
+fn mode_with_want(
+    args: &[StrykeValue],
+    want: WantarrayCtx,
+) -> crate::error::PerlResult<StrykeValue> {
+    let flat = flatten_to_values(args);
+    if flat.is_empty() {
         return Ok(match want {
             WantarrayCtx::List => StrykeValue::array(vec![]),
             WantarrayCtx::Scalar | WantarrayCtx::Void => StrykeValue::UNDEF,
         });
     }
-    let nums: Vec<f64> = args.iter().map(|x| x.to_number()).collect();
-    let mut idx: Vec<usize> = (0..args.len()).collect();
+    let nums: Vec<f64> = flat.iter().map(|x| x.to_number()).collect();
+    let mut idx: Vec<usize> = (0..flat.len()).collect();
     idx.sort_by(|&i, &j| nums[i].total_cmp(&nums[j]));
     let mut best_len = 0usize;
     let mut mode_starts: Vec<usize> = Vec::new();
@@ -579,7 +607,7 @@ fn mode_with_want(args: &[StrykeValue], want: WantarrayCtx) -> crate::error::Per
         }
         i = j;
     }
-    let modes: Vec<StrykeValue> = mode_starts.into_iter().map(|ix| args[ix].clone()).collect();
+    let modes: Vec<StrykeValue> = mode_starts.into_iter().map(|ix| flat[ix].clone()).collect();
     let first = modes.first().cloned().unwrap_or(StrykeValue::UNDEF);
     Ok(match want {
         WantarrayCtx::List => StrykeValue::array(modes),
@@ -590,27 +618,21 @@ fn mode_with_want(args: &[StrykeValue], want: WantarrayCtx) -> crate::error::Per
 
 /// Population variance (divide by N). Empty → `undef`; one element → `0`.
 fn variance(args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
-    if args.is_empty() {
+    let nums = flatten_to_numbers(args);
+    if nums.is_empty() {
         return Ok(StrykeValue::UNDEF);
     }
-    let n = args.len() as f64;
-    let mean_v: f64 = args.iter().map(|x| x.to_number()).sum::<f64>() / n;
-    let var: f64 = args
-        .iter()
-        .map(|x| {
-            let d = x.to_number() - mean_v;
-            d * d
-        })
-        .sum::<f64>()
-        / n;
+    let n = nums.len() as f64;
+    let mean_v: f64 = nums.iter().sum::<f64>() / n;
+    let var: f64 = nums.iter().map(|x| (x - mean_v).powi(2)).sum::<f64>() / n;
     Ok(StrykeValue::float(var))
 }
 
 fn stddev(args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
-    if args.is_empty() {
+    let var = variance(args)?;
+    if var.is_undef() {
         return Ok(StrykeValue::UNDEF);
     }
-    let var = variance(args)?;
     Ok(StrykeValue::float(var.to_number().sqrt()))
 }
 
@@ -703,7 +725,10 @@ fn windowed_with_want(
     })
 }
 
-fn sample_native(interp: &mut VMHelper, args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
+fn sample_native(
+    interp: &mut VMHelper,
+    args: &[StrykeValue],
+) -> crate::error::PerlResult<StrykeValue> {
     if args.is_empty() {
         return Ok(StrykeValue::array(vec![]));
     }
@@ -1313,7 +1338,10 @@ mod tests {
         let ms = call_native(
             &mut i,
             "minstr",
-            &[StrykeValue::string("z".into()), StrykeValue::string("a".into())],
+            &[
+                StrykeValue::string("z".into()),
+                StrykeValue::string("a".into()),
+            ],
             WantarrayCtx::Scalar,
         );
         assert_eq!(ms.to_string(), "a");

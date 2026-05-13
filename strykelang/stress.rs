@@ -1150,15 +1150,20 @@ pub(crate) fn stress_arm_kill_switch(args: &[StrykeValue], _line: usize) -> Resu
 
 /// `stress_killed()` → 1 if the kill switch tripped.
 pub(crate) fn stress_killed(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
-    Ok(StrykeValue::integer(if GLOBAL_KILL.load(Ordering::Relaxed) {
-        1
-    } else {
-        0
-    }))
+    Ok(StrykeValue::integer(
+        if GLOBAL_KILL.load(Ordering::Relaxed) {
+            1
+        } else {
+            0
+        },
+    ))
 }
 
 /// `stress_disarm_kill_switch()` — reset the kill flag.
-pub(crate) fn stress_disarm_kill_switch(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
+pub(crate) fn stress_disarm_kill_switch(
+    _args: &[StrykeValue],
+    _line: usize,
+) -> Result<StrykeValue> {
     GLOBAL_KILL.store(false, Ordering::Relaxed);
     Ok(StrykeValue::UNDEF)
 }
@@ -1270,7 +1275,10 @@ pub(crate) fn stress_metrics_export(args: &[StrykeValue], line: usize) -> Result
 /// `stress_metrics_prometheus()` → string in Prometheus text exposition
 /// format. Suitable for serving from a `/metrics` endpoint with no
 /// additional formatting.
-pub(crate) fn stress_metrics_prometheus(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
+pub(crate) fn stress_metrics_prometheus(
+    _args: &[StrykeValue],
+    _line: usize,
+) -> Result<StrykeValue> {
     let g = metrics().lock();
     Ok(StrykeValue::string(format_prometheus(&g)))
 }

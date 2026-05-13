@@ -1876,7 +1876,10 @@ impl Scope {
         if let Some(arc) = self.find_shared_array(name) {
             return Ok(arc.write().pop().unwrap_or(StrykeValue::UNDEF));
         }
-        Ok(self.get_array_mut(name)?.pop().unwrap_or(StrykeValue::UNDEF))
+        Ok(self
+            .get_array_mut(name)?
+            .pop()
+            .unwrap_or(StrykeValue::UNDEF))
     }
 
     /// Shift from array — works for regular, shared, and atomic arrays.
@@ -2092,7 +2095,11 @@ impl Scope {
     }
 
     /// Perl `delete $a[$i]` — sets the element to `undef`, returns the previous value.
-    pub fn delete_array_element(&mut self, name: &str, index: i64) -> Result<StrykeValue, PerlError> {
+    pub fn delete_array_element(
+        &mut self,
+        name: &str,
+        index: i64,
+    ) -> Result<StrykeValue, PerlError> {
         if let Some(aa) = self.find_atomic_array(name) {
             let mut arr = aa.0.lock();
             let idx = if index < 0 {
@@ -2860,7 +2867,8 @@ mod tests {
     fn set_array_element_extends_array_with_undef_gaps() {
         let mut s = Scope::new();
         s.declare_array("a", vec![]);
-        s.set_array_element("a", 2, StrykeValue::integer(7)).unwrap();
+        s.set_array_element("a", 2, StrykeValue::integer(7))
+            .unwrap();
         assert_eq!(s.get_array_element("a", 2).to_int(), 7);
         assert!(s.get_array_element("a", 0).is_undef());
     }

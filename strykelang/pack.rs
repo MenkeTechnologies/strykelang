@@ -844,8 +844,11 @@ mod tests {
 
     #[test]
     fn tokenize_rejects_unsupported_type() {
-        let e = perl_pack(&[StrykeValue::string("C X".into()), StrykeValue::integer(1)], 0)
-            .expect_err("unsupported");
+        let e = perl_pack(
+            &[StrykeValue::string("C X".into()), StrykeValue::integer(1)],
+            0,
+        )
+        .expect_err("unsupported");
         assert!(
             e.message.contains("unsupported pack type"),
             "msg={}",
@@ -900,7 +903,10 @@ mod tests {
     #[test]
     fn pack_h_rejects_odd_hex_length() {
         let e = perl_pack(
-            &[StrykeValue::string("H".into()), StrykeValue::string("f".into())],
+            &[
+                StrykeValue::string("H".into()),
+                StrykeValue::string("f".into()),
+            ],
             0,
         )
         .expect_err("short hex");
@@ -923,7 +929,10 @@ mod tests {
     fn pack_x_inserts_zeros() {
         assert_eq!(pack_bytes("x3", &[]), vec![0, 0, 0]);
         assert_eq!(
-            pack_bytes("C x2 C", &[StrykeValue::integer(1), StrykeValue::integer(2)]),
+            pack_bytes(
+                "C x2 C",
+                &[StrykeValue::integer(1), StrykeValue::integer(2)]
+            ),
             vec![1, 0, 0, 2]
         );
     }
@@ -943,8 +952,11 @@ mod tests {
 
     #[test]
     fn pack_not_enough_arguments() {
-        let e = perl_pack(&[StrykeValue::string("C C".into()), StrykeValue::integer(1)], 0)
-            .expect_err("short");
+        let e = perl_pack(
+            &[StrykeValue::string("C C".into()), StrykeValue::integer(1)],
+            0,
+        )
+        .expect_err("short");
         assert!(e.message.contains("not enough"), "{}", e.message);
     }
 
@@ -1093,8 +1105,11 @@ mod tests {
 
     #[test]
     fn unpack_rejects_non_string_data() {
-        let e = perl_unpack(&[StrykeValue::string("C".into()), StrykeValue::integer(99)], 0)
-            .expect_err("type");
+        let e = perl_unpack(
+            &[StrykeValue::string("C".into()), StrykeValue::integer(99)],
+            0,
+        )
+        .expect_err("type");
         assert!(e.message.contains("string or packed"), "{}", e.message);
     }
 

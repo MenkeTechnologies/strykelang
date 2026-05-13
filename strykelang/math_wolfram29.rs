@@ -138,19 +138,43 @@ fn builtin_struve_h1(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::float(sum))
 }
 
-// Lambert W principal branch (Halley iteration)
+// Lambert W principal branch (Halley iteration). Initial guess regionalized
+// so the iteration converges for the full [-1/e, ∞) domain — the previous
+// `x.ln() - x.ln().ln()` seed produced ln(0) = −∞ at x = 1 and diverged to
+// NaN at the Omega constant.
 fn builtin_lambert_w0(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let x = f1(args);
-    if x < -1.0 / std::f64::consts::E { return Ok(StrykeValue::float(f64::NAN)); }
-    let mut w: f64 = if x < 1.0 { x * (1.0 - x + 2.0 * x * x) } else { x.ln() - x.ln().ln() };
+    let e = std::f64::consts::E;
+    if x < -1.0 / e { return Ok(StrykeValue::float(f64::NAN)); }
+    if x == 0.0 { return Ok(StrykeValue::float(0.0)); }
+    let mut w: f64 = if x < 0.0 {
+        // For x in (−1/e, 0) the principal branch stays in [−1, 0]. Mix the
+        // power series w ≈ x − x² + 3x³/2 near 0 with the branch-point form
+        // w ≈ −1 + √(2(ex + 1)) near −1/e via x's position in the interval.
+        let frac = (1.0 + e * x).clamp(0.0, 1.0); // 0 at −1/e, 1 at 0
+        let series = x * (1.0 - x + 1.5 * x * x);
+        let branch = -1.0 + (2.0 * (e * x + 1.0)).max(0.0).sqrt();
+        frac * series + (1.0 - frac) * branch
+    } else if x <= e {
+        // Smooth fit on [0, e]: monotone in x, ≈ 0.567 at x=1 (Omega const),
+        // ≈ 1 at x=e. Bracket-friendly seed for Halley.
+        x / (1.0 + x * (e - 1.0) / e)
+    } else {
+        // Asymptotic for large x (x > e ⇒ ln(ln x) is real).
+        let lx = x.ln();
+        lx - lx.ln()
+    };
     for _ in 0..50 {
         let ew = w.exp();
         let f = w * ew - x;
         let fp = ew * (1.0 + w);
         let fpp = ew * (2.0 + w);
-        let dw = f / (fp - f * fpp / (2.0 * fp));
+        let denom = fp - f * fpp / (2.0 * fp);
+        if !denom.is_finite() || denom == 0.0 { break; }
+        let dw = f / denom;
         let w_new = w - dw;
-        if (w_new - w).abs() < 1e-12 { return Ok(StrykeValue::float(w_new)); }
+        if !w_new.is_finite() { break; }
+        if (w_new - w).abs() < 1e-14 { return Ok(StrykeValue::float(w_new)); }
         w = w_new;
     }
     Ok(StrykeValue::float(w))

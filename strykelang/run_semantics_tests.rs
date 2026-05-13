@@ -4714,7 +4714,9 @@ fn underscore_bareword_in_hash_subscript_reads_chain_not_literal() {
     // because `_<` itself is undef, not because the literal key `"_<"`
     // is absent.
     assert_eq!(
-        rs(r#"my %h = (k1 => 7, "_<" => 99); my @r = map { defined($h{_<}) ? "defined" : "undef" } "k1"; $r[0]"#),
+        rs(
+            r#"my %h = (k1 => 7, "_<" => 99); my @r = map { defined($h{_<}) ? "defined" : "undef" } "k1"; $r[0]"#
+        ),
         "undef"
     );
 }

@@ -399,7 +399,9 @@ pub(crate) fn web_text(args: &[StrykeValue], _line: usize) -> Result<StrykeValue
 
 pub(crate) fn web_params(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let map = with_current(|cur| cur.params.clone());
-    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(map))))
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(
+        map,
+    ))))
 }
 
 pub(crate) fn web_request(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
@@ -497,7 +499,9 @@ pub(crate) fn web_routes_table(_args: &[StrykeValue], _line: usize) -> Result<St
 
 pub(crate) fn web_session(_args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
     let map = with_current(|cur| cur.session.clone());
-    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(map))))
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(
+        map,
+    ))))
 }
 
 pub(crate) fn web_session_set(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
@@ -568,7 +572,9 @@ pub(crate) fn web_cookies(_args: &[StrykeValue], _line: usize) -> Result<StrykeV
         }
         out
     });
-    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(map))))
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(
+        map,
+    ))))
 }
 
 /// Replaces the stub `web_flash`. Read the incoming flash, set the
@@ -617,7 +623,9 @@ pub(crate) fn web_permit(args: &[StrykeValue], line: usize) -> Result<StrykeValu
             out.insert(k, v.clone());
         }
     }
-    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(out))))
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(
+        out,
+    ))))
 }
 
 /// SHA-256(salt + password), salt prefixed with `web1$saltHex$`. Not
@@ -1580,7 +1588,8 @@ impl VMHelper {
                 line,
             )
         })?;
-        self.render_erb(&src, &locals, line).map(StrykeValue::string)
+        self.render_erb(&src, &locals, line)
+            .map(StrykeValue::string)
     }
 }
 

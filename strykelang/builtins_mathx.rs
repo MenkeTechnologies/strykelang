@@ -31,10 +31,7 @@ fn arg_f64(args: &[StrykeValue], idx: usize) -> Option<f64> {
 pub fn extended_gcd(args: &[StrykeValue]) -> StrykeValue {
     use parking_lot::RwLock;
     use std::sync::Arc;
-    let (a, b) = (
-        arg_i64(args, 0).unwrap_or(0),
-        arg_i64(args, 1).unwrap_or(0),
-    );
+    let (a, b) = (arg_i64(args, 0).unwrap_or(0), arg_i64(args, 1).unwrap_or(0));
     fn egcd(a: i64, b: i64) -> (i64, i64, i64) {
         if b == 0 {
             (a.abs(), if a < 0 { -1 } else { 1 }, 0)
@@ -103,7 +100,9 @@ pub fn modpow(args: &[StrykeValue]) -> StrykeValue {
 /// `modular_sqrt(A, P)` — Tonelli–Shanks for `x^2 ≡ a (mod p)` with
 /// odd prime p. Returns undef if no solution. Returns the smaller root.
 pub fn modular_sqrt(args: &[StrykeValue]) -> StrykeValue {
-    let a = arg_i64(args, 0).unwrap_or(0).rem_euclid(arg_i64(args, 1).unwrap_or(1));
+    let a = arg_i64(args, 0)
+        .unwrap_or(0)
+        .rem_euclid(arg_i64(args, 1).unwrap_or(1));
     let p = arg_i64(args, 1).unwrap_or(0);
     if p < 2 {
         return StrykeValue::UNDEF;
@@ -334,7 +333,10 @@ pub fn divisor_sum(args: &[StrykeValue]) -> StrykeValue {
 pub fn sigma_divisors(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_u64(args, 0).unwrap_or(0);
     let k = arg_u64(args, 1).unwrap_or(1);
-    let sum: u128 = divisors_of(n).iter().map(|d| (*d as u128).pow(k as u32)).sum();
+    let sum: u128 = divisors_of(n)
+        .iter()
+        .map(|d| (*d as u128).pow(k as u32))
+        .sum();
     if sum > i64::MAX as u128 {
         return StrykeValue::UNDEF;
     }
@@ -487,7 +489,9 @@ pub fn is_quadratic_residue(args: &[StrykeValue]) -> StrykeValue {
 pub fn discrete_log(args: &[StrykeValue]) -> StrykeValue {
     use std::collections::HashMap;
     let base = arg_i64(args, 0).unwrap_or(0);
-    let target = arg_i64(args, 1).unwrap_or(0).rem_euclid(arg_i64(args, 2).unwrap_or(1));
+    let target = arg_i64(args, 1)
+        .unwrap_or(0)
+        .rem_euclid(arg_i64(args, 2).unwrap_or(1));
     let m = arg_i64(args, 2).unwrap_or(0);
     if m < 2 {
         return StrykeValue::UNDEF;

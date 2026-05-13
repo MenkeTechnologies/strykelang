@@ -175,10 +175,7 @@ fn parse_spec_string(spec: &str, line: usize) -> PerlResult<OptSpec> {
                 'f' => ScalarType::Float,
                 other => {
                     return Err(PerlError::runtime(
-                        format!(
-                            "getopts: invalid spec '{}': unknown type '{}'",
-                            spec, other
-                        ),
+                        format!("getopts: invalid spec '{}': unknown type '{}'", spec, other),
                         line,
                     ));
                 }
@@ -195,7 +192,10 @@ fn parse_spec_string(spec: &str, line: usize) -> PerlResult<OptSpec> {
                 "@" => {
                     if !required {
                         return Err(PerlError::runtime(
-                            format!("getopts: invalid spec '{}': `:T@` not supported (use `=T@`)", spec),
+                            format!(
+                                "getopts: invalid spec '{}': `:T@` not supported (use `=T@`)",
+                                spec
+                            ),
                             line,
                         ));
                     }
@@ -204,7 +204,10 @@ fn parse_spec_string(spec: &str, line: usize) -> PerlResult<OptSpec> {
                 "%" => {
                     if !required {
                         return Err(PerlError::runtime(
-                            format!("getopts: invalid spec '{}': `:T%` not supported (use `=T%`)", spec),
+                            format!(
+                                "getopts: invalid spec '{}': `:T%` not supported (use `=T%`)",
+                                spec
+                            ),
                             line,
                         ));
                     }
@@ -267,10 +270,7 @@ fn render_opt(name: &str) -> String {
 }
 
 /// Look up a spec by any of its names. Returns (index, matched-name, is-negation).
-fn find_spec<'a>(
-    specs: &'a [OptSpec],
-    name: &str,
-) -> Option<(usize, &'a OptSpec, bool)> {
+fn find_spec<'a>(specs: &'a [OptSpec], name: &str) -> Option<(usize, &'a OptSpec, bool)> {
     for (i, s) in specs.iter().enumerate() {
         for n in s.names() {
             if n == name {
@@ -292,10 +292,7 @@ fn find_spec<'a>(
 fn split_hash_kv(raw: &str, opt: &str, line: usize) -> PerlResult<(String, String)> {
     let eq = raw.find('=').ok_or_else(|| {
         PerlError::runtime(
-            format!(
-                "getopts: option '{}' expects key=value, got '{}'",
-                opt, raw
-            ),
+            format!("getopts: option '{}' expects key=value, got '{}'", opt, raw),
             line,
         )
     })?;
@@ -426,21 +423,11 @@ fn parse_argv(
                 None => (rest, None),
             };
             let (_, spec, negated) = find_spec(specs, name).ok_or_else(|| {
-                PerlError::runtime(
-                    format!("getopts: unknown option --{}", name),
-                    line,
-                )
+                PerlError::runtime(format!("getopts: unknown option --{}", name), line)
             })?;
             let display = render_opt(name);
             i = consume_option(
-                &input,
-                i,
-                inline_val,
-                spec,
-                negated,
-                &display,
-                &mut out,
-                line,
+                &input, i, inline_val, spec, negated, &display, &mut out, line,
             )?;
             continue;
         }
@@ -469,14 +456,7 @@ fn parse_argv(
                 })?;
                 let display = render_opt(&name);
                 i = consume_option(
-                    &input,
-                    i,
-                    inline_val,
-                    spec,
-                    negated,
-                    &display,
-                    &mut out,
-                    line,
+                    &input, i, inline_val, spec, negated, &display, &mut out, line,
                 )?;
                 continue;
             }
@@ -499,14 +479,7 @@ fn parse_argv(
                     ArgKind::Bool | ArgKind::NegBool | ArgKind::Counter => {
                         // No-arg flag in the middle (or only one) of a bundle.
                         i = consume_option(
-                            &input,
-                            i,
-                            None,
-                            spec,
-                            negated,
-                            &display,
-                            &mut out,
-                            line,
+                            &input, i, None, spec, negated, &display, &mut out, line,
                         )?;
                         // consume_option advanced `i` past the whole token; revert
                         // that advance for all but the last char in the bundle so
@@ -525,14 +498,7 @@ fn parse_argv(
                         let tail: String = chars[idx + 1..].iter().collect();
                         let inline_val = if tail.is_empty() { None } else { Some(tail) };
                         i = consume_option(
-                            &input,
-                            i,
-                            inline_val,
-                            spec,
-                            negated,
-                            &display,
-                            &mut out,
-                            line,
+                            &input, i, inline_val, spec, negated, &display, &mut out, line,
                         )?;
                         advanced_outer = true;
                         break;
@@ -692,7 +658,10 @@ fn parse_help_meta(v: &StrykeValue, line: usize) -> PerlResult<HelpMeta> {
             "epilog" => meta.epilog = Some(val.to_string()),
             other => {
                 return Err(PerlError::runtime(
-                    format!("getopts: unknown meta key '{}' (expected prog/desc/epilog)", other),
+                    format!(
+                        "getopts: unknown meta key '{}' (expected prog/desc/epilog)",
+                        other
+                    ),
                     line,
                 ));
             }
@@ -826,7 +795,11 @@ fn build_help_text(specs: &[OptSpec], meta: &HelpMeta, include_help_row: bool) -
             "show this help and exit".to_string(),
         ));
     }
-    let max_left = rows.iter().map(|(l, _)| l.chars().count()).max().unwrap_or(0);
+    let max_left = rows
+        .iter()
+        .map(|(l, _)| l.chars().count())
+        .max()
+        .unwrap_or(0);
     for (l, r) in &rows {
         let pad = max_left.saturating_sub(l.chars().count());
         out.push_str(&format!("  {}{}  {}\n", l, " ".repeat(pad), r));
@@ -1000,10 +973,7 @@ pub fn builtin_getopts(
         for s in &specs {
             if !seen.insert(&s.canonical) {
                 return Err(PerlError::runtime(
-                    format!(
-                        "getopts: duplicate option name '{}' in specs",
-                        s.canonical
-                    ),
+                    format!("getopts: duplicate option name '{}' in specs", s.canonical),
                     line,
                 ));
             }
@@ -1063,12 +1033,18 @@ mod tests {
     use super::*;
 
     fn argv(items: &[&str]) -> StrykeValue {
-        let v: Vec<StrykeValue> = items.iter().map(|s| StrykeValue::string((*s).into())).collect();
+        let v: Vec<StrykeValue> = items
+            .iter()
+            .map(|s| StrykeValue::string((*s).into()))
+            .collect();
         StrykeValue::array_ref(Arc::new(RwLock::new(v)))
     }
 
     fn specs(items: &[&str]) -> StrykeValue {
-        let v: Vec<StrykeValue> = items.iter().map(|s| StrykeValue::string((*s).into())).collect();
+        let v: Vec<StrykeValue> = items
+            .iter()
+            .map(|s| StrykeValue::string((*s).into()))
+            .collect();
         StrykeValue::array_ref(Arc::new(RwLock::new(v)))
     }
 
@@ -1107,7 +1083,9 @@ mod tests {
             .scope
             .set_array(
                 "ARGV",
-                argv.iter().map(|s| StrykeValue::string((*s).into())).collect(),
+                argv.iter()
+                    .map(|s| StrykeValue::string((*s).into()))
+                    .collect(),
             )
             .expect("seed @ARGV");
         let out = builtin_getopts(&mut interp, args, 1)?;
@@ -1188,7 +1166,10 @@ mod tests {
         let v = hget(&out, "tag");
         let arr = v.as_array_ref().expect("arrayref").read().clone();
         let strs: Vec<String> = arr.iter().map(|v| v.to_string()).collect();
-        assert_eq!(strs, vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+        assert_eq!(
+            strs,
+            vec!["a".to_string(), "b".to_string(), "c".to_string()]
+        );
     }
 
     #[test]
@@ -1266,7 +1247,10 @@ mod tests {
     fn defaults_via_hash_form() {
         let h: IndexMap<String, StrykeValue> = [
             ("count|n=i".to_string(), StrykeValue::integer(10)),
-            ("file|f=s".to_string(), StrykeValue::string("out.txt".into())),
+            (
+                "file|f=s".to_string(),
+                StrykeValue::string("out.txt".into()),
+            ),
         ]
         .into_iter()
         .collect();
@@ -1304,7 +1288,11 @@ mod tests {
         let s = specs(&["verbose|v", "verbose=s"]);
         let err = call(&[a, s]).unwrap_err();
         let msg = format!("{}", err);
-        assert!(msg.contains("duplicate option name 'verbose'"), "msg was: {}", msg);
+        assert!(
+            msg.contains("duplicate option name 'verbose'"),
+            "msg was: {}",
+            msg
+        );
     }
 
     #[test]
@@ -1382,10 +1370,7 @@ mod tests {
                     ("default", StrykeValue::string("out.txt".into())),
                 ],
             ),
-            (
-                "count|n=i",
-                &[("default", StrykeValue::integer(10))],
-            ),
+            ("count|n=i", &[("default", StrykeValue::integer(10))]),
         ]);
         let a = argv(&[]);
         let out = call(&[a, s]).unwrap();
@@ -1447,14 +1432,15 @@ mod tests {
 
     #[test]
     fn d1_unknown_metadata_key_errors() {
-        let s = meta_spec(&[(
-            "file|f=s",
-            &[("nope", StrykeValue::integer(1))],
-        )]);
+        let s = meta_spec(&[("file|f=s", &[("nope", StrykeValue::integer(1))])]);
         let a = argv(&[]);
         let err = call(&[a, s]).unwrap_err();
         let msg = format!("{}", err);
-        assert!(msg.contains("unknown metadata key 'nope'"), "msg was: {}", msg);
+        assert!(
+            msg.contains("unknown metadata key 'nope'"),
+            "msg was: {}",
+            msg
+        );
     }
 
     #[test]
@@ -1495,7 +1481,11 @@ mod tests {
         };
         let text = build_help_text(&specs, &meta, true);
         // Banner
-        assert!(text.contains("Usage: myscript [OPTIONS]"), "text:\n{}", text);
+        assert!(
+            text.contains("Usage: myscript [OPTIONS]"),
+            "text:\n{}",
+            text
+        );
         assert!(text.contains("do a thing"), "text:\n{}", text);
         // Each option appears with both names and metavar where applicable
         assert!(text.contains("-v, --verbose"), "text:\n{}", text);
@@ -1534,7 +1524,9 @@ mod tests {
             StrykeValue::string("--".into()),
             StrykeValue::string("--help".into()),
         ]));
-        assert!(!argv_requests_help(&[StrykeValue::string("--other".into())]));
+        assert!(!argv_requests_help(&[StrykeValue::string(
+            "--other".into()
+        )]));
     }
 
     #[test]
@@ -1575,11 +1567,7 @@ mod tests {
     #[test]
     fn implicit_argv_one_arg() {
         let s = specs(&["verbose|v", "file|f=s"]);
-        let (out, left) = call_with_argv(
-            &["--verbose", "--file=x.txt", "pos1"],
-            &[s],
-        )
-        .unwrap();
+        let (out, left) = call_with_argv(&["--verbose", "--file=x.txt", "pos1"], &[s]).unwrap();
         assert_eq!(hget(&out, "verbose").to_int(), 1);
         assert_eq!(hget(&out, "file").to_string(), "x.txt");
         assert_eq!(left, vec!["pos1".to_string()]);
@@ -1591,8 +1579,7 @@ mod tests {
         let mut m: IndexMap<String, StrykeValue> = IndexMap::new();
         m.insert("prog".into(), StrykeValue::string("demo".into()));
         let meta = StrykeValue::hash_ref(Arc::new(RwLock::new(m)));
-        let (out, left) =
-            call_with_argv(&["-v", "rest"], &[s, meta]).unwrap();
+        let (out, left) = call_with_argv(&["-v", "rest"], &[s, meta]).unwrap();
         assert_eq!(hget(&out, "verbose").to_int(), 1);
         assert_eq!(left, vec!["rest".to_string()]);
     }

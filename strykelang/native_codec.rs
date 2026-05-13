@@ -277,7 +277,9 @@ pub(crate) fn hmac_sha1(key: &StrykeValue, msg: &StrykeValue) -> PerlResult<Stry
     let mut mac = <HmacSha1 as Mac>::new_from_slice(&bytes_from_value(key))
         .map_err(|e| PerlError::runtime(format!("hmac_sha1: {}", e), 0))?;
     Mac::update(&mut mac, &bytes_from_value(msg));
-    Ok(StrykeValue::string(hex::encode(mac.finalize().into_bytes())))
+    Ok(StrykeValue::string(hex::encode(
+        mac.finalize().into_bytes(),
+    )))
 }
 
 /// HMAC-SHA384; returns lowercase hex (96 chars).
@@ -285,7 +287,9 @@ pub(crate) fn hmac_sha384(key: &StrykeValue, msg: &StrykeValue) -> PerlResult<St
     let mut mac = <HmacSha384 as Mac>::new_from_slice(&bytes_from_value(key))
         .map_err(|e| PerlError::runtime(format!("hmac_sha384: {}", e), 0))?;
     Mac::update(&mut mac, &bytes_from_value(msg));
-    Ok(StrykeValue::string(hex::encode(mac.finalize().into_bytes())))
+    Ok(StrykeValue::string(hex::encode(
+        mac.finalize().into_bytes(),
+    )))
 }
 
 /// HMAC-SHA512; returns lowercase hex (128 chars).
@@ -293,7 +297,9 @@ pub(crate) fn hmac_sha512(key: &StrykeValue, msg: &StrykeValue) -> PerlResult<St
     let mut mac = <HmacSha512 as Mac>::new_from_slice(&bytes_from_value(key))
         .map_err(|e| PerlError::runtime(format!("hmac_sha512: {}", e), 0))?;
     Mac::update(&mut mac, &bytes_from_value(msg));
-    Ok(StrykeValue::string(hex::encode(mac.finalize().into_bytes())))
+    Ok(StrykeValue::string(hex::encode(
+        mac.finalize().into_bytes(),
+    )))
 }
 
 /// HMAC-MD5; returns lowercase hex (32 chars). Legacy, avoid for new code.
@@ -301,7 +307,9 @@ pub(crate) fn hmac_md5(key: &StrykeValue, msg: &StrykeValue) -> PerlResult<Stryk
     let mut mac = <HmacMd5 as Mac>::new_from_slice(&bytes_from_value(key))
         .map_err(|e| PerlError::runtime(format!("hmac_md5: {}", e), 0))?;
     Mac::update(&mut mac, &bytes_from_value(msg));
-    Ok(StrykeValue::string(hex::encode(mac.finalize().into_bytes())))
+    Ok(StrykeValue::string(hex::encode(
+        mac.finalize().into_bytes(),
+    )))
 }
 
 // ── HKDF Key Derivation ──────────────────────────────────────────────────────
@@ -774,7 +782,10 @@ pub(crate) fn des3_encrypt(
 }
 
 /// 3DES-CBC decrypt. key=24 bytes, ciphertext=base64(iv || ciphertext).
-pub(crate) fn des3_decrypt(key: &StrykeValue, ciphertext_b64: &StrykeValue) -> PerlResult<StrykeValue> {
+pub(crate) fn des3_decrypt(
+    key: &StrykeValue,
+    ciphertext_b64: &StrykeValue,
+) -> PerlResult<StrykeValue> {
     use des::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
     type Des3CbcDec = cbc::Decryptor<des::TdesEde3>;
 
@@ -1092,7 +1103,10 @@ pub(crate) fn cast5_encrypt(
 }
 
 /// CAST5-CBC decrypt.
-pub(crate) fn cast5_decrypt(key: &StrykeValue, ciphertext_b64: &StrykeValue) -> PerlResult<StrykeValue> {
+pub(crate) fn cast5_decrypt(
+    key: &StrykeValue,
+    ciphertext_b64: &StrykeValue,
+) -> PerlResult<StrykeValue> {
     use cast5::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
     type Cast5CbcDec = cbc::Decryptor<cast5::Cast5>;
 
@@ -1240,7 +1254,10 @@ pub(crate) fn xsalsa20_decrypt(
 
 /// NaCl secretbox seal. Symmetric authenticated encryption (XSalsa20-Poly1305).
 /// key=32 bytes. Returns base64(nonce || ciphertext || tag).
-pub(crate) fn secretbox_seal(key: &StrykeValue, plaintext: &StrykeValue) -> PerlResult<StrykeValue> {
+pub(crate) fn secretbox_seal(
+    key: &StrykeValue,
+    plaintext: &StrykeValue,
+) -> PerlResult<StrykeValue> {
     use crypto_secretbox::{aead::Aead, KeyInit, XSalsa20Poly1305};
 
     let key_bytes = bytes_from_value(key);
@@ -1264,7 +1281,10 @@ pub(crate) fn secretbox_seal(key: &StrykeValue, plaintext: &StrykeValue) -> Perl
 }
 
 /// NaCl secretbox open. Decrypt and verify.
-pub(crate) fn secretbox_open(key: &StrykeValue, ciphertext_b64: &StrykeValue) -> PerlResult<StrykeValue> {
+pub(crate) fn secretbox_open(
+    key: &StrykeValue,
+    ciphertext_b64: &StrykeValue,
+) -> PerlResult<StrykeValue> {
     use crypto_secretbox::{aead::Aead, KeyInit, XSalsa20Poly1305};
 
     let key_bytes = bytes_from_value(key);
@@ -1477,7 +1497,10 @@ pub(crate) fn barcode_ean13(data: &StrykeValue) -> PerlResult<StrykeValue> {
 }
 
 /// Generate barcode as SVG. type = "code128", "code39", "ean13", "upca".
-pub(crate) fn barcode_svg(data: &StrykeValue, barcode_type: &StrykeValue) -> PerlResult<StrykeValue> {
+pub(crate) fn barcode_svg(
+    data: &StrykeValue,
+    barcode_type: &StrykeValue,
+) -> PerlResult<StrykeValue> {
     use barcoders::generators::svg::SVG;
 
     let data_str = data.to_string();
@@ -1567,7 +1590,10 @@ pub(crate) fn rsa_keygen(bits: &StrykeValue) -> PerlResult<StrykeValue> {
 }
 
 /// RSA-OAEP encrypt with SHA-256. public_key_pem, plaintext. Returns base64 ciphertext.
-pub(crate) fn rsa_encrypt(pub_pem: &StrykeValue, plaintext: &StrykeValue) -> PerlResult<StrykeValue> {
+pub(crate) fn rsa_encrypt(
+    pub_pem: &StrykeValue,
+    plaintext: &StrykeValue,
+) -> PerlResult<StrykeValue> {
     let pub_key = RsaPublicKey::from_public_key_pem(&pub_pem.to_string())
         .map_err(|e| PerlError::runtime(format!("rsa_encrypt: invalid public key: {}", e), 0))?;
     let mut rng = rand::thread_rng();
@@ -1682,7 +1708,10 @@ pub(crate) fn ecdsa_p256_keygen() -> PerlResult<StrykeValue> {
 }
 
 /// ECDSA P-256 sign. private_key_hex, message. Returns signature as hex (DER-encoded).
-pub(crate) fn ecdsa_p256_sign(priv_hex: &StrykeValue, message: &StrykeValue) -> PerlResult<StrykeValue> {
+pub(crate) fn ecdsa_p256_sign(
+    priv_hex: &StrykeValue,
+    message: &StrykeValue,
+) -> PerlResult<StrykeValue> {
     use p256::ecdsa::{signature::Signer, SigningKey};
     let priv_bytes = hex::decode(priv_hex.to_string().trim())
         .map_err(|e| PerlError::runtime(format!("ecdsa_p256_sign: invalid hex: {}", e), 0))?;
@@ -1741,7 +1770,10 @@ pub(crate) fn ecdsa_p384_keygen() -> PerlResult<StrykeValue> {
 }
 
 /// ECDSA P-384 sign. Returns signature as hex (DER-encoded).
-pub(crate) fn ecdsa_p384_sign(priv_hex: &StrykeValue, message: &StrykeValue) -> PerlResult<StrykeValue> {
+pub(crate) fn ecdsa_p384_sign(
+    priv_hex: &StrykeValue,
+    message: &StrykeValue,
+) -> PerlResult<StrykeValue> {
     use p384::ecdsa::{signature::Signer, SigningKey};
     let priv_bytes = hex::decode(priv_hex.to_string().trim())
         .map_err(|e| PerlError::runtime(format!("ecdsa_p384_sign: invalid hex: {}", e), 0))?;
@@ -2046,7 +2078,10 @@ pub(crate) fn aes_encrypt(key: &StrykeValue, plaintext: &StrykeValue) -> PerlRes
 }
 
 /// AES-256-GCM decrypt. key=32 bytes. Input is base64(nonce || ciphertext || tag).
-pub(crate) fn aes_decrypt(key: &StrykeValue, ciphertext_b64: &StrykeValue) -> PerlResult<StrykeValue> {
+pub(crate) fn aes_decrypt(
+    key: &StrykeValue,
+    ciphertext_b64: &StrykeValue,
+) -> PerlResult<StrykeValue> {
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() != 32 {
         return Err(PerlError::runtime(
@@ -2073,7 +2108,10 @@ pub(crate) fn aes_decrypt(key: &StrykeValue, ciphertext_b64: &StrykeValue) -> Pe
 
 /// ChaCha20-Poly1305 encrypt. key=32 bytes, nonce=12 bytes (auto-generated).
 /// Returns base64(nonce || ciphertext || tag).
-pub(crate) fn chacha_encrypt(key: &StrykeValue, plaintext: &StrykeValue) -> PerlResult<StrykeValue> {
+pub(crate) fn chacha_encrypt(
+    key: &StrykeValue,
+    plaintext: &StrykeValue,
+) -> PerlResult<StrykeValue> {
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() != 32 {
         return Err(PerlError::runtime(
@@ -2100,7 +2138,10 @@ pub(crate) fn chacha_encrypt(key: &StrykeValue, plaintext: &StrykeValue) -> Perl
 }
 
 /// ChaCha20-Poly1305 decrypt. key=32 bytes. Input is base64(nonce || ciphertext || tag).
-pub(crate) fn chacha_decrypt(key: &StrykeValue, ciphertext_b64: &StrykeValue) -> PerlResult<StrykeValue> {
+pub(crate) fn chacha_decrypt(
+    key: &StrykeValue,
+    ciphertext_b64: &StrykeValue,
+) -> PerlResult<StrykeValue> {
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() != 32 {
         return Err(PerlError::runtime(
@@ -2145,7 +2186,10 @@ pub(crate) fn ed25519_keygen() -> PerlResult<StrykeValue> {
 
 /// Ed25519 sign. private_key_hex (64 chars / 32 bytes), message.
 /// Returns signature as hex (128 chars / 64 bytes).
-pub(crate) fn ed25519_sign(private_key: &StrykeValue, message: &StrykeValue) -> PerlResult<StrykeValue> {
+pub(crate) fn ed25519_sign(
+    private_key: &StrykeValue,
+    message: &StrykeValue,
+) -> PerlResult<StrykeValue> {
     let key_bytes = hex::decode(private_key.to_string().trim())
         .map_err(|e| PerlError::runtime(format!("ed25519_sign: invalid hex key: {}", e), 0))?;
     if key_bytes.len() != 32 {
@@ -2214,7 +2258,10 @@ pub(crate) fn x25519_keygen() -> PerlResult<StrykeValue> {
 }
 
 /// X25519 Diffie-Hellman. my_private_hex, their_public_hex → shared_secret_hex.
-pub(crate) fn x25519_dh(my_private: &StrykeValue, their_public: &StrykeValue) -> PerlResult<StrykeValue> {
+pub(crate) fn x25519_dh(
+    my_private: &StrykeValue,
+    their_public: &StrykeValue,
+) -> PerlResult<StrykeValue> {
     let priv_bytes = hex::decode(my_private.to_string().trim())
         .map_err(|e| PerlError::runtime(format!("x25519_dh: invalid hex private key: {}", e), 0))?;
     let pub_bytes = hex::decode(their_public.to_string().trim())
@@ -2275,7 +2322,11 @@ pub(crate) fn math_lbeta(a: &StrykeValue, b: &StrykeValue) -> PerlResult<StrykeV
 }
 
 /// Regularized incomplete beta function I_x(a, b).
-pub(crate) fn math_betainc(x: &StrykeValue, a: &StrykeValue, b: &StrykeValue) -> PerlResult<StrykeValue> {
+pub(crate) fn math_betainc(
+    x: &StrykeValue,
+    a: &StrykeValue,
+    b: &StrykeValue,
+) -> PerlResult<StrykeValue> {
     use statrs::function::beta::beta_reg;
     Ok(StrykeValue::float(beta_reg(
         a.to_number(),
@@ -2568,7 +2619,10 @@ pub(crate) fn tar_create(dir: &StrykeValue) -> PerlResult<StrykeValue> {
 }
 
 /// Extract tar archive to a directory.
-pub(crate) fn tar_extract(tar_data: &StrykeValue, dest_dir: &StrykeValue) -> PerlResult<StrykeValue> {
+pub(crate) fn tar_extract(
+    tar_data: &StrykeValue,
+    dest_dir: &StrykeValue,
+) -> PerlResult<StrykeValue> {
     let data = bytes_from_value(tar_data);
     let dest = dest_dir.to_string();
     let mut archive = tar::Archive::new(&data[..]);
@@ -2693,7 +2747,10 @@ pub(crate) fn zip_create(dir: &StrykeValue) -> PerlResult<StrykeValue> {
 }
 
 /// Extract ZIP archive to a directory.
-pub(crate) fn zip_extract(zip_data: &StrykeValue, dest_dir: &StrykeValue) -> PerlResult<StrykeValue> {
+pub(crate) fn zip_extract(
+    zip_data: &StrykeValue,
+    dest_dir: &StrykeValue,
+) -> PerlResult<StrykeValue> {
     use std::fs;
     use std::io::Write;
     use std::path::Path;
@@ -2849,7 +2906,10 @@ pub(crate) fn datetime_format_tz(
 
 /// Wall-clock / naive datetime string interpreted in an IANA timezone → UTC epoch seconds (float).
 /// Accepts `%Y-%m-%d %H:%M:%S`, `%Y-%m-%dT%H:%M:%S`, or `%Y-%m-%d` (midnight).
-pub(crate) fn datetime_parse_local(s: &StrykeValue, tz_name: &StrykeValue) -> PerlResult<StrykeValue> {
+pub(crate) fn datetime_parse_local(
+    s: &StrykeValue,
+    tz_name: &StrykeValue,
+) -> PerlResult<StrykeValue> {
     let tz: Tz = parse_tz(tz_name)?;
     let text = s.to_string();
     let naive = parse_naive_datetime(text.trim()).ok_or_else(|| {
@@ -2879,7 +2939,10 @@ fn parse_naive_datetime(s: &str) -> Option<NaiveDateTime> {
 }
 
 /// Epoch arithmetic: `datetime_add_seconds($epoch, $delta)` — both floats; result is float UTC seconds.
-pub(crate) fn datetime_add_seconds(epoch: &StrykeValue, secs: &StrykeValue) -> PerlResult<StrykeValue> {
+pub(crate) fn datetime_add_seconds(
+    epoch: &StrykeValue,
+    secs: &StrykeValue,
+) -> PerlResult<StrykeValue> {
     let a = epoch.to_number();
     let b = secs.to_number();
     if !a.is_finite() || !b.is_finite() {

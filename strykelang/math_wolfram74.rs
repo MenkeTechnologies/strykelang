@@ -694,14 +694,38 @@ fn builtin_wiener_filter(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::float(sxx / (sxx + noise).max(1e-300)))
 }
 
-/// 1-D median filter: median of (2k+1)-sized window centred at i.
+/// 1-D median filter: at every index `i`, returns the median of a window of
+/// size `k` (odd, default 3) centred at `i`. Boundary windows clamp to the
+/// available samples on either side (shrunken window) rather than reflecting.
+/// Previous implementation returned the global median of the input.
 fn builtin_medfilt_1d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
-    let mut win = b74_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
-    if win.is_empty() { return Ok(StrykeValue::float(0.0)); }
-    win.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    let mid = win.len() / 2;
-    Ok(StrykeValue::float(if win.len() % 2 == 1 { win[mid] }
-                        else { (win[mid - 1] + win[mid]) / 2.0 }))
+    let signal = b74_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
+    let n = signal.len();
+    if n == 0 {
+        return Ok(StrykeValue::array(vec![]));
+    }
+    let raw_k = args.get(1).map(|v| v.to_number() as i64).unwrap_or(3);
+    // Force odd, ≥ 1.
+    let mut k = raw_k.max(1) as usize;
+    if k % 2 == 0 {
+        k += 1;
+    }
+    let half = k / 2;
+    let mut out = Vec::with_capacity(n);
+    for i in 0..n {
+        let lo = i.saturating_sub(half);
+        let hi = (i + half + 1).min(n);
+        let mut window: Vec<f64> = signal[lo..hi].to_vec();
+        window.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let m = window.len();
+        let med = if m % 2 == 1 {
+            window[m / 2]
+        } else {
+            (window[m / 2 - 1] + window[m / 2]) / 2.0
+        };
+        out.push(StrykeValue::float(med));
+    }
+    Ok(StrykeValue::array(out))
 }
 
 /// Peak-width-at-half-prominence estimation given prominence and slope.

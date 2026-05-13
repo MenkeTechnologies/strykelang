@@ -57,7 +57,10 @@ pub fn pselect_recv(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue
         Ok(v) => v,
         Err(_) => StrykeValue::UNDEF,
     };
-    Ok(StrykeValue::array(vec![val, StrykeValue::integer(idx as i64)]))
+    Ok(StrykeValue::array(vec![
+        val,
+        StrykeValue::integer(idx as i64),
+    ]))
 }
 
 /// Like [`pselect_recv`], with optional overall timeout. On timeout returns `(undef, -1)`.
@@ -104,7 +107,10 @@ pub fn pselect_recv_with_optional_timeout(
         Ok(v) => v,
         Err(_) => StrykeValue::UNDEF,
     };
-    Ok(StrykeValue::array(vec![val, StrykeValue::integer(idx as i64)]))
+    Ok(StrykeValue::array(vec![
+        val,
+        StrykeValue::integer(idx as i64),
+    ]))
 }
 
 /// `$tx->send($v)` and `$rx->recv` without package subs.

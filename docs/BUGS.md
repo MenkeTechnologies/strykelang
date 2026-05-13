@@ -19,6 +19,108 @@ Severity legend:
 
 ## Recently fixed
 
+- **BUG-121** — `median_absolute_deviation` for even-sized samples
+  returned `sorted[len/2]` (upper-half element) as the median instead of
+  averaging the two middle values. **Fix:** real even-length median in
+  `builtin_median_absolute_deviation` (`builtins_extended.rs`). Affects
+  spread for any even-`n` input; `MAD(1, 2, 100, 101)` now correctly
+  returns `49.5` (was `98`).
+- **BUG-133** — `depreciation_double(cost, salvage, life)` ignored the
+  salvage operand entirely, returning unbounded `2·cost/life`. **Fix:**
+  bound the unbounded annual depreciation by `(cost − salvage)` so the
+  per-year amount never causes book value to drop below salvage
+  (`builtins_extended.rs`).
+- **BUG-134** — `weber_number(ρ, v, L, σ)` clamped a missing/zero σ to
+  `1e-30`, producing a spurious finite ~`10³²` number instead of
+  signalling overflow. **Fix:** return `Infinity` (or NaN if numerator is
+  also non-finite) when σ ≤ 0 (`math_wolfram13.rs`).
+- **BUG-135** — `dB_voltage(V)` / `dB_power(P)` with a missing reference
+  silently substituted `1e-30`, fabricating dB readings on the order of
+  `+600 dB`. **Fix:** return NaN when the reference operand is missing or
+  non-positive (`math_wolfram12.rs`).
+- **BUG-145** — `unzip_pairs(zip(...))` (pair rows already laid out as
+  variadic args) deep-flattened every inner pair's contents into the row
+  axis, shredding alignment. **Fix:** preserve pair-row layout when the
+  caller spreads zip output; only peel the outer container when a single
+  arrayref argument is passed (`builtin_unzip_pairs` in `builtins.rs`).
+- **BUG-146** — `take_n(N, cycle(LIST))` returned an empty list because
+  `flatten_args` calls `collect_all` on the cycle iterator, which by
+  design refuses to materialize an infinite sequence. **Fix:** pull
+  exactly `N` items directly from the iterator when `take_n` receives a
+  single iterator argument (`builtins.rs`).
+- **BUG-149** — `without([drop1, drop2, ...], LIST)` silently filtered
+  nothing because the filter compared the *arrayref display string* to
+  each element's string. **Fix:** when the first argument is an
+  array/arrayref, build a `HashSet<String>` of the drop members and
+  filter against set membership; otherwise keep the single-value drop
+  semantics (`builtins.rs`).
+- **BUG-163** — `running_reduce { $a + $b }` always saw `$a = first` and
+  `$b = undef`, collapsing the chain to zeros after the first slot.
+  **Fix:** call `scope.set_sort_pair(acc, next)` before each `call_sub`
+  so the reducer block resolves `$a` / `$b` to the package globals — the
+  same mechanism `reduce`, `reductions`, and `sort { … }` use
+  (`builtins.rs`). `running_reduce { $a + $b } 1..5` now yields
+  `1, 3, 6, 10, 15`.
+- **BUG-166** — `nth(N, ARRAYREF)` returned `undef` because `to_list` does
+  not unpack `ArrayRef` storage. **Fix:** unwrap via
+  `map_flatten_outputs(true)` (`builtin_nth`, `builtins.rs`).
+- **BUG-173** — `mode([…])` (single arrayref operand) echoed the bracket
+  list instead of computing the modal element because
+  `list_builtins::mode_with_want` iterated `args` directly without
+  peeling array/arrayref storage. **Fix:** add `flatten_to_values` helper
+  and use it in `mode_with_want`, `minmax` (`min`/`max`/`minstr`/`maxstr`),
+  `variance`, and `stddev` so all four shapes — `mode(1,2,3)`,
+  `mode(@list)`, `mode([1,2,3])`, `mode(\@list)` — drain into the same
+  flat value vector (`list_builtins.rs`).
+- **BUG-175** — `trimmed_mean(LIST, PCT)` interpreted the leading
+  arrayref's `to_number()` as the trim percentage (which is the array
+  *length*), so `trimmed_mean([1,2,3,4,100], 20)` trimmed 5% on each side
+  using only `[20]` as the sample. **Fix:** auto-detect call order — if
+  the first arg is array-shaped and the trailing scalar is a single
+  number, treat it as `(LIST, PCT)`; otherwise stick with the
+  `(PCT, LIST...)` Wolfram form (`builtins.rs`).
+- **BUG-194** — `hamming_distance([1,0,1], [1,1,0])` compared
+  `"ARRAY(0x…)"` against `"ARRAY(0x…)"` and reported `0` mismatches.
+  **Fix:** when either operand is array/arrayref, drain both into value
+  vectors and compare element-wise; string operands keep codepoint
+  comparison (`builtin_hamming`, `builtins.rs`). Same fix replicated in
+  `builtin_hamming_distance` for callers that hit the alternate dispatch
+  path.
+- **BUG-187** — `clamp_list(lo, hi, list...)` Rust-panicked (`f64::clamp`
+  requires `min ≤ max`). **Fix:** normalize raw `lo` / `hi` to ascending
+  order before clamping (`builtins.rs`).
+- **BUG-189** — `mahalanobis([0,0], [1,1], cov_inv)` Rust-panicked because
+  the first arg parsed as a single 1-D row, mis-matching `center`'s
+  dimension. **Fix:** auto-promote a flat p-dim arrayref into a single
+  p-dim observation; rows with wrong dimension return NaN rather than
+  panicking (`builtins_extended.rs`).
+- **BUG-198** — `derangements(n)` used a fixed `(n − 1)` multiplier on
+  every recurrence step, yielding `n!` (`derangements(4) = 36`) instead
+  of the subfactorial `!n = 9`. **Fix:** use `(k − 1)` from the loop
+  index, matching `D(k) = (k − 1)·(D(k − 1) + D(k − 2))`
+  (`builtins_extended.rs`).
+- **BUG-128** — `lambert_w0(1)` returned NaN because the initial guess for
+  `x ≥ 1` was `ln(x) − ln(ln(x))`, which evaluates to `−∞` at `x = 1`.
+  **Fix:** region-specific seed — series for `x < 0`, smooth fit
+  `x / (1 + x·(e − 1)/e)` for `x ∈ [0, e]`, asymptotic for `x > e` — then
+  Halley iterate (`math_wolfram29.rs`). `lambert_w0(1)` now returns the
+  Omega constant `Ω ≈ 0.5671432904`.
+- **BUG-131** — `medfilt_1d` returned the *global* median of the entire
+  input vector rather than a sliding-window median. **Fix:** real
+  `(2k + 1)` sliding-window median filter; boundary windows clamp to
+  available samples (`math_wolfram74.rs`). Signature: `medfilt_1d(signal, k=3)`.
+- **BUG-129** — `convolve_full`, `convolve_valid`, `correlate_full`, and
+  `kron_product` returned only the output *sizes* (integers). **Fix:**
+  implement the actual discrete convolution
+  (`c[k] = Σ a[i]·b[k − i]`, output length `m + n − 1`),
+  cross-correlation (no kernel flip), and Kronecker product of two
+  vectors (`math_wolfram72.rs`).
+- **BUG-202** — `prim_mst` conflated weight `0` with "no edge", silently
+  reporting finite totals on disconnected graphs (re-processing the
+  start vertex). **Fix:** auto-detect convention — if the matrix contains
+  any `+Infinity`, treat infinity as absent and `0` as a valid weight;
+  otherwise keep the classic `0 = no edge`. Skip self-loops; return
+  `Infinity` when no reachable vertex remains (`builtins_extended.rs`).
 - **BUG-138** — `clamp(VALUE, LO, HI)` silently inverted bounds when callers
   passed the convention as `(value, min, max)` instead of the documented
   `(min, max, list)`. `clamp(11, 0, 10)` returned `11` instead of `10`.
@@ -488,7 +590,7 @@ NaN instead of a finite sentinel.
 Pin test: `cosine_distance_zero_operand_is_unit_bx` in
 `tests/suite/behavior_pin_2026_05_bx.rs`.
 
-## BUG-121 — `median_absolute_deviation` uses `sorted[len/2]` as the central value — **`bug`**
+## ~~BUG-121 — `median_absolute_deviation` uses `sorted[len/2]` as the central value~~ — **FIXED**
 
 For even-sized samples the implementation takes `vals[vals.len() / 2]` after
 sorting rather than the mean of the two middle order statistics (the usual
@@ -639,7 +741,7 @@ Pins: `iota_range_zero_until_n_exclusive_cb`,
 `iota_range_trailing_numeric_args_ignored_matches_five_only_cb` in
 `tests/suite/behavior_pin_2026_05_cb.rs`.
 
-## BUG-128 — `lambert_w0` (and **`wright_omega(0)`**) returns **NaN** at **`W(1)`** — **`bug`**
+## ~~BUG-128~~ — `lambert_w0` / `wright_omega(0)` now return the Omega constant at `W(1)` — **FIXED**
 
 `builtin_lambert_w0` selects the Halley initializer **`ln(x) - ln(ln(x))`** whenever
 \(x \ge 1\). Exactly at **`x == 1`**, \(\ln(\ln 1) = \ln 0\) is undefined in IEEE
@@ -659,7 +761,7 @@ Pins (contrast finite principal branch neighbors vs NaN sentinel):
 
 Batch: **`tests/suite/behavior_pin_2026_05_cc.rs`** (also aggregates many analytic/combinatorial pins unrelated to Lambert).
 
-## BUG-129 — `convolve_*`/`correlate_full`/`kron_product` return **sizes**, not convolution values — **`bug`**
+## ~~BUG-129~~ — `convolve_*`/`correlate_full`/`kron_product` now compute actual values, not sizes — **FIXED**
 
 `math_wolfram72.rs` computes only scalar dimensions (`len(a)+len(b)-1`, valid overlap counts,
 Kronecker flat cardinality). Callers naming these after textbook convolution expect full
@@ -678,7 +780,7 @@ subtract the fit manually today.
 
 Pin: `detrend_linear_pure_ramp_slope_one_cd` in `tests/suite/behavior_pin_2026_05_cd.rs`.
 
-## BUG-131 — `medfilt_1d` is not a (**2k+1**) sliding-window median filter — **`bug`**
+## ~~BUG-131~~ — `medfilt_1d` is now a proper `(2k+1)` sliding-window median filter — **FIXED**
 
 Implementation flattens the entire operand, globally sorts **all samples**, then returns **one**
 median of the multiset. There is **no positional windowing** contrary to Rustdoc ("1-D median filter:
@@ -697,7 +799,7 @@ Pins documenting current call-only Greeks: **`bs_delta_returns_call_delta_cdf_d1
 **`bs_put_delta_equals_call_delta_minus_one_ce`**, **`bs_theta_call_style_negative_ce`**, **`bs_rho_call_style_positive_ce`**
 in **`tests/suite/behavior_pin_2026_05_ce.rs`**.
 
-## BUG-133 — **`depreciation_double`** ignores the **salvage**/middle operand — **`bug`**
+## ~~BUG-133 — **`depreciation_double`** ignores the **salvage**/middle operand~~ — **FIXED**
 
 `builtin_depreciation_double` reads **`cost`** (`args[0]`) and **`life`** from **`args[2]`**, skipping **`args[1]`**
 entirely. Callers threading **`double_declining(cost, salvage, life)`** like **`depreciation_linear`** silently drop
@@ -707,7 +809,7 @@ scrap.
 Pins: **`depreciation_double_ignores_salvage_middle_arg_ce`**, **`depreciation_double_middle_arg_does_not_affect_rate_ce`**
 in **`tests/suite/behavior_pin_2026_05_ce.rs`**.
 
-## BUG-134 — **`weber_number`** clamps a **missing** \(\sigma\) to **1e-30** — **`bug`**
+## ~~BUG-134 — **`weber_number`** clamps a **missing** \(\sigma\) to **1e-30**~~ — **FIXED**
 
 `builtin_weber_number` computes **`ρ v² L / σ`** with **`σ = max(args[3].unwrap_or(0.0), 1e-30)`**. Omitting \(\sigma\)
 therefore divides by **\(10^{-30}\)** rather than returning an arity error — orders of magnitude larger than
@@ -717,7 +819,7 @@ the usual water–air ballpark.
 Pins: **`weber_number_requires_sigma_fourth_arg_cf`**, **`weber_number_step_matches_definition_with_default_sigma_cf`**,
 **`weber_number_omitting_sigma_explodes_via_tiny_denominator_cf`** in **`tests/suite/behavior_pin_2026_05_cf.rs`**.
 
-## BUG-135 — **`dB_voltage`** / **`dB_power`** missing reference becomes **1e-30** → **spurious giant dB** — **`bug`**
+## ~~BUG-135 — **`dB_voltage`** / **`dB_power`** missing reference becomes **1e-30** → **spurious giant dB**~~ — **FIXED**
 
 Both helpers clamp the reference argument with **`.max(1e-30)`** (`math_wolfram12.rs`). Calling **`dB_voltage(V)`** with
 only the numerator sets **`V_in = 1e-30`**, yielding **`20·log10(V / 10⁻³⁰)` ≈ 606 dB** instead of a controlled default
@@ -829,13 +931,13 @@ Pins throughout **`tests/suite/behavior_pin_2026_05_ci.rs`** (file module doc en
 
 Pins: **`transpose_single_nested_outer_array_clusters_rows_bug_ci`**, **`transpose_two_row_arguments_column_major_ci`**.
 
-## BUG-145 — **`unzip_pairs(zip(...))`** shreds pair rows because **`flatten_args` deep-merges** tuple innards — **`bug`**
+## ~~BUG-145 — **`unzip_pairs(zip(...))`** shreds pair rows because **`flatten_args` deep-merges** tuple innards~~ — **FIXED**
 
 `zip` already returns an array of pair rows, but **`builtin_unzip_pairs` calls `flatten_args`**, and each **dense inner array** expands to **raw scalars**, so the unzip walk pairs **`(1,9), (2), (8, undef)`** style garbage. Pass an explicit pair list (**`unzip_pairs([[1, 9], [2, 8]])`**) or rebuild pairs without an intermediate **`zip`** unless / until **`flatten_args` stops peeling pair innards**.
 
 Pins: **`unzip_pairs_explicit_pair_rows_ci`**, **`unzip_pairs_after_zip_over_flattens_to_scalars_bug_ci`**.
 
-## BUG-146 — **`take_n(_, cycle(...))` is vacuous**: **`CycleIterator::collect_all` → `[]` under `flatten_args`** — **`bug`**
+## ~~BUG-146 — **`take_n(_, cycle(...))` is vacuous**: **`CycleIterator::collect_all` → `[]` under `flatten_args`**~~ — **FIXED**
 
 **`flatten_args`** expands iterators via **`map_flatten_outputs`**, which invokes **`PerlIterator::collect_all`**. **Infinite `cycle` iterators return an empty snapshot** (“do not eagerly loop forever”), leaving **`take_n`** with **no input elements**, so stringify is **`()`** today.
 
@@ -863,7 +965,7 @@ whereas **`chain_from([1, 2], [3], [4, 5])`** flattens top-level list slots toda
 Pins: **`concat_iterator_one_bucket_per_arrayref_arg_cj`**, **`chain_from_three_lists_eager_flat_cj`**
 in **`tests/suite/behavior_pin_2026_05_cj.rs`**.
 
-## BUG-149 — **`without([...], LIST)`** does not subtract members: filter compares **ref display string** — **`bug`**
+## ~~BUG-149 — **`without([...], LIST)`** does not subtract members: filter compares **ref display string**~~ — **FIXED**
 
 **`builtin_without`** takes **`drop = args.first()`** and drops list elements where **`v.to_string() ==
 drop.to_string()`**. When **`drop`** is an **`ARRAYREF`**, **`drop.to_string()`** is the opaque
@@ -1004,7 +1106,7 @@ Pins: **`chebyshev_distance_four_scalars_cp`**, **`chebyshev_two_vectors_coerces
 **`slope_four_coordinates_cp`**, **`slope_with_two_vector_args_vertical_line_inf_bug_cp`**,
 **`midpoint_four_coordinates_cp`** in **`tests/suite/behavior_pin_2026_05_cp.rs`**.
 
-## BUG-163 — **`running_reduce { $a + $b }`** does not see comparator scalars (zeros after first) — **`bug`**
+## ~~BUG-163 — **`running_reduce { $a + $b }`** does not see comparator scalars (zeros after first)~~ — **FIXED**
 
 **`builtin_running_reduce`** invokes the reducer via **`call_sub`** on successive prefix tails, but the
 block’s **`$a` / `$b`** (or implicit sort-style bindings) are not populated for that code path the way
@@ -1039,7 +1141,7 @@ behaviour will not work.
 Pins: **`string_take_while_charset_prefix_not_predicate_cr`**, **`string_drop_while_charset_prefix_not_predicate_cr`**
 in **`tests/suite/behavior_pin_2026_05_cr.rs`**.
 
-## BUG-166 — **`nth(N, ARRAYREF)`** often returns **`undef`** because **`to_list`** does not unpack **`ArrayRef`** — **`bug`**
+## ~~BUG-166 — **`nth(N, ARRAYREF)`** often returns **`undef`** because **`to_list`** does not unpack **`ArrayRef`**~~ — **FIXED**
 
 **`builtin_nth`** falls back to **`v.to_list()`** for non-iterators. **`StrykeValue::to_list`** expands
 **`HeapObject::Array`** but **`HeapObject::ArrayRef`** hits the default arm and becomes a **one-element list**
@@ -1138,7 +1240,7 @@ vectors (or build explicit count maps). **`jaccard_index`** follows the same str
 Pins: **`jaccard_similarity_binary_masks_collapse_to_unit_bug_cw`**, **`jaccard_similarity_unique_elements_matches_index_cw`** (contrast)
 in **`tests/suite/behavior_pin_2026_05_cw.rs`**.
 
-## BUG-173 — **`mode([…])`** (single bracket list operand) does **not** return the element-wise mode — **`bug`**
+## ~~BUG-173 — **`mode([…])`** (single bracket list operand) does **not** return the element-wise mode~~ — **FIXED**
 
 **`builtin_mode`** (**`builtins.rs`**) uses **`flatten_args`**. **Observed:** **`mode([1, 2, 2, 3])`** **`stringify`** as **`[1, 2, 2, 3]`**
 (the bracket list echoed), while **`mode(1, 2, 2, 3)`** correctly yields **`2`**. Prefer variadic arguments or **`mode_val([1, 2,
@@ -1156,7 +1258,7 @@ Pins: **`mode_variadic_vs_single_arrayref_bug_cw`**, **`mode_val_arrayref_finds_
 Pins: **`windowed_tuple_two_overlap_three_windows_cx`**, **`windowed_bracket_array_yields_empty_bug_cx`**, **`chunked_tuple_pairs_cx`**,
 **`chunked_bracket_array_single_outer_chunk_bug_cx`** in **`tests/suite/behavior_pin_2026_05_cx.rs`**.
 
-## BUG-175 — **`trimmed_mean`** first operand **`ARRAY` → `to_number()`** is **length**, not an error — **`bug`**
+## ~~BUG-175 — **`trimmed_mean`** first operand **`ARRAY` → `to_number()`** is **length**, not an error~~ — **FIXED**
 
 **`builtin_trimmed_mean`** (**`builtins.rs`**) reads **`pct = args.first().to_number()`**. For an **`ARRAY`**, **`to_number`** is the
 element **count**. **`trimmed_mean([1, 2, 3, 4, 100], 20)`** therefore uses **`pct = 5`** (not **`20` %**) and **`collect_numbers([20])`**
@@ -1274,7 +1376,7 @@ Pins: **`winsorize_percent_first_bracket_list_db`**, **`winsorize_array_first_yi
 
 Pins: **`zip_interleave_unzip_flat_dc`**, **`unzip_nested_aof_pairs_mispairs_bug_dc`** in **`tests/suite/behavior_pin_2026_05_dc.rs`**.
 
-## BUG-187 — **`clamp_list`** **Rust-panics** when **`lo > hi`** — **`bug`**
+## ~~BUG-187~~ — `clamp_list` no longer panics when `lo > hi` (bounds auto-normalized) — **FIXED**
 
 **`builtin_clamp_list`** forwards to **`f64::clamp`**, which **`panic!`s** when **`min > max`**. Example: **`stryke -e 'clamp_list(5,0,1)'`** aborts the process instead of raising **`PerlError`**. Valid calls use **`lo ≤ hi`**.
 
@@ -1286,7 +1388,7 @@ No stable integration pin (subprocess abort); reproduction is the one-liner abov
 
 Pins: **`datetime_strftime_epoch_then_fmt_dd`**, **`datetime_strftime_swapped_args_returns_epoch_dd`** in **`tests/suite/behavior_pin_2026_05_dd.rs`**.
 
-## BUG-189 — **`mahalanobis`** **Rust-panics** when row dimension mismatches **`center`** — **`bug`**
+## ~~BUG-189~~ — `mahalanobis` no longer panics on row/center dimension mismatch — **FIXED**
 
 **`builtin_mahalanobis`** builds **`data`** rows from **`arg_to_vec`** on **`args[0]`**. A **flat** vector **`[0, 0]`** becomes a **single** \(\mathbb{R}^1\) row, but **`center = [1, 1]`** has **\(p=2\)** — **`diff[j]`** indexes past the row length and **panics**. **`mahalanobis([[0, 0]], …)`** is the safe shape (one **2-D** observation per row).
 
@@ -1316,7 +1418,7 @@ Pins: **`lerp_inv_lerp_smoothstep_remap_df`** (canonical **`lerp(10, 20, 0.5
 
 Pins: **`black_scholes_call_put_spot_strike_time_rate_vol_bug193_dg`**, **`bscall_doc_order_swaps_time_and_rate_bug193_dg`** in **`tests/suite/behavior_pin_2026_05_dg.rs`**.
 
-## BUG-194 — **`hamming_distance`** stringifies **`ARRAY`** operands — often identical **`ARRAY(0x…)`** shells — **`bug`**
+## ~~BUG-194 — **`hamming_distance`** stringifies **`ARRAY`** operands — often identical **`ARRAY(0x…)`** shells~~ — **FIXED**
 
 **`builtin_hamming_distance`** (**`builtins.rs`**) compares **`args[k].to_string()`** codepointwise. For **`ARRAY`** refs, **`Display`** collapses distinct buckets to the same **`ARRAY(0x…)`** pattern in common shells, so **`hamming_distance([1, 0, 1], [1, 1, 0])`** can report **`0`** mismatches even though the lists differ. Use **`string` / numeric character codes** / a list-aware metric when comparing vectors.
 
@@ -1340,7 +1442,7 @@ Pins: **`chinese_remainder_buckets_vs_flat_scalars_bug196_dh`** in **`tests/suit
 
 Pins: **`tetrahedron_volume_unit_simplex_dh`**, **`simplex_volume_3d_matrix_arg_yields_zero_bug197_dh`** in **`tests/suite/behavior_pin_2026_05_dh.rs`**.
 
-## BUG-198 — **`derangements(n)`** does **not** implement the subfactorial **`!n`** — **`bug`**
+## ~~BUG-198~~ — `derangements(n)` now implements the subfactorial `!n` correctly — **FIXED**
 
 The closed form for derangement counts is **`!n = n! \sum_{k=0}^n (-1)^k / k!`**, with **`!4 = 9`**. **`builtin_derangements`** (**`builtins_extended.rs`**) uses a bespoke loop **`c = (a+b)*(n-1)`** on a sliding pair, which produces **`derangements(4) = 36`** (here **`4!`**) instead of **`9`**. IDE/docs examples that cite **`derangements(4) → 9`** therefore disagree with the VM.
 
@@ -1358,7 +1460,7 @@ Pins: **`graph_tree_count_edges_max_degree_bug199_matrix_vs_list_di`** in **`tes
 
 Pins: **`snowball_stem_english_codepoints_not_string_bug200_di`** in **`tests/suite/behavior_pin_2026_05_di.rs`**.
 
-## BUG-202 — **`prim_mst`** ignores **zero-weight edges** and **misreports disconnected graphs** — **`bug`**
+## ~~BUG-202~~ — `prim_mst` now signals disconnected graphs via `Infinity` total — **FIXED**
 
 **`builtin_prim_mst`** (**`builtins_extended.rs`**) relaxes only entries with **`w[u][v] > 0.0`**, so **weight `0` is indistinguishable from “no edge.”** On a **fully disconnected** positive-weight‑free matrix (e.g. **2×2 zeros**), later Prim iterations **re-process the start vertex** with key **`0`**, and the summed total is **`0`** instead of **non‑finite** or a **connectivity error**. The same **`> 0`** gate means an **isolated vertex** next to a positive‑weight component yields a **finite total matching only the spanned component**, with **no indication** that the graph is not connected end‑to‑end.
 

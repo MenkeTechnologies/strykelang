@@ -293,7 +293,9 @@ pub extern "C" fn stryke_jit_string_cmp_bits(a: i64, b: i64, kind: i32) -> i64 {
             .raw_bits() as i64
         }
         4 => StrykeValue::integer(i64::from(pa.str_cmp(&pb) == Ordering::Less)).raw_bits() as i64,
-        5 => StrykeValue::integer(i64::from(pa.str_cmp(&pb) == Ordering::Greater)).raw_bits() as i64,
+        5 => {
+            StrykeValue::integer(i64::from(pa.str_cmp(&pb) == Ordering::Greater)).raw_bits() as i64
+        }
         6 => StrykeValue::integer(i64::from(matches!(
             pa.str_cmp(&pb),
             Ordering::Less | Ordering::Equal

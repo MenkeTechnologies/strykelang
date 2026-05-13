@@ -2129,7 +2129,10 @@ fn run_builtin_subcommand(name: &str, argv: &[String]) -> i32 {
     use stryke::vm_helper::VMHelper;
 
     let mut interp = VMHelper::new();
-    let argv_values: Vec<StrykeValue> = argv.iter().map(|s| StrykeValue::string(s.clone())).collect();
+    let argv_values: Vec<StrykeValue> = argv
+        .iter()
+        .map(|s| StrykeValue::string(s.clone()))
+        .collect();
     let _ = interp.scope.set_array("ARGV", argv_values);
 
     // Wrap in `p(...)` to print the result — most builtins return values without printing.

@@ -2,12 +2,11 @@
 
 # Pinning tests for more math bugs from BUGS.md
 
-# Pinning test for BUG-121: median_absolute_deviation even-n spread
-# The bug states that for even-sized samples, it takes the upper of the two middle elements.
+# BUG-121 (FIXED): median_absolute_deviation now averages two middle values for even n.
 my @data = (1, 2, 100, 101);
 my $mad = median_absolute_deviation(@data);
-# "median" is 100. Deviations: 99, 98, 0, 1. Median of deviations: 98.
-aeq($mad, 98, "BUG-121: median_absolute_deviation even-n spread");
+# median is (2+100)/2 = 51. Deviations: 50, 49, 49, 50. Sorted-median: (49+50)/2 = 49.5.
+aeq($mad, 49.5, "BUG-121 (FIXED): MAD even-n proper median");
 
 
 # Pinning test for BUG-122: js_divergence vs jensen_shannon_div

@@ -3,8 +3,8 @@
 
 use crate::value::StrykeValue;
 use parking_lot::RwLock;
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 fn arg_f64(args: &[StrykeValue], idx: usize) -> Option<f64> {
     args.get(idx).map(|v| v.to_number())
@@ -97,7 +97,13 @@ pub fn alphabeta_value(args: &[StrykeValue]) -> StrykeValue {
     if leaves.is_empty() {
         return StrykeValue::float(0.0);
     }
-    fn helper(values: &[f64], depth: usize, mut alpha: f64, mut beta: f64, maximizing: bool) -> f64 {
+    fn helper(
+        values: &[f64],
+        depth: usize,
+        mut alpha: f64,
+        mut beta: f64,
+        maximizing: bool,
+    ) -> f64 {
         if depth == 0 || values.len() == 1 {
             return values[0];
         }
@@ -124,7 +130,13 @@ pub fn alphabeta_value(args: &[StrykeValue]) -> StrykeValue {
             value.min(right)
         }
     }
-    StrykeValue::float(helper(&leaves, depth, f64::NEG_INFINITY, f64::INFINITY, true))
+    StrykeValue::float(helper(
+        &leaves,
+        depth,
+        f64::NEG_INFINITY,
+        f64::INFINITY,
+        true,
+    ))
 }
 
 pub fn expectiminimax_value(args: &[StrykeValue]) -> StrykeValue {
@@ -187,7 +199,10 @@ pub fn zero_sum_value(args: &[StrykeValue]) -> StrykeValue {
     if cols == 0 {
         return StrykeValue::UNDEF;
     }
-    let row_mins: Vec<f64> = m.iter().map(|r| r[..cols].iter().cloned().fold(f64::INFINITY, f64::min)).collect();
+    let row_mins: Vec<f64> = m
+        .iter()
+        .map(|r| r[..cols].iter().cloned().fold(f64::INFINITY, f64::min))
+        .collect();
     let col_maxs: Vec<f64> = (0..cols)
         .map(|j| m.iter().map(|r| r[j]).fold(f64::NEG_INFINITY, f64::max))
         .collect();
@@ -215,8 +230,20 @@ pub fn zero_sum_value(args: &[StrykeValue]) -> StrykeValue {
 // ══════════════════════════════════════════════════════════════════════
 
 pub fn knapsack_unbounded(args: &[StrykeValue]) -> StrykeValue {
-    let values: Vec<i64> = args.first().map(as_vec_sv).unwrap_or_default().iter().map(|x| x.to_int()).collect();
-    let weights: Vec<i64> = args.get(1).map(as_vec_sv).unwrap_or_default().iter().map(|x| x.to_int()).collect();
+    let values: Vec<i64> = args
+        .first()
+        .map(as_vec_sv)
+        .unwrap_or_default()
+        .iter()
+        .map(|x| x.to_int())
+        .collect();
+    let weights: Vec<i64> = args
+        .get(1)
+        .map(as_vec_sv)
+        .unwrap_or_default()
+        .iter()
+        .map(|x| x.to_int())
+        .collect();
     let cap = arg_i64(args, 2).unwrap_or(0).max(0) as usize;
     let n = values.len().min(weights.len());
     let mut dp = vec![0i64; cap + 1];
@@ -284,7 +311,11 @@ pub fn tsp_2opt(args: &[StrykeValue]) -> StrykeValue {
             }
         }
     }
-    arr_sv(tour.into_iter().map(|x| StrykeValue::integer(x as i64)).collect())
+    arr_sv(
+        tour.into_iter()
+            .map(|x| StrykeValue::integer(x as i64))
+            .collect(),
+    )
 }
 
 pub fn lp_simplex_max(args: &[StrykeValue]) -> StrykeValue {
@@ -313,7 +344,11 @@ pub fn lp_simplex_max(args: &[StrykeValue]) -> StrykeValue {
     }
     for _ in 0..200 {
         let pivot_col = (0..n + m)
-            .min_by(|&a, &b| tab[m][a].partial_cmp(&tab[m][b]).unwrap_or(std::cmp::Ordering::Equal))
+            .min_by(|&a, &b| {
+                tab[m][a]
+                    .partial_cmp(&tab[m][b])
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .unwrap_or(0);
         if tab[m][pivot_col] >= -1e-12 {
             break;
@@ -350,7 +385,13 @@ pub fn lp_simplex_max(args: &[StrykeValue]) -> StrykeValue {
 
 pub fn lp_simplex_min(args: &[StrykeValue]) -> StrykeValue {
     // Convert to max by negating c
-    let c: Vec<f64> = args.first().map(as_vec_f64).unwrap_or_default().into_iter().map(|x| -x).collect();
+    let c: Vec<f64> = args
+        .first()
+        .map(as_vec_f64)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|x| -x)
+        .collect();
     let neg_c = arr_f64(c);
     let mut new_args = vec![neg_c];
     if let Some(a) = args.get(1).cloned() {
@@ -364,7 +405,8 @@ pub fn lp_simplex_min(args: &[StrykeValue]) -> StrykeValue {
 
 pub fn job_schedule_spt(args: &[StrykeValue]) -> StrykeValue {
     // Shortest processing time first
-    let durations: Vec<(usize, f64)> = args.first()
+    let durations: Vec<(usize, f64)> = args
+        .first()
         .map(as_vec_f64)
         .unwrap_or_default()
         .into_iter()
@@ -372,12 +414,18 @@ pub fn job_schedule_spt(args: &[StrykeValue]) -> StrykeValue {
         .collect();
     let mut sorted = durations;
     sorted.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-    arr_sv(sorted.iter().map(|(i, _)| StrykeValue::integer(*i as i64)).collect())
+    arr_sv(
+        sorted
+            .iter()
+            .map(|(i, _)| StrykeValue::integer(*i as i64))
+            .collect(),
+    )
 }
 
 pub fn job_schedule_ljf(args: &[StrykeValue]) -> StrykeValue {
     // Longest job first
-    let durations: Vec<(usize, f64)> = args.first()
+    let durations: Vec<(usize, f64)> = args
+        .first()
         .map(as_vec_f64)
         .unwrap_or_default()
         .into_iter()
@@ -385,7 +433,12 @@ pub fn job_schedule_ljf(args: &[StrykeValue]) -> StrykeValue {
         .collect();
     let mut sorted = durations;
     sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-    arr_sv(sorted.iter().map(|(i, _)| StrykeValue::integer(*i as i64)).collect())
+    arr_sv(
+        sorted
+            .iter()
+            .map(|(i, _)| StrykeValue::integer(*i as i64))
+            .collect(),
+    )
 }
 
 fn bfs_augment(capacity: &mut [Vec<f64>], s: usize, t: usize) -> Option<(Vec<usize>, f64)> {
@@ -454,7 +507,10 @@ pub fn matching_bipartite_greedy(args: &[StrykeValue]) -> StrykeValue {
             matched_right.insert(v, u);
         }
     }
-    let result: Vec<StrykeValue> = matched_left.iter().map(|(&u, &v)| arr_sv(vec![StrykeValue::integer(u), StrykeValue::integer(v)])).collect();
+    let result: Vec<StrykeValue> = matched_left
+        .iter()
+        .map(|(&u, &v)| arr_sv(vec![StrykeValue::integer(u), StrykeValue::integer(v)]))
+        .collect();
     arr_sv(result)
 }
 
@@ -548,13 +604,27 @@ pub fn ml_relu_layer(args: &[StrykeValue]) -> StrykeValue {
 pub fn ml_leaky_relu_layer(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(as_vec_f64).unwrap_or_default();
     let slope = arg_f64(args, 1).unwrap_or(0.01);
-    arr_f64(xs.iter().map(|x| if *x > 0.0 { *x } else { slope * x }).collect())
+    arr_f64(
+        xs.iter()
+            .map(|x| if *x > 0.0 { *x } else { slope * x })
+            .collect(),
+    )
 }
 
 pub fn ml_elu_layer(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(as_vec_f64).unwrap_or_default();
     let alpha = arg_f64(args, 1).unwrap_or(1.0);
-    arr_f64(xs.iter().map(|x| if *x > 0.0 { *x } else { alpha * (x.exp() - 1.0) }).collect())
+    arr_f64(
+        xs.iter()
+            .map(|x| {
+                if *x > 0.0 {
+                    *x
+                } else {
+                    alpha * (x.exp() - 1.0)
+                }
+            })
+            .collect(),
+    )
 }
 
 pub fn ml_softmax_layer(args: &[StrykeValue]) -> StrykeValue {
@@ -583,7 +653,9 @@ pub fn ml_gelu_layer(args: &[StrykeValue]) -> StrykeValue {
     arr_f64(
         xs.iter()
             .map(|x| {
-                0.5 * x * (1.0 + ((2.0 / std::f64::consts::PI).sqrt() * (x + 0.044715 * x.powi(3))).tanh())
+                0.5 * x
+                    * (1.0
+                        + ((2.0 / std::f64::consts::PI).sqrt() * (x + 0.044715 * x.powi(3))).tanh())
             })
             .collect(),
     )
@@ -601,7 +673,9 @@ pub fn ml_dropout_mask(args: &[StrykeValue]) -> StrykeValue {
     let mut state = seed.wrapping_add(0x9E3779B97F4A7C15);
     let mut out = Vec::with_capacity(n);
     for _ in 0..n {
-        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let r = (state >> 32) as f64 / u32::MAX as f64;
         out.push(if r > p { 1.0 / (1.0 - p) } else { 0.0 });
     }
@@ -778,7 +852,11 @@ pub fn ml_label_smooth(args: &[StrykeValue]) -> StrykeValue {
     if n == 0 {
         return arr_f64(vec![]);
     }
-    arr_f64(xs.iter().map(|x| x * (1.0 - smoothing) + smoothing / n as f64).collect())
+    arr_f64(
+        xs.iter()
+            .map(|x| x * (1.0 - smoothing) + smoothing / n as f64)
+            .collect(),
+    )
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -786,13 +864,34 @@ pub fn ml_label_smooth(args: &[StrykeValue]) -> StrykeValue {
 // ══════════════════════════════════════════════════════════════════════
 
 const ATOMIC_MASSES: &[(&str, f64)] = &[
-    ("H", 1.008), ("He", 4.003), ("Li", 6.941), ("Be", 9.012),
-    ("B", 10.811), ("C", 12.011), ("N", 14.007), ("O", 15.999),
-    ("F", 18.998), ("Ne", 20.180), ("Na", 22.990), ("Mg", 24.305),
-    ("Al", 26.982), ("Si", 28.086), ("P", 30.974), ("S", 32.065),
-    ("Cl", 35.453), ("Ar", 39.948), ("K", 39.098), ("Ca", 40.078),
-    ("Fe", 55.845), ("Cu", 63.546), ("Zn", 65.380), ("Ag", 107.868),
-    ("I", 126.904), ("Au", 196.967), ("Hg", 200.590), ("Pb", 207.200),
+    ("H", 1.008),
+    ("He", 4.003),
+    ("Li", 6.941),
+    ("Be", 9.012),
+    ("B", 10.811),
+    ("C", 12.011),
+    ("N", 14.007),
+    ("O", 15.999),
+    ("F", 18.998),
+    ("Ne", 20.180),
+    ("Na", 22.990),
+    ("Mg", 24.305),
+    ("Al", 26.982),
+    ("Si", 28.086),
+    ("P", 30.974),
+    ("S", 32.065),
+    ("Cl", 35.453),
+    ("Ar", 39.948),
+    ("K", 39.098),
+    ("Ca", 40.078),
+    ("Fe", 55.845),
+    ("Cu", 63.546),
+    ("Zn", 65.380),
+    ("Ag", 107.868),
+    ("I", 126.904),
+    ("Au", 196.967),
+    ("Hg", 200.590),
+    ("Pb", 207.200),
     ("U", 238.029),
 ];
 
@@ -860,10 +959,17 @@ pub fn chem_balance_check(args: &[StrykeValue]) -> StrykeValue {
 pub fn chem_pka_lookup(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let lookup: HashMap<&str, f64> = [
-        ("HCl", -7.0), ("H2SO4", -3.0), ("HNO3", -1.4),
-        ("HF", 3.17), ("CH3COOH", 4.76), ("H2CO3", 6.35),
-        ("NH4+", 9.25), ("HCN", 9.21), ("HCO3-", 10.33),
-        ("H2O", 15.7), ("NH3", 38.0),
+        ("HCl", -7.0),
+        ("H2SO4", -3.0),
+        ("HNO3", -1.4),
+        ("HF", 3.17),
+        ("CH3COOH", 4.76),
+        ("H2CO3", 6.35),
+        ("NH4+", 9.25),
+        ("HCN", 9.21),
+        ("HCO3-", 10.33),
+        ("H2O", 15.7),
+        ("NH3", 38.0),
     ]
     .into_iter()
     .collect();
@@ -1018,7 +1124,13 @@ pub fn chem_arrhenius_k(args: &[StrykeValue]) -> StrykeValue {
 // ══════════════════════════════════════════════════════════════════════
 
 pub fn ngram_train(args: &[StrykeValue]) -> StrykeValue {
-    let tokens: Vec<String> = args.first().map(as_vec_sv).unwrap_or_default().iter().map(|x| x.as_str_or_empty()).collect();
+    let tokens: Vec<String> = args
+        .first()
+        .map(as_vec_sv)
+        .unwrap_or_default()
+        .iter()
+        .map(|x| x.as_str_or_empty())
+        .collect();
     let n = arg_i64(args, 1).unwrap_or(2).max(1) as usize;
     use indexmap::IndexMap;
     let mut counts: HashMap<String, HashMap<String, u64>> = HashMap::new();
@@ -1030,7 +1142,11 @@ pub fn ngram_train(args: &[StrykeValue]) -> StrykeValue {
     for i in 0..=tokens.len() - n {
         let ctx = tokens[i..i + n - 1].join(" ");
         let next = tokens[i + n - 1].clone();
-        *counts.entry(ctx.clone()).or_default().entry(next).or_insert(0) += 1;
+        *counts
+            .entry(ctx.clone())
+            .or_default()
+            .entry(next)
+            .or_insert(0) += 1;
         *totals.entry(ctx).or_insert(0) += 1;
     }
     let mut model: IndexMap<String, StrykeValue> = IndexMap::new();
@@ -1040,7 +1156,10 @@ pub fn ngram_train(args: &[StrykeValue]) -> StrykeValue {
         for (next, count) in next_counts {
             next_probs.insert(next, StrykeValue::float(count as f64 / total));
         }
-        model.insert(ctx, StrykeValue::hash_ref(Arc::new(RwLock::new(next_probs))));
+        model.insert(
+            ctx,
+            StrykeValue::hash_ref(Arc::new(RwLock::new(next_probs))),
+        );
     }
     StrykeValue::hash_ref(Arc::new(RwLock::new(model)))
 }
@@ -1065,7 +1184,13 @@ pub fn ngram_prob(args: &[StrykeValue]) -> StrykeValue {
 
 pub fn ngram_perplexity(args: &[StrykeValue]) -> StrykeValue {
     let model = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
-    let tokens: Vec<String> = args.get(1).map(as_vec_sv).unwrap_or_default().iter().map(|x| x.as_str_or_empty()).collect();
+    let tokens: Vec<String> = args
+        .get(1)
+        .map(as_vec_sv)
+        .unwrap_or_default()
+        .iter()
+        .map(|x| x.as_str_or_empty())
+        .collect();
     let n = arg_i64(args, 2).unwrap_or(2).max(1) as usize;
     if tokens.len() < n {
         return StrykeValue::float(f64::INFINITY);
@@ -1075,7 +1200,12 @@ pub fn ngram_perplexity(args: &[StrykeValue]) -> StrykeValue {
     for i in 0..=tokens.len() - n {
         let ctx = tokens[i..i + n - 1].join(" ");
         let next = &tokens[i + n - 1];
-        let p = ngram_prob(&[model.clone(), StrykeValue::string(ctx), StrykeValue::string(next.clone())]).to_number();
+        let p = ngram_prob(&[
+            model.clone(),
+            StrykeValue::string(ctx),
+            StrykeValue::string(next.clone()),
+        ])
+        .to_number();
         if p > 0.0 {
             log_sum += p.ln();
         } else {
@@ -1098,7 +1228,8 @@ pub fn ngram_top_k_next(args: &[StrykeValue]) -> StrykeValue {
         if let Some(next_probs) = m.get(&ctx) {
             if let Some(np) = next_probs.as_hash_ref() {
                 let np = np.read();
-                let mut entries: Vec<(String, f64)> = np.iter().map(|(k, v)| (k.clone(), v.to_number())).collect();
+                let mut entries: Vec<(String, f64)> =
+                    np.iter().map(|(k, v)| (k.clone(), v.to_number())).collect();
                 entries.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
                 let top: Vec<StrykeValue> = entries
                     .into_iter()
@@ -1308,7 +1439,14 @@ mod tests {
 
     #[test]
     fn ngram_perplexity_finite() {
-        let tokens = arr_sv(vec![sv_s("the"), sv_s("quick"), sv_s("brown"), sv_s("fox"), sv_s("the"), sv_s("quick")]);
+        let tokens = arr_sv(vec![
+            sv_s("the"),
+            sv_s("quick"),
+            sv_s("brown"),
+            sv_s("fox"),
+            sv_s("the"),
+            sv_s("quick"),
+        ]);
         let model = ngram_train(&[tokens.clone(), sv_i(2)]);
         let r = ngram_perplexity(&[model, tokens, sv_i(2)]).to_number();
         assert!(r.is_finite() && r > 0.0);

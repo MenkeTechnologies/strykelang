@@ -74,7 +74,9 @@ pub fn jq_get(args: &[StrykeValue]) -> StrykeValue {
             };
         } else {
             v = match v {
-                serde_json::Value::Object(mut m) => m.remove(seg).unwrap_or(serde_json::Value::Null),
+                serde_json::Value::Object(mut m) => {
+                    m.remove(seg).unwrap_or(serde_json::Value::Null)
+                }
                 _ => serde_json::Value::Null,
             };
         }
@@ -131,7 +133,10 @@ pub fn jq_delete(args: &[StrykeValue]) -> StrykeValue {
     }
     let last = segs[segs.len() - 1];
     let parents = &segs[..segs.len() - 1];
-    fn descend<'a>(v: &'a mut serde_json::Value, segs: &[&str]) -> Option<&'a mut serde_json::Value> {
+    fn descend<'a>(
+        v: &'a mut serde_json::Value,
+        segs: &[&str],
+    ) -> Option<&'a mut serde_json::Value> {
         let mut cur = v;
         for seg in segs {
             if let Ok(idx) = seg.parse::<usize>() {
@@ -231,14 +236,22 @@ pub fn jq_paths(args: &[StrykeValue]) -> StrykeValue {
         match v {
             serde_json::Value::Object(m) => {
                 for (k, vv) in m {
-                    let p = if prefix.is_empty() { k.clone() } else { format!("{}.{}", prefix, k) };
+                    let p = if prefix.is_empty() {
+                        k.clone()
+                    } else {
+                        format!("{}.{}", prefix, k)
+                    };
                     out.push(p.clone());
                     walk(vv, p, out);
                 }
             }
             serde_json::Value::Array(a) => {
                 for (i, vv) in a.iter().enumerate() {
-                    let p = if prefix.is_empty() { i.to_string() } else { format!("{}.{}", prefix, i) };
+                    let p = if prefix.is_empty() {
+                        i.to_string()
+                    } else {
+                        format!("{}.{}", prefix, i)
+                    };
                     out.push(p.clone());
                     walk(vv, p, out);
                 }
@@ -260,13 +273,21 @@ pub fn jq_leaf_paths(args: &[StrykeValue]) -> StrykeValue {
         match v {
             serde_json::Value::Object(m) => {
                 for (k, vv) in m {
-                    let p = if prefix.is_empty() { k.clone() } else { format!("{}.{}", prefix, k) };
+                    let p = if prefix.is_empty() {
+                        k.clone()
+                    } else {
+                        format!("{}.{}", prefix, k)
+                    };
                     walk(vv, p, out);
                 }
             }
             serde_json::Value::Array(a) => {
                 for (i, vv) in a.iter().enumerate() {
-                    let p = if prefix.is_empty() { i.to_string() } else { format!("{}.{}", prefix, i) };
+                    let p = if prefix.is_empty() {
+                        i.to_string()
+                    } else {
+                        format!("{}.{}", prefix, i)
+                    };
                     walk(vv, p, out);
                 }
             }
@@ -349,8 +370,13 @@ pub fn jq_min_by(args: &[StrykeValue]) -> StrykeValue {
     let v = jq_get(args);
     if let Some(arr_ref) = v.as_array_ref() {
         let g = arr_ref.read();
-        return g.iter()
-            .min_by(|a, b| a.to_number().partial_cmp(&b.to_number()).unwrap_or(std::cmp::Ordering::Equal))
+        return g
+            .iter()
+            .min_by(|a, b| {
+                a.to_number()
+                    .partial_cmp(&b.to_number())
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .cloned()
             .unwrap_or(StrykeValue::UNDEF);
     }
@@ -361,8 +387,13 @@ pub fn jq_max_by(args: &[StrykeValue]) -> StrykeValue {
     let v = jq_get(args);
     if let Some(arr_ref) = v.as_array_ref() {
         let g = arr_ref.read();
-        return g.iter()
-            .max_by(|a, b| a.to_number().partial_cmp(&b.to_number()).unwrap_or(std::cmp::Ordering::Equal))
+        return g
+            .iter()
+            .max_by(|a, b| {
+                a.to_number()
+                    .partial_cmp(&b.to_number())
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .cloned()
             .unwrap_or(StrykeValue::UNDEF);
     }
@@ -373,7 +404,11 @@ pub fn jq_sort_by(args: &[StrykeValue]) -> StrykeValue {
     let v = jq_get(args);
     if let Some(arr_ref) = v.as_array_ref() {
         let mut g: Vec<StrykeValue> = arr_ref.read().clone();
-        g.sort_by(|a, b| a.to_number().partial_cmp(&b.to_number()).unwrap_or(std::cmp::Ordering::Equal));
+        g.sort_by(|a, b| {
+            a.to_number()
+                .partial_cmp(&b.to_number())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         return arr(g);
     }
     StrykeValue::UNDEF
@@ -412,7 +447,11 @@ pub fn jq_unique_by(args: &[StrykeValue]) -> StrykeValue {
 pub fn jq_any(args: &[StrykeValue]) -> StrykeValue {
     let v = jq_get(args);
     if let Some(arr_ref) = v.as_array_ref() {
-        return StrykeValue::integer(if arr_ref.read().iter().any(|v| v.is_true()) { 1 } else { 0 });
+        return StrykeValue::integer(if arr_ref.read().iter().any(|v| v.is_true()) {
+            1
+        } else {
+            0
+        });
     }
     StrykeValue::integer(0)
 }
@@ -484,7 +523,11 @@ pub fn jq_indices(args: &[StrykeValue]) -> StrykeValue {
 pub fn jq_first(args: &[StrykeValue]) -> StrykeValue {
     let v = jq_get(args);
     if let Some(arr_ref) = v.as_array_ref() {
-        return arr_ref.read().first().cloned().unwrap_or(StrykeValue::UNDEF);
+        return arr_ref
+            .read()
+            .first()
+            .cloned()
+            .unwrap_or(StrykeValue::UNDEF);
     }
     v
 }
@@ -603,7 +646,9 @@ pub fn json_patch(args: &[StrykeValue]) -> StrykeValue {
         return StrykeValue::UNDEF;
     };
     for op in ops {
-        let serde_json::Value::Object(m) = op else { continue };
+        let serde_json::Value::Object(m) = op else {
+            continue;
+        };
         let op_kind = m.get("op").and_then(|v| v.as_str()).unwrap_or("");
         let path = m.get("path").and_then(|v| v.as_str()).unwrap_or("");
         let value = m.get("value").cloned();
@@ -619,7 +664,8 @@ pub fn json_patch(args: &[StrykeValue]) -> StrykeValue {
                             StrykeValue::string(serde_json::to_string(&v).unwrap_or_default()),
                             StrykeValue::string(path_str),
                             StrykeValue::string(serde_json::to_string(&nv).unwrap_or_default()),
-                        ]).to_string();
+                        ])
+                        .to_string();
                         if let Some(parsed) = parse_json(&new_s) {
                             v = parsed;
                         }
@@ -631,7 +677,8 @@ pub fn json_patch(args: &[StrykeValue]) -> StrykeValue {
                 let new_s = jq_delete(&[
                     StrykeValue::string(serde_json::to_string(&v).unwrap_or_default()),
                     StrykeValue::string(path_str),
-                ]).to_string();
+                ])
+                .to_string();
                 if let Some(parsed) = parse_json(&new_s) {
                     v = parsed;
                 }
@@ -839,7 +886,9 @@ pub fn html_extract_tables(args: &[StrykeValue]) -> StrykeValue {
         for r in t.select(&row_sel) {
             let cells: Vec<StrykeValue> = r
                 .select(&cell_sel)
-                .map(|c| StrykeValue::string(c.text().collect::<Vec<_>>().join("").trim().to_string()))
+                .map(|c| {
+                    StrykeValue::string(c.text().collect::<Vec<_>>().join("").trim().to_string())
+                })
                 .collect();
             rows.push(arr(cells));
         }
@@ -1060,7 +1109,12 @@ pub fn xml_attrs(args: &[StrykeValue]) -> StrykeValue {
 pub fn xml_children_by_tag(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let tag = args.get(1).map(|v| v.to_string()).unwrap_or_default();
-    let re = regex::Regex::new(&format!(r"<{}\b[^>]*>(.*?)</{}>", regex::escape(&tag), regex::escape(&tag))).unwrap();
+    let re = regex::Regex::new(&format!(
+        r"<{}\b[^>]*>(.*?)</{}>",
+        regex::escape(&tag),
+        regex::escape(&tag)
+    ))
+    .unwrap();
     let out: Vec<StrykeValue> = re
         .captures_iter(&s)
         .map(|c| StrykeValue::string(c[0].to_string()))
@@ -1071,9 +1125,11 @@ pub fn xml_children_by_tag(args: &[StrykeValue]) -> StrykeValue {
 pub fn xml_root(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let re = regex::Regex::new(r"<(\w+)").unwrap();
-    if let Some(c) = re.captures(s.trim_start_matches(|c: char| c == '<' && {
-        let i = s.find('<').unwrap();
-        s[i..].starts_with("<?")
+    if let Some(c) = re.captures(s.trim_start_matches(|c: char| {
+        c == '<' && {
+            let i = s.find('<').unwrap();
+            s[i..].starts_with("<?")
+        }
     })) {
         return StrykeValue::string(c[1].to_string());
     }
@@ -1085,7 +1141,12 @@ pub fn xpath_select_one(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let xp = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     if let Some(tag) = xp.strip_prefix("//") {
-        let re = regex::Regex::new(&format!(r"<{}\b[^>]*>(.*?)</{}>", regex::escape(tag), regex::escape(tag))).unwrap();
+        let re = regex::Regex::new(&format!(
+            r"<{}\b[^>]*>(.*?)</{}>",
+            regex::escape(tag),
+            regex::escape(tag)
+        ))
+        .unwrap();
         if let Some(c) = re.captures(&s) {
             return StrykeValue::string(c[0].to_string());
         }
@@ -1156,13 +1217,21 @@ pub fn css_minify(args: &[StrykeValue]) -> StrykeValue {
     let re = regex::Regex::new(r"/\*.*?\*/").unwrap();
     let s = re.replace_all(&s, "").to_string();
     let s = s.split_whitespace().collect::<Vec<_>>().join(" ");
-    let s = s.replace(" {", "{").replace("{ ", "{").replace(" }", "}").replace("; ", ";").replace(": ", ":");
+    let s = s
+        .replace(" {", "{")
+        .replace("{ ", "{")
+        .replace(" }", "}")
+        .replace("; ", ";")
+        .replace(": ", ":");
     StrykeValue::string(s)
 }
 
 pub fn css_pretty(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
-    let s = s.replace("{", " {\n  ").replace("}", "\n}\n").replace(";", ";\n  ");
+    let s = s
+        .replace("{", " {\n  ")
+        .replace("}", "\n}\n")
+        .replace(";", ";\n  ");
     StrykeValue::string(s)
 }
 
@@ -1287,16 +1356,24 @@ pub fn css_font_extract(args: &[StrykeValue]) -> StrykeValue {
 pub fn selector_to_xpath(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     // Very basic conversion: `a.b` → `//a[@class='b']`, `#id` → `//*[@id='id']`
-    let s = regex::Regex::new(r"^(\w+)\.([\w-]+)").unwrap().replace(&s, "//$1[@class='$2']");
-    let s = regex::Regex::new(r"^#([\w-]+)").unwrap().replace(&s, "//*[@id='$1']");
+    let s = regex::Regex::new(r"^(\w+)\.([\w-]+)")
+        .unwrap()
+        .replace(&s, "//$1[@class='$2']");
+    let s = regex::Regex::new(r"^#([\w-]+)")
+        .unwrap()
+        .replace(&s, "//*[@id='$1']");
     let s = regex::Regex::new(r"^(\w+)$").unwrap().replace(&s, "//$1");
     StrykeValue::string(s.to_string())
 }
 
 pub fn xpath_to_selector(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
-    let s = regex::Regex::new(r#"//(\w+)\[@class='([\w-]+)'\]"#).unwrap().replace(&s, "$1.$2");
-    let s = regex::Regex::new(r#"//\*\[@id='([\w-]+)'\]"#).unwrap().replace(&s, "#$1");
+    let s = regex::Regex::new(r#"//(\w+)\[@class='([\w-]+)'\]"#)
+        .unwrap()
+        .replace(&s, "$1.$2");
+    let s = regex::Regex::new(r#"//\*\[@id='([\w-]+)'\]"#)
+        .unwrap()
+        .replace(&s, "#$1");
     let s = regex::Regex::new(r"^//(\w+)$").unwrap().replace(&s, "$1");
     StrykeValue::string(s.to_string())
 }

@@ -377,11 +377,23 @@ fn builtin_efficiency_ratio(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 #[allow(non_snake_case)]
 fn builtin_dB_voltage(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
-    let v_out = f1(args); let v_in = args.get(1).map(|x| x.to_number()).unwrap_or(0.0).max(1e-30);
+    // `20·log10(Vout / Vin)`. If `Vin` is omitted or non-positive, return
+    // NaN rather than clamping it to 1e-30 (which produced a spurious
+    // ~600 dB and falsely-finite output — BUG-135).
+    let v_out = f1(args);
+    let v_in = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);
+    if v_in <= 0.0 {
+        return Ok(StrykeValue::float(f64::NAN));
+    }
     Ok(StrykeValue::float(20.0 * (v_out / v_in).log10()))
 }
 #[allow(non_snake_case)]
 fn builtin_dB_power(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
-    let p_out = f1(args); let p_in = args.get(1).map(|x| x.to_number()).unwrap_or(0.0).max(1e-30);
+    // Same NaN-on-missing-reference policy as `dB_voltage` (BUG-135).
+    let p_out = f1(args);
+    let p_in = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);
+    if p_in <= 0.0 {
+        return Ok(StrykeValue::float(f64::NAN));
+    }
     Ok(StrykeValue::float(10.0 * (p_out / p_in).log10()))
 }

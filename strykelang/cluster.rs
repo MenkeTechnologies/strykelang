@@ -54,7 +54,7 @@ use crate::remote_wire::{
     frame_kind, perl_to_json_value, read_typed_frame, send_msg, HelloAck, HelloMsg, JobMsg,
     JobRespMsg, SessionAck, SessionInit, PROTO_VERSION,
 };
-use crate::value::{StrykeValue, RemoteCluster, RemoteSlot};
+use crate::value::{RemoteCluster, RemoteSlot, StrykeValue};
 
 /// One unit of work tracked by the dispatcher. Carries the original sequence number for
 /// order-preserving result collection plus an attempt counter for retry accounting.

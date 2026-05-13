@@ -702,7 +702,9 @@ impl Compiler {
         if let ExprKind::Regex(pattern, flags) = &cond.kind {
             let name_idx = self.chunk.intern_name("_");
             self.emit_get_scalar(name_idx, line, Some(cond));
-            let pat_idx = self.chunk.add_constant(StrykeValue::string(pattern.clone()));
+            let pat_idx = self
+                .chunk
+                .add_constant(StrykeValue::string(pattern.clone()));
             let flags_idx = self.chunk.add_constant(StrykeValue::string(flags.clone()));
             self.emit_op(Op::LoadRegex(pat_idx, flags_idx), line, Some(cond));
             self.emit_op(Op::RegexMatchDyn(false), line, Some(cond));
@@ -5158,9 +5160,9 @@ impl Compiler {
                         self.emit_op(Op::Pop, line, Some(root));
                         self.compile_expr(value)?;
                         self.emit_op(Op::Pop, line, Some(root));
-                        let idx = self
-                            .chunk
-                            .add_constant(StrykeValue::string("assign to empty array slice".into()));
+                        let idx = self.chunk.add_constant(StrykeValue::string(
+                            "assign to empty array slice".into(),
+                        ));
                         self.emit_op(Op::RuntimeErrorConst(idx), line, Some(root));
                         self.emit_op(Op::LoadUndef, line, Some(root));
                         return Ok(());
@@ -7510,7 +7512,9 @@ impl Compiler {
                 delim: _,
             } => {
                 self.compile_expr(expr)?;
-                let pat_idx = self.chunk.add_constant(StrykeValue::string(pattern.clone()));
+                let pat_idx = self
+                    .chunk
+                    .add_constant(StrykeValue::string(pattern.clone()));
                 let flags_idx = self.chunk.add_constant(StrykeValue::string(flags.clone()));
                 let pos_key_idx = if *scalar_g && flags.contains('g') {
                     if let ExprKind::ScalarVar(n) = &expr.kind {
@@ -7537,7 +7541,9 @@ impl Compiler {
                 delim: _,
             } => {
                 self.compile_expr(expr)?;
-                let pat_idx = self.chunk.add_constant(StrykeValue::string(pattern.clone()));
+                let pat_idx = self
+                    .chunk
+                    .add_constant(StrykeValue::string(pattern.clone()));
                 let repl_idx = self
                     .chunk
                     .add_constant(StrykeValue::string(replacement.clone()));
@@ -7574,7 +7580,9 @@ impl Compiler {
                     // Statement context: bare `/pat/;` is `$_ =~ /pat/` (Perl), not a discarded regex object.
                     self.compile_boolean_rvalue_condition(root)?;
                 } else {
-                    let pat_idx = self.chunk.add_constant(StrykeValue::string(pattern.clone()));
+                    let pat_idx = self
+                        .chunk
+                        .add_constant(StrykeValue::string(pattern.clone()));
                     let flags_idx = self.chunk.add_constant(StrykeValue::string(flags.clone()));
                     self.emit_op(Op::LoadRegex(pat_idx, flags_idx), line, Some(root));
                 }

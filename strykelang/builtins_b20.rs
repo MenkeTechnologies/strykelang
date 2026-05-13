@@ -3,9 +3,9 @@
 
 use crate::value::StrykeValue;
 use parking_lot::RwLock;
-use std::sync::Arc;
-use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 use std::cmp::Ordering;
+use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
+use std::sync::Arc;
 
 fn arg_f64(args: &[StrykeValue], idx: usize) -> Option<f64> {
     args.get(idx).map(|v| v.to_number())
@@ -123,7 +123,13 @@ pub fn lattice_paths(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn multinomial_coefficient(args: &[StrykeValue]) -> StrykeValue {
-    let parts: Vec<i64> = args.first().map(as_vec_sv).unwrap_or_default().iter().map(|x| x.to_int()).collect();
+    let parts: Vec<i64> = args
+        .first()
+        .map(as_vec_sv)
+        .unwrap_or_default()
+        .iter()
+        .map(|x| x.to_int())
+        .collect();
     if parts.is_empty() {
         return StrykeValue::integer(1);
     }
@@ -187,12 +193,20 @@ pub fn fibonacci_matrix(args: &[StrykeValue]) -> StrykeValue {
     fn mat_mul(a: [[u64; 2]; 2], b: [[u64; 2]; 2]) -> [[u64; 2]; 2] {
         [
             [
-                a[0][0].wrapping_mul(b[0][0]).wrapping_add(a[0][1].wrapping_mul(b[1][0])),
-                a[0][0].wrapping_mul(b[0][1]).wrapping_add(a[0][1].wrapping_mul(b[1][1])),
+                a[0][0]
+                    .wrapping_mul(b[0][0])
+                    .wrapping_add(a[0][1].wrapping_mul(b[1][0])),
+                a[0][0]
+                    .wrapping_mul(b[0][1])
+                    .wrapping_add(a[0][1].wrapping_mul(b[1][1])),
             ],
             [
-                a[1][0].wrapping_mul(b[0][0]).wrapping_add(a[1][1].wrapping_mul(b[1][0])),
-                a[1][0].wrapping_mul(b[0][1]).wrapping_add(a[1][1].wrapping_mul(b[1][1])),
+                a[1][0]
+                    .wrapping_mul(b[0][0])
+                    .wrapping_add(a[1][1].wrapping_mul(b[1][0])),
+                a[1][0]
+                    .wrapping_mul(b[0][1])
+                    .wrapping_add(a[1][1].wrapping_mul(b[1][1])),
             ],
         ]
     }
@@ -345,7 +359,10 @@ fn adj_unweighted(v: &StrykeValue) -> Vec<Vec<usize>> {
                 .iter()
                 .map(|e| {
                     if let Some(p) = e.as_array_ref() {
-                        p.read().first().map(|x| x.to_int().max(0) as usize).unwrap_or(0)
+                        p.read()
+                            .first()
+                            .map(|x| x.to_int().max(0) as usize)
+                            .unwrap_or(0)
                     } else if let Some(p) = e.as_array_vec() {
                         p.first().map(|x| x.to_int().max(0) as usize).unwrap_or(0)
                     } else {
@@ -365,7 +382,10 @@ fn adj_weighted(v: &StrykeValue) -> Vec<Vec<(usize, f64)>> {
                 .iter()
                 .map(|e| {
                     let pair = as_vec_sv(e);
-                    let n = pair.first().map(|x| x.to_int().max(0) as usize).unwrap_or(0);
+                    let n = pair
+                        .first()
+                        .map(|x| x.to_int().max(0) as usize)
+                        .unwrap_or(0);
                     let w = pair.get(1).map(|x| x.to_number()).unwrap_or(1.0);
                     (n, w)
                 })
@@ -402,7 +422,11 @@ pub fn ida_star_search(args: &[StrykeValue]) -> StrykeValue {
         let mut path = vec![start];
         let result = ida_star_dfs(&g, start, goal, 0.0, threshold, &h, &mut path);
         if result < 0.0 {
-            return arr_sv(path.into_iter().map(|x| StrykeValue::integer(x as i64)).collect());
+            return arr_sv(
+                path.into_iter()
+                    .map(|x| StrykeValue::integer(x as i64))
+                    .collect(),
+            );
         }
         if result == f64::INFINITY {
             return arr_sv(vec![]);
@@ -545,7 +569,10 @@ pub fn a_star_grid(args: &[StrykeValue]) -> StrykeValue {
     g_score.insert((sx, sy), 0.0);
     let mut came_from: HashMap<(usize, usize), (usize, usize)> = HashMap::new();
     let mut open: BinaryHeap<AstarNode> = BinaryHeap::new();
-    open.push(AstarNode((gx as f64 - sx as f64).abs() + (gy as f64 - sy as f64).abs(), sx * w + sy));
+    open.push(AstarNode(
+        (gx as f64 - sx as f64).abs() + (gy as f64 - sy as f64).abs(),
+        sx * w + sy,
+    ));
     while let Some(AstarNode(_, idx)) = open.pop() {
         let x = idx / w;
         let y = idx % w;
@@ -557,7 +584,11 @@ pub fn a_star_grid(args: &[StrykeValue]) -> StrykeValue {
                 cur = prev;
             }
             path.reverse();
-            return arr_sv(path.into_iter().map(|(a, b)| arr_i64(vec![a as i64, b as i64])).collect());
+            return arr_sv(
+                path.into_iter()
+                    .map(|(a, b)| arr_i64(vec![a as i64, b as i64]))
+                    .collect(),
+            );
         }
         for (dx, dy) in &dirs {
             let nx = x as i32 + dx;
@@ -620,7 +651,13 @@ pub fn greedy_best_first(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn floyd_cycle_detect(args: &[StrykeValue]) -> StrykeValue {
-    let xs: Vec<i64> = args.first().map(as_vec_sv).unwrap_or_default().iter().map(|x| x.to_int()).collect();
+    let xs: Vec<i64> = args
+        .first()
+        .map(as_vec_sv)
+        .unwrap_or_default()
+        .iter()
+        .map(|x| x.to_int())
+        .collect();
     let n = xs.len();
     if n < 2 {
         return StrykeValue::integer(0);
@@ -822,7 +859,8 @@ pub fn chorus_simple(args: &[StrykeValue]) -> StrykeValue {
     let two_pi = 2.0 * std::f64::consts::PI;
     let mut out = Vec::with_capacity(n);
     for (i, &x) in signal.iter().enumerate() {
-        let delay_samples = depth_ms * 0.001 * sr * (1.0 + (two_pi * rate_hz * i as f64 / sr).sin()) / 2.0;
+        let delay_samples =
+            depth_ms * 0.001 * sr * (1.0 + (two_pi * rate_hz * i as f64 / sr).sin()) / 2.0;
         let read = i as f64 - delay_samples;
         let delayed = if read >= 0.0 && (read as usize) < n {
             signal[read as usize]
@@ -867,7 +905,12 @@ pub fn comb_filter(args: &[StrykeValue]) -> StrykeValue {
     let n = signal.len();
     let mut out = vec![0.0; n];
     for i in 0..n {
-        out[i] = signal[i] + if i >= delay { gain * out[i - delay] } else { 0.0 };
+        out[i] = signal[i]
+            + if i >= delay {
+                gain * out[i - delay]
+            } else {
+                0.0
+            };
     }
     arr_f64(out)
 }
@@ -880,7 +923,8 @@ pub fn all_pass_filter(args: &[StrykeValue]) -> StrykeValue {
     let mut out = vec![0.0; n];
     for i in 0..n {
         let delayed = if i >= delay { out[i - delay] } else { 0.0 };
-        out[i] = -gain * signal[i] + (if i >= delay { signal[i - delay] } else { 0.0 }) + gain * delayed;
+        out[i] =
+            -gain * signal[i] + (if i >= delay { signal[i - delay] } else { 0.0 }) + gain * delayed;
     }
     arr_f64(out)
 }
@@ -911,7 +955,12 @@ pub fn schroeder_reverb(args: &[StrykeValue]) -> StrykeValue {
     for &delay in &delays {
         let mut out = vec![0.0; n];
         for i in 0..n {
-            out[i] = signal[i] + if i >= delay { gain * out[i - delay] } else { 0.0 };
+            out[i] = signal[i]
+                + if i >= delay {
+                    gain * out[i - delay]
+                } else {
+                    0.0
+                };
         }
         for i in 0..n {
             summed[i] += out[i] * 0.25;
@@ -1150,8 +1199,7 @@ pub fn perlin_2d(args: &[StrykeValue]) -> StrykeValue {
 }
 
 fn hash_xyz(x: i32, y: i32, z: i32) -> u32 {
-    let mut h = (x as u32)
-        .wrapping_mul(73856093)
+    let mut h = (x as u32).wrapping_mul(73856093)
         ^ (y as u32).wrapping_mul(19349663)
         ^ (z as u32).wrapping_mul(83492791);
     h = h.wrapping_mul(2654435761);
@@ -1192,7 +1240,12 @@ pub fn perlin_3d(args: &[StrykeValue]) -> StrykeValue {
     let n001 = perlin_grad3(hash_xyz(xi, yi, zi + 1), xf, yf, zf - 1.0);
     let n101 = perlin_grad3(hash_xyz(xi + 1, yi, zi + 1), xf - 1.0, yf, zf - 1.0);
     let n011 = perlin_grad3(hash_xyz(xi, yi + 1, zi + 1), xf, yf - 1.0, zf - 1.0);
-    let n111 = perlin_grad3(hash_xyz(xi + 1, yi + 1, zi + 1), xf - 1.0, yf - 1.0, zf - 1.0);
+    let n111 = perlin_grad3(
+        hash_xyz(xi + 1, yi + 1, zi + 1),
+        xf - 1.0,
+        yf - 1.0,
+        zf - 1.0,
+    );
     let nx00 = lerp(n000, n100, u);
     let nx10 = lerp(n010, n110, u);
     let nx01 = lerp(n001, n101, u);
@@ -1279,7 +1332,9 @@ pub fn fbm_noise_2d(args: &[StrykeValue]) -> StrykeValue {
     let mut amp = 1.0_f64;
     let mut max_amp = 0.0_f64;
     for _ in 0..octaves {
-        total += perlin_2d(&[StrykeValue::float(x * freq), StrykeValue::float(y * freq)]).to_number() * amp;
+        total += perlin_2d(&[StrykeValue::float(x * freq), StrykeValue::float(y * freq)])
+            .to_number()
+            * amp;
         max_amp += amp;
         freq *= lacunarity;
         amp *= gain;

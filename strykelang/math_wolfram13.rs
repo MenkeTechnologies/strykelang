@@ -530,10 +530,21 @@ fn builtin_froude_number(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::float(v / (g * l).sqrt()))
 }
 fn builtin_weber_number(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
-    let rho = f1(args); let v = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);
+    // We = ρ·v²·L / σ. Returns Infinity (or 0 for zero numerator) when σ is
+    // omitted or non-positive, instead of clamping σ to 1e-30 and emitting
+    // a giant spurious finite number (BUG-134).
+    let rho = f1(args);
+    let v = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);
     let l = args.get(2).map(|x| x.to_number()).unwrap_or(0.0);
-    let sigma = args.get(3).map(|x| x.to_number()).unwrap_or(0.0).max(1e-30);
-    Ok(StrykeValue::float(rho * v * v * l / sigma))
+    let sigma = args.get(3).map(|x| x.to_number()).unwrap_or(0.0);
+    let num = rho * v * v * l;
+    if sigma <= 0.0 {
+        if num == 0.0 {
+            return Ok(StrykeValue::float(f64::NAN));
+        }
+        return Ok(StrykeValue::float(num.signum() * f64::INFINITY));
+    }
+    Ok(StrykeValue::float(num / sigma))
 }
 fn builtin_grashof_number(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let g = f1(args); let beta = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);

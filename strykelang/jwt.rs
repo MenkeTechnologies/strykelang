@@ -34,7 +34,11 @@ pub(crate) fn jwt_encode(
     Ok(StrykeValue::string(format!("{signing_input}.{sig_b64}")))
 }
 
-pub(crate) fn jwt_decode(token: &str, secret: &StrykeValue, line: usize) -> PerlResult<StrykeValue> {
+pub(crate) fn jwt_decode(
+    token: &str,
+    secret: &StrykeValue,
+    line: usize,
+) -> PerlResult<StrykeValue> {
     let parts: Vec<&str> = token.trim().split('.').collect();
     if parts.len() != 3 {
         return Err(PerlError::runtime(

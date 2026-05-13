@@ -14,7 +14,7 @@ use serde_json::Value as JsonValue;
 
 use crate::ast::StructDef;
 use crate::error::{PerlError, PerlResult};
-use crate::value::{HeapObject, PerlDataFrame, StrykeValue, StructInstance};
+use crate::value::{HeapObject, PerlDataFrame, StructInstance, StrykeValue};
 
 /// Parallel row→hashref conversion after a sequential CSV parse (good CPU parallelism on wide files).
 pub(crate) fn par_csv_read(path: &str) -> PerlResult<StrykeValue> {
@@ -48,11 +48,13 @@ pub(crate) fn par_csv_read(path: &str) -> PerlResult<StrykeValue> {
 pub(crate) fn dataframe_from_elements(val: &StrykeValue) -> PerlResult<StrykeValue> {
     let rows = val.map_flatten_outputs(true);
     if rows.is_empty() {
-        return Ok(StrykeValue::dataframe(Arc::new(Mutex::new(PerlDataFrame {
-            columns: vec![],
-            cols: vec![],
-            group_by: None,
-        }))));
+        return Ok(StrykeValue::dataframe(Arc::new(Mutex::new(
+            PerlDataFrame {
+                columns: vec![],
+                cols: vec![],
+                group_by: None,
+            },
+        ))));
     }
 
     // Detect format: list of hashrefs or list of arrayrefs
@@ -69,11 +71,13 @@ pub(crate) fn dataframe_from_elements(val: &StrykeValue) -> PerlResult<StrykeVal
                 }
             }
         }
-        return Ok(StrykeValue::dataframe(Arc::new(Mutex::new(PerlDataFrame {
-            columns,
-            cols,
-            group_by: None,
-        }))));
+        return Ok(StrykeValue::dataframe(Arc::new(Mutex::new(
+            PerlDataFrame {
+                columns,
+                cols,
+                group_by: None,
+            },
+        ))));
     } else if let Some(first_row_lock) = first_row.as_array_ref() {
         // List of arrayrefs: first row is headers
         let first_row_arr = first_row_lock.read();
@@ -87,11 +91,13 @@ pub(crate) fn dataframe_from_elements(val: &StrykeValue) -> PerlResult<StrykeVal
                 }
             }
         }
-        return Ok(StrykeValue::dataframe(Arc::new(Mutex::new(PerlDataFrame {
-            columns,
-            cols,
-            group_by: None,
-        }))));
+        return Ok(StrykeValue::dataframe(Arc::new(Mutex::new(
+            PerlDataFrame {
+                columns,
+                cols,
+                group_by: None,
+            },
+        ))));
     }
 
     Err(PerlError::runtime(
@@ -628,8 +634,12 @@ fn jaq_json_val_to_perl(v: jaq_json::Val) -> PerlResult<StrykeValue> {
         Jv::Null => Ok(StrykeValue::UNDEF),
         Jv::Bool(b) => Ok(StrykeValue::integer(i64::from(b))),
         Jv::Num(n) => jaq_num_to_perl(n),
-        Jv::BStr(b) => Ok(StrykeValue::string(String::from_utf8_lossy(&b).into_owned())),
-        Jv::TStr(b) => Ok(StrykeValue::string(String::from_utf8_lossy(&b).into_owned())),
+        Jv::BStr(b) => Ok(StrykeValue::string(
+            String::from_utf8_lossy(&b).into_owned(),
+        )),
+        Jv::TStr(b) => Ok(StrykeValue::string(
+            String::from_utf8_lossy(&b).into_owned(),
+        )),
         Jv::Arr(a) => {
             let v = a.as_ref();
             let mut out = Vec::with_capacity(v.len());

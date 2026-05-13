@@ -521,7 +521,12 @@ fn is_c_str_ptr(t: &str) -> bool {
     t == "*constc_char" || t == "*mutc_char"
 }
 
-fn invoke(name: &str, entry: &FfiEntry, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn invoke(
+    name: &str,
+    entry: &FfiEntry,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
     let expected = entry.sig.arity();
     if args.len() != expected {
         return Err(PerlError::runtime(
