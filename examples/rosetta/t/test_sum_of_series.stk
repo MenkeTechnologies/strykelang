@@ -1,15 +1,15 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Sum of Series
 
-fn sum_series {
+fn Rosetta::SumOfSeries::sum_series {
     my $m = _
     ~> (1..$m) map { 1 / (_ * _) } reduce { _0 + _1 }
 }
 
-my $res = sum_series(1000)
+my $res = Rosetta::SumOfSeries::sum_series(1000)
 # Should be close to pi^2 / 6 = 1.64493
 assert_ok abs($res - 1.6439) < 0.001, "Sum of 1/n^2 up to 1000"
 
-assert_eq sum_series(1), 1, "Sum 1/n^2 up to 1"
+assert_eq Rosetta::SumOfSeries::sum_series(1), 1, "Sum 1/n^2 up to 1"
 
 test_run

@@ -18,9 +18,9 @@ ai("extract status", schema => +{ status => "str", code => "int" })->{status} |>
 
 # ── AOP (Around) ─────────────────────────────────────────────────────────────
 
-fn target_fn = _ * 10
-around "target_fn" { proceed() + 5 }
-target_fn(2) |> aeq 25, "AOP around + proceed"
+fn Pin::Features::target_fn = _ * 10
+around "Pin::Features::target_fn" { proceed() + 5 }
+Pin::Features::target_fn(2) |> aeq 25, "AOP around + proceed"
 
 # ── Nested Implicit Parameters ─────────────────────────────────────────────
 

@@ -24,16 +24,16 @@ $? |> aeq 0, "BUG-031: system(LIST) drops exit code in \$?"
 
 # BUG-037 (FIXED): closure-wrapped coderef call now flattens @_ into the
 # call list (was returning scalar(@_) before the vm_helper fix).
-fn my_dbl_37($_0) { $_0 * 2 }
-my $f_37 = \&my_dbl_37
+fn Pin::BugsExtended::my_dbl_37($_0) { $_0 * 2 }
+my $f_37 = \&Pin::BugsExtended::my_dbl_37
 my $h_37 = fn { $f_37->(@_) }
 $h_37(5) |> aeq 10, "BUG-037 (FIXED): closure passes \@_ flattened, not as count"
 
 # BUG-044: AOP after sees $? as 0
-fn payload_44 { 42 }
+fn Pin::BugsExtended::payload_44 { 42 }
 oursync $after_q = -1
-after "payload_44" { $after_q = $? }
-payload_44()
+after "Pin::BugsExtended::payload_44" { $after_q = $? }
+Pin::BugsExtended::payload_44()
 $after_q |> aeq 0, "BUG-044: AOP after sees \$? as 0"
 
 # BUG-063: take(N, LIST) returns empty
@@ -45,8 +45,8 @@ my @r_65 = head(3, qw(a b c d e))
 join(",", @r_65) |> aeq "3", "BUG-065: head(N, LIST) returns N"
 
 # BUG-088: (&@) block prototype drops trailing args
-fn myff_88(&@) { my $cb = shift; len(@_) }
-my $res_88 = myff_88 { 1 } 5, 7
+fn Pin::BugsExtended::myff_88(&@) { my $cb = shift; len(@_) }
+my $res_88 = Pin::BugsExtended::myff_88 { 1 } 5, 7
 $res_88 |> aeq 0, "BUG-088: block prototype drops trailing args"
 
 # BUG-109 (FIXED): sum(\@a) now sums via arrayref operand (was returning 0).

@@ -23,9 +23,9 @@ exists($data{x}{y}{z}) |> aok "nested exists present path"
 
 # ── Return List ────────────────────────────────────────────────────────────
 
-fn get_list = (10, 20, 30)
-len(get_list()) |> aeq 3, "return list context"
-(get_list())[-1] |> aeq 30, "return scalar context (simulated via last element)"
+fn Pin::BugsPhase2::get_list = (10, 20, 30)
+len(Pin::BugsPhase2::get_list()) |> aeq 3, "return list context"
+(Pin::BugsPhase2::get_list())[-1] |> aeq 30, "return scalar context (simulated via last element)"
 
 # ── System / Exit Status ($?) ──────────────────────────────────────────────
 

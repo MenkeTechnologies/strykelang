@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Middle three digits
 
-fn middle_three_digits {
+fn Rosetta::MiddleThreeDigits::middle_three_digits {
     my $n = _
     my $s = ~> $n abs >{ sprintf("%d", _) }
     my $len = length($s)
@@ -14,11 +14,11 @@ fn middle_three_digits {
     }
 }
 
-assert_eq middle_three_digits(12345), "234", "12345 -> 234"
-assert_eq middle_three_digits(123), "123", "123 -> 123"
-assert_eq middle_three_digits(1234567), "345", "1234567 -> 345"
-assert_eq middle_three_digits(1234), "invalid", "1234 -> invalid"
-assert_eq middle_three_digits(12), "invalid", "12 -> invalid"
-assert_eq middle_three_digits(-12345), "234", "negative 12345 -> 234"
+assert_eq Rosetta::MiddleThreeDigits::middle_three_digits(12345), "234", "12345 -> 234"
+assert_eq Rosetta::MiddleThreeDigits::middle_three_digits(123), "123", "123 -> 123"
+assert_eq Rosetta::MiddleThreeDigits::middle_three_digits(1234567), "345", "1234567 -> 345"
+assert_eq Rosetta::MiddleThreeDigits::middle_three_digits(1234), "invalid", "1234 -> invalid"
+assert_eq Rosetta::MiddleThreeDigits::middle_three_digits(12), "invalid", "12 -> invalid"
+assert_eq Rosetta::MiddleThreeDigits::middle_three_digits(-12345), "234", "negative 12345 -> 234"
 
 test_run

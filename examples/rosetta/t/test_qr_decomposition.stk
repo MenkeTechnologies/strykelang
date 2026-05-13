@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: QR Decomposition
 
-fn dot($v1, $v2) {
+fn Rosetta::QrDecomposition::dot($v1, $v2) {
     my $sum = 0.0
     for my $i (0..len(@$v1)-1) { $sum = $sum + $v1->[$i] * $v2->[$i] }
     $sum
@@ -27,11 +27,11 @@ fn Rosetta::Qr::decompose($A) {
         
         for my $i (0..$j-1) {
             my $ui = $u[$i]
-            $R[$i]->[$j] = dot($ui, \@v)
+            $R[$i]->[$j] = Rosetta::QrDecomposition::dot($ui, \@v)
             for my $k (0..$rows-1) { $v[$k] = $v[$k] - $R[$i]->[$j] * $ui->[$k] }
         }
         
-        $R[$j]->[$j] = sqrt(dot(\@v, \@v))
+        $R[$j]->[$j] = sqrt(Rosetta::QrDecomposition::dot(\@v, \@v))
         my @q_col
         for my $k (0..$rows-1) { push @q_col, $v[$k] / $R[$j]->[$j] }
         push @u, \@q_col

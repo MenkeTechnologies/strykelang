@@ -23,7 +23,7 @@ fn Rosetta::IsPrime::is_prime($n) {
     }
 }
 
-fn smarandache_wellin($n) {
+fn Rosetta::SmarandacheWellin::smarandache_wellin($n) {
     my $count = 0
     my $p = 2
     my $s = ""
@@ -37,12 +37,12 @@ fn smarandache_wellin($n) {
     $s
 }
 
-assert_eq smarandache_wellin(1), "2", "SW(1)"
-assert_eq smarandache_wellin(2), "23", "SW(2)"
-assert_eq smarandache_wellin(3), "235", "SW(3)"
-assert_eq smarandache_wellin(4), "2357", "SW(4)"
-assert_eq smarandache_wellin(5), "235711", "SW(5)"
+assert_eq Rosetta::SmarandacheWellin::smarandache_wellin(1), "2", "SW(1)"
+assert_eq Rosetta::SmarandacheWellin::smarandache_wellin(2), "23", "SW(2)"
+assert_eq Rosetta::SmarandacheWellin::smarandache_wellin(3), "235", "SW(3)"
+assert_eq Rosetta::SmarandacheWellin::smarandache_wellin(4), "2357", "SW(4)"
+assert_eq Rosetta::SmarandacheWellin::smarandache_wellin(5), "235711", "SW(5)"
 
-5 |> smarandache_wellin |> assert_eq("235711", "pipe SW(5)")
+5 |> Rosetta::SmarandacheWellin::smarandache_wellin |> assert_eq("235711", "pipe SW(5)")
 
 test_run

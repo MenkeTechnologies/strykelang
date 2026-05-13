@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Proth numbers
 
-fn is_proth($n) {
+fn Rosetta::Proth::is_proth($n) {
     if ($n < 3 || $n % 2 == 0) {
         0
     } else {
@@ -17,14 +17,14 @@ fn is_proth($n) {
     }
 }
 
-assert_ok is_proth(3), "3 is Proth (1 * 2^1 + 1)"
-assert_ok is_proth(5), "5 is Proth (1 * 2^2 + 1)"
-assert_ok is_proth(9), "9 is Proth (1 * 2^3 + 1)"
-assert_ok is_proth(13), "13 is Proth (3 * 2^2 + 1)"
-assert_ok is_proth(17), "17 is Proth (1 * 2^4 + 1)"
-assert_ok is_proth(25), "25 is Proth (3 * 2^3 + 1)"
-assert_ok !is_proth(7), "7 is not Proth (3 * 2^1 + 1, but 2 < 3)"
+assert_ok Rosetta::Proth::is_proth(3), "3 is Proth (1 * 2^1 + 1)"
+assert_ok Rosetta::Proth::is_proth(5), "5 is Proth (1 * 2^2 + 1)"
+assert_ok Rosetta::Proth::is_proth(9), "9 is Proth (1 * 2^3 + 1)"
+assert_ok Rosetta::Proth::is_proth(13), "13 is Proth (3 * 2^2 + 1)"
+assert_ok Rosetta::Proth::is_proth(17), "17 is Proth (1 * 2^4 + 1)"
+assert_ok Rosetta::Proth::is_proth(25), "25 is Proth (3 * 2^3 + 1)"
+assert_ok !Rosetta::Proth::is_proth(7), "7 is not Proth (3 * 2^1 + 1, but 2 < 3)"
 
-13 |> is_proth |> assert_ok("pipe proth")
+13 |> Rosetta::Proth::is_proth |> assert_ok("pipe proth")
 
 test_run

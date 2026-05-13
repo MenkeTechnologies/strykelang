@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Logic Puzzle (Small Zebra)
 
-fn solve_logic {
+fn Rosetta::ZebraSmall::solve_logic {
     my @names = ("Alice", "Beatrice", "Carol")
     my @ages  = (10, 12, 14)
     my @sports = ("Soccer", "Tennis", "Swim")
@@ -42,7 +42,7 @@ fn solve_logic {
     }
 }
 
-my $res = solve_logic()
+my $res = Rosetta::ZebraSmall::solve_logic()
 my $a = $res->[0]
 my $s = $res->[1]
 

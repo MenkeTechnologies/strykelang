@@ -7,7 +7,7 @@ fn Rosetta::IsSquare::is_square {
     $root * $root == $n
 }
 
-fn pythagorean_triples {
+fn Rosetta::PythagoreanTriples::pythagorean_triples {
     my $max = _
     my @triples
     for my $a (1..$max) {
@@ -24,10 +24,10 @@ fn pythagorean_triples {
     [@triples]
 }
 
-my $t10 = pythagorean_triples(10)
+my $t10 = Rosetta::PythagoreanTriples::pythagorean_triples(10)
 assert_eq join(";", @$t10), "3,4,5;6,8,10", "triples up to 10"
 
-my $t20 = pythagorean_triples(20)
+my $t20 = Rosetta::PythagoreanTriples::pythagorean_triples(20)
 assert_eq join(";", @$t20), "3,4,5;5,12,13;6,8,10;8,15,17;9,12,15;12,16,20", "triples up to 20"
 
 test_run

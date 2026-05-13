@@ -1,9 +1,9 @@
 #!/usr/bin/env stryke
 my %memo
 
-fn fib_n($n) {
+fn Demo::Fibonacci::fib_n($n) {
     return $n if $n <= 1
-    $memo{$n} //= fib_n($n - 1) + fib_n($n - 2)
+    $memo{$n} //= Demo::Fibonacci::fib_n($n - 1) + Demo::Fibonacci::fib_n($n - 2)
 }
 
-printf "fib(%2d) = %d\n", _, fib_n(_) for 0:20
+printf "fib(%2d) = %d\n", _, Demo::Fibonacci::fib_n(_) for 0:20

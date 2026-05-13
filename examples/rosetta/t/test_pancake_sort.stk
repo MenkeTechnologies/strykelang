@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Pancake Sort
 
-fn flip {
+fn Rosetta::PancakeSort::flip {
     my $list = _
     my $k = _1
     my @arr = @$list
@@ -13,7 +13,7 @@ fn flip {
     \@arr
 }
 
-fn pancake_sort {
+fn Rosetta::PancakeSort::pancake_sort {
     my $list = _
     my @arr = @$list
     my $n = len(@arr)
@@ -33,10 +33,10 @@ fn pancake_sort {
         
         if ($max_idx != $curr - 1) {
             if ($max_idx != 0) {
-                my $res = flip([@arr], $max_idx)
+                my $res = Rosetta::PancakeSort::flip([@arr], $max_idx)
                 @arr = @$res
             }
-            my $res2 = flip([@arr], $curr - 1)
+            my $res2 = Rosetta::PancakeSort::flip([@arr], $curr - 1)
             @arr = @$res2
         }
     }
@@ -44,11 +44,11 @@ fn pancake_sort {
 }
 
 my $data = [6, 7, 2, 1, 8, 9, 5, 3, 4]
-my $sorted = pancake_sort($data)
+my $sorted = Rosetta::PancakeSort::pancake_sort($data)
 assert_eq join(",", @$sorted), "1,2,3,4,5,6,7,8,9", "pancake sort"
 
 my $small = [3, 1, 2]
-my $sorted_small = pancake_sort($small)
+my $sorted_small = Rosetta::PancakeSort::pancake_sort($small)
 assert_eq join(",", @$sorted_small), "1,2,3", "pancake sort small"
 
 test_run

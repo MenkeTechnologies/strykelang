@@ -4,7 +4,7 @@
 my @_roman_vals = (1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1)
 my @_roman_syms = qw(M CM D CD C XC L XL X IX V IV I)
 
-fn to_roman($n) {
+fn Rosetta::RomanNumerals::to_roman($n) {
     my $result = ""
     for my $i (0..$#_roman_vals) {
         while ($n >= $_roman_vals[$i]) {
@@ -15,7 +15,7 @@ fn to_roman($n) {
     $result
 }
 
-fn from_roman($r) {
+fn Rosetta::RomanNumerals::from_roman($r) {
     my %val = (I => 1, V => 5, X => 10, L => 50, C => 100, D => 500, M => 1000)
     my @chars = $r |> split //
     my $total = 0
@@ -27,15 +27,15 @@ fn from_roman($r) {
     $total
 }
 
-assert_eq to_roman(1), "I", "to_roman(1)"
-assert_eq to_roman(4), "IV", "to_roman(4)"
-assert_eq to_roman(9), "IX", "to_roman(9)"
-assert_eq to_roman(49), "XLIX", "to_roman(49)"
-assert_eq to_roman(1999), "MCMXCIX", "to_roman(1999)"
-assert_eq to_roman(2024), "MMXXIV", "to_roman(2024)"
+assert_eq Rosetta::RomanNumerals::to_roman(1), "I", "Rosetta::RomanNumerals::to_roman(1)"
+assert_eq Rosetta::RomanNumerals::to_roman(4), "IV", "Rosetta::RomanNumerals::to_roman(4)"
+assert_eq Rosetta::RomanNumerals::to_roman(9), "IX", "Rosetta::RomanNumerals::to_roman(9)"
+assert_eq Rosetta::RomanNumerals::to_roman(49), "XLIX", "Rosetta::RomanNumerals::to_roman(49)"
+assert_eq Rosetta::RomanNumerals::to_roman(1999), "MCMXCIX", "Rosetta::RomanNumerals::to_roman(1999)"
+assert_eq Rosetta::RomanNumerals::to_roman(2024), "MMXXIV", "Rosetta::RomanNumerals::to_roman(2024)"
 
-assert_eq from_roman("I"), 1, "from_roman(I)"
-assert_eq from_roman("IV"), 4, "from_roman(IV)"
-assert_eq from_roman("MCMXCIX"), 1999, "from_roman(MCMXCIX)"
+assert_eq Rosetta::RomanNumerals::from_roman("I"), 1, "Rosetta::RomanNumerals::from_roman(I)"
+assert_eq Rosetta::RomanNumerals::from_roman("IV"), 4, "Rosetta::RomanNumerals::from_roman(IV)"
+assert_eq Rosetta::RomanNumerals::from_roman("MCMXCIX"), 1999, "Rosetta::RomanNumerals::from_roman(MCMXCIX)"
 
 test_run

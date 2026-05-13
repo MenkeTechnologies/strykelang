@@ -4,8 +4,8 @@
 # Usage: s serve 8080 web_server.stk
 # Or just run it: s examples/web_server.stk (if it calls serve itself)
 
-# The handler function receives $req
-fn handler($req) {
+# The Demo::Web::handler function receives $req
+fn Demo::Web::handler($req) {
     my $path = $req->{path}
     my $method = $req->{method}
     
@@ -39,5 +39,5 @@ fn handler($req) {
 if ($0 eq __FILE__ || $0 =~ /web_server\.stk$/) {
     my $port = $ARGV[0] // 8080
     p "Starting Stryke server on port $port..."
-    serve($port, \&handler)
+    serve($port, \&Demo::Web::handler)
 }

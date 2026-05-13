@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Stooge Sort
 
-fn stooge_sort_recursive {
+fn Rosetta::StoogeSort::stooge_sort_recursive {
     my $list = _
     my $i = _1
     my $j = _2
@@ -13,28 +13,28 @@ fn stooge_sort_recursive {
     
     if ($j - $i + 1 > 2) {
         my $t = int(($j - $i + 1) / 3)
-        my $res1 = stooge_sort_recursive([@arr], $i, $j - $t)
+        my $res1 = Rosetta::StoogeSort::stooge_sort_recursive([@arr], $i, $j - $t)
         @arr = @$res1
-        my $res2 = stooge_sort_recursive([@arr], $i + $t, $j)
+        my $res2 = Rosetta::StoogeSort::stooge_sort_recursive([@arr], $i + $t, $j)
         @arr = @$res2
-        my $res3 = stooge_sort_recursive([@arr], $i, $j - $t)
+        my $res3 = Rosetta::StoogeSort::stooge_sort_recursive([@arr], $i, $j - $t)
         @arr = @$res3
     }
     \@arr
 }
 
-fn stooge_sort {
+fn Rosetta::StoogeSort::stooge_sort {
     my $list = _
     my @data = @$list
     my $n = len(@data)
     if ($n < 2) {
         return \@data
     }
-    stooge_sort_recursive([@data], 0, $n - 1)
+    Rosetta::StoogeSort::stooge_sort_recursive([@data], 0, $n - 1)
 }
 
 my $data = [1, 4, 5, 3, -6, 3, 7, 10, -2, -5, 7, 5, 9, -3, 7]
-my $sorted = stooge_sort($data)
+my $sorted = Rosetta::StoogeSort::stooge_sort($data)
 assert_eq join(",", @$sorted), "-6,-5,-3,-2,1,3,3,4,5,5,7,7,7,9,10", "stooge sort"
 
 test_run

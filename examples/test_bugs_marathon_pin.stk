@@ -40,9 +40,9 @@ $hashes |> maps { _ > 0 } |> aok "stress_cpu(1) returns positive hash count"
 
 # ── 6. refaddr of repeated references (BUG-102) ───────────────────────────
 
-fn myff_102 { 1 }
-my $r1_102 = \&myff_102
-my $r2_102 = \&myff_102
+fn Pin::BugsMarathon::myff_102 { 1 }
+my $r1_102 = \&Pin::BugsMarathon::myff_102
+my $r2_102 = \&Pin::BugsMarathon::myff_102
 refaddr($r1_102) != refaddr($r2_102) |> aok "BUG-102: refaddr of repeated \\&fn differs"
 
 # ── 7. Single scalar destructure (BUG-101) ────────────────────────────────

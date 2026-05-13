@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Middle three digits
 
-fn middle_three($n) {
+fn Rosetta::MiddleThreeNum::middle_three($n) {
     my $s = abs($n) . ""
     my $len = length($s)
     if ($len < 3 || $len % 2 == 0) {
@@ -11,10 +11,10 @@ fn middle_three($n) {
     substr($s, $mid - 1, 3)
 }
 
-assert_eq middle_three(12345), "234", "12345 -> 234"
-assert_eq middle_three(123), "123", "123 -> 123"
-assert_eq middle_three(1234567), "345", "1234567 -> 345"
-assert_eq middle_three(10), "error", "10 -> error"
-assert_eq middle_three(1234), "error", "1234 -> error"
+assert_eq Rosetta::MiddleThreeNum::middle_three(12345), "234", "12345 -> 234"
+assert_eq Rosetta::MiddleThreeNum::middle_three(123), "123", "123 -> 123"
+assert_eq Rosetta::MiddleThreeNum::middle_three(1234567), "345", "1234567 -> 345"
+assert_eq Rosetta::MiddleThreeNum::middle_three(10), "error", "10 -> error"
+assert_eq Rosetta::MiddleThreeNum::middle_three(1234), "error", "1234 -> error"
 
 test_run

@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Strobogrammatic numbers
 
-fn is_strobogrammatic($n) {
+fn Rosetta::Strobogrammatic::is_strobogrammatic($n) {
     my $s = "$n"
     my @chars = chars($s)
     my $res_s = ""
@@ -23,12 +23,12 @@ fn is_strobogrammatic($n) {
     $final
 }
 
-assert_ok is_strobogrammatic(69), "69 is strobogrammatic"
-assert_ok is_strobogrammatic(88), "88 is strobogrammatic"
-assert_ok is_strobogrammatic(818), "818 is strobogrammatic"
-assert_ok !is_strobogrammatic(66), "66 is not (flips to 99)"
-assert_eq is_strobogrammatic(2), 0, "2 is not"
+assert_ok Rosetta::Strobogrammatic::is_strobogrammatic(69), "69 is strobogrammatic"
+assert_ok Rosetta::Strobogrammatic::is_strobogrammatic(88), "88 is strobogrammatic"
+assert_ok Rosetta::Strobogrammatic::is_strobogrammatic(818), "818 is strobogrammatic"
+assert_ok !Rosetta::Strobogrammatic::is_strobogrammatic(66), "66 is not (flips to 99)"
+assert_eq Rosetta::Strobogrammatic::is_strobogrammatic(2), 0, "2 is not"
 
-69 |> is_strobogrammatic |> assert_ok("pipe Strobogrammatic")
+69 |> Rosetta::Strobogrammatic::is_strobogrammatic |> assert_ok("pipe Strobogrammatic")
 
 test_run

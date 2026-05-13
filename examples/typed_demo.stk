@@ -4,14 +4,14 @@
 # Demonstrates optional typing and advanced function syntax.
 
 # Typed parameters (runtime checked).
-fn calculate_risk($threat_level: Int, $impact: Float) {
+fn Demo::Typed::calculate_risk($threat_level: Int, $impact: Float) {
     $threat_level * $impact
 }
 
 # Typed variables (require 'typed' keyword).
 typed my $level  : Int   = 5
 typed my $impact : Float = 2.5
-typed my $risk   : Float = calculate_risk($level, $impact)
+typed my $risk   : Float = Demo::Typed::calculate_risk($level, $impact)
 
 printf "Threat Level: %d, Impact: %.1f, Total Risk: %.2f\n", $level, $impact, $risk
 
@@ -28,7 +28,7 @@ if ($@) {
 p "\nProcessing parallel data stream..."
 my @raw_data = 1:10
 my $total_processed_risk = @raw_data
-    |> pmap { calculate_risk(_, 1.5) }
+    |> pmap { Demo::Typed::calculate_risk(_, 1.5) }
     |> preduce { _0 + _1 }
 
 printf "Total Processed Risk: %.2f\n", $total_processed_risk

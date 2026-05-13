@@ -27,11 +27,11 @@ len(@arr) |> aeq 3, "outer array remains 3 (copied, not shared)"
 
 # ── AOP Final Expression ───────────────────────────────────────────────────
 
-fn target = 1
-around "target" {
+fn Pin::ArchGlobs::target = 1
+around "Pin::ArchGlobs::target" {
     my $x = proceed()
     $x + 10
 }
-target() |> aeq 11, "AOP ends in expression"
+Pin::ArchGlobs::target() |> aeq 11, "AOP ends in expression"
 
 test_run

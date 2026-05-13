@@ -37,7 +37,7 @@ fn Rosetta::NextPrime::next_prime($n) {
     }
 }
 
-fn is_strong_prime($n) {
+fn Rosetta::StrongPrimes::is_strong_prime($n) {
     if (!Rosetta::IsPrime::is_prime($n)) {
         0
     } else {
@@ -51,11 +51,11 @@ fn is_strong_prime($n) {
     }
 }
 
-assert_ok is_strong_prime(11), "11 is strong (7, 11, 13 average 10)"
-assert_ok is_strong_prime(17), "17 is strong (13, 17, 19 average 16)"
-assert_ok !is_strong_prime(5), "5 is not (3, 5, 7 average 5)"
-assert_ok !is_strong_prime(7), "7 is not (5, 7, 11 average 8)"
+assert_ok Rosetta::StrongPrimes::is_strong_prime(11), "11 is strong (7, 11, 13 average 10)"
+assert_ok Rosetta::StrongPrimes::is_strong_prime(17), "17 is strong (13, 17, 19 average 16)"
+assert_ok !Rosetta::StrongPrimes::is_strong_prime(5), "5 is not (3, 5, 7 average 5)"
+assert_ok !Rosetta::StrongPrimes::is_strong_prime(7), "7 is not (5, 7, 11 average 8)"
 
-11 |> is_strong_prime |> assert_ok("pipe strong prime")
+11 |> Rosetta::StrongPrimes::is_strong_prime |> assert_ok("pipe strong prime")
 
 test_run
