@@ -11,9 +11,9 @@
 //! tool that filters `\x1b[...m` sequences.
 
 use crate::builtins::{
-    aliases_hash_map, all_hash_map, builtins_hash_map, categories_hash_map,
-    descriptions_hash_map, extensions_hash_map, keywords_hash_map, operators_hash_map,
-    perl_compats_hash_map, primaries_hash_map, special_vars_hash_map,
+    aliases_hash_map, all_hash_map, builtins_hash_map, categories_hash_map, descriptions_hash_map,
+    extensions_hash_map, keywords_hash_map, operators_hash_map, perl_compats_hash_map,
+    primaries_hash_map, special_vars_hash_map,
 };
 
 /// Count of visible columns in `s`, ignoring ANSI SGR escape sequences.
@@ -149,9 +149,7 @@ pub fn render_banner(colored: bool) -> String {
     );
     row(
         &mut out,
-        &format!(
-            " {y}%c{n}  categories {n_categories:<5}  {y}%p{n}  primaries  {n_primaries:<5}"
-        ),
+        &format!(" {y}%c{n}  categories {n_categories:<5}  {y}%p{n}  primaries  {n_primaries:<5}"),
     );
     out.push_str(&format!(
         "{c} └────────────────────────────────────────────────────────────────┘{n}\n"

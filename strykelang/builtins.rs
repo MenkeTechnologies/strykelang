@@ -12300,9 +12300,7 @@ fn builtin_docs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     if args.len() == 1 {
         let topic = args[0].to_string();
         return Ok(match crate::lsp::doc_text_for(&topic) {
-            Some(s) => {
-                StrykeValue::string(crate::doc_render::render_doc(&topic, s, colored))
-            }
+            Some(s) => StrykeValue::string(crate::doc_render::render_doc(&topic, s, colored)),
             None => StrykeValue::UNDEF,
         });
     }
@@ -12310,9 +12308,7 @@ fn builtin_docs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     for a in args {
         let topic = a.to_string();
         let val = match crate::lsp::doc_text_for(&topic) {
-            Some(s) => {
-                StrykeValue::string(crate::doc_render::render_doc(&topic, s, colored))
-            }
+            Some(s) => StrykeValue::string(crate::doc_render::render_doc(&topic, s, colored)),
             None => StrykeValue::UNDEF,
         };
         h.insert(topic, val);
