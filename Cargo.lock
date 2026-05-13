@@ -771,9 +771,9 @@ checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
 
 [[package]]
 name = "compsys"
-version = "0.10.9"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "949ef39841a374bafb53a902ed7c85824ec2e7c10365448c2dae765c22f6f759"
+checksum = "a079bdabebdb9dc7db124e96bf0e7fd6b1dbb1777c1ada68b158b9fc1c508ae7"
 dependencies = [
  "dirs 5.0.1",
  "libc",
@@ -7051,9 +7051,9 @@ dependencies = [
 
 [[package]]
 name = "zshrs"
-version = "0.10.10"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f78e4a0f5d9bb0e0146326898e3f64fe16f0b5c93b8d835ff3faa5a3a28409a"
+checksum = "97bb6485fcad70d2f31e46c26fa4a00a6f9566f1cf27979d9e0dd5edea0314f9"
 dependencies = [
  "atty",
  "bincode",
@@ -7105,9 +7105,9 @@ dependencies = [
 
 [[package]]
 name = "zshrs-daemon"
-version = "0.10.9"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "753a26411e9ed8dfb655e1a129dcc541624ae81a23eac087c9e91b93254d4acd"
+checksum = "42f42ad224ed6afe7363ad999c0fbb8e2f3b147d0b8112f02d10a87bbff4ad40"
 dependencies = [
  "atty",
  "axum",
@@ -7140,16 +7140,6 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "walkdir",
- "zshrs-parse",
-]
-
-[[package]]
-name = "zshrs-parse"
-version = "0.10.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6a0600b84ac2fc2def1637c68a84d976d188224df136b16154c3554591d31f8"
-dependencies = [
- "serde",
 ]
 
 [[package]]
