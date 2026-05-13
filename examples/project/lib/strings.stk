@@ -1,26 +1,26 @@
 # lib/strings.stk — string utilities: regex, pipelines, transforms
 
-fn slugify_str ($str) {
+fn Project::Strings::slugify_str ($str) {
     my $s = lc $str
     $s =~ s/[^a-z0-9]+/-/g
     $s =~ s/^-|-$//g
     $s
 }
 
-fn get_initials ($name) {
+fn Project::Strings::get_initials ($name) {
     join("", map { uc(substr(_, 0, 1)) } split(/\s+/, $name))
 }
 
-fn truncate_str ($s, $max) {
+fn Project::Strings::truncate_str ($s, $max) {
     $max //= 50
     length($s) > $max ? substr($s, 0, $max - 1) . "~" : $s
 }
 
-fn repeat_str ($s, $n) {
+fn Project::Strings::repeat_str ($s, $n) {
     $s x ($n // 1)
 }
 
-fn pad_center ($s, $width) {
+fn Project::Strings::pad_center ($s, $width) {
     my $pad = $width - length($s)
     return $s if $pad <= 0
     my $left = int($pad / 2)
@@ -29,7 +29,7 @@ fn pad_center ($s, $width) {
 }
 
 # Caesar cipher with shift amount — works on a-z only
-fn caesar_cipher ($text, $shift) {
+fn Project::Strings::caesar_cipher ($text, $shift) {
     $shift //= 13
     my @chars = split("", $text)
     my @out = map {
@@ -45,6 +45,6 @@ fn caesar_cipher ($text, $shift) {
 }
 
 # Count vowels in a string via pipeline
-fn vowel_count ($s) {
+fn Project::Strings::vowel_count ($s) {
     scalar(grep { _ =~ /[aeiouAEIOU]/ } split("", $s))
 }

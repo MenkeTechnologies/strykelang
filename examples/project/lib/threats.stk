@@ -2,7 +2,7 @@
 
 enum ThreatLevel { HIGH, WARN, OK }
 
-fn analyze_threats ($sys, $net, $disks, $mem_free) {
+fn Project::Threats::analyze_threats ($sys, $net, $disks, $mem_free) {
     my @threats
     $mem_free //= mem_free()
 

@@ -1,7 +1,7 @@
 # lib/strings_advanced_impl.stk — advanced string algorithms
 
-# ── adv_levenshtein: minimum number of edits to change one string to another ─────
-fn adv_levenshtein($s1, $s2) {
+# ── Project::StringsAdvancedImpl::adv_levenshtein: minimum number of edits to change one string to another ─────
+fn Project::StringsAdvancedImpl::adv_levenshtein($s1, $s2) {
     my $len1 = length($s1)
     my $len2 = length($s2)
     
@@ -38,8 +38,8 @@ fn adv_levenshtein($s1, $s2) {
     $d[$len1][$len2]
 }
 
-# ── adv_lcs: longest common subsequence length ─────
-fn adv_lcs($s1, $s2) {
+# ── Project::StringsAdvancedImpl::adv_lcs: longest common subsequence length ─────
+fn Project::StringsAdvancedImpl::adv_lcs($s1, $s2) {
     my $len1 = length($s1)
     my $len2 = length($s2)
     
@@ -71,8 +71,8 @@ fn adv_lcs($s1, $s2) {
     $dp[$len1][$len2]
 }
 
-# ── adv_is_anagram: checks if two strings are anagrams ─────
-fn adv_is_anagram($s1, $s2) {
+# ── Project::StringsAdvancedImpl::adv_is_anagram: checks if two strings are anagrams ─────
+fn Project::StringsAdvancedImpl::adv_is_anagram($s1, $s2) {
     my $s1_clean = lc($s1)
     $s1_clean =~ s/\s+//g
     my $s2_clean = lc($s2)
@@ -86,8 +86,8 @@ fn adv_is_anagram($s1, $s2) {
     join("", @c1) eq join("", @c2) ? 1 : 0
 }
 
-# ── adv_word_frequency: returns hashref of word counts ─────
-fn adv_word_frequency($s) {
+# ── Project::StringsAdvancedImpl::adv_word_frequency: returns hashref of word counts ─────
+fn Project::StringsAdvancedImpl::adv_word_frequency($s) {
     my $clean = lc($s)
     $clean =~ s/[^\w\s]//g
     my @words = split(/\s+/, $clean)

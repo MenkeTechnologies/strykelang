@@ -11,10 +11,10 @@ my $sys_per_sector = 5
 # Total Planets = 50 * 3 = 150
 # Total Moons = 150 * 2 = 300
 
-my $galaxy = generate_massive_galaxy($num_sectors, $sys_per_sector)
+my $galaxy = Project::MassiveData::generate_massive_galaxy($num_sectors, $sys_per_sector)
 
 assert_eq $galaxy->name, "Andromeda", "Galaxy name"
-my $stats = galaxy_stats($galaxy)
+my $stats = Project::MassiveData::galaxy_stats($galaxy)
 
 assert_eq $stats->{sectors}, 10, "Stats: sectors"
 assert_eq $stats->{systems}, 50, "Stats: systems"
@@ -36,13 +36,13 @@ assert_true $m1->mass < 100, "Moon mass check"
 # ── 3. Cross-linked Mesh (Cyclic Graph) ───────────────────────────
 
 my $mesh_size = 20
-my @nodes = create_linked_mesh($mesh_size)
+my @nodes = Project::MassiveData::create_linked_mesh($mesh_size)
 
 assert_eq scalar(@nodes), 20, "Mesh size"
 assert_eq scalar(@{$nodes[0]->edges}), 3, "Node degree"
 
 # Test traversal (depth-limited to avoid infinite recursion in cycles)
-my $sum = traverse_mesh($nodes[0], 3)
+my $sum = Project::MassiveData::traverse_mesh($nodes[0], 3)
 assert_gt $sum, 0, "Graph traversal sum"
 
 # Verify references are stable

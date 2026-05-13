@@ -1,12 +1,12 @@
 # lib/data.stk — data processing: pipelines, aggregation, grouping
 
-fn word_freq_map {
+fn Project::Data::word_freq_map {
     my $freq = {}
     $freq->{$_}++ for @_
     $freq
 }
 
-fn group_records ($key, @records) {
+fn Project::Data::group_records ($key, @records) {
     my $groups = {}
     for my $r (@records) {
         my $k = $r->{$key} // "unknown"
@@ -16,7 +16,7 @@ fn group_records ($key, @records) {
     $groups
 }
 
-fn summarize_list (@data) {
+fn Project::Data::summarize_list (@data) {
     my $n = scalar @data
     return {} unless $n
     my $total = sum(@data)
@@ -31,7 +31,7 @@ fn summarize_list (@data) {
 }
 
 # Build a hash from parallel key/value arrays
-fn zip_to_hash ($keys, $vals) {
+fn Project::Data::zip_to_hash ($keys, $vals) {
     my $h = {}
     ~> 0..scalar(@$keys) - 1 ep {
         $h->{$keys->[_]} = $vals->[_]
@@ -40,7 +40,7 @@ fn zip_to_hash ($keys, $vals) {
 }
 
 # Partition an array into two: [matching, non-matching]
-fn split_by_pred ($pred, @items) {
+fn Project::Data::split_by_pred ($pred, @items) {
     my $yes = []
     my $no = []
     ~> @items ep {
@@ -55,7 +55,7 @@ fn split_by_pred ($pred, @items) {
 }
 
 # Running total of a numeric array
-fn running_total (@data) {
+fn Project::Data::running_total (@data) {
     my @result
     my $acc = 0
     for my $v (@data) {

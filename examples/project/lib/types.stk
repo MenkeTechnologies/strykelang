@@ -2,37 +2,37 @@
 
 # ── Scalar returns ───────────────────────────────────────────────────
 
-fn ret_int { 42 }
-fn ret_float { 3.14159 }
-fn ret_str { "hello world" }
-fn ret_undef { undef }
-fn ret_bool_true { 1 == 1 }
-fn ret_bool_false { 1 == 0 }
+fn Project::Types::ret_int { 42 }
+fn Project::Types::ret_float { 3.14159 }
+fn Project::Types::ret_str { "hello world" }
+fn Project::Types::ret_undef { undef }
+fn Project::Types::ret_bool_true { 1 == 1 }
+fn Project::Types::ret_bool_false { 1 == 0 }
 
 # ── Array returns ────────────────────────────────────────────────────
 
-fn ret_list { (1, 2, 3, 4, 5) }
-fn ret_empty_list { () }
-fn ret_nested_list { ((1, 2), (3, 4)) }
+fn Project::Types::ret_list { (1, 2, 3, 4, 5) }
+fn Project::Types::ret_empty_list { () }
+fn Project::Types::ret_nested_list { ((1, 2), (3, 4)) }
 
 # ── Hash returns (via list context) ──────────────────────────────────
 
-fn ret_hash_as_list { (a => 1, b => 2, c => 3) }
+fn Project::Types::ret_hash_as_list { (a => 1, b => 2, c => 3) }
 
 # ── Array refs ───────────────────────────────────────────────────────
 
-fn ret_aref { [10, 20, 30] }
-fn ret_nested_aref { [[1, 2], [3, 4], [5, 6]] }
-fn ret_mixed_aref { ["str", 42, [1, 2], { x => 9 }] }
+fn Project::Types::ret_aref { [10, 20, 30] }
+fn Project::Types::ret_nested_aref { [[1, 2], [3, 4], [5, 6]] }
+fn Project::Types::ret_mixed_aref { ["str", 42, [1, 2], { x => 9 }] }
 
 # ── Hash refs (use {} for implicit return) ──────────────────────────
 
-fn ret_href { { name => "test", value => 100 } }
-fn ret_nested_href { { outer => { inner => { deep => 42 } } } }
-fn ret_href_with_aref { { items => [1, 2, 3], meta => { count => 3 } } }
+fn Project::Types::ret_href { { name => "test", value => 100 } }
+fn Project::Types::ret_nested_href { { outer => { inner => { deep => 42 } } } }
+fn Project::Types::ret_href_with_aref { { items => [1, 2, 3], meta => { count => 3 } } }
 
 # Hash refs with reserved bareword keys (q, qq, qw, qx, qr, tr, y, s, m)
-fn ret_href_reserved_keys {
+fn Project::Types::ret_href_reserved_keys {
     {
         q  => "quote",
         qq => "double quote",
@@ -52,12 +52,12 @@ struct Vec3 { x, y, z }
 struct Person { name, age, email }
 struct Config { host => Str, port => Int, debug => Int }
 
-fn ret_struct { Vec3(1, 2, 3) }
-fn ret_struct_named { Person(name => "Alice", age => 30, email => "alice@example.com") }
-fn ret_struct_typed { Config(host => "localhost", port => 8080, debug => 0) }
+fn Project::Types::ret_struct { Vec3(1, 2, 3) }
+fn Project::Types::ret_struct_named { Person(name => "Alice", age => 30, email => "alice@example.com") }
+fn Project::Types::ret_struct_typed { Config(host => "localhost", port => 8080, debug => 0) }
 
-fn make_point($x, $y, $z) { Vec3($x, $y, $z) }
-fn make_person($n, $a) { Person(name => $n, age => $a, email => "$n@test.com") }
+fn Project::Types::make_point($x, $y, $z) { Vec3($x, $y, $z) }
+fn Project::Types::make_person($n, $a) { Person(name => $n, age => $a, email => "$n@test.com") }
 
 # ── Enums ────────────────────────────────────────────────────────────
 
@@ -65,10 +65,10 @@ enum Result { Ok, Err }
 enum Option { Some, None }
 enum TrafficLight { Red, Yellow, Green }
 
-fn ret_enum_ok { Result::Ok }
-fn ret_enum_err { Result::Err }
+fn Project::Types::ret_enum_ok { Result::Ok }
+fn Project::Types::ret_enum_err { Result::Err }
 
-fn traffic_next($light) {
+fn Project::Types::traffic_next($light) {
     match ($light) {
         TrafficLight::Red()    => TrafficLight::Green
         TrafficLight::Yellow() => TrafficLight::Red
@@ -76,7 +76,7 @@ fn traffic_next($light) {
     }
 }
 
-fn option_map($opt, $fn) {
+fn Project::Types::option_map($opt, $fn) {
     match ($opt) {
         Option::Some() => Option::Some
         Option::None() => Option::None
@@ -85,32 +85,32 @@ fn option_map($opt, $fn) {
 
 # ── Sets ─────────────────────────────────────────────────────────────
 
-fn ret_set { set(1, 2, 3, 4, 5) }
-fn ret_string_set { set("apple", "banana", "cherry") }
+fn Project::Types::ret_set { set(1, 2, 3, 4, 5) }
+fn Project::Types::ret_string_set { set("apple", "banana", "cherry") }
 
-fn set_contains($s, $val) { $s->has($val) }
-fn set_size($s) { $s->len }
+fn Project::Types::set_contains($s, $val) { $s->has($val) }
+fn Project::Types::set_size($s) { $s->len }
 
 # ── Code refs ────────────────────────────────────────────────────────
 
-fn ret_coderef { fn { 99 } }
-fn ret_coderef_with_arg { fn ($x) { $x * 2 } }
-fn ret_closure {
+fn Project::Types::ret_coderef { fn { 99 } }
+fn Project::Types::ret_coderef_with_arg { fn ($x) { $x * 2 } }
+fn Project::Types::ret_closure {
     my $n = 10
     fn { $n * $n }
 }
 
-fn make_adder($n) { fn ($x) { $x + $n } }
-fn make_multiplier($n) { fn ($x) { $x * $n } }
+fn Project::Types::make_adder($n) { fn ($x) { $x + $n } }
+fn Project::Types::make_multiplier($n) { fn ($x) { $x * $n } }
 
 # ── Blessed refs ─────────────────────────────────────────────────────
 
-fn ret_blessed { bless { val => 42 }, "MyClass" }
-fn ret_blessed_aref { bless [1, 2, 3], "MyArray" }
+fn Project::Types::ret_blessed { bless { val => 42 }, "MyClass" }
+fn Project::Types::ret_blessed_aref { bless [1, 2, 3], "MyArray" }
 
 # ── Complex nested structures ────────────────────────────────────────
 
-fn ret_complex {
+fn Project::Types::ret_complex {
     my $the_set = set(10, 11, 12)
     my $the_code = fn { "lambda" }
     {
@@ -128,17 +128,17 @@ fn ret_complex {
 
 # ── Conditional implicit returns ─────────────────────────────────────
 
-fn abs_val($n) {
+fn Project::Types::abs_val($n) {
     if ($n < 0) { -$n } else { $n }
 }
 
-fn clamp_val($val, $lo, $hi) {
+fn Project::Types::clamp_val($val, $lo, $hi) {
     if ($val < $lo) { $lo }
     elsif ($val > $hi) { $hi }
     else { $val }
 }
 
-fn sign_of($n) {
+fn Project::Types::sign_of($n) {
     if ($n > 0) { 1 }
     elsif ($n < 0) { -1 }
     else { 0 }
@@ -146,14 +146,14 @@ fn sign_of($n) {
 
 # ── Loop-based returns ───────────────────────────────────────────────
 
-fn first_even(@nums) {
+fn Project::Types::first_even(@nums) {
     for my $n (@nums) {
         return $n if $n % 2 == 0
     }
     undef
 }
 
-fn all_positive(@nums) {
+fn Project::Types::all_positive(@nums) {
     for my $n (@nums) {
         return 0 if $n <= 0
     }
@@ -162,14 +162,14 @@ fn all_positive(@nums) {
 
 # ── Recursive returns ────────────────────────────────────────────────
 
-fn factorial_of($n) {
+fn Project::Types::factorial_of($n) {
     if ($n <= 1) { 1 }
-    else { $n * factorial_of($n - 1) }
+    else { $n * Project::Types::factorial_of($n - 1) }
 }
 
-fn fib_of($n) {
+fn Project::Types::fib_of($n) {
     if ($n <= 1) { $n }
-    else { fib_of($n - 1) + fib_of($n - 2) }
+    else { Project::Types::fib_of($n - 1) + Project::Types::fib_of($n - 2) }
 }
 
 # ── Method chaining returns ──────────────────────────────────────────
@@ -187,17 +187,17 @@ class Builder {
     }
 }
 
-fn new_builder { Builder() }
+fn Project::Types::new_builder { Builder() }
 
 # ── Ternary implicit returns ─────────────────────────────────────────
 
-fn ternary_example($cond) { $cond ? "yes" : "no" }
-fn nested_ternary($n) { $n > 0 ? "positive" : $n < 0 ? "negative" : "zero" }
+fn Project::Types::ternary_example($cond) { $cond ? "yes" : "no" }
+fn Project::Types::nested_ternary($n) { $n > 0 ? "positive" : $n < 0 ? "negative" : "zero" }
 
 # ── Expression-bodied functions ──────────────────────────────────────
 
-fn dbl($x) { $x * 2 }
-fn square_it($x) { $x * $x }
-fn cube_it($x) { $x * $x * $x }
-fn greet($name) { "Hello, $name!" }
-fn full_name($first, $last) { "$first $last" }
+fn Project::Types::dbl($x) { $x * 2 }
+fn Project::Types::square_it($x) { $x * $x }
+fn Project::Types::cube_it($x) { $x * $x * $x }
+fn Project::Types::greet($name) { "Hello, $name!" }
+fn Project::Types::full_name($first, $last) { "$first $last" }

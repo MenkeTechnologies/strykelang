@@ -7,101 +7,101 @@ require "./lib/data_structures.stk"
 # NESTED ARRAYS
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq nested_array_access(), 3, "nested array access [1][0]"
-assert_eq nested_array_depth3(), 6, "nested array depth3 [1][0][1]"
-assert_eq nested_array_modify(), 99, "nested array modify"
-assert_eq nested_array_push(), 2, "nested array push count"
-assert_eq nested_array_count(), 3, "nested array count"
+assert_eq Project::DataStructures::nested_array_access(), 3, "nested array access [1][0]"
+assert_eq Project::DataStructures::nested_array_depth3(), 6, "nested array depth3 [1][0][1]"
+assert_eq Project::DataStructures::nested_array_modify(), 99, "nested array modify"
+assert_eq Project::DataStructures::nested_array_push(), 2, "nested array push count"
+assert_eq Project::DataStructures::nested_array_count(), 3, "nested array count"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # NESTED HASHES
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq nested_hash_access(), 2, "nested hash access {a}{y}"
-assert_eq nested_hash_depth3(), "deep", "nested hash depth3"
-assert_eq nested_hash_modify(), 99, "nested hash modify"
-assert_eq nested_hash_add_key(), "value", "nested hash add key"
-assert_eq nested_hash_keys(), 3, "nested hash keys count"
+assert_eq Project::DataStructures::nested_hash_access(), 2, "nested hash access {a}{y}"
+assert_eq Project::DataStructures::nested_hash_depth3(), "deep", "nested hash depth3"
+assert_eq Project::DataStructures::nested_hash_modify(), 99, "nested hash modify"
+assert_eq Project::DataStructures::nested_hash_add_key(), "value", "nested hash add key"
+assert_eq Project::DataStructures::nested_hash_keys(), 3, "nested hash keys count"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ARRAY OF HASHES (AOH)
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq aoh_access(), "Alice", "aoh access name"
-assert_eq aoh_modify(), 99, "aoh modify"
-assert_ok defined(aoh_iterate()), "aoh iterate"
-assert_ok defined(aoh_grep()), "aoh grep"
-assert_ok defined(aoh_map()), "aoh map"
+assert_eq Project::DataStructures::aoh_access(), "Alice", "aoh access name"
+assert_eq Project::DataStructures::aoh_modify(), 99, "aoh modify"
+assert_ok defined(Project::DataStructures::aoh_iterate()), "aoh iterate"
+assert_ok defined(Project::DataStructures::aoh_grep()), "aoh grep"
+assert_ok defined(Project::DataStructures::aoh_map()), "aoh map"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HASH OF ARRAYS (HOA)
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_ok defined(hoa_access()), "hoa access"
-assert_ok hoa_keys() >= 1, "hoa keys"
-assert_ok hoa_push() >= 1, "hoa push"
-assert_ok defined(hoa_modify()), "hoa modify"
-assert_ok defined(hoa_join()), "hoa join"
+assert_ok defined(Project::DataStructures::hoa_access()), "hoa access"
+assert_ok Project::DataStructures::hoa_keys() >= 1, "hoa keys"
+assert_ok Project::DataStructures::hoa_push() >= 1, "hoa push"
+assert_ok defined(Project::DataStructures::hoa_modify()), "hoa modify"
+assert_ok defined(Project::DataStructures::hoa_join()), "hoa join"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HASH OF HASHES (HOH)
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_ok defined(hoh_access()), "hoh access"
-assert_ok defined(hoh_modify()), "hoh modify"
-assert_ok defined(hoh_add_inner()), "hoh add inner"
-assert_ok defined(hoh_iterate()), "hoh iterate"
+assert_ok defined(Project::DataStructures::hoh_access()), "hoh access"
+assert_ok defined(Project::DataStructures::hoh_modify()), "hoh modify"
+assert_ok defined(Project::DataStructures::hoh_add_inner()), "hoh add inner"
+assert_ok defined(Project::DataStructures::hoh_iterate()), "hoh iterate"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # BUILD FUNCTIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_ok defined(build_records()), "build records"
-assert_ok defined(build_array_of_arrays()), "build array of arrays"
-assert_ok defined(build_hash_of_arrays()), "build hash of arrays"
+assert_ok defined(Project::DataStructures::build_records()), "build records"
+assert_ok defined(Project::DataStructures::build_array_of_arrays()), "build array of arrays"
+assert_ok defined(Project::DataStructures::build_hash_of_arrays()), "build hash of arrays"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # FILTER/SORT/GROUP
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_ok defined(filter_by_field()), "filter by field"
-assert_ok defined(sort_by_field()), "sort by field"
-assert_ok defined(group_by_key()), "group by key"
-assert_ok defined(transform_records()), "transform records"
+assert_ok defined(Project::DataStructures::filter_by_field()), "filter by field"
+assert_ok defined(Project::DataStructures::sort_by_field()), "sort by field"
+assert_ok defined(Project::DataStructures::group_by_key()), "group by key"
+assert_ok defined(Project::DataStructures::transform_records()), "transform records"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TRAVERSAL
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_ok traverse_array_sum() > 0, "traverse array sum"
-assert_ok traverse_hash_values() > 0, "traverse hash values"
-assert_ok defined(traverse_mixed()), "traverse mixed"
+assert_ok Project::DataStructures::traverse_array_sum() > 0, "traverse array sum"
+assert_ok Project::DataStructures::traverse_hash_values() > 0, "traverse hash values"
+assert_ok defined(Project::DataStructures::traverse_mixed()), "traverse mixed"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # REFERENCES
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_ok defined(ref_deref_array()), "ref deref array"
-assert_ok defined(ref_deref_hash()), "ref deref hash"
-assert_ok defined(ref_to_nested()), "ref to nested"
-assert_ok defined(ref_copy_vs_alias()), "ref copy vs alias"
+assert_ok defined(Project::DataStructures::ref_deref_array()), "ref deref array"
+assert_ok defined(Project::DataStructures::ref_deref_hash()), "ref deref hash"
+assert_ok defined(Project::DataStructures::ref_to_nested()), "ref to nested"
+assert_ok defined(Project::DataStructures::ref_copy_vs_alias()), "ref copy vs alias"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # COMPLEX EXAMPLES
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_ok defined(complex_config()), "complex config"
-assert_ok defined(complex_tree()), "complex tree"
-assert_ok defined(complex_graph()), "complex graph"
-assert_ok defined(complex_records()), "complex records"
+assert_ok defined(Project::DataStructures::complex_config()), "complex config"
+assert_ok defined(Project::DataStructures::complex_tree()), "complex tree"
+assert_ok defined(Project::DataStructures::complex_graph()), "complex graph"
+assert_ok defined(Project::DataStructures::complex_records()), "complex records"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # EDGE CASES
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_ok defined(mixed_types()), "mixed types"
-assert_ok defined(undef_in_structure()), "undef in structure"
-assert_ok defined(empty_nested_array()), "empty nested array"
-assert_ok defined(empty_nested_hash()), "empty nested hash"
+assert_ok defined(Project::DataStructures::mixed_types()), "mixed types"
+assert_ok defined(Project::DataStructures::undef_in_structure()), "undef in structure"
+assert_ok defined(Project::DataStructures::empty_nested_array()), "empty nested array"
+assert_ok defined(Project::DataStructures::empty_nested_hash()), "empty nested hash"
 
 test_run

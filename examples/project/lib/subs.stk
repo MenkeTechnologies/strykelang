@@ -4,23 +4,23 @@
 # BASIC SUBROUTINES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn no_args { 42 }
-fn one_arg($x) { $x * 2 }
-fn two_args($x, $y) { $x + $y }
-fn three_args($a, $b, $c) { $a * $b + $c }
+fn Project::Subs::no_args { 42 }
+fn Project::Subs::one_arg($x) { $x * 2 }
+fn Project::Subs::two_args($x, $y) { $x + $y }
+fn Project::Subs::three_args($a, $b, $c) { $a * $b + $c }
 
-fn explicit_return($x) {
+fn Project::Subs::explicit_return($x) {
     return $x * 2
 }
 
-fn early_return($x) {
+fn Project::Subs::early_return($x) {
     if ($x < 0) {
         return "negative"
     }
     "non-negative"
 }
 
-fn multiple_returns($x) {
+fn Project::Subs::multiple_returns($x) {
     if ($x < 0) { return "neg" }
     if ($x == 0) { return "zero" }
     return "pos"
@@ -30,21 +30,21 @@ fn multiple_returns($x) {
 # DEFAULT ARGUMENTS (using //= inside function)
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn with_default($x, $y) { $y //= 10; $x + $y }
-fn all_defaults($a, $b, $c) { $a //= 1; $b //= 2; $c //= 3; $a + $b + $c }
+fn Project::Subs::with_default($x, $y) { $y //= 10; $x + $y }
+fn Project::Subs::all_defaults($a, $b, $c) { $a //= 1; $b //= 2; $c //= 3; $a + $b + $c }
 
-fn default_expr($x, $y) { $y //= $x * 2; $x + $y }
+fn Project::Subs::default_expr($x, $y) { $y //= $x * 2; $x + $y }
 
-fn default_string($name) { $name //= "World"; "Hello, $name!" }
+fn Project::Subs::default_string($name) { $name //= "World"; "Hello, $name!" }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ARRAY AND HASH ARGUMENTS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn array_arg(@arr) { scalar(@arr) }
-fn hash_arg(%h) { scalar(keys %h) }
+fn Project::Subs::array_arg(@arr) { scalar(@arr) }
+fn Project::Subs::hash_arg(%h) { scalar(keys %h) }
 
-fn mixed_args($x, @rest) {
+fn Project::Subs::mixed_args($x, @rest) {
     my $sum = $x
     for my $r (@rest) {
         $sum += $r
@@ -52,7 +52,7 @@ fn mixed_args($x, @rest) {
     $sum
 }
 
-fn scalar_and_array($name, @items) {
+fn Project::Subs::scalar_and_array($name, @items) {
     "$name: " . join(",", @items)
 }
 
@@ -60,16 +60,16 @@ fn scalar_and_array($name, @items) {
 # RETURN VALUES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn return_scalar { 42 }
-fn return_array { (1, 2, 3) }
-fn return_hash { (a => 1, b => 2) }
+fn Project::Subs::return_scalar { 42 }
+fn Project::Subs::return_array { (1, 2, 3) }
+fn Project::Subs::return_hash { (a => 1, b => 2) }
 
-fn return_ref { [1, 2, 3] }
-fn return_hash_ref { {a => 1, b => 2} }
+fn Project::Subs::return_ref { [1, 2, 3] }
+fn Project::Subs::return_hash_ref { {a => 1, b => 2} }
 
-fn return_multiple { (1, "two", 3.0) }
+fn Project::Subs::return_multiple { (1, "two", 3.0) }
 
-fn return_in_context {
+fn Project::Subs::return_in_context {
     if (wantarray()) {
         return (1, 2, 3)
     }
@@ -80,44 +80,44 @@ fn return_in_context {
 # RECURSION
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn fact_rec($n) {
+fn Project::Subs::fact_rec($n) {
     if ($n <= 1) {
         return 1
     }
-    $n * fact_rec($n - 1)
+    $n * Project::Subs::fact_rec($n - 1)
 }
 
-fn fib_rec($n) {
+fn Project::Subs::fib_rec($n) {
     if ($n <= 1) {
         return $n
     }
-    fib_rec($n - 1) + fib_rec($n - 2)
+    Project::Subs::fib_rec($n - 1) + Project::Subs::fib_rec($n - 2)
 }
 
-fn sum_to($n) {
+fn Project::Subs::sum_to($n) {
     if ($n <= 0) {
         return 0
     }
-    $n + sum_to($n - 1)
+    $n + Project::Subs::sum_to($n - 1)
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ANONYMOUS SUBS (CODEREFS)
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn get_adder($n) {
+fn Project::Subs::get_adder($n) {
     fn { $_0 + $n }
 }
 
-fn get_multiplier($n) {
+fn Project::Subs::get_multiplier($n) {
     fn { $_0 * $n }
 }
 
-fn apply_twice($fn, $x) {
+fn Project::Subs::apply_twice($fn, $x) {
     $fn($fn($x))
 }
 
-fn compose_fn($f, $g) {
+fn Project::Subs::compose_fn($f, $g) {
     fn { $f($g($_0)) }
 }
 
@@ -125,15 +125,15 @@ fn compose_fn($f, $g) {
 # HIGHER ORDER FUNCTIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn apply_to_each($fn, @items) {
+fn Project::Subs::apply_to_each($fn, @items) {
     map $fn, @items
 }
 
-fn filter_with($fn, @items) {
+fn Project::Subs::filter_with($fn, @items) {
     grep $fn, @items
 }
 
-fn reduce_with($fn, $init, @items) {
+fn Project::Subs::reduce_with($fn, $init, @items) {
     my $acc = $init
     for my $item (@items) {
         $acc = $fn($acc, $item)
@@ -145,13 +145,13 @@ fn reduce_with($fn, $init, @items) {
 # CALLING CONVENTIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn call_with_list { join(",", one_arg(5), two_args(2, 3)) }
+fn Project::Subs::call_with_list { join(",", Project::Subs::one_arg(5), Project::Subs::two_args(2, 3)) }
 
-fn nested_calls { one_arg(two_args(1, 2)) }
+fn Project::Subs::nested_calls { Project::Subs::one_arg(Project::Subs::two_args(1, 2)) }
 
-fn call_in_expression { 10 + one_arg(5) }
+fn Project::Subs::call_in_expression { 10 + Project::Subs::one_arg(5) }
 
-fn method_chain_style {
+fn Project::Subs::method_chain_style {
     my @arr = (1, 2, 3)
     scalar @arr}
 
@@ -159,19 +159,19 @@ fn method_chain_style {
 # SPECIAL CASES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn void_return {
+fn Project::Subs::void_return {
     my $x = 1
 }
 
-fn implicit_return { 42 }
+fn Project::Subs::implicit_return { 42 }
 
-fn block_return {
+fn Project::Subs::block_return {
     {
         42
     }
 }
 
-fn if_return($cond) {
+fn Project::Subs::if_return($cond) {
     if ($cond) {
         "true"
     } else {
@@ -179,6 +179,6 @@ fn if_return($cond) {
     }
 }
 
-fn ternary_return($cond) {
+fn Project::Subs::ternary_return($cond) {
     $cond ? "yes" : "no"
 }

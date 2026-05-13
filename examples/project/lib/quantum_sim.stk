@@ -28,7 +28,7 @@ class Particle {
     energy;
 }
 
-fn particle_observe($p) {
+fn Project::QuantumSim::particle_observe($p) {
     if ($p->qstate eq "SUPERPOSITION") {
         my $new_state = rand(1) > 0.5 ? "UP" : "DOWN";
         my $new_energy = $p->energy * 0.5;
@@ -37,7 +37,7 @@ fn particle_observe($p) {
     return { qstate => $p->qstate, energy => $p->energy };
 }
 
-fn particle_entangle($p1, $p2) {
+fn Project::QuantumSim::particle_entangle($p1, $p2) {
     my $ent1 = $p1->entangled;
     my $ent2 = $p2->entangled;
     push @$ent1, $p2->id;
@@ -46,7 +46,7 @@ fn particle_entangle($p1, $p2) {
 
 # ── Advanced Iterators (Closure based) ───────────────────────────
 
-fn wave_function_generator($base_energy, $iterations) {
+fn Project::QuantumSim::wave_function_generator($base_energy, $iterations) {
     my $current = $base_energy;
     my $i = 0;
     return fn {
@@ -67,11 +67,11 @@ class QuantumProcessor {
     coherence_time;
 }
 
-fn qp_run_simulation($processor, $particles, $iterations) {
+fn Project::QuantumSim::qp_run_simulation($processor, $particles, $iterations) {
     my $results = {};
     
     for my $p (@$particles) {
-        my $gen = wave_function_generator($p->energy, $iterations);
+        my $gen = Project::QuantumSim::wave_function_generator($p->energy, $iterations);
         my $total_energy = 0;
         for (my $i = 0; $i < $iterations; $i++) {
             my $res = $gen->();
@@ -81,7 +81,7 @@ fn qp_run_simulation($processor, $particles, $iterations) {
         }
         
         # Observe particle
-        my $final_obs = particle_observe($p);
+        my $final_obs = Project::QuantumSim::particle_observe($p);
         
         $results->{$p->id} = {
             id => $p->id,
@@ -101,7 +101,7 @@ class Universe {
     processor;
 }
 
-fn universe_initialize($num_particles) {
+fn Project::QuantumSim::universe_initialize($num_particles) {
     my $p_map = {};
     for (my $i = 1; $i <= $num_particles; $i++) {
         my $p = Particle(
@@ -121,7 +121,7 @@ fn universe_initialize($num_particles) {
         my $p1 = $p_map->{$keys[int(rand($k_len))]};
         my $p2 = $p_map->{$keys[int(rand($k_len))]};
         if ($p1->id ne $p2->id) {
-            particle_entangle($p1, $p2);
+            Project::QuantumSim::particle_entangle($p1, $p2);
         }
     }
     
@@ -132,13 +132,13 @@ fn universe_initialize($num_particles) {
     );
 }
 
-fn universe_simulate_epoch($u) {
+fn Project::QuantumSim::universe_simulate_epoch($u) {
     my $next_epoch = $u->epoch + 1;
     my $p_map = $u->particles;
     my @p_list = values %$p_map;
     
     # Run simulation
-    my $results = qp_run_simulation($u->processor, \@p_list, 10);
+    my $results = Project::QuantumSim::qp_run_simulation($u->processor, \@p_list, 10);
     
     # Apply results using functional pipeline
     my @high_energy_up = grep {

@@ -2,14 +2,14 @@
 
 # ── Newline as statement terminator ──────────────────────────────────
 
-fn multi_stmt_newlines {
+fn Project::Parsing::multi_stmt_newlines {
     my $a = 1
     my $b = 2
     my $c = 3
     $a + $b + $c
 }
 
-fn chained_assignments {
+fn Project::Parsing::chained_assignments {
     my $x = 10
     $x = $x + 5
     $x = $x * 2
@@ -18,19 +18,19 @@ fn chained_assignments {
 
 # ── Prefix/postfix operators across newlines ─────────────────────────
 
-fn prefix_inc_newline {
+fn Project::Parsing::prefix_inc_newline {
     my $n = 5
     ++$n
     $n
 }
 
-fn postfix_inc_newline {
+fn Project::Parsing::postfix_inc_newline {
     my $n = 5
     $n++
     $n
 }
 
-fn mixed_inc_dec {
+fn Project::Parsing::mixed_inc_dec {
     my $a = 10
     ++$a
     $a--
@@ -42,14 +42,14 @@ fn mixed_inc_dec {
 
 struct Point2D { x, y }
 
-fn method_call_newlines {
+fn Project::Parsing::method_call_newlines {
     my $p = Point2D(3, 4)
     my $x = $p->x
     my $y = $p->y
     $x + $y
 }
 
-fn method_chain_newlines {
+fn Project::Parsing::method_chain_newlines {
     my $p = Point2D(1, 2)
     my $x = $p->x
     my $doubled = $x * 2
@@ -58,7 +58,7 @@ fn method_chain_newlines {
 
 # ── Hash/array access across newlines ────────────────────────────────
 
-fn hash_access_newlines {
+fn Project::Parsing::hash_access_newlines {
     my $h = { a => 1, b => 2, c => 3 }
     my $va = $h->{a}
     my $vb = $h->{b}
@@ -66,7 +66,7 @@ fn hash_access_newlines {
     $va + $vb + $vc
 }
 
-fn array_access_newlines {
+fn Project::Parsing::array_access_newlines {
     my $ar = [10, 20, 30]
     my $first = $ar->[0]
     my $second = $ar->[1]
@@ -74,7 +74,7 @@ fn array_access_newlines {
     $first + $second + $third
 }
 
-fn nested_access_newlines {
+fn Project::Parsing::nested_access_newlines {
     my $data = {
         users => [
             { name => "Alice", score => 100 },
@@ -90,25 +90,25 @@ fn nested_access_newlines {
 
 # ── Binary operators that could be unary ─────────────────────────────
 
-fn binary_plus_newlines {
+fn Project::Parsing::binary_plus_newlines {
     my $a = 10
     my $b = 20
     $a + $b
 }
 
-fn binary_minus_newlines {
+fn Project::Parsing::binary_minus_newlines {
     my $a = 30
     my $b = 10
     $a - $b
 }
 
-fn unary_minus_newlines {
+fn Project::Parsing::unary_minus_newlines {
     my $a = 5
     my $b = -$a
     $b
 }
 
-fn mixed_plus_minus {
+fn Project::Parsing::mixed_plus_minus {
     my $a = 10
     my $b = -5
     my $c = $a + $b
@@ -118,13 +118,13 @@ fn mixed_plus_minus {
 
 # ── Modulo vs hash deref ─────────────────────────────────────────────
 
-fn modulo_newlines {
+fn Project::Parsing::modulo_newlines {
     my $a = 17
     my $b = 5
     $a % $b
 }
 
-fn hash_after_modulo {
+fn Project::Parsing::hash_after_modulo {
     my $x = 10 % 3
     my $h = { result => $x }
     $h->{result}
@@ -132,28 +132,28 @@ fn hash_after_modulo {
 
 # ── Control flow without braces ──────────────────────────────────────
 
-fn single_line_if {
+fn Project::Parsing::single_line_if {
     my $x = 5
     my $r = 0
     $r = 1 if $x > 0
     $r
 }
 
-fn single_line_unless {
+fn Project::Parsing::single_line_unless {
     my $x = 0
     my $r = 1
     $r = 0 unless $x
     $r
 }
 
-fn single_line_while {
+fn Project::Parsing::single_line_while {
     my @items = (1, 2, 3)
     my $sum = 0
     $sum += shift @items while @items
     $sum
 }
 
-fn single_line_for {
+fn Project::Parsing::single_line_for {
     my $sum = 0
     $sum += _ for (1, 2, 3, 4, 5)
     $sum
@@ -161,19 +161,19 @@ fn single_line_for {
 
 # ── Function calls with/without parens ───────────────────────────────
 
-fn call_with_parens {
+fn Project::Parsing::call_with_parens {
     my @nums = (3, 1, 4, 1, 5)
     my $s = sum(@nums)
     $s
 }
 
-fn call_without_parens {
+fn Project::Parsing::call_without_parens {
     my @nums = (3, 1, 4, 1, 5)
     my $len = scalar @nums
     $len
 }
 
-fn nested_calls {
+fn Project::Parsing::nested_calls {
     my @nums = (1, 2, 3, 4, 5)
     my $result = sum(map { _ * 2 } @nums)
     $result
@@ -181,20 +181,20 @@ fn nested_calls {
 
 # ── String operations ────────────────────────────────────────────────
 
-fn string_concat_newlines {
+fn Project::Parsing::string_concat_newlines {
     my $a = "Hello"
     my $b = "World"
     my $c = $a . " " . $b
     $c
 }
 
-fn string_repeat_newlines {
+fn Project::Parsing::string_repeat_newlines {
     my $s = "ab"
     my $r = $s x 3
     $r
 }
 
-fn interpolation_newlines {
+fn Project::Parsing::interpolation_newlines {
     my $name = "Test"
     my $value = 42
     my $msg = "Name: $name, Value: $value"
@@ -203,13 +203,13 @@ fn interpolation_newlines {
 
 # ── Regex operations ─────────────────────────────────────────────────
 
-fn regex_match_newlines {
+fn Project::Parsing::regex_match_newlines {
     my $str = "hello world"
     my $found = $str =~ /world/
     $found
 }
 
-fn regex_subst_newlines {
+fn Project::Parsing::regex_subst_newlines {
     my $str = "hello world"
     $str =~ s/world/universe/
     $str
@@ -217,14 +217,14 @@ fn regex_subst_newlines {
 
 # ── List operations ──────────────────────────────────────────────────
 
-fn list_ops_newlines {
+fn Project::Parsing::list_ops_newlines {
     my @a = (1, 2, 3)
     my @b = (4, 5, 6)
     my @c = (@a, @b)
     scalar @c
 }
 
-fn push_pop_newlines {
+fn Project::Parsing::push_pop_newlines {
     my @arr = (1, 2, 3)
     push @arr, 4
     push @arr, 5
@@ -232,7 +232,7 @@ fn push_pop_newlines {
     $last
 }
 
-fn shift_unshift_newlines {
+fn Project::Parsing::shift_unshift_newlines {
     my @arr = (1, 2, 3)
     unshift @arr, 0
     my $first = shift @arr
@@ -241,13 +241,13 @@ fn shift_unshift_newlines {
 
 # ── Ternary across newlines ──────────────────────────────────────────
 
-fn ternary_multiline($cond) {
+fn Project::Parsing::ternary_multiline($cond) {
     $cond
         ? "true branch"
         : "false branch"
 }
 
-fn nested_ternary_multiline($n) {
+fn Project::Parsing::nested_ternary_multiline($n) {
     $n > 0
         ? "positive"
         : $n < 0
@@ -257,7 +257,7 @@ fn nested_ternary_multiline($n) {
 
 # ── Complex expressions ──────────────────────────────────────────────
 
-fn complex_expr {
+fn Project::Parsing::complex_expr {
     my $a = 2
     my $b = 3
     my $c = 4
@@ -265,7 +265,7 @@ fn complex_expr {
     $result
 }
 
-fn complex_with_calls {
+fn Project::Parsing::complex_with_calls {
     my @nums = (1, 2, 3, 4, 5)
     my $total = sum(@nums)
     my $count = scalar @nums

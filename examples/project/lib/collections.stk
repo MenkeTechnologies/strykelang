@@ -2,7 +2,7 @@
 
 # ── Set operations ───────────────────────────────────────────────────
 
-fn union_sets ($a, $b) {
+fn Project::Collections::union_sets ($a, $b) {
     my @combined
     ~> @$a ep { push @combined, _ }
     ~> @$b ep { push @combined, _ }
@@ -10,7 +10,7 @@ fn union_sets ($a, $b) {
     @result
 }
 
-fn intersect_sets ($a, $b) {
+fn Project::Collections::intersect_sets ($a, $b) {
     my $in_b = {}
     ~> @$b ep { $in_b->{_} = 1 }
     my @result
@@ -20,7 +20,7 @@ fn intersect_sets ($a, $b) {
     @result
 }
 
-fn diff_sets ($a, $b) {
+fn Project::Collections::diff_sets ($a, $b) {
     my $in_b = {}
     ~> @$b ep { $in_b->{_} = 1 }
     my @result
@@ -33,7 +33,7 @@ fn diff_sets ($a, $b) {
 # ── Hash pipeline utilities ─────────────────────────────────────────
 
 # Invert a hash (swap keys and values), returns hashref
-fn flip_hash (%h) {
+fn Project::Collections::flip_hash (%h) {
     my $inv = {}
     ~> keys %h ep {
         $inv->{$h{_}} = _
@@ -42,7 +42,7 @@ fn flip_hash (%h) {
 }
 
 # Select only certain keys from a hash
-fn extract_keys ($href) {
+fn Project::Collections::extract_keys ($href) {
     my @keys
     ~> 1..scalar(@_) - 1 ep {
         push @keys, $_[_]
@@ -55,7 +55,7 @@ fn extract_keys ($href) {
 }
 
 # Map over hash values, keeping keys
-fn apply_to_values ($href, $fn) {
+fn Project::Collections::apply_to_values ($href, $fn) {
     my $result = {}
     ~> keys %$href ep {
         $result->{_} = $fn($href->{_})
@@ -65,13 +65,13 @@ fn apply_to_values ($href, $fn) {
 
 # ── Higher-order collection functions ────────────────────────────────
 
-# Compose two functions: compose_fns(f, g) returns fn { f(g(x)) }
-fn compose_fns ($f, $g) {
+# Compose two functions: Project::Collections::compose_fns(f, g) returns fn { f(g(x)) }
+fn Project::Collections::compose_fns ($f, $g) {
     fn { $f($g($_0)) }
 }
 
 # Apply a list of transforms to a value (left fold of functions)
-fn apply_pipeline ($val, @fns) {
+fn Project::Collections::apply_pipeline ($val, @fns) {
     ~> @fns ep {
         $val = _($val)
     }
@@ -79,7 +79,7 @@ fn apply_pipeline ($val, @fns) {
 }
 
 # Count occurrences — returns arrayref of [value, count] pairs
-fn count_occurrences (@items) {
+fn Project::Collections::count_occurrences (@items) {
     my $freq = {}
     ~> @items ep {
         $freq->{_} = ($freq->{_} // 0) + 1
@@ -93,7 +93,7 @@ fn count_occurrences (@items) {
 }
 
 # Split an array into groups of N
-fn split_chunks ($n, @items) {
+fn Project::Collections::split_chunks ($n, @items) {
     my @chunks
     while (scalar @items) {
         my @group

@@ -130,8 +130,8 @@ fn apply_fn_n_times($fn, $x, $n) {
 
 assert_eq apply_fn(fn($x) { $x * 3 }, 7), 21, "fn as arg: apply"
 assert_eq apply_fn2(fn($a, $b) { $a - $b }, 10, 3), 7, "fn as arg: apply2"
-assert_eq apply_fn_twice(fn($x) { $x + 1 }, 5), 7, "fn as arg: apply_twice"
-assert_eq apply_fn_n_times(fn($x) { $x * 2 }, 1, 10), 1024, "fn as arg: apply_n_times"
+assert_eq apply_fn_twice(fn($x) { $x + 1 }, 5), 7, "fn as arg: Project::Closures::apply_twice"
+assert_eq apply_fn_n_times(fn($x) { $x * 2 }, 1, 10), 1024, "fn as arg: Project::Closures::apply_n_times"
 
 # map with custom function
 my @nums = (1, 2, 3, 4, 5)
@@ -172,11 +172,11 @@ assert_eq $product, 120, "custom reduce: product"
 # FUNCTIONS RETURNING FUNCTIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn make_adder($n) {
+fn Project::Closures::make_adder($n) {
     fn($x) { $x + $n }
 }
 
-fn make_multiplier($n) {
+fn Project::Closures::make_multiplier($n) {
     fn($x) { $x * $n }
 }
 
@@ -188,13 +188,13 @@ fn make_power($exp) {
     }
 }
 
-my $add10 = make_adder(10)
-my $add100 = make_adder(100)
+my $add10 = Project::Closures::make_adder(10)
+my $add100 = Project::Closures::make_adder(100)
 assert_eq $add10(5), 15, "fn returns fn: add10"
 assert_eq $add100(5), 105, "fn returns fn: add100"
 
-my $times5 = make_multiplier(5)
-my $times7 = make_multiplier(7)
+my $times5 = Project::Closures::make_multiplier(5)
+my $times7 = Project::Closures::make_multiplier(7)
 assert_eq $times5(3), 15, "fn returns fn: times5"
 assert_eq $times7(3), 21, "fn returns fn: times7"
 
@@ -207,7 +207,7 @@ assert_eq $fourth(2), 16, "fn returns fn: fourth power"
 # FUNCTION COMPOSITION
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn compose_fns($f, $g) {
+fn Project::Closures::compose_fns($f, $g) {
     fn($x) { $f($g($x)) }
 }
 
@@ -216,16 +216,16 @@ fn pipe_fns($g, $f) {
 }
 
 my $inc = fn($x) { $x + 1 }
-my $dbl = fn($x) { $x * 2 }
+my $Project::Types::dbl = fn($x) { $x * 2 }
 
-my $inc_then_dbl = pipe_fns($inc, $dbl)
-my $dbl_then_inc = pipe_fns($dbl, $inc)
+my $inc_then_dbl = pipe_fns($inc, $Project::Types::dbl)
+my $dbl_then_inc = pipe_fns($Project::Types::dbl, $inc)
 
-assert_eq $inc_then_dbl(5), 12, "pipe: inc then dbl: (5+1)*2=12"
-assert_eq $dbl_then_inc(5), 11, "pipe: dbl then inc: (5*2)+1=11"
+assert_eq $inc_then_dbl(5), 12, "pipe: inc then Project::Types::dbl: (5+1)*2=12"
+assert_eq $dbl_then_inc(5), 11, "pipe: Project::Types::dbl then inc: (5*2)+1=11"
 
-my $composed = compose_fns($dbl, $inc)
-assert_eq $composed(5), 12, "compose: dbl(inc(5))=12"
+my $composed = Project::Closures::compose_fns($Project::Types::dbl, $inc)
+assert_eq $composed(5), 12, "compose: Project::Types::dbl(inc(5))=12"
 
 # Chain multiple compositions
 fn compose_all_fns(@fns) {
@@ -242,19 +242,19 @@ my $chain = compose_all_fns(
     fn($x) { $x * 2 },
     fn($x) { $x + 3 },
 )
-assert_eq $chain(5), 17, "compose_all: ((5+3)*2)+1=17"
+assert_eq $chain(5), 17, "Project::PipelineAdvanced::compose_all: ((5+3)*2)+1=17"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # CLOSURES — capturing lexical scope
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn make_counter {
+fn Project::Closures::make_counter {
     mysync $count = 0
     fn { ++$count }
 }
 
-my $counter1 = make_counter()
-my $counter2 = make_counter()
+my $counter1 = Project::Closures::make_counter()
+my $counter2 = Project::Closures::make_counter()
 
 assert_eq $counter1(), 1, "closure counter1: 1"
 assert_eq $counter1(), 2, "closure counter1: 2"
@@ -299,20 +299,20 @@ assert_eq $stack->{size}(), 2, "closure stack: size after pop"
 # PARTIAL APPLICATION / CURRYING
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn curry2($fn) {
+fn Project::PipelineAdvanced::curry2($fn) {
     fn($a) { fn($b) { $fn($a, $b) } }
 }
 
-fn curry3($fn) {
+fn Project::PipelineAdvanced::curry3($fn) {
     fn($a) { fn($b) { fn($c) { $fn($a, $b, $c) } } }
 }
 
-my $curried_add = curry2(fn($a, $b) { $a + $b })
+my $curried_add = Project::PipelineAdvanced::curry2(fn($a, $b) { $a + $b })
 my $add5_curried = $curried_add(5)
 assert_eq $add5_curried(3), 8, "curried add: 5+3"
 assert_eq $curried_add(10)(20), 30, "curried add: 10+20"
 
-my $curried_sum3 = curry3(fn($a, $b, $c) { $a + $b + $c })
+my $curried_sum3 = Project::PipelineAdvanced::curry3(fn($a, $b, $c) { $a + $b + $c })
 assert_eq $curried_sum3(1)(2)(3), 6, "curried sum3: 1+2+3"
 
 # Partial application helper
@@ -323,10 +323,10 @@ fn partial_left($fn, $first) {
 my $div = fn($a, $b) { $a / $b }
 my $half = partial_left($div, 1)
 # Note: partial_left puts first arg first, so half(x) = 1/x... let's fix:
-fn partial_right($fn, $last) {
+fn Project::PipelineAdvanced::partial_right($fn, $last) {
     fn($first) { $fn($first, $last) }
 }
-my $halve = partial_right($div, 2)
+my $halve = Project::PipelineAdvanced::partial_right($div, 2)
 assert_eq $halve(10), 5, "partial right: 10/2"
 
 # ══════════════════════════════════════════════════════════════════════════════

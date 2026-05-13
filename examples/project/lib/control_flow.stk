@@ -2,7 +2,7 @@
 
 # ── Basic if/elsif/else ────────────────────────────────────────────
 
-fn classify_number($n) {
+fn Project::ControlFlow::classify_number($n) {
     if ($n > 0) {
         "positive"
     } elsif ($n < 0) {
@@ -12,7 +12,7 @@ fn classify_number($n) {
     }
 }
 
-fn grade_score($score) {
+fn Project::ControlFlow::grade_score($score) {
     if ($score >= 90) {
         "A"
     } elsif ($score >= 80) {
@@ -26,7 +26,7 @@ fn grade_score($score) {
     }
 }
 
-fn unless_example($val) {
+fn Project::ControlFlow::unless_example($val) {
     my $result = "default"
     unless ($val) {
         $result = "was falsy"
@@ -36,39 +36,39 @@ fn unless_example($val) {
 
 # ── Ternary operator ───────────────────────────────────────────────
 
-fn ternary_simple($cond) {
+fn Project::ControlFlow::ternary_simple($cond) {
     $cond ? "yes" : "no"
 }
 
-fn ternary_nested($n) {
+fn Project::ControlFlow::ternary_nested($n) {
     $n > 0 ? "positive" : $n < 0 ? "negative" : "zero"
 }
 
-fn ternary_expr($a, $b) {
+fn Project::ControlFlow::ternary_expr($a, $b) {
     ($a > $b) ? $a - $b : $b - $a
 }
 
 # ── Postfix conditionals ───────────────────────────────────────────
 
-fn postfix_if_true {
+fn Project::ControlFlow::postfix_if_true {
     my $result = 0
     $result = 42 if 1
     $result
 }
 
-fn postfix_if_false {
+fn Project::ControlFlow::postfix_if_false {
     my $result = 99
     $result = 42 if 0
     $result
 }
 
-fn postfix_unless_true {
+fn Project::ControlFlow::postfix_unless_true {
     my $result = 0
     $result = 42 unless 1
     $result
 }
 
-fn postfix_unless_false {
+fn Project::ControlFlow::postfix_unless_false {
     my $result = 0
     $result = 42 unless 0
     $result
@@ -76,7 +76,7 @@ fn postfix_unless_false {
 
 # ── For loops ──────────────────────────────────────────────────────
 
-fn sum_range($start, $end) {
+fn Project::ControlFlow::sum_range($start, $end) {
     my $sum = 0
     for my $i ($start..$end) {
         $sum += $i
@@ -84,7 +84,7 @@ fn sum_range($start, $end) {
     $sum
 }
 
-fn count_evens(@nums) {
+fn Project::ControlFlow::count_evens(@nums) {
     my $count = 0
     ~> @nums ep {
         $count++ if _ % 2 == 0
@@ -92,7 +92,7 @@ fn count_evens(@nums) {
     $count
 }
 
-fn for_c_style_sum($n) {
+fn Project::ControlFlow::for_c_style_sum($n) {
     my $sum = 0
     for (my $i = 1; $i <= $n; $i++) {
         $sum += $i
@@ -100,7 +100,7 @@ fn for_c_style_sum($n) {
     $sum
 }
 
-fn for_with_next {
+fn Project::ControlFlow::for_with_next {
     my $sum = 0
     for my $i (1..10) {
         next if $i % 2 == 0
@@ -109,7 +109,7 @@ fn for_with_next {
     $sum
 }
 
-fn for_with_last {
+fn Project::ControlFlow::for_with_last {
     my $sum = 0
     for my $i (1..100) {
         last if $i > 10
@@ -120,7 +120,7 @@ fn for_with_last {
 
 # ── While loops ────────────────────────────────────────────────────
 
-fn while_countdown($n) {
+fn Project::ControlFlow::while_countdown($n) {
     my @result
     while ($n > 0) {
         push @result, $n
@@ -129,7 +129,7 @@ fn while_countdown($n) {
     @result
 }
 
-fn while_with_last {
+fn Project::ControlFlow::while_with_last {
     my $count = 0
     my $sum = 0
     while (1) {
@@ -140,7 +140,7 @@ fn while_with_last {
     $sum
 }
 
-fn while_with_next {
+fn Project::ControlFlow::while_with_next {
     my $i = 0
     my $sum = 0
     while ($i < 10) {
@@ -151,7 +151,7 @@ fn while_with_next {
     $sum
 }
 
-fn until_example($target) {
+fn Project::ControlFlow::until_example($target) {
     my $n = 0
     until ($n >= $target) {
         $n += 2
@@ -161,13 +161,13 @@ fn until_example($target) {
 
 # ── Postfix loops ──────────────────────────────────────────────────
 
-fn postfix_for_sum {
+fn Project::ControlFlow::postfix_for_sum {
     my $sum = 0
     $sum += _ for (1, 2, 3, 4, 5)
     $sum
 }
 
-fn postfix_while_countdown {
+fn Project::ControlFlow::postfix_while_countdown {
     my @result
     my $n = 5
     do {
@@ -179,7 +179,7 @@ fn postfix_while_countdown {
 
 # ── Given/when (Perl 5.10+ switch) ─────────────────────────────────
 
-fn day_type_given($day) {
+fn Project::ControlFlow::day_type_given($day) {
     given ($day) {
         when ("Saturday") { return "weekend" }
         when ("Sunday")   { return "weekend" }
@@ -192,7 +192,7 @@ fn day_type_given($day) {
     }
 }
 
-fn http_status_given($code) {
+fn Project::ControlFlow::http_status_given($code) {
     given ($code) {
         when (200) { return "OK" }
         when (201) { return "Created" }
@@ -206,7 +206,7 @@ fn http_status_given($code) {
     }
 }
 
-fn classify_char_given($c) {
+fn Project::ControlFlow::classify_char_given($c) {
     given ($c) {
         when (/^[0-9]$/) { return "digit" }
         when (/^[a-z]$/) { return "lower" }
@@ -216,7 +216,7 @@ fn classify_char_given($c) {
     }
 }
 
-fn nested_given($a, $b) {
+fn Project::ControlFlow::nested_given($a, $b) {
     my $result
     given ($a) {
         when (1) {
@@ -239,7 +239,7 @@ fn nested_given($a, $b) {
 
 # ── Match expression (stryke native) ───────────────────────────────
 
-fn day_type($day) {
+fn Project::ControlFlow::day_type($day) {
     match ($day) {
         "Saturday" | "Sunday" => "weekend"
         "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" => "weekday"
@@ -247,7 +247,7 @@ fn day_type($day) {
     }
 }
 
-fn number_word($n) {
+fn Project::ControlFlow::number_word($n) {
     match ($n) {
         1 => "one"
         2 => "two"
@@ -258,7 +258,7 @@ fn number_word($n) {
 
 # ── Nested loops ───────────────────────────────────────────────────
 
-fn multiplication_table_sum($size) {
+fn Project::ControlFlow::multiplication_table_sum($size) {
     my $sum = 0
     for my $i (1..$size) {
         for my $j (1..$size) {
@@ -268,7 +268,7 @@ fn multiplication_table_sum($size) {
     $sum
 }
 
-fn find_pair_sum($target, @nums) {
+fn Project::ControlFlow::find_pair_sum($target, @nums) {
     my $len = scalar @nums
     for my $i (0..$len-2) {
         for my $j ($i+1..$len-1) {
@@ -282,21 +282,21 @@ fn find_pair_sum($target, @nums) {
 
 # ── Return in various contexts ─────────────────────────────────────
 
-fn early_return($n) {
+fn Project::ControlFlow::early_return($n) {
     return "negative" if $n < 0
     return "zero" if $n == 0
     return "small" if $n < 10
     "large"
 }
 
-fn return_from_loop(@nums) {
+fn Project::ControlFlow::return_from_loop(@nums) {
     for my $n (@nums) {
         return $n if $n > 100
     }
     -1
 }
 
-fn return_list_from_loop($count) {
+fn Project::ControlFlow::return_list_from_loop($count) {
     my @result
     for my $i (1..$count) {
         return @result if $i > 5
@@ -307,7 +307,7 @@ fn return_list_from_loop($count) {
 
 # ── Complex control flow ───────────────────────────────────────────
 
-fn fizz_buzz($n) {
+fn Project::ControlFlow::fizz_buzz($n) {
     my @result
     ~> 1..$n ep {
         if (_ % 15 == 0) {
@@ -323,7 +323,7 @@ fn fizz_buzz($n) {
     @result
 }
 
-fn collatz_steps($n) {
+fn Project::ControlFlow::collatz_steps($n) {
     my $steps = 0
     while ($n != 1) {
         if ($n % 2 == 0) {
@@ -336,7 +336,7 @@ fn collatz_steps($n) {
     $steps
 }
 
-fn find_primes($limit) {
+fn Project::ControlFlow::find_primes($limit) {
     my @primes
     OUTER: for my $n (2..$limit) {
         for my $p (@primes) {

@@ -13,9 +13,9 @@ class HuffmanNode {
     # We will push [freq, node_ref] into the PQ.
 }
 
-# ── adv_huffman_encode: compresses string using Huffman coding ─────
+# ── Project::Huffman::adv_huffman_encode: compresses string using Huffman coding ─────
 # Returns [encoded_binary_string, tree_root_node]
-fn adv_huffman_encode($text) {
+fn Project::Huffman::adv_huffman_encode($text) {
     return ["", undef] if length($text) == 0
     
     # 1. Count frequencies
@@ -27,7 +27,7 @@ fn adv_huffman_encode($text) {
     }
     
     # 2. Build Min-Heap
-    my $pq = pq_min_new()
+    my $pq = Project::PriorityQueue::pq_min_new()
     for my $char (keys %freq) {
         my $node = HuffmanNode(char => $char, freq => $freq{$char})
         $pq->push([$freq{$char}, $node])
@@ -92,8 +92,8 @@ fn _build_binary($text, $codes_ref) {
     return $res
 }
 
-# ── adv_huffman_decode: decompresses binary string using Huffman tree ─────
-fn adv_huffman_decode($binary, $root) {
+# ── Project::Huffman::adv_huffman_decode: decompresses binary string using Huffman tree ─────
+fn Project::Huffman::adv_huffman_decode($binary, $root) {
     return "" if !defined($root) || length($binary) == 0
     
     my $res = ""

@@ -4,43 +4,43 @@
 # ARRAY CREATION
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn arr_from_list { my @a = (1, 2, 3, 4, 5); @a }
-fn arr_from_range { my @a = 1..10; @a }
-fn arr_from_qw { my @a = qw(one two three); @a }
-fn arr_empty { my @a = (); @a }
-fn arr_single { my @a = (42); @a }
-fn arr_nested_flatten { my @a = (1, (2, 3), 4); @a }
+fn Project::ArraysExtended::arr_from_list { my @a = (1, 2, 3, 4, 5); @a }
+fn Project::ArraysExtended::arr_from_range { my @a = 1..10; @a }
+fn Project::ArraysExtended::arr_from_qw { my @a = qw(one two three); @a }
+fn Project::ArraysExtended::arr_empty { my @a = (); @a }
+fn Project::ArraysExtended::arr_single { my @a = (42); @a }
+fn Project::ArraysExtended::arr_nested_flatten { my @a = (1, (2, 3), 4); @a }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PUSH AND POP
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn arr_push_one {
+fn Project::ArraysExtended::arr_push_one {
     my @a = (1, 2, 3)
     push @a, 4
     @a
 }
 
-fn arr_push_many {
+fn Project::ArraysExtended::arr_push_many {
     my @a = (1, 2)
     push @a, 3, 4, 5
     @a
 }
 
-fn arr_push_array {
+fn Project::ArraysExtended::arr_push_array {
     my @a = (1, 2)
     my @b = (3, 4)
     push @a, @b
     @a
 }
 
-fn arr_pop {
+fn Project::ArraysExtended::arr_pop {
     my @a = (1, 2, 3)
     my $last = pop @a
     ($last, scalar(@a))
 }
 
-fn arr_pop_empty {
+fn Project::ArraysExtended::arr_pop_empty {
     my @a = ()
     my $x = pop @a
     defined($x) ? 1 : 0
@@ -50,25 +50,25 @@ fn arr_pop_empty {
 # SHIFT AND UNSHIFT
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn arr_shift {
+fn Project::ArraysExtended::arr_shift {
     my @a = (1, 2, 3)
     my $first = shift @a
     ($first, scalar(@a))
 }
 
-fn arr_shift_empty {
+fn Project::ArraysExtended::arr_shift_empty {
     my @a = ()
     my $x = shift @a
     defined($x) ? 1 : 0
 }
 
-fn arr_unshift_one {
+fn Project::ArraysExtended::arr_unshift_one {
     my @a = (2, 3)
     unshift @a, 1
     @a
 }
 
-fn arr_unshift_many {
+fn Project::ArraysExtended::arr_unshift_many {
     my @a = (4, 5)
     unshift @a, 1, 2, 3
     @a
@@ -78,25 +78,25 @@ fn arr_unshift_many {
 # SPLICE
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn arr_splice_remove {
+fn Project::ArraysExtended::arr_splice_remove {
     my @a = (1, 2, 3, 4, 5)
     my @removed = splice @a, 1, 2
     (join(",", @removed), join(",", @a))
 }
 
-fn arr_splice_insert {
+fn Project::ArraysExtended::arr_splice_insert {
     my @a = (1, 4, 5)
     splice @a, 1, 0, 2, 3
     @a
 }
 
-fn arr_splice_replace {
+fn Project::ArraysExtended::arr_splice_replace {
     my @a = (1, 2, 3, 4, 5)
     splice @a, 1, 3, "a", "b"
     @a
 }
 
-fn arr_splice_delete_to_end {
+fn Project::ArraysExtended::arr_splice_delete_to_end {
     my @a = (1, 2, 3, 4, 5)
     my @removed = splice @a, 2
     (join(",", @removed), join(",", @a))
@@ -106,22 +106,22 @@ fn arr_splice_delete_to_end {
 # SLICES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn arr_slice_indices {
+fn Project::ArraysExtended::arr_slice_indices {
     my @a = (10, 20, 30, 40, 50)
     @a[1, 3]
 }
 
-fn arr_slice_range {
+fn Project::ArraysExtended::arr_slice_range {
     my @a = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
     @a[2..5]
 }
 
-fn arr_slice_negative {
+fn Project::ArraysExtended::arr_slice_negative {
     my @a = (1, 2, 3, 4, 5)
     @a[-2, -1]
 }
 
-fn arr_slice_assign {
+fn Project::ArraysExtended::arr_slice_assign {
     my @a = (1, 2, 3, 4, 5)
     @a[1, 3] = (20, 40)
     @a
@@ -131,27 +131,27 @@ fn arr_slice_assign {
 # SORT
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn arr_sort_default {
+fn Project::ArraysExtended::arr_sort_default {
     my @a = qw(banana apple cherry)
     sort @a
 }
 
-fn arr_sort_numeric {
+fn Project::ArraysExtended::arr_sort_numeric {
     my @a = (3, 1, 4, 1, 5, 9, 2, 6)
     sort { $a <=> $b } @a
 }
 
-fn arr_sort_reverse_numeric {
+fn Project::ArraysExtended::arr_sort_reverse_numeric {
     my @a = (3, 1, 4, 1, 5, 9, 2, 6)
     sort { $b <=> $a } @a
 }
 
-fn arr_sort_by_length {
+fn Project::ArraysExtended::arr_sort_by_length {
     my @a = qw(bb aaa c dddd)
     sort { length($a) <=> length($b) } @a
 }
 
-fn arr_sort_case_insensitive {
+fn Project::ArraysExtended::arr_sort_case_insensitive {
     my @a = qw(Apple banana Cherry)
     sort { lc($a) cmp lc($b) } @a
 }
@@ -160,17 +160,17 @@ fn arr_sort_case_insensitive {
 # REVERSE
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn arr_reverse {
+fn Project::ArraysExtended::arr_reverse {
     my @a = (1, 2, 3, 4, 5)
     rev @a
 }
 
-fn arr_reverse_string {
+fn Project::ArraysExtended::arr_reverse_string {
     my @a = qw(a b c)
     rev @a
 }
 
-fn arr_reverse_in_place {
+fn Project::ArraysExtended::arr_reverse_in_place {
     my @a = (1, 2, 3)
     @a = rev @a
     @a
@@ -180,37 +180,37 @@ fn arr_reverse_in_place {
 # MAP AND GREP
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn arr_map_double {
+fn Project::ArraysExtended::arr_map_double {
     my @a = (1, 2, 3, 4, 5)
     map { _ * 2 } @a
 }
 
-fn arr_map_transform {
+fn Project::ArraysExtended::arr_map_transform {
     my @a = qw(a b c)
     map { uc(_) } @a
 }
 
-fn arr_map_to_hash_values {
+fn Project::ArraysExtended::arr_map_to_hash_values {
     my @a = (1, 2, 3)
     map { $_ => _ * _ } @a
 }
 
-fn arr_grep_even {
+fn Project::ArraysExtended::arr_grep_even {
     my @a = (1, 2, 3, 4, 5, 6)
     grep { _ % 2 == 0 } @a
 }
 
-fn arr_grep_defined {
+fn Project::ArraysExtended::arr_grep_defined {
     my @a = (1, undef, 2, undef, 3)
     grep { defined } @a
 }
 
-fn arr_grep_regex {
+fn Project::ArraysExtended::arr_grep_regex {
     my @a = qw(apple banana cherry apricot)
     grep { /^a/ } @a
 }
 
-fn arr_first_match {
+fn Project::ArraysExtended::arr_first_match {
     my @a = (1, 2, 3, 4, 5)
     my @found = grep { _ > 3 } @a
     $found[0]
@@ -220,30 +220,30 @@ fn arr_first_match {
 # JOIN AND SPLIT
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn arr_join_comma {
+fn Project::ArraysExtended::arr_join_comma {
     my @a = (1, 2, 3)
     join(",", @a)
 }
 
-fn arr_join_empty {
+fn Project::ArraysExtended::arr_join_empty {
     my @a = qw(a b c)
     join("", @a)
 }
 
-fn arr_join_newline {
+fn Project::ArraysExtended::arr_join_newline {
     my @a = qw(line1 line2 line3)
     join("\n", @a)
 }
 
-fn arr_split_comma {
+fn Project::ArraysExtended::arr_split_comma {
     split(/,/, "a,b,c")
 }
 
-fn arr_split_ws {
+fn Project::ArraysExtended::arr_split_ws {
     split(/\s+/, "one two three")
 }
 
-fn arr_split_limit {
+fn Project::ArraysExtended::arr_split_limit {
     split(/,/, "a,b,c,d", 2)
 }
 
@@ -251,16 +251,16 @@ fn arr_split_limit {
 # ARRAY FUNCTIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn arr_length {
+fn Project::ArraysExtended::arr_length {
     my @a = (1, 2, 3, 4, 5)
     scalar @a}
 
-fn arr_last_index {
+fn Project::ArraysExtended::arr_last_index {
     my @a = (1, 2, 3, 4, 5)
     $#a
 }
 
-fn arr_wantarray_context {
+fn Project::ArraysExtended::arr_wantarray_context {
     my @a = (1, 2, 3)
     my $count = @a
     ($count, scalar(@a))
@@ -270,13 +270,13 @@ fn arr_wantarray_context {
 # UNIQUE AND DEDUPE
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn arr_unique {
+fn Project::ArraysExtended::arr_unique {
     my @a = (1, 2, 2, 3, 3, 3, 4)
     my %seen
     grep { !$seen{$_}++ } @a
 }
 
-fn arr_unique_strings {
+fn Project::ArraysExtended::arr_unique_strings {
     my @a = qw(a b a c b d)
     my %seen
     grep { !$seen{$_}++ } @a
@@ -286,7 +286,7 @@ fn arr_unique_strings {
 # ARRAY UTILITIES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn arr_sum {
+fn Project::ArraysExtended::arr_sum {
     my @a = (1, 2, 3, 4, 5)
     my $sum = 0
     for my $n (@a) {
@@ -295,7 +295,7 @@ fn arr_sum {
     $sum
 }
 
-fn arr_min {
+fn Project::ArraysExtended::arr_min {
     my @a = (3, 1, 4, 1, 5, 9)
     my $min = $a[0]
     for my $n (@a) {
@@ -304,7 +304,7 @@ fn arr_min {
     $min
 }
 
-fn arr_max {
+fn Project::ArraysExtended::arr_max {
     my @a = (3, 1, 4, 1, 5, 9)
     my $max = $a[0]
     for my $n (@a) {
@@ -313,7 +313,7 @@ fn arr_max {
     $max
 }
 
-fn arr_any_match {
+fn Project::ArraysExtended::arr_any_match {
     my @a = (1, 3, 5, 7, 9)
     my $found = 0
     for my $n (@a) {
@@ -325,7 +325,7 @@ fn arr_any_match {
     $found
 }
 
-fn arr_all_match {
+fn Project::ArraysExtended::arr_all_match {
     my @a = (2, 4, 6, 8)
     my $all = 1
     for my $n (@a) {
@@ -337,7 +337,7 @@ fn arr_all_match {
     $all
 }
 
-fn arr_index_of {
+fn Project::ArraysExtended::arr_index_of {
     my @a = qw(a b c d e)
     my $idx = -1
     for my $i (0..$#a) {
@@ -349,14 +349,14 @@ fn arr_index_of {
     $idx
 }
 
-fn arr_flatten {
+fn Project::ArraysExtended::arr_flatten {
     my @a = (1, 2)
     my @b = (3, 4)
     my @c = (5, 6)
     (@a, @b, @c)
 }
 
-fn arr_zip {
+fn Project::ArraysExtended::arr_zip {
     my @a = (1, 2, 3)
     my @b = qw(a b c)
     my @result

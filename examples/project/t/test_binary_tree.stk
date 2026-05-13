@@ -3,7 +3,7 @@
 
 require "./lib/binary_tree.stk"
 
-my $root = bst_new(10)
+my $root = Project::BinaryTree::bst_new(10)
 $root->insert(5)
 $root->insert(15)
 $root->insert(2)

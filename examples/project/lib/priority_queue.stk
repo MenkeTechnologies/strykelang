@@ -1,4 +1,4 @@
-# lib/priority_queue.stk — Priority Queue implementations (Max and Min Heaps)
+# lib/Project::NestedOop::priority_queue.stk — Priority Queue implementations (Max and Min Heaps)
 
 class PriorityQueue {
     heap: Array = [];
@@ -99,7 +99,7 @@ class PriorityQueue {
     }
 }
 
-fn pq_new() {
+fn Project::PriorityQueue::pq_new() {
     PriorityQueue()->init()
 }
 
@@ -146,6 +146,6 @@ class MinPriorityQueue extends PriorityQueue {
     }
 }
 
-fn pq_min_new() {
+fn Project::PriorityQueue::pq_min_new() {
     MinPriorityQueue()->init()
 }

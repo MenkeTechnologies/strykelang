@@ -3,24 +3,24 @@
 
 require "./lib/strings_advanced_impl.stk"
 
-# ── adv_levenshtein ─────
-assert_eq adv_levenshtein("kitten", "sitting"), 3, "levenshtein(kitten, sitting)"
-assert_eq adv_levenshtein("flaw", "lawn"), 2, "levenshtein(flaw, lawn)"
-assert_eq adv_levenshtein("abc", "abc"), 0, "levenshtein(abc, abc)"
-assert_eq adv_levenshtein("", "abc"), 3, "levenshtein('', abc)"
+# ── Project::StringsAdvancedImpl::adv_levenshtein ─────
+assert_eq Project::StringsAdvancedImpl::adv_levenshtein("kitten", "sitting"), 3, "levenshtein(kitten, sitting)"
+assert_eq Project::StringsAdvancedImpl::adv_levenshtein("flaw", "lawn"), 2, "levenshtein(flaw, lawn)"
+assert_eq Project::StringsAdvancedImpl::adv_levenshtein("abc", "abc"), 0, "levenshtein(abc, abc)"
+assert_eq Project::StringsAdvancedImpl::adv_levenshtein("", "abc"), 3, "levenshtein('', abc)"
 
-# ── adv_lcs ─────
-assert_eq adv_lcs("abcde", "ace"), 3, "lcs(abcde, ace)"
-assert_eq adv_lcs("abc", "def"), 0, "lcs(abc, def)"
-assert_eq adv_lcs("aggtab", "gxtxayb"), 4, "lcs(aggtab, gxtxayb)"
+# ── Project::StringsAdvancedImpl::adv_lcs ─────
+assert_eq Project::StringsAdvancedImpl::adv_lcs("abcde", "ace"), 3, "lcs(abcde, ace)"
+assert_eq Project::StringsAdvancedImpl::adv_lcs("abc", "def"), 0, "lcs(abc, def)"
+assert_eq Project::StringsAdvancedImpl::adv_lcs("aggtab", "gxtxayb"), 4, "lcs(aggtab, gxtxayb)"
 
-# ── adv_is_anagram ─────
-assert_ok adv_is_anagram("Listen", "Silent"), "Listen/Silent is anagram"
-assert_ok adv_is_anagram("Dormitory", "Dirty Room"), "Dormitory/Dirty Room is anagram"
-assert_false adv_is_anagram("Hello", "World"), "Hello/World is not anagram"
+# ── Project::StringsAdvancedImpl::adv_is_anagram ─────
+assert_ok Project::StringsAdvancedImpl::adv_is_anagram("Listen", "Silent"), "Listen/Silent is anagram"
+assert_ok Project::StringsAdvancedImpl::adv_is_anagram("Dormitory", "Dirty Room"), "Dormitory/Dirty Room is anagram"
+assert_false Project::StringsAdvancedImpl::adv_is_anagram("Hello", "World"), "Hello/World is not anagram"
 
-# ── adv_word_frequency ─────
-my $f = adv_word_frequency("Hello world, hello!")
+# ── Project::StringsAdvancedImpl::adv_word_frequency ─────
+my $f = Project::StringsAdvancedImpl::adv_word_frequency("Hello world, hello!")
 assert_eq $f->{hello}, 2, "freq(hello)"
 assert_eq $f->{world}, 1, "freq(world)"
 assert_false defined($f->{missing}), "freq(missing)"

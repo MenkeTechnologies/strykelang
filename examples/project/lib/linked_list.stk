@@ -33,7 +33,7 @@ class Cons impl List {
     }
 }
 
-fn list_new(@vals) {
+fn Project::LinkedList::list_new(@vals) {
     my $curr = Nil();
     for my $v (rev @vals) {
         $curr = Cons(val => $v, next => $curr);
@@ -41,7 +41,7 @@ fn list_new(@vals) {
     $curr;
 }
 
-fn list_length($l) {
+fn Project::LinkedList::list_length($l) {
     my $len = 0;
     my $curr = $l;
     while (!$curr->is_empty()) {
@@ -51,17 +51,17 @@ fn list_length($l) {
     $len;
 }
 
-fn list_map($f, $l) {
+fn Project::LinkedList::list_map($f, $l) {
     my @arr;
     my $curr = $l;
     while (!$curr->is_empty()) {
         push @arr, $f->($curr->head());
         $curr = $curr->tail();
     }
-    return list_new(@arr);
+    return Project::LinkedList::list_new(@arr);
 }
 
-fn list_to_array($l) {
+fn Project::LinkedList::list_to_array($l) {
     my @res;
     my $curr = $l;
     while (!$curr->is_empty()) {

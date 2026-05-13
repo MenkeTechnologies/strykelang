@@ -4,34 +4,34 @@
 # ARITHMETIC OPERATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn add_int($a, $b) { $a + $b }
-fn sub_int($a, $b) { $a - $b }
-fn mul_int($a, $b) { $a * $b }
-fn div_int($a, $b) { $a / $b }
-fn mod_int($a, $b) { $a % $b }
-fn pow_int($a, $b) { $a ** $b }
-fn neg_int($a) { -$a }
+fn Project::Operators::add_int($a, $b) { $a + $b }
+fn Project::Operators::sub_int($a, $b) { $a - $b }
+fn Project::Operators::mul_int($a, $b) { $a * $b }
+fn Project::Operators::div_int($a, $b) { $a / $b }
+fn Project::Operators::mod_int($a, $b) { $a % $b }
+fn Project::Operators::pow_int($a, $b) { $a ** $b }
+fn Project::Operators::neg_int($a) { -$a }
 
-fn add_float($a, $b) { $a + $b }
-fn sub_float($a, $b) { $a - $b }
-fn mul_float($a, $b) { $a * $b }
-fn div_float($a, $b) { $a / $b }
+fn Project::Operators::add_float($a, $b) { $a + $b }
+fn Project::Operators::sub_float($a, $b) { $a - $b }
+fn Project::Operators::mul_float($a, $b) { $a * $b }
+fn Project::Operators::div_float($a, $b) { $a / $b }
 
-fn int_div($a, $b) { int($a / $b) }
+fn Project::Operators::int_div($a, $b) { int($a / $b) }
 
-fn mixed_arithmetic($a, $b, $c) {
+fn Project::Operators::mixed_arithmetic($a, $b, $c) {
     $a + $b * $c
 }
 
-fn parenthesized($a, $b, $c) {
+fn Project::Operators::parenthesized($a, $b, $c) {
     ($a + $b) * $c
 }
 
-fn chained_ops($a, $b, $c, $d) {
+fn Project::Operators::chained_ops($a, $b, $c, $d) {
     $a + $b - $c + $d
 }
 
-fn complex_expr($a, $b, $c) {
+fn Project::Operators::complex_expr($a, $b, $c) {
     ($a ** 2 + $b ** 2) / $c
 }
 
@@ -39,16 +39,16 @@ fn complex_expr($a, $b, $c) {
 # NUMERIC COMPARISON OPERATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn num_eq($a, $b) { $a == $b ? 1 : 0 }
-fn num_ne($a, $b) { $a != $b ? 1 : 0 }
-fn num_lt($a, $b) { $a < $b ? 1 : 0 }
-fn num_le($a, $b) { $a <= $b ? 1 : 0 }
-fn num_gt($a, $b) { $a > $b ? 1 : 0 }
-fn num_ge($a, $b) { $a >= $b ? 1 : 0 }
+fn Project::Operators::num_eq($a, $b) { $a == $b ? 1 : 0 }
+fn Project::Operators::num_ne($a, $b) { $a != $b ? 1 : 0 }
+fn Project::Operators::num_lt($a, $b) { $a < $b ? 1 : 0 }
+fn Project::Operators::num_le($a, $b) { $a <= $b ? 1 : 0 }
+fn Project::Operators::num_gt($a, $b) { $a > $b ? 1 : 0 }
+fn Project::Operators::num_ge($a, $b) { $a >= $b ? 1 : 0 }
 
-fn cmp_spaceship($a, $b) { $a <=> $b }
+fn Project::Operators::cmp_spaceship($a, $b) { $a <=> $b }
 
-fn compare_chain($a, $b, $c) {
+fn Project::Operators::compare_chain($a, $b, $c) {
     ($a < $b) && ($b < $c) ? 1 : 0
 }
 
@@ -56,46 +56,46 @@ fn compare_chain($a, $b, $c) {
 # STRING COMPARISON OPERATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn str_eq($a, $b) { $a eq $b ? 1 : 0 }
-fn str_ne($a, $b) { $a ne $b ? 1 : 0 }
-fn str_lt($a, $b) { $a lt $b ? 1 : 0 }
-fn str_le($a, $b) { $a le $b ? 1 : 0 }
-fn str_gt($a, $b) { $a gt $b ? 1 : 0 }
-fn str_ge($a, $b) { $a ge $b ? 1 : 0 }
+fn Project::Operators::str_eq($a, $b) { $a eq $b ? 1 : 0 }
+fn Project::Operators::str_ne($a, $b) { $a ne $b ? 1 : 0 }
+fn Project::Operators::str_lt($a, $b) { $a lt $b ? 1 : 0 }
+fn Project::Operators::str_le($a, $b) { $a le $b ? 1 : 0 }
+fn Project::Operators::str_gt($a, $b) { $a gt $b ? 1 : 0 }
+fn Project::Operators::str_ge($a, $b) { $a ge $b ? 1 : 0 }
 
-fn str_cmp($a, $b) { $a cmp $b }
+fn Project::Operators::str_cmp($a, $b) { $a cmp $b }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # LOGICAL OPERATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn logical_and($a, $b) { $a && $b }
-fn logical_or($a, $b) { $a || $b }
-fn logical_not($a) { !$a ? 1 : 0 }
+fn Project::Operators::logical_and($a, $b) { $a && $b }
+fn Project::Operators::logical_or($a, $b) { $a || $b }
+fn Project::Operators::logical_not($a) { !$a ? 1 : 0 }
 
-fn low_prec_and($a, $b) { $a and $b }
-fn low_prec_or($a, $b) { $a or $b }
-fn low_prec_not($a) { not $a ? 1 : 0 }
+fn Project::Operators::low_prec_and($a, $b) { $a and $b }
+fn Project::Operators::low_prec_or($a, $b) { $a or $b }
+fn Project::Operators::low_prec_not($a) { not $a ? 1 : 0 }
 
-fn defined_or($a, $b) { $a // $b }
+fn Project::Operators::defined_or($a, $b) { $a // $b }
 
-fn short_circuit_and($a) {
+fn Project::Operators::short_circuit_and($a) {
     my $side_effect = 0
     $a && ($side_effect = 1)
     $side_effect
 }
 
-fn short_circuit_or($a) {
+fn Project::Operators::short_circuit_or($a) {
     my $side_effect = 0
     $a || ($side_effect = 1)
     $side_effect
 }
 
-fn nested_logical($a, $b, $c) {
+fn Project::Operators::nested_logical($a, $b, $c) {
     ($a && $b) || $c
 }
 
-fn complex_logical($a, $b, $c, $d) {
+fn Project::Operators::complex_logical($a, $b, $c, $d) {
     ($a && $b) || ($c && $d)
 }
 
@@ -103,107 +103,107 @@ fn complex_logical($a, $b, $c, $d) {
 # BITWISE OPERATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn bitwise_and($a, $b) { $a & $b }
-fn bitwise_or($a, $b) { $a | $b }
-fn bitwise_xor($a, $b) { $a ^ $b }
-fn bitwise_not($a) { ~$a }
+fn Project::Operators::bitwise_and($a, $b) { $a & $b }
+fn Project::Operators::bitwise_or($a, $b) { $a | $b }
+fn Project::Operators::bitwise_xor($a, $b) { $a ^ $b }
+fn Project::Operators::bitwise_not($a) { ~$a }
 
-fn left_shift($a, $n) { $a << $n }
-fn right_shift($a, $n) { $a >> $n }
+fn Project::Operators::left_shift($a, $n) { $a << $n }
+fn Project::Operators::right_shift($a, $n) { $a >> $n }
 
-fn bit_mask($val, $mask) { $val & $mask }
-fn set_bit($val, $bit) { $val | (1 << $bit) }
-fn clear_bit($val, $bit) { $val & ~(1 << $bit) }
-fn toggle_bit($val, $bit) { $val ^ (1 << $bit) }
-fn test_bit($val, $bit) { ($val & (1 << $bit)) ? 1 : 0 }
+fn Project::Operators::bit_mask($val, $mask) { $val & $mask }
+fn Project::Operators::set_bit($val, $bit) { $val | (1 << $bit) }
+fn Project::Operators::clear_bit($val, $bit) { $val & ~(1 << $bit) }
+fn Project::Operators::toggle_bit($val, $bit) { $val ^ (1 << $bit) }
+fn Project::Operators::test_bit($val, $bit) { ($val & (1 << $bit)) ? 1 : 0 }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # STRING OPERATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn str_concat($a, $b) { $a . $b }
-fn concat_three($a, $b, $c) { $a . $b . $c }
-fn repeat_str($s, $n) { $s x $n }
+fn Project::Operators::str_concat($a, $b) { $a . $b }
+fn Project::Operators::concat_three($a, $b, $c) { $a . $b . $c }
+fn Project::Operators::repeat_str($s, $n) { $s x $n }
 
-fn concat_with_space($a, $b) { $a . " " . $b }
+fn Project::Operators::concat_with_space($a, $b) { $a . " " . $b }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ASSIGNMENT OPERATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn compound_add {
+fn Project::Operators::compound_add {
     my $x = 5
     $x += 3
     $x
 }
 
-fn compound_sub {
+fn Project::Operators::compound_sub {
     my $x = 10
     $x -= 4
     $x
 }
 
-fn compound_mul {
+fn Project::Operators::compound_mul {
     my $x = 3
     $x *= 4
     $x
 }
 
-fn compound_div {
+fn Project::Operators::compound_div {
     my $x = 20
     $x /= 4
     $x
 }
 
-fn compound_mod {
+fn Project::Operators::compound_mod {
     my $x = 17
     $x %= 5
     $x
 }
 
-fn compound_pow {
+fn Project::Operators::compound_pow {
     my $x = 2
     $x **= 3
     $x
 }
 
-fn compound_concat {
+fn Project::Operators::compound_concat {
     my $s = "hello"
     $s .= " world"
     $s
 }
 
-fn compound_repeat {
+fn Project::Operators::compound_repeat {
     my $s = "ab"
     $s = $s x 3
     $s
 }
 
-fn compound_or {
+fn Project::Operators::compound_or {
     my $x = 0
     $x ||= 42
     $x
 }
 
-fn compound_and {
+fn Project::Operators::compound_and {
     my $x = 5
     $x &&= 10
     $x
 }
 
-fn compound_defined_or {
+fn Project::Operators::compound_defined_or {
     my $x
     $x //= "default"
     $x
 }
 
-fn compound_bit_and {
+fn Project::Operators::compound_bit_and {
     my $x = 0xFF
     $x &= 0x0F
     $x
 }
 
-fn compound_bit_or {
+fn Project::Operators::compound_bit_or {
     my $x = 0x0F
     $x |= 0xF0
     $x
@@ -213,31 +213,31 @@ fn compound_bit_or {
 # INCREMENT/DECREMENT OPERATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn pre_increment {
+fn Project::Operators::pre_increment {
     my $x = 5
     my $y = ++$x
     ($x, $y)
 }
 
-fn post_increment {
+fn Project::Operators::post_increment {
     my $x = 5
     my $y = $x++
     ($x, $y)
 }
 
-fn pre_decrement {
+fn Project::Operators::pre_decrement {
     my $x = 5
     my $y = --$x
     ($x, $y)
 }
 
-fn post_decrement {
+fn Project::Operators::post_decrement {
     my $x = 5
     my $y = $x--
     ($x, $y)
 }
 
-fn increment_in_expr {
+fn Project::Operators::increment_in_expr {
     my $x = 5
     my $y = $x++ + ++$x
     $y
@@ -247,16 +247,16 @@ fn increment_in_expr {
 # TERNARY OPERATOR
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn ternary_true { 1 ? "yes" : "no" }
-fn ternary_false { 0 ? "yes" : "no" }
+fn Project::Operators::ternary_true { 1 ? "yes" : "no" }
+fn Project::Operators::ternary_false { 0 ? "yes" : "no" }
 
-fn ternary_expr($cond) { $cond ? "truthy" : "falsy" }
+fn Project::Operators::ternary_expr($cond) { $cond ? "truthy" : "falsy" }
 
-fn nested_ternary($n) {
+fn Project::Operators::nested_ternary($n) {
     $n < 0 ? "negative" : $n == 0 ? "zero" : "positive"
 }
 
-fn ternary_with_ops($a, $b) {
+fn Project::Operators::ternary_with_ops($a, $b) {
     $a > $b ? $a - $b : $b - $a
 }
 
@@ -264,12 +264,12 @@ fn ternary_with_ops($a, $b) {
 # RANGE OPERATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn incl_range($a, $b) {
+fn Project::Operators::incl_range($a, $b) {
     my @r = $a..$b
     @r
 }
 
-fn range_sum($a, $b) {
+fn Project::Operators::range_sum($a, $b) {
     my $sum = 0
     for my $i ($a..$b) {
         $sum += $i
@@ -277,12 +277,12 @@ fn range_sum($a, $b) {
     $sum
 }
 
-fn range_char {
+fn Project::Operators::range_char {
     my @chars = "a".."e"
     join("", @chars)
 }
 
-fn range_reverse($a, $b) {
+fn Project::Operators::range_reverse($a, $b) {
     my @r = rev($a..$b)
     @r
 }
@@ -291,25 +291,25 @@ fn range_reverse($a, $b) {
 # LIST OPERATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn list_assign {
+fn Project::Operators::list_assign {
     my ($a, $b, $c) = (1, 2, 3)
     $a + $b + $c
 }
 
-fn list_swap {
+fn Project::Operators::list_swap {
     my ($a, $b) = (1, 2)
     ($a, $b) = ($b, $a)
     ($a, $b)
 }
 
-fn comma_operator {
+fn Project::Operators::comma_operator {
     # In stryke mode, use explicit last-element syntax
     my @list = (1, 2, 3)
     my $x = $list[-1]
     $x
 }
 
-fn list_in_scalar {
+fn Project::Operators::list_in_scalar {
     my @arr = (1, 2, 3, 4, 5)
     scalar @arr}
 
@@ -317,29 +317,29 @@ fn list_in_scalar {
 # SPECIAL OPERATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn not_not($val) { !!$val ? 1 : 0 }
+fn Project::Operators::not_not($val) { !!$val ? 1 : 0 }
 
-fn double_tilde($val) { ~~$val }
+fn Project::Operators::double_tilde($val) { ~~$val }
 
-fn as_string($val) { "" . $val }
-fn numify($val) { 0 + $val }
+fn Project::Operators::as_string($val) { "" . $val }
+fn Project::Operators::numify($val) { 0 + $val }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # OPERATOR PRECEDENCE
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn prec_mul_add { 2 + 3 * 4 }
-fn prec_pow_mul { 2 * 3 ** 2 }
-fn prec_neg_pow { -2 ** 2 }
+fn Project::Operators::prec_mul_add { 2 + 3 * 4 }
+fn Project::Operators::prec_pow_mul { 2 * 3 ** 2 }
+fn Project::Operators::prec_neg_pow { -2 ** 2 }
 
-fn prec_compare_and { 1 < 2 && 3 < 4 ? 1 : 0 }
-fn prec_or_and { 0 || 1 && 0 ? 1 : 0 }
+fn Project::Operators::prec_compare_and { 1 < 2 && 3 < 4 ? 1 : 0 }
+fn Project::Operators::prec_or_and { 0 || 1 && 0 ? 1 : 0 }
 
-fn prec_not_and { !0 && 1 ? 1 : 0 }
+fn Project::Operators::prec_not_and { !0 && 1 ? 1 : 0 }
 
-fn prec_assign_ternary {
+fn Project::Operators::prec_assign_ternary {
     my $x = 1 ? "a" : "b"
     $x
 }
 
-fn prec_concat_repeat { "ab" . "cd" x 2 }
+fn Project::Operators::prec_concat_repeat { "ab" . "cd" x 2 }

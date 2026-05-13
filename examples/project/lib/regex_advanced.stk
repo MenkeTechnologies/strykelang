@@ -4,70 +4,70 @@
 # BASIC MATCHING
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn match_simple { "hello world" =~ /world/ ? 1 : 0 }
-fn match_start { "hello" =~ /^hello/ ? 1 : 0 }
-fn match_end { "hello" =~ /ello$/ ? 1 : 0 }
-fn match_full { "hello" =~ /^hello$/ ? 1 : 0 }
-fn match_none { "hello" =~ /xyz/ ? 1 : 0 }
+fn Project::RegexAdvanced::match_simple { "hello world" =~ /world/ ? 1 : 0 }
+fn Project::RegexAdvanced::match_start { "hello" =~ /^hello/ ? 1 : 0 }
+fn Project::RegexAdvanced::match_end { "hello" =~ /ello$/ ? 1 : 0 }
+fn Project::RegexAdvanced::match_full { "hello" =~ /^hello$/ ? 1 : 0 }
+fn Project::RegexAdvanced::match_none { "hello" =~ /xyz/ ? 1 : 0 }
 
-fn match_dot { "abc" =~ /a.c/ ? 1 : 0 }
-fn match_star { "aaa" =~ /a*/ ? 1 : 0 }
-fn match_plus { "aaa" =~ /a+/ ? 1 : 0 }
-fn match_question { "ab" =~ /ab?/ ? 1 : 0 }
+fn Project::RegexAdvanced::match_dot { "abc" =~ /a.c/ ? 1 : 0 }
+fn Project::RegexAdvanced::match_star { "aaa" =~ /a*/ ? 1 : 0 }
+fn Project::RegexAdvanced::match_plus { "aaa" =~ /a+/ ? 1 : 0 }
+fn Project::RegexAdvanced::match_question { "ab" =~ /ab?/ ? 1 : 0 }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # CHARACTER CLASSES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn class_digit { "abc123" =~ /\d+/ ? 1 : 0 }
-fn class_word { "hello_world" =~ /\w+/ ? 1 : 0 }
-fn class_space { "hello world" =~ /\s/ ? 1 : 0 }
-fn class_not_digit { "abc" =~ /\D+/ ? 1 : 0 }
-fn class_not_word { "!@#" =~ /\W+/ ? 1 : 0 }
-fn class_not_space { "hello" =~ /\S+/ ? 1 : 0 }
+fn Project::RegexAdvanced::class_digit { "abc123" =~ /\d+/ ? 1 : 0 }
+fn Project::RegexAdvanced::class_word { "hello_world" =~ /\w+/ ? 1 : 0 }
+fn Project::RegexAdvanced::class_space { "hello world" =~ /\s/ ? 1 : 0 }
+fn Project::RegexAdvanced::class_not_digit { "abc" =~ /\D+/ ? 1 : 0 }
+fn Project::RegexAdvanced::class_not_word { "!@#" =~ /\W+/ ? 1 : 0 }
+fn Project::RegexAdvanced::class_not_space { "hello" =~ /\S+/ ? 1 : 0 }
 
-fn class_range { "b" =~ /[a-z]/ ? 1 : 0 }
-fn class_negated { "x" =~ /[^abc]/ ? 1 : 0 }
-fn class_multiple { "5" =~ /[0-9a-f]/ ? 1 : 0 }
+fn Project::RegexAdvanced::class_range { "b" =~ /[a-z]/ ? 1 : 0 }
+fn Project::RegexAdvanced::class_negated { "x" =~ /[^abc]/ ? 1 : 0 }
+fn Project::RegexAdvanced::class_multiple { "5" =~ /[0-9a-f]/ ? 1 : 0 }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # QUANTIFIERS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn quant_exact { "aaa" =~ /a{3}/ ? 1 : 0 }
-fn quant_range { "aaaa" =~ /a{2,4}/ ? 1 : 0 }
-fn quant_min { "aaaaa" =~ /a{2,}/ ? 1 : 0 }
-fn quant_max { "aa" =~ /a{1,3}/ ? 1 : 0 }
+fn Project::RegexAdvanced::quant_exact { "aaa" =~ /a{3}/ ? 1 : 0 }
+fn Project::RegexAdvanced::quant_range { "aaaa" =~ /a{2,4}/ ? 1 : 0 }
+fn Project::RegexAdvanced::quant_min { "aaaaa" =~ /a{2,}/ ? 1 : 0 }
+fn Project::RegexAdvanced::quant_max { "aa" =~ /a{1,3}/ ? 1 : 0 }
 
-fn quant_greedy { "aaab" =~ /a+b/ ? 1 : 0 }
-fn quant_nongreedy { "aaab" =~ /a+?b/ ? 1 : 0 }
+fn Project::RegexAdvanced::quant_greedy { "aaab" =~ /a+b/ ? 1 : 0 }
+fn Project::RegexAdvanced::quant_nongreedy { "aaab" =~ /a+?b/ ? 1 : 0 }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # CAPTURES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn capture_simple {
+fn Project::RegexAdvanced::capture_simple {
     "hello world" =~ /(\w+) (\w+)/
     $1 eq "hello" ? 1 : 0
 }
 
-fn capture_second {
+fn Project::RegexAdvanced::capture_second {
     "hello world" =~ /(\w+) (\w+)/
     $2 eq "world" ? 1 : 0
 }
 
-fn capture_nested {
+fn Project::RegexAdvanced::capture_nested {
     "abc" =~ /((a)(b))(c)/
     $1 eq "ab" ? 1 : 0
 }
 
-fn capture_in_subst {
+fn Project::RegexAdvanced::capture_in_subst {
     my $s = "hello world"
     $s =~ s/(\w+) (\w+)/$2 $1/
     $s eq "world hello" ? 1 : 0
 }
 
-fn capture_digit_backrefs {
+fn Project::RegexAdvanced::capture_digit_backrefs {
     my $s = "hello hello"
     $s =~ /(\w+) \1/ ? 1 : 0
 }
@@ -76,59 +76,59 @@ fn capture_digit_backrefs {
 # FLAGS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn flag_case_insensitive { "HELLO" =~ /hello/i ? 1 : 0 }
+fn Project::RegexAdvanced::flag_case_insensitive { "HELLO" =~ /hello/i ? 1 : 0 }
 
 # global while match loop hangs - removed
-fn flag_global_count {
+fn Project::RegexAdvanced::flag_global_count {
     my $s = "aaa"
     my @matches = $s =~ /a/g
     scalar @matches}
 
-fn flag_multiline { "foo\nbar" =~ /^bar/m ? 1 : 0 }
+fn Project::RegexAdvanced::flag_multiline { "foo\nbar" =~ /^bar/m ? 1 : 0 }
 
-fn flag_dotall { "foo\nbar" =~ /foo.bar/s ? 1 : 0 }
+fn Project::RegexAdvanced::flag_dotall { "foo\nbar" =~ /foo.bar/s ? 1 : 0 }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SUBSTITUTION
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn subst_simple {
+fn Project::RegexAdvanced::subst_simple {
     my $s = "hello world"
     $s =~ s/world/there/
     $s
 }
 
-fn subst_global {
+fn Project::RegexAdvanced::subst_global {
     my $s = "aaa"
     $s =~ s/a/b/g
     $s
 }
 
-fn subst_case_insensitive {
+fn Project::RegexAdvanced::subst_case_insensitive {
     my $s = "HELLO"
     $s =~ s/hello/hi/i
     $s
 }
 
-fn subst_empty {
+fn Project::RegexAdvanced::subst_empty {
     my $s = "hello"
     $s =~ s/l//g
     $s
 }
 
-fn subst_backrefs {
+fn Project::RegexAdvanced::subst_backrefs {
     my $s = "hello world"
     $s =~ s/(\w+)/[$1]/g
     $s
 }
 
-fn subst_no_match {
+fn Project::RegexAdvanced::subst_no_match {
     my $s = "hello"
     my $count = $s =~ s/xyz/abc/
     $count == 0 ? 1 : 0
 }
 
-fn subst_returns_count {
+fn Project::RegexAdvanced::subst_returns_count {
     my $s = "aaa"
     my $count = $s =~ s/a/b/g
     $count
@@ -138,25 +138,25 @@ fn subst_returns_count {
 # TRANSLITERATION
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn tr_simple {
+fn Project::RegexAdvanced::tr_simple {
     my $s = "hello"
     $s =~ tr/a-z/A-Z/
     $s
 }
 
-fn tr_partial {
+fn Project::RegexAdvanced::tr_partial {
     my $s = "hello"
     $s =~ tr/aeiou/AEIOU/
     $s
 }
 
-fn tr_count {
+fn Project::RegexAdvanced::tr_count {
     my $s = "hello world"
     my $count = $s =~ tr/o/o/
     $count
 }
 
-fn tr_squeeze {
+fn Project::RegexAdvanced::tr_squeeze {
     my $s = "heeello"
     $s =~ tr/e/e/s
     $s
@@ -166,20 +166,20 @@ fn tr_squeeze {
 # SPLIT WITH REGEX
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn split_regex_ws {
+fn Project::RegexAdvanced::split_regex_ws {
     my @parts = split(/\s+/, "hello   world")
     scalar @parts}
 
-fn split_regex_delim {
+fn Project::RegexAdvanced::split_regex_delim {
     my @parts = split(/[,;]/, "a,b;c")
     join("|", @parts)
 }
 
-fn split_regex_limit {
+fn Project::RegexAdvanced::split_regex_limit {
     my @parts = split(/,/, "a,b,c,d", 2)
     scalar @parts}
 
-fn split_regex_capture {
+fn Project::RegexAdvanced::split_regex_capture {
     my @parts = split(/(\s+)/, "a b c")
     scalar @parts}
 
@@ -187,16 +187,16 @@ fn split_regex_capture {
 # MATCH IN LIST CONTEXT
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn match_list_context {
+fn Project::RegexAdvanced::match_list_context {
     my @matches = "hello world" =~ /(\w+)/g
     scalar @matches}
 
-fn match_list_first {
+fn Project::RegexAdvanced::match_list_first {
     my @matches = "hello world" =~ /(\w+)/g
     $matches[0] eq "hello" ? 1 : 0
 }
 
-fn match_list_all {
+fn Project::RegexAdvanced::match_list_all {
     my @matches = "a1b2c3" =~ /(\d)/g
     join(",", @matches)
 }
@@ -205,65 +205,65 @@ fn match_list_all {
 # ALTERNATION
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn alt_simple { "cat" =~ /cat|dog/ ? 1 : 0 }
-fn alt_second { "dog" =~ /cat|dog/ ? 1 : 0 }
-fn alt_none { "bird" =~ /cat|dog/ ? 1 : 0 }
-fn alt_grouped { "abc" =~ /a(b|x)c/ ? 1 : 0 }
-fn alt_multiple { "c" =~ /a|b|c|d/ ? 1 : 0 }
+fn Project::RegexAdvanced::alt_simple { "cat" =~ /cat|dog/ ? 1 : 0 }
+fn Project::RegexAdvanced::alt_second { "dog" =~ /cat|dog/ ? 1 : 0 }
+fn Project::RegexAdvanced::alt_none { "bird" =~ /cat|dog/ ? 1 : 0 }
+fn Project::RegexAdvanced::alt_grouped { "abc" =~ /a(b|x)c/ ? 1 : 0 }
+fn Project::RegexAdvanced::alt_multiple { "c" =~ /a|b|c|d/ ? 1 : 0 }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # WORD BOUNDARIES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn boundary_word_start { "hello world" =~ /\bworld/ ? 1 : 0 }
-fn boundary_word_end { "hello world" =~ /hello\b/ ? 1 : 0 }
-fn boundary_whole_word { "hello world" =~ /\bhello\b/ ? 1 : 0 }
-fn boundary_not { "hello" =~ /\Bll\B/ ? 1 : 0 }
+fn Project::RegexAdvanced::boundary_word_start { "hello world" =~ /\bworld/ ? 1 : 0 }
+fn Project::RegexAdvanced::boundary_word_end { "hello world" =~ /hello\b/ ? 1 : 0 }
+fn Project::RegexAdvanced::boundary_whole_word { "hello world" =~ /\bhello\b/ ? 1 : 0 }
+fn Project::RegexAdvanced::boundary_not { "hello" =~ /\Bll\B/ ? 1 : 0 }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ANCHORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn anchor_start { "hello" =~ /^h/ ? 1 : 0 }
-fn anchor_end { "hello" =~ /o$/ ? 1 : 0 }
-fn anchor_both { "hello" =~ /^hello$/ ? 1 : 0 }
-fn anchor_multiline_start { "foo\nbar" =~ /^bar/m ? 1 : 0 }
-fn anchor_multiline_end { "foo\nbar" =~ /foo$/m ? 1 : 0 }
+fn Project::RegexAdvanced::anchor_start { "hello" =~ /^h/ ? 1 : 0 }
+fn Project::RegexAdvanced::anchor_end { "hello" =~ /o$/ ? 1 : 0 }
+fn Project::RegexAdvanced::anchor_both { "hello" =~ /^hello$/ ? 1 : 0 }
+fn Project::RegexAdvanced::anchor_multiline_start { "foo\nbar" =~ /^bar/m ? 1 : 0 }
+fn Project::RegexAdvanced::anchor_multiline_end { "foo\nbar" =~ /foo$/m ? 1 : 0 }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ESCAPING
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn escape_dot { "a.b" =~ /a\.b/ ? 1 : 0 }
-fn escape_star { "a*b" =~ /a\*b/ ? 1 : 0 }
-fn escape_plus { "a+b" =~ /a\+b/ ? 1 : 0 }
-fn escape_question { "a?b" =~ /a\?b/ ? 1 : 0 }
-fn escape_paren { "a(b)c" =~ /a\(b\)c/ ? 1 : 0 }
-fn escape_bracket { "a[b]c" =~ /a\[b\]c/ ? 1 : 0 }
+fn Project::RegexAdvanced::escape_dot { "a.b" =~ /a\.b/ ? 1 : 0 }
+fn Project::RegexAdvanced::escape_star { "a*b" =~ /a\*b/ ? 1 : 0 }
+fn Project::RegexAdvanced::escape_plus { "a+b" =~ /a\+b/ ? 1 : 0 }
+fn Project::RegexAdvanced::escape_question { "a?b" =~ /a\?b/ ? 1 : 0 }
+fn Project::RegexAdvanced::escape_paren { "a(b)c" =~ /a\(b\)c/ ? 1 : 0 }
+fn Project::RegexAdvanced::escape_bracket { "a[b]c" =~ /a\[b\]c/ ? 1 : 0 }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # COMMON PATTERNS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn pattern_number { "123" =~ /^\d+$/ ? 1 : 0 }
-fn pattern_float { "3.14" =~ /^\d+\.\d+$/ ? 1 : 0 }
-fn pattern_hex { "0xFF" =~ /^0x[0-9A-Fa-f]+$/ ? 1 : 0 }
-fn pattern_word { "hello_world" =~ /^\w+$/ ? 1 : 0 }
+fn Project::RegexAdvanced::pattern_number { "123" =~ /^\d+$/ ? 1 : 0 }
+fn Project::RegexAdvanced::pattern_float { "3.14" =~ /^\d+\.\d+$/ ? 1 : 0 }
+fn Project::RegexAdvanced::pattern_hex { "0xFF" =~ /^0x[0-9A-Fa-f]+$/ ? 1 : 0 }
+fn Project::RegexAdvanced::pattern_word { "hello_world" =~ /^\w+$/ ? 1 : 0 }
 
-fn pattern_email_simple {
+fn Project::RegexAdvanced::pattern_email_simple {
     my $email = q{test@example.com}
     $email =~ /^\S+@\S+\.\S+$/ ? 1 : 0
 }
 
-fn pattern_date {
+fn Project::RegexAdvanced::pattern_date {
     "2024-01-15" =~ /^\d{4}-\d{2}-\d{2}$/ ? 1 : 0
 }
 
-fn pattern_time {
+fn Project::RegexAdvanced::pattern_time {
     "14:30:00" =~ /^\d{2}:\d{2}:\d{2}$/ ? 1 : 0
 }
 
-fn pattern_ip {
+fn Project::RegexAdvanced::pattern_ip {
     "192.168.1.1" =~ /^\d+\.\d+\.\d+\.\d+$/ ? 1 : 0
 }
 
@@ -271,17 +271,17 @@ fn pattern_ip {
 # REGEX CAPTURE RESULTS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn regex_capture_result {
+fn Project::RegexAdvanced::regex_capture_result {
     "hello world" =~ /(\w+) (\w+)/
     defined($1) && defined($2) ? 1 : 0
 }
 
-fn regex_capture_values {
+fn Project::RegexAdvanced::regex_capture_values {
     "hello world" =~ /(\w+) (\w+)/
     "$1-$2"
 }
 
-fn regex_no_capture {
+fn Project::RegexAdvanced::regex_no_capture {
     "hello" =~ /world/
     defined($1) ? 1 : 0
 }
@@ -290,10 +290,10 @@ fn regex_no_capture {
 # REGEX MODIFIERS COMBINED
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn mods_ig { "HELLO HELLO" =~ s/hello/hi/ig; _ // "" }
-fn mods_gi { "aAaA" =~ /a/gi ? 1 : 0 }
+fn Project::RegexAdvanced::mods_ig { "HELLO HELLO" =~ s/hello/hi/ig; _ // "" }
+fn Project::RegexAdvanced::mods_gi { "aAaA" =~ /a/gi ? 1 : 0 }
 
-fn subst_preserves_original {
+fn Project::RegexAdvanced::subst_preserves_original {
     my $s = "hello"
     my $orig = $s
     $s =~ s/hello/world/
@@ -304,8 +304,8 @@ fn subst_preserves_original {
 # REGEX EDGE CASES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn empty_pattern_match { "hello" =~ // ? 1 : 0 }
-fn empty_string_match { "" =~ /^$/ ? 1 : 0 }
-fn unicode_match { "café" =~ /caf/ ? 1 : 0 }
-fn newline_match { "hello\nworld" =~ /hello/ ? 1 : 0 }
-fn tab_match { "hello\tworld" =~ /\t/ ? 1 : 0 }
+fn Project::RegexAdvanced::empty_pattern_match { "hello" =~ // ? 1 : 0 }
+fn Project::RegexAdvanced::empty_string_match { "" =~ /^$/ ? 1 : 0 }
+fn Project::RegexAdvanced::unicode_match { "café" =~ /caf/ ? 1 : 0 }
+fn Project::RegexAdvanced::newline_match { "hello\nworld" =~ /hello/ ? 1 : 0 }
+fn Project::RegexAdvanced::tab_match { "hello\tworld" =~ /\t/ ? 1 : 0 }

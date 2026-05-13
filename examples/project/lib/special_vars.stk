@@ -4,7 +4,7 @@
 # $_ DEFAULT VARIABLE
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn default_in_for {
+fn Project::SpecialVars::default_in_for {
     my @r = ()
     for (1, 2, 3) {
         push @r, _
@@ -12,28 +12,28 @@ fn default_in_for {
     join(",", @r)
 }
 
-fn default_in_map {
+fn Project::SpecialVars::default_in_map {
     my @a = (1, 2, 3)
     join(",", map { _ * 2 } @a)
 }
 
-fn default_in_grep {
+fn Project::SpecialVars::default_in_grep {
     my @a = (1, 2, 3, 4, 5)
     scalar(grep { _ > 2 } @a)
 }
 
-fn default_explicit_set {
+fn Project::SpecialVars::default_explicit_set {
     _ = "hello"
     my $result = _
     $result
 }
 
-fn default_in_regex {
+fn Project::SpecialVars::default_in_regex {
     _ = "hello world"
     _ =~ /world/ ? 1 : 0
 }
 
-fn default_in_subst {
+fn Project::SpecialVars::default_in_subst {
     _ = "hello"
     _ =~ s/hello/world/
     _
@@ -43,22 +43,22 @@ fn default_in_subst {
 # @_ ARGUMENTS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn args_count {
+fn Project::SpecialVars::args_count {
     my $inner = fn { scalar(@_) }
     $inner(1, 2, 3)
 }
 
-fn args_first {
+fn Project::SpecialVars::args_first {
     my $inner = fn { $_0 }
     $inner("first", "second")
 }
 
-fn args_all {
+fn Project::SpecialVars::args_all {
     my $inner = fn { join(",", @_) }
     $inner(1, 2, 3)
 }
 
-fn args_shift_style {
+fn Project::SpecialVars::args_shift_style {
     my $inner = fn {
         my $a = shift
         my $b = shift
@@ -67,7 +67,7 @@ fn args_shift_style {
     $inner(10, 20)
 }
 
-fn args_modify {
+fn Project::SpecialVars::args_modify {
     my $inner = fn { $_0 = 999; 1 }
     my $x = 1
     $inner($x)
@@ -79,22 +79,22 @@ fn args_modify {
 # %ENV ENVIRONMENT
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn env_exists {
+fn Project::SpecialVars::env_exists {
     defined($ENV{PATH}) ? 1 : 0
 }
 
-fn env_home {
+fn Project::SpecialVars::env_home {
     defined($ENV{HOME}) ? 1 : 0
 }
 
-fn env_set_get {
+fn Project::SpecialVars::env_set_get {
     $ENV{STRYKE_TEST_VAR} = "test_value"
     my $val = $ENV{STRYKE_TEST_VAR}
     delete $ENV{STRYKE_TEST_VAR}
     $val eq "test_value" ? 1 : 0
 }
 
-fn test_env_keys {
+fn Project::SpecialVars::test_env_keys {
     my @keys = keys %ENV
     scalar(@keys) > 5 ? 1 : 0
 }
@@ -103,11 +103,11 @@ fn test_env_keys {
 # $0 PROGRAM NAME
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn prog_name_defined {
+fn Project::SpecialVars::prog_name_defined {
     defined($0) ? 1 : 0
 }
 
-fn prog_name_not_empty {
+fn Project::SpecialVars::prog_name_not_empty {
     length($0) > 0 ? 1 : 0
 }
 
@@ -115,11 +115,11 @@ fn prog_name_not_empty {
 # $$ PROCESS ID
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn pid_positive {
+fn Project::SpecialVars::pid_positive {
     $$ > 0 ? 1 : 0
 }
 
-fn pid_numeric {
+fn Project::SpecialVars::pid_numeric {
     $$ =~ /^\d+$/ ? 1 : 0
 }
 
@@ -127,17 +127,17 @@ fn pid_numeric {
 # $@ ERROR VARIABLE
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn error_after_eval_fail {
+fn Project::SpecialVars::error_after_eval_fail {
     eval { die "test error" }
     $@ =~ /test error/ ? 1 : 0
 }
 
-fn error_after_eval_success {
+fn Project::SpecialVars::error_after_eval_success {
     eval { 1 + 1 }
     $@ eq "" ? 1 : 0
 }
 
-fn error_cleared {
+fn Project::SpecialVars::error_cleared {
     eval { die "error1" }
     eval { 1 }
     $@ eq "" ? 1 : 0
@@ -147,7 +147,7 @@ fn error_cleared {
 # $! ERRNO
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn errno_after_bad_open {
+fn Project::SpecialVars::errno_after_bad_open {
     eval { open(my $fh, "<", "/nonexistent/file/path") }
     defined($!) ? 1 : 0
 }
@@ -156,7 +156,7 @@ fn errno_after_bad_open {
 # $? CHILD STATUS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn child_status_after_system {
+fn Project::SpecialVars::child_status_after_system {
     system("true")
     defined($?) ? 1 : 0
 }
@@ -165,11 +165,11 @@ fn child_status_after_system {
 # @ARGV COMMAND LINE ARGS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn argv_is_array {
+fn Project::SpecialVars::argv_is_array {
     ref(\@ARGV) eq "ARRAY" ? 1 : 0
 }
 
-fn argv_count {
+fn Project::SpecialVars::argv_count {
     scalar(@ARGV) >= 0 ? 1 : 0
 }
 
@@ -177,17 +177,17 @@ fn argv_count {
 # $1, $2, etc. CAPTURE GROUPS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn capture_1 {
+fn Project::SpecialVars::capture_1 {
     "hello world" =~ /(\w+)/
     $1 eq "hello" ? 1 : 0
 }
 
-fn capture_2 {
+fn Project::SpecialVars::capture_2 {
     "hello world" =~ /(\w+) (\w+)/
     $2 eq "world" ? 1 : 0
 }
 
-fn capture_multiple {
+fn Project::SpecialVars::capture_multiple {
     "a b c" =~ /(\w) (\w) (\w)/
     "$1$2$3" eq "abc" ? 1 : 0
 }
@@ -196,7 +196,7 @@ fn capture_multiple {
 # $; $" SUBSCRIPT AND LIST SEPARATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn list_separator {
+fn Project::SpecialVars::list_separator {
     my @a = (1, 2, 3)
     local $" = "-"
     "@a" eq "1-2-3" ? 1 : 0
@@ -206,7 +206,7 @@ fn list_separator {
 # $/ INPUT RECORD SEPARATOR
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn input_sep_default {
+fn Project::SpecialVars::input_sep_default {
     defined($/) && $/ eq "\n" ? 1 : 0
 }
 
@@ -214,7 +214,7 @@ fn input_sep_default {
 # $\ OUTPUT RECORD SEPARATOR
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn output_sep_default {
+fn Project::SpecialVars::output_sep_default {
     !defined($\) || $\ eq "" ? 1 : 0
 }
 
@@ -222,11 +222,11 @@ fn output_sep_default {
 # LINE NUMBER AND POSITION
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn line_number {
+fn Project::SpecialVars::line_number {
     __LINE__ > 0 ? 1 : 0
 }
 
-fn file_name {
+fn Project::SpecialVars::file_name {
     defined(__FILE__) ? 1 : 0
 }
 
@@ -234,12 +234,12 @@ fn file_name {
 # NUMERIC SPECIAL VARS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn array_last_index {
+fn Project::SpecialVars::array_last_index {
     my @a = (1, 2, 3, 4, 5)
     $#a == 4 ? 1 : 0
 }
 
-fn array_last_index_modify {
+fn Project::SpecialVars::array_last_index_modify {
     my @a = (1, 2, 3)
     $#a = 5
     scalar(@a) == 6 ? 1 : 0
@@ -249,10 +249,10 @@ fn array_last_index_modify {
 # VERSION VARIABLES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn perl_version {
+fn Project::SpecialVars::perl_version {
     defined($^V) ? 1 : 0
 }
 
-fn test_os_name {
+fn Project::SpecialVars::test_os_name {
     defined($^O) ? 1 : 0
 }

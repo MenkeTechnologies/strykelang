@@ -22,7 +22,7 @@ assert_eq describe_array([1, 2, 3, 4, 5]), "array with 5 elements", "match many"
 
 # ── Guards in Pattern Matching ─────────────────────────────────────
 
-fn classify_number($n) {
+fn Project::ControlFlow::classify_number($n) {
     if ($n < 0) {
         "negative"
     } elsif ($n == 0) {
@@ -38,11 +38,11 @@ fn classify_number($n) {
     }
 }
 
-assert_eq classify_number(-5), "negative", "guard negative"
-assert_eq classify_number(0), "zero", "literal zero"
-assert_eq classify_number(7), "small positive", "guard small"
-assert_eq classify_number(42), "medium positive", "guard medium"
-assert_eq classify_number(500), "large positive", "guard large"
+assert_eq Project::ControlFlow::classify_number(-5), "negative", "guard negative"
+assert_eq Project::ControlFlow::classify_number(0), "zero", "literal zero"
+assert_eq Project::ControlFlow::classify_number(7), "small positive", "guard small"
+assert_eq Project::ControlFlow::classify_number(42), "medium positive", "guard medium"
+assert_eq Project::ControlFlow::classify_number(500), "large positive", "guard large"
 
 # ── String Pattern Matching ────────────────────────────────────────
 

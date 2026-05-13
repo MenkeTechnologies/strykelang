@@ -784,7 +784,7 @@ class LuxurySportsCar extends SportsCar impl Luxury, Performance {
 # HELPER FUNCTIONS FOR HIERARCHY OPERATIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn build_org_chart {
+fn Project::ClassHierarchy::build_org_chart {
     my $ceo = Executive(
         id => 1,
         name => "Alice Johnson",
@@ -864,7 +864,7 @@ fn build_org_chart {
     $company
 }
 
-fn build_shape_scene {
+fn Project::ClassHierarchy::build_shape_scene {
     my @shapes
     
     push @shapes, Rectangle2D(
@@ -895,7 +895,7 @@ fn build_shape_scene {
     return [@shapes]
 }
 
-fn build_vehicle_fleet {
+fn Project::ClassHierarchy::build_vehicle_fleet {
     my @vehicles
     
     my $sports = LuxurySportsCar(
@@ -956,7 +956,7 @@ fn build_vehicle_fleet {
     return [@vehicles]
 }
 
-fn build_html_document {
+fn Project::ClassHierarchy::build_html_document {
     my $html = ElementNode(tag => "html")
     
     my $head = ElementNode(tag => "head")
@@ -985,7 +985,7 @@ fn build_html_document {
     $html
 }
 
-fn total_shape_area($shapes) {
+fn Project::ClassHierarchy::total_shape_area($shapes) {
     my $total = 0
     for my $s (@$shapes) {
         $total += $s->area()
@@ -993,7 +993,7 @@ fn total_shape_area($shapes) {
     $total
 }
 
-fn shapes_in_bounds($shapes, $bbox) {
+fn Project::ClassHierarchy::shapes_in_bounds($shapes, $bbox) {
     my @result
     for my $s (@$shapes) {
         my $shape_bounds = $s->bounds()

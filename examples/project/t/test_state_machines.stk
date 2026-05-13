@@ -7,7 +7,7 @@ require "./lib/state_machine.stk"
 # TRAFFIC LIGHT FSM
 # ══════════════════════════════════════════════════════════════════════════════
 
-my $light = make_traffic_light()
+my $light = Project::StateMachine::make_traffic_light()
 assert_eq $light->{current}(), "red", "traffic initial"
 assert_ok $light->{is_stop}(), "red is stop"
 
@@ -21,7 +21,7 @@ assert_eq $light->{next}(), "red", "traffic yellow->red"
 assert_eq $light->{current}(), "red", "traffic cycled back"
 
 # Full cycle test
-my $light2 = make_traffic_light()
+my $light2 = Project::StateMachine::make_traffic_light()
 for (1..6) { $light2->{next}() }
 assert_eq $light2->{current}(), "red", "traffic after 6 transitions"
 
@@ -29,7 +29,7 @@ assert_eq $light2->{current}(), "red", "traffic after 6 transitions"
 # DOOR FSM
 # ══════════════════════════════════════════════════════════════════════════════
 
-my $door = make_door_fsm()
+my $door = Project::StateMachine::make_door_fsm()
 assert_eq $door->{status}(), "closed", "door initial"
 
 assert_eq $door->{open}(), "opened", "door open"
@@ -56,7 +56,7 @@ assert_eq $door->{open}(), "opened", "door open after unlock"
 # COUNTER FSM
 # ══════════════════════════════════════════════════════════════════════════════
 
-my $counter = make_counter_fsm(0, 5)
+my $counter = Project::StateMachine::make_counter_fsm(0, 5)
 assert_eq $counter->{get}(), 0, "counter initial"
 assert_ok $counter->{at_min}(), "counter at min"
 assert_false $counter->{at_max}(), "counter not at max"
@@ -79,7 +79,7 @@ assert_eq $counter->{get}(), 0, "counter reset"
 # TOGGLE FSM
 # ══════════════════════════════════════════════════════════════════════════════
 
-my $toggle = make_toggle_fsm()
+my $toggle = Project::StateMachine::make_toggle_fsm()
 assert_eq $toggle->{is_on}(), 0, "toggle initial off"
 
 assert_eq $toggle->{toggle}(), "on", "toggle to on"
@@ -105,7 +105,7 @@ assert_eq $toggle->{is_on}(), 1, "toggle odd times"
 # PARSER FSM
 # ══════════════════════════════════════════════════════════════════════════════
 
-my $parser = make_parser_fsm()
+my $parser = Project::StateMachine::make_parser_fsm()
 my $input = "foo 123 bar456"
 my @chars = split("", $input)
 ~> @chars ep {
@@ -121,7 +121,7 @@ assert_eq $tokens->[2], "bar456", "parser token 2"
 # VENDING MACHINE FSM
 # ══════════════════════════════════════════════════════════════════════════════
 
-my $vend = make_vending_machine(100)
+my $vend = Project::StateMachine::make_vending_machine(100)
 my $status = $vend->{status}()
 assert_eq $status->{balance}, 0, "vend initial balance"
 assert_eq $status->{dispensed}, 0, "vend not dispensed"
@@ -138,7 +138,7 @@ my $status2 = $vend->{status}()
 assert_eq $status2->{dispensed}, 1, "vend dispensed flag"
 
 # Refund test
-my $vend2 = make_vending_machine(100)
+my $vend2 = Project::StateMachine::make_vending_machine(100)
 $vend2->{insert}(50)
 assert_eq $vend2->{refund}(), 50, "vend refund"
 my $status3 = $vend2->{status}()
@@ -148,7 +148,7 @@ assert_eq $status3->{balance}, 0, "vend refund clears balance"
 # GAME STATE FSM
 # ══════════════════════════════════════════════════════════════════════════════
 
-my $game = make_game_state()
+my $game = Project::StateMachine::make_game_state()
 assert_eq $game->{state}(), "menu", "game initial menu"
 
 assert_eq $game->{start}(), "game started", "game start"
@@ -179,7 +179,7 @@ assert_eq $game->{state}(), "game_over", "game state over"
 # CONNECTION FSM
 # ══════════════════════════════════════════════════════════════════════════════
 
-my $conn = make_connection_fsm()
+my $conn = Project::StateMachine::make_connection_fsm()
 my $cstatus = $conn->{status}()
 assert_eq $cstatus->{state}, "disconnected", "conn initial disconnected"
 

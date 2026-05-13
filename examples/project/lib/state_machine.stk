@@ -1,6 +1,6 @@
 # lib/state_machine.stk — state machine patterns and FSM implementations
 
-fn make_traffic_light {
+fn Project::StateMachine::make_traffic_light {
     mysync $state = "red"
     my $transitions = {
         red    => "green",
@@ -18,7 +18,7 @@ fn make_traffic_light {
     { next => $next, current => $current, is_stop => $is_stop }
 }
 
-fn make_door_fsm {
+fn Project::StateMachine::make_door_fsm {
     mysync $state = "closed"
     mysync $locked = 0
 
@@ -53,7 +53,7 @@ fn make_door_fsm {
     { open => $open, close => $close, lock => $lock, unlock => $unlock, status => $status }
 }
 
-fn make_counter_fsm($min, $max) {
+fn Project::StateMachine::make_counter_fsm($min, $max) {
     mysync $value = $min
 
     my $increment = fn {
@@ -79,7 +79,7 @@ fn make_counter_fsm($min, $max) {
     { inc => $increment, dec => $decrement, reset => $reset, get => $get, at_min => $at_min, at_max => $at_max }
 }
 
-fn make_toggle_fsm {
+fn Project::StateMachine::make_toggle_fsm {
     mysync $on = 0
 
     my $toggle = fn {
@@ -94,7 +94,7 @@ fn make_toggle_fsm {
     { toggle => $toggle, is_on => $is_on, on => $turn_on, off => $turn_off }
 }
 
-fn make_parser_fsm {
+fn Project::StateMachine::make_parser_fsm {
     mysync $state = "start"
     mysync $tokens = []
 
@@ -132,7 +132,7 @@ fn make_parser_fsm {
     { feed => $feed, tokens => $get_tokens, reset => $reset }
 }
 
-fn make_vending_machine($price) {
+fn Project::StateMachine::make_vending_machine($price) {
     mysync $balance = 0
     mysync $item_dispensed = 0
 
@@ -165,7 +165,7 @@ fn make_vending_machine($price) {
     { insert => $insert, dispense => $dispense, refund => $refund, status => $status }
 }
 
-fn make_game_state {
+fn Project::StateMachine::make_game_state {
     mysync $state = "menu"
     mysync $score = 0
     mysync $lives = 3
@@ -217,7 +217,7 @@ fn make_game_state {
     }
 }
 
-fn make_connection_fsm {
+fn Project::StateMachine::make_connection_fsm {
     mysync $state = "disconnected"
     mysync $retries = 0
 

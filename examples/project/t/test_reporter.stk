@@ -42,8 +42,8 @@ my @threats = (
 my $has_pdf = eval { to_pdf("test", "/tmp/test.pdf"); 1 } // 0
 
 if ($has_pdf) {
-    my $path = generate_report($sys, $net, \@disks, $git, \@threats)
-    assert_ok defined($path), "generate_report returns path"
+    my $path = Project::Reporter::generate_report($sys, $net, \@disks, $git, \@threats)
+    assert_ok defined($path), "Project::Reporter::generate_report returns path"
     assert_ok $path =~ /\.pdf$/, "path ends with .pdf"
 } else {
     assert_ok 1, "skipping PDF tests (to_pdf not available)"

@@ -4,7 +4,7 @@
 require "./lib/scanner.stk"
 
 # System scan
-my $sys = scan_system()
+my $sys = Project::Scanner::scan_system()
 assert_ok $sys->{hostname}, "has hostname"
 assert_ok $sys->{os}, "has os"
 assert_gt $sys->{cpus}, 0, "has cpus"
@@ -12,7 +12,7 @@ assert_ok $sys->{ram}, "has ram"
 assert_ok $sys->{uptime}, "has uptime"
 
 # Disk scan
-my @disks = scan_disks()
+my @disks = Project::Scanner::scan_disks()
 assert_gt scalar(@disks), 0, "has disks"
 my $root = $disks[0]
 assert_ok $root->{mount}, "disk has mount"
@@ -20,23 +20,23 @@ assert_gt $root->{total}, 0, "disk has total"
 assert_ok $root->{free_h}, "disk has free_h"
 
 # Network scan
-my $net = scan_network()
+my $net = Project::Scanner::scan_network()
 assert_ok $net->{ipv4}, "has ipv4"
 assert_ok $net->{mac}, "has mac"
 
 # Interfaces
-my @ifaces = scan_interfaces()
+my @ifaces = Project::Scanner::scan_interfaces()
 assert_gt scalar(@ifaces), 0, "has interfaces"
 
 # Usage bar
-my $bar = usage_bar(50, 10)
+my $bar = Project::Scanner::usage_bar(50, 10)
 assert_ok $bar, "usage bar renders"
 assert_contains $bar, "█", "bar has filled chars"
 
-my $bar_full = usage_bar(100, 10)
+my $bar_full = Project::Scanner::usage_bar(100, 10)
 assert_contains $bar_full, "█", "full bar"
 
-my $bar_empty = usage_bar(0, 10)
+my $bar_empty = Project::Scanner::usage_bar(0, 10)
 assert_contains $bar_empty, "░", "empty bar"
 
 # Process scan

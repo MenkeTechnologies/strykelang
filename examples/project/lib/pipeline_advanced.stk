@@ -6,7 +6,7 @@
 #     fn { $val }
 # }
 
-fn flip($fn) {
+fn Project::PipelineAdvanced::flip($fn) {
     fn($a, $b) { $fn($b, $a) }
 }
 
@@ -14,11 +14,11 @@ fn flip($fn) {
 #     fn { $fn($first, @_) }
 # }
 
-fn partial_right($fn, $last) {
+fn Project::PipelineAdvanced::partial_right($fn, $last) {
     fn { $fn(@_, $last) }
 }
 
-fn curry2($fn) {
+fn Project::PipelineAdvanced::curry2($fn) {
     fn($a) {
         fn($b) {
             $fn($a, $b)
@@ -26,7 +26,7 @@ fn curry2($fn) {
     }
 }
 
-fn curry3($fn) {
+fn Project::PipelineAdvanced::curry3($fn) {
     fn($a) {
         fn($b) {
             fn($c) {
@@ -36,17 +36,17 @@ fn curry3($fn) {
     }
 }
 
-fn uncurry2($fn) {
+fn Project::PipelineAdvanced::uncurry2($fn) {
     fn($a, $b) {
         $fn($a)($b)
     }
 }
 
-fn compose2($f, $g) {
+fn Project::PipelineAdvanced::compose2($f, $g) {
     fn { $f($g(@_)) }
 }
 
-fn compose_all(@fns) {
+fn Project::PipelineAdvanced::compose_all(@fns) {
     return \&identity unless scalar(@fns)
     return $fns[0] if scalar(@fns) == 1
 
@@ -59,7 +59,7 @@ fn compose_all(@fns) {
     $result
 }
 
-fn pipe_all(@fns) {
+fn Project::PipelineAdvanced::pipe_all(@fns) {
     return \&identity unless scalar(@fns)
     return $fns[0] if scalar(@fns) == 1
 
@@ -170,7 +170,7 @@ fn pipe_all(@fns) {
 #     -1
 # }
 
-fn count_if($pred, @items) {
+fn Project::PipelineAdvanced::count_if($pred, @items) {
     my $count = 0
     ~> @items ep {
         $count++ if $pred(_)
