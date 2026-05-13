@@ -3,8 +3,8 @@
 
 use crate::value::StrykeValue;
 use parking_lot::RwLock;
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 fn arg_f64(args: &[StrykeValue], idx: usize) -> Option<f64> {
     args.get(idx).map(|v| v.to_number())
@@ -96,22 +96,70 @@ pub fn rna_to_dna(args: &[StrykeValue]) -> StrykeValue {
 }
 
 const CODON_TABLE: &[(&str, char)] = &[
-    ("TTT", 'F'), ("TTC", 'F'), ("TTA", 'L'), ("TTG", 'L'),
-    ("CTT", 'L'), ("CTC", 'L'), ("CTA", 'L'), ("CTG", 'L'),
-    ("ATT", 'I'), ("ATC", 'I'), ("ATA", 'I'), ("ATG", 'M'),
-    ("GTT", 'V'), ("GTC", 'V'), ("GTA", 'V'), ("GTG", 'V'),
-    ("TCT", 'S'), ("TCC", 'S'), ("TCA", 'S'), ("TCG", 'S'),
-    ("CCT", 'P'), ("CCC", 'P'), ("CCA", 'P'), ("CCG", 'P'),
-    ("ACT", 'T'), ("ACC", 'T'), ("ACA", 'T'), ("ACG", 'T'),
-    ("GCT", 'A'), ("GCC", 'A'), ("GCA", 'A'), ("GCG", 'A'),
-    ("TAT", 'Y'), ("TAC", 'Y'), ("TAA", '*'), ("TAG", '*'),
-    ("CAT", 'H'), ("CAC", 'H'), ("CAA", 'Q'), ("CAG", 'Q'),
-    ("AAT", 'N'), ("AAC", 'N'), ("AAA", 'K'), ("AAG", 'K'),
-    ("GAT", 'D'), ("GAC", 'D'), ("GAA", 'E'), ("GAG", 'E'),
-    ("TGT", 'C'), ("TGC", 'C'), ("TGA", '*'), ("TGG", 'W'),
-    ("CGT", 'R'), ("CGC", 'R'), ("CGA", 'R'), ("CGG", 'R'),
-    ("AGT", 'S'), ("AGC", 'S'), ("AGA", 'R'), ("AGG", 'R'),
-    ("GGT", 'G'), ("GGC", 'G'), ("GGA", 'G'), ("GGG", 'G'),
+    ("TTT", 'F'),
+    ("TTC", 'F'),
+    ("TTA", 'L'),
+    ("TTG", 'L'),
+    ("CTT", 'L'),
+    ("CTC", 'L'),
+    ("CTA", 'L'),
+    ("CTG", 'L'),
+    ("ATT", 'I'),
+    ("ATC", 'I'),
+    ("ATA", 'I'),
+    ("ATG", 'M'),
+    ("GTT", 'V'),
+    ("GTC", 'V'),
+    ("GTA", 'V'),
+    ("GTG", 'V'),
+    ("TCT", 'S'),
+    ("TCC", 'S'),
+    ("TCA", 'S'),
+    ("TCG", 'S'),
+    ("CCT", 'P'),
+    ("CCC", 'P'),
+    ("CCA", 'P'),
+    ("CCG", 'P'),
+    ("ACT", 'T'),
+    ("ACC", 'T'),
+    ("ACA", 'T'),
+    ("ACG", 'T'),
+    ("GCT", 'A'),
+    ("GCC", 'A'),
+    ("GCA", 'A'),
+    ("GCG", 'A'),
+    ("TAT", 'Y'),
+    ("TAC", 'Y'),
+    ("TAA", '*'),
+    ("TAG", '*'),
+    ("CAT", 'H'),
+    ("CAC", 'H'),
+    ("CAA", 'Q'),
+    ("CAG", 'Q'),
+    ("AAT", 'N'),
+    ("AAC", 'N'),
+    ("AAA", 'K'),
+    ("AAG", 'K'),
+    ("GAT", 'D'),
+    ("GAC", 'D'),
+    ("GAA", 'E'),
+    ("GAG", 'E'),
+    ("TGT", 'C'),
+    ("TGC", 'C'),
+    ("TGA", '*'),
+    ("TGG", 'W'),
+    ("CGT", 'R'),
+    ("CGC", 'R'),
+    ("CGA", 'R'),
+    ("CGG", 'R'),
+    ("AGT", 'S'),
+    ("AGC", 'S'),
+    ("AGA", 'R'),
+    ("AGG", 'R'),
+    ("GGT", 'G'),
+    ("GGC", 'G'),
+    ("GGA", 'G'),
+    ("GGG", 'G'),
 ];
 
 fn codon_map() -> HashMap<&'static str, char> {
@@ -129,7 +177,10 @@ pub fn dna_translate(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default().to_uppercase();
     let map = codon_map();
     let mut out = String::new();
-    let chars: Vec<char> = s.chars().filter(|c| matches!(c, 'A' | 'C' | 'G' | 'T' | 'N')).collect();
+    let chars: Vec<char> = s
+        .chars()
+        .filter(|c| matches!(c, 'A' | 'C' | 'G' | 'T' | 'N'))
+        .collect();
     let mut i = 0;
     while i + 3 <= chars.len() {
         let codon: String = chars[i..i + 3].iter().collect();
@@ -149,7 +200,10 @@ pub fn dna_gc_content(args: &[StrykeValue]) -> StrykeValue {
     if total == 0 {
         return StrykeValue::float(0.0);
     }
-    let gc = s.chars().filter(|c| matches!(c.to_ascii_uppercase(), 'G' | 'C')).count();
+    let gc = s
+        .chars()
+        .filter(|c| matches!(c.to_ascii_uppercase(), 'G' | 'C'))
+        .count();
     StrykeValue::float(gc as f64 / total as f64)
 }
 
@@ -159,7 +213,10 @@ pub fn dna_at_content(args: &[StrykeValue]) -> StrykeValue {
     if total == 0 {
         return StrykeValue::float(0.0);
     }
-    let at = s.chars().filter(|c| matches!(c.to_ascii_uppercase(), 'A' | 'T' | 'U')).count();
+    let at = s
+        .chars()
+        .filter(|c| matches!(c.to_ascii_uppercase(), 'A' | 'T' | 'U'))
+        .count();
     StrykeValue::float(at as f64 / total as f64)
 }
 
@@ -169,7 +226,10 @@ pub fn dna_melting_temp(args: &[StrykeValue]) -> StrykeValue {
     if n == 0 {
         return StrykeValue::float(0.0);
     }
-    let gc = s.chars().filter(|c| matches!(c.to_ascii_uppercase(), 'G' | 'C')).count();
+    let gc = s
+        .chars()
+        .filter(|c| matches!(c.to_ascii_uppercase(), 'G' | 'C'))
+        .count();
     let at = n - gc;
     if n < 14 {
         StrykeValue::float((2.0 * at as f64) + (4.0 * gc as f64))
@@ -189,7 +249,9 @@ pub fn dna_kmer_count(args: &[StrykeValue]) -> StrykeValue {
     }
     for i in 0..=chars.len() - k {
         let kmer: String = chars[i..i + k].iter().collect();
-        let entry = counts.entry(kmer).or_insert_with(|| StrykeValue::integer(0));
+        let entry = counts
+            .entry(kmer)
+            .or_insert_with(|| StrykeValue::integer(0));
         let n = entry.to_int();
         *entry = StrykeValue::integer(n + 1);
     }
@@ -208,7 +270,10 @@ pub fn dna_kmer_index(args: &[StrykeValue]) -> StrykeValue {
     let mut buckets: HashMap<String, Vec<StrykeValue>> = HashMap::new();
     for i in 0..=chars.len() - k {
         let kmer: String = chars[i..i + k].iter().collect();
-        buckets.entry(kmer).or_default().push(StrykeValue::integer(i as i64));
+        buckets
+            .entry(kmer)
+            .or_default()
+            .push(StrykeValue::integer(i as i64));
     }
     for (k, v) in buckets {
         idx.insert(k, arr_sv(v));
@@ -243,18 +308,37 @@ pub fn rna_reverse_complement(args: &[StrykeValue]) -> StrykeValue {
 }
 
 const AA_MW: &[(char, f64)] = &[
-    ('A', 89.09), ('R', 174.20), ('N', 132.12), ('D', 133.10),
-    ('C', 121.16), ('Q', 146.15), ('E', 147.13), ('G', 75.07),
-    ('H', 155.16), ('I', 131.17), ('L', 131.17), ('K', 146.19),
-    ('M', 149.21), ('F', 165.19), ('P', 115.13), ('S', 105.09),
-    ('T', 119.12), ('W', 204.23), ('Y', 181.19), ('V', 117.15),
+    ('A', 89.09),
+    ('R', 174.20),
+    ('N', 132.12),
+    ('D', 133.10),
+    ('C', 121.16),
+    ('Q', 146.15),
+    ('E', 147.13),
+    ('G', 75.07),
+    ('H', 155.16),
+    ('I', 131.17),
+    ('L', 131.17),
+    ('K', 146.19),
+    ('M', 149.21),
+    ('F', 165.19),
+    ('P', 115.13),
+    ('S', 105.09),
+    ('T', 119.12),
+    ('W', 204.23),
+    ('Y', 181.19),
+    ('V', 117.15),
 ];
 
 pub fn protein_molecular_weight(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default().to_uppercase();
     let map: HashMap<char, f64> = AA_MW.iter().cloned().collect();
     let total: f64 = s.chars().filter_map(|c| map.get(&c).copied()).sum();
-    let water = 18.02 * (s.chars().filter(|c| map.contains_key(c)).count().saturating_sub(1)) as f64;
+    let water = 18.02
+        * (s.chars()
+            .filter(|c| map.contains_key(c))
+            .count()
+            .saturating_sub(1)) as f64;
     StrykeValue::float(total - water)
 }
 
@@ -299,10 +383,26 @@ pub fn protein_pI(args: &[StrykeValue]) -> StrykeValue {
 }
 
 const AA_KD_HYDROPATHY: &[(char, f64)] = &[
-    ('A', 1.8), ('R', -4.5), ('N', -3.5), ('D', -3.5), ('C', 2.5),
-    ('Q', -3.5), ('E', -3.5), ('G', -0.4), ('H', -3.2), ('I', 4.5),
-    ('L', 3.8), ('K', -3.9), ('M', 1.9), ('F', 2.8), ('P', -1.6),
-    ('S', -0.8), ('T', -0.7), ('W', -0.9), ('Y', -1.3), ('V', 4.2),
+    ('A', 1.8),
+    ('R', -4.5),
+    ('N', -3.5),
+    ('D', -3.5),
+    ('C', 2.5),
+    ('Q', -3.5),
+    ('E', -3.5),
+    ('G', -0.4),
+    ('H', -3.2),
+    ('I', 4.5),
+    ('L', 3.8),
+    ('K', -3.9),
+    ('M', 1.9),
+    ('F', 2.8),
+    ('P', -1.6),
+    ('S', -0.8),
+    ('T', -0.7),
+    ('W', -0.9),
+    ('Y', -1.3),
+    ('V', 4.2),
 ];
 
 pub fn protein_hydrophobicity(args: &[StrykeValue]) -> StrykeValue {
@@ -338,16 +438,34 @@ pub fn protein_charge_at_ph(args: &[StrykeValue]) -> StrykeValue {
 pub fn codon_optimize(args: &[StrykeValue]) -> StrykeValue {
     let protein = arg_str(args, 0).unwrap_or_default().to_uppercase();
     let preferred: HashMap<char, &str> = [
-        ('F', "TTC"), ('L', "CTG"), ('I', "ATC"), ('M', "ATG"),
-        ('V', "GTG"), ('S', "AGC"), ('P', "CCG"), ('T', "ACC"),
-        ('A', "GCC"), ('Y', "TAC"), ('H', "CAC"), ('Q', "CAG"),
-        ('N', "AAC"), ('K', "AAG"), ('D', "GAC"), ('E', "GAG"),
-        ('C', "TGC"), ('W', "TGG"), ('R', "CGT"), ('G', "GGC"),
+        ('F', "TTC"),
+        ('L', "CTG"),
+        ('I', "ATC"),
+        ('M', "ATG"),
+        ('V', "GTG"),
+        ('S', "AGC"),
+        ('P', "CCG"),
+        ('T', "ACC"),
+        ('A', "GCC"),
+        ('Y', "TAC"),
+        ('H', "CAC"),
+        ('Q', "CAG"),
+        ('N', "AAC"),
+        ('K', "AAG"),
+        ('D', "GAC"),
+        ('E', "GAG"),
+        ('C', "TGC"),
+        ('W', "TGG"),
+        ('R', "CGT"),
+        ('G', "GGC"),
         ('*', "TAA"),
     ]
     .into_iter()
     .collect();
-    let dna: String = protein.chars().filter_map(|aa| preferred.get(&aa).copied()).collect();
+    let dna: String = protein
+        .chars()
+        .filter_map(|aa| preferred.get(&aa).copied())
+        .collect();
     StrykeValue::string(dna)
 }
 
@@ -355,11 +473,16 @@ pub fn codon_usage_table(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default().to_uppercase();
     use indexmap::IndexMap;
     let mut table: IndexMap<String, StrykeValue> = IndexMap::new();
-    let chars: Vec<char> = s.chars().filter(|c| matches!(c, 'A' | 'C' | 'G' | 'T')).collect();
+    let chars: Vec<char> = s
+        .chars()
+        .filter(|c| matches!(c, 'A' | 'C' | 'G' | 'T'))
+        .collect();
     let mut i = 0;
     while i + 3 <= chars.len() {
         let codon: String = chars[i..i + 3].iter().collect();
-        let entry = table.entry(codon).or_insert_with(|| StrykeValue::integer(0));
+        let entry = table
+            .entry(codon)
+            .or_insert_with(|| StrykeValue::integer(0));
         let n = entry.to_int();
         *entry = StrykeValue::integer(n + 1);
         i += 3;
@@ -388,16 +511,29 @@ pub fn levenshtein_edit_path(args: &[StrykeValue]) -> StrykeValue {
     for i in 1..=m {
         for j in 1..=n {
             let cost = if ac[i - 1] == bc[j - 1] { 0 } else { 1 };
-            dp[i][j] = (dp[i - 1][j] + 1).min(dp[i][j - 1] + 1).min(dp[i - 1][j - 1] + cost);
+            dp[i][j] = (dp[i - 1][j] + 1)
+                .min(dp[i][j - 1] + 1)
+                .min(dp[i - 1][j - 1] + cost);
         }
     }
     let mut path: Vec<StrykeValue> = Vec::new();
     let mut i = m;
     let mut j = n;
     while i > 0 || j > 0 {
-        if i > 0 && j > 0 && dp[i][j] == dp[i - 1][j - 1] + if ac[i - 1] == bc[j - 1] { 0 } else { 1 } {
-            let op = if ac[i - 1] == bc[j - 1] { "match" } else { "sub" };
-            path.push(StrykeValue::string(format!("{op}:{}->{}", ac[i - 1], bc[j - 1])));
+        if i > 0
+            && j > 0
+            && dp[i][j] == dp[i - 1][j - 1] + if ac[i - 1] == bc[j - 1] { 0 } else { 1 }
+        {
+            let op = if ac[i - 1] == bc[j - 1] {
+                "match"
+            } else {
+                "sub"
+            };
+            path.push(StrykeValue::string(format!(
+                "{op}:{}->{}",
+                ac[i - 1],
+                bc[j - 1]
+            )));
             i -= 1;
             j -= 1;
         } else if i > 0 && dp[i][j] == dp[i - 1][j] + 1 {
@@ -431,7 +567,12 @@ pub fn nw_score(args: &[StrykeValue]) -> StrykeValue {
     }
     for i in 1..=m {
         for j in 1..=n {
-            let diag = dp[i - 1][j - 1] + if ac[i - 1] == bc[j - 1] { match_score } else { mismatch };
+            let diag = dp[i - 1][j - 1]
+                + if ac[i - 1] == bc[j - 1] {
+                    match_score
+                } else {
+                    mismatch
+                };
             let up = dp[i - 1][j] + gap;
             let left = dp[i][j - 1] + gap;
             dp[i][j] = diag.max(up).max(left);
@@ -454,7 +595,12 @@ pub fn sw_score(args: &[StrykeValue]) -> StrykeValue {
     let mut best = 0.0_f64;
     for i in 1..=m {
         for j in 1..=n {
-            let diag = dp[i - 1][j - 1] + if ac[i - 1] == bc[j - 1] { match_score } else { mismatch };
+            let diag = dp[i - 1][j - 1]
+                + if ac[i - 1] == bc[j - 1] {
+                    match_score
+                } else {
+                    mismatch
+                };
             let up = dp[i - 1][j] + gap;
             let left = dp[i][j - 1] + gap;
             dp[i][j] = diag.max(up).max(left).max(0.0);
@@ -485,16 +631,18 @@ pub fn sequence_similarity_pct(args: &[StrykeValue]) -> StrykeValue {
     }
     let group = |c: char| -> usize {
         match c {
-            'A' | 'V' | 'L' | 'I' | 'M' => 0,           // aliphatic
-            'F' | 'W' | 'Y' => 1,                       // aromatic
-            'S' | 'T' | 'C' | 'P' | 'N' | 'Q' => 2,     // polar
-            'K' | 'R' | 'H' => 3,                       // basic
-            'D' | 'E' => 4,                             // acidic
+            'A' | 'V' | 'L' | 'I' | 'M' => 0,       // aliphatic
+            'F' | 'W' | 'Y' => 1,                   // aromatic
+            'S' | 'T' | 'C' | 'P' | 'N' | 'Q' => 2, // polar
+            'K' | 'R' | 'H' => 3,                   // basic
+            'D' | 'E' => 4,                         // acidic
             'G' => 5,
             _ => 99,
         }
     };
-    let similar = a.chars().zip(b.chars())
+    let similar = a
+        .chars()
+        .zip(b.chars())
         .filter(|(x, y)| x == y || (group(*x) == group(*y) && group(*x) != 99))
         .count();
     StrykeValue::float(100.0 * similar as f64 / len as f64)
@@ -582,7 +730,9 @@ pub fn vec3_normalize(args: &[StrykeValue]) -> StrykeValue {
 pub fn vec3_distance(args: &[StrykeValue]) -> StrykeValue {
     let a = unpack_vec3(args.first().unwrap_or(&StrykeValue::UNDEF));
     let b = unpack_vec3(args.get(1).unwrap_or(&StrykeValue::UNDEF));
-    StrykeValue::float(((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt())
+    StrykeValue::float(
+        ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt(),
+    )
 }
 
 pub fn vec3_lerp(args: &[StrykeValue]) -> StrykeValue {
@@ -613,7 +763,11 @@ pub fn vec3_refract(args: &[StrykeValue]) -> StrykeValue {
         return pack_vec3([0.0; 3]);
     }
     let f = eta * dot + k.sqrt();
-    pack_vec3([eta * v[0] - f * n[0], eta * v[1] - f * n[1], eta * v[2] - f * n[2]])
+    pack_vec3([
+        eta * v[0] - f * n[0],
+        eta * v[1] - f * n[1],
+        eta * v[2] - f * n[2],
+    ])
 }
 
 pub fn vec3_project(args: &[StrykeValue]) -> StrykeValue {
@@ -840,10 +994,22 @@ pub fn mat4_look_at(args: &[StrykeValue]) -> StrykeValue {
         s[0] * f[1] - s[1] * f[0],
     ];
     let m = [
-        s[0], s[1], s[2], -(s[0] * eye[0] + s[1] * eye[1] + s[2] * eye[2]),
-        u[0], u[1], u[2], -(u[0] * eye[0] + u[1] * eye[1] + u[2] * eye[2]),
-        -f[0], -f[1], -f[2], f[0] * eye[0] + f[1] * eye[1] + f[2] * eye[2],
-        0.0, 0.0, 0.0, 1.0,
+        s[0],
+        s[1],
+        s[2],
+        -(s[0] * eye[0] + s[1] * eye[1] + s[2] * eye[2]),
+        u[0],
+        u[1],
+        u[2],
+        -(u[0] * eye[0] + u[1] * eye[1] + u[2] * eye[2]),
+        -f[0],
+        -f[1],
+        -f[2],
+        f[0] * eye[0] + f[1] * eye[1] + f[2] * eye[2],
+        0.0,
+        0.0,
+        0.0,
+        1.0,
     ];
     flat_to_mat4(m)
 }
@@ -877,10 +1043,17 @@ pub fn mat4_transpose(args: &[StrykeValue]) -> StrykeValue {
 
 fn mat4_det_inner(m: &[f64; 16]) -> f64 {
     let a = m;
-    a[0] * (a[5] * (a[10] * a[15] - a[11] * a[14]) - a[6] * (a[9] * a[15] - a[11] * a[13]) + a[7] * (a[9] * a[14] - a[10] * a[13]))
-        - a[1] * (a[4] * (a[10] * a[15] - a[11] * a[14]) - a[6] * (a[8] * a[15] - a[11] * a[12]) + a[7] * (a[8] * a[14] - a[10] * a[12]))
-        + a[2] * (a[4] * (a[9] * a[15] - a[11] * a[13]) - a[5] * (a[8] * a[15] - a[11] * a[12]) + a[7] * (a[8] * a[13] - a[9] * a[12]))
-        - a[3] * (a[4] * (a[9] * a[14] - a[10] * a[13]) - a[5] * (a[8] * a[14] - a[10] * a[12]) + a[6] * (a[8] * a[13] - a[9] * a[12]))
+    a[0] * (a[5] * (a[10] * a[15] - a[11] * a[14]) - a[6] * (a[9] * a[15] - a[11] * a[13])
+        + a[7] * (a[9] * a[14] - a[10] * a[13]))
+        - a[1]
+            * (a[4] * (a[10] * a[15] - a[11] * a[14]) - a[6] * (a[8] * a[15] - a[11] * a[12])
+                + a[7] * (a[8] * a[14] - a[10] * a[12]))
+        + a[2]
+            * (a[4] * (a[9] * a[15] - a[11] * a[13]) - a[5] * (a[8] * a[15] - a[11] * a[12])
+                + a[7] * (a[8] * a[13] - a[9] * a[12]))
+        - a[3]
+            * (a[4] * (a[9] * a[14] - a[10] * a[13]) - a[5] * (a[8] * a[14] - a[10] * a[12])
+                + a[6] * (a[8] * a[13] - a[9] * a[12]))
 }
 
 pub fn mat4_determinant(args: &[StrykeValue]) -> StrykeValue {
@@ -895,22 +1068,70 @@ pub fn mat4_inverse(args: &[StrykeValue]) -> StrykeValue {
         return mat4_identity(args);
     }
     let mut inv = [0.0; 16];
-    inv[0] = m[5] * m[10] * m[15] - m[5] * m[11] * m[14] - m[9] * m[6] * m[15] + m[9] * m[7] * m[14] + m[13] * m[6] * m[11] - m[13] * m[7] * m[10];
-    inv[4] = -m[4] * m[10] * m[15] + m[4] * m[11] * m[14] + m[8] * m[6] * m[15] - m[8] * m[7] * m[14] - m[12] * m[6] * m[11] + m[12] * m[7] * m[10];
-    inv[8] = m[4] * m[9] * m[15] - m[4] * m[11] * m[13] - m[8] * m[5] * m[15] + m[8] * m[7] * m[13] + m[12] * m[5] * m[11] - m[12] * m[7] * m[9];
-    inv[12] = -m[4] * m[9] * m[14] + m[4] * m[10] * m[13] + m[8] * m[5] * m[14] - m[8] * m[6] * m[13] - m[12] * m[5] * m[10] + m[12] * m[6] * m[9];
-    inv[1] = -m[1] * m[10] * m[15] + m[1] * m[11] * m[14] + m[9] * m[2] * m[15] - m[9] * m[3] * m[14] - m[13] * m[2] * m[11] + m[13] * m[3] * m[10];
-    inv[5] = m[0] * m[10] * m[15] - m[0] * m[11] * m[14] - m[8] * m[2] * m[15] + m[8] * m[3] * m[14] + m[12] * m[2] * m[11] - m[12] * m[3] * m[10];
-    inv[9] = -m[0] * m[9] * m[15] + m[0] * m[11] * m[13] + m[8] * m[1] * m[15] - m[8] * m[3] * m[13] - m[12] * m[1] * m[11] + m[12] * m[3] * m[9];
-    inv[13] = m[0] * m[9] * m[14] - m[0] * m[10] * m[13] - m[8] * m[1] * m[14] + m[8] * m[2] * m[13] + m[12] * m[1] * m[10] - m[12] * m[2] * m[9];
-    inv[2] = m[1] * m[6] * m[15] - m[1] * m[7] * m[14] - m[5] * m[2] * m[15] + m[5] * m[3] * m[14] + m[13] * m[2] * m[7] - m[13] * m[3] * m[6];
-    inv[6] = -m[0] * m[6] * m[15] + m[0] * m[7] * m[14] + m[4] * m[2] * m[15] - m[4] * m[3] * m[14] - m[12] * m[2] * m[7] + m[12] * m[3] * m[6];
-    inv[10] = m[0] * m[5] * m[15] - m[0] * m[7] * m[13] - m[4] * m[1] * m[15] + m[4] * m[3] * m[13] + m[12] * m[1] * m[7] - m[12] * m[3] * m[5];
-    inv[14] = -m[0] * m[5] * m[14] + m[0] * m[6] * m[13] + m[4] * m[1] * m[14] - m[4] * m[2] * m[13] - m[12] * m[1] * m[6] + m[12] * m[2] * m[5];
-    inv[3] = -m[1] * m[6] * m[11] + m[1] * m[7] * m[10] + m[5] * m[2] * m[11] - m[5] * m[3] * m[10] - m[9] * m[2] * m[7] + m[9] * m[3] * m[6];
-    inv[7] = m[0] * m[6] * m[11] - m[0] * m[7] * m[10] - m[4] * m[2] * m[11] + m[4] * m[3] * m[10] + m[8] * m[2] * m[7] - m[8] * m[3] * m[6];
-    inv[11] = -m[0] * m[5] * m[11] + m[0] * m[7] * m[9] + m[4] * m[1] * m[11] - m[4] * m[3] * m[9] - m[8] * m[1] * m[7] + m[8] * m[3] * m[5];
-    inv[15] = m[0] * m[5] * m[10] - m[0] * m[6] * m[9] - m[4] * m[1] * m[10] + m[4] * m[2] * m[9] + m[8] * m[1] * m[6] - m[8] * m[2] * m[5];
+    inv[0] = m[5] * m[10] * m[15] - m[5] * m[11] * m[14] - m[9] * m[6] * m[15]
+        + m[9] * m[7] * m[14]
+        + m[13] * m[6] * m[11]
+        - m[13] * m[7] * m[10];
+    inv[4] = -m[4] * m[10] * m[15] + m[4] * m[11] * m[14] + m[8] * m[6] * m[15]
+        - m[8] * m[7] * m[14]
+        - m[12] * m[6] * m[11]
+        + m[12] * m[7] * m[10];
+    inv[8] = m[4] * m[9] * m[15] - m[4] * m[11] * m[13] - m[8] * m[5] * m[15]
+        + m[8] * m[7] * m[13]
+        + m[12] * m[5] * m[11]
+        - m[12] * m[7] * m[9];
+    inv[12] = -m[4] * m[9] * m[14] + m[4] * m[10] * m[13] + m[8] * m[5] * m[14]
+        - m[8] * m[6] * m[13]
+        - m[12] * m[5] * m[10]
+        + m[12] * m[6] * m[9];
+    inv[1] = -m[1] * m[10] * m[15] + m[1] * m[11] * m[14] + m[9] * m[2] * m[15]
+        - m[9] * m[3] * m[14]
+        - m[13] * m[2] * m[11]
+        + m[13] * m[3] * m[10];
+    inv[5] = m[0] * m[10] * m[15] - m[0] * m[11] * m[14] - m[8] * m[2] * m[15]
+        + m[8] * m[3] * m[14]
+        + m[12] * m[2] * m[11]
+        - m[12] * m[3] * m[10];
+    inv[9] = -m[0] * m[9] * m[15] + m[0] * m[11] * m[13] + m[8] * m[1] * m[15]
+        - m[8] * m[3] * m[13]
+        - m[12] * m[1] * m[11]
+        + m[12] * m[3] * m[9];
+    inv[13] = m[0] * m[9] * m[14] - m[0] * m[10] * m[13] - m[8] * m[1] * m[14]
+        + m[8] * m[2] * m[13]
+        + m[12] * m[1] * m[10]
+        - m[12] * m[2] * m[9];
+    inv[2] = m[1] * m[6] * m[15] - m[1] * m[7] * m[14] - m[5] * m[2] * m[15]
+        + m[5] * m[3] * m[14]
+        + m[13] * m[2] * m[7]
+        - m[13] * m[3] * m[6];
+    inv[6] = -m[0] * m[6] * m[15] + m[0] * m[7] * m[14] + m[4] * m[2] * m[15]
+        - m[4] * m[3] * m[14]
+        - m[12] * m[2] * m[7]
+        + m[12] * m[3] * m[6];
+    inv[10] = m[0] * m[5] * m[15] - m[0] * m[7] * m[13] - m[4] * m[1] * m[15]
+        + m[4] * m[3] * m[13]
+        + m[12] * m[1] * m[7]
+        - m[12] * m[3] * m[5];
+    inv[14] = -m[0] * m[5] * m[14] + m[0] * m[6] * m[13] + m[4] * m[1] * m[14]
+        - m[4] * m[2] * m[13]
+        - m[12] * m[1] * m[6]
+        + m[12] * m[2] * m[5];
+    inv[3] = -m[1] * m[6] * m[11] + m[1] * m[7] * m[10] + m[5] * m[2] * m[11]
+        - m[5] * m[3] * m[10]
+        - m[9] * m[2] * m[7]
+        + m[9] * m[3] * m[6];
+    inv[7] = m[0] * m[6] * m[11] - m[0] * m[7] * m[10] - m[4] * m[2] * m[11]
+        + m[4] * m[3] * m[10]
+        + m[8] * m[2] * m[7]
+        - m[8] * m[3] * m[6];
+    inv[11] = -m[0] * m[5] * m[11] + m[0] * m[7] * m[9] + m[4] * m[1] * m[11]
+        - m[4] * m[3] * m[9]
+        - m[8] * m[1] * m[7]
+        + m[8] * m[3] * m[5];
+    inv[15] = m[0] * m[5] * m[10] - m[0] * m[6] * m[9] - m[4] * m[1] * m[10]
+        + m[4] * m[2] * m[9]
+        + m[8] * m[1] * m[6]
+        - m[8] * m[2] * m[5];
     for v in &mut inv {
         *v /= det;
     }
@@ -1012,10 +1233,22 @@ pub fn quat_to_mat4(args: &[StrykeValue]) -> StrykeValue {
     let wy = w * y;
     let wz = w * z;
     let m = [
-        1.0 - 2.0 * (yy + zz), 2.0 * (xy - wz), 2.0 * (xz + wy), 0.0,
-        2.0 * (xy + wz), 1.0 - 2.0 * (xx + zz), 2.0 * (yz - wx), 0.0,
-        2.0 * (xz - wy), 2.0 * (yz + wx), 1.0 - 2.0 * (xx + yy), 0.0,
-        0.0, 0.0, 0.0, 1.0,
+        1.0 - 2.0 * (yy + zz),
+        2.0 * (xy - wz),
+        2.0 * (xz + wy),
+        0.0,
+        2.0 * (xy + wz),
+        1.0 - 2.0 * (xx + zz),
+        2.0 * (yz - wx),
+        0.0,
+        2.0 * (xz - wy),
+        2.0 * (yz + wx),
+        1.0 - 2.0 * (xx + yy),
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
     ];
     flat_to_mat4(m)
 }
@@ -1038,9 +1271,12 @@ pub fn aabb_contains_point(args: &[StrykeValue]) -> StrykeValue {
     let min = unpack_vec3(&aabb[0]);
     let max = unpack_vec3(&aabb[1]);
     let p = unpack_vec3(args.get(1).unwrap_or(&StrykeValue::UNDEF));
-    let inside = p[0] >= min[0] && p[0] <= max[0]
-        && p[1] >= min[1] && p[1] <= max[1]
-        && p[2] >= min[2] && p[2] <= max[2];
+    let inside = p[0] >= min[0]
+        && p[0] <= max[0]
+        && p[1] >= min[1]
+        && p[1] <= max[1]
+        && p[2] >= min[2]
+        && p[2] <= max[2];
     StrykeValue::integer(if inside { 1 } else { 0 })
 }
 
@@ -1054,9 +1290,12 @@ pub fn aabb_intersects(args: &[StrykeValue]) -> StrykeValue {
     let amax = unpack_vec3(&a[1]);
     let bmin = unpack_vec3(&b[0]);
     let bmax = unpack_vec3(&b[1]);
-    let hit = amin[0] <= bmax[0] && amax[0] >= bmin[0]
-        && amin[1] <= bmax[1] && amax[1] >= bmin[1]
-        && amin[2] <= bmax[2] && amax[2] >= bmin[2];
+    let hit = amin[0] <= bmax[0]
+        && amax[0] >= bmin[0]
+        && amin[1] <= bmax[1]
+        && amax[1] >= bmin[1]
+        && amin[2] <= bmax[2]
+        && amax[2] >= bmin[2];
     StrykeValue::integer(if hit { 1 } else { 0 })
 }
 
@@ -1071,8 +1310,16 @@ pub fn aabb_union(args: &[StrykeValue]) -> StrykeValue {
     let bmin = unpack_vec3(&b[0]);
     let bmax = unpack_vec3(&b[1]);
     arr_sv(vec![
-        pack_vec3([amin[0].min(bmin[0]), amin[1].min(bmin[1]), amin[2].min(bmin[2])]),
-        pack_vec3([amax[0].max(bmax[0]), amax[1].max(bmax[1]), amax[2].max(bmax[2])]),
+        pack_vec3([
+            amin[0].min(bmin[0]),
+            amin[1].min(bmin[1]),
+            amin[2].min(bmin[2]),
+        ]),
+        pack_vec3([
+            amax[0].max(bmax[0]),
+            amax[1].max(bmax[1]),
+            amax[2].max(bmax[2]),
+        ]),
     ])
 }
 
@@ -1125,7 +1372,11 @@ pub fn ray_plane_intersect(args: &[StrykeValue]) -> StrykeValue {
     if denom.abs() < 1e-12 {
         return StrykeValue::float(-1.0);
     }
-    let diff = [point[0] - origin[0], point[1] - origin[1], point[2] - origin[2]];
+    let diff = [
+        point[0] - origin[0],
+        point[1] - origin[1],
+        point[2] - origin[2],
+    ];
     let t = (diff[0] * normal[0] + diff[1] * normal[1] + diff[2] * normal[2]) / denom;
     StrykeValue::float(if t >= 0.0 { t } else { -1.0 })
 }
@@ -1172,7 +1423,11 @@ pub fn plane_distance_to_point(args: &[StrykeValue]) -> StrykeValue {
     if n_len < 1e-12 {
         return StrykeValue::float(0.0);
     }
-    let diff = [point[0] - plane_point[0], point[1] - plane_point[1], point[2] - plane_point[2]];
+    let diff = [
+        point[0] - plane_point[0],
+        point[1] - plane_point[1],
+        point[2] - plane_point[2],
+    ];
     let dot = diff[0] * normal[0] + diff[1] * normal[1] + diff[2] * normal[2];
     StrykeValue::float(dot / n_len)
 }
@@ -1324,7 +1579,10 @@ pub fn wav_header_read(args: &[StrykeValue]) -> StrykeValue {
         ("format", StrykeValue::string("WAV".into())),
         ("channels", StrykeValue::integer(channels as i64)),
         ("sample_rate", StrykeValue::integer(sample_rate as i64)),
-        ("bits_per_sample", StrykeValue::integer(bits_per_sample as i64)),
+        (
+            "bits_per_sample",
+            StrykeValue::integer(bits_per_sample as i64),
+        ),
     ])
 }
 
@@ -1357,8 +1615,10 @@ pub fn zip_central_directory(args: &[StrykeValue]) -> StrykeValue {
     for i in (0..=n - 22).rev() {
         if bytes[i..i + 4] == sig {
             let entries = u16::from_le_bytes([bytes[i + 10], bytes[i + 11]]);
-            let cd_size = u32::from_le_bytes([bytes[i + 12], bytes[i + 13], bytes[i + 14], bytes[i + 15]]);
-            let cd_offset = u32::from_le_bytes([bytes[i + 16], bytes[i + 17], bytes[i + 18], bytes[i + 19]]);
+            let cd_size =
+                u32::from_le_bytes([bytes[i + 12], bytes[i + 13], bytes[i + 14], bytes[i + 15]]);
+            let cd_offset =
+                u32::from_le_bytes([bytes[i + 16], bytes[i + 17], bytes[i + 18], bytes[i + 19]]);
             return make_hash(vec![
                 ("entries", StrykeValue::integer(entries as i64)),
                 ("cd_size", StrykeValue::integer(cd_size as i64)),
@@ -1382,8 +1642,14 @@ pub fn zip_local_file_header(args: &[StrykeValue]) -> StrykeValue {
     make_hash(vec![
         ("compression", StrykeValue::integer(compression as i64)),
         ("crc32", StrykeValue::integer(crc32 as i64)),
-        ("compressed_size", StrykeValue::integer(compressed_size as i64)),
-        ("uncompressed_size", StrykeValue::integer(uncompressed_size as i64)),
+        (
+            "compressed_size",
+            StrykeValue::integer(compressed_size as i64),
+        ),
+        (
+            "uncompressed_size",
+            StrykeValue::integer(uncompressed_size as i64),
+        ),
     ])
 }
 
@@ -1396,7 +1662,9 @@ pub fn tar_header_read(args: &[StrykeValue]) -> StrykeValue {
     let name = String::from_utf8_lossy(&bytes[..100])
         .trim_end_matches('\0')
         .to_string();
-    let size_str = String::from_utf8_lossy(&bytes[124..136]).trim_end_matches('\0').to_string();
+    let size_str = String::from_utf8_lossy(&bytes[124..136])
+        .trim_end_matches('\0')
+        .to_string();
     let size = i64::from_str_radix(size_str.trim(), 8).unwrap_or(0);
     make_hash(vec![
         ("name", StrykeValue::string(name)),
@@ -1468,7 +1736,9 @@ pub fn bootstrap_resample(args: &[StrykeValue]) -> StrykeValue {
     let mut state = seed.wrapping_add(0x9E3779B97F4A7C15);
     let mut out = Vec::with_capacity(n);
     for _ in 0..n {
-        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let idx = (state >> 32) as usize % xs.len();
         out.push(xs[idx]);
     }
@@ -1480,7 +1750,9 @@ pub fn shuffle_resample(args: &[StrykeValue]) -> StrykeValue {
     let seed = arg_i64(args, 1).unwrap_or(0) as u64;
     let mut state = seed.wrapping_add(0x9E3779B97F4A7C15);
     for i in (1..xs.len()).rev() {
-        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let j = (state >> 32) as usize % (i + 1);
         xs.swap(i, j);
     }
@@ -1503,7 +1775,9 @@ pub fn permutation_test(args: &[StrykeValue]) -> StrykeValue {
     let mut count = 0u64;
     for _ in 0..n_perms {
         for i in (1..combined.len()).rev() {
-            state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             let j = (state >> 32) as usize % (i + 1);
             combined.swap(i, j);
         }
@@ -1517,7 +1791,13 @@ pub fn permutation_test(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn markov_transition_matrix(args: &[StrykeValue]) -> StrykeValue {
-    let seq: Vec<i64> = args.first().map(as_vec_sv).unwrap_or_default().iter().map(|x| x.to_int()).collect();
+    let seq: Vec<i64> = args
+        .first()
+        .map(as_vec_sv)
+        .unwrap_or_default()
+        .iter()
+        .map(|x| x.to_int())
+        .collect();
     if seq.len() < 2 {
         return matrix_to_sv(&[]);
     }
@@ -1580,7 +1860,13 @@ pub fn viterbi_decode(args: &[StrykeValue]) -> StrykeValue {
     let mut viterbi = vec![vec![0.0_f64; n_states]; t];
     let mut backpointer = vec![vec![0usize; n_states]; t];
     for s in 0..n_states {
-        viterbi[0][s] = init[s].ln() + emit.get(s).and_then(|r| r.get(obs[0])).copied().unwrap_or(0.0).ln();
+        viterbi[0][s] = init[s].ln()
+            + emit
+                .get(s)
+                .and_then(|r| r.get(obs[0]))
+                .copied()
+                .unwrap_or(0.0)
+                .ln();
     }
     for i in 1..t {
         for s in 0..n_states {
@@ -1588,13 +1874,24 @@ pub fn viterbi_decode(args: &[StrykeValue]) -> StrykeValue {
             let mut bp = 0;
             for prev in 0..n_states {
                 let score = viterbi[i - 1][prev]
-                    + trans.get(prev).and_then(|r| r.get(s)).copied().unwrap_or(0.0).ln();
+                    + trans
+                        .get(prev)
+                        .and_then(|r| r.get(s))
+                        .copied()
+                        .unwrap_or(0.0)
+                        .ln();
                 if score > best {
                     best = score;
                     bp = prev;
                 }
             }
-            viterbi[i][s] = best + emit.get(s).and_then(|r| r.get(obs[i])).copied().unwrap_or(0.0).ln();
+            viterbi[i][s] = best
+                + emit
+                    .get(s)
+                    .and_then(|r| r.get(obs[i]))
+                    .copied()
+                    .unwrap_or(0.0)
+                    .ln();
             backpointer[i][s] = bp;
         }
     }
@@ -1611,7 +1908,11 @@ pub fn viterbi_decode(args: &[StrykeValue]) -> StrykeValue {
     for i in (0..t - 1).rev() {
         path[i] = backpointer[i + 1][path[i + 1]];
     }
-    arr_sv(path.into_iter().map(|x| StrykeValue::integer(x as i64)).collect())
+    arr_sv(
+        path.into_iter()
+            .map(|x| StrykeValue::integer(x as i64))
+            .collect(),
+    )
 }
 
 pub fn forward_algorithm(args: &[StrykeValue]) -> StrykeValue {
@@ -1631,15 +1932,29 @@ pub fn forward_algorithm(args: &[StrykeValue]) -> StrykeValue {
     }
     let mut alpha = vec![0.0_f64; n_states];
     for s in 0..n_states {
-        alpha[s] = init[s] * emit.get(s).and_then(|r| r.get(obs[0])).copied().unwrap_or(0.0);
+        alpha[s] = init[s]
+            * emit
+                .get(s)
+                .and_then(|r| r.get(obs[0]))
+                .copied()
+                .unwrap_or(0.0);
     }
     for i in 1..obs.len() {
         let mut next = vec![0.0_f64; n_states];
         for j in 0..n_states {
             for prev in 0..n_states {
-                next[j] += alpha[prev] * trans.get(prev).and_then(|r| r.get(j)).copied().unwrap_or(0.0);
+                next[j] += alpha[prev]
+                    * trans
+                        .get(prev)
+                        .and_then(|r| r.get(j))
+                        .copied()
+                        .unwrap_or(0.0);
             }
-            next[j] *= emit.get(j).and_then(|r| r.get(obs[i])).copied().unwrap_or(0.0);
+            next[j] *= emit
+                .get(j)
+                .and_then(|r| r.get(obs[i]))
+                .copied()
+                .unwrap_or(0.0);
         }
         alpha = next;
     }
@@ -1668,14 +1983,26 @@ pub fn backward_algorithm(args: &[StrykeValue]) -> StrykeValue {
         for s in 0..n_states {
             for ns in 0..n_states {
                 next[s] += trans.get(s).and_then(|r| r.get(ns)).copied().unwrap_or(0.0)
-                    * emit.get(ns).and_then(|r| r.get(obs[i + 1])).copied().unwrap_or(0.0)
+                    * emit
+                        .get(ns)
+                        .and_then(|r| r.get(obs[i + 1]))
+                        .copied()
+                        .unwrap_or(0.0)
                     * beta[ns];
             }
         }
         beta = next;
     }
     let total: f64 = (0..n_states)
-        .map(|s| init[s] * emit.get(s).and_then(|r| r.get(obs[0])).copied().unwrap_or(0.0) * beta[s])
+        .map(|s| {
+            init[s]
+                * emit
+                    .get(s)
+                    .and_then(|r| r.get(obs[0]))
+                    .copied()
+                    .unwrap_or(0.0)
+                * beta[s]
+        })
         .sum();
     StrykeValue::float(total)
 }
@@ -1702,7 +2029,9 @@ pub fn hyperloglog_pp_add(args: &[StrykeValue]) -> StrykeValue {
         if regs.len() != m {
             regs.resize(m, 0);
         }
-        let hash = item.bytes().fold(0xCBF29CE484222325u64, |h, b| h.wrapping_mul(0x100000001B3).wrapping_add(b as u64));
+        let hash = item.bytes().fold(0xCBF29CE484222325u64, |h, b| {
+            h.wrapping_mul(0x100000001B3).wrapping_add(b as u64)
+        });
         let idx = (hash >> (64 - precision)) as usize;
         let w = (hash << precision) | (1u64 << (precision - 1));
         let leading = w.leading_zeros() as i64 + 1;
@@ -1766,7 +2095,10 @@ mod tests {
 
     #[test]
     fn dna_reverse_complement_basic() {
-        assert_eq!(dna_reverse_complement(&[sv_s("AAATGGC")]).as_str_or_empty(), "GCCATTT");
+        assert_eq!(
+            dna_reverse_complement(&[sv_s("AAATGGC")]).as_str_or_empty(),
+            "GCCATTT"
+        );
     }
 
     #[test]
@@ -1796,7 +2128,14 @@ mod tests {
 
     #[test]
     fn sw_score_local_match() {
-        let r = sw_score(&[sv_s("XXACGTYY"), sv_s("ZZACGTWW"), sv(2.0), sv(-1.0), sv(-2.0)]).to_number();
+        let r = sw_score(&[
+            sv_s("XXACGTYY"),
+            sv_s("ZZACGTWW"),
+            sv(2.0),
+            sv(-1.0),
+            sv(-2.0),
+        ])
+        .to_number();
         assert!(r >= 8.0);
     }
 
@@ -1836,7 +2175,10 @@ mod tests {
 
     #[test]
     fn aabb_contains_point_inside() {
-        let aabb = arr_sv(vec![arr_f64(vec![0.0, 0.0, 0.0]), arr_f64(vec![10.0, 10.0, 10.0])]);
+        let aabb = arr_sv(vec![
+            arr_f64(vec![0.0, 0.0, 0.0]),
+            arr_f64(vec![10.0, 10.0, 10.0]),
+        ]);
         assert_eq!(
             aabb_contains_point(&[aabb, arr_f64(vec![5.0, 5.0, 5.0])]).to_int(),
             1
@@ -1845,7 +2187,10 @@ mod tests {
 
     #[test]
     fn ray_aabb_hit() {
-        let aabb = arr_sv(vec![arr_f64(vec![0.0, 0.0, 0.0]), arr_f64(vec![1.0, 1.0, 1.0])]);
+        let aabb = arr_sv(vec![
+            arr_f64(vec![0.0, 0.0, 0.0]),
+            arr_f64(vec![1.0, 1.0, 1.0]),
+        ]);
         let origin = arr_f64(vec![-1.0, 0.5, 0.5]);
         let dir = arr_f64(vec![1.0, 0.0, 0.0]);
         let t = ray_aabb_intersect(&[origin, dir, aabb]).to_number();

@@ -49,7 +49,11 @@ pub fn bit_extract(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0);
     let start = arg_i64(args, 1).unwrap_or(0).max(0) as u32;
     let len = arg_i64(args, 2).unwrap_or(1).clamp(1, 64) as u32;
-    let mask = if len >= 64 { u64::MAX } else { (1u64 << len) - 1 };
+    let mask = if len >= 64 {
+        u64::MAX
+    } else {
+        (1u64 << len) - 1
+    };
     StrykeValue::integer(((x >> start) & mask) as i64)
 }
 
@@ -58,7 +62,11 @@ pub fn bit_insert(args: &[StrykeValue]) -> StrykeValue {
     let v = arg_u64(args, 1).unwrap_or(0);
     let start = arg_i64(args, 2).unwrap_or(0).max(0) as u32;
     let len = arg_i64(args, 3).unwrap_or(1).clamp(1, 64) as u32;
-    let mask = if len >= 64 { u64::MAX } else { (1u64 << len) - 1 };
+    let mask = if len >= 64 {
+        u64::MAX
+    } else {
+        (1u64 << len) - 1
+    };
     let cleared = x & !(mask << start);
     StrykeValue::integer((cleared | ((v & mask) << start)) as i64)
 }
@@ -187,7 +195,9 @@ pub fn popcount_u64(args: &[StrykeValue]) -> StrykeValue {
 // Music theory
 // ══════════════════════════════════════════════════════════════════════
 
-const NOTE_NAMES: [&str; 12] = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const NOTE_NAMES: [&str; 12] = [
+    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+];
 
 fn parse_note_name(s: &str) -> Option<i64> {
     let s = s.trim();
@@ -654,7 +664,13 @@ pub fn strip_indent(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or(0);
     let out: String = lines
         .iter()
-        .map(|l| if l.len() >= min_indent { &l[min_indent..] } else { *l })
+        .map(|l| {
+            if l.len() >= min_indent {
+                &l[min_indent..]
+            } else {
+                *l
+            }
+        })
         .collect::<Vec<_>>()
         .join("\n");
     StrykeValue::string(out)
@@ -719,11 +735,7 @@ pub fn truncate_middle(args: &[StrykeValue]) -> StrykeValue {
 
 pub fn unicode_codepoints(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
-    arr_sv(
-        s.chars()
-            .map(|c| StrykeValue::integer(c as i64))
-            .collect(),
-    )
+    arr_sv(s.chars().map(|c| StrykeValue::integer(c as i64)).collect())
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -771,7 +783,10 @@ fn chi2_p(stat: f64, df: f64) -> f64 {
     if df <= 0.0 {
         return f64::NAN;
     }
-    ChiSquared::new(df).ok().map(|d| 1.0 - d.cdf(stat)).unwrap_or(f64::NAN)
+    ChiSquared::new(df)
+        .ok()
+        .map(|d| 1.0 - d.cdf(stat))
+        .unwrap_or(f64::NAN)
 }
 
 fn f_dist_p(stat: f64, df1: f64, df2: f64) -> f64 {
@@ -860,7 +875,11 @@ pub fn chi_square_independence(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn anova_one_way(args: &[StrykeValue]) -> StrykeValue {
-    let groups: Vec<Vec<f64>> = args.iter().map(as_vec_f64).filter(|g| !g.is_empty()).collect();
+    let groups: Vec<Vec<f64>> = args
+        .iter()
+        .map(as_vec_f64)
+        .filter(|g| !g.is_empty())
+        .collect();
     let k = groups.len();
     if k < 2 {
         return make_result(f64::NAN, 0.0, f64::NAN);
@@ -895,7 +914,11 @@ pub fn rank_data(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(as_vec_f64).unwrap_or_default();
     let n = xs.len();
     let mut indices: Vec<usize> = (0..n).collect();
-    indices.sort_by(|&a, &b| xs[a].partial_cmp(&xs[b]).unwrap_or(std::cmp::Ordering::Equal));
+    indices.sort_by(|&a, &b| {
+        xs[a]
+            .partial_cmp(&xs[b])
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     let mut ranks = vec![0.0; n];
     let mut i = 0;
     while i < n {
@@ -929,13 +952,21 @@ pub fn mann_whitney_u(args: &[StrykeValue]) -> StrykeValue {
     let u = u1.min(u2);
     let mean_u = (n1 * n2) as f64 / 2.0;
     let sigma = (((n1 * n2 * (n1 + n2 + 1)) as f64) / 12.0).sqrt();
-    let z = if sigma > 0.0 { (u - mean_u) / sigma } else { 0.0 };
+    let z = if sigma > 0.0 {
+        (u - mean_u) / sigma
+    } else {
+        0.0
+    };
     let p = normal_p_two_sided(z);
     make_result(u, (n1 + n2) as f64, p)
 }
 
 pub fn kruskal_wallis(args: &[StrykeValue]) -> StrykeValue {
-    let groups: Vec<Vec<f64>> = args.iter().map(as_vec_f64).filter(|g| !g.is_empty()).collect();
+    let groups: Vec<Vec<f64>> = args
+        .iter()
+        .map(as_vec_f64)
+        .filter(|g| !g.is_empty())
+        .collect();
     let k = groups.len();
     if k < 2 {
         return make_result(f64::NAN, 0.0, f64::NAN);
@@ -1068,7 +1099,11 @@ pub fn fisher_exact_2x2(args: &[StrykeValue]) -> StrykeValue {
     let col2 = b + d;
     let total = row1 + row2;
     let log_p_observed = lfact(row1) + lfact(row2) + lfact(col1) + lfact(col2)
-        - lfact(total) - lfact(a) - lfact(b) - lfact(c) - lfact(d);
+        - lfact(total)
+        - lfact(a)
+        - lfact(b)
+        - lfact(c)
+        - lfact(d);
     // Two-sided: sum p(k) for all valid tables with p(k) <= p(observed)
     let lo = col1.saturating_sub(row2);
     let hi = col1.min(row1);
@@ -1078,7 +1113,11 @@ pub fn fisher_exact_2x2(args: &[StrykeValue]) -> StrykeValue {
         let cc = col1.saturating_sub(k);
         let dd = (row2).saturating_sub(cc);
         let log_p = lfact(row1) + lfact(row2) + lfact(col1) + lfact(col2)
-            - lfact(total) - lfact(k) - lfact(bb) - lfact(cc) - lfact(dd);
+            - lfact(total)
+            - lfact(k)
+            - lfact(bb)
+            - lfact(cc)
+            - lfact(dd);
         if log_p <= log_p_observed + 1e-12 {
             p_sum += log_p.exp();
         }
@@ -1106,12 +1145,26 @@ pub fn wilcoxon_signed_rank(args: &[StrykeValue]) -> StrykeValue {
     }
     let abs_diffs: Vec<f64> = diffs.iter().map(|x| x.0).collect();
     let ranks = as_vec_f64(&rank_data(&[arr_f64(abs_diffs)]));
-    let w_plus: f64 = diffs.iter().zip(ranks.iter()).filter(|(d, _)| d.1 > 0).map(|(_, r)| r).sum();
-    let w_minus: f64 = diffs.iter().zip(ranks.iter()).filter(|(d, _)| d.1 < 0).map(|(_, r)| r).sum();
+    let w_plus: f64 = diffs
+        .iter()
+        .zip(ranks.iter())
+        .filter(|(d, _)| d.1 > 0)
+        .map(|(_, r)| r)
+        .sum();
+    let w_minus: f64 = diffs
+        .iter()
+        .zip(ranks.iter())
+        .filter(|(d, _)| d.1 < 0)
+        .map(|(_, r)| r)
+        .sum();
     let w = w_plus.min(w_minus);
     let mean_w = (m * (m + 1)) as f64 / 4.0;
     let var_w = (m * (m + 1) * (2 * m + 1)) as f64 / 24.0;
-    let z = if var_w > 0.0 { (w - mean_w) / var_w.sqrt() } else { 0.0 };
+    let z = if var_w > 0.0 {
+        (w - mean_w) / var_w.sqrt()
+    } else {
+        0.0
+    };
     let p = normal_p_two_sided(z);
     make_result(w, m as f64, p)
 }
@@ -1204,7 +1257,8 @@ mod tests {
     #[test]
     fn hmac_sha256_rfc4231() {
         // RFC 4231 Test Case 1: key=0x0b*20 (20 bytes), data="Hi There"
-        let key = "\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b";
+        let key =
+            "\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b";
         let r = hmac_sha256_hex(&[sv_s(key), sv_s("Hi There")]).as_str_or_empty();
         assert_eq!(
             r,
@@ -1220,9 +1274,18 @@ mod tests {
 
     #[test]
     fn justify_basic() {
-        assert_eq!(justify_left(&[sv_s("hi"), sv_i(5)]).as_str_or_empty(), "hi   ");
-        assert_eq!(justify_right(&[sv_s("hi"), sv_i(5)]).as_str_or_empty(), "   hi");
-        assert_eq!(justify_center(&[sv_s("hi"), sv_i(6)]).as_str_or_empty(), "  hi  ");
+        assert_eq!(
+            justify_left(&[sv_s("hi"), sv_i(5)]).as_str_or_empty(),
+            "hi   "
+        );
+        assert_eq!(
+            justify_right(&[sv_s("hi"), sv_i(5)]).as_str_or_empty(),
+            "   hi"
+        );
+        assert_eq!(
+            justify_center(&[sv_s("hi"), sv_i(6)]).as_str_or_empty(),
+            "  hi  "
+        );
     }
 
     #[test]

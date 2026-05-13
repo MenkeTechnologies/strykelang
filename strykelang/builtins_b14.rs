@@ -3,9 +3,9 @@
 
 use crate::value::StrykeValue;
 use parking_lot::RwLock;
-use std::sync::Arc;
-use std::collections::{HashSet, VecDeque, BinaryHeap};
 use std::cmp::Ordering;
+use std::collections::{BinaryHeap, HashSet, VecDeque};
+use std::sync::Arc;
 
 fn arg_f64(args: &[StrykeValue], idx: usize) -> Option<f64> {
     args.get(idx).map(|v| v.to_number())
@@ -476,7 +476,10 @@ fn adj_from_arg(v: &StrykeValue) -> Vec<Vec<(usize, f64)>> {
                 .iter()
                 .map(|e| {
                     let pair = as_vec_sv(e);
-                    let n = pair.first().map(|x| x.to_int().max(0) as usize).unwrap_or(0);
+                    let n = pair
+                        .first()
+                        .map(|x| x.to_int().max(0) as usize)
+                        .unwrap_or(0);
                     let w = pair.get(1).map(|x| x.to_number()).unwrap_or(1.0);
                     (n, w)
                 })
@@ -494,9 +497,14 @@ fn adj_unweighted(v: &StrykeValue) -> Vec<Vec<usize>> {
                 .iter()
                 .map(|e| {
                     if let Some(pair) = e.as_array_ref() {
-                        pair.read().first().map(|x| x.to_int().max(0) as usize).unwrap_or(0)
+                        pair.read()
+                            .first()
+                            .map(|x| x.to_int().max(0) as usize)
+                            .unwrap_or(0)
                     } else if let Some(pair) = e.as_array_vec() {
-                        pair.first().map(|x| x.to_int().max(0) as usize).unwrap_or(0)
+                        pair.first()
+                            .map(|x| x.to_int().max(0) as usize)
+                            .unwrap_or(0)
                     } else {
                         e.to_int().max(0) as usize
                     }
@@ -514,7 +522,10 @@ pub fn graph_from_edges(args: &[StrykeValue]) -> StrykeValue {
         .iter()
         .map(|e| {
             let pair = as_vec_sv(e);
-            let a = pair.first().map(|x| x.to_int().max(0) as usize).unwrap_or(0);
+            let a = pair
+                .first()
+                .map(|x| x.to_int().max(0) as usize)
+                .unwrap_or(0);
             let b = pair.get(1).map(|x| x.to_int().max(0) as usize).unwrap_or(0);
             let w = pair.get(2).map(|x| x.to_number()).unwrap_or(1.0);
             max_node = max_node.max(a).max(b);
@@ -524,9 +535,15 @@ pub fn graph_from_edges(args: &[StrykeValue]) -> StrykeValue {
     let n = max_node + 1;
     let mut adj: Vec<Vec<StrykeValue>> = vec![Vec::new(); n];
     for (a, b, w) in parsed {
-        adj[a].push(arr_sv(vec![StrykeValue::integer(b as i64), StrykeValue::float(w)]));
+        adj[a].push(arr_sv(vec![
+            StrykeValue::integer(b as i64),
+            StrykeValue::float(w),
+        ]));
         if !directed {
-            adj[b].push(arr_sv(vec![StrykeValue::integer(a as i64), StrykeValue::float(w)]));
+            adj[b].push(arr_sv(vec![
+                StrykeValue::integer(a as i64),
+                StrykeValue::float(w),
+            ]));
         }
     }
     arr_sv(adj.into_iter().map(arr_sv).collect())
@@ -583,7 +600,12 @@ pub fn graph_bfs(args: &[StrykeValue]) -> StrykeValue {
             }
         }
     }
-    arr_sv(order.into_iter().map(|x| StrykeValue::integer(x as i64)).collect())
+    arr_sv(
+        order
+            .into_iter()
+            .map(|x| StrykeValue::integer(x as i64))
+            .collect(),
+    )
 }
 
 pub fn graph_dfs(args: &[StrykeValue]) -> StrykeValue {
@@ -608,7 +630,12 @@ pub fn graph_dfs(args: &[StrykeValue]) -> StrykeValue {
             }
         }
     }
-    arr_sv(order.into_iter().map(|x| StrykeValue::integer(x as i64)).collect())
+    arr_sv(
+        order
+            .into_iter()
+            .map(|x| StrykeValue::integer(x as i64))
+            .collect(),
+    )
 }
 
 #[derive(PartialEq)]
@@ -785,7 +812,12 @@ pub fn graph_topological_sort(args: &[StrykeValue]) -> StrykeValue {
             }
         }
     }
-    let mut q: VecDeque<usize> = in_deg.iter().enumerate().filter(|(_, d)| **d == 0).map(|(i, _)| i).collect();
+    let mut q: VecDeque<usize> = in_deg
+        .iter()
+        .enumerate()
+        .filter(|(_, d)| **d == 0)
+        .map(|(i, _)| i)
+        .collect();
     let mut order = Vec::new();
     while let Some(u) = q.pop_front() {
         order.push(u);
@@ -801,7 +833,12 @@ pub fn graph_topological_sort(args: &[StrykeValue]) -> StrykeValue {
     if order.len() != n {
         return arr_sv(vec![]);
     }
-    arr_sv(order.into_iter().map(|x| StrykeValue::integer(x as i64)).collect())
+    arr_sv(
+        order
+            .into_iter()
+            .map(|x| StrykeValue::integer(x as i64))
+            .collect(),
+    )
 }
 
 pub fn graph_connected_components(args: &[StrykeValue]) -> StrykeValue {
@@ -826,7 +863,11 @@ pub fn graph_connected_components(args: &[StrykeValue]) -> StrykeValue {
         }
         k += 1;
     }
-    arr_sv(comp.into_iter().map(|c| StrykeValue::integer(c as i64)).collect())
+    arr_sv(
+        comp.into_iter()
+            .map(|c| StrykeValue::integer(c as i64))
+            .collect(),
+    )
 }
 
 pub fn graph_strongly_connected_components(args: &[StrykeValue]) -> StrykeValue {
@@ -872,7 +913,11 @@ pub fn graph_strongly_connected_components(args: &[StrykeValue]) -> StrykeValue 
             k += 1;
         }
     }
-    arr_sv(comp.into_iter().map(|c| StrykeValue::integer(c as i64)).collect())
+    arr_sv(
+        comp.into_iter()
+            .map(|c| StrykeValue::integer(c as i64))
+            .collect(),
+    )
 }
 
 pub fn graph_cycle_detect(args: &[StrykeValue]) -> StrykeValue {
@@ -966,7 +1011,11 @@ pub fn graph_shortest_path(args: &[StrykeValue]) -> StrykeValue {
         cur = parent[cur];
     }
     path.reverse();
-    arr_sv(path.into_iter().map(|x| StrykeValue::integer(x as i64)).collect())
+    arr_sv(
+        path.into_iter()
+            .map(|x| StrykeValue::integer(x as i64))
+            .collect(),
+    )
 }
 
 pub fn graph_eccentricity(args: &[StrykeValue]) -> StrykeValue {
@@ -994,7 +1043,11 @@ pub fn graph_eccentricity(args: &[StrykeValue]) -> StrykeValue {
             }
         }
     }
-    let ecc = dist.iter().cloned().filter(|d| d.is_finite()).fold(0.0_f64, f64::max);
+    let ecc = dist
+        .iter()
+        .cloned()
+        .filter(|d| d.is_finite())
+        .fold(0.0_f64, f64::max);
     StrykeValue::float(ecc)
 }
 
@@ -1233,10 +1286,24 @@ pub fn graph_tarjan(args: &[StrykeValue]) -> StrykeValue {
     }
     for u in 0..n {
         if idx[u] == -1 {
-            strongconnect(u, &g, &mut idx, &mut low, &mut on_stack, &mut stack, &mut counter, &mut comp, &mut k);
+            strongconnect(
+                u,
+                &g,
+                &mut idx,
+                &mut low,
+                &mut on_stack,
+                &mut stack,
+                &mut counter,
+                &mut comp,
+                &mut k,
+            );
         }
     }
-    arr_sv(comp.into_iter().map(|c| StrykeValue::integer(c as i64)).collect())
+    arr_sv(
+        comp.into_iter()
+            .map(|c| StrykeValue::integer(c as i64))
+            .collect(),
+    )
 }
 
 pub fn graph_articulation_points(args: &[StrykeValue]) -> StrykeValue {
@@ -1286,7 +1353,16 @@ pub fn graph_articulation_points(args: &[StrykeValue]) -> StrykeValue {
     }
     for u in 0..n {
         if !visited[u] {
-            dfs(u, &g, &mut visited, &mut disc, &mut low, &mut parent, &mut ap, &mut timer);
+            dfs(
+                u,
+                &g,
+                &mut visited,
+                &mut disc,
+                &mut low,
+                &mut parent,
+                &mut ap,
+                &mut timer,
+            );
         }
     }
     let pts: Vec<StrykeValue> = ap
@@ -1338,12 +1414,26 @@ pub fn graph_bridges(args: &[StrykeValue]) -> StrykeValue {
     }
     for u in 0..n {
         if !visited[u] {
-            dfs(u, -1, &g, &mut visited, &mut disc, &mut low, &mut bridges, &mut timer);
+            dfs(
+                u,
+                -1,
+                &g,
+                &mut visited,
+                &mut disc,
+                &mut low,
+                &mut bridges,
+                &mut timer,
+            );
         }
     }
     let result: Vec<StrykeValue> = bridges
         .into_iter()
-        .map(|(u, v)| arr_sv(vec![StrykeValue::integer(u as i64), StrykeValue::integer(v as i64)]))
+        .map(|(u, v)| {
+            arr_sv(vec![
+                StrykeValue::integer(u as i64),
+                StrykeValue::integer(v as i64),
+            ])
+        })
         .collect();
     arr_sv(result)
 }
@@ -1416,7 +1506,12 @@ pub fn graph_color_greedy(args: &[StrykeValue]) -> StrykeValue {
         }
         color[u] = c;
     }
-    arr_sv(color.into_iter().map(|c| StrykeValue::integer(c as i64)).collect())
+    arr_sv(
+        color
+            .into_iter()
+            .map(|c| StrykeValue::integer(c as i64))
+            .collect(),
+    )
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -1553,7 +1648,11 @@ pub fn date_add_days(args: &[StrykeValue]) -> StrykeValue {
 }
 
 fn last_day_of_month(year: i32, month: u32) -> u32 {
-    let (ny, nm) = if month == 12 { (year + 1, 1) } else { (year, month + 1) };
+    let (ny, nm) = if month == 12 {
+        (year + 1, 1)
+    } else {
+        (year, month + 1)
+    };
     NaiveDate::from_ymd_opt(ny, nm, 1)
         .and_then(|first_next| first_next.pred_opt())
         .map(|d| d.day())
@@ -1641,7 +1740,11 @@ pub fn date_is_weekend(args: &[StrykeValue]) -> StrykeValue {
     parse_date_arg(args, 0)
         .map(|d| {
             let w = d.weekday();
-            StrykeValue::integer(if w == Weekday::Sat || w == Weekday::Sun { 1 } else { 0 })
+            StrykeValue::integer(if w == Weekday::Sat || w == Weekday::Sun {
+                1
+            } else {
+                0
+            })
         })
         .unwrap_or(StrykeValue::UNDEF)
 }
@@ -1738,8 +1841,9 @@ pub fn sun_rise_unix(args: &[StrykeValue]) -> StrykeValue {
         let rise_h = solar_noon_utc - ha;
         let hour = rise_h.floor() as i64;
         let min = ((rise_h - hour as f64) * 60.0) as i64;
-        let nd = NaiveDate::from_ymd_opt(d.year(), d.month(), d.day())
-            .and_then(|nd| nd.and_hms_opt(hour.rem_euclid(24) as u32, min.rem_euclid(60) as u32, 0));
+        let nd = NaiveDate::from_ymd_opt(d.year(), d.month(), d.day()).and_then(|nd| {
+            nd.and_hms_opt(hour.rem_euclid(24) as u32, min.rem_euclid(60) as u32, 0)
+        });
         if let Some(nd) = nd {
             return StrykeValue::integer(Utc.from_utc_datetime(&nd).timestamp());
         }
@@ -1769,8 +1873,9 @@ pub fn sun_set_unix(args: &[StrykeValue]) -> StrykeValue {
         let set_h = solar_noon_utc + ha;
         let hour = set_h.floor() as i64;
         let min = ((set_h - hour as f64) * 60.0) as i64;
-        let nd = NaiveDate::from_ymd_opt(d.year(), d.month(), d.day())
-            .and_then(|nd| nd.and_hms_opt(hour.rem_euclid(24) as u32, min.rem_euclid(60) as u32, 0));
+        let nd = NaiveDate::from_ymd_opt(d.year(), d.month(), d.day()).and_then(|nd| {
+            nd.and_hms_opt(hour.rem_euclid(24) as u32, min.rem_euclid(60) as u32, 0)
+        });
         if let Some(nd) = nd {
             return StrykeValue::integer(Utc.from_utc_datetime(&nd).timestamp());
         }
@@ -2122,7 +2227,10 @@ mod tests {
 
     #[test]
     fn matrix_determinant_2x2() {
-        let m = sv_a(vec![sv_a(vec![sv(1.0), sv(2.0)]), sv_a(vec![sv(3.0), sv(4.0)])]);
+        let m = sv_a(vec![
+            sv_a(vec![sv(1.0), sv(2.0)]),
+            sv_a(vec![sv(3.0), sv(4.0)]),
+        ]);
         let r = matrix_determinant(&[m]);
         assert!((r.to_number() - (-2.0)).abs() < 1e-9);
     }
@@ -2141,8 +2249,14 @@ mod tests {
 
     #[test]
     fn matrix_kronecker_2x2() {
-        let a = sv_a(vec![sv_a(vec![sv(1.0), sv(2.0)]), sv_a(vec![sv(3.0), sv(4.0)])]);
-        let b = sv_a(vec![sv_a(vec![sv(0.0), sv(5.0)]), sv_a(vec![sv(6.0), sv(7.0)])]);
+        let a = sv_a(vec![
+            sv_a(vec![sv(1.0), sv(2.0)]),
+            sv_a(vec![sv(3.0), sv(4.0)]),
+        ]);
+        let b = sv_a(vec![
+            sv_a(vec![sv(0.0), sv(5.0)]),
+            sv_a(vec![sv(6.0), sv(7.0)]),
+        ]);
         let r = matrix_kronecker(&[a, b]);
         let m = as_matrix(&r);
         assert_eq!(m.len(), 4);
@@ -2183,9 +2297,15 @@ mod tests {
     #[test]
     fn graph_dijkstra_weighted() {
         let g = sv_a(vec![
-            sv_a(vec![sv_a(vec![sv_i(1), sv(4.0)]), sv_a(vec![sv_i(2), sv(1.0)])]),
+            sv_a(vec![
+                sv_a(vec![sv_i(1), sv(4.0)]),
+                sv_a(vec![sv_i(2), sv(1.0)]),
+            ]),
             sv_a(vec![sv_a(vec![sv_i(3), sv(1.0)])]),
-            sv_a(vec![sv_a(vec![sv_i(1), sv(2.0)]), sv_a(vec![sv_i(3), sv(5.0)])]),
+            sv_a(vec![
+                sv_a(vec![sv_i(1), sv(2.0)]),
+                sv_a(vec![sv_i(3), sv(5.0)]),
+            ]),
             sv_a(vec![]),
         ]);
         let r = graph_dijkstra(&[g, sv_i(0)]);
@@ -2242,7 +2362,10 @@ mod tests {
     #[test]
     fn zodiac_signs() {
         assert_eq!(zodiac_sign(&[sv_i(3), sv_i(25)]).as_str_or_empty(), "Aries");
-        assert_eq!(zodiac_sign(&[sv_i(7), sv_i(15)]).as_str_or_empty(), "Cancer");
+        assert_eq!(
+            zodiac_sign(&[sv_i(7), sv_i(15)]).as_str_or_empty(),
+            "Cancer"
+        );
     }
 
     #[test]

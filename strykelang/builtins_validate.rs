@@ -50,9 +50,7 @@ pub fn is_ascii_only(args: &[StrykeValue]) -> StrykeValue {
 
 pub fn is_printable_ascii(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
-    b(!s.is_empty()
-        && s.chars()
-            .all(|c| c.is_ascii() && !c.is_ascii_control()))
+    b(!s.is_empty() && s.chars().all(|c| c.is_ascii() && !c.is_ascii_control()))
 }
 
 pub fn is_utf8(args: &[StrykeValue]) -> StrykeValue {
@@ -66,13 +64,19 @@ pub fn is_utf8(args: &[StrykeValue]) -> StrykeValue {
 pub fn is_lowercase(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let has_letter = s.chars().any(|c| c.is_alphabetic());
-    b(has_letter && s.chars().filter(|c| c.is_alphabetic()).all(|c| c.is_lowercase()))
+    b(has_letter
+        && s.chars()
+            .filter(|c| c.is_alphabetic())
+            .all(|c| c.is_lowercase()))
 }
 
 pub fn is_uppercase(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let has_letter = s.chars().any(|c| c.is_alphabetic());
-    b(has_letter && s.chars().filter(|c| c.is_alphabetic()).all(|c| c.is_uppercase()))
+    b(has_letter
+        && s.chars()
+            .filter(|c| c.is_alphabetic())
+            .all(|c| c.is_uppercase()))
 }
 
 pub fn is_titlecase(args: &[StrykeValue]) -> StrykeValue {
@@ -138,10 +142,7 @@ pub fn is_binary(args: &[StrykeValue]) -> StrykeValue {
 pub fn is_base32(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let cleaned = s.trim_end_matches('=');
-    b(!cleaned.is_empty()
-        && cleaned
-            .chars()
-            .all(|c| matches!(c, 'A'..='Z' | '2'..='7')))
+    b(!cleaned.is_empty() && cleaned.chars().all(|c| matches!(c, 'A'..='Z' | '2'..='7')))
 }
 
 pub fn is_md5_hash(args: &[StrykeValue]) -> StrykeValue {
@@ -366,8 +367,7 @@ pub fn is_imei(args: &[StrykeValue]) -> StrykeValue {
 pub fn is_imsi(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let digits_only: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
-    b(matches!(digits_only.len(), 14..=15)
-        && digits_only.chars().all(|c| c.is_ascii_digit()))
+    b(matches!(digits_only.len(), 14..=15) && digits_only.chars().all(|c| c.is_ascii_digit()))
 }
 
 pub fn is_vin(args: &[StrykeValue]) -> StrykeValue {
@@ -405,7 +405,9 @@ pub fn is_vin(args: &[StrykeValue]) -> StrykeValue {
     }
     let check = sum % 11;
     let expected = s.chars().nth(8).unwrap();
-    let check_char = if check == 10 { 'X' } else {
+    let check_char = if check == 10 {
+        'X'
+    } else {
         std::char::from_digit(check, 10).unwrap()
     };
     b(expected == check_char)
@@ -429,14 +431,35 @@ pub fn vin_decode(args: &[StrykeValue]) -> StrykeValue {
     // Year letter → base year (30-year cycle; we pick the most recent past).
     let year_letter_to_offset = |c: char| -> Option<u32> {
         match c {
-            'A' => Some(10), 'B' => Some(11), 'C' => Some(12), 'D' => Some(13),
-            'E' => Some(14), 'F' => Some(15), 'G' => Some(16), 'H' => Some(17),
-            'J' => Some(18), 'K' => Some(19), 'L' => Some(20), 'M' => Some(21),
-            'N' => Some(22), 'P' => Some(23), 'R' => Some(24), 'S' => Some(25),
-            'T' => Some(26), 'V' => Some(27), 'W' => Some(28), 'X' => Some(29),
+            'A' => Some(10),
+            'B' => Some(11),
+            'C' => Some(12),
+            'D' => Some(13),
+            'E' => Some(14),
+            'F' => Some(15),
+            'G' => Some(16),
+            'H' => Some(17),
+            'J' => Some(18),
+            'K' => Some(19),
+            'L' => Some(20),
+            'M' => Some(21),
+            'N' => Some(22),
+            'P' => Some(23),
+            'R' => Some(24),
+            'S' => Some(25),
+            'T' => Some(26),
+            'V' => Some(27),
+            'W' => Some(28),
+            'X' => Some(29),
             'Y' => Some(0),
-            '1' => Some(1), '2' => Some(2), '3' => Some(3), '4' => Some(4),
-            '5' => Some(5), '6' => Some(6), '7' => Some(7), '8' => Some(8),
+            '1' => Some(1),
+            '2' => Some(2),
+            '3' => Some(3),
+            '4' => Some(4),
+            '5' => Some(5),
+            '6' => Some(6),
+            '7' => Some(7),
+            '8' => Some(8),
             '9' => Some(9),
             _ => None,
         }
@@ -449,10 +472,7 @@ pub fn vin_decode(args: &[StrykeValue]) -> StrykeValue {
     if let Some(y) = year {
         h.insert("year".to_string(), StrykeValue::integer(y as i64));
     }
-    h.insert(
-        "plant".to_string(),
-        StrykeValue::string(plant.to_string()),
-    );
+    h.insert("plant".to_string(), StrykeValue::string(plant.to_string()));
     StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
 }
 
@@ -524,7 +544,11 @@ fn isbn13_valid(s: &str) -> bool {
     if s.len() != 13 {
         return false;
     }
-    let digits: Vec<u32> = match s.chars().map(|c| c.to_digit(10).ok_or(())).collect::<Result<Vec<_>, _>>() {
+    let digits: Vec<u32> = match s
+        .chars()
+        .map(|c| c.to_digit(10).ok_or(()))
+        .collect::<Result<Vec<_>, _>>()
+    {
         Ok(d) => d,
         Err(_) => return false,
     };
@@ -607,7 +631,11 @@ pub fn iban_country(args: &[StrykeValue]) -> StrykeValue {
     if cleaned.len() < 2 {
         return StrykeValue::UNDEF;
     }
-    let cc: String = cleaned.chars().take(2).collect::<String>().to_ascii_uppercase();
+    let cc: String = cleaned
+        .chars()
+        .take(2)
+        .collect::<String>()
+        .to_ascii_uppercase();
     if cc.chars().all(|c| c.is_ascii_alphabetic()) {
         StrykeValue::string(cc)
     } else {
@@ -708,10 +736,13 @@ pub fn is_postal_code(args: &[StrykeValue]) -> StrykeValue {
         .map(|v| v.to_string().trim().to_ascii_uppercase())
         .unwrap_or_else(|| "US".to_string());
     let ok = match country.as_str() {
-        "US" => code.len() == 5 && code.chars().all(|c| c.is_ascii_digit())
-            || (code.len() == 10 && code.chars().nth(5) == Some('-')
-                && code[..5].chars().all(|c| c.is_ascii_digit())
-                && code[6..].chars().all(|c| c.is_ascii_digit())),
+        "US" => {
+            code.len() == 5 && code.chars().all(|c| c.is_ascii_digit())
+                || (code.len() == 10
+                    && code.chars().nth(5) == Some('-')
+                    && code[..5].chars().all(|c| c.is_ascii_digit())
+                    && code[6..].chars().all(|c| c.is_ascii_digit()))
+        }
         "CA" => {
             // A1A 1A1 or A1A1A1
             let cleaned: String = code.chars().filter(|c| !c.is_whitespace()).collect();
@@ -922,7 +953,10 @@ mod tests {
     #[test]
     fn palindrome_check() {
         assert_eq!(is_palindrome_str(&[s("racecar")]).to_int(), 1);
-        assert_eq!(is_palindrome_str(&[s("A man a plan a canal Panama")]).to_int(), 1);
+        assert_eq!(
+            is_palindrome_str(&[s("A man a plan a canal Panama")]).to_int(),
+            1
+        );
         assert_eq!(is_palindrome_str(&[s("hello")]).to_int(), 0);
     }
 
@@ -988,8 +1022,14 @@ mod tests {
     #[test]
     fn isbn_round_trips() {
         // 0306406152 → 9780306406157
-        assert_eq!(isbn10_to_isbn13(&[s("0306406152")]).to_string(), "9780306406157");
-        assert_eq!(isbn13_to_isbn10(&[s("9780306406157")]).to_string(), "0306406152");
+        assert_eq!(
+            isbn10_to_isbn13(&[s("0306406152")]).to_string(),
+            "9780306406157"
+        );
+        assert_eq!(
+            isbn13_to_isbn10(&[s("9780306406157")]).to_string(),
+            "0306406152"
+        );
     }
 
     #[test]

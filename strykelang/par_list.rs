@@ -21,7 +21,10 @@ fn partition_bucket(key: &str, p: usize) -> usize {
     (h.finish() as usize) % p
 }
 
-fn puniq_sequential_with_progress(list: Vec<StrykeValue>, progress: &PmapProgress) -> Vec<StrykeValue> {
+fn puniq_sequential_with_progress(
+    list: Vec<StrykeValue>,
+    progress: &PmapProgress,
+) -> Vec<StrykeValue> {
     let mut seen = HashSet::<String>::new();
     let mut out = Vec::new();
     for v in list {

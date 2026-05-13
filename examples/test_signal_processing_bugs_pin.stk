@@ -8,11 +8,11 @@ my @iota2 = iota_range(5);
 aeq(join("", @iota1), join("", @iota2), "BUG-127: iota_range should ignore arguments after the first");
 
 
-# Pinning test for BUG-129: convolve_full returns size, not values
-my @a = (1, 2, 3);
-my @b = (4, 5);
-my $conv_full = convolve_full(@a, @b);
-aeq($conv_full, 1, "BUG-129: convolve_full should return 1");
+# BUG-129 (FIXED): convolve_full now returns the actual convolution values
+# (m + n − 1 samples). @a and @b above flatten through the pipe; pass as
+# arrayrefs so the builtin sees two operands.
+my @conv_full = convolve_full([1, 2, 3], [4, 5]);
+aeq(join(",", @conv_full), "4,13,22,15", "BUG-129 (FIXED): convolve_full([1,2,3], [4,5]) = [4, 13, 22, 15]");
 
 
 # Pinning test for BUG-130: detrend_linear returns slope, not samples

@@ -280,7 +280,10 @@ pub(crate) fn web_model_update(args: &[StrykeValue], line: usize) -> Result<Stry
         })?;
     let cols = table_columns(&table, line)?;
     let mut working = attrs.clone();
-    working.insert("updated_at".into(), StrykeValue::string(current_timestamp()));
+    working.insert(
+        "updated_at".into(),
+        StrykeValue::string(current_timestamp()),
+    );
     working.retain(|k, _| cols.iter().any(|c| c == k) && k != "id");
     if working.is_empty() {
         return Ok(StrykeValue::integer(0));
@@ -389,7 +392,9 @@ pub(crate) fn web_model_paginate(args: &[StrykeValue], line: usize) -> Result<St
     out.insert("page".to_string(), StrykeValue::integer(page));
     out.insert("per_page".to_string(), StrykeValue::integer(per_page));
     out.insert("total_pages".to_string(), StrykeValue::integer(total_pages));
-    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(out))))
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(
+        out,
+    ))))
 }
 
 /// LIKE-based search across one or more columns. `web_model_search("posts",
@@ -652,7 +657,9 @@ pub(crate) fn web_validate(args: &[StrykeValue], line: usize) -> Result<StrykeVa
         "errors".to_string(),
         StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(errors))),
     );
-    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(out))))
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(
+        out,
+    ))))
 }
 
 fn check_one_validator(
@@ -829,7 +836,11 @@ pub(crate) fn web_remove_column(args: &[StrykeValue], line: usize) -> Result<Str
 // their `up` / `down` blocks in deterministic order.
 
 impl VMHelper {
-    pub(crate) fn web_migrate(&mut self, _args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
+    pub(crate) fn web_migrate(
+        &mut self,
+        _args: &[StrykeValue],
+        line: usize,
+    ) -> Result<StrykeValue> {
         with_db(
             |c| {
                 exec_sql(
@@ -868,7 +879,11 @@ impl VMHelper {
         Ok(StrykeValue::integer(applied_now.len() as i64))
     }
 
-    pub(crate) fn web_rollback(&mut self, _args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
+    pub(crate) fn web_rollback(
+        &mut self,
+        _args: &[StrykeValue],
+        line: usize,
+    ) -> Result<StrykeValue> {
         let applied = applied_versions(line)?;
         let mut migrations = self.collect_migration_classes();
         migrations.sort_by(|a, b| b.0.cmp(&a.0)); // descending
@@ -1206,7 +1221,10 @@ pub(crate) fn web_job_dequeue(args: &[StrykeValue], line: usize) -> Result<Stryk
             let parsed = crate::native_data::json_decode(&args_json).unwrap_or(StrykeValue::UNDEF);
             h.insert("args".to_string(), parsed);
             h.insert("attempts".to_string(), StrykeValue::integer(attempts));
-            h.insert("max_attempts".to_string(), StrykeValue::integer(max_attempts));
+            h.insert(
+                "max_attempts".to_string(),
+                StrykeValue::integer(max_attempts),
+            );
             Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
         }
     }
@@ -1338,15 +1356,22 @@ pub(crate) fn web_jobs_list(args: &[StrykeValue], line: usize) -> Result<StrykeV
                 h.insert("queue".to_string(), StrykeValue::string(queue));
                 h.insert("priority".to_string(), StrykeValue::integer(priority));
                 h.insert("attempts".to_string(), StrykeValue::integer(attempts));
-                h.insert("max_attempts".to_string(), StrykeValue::integer(max_attempts));
+                h.insert(
+                    "max_attempts".to_string(),
+                    StrykeValue::integer(max_attempts),
+                );
                 h.insert("created_at".to_string(), StrykeValue::string(created_at));
                 h.insert(
                     "locked_at".to_string(),
-                    locked_at.map(StrykeValue::string).unwrap_or(StrykeValue::UNDEF),
+                    locked_at
+                        .map(StrykeValue::string)
+                        .unwrap_or(StrykeValue::UNDEF),
                 );
                 h.insert(
                     "ran_at".to_string(),
-                    ran_at.map(StrykeValue::string).unwrap_or(StrykeValue::UNDEF),
+                    ran_at
+                        .map(StrykeValue::string)
+                        .unwrap_or(StrykeValue::UNDEF),
                 );
                 h.insert(
                     "error".to_string(),

@@ -493,32 +493,82 @@ fn builtin_interp1d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::float(y0 + t * (y1 - y0)))
 }
 
-/// convolve_full — output length = m + n - 1.
+/// convolve_full — discrete linear convolution `c[k] = Σ a[i]·b[k−i]`.
+/// Output length `m + n − 1` (the "full" mode).
 fn builtin_convolve_full(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let a = b72_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let b = args.get(1).map(b72_to_floats).unwrap_or_default();
-    let n = a.len() + b.len();
-    Ok(StrykeValue::integer(n.saturating_sub(1) as i64))
+    if a.is_empty() || b.is_empty() {
+        return Ok(StrykeValue::array(vec![]));
+    }
+    let m = a.len();
+    let n = b.len();
+    let out_len = m + n - 1;
+    let mut out = vec![0.0_f64; out_len];
+    for i in 0..m {
+        for j in 0..n {
+            out[i + j] += a[i] * b[j];
+        }
+    }
+    Ok(StrykeValue::array(out.into_iter().map(StrykeValue::float).collect()))
 }
 
-/// convolve_valid — only fully overlapping window.
+/// convolve_valid — only fully-overlapping output positions, length
+/// `max(m, n) − min(m, n) + 1`.
 fn builtin_convolve_valid(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let a = b72_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let b = args.get(1).map(b72_to_floats).unwrap_or_default();
-    let n = (a.len().max(b.len()) + 1).saturating_sub(a.len().min(b.len()));
-    Ok(StrykeValue::integer(n as i64))
+    if a.is_empty() || b.is_empty() {
+        return Ok(StrykeValue::array(vec![]));
+    }
+    // Treat the shorter vector as the kernel (b'). Slide it over a'.
+    let (long, short) = if a.len() >= b.len() { (&a, &b) } else { (&b, &a) };
+    let m = long.len();
+    let k = short.len();
+    let out_len = m - k + 1;
+    let mut out = vec![0.0_f64; out_len];
+    for i in 0..out_len {
+        for j in 0..k {
+            // Convolution flips the kernel: short[k - 1 - j].
+            out[i] += long[i + j] * short[k - 1 - j];
+        }
+    }
+    Ok(StrykeValue::array(out.into_iter().map(StrykeValue::float).collect()))
 }
 
-/// correlate_full — same shape as convolve_full.
+/// correlate_full — discrete cross-correlation `c[k] = Σ a[i]·b[i+k]`
+/// (no kernel flip, unlike `convolve_full`). Output length `m + n − 1`.
 fn builtin_correlate_full(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
-    builtin_convolve_full(args)
+    let a = b72_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
+    let b = args.get(1).map(b72_to_floats).unwrap_or_default();
+    if a.is_empty() || b.is_empty() {
+        return Ok(StrykeValue::array(vec![]));
+    }
+    let m = a.len();
+    let n = b.len();
+    let out_len = m + n - 1;
+    let mut out = vec![0.0_f64; out_len];
+    // Cross-correlation = convolution with a reversed `b`.
+    for i in 0..m {
+        for j in 0..n {
+            out[i + (n - 1 - j)] += a[i] * b[j];
+        }
+    }
+    Ok(StrykeValue::array(out.into_iter().map(StrykeValue::float).collect()))
 }
 
-/// kron_product — output length m·n.
+/// kron_product — Kronecker product of two 1-D vectors. Flat vector of
+/// length `m · n` containing every pairwise product `a[i] · b[j]`.
 fn builtin_kron_product(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let a = b72_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let b = args.get(1).map(b72_to_floats).unwrap_or_default();
-    Ok(StrykeValue::integer((a.len() * b.len()) as i64))
+    let mut out = Vec::with_capacity(a.len() * b.len());
+    for &x in &a {
+        for &y in &b {
+            out.push(StrykeValue::float(x * y));
+        }
+    }
+    Ok(StrykeValue::array(out))
 }
 
 // ───── quadrature / ODE ─────

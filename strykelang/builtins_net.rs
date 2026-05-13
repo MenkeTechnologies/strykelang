@@ -229,9 +229,7 @@ pub fn bits_to_ip(args: &[StrykeValue]) -> StrykeValue {
         }
     }
     match n_bytes {
-        4 => StrykeValue::string(
-            Ipv4Addr::new(bytes[0], bytes[1], bytes[2], bytes[3]).to_string(),
-        ),
+        4 => StrykeValue::string(Ipv4Addr::new(bytes[0], bytes[1], bytes[2], bytes[3]).to_string()),
         16 => {
             let mut a = [0u8; 16];
             a.copy_from_slice(&bytes);
@@ -456,10 +454,7 @@ pub fn ip_reverse(args: &[StrykeValue]) -> StrykeValue {
     match parse_ip_lenient(&arg_str(args)) {
         Some(IpAddr::V4(v4)) => {
             let o = v4.octets();
-            StrykeValue::string(format!(
-                "{}.{}.{}.{}.in-addr.arpa",
-                o[3], o[2], o[1], o[0]
-            ))
+            StrykeValue::string(format!("{}.{}.{}.{}.in-addr.arpa", o[3], o[2], o[1], o[0]))
         }
         Some(IpAddr::V6(v6)) => {
             let mut nibbles: Vec<char> = Vec::with_capacity(32);
@@ -525,7 +520,10 @@ pub fn ip_sort(args: &[StrykeValue]) -> StrykeValue {
         return StrykeValue::array_ref(Arc::new(RwLock::new(out)));
     };
     let g = arr.read();
-    let mut ips: Vec<IpAddr> = g.iter().filter_map(|v| parse_ip_lenient(&v.to_string())).collect();
+    let mut ips: Vec<IpAddr> = g
+        .iter()
+        .filter_map(|v| parse_ip_lenient(&v.to_string()))
+        .collect();
     drop(g);
     ips.sort();
     let out: Vec<StrykeValue> = ips
@@ -2058,10 +2056,7 @@ pub fn mac_to_bytes(args: &[StrykeValue]) -> StrykeValue {
     let Some(m) = arg_mac(args) else {
         return StrykeValue::UNDEF;
     };
-    let elems: Vec<StrykeValue> = m
-        .iter()
-        .map(|b| StrykeValue::integer(*b as i64))
-        .collect();
+    let elems: Vec<StrykeValue> = m.iter().map(|b| StrykeValue::integer(*b as i64)).collect();
     StrykeValue::array_ref(Arc::new(RwLock::new(elems)))
 }
 
@@ -2557,22 +2552,23 @@ pub fn ws_frame_encode(args: &[StrykeValue]) -> StrykeValue {
         return StrykeValue::UNDEF;
     };
     let fin = args.get(2).map(|v| v.is_true()).unwrap_or(true);
-    let mask_key: Option<[u8; 4]> = args
-        .get(3)
-        .and_then(|v| v.as_array_ref())
-        .and_then(|arr| {
-            let g = arr.read();
-            if g.len() != 4 {
-                return None;
-            }
-            Some([
-                g[0].to_int() as u8,
-                g[1].to_int() as u8,
-                g[2].to_int() as u8,
-                g[3].to_int() as u8,
-            ])
-        });
-    let payload: Vec<u8> = payload_arr.read().iter().map(|v| v.to_int() as u8).collect();
+    let mask_key: Option<[u8; 4]> = args.get(3).and_then(|v| v.as_array_ref()).and_then(|arr| {
+        let g = arr.read();
+        if g.len() != 4 {
+            return None;
+        }
+        Some([
+            g[0].to_int() as u8,
+            g[1].to_int() as u8,
+            g[2].to_int() as u8,
+            g[3].to_int() as u8,
+        ])
+    });
+    let payload: Vec<u8> = payload_arr
+        .read()
+        .iter()
+        .map(|v| v.to_int() as u8)
+        .collect();
     let mut frame: Vec<u8> = Vec::with_capacity(payload.len() + 14);
     let byte0 = (if fin { 0x80 } else { 0x00 }) | opcode;
     frame.push(byte0);
@@ -2595,7 +2591,10 @@ pub fn ws_frame_encode(args: &[StrykeValue]) -> StrykeValue {
     } else {
         frame.extend_from_slice(&payload);
     }
-    let elems: Vec<StrykeValue> = frame.into_iter().map(|b| StrykeValue::integer(b as i64)).collect();
+    let elems: Vec<StrykeValue> = frame
+        .into_iter()
+        .map(|b| StrykeValue::integer(b as i64))
+        .collect();
     StrykeValue::array_ref(Arc::new(RwLock::new(elems)))
 }
 
@@ -2678,10 +2677,8 @@ pub fn ws_frame_decode(args: &[StrykeValue]) -> StrykeValue {
         StrykeValue::array_ref(Arc::new(RwLock::new(payload_elems))),
     );
     if let Some(mk) = mask_key {
-        let mk_elems: Vec<StrykeValue> = mk
-            .iter()
-            .map(|b| StrykeValue::integer(*b as i64))
-            .collect();
+        let mk_elems: Vec<StrykeValue> =
+            mk.iter().map(|b| StrykeValue::integer(*b as i64)).collect();
         h.insert(
             "mask_key".to_string(),
             StrykeValue::array_ref(Arc::new(RwLock::new(mk_elems))),
@@ -2711,7 +2708,10 @@ pub fn ws_close_frame(args: &[StrykeValue]) -> StrykeValue {
         frame.extend_from_slice(&(payload.len() as u16).to_be_bytes());
     }
     frame.extend_from_slice(&payload);
-    let elems: Vec<StrykeValue> = frame.into_iter().map(|b| StrykeValue::integer(b as i64)).collect();
+    let elems: Vec<StrykeValue> = frame
+        .into_iter()
+        .map(|b| StrykeValue::integer(b as i64))
+        .collect();
     StrykeValue::array_ref(Arc::new(RwLock::new(elems)))
 }
 
@@ -2779,14 +2779,8 @@ pub fn cookie_format(args: &[StrykeValue]) -> StrykeValue {
         return StrykeValue::UNDEF;
     };
     let g = h.read();
-    let name = g
-        .get("name")
-        .map(|v| v.to_string())
-        .unwrap_or_default();
-    let value = g
-        .get("value")
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let name = g.get("name").map(|v| v.to_string()).unwrap_or_default();
+    let value = g.get("value").map(|v| v.to_string()).unwrap_or_default();
     if name.is_empty() {
         return StrykeValue::UNDEF;
     }
@@ -2872,15 +2866,12 @@ pub fn cookie_is_expired(args: &[StrykeValue]) -> StrykeValue {
     let Some(h) = args.first().and_then(|v| v.as_hash_ref()) else {
         return StrykeValue::UNDEF;
     };
-    let now = args
-        .get(1)
-        .map(|v| v.to_int())
-        .unwrap_or_else(|| {
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_secs() as i64)
-                .unwrap_or(0)
-        });
+    let now = args.get(1).map(|v| v.to_int()).unwrap_or_else(|| {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0)
+    });
     let g = h.read();
     // Max-Age takes precedence over Expires per RFC 6265
     if let Some(ma) = g.get("max-age") {
@@ -2890,10 +2881,7 @@ pub fn cookie_is_expired(args: &[StrykeValue]) -> StrykeValue {
         }
         // We don't know the cookie's creation time, so use the
         // `created_at` field if present; otherwise treat as fresh.
-        let created = g
-            .get("created_at")
-            .map(|v| v.to_int())
-            .unwrap_or(now);
+        let created = g.get("created_at").map(|v| v.to_int()).unwrap_or(now);
         return b(now >= created + secs);
     }
     if let Some(exp) = g.get("expires") {
@@ -2942,7 +2930,10 @@ pub fn cookie_path_matches(args: &[StrykeValue]) -> StrykeValue {
     let Some(h) = args.first().and_then(|v| v.as_hash_ref()) else {
         return StrykeValue::UNDEF;
     };
-    let req_path = args.get(1).map(|v| v.to_string()).unwrap_or_else(|| "/".to_string());
+    let req_path = args
+        .get(1)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "/".to_string());
     let g = h.read();
     let path = g
         .get("path")
@@ -3265,7 +3256,9 @@ pub fn mime_is_video(args: &[StrykeValue]) -> StrykeValue {
 
 /// `mime_is_application(MIME)` — 1 if the type starts with `"application/"`.
 pub fn mime_is_application(args: &[StrykeValue]) -> StrykeValue {
-    b(arg_str(args).to_ascii_lowercase().starts_with("application/"))
+    b(arg_str(args)
+        .to_ascii_lowercase()
+        .starts_with("application/"))
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -3364,7 +3357,13 @@ pub fn rtt_min(args: &[StrykeValue]) -> StrykeValue {
     let s = collect_latencies(args);
     s.into_iter()
         .fold(f64::INFINITY, |a, b| a.min(b))
-        .pipe(|v| if v.is_infinite() { StrykeValue::UNDEF } else { StrykeValue::float(v) })
+        .pipe(|v| {
+            if v.is_infinite() {
+                StrykeValue::UNDEF
+            } else {
+                StrykeValue::float(v)
+            }
+        })
 }
 
 /// `rtt_max(\@samples_ms)` — maximum sample.
@@ -3372,7 +3371,13 @@ pub fn rtt_max(args: &[StrykeValue]) -> StrykeValue {
     let s = collect_latencies(args);
     s.into_iter()
         .fold(f64::NEG_INFINITY, |a, b| a.max(b))
-        .pipe(|v| if v.is_infinite() { StrykeValue::UNDEF } else { StrykeValue::float(v) })
+        .pipe(|v| {
+            if v.is_infinite() {
+                StrykeValue::UNDEF
+            } else {
+                StrykeValue::float(v)
+            }
+        })
 }
 
 /// `rtt_avg(\@samples_ms)` — arithmetic mean.
@@ -3430,14 +3435,20 @@ mod tests {
     fn ip_to_int_and_back_v4() {
         assert_eq!(ip_to_int(&[s("0.0.0.0")]).to_int(), 0);
         assert_eq!(ip_to_int(&[s("255.255.255.255")]).to_int(), 0xffff_ffff);
-        assert_eq!(int_to_ip(&[StrykeValue::integer(0xffff_ffff)]).to_string(), "255.255.255.255");
+        assert_eq!(
+            int_to_ip(&[StrykeValue::integer(0xffff_ffff)]).to_string(),
+            "255.255.255.255"
+        );
     }
 
     #[test]
     fn ip_to_bits_round_trip_v4() {
         let bits = ip_to_bits(&[s("10.0.0.1")]).to_string();
         assert_eq!(bits.len(), 32);
-        assert_eq!(bits_to_ip(&[StrykeValue::string(bits)]).to_string(), "10.0.0.1");
+        assert_eq!(
+            bits_to_ip(&[StrykeValue::string(bits)]).to_string(),
+            "10.0.0.1"
+        );
     }
 
     #[test]
@@ -3457,8 +3468,14 @@ mod tests {
 
     #[test]
     fn ip_reverse_v4() {
-        assert_eq!(ip_reverse(&[s("8.8.8.8")]).to_string(), "8.8.8.8.in-addr.arpa");
-        assert_eq!(ip_reverse(&[s("1.2.3.4")]).to_string(), "4.3.2.1.in-addr.arpa");
+        assert_eq!(
+            ip_reverse(&[s("8.8.8.8")]).to_string(),
+            "8.8.8.8.in-addr.arpa"
+        );
+        assert_eq!(
+            ip_reverse(&[s("1.2.3.4")]).to_string(),
+            "4.3.2.1.in-addr.arpa"
+        );
     }
 
     #[test]
@@ -3531,28 +3548,46 @@ mod tests {
     #[test]
     fn cidr_parses_v4_and_v6() {
         assert_eq!(cidr_parse(&[s("10.0.5.123/24")]).to_string(), "10.0.5.0/24");
-        assert_eq!(cidr_parse(&[s("2001:db8:0:0::1/64")]).to_string(), "2001:db8::/64");
+        assert_eq!(
+            cidr_parse(&[s("2001:db8:0:0::1/64")]).to_string(),
+            "2001:db8::/64"
+        );
         assert!(cidr_parse(&[s("not-a-cidr/24")]).is_undef());
     }
 
     #[test]
     fn cidr_network_and_broadcast() {
         assert_eq!(cidr_network(&[s("10.0.5.99/24")]).to_string(), "10.0.5.0");
-        assert_eq!(cidr_broadcast(&[s("10.0.5.0/24")]).to_string(), "10.0.5.255");
-        assert_eq!(cidr_broadcast(&[s("192.168.1.0/30")]).to_string(), "192.168.1.3");
+        assert_eq!(
+            cidr_broadcast(&[s("10.0.5.0/24")]).to_string(),
+            "10.0.5.255"
+        );
+        assert_eq!(
+            cidr_broadcast(&[s("192.168.1.0/30")]).to_string(),
+            "192.168.1.3"
+        );
     }
 
     #[test]
     fn cidr_masks() {
-        assert_eq!(cidr_netmask(&[s("10.0.0.0/24")]).to_string(), "255.255.255.0");
+        assert_eq!(
+            cidr_netmask(&[s("10.0.0.0/24")]).to_string(),
+            "255.255.255.0"
+        );
         assert_eq!(cidr_netmask(&[s("10.0.0.0/16")]).to_string(), "255.255.0.0");
         assert_eq!(cidr_hostmask(&[s("10.0.0.0/24")]).to_string(), "0.0.0.255");
     }
 
     #[test]
     fn cidr_to_netmask_and_back() {
-        assert_eq!(cidr_to_netmask(&[StrykeValue::integer(24)]).to_string(), "255.255.255.0");
-        assert_eq!(cidr_to_netmask(&[StrykeValue::integer(16)]).to_string(), "255.255.0.0");
+        assert_eq!(
+            cidr_to_netmask(&[StrykeValue::integer(24)]).to_string(),
+            "255.255.255.0"
+        );
+        assert_eq!(
+            cidr_to_netmask(&[StrykeValue::integer(16)]).to_string(),
+            "255.255.0.0"
+        );
         // Round-trip:
         assert_eq!(netmask_to_prefix(&[s("255.255.255.0")]).to_int(), 24);
         assert_eq!(netmask_to_prefix(&[s("255.255.0.0")]).to_int(), 16);
@@ -3574,13 +3609,22 @@ mod tests {
     #[test]
     fn cidr_first_last_host() {
         assert_eq!(cidr_first_host(&[s("10.0.0.0/24")]).to_string(), "10.0.0.1");
-        assert_eq!(cidr_last_host(&[s("10.0.0.0/24")]).to_string(), "10.0.0.254");
+        assert_eq!(
+            cidr_last_host(&[s("10.0.0.0/24")]).to_string(),
+            "10.0.0.254"
+        );
     }
 
     #[test]
     fn cidr_subnet_and_supernet() {
-        assert_eq!(cidr_subnet(&[s("10.0.0.0/16"), StrykeValue::integer(24)]).to_string(), "10.0.0.0/24");
-        assert_eq!(cidr_supernet(&[s("10.0.5.0/24"), StrykeValue::integer(16)]).to_string(), "10.0.0.0/16");
+        assert_eq!(
+            cidr_subnet(&[s("10.0.0.0/16"), StrykeValue::integer(24)]).to_string(),
+            "10.0.0.0/24"
+        );
+        assert_eq!(
+            cidr_supernet(&[s("10.0.5.0/24"), StrykeValue::integer(16)]).to_string(),
+            "10.0.0.0/16"
+        );
         assert!(cidr_subnet(&[s("10.0.0.0/24"), StrykeValue::integer(16)]).is_undef());
     }
 
@@ -3596,11 +3640,23 @@ mod tests {
 
     #[test]
     fn cidr_contains_and_overlaps() {
-        assert_eq!(cidr_contains(&[s("10.0.0.0/16"), s("10.0.5.123")]).to_int(), 1);
-        assert_eq!(cidr_contains(&[s("10.0.0.0/16"), s("11.0.0.1")]).to_int(), 0);
+        assert_eq!(
+            cidr_contains(&[s("10.0.0.0/16"), s("10.0.5.123")]).to_int(),
+            1
+        );
+        assert_eq!(
+            cidr_contains(&[s("10.0.0.0/16"), s("11.0.0.1")]).to_int(),
+            0
+        );
         assert_eq!(ip_in_cidr(&[s("10.0.5.123"), s("10.0.0.0/16")]).to_int(), 1);
-        assert_eq!(cidr_overlaps(&[s("10.0.0.0/16"), s("10.0.5.0/24")]).to_int(), 1);
-        assert_eq!(cidr_overlaps(&[s("10.0.0.0/16"), s("11.0.0.0/16")]).to_int(), 0);
+        assert_eq!(
+            cidr_overlaps(&[s("10.0.0.0/16"), s("10.0.5.0/24")]).to_int(),
+            1
+        );
+        assert_eq!(
+            cidr_overlaps(&[s("10.0.0.0/16"), s("11.0.0.0/16")]).to_int(),
+            0
+        );
     }
 
     #[test]
@@ -3638,8 +3694,14 @@ mod tests {
 
     #[test]
     fn cidr_distance_blocks_apart() {
-        assert_eq!(cidr_distance(&[s("10.0.0.0/24"), s("10.0.5.0/24")]).to_int(), 5);
-        assert_eq!(cidr_distance(&[s("10.0.5.0/24"), s("10.0.0.0/24")]).to_int(), -5);
+        assert_eq!(
+            cidr_distance(&[s("10.0.0.0/24"), s("10.0.5.0/24")]).to_int(),
+            5
+        );
+        assert_eq!(
+            cidr_distance(&[s("10.0.5.0/24"), s("10.0.0.0/24")]).to_int(),
+            -5
+        );
     }
 
     #[test]
@@ -3673,9 +3735,18 @@ mod tests {
     #[test]
     fn mac_format_with_separators() {
         let m = s("aa:bb:cc:dd:ee:ff");
-        assert_eq!(mac_format(&[m.clone(), s(":")]).to_string(), "aa:bb:cc:dd:ee:ff");
-        assert_eq!(mac_format(&[m.clone(), s("-")]).to_string(), "aa-bb-cc-dd-ee-ff");
-        assert_eq!(mac_format(&[m.clone(), s(".")]).to_string(), "aabb.ccdd.eeff");
+        assert_eq!(
+            mac_format(&[m.clone(), s(":")]).to_string(),
+            "aa:bb:cc:dd:ee:ff"
+        );
+        assert_eq!(
+            mac_format(&[m.clone(), s("-")]).to_string(),
+            "aa-bb-cc-dd-ee-ff"
+        );
+        assert_eq!(
+            mac_format(&[m.clone(), s(".")]).to_string(),
+            "aabb.ccdd.eeff"
+        );
         assert_eq!(mac_format(&[m, s("")]).to_string(), "aabbccddeeff");
     }
 
@@ -3683,7 +3754,10 @@ mod tests {
     fn mac_to_int_and_back() {
         let n = mac_to_int(&[s("00:11:22:33:44:55")]).to_int();
         assert_eq!(n, 0x001122334455);
-        assert_eq!(int_to_mac(&[StrykeValue::integer(n)]).to_string(), "00:11:22:33:44:55");
+        assert_eq!(
+            int_to_mac(&[StrykeValue::integer(n)]).to_string(),
+            "00:11:22:33:44:55"
+        );
     }
 
     #[test]
@@ -3697,8 +3771,14 @@ mod tests {
             mac_vendor_lookup(&[s("b8:27:eb:11:22:33")]).to_string(),
             "Raspberry Pi Foundation"
         );
-        assert_eq!(mac_vendor_lookup(&[s("00:50:56:11:22:33")]).to_string(), "VMware");
-        assert_eq!(mac_vendor_lookup(&[s("08:00:27:11:22:33")]).to_string(), "Oracle VirtualBox");
+        assert_eq!(
+            mac_vendor_lookup(&[s("00:50:56:11:22:33")]).to_string(),
+            "VMware"
+        );
+        assert_eq!(
+            mac_vendor_lookup(&[s("08:00:27:11:22:33")]).to_string(),
+            "Oracle VirtualBox"
+        );
     }
 
     #[test]
@@ -3712,11 +3792,23 @@ mod tests {
     #[test]
     fn mac_universal_vs_local() {
         // 02:... has U/L bit set → locally administered
-        assert_eq!(mac_is_locally_administered(&[s("02:00:00:00:00:01")]).to_int(), 1);
-        assert_eq!(mac_is_universally_administered(&[s("02:00:00:00:00:01")]).to_int(), 0);
+        assert_eq!(
+            mac_is_locally_administered(&[s("02:00:00:00:00:01")]).to_int(),
+            1
+        );
+        assert_eq!(
+            mac_is_universally_administered(&[s("02:00:00:00:00:01")]).to_int(),
+            0
+        );
         // 00:... has U/L bit clear → universally administered
-        assert_eq!(mac_is_locally_administered(&[s("00:11:22:33:44:55")]).to_int(), 0);
-        assert_eq!(mac_is_universally_administered(&[s("00:11:22:33:44:55")]).to_int(), 1);
+        assert_eq!(
+            mac_is_locally_administered(&[s("00:11:22:33:44:55")]).to_int(),
+            0
+        );
+        assert_eq!(
+            mac_is_universally_administered(&[s("00:11:22:33:44:55")]).to_int(),
+            1
+        );
     }
 
     #[test]
@@ -3755,8 +3847,17 @@ mod tests {
 
     #[test]
     fn mac_compare_ordering() {
-        assert_eq!(mac_compare(&[s("00:00:00:00:00:01"), s("00:00:00:00:00:02")]).to_int(), -1);
-        assert_eq!(mac_compare(&[s("00:00:00:00:00:02"), s("00:00:00:00:00:01")]).to_int(), 1);
-        assert_eq!(mac_compare(&[s("aa:bb:cc:dd:ee:ff"), s("aa:bb:cc:dd:ee:ff")]).to_int(), 0);
+        assert_eq!(
+            mac_compare(&[s("00:00:00:00:00:01"), s("00:00:00:00:00:02")]).to_int(),
+            -1
+        );
+        assert_eq!(
+            mac_compare(&[s("00:00:00:00:00:02"), s("00:00:00:00:00:01")]).to_int(),
+            1
+        );
+        assert_eq!(
+            mac_compare(&[s("aa:bb:cc:dd:ee:ff"), s("aa:bb:cc:dd:ee:ff")]).to_int(),
+            0
+        );
     }
 }

@@ -6,7 +6,10 @@ fn b81_to_floats(v: &StrykeValue) -> Vec<f64> {
 }
 
 fn b81_to_bytes(v: &StrykeValue) -> Vec<u8> {
-    arg_to_vec(v).iter().map(|x| x.to_number() as u8).collect()
+    if v.as_array_ref().is_some() || v.as_array_vec().is_some() {
+        return arg_to_vec(v).iter().map(|x| x.to_number() as u8).collect();
+    }
+    v.to_string().into_bytes()
 }
 
 // ───── Excel financial extras ─────

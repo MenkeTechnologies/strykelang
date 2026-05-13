@@ -137,7 +137,11 @@ pub fn trueskill_simple(args: &[StrykeValue]) -> StrykeValue {
     let v_fn = |t: f64| {
         let pdf = (-0.5 * t * t).exp() / (2.0 * std::f64::consts::PI).sqrt();
         let cdf = n.cdf(t);
-        if cdf > 1e-12 { pdf / cdf } else { -t }
+        if cdf > 1e-12 {
+            pdf / cdf
+        } else {
+            -t
+        }
     };
     let w_fn = |t: f64| {
         let v = v_fn(t);
@@ -166,7 +170,10 @@ pub fn pagerank_tournament(args: &[StrykeValue]) -> StrykeValue {
     if n == 0 {
         return arr_f64(vec![]);
     }
-    let row_sums: Vec<f64> = wins.iter().map(|r| r.iter().sum::<f64>().max(1e-12)).collect();
+    let row_sums: Vec<f64> = wins
+        .iter()
+        .map(|r| r.iter().sum::<f64>().max(1e-12))
+        .collect();
     let mut pr = vec![1.0 / n as f64; n];
     for _ in 0..iters {
         let mut next = vec![(1.0 - damp) / n as f64; n];
@@ -186,7 +193,11 @@ pub fn swiss_pairing(args: &[StrykeValue]) -> StrykeValue {
     let played: Vec<Vec<f64>> = args.get(1).map(as_matrix).unwrap_or_default();
     let n = scores.len();
     let mut order: Vec<usize> = (0..n).collect();
-    order.sort_by(|&a, &b| scores[b].partial_cmp(&scores[a]).unwrap_or(std::cmp::Ordering::Equal));
+    order.sort_by(|&a, &b| {
+        scores[b]
+            .partial_cmp(&scores[a])
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     let mut paired = vec![false; n];
     let mut out = Vec::new();
     for i in 0..n {
@@ -267,7 +278,11 @@ pub fn ranking_spearman_rho(args: &[StrykeValue]) -> StrykeValue {
     }
     fn rank(xs: &[f64]) -> Vec<f64> {
         let mut idx: Vec<usize> = (0..xs.len()).collect();
-        idx.sort_by(|&i, &j| xs[i].partial_cmp(&xs[j]).unwrap_or(std::cmp::Ordering::Equal));
+        idx.sort_by(|&i, &j| {
+            xs[i]
+                .partial_cmp(&xs[j])
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         let mut r = vec![0.0; xs.len()];
         for (rank, &i) in idx.iter().enumerate() {
             r[i] = (rank + 1) as f64;
@@ -327,7 +342,11 @@ fn morph_op(img: &[Vec<f64>], size: usize, dilate: bool) -> Vec<Vec<f64>> {
     let mut out = vec![vec![0.0_f64; w]; h];
     for i in 0..h {
         for j in 0..w {
-            let mut acc = if dilate { f64::NEG_INFINITY } else { f64::INFINITY };
+            let mut acc = if dilate {
+                f64::NEG_INFINITY
+            } else {
+                f64::INFINITY
+            };
             for di in 0..size {
                 for dj in 0..size {
                     let y = i as isize + di as isize - half as isize;
@@ -443,7 +462,9 @@ pub fn bilateral_filter_2d(args: &[StrykeValue]) -> StrykeValue {
                     let x = j as isize + dj as isize - half as isize;
                     if y >= 0 && y < h as isize && x >= 0 && x < w as isize {
                         let v = img[y as usize][x as usize];
-                        let d_spatial = ((di as f64 - half as f64).powi(2) + (dj as f64 - half as f64).powi(2)) / (2.0 * sigma_s * sigma_s);
+                        let d_spatial = ((di as f64 - half as f64).powi(2)
+                            + (dj as f64 - half as f64).powi(2))
+                            / (2.0 * sigma_s * sigma_s);
                         let d_range = (v - ci).powi(2) / (2.0 * sigma_r * sigma_r);
                         let weight = (-d_spatial - d_range).exp();
                         sum += weight * v;
@@ -501,7 +522,10 @@ pub fn contour_perimeter(args: &[StrykeValue]) -> StrykeValue {
         .iter()
         .map(|p| {
             let xs = as_vec_f64(p);
-            (xs.first().copied().unwrap_or(0.0), xs.get(1).copied().unwrap_or(0.0))
+            (
+                xs.first().copied().unwrap_or(0.0),
+                xs.get(1).copied().unwrap_or(0.0),
+            )
         })
         .collect();
     let n = pts.len();
@@ -522,7 +546,10 @@ pub fn contour_area(args: &[StrykeValue]) -> StrykeValue {
         .iter()
         .map(|p| {
             let xs = as_vec_f64(p);
-            (xs.first().copied().unwrap_or(0.0), xs.get(1).copied().unwrap_or(0.0))
+            (
+                xs.first().copied().unwrap_or(0.0),
+                xs.get(1).copied().unwrap_or(0.0),
+            )
         })
         .collect();
     let n = pts.len();
@@ -546,7 +573,10 @@ pub fn contour_centroid(args: &[StrykeValue]) -> StrykeValue {
         .iter()
         .map(|p| {
             let xs = as_vec_f64(p);
-            (xs.first().copied().unwrap_or(0.0), xs.get(1).copied().unwrap_or(0.0))
+            (
+                xs.first().copied().unwrap_or(0.0),
+                xs.get(1).copied().unwrap_or(0.0),
+            )
         })
         .collect();
     let n = pts.len();
@@ -554,7 +584,9 @@ pub fn contour_centroid(args: &[StrykeValue]) -> StrykeValue {
         return arr_f64(vec![0.0, 0.0]);
     }
     if n < 3 {
-        let (sx, sy): (f64, f64) = pts.iter().fold((0.0, 0.0), |acc, &(x, y)| (acc.0 + x, acc.1 + y));
+        let (sx, sy): (f64, f64) = pts
+            .iter()
+            .fold((0.0, 0.0), |acc, &(x, y)| (acc.0 + x, acc.1 + y));
         return arr_f64(vec![sx / n as f64, sy / n as f64]);
     }
     let mut a2 = 0.0_f64;
@@ -569,7 +601,9 @@ pub fn contour_centroid(args: &[StrykeValue]) -> StrykeValue {
         cy += (y0 + y1) * cross;
     }
     if a2.abs() < 1e-12 {
-        let (sx, sy): (f64, f64) = pts.iter().fold((0.0, 0.0), |acc, &(x, y)| (acc.0 + x, acc.1 + y));
+        let (sx, sy): (f64, f64) = pts
+            .iter()
+            .fold((0.0, 0.0), |acc, &(x, y)| (acc.0 + x, acc.1 + y));
         return arr_f64(vec![sx / n as f64, sy / n as f64]);
     }
     arr_f64(vec![cx / (3.0 * a2), cy / (3.0 * a2)])
@@ -594,7 +628,14 @@ pub fn moment_image(args: &[StrykeValue]) -> StrykeValue {
 
 pub fn hu_moments(args: &[StrykeValue]) -> StrykeValue {
     let img = args.first().map(as_matrix).unwrap_or_default();
-    let m = |p: u32, q: u32| moment_image(&[matrix_to_sv(&img), StrykeValue::integer(p as i64), StrykeValue::integer(q as i64)]).to_number();
+    let m = |p: u32, q: u32| {
+        moment_image(&[
+            matrix_to_sv(&img),
+            StrykeValue::integer(p as i64),
+            StrykeValue::integer(q as i64),
+        ])
+        .to_number()
+    };
     let m00 = m(0, 0).max(1e-12);
     let m10 = m(1, 0);
     let m01 = m(0, 1);
@@ -717,11 +758,14 @@ pub fn canny_edges_full(args: &[StrykeValue]) -> StrykeValue {
     let mut ang = vec![vec![0.0_f64; w]; h];
     for i in 1..h - 1 {
         for j in 1..w - 1 {
-            let gx = -blurred[i - 1][j - 1] + blurred[i - 1][j + 1]
-                - 2.0 * blurred[i][j - 1] + 2.0 * blurred[i][j + 1]
-                - blurred[i + 1][j - 1] + blurred[i + 1][j + 1];
+            let gx = -blurred[i - 1][j - 1] + blurred[i - 1][j + 1] - 2.0 * blurred[i][j - 1]
+                + 2.0 * blurred[i][j + 1]
+                - blurred[i + 1][j - 1]
+                + blurred[i + 1][j + 1];
             let gy = -blurred[i - 1][j - 1] - 2.0 * blurred[i - 1][j] - blurred[i - 1][j + 1]
-                + blurred[i + 1][j - 1] + 2.0 * blurred[i + 1][j] + blurred[i + 1][j + 1];
+                + blurred[i + 1][j - 1]
+                + 2.0 * blurred[i + 1][j]
+                + blurred[i + 1][j + 1];
             mag[i][j] = (gx * gx + gy * gy).sqrt();
             ang[i][j] = gy.atan2(gx).to_degrees().rem_euclid(180.0);
         }
@@ -740,7 +784,11 @@ pub fn canny_edges_full(args: &[StrykeValue]) -> StrykeValue {
             } else {
                 (mag[i - 1][j - 1], mag[i + 1][j + 1])
             };
-            nms[i][j] = if mag[i][j] >= n1 && mag[i][j] >= n2 { mag[i][j] } else { 0.0 };
+            nms[i][j] = if mag[i][j] >= n1 && mag[i][j] >= n2 {
+                mag[i][j]
+            } else {
+                0.0
+            };
         }
     }
     // Hysteresis: classify into strong/weak/none, then flood-fill weak pixels
@@ -798,8 +846,14 @@ pub fn sobel_magnitude(args: &[StrykeValue]) -> StrykeValue {
     let mut out = vec![vec![0.0_f64; w]; h];
     for i in 1..h - 1 {
         for j in 1..w - 1 {
-            let gx = -img[i - 1][j - 1] + img[i - 1][j + 1] - 2.0 * img[i][j - 1] + 2.0 * img[i][j + 1] - img[i + 1][j - 1] + img[i + 1][j + 1];
-            let gy = -img[i - 1][j - 1] - 2.0 * img[i - 1][j] - img[i - 1][j + 1] + img[i + 1][j - 1] + 2.0 * img[i + 1][j] + img[i + 1][j + 1];
+            let gx = -img[i - 1][j - 1] + img[i - 1][j + 1] - 2.0 * img[i][j - 1]
+                + 2.0 * img[i][j + 1]
+                - img[i + 1][j - 1]
+                + img[i + 1][j + 1];
+            let gy = -img[i - 1][j - 1] - 2.0 * img[i - 1][j] - img[i - 1][j + 1]
+                + img[i + 1][j - 1]
+                + 2.0 * img[i + 1][j]
+                + img[i + 1][j + 1];
             out[i][j] = (gx * gx + gy * gy).sqrt();
         }
     }
@@ -848,7 +902,10 @@ pub fn roberts_cross_kernel(_args: &[StrykeValue]) -> StrykeValue {
 
 fn point_xy_pair(v: &StrykeValue) -> (f64, f64) {
     let xs = as_vec_f64(v);
-    (xs.first().copied().unwrap_or(0.0), xs.get(1).copied().unwrap_or(0.0))
+    (
+        xs.first().copied().unwrap_or(0.0),
+        xs.get(1).copied().unwrap_or(0.0),
+    )
 }
 
 fn pts_pack(pts: &[(f64, f64)]) -> StrykeValue {
@@ -865,7 +922,11 @@ pub fn graham_scan_hull(args: &[StrykeValue]) -> StrykeValue {
     }
     let pivot = pts
         .iter()
-        .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal).then(a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal)))
+        .min_by(|a, b| {
+            a.1.partial_cmp(&b.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
+        })
         .copied()
         .unwrap();
     pts.sort_by(|a, b| {
@@ -895,7 +956,11 @@ pub fn andrew_monotone_hull(args: &[StrykeValue]) -> StrykeValue {
         .iter()
         .map(point_xy_pair)
         .collect();
-    pts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal).then(a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)));
+    pts.sort_by(|a, b| {
+        a.0.partial_cmp(&b.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+    });
     let n = pts.len();
     if n < 3 {
         return pts_pack(&pts);
@@ -967,7 +1032,10 @@ pub fn liang_barsky_clip(args: &[StrykeValue]) -> StrykeValue {
     }
     let clipped_a = (p1.0 + u1 * dx, p1.1 + u1 * dy);
     let clipped_b = (p1.0 + u2 * dx, p1.1 + u2 * dy);
-    arr_sv(vec![arr_f64(vec![clipped_a.0, clipped_a.1]), arr_f64(vec![clipped_b.0, clipped_b.1])])
+    arr_sv(vec![
+        arr_f64(vec![clipped_a.0, clipped_a.1]),
+        arr_f64(vec![clipped_b.0, clipped_b.1]),
+    ])
 }
 
 pub fn polygon_winding(args: &[StrykeValue]) -> StrykeValue {
@@ -1006,7 +1074,8 @@ pub fn polygon_simple_check(args: &[StrykeValue]) -> StrykeValue {
         let d2 = ccw(c, d, b);
         let d3 = ccw(a, b, c);
         let d4 = ccw(a, b, d);
-        ((d1 > 0.0 && d2 < 0.0) || (d1 < 0.0 && d2 > 0.0)) && ((d3 > 0.0 && d4 < 0.0) || (d3 < 0.0 && d4 > 0.0))
+        ((d1 > 0.0 && d2 < 0.0) || (d1 < 0.0 && d2 > 0.0))
+            && ((d3 > 0.0 && d4 < 0.0) || (d3 < 0.0 && d4 > 0.0))
     }
     for i in 0..n {
         for j in i + 2..n {
@@ -1062,7 +1131,10 @@ pub fn polygon_offset(args: &[StrykeValue]) -> StrykeValue {
             let bl = (bx * bx + by * by).sqrt().max(1e-12);
             out.push((cur.0 + d * bx / bl, cur.1 + d * by / bl));
         } else {
-            out.push((cur.0 + d * (n1.0 + n2.0) / denom, cur.1 + d * (n1.1 + n2.1) / denom));
+            out.push((
+                cur.0 + d * (n1.0 + n2.0) / denom,
+                cur.1 + d * (n1.1 + n2.1) / denom,
+            ));
         }
     }
     pts_pack(&out)
@@ -1109,7 +1181,8 @@ pub fn voronoi_cell_2d(args: &[StrykeValue]) -> StrykeValue {
                     let denom = dx * (cur.0 - prev.0) + dy * (cur.1 - prev.1);
                     if denom.abs() > 1e-12 {
                         let t = (dx * (mx - prev.0) + dy * (my - prev.1)) / denom;
-                        new_cell.push((prev.0 + t * (cur.0 - prev.0), prev.1 + t * (cur.1 - prev.1)));
+                        new_cell
+                            .push((prev.0 + t * (cur.0 - prev.0), prev.1 + t * (cur.1 - prev.1)));
                     }
                 }
                 new_cell.push(cur);
@@ -1148,7 +1221,12 @@ pub fn delaunay_triangulate_2d(args: &[StrykeValue]) -> StrykeValue {
         det > 0.0
     };
     // Super-triangle bounding all points
-    let (mut min_x, mut min_y, mut max_x, mut max_y) = (f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);
+    let (mut min_x, mut min_y, mut max_x, mut max_y) = (
+        f64::INFINITY,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        f64::NEG_INFINITY,
+    );
     for &(x, y) in &pts {
         min_x = min_x.min(x);
         min_y = min_y.min(y);
@@ -1207,7 +1285,13 @@ pub fn delaunay_triangulate_2d(args: &[StrykeValue]) -> StrykeValue {
     let result: Vec<StrykeValue> = triangles
         .into_iter()
         .filter(|t| t.0 < n_orig && t.1 < n_orig && t.2 < n_orig)
-        .map(|t| arr_sv(vec![StrykeValue::integer(t.0 as i64), StrykeValue::integer(t.1 as i64), StrykeValue::integer(t.2 as i64)]))
+        .map(|t| {
+            arr_sv(vec![
+                StrykeValue::integer(t.0 as i64),
+                StrykeValue::integer(t.1 as i64),
+                StrykeValue::integer(t.2 as i64),
+            ])
+        })
         .collect();
     arr_sv(result)
 }
@@ -1257,7 +1341,11 @@ pub fn convex_hull_3d(args: &[StrykeValue]) -> StrykeValue {
     // when viewed from outside the hull.
     type Face = (usize, usize, usize);
     let cross = |u: (f64, f64, f64), v: (f64, f64, f64)| {
-        (u.1 * v.2 - u.2 * v.1, u.2 * v.0 - u.0 * v.2, u.0 * v.1 - u.1 * v.0)
+        (
+            u.1 * v.2 - u.2 * v.1,
+            u.2 * v.0 - u.0 * v.2,
+            u.0 * v.1 - u.1 * v.0,
+        )
     };
     let sub = |a: (f64, f64, f64), b: (f64, f64, f64)| (a.0 - b.0, a.1 - b.1, a.2 - b.2);
     let dot = |u: (f64, f64, f64), v: (f64, f64, f64)| u.0 * v.0 + u.1 * v.1 + u.2 * v.2;
@@ -1548,7 +1636,10 @@ pub fn ec_point_add(args: &[StrykeValue]) -> StrykeValue {
         None => return arr_sv(vec![]),
     };
     let fmt_pt = |x: &BigInt, y: &BigInt| {
-        arr_sv(vec![StrykeValue::string(x.to_string()), StrykeValue::string(y.to_string())])
+        arr_sv(vec![
+            StrykeValue::string(x.to_string()),
+            StrykeValue::string(y.to_string()),
+        ])
     };
     let (p1, p2) = match (p1, p2) {
         (Some(p), Some(q)) => (p, q),
@@ -1829,7 +1920,9 @@ pub fn case_pascal(args: &[StrykeValue]) -> StrykeValue {
         .map(|w| {
             let mut c = w.chars();
             match c.next() {
-                Some(first) => first.to_ascii_uppercase().to_string() + &c.as_str().to_ascii_lowercase(),
+                Some(first) => {
+                    first.to_ascii_uppercase().to_string() + &c.as_str().to_ascii_lowercase()
+                }
                 None => String::new(),
             }
         })
@@ -1839,12 +1932,24 @@ pub fn case_pascal(args: &[StrykeValue]) -> StrykeValue {
 
 pub fn case_constant(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
-    StrykeValue::string(split_words(&s).iter().map(|w| w.to_ascii_uppercase()).collect::<Vec<_>>().join("_"))
+    StrykeValue::string(
+        split_words(&s)
+            .iter()
+            .map(|w| w.to_ascii_uppercase())
+            .collect::<Vec<_>>()
+            .join("_"),
+    )
 }
 
 pub fn case_dot(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
-    StrykeValue::string(split_words(&s).iter().map(|w| w.to_ascii_lowercase()).collect::<Vec<_>>().join("."))
+    StrykeValue::string(
+        split_words(&s)
+            .iter()
+            .map(|w| w.to_ascii_lowercase())
+            .collect::<Vec<_>>()
+            .join("."),
+    )
 }
 
 pub fn case_train(args: &[StrykeValue]) -> StrykeValue {
@@ -1855,7 +1960,9 @@ pub fn case_train(args: &[StrykeValue]) -> StrykeValue {
             .map(|w| {
                 let mut c = w.chars();
                 match c.next() {
-                    Some(first) => first.to_ascii_uppercase().to_string() + &c.as_str().to_ascii_lowercase(),
+                    Some(first) => {
+                        first.to_ascii_uppercase().to_string() + &c.as_str().to_ascii_lowercase()
+                    }
                     None => String::new(),
                 }
             })
@@ -1866,7 +1973,13 @@ pub fn case_train(args: &[StrykeValue]) -> StrykeValue {
 
 pub fn case_path(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
-    StrykeValue::string(split_words(&s).iter().map(|w| w.to_ascii_lowercase()).collect::<Vec<_>>().join("/"))
+    StrykeValue::string(
+        split_words(&s)
+            .iter()
+            .map(|w| w.to_ascii_lowercase())
+            .collect::<Vec<_>>()
+            .join("/"),
+    )
 }
 
 pub fn case_sentence(args: &[StrykeValue]) -> StrykeValue {
@@ -1892,7 +2005,9 @@ pub fn case_sentence(args: &[StrykeValue]) -> StrykeValue {
 
 pub fn case_title_proper(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
-    let small_words = ["a", "an", "the", "and", "or", "but", "for", "nor", "of", "in", "on", "at", "to", "by"];
+    let small_words = [
+        "a", "an", "the", "and", "or", "but", "for", "nor", "of", "in", "on", "at", "to", "by",
+    ];
     let words = split_words(&s);
     let n = words.len();
     let out: Vec<String> = words
@@ -1905,7 +2020,9 @@ pub fn case_title_proper(args: &[StrykeValue]) -> StrykeValue {
             } else {
                 let mut c = w.chars();
                 match c.next() {
-                    Some(first) => first.to_ascii_uppercase().to_string() + &c.as_str().to_ascii_lowercase(),
+                    Some(first) => {
+                        first.to_ascii_uppercase().to_string() + &c.as_str().to_ascii_lowercase()
+                    }
                     None => String::new(),
                 }
             }
@@ -1919,7 +2036,13 @@ pub fn case_alternating(args: &[StrykeValue]) -> StrykeValue {
     let out: String = s
         .chars()
         .enumerate()
-        .map(|(i, c)| if i % 2 == 0 { c.to_ascii_lowercase() } else { c.to_ascii_uppercase() })
+        .map(|(i, c)| {
+            if i % 2 == 0 {
+                c.to_ascii_lowercase()
+            } else {
+                c.to_ascii_uppercase()
+            }
+        })
         .collect();
     StrykeValue::string(out)
 }
@@ -2272,23 +2395,38 @@ mod tests {
 
     #[test]
     fn case_pascal_basic() {
-        assert_eq!(case_pascal(&[sv_s("hello_world")]).as_str_or_empty(), "HelloWorld");
-        assert_eq!(case_pascal(&[sv_s("foo-bar-baz")]).as_str_or_empty(), "FooBarBaz");
+        assert_eq!(
+            case_pascal(&[sv_s("hello_world")]).as_str_or_empty(),
+            "HelloWorld"
+        );
+        assert_eq!(
+            case_pascal(&[sv_s("foo-bar-baz")]).as_str_or_empty(),
+            "FooBarBaz"
+        );
     }
 
     #[test]
     fn case_constant_basic() {
-        assert_eq!(case_constant(&[sv_s("helloWorld")]).as_str_or_empty(), "HELLO_WORLD");
+        assert_eq!(
+            case_constant(&[sv_s("helloWorld")]).as_str_or_empty(),
+            "HELLO_WORLD"
+        );
     }
 
     #[test]
     fn case_swap_basic() {
-        assert_eq!(case_swap(&[sv_s("Hello World")]).as_str_or_empty(), "hELLO wORLD");
+        assert_eq!(
+            case_swap(&[sv_s("Hello World")]).as_str_or_empty(),
+            "hELLO wORLD"
+        );
     }
 
     #[test]
     fn case_alternating_basic() {
-        assert_eq!(case_alternating(&[sv_s("hello")]).as_str_or_empty(), "hElLo");
+        assert_eq!(
+            case_alternating(&[sv_s("hello")]).as_str_or_empty(),
+            "hElLo"
+        );
     }
 
     #[test]

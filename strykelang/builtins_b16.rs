@@ -3,8 +3,8 @@
 
 use crate::value::StrykeValue;
 use parking_lot::RwLock;
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 fn arg_f64(args: &[StrykeValue], idx: usize) -> Option<f64> {
     args.get(idx).map(|v| v.to_number())
@@ -174,7 +174,9 @@ pub fn nysiis(args: &[StrykeValue]) -> StrykeValue {
             'M' => Some('N'),
             'K' if chars.get(i + 1) == Some(&'N') => Some('N'),
             'K' => Some('C'),
-            'S' if chars.get(i..i + 2) == Some(&['S', 'C', 'H'][..2]) && chars.get(i + 2) == Some(&'H') => {
+            'S' if chars.get(i..i + 2) == Some(&['S', 'C', 'H'][..2])
+                && chars.get(i + 2) == Some(&'H') =>
+            {
                 i += 2;
                 Some('S')
             }
@@ -193,7 +195,9 @@ pub fn nysiis(args: &[StrykeValue]) -> StrykeValue {
                     Some('H')
                 }
             }
-            'W' if matches!(chars.get(i - 1), Some('A' | 'E' | 'I' | 'O' | 'U')) => chars.get(i - 1).copied(),
+            'W' if matches!(chars.get(i - 1), Some('A' | 'E' | 'I' | 'O' | 'U')) => {
+                chars.get(i - 1).copied()
+            }
             _ => Some(c),
         };
         if let Some(m) = mapped {
@@ -224,17 +228,26 @@ pub fn caverphone(args: &[StrykeValue]) -> StrykeValue {
     }
     let mut s: String = s.chars().filter(|c| c.is_ascii_alphabetic()).collect();
     let replacements: &[(&str, &str)] = &[
-        ("cough", "cou2f"), ("rough", "rou2f"), ("tough", "tou2f"),
-        ("enough", "enou2f"), ("trough", "trou2f"),
-        ("gn", "2n"), ("mb", "m2"),
+        ("cough", "cou2f"),
+        ("rough", "rou2f"),
+        ("tough", "tou2f"),
+        ("enough", "enou2f"),
+        ("trough", "trou2f"),
+        ("gn", "2n"),
+        ("mb", "m2"),
     ];
     for (a, b) in replacements {
         s = s.replace(a, b);
     }
     let single: &[(char, char)] = &[
-        ('c', 'k'), ('q', 'k'), ('x', 'k'),
-        ('v', 'f'), ('d', 't'), ('l', 'L'),
-        ('w', 'W'), ('p', 'p'),
+        ('c', 'k'),
+        ('q', 'k'),
+        ('x', 'k'),
+        ('v', 'f'),
+        ('d', 't'),
+        ('l', 'L'),
+        ('w', 'W'),
+        ('p', 'p'),
     ];
     let _ = single;
     let mut chars: Vec<char> = s.chars().collect();
@@ -363,7 +376,11 @@ pub fn match_rating_compare(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub(crate) fn match_rating_codex_impl(s: &str) -> String {
-    let s: String = s.to_uppercase().chars().filter(|c| c.is_ascii_alphabetic()).collect();
+    let s: String = s
+        .to_uppercase()
+        .chars()
+        .filter(|c| c.is_ascii_alphabetic())
+        .collect();
     let mut chars: Vec<char> = Vec::new();
     let s_chars: Vec<char> = s.chars().collect();
     for (i, &c) in s_chars.iter().enumerate() {
@@ -379,7 +396,12 @@ pub(crate) fn match_rating_codex_impl(s: &str) -> String {
         let half = (chars.len() - 6) / 2;
         let _ = half;
         let n = chars.len();
-        chars = chars.iter().enumerate().filter(|(i, _)| *i < 3 || *i >= n - 3).map(|(_, c)| *c).collect();
+        chars = chars
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| *i < 3 || *i >= n - 3)
+            .map(|(_, c)| *c)
+            .collect();
     }
     chars.into_iter().collect()
 }
@@ -429,7 +451,9 @@ pub fn mercator_project_x(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn mercator_project_y(args: &[StrykeValue]) -> StrykeValue {
-    let lat = arg_f64(args, 0).unwrap_or(0.0).clamp(-85.05112878, 85.05112878);
+    let lat = arg_f64(args, 0)
+        .unwrap_or(0.0)
+        .clamp(-85.05112878, 85.05112878);
     let phi = lat.to_radians();
     StrykeValue::float(6378137.0 * (std::f64::consts::FRAC_PI_4 + phi / 2.0).tan().ln())
 }
@@ -497,9 +521,8 @@ pub fn vincenty_bearing(args: &[StrykeValue]) -> StrykeValue {
     for _ in 0..100 {
         sin_l = lambda.sin();
         cos_l = lambda.cos();
-        let sin_sigma = ((cos_u2 * sin_l).powi(2)
-            + (cos_u1 * sin_u2 - sin_u1 * cos_u2 * cos_l).powi(2))
-            .sqrt();
+        let sin_sigma =
+            ((cos_u2 * sin_l).powi(2) + (cos_u1 * sin_u2 - sin_u1 * cos_u2 * cos_l).powi(2)).sqrt();
         if sin_sigma == 0.0 {
             return StrykeValue::float(0.0);
         }
@@ -545,8 +568,8 @@ pub fn destination_lat_lon(args: &[StrykeValue]) -> StrykeValue {
     let r = 6371000.0;
     let ad = dist / r;
     let lat2 = (lat.sin() * ad.cos() + lat.cos() * ad.sin() * bearing.cos()).asin();
-    let lon2 = lon
-        + (bearing.sin() * ad.sin() * lat.cos()).atan2(ad.cos() - lat.sin() * lat2.sin());
+    let lon2 =
+        lon + (bearing.sin() * ad.sin() * lat.cos()).atan2(ad.cos() - lat.sin() * lat2.sin());
     arr_sv(vec![
         StrykeValue::float(lat2.to_degrees()),
         StrykeValue::float(lon2.to_degrees()),
@@ -580,7 +603,8 @@ pub fn lat_lon_to_utm(args: &[StrykeValue]) -> StrykeValue {
             + (15.0 * e2 * e2 / 256.0) * (4.0 * phi).sin());
     let x = k0 * n * (a_arg + (1.0 - t + c) * a_arg.powi(3) / 6.0) + 500000.0;
     let y = k0
-        * (m + n * phi.tan()
+        * (m + n
+            * phi.tan()
             * (a_arg.powi(2) / 2.0 + (5.0 - t + 9.0 * c + 4.0 * c.powi(2)) * a_arg.powi(4) / 24.0));
     let y = if lat < 0.0 { y + 10_000_000.0 } else { y };
     arr_sv(vec![
@@ -601,7 +625,11 @@ pub fn utm_to_lat_lon(args: &[StrykeValue]) -> StrykeValue {
     let k0 = 0.9996_f64;
     let lon0 = (zone as f64 - 1.0) * 6.0 - 180.0 + 3.0;
     let x = easting - 500000.0;
-    let y = if hemi == "S" { northing - 10_000_000.0 } else { northing };
+    let y = if hemi == "S" {
+        northing - 10_000_000.0
+    } else {
+        northing
+    };
     let m = y / k0;
     let mu = m / (a * (1.0 - e2 / 4.0 - 3.0 * e2 * e2 / 64.0));
     let e1 = (1.0 - (1.0 - e2).sqrt()) / (1.0 + (1.0 - e2).sqrt());
@@ -730,7 +758,8 @@ pub fn base58check_decode(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(String::from_utf8_lossy(payload).into_owned())
 }
 
-const BASE91_ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%&()*+,./:;<=>?@[]^_`{|}~\"";
+const BASE91_ALPHABET: &[u8] =
+    b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%&()*+,./:;<=>?@[]^_`{|}~\"";
 
 pub fn base91_encode(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
@@ -810,7 +839,8 @@ pub fn basE91_decode(args: &[StrykeValue]) -> StrykeValue {
     base91_decode(args)
 }
 
-const Z85_ALPHABET: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#";
+const Z85_ALPHABET: &[u8] =
+    b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#";
 
 pub fn z85_encode(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
@@ -881,8 +911,7 @@ pub fn sidereal_time_greenwich(args: &[StrykeValue]) -> StrykeValue {
     let unix = arg_i64(args, 0).unwrap_or(0);
     let jd = 2440587.5 + unix as f64 / 86400.0;
     let t = (jd - 2451545.0) / 36525.0;
-    let mut gst = 280.46061837 + 360.98564736629 * (jd - 2451545.0)
-        + 0.000387933 * t.powi(2)
+    let mut gst = 280.46061837 + 360.98564736629 * (jd - 2451545.0) + 0.000387933 * t.powi(2)
         - t.powi(3) / 38710000.0;
     gst = gst.rem_euclid(360.0);
     StrykeValue::float(gst / 15.0)
@@ -984,8 +1013,20 @@ pub fn full_moon_julian(args: &[StrykeValue]) -> StrykeValue {
 // CRC variants
 // ══════════════════════════════════════════════════════════════════════
 
-fn crc_bitwise(data: &[u8], poly: u64, init: u64, refin: bool, refout: bool, xorout: u64, width: u32) -> u64 {
-    let mask = if width == 64 { u64::MAX } else { (1u64 << width) - 1 };
+fn crc_bitwise(
+    data: &[u8],
+    poly: u64,
+    init: u64,
+    refin: bool,
+    refout: bool,
+    xorout: u64,
+    width: u32,
+) -> u64 {
+    let mask = if width == 64 {
+        u64::MAX
+    } else {
+        (1u64 << width) - 1
+    };
     let top = 1u64 << (width - 1);
     let mut crc = init & mask;
     for &b in data {
@@ -1020,12 +1061,22 @@ pub fn crc24(args: &[StrykeValue]) -> StrykeValue {
 
 pub fn crc64_ecma(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
-    StrykeValue::integer(crc_bitwise(s.as_bytes(), 0x42F0E1EBA9EA3693, 0, false, false, 0, 64) as i64)
+    StrykeValue::integer(
+        crc_bitwise(s.as_bytes(), 0x42F0E1EBA9EA3693, 0, false, false, 0, 64) as i64,
+    )
 }
 
 pub fn crc64_xz(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
-    StrykeValue::integer(crc_bitwise(s.as_bytes(), 0x42F0E1EBA9EA3693, u64::MAX, true, true, u64::MAX, 64) as i64)
+    StrykeValue::integer(crc_bitwise(
+        s.as_bytes(),
+        0x42F0E1EBA9EA3693,
+        u64::MAX,
+        true,
+        true,
+        u64::MAX,
+        64,
+    ) as i64)
 }
 
 pub fn crc6_itu(args: &[StrykeValue]) -> StrykeValue {
@@ -1045,17 +1096,35 @@ pub fn crc12_dect(args: &[StrykeValue]) -> StrykeValue {
 
 pub fn crc32_bzip2(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
-    StrykeValue::integer(crc_bitwise(s.as_bytes(), 0x04C11DB7, u32::MAX as u64, false, false, u32::MAX as u64, 32) as i64)
+    StrykeValue::integer(crc_bitwise(
+        s.as_bytes(),
+        0x04C11DB7,
+        u32::MAX as u64,
+        false,
+        false,
+        u32::MAX as u64,
+        32,
+    ) as i64)
 }
 
 pub fn crc32_jamcrc(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
-    StrykeValue::integer(crc_bitwise(s.as_bytes(), 0x04C11DB7, u32::MAX as u64, true, true, 0, 32) as i64)
+    StrykeValue::integer(
+        crc_bitwise(s.as_bytes(), 0x04C11DB7, u32::MAX as u64, true, true, 0, 32) as i64,
+    )
 }
 
 pub fn crc32_mpeg2(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
-    StrykeValue::integer(crc_bitwise(s.as_bytes(), 0x04C11DB7, u32::MAX as u64, false, false, 0, 32) as i64)
+    StrykeValue::integer(crc_bitwise(
+        s.as_bytes(),
+        0x04C11DB7,
+        u32::MAX as u64,
+        false,
+        false,
+        0,
+        32,
+    ) as i64)
 }
 
 pub fn crc32_xfer(args: &[StrykeValue]) -> StrykeValue {
@@ -1186,7 +1255,11 @@ fn overlay_channel(a: f64, b: f64) -> f64 {
 pub fn rgb_blend_overlay(args: &[StrykeValue]) -> StrykeValue {
     let (r1, g1, b1) = unpack_rgb(args.first().unwrap_or(&StrykeValue::UNDEF));
     let (r2, g2, b2) = unpack_rgb(args.get(1).unwrap_or(&StrykeValue::UNDEF));
-    pack_rgb(overlay_channel(r1, r2), overlay_channel(g1, g2), overlay_channel(b1, b2))
+    pack_rgb(
+        overlay_channel(r1, r2),
+        overlay_channel(g1, g2),
+        overlay_channel(b1, b2),
+    )
 }
 
 pub fn rgb_blend_darken(args: &[StrykeValue]) -> StrykeValue {
@@ -1204,14 +1277,26 @@ pub fn rgb_blend_lighten(args: &[StrykeValue]) -> StrykeValue {
 pub fn rgb_blend_color_dodge(args: &[StrykeValue]) -> StrykeValue {
     let (r1, g1, b1) = unpack_rgb(args.first().unwrap_or(&StrykeValue::UNDEF));
     let (r2, g2, b2) = unpack_rgb(args.get(1).unwrap_or(&StrykeValue::UNDEF));
-    let dodge = |a: f64, b: f64| if b >= 255.0 { 255.0 } else { (a * 255.0 / (255.0 - b)).min(255.0) };
+    let dodge = |a: f64, b: f64| {
+        if b >= 255.0 {
+            255.0
+        } else {
+            (a * 255.0 / (255.0 - b)).min(255.0)
+        }
+    };
     pack_rgb(dodge(r1, r2), dodge(g1, g2), dodge(b1, b2))
 }
 
 pub fn rgb_blend_color_burn(args: &[StrykeValue]) -> StrykeValue {
     let (r1, g1, b1) = unpack_rgb(args.first().unwrap_or(&StrykeValue::UNDEF));
     let (r2, g2, b2) = unpack_rgb(args.get(1).unwrap_or(&StrykeValue::UNDEF));
-    let burn = |a: f64, b: f64| if b == 0.0 { 0.0 } else { (255.0 - (255.0 - a) * 255.0 / b).max(0.0) };
+    let burn = |a: f64, b: f64| {
+        if b == 0.0 {
+            0.0
+        } else {
+            (255.0 - (255.0 - a) * 255.0 / b).max(0.0)
+        }
+    };
     pack_rgb(burn(r1, r2), burn(g1, g2), burn(b1, b2))
 }
 
@@ -1270,7 +1355,13 @@ pub fn rle_decompress(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn delta_encode(args: &[StrykeValue]) -> StrykeValue {
-    let xs: Vec<i64> = args.first().map(as_vec_sv).unwrap_or_default().iter().map(|x| x.to_int()).collect();
+    let xs: Vec<i64> = args
+        .first()
+        .map(as_vec_sv)
+        .unwrap_or_default()
+        .iter()
+        .map(|x| x.to_int())
+        .collect();
     if xs.is_empty() {
         return arr_sv(vec![]);
     }
@@ -1282,7 +1373,13 @@ pub fn delta_encode(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn delta_decode(args: &[StrykeValue]) -> StrykeValue {
-    let xs: Vec<i64> = args.first().map(as_vec_sv).unwrap_or_default().iter().map(|x| x.to_int()).collect();
+    let xs: Vec<i64> = args
+        .first()
+        .map(as_vec_sv)
+        .unwrap_or_default()
+        .iter()
+        .map(|x| x.to_int())
+        .collect();
     if xs.is_empty() {
         return arr_sv(vec![]);
     }
@@ -1318,7 +1415,13 @@ pub fn varint_encode(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn varint_decode(args: &[StrykeValue]) -> StrykeValue {
-    let bytes: Vec<u8> = args.first().map(as_vec_sv).unwrap_or_default().iter().map(|x| x.to_int() as u8).collect();
+    let bytes: Vec<u8> = args
+        .first()
+        .map(as_vec_sv)
+        .unwrap_or_default()
+        .iter()
+        .map(|x| x.to_int() as u8)
+        .collect();
     let mut result: u64 = 0;
     let mut shift = 0;
     for b in bytes {
@@ -1336,7 +1439,10 @@ pub fn bwt_transform(args: &[StrykeValue]) -> StrykeValue {
     let bytes = s.as_bytes();
     let n = bytes.len();
     if n == 0 {
-        return make_hash(vec![("data", StrykeValue::string(String::new())), ("index", StrykeValue::integer(0))]);
+        return make_hash(vec![
+            ("data", StrykeValue::string(String::new())),
+            ("index", StrykeValue::integer(0)),
+        ]);
     }
     let mut indices: Vec<usize> = (0..n).collect();
     indices.sort_by(|&a, &b| {
@@ -1356,7 +1462,10 @@ pub fn bwt_transform(args: &[StrykeValue]) -> StrykeValue {
     let last: Vec<u8> = indices.iter().map(|&i| bytes[(i + n - 1) % n]).collect();
     let idx = indices.iter().position(|&i| i == 0).unwrap_or(0);
     make_hash(vec![
-        ("data", StrykeValue::string(String::from_utf8_lossy(&last).into_owned())),
+        (
+            "data",
+            StrykeValue::string(String::from_utf8_lossy(&last).into_owned()),
+        ),
         ("index", StrykeValue::integer(idx as i64)),
     ])
 }
@@ -1394,7 +1503,10 @@ pub fn bwt_invert(args: &[StrykeValue]) -> StrykeValue {
 pub fn huffman_encode(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     if s.is_empty() {
-        return make_hash(vec![("bits", StrykeValue::string(String::new())), ("table", arr_sv(vec![]))]);
+        return make_hash(vec![
+            ("bits", StrykeValue::string(String::new())),
+            ("table", arr_sv(vec![])),
+        ]);
     }
     let mut freq: HashMap<char, u64> = HashMap::new();
     for c in s.chars() {
@@ -1421,7 +1533,12 @@ pub fn huffman_encode(args: &[StrykeValue]) -> StrykeValue {
     }
     let mut heap: BinaryHeap<Reverse<Node>> = BinaryHeap::new();
     for (&c, &f) in &freq {
-        heap.push(Reverse(Node { freq: f, ch: Some(c), left: None, right: None }));
+        heap.push(Reverse(Node {
+            freq: f,
+            ch: Some(c),
+            left: None,
+            right: None,
+        }));
     }
     while heap.len() > 1 {
         let a = heap.pop().unwrap().0;
@@ -1437,7 +1554,14 @@ pub fn huffman_encode(args: &[StrykeValue]) -> StrykeValue {
     let mut codes: HashMap<char, String> = HashMap::new();
     fn walk(node: &Node, prefix: String, codes: &mut HashMap<char, String>) {
         if let Some(c) = node.ch {
-            codes.insert(c, if prefix.is_empty() { "0".into() } else { prefix });
+            codes.insert(
+                c,
+                if prefix.is_empty() {
+                    "0".into()
+                } else {
+                    prefix
+                },
+            );
             return;
         }
         if let Some(ref l) = node.left {
@@ -1448,12 +1572,23 @@ pub fn huffman_encode(args: &[StrykeValue]) -> StrykeValue {
         }
     }
     walk(&root, String::new(), &mut codes);
-    let bits: String = s.chars().map(|c| codes.get(&c).cloned().unwrap_or_default()).collect();
+    let bits: String = s
+        .chars()
+        .map(|c| codes.get(&c).cloned().unwrap_or_default())
+        .collect();
     let table: Vec<StrykeValue> = codes
         .iter()
-        .map(|(&c, code)| arr_sv(vec![StrykeValue::string(c.to_string()), StrykeValue::string(code.clone())]))
+        .map(|(&c, code)| {
+            arr_sv(vec![
+                StrykeValue::string(c.to_string()),
+                StrykeValue::string(code.clone()),
+            ])
+        })
         .collect();
-    make_hash(vec![("bits", StrykeValue::string(bits)), ("table", arr_sv(table))])
+    make_hash(vec![
+        ("bits", StrykeValue::string(bits)),
+        ("table", arr_sv(table)),
+    ])
 }
 
 pub fn huffman_decode(args: &[StrykeValue]) -> StrykeValue {
@@ -1597,7 +1732,10 @@ mod tests {
         assert_eq!(zigzag_encode(&[sv_i(0)]).to_int(), 0);
         assert_eq!(zigzag_encode(&[sv_i(-1)]).to_int(), 1);
         assert_eq!(zigzag_encode(&[sv_i(1)]).to_int(), 2);
-        assert_eq!(zigzag_decode(&[sv_i(zigzag_encode(&[sv_i(-100)]).to_int())]).to_int(), -100);
+        assert_eq!(
+            zigzag_decode(&[sv_i(zigzag_encode(&[sv_i(-100)]).to_int())]).to_int(),
+            -100
+        );
     }
 
     #[test]

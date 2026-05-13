@@ -557,7 +557,11 @@ mod tests {
     #[test]
     fn harris_response_md_roundtrips_to_html() {
         let md = doc_text_for("harris_response").expect("harris_response documented");
-        assert!(md.contains("structure tensor"), "doc_text_for: len={}", md.len());
+        assert!(
+            md.contains("structure tensor"),
+            "doc_text_for: len={}",
+            md.len()
+        );
         let html = markdown_to_html(md);
         assert!(
             html.contains("structure tensor"),

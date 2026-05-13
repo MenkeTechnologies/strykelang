@@ -34,8 +34,8 @@ use crate::scope::Scope;
 use crate::sort_fast::{detect_sort_block_fast, sort_magic_cmp};
 use crate::value::{
     perl_list_range_expand, CaptureResult, PerlAsyncTask, PerlBarrier, PerlDataFrame,
-    PerlGenerator, PerlHeap, PerlPpool, PerlSub, StrykeValue, PipelineInner, PipelineOp,
-    RemoteCluster,
+    PerlGenerator, PerlHeap, PerlPpool, PerlSub, PipelineInner, PipelineOp, RemoteCluster,
+    StrykeValue,
 };
 
 /// Merge two counting-hash accumulators (parallel `preduce_init` partials).
@@ -1752,15 +1752,17 @@ impl VMHelper {
         let mut by_pkg: std::collections::HashMap<String, IndexMap<String, StrykeValue>> =
             std::collections::HashMap::new();
 
-        let record =
-            |pkg: &str,
-             sym: &str,
-             kind: &str,
-             map: &mut std::collections::HashMap<String, IndexMap<String, StrykeValue>>| {
-                map.entry(pkg.to_string())
-                    .or_default()
-                    .insert(sym.to_string(), StrykeValue::string(kind.to_string()));
-            };
+        let record = |pkg: &str,
+                      sym: &str,
+                      kind: &str,
+                      map: &mut std::collections::HashMap<
+            String,
+            IndexMap<String, StrykeValue>,
+        >| {
+            map.entry(pkg.to_string())
+                .or_default()
+                .insert(sym.to_string(), StrykeValue::string(kind.to_string()));
+        };
 
         // Subs: keys like "main::foo" / "Foo::Bar::baz".
         for key in self.subs.keys() {
@@ -3908,7 +3910,12 @@ impl VMHelper {
         Ok(())
     }
 
-    fn install_constant_sub(&mut self, name: &str, val: &StrykeValue, line: usize) -> PerlResult<()> {
+    fn install_constant_sub(
+        &mut self,
+        name: &str,
+        val: &StrykeValue,
+        line: usize,
+    ) -> PerlResult<()> {
         let key = self.qualify_sub_key(name);
         let ret_expr = self.perl_value_to_const_literal_expr(val, line)?;
         let body = vec![Statement {
@@ -5481,7 +5488,9 @@ impl VMHelper {
         };
         buf.truncate(n);
         let read_str = crate::perl_fs::decode_utf8_or_latin1(&buf);
-        let _ = self.scope.set_scalar(var_name, StrykeValue::string(read_str));
+        let _ = self
+            .scope
+            .set_scalar(var_name, StrykeValue::string(read_str));
         Ok(StrykeValue::integer(n as i64))
     }
 
@@ -5664,9 +5673,9 @@ impl VMHelper {
             let mut rows = Vec::new();
             let mut last_caps: Option<PerlCaptures<'_>> = None;
             for caps in re.captures_iter(&s) {
-                rows.push(StrykeValue::array(crate::perl_regex::numbered_capture_flat(
-                    &caps,
-                )));
+                rows.push(StrykeValue::array(
+                    crate::perl_regex::numbered_capture_flat(&caps),
+                ));
                 last_caps = Some(caps);
             }
             self.scope.set_array("^CAPTURE_ALL", rows)?;
@@ -5778,9 +5787,9 @@ impl VMHelper {
             let mut rows = Vec::new();
             let mut last = None;
             for caps in re.captures_iter(&s) {
-                rows.push(StrykeValue::array(crate::perl_regex::numbered_capture_flat(
-                    &caps,
-                )));
+                rows.push(StrykeValue::array(
+                    crate::perl_regex::numbered_capture_flat(&caps),
+                ));
                 last = Some(caps);
             }
             self.scope.set_array("^CAPTURE_ALL", rows)?;
@@ -5860,9 +5869,9 @@ impl VMHelper {
                 out.push_str(&repl_val.to_string());
                 last = m0.end;
                 count += 1;
-                rows.push(StrykeValue::array(crate::perl_regex::numbered_capture_flat(
-                    &caps,
-                )));
+                rows.push(StrykeValue::array(
+                    crate::perl_regex::numbered_capture_flat(&caps),
+                ));
             }
             self.scope.set_array("^CAPTURE_ALL", rows)?;
             out.push_str(&s[last..]);
@@ -6329,7 +6338,9 @@ impl VMHelper {
             interp.argv = argv.clone();
             interp.scope.declare_array(
                 "ARGV",
-                argv.iter().map(|s| StrykeValue::string(s.clone())).collect(),
+                argv.iter()
+                    .map(|s| StrykeValue::string(s.clone()))
+                    .collect(),
             );
             for (k, v) in env {
                 interp
@@ -6737,7 +6748,10 @@ impl VMHelper {
     /// `->next` on a `gen { }` value: two-element **array ref** `(value, more)`; `more` is 0 when done.
     pub(crate) fn generator_next(&mut self, gen: &Arc<PerlGenerator>) -> PerlResult<StrykeValue> {
         let pair = |value: StrykeValue, more: i64| {
-            StrykeValue::array_ref(Arc::new(RwLock::new(vec![value, StrykeValue::integer(more)])))
+            StrykeValue::array_ref(Arc::new(RwLock::new(vec![
+                value,
+                StrykeValue::integer(more),
+            ])))
         };
         let mut exhausted = gen.exhausted.lock();
         if *exhausted {
@@ -8269,7 +8283,9 @@ impl VMHelper {
                             let stored = if val.is_mysync_deque_or_heap() {
                                 val
                             } else {
-                                StrykeValue::atomic(std::sync::Arc::new(parking_lot::Mutex::new(val)))
+                                StrykeValue::atomic(std::sync::Arc::new(parking_lot::Mutex::new(
+                                    val,
+                                )))
                             };
                             self.scope.declare_scalar(&decl.name, stored);
                         }
@@ -8316,7 +8332,9 @@ impl VMHelper {
                             let stored = if val.is_mysync_deque_or_heap() {
                                 val
                             } else {
-                                StrykeValue::atomic(std::sync::Arc::new(parking_lot::Mutex::new(val)))
+                                StrykeValue::atomic(std::sync::Arc::new(parking_lot::Mutex::new(
+                                    val,
+                                )))
                             };
                             self.scope.declare_scalar(&stash, stored);
                             self.english_note_lexical_scalar(&decl.name);
@@ -8952,8 +8970,12 @@ impl VMHelper {
                 Ok(StrykeValue::string(s.clone()))
             }
             ExprKind::Undef => Ok(StrykeValue::UNDEF),
-            ExprKind::MagicConst(MagicConstKind::File) => Ok(StrykeValue::string(self.file.clone())),
-            ExprKind::MagicConst(MagicConstKind::Line) => Ok(StrykeValue::integer(expr.line as i64)),
+            ExprKind::MagicConst(MagicConstKind::File) => {
+                Ok(StrykeValue::string(self.file.clone()))
+            }
+            ExprKind::MagicConst(MagicConstKind::Line) => {
+                Ok(StrykeValue::integer(expr.line as i64))
+            }
             ExprKind::MagicConst(MagicConstKind::Sub) => {
                 if let Some(sub) = self.current_sub_stack.last().cloned() {
                     Ok(StrykeValue::code_ref(sub))
@@ -8973,7 +8995,10 @@ impl VMHelper {
                 }
             }
             ExprKind::QW(words) => Ok(StrykeValue::array(
-                words.iter().map(|w| StrykeValue::string(w.clone())).collect(),
+                words
+                    .iter()
+                    .map(|w| StrykeValue::string(w.clone()))
+                    .collect(),
             )),
 
             // Interpolated strings
@@ -9366,11 +9391,15 @@ impl VMHelper {
                 }
                 ExprKind::ArraySlice { .. } | ExprKind::HashSlice { .. } => {
                     let list = self.eval_expr_ctx(inner, WantarrayCtx::List)?;
-                    Ok(StrykeValue::array_ref(Arc::new(RwLock::new(list.to_list()))))
+                    Ok(StrykeValue::array_ref(Arc::new(RwLock::new(
+                        list.to_list(),
+                    ))))
                 }
                 ExprKind::HashSliceDeref { .. } => {
                     let list = self.eval_expr_ctx(inner, WantarrayCtx::List)?;
-                    Ok(StrykeValue::array_ref(Arc::new(RwLock::new(list.to_list()))))
+                    Ok(StrykeValue::array_ref(Arc::new(RwLock::new(
+                        list.to_list(),
+                    ))))
                 }
                 _ => {
                     let val = self.eval_expr(inner)?;
@@ -11171,16 +11200,20 @@ impl VMHelper {
                     ))));
                 }
                 if let Some(hr) = val.as_hash_ref() {
-                    let mut out: indexmap::IndexMap<String, StrykeValue> = indexmap::IndexMap::new();
+                    let mut out: indexmap::IndexMap<String, StrykeValue> =
+                        indexmap::IndexMap::new();
                     for (k, v) in hr.read().iter() {
                         out.insert(v.to_string(), StrykeValue::string(k.clone()));
                     }
-                    return Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(out))));
+                    return Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(
+                        out,
+                    ))));
                 }
                 // Re-eval in list context for bare arrays/hashes
                 let val = self.eval_expr_ctx(expr, WantarrayCtx::List)?;
                 if let Some(hm) = val.as_hash_map() {
-                    let mut out: indexmap::IndexMap<String, StrykeValue> = indexmap::IndexMap::new();
+                    let mut out: indexmap::IndexMap<String, StrykeValue> =
+                        indexmap::IndexMap::new();
                     for (k, v) in hm.iter() {
                         out.insert(v.to_string(), StrykeValue::string(k.clone()));
                     }
@@ -13765,7 +13798,8 @@ impl VMHelper {
                         .flatten()
                         .and_then(|bu| a.checked_pow(bu))
                         .map(StrykeValue::integer);
-                    int_pow.unwrap_or_else(|| StrykeValue::float(lv.to_number().powf(rv.to_number())))
+                    int_pow
+                        .unwrap_or_else(|| StrykeValue::float(lv.to_number().powf(rv.to_number())))
                 } else {
                     StrykeValue::float(lv.to_number().powf(rv.to_number()))
                 }
@@ -15279,7 +15313,11 @@ impl VMHelper {
         }
     }
 
-    pub(crate) fn set_special_var(&mut self, name: &str, val: &StrykeValue) -> Result<(), PerlError> {
+    pub(crate) fn set_special_var(
+        &mut self,
+        name: &str,
+        val: &StrykeValue,
+    ) -> Result<(), PerlError> {
         let name = self.english_scalar_name(name);
         match name {
             "!" => {
@@ -16811,7 +16849,8 @@ impl VMHelper {
                     }
                     let mut names = Vec::new();
                     self.collect_class_method_names(&c.def, &mut names);
-                    let values: Vec<StrykeValue> = names.into_iter().map(StrykeValue::string).collect();
+                    let values: Vec<StrykeValue> =
+                        names.into_iter().map(StrykeValue::string).collect();
                     return Some(Ok(StrykeValue::array(values)));
                 }
                 "superclass" => {
@@ -17214,7 +17253,12 @@ impl VMHelper {
                 }
                 Ok(v)
             }
-            "peek" => Ok(h.lock().items.first().cloned().unwrap_or(StrykeValue::UNDEF)),
+            "peek" => Ok(h
+                .lock()
+                .items
+                .first()
+                .cloned()
+                .unwrap_or(StrykeValue::UNDEF)),
             _ => Err(PerlError::runtime(
                 format!("Unknown method for heap: {}", method),
                 line,
@@ -19948,7 +19992,10 @@ impl VMHelper {
     }
 
     /// Result of `keys EXPR` after `EXPR` has been evaluated (VM opcode path or tests).
-    pub(crate) fn keys_from_value(val: StrykeValue, line: usize) -> Result<StrykeValue, FlowOrError> {
+    pub(crate) fn keys_from_value(
+        val: StrykeValue,
+        line: usize,
+    ) -> Result<StrykeValue, FlowOrError> {
         if let Some(h) = val.as_hash_map() {
             Ok(StrykeValue::array(
                 h.keys().map(|k| StrykeValue::string(k.clone())).collect(),
@@ -19977,7 +20024,10 @@ impl VMHelper {
     }
 
     /// Result of `values EXPR` after `EXPR` has been evaluated.
-    pub(crate) fn values_from_value(val: StrykeValue, line: usize) -> Result<StrykeValue, FlowOrError> {
+    pub(crate) fn values_from_value(
+        val: StrykeValue,
+        line: usize,
+    ) -> Result<StrykeValue, FlowOrError> {
         if let Some(h) = val.as_hash_map() {
             Ok(StrykeValue::array(h.values().cloned().collect()))
         } else if let Some(r) = val.as_hash_ref() {

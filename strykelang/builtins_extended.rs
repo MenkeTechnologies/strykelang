@@ -816,17 +816,23 @@ fn builtin_mean_squared_error(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     ))
 }
 
-/// `median_absolute_deviation LIST`.
+/// `median_absolute_deviation LIST` — MAD = median(|xᵢ − median(x)|). Uses
+/// the proper median (averages the two middle values for even-length input)
+/// for both the central value and the final deviation, not `sorted[n / 2]`.
 fn builtin_median_absolute_deviation(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let mut vals: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
     if vals.is_empty() {
         return Ok(StrykeValue::float(0.0));
     }
+    fn median_sorted(v: &[f64]) -> f64 {
+        let n = v.len();
+        if n % 2 == 1 { v[n / 2] } else { (v[n / 2 - 1] + v[n / 2]) / 2.0 }
+    }
     vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    let med = vals[vals.len() / 2];
+    let med = median_sorted(&vals);
     let mut devs: Vec<f64> = vals.iter().map(|v| (v - med).abs()).collect();
     devs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    Ok(StrykeValue::float(devs[devs.len() / 2]))
+    Ok(StrykeValue::float(median_sorted(&devs)))
 }
 
 /// `winsorize PERCENT, LIST`.
@@ -1787,13 +1793,19 @@ fn builtin_depreciation_linear(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
     }))
 }
 fn builtin_depreciation_double(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    // Double-declining-balance first-period depreciation. `salvage` is the
+    // floor below which book value cannot fall, so the depreciation amount
+    // is bounded by `cost − salvage`. Previously the salvage operand was
+    // ignored entirely (BUG-133).
     let cost = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let salvage = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let life = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
-    Ok(StrykeValue::float(if life == 0.0 {
-        0.0
-    } else {
-        cost * 2.0 / life
-    }))
+    if life == 0.0 {
+        return Ok(StrykeValue::float(0.0));
+    }
+    let unbounded = cost * 2.0 / life;
+    let cap = (cost - salvage).max(0.0);
+    Ok(StrykeValue::float(unbounded.min(cap)))
 }
 fn builtin_cagr(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let start = args.first().map(|v| v.to_number()).unwrap_or(1.0);
@@ -6998,31 +7010,65 @@ fn builtin_floyd_warshall(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(matrix_to_perl(&dist))
 }
 
-/// `prim_mst MATRIX` — minimum spanning tree via Prim's algorithm. Returns total weight.
+/// `prim_mst MATRIX` — minimum spanning tree via Prim's algorithm. Returns
+/// total weight, or `Infinity` if the graph is disconnected. Accepts either
+/// convention for "no edge":
+///   * `0.0` (zero-as-absent, classic adjacency-matrix style), OR
+///   * `f64::INFINITY` (use INFINITY for absent so zero-weight edges remain
+///     real edges — preferred for graphs that legitimately have weight-0 edges).
+/// Self-loops `(u, u)` are always ignored.
 fn builtin_prim_mst(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let w = args_to_matrix(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = w.len();
     if n == 0 {
         return Ok(StrykeValue::float(0.0));
     }
+    // Auto-detect convention: if any off-diagonal cell is +Infinity, infinity
+    // means "no edge" and 0.0 is a legitimate weight. Otherwise fall back to
+    // the classic "0 = no edge" convention.
+    let mut infinity_means_absent = false;
+    'outer: for i in 0..n {
+        for j in 0..n {
+            if i != j && j < w[i].len() && w[i][j].is_infinite() && w[i][j] > 0.0 {
+                infinity_means_absent = true;
+                break 'outer;
+            }
+        }
+    }
+    let is_edge = |u: usize, v: usize| -> Option<f64> {
+        if u == v { return None; }
+        if v >= w[u].len() { return None; }
+        let weight = w[u][v];
+        if !weight.is_finite() { return None; }
+        if !infinity_means_absent && weight == 0.0 { return None; }
+        Some(weight)
+    };
     let mut in_mst = vec![false; n];
     let mut key = vec![f64::INFINITY; n];
     key[0] = 0.0;
-    let mut total = 0.0;
+    let mut total = 0.0_f64;
     for _ in 0..n {
-        let mut u = 0;
+        let mut u_opt: Option<usize> = None;
         let mut min_key = f64::INFINITY;
         for v in 0..n {
             if !in_mst[v] && key[v] < min_key {
                 min_key = key[v];
-                u = v;
+                u_opt = Some(v);
             }
         }
+        let Some(u) = u_opt else {
+            // No reachable unvisited vertex — graph is disconnected.
+            return Ok(StrykeValue::float(f64::INFINITY));
+        };
         in_mst[u] = true;
         total += key[u];
         for v in 0..n {
-            if !in_mst[v] && w[u][v] > 0.0 && w[u][v] < key[v] {
-                key[v] = w[u][v];
+            if !in_mst[v] {
+                if let Some(weight) = is_edge(u, v) {
+                    if weight < key[v] {
+                        key[v] = weight;
+                    }
+                }
             }
         }
     }
@@ -7341,6 +7387,10 @@ fn builtin_miller_rabin(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// `derangements n` — count of derangements (subfactorial !n).
 fn builtin_derangements(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    // Subfactorial `!n`, the count of permutations with no fixed points.
+    // Recurrence: D(0) = 1, D(1) = 0, D(k) = (k − 1) · (D(k − 1) + D(k − 2)).
+    // Previous implementation used a fixed `(n − 1)` factor on every step,
+    // producing `n!` for k = n instead of the subfactorial.
     let n = args.first().map(|v| v.to_number() as i64).unwrap_or(0);
     if n <= 0 {
         return Ok(StrykeValue::integer(1));
@@ -7348,10 +7398,10 @@ fn builtin_derangements(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     if n == 1 {
         return Ok(StrykeValue::integer(0));
     }
-    let mut a = 1i64;
-    let mut b = 0i64;
-    for _ in 2..=n {
-        let c = (a + b) * (n - 1);
+    let mut a = 1i64; // D(k − 2)
+    let mut b = 0i64; // D(k − 1)
+    for k in 2..=n {
+        let c = (k - 1) * (a + b);
         a = b;
         b = c;
     }
@@ -9709,19 +9759,36 @@ fn builtin_cov_matrix(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// `mahalanobis X, CENTER, COV_INV` — Mahalanobis distance for each observation.
 fn builtin_mahalanobis(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
-    let data: Vec<Vec<f64>> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
-        .iter()
-        .map(|v| arg_to_vec(v).iter().map(|x| x.to_number()).collect())
-        .collect();
     let center: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
         .collect();
-    let cov_inv = args_to_matrix(&args.get(2).cloned().unwrap_or(StrykeValue::UNDEF));
     let p = center.len();
+    let cov_inv = args_to_matrix(&args.get(2).cloned().unwrap_or(StrykeValue::UNDEF));
+    let first_arg_rows = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
+    // Auto-detect: if the first arg looks like a flat p-dim vector (each
+    // element is a scalar, total len == p), treat it as a single observation.
+    let looks_flat = !first_arg_rows.is_empty()
+        && first_arg_rows.len() == p
+        && first_arg_rows
+            .iter()
+            .all(|v| v.as_array_ref().is_none() && v.as_array_vec().is_none());
+    let data: Vec<Vec<f64>> = if looks_flat {
+        vec![first_arg_rows.iter().map(|v| v.to_number()).collect()]
+    } else {
+        first_arg_rows
+            .iter()
+            .map(|v| arg_to_vec(v).iter().map(|x| x.to_number()).collect())
+            .collect()
+    };
     let result: Vec<StrykeValue> = data
         .iter()
         .map(|x| {
+            // Skip rows whose dimension doesn't match `center` — return NaN
+            // rather than panicking, so the rest of the batch still computes.
+            if x.len() != p || cov_inv.len() != p || cov_inv.iter().any(|r| r.len() != p) {
+                return StrykeValue::float(f64::NAN);
+            }
             let diff: Vec<f64> = (0..p).map(|j| x[j] - center[j]).collect();
             let mut d = 0.0;
             for i in 0..p {
@@ -9732,6 +9799,10 @@ fn builtin_mahalanobis(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
             StrykeValue::float(d.sqrt())
         })
         .collect();
+    // Single observation → return a scalar, matching the auto-promoted shape.
+    if looks_flat && result.len() == 1 {
+        return Ok(result.into_iter().next().unwrap());
+    }
     Ok(StrykeValue::array(result))
 }
 

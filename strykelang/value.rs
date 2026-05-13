@@ -623,7 +623,9 @@ impl Clone for StrykeValue {
                 HeapObject::Array(v) => {
                     StrykeValue::from_heap(Arc::new(HeapObject::Array(v.clone())))
                 }
-                HeapObject::Hash(h) => StrykeValue::from_heap(Arc::new(HeapObject::Hash(h.clone()))),
+                HeapObject::Hash(h) => {
+                    StrykeValue::from_heap(Arc::new(HeapObject::Hash(h.clone())))
+                }
                 HeapObject::String(s) => {
                     StrykeValue::from_heap(Arc::new(HeapObject::String(s.clone())))
                 }
@@ -3208,7 +3210,9 @@ fn ipv6_range_stepped(from: &str, to: &str, step: i64) -> Vec<StrykeValue> {
         let step = step as u128;
         let mut cur = s;
         loop {
-            out.push(StrykeValue::string(std::net::Ipv6Addr::from(cur).to_string()));
+            out.push(StrykeValue::string(
+                std::net::Ipv6Addr::from(cur).to_string(),
+            ));
             if cur == e || e.saturating_sub(cur) < step {
                 break;
             }
@@ -3221,7 +3225,9 @@ fn ipv6_range_stepped(from: &str, to: &str, step: i64) -> Vec<StrykeValue> {
         let step = (-step) as u128;
         let mut cur = s;
         loop {
-            out.push(StrykeValue::string(std::net::Ipv6Addr::from(cur).to_string()));
+            out.push(StrykeValue::string(
+                std::net::Ipv6Addr::from(cur).to_string(),
+            ));
             if cur == e || cur.saturating_sub(e) < step {
                 break;
             }
@@ -4186,8 +4192,8 @@ mod tests {
 
     #[test]
     fn scalar_context_array_and_hash() {
-        let a =
-            StrykeValue::array(vec![StrykeValue::integer(1), StrykeValue::integer(2)]).scalar_context();
+        let a = StrykeValue::array(vec![StrykeValue::integer(1), StrykeValue::integer(2)])
+            .scalar_context();
         assert_eq!(a.to_int(), 2);
         let mut h = IndexMap::new();
         h.insert("a".into(), StrykeValue::integer(1));
@@ -4338,7 +4344,10 @@ mod tests {
 
     #[test]
     fn display_array_concatenates_element_displays() {
-        let a = StrykeValue::array(vec![StrykeValue::integer(1), StrykeValue::string("b".into())]);
+        let a = StrykeValue::array(vec![
+            StrykeValue::integer(1),
+            StrykeValue::string("b".into()),
+        ]);
         assert_eq!(a.to_string(), "1b");
     }
 
@@ -4368,7 +4377,10 @@ mod tests {
 
     #[test]
     fn display_iohandle_is_name() {
-        assert_eq!(StrykeValue::io_handle("STDOUT".into()).to_string(), "STDOUT");
+        assert_eq!(
+            StrykeValue::io_handle("STDOUT".into()).to_string(),
+            "STDOUT"
+        );
     }
 
     #[test]
@@ -4448,7 +4460,9 @@ mod tests {
 
     #[test]
     fn errno_dual_parts_none_for_plain_string() {
-        assert!(StrykeValue::string("hi".into()).errno_dual_parts().is_none());
+        assert!(StrykeValue::string("hi".into())
+            .errno_dual_parts()
+            .is_none());
     }
 
     #[test]
@@ -4466,8 +4480,10 @@ mod tests {
     #[test]
     fn list_range_alpha_joins_like_perl() {
         use super::perl_list_range_expand;
-        let v =
-            perl_list_range_expand(StrykeValue::string("a".into()), StrykeValue::string("z".into()));
+        let v = perl_list_range_expand(
+            StrykeValue::string("a".into()),
+            StrykeValue::string("z".into()),
+        );
         let s: String = v.iter().map(|x| x.to_string()).collect();
         assert_eq!(s, "abcdefghijklmnopqrstuvwxyz");
     }

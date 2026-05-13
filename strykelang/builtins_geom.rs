@@ -44,7 +44,10 @@ fn unpack_complex(v: &StrykeValue) -> Option<(f64, f64)> {
 
 /// `complex_new(RE, IM)` — construct `{ re, im }`.
 pub fn complex_new(args: &[StrykeValue]) -> StrykeValue {
-    mk_complex(arg_f64(args, 0).unwrap_or(0.0), arg_f64(args, 1).unwrap_or(0.0))
+    mk_complex(
+        arg_f64(args, 0).unwrap_or(0.0),
+        arg_f64(args, 1).unwrap_or(0.0),
+    )
 }
 
 /// `complex_real(C)` — real part.
@@ -72,7 +75,10 @@ pub fn complex_polar(args: &[StrykeValue]) -> StrykeValue {
         return StrykeValue::UNDEF;
     };
     let mut h: IndexMap<String, StrykeValue> = IndexMap::new();
-    h.insert("r".to_string(), StrykeValue::float((re * re + im * im).sqrt()));
+    h.insert(
+        "r".to_string(),
+        StrykeValue::float((re * re + im * im).sqrt()),
+    );
     h.insert("theta".to_string(), StrykeValue::float(im.atan2(re)));
     StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
 }
@@ -430,9 +436,7 @@ pub fn polygon_contains_point(args: &[StrykeValue]) -> StrykeValue {
     for i in 0..n {
         let (xi, yi) = pts[i];
         let (xj, yj) = pts[j];
-        if ((yi > py) != (yj > py))
-            && (px < (xj - xi) * (py - yi) / (yj - yi + 1e-300) + xi)
-        {
+        if ((yi > py) != (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi + 1e-300) + xi) {
             inside = !inside;
         }
         j = i;
@@ -459,7 +463,13 @@ pub fn polygon_convex(args: &[StrykeValue]) -> StrykeValue {
         let dx2 = p3.0 - p2.0;
         let dy2 = p3.1 - p2.1;
         let cross = dx1 * dy2 - dy1 * dx2;
-        let s: i8 = if cross > 0.0 { 1 } else if cross < 0.0 { -1 } else { 0 };
+        let s: i8 = if cross > 0.0 {
+            1
+        } else if cross < 0.0 {
+            -1
+        } else {
+            0
+        };
         if s == 0 {
             continue;
         }
@@ -558,7 +568,11 @@ pub fn polygon_convex_hull_2d(args: &[StrykeValue]) -> StrykeValue {
             .collect();
         return StrykeValue::array_ref(Arc::new(RwLock::new(elems)));
     }
-    pts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap().then(a.1.partial_cmp(&b.1).unwrap()));
+    pts.sort_by(|a, b| {
+        a.0.partial_cmp(&b.0)
+            .unwrap()
+            .then(a.1.partial_cmp(&b.1).unwrap())
+    });
     let cross = |o: (f64, f64), a: (f64, f64), b: (f64, f64)| -> f64 {
         (a.0 - o.0) * (b.1 - o.1) - (a.1 - o.1) * (b.0 - o.0)
     };
@@ -738,7 +752,11 @@ pub fn circle_intersects_circle(args: &[StrykeValue]) -> StrykeValue {
     let c2y = arg_f64(args, 4).unwrap_or(0.0);
     let r2 = arg_f64(args, 5).unwrap_or(0.0);
     let d = ((c2x - c1x).powi(2) + (c2y - c1y).powi(2)).sqrt();
-    StrykeValue::integer(if d <= r1 + r2 && d >= (r1 - r2).abs() { 1 } else { 0 })
+    StrykeValue::integer(if d <= r1 + r2 && d >= (r1 - r2).abs() {
+        1
+    } else {
+        0
+    })
 }
 
 pub fn rect_area(args: &[StrykeValue]) -> StrykeValue {
@@ -805,7 +823,11 @@ pub fn rect_contains_point(args: &[StrykeValue]) -> StrykeValue {
     let Some((px, py)) = args.get(1).and_then(point_xy) else {
         return StrykeValue::UNDEF;
     };
-    StrykeValue::integer(if px >= x && px <= x + w && py >= y && py <= y + h { 1 } else { 0 })
+    StrykeValue::integer(if px >= x && px <= x + w && py >= y && py <= y + h {
+        1
+    } else {
+        0
+    })
 }
 
 pub fn rect_union(args: &[StrykeValue]) -> StrykeValue {
@@ -1105,7 +1127,10 @@ pub fn chromatic_adaptation(args: &[StrykeValue]) -> StrykeValue {
         .get(4)
         .map(|v| v.to_string())
         .unwrap_or_else(|| "d50".to_string());
-    match (from.to_ascii_lowercase().as_str(), to.to_ascii_lowercase().as_str()) {
+    match (
+        from.to_ascii_lowercase().as_str(),
+        to.to_ascii_lowercase().as_str(),
+    ) {
         ("d65", "d50") => xyz_d65_to_d50(args),
         ("d50", "d65") => xyz_d50_to_d65(args),
         _ => StrykeValue::UNDEF,
@@ -1113,7 +1138,11 @@ pub fn chromatic_adaptation(args: &[StrykeValue]) -> StrykeValue {
 }
 
 fn color_lerp(a: (f64, f64, f64), b: (f64, f64, f64), t: f64) -> (f64, f64, f64) {
-    (a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t, a.2 + (b.2 - a.2) * t)
+    (
+        a.0 + (b.0 - a.0) * t,
+        a.1 + (b.1 - a.1) * t,
+        a.2 + (b.2 - a.2) * t,
+    )
 }
 
 pub fn color_interpolate_rgb(args: &[StrykeValue]) -> StrykeValue {
@@ -1162,11 +1191,7 @@ pub fn color_blend_screen(args: &[StrykeValue]) -> StrykeValue {
         return StrykeValue::UNDEF;
     };
     let g = arr2.read();
-    let (r2, g2, b2) = (
-        g[0].to_number(),
-        g[1].to_number(),
-        g[2].to_number(),
-    );
+    let (r2, g2, b2) = (g[0].to_number(), g[1].to_number(), g[2].to_number());
     mk_rgb(
         1.0 - (1.0 - r1) * (1.0 - r2),
         1.0 - (1.0 - g1) * (1.0 - g2),
@@ -1315,9 +1340,8 @@ mod tests {
     fn triangle_area_basic() {
         use parking_lot::RwLock;
         use std::sync::Arc;
-        let mk_pt = |x: f64, y: f64| {
-            StrykeValue::array_ref(Arc::new(RwLock::new(vec![f(x), f(y)])))
-        };
+        let mk_pt =
+            |x: f64, y: f64| StrykeValue::array_ref(Arc::new(RwLock::new(vec![f(x), f(y)])));
         // Right triangle (0,0), (3,0), (0,4) → area 6
         let area = triangle_area(&[mk_pt(0.0, 0.0), mk_pt(3.0, 0.0), mk_pt(0.0, 4.0)]);
         assert!((area.to_number() - 6.0).abs() < 1e-9);
@@ -1334,9 +1358,8 @@ mod tests {
     fn polygon_orientation_check() {
         use parking_lot::RwLock;
         use std::sync::Arc;
-        let mk_pt = |x: f64, y: f64| {
-            StrykeValue::array_ref(Arc::new(RwLock::new(vec![f(x), f(y)])))
-        };
+        let mk_pt =
+            |x: f64, y: f64| StrykeValue::array_ref(Arc::new(RwLock::new(vec![f(x), f(y)])));
         // CCW square
         let ccw = StrykeValue::array_ref(Arc::new(RwLock::new(vec![
             mk_pt(0.0, 0.0),
@@ -1378,7 +1401,11 @@ mod tests {
     fn srgb_round_trip() {
         let lin = srgb_to_rgb(&[f(0.5), f(0.5), f(0.5)]);
         let g = lin.as_array_ref().unwrap().read().clone();
-        let back = rgb_to_srgb(&[f(g[0].to_number()), f(g[1].to_number()), f(g[2].to_number())]);
+        let back = rgb_to_srgb(&[
+            f(g[0].to_number()),
+            f(g[1].to_number()),
+            f(g[2].to_number()),
+        ]);
         let bg = back.as_array_ref().unwrap().read().clone();
         assert!((bg[0].to_number() - 0.5).abs() < 1e-6);
     }

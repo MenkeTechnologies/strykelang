@@ -6,16 +6,20 @@
 # ── Math & Analytic Divergences ───────────────────────────────────────────
 
 len(iota_range(5, 99)) |> aeq 5, "iota_range ignores tail"
-tj(lambert_w0(1)) |> aeq "NaN", "lambert_w0(1) is NaN"
-tj(wright_omega(0)) |> aeq "NaN", "wright_omega(0) is NaN"
-convolve_full([1,2], [3,4]) |> aeq 3, "convolve_full returns output length"
+# BUG-128 (FIXED): lambert_w0(1) now returns the Omega constant ≈ 0.567143
+abs(lambert_w0(1) - 0.5671432904) < 1e-9 |> aok "BUG-128 (FIXED): lambert_w0(1) = Ω ≈ 0.5671432904"
+abs(wright_omega(0) - 0.5671432904) < 1e-9 |> aok "BUG-128 (FIXED): wright_omega(0) = W(1) = Ω"
+# BUG-129 (FIXED): convolve_full now returns the actual convolution
+join(",", convolve_full([1,2], [3,4])) |> aeq "3,10,8", "BUG-129 (FIXED): convolve_full([1,2],[3,4]) = [3, 10, 8]"
 detrend_linear([1, 2, 3]) |> aeq 1, "detrend_linear returns slope"
-medfilt_1d([10, 1, 2, 3], 1) |> aeq 2.5, "medfilt_1d is global median"
+# BUG-131 (FIXED): medfilt_1d now returns sliding-window medians
+join(",", medfilt_1d([10, 1, 2, 3], 3)) |> aeq "5.5,2,2,2.5", "BUG-131 (FIXED): medfilt_1d sliding window"
 
 my $delta = bs_delta(100, 100, 1, 0.05, 0.2)
 ($delta > 0.6 && $delta < 0.7) |> aok "bs_delta returns call delta"
 depreciation_double(1000, 500, 5) |> aeq 400, "depreciation_double ignores salvage"
-(dB_voltage(1) >= 600) |> aok "dB_voltage balloons with missing reference"
+my $dbv = dB_voltage(1)
+($dbv != $dbv) |> aok "BUG-135 (FIXED): dB_voltage without reference returns NaN, not 1200 dB"
 len(box_blur_kernel(3)) |> aeq 49, "box_blur_kernel(3) side is 7"
 
 # ── List & Collection Pitfalls ─────────────────────────────────────────────
@@ -25,7 +29,7 @@ product([10, 20]) |> aeq 200, "product([10,20]) unwraps arrayref (FIXED): 10·20
 sum_list([10, 20]) |> aeq 30, "sum_list works correctly"
 len(chain_from([[1,2], [3,4]])) |> aeq 4, "chain_from length 4 (pinned behavior)"
 len(permutations([1,2,3])) |> aeq 18, "permutations(arrayref) sums len of each perm (3! · 3 = 18) when passed as varargs to len"
-len(without([1,2], ([1,2], 10, 20))) |> aeq 4, "without arrayref removes nothing (pinned behavior)"
+len(without([1,2], (1, 2, 10, 20))) |> aeq 2, "BUG-149 (FIXED): without([1,2], LIST) drops members 1 and 2 — leaves 10,20"
 clamp(11, 0, 10) |> aeq 10, "clamp(11, 0, 10) returns 10 (FIXED: bounds now normalized so swap order works)"
 seq(2, 5) |> aeq "2", "seq(2, 5) yields '2' (bug)"
 tj(parse_int("0xff")) |> aeq "null", "parse_int('0xff') is null without radix"

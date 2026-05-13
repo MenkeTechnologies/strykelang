@@ -16,8 +16,8 @@ use crate::perl_fs::read_file_text_perl_compat;
 use crate::pmap_progress::{FanProgress, PmapProgress};
 use crate::sort_fast::{sort_magic_cmp, SortBlockFast};
 use crate::value::{
-    perl_list_range_expand, PerlAsyncTask, PerlBarrier, PerlHeap, PerlSub, StrykeValue,
-    PipelineInner, PipelineOp,
+    perl_list_range_expand, PerlAsyncTask, PerlBarrier, PerlHeap, PerlSub, PipelineInner,
+    PipelineOp, StrykeValue,
 };
 use crate::vm_helper::{
     fold_preduce_init_step, merge_preduce_init_partials, preduce_init_fold_identity, Flow,
@@ -721,9 +721,9 @@ impl<'a> VM<'a> {
                     if key.str_eq(pk) {
                         run.push(item);
                     } else {
-                        chunks.push(StrykeValue::array_ref(Arc::new(RwLock::new(std::mem::take(
-                            &mut run,
-                        )))));
+                        chunks.push(StrykeValue::array_ref(Arc::new(RwLock::new(
+                            std::mem::take(&mut run),
+                        ))));
                         run.push(item);
                         prev_key = Some(key);
                     }
@@ -775,9 +775,9 @@ impl<'a> VM<'a> {
                     if key.str_eq(pk) {
                         run.push(item);
                     } else {
-                        chunks.push(StrykeValue::array_ref(Arc::new(RwLock::new(std::mem::take(
-                            &mut run,
-                        )))));
+                        chunks.push(StrykeValue::array_ref(Arc::new(RwLock::new(
+                            std::mem::take(&mut run),
+                        ))));
                         run.push(item);
                         prev_key = Some(key);
                     }
@@ -1180,7 +1180,9 @@ impl<'a> VM<'a> {
                     let nm = names[i as usize].as_str();
                     let pv = self.interp.scope.get_scalar(nm);
                     self.jit_buf_plain[i as usize] = match block_buf_mode {
-                        crate::jit::BlockJitBufferMode::I64AsStrykeValueBits => pv.raw_bits() as i64,
+                        crate::jit::BlockJitBufferMode::I64AsStrykeValueBits => {
+                            pv.raw_bits() as i64
+                        }
                         crate::jit::BlockJitBufferMode::I64AsInteger => match pv.as_integer() {
                             Some(v) => v,
                             None => {
@@ -1207,7 +1209,9 @@ impl<'a> VM<'a> {
                     let pos = base + i as usize;
                     let pv = self.stack.get(pos).cloned().unwrap_or(StrykeValue::UNDEF);
                     self.jit_buf_arg[i as usize] = match block_buf_mode {
-                        crate::jit::BlockJitBufferMode::I64AsStrykeValueBits => pv.raw_bits() as i64,
+                        crate::jit::BlockJitBufferMode::I64AsStrykeValueBits => {
+                            pv.raw_bits() as i64
+                        }
                         crate::jit::BlockJitBufferMode::I64AsInteger => match pv.as_integer() {
                             Some(v) => v,
                             None => {
@@ -3781,7 +3785,8 @@ impl<'a> VM<'a> {
                         // Flatten to a Vec<StrykeValue>: an array value gives its
                         // items; a scalar (e.g. `(0) x 5` after the LHS evaluates
                         // through scalar-collapse paths) wraps as a 1-elt list.
-                        let items: Vec<StrykeValue> = val.as_array_vec().unwrap_or_else(|| vec![val]);
+                        let items: Vec<StrykeValue> =
+                            val.as_array_vec().unwrap_or_else(|| vec![val]);
                         let mut out = Vec::with_capacity(items.len().saturating_mul(n));
                         for _ in 0..n {
                             out.extend(items.iter().cloned());
@@ -4773,7 +4778,8 @@ impl<'a> VM<'a> {
                         }
                         let base = len - n - 1;
                         let container = self.stack[base].clone();
-                        let key_vals: Vec<StrykeValue> = self.stack[base + 1..base + 1 + n].to_vec();
+                        let key_vals: Vec<StrykeValue> =
+                            self.stack[base + 1..base + 1 + n].to_vec();
                         let list = vm_interp_result(
                             self.interp
                                 .hash_slice_deref_values(&container, &key_vals, line),
@@ -5875,7 +5881,10 @@ impl<'a> VM<'a> {
                         // Read argument from caller's stack region without @_ allocation.
                         let val = if let Some(frame) = self.call_stack.last() {
                             let arg_pos = frame.stack_base + *idx as usize;
-                            self.stack.get(arg_pos).cloned().unwrap_or(StrykeValue::UNDEF)
+                            self.stack
+                                .get(arg_pos)
+                                .cloned()
+                                .unwrap_or(StrykeValue::UNDEF)
                         } else {
                             StrykeValue::UNDEF
                         };
@@ -8494,7 +8503,9 @@ impl<'a> VM<'a> {
                         let n = names[*idx as usize].as_str();
                         self.interp.scope_pop_hook();
                         self.interp.scope_push_hook();
-                        self.interp.scope.declare_scalar(n, StrykeValue::string(msg));
+                        self.interp
+                            .scope
+                            .declare_scalar(n, StrykeValue::string(msg));
                         self.interp.english_note_lexical_scalar(n);
                         Ok(())
                     }
@@ -8878,7 +8889,9 @@ impl<'a> VM<'a> {
                 let mut it = args.into_iter();
                 let p = it.next().unwrap_or(StrykeValue::UNDEF).to_string();
                 let salt = it.next().unwrap_or(StrykeValue::UNDEF).to_string();
-                Ok(StrykeValue::string(crate::crypt_util::perl_crypt(&p, &salt)))
+                Ok(StrykeValue::string(crate::crypt_util::perl_crypt(
+                    &p, &salt,
+                )))
             }
             Some(BuiltinId::Fc) => {
                 let s = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
@@ -8904,7 +8917,11 @@ impl<'a> VM<'a> {
                 Ok(VMHelper::study_return_value(&s.to_string()))
             }
             Some(BuiltinId::Chr) => {
-                let n = args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_int() as u32;
+                let n = args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(StrykeValue::UNDEF)
+                    .to_int() as u32;
                 Ok(StrykeValue::string(
                     char::from_u32(n).map(|c| c.to_string()).unwrap_or_default(),
                 ))
@@ -9368,11 +9385,13 @@ impl<'a> VM<'a> {
             }
             Some(BuiltinId::Mkdir) => {
                 let path = args.first().map(|v| v.to_string()).unwrap_or_default();
-                Ok(StrykeValue::integer(if std::fs::create_dir(&path).is_ok() {
-                    1
-                } else {
-                    0
-                }))
+                Ok(StrykeValue::integer(
+                    if std::fs::create_dir(&path).is_ok() {
+                        1
+                    } else {
+                        0
+                    },
+                ))
             }
             Some(BuiltinId::Unlink) => {
                 let mut count = 0i64;

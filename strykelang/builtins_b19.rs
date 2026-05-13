@@ -4,8 +4,8 @@
 
 use crate::value::StrykeValue;
 use parking_lot::RwLock;
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 fn arg_f64(args: &[StrykeValue], idx: usize) -> Option<f64> {
     args.get(idx).map(|v| v.to_number())
@@ -217,8 +217,14 @@ pub fn gradient_magnitude_2d(args: &[StrykeValue]) -> StrykeValue {
     let mut out = vec![vec![0.0_f64; w]; h];
     for i in 1..h - 1 {
         for j in 1..w - 1 {
-            let gx = -img[i - 1][j - 1] + img[i - 1][j + 1] - 2.0 * img[i][j - 1] + 2.0 * img[i][j + 1] - img[i + 1][j - 1] + img[i + 1][j + 1];
-            let gy = -img[i - 1][j - 1] - 2.0 * img[i - 1][j] - img[i - 1][j + 1] + img[i + 1][j - 1] + 2.0 * img[i + 1][j] + img[i + 1][j + 1];
+            let gx = -img[i - 1][j - 1] + img[i - 1][j + 1] - 2.0 * img[i][j - 1]
+                + 2.0 * img[i][j + 1]
+                - img[i + 1][j - 1]
+                + img[i + 1][j + 1];
+            let gy = -img[i - 1][j - 1] - 2.0 * img[i - 1][j] - img[i - 1][j + 1]
+                + img[i + 1][j - 1]
+                + 2.0 * img[i + 1][j]
+                + img[i + 1][j + 1];
             out[i][j] = (gx * gx + gy * gy).sqrt();
         }
     }
@@ -269,7 +275,11 @@ pub fn otsu_threshold(args: &[StrykeValue]) -> StrykeValue {
     if total == 0 {
         return StrykeValue::float(128.0);
     }
-    let sum_total: f64 = hist.iter().enumerate().map(|(i, &c)| i as f64 * c as f64).sum();
+    let sum_total: f64 = hist
+        .iter()
+        .enumerate()
+        .map(|(i, &c)| i as f64 * c as f64)
+        .sum();
     let mut sum_back = 0.0_f64;
     let mut w_back = 0_u64;
     let mut max_var = 0.0_f64;
@@ -409,7 +419,11 @@ pub fn integral_image(args: &[StrykeValue]) -> StrykeValue {
             out[i][j] = img[i][j]
                 + if i > 0 { out[i - 1][j] } else { 0.0 }
                 + if j > 0 { out[i][j - 1] } else { 0.0 }
-                - if i > 0 && j > 0 { out[i - 1][j - 1] } else { 0.0 };
+                - if i > 0 && j > 0 {
+                    out[i - 1][j - 1]
+                } else {
+                    0.0
+                };
         }
     }
     matrix_to_sv(&out)
@@ -444,12 +458,19 @@ pub fn tfidf_compute(args: &[StrykeValue]) -> StrykeValue {
         .collect();
     let n_docs = docs.len();
     if n_docs == 0 {
-        return make_hash(vec![("vocab", arr_sv(vec![])), ("matrix", matrix_to_sv(&[]))]);
+        return make_hash(vec![
+            ("vocab", arr_sv(vec![])),
+            ("matrix", matrix_to_sv(&[])),
+        ]);
     }
     let mut vocab: Vec<String> = docs.iter().flat_map(|d| d.iter().cloned()).collect();
     vocab.sort();
     vocab.dedup();
-    let term_idx: HashMap<String, usize> = vocab.iter().enumerate().map(|(i, t)| (t.clone(), i)).collect();
+    let term_idx: HashMap<String, usize> = vocab
+        .iter()
+        .enumerate()
+        .map(|(i, t)| (t.clone(), i))
+        .collect();
     let mut df = vec![0_u64; vocab.len()];
     for doc in &docs {
         let mut seen = std::collections::HashSet::new();
@@ -480,14 +501,29 @@ pub fn tfidf_compute(args: &[StrykeValue]) -> StrykeValue {
         }
     }
     make_hash(vec![
-        ("vocab", arr_sv(vocab.into_iter().map(StrykeValue::string).collect())),
+        (
+            "vocab",
+            arr_sv(vocab.into_iter().map(StrykeValue::string).collect()),
+        ),
         ("matrix", matrix_to_sv(&matrix)),
     ])
 }
 
 pub fn bm25_score(args: &[StrykeValue]) -> StrykeValue {
-    let query: Vec<String> = args.first().map(as_vec_sv).unwrap_or_default().iter().map(|x| x.as_str_or_empty()).collect();
-    let doc: Vec<String> = args.get(1).map(as_vec_sv).unwrap_or_default().iter().map(|x| x.as_str_or_empty()).collect();
+    let query: Vec<String> = args
+        .first()
+        .map(as_vec_sv)
+        .unwrap_or_default()
+        .iter()
+        .map(|x| x.as_str_or_empty())
+        .collect();
+    let doc: Vec<String> = args
+        .get(1)
+        .map(as_vec_sv)
+        .unwrap_or_default()
+        .iter()
+        .map(|x| x.as_str_or_empty())
+        .collect();
     let avg_dl = arg_f64(args, 2).unwrap_or(0.0).max(1e-9);
     let n_total = arg_f64(args, 3).unwrap_or(1.0).max(1.0);
     let df_v: Vec<f64> = args.get(4).map(as_vec_f64).unwrap_or_default();
@@ -533,7 +569,10 @@ pub fn cosine_sim_sparse(args: &[StrykeValue]) -> StrykeValue {
     for &(i, v) in &b {
         *b_map.entry(i).or_insert(0.0) += v;
     }
-    let dot: f64 = a.iter().map(|&(i, v)| v * b_map.get(&i).copied().unwrap_or(0.0)).sum();
+    let dot: f64 = a
+        .iter()
+        .map(|&(i, v)| v * b_map.get(&i).copied().unwrap_or(0.0))
+        .sum();
     let na: f64 = a.iter().map(|&(_, v)| v * v).sum::<f64>().sqrt();
     let nb: f64 = b.iter().map(|&(_, v)| v * v).sum::<f64>().sqrt();
     if na < 1e-12 || nb < 1e-12 {
@@ -543,8 +582,14 @@ pub fn cosine_sim_sparse(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn jaccard_sim(args: &[StrykeValue]) -> StrykeValue {
-    let a: Vec<String> = as_vec_sv(args.first().unwrap_or(&StrykeValue::UNDEF)).iter().map(|x| x.as_str_or_empty()).collect();
-    let b: Vec<String> = as_vec_sv(args.get(1).unwrap_or(&StrykeValue::UNDEF)).iter().map(|x| x.as_str_or_empty()).collect();
+    let a: Vec<String> = as_vec_sv(args.first().unwrap_or(&StrykeValue::UNDEF))
+        .iter()
+        .map(|x| x.as_str_or_empty())
+        .collect();
+    let b: Vec<String> = as_vec_sv(args.get(1).unwrap_or(&StrykeValue::UNDEF))
+        .iter()
+        .map(|x| x.as_str_or_empty())
+        .collect();
     let sa: std::collections::HashSet<String> = a.into_iter().collect();
     let sb: std::collections::HashSet<String> = b.into_iter().collect();
     let inter = sa.intersection(&sb).count();
@@ -556,8 +601,14 @@ pub fn jaccard_sim(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn overlap_coeff(args: &[StrykeValue]) -> StrykeValue {
-    let a: Vec<String> = as_vec_sv(args.first().unwrap_or(&StrykeValue::UNDEF)).iter().map(|x| x.as_str_or_empty()).collect();
-    let b: Vec<String> = as_vec_sv(args.get(1).unwrap_or(&StrykeValue::UNDEF)).iter().map(|x| x.as_str_or_empty()).collect();
+    let a: Vec<String> = as_vec_sv(args.first().unwrap_or(&StrykeValue::UNDEF))
+        .iter()
+        .map(|x| x.as_str_or_empty())
+        .collect();
+    let b: Vec<String> = as_vec_sv(args.get(1).unwrap_or(&StrykeValue::UNDEF))
+        .iter()
+        .map(|x| x.as_str_or_empty())
+        .collect();
     let sa: std::collections::HashSet<String> = a.into_iter().collect();
     let sb: std::collections::HashSet<String> = b.into_iter().collect();
     let inter = sa.intersection(&sb).count();
@@ -569,8 +620,14 @@ pub fn overlap_coeff(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn dice_coeff(args: &[StrykeValue]) -> StrykeValue {
-    let a: Vec<String> = as_vec_sv(args.first().unwrap_or(&StrykeValue::UNDEF)).iter().map(|x| x.as_str_or_empty()).collect();
-    let b: Vec<String> = as_vec_sv(args.get(1).unwrap_or(&StrykeValue::UNDEF)).iter().map(|x| x.as_str_or_empty()).collect();
+    let a: Vec<String> = as_vec_sv(args.first().unwrap_or(&StrykeValue::UNDEF))
+        .iter()
+        .map(|x| x.as_str_or_empty())
+        .collect();
+    let b: Vec<String> = as_vec_sv(args.get(1).unwrap_or(&StrykeValue::UNDEF))
+        .iter()
+        .map(|x| x.as_str_or_empty())
+        .collect();
     let sa: std::collections::HashSet<String> = a.into_iter().collect();
     let sb: std::collections::HashSet<String> = b.into_iter().collect();
     let inter = sa.intersection(&sb).count();
@@ -596,8 +653,16 @@ pub fn tanimoto_coeff(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn tversky_index(args: &[StrykeValue]) -> StrykeValue {
-    let a: std::collections::HashSet<String> = as_vec_sv(args.first().unwrap_or(&StrykeValue::UNDEF)).iter().map(|x| x.as_str_or_empty()).collect();
-    let b: std::collections::HashSet<String> = as_vec_sv(args.get(1).unwrap_or(&StrykeValue::UNDEF)).iter().map(|x| x.as_str_or_empty()).collect();
+    let a: std::collections::HashSet<String> =
+        as_vec_sv(args.first().unwrap_or(&StrykeValue::UNDEF))
+            .iter()
+            .map(|x| x.as_str_or_empty())
+            .collect();
+    let b: std::collections::HashSet<String> =
+        as_vec_sv(args.get(1).unwrap_or(&StrykeValue::UNDEF))
+            .iter()
+            .map(|x| x.as_str_or_empty())
+            .collect();
     let alpha = arg_f64(args, 2).unwrap_or(1.0);
     let beta = arg_f64(args, 3).unwrap_or(1.0);
     let inter = a.intersection(&b).count() as f64;
@@ -734,7 +799,10 @@ pub fn posterior_predictive_normal(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn prior_jeffreys_uniform(_args: &[StrykeValue]) -> StrykeValue {
-    make_hash(vec![("alpha", StrykeValue::float(0.5)), ("beta", StrykeValue::float(0.5))])
+    make_hash(vec![
+        ("alpha", StrykeValue::float(0.5)),
+        ("beta", StrykeValue::float(0.5)),
+    ])
 }
 
 pub fn maximum_a_posteriori(args: &[StrykeValue]) -> StrykeValue {
@@ -853,7 +921,9 @@ pub fn thompson_beta_choose(args: &[StrykeValue]) -> StrykeValue {
     let mut best = 0_usize;
     let mut best_s = f64::NEG_INFINITY;
     for i in 0..n {
-        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let u = (state >> 32) as f64 / u32::MAX as f64;
         let sample = match Beta::new(alphas[i].max(1e-9), betas[i].max(1e-9)) {
             Ok(d) => d.inverse_cdf(u.clamp(1e-9, 1.0 - 1e-9)),
@@ -878,7 +948,9 @@ pub fn softmax_choose(args: &[StrykeValue]) -> StrykeValue {
     let exps: Vec<f64> = logits.iter().map(|x| ((x - max) / temp).exp()).collect();
     let sum: f64 = exps.iter().sum();
     let probs: Vec<f64> = exps.iter().map(|x| x / sum).collect();
-    let state = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    let state = seed
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
     let r = (state >> 32) as f64 / u32::MAX as f64;
     let mut cum = 0.0;
     for (i, p) in probs.iter().enumerate() {
@@ -945,7 +1017,13 @@ fn rgb_to_lab_inner(r: f64, g: f64, b: f64) -> (f64, f64, f64) {
     let xn = 95.047;
     let yn = 100.0;
     let zn = 108.883;
-    let f = |t: f64| if t > 0.008856 { t.powf(1.0 / 3.0) } else { 7.787 * t + 16.0 / 116.0 };
+    let f = |t: f64| {
+        if t > 0.008856 {
+            t.powf(1.0 / 3.0)
+        } else {
+            7.787 * t + 16.0 / 116.0
+        }
+    };
     let fx = f(x / xn);
     let fy = f(y / yn);
     let fz = f(z / zn);
@@ -986,7 +1064,13 @@ fn lab_to_rgb_inner(l: f64, a: f64, b: f64) -> StrykeValue {
     let fy = (l + 16.0) / 116.0;
     let fx = a / 500.0 + fy;
     let fz = fy - b / 200.0;
-    let fcube = |t: f64| if t.powi(3) > 0.008856 { t.powi(3) } else { (t - 16.0 / 116.0) / 7.787 };
+    let fcube = |t: f64| {
+        if t.powi(3) > 0.008856 {
+            t.powi(3)
+        } else {
+            (t - 16.0 / 116.0) / 7.787
+        }
+    };
     let xn = 95.047;
     let yn = 100.0;
     let zn = 108.883;
@@ -1142,8 +1226,16 @@ pub fn ciede2000_color_distance(args: &[StrykeValue]) -> StrykeValue {
     let a2p = (1.0 + g) * a2;
     let c1p = (a1p * a1p + b1 * b1).sqrt();
     let c2p = (a2p * a2p + b2 * b2).sqrt();
-    let h1p = if a1p == 0.0 && b1 == 0.0 { 0.0 } else { b1.atan2(a1p).to_degrees().rem_euclid(360.0) };
-    let h2p = if a2p == 0.0 && b2 == 0.0 { 0.0 } else { b2.atan2(a2p).to_degrees().rem_euclid(360.0) };
+    let h1p = if a1p == 0.0 && b1 == 0.0 {
+        0.0
+    } else {
+        b1.atan2(a1p).to_degrees().rem_euclid(360.0)
+    };
+    let h2p = if a2p == 0.0 && b2 == 0.0 {
+        0.0
+    } else {
+        b2.atan2(a2p).to_degrees().rem_euclid(360.0)
+    };
     let dl = l2 - l1;
     let dcp = c2p - c1p;
     let dhp = if c1p * c2p == 0.0 {
@@ -1167,8 +1259,7 @@ pub fn ciede2000_color_distance(args: &[StrykeValue]) -> StrykeValue {
     } else {
         (h1p + h2p - 360.0) / 2.0
     };
-    let t = 1.0
-        - 0.17 * (h_bar_p - 30.0).to_radians().cos()
+    let t = 1.0 - 0.17 * (h_bar_p - 30.0).to_radians().cos()
         + 0.24 * (2.0 * h_bar_p).to_radians().cos()
         + 0.32 * (3.0 * h_bar_p + 6.0).to_radians().cos()
         - 0.20 * (4.0 * h_bar_p - 63.0).to_radians().cos();
@@ -1282,7 +1373,9 @@ pub fn trie_insert(args: &[StrykeValue]) -> StrykeValue {
                     ch.write().insert(key.clone(), new_node);
                 }
                 let child = ch.read().get(&key).cloned().unwrap_or(StrykeValue::UNDEF);
-                cur_children = child.as_hash_ref().and_then(|c| c.read().get("children").cloned());
+                cur_children = child
+                    .as_hash_ref()
+                    .and_then(|c| c.read().get("children").cloned());
                 cur_ref = child;
             }
         }
@@ -1341,8 +1434,11 @@ pub fn trie_prefix_search(args: &[StrykeValue]) -> StrykeValue {
             if let Some(ch) = n_read.get("children").cloned() {
                 drop(n_read);
                 if let Some(c) = ch.as_hash_ref() {
-                    let entries: Vec<(String, StrykeValue)> =
-                        c.read().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+                    let entries: Vec<(String, StrykeValue)> = c
+                        .read()
+                        .iter()
+                        .map(|(k, v)| (k.clone(), v.clone()))
+                        .collect();
                     for (k, child) in entries {
                         walk(&child, format!("{path}{k}"), results);
                     }
@@ -1376,7 +1472,10 @@ pub fn trie_remove(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn trie_keys(args: &[StrykeValue]) -> StrykeValue {
-    trie_prefix_search(&[args.first().cloned().unwrap_or(StrykeValue::UNDEF), StrykeValue::string(String::new())])
+    trie_prefix_search(&[
+        args.first().cloned().unwrap_or(StrykeValue::UNDEF),
+        StrykeValue::string(String::new()),
+    ])
 }
 
 pub fn trie_count(args: &[StrykeValue]) -> StrykeValue {
@@ -1496,7 +1595,8 @@ pub fn union_find_components(args: &[StrykeValue]) -> StrykeValue {
         if let Some(p_sv) = p_sv {
             let mut p: Vec<i64> = as_vec_sv(&p_sv).iter().map(|v| v.to_int()).collect();
             let n = p.len();
-            let roots: std::collections::HashSet<usize> = (0..n).map(|i| uf_find(&mut p, i)).collect();
+            let roots: std::collections::HashSet<usize> =
+                (0..n).map(|i| uf_find(&mut p, i)).collect();
             return StrykeValue::integer(roots.len() as i64);
         }
     }
@@ -1561,11 +1661,26 @@ pub fn cidr_to_range(args: &[StrykeValue]) -> StrykeValue {
         return arr_sv(vec![]);
     }
     let base = (ip_parts[0] << 24) | (ip_parts[1] << 16) | (ip_parts[2] << 8) | ip_parts[3];
-    let mask = if prefix == 0 { 0 } else { !0u32 << (32 - prefix) };
+    let mask = if prefix == 0 {
+        0
+    } else {
+        !0u32 << (32 - prefix)
+    };
     let net = base & mask;
     let bcast = net | !mask;
-    let fmt = |a: u32| format!("{}.{}.{}.{}", (a >> 24) & 0xFF, (a >> 16) & 0xFF, (a >> 8) & 0xFF, a & 0xFF);
-    arr_sv(vec![StrykeValue::string(fmt(net)), StrykeValue::string(fmt(bcast))])
+    let fmt = |a: u32| {
+        format!(
+            "{}.{}.{}.{}",
+            (a >> 24) & 0xFF,
+            (a >> 16) & 0xFF,
+            (a >> 8) & 0xFF,
+            a & 0xFF
+        )
+    };
+    arr_sv(vec![
+        StrykeValue::string(fmt(net)),
+        StrykeValue::string(fmt(bcast)),
+    ])
 }
 
 pub fn range_to_cidr(args: &[StrykeValue]) -> StrykeValue {
@@ -1587,7 +1702,15 @@ pub fn range_to_cidr(args: &[StrykeValue]) -> StrykeValue {
         None => return arr_sv(vec![]),
     };
     let mut out = Vec::new();
-    let fmt = |a: u32| format!("{}.{}.{}.{}", (a >> 24) & 0xFF, (a >> 16) & 0xFF, (a >> 8) & 0xFF, a & 0xFF);
+    let fmt = |a: u32| {
+        format!(
+            "{}.{}.{}.{}",
+            (a >> 24) & 0xFF,
+            (a >> 16) & 0xFF,
+            (a >> 8) & 0xFF,
+            a & 0xFF
+        )
+    };
     while s <= e {
         let mut max_size = 32 - if s == 0 { 32 } else { s.trailing_zeros() };
         let range_size = ((e - s + 1) as f64).log2().floor() as u32;
@@ -1640,7 +1763,11 @@ mod tests {
 
     #[test]
     fn integral_image_corner() {
-        let img = matrix_to_sv(&[vec![1.0, 1.0, 1.0], vec![1.0, 1.0, 1.0], vec![1.0, 1.0, 1.0]]);
+        let img = matrix_to_sv(&[
+            vec![1.0, 1.0, 1.0],
+            vec![1.0, 1.0, 1.0],
+            vec![1.0, 1.0, 1.0],
+        ]);
         let r = integral_image(&[img]);
         let m = as_matrix(&r);
         assert_eq!(m[2][2], 9.0);

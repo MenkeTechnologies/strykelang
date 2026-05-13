@@ -160,7 +160,11 @@ pub fn bignum_gcd(args: &[StrykeValue]) -> StrykeValue {
             a = b;
             b = r;
         }
-        if a.sign() == Sign::Minus { -a } else { a.max(zero) }
+        if a.sign() == Sign::Minus {
+            -a
+        } else {
+            a.max(zero)
+        }
     }
     ret_bigint(gcd(a, b))
 }
@@ -176,7 +180,11 @@ pub fn bignum_lcm(args: &[StrykeValue]) -> StrykeValue {
             a = b;
             b = r;
         }
-        if a.sign() == Sign::Minus { -a } else { a.max(zero) }
+        if a.sign() == Sign::Minus {
+            -a
+        } else {
+            a.max(zero)
+        }
     }
     if a.is_zero() || b.is_zero() {
         return ret_bigint(BigInt::zero());
@@ -434,9 +442,25 @@ pub fn physics_collide_aabb(args: &[StrykeValue]) -> StrykeValue {
     if a.len() < 4 || b.len() < 4 {
         return StrykeValue::UNDEF;
     }
-    let (ax, ay, aw, ah) = (a[0].to_number(), a[1].to_number(), a[2].to_number(), a[3].to_number());
-    let (bx, by, bw, bh) = (b[0].to_number(), b[1].to_number(), b[2].to_number(), b[3].to_number());
-    StrykeValue::integer(if ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by { 1 } else { 0 })
+    let (ax, ay, aw, ah) = (
+        a[0].to_number(),
+        a[1].to_number(),
+        a[2].to_number(),
+        a[3].to_number(),
+    );
+    let (bx, by, bw, bh) = (
+        b[0].to_number(),
+        b[1].to_number(),
+        b[2].to_number(),
+        b[3].to_number(),
+    );
+    StrykeValue::integer(
+        if ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by {
+            1
+        } else {
+            0
+        },
+    )
 }
 
 pub fn physics_collide_sphere(args: &[StrykeValue]) -> StrykeValue {
@@ -534,14 +558,20 @@ pub fn vector2_add(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (args.first().and_then(v2), args.get(1).and_then(v2)) else {
         return StrykeValue::UNDEF;
     };
-    arr(vec![StrykeValue::float(a.0 + b.0), StrykeValue::float(a.1 + b.1)])
+    arr(vec![
+        StrykeValue::float(a.0 + b.0),
+        StrykeValue::float(a.1 + b.1),
+    ])
 }
 
 pub fn vector2_sub(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (args.first().and_then(v2), args.get(1).and_then(v2)) else {
         return StrykeValue::UNDEF;
     };
-    arr(vec![StrykeValue::float(a.0 - b.0), StrykeValue::float(a.1 - b.1)])
+    arr(vec![
+        StrykeValue::float(a.0 - b.0),
+        StrykeValue::float(a.1 - b.1),
+    ])
 }
 
 pub fn vector2_scale(args: &[StrykeValue]) -> StrykeValue {
@@ -549,7 +579,10 @@ pub fn vector2_scale(args: &[StrykeValue]) -> StrykeValue {
         return StrykeValue::UNDEF;
     };
     let s = arg_f64(args, 1).unwrap_or(1.0);
-    arr(vec![StrykeValue::float(a.0 * s), StrykeValue::float(a.1 * s)])
+    arr(vec![
+        StrykeValue::float(a.0 * s),
+        StrykeValue::float(a.1 * s),
+    ])
 }
 
 pub fn vector2_dot(args: &[StrykeValue]) -> StrykeValue {
@@ -581,7 +614,10 @@ pub fn vector2_normalize(args: &[StrykeValue]) -> StrykeValue {
     if len < 1e-12 {
         return arr(vec![StrykeValue::float(0.0), StrykeValue::float(0.0)]);
     }
-    arr(vec![StrykeValue::float(x / len), StrykeValue::float(y / len)])
+    arr(vec![
+        StrykeValue::float(x / len),
+        StrykeValue::float(y / len),
+    ])
 }
 
 pub fn vector2_distance(args: &[StrykeValue]) -> StrykeValue {
@@ -633,7 +669,11 @@ pub fn quaternion_from_axis_angle(args: &[StrykeValue]) -> StrykeValue {
     if axis.len() < 3 {
         return StrykeValue::UNDEF;
     }
-    let (ax, ay, az) = (axis[0].to_number(), axis[1].to_number(), axis[2].to_number());
+    let (ax, ay, az) = (
+        axis[0].to_number(),
+        axis[1].to_number(),
+        axis[2].to_number(),
+    );
     let len = (ax * ax + ay * ay + az * az).sqrt().max(1e-12);
     let half = angle / 2.0;
     let s = half.sin() / len;
@@ -849,7 +889,10 @@ pub fn hyperloglog_new(args: &[StrykeValue]) -> StrykeValue {
     let registers: Vec<StrykeValue> = (0..m).map(|_| StrykeValue::integer(0)).collect();
     let mut h: IndexMap<String, StrykeValue> = IndexMap::new();
     h.insert("kind".to_string(), StrykeValue::string("hll".to_string()));
-    h.insert("precision".to_string(), StrykeValue::integer(precision as i64));
+    h.insert(
+        "precision".to_string(),
+        StrykeValue::integer(precision as i64),
+    );
     h.insert("registers".to_string(), arr(registers));
     StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
 }
@@ -860,7 +903,10 @@ pub fn hyperloglog_add(args: &[StrykeValue]) -> StrykeValue {
     };
     let key = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let g = f.read();
-    let precision = g.get("precision").map(|v| v.to_int() as usize).unwrap_or(12);
+    let precision = g
+        .get("precision")
+        .map(|v| v.to_int() as usize)
+        .unwrap_or(12);
     let registers_v = g.get("registers").cloned().unwrap_or(StrykeValue::UNDEF);
     drop(g);
     let Some(registers) = registers_v.as_array_ref() else {
@@ -885,7 +931,10 @@ pub fn hyperloglog_estimate(args: &[StrykeValue]) -> StrykeValue {
         return StrykeValue::UNDEF;
     };
     let g = f.read();
-    let precision = g.get("precision").map(|v| v.to_int() as usize).unwrap_or(12);
+    let precision = g
+        .get("precision")
+        .map(|v| v.to_int() as usize)
+        .unwrap_or(12);
     let registers_v = g.get("registers").cloned().unwrap_or(StrykeValue::UNDEF);
     drop(g);
     let Some(registers) = registers_v.as_array_ref() else {
@@ -951,7 +1000,10 @@ pub fn hyperloglog_merge(args: &[StrykeValue]) -> StrykeValue {
 pub fn tdigest_new(_args: &[StrykeValue]) -> StrykeValue {
     use indexmap::IndexMap;
     let mut h: IndexMap<String, StrykeValue> = IndexMap::new();
-    h.insert("kind".to_string(), StrykeValue::string("tdigest".to_string()));
+    h.insert(
+        "kind".to_string(),
+        StrykeValue::string("tdigest".to_string()),
+    );
     h.insert("samples".to_string(), arr(vec![]));
     StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
 }
@@ -1016,7 +1068,9 @@ pub fn midi_note_to_name(args: &[StrykeValue]) -> StrykeValue {
     if !(0..=127).contains(&midi) {
         return StrykeValue::UNDEF;
     }
-    let names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+    let names = [
+        "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+    ];
     let octave = midi / 12 - 1;
     let n = names[(midi % 12) as usize];
     StrykeValue::string(format!("{}{}", n, octave))
@@ -1024,7 +1078,10 @@ pub fn midi_note_to_name(args: &[StrykeValue]) -> StrykeValue {
 
 pub fn chord_notes(args: &[StrykeValue]) -> StrykeValue {
     let root = arg_i64(args, 0).unwrap_or(60);
-    let kind = args.get(1).map(|v| v.to_string()).unwrap_or_else(|| "major".to_string());
+    let kind = args
+        .get(1)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "major".to_string());
     let intervals: &[i64] = match kind.to_ascii_lowercase().as_str() {
         "minor" | "min" | "m" => &[0, 3, 7],
         "dim" | "diminished" => &[0, 3, 6],
@@ -1044,7 +1101,10 @@ pub fn chord_notes(args: &[StrykeValue]) -> StrykeValue {
 
 pub fn scale_notes(args: &[StrykeValue]) -> StrykeValue {
     let root = arg_i64(args, 0).unwrap_or(60);
-    let kind = args.get(1).map(|v| v.to_string()).unwrap_or_else(|| "major".to_string());
+    let kind = args
+        .get(1)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "major".to_string());
     let intervals: &[i64] = match kind.to_ascii_lowercase().as_str() {
         "minor" | "natural_minor" => &[0, 2, 3, 5, 7, 8, 10],
         "harmonic_minor" => &[0, 2, 3, 5, 7, 8, 11],
@@ -1060,7 +1120,10 @@ pub fn scale_notes(args: &[StrykeValue]) -> StrykeValue {
         "locrian" => &[0, 1, 3, 5, 6, 8, 10],
         _ => &[0, 2, 4, 5, 7, 9, 11], // major
     };
-    arr(intervals.iter().map(|i| StrykeValue::integer(root + i)).collect())
+    arr(intervals
+        .iter()
+        .map(|i| StrykeValue::integer(root + i))
+        .collect())
 }
 
 pub fn transpose_note(args: &[StrykeValue]) -> StrykeValue {
@@ -1126,7 +1189,10 @@ pub fn audio_normalize(args: &[StrykeValue]) -> StrykeValue {
     }
     let target = arg_f64(args, 1).unwrap_or(1.0);
     let scale = target / peak;
-    arr(xs.iter().map(|v| StrykeValue::float(v.to_number() * scale)).collect())
+    arr(xs
+        .iter()
+        .map(|v| StrykeValue::float(v.to_number() * scale))
+        .collect())
 }
 
 pub fn audio_fade_in(args: &[StrykeValue]) -> StrykeValue {
@@ -1136,7 +1202,11 @@ pub fn audio_fade_in(args: &[StrykeValue]) -> StrykeValue {
         .iter()
         .enumerate()
         .map(|(i, v)| {
-            let g = if n > 1 { i as f64 / (n - 1) as f64 } else { 1.0 };
+            let g = if n > 1 {
+                i as f64 / (n - 1) as f64
+            } else {
+                1.0
+            };
             StrykeValue::float(v.to_number() * g)
         })
         .collect())
@@ -1149,7 +1219,11 @@ pub fn audio_fade_out(args: &[StrykeValue]) -> StrykeValue {
         .iter()
         .enumerate()
         .map(|(i, v)| {
-            let g = if n > 1 { 1.0 - i as f64 / (n - 1) as f64 } else { 1.0 };
+            let g = if n > 1 {
+                1.0 - i as f64 / (n - 1) as f64
+            } else {
+                1.0
+            };
             StrykeValue::float(v.to_number() * g)
         })
         .collect())
@@ -1363,7 +1437,11 @@ pub fn crossfade(args: &[StrykeValue]) -> StrykeValue {
     let n = a.len().min(b.len());
     let mut out = Vec::with_capacity(n);
     for i in 0..n {
-        let t = if n > 1 { i as f64 / (n - 1) as f64 } else { 0.5 };
+        let t = if n > 1 {
+            i as f64 / (n - 1) as f64
+        } else {
+            0.5
+        };
         let av = a[i].to_number();
         let bv = b[i].to_number();
         out.push(StrykeValue::float(av * (1.0 - t) + bv * t));
@@ -1481,7 +1559,12 @@ pub fn mercator_unproject(args: &[StrykeValue]) -> StrykeValue {
     let y = arg_f64(args, 1).unwrap_or(0.0);
     let r = 6378137.0;
     let lon = (x / r).to_degrees();
-    let lat = (y / r).atan().exp().atan().mul_add(2.0, -std::f64::consts::FRAC_PI_2).to_degrees();
+    let lat = (y / r)
+        .atan()
+        .exp()
+        .atan()
+        .mul_add(2.0, -std::f64::consts::FRAC_PI_2)
+        .to_degrees();
     arr(vec![StrykeValue::float(lat), StrykeValue::float(lon)])
 }
 

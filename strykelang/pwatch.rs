@@ -137,7 +137,9 @@ pub fn run_pwatch(
                         local_interp.scope.restore_capture(&scalars);
                         local_interp.scope.restore_atomics(&aa, &ah);
                         local_interp.enable_parallel_guard();
-                        local_interp.scope.set_topic(StrykeValue::string(path_string));
+                        local_interp
+                            .scope
+                            .set_topic(StrykeValue::string(path_string));
                         let _ = local_interp.call_sub(&sub, vec![], WantarrayCtx::Void, line);
                     });
                 }

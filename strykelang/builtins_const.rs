@@ -110,7 +110,11 @@ pub fn rbeta(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
     let mut rng = rand::thread_rng();
     let p: f64 = rng.gen();
-    qbeta(&[StrykeValue::float(p), args.first().cloned().unwrap_or(StrykeValue::float(1.0)), args.get(1).cloned().unwrap_or(StrykeValue::float(1.0))])
+    qbeta(&[
+        StrykeValue::float(p),
+        args.first().cloned().unwrap_or(StrykeValue::float(1.0)),
+        args.get(1).cloned().unwrap_or(StrykeValue::float(1.0)),
+    ])
 }
 
 pub fn dcauchy(args: &[StrykeValue]) -> StrykeValue {

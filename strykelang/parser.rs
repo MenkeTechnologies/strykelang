@@ -7934,11 +7934,9 @@ impl Parser {
         // Without this, `on $cluster () map { … }` parses `()` as a postfix
         // indirect call on `$cluster`, stealing the empty list meant as SOURCE.
         // Zero-arg cluster from a scalar sub: `on ($factory())` or `on $f->()`.
-        self.suppress_indirect_paren_call =
-            self.suppress_indirect_paren_call.saturating_add(1);
+        self.suppress_indirect_paren_call = self.suppress_indirect_paren_call.saturating_add(1);
         let cluster_expr = self.parse_thread_input();
-        self.suppress_indirect_paren_call =
-            self.suppress_indirect_paren_call.saturating_sub(1);
+        self.suppress_indirect_paren_call = self.suppress_indirect_paren_call.saturating_sub(1);
         self.suppress_parenless_call = self.suppress_parenless_call.saturating_sub(1);
         let cluster_expr = cluster_expr?;
 
@@ -19851,7 +19849,9 @@ mod tests {
     fn parse_named_fn_eq_shorthand_with_sig() {
         let p = parse_ok("fn add_one($x) = $x + 1");
         match &p.statements[0].kind {
-            StmtKind::SubDecl { name, params, body, .. } => {
+            StmtKind::SubDecl {
+                name, params, body, ..
+            } => {
                 assert_eq!(name, "add_one");
                 assert_eq!(params.len(), 1);
                 assert_eq!(body.len(), 1);

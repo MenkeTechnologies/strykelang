@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 
-use stryke::value::{StrykeValue, RemoteCluster, RemoteSlot};
+use stryke::value::{RemoteCluster, RemoteSlot, StrykeValue};
 use stryke::vm_helper::VMHelper;
 
 /// `STRYKE_CLUSTER_LOCAL_BIN` is process-global; serialize tests that set it

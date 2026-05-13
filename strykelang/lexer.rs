@@ -628,13 +628,13 @@ impl Lexer {
 
     fn read_double_quoted_string(&mut self) -> PerlResult<Token> {
         self.advance(); // consume opening "
-        // Triple-quoted form: `"""..."""` — multi-line interpolating string.
-        // The opening `"` was just consumed; if the next two chars are also
-        // `"`, we're in triple-quote mode. Read until the closing `"""`,
-        // preserving raw newlines (no indent stripping). Interpolation
-        // (`$var`, `@arr`, `#{expr}`) flows through unchanged because the
-        // resulting `Token::DoubleString` body goes through the same
-        // downstream interpolator as a normal `"..."`.
+                        // Triple-quoted form: `"""..."""` — multi-line interpolating string.
+                        // The opening `"` was just consumed; if the next two chars are also
+                        // `"`, we're in triple-quote mode. Read until the closing `"""`,
+                        // preserving raw newlines (no indent stripping). Interpolation
+                        // (`$var`, `@arr`, `#{expr}`) flows through unchanged because the
+                        // resulting `Token::DoubleString` body goes through the same
+                        // downstream interpolator as a normal `"..."`.
         if self.peek() == Some('"') && self.peek_at(1) == Some('"') {
             self.advance(); // consume 2nd "
             self.advance(); // consume 3rd "

@@ -7,11 +7,11 @@
 # BUG-120: cosine_distance with zero-length/zero-norm vector returns 1
 cosine_distance([0], [0]) |> aeq 1, "BUG-120: cosine_distance zero-norm returns 1"
 
-# BUG-121: median_absolute_deviation even-n spread
-# median of (1, 2, 100, 101) is treated as 100 (sorted[len/2])
-# abs(1-100)=99, abs(2-100)=98, abs(100-100)=0, abs(101-100)=1
-# sorted diffs: (0, 1, 98, 99) -> median is 98
-median_absolute_deviation(1, 2, 100, 101) |> aeq 98, "BUG-121: MAD even-n uses sorted[len/2]"
+# BUG-121 (FIXED): median_absolute_deviation now averages two middle values for even n.
+# data (1, 2, 100, 101): proper median = (2+100)/2 = 51
+# abs(1-51)=50, abs(2-51)=49, abs(100-51)=49, abs(101-51)=50
+# sorted diffs (49, 49, 50, 50) -> median = (49+50)/2 = 49.5
+median_absolute_deviation(1, 2, 100, 101) |> aeq 49.5, "BUG-121 (FIXED): MAD uses proper even-n median"
 
 # BUG-122: js_divergence (nats) vs jensen_shannon_div (bits)
 my $p = [0.1, 0.9]

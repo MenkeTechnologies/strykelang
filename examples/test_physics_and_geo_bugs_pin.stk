@@ -2,20 +2,16 @@
 
 # Pinning tests for physics and geo bugs from BUGS.md
 
-# Pinning test for BUG-134: weber_number clamps a missing sigma
-# weber_number(rho, v, L, sigma)
-# Missing sigma should result in a very large number.
+# BUG-134 (FIXED): weber_number now returns Infinity/NaN for missing/zero sigma.
 my $weber_no_sigma = weber_number(1000, 10, 0.1);
-my $is_large = $weber_no_sigma > 1e30;
-aok($is_large, "BUG-134: weber_number with missing sigma should be very large");
+my $is_inf_or_nan = ($weber_no_sigma != $weber_no_sigma) || ($weber_no_sigma > 1e308);
+aok($is_inf_or_nan, "BUG-134 (FIXED): weber_number with missing sigma returns Infinity/NaN");
 
 
-# Pinning test for BUG-135: dB_voltage missing reference
-# dB_voltage(V, V_in)
-# Missing V_in should result in a large dB value.
+# BUG-135 (FIXED): dB_voltage now returns NaN when reference is missing/non-positive.
 my $db_no_ref = dB_voltage(1);
-my $is_large_db = $db_no_ref > 500;
-aok($is_large_db, "BUG-135: dB_voltage with missing reference should be very large");
+my $is_nan = $db_no_ref != $db_no_ref;
+aok($is_nan, "BUG-135 (FIXED): dB_voltage without reference returns NaN");
 
 
 # Pinning test for BUG-136: geohash_neighbor is identity at precision 6

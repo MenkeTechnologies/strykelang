@@ -85,7 +85,11 @@ pub fn wma(args: &[StrykeValue]) -> StrykeValue {
     let mut out = Vec::with_capacity(data.len() - p + 1);
     for i in 0..=data.len() - p {
         let win = &data[i..i + p];
-        let weighted: f64 = win.iter().enumerate().map(|(j, x)| x * (j + 1) as f64).sum();
+        let weighted: f64 = win
+            .iter()
+            .enumerate()
+            .map(|(j, x)| x * (j + 1) as f64)
+            .sum();
         out.push(weighted / denom);
     }
     arr_f64(out)
@@ -113,7 +117,11 @@ fn wma_compute_raw(data: &[f64], p: usize) -> Vec<f64> {
     let mut out = Vec::with_capacity(data.len() - p + 1);
     for i in 0..=data.len() - p {
         let win = &data[i..i + p];
-        let weighted: f64 = win.iter().enumerate().map(|(j, x)| x * (j + 1) as f64).sum();
+        let weighted: f64 = win
+            .iter()
+            .enumerate()
+            .map(|(j, x)| x * (j + 1) as f64)
+            .sum();
         out.push(weighted / denom);
     }
     out
@@ -132,7 +140,11 @@ pub fn kama(args: &[StrykeValue]) -> StrykeValue {
         let start = i.saturating_sub(p);
         let change = (data[i] - data[start]).abs();
         let volatility: f64 = (start + 1..=i).map(|j| (data[j] - data[j - 1]).abs()).sum();
-        let er = if volatility > 1e-12 { change / volatility } else { 0.0 };
+        let er = if volatility > 1e-12 {
+            change / volatility
+        } else {
+            0.0
+        };
         let sc = (er * (fast - slow) + slow).powi(2);
         out.push(out[i - 1] + sc * (data[i] - out[i - 1]));
     }
@@ -146,7 +158,9 @@ pub fn tema(args: &[StrykeValue]) -> StrykeValue {
     let e2 = ema_compute(&e1, p);
     let e3 = ema_compute(&e2, p);
     let len = e1.len().min(e2.len()).min(e3.len());
-    let out: Vec<f64> = (0..len).map(|i| 3.0 * e1[i] - 3.0 * e2[i] + e3[i]).collect();
+    let out: Vec<f64> = (0..len)
+        .map(|i| 3.0 * e1[i] - 3.0 * e2[i] + e3[i])
+        .collect();
     arr_f64(out)
 }
 
@@ -171,7 +185,13 @@ pub fn trix(args: &[StrykeValue]) -> StrykeValue {
     }
     let out: Vec<f64> = e3
         .windows(2)
-        .map(|w| if w[0] == 0.0 { 0.0 } else { 100.0 * (w[1] - w[0]) / w[0] })
+        .map(|w| {
+            if w[0] == 0.0 {
+                0.0
+            } else {
+                100.0 * (w[1] - w[0]) / w[0]
+            }
+        })
         .collect();
     arr_f64(out)
 }
@@ -199,7 +219,11 @@ pub fn rsi(args: &[StrykeValue]) -> StrykeValue {
             avg_g = (avg_g * (p as f64 - 1.0) + gains[i]) / p as f64;
             avg_l = (avg_l * (p as f64 - 1.0) + losses[i]) / p as f64;
         }
-        let rs = if avg_l == 0.0 { f64::INFINITY } else { avg_g / avg_l };
+        let rs = if avg_l == 0.0 {
+            f64::INFINITY
+        } else {
+            avg_g / avg_l
+        };
         out.push(100.0 - 100.0 / (1.0 + rs));
     }
     arr_f64(out)
@@ -218,7 +242,11 @@ pub fn stoch_rsi(args: &[StrykeValue]) -> StrykeValue {
         let mn = win.iter().cloned().fold(f64::INFINITY, f64::min);
         let mx = win.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
         let cur = win[win.len() - 1];
-        out.push(if mx == mn { 0.0 } else { (cur - mn) / (mx - mn) });
+        out.push(if mx == mn {
+            0.0
+        } else {
+            (cur - mn) / (mx - mn)
+        });
     }
     arr_f64(out)
 }
@@ -304,7 +332,12 @@ pub fn donchian_upper(args: &[StrykeValue]) -> StrykeValue {
         return arr_f64(Vec::new());
     }
     let out: Vec<f64> = (0..=high.len() - p)
-        .map(|i| high[i..i + p].iter().cloned().fold(f64::NEG_INFINITY, f64::max))
+        .map(|i| {
+            high[i..i + p]
+                .iter()
+                .cloned()
+                .fold(f64::NEG_INFINITY, f64::max)
+        })
         .collect();
     arr_f64(out)
 }
@@ -456,7 +489,9 @@ pub fn cci(args: &[StrykeValue]) -> StrykeValue {
     if n < p {
         return arr_f64(Vec::new());
     }
-    let tp: Vec<f64> = (0..n).map(|i| (highs[i] + lows[i] + closes[i]) / 3.0).collect();
+    let tp: Vec<f64> = (0..n)
+        .map(|i| (highs[i] + lows[i] + closes[i]) / 3.0)
+        .collect();
     let mid = sma_compute(&tp, p);
     if mid.is_empty() {
         return arr_f64(Vec::new());
@@ -514,10 +549,17 @@ pub fn williams_r(args: &[StrykeValue]) -> StrykeValue {
     }
     let out: Vec<f64> = (0..=n - p)
         .map(|i| {
-            let hi = highs[i..i + p].iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let hi = highs[i..i + p]
+                .iter()
+                .cloned()
+                .fold(f64::NEG_INFINITY, f64::max);
             let lo = lows[i..i + p].iter().cloned().fold(f64::INFINITY, f64::min);
             let close = closes[i + p - 1];
-            if hi == lo { 0.0 } else { -100.0 * (hi - close) / (hi - lo) }
+            if hi == lo {
+                0.0
+            } else {
+                -100.0 * (hi - close) / (hi - lo)
+            }
         })
         .collect();
     arr_f64(out)
@@ -737,7 +779,11 @@ pub fn candlestick_pattern_doji(args: &[StrykeValue]) -> StrykeValue {
         .map(|i| {
             let body = (c[i] - o[i]).abs();
             let range = h[i] - l[i];
-            StrykeValue::integer(if range > 0.0 && body / range < 0.1 { 1 } else { 0 })
+            StrykeValue::integer(if range > 0.0 && body / range < 0.1 {
+                1
+            } else {
+                0
+            })
         })
         .collect();
     arr(out)
@@ -754,7 +800,11 @@ pub fn candlestick_pattern_hammer(args: &[StrykeValue]) -> StrykeValue {
             let body = (c[i] - o[i]).abs();
             let lower = o[i].min(c[i]) - l[i];
             let upper = h[i] - o[i].max(c[i]);
-            StrykeValue::integer(if lower > body * 2.0 && upper < body { 1 } else { 0 })
+            StrykeValue::integer(if lower > body * 2.0 && upper < body {
+                1
+            } else {
+                0
+            })
         })
         .collect();
     arr(out)
@@ -766,14 +816,8 @@ pub fn candlestick_pattern_engulfing(args: &[StrykeValue]) -> StrykeValue {
     let n = o.len().min(c.len());
     let mut out = vec![StrykeValue::integer(0); n];
     for i in 1..n {
-        let bull = c[i] > o[i]
-            && c[i - 1] < o[i - 1]
-            && o[i] < c[i - 1]
-            && c[i] > o[i - 1];
-        let bear = c[i] < o[i]
-            && c[i - 1] > o[i - 1]
-            && o[i] > c[i - 1]
-            && c[i] < o[i - 1];
+        let bull = c[i] > o[i] && c[i - 1] < o[i - 1] && o[i] < c[i - 1] && c[i] > o[i - 1];
+        let bear = c[i] < o[i] && c[i - 1] > o[i - 1] && o[i] > c[i - 1] && c[i] < o[i - 1];
         out[i] = StrykeValue::integer(if bull || bear { 1 } else { 0 });
     }
     arr(out)
@@ -813,8 +857,11 @@ pub fn candlestick_pattern_three_white_soldiers(args: &[StrykeValue]) -> StrykeV
     let n = c.len().min(o.len());
     let mut out = vec![StrykeValue::integer(0); n];
     for i in 2..n {
-        let ok = c[i - 2] > o[i - 2] && c[i - 1] > o[i - 1] && c[i] > o[i]
-            && c[i] > c[i - 1] && c[i - 1] > c[i - 2];
+        let ok = c[i - 2] > o[i - 2]
+            && c[i - 1] > o[i - 1]
+            && c[i] > o[i]
+            && c[i] > c[i - 1]
+            && c[i - 1] > c[i - 2];
         out[i] = StrykeValue::integer(if ok { 1 } else { 0 });
     }
     arr(out)
@@ -826,8 +873,11 @@ pub fn candlestick_pattern_three_black_crows(args: &[StrykeValue]) -> StrykeValu
     let n = c.len().min(o.len());
     let mut out = vec![StrykeValue::integer(0); n];
     for i in 2..n {
-        let ok = c[i - 2] < o[i - 2] && c[i - 1] < o[i - 1] && c[i] < o[i]
-            && c[i] < c[i - 1] && c[i - 1] < c[i - 2];
+        let ok = c[i - 2] < o[i - 2]
+            && c[i - 1] < o[i - 1]
+            && c[i] < o[i]
+            && c[i] < c[i - 1]
+            && c[i - 1] < c[i - 2];
         out[i] = StrykeValue::integer(if ok { 1 } else { 0 });
     }
     arr(out)
@@ -902,11 +952,12 @@ pub fn detrend_linear(args: &[StrykeValue]) -> StrykeValue {
     let sum_xx = (0..n).map(|i| (i as f64).powi(2)).sum::<f64>();
     let slope = (n_f * sum_xy - sum_x * sum_y) / (n_f * sum_xx - sum_x.powi(2));
     let intercept = (sum_y - slope * sum_x) / n_f;
-    arr_f64(data
-        .iter()
-        .enumerate()
-        .map(|(i, y)| y - (slope * i as f64 + intercept))
-        .collect())
+    arr_f64(
+        data.iter()
+            .enumerate()
+            .map(|(i, y)| y - (slope * i as f64 + intercept))
+            .collect(),
+    )
 }
 
 pub fn remove_seasonality(args: &[StrykeValue]) -> StrykeValue {
@@ -926,11 +977,12 @@ pub fn remove_seasonality(args: &[StrykeValue]) -> StrykeValue {
             seasonal[i] /= counts[i] as f64;
         }
     }
-    arr_f64(data
-        .iter()
-        .enumerate()
-        .map(|(i, v)| v - seasonal[i % period])
-        .collect())
+    arr_f64(
+        data.iter()
+            .enumerate()
+            .map(|(i, v)| v - seasonal[i % period])
+            .collect(),
+    )
 }
 
 pub fn add_seasonality(args: &[StrykeValue]) -> StrykeValue {
@@ -939,11 +991,12 @@ pub fn add_seasonality(args: &[StrykeValue]) -> StrykeValue {
     if pattern.is_empty() {
         return arr_f64(data);
     }
-    arr_f64(data
-        .iter()
-        .enumerate()
-        .map(|(i, v)| v + pattern[i % pattern.len()])
-        .collect())
+    arr_f64(
+        data.iter()
+            .enumerate()
+            .map(|(i, v)| v + pattern[i % pattern.len()])
+            .collect(),
+    )
 }
 
 pub fn hurst_exponent(args: &[StrykeValue]) -> StrykeValue {
@@ -963,8 +1016,12 @@ pub fn hurst_exponent(args: &[StrykeValue]) -> StrykeValue {
         let mut hi = f64::NEG_INFINITY;
         for x in chunk {
             c += x - mean;
-            if c < lo { lo = c; }
-            if c > hi { hi = c; }
+            if c < lo {
+                lo = c;
+            }
+            if c > hi {
+                hi = c;
+            }
         }
         let range = hi - lo;
         let var = chunk.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / m as f64;
@@ -1031,26 +1088,28 @@ pub fn diff_series(args: &[StrykeValue]) -> StrykeValue {
 pub fn expanding_mean(args: &[StrykeValue]) -> StrykeValue {
     let data = args.first().map(as_vec).unwrap_or_default();
     let mut sum = 0.0;
-    arr_f64(data
-        .iter()
-        .enumerate()
-        .map(|(i, v)| {
-            sum += v;
-            sum / (i + 1) as f64
-        })
-        .collect())
+    arr_f64(
+        data.iter()
+            .enumerate()
+            .map(|(i, v)| {
+                sum += v;
+                sum / (i + 1) as f64
+            })
+            .collect(),
+    )
 }
 
 pub fn expanding_sum(args: &[StrykeValue]) -> StrykeValue {
     let data = args.first().map(as_vec).unwrap_or_default();
     let mut sum = 0.0;
-    arr_f64(data
-        .iter()
-        .map(|v| {
-            sum += v;
-            sum
-        })
-        .collect())
+    arr_f64(
+        data.iter()
+            .map(|v| {
+                sum += v;
+                sum
+            })
+            .collect(),
+    )
 }
 
 fn rolling_apply<F: Fn(&[f64]) -> f64>(data: &[f64], p: usize, f: F) -> Vec<f64> {
@@ -1063,7 +1122,9 @@ fn rolling_apply<F: Fn(&[f64]) -> f64>(data: &[f64], p: usize, f: F) -> Vec<f64>
 pub fn rolling_mean(args: &[StrykeValue]) -> StrykeValue {
     let data = args.first().map(as_vec).unwrap_or_default();
     let p = arg_i64(args, 1).unwrap_or(10).max(1) as usize;
-    arr_f64(rolling_apply(&data, p, |w| w.iter().sum::<f64>() / w.len() as f64))
+    arr_f64(rolling_apply(&data, p, |w| {
+        w.iter().sum::<f64>() / w.len() as f64
+    }))
 }
 
 pub fn rolling_sum(args: &[StrykeValue]) -> StrykeValue {
@@ -1093,13 +1154,17 @@ pub fn rolling_var(args: &[StrykeValue]) -> StrykeValue {
 pub fn rolling_min(args: &[StrykeValue]) -> StrykeValue {
     let data = args.first().map(as_vec).unwrap_or_default();
     let p = arg_i64(args, 1).unwrap_or(10).max(1) as usize;
-    arr_f64(rolling_apply(&data, p, |w| w.iter().cloned().fold(f64::INFINITY, f64::min)))
+    arr_f64(rolling_apply(&data, p, |w| {
+        w.iter().cloned().fold(f64::INFINITY, f64::min)
+    }))
 }
 
 pub fn rolling_max(args: &[StrykeValue]) -> StrykeValue {
     let data = args.first().map(as_vec).unwrap_or_default();
     let p = arg_i64(args, 1).unwrap_or(10).max(1) as usize;
-    arr_f64(rolling_apply(&data, p, |w| w.iter().cloned().fold(f64::NEG_INFINITY, f64::max)))
+    arr_f64(rolling_apply(&data, p, |w| {
+        w.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
+    }))
 }
 
 pub fn rolling_median(args: &[StrykeValue]) -> StrykeValue {
@@ -1167,23 +1232,30 @@ pub fn diff_pct(args: &[StrykeValue]) -> StrykeValue {
     let data = args.first().map(as_vec).unwrap_or_default();
     let out: Vec<f64> = data
         .windows(2)
-        .map(|w| if w[0] == 0.0 { 0.0 } else { (w[1] - w[0]) / w[0] })
+        .map(|w| {
+            if w[0] == 0.0 {
+                0.0
+            } else {
+                (w[1] - w[0]) / w[0]
+            }
+        })
         .collect();
     arr_f64(out)
 }
 
 pub fn log_returns(args: &[StrykeValue]) -> StrykeValue {
     let data = args.first().map(as_vec).unwrap_or_default();
-    arr_f64(data
-        .windows(2)
-        .map(|w| {
-            if w[0] <= 0.0 || w[1] <= 0.0 {
-                0.0
-            } else {
-                (w[1] / w[0]).ln()
-            }
-        })
-        .collect())
+    arr_f64(
+        data.windows(2)
+            .map(|w| {
+                if w[0] <= 0.0 || w[1] <= 0.0 {
+                    0.0
+                } else {
+                    (w[1] / w[0]).ln()
+                }
+            })
+            .collect(),
+    )
 }
 
 pub fn volatility_annualized(args: &[StrykeValue]) -> StrykeValue {
@@ -1206,7 +1278,11 @@ pub fn sharpe(args: &[StrykeValue]) -> StrykeValue {
     let excess = m - rf;
     let var = returns.iter().map(|x| (x - m).powi(2)).sum::<f64>() / returns.len() as f64;
     let std = var.sqrt();
-    StrykeValue::float(if std == 0.0 { 0.0 } else { excess / std * (252.0_f64).sqrt() })
+    StrykeValue::float(if std == 0.0 {
+        0.0
+    } else {
+        excess / std * (252.0_f64).sqrt()
+    })
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -1245,7 +1321,11 @@ pub fn internal_rate_of_return(args: &[StrykeValue]) -> StrykeValue {
     }
     let mut rate: f64 = 0.1;
     for _ in 0..100 {
-        let npv: f64 = flows.iter().enumerate().map(|(t, cf)| *cf / (1.0_f64 + rate).powi(t as i32)).sum();
+        let npv: f64 = flows
+            .iter()
+            .enumerate()
+            .map(|(t, cf)| *cf / (1.0_f64 + rate).powi(t as i32))
+            .sum();
         let dnpv: f64 = flows
             .iter()
             .enumerate()
@@ -1376,7 +1456,11 @@ pub fn convexity(args: &[StrykeValue]) -> StrykeValue {
         num += t_f * (t_f + 1.0) * disc;
         den += disc;
     }
-    StrykeValue::float(if den == 0.0 { 0.0 } else { num / (den * (1.0 + rate).powi(2)) })
+    StrykeValue::float(if den == 0.0 {
+        0.0
+    } else {
+        num / (den * (1.0 + rate).powi(2))
+    })
 }
 
 pub fn break_even_qty(args: &[StrykeValue]) -> StrykeValue {
@@ -1429,7 +1513,8 @@ pub fn loan_remaining(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_f64(args, 2).unwrap_or(0.0);
     let paid = arg_f64(args, 3).unwrap_or(0.0);
     let pmt = loan_payment(args).to_number();
-    let remaining = principal * (1.0 + rate).powf(paid) - pmt * ((1.0 + rate).powf(paid) - 1.0) / rate;
+    let remaining =
+        principal * (1.0 + rate).powf(paid) - pmt * ((1.0 + rate).powf(paid) - 1.0) / rate;
     let _ = n;
     StrykeValue::float(remaining)
 }
@@ -1463,7 +1548,13 @@ pub fn sortino(args: &[StrykeValue]) -> StrykeValue {
     let m = returns.iter().sum::<f64>() / returns.len() as f64;
     let downside: f64 = returns
         .iter()
-        .map(|r| if *r < target { (r - target).powi(2) } else { 0.0 })
+        .map(|r| {
+            if *r < target {
+                (r - target).powi(2)
+            } else {
+                0.0
+            }
+        })
         .sum::<f64>()
         / returns.len() as f64;
     let dd = downside.sqrt();
@@ -1532,9 +1623,21 @@ pub fn omega_ratio(args: &[StrykeValue]) -> StrykeValue {
     if returns.is_empty() {
         return StrykeValue::float(0.0);
     }
-    let gains: f64 = returns.iter().filter(|r| **r > threshold).map(|r| r - threshold).sum();
-    let losses: f64 = returns.iter().filter(|r| **r < threshold).map(|r| threshold - r).sum();
-    StrykeValue::float(if losses == 0.0 { f64::INFINITY } else { gains / losses })
+    let gains: f64 = returns
+        .iter()
+        .filter(|r| **r > threshold)
+        .map(|r| r - threshold)
+        .sum();
+    let losses: f64 = returns
+        .iter()
+        .filter(|r| **r < threshold)
+        .map(|r| threshold - r)
+        .sum();
+    StrykeValue::float(if losses == 0.0 {
+        f64::INFINITY
+    } else {
+        gains / losses
+    })
 }
 
 pub fn ulcer_index(args: &[StrykeValue]) -> StrykeValue {
@@ -1625,7 +1728,11 @@ pub fn finite_difference_central(args: &[StrykeValue]) -> StrykeValue {
     if xs.len() < 3 {
         return arr_f64(Vec::new());
     }
-    arr_f64((1..xs.len() - 1).map(|i| (xs[i + 1] - xs[i - 1]) / (2.0 * h)).collect())
+    arr_f64(
+        (1..xs.len() - 1)
+            .map(|i| (xs[i + 1] - xs[i - 1]) / (2.0 * h))
+            .collect(),
+    )
 }
 
 pub fn interp_linear(args: &[StrykeValue]) -> StrykeValue {

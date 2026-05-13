@@ -30,10 +30,7 @@ fn arr(vs: Vec<StrykeValue>) -> StrykeValue {
 /// `triples(\@xs)` — overlapping 3-tuples: `[a,b,c,d]` → `[[a,b,c],[b,c,d]]`.
 pub fn triples(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
-    let out: Vec<StrykeValue> = xs
-        .windows(3)
-        .map(|w| arr(w.to_vec()))
-        .collect();
+    let out: Vec<StrykeValue> = xs.windows(3).map(|w| arr(w.to_vec())).collect();
     arr(out)
 }
 
@@ -41,10 +38,7 @@ pub fn triples(args: &[StrykeValue]) -> StrykeValue {
 pub fn n_tuples(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let n = args.get(1).map(|v| v.to_int().max(1) as usize).unwrap_or(2);
-    let out: Vec<StrykeValue> = xs
-        .windows(n)
-        .map(|w| arr(w.to_vec()))
-        .collect();
+    let out: Vec<StrykeValue> = xs.windows(n).map(|w| arr(w.to_vec())).collect();
     arr(out)
 }
 
@@ -152,7 +146,11 @@ pub fn sliding_min(args: &[StrykeValue]) -> StrykeValue {
 pub fn top_n_by(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let n = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
-    let mut nums: Vec<(usize, f64)> = xs.iter().enumerate().map(|(i, v)| (i, v.to_number())).collect();
+    let mut nums: Vec<(usize, f64)> = xs
+        .iter()
+        .enumerate()
+        .map(|(i, v)| (i, v.to_number()))
+        .collect();
     nums.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
     let out: Vec<StrykeValue> = nums.iter().take(n).map(|(i, _)| xs[*i].clone()).collect();
     arr(out)
@@ -161,7 +159,11 @@ pub fn top_n_by(args: &[StrykeValue]) -> StrykeValue {
 pub fn bottom_n_by(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let n = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
-    let mut nums: Vec<(usize, f64)> = xs.iter().enumerate().map(|(i, v)| (i, v.to_number())).collect();
+    let mut nums: Vec<(usize, f64)> = xs
+        .iter()
+        .enumerate()
+        .map(|(i, v)| (i, v.to_number()))
+        .collect();
     nums.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
     let out: Vec<StrykeValue> = nums.iter().take(n).map(|(i, _)| xs[*i].clone()).collect();
     arr(out)
@@ -173,7 +175,11 @@ pub fn all_equal(args: &[StrykeValue]) -> StrykeValue {
         return StrykeValue::integer(1);
     }
     let first = xs[0].to_string();
-    StrykeValue::integer(if xs.iter().all(|v| v.to_string() == first) { 1 } else { 0 })
+    StrykeValue::integer(if xs.iter().all(|v| v.to_string() == first) {
+        1
+    } else {
+        0
+    })
 }
 
 pub fn take_n_random(args: &[StrykeValue]) -> StrykeValue {
@@ -281,7 +287,10 @@ pub fn ranked_choice(args: &[StrykeValue]) -> StrykeValue {
                 return StrykeValue::string(winner.clone());
             }
         }
-        let loser = counts.iter().min_by_key(|(_, c)| **c).map(|(s, _)| s.clone());
+        let loser = counts
+            .iter()
+            .min_by_key(|(_, c)| **c)
+            .map(|(s, _)| s.clone());
         let Some(loser) = loser else {
             return StrykeValue::UNDEF;
         };
@@ -325,7 +334,9 @@ pub fn quickselect_nth(args: &[StrykeValue]) -> StrykeValue {
     if n >= nums.len() {
         return StrykeValue::UNDEF;
     }
-    nums.select_nth_unstable_by(n, |a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    nums.select_nth_unstable_by(n, |a, b| {
+        a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+    });
     StrykeValue::float(nums[n])
 }
 
@@ -336,13 +347,15 @@ pub fn quickselect_median(args: &[StrykeValue]) -> StrykeValue {
         return StrykeValue::UNDEF;
     }
     let mid = nums.len() / 2;
-    nums.select_nth_unstable_by(mid, |a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    nums.select_nth_unstable_by(mid, |a, b| {
+        a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+    });
     StrykeValue::float(nums[mid])
 }
 
 pub fn top_k_min_heap(args: &[StrykeValue]) -> StrykeValue {
-    use std::collections::BinaryHeap;
     use std::cmp::Reverse;
+    use std::collections::BinaryHeap;
     let xs = args.first().map(list_elements).unwrap_or_default();
     let k = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
     let mut heap: BinaryHeap<Reverse<i64>> = BinaryHeap::new();
@@ -402,11 +415,8 @@ pub fn unique_consecutive(args: &[StrykeValue]) -> StrykeValue {
 
 pub fn exclude(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
-    let to_exclude: std::collections::HashSet<String> = args
-        .iter()
-        .skip(1)
-        .map(|v| v.to_string())
-        .collect();
+    let to_exclude: std::collections::HashSet<String> =
+        args.iter().skip(1).map(|v| v.to_string()).collect();
     let out: Vec<StrykeValue> = xs
         .into_iter()
         .filter(|x| !to_exclude.contains(&x.to_string()))
@@ -709,7 +719,14 @@ pub fn match_rating(args: &[StrykeValue]) -> StrykeValue {
         if out.len() > 6 {
             // First 3 + last 3
             let first: String = out.chars().take(3).collect();
-            let last: String = out.chars().rev().take(3).collect::<Vec<_>>().into_iter().rev().collect();
+            let last: String = out
+                .chars()
+                .rev()
+                .take(3)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect();
             format!("{}{}", first, last)
         } else {
             out
@@ -746,7 +763,11 @@ pub fn match_rating(args: &[StrykeValue]) -> StrykeValue {
         2
     };
     let rating = 6i64 - unmatched_total as i64;
-    StrykeValue::integer(if rating >= max_min_rating as i64 { rating } else { 0 })
+    StrykeValue::integer(if rating >= max_min_rating as i64 {
+        rating
+    } else {
+        0
+    })
 }
 
 fn lcs_str(a: &str, b: &str) -> String {
@@ -919,8 +940,7 @@ pub fn str_huffman_encode(args: &[StrykeValue]) -> StrykeValue {
     // Simplified: returns canonical-frequency-prefix Huffman as bit string.
     // For brevity, uses Vec-based binary heap.
     use indexmap::IndexMap;
-    
-    
+
     let s = arg_str(args);
     if s.is_empty() {
         return StrykeValue::string(String::new());

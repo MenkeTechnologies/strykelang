@@ -8,7 +8,7 @@ use parking_lot::Mutex;
 use crate::ast::Expr;
 use crate::error::{PerlError, PerlResult};
 use crate::scope::{AtomicArray, AtomicHash};
-use crate::value::{PerlIterator, PerlSub, StrykeValue, PipelineOp};
+use crate::value::{PerlIterator, PerlSub, PipelineOp, StrykeValue};
 use crate::vm_helper::{FlowOrError, VMHelper, WantarrayCtx};
 
 struct VecPullIter {
@@ -433,15 +433,17 @@ impl VMHelper {
         let source = into_pull_iter(list_val);
         let (capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
         let sub = self.anon_coderef_from_block(block);
-        Ok(StrykeValue::iterator(Arc::new(MapStreamIterator::new_block(
-            source,
-            sub,
-            self.subs.clone(),
-            capture,
-            atomic_arrays,
-            atomic_hashes,
-            peel,
-        ))))
+        Ok(StrykeValue::iterator(Arc::new(
+            MapStreamIterator::new_block(
+                source,
+                sub,
+                self.subs.clone(),
+                capture,
+                atomic_arrays,
+                atomic_hashes,
+                peel,
+            ),
+        )))
     }
 
     /// Build lazy `maps EXPR, LIST` iterator.
@@ -469,15 +471,17 @@ impl VMHelper {
         }
         let source = into_pull_iter(list_val);
         let (capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
-        Ok(StrykeValue::iterator(Arc::new(MapStreamIterator::new_expr(
-            source,
-            Arc::new(expr.clone()),
-            self.subs.clone(),
-            capture,
-            atomic_arrays,
-            atomic_hashes,
-            peel,
-        ))))
+        Ok(StrykeValue::iterator(Arc::new(
+            MapStreamIterator::new_expr(
+                source,
+                Arc::new(expr.clone()),
+                self.subs.clone(),
+                capture,
+                atomic_arrays,
+                atomic_hashes,
+                peel,
+            ),
+        )))
     }
 }
 

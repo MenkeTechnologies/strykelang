@@ -108,7 +108,10 @@ pub fn aliases_hash_map() -> indexmap::IndexMap<String, StrykeValue> {
             if primary_set.contains(*alias) {
                 continue;
             }
-            m.insert((*alias).to_string(), StrykeValue::string(primary.to_string()));
+            m.insert(
+                (*alias).to_string(),
+                StrykeValue::string(primary.to_string()),
+            );
         }
     }
     m
@@ -617,7 +620,9 @@ pub fn special_vars_hash_map() -> indexmap::IndexMap<String, StrykeValue> {
 
 /// O(1) special-variable check (sigil-included spelling).
 pub fn is_special_var(name: &str) -> bool {
-    SPECIAL_VARS.binary_search_by_key(&name, |(n, _)| *n).is_ok()
+    SPECIAL_VARS
+        .binary_search_by_key(&name, |(n, _)| *n)
+        .is_ok()
 }
 
 /// Returns `true` if `name` is a known builtin function (primary or alias).
@@ -822,7 +827,11 @@ fn builtin_dirname(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `fileparse` — Fileparse. Returns a string.
-fn builtin_fileparse(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_fileparse(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
     let path = args
         .first()
         .ok_or_else(|| PerlError::runtime("fileparse needs a path", line))?;
@@ -1084,8 +1093,12 @@ pub(crate) fn try_builtin(
         "mac_is_unicast" => Some(Ok(crate::builtins_net::mac_is_unicast(args))),
         "mac_is_multicast" => Some(Ok(crate::builtins_net::mac_is_multicast(args))),
         "mac_is_broadcast" => Some(Ok(crate::builtins_net::mac_is_broadcast(args))),
-        "mac_is_locally_administered" => Some(Ok(crate::builtins_net::mac_is_locally_administered(args))),
-        "mac_is_universally_administered" => Some(Ok(crate::builtins_net::mac_is_universally_administered(args))),
+        "mac_is_locally_administered" => {
+            Some(Ok(crate::builtins_net::mac_is_locally_administered(args)))
+        }
+        "mac_is_universally_administered" => Some(Ok(
+            crate::builtins_net::mac_is_universally_administered(args),
+        )),
         "mac_random" => Some(Ok(crate::builtins_net::mac_random(args))),
         "mac_random_local" => Some(Ok(crate::builtins_net::mac_random_local(args))),
         "mac_compare" => Some(Ok(crate::builtins_net::mac_compare(args))),
@@ -1123,15 +1136,23 @@ pub(crate) fn try_builtin(
         "cookie_path_matches" => Some(Ok(crate::builtins_net::cookie_path_matches(args))),
         "cookie_set_max_age" => Some(Ok(crate::builtins_net::cookie_set_max_age(args))),
         // ── http / method / status / mime ──
-        "http_method_is_idempotent" => Some(Ok(crate::builtins_net::http_method_is_idempotent(args))),
+        "http_method_is_idempotent" => {
+            Some(Ok(crate::builtins_net::http_method_is_idempotent(args)))
+        }
         "http_method_is_safe" => Some(Ok(crate::builtins_net::http_method_is_safe(args))),
         "http_method_has_body" => Some(Ok(crate::builtins_net::http_method_has_body(args))),
         "http_status_class" => Some(Ok(crate::builtins_net::http_status_class(args))),
-        "http_status_is_informational" => Some(Ok(crate::builtins_net::http_status_is_informational(args))),
+        "http_status_is_informational" => {
+            Some(Ok(crate::builtins_net::http_status_is_informational(args)))
+        }
         "http_status_is_success" => Some(Ok(crate::builtins_net::http_status_is_success(args))),
         "http_status_is_redirect" => Some(Ok(crate::builtins_net::http_status_is_redirect(args))),
-        "http_status_is_client_error" => Some(Ok(crate::builtins_net::http_status_is_client_error(args))),
-        "http_status_is_server_error" => Some(Ok(crate::builtins_net::http_status_is_server_error(args))),
+        "http_status_is_client_error" => {
+            Some(Ok(crate::builtins_net::http_status_is_client_error(args)))
+        }
+        "http_status_is_server_error" => {
+            Some(Ok(crate::builtins_net::http_status_is_server_error(args)))
+        }
         "http_status_text" => Some(Ok(crate::builtins_net::http_status_text(args))),
         "http_date_parse" => Some(Ok(crate::builtins_net::http_date_parse(args))),
         "http_date_format" => Some(Ok(crate::builtins_net::http_date_format(args))),
@@ -1200,9 +1221,15 @@ pub(crate) fn try_builtin(
         "is_ssn_us" => Some(Ok(crate::builtins_validate::is_ssn_us(args))),
         "semver_compare" => Some(Ok(crate::builtins_validate::semver_compare(args))),
         "semver_satisfies" => Some(Ok(crate::builtins_validate::semver_satisfies(args))),
-        "semver_increment_major" => Some(Ok(crate::builtins_validate::semver_increment_major(args))),
-        "semver_increment_minor" => Some(Ok(crate::builtins_validate::semver_increment_minor(args))),
-        "semver_increment_patch" => Some(Ok(crate::builtins_validate::semver_increment_patch(args))),
+        "semver_increment_major" => {
+            Some(Ok(crate::builtins_validate::semver_increment_major(args)))
+        }
+        "semver_increment_minor" => {
+            Some(Ok(crate::builtins_validate::semver_increment_minor(args)))
+        }
+        "semver_increment_patch" => {
+            Some(Ok(crate::builtins_validate::semver_increment_patch(args)))
+        }
         // ── math / number theory extras ──
         "extended_gcd" => Some(Ok(crate::builtins_mathx::extended_gcd(args))),
         "modinverse" => Some(Ok(crate::builtins_mathx::modinverse(args))),
@@ -1242,7 +1269,9 @@ pub(crate) fn try_builtin(
         "random_password" => Some(Ok(crate::builtins_mathx::random_password(args))),
         "random_choices_weighted" => Some(Ok(crate::builtins_mathx::random_choices_weighted(args))),
         "sample_weighted_unique" => Some(Ok(crate::builtins_mathx::sample_weighted_unique(args))),
-        "reservoir_sample_weighted" => Some(Ok(crate::builtins_mathx::reservoir_sample_weighted(args))),
+        "reservoir_sample_weighted" => {
+            Some(Ok(crate::builtins_mathx::reservoir_sample_weighted(args)))
+        }
         "seeded_rng" => Some(Ok(crate::builtins_mathx::seeded_rng(args))),
         "save_random_state" => Some(Ok(crate::builtins_mathx::save_random_state(args))),
         "restore_random_state" => Some(Ok(crate::builtins_mathx::restore_random_state(args))),
@@ -1291,7 +1320,9 @@ pub(crate) fn try_builtin(
         "circle_circumference" => Some(Ok(crate::builtins_geom::circle_circumference(args))),
         "circle_area" => Some(Ok(crate::builtins_geom::circle_area(args))),
         "circle_intersects_line" => Some(Ok(crate::builtins_geom::circle_intersects_line(args))),
-        "circle_intersects_circle" => Some(Ok(crate::builtins_geom::circle_intersects_circle(args))),
+        "circle_intersects_circle" => {
+            Some(Ok(crate::builtins_geom::circle_intersects_circle(args)))
+        }
         "rect_area" => Some(Ok(crate::builtins_geom::rect_area(args))),
         "rect_perimeter" => Some(Ok(crate::builtins_geom::rect_perimeter(args))),
         "rect_intersect" => Some(Ok(crate::builtins_geom::rect_intersect(args))),
@@ -1314,8 +1345,12 @@ pub(crate) fn try_builtin(
         "gamma_remove" => Some(Ok(crate::builtins_geom::gamma_remove(args))),
         "white_point_d65" => Some(Ok(crate::builtins_geom::white_point_d65(args))),
         "white_point_d50" => Some(Ok(crate::builtins_geom::white_point_d50(args))),
-        "color_temperature_to_rgb" => Some(Ok(crate::builtins_geom::color_temperature_to_rgb(args))),
-        "rgb_to_color_temperature" => Some(Ok(crate::builtins_geom::rgb_to_color_temperature(args))),
+        "color_temperature_to_rgb" => {
+            Some(Ok(crate::builtins_geom::color_temperature_to_rgb(args)))
+        }
+        "rgb_to_color_temperature" => {
+            Some(Ok(crate::builtins_geom::rgb_to_color_temperature(args)))
+        }
         "chromatic_adaptation" => Some(Ok(crate::builtins_geom::chromatic_adaptation(args))),
         "color_interpolate_rgb" => Some(Ok(crate::builtins_geom::color_interpolate_rgb(args))),
         "color_interpolate_hsl" => Some(Ok(crate::builtins_geom::color_interpolate_hsl(args))),
@@ -1328,8 +1363,12 @@ pub(crate) fn try_builtin(
         "cartesian_to_polar" => Some(Ok(crate::builtins_geom::cartesian_to_polar(args))),
         "spherical_to_cartesian" => Some(Ok(crate::builtins_geom::spherical_to_cartesian(args))),
         "cartesian_to_spherical" => Some(Ok(crate::builtins_geom::cartesian_to_spherical(args))),
-        "cylindrical_to_cartesian" => Some(Ok(crate::builtins_geom::cylindrical_to_cartesian(args))),
-        "cartesian_to_cylindrical" => Some(Ok(crate::builtins_geom::cartesian_to_cylindrical(args))),
+        "cylindrical_to_cartesian" => {
+            Some(Ok(crate::builtins_geom::cylindrical_to_cartesian(args)))
+        }
+        "cartesian_to_cylindrical" => {
+            Some(Ok(crate::builtins_geom::cartesian_to_cylindrical(args)))
+        }
         "versine_fn" => Some(Ok(crate::builtins_geom::versine_fn(args))),
         // ── iterator + string-distance extras ──
         "triples" => Some(Ok(crate::builtins_iter::triples(args))),
@@ -1382,7 +1421,9 @@ pub(crate) fn try_builtin(
         "match_rating" => Some(Ok(crate::builtins_iter::match_rating(args))),
         "str_lcs" => Some(Ok(crate::builtins_iter::str_lcs(args))),
         "str_lcs_length" => Some(Ok(crate::builtins_iter::str_lcs_length(args))),
-        "str_longest_common_substring" => Some(Ok(crate::builtins_iter::str_longest_common_substring(args))),
+        "str_longest_common_substring" => {
+            Some(Ok(crate::builtins_iter::str_longest_common_substring(args)))
+        }
         "str_kmp" => Some(Ok(crate::builtins_iter::str_kmp(args))),
         "str_boyer_moore" => Some(Ok(crate::builtins_iter::str_boyer_moore(args))),
         "str_rabin_karp" => Some(Ok(crate::builtins_iter::str_rabin_karp(args))),
@@ -1452,7 +1493,9 @@ pub(crate) fn try_builtin(
         "vector2_distance" => Some(Ok(crate::builtins_misc::vector2_distance(args))),
         "vector2_rotate" => Some(Ok(crate::builtins_misc::vector2_rotate(args))),
         "quaternion_new" => Some(Ok(crate::builtins_misc::quaternion_new(args))),
-        "quaternion_from_axis_angle" => Some(Ok(crate::builtins_misc::quaternion_from_axis_angle(args))),
+        "quaternion_from_axis_angle" => {
+            Some(Ok(crate::builtins_misc::quaternion_from_axis_angle(args)))
+        }
         "quaternion_multiply" => Some(Ok(crate::builtins_misc::quaternion_multiply(args))),
         "quaternion_normalize" => Some(Ok(crate::builtins_misc::quaternion_normalize(args))),
         "quaternion_to_matrix" => Some(Ok(crate::builtins_misc::quaternion_to_matrix(args))),
@@ -1599,44 +1642,94 @@ pub(crate) fn try_builtin(
         "xpath_to_selector" => Some(Ok(crate::builtins_data::xpath_to_selector(args))),
         // ── HTTP fillers + distribution d/q/r ──
         "http_status_continue" => Some(Ok(crate::builtins_const::http_status_continue(args))),
-        "http_status_switching_protocols" => Some(Ok(crate::builtins_const::http_status_switching_protocols(args))),
+        "http_status_switching_protocols" => Some(Ok(
+            crate::builtins_const::http_status_switching_protocols(args),
+        )),
         "http_status_ok" => Some(Ok(crate::builtins_const::http_status_ok(args))),
         "http_status_created" => Some(Ok(crate::builtins_const::http_status_created(args))),
         "http_status_accepted" => Some(Ok(crate::builtins_const::http_status_accepted(args))),
         "http_status_no_content" => Some(Ok(crate::builtins_const::http_status_no_content(args))),
-        "http_status_partial_content" => Some(Ok(crate::builtins_const::http_status_partial_content(args))),
-        "http_status_multiple_choices" => Some(Ok(crate::builtins_const::http_status_multiple_choices(args))),
-        "http_status_moved_permanently" => Some(Ok(crate::builtins_const::http_status_moved_permanently(args))),
+        "http_status_partial_content" => {
+            Some(Ok(crate::builtins_const::http_status_partial_content(args)))
+        }
+        "http_status_multiple_choices" => Some(Ok(
+            crate::builtins_const::http_status_multiple_choices(args),
+        )),
+        "http_status_moved_permanently" => Some(Ok(
+            crate::builtins_const::http_status_moved_permanently(args),
+        )),
         "http_status_found" => Some(Ok(crate::builtins_const::http_status_found(args))),
         "http_status_see_other" => Some(Ok(crate::builtins_const::http_status_see_other(args))),
-        "http_status_not_modified" => Some(Ok(crate::builtins_const::http_status_not_modified(args))),
-        "http_status_temporary_redirect" => Some(Ok(crate::builtins_const::http_status_temporary_redirect(args))),
-        "http_status_permanent_redirect" => Some(Ok(crate::builtins_const::http_status_permanent_redirect(args))),
+        "http_status_not_modified" => {
+            Some(Ok(crate::builtins_const::http_status_not_modified(args)))
+        }
+        "http_status_temporary_redirect" => Some(Ok(
+            crate::builtins_const::http_status_temporary_redirect(args),
+        )),
+        "http_status_permanent_redirect" => Some(Ok(
+            crate::builtins_const::http_status_permanent_redirect(args),
+        )),
         "http_status_bad_request" => Some(Ok(crate::builtins_const::http_status_bad_request(args))),
-        "http_status_unauthorized" => Some(Ok(crate::builtins_const::http_status_unauthorized(args))),
-        "http_status_payment_required" => Some(Ok(crate::builtins_const::http_status_payment_required(args))),
+        "http_status_unauthorized" => {
+            Some(Ok(crate::builtins_const::http_status_unauthorized(args)))
+        }
+        "http_status_payment_required" => Some(Ok(
+            crate::builtins_const::http_status_payment_required(args),
+        )),
         "http_status_forbidden" => Some(Ok(crate::builtins_const::http_status_forbidden(args))),
         "http_status_not_found" => Some(Ok(crate::builtins_const::http_status_not_found(args))),
-        "http_status_method_not_allowed" => Some(Ok(crate::builtins_const::http_status_method_not_allowed(args))),
-        "http_status_not_acceptable" => Some(Ok(crate::builtins_const::http_status_not_acceptable(args))),
+        "http_status_method_not_allowed" => Some(Ok(
+            crate::builtins_const::http_status_method_not_allowed(args),
+        )),
+        "http_status_not_acceptable" => {
+            Some(Ok(crate::builtins_const::http_status_not_acceptable(args)))
+        }
         "http_status_conflict" => Some(Ok(crate::builtins_const::http_status_conflict(args))),
         "http_status_gone" => Some(Ok(crate::builtins_const::http_status_gone(args))),
-        "http_status_length_required" => Some(Ok(crate::builtins_const::http_status_length_required(args))),
-        "http_status_precondition_failed" => Some(Ok(crate::builtins_const::http_status_precondition_failed(args))),
-        "http_status_payload_too_large" => Some(Ok(crate::builtins_const::http_status_payload_too_large(args))),
-        "http_status_uri_too_long" => Some(Ok(crate::builtins_const::http_status_uri_too_long(args))),
-        "http_status_unsupported_media_type" => Some(Ok(crate::builtins_const::http_status_unsupported_media_type(args))),
-        "http_status_range_not_satisfiable" => Some(Ok(crate::builtins_const::http_status_range_not_satisfiable(args))),
-        "http_status_expectation_failed" => Some(Ok(crate::builtins_const::http_status_expectation_failed(args))),
+        "http_status_length_required" => {
+            Some(Ok(crate::builtins_const::http_status_length_required(args)))
+        }
+        "http_status_precondition_failed" => Some(Ok(
+            crate::builtins_const::http_status_precondition_failed(args),
+        )),
+        "http_status_payload_too_large" => Some(Ok(
+            crate::builtins_const::http_status_payload_too_large(args),
+        )),
+        "http_status_uri_too_long" => {
+            Some(Ok(crate::builtins_const::http_status_uri_too_long(args)))
+        }
+        "http_status_unsupported_media_type" => Some(Ok(
+            crate::builtins_const::http_status_unsupported_media_type(args),
+        )),
+        "http_status_range_not_satisfiable" => Some(Ok(
+            crate::builtins_const::http_status_range_not_satisfiable(args),
+        )),
+        "http_status_expectation_failed" => Some(Ok(
+            crate::builtins_const::http_status_expectation_failed(args),
+        )),
         "http_status_im_a_teapot" => Some(Ok(crate::builtins_const::http_status_im_a_teapot(args))),
-        "http_status_unprocessable_entity" => Some(Ok(crate::builtins_const::http_status_unprocessable_entity(args))),
-        "http_status_too_many_requests" => Some(Ok(crate::builtins_const::http_status_too_many_requests(args))),
-        "http_status_internal_server_error" => Some(Ok(crate::builtins_const::http_status_internal_server_error(args))),
-        "http_status_not_implemented" => Some(Ok(crate::builtins_const::http_status_not_implemented(args))),
+        "http_status_unprocessable_entity" => Some(Ok(
+            crate::builtins_const::http_status_unprocessable_entity(args),
+        )),
+        "http_status_too_many_requests" => Some(Ok(
+            crate::builtins_const::http_status_too_many_requests(args),
+        )),
+        "http_status_internal_server_error" => Some(Ok(
+            crate::builtins_const::http_status_internal_server_error(args),
+        )),
+        "http_status_not_implemented" => {
+            Some(Ok(crate::builtins_const::http_status_not_implemented(args)))
+        }
         "http_status_bad_gateway" => Some(Ok(crate::builtins_const::http_status_bad_gateway(args))),
-        "http_status_service_unavailable" => Some(Ok(crate::builtins_const::http_status_service_unavailable(args))),
-        "http_status_gateway_timeout" => Some(Ok(crate::builtins_const::http_status_gateway_timeout(args))),
-        "http_status_http_version_not_supported" => Some(Ok(crate::builtins_const::http_status_http_version_not_supported(args))),
+        "http_status_service_unavailable" => Some(Ok(
+            crate::builtins_const::http_status_service_unavailable(args),
+        )),
+        "http_status_gateway_timeout" => {
+            Some(Ok(crate::builtins_const::http_status_gateway_timeout(args)))
+        }
+        "http_status_http_version_not_supported" => Some(Ok(
+            crate::builtins_const::http_status_http_version_not_supported(args),
+        )),
         "http_method_get" => Some(Ok(crate::builtins_const::http_method_get(args))),
         "http_method_post" => Some(Ok(crate::builtins_const::http_method_post(args))),
         "http_method_put" => Some(Ok(crate::builtins_const::http_method_put(args))),
@@ -1690,7 +1783,9 @@ pub(crate) fn try_builtin(
         "currency_format" => Some(Ok(crate::builtins_misc2::currency_format(args))),
         "currency_parse" => Some(Ok(crate::builtins_misc2::currency_parse(args))),
         "currency_round" => Some(Ok(crate::builtins_misc2::currency_round(args))),
-        "currency_split_thousands" => Some(Ok(crate::builtins_misc2::currency_split_thousands(args))),
+        "currency_split_thousands" => {
+            Some(Ok(crate::builtins_misc2::currency_split_thousands(args)))
+        }
         "currency_code_to_symbol" => Some(Ok(crate::builtins_misc2::currency_code_to_symbol(args))),
         "currency_symbol_to_code" => Some(Ok(crate::builtins_misc2::currency_symbol_to_code(args))),
         "currency_iso_4217" => Some(Ok(crate::builtins_misc2::currency_iso_4217(args))),
@@ -1706,7 +1801,9 @@ pub(crate) fn try_builtin(
         "tokenize_sentencepiece" => Some(Ok(crate::builtins_misc2::tokenize_sentencepiece(args))),
         "embed_text" => Some(Ok(crate::builtins_misc2::embed_text(args))),
         "cosine_similarity" => Some(Ok(crate::builtins_misc2::cosine_similarity(args))),
-        "euclidean_distance" | "eucdist" => Some(Ok(crate::builtins_misc2::euclidean_distance(args))),
+        "euclidean_distance" | "eucdist" => {
+            Some(Ok(crate::builtins_misc2::euclidean_distance(args)))
+        }
         "manhattan_distance" | "mdist" => Some(Ok(crate::builtins_misc2::manhattan_distance(args))),
         "dot_product" | "dotp" => Some(Ok(crate::builtins_misc2::dot_product(args))),
         "normalize_vector" => Some(Ok(crate::builtins_misc2::normalize_vector(args))),
@@ -1757,10 +1854,16 @@ pub(crate) fn try_builtin(
         "locale_number_format" => Some(Ok(crate::builtins_misc2::locale_number_format(args))),
         "locale_date_format" => Some(Ok(crate::builtins_misc2::locale_date_format(args))),
         "locale_time_format" => Some(Ok(crate::builtins_misc2::locale_time_format(args))),
-        "locale_decimal_separator" => Some(Ok(crate::builtins_misc2::locale_decimal_separator(args))),
+        "locale_decimal_separator" => {
+            Some(Ok(crate::builtins_misc2::locale_decimal_separator(args)))
+        }
         "locale_group_separator" => Some(Ok(crate::builtins_misc2::locale_group_separator(args))),
-        "locale_first_day_of_week" => Some(Ok(crate::builtins_misc2::locale_first_day_of_week(args))),
-        "locale_measurement_system" => Some(Ok(crate::builtins_misc2::locale_measurement_system(args))),
+        "locale_first_day_of_week" => {
+            Some(Ok(crate::builtins_misc2::locale_first_day_of_week(args)))
+        }
+        "locale_measurement_system" => {
+            Some(Ok(crate::builtins_misc2::locale_measurement_system(args)))
+        }
         "country_code_alpha2" => Some(Ok(crate::builtins_misc2::country_code_alpha2(args))),
         "country_code_alpha3" => Some(Ok(crate::builtins_misc2::country_code_alpha3(args))),
         "country_code_numeric" => Some(Ok(crate::builtins_misc2::country_code_numeric(args))),
@@ -1780,7 +1883,9 @@ pub(crate) fn try_builtin(
         "channel_close" => Some(Ok(crate::builtins_misc2::channel_close(args))),
         "channel_is_closed" => Some(Ok(crate::builtins_misc2::channel_is_closed(args))),
         "broadcast_channel_new" => Some(Ok(crate::builtins_misc2::broadcast_channel_new(args))),
-        "broadcast_channel_subscribe" => Some(Ok(crate::builtins_misc2::broadcast_channel_subscribe(args))),
+        "broadcast_channel_subscribe" => {
+            Some(Ok(crate::builtins_misc2::broadcast_channel_subscribe(args)))
+        }
         "oneshot_new" => Some(Ok(crate::builtins_misc2::oneshot_new(args))),
         "trapezoidal_integrate" => Some(Ok(crate::builtins_quant::trapezoidal_integrate(args))),
         "simpson_integrate" => Some(Ok(crate::builtins_quant::simpson_integrate(args))),
@@ -1794,13 +1899,27 @@ pub(crate) fn try_builtin(
         "bollinger_upper" => Some(Ok(crate::builtins_quant::bollinger_upper(args))),
         "break_even_price" => Some(Ok(crate::builtins_quant::break_even_price(args))),
         "break_even_qty" => Some(Ok(crate::builtins_quant::break_even_qty(args))),
-        "candlestick_pattern_doji" => Some(Ok(crate::builtins_quant::candlestick_pattern_doji(args))),
-        "candlestick_pattern_engulfing" => Some(Ok(crate::builtins_quant::candlestick_pattern_engulfing(args))),
-        "candlestick_pattern_evening_star" => Some(Ok(crate::builtins_quant::candlestick_pattern_evening_star(args))),
-        "candlestick_pattern_hammer" => Some(Ok(crate::builtins_quant::candlestick_pattern_hammer(args))),
-        "candlestick_pattern_morning_star" => Some(Ok(crate::builtins_quant::candlestick_pattern_morning_star(args))),
-        "candlestick_pattern_three_black_crows" => Some(Ok(crate::builtins_quant::candlestick_pattern_three_black_crows(args))),
-        "candlestick_pattern_three_white_soldiers" => Some(Ok(crate::builtins_quant::candlestick_pattern_three_white_soldiers(args))),
+        "candlestick_pattern_doji" => {
+            Some(Ok(crate::builtins_quant::candlestick_pattern_doji(args)))
+        }
+        "candlestick_pattern_engulfing" => Some(Ok(
+            crate::builtins_quant::candlestick_pattern_engulfing(args),
+        )),
+        "candlestick_pattern_evening_star" => Some(Ok(
+            crate::builtins_quant::candlestick_pattern_evening_star(args),
+        )),
+        "candlestick_pattern_hammer" => {
+            Some(Ok(crate::builtins_quant::candlestick_pattern_hammer(args)))
+        }
+        "candlestick_pattern_morning_star" => Some(Ok(
+            crate::builtins_quant::candlestick_pattern_morning_star(args),
+        )),
+        "candlestick_pattern_three_black_crows" => Some(Ok(
+            crate::builtins_quant::candlestick_pattern_three_black_crows(args),
+        )),
+        "candlestick_pattern_three_white_soldiers" => Some(Ok(
+            crate::builtins_quant::candlestick_pattern_three_white_soldiers(args),
+        )),
         "cci" => Some(Ok(crate::builtins_quant::cci(args))),
         "dema" => Some(Ok(crate::builtins_quant::dema(args))),
         "diff_pct" => Some(Ok(crate::builtins_quant::diff_pct(args))),
@@ -1808,15 +1927,21 @@ pub(crate) fn try_builtin(
         "discount_pct" => Some(Ok(crate::builtins_quant::discount_pct(args))),
         "donchian_lower" => Some(Ok(crate::builtins_quant::donchian_lower(args))),
         "donchian_upper" => Some(Ok(crate::builtins_quant::donchian_upper(args))),
-        "double_exponential_smoothing" => Some(Ok(crate::builtins_quant::double_exponential_smoothing(args))),
+        "double_exponential_smoothing" => Some(Ok(
+            crate::builtins_quant::double_exponential_smoothing(args),
+        )),
         "duration_modified" => Some(Ok(crate::builtins_quant::duration_modified(args))),
         "ema" => Some(Ok(crate::builtins_quant::ema(args))),
         "expanding_mean" => Some(Ok(crate::builtins_quant::expanding_mean(args))),
         "expanding_sum" => Some(Ok(crate::builtins_quant::expanding_sum(args))),
         "fibonacci_extension" => Some(Ok(crate::builtins_quant::fibonacci_extension(args))),
         "fibonacci_retracement" => Some(Ok(crate::builtins_quant::fibonacci_retracement(args))),
-        "finite_difference_central" => Some(Ok(crate::builtins_quant::finite_difference_central(args))),
-        "finite_difference_forward" => Some(Ok(crate::builtins_quant::finite_difference_forward(args))),
+        "finite_difference_central" => {
+            Some(Ok(crate::builtins_quant::finite_difference_central(args)))
+        }
+        "finite_difference_forward" => {
+            Some(Ok(crate::builtins_quant::finite_difference_forward(args)))
+        }
         "hma" => Some(Ok(crate::builtins_quant::hma(args))),
         "hurst_exponent" => Some(Ok(crate::builtins_quant::hurst_exponent(args))),
         "interp_lagrange" => Some(Ok(crate::builtins_quant::interp_lagrange(args))),
@@ -1870,7 +1995,9 @@ pub(crate) fn try_builtin(
         "date_add_days" => Some(Ok(crate::builtins_b14::date_add_days(args))),
         "date_add_months" => Some(Ok(crate::builtins_b14::date_add_months(args))),
         "date_add_years" => Some(Ok(crate::builtins_b14::date_add_years(args))),
-        "date_business_days_between" => Some(Ok(crate::builtins_b14::date_business_days_between(args))),
+        "date_business_days_between" => {
+            Some(Ok(crate::builtins_b14::date_business_days_between(args)))
+        }
         "date_day" => Some(Ok(crate::builtins_b14::date_day(args))),
         "date_dayofweek" => Some(Ok(crate::builtins_b14::date_dayofweek(args))),
         "date_dayofyear" => Some(Ok(crate::builtins_b14::date_dayofyear(args))),
@@ -1899,21 +2026,29 @@ pub(crate) fn try_builtin(
         "expint" => Some(Ok(crate::builtins_b14::expint(args))),
         "gamma_regularized_p" => Some(Ok(crate::builtins_b14::gamma_regularized_p(args))),
         "gamma_regularized_q" => Some(Ok(crate::builtins_b14::gamma_regularized_q(args))),
-        "graph_articulation_points" => Some(Ok(crate::builtins_b14::graph_articulation_points(args))),
+        "graph_articulation_points" => {
+            Some(Ok(crate::builtins_b14::graph_articulation_points(args)))
+        }
         "graph_bellman_ford" => Some(Ok(crate::builtins_b14::graph_bellman_ford(args))),
         "graph_betweenness" => Some(Ok(crate::builtins_b14::graph_betweenness(args))),
         "graph_bfs" => Some(Ok(crate::builtins_b14::graph_bfs(args))),
         "graph_bridges" => Some(Ok(crate::builtins_b14::graph_bridges(args))),
         "graph_closeness" => Some(Ok(crate::builtins_b14::graph_closeness(args))),
-        "graph_clustering_coefficient" => Some(Ok(crate::builtins_b14::graph_clustering_coefficient(args))),
+        "graph_clustering_coefficient" => {
+            Some(Ok(crate::builtins_b14::graph_clustering_coefficient(args)))
+        }
         "graph_color_greedy" => Some(Ok(crate::builtins_b14::graph_color_greedy(args))),
-        "graph_connected_components" => Some(Ok(crate::builtins_b14::graph_connected_components(args))),
+        "graph_connected_components" => {
+            Some(Ok(crate::builtins_b14::graph_connected_components(args)))
+        }
         "graph_cycle_detect" => Some(Ok(crate::builtins_b14::graph_cycle_detect(args))),
         "graph_degree" => Some(Ok(crate::builtins_b14::graph_degree(args))),
         "graph_dfs" => Some(Ok(crate::builtins_b14::graph_dfs(args))),
         "graph_dijkstra" => Some(Ok(crate::builtins_b14::graph_dijkstra(args))),
         "graph_eccentricity" => Some(Ok(crate::builtins_b14::graph_eccentricity(args))),
-        "graph_eigenvector_centrality" => Some(Ok(crate::builtins_b14::graph_eigenvector_centrality(args))),
+        "graph_eigenvector_centrality" => {
+            Some(Ok(crate::builtins_b14::graph_eigenvector_centrality(args)))
+        }
         "graph_floyd_warshall" => Some(Ok(crate::builtins_b14::graph_floyd_warshall(args))),
         "graph_from_edges" => Some(Ok(crate::builtins_b14::graph_from_edges(args))),
         "graph_has_path" => Some(Ok(crate::builtins_b14::graph_has_path(args))),
@@ -1926,7 +2061,9 @@ pub(crate) fn try_builtin(
         "graph_pagerank" => Some(Ok(crate::builtins_b14::graph_pagerank(args))),
         "graph_prim_mst" => Some(Ok(crate::builtins_b14::graph_prim_mst(args))),
         "graph_shortest_path" => Some(Ok(crate::builtins_b14::graph_shortest_path(args))),
-        "graph_strongly_connected_components" => Some(Ok(crate::builtins_b14::graph_strongly_connected_components(args))),
+        "graph_strongly_connected_components" => Some(Ok(
+            crate::builtins_b14::graph_strongly_connected_components(args),
+        )),
         "graph_tarjan" => Some(Ok(crate::builtins_b14::graph_tarjan(args))),
         "graph_to_adj_list" => Some(Ok(crate::builtins_b14::graph_to_adj_list(args))),
         "graph_to_adj_matrix" => Some(Ok(crate::builtins_b14::graph_to_adj_matrix(args))),
@@ -1935,7 +2072,9 @@ pub(crate) fn try_builtin(
         "hypergeom_2f1" => Some(Ok(crate::builtins_b14::hypergeom_2f1(args))),
         "li" => Some(Ok(crate::builtins_b14::li(args))),
         "matrix_adjugate" => Some(Ok(crate::builtins_b14::matrix_adjugate(args))),
-        "matrix_cholesky_decompose" => Some(Ok(crate::builtins_b14::matrix_cholesky_decompose(args))),
+        "matrix_cholesky_decompose" => {
+            Some(Ok(crate::builtins_b14::matrix_cholesky_decompose(args)))
+        }
         "matrix_cofactor" => Some(Ok(crate::builtins_b14::matrix_cofactor(args))),
         "matrix_cols" => Some(Ok(crate::builtins_b14::matrix_cols(args))),
         "matrix_concat_h" => Some(Ok(crate::builtins_b14::matrix_concat_h(args))),
@@ -2224,26 +2363,46 @@ pub(crate) fn try_builtin(
         "chem_arrhenius_k" => Some(Ok(crate::builtins_b18::chem_arrhenius_k(args))),
         "chem_avogadro" => Some(Ok(crate::builtins_b18::chem_avogadro(args))),
         "chem_balance_check" => Some(Ok(crate::builtins_b18::chem_balance_check(args))),
-        "chem_boiling_point_elevation" => Some(Ok(crate::builtins_b18::chem_boiling_point_elevation(args))),
+        "chem_boiling_point_elevation" => {
+            Some(Ok(crate::builtins_b18::chem_boiling_point_elevation(args)))
+        }
         "chem_buffer_capacity" => Some(Ok(crate::builtins_b18::chem_buffer_capacity(args))),
-        "chem_celsius_to_fahrenheit" => Some(Ok(crate::builtins_b18::chem_celsius_to_fahrenheit(args))),
+        "chem_celsius_to_fahrenheit" => {
+            Some(Ok(crate::builtins_b18::chem_celsius_to_fahrenheit(args)))
+        }
         "chem_celsius_to_kelvin" => Some(Ok(crate::builtins_b18::chem_celsius_to_kelvin(args))),
-        "chem_concentration_to_molarity" => Some(Ok(crate::builtins_b18::chem_concentration_to_molarity(args))),
+        "chem_concentration_to_molarity" => Some(Ok(
+            crate::builtins_b18::chem_concentration_to_molarity(args),
+        )),
         "chem_dilution" => Some(Ok(crate::builtins_b18::chem_dilution(args))),
-        "chem_fahrenheit_to_celsius" => Some(Ok(crate::builtins_b18::chem_fahrenheit_to_celsius(args))),
-        "chem_fahrenheit_to_kelvin" => Some(Ok(crate::builtins_b18::chem_fahrenheit_to_kelvin(args))),
+        "chem_fahrenheit_to_celsius" => {
+            Some(Ok(crate::builtins_b18::chem_fahrenheit_to_celsius(args)))
+        }
+        "chem_fahrenheit_to_kelvin" => {
+            Some(Ok(crate::builtins_b18::chem_fahrenheit_to_kelvin(args)))
+        }
         "chem_formula_parse" => Some(Ok(crate::builtins_b18::chem_formula_parse(args))),
-        "chem_freezing_point_depression" => Some(Ok(crate::builtins_b18::chem_freezing_point_depression(args))),
+        "chem_freezing_point_depression" => Some(Ok(
+            crate::builtins_b18::chem_freezing_point_depression(args),
+        )),
         "chem_h_from_ph" => Some(Ok(crate::builtins_b18::chem_h_from_ph(args))),
-        "chem_henderson_hasselbalch" => Some(Ok(crate::builtins_b18::chem_henderson_hasselbalch(args))),
+        "chem_henderson_hasselbalch" => {
+            Some(Ok(crate::builtins_b18::chem_henderson_hasselbalch(args)))
+        }
         "chem_ideal_gas_volume" => Some(Ok(crate::builtins_b18::chem_ideal_gas_volume(args))),
-        "chem_isoelectric_estimate" => Some(Ok(crate::builtins_b18::chem_isoelectric_estimate(args))),
+        "chem_isoelectric_estimate" => {
+            Some(Ok(crate::builtins_b18::chem_isoelectric_estimate(args)))
+        }
         "chem_kelvin_to_celsius" => Some(Ok(crate::builtins_b18::chem_kelvin_to_celsius(args))),
-        "chem_kelvin_to_fahrenheit" => Some(Ok(crate::builtins_b18::chem_kelvin_to_fahrenheit(args))),
+        "chem_kelvin_to_fahrenheit" => {
+            Some(Ok(crate::builtins_b18::chem_kelvin_to_fahrenheit(args)))
+        }
         "chem_kelvin_to_rankine" => Some(Ok(crate::builtins_b18::chem_kelvin_to_rankine(args))),
         "chem_molality" => Some(Ok(crate::builtins_b18::chem_molality(args))),
         "chem_molar_mass" => Some(Ok(crate::builtins_b18::chem_molar_mass(args))),
-        "chem_molarity_to_normality" => Some(Ok(crate::builtins_b18::chem_molarity_to_normality(args))),
+        "chem_molarity_to_normality" => {
+            Some(Ok(crate::builtins_b18::chem_molarity_to_normality(args)))
+        }
         "chem_partial_pressure" => Some(Ok(crate::builtins_b18::chem_partial_pressure(args))),
         "chem_ph_from_h" => Some(Ok(crate::builtins_b18::chem_ph_from_h(args))),
         "chem_pka_lookup" => Some(Ok(crate::builtins_b18::chem_pka_lookup(args))),
@@ -2254,14 +2413,22 @@ pub(crate) fn try_builtin(
         "job_schedule_ljf" => Some(Ok(crate::builtins_b18::job_schedule_ljf(args))),
         "job_schedule_spt" => Some(Ok(crate::builtins_b18::job_schedule_spt(args))),
         "joint_entropy" => Some(Ok(crate::builtins_b18::joint_entropy(args))),
-        "js_divergence_distributions" => Some(Ok(crate::builtins_b18::js_divergence_distributions(args))),
-        "kl_divergence_distributions" => Some(Ok(crate::builtins_b18::kl_divergence_distributions(args))),
+        "js_divergence_distributions" => {
+            Some(Ok(crate::builtins_b18::js_divergence_distributions(args)))
+        }
+        "kl_divergence_distributions" => {
+            Some(Ok(crate::builtins_b18::kl_divergence_distributions(args)))
+        }
         "knapsack_fractional" => Some(Ok(crate::builtins_b18::knapsack_fractional(args))),
         "knapsack_unbounded" => Some(Ok(crate::builtins_b18::knapsack_unbounded(args))),
         "lp_simplex_max" => Some(Ok(crate::builtins_b18::lp_simplex_max(args))),
         "lp_simplex_min" => Some(Ok(crate::builtins_b18::lp_simplex_min(args))),
-        "matching_bipartite_greedy" => Some(Ok(crate::builtins_b18::matching_bipartite_greedy(args))),
-        "matching_bipartite_hungarian" => Some(Ok(crate::builtins_b18::matching_bipartite_hungarian(args))),
+        "matching_bipartite_greedy" => {
+            Some(Ok(crate::builtins_b18::matching_bipartite_greedy(args)))
+        }
+        "matching_bipartite_hungarian" => {
+            Some(Ok(crate::builtins_b18::matching_bipartite_hungarian(args)))
+        }
         "minimax_value" => Some(Ok(crate::builtins_b18::minimax_value(args))),
         "mixed_strategy_2x2" => Some(Ok(crate::builtins_b18::mixed_strategy_2x2(args))),
         "ml_attention_score" => Some(Ok(crate::builtins_b18::ml_attention_score(args))),
@@ -2337,8 +2504,12 @@ pub(crate) fn try_builtin(
         "oklch_to_rgb" => Some(Ok(crate::builtins_b19::oklch_to_rgb(args))),
         "otsu_threshold" => Some(Ok(crate::builtins_b19::otsu_threshold(args))),
         "overlap_coeff" => Some(Ok(crate::builtins_b19::overlap_coeff(args))),
-        "posterior_predictive_beta" => Some(Ok(crate::builtins_b19::posterior_predictive_beta(args))),
-        "posterior_predictive_normal" => Some(Ok(crate::builtins_b19::posterior_predictive_normal(args))),
+        "posterior_predictive_beta" => {
+            Some(Ok(crate::builtins_b19::posterior_predictive_beta(args)))
+        }
+        "posterior_predictive_normal" => {
+            Some(Ok(crate::builtins_b19::posterior_predictive_normal(args)))
+        }
         "prior_jeffreys_uniform" => Some(Ok(crate::builtins_b19::prior_jeffreys_uniform(args))),
         "qlearning_step" => Some(Ok(crate::builtins_b19::qlearning_step(args))),
         "range_to_cidr" => Some(Ok(crate::builtins_b19::range_to_cidr(args))),
@@ -2411,7 +2582,9 @@ pub(crate) fn try_builtin(
         "lattice_paths" => Some(Ok(crate::builtins_b20::lattice_paths(args))),
         "lift_force" => Some(Ok(crate::builtins_b20::lift_force(args))),
         "lucas_nth" => Some(Ok(crate::builtins_b20::lucas_nth(args))),
-        "moment_of_inertia_cylinder" => Some(Ok(crate::builtins_b20::moment_of_inertia_cylinder(args))),
+        "moment_of_inertia_cylinder" => {
+            Some(Ok(crate::builtins_b20::moment_of_inertia_cylinder(args)))
+        }
         "moment_of_inertia_disc" => Some(Ok(crate::builtins_b20::moment_of_inertia_disc(args))),
         "moment_of_inertia_rod" => Some(Ok(crate::builtins_b20::moment_of_inertia_rod(args))),
         "moment_of_inertia_sphere" => Some(Ok(crate::builtins_b20::moment_of_inertia_sphere(args))),
@@ -2469,12 +2642,18 @@ pub(crate) fn try_builtin(
         "constants_boltzmann_k" => Some(Ok(crate::builtins_b21::constants_boltzmann_k(args))),
         "constants_earth_mass" => Some(Ok(crate::builtins_b21::constants_earth_mass(args))),
         "constants_earth_radius" => Some(Ok(crate::builtins_b21::constants_earth_radius(args))),
-        "constants_electron_charge" => Some(Ok(crate::builtins_b21::constants_electron_charge(args))),
+        "constants_electron_charge" => {
+            Some(Ok(crate::builtins_b21::constants_electron_charge(args)))
+        }
         "constants_electron_mass" => Some(Ok(crate::builtins_b21::constants_electron_mass(args))),
         "constants_faraday" => Some(Ok(crate::builtins_b21::constants_faraday(args))),
         "constants_gas_r" => Some(Ok(crate::builtins_b21::constants_gas_r(args))),
-        "constants_gravitational_g" => Some(Ok(crate::builtins_b21::constants_gravitational_g(args))),
-        "constants_lightyear_meters" => Some(Ok(crate::builtins_b21::constants_lightyear_meters(args))),
+        "constants_gravitational_g" => {
+            Some(Ok(crate::builtins_b21::constants_gravitational_g(args)))
+        }
+        "constants_lightyear_meters" => {
+            Some(Ok(crate::builtins_b21::constants_lightyear_meters(args)))
+        }
         "constants_neutron_mass" => Some(Ok(crate::builtins_b21::constants_neutron_mass(args))),
         "constants_parsec_meters" => Some(Ok(crate::builtins_b21::constants_parsec_meters(args))),
         "constants_planck_h" => Some(Ok(crate::builtins_b21::constants_planck_h(args))),
@@ -2485,7 +2664,9 @@ pub(crate) fn try_builtin(
         "constants_solar_mass" => Some(Ok(crate::builtins_b21::constants_solar_mass(args))),
         "constants_solar_radius" => Some(Ok(crate::builtins_b21::constants_solar_radius(args))),
         "constants_speed_of_light" => Some(Ok(crate::builtins_b21::constants_speed_of_light(args))),
-        "constants_stefan_boltzmann" => Some(Ok(crate::builtins_b21::constants_stefan_boltzmann(args))),
+        "constants_stefan_boltzmann" => {
+            Some(Ok(crate::builtins_b21::constants_stefan_boltzmann(args)))
+        }
         "contour_area" => Some(Ok(crate::builtins_b21::contour_area(args))),
         "contour_centroid" => Some(Ok(crate::builtins_b21::contour_centroid(args))),
         "contour_find" => Some(Ok(crate::builtins_b21::contour_find(args))),
@@ -11746,7 +11927,9 @@ fn builtin_count_size_cnt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
             // `len` / `[]` / `find` while leaving Perl-counters untouched.
             return Ok(StrykeValue::integer(a.to_string().chars().count() as i64));
         }
-        return Ok(StrykeValue::integer(a.map_flatten_outputs(true).len() as i64));
+        return Ok(StrykeValue::integer(
+            a.map_flatten_outputs(true).len() as i64
+        ));
     }
     builtin_list_count(args)
 }
@@ -12040,7 +12223,10 @@ fn builtin_perfview(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         h.insert("path".to_string(), StrykeValue::string(r.path));
         h.insert("argv".to_string(), StrykeValue::string(r.argv));
         h.insert("started_ns".to_string(), StrykeValue::integer(r.started_ns));
-        h.insert("duration_ns".to_string(), StrykeValue::integer(r.duration_ns));
+        h.insert(
+            "duration_ns".to_string(),
+            StrykeValue::integer(r.duration_ns),
+        );
         h.insert(
             "duration_ms".to_string(),
             StrykeValue::integer(r.duration_ns / 1_000_000),
@@ -12052,10 +12238,7 @@ fn builtin_perfview(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         h.insert("version".to_string(), StrykeValue::string(r.version));
         h.insert("host".to_string(), StrykeValue::string(r.host));
         h.insert("pid".to_string(), StrykeValue::integer(r.pid));
-        h.insert(
-            "parent_pid".to_string(),
-            StrykeValue::integer(r.parent_pid),
-        );
+        h.insert("parent_pid".to_string(), StrykeValue::integer(r.parent_pid));
         out.push(StrykeValue::hash_ref(Arc::new(RwLock::new(h))));
     }
     Ok(StrykeValue::array_ref(Arc::new(RwLock::new(out))))
@@ -12817,7 +13000,11 @@ fn builtin_xopen(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlRe
 /// `preview SVG_STRING` — wrap SVG/HTML content in an HTML page, write to a temp
 /// file, and open in the default browser. Returns the temp path for chaining.
 /// Detects whether the input is already a full HTML document or raw SVG.
-fn builtin_preview(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_preview(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
     use std::io::Write as _;
     let content = first_arg_or_topic(interp, args).to_string();
     let html = if content.trim_start().starts_with("<!DOCTYPE")
@@ -14104,7 +14291,21 @@ fn builtin_nth(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         }
         return Ok(iter.next_item().unwrap_or(StrykeValue::UNDEF));
     }
-    let list = v.to_list();
+    // Unwrap arrayref shape (BUG-166): `nth(N, ARRAYREF)` previously fell into
+    // `to_list()` which treats an ArrayRef as a single atom, so the result
+    // was always `undef` for N ≥ 1. Pull through map_flatten_outputs so
+    // both `nth(2, [a, b, c])` and `nth(2, a, b, c)` shapes work.
+    let list: Vec<StrykeValue> = if v.as_array_ref().is_some() || v.as_array_vec().is_some() {
+        v.map_flatten_outputs(true)
+    } else if args.len() > 2 {
+        // Variadic shape: `nth(N, a, b, c, ...)` — items spread across args.
+        args[1..]
+            .iter()
+            .flat_map(|a| a.map_flatten_outputs(true))
+            .collect()
+    } else {
+        v.to_list()
+    };
     Ok(list.get(n).cloned().unwrap_or(StrykeValue::UNDEF))
 }
 
@@ -14228,7 +14429,11 @@ fn builtin_clamp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     // clamp(value, lo, hi) instead of clamp(min, max, list)), swap so that
     // min_val <= max_val. Saturating the result inside the actual interval is
     // what every other clamp implementation does.
-    let (min_val, max_val) = if raw_min <= raw_max { (raw_min, raw_max) } else { (raw_max, raw_min) };
+    let (min_val, max_val) = if raw_min <= raw_max {
+        (raw_min, raw_max)
+    } else {
+        (raw_max, raw_min)
+    };
     let items: Vec<StrykeValue> = values
         .iter()
         .map(|v| {
@@ -15208,6 +15413,19 @@ fn builtin_take_n(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .first()
         .map(|v| v.to_int().max(0) as usize)
         .unwrap_or(0);
+    if let Some(src) = args.get(1) {
+        if args.len() == 2 && src.is_iterator() {
+            let it = src.clone().into_iterator();
+            let mut out = Vec::with_capacity(n);
+            for _ in 0..n {
+                match it.next_item() {
+                    Some(v) => out.push(v),
+                    None => break,
+                }
+            }
+            return Ok(StrykeValue::array(out));
+        }
+    }
     let xs = flatten_args(&args[1..]);
     Ok(StrykeValue::array(xs.into_iter().take(n).collect()))
 }
@@ -15678,7 +15896,9 @@ fn builtin_weekday_name(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// `weekday_short` — Weekday short. Returns a string.
 fn builtin_weekday_short(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let d = args.first().map(|v| v.to_int() + 1).unwrap_or(0);
-    Ok(StrykeValue::string(idx_or(WEEKDAYS_SHORT, d, 7).to_string()))
+    Ok(StrykeValue::string(
+        idx_or(WEEKDAYS_SHORT, d, 7).to_string(),
+    ))
 }
 /// `quarter` — Quarter. Returns an integer.
 fn builtin_quarter(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
@@ -16816,7 +17036,11 @@ fn open_git_repo(
 }
 
 /// `git_log [PATH] [, N]` — last N commits as array of hashrefs.
-fn builtin_git_log(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_git_log(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
     let repo = open_git_repo(interp, &[], line)?;
     let limit = args.first().map(|v| v.to_int() as usize).unwrap_or(20);
     let mut revwalk = repo
@@ -16853,7 +17077,11 @@ fn builtin_git_log(interp: &VMHelper, args: &[StrykeValue], line: usize) -> Perl
 }
 
 /// `git_status` — working tree status as array of hashrefs {path, status}.
-fn builtin_git_status(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_git_status(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
     let repo = open_git_repo(interp, args, line)?;
     let statuses = repo
         .statuses(None)
@@ -16888,7 +17116,11 @@ fn builtin_git_status(interp: &VMHelper, args: &[StrykeValue], line: usize) -> P
 }
 
 /// `git_diff` — diff of working tree vs HEAD as string.
-fn builtin_git_diff(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_git_diff(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
     let repo = open_git_repo(interp, args, line)?;
     let diff = repo
         .diff_index_to_workdir(None, None)
@@ -16933,7 +17165,11 @@ fn builtin_git_branches(
 }
 
 /// `git_tags` — list tags as array of strings.
-fn builtin_git_tags(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_git_tags(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
     let repo = open_git_repo(interp, args, line)?;
     let tags = repo
         .tag_names(None)
@@ -17023,7 +17259,11 @@ fn builtin_git_authors(
 }
 
 /// `git_files` — list tracked files as array of strings.
-fn builtin_git_files(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_git_files(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
     let repo = open_git_repo(interp, args, line)?;
     let head = repo
         .head()
@@ -17106,7 +17346,11 @@ fn builtin_git_show(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue
 }
 
 /// `git_root` — return the repo root path.
-fn builtin_git_root(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_git_root(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
     let repo = open_git_repo(interp, args, line)?;
     Ok(StrykeValue::string(
         repo.workdir()
@@ -17395,7 +17639,11 @@ fn builtin_du(_interp: &VMHelper, args: &[StrykeValue], _line: usize) -> PerlRes
 }
 
 /// `du_tree PATH [, depth]` — directory sizes as array of hashrefs {path, size}, sorted desc.
-fn builtin_du_tree(_interp: &VMHelper, args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+fn builtin_du_tree(
+    _interp: &VMHelper,
+    args: &[StrykeValue],
+    _line: usize,
+) -> PerlResult<StrykeValue> {
     let path = if args.is_empty() || args[0].to_string().is_empty() {
         ".".to_string()
     } else {
@@ -17533,7 +17781,11 @@ fn required_args_for_assert(kind: &str) -> usize {
 }
 
 /// `assert_eq A, B [, MSG]`
-fn builtin_assert_eq(interp: &VMHelper, args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+fn builtin_assert_eq(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    _line: usize,
+) -> PerlResult<StrykeValue> {
     let a = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let b = args.get(1).cloned().unwrap_or(StrykeValue::UNDEF);
     let msg = assert_label(interp, args, "assert_eq");
@@ -17547,7 +17799,11 @@ fn builtin_assert_eq(interp: &VMHelper, args: &[StrykeValue], _line: usize) -> P
 }
 
 /// `assert_ne A, B [, MSG]`
-fn builtin_assert_ne(interp: &VMHelper, args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+fn builtin_assert_ne(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    _line: usize,
+) -> PerlResult<StrykeValue> {
     let a = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let b = args.get(1).cloned().unwrap_or(StrykeValue::UNDEF);
     let msg = assert_label(interp, args, "assert_ne");
@@ -17561,7 +17817,11 @@ fn builtin_assert_ne(interp: &VMHelper, args: &[StrykeValue], _line: usize) -> P
 }
 
 /// `assert_ok VALUE [, MSG]` — passes if value is truthy.
-fn builtin_assert_ok(interp: &VMHelper, args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+fn builtin_assert_ok(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    _line: usize,
+) -> PerlResult<StrykeValue> {
     let a = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let msg = assert_label(interp, args, "assert_ok");
     if a.is_true() {
@@ -17609,7 +17869,11 @@ fn builtin_assert_false(
 }
 
 /// `assert_gt A, B [, MSG]`
-fn builtin_assert_gt(interp: &VMHelper, args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+fn builtin_assert_gt(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    _line: usize,
+) -> PerlResult<StrykeValue> {
     let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let msg = args
@@ -17625,7 +17889,11 @@ fn builtin_assert_gt(interp: &VMHelper, args: &[StrykeValue], _line: usize) -> P
 }
 
 /// `assert_lt A, B [, MSG]`
-fn builtin_assert_lt(interp: &VMHelper, args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+fn builtin_assert_lt(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    _line: usize,
+) -> PerlResult<StrykeValue> {
     let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let msg = args
@@ -17641,7 +17909,11 @@ fn builtin_assert_lt(interp: &VMHelper, args: &[StrykeValue], _line: usize) -> P
 }
 
 /// `assert_ge A, B [, MSG]`
-fn builtin_assert_ge(interp: &VMHelper, args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+fn builtin_assert_ge(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    _line: usize,
+) -> PerlResult<StrykeValue> {
     let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let msg = args
@@ -17657,7 +17929,11 @@ fn builtin_assert_ge(interp: &VMHelper, args: &[StrykeValue], _line: usize) -> P
 }
 
 /// `assert_le A, B [, MSG]`
-fn builtin_assert_le(interp: &VMHelper, args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+fn builtin_assert_le(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    _line: usize,
+) -> PerlResult<StrykeValue> {
     let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let msg = args
@@ -17773,7 +18049,11 @@ fn builtin_assert_dies(
 }
 
 /// `test_run` / `run_tests` — print test summary and exit with appropriate code.
-fn builtin_test_run(interp: &VMHelper, _args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+fn builtin_test_run(
+    interp: &VMHelper,
+    _args: &[StrykeValue],
+    _line: usize,
+) -> PerlResult<StrykeValue> {
     let pass = interp.test_pass_count.load(AtomicOrdering::Relaxed);
     let fail = interp.test_fail_count.load(AtomicOrdering::Relaxed);
     let skip = interp.test_skip_count.load(AtomicOrdering::Relaxed);
@@ -17832,7 +18112,11 @@ fn builtin_test_run(interp: &VMHelper, _args: &[StrykeValue], _line: usize) -> P
 /// `test_skip MSG` — mark the surrounding assertion as skipped (yellow `↷`).
 /// Pair with postfix `if`/`unless` to gate on a condition:
 /// `test_skip "needs --compat" unless compat_mode`.
-fn builtin_test_skip(interp: &VMHelper, args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+fn builtin_test_skip(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    _line: usize,
+) -> PerlResult<StrykeValue> {
     let msg = args
         .first()
         .map(|v| v.to_string())
@@ -17946,10 +18230,16 @@ fn builtin_net_interfaces() -> PerlResult<StrykeValue> {
         let mut h = indexmap::IndexMap::new();
         h.insert("name".to_string(), StrykeValue::string(name.clone()));
         if !info.ipv4.is_empty() {
-            h.insert("ipv4".to_string(), StrykeValue::string(info.ipv4.join(", ")));
+            h.insert(
+                "ipv4".to_string(),
+                StrykeValue::string(info.ipv4.join(", ")),
+            );
         }
         if !info.ipv6.is_empty() {
-            h.insert("ipv6".to_string(), StrykeValue::string(info.ipv6.join(", ")));
+            h.insert(
+                "ipv6".to_string(),
+                StrykeValue::string(info.ipv6.join(", ")),
+            );
         }
         if let Some(ref mac) = info.mac {
             h.insert("mac".to_string(), StrykeValue::string(mac.clone()));
@@ -18869,13 +19159,30 @@ fn builtin_is_palindrome(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<
 }
 /// `hamming` — Hamming. Returns an integer.
 fn builtin_hamming(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
-    let a = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let b = args.get(1).map(|v| v.to_string()).unwrap_or_default();
-    if a.chars().count() != b.chars().count() {
+    let a = args.first();
+    let b = args.get(1);
+    let a_is_arr = a.is_some_and(|v| v.as_array_ref().is_some() || v.as_array_vec().is_some());
+    let b_is_arr = b.is_some_and(|v| v.as_array_ref().is_some() || v.as_array_vec().is_some());
+    if a_is_arr || b_is_arr {
+        let v1 = a.map(arg_to_vec).unwrap_or_default();
+        let v2 = b.map(arg_to_vec).unwrap_or_default();
+        if v1.len() != v2.len() {
+            return Ok(StrykeValue::UNDEF);
+        }
+        let dist = v1
+            .iter()
+            .zip(v2.iter())
+            .filter(|(x, y)| x.to_string() != y.to_string())
+            .count();
+        return Ok(StrykeValue::integer(dist as i64));
+    }
+    let sa = a.map(|v| v.to_string()).unwrap_or_default();
+    let sb = b.map(|v| v.to_string()).unwrap_or_default();
+    if sa.chars().count() != sb.chars().count() {
         return Ok(StrykeValue::UNDEF);
     }
     Ok(StrykeValue::integer(
-        a.chars().zip(b.chars()).filter(|(x, y)| x != y).count() as i64,
+        sa.chars().zip(sb.chars()).filter(|(x, y)| x != y).count() as i64,
     ))
 }
 /// `lcp` — Lcp. Returns a string.
@@ -19932,11 +20239,19 @@ fn builtin_without(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let Some(drop) = args.first() else {
         return Ok(StrykeValue::array(vec![]));
     };
-    let d = drop.to_string();
+    let drop_set: std::collections::HashSet<String> =
+        if drop.as_array_ref().is_some() || drop.as_array_vec().is_some() {
+            arg_to_vec(drop)
+                .into_iter()
+                .map(|v| v.to_string())
+                .collect()
+        } else {
+            std::iter::once(drop.to_string()).collect()
+        };
     Ok(StrykeValue::array(
         flatten_args(&args[1..])
             .into_iter()
-            .filter(|v| v.to_string() != d)
+            .filter(|v| !drop_set.contains(&v.to_string()))
             .collect(),
     ))
 }
@@ -20125,7 +20440,11 @@ fn builtin_pop_clj(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `some PREDICATE, LIST` — returns the first truthy value for which pred returns true.
-fn builtin_some(interp: &mut VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_some(
+    interp: &mut VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
     if args.is_empty() {
         return Ok(StrykeValue::UNDEF);
     }
@@ -20151,7 +20470,11 @@ fn builtin_some(interp: &mut VMHelper, args: &[StrykeValue], line: usize) -> Per
 }
 
 /// `every PREDICATE, LIST` — returns true if pred is true for all elements.
-fn builtin_every(interp: &mut VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_every(
+    interp: &mut VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
     if args.is_empty() {
         return Ok(bool_iv(true));
     }
@@ -20287,7 +20610,10 @@ fn builtin_partial(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue>
         body: vec![],
         closure_env: Some(vec![
             ("__partial_fn__".to_string(), f),
-            ("__partial_args__".to_string(), StrykeValue::array(bound_args)),
+            (
+                "__partial_args__".to_string(),
+                StrykeValue::array(bound_args),
+            ),
         ]),
         prototype: None,
         fib_like: None,
@@ -20354,7 +20680,10 @@ fn builtin_fnil(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
         body: vec![],
         closure_env: Some(vec![
             ("__fnil_fn__".to_string(), f),
-            ("__fnil_defaults__".to_string(), StrykeValue::array(defaults)),
+            (
+                "__fnil_defaults__".to_string(),
+                StrykeValue::array(defaults),
+            ),
         ]),
         prototype: None,
         fib_like: None,
@@ -20402,7 +20731,9 @@ fn builtin_iterate(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue>
         ));
     };
     let x = args.get(1).cloned().unwrap_or(StrykeValue::UNDEF);
-    Ok(StrykeValue::iterator(Arc::new(IterateIterator::new(sub, x))))
+    Ok(StrykeValue::iterator(Arc::new(IterateIterator::new(
+        sub, x,
+    ))))
 }
 
 struct IterateIterator {
@@ -20558,7 +20889,11 @@ impl PerlIterator for CycleIterator {
 }
 
 /// `mapcat FN, LIST` — maps f over list and concatenates the results.
-fn builtin_mapcat(interp: &mut VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_mapcat(
+    interp: &mut VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
     if args.is_empty() {
         return Ok(StrykeValue::array(vec![]));
     }
@@ -20583,7 +20918,11 @@ fn builtin_mapcat(interp: &mut VMHelper, args: &[StrykeValue], line: usize) -> P
 }
 
 /// `keep FN, LIST` — returns non-nil results of mapping f over list.
-fn builtin_keep(interp: &mut VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_keep(
+    interp: &mut VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
     if args.is_empty() {
         return Ok(StrykeValue::array(vec![]));
     }
@@ -20709,9 +21048,9 @@ fn builtin_partition_by(
         )?
         .to_string();
         if last_key.as_ref() != Some(&key) && !current_group.is_empty() {
-            result.push(StrykeValue::array_ref(Arc::new(RwLock::new(std::mem::take(
-                &mut current_group,
-            )))));
+            result.push(StrykeValue::array_ref(Arc::new(RwLock::new(
+                std::mem::take(&mut current_group),
+            ))));
         }
         current_group.push(x);
         last_key = Some(key);
@@ -20855,7 +21194,11 @@ fn builtin_assoc_in(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let keys = args.get(1).map(|v| v.to_list()).unwrap_or_default();
     let value = args.get(2).cloned().unwrap_or(StrykeValue::UNDEF);
 
-    fn assoc_in_recursive(current: StrykeValue, keys: &[StrykeValue], value: StrykeValue) -> StrykeValue {
+    fn assoc_in_recursive(
+        current: StrykeValue,
+        keys: &[StrykeValue],
+        value: StrykeValue,
+    ) -> StrykeValue {
         if keys.is_empty() {
             return value;
         }
@@ -20915,7 +21258,11 @@ fn builtin_update_in(
         line,
     )?;
 
-    fn update_in_recursive(current: StrykeValue, keys: &[StrykeValue], value: StrykeValue) -> StrykeValue {
+    fn update_in_recursive(
+        current: StrykeValue,
+        keys: &[StrykeValue],
+        value: StrykeValue,
+    ) -> StrykeValue {
         if keys.is_empty() {
             return value;
         }
@@ -20995,7 +21342,11 @@ fn builtin_vec_clj(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `apply FN, ARGS...` — applies function to args, with last arg spread if it's a list.
-fn builtin_apply(interp: &mut VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_apply(
+    interp: &mut VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
     if args.is_empty() {
         return Ok(StrykeValue::UNDEF);
     }
@@ -21035,7 +21386,10 @@ fn builtin_divmod(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let a = args.first().map(|v| v.to_int()).unwrap_or(0);
     let b = args.get(1).map(|v| v.to_int()).unwrap_or(1);
     if b == 0 {
-        return Ok(StrykeValue::array(vec![StrykeValue::UNDEF, StrykeValue::UNDEF]));
+        return Ok(StrykeValue::array(vec![
+            StrykeValue::UNDEF,
+            StrykeValue::UNDEF,
+        ]));
     }
     Ok(StrykeValue::array(vec![
         StrykeValue::integer(a / b),
@@ -21148,7 +21502,9 @@ fn builtin_combinations(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         result: &mut Vec<StrykeValue>,
     ) {
         if current.len() == n {
-            result.push(StrykeValue::array_ref(Arc::new(RwLock::new(current.clone()))));
+            result.push(StrykeValue::array_ref(Arc::new(RwLock::new(
+                current.clone(),
+            ))));
             return;
         }
         for i in start..items.len() {
@@ -21189,7 +21545,9 @@ fn builtin_permutations(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         result: &mut Vec<StrykeValue>,
     ) {
         if current.len() == n {
-            result.push(StrykeValue::array_ref(Arc::new(RwLock::new(current.clone()))));
+            result.push(StrykeValue::array_ref(Arc::new(RwLock::new(
+                current.clone(),
+            ))));
             return;
         }
         for i in 0..items.len() {
@@ -21225,7 +21583,9 @@ fn builtin_cartesian_product(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         result: &mut Vec<StrykeValue>,
     ) {
         if idx == lists.len() {
-            result.push(StrykeValue::array_ref(Arc::new(RwLock::new(current.clone()))));
+            result.push(StrykeValue::array_ref(Arc::new(RwLock::new(
+                current.clone(),
+            ))));
             return;
         }
         for item in &lists[idx] {
@@ -21443,7 +21803,11 @@ fn builtin_each_cons(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `one FN, LIST` — returns true if exactly one element matches (Ruby's one?).
-fn builtin_one(interp: &mut VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_one(
+    interp: &mut VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
     if args.is_empty() {
         return Ok(bool_iv(false));
     }
@@ -21572,7 +21936,10 @@ fn builtin_rindex_fn(
 fn builtin_minmax(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let xs = flatten_args(args);
     if xs.is_empty() {
-        return Ok(StrykeValue::array(vec![StrykeValue::UNDEF, StrykeValue::UNDEF]));
+        return Ok(StrykeValue::array(vec![
+            StrykeValue::UNDEF,
+            StrykeValue::UNDEF,
+        ]));
     }
     let mut min = xs[0].clone();
     let mut max = xs[0].clone();
@@ -21594,7 +21961,10 @@ fn builtin_minmax_by(
     line: usize,
 ) -> PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Ok(StrykeValue::array(vec![StrykeValue::UNDEF, StrykeValue::UNDEF]));
+        return Ok(StrykeValue::array(vec![
+            StrykeValue::UNDEF,
+            StrykeValue::UNDEF,
+        ]));
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
@@ -21605,7 +21975,10 @@ fn builtin_minmax_by(
     };
     let xs = flatten_args(&args[1..]);
     if xs.is_empty() {
-        return Ok(StrykeValue::array(vec![StrykeValue::UNDEF, StrykeValue::UNDEF]));
+        return Ok(StrykeValue::array(vec![
+            StrykeValue::UNDEF,
+            StrykeValue::UNDEF,
+        ]));
     }
     let mut min_item = xs[0].clone();
     let mut max_item = xs[0].clone();
@@ -21643,7 +22016,10 @@ fn builtin_dig(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let mut current = args[0].clone();
     for key in args.iter().skip(1) {
         if let Some(m) = current.as_hash_map() {
-            current = m.get(&key.to_string()).cloned().unwrap_or(StrykeValue::UNDEF);
+            current = m
+                .get(&key.to_string())
+                .cloned()
+                .unwrap_or(StrykeValue::UNDEF);
         } else if let Some(r) = current.as_hash_ref() {
             current = r
                 .read()
@@ -21767,7 +22143,12 @@ fn builtin_transform_keys(
     };
     for (k, v) in pairs {
         let new_key = exec_to_perl_result(
-            interp.call_sub(&sub, vec![StrykeValue::string(k)], WantarrayCtx::Scalar, line),
+            interp.call_sub(
+                &sub,
+                vec![StrykeValue::string(k)],
+                WantarrayCtx::Scalar,
+                line,
+            ),
             "transform_keys",
             line,
         )?
@@ -21819,7 +22200,11 @@ fn builtin_transform_values(
 }
 
 /// `sum_by FN, LIST` — sums values by key function (Ruby's sum with block).
-fn builtin_sum_by(interp: &mut VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_sum_by(
+    interp: &mut VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
     if args.is_empty() {
         return Ok(StrykeValue::float(0.0));
     }
@@ -22354,9 +22739,9 @@ fn builtin_group_runs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         if key == last_key {
             current_group.push(x.clone());
         } else {
-            result.push(StrykeValue::array_ref(Arc::new(RwLock::new(std::mem::take(
-                &mut current_group,
-            )))));
+            result.push(StrykeValue::array_ref(Arc::new(RwLock::new(
+                std::mem::take(&mut current_group),
+            ))));
             current_group.push(x.clone());
             last_key = key;
         }
@@ -22498,7 +22883,11 @@ fn builtin_lookup_assoc(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `scanl FN, INIT, LIST` — like foldl but returns intermediate values (Haskell's scanl).
-fn builtin_scanl(interp: &mut VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_scanl(
+    interp: &mut VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
     if args.is_empty() {
         return Ok(StrykeValue::array(vec![]));
     }
@@ -22525,7 +22914,11 @@ fn builtin_scanl(interp: &mut VMHelper, args: &[StrykeValue], line: usize) -> Pe
 }
 
 /// `scanr FN, INIT, LIST` — like foldr but returns intermediate values (Haskell's scanr).
-fn builtin_scanr(interp: &mut VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_scanr(
+    interp: &mut VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
     if args.is_empty() {
         return Ok(StrykeValue::array(vec![]));
     }
@@ -22908,9 +23301,9 @@ fn builtin_chunk_while(
         if should_continue {
             current_chunk.push(curr.clone());
         } else {
-            result.push(StrykeValue::array_ref(Arc::new(RwLock::new(std::mem::take(
-                &mut current_chunk,
-            )))));
+            result.push(StrykeValue::array_ref(Arc::new(RwLock::new(
+                std::mem::take(&mut current_chunk),
+            ))));
             current_chunk.push(curr.clone());
         }
     }
@@ -23131,7 +23524,13 @@ fn builtin_zip_all(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// `unzip_pairs PAIRS` — unzips list of pairs into two lists.
 fn builtin_unzip_pairs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
-    let pairs = flatten_args(args);
+    let pairs: Vec<StrykeValue> = if args.len() == 1
+        && (args[0].as_array_ref().is_some() || args[0].as_array_vec().is_some())
+    {
+        arg_to_vec(&args[0])
+    } else {
+        args.to_vec()
+    };
     let mut firsts = Vec::new();
     let mut seconds = Vec::new();
     for pair in pairs {
@@ -23404,7 +23803,9 @@ fn builtin_combinations_rep(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         result: &mut Vec<StrykeValue>,
     ) {
         if current.len() == n {
-            result.push(StrykeValue::array_ref(Arc::new(RwLock::new(current.clone()))));
+            result.push(StrykeValue::array_ref(Arc::new(RwLock::new(
+                current.clone(),
+            ))));
             return;
         }
         for i in start..items.len() {
@@ -23467,7 +23868,11 @@ fn builtin_subsequences(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `nub_by FN, LIST` — remove duplicates using custom equality (Haskell nubBy).
-fn builtin_nub_by(interp: &mut VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_nub_by(
+    interp: &mut VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
     if args.is_empty() {
         return Ok(StrykeValue::array(vec![]));
     }
@@ -23539,9 +23944,9 @@ fn builtin_slice_when(
         )?
         .is_true();
         if should_split {
-            result.push(StrykeValue::array_ref(Arc::new(RwLock::new(std::mem::take(
-                &mut current,
-            )))));
+            result.push(StrykeValue::array_ref(Arc::new(RwLock::new(
+                std::mem::take(&mut current),
+            ))));
         }
         current.push(curr.clone());
     }
@@ -23581,9 +23986,9 @@ fn builtin_slice_before(
         )?
         .is_true();
         if should_split && !current.is_empty() {
-            result.push(StrykeValue::array_ref(Arc::new(RwLock::new(std::mem::take(
-                &mut current,
-            )))));
+            result.push(StrykeValue::array_ref(Arc::new(RwLock::new(
+                std::mem::take(&mut current),
+            ))));
         }
         current.push(x);
     }
@@ -23624,9 +24029,9 @@ fn builtin_slice_after(
         )?
         .is_true();
         if should_split {
-            result.push(StrykeValue::array_ref(Arc::new(RwLock::new(std::mem::take(
-                &mut current,
-            )))));
+            result.push(StrykeValue::array_ref(Arc::new(RwLock::new(
+                std::mem::take(&mut current),
+            ))));
         }
     }
     if !current.is_empty() {
@@ -23769,8 +24174,14 @@ fn builtin_running_reduce(
     let mut result = vec![xs[0].clone()];
     let mut acc = xs[0].clone();
     for x in xs.iter().skip(1) {
+        interp.scope.set_sort_pair(acc.clone(), x.clone());
         acc = exec_to_perl_result(
-            interp.call_sub(&sub, vec![acc, x.clone()], WantarrayCtx::Scalar, line),
+            interp.call_sub(
+                &sub,
+                vec![acc.clone(), x.clone()],
+                WantarrayCtx::Scalar,
+                line,
+            ),
             "running_reduce",
             line,
         )?;
@@ -24315,7 +24726,10 @@ fn builtin_pluralize(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         && !word.ends_with("oy")
         && !word.ends_with("uy")
     {
-        Ok(StrykeValue::string(format!("{}ies", &word[..word.len() - 1])))
+        Ok(StrykeValue::string(format!(
+            "{}ies",
+            &word[..word.len() - 1]
+        )))
     } else {
         Ok(StrykeValue::string(format!("{}s", word)))
     }
@@ -26179,7 +26593,7 @@ fn builtin_slugify(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<Stryke
 
 /// `mode LIST` — most frequent element(s).
 fn builtin_mode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
-    let xs = flatten_args(args);
+    let xs: Vec<StrykeValue> = args.iter().flat_map(arg_to_vec).collect();
     if xs.is_empty() {
         return Ok(StrykeValue::UNDEF);
     }
@@ -27680,7 +28094,9 @@ fn builtin_cartesian_power(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         result: &mut Vec<StrykeValue>,
     ) {
         if current.len() == n {
-            result.push(StrykeValue::array_ref(Arc::new(RwLock::new(current.clone()))));
+            result.push(StrykeValue::array_ref(Arc::new(RwLock::new(
+                current.clone(),
+            ))));
             return;
         }
         for x in xs {
@@ -27712,8 +28128,28 @@ fn builtin_is_heterogram(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<
 
 /// `hamming_distance STR1, STR2` — Hamming distance (equal length only).
 fn builtin_hamming_distance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
-    let s1 = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let s2 = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let a = args.first();
+    let b = args.get(1);
+    let a_is_arr = a.is_some_and(|v| v.as_array_ref().is_some() || v.as_array_vec().is_some());
+    let b_is_arr = b.is_some_and(|v| v.as_array_ref().is_some() || v.as_array_vec().is_some());
+    if a_is_arr || b_is_arr {
+        let v1 = a.map(arg_to_vec).unwrap_or_default();
+        let v2 = b.map(arg_to_vec).unwrap_or_default();
+        if v1.len() != v2.len() {
+            return Err(PerlError::runtime(
+                "hamming_distance: vectors must be equal length",
+                0,
+            ));
+        }
+        let dist = v1
+            .iter()
+            .zip(v2.iter())
+            .filter(|(x, y)| x.to_string() != y.to_string())
+            .count();
+        return Ok(StrykeValue::integer(dist as i64));
+    }
+    let s1 = a.map(|v| v.to_string()).unwrap_or_default();
+    let s2 = b.map(|v| v.to_string()).unwrap_or_default();
     let c1: Vec<char> = s1.chars().collect();
     let c2: Vec<char> = s2.chars().collect();
     if c1.len() != c2.len() {
@@ -28710,9 +29146,9 @@ fn builtin_group_consecutive(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
             group.push(v);
         } else {
             if !group.is_empty() {
-                out.push(StrykeValue::array_ref(Arc::new(RwLock::new(std::mem::take(
-                    &mut group,
-                )))));
+                out.push(StrykeValue::array_ref(Arc::new(RwLock::new(
+                    std::mem::take(&mut group),
+                ))));
             }
             group.push(v);
             last = Some(s);
@@ -28758,8 +29194,15 @@ fn builtin_before_n(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 /// `clamp_list` — Clamp list. Returns a float.
 fn builtin_clamp_list(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
-    let lo = args.first().map(|v| v.to_number()).unwrap_or(0.0);
-    let hi = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    // Normalize bounds so callers can pass them in either order without the
+    // `f64::clamp` panic (which fires when `min > max`).
+    let raw_lo = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let raw_hi = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let (lo, hi) = if raw_lo <= raw_hi {
+        (raw_lo, raw_hi)
+    } else {
+        (raw_hi, raw_lo)
+    };
     Ok(StrykeValue::array(
         collect_numbers(&args[2..])
             .into_iter()
@@ -29266,7 +29709,10 @@ fn builtin_zfill(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::string(format!("{}{}", "0".repeat(pad), s)))
 }
 /// `normalize_whitespace` — Normalize whitespace.
-fn builtin_normalize_whitespace(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_normalize_whitespace(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+) -> PerlResult<StrykeValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(StrykeValue::string(
         s.split_whitespace().collect::<Vec<_>>().join(" "),
@@ -29304,7 +29750,9 @@ fn builtin_substring(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .get(2)
         .map(|v| v.to_int().max(0) as usize)
         .unwrap_or(usize::MAX);
-    Ok(StrykeValue::string(s.chars().skip(start).take(len).collect()))
+    Ok(StrykeValue::string(
+        s.chars().skip(start).take(len).collect(),
+    ))
 }
 /// `insert_str` — Insert str.
 fn builtin_insert_str(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
@@ -29947,7 +30395,9 @@ fn builtin_range_inclusive(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 fn builtin_range_exclusive(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let lo = args.first().map(|v| v.to_int()).unwrap_or(0);
     let hi = args.get(1).map(|v| v.to_int()).unwrap_or(0);
-    Ok(StrykeValue::array((lo..hi).map(StrykeValue::integer).collect()))
+    Ok(StrykeValue::array(
+        (lo..hi).map(StrykeValue::integer).collect(),
+    ))
 }
 /// `hex_to_bytes` — Convert hex to bytes.
 fn builtin_hex_to_bytes(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
@@ -30837,7 +31287,9 @@ fn builtin_histogram_bins(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let mx = xs.iter().copied().fold(f64::NEG_INFINITY, f64::max);
     let w = (mx - mn) / nbins as f64;
     if w == 0.0 {
-        return Ok(StrykeValue::array(vec![StrykeValue::integer(xs.len() as i64)]));
+        return Ok(StrykeValue::array(vec![StrykeValue::integer(
+            xs.len() as i64
+        )]));
     }
     let mut bins = vec![0i64; nbins];
     for &x in &xs {
@@ -31128,8 +31580,21 @@ fn builtin_to_csv_line(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 /// `trimmed_mean` — Trimmed mean.
 fn builtin_trimmed_mean(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
-    let pct = args.first().map(|v| v.to_number()).unwrap_or(10.0);
-    let mut xs = collect_numbers(&args[1..]);
+    let first_is_arr = args
+        .first()
+        .is_some_and(|v| v.as_array_ref().is_some() || v.as_array_vec().is_some());
+    let last_is_scalar = args.last().is_some_and(|v| {
+        v.as_array_ref().is_none() && v.as_array_vec().is_none() && v.to_list().len() <= 1
+    });
+    let (pct, mut xs) = if first_is_arr && args.len() >= 2 && last_is_scalar {
+        let p = args.last().unwrap().to_number();
+        let ys = collect_numbers(&args[..args.len() - 1]);
+        (p, ys)
+    } else {
+        let p = args.first().map(|v| v.to_number()).unwrap_or(10.0);
+        let ys = collect_numbers(&args[1..]);
+        (p, ys)
+    };
     if xs.is_empty() {
         return Ok(StrykeValue::UNDEF);
     }
@@ -31148,7 +31613,9 @@ fn builtin_trimmed_mean(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 fn builtin_abs_each(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let xs = collect_numbers(args);
     Ok(StrykeValue::array(
-        xs.into_iter().map(|x| StrykeValue::float(x.abs())).collect(),
+        xs.into_iter()
+            .map(|x| StrykeValue::float(x.abs()))
+            .collect(),
     ))
 }
 /// `bool_each` — Bool each.
@@ -31182,7 +31649,9 @@ fn builtin_clamp_each(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 fn builtin_dec_each(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let xs = collect_numbers(args);
     Ok(StrykeValue::array(
-        xs.into_iter().map(|x| StrykeValue::float(x - 1.0)).collect(),
+        xs.into_iter()
+            .map(|x| StrykeValue::float(x - 1.0))
+            .collect(),
     ))
 }
 /// `defined_count` — Defined count.
@@ -31195,7 +31664,9 @@ fn builtin_defined_count(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 fn builtin_double_each(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let xs = collect_numbers(args);
     Ok(StrykeValue::array(
-        xs.into_iter().map(|x| StrykeValue::float(x * 2.0)).collect(),
+        xs.into_iter()
+            .map(|x| StrykeValue::float(x * 2.0))
+            .collect(),
     ))
 }
 /// `downcase_each` — Downcase each.
@@ -31256,14 +31727,18 @@ fn builtin_from_pairs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 fn builtin_half_each(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let xs = collect_numbers(args);
     Ok(StrykeValue::array(
-        xs.into_iter().map(|x| StrykeValue::float(x / 2.0)).collect(),
+        xs.into_iter()
+            .map(|x| StrykeValue::float(x / 2.0))
+            .collect(),
     ))
 }
 /// `inc_each` — Inc each.
 fn builtin_inc_each(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let xs = collect_numbers(args);
     Ok(StrykeValue::array(
-        xs.into_iter().map(|x| StrykeValue::float(x + 1.0)).collect(),
+        xs.into_iter()
+            .map(|x| StrykeValue::float(x + 1.0))
+            .collect(),
     ))
 }
 /// `interleave_lists` — Interleave lists.
@@ -31548,7 +32023,9 @@ fn builtin_scale_each(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 fn builtin_sqrt_each(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let xs = collect_numbers(args);
     Ok(StrykeValue::array(
-        xs.into_iter().map(|x| StrykeValue::float(x.sqrt())).collect(),
+        xs.into_iter()
+            .map(|x| StrykeValue::float(x.sqrt()))
+            .collect(),
     ))
 }
 /// `square_each` — Square each.
@@ -31571,14 +32048,18 @@ fn builtin_string_count(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 fn builtin_to_float_each(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let xs = flatten_args(args);
     Ok(StrykeValue::array(
-        xs.iter().map(|v| StrykeValue::float(v.to_number())).collect(),
+        xs.iter()
+            .map(|v| StrykeValue::float(v.to_number()))
+            .collect(),
     ))
 }
 /// `to_int_each` — To int each.
 fn builtin_to_int_each(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let xs = flatten_args(args);
     Ok(StrykeValue::array(
-        xs.iter().map(|v| StrykeValue::integer(v.to_int())).collect(),
+        xs.iter()
+            .map(|v| StrykeValue::integer(v.to_int()))
+            .collect(),
     ))
 }
 /// `to_pairs` — Group flat list into pairs.
@@ -32458,7 +32939,8 @@ fn parse_toml(s: &str) -> PerlResult<StrykeValue> {
                     guard.get(section).and_then(|v| v.as_hash_ref())
                 };
                 let section_hash = section_hash.unwrap_or_else(|| {
-                    let new_hash: indexmap::IndexMap<String, StrykeValue> = indexmap::IndexMap::new();
+                    let new_hash: indexmap::IndexMap<String, StrykeValue> =
+                        indexmap::IndexMap::new();
                     let new_hash = Arc::new(RwLock::new(new_hash));
                     hash.write()
                         .insert(section.clone(), StrykeValue::hash_ref(new_hash.clone()));
@@ -32567,7 +33049,8 @@ fn parse_xml_element(s: &str) -> PerlResult<(StrykeValue, &str)> {
         let tag_name = stripped.split_whitespace().next().unwrap_or("");
         let hash: indexmap::IndexMap<String, StrykeValue> = indexmap::IndexMap::new();
         let hash = Arc::new(RwLock::new(hash));
-        hash.write().insert(tag_name.to_string(), StrykeValue::UNDEF);
+        hash.write()
+            .insert(tag_name.to_string(), StrykeValue::UNDEF);
         return Ok((StrykeValue::hash_ref(hash), &s[tag_end + 1..]));
     }
     let tag_name = tag_content.split_whitespace().next().unwrap_or("");
@@ -33054,7 +33537,11 @@ fn builtin_html_parse(
 
 /// `css_select SELECTOR, HTML_STRING` — query HTML with CSS selector, return matching elements.
 /// Each element is a hashref {tag, text, attrs, html}.
-fn builtin_css_select(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_css_select(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
     let selector_str = args.first().map(|v| v.to_string()).unwrap_or_default();
     let html_str = if args.len() > 1 {
         args[1].to_string()
@@ -34018,7 +34505,11 @@ fn ddump_value(buf: &mut String, val: &StrykeValue, depth: usize) {
 }
 
 /// `read_lines PATH` — slurp file into array of chomped lines.
-fn builtin_read_lines(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_read_lines(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
     let path = args.first().map(|v| v.to_string()).unwrap_or_default();
     let content = std::fs::read_to_string(&path)
         .map_err(|e| PerlError::runtime(format!("read_lines: {}: {}", path, e), line))?;
@@ -34871,7 +35362,10 @@ fn builtin_intercept_list(interp: &VMHelper) -> PerlResult<StrykeValue> {
 }
 
 /// `intercept_remove(id)` — remove advice by id; returns count removed (0 or 1).
-fn builtin_intercept_remove(interp: &mut VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_intercept_remove(
+    interp: &mut VMHelper,
+    args: &[StrykeValue],
+) -> PerlResult<StrykeValue> {
     let id = args.first().map(|v| v.to_int()).unwrap_or(0).max(0) as u32;
     let before = interp.intercepts.len();
     interp.intercepts.retain(|i| i.id != id);
@@ -34899,7 +35393,9 @@ fn builtin_time() -> PerlResult<StrykeValue> {
 /// `canonpath` — Canonpath. Returns a string.
 fn builtin_canonpath(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let path = args.first().map(|v| v.to_string()).unwrap_or_default();
-    Ok(StrykeValue::string(crate::perl_fs::canonpath_logical(&path)))
+    Ok(StrykeValue::string(crate::perl_fs::canonpath_logical(
+        &path,
+    )))
 }
 
 type LocaltimeParts = (i64, i64, i64, i64, i64, i64, i64, i64, i64);
@@ -36490,7 +36986,11 @@ impl VMHelper {
 
     // ── gethostbyaddr(ADDR, ADDRTYPE) ──────────────────────────────────
     /// `gethostbyaddr` — Gethostbyaddr. Returns a string.
-    fn builtin_gethostbyaddr(&mut self, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    fn builtin_gethostbyaddr(
+        &mut self,
+        args: &[StrykeValue],
+        line: usize,
+    ) -> PerlResult<StrykeValue> {
         if args.len() < 2 {
             return Err(PerlError::runtime(
                 "gethostbyaddr: not enough arguments",
