@@ -17,20 +17,20 @@ assert_eq $vn->y, 0.8, "Normalized y"
 my $p1 = Particle(id => "A", qstate => "SUPERPOSITION", position => $v, entangled => [], energy => 100)
 my $p2 = Particle(id => "B", qstate => "SUPERPOSITION", position => $v, entangled => [], energy => 200)
 
-particle_entangle($p1, $p2)
+Project::QuantumSim::particle_entangle($p1, $p2)
 assert_eq scalar(@{$p1->entangled}), 1, "Entangled length A"
 assert_eq $p1->entangled->[0], "B", "Entangled with B"
 assert_eq $p2->entangled->[0], "A", "Entangled with A"
 
 # ── 3. Particle Observation (Collapse) ────────────────────────────
 
-my $obs = particle_observe($p1)
+my $obs = Project::QuantumSim::particle_observe($p1)
 assert_true ($obs->{qstate} eq "UP" || $obs->{qstate} eq "DOWN"), "Observation collapses qstate"
 assert_eq $obs->{energy}, 50, "Observation halves energy"
 
 # ── 4. Wave Function Generator ────────────────────────────────────
 
-my $gen = wave_function_generator(10, 3)
+my $gen = Project::QuantumSim::wave_function_generator(10, 3)
 my $r1 = $gen->()
 my $r2 = $gen->()
 my $r3 = $gen->()
@@ -42,12 +42,12 @@ assert_false $r4->[1], "Wave iter 4 ends"
 
 # ── 5. Full Universe Simulation (Async/Parallel/Pipelines) ────────
 
-my $u = universe_initialize(20) # 20 particles
+my $u = Project::QuantumSim::universe_initialize(20) # 20 particles
 
 assert_eq scalar(keys %{$u->particles}), 20, "Universe particles initialized"
 
 my $start = el()
-my $epoch_res = universe_simulate_epoch($u)
+my $epoch_res = Project::QuantumSim::universe_simulate_epoch($u)
 my $elapsed = el() - $start
 
 assert_eq $epoch_res->{epoch}, 1, "Epoch incremented"

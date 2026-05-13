@@ -9,7 +9,7 @@ class StarSystem {
     planets; # Array ref
 }
 
-fn ss_total_moons($self) {
+fn Project::MassiveData::ss_total_moons($self) {
     my $count = 0;
     my $plist = $self->planets;
     for my $p (@$plist) {
@@ -25,7 +25,7 @@ class Sector {
     systems;     # Hash ref
 }
 
-fn sector_total_planets($self) {
+fn Project::MassiveData::sector_total_planets($self) {
     my $count = 0;
     my $smap = $self->systems;
     for my $s (values %$smap) {
@@ -40,7 +40,7 @@ class Galaxy {
     sectors; # Array ref
 }
 
-fn galaxy_stats($self) {
+fn Project::MassiveData::galaxy_stats($self) {
     my $seclist = $self->sectors;
     my $s_count = scalar(@$seclist);
     my $sys_count = 0;
@@ -50,9 +50,9 @@ fn galaxy_stats($self) {
     for my $sec (@$seclist) {
         my $smap = $sec->{systems};
         $sys_count += scalar(keys %$smap);
-        $p_count += sector_total_planets($sec);
+        $p_count += Project::MassiveData::sector_total_planets($sec);
         for my $sys (values %$smap) {
-            $m_count += ss_total_moons($sys);
+            $m_count += Project::MassiveData::ss_total_moons($sys);
         }
     }
     
@@ -66,7 +66,7 @@ fn galaxy_stats($self) {
 
 # ── Factory Functions ──────────────────────────────────────────────
 
-fn generate_massive_galaxy($num_sectors, $sys_per_sector) {
+fn Project::MassiveData::generate_massive_galaxy($num_sectors, $sys_per_sector) {
     my $sectors = [];
     for (my $i = 1; $i <= $num_sectors; $i++) {
         my $systems = {};
@@ -112,7 +112,7 @@ class Node {
     edges; # Array ref
 }
 
-fn create_linked_mesh($size) {
+fn Project::MassiveData::create_linked_mesh($size) {
     my @nodes;
     for (my $i = 0; $i < $size; $i++) {
         push @nodes, Node(id => $i, value => rand(1000), edges => []);
@@ -133,12 +133,12 @@ fn create_linked_mesh($size) {
     return @nodes;
 }
 
-fn traverse_mesh($start_node, $depth) {
+fn Project::MassiveData::traverse_mesh($start_node, $depth) {
     return 0 if $depth <= 0;
     my $sum = $start_node->value;
     my $elist = $start_node->edges;
     for my $neighbor (@$elist) {
-        $sum += traverse_mesh($neighbor, $depth - 1);
+        $sum += Project::MassiveData::traverse_mesh($neighbor, $depth - 1);
     }
     return $sum;
 }

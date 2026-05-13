@@ -1,9 +1,9 @@
 #!/usr/bin/env stryke
 # t/test_random.stk — random number generation
 
-# Coin flip returns 0 or 1
-my $flip = coin_flip()
-assert_ok $flip == 0 || $flip == 1, "coin_flip is 0 or 1"
+# Coin Project::PipelineAdvanced::flip returns 0 or 1
+my $Project::PipelineAdvanced::flip = coin_flip()
+assert_ok $Project::PipelineAdvanced::flip == 0 || $Project::PipelineAdvanced::flip == 1, "coin_flip is 0 or 1"
 
 # Dice roll (default 6-sided)
 my $roll = dice_roll()

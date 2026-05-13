@@ -46,8 +46,8 @@ assert_eq $running[0], 1, "scan first"
 assert_eq $running[5], 15, "scan last"
 
 # First / find
-my $first_even = 1..10 |> first { _ % 2 == 0 }
-assert_eq $first_even, 2, "first even"
+my $Project::Types::first_even = 1..10 |> first { _ % 2 == 0 }
+assert_eq $Project::Types::first_even, 2, "first even"
 
 my $found = 1..10 |> find { _ > 7 }
 assert_eq $found, 8, "find > 7"

@@ -21,8 +21,8 @@ fn Algo::binary_search($target, @list) {
     -1
 }
 
-# ── bubble_sort: classic inefficient sort for testing ─────
-fn bubble_sort(@list) {
+# ── Project::Algorithms::bubble_sort: classic inefficient sort for testing ─────
+fn Project::Algorithms::bubble_sort(@list) {
     my $len = scalar(@list)
     for my $i (0..$len-1) {
         for my $j (0..$len-$i-2) {
@@ -36,8 +36,8 @@ fn bubble_sort(@list) {
     @list
 }
 
-# ── quick_sort: recursive divide and conquer ─────
-fn quick_sort(@list) {
+# ── Project::Algorithms::quick_sort: recursive divide and conquer ─────
+fn Project::Algorithms::quick_sort(@list) {
     if (scalar(@list) <= 1) {
         return @list
     }
@@ -57,19 +57,19 @@ fn quick_sort(@list) {
     
     my @sorted_left = ()
     if (scalar(@left) > 0) {
-        @sorted_left = quick_sort(@left)
+        @sorted_left = Project::Algorithms::quick_sort(@left)
     }
     
     my @sorted_right = ()
     if (scalar(@right) > 0) {
-        @sorted_right = quick_sort(@right)
+        @sorted_right = Project::Algorithms::quick_sort(@right)
     }
     
     (@sorted_left, $pivot, @sorted_right)
 }
 
-# ── merge_sort: stable divide and conquer ─────
-fn merge_sort(@list) {
+# ── Project::Algorithms::merge_sort: stable divide and conquer ─────
+fn Project::Algorithms::merge_sort(@list) {
     if (scalar(@list) <= 1) {
         return @list
     }
@@ -78,8 +78,8 @@ fn merge_sort(@list) {
     my @left = @list[0..$mid-1]
     my @right = @list[$mid..scalar(@list)-1]
     
-    my @sorted_left = merge_sort(@left)
-    my @sorted_right = merge_sort(@right)
+    my @sorted_left = Project::Algorithms::merge_sort(@left)
+    my @sorted_right = Project::Algorithms::merge_sort(@right)
     
     _merge(\@sorted_left, \@sorted_right)
 }
@@ -102,11 +102,11 @@ fn _merge($left_ref, $right_ref) {
 
 require "./lib/priority_queue.stk"
 
-# ── heap_sort: sort using a priority queue (O(n log n)) ─────
-fn heap_sort(@list) {
+# ── Project::Algorithms::heap_sort: sort using a priority queue (O(n log n)) ─────
+fn Project::Algorithms::heap_sort(@list) {
     return @list if scalar(@list) <= 1
     
-    my $pq = pq_new()
+    my $pq = Project::PriorityQueue::pq_new()
     ~> @list ep {
         $pq->push(_)
     }

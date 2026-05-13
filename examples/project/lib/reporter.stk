@@ -1,6 +1,6 @@
 # lib/reporter.stk — generate HTML/PDF recon reports
 
-fn generate_report ($sys, $net, $disks, $git, $threats) {
+fn Project::Reporter::generate_report ($sys, $net, $disks, $git, $threats) {
     my @lines
     push @lines, "STRYKE RECON REPORT"
     push @lines, "═══════════════════"

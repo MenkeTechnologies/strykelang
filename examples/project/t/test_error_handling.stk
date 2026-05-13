@@ -6,110 +6,110 @@ require "./lib/error_handling.stk"
 # CONST VARIABLES
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq get_pi(), 3.14159265358979, "const pi"
-assert_eq get_e(), 2.71828182845905, "const e"
-assert_eq get_golden_ratio(), 1.61803398874989, "const golden ratio"
-assert_eq get_max_retries(), 3, "const max retries"
-assert_eq get_timeout(), 30, "const timeout"
-assert_eq get_app_name(), "StrykeDemo", "const app name"
-assert_eq get_version(), "1.0.0", "const version"
+assert_eq Project::ErrorHandling::get_pi(), 3.14159265358979, "const pi"
+assert_eq Project::ErrorHandling::get_e(), 2.71828182845905, "const e"
+assert_eq Project::ErrorHandling::get_golden_ratio(), 1.61803398874989, "const golden ratio"
+assert_eq Project::ErrorHandling::get_max_retries(), 3, "const max retries"
+assert_eq Project::ErrorHandling::get_timeout(), 30, "const timeout"
+assert_eq Project::ErrorHandling::get_app_name(), "StrykeDemo", "const app name"
+assert_eq Project::ErrorHandling::get_version(), "1.0.0", "const version"
 
-my $area = circle_area(2)
+my $area = Project::ErrorHandling::circle_area(2)
 assert_eq int($area * 100) / 100, 12.56, "circle area"
 
-my $circ = circle_circumference(1)
+my $circ = Project::ErrorHandling::circle_circumference(1)
 assert_eq int($circ * 100) / 100, 6.28, "circle circumference"
 
-my $growth = exponential_growth(100, 0.1, 1)
+my $growth = Project::ErrorHandling::exponential_growth(100, 0.1, 1)
 assert_eq int($growth), 110, "exponential growth"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TRY/CATCH
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq try_catch_basic(), 42, "try catch basic"
-assert_eq try_catch_with_die(), 1, "try catch with die"
-assert_eq try_catch_error_message(), 1, "try catch error message"
-assert_eq try_catch_nested(), "caught-inner;caught-outer", "try catch nested"
-assert_eq try_catch_no_error(), 100, "try catch no error"
+assert_eq Project::ErrorHandling::try_catch_basic(), 42, "try catch basic"
+assert_eq Project::ErrorHandling::try_catch_with_die(), 1, "try catch with die"
+assert_eq Project::ErrorHandling::try_catch_error_message(), 1, "try catch error message"
+assert_eq Project::ErrorHandling::try_catch_nested(), "caught-inner;caught-outer", "try catch nested"
+assert_eq Project::ErrorHandling::try_catch_no_error(), 100, "try catch no error"
 
-my $div_result = safe_divide_try(10, 2)
+my $div_result = Project::ErrorHandling::safe_divide_try(10, 2)
 assert_eq $div_result, 5, "safe divide try ok"
 
-my $div_zero = safe_divide_try(10, 0)
+my $div_zero = Project::ErrorHandling::safe_divide_try(10, 0)
 assert_eq defined($div_zero) ? 1 : 0, 0, "safe divide try zero"
 
-assert_eq try_catch_finally_pattern(), "try,catch,after", "try catch finally pattern"
-assert_eq try_catch_return_from_try(), "from-try", "try catch return from try"
-assert_eq try_catch_return_from_catch(), "from-catch", "try catch return from catch"
-assert_eq multiple_try_catch(), 12, "multiple try catch"
+assert_eq Project::ErrorHandling::try_catch_finally_pattern(), "try,catch,after", "try catch finally pattern"
+assert_eq Project::ErrorHandling::try_catch_return_from_try(), "from-try", "try catch return from try"
+assert_eq Project::ErrorHandling::try_catch_return_from_catch(), "from-catch", "try catch return from catch"
+assert_eq Project::ErrorHandling::multiple_try_catch(), 12, "multiple try catch"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # EVAL BLOCK
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq eval_success(), 42, "eval success"
-assert_eq eval_with_die(), "undef", "eval with die"
-assert_eq eval_captures_error(), 1, "eval captures error"
-assert_eq eval_clears_error(), 1, "eval clears error"
-assert_eq eval_nested(), "outer ok", "eval nested"
+assert_eq Project::ErrorHandling::eval_success(), 42, "eval success"
+assert_eq Project::ErrorHandling::eval_with_die(), "undef", "eval with die"
+assert_eq Project::ErrorHandling::eval_captures_error(), 1, "eval captures error"
+assert_eq Project::ErrorHandling::eval_clears_error(), 1, "eval clears error"
+assert_eq Project::ErrorHandling::eval_nested(), "outer ok", "eval nested"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DIE AND WARN
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq die_in_eval(), 1, "die in eval"
+assert_eq Project::ErrorHandling::die_in_eval(), 1, "die in eval"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ERROR HANDLING PATTERNS
 # ══════════════════════════════════════════════════════════════════════════════
 
-my $tc = try_catch_pattern()
+my $tc = Project::ErrorHandling::try_catch_pattern()
 assert_eq $tc =~ /caught/ ? 1 : 0, 1, "try catch pattern"
 
-assert_eq safe_division(10, 2), 5, "safe division ok"
-assert_eq defined(safe_division(10, 0)) ? 1 : 0, 0, "safe division zero"
+assert_eq Project::ErrorHandling::safe_division(10, 2), 5, "safe division ok"
+assert_eq defined(Project::ErrorHandling::safe_division(10, 0)) ? 1 : 0, 0, "safe division zero"
 
-assert_eq with_cleanup(), 1, "with cleanup"
+assert_eq Project::ErrorHandling::with_cleanup(), 1, "with cleanup"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ERROR PROPAGATION
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq outer_catches(), 1, "outer catches"
-assert_eq rethrow(), 1, "rethrow"
+assert_eq Project::ErrorHandling::outer_catches(), 1, "outer catches"
+assert_eq Project::ErrorHandling::rethrow(), 1, "Project::ErrorHandling::rethrow"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # CONDITIONAL ERRORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq validate_positive(5), 5, "validate positive ok"
+assert_eq Project::ErrorHandling::validate_positive(5), 5, "validate positive ok"
 
-my $neg_result = eval { validate_positive(-5) }
+my $neg_result = eval { Project::ErrorHandling::validate_positive(-5) }
 assert_eq defined($neg_result) ? 1 : 0, 0, "validate positive fail"
 
-assert_eq validate_in_range(5, 1, 10), 5, "validate range ok"
+assert_eq Project::ErrorHandling::validate_in_range(5, 1, 10), 5, "validate range ok"
 
-my $range_fail = eval { validate_in_range(15, 1, 10) }
+my $range_fail = eval { Project::ErrorHandling::validate_in_range(15, 1, 10) }
 assert_eq $@ =~ /out of range/ ? 1 : 0, 1, "validate range fail"
 
-assert_eq validate_non_empty("hello"), "hello", "validate non-empty ok"
+assert_eq Project::ErrorHandling::validate_non_empty("hello"), "hello", "validate non-empty ok"
 
-my $empty_fail = eval { validate_non_empty("") }
+my $empty_fail = eval { Project::ErrorHandling::validate_non_empty("") }
 assert_eq $@ =~ /must not be empty/ ? 1 : 0, 1, "validate non-empty fail"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # RETURN VS DIE
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq return_or_die(0), "returning", "return or die - return"
+assert_eq Project::ErrorHandling::return_or_die(0), "returning", "return or die - return"
 
-my $die_result = eval { return_or_die(1) }
+my $die_result = eval { Project::ErrorHandling::return_or_die(1) }
 assert_eq $@ =~ /dying/ ? 1 : 0, 1, "return or die - die"
 
-assert_eq early_die(0), "reached end", "early die - no die"
+assert_eq Project::ErrorHandling::early_die(0), "reached end", "early die - no die"
 
-my $early_result = eval { early_die(1) }
+my $early_result = eval { Project::ErrorHandling::early_die(1) }
 assert_eq $@ =~ /early/ ? 1 : 0, 1, "early die - die"
 
 # ══════════════════════════════════════════════════════════════════════════════

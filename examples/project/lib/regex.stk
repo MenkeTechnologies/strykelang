@@ -2,33 +2,33 @@
 
 # ── Basic matching ─────────────────────────────────────────────────
 
-fn contains_digit($str) {
+fn Project::Regex::contains_digit($str) {
     $str =~ /\d/ ? 1 : 0
 }
 
-fn contains_word($str, $word) {
+fn Project::Regex::contains_word($str, $word) {
     $str =~ /\b$word\b/ ? 1 : 0
 }
 
-fn has_prefix($str, $prefix) {
+fn Project::Regex::has_prefix($str, $prefix) {
     $str =~ /^$prefix/ ? 1 : 0
 }
 
-fn has_suffix($str, $suffix) {
+fn Project::Regex::has_suffix($str, $suffix) {
     $str =~ /$suffix$/ ? 1 : 0
 }
 
-fn is_email_like($str) {
+fn Project::Regex::is_email_like($str) {
     $str =~ /^\w+@\w+\.\w+$/ ? 1 : 0
 }
 
-fn is_phone_like($str) {
+fn Project::Regex::is_phone_like($str) {
     $str =~ /^\d{3}-\d{3}-\d{4}$/ ? 1 : 0
 }
 
 # ── Capture groups ─────────────────────────────────────────────────
 
-fn extract_numbers($str) {
+fn Project::Regex::extract_numbers($str) {
     my @nums
     while ($str =~ /(\d+)/g) {
         push @nums, $1
@@ -36,7 +36,7 @@ fn extract_numbers($str) {
     @nums
 }
 
-fn extract_first_word($str) {
+fn Project::Regex::extract_first_word($str) {
     if ($str =~ /^(\w+)/) {
         $1
     } else {
@@ -44,7 +44,7 @@ fn extract_first_word($str) {
     }
 }
 
-fn parse_key_value($str) {
+fn Project::Regex::parse_key_value($str) {
     if ($str =~ /^(\w+)\s*=\s*(.*)$/) {
         ($1, $2)
     } else {
@@ -52,7 +52,7 @@ fn parse_key_value($str) {
     }
 }
 
-fn extract_between_parens($str) {
+fn Project::Regex::extract_between_parens($str) {
     if ($str =~ /\(([^)]*)\)/) {
         $1
     } else {
@@ -62,31 +62,31 @@ fn extract_between_parens($str) {
 
 # ── Substitution ───────────────────────────────────────────────────
 
-fn replace_digits_with($str, $repl) {
+fn Project::Regex::replace_digits_with($str, $repl) {
     my $result = $str
     $result =~ s/\d/$repl/g
     $result
 }
 
-fn trim_whitespace($str) {
+fn Project::Regex::trim_whitespace($str) {
     my $result = $str
     $result =~ s/^\s+//
     $result =~ s/\s+$//
     $result
 }
 
-fn spaces_normalize($str) {
+fn Project::Regex::spaces_normalize($str) {
     my $result = $str
     $result =~ s/\s+/ /g
     $result
 }
 
-fn camelcase_to_snake($str) {
+fn Project::Regex::camelcase_to_snake($str) {
     my $result = $str
     $result =~ s/([a-z])([A-Z])/${1}_${2}/g
     lc $result}
 
-fn snake_to_camelcase($str) {
+fn Project::Regex::snake_to_camelcase($str) {
     my $result = $str
     $result =~ s/_([a-z])/uc($1)/ge
     $result
@@ -94,64 +94,64 @@ fn snake_to_camelcase($str) {
 
 # ── Split with regex ───────────────────────────────────────────────
 
-fn split_on_whitespace($str) {
+fn Project::Regex::split_on_whitespace($str) {
     my @parts = split(/\s+/, $str)
     @parts
 }
 
-fn split_on_commas($str) {
+fn Project::Regex::split_on_commas($str) {
     my @parts = split(/\s*,\s*/, $str)
     @parts
 }
 
-fn split_sentences($str) {
+fn Project::Regex::split_sentences($str) {
     my @parts = split(/[.!?]+\s*/, $str)
     @parts
 }
 
 # ── Pattern flags ──────────────────────────────────────────────────
 
-fn match_case_insensitive($str, $pattern) {
+fn Project::Regex::match_case_insensitive($str, $pattern) {
     $str =~ /$pattern/i ? 1 : 0
 }
 
-fn count_matches($str, $pattern) {
+fn Project::Regex::count_matches($str, $pattern) {
     my @matches = ($str =~ /$pattern/g)
     scalar @matches
 }
 
-fn match_multiline($str, $pattern) {
+fn Project::Regex::match_multiline($str, $pattern) {
     $str =~ /$pattern/m ? 1 : 0
 }
 
 # ── Character classes ──────────────────────────────────────────────
 
-fn vowels_count($str) {
+fn Project::Regex::vowels_count($str) {
     my @v = ($str =~ /[aeiouAEIOU]/g)
     scalar @v
 }
 
-fn consonants_count($str) {
+fn Project::Regex::consonants_count($str) {
     my @c = ($str =~ /[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]/g)
     scalar @c
 }
 
-fn is_alphanumeric($str) {
+fn Project::Regex::is_alphanumeric($str) {
     $str =~ /^[a-zA-Z0-9]+$/ ? 1 : 0
 }
 
-fn is_hex($str) {
+fn Project::Regex::is_hex($str) {
     $str =~ /^[0-9a-fA-F]+$/ ? 1 : 0
 }
 
 # ── Anchors and boundaries ─────────────────────────────────────────
 
-fn words_count($str) {
+fn Project::Regex::words_count($str) {
     my @words = ($str =~ /\b\w+\b/g)
     scalar @words
 }
 
-fn first_line($str) {
+fn Project::Regex::first_line($str) {
     if ($str =~ /^(.*)$/m) {
         $1
     } else {
@@ -159,14 +159,14 @@ fn first_line($str) {
     }
 }
 
-fn extract_lines($str) {
+fn Project::Regex::extract_lines($str) {
     my @lines = split(/\n/, $str)
     @lines
 }
 
 # ── Lookahead simulation ───────────────────────────────────────────
 
-fn numbers_followed_by_letter($str) {
+fn Project::Regex::numbers_followed_by_letter($str) {
     my @nums
     while ($str =~ /(\d+)[a-zA-Z]/g) {
         push @nums, $1
@@ -174,7 +174,7 @@ fn numbers_followed_by_letter($str) {
     @nums
 }
 
-fn words_before_colon($str) {
+fn Project::Regex::words_before_colon($str) {
     my @words
     while ($str =~ /(\w+):/g) {
         push @words, $1
@@ -184,7 +184,7 @@ fn words_before_colon($str) {
 
 # ── Complex patterns ───────────────────────────────────────────────
 
-fn parse_date($str) {
+fn Project::Regex::parse_date($str) {
     if ($str =~ /^(\d{4})-(\d{2})-(\d{2})$/) {
         ($1, $2, $3)
     } else {
@@ -192,7 +192,7 @@ fn parse_date($str) {
     }
 }
 
-fn parse_time($str) {
+fn Project::Regex::parse_time($str) {
     if ($str =~ /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/) {
         my $h = $1
         my $m = $2
@@ -203,7 +203,7 @@ fn parse_time($str) {
     }
 }
 
-fn extract_urls($str) {
+fn Project::Regex::extract_urls($str) {
     my @urls
     while ($str =~ /(https?:\/\/[^\s]+)/g) {
         push @urls, $1
@@ -211,14 +211,14 @@ fn extract_urls($str) {
     @urls
 }
 
-fn mask_digits($str) {
+fn Project::Regex::mask_digits($str) {
     my $mask = "X"
     my $result = $str
     $result =~ s/\d/$mask/g
     $result
 }
 
-fn words_reversed($str) {
+fn Project::Regex::words_reversed($str) {
     my @words = split(/\s+/, $str)
     join(" ", rev @words)
 }

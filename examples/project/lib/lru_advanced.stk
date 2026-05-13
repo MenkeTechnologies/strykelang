@@ -97,6 +97,6 @@ class AdvancedLRUCache {
     }
 }
 
-fn lru_adv_new($max, $ttl) {
+fn Project::LruAdvanced::lru_adv_new($max, $ttl) {
     AdvancedLRUCache()->init($max, $ttl)
 }

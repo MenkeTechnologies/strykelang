@@ -55,6 +55,6 @@ class BSTNode {
     }
 }
 
-fn bst_new($root_val) {
+fn Project::BinaryTree::bst_new($root_val) {
     BSTNode(val => $root_val)
 }

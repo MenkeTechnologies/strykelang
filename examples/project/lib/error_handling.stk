@@ -12,23 +12,23 @@ const my $TIMEOUT_SECONDS = 30
 const my $APP_NAME = "StrykeDemo"
 const my $VERSION = "1.0.0"
 
-fn get_pi { $PI }
-fn get_e { $E }
-fn get_golden_ratio { $GOLDEN_RATIO }
-fn get_max_retries { $MAX_RETRIES }
-fn get_timeout { $TIMEOUT_SECONDS }
-fn get_app_name { $APP_NAME }
-fn get_version { $VERSION }
+fn Project::ErrorHandling::get_pi { $PI }
+fn Project::ErrorHandling::get_e { $E }
+fn Project::ErrorHandling::get_golden_ratio { $GOLDEN_RATIO }
+fn Project::ErrorHandling::get_max_retries { $MAX_RETRIES }
+fn Project::ErrorHandling::get_timeout { $TIMEOUT_SECONDS }
+fn Project::ErrorHandling::get_app_name { $APP_NAME }
+fn Project::ErrorHandling::get_version { $VERSION }
 
-fn circle_area($r) {
+fn Project::ErrorHandling::circle_area($r) {
     $PI * $r * $r
 }
 
-fn circle_circumference($r) {
+fn Project::ErrorHandling::circle_circumference($r) {
     2 * $PI * $r
 }
 
-fn exponential_growth($initial, $rate, $time) {
+fn Project::ErrorHandling::exponential_growth($initial, $rate, $time) {
     $initial * ($E ** ($rate * $time))
 }
 
@@ -36,7 +36,7 @@ fn exponential_growth($initial, $rate, $time) {
 # TRY/CATCH (stryke native exception handling)
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn try_catch_basic {
+fn Project::ErrorHandling::try_catch_basic {
     my $result
     try {
         $result = 42
@@ -46,7 +46,7 @@ fn try_catch_basic {
     $result
 }
 
-fn try_catch_with_die {
+fn Project::ErrorHandling::try_catch_with_die {
     my $caught = 0
     try {
         die "intentional error"
@@ -56,7 +56,7 @@ fn try_catch_with_die {
     $caught
 }
 
-fn try_catch_error_message {
+fn Project::ErrorHandling::try_catch_error_message {
     my $msg = ""
     try {
         die "specific error message"
@@ -66,14 +66,14 @@ fn try_catch_error_message {
     $msg =~ /specific error/ ? 1 : 0
 }
 
-fn try_catch_nested {
+fn Project::ErrorHandling::try_catch_nested {
     my $result = ""
     try {
         try {
             die "inner"
         } catch ($e1) {
             $result .= "caught-inner;"
-            die "rethrow"
+            die "Project::ErrorHandling::rethrow"
         }
     } catch ($e2) {
         $result .= "caught-outer"
@@ -81,7 +81,7 @@ fn try_catch_nested {
     $result
 }
 
-fn try_catch_no_error {
+fn Project::ErrorHandling::try_catch_no_error {
     my $value = 0
     try {
         $value = 100
@@ -91,7 +91,7 @@ fn try_catch_no_error {
     $value
 }
 
-fn safe_divide_try($a, $b) {
+fn Project::ErrorHandling::safe_divide_try($a, $b) {
     my $result
     try {
         die "division by zero" if $b == 0
@@ -102,7 +102,7 @@ fn safe_divide_try($a, $b) {
     $result
 }
 
-fn try_catch_finally_pattern {
+fn Project::ErrorHandling::try_catch_finally_pattern {
     my @log
     try {
         push @log, "try"
@@ -114,7 +114,7 @@ fn try_catch_finally_pattern {
     join(",", @log)
 }
 
-fn try_catch_return_from_try {
+fn Project::ErrorHandling::try_catch_return_from_try {
     try {
         return "from-try"
     } catch ($e) {
@@ -123,7 +123,7 @@ fn try_catch_return_from_try {
     "after"
 }
 
-fn try_catch_return_from_catch {
+fn Project::ErrorHandling::try_catch_return_from_catch {
     try {
         die "error"
     } catch ($e) {
@@ -132,7 +132,7 @@ fn try_catch_return_from_catch {
     "after"
 }
 
-fn multiple_try_catch {
+fn Project::ErrorHandling::multiple_try_catch {
     my $count = 0
     try { die "1" } catch ($e) { $count++ }
     try { die "2" } catch ($e) { $count++ }
@@ -144,28 +144,28 @@ fn multiple_try_catch {
 # EVAL BLOCK (Perl 5 style)
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn eval_success {
+fn Project::ErrorHandling::eval_success {
     my $result = eval { 42 }
     $result
 }
 
-fn eval_with_die {
+fn Project::ErrorHandling::eval_with_die {
     my $result = eval { die "error message" }
     defined($result) ? "defined" : "undef"
 }
 
-fn eval_captures_error {
+fn Project::ErrorHandling::eval_captures_error {
     eval { die "test error" }
     $@ =~ /test error/ ? 1 : 0
 }
 
-fn eval_clears_error {
+fn Project::ErrorHandling::eval_clears_error {
     eval { die "first" }
     eval { 1 }
     $@ eq "" ? 1 : 0
 }
 
-fn eval_nested {
+fn Project::ErrorHandling::eval_nested {
     my $outer = eval {
         my $inner = eval { die "inner" }
         "outer ok"
@@ -177,7 +177,7 @@ fn eval_nested {
 # DIE AND WARN
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn die_in_eval {
+fn Project::ErrorHandling::die_in_eval {
     my $caught = 0
     eval {
         die "intentional"
@@ -186,7 +186,7 @@ fn die_in_eval {
     $caught == 0 && $@ =~ /intentional/ ? 1 : 0
 }
 
-fn die_with_object {
+fn Project::ErrorHandling::die_with_object {
     my $obj = {code => 500, msg => "error"}
     my $result = eval { die $obj }
     ref($@) eq "HASH" ? 1 : 0
@@ -196,7 +196,7 @@ fn die_with_object {
 # ERROR HANDLING PATTERNS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn try_catch_pattern {
+fn Project::ErrorHandling::try_catch_pattern {
     my $result = eval {
         die "oops"
     }
@@ -206,7 +206,7 @@ fn try_catch_pattern {
     return "success: $result"
 }
 
-fn safe_division($a, $b) {
+fn Project::ErrorHandling::safe_division($a, $b) {
     my $result = eval {
         die "division by zero" if $b == 0
         $a / $b
@@ -217,7 +217,7 @@ fn safe_division($a, $b) {
     return $result
 }
 
-fn with_cleanup {
+fn Project::ErrorHandling::with_cleanup {
     my $cleaned = 0
     eval {
         die "error"
@@ -230,16 +230,16 @@ fn with_cleanup {
 # ERROR PROPAGATION
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn inner_throws {
+fn Project::ErrorHandling::inner_throws {
     die "from inner"
 }
 
-fn outer_catches {
-    my $result = eval { inner_throws() }
+fn Project::ErrorHandling::outer_catches {
+    my $result = eval { Project::ErrorHandling::inner_throws() }
     $@ =~ /from inner/ ? 1 : 0
 }
 
-fn rethrow {
+fn Project::ErrorHandling::rethrow {
     eval {
         eval { die "original" }
         die $@ if $@
@@ -251,21 +251,21 @@ fn rethrow {
 # CONDITIONAL ERRORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn validate_positive($n) {
+fn Project::ErrorHandling::validate_positive($n) {
     if ($n < 0) {
         die "must be positive"
     }
     $n
 }
 
-fn validate_in_range($n, $min, $max) {
+fn Project::ErrorHandling::validate_in_range($n, $min, $max) {
     if ($n < $min || $n > $max) {
         die "out of range: $n not in [$min, $max]"
     }
     $n
 }
 
-fn validate_non_empty($s) {
+fn Project::ErrorHandling::validate_non_empty($s) {
     if (!defined($s) || $s eq "") {
         die "must not be empty"
     }
@@ -276,14 +276,14 @@ fn validate_non_empty($s) {
 # RETURN VS DIE
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn return_or_die($should_die) {
+fn Project::ErrorHandling::return_or_die($should_die) {
     if ($should_die) {
         die "dying"
     }
     return "returning"
 }
 
-fn early_die($cond) {
+fn Project::ErrorHandling::early_die($cond) {
     die "early" if $cond
     "reached end"
 }

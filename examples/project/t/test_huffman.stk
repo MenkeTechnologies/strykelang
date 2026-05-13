@@ -5,10 +5,10 @@ require "./lib/huffman.stk"
 
 # ── Huffman Roundtrip ─────
 fn test_huffman($input) {
-    my $res = adv_huffman_encode($input)
+    my $res = Project::Huffman::adv_huffman_encode($input)
     my $binary = $res->[0]
     my $root = $res->[1]
-    my $decoded = adv_huffman_decode($binary, $root)
+    my $decoded = Project::Huffman::adv_huffman_decode($binary, $root)
     return $decoded
 }
 
@@ -20,7 +20,7 @@ assert_eq test_huffman(""), "", "huffman empty"
 
 # ── Verify compression ─────
 my $input = "this is a test of huffman coding"
-my $res = adv_huffman_encode($input)
+my $res = Project::Huffman::adv_huffman_encode($input)
 my $binary = $res->[0]
 # Original: 32 chars * 8 bits = 256 bits
 # Huffman should be significantly less

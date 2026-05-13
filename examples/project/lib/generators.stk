@@ -3,8 +3,8 @@
 # NOTE: Resuming inside loops or using external variables in gen { } 
 # is currently limited in the tree interpreter.
 
-# ── range10_12_gen: returns 10, 11, 12 ─────
-fn range10_12_gen {
+# ── Project::Generators::range10_12_gen: returns 10, 11, 12 ─────
+fn Project::Generators::range10_12_gen {
     gen {
         yield 10;
         yield 11;
@@ -12,8 +12,8 @@ fn range10_12_gen {
     }
 }
 
-# ── simple_fib_gen: first few fibonacci numbers ─────
-fn simple_fib_gen {
+# ── Project::Generators::simple_fib_gen: first few fibonacci numbers ─────
+fn Project::Generators::simple_fib_gen {
     gen {
         yield 0;
         yield 1;
@@ -25,8 +25,8 @@ fn simple_fib_gen {
     }
 }
 
-# ── take_gen: take N values from a generator ─────
-fn take_gen($n, $g) {
+# ── Project::Generators::take_gen: take N values from a generator ─────
+fn Project::Generators::take_gen($n, $g) {
     my @res;
     for (1..$n) {
         my $next = $g->next();

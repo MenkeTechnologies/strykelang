@@ -4,36 +4,36 @@
 # SCALAR VARIABLES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn scalar_int { my $x = 42; $x }
-fn scalar_float { my $x = 3.14; $x }
-fn scalar_string { my $x = "hello"; $x }
-fn scalar_undef { my $x; defined($x) ? 1 : 0 }
+fn Project::Variables::scalar_int { my $x = 42; $x }
+fn Project::Variables::scalar_float { my $x = 3.14; $x }
+fn Project::Variables::scalar_string { my $x = "hello"; $x }
+fn Project::Variables::scalar_undef { my $x; defined($x) ? 1 : 0 }
 
-fn scalar_assign_chain {
+fn Project::Variables::scalar_assign_chain {
     my $a = my $b = my $c = 5
     $a + $b + $c
 }
 
-fn scalar_multiple_assign {
+fn Project::Variables::scalar_multiple_assign {
     my $x = 1
     my $y = 2
     my $z = 3
     $x + $y + $z
 }
 
-fn scalar_reassign {
+fn Project::Variables::scalar_reassign {
     my $x = 1
     $x = 2
     $x = 3
     $x
 }
 
-fn scalar_interpolate {
+fn Project::Variables::scalar_interpolate {
     my $name = "world"
     "hello $name"
 }
 
-fn scalar_interpolate_expr {
+fn Project::Variables::scalar_interpolate_expr {
     my $x = 5
     "x is $x and x+1 is " . ($x + 1)
 }
@@ -42,62 +42,62 @@ fn scalar_interpolate_expr {
 # ARRAY VARIABLES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn array_literal { my @a = (1, 2, 3); @a }
-fn array_empty { my @a = (); scalar(@a) }
-fn array_single { my @a = (42); $a[0] }
+fn Project::Variables::array_literal { my @a = (1, 2, 3); @a }
+fn Project::Variables::array_empty { my @a = (); scalar(@a) }
+fn Project::Variables::array_single { my @a = (42); $a[0] }
 
-fn array_access {
+fn Project::Variables::array_access {
     my @a = (10, 20, 30, 40, 50)
     $a[2]
 }
 
-fn array_negative_index {
+fn Project::Variables::array_negative_index {
     my @a = (1, 2, 3, 4, 5)
     $a[-1]
 }
 
-fn array_length {
+fn Project::Variables::array_length {
     my @a = (1, 2, 3, 4, 5)
     scalar @a
 }
 
-fn array_last_index {
+fn Project::Variables::array_last_index {
     my @a = (1, 2, 3, 4, 5)
     $#a
 }
 
-fn array_modify {
+fn Project::Variables::array_modify {
     my @a = (1, 2, 3)
     $a[1] = 20
     $a[1]
 }
 
-fn array_extend {
+fn Project::Variables::array_extend {
     my @a = (1, 2, 3)
     $a[5] = 6
     scalar @a
 }
 
-fn array_flatten {
+fn Project::Variables::array_flatten {
     my @a = (1, 2)
     my @b = (3, 4)
     my @c = (@a, @b)
     scalar @c
 }
 
-fn array_in_scalar {
+fn Project::Variables::array_in_scalar {
     my @a = (1, 2, 3, 4, 5)
     my $count = @a
     $count
 }
 
-fn array_slice {
+fn Project::Variables::array_slice {
     my @a = (10, 20, 30, 40, 50)
     my @s = @a[1, 3]
     join(",", @s)
 }
 
-fn array_range_slice {
+fn Project::Variables::array_range_slice {
     my @a = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
     my @s = @a[2..5]
     join(",", @s)
@@ -107,51 +107,51 @@ fn array_range_slice {
 # HASH VARIABLES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn hash_literal {
+fn Project::Variables::hash_literal {
     my %h = (a => 1, b => 2, c => 3)
     $h{b}
 }
 
-fn hash_empty {
+fn Project::Variables::hash_empty {
     my %h = ()
     scalar(keys %h)
 }
 
-fn hash_access {
+fn Project::Variables::hash_access {
     my %h = (name => "Alice", age => 30)
     $h{name}
 }
 
-fn hash_modify {
+fn Project::Variables::hash_modify {
     my %h = (x => 1)
     $h{x} = 10
     $h{x}
 }
 
-fn hash_add_key {
+fn Project::Variables::hash_add_key {
     my %h = (a => 1)
     $h{b} = 2
     $h{b}
 }
 
-fn hash_keys {
+fn Project::Variables::hash_keys {
     my %h = (a => 1, b => 2, c => 3)
     scalar(keys %h)
 }
 
-fn hash_values {
+fn Project::Variables::hash_values {
     my %h = (a => 1, b => 2, c => 3)
     my @v = sort { $a <=> $b } values %h
     join(",", @v)
 }
 
-fn hash_slice {
+fn Project::Variables::hash_slice {
     my %h = (a => 1, b => 2, c => 3, d => 4)
     my @vals = @h{qw(a c)}
     join(",", @vals)
 }
 
-fn hash_exists {
+fn Project::Variables::hash_exists {
     my %h = (a => 1, b => undef)
     my $a = exists $h{a} ? 1 : 0
     my $b = exists $h{b} ? 1 : 0
@@ -159,19 +159,19 @@ fn hash_exists {
     "$a$b$c"
 }
 
-fn hash_delete_val {
+fn Project::Variables::hash_delete_val {
     my %h = (a => 1, b => 2, c => 3)
     my $deleted = delete $h{b}
     $deleted
 }
 
-fn hash_delete_count {
+fn Project::Variables::hash_delete_count {
     my %h = (a => 1, b => 2, c => 3)
     delete $h{b}
     scalar(keys %h)
 }
 
-fn hash_from_array {
+fn Project::Variables::hash_from_array {
     my @list = qw(a 1 b 2 c 3)
     my %h = @list
     my $val = $h{b}
@@ -182,59 +182,59 @@ fn hash_from_array {
 # REFERENCES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn scalar_ref {
+fn Project::Variables::scalar_ref {
     my $x = 42
     my $ref = \$x
     $$ref
 }
 
-fn scalar_ref_modify {
+fn Project::Variables::scalar_ref_modify {
     my $x = 10
     my $ref = \$x
     $$ref = 20
     $x
 }
 
-fn array_ref_literal {
+fn Project::Variables::array_ref_literal {
     my $aref = [1, 2, 3]
     $aref->[1]
 }
 
-fn array_ref_from_array {
+fn Project::Variables::array_ref_from_array {
     my @a = (1, 2, 3)
     my $ref = \@a
     $ref->[2]
 }
 
-fn array_ref_deref {
+fn Project::Variables::array_ref_deref {
     my $aref = [10, 20, 30]
     my @copy = @$aref
     join(",", @copy)
 }
 
-fn hash_ref_literal {
+fn Project::Variables::hash_ref_literal {
     my $href = {a => 1, b => 2}
     $href->{b}
 }
 
-fn hash_ref_from_hash {
+fn Project::Variables::hash_ref_from_hash {
     my %h = (x => 10, y => 20)
     my $ref = \%h
     $ref->{x}
 }
 
-fn hash_ref_deref {
+fn Project::Variables::hash_ref_deref {
     my $href = {a => 1, b => 2}
     my %copy = %$href
     $copy{a}
 }
 
-fn nested_array_ref {
+fn Project::Variables::nested_array_ref {
     my $aref = [[1, 2], [3, 4], [5, 6]]
     $aref->[1][1]
 }
 
-fn nested_hash_ref {
+fn Project::Variables::nested_hash_ref {
     my $href = {
         outer => {
             inner => "value"
@@ -243,7 +243,7 @@ fn nested_hash_ref {
     $href->{outer}{inner}
 }
 
-fn mixed_nested {
+fn Project::Variables::mixed_nested {
     my $data = {
         users => [
             {name => "Alice", scores => [90, 85, 92]},
@@ -253,35 +253,35 @@ fn mixed_nested {
     $data->{users}[0]{scores}[2]
 }
 
-fn ref_type_scalar {
+fn Project::Variables::ref_type_scalar {
     my $x = 42
     ref(\$x)
 }
 
-fn ref_type_array {
+fn Project::Variables::ref_type_array {
     my @a = (1, 2, 3)
     ref(\@a)
 }
 
-fn ref_type_hash {
+fn Project::Variables::ref_type_hash {
     my %h = (a => 1)
     ref(\%h)
 }
 
-fn ref_type_anon_array {
+fn Project::Variables::ref_type_anon_array {
     ref([1, 2, 3])
 }
 
-fn ref_type_anon_hash {
+fn Project::Variables::ref_type_anon_hash {
     ref({a => 1})
 }
 
-fn code_ref {
+fn Project::Variables::code_ref {
     my $add = fn { $_0 + $_1 }
     $add(3, 4)
 }
 
-fn code_ref_closure {
+fn Project::Variables::code_ref_closure {
     my $x = 10
     my $add_x = fn { $_0 + $x }
     $add_x(5)
@@ -291,7 +291,7 @@ fn code_ref_closure {
 # VARIABLE SCOPING
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn lexical_scope {
+fn Project::Variables::lexical_scope {
     my $x = "outer"
     {
         my $x = "inner"
@@ -299,7 +299,7 @@ fn lexical_scope {
     $x
 }
 
-fn nested_scope {
+fn Project::Variables::nested_scope {
     my $a = 1
     {
         my $b = 2
@@ -310,7 +310,7 @@ fn nested_scope {
     }
 }
 
-fn scope_shadow {
+fn Project::Variables::scope_shadow {
     my $x = 10
     my $inner_result
     {
@@ -320,12 +320,12 @@ fn scope_shadow {
     ($x, $inner_result)
 }
 
-fn our_variable {
+fn Project::Variables::our_variable {
     our $pkg_var = 42
     $pkg_var
 }
 
-fn local_scope {
+fn Project::Variables::local_scope {
     our $global = "outer"
     my $inner_val = "inner"
     ($global, $inner_val)
@@ -335,24 +335,24 @@ fn local_scope {
 # SPECIAL VARIABLES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn underscore_default {
+fn Project::Variables::underscore_default {
     _ = "test"
     uc
 }
 
-fn topic_in_map {
+fn Project::Variables::topic_in_map {
     my @nums = (1, 2, 3)
     my @doubled = map { _ * 2 } @nums
     join(",", @doubled)
 }
 
-fn topic_in_grep {
+fn Project::Variables::topic_in_grep {
     my @nums = (1, 2, 3, 4, 5, 6)
     my @evens = grep { _ % 2 == 0 } @nums
     join(",", @evens)
 }
 
-fn argv_like {
+fn Project::Variables::argv_like {
     my @args = qw(one two three)
     join(",", @args)
 }
@@ -387,18 +387,18 @@ fn Var::Test::mixed_init {
 # AUTOVIVIFICATION
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn autoviv_hash {
+fn Project::Variables::autoviv_hash {
     my %h = (a => {b => {c => "deep"}})
     $h{a}{b}{c}
 }
 
-fn autoviv_array {
+fn Project::Variables::autoviv_array {
     my @a
     $a[2] = ["x", "y", "z", "nested"]
     $a[2][3]
 }
 
-fn autoviv_mixed {
+fn Project::Variables::autoviv_mixed {
     my %data = (users => [{name => "Alice"}])
     $data{users}[0]{name}
 }
@@ -407,19 +407,19 @@ fn autoviv_mixed {
 # SIGIL COERCION
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn array_to_scalar_count {
+fn Project::Variables::array_to_scalar_count {
     my @a = (1, 2, 3, 4, 5)
     my $count = @a
     $count
 }
 
-fn hash_to_scalar {
+fn Project::Variables::hash_to_scalar {
     my %h = (a => 1, b => 2, c => 3)
     my $info = %h
     defined($info) ? 1 : 0
 }
 
-fn scalar_force {
+fn Project::Variables::scalar_force {
     my @a = (1, 2, 3)
     scalar @a
 }
@@ -428,7 +428,7 @@ fn scalar_force {
 # VARIABLE OPERATIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn defined_check {
+fn Project::Variables::defined_check {
     my $a = 42
     my $b
     my $da = defined($a) ? 1 : 0
@@ -436,13 +436,13 @@ fn defined_check {
     "$da$db"
 }
 
-fn undef_var {
+fn Project::Variables::undef_var {
     my $x = 42
     undef $x
     defined($x) ? 1 : 0
 }
 
-fn ref_check {
+fn Project::Variables::ref_check {
     my $scalar = 42
     my @array = (1, 2)
     my %hash = (a => 1)

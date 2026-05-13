@@ -4,47 +4,47 @@
 # THREADING MACRO ~> (thread-first: inserts value as FIRST argument)
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn thread_first_simple {
+fn Project::Threading::thread_first_simple {
     ~> 5 double
 }
 
-fn thread_first_chain {
+fn Project::Threading::thread_first_chain {
     ~> 10 double double
 }
 
-fn thread_first_string {
+fn Project::Threading::thread_first_string {
     ~> "  hello world  " trim uc
 }
 
-fn thread_first_math {
+fn Project::Threading::thread_first_math {
     ~> 100 half half half
 }
 
-fn thread_first_with_args {
+fn Project::Threading::thread_first_with_args {
     ~> "hello" repeat(3)
 }
 
-fn thread_first_mixed {
+fn Project::Threading::thread_first_mixed {
     ~> "  HELLO  " trim lc ucfirst
 }
 
-fn thread_first_numeric {
+fn Project::Threading::thread_first_numeric {
     ~> 16 sqrt double
 }
 
-fn thread_first_array_sum {
+fn Project::Threading::thread_first_array_sum {
     ~> (1, 2, 3, 4, 5) sum
 }
 
-fn thread_first_filter_sum {
+fn Project::Threading::thread_first_filter_sum {
     ~> (1..10) grep { _ > 5 } sum
 }
 
-fn thread_first_map_sum {
+fn Project::Threading::thread_first_map_sum {
     ~> (1..5) map { _ * 2 } sum
 }
 
-fn thread_first_complex {
+fn Project::Threading::thread_first_complex {
     ~> (1..20) grep { _ % 2 == 0 } map { _ * _ } sum
 }
 
@@ -52,42 +52,42 @@ fn thread_first_complex {
 # THREADING MACRO ->> (alias for ~>, both are thread-first)
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn arrow_thread_simple {
+fn Project::Threading::arrow_thread_simple {
     ~> (1..5) sum
 }
 
-fn arrow_thread_filter {
+fn Project::Threading::arrow_thread_filter {
     ~> (1..10) grep { _ % 2 == 0 } sum
 }
 
-fn arrow_thread_map {
+fn Project::Threading::arrow_thread_map {
     ~> (1..5) map { _ ** 2 } sum
 }
 
-fn arrow_thread_chain {
+fn Project::Threading::arrow_thread_chain {
     ~> (1..100) grep { _ % 3 == 0 } grep { _ % 5 == 0 } sum
 }
 
-fn arrow_thread_to_array {
+fn Project::Threading::arrow_thread_to_array {
     my @result = ~> (1..10) grep { _ > 5 } map { _ * 2 }
     scalar @result
 }
 
-fn arrow_thread_string_join {
+fn Project::Threading::arrow_thread_string_join {
     ~> qw(a b c d) fn { join("-", @_) }
 }
 
-fn arrow_thread_sort {
+fn Project::Threading::arrow_thread_sort {
     my @sorted = (~> (5, 2, 8, 1, 9) sort)
     $sorted[0]
 }
 
-fn arrow_thread_reverse {
+fn Project::Threading::arrow_thread_reverse {
     my @rev = (~> (1, 2, 3) rev)
     $rev[0]
 }
 
-fn arrow_thread_nested {
+fn Project::Threading::arrow_thread_nested {
     ~> (1..20) grep { _ % 2 == 1 } map { _ * 3 } grep { _ < 30 } sum
 }
 
@@ -95,31 +95,31 @@ fn arrow_thread_nested {
 # PIPELINE OPERATOR |> (stryke native)
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn pipeline_simple {
+fn Project::Threading::pipeline_simple {
     5 |> double |> double
 }
 
-fn pipeline_string {
+fn Project::Threading::pipeline_string {
     "hello" |> uc |> rev
 }
 
-fn pipeline_array {
+fn Project::Threading::pipeline_array {
     (1..5) |> map { _ * 2 } |> sum
 }
 
-fn pipeline_filter {
+fn Project::Threading::pipeline_filter {
     (1..10) |> grep { _ % 2 == 0 } |> sum
 }
 
-fn pipeline_complex {
+fn Project::Threading::pipeline_complex {
     (1..100) |> grep { _ % 7 == 0 } |> map { _ / 7 } |> sum
 }
 
-fn pipeline_with_transform {
+fn Project::Threading::pipeline_with_transform {
     "  HELLO WORLD  " |> trim |> lc |> ucfirst
 }
 
-fn pipeline_multi_step {
+fn Project::Threading::pipeline_multi_step {
     (1..50)
         |> grep { is_prime(_) }
         |> map { _ * 2 }
@@ -130,21 +130,21 @@ fn pipeline_multi_step {
 # COMBINING THREADING STYLES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn threading_comparison {
+fn Project::Threading::threading_comparison {
     my $a = ~> (1..5) sum
     my $b = ~> (1..5) sum
     my $c = (1..5) |> sum
     $a == $b && $b == $c ? 1 : 0
 }
 
-fn threading_vs_traditional {
+fn Project::Threading::threading_vs_traditional {
     my $traditional = sum(grep { _ % 2 == 0 } (1..10))
     my $threaded = ~> (1..10) grep { _ % 2 == 0 } sum
     my $piped = (1..10) |> grep { _ % 2 == 0 } |> sum
     $traditional == $threaded && $threaded == $piped ? 1 : 0
 }
 
-fn nested_threading {
+fn Project::Threading::nested_threading {
     my $inner = ~> 5 double
     my $outer = ~> $inner triple
     $outer

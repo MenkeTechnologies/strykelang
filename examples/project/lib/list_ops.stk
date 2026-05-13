@@ -4,60 +4,60 @@
 # MAP
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn map_double {
+fn Project::ListOps::map_double {
     my @a = (1, 2, 3, 4, 5)
     my @r = map { _ * 2 } @a
     join(",", @r)
 }
 
-fn map_square {
+fn Project::ListOps::map_square {
     my @a = (1, 2, 3, 4)
     my @r = map { _ * _ } @a
     join(",", @r)
 }
 
-fn map_string {
+fn Project::ListOps::map_string {
     my @a = qw(a b c)
     my @r = map { uc(_) } @a
     join(",", @r)
 }
 
-fn map_length {
+fn Project::ListOps::map_length {
     my @a = qw(one two three)
     my @r = map { length(_) } @a
     join(",", @r)
 }
 
-fn map_empty {
+fn Project::ListOps::map_empty {
     my @a = ()
     my @r = map { _ * 2 } @a
     scalar @r}
 
-fn map_to_hash_key {
+fn Project::ListOps::map_to_hash_key {
     my @a = qw(a b c)
     my @r = map { $_ => 1 } @a
     scalar @r}
 
-fn map_conditional {
+fn Project::ListOps::map_conditional {
     my @a = (1, 2, 3, 4, 5)
     my @r = map { _ > 2 ? _ : 0 } @a
     join(",", @r)
 }
 
-fn map_chained {
+fn Project::ListOps::map_chained {
     my @a = (1, 2, 3)
     my @r = map { _ + 1 } map { _ * 2 } @a
     join(",", @r)
 }
 
-fn map_with_index {
+fn Project::ListOps::map_with_index {
     my @a = qw(a b c)
     my $i = 0
     my @r = map { my $x = "$_$i"; $i++; $x } @a
     join(",", @r)
 }
 
-fn map_flatten {
+fn Project::ListOps::map_flatten {
     my @a = (1, 2, 3)
     my @r = map { (_, _ * 10) } @a
     join(",", @r)
@@ -67,56 +67,56 @@ fn map_flatten {
 # GREP
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn grep_positive {
+fn Project::ListOps::grep_positive {
     my @a = (-2, -1, 0, 1, 2)
     my @r = grep { _ > 0 } @a
     join(",", @r)
 }
 
-fn grep_even {
+fn Project::ListOps::grep_even {
     my @a = (1, 2, 3, 4, 5, 6)
     my @r = grep { _ % 2 == 0 } @a
     join(",", @r)
 }
 
-fn grep_string_match {
+fn Project::ListOps::grep_string_match {
     my @a = qw(apple banana cherry date)
     my @r = grep { /a/ } @a
     join(",", @r)
 }
 
-fn grep_defined {
+fn Project::ListOps::grep_defined {
     my @a = (1, undef, 2, undef, 3)
     my @r = grep { defined(_) } @a
     join(",", @r)
 }
 
-fn grep_true {
+fn Project::ListOps::grep_true {
     my @a = (0, 1, "", "hello", undef)
     my @r = grep { _ } @a
     scalar @r}
 
-fn grep_empty {
+fn Project::ListOps::grep_empty {
     my @a = ()
     my @r = grep { _ > 0 } @a
     scalar @r}
 
-fn grep_none_match {
+fn Project::ListOps::grep_none_match {
     my @a = (1, 2, 3)
     my @r = grep { _ > 10 } @a
     scalar @r}
 
-fn grep_all_match {
+fn Project::ListOps::grep_all_match {
     my @a = (10, 20, 30)
     my @r = grep { _ > 5 } @a
     scalar @r}
 
-fn grep_count {
+fn Project::ListOps::grep_count {
     my @a = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
     scalar(grep { _ % 2 == 0 } @a)
 }
 
-fn grep_chained {
+fn Project::ListOps::grep_chained {
     my @a = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
     my @r = grep { _ > 3 } grep { _ % 2 == 0 } @a
     join(",", @r)
@@ -126,66 +126,66 @@ fn grep_chained {
 # SORT
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn sort_numeric {
+fn Project::ListOps::sort_numeric {
     my @a = (3, 1, 4, 1, 5, 9, 2, 6)
     my @r = sort { $a <=> $b } @a
     join(",", @r)
 }
 
-fn sort_numeric_desc {
+fn Project::ListOps::sort_numeric_desc {
     my @a = (3, 1, 4, 1, 5)
     my @r = sort { $b <=> $a } @a
     join(",", @r)
 }
 
-fn sort_string {
+fn Project::ListOps::sort_string {
     my @a = qw(banana apple cherry)
     my @r = sort @a
     join(",", @r)
 }
 
-fn sort_string_cmp {
+fn Project::ListOps::sort_string_cmp {
     my @a = qw(banana Apple cherry)
     my @r = sort { $a cmp $b } @a
     join(",", @r)
 }
 
-fn sort_string_desc {
+fn Project::ListOps::sort_string_desc {
     my @a = qw(apple banana cherry)
     my @r = sort { $b cmp $a } @a
     join(",", @r)
 }
 
-fn sort_case_insensitive {
+fn Project::ListOps::sort_case_insensitive {
     my @a = qw(Banana apple Cherry)
     my @r = sort { lc($a) cmp lc($b) } @a
     join(",", @r)
 }
 
-fn sort_by_length {
+fn Project::ListOps::sort_by_length {
     my @a = qw(a bb ccc dd e)
     my @r = sort { length($a) <=> length($b) } @a
     join(",", @r)
 }
 
-fn sort_empty {
+fn Project::ListOps::sort_empty {
     my @a = ()
     my @r = sort @a
     scalar @r}
 
-fn sort_single {
+fn Project::ListOps::sort_single {
     my @a = (42)
     my @r = sort @a
     $r[0]
 }
 
-fn sort_stable_check {
+fn Project::ListOps::sort_stable_check {
     my @a = (3, 1, 4, 1, 5)
     my @r = sort { $a <=> $b } @a
     $r[0] == 1 && $r[1] == 1 ? 1 : 0
 }
 
-fn sort_preserves_original {
+fn Project::ListOps::sort_preserves_original {
     my @a = (3, 1, 2)
     my @r = sort { $a <=> $b } @a
     $a[0]
@@ -195,35 +195,35 @@ fn sort_preserves_original {
 # REVERSE
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn reverse_array {
+fn Project::ListOps::reverse_array {
     my @a = (1, 2, 3, 4, 5)
     my @r = rev(@a)
     join(",", @r)
 }
 
-fn reverse_array_empty {
+fn Project::ListOps::reverse_array_empty {
     my @a = ()
     my @r = rev(@a)
     scalar @r
 }
 
-fn reverse_array_single {
+fn Project::ListOps::reverse_array_single {
     my @a = (42)
     my @r = rev(@a)
     $r[0]
 }
 
-fn reverse_string_scalar {
+fn Project::ListOps::reverse_string_scalar {
     rev("hello")
 }
 
-fn reverse_preserves {
+fn Project::ListOps::reverse_preserves {
     my @a = (1, 2, 3)
     my @r = rev(@a)
     $a[0]
 }
 
-fn reverse_twice {
+fn Project::ListOps::reverse_twice {
     my @a = (1, 2, 3)
     my @r = rev(rev(@a))
     join(",", @r)
@@ -233,47 +233,47 @@ fn reverse_twice {
 # JOIN
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn join_comma {
+fn Project::ListOps::join_comma {
     my @a = (1, 2, 3)
     join(",", @a)
 }
 
-fn join_space {
+fn Project::ListOps::join_space {
     my @a = qw(hello world)
     join(" ", @a)
 }
 
-fn join_empty_sep {
+fn Project::ListOps::join_empty_sep {
     my @a = qw(a b c)
     join("", @a)
 }
 
-fn join_empty_array {
+fn Project::ListOps::join_empty_array {
     my @a = ()
     join(",", @a)
 }
 
-fn join_single {
+fn Project::ListOps::join_single {
     my @a = (42)
     join(",", @a)
 }
 
-fn join_multi_char {
+fn Project::ListOps::join_multi_char {
     my @a = (1, 2, 3)
     join(" - ", @a)
 }
 
-fn join_with_undef {
+fn Project::ListOps::join_with_undef {
     my @a = (1, undef, 3)
     join(",", @a)
 }
 
-fn join_mixed_types {
+fn Project::ListOps::join_mixed_types {
     my @a = (1, "hello", 3.14)
     join("|", @a)
 }
 
-fn join_newline {
+fn Project::ListOps::join_newline {
     my @a = qw(line1 line2 line3)
     my $s = join("\n", @a)
     length $s}
@@ -282,47 +282,47 @@ fn join_newline {
 # SPLIT
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn split_comma {
+fn Project::ListOps::split_comma {
     my @r = split(/,/, "a,b,c")
     join("|", @r)
 }
 
-fn split_space {
+fn Project::ListOps::split_space {
     my @r = split(/ /, "hello world")
     scalar @r}
 
-fn split_re {
+fn Project::ListOps::split_re {
     my @r = split(/\s+/, "a  b   c")
     join(",", @r)
 }
 
-fn split_limit {
+fn Project::ListOps::split_limit {
     my @r = split(/,/, "a,b,c,d", 2)
     scalar @r}
 
-fn split_limit_rest {
+fn Project::ListOps::split_limit_rest {
     my @r = split(/,/, "a,b,c,d", 2)
     $r[1]
 }
 
-fn split_no_match {
+fn Project::ListOps::split_no_match {
     my @r = split(/x/, "hello")
     scalar @r}
 
-fn split_empty_string {
+fn Project::ListOps::split_empty_string {
     my @r = split(/,/, "")
     scalar @r}
 
-fn split_trailing_empty {
+fn Project::ListOps::split_trailing_empty {
     my @r = split(/,/, "a,b,")
     scalar @r}
 
-fn split_multiple_delim {
+fn Project::ListOps::split_multiple_delim {
     my @r = split(/[,;]/, "a,b;c")
     join("|", @r)
 }
 
-fn split_at_start {
+fn Project::ListOps::split_at_start {
     my @r = split(/,/, ",a,b")
     scalar @r}
 
@@ -330,29 +330,29 @@ fn split_at_start {
 # PUSH
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn push_single {
+fn Project::ListOps::push_single {
     my @a = (1, 2)
     push @a, 3
     join(",", @a)
 }
 
-fn push_multiple {
+fn Project::ListOps::push_multiple {
     my @a = (1)
     push @a, 2, 3, 4
     join(",", @a)
 }
 
-fn push_returns {
+fn Project::ListOps::push_returns {
     my @a = (1, 2)
     push @a, 3
 }
 
-fn push_empty {
+fn Project::ListOps::push_empty {
     my @a = ()
     push @a, 1
     scalar @a}
 
-fn push_array {
+fn Project::ListOps::push_array {
     my @a = (1, 2)
     my @b = (3, 4)
     push @a, @b
@@ -363,24 +363,24 @@ fn push_array {
 # POP
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn pop_returns {
+fn Project::ListOps::pop_returns {
     my @a = (1, 2, 3)
     pop @a
 }
 
-fn pop_modifies {
+fn Project::ListOps::pop_modifies {
     my @a = (1, 2, 3)
     pop @a
     join(",", @a)
 }
 
-fn pop_empty {
+fn Project::ListOps::pop_empty {
     my @a = ()
     my $r = pop @a
     defined($r) ? 1 : 0
 }
 
-fn pop_single {
+fn Project::ListOps::pop_single {
     my @a = (42)
     my $r = pop @a
     $r == 42 && scalar(@a) == 0 ? 1 : 0
@@ -390,24 +390,24 @@ fn pop_single {
 # SHIFT
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn shift_returns {
+fn Project::ListOps::shift_returns {
     my @a = (1, 2, 3)
     shift @a
 }
 
-fn shift_modifies {
+fn Project::ListOps::shift_modifies {
     my @a = (1, 2, 3)
     shift @a
     join(",", @a)
 }
 
-fn shift_empty {
+fn Project::ListOps::shift_empty {
     my @a = ()
     my $r = shift @a
     defined($r) ? 1 : 0
 }
 
-fn shift_single {
+fn Project::ListOps::shift_single {
     my @a = (42)
     my $r = shift @a
     $r == 42 && scalar(@a) == 0 ? 1 : 0
@@ -417,24 +417,24 @@ fn shift_single {
 # UNSHIFT
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn unshift_single {
+fn Project::ListOps::unshift_single {
     my @a = (2, 3)
     unshift @a, 1
     join(",", @a)
 }
 
-fn unshift_multiple {
+fn Project::ListOps::unshift_multiple {
     my @a = (4)
     unshift @a, 1, 2, 3
     join(",", @a)
 }
 
-fn unshift_returns {
+fn Project::ListOps::unshift_returns {
     my @a = (2, 3)
     unshift @a, 1
 }
 
-fn unshift_empty {
+fn Project::ListOps::unshift_empty {
     my @a = ()
     unshift @a, 1
     scalar @a}
@@ -443,37 +443,37 @@ fn unshift_empty {
 # SPLICE
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn splice_remove {
+fn Project::ListOps::splice_remove {
     my @a = (1, 2, 3, 4, 5)
     my @r = splice(@a, 1, 2)
     join(",", @r)
 }
 
-fn splice_remove_result {
+fn Project::ListOps::splice_remove_result {
     my @a = (1, 2, 3, 4, 5)
     splice(@a, 1, 2)
     join(",", @a)
 }
 
-fn splice_insert {
+fn Project::ListOps::splice_insert {
     my @a = (1, 4, 5)
     splice(@a, 1, 0, 2, 3)
     join(",", @a)
 }
 
-fn splice_replace {
+fn Project::ListOps::splice_replace {
     my @a = (1, 2, 3, 4, 5)
     splice(@a, 1, 2, "a", "b", "c")
     join(",", @a)
 }
 
-fn splice_to_end {
+fn Project::ListOps::splice_to_end {
     my @a = (1, 2, 3, 4, 5)
     my @r = splice(@a, 2)
     join(",", @r)
 }
 
-fn splice_negative {
+fn Project::ListOps::splice_negative {
     my @a = (1, 2, 3, 4, 5)
     my @r = splice(@a, -2)
     join(",", @r)
@@ -483,19 +483,19 @@ fn splice_negative {
 # WANTARRAY IN LIST OPS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn list_in_scalar {
+fn Project::ListOps::list_in_scalar {
     my @a = (1, 2, 3)
     my $count = @a
     $count
 }
 
-fn list_in_scalar_grep {
+fn Project::ListOps::list_in_scalar_grep {
     my @a = (1, 2, 3, 4, 5)
     my $count = grep { _ > 2 } @a
     $count
 }
 
-fn list_in_scalar_map {
+fn Project::ListOps::list_in_scalar_map {
     my @a = (1, 2, 3)
     my $count = map { _ * 2 } @a
     $count
@@ -505,42 +505,42 @@ fn list_in_scalar_map {
 # COMBINED OPERATIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn map_grep_combo {
+fn Project::ListOps::map_grep_combo {
     my @a = (1, 2, 3, 4, 5, 6)
     my @r = map { _ * 2 } grep { _ % 2 == 0 } @a
     join(",", @r)
 }
 
-fn sort_grep_combo {
+fn Project::ListOps::sort_grep_combo {
     my @a = (5, 2, 8, 1, 9, 3)
     my @r = sort { $a <=> $b } grep { _ > 2 } @a
     join(",", @r)
 }
 
-fn map_sort_combo {
+fn Project::ListOps::map_sort_combo {
     my @a = (3, 1, 2)
     my @r = sort { $a <=> $b } map { _ * 10 } @a
     join(",", @r)
 }
 
-fn reverse_sort_combo {
+fn Project::ListOps::reverse_sort_combo {
     my @a = (3, 1, 4, 1, 5)
     my @r = rev(sort { $a <=> $b } @a)
     join(",", @r)
 }
 
-fn join_map_combo {
+fn Project::ListOps::join_map_combo {
     my @a = (1, 2, 3)
     join("-", map { _ * 2 } @a)
 }
 
-fn split_join_round {
+fn Project::ListOps::split_join_round {
     my $s = "a,b,c"
     my @a = split(/,/, $s)
     join(",", @a)
 }
 
-fn transform_pipeline {
+fn Project::ListOps::transform_pipeline {
     my @a = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
     my @r = sort { $b <=> $a }
             map { _ * _ }
@@ -552,21 +552,21 @@ fn transform_pipeline {
 # REDUCE / FOLD PATTERNS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn reduce_sum {
+fn Project::ListOps::reduce_sum {
     my @a = (1, 2, 3, 4, 5)
     my $sum = 0
     $sum += _ for @a
     $sum
 }
 
-fn reduce_product {
+fn Project::ListOps::reduce_product {
     my @a = (1, 2, 3, 4, 5)
     my $prod = 1
     $prod *= _ for @a
     $prod
 }
 
-fn reduce_max {
+fn Project::ListOps::reduce_max {
     my @a = (3, 1, 4, 1, 5, 9, 2, 6)
     my $max = $a[0]
     for my $x (@a) {
@@ -575,7 +575,7 @@ fn reduce_max {
     $max
 }
 
-fn reduce_min {
+fn Project::ListOps::reduce_min {
     my @a = (3, 1, 4, 1, 5, 9, 2, 6)
     my $min = $a[0]
     for my $x (@a) {
@@ -584,7 +584,7 @@ fn reduce_min {
     $min
 }
 
-fn reduce_concat {
+fn Project::ListOps::reduce_concat {
     my @a = qw(a b c)
     my $s = ""
     $s .= _ for @a
@@ -595,36 +595,36 @@ fn reduce_concat {
 # EDGE CASES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn map_returns_empty {
+fn Project::ListOps::map_returns_empty {
     my @a = (1, 2, 3)
     my @r = map { () } @a
     scalar @r}
 
-fn grep_regex_match {
+fn Project::ListOps::grep_regex_match {
     my @a = qw(foo bar baz qux)
     my @r = grep { /^b/ } @a
     join(",", @r)
 }
 
-fn sort_with_undef {
+fn Project::ListOps::sort_with_undef {
     my @a = (3, 1, 2)
     my @r = sort { ($a // 0) <=> ($b // 0) } @a
     join(",", @r)
 }
 
-fn nested_map {
+fn Project::ListOps::nested_map {
     my @a = (1, 2)
     my @r = map { my $x = _; map { $x * _ } (1, 2, 3) } @a
     join(",", @r)
 }
 
-fn first_match {
+fn Project::ListOps::first_match {
     my @a = (1, 2, 3, 4, 5)
     my @r = grep { _ > 2 } @a
     $r[0]
 }
 
-fn last_match {
+fn Project::ListOps::last_match {
     my @a = (1, 2, 3, 4, 5)
     my @r = grep { _ > 2 } @a
     $r[-1]

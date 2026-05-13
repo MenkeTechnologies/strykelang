@@ -50,7 +50,7 @@ class TreeNode {
 # STRUCTS IN ARRAYS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn points_in_array {
+fn Project::NestedOop::points_in_array {
     my @points = (
         Point(1, 2),
         Point(3, 4),
@@ -59,11 +59,11 @@ fn points_in_array {
     @points
 }
 
-fn points_in_arrayref {
+fn Project::NestedOop::points_in_arrayref {
     [Point(10, 20), Point(30, 40), Point(50, 60)]
 }
 
-fn sum_point_coords(@points) {
+fn Project::NestedOop::sum_point_coords(@points) {
     my $sum = 0
     for my $p (@points) {
         $sum += $p->x + $p->y
@@ -71,19 +71,19 @@ fn sum_point_coords(@points) {
     $sum
 }
 
-fn map_points_to_distances(@points) {
+fn Project::NestedOop::map_points_to_distances(@points) {
     map { sqrt(_->x * _->x + _->y * _->y) } @points
 }
 
-fn filter_points_in_quadrant(@points) {
+fn Project::NestedOop::filter_points_in_quadrant(@points) {
     grep { _->x > 0 && _->y > 0 } @points
 }
 
-fn sort_points_by_x(@points) {
+fn Project::NestedOop::sort_points_by_x(@points) {
     sort { $a->x <=> $b->x } @points
 }
 
-fn tasks_in_array {
+fn Project::NestedOop::tasks_in_array {
     [
         Task(1, "Setup", Priority::High),
         Task(2, "Build", Priority::Medium),
@@ -96,7 +96,7 @@ fn tasks_in_array {
 # STRUCTS IN HASHES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn points_in_hash {
+fn Project::NestedOop::points_in_hash {
     {
         origin => Point(0, 0),
         north  => Point(0, 1),
@@ -106,7 +106,7 @@ fn points_in_hash {
     }
 }
 
-fn person_lookup {
+fn Project::NestedOop::person_lookup {
     {
         alice => Person("Alice", 30),
         bob   => Person("Bob", 25),
@@ -114,11 +114,11 @@ fn person_lookup {
     }
 }
 
-fn get_person_age($lookup, $name) {
+fn Project::NestedOop::get_person_age($lookup, $name) {
     $lookup->{$name}->age
 }
 
-fn task_registry {
+fn Project::NestedOop::task_registry {
     {
         "TASK-001" => Task(1, "Initialize", Priority::High),
         "TASK-002" => Task(2, "Configure", Priority::Medium),
@@ -130,11 +130,11 @@ fn task_registry {
 # STRUCTS IN SETS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn unique_priorities {
+fn Project::NestedOop::unique_priorities {
     set(Priority::High, Priority::Medium, Priority::Low, Priority::High)
 }
 
-fn unique_statuses {
+fn Project::NestedOop::unique_statuses {
     set(Status::Todo, Status::InProgress, Status::Done, Status::Todo)
 }
 
@@ -142,19 +142,19 @@ fn unique_statuses {
 # ENUMS IN ARRAYS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn priority_queue {
+fn Project::NestedOop::priority_queue {
     [Priority::Critical, Priority::High, Priority::Medium, Priority::Low]
 }
 
-fn color_palette {
+fn Project::NestedOop::color_palette {
     [Color::Red, Color::Green, Color::Blue]
 }
 
-fn status_workflow {
+fn Project::NestedOop::status_workflow {
     [Status::Todo, Status::InProgress, Status::Done]
 }
 
-fn count_priority($tasks, $target) {
+fn Project::NestedOop::count_priority($tasks, $target) {
     my $count = 0
     for my $t (@$tasks) {
         my $matches = match ($t->priority) {
@@ -173,7 +173,7 @@ fn count_priority($tasks, $target) {
 # ENUMS IN HASHES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn priority_labels {
+fn Project::NestedOop::priority_labels {
     {
         low      => Priority::Low,
         medium   => Priority::Medium,
@@ -182,7 +182,7 @@ fn priority_labels {
     }
 }
 
-fn status_by_id {
+fn Project::NestedOop::status_by_id {
     {
         0 => Status::Todo,
         1 => Status::InProgress,
@@ -191,7 +191,7 @@ fn status_by_id {
     }
 }
 
-fn color_codes {
+fn Project::NestedOop::color_codes {
     {
         red   => Color::Red,
         green => Color::Green,
@@ -203,7 +203,7 @@ fn color_codes {
 # CLASSES IN ARRAYS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn employee_roster {
+fn Project::NestedOop::employee_roster {
     [
         Employee(name => "Alice", department => "Engineering", salary => 100000),
         Employee(name => "Bob", department => "Marketing", salary => 80000),
@@ -212,7 +212,7 @@ fn employee_roster {
     ]
 }
 
-fn product_catalog {
+fn Project::NestedOop::product_catalog {
     [
         Product(sku => "SKU001", name => "Widget", price => 1999),
         Product(sku => "SKU002", name => "Gadget", price => 2999),
@@ -220,11 +220,11 @@ fn product_catalog {
     ]
 }
 
-fn filter_by_department($roster, $dept) {
+fn Project::NestedOop::filter_by_department($roster, $dept) {
     [grep { _->department eq $dept } @$roster]
 }
 
-fn total_salary($roster) {
+fn Project::NestedOop::total_salary($roster) {
     my $sum = 0
     for my $e (@$roster) {
         $sum += $e->salary
@@ -232,7 +232,7 @@ fn total_salary($roster) {
     $sum
 }
 
-fn apply_discount_all($products, $pct) {
+fn Project::NestedOop::apply_discount_all($products, $pct) {
     [map { _->discount($pct) } @$products]
 }
 
@@ -240,7 +240,7 @@ fn apply_discount_all($products, $pct) {
 # CLASSES IN HASHES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn employee_directory {
+fn Project::NestedOop::employee_directory {
     {
         "emp001" => Employee(name => "Alice", department => "Eng", salary => 100000),
         "emp002" => Employee(name => "Bob", department => "Mkt", salary => 80000),
@@ -248,18 +248,18 @@ fn employee_directory {
     }
 }
 
-fn product_by_sku {
+fn Project::NestedOop::product_by_sku {
     {
         "SKU001" => Product(sku => "SKU001", name => "Widget", price => 1999),
         "SKU002" => Product(sku => "SKU002", name => "Gadget", price => 2999),
     }
 }
 
-fn get_employee_name($dir, $id) {
+fn Project::NestedOop::get_employee_name($dir, $id) {
     $dir->{$id}->name
 }
 
-fn update_salary($dir, $id, $new_salary) {
+fn Project::NestedOop::update_salary($dir, $id, $new_salary) {
     $dir->{$id}->salary($new_salary)
     $dir
 }
@@ -268,7 +268,7 @@ fn update_salary($dir, $id, $new_salary) {
 # NESTED STRUCTS IN ARRAYS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn tree_as_struct {
+fn Project::NestedOop::tree_as_struct {
     Node(
         10,
         [
@@ -278,7 +278,7 @@ fn tree_as_struct {
     )
 }
 
-fn graph_edges {
+fn Project::NestedOop::graph_edges {
     [
         Edge(Point(0, 0), Point(1, 1), 10),
         Edge(Point(1, 1), Point(2, 0), 15),
@@ -286,7 +286,7 @@ fn graph_edges {
     ]
 }
 
-fn nested_points {
+fn Project::NestedOop::nested_points {
     [
         [Point(0, 0), Point(1, 0), Point(2, 0)],
         [Point(0, 1), Point(1, 1), Point(2, 1)],
@@ -294,7 +294,7 @@ fn nested_points {
     ]
 }
 
-fn sum_nested_points($grid) {
+fn Project::NestedOop::sum_nested_points($grid) {
     my $sum = 0
     for my $row (@$grid) {
         for my $p (@$row) {
@@ -308,7 +308,7 @@ fn sum_nested_points($grid) {
 # NESTED STRUCTS IN HASHES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn point_groups {
+fn Project::NestedOop::point_groups {
     {
         quadrant1 => [Point(1, 1), Point(2, 2), Point(3, 3)],
         quadrant2 => [Point(-1, 1), Point(-2, 2)],
@@ -317,7 +317,7 @@ fn point_groups {
     }
 }
 
-fn team_structure {
+fn Project::NestedOop::team_structure {
     {
         engineering => [
             Person("Alice", 30),
@@ -333,7 +333,7 @@ fn team_structure {
     }
 }
 
-fn count_team_members($structure) {
+fn Project::NestedOop::count_team_members($structure) {
     my $total = 0
     for my $team (keys %$structure) {
         $total += scalar(@{$structure->{$team}})
@@ -341,7 +341,7 @@ fn count_team_members($structure) {
     $total
 }
 
-fn get_oldest_in_team($structure, $team) {
+fn Project::NestedOop::get_oldest_in_team($structure, $team) {
     my @members = @{$structure->{$team}}
     my $oldest = $members[0]
     for my $m (@members) {
@@ -429,7 +429,7 @@ class TaskQueue {
 # BINARY TREE WITH CLASS NODES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn build_binary_tree {
+fn Project::NestedOop::build_binary_tree {
     TreeNode(
         value => 10,
         left => TreeNode(
@@ -445,34 +445,34 @@ fn build_binary_tree {
     )
 }
 
-fn tree_sum($node) {
+fn Project::NestedOop::tree_sum($node) {
     if (!defined($node)) {
         return 0
     }
-    $node->value + tree_sum($node->left) + tree_sum($node->right)
+    $node->value + Project::NestedOop::tree_sum($node->left) + Project::NestedOop::tree_sum($node->right)
 }
 
-fn tree_depth($node) {
+fn Project::NestedOop::tree_depth($node) {
     if (!defined($node)) {
         return 0
     }
-    my $left_depth = tree_depth($node->left)
-    my $right_depth = tree_depth($node->right)
+    my $left_depth = Project::NestedOop::tree_depth($node->left)
+    my $right_depth = Project::NestedOop::tree_depth($node->right)
     1 + ($left_depth > $right_depth ? $left_depth : $right_depth)
 }
 
-fn tree_to_array($node) {
+fn Project::NestedOop::tree_to_array($node) {
     if (!defined($node)) {
         return ()
     }
-    (tree_to_array($node->left), $node->value, tree_to_array($node->right))
+    (Project::NestedOop::tree_to_array($node->left), $node->value, Project::NestedOop::tree_to_array($node->right))
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # COMPLEX NESTED STRUCTURES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn organization_chart {
+fn Project::NestedOop::organization_chart {
     {
         ceo => Employee(name => "Alice", department => "Executive", salary => 500000),
         departments => {
@@ -494,7 +494,7 @@ fn organization_chart {
     }
 }
 
-fn project_board {
+fn Project::NestedOop::project_board {
     {
         todo => [
             Task(1, "Design API", Priority::High),
@@ -510,7 +510,7 @@ fn project_board {
     }
 }
 
-fn move_task($board, $task_id, $from_col, $to_col) {
+fn Project::NestedOop::move_task($board, $task_id, $from_col, $to_col) {
     my @from_tasks = @{$board->{$from_col}}
     my @remaining
     my $moved_task
@@ -526,7 +526,7 @@ fn move_task($board, $task_id, $from_col, $to_col) {
     $board
 }
 
-fn count_tasks_by_priority($board, $priority) {
+fn Project::NestedOop::count_tasks_by_priority($board, $priority) {
     my $count = 0
     for my $col (keys %$board) {
         for my $t (@{$board->{$col}}) {
@@ -547,7 +547,7 @@ fn count_tasks_by_priority($board, $priority) {
 # ARRAY OF ARRAYS OF STRUCTS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn matrix_of_points {
+fn Project::NestedOop::matrix_of_points {
     my @matrix
     for my $i (0..2) {
         my @row
@@ -559,7 +559,7 @@ fn matrix_of_points {
     [@matrix]
 }
 
-fn flatten_point_matrix($matrix) {
+fn Project::NestedOop::flatten_point_matrix($matrix) {
     my @flat
     for my $row (@$matrix) {
         ~> @$row ep {
@@ -573,7 +573,7 @@ fn flatten_point_matrix($matrix) {
 # HASH OF HASHES OF CLASSES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn region_offices {
+fn Project::NestedOop::region_offices {
     {
         "us" => {
             "ny" => Employee(name => "Alice", department => "Sales", salary => 90000),
@@ -586,11 +586,11 @@ fn region_offices {
     }
 }
 
-fn get_regional_employee($offices, $region, $office) {
+fn Project::NestedOop::get_regional_employee($offices, $region, $office) {
     $offices->{$region}{$office}
 }
 
-fn total_regional_salary($offices, $region) {
+fn Project::NestedOop::total_regional_salary($offices, $region) {
     my $sum = 0
     for my $office (keys %{$offices->{$region}}) {
         $sum += $offices->{$region}{$office}->salary
@@ -602,7 +602,7 @@ fn total_regional_salary($offices, $region) {
 # MIXED COLLECTIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn mixed_struct_types {
+fn Project::NestedOop::mixed_struct_types {
     [
         { type => "point", data => Point(1, 2) },
         { type => "person", data => Person("Alice", 30) },
@@ -610,7 +610,7 @@ fn mixed_struct_types {
     ]
 }
 
-fn process_mixed($items) {
+fn Project::NestedOop::process_mixed($items) {
     my @results
     for my $item (@$items) {
         my $result = match ($item->{type}) {
@@ -628,21 +628,21 @@ fn process_mixed($items) {
 # STRUCT/CLASS TRANSFORMATION PIPELINES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn transform_points($points, $scale, $offset_x, $offset_y) {
+fn Project::NestedOop::transform_points($points, $scale, $offset_x, $offset_y) {
     [map {
         Point(_->x * $scale + $offset_x, _->y * $scale + $offset_y)
     } @$points]
 }
 
-fn filter_adults($people) {
+fn Project::NestedOop::filter_adults($people) {
     [grep { _->age >= 18 } @$people]
 }
 
-fn sort_by_age($people) {
+fn Project::NestedOop::sort_by_age($people) {
     [sort { $a->age <=> $b->age } @$people]
 }
 
-fn partition_by_age($people, $threshold) {
+fn Project::NestedOop::partition_by_age($people, $threshold) {
     my @young
     my @old
     ~> @$people ep {

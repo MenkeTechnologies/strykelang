@@ -50,7 +50,7 @@ assert_near Circle::area($circle), 78.54, 0.01, "circle area"
 my $person = Person::new("Alice", 25)
 assert_eq $person->name, "Alice", "person name"
 assert_eq $person->age, 25, "person age"
-assert_eq Person::greet($person), "Hello, my name is Alice", "person greet"
+assert_eq Person::greet($person), "Hello, my name is Alice", "person Project::Types::greet"
 assert_ok Person::is_adult($person), "person is adult"
 
 my $child = Person::new("Bob", 10)

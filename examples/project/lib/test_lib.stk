@@ -2,7 +2,7 @@ class TestCache {
     cache: Hash = {a => 1};
     fn get_cache { $self->cache }
 }
-fn test_cache_ref() {
+fn Project::Lib::test_cache_ref() {
     my $o = TestCache()
     my $c = $o->get_cache()
     p "C TYPE:" . ref($c)

@@ -189,7 +189,7 @@ $eng_dept->add_employee($emp1)
 $eng_dept->add_employee($emp2)
 
 assert_eq $tech_dept->total_employees(), 3, "tech_dept total_employees (nested)"
-assert_eq $tech_dept->total_salary(), 275000, "tech_dept total_salary"
+assert_eq $tech_dept->total_salary(), 275000, "tech_dept Project::NestedOop::total_salary"
 assert_eq $tech_dept->depth(), 2, "tech_dept depth"
 assert_eq $qa_dept->depth(), 1, "qa_dept depth (leaf)"
 
@@ -197,7 +197,7 @@ assert_eq $qa_dept->depth(), 1, "qa_dept depth (leaf)"
 # COMPANY WITH FULL HIERARCHY
 # ══════════════════════════════════════════════════════════════════════════════
 
-my $company = build_org_chart()
+my $company = Project::ClassHierarchy::build_org_chart()
 assert_eq $company->name, "TechCorp", "company name"
 assert_eq $company->founded_year, 2005, "company founded_year"
 assert_eq $company->department_count(), 1, "company department_count"
@@ -258,7 +258,7 @@ my $trans = Transmission(gear_count => 6, trans_type => "manual")
 assert_ok $trans->is_manual(), "transmission is_manual"
 
 my $car = Car(id => 1, name => "Family Car", vin => "VIN123", year => 2023, make => "Honda", model => "Accord", weight => 3300.0, body_style => "sedan", door_count => 4, engine => $engine, transmission => $trans)
-assert_eq $car->full_name(), "2023 Honda Accord", "car full_name"
+assert_eq $car->full_name(), "2023 Honda Accord", "car Project::Types::full_name"
 assert_ok $car->is_sedan(), "car is_sedan"
 assert_false $car->is_coupe(), "car not is_coupe"
 assert_ok $car->has_engine(), "car has_engine"
@@ -286,23 +286,23 @@ assert_ok $luxury_sports->is_supercar(), "luxury supercar"
 # BUILD HELPER FUNCTIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
-my $shapes = build_shape_scene()
-assert_eq scalar(@$shapes), 4, "build_shape_scene count"
+my $shapes = Project::ClassHierarchy::build_shape_scene()
+assert_eq scalar(@$shapes), 4, "Project::ClassHierarchy::build_shape_scene count"
 assert_ok $shapes->[0]->isa("Rectangle2D"), "shape[0] is Rectangle2D"
 assert_ok $shapes->[1]->isa("Circle2D"), "shape[1] is Circle2D"
 assert_ok $shapes->[2]->isa("Cube3D"), "shape[2] is Cube3D"
 assert_ok $shapes->[3]->isa("Sphere3D"), "shape[3] is Sphere3D"
 
-my $total_area = total_shape_area($shapes)
-assert_ok $total_area > 0, "total_shape_area positive"
+my $total_area = Project::ClassHierarchy::total_shape_area($shapes)
+assert_ok $total_area > 0, "Project::ClassHierarchy::total_shape_area positive"
 
-my $fleet = build_vehicle_fleet()
-assert_eq scalar(@$fleet), 3, "build_vehicle_fleet count"
+my $fleet = Project::ClassHierarchy::build_vehicle_fleet()
+assert_eq scalar(@$fleet), 3, "Project::ClassHierarchy::build_vehicle_fleet count"
 assert_ok $fleet->[0]->isa("LuxurySportsCar"), "fleet[0] is LuxurySportsCar"
 assert_ok $fleet->[1]->isa("ElectricCar"), "fleet[1] is ElectricCar"
 assert_ok $fleet->[2]->isa("Truck"), "fleet[2] is Truck"
 
-my $doc = build_html_document()
+my $doc = Project::ClassHierarchy::build_html_document()
 assert_ok $doc->isa("ElementNode"), "doc is ElementNode"
 assert_eq $doc->child_count(), 2, "doc has head and body"
 assert_ok $doc->node_count() > 5, "doc has multiple nodes"
