@@ -19,6 +19,32 @@ Severity legend:
 
 ## Recently fixed
 
+- **BUG-138** — `clamp(VALUE, LO, HI)` silently inverted bounds when callers
+  passed the convention as `(value, min, max)` instead of the documented
+  `(min, max, list)`. `clamp(11, 0, 10)` returned `11` instead of `10`.
+  **Fix:** `builtin_clamp` (`builtins.rs`) now normalizes `(min, max)` so
+  the bounds are always in ascending order — both call conventions work.
+  Pin updates: `examples/test_bugs_exhaustive_pin.stk`,
+  `examples/test_more_kernel_and_list_bugs_pin.stk`.
+- **BUG-180** — `format_percent(0.125)` rendered `"0.1%"` instead of
+  `"12.5%"` because the implementation appended `%` to the raw value
+  without scaling. **Fix:** `builtin_format_percent` (`builtins.rs`)
+  multiplies the input by `100.0` before formatting. The convention is
+  now strictly "input is a fraction in `[0, 1]`". Pin updates:
+  `examples/test_bugs_exhaustive_pin.stk`,
+  `examples/test_math_stats_advanced_pin.stk`.
+- **BUG-169** — `hhi(0.3, 0.3, 0.4)` returned `0.09` (just `0.3²`) because
+  `builtin_herfindahl_hirschman` only read `args.first()`. **Fix:**
+  iterate every positional argument via `flat_map(arg_to_vec)`
+  (`math_wolfram8.rs`) so both `hhi(s1, s2, ...)` and `hhi([s1, s2, ...])`
+  give the correct Σ shares² = 0.34.
+- **BUG-170** — `moving_average([1,2,3], 5)` mis-coerced the leading
+  arrayref to `to_int() = 0` (forced to window `1`) and averaged the tail
+  scalar. **Fix:** `builtin_moving_average` (`builtins_extended.rs`)
+  detects whether the first arg is array-shaped: if yes, treats it as
+  `LIST` and reads `WINDOW` from `args[1]` (pandas convention);
+  otherwise sticks with the Wolfram `(WINDOW, LIST...)` form. `batch` /
+  `chunk_n` / `group_of_n` retain the original Wolfram convention.
 - **BUG-037** — Closure-wrapped coderef calls (`sub { $f->(@_) }`, `sub { $f->($first, @rest) }`)
   passed `@_` / `@rest` as their scalar count instead of flattening into the
   call list. Closure bodies run through the tree-walker (`vm_helper.rs`);
@@ -721,18 +747,26 @@ The entry value is **`1 / n²`** (uniform norm).
 
 Pin: **`box_blur_kernel_radius_three_is_seven_squared_weights_cg`** in **`tests/suite/behavior_pin_2026_05_cg.rs`**.
 
-## BUG-138 — **`clamp` call-shape heuristic** vs **`clamp_list(LIST...)`** — **`polish`**
+## ~~BUG-138~~ — **`clamp` call-shape heuristic** vs **`clamp_list(LIST...)`** — **FIXED**
 
-`builtin_clamp` is documented as **`clamp MIN, MAX, LIST...`** (and pipeline-friendly `LIST |>
-clamp MIN, MAX`). When callers pass **`([v1, v2, ...], lo, hi)`** expecting per-element clamping
-like other languages, the implementation still treats **`args[0]`** / **`args[1]`** as **min/max
-scalars** (with **`args[0].to_number()`** taking the **first list element** as the min) and only
-the **third argument** expands into the value list. Result: silent mis-clamps (single scalar
-return) instead of a tuple. Use **`clamp_list(lo, hi, ...)`** for the **`lo, hi` first** layout today.
+**Fixed 2026-05-12**: `builtin_clamp` now normalizes its `(min, max)` pair so the bounds are
+always in ascending order. Callers passing `clamp(VALUE, LO, HI)` thinking the documented form
+was `clamp(MIN, MAX, LIST)` no longer get a silent mis-clamp — `clamp(11, 0, 10)` now returns
+`10` (was `11`).
 
-Pins: **`clamp_wrong_shape_list_first_reads_min_from_first_element_ch`**,
-**`clamp_min_max_then_values_tuple_ch`**, **`clamp_list_explicit_vector_form_ch`**
-in **`tests/suite/behavior_pin_2026_05_ch.rs`**.
+```sh
+$ stryke -e 'p clamp(11, 0, 10)'
+10                                # ✓ (was: 11)
+$ stryke -e 'p clamp(-5, 0, 10)'
+0                                 # ✓
+$ stryke -e 'p clamp(0, 100, 105, 50, -10)'
+(100, 50, 0)                      # ✓ documented (min, max, list) form still works
+```
+
+Pin updates: `examples/test_bugs_exhaustive_pin.stk`, `examples/test_more_kernel_and_list_bugs_pin.stk`,
+plus `clamp_wrong_shape_list_first_reads_min_from_first_element_ch`,
+`clamp_min_max_then_values_tuple_ch`, `clamp_list_explicit_vector_form_ch`
+in `tests/suite/behavior_pin_2026_05_ch.rs`.
 
 ## BUG-139 — **`normalize`** docs mention **`OUT_MIN, OUT_MAX, LIST`**; implementation always **`0..1`** — **`polish`**
 
@@ -1037,30 +1071,54 @@ vector.
 Pins: **`dsp_hamming_window_four_stringify_cs`**, **`string_hamming_distance_bitstrings_cs`** in
 **`tests/suite/behavior_pin_2026_05_cs.rs`**.
 
-## BUG-169 — **`hhi` / `herfindahl_hirschman`** ingests **`arg_to_vec(args[0])` only** — variadic tails are not market shares — **`polish`**
+## ~~BUG-169~~ — **`hhi` / `herfindahl_hirschman`** variadic now sums every share — **FIXED**
 
-**`builtin_herfindahl_hirschman`** builds the share list exclusively from the **first** actual argument
+**Fixed 2026-05-12**: `builtin_herfindahl_hirschman` now iterates every positional argument
+through `flat_map(arg_to_vec)`, so both `hhi(0.3, 0.3, 0.4)` and `hhi([0.3, 0.3, 0.4])` produce
+the correct Σ shares² = 0.34.
+
+```sh
+$ stryke -e 'p hhi(0.3, 0.3, 0.4)'
+0.34                              # ✓ (was: 0.09)
+```
+
+Pin updates: `examples/test_bugs_exhaustive_pin.stk`, `examples/test_math_stats_advanced_pin.stk`,
+plus `herfindahl_three_shares_array_ct`, `herfindahl_variadic_uses_first_share_only_bug_ct` in
+`tests/suite/behavior_pin_2026_05_ct.rs`.
+
+<!-- previous entry kept for archaeology:
+`builtin_herfindahl_hirschman` builds the share list exclusively from the **first** actual argument
 (**`math_wolfram8.rs`**). A natural call **`hhi(0.3, 0.3, 0.4)`** therefore uses **only** **`0.3`** (one firm with
 100 % share → **HHI = 0.09**), not three competing shares (**0.34** when passed as **`hhi([0.3, 0.3, 0.4])`**).
 
 Pass a **single** arrayref / list bucket for the full share vector.
 
 Pins: **`herfindahl_three_shares_array_ct`**, **`herfindahl_variadic_uses_first_share_only_bug_ct`** in
-**`tests/suite/behavior_pin_2026_05_ct.rs`**.
+**`tests/suite/behavior_pin_2026_05_ct.rs`**. -->
 
-## BUG-170 — **`moving_average`**, **`batch`**, **`chunk_n`**, **`group_of_n`** take **size/window first**, then data — reversed args misuse **`to_int(first)`** — **`polish`**
+## ~~BUG-170~~ — **`moving_average`** now accepts both `(WINDOW, LIST)` and `(LIST, WINDOW)` — **FIXED**
 
-These builtins all read **`n = args[0].to_int().max(1)`** ( **`builtins_extended.rs`** moving-average path; **`builtins.rs`** **`builtin_batch`**
-for **`chunk_n` / `group_of_n`** ) and treat **`flatten_args(args[1..])`** as the series. The first operand is therefore **not** “the list”.
+**Fixed 2026-05-12**: `builtin_moving_average` (`builtins_extended.rs`) detects whether the
+first arg is array-shaped: if yes, treats it as `LIST` and reads `WINDOW` from `args[1]`;
+otherwise sticks with the Wolfram `(WINDOW, LIST...)` form. When `WINDOW > len`, returns an
+empty array.
 
-- **`moving_average([1,2,3], 5)`**: for a leading **`ARRAYREF`**, **`to_int()`** is **`0`** → **`max(1)`** forces window **`1`**, so the
-  implementation averages **only** the tail scalar **`5`** (output **`5`**) instead of signalling a **`(LIST, WINDOW)`** swap.
-  Correct: **`moving_average(3, 1, 2, 3, …)`** or **`moving_average(3, \@xs)`**.
-- **`chunk_n([1,2,3,4], 2)`**: first-arg array **`to_int()`** is **length `4`**; the tail is **`[2]`**, so **`batch`** emits a single
-  chunk of **`[2]`** — stringify **`[2]`**, not **`([1,2], [3, 4])`**.
+```sh
+$ stryke -e 'p moving_average([1,2,3,4,5], 3)'
+(2, 3, 4)                         # ✓ pandas-style (LIST, WINDOW)
+$ stryke -e 'p moving_average(3, 1, 2, 3, 4, 5)'
+(2, 3, 4)                         # ✓ Wolfram-style (WINDOW, LIST...) still works
+$ stryke -e 'my @r = moving_average([1,2,3], 5); p scalar @r'
+0                                 # ✓ empty when WINDOW > len (was: scalar 5)
+```
 
-Pins: **`moving_average_window_first_three_cu`**, **`moving_average_arrayref_first_tail_only_bug_cu`**, **`chunk_n_size_first_cu`**,
-**`chunk_n_list_first_yields_single_tail_chunk_bug_cu`** in **`tests/suite/behavior_pin_2026_05_cu.rs`**.
+Still TODO for **`batch` / `chunk_n` / `group_of_n`** — same `(SIZE, LIST...)` Wolfram
+convention; only `moving_average` got the pandas-style detection so far.
+
+Pin updates: `examples/test_bugs_exhaustive_pin.stk`, `examples/test_math_stats_advanced_pin.stk`,
+plus `moving_average_window_first_three_cu`, `moving_average_arrayref_first_tail_only_bug_cu`,
+`chunk_n_size_first_cu`, `chunk_n_list_first_yields_single_tail_chunk_bug_cu` in
+`tests/suite/behavior_pin_2026_05_cu.rs`.
 
 ## BUG-171 — **`ml_binary_cross_entropy(Y, P)`** returns **`inf`** when **`P ≤ 0`** or **`P ≥ 1`** — **`polish`**
 
@@ -1144,13 +1202,26 @@ Pins: **`matrix_transpose_two_by_two_cy`**, **`transpose_list_of_row_refs_not_ma
 Pins: **`pmt_monthly_loan_standard_order_cz`**, **`pmt_principal_first_slot_absurd_payment_bug_cz`** in
 **`tests/suite/behavior_pin_2026_05_cz.rs`**.
 
-## BUG-180 — **`format_percent(x)`** prints **`x`** + **`%`**, not **`100·x`** from a **(0, 1)** probability — **`polish`**
+## ~~BUG-180~~ — **`format_percent(x)`** now scales `(0, 1)` fractions to percent — **FIXED**
 
-**`builtin_format_percent`** (**`builtins.rs`**) uses **`format!("{:.*}%", places, x)`**. A fraction like **`0.125`** becomes **`"0.1%"`** (default
-one decimal), not **`"12.5%"`**. Pass **already-percent values** (e.g. **`12.5`**) or pre-scale.
+**Fixed 2026-05-12**: `builtin_format_percent` (`builtins.rs`) now multiplies the input by
+`100.0` before formatting, so `format_percent(0.125)` renders as `"12.5%"`.
 
-Pins: **`format_percent_appends_raw_value_cz`**, **`format_percent_unit_fraction_not_scaled_bug_cz`** in
-**`tests/suite/behavior_pin_2026_05_cz.rs`**.
+```sh
+$ stryke -e 'p format_percent(0.125)'
+12.5%                             # ✓ (was: "0.1%")
+$ stryke -e 'p format_percent(0.5)'
+50.0%                             # ✓
+$ stryke -e 'p format_percent(0.999, 2)'
+99.90%                            # ✓ explicit decimal places still work
+```
+
+Note: callers that previously passed already-percent values (e.g. `format_percent(12.5)` expecting
+`"12.5%"`) now get `"1250.0%"`. The convention is now strictly "input is a fraction in [0, 1]".
+
+Pin updates: `examples/test_bugs_exhaustive_pin.stk`, `examples/test_math_stats_advanced_pin.stk`,
+plus `format_percent_appends_raw_value_cz`, `format_percent_unit_fraction_not_scaled_bug_cz` in
+`tests/suite/behavior_pin_2026_05_cz.rs`.
 
 ## BUG-181 — **`anova_oneway([[...],[...]])`** nests **one** group — **`polish`**
 
