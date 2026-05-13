@@ -342,11 +342,10 @@ pub fn phonex(args: &[StrykeValue]) -> StrykeValue {
 }
 
 pub fn match_rating_compare(args: &[StrykeValue]) -> StrykeValue {
-    use crate::builtins_b16::match_rating_codex_impl as mrc;
     let s1 = arg_str(args, 0).unwrap_or_default();
     let s2 = arg_str(args, 1).unwrap_or_default();
-    let c1 = mrc(&s1);
-    let c2 = mrc(&s2);
+    let c1 = match_rating_codex_impl(&s1);
+    let c2 = match_rating_codex_impl(&s2);
     let len_diff = (c1.len() as i64 - c2.len() as i64).abs();
     if len_diff > 3 {
         return StrykeValue::integer(0);
