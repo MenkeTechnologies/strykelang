@@ -427,9 +427,9 @@ pub fn recording_enabled_in_env() -> bool {
 /// Derive the canonical `path` field for a stryke invocation given argv.
 /// Returns `(path, argv_to_record)`.
 /// - First positional file arg → its canonical absolute path
-/// - `-e` / `--exec` → "<eval>"
-/// - REPL (no positional, stdin tty) → "<repl>"
-/// - Subcommand → "<subcmd:NAME>"
+/// - `-e` / `--exec` → "&lt;eval&gt;"
+/// - REPL (no positional, stdin tty) → "&lt;repl&gt;"
+/// - Subcommand → "&lt;subcmd:NAME&gt;"
 pub fn classify_invocation(argv: &[String]) -> String {
     if argv.len() <= 1 {
         return "<repl>".to_string();

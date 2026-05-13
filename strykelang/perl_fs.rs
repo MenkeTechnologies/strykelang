@@ -11,6 +11,61 @@ use std::time::UNIX_EPOCH;
 use crate::pmap_progress::PmapProgress;
 use crate::value::StrykeValue;
 
+/// Keys touched by [`StrykeGlobOptsGuard`] — must match restore in `Drop`.
+const STRYKE_GLOB_OPT_KEYS: &[&str] = &[
+    "nullglob",
+    "markdirs",
+    "dotglob",
+    "globdots",
+    "listtypes",
+    "numericglobsort",
+    "chaselinks",
+    "extendedglob",
+    "caseglob",
+    "nocaseglob",
+    "globstarshort",
+    "bareglobqual",
+    "braceccl",
+];
+
+/// zshrs `glob()` reads options from the global store (`opt_state_*`). Apply
+/// the former `GlobOptions` preset for this expansion only, then restore on drop.
+pub(crate) struct StrykeGlobOptsGuard {
+    snap: std::collections::HashMap<String, bool>,
+}
+
+impl StrykeGlobOptsGuard {
+    pub(crate) fn new() -> Self {
+        let snap = zsh::options::opt_state_snapshot();
+        zsh::options::opt_state_set("nullglob", true);
+        zsh::options::opt_state_set("markdirs", false);
+        zsh::options::opt_state_set("dotglob", false);
+        zsh::options::opt_state_set("globdots", false);
+        zsh::options::opt_state_set("listtypes", false);
+        zsh::options::opt_state_set("numericglobsort", false);
+        zsh::options::opt_state_set("chaselinks", false);
+        zsh::options::opt_state_set("extendedglob", true);
+        zsh::options::opt_state_set("caseglob", true);
+        zsh::options::opt_state_set("nocaseglob", false);
+        zsh::options::opt_state_set("globstarshort", true);
+        zsh::options::opt_state_set("bareglobqual", true);
+        zsh::options::opt_state_set("braceccl", true);
+        Self { snap }
+    }
+}
+
+impl Drop for StrykeGlobOptsGuard {
+    fn drop(&mut self) {
+        for &key in STRYKE_GLOB_OPT_KEYS {
+            if let Some(v) = self.snap.get(key) {
+                zsh::options::opt_state_set(key, *v);
+            } else {
+                zsh::options::opt_state_unset(key);
+            }
+        }
+    }
+}
+
 pub use crate::perl_decode::{
     decode_utf8_or_latin1, decode_utf8_or_latin1_line, decode_utf8_or_latin1_read_until,
 };
@@ -22,13 +77,12 @@ pub fn read_file_text_perl_compat(path: impl AsRef<Path>) -> io::Result<String> 
     Ok(decode_utf8_or_latin1(&bytes))
 }
 
-/// `glob_with_options` preset for stryke: full extended glob, bare-qualifier
-/// shorthand on (`*(/)` works without `(#q.../)`), `null_glob: true` so a
-/// no-match returns an empty list (Perl `glob` semantics) instead of echoing
-/// the literal pattern back. `glob_star_short: true` makes `**.stk` match
-/// every .stk file at any depth, `brace_ccl: true` enables `{a,b,c}` and
-/// `{abc}` brace expansion — both wired through to the expander in
-/// zshrs ≥0.10.4.
+/// Preset for stryke glob (via [`StrykeGlobOptsGuard`] + `zsh::glob::glob`): full
+/// extended glob, bare-qualifier shorthand on (`*(/)` works without `(#q.../)`),
+/// `nullglob` so a no-match returns an empty list (Perl `glob` semantics) instead
+/// of echoing the literal pattern back. `globstarshort` makes `**.stk` match every
+/// `.stk` file at any depth; `braceccl` enables `{a,b,c}` / `{abc}` brace expansion
+/// — wired through zshrs's global option store like stock zsh.
 fn stryke_glob(pattern: &str) -> Vec<String> {
     // zshrs glob fails to match wildcards behind a leading `./` (works for
     // literal filenames but not patterns like `./lib/*.stk`). Strip the
@@ -40,22 +94,8 @@ fn stryke_glob(pattern: &str) -> Vec<String> {
     } else {
         (pattern, false)
     };
-    let results = zsh::glob::glob_with_options(
-        stripped,
-        zsh::glob::GlobOptions {
-            null_glob: true,
-            mark_dirs: false,
-            no_glob_dots: true,
-            list_types: false,
-            numeric_sort: false,
-            follow_links: false,
-            extended_glob: true,
-            case_glob: true,
-            glob_star_short: true,
-            bare_glob_qual: true,
-            brace_ccl: true,
-        },
-    );
+    let _opts = StrykeGlobOptsGuard::new();
+    let results = zsh::glob::glob(stripped);
     if had_dot_slash {
         results
             .into_iter()
@@ -81,13 +121,13 @@ fn stryke_glob(pattern: &str) -> Vec<String> {
 /// meaningless and asking for it is a bug.
 ///
 /// Routing: a path goes through the glob expander when it has wildcards
-/// (per zshrs's [`zsh::glob::has_wildcards`]) OR a trailing bare qualifier
+/// (per zshrs's [`zsh::glob::haswilds`]) OR a trailing bare qualifier
 /// suffix (`dir(/)` / `name(.)`). Otherwise we read the literal path so a
 /// missing file produces the proper `No such file or directory` instead of
 /// a silent empty.
 pub fn read_file_text_or_glob(path: &str) -> io::Result<String> {
     let (stripped, qual) = zsh::glob::split_qualifier(path);
-    let is_glob = qual.is_some() || zsh::glob::has_wildcards(stripped);
+    let is_glob = qual.is_some() || zsh::glob::haswilds(stripped);
     if !is_glob {
         return read_file_text_perl_compat(path);
     }
@@ -118,7 +158,7 @@ pub fn read_file_text_or_glob(path: &str) -> io::Result<String> {
 /// pattern-parsing logic of its own.
 fn pattern_is_glob(path: &str) -> bool {
     let (stripped, qual) = zsh::glob::split_qualifier(path);
-    qual.is_some() || zsh::glob::has_wildcards(stripped) || zsh::glob::has_braces(stripped, true)
+    qual.is_some() || zsh::glob::haswilds(stripped) || zsh::glob::hasbraces(stripped, true)
 }
 
 /// Like [`BufRead::read_line`] but decodes with [`decode_utf8_or_latin1_read_until`] (no U+FFFD).

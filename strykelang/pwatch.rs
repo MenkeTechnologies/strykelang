@@ -7,6 +7,7 @@ use std::sync::Arc;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 
 use crate::error::{PerlError, PerlResult};
+use crate::perl_fs::StrykeGlobOptsGuard;
 use crate::scope::{AtomicArray, AtomicHash};
 use crate::value::{PerlSub, StrykeValue};
 use crate::vm_helper::{VMHelper, WantarrayCtx};
@@ -26,30 +27,16 @@ pub fn run_pwatch(
     // event, so it can only check pattern shape — not stat-based qualifiers
     // like `(/)`. Strip the trailing qualifier suffix via zshrs's parser so
     // the pattern half can feed `glob::Pattern`; the qualifier still applies
-    // during initial expansion via `zsh::glob::glob_with_options` below.
+    // during initial expansion via `zsh::glob::glob` + stryke glob options below.
     let (pattern_no_qual, _qual) = zsh::glob::split_qualifier(pattern);
     let gpat = glob::Pattern::new(pattern_no_qual)
         .map_err(|e| PerlError::runtime(format!("pwatch: invalid glob pattern: {}", e), line))?;
 
-    let expanded: Vec<PathBuf> = zsh::glob::glob_with_options(
-        pattern,
-        zsh::glob::GlobOptions {
-            null_glob: true,
-            mark_dirs: false,
-            no_glob_dots: true,
-            list_types: false,
-            numeric_sort: false,
-            follow_links: false,
-            extended_glob: true,
-            case_glob: true,
-            glob_star_short: true,
-            bare_glob_qual: true,
-            brace_ccl: true,
-        },
-    )
-    .into_iter()
-    .map(PathBuf::from)
-    .collect();
+    let _opts = StrykeGlobOptsGuard::new();
+    let expanded: Vec<PathBuf> = zsh::glob::glob(pattern)
+        .into_iter()
+        .map(PathBuf::from)
+        .collect();
 
     let mut watch_specs: Vec<(PathBuf, RecursiveMode)> = Vec::new();
     let mut seen = HashSet::new();

@@ -77,7 +77,11 @@ mod tests {
     #[test]
     fn plain_mode_strips_ansi() {
         let r = render_doc("pmap", "Hello `world`", false);
-        assert!(!r.contains('\x1b'), "plain mode must not emit ANSI: {:?}", r);
+        assert!(
+            !r.contains('\x1b'),
+            "plain mode must not emit ANSI: {:?}",
+            r
+        );
         assert!(r.contains("pmap"));
         // Backticks are consumed by the inline-code renderer; in plain
         // mode the color/reset wrappers collapse to empty strings, so the
@@ -95,7 +99,11 @@ mod tests {
     #[test]
     fn code_fence_lines_render_green() {
         let r = render_doc("pmap", "intro\n```perl\nmy $x = 1\n```\nafter", true);
-        assert!(r.contains("\x1b[32m"), "fenced block must emit green: {:?}", r);
+        assert!(
+            r.contains("\x1b[32m"),
+            "fenced block must emit green: {:?}",
+            r
+        );
         assert!(!r.contains("```"), "fence markers must be hidden: {:?}", r);
     }
 }

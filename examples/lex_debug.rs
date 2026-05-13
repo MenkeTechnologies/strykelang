@@ -1,5 +1,7 @@
-use stryke::zsh_lex::ZshLexer;
-use stryke::zsh_tokens::LexTok;
+use std::sync::atomic::Ordering;
+
+use stryke::zsh_errflag;
+use stryke::zsh_lex::{lex_init, tok, tokstr, zshlex, ENDINPUT, LEXERR};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -9,12 +11,14 @@ fn main() {
         "args=( 'foo' )".to_string()
     };
 
-    let mut lexer = ZshLexer::new(&input);
+    zsh_errflag.store(0, Ordering::Relaxed);
+    lex_init(&input);
 
     for _ in 0..50 {
-        lexer.zshlex();
-        println!("{:?} {:?}", lexer.tok, lexer.tokstr);
-        if lexer.tok == LexTok::Endinput || lexer.tok == LexTok::Lexerr {
+        zshlex();
+        let t = tok();
+        println!("{:?} {:?}", t, tokstr());
+        if t == ENDINPUT || t == LEXERR {
             break;
         }
     }
