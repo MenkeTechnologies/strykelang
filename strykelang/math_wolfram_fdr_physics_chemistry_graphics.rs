@@ -6,7 +6,7 @@
 // cepstrum, Butterworth/SG coefficients), image processing (Canny, bilateral),
 // clustering helpers, more combinatorics, more number theory, network
 // metrics, RSA / DH crypto helpers, quantum entanglement primitives, more 2-D
-// geometry, time-series smoothing. Included after `math_wolfram6.rs`.
+// geometry, time-series smoothing. Included after `math_wolfram_mcmc_hmm_survival_control.rs`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── 1. Multiple-testing corrections ──────────────────────────────────────────

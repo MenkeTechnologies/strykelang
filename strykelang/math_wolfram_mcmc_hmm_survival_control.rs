@@ -4,7 +4,7 @@
 // chemistry, control theory, game theory, operations research, numerical PDE,
 // Bayesian conjugate updates, quantum gates, splines, music/audio, astronomy,
 // fluid dynamics, more distributions, random-graph generators, perceptual
-// colour, integer sequences. Included after `math_wolfram5.rs`.
+// colour, integer sequences. Included after `math_wolfram_cas_clustering_neural.rs`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─── 1. MCMC samplers (callbacks) ────────────────────────────────────────────

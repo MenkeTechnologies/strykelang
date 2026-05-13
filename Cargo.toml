@@ -1,13 +1,13 @@
 [package]
 name = "strykelang"
-version = "0.13.11"
+version = "0.13.12"
 edition = "2021"
 description = "A highly parallel Perl 5 interpreter written in Rust"
 license = "MIT"
 authors = ["MenkeTechnologies"]
 repository = "https://github.com/MenkeTechnologies/strykelang"
 documentation = "https://docs.rs/strykelang"
-exclude = ["/parity/", "/.github/", "/examples/"]
+exclude = ["/parity/", "/.github/", "/examples/", "/bench/", "/benches/", "/docs/", "/scripts/", "/vendor/", "/tools/"]
 autobins = false
 
 [lib]
@@ -151,7 +151,7 @@ lsp-types = "0.97.0"
 unicode_names2 = "2"
 reedline = "0.47.0"
 nu-ansi-term = "0.50"
-zshrs = "0.11.0"
+zshrs = "0.11.1"
 dirs = "6.0.0"
 hostname = "0.4.2"
 atty = "0.2.14"

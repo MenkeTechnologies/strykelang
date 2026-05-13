@@ -1,4 +1,4 @@
-//! Behavior-pinning batch DL (2026-05): **database / sketch micro-ops** (`math_wolfram48` — B-tree, LSM,
+//! Behavior-pinning batch DL (2026-05): **database / sketch micro-ops** (`math_wolfram_database_consensus_sketches` — B-tree, LSM,
 //! Bloom / cuckoo / quotient filters, count-min, HyperLogLog, min-hash, **SimHash sign quirk** — **BUG-204**),
 //! **planner cost** stubs, **quantiles** (p99, KLL, t-digest, DD-sketch, reservoir), **multiset / multinomial /
 //! Stirling / binomial**, **Carlson RF**, **elliptic F**, **Jacobi AM**, **polylog**, **Legendre Q**, **Gegenbauer**,
@@ -6,7 +6,7 @@
 
 use crate::common::*;
 
-// ── math_wolfram48: structures & sketches ───────────────────────────────
+// ── math_wolfram_database_consensus_sketches: structures & sketches ───────────────────────────────
 
 #[test]
 fn db_b_tree_split_median_index_dl() {
