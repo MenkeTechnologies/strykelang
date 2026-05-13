@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.13.9 · 10065 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.13.14 · 10067 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -330,7 +330,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">8394</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">8396</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -11983,7 +11983,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">8394 topics</p>
+      <p class="chapter-meta">8396 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$!</code></h3>
         <p><code>$!</code> — the OS error from the most recent system call, in stringified form (e.g. <code>&quot;No such file or directory&quot;</code>) or as an <code>errno</code> integer in numeric context. Set by <code>open</code>, <code>close</code>, <code>chdir</code>, <code>read</code>, <code>write</code>, and other syscalls when they fail. The value persists until the next failing call, so always check it *immediately* after the failing operation — intermediate clean Perl code does not touch it, but any subsequent syscall will.</p>
@@ -15344,6 +15344,16 @@ p au / 1000      # ~149.6 million km
         <p><code>bandwidth_parse</code> — operation <code>bandwidth parse</code>. Category: *network / ip / cidr*.</p>
         <pre><code class="lang-perl">p bandwidth_parse $x
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-banner">
+        <h3><a class="doc-anchor" href="#doc-banner">#</a> <code>banner</code></h3>
+        <p><code>banner()</code> — print the stryke ASCII logo + live-stats box + tagline (the same banner the REPL shows on startup and <code>stryke --help</code> displays). Every reflection count (<code>%b</code> builtins, <code>%a</code> aliases, <code>%k</code> keywords, <code>%o</code> operators, <code>%v</code> special vars, <code>%pc</code> perl5 core, <code>%e</code> stryke extensions, <code>%d</code> descriptions, <code>%c</code> categories, <code>%p</code> primaries, <code>%all</code> everything) is pulled at call time, so the values stay current after rebuilds.</p>
+        <p>With no args, prints to stdout and returns <code>undef</code>. With a truthy first arg (<code>banner(1)</code>), returns the rendered string instead of printing — useful for capturing into a variable, embedding in a larger report, or piping elsewhere. ANSI colors are emitted only when stdout is a TTY.</p>
+        <pre><code class="lang-perl">banner                                # print to stdout
+my $s = banner(1)                     # capture as string
+banner(1) |&gt; spurt &quot;/tmp/welcome.txt&quot;  # write to file (no ANSI when not a tty)
+</code></pre>
+        <p>See also: <code>docs</code> (in-language doc browser), <code>%stryke::builtins</code>, <code>%stryke::aliases</code>.</p>
       </article>
       <article class="doc-entry" id="doc-banzhaf-index-two">
         <h3><a class="doc-anchor" href="#doc-banzhaf-index-two">#</a> <code>banzhaf_index_two</code></h3>
@@ -25525,6 +25535,18 @@ my $D2 = dist_mat([[0,0],[1,1]], &quot;manhattan&quot;)  # Manhattan
         <p><code>do_call</code> — call a function with args from a list. Like R&#39;s do.call().</p>
         <pre><code class="lang-perl">my $result = docall(fn { $_[0] + $_[1] }, [3, 4])  # 7
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-docs">
+        <h3><a class="doc-anchor" href="#doc-docs">#</a> <code>docs</code></h3>
+        <p><code>docs(TOPIC)</code> — return the raw hover-doc string for <code>TOPIC</code> (the same source the <code>stryke docs</code> browser renders). <code>TOPIC</code> may be any primary builtin name, alias spelling, keyword, operator, or sigil-prefixed reflection-hash name (<code>%stryke::builtins</code>, <code>~&gt;</code>, <code>$_</code>, …). Returns <code>undef</code> when no doc page exists for the topic.</p>
+        <p>With multiple args, returns a hashref of <code>{ name =&gt; doc }</code> so a list of topics round-trips in one call. With no args, returns an arrayref of every documented topic name (sorted, deduped) — the in-language equivalent of <code>stryke docs --list</code>.</p>
+        <pre><code class="lang-perl">p docs(&quot;pmap&quot;)                  # raw markdown doc string for pmap
+p docs(&quot;tj&quot;)                    # alias spellings work too
+my %d = %{docs(qw(pmap pgrep psort))}
+p scalar @{docs()}              # total count of documented topics
+docs(&quot;foo&quot;) // p &quot;no such topic&quot;
+</code></pre>
+        <p>See also: <code>stryke docs</code> CLI subcommand (interactive TUI pager), <code>%stryke::descriptions</code> (one-line summaries), <code>%stryke::builtins</code> (name → category).</p>
       </article>
       <article class="doc-entry" id="doc-doctor">
         <h3><a class="doc-anchor" href="#doc-doctor">#</a> <code>doctor</code></h3>
