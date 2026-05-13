@@ -136,7 +136,7 @@ fn one_hot_softmax_sigmoid_relu_leaky_gelu_db() {
     assert_eq!(eval_string(r#"stringify(one_hot(2, 4))"#), "(0, 0, 1, 0)");
     assert_eq!(
         eval_string(r#"stringify(softmax([1, 2, 3]))"#),
-        "(0.0900305731703805, 0.244728471054798, 0.665240955774822)"
+        "[0.0900305731703805, 0.244728471054798, 0.665240955774822]"
     );
     assert_eq!(eval_string(r#"sprintf("%.10g", sigmoid(0))"#), "0.5");
     assert_eq!(eval_string(r#"sprintf("%.10g", relu(-3))"#), "0");
@@ -186,11 +186,11 @@ fn gamma_beta_bessel_zeta_samples_db() {
 fn convolve_valid_full_scalar_outputs_db() {
     assert_eq!(
         eval_string(r#"stringify(convolve_valid([1, 2, 1], [1, 1]))"#),
-        "2"
+        "(3, 3)"
     );
     assert_eq!(
         eval_string(r#"stringify(convolve_full([1, 2], [1, 1, 1]))"#),
-        "4"
+        "(1, 3, 3, 2)"
     );
 }
 
@@ -318,7 +318,7 @@ fn run_length_encode_numeric_db() {
 fn combinatorics_bell_catalan_derangements_partition_db() {
     assert_eq!(eval_string(r#"sprintf("%d", bell_number(4))"#), "15");
     assert_eq!(eval_string(r#"sprintf("%.10g", catalan(4))"#), "14");
-    assert_eq!(eval_string(r#"sprintf("%d", derangements(4))"#), "36");
+    assert_eq!(eval_string(r#"sprintf("%d", derangements(4))"#), "9");
     assert_eq!(
         eval_string(r#"sprintf("%.10g", partition_function(5))"#),
         "0.006737946999"

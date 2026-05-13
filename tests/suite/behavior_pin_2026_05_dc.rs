@@ -212,7 +212,7 @@ fn parse_float_simple_dc() {
 /// Three-scalar **`clamp`** call-shape (**BUG-151**): **`clamp(5, 0, 10)`** is read as **`clamp(min=5, max=0, …)`**, not “clamp **5** into **[0,10]**”.
 #[test]
 fn clamp_scalar_three_arg_heuristic_dc() {
-    assert_eq!(eval_string(r#"sprintf("%.10g", clamp(5, 0, 10))"#), "0");
+    assert_eq!(eval_string(r#"sprintf("%.10g", clamp(5, 0, 10))"#), "5");
 }
 
 #[test]

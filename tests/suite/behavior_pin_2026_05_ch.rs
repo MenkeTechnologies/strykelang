@@ -189,8 +189,8 @@ fn first_or_skips_undef_empty_string_zero_ch() {
 #[test]
 fn softmax_uniform_triple_is_thirds_ch() {
     assert_eq!(
-        eval_string(r#"stringify(softmax(0, 0, 0))"#),
-        "(0.333333333333333, 0.333333333333333, 0.333333333333333)"
+        eval_string(r#"stringify(softmax([0, 0, 0]))"#),
+        "[0.333333333333333, 0.333333333333333, 0.333333333333333]"
     );
 }
 

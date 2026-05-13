@@ -235,8 +235,8 @@ fn erf_hyperbolic_cov_matrix_bn() {
 #[test]
 fn ml_activations_softmax_norms_bn() {
     assert_eq!(
-        eval_string(r#"stringify(softmax(1, 2, 3))"#),
-        "(0.0900305731703805, 0.244728471054798, 0.665240955774822)"
+        eval_string(r#"stringify(softmax([1, 2, 3]))"#),
+        "[0.0900305731703805, 0.244728471054798, 0.665240955774822]"
     );
 
     assert_eq!(eval_string(r#"sprintf("%.6f", sigmoid(0))"#), "0.500000");

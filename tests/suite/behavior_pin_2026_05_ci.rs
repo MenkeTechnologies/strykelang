@@ -102,7 +102,7 @@ fn unzip_pairs_explicit_pair_rows_ci() {
 fn unzip_pairs_after_zip_over_flattens_to_scalars_bug_ci() {
     assert_eq!(
         eval_string(r#"stringify(unzip_pairs(zip([1, 2], [9, 8])))"#),
-        "([1, 9, 2, 8], [undef, undef, undef, undef])"
+        "([1, 2], [9, 8])"
     );
 }
 
@@ -343,7 +343,7 @@ fn repeat_elem_numeric_triple_ci() {
 fn take_n_cycle_iterator_yields_empty_today_bug_ci() {
     assert_eq!(
         eval_string(r#"stringify(take_n(6, cycle([1, 2, 3])))"#),
-        "()"
+        "(1, 2, 3, 1, 2, 3)"
     );
 }
 

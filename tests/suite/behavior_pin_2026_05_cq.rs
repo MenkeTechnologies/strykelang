@@ -118,7 +118,7 @@ fn running_reduce_implicit_slot_add_cq() {
 fn running_reduce_dollar_ab_zeros_after_first_bug_cq() {
     assert_eq!(
         eval_string(r#"stringify(running_reduce(sub { $a + $b }, [1, 2, 3, 4]))"#,),
-        "(1, 0, 0, 0)"
+        "(1, 3, 6, 10)"
     );
 }
 
@@ -198,7 +198,7 @@ fn uri_resolve_byte_vector_absolute_uri_cq() {
 fn uri_resolve_plain_string_misclassified_relative_bug_cq() {
     assert_eq!(
         eval_string(r#"sprintf("%.0f", uri_resolve("http://example.com/x"))"#),
-        "4"
+        "1"
     );
 }
 

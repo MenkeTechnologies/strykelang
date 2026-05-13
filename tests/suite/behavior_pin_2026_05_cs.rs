@@ -84,7 +84,7 @@ fn pt_zero_five_df_cs() {
 fn softmax_three_logits_stringify_cs() {
     assert_eq!(
         eval_string(r#"stringify(softmax([1, 2, 3]))"#),
-        "(0.0900305731703805, 0.244728471054798, 0.665240955774822)"
+        "[0.0900305731703805, 0.244728471054798, 0.665240955774822]"
     );
 }
 
@@ -163,7 +163,7 @@ fn median_odd_triple_cs() {
 
 #[test]
 fn mad_simple_list_cs() {
-    assert_eq!(eval_string(r#"sprintf("%.10g", mad([1, 2, 3, 10]))"#), "2");
+    assert_eq!(eval_string(r#"sprintf("%.10g", mad([1, 2, 3, 10]))"#), "1");
 }
 
 #[test]

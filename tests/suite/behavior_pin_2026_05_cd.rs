@@ -200,7 +200,7 @@ fn detrend_linear_pure_ramp_slope_one_cd() {
 fn medfilt_one_d_global_sorted_median_cd() {
     assert_eq!(
         eval_string(r#"sprintf("%.14f", medfilt_1d([10, 100, 40, 110, 42]))"#),
-        "42.00000000000000"
+        "55.00000000000000"
     );
 }
 

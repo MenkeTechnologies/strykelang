@@ -35,7 +35,7 @@ fn hamming_distance_strings_vs_arrayrefs_bug194_dg() {
     );
     assert_eq!(
         eval_string(r#"sprintf("%d", hamming_distance([1, 0, 1], [1, 1, 0]))"#),
-        "0"
+        "2"
     );
 }
 

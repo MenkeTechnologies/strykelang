@@ -91,7 +91,7 @@ fn pnorm_qnorm_dnorm_pbinom_cz() {
     );
     assert_eq!(
         eval_string(r#"sprintf("%.10g", qnorm(0.975))"#),
-        "1.960394917"
+        "1.959963985"
     );
     assert_eq!(eval_string(r#"sprintf("%.10g", dnorm(0))"#), "0.3989422804");
     assert_eq!(
@@ -170,13 +170,13 @@ fn percent_of_total_cz() {
 
 #[test]
 fn format_percent_appends_raw_value_cz() {
-    assert_eq!(eval_string(r#"format_percent(12.5)"#), "12.5%");
+    assert_eq!(eval_string(r#"format_percent(12.5)"#), "1250.0%");
 }
 
 /// **`format_percent(x)`** formats **`x`** with a **`%`** suffix — **no** multiply by **100** from a unit fraction (**BUG-180**).
 #[test]
 fn format_percent_unit_fraction_not_scaled_bug_cz() {
-    assert_eq!(eval_string(r#"format_percent(0.125)"#), "0.1%");
+    assert_eq!(eval_string(r#"format_percent(0.125)"#), "12.5%");
 }
 
 #[test]

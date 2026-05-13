@@ -101,6 +101,6 @@ fn cosine_distance_zero_operand_is_unit_bx() {
 fn median_absolute_deviation_even_n_spread_bx() {
     assert_eq!(
         eval_string(r#"sprintf("%.10f", median_absolute_deviation(1, 2, 100, 101))"#),
-        "98.0000000000"
+        "49.5000000000"
     );
 }

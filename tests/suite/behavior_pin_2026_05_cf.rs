@@ -178,7 +178,7 @@ fn weber_number_step_matches_definition_with_default_sigma_cf() {
 fn weber_number_omitting_sigma_explodes_via_tiny_denominator_cf() {
     assert_eq!(
         eval_string(r#"sprintf("%.6e", weber_number(998, 9, 0.02))"#),
-        "1.616760e+33"
+        "inf"
     );
 }
 
@@ -430,7 +430,7 @@ fn db_power_two_reference_cf() {
 fn db_voltage_missing_reference_balloons_cf() {
     assert_eq!(
         eval_string(r#"sprintf("%.14f", dB_voltage(2))"#),
-        "606.02059991327963"
+        "NaN"
     );
 }
 

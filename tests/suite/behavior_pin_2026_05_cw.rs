@@ -27,7 +27,7 @@ fn categorical_cross_entropy_matches_cce_alias_cw() {
 fn softmax_two_values_cw() {
     assert_eq!(
         eval_string(r#"stringify(softmax([0, 1]))"#),
-        "(0.268941421369995, 0.731058578630005)"
+        "[0.268941421369995, 0.731058578630005]"
     );
 }
 
@@ -35,7 +35,7 @@ fn softmax_two_values_cw() {
 fn log_softmax_two_values_cw() {
     assert_eq!(
         eval_string(r#"stringify(log_softmax([0, 1]))"#),
-        "(-1.31326168751822, -0.313261687518223)"
+        "[-1.31326168751822, -0.313261687518223]"
     );
 }
 
@@ -403,7 +403,7 @@ fn mode_variadic_vs_single_arrayref_bug_cw() {
     assert_eq!(eval_string(r#"stringify(mode(1, 2, 2, 3))"#), "2");
     assert_eq!(
         eval_string(r#"stringify(mode([1, 2, 2, 3]))"#),
-        "[1, 2, 2, 3]"
+        "2"
     );
 }
 

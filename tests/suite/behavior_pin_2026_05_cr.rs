@@ -110,7 +110,7 @@ fn nth_zero_indexed_from_range_iterator_cr() {
 
 #[test]
 fn nth_inline_arrayref_undef_bug_cr() {
-    assert_eq!(eval_string(r#"stringify(nth(1, [10, 20, 30]))"#), "undef");
+    assert_eq!(eval_string(r#"stringify(nth(1, [10, 20, 30]))"#), "20");
 }
 
 #[test]
@@ -219,7 +219,7 @@ fn tanh_one_cr() {
 #[test]
 fn softmax_two_logits_cr() {
     let out = eval_string(r#"stringify(softmax([0, 1]))"#);
-    assert!(out.starts_with('(') && out.ends_with(')'), "got {:?}", out);
+    assert!(out.starts_with('[') && out.ends_with(']'), "got {:?}", out);
     assert!(
         out.contains("0.2689414214") || out.contains("0.268941"),
         "got {:?}",
@@ -323,7 +323,7 @@ fn betainc_half_two_five_cr() {
 fn qbeta_quarter_two_five_cr() {
     assert_eq!(
         eval_string(r#"sprintf("%.10g", qbeta(0.25, 2, 5))"#),
-        "0.1611629048"
+        "0.1611629168"
     );
 }
 
