@@ -4,7 +4,7 @@
 // Ei, Li, Fresnel), number-theory gaps, combinatoric gaps, q-series, inverses,
 // and piecewise/symbolic primitives.
 //
-// Included via `include!("math_wolfram.rs");` from `builtins.rs`, sharing the
+// Included via `include!("math_wolfram_special_functions_core.rs");` from `builtins.rs`, sharing the
 // crate-internal `arg_to_vec` and `StrykeValue` scope.
 //
 // Sources for the recipes are NIST DLMF (https://dlmf.nist.gov), Numerical

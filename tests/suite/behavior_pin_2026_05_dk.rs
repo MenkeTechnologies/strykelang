@@ -1,6 +1,6 @@
 //! Behavior-pinning batch DK (2026-05): **continuous PDFs** (`beta_pdf`, `gamma_pdf`, `chi2_pdf`, `t_pdf`,
 //! `f_pdf`, `laplace_pdf`, `cauchy_pdf`, `pareto_pdf`, `weibull_pdf`, `lognormal_pdf`, `normal_cdf` / `normal_pdf`,
-//! `poisson_pmf`), **graph / search micro-ops** from **`math_wolfram75`** (`dijkstra_relax`, **`bellman_ford_relax`**,
+//! `poisson_pmf`), **graph / search micro-ops** from **`math_wolfram_networkx_graph_algorithms`** (`dijkstra_relax`, **`bellman_ford_relax`**,
 //! **`floyd_warshall_step`**, **`astar_search`**, **`bidirectional_dijkstra`**, **`prim_step`**, **`kruskal_step`**,
 //! **`johnson_reweight`**, **`yen_k_shortest`**, **`ida_star`**, **`bfs_count`**, **`tarjan_scc_step`**, **`topo_kahn_step`**,
 //! **`dfs_postorder_done`**), **distribution / hash crumbs** (`db_jump_hash_bucket`), **procedural / SDF**

@@ -6,7 +6,7 @@
 // time-series advanced, image processing, spatial/geographic, integer
 // sequences, graph metrics, 3-D geometry, classical iterative solvers,
 // algebraic/crypto helpers, classical physics and chemistry. Included after
-// `math_wolfram4.rs`.
+// `math_wolfram_autodiff_ode_glm.rs`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── 1. CAS-lite (real coefficients) ──────────────────────────────────────────

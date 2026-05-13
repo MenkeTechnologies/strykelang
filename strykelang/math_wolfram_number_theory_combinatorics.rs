@@ -2,7 +2,7 @@
 // Wolfram-Math parity: number-theory extras, combinatoric sequences,
 // linear-algebra extras, polynomial algebra, more distributions, Mathieu /
 // Heun, wavelets, graph extras, and misc fill-ins (Stieltjes, Gauss sum, etc).
-// Included alongside `math_wolfram.rs` from `builtins.rs`. Helpers `f1..f4`,
+// Included alongside `math_wolfram_special_functions_core.rs` from `builtins.rs`. Helpers `f1..f4`,
 // `i1..i2`, `arg_to_vec`, `mod_pow_i64`, `gcd_i64`, `binomial_f`, and
 // `prime_factorize` come from the surrounding scope.
 // ─────────────────────────────────────────────────────────────────────────────

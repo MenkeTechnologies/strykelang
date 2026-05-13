@@ -4,7 +4,7 @@
 // information theory, quantum primitives, stat mech, optics, astrodynamics,
 // time series, graph centrality, random samplers for new distributions, 2-D
 // convex hull, line geometry. Included from `builtins.rs` after
-// `math_wolfram2.rs`. Helpers (`f1..f4`, `i1`, `i2`, `arg_to_vec`,
+// `math_wolfram_number_theory_combinatorics.rs`. Helpers (`f1..f4`, `i1`, `i2`, `arg_to_vec`,
 // `mat_mul`, `matrix_from_value`, `matrix_to_value`, `matrix_det_f64`,
 // `gcd_i64`, `prime_factorize`, `binomial_f`) come from earlier modules.
 // ─────────────────────────────────────────────────────────────────────────────

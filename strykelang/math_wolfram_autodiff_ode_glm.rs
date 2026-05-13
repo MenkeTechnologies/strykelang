@@ -6,7 +6,7 @@
 // poisson / ridge / lasso), bootstrap / resampling, time-series ops, DP
 // utilities, ML metrics, DSP / image filters, stochastic-process samplers,
 // compression / info, quantum + classical physics extras, and a handful of
-// number-theory primitives. Included after `math_wolfram3.rs`.
+// number-theory primitives. Included after `math_wolfram_vector_calculus_optimization.rs`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─── 1. Forward-mode auto-diff (Julia ForwardDiff) ────────────────────────────
