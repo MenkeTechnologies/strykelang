@@ -985,6 +985,8 @@ pub(crate) fn try_builtin(
         "pfrequencies" | "pfreq" | "pfrq" => Some(builtin_pfrequencies(args)),
         "ddump" | "dd" => Some(builtin_ddump(args)),
         "perfview" | "pfv" => Some(builtin_perfview(args)),
+        "docs" => Some(builtin_docs(args)),
+        "banner" => Some(builtin_banner(args)),
         // ── network / ip / cidr (IP-address subset) ──
         "ip_parse" => Some(Ok(crate::builtins_net::ip_parse(args))),
         "ip_is_valid" => Some(Ok(crate::builtins_net::ip_is_valid(args))),
@@ -12242,6 +12244,80 @@ fn builtin_perfview(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         out.push(StrykeValue::hash_ref(Arc::new(RwLock::new(h))));
     }
     Ok(StrykeValue::array_ref(Arc::new(RwLock::new(out))))
+}
+
+/// `banner()` — print the stryke ASCII logo + live-stats box + tagline
+/// (the same banner the REPL shows on startup and `stryke --help`
+/// displays). Reflection counts (`%b`/`%a`/`%k`/...) are pulled at call
+/// time so the values stay current after rebuilds.
+///
+/// In list context returns `undef` (it's a print-side-effect builtin).
+/// With a single arg that is true (e.g. `banner(1)`), returns the
+/// rendered string instead of printing — useful for capturing the
+/// banner into a variable or piping it elsewhere. ANSI colors are
+/// emitted only when stdout is a TTY.
+fn builtin_banner(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    use std::io::IsTerminal;
+    let colored = std::io::stdout().is_terminal();
+    let capture = args.first().is_some_and(|v| v.is_true());
+    if capture {
+        Ok(StrykeValue::string(crate::banner::render_banner(colored)))
+    } else {
+        crate::banner::print_banner(colored);
+        Ok(StrykeValue::UNDEF)
+    }
+}
+
+/// `docs(TOPIC)` — return the hover-doc page for `TOPIC` from `lsp.rs`
+/// (the same source `stryke docs` renders), formatted for terminal
+/// display: bold heading, dim rule, cyan inline `backticks`, green
+/// `\`\`\`code fences\`\`\``. ANSI colors are emitted only when stdout
+/// is a TTY so piped / redirected output stays clean.
+///
+/// `TOPIC` may be any primary builtin name, alias spelling, keyword,
+/// operator, or sigil-prefixed reflection-hash name. Returns `undef`
+/// when no doc page exists.
+///
+/// With multiple args, returns a hashref of `{ name => rendered_page }`
+/// so a list of topics round-trips in one call.
+///
+/// With no args, returns an arrayref of every documented topic name
+/// (sorted, deduped) — the in-language equivalent of `stryke docs --list`.
+fn builtin_docs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    use std::io::IsTerminal;
+    let colored = std::io::stdout().is_terminal();
+    if args.is_empty() {
+        let topics = crate::lsp::doc_topics();
+        let mut out: Vec<StrykeValue> = topics
+            .iter()
+            .filter(|t| crate::lsp::doc_text_for(t).is_some())
+            .map(|t| StrykeValue::string(t.to_string()))
+            .collect();
+        out.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+        out.dedup_by(|a, b| a.to_string() == b.to_string());
+        return Ok(StrykeValue::array_ref(Arc::new(RwLock::new(out))));
+    }
+    if args.len() == 1 {
+        let topic = args[0].to_string();
+        return Ok(match crate::lsp::doc_text_for(&topic) {
+            Some(s) => {
+                StrykeValue::string(crate::doc_render::render_doc(&topic, s, colored))
+            }
+            None => StrykeValue::UNDEF,
+        });
+    }
+    let mut h: indexmap::IndexMap<String, StrykeValue> = indexmap::IndexMap::new();
+    for a in args {
+        let topic = a.to_string();
+        let val = match crate::lsp::doc_text_for(&topic) {
+            Some(s) => {
+                StrykeValue::string(crate::doc_render::render_doc(&topic, s, colored))
+            }
+            None => StrykeValue::UNDEF,
+        };
+        h.insert(topic, val);
+    }
+    Ok(StrykeValue::hash_ref(Arc::new(RwLock::new(h))))
 }
 
 /// `stringify EXPR, ...` / `str EXPR, ...` — convert values to valid stryke string literals.

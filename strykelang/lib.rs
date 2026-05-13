@@ -31,6 +31,8 @@ pub mod builtins_misc2;
 pub mod builtins_net;
 pub mod builtins_quant;
 pub mod builtins_validate;
+pub mod doc_render;
+pub mod banner;
 pub mod bytecode;
 pub mod capture;
 pub mod cli_runners;

@@ -13704,6 +13704,8 @@ impl Parser {
             | "mounts" | "du" | "du_tree" | "process_list"
             | "thread_count" | "pool_info" | "par_bench"
             | "perfview" | "pfv"
+            | "docs"
+            | "banner"
             // ── network / ip / cidr ─────────────────────────────────────────
             | "ip_parse" | "ip_is_valid" | "ip_version" | "ip_family"
             | "ip_to_int" | "int_to_ip" | "ip_to_bytes" | "bytes_to_ip"
