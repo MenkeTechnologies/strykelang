@@ -537,9 +537,7 @@ pub fn doc_for_domain_label(label: &str) -> Option<&'static str> {
         "viterbi_decode" => "`viterbi_decode(obs, init, trans, emit) → array` — most likely HMM state path; log-space Viterbi.\n\n```perl\np viterbi_decode([0,1,0], \\@pi, \\@A, \\@B)\n```",
         "forward_algorithm" => "`forward_algorithm(obs, init, trans, emit) → number` — total probability `P(obs)` summed over all state paths.",
         "backward_algorithm" => "`backward_algorithm(obs, init, trans, emit) → number` — backward equivalent of `forward_algorithm` for Baum-Welch updates.",
-        "hyperloglog_pp_new" => "`hyperloglog_pp_new(precision=14) → hash` — HyperLogLog sketch with `2^precision` dense registers. (Lacks HLL++ sparse representation and bias-correction tables — counts within ~3% of standard HLL.)",
-        "hyperloglog_pp_add" => "`hyperloglog_pp_add(hll, item) → hash` — fold an item into the sketch using 64-bit FNV-1a hash.",
-        "hyperloglog_pp_estimate" => "`hyperloglog_pp_estimate(hll) → number` — estimated cardinality with linear-counting small-range correction.\n\n```perl\nmy $h = hyperloglog_pp_new(10)\n$h = hyperloglog_pp_add($h, \"item$_\") for 1..1000\np hyperloglog_pp_estimate($h)\n```",
+        // hyperloglog_pp_* removed — see fast HeapObject-backed `hll_*` family in sketches.rs (RFC-1).
 
         // ── Game theory ────────────────────────────────────────────────
         "minimax_value" => "`minimax_value(leaves, depth) → number` — minimax over a complete binary tree of leaf payoffs. Even depth = max layer.\n\n```perl\np minimax_value([3,5,2,9], 2)  # 3\n```",

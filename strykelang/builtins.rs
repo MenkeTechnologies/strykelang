@@ -1723,19 +1723,8 @@ pub(crate) fn try_builtin(
         "quaternion_multiply" => Some(Ok(crate::builtins_misc::quaternion_multiply(args))),
         "quaternion_normalize" => Some(Ok(crate::builtins_misc::quaternion_normalize(args))),
         "quaternion_to_matrix" => Some(Ok(crate::builtins_misc::quaternion_to_matrix(args))),
-        "bloom_filter_new" => Some(Ok(crate::builtins_misc::bloom_filter_new(args))),
-        "bloom_filter_add" => Some(Ok(crate::builtins_misc::bloom_filter_add(args))),
-        "bloom_filter_contains" => Some(Ok(crate::builtins_misc::bloom_filter_contains(args))),
-        "count_min_sketch_new" => Some(Ok(crate::builtins_misc::count_min_sketch_new(args))),
-        "count_min_sketch_add" => Some(Ok(crate::builtins_misc::count_min_sketch_add(args))),
-        "count_min_sketch_query" => Some(Ok(crate::builtins_misc::count_min_sketch_query(args))),
-        "hyperloglog_new" => Some(Ok(crate::builtins_misc::hyperloglog_new(args))),
-        "hyperloglog_add" => Some(Ok(crate::builtins_misc::hyperloglog_add(args))),
-        "hyperloglog_estimate" => Some(Ok(crate::builtins_misc::hyperloglog_estimate(args))),
-        "hyperloglog_merge" => Some(Ok(crate::builtins_misc::hyperloglog_merge(args))),
-        "tdigest_new" => Some(Ok(crate::builtins_misc::tdigest_new(args))),
-        "tdigest_add" => Some(Ok(crate::builtins_misc::tdigest_add(args))),
-        "tdigest_quantile" => Some(Ok(crate::builtins_misc::tdigest_quantile(args))),
+        // Slow Wolfram-style hashref-backed sketch impls removed — replaced
+        // by HeapObject-backed fast versions in `sketches.rs` (RFC-1).
         "freq_to_note" => Some(Ok(crate::builtins_misc::freq_to_note(args))),
         "note_to_freq" => Some(Ok(crate::builtins_misc::note_to_freq(args))),
         "midi_note_to_name" => Some(Ok(crate::builtins_misc::midi_note_to_name(args))),
@@ -2507,9 +2496,8 @@ pub(crate) fn try_builtin(
         "elf_header_read" => Some(Ok(crate::builtins_bio_geom_markov::elf_header_read(args))),
         "forward_algorithm" => Some(Ok(crate::builtins_bio_geom_markov::forward_algorithm(args))),
         "gif_header_read" => Some(Ok(crate::builtins_bio_geom_markov::gif_header_read(args))),
-        "hyperloglog_pp_add" => Some(Ok(crate::builtins_bio_geom_markov::hyperloglog_pp_add(args))),
-        "hyperloglog_pp_estimate" => Some(Ok(crate::builtins_bio_geom_markov::hyperloglog_pp_estimate(args))),
-        "hyperloglog_pp_new" => Some(Ok(crate::builtins_bio_geom_markov::hyperloglog_pp_new(args))),
+        // Slow HLL++ hashref-backed primitives removed — replaced by
+        // HeapObject-backed fast HLL in `sketches.rs` (RFC-1).
         "ico_header_read" => Some(Ok(crate::builtins_bio_geom_markov::ico_header_read(args))),
         "jpeg_markers" => Some(Ok(crate::builtins_bio_geom_markov::jpeg_markers(args))),
         "levenshtein_edit_path" => Some(Ok(crate::builtins_bio_geom_markov::levenshtein_edit_path(args))),
@@ -3956,6 +3944,121 @@ pub(crate) fn try_builtin(
         "from_xml" | "fx" => Some(builtin_from_xml(args)),
         "from_csv" | "fcsv" => Some(builtin_from_csv(args)),
         "set" => Some(Ok(crate::value::set_from_elements(args.iter().cloned()))),
+        // ── Probabilistic data structures — see `sketches.rs` ──
+        "bloom_filter" | "bloom" | "bloom_new" => {
+            Some(crate::sketches::builtin_bloom_filter(args, line))
+        }
+        "bloom_add" => Some(crate::sketches::builtin_bloom_add(args, line)),
+        "bloom_contains" | "bloom_has" => {
+            Some(crate::sketches::builtin_bloom_contains(args, line))
+        }
+        "bloom_len" | "bloom_count" => Some(crate::sketches::builtin_bloom_len(args, line)),
+        "bloom_clear" | "bloom_reset" => Some(crate::sketches::builtin_bloom_clear(args, line)),
+        "bloom_merge" | "bloom_union" => Some(crate::sketches::builtin_bloom_merge(args, line)),
+        "bloom_fpr" => Some(crate::sketches::builtin_bloom_fpr(args, line)),
+        "bloom_bits" => Some(crate::sketches::builtin_bloom_bits(args, line)),
+        "bloom_serialize" | "bloom_to_bytes" => {
+            Some(crate::sketches::builtin_bloom_serialize(args, line))
+        }
+        "bloom_deserialize" | "bloom_from_bytes" => {
+            Some(crate::sketches::builtin_bloom_deserialize(args, line))
+        }
+        "hll" | "hyperloglog" | "hll_new" | "hyperloglog_new" | "hyperloglog_pp_new" => {
+            Some(crate::sketches::builtin_hll(args, line))
+        }
+        "hll_add" | "hyperloglog_add" | "hyperloglog_pp_add" => {
+            Some(crate::sketches::builtin_hll_add(args, line))
+        }
+        "hll_count" | "hll_estimate" | "hyperloglog_estimate" | "hyperloglog_pp_estimate" => {
+            Some(crate::sketches::builtin_hll_count(args, line))
+        }
+        "hll_merge" | "hyperloglog_merge" => {
+            Some(crate::sketches::builtin_hll_merge(args, line))
+        }
+        "hll_clear" | "hll_reset" => Some(crate::sketches::builtin_hll_clear(args, line)),
+        "hll_precision" => Some(crate::sketches::builtin_hll_precision(args, line)),
+        "hll_serialize" | "hll_to_bytes" => {
+            Some(crate::sketches::builtin_hll_serialize(args, line))
+        }
+        "hll_deserialize" | "hll_from_bytes" => {
+            Some(crate::sketches::builtin_hll_deserialize(args, line))
+        }
+        "cms" | "count_min_sketch" | "count_min_sketch_new" | "cms_new" => {
+            Some(crate::sketches::builtin_cms(args, line))
+        }
+        "cms_add" | "count_min_sketch_add" => Some(crate::sketches::builtin_cms_add(args, line)),
+        "cms_count" | "cms_query" | "count_min_sketch_query" => {
+            Some(crate::sketches::builtin_cms_count(args, line))
+        }
+        "cms_merge" => Some(crate::sketches::builtin_cms_merge(args, line)),
+        "cms_clear" | "cms_reset" => Some(crate::sketches::builtin_cms_clear(args, line)),
+        "cms_serialize" | "cms_to_bytes" => {
+            Some(crate::sketches::builtin_cms_serialize(args, line))
+        }
+        "cms_deserialize" | "cms_from_bytes" => {
+            Some(crate::sketches::builtin_cms_deserialize(args, line))
+        }
+        "topk" | "top_k" | "top_k_sketch" | "topk_new" => {
+            Some(crate::sketches::builtin_topk(args, line))
+        }
+        "topk_add" => Some(crate::sketches::builtin_topk_add(args, line)),
+        "topk_heavies" | "topk_top" => Some(crate::sketches::builtin_topk_heavies(args, line)),
+        "topk_count" => Some(crate::sketches::builtin_topk_count(args, line)),
+        "topk_size" => Some(crate::sketches::builtin_topk_size(args, line)),
+        "topk_merge" => Some(crate::sketches::builtin_topk_merge(args, line)),
+        "topk_clear" | "topk_reset" => Some(crate::sketches::builtin_topk_clear(args, line)),
+        "topk_serialize" | "topk_to_bytes" => {
+            Some(crate::sketches::builtin_topk_serialize(args, line))
+        }
+        "topk_deserialize" | "topk_from_bytes" => {
+            Some(crate::sketches::builtin_topk_deserialize(args, line))
+        }
+        "t_digest" | "tdigest" | "t_digest_new" | "td_new" | "tdigest_new" | "tdg" => {
+            // `td` is reserved (toml_decode alias); use `tdg` for the short form.
+            Some(crate::sketches::builtin_t_digest(args, line))
+        }
+        "td_add" | "tdigest_add" => Some(crate::sketches::builtin_td_add(args, line)),
+        "td_quantile" | "tdigest_quantile" => {
+            Some(crate::sketches::builtin_td_quantile(args, line))
+        }
+        "td_count" => Some(crate::sketches::builtin_td_count(args, line)),
+        "td_min" => Some(crate::sketches::builtin_td_min(args, line)),
+        "td_max" => Some(crate::sketches::builtin_td_max(args, line)),
+        "td_sum" => Some(crate::sketches::builtin_td_sum(args, line)),
+        "td_mean" => Some(crate::sketches::builtin_td_mean(args, line)),
+        "td_merge" => Some(crate::sketches::builtin_td_merge(args, line)),
+        "td_clear" | "td_reset" => Some(crate::sketches::builtin_td_clear(args, line)),
+        "td_serialize" | "td_to_bytes" => {
+            Some(crate::sketches::builtin_td_serialize(args, line))
+        }
+        "td_deserialize" | "td_from_bytes" => {
+            Some(crate::sketches::builtin_td_deserialize(args, line))
+        }
+        "roaring" | "roaring_bitmap" | "rbm" => {
+            // `rb` is reserved (read_bytes alias); use `rbm` for the short form.
+            Some(crate::sketches::builtin_roaring(args, line))
+        }
+        "rb_add" => Some(crate::sketches::builtin_rb_add(args, line)),
+        "rb_remove" | "rb_del" => Some(crate::sketches::builtin_rb_remove(args, line)),
+        "rb_contains" | "rb_has" => Some(crate::sketches::builtin_rb_contains(args, line)),
+        "rb_len" | "rb_count" => Some(crate::sketches::builtin_rb_len(args, line)),
+        "rb_min" => Some(crate::sketches::builtin_rb_min(args, line)),
+        "rb_max" => Some(crate::sketches::builtin_rb_max(args, line)),
+        "rb_to_array" | "rb_to_list" => Some(crate::sketches::builtin_rb_to_array(args, line)),
+        "rb_rank" => Some(crate::sketches::builtin_rb_rank(args, line)),
+        "rb_or" | "rb_union" => Some(crate::sketches::builtin_rb_or(args, line)),
+        "rb_and" | "rb_intersect" => Some(crate::sketches::builtin_rb_and(args, line)),
+        "rb_xor" | "rb_symdiff" => Some(crate::sketches::builtin_rb_xor(args, line)),
+        "rb_andnot" | "rb_diff" | "rb_minus" => {
+            Some(crate::sketches::builtin_rb_andnot(args, line))
+        }
+        "rb_clear" | "rb_reset" => Some(crate::sketches::builtin_rb_clear(args, line)),
+        "rb_serialize" | "rb_to_bytes" => {
+            Some(crate::sketches::builtin_rb_serialize(args, line))
+        }
+        "rb_deserialize" | "rb_from_bytes" => {
+            Some(crate::sketches::builtin_rb_deserialize(args, line))
+        }
         "tee" => Some(builtin_tee(args, line)),
         "nth" => Some(builtin_nth(args)),
         "to_set" => Some(builtin_to_set(args)),

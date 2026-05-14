@@ -116,6 +116,8 @@ snap = "1"
 weezl = "0.1"
 zip = "2"
 xxhash-rust = { version = "0.8", features = ["xxh32", "xxh64", "xxh3"] }
+tdigest = { version = "0.2", features = ["use_serde"] }
+roaring = "0.11"
 murmur3 = "0.5"
 md4 = "0.10"
 blowfish = "0.9"

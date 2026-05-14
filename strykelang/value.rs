@@ -586,6 +586,19 @@ pub(crate) enum HeapObject {
     Generator(Arc<PerlGenerator>),
     Deque(Arc<Mutex<VecDeque<StrykeValue>>>),
     Heap(Arc<Mutex<PerlHeap>>),
+    /// Probabilistic-data-structure family — see `sketches.rs`.
+    /// Bloom filter: capacity/FPR-parameterized set-membership sketch.
+    BloomFilter(Arc<Mutex<crate::sketches::BloomFilter>>),
+    /// HyperLogLog: cardinality estimation (distinct-count sketch).
+    HllSketch(Arc<Mutex<crate::sketches::HllSketch>>),
+    /// Count-Min Sketch: per-key frequency estimation.
+    CmsSketch(Arc<Mutex<crate::sketches::CmsSketch>>),
+    /// SpaceSaving top-K heavy-hitters sketch.
+    TopKSketch(Arc<Mutex<crate::sketches::TopKSketch>>),
+    /// t-digest streaming quantile sketch.
+    TDigestSketch(Arc<Mutex<crate::sketches::TDigestSketch>>),
+    /// Roaring bitmap — compressed bitset over u32.
+    RoaringBitmap(Arc<Mutex<crate::sketches::RoaringBitmapSketch>>),
     Pipeline(Arc<Mutex<PipelineInner>>),
     Capture(Arc<CaptureResult>),
     Ppool(PerlPpool),
@@ -1676,6 +1689,90 @@ impl StrykeValue {
     }
 
     #[inline]
+    pub fn bloom_filter(b: Arc<Mutex<crate::sketches::BloomFilter>>) -> Self {
+        Self::from_heap(Arc::new(HeapObject::BloomFilter(b)))
+    }
+
+    #[inline]
+    pub fn as_bloom_filter(&self) -> Option<Arc<Mutex<crate::sketches::BloomFilter>>> {
+        self.with_heap(|h| match h {
+            HeapObject::BloomFilter(b) => Some(Arc::clone(b)),
+            _ => None,
+        })
+        .flatten()
+    }
+
+    #[inline]
+    pub fn hll_sketch(h: Arc<Mutex<crate::sketches::HllSketch>>) -> Self {
+        Self::from_heap(Arc::new(HeapObject::HllSketch(h)))
+    }
+
+    #[inline]
+    pub fn as_hll_sketch(&self) -> Option<Arc<Mutex<crate::sketches::HllSketch>>> {
+        self.with_heap(|h| match h {
+            HeapObject::HllSketch(s) => Some(Arc::clone(s)),
+            _ => None,
+        })
+        .flatten()
+    }
+
+    #[inline]
+    pub fn cms_sketch(c: Arc<Mutex<crate::sketches::CmsSketch>>) -> Self {
+        Self::from_heap(Arc::new(HeapObject::CmsSketch(c)))
+    }
+
+    #[inline]
+    pub fn as_cms_sketch(&self) -> Option<Arc<Mutex<crate::sketches::CmsSketch>>> {
+        self.with_heap(|h| match h {
+            HeapObject::CmsSketch(s) => Some(Arc::clone(s)),
+            _ => None,
+        })
+        .flatten()
+    }
+
+    #[inline]
+    pub fn topk_sketch(t: Arc<Mutex<crate::sketches::TopKSketch>>) -> Self {
+        Self::from_heap(Arc::new(HeapObject::TopKSketch(t)))
+    }
+
+    #[inline]
+    pub fn as_topk_sketch(&self) -> Option<Arc<Mutex<crate::sketches::TopKSketch>>> {
+        self.with_heap(|h| match h {
+            HeapObject::TopKSketch(s) => Some(Arc::clone(s)),
+            _ => None,
+        })
+        .flatten()
+    }
+
+    #[inline]
+    pub fn tdigest_sketch(t: Arc<Mutex<crate::sketches::TDigestSketch>>) -> Self {
+        Self::from_heap(Arc::new(HeapObject::TDigestSketch(t)))
+    }
+
+    #[inline]
+    pub fn as_tdigest_sketch(&self) -> Option<Arc<Mutex<crate::sketches::TDigestSketch>>> {
+        self.with_heap(|h| match h {
+            HeapObject::TDigestSketch(s) => Some(Arc::clone(s)),
+            _ => None,
+        })
+        .flatten()
+    }
+
+    #[inline]
+    pub fn roaring_bitmap(r: Arc<Mutex<crate::sketches::RoaringBitmapSketch>>) -> Self {
+        Self::from_heap(Arc::new(HeapObject::RoaringBitmap(r)))
+    }
+
+    #[inline]
+    pub fn as_roaring_bitmap(&self) -> Option<Arc<Mutex<crate::sketches::RoaringBitmapSketch>>> {
+        self.with_heap(|h| match h {
+            HeapObject::RoaringBitmap(s) => Some(Arc::clone(s)),
+            _ => None,
+        })
+        .flatten()
+    }
+
+    #[inline]
     pub fn pipeline(p: Arc<Mutex<PipelineInner>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Pipeline(p)))
     }
@@ -2102,6 +2199,12 @@ impl StrykeValue {
             HeapObject::Generator(_) => "Generator".to_string(),
             HeapObject::Deque(_) => "Deque".to_string(),
             HeapObject::Heap(_) => "Heap".to_string(),
+            HeapObject::BloomFilter(_) => "BloomFilter".to_string(),
+            HeapObject::HllSketch(_) => "HllSketch".to_string(),
+            HeapObject::CmsSketch(_) => "CmsSketch".to_string(),
+            HeapObject::TopKSketch(_) => "TopKSketch".to_string(),
+            HeapObject::TDigestSketch(_) => "TDigestSketch".to_string(),
+            HeapObject::RoaringBitmap(_) => "RoaringBitmap".to_string(),
             HeapObject::Pipeline(_) => "Pipeline".to_string(),
             HeapObject::DataFrame(_) => "DataFrame".to_string(),
             HeapObject::Capture(_) => "Capture".to_string(),
@@ -2144,6 +2247,12 @@ impl StrykeValue {
             HeapObject::Generator(_) => StrykeValue::string("Generator".into()),
             HeapObject::Deque(_) => StrykeValue::string("Deque".into()),
             HeapObject::Heap(_) => StrykeValue::string("Heap".into()),
+            HeapObject::BloomFilter(_) => StrykeValue::string("BloomFilter".into()),
+            HeapObject::HllSketch(_) => StrykeValue::string("HllSketch".into()),
+            HeapObject::CmsSketch(_) => StrykeValue::string("CmsSketch".into()),
+            HeapObject::TopKSketch(_) => StrykeValue::string("TopKSketch".into()),
+            HeapObject::TDigestSketch(_) => StrykeValue::string("TDigestSketch".into()),
+            HeapObject::RoaringBitmap(_) => StrykeValue::string("RoaringBitmap".into()),
             HeapObject::Pipeline(_) => StrykeValue::string("Pipeline".into()),
             HeapObject::DataFrame(_) => StrykeValue::string("DataFrame".into()),
             HeapObject::Capture(_) => StrykeValue::string("Capture".into()),
@@ -2393,6 +2502,30 @@ impl fmt::Display for StrykeValue {
             HeapObject::Generator(g) => write!(f, "Generator({} stmts)", g.block.len()),
             HeapObject::Deque(d) => write!(f, "Deque({})", d.lock().len()),
             HeapObject::Heap(h) => write!(f, "Heap({})", h.lock().items.len()),
+            HeapObject::BloomFilter(b) => {
+                let g = b.lock();
+                write!(f, "BloomFilter(n={}, bits={}, k={})", g.inserted(), g.bit_count(), g.k())
+            }
+            HeapObject::HllSketch(s) => {
+                let g = s.lock();
+                write!(f, "HllSketch(p={}, m={})", g.precision(), g.registers_len())
+            }
+            HeapObject::CmsSketch(s) => {
+                let g = s.lock();
+                write!(f, "CmsSketch(w={}, d={})", g.width(), g.depth())
+            }
+            HeapObject::TopKSketch(s) => {
+                let g = s.lock();
+                write!(f, "TopKSketch(k={}, n={})", g.k(), g.size())
+            }
+            HeapObject::TDigestSketch(s) => {
+                let g = s.lock();
+                write!(f, "TDigestSketch(compression={})", g.compression())
+            }
+            HeapObject::RoaringBitmap(s) => {
+                let g = s.lock();
+                write!(f, "RoaringBitmap(n={})", g.len())
+            }
             HeapObject::Pipeline(p) => {
                 let g = p.lock();
                 write!(f, "Pipeline({} ops)", g.ops.len())
@@ -2526,6 +2659,12 @@ pub fn set_member_key(v: &StrykeValue) -> String {
         HeapObject::Generator(g) => format!("gen:{:p}", Arc::as_ptr(g)),
         HeapObject::Deque(d) => format!("dq:{:p}", Arc::as_ptr(d)),
         HeapObject::Heap(h) => format!("hp:{:p}", Arc::as_ptr(h)),
+        HeapObject::BloomFilter(b) => format!("bf:{:p}", Arc::as_ptr(b)),
+        HeapObject::HllSketch(s) => format!("hll:{:p}", Arc::as_ptr(s)),
+        HeapObject::CmsSketch(s) => format!("cms:{:p}", Arc::as_ptr(s)),
+        HeapObject::TopKSketch(s) => format!("topk:{:p}", Arc::as_ptr(s)),
+        HeapObject::TDigestSketch(s) => format!("td:{:p}", Arc::as_ptr(s)),
+        HeapObject::RoaringBitmap(s) => format!("rb:{:p}", Arc::as_ptr(s)),
         HeapObject::Pipeline(p) => format!("pl:{:p}", Arc::as_ptr(p)),
         HeapObject::Capture(c) => format!("cap:{:p}", Arc::as_ptr(c)),
         HeapObject::Ppool(p) => format!("pp:{:p}", Arc::as_ptr(&p.0)),
