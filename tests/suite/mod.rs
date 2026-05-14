@@ -164,6 +164,7 @@ mod native_codec;
 mod native_ext;
 mod new_builtins;
 mod no_interop;
+mod numerical_ids;
 mod numeric_builtins;
 mod pack_unpack_runtime;
 mod par_chunk_macros;

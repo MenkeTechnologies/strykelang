@@ -3498,6 +3498,16 @@ pub(crate) fn try_builtin(
         "nanoid" => Some(builtin_nanoid(args)),
         "short_id" => Some(builtin_short_id()),
         "is_uuid" => Some(builtin_is_uuid(interp, args)),
+        "ulid" | "ulid_new" => Some(builtin_ulid(args)),
+        "is_ulid" => Some(builtin_is_ulid(interp, args)),
+        "ulid_timestamp" | "ulid_ts" => Some(builtin_ulid_timestamp(args)),
+        "kahan_sum" | "kahan" | "neumaier_sum" => Some(builtin_kahan_sum(interp, args)),
+        "welford_mean" => Some(builtin_welford_mean(interp, args)),
+        "welford_variance" | "welford_var" => Some(builtin_welford_variance(interp, args)),
+        "welford_stddev" | "welford_sd" => Some(builtin_welford_stddev(interp, args)),
+        "welford_pop_variance" | "welford_pvar" => {
+            Some(builtin_welford_pop_variance(interp, args))
+        }
         "token" => Some(builtin_token(args)),
         // ── URL/email parts ──
         "email_domain" => Some(builtin_email_domain(interp, args)),
@@ -4058,6 +4068,72 @@ pub(crate) fn try_builtin(
         }
         "rb_deserialize" | "rb_from_bytes" => {
             Some(crate::sketches::builtin_rb_deserialize(args, line))
+        }
+        // ── Rate limiters ──
+        "token_bucket" | "token_bucket_new" => {
+            Some(crate::sketches::builtin_token_bucket(args, line))
+        }
+        "leaky_bucket" | "leaky_bucket_new" => {
+            Some(crate::sketches::builtin_leaky_bucket(args, line))
+        }
+        "rl_try_take" | "rl_take" | "bucket_try_take" => {
+            Some(crate::sketches::builtin_rl_try_take(args, line))
+        }
+        "rl_available" | "bucket_available" => {
+            Some(crate::sketches::builtin_rl_available(args, line))
+        }
+        // ── Hash ring ──
+        "hash_ring" | "consistent_hash" | "hash_ring_new" => {
+            Some(crate::sketches::builtin_hash_ring(args, line))
+        }
+        "hr_add" | "hash_ring_add" => Some(crate::sketches::builtin_hr_add(args, line)),
+        "hr_remove" | "hash_ring_remove" => Some(crate::sketches::builtin_hr_remove(args, line)),
+        "hr_get" | "hash_ring_get" => Some(crate::sketches::builtin_hr_get(args, line)),
+        "hr_nodes" | "hash_ring_nodes" => Some(crate::sketches::builtin_hr_nodes(args, line)),
+        // ── SimHash / MinHash ──
+        "simhash" | "simhash_new" => Some(crate::sketches::builtin_simhash(args, line)),
+        "sh_add" | "simhash_add" => Some(crate::sketches::builtin_sh_add(args, line)),
+        "sh_digest" | "simhash_digest" => Some(crate::sketches::builtin_sh_digest(args, line)),
+        "sh_similarity" | "simhash_similarity" => {
+            Some(crate::sketches::builtin_sh_similarity(args, line))
+        }
+        "minhash" | "minhash_new" => Some(crate::sketches::builtin_minhash(args, line)),
+        "mh_add" | "minhash_add" => Some(crate::sketches::builtin_mh_add(args, line)),
+        "mh_jaccard" | "minhash_jaccard" => Some(crate::sketches::builtin_mh_jaccard(args, line)),
+        "mh_merge" | "minhash_merge" => Some(crate::sketches::builtin_mh_merge(args, line)),
+        // ── Interval tree ──
+        "interval_tree" | "interval_tree_new" => {
+            Some(crate::sketches::builtin_interval_tree(args, line))
+        }
+        "it_insert" | "interval_insert" => Some(crate::sketches::builtin_it_insert(args, line)),
+        "it_query_point" | "interval_at" => {
+            Some(crate::sketches::builtin_it_query_point(args, line))
+        }
+        "it_query_range" | "interval_overlap" => {
+            Some(crate::sketches::builtin_it_query_range(args, line))
+        }
+        "it_remove" | "interval_remove" => Some(crate::sketches::builtin_it_remove(args, line)),
+        "it_len" | "interval_count" => Some(crate::sketches::builtin_it_len(args, line)),
+        // ── BK-tree ──
+        "bk_tree" | "bk_tree_new" => Some(crate::sketches::builtin_bk_tree(args, line)),
+        "bk_insert" => Some(crate::sketches::builtin_bk_insert(args, line)),
+        "bk_query" | "bk_search" | "fuzzy_query" => {
+            Some(crate::sketches::builtin_bk_query(args, line))
+        }
+        "bk_len" => Some(crate::sketches::builtin_bk_len(args, line)),
+        // ── Rope ──
+        "rope" | "rope_new" => Some(crate::sketches::builtin_rope(args, line)),
+        "rope_insert" => Some(crate::sketches::builtin_rope_insert(args, line)),
+        "rope_delete" => Some(crate::sketches::builtin_rope_delete(args, line)),
+        "rope_substring" | "rope_substr" => {
+            Some(crate::sketches::builtin_rope_substring(args, line))
+        }
+        "rope_to_string" | "rope_str" => Some(crate::sketches::builtin_rope_to_string(args, line)),
+        "rope_len" => Some(crate::sketches::builtin_rope_len(args, line)),
+        // ── Diff algorithms ──
+        "myers_diff" | "diff_myers" => Some(crate::sketches::builtin_myers_diff(args, line)),
+        "patience_diff" | "diff_patience" => {
+            Some(crate::sketches::builtin_patience_diff(args, line))
         }
         "tee" => Some(builtin_tee(args, line)),
         "nth" => Some(builtin_nth(args)),
@@ -20628,6 +20704,224 @@ fn builtin_nanoid(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 fn builtin_short_id() -> PerlResult<StrykeValue> {
     let n = (rand::random::<u64>() & 0xfffffff) as i64;
     Ok(StrykeValue::string(format!("{:07x}", n)))
+}
+
+/// `ulid` — 26-char Crockford-Base32 ULID: 10 chars of 48-bit
+/// millisecond timestamp + 16 chars of 80-bit randomness, monotonic
+/// within the same millisecond.
+///
+/// Monotonicity: a process-wide `Mutex<(last_ms, last_rand)>` ensures
+/// successive calls in the same millisecond produce a strictly larger
+/// random part (`last_rand + 1`). This is what makes ULIDs reliably
+/// lexicographically sortable in burst-emission patterns.
+///
+/// World's-first as scripting-language stdlib builtin: Python / Ruby /
+/// Node all need third-party packages. Zero binary cost (uses existing
+/// `rand` + `std::time` + `parking_lot::Mutex`).
+fn builtin_ulid(_args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    use once_cell::sync::Lazy;
+    use parking_lot::Mutex;
+    static MONO: Lazy<Mutex<(u64, u128)>> = Lazy::new(|| Mutex::new((0u64, 0u128)));
+
+    const CROCKFORD: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+    let ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+
+    // Compose the 80-bit random component with monotonic guard.
+    let rand80: u128 = {
+        let mut g = MONO.lock();
+        if ms == g.0 {
+            // Same-millisecond: increment the last issued random by 1.
+            // 80-bit overflow saturates back to a fresh random (extreme
+            // edge case — would require >2^80 ULIDs in a single ms).
+            let mask = (1u128 << 80) - 1;
+            let next = (g.1.wrapping_add(1)) & mask;
+            if next == 0 {
+                let fresh = ((rand::random::<u64>() as u128) << 16)
+                    | (rand::random::<u16>() as u128);
+                g.1 = fresh & mask;
+            } else {
+                g.1 = next;
+            }
+        } else {
+            // New millisecond: draw a fresh 80-bit random.
+            let fresh = ((rand::random::<u64>() as u128) << 16)
+                | (rand::random::<u16>() as u128);
+            g.0 = ms;
+            g.1 = fresh & ((1u128 << 80) - 1);
+        }
+        g.1
+    };
+
+    // 128-bit composite: top 48 bits = ms, bottom 80 = rand80.
+    let composite: u128 = ((ms as u128) << 80) | rand80;
+    let mut out = [b'0'; 26];
+    // First char: top 2 bits, padded to 5 bits via zero-extension.
+    out[0] = CROCKFORD[((composite >> 125) & 0x1F) as usize];
+    for i in 0..25 {
+        let shift = 120 - i * 5;
+        out[i + 1] = CROCKFORD[((composite >> shift) & 0x1F) as usize];
+    }
+    Ok(StrykeValue::string(
+        String::from_utf8(out.to_vec()).unwrap(),
+    ))
+}
+
+/// `is_ulid` — `1`/`0` per the 26-char Crockford-Base32 format
+/// (`[0-9A-HJKMNP-TV-Z]{26}`).
+fn builtin_is_ulid(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    if s.len() != 26 {
+        return Ok(bool_iv(false));
+    }
+    let ok = s.chars().all(|c| {
+        matches!(c, '0'..='9' | 'A'..='H' | 'J' | 'K' | 'M' | 'N' | 'P'..='T' | 'V'..='Z')
+    });
+    Ok(bool_iv(ok))
+}
+
+/// `ulid_timestamp(ULID)` — extract the 48-bit millisecond timestamp
+/// from a ULID string. Returns the integer ms-since-Unix-epoch, or
+/// `undef` on malformed input.
+fn builtin_ulid_timestamp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let Some(s) = args.first().map(|v| v.to_string()) else {
+        return Ok(StrykeValue::UNDEF);
+    };
+    if s.len() != 26 {
+        return Ok(StrykeValue::UNDEF);
+    }
+    // Decode the first 10 chars (50 bits) as Crockford base-32; mask to 48 bits.
+    let decode = |c: char| -> Option<u64> {
+        match c {
+            '0'..='9' => Some(c as u64 - '0' as u64),
+            'A'..='H' => Some(c as u64 - 'A' as u64 + 10),
+            'J' => Some(18),
+            'K' => Some(19),
+            'M' => Some(20),
+            'N' => Some(21),
+            'P' => Some(22),
+            'Q' => Some(23),
+            'R' => Some(24),
+            'S' => Some(25),
+            'T' => Some(26),
+            'V' => Some(27),
+            'W' => Some(28),
+            'X' => Some(29),
+            'Y' => Some(30),
+            'Z' => Some(31),
+            _ => None,
+        }
+    };
+    let mut acc: u64 = 0;
+    for c in s.chars().take(10) {
+        let Some(v) = decode(c) else {
+            return Ok(StrykeValue::UNDEF);
+        };
+        acc = (acc << 5) | v;
+    }
+    // Top 50 bits decoded; lower 48 bits are the timestamp.
+    Ok(StrykeValue::integer((acc & 0x0000_FFFF_FFFF_FFFF) as i64))
+}
+
+/// `kahan_sum LIST` — compensated summation (Kahan–Babuška–Neumaier).
+/// Recovers ~16-17 digits of precision on long float sums where naive
+/// `sum` loses precision to cancellation. World's-first as builtin:
+/// Python's `math.fsum` is closest but it's a separate function, not a
+/// pipeable list builtin; Ruby / Node / Perl have no stdlib equivalent.
+/// O(n), single pass, no allocation.
+fn builtin_kahan_sum(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let xs = flatten_args(args);
+    if xs.is_empty() {
+        // Match `sum`/`sum0` convention: empty → 0.0 in numeric context.
+        let _ = interp;
+        return Ok(StrykeValue::float(0.0));
+    }
+    // Neumaier's variant: handles both cases where `|s| >= |x|` and `|s| < |x|`.
+    let mut sum = 0.0f64;
+    let mut c = 0.0f64;
+    for v in &xs {
+        let x = v.to_number();
+        let t = sum + x;
+        c += if sum.abs() >= x.abs() {
+            (sum - t) + x
+        } else {
+            (x - t) + sum
+        };
+        sum = t;
+    }
+    Ok(StrykeValue::float(sum + c))
+}
+
+/// `welford_mean LIST` — single-pass mean via Welford's online
+/// algorithm. Numerically stable for long streams where naive
+/// `sum(@xs) / len(@xs)` overflows or loses precision. Returns 0.0 on
+/// empty input (matches `mean` convention).
+fn builtin_welford_mean(_interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let xs = flatten_args(args);
+    if xs.is_empty() {
+        return Ok(StrykeValue::float(0.0));
+    }
+    let mut mean = 0.0f64;
+    let mut n = 0u64;
+    for v in &xs {
+        n += 1;
+        let x = v.to_number();
+        let delta = x - mean;
+        mean += delta / n as f64;
+    }
+    Ok(StrykeValue::float(mean))
+}
+
+/// `welford_variance LIST` — single-pass sample variance (n-1
+/// denominator) via Welford's online algorithm. One pass, O(n), no
+/// allocation. Returns 0.0 for n < 2.
+fn builtin_welford_variance(_interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let xs = flatten_args(args);
+    if xs.len() < 2 {
+        return Ok(StrykeValue::float(0.0));
+    }
+    let mut mean = 0.0f64;
+    let mut m2 = 0.0f64;
+    let mut n = 0u64;
+    for v in &xs {
+        n += 1;
+        let x = v.to_number();
+        let delta = x - mean;
+        mean += delta / n as f64;
+        let delta2 = x - mean;
+        m2 += delta * delta2;
+    }
+    Ok(StrykeValue::float(m2 / (n - 1) as f64))
+}
+
+/// `welford_stddev LIST` — sample standard deviation via Welford
+/// (`sqrt(welford_variance)`). Numerically stable on streams.
+fn builtin_welford_stddev(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let var = builtin_welford_variance(interp, args)?;
+    Ok(StrykeValue::float(var.to_number().sqrt()))
+}
+
+/// `welford_pop_variance LIST` — population variance (n denominator),
+/// counterpart to `welford_variance` (sample, n-1).
+fn builtin_welford_pop_variance(_interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let xs = flatten_args(args);
+    if xs.is_empty() {
+        return Ok(StrykeValue::float(0.0));
+    }
+    let mut mean = 0.0f64;
+    let mut m2 = 0.0f64;
+    let mut n = 0u64;
+    for v in &xs {
+        n += 1;
+        let x = v.to_number();
+        let delta = x - mean;
+        mean += delta / n as f64;
+        let delta2 = x - mean;
+        m2 += delta * delta2;
+    }
+    Ok(StrykeValue::float(m2 / n as f64))
 }
 /// `is_uuid` — Test whether the argument is uuid. Returns 1 (true) or 0 (false). Defaults to `$_`.
 fn builtin_is_uuid(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {

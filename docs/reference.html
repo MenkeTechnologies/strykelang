@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.13.16 · 10072 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.14.0 · 10143 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -330,7 +330,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">8400</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">8471</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -11990,7 +11990,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">8400 topics</p>
+      <p class="chapter-meta">8471 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$!</code></h3>
         <p><code>$!</code> — the OS error from the most recent system call, in stringified form (e.g. <code>&quot;No such file or directory&quot;</code>) or as an <code>errno</code> integer in numeric context. Set by <code>open</code>, <code>close</code>, <code>chdir</code>, <code>read</code>, <code>write</code>, and other syscalls when they fail. The value persists until the next failing call, so always check it *immediately* after the failing operation — intermediate clean Perl code does not touch it, but any subsequent syscall will.</p>
@@ -12013,15 +12013,6 @@ local $&quot; = &quot; | &quot;
 p &quot;row: @xs&quot;    # row: 1 | 2 | 3
 </code></pre>
         <p>Only affects double-quoted interpolation, not bare <code>print @xs</code> (which uses <code>$,</code>). Use <code>local $&quot;</code> to scope the change.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>$#</code></h3>
-        <p><code>$#</code> — the default output format for printed numbers (legacy / deprecated since early Perl 5; modern code uses <code>printf</code>/<code>sprintf</code> explicitly). Distinct from <code>$#array</code> which is the last-index expression — <code>$#</code> standalone reads the number-format global, <code>$#NAME</code> reads <code>$#{NAME}</code>, the last index of <code>@NAME</code>.</p>
-        <pre><code class="lang-perl">p $#                # number-format global (rarely set)
-my @xs = (1, 2, 3, 4)
-p $#xs              # 3 — last index of @xs
-</code></pre>
-        <p>For modern formatting use <code>printf &quot;%.2f&quot;, $n</code>. See also: <code>$#array</code> syntax, <code>printf</code>, <code>sprintf</code>.</p>
       </article>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$$</code></h3>
@@ -12104,14 +12095,6 @@ local $, = &quot; | &quot;
 print qw(a b c), &quot;\n&quot;      # a | b | c |
 </code></pre>
         <p>See also: <code>$\</code> (output record separator), <code>$&quot;</code> (list interpolation separator).</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>$-</code></h3>
-        <p><code>$-</code> — the number of lines left on the current output page for <code>format</code>/<code>write</code>. Decremented as <code>write</code> emits lines; when it hits 0, the top-of-page header (<code>$^</code> / <code>$=</code>) is re-emitted. Niche; only relevant to the legacy <code>format</code> system.</p>
-        <pre><code class="lang-perl">write
-p &quot;$- lines left on page&quot;
-</code></pre>
-        <p>See also: <code>format</code>, <code>write</code>, <code>$=</code> (page length), <code>$^</code> (top-of-page format).</p>
       </article>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$.</code></h3>
@@ -12258,76 +12241,6 @@ try { dangerous_call() } catch ($e) { warn &quot;caught: $e&quot; }
 }
 </code></pre>
         <p>See also: <code>@ARGV</code> (the list of files), <code>$.</code> (line number).</p>
-      </article>
-      <article class="doc-entry" id="doc-autoload">
-        <h3><a class="doc-anchor" href="#doc-autoload">#</a> <code>$AUTOLOAD</code></h3>
-        <p><code>$AUTOLOAD</code> — set by stryke just before an <code>AUTOLOAD</code> sub is invoked. Holds the fully-qualified name of the missing method that triggered the autoload (e.g. <code>&quot;My::Dispatcher::foo&quot;</code>). Inside <code>AUTOLOAD</code>, parse <code>$AUTOLOAD</code> to decide what to do — install a generated sub, proxy elsewhere, or <code>die</code> for unknown names.</p>
-        <pre><code class="lang-perl">package RPC
-fn AUTOLOAD {
-    my $name = $AUTOLOAD
-    $name =~ s/.*:://       # strip package prefix
-    return if $name eq &#39;DESTROY&#39;
-    my $self = shift
-    $self-&gt;call($name, @_)
-}
-</code></pre>
-        <p>See also: <code>AUTOLOAD</code> (the sub), <code>DESTROY</code>, MRO walking.</p>
-      </article>
-      <article class="doc-entry" id="doc-intercept-ms">
-        <h3><a class="doc-anchor" href="#doc-intercept-ms">#</a> <code>$INTERCEPT_MS</code></h3>
-        <p><code>$INTERCEPT_MS</code> — inside an <code>after</code> advice body, the elapsed wall-clock time of the wrapped call in <strong>milliseconds</strong> as a floating-point number. Mirrors <code>INTERCEPT_MS</code> from the zshrs AOP runtime. Use this for cheap timing instrumentation without a profiler.</p>
-        <pre><code class="lang-perl">after &quot;slow_query&quot; {
-    warn &quot;slow_query took ${INTERCEPT_MS}ms&quot; if $INTERCEPT_MS &gt; 100
-}
-after &quot;*&quot; {
-    record_metric($INTERCEPT_NAME, $INTERCEPT_MS)
-}
-</code></pre>
-        <p>See also: <code>$INTERCEPT_US</code> (microsecond precision), <code>$INTERCEPT_RESULT</code>, <code>before</code>, <code>after</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-intercept-name">
-        <h3><a class="doc-anchor" href="#doc-intercept-name">#</a> <code>$INTERCEPT_NAME</code></h3>
-        <p><code>$INTERCEPT_NAME</code> — inside an AOP advice body, the fully-qualified name of the intercepted sub (e.g. <code>&quot;main::fetch&quot;</code>, <code>&quot;My::DB::query&quot;</code>). Useful for glob-based advice (<code>before &quot;*&quot;</code> or <code>before &quot;My::*&quot;</code>) that needs to log or dispatch on the actual name being called.</p>
-        <pre><code class="lang-perl">before &quot;*&quot; { trace($INTERCEPT_NAME) }
-before &quot;My::DB::*&quot; {
-    log_info(&quot;db call: $INTERCEPT_NAME with @INTERCEPT_ARGS&quot;)
-}
-</code></pre>
-        <p>See also: <code>@INTERCEPT_ARGS</code>, <code>$INTERCEPT_RESULT</code>, <code>before</code>, <code>after</code>, <code>around</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-intercept-result">
-        <h3><a class="doc-anchor" href="#doc-intercept-result">#</a> <code>$INTERCEPT_RESULT</code></h3>
-        <p><code>$INTERCEPT_RESULT</code> — inside an <code>after</code> advice body, the value the wrapped sub returned (the equivalent of inspecting <code>$?</code>-style after a call). <code>before</code> advice runs too early to see this; <code>around</code> advice receives the result from <code>proceed()</code> and can rewrite it.</p>
-        <pre><code class="lang-perl">after &quot;fetch&quot; {
-    log_info(&quot;fetch returned $INTERCEPT_RESULT in ${INTERCEPT_MS}ms&quot;)
-}
-</code></pre>
-        <p>See also: <code>@INTERCEPT_ARGS</code>, <code>$INTERCEPT_NAME</code>, <code>$INTERCEPT_MS</code>, <code>before</code>, <code>after</code>, <code>around</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-intercept-us">
-        <h3><a class="doc-anchor" href="#doc-intercept-us">#</a> <code>$INTERCEPT_US</code></h3>
-        <p><code>$INTERCEPT_US</code> — inside an <code>after</code> advice body, the elapsed wall-clock time of the wrapped call in <strong>microseconds</strong> as an integer. Use when millisecond resolution from <code>$INTERCEPT_MS</code> is too coarse (sub-millisecond ops, hot inner loops).</p>
-        <pre><code class="lang-perl">after &quot;hot_op&quot; {
-    histogram_record(&quot;hot_op_us&quot;, $INTERCEPT_US)
-}
-</code></pre>
-        <p>See also: <code>$INTERCEPT_MS</code>, <code>before</code>, <code>after</code>, <code>around</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-nf">
-        <h3><a class="doc-anchor" href="#doc-nf">#</a> <code>$NF</code></h3>
-        <p><code>$NF</code> — awk-compat: the number of fields produced by the most recent autosplit of an input line into <code>@F</code> (<code>-a</code> flag). Equivalent to <code>scalar @F</code>. stryke exposes both for one-liner familiarity to awk users.</p>
-        <pre><code class="lang-perl"># stryke -F: -nae &#39;p &quot;$NF fields: @F&quot;&#39; /etc/passwd
-# Equivalent to awk &#39;{ print NF&quot; fields: &quot;$0 }&#39;
-</code></pre>
-        <p>See also: <code>$NR</code>, <code>@F</code>, <code>-a</code> / <code>-F</code> command-line flags, awk-compat one-liner mode.</p>
-      </article>
-      <article class="doc-entry" id="doc-nr">
-        <h3><a class="doc-anchor" href="#doc-nr">#</a> <code>$NR</code></h3>
-        <p><code>$NR</code> — awk-compat: the current input record number. Equivalent to <code>$.</code> (current line of the most recently read filehandle). stryke exposes both for one-liner familiarity to awk users. <code>$.</code>-based code and <code>$NR</code>-based code can be mixed in the same one-liner.</p>
-        <pre><code class="lang-perl"># stryke -nae &#39;p &quot;$NR: $_&quot; if /TODO/&#39;
-# Equivalent to awk &#39;/TODO/ { print NR&quot;: &quot;$0 }&#39;
-</code></pre>
-        <p>See also: <code>$.</code>, <code>$NF</code>, <code>@F</code>, <code>-a</code> / <code>-F</code>, <code>-n</code> / <code>-p</code>.</p>
       </article>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$\</code></h3>
@@ -12503,105 +12416,6 @@ p &quot;@xs&quot;   # 10 20 30
 </code></pre>
         <p>Use <code>local $_</code> to scope a topic change. In stryke, <code>_</code> (no sigil) is the preferred pipeline topic; <code>$_</code> is the Perl-5-compatible form.</p>
       </article>
-      <article class="doc-entry" id="doc-0">
-        <h3><a class="doc-anchor" href="#doc-0">#</a> <code>$_0</code></h3>
-        <p><code>_0</code> — explicit <strong>slot-0</strong> spelling of the pipeline topic (same value as bare <code>_</code>). Use <code>_0</code> when <code>_1</code>, <code>_2</code>, … are also in scope so the arity reads clearly. <code>$_0</code> is the sigiled equivalent and is mainly useful inside <strong>double-quoted strings</strong> where bare <code>_0</code> does not interpolate.</p>
-        <pre><code class="lang-perl">1:5 |&gt; map _ * 2     |&gt; e p       # implicit topic
-1:5 |&gt; map _0 * 2    |&gt; e p       # explicit positional 0 — same meaning
-</code></pre>
-        <p>See also: <code>$_</code>, <code>_</code>, <code>_1</code>..<code>_4</code>, <code>_&lt;N</code> (indexed ascent past depth 2).</p>
-      </article>
-      <article class="doc-entry" id="doc-0">
-        <h3><a class="doc-anchor" href="#doc-0">#</a> <code>$_0&lt;</code></h3>
-        <p><strong>Topic ascent, 1 frame up.</strong> Eight equivalent spellings of the same value — the topic from the *enclosing* block one frame out.</p>
-        <pre><code class="lang-text">spellings (all identical): _&lt;  $_&lt;  _0&lt;  $_0&lt;  _&lt;1  $_&lt;1  _0&lt;1  $_0&lt;1
-</code></pre>
-        <p>Every <code>|&gt;</code> stage, <code>map</code>/<code>grep</code>/<code>fore</code> block, and <code>sort</code> block opens a new topic frame. Inside that frame the *current* topic is <code>_</code> / <code>_0</code> (same slot as <code>$_</code> when that binding is active). One chevron <code>&lt;</code> walks up one frame to the surrounding block&#39;s topic. Indexed form <code>_&lt;N</code> is sugar for <code>N</code> chevrons — <code>_&lt;1</code> ≡ <code>_&lt;</code>, more readable as ascent depth grows. Runtime cap: 5 frames (<code>parser.rs:1473</code>).</p>
-        <p>At the outermost iter (no enclosing topic frame), <code>_&lt;</code> is <strong>undef</strong> — strict ascent semantics, no fallback to current <code>_</code>. If you need the current frame&#39;s topic, write <code>_</code> directly.</p>
-        <pre><code class="lang-perl">@rows |&gt; map {
-    my @cells = @$_                # $_ is current row
-    @cells |&gt; map { uc($_) . &quot;:&quot; . len($_&lt;) }
-    #                ^^ inner topic   ^^^ outer row arrayref
-}
-</code></pre>
-        <p>The four-spelling matrix lets you choose readability per context: bare <code>_&lt;</code> in pipe chains, sigiled <code>$_&lt;</code> when interpolating into <strong>strings</strong>, slot-explicit <code>_0&lt;</code> when slot 1, 2, … positionals are also in scope.</p>
-        <p>See also: <code>_&lt;&lt;</code> (2 up), <code>_&lt;&lt;&lt;</code> (3 up), <code>_&lt;&lt;&lt;&lt;</code> (4 up), <code>_&lt;&lt;&lt;&lt;&lt;</code> (5 up), <code>_&lt;N</code>/<code>_0&lt;N</code> (indexed ascent), <code>_</code>/<code>_0</code>/<code>$_</code> (current frame).</p>
-      </article>
-      <article class="doc-entry" id="doc-0-2">
-        <h3><a class="doc-anchor" href="#doc-0-2">#</a> <code>$_0&lt;2</code></h3>
-        <p><strong>Topic ascent, 2 frames up.</strong> Eight equivalent spellings of the topic from the block enclosing the enclosing block.</p>
-        <pre><code class="lang-text">spellings (all identical): _&lt;&lt;  $_&lt;&lt;  _0&lt;&lt;  $_0&lt;&lt;  _&lt;2  $_&lt;2  _0&lt;2  $_0&lt;2
-</code></pre>
-        <p>Two chevrons walk up two topic frames. Indexed form <code>_&lt;2</code> ≡ <code>_&lt;&lt;</code> — pick whichever is clearer at the call site. Often appears inside nested <code>map</code>/<code>grep</code> where you need to reach past the immediate enclosing block.</p>
-        <pre><code class="lang-perl">@docs |&gt; map {
-    my $doc = $_                            # _&lt;0 = current doc
-    $doc-&gt;{lines} |&gt; map {
-        my $line = $_                        # _&lt;0 = current line
-        $line |&gt; map {                       # _&lt;0 = char
-            { char =&gt; $_, line =&gt; $_&lt;, doc =&gt; $_&lt;&lt;-&gt;{id} }
-            #                  ^^^ line       ^^^^ doc, 2 up
-        }
-    }
-}
-</code></pre>
-        <p>See also: <code>_&lt;</code> (1 up), <code>_&lt;&lt;&lt;</code> (3 up), <code>_&lt;&lt;&lt;&lt;</code> (4 up), <code>_&lt;&lt;&lt;&lt;&lt;</code> (5 up), <code>_&lt;N</code>/<code>_0&lt;N</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-0-3">
-        <h3><a class="doc-anchor" href="#doc-0-3">#</a> <code>$_0&lt;3</code></h3>
-        <p><strong>Topic ascent, 3 frames up.</strong> Eight equivalent spellings of the topic three blocks out.</p>
-        <pre><code class="lang-text">spellings (all identical): _&lt;&lt;&lt;  $_&lt;&lt;&lt;  _0&lt;&lt;&lt;  $_0&lt;&lt;&lt;  _&lt;3  $_&lt;3  _0&lt;3  $_0&lt;3
-</code></pre>
-        <p>At this depth the indexed form <code>_&lt;3</code> is usually the clearer choice — counting chevrons gets error-prone past two. Both forms compile to the same bytecode.</p>
-        <pre><code class="lang-perl">@projects |&gt; map {
-    my $proj = $_                                       # _&lt;0
-    $proj-&gt;{tasks} |&gt; map {
-        $_-&gt;{steps} |&gt; map {
-            $_-&gt;{notes} |&gt; map {
-                { note =&gt; $_, step =&gt; $_&lt;, task =&gt; $_&lt;&lt;, proj =&gt; $_&lt;3 }
-                #                                              ^^^^ project, 3 up
-            }
-        }
-    }
-}
-</code></pre>
-        <p>See also: <code>_&lt;</code> (1 up), <code>_&lt;&lt;</code> (2 up), <code>_&lt;&lt;&lt;&lt;</code> (4 up), <code>_&lt;&lt;&lt;&lt;&lt;</code> (5 up), <code>_&lt;N</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-0-4">
-        <h3><a class="doc-anchor" href="#doc-0-4">#</a> <code>$_0&lt;4</code></h3>
-        <p><strong>Topic ascent, 4 frames up.</strong> Eight equivalent spellings of the topic four blocks out. At this depth prefer the indexed form <code>_&lt;4</code> for readability.</p>
-        <pre><code class="lang-text">spellings (all identical): _&lt;&lt;&lt;&lt;  $_&lt;&lt;&lt;&lt;  _0&lt;&lt;&lt;&lt;  $_0&lt;&lt;&lt;&lt;  _&lt;4  $_&lt;4  _0&lt;4  $_0&lt;4
-</code></pre>
-        <p>See also: <code>_&lt;</code> (1 up), <code>_&lt;&lt;</code> (2 up), <code>_&lt;&lt;&lt;</code> (3 up), <code>_&lt;&lt;&lt;&lt;&lt;</code> (5 up), <code>_&lt;N</code>/<code>_0&lt;N</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-0-5">
-        <h3><a class="doc-anchor" href="#doc-0-5">#</a> <code>$_0&lt;5</code></h3>
-        <p><strong>Topic ascent, 5 frames up.</strong> Eight equivalent spellings of the topic five blocks out — the deepest ascent the runtime accepts (<code>parser.rs:1473</code> caps at 5). Past this depth, refactor to a named lexical (<code>my $outer = $_</code>) instead.</p>
-        <pre><code class="lang-text">spellings (all identical): _&lt;&lt;&lt;&lt;&lt;  $_&lt;&lt;&lt;&lt;&lt;  _0&lt;&lt;&lt;&lt;&lt;  $_0&lt;&lt;&lt;&lt;&lt;  _&lt;5  $_&lt;5  _0&lt;5  $_0&lt;5
-</code></pre>
-        <p>At this depth always use the indexed form <code>_&lt;5</code> — five chevrons is unreadable.</p>
-        <p>See also: <code>_&lt;</code> (1 up), <code>_&lt;&lt;</code> (2 up), <code>_&lt;&lt;&lt;</code> (3 up), <code>_&lt;&lt;&lt;&lt;</code> (4 up), <code>_&lt;N</code>/<code>_0&lt;N</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-1">
-        <h3><a class="doc-anchor" href="#doc-1">#</a> <code>$_1</code></h3>
-        <p><code>_1</code> — the <strong>first additional</strong> positional bound in a <code>|&gt;</code> pipeline stage. When a HOF takes a block plus extra arguments, the extras are bound as <code>_1</code>, <code>_2</code>, …; the current value stays in <code>_</code> / <code>_0</code> / <code>$_</code>. <code>$_1</code> is the sigiled same slot (e.g. in <strong>double-quoted strings</strong>). This is what makes EXPR-form HOFs (<code>grep EXPR, LIST</code>) and brace-form HOFs (<code>grep { BLOCK } LIST</code>) share the same scope binding.</p>
-        <pre><code class="lang-perl"># grep EXPR, LIST — `_` is each element, `_1` is the predicate coderef
-my $pred = fn ($x) { $x &gt; 10 }
-my @big = grep _1, $pred, (5, 12, 8, 20)
-</code></pre>
-        <p>See also: <code>_0</code>, <code>_2</code>..<code>_4</code>, <code>_&lt;N</code> (indexed ascent).</p>
-      </article>
-      <article class="doc-entry" id="doc-2">
-        <h3><a class="doc-anchor" href="#doc-2">#</a> <code>$_2</code></h3>
-        <p><code>_2</code> — the second additional positional in a <code>|&gt;</code> pipeline stage. <code>$_2</code> is the sigiled same slot (e.g. inside <strong>double-quoted strings</strong>). See <code>_1</code> for full semantics.</p>
-      </article>
-      <article class="doc-entry" id="doc-3">
-        <h3><a class="doc-anchor" href="#doc-3">#</a> <code>$_3</code></h3>
-        <p><code>_3</code> — the third additional positional in a <code>|&gt;</code> pipeline stage. <code>$_3</code> is the sigiled same slot (e.g. inside <strong>double-quoted strings</strong>). See <code>_1</code> for full semantics.</p>
-      </article>
-      <article class="doc-entry" id="doc-4">
-        <h3><a class="doc-anchor" href="#doc-4">#</a> <code>$_4</code></h3>
-        <p><code>_4</code> — the fourth additional positional in a <code>|&gt;</code> pipeline stage. <code>$_4</code> is the sigiled same slot (e.g. inside <strong>double-quoted strings</strong>). See <code>_1</code> for full semantics. Past depth 2 also consider the indexed-ascent shortcut <code>_&lt;N</code>.</p>
-      </article>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$`</code></h3>
         <p><code></code> $<code> </code><code> — the substring *preceding* the last successful regex match (&quot;prematch&quot;). With </code>$&amp;<code> and </code>$&#39;`, reconstructs the full input. Reset on every successful match.</p>
@@ -12613,26 +12427,6 @@ my @big = grep _1, $pred, (5, 12, 8, 20)
 </code></pre>
         <p>See also: <code>$&amp;</code>, <code>$&#39;</code>, <code>${^PREMATCH}</code> (cleaner under <code>use re &#39;p&#39;</code>).</p>
       </article>
-      <article class="doc-entry" id="doc-a">
-        <h3><a class="doc-anchor" href="#doc-a">#</a> <code>$a</code></h3>
-        <p><code>$a</code> — paired with <code>$b</code>, the comparator variables inside <code>sort BLOCK LIST</code>, <code>psort BLOCK LIST</code>, <code>preduce</code>, <code>pmap_reduce</code> blocks, and any user code that wants to compare two values without a closure. Stryke marks <code>$a</code>/<code>$b</code> as parallel-safe topics — assignments to them inside a parallel block are allowed even though they look like captured globals.</p>
-        <pre><code class="lang-perl">my @sorted = sort { $a &lt;=&gt; $b } @nums                  # numeric ascending
-my @rsorted = sort { $b &lt;=&gt; $a } @nums                  # descending
-my @by_len = sort { length($a) &lt;=&gt; length($b) } @strs
-@nums |&gt; psort { $a &lt;=&gt; $b }                              # parallel sort
-@nums |&gt; preduce { $a + $b }                              # parallel reduce
-</code></pre>
-        <p>With <code>--no-interop</code>, <code>$a</code>/<code>$b</code> outside of <code>sort</code>/<code>preduce</code> blocks are rejected — the linter wants you to write <code>_</code>/<code>_1</code> for general two-arg blocks.</p>
-        <p>See also: <code>$b</code>, <code>sort</code>, <code>psort</code>, <code>preduce</code>, <code>pmap_reduce</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-b">
-        <h3><a class="doc-anchor" href="#doc-b">#</a> <code>$b</code></h3>
-        <p><code>$b</code> — paired with <code>$a</code>, the comparator variables inside <code>sort</code>, <code>psort</code>, <code>preduce</code>, <code>pmap_reduce</code> blocks. See <code>$a</code> for full semantics.</p>
-        <pre><code class="lang-perl">my @desc = sort { $b &lt;=&gt; $a } @nums          # descending numeric
-my @z_a  = sort { $b cmp $a } @strs           # reverse string order
-</code></pre>
-        <p>See also: <code>$a</code>, <code>sort</code>, <code>psort</code>, <code>preduce</code>.</p>
-      </article>
       <article class="doc-entry" id="doc-stryke-version">
         <h3><a class="doc-anchor" href="#doc-stryke-version">#</a> <code>$stryke::VERSION</code></h3>
         <p><code>$stryke::VERSION</code> — the stryke language version string (e.g. <code>&quot;0.13.4&quot;</code>). Matches the version baked into the binary at build time from <code>Cargo.toml</code>. Use it for feature gating and diagnostics.</p>
@@ -12640,17 +12434,6 @@ my @z_a  = sort { $b cmp $a } @strs           # reverse string order
 die &quot;need stryke 0.14+&quot; if $stryke::VERSION lt &quot;0.14&quot;
 </code></pre>
         <p>See also: <code>$^V</code> (interpreter version), <code>--version</code> CLI flag.</p>
-      </article>
-      <article class="doc-entry" id="doc-global-phase">
-        <h3><a class="doc-anchor" href="#doc-global-phase">#</a> <code>${^GLOBAL_PHASE}</code></h3>
-        <p><code>${^GLOBAL_PHASE}</code> — the current interpreter phase as a string. Values: <code>&quot;START&quot;</code> (very early init), <code>&quot;BEGIN&quot;</code> (inside a <code>BEGIN</code> block), <code>&quot;CHECK&quot;</code>, <code>&quot;INIT&quot;</code>, <code>&quot;RUN&quot;</code> (normal execution), <code>&quot;END&quot;</code> (inside an <code>END</code> block), <code>&quot;DESTRUCT&quot;</code> (final cleanup, after <code>END</code> blocks finish). Most code sees <code>&quot;RUN&quot;</code>; <code>DESTROY</code> methods invoked at interpreter shutdown can see <code>&quot;DESTRUCT&quot;</code> and skip work that would touch already-cleaned state.</p>
-        <pre><code class="lang-perl">fn Resource::DESTROY {
-    return if ${^GLOBAL_PHASE} eq &quot;DESTRUCT&quot;   # skip during shutdown
-    close_external_handle($_[0])
-}
-p ${^GLOBAL_PHASE}                # RUN
-</code></pre>
-        <p>See also: <code>BEGIN</code>, <code>END</code>, <code>DESTROY</code>, phase blocks.</p>
       </article>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$|</code></h3>
@@ -12985,35 +12768,6 @@ for my $k (sort keys %ENV) {
 </code></pre>
         <p>See also: <code>%ENV</code>.</p>
       </article>
-      <article class="doc-entry" id="doc-export">
-        <h3><a class="doc-anchor" href="#doc-export">#</a> <code>@EXPORT</code></h3>
-        <p><code>@EXPORT</code> — the list of symbol names a module exports unconditionally when imported with <code>use Module;</code> (no explicit import list). Set in the module&#39;s package via <code>our @EXPORT = qw(foo bar)</code>. stryke honours <code>@EXPORT</code> for user modules; built-in pragmas (<code>strict</code>, <code>warnings</code>, <code>utf8</code>, <code>feature</code>, <code>open</code>, <code>Env</code>) do not use it because they don&#39;t load files.</p>
-        <pre><code class="lang-perl">package My::Utils
-our @EXPORT    = qw(normalize)            # always imported
-our @EXPORT_OK = qw(canonicalize internal)  # opt-in only
-fn normalize    { ... }
-fn canonicalize { ... }
-
-package main
-use My::Utils                    # normalize is in scope
-use My::Utils qw(canonicalize)   # explicit opt-in for OK-list
-</code></pre>
-        <p>See also: <code>@EXPORT_OK</code>, <code>use</code>, <code>require</code>, <code>Exporter</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-export-ok">
-        <h3><a class="doc-anchor" href="#doc-export-ok">#</a> <code>@EXPORT_OK</code></h3>
-        <p><code>@EXPORT_OK</code> — the list of symbol names a module makes available for *explicit* import only: <code>use Module qw(name1 name2)</code>. Unlike <code>@EXPORT</code>, nothing in this list is imported by default — the caller must name each symbol. This is the Exporter-pattern way to publish symbols without polluting every caller&#39;s namespace.</p>
-        <pre><code class="lang-perl">package My::Tools
-our @EXPORT    = qw()                       # nothing by default
-our @EXPORT_OK = qw(slugify camel_case)     # opt-in only
-fn slugify    { ... }
-fn camel_case { ... }
-
-package main
-use My::Tools qw(slugify)        # only slugify in scope
-</code></pre>
-        <p>See also: <code>@EXPORT</code>, <code>use</code>, <code>Exporter</code>.</p>
-      </article>
       <article class="doc-entry" id="doc-f">
         <h3><a class="doc-anchor" href="#doc-f">#</a> <code>@F</code></h3>
         <p><code>@F</code> — the autosplit field array, populated when stryke / Perl runs with the <code>-a</code> flag. Each input line read by <code>-n</code>/<code>-p</code> is automatically split on whitespace (or on the regex given to <code>-F</code>) into <code>@F</code>. AWK-like one-liners use this heavily.</p>
@@ -13030,36 +12784,6 @@ use My::Module                # searched in @INC
 p join &quot;\n&quot;, @INC              # show search path
 </code></pre>
         <p>See also: <code>%INC</code> (loaded files), <code>require</code>, <code>use lib</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-intercept-args">
-        <h3><a class="doc-anchor" href="#doc-intercept-args">#</a> <code>@INTERCEPT_ARGS</code></h3>
-        <p><code>@INTERCEPT_ARGS</code> — inside an AOP advice body (<code>before</code>/<code>after</code>/<code>around</code>), the arguments passed to the intercepted sub call. Same shape as <code>@_</code> would have inside the wrapped sub itself. Mutating <code>@INTERCEPT_ARGS</code> does <strong>not</strong> change what the wrapped sub receives — use <code>around</code> if you need to modify the call.</p>
-        <pre><code class="lang-perl">before &quot;fetch&quot; {
-    warn &quot;calling fetch(&quot; . join(&quot;, &quot;, @INTERCEPT_ARGS) . &quot;)&quot;
-}
-around &quot;cached_lookup&quot; {
-    if (my $hit = cache_get($INTERCEPT_ARGS[0])) { return $hit }
-    my $r = proceed()
-    cache_put($INTERCEPT_ARGS[0], $r)
-    $r
-}
-</code></pre>
-        <p>See also: <code>$INTERCEPT_NAME</code>, <code>$INTERCEPT_RESULT</code>, <code>$INTERCEPT_MS</code>, <code>$INTERCEPT_US</code>, <code>before</code>, <code>after</code>, <code>around</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-isa">
-        <h3><a class="doc-anchor" href="#doc-isa">#</a> <code>@ISA</code></h3>
-        <p><code>@ISA</code> — a package&#39;s inheritance list. <code>package Foo; our @ISA = (&#39;Bar&#39;, &#39;Baz&#39;)</code> makes <code>Foo</code> inherit methods from <code>Bar</code> first, then <code>Baz</code>. stryke walks <code>@ISA</code> using <strong>C3 method resolution order (live, not cached)</strong> for <code>-&gt;method</code> dispatch and <code>SUPER::</code> — covering both single and multiple inheritance without the diamond ambiguities of Perl&#39;s default depth-first MRO.</p>
-        <pre><code class="lang-perl">package Animal
-fn speak { p &quot;...&quot; }
-package Dog
-our @ISA = (&#39;Animal&#39;)
-fn speak { p &quot;woof&quot; }
-package main
-Dog-&gt;speak                       # woof
-# Inheritance chain visible at runtime:
-p &quot;@Dog::ISA&quot;                    # Animal
-</code></pre>
-        <p>See also: <code>bless</code>, <code>class</code> (modern stryke OOP), <code>SUPER::</code>, <code>DESTROY</code>, <code>AUTOLOAD</code>.</p>
       </article>
       <article class="doc-entry" id="doc-capture">
         <h3><a class="doc-anchor" href="#doc-capture">#</a> <code>@^CAPTURE</code></h3>
@@ -13124,21 +12848,6 @@ system &#39;mytool&#39;                # finds it via the updated PATH
 </code></pre>
         <p>See also: <code>$ENV{PATH}</code>, <code>which</code>, <code>find_in_path</code>.</p>
       </article>
-      <article class="doc-entry" id="doc-autoload">
-        <h3><a class="doc-anchor" href="#doc-autoload">#</a> <code>AUTOLOAD</code></h3>
-        <p><code>AUTOLOAD</code> — a fallback sub invoked when a call is made to a name that doesn&#39;t exist in the current package (or any parent in <code>@ISA</code>). Stryke walks the C3 MRO starting from the invocant&#39;s class looking for an <code>AUTOLOAD</code>; the first one found runs with <code>$AUTOLOAD</code> set to the fully-qualified name of the missing method.</p>
-        <p>Classic uses: lazy method generation, RPC proxies, attribute auto-accessors, and &quot;missing method&quot; diagnostics. <code>AUTOLOAD</code> should <code>return</code> (without throwing) for the conventional <code>DESTROY</code> lookup so destructor dispatch isn&#39;t misrouted.</p>
-        <pre><code class="lang-perl">package Proxy
-fn AUTOLOAD {
-    my $name = $AUTOLOAD
-    $name =~ s/.*:://
-    return if $name eq &#39;DESTROY&#39;
-    my $self = shift
-    $self-&gt;{conn}-&gt;call($name, @_)
-}
-</code></pre>
-        <p>See also: <code>$AUTOLOAD</code>, <code>@ISA</code>, <code>DESTROY</code>, C3 MRO.</p>
-      </article>
       <article class="doc-entry" id="doc-build">
         <h3><a class="doc-anchor" href="#doc-build">#</a> <code>BUILD</code></h3>
         <p><code>BUILD</code> — the constructor hook for stryke classes. When a class defines a <code>BUILD</code> method, it runs *after* attribute initialization but *before* the constructed object is returned from <code>new</code>. Use it for cross-attribute validation, derived-field computation, and external resource setup that depends on the attribute values.</p>
@@ -13195,71 +12904,6 @@ p $msg   # hello from child
         <p>A pending-destroy queue (<code>pending_destroy.rs</code>) drains before the next VM op so destructors run in deterministic order.</p>
         <p>See also: <code>BUILD</code>, <code>bless</code>, <code>${^GLOBAL_PHASE}</code>, <code>class</code>.</p>
       </article>
-      <article class="doc-entry" id="doc-store">
-        <h3><a class="doc-anchor" href="#doc-store">#</a> <code>STORE</code></h3>
-        <p><code>STORE</code> — the writer method on a tie class. Called with <code>($self, $value)</code> for tied scalars, <code>($self, $index, $value)</code> for tied arrays, and <code>($self, $key, $value)</code> for tied hashes. Whatever <code>STORE</code> returns is discarded — assignments to the tied variable always evaluate to the assigned value.</p>
-        <pre><code class="lang-perl">package Logged
-fn TIESCALAR { bless { v =&gt; 0 }, shift }
-fn FETCH     { $_[0]-&gt;{v} }
-fn STORE     {
-    p &quot;writing: $_[1]&quot;
-    $_[0]-&gt;{v} = $_[1]
-}
-
-package main
-tie my $x, &#39;Logged&#39;
-$x = 42        # prints: writing: 42
-</code></pre>
-        <p>See also: <code>FETCH</code>, <code>EXISTS</code>, <code>DELETE</code>, <code>TIESCALAR</code>, <code>TIEARRAY</code>, <code>TIEHASH</code>, <code>tie</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-tiearray">
-        <h3><a class="doc-anchor" href="#doc-tiearray">#</a> <code>TIEARRAY</code></h3>
-        <p><code>TIEARRAY</code> — the constructor invoked by <code>tie @array, &#39;ClassName&#39;, @args</code>. The class provides <code>TIEARRAY</code> returning a blessed object; element access and assignment route through <code>FETCH(idx)</code> / <code>STORE(idx, val)</code> methods on the returned object.</p>
-        <pre><code class="lang-perl">package Backed
-fn TIEARRAY { bless { data =&gt; [] }, shift }
-fn FETCH    { $_[0]-&gt;{data}[$_[1]] }
-fn STORE    { $_[0]-&gt;{data}[$_[1]] = $_[2] }
-
-package main
-tie my @arr, &#39;Backed&#39;
-$arr[0] = &#39;hello&#39;
-p $arr[0]      # hello (via FETCH)
-</code></pre>
-        <p>See also: <code>tie</code>, <code>tied</code>, <code>untie</code>, <code>FETCH</code>, <code>STORE</code>, <code>TIESCALAR</code>, <code>TIEHASH</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-tiehash">
-        <h3><a class="doc-anchor" href="#doc-tiehash">#</a> <code>TIEHASH</code></h3>
-        <p><code>TIEHASH</code> — the constructor invoked by <code>tie %hash, &#39;ClassName&#39;, @args</code>. The class provides <code>TIEHASH</code> returning a blessed object; hash access routes through <code>FETCH(key)</code> / <code>STORE(key, val)</code> / <code>EXISTS(key)</code> / <code>DELETE(key)</code> on the returned object.</p>
-        <pre><code class="lang-perl">package InMem
-fn TIEHASH { bless { h =&gt; {} }, shift }
-fn FETCH   { $_[0]-&gt;{h}{$_[1]} }
-fn STORE   { $_[0]-&gt;{h}{$_[1]} = $_[2] }
-fn EXISTS  { exists $_[0]-&gt;{h}{$_[1]} }
-fn DELETE  { delete $_[0]-&gt;{h}{$_[1]} }
-
-package main
-tie my %h, &#39;InMem&#39;
-$h{key} = &#39;value&#39;
-p $h{key}      # value
-p exists $h{key}   # 1
-</code></pre>
-        <p>See also: <code>tie</code>, <code>tied</code>, <code>untie</code>, <code>FETCH</code>, <code>STORE</code>, <code>EXISTS</code>, <code>DELETE</code>, <code>TIESCALAR</code>, <code>TIEARRAY</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-tiescalar">
-        <h3><a class="doc-anchor" href="#doc-tiescalar">#</a> <code>TIESCALAR</code></h3>
-        <p><code>TIESCALAR</code> — the constructor invoked by <code>tie $scalar, &#39;ClassName&#39;, @args</code>. The class must provide <code>TIESCALAR</code> returning a blessed object that will back the tied scalar. Subsequent reads and writes go through <code>FETCH</code> / <code>STORE</code> methods on the returned object.</p>
-        <pre><code class="lang-perl">package AutoIncr
-fn TIESCALAR { bless { v =&gt; 0 }, shift }
-fn FETCH     { $_[0]-&gt;{v} }
-fn STORE     { $_[0]-&gt;{v} = $_[1] }
-
-package main
-tie my $n, &#39;AutoIncr&#39;
-$n = 5
-p $n          # 5 (via FETCH)
-</code></pre>
-        <p>See also: <code>tie</code>, <code>tied</code>, <code>untie</code>, <code>FETCH</code>, <code>STORE</code>, <code>TIEARRAY</code>, <code>TIEHASH</code>.</p>
-      </article>
       <article class="doc-entry" id="doc-unitcheck">
         <h3><a class="doc-anchor" href="#doc-unitcheck">#</a> <code>UNITCHECK</code></h3>
         <p><code>UNITCHECK { }</code> — a compile-time phase block that runs after the *current compilation unit* (script, module, or eval string) finishes compiling, but before any code in it runs. Modules use this for setup that must observe the full compiled state of *just this file* (without seeing later-required modules). Runs in reverse declaration order, like <code>END</code>.</p>
@@ -13273,16 +12917,6 @@ p &quot;running&quot;
 # running
 </code></pre>
         <p>See also: <code>BEGIN</code>, <code>CHECK</code>, <code>INIT</code>, <code>END</code>.</p>
-      </article>
-      <article class="doc-entry" id="doc-">
-        <h3><a class="doc-anchor" href="#doc-">#</a> <code>_</code></h3>
-        <p><code>_</code> — the stryke pipeline topic placeholder. Inside a <code>|&gt;</code> stage, <code>_</code> refers to the current value being threaded through. Unlike Perl&#39;s <code>$_</code>, <code>_</code> has no sigil because it represents the topic *position* rather than a variable — it can be a scalar, an array, a hash, or any value the previous stage emitted.</p>
-        <p>In <code>for</code>/<code>while</code> loop blocks the variable is <code>$_</code> (Perl-compatible). In numeric / regex contexts you can still write <code>$_</code> and they mean the same thing where stryke supports it.</p>
-        <pre><code class="lang-perl">1:10 |&gt; map _ * 2 |&gt; grep _ &gt; 10 |&gt; e p
-qw(alice bob carol) |&gt; map uc(_) |&gt; e p
-@files |&gt; grep -f _ |&gt; e p             # only real files
-</code></pre>
-        <p>In <code>fn ($n) { ... }</code> style, <code>_</code> also serves as the underscore placeholder for unused arguments. See also: <code>$_</code>, <code>@_</code>, <code>|&gt;</code>.</p>
       </article>
       <article class="doc-entry" id="doc-data">
         <h3><a class="doc-anchor" href="#doc-data">#</a> <code>__DATA__</code></h3>
@@ -16736,6 +16370,26 @@ p bernoulli(4)   # -0.0333
         <pre><code class="lang-perl">p bitset_test $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-bk-insert">
+        <h3><a class="doc-anchor" href="#doc-bk-insert">#</a> <code>bk_insert</code></h3>
+        <p><code>bk_insert(BK, WORD...)</code> → number of newly-inserted words (duplicates skipped).</p>
+      </article>
+      <article class="doc-entry" id="doc-bk-len">
+        <h3><a class="doc-anchor" href="#doc-bk-len">#</a> <code>bk_len</code></h3>
+        <p><code>bk_len(BK)</code> → number of stored words.</p>
+      </article>
+      <article class="doc-entry" id="doc-bk-query">
+        <h3><a class="doc-anchor" href="#doc-bk-query">#</a> <code>bk_query</code></h3>
+        <p><code>bk_query(BK, QUERY, MAX_DIST=2)</code> → list of <code>[word, distance]</code> arrayrefs within <code>MAX_DIST</code> edits, sorted by distance asc.</p>
+      </article>
+      <article class="doc-entry" id="doc-bk-tree">
+        <h3><a class="doc-anchor" href="#doc-bk-tree">#</a> <code>bk_tree</code></h3>
+        <p><code>bk_tree()</code> — Burkhard-Keller tree for fuzzy / typo retrieval. Uses Damerau-Levenshtein distance. Insert O(log n) avg; range queries O(n^(1-1/d)) for small <code>d</code>.</p>
+        <pre><code class="lang-perl">my $bk = bk_tree()
+bk_insert($bk, qw(hello world help halo hells))
+my @near = bk_query($bk, &quot;hallo&quot;, 2)  # [[&quot;hello&quot;,1], [&quot;halo&quot;,1], [&quot;hells&quot;,2]]
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-bkt">
         <h3><a class="doc-anchor" href="#doc-bkt">#</a> <code>bkt</code></h3>
         <p><code>bkt</code> — operation <code>bkt</code>. Alias for <code>bucket</code>. Category: *array / list operations extras*.</p>
@@ -16872,23 +16526,53 @@ p bernoulli(4)   # -0.0333
         <pre><code class="lang-perl">p block_devices $x
 </code></pre>
       </article>
-      <article class="doc-entry" id="doc-bloom-filter-add">
-        <h3><a class="doc-anchor" href="#doc-bloom-filter-add">#</a> <code>bloom_filter_add</code></h3>
-        <p><code>bloom_filter_add</code> — Bloom filter op <code>filter add</code>. Category: *extras*.</p>
-        <pre><code class="lang-perl">p bloom_filter_add $x
+      <article class="doc-entry" id="doc-bloom">
+        <h3><a class="doc-anchor" href="#doc-bloom">#</a> <code>bloom</code></h3>
+        <p><code>bloom_filter(CAPACITY, FPR=0.01)</code> — Bloom filter sized for <code>CAPACITY</code> distinct items with target false-positive rate <code>FPR</code>. Bit count rounds up to a power of two; <code>k</code> (probe count) is computed for the (cap, fpr) pair. Probe indexing uses Kirsch–Mitzenmacher double-hashing over xxh3-128; no allocations on <code>bloom_add</code> / <code>bloom_contains</code>.</p>
+        <pre><code class="lang-perl">my $b = bloom_filter(10_000, 0.001)
+bloom_add($b, &quot;alice&quot;); bloom_add($b, &quot;bob&quot;)
+p bloom_contains($b, &quot;alice&quot;)        # 1
+p bloom_contains($b, &quot;carol&quot;)        # 0
+my $bytes = bloom_serialize($b)
+my $r = bloom_deserialize($bytes)
 </code></pre>
+        <p>Family: <code>bloom_add</code>, <code>bloom_contains</code>, <code>bloom_len</code>, <code>bloom_clear</code>, <code>bloom_merge</code>, <code>bloom_fpr</code>, <code>bloom_bits</code>, <code>bloom_serialize</code>, <code>bloom_deserialize</code>.</p>
       </article>
-      <article class="doc-entry" id="doc-bloom-filter-contains">
-        <h3><a class="doc-anchor" href="#doc-bloom-filter-contains">#</a> <code>bloom_filter_contains</code></h3>
-        <p><code>bloom_filter_contains</code> — Bloom filter op <code>filter contains</code>. Category: *extras*.</p>
-        <pre><code class="lang-perl">p bloom_filter_contains $x
-</code></pre>
+      <article class="doc-entry" id="doc-bloom-add">
+        <h3><a class="doc-anchor" href="#doc-bloom-add">#</a> <code>bloom_add</code></h3>
+        <p><code>bloom_add(BF, KEY)</code> — insert <code>KEY</code> into a Bloom filter. Returns <code>1</code> if every probe bit was previously unset (newly inserted, no false positive collision on insert), <code>0</code> if all probe bits already 1 (key already present OR false positive). <code>bloom_len(BF)</code> tracks the unique-insert count.</p>
       </article>
-      <article class="doc-entry" id="doc-bloom-filter-new">
-        <h3><a class="doc-anchor" href="#doc-bloom-filter-new">#</a> <code>bloom_filter_new</code></h3>
-        <p><code>bloom_filter_new</code> — Bloom filter op <code>filter new</code>. Category: *extras*.</p>
-        <pre><code class="lang-perl">p bloom_filter_new $x
-</code></pre>
+      <article class="doc-entry" id="doc-bloom-bits">
+        <h3><a class="doc-anchor" href="#doc-bloom-bits">#</a> <code>bloom_bits</code></h3>
+        <p><code>bloom_bits(BF)</code> — total bit count of the underlying array (always a power of two ≥ 64).</p>
+      </article>
+      <article class="doc-entry" id="doc-bloom-clear">
+        <h3><a class="doc-anchor" href="#doc-bloom-clear">#</a> <code>bloom_clear</code></h3>
+        <p><code>bloom_clear(BF)</code> — zero the bit array and reset the insertion counter. Returns the same BF for chaining.</p>
+      </article>
+      <article class="doc-entry" id="doc-bloom-contains">
+        <h3><a class="doc-anchor" href="#doc-bloom-contains">#</a> <code>bloom_contains</code></h3>
+        <p><code>bloom_contains(BF, KEY)</code> — <code>1</code> if <code>KEY</code> may be present (no false negatives), <code>0</code> if definitely absent. Probe count k = <code>bloom_filter</code>&#39;s <code>(capacity, fpr)</code>-derived constant.</p>
+      </article>
+      <article class="doc-entry" id="doc-bloom-count">
+        <h3><a class="doc-anchor" href="#doc-bloom-count">#</a> <code>bloom_count</code></h3>
+        <p><code>bloom_len(BF)</code> — unique-insert count seen by this filter. May exceed <code>capacity</code> if you over-insert; once it does, <code>bloom_fpr</code> will have climbed past target.</p>
+      </article>
+      <article class="doc-entry" id="doc-bloom-deserialize">
+        <h3><a class="doc-anchor" href="#doc-bloom-deserialize">#</a> <code>bloom_deserialize</code></h3>
+        <p><code>bloom_deserialize(BYTES)</code> → <code>BloomFilter | undef</code> — restore from <code>bloom_serialize</code> output. Returns <code>undef</code> on format mismatch.</p>
+      </article>
+      <article class="doc-entry" id="doc-bloom-fpr">
+        <h3><a class="doc-anchor" href="#doc-bloom-fpr">#</a> <code>bloom_fpr</code></h3>
+        <p><code>bloom_fpr(BF)</code> — current estimated false-positive rate from the running insertion count: <code>(1 - exp(-k·n/m))^k</code>. When this drifts above your target, rebuild with a larger capacity.</p>
+      </article>
+      <article class="doc-entry" id="doc-bloom-merge">
+        <h3><a class="doc-anchor" href="#doc-bloom-merge">#</a> <code>bloom_merge</code></h3>
+        <p><code>bloom_merge(BF, OTHER)</code> — bitwise OR union with another filter of identical geometry. Returns <code>1</code> on success, <code>0</code> if bit count or <code>k</code> differ. After merge, <code>bloom_contains</code> of any key inserted into either source returns <code>1</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-bloom-serialize">
+        <h3><a class="doc-anchor" href="#doc-bloom-serialize">#</a> <code>bloom_serialize</code></h3>
+        <p><code>bloom_serialize(BF)</code> → BYTES — versioned wire format (<code>STKBLOM\x01</code> magic + log2_cap + k + inserted + capacity_hint + fpr_hint + bit words). Pair with <code>bloom_deserialize</code>.</p>
       </article>
       <article class="doc-entry" id="doc-blossom-match-step">
         <h3><a class="doc-anchor" href="#doc-blossom-match-step">#</a> <code>blossom_match_step</code></h3>
@@ -17674,6 +17358,14 @@ p bond_price(1000, 0.05, 0.06, 10)   # ~926 (discount)
         <p><code>bucket</code> — operation <code>bucket</code>. Category: *array / list operations extras*.</p>
         <pre><code class="lang-perl">p bucket $x
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-bucket-available">
+        <h3><a class="doc-anchor" href="#doc-bucket-available">#</a> <code>bucket_available</code></h3>
+        <p><code>rl_available(RL)</code> → tokens currently available (token-bucket) or remaining headroom (leaky-bucket).</p>
+      </article>
+      <article class="doc-entry" id="doc-bucket-try-take">
+        <h3><a class="doc-anchor" href="#doc-bucket-try-take">#</a> <code>bucket_try_take</code></h3>
+        <p><code>rl_try_take(RL, COST=1)</code> → <code>1</code> on success (capacity available / no overflow), <code>0</code> on rejection.</p>
       </article>
       <article class="doc-entry" id="doc-buffer-capacity-acid-base">
         <h3><a class="doc-anchor" href="#doc-buffer-capacity-acid-base">#</a> <code>buffer_capacity_acid_base</code></h3>
@@ -20446,6 +20138,63 @@ my $d3 = $dog-&gt;clone()        # deep copy
         <pre><code class="lang-perl">p cmpr $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-cms">
+        <h3><a class="doc-anchor" href="#doc-cms">#</a> <code>cms</code></h3>
+        <p><code>cms(WIDTH=2048, DEPTH=5)</code> — Count-Min frequency sketch. <code>epsilon ≈ e/width</code> (over-estimation bound), <code>delta ≈ 1/2^depth</code> (failure probability). Defaults give 0.13% over-bound with 97% confidence. Counters are <code>u32</code> saturating; <code>cms_count</code> is always ≥ the true count.</p>
+        <pre><code class="lang-perl">my $c = cms(4096, 7)
+cms_add($c, $_) for @stream
+p cms_count($c, &quot;frequent_key&quot;)
+</code></pre>
+        <p>Family: <code>cms_add</code>, <code>cms_count</code>, <code>cms_merge</code>, <code>cms_clear</code>, <code>cms_serialize</code>, <code>cms_deserialize</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-cms-add">
+        <h3><a class="doc-anchor" href="#doc-cms-add">#</a> <code>cms_add</code></h3>
+        <p><code>cms_add(CMS, KEY, COUNT=1)</code> — add <code>COUNT</code> occurrences of <code>KEY</code> to the sketch.</p>
+      </article>
+      <article class="doc-entry" id="doc-cms-clear">
+        <h3><a class="doc-anchor" href="#doc-cms-clear">#</a> <code>cms_clear</code></h3>
+        <p><code>cms_clear</code> — operation <code>cms clear</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p cms_clear $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cms-count">
+        <h3><a class="doc-anchor" href="#doc-cms-count">#</a> <code>cms_count</code></h3>
+        <p><code>cms_count(CMS, KEY)</code> → estimated count (upper bound on truth).</p>
+      </article>
+      <article class="doc-entry" id="doc-cms-deserialize">
+        <h3><a class="doc-anchor" href="#doc-cms-deserialize">#</a> <code>cms_deserialize</code></h3>
+        <p><code>cms_deserialize</code> — operation <code>cms deserialize</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p cms_deserialize $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cms-from-bytes">
+        <h3><a class="doc-anchor" href="#doc-cms-from-bytes">#</a> <code>cms_from_bytes</code></h3>
+        <p><code>cms_from_bytes</code> — operation <code>cms from bytes</code>. Alias for <code>cms_deserialize</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p cms_from_bytes $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cms-merge">
+        <h3><a class="doc-anchor" href="#doc-cms-merge">#</a> <code>cms_merge</code></h3>
+        <p><code>cms_merge(CMS, OTHER)</code> — counter-wise sum (must share width and depth). Returns <code>1</code> on success.</p>
+      </article>
+      <article class="doc-entry" id="doc-cms-reset">
+        <h3><a class="doc-anchor" href="#doc-cms-reset">#</a> <code>cms_reset</code></h3>
+        <p><code>cms_reset</code> — operation <code>cms reset</code>. Alias for <code>cms_clear</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p cms_reset $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cms-serialize">
+        <h3><a class="doc-anchor" href="#doc-cms-serialize">#</a> <code>cms_serialize</code></h3>
+        <p><code>cms_serialize</code> — operation <code>cms serialize</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p cms_serialize $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cms-to-bytes">
+        <h3><a class="doc-anchor" href="#doc-cms-to-bytes">#</a> <code>cms_to_bytes</code></h3>
+        <p><code>cms_to_bytes</code> — convert from <code>cms</code> to <code>bytes</code>. Alias for <code>cms_serialize</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p cms_to_bytes $value
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-cmyk-to-rgb">
         <h3><a class="doc-anchor" href="#doc-cmyk-to-rgb">#</a> <code>cmyk_to_rgb</code></h3>
         <p><code>cmyk_to_rgb</code> — convert from <code>cmyk</code> to <code>rgb</code>. Category: *b82-misc-utility*.</p>
@@ -21259,6 +21008,14 @@ p $ci-&gt;{slope_lower}
         <pre><code class="lang-perl">p consecutive_pairs $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-consistent-hash">
+        <h3><a class="doc-anchor" href="#doc-consistent-hash">#</a> <code>consistent_hash</code></h3>
+        <p><code>hash_ring(VNODES_PER_NODE=128)</code> — consistent-hash ring (Karger-style virtual nodes). Adds and removes nodes with minimal key remapping (≈ 1/(N+1) of keys move when a node joins N existing nodes). xxh3-64 hashing; binary search lookup is O(log V).</p>
+        <pre><code class="lang-perl">my $hr = hash_ring(128)
+hr_add($hr, &quot;shard-a&quot;, &quot;shard-b&quot;, &quot;shard-c&quot;)
+my $owner = hr_get($hr, &quot;user-42&quot;)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-const-fn">
         <h3><a class="doc-anchor" href="#doc-const-fn">#</a> <code>const_fn</code></h3>
         <p><code>const_fn</code> — operation <code>const fn</code>. Category: *functional primitives*.</p>
@@ -21885,24 +21642,6 @@ p $ci-&gt;{slope_lower}
         <h3><a class="doc-anchor" href="#doc-count-match">#</a> <code>count_match</code></h3>
         <p><code>count_match</code> — operation <code>count match</code>. Category: *counters*.</p>
         <pre><code class="lang-perl">p count_match $x
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-count-min-sketch-add">
-        <h3><a class="doc-anchor" href="#doc-count-min-sketch-add">#</a> <code>count_min_sketch_add</code></h3>
-        <p><code>count_min_sketch_add</code> — operation <code>count min sketch add</code>. Category: *extras*.</p>
-        <pre><code class="lang-perl">p count_min_sketch_add $x
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-count-min-sketch-new">
-        <h3><a class="doc-anchor" href="#doc-count-min-sketch-new">#</a> <code>count_min_sketch_new</code></h3>
-        <p><code>count_min_sketch_new</code> — constructor of <code>count min sketch</code>. Category: *extras*.</p>
-        <pre><code class="lang-perl">p count_min_sketch_new $x
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-count-min-sketch-query">
-        <h3><a class="doc-anchor" href="#doc-count-min-sketch-query">#</a> <code>count_min_sketch_query</code></h3>
-        <p><code>count_min_sketch_query</code> — operation <code>count min sketch query</code>. Category: *extras*.</p>
-        <pre><code class="lang-perl">p count_min_sketch_query $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-count-ne">
@@ -25092,6 +24831,22 @@ my @dy = @{numdiff(\@y)}  # ≈ [0, 2, 4, 6, ...]
 p diff_lag([1,3,6,10], 2)    # [5,7] (lag=2)
 p diff_lag([1,3,6,10], 1, 2) # [1,1] (second differences)
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-diff-myers">
+        <h3><a class="doc-anchor" href="#doc-diff-myers">#</a> <code>diff_myers</code></h3>
+        <p><code>myers_diff(\@A, \@B)</code> → list of <code>[op, value]</code> arrayrefs (op = <code>&quot;=&quot;</code>, <code>&quot;+&quot;</code>, <code>&quot;-&quot;</code>). Eugene Myers&#39; O((N+M)·D) longest-common-subsequence diff. Foundational text-diff primitive.</p>
+        <pre><code class="lang-perl">my @a = (&quot;alpha&quot;, &quot;beta&quot;,  &quot;gamma&quot;)
+my @b = (&quot;alpha&quot;, &quot;BETA&quot;,  &quot;gamma&quot;)
+myers_diff(\@a, \@b) |&gt; e { p &quot;$_-&gt;[0] $_-&gt;[1]&quot; }
+# = alpha
+# - beta
+# + BETA
+# = gamma
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-diff-patience">
+        <h3><a class="doc-anchor" href="#doc-diff-patience">#</a> <code>diff_patience</code></h3>
+        <p><code>patience_diff(\@A, \@B)</code> → list of <code>[op, value]</code> arrayrefs. Bram Cohen&#39;s patience diff: finds the longest common subsequence of *unique* lines as anchors, then runs Myers on the gaps between anchors. Produces more human-readable diffs than Myers on code-like inputs where repeated short lines (braces, blank lines) make Myers pick noisy alignments.</p>
       </article>
       <article class="doc-entry" id="doc-diff-pct">
         <h3><a class="doc-anchor" href="#doc-diff-pct">#</a> <code>diff_pct</code></h3>
@@ -31861,6 +31616,22 @@ p harmonic(100)  # 5.1874
         <pre><code class="lang-perl">p hash_merge_deep $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-hash-ring-add">
+        <h3><a class="doc-anchor" href="#doc-hash-ring-add">#</a> <code>hash_ring_add</code></h3>
+        <p><code>hr_add(HR, NAME...)</code> → number of new nodes inserted (duplicates skipped).</p>
+      </article>
+      <article class="doc-entry" id="doc-hash-ring-get">
+        <h3><a class="doc-anchor" href="#doc-hash-ring-get">#</a> <code>hash_ring_get</code></h3>
+        <p><code>hr_get(HR, KEY)</code> → owner node name, or <code>undef</code> if the ring is empty.</p>
+      </article>
+      <article class="doc-entry" id="doc-hash-ring-nodes">
+        <h3><a class="doc-anchor" href="#doc-hash-ring-nodes">#</a> <code>hash_ring_nodes</code></h3>
+        <p><code>hr_nodes(HR)</code> → list of currently-registered node names.</p>
+      </article>
+      <article class="doc-entry" id="doc-hash-ring-remove">
+        <h3><a class="doc-anchor" href="#doc-hash-ring-remove">#</a> <code>hash_ring_remove</code></h3>
+        <p><code>hr_remove(HR, NAME...)</code> → number of nodes removed.</p>
+      </article>
       <article class="doc-entry" id="doc-hash-size">
         <h3><a class="doc-anchor" href="#doc-hash-size">#</a> <code>hash_size</code></h3>
         <p><code>hash_size</code> — hash-table / hashing helper <code>size</code>. Category: *hash ops*.</p>
@@ -32351,6 +32122,43 @@ my $ac_only = hpf(\@with_dc, 0.1)
         <p><code>hlen</code> — operation <code>hlen</code>. Category: *redis-flavour primitives*.</p>
         <pre><code class="lang-perl">p hlen $x
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hll">
+        <h3><a class="doc-anchor" href="#doc-hll">#</a> <code>hll</code></h3>
+        <p><code>hll(PRECISION=14)</code> — HyperLogLog cardinality (distinct-count) sketch with <code>2^precision</code> 8-bit registers. Precision clamped to <code>[4, 18]</code>; typical <code>14</code> gives ~1.3% relative error in 16 KB. Replaces the older slow <code>hyperloglog_pp_*</code> family with a HeapObject-backed primitive that is <code>~1000x</code> faster on <code>_add</code> (no allocation per insert).</p>
+        <pre><code class="lang-perl">my $h = hll(14)
+hll_add($h, &quot;user_$_&quot;) for 1..100_000
+printf &quot;~%d\n&quot;, hll_count($h)        # ~99672 — ~0.33% error
+</code></pre>
+        <p>Family: <code>hll_add</code>, <code>hll_count</code>, <code>hll_merge</code>, <code>hll_clear</code>, <code>hll_precision</code>, <code>hll_serialize</code>, <code>hll_deserialize</code>. Legacy aliases (<code>hyperloglog_pp_new</code>, <code>hyperloglog_pp_add</code>, <code>hyperloglog_pp_estimate</code>, <code>hyperloglog_new</code>, etc.) all route here.</p>
+      </article>
+      <article class="doc-entry" id="doc-hll-add">
+        <h3><a class="doc-anchor" href="#doc-hll-add">#</a> <code>hll_add</code></h3>
+        <p><code>hll_add(HLL, KEY)</code> — fold <code>KEY</code> into the sketch (one xxh3-64 + one register update). Returns the same HLL for chaining.</p>
+      </article>
+      <article class="doc-entry" id="doc-hll-clear">
+        <h3><a class="doc-anchor" href="#doc-hll-clear">#</a> <code>hll_clear</code></h3>
+        <p><code>hll_clear(HLL)</code> — zero every register.</p>
+      </article>
+      <article class="doc-entry" id="doc-hll-count">
+        <h3><a class="doc-anchor" href="#doc-hll-count">#</a> <code>hll_count</code></h3>
+        <p><code>hll_count(HLL)</code> → estimated number of distinct items seen. Uses alpha-corrected standard HLL with linear-counting fallback for small ranges.</p>
+      </article>
+      <article class="doc-entry" id="doc-hll-deserialize">
+        <h3><a class="doc-anchor" href="#doc-hll-deserialize">#</a> <code>hll_deserialize</code></h3>
+        <p><code>hll_deserialize(BYTES)</code> → <code>HllSketch | undef</code> — round-trip from <code>hll_serialize</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-hll-merge">
+        <h3><a class="doc-anchor" href="#doc-hll-merge">#</a> <code>hll_merge</code></h3>
+        <p><code>hll_merge(HLL, OTHER)</code> — register-wise max into the receiver (union of two distinct sets). Returns <code>1</code> on success, <code>0</code> on precision mismatch.</p>
+      </article>
+      <article class="doc-entry" id="doc-hll-precision">
+        <h3><a class="doc-anchor" href="#doc-hll-precision">#</a> <code>hll_precision</code></h3>
+        <p><code>hll_precision(HLL)</code> → integer precision parameter (4-18) — the sketch holds <code>2^precision</code> registers.</p>
+      </article>
+      <article class="doc-entry" id="doc-hll-serialize">
+        <h3><a class="doc-anchor" href="#doc-hll-serialize">#</a> <code>hll_serialize</code></h3>
+        <p><code>hll_serialize(HLL)</code> → BYTES — <code>STKHLL\x01</code> magic + 4-byte precision + register vector.</p>
       </article>
       <article class="doc-entry" id="doc-hlookup">
         <h3><a class="doc-anchor" href="#doc-hlookup">#</a> <code>hlookup</code></h3>
@@ -33380,46 +33188,6 @@ my $ac_only = hpf(\@with_dc, 0.1)
         <pre><code class="lang-perl">p hypergeom_2f1(1, 1, 2, 0.5)
 </code></pre>
       </article>
-      <article class="doc-entry" id="doc-hyperloglog-add">
-        <h3><a class="doc-anchor" href="#doc-hyperloglog-add">#</a> <code>hyperloglog_add</code></h3>
-        <p><code>hyperloglog_add</code> — HyperLogLog cardinality sketch <code>add</code>. Category: *extras*.</p>
-        <pre><code class="lang-perl">p hyperloglog_add $x
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-hyperloglog-estimate">
-        <h3><a class="doc-anchor" href="#doc-hyperloglog-estimate">#</a> <code>hyperloglog_estimate</code></h3>
-        <p><code>hyperloglog_estimate</code> — HyperLogLog cardinality sketch <code>estimate</code>. Category: *extras*.</p>
-        <pre><code class="lang-perl">p hyperloglog_estimate $x
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-hyperloglog-merge">
-        <h3><a class="doc-anchor" href="#doc-hyperloglog-merge">#</a> <code>hyperloglog_merge</code></h3>
-        <p><code>hyperloglog_merge</code> — HyperLogLog cardinality sketch <code>merge</code>. Category: *extras*.</p>
-        <pre><code class="lang-perl">p hyperloglog_merge $x
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-hyperloglog-new">
-        <h3><a class="doc-anchor" href="#doc-hyperloglog-new">#</a> <code>hyperloglog_new</code></h3>
-        <p><code>hyperloglog_new</code> — HyperLogLog cardinality sketch <code>new</code>. Category: *extras*.</p>
-        <pre><code class="lang-perl">p hyperloglog_new $x
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-hyperloglog-pp-add">
-        <h3><a class="doc-anchor" href="#doc-hyperloglog-pp-add">#</a> <code>hyperloglog_pp_add</code></h3>
-        <p><code>hyperloglog_pp_add(hll, item) → hash</code> — fold an item into the sketch using 64-bit FNV-1a hash.</p>
-      </article>
-      <article class="doc-entry" id="doc-hyperloglog-pp-estimate">
-        <h3><a class="doc-anchor" href="#doc-hyperloglog-pp-estimate">#</a> <code>hyperloglog_pp_estimate</code></h3>
-        <p><code>hyperloglog_pp_estimate(hll) → number</code> — estimated cardinality with linear-counting small-range correction.</p>
-        <pre><code class="lang-perl">my $h = hyperloglog_pp_new(10)
-$h = hyperloglog_pp_add($h, &quot;item$_&quot;) for 1..1000
-p hyperloglog_pp_estimate($h)
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-hyperloglog-pp-new">
-        <h3><a class="doc-anchor" href="#doc-hyperloglog-pp-new">#</a> <code>hyperloglog_pp_new</code></h3>
-        <p><code>hyperloglog_pp_new(precision=14) → hash</code> — HyperLogLog sketch with <code>2^precision</code> dense registers. (Lacks HLL++ sparse representation and bias-correction tables — counts within ~3% of standard HLL.)</p>
-      </article>
       <article class="doc-entry" id="doc-hyperoperation">
         <h3><a class="doc-anchor" href="#doc-hyperoperation">#</a> <code>hyperoperation</code></h3>
         <p><code>hyperoperation</code> — operation <code>hyperoperation</code>. Category: *math / number theory extras*.</p>
@@ -34323,11 +34091,27 @@ class Item impl Printable {
         <pre><code class="lang-perl">p intersperse_with $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-interval-at">
+        <h3><a class="doc-anchor" href="#doc-interval-at">#</a> <code>interval_at</code></h3>
+        <p><code>it_query_point(IT, P)</code> → list of <code>[start, end, payload]</code> arrayrefs containing point <code>P</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-interval-count">
+        <h3><a class="doc-anchor" href="#doc-interval-count">#</a> <code>interval_count</code></h3>
+        <p><code>it_len(IT)</code> → number of intervals stored.</p>
+      </article>
+      <article class="doc-entry" id="doc-interval-insert">
+        <h3><a class="doc-anchor" href="#doc-interval-insert">#</a> <code>interval_insert</code></h3>
+        <p><code>it_insert(IT, START, END, PAYLOAD=undef)</code> — append an interval. Endpoints normalized so <code>START ≤ END</code>.</p>
+      </article>
       <article class="doc-entry" id="doc-interval-name">
         <h3><a class="doc-anchor" href="#doc-interval-name">#</a> <code>interval_name</code></h3>
         <p><code>interval_name(semitones) → string</code> — Western music interval label: P1, m2, M2, m3, M3, P4, TT, P5, m6, M6, m7, M7.</p>
         <pre><code class="lang-perl">p interval_name(7)  # P5
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-interval-overlap">
+        <h3><a class="doc-anchor" href="#doc-interval-overlap">#</a> <code>interval_overlap</code></h3>
+        <p><code>it_query_range(IT, LO, HI)</code> → list of <code>[start, end, payload]</code> arrayrefs overlapping range <code>[LO, HI]</code>.</p>
       </article>
       <article class="doc-entry" id="doc-interval-quality-size">
         <h3><a class="doc-anchor" href="#doc-interval-quality-size">#</a> <code>interval_quality_size</code></h3>
@@ -34335,10 +34119,23 @@ class Item impl Printable {
         <pre><code class="lang-perl">p interval_quality_size $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-interval-remove">
+        <h3><a class="doc-anchor" href="#doc-interval-remove">#</a> <code>interval_remove</code></h3>
+        <p><code>it_remove(IT, START, END)</code> → number of removed intervals with exact endpoints.</p>
+      </article>
       <article class="doc-entry" id="doc-interval-semitones">
         <h3><a class="doc-anchor" href="#doc-interval-semitones">#</a> <code>interval_semitones</code></h3>
         <p><code>interval_semitones</code> — operation <code>interval semitones</code>. Category: *misc*.</p>
         <pre><code class="lang-perl">p interval_semitones $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-interval-tree">
+        <h3><a class="doc-anchor" href="#doc-interval-tree">#</a> <code>interval_tree</code></h3>
+        <p><code>interval_tree()</code> — store <code>[start, end]</code> intervals (inclusive) with associated payloads; query for all intervals overlapping a point or another range.</p>
+        <pre><code class="lang-perl">my $it = interval_tree()
+it_insert($it, 1, 10, &quot;meeting-a&quot;)
+it_insert($it, 8, 15, &quot;meeting-b&quot;)
+my @hits = it_query_point($it, 9)     # both overlap
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-intl">
@@ -35816,6 +35613,10 @@ p millerrabin(104730)     # 0 (composite)
         <p><code>is_tty</code> — predicate: 1 if input is tty, 0 otherwise. Category: *more process / system*.</p>
         <pre><code class="lang-perl">p is_tty $x
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-is-ulid">
+        <h3><a class="doc-anchor" href="#doc-is-ulid">#</a> <code>is_ulid</code></h3>
+        <p><code>is_ulid SCALAR</code> → <code>1</code>/<code>0</code> per the 26-char Crockford-Base32 format (<code>[0-9A-HJKMNP-TV-Z]{26}</code>). Excludes <code>I</code>, <code>L</code>, <code>O</code>, <code>U</code> per Crockford spec.</p>
       </article>
       <article class="doc-entry" id="doc-is-undef">
         <h3><a class="doc-anchor" href="#doc-is-undef">#</a> <code>is_undef</code></h3>
@@ -37311,6 +37112,14 @@ p millerrabin(104730)     # 0 (composite)
         <pre><code class="lang-perl">p ka_to_pka $value
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-kahan">
+        <h3><a class="doc-anchor" href="#doc-kahan">#</a> <code>kahan</code></h3>
+        <p><code>kahan_sum LIST</code> — Neumaier-variant compensated summation. Recovers ~16-17 digits of precision on long float sums where naive <code>sum</code> loses precision to cancellation.</p>
+        <pre><code class="lang-perl">p sum(1e20, 1, -1e20, 1, -1e20, 1e20)         # 0  (precision lost)
+p kahan_sum(1e20, 1, -1e20, 1, -1e20, 1e20)   # 2  (recovered)
+</code></pre>
+        <p>World&#39;s-first as scripting-lang stdlib pipe-friendly builtin: Python&#39;s <code>math.fsum</code> is closest but not pipeable; Ruby / Node / Perl have no stdlib equivalent.</p>
+      </article>
       <article class="doc-entry" id="doc-kaiser">
         <h3><a class="doc-anchor" href="#doc-kaiser">#</a> <code>kaiser</code></h3>
         <p><code>window_kaiser($n, $beta)</code> (alias <code>kaiser</code>) — generates a Kaiser window with parameter beta controlling the tradeoff between main lobe width and sidelobe level. Beta=0 is rectangular, beta~5 is similar to Hamming.</p>
@@ -38406,6 +38215,10 @@ p lambertw(exp(1))  # 1.0
         <p><code>leading_zeros</code> — operation <code>leading zeros</code>. Category: *base conversion*.</p>
         <pre><code class="lang-perl">p leading_zeros $x
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-leaky-bucket">
+        <h3><a class="doc-anchor" href="#doc-leaky-bucket">#</a> <code>leaky_bucket</code></h3>
+        <p><code>leaky_bucket(CAPACITY, DRAIN_PER_SEC)</code> — leaky-bucket rate limiter (drains over time, fills as requests arrive). <code>rl_try_take(cost)</code> succeeds if the fill plus <code>cost</code> doesn&#39;t overflow.</p>
       </article>
       <article class="doc-entry" id="doc-leaky-relu">
         <h3><a class="doc-anchor" href="#doc-leaky-relu">#</a> <code>leaky_relu</code></h3>
@@ -41483,6 +41296,18 @@ gauge(mem_used / mem_total) |&gt; p         # memory usage gauge
         <pre><code class="lang-perl">p mgrs_encode $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-mh-add">
+        <h3><a class="doc-anchor" href="#doc-mh-add">#</a> <code>mh_add</code></h3>
+        <p><code>mh_add(MH, ITEM)</code> — fold an element into the signature.</p>
+      </article>
+      <article class="doc-entry" id="doc-mh-jaccard">
+        <h3><a class="doc-anchor" href="#doc-mh-jaccard">#</a> <code>mh_jaccard</code></h3>
+        <p><code>mh_jaccard(A, B)</code> → estimated Jaccard similarity.</p>
+      </article>
+      <article class="doc-entry" id="doc-mh-merge">
+        <h3><a class="doc-anchor" href="#doc-mh-merge">#</a> <code>mh_merge</code></h3>
+        <p><code>mh_merge(A, B)</code> — register-wise min into A (union of two sets). Returns <code>1</code> on success.</p>
+      </article>
       <article class="doc-entry" id="doc-mhad">
         <h3><a class="doc-anchor" href="#doc-mhad">#</a> <code>mhad</code></h3>
         <p><code>mhad</code> — operation <code>mhad</code>. Alias for <code>matrix_hadamard</code>. Category: *matrix operations extras*.</p>
@@ -41722,6 +41547,15 @@ p midi_to_note_name(69)  # A4
         <h3><a class="doc-anchor" href="#doc-mineral-mohs-hardness">#</a> <code>mineral_mohs_hardness</code></h3>
         <p><code>mineral_mohs_hardness</code> — operation <code>mineral mohs hardness</code>. Category: *geology, seismology, mineralogy*.</p>
         <pre><code class="lang-perl">p mineral_mohs_hardness $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-minhash">
+        <h3><a class="doc-anchor" href="#doc-minhash">#</a> <code>minhash</code></h3>
+        <p><code>minhash(K=128)</code> — MinHash Jaccard-similarity signature with <code>K</code> independent hash functions (Kirsch-Mitzenmacher double-hashing over xxh3-128). <code>mh_jaccard(a, b)</code> ≈ true Jaccard with error O(1/sqrt(K)).</p>
+        <pre><code class="lang-perl">my $a = minhash(256); my $b = minhash(256)
+mh_add($a, $_) for @shingles_a
+mh_add($b, $_) for @shingles_b
+p mh_jaccard($a, $b)                  # ~|A∩B|/|A∪B|
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-minimax-value">
@@ -50767,6 +50601,110 @@ p r72(0.10)   # 7.2 years at 10%
         <pre><code class="lang-perl">p rb $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-rb-add">
+        <h3><a class="doc-anchor" href="#doc-rb-add">#</a> <code>rb_add</code></h3>
+        <p><code>rb_add(RB, U32...)</code> — insert one or more u32 values (clamped to <code>[0, 2^32-1]</code>); accepts ARRAYREFs as well. Returns the count newly inserted.</p>
+      </article>
+      <article class="doc-entry" id="doc-rb-and">
+        <h3><a class="doc-anchor" href="#doc-rb-and">#</a> <code>rb_and</code></h3>
+        <p><code>rb_and(RB, OTHER)</code> — in-place intersect.</p>
+      </article>
+      <article class="doc-entry" id="doc-rb-andnot">
+        <h3><a class="doc-anchor" href="#doc-rb-andnot">#</a> <code>rb_andnot</code></h3>
+        <p><code>rb_andnot(RB, OTHER)</code> — in-place <code>RB - OTHER</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-rb-clear">
+        <h3><a class="doc-anchor" href="#doc-rb-clear">#</a> <code>rb_clear</code></h3>
+        <p><code>rb_clear</code> — operation <code>rb clear</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p rb_clear $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rb-contains">
+        <h3><a class="doc-anchor" href="#doc-rb-contains">#</a> <code>rb_contains</code></h3>
+        <p><code>rb_contains(RB, U32)</code> → <code>1</code>/<code>0</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-rb-count">
+        <h3><a class="doc-anchor" href="#doc-rb-count">#</a> <code>rb_count</code></h3>
+        <p><code>rb_count</code> — count of <code>rb</code>. Alias for <code>rb_len</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p rb_count $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rb-del">
+        <h3><a class="doc-anchor" href="#doc-rb-del">#</a> <code>rb_del</code></h3>
+        <p><code>rb_del</code> — operation <code>rb del</code>. Alias for <code>rb_remove</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p rb_del $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rb-deserialize">
+        <h3><a class="doc-anchor" href="#doc-rb-deserialize">#</a> <code>rb_deserialize</code></h3>
+        <p><code>rb_deserialize</code> — operation <code>rb deserialize</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p rb_deserialize $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rb-from-bytes">
+        <h3><a class="doc-anchor" href="#doc-rb-from-bytes">#</a> <code>rb_from_bytes</code></h3>
+        <p><code>rb_from_bytes</code> — operation <code>rb from bytes</code>. Alias for <code>rb_deserialize</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p rb_from_bytes $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rb-len">
+        <h3><a class="doc-anchor" href="#doc-rb-len">#</a> <code>rb_len</code></h3>
+        <p><code>rb_len</code> — operation <code>rb len</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p rb_len $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rb-max">
+        <h3><a class="doc-anchor" href="#doc-rb-max">#</a> <code>rb_max</code></h3>
+        <p><code>rb_max</code> — maximum of <code>rb</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p rb_max $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rb-min">
+        <h3><a class="doc-anchor" href="#doc-rb-min">#</a> <code>rb_min</code></h3>
+        <p><code>rb_min</code> — minimum of <code>rb</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p rb_min $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rb-or">
+        <h3><a class="doc-anchor" href="#doc-rb-or">#</a> <code>rb_or</code></h3>
+        <p><code>rb_or(RB, OTHER)</code> — in-place set union into RB.</p>
+      </article>
+      <article class="doc-entry" id="doc-rb-rank">
+        <h3><a class="doc-anchor" href="#doc-rb-rank">#</a> <code>rb_rank</code></h3>
+        <p><code>rb_rank(RB, V)</code> → number of elements ≤ V.</p>
+      </article>
+      <article class="doc-entry" id="doc-rb-remove">
+        <h3><a class="doc-anchor" href="#doc-rb-remove">#</a> <code>rb_remove</code></h3>
+        <p><code>rb_remove</code> — operation <code>rb remove</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p rb_remove $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rb-reset">
+        <h3><a class="doc-anchor" href="#doc-rb-reset">#</a> <code>rb_reset</code></h3>
+        <p><code>rb_reset</code> — operation <code>rb reset</code>. Alias for <code>rb_clear</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p rb_reset $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rb-serialize">
+        <h3><a class="doc-anchor" href="#doc-rb-serialize">#</a> <code>rb_serialize</code></h3>
+        <p><code>rb_serialize</code> — operation <code>rb serialize</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p rb_serialize $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rb-symdiff">
+        <h3><a class="doc-anchor" href="#doc-rb-symdiff">#</a> <code>rb_symdiff</code></h3>
+        <p><code>rb_xor(RB, OTHER)</code> — in-place symmetric difference.</p>
+      </article>
+      <article class="doc-entry" id="doc-rb-to-array">
+        <h3><a class="doc-anchor" href="#doc-rb-to-array">#</a> <code>rb_to_array</code></h3>
+        <p><code>rb_to_array(RB)</code> → sorted ascending list of contained u32s.</p>
+      </article>
+      <article class="doc-entry" id="doc-rb-to-bytes">
+        <h3><a class="doc-anchor" href="#doc-rb-to-bytes">#</a> <code>rb_to_bytes</code></h3>
+        <p><code>rb_to_bytes</code> — convert from <code>rb</code> to <code>bytes</code>. Alias for <code>rb_serialize</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p rb_to_bytes $value
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-rbeta">
         <h3><a class="doc-anchor" href="#doc-rbeta">#</a> <code>rbeta</code></h3>
         <p><code>rbeta</code> — generate n random beta variates. Args: n, alpha, beta. Like R&#39;s rbeta().</p>
@@ -50784,6 +50722,16 @@ p r72(0.10)   # 7.2 years at 10%
         <p><code>rbinom</code> — generate n random binomial variates. Args: n, size, prob. Like R&#39;s rbinom().</p>
         <pre><code class="lang-perl">my @x = @{rbinom(100, 10, 0.3)} # 100 draws from Binom(10,0.3)
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rbm">
+        <h3><a class="doc-anchor" href="#doc-rbm">#</a> <code>rbm</code></h3>
+        <p><code>roaring(LIST | \@ARR | ...)</code> — Roaring Bitmap (compressed <code>u32</code> set). Apache-licensed <code>roaring</code> crate; the canonical impl used by quickwit/tantivy/lucene-rs. O(1) <code>add</code>/<code>contains</code>, O(n/run-length) set ops; typically 10-100× smaller than <code>HashSet&lt;u32&gt;</code> on natural datasets. <code>rb</code> short alias reserved for <code>read_bytes</code>; use <code>rbm</code>.</p>
+        <pre><code class="lang-perl">my $a = roaring(1, 2, 3, 5, 8)
+my $b = roaring([2, 4, 6, 8, 10])
+rb_and($a, $b)                        # in-place intersect
+p join(&quot;,&quot;, rb_to_array($a))         # 2,8
+</code></pre>
+        <p>Family: <code>rb_add</code>, <code>rb_remove</code>, <code>rb_contains</code>, <code>rb_or</code> (alias <code>rb_union</code>), <code>rb_and</code> (<code>rb_intersect</code>), <code>rb_xor</code> (<code>rb_symdiff</code>), <code>rb_andnot</code> (<code>rb_diff</code>, <code>rb_minus</code>), <code>rb_len</code>, <code>rb_min</code>, <code>rb_max</code>, <code>rb_rank</code>, <code>rb_to_array</code>, <code>rb_clear</code>, <code>rb_serialize</code>, <code>rb_deserialize</code>.</p>
       </article>
       <article class="doc-entry" id="doc-rc-tau">
         <h3><a class="doc-anchor" href="#doc-rc-tau">#</a> <code>rc_tau</code></h3>
@@ -52430,6 +52378,34 @@ my @y = @{rnorm(100, 50, 10)}   # mean=50, sd=10
         <p><code>root_system_count</code> — count of <code>root system</code>. Category: *econometrics*.</p>
         <pre><code class="lang-perl">p root_system_count $x
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rope">
+        <h3><a class="doc-anchor" href="#doc-rope">#</a> <code>rope</code></h3>
+        <p><code>rope(INITIAL_STRING=&quot;&quot;)</code> — text data structure for fast insert/delete in long strings. Chunk-balanced (1 KB max per chunk); amortized O(log n) edits. Codepoint-safe across UTF-8 boundaries.</p>
+        <pre><code class="lang-perl">my $r = rope(&quot;Hello, world!&quot;)
+rope_insert($r, 7, &quot;beautiful &quot;)
+p rope_to_string($r)                  # &quot;Hello, beautiful world!&quot;
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rope-delete">
+        <h3><a class="doc-anchor" href="#doc-rope-delete">#</a> <code>rope_delete</code></h3>
+        <p><code>rope_delete(R, START, END)</code> — delete codepoints <code>[START, END)</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-rope-insert">
+        <h3><a class="doc-anchor" href="#doc-rope-insert">#</a> <code>rope_insert</code></h3>
+        <p><code>rope_insert(R, POS, TEXT)</code> — insert <code>TEXT</code> at codepoint position <code>POS</code> (clamped to <code>[0, len]</code>).</p>
+      </article>
+      <article class="doc-entry" id="doc-rope-len">
+        <h3><a class="doc-anchor" href="#doc-rope-len">#</a> <code>rope_len</code></h3>
+        <p><code>rope_len(R)</code> → codepoint count.</p>
+      </article>
+      <article class="doc-entry" id="doc-rope-str">
+        <h3><a class="doc-anchor" href="#doc-rope-str">#</a> <code>rope_str</code></h3>
+        <p><code>rope_to_string(R)</code> → materialize as a contiguous String.</p>
+      </article>
+      <article class="doc-entry" id="doc-rope-substr">
+        <h3><a class="doc-anchor" href="#doc-rope-substr">#</a> <code>rope_substr</code></h3>
+        <p><code>rope_substring(R, START, END)</code> → substring at codepoint range <code>[START, END)</code>.</p>
       </article>
       <article class="doc-entry" id="doc-ros2-step">
         <h3><a class="doc-anchor" href="#doc-ros2-step">#</a> <code>ros2_step</code></h3>
@@ -54495,6 +54471,18 @@ my @r = @{seq_fn(5, 1, -1)}  # [5,4,3,2,1]
         <pre><code class="lang-perl">p sgp4_propagate_step $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-sh-add">
+        <h3><a class="doc-anchor" href="#doc-sh-add">#</a> <code>sh_add</code></h3>
+        <p><code>sh_add(SH, FEATURE, WEIGHT=1)</code> — fold a token into the sketch.</p>
+      </article>
+      <article class="doc-entry" id="doc-sh-digest">
+        <h3><a class="doc-anchor" href="#doc-sh-digest">#</a> <code>sh_digest</code></h3>
+        <p><code>sh_digest(SH)</code> → 64-bit integer fingerprint.</p>
+      </article>
+      <article class="doc-entry" id="doc-sh-similarity">
+        <h3><a class="doc-anchor" href="#doc-sh-similarity">#</a> <code>sh_similarity</code></h3>
+        <p><code>sh_similarity(A, B)</code> → approximate cosine similarity ∈ <code>[0, 1]</code>.</p>
+      </article>
       <article class="doc-entry" id="doc-shake-map-pga">
         <h3><a class="doc-anchor" href="#doc-shake-map-pga">#</a> <code>shake_map_pga</code></h3>
         <p><code>shake_map_pga</code> — operation <code>shake map pga</code>. Category: *geology, seismology, mineralogy*.</p>
@@ -54868,6 +54856,15 @@ p swish(-2)  # -0.2384
         <h3><a class="doc-anchor" href="#doc-sim">#</a> <code>sim</code></h3>
         <p><code>sim</code> — operation <code>sim</code>. Alias for <code>similarity</code>. Category: *extended stdlib*.</p>
         <pre><code class="lang-perl">p sim $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-simhash">
+        <h3><a class="doc-anchor" href="#doc-simhash">#</a> <code>simhash</code></h3>
+        <p><code>simhash()</code> — Charikar 64-bit SimHash sketch. Each feature flips +/- on 64 signed accumulators; final <code>digest()</code> is the per-bit sign. Cosine similarity ≈ <code>(64 - hamming(a, b)) / 64</code>. Stateful upgrade to the deleted <code>db_simhash_bit</code> spec primitive.</p>
+        <pre><code class="lang-perl">my $sh = simhash()
+sh_add($sh, $_) for @doc_tokens
+my $hash = sh_digest($sh)
+p sh_similarity($a, $b)               # 0..1
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-similarity">
@@ -57737,6 +57734,15 @@ p &quot;up $days days&quot;
         <pre><code class="lang-perl">p t1ha $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-t-digest">
+        <h3><a class="doc-anchor" href="#doc-t-digest">#</a> <code>t_digest</code></h3>
+        <p><code>t_digest(COMPRESSION=100)</code> — streaming-quantile sketch (Dunning). Larger compression → more centroids, more accuracy, linear extra memory. Default <code>100</code> gives ~1% error at p50, ~5% at p99 in O(100) bytes. Pending-buffer + flush-on-query so per-<code>td_add</code> is amortized O(1).</p>
+        <pre><code class="lang-perl">my $td = t_digest(200)
+td_add($td, $_) for @latencies_us
+printf &quot;p99: %.1f us\n&quot;, td_quantile($td, 0.99)
+</code></pre>
+        <p>Family: <code>td_add</code>, <code>td_quantile</code>, <code>td_count</code>, <code>td_min</code>, <code>td_max</code>, <code>td_sum</code>, <code>td_mean</code>, <code>td_merge</code>, <code>td_clear</code>, <code>td_serialize</code>, <code>td_deserialize</code>. <code>td</code> short alias is reserved for <code>toml_decode</code>; use <code>tdg</code>.</p>
+      </article>
       <article class="doc-entry" id="doc-t-test-one-sample">
         <h3><a class="doc-anchor" href="#doc-t-test-one-sample">#</a> <code>t_test_one_sample</code></h3>
         <p><code>t_test_one_sample($mu, @sample)</code> (alias <code>ttest1</code>) — performs a one-sample t-test comparing a sample mean against a hypothesized population mean mu. Returns [t_statistic, degrees_of_freedom]. Use t-distribution tables for p-value lookup.</p>
@@ -57999,34 +58005,84 @@ p $means{b}  # 3.5
         <pre><code class="lang-perl">p td $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-td-add">
+        <h3><a class="doc-anchor" href="#doc-td-add">#</a> <code>td_add</code></h3>
+        <p><code>td_add(TD, VALUE)</code> — insert a single sample. Non-finite values silently dropped.</p>
+      </article>
+      <article class="doc-entry" id="doc-td-clear">
+        <h3><a class="doc-anchor" href="#doc-td-clear">#</a> <code>td_clear</code></h3>
+        <p><code>td_clear</code> — operation <code>td clear</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p td_clear $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-td-count">
+        <h3><a class="doc-anchor" href="#doc-td-count">#</a> <code>td_count</code></h3>
+        <p><code>td_count(TD)</code> → number of samples inserted so far.</p>
+      </article>
+      <article class="doc-entry" id="doc-td-deserialize">
+        <h3><a class="doc-anchor" href="#doc-td-deserialize">#</a> <code>td_deserialize</code></h3>
+        <p><code>td_deserialize</code> — operation <code>td deserialize</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p td_deserialize $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-td-from-bytes">
+        <h3><a class="doc-anchor" href="#doc-td-from-bytes">#</a> <code>td_from_bytes</code></h3>
+        <p><code>td_from_bytes</code> — operation <code>td from bytes</code>. Alias for <code>td_deserialize</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p td_from_bytes $x
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-td-lambda-update">
         <h3><a class="doc-anchor" href="#doc-td-lambda-update">#</a> <code>td_lambda_update</code></h3>
         <p><code>td_lambda_update</code> — update step of <code>td lambda</code>. Category: *electrochemistry, batteries, fuel cells*.</p>
         <pre><code class="lang-perl">p td_lambda_update $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-td-max">
+        <h3><a class="doc-anchor" href="#doc-td-max">#</a> <code>td_max</code></h3>
+        <p><code>td_max(TD)</code> — exact maximum sample seen.</p>
+      </article>
+      <article class="doc-entry" id="doc-td-mean">
+        <h3><a class="doc-anchor" href="#doc-td-mean">#</a> <code>td_mean</code></h3>
+        <p><code>td_mean(TD)</code> — exact mean of all inserted samples.</p>
+      </article>
+      <article class="doc-entry" id="doc-td-merge">
+        <h3><a class="doc-anchor" href="#doc-td-merge">#</a> <code>td_merge</code></h3>
+        <p><code>td_merge(TD, OTHER)</code> — combine two t-digests via <code>tdigest::TDigest::merge_digests</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-td-min">
+        <h3><a class="doc-anchor" href="#doc-td-min">#</a> <code>td_min</code></h3>
+        <p><code>td_min(TD)</code> / <code>td_max(TD)</code> — exact min/max (t-digest tracks both).</p>
+      </article>
+      <article class="doc-entry" id="doc-td-quantile">
+        <h3><a class="doc-anchor" href="#doc-td-quantile">#</a> <code>td_quantile</code></h3>
+        <p><code>td_quantile(TD, Q)</code> → estimated <code>Q</code>-th quantile (0 ≤ Q ≤ 1).</p>
+      </article>
+      <article class="doc-entry" id="doc-td-reset">
+        <h3><a class="doc-anchor" href="#doc-td-reset">#</a> <code>td_reset</code></h3>
+        <p><code>td_reset</code> — operation <code>td reset</code>. Alias for <code>td_clear</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p td_reset $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-td-serialize">
+        <h3><a class="doc-anchor" href="#doc-td-serialize">#</a> <code>td_serialize</code></h3>
+        <p><code>td_serialize</code> — operation <code>td serialize</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p td_serialize $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-td-sum">
+        <h3><a class="doc-anchor" href="#doc-td-sum">#</a> <code>td_sum</code></h3>
+        <p><code>td_sum(TD)</code> — exact sum of all inserted samples.</p>
+      </article>
+      <article class="doc-entry" id="doc-td-to-bytes">
+        <h3><a class="doc-anchor" href="#doc-td-to-bytes">#</a> <code>td_to_bytes</code></h3>
+        <p><code>td_to_bytes</code> — convert from <code>td</code> to <code>bytes</code>. Alias for <code>td_serialize</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p td_to_bytes $value
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-td-zero-update">
         <h3><a class="doc-anchor" href="#doc-td-zero-update">#</a> <code>td_zero_update</code></h3>
         <p><code>td_zero_update</code> — update step of <code>td zero</code>. Category: *electrochemistry, batteries, fuel cells*.</p>
         <pre><code class="lang-perl">p td_zero_update $x
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-tdigest-add">
-        <h3><a class="doc-anchor" href="#doc-tdigest-add">#</a> <code>tdigest_add</code></h3>
-        <p><code>tdigest_add</code> — operation <code>tdigest add</code>. Category: *extras*.</p>
-        <pre><code class="lang-perl">p tdigest_add $x
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-tdigest-new">
-        <h3><a class="doc-anchor" href="#doc-tdigest-new">#</a> <code>tdigest_new</code></h3>
-        <p><code>tdigest_new</code> — constructor of <code>tdigest</code>. Category: *extras*.</p>
-        <pre><code class="lang-perl">p tdigest_new $x
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-tdigest-quantile">
-        <h3><a class="doc-anchor" href="#doc-tdigest-quantile">#</a> <code>tdigest_quantile</code></h3>
-        <p><code>tdigest_quantile</code> — operation <code>tdigest quantile</code>. Category: *extras*.</p>
-        <pre><code class="lang-perl">p tdigest_quantile $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-tdilate">
@@ -58613,6 +58669,13 @@ p $allowed-&gt;contains(&quot;foo&quot;)
         <pre><code class="lang-perl">p token $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-token-bucket">
+        <h3><a class="doc-anchor" href="#doc-token-bucket">#</a> <code>token_bucket</code></h3>
+        <p><code>token_bucket(CAPACITY=100, RATE=10)</code> — token-bucket rate limiter. <code>CAPACITY</code> is the max burst; <code>RATE</code> (tokens/sec) is the steady-state allowance. Refills lazily on each <code>rl_try_take</code> based on wall-clock — no background thread. Stateful upgrade over the deleted <code>db_token_bucket_step</code> spec primitive.</p>
+        <pre><code class="lang-perl">my $rl = token_bucket(100, 50)         # 50 req/s, burst 100
+if (rl_try_take($rl, 1)) { ... } else { sleep(0.02) }
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-tokenize-bpe">
         <h3><a class="doc-anchor" href="#doc-tokenize-bpe">#</a> <code>tokenize_bpe</code></h3>
         <p><code>tokenize_bpe(s, merges) → array</code> — Byte-Pair Encoding tokenisation against a merge table.</p>
@@ -58651,6 +58714,14 @@ p $allowed-&gt;contains(&quot;foo&quot;)
         <h3><a class="doc-anchor" href="#doc-top-hat-transform">#</a> <code>top_hat_transform</code></h3>
         <p><code>top_hat_transform(image, size=3) → matrix</code> — <code>image - opening</code>. Extracts bright details smaller than the structuring element.</p>
       </article>
+      <article class="doc-entry" id="doc-top-k">
+        <h3><a class="doc-anchor" href="#doc-top-k">#</a> <code>top_k</code></h3>
+        <p><code>topk(K=10)</code> — SpaceSaving top-K heavy-hitters sketch. Tracks exactly <code>K</code> slots; on overflow the lowest-count slot is replaced with a new key inheriting <code>min+1</code> count and the evicted count as an error floor. <code>topk_heavies(N)</code> returns <code>[key, count, err]</code> rows sorted by count desc; truth lies in <code>[count - err, count]</code>.</p>
+        <pre><code class="lang-perl">my $t = topk(10)
+topk_add($t, $_) for @clickstream
+my @hot = topk_heavies($t)            # top 10 by frequency
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-top-k-indices">
         <h3><a class="doc-anchor" href="#doc-top-k-indices">#</a> <code>top_k_indices</code></h3>
         <p><code>top_k_indices(values, k=5) → array</code> — indices of the <code>k</code> largest values, sorted descending.</p>
@@ -58681,10 +58752,66 @@ p $allowed-&gt;contains(&quot;foo&quot;)
         <pre><code class="lang-perl">p top_trading_cycles_step $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-topk-add">
+        <h3><a class="doc-anchor" href="#doc-topk-add">#</a> <code>topk_add</code></h3>
+        <p><code>topk_add(TOPK, KEY)</code> — observe one occurrence of <code>KEY</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-topk-clear">
+        <h3><a class="doc-anchor" href="#doc-topk-clear">#</a> <code>topk_clear</code></h3>
+        <p><code>topk_clear</code> — top-K sketch op <code>clear</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p topk_clear $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-topk-count">
+        <h3><a class="doc-anchor" href="#doc-topk-count">#</a> <code>topk_count</code></h3>
+        <p><code>topk_count(TOPK, KEY)</code> → count of <code>KEY</code> if currently tracked; <code>0</code> if displaced.</p>
+      </article>
+      <article class="doc-entry" id="doc-topk-deserialize">
+        <h3><a class="doc-anchor" href="#doc-topk-deserialize">#</a> <code>topk_deserialize</code></h3>
+        <p><code>topk_deserialize</code> — top-K sketch op <code>deserialize</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p topk_deserialize $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-topk-from-bytes">
+        <h3><a class="doc-anchor" href="#doc-topk-from-bytes">#</a> <code>topk_from_bytes</code></h3>
+        <p><code>topk_from_bytes</code> — top-K sketch op <code>from bytes</code>. Alias for <code>topk_deserialize</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p topk_from_bytes $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-topk-heavies">
+        <h3><a class="doc-anchor" href="#doc-topk-heavies">#</a> <code>topk_heavies</code></h3>
+        <p><code>topk_heavies(TOPK, N=K)</code> → list of <code>[key, count, error_floor]</code> rows sorted by count desc.</p>
+      </article>
       <article class="doc-entry" id="doc-topk-indices">
         <h3><a class="doc-anchor" href="#doc-topk-indices">#</a> <code>topk_indices</code></h3>
         <p><code>topk_indices</code> — top-K sketch op <code>indices</code>. Category: *ml extensions*.</p>
         <pre><code class="lang-perl">p topk_indices $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-topk-merge">
+        <h3><a class="doc-anchor" href="#doc-topk-merge">#</a> <code>topk_merge</code></h3>
+        <p><code>topk_merge(TOPK, OTHER)</code> — replay <code>OTHER</code>&#39;s observations through the standard online update. Cost is O(sum_of_counts).</p>
+      </article>
+      <article class="doc-entry" id="doc-topk-reset">
+        <h3><a class="doc-anchor" href="#doc-topk-reset">#</a> <code>topk_reset</code></h3>
+        <p><code>topk_reset</code> — top-K sketch op <code>reset</code>. Alias for <code>topk_clear</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p topk_reset $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-topk-serialize">
+        <h3><a class="doc-anchor" href="#doc-topk-serialize">#</a> <code>topk_serialize</code></h3>
+        <p><code>topk_serialize</code> — top-K sketch op <code>serialize</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p topk_serialize $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-topk-size">
+        <h3><a class="doc-anchor" href="#doc-topk-size">#</a> <code>topk_size</code></h3>
+        <p><code>topk_size(TOPK)</code> → current entries (≤ K).</p>
+      </article>
+      <article class="doc-entry" id="doc-topk-to-bytes">
+        <h3><a class="doc-anchor" href="#doc-topk-to-bytes">#</a> <code>topk_to_bytes</code></h3>
+        <p><code>topk_to_bytes</code> — convert from <code>topk</code> to <code>bytes</code>. Alias for <code>topk_serialize</code>. Category: *probabilistic data structures*.</p>
+        <pre><code class="lang-perl">p topk_to_bytes $value
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-topo-kahn-step">
@@ -59676,6 +59803,18 @@ $t = trie_insert($t, &quot;hello&quot;)
         <p><code>ulcer_index(prices) → number</code> — Peter Martin&#39;s measure of downside risk: <code>√(mean(drawdown_pct²))</code>. Heavier penalty on deep, lasting drawdowns than stddev.</p>
         <pre><code class="lang-perl">p ulcer_index(\@equity_curve)
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ulid">
+        <h3><a class="doc-anchor" href="#doc-ulid">#</a> <code>ulid</code></h3>
+        <p><code>ulid()</code> → 26-char Crockford-Base32 ULID — 48-bit ms timestamp + 80-bit random. Lexicographically sortable; monotonic within the same millisecond via a process-wide <code>Mutex&lt;(last_ms, last_rand)&gt;</code>. World&#39;s-first as scripting-language stdlib builtin: Python / Ruby / Node all need third-party packages. Use for trace IDs in <code>ai</code>/<code>prompt</code> workflows where ordered insertion matters.</p>
+        <pre><code class="lang-perl">my $trace_id = ulid()                 # 01KRJ8YC8AGW5XHM2BKHJ23ZRR
+is_ulid($trace_id) ? &quot;ok&quot; : die
+p ulid_timestamp($trace_id)           # ms-since-epoch
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ulid-timestamp">
+        <h3><a class="doc-anchor" href="#doc-ulid-timestamp">#</a> <code>ulid_timestamp</code></h3>
+        <p><code>ulid_timestamp(ULID)</code> → 48-bit ms-since-Unix-epoch extracted from the timestamp prefix. Returns <code>undef</code> on malformed input.</p>
       </article>
       <article class="doc-entry" id="doc-ultimatum-acceptance-prob">
         <h3><a class="doc-anchor" href="#doc-ultimatum-acceptance-prob">#</a> <code>ultimatum_acceptance_prob</code></h3>
@@ -61095,6 +61234,22 @@ p &quot;t=$t df=$df&quot;
         <p><code>welch_window</code> — operation <code>welch window</code>. Category: *signal processing*.</p>
         <pre><code class="lang-perl">p welch_window $x
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-welford-mean">
+        <h3><a class="doc-anchor" href="#doc-welford-mean">#</a> <code>welford_mean</code></h3>
+        <p><code>welford_mean LIST</code> — single-pass online mean via Welford&#39;s algorithm. Numerically stable for long streams where naive <code>sum / len</code> overflows or loses precision.</p>
+      </article>
+      <article class="doc-entry" id="doc-welford-pop-variance">
+        <h3><a class="doc-anchor" href="#doc-welford-pop-variance">#</a> <code>welford_pop_variance</code></h3>
+        <p><code>welford_pop_variance LIST</code> — population variance (n denominator), counterpart to <code>welford_variance</code> (sample, n-1).</p>
+      </article>
+      <article class="doc-entry" id="doc-welford-sd">
+        <h3><a class="doc-anchor" href="#doc-welford-sd">#</a> <code>welford_sd</code></h3>
+        <p><code>welford_stddev LIST</code> — sqrt of <code>welford_variance</code>; numerically-stable sample standard deviation.</p>
+      </article>
+      <article class="doc-entry" id="doc-welford-var">
+        <h3><a class="doc-anchor" href="#doc-welford-var">#</a> <code>welford_var</code></h3>
+        <p><code>welford_variance LIST</code> — single-pass sample variance (n-1 denominator) via Welford&#39;s algorithm.</p>
       </article>
       <article class="doc-entry" id="doc-welsh-powell">
         <h3><a class="doc-anchor" href="#doc-welsh-powell">#</a> <code>welsh_powell</code></h3>

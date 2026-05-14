@@ -222,9 +222,9 @@
   \apptocmd{\@title}{\par {\large #1 \par}}{}{}
 }
 \makeatother
-\subtitle{v0.13.15}
+\subtitle{v0.14.0}
 \author{MenkeTechnologies}
-\date{2026-05-13}
+\date{2026-05-14}
 
 \begin{document}
 \maketitle
@@ -1675,7 +1675,7 @@ parameter instead of \texttt{\_}.
 \NormalTok{my @evens = grep \{ \_ \% 2 == 0 \} 1:10}
 \NormalTok{@evens |\textgreater{} e p   \# 2 4 6 8 10}
 \NormalTok{grep \{ |$x| $x \textgreater{} 3 \}, 1:6   \# named param}
-\NormalTok{my @long = grep \{ length(\_) \textgreater{} 3 \} @words}
+\NormalTok{my @long = grep \{ len \textgreater{} 3 \} @words}
 \end{Highlighting}
 \end{Shaded}
 
@@ -15248,7 +15248,7 @@ explicitly --- Perl auto-seeds on first use of \texttt{rand}.
 \protect\phantomsection\label{ch-file-system}
 \chapter{File System}\label{file-system}
 
-34 topics
+35 topics
 
 \section{\texorpdfstring{\texttt{basename}}{basename}}\label{basename}
 
@@ -15351,6 +15351,27 @@ command. Often used to save and restore directory context around
 \NormalTok{p pwd()      \# /tmp}
 \NormalTok{chdir($orig)}
 \NormalTok{p getcwd()   \# back to original}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{cd}}{cd}}\label{cd}
+
+Set the interpreter working directory used to resolve \textbf{relative}
+paths for Stryke builtins (\texttt{slurp}, \texttt{spurt},
+\texttt{open}, \texttt{glob}, \texttt{stat}, \texttt{rename},
+\texttt{ls}, \texttt{-e}, \ldots). Does \textbf{not} call the OS
+\texttt{chdir} by itself --- \texttt{getcwd}/\texttt{pwd} stay unchanged
+until you call \texttt{chdir}. A successful \texttt{chdir} \textbf{does}
+refresh this logical base from the new OS cwd. Relative \texttt{cd}
+targets are resolved against the current logical directory first. With
+no arguments, uses \texttt{\$HOME} / \texttt{\%USERPROFILE\%} when set.
+Returns \texttt{1} on success, \texttt{0} on failure and sets
+\texttt{\$!}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{cd("/tmp")}
+\NormalTok{spurt("x.txt", "hi")       \# writes /tmp/x.txt}
 \end{Highlighting}
 \end{Shaded}
 
@@ -15612,9 +15633,10 @@ privileges.
 
 \section{\texorpdfstring{\texttt{chdir}}{chdir}}\label{chdir}
 
-Change the current working directory of the process. Dies if the
-directory does not exist or is not accessible. This affects all
-subsequent relative path operations. Pair with
+Change the current working directory of the process. On success, also
+refreshes the interpreter logical directory used for relative Stryke
+builtins (same as after a successful \texttt{cd} to that path). Returns
+\texttt{0}/\texttt{1} (does not throw). Pair with
 \texttt{getcwd}/\texttt{pwd} to save and restore the original directory.
 
 \begin{Shaded}
@@ -20090,7 +20112,7 @@ list.
 \protect\phantomsection\label{ch-other}
 \chapter{Other}\label{other}
 
-8396 topics
+8471 topics
 
 \section{\texorpdfstring{\texttt{\$!}}{\$!}}\label{section-55}
 
@@ -20137,27 +20159,7 @@ CSV-like joining without \texttt{join}.
 Only affects double-quoted interpolation, not bare \texttt{print\ @xs}
 (which uses \texttt{\$,}). Use \texttt{local\ \$"} to scope the change.
 
-\section{\texorpdfstring{\texttt{\$\#}}{\$\#}}\label{section-57}
-
-\texttt{\$\#} --- the default output format for printed numbers (legacy
-/ deprecated since early Perl 5; modern code uses
-\texttt{printf}/\texttt{sprintf} explicitly). Distinct from
-\texttt{\$\#array} which is the last-index expression --- \texttt{\$\#}
-standalone reads the number-format global, \texttt{\$\#NAME} reads
-\texttt{\$\#\{NAME\}}, the last index of \texttt{@NAME}.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{p $\#                \# number{-}format global (rarely set)}
-\NormalTok{my @xs = (1, 2, 3, 4)}
-\NormalTok{p $\#xs              \# 3 — last index of @xs}
-\end{Highlighting}
-\end{Shaded}
-
-For modern formatting use \texttt{printf\ "\%.2f",\ \$n}. See also:
-\texttt{\$\#array} syntax, \texttt{printf}, \texttt{sprintf}.
-
-\section{\texorpdfstring{\texttt{\$\$}}{\$\$}}\label{section-58}
+\section{\texorpdfstring{\texttt{\$\$}}{\$\$}}\label{section-57}
 
 \texttt{\$\$} --- the process ID of the running stryke interpreter.
 Read-only, set once at startup. Useful for PID files, log filenames, and
@@ -20181,7 +20183,7 @@ child/parent disambiguation after \texttt{fork}.
 See also: \texttt{getppid()} for the parent PID, \texttt{fork()} to
 spawn children.
 
-\section{\texorpdfstring{\texttt{\$\&}}{\$\&}}\label{section-59}
+\section{\texorpdfstring{\texttt{\$\&}}{\$\&}}\label{section-58}
 
 \texttt{\$\&} --- the entire string matched by the most recent
 successful regex match in the current scope. Reset on every match. In
@@ -20203,7 +20205,7 @@ See also:
 \$\texttt{\ }\texttt{\ (prematch),\ }\$\textquotesingle{}\texttt{\ (postmatch),\ }\$1\texttt{..}\$9\texttt{\ (capture\ groups),\ }@-\texttt{\ /\ }@+\texttt{\ (offsets),\ }\$\{\^{}MATCH\}\texttt{\ /\ }\$\{\^{}PREMATCH\}\texttt{\ /\ }\$\{\^{}POSTMATCH\}\texttt{\ (no-penalty\ equivalents\ under\ }use
 re \textquotesingle p\textquotesingle`).
 
-\section{\texorpdfstring{\texttt{\$\textquotesingle{}}}{\$\textquotesingle{}}}\label{section-60}
+\section{\texorpdfstring{\texttt{\$\textquotesingle{}}}{\$\textquotesingle{}}}\label{section-59}
 
 \texttt{\$\textquotesingle{}} --- the substring *following* the last
 successful regex match ("postmatch"). Combined with
@@ -20224,7 +20226,7 @@ See also:
 \$\texttt{\ }\texttt{,\ }\$\&\texttt{,\ }\$\{\^{}POSTMATCH\}\texttt{\ (cleaner\ under\ }use
 re \textquotesingle p\textquotesingle`).
 
-\section{\texorpdfstring{\texttt{\$(}}{\$(}}\label{section-61}
+\section{\texorpdfstring{\texttt{\$(}}{\$(}}\label{section-60}
 
 \texttt{\$(} --- the real group ID of the running process. In list
 context (or when stringified with whitespace) yields the primary GID
@@ -20245,7 +20247,7 @@ followed by every supplementary group, space-separated. Use
 See also: \texttt{\$)} (effective gid), \texttt{\$\textless{}} (real
 uid), \texttt{\$\textgreater{}} (effective uid).
 
-\section{\texorpdfstring{\texttt{\$)}}{\$)}}\label{section-62}
+\section{\texorpdfstring{\texttt{\$)}}{\$)}}\label{section-61}
 
 \texttt{\$)} --- the effective group ID of the running process. Like
 \texttt{\$(}, returns the primary EGID plus supplementary groups
@@ -20265,7 +20267,7 @@ filesystem operations. Assigning to \texttt{\$)} requires privileges
 See also: \texttt{\$(} (real gid), \texttt{\$\textgreater{}} (effective
 uid).
 
-\section{\texorpdfstring{\texttt{\$+}}{\$+}}\label{section-63}
+\section{\texorpdfstring{\texttt{\$+}}{\$+}}\label{section-62}
 
 \texttt{\$+} --- the contents of the \textbf{last} parenthesised capture
 group that successfully matched in the most recent regex. When the regex
@@ -20287,7 +20289,7 @@ different groups depending on input.
 See also: \texttt{\$1}..\texttt{\$9} (positional captures), \texttt{\%+}
 (named captures), \texttt{@+} (end-of-match offsets).
 
-\section{\texorpdfstring{\texttt{\$,}}{\$,}}\label{section-64}
+\section{\texorpdfstring{\texttt{\$,}}{\$,}}\label{section-63}
 
 \texttt{\$,} --- the output field separator inserted between arguments
 by \texttt{print} (default: empty string). Does *not* affect
@@ -20309,25 +20311,7 @@ is the classic way to print comma-separated lists without an explicit
 See also: \texttt{\$\textbackslash{}} (output record separator),
 \texttt{\$"} (list interpolation separator).
 
-\section{\texorpdfstring{\texttt{\$-}}{\$-}}\label{section-65}
-
-\texttt{\$-} --- the number of lines left on the current output page for
-\texttt{format}/\texttt{write}. Decremented as \texttt{write} emits
-lines; when it hits 0, the top-of-page header (\texttt{\$\^{}} /
-\texttt{\$=}) is re-emitted. Niche; only relevant to the legacy
-\texttt{format} system.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{write}
-\NormalTok{p "${-} lines left on page"}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{format}, \texttt{write}, \texttt{\$=} (page length),
-\texttt{\$\^{}} (top-of-page format).
-
-\section{\texorpdfstring{\texttt{\$.}}{\$.}}\label{section-66}
+\section{\texorpdfstring{\texttt{\$.}}{\$.}}\label{section-64}
 
 \texttt{\$.} --- the current input line number of the most recently read
 filehandle, as tracked by \texttt{\textless{}\textgreater{}},
@@ -20349,7 +20333,7 @@ line numbers continue across files unless you reset it manually).
 See also: \texttt{\$ARGV} (current filename), \texttt{eof} (file
 boundary detection).
 
-\section{\texorpdfstring{\texttt{\$/}}{\$/}}\label{section-67}
+\section{\texorpdfstring{\texttt{\$/}}{\$/}}\label{section-65}
 
 \texttt{\$/} --- the input record separator used by
 \texttt{\textless{}\textgreater{}}/\texttt{readline}. Default:
@@ -20377,7 +20361,7 @@ Always \texttt{local}-ise the change so it doesn\textquotesingle t leak.
 See also: \texttt{\$\textbackslash{}} (output record separator),
 \texttt{\$,}.
 
-\section{\texorpdfstring{\texttt{\$0}}{\$0}}\label{section-68}
+\section{\texorpdfstring{\texttt{\$0}}{\$0}}\label{section-66}
 
 \texttt{\$0} --- the program name as the OS sees it. Initialised from
 \texttt{argv{[}0{]}}. Assignment to \texttt{\$0} updates the visible
@@ -20397,7 +20381,7 @@ want to reflect what they\textquotesingle re doing.
 See also: \texttt{@ARGV} (the rest of the command line),
 \texttt{\_\_FILE\_\_} (compile-time source path).
 
-\section{\texorpdfstring{\texttt{\$1}}{\$1}}\label{section-69}
+\section{\texorpdfstring{\texttt{\$1}}{\$1}}\label{section-67}
 
 \texttt{\$1} --- the substring matched by the \textbf{first}
 parenthesised capture group of the most recent successful regex. Undef
@@ -20418,42 +20402,42 @@ See also: \texttt{\$2}..\texttt{\$9}, \texttt{\%+} (named captures via
 \texttt{(?\textless{}name\textgreater{}...)}), \texttt{@-} / \texttt{@+}
 (offsets), \texttt{\$+} (last successful group).
 
-\section{\texorpdfstring{\texttt{\$2}}{\$2}}\label{section-70}
+\section{\texorpdfstring{\texttt{\$2}}{\$2}}\label{section-68}
 
 \texttt{\$2} --- second capture group from the most recent regex match.
 See \texttt{\$1} for full semantics.
 
-\section{\texorpdfstring{\texttt{\$3}}{\$3}}\label{section-71}
+\section{\texorpdfstring{\texttt{\$3}}{\$3}}\label{section-69}
 
 \texttt{\$3} --- third capture group from the most recent regex match.
 See \texttt{\$1} for full semantics.
 
-\section{\texorpdfstring{\texttt{\$4}}{\$4}}\label{section-72}
+\section{\texorpdfstring{\texttt{\$4}}{\$4}}\label{section-70}
 
 \texttt{\$4} --- fourth capture group from the most recent regex match.
 See \texttt{\$1} for full semantics.
 
-\section{\texorpdfstring{\texttt{\$5}}{\$5}}\label{section-73}
+\section{\texorpdfstring{\texttt{\$5}}{\$5}}\label{section-71}
 
 \texttt{\$5} --- fifth capture group from the most recent regex match.
 See \texttt{\$1} for full semantics.
 
-\section{\texorpdfstring{\texttt{\$6}}{\$6}}\label{section-74}
+\section{\texorpdfstring{\texttt{\$6}}{\$6}}\label{section-72}
 
 \texttt{\$6} --- sixth capture group from the most recent regex match.
 See \texttt{\$1} for full semantics.
 
-\section{\texorpdfstring{\texttt{\$7}}{\$7}}\label{section-75}
+\section{\texorpdfstring{\texttt{\$7}}{\$7}}\label{section-73}
 
 \texttt{\$7} --- seventh capture group from the most recent regex match.
 See \texttt{\$1} for full semantics.
 
-\section{\texorpdfstring{\texttt{\$8}}{\$8}}\label{section-76}
+\section{\texorpdfstring{\texttt{\$8}}{\$8}}\label{section-74}
 
 \texttt{\$8} --- eighth capture group from the most recent regex match.
 See \texttt{\$1} for full semantics.
 
-\section{\texorpdfstring{\texttt{\$9}}{\$9}}\label{section-77}
+\section{\texorpdfstring{\texttt{\$9}}{\$9}}\label{section-75}
 
 \texttt{\$9} --- ninth capture group from the most recent regex match.
 Captures past \texttt{\$9} work fine in stryke (no Perl 4 limit), but
@@ -20461,7 +20445,7 @@ the conventional way to access many groups is named captures
 (\texttt{(?\textless{}name\textgreater{}...)} + \texttt{\%+}) or
 \texttt{@-}/\texttt{@+} offsets.
 
-\section{\texorpdfstring{\texttt{\$;}}{\$;}}\label{section-78}
+\section{\texorpdfstring{\texttt{\$;}}{\$;}}\label{section-76}
 
 \texttt{\$;} --- the multidimensional-array subscript separator. When
 you write \texttt{\$h\{a,b,c\}} Perl joins the keys with \texttt{\$;}
@@ -20482,7 +20466,7 @@ arrayrefs).
 See also: prefer \texttt{\$h\{a\}\{b\}\{c\}} autovivification for nested
 storage.
 
-\section{\texorpdfstring{\texttt{\$\textless{}}}{\$\textless{}}}\label{section-79}
+\section{\texorpdfstring{\texttt{\$\textless{}}}{\$\textless{}}}\label{section-77}
 
 \texttt{\$\textless{}} --- the real user ID of the running process.
 Read-only on most systems unless the process has appropriate privileges.
@@ -20502,7 +20486,7 @@ Use \texttt{getpwuid(\$\textless{})} to map to a username.
 See also: \texttt{\$\textgreater{}} (effective uid), \texttt{\$(} /
 \texttt{\$)} (gids).
 
-\section{\texorpdfstring{\texttt{\$\textgreater{}}}{\$\textgreater{}}}\label{section-80}
+\section{\texorpdfstring{\texttt{\$\textgreater{}}}{\$\textgreater{}}}\label{section-78}
 
 \texttt{\$\textgreater{}} --- the effective user ID of the running
 process. Determines filesystem permission checks. Setuid binaries start
@@ -20520,7 +20504,7 @@ for setuid scripts that want to temporarily drop privileges.
 
 See also: \texttt{\$\textless{}}, \texttt{\$(} / \texttt{\$)}.
 
-\section{\texorpdfstring{\texttt{\$?}}{\$?}}\label{section-81}
+\section{\texorpdfstring{\texttt{\$?}}{\$?}}\label{section-79}
 
 \texttt{\$?} --- the status of the last child process: a backtick
 command, \texttt{system()} call, or piped-\texttt{open} close. The raw
@@ -20545,7 +20529,7 @@ single integer. Extract the exit code with
 See also: \texttt{\$!} (syscall error), \texttt{system}, \texttt{exec},
 \texttt{wait}.
 
-\section{\texorpdfstring{\texttt{\$@}}{\$@}}\label{section-82}
+\section{\texorpdfstring{\texttt{\$@}}{\$@}}\label{section-80}
 
 \texttt{\$@} --- the error message left by the most recent
 \texttt{eval\ \{\ \}} (or \texttt{die} inside one). Empty string when
@@ -20595,147 +20579,7 @@ hit.
 See also: \texttt{@ARGV} (the list of files), \texttt{\$.} (line
 number).
 
-\section{\texorpdfstring{\texttt{\$AUTOLOAD}}{\$AUTOLOAD}}\label{autoload}
-
-\texttt{\$AUTOLOAD} --- set by stryke just before an \texttt{AUTOLOAD}
-sub is invoked. Holds the fully-qualified name of the missing method
-that triggered the autoload (e.g. \texttt{"My::Dispatcher::foo"}).
-Inside \texttt{AUTOLOAD}, parse \texttt{\$AUTOLOAD} to decide what to do
---- install a generated sub, proxy elsewhere, or \texttt{die} for
-unknown names.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{package RPC}
-\NormalTok{fn AUTOLOAD \{}
-\NormalTok{    my $name = $AUTOLOAD}
-\NormalTok{    $name =\textasciitilde{} s/.*:://       \# strip package prefix}
-\NormalTok{    return if $name eq \textquotesingle{}DESTROY\textquotesingle{}}
-\NormalTok{    my $self = shift}
-\NormalTok{    $self{-}\textgreater{}call($name, @\_)}
-\NormalTok{\}}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{AUTOLOAD} (the sub), \texttt{DESTROY}, MRO walking.
-
-\section{\texorpdfstring{\texttt{\$INTERCEPT\_MS}}{\$INTERCEPT\_MS}}\label{intercept_ms}
-
-\texttt{\$INTERCEPT\_MS} --- inside an \texttt{after} advice body, the
-elapsed wall-clock time of the wrapped call in \textbf{milliseconds} as
-a floating-point number. Mirrors \texttt{INTERCEPT\_MS} from the zshrs
-AOP runtime. Use this for cheap timing instrumentation without a
-profiler.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{after "slow\_query" \{}
-\NormalTok{    warn "slow\_query took $\{INTERCEPT\_MS\}ms" if $INTERCEPT\_MS \textgreater{} 100}
-\NormalTok{\}}
-\NormalTok{after "*" \{}
-\NormalTok{    record\_metric($INTERCEPT\_NAME, $INTERCEPT\_MS)}
-\NormalTok{\}}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{\$INTERCEPT\_US} (microsecond precision),
-\texttt{\$INTERCEPT\_RESULT}, \texttt{before}, \texttt{after}.
-
-\section{\texorpdfstring{\texttt{\$INTERCEPT\_NAME}}{\$INTERCEPT\_NAME}}\label{intercept_name}
-
-\texttt{\$INTERCEPT\_NAME} --- inside an AOP advice body, the
-fully-qualified name of the intercepted sub (e.g.
-\texttt{"main::fetch"}, \texttt{"My::DB::query"}). Useful for glob-based
-advice (\texttt{before\ "*"} or \texttt{before\ "My::*"}) that needs to
-log or dispatch on the actual name being called.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{before "*" \{ trace($INTERCEPT\_NAME) \}}
-\NormalTok{before "My::DB::*" \{}
-\NormalTok{    log\_info("db call: $INTERCEPT\_NAME with @INTERCEPT\_ARGS")}
-\NormalTok{\}}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{@INTERCEPT\_ARGS}, \texttt{\$INTERCEPT\_RESULT},
-\texttt{before}, \texttt{after}, \texttt{around}.
-
-\section{\texorpdfstring{\texttt{\$INTERCEPT\_RESULT}}{\$INTERCEPT\_RESULT}}\label{intercept_result}
-
-\texttt{\$INTERCEPT\_RESULT} --- inside an \texttt{after} advice body,
-the value the wrapped sub returned (the equivalent of inspecting
-\texttt{\$?}-style after a call). \texttt{before} advice runs too early
-to see this; \texttt{around} advice receives the result from
-\texttt{proceed()} and can rewrite it.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{after "fetch" \{}
-\NormalTok{    log\_info("fetch returned $INTERCEPT\_RESULT in $\{INTERCEPT\_MS\}ms")}
-\NormalTok{\}}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{@INTERCEPT\_ARGS}, \texttt{\$INTERCEPT\_NAME},
-\texttt{\$INTERCEPT\_MS}, \texttt{before}, \texttt{after},
-\texttt{around}.
-
-\section{\texorpdfstring{\texttt{\$INTERCEPT\_US}}{\$INTERCEPT\_US}}\label{intercept_us}
-
-\texttt{\$INTERCEPT\_US} --- inside an \texttt{after} advice body, the
-elapsed wall-clock time of the wrapped call in \textbf{microseconds} as
-an integer. Use when millisecond resolution from
-\texttt{\$INTERCEPT\_MS} is too coarse (sub-millisecond ops, hot inner
-loops).
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{after "hot\_op" \{}
-\NormalTok{    histogram\_record("hot\_op\_us", $INTERCEPT\_US)}
-\NormalTok{\}}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{\$INTERCEPT\_MS}, \texttt{before}, \texttt{after},
-\texttt{around}.
-
-\section{\texorpdfstring{\texttt{\$NF}}{\$NF}}\label{nf}
-
-\texttt{\$NF} --- awk-compat: the number of fields produced by the most
-recent autosplit of an input line into \texttt{@F} (\texttt{-a} flag).
-Equivalent to \texttt{scalar\ @F}. stryke exposes both for one-liner
-familiarity to awk users.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{\# stryke {-}F: {-}nae \textquotesingle{}p "$NF fields: @F"\textquotesingle{} /etc/passwd}
-\NormalTok{\# Equivalent to awk \textquotesingle{}\{ print NF" fields: "$0 \}\textquotesingle{}}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{\$NR}, \texttt{@F}, \texttt{-a} / \texttt{-F}
-command-line flags, awk-compat one-liner mode.
-
-\section{\texorpdfstring{\texttt{\$NR}}{\$NR}}\label{nr}
-
-\texttt{\$NR} --- awk-compat: the current input record number.
-Equivalent to \texttt{\$.} (current line of the most recently read
-filehandle). stryke exposes both for one-liner familiarity to awk users.
-\texttt{\$.}-based code and \texttt{\$NR}-based code can be mixed in the
-same one-liner.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{\# stryke {-}nae \textquotesingle{}p "$NR: $\_" if /TODO/\textquotesingle{}}
-\NormalTok{\# Equivalent to awk \textquotesingle{}/TODO/ \{ print NR": "$0 \}\textquotesingle{}}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{\$.}, \texttt{\$NF}, \texttt{@F}, \texttt{-a} /
-\texttt{-F}, \texttt{-n} / \texttt{-p}.
-
-\section{\texorpdfstring{\texttt{\$\textbackslash{}}}{\$\textbackslash{}}}\label{section-83}
+\section{\texorpdfstring{\texttt{\$\textbackslash{}}}{\$\textbackslash{}}}\label{section-81}
 
 \texttt{\$\textbackslash{}} --- the output record separator appended
 automatically by \texttt{print} (default: empty string). Pairs with
@@ -21072,7 +20916,7 @@ calls that are guaranteed to use the same binary.
 
 See also: \texttt{\$0} (program name), \texttt{@ARGV}.
 
-\section{\texorpdfstring{\texttt{\$\_}}{\$\_}}\label{section-84}
+\section{\texorpdfstring{\texttt{\$\_}}{\$\_}}\label{section-82}
 
 \texttt{\$\_} --- the default topic variable. Many builtins
 (\texttt{print}, \texttt{say}/\texttt{p}, \texttt{chomp},
@@ -21103,234 +20947,7 @@ Use \texttt{local\ \$\_} to scope a topic change. In stryke, \texttt{\_}
 (no sigil) is the preferred pipeline topic; \texttt{\$\_} is the
 Perl-5-compatible form.
 
-\section{\texorpdfstring{\texttt{\$\_0}}{\$\_0}}\label{section-85}
-
-\texttt{\_0} --- explicit \textbf{slot-0} spelling of the pipeline topic
-(same value as bare \texttt{\_}). Use \texttt{\_0} when \texttt{\_1},
-\texttt{\_2}, \ldots{} are also in scope so the arity reads clearly.
-\texttt{\$\_0} is the sigiled equivalent and is mainly useful inside
-\textbf{double-quoted strings} where bare \texttt{\_0} does not
-interpolate.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{1:5 |\textgreater{} map \_ * 2     |\textgreater{} e p       \# implicit topic}
-\NormalTok{1:5 |\textgreater{} map \_0 * 2    |\textgreater{} e p       \# explicit positional 0 — same meaning}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{\$\_}, \texttt{\_}, \texttt{\_1}..\texttt{\_4},
-\texttt{\_\textless{}N} (indexed ascent past depth 2).
-
-\section{\texorpdfstring{\texttt{\$\_0\textless{}}}{\$\_0\textless{}}}\label{section-86}
-
-\textbf{Topic ascent, 1 frame up.} Eight equivalent spellings of the
-same value --- the topic from the *enclosing* block one frame out.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{spellings (all identical): \_\textless{}  $\_\textless{}  \_0\textless{}  $\_0\textless{}  \_\textless{}1  $\_\textless{}1  \_0\textless{}1  $\_0\textless{}1}
-\end{Highlighting}
-\end{Shaded}
-
-Every \texttt{\textbar{}\textgreater{}} stage,
-\texttt{map}/\texttt{grep}/\texttt{fore} block, and \texttt{sort} block
-opens a new topic frame. Inside that frame the *current* topic is
-\texttt{\_} / \texttt{\_0} (same slot as \texttt{\$\_} when that binding
-is active). One chevron \texttt{\textless{}} walks up one frame to the
-surrounding block\textquotesingle s topic. Indexed form
-\texttt{\_\textless{}N} is sugar for \texttt{N} chevrons ---
-\texttt{\_\textless{}1} ≡ \texttt{\_\textless{}}, more readable as
-ascent depth grows. Runtime cap: 5 frames (\texttt{parser.rs:1473}).
-
-At the outermost iter (no enclosing topic frame), \texttt{\_\textless{}}
-is \textbf{undef} --- strict ascent semantics, no fallback to current
-\texttt{\_}. If you need the current frame\textquotesingle s topic,
-write \texttt{\_} directly.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{@rows |\textgreater{} map \{}
-\NormalTok{    my @cells = @$\_                \# $\_ is current row}
-\NormalTok{    @cells |\textgreater{} map \{ uc($\_) . ":" . len($\_\textless{}) \}}
-\NormalTok{    \#                \^{}\^{} inner topic   \^{}\^{}\^{} outer row arrayref}
-\NormalTok{\}}
-\end{Highlighting}
-\end{Shaded}
-
-The four-spelling matrix lets you choose readability per context: bare
-\texttt{\_\textless{}} in pipe chains, sigiled \texttt{\$\_\textless{}}
-when interpolating into \textbf{strings}, slot-explicit
-\texttt{\_0\textless{}} when slot 1, 2, \ldots{} positionals are also in
-scope.
-
-See also: \texttt{\_\textless{}\textless{}} (2 up),
-\texttt{\_\textless{}\textless{}\textless{}} (3 up),
-\texttt{\_\textless{}\textless{}\textless{}\textless{}} (4 up),
-\texttt{\_\textless{}\textless{}\textless{}\textless{}\textless{}} (5
-up), \texttt{\_\textless{}N}/\texttt{\_0\textless{}N} (indexed ascent),
-\texttt{\_}/\texttt{\_0}/\texttt{\$\_} (current frame).
-
-\section{\texorpdfstring{\texttt{\$\_0\textless{}2}}{\$\_0\textless2}}\label{section-87}
-
-\textbf{Topic ascent, 2 frames up.} Eight equivalent spellings of the
-topic from the block enclosing the enclosing block.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{spellings (all identical): \_\textless{}\textless{}  $\_\textless{}\textless{}  \_0\textless{}\textless{}  $\_0\textless{}\textless{}  \_\textless{}2  $\_\textless{}2  \_0\textless{}2  $\_0\textless{}2}
-\end{Highlighting}
-\end{Shaded}
-
-Two chevrons walk up two topic frames. Indexed form
-\texttt{\_\textless{}2} ≡ \texttt{\_\textless{}\textless{}} --- pick
-whichever is clearer at the call site. Often appears inside nested
-\texttt{map}/\texttt{grep} where you need to reach past the immediate
-enclosing block.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{@docs |\textgreater{} map \{}
-\NormalTok{    my $doc = $\_                            \# \_\textless{}0 = current doc}
-\NormalTok{    $doc{-}\textgreater{}\{lines\} |\textgreater{} map \{}
-\NormalTok{        my $line = $\_                        \# \_\textless{}0 = current line}
-\NormalTok{        $line |\textgreater{} map \{                       \# \_\textless{}0 = char}
-\NormalTok{            \{ char =\textgreater{} $\_, line =\textgreater{} $\_\textless{}, doc =\textgreater{} $\_\textless{}\textless{}{-}\textgreater{}\{id\} \}}
-\NormalTok{            \#                  \^{}\^{}\^{} line       \^{}\^{}\^{}\^{} doc, 2 up}
-\NormalTok{        \}}
-\NormalTok{    \}}
-\NormalTok{\}}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{\_\textless{}} (1 up),
-\texttt{\_\textless{}\textless{}\textless{}} (3 up),
-\texttt{\_\textless{}\textless{}\textless{}\textless{}} (4 up),
-\texttt{\_\textless{}\textless{}\textless{}\textless{}\textless{}} (5
-up), \texttt{\_\textless{}N}/\texttt{\_0\textless{}N}.
-
-\section{\texorpdfstring{\texttt{\$\_0\textless{}3}}{\$\_0\textless3}}\label{section-88}
-
-\textbf{Topic ascent, 3 frames up.} Eight equivalent spellings of the
-topic three blocks out.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{spellings (all identical): \_\textless{}\textless{}\textless{}  $\_\textless{}\textless{}\textless{}  \_0\textless{}\textless{}\textless{}  $\_0\textless{}\textless{}\textless{}  \_\textless{}3  $\_\textless{}3  \_0\textless{}3  $\_0\textless{}3}
-\end{Highlighting}
-\end{Shaded}
-
-At this depth the indexed form \texttt{\_\textless{}3} is usually the
-clearer choice --- counting chevrons gets error-prone past two. Both
-forms compile to the same bytecode.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{@projects |\textgreater{} map \{}
-\NormalTok{    my $proj = $\_                                       \# \_\textless{}0}
-\NormalTok{    $proj{-}\textgreater{}\{tasks\} |\textgreater{} map \{}
-\NormalTok{        $\_{-}\textgreater{}\{steps\} |\textgreater{} map \{}
-\NormalTok{            $\_{-}\textgreater{}\{notes\} |\textgreater{} map \{}
-\NormalTok{                \{ note =\textgreater{} $\_, step =\textgreater{} $\_\textless{}, task =\textgreater{} $\_\textless{}\textless{}, proj =\textgreater{} $\_\textless{}3 \}}
-\NormalTok{                \#                                              \^{}\^{}\^{}\^{} project, 3 up}
-\NormalTok{            \}}
-\NormalTok{        \}}
-\NormalTok{    \}}
-\NormalTok{\}}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{\_\textless{}} (1 up),
-\texttt{\_\textless{}\textless{}} (2 up),
-\texttt{\_\textless{}\textless{}\textless{}\textless{}} (4 up),
-\texttt{\_\textless{}\textless{}\textless{}\textless{}\textless{}} (5
-up), \texttt{\_\textless{}N}.
-
-\section{\texorpdfstring{\texttt{\$\_0\textless{}4}}{\$\_0\textless4}}\label{section-89}
-
-\textbf{Topic ascent, 4 frames up.} Eight equivalent spellings of the
-topic four blocks out. At this depth prefer the indexed form
-\texttt{\_\textless{}4} for readability.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{spellings (all identical): \_\textless{}\textless{}\textless{}\textless{}  $\_\textless{}\textless{}\textless{}\textless{}  \_0\textless{}\textless{}\textless{}\textless{}  $\_0\textless{}\textless{}\textless{}\textless{}  \_\textless{}4  $\_\textless{}4  \_0\textless{}4  $\_0\textless{}4}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{\_\textless{}} (1 up),
-\texttt{\_\textless{}\textless{}} (2 up),
-\texttt{\_\textless{}\textless{}\textless{}} (3 up),
-\texttt{\_\textless{}\textless{}\textless{}\textless{}\textless{}} (5
-up), \texttt{\_\textless{}N}/\texttt{\_0\textless{}N}.
-
-\section{\texorpdfstring{\texttt{\$\_0\textless{}5}}{\$\_0\textless5}}\label{section-90}
-
-\textbf{Topic ascent, 5 frames up.} Eight equivalent spellings of the
-topic five blocks out --- the deepest ascent the runtime accepts
-(\texttt{parser.rs:1473} caps at 5). Past this depth, refactor to a
-named lexical (\texttt{my\ \$outer\ =\ \$\_}) instead.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{spellings (all identical): \_\textless{}\textless{}\textless{}\textless{}\textless{}  $\_\textless{}\textless{}\textless{}\textless{}\textless{}  \_0\textless{}\textless{}\textless{}\textless{}\textless{}  $\_0\textless{}\textless{}\textless{}\textless{}\textless{}  \_\textless{}5  $\_\textless{}5  \_0\textless{}5  $\_0\textless{}5}
-\end{Highlighting}
-\end{Shaded}
-
-At this depth always use the indexed form \texttt{\_\textless{}5} ---
-five chevrons is unreadable.
-
-See also: \texttt{\_\textless{}} (1 up),
-\texttt{\_\textless{}\textless{}} (2 up),
-\texttt{\_\textless{}\textless{}\textless{}} (3 up),
-\texttt{\_\textless{}\textless{}\textless{}\textless{}} (4 up),
-\texttt{\_\textless{}N}/\texttt{\_0\textless{}N}.
-
-\section{\texorpdfstring{\texttt{\$\_1}}{\$\_1}}\label{section-91}
-
-\texttt{\_1} --- the \textbf{first additional} positional bound in a
-\texttt{\textbar{}\textgreater{}} pipeline stage. When a HOF takes a
-block plus extra arguments, the extras are bound as \texttt{\_1},
-\texttt{\_2}, \ldots; the current value stays in \texttt{\_} /
-\texttt{\_0} / \texttt{\$\_}. \texttt{\$\_1} is the sigiled same slot
-(e.g. in \textbf{double-quoted strings}). This is what makes EXPR-form
-HOFs (\texttt{grep\ EXPR,\ LIST}) and brace-form HOFs
-(\texttt{grep\ \{\ BLOCK\ \}\ LIST}) share the same scope binding.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{\# grep EXPR, LIST — \textasciigrave{}\_\textasciigrave{} is each element, \textasciigrave{}\_1\textasciigrave{} is the predicate coderef}
-\NormalTok{my $pred = fn ($x) \{ $x \textgreater{} 10 \}}
-\NormalTok{my @big = grep \_1, $pred, (5, 12, 8, 20)}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{\_0}, \texttt{\_2}..\texttt{\_4},
-\texttt{\_\textless{}N} (indexed ascent).
-
-\section{\texorpdfstring{\texttt{\$\_2}}{\$\_2}}\label{section-92}
-
-\texttt{\_2} --- the second additional positional in a
-\texttt{\textbar{}\textgreater{}} pipeline stage. \texttt{\$\_2} is the
-sigiled same slot (e.g. inside \textbf{double-quoted strings}). See
-\texttt{\_1} for full semantics.
-
-\section{\texorpdfstring{\texttt{\$\_3}}{\$\_3}}\label{section-93}
-
-\texttt{\_3} --- the third additional positional in a
-\texttt{\textbar{}\textgreater{}} pipeline stage. \texttt{\$\_3} is the
-sigiled same slot (e.g. inside \textbf{double-quoted strings}). See
-\texttt{\_1} for full semantics.
-
-\section{\texorpdfstring{\texttt{\$\_4}}{\$\_4}}\label{section-94}
-
-\texttt{\_4} --- the fourth additional positional in a
-\texttt{\textbar{}\textgreater{}} pipeline stage. \texttt{\$\_4} is the
-sigiled same slot (e.g. inside \textbf{double-quoted strings}). See
-\texttt{\_1} for full semantics. Past depth 2 also consider the
-indexed-ascent shortcut \texttt{\_\textless{}N}.
-
-\section{\texorpdfstring{\texttt{\$\textasciigrave{}}}{\$`}}\label{section-95}
+\section{\texorpdfstring{\texttt{\$\textasciigrave{}}}{\$`}}\label{section-83}
 
 \$\texttt{\ }\texttt{\ —\ the\ substring\ *preceding*\ the\ last\ successful\ regex\ match\ ("prematch").\ With\ }\$\&\texttt{\ and\ }\$\textquotesingle`,
 reconstructs the full input. Reset on every successful match.
@@ -21349,48 +20966,6 @@ See also: \texttt{\$\&}, \texttt{\$\textquotesingle{}},
 \texttt{\$\{\^{}PREMATCH\}} (cleaner under
 \texttt{use\ re\ \textquotesingle{}p\textquotesingle{}}).
 
-\section{\texorpdfstring{\texttt{\$a}}{\$a}}\label{a-1}
-
-\texttt{\$a} --- paired with \texttt{\$b}, the comparator variables
-inside \texttt{sort\ BLOCK\ LIST}, \texttt{psort\ BLOCK\ LIST},
-\texttt{preduce}, \texttt{pmap\_reduce} blocks, and any user code that
-wants to compare two values without a closure. Stryke marks
-\texttt{\$a}/\texttt{\$b} as parallel-safe topics --- assignments to
-them inside a parallel block are allowed even though they look like
-captured globals.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{my @sorted = sort \{ $a \textless{}=\textgreater{} $b \} @nums                  \# numeric ascending}
-\NormalTok{my @rsorted = sort \{ $b \textless{}=\textgreater{} $a \} @nums                  \# descending}
-\NormalTok{my @by\_len = sort \{ length($a) \textless{}=\textgreater{} length($b) \} @strs}
-\NormalTok{@nums |\textgreater{} psort \{ $a \textless{}=\textgreater{} $b \}                              \# parallel sort}
-\NormalTok{@nums |\textgreater{} preduce \{ $a + $b \}                              \# parallel reduce}
-\end{Highlighting}
-\end{Shaded}
-
-With \texttt{-\/-no-interop}, \texttt{\$a}/\texttt{\$b} outside of
-\texttt{sort}/\texttt{preduce} blocks are rejected --- the linter wants
-you to write \texttt{\_}/\texttt{\_1} for general two-arg blocks.
-
-See also: \texttt{\$b}, \texttt{sort}, \texttt{psort}, \texttt{preduce},
-\texttt{pmap\_reduce}.
-
-\section{\texorpdfstring{\texttt{\$b}}{\$b}}\label{b}
-
-\texttt{\$b} --- paired with \texttt{\$a}, the comparator variables
-inside \texttt{sort}, \texttt{psort}, \texttt{preduce},
-\texttt{pmap\_reduce} blocks. See \texttt{\$a} for full semantics.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{my @desc = sort \{ $b \textless{}=\textgreater{} $a \} @nums          \# descending numeric}
-\NormalTok{my @z\_a  = sort \{ $b cmp $a \} @strs           \# reverse string order}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{\$a}, \texttt{sort}, \texttt{psort}, \texttt{preduce}.
-
 \section{\texorpdfstring{\texttt{\$stryke::VERSION}}{\$stryke::VERSION}}\label{strykeversion}
 
 \texttt{\$stryke::VERSION} --- the stryke language version string (e.g.
@@ -21408,31 +20983,7 @@ diagnostics.
 See also: \texttt{\$\^{}V} (interpreter version), \texttt{-\/-version}
 CLI flag.
 
-\section{\texorpdfstring{\texttt{\$\{\^{}GLOBAL\_PHASE\}}}{\$\{\^{}GLOBAL\_PHASE\}}}\label{global_phase}
-
-\texttt{\$\{\^{}GLOBAL\_PHASE\}} --- the current interpreter phase as a
-string. Values: \texttt{"START"} (very early init), \texttt{"BEGIN"}
-(inside a \texttt{BEGIN} block), \texttt{"CHECK"}, \texttt{"INIT"},
-\texttt{"RUN"} (normal execution), \texttt{"END"} (inside an
-\texttt{END} block), \texttt{"DESTRUCT"} (final cleanup, after
-\texttt{END} blocks finish). Most code sees \texttt{"RUN"};
-\texttt{DESTROY} methods invoked at interpreter shutdown can see
-\texttt{"DESTRUCT"} and skip work that would touch already-cleaned
-state.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{fn Resource::DESTROY \{}
-\NormalTok{    return if $\{\^{}GLOBAL\_PHASE\} eq "DESTRUCT"   \# skip during shutdown}
-\NormalTok{    close\_external\_handle($\_[0])}
-\NormalTok{\}}
-\NormalTok{p $\{\^{}GLOBAL\_PHASE\}                \# RUN}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{BEGIN}, \texttt{END}, \texttt{DESTROY}, phase blocks.
-
-\section{\texorpdfstring{\texttt{\$\textbar{}}}{\$\textbar{}}}\label{section-96}
+\section{\texorpdfstring{\texttt{\$\textbar{}}}{\$\textbar{}}}\label{section-84}
 
 \texttt{\$\textbar{}} --- the autoflush flag for the currently selected
 output filehandle. When true (any non-zero value), every
@@ -21458,7 +21009,7 @@ specific handle.
 
 See also: \texttt{select}, \texttt{IO::Handle::autoflush}.
 
-\section{\texorpdfstring{\texttt{\$\textasciitilde{}}}{\$\textasciitilde{}}}\label{section-97}
+\section{\texorpdfstring{\texttt{\$\textasciitilde{}}}{\$\textasciitilde{}}}\label{section-85}
 
 \texttt{\$\textasciitilde{}} --- the name of the current format used by
 \texttt{write}. Defaults to the name of the filehandle being written to.
@@ -21581,7 +21132,7 @@ usually you\textquotesingle d use a pragma or module that hooks for you
 
 See also: stryke AOP / intercept facilities.
 
-\section{\texorpdfstring{\texttt{\%a}}{\%a}}\label{a-2}
+\section{\texorpdfstring{\texttt{\%a}}{\%a}}\label{a-1}
 
 \texttt{\%a} --- short alias for \texttt{\%stryke::aliases}. Maps every
 alias spelling to its canonical primary name. Keys are the 2nd-and-later
@@ -21601,7 +21152,7 @@ For O(1) *reverse* lookup (primary → all its aliases), use \texttt{\%p}
 See also: \texttt{\%stryke::aliases}, \texttt{\%p} /
 \texttt{\%stryke::primaries}.
 
-\section{\texorpdfstring{\texttt{\%b}}{\%b}}\label{b-1}
+\section{\texorpdfstring{\texttt{\%b}}{\%b}}\label{b}
 
 \texttt{\%b} --- short alias for \texttt{\%stryke::builtins}. Maps every
 \textbf{primary} callable name to its category string. Primaries-only
@@ -22038,7 +21589,7 @@ See also: \texttt{\%stryke::special\_vars}, \texttt{\%o} /
 \texttt{\%stryke::operators}, \texttt{\%k} /
 \texttt{\%stryke::keywords}.
 
-\section{\texorpdfstring{\texttt{@+}}{@+}}\label{section-98}
+\section{\texorpdfstring{\texttt{@+}}{@+}}\label{section-86}
 
 \texttt{@+} --- array of byte offsets *one past the end* of each match
 group in the most recent successful regex. \texttt{\$+{[}0{]}} is the
@@ -22060,7 +21611,7 @@ slicing without re-running the regex.
 See also: \texttt{@-}, \texttt{\$1}..\texttt{\$9},
 \texttt{\$\{\^{}MATCH\}}.
 
-\section{\texorpdfstring{\texttt{@-}}{@-}}\label{section-99}
+\section{\texorpdfstring{\texttt{@-}}{@-}}\label{section-87}
 
 \texttt{@-} --- array of byte offsets to the *start* of each match group
 in the most recent successful regex. \texttt{\$-{[}0{]}} is the start of
@@ -22122,57 +21673,6 @@ list of \texttt{KEY=VALUE} strings on some systems, undef on others.
 
 See also: \texttt{\%ENV}.
 
-\section{\texorpdfstring{\texttt{@EXPORT}}{@EXPORT}}\label{export}
-
-\texttt{@EXPORT} --- the list of symbol names a module exports
-unconditionally when imported with \texttt{use\ Module;} (no explicit
-import list). Set in the module\textquotesingle s package via
-\texttt{our\ @EXPORT\ =\ qw(foo\ bar)}. stryke honours \texttt{@EXPORT}
-for user modules; built-in pragmas (\texttt{strict}, \texttt{warnings},
-\texttt{utf8}, \texttt{feature}, \texttt{open}, \texttt{Env}) do not use
-it because they don\textquotesingle t load files.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{package My::Utils}
-\NormalTok{our @EXPORT    = qw(normalize)            \# always imported}
-\NormalTok{our @EXPORT\_OK = qw(canonicalize internal)  \# opt{-}in only}
-\NormalTok{fn normalize    \{ ... \}}
-\NormalTok{fn canonicalize \{ ... \}}
-
-\NormalTok{package main}
-\NormalTok{use My::Utils                    \# normalize is in scope}
-\NormalTok{use My::Utils qw(canonicalize)   \# explicit opt{-}in for OK{-}list}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{@EXPORT\_OK}, \texttt{use}, \texttt{require},
-\texttt{Exporter}.
-
-\section{\texorpdfstring{\texttt{@EXPORT\_OK}}{@EXPORT\_OK}}\label{export_ok}
-
-\texttt{@EXPORT\_OK} --- the list of symbol names a module makes
-available for *explicit* import only:
-\texttt{use\ Module\ qw(name1\ name2)}. Unlike \texttt{@EXPORT}, nothing
-in this list is imported by default --- the caller must name each
-symbol. This is the Exporter-pattern way to publish symbols without
-polluting every caller\textquotesingle s namespace.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{package My::Tools}
-\NormalTok{our @EXPORT    = qw()                       \# nothing by default}
-\NormalTok{our @EXPORT\_OK = qw(slugify camel\_case)     \# opt{-}in only}
-\NormalTok{fn slugify    \{ ... \}}
-\NormalTok{fn camel\_case \{ ... \}}
-
-\NormalTok{package main}
-\NormalTok{use My::Tools qw(slugify)        \# only slugify in scope}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{@EXPORT}, \texttt{use}, \texttt{Exporter}.
-
 \section{\texorpdfstring{\texttt{@F}}{@F}}\label{f-1}
 
 \texttt{@F} --- the autosplit field array, populated when stryke / Perl
@@ -22212,61 +21712,6 @@ to add directories before module loads run.
 See also: \texttt{\%INC} (loaded files), \texttt{require},
 \texttt{use\ lib}.
 
-\section{\texorpdfstring{\texttt{@INTERCEPT\_ARGS}}{@INTERCEPT\_ARGS}}\label{intercept_args}
-
-\texttt{@INTERCEPT\_ARGS} --- inside an AOP advice body
-(\texttt{before}/\texttt{after}/\texttt{around}), the arguments passed
-to the intercepted sub call. Same shape as \texttt{@\_} would have
-inside the wrapped sub itself. Mutating \texttt{@INTERCEPT\_ARGS} does
-\textbf{not} change what the wrapped sub receives --- use
-\texttt{around} if you need to modify the call.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{before "fetch" \{}
-\NormalTok{    warn "calling fetch(" . join(", ", @INTERCEPT\_ARGS) . ")"}
-\NormalTok{\}}
-\NormalTok{around "cached\_lookup" \{}
-\NormalTok{    if (my $hit = cache\_get($INTERCEPT\_ARGS[0])) \{ return $hit \}}
-\NormalTok{    my $r = proceed()}
-\NormalTok{    cache\_put($INTERCEPT\_ARGS[0], $r)}
-\NormalTok{    $r}
-\NormalTok{\}}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{\$INTERCEPT\_NAME}, \texttt{\$INTERCEPT\_RESULT},
-\texttt{\$INTERCEPT\_MS}, \texttt{\$INTERCEPT\_US}, \texttt{before},
-\texttt{after}, \texttt{around}.
-
-\section{\texorpdfstring{\texttt{@ISA}}{@ISA}}\label{isa}
-
-\texttt{@ISA} --- a package\textquotesingle s inheritance list.
-\texttt{package\ Foo;\ our\ @ISA\ =\ (\textquotesingle{}Bar\textquotesingle{},\ \textquotesingle{}Baz\textquotesingle{})}
-makes \texttt{Foo} inherit methods from \texttt{Bar} first, then
-\texttt{Baz}. stryke walks \texttt{@ISA} using \textbf{C3 method
-resolution order (live, not cached)} for \texttt{-\textgreater{}method}
-dispatch and \texttt{SUPER::} --- covering both single and multiple
-inheritance without the diamond ambiguities of Perl\textquotesingle s
-default depth-first MRO.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{package Animal}
-\NormalTok{fn speak \{ p "..." \}}
-\NormalTok{package Dog}
-\NormalTok{our @ISA = (\textquotesingle{}Animal\textquotesingle{})}
-\NormalTok{fn speak \{ p "woof" \}}
-\NormalTok{package main}
-\NormalTok{Dog{-}\textgreater{}speak                       \# woof}
-\NormalTok{\# Inheritance chain visible at runtime:}
-\NormalTok{p "@Dog::ISA"                    \# Animal}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{bless}, \texttt{class} (modern stryke OOP),
-\texttt{SUPER::}, \texttt{DESTROY}, \texttt{AUTOLOAD}.
-
 \section{\texorpdfstring{\texttt{@\^{}CAPTURE}}{@\^{}CAPTURE}}\label{capture-1}
 
 \texttt{@\^{}CAPTURE} --- array of substring captures from the most
@@ -22305,7 +21750,7 @@ without writing a \texttt{while\ ...\ =\textasciitilde{}} loop.
 
 See also: \texttt{@\^{}CAPTURE}, \texttt{/g} modifier.
 
-\section{\texorpdfstring{\texttt{@\_}}{@\_}}\label{section-100}
+\section{\texorpdfstring{\texttt{@\_}}{@\_}}\label{section-88}
 
 \texttt{@\_} --- the implicit argument array inside a subroutine. Every
 \texttt{fn} / \texttt{sub} receives its caller\textquotesingle s
@@ -22390,36 +21835,6 @@ script.
 
 See also: \texttt{\$ENV\{PATH\}}, \texttt{which},
 \texttt{find\_in\_path}.
-
-\section{\texorpdfstring{\texttt{AUTOLOAD}}{AUTOLOAD}}\label{autoload-1}
-
-\texttt{AUTOLOAD} --- a fallback sub invoked when a call is made to a
-name that doesn\textquotesingle t exist in the current package (or any
-parent in \texttt{@ISA}). Stryke walks the C3 MRO starting from the
-invocant\textquotesingle s class looking for an \texttt{AUTOLOAD}; the
-first one found runs with \texttt{\$AUTOLOAD} set to the fully-qualified
-name of the missing method.
-
-Classic uses: lazy method generation, RPC proxies, attribute
-auto-accessors, and "missing method" diagnostics. \texttt{AUTOLOAD}
-should \texttt{return} (without throwing) for the conventional
-\texttt{DESTROY} lookup so destructor dispatch isn\textquotesingle t
-misrouted.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{package Proxy}
-\NormalTok{fn AUTOLOAD \{}
-\NormalTok{    my $name = $AUTOLOAD}
-\NormalTok{    $name =\textasciitilde{} s/.*:://}
-\NormalTok{    return if $name eq \textquotesingle{}DESTROY\textquotesingle{}}
-\NormalTok{    my $self = shift}
-\NormalTok{    $self{-}\textgreater{}\{conn\}{-}\textgreater{}call($name, @\_)}
-\NormalTok{\}}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{\$AUTOLOAD}, \texttt{@ISA}, \texttt{DESTROY}, C3 MRO.
 
 \section{\texorpdfstring{\texttt{BUILD}}{BUILD}}\label{build}
 
@@ -22531,113 +21946,6 @@ next VM op so destructors run in deterministic order.
 See also: \texttt{BUILD}, \texttt{bless},
 \texttt{\$\{\^{}GLOBAL\_PHASE\}}, \texttt{class}.
 
-\section{\texorpdfstring{\texttt{STORE}}{STORE}}\label{store}
-
-\texttt{STORE} --- the writer method on a tie class. Called with
-\texttt{(\$self,\ \$value)} for tied scalars,
-\texttt{(\$self,\ \$index,\ \$value)} for tied arrays, and
-\texttt{(\$self,\ \$key,\ \$value)} for tied hashes. Whatever
-\texttt{STORE} returns is discarded --- assignments to the tied variable
-always evaluate to the assigned value.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{package Logged}
-\NormalTok{fn TIESCALAR \{ bless \{ v =\textgreater{} 0 \}, shift \}}
-\NormalTok{fn FETCH     \{ $\_[0]{-}\textgreater{}\{v\} \}}
-\NormalTok{fn STORE     \{}
-\NormalTok{    p "writing: $\_[1]"}
-\NormalTok{    $\_[0]{-}\textgreater{}\{v\} = $\_[1]}
-\NormalTok{\}}
-
-\NormalTok{package main}
-\NormalTok{tie my $x, \textquotesingle{}Logged\textquotesingle{}}
-\NormalTok{$x = 42        \# prints: writing: 42}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{FETCH}, \texttt{EXISTS}, \texttt{DELETE},
-\texttt{TIESCALAR}, \texttt{TIEARRAY}, \texttt{TIEHASH}, \texttt{tie}.
-
-\section{\texorpdfstring{\texttt{TIEARRAY}}{TIEARRAY}}\label{tiearray}
-
-\texttt{TIEARRAY} --- the constructor invoked by
-\texttt{tie\ @array,\ \textquotesingle{}ClassName\textquotesingle{},\ @args}.
-The class provides \texttt{TIEARRAY} returning a blessed object; element
-access and assignment route through \texttt{FETCH(idx)} /
-\texttt{STORE(idx,\ val)} methods on the returned object.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{package Backed}
-\NormalTok{fn TIEARRAY \{ bless \{ data =\textgreater{} [] \}, shift \}}
-\NormalTok{fn FETCH    \{ $\_[0]{-}\textgreater{}\{data\}[$\_[1]] \}}
-\NormalTok{fn STORE    \{ $\_[0]{-}\textgreater{}\{data\}[$\_[1]] = $\_[2] \}}
-
-\NormalTok{package main}
-\NormalTok{tie my @arr, \textquotesingle{}Backed\textquotesingle{}}
-\NormalTok{$arr[0] = \textquotesingle{}hello\textquotesingle{}}
-\NormalTok{p $arr[0]      \# hello (via FETCH)}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{tie}, \texttt{tied}, \texttt{untie}, \texttt{FETCH},
-\texttt{STORE}, \texttt{TIESCALAR}, \texttt{TIEHASH}.
-
-\section{\texorpdfstring{\texttt{TIEHASH}}{TIEHASH}}\label{tiehash}
-
-\texttt{TIEHASH} --- the constructor invoked by
-\texttt{tie\ \%hash,\ \textquotesingle{}ClassName\textquotesingle{},\ @args}.
-The class provides \texttt{TIEHASH} returning a blessed object; hash
-access routes through \texttt{FETCH(key)} / \texttt{STORE(key,\ val)} /
-\texttt{EXISTS(key)} / \texttt{DELETE(key)} on the returned object.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{package InMem}
-\NormalTok{fn TIEHASH \{ bless \{ h =\textgreater{} \{\} \}, shift \}}
-\NormalTok{fn FETCH   \{ $\_[0]{-}\textgreater{}\{h\}\{$\_[1]\} \}}
-\NormalTok{fn STORE   \{ $\_[0]{-}\textgreater{}\{h\}\{$\_[1]\} = $\_[2] \}}
-\NormalTok{fn EXISTS  \{ exists $\_[0]{-}\textgreater{}\{h\}\{$\_[1]\} \}}
-\NormalTok{fn DELETE  \{ delete $\_[0]{-}\textgreater{}\{h\}\{$\_[1]\} \}}
-
-\NormalTok{package main}
-\NormalTok{tie my \%h, \textquotesingle{}InMem\textquotesingle{}}
-\NormalTok{$h\{key\} = \textquotesingle{}value\textquotesingle{}}
-\NormalTok{p $h\{key\}      \# value}
-\NormalTok{p exists $h\{key\}   \# 1}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{tie}, \texttt{tied}, \texttt{untie}, \texttt{FETCH},
-\texttt{STORE}, \texttt{EXISTS}, \texttt{DELETE}, \texttt{TIESCALAR},
-\texttt{TIEARRAY}.
-
-\section{\texorpdfstring{\texttt{TIESCALAR}}{TIESCALAR}}\label{tiescalar}
-
-\texttt{TIESCALAR} --- the constructor invoked by
-\texttt{tie\ \$scalar,\ \textquotesingle{}ClassName\textquotesingle{},\ @args}.
-The class must provide \texttt{TIESCALAR} returning a blessed object
-that will back the tied scalar. Subsequent reads and writes go through
-\texttt{FETCH} / \texttt{STORE} methods on the returned object.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{package AutoIncr}
-\NormalTok{fn TIESCALAR \{ bless \{ v =\textgreater{} 0 \}, shift \}}
-\NormalTok{fn FETCH     \{ $\_[0]{-}\textgreater{}\{v\} \}}
-\NormalTok{fn STORE     \{ $\_[0]{-}\textgreater{}\{v\} = $\_[1] \}}
-
-\NormalTok{package main}
-\NormalTok{tie my $n, \textquotesingle{}AutoIncr\textquotesingle{}}
-\NormalTok{$n = 5}
-\NormalTok{p $n          \# 5 (via FETCH)}
-\end{Highlighting}
-\end{Shaded}
-
-See also: \texttt{tie}, \texttt{tied}, \texttt{untie}, \texttt{FETCH},
-\texttt{STORE}, \texttt{TIEARRAY}, \texttt{TIEHASH}.
-
 \section{\texorpdfstring{\texttt{UNITCHECK}}{UNITCHECK}}\label{unitcheck}
 
 \texttt{UNITCHECK\ \{\ \}} --- a compile-time phase block that runs
@@ -22665,31 +21973,6 @@ program execution), \texttt{END} (end of execution).
 \end{Shaded}
 
 See also: \texttt{BEGIN}, \texttt{CHECK}, \texttt{INIT}, \texttt{END}.
-
-\section{\texorpdfstring{\texttt{\_}}{\_}}\label{section-101}
-
-\texttt{\_} --- the stryke pipeline topic placeholder. Inside a
-\texttt{\textbar{}\textgreater{}} stage, \texttt{\_} refers to the
-current value being threaded through. Unlike Perl\textquotesingle s
-\texttt{\$\_}, \texttt{\_} has no sigil because it represents the topic
-*position* rather than a variable --- it can be a scalar, an array, a
-hash, or any value the previous stage emitted.
-
-In \texttt{for}/\texttt{while} loop blocks the variable is \texttt{\$\_}
-(Perl-compatible). In numeric / regex contexts you can still write
-\texttt{\$\_} and they mean the same thing where stryke supports it.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{1:10 |\textgreater{} map \_ * 2 |\textgreater{} grep \_ \textgreater{} 10 |\textgreater{} e p}
-\NormalTok{qw(alice bob carol) |\textgreater{} map uc(\_) |\textgreater{} e p}
-\NormalTok{@files |\textgreater{} grep {-}f \_ |\textgreater{} e p             \# only real files}
-\end{Highlighting}
-\end{Shaded}
-
-In \texttt{fn\ (\$n)\ \{\ ...\ \}} style, \texttt{\_} also serves as the
-underscore placeholder for unused arguments. See also: \texttt{\$\_},
-\texttt{@\_}, \texttt{\textbar{}\textgreater{}}.
 
 \section{\texorpdfstring{\texttt{\_\_DATA\_\_}}{\_\_DATA\_\_}}\label{data__}
 
@@ -29012,6 +28295,35 @@ structure helpers*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{bk\_insert}}{bk\_insert}}\label{bk_insert}
+
+\texttt{bk\_insert(BK,\ WORD...)} → number of newly-inserted words
+(duplicates skipped).
+
+\section{\texorpdfstring{\texttt{bk\_len}}{bk\_len}}\label{bk_len}
+
+\texttt{bk\_len(BK)} → number of stored words.
+
+\section{\texorpdfstring{\texttt{bk\_query}}{bk\_query}}\label{bk_query}
+
+\texttt{bk\_query(BK,\ QUERY,\ MAX\_DIST=2)} → list of
+\texttt{{[}word,\ distance{]}} arrayrefs within \texttt{MAX\_DIST}
+edits, sorted by distance asc.
+
+\section{\texorpdfstring{\texttt{bk\_tree}}{bk\_tree}}\label{bk_tree}
+
+\texttt{bk\_tree()} --- Burkhard-Keller tree for fuzzy / typo retrieval.
+Uses Damerau-Levenshtein distance. Insert O(log n) avg; range queries
+O(n\^{}(1-1/d)) for small \texttt{d}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $bk = bk\_tree()}
+\NormalTok{bk\_insert($bk, qw(hello world help halo hells))}
+\NormalTok{my @near = bk\_query($bk, "hallo", 2)  \# [["hello",1], ["halo",1], ["hells",2]]}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{bkt}}{bkt}}\label{bkt}
 
 \texttt{bkt} --- operation \texttt{bkt}. Alias for \texttt{bucket}.
@@ -29263,38 +28575,88 @@ Category: *quantum*.
 \end{Highlighting}
 \end{Shaded}
 
-\section{\texorpdfstring{\texttt{bloom\_filter\_add}}{bloom\_filter\_add}}\label{bloom_filter_add}
+\section{\texorpdfstring{\texttt{bloom}}{bloom}}\label{bloom}
 
-\texttt{bloom\_filter\_add} --- Bloom filter op \texttt{filter\ add}.
-Category: *extras*.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{p bloom\_filter\_add $x}
-\end{Highlighting}
-\end{Shaded}
-
-\section{\texorpdfstring{\texttt{bloom\_filter\_contains}}{bloom\_filter\_contains}}\label{bloom_filter_contains}
-
-\texttt{bloom\_filter\_contains} --- Bloom filter op
-\texttt{filter\ contains}. Category: *extras*.
+\texttt{bloom\_filter(CAPACITY,\ FPR=0.01)} --- Bloom filter sized for
+\texttt{CAPACITY} distinct items with target false-positive rate
+\texttt{FPR}. Bit count rounds up to a power of two; \texttt{k} (probe
+count) is computed for the (cap, fpr) pair. Probe indexing uses
+Kirsch--Mitzenmacher double-hashing over xxh3-128; no allocations on
+\texttt{bloom\_add} / \texttt{bloom\_contains}.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{p bloom\_filter\_contains $x}
+\NormalTok{my $b = bloom\_filter(10\_000, 0.001)}
+\NormalTok{bloom\_add($b, "alice"); bloom\_add($b, "bob")}
+\NormalTok{p bloom\_contains($b, "alice")        \# 1}
+\NormalTok{p bloom\_contains($b, "carol")        \# 0}
+\NormalTok{my $bytes = bloom\_serialize($b)}
+\NormalTok{my $r = bloom\_deserialize($bytes)}
 \end{Highlighting}
 \end{Shaded}
 
-\section{\texorpdfstring{\texttt{bloom\_filter\_new}}{bloom\_filter\_new}}\label{bloom_filter_new}
+Family: \texttt{bloom\_add}, \texttt{bloom\_contains},
+\texttt{bloom\_len}, \texttt{bloom\_clear}, \texttt{bloom\_merge},
+\texttt{bloom\_fpr}, \texttt{bloom\_bits}, \texttt{bloom\_serialize},
+\texttt{bloom\_deserialize}.
 
-\texttt{bloom\_filter\_new} --- Bloom filter op \texttt{filter\ new}.
-Category: *extras*.
+\section{\texorpdfstring{\texttt{bloom\_add}}{bloom\_add}}\label{bloom_add}
 
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{p bloom\_filter\_new $x}
-\end{Highlighting}
-\end{Shaded}
+\texttt{bloom\_add(BF,\ KEY)} --- insert \texttt{KEY} into a Bloom
+filter. Returns \texttt{1} if every probe bit was previously unset
+(newly inserted, no false positive collision on insert), \texttt{0} if
+all probe bits already 1 (key already present OR false positive).
+\texttt{bloom\_len(BF)} tracks the unique-insert count.
+
+\section{\texorpdfstring{\texttt{bloom\_bits}}{bloom\_bits}}\label{bloom_bits}
+
+\texttt{bloom\_bits(BF)} --- total bit count of the underlying array
+(always a power of two ≥ 64).
+
+\section{\texorpdfstring{\texttt{bloom\_clear}}{bloom\_clear}}\label{bloom_clear}
+
+\texttt{bloom\_clear(BF)} --- zero the bit array and reset the insertion
+counter. Returns the same BF for chaining.
+
+\section{\texorpdfstring{\texttt{bloom\_contains}}{bloom\_contains}}\label{bloom_contains}
+
+\texttt{bloom\_contains(BF,\ KEY)} --- \texttt{1} if \texttt{KEY} may be
+present (no false negatives), \texttt{0} if definitely absent. Probe
+count k = \texttt{bloom\_filter}\textquotesingle s
+\texttt{(capacity,\ fpr)}-derived constant.
+
+\section{\texorpdfstring{\texttt{bloom\_count}}{bloom\_count}}\label{bloom_count}
+
+\texttt{bloom\_len(BF)} --- unique-insert count seen by this filter. May
+exceed \texttt{capacity} if you over-insert; once it does,
+\texttt{bloom\_fpr} will have climbed past target.
+
+\section{\texorpdfstring{\texttt{bloom\_deserialize}}{bloom\_deserialize}}\label{bloom_deserialize}
+
+\texttt{bloom\_deserialize(BYTES)} →
+\texttt{BloomFilter\ \textbar{}\ undef} --- restore from
+\texttt{bloom\_serialize} output. Returns \texttt{undef} on format
+mismatch.
+
+\section{\texorpdfstring{\texttt{bloom\_fpr}}{bloom\_fpr}}\label{bloom_fpr}
+
+\texttt{bloom\_fpr(BF)} --- current estimated false-positive rate from
+the running insertion count: \texttt{(1\ -\ exp(-k·n/m))\^{}k}. When
+this drifts above your target, rebuild with a larger capacity.
+
+\section{\texorpdfstring{\texttt{bloom\_merge}}{bloom\_merge}}\label{bloom_merge}
+
+\texttt{bloom\_merge(BF,\ OTHER)} --- bitwise OR union with another
+filter of identical geometry. Returns \texttt{1} on success, \texttt{0}
+if bit count or \texttt{k} differ. After merge, \texttt{bloom\_contains}
+of any key inserted into either source returns \texttt{1}.
+
+\section{\texorpdfstring{\texttt{bloom\_serialize}}{bloom\_serialize}}\label{bloom_serialize}
+
+\texttt{bloom\_serialize(BF)} → BYTES --- versioned wire format
+(\texttt{STKBLOM\textbackslash{}x01} magic + log2\_cap + k + inserted +
+capacity\_hint + fpr\_hint + bit words). Pair with
+\texttt{bloom\_deserialize}.
 
 \section{\texorpdfstring{\texttt{blossom\_match\_step}}{blossom\_match\_step}}\label{blossom_match_step}
 
@@ -30742,6 +30104,16 @@ operations extras*.
 \NormalTok{p bucket $x}
 \end{Highlighting}
 \end{Shaded}
+
+\section{\texorpdfstring{\texttt{bucket\_available}}{bucket\_available}}\label{bucket_available}
+
+\texttt{rl\_available(RL)} → tokens currently available (token-bucket)
+or remaining headroom (leaky-bucket).
+
+\section{\texorpdfstring{\texttt{bucket\_try\_take}}{bucket\_try\_take}}\label{bucket_try_take}
+
+\texttt{rl\_try\_take(RL,\ COST=1)} → \texttt{1} on success (capacity
+available / no overflow), \texttt{0} on rejection.
 
 \section{\texorpdfstring{\texttt{buffer\_capacity\_acid\_base}}{buffer\_capacity\_acid\_base}}\label{buffer_capacity_acid_base}
 
@@ -35772,6 +35144,107 @@ Category: *python/ruby stdlib*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{cms}}{cms}}\label{cms}
+
+\texttt{cms(WIDTH=2048,\ DEPTH=5)} --- Count-Min frequency sketch.
+\texttt{epsilon\ ≈\ e/width} (over-estimation bound),
+\texttt{delta\ ≈\ 1/2\^{}depth} (failure probability). Defaults give
+0.13\% over-bound with 97\% confidence. Counters are \texttt{u32}
+saturating; \texttt{cms\_count} is always ≥ the true count.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $c = cms(4096, 7)}
+\NormalTok{cms\_add($c, $\_) for @stream}
+\NormalTok{p cms\_count($c, "frequent\_key")}
+\end{Highlighting}
+\end{Shaded}
+
+Family: \texttt{cms\_add}, \texttt{cms\_count}, \texttt{cms\_merge},
+\texttt{cms\_clear}, \texttt{cms\_serialize}, \texttt{cms\_deserialize}.
+
+\section{\texorpdfstring{\texttt{cms\_add}}{cms\_add}}\label{cms_add}
+
+\texttt{cms\_add(CMS,\ KEY,\ COUNT=1)} --- add \texttt{COUNT}
+occurrences of \texttt{KEY} to the sketch.
+
+\section{\texorpdfstring{\texttt{cms\_clear}}{cms\_clear}}\label{cms_clear}
+
+\texttt{cms\_clear} --- operation \texttt{cms\ clear}. Category:
+*probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p cms\_clear $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{cms\_count}}{cms\_count}}\label{cms_count}
+
+\texttt{cms\_count(CMS,\ KEY)} → estimated count (upper bound on truth).
+
+\section{\texorpdfstring{\texttt{cms\_deserialize}}{cms\_deserialize}}\label{cms_deserialize}
+
+\texttt{cms\_deserialize} --- operation \texttt{cms\ deserialize}.
+Category: *probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p cms\_deserialize $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{cms\_from\_bytes}}{cms\_from\_bytes}}\label{cms_from_bytes}
+
+\texttt{cms\_from\_bytes} --- operation \texttt{cms\ from\ bytes}. Alias
+for \texttt{cms\_deserialize}. Category: *probabilistic data
+structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p cms\_from\_bytes $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{cms\_merge}}{cms\_merge}}\label{cms_merge}
+
+\texttt{cms\_merge(CMS,\ OTHER)} --- counter-wise sum (must share width
+and depth). Returns \texttt{1} on success.
+
+\section{\texorpdfstring{\texttt{cms\_reset}}{cms\_reset}}\label{cms_reset}
+
+\texttt{cms\_reset} --- operation \texttt{cms\ reset}. Alias for
+\texttt{cms\_clear}. Category: *probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p cms\_reset $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{cms\_serialize}}{cms\_serialize}}\label{cms_serialize}
+
+\texttt{cms\_serialize} --- operation \texttt{cms\ serialize}. Category:
+*probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p cms\_serialize $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{cms\_to\_bytes}}{cms\_to\_bytes}}\label{cms_to_bytes}
+
+\texttt{cms\_to\_bytes} --- convert from \texttt{cms} to \texttt{bytes}.
+Alias for \texttt{cms\_serialize}. Category: *probabilistic data
+structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p cms\_to\_bytes $value}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{cmyk\_to\_rgb}}{cmyk\_to\_rgb}}\label{cmyk_to_rgb}
 
 \texttt{cmyk\_to\_rgb} --- convert from \texttt{cmyk} to \texttt{rgb}.
@@ -35846,10 +35319,12 @@ theory*.
 of elements in a list, the \textbf{codepoint count} of a string, the
 number of key-value pairs in a hash, or the cardinality of a set.
 Universal length-like function that dispatches on the type of its
-argument. Replaces \texttt{scalar\ @array} / \texttt{length\ \$string}
-for stryke code; on strings it pairs with \texttt{{[}i{]}} /
-\texttt{{[}a:b{]}} and \texttt{cindex} / \texttt{crindex}, all of which
-use codepoint positions.
+argument. With \textbf{no arguments}, it is the same as one argument on
+\texttt{\$\_} (like Perl 5\textquotesingle s bare \texttt{length} in
+map/grep blocks). Replaces \texttt{scalar\ @array} /
+\texttt{length\ \$string} for stryke code; on strings it pairs with
+\texttt{{[}i{]}} / \texttt{{[}a:b{]}} and \texttt{cindex} /
+\texttt{crindex}, all of which use codepoint positions.
 
 For byte length on a string, use Perl 5\textquotesingle s
 \texttt{length} (kept byte-based for compat with \texttt{index} /
@@ -35865,6 +35340,7 @@ For byte length on a string, use Perl 5\textquotesingle s
 \NormalTok{p length "─"        \# 3 (bytes)}
 \NormalTok{my \%h = (a =\textgreater{} 1, b =\textgreater{} 2)}
 \NormalTok{p cnt \textbackslash{}\%h           \# 2}
+\NormalTok{my @long = grep \{ len \textgreater{} 3 \} qw(ab abcd x)  \# abcd}
 \NormalTok{rl("file.txt") |\textgreater{} cnt |\textgreater{} p  \# line count}
 \end{Highlighting}
 \end{Shaded}
@@ -37271,6 +36747,21 @@ Category: *list helpers*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{consistent\_hash}}{consistent\_hash}}\label{consistent_hash}
+
+\texttt{hash\_ring(VNODES\_PER\_NODE=128)} --- consistent-hash ring
+(Karger-style virtual nodes). Adds and removes nodes with minimal key
+remapping (≈ 1/(N+1) of keys move when a node joins N existing nodes).
+xxh3-64 hashing; binary search lookup is O(log V).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $hr = hash\_ring(128)}
+\NormalTok{hr\_add($hr, "shard{-}a", "shard{-}b", "shard{-}c")}
+\NormalTok{my $owner = hr\_get($hr, "user{-}42")}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{const\_fn}}{const\_fn}}\label{const_fn}
 
 \texttt{const\_fn} --- operation \texttt{const\ fn}. Category:
@@ -38363,39 +37854,6 @@ Category: *extended stdlib*.
 \end{Highlighting}
 \end{Shaded}
 
-\section{\texorpdfstring{\texttt{count\_min\_sketch\_add}}{count\_min\_sketch\_add}}\label{count_min_sketch_add}
-
-\texttt{count\_min\_sketch\_add} --- operation
-\texttt{count\ min\ sketch\ add}. Category: *extras*.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{p count\_min\_sketch\_add $x}
-\end{Highlighting}
-\end{Shaded}
-
-\section{\texorpdfstring{\texttt{count\_min\_sketch\_new}}{count\_min\_sketch\_new}}\label{count_min_sketch_new}
-
-\texttt{count\_min\_sketch\_new} --- constructor of
-\texttt{count\ min\ sketch}. Category: *extras*.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{p count\_min\_sketch\_new $x}
-\end{Highlighting}
-\end{Shaded}
-
-\section{\texorpdfstring{\texttt{count\_min\_sketch\_query}}{count\_min\_sketch\_query}}\label{count_min_sketch_query}
-
-\texttt{count\_min\_sketch\_query} --- operation
-\texttt{count\ min\ sketch\ query}. Category: *extras*.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{p count\_min\_sketch\_query $x}
-\end{Highlighting}
-\end{Shaded}
-
 \section{\texorpdfstring{\texttt{count\_ne}}{count\_ne}}\label{count_ne}
 
 \texttt{count\_ne} --- operation \texttt{count\ ne}. Category: *more
@@ -38722,6 +38180,17 @@ fuel cells*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p covariant\_derivative\_step $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{cp}}{cp}}\label{cp}
+
+Alias for \texttt{copy} --- identical \texttt{FROM}, \texttt{TO}, and
+optional trailing hash (\texttt{preserve\ =\textgreater{}\ 1}).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{cp("a.txt", "b.txt")}
 \end{Highlighting}
 \end{Shaded}
 
@@ -44216,6 +43685,34 @@ Args: vec {[}, lag, differences{]}. Like R\textquotesingle s diff().
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{diff\_myers}}{diff\_myers}}\label{diff_myers}
+
+\texttt{myers\_diff(\textbackslash{}@A,\ \textbackslash{}@B)} → list of
+\texttt{{[}op,\ value{]}} arrayrefs (op = \texttt{"="}, \texttt{"+"},
+\texttt{"-"}). Eugene Myers\textquotesingle{} O((N+M)·D)
+longest-common-subsequence diff. Foundational text-diff primitive.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @a = ("alpha", "beta",  "gamma")}
+\NormalTok{my @b = ("alpha", "BETA",  "gamma")}
+\NormalTok{myers\_diff(\textbackslash{}@a, \textbackslash{}@b) |\textgreater{} e \{ p "$\_{-}\textgreater{}[0] $\_{-}\textgreater{}[1]" \}}
+\NormalTok{\# = alpha}
+\NormalTok{\# {-} beta}
+\NormalTok{\# + BETA}
+\NormalTok{\# = gamma}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{diff\_patience}}{diff\_patience}}\label{diff_patience}
+
+\texttt{patience\_diff(\textbackslash{}@A,\ \textbackslash{}@B)} → list
+of \texttt{{[}op,\ value{]}} arrayrefs. Bram Cohen\textquotesingle s
+patience diff: finds the longest common subsequence of *unique* lines as
+anchors, then runs Myers on the gaps between anchors. Produces more
+human-readable diffs than Myers on code-like inputs where repeated short
+lines (braces, blank lines) make Myers pick noisy alignments.
+
 \section{\texorpdfstring{\texttt{diff\_pct}}{diff\_pct}}\label{diff_pct}
 
 \texttt{diff\_pct(series)\ →\ array} --- percentage change between
@@ -49456,6 +48953,21 @@ angular FOV in degrees.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p field\_of\_view(50, 36)  \# \textasciitilde{}39.6°}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{file}}{file}}\label{file}
+
+\texttt{file\ PATH} --- one-line description in the spirit of
+\texttt{file(1)}: symlink targets, \texttt{directory},
+FIFO/socket/device nodes (Unix), and magic-byte sniff for regular files
+(\texttt{PNG}, \texttt{ELF}, \texttt{gzip}, shebang scripts,
+\texttt{ASCII\ text}, etc.). With no arguments, inspects \texttt{\$\_}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p file("/bin/sh")}
+\NormalTok{p file("Cargo.toml")}
 \end{Highlighting}
 \end{Shaded}
 
@@ -56693,6 +56205,24 @@ Category: *file stat / path*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{hash\_ring\_add}}{hash\_ring\_add}}\label{hash_ring_add}
+
+\texttt{hr\_add(HR,\ NAME...)} → number of new nodes inserted
+(duplicates skipped).
+
+\section{\texorpdfstring{\texttt{hash\_ring\_get}}{hash\_ring\_get}}\label{hash_ring_get}
+
+\texttt{hr\_get(HR,\ KEY)} → owner node name, or \texttt{undef} if the
+ring is empty.
+
+\section{\texorpdfstring{\texttt{hash\_ring\_nodes}}{hash\_ring\_nodes}}\label{hash_ring_nodes}
+
+\texttt{hr\_nodes(HR)} → list of currently-registered node names.
+
+\section{\texorpdfstring{\texttt{hash\_ring\_remove}}{hash\_ring\_remove}}\label{hash_ring_remove}
+
+\texttt{hr\_remove(HR,\ NAME...)} → number of nodes removed.
+
 \section{\texorpdfstring{\texttt{hash\_size}}{hash\_size}}\label{hash_size}
 
 \texttt{hash\_size} --- hash-table / hashing helper \texttt{size}.
@@ -57595,6 +57125,68 @@ primitives*.
 \NormalTok{p hlen $x}
 \end{Highlighting}
 \end{Shaded}
+
+\section{\texorpdfstring{\texttt{hll}}{hll}}\label{hll}
+
+\texttt{hll(PRECISION=14)} --- HyperLogLog cardinality (distinct-count)
+sketch with \texttt{2\^{}precision} 8-bit registers. Precision clamped
+to \texttt{{[}4,\ 18{]}}; typical \texttt{14} gives \textasciitilde1.3\%
+relative error in 16 KB. Replaces the older slow
+\texttt{hyperloglog\_pp\_*} family with a HeapObject-backed primitive
+that is \texttt{\textasciitilde{}1000x} faster on \texttt{\_add} (no
+allocation per insert).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $h = hll(14)}
+\NormalTok{hll\_add($h, "user\_$\_") for 1..100\_000}
+\NormalTok{printf "\textasciitilde{}\%d\textbackslash{}n", hll\_count($h)        \# \textasciitilde{}99672 — \textasciitilde{}0.33\% error}
+\end{Highlighting}
+\end{Shaded}
+
+Family: \texttt{hll\_add}, \texttt{hll\_count}, \texttt{hll\_merge},
+\texttt{hll\_clear}, \texttt{hll\_precision}, \texttt{hll\_serialize},
+\texttt{hll\_deserialize}. Legacy aliases
+(\texttt{hyperloglog\_pp\_new}, \texttt{hyperloglog\_pp\_add},
+\texttt{hyperloglog\_pp\_estimate}, \texttt{hyperloglog\_new}, etc.) all
+route here.
+
+\section{\texorpdfstring{\texttt{hll\_add}}{hll\_add}}\label{hll_add}
+
+\texttt{hll\_add(HLL,\ KEY)} --- fold \texttt{KEY} into the sketch (one
+xxh3-64 + one register update). Returns the same HLL for chaining.
+
+\section{\texorpdfstring{\texttt{hll\_clear}}{hll\_clear}}\label{hll_clear}
+
+\texttt{hll\_clear(HLL)} --- zero every register.
+
+\section{\texorpdfstring{\texttt{hll\_count}}{hll\_count}}\label{hll_count}
+
+\texttt{hll\_count(HLL)} → estimated number of distinct items seen. Uses
+alpha-corrected standard HLL with linear-counting fallback for small
+ranges.
+
+\section{\texorpdfstring{\texttt{hll\_deserialize}}{hll\_deserialize}}\label{hll_deserialize}
+
+\texttt{hll\_deserialize(BYTES)} → \texttt{HllSketch\ \textbar{}\ undef}
+--- round-trip from \texttt{hll\_serialize}.
+
+\section{\texorpdfstring{\texttt{hll\_merge}}{hll\_merge}}\label{hll_merge}
+
+\texttt{hll\_merge(HLL,\ OTHER)} --- register-wise max into the receiver
+(union of two distinct sets). Returns \texttt{1} on success, \texttt{0}
+on precision mismatch.
+
+\section{\texorpdfstring{\texttt{hll\_precision}}{hll\_precision}}\label{hll_precision}
+
+\texttt{hll\_precision(HLL)} → integer precision parameter (4-18) ---
+the sketch holds \texttt{2\^{}precision} registers.
+
+\section{\texorpdfstring{\texttt{hll\_serialize}}{hll\_serialize}}\label{hll_serialize}
+
+\texttt{hll\_serialize(HLL)} → BYTES ---
+\texttt{STKHLL\textbackslash{}x01} magic + 4-byte precision + register
+vector.
 
 \section{\texorpdfstring{\texttt{hlookup}}{hlookup}}\label{hlookup}
 
@@ -59479,75 +59071,6 @@ hypergeometric ₂F₁ via power series. Requires
 \end{Highlighting}
 \end{Shaded}
 
-\section{\texorpdfstring{\texttt{hyperloglog\_add}}{hyperloglog\_add}}\label{hyperloglog_add}
-
-\texttt{hyperloglog\_add} --- HyperLogLog cardinality sketch
-\texttt{add}. Category: *extras*.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{p hyperloglog\_add $x}
-\end{Highlighting}
-\end{Shaded}
-
-\section{\texorpdfstring{\texttt{hyperloglog\_estimate}}{hyperloglog\_estimate}}\label{hyperloglog_estimate}
-
-\texttt{hyperloglog\_estimate} --- HyperLogLog cardinality sketch
-\texttt{estimate}. Category: *extras*.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{p hyperloglog\_estimate $x}
-\end{Highlighting}
-\end{Shaded}
-
-\section{\texorpdfstring{\texttt{hyperloglog\_merge}}{hyperloglog\_merge}}\label{hyperloglog_merge}
-
-\texttt{hyperloglog\_merge} --- HyperLogLog cardinality sketch
-\texttt{merge}. Category: *extras*.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{p hyperloglog\_merge $x}
-\end{Highlighting}
-\end{Shaded}
-
-\section{\texorpdfstring{\texttt{hyperloglog\_new}}{hyperloglog\_new}}\label{hyperloglog_new}
-
-\texttt{hyperloglog\_new} --- HyperLogLog cardinality sketch
-\texttt{new}. Category: *extras*.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{p hyperloglog\_new $x}
-\end{Highlighting}
-\end{Shaded}
-
-\section{\texorpdfstring{\texttt{hyperloglog\_pp\_add}}{hyperloglog\_pp\_add}}\label{hyperloglog_pp_add}
-
-\texttt{hyperloglog\_pp\_add(hll,\ item)\ →\ hash} --- fold an item into
-the sketch using 64-bit FNV-1a hash.
-
-\section{\texorpdfstring{\texttt{hyperloglog\_pp\_estimate}}{hyperloglog\_pp\_estimate}}\label{hyperloglog_pp_estimate}
-
-\texttt{hyperloglog\_pp\_estimate(hll)\ →\ number} --- estimated
-cardinality with linear-counting small-range correction.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{my $h = hyperloglog\_pp\_new(10)}
-\NormalTok{$h = hyperloglog\_pp\_add($h, "item$\_") for 1..1000}
-\NormalTok{p hyperloglog\_pp\_estimate($h)}
-\end{Highlighting}
-\end{Shaded}
-
-\section{\texorpdfstring{\texttt{hyperloglog\_pp\_new}}{hyperloglog\_pp\_new}}\label{hyperloglog_pp_new}
-
-\texttt{hyperloglog\_pp\_new(precision=14)\ →\ hash} --- HyperLogLog
-sketch with \texttt{2\^{}precision} dense registers. (Lacks HLL++ sparse
-representation and bias-correction tables --- counts within
-\textasciitilde3\% of standard HLL.)
-
 \section{\texorpdfstring{\texttt{hyperoperation}}{hyperoperation}}\label{hyperoperation}
 
 \texttt{hyperoperation} --- operation \texttt{hyperoperation}. Category:
@@ -61202,6 +60725,21 @@ Category: *additional missing stdlib functions*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{interval\_at}}{interval\_at}}\label{interval_at}
+
+\texttt{it\_query\_point(IT,\ P)} → list of
+\texttt{{[}start,\ end,\ payload{]}} arrayrefs containing point
+\texttt{P}.
+
+\section{\texorpdfstring{\texttt{interval\_count}}{interval\_count}}\label{interval_count}
+
+\texttt{it\_len(IT)} → number of intervals stored.
+
+\section{\texorpdfstring{\texttt{interval\_insert}}{interval\_insert}}\label{interval_insert}
+
+\texttt{it\_insert(IT,\ START,\ END,\ PAYLOAD=undef)} --- append an
+interval. Endpoints normalized so \texttt{START\ ≤\ END}.
+
 \section{\texorpdfstring{\texttt{interval\_name}}{interval\_name}}\label{interval_name}
 
 \texttt{interval\_name(semitones)\ →\ string} --- Western music interval
@@ -61212,6 +60750,12 @@ label: P1, m2, M2, m3, M3, P4, TT, P5, m6, M6, m7, M7.
 \NormalTok{p interval\_name(7)  \# P5}
 \end{Highlighting}
 \end{Shaded}
+
+\section{\texorpdfstring{\texttt{interval\_overlap}}{interval\_overlap}}\label{interval_overlap}
+
+\texttt{it\_query\_range(IT,\ LO,\ HI)} → list of
+\texttt{{[}start,\ end,\ payload{]}} arrayrefs overlapping range
+\texttt{{[}LO,\ HI{]}}.
 
 \section{\texorpdfstring{\texttt{interval\_quality\_size}}{interval\_quality\_size}}\label{interval_quality_size}
 
@@ -61224,6 +60768,11 @@ label: P1, m2, M2, m3, M3, P4, TT, P5, m6, M6, m7, M7.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{interval\_remove}}{interval\_remove}}\label{interval_remove}
+
+\texttt{it\_remove(IT,\ START,\ END)} → number of removed intervals with
+exact endpoints.
+
 \section{\texorpdfstring{\texttt{interval\_semitones}}{interval\_semitones}}\label{interval_semitones}
 
 \texttt{interval\_semitones} --- operation \texttt{interval\ semitones}.
@@ -61232,6 +60781,21 @@ Category: *misc*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p interval\_semitones $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{interval\_tree}}{interval\_tree}}\label{interval_tree}
+
+\texttt{interval\_tree()} --- store \texttt{{[}start,\ end{]}} intervals
+(inclusive) with associated payloads; query for all intervals
+overlapping a point or another range.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $it = interval\_tree()}
+\NormalTok{it\_insert($it, 1, 10, "meeting{-}a")}
+\NormalTok{it\_insert($it, 8, 15, "meeting{-}b")}
+\NormalTok{my @hits = it\_query\_point($it, 9)     \# both overlap}
 \end{Highlighting}
 \end{Shaded}
 
@@ -63941,6 +63505,13 @@ Category: *more process / system*.
 \NormalTok{p is\_tty $x}
 \end{Highlighting}
 \end{Shaded}
+
+\section{\texorpdfstring{\texttt{is\_ulid}}{is\_ulid}}\label{is_ulid}
+
+\texttt{is\_ulid\ SCALAR} → \texttt{1}/\texttt{0} per the 26-char
+Crockford-Base32 format (\texttt{{[}0-9A-HJKMNP-TV-Z{]}\{26\}}).
+Excludes \texttt{I}, \texttt{L}, \texttt{O}, \texttt{U} per Crockford
+spec.
 
 \section{\texorpdfstring{\texttt{is\_undef}}{is\_undef}}\label{is_undef}
 
@@ -66667,6 +66238,23 @@ Category: *chemistry \& biochemistry*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{kahan}}{kahan}}\label{kahan}
+
+\texttt{kahan\_sum\ LIST} --- Neumaier-variant compensated summation.
+Recovers \textasciitilde16-17 digits of precision on long float sums
+where naive \texttt{sum} loses precision to cancellation.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p sum(1e20, 1, {-}1e20, 1, {-}1e20, 1e20)         \# 0  (precision lost)}
+\NormalTok{p kahan\_sum(1e20, 1, {-}1e20, 1, {-}1e20, 1e20)   \# 2  (recovered)}
+\end{Highlighting}
+\end{Shaded}
+
+World\textquotesingle s-first as scripting-lang stdlib pipe-friendly
+builtin: Python\textquotesingle s \texttt{math.fsum} is closest but not
+pipeable; Ruby / Node / Perl have no stdlib equivalent.
+
 \section{\texorpdfstring{\texttt{kaiser}}{kaiser}}\label{kaiser}
 
 \texttt{window\_kaiser(\$n,\ \$beta)} (alias \texttt{kaiser}) ---
@@ -68683,6 +68271,13 @@ Category: *chemistry*.
 \NormalTok{p leading\_zeros $x}
 \end{Highlighting}
 \end{Shaded}
+
+\section{\texorpdfstring{\texttt{leaky\_bucket}}{leaky\_bucket}}\label{leaky_bucket}
+
+\texttt{leaky\_bucket(CAPACITY,\ DRAIN\_PER\_SEC)} --- leaky-bucket rate
+limiter (drains over time, fills as requests arrive).
+\texttt{rl\_try\_take(cost)} succeeds if the fill plus \texttt{cost}
+doesn\textquotesingle t overflow.
 
 \section{\texorpdfstring{\texttt{leaky\_relu}}{leaky\_relu}}\label{leaky_relu}
 
@@ -70855,6 +70450,27 @@ structure helpers*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p lrun $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{ls}}{ls}}\label{ls}
+
+\texttt{ls} / \texttt{ls(DIR)} --- long directory listing in the style
+of \texttt{ls\ -l}. With no arguments, lists the interpreter working
+directory (same base \texttt{cd} uses; not \texttt{\$\_} and not
+necessarily the OS \texttt{getcwd}). With one or more directory paths,
+lists each directory; if more than one path is given, each block is
+prefixed with \texttt{DIR:} like GNU \texttt{ls}. Returns a single
+multiline string (suitable for \texttt{p} or \texttt{spurt}). On Unix,
+includes a \texttt{total} line (1024-byte block units), mode bits, link
+count, numeric uid/gid, size, mtime, and name; symbolic links show
+\texttt{-\textgreater{}\ target}. On Windows, lines use file attributes,
+size, and a simplified timestamp.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p ls()           \# logical cwd (see \textasciigrave{}cd\textasciigrave{})}
+\NormalTok{p ls("/tmp")}
 \end{Highlighting}
 \end{Shaded}
 
@@ -74274,6 +73890,19 @@ primitives*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{mh\_add}}{mh\_add}}\label{mh_add}
+
+\texttt{mh\_add(MH,\ ITEM)} --- fold an element into the signature.
+
+\section{\texorpdfstring{\texttt{mh\_jaccard}}{mh\_jaccard}}\label{mh_jaccard}
+
+\texttt{mh\_jaccard(A,\ B)} → estimated Jaccard similarity.
+
+\section{\texorpdfstring{\texttt{mh\_merge}}{mh\_merge}}\label{mh_merge}
+
+\texttt{mh\_merge(A,\ B)} --- register-wise min into A (union of two
+sets). Returns \texttt{1} on success.
+
 \section{\texorpdfstring{\texttt{mhad}}{mhad}}\label{mhad}
 
 \texttt{mhad} --- operation \texttt{mhad}. Alias for
@@ -74713,6 +74342,22 @@ mineralogy*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p mineral\_mohs\_hardness $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{minhash}}{minhash}}\label{minhash}
+
+\texttt{minhash(K=128)} --- MinHash Jaccard-similarity signature with
+\texttt{K} independent hash functions (Kirsch-Mitzenmacher
+double-hashing over xxh3-128). \texttt{mh\_jaccard(a,\ b)} ≈ true
+Jaccard with error O(1/sqrt(K)).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $a = minhash(256); my $b = minhash(256)}
+\NormalTok{mh\_add($a, $\_) for @shingles\_a}
+\NormalTok{mh\_add($b, $\_) for @shingles\_b}
+\NormalTok{p mh\_jaccard($a, $b)                  \# \textasciitilde{}|A∩B|/|A∪B|}
 \end{Highlighting}
 \end{Shaded}
 
@@ -91389,6 +91034,173 @@ Category: *filesystem extensions*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{rb\_add}}{rb\_add}}\label{rb_add}
+
+\texttt{rb\_add(RB,\ U32...)} --- insert one or more u32 values (clamped
+to \texttt{{[}0,\ 2\^{}32-1{]}}); accepts ARRAYREFs as well. Returns the
+count newly inserted.
+
+\section{\texorpdfstring{\texttt{rb\_and}}{rb\_and}}\label{rb_and}
+
+\texttt{rb\_and(RB,\ OTHER)} --- in-place intersect.
+
+\section{\texorpdfstring{\texttt{rb\_andnot}}{rb\_andnot}}\label{rb_andnot}
+
+\texttt{rb\_andnot(RB,\ OTHER)} --- in-place \texttt{RB\ -\ OTHER}.
+
+\section{\texorpdfstring{\texttt{rb\_clear}}{rb\_clear}}\label{rb_clear}
+
+\texttt{rb\_clear} --- operation \texttt{rb\ clear}. Category:
+*probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p rb\_clear $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{rb\_contains}}{rb\_contains}}\label{rb_contains}
+
+\texttt{rb\_contains(RB,\ U32)} → \texttt{1}/\texttt{0}.
+
+\section{\texorpdfstring{\texttt{rb\_count}}{rb\_count}}\label{rb_count}
+
+\texttt{rb\_count} --- count of \texttt{rb}. Alias for \texttt{rb\_len}.
+Category: *probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p rb\_count $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{rb\_del}}{rb\_del}}\label{rb_del}
+
+\texttt{rb\_del} --- operation \texttt{rb\ del}. Alias for
+\texttt{rb\_remove}. Category: *probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p rb\_del $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{rb\_deserialize}}{rb\_deserialize}}\label{rb_deserialize}
+
+\texttt{rb\_deserialize} --- operation \texttt{rb\ deserialize}.
+Category: *probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p rb\_deserialize $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{rb\_from\_bytes}}{rb\_from\_bytes}}\label{rb_from_bytes}
+
+\texttt{rb\_from\_bytes} --- operation \texttt{rb\ from\ bytes}. Alias
+for \texttt{rb\_deserialize}. Category: *probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p rb\_from\_bytes $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{rb\_len}}{rb\_len}}\label{rb_len}
+
+\texttt{rb\_len} --- operation \texttt{rb\ len}. Category:
+*probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p rb\_len $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{rb\_max}}{rb\_max}}\label{rb_max}
+
+\texttt{rb\_max} --- maximum of \texttt{rb}. Category: *probabilistic
+data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p rb\_max $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{rb\_min}}{rb\_min}}\label{rb_min}
+
+\texttt{rb\_min} --- minimum of \texttt{rb}. Category: *probabilistic
+data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p rb\_min $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{rb\_or}}{rb\_or}}\label{rb_or}
+
+\texttt{rb\_or(RB,\ OTHER)} --- in-place set union into RB.
+
+\section{\texorpdfstring{\texttt{rb\_rank}}{rb\_rank}}\label{rb_rank}
+
+\texttt{rb\_rank(RB,\ V)} → number of elements ≤ V.
+
+\section{\texorpdfstring{\texttt{rb\_remove}}{rb\_remove}}\label{rb_remove}
+
+\texttt{rb\_remove} --- operation \texttt{rb\ remove}. Category:
+*probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p rb\_remove $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{rb\_reset}}{rb\_reset}}\label{rb_reset}
+
+\texttt{rb\_reset} --- operation \texttt{rb\ reset}. Alias for
+\texttt{rb\_clear}. Category: *probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p rb\_reset $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{rb\_serialize}}{rb\_serialize}}\label{rb_serialize}
+
+\texttt{rb\_serialize} --- operation \texttt{rb\ serialize}. Category:
+*probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p rb\_serialize $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{rb\_symdiff}}{rb\_symdiff}}\label{rb_symdiff}
+
+\texttt{rb\_xor(RB,\ OTHER)} --- in-place symmetric difference.
+
+\section{\texorpdfstring{\texttt{rb\_to\_array}}{rb\_to\_array}}\label{rb_to_array}
+
+\texttt{rb\_to\_array(RB)} → sorted ascending list of contained u32s.
+
+\section{\texorpdfstring{\texttt{rb\_to\_bytes}}{rb\_to\_bytes}}\label{rb_to_bytes}
+
+\texttt{rb\_to\_bytes} --- convert from \texttt{rb} to \texttt{bytes}.
+Alias for \texttt{rb\_serialize}. Category: *probabilistic data
+structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p rb\_to\_bytes $value}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{rbeta}}{rbeta}}\label{rbeta}
 
 \texttt{rbeta} --- generate n random beta variates. Args: n, alpha,
@@ -91421,6 +91233,34 @@ prob. Like R\textquotesingle s rbinom().
 \NormalTok{my @x = @\{rbinom(100, 10, 0.3)\} \# 100 draws from Binom(10,0.3)}
 \end{Highlighting}
 \end{Shaded}
+
+\section{\texorpdfstring{\texttt{rbm}}{rbm}}\label{rbm}
+
+\texttt{roaring(LIST\ \textbar{}\ \textbackslash{}@ARR\ \textbar{}\ ...)}
+--- Roaring Bitmap (compressed \texttt{u32} set). Apache-licensed
+\texttt{roaring} crate; the canonical impl used by
+quickwit/tantivy/lucene-rs. O(1) \texttt{add}/\texttt{contains},
+O(n/run-length) set ops; typically 10-100× smaller than
+\texttt{HashSet\textless{}u32\textgreater{}} on natural datasets.
+\texttt{rb} short alias reserved for \texttt{read\_bytes}; use
+\texttt{rbm}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $a = roaring(1, 2, 3, 5, 8)}
+\NormalTok{my $b = roaring([2, 4, 6, 8, 10])}
+\NormalTok{rb\_and($a, $b)                        \# in{-}place intersect}
+\NormalTok{p join(",", rb\_to\_array($a))         \# 2,8}
+\end{Highlighting}
+\end{Shaded}
+
+Family: \texttt{rb\_add}, \texttt{rb\_remove}, \texttt{rb\_contains},
+\texttt{rb\_or} (alias \texttt{rb\_union}), \texttt{rb\_and}
+(\texttt{rb\_intersect}), \texttt{rb\_xor} (\texttt{rb\_symdiff}),
+\texttt{rb\_andnot} (\texttt{rb\_diff}, \texttt{rb\_minus}),
+\texttt{rb\_len}, \texttt{rb\_min}, \texttt{rb\_max}, \texttt{rb\_rank},
+\texttt{rb\_to\_array}, \texttt{rb\_clear}, \texttt{rb\_serialize},
+\texttt{rb\_deserialize}.
 
 \section{\texorpdfstring{\texttt{rc\_tau}}{rc\_tau}}\label{rc_tau}
 
@@ -94385,6 +94225,43 @@ Category: *econometrics*.
 \NormalTok{p root\_system\_count $x}
 \end{Highlighting}
 \end{Shaded}
+
+\section{\texorpdfstring{\texttt{rope}}{rope}}\label{rope}
+
+\texttt{rope(INITIAL\_STRING="")} --- text data structure for fast
+insert/delete in long strings. Chunk-balanced (1 KB max per chunk);
+amortized O(log n) edits. Codepoint-safe across UTF-8 boundaries.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $r = rope("Hello, world!")}
+\NormalTok{rope\_insert($r, 7, "beautiful ")}
+\NormalTok{p rope\_to\_string($r)                  \# "Hello, beautiful world!"}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{rope\_delete}}{rope\_delete}}\label{rope_delete}
+
+\texttt{rope\_delete(R,\ START,\ END)} --- delete codepoints
+\texttt{{[}START,\ END)}.
+
+\section{\texorpdfstring{\texttt{rope\_insert}}{rope\_insert}}\label{rope_insert}
+
+\texttt{rope\_insert(R,\ POS,\ TEXT)} --- insert \texttt{TEXT} at
+codepoint position \texttt{POS} (clamped to \texttt{{[}0,\ len{]}}).
+
+\section{\texorpdfstring{\texttt{rope\_len}}{rope\_len}}\label{rope_len}
+
+\texttt{rope\_len(R)} → codepoint count.
+
+\section{\texorpdfstring{\texttt{rope\_str}}{rope\_str}}\label{rope_str}
+
+\texttt{rope\_to\_string(R)} → materialize as a contiguous String.
+
+\section{\texorpdfstring{\texttt{rope\_substr}}{rope\_substr}}\label{rope_substr}
+
+\texttt{rope\_substring(R,\ START,\ END)} → substring at codepoint range
+\texttt{{[}START,\ END)}.
 
 \section{\texorpdfstring{\texttt{ros2\_step}}{ros2\_step}}\label{ros2_step}
 
@@ -98247,6 +98124,20 @@ Category: *misc*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{sh\_add}}{sh\_add}}\label{sh_add}
+
+\texttt{sh\_add(SH,\ FEATURE,\ WEIGHT=1)} --- fold a token into the
+sketch.
+
+\section{\texorpdfstring{\texttt{sh\_digest}}{sh\_digest}}\label{sh_digest}
+
+\texttt{sh\_digest(SH)} → 64-bit integer fingerprint.
+
+\section{\texorpdfstring{\texttt{sh\_similarity}}{sh\_similarity}}\label{sh_similarity}
+
+\texttt{sh\_similarity(A,\ B)} → approximate cosine similarity ∈
+\texttt{{[}0,\ 1{]}}.
+
 \section{\texorpdfstring{\texttt{shake\_map\_pga}}{shake\_map\_pga}}\label{shake_map_pga}
 
 \texttt{shake\_map\_pga} --- operation \texttt{shake\ map\ pga}.
@@ -98926,6 +98817,23 @@ Category: *extended stdlib*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p sim $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{simhash}}{simhash}}\label{simhash}
+
+\texttt{simhash()} --- Charikar 64-bit SimHash sketch. Each feature
+flips +/- on 64 signed accumulators; final \texttt{digest()} is the
+per-bit sign. Cosine similarity ≈
+\texttt{(64\ -\ hamming(a,\ b))\ /\ 64}. Stateful upgrade to the deleted
+\texttt{db\_simhash\_bit} spec primitive.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $sh = simhash()}
+\NormalTok{sh\_add($sh, $\_) for @doc\_tokens}
+\NormalTok{my $hash = sh\_digest($sh)}
+\NormalTok{p sh\_similarity($a, $b)               \# 0..1}
 \end{Highlighting}
 \end{Shaded}
 
@@ -104204,6 +104112,28 @@ process (see \texttt{uptime\_secs} for process uptime).
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{t\_digest}}{t\_digest}}\label{t_digest}
+
+\texttt{t\_digest(COMPRESSION=100)} --- streaming-quantile sketch
+(Dunning). Larger compression → more centroids, more accuracy, linear
+extra memory. Default \texttt{100} gives \textasciitilde1\% error at
+p50, \textasciitilde5\% at p99 in O(100) bytes. Pending-buffer +
+flush-on-query so per-\texttt{td\_add} is amortized O(1).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $td = t\_digest(200)}
+\NormalTok{td\_add($td, $\_) for @latencies\_us}
+\NormalTok{printf "p99: \%.1f us\textbackslash{}n", td\_quantile($td, 0.99)}
+\end{Highlighting}
+\end{Shaded}
+
+Family: \texttt{td\_add}, \texttt{td\_quantile}, \texttt{td\_count},
+\texttt{td\_min}, \texttt{td\_max}, \texttt{td\_sum}, \texttt{td\_mean},
+\texttt{td\_merge}, \texttt{td\_clear}, \texttt{td\_serialize},
+\texttt{td\_deserialize}. \texttt{td} short alias is reserved for
+\texttt{toml\_decode}; use \texttt{tdg}.
+
 \section{\texorpdfstring{\texttt{t\_test\_one\_sample}}{t\_test\_one\_sample}}\label{t_test_one_sample}
 
 \texttt{t\_test\_one\_sample(\$mu,\ @sample)} (alias \texttt{ttest1})
@@ -104679,6 +104609,48 @@ Category: *serialization (stryke-only encoders)*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{td\_add}}{td\_add}}\label{td_add}
+
+\texttt{td\_add(TD,\ VALUE)} --- insert a single sample. Non-finite
+values silently dropped.
+
+\section{\texorpdfstring{\texttt{td\_clear}}{td\_clear}}\label{td_clear}
+
+\texttt{td\_clear} --- operation \texttt{td\ clear}. Category:
+*probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p td\_clear $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{td\_count}}{td\_count}}\label{td_count}
+
+\texttt{td\_count(TD)} → number of samples inserted so far.
+
+\section{\texorpdfstring{\texttt{td\_deserialize}}{td\_deserialize}}\label{td_deserialize}
+
+\texttt{td\_deserialize} --- operation \texttt{td\ deserialize}.
+Category: *probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p td\_deserialize $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{td\_from\_bytes}}{td\_from\_bytes}}\label{td_from_bytes}
+
+\texttt{td\_from\_bytes} --- operation \texttt{td\ from\ bytes}. Alias
+for \texttt{td\_deserialize}. Category: *probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p td\_from\_bytes $x}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{td\_lambda\_update}}{td\_lambda\_update}}\label{td_lambda_update}
 
 \texttt{td\_lambda\_update} --- update step of \texttt{td\ lambda}.
@@ -104690,6 +104662,67 @@ Category: *electrochemistry, batteries, fuel cells*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{td\_max}}{td\_max}}\label{td_max}
+
+\texttt{td\_max(TD)} --- exact maximum sample seen.
+
+\section{\texorpdfstring{\texttt{td\_mean}}{td\_mean}}\label{td_mean}
+
+\texttt{td\_mean(TD)} --- exact mean of all inserted samples.
+
+\section{\texorpdfstring{\texttt{td\_merge}}{td\_merge}}\label{td_merge}
+
+\texttt{td\_merge(TD,\ OTHER)} --- combine two t-digests via
+\texttt{tdigest::TDigest::merge\_digests}.
+
+\section{\texorpdfstring{\texttt{td\_min}}{td\_min}}\label{td_min}
+
+\texttt{td\_min(TD)} / \texttt{td\_max(TD)} --- exact min/max (t-digest
+tracks both).
+
+\section{\texorpdfstring{\texttt{td\_quantile}}{td\_quantile}}\label{td_quantile}
+
+\texttt{td\_quantile(TD,\ Q)} → estimated \texttt{Q}-th quantile (0 ≤ Q
+≤ 1).
+
+\section{\texorpdfstring{\texttt{td\_reset}}{td\_reset}}\label{td_reset}
+
+\texttt{td\_reset} --- operation \texttt{td\ reset}. Alias for
+\texttt{td\_clear}. Category: *probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p td\_reset $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{td\_serialize}}{td\_serialize}}\label{td_serialize}
+
+\texttt{td\_serialize} --- operation \texttt{td\ serialize}. Category:
+*probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p td\_serialize $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{td\_sum}}{td\_sum}}\label{td_sum}
+
+\texttt{td\_sum(TD)} --- exact sum of all inserted samples.
+
+\section{\texorpdfstring{\texttt{td\_to\_bytes}}{td\_to\_bytes}}\label{td_to_bytes}
+
+\texttt{td\_to\_bytes} --- convert from \texttt{td} to \texttt{bytes}.
+Alias for \texttt{td\_serialize}. Category: *probabilistic data
+structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p td\_to\_bytes $value}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{td\_zero\_update}}{td\_zero\_update}}\label{td_zero_update}
 
 \texttt{td\_zero\_update} --- update step of \texttt{td\ zero}.
@@ -104698,39 +104731,6 @@ Category: *electrochemistry, batteries, fuel cells*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p td\_zero\_update $x}
-\end{Highlighting}
-\end{Shaded}
-
-\section{\texorpdfstring{\texttt{tdigest\_add}}{tdigest\_add}}\label{tdigest_add}
-
-\texttt{tdigest\_add} --- operation \texttt{tdigest\ add}. Category:
-*extras*.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{p tdigest\_add $x}
-\end{Highlighting}
-\end{Shaded}
-
-\section{\texorpdfstring{\texttt{tdigest\_new}}{tdigest\_new}}\label{tdigest_new}
-
-\texttt{tdigest\_new} --- constructor of \texttt{tdigest}. Category:
-*extras*.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{p tdigest\_new $x}
-\end{Highlighting}
-\end{Shaded}
-
-\section{\texorpdfstring{\texttt{tdigest\_quantile}}{tdigest\_quantile}}\label{tdigest_quantile}
-
-\texttt{tdigest\_quantile} --- operation \texttt{tdigest\ quantile}.
-Category: *extras*.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{p tdigest\_quantile $x}
 \end{Highlighting}
 \end{Shaded}
 
@@ -105809,6 +105809,22 @@ Category: *econometrics*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{token\_bucket}}{token\_bucket}}\label{token_bucket}
+
+\texttt{token\_bucket(CAPACITY=100,\ RATE=10)} --- token-bucket rate
+limiter. \texttt{CAPACITY} is the max burst; \texttt{RATE} (tokens/sec)
+is the steady-state allowance. Refills lazily on each
+\texttt{rl\_try\_take} based on wall-clock --- no background thread.
+Stateful upgrade over the deleted \texttt{db\_token\_bucket\_step} spec
+primitive.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $rl = token\_bucket(100, 50)         \# 50 req/s, burst 100}
+\NormalTok{if (rl\_try\_take($rl, 1)) \{ ... \} else \{ sleep(0.02) \}}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{tokenize\_bpe}}{tokenize\_bpe}}\label{tokenize_bpe}
 
 \texttt{tokenize\_bpe(s,\ merges)\ →\ array} --- Byte-Pair Encoding
@@ -105867,6 +105883,23 @@ helpers*.
 \texttt{image\ -\ opening}. Extracts bright details smaller than the
 structuring element.
 
+\section{\texorpdfstring{\texttt{top\_k}}{top\_k}}\label{top_k}
+
+\texttt{topk(K=10)} --- SpaceSaving top-K heavy-hitters sketch. Tracks
+exactly \texttt{K} slots; on overflow the lowest-count slot is replaced
+with a new key inheriting \texttt{min+1} count and the evicted count as
+an error floor. \texttt{topk\_heavies(N)} returns
+\texttt{{[}key,\ count,\ err{]}} rows sorted by count desc; truth lies
+in \texttt{{[}count\ -\ err,\ count{]}}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $t = topk(10)}
+\NormalTok{topk\_add($t, $\_) for @clickstream}
+\NormalTok{my @hot = topk\_heavies($t)            \# top 10 by frequency}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{top\_k\_indices}}{top\_k\_indices}}\label{top_k_indices}
 
 \texttt{top\_k\_indices(values,\ k=5)\ →\ array} --- indices of the
@@ -105922,6 +105955,55 @@ Category: *economics + game theory*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{topk\_add}}{topk\_add}}\label{topk_add}
+
+\texttt{topk\_add(TOPK,\ KEY)} --- observe one occurrence of
+\texttt{KEY}.
+
+\section{\texorpdfstring{\texttt{topk\_clear}}{topk\_clear}}\label{topk_clear}
+
+\texttt{topk\_clear} --- top-K sketch op \texttt{clear}. Category:
+*probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p topk\_clear $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{topk\_count}}{topk\_count}}\label{topk_count}
+
+\texttt{topk\_count(TOPK,\ KEY)} → count of \texttt{KEY} if currently
+tracked; \texttt{0} if displaced.
+
+\section{\texorpdfstring{\texttt{topk\_deserialize}}{topk\_deserialize}}\label{topk_deserialize}
+
+\texttt{topk\_deserialize} --- top-K sketch op \texttt{deserialize}.
+Category: *probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p topk\_deserialize $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{topk\_from\_bytes}}{topk\_from\_bytes}}\label{topk_from_bytes}
+
+\texttt{topk\_from\_bytes} --- top-K sketch op \texttt{from\ bytes}.
+Alias for \texttt{topk\_deserialize}. Category: *probabilistic data
+structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p topk\_from\_bytes $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{topk\_heavies}}{topk\_heavies}}\label{topk_heavies}
+
+\texttt{topk\_heavies(TOPK,\ N=K)} → list of
+\texttt{{[}key,\ count,\ error\_floor{]}} rows sorted by count desc.
+
 \section{\texorpdfstring{\texttt{topk\_indices}}{topk\_indices}}\label{topk_indices}
 
 \texttt{topk\_indices} --- top-K sketch op \texttt{indices}. Category:
@@ -105930,6 +106012,50 @@ Category: *economics + game theory*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p topk\_indices $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{topk\_merge}}{topk\_merge}}\label{topk_merge}
+
+\texttt{topk\_merge(TOPK,\ OTHER)} --- replay
+\texttt{OTHER}\textquotesingle s observations through the standard
+online update. Cost is O(sum\_of\_counts).
+
+\section{\texorpdfstring{\texttt{topk\_reset}}{topk\_reset}}\label{topk_reset}
+
+\texttt{topk\_reset} --- top-K sketch op \texttt{reset}. Alias for
+\texttt{topk\_clear}. Category: *probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p topk\_reset $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{topk\_serialize}}{topk\_serialize}}\label{topk_serialize}
+
+\texttt{topk\_serialize} --- top-K sketch op \texttt{serialize}.
+Category: *probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p topk\_serialize $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{topk\_size}}{topk\_size}}\label{topk_size}
+
+\texttt{topk\_size(TOPK)} → current entries (≤ K).
+
+\section{\texorpdfstring{\texttt{topk\_to\_bytes}}{topk\_to\_bytes}}\label{topk_to_bytes}
+
+\texttt{topk\_to\_bytes} --- convert from \texttt{topk} to
+\texttt{bytes}. Alias for \texttt{topk\_serialize}. Category:
+*probabilistic data structures*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p topk\_to\_bytes $value}
 \end{Highlighting}
 \end{Shaded}
 
@@ -107741,6 +107867,29 @@ drawdowns than stddev.
 \NormalTok{p ulcer\_index(\textbackslash{}@equity\_curve)}
 \end{Highlighting}
 \end{Shaded}
+
+\section{\texorpdfstring{\texttt{ulid}}{ulid}}\label{ulid}
+
+\texttt{ulid()} → 26-char Crockford-Base32 ULID --- 48-bit ms timestamp
++ 80-bit random. Lexicographically sortable; monotonic within the same
+millisecond via a process-wide
+\texttt{Mutex\textless{}(last\_ms,\ last\_rand)\textgreater{}}.
+World\textquotesingle s-first as scripting-language stdlib builtin:
+Python / Ruby / Node all need third-party packages. Use for trace IDs in
+\texttt{ai}/\texttt{prompt} workflows where ordered insertion matters.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $trace\_id = ulid()                 \# 01KRJ8YC8AGW5XHM2BKHJ23ZRR}
+\NormalTok{is\_ulid($trace\_id) ? "ok" : die}
+\NormalTok{p ulid\_timestamp($trace\_id)           \# ms{-}since{-}epoch}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{ulid\_timestamp}}{ulid\_timestamp}}\label{ulid_timestamp}
+
+\texttt{ulid\_timestamp(ULID)} → 48-bit ms-since-Unix-epoch extracted
+from the timestamp prefix. Returns \texttt{undef} on malformed input.
 
 \section{\texorpdfstring{\texttt{ultimatum\_acceptance\_prob}}{ultimatum\_acceptance\_prob}}\label{ultimatum_acceptance_prob}
 
@@ -110286,6 +110435,27 @@ variances. Returns {[}t-statistic, degrees of freedom{]}.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{welford\_mean}}{welford\_mean}}\label{welford_mean}
+
+\texttt{welford\_mean\ LIST} --- single-pass online mean via
+Welford\textquotesingle s algorithm. Numerically stable for long streams
+where naive \texttt{sum\ /\ len} overflows or loses precision.
+
+\section{\texorpdfstring{\texttt{welford\_pop\_variance}}{welford\_pop\_variance}}\label{welford_pop_variance}
+
+\texttt{welford\_pop\_variance\ LIST} --- population variance (n
+denominator), counterpart to \texttt{welford\_variance} (sample, n-1).
+
+\section{\texorpdfstring{\texttt{welford\_sd}}{welford\_sd}}\label{welford_sd}
+
+\texttt{welford\_stddev\ LIST} --- sqrt of \texttt{welford\_variance};
+numerically-stable sample standard deviation.
+
+\section{\texorpdfstring{\texttt{welford\_var}}{welford\_var}}\label{welford_var}
+
+\texttt{welford\_variance\ LIST} --- single-pass sample variance (n-1
+denominator) via Welford\textquotesingle s algorithm.
+
 \section{\texorpdfstring{\texttt{welsh\_powell}}{welsh\_powell}}\label{welsh_powell}
 
 \texttt{welsh\_powell} --- operation \texttt{welsh\ powell}. Category:
@@ -111677,6 +111847,20 @@ extensions*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p xtea\_round $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{xxd}}{xxd}}\label{xxd}
+
+\texttt{xxd\ PATH} --- hex dump (\texttt{xxd(1)} layout: offset, paired
+hex, ASCII). Optional second positional sets bytes per line (default 16,
+max 32). Trailing hash: \texttt{cols\ =\textgreater{}\ N},
+\texttt{max\ =\textgreater{}\ BYTES} (default 1\_048\_576 bytes read).
+No path uses \texttt{\$\_}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p xxd("Cargo.toml", 8)}
 \end{Highlighting}
 \end{Shaded}
 

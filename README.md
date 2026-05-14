@@ -84,7 +84,7 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - **Bytecode VM + JIT** — match-dispatch interpreter with Cranelift block + linear-sub JIT (`src/vm.rs`, `src/jit.rs`).
 - **Rayon parallelism** — every parallel builtin uses work-stealing across all cores.
 - **10,124 standard library primaries** in `%b` (10,736 keys in `%all` including aliases and keywords) — largest bareword library of any language; clears Wolfram v14.3's high-band estimate (~7,300) by ~2,800
-- **39 MB single static binary** — `~/.cargo/bin/s` ships every builtin in one file, ~3.6 KB amortized per builtin, ~200&times; denser than Wolfram Engine per builtin/byte, sub-10 ms cold start
+- **40 MB single static binary** — `~/.cargo/bin/s` ships every builtin in one file, ~3.6 KB amortized per builtin, ~200&times; denser than Wolfram Engine per builtin/byte, sub-10 ms cold start
 
 ---
 
