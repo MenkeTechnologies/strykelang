@@ -356,6 +356,30 @@ fn move_renames_file_like_rename() {
     std::fs::remove_dir_all(&dir).ok();
 }
 
+#[test]
+fn ls_builtin_long_format_tmp_dir() {
+    let dir: PathBuf =
+        std::env::temp_dir().join(format!("stryke_itest_ls_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("hello.txt"), "x").unwrap();
+    let pd = dir.to_str().expect("utf-8");
+    let code = format!(r#"ls("{pd}")"#);
+    let out = eval_string(&code);
+    assert!(
+        out.contains("hello.txt"),
+        "expected filename in listing:\n{out}"
+    );
+    #[cfg(unix)]
+    assert!(out.contains("total "), "expected unix total line:\n{out}");
+    #[cfg(unix)]
+    assert!(
+        out.contains("-rw"),
+        "expected regular file perms:\n{out}"
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}
+
 #[cfg(unix)]
 #[test]
 fn which_finds_sh_on_path() {
