@@ -731,6 +731,7 @@ CORE::bearing
 CORE::beat_frequency
 CORE::beat_to_seconds
 CORE::beaufort
+CORE::beep
 CORE::beer_lambert
 CORE::before_n
 CORE::bekenstein_entropy_step
@@ -1537,6 +1538,7 @@ CORE::charge_transfer_resistance
 CORE::charpoly
 CORE::chars
 CORE::chars_to_string
+CORE::charset_convert
 CORE::chat
 CORE::chc_bound_makespan
 CORE::chdir
@@ -1727,6 +1729,7 @@ CORE::clausen_cl2
 CORE::clausius_clapeyron
 CORE::clausius_clapeyron_full
 CORE::clean_price
+CORE::clear
 CORE::clebsch_gordan
 CORE::clenshaw_curtis_quad
 CORE::cliff_delta
@@ -1743,6 +1746,7 @@ CORE::closest_pt_segment_2d
 CORE::closing_2d
 CORE::clp
 CORE::clpi
+CORE::cls
 CORE::cluster
 CORE::cluster_attack_rate
 CORE::cluster_slots
@@ -1852,6 +1856,7 @@ CORE::color_temperature_kelvin
 CORE::color_temperature_to_rgb
 CORE::cols
 CORE::columbic_capacity_lihalfcell
+CORE::column
 CORE::column_generation_step
 CORE::columns
 CORE::comb
@@ -1861,6 +1866,7 @@ CORE::combinations_list
 CORE::combinations_rep
 CORE::combinatorial_auction_step
 CORE::combrep
+CORE::comm
 CORE::common_kmers
 CORE::common_knowledge_iterations
 CORE::common_neighbors
@@ -1873,6 +1879,7 @@ CORE::comp
 CORE::compact
 CORE::companion
 CORE::companion_matrix
+CORE::compare_sorted
 CORE::compare_versions
 CORE::compl
 CORE::complement
@@ -2217,6 +2224,8 @@ CORE::cumsum
 CORE::cumtrapz
 CORE::cumulative_trapz
 CORE::cups_to_ml
+CORE::curl_get
+CORE::curl_post
 CORE::currency_code_to_symbol
 CORE::currency_convert
 CORE::currency_decimal_places
@@ -2733,6 +2742,7 @@ CORE::diopter
 CORE::dipole_radiation_power
 CORE::dir_size
 CORE::dir_sizes
+CORE::dir_stack
 CORE::dirac_comb
 CORE::dirac_delta
 CORE::direct_age_adjusted
@@ -3514,6 +3524,7 @@ CORE::format_bytes
 CORE::format_duration
 CORE::format_number
 CORE::format_percent
+CORE::format_strftime
 CORE::format_table_simple
 CORE::formline
 CORE::forward_algorithm
@@ -4092,6 +4103,7 @@ CORE::group_number
 CORE::group_of_n
 CORE::group_runs
 CORE::groupby_iter
+CORE::groups
 CORE::grover_iter
 CORE::growing_perpetuity
 CORE::growth_rate_from_ratio
@@ -4323,6 +4335,7 @@ CORE::histogram_bin_edges
 CORE::histogram_bins
 CORE::histogram_equalize
 CORE::histogram_svg
+CORE::history
 CORE::hits_authority
 CORE::hits_hub
 CORE::hits_simple
@@ -4455,6 +4468,8 @@ CORE::htmld
 CORE::htmle
 CORE::http_date_format
 CORE::http_date_parse
+CORE::http_fetch
+CORE::http_get
 CORE::http_headers
 CORE::http_method_connect
 CORE::http_method_delete
@@ -4468,6 +4483,7 @@ CORE::http_method_patch
 CORE::http_method_post
 CORE::http_method_put
 CORE::http_method_trace
+CORE::http_post
 CORE::http_request
 CORE::http_status_accepted
 CORE::http_status_bad_gateway
@@ -4586,6 +4602,7 @@ CORE::ibnr_estimate
 CORE::ical
 CORE::ice_age_milankovitch
 CORE::ico_header_read
+CORE::iconv
 CORE::icosahedral
 CORE::icosahedral_number
 CORE::id
@@ -6314,6 +6331,10 @@ CORE::mixing_length_prandtl
 CORE::mixture_normal_pdf
 CORE::mjo_phase_step
 CORE::mkdir
+CORE::mkdtemp
+CORE::mktemp
+CORE::mktemp_file
+CORE::mktempdir
 CORE::ml_adabelief_step
 CORE::ml_adagrad_step
 CORE::ml_adam_step
@@ -6844,6 +6865,7 @@ CORE::ngram_top_k_next
 CORE::ngram_train
 CORE::ngrams
 CORE::nhess
+CORE::nice
 CORE::nichols_chart_step
 CORE::nik_basis
 CORE::nilpotency_class_lower
@@ -7132,8 +7154,10 @@ CORE::only_digits
 CORE::onsager_relation_two_species
 CORE::open
 CORE::open_pipe_harmonic
+CORE::open_url
 CORE::opendir
 CORE::opening_2d
+CORE::openurl
 CORE::operad_count_two
 CORE::operator_norm_2
 CORE::oppenheimer_volkoff_step
@@ -7780,6 +7804,7 @@ CORE::popcnt
 CORE::popcount
 CORE::popcount_u32
 CORE::popcount_u64
+CORE::popd
 CORE::porosity_active_layer
 CORE::port_is_assigned
 CORE::port_is_dynamic
@@ -7970,6 +7995,7 @@ CORE::purple
 CORE::push
 CORE::push_relabel_relabel
 CORE::push_relabel_step
+CORE::pushd
 CORE::pv
 CORE::pv_nrt
 CORE::pvw
@@ -8372,6 +8398,7 @@ CORE::remove_vowels
 CORE::remove_whitespace
 CORE::rename
 CORE::renamenx
+CORE::renice
 CORE::renyi_divergence_step
 CORE::renyi_entropy
 CORE::rep
@@ -8384,6 +8411,9 @@ CORE::repeat_list
 CORE::repeat_string
 CORE::repeated_game_avg_payoff
 CORE::repeatedly
+CORE::repl_alias
+CORE::repl_history
+CORE::repl_unalias
 CORE::replace_all_str
 CORE::replace_at
 CORE::replace_at_index
@@ -8428,6 +8458,7 @@ CORE::retry
 CORE::return
 CORE::rev
 CORE::rev_comp_dna
+CORE::rev_lines
 CORE::rev_str
 CORE::rev_vec
 CORE::revenue_equivalence_check
@@ -8436,6 +8467,7 @@ CORE::reverse_complement_dna
 CORE::reverse_delete_step
 CORE::reverse_each
 CORE::reverse_each_word
+CORE::reverse_lines
 CORE::reverse_list
 CORE::reverse_str
 CORE::reverse_transcribe
@@ -8513,6 +8545,7 @@ CORE::riffle
 CORE::right_str
 CORE::rindex
 CORE::rindex_fn
+CORE::ring_bell
 CORE::ring_modulate
 CORE::rinverse_gamma
 CORE::rinvgamma
@@ -8552,6 +8585,8 @@ CORE::rlnorm
 CORE::rlogis
 CORE::rlogistic
 CORE::rltau
+CORE::rm
+CORE::rm_file
 CORE::rmall
 CORE::rmcons
 CORE::rmd160
@@ -9028,10 +9063,13 @@ CORE::serve
 CORE::servo_position_velocity
 CORE::servo_torque_step
 CORE::set
+CORE::set_alias
 CORE::set_at
 CORE::set_cover_greedy_step
 CORE::set_cover_lp_round
 CORE::set_subname
+CORE::set_term_title
+CORE::set_title
 CORE::setex
 CORE::setgrent
 CORE::sethostent
@@ -9641,6 +9679,7 @@ CORE::stress_test
 CORE::stress_thermal_zones
 CORE::stress_thread
 CORE::stress_throttled
+CORE::strftime
 CORE::strict_word_similarity
 CORE::strikethrough
 CORE::string_agg
@@ -9806,6 +9845,8 @@ CORE::table
 CORE::tableau_branch_close
 CORE::tabu_search_move_score
 CORE::tabulate
+CORE::tabulate_cols
+CORE::tac
 CORE::tackle_efficiency
 CORE::tafel_anodic_current
 CORE::tafel_cathodic_current
@@ -9905,7 +9946,13 @@ CORE::tensor_outer_two
 CORE::tensor_product
 CORE::tensor_symmetrize_two
 CORE::tensor_trace_index
+CORE::term_cols
+CORE::term_dims
+CORE::term_height
 CORE::term_life_a_n_t
+CORE::term_rows
+CORE::term_size
+CORE::term_width
 CORE::terminal_velocity
 CORE::ternary_search
 CORE::test
@@ -10125,6 +10172,7 @@ CORE::trapezoidal_lte
 CORE::trapped_surface_check
 CORE::trapz
 CORE::trasatti_voltammetry_charge
+CORE::tree
 CORE::tree_kernel_collins
 CORE::treemap
 CORE::treemap_svg
@@ -10221,6 +10269,12 @@ CORE::ttable
 CORE::ttest1
 CORE::ttest2
 CORE::ttl
+CORE::tty_cols
+CORE::tty_cooked
+CORE::tty_lines
+CORE::tty_raw
+CORE::tty_rows
+CORE::tty_size
 CORE::tukey_hsd
 CORE::tukey_lambda_quantile
 CORE::tukey_w
@@ -10333,6 +10387,7 @@ CORE::unpairs
 CORE::unquote
 CORE::unruh_temperature_full
 CORE::unscented_sigma_point
+CORE::unset_alias
 CORE::unsharp_mask_kernel
 CORE::unsharp_mask_step
 CORE::unshift
@@ -10737,6 +10792,7 @@ CORE::wh
 CORE::wha
 CORE::when_false
 CORE::when_true
+CORE::whereis
 CORE::which
 CORE::which_all
 CORE::which_fn
@@ -10748,6 +10804,7 @@ CORE::white_point_d65
 CORE::white_robust_se
 CORE::white_test_stat
 CORE::whittaker_m
+CORE::whoami
 CORE::whois
 CORE::whole_life_a
 CORE::wi
@@ -10782,6 +10839,7 @@ CORE::window_hamming
 CORE::window_hann
 CORE::window_kaiser
 CORE::window_n
+CORE::window_title
 CORE::window_tukey
 CORE::window_welch
 CORE::windowed
@@ -10849,12 +10907,14 @@ CORE::x25519_keygen
 CORE::x_dh
 CORE::x_keygen
 CORE::xadd
+CORE::xargs
 CORE::xattr_get
 CORE::xattr_list
 CORE::xattr_set
 CORE::xavier_init
 CORE::xcorr
 CORE::xd
+CORE::xdg_open
 CORE::xe
 CORE::xentropy
 CORE::xfip
@@ -11623,6 +11683,7 @@ bearing
 beat_frequency
 beat_to_seconds
 beaufort
+beep
 beer_lambert
 before
 before_n
@@ -12431,6 +12492,7 @@ charge_transfer_resistance
 charpoly
 chars
 chars_to_string
+charset_convert
 chat
 chc_bound_makespan
 chdir
@@ -12622,6 +12684,7 @@ clausen_cl2
 clausius_clapeyron
 clausius_clapeyron_full
 clean_price
+clear
 clebsch_gordan
 clenshaw_curtis_quad
 cliff_delta
@@ -12638,6 +12701,7 @@ closest_pt_segment_2d
 closing_2d
 clp
 clpi
+cls
 cluster
 cluster_attack_rate
 cluster_slots
@@ -12748,6 +12812,7 @@ color_temperature_kelvin
 color_temperature_to_rgb
 cols
 columbic_capacity_lihalfcell
+column
 column_generation_step
 columns
 comb
@@ -12757,6 +12822,7 @@ combinations_list
 combinations_rep
 combinatorial_auction_step
 combrep
+comm
 common_kmers
 common_knowledge_iterations
 common_neighbors
@@ -12769,6 +12835,7 @@ comp
 compact
 companion
 companion_matrix
+compare_sorted
 compare_versions
 compl
 complement
@@ -13115,6 +13182,8 @@ cumsum
 cumtrapz
 cumulative_trapz
 cups_to_ml
+curl_get
+curl_post
 currency_code_to_symbol
 currency_convert
 currency_decimal_places
@@ -13633,6 +13702,7 @@ diopter
 dipole_radiation_power
 dir_size
 dir_sizes
+dir_stack
 dirac_comb
 dirac_delta
 direct_age_adjusted
@@ -14422,6 +14492,7 @@ format_bytes
 format_duration
 format_number
 format_percent
+format_strftime
 format_table_simple
 formline
 forward_algorithm
@@ -15003,6 +15074,7 @@ group_number
 group_of_n
 group_runs
 groupby_iter
+groups
 grover_iter
 growing_perpetuity
 growth_rate_from_ratio
@@ -15235,6 +15307,7 @@ histogram_bin_edges
 histogram_bins
 histogram_equalize
 histogram_svg
+history
 hits_authority
 hits_hub
 hits_simple
@@ -15367,6 +15440,8 @@ htmld
 htmle
 http_date_format
 http_date_parse
+http_fetch
+http_get
 http_headers
 http_method_connect
 http_method_delete
@@ -15380,6 +15455,7 @@ http_method_patch
 http_method_post
 http_method_put
 http_method_trace
+http_post
 http_request
 http_status_accepted
 http_status_bad_gateway
@@ -15498,6 +15574,7 @@ ibnr_estimate
 ical
 ice_age_milankovitch
 ico_header_read
+iconv
 icosahedral
 icosahedral_number
 id
@@ -17231,6 +17308,10 @@ mixing_length_prandtl
 mixture_normal_pdf
 mjo_phase_step
 mkdir
+mkdtemp
+mktemp
+mktemp_file
+mktempdir
 ml_adabelief_step
 ml_adagrad_step
 ml_adam_step
@@ -17763,6 +17844,7 @@ ngram_top_k_next
 ngram_train
 ngrams
 nhess
+nice
 nichols_chart_step
 nik_basis
 nilpotency_class_lower
@@ -18051,8 +18133,10 @@ only_digits
 onsager_relation_two_species
 open
 open_pipe_harmonic
+open_url
 opendir
 opening_2d
+openurl
 operad_count_two
 operator_norm_2
 oppenheimer_volkoff_step
@@ -18701,6 +18785,7 @@ popcnt
 popcount
 popcount_u32
 popcount_u64
+popd
 porosity_active_layer
 port_is_assigned
 port_is_dynamic
@@ -18893,6 +18978,7 @@ purple
 push
 push_relabel_relabel
 push_relabel_step
+pushd
 pv
 pv_nrt
 pvw
@@ -19296,6 +19382,7 @@ remove_vowels
 remove_whitespace
 rename
 renamenx
+renice
 renyi_divergence_step
 renyi_entropy
 rep
@@ -19308,6 +19395,9 @@ repeat_list
 repeat_string
 repeated_game_avg_payoff
 repeatedly
+repl_alias
+repl_history
+repl_unalias
 replace_all_str
 replace_at
 replace_at_index
@@ -19352,6 +19442,7 @@ retry
 return
 rev
 rev_comp_dna
+rev_lines
 rev_str
 rev_vec
 revenue_equivalence_check
@@ -19360,6 +19451,7 @@ reverse_complement_dna
 reverse_delete_step
 reverse_each
 reverse_each_word
+reverse_lines
 reverse_list
 reverse_str
 reverse_transcribe
@@ -19437,6 +19529,7 @@ riffle
 right_str
 rindex
 rindex_fn
+ring_bell
 ring_modulate
 rinverse_gamma
 rinvgamma
@@ -19476,6 +19569,8 @@ rlnorm
 rlogis
 rlogistic
 rltau
+rm
+rm_file
 rmall
 rmcons
 rmd160
@@ -19953,10 +20048,13 @@ serve
 servo_position_velocity
 servo_torque_step
 set
+set_alias
 set_at
 set_cover_greedy_step
 set_cover_lp_round
 set_subname
+set_term_title
+set_title
 setex
 setgrent
 sethostent
@@ -20567,6 +20665,7 @@ stress_test
 stress_thermal_zones
 stress_thread
 stress_throttled
+strftime
 strict_word_similarity
 strikethrough
 string_agg
@@ -20733,6 +20832,8 @@ table
 tableau_branch_close
 tabu_search_move_score
 tabulate
+tabulate_cols
+tac
 tackle_efficiency
 tafel_anodic_current
 tafel_cathodic_current
@@ -20832,7 +20933,13 @@ tensor_outer_two
 tensor_product
 tensor_symmetrize_two
 tensor_trace_index
+term_cols
+term_dims
+term_height
 term_life_a_n_t
+term_rows
+term_size
+term_width
 terminal_velocity
 ternary_search
 test
@@ -21054,6 +21161,7 @@ trapezoidal_lte
 trapped_surface_check
 trapz
 trasatti_voltammetry_charge
+tree
 tree_kernel_collins
 treemap
 treemap_svg
@@ -21151,6 +21259,12 @@ ttable
 ttest1
 ttest2
 ttl
+tty_cols
+tty_cooked
+tty_lines
+tty_raw
+tty_rows
+tty_size
 tukey_hsd
 tukey_lambda_quantile
 tukey_w
@@ -21264,6 +21378,7 @@ unpairs
 unquote
 unruh_temperature_full
 unscented_sigma_point
+unset_alias
 unsharp_mask_kernel
 unsharp_mask_step
 unshift
@@ -21669,6 +21784,7 @@ wha
 when
 when_false
 when_true
+whereis
 which
 which_all
 which_fn
@@ -21680,6 +21796,7 @@ white_point_d65
 white_robust_se
 white_test_stat
 whittaker_m
+whoami
 whois
 whole_life_a
 wi
@@ -21714,6 +21831,7 @@ window_hamming
 window_hann
 window_kaiser
 window_n
+window_title
 window_tukey
 window_welch
 windowed
@@ -21782,12 +21900,14 @@ x25519_keygen
 x_dh
 x_keygen
 xadd
+xargs
 xattr_get
 xattr_list
 xattr_set
 xavier_init
 xcorr
 xd
+xdg_open
 xe
 xentropy
 xfip
@@ -21949,4 +22069,3 @@ zstd_decode
 zstd_encode_step
 zstd_frame_header
 zstd_window_size_log
-

@@ -13534,6 +13534,21 @@ impl Parser {
             | "ulid" | "is_ulid" | "ulid_timestamp"
             | "kahan_sum" | "welford_mean" | "welford_variance"
             | "welford_stddev" | "welford_pop_variance"
+            // ── Shell-like REPL (Tier S) ───────────────────────────────────
+            | "clear" | "cls" | "whoami" | "groups"
+            | "pushd" | "popd" | "dir_stack"
+            | "history" | "repl_alias" | "repl_unalias" | "set_alias" | "unset_alias"
+            | "term_size" | "term_width" | "term_height"
+            | "set_title" | "beep" | "ring_bell"
+            // ── Shell-like REPL (Tier A) ───────────────────────────────────
+            | "rm" | "mktemp" | "mktempdir" | "whereis"
+            | "nice" | "renice"
+            | "tree" | "comm" | "column" | "xargs"
+            | "openurl" | "xdg_open"
+            | "curl_get" | "curl_post"
+            | "iconv" | "strftime"
+            | "tac" | "rev_lines"
+            | "tty_raw" | "tty_cooked"
             // ── probabilistic data structures ──────────────────────────────
             | "bloom_filter" | "bloom_add" | "bloom_contains" | "bloom_len"
             | "bloom_clear" | "bloom_merge" | "bloom_fpr" | "bloom_bits"
