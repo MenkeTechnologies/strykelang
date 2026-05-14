@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.13.15 · 10068 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.13.16 · 10072 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -312,7 +312,7 @@
         <li><a href="#ch-cluster-distributed">Cluster / Distributed</a> <span class="chapter-count">4</span></li>
         <li><a href="#ch-datetime">Datetime</a> <span class="chapter-count">15</span></li>
         <li><a href="#ch-math">Math</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-file-system">File System</a> <span class="chapter-count">34</span></li>
+        <li><a href="#ch-file-system">File System</a> <span class="chapter-count">35</span></li>
         <li><a href="#ch-process">Process</a> <span class="chapter-count">21</span></li>
         <li><a href="#ch-pack-binary">Pack / Binary</a> <span class="chapter-count">4</span></li>
         <li><a href="#ch-logging">Logging</a> <span class="chapter-count">7</span></li>
@@ -330,7 +330,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">8397</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">8400</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -9243,7 +9243,7 @@ srand()                     # re-seed from entropy
     </section>
     <section class="tutorial-section" id="ch-file-system">
       <h2>File System</h2>
-      <p class="chapter-meta">34 topics</p>
+      <p class="chapter-meta">35 topics</p>
       <article class="doc-entry" id="doc-basename">
         <h3><a class="doc-anchor" href="#doc-basename">#</a> <code>basename</code></h3>
         <p>Extract the filename component from a path, stripping all leading directory segments. The short alias <code>bn</code> keeps one-liner pipelines terse. If an optional suffix argument is provided, that suffix is also stripped from the result, which is handy for removing extensions.</p>
@@ -9295,6 +9295,13 @@ chdir(&quot;/tmp&quot;)
 p pwd()      # /tmp
 chdir($orig)
 p getcwd()   # back to original
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cd">
+        <h3><a class="doc-anchor" href="#doc-cd">#</a> <code>cd</code></h3>
+        <p>Set the interpreter working directory used to resolve <strong>relative</strong> paths for Stryke builtins (<code>slurp</code>, <code>spurt</code>, <code>open</code>, <code>glob</code>, <code>stat</code>, <code>rename</code>, <code>ls</code>, <code>-e</code>, …). Does <strong>not</strong> call the OS <code>chdir</code> by itself — <code>getcwd</code>/<code>pwd</code> stay unchanged until you call <code>chdir</code>. A successful <code>chdir</code> <strong>does</strong> refresh this logical base from the new OS cwd. Relative <code>cd</code> targets are resolved against the current logical directory first. With no arguments, uses <code>$HOME</code> / <code>%USERPROFILE%</code> when set. Returns <code>1</code> on success, <code>0</code> on failure and sets <code>$!</code>.</p>
+        <pre><code class="lang-perl">cd(&quot;/tmp&quot;)
+spurt(&quot;x.txt&quot;, &quot;hi&quot;)       # writes /tmp/x.txt
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-which">
@@ -9423,7 +9430,7 @@ chown($uid, -1, &quot;release.tar&quot;)
       </article>
       <article class="doc-entry" id="doc-chdir">
         <h3><a class="doc-anchor" href="#doc-chdir">#</a> <code>chdir</code></h3>
-        <p>Change the current working directory of the process. Dies if the directory does not exist or is not accessible. This affects all subsequent relative path operations. Pair with <code>getcwd</code>/<code>pwd</code> to save and restore the original directory.</p>
+        <p>Change the current working directory of the process. On success, also refreshes the interpreter logical directory used for relative Stryke builtins (same as after a successful <code>cd</code> to that path). Returns <code>0</code>/<code>1</code> (does not throw). Pair with <code>getcwd</code>/<code>pwd</code> to save and restore the original directory.</p>
         <pre><code class="lang-perl">my $orig = pwd()
 chdir(&quot;/tmp&quot;)
 spurt(&quot;scratch.txt&quot;, &quot;hello&quot;)
@@ -11983,7 +11990,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">8397 topics</p>
+      <p class="chapter-meta">8400 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$!</code></h3>
         <p><code>$!</code> — the OS error from the most recent system call, in stringified form (e.g. <code>&quot;No such file or directory&quot;</code>) or as an <code>errno</code> integer in numeric context. Set by <code>open</code>, <code>close</code>, <code>chdir</code>, <code>read</code>, <code>write</code>, and other syscalls when they fail. The value persists until the next failing call, so always check it *immediately* after the failing operation — intermediate clean Perl code does not touch it, but any subsequent syscall will.</p>
@@ -22082,6 +22089,12 @@ p $ci-&gt;{slope_lower}
         <pre><code class="lang-perl">p covariant_derivative_step $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-cp">
+        <h3><a class="doc-anchor" href="#doc-cp">#</a> <code>cp</code></h3>
+        <p>Alias for <code>copy</code> — identical <code>FROM</code>, <code>TO</code>, and optional trailing hash (<code>preserve =&gt; 1</code>).</p>
+        <pre><code class="lang-perl">cp(&quot;a.txt&quot;, &quot;b.txt&quot;)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-cp-monatomic-ideal">
         <h3><a class="doc-anchor" href="#doc-cp-monatomic-ideal">#</a> <code>cp_monatomic_ideal</code></h3>
         <p><code>cp_monatomic_ideal</code> — operation <code>cp monatomic ideal</code>. Category: *chemistry*.</p>
@@ -27939,6 +27952,13 @@ $f = fenwick_update($f, 3, 5)
         <h3><a class="doc-anchor" href="#doc-field-of-view">#</a> <code>field_of_view</code></h3>
         <p><code>field_of_view(focal_mm, sensor_dim_mm=36) → number</code> — angular FOV in degrees.</p>
         <pre><code class="lang-perl">p field_of_view(50, 36)  # ~39.6°
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-file">
+        <h3><a class="doc-anchor" href="#doc-file">#</a> <code>file</code></h3>
+        <p><code>file PATH</code> — one-line description in the spirit of <code>file(1)</code>: symlink targets, <code>directory</code>, FIFO/socket/device nodes (Unix), and magic-byte sniff for regular files (<code>PNG</code>, <code>ELF</code>, <code>gzip</code>, shebang scripts, <code>ASCII text</code>, etc.). With no arguments, inspects <code>$_</code>.</p>
+        <pre><code class="lang-perl">p file(&quot;/bin/sh&quot;)
+p file(&quot;Cargo.toml&quot;)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-file-acl-get">
@@ -39600,8 +39620,8 @@ my $smooth = lpf(\@noisy, 0.1)
       </article>
       <article class="doc-entry" id="doc-ls">
         <h3><a class="doc-anchor" href="#doc-ls">#</a> <code>ls</code></h3>
-        <p><code>ls</code> / <code>ls(DIR)</code> — long directory listing in the style of <code>ls -l</code>. With no arguments, lists the process current working directory (not <code>$_</code>). With one or more directory paths, lists each directory; if more than one path is given, each block is prefixed with <code>DIR:</code> like GNU <code>ls</code>. Returns a single multiline string (suitable for <code>p</code> or <code>spurt</code>). On Unix, includes a <code>total</code> line (1024-byte block units), mode bits, link count, numeric uid/gid, size, mtime, and name; symbolic links show <code>-&gt; target</code>. On Windows, lines use file attributes, size, and a simplified timestamp.</p>
-        <pre><code class="lang-perl">p ls()           # cwd
+        <p><code>ls</code> / <code>ls(DIR)</code> — long directory listing in the style of <code>ls -l</code>. With no arguments, lists the interpreter working directory (same base <code>cd</code> uses; not <code>$_</code> and not necessarily the OS <code>getcwd</code>). With one or more directory paths, lists each directory; if more than one path is given, each block is prefixed with <code>DIR:</code> like GNU <code>ls</code>. Returns a single multiline string (suitable for <code>p</code> or <code>spurt</code>). On Unix, includes a <code>total</code> line (1024-byte block units), mode bits, link count, numeric uid/gid, size, mtime, and name; symbolic links show <code>-&gt; target</code>. On Windows, lines use file attributes, size, and a simplified timestamp.</p>
+        <pre><code class="lang-perl">p ls()           # logical cwd (see `cd`)
 p ls(&quot;/tmp&quot;)
 </code></pre>
       </article>
@@ -61846,6 +61866,12 @@ p xirr(\@cf, \@dates)
         <h3><a class="doc-anchor" href="#doc-xtea-round">#</a> <code>xtea_round</code></h3>
         <p><code>xtea_round</code> — operation <code>xtea round</code>. Category: *more extensions*.</p>
         <pre><code class="lang-perl">p xtea_round $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-xxd">
+        <h3><a class="doc-anchor" href="#doc-xxd">#</a> <code>xxd</code></h3>
+        <p><code>xxd PATH</code> — hex dump (<code>xxd(1)</code> layout: offset, paired hex, ASCII). Optional second positional sets bytes per line (default 16, max 32). Trailing hash: <code>cols =&gt; N</code>, <code>max =&gt; BYTES</code> (default 1_048_576 bytes read). No path uses <code>$_</code>.</p>
+        <pre><code class="lang-perl">p xxd(&quot;Cargo.toml&quot;, 8)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-xyz-d50-to-d65">

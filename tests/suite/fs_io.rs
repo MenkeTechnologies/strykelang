@@ -157,6 +157,26 @@ fn getcwd_contains_chdir_target() {
     std::fs::remove_dir_all(&dir).ok();
 }
 
+#[test]
+fn cd_builtin_sets_relative_spurt_slurp() {
+    let base =
+        std::env::temp_dir().join(format!("stryke_itest_cd_rel_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&base);
+    std::fs::create_dir_all(&base).unwrap();
+    let inner = base.join("inner");
+    std::fs::create_dir_all(&inner).unwrap();
+    let pb = base.to_str().expect("utf-8");
+    let code = format!(
+        r#"cd("{pb}") && cd("inner") && spurt("x.txt", "ab") && (slurp("x.txt") eq "ab") ? 1 : 0"#
+    );
+    assert_eq!(eval_int(&code), 1);
+    assert_eq!(
+        std::fs::read_to_string(inner.join("x.txt")).unwrap(),
+        "ab"
+    );
+    std::fs::remove_dir_all(&base).ok();
+}
+
 #[cfg(unix)]
 #[test]
 fn utime_sets_times() {
@@ -377,6 +397,65 @@ fn ls_builtin_long_format_tmp_dir() {
         out.contains("-rw"),
         "expected regular file perms:\n{out}"
     );
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn cp_alias_copies_like_copy() {
+    let dir: PathBuf =
+        std::env::temp_dir().join(format!("stryke_itest_cp_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let a = dir.join("src.bin");
+    let b = dir.join("dst.bin");
+    std::fs::write(&a, [1u8, 2, 3]).unwrap();
+    let pa = a.to_str().expect("utf-8");
+    let pb = b.to_str().expect("utf-8");
+    let code = format!(r#"cp("{pa}", "{pb}"); slurp_raw("{pb}")"#);
+    let out = eval_string(&code);
+    assert_eq!(out.len(), 3);
+    assert_eq!(out.as_bytes(), &[1, 2, 3]);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn file_builtin_describes_text_and_copy() {
+    let dir: PathBuf =
+        std::env::temp_dir().join(format!("stryke_itest_file_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let txt = dir.join("t.txt");
+    let sh = dir.join("s.sh");
+    std::fs::write(&txt, "hello\nworld\n").unwrap();
+    std::fs::write(&sh, "#!/bin/sh\necho 1\n").unwrap();
+    let pt = txt.to_str().expect("utf-8");
+    let ps = sh.to_str().expect("utf-8");
+    let out_t = eval_string(&format!(r#"file("{pt}")"#));
+    assert!(
+        out_t.contains("ASCII text"),
+        "unexpected file() output: {out_t:?}"
+    );
+    let out_s = eval_string(&format!(r#"file("{ps}")"#));
+    assert!(
+        out_s.contains("script text executable"),
+        "unexpected file() output: {out_s:?}"
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn xxd_builtin_dumps_bytes() {
+    let dir: PathBuf =
+        std::env::temp_dir().join(format!("stryke_itest_xxd_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let f = dir.join("b.bin");
+    std::fs::write(&f, [0x48, 0x69, 0x0a]).unwrap(); // "Hi\n"
+    let pf = f.to_str().expect("utf-8");
+    let out = eval_string(&format!(r#"xxd("{pf}", 2)"#));
+    assert!(out.contains("00000000:"), "{out}");
+    assert!(out.contains("4869"), "{out}");
+    assert!(out.contains("Hi"), "{out}");
     std::fs::remove_dir_all(&dir).ok();
 }
 

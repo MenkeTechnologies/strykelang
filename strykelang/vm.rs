@@ -928,6 +928,14 @@ impl<'a> VM<'a> {
                 | "head"
                 | "tail"
                 | "drop"
+                // `len` / `count` / … must receive list-valued operands as **one** value.
+                // Otherwise `len stat $path` flattens `@_`: empty stat → 0 args → `$_` fallback
+                // (wrong), success → 13 args → list_count semantics (wrong for `len`).
+                | "len"
+                | "cnt"
+                | "count"
+                | "list_count"
+                | "list_size"
         )
     }
 
@@ -9019,6 +9027,11 @@ impl<'a> VM<'a> {
                     .map(|(s, _)| s)
                     .unwrap_or_else(|| pat_val.to_string());
                 let s = iter.next().unwrap_or(StrykeValue::UNDEF).to_string();
+                // Perl 5: splitting the empty string yields the empty list for any
+                // pattern / limit (regex `split` on `""` would otherwise leave one field).
+                if s.is_empty() {
+                    return Ok(StrykeValue::array(vec![]));
+                }
                 // Perl LIMIT semantics:
                 //   omitted / 0  → no truncation, strip trailing empties.
                 //   > 0          → at most LIMIT fields, keep empties up to limit.
@@ -9375,16 +9388,19 @@ impl<'a> VM<'a> {
                     .next()
                     .unwrap_or(StrykeValue::UNDEF)
                     .to_string();
-                Ok(StrykeValue::integer(
-                    if std::env::set_current_dir(&path).is_ok() {
-                        1
-                    } else {
-                        0
-                    },
-                ))
+                if std::env::set_current_dir(&path).is_ok() {
+                    if let Ok(c) = std::env::current_dir() {
+                        self.interp.stryke_pwd =
+                            std::fs::canonicalize(&c).unwrap_or(c);
+                    }
+                    Ok(StrykeValue::integer(1))
+                } else {
+                    Ok(StrykeValue::integer(0))
+                }
             }
             Some(BuiltinId::Mkdir) => {
                 let path = args.first().map(|v| v.to_string()).unwrap_or_default();
+                let path = self.interp.resolve_stryke_path_string(&path);
                 Ok(StrykeValue::integer(
                     if std::fs::create_dir(&path).is_ok() {
                         1
@@ -9396,7 +9412,8 @@ impl<'a> VM<'a> {
             Some(BuiltinId::Unlink) => {
                 let mut count = 0i64;
                 for a in &args {
-                    if std::fs::remove_file(a.to_string()).is_ok() {
+                    let p = self.interp.resolve_stryke_path_string(&a.to_string());
+                    if std::fs::remove_file(&p).is_ok() {
                         count += 1;
                     }
                 }
@@ -9408,8 +9425,12 @@ impl<'a> VM<'a> {
             Some(BuiltinId::Getcwd) => self.interp.builtin_getcwd_execute(&args, line),
             Some(BuiltinId::Pipe) => self.interp.builtin_pipe_execute(&args, line),
             Some(BuiltinId::Rename) => {
-                let old = args.first().map(|v| v.to_string()).unwrap_or_default();
-                let new = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+                let old = self
+                    .interp
+                    .resolve_stryke_path_string(&args.first().map(|v| v.to_string()).unwrap_or_default());
+                let new = self
+                    .interp
+                    .resolve_stryke_path_string(&args.get(1).map(|v| v.to_string()).unwrap_or_default());
                 Ok(crate::perl_fs::rename_paths(&old, &new))
             }
             Some(BuiltinId::Chmod) => {
@@ -9417,7 +9438,11 @@ impl<'a> VM<'a> {
                     return Ok(StrykeValue::integer(0));
                 }
                 let mode = args[0].to_int();
-                let paths: Vec<String> = args.iter().skip(1).map(|v| v.to_string()).collect();
+                let paths: Vec<String> = args
+                    .iter()
+                    .skip(1)
+                    .map(|v| self.interp.resolve_stryke_path_string(&v.to_string()))
+                    .collect();
                 Ok(StrykeValue::integer(crate::perl_fs::chmod_paths(
                     &paths, mode,
                 )))
@@ -9428,58 +9453,77 @@ impl<'a> VM<'a> {
                 }
                 let uid = args[0].to_int();
                 let gid = args[1].to_int();
-                let paths: Vec<String> = args.iter().skip(2).map(|v| v.to_string()).collect();
+                let paths: Vec<String> = args
+                    .iter()
+                    .skip(2)
+                    .map(|v| self.interp.resolve_stryke_path_string(&v.to_string()))
+                    .collect();
                 Ok(StrykeValue::integer(crate::perl_fs::chown_paths(
                     &paths, uid, gid,
                 )))
             }
             Some(BuiltinId::Stat) => {
-                let path = args.first().map(|v| v.to_string()).unwrap_or_default();
+                let path = self
+                    .interp
+                    .resolve_stryke_path_string(&args.first().map(|v| v.to_string()).unwrap_or_default());
                 Ok(crate::perl_fs::stat_path(&path, false))
             }
             Some(BuiltinId::Lstat) => {
-                let path = args.first().map(|v| v.to_string()).unwrap_or_default();
+                let path = self
+                    .interp
+                    .resolve_stryke_path_string(&args.first().map(|v| v.to_string()).unwrap_or_default());
                 Ok(crate::perl_fs::stat_path(&path, true))
             }
             Some(BuiltinId::Link) => {
-                let old = args.first().map(|v| v.to_string()).unwrap_or_default();
-                let new = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+                let old = self
+                    .interp
+                    .resolve_stryke_path_string(&args.first().map(|v| v.to_string()).unwrap_or_default());
+                let new = self
+                    .interp
+                    .resolve_stryke_path_string(&args.get(1).map(|v| v.to_string()).unwrap_or_default());
                 Ok(crate::perl_fs::link_hard(&old, &new))
             }
             Some(BuiltinId::Symlink) => {
                 let old = args.first().map(|v| v.to_string()).unwrap_or_default();
-                let new = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+                let new = self
+                    .interp
+                    .resolve_stryke_path_string(&args.get(1).map(|v| v.to_string()).unwrap_or_default());
                 Ok(crate::perl_fs::link_sym(&old, &new))
             }
             Some(BuiltinId::Readlink) => {
-                let path = args.first().map(|v| v.to_string()).unwrap_or_default();
+                let path = self
+                    .interp
+                    .resolve_stryke_path_string(&args.first().map(|v| v.to_string()).unwrap_or_default());
                 Ok(crate::perl_fs::read_link(&path))
             }
             Some(BuiltinId::Glob) => {
-                let pats: Vec<String> = args.iter().map(|v| v.to_string()).collect();
+                let pats: Vec<String> = args
+                    .iter()
+                    .map(|v| self.interp.resolve_stryke_path_string(&v.to_string()))
+                    .collect();
                 Ok(crate::perl_fs::glob_patterns(&pats))
             }
             Some(BuiltinId::Files) => {
                 let dir = if args.is_empty() {
-                    ".".to_string()
+                    self.interp.resolve_stryke_path_string(".")
                 } else {
-                    args[0].to_string()
+                    self.interp.resolve_stryke_path_string(&args[0].to_string())
                 };
                 Ok(crate::perl_fs::list_files(&dir))
             }
             Some(BuiltinId::Filesf) => {
                 let dir = if args.is_empty() {
-                    ".".to_string()
+                    self.interp.resolve_stryke_path_string(".")
                 } else {
-                    args[0].to_string()
+                    self.interp.resolve_stryke_path_string(&args[0].to_string())
                 };
                 Ok(crate::perl_fs::list_filesf(&dir))
             }
             Some(BuiltinId::FilesfRecursive) => {
                 let dir = if args.is_empty() {
-                    ".".to_string()
+                    self.interp.resolve_stryke_path_string(".")
                 } else {
-                    args[0].to_string()
+                    self.interp.resolve_stryke_path_string(&args[0].to_string())
                 };
                 Ok(StrykeValue::iterator(std::sync::Arc::new(
                     crate::value::FsWalkIterator::new(&dir, true),
@@ -9487,17 +9531,17 @@ impl<'a> VM<'a> {
             }
             Some(BuiltinId::Dirs) => {
                 let dir = if args.is_empty() {
-                    ".".to_string()
+                    self.interp.resolve_stryke_path_string(".")
                 } else {
-                    args[0].to_string()
+                    self.interp.resolve_stryke_path_string(&args[0].to_string())
                 };
                 Ok(crate::perl_fs::list_dirs(&dir))
             }
             Some(BuiltinId::DirsRecursive) => {
                 let dir = if args.is_empty() {
-                    ".".to_string()
+                    self.interp.resolve_stryke_path_string(".")
                 } else {
-                    args[0].to_string()
+                    self.interp.resolve_stryke_path_string(&args[0].to_string())
                 };
                 Ok(StrykeValue::iterator(std::sync::Arc::new(
                     crate::value::FsWalkIterator::new(&dir, false),
@@ -9505,61 +9549,64 @@ impl<'a> VM<'a> {
             }
             Some(BuiltinId::SymLinks) => {
                 let dir = if args.is_empty() {
-                    ".".to_string()
+                    self.interp.resolve_stryke_path_string(".")
                 } else {
-                    args[0].to_string()
+                    self.interp.resolve_stryke_path_string(&args[0].to_string())
                 };
                 Ok(crate::perl_fs::list_sym_links(&dir))
             }
             Some(BuiltinId::Sockets) => {
                 let dir = if args.is_empty() {
-                    ".".to_string()
+                    self.interp.resolve_stryke_path_string(".")
                 } else {
-                    args[0].to_string()
+                    self.interp.resolve_stryke_path_string(&args[0].to_string())
                 };
                 Ok(crate::perl_fs::list_sockets(&dir))
             }
             Some(BuiltinId::Pipes) => {
                 let dir = if args.is_empty() {
-                    ".".to_string()
+                    self.interp.resolve_stryke_path_string(".")
                 } else {
-                    args[0].to_string()
+                    self.interp.resolve_stryke_path_string(&args[0].to_string())
                 };
                 Ok(crate::perl_fs::list_pipes(&dir))
             }
             Some(BuiltinId::BlockDevices) => {
                 let dir = if args.is_empty() {
-                    ".".to_string()
+                    self.interp.resolve_stryke_path_string(".")
                 } else {
-                    args[0].to_string()
+                    self.interp.resolve_stryke_path_string(&args[0].to_string())
                 };
                 Ok(crate::perl_fs::list_block_devices(&dir))
             }
             Some(BuiltinId::CharDevices) => {
                 let dir = if args.is_empty() {
-                    ".".to_string()
+                    self.interp.resolve_stryke_path_string(".")
                 } else {
-                    args[0].to_string()
+                    self.interp.resolve_stryke_path_string(&args[0].to_string())
                 };
                 Ok(crate::perl_fs::list_char_devices(&dir))
             }
             Some(BuiltinId::Executables) => {
                 let dir = if args.is_empty() {
-                    ".".to_string()
+                    self.interp.resolve_stryke_path_string(".")
                 } else {
-                    args[0].to_string()
+                    self.interp.resolve_stryke_path_string(&args[0].to_string())
                 };
                 Ok(crate::perl_fs::list_executables(&dir))
             }
             Some(BuiltinId::GlobPar) => {
-                let pats: Vec<String> = args.iter().map(|v| v.to_string()).collect();
+                let pats: Vec<String> = args
+                    .iter()
+                    .map(|v| self.interp.resolve_stryke_path_string(&v.to_string()))
+                    .collect();
                 Ok(crate::perl_fs::glob_par_patterns(&pats))
             }
             Some(BuiltinId::GlobParProgress) => {
                 let progress = args.last().map(|v| v.is_true()).unwrap_or(false);
                 let pats: Vec<String> = args[..args.len().saturating_sub(1)]
                     .iter()
-                    .map(|v| v.to_string())
+                    .map(|v| self.interp.resolve_stryke_path_string(&v.to_string()))
                     .collect();
                 Ok(crate::perl_fs::glob_par_patterns_with_progress(
                     &pats, progress,
@@ -9603,6 +9650,7 @@ impl<'a> VM<'a> {
                     .next()
                     .unwrap_or(StrykeValue::UNDEF)
                     .to_string();
+                let path = self.interp.resolve_stryke_path_string(&path);
                 crate::perl_fs::read_file_text_or_glob(&path)
                     .map(StrykeValue::string)
                     .map_err(|e| PerlError::runtime(format!("slurp: {}", e), line))

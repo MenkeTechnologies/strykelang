@@ -648,6 +648,18 @@ fn opt_hash_bool(v: &StrykeValue, key: &str) -> bool {
     entry.is_some_and(|x| x.is_true())
 }
 
+#[inline]
+fn opt_hash_i64(v: &StrykeValue, key: &str) -> Option<i64> {
+    let entry = if let Some(m) = v.as_hash_map() {
+        m.get(key).cloned()
+    } else if let Some(r) = v.as_hash_ref() {
+        r.read().get(key).cloned()
+    } else {
+        None
+    };
+    Some(entry?.to_int())
+}
+
 fn perl_scalar_as_bytes(v: &StrykeValue) -> Vec<u8> {
     if let Some(b) = v.as_bytes_arc() {
         return b.as_ref().clone();
@@ -656,11 +668,11 @@ fn perl_scalar_as_bytes(v: &StrykeValue) -> Vec<u8> {
 }
 
 /// `spurt` — Spurt. Returns an integer.
-fn builtin_spurt(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_spurt(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.len() < 2 {
         return Err(PerlError::runtime("spurt needs PATH and CONTENT", line));
     }
-    let path = args[0].to_string();
+    let path = interp.resolve_stryke_path_string(&args[0].to_string());
     let data = perl_scalar_as_bytes(&args[1]);
     let opts = args.get(2);
     let mkdir = opts.is_some_and(|o| opt_hash_bool(o, "mkdir") || opt_hash_bool(o, "mkpath"));
@@ -784,16 +796,223 @@ fn builtin_test_no_interop(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `copy` — Copy.
-fn builtin_copy(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_copy(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.len() < 2 {
         return Err(PerlError::runtime("copy needs FROM and TO paths", line));
     }
-    let from = args[0].to_string();
-    let to = args[1].to_string();
+    let from = interp.resolve_stryke_path_string(&args[0].to_string());
+    let to = interp.resolve_stryke_path_string(&args[1].to_string());
     let preserve = args
         .get(2)
         .is_some_and(|o| opt_hash_bool(o, "preserve") || opt_hash_bool(o, "metadata"));
     Ok(crate::perl_fs::copy_file(&from, &to, preserve))
+}
+
+/// `file` / `file PATH` — describe a path like `file(1)` (symlink, directory,
+/// special nodes, or magic sniff for regular files). With no arguments, uses `$_`.
+/// Returns one line: `PATH: description`.
+fn builtin_file(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    use std::fs::File;
+    use std::io::Read;
+    use std::path::Path;
+
+    let path = interp.resolve_stryke_path_string(&first_arg_or_topic(interp, args).to_string());
+    if path.is_empty() {
+        return Err(PerlError::runtime("file: need path", line));
+    }
+    let p = Path::new(&path);
+    let lm = std::fs::symlink_metadata(p).map_err(|e| {
+        PerlError::runtime(format!("file: {}: {e}", p.display()), line)
+    })?;
+    if lm.file_type().is_symlink() {
+        let tgt = std::fs::read_link(p).unwrap_or_else(|_| std::path::PathBuf::new());
+        return Ok(StrykeValue::string(format!(
+            "{}: symbolic link to {}",
+            path,
+            tgt.display()
+        )));
+    }
+    if lm.is_dir() {
+        return Ok(StrykeValue::string(format!("{path}: directory")));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::FileTypeExt;
+        let ft = lm.file_type();
+        if ft.is_fifo() {
+            return Ok(StrykeValue::string(format!("{path}: FIFO (named pipe)")));
+        }
+        if ft.is_socket() {
+            return Ok(StrykeValue::string(format!("{path}: socket")));
+        }
+        if ft.is_block_device() {
+            return Ok(StrykeValue::string(format!("{path}: block special")));
+        }
+        if ft.is_char_device() {
+            return Ok(StrykeValue::string(format!("{path}: character special")));
+        }
+    }
+    if lm.is_file() {
+        let mut f = File::open(p).map_err(|e| {
+            PerlError::runtime(format!("file: {}: {e}", p.display()), line)
+        })?;
+        let mut buf = [0u8; 4096];
+        let n = f.read(&mut buf).map_err(|e| {
+            PerlError::runtime(format!("file: {}: {e}", p.display()), line)
+        })?;
+        let desc = sniff_file_description(&buf[..n]);
+        return Ok(StrykeValue::string(format!("{path}: {desc}")));
+    }
+    Ok(StrykeValue::string(format!("{path}: other")))
+}
+
+fn sniff_file_description(buf: &[u8]) -> String {
+    if buf.is_empty() {
+        return "empty".into();
+    }
+    if buf.starts_with(b"\x7FELF") {
+        return "ELF".into();
+    }
+    if buf.starts_with(b"MZ") {
+        return "PE32 executable (MS Windows)".into();
+    }
+    if buf.starts_with(b"\x89PNG\r\n\x1a\n") {
+        return "PNG image data".into();
+    }
+    if buf.starts_with(b"GIF87a") || buf.starts_with(b"GIF89a") {
+        return "GIF image data".into();
+    }
+    if buf.len() >= 3 && buf[0] == 0xff && buf[1] == 0xd8 && buf[2] == 0xff {
+        return "JPEG image data".into();
+    }
+    if buf.starts_with(b"%PDF-") {
+        return "PDF document".into();
+    }
+    if buf.starts_with(b"PK\x03\x04") || buf.starts_with(b"PK\x05\x06") {
+        return "Zip archive data".into();
+    }
+    if buf.starts_with(&[0x1f, 0x8b]) {
+        return "gzip compressed data".into();
+    }
+    if buf.len() >= 12 && buf.starts_with(b"RIFF") && &buf[8..12] == b"WEBP" {
+        return "RIFF (little-endian) data, Web/P image".into();
+    }
+    if buf.starts_with(b"\xFE\xFF") || buf.starts_with(b"\xFF\xFE") {
+        return "Unicode text, UTF-16".into();
+    }
+    if buf.starts_with(b"\xEF\xBB\xBF") {
+        return "UTF-8 Unicode (with BOM) text".into();
+    }
+    if buf.starts_with(b"#!") {
+        let end = buf
+            .iter()
+            .position(|&b| b == b'\n' || b == b'\r')
+            .unwrap_or(buf.len());
+        let line = String::from_utf8_lossy(&buf[..end]);
+        return format!("{line} script text executable");
+    }
+    if buf.starts_with(b"<?xml") {
+        return "XML document text".into();
+    }
+    let ascii_lines = buf.iter().take(4096).all(|&b| {
+        b == 0x09 || b == 0x0a || b == 0x0d || b == 0x0c || (0x20..=0x7e).contains(&b)
+    }) && buf.iter().any(|&b| b == b'\n' || b == b'\r');
+    if ascii_lines {
+        return "ASCII text".into();
+    }
+    if std::str::from_utf8(buf).is_ok() && buf.iter().any(|&b| b >= 0x80) {
+        return "UTF-8 Unicode text".into();
+    }
+    "data".into()
+}
+
+/// `xxd` / `xxd PATH` — hex dump in `xxd(1)` style (address, paired hex, ASCII).
+/// Optional second positional integer sets columns (bytes per line, default 16, max 32).
+/// Trailing hash: `cols => N`, `max => BYTES` (default 1_048_576). No path uses `$_`.
+fn builtin_xxd(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    use std::io::Read;
+
+    let (head, opts) = if args.last().is_some_and(is_http_opts_hash) {
+        (&args[..args.len() - 1], args.last())
+    } else {
+        (args, None)
+    };
+
+    let mut cols = 16usize;
+    let mut max_bytes = 1_048_576usize;
+    if let Some(h) = opts {
+        if let Some(c) = opt_hash_i64(h, "cols") {
+            cols = (c as usize).clamp(1, 32);
+        }
+        if let Some(m) = opt_hash_i64(h, "max") {
+            max_bytes = (m as usize).max(1);
+        }
+    }
+
+    let path_raw = match head.first() {
+        None => interp.scope.get_scalar("_").to_string(),
+        Some(v) if !v.to_string().is_empty() => v.to_string(),
+        Some(_) => interp.scope.get_scalar("_").to_string(),
+    };
+    if path_raw.is_empty() {
+        return Err(PerlError::runtime("xxd: need path", line));
+    }
+    let path = interp.resolve_stryke_path_string(&path_raw);
+    if head.len() >= 2 {
+        cols = head[1].to_int().clamp(1, 32) as usize;
+    }
+
+    let mut f = std::fs::File::open(&path).map_err(|e| {
+        PerlError::runtime(format!("xxd: {}: {e}", path), line)
+    })?;
+    let mut buf = Vec::new();
+    (&mut f)
+        .take(max_bytes as u64)
+        .read_to_end(&mut buf)
+        .map_err(|e| PerlError::runtime(format!("xxd: {}: {e}", path), line))?;
+
+    Ok(StrykeValue::string(format_xxd(&buf, cols)))
+}
+
+fn format_xxd(data: &[u8], cols: usize) -> String {
+    let pairs = (cols + 1) / 2;
+    let hex_width = pairs * 5 - 1;
+    let mut out = String::new();
+    let mut off = 0usize;
+    while off < data.len() {
+        let end = (off + cols).min(data.len());
+        let chunk = &data[off..end];
+        let mut hex = String::new();
+        let mut i = 0;
+        while i < chunk.len() {
+            if i > 0 {
+                hex.push(' ');
+            }
+            if i + 1 < chunk.len() {
+                hex.push_str(&format!("{:02x}{:02x}", chunk[i], chunk[i + 1]));
+            } else {
+                hex.push_str(&format!("{:02x}  ", chunk[i]));
+            }
+            i += 2;
+        }
+        while hex.len() < hex_width {
+            hex.push(' ');
+        }
+        let ascii: String = chunk
+            .iter()
+            .map(|&b| {
+                if (0x20..=0x7e).contains(&b) {
+                    b as char
+                } else {
+                    '.'
+                }
+            })
+            .collect();
+        use std::fmt::Write as _;
+        let _ = writeln!(&mut out, "{:08x}: {} {}", off, hex, ascii);
+        off = end;
+    }
+    out
 }
 
 /// `basename` — Basename. Returns a string.
@@ -929,11 +1148,14 @@ pub(crate) fn try_builtin(
         "check_no_interop" | "check_ni" => Some(builtin_check_no_interop(args)),
         "test" => Some(builtin_test(args)),
         "test_no_interop" | "test_ni" => Some(builtin_test_no_interop(args)),
-        "copy" => Some(builtin_copy(args, line)),
+        "copy" | "cp" => Some(builtin_copy(interp, args, line)),
         "dirname" | "dn" => Some(builtin_dirname(args)),
+        "file" => Some(builtin_file(interp, args, line)),
+        "xxd" => Some(builtin_xxd(interp, args, line)),
         "fileparse" => Some(builtin_fileparse(interp, args, line)),
         "gethostname" | "hn" => Some(builtin_gethostname()),
-        "spurt" | "spit" | "spew" | "write_file" | "wf" => Some(builtin_spurt(args, line)),
+        "cd" => Some(interp.builtin_cd_execute(args, line)),
+        "spurt" | "spit" | "spew" | "write_file" | "wf" => Some(builtin_spurt(interp, args, line)),
         "collect" => Some(interp.builtin_collect_execute(args, line)),
         "take" | "head" | "hd" => {
             if name == "take"
@@ -2756,7 +2978,7 @@ pub(crate) fn try_builtin(
         "avg" => Some(builtin_avg(args)),
         "top" => Some(builtin_top(args)),
         "pager" | "pg" | "less" => Some(builtin_pager(interp, args)),
-        "to_file" => Some(builtin_to_file(args, line)),
+        "to_file" => Some(builtin_to_file(interp, args, line)),
         "to_json" | "tj" => Some(builtin_to_json(args)),
         "to_csv" | "tc" => Some(builtin_to_csv(args)),
         "to_html" | "th" => Some(builtin_to_html(args)),
@@ -4226,8 +4448,8 @@ pub(crate) fn try_builtin(
         "fetch" | "ft" => Some(builtin_fetch(args, line)),
         "fetch_json" | "ftj" => Some(builtin_fetch_json(args, line)),
         "http_request" | "hr" => Some(builtin_http_request(args, line)),
-        "read_bytes" | "slurp_raw" | "rb" => Some(builtin_read_bytes(args, line)),
-        "move" | "mv" => Some(builtin_move(args, line)),
+        "read_bytes" | "slurp_raw" | "rb" => Some(builtin_read_bytes(interp, args, line)),
+        "move" | "mv" => Some(builtin_move(interp, args, line)),
         "which" | "wh" => Some(builtin_which(args, line)),
         "json_encode" | "je" => Some(builtin_json_encode(args)),
         "json_decode" | "jd" => Some(builtin_json_decode(args)),
@@ -11853,20 +12075,25 @@ fn builtin_http_request(args: &[StrykeValue], line: usize) -> PerlResult<StrykeV
 }
 
 /// `read_bytes` — Read bytes.
-fn builtin_read_bytes(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
-    let path = args.first().map(|v| v.to_string()).unwrap_or_default();
+fn builtin_read_bytes(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let path = interp.resolve_stryke_path_string(
+        &args
+            .first()
+            .map(|v| v.to_string())
+            .unwrap_or_default(),
+    );
     let b = crate::perl_fs::read_file_bytes(&path)
         .map_err(|e| PerlError::runtime(format!("read_bytes: {}", e), line))?;
     Ok(StrykeValue::bytes(b))
 }
 
 /// `move` — Move.
-fn builtin_move(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_move(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.len() < 2 {
         return Err(PerlError::runtime("move needs FROM and TO paths", line));
     }
-    let from = args[0].to_string();
-    let to = args[1].to_string();
+    let from = interp.resolve_stryke_path_string(&args[0].to_string());
+    let to = interp.resolve_stryke_path_string(&args[1].to_string());
     Ok(crate::perl_fs::move_path(&from, &to))
 }
 
@@ -11947,7 +12174,7 @@ fn builtin_count_size_cnt(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult
 /// Returns `undef` for paths that can't be stat'd.
 fn builtin_file_size(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let size_of = |v: &StrykeValue| -> StrykeValue {
-        let path = v.to_string();
+        let path = interp.resolve_stryke_path_string(&v.to_string());
         match std::fs::metadata(&path) {
             Ok(m) => StrykeValue::integer(m.len() as i64),
             Err(_) => StrykeValue::UNDEF,
@@ -11973,18 +12200,16 @@ fn builtin_file_size(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<Stry
 }
 
 /// `ls` / `ls DIR` / `ls A, B, ...` — long directory listing in the style of `ls -l`.
-/// With no arguments, lists the process current working directory (not `$_`).
+/// With no arguments, lists [`VMHelper::stryke_pwd`] (interpreter working directory; see `cd`).
 /// Returns one string (newline-separated lines). Each non-empty argument must name a directory.
-fn builtin_ls(_interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_ls(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     use std::path::{Path, PathBuf};
 
     let dirs: Vec<PathBuf> = if args.is_empty() {
-        vec![std::env::current_dir().map_err(|e| {
-            PerlError::runtime(format!("ls: cannot get cwd: {e}"), line)
-        })?]
+        vec![interp.stryke_pwd.clone()]
     } else {
         args.iter()
-            .map(|v| PathBuf::from(v.to_string()))
+            .map(|v| interp.resolve_stryke_path(&v.to_string()))
             .filter(|p| !p.as_os_str().is_empty())
             .collect()
     };
@@ -14158,7 +14383,7 @@ fn builtin_top(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `to_file PATH, STRING` — write string to file, returns the string for further piping.
-fn builtin_to_file(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+fn builtin_to_file(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.len() < 2 {
         return Err(PerlError::runtime(
             "to_file: need PATH and content".to_string(),
@@ -14172,6 +14397,7 @@ fn builtin_to_file(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue>
     } else {
         (args[0].to_string(), args[1].to_string())
     };
+    let path = interp.resolve_stryke_path_string(&path);
     std::fs::write(&path, &content)
         .map_err(|e| PerlError::runtime(format!("to_file: {}: {}", path, e), line))?;
     Ok(StrykeValue::string(path))

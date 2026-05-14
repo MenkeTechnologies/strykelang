@@ -858,6 +858,8 @@ pub struct VMHelper {
     pub cached_chunk: Option<crate::bytecode::Chunk>,
     /// Sideband: script path for bytecode cache save after compilation (mtime-based).
     pub cache_script_path: Option<std::path::PathBuf>,
+    /// Interpreter base for relative filesystem paths (`cd` updates this; OS `chdir` does not).
+    pub(crate) stryke_pwd: PathBuf,
     /// Set while stepping a `gen { }` body (`yield`).
     pub(crate) in_generator: bool,
     /// `-n`/`-p` driver: prelude only; body runs per line in [`Self::process_line_vm`].
@@ -1487,6 +1489,9 @@ impl VMHelper {
 
         let executable_path = cached_executable_path();
 
+        let stryke_pwd_init = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let stryke_pwd = std::fs::canonicalize(&stryke_pwd_init).unwrap_or(stryke_pwd_init);
+
         let mut special_caret_scalars: HashMap<String, StrykeValue> = HashMap::new();
         for name in crate::special_vars::PERL5_DOCUMENTED_CARET_NAMES {
             special_caret_scalars.insert(format!("^{}", name), StrykeValue::UNDEF);
@@ -1626,6 +1631,7 @@ impl VMHelper {
             disasm_bytecode: false,
             cached_chunk: None,
             cache_script_path: None,
+            stryke_pwd,
             in_generator: false,
             line_mode_skip_main: false,
             line_mode_chunk: None,
@@ -1976,6 +1982,7 @@ impl VMHelper {
             // Sideband cache fields belong to the top-level driver, not line-mode workers.
             cached_chunk: None,
             cache_script_path: None,
+            stryke_pwd: self.stryke_pwd.clone(),
             in_generator: false,
             line_mode_skip_main: false,
             line_mode_chunk: self.line_mode_chunk.clone(),
@@ -4088,6 +4095,60 @@ impl VMHelper {
         );
     }
 
+    /// Resolve `path` against [`Self::stryke_pwd`] when relative; absolute paths unchanged.
+    #[inline]
+    pub(crate) fn resolve_stryke_path(&self, path: &str) -> PathBuf {
+        if path.is_empty() {
+            return self.stryke_pwd.clone();
+        }
+        let p = Path::new(path);
+        if p.is_absolute() {
+            PathBuf::from(path)
+        } else {
+            self.stryke_pwd.join(path)
+        }
+    }
+
+    pub(crate) fn resolve_stryke_path_string(&self, path: &str) -> String {
+        self.resolve_stryke_path(path).to_string_lossy().into_owned()
+    }
+
+    /// `cd DIR` / `cd()` — set the interpreter working directory for relative path builtins
+    /// (does not call OS `chdir`; use `chdir` for that). Returns `1` on success, `0` on failure
+    /// and sets `$!` / errno. With no arguments, changes to `$HOME` / `%USERPROFILE%` when set.
+    pub(crate) fn builtin_cd_execute(
+        &mut self,
+        args: &[StrykeValue],
+        _line: usize,
+    ) -> PerlResult<StrykeValue> {
+        let dest: PathBuf = if args.is_empty() {
+            let home = std::env::var_os("HOME")
+                .or_else(|| std::env::var_os("USERPROFILE"))
+                .map(PathBuf::from);
+            let Some(h) = home else {
+                return Ok(StrykeValue::integer(0));
+            };
+            h
+        } else {
+            let raw = args[0].to_string();
+            if raw.is_empty() {
+                return Ok(StrykeValue::integer(0));
+            }
+            self.resolve_stryke_path(&raw)
+        };
+        match std::fs::metadata(&dest) {
+            Ok(m) if m.is_dir() => {
+                self.stryke_pwd = std::fs::canonicalize(&dest).unwrap_or(dest);
+                Ok(StrykeValue::integer(1))
+            }
+            Ok(_) => Ok(StrykeValue::integer(0)),
+            Err(e) => {
+                self.apply_io_error_to_errno(&e);
+                Ok(StrykeValue::integer(0))
+            }
+        }
+    }
+
     /// `open` and VM `BuiltinId::Open`. `file_opt` is the evaluated third argument when present.
     ///
     /// Two-arg `open $fh, EXPR` with a single string: Perl treats a leading `|` as pipe-to-command
@@ -4125,6 +4186,10 @@ impl VMHelper {
             }
         };
         let handle_return = handle_name.clone();
+        let file_path = match actual_mode.as_str() {
+            "<" | ">" | ">>" => self.resolve_stryke_path_string(&path),
+            _ => path.clone(),
+        };
         match actual_mode.as_str() {
             "-|" => {
                 let mut cmd = piped_shell_command(&path);
@@ -4157,7 +4222,7 @@ impl VMHelper {
                 self.pipe_children.insert(handle_name, child);
             }
             "<" => {
-                let file = match std::fs::File::open(&path) {
+                let file = match std::fs::File::open(&file_path) {
                     Ok(f) => f,
                     Err(e) => {
                         self.apply_io_error_to_errno(&e);
@@ -4173,7 +4238,7 @@ impl VMHelper {
                 );
             }
             ">" => {
-                let file = match std::fs::File::create(&path) {
+                let file = match std::fs::File::create(&file_path) {
                     Ok(f) => f,
                     Err(e) => {
                         self.apply_io_error_to_errno(&e);
@@ -4192,7 +4257,7 @@ impl VMHelper {
                 let file = match std::fs::OpenOptions::new()
                     .append(true)
                     .create(true)
-                    .open(&path)
+                    .open(&file_path)
                 {
                     Ok(f) => f,
                     Err(e) => {
@@ -4562,6 +4627,7 @@ impl VMHelper {
             if p.is_empty() {
                 continue;
             }
+            let p = self.resolve_stryke_path_string(&p);
             if std::fs::remove_dir(&p).is_ok() {
                 count += 1;
             }
@@ -4575,7 +4641,10 @@ impl VMHelper {
         args: &[StrykeValue],
         _line: usize,
     ) -> PerlResult<StrykeValue> {
-        let paths: Vec<String> = args.iter().map(|v| v.to_string()).collect();
+        let paths: Vec<String> = args
+            .iter()
+            .map(|v| self.resolve_stryke_path_string(&v.to_string()))
+            .collect();
         Ok(StrykeValue::integer(crate::perl_fs::touch_paths(&paths)))
     }
 
@@ -4593,7 +4662,11 @@ impl VMHelper {
         }
         let at = args[0].to_int();
         let mt = args[1].to_int();
-        let paths: Vec<String> = args.iter().skip(2).map(|v| v.to_string()).collect();
+        let paths: Vec<String> = args
+            .iter()
+            .skip(2)
+            .map(|v| self.resolve_stryke_path_string(&v.to_string()))
+            .collect();
         let n = crate::perl_fs::utime_paths(at, mt, &paths);
         #[cfg(not(unix))]
         if !paths.is_empty() && n == 0 {
@@ -4664,6 +4737,7 @@ impl VMHelper {
         if path.is_empty() {
             return Err(PerlError::runtime("realpath: need path", line));
         }
+        let path = self.resolve_stryke_path_string(&path);
         match crate::perl_fs::realpath_resolved(&path) {
             Ok(s) => Ok(StrykeValue::string(s)),
             Err(e) => {
@@ -4801,7 +4875,9 @@ impl VMHelper {
                 loop {
                     if self.diamond_reader.is_none() {
                         while self.diamond_next_idx < argv.len() {
-                            let path = argv[self.diamond_next_idx].to_string();
+                            let path = self.resolve_stryke_path_string(
+                                &argv[self.diamond_next_idx].to_string(),
+                            );
                             self.diamond_next_idx += 1;
                             match File::open(&path) {
                                 Ok(f) => {
@@ -4986,7 +5062,8 @@ impl VMHelper {
     }
 
     pub(crate) fn opendir_handle(&mut self, handle: &str, path: &str) -> StrykeValue {
-        match std::fs::read_dir(path) {
+        let path = self.resolve_stryke_path_string(path);
+        match std::fs::read_dir(&path) {
             Ok(rd) => {
                 let entries: Vec<String> = rd
                     .filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().into_owned()))
@@ -12023,6 +12100,7 @@ impl VMHelper {
             }
             ExprKind::Slurp(e) => {
                 let path = self.eval_expr(e)?.to_string();
+                let path = self.resolve_stryke_path_string(&path);
                 crate::perl_fs::read_file_text_or_glob(&path)
                     .map(StrykeValue::string)
                     .map_err(|e| {
@@ -12561,6 +12639,9 @@ impl VMHelper {
                     .map(|(s, _)| s)
                     .unwrap_or_else(|| pat_val.to_string());
                 let s = self.eval_expr(string)?.to_string();
+                if s.is_empty() {
+                    return Ok(StrykeValue::array(vec![]));
+                }
                 // Perl semantics for the limit field:
                 //   omitted / 0  → no truncation, *strip* trailing empty fields.
                 //   > 0          → at most LIMIT fields, keep empties up to limit.
@@ -12845,7 +12926,8 @@ impl VMHelper {
 
             // File tests
             ExprKind::FileTest { op, expr } => {
-                let path = self.eval_expr(expr)?.to_string();
+                let raw = self.eval_expr(expr)?.to_string();
+                let path = self.resolve_stryke_path_string(&raw);
                 // -M, -A, -C return fractional days (float), not boolean
                 if matches!(op, 'M' | 'A' | 'C') {
                     #[cfg(unix)]
@@ -13056,7 +13138,12 @@ impl VMHelper {
             ExprKind::Chdir(expr) => {
                 let path = self.eval_expr(expr)?.to_string();
                 match std::env::set_current_dir(&path) {
-                    Ok(_) => Ok(StrykeValue::integer(1)),
+                    Ok(_) => {
+                        if let Ok(c) = std::env::current_dir() {
+                            self.stryke_pwd = std::fs::canonicalize(&c).unwrap_or(c);
+                        }
+                        Ok(StrykeValue::integer(1))
+                    }
                     Err(e) => {
                         self.apply_io_error_to_errno(&e);
                         Ok(StrykeValue::integer(0))
@@ -13064,7 +13151,8 @@ impl VMHelper {
                 }
             }
             ExprKind::Mkdir { path, mode: _ } => {
-                let p = self.eval_expr(path)?.to_string();
+                let raw = self.eval_expr(path)?.to_string();
+                let p = self.resolve_stryke_path_string(&raw);
                 match std::fs::create_dir(&p) {
                     Ok(_) => Ok(StrykeValue::integer(1)),
                     Err(e) => {
@@ -13076,7 +13164,8 @@ impl VMHelper {
             ExprKind::Unlink(args) => {
                 let mut count = 0i64;
                 for a in args {
-                    let path = self.eval_expr(a)?.to_string();
+                    let raw = self.eval_expr(a)?.to_string();
+                    let path = self.resolve_stryke_path_string(&raw);
                     if std::fs::remove_file(&path).is_ok() {
                         count += 1;
                     }
@@ -13084,15 +13173,18 @@ impl VMHelper {
                 Ok(StrykeValue::integer(count))
             }
             ExprKind::Rename { old, new } => {
-                let o = self.eval_expr(old)?.to_string();
-                let n = self.eval_expr(new)?.to_string();
+                let o_raw = self.eval_expr(old)?.to_string();
+                let n_raw = self.eval_expr(new)?.to_string();
+                let o = self.resolve_stryke_path_string(&o_raw);
+                let n = self.resolve_stryke_path_string(&n_raw);
                 Ok(crate::perl_fs::rename_paths(&o, &n))
             }
             ExprKind::Chmod(args) => {
                 let mode = self.eval_expr(&args[0])?.to_int();
                 let mut paths = Vec::new();
                 for a in &args[1..] {
-                    paths.push(self.eval_expr(a)?.to_string());
+                    let raw = self.eval_expr(a)?.to_string();
+                    paths.push(self.resolve_stryke_path_string(&raw));
                 }
                 Ok(StrykeValue::integer(crate::perl_fs::chmod_paths(
                     &paths, mode,
@@ -13103,137 +13195,157 @@ impl VMHelper {
                 let gid = self.eval_expr(&args[1])?.to_int();
                 let mut paths = Vec::new();
                 for a in &args[2..] {
-                    paths.push(self.eval_expr(a)?.to_string());
+                    let raw = self.eval_expr(a)?.to_string();
+                    paths.push(self.resolve_stryke_path_string(&raw));
                 }
                 Ok(StrykeValue::integer(crate::perl_fs::chown_paths(
                     &paths, uid, gid,
                 )))
             }
             ExprKind::Stat(e) => {
-                let path = self.eval_expr(e)?.to_string();
+                let raw = self.eval_expr(e)?.to_string();
+                let path = self.resolve_stryke_path_string(&raw);
                 Ok(crate::perl_fs::stat_path(&path, false))
             }
             ExprKind::Lstat(e) => {
-                let path = self.eval_expr(e)?.to_string();
+                let raw = self.eval_expr(e)?.to_string();
+                let path = self.resolve_stryke_path_string(&raw);
                 Ok(crate::perl_fs::stat_path(&path, true))
             }
             ExprKind::Link { old, new } => {
-                let o = self.eval_expr(old)?.to_string();
-                let n = self.eval_expr(new)?.to_string();
+                let o_raw = self.eval_expr(old)?.to_string();
+                let n_raw = self.eval_expr(new)?.to_string();
+                let o = self.resolve_stryke_path_string(&o_raw);
+                let n = self.resolve_stryke_path_string(&n_raw);
                 Ok(crate::perl_fs::link_hard(&o, &n))
             }
             ExprKind::Symlink { old, new } => {
                 let o = self.eval_expr(old)?.to_string();
-                let n = self.eval_expr(new)?.to_string();
+                let n_raw = self.eval_expr(new)?.to_string();
+                let n = self.resolve_stryke_path_string(&n_raw);
                 Ok(crate::perl_fs::link_sym(&o, &n))
             }
             ExprKind::Readlink(e) => {
-                let path = self.eval_expr(e)?.to_string();
+                let raw = self.eval_expr(e)?.to_string();
+                let path = self.resolve_stryke_path_string(&raw);
                 Ok(crate::perl_fs::read_link(&path))
             }
             ExprKind::Files(args) => {
-                let dir = if args.is_empty() {
+                let dir_raw = if args.is_empty() {
                     ".".to_string()
                 } else {
                     self.eval_expr(&args[0])?.to_string()
                 };
+                let dir = self.resolve_stryke_path_string(&dir_raw);
                 Ok(crate::perl_fs::list_files(&dir))
             }
             ExprKind::Filesf(args) => {
-                let dir = if args.is_empty() {
+                let dir_raw = if args.is_empty() {
                     ".".to_string()
                 } else {
                     self.eval_expr(&args[0])?.to_string()
                 };
+                let dir = self.resolve_stryke_path_string(&dir_raw);
                 Ok(crate::perl_fs::list_filesf(&dir))
             }
             ExprKind::FilesfRecursive(args) => {
-                let dir = if args.is_empty() {
+                let dir_raw = if args.is_empty() {
                     ".".to_string()
                 } else {
                     self.eval_expr(&args[0])?.to_string()
                 };
+                let dir = self.resolve_stryke_path_string(&dir_raw);
                 Ok(StrykeValue::iterator(Arc::new(
                     crate::value::FsWalkIterator::new(&dir, true),
                 )))
             }
             ExprKind::Dirs(args) => {
-                let dir = if args.is_empty() {
+                let dir_raw = if args.is_empty() {
                     ".".to_string()
                 } else {
                     self.eval_expr(&args[0])?.to_string()
                 };
+                let dir = self.resolve_stryke_path_string(&dir_raw);
                 Ok(crate::perl_fs::list_dirs(&dir))
             }
             ExprKind::DirsRecursive(args) => {
-                let dir = if args.is_empty() {
+                let dir_raw = if args.is_empty() {
                     ".".to_string()
                 } else {
                     self.eval_expr(&args[0])?.to_string()
                 };
+                let dir = self.resolve_stryke_path_string(&dir_raw);
                 Ok(StrykeValue::iterator(Arc::new(
                     crate::value::FsWalkIterator::new(&dir, false),
                 )))
             }
             ExprKind::SymLinks(args) => {
-                let dir = if args.is_empty() {
+                let dir_raw = if args.is_empty() {
                     ".".to_string()
                 } else {
                     self.eval_expr(&args[0])?.to_string()
                 };
+                let dir = self.resolve_stryke_path_string(&dir_raw);
                 Ok(crate::perl_fs::list_sym_links(&dir))
             }
             ExprKind::Sockets(args) => {
-                let dir = if args.is_empty() {
+                let dir_raw = if args.is_empty() {
                     ".".to_string()
                 } else {
                     self.eval_expr(&args[0])?.to_string()
                 };
+                let dir = self.resolve_stryke_path_string(&dir_raw);
                 Ok(crate::perl_fs::list_sockets(&dir))
             }
             ExprKind::Pipes(args) => {
-                let dir = if args.is_empty() {
+                let dir_raw = if args.is_empty() {
                     ".".to_string()
                 } else {
                     self.eval_expr(&args[0])?.to_string()
                 };
+                let dir = self.resolve_stryke_path_string(&dir_raw);
                 Ok(crate::perl_fs::list_pipes(&dir))
             }
             ExprKind::BlockDevices(args) => {
-                let dir = if args.is_empty() {
+                let dir_raw = if args.is_empty() {
                     ".".to_string()
                 } else {
                     self.eval_expr(&args[0])?.to_string()
                 };
+                let dir = self.resolve_stryke_path_string(&dir_raw);
                 Ok(crate::perl_fs::list_block_devices(&dir))
             }
             ExprKind::CharDevices(args) => {
-                let dir = if args.is_empty() {
+                let dir_raw = if args.is_empty() {
                     ".".to_string()
                 } else {
                     self.eval_expr(&args[0])?.to_string()
                 };
+                let dir = self.resolve_stryke_path_string(&dir_raw);
                 Ok(crate::perl_fs::list_char_devices(&dir))
             }
             ExprKind::Executables(args) => {
-                let dir = if args.is_empty() {
+                let dir_raw = if args.is_empty() {
                     ".".to_string()
                 } else {
                     self.eval_expr(&args[0])?.to_string()
                 };
+                let dir = self.resolve_stryke_path_string(&dir_raw);
                 Ok(crate::perl_fs::list_executables(&dir))
             }
             ExprKind::Glob(args) => {
                 let mut pats = Vec::new();
                 for a in args {
-                    pats.push(self.eval_expr(a)?.to_string());
+                    let raw = self.eval_expr(a)?.to_string();
+                    pats.push(self.resolve_stryke_path_string(&raw));
                 }
                 Ok(crate::perl_fs::glob_patterns(&pats))
             }
             ExprKind::GlobPar { args, progress } => {
                 let mut pats = Vec::new();
                 for a in args {
-                    pats.push(self.eval_expr(a)?.to_string());
+                    let raw = self.eval_expr(a)?.to_string();
+                    pats.push(self.resolve_stryke_path_string(&raw));
                 }
                 let show_progress = progress
                     .as_ref()
@@ -20345,7 +20457,8 @@ impl VMHelper {
             .transpose()?
             .map(|v| v.is_true())
             .unwrap_or(false);
-        let path_s = self.eval_expr(path)?.to_string();
+        let raw = self.eval_expr(path)?.to_string();
+        let path_s = self.resolve_stryke_path_string(&raw);
         let cb_val = self.eval_expr(callback)?;
         let sub = if let Some(s) = cb_val.as_code_ref() {
             s

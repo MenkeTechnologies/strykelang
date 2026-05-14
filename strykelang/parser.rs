@@ -13580,8 +13580,9 @@ impl Parser {
             | "files" | "filesf" | "f" | "fr" | "dirs" | "d" | "dr" | "sym_links"
             | "sockets" | "pipes" | "block_devices" | "char_devices" | "exe" | "executables"
             | "basename" | "dirname" | "fileparse" | "realpath" | "canonpath"
-            | "copy" | "move" | "spurt" | "spit" | "read_bytes" | "which"
-            | "getcwd" | "touch" | "gethostname" | "uname"
+            | "copy" | "cp" | "move" | "spurt" | "spit" | "read_bytes" | "which"
+            | "getcwd" | "cd" | "ls" | "touch" | "gethostname" | "uname"
+            | "file" | "xxd"
             // ── data / network ──────────────────────────────────────────────
             | "csv_read" | "csv_write" | "dataframe" | "sqlite"
             | "fetch" | "fetch_json" | "fetch_async" | "fetch_async_json"
