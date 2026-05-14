@@ -1,0 +1,1954 @@
+.\" strykeall(1) — comprehensive all-in-one man page for stryke
+.\" Modeled after zshall(1): every man page in one document.
+.\" Render with:  man -l man/strykeall.1
+.\" Install:      cp man/strykeall.1 /usr/local/share/man/man1/
+.TH STRYKEALL 1 "May 2026" "stryke 0.14.1" "User Commands"
+.SH NAME
+strykeall \- the stryke comprehensive reference (invocation, language,
+builtins, REPL, AI, web, package manager, parallelism)
+.SH OVERVIEW
+This is the all-in-one stryke manual, modeled on zsh's
+.BR zshall (1).
+It concatenates the major sections of the stryke reference into a
+single page so you can grep with `/`:
+.RS 2
+.PP
+.B INVOCATION
+.RB "\(em " "every CLI flag and subcommand"
+.br
+.B LEXICAL
+.RB "\(em " "tokens, comments, strings, heredocs, regex literals"
+.br
+.B DATA TYPES
+.RB "\(em " "scalars, arrays, hashes, refs, classes, structs, enums, sets, deques, heaps, sketches"
+.br
+.B OPERATORS
+.RB "\(em " "arithmetic, logical, regex, threading (" |> "," ~> "), the slice colon (1:N)"
+.br
+.B CONTROL FLOW
+.RB "\(em " "if/while/for, last/next/redo, match/algebraic match, async/await"
+.br
+.B SUBROUTINES
+.RB "\(em " "sub, fn, signatures, prototypes, closures"
+.br
+.B TOPICS
+.RB "\(em " "$_, _, _0, _1, _N, $_<, $_<<"
+.br
+.B SCOPES
+.RB "\(em " "my/our/local/oursync, package, BEGIN/END/INIT/CHECK, use/require/no"
+.br
+.B REGEX
+.RB "\(em " "three-tier engine, named captures, qr//, tr///"
+.br
+.B OOP
+.RB "\(em " "class, trait, impl, fn Self.x, fields, C3 MRO"
+.br
+.B AOP
+.RB "\(em " "intercepts, proceed, advice"
+.br
+.B PARALLEL
+.RB "\(em " "pmap/pgrep/pfor/psort/preduce, fan, par_pipeline"
+.br
+.B PIPELINES
+.RB "\(em " "|>, pipeline(), par_pipeline_stream, lazy iterators"
+.br
+.B THREAD MACRO
+.RB "\(em " "~>, ~>>, outer-topic chain"
+.br
+.B REFLECTION
+.RB "\(em " "%b %a %all %k %d %c %o %v %pc %e %p"
+.br
+.B BUILTINS
+.RB "\(em " "categorical tour of " 10267 " primaries"
+.br
+.B REPL
+.RB "\(em " "shell-like primitives, history, aliases, prompt"
+.br
+.B AI
+.RB "\(em " "ai, prompt, embed, tool fn, MCP, agent loop"
+.br
+.B WEB
+.RB "\(em " "web_serve, route DSL, ORM, sessions, templates, s_web"
+.br
+.B PACKAGE MGR
+.RB "\(em " "stryke.toml, stryke.lock, ~/.stryke/store, add/remove/install"
+.br
+.B CLUSTER
+.RB "\(em " "pmap_on, agent/controller, remote_wire"
+.br
+.B SPECIAL VARS
+.RB "\(em " "$_, $!, $/, $@, $0, $0, @ARGV, %ENV, $^X"
+.br
+.B PRAGMAS
+.RB "\(em " "strict, warnings, utf8, feature, --compat, --no-interop"
+.br
+.B ENVIRONMENT
+.RB "\(em " "PERL5LIB, STRYKE_RECORD, STRYKE_AI_MODE, …"
+.br
+.B FILES
+.RB "\(em " "~/.cargo/bin/s, ~/.stryke/, stryke.toml, stryke.lock"
+.br
+.B EXAMPLES
+.RB "\(em " "one-liners across every domain"
+.br
+.B PERFORMANCE
+.RB "\(em " "JIT, perfview, flamegraph, --record"
+.br
+.B DEBUGGING
+.RB "\(em " "--disasm, --ast, --explain, -d"
+.RE
+.PP
+For the single-line summary use
+.BR stryke (1)
+or
+.BR s (1).
+.SH NAME
+stryke, s \- highly parallel Perl 5 interpreter with shell-grade REPL
+.SH SYNOPSIS
+.B s
+[\fIOPTION\fR]... [\fB--\fR] [\fIPROGRAMFILE\fR] [\fIARGUMENT\fR]...
+.br
+.B s \fICODE\fR
+.RB " (" -e " optional when arg looks like code)"
+.br
+.B s \fIBUILTIN\fR [\fIARGS\fR]
+.RB " (" -e " not needed; calls builtin directly)"
+.br
+.B s \fISUBCOMMAND\fR [\fIARGS\fR]
+.SH DESCRIPTION
+.B stryke
+is a single-binary Perl 5 interpreter written in Rust with parallel
+extensions, a Cranelift JIT, pipe-forward (\fB|>\fR), the thread macro
+(\fB~>\fR), 10,267 primary builtins in
+.BR %b ,
+and an interactive REPL that doubles as a Unix shell.
+.PP
+The interpreter compiles source to a 346-opcode bytecode running on a
+register+stack hybrid VM; hot blocks are JIT'd to native code via
+Cranelift. Parallel primitives (\fBpmap\fR / \fBpgrep\fR / \fBpfor\fR /
+\fBpsort\fR / \fBpreduce\fR) ride on rayon work-stealing across every
+available core.
+.PP
+The binary is invoked as
+.B s
+by default;
+.B stryke
+and
+.B st
+are alternate spellings, all routing to the same entry point.
+.PP
+.B stryke
+is also a coreutils-style command launcher: when called with one
+argument matching a known builtin name plus its arguments, stryke
+invokes that builtin directly. Example:
+.RS 4
+.EX
+s basename /a/b/c.txt    # prints: c.txt
+s sha256 myfile          # prints SHA-256 digest
+s len 'hello'            # prints: 5
+.EE
+.RE
+.SH "1.  INVOCATION"
+.SS "1.1  Execution"
+.TP
+\fB'\fR\fICODE\fR\fB'\fR
+Inline code; \fB-e\fR is optional when the argument looks like code.
+.TP
+.B -e \fICODE\fR
+Explicit inline; required with \fB-n\fR, \fB-p\fR, \fB-l\fR, \fB-a\fR.
+.TP
+.B -E \fICODE\fR
+Like \fB-e\fR but enables all optional features (Perl 5
+.BR feature .pm-style
+preloads).
+.TP
+.IB BUILTIN " [" ARGS "]"
+Direct builtin invocation (no \fB-e\fR needed).
+.TP
+.B --script
+Force script lookup when a name conflicts with a builtin
+(\fBs --script basename\fR runs \fI./basename\fR).
+.TP
+.B -c
+Check syntax only; parse without compile/run.
+.TP
+.BR --lint ", " --check
+Parse + compile to bytecode without running.
+.TP
+.BR --disasm ", " --disassemble
+Print bytecode disassembly to stderr before VM run.
+.TP
+.B --ast
+Dump parsed AST as JSON and exit (no execution).
+.TP
+.B --fmt
+Pretty-print parsed Perl to stdout and exit.
+.TP
+.B --explain \fICODE\fR
+Print expanded hint for an error code (e.g. \fBE0001\fR) and exit.
+.TP
+.B --profile
+Wall-clock profile to stderr (VM op lines; flamegraph-ready).
+.TP
+.B --flame
+Flamegraph: terminal bars (TTY) or SVG (piped to file).
+.TP
+.B --no-jit
+Disable Cranelift JIT (bytecode interpreter only).
+.TP
+.B --compat
+Perl 5 strict-compat: disable all stryke extensions.
+.TP
+.B --no-interop
+Reject Perl-isms; force idiomatic stryke
+(\fB$_0\fR/\fB$_1\fR over \fB$a\fR/\fB$b\fR; \fBfn\fR not \fBsub\fR).
+.TP
+.B -d\fR[\fBt\fR][\fI:MOD\fR]
+Run program under debugger or module \fIDevel::MOD\fR.
+.TP
+.B -D\fR[\fInumber/letters\fR]
+Set debugging flags.
+.TP
+.B -u
+Dump core after parsing program.
+.TP
+.B --record
+Record every run to \fI~/.stryke/perf.sqlite\fR for inspection via
+\fBperfview\fR.
+.SS "1.2  Input Processing"
+.TP
+.B -n
+Assume \fBwhile (<>) { ... }\fR loop around program.
+.TP
+.B -p
+Like \fB-n\fR but print each \fB$_\fR after the loop body (sed-style).
+.TP
+.B -a
+Autosplit mode (splits \fB$_\fR into \fB@F\fR).
+.TP
+.B -F\fI/pattern/\fR
+\fBsplit()\fR pattern for \fB-a\fR.
+.TP
+.B -l\fR[\fIoctnum\fR]
+Enable line ending processing.
+.TP
+.B -0\fR[\fIoctal\fR]
+Specify record separator (\fB\\0\fR if no arg).
+.TP
+.B -g
+Slurp all input at once (alias for \fB-0777\fR).
+.TP
+.B -i\fR[\fIextension\fR]
+Edit \fB<>\fR files in place; multiple files processed in parallel.
+.SS "1.3  Modules & Paths"
+.TP
+.B -M \fIMODULE\fR
+Execute \fBuse \fIMODULE\fR before program.
+.TP
+.B -m \fIMODULE\fR
+Execute \fBuse \fIMODULE\fB ()\fR before program (no import).
+.TP
+.B -I \fIDIRECTORY\fR
+Specify \fB@INC\fR directory (multiple allowed).
+.TP
+.B -f
+Don't do \fI$sitelib/sitecustomize.pl\fR at startup.
+.TP
+.B -S
+Look for programfile using \fB$PATH\fR.
+.TP
+.B -x\fR[\fIdirectory\fR]
+Ignore text before \fB#!perl\fR line.
+.SS "1.4  Unicode & Safety"
+.TP
+.B -C\fR[\fInumber/list\fR]
+Enable listed Unicode features.
+.TP
+.B -t
+Tainting warnings.
+.TP
+.B -T
+Tainting checks.
+.TP
+.B -U
+Allow unsafe operations.
+.TP
+.B -s
+Switch parsing for programfile args.
+.SS "1.5  Warnings"
+.TP
+.B -w
+Many useful warnings.
+.TP
+.B -W
+All warnings.
+.TP
+.B -X
+No warnings.
+.SS "1.6  Info"
+.TP
+.B -v
+Version, patchlevel, license.
+.TP
+.B -V\fR[\fB:\fIconfigvar\fR]
+Configuration summary.
+.TP
+.BR -h ", " --help
+Help.
+.SS "1.7  Parallelism"
+.TP
+.B -j \fIN\fR
+Set rayon pool size to \fIN\fR threads.
+.SS "1.8  Subcommands"
+.TP
+.B docs \fR[\fITOPIC\fR]
+TUI hover-doc reader (vi-style nav: j/k/d/u/]/[ /t / / : r ? q).
+Aliases:
+.BR help ", " h .
+.TP
+.B repl \fR[\fB--load \fIFILE\fR]
+Interactive REPL with optional pre-load.
+.TP
+.B serve \fR[\fIPORT\fR] [\fISCRIPT\fR]
+HTTP server.
+.TP
+.B fmt \fR[\fB-i\fR] \fIFILE\fR...
+Format source files.
+.TP
+.B bench \fR[\fIFILE|DIR\fR]
+Run benchmarks.
+.TP
+.B init \fR[\fINAME\fR]
+Scaffold project in cwd.
+.TP
+.B new \fINAME\fR
+Scaffold project at \fI./NAME/\fR.
+.TP
+.B install \fR[\fB--offline\fR]
+Resolve deps, populate \fIstryke.lock\fR + \fI~/.stryke/store\fR.
+.TP
+.B add \fINAME\fR[\fB@\fIVER\fR] ...
+Add dep to \fIstryke.toml\fR. Flags:
+.B --dev \fR/\fR --group=\fIN\fR \fR/\fR --path=\fIDIR\fR \fR/\fR --features=\fIA,B\fR.
+.TP
+.B remove \fINAME\fR
+Drop dep from \fIstryke.toml\fR.
+.TP
+.B tree
+Print resolved dep graph from \fIstryke.lock\fR.
+.TP
+.B info \fINAME\fR
+Show lockfile entry + store path.
+.TP
+.B pkg \fISUBCOMMAND\fR
+Dispatcher for package commands.
+.TP
+.B build \fISCRIPT\fR \fR[\fB-o \fIOUT\fR]
+AOT bundle SCRIPT into a copy of this binary as a standalone exe.
+.TP
+.B --lsp
+Language Server (JSON-RPC on stdio); must be sole arg.
+.TP
+.B --remote-worker
+Persistent cluster worker (stdio); sole arg.
+.TP
+.B --remote-worker-v1
+Legacy one-shot worker (stdio); sole arg.
+.TP
+.B t \fR[\fIFILE|DIR\fR]
+Run tests from \fIt/\fR (test files matching \fItest_*.stk\fR).
+Parallel by default; flags \fB--quiet\fR, \fB--summary\fR.
+.TP
+.B perfview \fR[options]
+Read the wall-clock perf log from \fI~/.stryke/perf.sqlite\fR.
+Options: \fBtop \fIN\fR, \fBname \fISUB\fR, \fBre \fIREGEX\fR,
+\fBpath \fI/abs\fR, \fBsince \fI7d\fR, \fBslowest / fastest / recent\fR.
+.SH "2.  LEXICAL STRUCTURE"
+.SS "2.1  Comments"
+.PP
+Line comments start with
+.BR # ;
+they extend to end of line. No block-comment syntax.
+.PP
+.RS 4
+.EX
+# This is a comment
+my $x = 1   # trailing
+.EE
+.RE
+.SS "2.2  Identifiers"
+.PP
+Identifiers match
+.B [A-Za-z_][A-Za-z0-9_]*
+plus Unicode XID. Package separators:
+.B ::
+.RB "(e.g. " "Foo::Bar::baz" ).
+Sigils:
+.BR $  ", " @  ", " %  ", " &  ", " *
+for scalars, arrays, hashes, code, and typeglobs.
+.SS "2.3  Strings"
+.PP
+.TP
+.B '...'
+Single quotes; no interpolation, no escapes except
+.B \\'
+and
+.BR \\\\ .
+.TP
+.B "..."
+Double quotes; full interpolation:
+.BR $var ", " @arr ", " "${complex}" ", " "${$ref}" ", " "@{[expr]}" ", " "${\\expr}" .
+Escapes:
+.BR \\n " \\t \\r \\0 \\xNN \\uNNNN \\\\ \\\""
++ \\e \\a \\f \\b \\v.
+.TP
+.B q(...)
+Like single quotes, with custom delimiter (any matched bracket pair
+or non-alphanumeric char).
+.TP
+.B qq(...)
+Like double quotes, with custom delimiter.
+.TP
+.B qw(LIST)
+Word list, whitespace-separated.
+.TP
+.B qr/PATTERN/
+Compiled regex literal.
+.TP
+.BI <<EOT ... EOT
+Heredoc (newline-terminated;
+.B <<~EOT
+strips leading indentation).
+.SS "2.4  Numbers"
+.PP
+.RS 4
+.EX
+123       # decimal
+0x1A      # hex
+0b1010    # binary
+0o17      # octal (stryke-style)
+0755      # octal (Perl-style)
+3.14      # float
+1.5e-3    # scientific
+1_000_000 # underscore-separated
+.EE
+.RE
+.SS "2.5  Regex Literals"
+.PP
+.RS 4
+.EX
+m/PATTERN/FLAGS   # match (m// is optional with / delimiters)
+s/PATTERN/REPL/FLAGS  # substitute
+tr/SRC/DST/FLAGS  # transliterate
+qr/PATTERN/FLAGS  # compiled regex value
+.EE
+.RE
+Flags:
+.B i
+(case-insensitive),
+.B m
+(multiline),
+.B s
+(dotall),
+.B x
+(extended),
+.B g
+(global),
+.B e
+(eval RHS),
+.B r
+(return; don't mutate).
+.SH "3.  DATA TYPES"
+.SS "3.1  Scalars"
+.B StrykeValue
+is NaN-boxed: immediates (
+.BR undef ", "
+i32, f64) and Arc-tagged heap objects (BigInt, String, Bytes, Array,
+Hash, ArrayRef, HashRef, ScalarRef, CodeRef, Regex, Blessed, IOHandle,
+Set, Deque, Heap, sketches: BloomFilter, HllSketch, CmsSketch,
+TopKSketch, TDigestSketch, RoaringBitmap, RateLimiter, HashRing,
+SimHash, MinHash, IntervalTree, BkTree, Rope).
+.SS "3.2  Arrays"
+.PP
+.RS 4
+.EX
+my @arr = (1, 2, 3);
+$arr[0]        # element
+@arr[1..2]     # slice
+@arr[1:2]      # slice with stryke colon range (1:N inclusive)
+scalar @arr    # length (Perl convention)
+len(@arr)      # length (stryke convention)
+push @arr, 4
+pop @arr
+unshift @arr, 0
+shift @arr
+.EE
+.RE
+.SS "3.3  Hashes"
+.PP
+.RS 4
+.EX
+my %h = (a => 1, b => 2);
+$h{a}          # element
+@h{qw(a b)}    # slice
+keys %h
+values %h
+exists $h{a}
+delete $h{a}
+%h = ()        # clear
+.EE
+.RE
+.SS "3.4  References"
+.PP
+.RS 4
+.EX
+my $ref = \@arr;       # scalar ref to array
+$$ref                  # deref scalar
+@$ref                  # deref array
+@{$ref}                # explicit
+$ref->[0]              # arrow deref array element
+$ref->{key}            # arrow deref hash element
+&$cref()               # call coderef
+$cref->(args)          # call coderef (preferred)
+ref($x)                # "ARRAY" / "HASH" / "CODE" / etc.
+.EE
+.RE
+.SS "3.5  Classes (stryke extension)"
+.PP
+.RS 4
+.EX
+class Point {
+    x: Num = 0
+    y: Num = 0
+    fn distance($other) {
+        sqrt(($self->x - $other->x)**2 + ($self->y - $other->y)**2)
+    }
+    fn Self.origin() { Point() }
+}
+my $p = Point(x => 3, y => 4)
+p $p->distance(Point::origin())   # 5
+.EE
+.RE
+.SS "3.6  Structs (stryke extension)"
+.PP
+.RS 4
+.EX
+struct Foo { a: Int, b: Str }
+my $f = Foo(a => 1, b => "hi")
+.EE
+.RE
+.SS "3.7  Enums (stryke extension)"
+.PP
+.RS 4
+.EX
+enum Shape {
+    Circle(r: Num),
+    Square(side: Num),
+    Triangle(a: Num, b: Num, c: Num),
+}
+my $s = Circle(r => 5)
+match ($s) {
+    Circle($r)    => p "circle r=$r",
+    Square($side) => p "square side=$side",
+    _             => p "other",
+}
+.EE
+.RE
+.SS "3.8  Sets / Deques / Heaps / Sketches"
+.PP
+.RS 4
+.EX
+my $s = set(1, 2, 3, 2, 1)             # uniq
+$s->contains(2)                        # 1
+$s->union(set(4, 5))
+
+my $dq = deque(1, 2, 3)
+$dq->push_front(0); $dq->pop_back
+
+my $h = heap(5, 3, 8, 1)               # min-heap
+$h->pop                                # 1
+$h->peek                               # 3
+
+my $b = bloom_filter(10_000, 0.001)    # capacity, fpr
+bloom_add($b, "alice")
+bloom_contains($b, "alice")            # 1
+
+my $hll = hll(14)                      # precision 14 → 16k registers
+hll_add($hll, $_) for 1..100_000
+hll_count($hll)                        # ~99672, ~0.33% error
+
+my $td = t_digest(100)
+td_add($td, $_) for @samples
+td_quantile($td, 0.99)                 # 99th percentile
+
+my $rb = roaring(1, 2, 3, 5, 8, 13)
+rb_and($rb, roaring(2, 4, 6, 8))       # in-place intersect
+rb_to_array($rb)                       # (2, 8)
+.EE
+.RE
+.SH "4.  OPERATORS"
+.SS "4.1  Arithmetic"
+.B + - * / % ** //
+(integer division)
+.B ++ --
+.SS "4.2  Comparison (numeric)"
+.B == != < > <= >= <=>
+(spaceship)
+.SS "4.3  Comparison (string)"
+.B eq ne lt gt le ge cmp
+.SS "4.4  Logical"
+.B && || ! //
+.RB "(defined-or), word forms: " "and or not xor" .
+.SS "4.5  Bitwise"
+.B & | ^ ~ << >>
+.SS "4.6  String"
+.B .
+.RB "(concat), " x " (repeat)."
+.SS "4.7  Range"
+.B 1..N
+(inclusive Perl range),
+.B 1:N
+(stryke colon range \(em inclusive, supports floats and reverse).
+.SS "4.8  Regex"
+.B =~ !~
+match/no-match.
+.SS "4.9  Ternary"
+.B COND ? T : F
+.SS "4.10  Pipe-Forward (stryke extension)"
+.B EXPR |> FN
+.RB "passes the LHS as the first argument to " FN .
+Compose stages left-to-right:
+.PP
+.RS 4
+.EX
+@nums |> grep { _ > 0 } |> map { _ * 2 } |> sum
+.EE
+.RE
+.SS "4.11  Thread Macro (stryke extension)"
+.B ~> EXPR FN FN ...
+threads
+.B EXPR
+through each
+.B FN
+sequentially:
+.PP
+.RS 4
+.EX
+~> "Hello, World!"
+    .uc
+    .reverse
+    .substr(0, 5)
+.EE
+.RE
+.PP
+.B ~>>
+is the parallel variant (each stage runs in its own task).
+.SS "4.12  Topic Slots"
+.PP
+.TP
+.B $_
+Perl-compat topic.
+.TP
+.B _
+Stryke topic (same value, unsigiled, only inside blocks/closures).
+.TP
+.B _0 _1 _2 ...
+Positional block parameters (0-indexed). Replaces the
+.BR $a "/" $b
+magic in sort/reduce.
+.TP
+.B $_<
+.RB "Outer topic in a nested " ~> " chain."
+.TP
+.B $_<<
+.RB "Outer-outer (each " < " climbs one chain level)."
+.SH "5.  CONTROL FLOW"
+.SS "5.1  Conditionals"
+.PP
+.RS 4
+.EX
+if (COND)    { ... } elsif (COND) { ... } else { ... }
+unless (COND) { ... }                  # equivalent to if (!COND)
+EXPR if COND                           # postfix
+EXPR unless COND                       # postfix
+.EE
+.RE
+.SS "5.2  Loops"
+.PP
+.RS 4
+.EX
+while (COND) { ... }
+until (COND) { ... }
+do { ... } while (COND)
+for (INIT; COND; STEP) { ... }
+for/foreach my $v (@list) { ... }
+EXPR while COND                        # postfix
+EXPR for @list                         # postfix
+.EE
+.RE
+.SS "5.3  Loop Control"
+.B last
+.RB "(break), " next " (continue), " redo " (re-enter without re-test)."
+Block labels:
+.B LABEL: while ... { last LABEL; }
+.SS "5.4  Algebraic Match (stryke extension)"
+.PP
+.RS 4
+.EX
+match ($val) {
+    /^\\d+$/         => p "number: $val",
+    [1, 2, _]        => p "array starting 1,2",
+    { name => $n }   => p "name is $n",
+    Point($x, $y)    => p "point $x,$y",
+    _                => p "default",
+}
+.EE
+.RE
+.SS "5.5  Try/Catch (stryke extension)"
+.PP
+.RS 4
+.EX
+try {
+    risky_op();
+} catch ($err) {
+    p "caught: $err"
+} finally {
+    cleanup()
+}
+.EE
+.RE
+.PP
+Equivalent Perl 5 form: \fBeval { ... }; if ($@) { ... }\fR.
+.SH "6.  SUBROUTINES"
+.SS "6.1  sub (Perl-compat)"
+.PP
+.RS 4
+.EX
+sub greet { my ($name) = @_; "Hello, $name!" }
+sub add($a, $b) { $a + $b }            # signatures (Perl 5.20+)
+sub circle_area :prototype($) { my $r = shift; PI * $r ** 2 }
+.EE
+.RE
+.SS "6.2  fn (stryke-idiomatic)"
+.PP
+.RS 4
+.EX
+fn add($a, $b) { $a + $b }
+fn add($a: Int, $b: Int) { $a + $b }        # typed signature
+fn add($a: Int = 0, $b: Int = 0) { ... }    # defaults
+fn Foo::add($a, $b) { ... }                  # qualified
+fn Foo.bar { ... }                           # method on package
+.EE
+.RE
+.SS "6.3  Anonymous & Closures"
+.PP
+.RS 4
+.EX
+my $sq = sub { $_[0] ** 2 };
+my $sq = fn { _ ** 2 };                  # stryke: _ is topic
+my $f = fn ($x) { $x + 1 };
+.EE
+.RE
+.SS "6.4  Async / Await"
+.PP
+.RS 4
+.EX
+my $task = async { expensive_work() };
+my $result = await $task;
+my @results = await spawn { fetch_url $_ }, @urls;
+.EE
+.RE
+.SS "6.5  Prototypes"
+.PP
+.RS 4
+.EX
+sub myfn :prototype($\\@$) { ... }       # scalar, array-ref, scalar
+.EE
+.RE
+.SH "7.  SCOPES & PACKAGES"
+.SS "7.1  my / our / local / oursync"
+.TP
+.B my $x
+Lexical scope (block-local).
+.TP
+.B our $x
+Package global with lexical alias.
+.TP
+.B local $x
+Dynamic scope (preserved and restored).
+.TP
+.B oursync $x
+Stryke extension: package global with cross-thread synchronized access
+(reads acquire shared lock, writes acquire exclusive lock).
+.TP
+.B mysync $x
+Stryke extension: lexical sync — \fBmy\fR scope with cross-thread visibility.
+.SS "7.2  package"
+.PP
+.RS 4
+.EX
+package Foo::Bar;
+sub new { bless {}, shift }
+1;
+.EE
+.RE
+.SS "7.3  use / require / no"
+.PP
+.RS 4
+.EX
+use strict;
+use warnings;
+use feature qw(say signatures);
+use Foo::Bar;
+use Foo::Bar qw(fn1 fn2);
+require "module.pl";
+no warnings 'uninitialized';
+.EE
+.RE
+.SS "7.4  Special Blocks"
+.B BEGIN { ... }
+runs at compile time.
+.B END { ... }
+runs at exit.
+.B INIT { ... }
+runs once at start.
+.B CHECK { ... }
+runs after compile, before run.
+.B UNITCHECK { ... }
+per-compilation-unit equivalent.
+.SH "8.  REGEX"
+.PP
+Three-tier engine (
+.IR regex (1)
+crate \(-> fancy-regex \(-> pcre2):
+.IP \(bu 2
+.B regex
+crate handles standard regex with linear-time guarantees.
+.IP \(bu 2
+.B fancy-regex
+adds backrefs, lookarounds, atomic groups.
+.IP \(bu 2
+.B pcre2
+provides PCRE-only verbs (\\K, \\g'name', recursion, named subroutines).
+.PP
+Stryke picks the lowest tier that handles the pattern.
+.SS "8.1  Match"
+.PP
+.RS 4
+.EX
+"hello" =~ /^h/         # 1
+"hello" =~ /(.)(.)/     # captures: $1='h', $2='e'
+"abc" =~ /(?<first>.)/  # named: $+{first}='a'
+.EE
+.RE
+.SS "8.2  Substitution"
+.PP
+.RS 4
+.EX
+$_ = "foo bar";
+s/foo/FOO/;             # mutates
+my $new = $_ =~ s/o/0/gr;  # non-destructive (r flag)
+.EE
+.RE
+.SS "8.3  Transliteration"
+.PP
+.RS 4
+.EX
+my $s = "Hello";
+$s =~ tr/a-z/A-Z/;      # HELLO
+my $n = $s =~ tr/L//;   # count L's (returns count)
+.EE
+.RE
+.SS "8.4  Compiled Regex Objects"
+.PP
+.RS 4
+.EX
+my $re = qr/^\\d+$/;
+"123" =~ $re            # 1
+.EE
+.RE
+.SH "9.  OOP (Modern stryke `class` syntax)"
+.PP
+Stryke supports two OOP styles: Perl 5
+.B bless
+and the modern
+.B class
+keyword (cleaner, typed, with traits).
+.SS "9.1  Class declaration"
+.PP
+.RS 4
+.EX
+class Animal {
+    name: Str
+    age: Int = 0
+    fn speak { p "Animal $self->name speaks" }
+}
+
+class Dog extends Animal {
+    breed: Str = "mixed"
+    fn speak { p "Woof! I am $self->name" }   # override
+    fn bark  { $self->speak() }
+}
+
+trait Printable { fn to_str }
+class Item impl Printable {
+    name: Str
+    fn to_str { $self->name }
+}
+
+class C extends A, B { }                  # multiple inheritance, C3 MRO
+.EE
+.RE
+.SS "9.2  Construction"
+.PP
+.RS 4
+.EX
+my $dog = Dog(name => "Rex", age => 5, breed => "Lab")
+my $dog = Dog("Rex", 5, "Lab")              # positional
+.EE
+.RE
+.SS "9.3  Field access (getter / setter)"
+.PP
+.RS 4
+.EX
+p $dog->name        # getter (no args)
+$dog->age(6)        # setter (one arg)
+.EE
+.RE
+.SS "9.4  Static methods (fn Self.name)"
+.PP
+.RS 4
+.EX
+class Math {
+    fn Self.add($x, $y) { $x + $y }
+    fn Self.pi { 3.14159 }
+}
+p Math::add(3, 4)   # 7
+p Math::pi()        # 3.14159
+.EE
+.RE
+.SS "9.5  Introspection"
+.PP
+.RS 4
+.EX
+$dog->isa("Dog")          # 1
+$dog->isa("Animal")       # 1
+$dog->fields()            # (name, age, breed)
+$dog->to_hash()           # { name=>"Rex", age=>5, breed=>"Lab" }
+$dog->with(age => 6)      # functional update (returns new instance)
+$dog->clone()             # deep copy
+.EE
+.RE
+.SS "9.6  Visibility"
+.PP
+.RS 4
+.EX
+class Secret {
+    pub  visible: Int = 1
+    priv hidden:  Int = 42
+    pub fn get_hidden { $self->hidden }
+}
+.EE
+.RE
+.SH "10. AOP (Aspect-Oriented Programming)"
+.PP
+Stryke extends Perl 5 with first-class advice on user subs and methods.
+.SS "10.1  Intercept"
+.PP
+.RS 4
+.EX
+intercept Foo::greet  before { p "calling $_->name" }
+intercept Foo::greet  after  { p "called  $_->name" }
+intercept Foo::greet  around { p "before"; my $r = proceed(); p "after"; $r }
+intercept_list                       # list all intercepts
+intercept_remove "Foo::greet"        # drop intercepts on greet
+intercept_clear                      # drop all
+.EE
+.RE
+.PP
+Advice has access to
+.B $_->name
+(sub name),
+.B $_->args
+(call args),
+.B proceed()
+(call the next layer / original),
+.B $_->return_value
+(in
+.BR after ).
+.SH "11. PARALLEL PRIMITIVES"
+.PP
+Rayon-backed work-stealing across all cores. Two syntactic forms per
+primitive: block form and bare-fn form.
+.SS "11.1  pmap"
+.PP
+.RS 4
+.EX
+my @out = pmap { _ * 2 } 1..1_000_000
+my @hashes = pmap sha256 @blobs, progress => 1
+
+# bare-fn form
+my @doubled = pmap dbl, 1..100
+fn dbl = _ * 2
+.EE
+.RE
+.SS "11.2  pgrep / pfor / psort / preduce / pmap_reduce"
+.PP
+.RS 4
+.EX
+my @errs = pgrep { /ERROR/ } @log_lines
+pfor { print_log _ } @files
+my @sorted = psort { length _0 <=> length _1 } @strings
+my $sum = preduce { _0 + _1 } 1..1000
+my $sum = preduce_init 0, { _0 + _1 } @nums
+my $total = pmap_reduce { _ * 2 } { _0 + _1 } @nums
+.EE
+.RE
+.SS "11.3  pcache (parallel memoize)"
+.PP
+.RS 4
+.EX
+my @results = pcache { expensive(_) } @inputs
+.EE
+.RE
+.SS "11.4  fan / fan_cap"
+.PP
+.RS 4
+.EX
+fan { hit_endpoint(_) }              # _ is index 0..rayon_pool_size-1
+fan_cap 100, { compute_one(_) }      # caps at 100, collects results
+.EE
+.RE
+.SS "11.5  par_walk / par_lines / par_sed"
+.PP
+.RS 4
+.EX
+par_walk "/tmp", { lstat(_)->[7] > 1_000_000 and p _ }
+par_lines "huge.log", { /ERROR/ and p _ }
+par_sed qr/foo/, "bar", "*.txt"      # in-place across all files
+.EE
+.RE
+.SS "11.6  ppool / pchannel"
+.PP
+.RS 4
+.EX
+my $pool = ppool(4)                  # 4 workers
+$pool->submit({ ... }) for @jobs
+my @results = $pool->collect()
+
+my ($tx, $rx) = pchannel(64)         # bounded channel
+$tx->send($v); my $v = $rx->recv()
+.EE
+.RE
+.SS "11.7  async / spawn / await"
+.PP
+.RS 4
+.EX
+my $t = async { expensive_compute() }
+my $r = await $t
+
+my @tasks = map { spawn { fetch_url _ } } @urls
+my @bodies = await @tasks
+.EE
+.RE
+.SH "12. PIPELINES"
+.SS "12.1  Pipe-Forward (|>)"
+.PP
+.RS 4
+.EX
+@nums
+  |> grep { _ > 0 }
+  |> map  { _ * 2 }
+  |> sort { _0 <=> _1 }
+  |> head 10
+  |> sum
+.EE
+.RE
+.SS "12.2  pipeline() — lazy iterator object"
+.PP
+.RS 4
+.EX
+my @out = pipeline(1:1_000_000)
+  ->filter { _ % 3 == 0 }
+  ->map    { _ ** 2 }
+  ->take(5)
+  ->collect
+# Stages run on demand; no intermediate arrays allocated.
+.EE
+.RE
+.SS "12.3  par_pipeline / par_pipeline_stream"
+.PP
+.RS 4
+.EX
+par_pipeline(@in)
+  ->map { transform _ }
+  ->filter { valid _ }
+  ->collect
+
+# Streaming with bounded channels between stages:
+par_pipeline_stream(
+    source  => fn { while (my $l = <STDIN>) { yield $l } },
+    stages  => [
+        { name => "parse", map => fn { json_decode } },
+        { name => "score", map => fn { compute_score } },
+    ],
+    workers => 4,
+)
+.EE
+.RE
+.SH "13. THREAD MACRO (~> / ~>>)"
+.PP
+Threads a value through a chain of stages, each of which sees the
+running value as
+.BR _ .
+Distinguishes itself from
+.B |>
+by allowing each stage to be a complex form, not just a callable.
+.PP
+.RS 4
+.EX
+~> "hello world"
+    chars             # "h", "e", "l", "l", "o", " ", "w", ...
+    grep { _ ne " " }
+    uniq
+    sort
+    join ""           # "delhorw"
+
+# Parallel threading:
+~>> 1..1_000_000
+    map { sha256 _ }
+    grep { /^00/ }
+    head 10
+.EE
+.RE
+.PP
+.B Outer topic chain:
+inside a nested
+.BR ~> ,
+.B _<
+refers to the outer chain's running value;
+.B _<<
+to the chain one level further out, etc. Each
+.B <
+climbs one nesting level.
+.SH "14. REFLECTION HASHES"
+.PP
+.RS 4
+.EX
+keys %b           # 10,267 primary builtin names → category
+keys %a           # 641 aliases (name → primary)
+keys %all         # 10,993 = %b ∪ %a ∪ %k
+keys %k           # 85 keywords (if, sub, my, our, …)
+keys %pc          # 185 Perl 5 core names (subset of %b)
+keys %e           # 10,082 stryke extensions (subset of %b)
+keys %d           # 4,228 names with LSP hover documentation
+keys %c           # 306 categories
+keys %p           # 8,790 primaries (after alias dedup)
+keys %o           # 70 operators
+keys %v           # 97 special variables ($_, $!, $/, ...)
+%parameters       # live binding view of every named pad slot
+
+# Per-package stashes:
+keys %main::      # everything in package main
+keys %Foo::       # everything in package Foo
+.EE
+.RE
+.SH "15. BUILTINS BY CATEGORY"
+.PP
+This is a navigational overview. For per-builtin documentation, use
+the LSP hover (
+.B s docs NAME
+), the in-REPL `help NAME` alias, or
+.IR /usr/local/share/man/man1/stryke.1 .
+.SS "15.1  String"
+.B length len substr index rindex uc lc ucfirst lcfirst chomp chop
+.B chop quotemeta reverse_str sprintf printf format lpad rpad center
+.B truncate_str trim trim_left trim_right pad title_case snake_case
+.B camel_case kebab_case starts_with ends_with contains words letters
+.B punct sentences paragraphs graphemes chars chars_at codepoints
+.SS "15.2  Numeric"
+.B abs int float ceil floor round sign sqrt exp log log2 log10 pow
+.B sin cos tan asin acos atan atan2 sinh cosh tanh
+.B isnan isfinite isinf max min sum sum0 prod product mean median
+.B mode stddev variance percentile quantile clamp scale normalize
+.B random rand_range rand_int gcd lcm fact comb perm
+.SS "15.3  Array / Hash"
+.B push pop shift unshift splice
+.B grep map sort reverse_list
+.B uniq distinct flatten zip with_index
+.B keys values each first last nth find_index
+.B exists defined delete
+.B chunk windowed take drop head tail rotate
+.B partition group_by chunk_by tally
+.B reduce inject scan zipmap
+.B intersect difference symmetric_diff_arr
+.SS "15.4  Regex"
+.B regex_match regex_replace regex_split regex_split_limit
+.B captures named_captures match_all
+.B quotemeta_regex
+.SS "15.5  File / Path"
+.B slurp spurt cat read_lines append_file write_json read_json
+.B open close read write seek tell truncate
+.B file_exists is_file is_dir is_link is_readable is_writable
+.B stat lstat fstat mkdir rmdir touch unlink rename copy symlink
+.B realpath canonpath basename dirname tempfile tempdir mktemp
+.B mktempdir chmod chown
+.B files filesf dirs sym_links char_devices executables
+.SS "15.6  Process / System"
+.B system exec backtick `cmd` fork waitpid wait sleep nanosleep
+.B getpid getppid getuid geteuid getgid getegid umask
+.B kill signal_name nice renice setpriority getpriority
+.B process_list top time uptime_secs uname hostname_str
+.B getpwuid getpwnam getgrgid getgrnam
+.B chdir getcwd cwd pwd_str chroot
+.SS "15.7  Network"
+.B fetch_async fetch_val fetch_json fetch_url_tool
+.B http_headers http_method_get http_method_post http_method_put
+.B http_method_delete http_method_patch http_status_line
+.B curl_get curl_post http_fetch http_post
+.B web_serve web_route web_render web_redirect web_static
+.B ip_parse ip_is_valid ip_to_int int_to_ip
+.B cidr_parse cidr_contains ip_in_cidr cidr_difference
+.B net_interfaces ifconfig
+.SS "15.8  Crypto"
+.B md5 sha1 sha256 sha384 sha512 sha3_256 sha3_512 blake2b blake3
+.B hmac_sha1 hmac_sha256 hmac_sha512 hkdf_sha256 hkdf_sha512
+.B pbkdf2_sha256 pbkdf2_sha512 argon2 bcrypt scrypt
+.B aes_encrypt aes_decrypt chacha_encrypt chacha_decrypt
+.B ed25519_keygen ed25519_sign ed25519_verify
+.B rsa_keygen rsa_sign rsa_verify rsa_encrypt rsa_decrypt
+.B base64_encode base64_decode hex_encode hex_decode
+.B totp_at totp_now totp_uri uuid_v4 uuid_v7 ulid nanoid
+.SS "15.9  Codec / Serialization"
+.B to_json from_json to_yaml from_yaml to_toml from_toml
+.B to_xml from_xml to_csv from_csv to_html to_markdown
+.B msgpack_pack msgpack_unpack
+.B native_codec_dumps native_codec_loads
+.B encode decode iconv strftime
+.SS "15.10 Compression"
+.B gzip gzip_compress gzip_decompress
+.B brotli_encode brotli_decode
+.B zstd zstd_compress zstd_decompress
+.B xz xz_compress xz_decompress
+.B lz4_compress lz4_decompress
+.B tar tar_create tar_extract tar_list
+.B zip zip_create zip_extract zip_list
+.SS "15.11 Date / Time"
+.B time now timestamp date_iso_format date_day date_dayofweek
+.B date_dayofyear date_days_in_month date_diff_days date_diff_hours
+.B date_diff_minutes date_diff_seconds date_add_days date_add_months
+.B date_add_years date_business_days_between iso_week
+.B strftime date_now_ms date_now_us date_now_ns
+.B human_duration format_duration sleep_ms sleep_us
+.SS "15.12 Reflection / Introspection"
+.B keys values exists defined ref blessed isa can DOES
+.B caller wantarray __FILE__ __LINE__ __PACKAGE__ __SUB__
+.B perfview docs help h man lsp_completion_words methods_for which
+.B which_all type_name fields to_hash builtins_hash_map
+.SS "15.13 Probabilistic Sketches (RFC-1)"
+.B bloom_filter bloom_add bloom_contains bloom_len bloom_clear
+.B bloom_merge bloom_fpr bloom_bits bloom_serialize bloom_deserialize
+.B hll hll_add hll_count hll_merge hll_clear hll_precision
+.B hll_serialize hll_deserialize
+.B cms cms_add cms_count cms_merge cms_clear
+.B topk topk_add topk_heavies topk_count topk_size topk_merge
+.B t_digest td_add td_quantile td_count td_min td_max td_sum td_mean
+.B td_merge td_clear td_serialize td_deserialize
+.B roaring rb_add rb_remove rb_contains rb_or rb_and rb_xor rb_andnot
+.B rb_len rb_min rb_max rb_rank rb_to_array rb_serialize rb_deserialize
+.SS "15.14 Stateful Sketches (Tier 2)"
+.B token_bucket leaky_bucket rl_try_take rl_available
+.B hash_ring consistent_hash hr_add hr_remove hr_get hr_nodes
+.B simhash sh_add sh_digest sh_similarity
+.B minhash mh_add mh_jaccard mh_merge
+.B interval_tree it_insert it_query_point it_query_range it_remove
+.B bk_tree bk_insert bk_query bk_len
+.B rope rope_insert rope_delete rope_substring rope_to_string rope_len
+.B myers_diff patience_diff damerau_levenshtein
+.SS "15.15 Numerical Stability (Tier 1)"
+.B kahan_sum neumaier_sum welford_mean welford_variance welford_stddev
+.B welford_pop_variance reservoir_sample
+.SS "15.16 Shell-Like REPL (Tier S + A)"
+.B clear cls whoami groups pushd popd dir_stack
+.B history repl_alias repl_unalias set_alias unset_alias
+.B term_size term_width term_height set_title beep ring_bell
+.B rm mktemp mktempdir whereis nice renice tree comm column xargs
+.B openurl xdg_open curl_get curl_post
+.B iconv strftime tac rev_lines tty_raw tty_cooked
+.B man manpage
+.SS "15.17 AI / ML / Vectors"
+.B ai prompt stream_prompt embed embed_batch ai_cost ai_routing
+.B ai_filter ai_map ai_classify ai_sort ai_match ai_dedupe
+.B vec_cosine vec_dot vec_normalize vec_add vec_scale vec_search
+.B vec_topk cosine_similarity euclidean_distance
+.B tool fn ... # declarative AI tool with build-time JSON schema
+.B mcp_connect mcp_server mcp_server_start mcp_serve_registered_tools
+.SS "15.18 Web Framework"
+.B web_serve web_route web_get web_post web_put web_delete web_patch
+.B web_static web_render web_redirect web_json web_text web_html
+.B web_session web_flash web_cookie web_csrf web_csrf_meta_tag
+.B web_security_headers web_form web_multipart web_uuid
+.B web_create_table web_add_column web_migrate
+.B web_jobs_init web_job_enqueue web_job_dequeue
+.B web_sse web_jobs_stats web_rate_limit
+.B s_web   # CLI subcommand: scaffold + build a web app
+.SS "15.19 Package Manager"
+.B s_install s_add s_remove s_update s_outdated s_audit s_vendor
+.B s_clean s_tree s_info s_init s_new
+.SS "15.20 Cluster / Distributed"
+.B cluster pmap_on remote_wire stryke_agent stryke_controller
+.B ppool barrier remote_eval remote_spawn
+.SS "15.21 Bench / Stress"
+.B bench bench_compare bench_section
+.B stress_metrics_prometheus stress_metrics_csv stress_metrics_json
+.B stress_metrics_export stress_metrics_watch stress_throttled
+.B audit_log heat fire
+.SH "16. REPL & SHELL-LIKE BEHAVIOR"
+.PP
+Type
+.B s
+with no arguments to enter the REPL:
+.PP
+.RS 4
+.EX
+$ s
+ ███████╗████████╗██████╗ ██╗   ██╗██╗  ██╗███████╗
+ ██╔════╝╚══██╔══╝██╔══██╗╚██╗ ██╔╝██║ ██╔╝██╔════╝
+ (banner with reflection counts)
+
+stryke❯ ls
+stryke❯ pwd
+stryke❯ pushd /tmp
+stryke❯ curl_get("https://api.example.com") |> from_json |> to_table |> p
+stryke❯ help pmap         # opens TUI hover-doc reader
+stryke❯ man ls            # spawns system man(1)
+stryke❯ exit              # Ctrl-D also works
+.EE
+.RE
+.PP
+Tab completion is backed by
+.IR strykelang/lsp_completion_words.txt
+(22,071 names: every primary, alias, keyword, special variable, file
+test op, glob qualifier). History is reedline-backed and persists
+across sessions.
+.PP
+.B Pipelines in stryke REPL are in-process.
+Each
+.B |>
+stage is a heap-resident
+.B StrykeValue
+passed to the next stage's function. No fork, no exec, no syscall
+boundary. The REPL is the only programming-language prompt that
+provides shell-grade UX
+.B and
+in-process structured pipelines simultaneously.
+.SS "16.1  REPL Aliases"
+.PP
+Bare
+.B alias
+is reserved for Perl typeglob assignment
+.RB ( "*alias = \\&original" ).
+REPL alias table lives under
+.B repl_alias / repl_unalias / set_alias / unset_alias :
+.PP
+.RS 4
+.EX
+stryke❯ repl_alias("ll", "ls -la")
+stryke❯ repl_alias("g=git")           # equals-form
+stryke❯ repl_unalias("g")
+.EE
+.RE
+.SH "17. AI PRIMITIVES"
+.SS "17.1  ai / prompt / stream_prompt"
+.PP
+.RS 4
+.EX
+my $r = ai "summarize this", $document
+my $r = prompt "What is 2+2?", model => "claude-sonnet-4-6"
+stream_prompt "explain quantum entanglement", { _ }  # streams chunks
+.EE
+.RE
+.SS "17.2  tool fn (declarative tool)"
+.PP
+.RS 4
+.EX
+tool fn weather($city: string) "Get the current weather" {
+    fetch "https://api.weather.com/" . uri_encode($city)
+}
+ai "what's the weather in Tokyo?"        # auto-routes to agent loop
+.EE
+.RE
+.SS "17.3  AI collection builtins"
+.PP
+.RS 4
+.EX
+my @keep = ai_filter "is positive sentiment", @comments
+my @cats = ai_map    "categorize",            @items
+my @class = ai_classify ["bug","feature","question"], @issues
+my @sorted = ai_sort "rank by relevance to $query", @docs
+my $hit   = ai_match  "find the user-mentioning $name", @rows
+.EE
+.RE
+.SS "17.4  Embeddings + vector search"
+.PP
+.RS 4
+.EX
+my @vecs = embed_batch \@texts             # auto-batched
+my $hit  = vec_search $query_vec, \@vecs   # SQLite-vec backed
+my @top  = vec_topk 5, $query_vec, \@vecs
+.EE
+.RE
+.SS "17.5  MCP (Model Context Protocol)"
+.PP
+.RS 4
+.EX
+my $mcp = mcp_connect "stdio:./my-mcp-server"
+mcp_server "myserver", tools => [\\&weather, \\&search]
+mcp_server_start "myserver"
+# `s build --mcp-server NAME` builds a self-contained MCP server binary.
+.EE
+.RE
+.SH "18. WEB FRAMEWORK"
+.PP
+Rails-shaped scaffold;
+.IR .stk
+source files; framework runtime is
+.B web_*
+builtins. The whole framework + your app + SQLite ships as a single
+.B cargo build --release
+binary via
+.BR "s_web build" .
+.SS "18.1  Generator"
+.PP
+.RS 4
+.EX
+s_web new myapp \\
+    --app everything --theme cyberpunk \\
+    --auth --admin --docker --ci --pwa --migrate
+.EE
+.RE
+.SS "18.2  Routing"
+.PP
+.RS 4
+.EX
+web_route "GET",  "/users",       \\&list_users
+web_route "POST", "/users",       \\&create_user
+web_route "GET",  "/users/:id",   \\&show_user
+web_serve port => 8080
+.EE
+.RE
+.SS "18.3  ORM"
+.PP
+.RS 4
+.EX
+web_create_table "users", {
+    id      => "INTEGER PRIMARY KEY",
+    name    => "TEXT NOT NULL",
+    email   => "TEXT UNIQUE",
+}
+my @users = User->all
+my $u    = User->find(42)
+$u->{name} = "Alice"
+$u->save
+.EE
+.RE
+.SS "18.4  Templates"
+.PP
+ERB-style
+.B <%= expr %>
+,
+.B <% code %>
+,
+.B <%- code -%>
+(trim whitespace), layouts, partials.
+.SH "19. PACKAGE MANAGER"
+.PP
+Cargo-shaped manifest. Reproducible builds via
+.B stryke.lock
++ content-addressed
+.BR ~/.stryke/store/ .
+.SS "19.1  Manifest"
+.PP
+.RS 4
+.EX
+# stryke.toml
+[package]
+name = "myproj"
+version = "0.1.0"
+edition = "2026"
+
+[dependencies]
+stryke-utils = "1.2"
+stryke-http  = { version = "0.5", features = ["tls"] }
+local-shared = { path = "../shared" }
+.EE
+.RE
+.SS "19.2  Commands"
+.PP
+.RS 4
+.EX
+s install            # resolve + populate store
+s add httprs        # add dep
+s remove httprs     # remove dep
+s tree              # print resolved graph
+s info httprs       # store path + version
+s update            # bump pinned versions
+s outdated          # diff against latest
+s audit             # security scan
+s vendor            # copy deps into ./vendor
+.EE
+.RE
+.SH "20. CLUSTER & DISTRIBUTED"
+.PP
+Built-in distributed compute: spawn workers across many machines,
+fan-out work, collect results. Single-binary deployment via
+.BR "s build" .
+.PP
+.RS 4
+.EX
+my $cluster = cluster(["host1", "host2", "host3"])
+my @results = $cluster->pmap_on(sub { sha256(slurp _) }, \@files)
+.EE
+.RE
+.PP
+The controller spawns
+.B s --remote-worker
+on each host via SSH. Wire protocol is custom (
+.B remote_wire
+), bincode-serialized, length-prefixed. mTLS in roadmap; current
+plaintext OK for trusted networks.
+.SH "21. SPECIAL VARIABLES"
+.PP
+.TP
+.B $_
+Default topic.
+.TP
+.B @_
+Subroutine arguments.
+.TP
+.B $0
+Program name.
+.TP
+.B $^X
+The stryke / perl binary path.
+.TP
+.B $!
+Last system error message (errno).
+.TP
+.B $@
+Last \fBeval\fR error.
+.TP
+.B $/
+Input record separator (default \fB\\n\fR).
+.TP
+.B $\\
+Output record separator.
+.TP
+.B $,
+Output field separator (for \fBprint\fR).
+.TP
+.B $"
+List interpolation separator.
+.TP
+.B $.
+Current line number for last read filehandle.
+.TP
+.B $1 .. $9
+Regex captures.
+.TP
+.B $+
+Last successful regex capture.
+.TP
+.B %+
+Named regex captures.
+.TP
+.B @+ @-
+Capture end / start offsets.
+.TP
+.B @ARGV
+Command-line arguments.
+.TP
+.B %ENV
+Environment variables.
+.TP
+.B @INC
+Module include path.
+.TP
+.B %INC
+Loaded modules.
+.TP
+.B %SIG
+Signal handlers.
+.TP
+.B $$
+Process ID.
+.SH "22. PRAGMAS"
+.TP
+.B use strict;
+Strict variable / refs / subs.
+.TP
+.B use warnings;
+Compile-time + runtime warnings.
+.TP
+.B use utf8;
+Source code is UTF-8.
+.TP
+.B use feature qw(say signatures fc);
+Enable Perl 5+ features.
+.TP
+.B --compat
+Disable all stryke extensions (CLI flag).
+.TP
+.B --no-interop
+Enforce idiomatic stryke (CLI flag).
+.SH "23. ENVIRONMENT VARIABLES"
+.TP
+.B PERL5LIB
+Colon-separated dirs prepended to
+.BR @INC .
+.TP
+.B PERL5OPT
+Default CLI options.
+.TP
+.B STRYKE_RECORD
+\fB1\fR records runs to \fI~/.stryke/perf.sqlite\fR.
+.TP
+.B STRYKE_AI_MODE
+\fBmock-only\fR forces AI builtins to return mocked responses.
+.TP
+.B STRYKE_AUDIT_LOG
+Path for structured audit JSONL log; default \fI~/.stryke/audit.log\fR.
+.TP
+.B RAYON_NUM_THREADS
+Override the rayon pool size (see also CLI \fB-j N\fR).
+.TP
+.B NO_COLOR
+Disable colored output / banner.
+.TP
+.B HOME
+Used by \fBcd\fR / \fI~\fR expansion / \fI~/.stryke\fR resolution.
+.SH "24. FILES"
+.TP
+.I ~/.cargo/bin/s
+Default install location via \fBcargo install strykelang\fR.
+.TP
+.I ~/.stryke/store/
+Content-addressed dep blobs.
+.TP
+.I ~/.stryke/perf.sqlite
+Per-run wall-clock log (when \fBSTRYKE_RECORD=1\fR or \fB--record\fR).
+.TP
+.I ~/.stryke/audit.log
+Structured JSONL audit log.
+.TP
+.I ~/.stryke/scripts.db
+Bytecode cache (rkyv-backed).
+.TP
+.I ~/.cache/stryke/
+Other transient caches.
+.TP
+.I ./stryke.toml
+Per-project manifest.
+.TP
+.I ./stryke.lock
+Per-project resolver lockfile.
+.TP
+.I ./lib/
+Project library code.
+.TP
+.I ./t/
+Test directory.
+.TP
+.I /usr/local/share/man/man1/stryke.1
+Short man page.
+.TP
+.I /usr/local/share/man/man1/strykeall.1
+This page.
+.SH "25. EXAMPLES"
+.SS "Inline one-liners"
+.PP
+.RS 4
+.EX
+# Sum stdin numbers:
+seq 1 100 | s -ne '$s += $_; END { p $s }'
+
+# Parallel SHA-256:
+s 'glob("**/*.txt") |> pmap { sha256 _ } |> e p'
+
+# Filter JSON from URL:
+s 'curl_get("https://api.example.com") |> from_json
+   |> grep { _->{active} } |> map { _->{name} } |> e p'
+
+# Parallel grep with progress:
+s 'glob("logs/*.log")
+   |> pmap { grep /ERROR/, read_lines _ } |> e p, progress => 1'
+
+# Sed-like in-place rewrite, parallel across files:
+s -i.bak -pe 's/foo/bar/g' *.txt
+
+# Top 10 longest lines from STDIN:
+s -ne 'BEGIN { my @h }
+       push @h, [length, $_]; @h = sort { $b->[0] <=> $a->[0] } @h;
+       @h = @h[0..9] if @h > 10
+       END { p "$_->[0]\\t$_->[1]" for @h }'
+
+# Count distinct values via HyperLogLog from CSV:
+s 'my $h = hll(14);
+   from_csv(slurp "data.csv") |> e { hll_add($h, $_->{user_id}) };
+   p hll_count($h)'
+
+# Build a static binary for distribution:
+s build mytool.stk -o ./mytool
+
+# Spin up a web app:
+s_web new myapp --auth --admin && cd myapp && s_web build
+
+# Connect to an MCP server:
+my $mcp = mcp_connect "stdio:./my-mcp-server"
+ai "summarize the data", mcp => $mcp
+.EE
+.RE
+.SS "REPL one-liners"
+.PP
+.RS 4
+.EX
+stryke❯ ls
+stryke❯ pwd
+stryke❯ pushd /tmp
+stryke❯ curl_get "https://example.com" |> length
+stryke❯ tree(".", 2) |> p
+stryke❯ help pmap                   # opens hover-doc TUI
+stryke❯ man ls                      # spawns system man(1)
+stryke❯ keys %b |> grep { /^cms/ }   # introspect builtins by prefix
+stryke❯ history(-5)                  # 5th-from-last input
+stryke❯ exit
+.EE
+.RE
+.SH "26. PERFORMANCE"
+.PP
+.B Hot-path JIT.
+Cranelift block-JIT compiles hot loops to native code; deoptimization
+back to bytecode VM is a frame-pointer swap. Disable with
+.BR --no-jit .
+.PP
+.B Per-run profiling.
+.B --record
+or
+.B STRYKE_RECORD=1
+records every run to
+.IR ~/.stryke/perf.sqlite .
+View via
+.BR perfview :
+.PP
+.RS 4
+.EX
+s perfview                          # top 20 slowest
+s perfview top 5                    # top 5
+s perfview name rosetta             # path substring filter
+s perfview since 24h                # last 24 hours
+s perfview slowest                  # sort by duration desc (default)
+s perfview fastest                  # sort asc
+s perfview path /abs/script.stk     # exact-path filter
+.EE
+.RE
+.PP
+.B Flamegraph.
+.B --flame
+prints terminal bar charts (TTY) or SVG (when piped to a file):
+.PP
+.RS 4
+.EX
+s --flame myscript.stk > flame.svg
+.EE
+.RE
+.PP
+.B Bytecode disassembly.
+.B --disasm
+prints the compiled program before running.
+.PP
+.B Release-build tuning.
+The release profile uses
+.B "lto = \"fat\""
+,
+.B "codegen-units = 1"
+,
+.B "panic = \"abort\""
+,
+.B "strip = true"
+to maximize per-builtin density. 40 MB binary for 10,267 primaries
+≈ 3.9 KB amortized per builtin.
+.SH "27. DEBUGGING"
+.PP
+.TP
+.B --ast
+Dump parsed AST as JSON.
+.TP
+.B --disasm
+Print bytecode before running.
+.TP
+.B --explain \fICODE\fR
+Print the expanded hint for an error code (e.g.
+.BR E0001 ).
+.TP
+.B -d
+Run under debugger.
+.TP
+.B -D\fIFLAGS\fR
+Set debug flags (Perl-compat letters).
+.TP
+.B --profile
+Wall-clock profile (VM op lines).
+.TP
+.B --flame
+Flamegraph.
+.SH "28. PERL 5 COMPATIBILITY"
+.PP
+Stryke runs unmodified Perl 5 scripts in
+.B --compat
+mode (no stryke extensions enabled). The compatibility surface
+covers:
+.IP \(bu 2
+All Perl 5 core builtins (
+.IR perlfunc (1)).
+.IP \(bu 2
+Regex (
+.B m// s/// tr/// qr//
+) with full Perl 5.40 syntax.
+.IP \(bu 2
+References, complex data structures.
+.IP \(bu 2
+Bless / OOP via
+.BR bless .
+.IP \(bu 2
+.BR BEGIN ", " END ", " INIT ", " CHECK ", " UNITCHECK ", " DESTROY ", " AUTOLOAD .
+.IP \(bu 2
+.B Carp::
+,
+.B Scalar::Util::
+,
+.B List::Util::
+,
+.B POSIX::
+shipped in
+.BR %INC .
+.PP
+Parity vs Perl is enforced by 20,056
+.B parity/cases
+test cases that run both interpreters on every CI cycle and assert
+byte-identical output.
+.PP
+Differences from Perl 5:
+.IP \(bu 2
+Stryke
+.B len
+is codepoint-counting; Perl
+.B length
+is byte-counting. Stryke
+.B []
+slices are codepoint-indexed; Perl is byte-indexed. Pick one
+coordinate system per expression.
+.IP \(bu 2
+Stryke
+.B sub
+and
+.B fn
+are interchangeable; idiomatic stryke uses
+.BR fn .
+.IP \(bu 2
+Stryke has its own
+.B $_0
+/
+.B $_1
+positional block params (replaces Perl's magic
+.B $a
+/
+.BR $b ).
+.SH "29. EXIT STATUS"
+.TP
+.B 0
+Success.
+.TP
+.B 1
+Script error / non-zero exit from program / die uncaught.
+.TP
+.B 2
+CLI argument parse error.
+.TP
+.B 130
+Interrupted by SIGINT.
+.TP
+.B 137
+Killed by SIGKILL.
+.TP
+.B 139
+Segfault.
+.SH "30. SIGNALS"
+.PP
+Signal handlers register via
+.BR %SIG :
+.PP
+.RS 4
+.EX
+$SIG{INT} = sub { p "caught Ctrl-C"; exit 0 };
+$SIG{TERM} = "IGNORE";
+$SIG{__DIE__} = sub { ... };
+.EE
+.RE
+.SH "31. BUGS"
+.PP
+Known parity gaps tracked in
+.I docs/BUGS.md
+in the source tree. File new reports at:
+.RS 2
+https://github.com/MenkeTechnologies/strykelang/issues
+.RE
+.PP
+Some Perl 5 magic edge cases (
+.B tie
+on complex structures,
+.B AUTOLOAD
+inheritance interaction) may diverge; full list:
+.B s docs --bugs
+.SH "32. SEE ALSO"
+.BR stryke (1),
+.BR perl (1),
+.BR awk (1),
+.BR jq (1),
+.BR rg (1),
+.BR zshall (1).
+.PP
+.B Project home:
+.UR https://github.com/MenkeTechnologies/strykelang
+.UE
+.br
+.B Full reference (10,176 topics):
+.UR https://stryke.menketech.com/reference.html
+.UE
+.br
+.B Engineering report:
+.UR https://stryke.menketech.com/report.html
+.UE
+.br
+.B AI primitives spec:
+.I docs/AI_PRIMITIVES.md
+.br
+.B Package registry spec:
+.I docs/PACKAGE_REGISTRY.md
+.br
+.B Web framework spec:
+.I docs/WEB_FRAMEWORK.md
+.br
+.B Stress testing spec:
+.I docs/STRESS_TESTING.md
+.br
+.B Style guide:
+.I docs/STYLE_GUIDE.md
+.br
+.B Roadmap:
+.I docs/ROADMAP.md
+.SH "33. AUTHOR"
+Jacob Menke (MenkeTechnologies).
+.PP
+.B "There is more than one way to do it \(em in parallel."
+.SH "34. LICENSE"
+MIT.

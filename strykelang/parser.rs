@@ -13539,7 +13539,7 @@ impl Parser {
             | "pushd" | "popd" | "dir_stack"
             | "history" | "repl_alias" | "repl_unalias" | "set_alias" | "unset_alias"
             | "term_size" | "term_width" | "term_height"
-            | "set_title" | "beep" | "ring_bell"
+            | "set_title" | "beep" | "ring_bell" | "man" | "manpage"
             // ── Shell-like REPL (Tier A) ───────────────────────────────────
             | "rm" | "mktemp" | "mktempdir" | "whereis"
             | "nice" | "renice"
@@ -13753,7 +13753,7 @@ impl Parser {
             | "mounts" | "du" | "du_tree" | "process_list"
             | "thread_count" | "pool_info" | "par_bench"
             | "perfview" | "pfv"
-            | "docs"
+            | "docs" | "help" | "h"
             | "banner"
             // ── network / ip / cidr ─────────────────────────────────────────
             | "ip_parse" | "ip_is_valid" | "ip_version" | "ip_family"

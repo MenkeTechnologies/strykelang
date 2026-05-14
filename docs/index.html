@@ -597,6 +597,129 @@ scp load_test node{1:100}:/tmp/</pre>
         <p>See <a href="STRESS_TESTING.md">docs/STRESS_TESTING.md</a> and <a href="rfcs/">RFCs</a> for full documentation.</p>
       </section>
 
+      <section class="tutorial-section" style="border: 2px solid #39ff14; background: linear-gradient(135deg, rgba(57,255,20,0.08) 0%, transparent 50%);">
+        <h2 style="color:#39ff14;">REPL — Shell-Grade Interactive Prompt</h2>
+        <p>Type <code>s</code> and you're in a programming-language REPL <em>and</em> a Unix shell at the same time. Every coreutils-style command works as a bareword; every builtin is callable with or without parens; tab-completion sees every name in <code>%all</code>; history persists; directory stack and aliases match shell muscle-memory.</p>
+
+<pre><span class="comment"># Startup banner — reflection counts at-a-glance</span>
+<span class="prompt">$</span> s
+ ███████╗████████╗██████╗ ██╗   ██╗██╗  ██╗███████╗
+ ██╔════╝╚══██╔══╝██╔══██╗╚██╗ ██╔╝██║ ██╔╝██╔════╝
+ ███████╗   ██║   ██████╔╝ ╚████╔╝ █████╔╝ █████╗
+ ╚════██║   ██║   ██╔══██╗  ╚██╔╝  ██╔═██╗ ██╔══╝
+ ███████║   ██║   ██║  ██║   ██║   ██║  ██╗███████╗
+ ╚══════╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚══════╝
+ ┌────────────────────────────────────────────────────────────────┐
+ │ SYSTEM  status: ONLINE // os: macos arch: aarch64 pid: 30386   │
+ │ CORES   18    MEM  56.2 / 64.0 GiB available                   │
+ ├────────────────────────────────────────────────────────────────┤
+ │ %b  builtins   10267  %a  aliases    641    %all 10993         │
+ │ %k  keywords   85     %o  operators  70     %v   97            │
+ │ %pc perl5 core 185    %e  stryke ext 10082  %d   4228          │
+ │ %c  categories 306    %p  primaries  8790                      │
+ └────────────────────────────────────────────────────────────────┘
+  >> PARALLEL PERL5 INTERPRETER // RUST-POWERED v0.14.1 &lt;&lt;
+</pre>
+
+        <h3 style="color:#39ff14;">Shell-Like Builtins (no PATH walk, no fork)</h3>
+        <p>These are all <strong>in-process</strong> Rust functions, not <code>exec()</code> calls to coreutils. No fork. No path resolution. No spawning. Each returns a stryke value usable in the very next pipeline stage.</p>
+
+        <table class="reflection-table" style="margin-top: 1rem;">
+          <thead><tr><th>Family</th><th>Builtins</th><th>Backed by</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Filesystem</strong></td><td><code>cd</code> <code>pwd</code> <code>ls</code> <code>cat</code> <code>rm</code> <code>mv</code> <code>cp</code> <code>ln</code> <code>mkdir</code> <code>rmdir</code> <code>touch</code> <code>chmod</code> <code>chown</code> <code>realpath</code> <code>basename</code> <code>dirname</code> <code>mktemp</code> <code>mktempdir</code> <code>tree</code> <code>find</code> <code>glob</code></td><td><code>std::fs</code>, <code>tempfile</code> crate</td></tr>
+            <tr><td><strong>Directory stack</strong></td><td><code>pushd</code> <code>popd</code> <code>dir_stack</code></td><td>process-wide <code>Mutex&lt;Vec&lt;PathBuf&gt;&gt;</code></td></tr>
+            <tr><td><strong>Identity</strong></td><td><code>whoami</code> <code>groups</code> <code>id</code> <code>hostname</code> <code>getpwuid</code> <code>getpwnam</code> <code>getgrgid</code> <code>getgrnam</code></td><td><code>libc</code></td></tr>
+            <tr><td><strong>Process</strong></td><td><code>ps</code> <code>top</code> <code>kill</code> <code>nice</code> <code>renice</code> <code>time</code> <code>sleep</code> <code>wait</code> <code>fork</code> <code>exec</code></td><td><code>libc</code>, <code>nix</code></td></tr>
+            <tr><td><strong>Text processing</strong></td><td><code>grep</code> <code>sort</code> <code>uniq</code> <code>wc</code> <code>head</code> <code>tail</code> <code>cut</code> <code>tr</code> <code>tac</code> <code>rev_lines</code> <code>shuf</code> <code>column</code> <code>comm</code> <code>diff</code> <code>myers_diff</code> <code>patience_diff</code></td><td>pure Rust</td></tr>
+            <tr><td><strong>Search</strong></td><td><code>which</code> <code>whereis</code> <code>type</code> <code>command</code></td><td><code>$PATH</code> walker</td></tr>
+            <tr><td><strong>Networking</strong></td><td><code>curl_get</code> <code>curl_post</code> <code>http_fetch</code> <code>http_post</code> <code>fetch_async</code> <code>fetch_json</code> <code>fetch_url_tool</code> <code>openurl</code> <code>xdg_open</code> <code>open</code></td><td><code>ureq</code> + OS launcher</td></tr>
+            <tr><td><strong>Archives</strong></td><td><code>tar</code> <code>zip</code> <code>unzip</code> <code>xz</code> <code>gzip</code> <code>zstd</code></td><td><code>tar</code>, <code>zip</code>, <code>xz2</code>, <code>flate2</code>, <code>zstd</code> crates</td></tr>
+            <tr><td><strong>Environment</strong></td><td><code>env</code> <code>env_get</code> <code>env_set</code> <code>env_keys</code> <code>env_pairs</code></td><td><code>std::env</code></td></tr>
+            <tr><td><strong>Encoding</strong></td><td><code>iconv</code> <code>strftime</code> <code>date_iso_format</code> <code>format_bytes</code> <code>format_duration</code></td><td><code>chrono</code>, hand-rolled</td></tr>
+            <tr><td><strong>Terminal control</strong></td><td><code>clear</code> <code>cls</code> <code>reset</code> <code>beep</code> <code>ring_bell</code> <code>set_title</code> <code>set_term_title</code> <code>term_size</code> <code>term_width</code> <code>term_height</code> <code>tty_raw</code> <code>tty_cooked</code></td><td><code>termios</code> ioctl + ANSI escapes</td></tr>
+            <tr><td><strong>REPL state</strong></td><td><code>history</code> <code>repl_alias</code> <code>repl_unalias</code> <code>set_alias</code> <code>unset_alias</code></td><td>process-wide tables, <code>reedline</code> history</td></tr>
+            <tr><td><strong>Inspection</strong></td><td><code>perfview</code> <code>docs</code> <code>lsp_completion_words</code> <code>methods_for</code> <code>which_all</code> <code>fields</code> <code>to_hash</code></td><td>introspection on reflection hashes</td></tr>
+          </tbody>
+        </table>
+
+        <h3 style="color:#39ff14;">Real REPL Session</h3>
+<pre>
+<span class="prompt">stryke❯</span> <span class="cmd">ls</span>
+total 408
+-rw-r--r--    1   501    20     6148 May  9 19:13 .DS_Store
+drwxr-xr-x    4   501    20      128 May 14 13:57 .claude
+drwxr-xr-x    3   501    20       96 Apr 18 23:49 .cursor
+
+<span class="comment"># Coreutils-shaped builtins compose with stryke pipelines:</span>
+<span class="prompt">stryke❯</span> <span class="cmd">ls() |&gt; grep { /\.rs$/ } |&gt; sort |&gt; head 5</span>
+
+<span class="comment"># pwd / pushd / popd dir stack — zsh-style:</span>
+<span class="prompt">stryke❯</span> <span class="cmd">pwd</span>
+/Users/wizard/code/strykelang
+<span class="prompt">stryke❯</span> <span class="cmd">pushd "/tmp"</span>
+/private/tmp
+<span class="prompt">stryke❯</span> <span class="cmd">dir_stack</span>
+(/Users/wizard/code/strykelang)
+<span class="prompt">stryke❯</span> <span class="cmd">popd</span>
+/Users/wizard/code/strykelang
+
+<span class="comment"># REPL aliases (renamed from `alias` so Perl typeglob `*alias = \&amp;sub` keeps working):</span>
+<span class="prompt">stryke❯</span> <span class="cmd">repl_alias("ll", "ls -la")</span>
+<span class="prompt">stryke❯</span> <span class="cmd">repl_alias("g=git")</span>
+
+<span class="comment"># Identity + system info — libc-backed, no process spawn:</span>
+<span class="prompt">stryke❯</span> <span class="cmd">whoami</span>
+wizard
+<span class="prompt">stryke❯</span> <span class="cmd">groups</span>
+(staff everyone admin _developer com.apple.access_ssh)
+<span class="prompt">stryke❯</span> <span class="cmd">term_size</span>
+(204 53)
+
+<span class="comment"># HTTP without leaving the REPL:</span>
+<span class="prompt">stryke❯</span> <span class="cmd">curl_get("https://api.github.com/repos/MenkeTechnologies/strykelang") |&gt; from_json |&gt; { _-&gt;{stargazers_count} }</span>
+
+<span class="comment"># Find the binary for a name:</span>
+<span class="prompt">stryke❯</span> <span class="cmd">whereis "git"</span>
+(/usr/bin/git /usr/share/man/man1/git.1)
+
+<span class="comment"># Recursive tree view:</span>
+<span class="prompt">stryke❯</span> <span class="cmd">tree(".", 2) |&gt; p</span>
+
+<span class="comment"># Built-in coreutils-style pipeline — no fork chain:</span>
+<span class="prompt">stryke❯</span> <span class="cmd">cat "/etc/passwd" |&gt; grep { not /^#/ } |&gt; map { (split /:/)[0] } |&gt; sort |&gt; uniq</span>
+
+<span class="comment"># Open a URL in the system browser:</span>
+<span class="prompt">stryke❯</span> <span class="cmd">openurl "https://stryke.menketech.com"</span>
+
+<span class="comment"># Terminal title for tmux/iTerm window:</span>
+<span class="prompt">stryke❯</span> <span class="cmd">set_title "stryke // 0x42"</span>
+</pre>
+
+        <h3 style="color:#39ff14;">What stryke REPL Has That zsh / bash Don't</h3>
+        <ul>
+          <li><strong>Composable pipelines</strong> — every shell-like builtin returns a stryke value, so <code>ls() |&gt; grep { /\.rs$/ } |&gt; sort</code> works without spawning subprocesses</li>
+          <li><strong>10,267 builtins in scope at all times</strong> — math, crypto, AI, web, regex, parallel, codec — every primitive listed in <code>%b</code> is callable from the REPL with zero imports</li>
+          <li><strong>Perl 5 syntax</strong> for everything that isn't shell muscle-memory: <code>$_</code>, <code>@ARGV</code>, <code>%ENV</code>, here-docs, regex literals, captures, <code>sub</code>, <code>my</code>, <code>local</code>, <code>our</code> all work</li>
+          <li><strong>Reflection at the prompt</strong> — <code>keys %b</code> for the full builtin set, <code>keys %a</code> for aliases, <code>keys %d</code> for documented names, <code>keys %p</code> for primaries, <code>keys %k</code> for keywords, <code>keys %c</code> for category names</li>
+          <li><strong>Live doc browser</strong> — <code>docs &lt;name&gt;</code> drops into a TUI hover-doc reader (j/k nav, t for ToC, / search, ]/[ for next/prev chapter)</li>
+          <li><strong>Parallel primitives</strong> — <code>1..1_000 |&gt; pmap { fetch "https://example.com/api/$_" }</code> saturates all 18 cores immediately. No syntax change, no <code>xargs -P</code></li>
+          <li><strong>Tab completion</strong> — backed by <code>lsp_completion_words.txt</code> (22,071 names + every alias + every keyword), routed through reedline</li>
+          <li><strong>Persistent history</strong> — reedline stores accepted lines; <code>history()</code> exposes them as a list usable in pipelines</li>
+          <li><strong>No PATH walk, no fork, no exec</strong> — every builtin is a Rust function call. <code>grep</code> in stryke is faster than <code>/usr/bin/grep</code> on stryke datasets because there's no process boundary</li>
+        </ul>
+
+        <h3 style="color:#39ff14;">Coexisting With Perl 5 Semantics</h3>
+        <p>The shell-like builtins don't shadow Perl. Renamed where conflicts existed:</p>
+        <ul>
+          <li><code>alias</code> stays a free Perl typeglob name (<code>*alias = \&amp;original</code>); REPL alias table is <code>repl_alias</code> / <code>set_alias</code></li>
+          <li><code>do FILE</code> remains Perl's file-eval; shell-style <code>source</code> is not added (single-spelling rule per <code>CLAUDE.md</code> "no dups")</li>
+          <li>Names like <code>open</code>, <code>close</code>, <code>read</code>, <code>write</code>, <code>print</code> remain Perl 5 file-IO builtins with full Perl semantics; shell-equivalents (<code>cat</code>, <code>tee</code>, <code>spurt</code>) sit alongside as stryke extensions</li>
+        </ul>
+
+        <p style="margin-top:1.5rem;"><strong>Cold-start cost:</strong> &lt; 10 ms from <code>s</code> to first prompt. The banner with reflection counts is computed on-demand from the actual <code>%b</code> / <code>%a</code> / <code>%all</code> tables — not hard-coded — so it always shows the current build's numbers.</p>
+      </section>
+
       <section class="tutorial-section" style="border: 2px solid #05d9e8; background: linear-gradient(135deg, rgba(5,217,232,0.08) 0%, transparent 50%);">
         <h2 style="color:#05d9e8;">AI Primitives — <code>ai</code> is a builtin like <code>print</code></h2>
         <p>Two letters, ubiquitous, unlimited power. Agent loop, MCP client+server, RAG memory, vector search — all native to the language.</p>
