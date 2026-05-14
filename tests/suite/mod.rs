@@ -198,6 +198,7 @@ mod runtime_quality_batch4;
 mod scoping;
 mod semantic_edge;
 mod serialization;
+mod sketches;
 mod slice_colon;
 mod special_globals;
 mod string_extensions;

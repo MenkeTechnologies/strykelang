@@ -13530,6 +13530,24 @@ impl Parser {
     /// Used by `--compat` to reject extensions at parse time.
     fn stryke_extension_name(name: &str) -> Option<&str> {
         match name {
+            // ── probabilistic data structures ──────────────────────────────
+            | "bloom_filter" | "bloom_add" | "bloom_contains" | "bloom_len"
+            | "bloom_clear" | "bloom_merge" | "bloom_fpr" | "bloom_bits"
+            | "bloom_serialize" | "bloom_deserialize"
+            | "hll" | "hyperloglog" | "hll_add" | "hll_count" | "hll_merge"
+            | "hll_clear" | "hll_precision" | "hll_serialize" | "hll_deserialize"
+            | "cms" | "count_min_sketch" | "cms_add" | "cms_count" | "cms_query"
+            | "cms_merge" | "cms_clear" | "cms_serialize" | "cms_deserialize"
+            | "topk" | "top_k_sketch" | "topk_add" | "topk_heavies" | "topk_count"
+            | "topk_size" | "topk_merge" | "topk_clear"
+            | "topk_serialize" | "topk_deserialize"
+            | "t_digest" | "tdg" | "tdigest" | "td_add" | "td_quantile" | "td_count"
+            | "td_min" | "td_max" | "td_sum" | "td_mean" | "td_merge" | "td_clear"
+            | "td_serialize" | "td_deserialize"
+            | "roaring" | "roaring_bitmap" | "rbm" | "rb_add" | "rb_remove" | "rb_contains"
+            | "rb_len" | "rb_min" | "rb_max" | "rb_to_array" | "rb_rank"
+            | "rb_or" | "rb_and" | "rb_xor" | "rb_andnot" | "rb_clear"
+            | "rb_serialize" | "rb_deserialize"
             // ── aop ────────────────────────────────────────────────────────
             | "proceed" | "intercept_list" | "intercept_remove" | "intercept_clear"
             // ── parallel ────────────────────────────────────────────────────
@@ -13895,10 +13913,6 @@ impl Parser {
             | "vector2_normalize" | "vector2_distance" | "vector2_rotate"
             | "quaternion_new" | "quaternion_from_axis_angle"
             | "quaternion_multiply" | "quaternion_normalize" | "quaternion_to_matrix"
-            | "bloom_filter_new" | "bloom_filter_add" | "bloom_filter_contains"
-            | "count_min_sketch_new" | "count_min_sketch_add" | "count_min_sketch_query"
-            | "hyperloglog_new" | "hyperloglog_add" | "hyperloglog_estimate" | "hyperloglog_merge"
-            | "tdigest_new" | "tdigest_add" | "tdigest_quantile"
             | "freq_to_note" | "note_to_freq" | "midi_note_to_name"
             | "chord_notes" | "scale_notes" | "transpose_note"
             | "window_tukey" | "zero_crossing_rate" | "peak_db"
@@ -17491,7 +17505,7 @@ impl Parser {
             | "dna_at_content" | "dna_complement" | "dna_gc_content" | "dna_kmer_count"
             | "dna_kmer_index" | "dna_melting_temp" | "dna_reverse_complement" | "dna_transcribe"
             | "dna_translate" | "elf_header_read" | "forward_algorithm" | "gif_header_read"
-            | "hyperloglog_pp_add" | "hyperloglog_pp_estimate" | "hyperloglog_pp_new" | "ico_header_read"
+            | "ico_header_read"
             | "jpeg_markers" | "levenshtein_edit_path" | "mach_o_header_read" | "markov_stationary"
             | "markov_transition_matrix" | "mat4_determinant" | "mat4_identity" | "mat4_inverse"
             | "mat4_look_at" | "mat4_multiply" | "mat4_orthographic" | "mat4_perspective"
