@@ -10520,6 +10520,25 @@ impl VMHelper {
                     v
                 } else if matches!(
                     dispatch_name,
+                    "count" | "size" | "cnt" | "len" | "list_count" | "list_size"
+                ) {
+                    // Count-family: preserve the "user wrote 1 syntactic arg" signal.
+                    // Flattening the lone operand here collapses `count(@empty)` to a
+                    // zero-arg call, which would then fall back to `$_` topic — wrong.
+                    // Pass the single evaluated value directly so the builtin's 1-arg
+                    // path can dispatch on its type (string → chars, array/aref →
+                    // element count via map_flatten_outputs, hash → key count, …).
+                    let mut list_out = Vec::new();
+                    if args.len() == 1 {
+                        list_out.push(self.eval_expr_ctx(&args[0], WantarrayCtx::List)?);
+                    } else {
+                        for a in args {
+                            list_out.extend(self.eval_expr_ctx(a, WantarrayCtx::List)?.to_list());
+                        }
+                    }
+                    list_out
+                } else if matches!(
+                    dispatch_name,
                     "uniq"
                         | "distinct"
                         | "uniqstr"
@@ -10527,11 +10546,6 @@ impl VMHelper {
                         | "uniqnum"
                         | "flatten"
                         | "set"
-                        | "list_count"
-                        | "list_size"
-                        | "count"
-                        | "size"
-                        | "cnt"
                         | "with_index"
                         | "shuffle"
                         | "sum"
@@ -13334,18 +13348,22 @@ impl VMHelper {
                 Ok(crate::perl_fs::list_executables(&dir))
             }
             ExprKind::Glob(args) => {
+                // Pass the user's pattern through unchanged: zsh::glob runs from
+                // OS cwd, which `chdir` keeps in sync with `stryke_pwd`. Resolving
+                // relative patterns to absolute paths up front would turn
+                // `glob("**(/)")` results from "sub" into "/abs/.../sub" — breaking
+                // the documented contract that relative patterns yield relative
+                // results (pinned in tests/suite/glob_zsh_qualifiers.rs).
                 let mut pats = Vec::new();
                 for a in args {
-                    let raw = self.eval_expr(a)?.to_string();
-                    pats.push(self.resolve_stryke_path_string(&raw));
+                    pats.push(self.eval_expr(a)?.to_string());
                 }
                 Ok(crate::perl_fs::glob_patterns(&pats))
             }
             ExprKind::GlobPar { args, progress } => {
                 let mut pats = Vec::new();
                 for a in args {
-                    let raw = self.eval_expr(a)?.to_string();
-                    pats.push(self.resolve_stryke_path_string(&raw));
+                    pats.push(self.eval_expr(a)?.to_string());
                 }
                 let show_progress = progress
                     .as_ref()

@@ -12119,13 +12119,25 @@ fn builtin_drop(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeVal
 
 /// `list_count` / `list_size` + `LIST` — like [`builtin_flatten`]: one-level
 /// [`StrykeValue::map_flatten_outputs`] per actual; returns the **element** count.
-/// No arguments → same as `list_count($_)`.
-fn builtin_list_count(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
-    let mut topic = StrykeValue::UNDEF;
-    let args = variadic_list_or_topic(interp, args, &mut topic);
+/// No arguments → `0` (explicit list-context count, no `$_` fallback). Compare
+/// `count` / `cnt` / `len` which default to `$_` when called bare.
+fn builtin_list_count(_interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    // Each ACTUAL gets one level of Perl list-context flatten. The VM's
+    // `call_preserve_operand_arrays` wraps multi-arg comma lists into a single
+    // outer `Array` slot (so `len stat $path` survives `@_` flattening); we
+    // peel that wrap first and then flatten each actual exactly once. A lone
+    // user-supplied arrayref (`list_count([1, [2,3]])`) keeps the inner
+    // arrayref intact — one-level peel, matching the
+    // `list_count_one_level_flatten_ci` pin.
     let mut out = Vec::new();
     for a in args {
-        out.extend(a.map_flatten_outputs(true));
+        if let Some(unwrapped) = a.as_array_vec() {
+            for item in unwrapped {
+                out.extend(item.map_flatten_outputs(true));
+            }
+        } else {
+            out.extend(a.map_flatten_outputs(true));
+        }
     }
     Ok(StrykeValue::integer(out.len() as i64))
 }
@@ -15921,6 +15933,29 @@ fn flatten_args(args: &[StrykeValue]) -> Vec<StrykeValue> {
         out.extend(a.clone().map_flatten_outputs(true));
     }
     out
+}
+
+/// Same as `flatten_args`, but a lone string operand is split into its
+/// codepoints — Stryke convention for list builtins (`sorted`, `reverse_list`,
+/// …) called with a single string topic so that
+/// `map { sorted } qw(cba)` yields chars sorted rather than a no-op on a
+/// 1-element list. Multi-arg calls keep list-context semantics.
+fn flatten_args_split_lone_string(args: &[StrykeValue]) -> Vec<StrykeValue> {
+    if args.len() == 1 {
+        let a = &args[0];
+        if a.as_array_vec().is_none()
+            && a.as_array_ref().is_none()
+            && !a.is_iterator()
+            && a.is_string_like()
+        {
+            return a
+                .to_string()
+                .chars()
+                .map(|c| StrykeValue::string(c.to_string()))
+                .collect();
+        }
+    }
+    flatten_args(args)
 }
 /// `riffle LIST, SEP` — insert SEP between each element.
 fn builtin_riffle(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
@@ -20752,11 +20787,12 @@ fn builtin_zscore(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     }
     Ok(StrykeValue::float((x - mean) / sd))
 }
-/// `sorted` — Sorted. Returns a list. No arguments → `sorted($_)`.
+/// `sorted` — Sorted. Returns a list. No arguments → `sorted($_)`; a lone
+/// string topic is split into chars so `map { sorted } qw(cba)` → "abc".
 fn builtin_sorted(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let mut topic = StrykeValue::UNDEF;
     let args = variadic_list_or_topic(interp, args, &mut topic);
-    let mut xs = flatten_args(args);
+    let mut xs = flatten_args_split_lone_string(args);
     xs.sort_by_key(|a| a.to_string());
     Ok(StrykeValue::array(xs))
 }
@@ -20764,7 +20800,7 @@ fn builtin_sorted(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeV
 fn builtin_sorted_desc(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let mut topic = StrykeValue::UNDEF;
     let args = variadic_list_or_topic(interp, args, &mut topic);
-    let mut xs = flatten_args(args);
+    let mut xs = flatten_args_split_lone_string(args);
     xs.sort_by_key(|v| std::cmp::Reverse(v.to_string()));
     Ok(StrykeValue::array(xs))
 }
@@ -20772,7 +20808,7 @@ fn builtin_sorted_desc(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<St
 fn builtin_sorted_nums(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let mut topic = StrykeValue::UNDEF;
     let args = variadic_list_or_topic(interp, args, &mut topic);
-    let mut xs = flatten_args(args);
+    let mut xs = flatten_args_split_lone_string(args);
     xs.sort_by(|a, b| {
         a.to_number()
             .partial_cmp(&b.to_number())
@@ -20784,15 +20820,17 @@ fn builtin_sorted_nums(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<St
 fn builtin_sorted_by_length(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let mut topic = StrykeValue::UNDEF;
     let args = variadic_list_or_topic(interp, args, &mut topic);
-    let mut xs = flatten_args(args);
+    let mut xs = flatten_args_split_lone_string(args);
     xs.sort_by_key(|v| v.to_string().chars().count());
     Ok(StrykeValue::array(xs))
 }
-/// `reverse_list` — Reverse list. Returns a list. No arguments → `reverse_list($_)`.
+/// `reverse_list` — Reverse list. Returns a list. No arguments →
+/// `reverse_list($_)`; a lone string topic is split into chars so
+/// `map { reverse_list } qw(ab cd)` → "ba dc".
 fn builtin_reverse_list(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let mut topic = StrykeValue::UNDEF;
     let args = variadic_list_or_topic(interp, args, &mut topic);
-    let mut xs = flatten_args(args);
+    let mut xs = flatten_args_split_lone_string(args);
     xs.reverse();
     Ok(StrykeValue::array(xs))
 }
