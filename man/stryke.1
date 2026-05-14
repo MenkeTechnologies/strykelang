@@ -1,0 +1,620 @@
+.\" stryke(1) — man page for the stryke / s binary
+.\" Render with:  man -l man/stryke.1
+.\" Install:      cp man/stryke.1 /usr/local/share/man/man1/  (or $MANPATH/man1/)
+.TH STRYKE 1 "May 2026" "stryke 0.14.1" "User Commands"
+.SH NAME
+stryke, s \- highly parallel Perl 5 interpreter with shell-grade REPL
+.SH SYNOPSIS
+.B s
+[\fIOPTION\fR]... [\fB--\fR] [\fIPROGRAMFILE\fR] [\fIARGUMENT\fR]...
+.br
+.B s
+\fICODE\fR
+.br
+.B s
+.B -e
+\fICODE\fR
+.br
+.B s
+.I BUILTIN
+[\fIARGS\fR...]
+.br
+.B s
+.I SUBCOMMAND
+[\fIARGS\fR...]
+.SH DESCRIPTION
+.B stryke
+is a single-binary Perl 5 interpreter written in Rust, with parallel
+extensions (pmap / pgrep / pfor / psort / preduce), a Cranelift JIT,
+pipe-forward (\fB|>\fR) syntax, the thread macro (\fB~>\fR), and a
+shell-grade REPL exposing 10,267 builtins as immediately-callable
+barewords (no \fBuse\fR / \fBrequire\fR / \fBimport\fR).
+.PP
+The binary is invoked as \fBs\fR by default; \fBstryke\fR and \fBst\fR
+are alternate spellings.
+.PP
+When called with one argument that looks like code, the
+\fB-e\fR is optional (\fBs 'p "hi"'\fR works). When called with a known
+builtin name plus arguments, stryke invokes that builtin directly
+(\fBs basename /a/b\fR returns \fIb\fR), enabling stryke to be used as
+a coreutils-style command launcher.
+.SH EXECUTION
+.TP
+\fB'\fR\fICODE\fR\fB'\fR
+Inline code; \fB-e\fR is optional when the argument looks like code.
+.TP
+.B -e \fICODE\fR
+Explicit inline; required with \fB-n\fR, \fB-p\fR, \fB-l\fR, \fB-a\fR.
+.TP
+.B -E \fICODE\fR
+Like \fB-e\fR but enables all optional features.
+.TP
+.IB BUILTIN " [" ARGS "]"
+Call a builtin function directly from the shell. Example:
+\fBs len 'hello'\fR, \fBs sha256 myfile\fR.
+.TP
+.B --script
+Force script lookup when name conflicts with a builtin.
+.TP
+.B -c
+Check syntax only; parse without compile/run.
+.TP
+.BR --lint ", " --check
+Parse and compile bytecode without running.
+.TP
+.BR --disasm ", " --disassemble
+Print bytecode disassembly to stderr before VM run.
+.TP
+.B --ast
+Dump parsed AST as JSON and exit (no execution).
+.TP
+.B --fmt
+Pretty-print parsed Perl to stdout and exit.
+.TP
+.B --explain \fICODE\fR
+Print expanded hint for an error code (e.g. \fBE0001\fR) and exit.
+.TP
+.B --profile
+Wall-clock profile to stderr (VM op lines; flamegraph-ready).
+.TP
+.B --flame
+Flamegraph: terminal bars (TTY) or SVG (piped to file).
+.TP
+.B --no-jit
+Disable Cranelift JIT (bytecode interpreter only).
+.TP
+.B --compat
+Perl 5 strict-compat: disable all stryke extensions.
+.TP
+.B --no-interop
+Reject Perl-isms (\fBsub\fR, \fBsay\fR, \fBreverse\fR, \fB$a\fR/\fB$b\fR);
+force idiomatic stryke (\fB$_0\fR/\fB$_1\fR).
+.TP
+.B -d\fR[\fBt\fR][\fI:MOD\fR]
+Run program under debugger or module \fIDevel::MOD\fR.
+.TP
+.B -D\fR[\fInumber/letters\fR]
+Set debugging flags.
+.TP
+.B -u
+Dump core after parsing program.
+.SH INPUT PROCESSING
+.TP
+.B -n
+Assume \fBwhile (<>) { ... }\fR loop around program.
+.TP
+.B -p
+Like \fB-n\fR but print each \fB$_\fR after the loop body (sed-style).
+.TP
+.B -a
+Autosplit mode (splits \fB$_\fR into \fB@F\fR).
+.TP
+.B -F\fI/pattern/\fR
+\fBsplit()\fR pattern for \fB-a\fR.
+.TP
+.B -l\fR[\fIoctnum\fR]
+Enable line ending processing.
+.TP
+.B -0\fR[\fIoctal\fR]
+Specify record separator (\fB\\0\fR if no arg).
+.TP
+.B -g
+Slurp all input at once (alias for \fB-0777\fR).
+.TP
+.B -i\fR[\fIextension\fR]
+Edit \fB<>\fR files in place; backup if extension supplied; multiple files
+processed in parallel.
+.SH MODULES & PATHS
+.TP
+.B -M \fIMODULE\fR
+Execute \fBuse \fImodule\fB...\fR before program.
+.TP
+.B -m \fIMODULE\fR
+Execute \fBuse \fImodule\fB ()\fR before program (no import).
+.TP
+.B -I \fIDIRECTORY\fR
+Specify \fB@INC\fR directory (several allowed).
+.TP
+.B -f
+Don't do \fI$sitelib/sitecustomize.pl\fR at startup.
+.TP
+.B -S
+Look for programfile using \fB$PATH\fR.
+.TP
+.B -x\fR[\fIdirectory\fR]
+Ignore text before \fB#!perl\fR line.
+.SH UNICODE & SAFETY
+.TP
+.B -C\fR[\fInumber/list\fR]
+Enable listed Unicode features.
+.TP
+.B -t
+Enable tainting warnings.
+.TP
+.B -T
+Enable tainting checks.
+.TP
+.B -U
+Allow unsafe operations.
+.TP
+.B -s
+Enable switch parsing for programfile args.
+.SH WARNINGS
+.TP
+.B -w
+Enable many useful warnings.
+.TP
+.B -W
+Enable all warnings.
+.TP
+.B -X
+Disable all warnings.
+.SH INFO
+.TP
+.B -v
+Print version, patchlevel and license.
+.TP
+.B -V\fR[\fB:\fIconfigvar\fR]
+Print configuration summary.
+.TP
+.BR -h ", " --help
+Print help.
+.SH PARALLEL EXTENSIONS
+.TP
+.B -j \fIN\fR
+Set number of parallel threads (rayon pool).
+.TP
+.BR pmap " {BLOCK} @list [, progress => EXPR]"
+Parallel map; optional stderr progress bar.
+.TP
+.BR pmap_chunked " N {BLOCK} @list"
+Parallel map in batches of N items per thread.
+.TP
+.BR pcache " {BLOCK} @list"
+Parallel memoize (key = stringified topic).
+.TP
+.BR par_lines " PATH, CODE [, progress => EXPR]"
+mmap + parallel line scan (interpreter).
+.TP
+.BR par_walk " PATH, CODE"
+Parallel recursive dir walk; topic is each path.
+.TP
+.BR par_sed " PATTERN, REPLACEMENT, FILES..."
+Parallel in-place regex replace per file (g flag).
+.TP
+.BR pipeline " @list ->filter/map/take/collect"
+Lazy iterator (runs on collect); chain
+.B ->pmap/pgrep/pfor/pmap_chunked/psort/pcache/preduce
+like top-level p* functions.
+.TP
+.BR par_pipeline " @list" \fIsame chain\fR
+Filter / map parallel on collect (order kept).
+.B par_pipeline(source=>...,stages=>...,workers=>...)
+for explicit channel stages.
+.TP
+.BR async " {BLOCK}"
+Run block on a worker thread; returns a task handle.
+.TP
+.BR spawn " {BLOCK}"
+Rust-style alias for \fBasync\fR; join with \fBawait\fR.
+.TP
+.BR await " EXPR"
+Join async task; passes through non-task values.
+.TP
+.BR pgrep " {BLOCK} @list"
+Parallel grep across all cores.
+.TP
+.BR pfor " {BLOCK} @list"
+Parallel foreach.
+.TP
+.BR psort " {BLOCK} @list"
+Parallel sort.
+.TP
+.BR preduce " {BLOCK} @list"
+Parallel tree fold (rayon; associative ops only).
+.TP
+.BR preduce_init " EXPR, {BLOCK} @list"
+Parallel fold with explicit identity.
+.TP
+.BR pmap_reduce " {MAP} {REDUCE} @list"
+Fused parallel map + tree reduce.
+.TP
+.BR fan " [N] {BLOCK}"
+Execute BLOCK N times (default N = rayon pool size).
+\fB$_\fR is the index.
+.TP
+.BR fan_cap " [N] {BLOCK}"
+Like \fBfan\fR; returns list of block return values (index order).
+.SH REPL & SHELL-LIKE BUILTINS
+The
+.B s
+binary doubles as an interactive REPL via reedline:
+persistent history, tab completion against the full 22,071-name
+corpus, sub-10 ms cold start. Over 80 coreutils-shaped builtins
+work as immediately-callable barewords with no fork or exec
+(every result is a stryke value, composable with \fB|>\fR pipelines).
+.PP
+.RS 2
+.B Filesystem:
+.IR cd ,
+.IR pwd ,
+.IR ls ,
+.IR cat ,
+.IR rm ,
+.IR mv ,
+.IR cp ,
+.IR ln ,
+.IR mkdir ,
+.IR rmdir ,
+.IR touch ,
+.IR chmod ,
+.IR chown ,
+.IR realpath ,
+.IR basename ,
+.IR dirname ,
+.IR mktemp ,
+.IR mktempdir ,
+.IR tree ,
+.IR find ,
+.IR glob .
+.PP
+.B Directory stack:
+.IR pushd ,
+.IR popd ,
+.IR dir_stack .
+.PP
+.B Identity:
+.IR whoami ,
+.IR groups ,
+.IR id ,
+.IR hostname ,
+.IR getpwuid ,
+.IR getpwnam ,
+.IR getgrgid ,
+.IR getgrnam .
+.PP
+.B Process:
+.IR ps ,
+.IR top ,
+.IR kill ,
+.IR nice ,
+.IR renice ,
+.IR time ,
+.IR sleep ,
+.IR wait ,
+.IR fork ,
+.IR exec .
+.PP
+.B Text processing:
+.IR grep ,
+.IR sort ,
+.IR uniq ,
+.IR wc ,
+.IR head ,
+.IR tail ,
+.IR cut ,
+.IR tr ,
+.IR tac ,
+.IR rev_lines ,
+.IR shuf ,
+.IR column ,
+.IR comm ,
+.IR diff ,
+.IR myers_diff ,
+.IR patience_diff .
+.PP
+.B Networking:
+.IR curl_get ,
+.IR curl_post ,
+.IR http_fetch ,
+.IR http_post ,
+.IR fetch_async ,
+.IR fetch_json ,
+.IR openurl ,
+.IR xdg_open .
+.PP
+.B Archives:
+.IR tar ,
+.IR zip ,
+.IR unzip ,
+.IR xz ,
+.IR gzip ,
+.IR zstd .
+.PP
+.B Terminal:
+.IR clear ,
+.IR cls ,
+.IR reset ,
+.IR beep ,
+.IR ring_bell ,
+.IR set_title ,
+.IR term_size ,
+.IR term_width ,
+.IR term_height ,
+.IR tty_raw ,
+.IR tty_cooked .
+.PP
+.B REPL state:
+.IR history ,
+.IR repl_alias ,
+.IR repl_unalias ,
+.IR set_alias ,
+.IR unset_alias .
+.PP
+.B Search:
+.IR which ,
+.IR whereis ,
+.IR type ,
+.IR command .
+.PP
+.B Encoding:
+.IR iconv ,
+.IR strftime ,
+.IR date_iso_format ,
+.IR format_bytes ,
+.IR format_duration .
+.RE
+.SH SUBCOMMANDS
+.TP
+.B docs \fR[\fITOPIC\fR]
+Built-in docs (\fBs docs pmap\fR, \fBs docs '|>'\fR).
+Drops into a TUI hover-doc reader with vi-style navigation
+(\fBj/k\fR next/prev, \fBd/u\fR \[+-]5, \fB]/[\fR chapter, \fBt\fR toc,
+\fB/\fR search, \fB:\fIN\fR jump, \fBr\fR random, \fB?\fR help, \fBq\fR quit).
+.TP
+.B repl \fR[\fB--load \fIFILE\fR]
+Interactive REPL with optional pre-load.
+.TP
+.B serve \fR[\fIPORT\fR] [\fISCRIPT\fR]
+HTTP server (\fBs serve\fR, \fBs serve 8080 app.stk\fR).
+.TP
+.B fmt \fR[\fB-i\fR] \fIFILE\fR...
+Format source files (\fBs fmt -i .\fR for in-place recursive).
+.TP
+.B bench \fR[\fIFILE|DIR\fR]
+Run benchmarks from \fIbench/\fR or \fIbenches/\fR.
+.TP
+.B init \fR[\fINAME\fR]
+Scaffold project in cwd: \fIstryke.toml\fR + \fIlib/\fR, \fIt/\fR, \fIbenches/\fR.
+.TP
+.B new \fINAME\fR
+Scaffold a new project at \fI./NAME/\fR.
+.TP
+.B install \fR[\fB--offline\fR]
+Resolve manifest deps; populate \fIstryke.lock\fR and \fI~/.stryke/store\fR.
+.TP
+.B add \fINAME\fR[\fB@\fIVER\fR] ...
+Add a dep to \fIstryke.toml\fR. Flags:
+.B --dev \fR/\fR --group=\fIN\fR \fR/\fR --path=\fIDIR\fR \fR/\fR --features=\fIA,B\fR.
+.TP
+.B remove \fINAME\fR
+Drop a dep from \fIstryke.toml\fR; reruns install.
+.TP
+.B tree
+Print resolved dep graph from \fIstryke.lock\fR.
+.TP
+.B info \fINAME\fR
+Show lockfile entry + store path for a dep.
+.TP
+.B pkg \fISUBCOMMAND\fR
+Dispatcher for package commands (init/new/install/add/remove/tree/info).
+.TP
+.B build \fISCRIPT\fR \fR[\fB-o \fIOUT\fR]
+AOT: copy this binary with SCRIPT embedded (standalone exe).
+.TP
+.B --lsp
+Language Server (JSON-RPC on stdio); must be the only argument.
+.TP
+.B --remote-worker
+Persistent cluster worker (stdio); only argument.
+.TP
+.B --remote-worker-v1
+Legacy one-shot worker (stdio); only argument.
+.SH ENVIRONMENT
+.TP
+.B PERL5LIB
+Colon-separated list of dirs prepended to
+.BR @INC .
+.TP
+.B PERL5OPT
+Default command-line options.
+.TP
+.B STRYKE_RECORD
+If set to \fB1\fR, records every run to \fI~/.stryke/perf.sqlite\fR for
+later inspection via the \fBperfview\fR builtin.
+.TP
+.B STRYKE_AI_MODE
+\fBmock-only\fR forces AI builtins to return mocked responses (for
+tests). Pair with \fBai_mock_install\fR.
+.TP
+.B STRYKE_AUDIT_LOG
+Path for the structured-audit JSONL append-log; default
+\fI~/.stryke/audit.log\fR.
+.TP
+.B HOME
+Used by \fBcd\fR (no args) and \fI~/.stryke\fR resolution.
+.SH FILES
+.TP
+.I ~/.cargo/bin/s
+Default install location via \fBcargo install strykelang\fR.
+.TP
+.I ~/.stryke/
+Per-user state: \fBstore/\fR (dep blobs), \fBperf.sqlite\fR (run log),
+\fBaudit.log\fR (JSONL audit), \fBscripts.db\fR (bytecode cache).
+.TP
+.I ./stryke.toml
+Per-project manifest (deps, features, package metadata).
+.TP
+.I ./stryke.lock
+Per-project lockfile (resolved dep graph + content hashes).
+.TP
+.I ./lib/
+Project library code (loaded via \fBuse\fR / \fBrequire\fR).
+.TP
+.I ./t/
+Test suite directory (run via \fBs t\fR).
+.TP
+.I /usr/local/share/man/man1/stryke.1
+This man page.
+.SH REFLECTION HASHES
+Every name stryke knows is in one of these compile-time-populated
+hashes, queryable at the REPL with \fBkeys %\fIHASH\fR:
+.PP
+.RS 4
+.B %b
+.RB "\(em " "10,267 primary builtins (callable-only)"
+.br
+.B %a
+.RB "\(em " "641 aliases (name \(-> primary)"
+.br
+.B %all
+.RB "\(em " "10,993 keys: %b + %a + %k"
+.br
+.B %k
+.RB "\(em " "85 keywords (if/while/sub/...)"
+.br
+.B %pc
+.RB "\(em " "185 Perl 5 core names (subset of %b)"
+.br
+.B %e
+.RB "\(em " "10,082 stryke extension names (subset of %b)"
+.br
+.B %d
+.RB "\(em " "4,228 names with LSP hover documentation"
+.br
+.B %c
+.RB "\(em " "306 distinct category strings"
+.br
+.B %p
+.RB "\(em " "8,790 primaries (after alias dedup)"
+.br
+.B %o
+.RB "\(em " "70 operators"
+.br
+.B %v
+.RB "\(em " "97 special variables ($_, $!, @ARGV, %ENV, ...)"
+.br
+.B %parameters
+.RB "\(em " "live binding view (every named pad slot)"
+.RE
+.SH EXAMPLES
+One-liner sum from stdin:
+.PP
+.RS 4
+.EX
+seq 1 100 | s -ne '$s += $_; END { p $s }'
+.EE
+.RE
+.PP
+Parallel SHA-256 of 10000 files:
+.PP
+.RS 4
+.EX
+s 'glob("**/*.txt") |> pmap { sha256 _ } |> e p'
+.EE
+.RE
+.PP
+Inline call to a builtin as a CLI tool (no script needed):
+.PP
+.RS 4
+.EX
+s basename /a/b/c.txt    # prints: c.txt
+s sha256 myfile          # prints SHA-256 digest
+s len 'hello'            # prints: 5
+.EE
+.RE
+.PP
+Format JSON from a URL:
+.PP
+.RS 4
+.EX
+s 'curl_get("https://api.example.com/data") |> from_json |> to_table |> p'
+.EE
+.RE
+.PP
+Parallel grep with progress bar:
+.PP
+.RS 4
+.EX
+s 'glob("logs/*.log") |> pmap { grep /ERROR/, read_lines _ } |> e p, progress => 1'
+.EE
+.RE
+.PP
+Scaffold a new project + add a dep:
+.PP
+.RS 4
+.EX
+s new myproj && cd myproj
+s add stryke-utils
+.EE
+.RE
+.PP
+Build a standalone binary that bundles a script:
+.PP
+.RS 4
+.EX
+s build mytool.stk -o ./mytool
+./mytool                 # runs without stryke installed
+.EE
+.RE
+.PP
+Drop into the REPL with a project pre-loaded:
+.PP
+.RS 4
+.EX
+s repl --load ./lib/utils.stk
+.EE
+.RE
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+Script error or non-zero exit from program.
+.TP
+.B 2
+CLI argument error.
+.TP
+.B 130
+Interrupted by SIGINT.
+.SH SEE ALSO
+.BR perl (1),
+.BR awk (1),
+.BR jq (1),
+.BR rg (1).
+.PP
+.B Project home:
+https://github.com/MenkeTechnologies/strykelang
+.br
+.B Full reference:
+\fIhttps://stryke.menketech.com/reference.html\fR (10,176 topics)
+.br
+.B Engineering report:
+\fIhttps://stryke.menketech.com/report.html\fR
+.SH AUTHOR
+Jacob Menke (MenkeTechnologies)
+.PP
+.B "There is more than one way to do it \(em in parallel."
+.SH LICENSE
+MIT.

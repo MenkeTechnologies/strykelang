@@ -1207,7 +1207,7 @@ pub(crate) fn try_builtin(
         "pfrequencies" | "pfreq" | "pfrq" => Some(builtin_pfrequencies(args)),
         "ddump" | "dd" => Some(builtin_ddump(args)),
         "perfview" | "pfv" => Some(builtin_perfview(args)),
-        "docs" => Some(builtin_docs(args)),
+        "docs" | "help" | "h" => Some(builtin_docs(args)),
         "banner" => Some(builtin_banner(args)),
         // ── network / ip / cidr (IP-address subset) ──
         "ip_parse" => Some(Ok(crate::builtins_net::ip_parse(args))),
@@ -3517,6 +3517,7 @@ pub(crate) fn try_builtin(
         "term_height" | "term_rows" | "tty_lines" | "tty_rows" => Some(builtin_term_height()),
         "set_title" | "set_term_title" | "window_title" => Some(builtin_set_title(args)),
         "beep" | "ring_bell" => Some(builtin_beep()),
+        "man" | "manpage" => Some(builtin_man(args, line)),
         // ── Shell-like REPL builtins (Tier A) ──
         "rm" | "rm_file" => Some(builtin_rm(interp, args, line)),
         "mktemp" | "mktemp_file" => Some(builtin_mktemp(args, line)),
@@ -21127,6 +21128,25 @@ fn builtin_beep() -> PerlResult<StrykeValue> {
     let _ = out.write_all(b"\x07");
     let _ = out.flush();
     Ok(StrykeValue::integer(1))
+}
+
+/// `man PAGE...` — spawn the OS `man(1)` command with the given page
+/// names as arguments. Inherits stdin/stdout/stderr from the parent so
+/// the user gets a normal pager. Returns the child's exit code as an
+/// integer; `undef` if `man` couldn't be found or spawned.
+///
+/// Companion to `docs` (the in-process TUI hover-doc reader): `man`
+/// dispatches to system man pages, `docs`/`help` browses stryke's own
+/// LSP-backed corpus.
+fn builtin_man(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    if args.is_empty() {
+        return Ok(StrykeValue::UNDEF);
+    }
+    let argv: Vec<String> = args.iter().map(|v| v.to_string()).collect();
+    match std::process::Command::new("man").args(&argv).status() {
+        Ok(status) => Ok(StrykeValue::integer(status.code().unwrap_or(0) as i64)),
+        Err(_) => Ok(StrykeValue::UNDEF),
+    }
 }
 
 // ── Shell-like REPL builtins (Tier A) ──────────────────────────────────

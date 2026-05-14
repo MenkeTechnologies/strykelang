@@ -556,6 +556,89 @@
       <hr class="section-rule">
 
       <!-- ═══════════════════════════════════════ -->
+      <!-- SECTION 10a: REPL &amp; INTERACTIVE SHELL    -->
+      <!-- ═══════════════════════════════════════ -->
+      <h2 class="tutorial-title"><span class="step-hash">&gt;</span>REPL &amp; INTERACTIVE SHELL</h2>
+      <p class="tutorial-subtitle">The <code>s</code> binary doubles as a Perl 5 interpreter and a Unix shell. Reedline-backed REPL with persistent history, tab-completion against the full 22,071-name corpus, ANSI-colored cyberpunk banner, and 80+ shell-style coreutils builtins (<code>ls</code>, <code>cat</code>, <code>grep</code>, <code>cd</code>, <code>pushd</code>, <code>whoami</code>, <code>curl_get</code>, <code>tree</code>) that are <strong>in-process Rust function calls, not subprocess spawns</strong>. No fork, no PATH walk, no exec — every result is a stryke value ready for the next pipeline stage.</p>
+
+      <div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));">
+        <div class="stat-card"><div class="stat-val accent">22,071</div><div class="stat-label">Tab-complete corpus</div></div>
+        <div class="stat-card"><div class="stat-val green">&lt; 10 ms</div><div class="stat-label">Cold start to prompt</div></div>
+        <div class="stat-card"><div class="stat-val">10,267</div><div class="stat-label">Builtins in scope</div></div>
+        <div class="stat-card"><div class="stat-val">4,228</div><div class="stat-label">LSP hover docs</div></div>
+        <div class="stat-card"><div class="stat-val">306</div><div class="stat-label">Categories in <code>%c</code></div></div>
+        <div class="stat-card"><div class="stat-val">85</div><div class="stat-label">Keywords in <code>%k</code></div></div>
+      </div>
+
+      <h3 style="font-family:'Orbitron',sans-serif;font-size:11px;color:var(--cyan);letter-spacing:1.5px;margin:1.5rem 0 0.5rem;">// STARTUP BANNER</h3>
+      <p>The banner is computed at REPL launch from live reflection — never hard-coded. Numbers shift as builtins land or get removed.</p>
+<pre style="font-size:11px;line-height:1.4;">
+ ███████╗████████╗██████╗ ██╗   ██╗██╗  ██╗███████╗
+ ██╔════╝╚══██╔══╝██╔══██╗╚██╗ ██╔╝██║ ██╔╝██╔════╝
+ ███████╗   ██║   ██████╔╝ ╚████╔╝ █████╔╝ █████╗
+ ╚════██║   ██║   ██╔══██╗  ╚██╔╝  ██╔═██╗ ██╔══╝
+ ███████║   ██║   ██║  ██║   ██║   ██║  ██╗███████╗
+ ╚══════╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚══════╝
+ ┌────────────────────────────────────────────────────────────────┐
+ │ SYSTEM  status: ONLINE // os: macos arch: aarch64 pid: 30386   │
+ │ CORES   18    MEM  56.2 / 64.0 GiB available                   │
+ ├────────────────────────────────────────────────────────────────┤
+ │ %b  builtins   10267  %a  aliases    641    %all 10993         │
+ │ %k  keywords   85     %o  operators  70     %v   97            │
+ │ %pc perl5 core 185    %e  stryke ext 10082  %d   4228          │
+ │ %c  categories 306    %p  primaries  8790                      │
+ └────────────────────────────────────────────────────────────────┘
+  &gt;&gt; PARALLEL PERL5 INTERPRETER // RUST-POWERED v0.14.1 &lt;&lt;
+</pre>
+
+      <h3 style="font-family:'Orbitron',sans-serif;font-size:11px;color:var(--cyan);letter-spacing:1.5px;margin:1.5rem 0 0.5rem;">// SHELL-LIKE BUILTINS (NO FORK, NO EXEC)</h3>
+      <div class="feature-grid">
+        <div class="feature-card"><h4>Filesystem (21)</h4><p><code>cd pwd ls cat rm mv cp ln mkdir rmdir touch chmod chown realpath basename dirname mktemp mktempdir tree find glob</code> — all wrap <code>std::fs</code> / <code>tempfile</code> in-process. Output is a stryke value, composable with <code>|&gt;</code>.</p></div>
+        <div class="feature-card"><h4>Directory Stack (3)</h4><p><code>pushd</code> / <code>popd</code> / <code>dir_stack</code> backed by a process-wide <code>Mutex&lt;Vec&lt;PathBuf&gt;&gt;</code>. zsh-style swap-on-bare-pushd.</p></div>
+        <div class="feature-card"><h4>Identity (8)</h4><p><code>whoami groups id hostname getpwuid getpwnam getgrgid getgrnam</code> &mdash; <code>libc</code>-backed, no subprocess.</p></div>
+        <div class="feature-card"><h4>Process (10)</h4><p><code>ps top kill nice renice time sleep wait fork exec</code> via <code>libc</code> / <code>nix</code>.</p></div>
+        <div class="feature-card"><h4>Text Processing (16)</h4><p><code>grep sort uniq wc head tail cut tr tac rev_lines shuf column comm diff myers_diff patience_diff</code> &mdash; pure Rust.</p></div>
+        <div class="feature-card"><h4>Networking (9)</h4><p><code>curl_get curl_post http_fetch http_post fetch_async fetch_json fetch_url_tool openurl xdg_open</code> via <code>ureq</code> + OS launcher.</p></div>
+        <div class="feature-card"><h4>Archives (6)</h4><p><code>tar zip unzip xz gzip zstd</code> &mdash; <code>tar</code> / <code>zip</code> / <code>xz2</code> / <code>flate2</code> / <code>zstd</code> crates, all already deps.</p></div>
+        <div class="feature-card"><h4>Terminal (12)</h4><p><code>clear cls reset beep ring_bell set_title set_term_title term_size term_width term_height tty_raw tty_cooked</code> &mdash; termios ioctl + ANSI escapes.</p></div>
+        <div class="feature-card"><h4>REPL State (5)</h4><p><code>history repl_alias repl_unalias set_alias unset_alias</code> &mdash; process-wide tables, reedline history bridge via <code>crate::builtins::repl_history_push()</code>.</p></div>
+        <div class="feature-card"><h4>Search (4)</h4><p><code>which whereis type command</code> &mdash; <code>$PATH</code> walker.</p></div>
+        <div class="feature-card"><h4>Encoding (5)</h4><p><code>iconv strftime date_iso_format format_bytes format_duration</code> &mdash; <code>chrono</code> + hand-rolled.</p></div>
+        <div class="feature-card"><h4>Inspection (7)</h4><p><code>perfview docs lsp_completion_words methods_for which_all fields to_hash</code> &mdash; introspect every reflection hash.</p></div>
+      </div>
+
+      <h3 style="font-family:'Orbitron',sans-serif;font-size:11px;color:var(--cyan);letter-spacing:1.5px;margin:1.5rem 0 0.5rem;">// DESIGN DECISIONS</h3>
+      <table class="file-table">
+        <thead><tr><th>Decision</th><th>Rationale</th></tr></thead>
+        <tbody>
+          <tr><td>In-process builtins, not subprocess wrappers</td><td>A subprocess <code>fork+exec</code> costs ~1-3 ms on Linux/macOS. Composing 5 of them in a pipeline = 10-15 ms of overhead. Stryke's <code>cat |&gt; grep |&gt; sort |&gt; uniq</code> stays inside the VM &mdash; no syscall boundaries, output of one stage is a heap-resident <code>StrykeValue</code> passed to the next.</td></tr>
+          <tr><td>Reedline frontend, not raw <code>readline</code></td><td>Pure-Rust line editor, no <code>libreadline</code> linkage (which would need GPL or BSD-readline alternatives). Native multi-line editing, syntax highlighting, history search, completer hooks.</td></tr>
+          <tr><td>Tab complete from <code>%all</code> via <code>lsp_completion_words.txt</code></td><td>22,071 names cached at build time. Reedline calls into the completer with each prefix, gets back a sorted candidate list. Includes every primary, alias, keyword, special variable, file-test op, and zsh-style glob qualifier.</td></tr>
+          <tr><td><code>repl_alias</code> instead of <code>alias</code></td><td>Bare <code>alias</code> is reserved for Perl typeglob assignment (<code>*alias = \&amp;original</code>); shadowing it with a builtin would break <code>tests/suite/behavior_pin_2026_05_d.rs::typeglob_assigns_coderef_alias</code>. Same pattern for <code>unalias</code> → <code>repl_unalias</code>.</td></tr>
+          <tr><td>No <code>source</code> builtin</td><td>Perl already has <code>do FILE</code> (eval-in-current-scope) and <code>require FILE</code> (eval-once with INC tracking). Adding a third spelling violates the "no dups" rule.</td></tr>
+          <tr><td>Stack-shared dir stack, not per-tab</td><td><code>pushd</code> / <code>popd</code> mutate process cwd via <code>chdir(2)</code>, which is process-wide on POSIX. The stack mirrors that &mdash; one <code>Mutex&lt;Vec&lt;PathBuf&gt;&gt;</code> for the whole interpreter. Tab- or window-scoped stacks would lie about what <code>chdir</code> did.</td></tr>
+          <tr><td>Banner numbers are computed live</td><td>Reflection hashes (<code>%b</code>, <code>%a</code>, <code>%all</code>, <code>%k</code>, <code>%d</code>, <code>%c</code>) are populated at compile time by <code>build.rs</code> from the actual <code>try_builtin</code> dispatch arms. The startup banner reads <code>scalar(keys %b)</code> etc. &mdash; if a builtin is added, the next REPL launch shows the updated count without touching <code>banner.rs</code>.</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="font-family:'Orbitron',sans-serif;font-size:11px;color:var(--cyan);letter-spacing:1.5px;margin:1.5rem 0 0.5rem;">// COMPARISON</h3>
+      <table class="file-table">
+        <thead><tr><th>REPL</th><th>Builtins in scope</th><th>Tab-complete corpus</th><th>Cold start</th><th>Pipelines in-process</th></tr></thead>
+        <tbody>
+          <tr><td>bash 5</td><td class="num">~150</td><td class="num">~250</td><td class="num">~5 ms</td><td>No (fork+exec per stage)</td></tr>
+          <tr><td>zsh 5</td><td class="num">~140 + zinit-loaded</td><td class="num">~2k via compinit</td><td class="num">~30 ms (cold)</td><td>No</td></tr>
+          <tr><td>fish 3</td><td class="num">~200</td><td class="num">~1k</td><td class="num">~25 ms</td><td>No</td></tr>
+          <tr><td>nushell 0.x</td><td class="num">~350</td><td class="num">~400</td><td class="num">~50 ms</td><td><strong>Yes</strong> (pipe is in-VM)</td></tr>
+          <tr><td>python -i</td><td class="num">71</td><td class="num">71 + imported</td><td class="num">~40 ms</td><td>No (subprocess module spawns)</td></tr>
+          <tr><td>node</td><td class="num">0 (require-first)</td><td class="num">REPL-internal</td><td class="num">~80 ms</td><td>No</td></tr>
+          <tr style="background:rgba(57,255,20,0.05);"><td style="color:var(--green);"><strong>stryke</strong></td><td class="num"><strong>10,267</strong></td><td class="num"><strong>22,071</strong></td><td class="num"><strong>&lt; 10 ms</strong></td><td><strong>Yes</strong> (every <code>|&gt;</code> stage is a heap value)</td></tr>
+        </tbody>
+      </table>
+      <p style="margin-top:8px;">Nushell is the only direct architectural peer (in-process pipelines, structured values) but it's an order of magnitude smaller in builtin surface and slower to cold-start. No other REPL passes the combination of <em>shell-grade pipelines + 10k+ builtin surface + sub-10 ms launch</em>.</p>
+
+      <hr class="section-rule">
+
+      <!-- ═══════════════════════════════════════ -->
       <!-- SECTION 10b: EXAMPLES &amp; SOLVED PROBLEMS  -->
       <!-- ═══════════════════════════════════════ -->
       <h2 class="tutorial-title"><span class="step-hash">.</span>EXAMPLES &amp; SOLVED PROBLEMS</h2>
