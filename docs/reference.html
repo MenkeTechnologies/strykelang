@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.14.0 · 10143 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.14.0 · 10176 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -330,7 +330,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">8471</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">8504</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -11990,7 +11990,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">8471 topics</p>
+      <p class="chapter-meta">8504 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$!</code></h3>
         <p><code>$!</code> — the OS error from the most recent system call, in stringified form (e.g. <code>&quot;No such file or directory&quot;</code>) or as an <code>errno</code> integer in numeric context. Set by <code>open</code>, <code>close</code>, <code>chdir</code>, <code>read</code>, <code>write</code>, and other syscalls when they fail. The value persists until the next failing call, so always check it *immediately* after the failing operation — intermediate clean Perl code does not touch it, but any subsequent syscall will.</p>
@@ -15291,6 +15291,10 @@ p @$bb   # (0, 1, 5, 4)
         <p><code>beaufort</code> — operation <code>beaufort</code>. Category: *cryptography deep*.</p>
         <pre><code class="lang-perl">p beaufort $x
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-beep">
+        <h3><a class="doc-anchor" href="#doc-beep">#</a> <code>beep</code></h3>
+        <p><code>beep</code> / <code>ring_bell</code> — emit <code>\x07</code> (BEL — ASCII 7), which most terminals interpret as an audible or visual bell depending on settings. Returns <code>1</code>.</p>
       </article>
       <article class="doc-entry" id="doc-before-n">
         <h3><a class="doc-anchor" href="#doc-before-n">#</a> <code>before_n</code></h3>
@@ -19023,6 +19027,13 @@ p @$c   # (1, 1)
         <pre><code class="lang-perl">p chars_to_string $value
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-charset-convert">
+        <h3><a class="doc-anchor" href="#doc-charset-convert">#</a> <code>charset_convert</code></h3>
+        <p><code>iconv(STRING, FROM, TO)</code> → re-encode <code>STRING</code> between character sets. Supports <code>utf-8</code>, <code>latin-1</code> (aliases <code>iso-8859-1</code>, <code>iso8859-1</code>, <code>latin1</code>), and <code>ascii</code>. Lossy for unsupported chars (<code>?</code> substitute). Unknown FROM / TO returns input unchanged. For wider charset support, use a dedicated codec — <code>iconv</code> is the shell-grade convenience wrapper.</p>
+        <pre><code class="lang-perl">p iconv(&quot;café&quot;, &quot;utf-8&quot;, &quot;ascii&quot;)    # caf?
+p iconv($latin_bytes, &quot;latin-1&quot;, &quot;utf-8&quot;)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-chc-bound-makespan">
         <h3><a class="doc-anchor" href="#doc-chc-bound-makespan">#</a> <code>chc_bound_makespan</code></h3>
         <p><code>chc_bound_makespan</code> — operation <code>chc bound makespan</code>. Category: *combinatorial optimization, scheduling*.</p>
@@ -20026,6 +20037,12 @@ my $d3 = $dog-&gt;clone()        # deep copy
         <pre><code class="lang-perl">p clean_price $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-clear">
+        <h3><a class="doc-anchor" href="#doc-clear">#</a> <code>clear</code></h3>
+        <p><code>clear</code> / <code>cls</code> — emit ANSI <code>\x1b[2J\x1b[H</code> (clear screen + cursor home). Lighter than <code>reset</code> (which re-inits the terminal); <code>clear</code> is the shell muscle-memory key for &quot;give me a blank prompt.&quot;</p>
+        <pre><code class="lang-perl">clear()                              # blank the screen
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-clighten">
         <h3><a class="doc-anchor" href="#doc-clighten">#</a> <code>clighten</code></h3>
         <p><code>clighten</code> — operation <code>clighten</code>. Alias for <code>color_lighten</code>. Category: *color operations*.</p>
@@ -20609,6 +20626,12 @@ p codon_to_amino_acid(&quot;TAA&quot;)  # * (stop)
         <pre><code class="lang-perl">p columbic_capacity_lihalfcell $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-column">
+        <h3><a class="doc-anchor" href="#doc-column">#</a> <code>column</code></h3>
+        <p><code>column(\@ITEMS)</code> → tabulate items into terminal-width-aware fixed-width columns. Falls back to 80 cols when terminal size is unavailable. Returns a single multi-line string suitable for <code>print</code>.</p>
+        <pre><code class="lang-perl">p column([sort keys %b])             # all builtins in columns
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-column-generation-step">
         <h3><a class="doc-anchor" href="#doc-column-generation-step">#</a> <code>column_generation_step</code></h3>
         <p><code>column_generation_step</code> — single-step update of <code>column generation</code>. Category: *combinatorial optimization, scheduling*.</p>
@@ -20642,6 +20665,15 @@ p comb(52, 5)   # 2598960 (poker hands)
         <h3><a class="doc-anchor" href="#doc-combrep">#</a> <code>combrep</code></h3>
         <p><code>combrep</code> — operation <code>combrep</code>. Alias for <code>combinations_rep</code>. Category: *additional missing stdlib functions*.</p>
         <pre><code class="lang-perl">p combrep $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-comm">
+        <h3><a class="doc-anchor" href="#doc-comm">#</a> <code>comm</code></h3>
+        <p><code>comm(\@A, \@B)</code> — 3-column compare of two SORTED lists. Returns an arrayref <code>[$only_a, $only_b, $both]</code> where each entry is an arrayref of lines. Mirrors POSIX <code>comm</code>: input must already be sorted (lexical); use <code>sort</code> first if unsure.</p>
+        <pre><code class="lang-perl">my $r = comm([sort @set_a], [sort @set_b])
+p &quot;only in A: &quot; . scalar @{$r-&gt;[0]}
+p &quot;only in B: &quot; . scalar @{$r-&gt;[1]}
+p &quot;in both: &quot;   . scalar @{$r-&gt;[2]}
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-common-kmers">
@@ -22339,6 +22371,16 @@ my @F = @{cumtrapz(\@y)}  # [0, 1.5, 4.0, 7.5]
         <p><code>cups_to_ml</code> — convert from <code>cups</code> to <code>ml</code>. Category: *file stat / path*.</p>
         <pre><code class="lang-perl">p cups_to_ml $value
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-curl-get">
+        <h3><a class="doc-anchor" href="#doc-curl-get">#</a> <code>curl_get</code></h3>
+        <p><code>curl_get(URL)</code> → response body as a string, or <code>undef</code> on failure. Shell-named wrapper over the existing <code>ureq</code> HTTP client. For full HTTP semantics (custom headers, redirects, JSON parsing), use the lower-level <code>fetch_val</code> / <code>fetch_async</code> / <code>http_*</code> family.</p>
+        <pre><code class="lang-perl">my $page = curl_get(&quot;https://example.com&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-curl-post">
+        <h3><a class="doc-anchor" href="#doc-curl-post">#</a> <code>curl_post</code></h3>
+        <p><code>curl_post(URL, BODY)</code> → POST <code>BODY</code> to <code>URL</code>. <code>Content-Type</code> auto-detected: <code>application/json</code> when <code>BODY</code> parses as JSON, else <code>text/plain</code>. Returns response body as a string, or <code>undef</code> on failure.</p>
       </article>
       <article class="doc-entry" id="doc-currency-code-to-symbol">
         <h3><a class="doc-anchor" href="#doc-currency-code-to-symbol">#</a> <code>currency_code_to_symbol</code></h3>
@@ -24984,6 +25026,10 @@ my $d = dijkstra($g, &quot;A&quot;)  # {A=&gt;0, B=&gt;1, C=&gt;3}
         <p><code>diopter</code> — operation <code>diopter</code>. Alias for <code>lens_power</code>. Category: *physics formulas*.</p>
         <pre><code class="lang-perl">p diopter $x
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-dir-stack">
+        <h3><a class="doc-anchor" href="#doc-dir-stack">#</a> <code>dir_stack</code></h3>
+        <p><code>dir_stack</code> → list the saved directory stack (oldest first, most-recent last). Read-only view; use <code>pushd</code> / <code>popd</code> to mutate.</p>
       </article>
       <article class="doc-entry" id="doc-direct-age-adjusted">
         <h3><a class="doc-anchor" href="#doc-direct-age-adjusted">#</a> <code>direct_age_adjusted</code></h3>
@@ -28551,6 +28597,13 @@ p &quot;min=$f-&gt;[0] Q1=$f-&gt;[1] med=$f-&gt;[2] Q3=$f-&gt;[3] max=$f-&gt;[4]
         <pre><code class="lang-perl">p format_percent $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-format-strftime">
+        <h3><a class="doc-anchor" href="#doc-format-strftime">#</a> <code>format_strftime</code></h3>
+        <p><code>strftime(FORMAT, EPOCH_SECS?)</code> → format a Unix timestamp using strftime directives (<code>%Y</code> <code>%m</code> <code>%d</code> <code>%H</code> <code>%M</code> <code>%S</code> <code>%a</code> <code>%A</code> etc.). Default timestamp is <code>Local::now()</code>. Wraps the existing <code>chrono</code> dep.</p>
+        <pre><code class="lang-perl">p strftime(&quot;%Y-%m-%d %H:%M:%S&quot;)     # 2026-05-14 17:19:48
+p strftime(&quot;%FT%TZ&quot;, 1700000000)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-format-table-simple">
         <h3><a class="doc-anchor" href="#doc-format-table-simple">#</a> <code>format_table_simple</code></h3>
         <p><code>format_table_simple</code> — operation <code>format table simple</code>. Category: *misc*.</p>
@@ -31078,6 +31131,12 @@ p gini(0, 0, 0, 100)   # ~0.75 (high inequality)
         <pre><code class="lang-perl">p groupby_iter $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-groups">
+        <h3><a class="doc-anchor" href="#doc-groups">#</a> <code>groups</code></h3>
+        <p><code>groups</code> → list of supplementary group names for the current process. Wraps <code>libc::getgroups</code> + <code>libc::getgrgid_r</code> for each GID. Returns an array of strings; empty on Windows.</p>
+        <pre><code class="lang-perl">p &quot;in groups: &quot; . join(&quot;,&quot;, groups)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-grover-iter">
         <h3><a class="doc-anchor" href="#doc-grover-iter">#</a> <code>grover_iter</code></h3>
         <p><code>grover_iter</code> — operation <code>grover iter</code>. Category: *quantum*.</p>
@@ -32073,6 +32132,13 @@ my $ac_only = hpf(\@with_dc, 0.1)
         <h3><a class="doc-anchor" href="#doc-histogram-bins">#</a> <code>histogram_bins</code></h3>
         <p><code>histogram_bins</code> — operation <code>histogram bins</code>. Category: *list helpers*.</p>
         <pre><code class="lang-perl">p histogram_bins $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-history">
+        <h3><a class="doc-anchor" href="#doc-history">#</a> <code>history</code></h3>
+        <p><code>history</code> / <code>history(N)</code> / <code>history(-N)</code> — REPL history access. No args: full history buffer as a list. Positive N: the last N lines. Negative N: the N-th-from-last line as a scalar. The REPL frontend pushes accepted lines into this buffer via <code>repl_history_push()</code>; from a non-REPL script, history is whatever the embedding application wires.</p>
+        <pre><code class="lang-perl">my @last10 = history(10)
+p &quot;prev: &quot; . history(-1)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-hits-authority">
@@ -41729,6 +41795,17 @@ p mish(-1)   # -0.3034
         <pre><code class="lang-perl">p mjo_phase_step $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-mkdtemp">
+        <h3><a class="doc-anchor" href="#doc-mkdtemp">#</a> <code>mkdtemp</code></h3>
+        <p><code>mktempdir(PREFIX=&quot;stryke&quot;)</code> — create a fresh temp directory and return its absolute path. NOT auto-deleted.</p>
+      </article>
+      <article class="doc-entry" id="doc-mktemp">
+        <h3><a class="doc-anchor" href="#doc-mktemp">#</a> <code>mktemp</code></h3>
+        <p><code>mktemp(PREFIX=&quot;stryke&quot;)</code> — create a fresh temp file under <code>$TMPDIR</code> and return its absolute path as a string. File is NOT auto-deleted (caller must <code>rm</code> it); use the existing <code>tempfile()</code> builtin for auto-cleanup semantics. Wraps the <code>tempfile</code> crate.</p>
+        <pre><code class="lang-perl">my $p = mktemp(&quot;build&quot;)              # /tmp/build-AbCdEf
+spurt($p, &quot;…&quot;)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-ml-adabelief-step">
         <h3><a class="doc-anchor" href="#doc-ml-adabelief-step">#</a> <code>ml_adabelief_step</code></h3>
         <p><code>ml_adabelief_step</code> — ML inference primitive <code>adabelief step</code>. Category: *climate, fluids, atmospheric*.</p>
@@ -44354,6 +44431,12 @@ p powmod(3, 13, 50)    # 7
         <pre><code class="lang-perl">p ngrams $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-nice">
+        <h3><a class="doc-anchor" href="#doc-nice">#</a> <code>nice</code></h3>
+        <p><code>nice(PRIORITY=10)</code> — set this process&#39;s priority adjustment via <code>libc::setpriority</code>. Range <code>[-20, 19]</code> (negative is higher priority; requires CAP_SYS_NICE / root to set). Returns the new priority on success or <code>undef</code> on permission denial. Standard Unix <code>nice</code> semantics.</p>
+        <pre><code class="lang-perl">nice(5)                              # be polite
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-nichols-chart-step">
         <h3><a class="doc-anchor" href="#doc-nichols-chart-step">#</a> <code>nichols_chart_step</code></h3>
         <p><code>nichols_chart_step</code> — single-step update of <code>nichols chart</code>. Category: *robotics &amp; control*.</p>
@@ -45817,6 +45900,13 @@ printf &quot;elapsed: %d s\n&quot;, now - $start
         <h3><a class="doc-anchor" href="#doc-open-pipe-harmonic">#</a> <code>open_pipe_harmonic</code></h3>
         <p><code>open_pipe_harmonic</code> — operation <code>open pipe harmonic</code>. Category: *em / optics / relativity*.</p>
         <pre><code class="lang-perl">p open_pipe_harmonic $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-open-url">
+        <h3><a class="doc-anchor" href="#doc-open-url">#</a> <code>open_url</code></h3>
+        <p><code>openurl(URL_OR_PATH)</code> — launch the OS default handler for <code>URL_OR_PATH</code>. macOS → <code>open</code>, Linux → <code>xdg-open</code>, Windows → <code>cmd /c start</code>. Returns <code>1</code> on launch success, <code>0</code> otherwise.</p>
+        <pre><code class="lang-perl">openurl(&quot;https://stryke.menketech.com&quot;)
+openurl(&quot;./report.pdf&quot;)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-opening-2d">
@@ -48635,6 +48725,10 @@ p polyper(@square)   # 4
         <h3><a class="doc-anchor" href="#doc-popcount-u64">#</a> <code>popcount_u64</code></h3>
         <p><code>popcount_u64(x) → int</code> — population count over all 64 bits (alias for <code>bit_count_ones</code>).</p>
       </article>
+      <article class="doc-entry" id="doc-popd">
+        <h3><a class="doc-anchor" href="#doc-popd">#</a> <code>popd</code></h3>
+        <p><code>popd</code> — pop the top entry off the directory stack and <code>chdir</code> to it. Returns the new cwd. Errors when the stack is empty (<code>popd: directory stack empty</code>). Pair with <code>pushd</code>.</p>
+      </article>
       <article class="doc-entry" id="doc-porosity-active-layer">
         <h3><a class="doc-anchor" href="#doc-porosity-active-layer">#</a> <code>porosity_active_layer</code></h3>
         <p><code>porosity_active_layer</code> — operation <code>porosity active layer</code>. Category: *electrochemistry, batteries, fuel cells*.</p>
@@ -49434,6 +49528,14 @@ p punif(3, 0, 10)   # 0.3
         <h3><a class="doc-anchor" href="#doc-push-relabel-step">#</a> <code>push_relabel_step</code></h3>
         <p><code>push_relabel_step</code> — single-step update of <code>push relabel</code>. Category: *combinatorial optimization, scheduling*.</p>
         <pre><code class="lang-perl">p push_relabel_step $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pushd">
+        <h3><a class="doc-anchor" href="#doc-pushd">#</a> <code>pushd</code></h3>
+        <p><code>pushd(DIR)</code> — save current cwd onto a process-wide directory stack, then <code>chdir(DIR)</code>. Returns the new cwd. Bare <code>pushd()</code> with no argument swaps the top of the stack with cwd (zsh convention). Also updates <code>stryke_pwd</code> so relative-path builtins (<code>glob</code>, <code>slurp</code>, <code>slurp_self</code>, …) follow the new directory.</p>
+        <pre><code class="lang-perl">pushd(&quot;/tmp&quot;)                       # save cwd, chdir /tmp
+# … work in /tmp …
+popd()                              # restore previous cwd
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pv">
@@ -51309,6 +51411,10 @@ p reflect_point(3, 4, &#39;origin&#39;)  # [-3, -4]
         <pre><code class="lang-perl">p renamenx $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-renice">
+        <h3><a class="doc-anchor" href="#doc-renice">#</a> <code>renice</code></h3>
+        <p><code>renice(PID, PRIORITY)</code> — adjust another process&#39;s priority. Same <code>[-20, 19]</code> range; requires permission. Returns the new priority or <code>undef</code>.</p>
+      </article>
       <article class="doc-entry" id="doc-renyi-divergence-step">
         <h3><a class="doc-anchor" href="#doc-renyi-divergence-step">#</a> <code>renyi_divergence_step</code></h3>
         <p><code>renyi_divergence_step</code> — single-step update of <code>renyi divergence</code>. Category: *electrochemistry, batteries, fuel cells*.</p>
@@ -51375,6 +51481,19 @@ my @s = @{rep_fn(&quot;x&quot;, 5)}  # five &quot;x&quot;s
         <p><code>repeatedly</code> — operation <code>repeatedly</code>. Category: *algebraic match*.</p>
         <pre><code class="lang-perl">p repeatedly $x
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-repl-alias">
+        <h3><a class="doc-anchor" href="#doc-repl-alias">#</a> <code>repl_alias</code></h3>
+        <p><code>repl_alias(NAME, EXPANSION)</code> / <code>repl_alias(&quot;NAME=EXPANSION&quot;)</code> — register a REPL alias. With one arg as a query (<code>repl_alias(&quot;ll&quot;)</code>), returns the expansion or <code>undef</code>. With no args, returns the full alias table as <code>name=expansion</code> strings. The REPL prompt rewriter consults this table before each parse.</p>
+        <p>*Renamed from bare <code>alias</code> so Perl typeglob assignment (<code>*alias = \&amp;sub</code>) keeps working.*</p>
+        <pre><code class="lang-perl">repl_alias(&quot;ll&quot;, &quot;ls -la&quot;)
+repl_alias(&quot;g=git&quot;)                 # equals-form
+p repl_alias(&quot;ll&quot;)                  # ls -la
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-repl-unalias">
+        <h3><a class="doc-anchor" href="#doc-repl-unalias">#</a> <code>repl_unalias</code></h3>
+        <p><code>repl_unalias(NAME)</code> — drop one REPL alias. Returns <code>1</code> if removed, <code>0</code> if not present.</p>
       </article>
       <article class="doc-entry" id="doc-replace-all-str">
         <h3><a class="doc-anchor" href="#doc-replace-all-str">#</a> <code>replace_all_str</code></h3>
@@ -51593,6 +51712,12 @@ my $down = resample(\@signal, 0.5) # halve sample rate
         <pre><code class="lang-perl">p rev $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-rev-lines">
+        <h3><a class="doc-anchor" href="#doc-rev-lines">#</a> <code>rev_lines</code></h3>
+        <p><code>rev_lines(STRING)</code> → reverse a multi-line string line-by-line (the LINE order, not chars within each line). Pairs with <code>tac</code> for the list-form variant.</p>
+        <pre><code class="lang-perl">p rev_lines(slurp(&quot;log.txt&quot;))         # newest entries on top
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-rev-str">
         <h3><a class="doc-anchor" href="#doc-rev-str">#</a> <code>rev_str</code></h3>
         <p><code>rev_str</code> — operation <code>rev str</code>. Alias for <code>reverse_str</code>. Category: *trivial string ops*.</p>
@@ -51627,6 +51752,13 @@ my $down = resample(\@signal, 0.5) # halve sample rate
         <h3><a class="doc-anchor" href="#doc-reverse-each-word">#</a> <code>reverse_each_word</code></h3>
         <p><code>reverse_each_word</code> — operation <code>reverse each word</code>. Category: *string processing extras*.</p>
         <pre><code class="lang-perl">p reverse_each_word $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-reverse-lines">
+        <h3><a class="doc-anchor" href="#doc-reverse-lines">#</a> <code>reverse_lines</code></h3>
+        <p><code>tac(\@LIST)</code> → reverse the order of a list. Mirrors POSIX <code>tac</code>. Composes with <code>cat</code> / pipes for traditional shell idioms.</p>
+        <pre><code class="lang-perl">my @rev = tac([sort @items])
+my @recent_first = tac([read_lines(&quot;history.log&quot;)])
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-reverse-list">
@@ -52114,6 +52246,13 @@ my $sol = rk4(fn { -$_[1] }, 0, 1, 0.1, 100)
         <h3><a class="doc-anchor" href="#doc-rltau">#</a> <code>rltau</code></h3>
         <p><code>rltau</code> — operation <code>rltau</code>. Alias for <code>rl_time_constant</code>. Category: *physics formulas*.</p>
         <pre><code class="lang-perl">p rltau $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rm">
+        <h3><a class="doc-anchor" href="#doc-rm">#</a> <code>rm</code></h3>
+        <p><code>rm PATH...</code> — remove one or more files. Returns the count actually removed. Silently skips paths that don&#39;t exist (Perl <code>unlink</code> semantics applied to the shell-name).</p>
+        <pre><code class="lang-perl">rm(&quot;/tmp/foo&quot;)
+rm(@stale_files)                    # bulk
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-rmall">
@@ -54379,6 +54518,12 @@ my @r = @{seq_fn(5, 1, -1)}  # [5,4,3,2,1]
         <h3><a class="doc-anchor" href="#doc-set-subname">#</a> <code>set_subname</code></h3>
         <p><code>set_subname</code> — set-theoretic op <code>subname</code>. Category: *list / aggregate*.</p>
         <pre><code class="lang-perl">p set_subname $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-set-term-title">
+        <h3><a class="doc-anchor" href="#doc-set-term-title">#</a> <code>set_term_title</code></h3>
+        <p><code>set_title(TITLE)</code> — emit the ANSI OSC sequence <code>\x1b]2;TITLE\x07</code> (sets the terminal window title in most modern terminals: macOS Terminal, iTerm2, Alacritty, kitty, GNOME Terminal, Windows Terminal). Uses <code>OSC 2</code> rather than <code>OSC 0</code> so the icon is left untouched. Returns <code>1</code>.</p>
+        <pre><code class="lang-perl">set_title(&quot;stryke - $script_name&quot;)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-setex">
@@ -58175,6 +58320,21 @@ p $means{b}  # 3.5
         <pre><code class="lang-perl">p tensor_trace_index $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-term-cols">
+        <h3><a class="doc-anchor" href="#doc-term-cols">#</a> <code>term_cols</code></h3>
+        <p><code>term_width</code> → integer column count of the controlling terminal (0 off-TTY).</p>
+      </article>
+      <article class="doc-entry" id="doc-term-dims">
+        <h3><a class="doc-anchor" href="#doc-term-dims">#</a> <code>term_dims</code></h3>
+        <p><code>term_size</code> → <code>(cols, rows)</code> of the controlling terminal via <code>TIOCGWINSZ</code> ioctl. Returns <code>(0, 0)</code> when STDOUT isn&#39;t a TTY (piped output, captured by a parent process, etc.).</p>
+        <pre><code class="lang-perl">my ($c, $r) = term_size()
+p &quot;$c x $r&quot;
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-term-height">
+        <h3><a class="doc-anchor" href="#doc-term-height">#</a> <code>term_height</code></h3>
+        <p><code>term_height</code> → integer row count of the controlling terminal (0 off-TTY).</p>
+      </article>
       <article class="doc-entry" id="doc-term-life-a-n-t">
         <h3><a class="doc-anchor" href="#doc-term-life-a-n-t">#</a> <code>term_life_a_n_t</code></h3>
         <p><code>term_life_a_n_t</code> — operation <code>term life a n t</code>. Category: *actuarial science*.</p>
@@ -59135,6 +59295,13 @@ p trapz(\@y, 0.01)  # ≈ 0.3333
         <pre><code class="lang-perl">p trasatti_voltammetry_charge $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-tree">
+        <h3><a class="doc-anchor" href="#doc-tree">#</a> <code>tree</code></h3>
+        <p><code>tree(PATH=&quot;.&quot;, max_depth=5)</code> → recursive directory listing as a single multi-line string with box-drawing characters (<code>├── </code>, <code>└── </code>, <code>│   </code>). Skips hidden entries (leading <code>.</code>). Sorted alphabetically per directory.</p>
+        <pre><code class="lang-perl">p tree(&quot;.&quot;, 3)                       # 3-level deep tree of cwd
+spurt(&quot;struct.txt&quot;, tree(&quot;/etc&quot;, 2))
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-tree-kernel-collins">
         <h3><a class="doc-anchor" href="#doc-tree-kernel-collins">#</a> <code>tree_kernel_collins</code></h3>
         <p><code>tree_kernel_collins</code> — operation <code>tree kernel collins</code>. Category: *computational linguistics*.</p>
@@ -59568,6 +59735,18 @@ $t = trie_insert($t, &quot;hello&quot;)
         <h3><a class="doc-anchor" href="#doc-ttl">#</a> <code>ttl</code></h3>
         <p><code>ttl</code> — operation <code>ttl</code>. Category: *redis-flavour primitives*.</p>
         <pre><code class="lang-perl">p ttl $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-tty-cooked">
+        <h3><a class="doc-anchor" href="#doc-tty-cooked">#</a> <code>tty_cooked</code></h3>
+        <p><code>tty_cooked</code> — flip the controlling TTY back into canonical (line-buffered, echoing) mode. The default state for interactive shells.</p>
+      </article>
+      <article class="doc-entry" id="doc-tty-raw">
+        <h3><a class="doc-anchor" href="#doc-tty-raw">#</a> <code>tty_raw</code></h3>
+        <p><code>tty_raw</code> — flip the controlling TTY into raw mode: ICANON and ECHO off, no line buffering, no input echo. Used for interactive selectors and key-by-key input. Returns <code>1</code> on success, <code>0</code> otherwise. Pair with <code>tty_cooked</code> to restore.</p>
+        <pre><code class="lang-perl">tty_raw();
+my $key = sysread(STDIN, my $buf, 1) ? $buf : undef;
+tty_cooked();
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-tukey-lambda-quantile">
@@ -61320,6 +61499,13 @@ p scalar wha(&quot;perl&quot;)        # number of perls on PATH
         <pre><code class="lang-perl">p when_true $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-whereis">
+        <h3><a class="doc-anchor" href="#doc-whereis">#</a> <code>whereis</code></h3>
+        <p><code>whereis(CMD)</code> → list of every match for <code>CMD</code> on <code>$PATH</code>, then every man-page file in <code>$MANPATH</code> (or <code>/usr/share/man</code> if unset). Returns an array of absolute paths.</p>
+        <pre><code class="lang-perl">my @hits = whereis(&quot;git&quot;)
+# /usr/bin/git, /usr/share/man/man1/git.1, …
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-which-fn">
         <h3><a class="doc-anchor" href="#doc-which-fn">#</a> <code>which_fn</code></h3>
         <p><code>which_fn</code> — return indices where a predicate is true. Like R&#39;s which().</p>
@@ -61366,6 +61552,12 @@ p scalar wha(&quot;perl&quot;)        # number of perls on PATH
         <h3><a class="doc-anchor" href="#doc-whittaker-m">#</a> <code>whittaker_m</code></h3>
         <p><code>whittaker_m</code> — operation <code>whittaker m</code>. Category: *special functions extra*.</p>
         <pre><code class="lang-perl">p whittaker_m $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-whoami">
+        <h3><a class="doc-anchor" href="#doc-whoami">#</a> <code>whoami</code></h3>
+        <p><code>whoami</code> → current user name. Wraps <code>libc::getuid()</code> + the existing <code>getpwuid</code> lookup. Returns the bare string username (NOT the passwd-list array that <code>getpwuid</code> returns in list context).</p>
+        <pre><code class="lang-perl">p &quot;running as: &quot; . whoami
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-whole-life-a">
@@ -61799,6 +61991,13 @@ p work(100, 10, 60)   # 500 J (force at 60°)
         <h3><a class="doc-anchor" href="#doc-xadd">#</a> <code>xadd</code></h3>
         <p><code>xadd</code> — operation <code>xadd</code>. Category: *redis-flavour primitives*.</p>
         <pre><code class="lang-perl">p xadd $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-xargs">
+        <h3><a class="doc-anchor" href="#doc-xargs">#</a> <code>xargs</code></h3>
+        <p><code>xargs(\&amp;CALLABLE, \@ARGS)</code> → invoke <code>CALLABLE</code> once per element of <code>\@ARGS</code>, returning a list of results. Sequential; for parallel use <code>pmap</code> directly. Composes naturally with <code>tac</code> / <code>comm</code> / pipe forwarding.</p>
+        <pre><code class="lang-perl">my @hashes = xargs(\&amp;sha256, \@filenames)
+xargs(\&amp;open_url, [&quot;https://a.com&quot;, &quot;https://b.com&quot;])
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-xattr-get">

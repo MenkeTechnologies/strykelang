@@ -20112,7 +20112,7 @@ list.
 \protect\phantomsection\label{ch-other}
 \chapter{Other}\label{other}
 
-8471 topics
+8504 topics
 
 \section{\texorpdfstring{\texttt{\$!}}{\$!}}\label{section-55}
 
@@ -26338,6 +26338,13 @@ Category: *astronomy / music / color / units*.
 \NormalTok{p beaufort $x}
 \end{Highlighting}
 \end{Shaded}
+
+\section{\texorpdfstring{\texttt{beep}}{beep}}\label{beep}
+
+\texttt{beep} / \texttt{ring\_bell} --- emit
+\texttt{\textbackslash{}x07} (BEL --- ASCII 7), which most terminals
+interpret as an audible or visual bell depending on settings. Returns
+\texttt{1}.
 
 \section{\texorpdfstring{\texttt{before\_n}}{before\_n}}\label{before_n}
 
@@ -33148,6 +33155,23 @@ batteries, fuel cells*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{charset\_convert}}{charset\_convert}}\label{charset_convert}
+
+\texttt{iconv(STRING,\ FROM,\ TO)} → re-encode \texttt{STRING} between
+character sets. Supports \texttt{utf-8}, \texttt{latin-1} (aliases
+\texttt{iso-8859-1}, \texttt{iso8859-1}, \texttt{latin1}), and
+\texttt{ascii}. Lossy for unsupported chars (\texttt{?} substitute).
+Unknown FROM / TO returns input unchanged. For wider charset support,
+use a dedicated codec --- \texttt{iconv} is the shell-grade convenience
+wrapper.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p iconv("café", "utf{-}8", "ascii")    \# caf?}
+\NormalTok{p iconv($latin\_bytes, "latin{-}1", "utf{-}8")}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{chc\_bound\_makespan}}{chc\_bound\_makespan}}\label{chc_bound_makespan}
 
 \texttt{chc\_bound\_makespan} --- operation
@@ -34940,6 +34964,20 @@ atmospheric*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{clear}}{clear}}\label{clear}
+
+\texttt{clear} / \texttt{cls} --- emit ANSI
+\texttt{\textbackslash{}x1b{[}2J\textbackslash{}x1b{[}H} (clear screen +
+cursor home). Lighter than \texttt{reset} (which re-inits the terminal);
+\texttt{clear} is the shell muscle-memory key for "give me a blank
+prompt."
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{clear()                              \# blank the screen}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{clighten}}{clighten}}\label{clighten}
 
 \texttt{clighten} --- operation \texttt{clighten}. Alias for
@@ -36015,6 +36053,19 @@ batteries, fuel cells*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{column}}{column}}\label{column}
+
+\texttt{column(\textbackslash{}@ITEMS)} → tabulate items into
+terminal-width-aware fixed-width columns. Falls back to 80 cols when
+terminal size is unavailable. Returns a single multi-line string
+suitable for \texttt{print}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p column([sort keys \%b])             \# all builtins in columns}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{column\_generation\_step}}{column\_generation\_step}}\label{column_generation_step}
 
 \texttt{column\_generation\_step} --- single-step update of
@@ -36077,6 +36128,23 @@ functions*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p combrep $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{comm}}{comm}}\label{comm}
+
+\texttt{comm(\textbackslash{}@A,\ \textbackslash{}@B)} --- 3-column
+compare of two SORTED lists. Returns an arrayref
+\texttt{{[}\$only\_a,\ \$only\_b,\ \$both{]}} where each entry is an
+arrayref of lines. Mirrors POSIX \texttt{comm}: input must already be
+sorted (lexical); use \texttt{sort} first if unsure.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $r = comm([sort @set\_a], [sort @set\_b])}
+\NormalTok{p "only in A: " . scalar @\{$r{-}\textgreater{}[0]\}}
+\NormalTok{p "only in B: " . scalar @\{$r{-}\textgreater{}[1]\}}
+\NormalTok{p "in both: "   . scalar @\{$r{-}\textgreater{}[2]\}}
 \end{Highlighting}
 \end{Shaded}
 
@@ -39083,6 +39151,27 @@ Category: *file stat / path*.
 \NormalTok{p cups\_to\_ml $value}
 \end{Highlighting}
 \end{Shaded}
+
+\section{\texorpdfstring{\texttt{curl\_get}}{curl\_get}}\label{curl_get}
+
+\texttt{curl\_get(URL)} → response body as a string, or \texttt{undef}
+on failure. Shell-named wrapper over the existing \texttt{ureq} HTTP
+client. For full HTTP semantics (custom headers, redirects, JSON
+parsing), use the lower-level \texttt{fetch\_val} /
+\texttt{fetch\_async} / \texttt{http\_*} family.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $page = curl\_get("https://example.com")}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{curl\_post}}{curl\_post}}\label{curl_post}
+
+\texttt{curl\_post(URL,\ BODY)} → POST \texttt{BODY} to \texttt{URL}.
+\texttt{Content-Type} auto-detected: \texttt{application/json} when
+\texttt{BODY} parses as JSON, else \texttt{text/plain}. Returns response
+body as a string, or \texttt{undef} on failure.
 
 \section{\texorpdfstring{\texttt{currency\_code\_to\_symbol}}{currency\_code\_to\_symbol}}\label{currency_code_to_symbol}
 
@@ -43965,6 +44054,12 @@ scheduling*.
 \NormalTok{p diopter $x}
 \end{Highlighting}
 \end{Shaded}
+
+\section{\texorpdfstring{\texttt{dir\_stack}}{dir\_stack}}\label{dir_stack}
+
+\texttt{dir\_stack} → list the saved directory stack (oldest first,
+most-recent last). Read-only view; use \texttt{pushd} / \texttt{popd} to
+mutate.
 
 \section{\texorpdfstring{\texttt{direct\_age\_adjusted}}{direct\_age\_adjusted}}\label{direct_age_adjusted}
 
@@ -50484,6 +50579,21 @@ Category: *file stat / path*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{format\_strftime}}{format\_strftime}}\label{format_strftime}
+
+\texttt{strftime(FORMAT,\ EPOCH\_SECS?)} → format a Unix timestamp using
+strftime directives (\texttt{\%Y} \texttt{\%m} \texttt{\%d} \texttt{\%H}
+\texttt{\%M} \texttt{\%S} \texttt{\%a} \texttt{\%A} etc.). Default
+timestamp is \texttt{Local::now()}. Wraps the existing \texttt{chrono}
+dep.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p strftime("\%Y{-}\%m{-}\%d \%H:\%M:\%S")     \# 2026{-}05{-}14 17:19:48}
+\NormalTok{p strftime("\%FT\%TZ", 1700000000)}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{format\_table\_simple}}{format\_table\_simple}}\label{format_table_simple}
 
 \texttt{format\_table\_simple} --- operation
@@ -55212,6 +55322,18 @@ Category: *economics + game theory*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{groups}}{groups}}\label{groups}
+
+\texttt{groups} → list of supplementary group names for the current
+process. Wraps \texttt{libc::getgroups} + \texttt{libc::getgrgid\_r} for
+each GID. Returns an array of strings; empty on Windows.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p "in groups: " . join(",", groups)}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{grover\_iter}}{grover\_iter}}\label{grover_iter}
 
 \texttt{grover\_iter} --- operation \texttt{grover\ iter}. Category:
@@ -57034,6 +57156,22 @@ Category: *list helpers*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p histogram\_bins $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{history}}{history}}\label{history}
+
+\texttt{history} / \texttt{history(N)} / \texttt{history(-N)} --- REPL
+history access. No args: full history buffer as a list. Positive N: the
+last N lines. Negative N: the N-th-from-last line as a scalar. The REPL
+frontend pushes accepted lines into this buffer via
+\texttt{repl\_history\_push()}; from a non-REPL script, history is
+whatever the embedding application wires.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @last10 = history(10)}
+\NormalTok{p "prev: " . history({-}1)}
 \end{Highlighting}
 \end{Shaded}
 
@@ -74679,6 +74817,26 @@ Category: *climate, fluids, atmospheric*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{mkdtemp}}{mkdtemp}}\label{mkdtemp}
+
+\texttt{mktempdir(PREFIX="stryke")} --- create a fresh temp directory
+and return its absolute path. NOT auto-deleted.
+
+\section{\texorpdfstring{\texttt{mktemp}}{mktemp}}\label{mktemp}
+
+\texttt{mktemp(PREFIX="stryke")} --- create a fresh temp file under
+\texttt{\$TMPDIR} and return its absolute path as a string. File is NOT
+auto-deleted (caller must \texttt{rm} it); use the existing
+\texttt{tempfile()} builtin for auto-cleanup semantics. Wraps the
+\texttt{tempfile} crate.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $p = mktemp("build")              \# /tmp/build{-}AbCdEf}
+\NormalTok{spurt($p, "…")}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{ml\_adabelief\_step}}{ml\_adabelief\_step}}\label{ml_adabelief_step}
 
 \texttt{ml\_adabelief\_step} --- ML inference primitive
@@ -79525,6 +79683,21 @@ processing extras*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{nice}}{nice}}\label{nice}
+
+\texttt{nice(PRIORITY=10)} --- set this process\textquotesingle s
+priority adjustment via \texttt{libc::setpriority}. Range
+\texttt{{[}-20,\ 19{]}} (negative is higher priority; requires
+CAP\_SYS\_NICE / root to set). Returns the new priority on success or
+\texttt{undef} on permission denial. Standard Unix \texttt{nice}
+semantics.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{nice(5)                              \# be polite}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{nichols\_chart\_step}}{nichols\_chart\_step}}\label{nichols_chart_step}
 
 \texttt{nichols\_chart\_step} --- single-step update of
@@ -82241,6 +82414,20 @@ batteries, fuel cells*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p open\_pipe\_harmonic $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{open\_url}}{open\_url}}\label{open_url}
+
+\texttt{openurl(URL\_OR\_PATH)} --- launch the OS default handler for
+\texttt{URL\_OR\_PATH}. macOS → \texttt{open}, Linux →
+\texttt{xdg-open}, Windows → \texttt{cmd\ /c\ start}. Returns \texttt{1}
+on launch success, \texttt{0} otherwise.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{openurl("https://stryke.menketech.com")}
+\NormalTok{openurl("./report.pdf")}
 \end{Highlighting}
 \end{Shaded}
 
@@ -87487,6 +87674,13 @@ bits.
 \texttt{popcount\_u64(x)\ →\ int} --- population count over all 64 bits
 (alias for \texttt{bit\_count\_ones}).
 
+\section{\texorpdfstring{\texttt{popd}}{popd}}\label{popd}
+
+\texttt{popd} --- pop the top entry off the directory stack and
+\texttt{chdir} to it. Returns the new cwd. Errors when the stack is
+empty (\texttt{popd:\ directory\ stack\ empty}). Pair with
+\texttt{pushd}.
+
 \section{\texorpdfstring{\texttt{porosity\_active\_layer}}{porosity\_active\_layer}}\label{porosity_active_layer}
 
 \texttt{porosity\_active\_layer} --- operation
@@ -88941,6 +89135,23 @@ scheduling*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p push\_relabel\_step $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{pushd}}{pushd}}\label{pushd}
+
+\texttt{pushd(DIR)} --- save current cwd onto a process-wide directory
+stack, then \texttt{chdir(DIR)}. Returns the new cwd. Bare
+\texttt{pushd()} with no argument swaps the top of the stack with cwd
+(zsh convention). Also updates \texttt{stryke\_pwd} so relative-path
+builtins (\texttt{glob}, \texttt{slurp}, \texttt{slurp\_self}, \ldots)
+follow the new directory.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{pushd("/tmp")                       \# save cwd, chdir /tmp}
+\NormalTok{\# … work in /tmp …}
+\NormalTok{popd()                              \# restore previous cwd}
 \end{Highlighting}
 \end{Shaded}
 
@@ -92318,6 +92529,12 @@ Category: *extended stdlib*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{renice}}{renice}}\label{renice}
+
+\texttt{renice(PID,\ PRIORITY)} --- adjust another
+process\textquotesingle s priority. Same \texttt{{[}-20,\ 19{]}} range;
+requires permission. Returns the new priority or \texttt{undef}.
+
 \section{\texorpdfstring{\texttt{renyi\_divergence\_step}}{renyi\_divergence\_step}}\label{renyi_divergence_step}
 
 \texttt{renyi\_divergence\_step} --- single-step update of
@@ -92440,6 +92657,31 @@ atmospheric*.
 \NormalTok{p repeatedly $x}
 \end{Highlighting}
 \end{Shaded}
+
+\section{\texorpdfstring{\texttt{repl\_alias}}{repl\_alias}}\label{repl_alias}
+
+\texttt{repl\_alias(NAME,\ EXPANSION)} /
+\texttt{repl\_alias("NAME=EXPANSION")} --- register a REPL alias. With
+one arg as a query (\texttt{repl\_alias("ll")}), returns the expansion
+or \texttt{undef}. With no args, returns the full alias table as
+\texttt{name=expansion} strings. The REPL prompt rewriter consults this
+table before each parse.
+
+*Renamed from bare \texttt{alias} so Perl typeglob assignment
+(\texttt{*alias\ =\ \textbackslash{}\&sub}) keeps working.*
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{repl\_alias("ll", "ls {-}la")}
+\NormalTok{repl\_alias("g=git")                 \# equals{-}form}
+\NormalTok{p repl\_alias("ll")                  \# ls {-}la}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{repl\_unalias}}{repl\_unalias}}\label{repl_unalias}
+
+\texttt{repl\_unalias(NAME)} --- drop one REPL alias. Returns \texttt{1}
+if removed, \texttt{0} if not present.
 
 \section{\texorpdfstring{\texttt{replace\_all\_str}}{replace\_all\_str}}\label{replace_all_str}
 
@@ -92837,6 +93079,18 @@ Category: *physics formulas*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{rev\_lines}}{rev\_lines}}\label{rev_lines}
+
+\texttt{rev\_lines(STRING)} → reverse a multi-line string line-by-line
+(the LINE order, not chars within each line). Pairs with \texttt{tac}
+for the list-form variant.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p rev\_lines(slurp("log.txt"))         \# newest entries on top}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{rev\_str}}{rev\_str}}\label{rev_str}
 
 \texttt{rev\_str} --- operation \texttt{rev\ str}. Alias for
@@ -92900,6 +93154,19 @@ Category: *string processing extras*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p reverse\_each\_word $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{reverse\_lines}}{reverse\_lines}}\label{reverse_lines}
+
+\texttt{tac(\textbackslash{}@LIST)} → reverse the order of a list.
+Mirrors POSIX \texttt{tac}. Composes with \texttt{cat} / pipes for
+traditional shell idioms.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @rev = tac([sort @items])}
+\NormalTok{my @recent\_first = tac([read\_lines("history.log")])}
 \end{Highlighting}
 \end{Shaded}
 
@@ -93770,6 +94037,19 @@ mu, sigma{]}.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p rltau $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{rm}}{rm}}\label{rm}
+
+\texttt{rm\ PATH...} --- remove one or more files. Returns the count
+actually removed. Silently skips paths that don\textquotesingle t exist
+(Perl \texttt{unlink} semantics applied to the shell-name).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{rm("/tmp/foo")}
+\NormalTok{rm(@stale\_files)                    \# bulk}
 \end{Highlighting}
 \end{Shaded}
 
@@ -97958,6 +98238,21 @@ scheduling*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p set\_subname $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{set\_term\_title}}{set\_term\_title}}\label{set_term_title}
+
+\texttt{set\_title(TITLE)} --- emit the ANSI OSC sequence
+\texttt{\textbackslash{}x1b{]}2;TITLE\textbackslash{}x07} (sets the
+terminal window title in most modern terminals: macOS Terminal, iTerm2,
+Alacritty, kitty, GNOME Terminal, Windows Terminal). Uses
+\texttt{OSC\ 2} rather than \texttt{OSC\ 0} so the icon is left
+untouched. Returns \texttt{1}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{set\_title("stryke {-} $script\_name")}
 \end{Highlighting}
 \end{Shaded}
 
@@ -104904,6 +105199,30 @@ Category: *electrochemistry, batteries, fuel cells*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{term\_cols}}{term\_cols}}\label{term_cols}
+
+\texttt{term\_width} → integer column count of the controlling terminal
+(0 off-TTY).
+
+\section{\texorpdfstring{\texttt{term\_dims}}{term\_dims}}\label{term_dims}
+
+\texttt{term\_size} → \texttt{(cols,\ rows)} of the controlling terminal
+via \texttt{TIOCGWINSZ} ioctl. Returns \texttt{(0,\ 0)} when STDOUT
+isn\textquotesingle t a TTY (piped output, captured by a parent process,
+etc.).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my ($c, $r) = term\_size()}
+\NormalTok{p "$c x $r"}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{term\_height}}{term\_height}}\label{term_height}
+
+\texttt{term\_height} → integer row count of the controlling terminal (0
+off-TTY).
+
 \section{\texorpdfstring{\texttt{term\_life\_a\_n\_t}}{term\_life\_a\_n\_t}}\label{term_life_a_n_t}
 
 \texttt{term\_life\_a\_n\_t} --- operation \texttt{term\ life\ a\ n\ t}.
@@ -106651,6 +106970,20 @@ batteries, fuel cells*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{tree}}{tree}}\label{tree}
+
+\texttt{tree(PATH=".",\ max\_depth=5)} → recursive directory listing as
+a single multi-line string with box-drawing characters (\texttt{├──\ },
+\texttt{└──\ }, \texttt{│\ }). Skips hidden entries (leading
+\texttt{.}). Sorted alphabetically per directory.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p tree(".", 3)                       \# 3{-}level deep tree of cwd}
+\NormalTok{spurt("struct.txt", tree("/etc", 2))}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{tree\_kernel\_collins}}{tree\_kernel\_collins}}\label{tree_kernel_collins}
 
 \texttt{tree\_kernel\_collins} --- operation
@@ -107435,6 +107768,26 @@ primitives*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p ttl $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{tty\_cooked}}{tty\_cooked}}\label{tty_cooked}
+
+\texttt{tty\_cooked} --- flip the controlling TTY back into canonical
+(line-buffered, echoing) mode. The default state for interactive shells.
+
+\section{\texorpdfstring{\texttt{tty\_raw}}{tty\_raw}}\label{tty_raw}
+
+\texttt{tty\_raw} --- flip the controlling TTY into raw mode: ICANON and
+ECHO off, no line buffering, no input echo. Used for interactive
+selectors and key-by-key input. Returns \texttt{1} on success,
+\texttt{0} otherwise. Pair with \texttt{tty\_cooked} to restore.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{tty\_raw();}
+\NormalTok{my $key = sysread(STDIN, my $buf, 1) ? $buf : undef;}
+\NormalTok{tty\_cooked();}
 \end{Highlighting}
 \end{Shaded}
 
@@ -110585,6 +110938,19 @@ installed.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{whereis}}{whereis}}\label{whereis}
+
+\texttt{whereis(CMD)} → list of every match for \texttt{CMD} on
+\texttt{\$PATH}, then every man-page file in \texttt{\$MANPATH} (or
+\texttt{/usr/share/man} if unset). Returns an array of absolute paths.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @hits = whereis("git")}
+\NormalTok{\# /usr/bin/git, /usr/share/man/man1/git.1, …}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{which\_fn}}{which\_fn}}\label{which_fn}
 
 \texttt{which\_fn} --- return indices where a predicate is true. Like
@@ -110670,6 +111036,18 @@ Category: *econometrics*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p whittaker\_m $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{whoami}}{whoami}}\label{whoami}
+
+\texttt{whoami} → current user name. Wraps \texttt{libc::getuid()} + the
+existing \texttt{getpwuid} lookup. Returns the bare string username (NOT
+the passwd-list array that \texttt{getpwuid} returns in list context).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p "running as: " . whoami}
 \end{Highlighting}
 \end{Shaded}
 
@@ -111453,6 +111831,21 @@ primitives*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p xadd $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{xargs}}{xargs}}\label{xargs}
+
+\texttt{xargs(\textbackslash{}\&CALLABLE,\ \textbackslash{}@ARGS)} →
+invoke \texttt{CALLABLE} once per element of
+\texttt{\textbackslash{}@ARGS}, returning a list of results. Sequential;
+for parallel use \texttt{pmap} directly. Composes naturally with
+\texttt{tac} / \texttt{comm} / pipe forwarding.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @hashes = xargs(\textbackslash{}\&sha256, \textbackslash{}@filenames)}
+\NormalTok{xargs(\textbackslash{}\&open\_url, ["https://a.com", "https://b.com"])}
 \end{Highlighting}
 \end{Shaded}
 

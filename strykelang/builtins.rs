@@ -3499,6 +3499,44 @@ pub(crate) fn try_builtin(
         "short_id" => Some(builtin_short_id()),
         "is_uuid" => Some(builtin_is_uuid(interp, args)),
         "ulid" | "ulid_new" => Some(builtin_ulid(args)),
+        // ── Shell-like REPL builtins (Tier S) ──
+        "clear" | "cls" => Some(builtin_clear()),
+        "whoami" => Some(builtin_whoami()),
+        "groups" => Some(builtin_groups()),
+        "pushd" => Some(builtin_pushd(interp, args, line)),
+        "popd" => Some(builtin_popd(interp, args, line)),
+        "dir_stack" => Some(builtin_dir_stack(args)),
+        "history" | "repl_history" => Some(builtin_history(args)),
+        // `alias` reserved as a Perl-typeglob-assignable name (`*alias = ...`);
+        // we expose the REPL alias table under `repl_alias` / `repl_unalias`
+        // / `set_alias` / `unset_alias` so user subs and typeglobs win.
+        "repl_alias" | "set_alias" => Some(builtin_alias(args)),
+        "repl_unalias" | "unset_alias" => Some(builtin_unalias(args)),
+        "term_size" | "tty_size" | "term_dims" => Some(builtin_term_size()),
+        "term_width" | "term_cols" | "tty_cols" => Some(builtin_term_width()),
+        "term_height" | "term_rows" | "tty_lines" | "tty_rows" => Some(builtin_term_height()),
+        "set_title" | "set_term_title" | "window_title" => Some(builtin_set_title(args)),
+        "beep" | "ring_bell" => Some(builtin_beep()),
+        // ── Shell-like REPL builtins (Tier A) ──
+        "rm" | "rm_file" => Some(builtin_rm(interp, args, line)),
+        "mktemp" | "mktemp_file" => Some(builtin_mktemp(args, line)),
+        "mktempdir" | "mkdtemp" => Some(builtin_mktempdir(args, line)),
+        "whereis" => Some(builtin_whereis(args, line)),
+        "nice" => Some(builtin_nice(args, line)),
+        "renice" => Some(builtin_renice(args, line)),
+        "tree" => Some(builtin_tree(interp, args, line)),
+        "comm" | "compare_sorted" => Some(builtin_comm(args, line)),
+        "column" | "tabulate_cols" => Some(builtin_column(args, line)),
+        "xargs" => Some(builtin_xargs(interp, args, line)),
+        "openurl" | "xdg_open" | "open_url" => Some(builtin_openurl(args, line)),
+        "curl_get" | "http_fetch" | "http_get" => Some(builtin_curl_get(args, line)),
+        "curl_post" | "http_post" => Some(builtin_curl_post(args, line)),
+        "iconv" | "charset_convert" => Some(builtin_iconv(args, line)),
+        "strftime" | "format_strftime" => Some(builtin_strftime(args, line)),
+        "tac" | "reverse_lines" => Some(builtin_tac(args, line)),
+        "rev_lines" => Some(builtin_rev_lines(args, line)),
+        "tty_raw" => Some(builtin_tty_raw()),
+        "tty_cooked" => Some(builtin_tty_cooked()),
         "is_ulid" => Some(builtin_is_ulid(interp, args)),
         "ulid_timestamp" | "ulid_ts" => Some(builtin_ulid_timestamp(args)),
         "kahan_sum" | "kahan" | "neumaier_sum" => Some(builtin_kahan_sum(interp, args)),
@@ -20767,6 +20805,863 @@ fn builtin_ulid(_args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::string(
         String::from_utf8(out.to_vec()).unwrap(),
     ))
+}
+
+// ── Shell-like REPL builtins (Tier S) ──────────────────────────────────
+
+/// `clear` / `cls` — emit ANSI clear-screen + cursor-home (`\x1b[2J\x1b[H`).
+/// Lighter than `reset` (which does a full terminal reset / re-init);
+/// `clear` is the shell muscle-memory key for "give me a blank prompt".
+fn builtin_clear() -> PerlResult<StrykeValue> {
+    use std::io::Write;
+    let _ = std::io::stdout().write_all(b"\x1b[2J\x1b[H");
+    let _ = std::io::stdout().flush();
+    Ok(StrykeValue::integer(1))
+}
+
+/// `whoami` — current user name. Wraps `libc::getuid` → existing
+/// passwd lookup. Returns the string username (Perl convention:
+/// `whoami` is a scalar even though `getpwuid` is list-context).
+fn builtin_whoami() -> PerlResult<StrykeValue> {
+    #[cfg(not(unix))]
+    {
+        return Ok(StrykeValue::UNDEF);
+    }
+    #[cfg(unix)]
+    {
+        let uid = unsafe { libc::getuid() };
+        match fetch_passwd_by_uid(uid) {
+            Some(pw) => Ok(StrykeValue::string(pw.name)),
+            None => Ok(StrykeValue::UNDEF),
+        }
+    }
+}
+
+/// `groups` — supplementary group names for the current process.
+/// Wraps `libc::getgroups` then resolves each GID to a name via the
+/// existing `getgrgid` path. Returns a list.
+fn builtin_groups() -> PerlResult<StrykeValue> {
+    #[cfg(not(unix))]
+    {
+        return Ok(StrykeValue::array(vec![]));
+    }
+    #[cfg(unix)]
+    {
+        // libc::getgroups: -1 for size returns count; then allocate.
+        let n = unsafe { libc::getgroups(0, std::ptr::null_mut()) };
+        if n < 0 {
+            return Ok(StrykeValue::array(vec![]));
+        }
+        let mut gids = vec![0 as libc::gid_t; n as usize];
+        let got = unsafe { libc::getgroups(n, gids.as_mut_ptr()) };
+        if got < 0 {
+            return Ok(StrykeValue::array(vec![]));
+        }
+        gids.truncate(got as usize);
+        let names: Vec<StrykeValue> = gids
+            .into_iter()
+            .filter_map(|gid| {
+                let buf = vec![0u8; 4096];
+                unsafe {
+                    let mut grp: libc::group = std::mem::zeroed();
+                    let mut result: *mut libc::group = std::ptr::null_mut();
+                    if libc::getgrgid_r(
+                        gid,
+                        &mut grp,
+                        buf.as_ptr() as *mut libc::c_char,
+                        buf.len(),
+                        &mut result,
+                    ) == 0
+                        && !result.is_null()
+                        && !grp.gr_name.is_null()
+                    {
+                        let name = std::ffi::CStr::from_ptr(grp.gr_name)
+                            .to_string_lossy()
+                            .into_owned();
+                        Some(StrykeValue::string(name))
+                    } else {
+                        None
+                    }
+                }
+            })
+            .collect();
+        Ok(StrykeValue::array(names))
+    }
+}
+
+/// Global directory stack — shared across the process. `pushd` / `popd`
+/// borrow shell semantics: `pushd DIR` saves cwd then cd's to DIR;
+/// `popd` restores the most-recently-saved cwd. Empty stack on
+/// process start.
+fn dir_stack() -> &'static parking_lot::Mutex<Vec<std::path::PathBuf>> {
+    use once_cell::sync::Lazy;
+    static STACK: Lazy<parking_lot::Mutex<Vec<std::path::PathBuf>>> =
+        Lazy::new(|| parking_lot::Mutex::new(Vec::new()));
+    &STACK
+}
+
+/// `pushd(DIR)` — save current cwd to the dir stack, then `chdir(DIR)`.
+/// Returns the new cwd path. Per stryke convention, also updates
+/// `stryke_pwd` via the same path the `cd` builtin uses.
+fn builtin_pushd(interp: &mut VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let dir_arg = args.first().map(|v| v.to_string());
+    let cur = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let target: std::path::PathBuf = match dir_arg {
+        Some(s) if !s.is_empty() => interp.resolve_stryke_path(&s),
+        _ => {
+            // bare `pushd` swaps top of stack with cwd (zsh convention).
+            let mut s = dir_stack().lock();
+            if let Some(top) = s.last_mut() {
+                let swap = std::mem::replace(top, cur.clone());
+                drop(s);
+                return swap_to_dir(interp, &swap, line);
+            }
+            return Err(PerlError::runtime("pushd: directory stack empty", line));
+        }
+    };
+    dir_stack().lock().push(cur);
+    swap_to_dir(interp, &target, line)
+}
+
+/// `popd` — pop the top entry off the dir stack and `chdir` to it.
+/// Returns the new cwd. Errors when the stack is empty.
+fn builtin_popd(interp: &mut VMHelper, _args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let top = dir_stack().lock().pop();
+    match top {
+        Some(path) => swap_to_dir(interp, &path, line),
+        None => Err(PerlError::runtime("popd: directory stack empty", line)),
+    }
+}
+
+/// `dir_stack` — list the saved directory stack (top of stack last).
+/// Mirrors zsh's `dirs` output but `dirs` is already taken; pick a
+/// non-colliding name.
+fn builtin_dir_stack(_args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let s = dir_stack().lock();
+    Ok(StrykeValue::array(
+        s.iter()
+            .map(|p| StrykeValue::string(p.to_string_lossy().into_owned()))
+            .collect(),
+    ))
+}
+
+fn swap_to_dir(
+    interp: &mut VMHelper,
+    target: &std::path::Path,
+    line: usize,
+) -> PerlResult<StrykeValue> {
+    match std::env::set_current_dir(target) {
+        Ok(()) => {
+            if let Ok(c) = std::env::current_dir() {
+                interp.stryke_pwd = std::fs::canonicalize(&c).unwrap_or(c);
+            }
+            Ok(StrykeValue::string(
+                interp.stryke_pwd.to_string_lossy().into_owned(),
+            ))
+        }
+        Err(e) => Err(PerlError::runtime(
+            format!("chdir({}): {}", target.display(), e),
+            line,
+        )),
+    }
+}
+
+/// REPL alias table — process-wide. Maps alias name to expansion
+/// string. The REPL prompt rewriter consults this table before parsing
+/// each input line. Outside the REPL, `alias` is still callable (for
+/// scripting consistency); it just stores definitions that nothing
+/// reads.
+fn alias_table() -> &'static parking_lot::Mutex<indexmap::IndexMap<String, String>> {
+    use once_cell::sync::Lazy;
+    static TABLE: Lazy<parking_lot::Mutex<indexmap::IndexMap<String, String>>> =
+        Lazy::new(|| parking_lot::Mutex::new(indexmap::IndexMap::new()));
+    &TABLE
+}
+
+/// `alias` — no args: list current alias table. `alias("name")`:
+/// return the alias's expansion (or undef). `alias("name", "expansion")`
+/// or `alias("name=expansion")`: register an alias. The REPL prompt
+/// rewriter (when wired) consults this table before parsing each line.
+fn builtin_alias(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    if args.is_empty() {
+        let t = alias_table().lock();
+        let mut out: Vec<StrykeValue> = Vec::with_capacity(t.len());
+        for (k, v) in t.iter() {
+            out.push(StrykeValue::string(format!("{k}={v}")));
+        }
+        return Ok(StrykeValue::array(out));
+    }
+    if args.len() == 1 {
+        // Either a query OR `alias("name=expansion")`-style single string.
+        let raw = args[0].to_string();
+        if let Some((name, expansion)) = raw.split_once('=') {
+            alias_table()
+                .lock()
+                .insert(name.trim().to_string(), expansion.to_string());
+            return Ok(StrykeValue::integer(1));
+        }
+        let t = alias_table().lock();
+        return Ok(t
+            .get(&raw)
+            .cloned()
+            .map(StrykeValue::string)
+            .unwrap_or(StrykeValue::UNDEF));
+    }
+    // Two args: alias(name, expansion).
+    let name = args[0].to_string();
+    let expansion = args[1].to_string();
+    alias_table().lock().insert(name, expansion);
+    Ok(StrykeValue::integer(1))
+}
+
+/// `unalias NAME` — drop one alias. Returns `1` if removed, `0` if
+/// not present.
+fn builtin_unalias(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let name = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let removed = alias_table().lock().shift_remove(&name).is_some();
+    Ok(StrykeValue::integer(if removed { 1 } else { 0 }))
+}
+
+/// REPL history — process-wide. The REPL pushes each accepted line
+/// here on submission. `history()` exposes the buffer; `history(N)`
+/// returns the last N lines; `history(-N)` returns the N-th-from-last
+/// line as a scalar.
+fn history_buffer() -> &'static parking_lot::Mutex<Vec<String>> {
+    use once_cell::sync::Lazy;
+    static HIST: Lazy<parking_lot::Mutex<Vec<String>>> =
+        Lazy::new(|| parking_lot::Mutex::new(Vec::new()));
+    &HIST
+}
+
+/// Public accessor for the REPL to push accepted lines into the history
+/// buffer. Called from `repl.rs` on each submission.
+pub fn repl_history_push(line: String) {
+    if !line.trim().is_empty() {
+        history_buffer().lock().push(line);
+    }
+}
+
+/// `history()` / `history(N)` / `history(-N)` — REPL history access.
+/// No args: full buffer as a list. Positive N: last N entries.
+/// Negative N: the N-th-from-last entry as a scalar.
+fn builtin_history(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let h = history_buffer().lock();
+    match args.first() {
+        None => Ok(StrykeValue::array(
+            h.iter().cloned().map(StrykeValue::string).collect(),
+        )),
+        Some(v) => {
+            let n = v.to_int();
+            if n < 0 {
+                let idx = h.len() as i64 + n;
+                if idx < 0 || idx as usize >= h.len() {
+                    return Ok(StrykeValue::UNDEF);
+                }
+                Ok(StrykeValue::string(h[idx as usize].clone()))
+            } else {
+                let take = (n as usize).min(h.len());
+                let start = h.len() - take;
+                Ok(StrykeValue::array(
+                    h[start..].iter().cloned().map(StrykeValue::string).collect(),
+                ))
+            }
+        }
+    }
+}
+
+/// `term_size()` — return `(cols, rows)` of the controlling terminal,
+/// or `(0, 0)` when not on a TTY. Pairs with `term_width` / `term_height`
+/// for the single-axis variants.
+fn term_winsize() -> Option<(u16, u16)> {
+    #[cfg(unix)]
+    unsafe {
+        let mut ws: libc::winsize = std::mem::zeroed();
+        if libc::ioctl(1, libc::TIOCGWINSZ, &mut ws) == 0 {
+            return Some((ws.ws_col, ws.ws_row));
+        }
+        None
+    }
+    #[cfg(not(unix))]
+    {
+        None
+    }
+}
+
+fn builtin_term_size() -> PerlResult<StrykeValue> {
+    let (c, r) = term_winsize().unwrap_or((0, 0));
+    Ok(StrykeValue::array(vec![
+        StrykeValue::integer(c as i64),
+        StrykeValue::integer(r as i64),
+    ]))
+}
+
+fn builtin_term_width() -> PerlResult<StrykeValue> {
+    Ok(StrykeValue::integer(
+        term_winsize().map(|(c, _)| c).unwrap_or(0) as i64,
+    ))
+}
+
+fn builtin_term_height() -> PerlResult<StrykeValue> {
+    Ok(StrykeValue::integer(
+        term_winsize().map(|(_, r)| r).unwrap_or(0) as i64,
+    ))
+}
+
+/// `set_title(TITLE)` — emit `\x1b]2;TITLE\x07` (sets terminal window
+/// title in most modern terminals). Returns `1`. Most terminals also
+/// accept `\x1b]0;...\x07` which sets both title AND icon; we use `2;`
+/// to leave the icon untouched.
+fn builtin_set_title(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    use std::io::Write;
+    let title = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let mut out = std::io::stdout().lock();
+    let _ = write!(out, "\x1b]2;{}\x07", title);
+    let _ = out.flush();
+    Ok(StrykeValue::integer(1))
+}
+
+/// `beep` / `ring_bell` — emit `\x07` (terminal bell). Returns `1`.
+fn builtin_beep() -> PerlResult<StrykeValue> {
+    use std::io::Write;
+    let mut out = std::io::stdout().lock();
+    let _ = out.write_all(b"\x07");
+    let _ = out.flush();
+    Ok(StrykeValue::integer(1))
+}
+
+// ── Shell-like REPL builtins (Tier A) ──────────────────────────────────
+
+/// `rm PATH...` — remove one or more files. Returns the count actually
+/// removed. Silently ignores paths that don't exist (Perl `unlink`
+/// semantics applied to the shell-name).
+fn builtin_rm(interp: &VMHelper, args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    let mut n = 0i64;
+    for a in args {
+        let p = interp.resolve_stryke_path_string(&a.to_string());
+        if std::fs::remove_file(&p).is_ok() {
+            n += 1;
+        }
+    }
+    Ok(StrykeValue::integer(n))
+}
+
+/// `mktemp(PREFIX="stryke")` — create a fresh temp file via the
+/// existing `tempfile` crate and return its absolute path as a string.
+/// File is NOT auto-deleted (caller must `rm` it); use `tempfile` /
+/// the Perl `tempfile()` builtin for auto-cleanup semantics.
+fn builtin_mktemp(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let prefix = args
+        .first()
+        .map(|v| v.to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "stryke".to_string());
+    let pf = format!("{prefix}-");
+    let mut builder = tempfile::Builder::new();
+    builder.prefix(pf.as_str());
+    let file = builder
+        .tempfile()
+        .map_err(|e| PerlError::runtime(format!("mktemp: {e}"), line))?;
+    // Persist so the file stays after the NamedTempFile drops.
+    let (_f, persisted) = file
+        .keep()
+        .map_err(|e| PerlError::runtime(format!("mktemp: persist: {e}"), line))?;
+    Ok(StrykeValue::string(persisted.to_string_lossy().into_owned()))
+}
+
+/// `mktempdir(PREFIX="stryke")` — create a fresh temp directory and
+/// return its absolute path. Directory is NOT auto-deleted.
+fn builtin_mktempdir(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let prefix = args
+        .first()
+        .map(|v| v.to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "stryke".to_string());
+    let pf = format!("{prefix}-");
+    let mut builder = tempfile::Builder::new();
+    builder.prefix(pf.as_str());
+    let dir = builder
+        .tempdir()
+        .map_err(|e| PerlError::runtime(format!("mktempdir: {e}"), line))?;
+    let path = dir.keep();
+    Ok(StrykeValue::string(path.to_string_lossy().into_owned()))
+}
+
+/// `whereis CMD` — list every match for CMD on `$PATH`. Wraps the
+/// existing `which_all` builtin's algorithm (`$PATH` walker) but adds
+/// the `whereis`-conventional manpage hints if `MANPATH` is set.
+/// Returns a list (executable hits first, manpage hits second).
+fn builtin_whereis(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    let Some(name) = args.first().map(|v| v.to_string()) else {
+        return Ok(StrykeValue::array(vec![]));
+    };
+    if name.is_empty() {
+        return Ok(StrykeValue::array(vec![]));
+    }
+    let mut hits: Vec<StrykeValue> = Vec::new();
+    if let Some(path) = std::env::var_os("PATH") {
+        for dir in std::env::split_paths(&path) {
+            let candidate = dir.join(&name);
+            if let Ok(m) = std::fs::metadata(&candidate) {
+                if m.is_file() {
+                    hits.push(StrykeValue::string(candidate.to_string_lossy().into_owned()));
+                }
+            }
+        }
+    }
+    // Manpage hits (best-effort).
+    if let Some(manpath) = std::env::var_os("MANPATH").or_else(|| Some("/usr/share/man".into())) {
+        for dir in std::env::split_paths(&manpath) {
+            for sect in 1..=9 {
+                let section_dir = dir.join(format!("man{sect}"));
+                if let Ok(entries) = std::fs::read_dir(&section_dir) {
+                    for entry in entries.flatten() {
+                        let fname = entry.file_name();
+                        let s = fname.to_string_lossy();
+                        if s.starts_with(&format!("{name}.")) {
+                            hits.push(StrykeValue::string(
+                                entry.path().to_string_lossy().into_owned(),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(StrykeValue::array(hits))
+}
+
+/// `nice(PRIORITY=10)` — set the process priority adjustment via
+/// `libc::setpriority`. Range `[-20, 19]` on Unix; values clamped.
+/// Returns the new priority (or `undef` on Windows / failure).
+fn builtin_nice(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    #[cfg(unix)]
+    {
+        let prio = args.first().map(|v| v.to_int()).unwrap_or(10).clamp(-20, 19) as i32;
+        let pid = unsafe { libc::getpid() };
+        unsafe {
+            // PRIO_PROCESS = 0
+            if libc::setpriority(0, pid as libc::id_t, prio) != 0 {
+                return Ok(StrykeValue::UNDEF);
+            }
+        }
+        Ok(StrykeValue::integer(prio as i64))
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = args;
+        Ok(StrykeValue::UNDEF)
+    }
+}
+
+/// `renice(PID, PRIORITY)` — adjust another process's priority. Same
+/// `[-20, 19]` clamping; returns the new priority on success or
+/// `undef` on permission denial / unknown PID.
+fn builtin_renice(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    #[cfg(unix)]
+    {
+        let pid = args.first().map(|v| v.to_int()).unwrap_or(0) as libc::pid_t;
+        let prio = args.get(1).map(|v| v.to_int()).unwrap_or(0).clamp(-20, 19) as i32;
+        unsafe {
+            if libc::setpriority(0, pid as libc::id_t, prio) != 0 {
+                return Ok(StrykeValue::UNDEF);
+            }
+        }
+        Ok(StrykeValue::integer(prio as i64))
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = args;
+        Ok(StrykeValue::UNDEF)
+    }
+}
+
+/// `tree(PATH=".", max_depth=5)` — recursive directory listing with
+/// indentation. Returns a single multi-line string. Skips hidden
+/// entries (leading `.`) and respects `max_depth`.
+fn builtin_tree(interp: &VMHelper, args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    let root = args
+        .first()
+        .map(|v| v.to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| ".".to_string());
+    let max_depth = args.get(1).map(|v| v.to_int()).unwrap_or(5).max(0) as usize;
+    let root_path = interp.resolve_stryke_path(&root);
+    let mut out = String::new();
+    out.push_str(&root_path.to_string_lossy());
+    out.push('\n');
+    fn walk(
+        out: &mut String,
+        path: &std::path::Path,
+        depth: usize,
+        max_depth: usize,
+        prefix: &str,
+    ) {
+        if depth >= max_depth {
+            return;
+        }
+        let Ok(rd) = std::fs::read_dir(path) else {
+            return;
+        };
+        let mut entries: Vec<_> = rd.flatten().collect();
+        entries.sort_by_key(|e| e.file_name());
+        let entries: Vec<_> = entries
+            .into_iter()
+            .filter(|e| {
+                !e.file_name()
+                    .to_string_lossy()
+                    .starts_with('.')
+            })
+            .collect();
+        let last_idx = entries.len().saturating_sub(1);
+        for (i, entry) in entries.iter().enumerate() {
+            let name = entry.file_name();
+            let is_last = i == last_idx;
+            let connector = if is_last { "└── " } else { "├── " };
+            out.push_str(prefix);
+            out.push_str(connector);
+            out.push_str(&name.to_string_lossy());
+            out.push('\n');
+            if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                let next_prefix = format!("{prefix}{}", if is_last { "    " } else { "│   " });
+                walk(out, &entry.path(), depth + 1, max_depth, &next_prefix);
+            }
+        }
+    }
+    walk(&mut out, &root_path, 0, max_depth, "");
+    Ok(StrykeValue::string(out))
+}
+
+/// `comm(\@A, \@B)` — 3-column compare of two SORTED lists. Returns
+/// an arrayref `[$only_a, $only_b, $both]` where each entry is an
+/// arrayref of lines. Mirrors `comm` POSIX semantics (input must be
+/// sorted; lexical comparison).
+fn builtin_comm(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    fn arg_lines(v: &StrykeValue) -> Vec<String> {
+        if let Some(arr) = v.as_array_vec() {
+            return arr.iter().map(|x| x.to_string()).collect();
+        }
+        if let Some(ar) = v.as_array_ref() {
+            return ar.read().iter().map(|x| x.to_string()).collect();
+        }
+        vec![v.to_string()]
+    }
+    let a = arg_lines(args.first().unwrap_or(&StrykeValue::UNDEF));
+    let b = arg_lines(args.get(1).unwrap_or(&StrykeValue::UNDEF));
+    let mut only_a: Vec<StrykeValue> = Vec::new();
+    let mut only_b: Vec<StrykeValue> = Vec::new();
+    let mut both: Vec<StrykeValue> = Vec::new();
+    let (mut i, mut j) = (0usize, 0usize);
+    while i < a.len() && j < b.len() {
+        match a[i].cmp(&b[j]) {
+            std::cmp::Ordering::Less => {
+                only_a.push(StrykeValue::string(a[i].clone()));
+                i += 1;
+            }
+            std::cmp::Ordering::Greater => {
+                only_b.push(StrykeValue::string(b[j].clone()));
+                j += 1;
+            }
+            std::cmp::Ordering::Equal => {
+                both.push(StrykeValue::string(a[i].clone()));
+                i += 1;
+                j += 1;
+            }
+        }
+    }
+    while i < a.len() {
+        only_a.push(StrykeValue::string(a[i].clone()));
+        i += 1;
+    }
+    while j < b.len() {
+        only_b.push(StrykeValue::string(b[j].clone()));
+        j += 1;
+    }
+    Ok(StrykeValue::array(vec![
+        StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(only_a))),
+        StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(only_b))),
+        StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(both))),
+    ]))
+}
+
+/// `column LIST` — tabulate input into a fixed-width column layout
+/// that fits the current terminal. Falls back to 80 columns when
+/// terminal size is unavailable.
+fn builtin_column(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    // Collect inputs as flat strings.
+    let mut items: Vec<String> = Vec::new();
+    for a in args {
+        if let Some(arr) = a.as_array_vec() {
+            for v in arr {
+                items.push(v.to_string());
+            }
+        } else if let Some(ar) = a.as_array_ref() {
+            for v in ar.read().iter() {
+                items.push(v.to_string());
+            }
+        } else {
+            items.push(a.to_string());
+        }
+    }
+    if items.is_empty() {
+        return Ok(StrykeValue::string(String::new()));
+    }
+    let term_cols = term_winsize().map(|(c, _)| c as usize).unwrap_or(80).max(20);
+    let max_w = items.iter().map(|s| s.chars().count()).max().unwrap_or(1);
+    let col_w = max_w + 2;
+    let ncols = (term_cols / col_w).max(1);
+    let nrows = items.len().div_ceil(ncols);
+    let mut out = String::new();
+    for row in 0..nrows {
+        for col in 0..ncols {
+            let idx = col * nrows + row;
+            if let Some(s) = items.get(idx) {
+                out.push_str(s);
+                if col < ncols - 1 {
+                    let pad = col_w - s.chars().count();
+                    for _ in 0..pad {
+                        out.push(' ');
+                    }
+                }
+            }
+        }
+        out.push('\n');
+    }
+    Ok(StrykeValue::string(out))
+}
+
+/// `xargs(CALLABLE, \@ARGS)` — invoke `CALLABLE` once per element of
+/// `\@ARGS`. Returns a list of results. Sequential by default — for
+/// parallel, use `pmap` directly.
+fn builtin_xargs(
+    interp: &mut VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
+    let callable = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
+    let Some(sub) = callable.as_code_ref() else {
+        return Err(PerlError::runtime(
+            "xargs: first arg must be a callable / coderef",
+            line,
+        ));
+    };
+    let mut items: Vec<StrykeValue> = Vec::new();
+    for a in args.iter().skip(1) {
+        if let Some(arr) = a.as_array_vec() {
+            items.extend(arr);
+        } else if let Some(ar) = a.as_array_ref() {
+            items.extend(ar.read().iter().cloned());
+        } else {
+            items.push(a.clone());
+        }
+    }
+    use crate::vm_helper::FlowOrError;
+    let mut out: Vec<StrykeValue> = Vec::with_capacity(items.len());
+    for item in items {
+        match interp.call_sub(&sub, vec![item], WantarrayCtx::Scalar, line) {
+            Ok(v) => out.push(v),
+            Err(FlowOrError::Error(e)) => return Err(e),
+            Err(FlowOrError::Flow(_)) => break,
+        }
+    }
+    Ok(StrykeValue::array(out))
+}
+
+/// `openurl(URL)` / `xdg_open(URL)` — invoke the OS default-app
+/// handler for URL or file path. macOS → `open`, Linux → `xdg-open`,
+/// Windows → `cmd /c start`. Returns `1` on launch success, `0`
+/// otherwise.
+fn builtin_openurl(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    let url = args.first().map(|v| v.to_string()).unwrap_or_default();
+    if url.is_empty() {
+        return Ok(StrykeValue::integer(0));
+    }
+    let result = if cfg!(target_os = "macos") {
+        std::process::Command::new("open").arg(&url).status()
+    } else if cfg!(target_os = "windows") {
+        std::process::Command::new("cmd").args(["/c", "start", &url]).status()
+    } else {
+        std::process::Command::new("xdg-open").arg(&url).status()
+    };
+    let ok = result.map(|s| s.success()).unwrap_or(false);
+    Ok(StrykeValue::integer(if ok { 1 } else { 0 }))
+}
+
+/// `curl_get(URL)` — shell-named wrapper over the existing `fetch_val`
+/// machinery. Returns the response body as a string; `undef` on
+/// failure.
+fn builtin_curl_get(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    let url = args.first().map(|v| v.to_string()).unwrap_or_default();
+    if url.is_empty() {
+        return Ok(StrykeValue::UNDEF);
+    }
+    let response = ureq::get(&url).call();
+    match response {
+        Ok(resp) => {
+            let body = resp.into_string().unwrap_or_default();
+            Ok(StrykeValue::string(body))
+        }
+        Err(_) => Ok(StrykeValue::UNDEF),
+    }
+}
+
+/// `curl_post(URL, BODY)` — POST `BODY` to `URL`. `Content-Type`
+/// defaults to `application/json` when `BODY` parses as JSON, else
+/// `text/plain`.
+fn builtin_curl_post(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    let url = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let body = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    if url.is_empty() {
+        return Ok(StrykeValue::UNDEF);
+    }
+    let content_type = if serde_json::from_str::<serde_json::Value>(&body).is_ok() {
+        "application/json"
+    } else {
+        "text/plain"
+    };
+    let response = ureq::post(&url)
+        .set("Content-Type", content_type)
+        .send_string(&body);
+    match response {
+        Ok(resp) => {
+            let body = resp.into_string().unwrap_or_default();
+            Ok(StrykeValue::string(body))
+        }
+        Err(_) => Ok(StrykeValue::UNDEF),
+    }
+}
+
+/// `iconv(STRING, FROM, TO)` — UTF-8 ↔ Latin-1 ↔ ASCII conversion.
+/// Limited to charsets reachable via the standard library and
+/// existing deps (no `encoding_rs` heavy import). Unknown
+/// from/to-charsets pass STRING through unchanged.
+fn builtin_iconv(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let from = args.get(1).map(|v| v.to_string().to_lowercase()).unwrap_or_default();
+    let to = args.get(2).map(|v| v.to_string().to_lowercase()).unwrap_or_default();
+    // Normalise charset aliases.
+    let norm = |c: &str| -> &'static str {
+        match c {
+            "utf-8" | "utf8" => "utf-8",
+            "latin-1" | "latin1" | "iso-8859-1" | "iso8859-1" => "latin-1",
+            "ascii" | "us-ascii" => "ascii",
+            _ => "unknown",
+        }
+    };
+    let from = norm(&from);
+    let to = norm(&to);
+    if from == "unknown" || to == "unknown" || from == to {
+        return Ok(StrykeValue::string(s));
+    }
+    // Convert via byte form.
+    let bytes: Vec<u8> = match from {
+        "utf-8" => s.into_bytes(),
+        "latin-1" => s.chars().map(|c| c as u32 as u8).collect(),
+        "ascii" => s.chars().map(|c| (c as u32).min(127) as u8).collect(),
+        _ => unreachable!(),
+    };
+    let out: String = match to {
+        "utf-8" => String::from_utf8_lossy(&bytes).into_owned(),
+        "latin-1" => bytes.iter().map(|&b| b as char).collect(),
+        "ascii" => bytes
+            .iter()
+            .map(|&b| if b < 128 { b as char } else { '?' })
+            .collect(),
+        _ => unreachable!(),
+    };
+    Ok(StrykeValue::string(out))
+}
+
+/// `strftime(FORMAT, EPOCH_SECS?)` — format a Unix timestamp using
+/// `strftime` directives. Default timestamp is `Local::now()`.
+/// Wraps `chrono::format` which is already in deps.
+fn builtin_strftime(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    let fmt = args
+        .first()
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "%Y-%m-%d %H:%M:%S".to_string());
+    let ts: Option<i64> = args.get(1).map(|v| v.to_int());
+    let formatted = match ts {
+        Some(secs) => {
+            let dt = chrono::Local
+                .timestamp_opt(secs, 0)
+                .single()
+                .unwrap_or_else(chrono::Local::now);
+            dt.format(&fmt).to_string()
+        }
+        None => chrono::Local::now().format(&fmt).to_string(),
+    };
+    Ok(StrykeValue::string(formatted))
+}
+
+/// `tac(\@LIST)` / `rev_lines(STRING)` — reverse the order of lines /
+/// elements in a list. `tac` mirrors the POSIX coreutil; `rev_lines`
+/// takes a single multi-line string and reverses it line-by-line.
+fn builtin_tac(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    let mut items: Vec<StrykeValue> = Vec::new();
+    for a in args {
+        if let Some(arr) = a.as_array_vec() {
+            items.extend(arr);
+        } else if let Some(ar) = a.as_array_ref() {
+            items.extend(ar.read().iter().cloned());
+        } else {
+            items.push(a.clone());
+        }
+    }
+    items.reverse();
+    Ok(StrykeValue::array(items))
+}
+
+fn builtin_rev_lines(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let mut lines: Vec<&str> = s.lines().collect();
+    lines.reverse();
+    Ok(StrykeValue::string(lines.join("\n")))
+}
+
+/// `tty_raw` / `tty_cooked` — flip the controlling TTY into raw
+/// (no-line-buffering, no-echo) or cooked (canonical line mode) state
+/// via `termios`. Useful for interactive selectors. Returns `1` on
+/// success, `0` otherwise.
+fn builtin_tty_raw() -> PerlResult<StrykeValue> {
+    #[cfg(unix)]
+    {
+        use std::os::fd::AsRawFd;
+        let fd = std::io::stdin().as_raw_fd();
+        unsafe {
+            let mut t: libc::termios = std::mem::zeroed();
+            if libc::tcgetattr(fd, &mut t) != 0 {
+                return Ok(StrykeValue::integer(0));
+            }
+            t.c_lflag &= !(libc::ICANON | libc::ECHO);
+            if libc::tcsetattr(fd, libc::TCSANOW, &t) != 0 {
+                return Ok(StrykeValue::integer(0));
+            }
+        }
+        Ok(StrykeValue::integer(1))
+    }
+    #[cfg(not(unix))]
+    Ok(StrykeValue::integer(0))
+}
+
+fn builtin_tty_cooked() -> PerlResult<StrykeValue> {
+    #[cfg(unix)]
+    {
+        use std::os::fd::AsRawFd;
+        let fd = std::io::stdin().as_raw_fd();
+        unsafe {
+            let mut t: libc::termios = std::mem::zeroed();
+            if libc::tcgetattr(fd, &mut t) != 0 {
+                return Ok(StrykeValue::integer(0));
+            }
+            t.c_lflag |= libc::ICANON | libc::ECHO;
+            if libc::tcsetattr(fd, libc::TCSANOW, &t) != 0 {
+                return Ok(StrykeValue::integer(0));
+            }
+        }
+        Ok(StrykeValue::integer(1))
+    }
+    #[cfg(not(unix))]
+    Ok(StrykeValue::integer(0))
 }
 
 /// `is_ulid` — `1`/`0` per the 26-char Crockford-Base32 format
