@@ -13530,6 +13530,10 @@ impl Parser {
     /// Used by `--compat` to reject extensions at parse time.
     fn stryke_extension_name(name: &str) -> Option<&str> {
         match name {
+            // ── numerical stability + modern IDs ───────────────────────────
+            | "ulid" | "is_ulid" | "ulid_timestamp"
+            | "kahan_sum" | "welford_mean" | "welford_variance"
+            | "welford_stddev" | "welford_pop_variance"
             // ── probabilistic data structures ──────────────────────────────
             | "bloom_filter" | "bloom_add" | "bloom_contains" | "bloom_len"
             | "bloom_clear" | "bloom_merge" | "bloom_fpr" | "bloom_bits"
@@ -13548,6 +13552,17 @@ impl Parser {
             | "rb_len" | "rb_min" | "rb_max" | "rb_to_array" | "rb_rank"
             | "rb_or" | "rb_and" | "rb_xor" | "rb_andnot" | "rb_clear"
             | "rb_serialize" | "rb_deserialize"
+            // ── Rate limiters / hash ring / LSH / trees / diff ────────────
+            | "token_bucket" | "leaky_bucket" | "rl_try_take" | "rl_available"
+            | "hash_ring" | "consistent_hash" | "hr_add" | "hr_remove" | "hr_get" | "hr_nodes"
+            | "simhash" | "sh_add" | "sh_digest" | "sh_similarity"
+            | "minhash" | "mh_add" | "mh_jaccard" | "mh_merge"
+            | "interval_tree" | "it_insert" | "it_query_point" | "it_query_range"
+            | "it_remove" | "it_len"
+            | "bk_tree" | "bk_insert" | "bk_query" | "bk_len"
+            | "rope" | "rope_insert" | "rope_delete" | "rope_substring"
+            | "rope_to_string" | "rope_len"
+            | "myers_diff" | "patience_diff"
             // ── aop ────────────────────────────────────────────────────────
             | "proceed" | "intercept_list" | "intercept_remove" | "intercept_clear"
             // ── parallel ────────────────────────────────────────────────────

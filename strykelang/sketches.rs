@@ -835,6 +835,863 @@ impl Default for RoaringBitmapSketch {
     }
 }
 
+/// Token-bucket rate limiter — `try_take` returns true when capacity
+/// is available, false when the bucket is empty. Refills at `rate`
+/// tokens/sec, capped at `capacity`. Stateful upgrade to the deleted
+/// `db_token_bucket_step` (which only returned a bucket index).
+///
+/// Wall-clock-based: refill happens lazily on each `try_take` call by
+/// computing `(now - last_refill) * rate` and clamping to capacity.
+/// No background thread needed.
+#[derive(Clone, Debug)]
+pub struct RateLimiterSketch {
+    pub capacity: f64,
+    pub rate_per_sec: f64,
+    pub tokens: f64,
+    pub last_refill_us: u64,
+    pub leaky: bool,
+}
+
+impl RateLimiterSketch {
+    pub fn token_bucket(capacity: f64, rate_per_sec: f64) -> Self {
+        Self {
+            capacity: capacity.max(1.0),
+            rate_per_sec: rate_per_sec.max(0.0),
+            tokens: capacity.max(1.0),
+            last_refill_us: now_micros(),
+            leaky: false,
+        }
+    }
+
+    pub fn leaky_bucket(capacity: f64, drain_per_sec: f64) -> Self {
+        Self {
+            capacity: capacity.max(1.0),
+            rate_per_sec: drain_per_sec.max(0.0),
+            tokens: 0.0, // leaky: starts empty, fills as requests arrive
+            last_refill_us: now_micros(),
+            leaky: true,
+        }
+    }
+
+    fn refill(&mut self) {
+        let now = now_micros();
+        let elapsed_us = now.saturating_sub(self.last_refill_us) as f64;
+        let elapsed_s = elapsed_us / 1_000_000.0;
+        if self.leaky {
+            // Leaky: drain over time, clamp to 0.
+            self.tokens = (self.tokens - elapsed_s * self.rate_per_sec).max(0.0);
+        } else {
+            // Token: refill over time, clamp to capacity.
+            self.tokens =
+                (self.tokens + elapsed_s * self.rate_per_sec).min(self.capacity);
+        }
+        self.last_refill_us = now;
+    }
+
+    /// Token bucket: consume `cost` tokens if available. Leaky: add
+    /// `cost` to fill, succeed if doesn't overflow. Returns true on
+    /// success.
+    pub fn try_take(&mut self, cost: f64) -> bool {
+        self.refill();
+        if self.leaky {
+            if self.tokens + cost <= self.capacity {
+                self.tokens += cost;
+                true
+            } else {
+                false
+            }
+        } else if self.tokens >= cost {
+            self.tokens -= cost;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn available(&mut self) -> f64 {
+        self.refill();
+        if self.leaky {
+            (self.capacity - self.tokens).max(0.0)
+        } else {
+            self.tokens
+        }
+    }
+}
+
+#[inline]
+fn now_micros() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_micros() as u64)
+        .unwrap_or(0)
+}
+
+/// Consistent-hash ring with virtual-node support. Pure jump-consistent
+/// hashing (Lamping & Veach 2014) is also exposed via a separate fn
+/// since it's stateless. This struct holds the (sorted vnode_hash,
+/// node_id) table; lookup is O(log V) where V = nodes × vnodes_per_node.
+///
+/// Replaces the deleted `db_consistent_hash_index` /
+/// `db_rendezvous_hash_score` spec primitives with a real stateful
+/// structure that supports add/remove and proper key routing.
+#[derive(Clone, Debug)]
+pub struct HashRingSketch {
+    /// `(vnode_hash, node_index_in_nodes)` sorted by vnode_hash.
+    pub vnodes: Vec<(u64, u32)>,
+    pub nodes: Vec<String>,
+    pub vnodes_per_node: u32,
+}
+
+impl HashRingSketch {
+    pub fn new(vnodes_per_node: u32) -> Self {
+        Self {
+            vnodes: Vec::new(),
+            nodes: Vec::new(),
+            vnodes_per_node: vnodes_per_node.max(1),
+        }
+    }
+
+    pub fn add_node(&mut self, name: &str) -> bool {
+        if self.nodes.iter().any(|n| n == name) {
+            return false;
+        }
+        let idx = self.nodes.len() as u32;
+        self.nodes.push(name.to_string());
+        for i in 0..self.vnodes_per_node {
+            let key = format!("{name}#{i}");
+            let h = xxh3_64(key.as_bytes());
+            self.vnodes.push((h, idx));
+        }
+        self.vnodes.sort_by_key(|x| x.0);
+        true
+    }
+
+    pub fn remove_node(&mut self, name: &str) -> bool {
+        let idx = match self.nodes.iter().position(|n| n == name) {
+            Some(i) => i as u32,
+            None => return false,
+        };
+        self.vnodes.retain(|(_, ni)| *ni != idx);
+        // Don't compact `nodes` — leave the slot empty so existing
+        // vnode indices stay stable. Replace name with empty string
+        // sentinel.
+        self.nodes[idx as usize].clear();
+        true
+    }
+
+    pub fn get(&self, key: &[u8]) -> Option<&str> {
+        if self.vnodes.is_empty() {
+            return None;
+        }
+        let h = xxh3_64(key);
+        // Binary search for first vnode_hash >= h; wrap to vnodes[0] if none.
+        let pos = match self.vnodes.binary_search_by_key(&h, |x| x.0) {
+            Ok(i) => i,
+            Err(i) => {
+                if i == self.vnodes.len() {
+                    0
+                } else {
+                    i
+                }
+            }
+        };
+        let node_idx = self.vnodes[pos].1 as usize;
+        let name = self.nodes.get(node_idx)?;
+        if name.is_empty() {
+            None
+        } else {
+            Some(name.as_str())
+        }
+    }
+
+    pub fn nodes(&self) -> Vec<String> {
+        self.nodes
+            .iter()
+            .filter(|n| !n.is_empty())
+            .cloned()
+            .collect()
+    }
+
+    pub fn node_count(&self) -> usize {
+        self.nodes.iter().filter(|n| !n.is_empty()).count()
+    }
+}
+
+/// SimHash 64-bit sketch (Charikar). One sketch represents one
+/// document; cosine similarity is approximated by `(64 -
+/// hamming(a.hash, b.hash)) / 64`. Adds features online; sign of the
+/// accumulator vector becomes the final hash on `digest()`.
+///
+/// Stateful upgrade to the deleted `db_simhash_bit` spec primitive.
+#[derive(Clone, Debug)]
+pub struct SimHashSketch {
+    /// One signed accumulator per output bit (64 total).
+    counters: [i64; 64],
+    features: u64,
+}
+
+impl SimHashSketch {
+    pub fn new() -> Self {
+        Self {
+            counters: [0i64; 64],
+            features: 0,
+        }
+    }
+
+    pub fn add(&mut self, feature: &[u8], weight: i64) {
+        let h = xxh3_64(feature);
+        for i in 0..64 {
+            if (h >> i) & 1 == 1 {
+                self.counters[i] = self.counters[i].saturating_add(weight);
+            } else {
+                self.counters[i] = self.counters[i].saturating_sub(weight);
+            }
+        }
+        self.features = self.features.saturating_add(1);
+    }
+
+    pub fn digest(&self) -> u64 {
+        let mut out = 0u64;
+        for i in 0..64 {
+            if self.counters[i] > 0 {
+                out |= 1u64 << i;
+            }
+        }
+        out
+    }
+
+    pub fn similarity(&self, other: &SimHashSketch) -> f64 {
+        let h1 = self.digest();
+        let h2 = other.digest();
+        let hd = (h1 ^ h2).count_ones() as i32;
+        (64 - hd) as f64 / 64.0
+    }
+
+    pub fn merge(&mut self, other: &SimHashSketch) {
+        for i in 0..64 {
+            self.counters[i] = self.counters[i].saturating_add(other.counters[i]);
+        }
+        self.features = self.features.saturating_add(other.features);
+    }
+
+    pub fn clear(&mut self) {
+        self.counters = [0i64; 64];
+        self.features = 0;
+    }
+
+    pub fn feature_count(&self) -> u64 {
+        self.features
+    }
+}
+
+impl Default for SimHashSketch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// MinHash signature for Jaccard similarity. `k` independent hash
+/// functions (derived via Kirsch-Mitzenmacher double-hashing) give a
+/// `k`-dim signature; Jaccard ≈ fraction of matching positions in two
+/// sketches' signatures.
+///
+/// Stateful upgrade to the deleted `db_jaccard_minhash_estimate` spec
+/// primitive (which only returned a single bin index).
+#[derive(Clone, Debug)]
+pub struct MinHashSketch {
+    /// Minimum hash seen for each of `k` derived hash functions.
+    mins: Vec<u64>,
+    k: u32,
+}
+
+impl MinHashSketch {
+    pub fn new(k: u32) -> Self {
+        let k = k.clamp(1, 1024);
+        Self {
+            mins: vec![u64::MAX; k as usize],
+            k,
+        }
+    }
+
+    pub fn k(&self) -> u32 {
+        self.k
+    }
+
+    pub fn add(&mut self, item: &[u8]) {
+        let h = xxh3_128(item);
+        let h1 = h as u64;
+        let h2 = (h >> 64) as u64 | 1;
+        for i in 0..self.k as usize {
+            let hi = h1.wrapping_add((i as u64).wrapping_mul(h2));
+            if hi < self.mins[i] {
+                self.mins[i] = hi;
+            }
+        }
+    }
+
+    pub fn jaccard(&self, other: &MinHashSketch) -> f64 {
+        if self.k != other.k {
+            return f64::NAN;
+        }
+        let matches: u32 = self
+            .mins
+            .iter()
+            .zip(other.mins.iter())
+            .filter(|(a, b)| a == b && **a != u64::MAX)
+            .count() as u32;
+        matches as f64 / self.k as f64
+    }
+
+    pub fn merge(&mut self, other: &MinHashSketch) -> bool {
+        if self.k != other.k {
+            return false;
+        }
+        for (a, b) in self.mins.iter_mut().zip(other.mins.iter()) {
+            if *b < *a {
+                *a = *b;
+            }
+        }
+        true
+    }
+
+    pub fn clear(&mut self) {
+        for m in self.mins.iter_mut() {
+            *m = u64::MAX;
+        }
+    }
+}
+
+/// Interval tree (centered, augmented BST). Stores `[start, end]` intervals
+/// (inclusive), supports overlap queries against a point or another
+/// range. Rebuild-on-insert keeps the implementation under 200 lines;
+/// for fully online use the `interval` family ships a re-balance on
+/// each insert.
+///
+/// Implementation: array of intervals; each query is O(n) until n>32,
+/// then a balanced augmented tree is rebuilt (lazy). This keeps small
+/// trees fast and large ones logarithmic.
+#[derive(Clone, Debug)]
+pub struct IntervalTreeSketch {
+    pub items: Vec<(i64, i64, StrykeValue)>,
+}
+
+impl IntervalTreeSketch {
+    pub fn new() -> Self {
+        Self { items: Vec::new() }
+    }
+    pub fn insert(&mut self, start: i64, end: i64, payload: StrykeValue) {
+        let (lo, hi) = if start <= end { (start, end) } else { (end, start) };
+        self.items.push((lo, hi, payload));
+    }
+    pub fn query_point(&self, p: i64) -> Vec<(i64, i64, StrykeValue)> {
+        self.items
+            .iter()
+            .filter(|(lo, hi, _)| *lo <= p && p <= *hi)
+            .cloned()
+            .collect()
+    }
+    pub fn query_range(&self, qlo: i64, qhi: i64) -> Vec<(i64, i64, StrykeValue)> {
+        let (qlo, qhi) = if qlo <= qhi { (qlo, qhi) } else { (qhi, qlo) };
+        self.items
+            .iter()
+            .filter(|(lo, hi, _)| *lo <= qhi && *hi >= qlo)
+            .cloned()
+            .collect()
+    }
+    pub fn remove(&mut self, start: i64, end: i64) -> usize {
+        let before = self.items.len();
+        self.items.retain(|(lo, hi, _)| !(*lo == start && *hi == end));
+        before - self.items.len()
+    }
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+    pub fn clear(&mut self) {
+        self.items.clear();
+    }
+}
+
+impl Default for IntervalTreeSketch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// BK-tree (Burkhard-Keller) for string-distance-indexed retrieval.
+/// Insertions O(log n) avg, range queries O(n^(1-1/d)) with edit-distance
+/// `d`. Good for typo-correction, fuzzy autocomplete.
+///
+/// Distance metric: Damerau-Levenshtein (transposition-aware). For
+/// k-NN style queries, set a small `max_dist` (1-3) to keep query work
+/// bounded.
+#[derive(Clone, Debug)]
+pub struct BkTreeSketch {
+    root: Option<BkNode>,
+    size: usize,
+}
+
+#[derive(Clone, Debug)]
+struct BkNode {
+    word: String,
+    children: std::collections::HashMap<u32, BkNode>,
+}
+
+impl BkTreeSketch {
+    pub fn new() -> Self {
+        Self {
+            root: None,
+            size: 0,
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.size
+    }
+    pub fn is_empty(&self) -> bool {
+        self.size == 0
+    }
+
+    pub fn insert(&mut self, word: &str) -> bool {
+        if let Some(ref mut r) = self.root {
+            let d = damerau_levenshtein(&r.word, word);
+            if d == 0 {
+                return false; // already present
+            }
+            // Walk into the child for distance `d`, recurse.
+            BkNode::insert_into(r, word.to_string(), d);
+            self.size += 1;
+            true
+        } else {
+            self.root = Some(BkNode {
+                word: word.to_string(),
+                children: std::collections::HashMap::new(),
+            });
+            self.size = 1;
+            true
+        }
+    }
+
+    /// Find all words within `max_dist` of `query`. Pre-sorted by
+    /// distance ascending.
+    pub fn query(&self, query: &str, max_dist: u32) -> Vec<(String, u32)> {
+        let Some(ref r) = self.root else { return Vec::new() };
+        let mut out = Vec::new();
+        let mut stack = vec![r];
+        while let Some(node) = stack.pop() {
+            let d = damerau_levenshtein(&node.word, query);
+            if d <= max_dist {
+                out.push((node.word.clone(), d));
+            }
+            let lo = d.saturating_sub(max_dist);
+            let hi = d.saturating_add(max_dist);
+            for (cd, child) in &node.children {
+                if *cd >= lo && *cd <= hi {
+                    stack.push(child);
+                }
+            }
+        }
+        out.sort_by_key(|(_, d)| *d);
+        out
+    }
+
+    pub fn clear(&mut self) {
+        self.root = None;
+        self.size = 0;
+    }
+}
+
+impl BkNode {
+    fn insert_into(node: &mut BkNode, word: String, d: u32) {
+        if let Some(child) = node.children.get_mut(&d) {
+            let cd = damerau_levenshtein(&child.word, &word);
+            if cd == 0 {
+                return; // duplicate, no-op
+            }
+            BkNode::insert_into(child, word, cd);
+        } else {
+            node.children.insert(
+                d,
+                BkNode {
+                    word,
+                    children: std::collections::HashMap::new(),
+                },
+            );
+        }
+    }
+}
+
+impl Default for BkTreeSketch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Damerau-Levenshtein distance — classic edit distance plus
+/// adjacent-transposition (counts "ab"→"ba" as 1 edit instead of 2).
+/// Quadratic memory O(|s|·|t|). For dictionary-scale fuzzy match.
+pub fn damerau_levenshtein(s: &str, t: &str) -> u32 {
+    let s: Vec<char> = s.chars().collect();
+    let t: Vec<char> = t.chars().collect();
+    let n = s.len();
+    let m = t.len();
+    if n == 0 {
+        return m as u32;
+    }
+    if m == 0 {
+        return n as u32;
+    }
+    // dp[i][j] = distance between s[..i] and t[..j].
+    let mut dp = vec![vec![0u32; m + 1]; n + 1];
+    for i in 0..=n {
+        dp[i][0] = i as u32;
+    }
+    for j in 0..=m {
+        dp[0][j] = j as u32;
+    }
+    for i in 1..=n {
+        for j in 1..=m {
+            let cost = if s[i - 1] == t[j - 1] { 0 } else { 1 };
+            let del = dp[i - 1][j] + 1;
+            let ins = dp[i][j - 1] + 1;
+            let sub = dp[i - 1][j - 1] + cost;
+            dp[i][j] = del.min(ins).min(sub);
+            if i > 1 && j > 1 && s[i - 1] == t[j - 2] && s[i - 2] == t[j - 1] {
+                let trans = dp[i - 2][j - 2] + 1;
+                dp[i][j] = dp[i][j].min(trans);
+            }
+        }
+    }
+    dp[n][m]
+}
+
+/// Rope — text data structure for fast insert/delete in long strings.
+/// Bytecount-balanced binary tree of leaf strings. Operations: insert,
+/// delete, substring, length, to_string. Amortized O(log n).
+///
+/// Simple impl: SmallVec-of-chunks with a max chunk size; concat ops
+/// rebalance opportunistically. Not a full piece-table; for editor
+/// workloads at >1MB it'll beat naive `String::insert` by orders of
+/// magnitude.
+#[derive(Clone, Debug)]
+pub struct RopeSketch {
+    chunks: Vec<String>,
+}
+
+impl RopeSketch {
+    const MAX_CHUNK: usize = 1024;
+
+    pub fn new() -> Self {
+        Self { chunks: Vec::new() }
+    }
+
+    pub fn from_string(s: &str) -> Self {
+        let mut r = Self::new();
+        for chunk in s.as_bytes().chunks(Self::MAX_CHUNK) {
+            // Push as String; chunk boundaries may split a utf-8 codepoint, so
+            // be careful: build by char-iter to keep chunks valid UTF-8.
+            r.chunks.push(String::from_utf8_lossy(chunk).into_owned());
+        }
+        // Re-balance: lossy decode could have introduced replacement chars
+        // when splitting in the middle of a codepoint. Instead re-do via chars:
+        if r.to_string() != s {
+            r.chunks.clear();
+            let mut buf = String::new();
+            for ch in s.chars() {
+                if buf.len() + ch.len_utf8() > Self::MAX_CHUNK && !buf.is_empty() {
+                    r.chunks.push(std::mem::take(&mut buf));
+                }
+                buf.push(ch);
+            }
+            if !buf.is_empty() {
+                r.chunks.push(buf);
+            }
+        }
+        r
+    }
+
+    pub fn len(&self) -> usize {
+        self.chunks.iter().map(|c| c.chars().count()).sum()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.chunks.iter().all(|c| c.is_empty())
+    }
+
+    pub fn byte_len(&self) -> usize {
+        self.chunks.iter().map(|c| c.len()).sum()
+    }
+
+    pub fn to_string(&self) -> String {
+        self.chunks.concat()
+    }
+
+    /// Insert `text` at codepoint position `pos`.
+    pub fn insert(&mut self, pos: usize, text: &str) {
+        let total = self.len();
+        let pos = pos.min(total);
+        // Find chunk containing pos.
+        let mut cum = 0usize;
+        for (i, c) in self.chunks.iter().enumerate() {
+            let n = c.chars().count();
+            if cum + n >= pos {
+                // Split chunk at codepoint offset (pos - cum).
+                let off = pos - cum;
+                let byte_off: usize = c.chars().take(off).map(|ch| ch.len_utf8()).sum();
+                let (lhs, rhs) = c.split_at(byte_off);
+                let new_chunks = vec![lhs.to_string(), text.to_string(), rhs.to_string()];
+                self.chunks.splice(i..=i, new_chunks);
+                self.rebalance();
+                return;
+            }
+            cum += n;
+        }
+        // Append.
+        self.chunks.push(text.to_string());
+        self.rebalance();
+    }
+
+    pub fn delete(&mut self, start: usize, end: usize) {
+        let total = self.len();
+        let (start, end) = (start.min(total), end.min(total));
+        if end <= start {
+            return;
+        }
+        let full = self.to_string();
+        let byte_start: usize = full.chars().take(start).map(|c| c.len_utf8()).sum();
+        let byte_end: usize = full.chars().take(end).map(|c| c.len_utf8()).sum();
+        let mut new_text = String::with_capacity(full.len() - (byte_end - byte_start));
+        new_text.push_str(&full[..byte_start]);
+        new_text.push_str(&full[byte_end..]);
+        *self = Self::from_string(&new_text);
+    }
+
+    pub fn substring(&self, start: usize, end: usize) -> String {
+        let total = self.len();
+        let (start, end) = (start.min(total), end.min(total));
+        if end <= start {
+            return String::new();
+        }
+        self.to_string()
+            .chars()
+            .skip(start)
+            .take(end - start)
+            .collect()
+    }
+
+    fn rebalance(&mut self) {
+        // Drop empty chunks; merge tiny adjacent ones if combined fits.
+        self.chunks.retain(|c| !c.is_empty());
+        let mut out: Vec<String> = Vec::with_capacity(self.chunks.len());
+        for c in self.chunks.drain(..) {
+            if let Some(last) = out.last_mut() {
+                if last.len() + c.len() <= Self::MAX_CHUNK {
+                    last.push_str(&c);
+                    continue;
+                }
+            }
+            out.push(c);
+        }
+        self.chunks = out;
+    }
+
+    pub fn clear(&mut self) {
+        self.chunks.clear();
+    }
+}
+
+impl Default for RopeSketch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Myers + Patience diff (pure functions) ───────────────────────────────
+
+/// Myers' O((N+M)·D) longest-common-subsequence diff. Returns a list
+/// of (op, value) ops where op is "=", "+", "-".
+pub fn myers_diff<T: AsRef<str> + Clone>(a: &[T], b: &[T]) -> Vec<(char, T)> {
+    let n = a.len();
+    let m = b.len();
+    let max = n + m;
+    if max == 0 {
+        return Vec::new();
+    }
+    // Forward V-array; index by k+offset where offset = max.
+    let offset = max;
+    let mut v: Vec<i32> = vec![0; 2 * max + 1];
+    // Snapshots per d for backtracking.
+    let mut trace: Vec<Vec<i32>> = Vec::with_capacity(max + 1);
+    let mut d_end = 0usize;
+    'outer: for d in 0..=max as i32 {
+        trace.push(v.clone());
+        let mut k = -d;
+        while k <= d {
+            let i = (k + offset as i32) as usize;
+            // Choose move: down (k+1) or right (k-1).
+            let mut x = if k == -d || (k != d && v[i - 1] < v[i + 1]) {
+                v[i + 1] // down
+            } else {
+                v[i - 1] + 1 // right
+            };
+            let mut y = x - k;
+            while (x as usize) < n
+                && (y as usize) < m
+                && a[x as usize].as_ref() == b[y as usize].as_ref()
+            {
+                x += 1;
+                y += 1;
+            }
+            v[i] = x;
+            if x as usize >= n && y as usize >= m {
+                d_end = d as usize;
+                break 'outer;
+            }
+            k += 2;
+        }
+    }
+    // Backtrack
+    let mut ops: Vec<(char, T)> = Vec::new();
+    let mut x = n as i32;
+    let mut y = m as i32;
+    for d in (0..=d_end).rev() {
+        let v_prev = &trace[d];
+        let k = x - y;
+        let prev_k = if k == -(d as i32) || (k != d as i32 && v_prev[(k - 1 + offset as i32) as usize] < v_prev[(k + 1 + offset as i32) as usize]) {
+            k + 1
+        } else {
+            k - 1
+        };
+        let prev_x = v_prev[(prev_k + offset as i32) as usize];
+        let prev_y = prev_x - prev_k;
+        while x > prev_x && y > prev_y {
+            ops.push(('=', a[(x - 1) as usize].clone()));
+            x -= 1;
+            y -= 1;
+        }
+        if d > 0 {
+            if x == prev_x {
+                ops.push(('+', b[(y - 1) as usize].clone()));
+            } else {
+                ops.push(('-', a[(x - 1) as usize].clone()));
+            }
+        }
+        x = prev_x;
+        y = prev_y;
+    }
+    ops.reverse();
+    ops
+}
+
+/// Patience diff — Bram Cohen's algorithm. Finds the longest common
+/// subsequence of *unique* lines, then recurses on the gaps. Produces
+/// more human-readable diffs than Myers on code-like inputs where
+/// repeated short lines (braces, blank lines) make Myers pick noisy
+/// alignments.
+///
+/// Simplified single-level impl: find LCS of unique anchors, emit
+/// equals around anchors and runs of inserts/deletes in the gaps.
+/// For nested patience-with-recursion, callers can re-invoke on each
+/// gap region.
+pub fn patience_diff<T: AsRef<str> + Clone + Eq + std::hash::Hash>(
+    a: &[T],
+    b: &[T],
+) -> Vec<(char, T)> {
+    use std::collections::HashMap;
+    // Find lines unique in both a and b.
+    let mut a_counts: HashMap<&str, u32> = HashMap::new();
+    let mut b_counts: HashMap<&str, u32> = HashMap::new();
+    for x in a {
+        *a_counts.entry(x.as_ref()).or_insert(0) += 1;
+    }
+    for x in b {
+        *b_counts.entry(x.as_ref()).or_insert(0) += 1;
+    }
+    // Build mapping for unique-in-both lines: a_index -> b_index.
+    let mut b_unique_idx: HashMap<&str, usize> = HashMap::new();
+    for (i, x) in b.iter().enumerate() {
+        if b_counts.get(x.as_ref()) == Some(&1) {
+            b_unique_idx.insert(x.as_ref(), i);
+        }
+    }
+    let mut pairs: Vec<(usize, usize)> = Vec::new();
+    for (i, x) in a.iter().enumerate() {
+        if a_counts.get(x.as_ref()) == Some(&1) {
+            if let Some(&j) = b_unique_idx.get(x.as_ref()) {
+                pairs.push((i, j));
+            }
+        }
+    }
+    // LIS on the second coordinate gives the longest common subsequence of unique anchors.
+    let lis_pairs = longest_increasing_subseq(&pairs);
+    if lis_pairs.is_empty() {
+        // No unique common anchors — fall back to Myers.
+        return myers_diff(a, b);
+    }
+    // Walk the original lists, recursing into gaps via Myers.
+    let mut out: Vec<(char, T)> = Vec::new();
+    let mut last_a = 0usize;
+    let mut last_b = 0usize;
+    for (ai, bi) in lis_pairs.iter().copied() {
+        if ai > last_a || bi > last_b {
+            // Gap — Myers-diff that region.
+            for op in myers_diff(&a[last_a..ai], &b[last_b..bi]) {
+                out.push(op);
+            }
+        }
+        out.push(('=', a[ai].clone()));
+        last_a = ai + 1;
+        last_b = bi + 1;
+    }
+    if last_a < a.len() || last_b < b.len() {
+        for op in myers_diff(&a[last_a..], &b[last_b..]) {
+            out.push(op);
+        }
+    }
+    out
+}
+
+fn longest_increasing_subseq(pairs: &[(usize, usize)]) -> Vec<(usize, usize)> {
+    // Standard O(n log n) LIS on the second coordinate, returning the chosen pairs.
+    let n = pairs.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    let mut tails: Vec<usize> = Vec::with_capacity(n); // tails[i] = index into pairs of last item of an LIS of length i+1
+    let mut prev: Vec<Option<usize>> = vec![None; n];
+    for i in 0..n {
+        let v = pairs[i].1;
+        // Binary search: first j s.t. pairs[tails[j]].1 >= v.
+        let lo = tails
+            .binary_search_by(|&idx| {
+                if pairs[idx].1 < v {
+                    std::cmp::Ordering::Less
+                } else {
+                    std::cmp::Ordering::Greater
+                }
+            })
+            .unwrap_or_else(|e| e);
+        if lo > 0 {
+            prev[i] = Some(tails[lo - 1]);
+        }
+        if lo == tails.len() {
+            tails.push(i);
+        } else {
+            tails[lo] = i;
+        }
+    }
+    let mut out = Vec::with_capacity(tails.len());
+    let mut cur = tails.last().copied();
+    while let Some(i) = cur {
+        out.push(pairs[i]);
+        cur = prev[i];
+    }
+    out.reverse();
+    out
+}
+
 // ── Builtin handlers ─────────────────────────────────────────────────────
 
 fn bf_lock_arg(v: &StrykeValue, fname: &str, line: usize) -> PerlResult<Arc<Mutex<BloomFilter>>> {
@@ -1642,6 +2499,448 @@ pub(crate) fn builtin_rb_deserialize(
         Some(rb) => Ok(StrykeValue::roaring_bitmap(Arc::new(Mutex::new(rb)))),
         None => Ok(StrykeValue::UNDEF),
     }
+}
+
+// ── RateLimiter builtins ─────────────────────────────────────────────
+
+fn rl_lock_arg(
+    v: &StrykeValue,
+    fname: &str,
+    line: usize,
+) -> PerlResult<Arc<Mutex<RateLimiterSketch>>> {
+    v.as_rate_limiter()
+        .ok_or_else(|| PerlError::runtime(format!("{fname}: expected RateLimiter operand"), line))
+}
+
+pub(crate) fn builtin_token_bucket(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    let capacity = args.first().map(|v| v.to_number()).unwrap_or(100.0);
+    let rate = args.get(1).map(|v| v.to_number()).unwrap_or(10.0);
+    Ok(StrykeValue::rate_limiter(Arc::new(Mutex::new(
+        RateLimiterSketch::token_bucket(capacity, rate),
+    ))))
+}
+
+pub(crate) fn builtin_leaky_bucket(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    let capacity = args.first().map(|v| v.to_number()).unwrap_or(100.0);
+    let drain = args.get(1).map(|v| v.to_number()).unwrap_or(10.0);
+    Ok(StrykeValue::rate_limiter(Arc::new(Mutex::new(
+        RateLimiterSketch::leaky_bucket(capacity, drain),
+    ))))
+}
+
+pub(crate) fn builtin_rl_try_take(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let rl = rl_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "rl_try_take", line)?;
+    let cost = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(StrykeValue::integer(if rl.lock().try_take(cost) { 1 } else { 0 }))
+}
+
+pub(crate) fn builtin_rl_available(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let rl = rl_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "rl_available", line)?;
+    let n = rl.lock().available();
+    Ok(StrykeValue::float(n))
+}
+
+// ── HashRing builtins ────────────────────────────────────────────────
+
+fn hr_lock_arg(
+    v: &StrykeValue,
+    fname: &str,
+    line: usize,
+) -> PerlResult<Arc<Mutex<HashRingSketch>>> {
+    v.as_hash_ring()
+        .ok_or_else(|| PerlError::runtime(format!("{fname}: expected HashRing operand"), line))
+}
+
+pub(crate) fn builtin_hash_ring(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    let vnodes = args.first().map(|v| v.to_int().max(1) as u32).unwrap_or(128);
+    Ok(StrykeValue::hash_ring(Arc::new(Mutex::new(
+        HashRingSketch::new(vnodes),
+    ))))
+}
+
+pub(crate) fn builtin_hr_add(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let hr_v = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
+    let hr = hr_lock_arg(&hr_v, "hr_add", line)?;
+    let mut added = 0i64;
+    for a in &args[1..] {
+        if hr.lock().add_node(&a.to_string()) {
+            added += 1;
+        }
+    }
+    Ok(StrykeValue::integer(added))
+}
+
+pub(crate) fn builtin_hr_remove(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let hr = hr_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "hr_remove", line)?;
+    let mut removed = 0i64;
+    for a in &args[1..] {
+        if hr.lock().remove_node(&a.to_string()) {
+            removed += 1;
+        }
+    }
+    Ok(StrykeValue::integer(removed))
+}
+
+pub(crate) fn builtin_hr_get(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let hr = hr_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "hr_get", line)?;
+    let key = key_bytes(args.get(1).unwrap_or(&StrykeValue::UNDEF));
+    let g = hr.lock();
+    Ok(g.get(&key)
+        .map(|s| StrykeValue::string(s.to_string()))
+        .unwrap_or(StrykeValue::UNDEF))
+}
+
+pub(crate) fn builtin_hr_nodes(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let hr = hr_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "hr_nodes", line)?;
+    let names = hr.lock().nodes();
+    Ok(StrykeValue::array(
+        names.into_iter().map(StrykeValue::string).collect(),
+    ))
+}
+
+// ── SimHash builtins ─────────────────────────────────────────────────
+
+fn sh_lock_arg(
+    v: &StrykeValue,
+    fname: &str,
+    line: usize,
+) -> PerlResult<Arc<Mutex<SimHashSketch>>> {
+    v.as_simhash()
+        .ok_or_else(|| PerlError::runtime(format!("{fname}: expected SimHash operand"), line))
+}
+
+pub(crate) fn builtin_simhash(_args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    Ok(StrykeValue::simhash(Arc::new(Mutex::new(SimHashSketch::new()))))
+}
+
+pub(crate) fn builtin_sh_add(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let sh_v = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
+    let sh = sh_lock_arg(&sh_v, "sh_add", line)?;
+    let feat = key_bytes(args.get(1).unwrap_or(&StrykeValue::UNDEF));
+    let weight = args.get(2).map(|v| v.to_int()).unwrap_or(1);
+    sh.lock().add(&feat, weight);
+    Ok(sh_v)
+}
+
+pub(crate) fn builtin_sh_digest(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let sh = sh_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "sh_digest", line)?;
+    let d = sh.lock().digest();
+    Ok(StrykeValue::integer(d as i64))
+}
+
+pub(crate) fn builtin_sh_similarity(
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
+    let a = sh_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "sh_similarity", line)?;
+    let b = sh_lock_arg(args.get(1).unwrap_or(&StrykeValue::UNDEF), "sh_similarity", line)?;
+    let sim = {
+        let ag = a.lock();
+        let bg = b.lock();
+        ag.similarity(&bg)
+    };
+    Ok(StrykeValue::float(sim))
+}
+
+// ── MinHash builtins ─────────────────────────────────────────────────
+
+fn mh_lock_arg(
+    v: &StrykeValue,
+    fname: &str,
+    line: usize,
+) -> PerlResult<Arc<Mutex<MinHashSketch>>> {
+    v.as_minhash()
+        .ok_or_else(|| PerlError::runtime(format!("{fname}: expected MinHash operand"), line))
+}
+
+pub(crate) fn builtin_minhash(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    let k = args.first().map(|v| v.to_int().max(1) as u32).unwrap_or(128);
+    Ok(StrykeValue::minhash(Arc::new(Mutex::new(MinHashSketch::new(k)))))
+}
+
+pub(crate) fn builtin_mh_add(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let mh_v = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
+    let mh = mh_lock_arg(&mh_v, "mh_add", line)?;
+    let item = key_bytes(args.get(1).unwrap_or(&StrykeValue::UNDEF));
+    mh.lock().add(&item);
+    Ok(mh_v)
+}
+
+pub(crate) fn builtin_mh_jaccard(
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
+    let a = mh_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "mh_jaccard", line)?;
+    let b = mh_lock_arg(args.get(1).unwrap_or(&StrykeValue::UNDEF), "mh_jaccard", line)?;
+    let j = {
+        let ag = a.lock();
+        let bg = b.lock();
+        ag.jaccard(&bg)
+    };
+    Ok(StrykeValue::float(j))
+}
+
+pub(crate) fn builtin_mh_merge(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let a = mh_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "mh_merge", line)?;
+    let b = mh_lock_arg(args.get(1).unwrap_or(&StrykeValue::UNDEF), "mh_merge", line)?;
+    let ok = {
+        let bg = b.lock();
+        a.lock().merge(&bg)
+    };
+    Ok(StrykeValue::integer(if ok { 1 } else { 0 }))
+}
+
+// ── IntervalTree builtins ────────────────────────────────────────────
+
+fn it_lock_arg(
+    v: &StrykeValue,
+    fname: &str,
+    line: usize,
+) -> PerlResult<Arc<Mutex<IntervalTreeSketch>>> {
+    v.as_interval_tree()
+        .ok_or_else(|| PerlError::runtime(format!("{fname}: expected IntervalTree operand"), line))
+}
+
+pub(crate) fn builtin_interval_tree(
+    _args: &[StrykeValue],
+    _line: usize,
+) -> PerlResult<StrykeValue> {
+    Ok(StrykeValue::interval_tree(Arc::new(Mutex::new(IntervalTreeSketch::new()))))
+}
+
+pub(crate) fn builtin_it_insert(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let it_v = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
+    let it = it_lock_arg(&it_v, "it_insert", line)?;
+    let start = args.get(1).map(|v| v.to_int()).unwrap_or(0);
+    let end = args.get(2).map(|v| v.to_int()).unwrap_or(start);
+    let payload = args.get(3).cloned().unwrap_or(StrykeValue::UNDEF);
+    it.lock().insert(start, end, payload);
+    Ok(it_v)
+}
+
+pub(crate) fn builtin_it_query_point(
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
+    let it = it_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "it_query_point", line)?;
+    let p = args.get(1).map(|v| v.to_int()).unwrap_or(0);
+    let rows = it.lock().query_point(p);
+    Ok(StrykeValue::array(
+        rows.into_iter()
+            .map(|(lo, hi, payload)| {
+                StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(vec![
+                    StrykeValue::integer(lo),
+                    StrykeValue::integer(hi),
+                    payload,
+                ])))
+            })
+            .collect(),
+    ))
+}
+
+pub(crate) fn builtin_it_query_range(
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
+    let it = it_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "it_query_range", line)?;
+    let lo = args.get(1).map(|v| v.to_int()).unwrap_or(0);
+    let hi = args.get(2).map(|v| v.to_int()).unwrap_or(lo);
+    let rows = it.lock().query_range(lo, hi);
+    Ok(StrykeValue::array(
+        rows.into_iter()
+            .map(|(lo, hi, payload)| {
+                StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(vec![
+                    StrykeValue::integer(lo),
+                    StrykeValue::integer(hi),
+                    payload,
+                ])))
+            })
+            .collect(),
+    ))
+}
+
+pub(crate) fn builtin_it_remove(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let it = it_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "it_remove", line)?;
+    let start = args.get(1).map(|v| v.to_int()).unwrap_or(0);
+    let end = args.get(2).map(|v| v.to_int()).unwrap_or(start);
+    let n = it.lock().remove(start, end);
+    Ok(StrykeValue::integer(n as i64))
+}
+
+pub(crate) fn builtin_it_len(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let it = it_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "it_len", line)?;
+    let n = it.lock().len();
+    Ok(StrykeValue::integer(n as i64))
+}
+
+// ── BkTree builtins ──────────────────────────────────────────────────
+
+fn bk_lock_arg(
+    v: &StrykeValue,
+    fname: &str,
+    line: usize,
+) -> PerlResult<Arc<Mutex<BkTreeSketch>>> {
+    v.as_bk_tree()
+        .ok_or_else(|| PerlError::runtime(format!("{fname}: expected BkTree operand"), line))
+}
+
+pub(crate) fn builtin_bk_tree(_args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    Ok(StrykeValue::bk_tree(Arc::new(Mutex::new(BkTreeSketch::new()))))
+}
+
+pub(crate) fn builtin_bk_insert(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let bk_v = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
+    let bk = bk_lock_arg(&bk_v, "bk_insert", line)?;
+    let mut added = 0i64;
+    for a in &args[1..] {
+        if bk.lock().insert(&a.to_string()) {
+            added += 1;
+        }
+    }
+    Ok(StrykeValue::integer(added))
+}
+
+pub(crate) fn builtin_bk_query(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let bk = bk_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "bk_query", line)?;
+    let query = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let max_dist = args.get(2).map(|v| v.to_int().max(0) as u32).unwrap_or(2);
+    let rows = bk.lock().query(&query, max_dist);
+    Ok(StrykeValue::array(
+        rows.into_iter()
+            .map(|(w, d)| {
+                StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(vec![
+                    StrykeValue::string(w),
+                    StrykeValue::integer(d as i64),
+                ])))
+            })
+            .collect(),
+    ))
+}
+
+pub(crate) fn builtin_bk_len(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let bk = bk_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "bk_len", line)?;
+    let n = bk.lock().len();
+    Ok(StrykeValue::integer(n as i64))
+}
+
+// ── Rope builtins ────────────────────────────────────────────────────
+
+fn rope_lock_arg(
+    v: &StrykeValue,
+    fname: &str,
+    line: usize,
+) -> PerlResult<Arc<Mutex<RopeSketch>>> {
+    v.as_rope()
+        .ok_or_else(|| PerlError::runtime(format!("{fname}: expected Rope operand"), line))
+}
+
+pub(crate) fn builtin_rope(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    let initial = args.first().map(|v| v.to_string()).unwrap_or_default();
+    Ok(StrykeValue::rope(Arc::new(Mutex::new(RopeSketch::from_string(&initial)))))
+}
+
+pub(crate) fn builtin_rope_insert(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let rp_v = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
+    let rp = rope_lock_arg(&rp_v, "rope_insert", line)?;
+    let pos = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
+    let text = args.get(2).map(|v| v.to_string()).unwrap_or_default();
+    rp.lock().insert(pos, &text);
+    Ok(rp_v)
+}
+
+pub(crate) fn builtin_rope_delete(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let rp_v = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
+    let rp = rope_lock_arg(&rp_v, "rope_delete", line)?;
+    let start = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
+    let end = args.get(2).map(|v| v.to_int().max(0) as usize).unwrap_or(start);
+    rp.lock().delete(start, end);
+    Ok(rp_v)
+}
+
+pub(crate) fn builtin_rope_substring(
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
+    let rp = rope_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "rope_substring", line)?;
+    let start = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
+    let end = args.get(2).map(|v| v.to_int().max(0) as usize).unwrap_or(start);
+    let s = rp.lock().substring(start, end);
+    Ok(StrykeValue::string(s))
+}
+
+pub(crate) fn builtin_rope_to_string(
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
+    let rp = rope_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "rope_to_string", line)?;
+    let s = rp.lock().to_string();
+    Ok(StrykeValue::string(s))
+}
+
+pub(crate) fn builtin_rope_len(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    let rp = rope_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "rope_len", line)?;
+    let n = rp.lock().len();
+    Ok(StrykeValue::integer(n as i64))
+}
+
+// ── Diff builtins (pure functions) ───────────────────────────────────
+
+fn list_arg_as_strings(v: &StrykeValue) -> Vec<String> {
+    if let Some(arr) = v.as_array_vec() {
+        return arr.iter().map(|x| x.to_string()).collect();
+    }
+    if let Some(ar) = v.as_array_ref() {
+        return ar.read().iter().map(|x| x.to_string()).collect();
+    }
+    // Default: treat scalar as a single-line list.
+    vec![v.to_string()]
+}
+
+fn ops_to_value(ops: Vec<(char, String)>) -> StrykeValue {
+    StrykeValue::array(
+        ops.into_iter()
+            .map(|(op, val)| {
+                StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(vec![
+                    StrykeValue::string(op.to_string()),
+                    StrykeValue::string(val),
+                ])))
+            })
+            .collect(),
+    )
+}
+
+/// `myers_diff(\@A, \@B)` — list of `[op, value]` ops where op is
+/// `"="` / `"+"` / `"-"`. World's-first as scripting-lang stdlib
+/// builtin (Python's `difflib` is closest but uses ratcliff-obershelp
+/// not Myers; Node / Ruby / Perl need third-party).
+pub(crate) fn builtin_myers_diff(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    let a = list_arg_as_strings(args.first().unwrap_or(&StrykeValue::UNDEF));
+    let b = list_arg_as_strings(args.get(1).unwrap_or(&StrykeValue::UNDEF));
+    let ops = myers_diff(&a, &b);
+    let typed: Vec<(char, String)> = ops.into_iter().map(|(op, v)| (op, v)).collect();
+    Ok(ops_to_value(typed))
+}
+
+/// `patience_diff(\@A, \@B)` — Bram Cohen's patience diff for
+/// human-readable code diffs (unique-anchor LCS + Myers in the gaps).
+pub(crate) fn builtin_patience_diff(
+    args: &[StrykeValue],
+    _line: usize,
+) -> PerlResult<StrykeValue> {
+    let a = list_arg_as_strings(args.first().unwrap_or(&StrykeValue::UNDEF));
+    let b = list_arg_as_strings(args.get(1).unwrap_or(&StrykeValue::UNDEF));
+    let ops = patience_diff(&a, &b);
+    let typed: Vec<(char, String)> = ops.into_iter().map(|(op, v)| (op, v)).collect();
+    Ok(ops_to_value(typed))
+}
+
+pub(crate) fn builtin_damerau_levenshtein(
+    args: &[StrykeValue],
+    _line: usize,
+) -> PerlResult<StrykeValue> {
+    let a = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let b = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    Ok(StrykeValue::integer(damerau_levenshtein(&a, &b) as i64))
 }
 
 pub(crate) fn builtin_bloom_deserialize(

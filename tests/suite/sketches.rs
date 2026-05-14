@@ -812,3 +812,405 @@ fn roaring_appears_in_b_hash() {
     assert_eq!(eval_int(r#"exists $b{rb_or} ? 1 : 0"#), 1);
 }
 
+// ── Rate limiter (token bucket + leaky bucket) ────────────────────────
+
+#[test]
+fn token_bucket_initial_capacity_full() {
+    assert_eq!(
+        eval_int(r#"my $rl = token_bucket(10, 5); rl_try_take($rl, 10)"#),
+        1
+    );
+}
+
+#[test]
+fn token_bucket_rejects_over_capacity() {
+    // Fresh bucket has cap=10 tokens; ask for 11.
+    assert_eq!(
+        eval_int(r#"my $rl = token_bucket(10, 5); rl_try_take($rl, 11)"#),
+        0
+    );
+}
+
+#[test]
+fn token_bucket_drains_on_take() {
+    let code = r#"
+        my $rl = token_bucket(10, 0);  # no refill so we test exact accounting
+        rl_try_take($rl, 5);
+        my $avail = rl_available($rl);
+        abs($avail - 5) < 0.1 ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn leaky_bucket_starts_empty() {
+    let code = r#"
+        my $rl = leaky_bucket(10, 1);
+        rl_available($rl)
+    "#;
+    // Leaky semantics: "available" reports capacity-fill.
+    assert_eq!(eval_int(code), 10);
+}
+
+#[test]
+fn leaky_bucket_rejects_overflow() {
+    assert_eq!(
+        eval_int(r#"my $rl = leaky_bucket(5, 0); rl_try_take($rl, 6)"#),
+        0
+    );
+}
+
+#[test]
+fn rate_limiter_ref_type() {
+    assert_eq!(
+        eval_string(r#"my $rl = token_bucket(10, 5); ref($rl)"#),
+        "RateLimiter"
+    );
+}
+
+// ── Hash ring ─────────────────────────────────────────────────────────
+
+#[test]
+fn hash_ring_routes_consistently_for_same_key() {
+    let code = r#"
+        my $hr = hash_ring(128);
+        hr_add($hr, "a", "b", "c");
+        my $r1 = hr_get($hr, "user-42");
+        my $r2 = hr_get($hr, "user-42");
+        $r1 eq $r2 && $r1 ne "" ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn hash_ring_returns_undef_when_empty() {
+    assert_eq!(
+        eval_int(r#"my $hr = hash_ring(64); defined(hr_get($hr, "k")) ? 1 : 0"#),
+        0
+    );
+}
+
+#[test]
+fn hash_ring_add_returns_new_count() {
+    assert_eq!(
+        eval_int(r#"my $hr = hash_ring(8); hr_add($hr, "a", "b", "a")"#),
+        2 // "a" added once, "b" added once; second "a" rejected as dup
+    );
+}
+
+#[test]
+fn hash_ring_remove_drops_node_from_lookup() {
+    let code = r#"
+        my $hr = hash_ring(64);
+        hr_add($hr, "a", "b", "c");
+        my $before = hr_get($hr, "k");
+        hr_remove($hr, $before);
+        my $after = hr_get($hr, "k");
+        $after ne "" && $after ne $before ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn hash_ring_minimal_remapping_under_node_change() {
+    // Add 1000 keys; track which node each routes to. Add a new node;
+    // expect ~1/(N+1) of keys to remap, not most/all of them.
+    let code = r#"
+        my $hr = hash_ring(64);
+        hr_add($hr, "n1", "n2", "n3");
+        my %before;
+        for my $i (1..1000) { $before{$i} = hr_get($hr, "k$i") }
+        hr_add($hr, "n4");
+        my $moved = 0;
+        for my $i (1..1000) { $moved++ if hr_get($hr, "k$i") ne $before{$i} }
+        # With 4 nodes after, expect ~25% (250) moved. Bound liberally.
+        ($moved > 100 && $moved < 400) ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+// ── SimHash ───────────────────────────────────────────────────────────
+
+#[test]
+fn simhash_identical_docs_are_similarity_one() {
+    let code = r#"
+        my $a = simhash(); my $b = simhash();
+        for my $w (qw(the quick brown fox jumps over the lazy dog)) {
+            sh_add($a, $w); sh_add($b, $w);
+        }
+        sh_similarity($a, $b) == 1 ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn simhash_disjoint_docs_have_lower_similarity() {
+    let code = r#"
+        my $a = simhash(); my $b = simhash();
+        sh_add($a, $_) for qw(alpha beta gamma);
+        sh_add($b, $_) for qw(delta epsilon zeta);
+        # 64-bit random hashes of disjoint features should be far apart;
+        # similarity should be substantially below 1.
+        sh_similarity($a, $b) < 0.9 ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+// ── MinHash ───────────────────────────────────────────────────────────
+
+#[test]
+fn minhash_identical_sets_have_jaccard_one() {
+    let code = r#"
+        my $a = minhash(128); my $b = minhash(128);
+        for my $i (1..100) {
+            mh_add($a, "k$i"); mh_add($b, "k$i");
+        }
+        mh_jaccard($a, $b) == 1 ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn minhash_disjoint_sets_have_jaccard_zero() {
+    let code = r#"
+        my $a = minhash(128); my $b = minhash(128);
+        mh_add($a, "k$_") for 1..100;
+        mh_add($b, "x$_") for 1..100;
+        mh_jaccard($a, $b) == 0 ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn minhash_partial_overlap_in_expected_range() {
+    let code = r#"
+        my $a = minhash(256); my $b = minhash(256);
+        mh_add($a, "k$_") for 1..1000;
+        mh_add($b, "k$_") for 500..1499;
+        # Truth: |A∩B|=501, |A∪B|=1499; Jaccard ≈ 0.334.
+        # Allow 8% slop for the sketch error.
+        my $j = mh_jaccard($a, $b);
+        abs($j - 0.334) < 0.08 ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+// ── IntervalTree ──────────────────────────────────────────────────────
+
+#[test]
+fn interval_tree_query_point_returns_overlapping() {
+    let code = r#"
+        my $it = interval_tree();
+        it_insert($it, 1, 10, "a");
+        it_insert($it, 5, 15, "b");
+        it_insert($it, 20, 30, "c");
+        scalar(it_query_point($it, 7))
+    "#;
+    // [1,10] and [5,15] both contain 7.
+    assert_eq!(eval_int(code), 2);
+}
+
+#[test]
+fn interval_tree_query_range_returns_overlapping() {
+    let code = r#"
+        my $it = interval_tree();
+        it_insert($it, 1, 5, "a");
+        it_insert($it, 10, 15, "b");
+        it_insert($it, 20, 25, "c");
+        scalar(it_query_range($it, 12, 22))
+    "#;
+    // [10,15] (overlaps via 12) and [20,25] (overlaps via 22).
+    assert_eq!(eval_int(code), 2);
+}
+
+#[test]
+fn interval_tree_swapped_endpoints_normalized() {
+    assert_eq!(
+        eval_int(
+            r#"
+                my $it = interval_tree();
+                it_insert($it, 10, 1, "swapped");
+                scalar(it_query_point($it, 5))
+            "#
+        ),
+        1
+    );
+}
+
+// ── BK-tree ───────────────────────────────────────────────────────────
+
+#[test]
+fn bk_tree_fuzzy_match_returns_close_words() {
+    let code = r#"
+        my $bk = bk_tree();
+        bk_insert($bk, "hello", "world", "help", "hells", "halo");
+        # query "hallo" with max_dist=2; "hello" / "halo" are dist 1; "hells" is 2.
+        my @r = bk_query($bk, "hallo", 2);
+        scalar(@r) >= 2 ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn bk_tree_rejects_duplicate_inserts() {
+    assert_eq!(
+        eval_int(r#"my $bk = bk_tree(); bk_insert($bk, "x", "y", "x")"#),
+        2
+    );
+}
+
+#[test]
+fn bk_tree_query_sorted_by_distance() {
+    let code = r#"
+        my $bk = bk_tree();
+        bk_insert($bk, "kitten", "kittens", "sittin", "sitting");
+        my @r = bk_query($bk, "kittin", 3);
+        # First result must be the smallest-distance word.
+        scalar(@r) > 0 && $r[0]->[1] <= $r[-1]->[1] ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+// ── Rope ──────────────────────────────────────────────────────────────
+
+#[test]
+fn rope_round_trips_string() {
+    assert_eq!(
+        eval_string(r#"my $r = rope("Hello, world!"); rope_to_string($r)"#),
+        "Hello, world!"
+    );
+}
+
+#[test]
+fn rope_insert_at_position() {
+    assert_eq!(
+        eval_string(
+            r#"my $r = rope("Hello, world!"); rope_insert($r, 7, "beautiful "); rope_to_string($r)"#
+        ),
+        "Hello, beautiful world!"
+    );
+}
+
+#[test]
+fn rope_delete_range() {
+    assert_eq!(
+        eval_string(
+            r#"my $r = rope("Hello, world!"); rope_delete($r, 5, 13); rope_to_string($r)"#
+        ),
+        "Hello"
+    );
+}
+
+#[test]
+fn rope_substring_extracts_range() {
+    assert_eq!(
+        eval_string(r#"my $r = rope("Hello, world!"); rope_substring($r, 7, 12)"#),
+        "world"
+    );
+}
+
+#[test]
+fn rope_handles_unicode_codepoints() {
+    let code = r#"
+        my $r = rope("héllo wörld 🌍");
+        my $len = rope_len($r);
+        my $s = rope_substring($r, 6, 11);
+        $len == 13 && $s eq "wörld" ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+// ── Myers diff / Patience diff ────────────────────────────────────────
+
+#[test]
+fn myers_diff_identical_inputs_are_all_equals() {
+    let code = r#"
+        my @a = ("a", "b", "c");
+        my @ops = myers_diff(\@a, \@a);
+        my $all_eq = 1;
+        for my $op (@ops) { $all_eq = 0 if $op->[0] ne "=" }
+        $all_eq && scalar(@ops) == 3 ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn myers_diff_substitution() {
+    let code = r#"
+        my @a = ("a", "b", "c");
+        my @b = ("a", "x", "c");
+        my @ops = myers_diff(\@a, \@b);
+        # Expected: =a, -b, +x, =c (order may interleave - and +).
+        my $minuses = 0; my $pluses = 0; my $equals = 0;
+        for my $op (@ops) {
+            $minuses++ if $op->[0] eq "-";
+            $pluses++  if $op->[0] eq "+";
+            $equals++  if $op->[0] eq "=";
+        }
+        $minuses == 1 && $pluses == 1 && $equals == 2 ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn myers_diff_pure_insertion() {
+    let code = r#"
+        my @a = ();
+        my @b = ("x", "y");
+        my @ops = myers_diff(\@a, \@b);
+        my $pluses = 0;
+        for my $op (@ops) { $pluses++ if $op->[0] eq "+" }
+        $pluses == 2 ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn patience_diff_handles_unique_anchors() {
+    let code = r#"
+        my @a = ("alpha", "BLOCK1", "beta", "gamma", "BLOCK2", "delta");
+        my @b = ("alpha", "BLOCK1", "BETA", "GAMMA", "BLOCK2", "delta");
+        my @ops = patience_diff(\@a, \@b);
+        # The BLOCK1 and BLOCK2 unique anchors should appear as equals.
+        my $block_eqs = 0;
+        for my $op (@ops) {
+            $block_eqs++ if $op->[0] eq "=" && $op->[1] =~ /BLOCK/;
+        }
+        $block_eqs == 2 ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+// ── Reflection ────────────────────────────────────────────────────────
+
+#[test]
+fn tier2_builtins_in_b_hash() {
+    for name in &[
+        "token_bucket",
+        "leaky_bucket",
+        "rl_try_take",
+        "rl_available",
+        "hash_ring",
+        "hr_get",
+        "simhash",
+        "sh_add",
+        "sh_similarity",
+        "minhash",
+        "mh_jaccard",
+        "interval_tree",
+        "it_insert",
+        "it_query_point",
+        "bk_tree",
+        "bk_insert",
+        "bk_query",
+        "rope",
+        "rope_insert",
+        "rope_delete",
+        "myers_diff",
+        "patience_diff",
+    ] {
+        let code = format!(r#"exists $b{{{name}}} ? 1 : 0"#);
+        assert_eq!(eval_int(&code), 1, "missing from %b: {name}");
+    }
+}
+

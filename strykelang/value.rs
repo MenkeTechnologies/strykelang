@@ -599,6 +599,20 @@ pub(crate) enum HeapObject {
     TDigestSketch(Arc<Mutex<crate::sketches::TDigestSketch>>),
     /// Roaring bitmap — compressed bitset over u32.
     RoaringBitmap(Arc<Mutex<crate::sketches::RoaringBitmapSketch>>),
+    /// Token-bucket / leaky-bucket rate limiter.
+    RateLimiter(Arc<Mutex<crate::sketches::RateLimiterSketch>>),
+    /// Consistent-hash ring (Karger '97 style with virtual nodes).
+    HashRing(Arc<Mutex<crate::sketches::HashRingSketch>>),
+    /// SimHash 64-bit document sketch.
+    SimHash(Arc<Mutex<crate::sketches::SimHashSketch>>),
+    /// MinHash k-dim signature for Jaccard similarity.
+    MinHash(Arc<Mutex<crate::sketches::MinHashSketch>>),
+    /// Interval tree — store + query overlap intervals.
+    IntervalTree(Arc<Mutex<crate::sketches::IntervalTreeSketch>>),
+    /// BK-tree — string-distance index for fuzzy / typo search.
+    BkTree(Arc<Mutex<crate::sketches::BkTreeSketch>>),
+    /// Rope — fast insert/delete in long strings.
+    Rope(Arc<Mutex<crate::sketches::RopeSketch>>),
     Pipeline(Arc<Mutex<PipelineInner>>),
     Capture(Arc<CaptureResult>),
     Ppool(PerlPpool),
@@ -1773,6 +1787,97 @@ impl StrykeValue {
     }
 
     #[inline]
+    pub fn rate_limiter(r: Arc<Mutex<crate::sketches::RateLimiterSketch>>) -> Self {
+        Self::from_heap(Arc::new(HeapObject::RateLimiter(r)))
+    }
+    #[inline]
+    pub fn as_rate_limiter(&self) -> Option<Arc<Mutex<crate::sketches::RateLimiterSketch>>> {
+        self.with_heap(|h| match h {
+            HeapObject::RateLimiter(s) => Some(Arc::clone(s)),
+            _ => None,
+        })
+        .flatten()
+    }
+
+    #[inline]
+    pub fn hash_ring(r: Arc<Mutex<crate::sketches::HashRingSketch>>) -> Self {
+        Self::from_heap(Arc::new(HeapObject::HashRing(r)))
+    }
+    #[inline]
+    pub fn as_hash_ring(&self) -> Option<Arc<Mutex<crate::sketches::HashRingSketch>>> {
+        self.with_heap(|h| match h {
+            HeapObject::HashRing(s) => Some(Arc::clone(s)),
+            _ => None,
+        })
+        .flatten()
+    }
+
+    #[inline]
+    pub fn simhash(s: Arc<Mutex<crate::sketches::SimHashSketch>>) -> Self {
+        Self::from_heap(Arc::new(HeapObject::SimHash(s)))
+    }
+    #[inline]
+    pub fn as_simhash(&self) -> Option<Arc<Mutex<crate::sketches::SimHashSketch>>> {
+        self.with_heap(|h| match h {
+            HeapObject::SimHash(s) => Some(Arc::clone(s)),
+            _ => None,
+        })
+        .flatten()
+    }
+
+    #[inline]
+    pub fn minhash(m: Arc<Mutex<crate::sketches::MinHashSketch>>) -> Self {
+        Self::from_heap(Arc::new(HeapObject::MinHash(m)))
+    }
+    #[inline]
+    pub fn as_minhash(&self) -> Option<Arc<Mutex<crate::sketches::MinHashSketch>>> {
+        self.with_heap(|h| match h {
+            HeapObject::MinHash(s) => Some(Arc::clone(s)),
+            _ => None,
+        })
+        .flatten()
+    }
+
+    #[inline]
+    pub fn interval_tree(t: Arc<Mutex<crate::sketches::IntervalTreeSketch>>) -> Self {
+        Self::from_heap(Arc::new(HeapObject::IntervalTree(t)))
+    }
+    #[inline]
+    pub fn as_interval_tree(&self) -> Option<Arc<Mutex<crate::sketches::IntervalTreeSketch>>> {
+        self.with_heap(|h| match h {
+            HeapObject::IntervalTree(s) => Some(Arc::clone(s)),
+            _ => None,
+        })
+        .flatten()
+    }
+
+    #[inline]
+    pub fn bk_tree(t: Arc<Mutex<crate::sketches::BkTreeSketch>>) -> Self {
+        Self::from_heap(Arc::new(HeapObject::BkTree(t)))
+    }
+    #[inline]
+    pub fn as_bk_tree(&self) -> Option<Arc<Mutex<crate::sketches::BkTreeSketch>>> {
+        self.with_heap(|h| match h {
+            HeapObject::BkTree(s) => Some(Arc::clone(s)),
+            _ => None,
+        })
+        .flatten()
+    }
+
+    #[inline]
+    pub fn rope(r: Arc<Mutex<crate::sketches::RopeSketch>>) -> Self {
+        Self::from_heap(Arc::new(HeapObject::Rope(r)))
+    }
+    #[inline]
+    pub fn as_rope(&self) -> Option<Arc<Mutex<crate::sketches::RopeSketch>>> {
+        self.with_heap(|h| match h {
+            HeapObject::Rope(s) => Some(Arc::clone(s)),
+            _ => None,
+        })
+        .flatten()
+    }
+
+    #[inline]
     pub fn pipeline(p: Arc<Mutex<PipelineInner>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Pipeline(p)))
     }
@@ -2205,6 +2310,13 @@ impl StrykeValue {
             HeapObject::TopKSketch(_) => "TopKSketch".to_string(),
             HeapObject::TDigestSketch(_) => "TDigestSketch".to_string(),
             HeapObject::RoaringBitmap(_) => "RoaringBitmap".to_string(),
+            HeapObject::RateLimiter(_) => "RateLimiter".to_string(),
+            HeapObject::HashRing(_) => "HashRing".to_string(),
+            HeapObject::SimHash(_) => "SimHash".to_string(),
+            HeapObject::MinHash(_) => "MinHash".to_string(),
+            HeapObject::IntervalTree(_) => "IntervalTree".to_string(),
+            HeapObject::BkTree(_) => "BkTree".to_string(),
+            HeapObject::Rope(_) => "Rope".to_string(),
             HeapObject::Pipeline(_) => "Pipeline".to_string(),
             HeapObject::DataFrame(_) => "DataFrame".to_string(),
             HeapObject::Capture(_) => "Capture".to_string(),
@@ -2253,6 +2365,13 @@ impl StrykeValue {
             HeapObject::TopKSketch(_) => StrykeValue::string("TopKSketch".into()),
             HeapObject::TDigestSketch(_) => StrykeValue::string("TDigestSketch".into()),
             HeapObject::RoaringBitmap(_) => StrykeValue::string("RoaringBitmap".into()),
+            HeapObject::RateLimiter(_) => StrykeValue::string("RateLimiter".into()),
+            HeapObject::HashRing(_) => StrykeValue::string("HashRing".into()),
+            HeapObject::SimHash(_) => StrykeValue::string("SimHash".into()),
+            HeapObject::MinHash(_) => StrykeValue::string("MinHash".into()),
+            HeapObject::IntervalTree(_) => StrykeValue::string("IntervalTree".into()),
+            HeapObject::BkTree(_) => StrykeValue::string("BkTree".into()),
+            HeapObject::Rope(_) => StrykeValue::string("Rope".into()),
             HeapObject::Pipeline(_) => StrykeValue::string("Pipeline".into()),
             HeapObject::DataFrame(_) => StrykeValue::string("DataFrame".into()),
             HeapObject::Capture(_) => StrykeValue::string("Capture".into()),
@@ -2526,6 +2645,39 @@ impl fmt::Display for StrykeValue {
                 let g = s.lock();
                 write!(f, "RoaringBitmap(n={})", g.len())
             }
+            HeapObject::RateLimiter(s) => {
+                let g = s.lock();
+                let kind = if g.leaky { "leaky" } else { "token" };
+                write!(
+                    f,
+                    "RateLimiter({}, cap={}, rate={}/s)",
+                    kind, g.capacity, g.rate_per_sec
+                )
+            }
+            HeapObject::HashRing(s) => {
+                let g = s.lock();
+                write!(f, "HashRing(nodes={}, vnodes={})", g.node_count(), g.vnodes_per_node)
+            }
+            HeapObject::SimHash(s) => {
+                let g = s.lock();
+                write!(f, "SimHash(features={})", g.feature_count())
+            }
+            HeapObject::MinHash(s) => {
+                let g = s.lock();
+                write!(f, "MinHash(k={})", g.k())
+            }
+            HeapObject::IntervalTree(s) => {
+                let g = s.lock();
+                write!(f, "IntervalTree(n={})", g.len())
+            }
+            HeapObject::BkTree(s) => {
+                let g = s.lock();
+                write!(f, "BkTree(n={})", g.len())
+            }
+            HeapObject::Rope(s) => {
+                let g = s.lock();
+                write!(f, "Rope(len={}, bytes={})", g.len(), g.byte_len())
+            }
             HeapObject::Pipeline(p) => {
                 let g = p.lock();
                 write!(f, "Pipeline({} ops)", g.ops.len())
@@ -2665,6 +2817,13 @@ pub fn set_member_key(v: &StrykeValue) -> String {
         HeapObject::TopKSketch(s) => format!("topk:{:p}", Arc::as_ptr(s)),
         HeapObject::TDigestSketch(s) => format!("td:{:p}", Arc::as_ptr(s)),
         HeapObject::RoaringBitmap(s) => format!("rb:{:p}", Arc::as_ptr(s)),
+        HeapObject::RateLimiter(s) => format!("rl:{:p}", Arc::as_ptr(s)),
+        HeapObject::HashRing(s) => format!("hr:{:p}", Arc::as_ptr(s)),
+        HeapObject::SimHash(s) => format!("sh:{:p}", Arc::as_ptr(s)),
+        HeapObject::MinHash(s) => format!("mh:{:p}", Arc::as_ptr(s)),
+        HeapObject::IntervalTree(s) => format!("it:{:p}", Arc::as_ptr(s)),
+        HeapObject::BkTree(s) => format!("bk:{:p}", Arc::as_ptr(s)),
+        HeapObject::Rope(s) => format!("rp:{:p}", Arc::as_ptr(s)),
         HeapObject::Pipeline(p) => format!("pl:{:p}", Arc::as_ptr(p)),
         HeapObject::Capture(c) => format!("cap:{:p}", Arc::as_ptr(c)),
         HeapObject::Ppool(p) => format!("pp:{:p}", Arc::as_ptr(&p.0)),
