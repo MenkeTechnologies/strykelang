@@ -93,23 +93,60 @@ pub fn read_file_text_perl_compat(path: impl AsRef<Path>) -> io::Result<String> 
 /// `.stk` file at any depth; `braceccl` enables `{a,b,c}` / `{abc}` brace expansion
 /// — wired through zshrs's global option store like stock zsh.
 pub(crate) fn stryke_glob(pattern: &str) -> Vec<String> {
-    // zshrs glob fails to match wildcards behind a leading `./` (works for
-    // literal filenames but not patterns like `./lib/*.stk`). Strip the
-    // prefix before delegating, then re-prepend it to each result so callers
-    // see the path they asked for. `./` is semantic-equivalent to no prefix
-    // (current directory), so this normalisation is safe.
-    let (stripped, had_dot_slash) = if let Some(rest) = pattern.strip_prefix("./") {
-        (rest, true)
+    // zshrs glob fails to match wildcards behind a `./` directory segment
+    // (works for literal filenames but not patterns like `./lib/*.stk`,
+    // nor for `/abs/./lib/*.stk` which `resolve_stryke_path` produces when
+    // joining cwd with a `./`-prefixed relative path). Collapse leading
+    // `./` and mid-path `/./` before delegating, then re-prepend the
+    // leading `./` to each result so callers see the form they asked for.
+    // `.` as a directory component is always the current directory; no
+    // filesystem entry can legitimately bear that name, so collapsing is
+    // safe and matches OS / `std::fs` behaviour.
+    let (stripped_leading, had_dot_slash) = if let Some(rest) = pattern.strip_prefix("./") {
+        (rest.to_string(), true)
     } else {
-        (pattern, false)
+        (pattern.to_string(), false)
     };
+    let normalized = stripped_leading.replace("/./", "/");
+    let is_relative_pattern = !std::path::Path::new(&normalized).is_absolute();
     let results = {
         let _lock = ZSH_GLOB_GLOBAL_MUTEX.lock();
         let _opts = StrykeGlobOptsGuard::new();
-        zsh::glob::glob(stripped)
+        zsh::glob::glob(&normalized)
+    };
+    // zshrs emits absolute paths even when called with a relative pattern;
+    // strip the cwd prefix so the user sees what they asked for. Leading-`./`
+    // patterns get the prefix re-attached (existing contract); other relative
+    // patterns return bare relative paths. Check both the raw cwd and its
+    // canonical form because macOS reports `/var/...` via `current_dir()` but
+    // the glob engine emits the canonical `/private/var/...`.
+    let stripped: Vec<String> = if is_relative_pattern {
+        let cwd = std::env::current_dir().ok();
+        let cwd_canonical = cwd
+            .as_ref()
+            .and_then(|p| std::fs::canonicalize(p).ok())
+            .map(|p| p.to_string_lossy().into_owned());
+        let cwd_plain = cwd.as_ref().map(|p| p.to_string_lossy().into_owned());
+        results
+            .into_iter()
+            .map(|p| {
+                for pref in [cwd_canonical.as_deref(), cwd_plain.as_deref()]
+                    .into_iter()
+                    .flatten()
+                {
+                    if let Some(rest) = p.strip_prefix(pref) {
+                        let r = rest.trim_start_matches('/');
+                        return if r.is_empty() { ".".to_string() } else { r.to_string() };
+                    }
+                }
+                p
+            })
+            .collect()
+    } else {
+        results
     };
     if had_dot_slash {
-        results
+        stripped
             .into_iter()
             .map(|p| {
                 if p.starts_with("./") {
@@ -120,7 +157,7 @@ pub(crate) fn stryke_glob(pattern: &str) -> Vec<String> {
             })
             .collect()
     } else {
-        results
+        stripped
     }
 }
 

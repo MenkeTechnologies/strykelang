@@ -9497,10 +9497,12 @@ impl<'a> VM<'a> {
                 Ok(crate::perl_fs::read_link(&path))
             }
             Some(BuiltinId::Glob) => {
-                let pats: Vec<String> = args
-                    .iter()
-                    .map(|v| self.interp.resolve_stryke_path_string(&v.to_string()))
-                    .collect();
+                // Pass user patterns through verbatim: zsh::glob runs from OS cwd,
+                // which `chdir` keeps in sync with `stryke_pwd`. Absolutising the
+                // pattern up front would turn relative-pattern results into
+                // absolute paths (breaking `glob("**(/)")` → "sub" contract,
+                // pinned in tests/suite/glob_zsh_qualifiers.rs).
+                let pats: Vec<String> = args.iter().map(|v| v.to_string()).collect();
                 Ok(crate::perl_fs::glob_patterns(&pats))
             }
             Some(BuiltinId::Files) => {
