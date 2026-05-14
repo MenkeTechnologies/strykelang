@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.13.15 · 10067 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.13.15 · 10068 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -330,7 +330,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">8396</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">8397</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -1019,7 +1019,7 @@ my @pairs = map { (_, _ * 10) } 1:3
         <pre><code class="lang-perl">my @evens = grep { _ % 2 == 0 } 1:10
 @evens |&gt; e p   # 2 4 6 8 10
 grep { |$x| $x &gt; 3 }, 1:6   # named param
-my @long = grep { length(_) &gt; 3 } @words
+my @long = grep { len &gt; 3 } @words
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-sort">
@@ -11983,7 +11983,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">8396 topics</p>
+      <p class="chapter-meta">8397 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$!</code></h3>
         <p><code>$!</code> — the OS error from the most recent system call, in stringified form (e.g. <code>&quot;No such file or directory&quot;</code>) or as an <code>errno</code> integer in numeric context. Set by <code>open</code>, <code>close</code>, <code>chdir</code>, <code>read</code>, <code>write</code>, and other syscalls when they fail. The value persists until the next failing call, so always check it *immediately* after the failing operation — intermediate clean Perl code does not touch it, but any subsequent syscall will.</p>
@@ -20477,7 +20477,7 @@ my $d3 = $dog-&gt;clone()        # deep copy
       </article>
       <article class="doc-entry" id="doc-cnt">
         <h3><a class="doc-anchor" href="#doc-cnt">#</a> <code>cnt</code></h3>
-        <p><code>count</code> (aliases <code>len</code>, <code>cnt</code>) returns the number of elements in a list, the <strong>codepoint count</strong> of a string, the number of key-value pairs in a hash, or the cardinality of a set. Universal length-like function that dispatches on the type of its argument. Replaces <code>scalar @array</code> / <code>length $string</code> for stryke code; on strings it pairs with <code>[i]</code> / <code>[a:b]</code> and <code>cindex</code> / <code>crindex</code>, all of which use codepoint positions.</p>
+        <p><code>count</code> (aliases <code>len</code>, <code>cnt</code>) returns the number of elements in a list, the <strong>codepoint count</strong> of a string, the number of key-value pairs in a hash, or the cardinality of a set. Universal length-like function that dispatches on the type of its argument. With <strong>no arguments</strong>, it is the same as one argument on <code>$_</code> (like Perl 5&#39;s bare <code>length</code> in map/grep blocks). Replaces <code>scalar @array</code> / <code>length $string</code> for stryke code; on strings it pairs with <code>[i]</code> / <code>[a:b]</code> and <code>cindex</code> / <code>crindex</code>, all of which use codepoint positions.</p>
         <p>For byte length on a string, use Perl 5&#39;s <code>length</code> (kept byte-based for compat with <code>index</code> / <code>rindex</code> / <code>substr</code>). <code>size</code> is NOT a count alias — it returns a file&#39;s byte size.</p>
         <pre><code class="lang-perl">my @arr = (1, 2, 3, 4, 5)
 p cnt @arr          # 5
@@ -20486,6 +20486,7 @@ p len &quot;─&quot;           # 1 (codepoint)
 p length &quot;─&quot;        # 3 (bytes)
 my %h = (a =&gt; 1, b =&gt; 2)
 p cnt \%h           # 2
+my @long = grep { len &gt; 3 } qw(ab abcd x)  # abcd
 rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p  # line count
 </code></pre>
       </article>
@@ -39595,6 +39596,13 @@ my $smooth = lpf(\@noisy, 0.1)
         <h3><a class="doc-anchor" href="#doc-lrun">#</a> <code>lrun</code></h3>
         <p><code>lrun</code> — operation <code>lrun</code>. Alias for <code>longest_run</code>. Category: *extended stdlib*.</p>
         <pre><code class="lang-perl">p lrun $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ls">
+        <h3><a class="doc-anchor" href="#doc-ls">#</a> <code>ls</code></h3>
+        <p><code>ls</code> / <code>ls(DIR)</code> — long directory listing in the style of <code>ls -l</code>. With no arguments, lists the process current working directory (not <code>$_</code>). With one or more directory paths, lists each directory; if more than one path is given, each block is prefixed with <code>DIR:</code> like GNU <code>ls</code>. Returns a single multiline string (suitable for <code>p</code> or <code>spurt</code>). On Unix, includes a <code>total</code> line (1024-byte block units), mode bits, link count, numeric uid/gid, size, mtime, and name; symbolic links show <code>-&gt; target</code>. On Windows, lines use file attributes, size, and a simplified timestamp.</p>
+        <pre><code class="lang-perl">p ls()           # cwd
+p ls(&quot;/tmp&quot;)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-lse">

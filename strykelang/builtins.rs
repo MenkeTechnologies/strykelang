@@ -3156,7 +3156,7 @@ pub(crate) fn try_builtin(
         "run_length_decode" | "rld" => Some(builtin_rld(args)),
         "sliding_pairs" => Some(builtin_sliding_pairs(args)),
         "consecutive_eq" => Some(builtin_consecutive_eq(args)),
-        "flatten_deep" => Some(builtin_flatten_deep(args)),
+        "flatten_deep" => Some(builtin_flatten_deep(interp, args)),
         // ── More trig / math ──
         "tan" => Some(builtin_tan(interp, args)),
         "asin" => Some(builtin_asin(interp, args)),
@@ -3314,17 +3314,17 @@ pub(crate) fn try_builtin(
         "geometric_mean" => Some(builtin_geometric_mean(args)),
         "zscore" => Some(builtin_zscore(args)),
         // ── Sorting helpers ──
-        "sorted" => Some(builtin_sorted(args)),
-        "sorted_desc" => Some(builtin_sorted_desc(args)),
-        "sorted_nums" => Some(builtin_sorted_nums(args)),
-        "sorted_by_length" => Some(builtin_sorted_by_length(args)),
-        "reverse_list" | "list_reverse" => Some(builtin_reverse_list(args)),
+        "sorted" => Some(builtin_sorted(interp, args)),
+        "sorted_desc" => Some(builtin_sorted_desc(interp, args)),
+        "sorted_nums" => Some(builtin_sorted_nums(interp, args)),
+        "sorted_by_length" => Some(builtin_sorted_by_length(interp, args)),
+        "reverse_list" | "list_reverse" => Some(builtin_reverse_list(interp, args)),
         // ── Array helpers ──
         "without" => Some(builtin_without(args)),
         "without_nth" => Some(builtin_without_nth(args)),
         "take_last" => Some(builtin_take_last(args)),
         "drop_last" => Some(builtin_drop_last(args)),
-        "pairwise" => Some(builtin_pairwise(args)),
+        "pairwise" => Some(builtin_pairwise(interp, args)),
         "zipmap" => Some(builtin_zipmap(args)),
         // ── Format helpers ──
         "format_bytes" | "human_bytes" => Some(builtin_format_bytes(interp, args)),
@@ -3584,7 +3584,7 @@ pub(crate) fn try_builtin(
         "discount_amount" => Some(builtin_discount_amount(args)),
         "entropy" => Some(builtin_entropy(args)),
         "find_first" => Some(builtin_find_first(args)),
-        "flatten_once" => Some(builtin_flatten_once(args)),
+        "flatten_once" => Some(builtin_flatten_once(interp, args)),
         "fma" => Some(builtin_fma(args)),
         "freq_wavelength" => Some(builtin_freq_wavelength(interp, args)),
         "future_value" => Some(builtin_future_value(args)),
@@ -3692,8 +3692,8 @@ pub(crate) fn try_builtin(
         "least_common" => Some(builtin_least_common(args)),
         "length_each" => Some(builtin_length_each(args)),
         "list_compact" => Some(builtin_list_compact(args)),
-        "list_flatten_deep" => Some(builtin_list_flatten_deep(args)),
-        "most_common" => Some(builtin_most_common(args)),
+        "list_flatten_deep" => Some(builtin_list_flatten_deep(interp, args)),
+        "most_common" => Some(builtin_most_common(interp, args)),
         "negate_each" => Some(builtin_negate_each(args)),
         "nonempty_count" => Some(builtin_nonempty_count(args)),
         "nop" => Some(builtin_nop(args)),
@@ -3742,8 +3742,8 @@ pub(crate) fn try_builtin(
         "chunk" | "chk" => Some(builtin_chunk(args)),
         "dedup" | "dup" => Some(builtin_dedup(args)),
         "range" => Some(builtin_range(args)),
-        "list_count" | "list_size" => Some(builtin_list_count(args)),
-        "count" | "len" | "cnt" => Some(builtin_count_size_cnt(args)),
+        "list_count" | "list_size" => Some(builtin_list_count(interp, args)),
+        "count" | "len" | "cnt" => Some(builtin_count_size_cnt(interp, args)),
         "size" => Some(builtin_file_size(interp, args)),
         "read_lines" | "rl" => Some(builtin_read_lines(interp, args, line)),
         "append_file" | "af" => Some(builtin_append_file(args, line)),
@@ -3759,6 +3759,7 @@ pub(crate) fn try_builtin(
         "utime" => Some(interp.builtin_utime_execute(args, line)),
         "umask" => Some(interp.builtin_umask_execute(args, line)),
         "getcwd" | "pwd" => Some(interp.builtin_getcwd_execute(args, line)),
+        "ls" => Some(builtin_ls(interp, args, line)),
         "realpath" | "rp" => Some(interp.builtin_realpath_execute(args, line)),
         "canonpath" => Some(builtin_canonpath(args)),
         "pipe" => Some(interp.builtin_pipe_execute(args, line)),
@@ -4970,7 +4971,7 @@ pub(crate) fn try_builtin(
         "filterfalse" | "falf" => Some(builtin_filterfalse(interp, args, line)),
         "islice" | "isl" => Some(builtin_islice(args)),
         "chain_from" | "chfr" => Some(builtin_chain_from(args)),
-        "pairwise_iter" | "pwi" => Some(builtin_pairwise_iter(args)),
+        "pairwise_iter" | "pwi" => Some(builtin_pairwise_iter(interp, args)),
         "tee_iter" | "teei" => Some(builtin_tee_iter(args)),
         "groupby_iter" | "gbi" => Some(builtin_groupby_iter(interp, args, line)),
         "each_slice" | "eslice" => Some(builtin_each_slice(args)),
@@ -11891,7 +11892,10 @@ fn builtin_drop(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeVal
 
 /// `list_count` / `list_size` + `LIST` — like [`builtin_flatten`]: one-level
 /// [`StrykeValue::map_flatten_outputs`] per actual; returns the **element** count.
-fn builtin_list_count(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+/// No arguments → same as `list_count($_)`.
+fn builtin_list_count(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let mut topic = StrykeValue::UNDEF;
+    let args = variadic_list_or_topic(interp, args, &mut topic);
     let mut out = Vec::new();
     for a in args {
         out.extend(a.map_flatten_outputs(true));
@@ -11899,13 +11903,15 @@ fn builtin_list_count(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::integer(out.len() as i64))
 }
 
-/// `count` / `size` / `cnt`: pipe-friendly “how big is this value?”
-/// — **one string** → UTF-8 byte length (same as the `length` builtin);
+/// `count` / `len` / `cnt`: pipe-friendly “how big is this value?”
+/// — **no args** → same as one-arg form on `$_` (matches `length` with no operand in Perl 5);
+/// **one string** → codepoint count (Stryke; Perl's `length` is byte-based);
 /// **one array / aref** → flattened element count (list context ranges become arrays first);
 /// **one hash** → number of keys; **one set** → set size; **several actuals** → same as [`builtin_list_count`].
-fn builtin_count_size_cnt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_count_size_cnt(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Ok(StrykeValue::integer(0));
+        let topic = interp.scope.get_scalar("_");
+        return builtin_count_size_cnt(interp, std::slice::from_ref(&topic));
     }
     if args.len() == 1 {
         let a = &args[0];
@@ -11933,7 +11939,7 @@ fn builtin_count_size_cnt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
             a.map_flatten_outputs(true).len() as i64
         ));
     }
-    builtin_list_count(args)
+    builtin_list_count(interp, args)
 }
 
 /// `size` — byte size of a file, like Perl's `-s`.
@@ -11966,8 +11972,235 @@ fn builtin_file_size(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<Stry
     Ok(StrykeValue::array(flat.iter().map(size_of).collect()))
 }
 
+/// `ls` / `ls DIR` / `ls A, B, ...` — long directory listing in the style of `ls -l`.
+/// With no arguments, lists the process current working directory (not `$_`).
+/// Returns one string (newline-separated lines). Each non-empty argument must name a directory.
+fn builtin_ls(_interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+    use std::path::{Path, PathBuf};
+
+    let dirs: Vec<PathBuf> = if args.is_empty() {
+        vec![std::env::current_dir().map_err(|e| {
+            PerlError::runtime(format!("ls: cannot get cwd: {e}"), line)
+        })?]
+    } else {
+        args.iter()
+            .map(|v| PathBuf::from(v.to_string()))
+            .filter(|p| !p.as_os_str().is_empty())
+            .collect()
+    };
+    if dirs.is_empty() {
+        return Err(PerlError::runtime("ls: need directory path", line));
+    }
+
+    let mut out = String::new();
+    for (i, dir) in dirs.iter().enumerate() {
+        if i > 0 {
+            out.push('\n');
+        }
+        if dirs.len() > 1 {
+            use std::fmt::Write as _;
+            let _ = writeln!(&mut out, "{}:", dir.display());
+        }
+        let meta = std::fs::metadata(dir).map_err(|e| {
+            PerlError::runtime(format!("ls: {}: {e}", dir.display()), line)
+        })?;
+        if !meta.is_dir() {
+            return Err(PerlError::runtime(
+                format!("ls: not a directory: {}", dir.display()),
+                line,
+            ));
+        }
+        out.push_str(&format_ls_long_dir(Path::new(dir), line)?);
+    }
+    Ok(StrykeValue::string(out))
+}
+
+#[cfg(unix)]
+fn ls_rwx_triple(
+    read: bool,
+    write: bool,
+    exec: bool,
+    special: bool,
+    sp_lower: char,
+    sp_upper: char,
+) -> String {
+    let mut s = String::with_capacity(3);
+    s.push(if read { 'r' } else { '-' });
+    s.push(if write { 'w' } else { '-' });
+    s.push(match (exec, special) {
+        (true, true) => sp_lower,
+        (false, true) => sp_upper,
+        (true, false) => 'x',
+        _ => '-',
+    });
+    s
+}
+
+#[cfg(unix)]
+fn ls_unix_mode_string(meta: &std::fs::Metadata) -> String {
+    use std::os::unix::fs::{FileTypeExt, MetadataExt};
+    let mode = meta.mode() as u32;
+    let ft = meta.file_type();
+    let tc = if ft.is_symlink() {
+        'l'
+    } else if ft.is_dir() {
+        'd'
+    } else if ft.is_block_device() {
+        'b'
+    } else if ft.is_char_device() {
+        'c'
+    } else if ft.is_fifo() {
+        'p'
+    } else if ft.is_socket() {
+        's'
+    } else {
+        '-'
+    };
+    let mut out = String::with_capacity(10);
+    out.push(tc);
+    out.push_str(&ls_rwx_triple(
+        mode & 0o400 != 0,
+        mode & 0o200 != 0,
+        mode & 0o100 != 0,
+        mode & 0o4000 != 0,
+        's',
+        'S',
+    ));
+    out.push_str(&ls_rwx_triple(
+        mode & 0o040 != 0,
+        mode & 0o020 != 0,
+        mode & 0o010 != 0,
+        mode & 0o2000 != 0,
+        's',
+        'S',
+    ));
+    out.push_str(&ls_rwx_triple(
+        mode & 0o004 != 0,
+        mode & 0o002 != 0,
+        mode & 0o001 != 0,
+        mode & 0o1000 != 0,
+        't',
+        'T',
+    ));
+    out
+}
+
+#[cfg(unix)]
+fn ls_l_one_line_unix(dir: &std::path::Path, name: &str, meta: &std::fs::Metadata) -> PerlResult<String> {
+    use std::os::unix::fs::MetadataExt;
+    use chrono::{Datelike, Local, TimeZone};
+    let mode_str = ls_unix_mode_string(meta);
+    let nlink = meta.nlink();
+    let uid = meta.uid();
+    let gid = meta.gid();
+    let size = meta.size();
+    let ts = meta
+        .modified()
+        .ok()
+        .and_then(|st| st.duration_since(std::time::UNIX_EPOCH).ok())
+        .and_then(|d| Local.timestamp_opt(d.as_secs() as i64, d.subsec_nanos() as u32).single())
+        .map(|dt| {
+            let now = Local::now();
+            if dt.year() == now.year() {
+                dt.format("%b %e %H:%M").to_string()
+            } else {
+                dt.format("%b %e  %Y").to_string()
+            }
+        })
+        .unwrap_or_else(|| "?".repeat(12));
+    let full = dir.join(name);
+    let mut name_disp = name.to_string();
+    if meta.file_type().is_symlink() {
+        if let Ok(tgt) = std::fs::read_link(&full) {
+            name_disp.push_str(" -> ");
+            name_disp.push_str(&tgt.to_string_lossy());
+        }
+    }
+    Ok(format!(
+        "{mode_str} {nlink:>4} {uid:>5} {gid:>5} {size:>8} {ts} {name_disp}"
+    ))
+}
+
+#[cfg(not(unix))]
+fn ls_l_one_line_windows(name: &str, meta: &std::fs::Metadata) -> PerlResult<String> {
+    use chrono::{Datelike, Local, TimeZone};
+    use std::os::windows::fs::MetadataExt;
+    let len = meta.len();
+    let tag = if meta.is_dir() { "<DIR>" } else { "" };
+    let attrs = meta.file_attributes();
+    let ts = meta
+        .modified()
+        .ok()
+        .and_then(|st| st.duration_since(std::time::UNIX_EPOCH).ok())
+        .and_then(|d| Local.timestamp_opt(d.as_secs() as i64, d.subsec_nanos() as u32).single())
+        .map(|dt| {
+            let now = Local::now();
+            if dt.year() == now.year() {
+                dt.format("%b %e %H:%M").to_string()
+            } else {
+                dt.format("%b %e  %Y").to_string()
+            }
+        })
+        .unwrap_or_else(|| "?".repeat(12));
+    Ok(format!(
+        "{attrs:#010x} {tag:<5} {len:>10} {ts} {name}"
+    ))
+}
+
+fn format_ls_long_dir(dir: &std::path::Path, line: usize) -> PerlResult<String> {
+    let mut entries: Vec<std::fs::DirEntry> = std::fs::read_dir(dir)
+        .map_err(|e| PerlError::runtime(format!("ls: {}: {e}", dir.display()), line))?
+        .filter_map(|e| e.ok())
+        .collect();
+    entries.sort_by(|a, b| {
+        a.file_name()
+            .to_string_lossy()
+            .cmp(&b.file_name().to_string_lossy())
+    });
+
+    let mut out_lines: Vec<String> = Vec::new();
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let mut sum_blocks: u64 = 0;
+        let mut rows: Vec<(std::fs::Metadata, String)> = Vec::new();
+        for entry in &entries {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let full = dir.join(&name);
+            let sm = std::fs::symlink_metadata(&full).map_err(|e| {
+                PerlError::runtime(format!("ls: {}: {e}", full.display()), line)
+            })?;
+            sum_blocks = sum_blocks.saturating_add(sm.blocks());
+            rows.push((sm, name));
+        }
+        let total_k = (sum_blocks.saturating_add(1)) / 2;
+        out_lines.push(format!("total {total_k}"));
+        for (sm, name) in rows {
+            out_lines.push(ls_l_one_line_unix(dir, &name, &sm)?);
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        for entry in &entries {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let full = dir.join(&name);
+            let sm = std::fs::symlink_metadata(&full).map_err(|e| {
+                PerlError::runtime(format!("ls: {}: {e}", full.display()), line)
+            })?;
+            out_lines.push(ls_l_one_line_windows(&name, &sm)?);
+        }
+    }
+
+    Ok(out_lines.join("\n") + "\n")
+}
+
 /// One-level list flatten: plain arrays and arrayrefs expand like `flat_map` / [`StrykeValue::map_flatten_outputs`].
+/// No arguments → same as `flatten($_)`.
 fn builtin_flatten(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let mut topic = StrykeValue::UNDEF;
+    let args = variadic_list_or_topic(interp, args, &mut topic);
     let mut out = Vec::new();
     for a in args {
         out.extend(a.map_flatten_outputs(true));
@@ -14608,6 +14841,8 @@ fn builtin_expt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // `filter { is_blank }` all work without spelling out `$_`. Parser-side
 // rewrite in `parse_block` auto-injects `$_` for `{ fn }` bodies, and
 // `first_arg_or_topic` covers bare call-sites like `even;`.
+// List-slurping helpers (`flatten`, `sorted`, `list_count`, …) use
+// `variadic_list_or_topic` so `map { sorted } @rows` means `sorted($_)`.
 // ─────────────────────────────────────────────────────────────────────────
 
 /// Grab the first arg, or `$_` if the call had none.
@@ -14615,6 +14850,22 @@ fn first_arg_or_topic(interp: &VMHelper, args: &[StrykeValue]) -> StrykeValue {
     args.first()
         .cloned()
         .unwrap_or_else(|| interp.scope.get_scalar("_"))
+}
+
+/// For built-ins that slurp a variable-length operand list across `args`:
+/// no arguments means `($_)` — same default as `len` / Perl's list-reading builtins in `map`/`grep`.
+#[inline]
+fn variadic_list_or_topic<'a>(
+    interp: &'a VMHelper,
+    args: &'a [StrykeValue],
+    topic_slot: &'a mut StrykeValue,
+) -> &'a [StrykeValue] {
+    if args.is_empty() {
+        *topic_slot = interp.scope.get_scalar("_");
+        std::slice::from_ref(topic_slot)
+    } else {
+        args
+    }
 }
 
 #[inline]
@@ -18872,7 +19123,10 @@ fn builtin_consecutive_eq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(bool_iv(true))
 }
 /// `flatten_deep LIST` — recursively flatten nested arrayrefs.
-fn builtin_flatten_deep(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+/// No arguments → same as `flatten_deep($_)`.
+fn builtin_flatten_deep(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let mut topic = StrykeValue::UNDEF;
+    let args = variadic_list_or_topic(interp, args, &mut topic);
     fn go(v: &StrykeValue, out: &mut Vec<StrykeValue>) {
         if let Some(ar) = v.as_array_ref() {
             for e in ar.read().iter() {
@@ -20272,20 +20526,26 @@ fn builtin_zscore(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     }
     Ok(StrykeValue::float((x - mean) / sd))
 }
-/// `sorted` — Sorted. Returns a list.
-fn builtin_sorted(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+/// `sorted` — Sorted. Returns a list. No arguments → `sorted($_)`.
+fn builtin_sorted(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let mut topic = StrykeValue::UNDEF;
+    let args = variadic_list_or_topic(interp, args, &mut topic);
     let mut xs = flatten_args(args);
     xs.sort_by_key(|a| a.to_string());
     Ok(StrykeValue::array(xs))
 }
-/// `sorted_desc` — Sorted desc. Returns a list.
-fn builtin_sorted_desc(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+/// `sorted_desc` — Sorted desc. Returns a list. No arguments → `sorted_desc($_)`.
+fn builtin_sorted_desc(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let mut topic = StrykeValue::UNDEF;
+    let args = variadic_list_or_topic(interp, args, &mut topic);
     let mut xs = flatten_args(args);
     xs.sort_by_key(|v| std::cmp::Reverse(v.to_string()));
     Ok(StrykeValue::array(xs))
 }
-/// `sorted_nums` — Sorted nums. Returns a list.
-fn builtin_sorted_nums(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+/// `sorted_nums` — Sorted nums. Returns a list. No arguments → `sorted_nums($_)`.
+fn builtin_sorted_nums(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let mut topic = StrykeValue::UNDEF;
+    let args = variadic_list_or_topic(interp, args, &mut topic);
     let mut xs = flatten_args(args);
     xs.sort_by(|a, b| {
         a.to_number()
@@ -20294,14 +20554,18 @@ fn builtin_sorted_nums(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     });
     Ok(StrykeValue::array(xs))
 }
-/// `sorted_by_length` — Sorted by length. Returns a list.
-fn builtin_sorted_by_length(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+/// `sorted_by_length` — Sorted by length. Returns a list. No arguments → `sorted_by_length($_)`.
+fn builtin_sorted_by_length(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let mut topic = StrykeValue::UNDEF;
+    let args = variadic_list_or_topic(interp, args, &mut topic);
     let mut xs = flatten_args(args);
     xs.sort_by_key(|v| v.to_string().chars().count());
     Ok(StrykeValue::array(xs))
 }
-/// `reverse_list` — Reverse list. Returns a list.
-fn builtin_reverse_list(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+/// `reverse_list` — Reverse list. Returns a list. No arguments → `reverse_list($_)`.
+fn builtin_reverse_list(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let mut topic = StrykeValue::UNDEF;
+    let args = variadic_list_or_topic(interp, args, &mut topic);
     let mut xs = flatten_args(args);
     xs.reverse();
     Ok(StrykeValue::array(xs))
@@ -20359,8 +20623,10 @@ fn builtin_drop_last(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let end = xs.len().saturating_sub(n);
     Ok(StrykeValue::array(xs[..end].to_vec()))
 }
-/// `pairwise` — Pairwise. Returns a list.
-fn builtin_pairwise(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+/// `pairwise` — Pairwise. Returns a list. No arguments → `pairwise($_)`.
+fn builtin_pairwise(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let mut topic = StrykeValue::UNDEF;
+    let args = variadic_list_or_topic(interp, args, &mut topic);
     let xs = flatten_args(args);
     Ok(StrykeValue::array(
         xs.windows(2)
@@ -21757,7 +22023,10 @@ fn builtin_chain_from(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `pairwise_iter LIST` — returns overlapping pairs (Python 3.10+ itertools.pairwise).
-fn builtin_pairwise_iter(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+/// No arguments → `pairwise_iter($_)`.
+fn builtin_pairwise_iter(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let mut topic = StrykeValue::UNDEF;
+    let args = variadic_list_or_topic(interp, args, &mut topic);
     let xs = flatten_args(args);
     if xs.len() < 2 {
         return Ok(StrykeValue::array(vec![]));
@@ -30888,8 +31157,10 @@ fn builtin_find_first(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .find(|v| v.to_string() == t)
         .unwrap_or(StrykeValue::UNDEF))
 }
-/// `flatten_once` — Flatten one level.
-fn builtin_flatten_once(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+/// `flatten_once` — Flatten one level. No arguments → `flatten_once($_)`.
+fn builtin_flatten_once(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let mut topic = StrykeValue::UNDEF;
+    let args = variadic_list_or_topic(interp, args, &mut topic);
     Ok(StrykeValue::array(flatten_args(args)))
 }
 /// `fma` — Fused multiply-add: a*b+c.
@@ -31958,8 +32229,10 @@ fn builtin_list_compact(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
             .collect(),
     ))
 }
-/// `list_flatten_deep` — List flatten deep.
-fn builtin_list_flatten_deep(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+/// `list_flatten_deep` — List flatten deep. No arguments → `list_flatten_deep($_)`.
+fn builtin_list_flatten_deep(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let mut topic = StrykeValue::UNDEF;
+    let args = variadic_list_or_topic(interp, args, &mut topic);
     fn go(v: &StrykeValue, out: &mut Vec<StrykeValue>) {
         if let Some(ar) = v.as_array_ref() {
             for e in ar.read().iter() {
@@ -31975,8 +32248,10 @@ fn builtin_list_flatten_deep(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     }
     Ok(StrykeValue::array(out))
 }
-/// `most_common` — Most common.
-fn builtin_most_common(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+/// `most_common` — Most common. No arguments → `most_common($_)`.
+fn builtin_most_common(interp: &VMHelper, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    let mut topic = StrykeValue::UNDEF;
+    let args = variadic_list_or_topic(interp, args, &mut topic);
     let xs = flatten_args(args);
     let mut counts: std::collections::HashMap<String, (StrykeValue, usize)> =
         std::collections::HashMap::new();

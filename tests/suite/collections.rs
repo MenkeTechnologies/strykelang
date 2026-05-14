@@ -67,6 +67,30 @@ fn map_grep() {
 }
 
 #[test]
+fn grep_bare_len_reads_topic() {
+    assert_eq!(
+        eval_string(
+            r#"my @words = qw(aadsg agdasgd agd asdg);
+               my @long = grep { len > 3 } @words;
+               join ",", @long"#
+        ),
+        "aadsg,agdasgd,asdg"
+    );
+}
+
+#[test]
+fn variadic_list_builtins_default_to_topic() {
+    assert_eq!(
+        eval_string(r#"join " ", map { join "", reverse_list } qw(ab cd)"#),
+        "ba dc"
+    );
+    assert_eq!(
+        eval_string(r#"join "", map { join "", sorted } qw(cba)"#),
+        "abc"
+    );
+}
+
+#[test]
 fn sort_array() {
     assert_eq!(eval_string(r#"join(",", sort("c","a","b"))"#), "a,b,c");
     assert_eq!(
