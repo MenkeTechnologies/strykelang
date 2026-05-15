@@ -93,9 +93,13 @@ stress_mem(1e6) |> aok "stress_mem(1e6)"
 
 # ── 8. Web Jobs ─────────────────────────────────────────────────────────────
 
-my $db_path = "/tmp/test_jobs_pin6.db"
-unlink($db_path)
-web_db_connect("sqlite:" . $db_path)
+# Use an in-memory SQLite DB so the test leaves no on-disk artifact and
+# can run in parallel without filename collisions. The old form
+# `web_db_connect("sqlite:" . $path)` was a bug — `parse_db_url` only
+# strips `sqlite://` (two slashes), so `sqlite:/tmp/...` was treated as
+# a literal filename, and the parent-directory create spawned a
+# stray `sqlite:` directory in the repo root.
+web_db_connect(":memory:")
 web_jobs_init()
 web_job_enqueue("test_job", { payload => "data" })
 my $job = web_job_dequeue()
@@ -103,7 +107,6 @@ $job->{name} |> aeq "test_job", "web_job_dequeue name"
 $job->{args}->{payload} |> aeq "data", "web_job_dequeue args"
 web_job_complete($job->{id})
 web_jobs_stats()->{done} |> { _ >= 1 } |> aok "web_jobs_stats done"
-unlink($db_path)
 
 # ── 9. Reflection ──────────────────────────────────────────────────────────
 

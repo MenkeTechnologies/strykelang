@@ -35,8 +35,12 @@ squared(3, 4) |> aeq 9, "BUG-126: squared ignores variadic tail"
 # Let's check uniq behavior from BUGS.md carefully.
 # "uniq_variadic_deduplicates_neighbors_ch", "uniq_single_array_bucket_treated_as_atom_ch"
 uniq(1, 1, 2, 2) |> len |> aeq 2, "uniq variadic works"
-# BUG-126/140: uniq single arrayref treated as atom, returns the array ref itself, len is original size
-uniq([1, 1, 2, 2]) |> len |> aeq 4, "BUG-126/140: uniq single arrayref treated as atom"
+# BUG-126/140 (FIXED): `uniq([1, 1, 2, 2])` now derefs the arrayref and
+# yields (1, 2) — len 2. Before the fix this returned the arrayref as a
+# single atom (len 1, not 4 as the original pin incorrectly asserted).
+# Fix lives in `strykelang/list_builtins.rs::uniq_list` (added an
+# `as_array_ref` branch alongside the existing `as_array_vec` one).
+uniq([1, 1, 2, 2]) |> len |> aeq 2, "BUG-126/140 (FIXED): uniq([..]) derefs arrayref"
 
 # BUG-127: iota_range ignores args after first
 iota_range(5, 99) |> len |> aeq 5, "BUG-127: iota_range ignores second arg"

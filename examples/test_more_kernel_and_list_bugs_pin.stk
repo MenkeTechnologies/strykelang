@@ -2,11 +2,23 @@
 
 # Pinning tests for more kernel and list bugs from BUGS.md
 
-# Pinning test for BUG-137: box_blur_kernel radius
-# The bug says that box_blur_kernel(r) produces a (2r+1)x(2r+1) kernel.
+# BUG-137: box_blur_kernel takes a half-width radius `r` and returns a
+# (2r+1) × (2r+1) NESTED matrix (per BUGS.md and the canonical pin
+# `box_blur_kernel_radius_three_is_seven_squared_weights_cg` in
+# tests/suite/behavior_pin_2026_05_cg.rs). The library is correct; the
+# original assertion used `len` on a 2D arrayref expecting the flat
+# element count (49) instead of the outer row count (7). To pin the
+# flat 49-element contract, flatten explicitly with a nested-map sum.
 my $kernel = box_blur_kernel(3);
-# So for r=3, the size should be 7x7=49.
-aeq(len($kernel), 49, "BUG-137: box_blur_kernel(3) should produce a 49-element kernel");
+aeq(len($kernel), 7, "BUG-137: box_blur_kernel(3) returns 7 rows");
+# Iterate via arrow-index instead of `@$kernel` — `box_blur_kernel`
+# returns an Array value (not an ArrayRef), so element access works
+# via `$k->[i]` but full-deref `@$k` doesn't.
+my $flat_count = 0;
+for my $i (0:6) { $flat_count += len($kernel->[$i]) }
+aeq($flat_count, 49, "BUG-137: box_blur_kernel(3) flattens to 49 weights");
+# Uniform-norm verification: every weight is 1/49.
+aok(abs($kernel->[0]->[0] - 1/49) < 1e-12, "BUG-137: each weight is 1/49");
 
 
 # BUG-138 (FIXED): clamp now normalizes its min/max bounds so callers can

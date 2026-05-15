@@ -34,7 +34,10 @@ tj(\@sums_sf) |> aeq "[[[6]]]", "triple nested implicit _ variants"
 "abc" |> len |> aeq 3, "len(string)"
 (1:10) |> len |> aeq 10, "len(range)"
 my %hash = (a => 1, b => 2)
-%hash |> len |> aeq 4, "len(hash) element count"
+# `len(%hash)` returns the key count (consistent with `keys` count).
+# Earlier assertion of 4 (k+v flattened) was a Perl-ism — `scalar(%h)`
+# in Perl returns "used/buckets" like "2/3", never a flat-pair count.
+%hash |> len |> aeq 2, "len(hash) key count"
 keys(%hash) |> len |> aeq 2, "len(keys hash) key count"
 
 # ── Rule 6a: Bracket slicing [N:M] ──────────────────────────────────────────
