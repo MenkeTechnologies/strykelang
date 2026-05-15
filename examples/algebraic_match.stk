@@ -1,0 +1,80 @@
+#!/usr/bin/env stryke
+
+# Stryke `match` expression — exhaustive pattern matching on enum
+# variants and value literals. Each arm is `pattern => expression`.
+# Result of the chosen arm is the value of the whole match expression.
+
+p "── Enum + match on signal codes ───────────────────────";
+enum Sig { Hup, Int, Term, Kill }
+
+fn Demo::handle($sig) {
+    match ($sig) {
+        Sig::Hup  => "reload config",
+        Sig::Int  => "graceful shutdown",
+        Sig::Term => "drain + stop",
+        Sig::Kill => "(no handler — kernel reaps)",
+    }
+}
+
+for my $s (Sig::Hup, Sig::Int, Sig::Term, Sig::Kill) {
+    p "  handler: ", Demo::handle($s);
+}
+
+p "";
+p "── Match on integer / string / wildcard ───────────────";
+fn Demo::http_status($code) {
+    match ($code) {
+        200 => "OK",
+        201 => "Created",
+        204 => "No Content",
+        301 => "Moved Permanently",
+        404 => "Not Found",
+        500 => "Internal Server Error",
+        _   => "Unknown ($code)",
+    }
+}
+for my $c (200, 204, 404, 500, 418) {
+    printf "  %d → %s\n", $c, Demo::http_status($c);
+}
+
+p "";
+p "── Match drives a per-tag dispatcher ──────────────────";
+enum Op { Add, Sub, Mul, Div }
+
+fn Demo::eval2($op, $x, $y) {
+    match ($op) {
+        Op::Add => $x + $y,
+        Op::Sub => $x - $y,
+        Op::Mul => $x * $y,
+        Op::Div => $x / $y,
+    }
+}
+p "  Add(8,3)  = ", Demo::eval2(Op::Add, 8, 3);
+p "  Sub(8,3)  = ", Demo::eval2(Op::Sub, 8, 3);
+p "  Mul(8,3)  = ", Demo::eval2(Op::Mul, 8, 3);
+p "  Div(8,3)  = ", Demo::eval2(Op::Div, 8, 3);
+
+p "";
+p "── Match composes with pipe-forward ───────────────────";
+my @codes = (200, 201, 404, 500, 200, 503);
+my @categorized = @codes |> map {
+    match ($_) {
+        200 => "ok",
+        201 => "ok",
+        204 => "ok",
+        404 => "client-err",
+        500 => "server-err",
+        503 => "server-err",
+        _   => "other",
+    }
+};
+p "  categorised: ", join(", ", @categorized);
+
+p "";
+p "── Match as an expression — bind the result ───────────";
+my $cat = match (200) {
+    200 => "ok",
+    404 => "miss",
+    500 => "crash",
+};
+p "  expression result: $cat";

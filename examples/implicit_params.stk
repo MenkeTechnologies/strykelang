@@ -1,0 +1,87 @@
+#!/usr/bin/env stryke
+
+# Stryke implicit closure params — world-first design.
+#
+# `_0`, `_1`, `_N`     — positional block parameters (0-indexed).
+#                        Replaces Perl's `$a`/`$b` magic in sort/reduce.
+# `_`  (bareword)      — current topic, sigil-free (same as `$_`).
+# `_<`, `_<<`, ...      — outer-topic chain. Each `<` climbs one nesting
+#                        level. **No other language has this.**
+
+p "── _0 / _1 replace \$a / \$b in sort ─────────────────";
+my @nums = (3, 1, 4, 1, 5, 9, 2, 6, 5);
+my @asc  = sort { _0 <=> _1 } @nums;
+my @desc = sort { _1 <=> _0 } @nums;
+p "  asc  : ", join(",", @asc);
+p "  desc : ", join(",", @desc);
+
+p "";
+p "── _0 / _1 in reduce ─────────────────────────────────";
+my $product = reduce { _0 * _1 } 1, (1..6);
+p "  6! = $product";
+
+p "";
+p "── Bareword _ in map / grep ──────────────────────────";
+my @doubled = map { _ * 2 } (1..5);
+my @evens   = grep { _ % 2 == 0 } (1..10);
+p "  doubled : ", join(",", @doubled);
+p "  evens   : ", join(",", @evens);
+
+p "";
+p "── Multi-positional _0 / _1 / _2 in custom callbacks ──";
+fn Demo::compute($x, $y, $z) { $x + $y * $z }
+# A 3-arg block-form invocation uses _0, _1, _2:
+my $sum = Demo::compute(1, 2, 3);
+p "  Demo::compute(1,2,3) = $sum";
+
+p "";
+p "── Outer-topic chain `_<` (world-first) ───────────────";
+# Inside a nested closure, `_<` reads the topic of the enclosing
+# closure. Stack up `<` to climb further: `_<<` = two levels out,
+# `_<<<` = three levels, up to `_<<<<<`. Same for positional slots:
+# `_1<<` = `_1` two frames out.
+my @result = map {
+    # outer topic here = 10, 20, 30
+    (1..3) |> map { _ + _< }
+    # inner topic = 1..3, _< = current outer
+} (10, 20, 30);
+p "  10..30 cross 1..3: ", to_json(\@result);
+# Expected: [[11,12,13],[21,22,23],[31,32,33]]
+
+p "";
+p "── Two-level outer chain `_<<` ────────────────────────";
+my @triple_nested = map {
+    # frame 0: 100, 200
+    map {
+        # frame 1: 10, 20, 30
+        map {
+            # frame 2: 1, 2
+            sprintf("%d/%d/%d", _, _<, _<<)
+        } (1, 2)
+    } (10, 20, 30)
+} (100, 200);
+p "  three levels out:";
+for my $row (@triple_nested) {
+    p "    ", join("  ", @$row);
+}
+
+p "";
+p "── Sort with custom field accessor (no \$a/\$b) ───────";
+my @items = (
+    { name => "carol", age => 30 },
+    { name => "alice", age => 25 },
+    { name => "bob",   age => 28 },
+);
+my @by_age = sort { _0->{age} <=> _1->{age} } @items;
+p "  by age:";
+p "    $_->{name} ($_->{age})" for @by_age;
+
+p "";
+p "── Why _0/_1 wins over \$a/\$b ─────────────────────────";
+my @vals = (1, 2, 3, 4, 5);
+my $sum  = reduce { _0 + _1 } 0, @vals;
+my $prod = reduce { _0 * _1 } 1, @vals;
+p "  reduce { _0 + _1 } = $sum";
+p "  reduce { _0 * _1 } = $prod";
+p "  Perl's \$a/\$b magic pollutes package globals; _0/_1 are";
+p "  lexical to the block and extend naturally to _2, _3, …";

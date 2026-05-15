@@ -1,0 +1,81 @@
+#!/usr/bin/env stryke
+
+# Stryke three-tier regex engine. The compiler automatically picks the
+# right engine for each pattern:
+#
+#   Tier 1 — Rust `regex` (DFA, linear-time, no backrefs/lookaround)
+#   Tier 2 — `fancy-regex`   (Rust regex + backrefs + look-around)
+#   Tier 3 — `pcre2`         (PCRE-only verbs: (*FAIL), (*PRUNE), …)
+#
+# Same `m//`, `s///`, `qr//` syntax; engine selection is invisible.
+# Performance: tier 1 is fastest; only when a pattern needs richer
+# features does the compiler escalate.
+
+p "── Tier 1: vanilla regex — DFA, linear time ───────────";
+my $s = "user_id=42 status=ok latency=137ms";
+if ($s =~ /user_id=(\d+).*latency=(\d+)ms/) {
+    p "  user=$1 latency=${2}ms";
+}
+
+p "";
+p "── Capture groups — numbered + named ──────────────────";
+my $email = "alice.bob+spam\@example.com";
+if ($email =~ /^(?<user>[\w.+]+)@(?<host>[\w.]+)$/) {
+    p "  user = $+{user}";
+    p "  host = $+{host}";
+}
+
+p "";
+p "── Tier 2: backrefs (palindrome via fancy-regex) ──────";
+for my $w ("level", "abba", "stryke", "racecar", "hello") {
+    if ($w =~ /^(.)(.).*\2\1$/ || $w =~ /^(.)(.)\2\1$/) {
+        p "  '$w' is a palindrome";
+    } else {
+        p "  '$w' is not";
+    }
+}
+
+p "";
+p "── Tier 2: look-around (?= ... ) ──────────────────────";
+# Find words followed by " bar" but only return the word.
+my $text = "foo bar baz bar qux quux bar";
+my @hits;
+while ($text =~ /(\w+)(?= bar)/g) {
+    push @hits, $1;
+}
+p "  words preceding ' bar' : ", join(", ", @hits);
+
+p "";
+p "── Substitution s/// with backref ─────────────────────";
+my $csv = "alpha,beta,gamma,delta";
+my $piped = $csv;
+$piped =~ s/,/ | /g;
+p "  csv → pipe-sep : $piped";
+
+# Capture group substitution
+my $words = "alice is here";
+$words =~ s/(\w+)/<$1>/g;
+p "  wrapped       : $words";
+
+p "";
+p "── Compiled regex (qr//) for reuse ────────────────────";
+my $isodate = qr/^(\d{4})-(\d{2})-(\d{2})$/;
+for my $d ("2026-05-15", "not-a-date", "1999-12-31") {
+    if ($d =~ $isodate) {
+        printf "  %s → year=%s, month=%s, day=%s\n", $d, $1, $2, $3;
+    } else {
+        printf "  %s → reject\n", $d;
+    }
+}
+
+p "";
+p "── Compose with pipe-forward ──────────────────────────";
+my @log = (
+    "INFO  10:00 user 42 login ok",
+    "ERROR 10:02 user 17 login failed",
+    "INFO  10:05 user 42 logout",
+    "ERROR 10:09 user 99 timeout",
+);
+my @errors_only = @log |> grep { /^ERROR/ };
+p "  error rows:";
+p "    $_" for @errors_only;

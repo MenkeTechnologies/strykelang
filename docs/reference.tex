@@ -222,9 +222,9 @@
   \apptocmd{\@title}{\par {\large #1 \par}}{}{}
 }
 \makeatother
-\subtitle{v0.14.0}
+\subtitle{v0.14.2}
 \author{MenkeTechnologies}
-\date{2026-05-14}
+\date{2026-05-15}
 
 \begin{document}
 \maketitle
@@ -20112,7 +20112,7 @@ list.
 \protect\phantomsection\label{ch-other}
 \chapter{Other}\label{other}
 
-8504 topics
+8520 topics
 
 \section{\texorpdfstring{\texttt{\$!}}{\$!}}\label{section-55}
 
@@ -55512,6 +55512,17 @@ Category: *archive/encoding format primitives*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{h}}{h}}\label{h-2}
+
+\texttt{h} --- operation \texttt{h}. Alias for \texttt{docs}. Category:
+*system info*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p h $x}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{h0}}{h0}}\label{h0}
 
 \texttt{h0} --- operation \texttt{h0}. Alias for
@@ -56681,6 +56692,17 @@ fuel cells*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p helmholtz\_decomp\_step $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{help}}{help}}\label{help}
+
+\texttt{help} --- operation \texttt{help}. Alias for \texttt{docs}.
+Category: *system info*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p help $x}
 \end{Highlighting}
 \end{Shaded}
 
@@ -67640,6 +67662,130 @@ scipy.special*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{kv\_batch}}{kv\_batch}}\label{kv_batch}
+
+\texttt{kv\_batch(STORE,\ {[}{[}"put",\ k,\ v{]},\ {[}"del",\ k{]},\ ...{]})}
+→ number of ops applied. All-or-nothing on the in-memory state: if any
+op rejects (unknown kind, etc.), the entries map is rolled back to the
+snapshot taken at entry. Caller invokes \texttt{kv\_commit} afterwards
+for durability.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{kv\_batch($db, [}
+\NormalTok{    ["put", "counter:a", 1],}
+\NormalTok{    ["put", "counter:b", 2],}
+\NormalTok{    ["del", "old\_key"],}
+\NormalTok{]);}
+\NormalTok{kv\_commit($db);}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{kv\_close}}{kv\_close}}\label{kv_close}
+
+\texttt{kv\_close(STORE)} → \texttt{1}. Auto-commits if dirty, then
+drops the handle (Arc decref). Safe to omit if \texttt{kv\_commit} was
+already called.
+
+\section{\texorpdfstring{\texttt{kv\_commit}}{kv\_commit}}\label{kv_commit}
+
+\texttt{kv\_commit(STORE)} → \texttt{1}. Atomic rewrite of the whole
+archive to disk via tmp + rename + fsync. No-op if not dirty. Versioned
+header (\texttt{STKV} magic + \texttt{format\_version}) lets future
+stryke versions reject mismatched archives instead of silently
+mis-deserialising.
+
+\section{\texorpdfstring{\texttt{kv\_count}}{kv\_count}}\label{kv_count}
+
+\texttt{kv\_len(STORE)} → entry count.
+
+\section{\texorpdfstring{\texttt{kv\_del}}{kv\_del}}\label{kv_del}
+
+\texttt{kv\_del(STORE,\ KEY)} → \texttt{1} if the key existed,
+\texttt{0} otherwise. Marks store dirty so the next \texttt{kv\_commit}
+persists the removal.
+
+\section{\texorpdfstring{\texttt{kv\_exists}}{kv\_exists}}\label{kv_exists}
+
+\texttt{kv\_exists(STORE,\ KEY)} → \texttt{1} / \texttt{0}.
+Constant-time hash lookup.
+
+\section{\texorpdfstring{\texttt{kv\_get}}{kv\_get}}\label{kv_get}
+
+\texttt{kv\_get(STORE,\ KEY)} → value or \texttt{undef}. Compound values
+come back as refs (\texttt{-\textgreater{}{[}i{]}} /
+\texttt{-\textgreater{}\{k\}} arrow deref works directly). Reads are
+zero-copy validation on the mmap\textquotesingle d archive when no write
+has occurred since open.
+
+\section{\texorpdfstring{\texttt{kv\_info}}{kv\_info}}\label{kv_info}
+
+\texttt{kv\_stats(STORE)} → hashref with \texttt{path},
+\texttt{entries}, \texttt{dirty}, \texttt{format\_version},
+\texttt{created\_at\_secs}, \texttt{last\_commit\_secs},
+\texttt{commit\_count}, \texttt{stryke\_version}.
+
+\section{\texorpdfstring{\texttt{kv\_keys}}{kv\_keys}}\label{kv_keys}
+
+\texttt{kv\_keys(STORE\ {[},\ PREFIX{]})} → sorted array of keys,
+optionally filtered by prefix. Use prefixes like \texttt{users:} /
+\texttt{log:} as namespaces.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{for my $k (kv\_keys($db, "users:")) \{ p kv\_get($db, $k) \}}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{kv\_new}}{kv\_new}}\label{kv_new}
+
+\texttt{kv\_open(PATH)} → KvStore handle. Open or create a rkyv-archived
+KV store at \texttt{PATH}. Missing file → empty store, no I/O until
+first commit. Existing file → mmap + check\_archived\_root + deserialize
+into the in-memory mirror.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $db = kv\_open("/tmp/cache.rkyv");}
+\NormalTok{kv\_put($db, "users:alice", \{ name =\textgreater{} "Alice", age =\textgreater{} 30 \});}
+\NormalTok{kv\_commit($db);}
+\NormalTok{my $u = kv\_get($db, "users:alice");}
+\NormalTok{p $u{-}\textgreater{}\{name\}                           \# Alice}
+\end{Highlighting}
+\end{Shaded}
+
+World\textquotesingle s-first as scripting-lang stdlib: zero-copy
+archive KV with SQLite-shaped ergonomics. Reads are
+\texttt{mmap\ +\ validate\ +\ cast}; no parse, no allocate per row.
+Family: \texttt{kv\_put}, \texttt{kv\_get}, \texttt{kv\_del},
+\texttt{kv\_exists}, \texttt{kv\_keys}, \texttt{kv\_scan},
+\texttt{kv\_len}, \texttt{kv\_commit}, \texttt{kv\_batch},
+\texttt{kv\_close}, \texttt{kv\_stats}.
+
+\section{\texorpdfstring{\texttt{kv\_put}}{kv\_put}}\label{kv_put}
+
+\texttt{kv\_put(STORE,\ KEY,\ VALUE)} → previous value or
+\texttt{undef}. Scalars round-trip lossless; arrayrefs become
+\texttt{Array}, hashrefs become \texttt{Hash}. Mutation is in-memory
+until \texttt{kv\_commit} rewrites the archive atomically (tmp +
+rename).
+
+\section{\texorpdfstring{\texttt{kv\_scan}}{kv\_scan}}\label{kv_scan}
+
+\texttt{kv\_scan(STORE,\ PREFIX)} → array of \texttt{{[}KEY,\ VALUE{]}}
+arrayref pairs (sorted by key). For lazy streaming over network
+connections see Phase 2 \texttt{kv\_connect} /
+\texttt{WireFrame::StreamChunk}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{for my $row (kv\_scan($db, "users:")) \{}
+\NormalTok{    my ($key, $val) = @$row;}
+\NormalTok{    say "$key {-}\textgreater{} $val{-}\textgreater{}\{name\}";}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{kwh\_to\_joules}}{kwh\_to\_joules}}\label{kwh_to_joules}
 
 \texttt{kwh\_to\_joules} --- convert from \texttt{kwh} to
@@ -71533,6 +71679,17 @@ cells*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{man}}{man}}\label{man}
+
+\texttt{man} --- operation \texttt{man}. Category: *shell-like repl
+(tier s)*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p man $x}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{manacher}}{manacher}}\label{manacher}
 
 \texttt{manacher} --- operation \texttt{manacher}. Alias for
@@ -71661,6 +71818,17 @@ Category: *misc*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p mannwhitneyu $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{manpage}}{manpage}}\label{manpage}
+
+\texttt{manpage} --- operation \texttt{manpage}. Alias for \texttt{man}.
+Category: *shell-like repl (tier s)*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p manpage $x}
 \end{Highlighting}
 \end{Shaded}
 

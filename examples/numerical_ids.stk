@@ -1,0 +1,67 @@
+#!/usr/bin/env stryke
+
+# Stryke Tier-1 numerical-stability + modern IDs builtins.
+#
+#   ulid()         — 26-char Crockford-Base32 ULID, lexicographic + monotonic
+#   kahan_sum LIST — Neumaier compensated summation, recovers precision
+#                    on long float sums that lose digits to cancellation
+#   welford_*  LIST — single-pass online mean/variance/stddev
+
+p "── ULID — sortable, monotonic trace IDs ───────────────";
+my @ids = map { ulid() } (1..5);
+p "  five ULIDs minted back-to-back:";
+p "    $_" for @ids;
+my @sorted = sort @ids;
+my $monotonic = (join("|", @ids) eq join("|", @sorted)) ? "yes" : "no";
+p "  same order if sorted lexicographically? $monotonic";
+printf "  timestamp ms of first: %d\n", ulid_timestamp($ids[0]);
+p "  is_ulid('not-a-ulid'):       ", is_ulid("not-a-ulid");
+p "  is_ulid(\$ids[0]):            ", is_ulid($ids[0]);
+
+p "";
+p "── Kahan / Neumaier compensated summation ─────────────";
+my @nasty = (1e20, 1, -1e20, 1, -1e20, 1e20);   # naive sum loses precision
+my $naive = 0;
+$naive += $_ for @nasty;
+printf "  naive sum  : %g     (digits lost to cancellation)\n", $naive;
+printf "  kahan_sum  : %g     (precision recovered)\n", kahan_sum(@nasty);
+
+p "";
+my @stream = map { 1e10 + $_ * 1e-3 } (1..10_000);
+my $naive2 = 0;
+$naive2 += $_ for @stream;
+my $kahan2 = kahan_sum(@stream);
+printf "  10k terms of (1e10 + i*1e-3):\n";
+printf "    naive sum  : %.6f\n", $naive2;
+printf "    kahan_sum  : %.6f  ← stable across long streams\n", $kahan2;
+
+p "";
+p "── Welford online mean / stddev (single-pass) ─────────";
+my @samples = (4.0, 8.0, 15.0, 16.0, 23.0, 42.0);
+printf "  samples: %s\n", join(", ", @samples);
+printf "  mean   : %.4f  (welford_mean)\n",   welford_mean(@samples);
+printf "  stddev : %.4f  (welford_stddev)\n", welford_stddev(@samples);
+printf "  var    : %.4f  (welford_variance)\n", welford_variance(@samples);
+
+p "";
+p "── Cross-feature: ULID as KV key + Welford in value ───";
+my $path = "/tmp/numerical_ids_demo.rkyv";
+unlink($path);
+my $db = kv_open($path);
+for my $batch (1..3) {
+    my @nums = map { rand() * 100 } (1..1000);
+    kv_put($db, ulid(), {
+        n       => len(@nums),
+        mean    => welford_mean(@nums),
+        stddev  => welford_stddev(@nums),
+    });
+}
+kv_commit($db);
+
+p "  three batches recorded with ULID keys (insertion-ordered):";
+for my $k (sort kv_keys($db)) {
+    my $stat = kv_get($db, $k);
+    printf "    %s  n=%d mean=%.2f stddev=%.2f\n",
+        $k, $stat->{n}, $stat->{mean}, $stat->{stddev};
+}
+unlink($path);

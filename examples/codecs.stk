@@ -1,0 +1,77 @@
+#!/usr/bin/env stryke
+
+# Stryke codec roundtrips — JSON / YAML / TOML / CSV all share the
+# `to_X` / `from_X` naming convention.
+
+my $config = {
+    name    => "stryke",
+    version => "0.14.2",
+    paths   => ["bin", "lib", "examples"],
+    flags   => { jit => 1, strict => 1, parallel => 1 },
+    weights => [0.1, 0.2, 0.3, 0.4],
+};
+
+p "── JSON roundtrip ─────────────────────────────────────";
+my $j = to_json($config);
+my $j_back = from_json($j);
+p "  pretty:";
+p "    $_" for split(/\n/, $j);
+p "  name == ", $j_back->{name}, "  (roundtrip ok: ",
+    ($j_back->{name} eq $config->{name}) ? "yes" : "no", ")";
+
+p "";
+p "── YAML roundtrip ─────────────────────────────────────";
+my $y = to_yaml($config);
+my $y_back = from_yaml($y);
+p "  yaml:";
+p "    $_" for split(/\n/, $y);
+p "  roundtrip ok: ",
+    ($y_back->{flags}->{jit} == 1) ? "yes" : "no";
+
+p "";
+p "── TOML roundtrip ─────────────────────────────────────";
+my $t = to_toml($config);
+my $t_back = from_toml($t);
+p "  toml:";
+p "    $_" for split(/\n/, $t);
+p "  roundtrip ok: ",
+    ($t_back->{name} eq $config->{name}) ? "yes" : "no";
+
+p "";
+p "── CSV — array-of-hashes / array-of-arrays ────────────";
+my @rows = (
+    { name => "alice", age => 30, role => "admin" },
+    { name => "bob",   age => 28, role => "user"  },
+    { name => "carol", age => 41, role => "user"  },
+);
+my $csv = to_csv(\@rows);
+p "  csv:";
+p "    $_" for split(/\n/, $csv);
+my $back = from_csv($csv);
+p "  parsed back: ", len(@$back), " rows";
+p "  first row : ", to_json($back->[0]);
+
+p "";
+p "── Cross-format: JSON → YAML → TOML ───────────────────";
+my $multi = from_json($j);
+my $as_yaml = to_yaml($multi);
+my $as_toml = to_toml($multi);
+p "  json → yaml lines: ", len([split(/\n/, $as_yaml)]);
+p "  json → toml lines: ", len([split(/\n/, $as_toml)]);
+
+p "";
+p "── Compose with KV — config persistence ───────────────";
+my $path = "/tmp/stryke_codec_demo.rkyv";
+unlink($path);
+my $db = kv_open($path);
+kv_put($db, "config", $config);
+kv_put($db, "config:json", to_json($config));
+kv_put($db, "config:yaml", to_yaml($config));
+kv_commit($db);
+
+my $db2 = kv_open($path);
+p "  reopened, keys: ", join(", ", kv_keys($db2));
+my $back_cfg = kv_get($db2, "config");
+p "  config->name : ", $back_cfg->{name};
+p "  flags->jit   : ", $back_cfg->{flags}->{jit};
+unlink($path);
