@@ -1,0 +1,152 @@
+#!/usr/bin/env stryke
+
+# Observability dashboard demo. Reads a synthetic stream of request
+# events from multiple services, builds per-service sketch-aggregated
+# stats (distinct user IDs via HLL, top errors via TopK, p99 latency
+# via t-digest), then prints a tabular dashboard.
+#
+# Patterns:
+#   * sketch-per-service via hash of t-digest / hll / topk handles
+#   * sketch algebra to merge service stats into a global view
+#   * graceful handling of missing services (per BUG-216 no autoviv)
+#   * tabular output with right-aligned formatting
+
+# ── synthesise event stream ──────────────────────────────────────────
+
+my @services = ("api", "auth", "payment", "notify", "search")
+my @levels   = ("ok", "ok", "ok", "ok", "ok", "ok", "ok", "warn", "error", "error")
+my @errors   = ("Timeout", "DBConnError", "RateLimit", "AuthFailed", "NotFound", "ServiceUnavailable")
+
+my @events
+for my $i (1:500) {
+    my $svc   = $services[int(rand() * len(@services))]
+    my $level = $levels[int(rand() * len(@levels))]
+    my $lat   = int(rand() * 800) + 20    # 20..820 ms
+    my $user  = "user-" . int(rand() * 100)   # 100 distinct users
+    my $err   = $level eq "error" ? $errors[int(rand() * len(@errors))] : undef
+    push @events, +{
+        service => $svc,
+        level   => $level,
+        latency => $lat,
+        user    => $user,
+        error   => $err,
+    }
+}
+
+printf "── stream: %d events across %d services ─────────────\n",
+    len(@events), len(@services)
+
+# ── build per-service sketches ──────────────────────────────────────
+
+my %hll       # service -> HLL of distinct users
+my %td        # service -> t-digest of latency
+my %tk_err    # service -> TopK of error names
+my %total     # service -> event count
+my %ok_count  # service -> ok count
+my %warn_count
+my %error_count
+
+for my $svc (@services) {
+    $hll{$svc}     = hll(14)
+    $td{$svc}      = t_digest(100)
+    $tk_err{$svc}  = topk(3)
+    $total{$svc}   = 0
+    $ok_count{$svc}    = 0
+    $warn_count{$svc}  = 0
+    $error_count{$svc} = 0
+}
+
+for my $e (@events) {
+    my $svc = $e->{service}
+    $total{$svc}++
+    hll_add($hll{$svc}, $e->{user})
+    td_add($td{$svc}, $e->{latency})
+    if ($e->{level} eq "ok")    { $ok_count{$svc}++ }
+    if ($e->{level} eq "warn")  { $warn_count{$svc}++ }
+    if ($e->{level} eq "error") {
+        $error_count{$svc}++
+        topk_add($tk_err{$svc}, $e->{error}) if defined $e->{error}
+    }
+}
+
+# ── dashboard ───────────────────────────────────────────────────────
+
+p ""
+p "── per-service dashboard ────────────────────────────────────────────"
+printf "  %-9s %5s %5s %5s %5s %6s %6s %6s %6s\n",
+    "service", "n", "ok", "warn", "err",
+    "users", "p50", "p99", "%err"
+p   "  --------- ----- ----- ----- ----- ------ ------ ------ ------"
+for my $svc (@services) {
+    my $n    = $total{$svc}
+    next if $n == 0
+    my $u    = hll_count($hll{$svc})
+    my $p50  = int(td_quantile($td{$svc}, 0.50))
+    my $p99  = int(td_quantile($td{$svc}, 0.99))
+    my $errs = $error_count{$svc}
+    my $pct  = 100.0 * $errs / $n
+    printf "  %-9s %5d %5d %5d %5d %6d %6d %6d %5.1f%%\n",
+        $svc, $n, $ok_count{$svc}, $warn_count{$svc}, $errs,
+        $u, $p50, $p99, $pct
+}
+
+# ── global rollup via sketch algebra ────────────────────────────────
+
+p ""
+p "── global rollup (sketch union via `+`) ─────────────"
+my $global_hll = $hll{api} + $hll{auth} + $hll{payment} + $hll{notify} + $hll{search}
+printf "  total events           : %d\n", len(@events)
+my $total_err = 0
+$total_err += $error_count{$_} for @services
+printf "  total errors           : %d (%.1f%%)\n",
+    $total_err, 100.0 * $total_err / len(@events)
+printf "  HLL distinct users      : %d\n", hll_count($global_hll)
+my %seen_users
+$seen_users{$_->{user}} = 1 for @events
+printf "  exact distinct users    : %d\n", len(keys %seen_users)
+
+# ── top errors per service (TopK) ────────────────────────────────────
+
+p ""
+p "── top errors per service ───────────────────────────"
+for my $svc (@services) {
+    next if $error_count{$svc} == 0
+    my @hits = topk_top($tk_err{$svc})
+    my @parts
+    for my $h (@hits) {
+        push @parts, sprintf("%s(%d)", $h->[0], $h->[1])
+    }
+    printf "  %-9s : %s\n", $svc, join(", ", @parts)
+}
+
+# ── alerts: any service with > 20% error rate ───────────────────────
+
+p ""
+p "── alerts (services with > 20% error rate) ──────────"
+my @alerts
+for my $svc (@services) {
+    my $n = $total{$svc}
+    next if $n == 0
+    my $rate = 100.0 * $error_count{$svc} / $n
+    push @alerts, +{ svc => $svc, rate => $rate } if $rate > 20.0
+}
+if (len(@alerts) == 0) {
+    p "  (no service exceeds threshold — system healthy)"
+} else {
+    for my $alert (sort { $_1->{rate} <=> $_0->{rate} } @alerts) {
+        printf "  ALERT %-9s : %.1f%% errors\n", $alert->{svc}, $alert->{rate}
+    }
+}
+
+# ── slowest service by p99 ──────────────────────────────────────────
+
+p ""
+p "── slowest service by p99 latency ───────────────────"
+my @ranked = sort {
+    int(td_quantile($td{_1}, 0.99)) <=> int(td_quantile($td{_0}, 0.99))
+} @services
+for my $i (0:2) {
+    my $svc = $ranked[$i]
+    next unless $total{$svc} > 0
+    printf "  %d. %-9s p99=%d ms\n", $i + 1, $svc, int(td_quantile($td{$svc}, 0.99))
+}

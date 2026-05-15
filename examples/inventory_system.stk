@@ -1,0 +1,191 @@
+#!/usr/bin/env stryke
+
+# Inventory tracking demo: Product class with stock, reorder threshold,
+# transaction log, and pareto analysis (80/20 rule) on sales volume.
+# Patterns:
+#   * class { name: Type } for the Product type
+#   * BUILD hook for invariant setup
+#   * hash-of-classes for inventory keyed by SKU
+#   * sketch (TopK + HLL) for sales analytics
+#   * t-digest for per-transaction latency
+
+# ── Product class ────────────────────────────────────────────────────
+
+class Product {
+    sku:      Str
+    name:     Str
+    price:    Float
+    stock:    Int = 0
+    reorder:  Int = 5
+    sold:     Int = 0
+
+    fn restock($qty) {
+        $self->stock($self->stock + $qty)
+    }
+
+    fn sell($qty) {
+        return 0 if $qty > $self->stock
+        $self->stock($self->stock - $qty)
+        $self->sold($self->sold + $qty)
+        return 1
+    }
+
+    fn needs_reorder {
+        $self->stock < $self->reorder
+    }
+
+    fn revenue {
+        $self->sold * $self->price
+    }
+}
+
+# ── inventory: SKU -> Product ────────────────────────────────────────
+
+my %inventory
+
+fn Demo::Inv::add_product($sku, $name, $price, $stock, $reorder) {
+    $inventory{$sku} = Product(
+        sku => $sku, name => $name, price => $price,
+        stock => $stock, reorder => $reorder
+    )
+}
+
+# ── transaction log for AOP ──────────────────────────────────────────
+
+mysync @txlog
+my $td_lat = t_digest(100)
+
+fn Demo::Inv::record_sale($sku, $qty) {
+    return +{ ok => 0, reason => "unknown_sku" } unless exists $inventory{$sku}
+    my $t0 = now_ns()
+    my $p = $inventory{$sku}
+    my $ok = $p->sell($qty)
+    td_add($td_lat, (now_ns() - $t0) / 1000.0)
+    my $entry = +{ sku => $sku, qty => $qty, ok => $ok ? 1 : 0, ts => time() }
+    push @txlog, $entry
+    return +{ ok => $ok, sku => $sku, qty => $qty }
+}
+
+# ── seed catalogue ──────────────────────────────────────────────────
+
+Demo::Inv::add_product("WIDGET-A", "Premium Widget",     49.99,  20, 5)
+Demo::Inv::add_product("WIDGET-B", "Basic Widget",       19.99,  50, 10)
+Demo::Inv::add_product("GADGET-A", "Smart Gadget",      129.99,   8, 3)
+Demo::Inv::add_product("GADGET-B", "Eco Gadget",         89.99,  15, 5)
+Demo::Inv::add_product("DOODAD-A", "Lux Doodad",        299.99,   3, 2)
+Demo::Inv::add_product("DOODAD-B", "Std Doodad",         99.99,  10, 3)
+Demo::Inv::add_product("THINGY-A", "Premium Thingy",     24.99, 100, 20)
+Demo::Inv::add_product("THINGY-B", "Basic Thingy",        9.99, 200, 40)
+
+p "── initial inventory ────────────────────────────────"
+printf "  %-10s %-18s %10s %5s %5s\n", "sku", "name", "price", "stock", "min"
+for my $sku (sort { _0 cmp _1 } keys %inventory) {
+    my $p = $inventory{$sku}
+    printf "  %-10s %-18s %10.2f %5d %5d\n",
+        $p->sku, $p->name, $p->price, $p->stock, $p->reorder
+}
+
+# ── simulate sales workload ─────────────────────────────────────────
+
+my @sales = (
+    ["WIDGET-A", 3],  ["WIDGET-A", 5],  ["WIDGET-A", 4],
+    ["WIDGET-B", 10], ["WIDGET-B", 15], ["WIDGET-B", 8],  ["WIDGET-B", 12],
+    ["GADGET-A", 2],  ["GADGET-A", 3],
+    ["GADGET-B", 5],
+    ["DOODAD-A", 1],  ["DOODAD-A", 1],
+    ["DOODAD-B", 2],
+    ["THINGY-A", 30], ["THINGY-A", 25], ["THINGY-A", 15],
+    ["THINGY-B", 50], ["THINGY-B", 80], ["THINGY-B", 30], ["THINGY-B", 25],
+    ["GHOST-X",  1],   # unknown SKU
+    ["WIDGET-A", 100], # over-sell rejection
+)
+
+p ""
+printf "── processing %d sales ────────────────────────────\n", len(@sales)
+my $accepted = 0
+my $rejected = 0
+for my $s (@sales) {
+    my $r = Demo::Inv::record_sale($s->[0], $s->[1])
+    if ($r->{ok}) {
+        $accepted++
+    } else {
+        $rejected++
+        printf "  REJECT %s qty=%d (%s)\n",
+            $s->[0], $s->[1], $r->{reason} // "insufficient_stock"
+    }
+}
+printf "  accepted : %d\n", $accepted
+printf "  rejected : %d\n", $rejected
+
+# ── pareto: top revenue earners ─────────────────────────────────────
+
+p ""
+p "── revenue ranking (TopK pareto) ────────────────────"
+my @by_rev = sort { _1->revenue <=> _0->revenue } values %inventory
+my $total_rev = 0
+$total_rev += $_->revenue for @by_rev
+my $cum = 0
+my $i = 0
+my $eighty_at = 0
+printf "  %-10s %-18s %8s %8s %6s\n", "sku", "name", "sold", "revenue", "%cum"
+for my $p (@by_rev) {
+    $i++
+    $cum += $p->revenue
+    my $pct = 100.0 * $cum / $total_rev
+    printf "  %-10s %-18s %8d %8.2f %5.1f%%\n",
+        $p->sku, $p->name, $p->sold, $p->revenue, $pct
+    if ($pct >= 80.0 && $eighty_at == 0) {
+        $eighty_at = $i
+    }
+}
+printf "  → 80%% of revenue comes from %d / %d products (pareto)\n",
+    $eighty_at, len(@by_rev)
+
+# ── reorder list ────────────────────────────────────────────────────
+
+p ""
+p "── reorder candidates ───────────────────────────────"
+my @need_reorder = grep { $_->needs_reorder } values %inventory
+if (len(@need_reorder) == 0) {
+    p "  (none)"
+} else {
+    for my $p (sort { _0->sku cmp _1->sku } @need_reorder) {
+        printf "  %-10s %-18s stock=%d min=%d\n",
+            $p->sku, $p->name, $p->stock, $p->reorder
+    }
+}
+
+# ── sketch-based analytics ──────────────────────────────────────────
+
+p ""
+p "── TopK best-selling SKUs (sketch) ──────────────────"
+my $topk = topk(3)
+for my $tx (@txlog) {
+    next unless $tx->{ok}
+    for my $j (1:$tx->{qty}) {
+        topk_add($topk, $tx->{sku})
+    }
+}
+my @hits = topk_top($topk)
+for my $h (@hits) {
+    printf "  %-10s : %d units\n", $h->[0], $h->[1]
+}
+
+# ── distinct SKUs touched (HLL) ─────────────────────────────────────
+
+p ""
+p "── distinct cardinality (HLL) ───────────────────────"
+my $hll = hll(14)
+hll_add($hll, $_->{sku}) for @txlog
+printf "  HLL distinct SKUs in tx log : %d\n", hll_count($hll)
+my %seen
+$seen{$_->{sku}} = 1 for @txlog
+printf "  exact distinct                : %d\n", len(keys %seen)
+
+# ── transaction latency percentiles ─────────────────────────────────
+
+p ""
+p "── record_sale latency (t-digest) ───────────────────"
+printf "  p50  : %.1f µs\n", td_quantile($td_lat, 0.50)
+printf "  p90  : %.1f µs\n", td_quantile($td_lat, 0.90)
+printf "  p99  : %.1f µs\n", td_quantile($td_lat, 0.99)

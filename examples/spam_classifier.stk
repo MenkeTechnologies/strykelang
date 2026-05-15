@@ -1,0 +1,170 @@
+#!/usr/bin/env stryke
+
+# Naive Bayes spam classifier demo. Train on a small labeled corpus,
+# compute per-class word log-probabilities, then classify test
+# messages and report accuracy.
+#
+# Patterns:
+#   * hash-of-hash for word counts per class
+#   * Laplace smoothing for unseen words
+#   * log-space arithmetic to avoid underflow
+#   * t-digest for classify latency
+
+# ── training corpus (labeled) ────────────────────────────────────────
+
+my @train = (
+    +{ label => "spam", text => "win free money click here to claim your prize" },
+    +{ label => "spam", text => "free viagra and prize money click now buy now" },
+    +{ label => "spam", text => "limited time offer winner click here free shipping" },
+    +{ label => "spam", text => "you have won free cash click below to claim now" },
+    +{ label => "spam", text => "winner free vacation click for your prize today" },
+    +{ label => "ham",  text => "meeting tomorrow at noon please confirm attendance" },
+    +{ label => "ham",  text => "the project report is due friday let me know" },
+    +{ label => "ham",  text => "thanks for the email i will review and respond" },
+    +{ label => "ham",  text => "please find attached the meeting notes from today" },
+    +{ label => "ham",  text => "looking forward to our project meeting tomorrow" },
+)
+
+my $sp_cnt = grep { $_->{label} eq "spam" } @train
+my $hm_cnt = grep { $_->{label} eq "ham"  } @train
+printf "── training: %d examples (%d spam, %d ham) ────────────\n", len(@train), $sp_cnt, $hm_cnt
+
+# ── train: count word occurrences per class ────────────────────────
+
+my %word_counts   # word_counts{label}{word} = count
+my %class_count   # class_count{label} = total docs of that label
+my %total_words   # total_words{label} = total word count
+my %vocab         # vocab{word} = 1
+
+for my $cls ("spam", "ham") {
+    $word_counts{$cls} = +{}
+    $class_count{$cls} = 0
+    $total_words{$cls} = 0
+}
+
+for my $doc (@train) {
+    my $cls = $doc->{label}
+    $class_count{$cls}++
+    my @words = split /\s+/, lc($doc->{text})
+    for my $w (@words) {
+        next if len($w) == 0
+        $word_counts{$cls}->{$w} = ($word_counts{$cls}->{$w} // 0) + 1
+        $total_words{$cls}++
+        $vocab{$w} = 1
+    }
+}
+
+printf "  vocab size : %d distinct words\n", len(keys %vocab)
+printf "  total words: spam=%d, ham=%d\n",
+    $total_words{spam}, $total_words{ham}
+
+# ── classify: compute log-prob per class, pick max ─────────────────
+
+my $td_lat = t_digest(100)
+
+fn Demo::NB::classify($text) {
+    my $t0 = now_ns()
+    my @words = split /\s+/, lc($text)
+    @words = grep { len($_) > 0 } @words
+    my $vsize = len(keys %vocab)
+    my $total = $class_count{spam} + $class_count{ham}
+    my %log_score
+    for my $cls ("spam", "ham") {
+        # Class prior.
+        my $log_prior = log($class_count{$cls} / $total)
+        my $log_likelihood = 0.0
+        for my $w (@words) {
+            my $count = $word_counts{$cls}->{$w} // 0
+            # Laplace smoothing: (count + 1) / (total_words + vsize).
+            my $p = ($count + 1) / ($total_words{$cls} + $vsize)
+            $log_likelihood += log($p)
+        }
+        $log_score{$cls} = $log_prior + $log_likelihood
+    }
+    td_add($td_lat, (now_ns() - $t0) / 1000.0)
+    return $log_score{spam} > $log_score{ham} ? "spam" : "ham"
+}
+
+# ── test corpus ─────────────────────────────────────────────────────
+
+my @test = (
+    +{ true_label => "spam", text => "click here to win free money" },
+    +{ true_label => "spam", text => "limited time winner claim your prize today" },
+    +{ true_label => "spam", text => "free viagra offer click now" },
+    +{ true_label => "ham",  text => "please confirm the meeting tomorrow" },
+    +{ true_label => "ham",  text => "the report is due next friday please review" },
+    +{ true_label => "ham",  text => "thanks for sending the notes" },
+    +{ true_label => "spam", text => "win prize free shipping click below" },
+    +{ true_label => "ham",  text => "looking forward to the project review tomorrow" },
+)
+
+printf "\n── classification of %d test messages ─────────────\n", len(@test)
+my $correct = 0
+my $tp = 0; my $fp = 0; my $tn = 0; my $fn = 0;
+for my $msg (@test) {
+    my $pred = Demo::NB::classify($msg->{text})
+    my $true = $msg->{true_label}
+    my $tag = $pred eq $true ? "ok " : "WRONG"
+    $correct++ if $pred eq $true
+    if    ($true eq "spam" && $pred eq "spam") { $tp++ }
+    elsif ($true eq "ham"  && $pred eq "spam") { $fp++ }
+    elsif ($true eq "ham"  && $pred eq "ham")  { $tn++ }
+    elsif ($true eq "spam" && $pred eq "ham")  { $fn++ }
+    printf "  [%s] true=%-4s pred=%-4s : %s\n",
+        $tag, $true, $pred, substr($msg->{text}, 0, 40)
+}
+
+# ── confusion matrix + metrics ──────────────────────────────────────
+
+p ""
+p "── confusion matrix ─────────────────────────────────"
+printf "  TP (correct spam)   : %d\n", $tp
+printf "  FP (ham as spam)    : %d\n", $fp
+printf "  TN (correct ham)    : %d\n", $tn
+printf "  FN (spam as ham)    : %d\n", $fn
+
+p ""
+p "── metrics ──────────────────────────────────────────"
+my $accuracy  = $correct / len(@test)
+my $precision = ($tp + $fp) > 0 ? $tp / ($tp + $fp) : 0.0
+my $recall    = ($tp + $fn) > 0 ? $tp / ($tp + $fn) : 0.0
+my $f1        = ($precision + $recall) > 0
+                ? 2 * $precision * $recall / ($precision + $recall)
+                : 0.0
+printf "  accuracy  : %.1f%%\n", 100 * $accuracy
+printf "  precision : %.2f\n", $precision
+printf "  recall    : %.2f\n", $recall
+printf "  F1        : %.2f\n", $f1
+
+# ── classify latency ────────────────────────────────────────────────
+
+p ""
+p "── classify() latency (t-digest) ────────────────────"
+printf "  p50  : %.1f µs\n", td_quantile($td_lat, 0.50)
+printf "  p99  : %.1f µs\n", td_quantile($td_lat, 0.99)
+
+# ── top spam-indicator words via TopK (sketch) ─────────────────────
+
+p ""
+p "── top spam-indicator words (TopK by P(w|spam)/P(w|ham)) ──"
+# log-ratio: log(P(w|spam) / P(w|ham)) — higher = stronger spam signal.
+my $tk = topk(5)
+my $vsize = len(keys %vocab)
+for my $w (keys %vocab) {
+    my $sc = $word_counts{spam}->{$w} // 0
+    my $hc = $word_counts{ham}->{$w}  // 0
+    my $p_s = ($sc + 1) / ($total_words{spam} + $vsize)
+    my $p_h = ($hc + 1) / ($total_words{ham}  + $vsize)
+    my $ratio = $p_s / $p_h
+    # TopK only sees integer weight; use occurrence count in spam as
+    # a proxy and emit each as separate adds.
+    if ($ratio > 1.5) {
+        for my $i (1:int($ratio * 10)) {
+            topk_add($tk, $w)
+        }
+    }
+}
+my @hits = topk_top($tk)
+for my $h (@hits) {
+    printf "  %-15s\n", $h->[0]
+}

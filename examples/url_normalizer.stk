@@ -1,0 +1,184 @@
+#!/usr/bin/env stryke
+
+# URL normalizer demo. Takes a stream of URLs, parses each into
+# components, strips tracking parameters, lowercases the scheme/host,
+# sorts query parameters for canonical form, then deduplicates.
+#
+# Patterns:
+#   * regex with manual segment splitting (works around BUG-218)
+#   * hash-of-key/value query parsing
+#   * sort+join for canonical query string
+#   * uniq for dedup
+#   * sketch (HLL) for distinct-URL estimation at scale
+
+# ── tracking parameter blacklist ───────────────────────────────────
+
+my %TRACKING = (
+    utm_source   => 1, utm_medium    => 1, utm_campaign => 1,
+    utm_term     => 1, utm_content   => 1,
+    fbclid       => 1, gclid         => 1, mc_cid       => 1,
+    mc_eid       => 1, ref           => 1, ref_src      => 1,
+    igshid       => 1,
+)
+
+# ── parser ──────────────────────────────────────────────────────────
+
+fn Demo::URL::parse($url) {
+    my $scheme  = ""
+    my $host    = ""
+    my $port    = ""
+    my $path    = "/"
+    my $query   = ""
+    my $rest = $url
+    if ($rest =~ /^([a-zA-Z][a-zA-Z0-9+.\-]*):\/\/(.*)$/) {
+        $scheme = lc($1)
+        $rest = $2
+    }
+    if ($rest =~ /^([^\/?]+)(.*)$/) {
+        my $authority = $1
+        $rest = $2
+        if ($authority =~ /^([^:]+):(\d+)$/) {
+            $host = lc($1)
+            $port = $2
+        } else {
+            $host = lc($authority)
+        }
+    }
+    if ($rest =~ /^([^?]*)(?:\?(.*))?$/) {
+        $path = $1 ne "" ? $1 : "/"
+        $query = $2 // ""
+    }
+    return +{
+        scheme => $scheme, host => $host, port => $port,
+        path   => $path,   query => $query,
+    }
+}
+
+# ── parse + normalize query string ─────────────────────────────────
+
+fn Demo::URL::parse_query($qs) {
+    my @parts = split /&/, $qs
+    @parts = grep { len($_) > 0 } @parts
+    my %params
+    for my $p (@parts) {
+        my @kv = split /=/, $p, 2
+        my $k = $kv[0]
+        my $v = $kv[1] // ""
+        next if exists $TRACKING{lc($k)}
+        $params{$k} = $v
+    }
+    return \%params
+}
+
+fn Demo::URL::serialize_query($params) {
+    my @keys = sort { _0 cmp _1 } keys %$params
+    my @parts
+    for my $k (@keys) {
+        push @parts, "$k=" . $params->{$k}
+    }
+    return join("&", @parts)
+}
+
+# ── full normalize ──────────────────────────────────────────────────
+
+fn Demo::URL::normalize($url) {
+    my $parsed = Demo::URL::parse($url)
+    my $clean_q = Demo::URL::parse_query($parsed->{query})
+    my $qs = Demo::URL::serialize_query($clean_q)
+    my $out = ""
+    $out .= $parsed->{scheme} . "://" if len($parsed->{scheme})
+    $out .= $parsed->{host}
+    $out .= ":" . $parsed->{port} if len($parsed->{port})
+    $out .= $parsed->{path}
+    $out .= "?" . $qs if len($qs)
+    return $out
+}
+
+# ── sample URLs ─────────────────────────────────────────────────────
+
+my @urls = (
+    "https://example.com/page?id=1&utm_source=twitter",
+    "https://example.com/page?id=1",
+    "HTTPS://Example.com/page?id=1",                       # case folds
+    "http://example.com/page?utm_source=fb&id=1",          # different scheme
+    "https://example.com/page?id=2&fbclid=ABC123",
+    "https://example.com/page?id=2",
+    "https://other.com/path?id=3&utm_campaign=summer",
+    "https://other.com/path?id=3",
+    "https://api.example.com:8080/v1/users?limit=10",
+    "https://api.example.com:8080/v1/users?limit=10&gclid=xyz",
+    "https://search.example.com/q?q=hello&page=1&utm_medium=email",
+    "https://search.example.com/q?page=1&q=hello",
+)
+
+printf "── input: %d URLs ─────────────────────────────────────\n", len(@urls)
+
+# ── normalize each ──────────────────────────────────────────────────
+
+my @normalized = map { Demo::URL::normalize($_) } @urls
+
+p ""
+p "── normalized forms ─────────────────────────────────"
+for my $i (0:len(@urls) - 1) {
+    printf "  %s\n", substr($urls[$i], 0, 65)
+    printf "    -> %s\n", $normalized[$i]
+}
+
+# ── distinct via uniq ───────────────────────────────────────────────
+
+my @distinct = sort { _0 cmp _1 } uniq(@normalized)
+p ""
+printf "── %d distinct normalized URLs ────────────────────────\n", len(@distinct)
+for my $u (@distinct) {
+    p "  $u"
+}
+
+# ── tracking-param removal stats ────────────────────────────────────
+
+p ""
+p "── tracking-param removal stats ─────────────────────"
+my $tracked = 0
+my %tracked_kinds
+for my $url (@urls) {
+    my $p = Demo::URL::parse($url)
+    next unless len($p->{query})
+    for my $part (split /&/, $p->{query}) {
+        my @kv = split /=/, $part, 2
+        my $k = lc($kv[0])
+        if (exists $TRACKING{$k}) {
+            $tracked++
+            $tracked_kinds{$k}++
+        }
+    }
+}
+printf "  tracking params found : %d (across %d URLs)\n",
+    $tracked, len(@urls)
+for my $k (sort { $tracked_kinds{_1} <=> $tracked_kinds{_0} } keys %tracked_kinds) {
+    printf "  %-15s : %d\n", $k, $tracked_kinds{$k}
+}
+
+# ── sketch-based: distinct URLs via HLL ────────────────────────────
+
+p ""
+p "── distinct cardinality (HLL) ───────────────────────"
+my $hll_raw = hll(14)
+hll_add($hll_raw, $_) for @urls
+my $hll_norm = hll(14)
+hll_add($hll_norm, $_) for @normalized
+printf "  HLL distinct (raw URLs)        : %d\n", hll_count($hll_raw)
+printf "  HLL distinct (normalized URLs) : %d\n", hll_count($hll_norm)
+printf "  exact distinct (normalized)    : %d\n", len(@distinct)
+
+# ── host frequency ──────────────────────────────────────────────────
+
+p ""
+p "── host frequency (TopK) ────────────────────────────"
+my $tk = topk(5)
+for my $url (@urls) {
+    my $p = Demo::URL::parse($url)
+    topk_add($tk, $p->{host})
+}
+my @top = topk_top($tk)
+for my $h (@top) {
+    printf "  %-30s : %d\n", $h->[0], $h->[1]
+}

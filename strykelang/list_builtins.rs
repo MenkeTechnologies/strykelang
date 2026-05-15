@@ -321,7 +321,7 @@ fn uniq_with_want(
 fn uniq_list(args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
     let mut out = Vec::new();
     let mut seen = std::collections::HashSet::new();
-    let mut push_val = |x: &StrykeValue, out: &mut Vec<StrykeValue>, seen: &mut std::collections::HashSet<String>| {
+    let push_val = |x: &StrykeValue, out: &mut Vec<StrykeValue>, seen: &mut std::collections::HashSet<String>| {
         let key = x.to_string();
         if seen.insert(key) {
             out.push(x.clone());

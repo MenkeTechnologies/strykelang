@@ -1,0 +1,138 @@
+#!/usr/bin/env stryke
+
+# Word-frequency streaming analyzer. Splits a synthetic text corpus
+# into chunks, runs a CMS+TopK pipeline over each chunk in parallel
+# via pmap, then merges per-chunk sketches using sketch algebra (+).
+# Final report ranks the top terms across the entire stream.
+#
+# Composes seven features: pipe-forward, pmap (parallel-map), regex
+# (split), Count-Min Sketch, SpaceSaving TopK, sketch algebra
+# `cms_a + cms_b` / `topk_a + topk_b`, and pure-text iterator helpers
+# (uniq, len). World-first claim: no other scripting language has
+# sketch algebra as a syntactic primitive — see
+# `examples/sketch_algebra.stk` for the full surface.
+
+# ── source corpus (8 chunks) ──────────────────────────────────────────
+# Each chunk is a synthetic "document" of words; in a real pipeline
+# these would be log lines / tweets / page bodies arriving over a
+# stream.
+
+my @corpus = (
+    "the quick brown fox jumps over the lazy dog the fox",
+    "stryke runs faster than perl ruby and python for this task",
+    "the quick rust runtime jit compiles hot paths to native code",
+    "perl is text mining python is data science ruby is web apps",
+    "lazy iterators stream through pipe forward operators in stryke",
+    "rust beats c on safety perl beats python on text munging",
+    "the dog barks at the fox who jumps over the lazy bird",
+    "stryke sketch algebra unifies bloom hll cms tdigest topk roaring",
+)
+
+p "── corpus shape ───────────────────────────────────────"
+printf "  %d chunks, ~%d words each\n",
+    len(@corpus), len([split(/\s+/, $corpus[0])])
+my $total_words = 0
+$total_words += len([split(/\s+/, $_)]) for @corpus
+printf "  %d total words across all chunks\n", $total_words
+
+# ── per-chunk pipeline → list of (cms, topk) pairs ────────────────────
+# Each chunk gets its own pair of sketches built in isolation, then we
+# merge them with sketch algebra. This is the same pattern a
+# distributed map-reduce job would use.
+
+p ""
+p "── per-chunk sketches (parallel) ──────────────────────"
+my @per_chunk = pmap {
+    my $chunk = _
+    my @words = split(/\s+/, $chunk)
+    my $cms_c  = cms(2048, 5)
+    # `topk(50)` per chunk so the merge has enough capacity to keep
+    # accurate counts for the corpus's full vocabulary. With small k
+    # (e.g. 5) the SpaceSaving merge inherits inflated counters for
+    # entries that get displaced — fine for true heavy hitters, bad
+    # for ranking the full set.
+    my $topk_c = topk(50)
+    for my $w (@words) {
+        cms_add($cms_c, $w)
+        topk_add($topk_c, $w)
+    }
+    +{ cms => $cms_c, topk => $topk_c, words => len(@words) }
+} @corpus
+
+for my $i (0:len(@per_chunk)-1) {
+    printf "  chunk %d: %d words, top: %s\n",
+        $i, $per_chunk[$i]->{words},
+        topk_heavies($per_chunk[$i]->{topk})->[0]->[0]
+}
+
+# ── merge via sketch algebra (`+` operator) ───────────────────────────
+
+p ""
+p "── merge per-chunk sketches ───────────────────────────"
+my $cms_total = $per_chunk[0]->{cms}
+my $topk_total = $per_chunk[0]->{topk}
+for my $i (1:len(@per_chunk)-1) {
+    $cms_total  = $cms_total  + $per_chunk[$i]->{cms}
+    $topk_total = $topk_total + $per_chunk[$i]->{topk}
+}
+p "  merged 8 per-chunk sketches via cms_a + cms_b and topk_a + topk_b"
+
+# ── report top-N across the whole stream ─────────────────────────────
+# Print top-10 from the merged TopK (good for hot hitters), then
+# cross-check the same words via CMS for ground-truthier counts.
+
+p ""
+p "── top 10 terms across stream (via merged TopK) ───────"
+my @top = topk_heavies($topk_total)
+my $cap = len(@top) > 10 ? 10 : len(@top)
+for my $i (0:$cap-1) {
+    printf "  %2d. %-14s × %d  (cms: %d)\n",
+        $i + 1, $top[$i]->[0], $top[$i]->[1],
+        cms_count($cms_total, $top[$i]->[0])
+}
+
+# ── spot-check specific terms via CMS ────────────────────────────────
+
+p ""
+p "── per-term frequency via merged CMS ──────────────────"
+for my $w ("the", "stryke", "fox", "rust", "perl") {
+    printf "  %-10s × %d\n", $w, cms_count($cms_total, $w)
+}
+
+# ── distinct-word count via HLL (post-merge feeling) ──────────────────
+# We rebuild the HLL from scratch since hll wasn't carried per-chunk —
+# but this still demonstrates the merge story.
+
+p ""
+p "── distinct-word count via HLL ────────────────────────"
+my $hll = hll(14)
+for my $chunk (@corpus) {
+    hll_add($hll, $_) for split(/\s+/, $chunk)
+}
+printf "  HLL estimate : %d distinct words\n", hll_count($hll)
+
+# Ground truth via plain Perl-style dedupe (only ok at this small scale).
+my %seen
+for my $chunk (@corpus) {
+    $seen{$_}++ for split(/\s+/, $chunk)
+}
+printf "  exact distinct (small N): %d\n", len(keys %seen)
+
+# ── determinism check ────────────────────────────────────────────────
+# Same input always produces the same merged-TopK output. SpaceSaving
+# is order-sensitive on the input STREAM, but since each chunk is
+# processed in fixed order and the merge order is deterministic, the
+# final ranking is stable across runs.
+
+p ""
+p "── determinism check (re-run produces same top word) ──"
+my @per_chunk_2 = pmap {
+    my $tk = topk(50)
+    topk_add($tk, $_) for split(/\s+/, _)
+    $tk
+} @corpus
+my $merged_2 = $per_chunk_2[0]
+for my $i (1:len(@per_chunk_2)-1) { $merged_2 = $merged_2 + $per_chunk_2[$i] }
+my $run2_top = topk_heavies($merged_2)->[0]->[0]
+printf "  run-1 top: %s  run-2 top: %s  identical: %s\n",
+    $top[0]->[0], $run2_top, ($top[0]->[0] eq $run2_top ? "yes" : "no")

@@ -1,0 +1,177 @@
+#!/usr/bin/env stryke
+
+# URL routing demo: register routes with named parameters
+# (`/users/:id`), match incoming request paths, dispatch to handler
+# functions, and observe the whole pipeline via AOP middleware.
+# Patterns:
+#   * route as arrayref [method, pattern, handler]
+#   * named-param extraction via regex (built up safely per BUG-218)
+#   * AOP `around` for request audit log + latency
+#   * t-digest for p50/p99 dispatch latency
+#   * TopK for "most-requested" telemetry
+
+# ── route registry ──────────────────────────────────────────────────
+
+my @routes  # each entry: [method, pattern, handler, segments_with_param_marker]
+
+# Decompose `/users/:id/posts/:slug` into a list of segments where
+# `:name` segments are tagged as {kind=>"param", name=>"id"}. This
+# avoids BUG-218 (regex-with-interpolated-variable result cache),
+# which prevents the natural `=~ /^$re$/` approach from working
+# across multiple routes in a loop.
+
+fn Demo::Router::register($method, $pattern, $handler) {
+    my @raw_segs = split /\//, $pattern
+    # First element is empty (leading "/"); drop it.
+    @raw_segs = grep { len($_) > 0 } @raw_segs
+    my @parsed
+    for my $seg (@raw_segs) {
+        if (substr($seg, 0, 1) eq ":") {
+            push @parsed, +{ kind => "param", name => substr($seg, 1) }
+        } else {
+            push @parsed, +{ kind => "lit",   name => $seg }
+        }
+    }
+    push @routes, [$method, $pattern, \@parsed, $handler]
+}
+
+# ── match incoming request ──────────────────────────────────────────
+
+fn Demo::Router::dispatch($method, $path) {
+    my @path_segs = split /\//, $path
+    @path_segs = grep { len($_) > 0 } @path_segs
+
+    for my $route (@routes) {
+        next unless $route->[0] eq $method
+        my $segs    = $route->[2]
+        my $handler = $route->[3]
+
+        next unless len(@$segs) == len(@path_segs)
+
+        my %params
+        my $ok = 1
+        for my $i (0:len(@$segs) - 1) {
+            my $rseg = $segs->[$i]
+            my $pseg = $path_segs[$i]
+            if ($rseg->{kind} eq "lit") {
+                if ($rseg->{name} ne $pseg) {
+                    $ok = 0
+                    last
+                }
+            } else {
+                $params{$rseg->{name}} = $pseg
+            }
+        }
+        if ($ok) {
+            return +{ ok => 1, route => $route->[1], params => \%params, handler => $handler }
+        }
+    }
+    return +{ ok => 0, route => undef, params => +{}, handler => undef }
+}
+
+# ── handler implementations ─────────────────────────────────────────
+
+fn Demo::Handlers::list_users($params) {
+    "200 OK list-users"
+}
+
+fn Demo::Handlers::show_user($params) {
+    "200 OK show-user id=" . $params->{id}
+}
+
+fn Demo::Handlers::user_post($params) {
+    sprintf("200 OK user=%s post=%s", $params->{id}, $params->{slug})
+}
+
+fn Demo::Handlers::create_user($params) {
+    "201 Created user"
+}
+
+# ── register a small set of routes ──────────────────────────────────
+
+Demo::Router::register("GET",  "/users",                    \&Demo::Handlers::list_users)
+Demo::Router::register("GET",  "/users/:id",                \&Demo::Handlers::show_user)
+Demo::Router::register("GET",  "/users/:id/posts/:slug",    \&Demo::Handlers::user_post)
+Demo::Router::register("POST", "/users",                    \&Demo::Handlers::create_user)
+
+printf "── %d routes registered ──────────────────────────────\n", len(@routes)
+for my $r (@routes) {
+    printf "  %-5s %s\n", $r->[0], $r->[1]
+}
+
+# ── AOP instrumentation: per-request audit + latency ────────────────
+
+mysync $req_count = 0
+mysync $matched   = 0
+mysync $lat = t_digest(100)
+mysync $hits = topk(3)
+
+around "Demo::Router::dispatch" {
+    my $method = $INTERCEPT_ARGS[0]
+    my $path   = $INTERCEPT_ARGS[1]
+    $req_count++
+    my $t0 = now_ns()
+    my $r = proceed(@INTERCEPT_ARGS)
+    my $us = (now_ns() - $t0) / 1000.0
+    td_add($lat, $us)
+    if ($r->{ok}) {
+        $matched++
+        topk_add($hits, $r->{route})
+    }
+    $r
+}
+
+# ── simulate a request stream ───────────────────────────────────────
+
+my @requests = (
+    ["GET",  "/users"],
+    ["GET",  "/users/42"],
+    ["GET",  "/users/100"],
+    ["GET",  "/users/42/posts/welcome"],
+    ["GET",  "/users/100/posts/hello-world"],
+    ["POST", "/users"],
+    ["GET",  "/no/such/route"],
+    ["DELETE","/users/42"],   # method not registered
+    ["GET",  "/users/100"],
+    ["GET",  "/users/42/posts/another-one"],
+)
+
+p ""
+printf "── dispatching %d requests ────────────────────────────\n", len(@requests)
+for my $req (@requests) {
+    my $result = Demo::Router::dispatch($req->[0], $req->[1])
+    if ($result->{ok}) {
+        my $response = $result->{handler}->($result->{params})
+        printf "  %-6s %-30s -> %s\n", $req->[0], $req->[1], $response
+    } else {
+        printf "  %-6s %-30s -> 404 Not Found\n", $req->[0], $req->[1]
+    }
+}
+
+# ── rollup ──────────────────────────────────────────────────────────
+
+p ""
+p "── request rollup ───────────────────────────────────"
+printf "  total requests  : %d\n", $req_count
+printf "  matched         : %d\n", $matched
+printf "  404 / no-match  : %d\n", $req_count - $matched
+printf "  match rate      : %.1f%%\n", 100.0 * $matched / $req_count
+
+# ── dispatch latency percentiles ─────────────────────────────────────
+
+p ""
+p "── dispatch latency (t-digest) ──────────────────────"
+printf "  p50  : %.1f µs\n", td_quantile($lat, 0.50)
+printf "  p90  : %.1f µs\n", td_quantile($lat, 0.90)
+printf "  p99  : %.1f µs\n", td_quantile($lat, 0.99)
+
+# ── most-hit routes via TopK ─────────────────────────────────────────
+
+p ""
+p "── top routes (TopK) ────────────────────────────────"
+my @top = topk_top($hits)
+for my $h (@top) {
+    printf "  %-32s : %d hit(s)\n", $h->[0], $h->[1]
+}
+
+intercept_clear("Demo::Router::dispatch")

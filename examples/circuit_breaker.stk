@@ -1,0 +1,172 @@
+#!/usr/bin/env stryke
+
+# Circuit-breaker pattern demo. Tracks failures from a flaky
+# downstream call; when failure rate crosses a threshold, the breaker
+# opens (rejects all calls immediately). After a cooldown period the
+# breaker half-opens (try one call); a success closes it back.
+#
+# Patterns:
+#   * mysync hash for breaker state (closed/open/half_open)
+#   * sliding window of recent outcomes (success / fail)
+#   * t-digest for per-outcome latency (success p99 vs fail p99)
+#   * AOP `around` for outcome observation (free fn — avoids BUG-222)
+
+# ── breaker state ────────────────────────────────────────────────────
+
+mysync $bstate = "closed"     # closed | open | half_open
+mysync @recent_outcomes       # 1 = success, 0 = failure
+mysync $opened_at = 0          # ns timestamp when breaker opened
+
+my $window     = 10            # outcomes to remember
+my $threshold  = 0.5           # >= 50% failures → open
+my $cooldown_ns = 200_000_000  # 200 ms cooldown before half-open
+
+# ── decision logic ──────────────────────────────────────────────────
+
+fn Demo::Cb::should_allow() {
+    if ($bstate eq "closed") {
+        return 1
+    }
+    if ($bstate eq "open") {
+        # Has cooldown elapsed?
+        if (now_ns() - $opened_at >= $cooldown_ns) {
+            $bstate = "half_open"
+            return 1   # let one through
+        }
+        return 0
+    }
+    if ($bstate eq "half_open") {
+        return 1
+    }
+    return 1
+}
+
+fn Demo::Cb::record_outcome($ok) {
+    push @recent_outcomes, $ok ? 1 : 0
+    # Trim window.
+    if (len(@recent_outcomes) > $window) {
+        shift @recent_outcomes
+    }
+    # State transitions.
+    if ($bstate eq "half_open") {
+        if ($ok) {
+            $bstate = "closed"
+            @recent_outcomes = ()
+        } else {
+            $bstate = "open"
+            $opened_at = now_ns()
+        }
+        return
+    }
+    if ($bstate eq "closed") {
+        if (len(@recent_outcomes) == $window) {
+            my $failures = grep { _ == 0 } @recent_outcomes
+            my $fail_rate = $failures / $window
+            if ($fail_rate >= $threshold) {
+                $bstate = "open"
+                $opened_at = now_ns()
+            }
+        }
+    }
+}
+
+# ── instrumented downstream (intentionally flaky) ───────────────────
+
+mysync $succ_lat = t_digest(100)
+mysync $fail_lat = t_digest(100)
+
+fn Demo::Cb::call_downstream($flake_rate) {
+    my $t0 = now_ns()
+    # Burn a small amount of time.
+    my $end = now_ns() + 50_000   # 50 µs
+    while (now_ns() < $end) { }
+    if (rand() < $flake_rate) {
+        td_add($fail_lat, (now_ns() - $t0) / 1000.0)
+        return +{ ok => 0, error => "downstream_failure" }
+    }
+    td_add($succ_lat, (now_ns() - $t0) / 1000.0)
+    return +{ ok => 1, body => "response_data" }
+}
+
+# ── guarded call ────────────────────────────────────────────────────
+
+mysync $allowed = 0
+mysync $rejected = 0
+mysync $upstream_ok = 0
+mysync $upstream_fail = 0
+mysync @audit
+mysync %state_transitions
+
+fn Demo::Cb::call($flake_rate) {
+    my $prev_state = $bstate
+    if (!Demo::Cb::should_allow()) {
+        $rejected = $rejected + 1
+        push @audit, +{ state => $bstate, decision => "rejected" }
+        return +{ ok => 0, reason => "breaker_open" }
+    }
+    $allowed = $allowed + 1
+    my $r = Demo::Cb::call_downstream($flake_rate)
+    Demo::Cb::record_outcome($r->{ok})
+    if ($r->{ok}) {
+        $upstream_ok = $upstream_ok + 1
+    } else {
+        $upstream_fail = $upstream_fail + 1
+    }
+    my $transition = "$prev_state -> $bstate"
+    $state_transitions{$transition} = ($state_transitions{$transition} // 0) + 1
+    push @audit, +{
+        state    => $bstate,
+        decision => "allowed",
+        ok       => $r->{ok} ? 1 : 0,
+    }
+    return $r
+}
+
+# ── workload simulator ──────────────────────────────────────────────
+
+# Phase 1: 30 calls against an 80%-failing downstream (should trip).
+p "── phase 1: 30 calls @ 80% flake rate ───────────────"
+for my $i (1:30) {
+    my $r = Demo::Cb::call(0.80)
+    my $tag = $r->{ok} ? "ok" : ($r->{reason} // "fail")
+    printf "  %2d: state=%-10s %s\n", $i, $bstate, $tag
+}
+
+p ""
+printf "── after phase 1: state=%s ────────────────────────────\n", $bstate
+
+# Phase 2: wait past cooldown, then 10 calls against healthy downstream.
+p ""
+p "── busy-wait for cooldown (200ms) ───────────────────"
+my $end = now_ns() + 220_000_000
+while (now_ns() < $end) { }
+
+p "── phase 2: 10 calls @ 0% flake rate ────────────────"
+for my $i (1:10) {
+    my $r = Demo::Cb::call(0.0)
+    my $tag = $r->{ok} ? "ok" : ($r->{reason} // "fail")
+    printf "  %2d: state=%-10s %s\n", $i, $bstate, $tag
+}
+
+# ── rollup ──────────────────────────────────────────────────────────
+
+p ""
+p "── rollup ───────────────────────────────────────────"
+printf "  upstream calls allowed   : %d\n", $allowed
+printf "  upstream calls rejected  : %d\n", $rejected
+printf "  upstream successes       : %d\n", $upstream_ok
+printf "  upstream failures        : %d\n", $upstream_fail
+printf "  final breaker state      : %s\n", $bstate
+
+p ""
+p "── state transitions ───────────────────────────────"
+for my $k (sort { _0 cmp _1 } keys %state_transitions) {
+    printf "  %-30s : %d\n", $k, $state_transitions{$k}
+}
+
+p ""
+p "── latency (t-digest) ──────────────────────────────"
+printf "  success p50  : %.1f µs\n", td_quantile($succ_lat, 0.50)
+printf "  success p99  : %.1f µs\n", td_quantile($succ_lat, 0.99)
+printf "  failure p50  : %.1f µs\n", td_quantile($fail_lat, 0.50)
+printf "  failure p99  : %.1f µs\n", td_quantile($fail_lat, 0.99)

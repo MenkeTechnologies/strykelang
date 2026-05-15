@@ -1,0 +1,87 @@
+#!/usr/bin/env stryke
+
+# Web job queue demo — practical pattern using stryke's `s_web` ORM
+# layer over in-memory SQLite, plus a t-digest for per-job latency
+# stats. Composes the persistent job queue with sketch-based
+# observability in one cohesive demo.
+#
+# Critically uses `web_db_connect(":memory:")` not `"sqlite:" . $path`
+# (which would silently materialise a `sqlite:` directory in the cwd —
+# see the prior audit fix in `test_power_user_features_pin.stk`).
+
+# ── connect + init job table ──────────────────────────────────────────
+
+web_db_connect(":memory:")
+web_jobs_init()
+
+# ── enqueue a wave of jobs with varied payloads ───────────────────────
+
+p "── enqueue 10 jobs ────────────────────────────────────"
+for my $i (1:10) {
+    web_job_enqueue("process_invoice", +{
+        invoice_id => $i,
+        amount     => 100 + $i * 13,
+        priority   => $i <= 3 ? "high" : "normal",
+    })
+}
+printf "  enqueued, stats: %s\n", to_json(web_jobs_stats())
+
+# ── consume jobs in a loop, measure per-job latency ───────────────────
+
+p ""
+p "── consume + record latency in t-digest ───────────────"
+my $latency = t_digest(100)
+my $by_priority = cms(2048, 5)
+
+my $done = 0
+while (my $job = web_job_dequeue()) {
+    my $t1 = now_ns()
+    # Simulated work: priority-high jobs are slower (more validation).
+    my $extra = $job->{args}->{priority} eq "high" ? 0.01 : 0.002
+    sleep $extra
+    my $dt_us = (now_ns() - $t1) / 1000.0
+    td_add($latency, $dt_us)
+    cms_add($by_priority, $job->{args}->{priority})
+    web_job_complete($job->{id})
+    $done++
+}
+printf "  processed %d jobs\n", $done
+
+# ── latency distribution from t-digest ────────────────────────────────
+
+p ""
+p "── per-job latency quantiles (µs) ─────────────────────"
+printf "  p50  : %.1f\n", td_quantile($latency, 0.50)
+printf "  p90  : %.1f\n", td_quantile($latency, 0.90)
+printf "  p99  : %.1f\n", td_quantile($latency, 0.99)
+printf "  min  : %.1f\n", td_min($latency)
+printf "  max  : %.1f\n", td_max($latency)
+printf "  mean : %.1f\n", td_mean($latency)
+
+# ── priority distribution from CMS ────────────────────────────────────
+
+p ""
+p "── job count by priority ──────────────────────────────"
+for my $p ("high", "normal", "low") {
+    printf "  %-7s × %d\n", $p, cms_count($by_priority, $p)
+}
+
+# ── final job-queue stats ─────────────────────────────────────────────
+
+p ""
+p "── final job-queue stats ──────────────────────────────"
+my $stats = web_jobs_stats()
+printf "  done    : %d\n", $stats->{done}
+printf "  pending : %d\n", $stats->{pending}
+printf "  failed  : %d\n", $stats->{failed} // 0
+
+# ── enqueue a failing job, mark it failed, see the counter move ───────
+
+p ""
+p "── failure path ───────────────────────────────────────"
+web_job_enqueue("buggy_job", +{ retry => 0 })
+my $bad = web_job_dequeue()
+web_job_fail($bad->{id}, "simulated runtime error")
+my $stats2 = web_jobs_stats()
+printf "  done    : %d\n", $stats2->{done}
+printf "  failed  : %d\n", $stats2->{failed} // 0

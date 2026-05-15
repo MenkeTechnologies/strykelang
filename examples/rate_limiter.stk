@@ -1,0 +1,133 @@
+#!/usr/bin/env stryke
+
+# Token-bucket rate limiter demo. Each client gets a bucket of tokens
+# that refills at a fixed rate; each request consumes one token. When
+# the bucket is empty, the request is rejected (or queued).
+#
+# Patterns:
+#   * mysync hash-of-hashes for per-client bucket state
+#   * elapsed-time refill math via now_ns
+#   * AOP `around` for audit log without touching the limiter body
+#   * t-digest for inter-request latency
+#   * TopK for "rate-limited the most" telemetry
+
+# ── per-client bucket state ──────────────────────────────────────────
+# buckets{client} = { tokens => N, last_refill_ns => T }
+
+mysync %buckets
+
+my $capacity     = 5        # max tokens per bucket
+my $refill_per_s = 2        # tokens refilled per second
+my $refill_per_ns = $refill_per_s / 1_000_000_000.0
+
+# ── try to consume one token; return 1 if allowed, 0 if denied ──────
+
+fn Demo::RL::try_acquire($client) {
+    my $now = now_ns()
+    if (!exists $buckets{$client}) {
+        $buckets{$client} = +{ tokens => $capacity, last_refill_ns => $now }
+    }
+    my $bucket = $buckets{$client}
+    # Refill based on elapsed time.
+    my $elapsed_ns = $now - $bucket->{last_refill_ns}
+    my $add = $elapsed_ns * $refill_per_ns
+    my $new_tokens = $bucket->{tokens} + $add
+    $new_tokens = $capacity if $new_tokens > $capacity
+    $bucket->{tokens}         = $new_tokens
+    $bucket->{last_refill_ns} = $now
+    if ($bucket->{tokens} >= 1.0) {
+        $bucket->{tokens} = $bucket->{tokens} - 1.0
+        return 1
+    }
+    return 0
+}
+
+# ── AOP instrumentation: count allows/denies, latency ───────────────
+
+mysync $allowed = 0
+mysync $denied  = 0
+mysync $latency = t_digest(100)
+mysync $rejects = topk(3)
+
+around "Demo::RL::try_acquire" {
+    my $client = $INTERCEPT_ARGS[0]
+    my $t0 = now_ns()
+    my $r = proceed(@INTERCEPT_ARGS)
+    td_add($latency, (now_ns() - $t0) / 1000.0)
+    if ($r) {
+        $allowed = $allowed + 1
+    } else {
+        $denied = $denied + 1
+        topk_add($rejects, $client)
+    }
+    $r
+}
+
+# ── simulate a bursty workload ──────────────────────────────────────
+
+# 4 clients, each fires 15 requests in a tight loop.
+my @clients = ("api-key-A", "api-key-B", "api-key-C", "api-key-D")
+
+p "── token bucket: capacity=5, refill=2/s ─────────────"
+p "── 4 clients, 15 requests each, all back-to-back ────"
+
+for my $client (@clients) {
+    my @log
+    for my $i (1:15) {
+        my $r = Demo::RL::try_acquire($client)
+        push @log, $r ? "ALLOW" : "DENY"
+    }
+    printf "  %-12s : %s\n", $client, join(" ", @log)
+}
+
+# ── after a 0.5s sleep, simulate refilled buckets ───────────────────
+
+p ""
+p "── after waiting ~0.5s (busy-wait) ──────────────────"
+my $end = now_ns() + 500_000_000   # 500 ms
+my $spin = 0
+while (now_ns() < $end) { $spin++ }
+
+for my $client (@clients) {
+    my @log
+    for my $i (1:5) {
+        my $r = Demo::RL::try_acquire($client)
+        push @log, $r ? "ALLOW" : "DENY"
+    }
+    printf "  %-12s : %s\n", $client, join(" ", @log)
+}
+
+# ── rollup ──────────────────────────────────────────────────────────
+
+p ""
+p "── rollup ───────────────────────────────────────────"
+my $total = $allowed + $denied
+printf "  total requests : %d\n", $total
+printf "  allowed        : %d  (%.1f%%)\n",
+    $allowed, 100.0 * $allowed / $total
+printf "  denied         : %d  (%.1f%%)\n",
+    $denied,  100.0 * $denied / $total
+
+p ""
+p "── try_acquire latency (t-digest) ───────────────────"
+printf "  p50  : %.1f µs\n", td_quantile($latency, 0.50)
+printf "  p90  : %.1f µs\n", td_quantile($latency, 0.90)
+printf "  p99  : %.1f µs\n", td_quantile($latency, 0.99)
+
+p ""
+p "── most-rejected clients (TopK) ─────────────────────"
+my @top = topk_top($rejects)
+for my $h (@top) {
+    printf "  %-12s : %d denials\n", $h->[0], $h->[1]
+}
+
+# ── final bucket state ──────────────────────────────────────────────
+
+p ""
+p "── final per-client bucket state ────────────────────"
+for my $client (sort { _0 cmp _1 } keys %buckets) {
+    my $bucket = $buckets{$client}
+    printf "  %-12s : tokens=%.2f\n", $client, $bucket->{tokens}
+}
+
+intercept_clear("Demo::RL::try_acquire")

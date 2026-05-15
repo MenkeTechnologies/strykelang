@@ -4194,6 +4194,853 @@ in `tests/suite/behavior_pin_2026_05_at.rs`.
 Severity: **parity** (intentional-strictness).
 
 
+## BUG-205 — `preduce_init INIT, { BLOCK } LIST` returns the init unchanged
+
+```sh
+$ s -e 'my $r = preduce_init 100, { _0 + _1 } (1, 2, 3, 4); print "r=$r\n"'
+r=0
+$ s -e 'my $r = preduce { _0 + _1 } 100, (1, 2, 3, 4); print "r=$r\n"'
+r=110
+```
+
+The `preduce_init INIT, { BLOCK } LIST` argument-order form silently
+returns 0 instead of folding the list into the init accumulator. The
+working form is the regular `preduce { BLOCK } INIT, LIST` (init second).
+
+Discovered while writing the parallel-primitives pin file
+(`tests/suite/parallel_primitives_pin.rs`). The pin tests the working
+form. A future fix should make `preduce_init` route to the same fold;
+the current behavior is wrong on its face.
+
+Severity: **bug**.
+
+
+## BUG-206 — `from_yaml(to_yaml(...))` flattens 3+ level nested hashrefs
+
+```sh
+$ s -e '
+    my $d = +{ a => +{ b => +{ c => +{ d => 1 } } } };
+    my $back = from_yaml(to_yaml($d));
+    print defined($back->{a}->{b}->{c}->{d}) ? "ok" : "missing", "\n"
+'
+missing
+```
+
+YAML round-trip of hash-of-hash-of-hash at depth ≥ 3 loses leaf values
+on the deeper paths. Two-level nesting (`{a => {b => 1}}`) round-trips
+fine. The pin file `tests/suite/codec_roundtrip_pin.rs` documents the
+working depth-2 case; this entry tracks the deeper case as a known gap.
+
+Root cause not yet diagnosed — likely either in the YAML emitter
+(missing block-scalar indentation past two levels) or in the parser
+(eager flatten on nested mapping). JSON/TOML do not exhibit this.
+
+Severity: **bug**.
+
+
+## BUG-207 — `from_json("definitely not json")` returns the input string
+
+```sh
+$ s -e 'my $r = from_json("definitely not json"); print "type=", ref($r) // "scalar", " val=$r\n"'
+type=scalar val=definitely not json
+```
+
+`from_json` on a non-JSON string silently passes the input through as a
+scalar rather than raising an error or returning `undef`. This masks
+real data bugs: a script that parses HTTP response bodies will see a
+"successful parse" of an error page.
+
+The current behavior is pinned (`from_json_on_garbage_passes_through_unchanged`
+in `tests/suite/codec_roundtrip_pin.rs`) so a future strict-mode change
+is a visible decision rather than a silent regression. A reasonable fix
+direction: return `undef` on parse error and set `$!` to a parser
+diagnostic, the way Perl's `JSON::PP` does.
+
+Severity: **bug**.
+
+
+## BUG-208 — `box_blur_kernel(N)` returns a flat Array, not an ArrayRef
+
+```sh
+$ s -e '
+    my $k = box_blur_kernel(3);
+    print "ref=", ref($k) // "(none)", " len=", len($k), "\n";
+    # Works: arrow-indexed access.
+    print "k[0]=", $k->[0], "\n";
+    # Fails: array-deref.
+    my @rows = @$k;
+    print "rows=", scalar(@rows), "\n"
+'
+ref= len=7
+k[0]=0.111111
+rows=1
+```
+
+`box_blur_kernel(3)` returns an Array value (length 7, all `1/9` ≈ 0.111)
+rather than a 3×3 ArrayRef of rows. The arrow-index form works because
+the Array is auto-indexed, but `@$k` dereferences as a 1-element wrap,
+producing wrong-shape output for any caller expecting an MxN matrix.
+
+The companion math kernels (`pauli_x`, `lu_decompose`, etc.) return
+proper ArrayRef-of-ArrayRef matrices. Discovered while pinning these
+shapes in `tests/suite/len_semantics_pin.rs`.
+
+Severity: **bug**.
+
+
+## BUG-209 — Pipe-forward into `>{ BLOCK }` passes the value as `$_`, never as `@_`
+
+```sh
+$ s -e '
+    my @arr = (1, 2, 3, 4, 5);
+    my @r = @arr |> >{ join(",", @_) };
+    print "r=@r\n"
+'
+r=
+$ s -e '
+    my @arr = (1, 2, 3, 4, 5);
+    my $r = @arr |> >{ join(",", @$_) };
+    print "r=$r\n"
+'
+r=5,4,3,2,1
+```
+
+Wait, the second form prints reversed — that's the existing array-ref
+binding from a prior stage. Setting that aside, the central observation:
+the `>{ ... }` IIFE stage in a pipe-forward chain receives the LHS as
+`$_` (a single scalar that's either the original value or an arrayref
+if the LHS was an array), *not* as `@_`. So patterns like
+
+```stryke
+my @top5 = (1..100) |> sort { _1 <=> _0 } |> >{ @_[0:4] };
+```
+
+silently produce an empty `@_` and an empty result.
+
+The pin for `pipe_iife_stage_receives_lhs_as_underscore` in
+`tests/suite/pipe_forward_pin.rs` documents the working `$_` form.
+Demos affected during round-6 work: `examples/stream_merge.stk` was
+rewritten to materialize an intermediate `@desc_uniq` array and slice
+explicitly, sidestepping the `>{ ... }` stage.
+
+A future fix should bind `@_` to the LHS items when the LHS is a list,
+matching Perl-block expectations. Today, this is a quiet sharp edge that
+costs every new user a debug session.
+
+Severity: **bug**.
+
+
+## BUG-210 — `return` inside `eval { ... }` returns from the eval, not from the enclosing sub
+
+```sh
+$ s -e 'sub g { eval { return 42 }; 99 } print g(), "\n"'
+99
+$ perl -e 'sub g { eval { return 42 }; 99 } print g(), "\n"'
+42
+```
+
+Perl's `return` inside `eval { BLOCK }` unwinds the call frame
+through the eval back to the enclosing sub, so `g()` should return
+42. Stryke treats the eval block as a regular block and `return`
+exits only the eval, letting the enclosing sub fall through to the
+trailing `99`.
+
+Affects any code pattern of the form:
+
+```perl
+sub fetch_or_die {
+    eval { return cache_get($key) if defined cache_get($key) };
+    return compute();
+}
+```
+
+— in stryke, the eval-block return is silently lost and `compute()`
+always runs even on a cache hit.
+
+Pinning test: `return_inside_eval_returns_from_eval_not_enclosing_sub`
+in `tests/suite/error_handling_pin.rs`.
+
+Severity: **bug** (parity gap vs Perl 5 semantics).
+
+
+## BUG-211 — `"42 at FILE line N." + 0` numerifies to `1`, not `42`
+
+```sh
+$ s -e 'eval { die 42 }; print $@ + 0, "\n"'
+1
+$ perl -e 'eval { die 42 }; print $@ + 0, "\n"'
+42
+```
+
+Perl's numeric-context coercion of a string consumes the leading
+numeric prefix (`"42 at -e line 1.\n"` → `42`). Stryke's coercion
+returns `1` — apparently treating the whole non-numeric tail as
+significant and degrading the result to a boolean-style 1.
+
+This breaks the common Perl idiom of `if ($@ == ERRNO)` for error-code
+dispatch when the die payload is an integer.
+
+Pinning test: indirect via `die_with_integer_payload_stringified_with_location_suffix`
+in `tests/suite/error_handling_pin.rs` (pins the string-prefix shape;
+numeric coercion gap tracked here for future fix).
+
+Severity: **bug** (parity gap; affects classic Perl error-dispatch).
+
+
+## BUG-212 — AOP `around` advice does not fire when target is invoked inside `eval { ... }`
+
+```sh
+$ s -e '
+    fn foo($x) { $x * 2 }
+    fn caller_fn($x) { eval { foo($x) } }
+    mysync $count = 0;
+    around "foo" { $count++; proceed(@INTERCEPT_ARGS) }
+    caller_fn(1); caller_fn(2); caller_fn(3);
+    print "count=$count\n"
+'
+count=0
+
+$ s -e '
+    fn foo($x) { $x * 2 }
+    mysync $count = 0;
+    around "foo" { $count++; proceed(@INTERCEPT_ARGS) }
+    foo(1); foo(2); foo(3);
+    print "count=$count\n"
+'
+count=3
+```
+
+When the AOP-wrapped function is invoked directly, the `around` body
+fires correctly. When the same function is invoked from inside an
+`eval { BLOCK }` (anywhere in the call chain — directly in the eval, or
+inside another function called from within the eval), the AOP dispatch
+is bypassed entirely. Counter stays at zero. The function body still
+runs, but observers, latency tracking, and retry counters all silently
+disappear.
+
+This is load-bearing: any defensive code path using `eval` to swallow
+expected exceptions silently loses every form of instrumentation
+attached via `around` / `before` / `after`. Worked around in
+`examples/job_queue.stk` by returning `+{ ok => 0, error => ... }`
+hashrefs from the worker instead of `die`-ing, so the caller never
+needs to `eval`.
+
+Root cause likely: the `eval` block lowering installs its own call
+frame that doesn't route through the AOP dispatch table — the VM jumps
+straight to the bytecode for the called function.
+
+Severity: **bug** (silent observability hole; should be a P1 fix).
+
+**Update (round-11):** A second manifestation of the same root cause —
+AOP `around` advice on a recursive function fires only for the outermost
+invocation, never for self-recursive sub-calls. Discovered in
+`examples/expression_parser.stk`: the AOP-wrapped `eval_ast` counter
+reads `12` (one per top-level evaluation) when the actual recursive
+call count is several times higher. Either internal call-site bytecode
+short-circuits the AOP dispatch table, or AOP intentionally suppresses
+re-entrancy. Either way the surface is wrong for observability use
+cases.
+
+
+## BUG-213 — Global match in list context returns full match strings, not per-capture values
+
+```sh
+$ s -e 'my @r = ("foo=1 bar=2 baz=3" =~ /(\w+)=(\d+)/g); print scalar(@r), ":", join(",", @r), "\n"'
+3:foo=1,bar=2,baz=3
+$ perl -e 'my @r = ("foo=1 bar=2 baz=3" =~ /(\w+)=(\d+)/g); print scalar(@r), ":", join(",", @r), "\n"'
+6:foo,1,bar,2,baz,3
+```
+
+Perl's `=~ //g` in list context returns the captures **flattened across
+matches** — `(cap1_of_match1, cap2_of_match1, cap1_of_match2, ...)`.
+Stryke returns the full match strings (`$&` of each match) instead.
+
+Affects every Perl idiom of the form `my @pairs = $s =~ /(\w+)=(\d+)/g`,
+which expects 2N elements but gets N. Pin in
+`tests/suite/regex_capture_pin.rs::global_match_in_list_context_returns_full_match_strings`.
+
+Severity: **bug** (parity gap).
+
+
+## BUG-214 — `$\`` and `$'` (pre-match / post-match) variables not supported
+
+```sh
+$ s -e '"abc123def" =~ /(\d+)/; print "pre=[", $`, "] post=[", $'\'', "]\n"'
+Expected variable name after $ at -e line 1.
+
+$ perl -e '"abc123def" =~ /(\d+)/; print "pre=[$`] post=[$\047]\n"'
+pre=[abc] post=[def]
+```
+
+Stryke parser rejects `$\`` (pre-match) and `$'` (post-match) variables
+outright. Scripts that use these idiomatic Perl regex helpers must
+derive pre/post manually from `$-[0]` / `$+[0]` offsets (also not
+verified to be supported).
+
+Workaround: use `(?:before)(target)(?:after)` capture groups instead.
+
+Severity: **bug** (parity gap).
+
+
+## BUG-215 — `$+{name}` named-backref interpolation broken in s/// replacement
+
+```sh
+$ s -e 'my $s = "alice=30"; $s =~ s/(?<k>\w+)=(?<v>\d+)/$+{v} -> $+{k}/; print "$s\n"'
+$+{v} -> $+{k}
+
+$ perl -e 'my $s = "alice=30"; $s =~ s/(?<k>\w+)=(?<v>\d+)/$+{v} -> $+{k}/; print "$s\n"'
+30 -> alice
+```
+
+Inside an `s///` replacement string, `$+{name}` is not interpolated and
+appears verbatim in the output. The numeric form `$1`, `$2` does work,
+so this is specifically about hash-syntax interpolation in replacement
+context.
+
+Workaround: use numbered backrefs `$1`, `$2`, ... even with named-group
+patterns. Pin: `substitution_with_named_backref_via_numeric_form` in
+`tests/suite/regex_capture_pin.rs`.
+
+Severity: **bug** (parity gap).
+
+
+## BUG-216 — No autovivification on deep-write or `push`
+
+```sh
+$ s -e 'my %h; $h{a}{b}{c} = "x"; print $h{a}{b}{c}, "\n"'
+Can't use arrow deref on non-hash-ref at -e line 1.
+
+$ s -e 'my $r = +{}; push @{$r->{list}}, "first"; print scalar(@{$r->{list}}), "\n"'
+push argument is not an ARRAY reference at -e line 1.
+
+$ perl -e 'my %h; $h{a}{b}{c} = "x"; print $h{a}{b}{c}, "\n"'
+x
+$ perl -e 'my $r = +{}; push @{$r->{list}}, "first"; print scalar(@{$r->{list}}), "\n"'
+1
+```
+
+Perl autovivification is the language feature that makes `$h{a}{b}{c} = X`
+silently create the chain of intermediate hashes. Stryke does NOT
+autoviv — every level must be created explicitly:
+
+```stryke
+my %h;
+$h{a}    = +{};
+$h{a}{b} = +{};
+$h{a}{b}{c} = "x";
+
+my $r = +{};
+$r->{list} = [];
+push @{$r->{list}}, "first";
+```
+
+Affects every Perl idiom that incrementally builds nested structures
+(grouping hashes, parser AST construction, recursive descent state).
+
+Pin: `autoviv_requires_explicit_intermediate_construction` and
+`autoviv_requires_explicit_arrayref_before_push` in
+`tests/suite/hashref_deep_pin.rs`.
+
+Severity: **bug** (large parity gap; major Perl idiom blocker).
+
+
+## BUG-217 — Hash slice through arrow-deref `@{$r}{KEYS}` errors
+
+```sh
+$ s -e 'my $r = +{ a => 1, b => 2 }; my @v = @{$r}{qw(a b)}; print join(",", @v), "\n"'
+Can't dereference non-reference as array at -e line 1.
+
+$ perl -e 'my $r = +{ a => 1, b => 2 }; my @v = @{$r}{qw(a b)}; print join(",", @v), "\n"'
+1,2
+```
+
+The `@{$r}{KEYS}` form — hash slice through a hashref via the explicit
+`@{...}{...}` deref-then-slice syntax — fails to parse as a hash slice.
+Stryke appears to interpret `@{$r}` as an array deref first, then
+gets confused by the `{KEYS}` block.
+
+Workaround: pluck keys explicitly, or use `@$r{KEYS}` (no braces around
+the variable) if supported.
+
+Pin: `hash_slice_through_arrow_via_explicit_keys` in
+`tests/suite/hashref_deep_pin.rs`.
+
+Severity: **bug** (parity gap).
+
+
+## BUG-218 — Regex with interpolated variable `/^$re$/` caches result across calls in a loop
+
+```sh
+$ cat > /tmp/probe.stk <<'EOF'
+fn pm($pat, $topic) {
+    my $re = $pat;
+    $re =~ s/\./\\./g;
+    $re =~ s/\*/[^.]+/g;
+    my $r = $topic =~ /^$re$/ ? 1 : 0;
+    printf "pat=[%s] re=[%s] r=%d\n", $pat, $re, $r;
+    return $r;
+}
+my $topic = "user.created";
+for my $pat ("user.*", "order.placed", "order.*") {
+    pm($pat, $topic);
+}
+EOF
+$ s --no-interop /tmp/probe.stk
+pat=[user.*] re=[user\.[^.]+] r=1
+pat=[order.placed] re=[order\.placed] r=1     # WRONG, should be 0
+pat=[order.*] re=[order\.[^.]+] r=1            # WRONG, should be 0
+```
+
+When a regex is built via variable interpolation (`/^$re$/` or
+`qr/^$re$/`) inside a function called in a loop, the **result of the
+first match is reused for every subsequent call**, regardless of the
+new variable value. Reversing the call order flips the bug to
+"first call returns 0 → all return 0".
+
+The same regex form works correctly in isolation (single call) and in
+direct testing outside the function. The bug surfaces only when the
+function is called repeatedly with different variable values.
+
+Most likely root cause: the regex literal `/^$re$/` is compiled once
+at first execution and the compiled pattern is cached per call-site
+program-counter, not re-compiled per dynamic value of `$re`.
+
+Affects: pattern-matching dispatch tables, glob-style routing,
+templated query builders, anything that varies a regex per iteration.
+Workaround in `examples/event_dispatcher.stk`: use the `glob_match`
+builtin instead of hand-rolled regex.
+
+Severity: **bug** (P1; regex correctness; silent wrong-result hazard).
+
+
+## BUG-219 — AOP advice body rejects multi-line `+{...}` hashref literals + multi-statement `if` modifiers
+
+When writing an AOP `around`/`before`/`after` advice body, certain
+constructs that work elsewhere in stryke trigger:
+
+```
+AOP around advice body for `NAME` could not be lowered to bytecode
+(likely contains a construct unsupported by block lowering)
+```
+
+Reproducible patterns that hit the lowering wall:
+
+1. **Multi-line hashref literal inside an advice statement**:
+
+```stryke
+around "foo" {
+    push @$log, +{
+        from => $a,
+        event => $b,
+    }
+    proceed()
+}
+```
+
+Workaround: build the hashref on one line, store in a local, then push.
+
+```stryke
+around "foo" {
+    my $entry = +{ from => $a, event => $b }
+    push @$log, $entry
+    proceed()
+}
+```
+
+2. **`$hash{key}++ if cond` postfix-modifier increment**:
+
+```stryke
+around "foo" {
+    $count{$bucket}++ if defined $bucket
+    proceed()
+}
+```
+
+Workaround: lift to a full `if`-block with explicit `+= 1`.
+
+3. **Literal `return` in advice body** (previously documented; same lowering pass):
+
+The common thread is that the AOP lowering pass only handles a subset
+of block-statement shapes. Real advice bodies often need this stuff,
+so workarounds compound demo verbosity.
+
+Discovered via `examples/state_machine.stk` and `examples/graph_bfs.stk`
+during round-8/round-10 demo work.
+
+Severity: **bug** (developer-experience friction; correctness if a
+user assumes the advice fired when it didn't compile in).
+
+
+## BUG-220 — `scalar(N:M)` of a colon-range returns the empty string
+
+```sh
+$ s -e 'my $n = scalar(1:100); print "n=[", $n, "]\n"'
+n=[]
+
+$ s -e 'my @r = (1:100); my $n = scalar(@r); print "len=$n\n"'
+len=100
+
+$ s -e 'my $n = len(1:100); print "n=$n\n"'
+n=100
+```
+
+`scalar(N:M)` on a colon-range expression does not materialize the
+range and returns an empty string instead of the element count. Two
+workarounds work:
+
+- `len(N:M)` — the stryke-idiomatic length.
+- `my @arr = (N:M); my $n = scalar(@arr);` — materialise first.
+
+Affects any code that tries `scalar(0:$n-1)` to derive an iteration
+count without copying.
+
+Pinning test: `range_via_len_returns_element_count` in
+`tests/suite/range_iteration_pin.rs` (pins the working `len` form).
+
+Severity: **bug** (minor parity gap; easy workaround).
+
+
+## BUG-222 — AOP `around "Pkg::method"` advice does not fire on `$obj->method()` calls
+
+```sh
+$ cat > /tmp/probe.stk <<'EOF'
+class Foo {
+    n: Int = 0
+    fn bump { $self->n($self->n + 1) }
+}
+mysync $count = 0
+around "Foo::bump" {
+    $count = $count + 1
+    proceed(@INTERCEPT_ARGS)
+}
+my $f = Foo()
+$f->bump
+$f->bump
+$f->bump
+print "count=$count f->n=", $f->n, "\n"
+EOF
+$ s --no-interop /tmp/probe.stk
+count=0 f->n=3
+```
+
+The method body runs (`f->n` becomes 3 after 3 bumps), but the `around`
+advice registered against `"Foo::bump"` never increments `$count`.
+AOP dispatch is bypassed entirely for method-call syntax.
+
+Same root cause as BUG-212: AOP advice fires for direct symbol-table
+calls but is skipped for any invocation path that doesn't route through
+the AOP dispatch table — `eval { fn() }`, recursive self-calls,
+**and now `$obj->method()` method calls**.
+
+Affects every observability use case where the wrapped target is an
+OOP method: hit-rate trackers on cache classes, latency tracing on
+service classes, audit logs on persistence layers.
+
+Worked around in `examples/lru_cache.stk` (the per-op t-digest reports
+`NaN` because no samples ever flowed through the advice).
+
+Workaround: wrap a free function that calls into the method, register
+AOP on the free function. Verbose; defeats the purpose of `around`.
+
+Severity: **bug** (P1 alongside BUG-212; together they make AOP
+unreliable for observability on real codebases).
+
+
+## BUG-223 — `zip(@a, @b)` pads to longer side instead of truncating to shorter
+
+```sh
+$ s -e 'my @r = zip([1, 2, 3, 4, 5], ["a", "b"]); print "n=", scalar(@r), "\n"; for my $p (@r) { print "  [", $p->[0], ",", $p->[1], "]\n" }'
+n=5
+  [1,a]
+  [2,b]
+  [3,]
+  [4,]
+  [5,]
+```
+
+Perl / `List::MoreUtils::zip` returns rows up to the shorter array's
+length. Stryke pads the shorter side with empty values and continues
+to the longer side, producing rows with empty-string second fields.
+
+Affects any code that relies on `zip` to act as a "stop at shorter"
+truncating iterator (the standard pairing semantic).
+
+Pin: `zip_arrays_of_unequal_length_pads_to_longer` in
+`tests/suite/iterators_pin.rs`.
+
+Severity: **bug** (parity gap; affects iterator pipelines).
+
+
+## BUG-224 — `chunk(N, LIST)` returns a single-element arrayref wrapping `N`
+
+```sh
+$ s -e 'my @g = chunk(3, 1, 2, 3, 4, 5, 6, 7, 8, 9); print scalar(@g), "\n"; for my $c (@g) { print "[", join(",", @$c), "]\n" }'
+1
+[1]
+
+$ s -e 'my @g = chunked((1, 2, 3, 4, 5, 6, 7, 8, 9), 3); print scalar(@g), "\n"; for my $c (@g) { print "[", join(",", @$c), "]\n" }'
+3
+[1,2,3]
+[4,5,6]
+[7,8,9]
+```
+
+`chunk(N, LIST)` returns `[[N]]` (a single arrayref containing N as the
+sole element) instead of the expected N-sized groups. Same for
+`chunk_n(LIST, N)` and `ai_chunk([...], N)` — all return wrong shape.
+
+The `chunked((...), N)` form (parens around the LIST, N second) works
+correctly. Use that form in fresh code.
+
+Pin: `chunked_3_splits_into_groups_of_three` in
+`tests/suite/iterators_pin.rs`.
+
+Severity: **bug** (BUG-058 marked some chunk variants — this is the
+remaining set).
+
+
+## BUG-225 — `sliding_window` appears in `%b` keys but errors on call
+
+```sh
+$ s -e 'print grep { /^sliding/ } keys %b'
+sliding_average sliding_dot_product sliding_max sliding_min sliding_pairs sliding_sum sliding_window
+
+$ s -e 'my @w = sliding_window([1,2,3,4,5], 3); print scalar(@w), "\n"'
+Undefined subroutine &sliding_window at -e line 1.
+```
+
+`sliding_window` is listed as a builtin in the reflection hash `%b` but
+calling it errors as `Undefined subroutine`. Either the reflection
+table includes a stale name, or the dispatch table is missing the
+implementation.
+
+Workaround: use `sliding_pairs` for size=2; for larger sizes, roll
+your own using `chunked` and an offset.
+
+Severity: **bug** (reflection / implementation inconsistency; minor
+discoverability hazard).
+
+
+## BUG-226 — `mysync $x = t_digest(N)` mid-script silently corrupts the sketch type tag
+
+```stryke
+# Top of file:
+mysync $hll = hll(14)
+mysync $tk  = topk(3)
+
+# After some code runs:
+mysync $global_lat = t_digest(100)
+td_add($global_lat, 42)   # → "td_add: expected TDigestSketch operand"
+```
+
+When `mysync $x = t_digest(N)` is declared **after** other `mysync`
+declarations + intervening code, subsequent `td_add($x, ...)` errors
+out with "expected TDigestSketch operand". Switching to plain `my $x`
+declaration works; declaring all `mysync` sketches at the top of the
+script also works.
+
+Manifested in `examples/json_lines_log.stk` (round 13) — mid-script
+`mysync` of a t-digest after parsing log records corrupted the type.
+Workaround applied: use `my` for sketches that don't need cross-closure
+write-back.
+
+Severity: **bug** (silent type-tag corruption; surface is non-obvious).
+
+
+## BUG-227 — `mysync $count = $count + 1` inside `pfor` races (lost updates)
+
+```sh
+$ s -e 'mysync $count = 0; pfor { $count = $count + 1 } (1:100); print "count=$count\n"'
+count=75
+```
+
+`mysync` provides shared visibility across closure boundaries but does
+NOT make read-modify-write atomic. Under `pfor` workload, observed
+final counter values consistently fall below the iteration count due
+to lost updates (worker reads `$count`, increments, writes back —
+between read and write another worker has the same stale value).
+
+In `examples/job_queue.stk` and other earlier demos the workaround was
+to switch to sequential `map`; round-15's concurrency_pin file pins
+the buggy observed behavior (`$count <= iteration_count` rather than
+`$count == iteration_count`) so a future atomic-increment fix is a
+deliberate decision.
+
+Affects: counters, rate limiters, hit/miss counters inside `pfor`,
+anything that does `$x = $x + delta` from worker code.
+
+Sketch operations (hll_add, td_add, topk_add, bloom_add) appear to
+use internal atomic state and survive `pfor` reasonably well, though
+with reduced counts under contention.
+
+Pin: `pfor_counter_increment_races_under_contention` in
+`tests/suite/concurrency_pin.rs`.
+
+Severity: **bug** (correctness; should be a P1 fix — race-free
+counters are table stakes for any parallel framework).
+
+
+## BUG-228 — `my ($a, $b) = each %h` in expression context unsupported
+
+```sh
+$ s -e 'my %h = (a => 1, b => 2); while (my ($k, $v) = each %h) { print "$k=$v\n" }'
+VM compile error (unsupported): my/our/state/local in expression context with multiple or non-scalar decls
+```
+
+Stryke's VM rejects multi-variable `my` declarations in expression
+context, even though this is a core Perl idiom for hash iteration with
+`each` and the canonical pattern for "while loop over hash". Single-
+variable `my $x = ...` works fine.
+
+Workaround: declare separately, or rewrite using `for my $k (keys %h)`.
+The for-keys form is more idiomatic stryke regardless.
+
+Pin: `while_each_via_separate_my_declarations` in
+`tests/suite/hashref_iteration_pin.rs`.
+
+Severity: **bug** (parity gap; affects the `each` idiom).
+
+
+## BUG-229 — `around` advice without `proceed()` still runs the function body
+
+```sh
+$ s -e '
+    fn foo() { die "body_ran\n" }
+    around "foo" { "swallowed" }
+    my $r = eval { foo() };
+    print "r=[$r] err=[$@]\n"
+'
+r=[] err=[body_ran
+]
+```
+
+In standard AOP semantics, `around` advice can choose to skip
+`proceed()` entirely, replacing the wrapped call. In stryke, the
+function body runs regardless of whether the advice body calls
+`proceed()` or not. `around` is effectively a `before` + `after`
+shorthand rather than a true around.
+
+Affects: pre-conditions, caching wrappers (return cached value
+without calling underlying), feature flags (suppress real call when
+disabled). All require an explicit `return` from the advice — which
+also doesn't work per BUG-210.
+
+Pin: `around_advice_does_NOT_block_body_when_proceed_omitted` in
+`tests/suite/aop_composition_extra_pin.rs`.
+
+Severity: **bug** (semantic divergence from canonical AOP).
+
+
+## BUG-230 — Multiple `around` registrations on same target: only first fires
+
+```sh
+$ s -e '
+    fn f($x) { $x + 1 }
+    mysync $outer = 0;
+    mysync $inner = 0;
+    around "f" { $outer = $outer + 1; proceed(@INTERCEPT_ARGS) }
+    around "f" { $inner = $inner + 1; proceed(@INTERCEPT_ARGS) }
+    f(10); f(20);
+    print "outer=$outer inner=$inner\n"
+'
+outer=2 inner=0
+```
+
+Registering a second `around` for the same target is silently ignored.
+The first registered advice fires for every call; the second never
+fires. Same root cause as BUG-069 (multiple around does not compose),
+but pinned with explicit call counts for clarity.
+
+Affects: layered AOP usage like a logger + a metrics tracer on the
+same fn. Workaround: combine both concerns into a single around block.
+
+Pin: `multiple_around_only_first_registered_fires` in
+`tests/suite/aop_composition_extra_pin.rs`.
+
+Severity: **bug** (silent drop; composability gap).
+
+
+## BUG-231 — `topk_add($tk, $key, $weight)` silently ignores the weight argument
+
+```sh
+$ s -e '
+    my $tk = topk(3);
+    topk_add($tk, "x", 10);
+    topk_add($tk, "x", 5);
+    my @top = topk_top($tk);
+    print "count=", $top[0]->[1], "\n"
+'
+count=2
+```
+
+The 3-arg form `topk_add($tk, $key, $weight)` is accepted at parse
+time but the weight is silently dropped. Each call increments by 1
+regardless. Expected: weighted SpaceSaving where count grows by
+`$weight`.
+
+Workaround: call `topk_add($tk, $key)` repeatedly `$weight` times.
+Wastes cycles for sketch maintenance but produces the correct result.
+
+Pin: `topk_add_ignores_third_weight_arg` in
+`tests/suite/topk_semantics_pin.rs`.
+
+Severity: **bug** (silent arg drop; affects telemetry workloads that
+naturally count by weight).
+
+
+## BUG-232 — `count { BLOCK } LIST` returns first matched element value, not the count
+
+```sh
+$ s -e 'my $n = count { _ > 0 } (1, 2, -1, 3, 4); print $n, "\n"'
+1
+$ s -e 'my $n = scalar(grep { _ > 0 } (1, 2, -1, 3, 4)); print $n, "\n"'
+4
+```
+
+The `count { BLOCK } LIST` builtin is documented to return the number
+of list items for which BLOCK returns true, but actually returns the
+*value* of the first item that matched (`1` in this example, because
+`1 > 0` is true).
+
+Workaround: use the Perl idiom `scalar(grep { BLOCK } LIST)` which
+returns the correct count. Pin:
+`count_via_scalar_grep_idiom` in `tests/suite/list_builtins_pin.rs`.
+
+Severity: **bug** (silent wrong-result; affects rollups and percent-
+match patterns).
+
+
+## BUG-233 — Bare `{ ... }` block with `my` clobbers outer scope variable to undef
+
+```sh
+$ s -e '
+    my $x = 10;
+    my $r;
+    {
+        my $x = 20;
+        $r = $x;
+    }
+    print "r=$r x=", defined($x) ? $x : "(undef)", "\n"
+'
+r=20 x=(undef)
+```
+
+In Perl, an inner `my $x` inside a `{...}` block creates a fresh local
+binding that shadows the outer `$x`; after the block, the outer `$x`
+returns to its original value (10 here). Stryke's behavior leaves the
+outer `$x` as undef after the block exits — the inner declaration
+appears to bind to the outer slot rather than create a fresh inner.
+
+Affects any pattern that uses bare blocks for temporary scoping (a
+common Perl idiom for `local`-like behavior, helper-table init, or
+RAII-style cleanup). The fix likely lives in the block-lowering pass.
+
+Pin: `my_in_inner_block_shadow_value_seen_inside_only` in
+`tests/suite/scope_pin.rs`.
+
+Severity: **bug** (Perl-parity gap; affects idiomatic block-scoping).
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't

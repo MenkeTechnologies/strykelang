@@ -1,0 +1,149 @@
+#!/usr/bin/env stryke
+
+# Practical example: a tiny query DSL over arrays-of-hashes. This is the
+# pattern you reach for when reading a CSV/JSON dataset and want to
+# extract WHERE/GROUP-BY/SUM-style summaries without dragging in
+# sqlite or polars. Showcases:
+#   * `_0` / `_1` in sort blocks (Ruby/Clojure style positional params)
+#   * pipe-forward `|>` for stage composition
+#   * grep / map / sort all as first-class chain stages
+#   * t-digest for percentile queries (SQL-like APPROX_PERCENTILE)
+#   * topk for "TOP N" queries
+#   * sketch algebra `+` for merging per-shard rollups
+
+# ── dataset: a synthetic "orders" table ──────────────────────────────
+
+my @orders = (
+    +{ id => 1,  customer => "alice", region => "us-west", amount =>  120.50, items => 3 },
+    +{ id => 2,  customer => "bob",   region => "us-east", amount =>   75.00, items => 1 },
+    +{ id => 3,  customer => "carol", region => "eu",      amount =>  250.00, items => 5 },
+    +{ id => 4,  customer => "alice", region => "us-west", amount =>   42.10, items => 2 },
+    +{ id => 5,  customer => "dave",  region => "us-east", amount =>  330.00, items => 7 },
+    +{ id => 6,  customer => "bob",   region => "us-east", amount =>   18.00, items => 1 },
+    +{ id => 7,  customer => "carol", region => "eu",      amount =>   90.50, items => 2 },
+    +{ id => 8,  customer => "eve",   region => "ap",      amount =>  500.00, items => 4 },
+    +{ id => 9,  customer => "alice", region => "us-west", amount =>   60.75, items => 1 },
+    +{ id => 10, customer => "frank", region => "ap",      amount =>  175.20, items => 3 },
+)
+
+printf "── dataset: %d orders ─────────────────────────────\n", len(@orders)
+
+# ── SELECT id, customer, amount WHERE amount > 100 ──────────────────
+
+p ""
+p "── SELECT id,customer,amount WHERE amount > 100 ─────"
+my @big = @orders
+    |> grep { _->{amount} > 100 }
+    |> sort { _1->{amount} <=> _0->{amount} }   # DESC
+for my $row (@big) {
+    printf "  id=%-2d  %-7s  \$%-7.2f\n",
+        $row->{id}, $row->{customer}, $row->{amount}
+}
+
+# ── SELECT customer, SUM(amount) AS total GROUP BY customer ─────────
+
+p ""
+p "── SELECT customer, SUM(amount) GROUP BY customer ───"
+my %by_customer
+for my $row (@orders) {
+    $by_customer{$row->{customer}} += $row->{amount}
+}
+for my $name (sort { $by_customer{_1} <=> $by_customer{_0} } keys %by_customer) {
+    printf "  %-7s  \$%.2f\n", $name, $by_customer{$name}
+}
+
+# ── SELECT region, COUNT(*), SUM(amount), AVG(amount) GROUP BY region ──
+
+p ""
+p "── per-region rollup ────────────────────────────────"
+my %by_region
+for my $row (@orders) {
+    my $r = $row->{region}
+    $by_region{$r} //= +{ count => 0, total => 0.0, items => 0 }
+    $by_region{$r}->{count}++
+    $by_region{$r}->{total} += $row->{amount}
+    $by_region{$r}->{items} += $row->{items}
+}
+printf "  %-8s %5s %10s %10s %10s\n", "region", "n", "total", "avg", "items"
+for my $r (sort { _0 cmp _1 } keys %by_region) {
+    my $g = $by_region{$r}
+    printf "  %-8s %5d %10.2f %10.2f %10d\n",
+        $r, $g->{count}, $g->{total},
+        $g->{total} / $g->{count}, $g->{items}
+}
+
+# ── APPROX_PERCENTILE(amount, [0.5, 0.95]) via t-digest ─────────────
+
+p ""
+p "── APPROX_PERCENTILE via t-digest ───────────────────"
+my $td = t_digest(100)
+td_add($td, $_->{amount}) for @orders
+printf "  p50  : \$%.2f\n", td_quantile($td, 0.50)
+printf "  p90  : \$%.2f\n", td_quantile($td, 0.90)
+printf "  p95  : \$%.2f\n", td_quantile($td, 0.95)
+printf "  p99  : \$%.2f\n", td_quantile($td, 0.99)
+
+# ── SELECT customer, COUNT(*) ORDER BY n DESC LIMIT 3 via TopK ──────
+
+p ""
+p "── TOP 3 customers by order count (TopK sketch) ─────"
+my $tk = topk(3)
+topk_add($tk, $_->{customer}) for @orders
+my @top = topk_top($tk)
+for my $hit (@top) {
+    printf "  %-7s : %d orders\n", $hit->[0], $hit->[1]
+}
+
+# ── DISTINCT customer (via uniq) ─────────────────────────────────────
+
+p ""
+p "── SELECT DISTINCT customer ─────────────────────────"
+my @customers = map { $_->{customer} } @orders
+my @distinct = sort { _0 cmp _1 } uniq(@customers)
+printf "  distinct customers (%d): %s\n",
+    len(@distinct), join(", ", @distinct)
+
+# ── HAVING SUM(amount) > 200: filter on group results ────────────────
+
+p ""
+p "── HAVING SUM(amount) > 200 ─────────────────────────"
+my @big_customers = grep { $by_customer{$_} > 200 } keys %by_customer
+for my $c (sort { $by_customer{_1} <=> $by_customer{_0} } @big_customers) {
+    printf "  %-7s  \$%.2f\n", $c, $by_customer{$c}
+}
+
+# ── window function: running total by id ─────────────────────────────
+
+p ""
+p "── window: cumulative total over id-asc ─────────────"
+my $running = 0
+for my $row (sort { _0->{id} <=> _1->{id} } @orders) {
+    $running += $row->{amount}
+    printf "  id=%-2d  %-7s  \$%-7.2f  running=\$%.2f\n",
+        $row->{id}, $row->{customer}, $row->{amount}, $running
+}
+
+# ── sharded rollups + sketch algebra (merge per-shard sketches) ─────
+
+p ""
+p "── sharded rollup + sketch merge (sketch algebra) ───"
+my $h_west = hll(14)
+my $h_east = hll(14)
+my $h_eu   = hll(14)
+my $h_ap   = hll(14)
+for my $row (@orders) {
+    my $key = $row->{customer}
+    if    ($row->{region} eq "us-west") { hll_add($h_west, $key) }
+    elsif ($row->{region} eq "us-east") { hll_add($h_east, $key) }
+    elsif ($row->{region} eq "eu")      { hll_add($h_eu,   $key) }
+    elsif ($row->{region} eq "ap")      { hll_add($h_ap,   $key) }
+}
+# Sketch algebra: union all four region sketches via `+`.
+my $h_all = $h_west + $h_east + $h_eu + $h_ap
+printf "  per-shard distinct customers:\n"
+printf "    us-west : %d\n", hll_count($h_west)
+printf "    us-east : %d\n", hll_count($h_east)
+printf "    eu      : %d\n", hll_count($h_eu)
+printf "    ap      : %d\n", hll_count($h_ap)
+printf "  union (HLL): %d distinct customers\n", hll_count($h_all)
+printf "  exact      : %d distinct customers\n", len(@distinct)

@@ -1,0 +1,156 @@
+#!/usr/bin/env stryke
+
+# Finite-state-machine demo: model an order lifecycle.
+# Patterns:
+#   * transition table as hash-of-hashes
+#   * guard predicates per transition
+#   * AOP `around` for transition audit log
+#   * sketch (TopK) for state-popularity telemetry
+#   * t-digest for transition latency per state
+#   * graceful rejection of illegal transitions (no `die`, return undef)
+
+# ── states + valid transitions ────────────────────────────────────────
+# transitions{from}{event} = { to => $next_state, guard => $coderef }
+
+my %transitions
+
+# Define transitions programmatically (BUG-216 — no autoviv).
+fn Demo::FSM::add($from, $event, $to, $guard) {
+    $transitions{$from} = +{} unless exists $transitions{$from}
+    $transitions{$from}->{$event} = +{ to => $to, guard => $guard }
+}
+
+# An always-true guard helper.
+my $allow = fn($ctx) { 1 }
+
+Demo::FSM::add("created", "submit",   "pending",   $allow)
+Demo::FSM::add("pending", "approve",  "approved",  fn($ctx) { $ctx->{amount} >= 0 })
+Demo::FSM::add("pending", "reject",   "rejected",  $allow)
+Demo::FSM::add("approved","pay",      "paid",      fn($ctx) { $ctx->{paid_at} > 0 })
+Demo::FSM::add("paid",    "ship",     "shipped",   $allow)
+Demo::FSM::add("shipped", "deliver",  "delivered", $allow)
+Demo::FSM::add("approved","cancel",   "cancelled", $allow)
+Demo::FSM::add("pending", "cancel",   "cancelled", $allow)
+
+# ── core transition function ──────────────────────────────────────────
+
+mysync %state_visits          # state -> count
+mysync %transition_latency_us # event -> running sum of µs
+
+fn Demo::FSM::transition($from, $event, $ctx) {
+    return undef unless exists $transitions{$from}
+    return undef unless exists $transitions{$from}->{$event}
+    my $rule = $transitions{$from}->{$event}
+    return undef unless $rule->{guard}->($ctx)
+    return $rule->{to}
+}
+
+# ── instrumented variant ─────────────────────────────────────────────
+
+mysync $audit_log = []
+mysync $tlat = t_digest(100)
+
+around "Demo::FSM::transition" {
+    my $from  = $INTERCEPT_ARGS[0]
+    my $event = $INTERCEPT_ARGS[1]
+    my $t0 = now_ns()
+    my $to = proceed(@INTERCEPT_ARGS)
+    my $elapsed = (now_ns() - $t0) / 1000.0
+    td_add($tlat, $elapsed)
+    my $status_str = defined($to) ? "ok" : "rejected"
+    my $entry = +{ from => $from, event => $event, to => $to, status => $status_str, us => $elapsed }
+    push @$audit_log, $entry
+    if (defined $to) { $state_visits{$to} = ($state_visits{$to} // 0) + 1 }
+    $to
+}
+
+# ── simulated order lifecycle ────────────────────────────────────────
+
+fn Demo::FSM::run_order($order_id, $script) {
+    my $state = "created"
+    printf "── order %d ──────────────────────────────────────────\n", $order_id
+    for my $step (@{$script}) {
+        my $event = $step->[0]
+        my $ctx   = $step->[1]
+        my $next  = Demo::FSM::transition($state, $event, $ctx)
+        if (defined $next) {
+            printf "  %-10s --%-8s--> %s\n", $state, $event, $next
+            $state = $next
+        } else {
+            printf "  %-10s --%-8s--> REJECTED (illegal or guard failed)\n",
+                $state, $event
+        }
+    }
+    return $state
+}
+
+my $now = time()
+
+# Three orders with different lifecycles.
+my @order1 = (
+    ["submit",   +{}],
+    ["approve",  +{ amount => 100 }],
+    ["pay",      +{ paid_at => $now }],
+    ["ship",     +{}],
+    ["deliver",  +{}],
+)
+
+my @order2 = (
+    ["submit",   +{}],
+    ["cancel",   +{}],
+    ["pay",      +{ paid_at => $now }],   # illegal from cancelled
+)
+
+my @order3 = (
+    ["submit",   +{}],
+    ["approve",  +{ amount => 200 }],
+    ["pay",      +{ paid_at => 0 }],      # guard fails (paid_at == 0)
+    ["pay",      +{ paid_at => $now }],
+    ["ship",     +{}],
+    ["return",   +{}],                    # unknown event
+)
+
+Demo::FSM::run_order(1, \@order1)
+Demo::FSM::run_order(2, \@order2)
+Demo::FSM::run_order(3, \@order3)
+
+# ── audit log summary ────────────────────────────────────────────────
+
+p ""
+p "── audit log summary ────────────────────────────────"
+my $total      = len(@$audit_log)
+my $ok         = grep { $_->{status} eq "ok" } @$audit_log
+my $rejected   = $total - $ok
+printf "  total transitions  : %d\n", $total
+printf "  successful         : %d\n", $ok
+printf "  rejected           : %d\n", $rejected
+printf "  rejection rate     : %.1f%%\n", 100.0 * $rejected / $total
+
+# ── per-state visit counts ───────────────────────────────────────────
+
+p ""
+p "── per-state visit counts ───────────────────────────"
+for my $s (sort { _0 cmp _1 } keys %state_visits) {
+    printf "  %-12s : %d\n", $s, $state_visits{$s}
+}
+
+# ── transition latency percentiles ───────────────────────────────────
+
+p ""
+p "── transition latency (t-digest) ────────────────────"
+printf "  p50  : %.1f µs\n", td_quantile($tlat, 0.50)
+printf "  p90  : %.1f µs\n", td_quantile($tlat, 0.90)
+printf "  p99  : %.1f µs\n", td_quantile($tlat, 0.99)
+
+# ── illegal-transition spotting via grep ─────────────────────────────
+
+p ""
+p "── illegal transitions (audit log) ──────────────────"
+my @rejects = grep { $_->{status} eq "rejected" } @$audit_log
+for my $r (@rejects) {
+    printf "  REJECTED: %-10s --%-8s-->\n", $r->{from}, $r->{event}
+}
+
+# ── intercept cleanup ────────────────────────────────────────────────
+
+intercept_clear("Demo::FSM::transition")

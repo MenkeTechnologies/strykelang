@@ -1,0 +1,128 @@
+#!/usr/bin/env stryke
+
+# Anagram grouping demo: take a word list, group by sorted-character
+# key (canonical form), find the largest groups, sketch-based hot-key
+# detection. Showcases:
+#   * split + sort on characters via split //
+#   * hash-of-arrayref grouping (no autoviv: explicit init per BUG-216)
+#   * pipe-forward composition
+#   * TopK sketch for top anagram families
+#   * t-digest for canonicalize() latency
+
+# ── word list ───────────────────────────────────────────────────────
+
+my @words = (
+    "eat", "tea", "tan", "ate", "nat", "bat",
+    "listen", "silent", "enlist", "tinsel",
+    "evil", "vile", "live", "veil", "levi",
+    "stop", "tops", "spot", "pots", "opts",
+    "rat", "tar", "art",
+    "race", "care", "acre",
+    "hello", "world",
+    "post", "spot",       # duplicate "spot"
+    "tar", "rat",         # duplicates
+    "dusty", "study",
+    "night", "thing",
+)
+
+printf "── input: %d words ────────────────────────────────────\n",
+    len(@words)
+
+# ── canonical key: sorted characters ────────────────────────────────
+
+my $td_lat = t_digest(100)
+
+fn Demo::Anagram::canonical($word) {
+    my $t0 = now_ns()
+    my @chars = split //, lc($word)
+    my @sorted = sort { _0 cmp _1 } @chars
+    my $r = join("", @sorted)
+    td_add($td_lat, (now_ns() - $t0) / 1000.0)
+    return $r
+}
+
+# ── group words by canonical key ────────────────────────────────────
+
+my %groups
+for my $w (@words) {
+    my $k = Demo::Anagram::canonical($w)
+    $groups{$k} = [] unless exists $groups{$k}
+    push @{$groups{$k}}, $w
+}
+
+printf "  %d distinct canonical forms\n", len(keys %groups)
+
+# ── report groups with 2+ members ───────────────────────────────────
+
+p ""
+p "── groups with 2+ members ────────────────────────────"
+my @keep
+for my $k (keys %groups) {
+    next if len(@{$groups{$k}}) < 2
+    push @keep, $k
+}
+@keep = sort { len(@{$groups{_1}}) <=> len(@{$groups{_0}}) } @keep
+for my $k (@keep) {
+    my $members = $groups{$k}
+    my @uniq_mems = sort { _0 cmp _1 } uniq(@$members)
+    printf "  '%s' (%d words): %s\n", $k, len(@uniq_mems), join(", ", @uniq_mems)
+}
+
+# ── singletons (no anagram partners) ────────────────────────────────
+
+p ""
+p "── singletons (no anagram partners in input) ────────"
+my @singletons
+for my $k (keys %groups) {
+    push @singletons, $groups{$k}->[0] if len(uniq(@{$groups{$k}})) == 1
+}
+@singletons = sort { _0 cmp _1 } @singletons
+printf "  %d singletons: %s\n", len(@singletons), join(", ", @singletons)
+
+# ── largest group ───────────────────────────────────────────────────
+
+p ""
+my @sorted_groups = sort { len(@{$groups{_1}}) <=> len(@{$groups{_0}}) } keys %groups
+my $largest_key = $sorted_groups[0]
+printf "── largest anagram family ────────────────────────────\n"
+printf "  canonical: '%s' (%d occurrences)\n",
+    $largest_key, len(@{$groups{$largest_key}})
+my @members = uniq(@{$groups{$largest_key}})
+printf "  distinct members: %s\n", join(", ", sort { _0 cmp _1 } @members)
+
+# ── sketch-based "hot keys" using TopK ──────────────────────────────
+
+p ""
+p "── TopK hottest anagram families (sketch) ────────────"
+my $tk = topk(5)
+topk_add($tk, Demo::Anagram::canonical($_)) for @words
+my @hits = topk_top($tk)
+for my $h (@hits) {
+    printf "  '%s' : %d hits\n", $h->[0], $h->[1]
+}
+
+# ── HLL: distinct canonical forms ───────────────────────────────────
+
+p ""
+p "── distinct canonical-key cardinality (HLL) ──────────"
+my $hll = hll(14)
+hll_add($hll, Demo::Anagram::canonical($_)) for @words
+printf "  HLL distinct keys : %d\n", hll_count($hll)
+printf "  exact (hash keys) : %d\n", len(keys %groups)
+
+# ── pipe-forward composition: distinct canonical forms via uniq ─────
+
+p ""
+p "── pipe-forward composition ──────────────────────────"
+my @all_canonical = map { Demo::Anagram::canonical($_) } @words
+my @distinct_keys = sort { _0 cmp _1 } uniq(@all_canonical)
+printf "  distinct canonical forms (composed): %d\n", len(@distinct_keys)
+printf "  alphabetically first: %s\n", $distinct_keys[0]
+printf "  alphabetically last : %s\n", $distinct_keys[-1]
+
+# ── canonicalize latency ────────────────────────────────────────────
+
+p ""
+p "── canonicalize() latency (t-digest) ─────────────────"
+printf "  p50  : %.1f µs\n", td_quantile($td_lat, 0.50)
+printf "  p99  : %.1f µs\n", td_quantile($td_lat, 0.99)

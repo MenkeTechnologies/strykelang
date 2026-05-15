@@ -1,0 +1,136 @@
+#!/usr/bin/env stryke
+
+# Maze solver demo. BFS pathfinding from S to E over a grid maze where
+# '#' = wall, '.' = open, 'S' = start, 'E' = end. Renders the path
+# with 'o' markers.
+#
+# Patterns:
+#   * grid as array-of-strings; cell lookup via substr
+#   * BFS queue of [row, col, parent_idx] tuples
+#   * back-pointer chain reconstruction
+#   * t-digest for per-step BFS latency
+#   * HLL distinct-cell count visited
+
+# ── maze (10 rows x 20 cols) ─────────────────────────────────────────
+
+my @maze = (
+    "####################",
+    "#S.................#",
+    "###.#####.######.###",
+    "#...#...#.#....#...#",
+    "#.###.#.#.#.##.#.#.#",
+    "#.....#.#...#..#.#.#",
+    "#####.#.#####..#.#.#",
+    "#.....#......#.#.#.#",
+    "#.###########.#....E",
+    "####################",
+)
+
+my $H = len(@maze)
+my $W = len($maze[0])
+
+p "── maze ─────────────────────────────────────────────"
+for my $line (@maze) { p "  $line" }
+
+# ── find S and E ────────────────────────────────────────────────────
+
+my $sr = -1; my $sc = -1
+my $er = -1; my $ec = -1
+for my $r (0:$H - 1) {
+    for my $c (0:$W - 1) {
+        my $ch = substr($maze[$r], $c, 1)
+        if ($ch eq "S") { $sr = $r; $sc = $c }
+        if ($ch eq "E") { $er = $r; $ec = $c }
+    }
+}
+printf "  S = (%d,%d), E = (%d,%d)\n", $sr, $sc, $er, $ec
+
+# ── BFS ─────────────────────────────────────────────────────────────
+
+my @queue
+push @queue, [$sr, $sc, -1]
+my %visited
+$visited{"$sr,$sc"} = 0
+my @nodes   # nodes[i] = [row, col, parent_idx]
+push @nodes, [$sr, $sc, -1]
+
+my $td_step = t_digest(100)
+my $hll_visited = hll(14)
+hll_add($hll_visited, "$sr,$sc")
+
+my $end_idx = -1
+my @dirs = ([0, 1], [0, -1], [1, 0], [-1, 0])
+
+my $step_count = 0
+while (len(@queue) > 0 && $end_idx < 0) {
+    my $current = shift @queue
+    my $cr = $current->[0]
+    my $cc = $current->[1]
+    if ($cr == $er && $cc == $ec) {
+        $end_idx = $visited{"$cr,$cc"}
+        last
+    }
+    my $parent_idx = $visited{"$cr,$cc"}
+    for my $d (@dirs) {
+        my $nr = $cr + $d->[0]
+        my $nc = $cc + $d->[1]
+        next if $nr < 0 || $nr >= $H || $nc < 0 || $nc >= $W
+        my $key = "$nr,$nc"
+        next if exists $visited{$key}
+        my $ch = substr($maze[$nr], $nc, 1)
+        next if $ch eq "#"
+        my $t0 = now_ns()
+        $step_count++
+        my $new_idx = len(@nodes)
+        $visited{$key} = $new_idx
+        hll_add($hll_visited, $key)
+        push @nodes, [$nr, $nc, $parent_idx]
+        push @queue, [$nr, $nc]
+        if ($nr == $er && $nc == $ec) {
+            $end_idx = $new_idx
+        }
+        td_add($td_step, (now_ns() - $t0) / 1000.0)
+    }
+}
+
+p ""
+if ($end_idx < 0) {
+    p "── no path found ────────────────────────────────────"
+} else {
+    # Reconstruct path.
+    my @path
+    my $idx = $end_idx
+    while ($idx >= 0) {
+        unshift @path, $nodes[$idx]
+        $idx = $nodes[$idx]->[2]
+    }
+    printf "── path found: %d steps ─────────────────────────────\n",
+        len(@path) - 1
+
+    # Render path on maze.
+    my @rendered = @maze
+    for my $p (@path) {
+        my $r = $p->[0]
+        my $c = $p->[1]
+        my $ch = substr($rendered[$r], $c, 1)
+        next if $ch eq "S" || $ch eq "E"
+        my $line = $rendered[$r]
+        $rendered[$r] = substr($line, 0, $c) . "o" . substr($line, $c + 1)
+    }
+    p ""
+    p "── rendered path ────────────────────────────────────"
+    for my $line (@rendered) { p "  $line" }
+}
+
+# ── rollup ──────────────────────────────────────────────────────────
+
+p ""
+p "── BFS rollup ──────────────────────────────────────"
+printf "  cells visited (exact) : %d\n", len(keys %visited)
+printf "  cells visited (HLL)   : %d\n", hll_count($hll_visited)
+printf "  expansion steps        : %d\n", $step_count
+
+p ""
+p "── per-step BFS latency (t-digest) ───────────────────"
+printf "  p50  : %.1f µs\n", td_quantile($td_step, 0.50)
+printf "  p99  : %.1f µs\n", td_quantile($td_step, 0.99)
