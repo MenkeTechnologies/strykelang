@@ -4174,6 +4174,19 @@ pub(crate) fn try_builtin(
         "patience_diff" | "diff_patience" => {
             Some(crate::sketches::builtin_patience_diff(args, line))
         }
+        // ── rkyv KV store ──
+        "kv_open" | "kv_new" => Some(crate::kvstore::builtin_kv_open(args, line)),
+        "kv_put" | "kv_set" => Some(crate::kvstore::builtin_kv_put(args, line)),
+        "kv_get" => Some(crate::kvstore::builtin_kv_get(args, line)),
+        "kv_del" | "kv_delete" | "kv_remove" => Some(crate::kvstore::builtin_kv_del(args, line)),
+        "kv_exists" | "kv_has" => Some(crate::kvstore::builtin_kv_exists(args, line)),
+        "kv_keys" => Some(crate::kvstore::builtin_kv_keys(args, line)),
+        "kv_scan" => Some(crate::kvstore::builtin_kv_scan(args, line)),
+        "kv_len" | "kv_count" | "kv_size" => Some(crate::kvstore::builtin_kv_len(args, line)),
+        "kv_commit" | "kv_flush" => Some(crate::kvstore::builtin_kv_commit(args, line)),
+        "kv_batch" => Some(crate::kvstore::builtin_kv_batch(args, line)),
+        "kv_close" => Some(crate::kvstore::builtin_kv_close(args, line)),
+        "kv_stats" | "kv_info" => Some(crate::kvstore::builtin_kv_stats(args, line)),
         "tee" => Some(builtin_tee(args, line)),
         "nth" => Some(builtin_nth(args)),
         "to_set" => Some(builtin_to_set(args)),

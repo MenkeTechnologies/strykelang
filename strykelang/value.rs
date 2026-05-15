@@ -613,6 +613,8 @@ pub(crate) enum HeapObject {
     BkTree(Arc<Mutex<crate::sketches::BkTreeSketch>>),
     /// Rope — fast insert/delete in long strings.
     Rope(Arc<Mutex<crate::sketches::RopeSketch>>),
+    /// rkyv-backed KV store handle — see `kvstore.rs`.
+    KvStore(Arc<Mutex<crate::kvstore::KvStore>>),
     Pipeline(Arc<Mutex<PipelineInner>>),
     Capture(Arc<CaptureResult>),
     Ppool(PerlPpool),
@@ -1878,6 +1880,19 @@ impl StrykeValue {
     }
 
     #[inline]
+    pub fn kv_store(k: Arc<Mutex<crate::kvstore::KvStore>>) -> Self {
+        Self::from_heap(Arc::new(HeapObject::KvStore(k)))
+    }
+    #[inline]
+    pub fn as_kv_store(&self) -> Option<Arc<Mutex<crate::kvstore::KvStore>>> {
+        self.with_heap(|h| match h {
+            HeapObject::KvStore(s) => Some(Arc::clone(s)),
+            _ => None,
+        })
+        .flatten()
+    }
+
+    #[inline]
     pub fn pipeline(p: Arc<Mutex<PipelineInner>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Pipeline(p)))
     }
@@ -2317,6 +2332,7 @@ impl StrykeValue {
             HeapObject::IntervalTree(_) => "IntervalTree".to_string(),
             HeapObject::BkTree(_) => "BkTree".to_string(),
             HeapObject::Rope(_) => "Rope".to_string(),
+            HeapObject::KvStore(_) => "KvStore".to_string(),
             HeapObject::Pipeline(_) => "Pipeline".to_string(),
             HeapObject::DataFrame(_) => "DataFrame".to_string(),
             HeapObject::Capture(_) => "Capture".to_string(),
@@ -2372,6 +2388,7 @@ impl StrykeValue {
             HeapObject::IntervalTree(_) => StrykeValue::string("IntervalTree".into()),
             HeapObject::BkTree(_) => StrykeValue::string("BkTree".into()),
             HeapObject::Rope(_) => StrykeValue::string("Rope".into()),
+            HeapObject::KvStore(_) => StrykeValue::string("KvStore".into()),
             HeapObject::Pipeline(_) => StrykeValue::string("Pipeline".into()),
             HeapObject::DataFrame(_) => StrykeValue::string("DataFrame".into()),
             HeapObject::Capture(_) => StrykeValue::string("Capture".into()),
@@ -2734,6 +2751,10 @@ impl fmt::Display for StrykeValue {
                 write!(f, "DataFrame({} rows)", g.nrows())
             }
             HeapObject::Iterator(_) => f.write_str("Iterator"),
+            HeapObject::KvStore(s) => {
+                let g = s.lock();
+                write!(f, "KvStore({} entries)", g.len())
+            }
         }
     }
 }
@@ -2836,6 +2857,7 @@ pub fn set_member_key(v: &StrykeValue) -> String {
         }
         HeapObject::ClassInst(c) => format!("cl:{}:{:?}", c.def.name, c.values),
         HeapObject::DataFrame(d) => format!("df:{:p}", Arc::as_ptr(d)),
+        HeapObject::KvStore(s) => format!("kv:{:p}", Arc::as_ptr(s)),
         HeapObject::Iterator(_) => "iter".to_string(),
         HeapObject::ErrnoDual { code, msg } => format!("e:{code}:{msg}"),
         HeapObject::Integer(n) => format!("i:{n}"),

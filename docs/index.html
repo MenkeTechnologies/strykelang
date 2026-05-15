@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <meta name="description" content="stryke — the hottest language ever created. Server farms first. 100% TDP load testing, distributed agents, parallel Perl 5 interpreter in Rust. ~382k-line Rust slice (production + tests + tooling), 10,267 builtins (10,993 keys in %all), 346-opcode VM + Cranelift JIT.">
+  <meta name="description" content="stryke — the hottest language ever created. Server farms first. 100% TDP load testing, distributed agents, parallel Perl 5 interpreter in Rust. ~382k-line Rust slice (production + tests + tooling), 10,292 builtins (11,018 keys in %all), 346-opcode VM + Cranelift JIT.">
   <title>stryke — Documentation</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -149,7 +149,7 @@
             <span class="sep">/</span>
             <a href="https://docs.rs/strykelang" target="_blank" rel="noopener noreferrer">docs.rs</a>
           </nav>
-          <p class="docs-build-line" id="strykeBuildLine">stryke v0.14.0 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 10,267 builtins (10,993 keys in %all)</p>
+          <p class="docs-build-line" id="strykeBuildLine">stryke v0.14.2 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 10,292 builtins (11,018 keys in %all)</p>
         </div>
         <div class="tutorial-toolbar">
           <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -171,7 +171,7 @@
 
     <main class="tutorial-main">
       <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>STRYKE — SERVER FARMS FIRST</h2>
-      <p class="tutorial-subtitle"><strong>The hottest language ever created. Literally.</strong> Pin millions of servers to 100% TDP from a single REPL. Distributed load testing with <code>stryke agent</code> + <code>stryke controller</code>. Also a blazing-fast Perl 5 interpreter: NaN-boxed values, Rayon work-stealing across every CPU, bytecode VM with Cranelift Block JIT, 10,267 builtins in %b (10,993 keys in %all), and pipe-forward syntax. <strong>100% TDP — beware.</strong></p>
+      <p class="tutorial-subtitle"><strong>The hottest language ever created. Literally.</strong> Pin millions of servers to 100% TDP from a single REPL. Distributed load testing with <code>stryke agent</code> + <code>stryke controller</code>. Also a blazing-fast Perl 5 interpreter: NaN-boxed values, Rayon work-stealing across every CPU, bytecode VM with Cranelift Block JIT, 10,292 builtins in %b (11,018 keys in %all), and pipe-forward syntax. <strong>100% TDP — beware.</strong></p>
 
       <section class="tutorial-section">
         <h2>Quickstart</h2>
@@ -442,6 +442,20 @@ my $i = $rb_a &amp; $rb_b;             # Roaring intersection
 my $x = $rb_a ^ $rb_b;             # Roaring symmetric difference
 my $d = $rb_a - $rb_b;             # Roaring andnot</pre>
         <p>Shape mismatch (HLL precision differs, Bloom capacity differs) falls back to the default numeric/bitwise operator path — no panic, no silent truncation.</p>
+
+        <h3>rkyv KV store — zero-copy CRUD <em>(world-first)</em></h3>
+        <p>First-class CRUD store with rkyv as the on-disk codec. No other scripting language ships a zero-copy archive KV as core builtins — Python has <code>shelve</code> (pickle), Ruby has <code>PStore</code> (Marshal), Perl has <code>DBM_File</code> (BerkeleyDB), Node has <code>level</code> bindings. Every one pays a parse + allocate per read. Stryke's <code>kv_get</code> is <code>mmap + validate + cast</code> — the same primitive <code>script_cache.rs</code> already uses for cached bytecode.</p>
+<pre>my $db = kv_open("/tmp/cache.rkyv");
+kv_put($db, "users:alice", { name =&gt; "Alice", age =&gt; 30 });
+kv_put($db, "users:bob",   { name =&gt; "Bob",   age =&gt; 28 });
+kv_commit($db);
+
+for my $row (kv_scan($db, "users:")) {
+    my ($key, $val) = @$row;
+    say "$key -&gt; $val-&gt;{name}";
+}</pre>
+        <p>SQLite-shaped API ergonomics, beats SQLite on reads for any store that fits comfortably in RAM. Atomic rewrite on commit (tmp + rename), versioned format header (<code>STKV</code> magic + <code>format_version</code>), all-or-nothing <code>kv_batch</code>. Phase 2 ships <code>stryke kvd</code> server + remote <code>kv_connect</code> client over the same archive bytes.</p>
+        <p>Surface: <code>kv_open</code>, <code>kv_put</code>, <code>kv_get</code>, <code>kv_del</code>, <code>kv_exists</code>, <code>kv_keys</code>, <code>kv_scan</code>, <code>kv_len</code>, <code>kv_commit</code>, <code>kv_batch</code>, <code>kv_close</code>, <code>kv_stats</code>.</p>
       </section>
 
       <section class="tutorial-section">
@@ -481,7 +495,7 @@ substr $s, 9, 5              <span class="comment"># "world" — byte substr</sp
 
       <section class="tutorial-section">
         <h2>Builtin categories</h2>
-        <p>10,267 primaries in <code>%b</code> (10,993 keys in <code>%all</code>, including aliases and keywords). Query them via <code>keys %stryke::builtins</code> — the table below is a navigational overview, not a full index. Run <code>s 'p scalar keys %b'</code> for the live primary count.</p>
+        <p>10,292 primaries in <code>%b</code> (11,018 keys in <code>%all</code>, including aliases and keywords). Query them via <code>keys %stryke::builtins</code> — the table below is a navigational overview, not a full index. Run <code>s 'p scalar keys %b'</code> for the live primary count.</p>
         <div class="cat-grid">
           <div class="cat-card"><h4>Array / List (134+)</h4><p><code>map maps flat_map grep sort reverse push pop shift unshift splice reduce fold fore e first any all none take take_while drop skip_while partition min_by max_by zip zip_with interleave frequencies count_by chunk windowed enumerate shuffle uniq dedup compact flatten concat pluck grep_v with_index sorted sorted_desc sorted_nums without take_last drop_last pairwise batch rotate swap_pairs sliding_pairs run_length_encode group_consecutive permutations combinations power_set cartesian_product</code> &hellip;</p></div>
           <div class="cat-card"><h4>String (129+)</h4><p><code>chomp chop length substr index rindex split join uc lc ucfirst lcfirst chr ord trim lines words chars snake_case camel_case kebab_case pascal_case constant_case capitalize swap_case title_case squish pad_left pad_right center truncate_at reverse_str rot13 rot47 caesar_shift count_vowels count_consonants first_word last_word left_str right_str wrap_text dedent indent strip_html levenshtein soundex extract_numbers extract_emails extract_urls</code> &hellip;</p></div>
@@ -712,7 +726,7 @@ wizard
         <h3 style="color:#39ff14;">What stryke REPL Has That zsh / bash Don't</h3>
         <ul>
           <li><strong>Composable pipelines</strong> — every shell-like builtin returns a stryke value, so <code>ls() |&gt; grep { /\.rs$/ } |&gt; sort</code> works without spawning subprocesses</li>
-          <li><strong>10,267 builtins in scope at all times</strong> — math, crypto, AI, web, regex, parallel, codec — every primitive listed in <code>%b</code> is callable from the REPL with zero imports</li>
+          <li><strong>10,292 builtins in scope at all times</strong> — math, crypto, AI, web, regex, parallel, codec — every primitive listed in <code>%b</code> is callable from the REPL with zero imports</li>
           <li><strong>Perl 5 syntax</strong> for everything that isn't shell muscle-memory: <code>$_</code>, <code>@ARGV</code>, <code>%ENV</code>, here-docs, regex literals, captures, <code>sub</code>, <code>my</code>, <code>local</code>, <code>our</code> all work</li>
           <li><strong>Reflection at the prompt</strong> — <code>keys %b</code> for the full builtin set, <code>keys %a</code> for aliases, <code>keys %d</code> for documented names, <code>keys %p</code> for primaries, <code>keys %k</code> for keywords, <code>keys %c</code> for category names</li>
           <li><strong>Live doc browser</strong> — <code>docs &lt;name&gt;</code> drops into a TUI hover-doc reader (j/k nav, t for ToC, / search, ]/[ for next/prev chapter)</li>
@@ -1696,7 +1710,7 @@ STRYKE_CACHE=0 stryke app.stk  <span class="comment"># disable caching for this 
             </tr>
             <tr>
               <td><strong>Encyclopedic-stdlib design axis</strong></td>
-              <td>10,267 builtins in %b / 10,993 keys in %all in 40&nbsp;MB single static binary, zero-import</td>
+              <td>10,292 builtins in %b / 11,018 keys in %all in 40&nbsp;MB single static binary, zero-import</td>
               <td>Inverts the prevailing scripting-language design philosophy — &ldquo;core minimal, libraries optional&rdquo; becomes &ldquo;core encyclopedic, libraries unnecessary.&rdquo; Shipped builtins span crypto, stats, linear algebra, networking, codecs, terminal viz, git, jq. Density: ~3.6&nbsp;KB amortized per builtin, ~200&times; denser than Wolfram Engine v14 (~5&ndash;6 GB on disk for ~7,000 builtins). The single-binary qualifier is structural, not just a packaging choice — no kernel boot, no paclet manager, no licensing daemon, no <code>library()</code> resolution.</td>
             </tr>
             <tr>

@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.14.0 · 10176 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.14.2 · 10192 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -330,7 +330,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">8504</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">8520</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -11990,7 +11990,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">8504 topics</p>
+      <p class="chapter-meta">8520 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$!</code></h3>
         <p><code>$!</code> — the OS error from the most recent system call, in stringified form (e.g. <code>&quot;No such file or directory&quot;</code>) or as an <code>errno</code> integer in numeric context. Set by <code>open</code>, <code>close</code>, <code>chdir</code>, <code>read</code>, <code>write</code>, and other syscalls when they fail. The value persists until the next failing call, so always check it *immediately* after the failing operation — intermediate clean Perl code does not touch it, but any subsequent syscall will.</p>
@@ -31233,6 +31233,12 @@ p gini(0, 0, 0, 100)   # ~0.75 (high inequality)
         <pre><code class="lang-perl">p gzip_member_step $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-h">
+        <h3><a class="doc-anchor" href="#doc-h">#</a> <code>h</code></h3>
+        <p><code>h</code> — operation <code>h</code>. Alias for <code>docs</code>. Category: *system info*.</p>
+        <pre><code class="lang-perl">p h $x
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-h0">
         <h3><a class="doc-anchor" href="#doc-h0">#</a> <code>h0</code></h3>
         <p><code>h0</code> — operation <code>h0</code>. Alias for <code>hubble_constant</code>. Category: *physics constants*.</p>
@@ -31871,6 +31877,12 @@ p haversine(40.7128, -74.0060, 34.0522, -118.2437)
         <h3><a class="doc-anchor" href="#doc-helmholtz-decomp-step">#</a> <code>helmholtz_decomp_step</code></h3>
         <p><code>helmholtz_decomp_step</code> — single-step update of <code>helmholtz decomp</code>. Category: *climate, fluids, atmospheric*.</p>
         <pre><code class="lang-perl">p helmholtz_decomp_step $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-help">
+        <h3><a class="doc-anchor" href="#doc-help">#</a> <code>help</code></h3>
+        <p><code>help</code> — operation <code>help</code>. Alias for <code>docs</code>. Category: *system info*.</p>
+        <pre><code class="lang-perl">p help $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-henderson-base">
@@ -37857,6 +37869,75 @@ p kahan_sum(1e20, 1, -1e20, 1, -1e20, 1e20)   # 2  (recovered)
         <pre><code class="lang-perl">p kv $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-kv-batch">
+        <h3><a class="doc-anchor" href="#doc-kv-batch">#</a> <code>kv_batch</code></h3>
+        <p><code>kv_batch(STORE, [[&quot;put&quot;, k, v], [&quot;del&quot;, k], ...])</code> → number of ops applied. All-or-nothing on the in-memory state: if any op rejects (unknown kind, etc.), the entries map is rolled back to the snapshot taken at entry. Caller invokes <code>kv_commit</code> afterwards for durability.</p>
+        <pre><code class="lang-perl">kv_batch($db, [
+    [&quot;put&quot;, &quot;counter:a&quot;, 1],
+    [&quot;put&quot;, &quot;counter:b&quot;, 2],
+    [&quot;del&quot;, &quot;old_key&quot;],
+]);
+kv_commit($db);
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-kv-close">
+        <h3><a class="doc-anchor" href="#doc-kv-close">#</a> <code>kv_close</code></h3>
+        <p><code>kv_close(STORE)</code> → <code>1</code>. Auto-commits if dirty, then drops the handle (Arc decref). Safe to omit if <code>kv_commit</code> was already called.</p>
+      </article>
+      <article class="doc-entry" id="doc-kv-commit">
+        <h3><a class="doc-anchor" href="#doc-kv-commit">#</a> <code>kv_commit</code></h3>
+        <p><code>kv_commit(STORE)</code> → <code>1</code>. Atomic rewrite of the whole archive to disk via tmp + rename + fsync. No-op if not dirty. Versioned header (<code>STKV</code> magic + <code>format_version</code>) lets future stryke versions reject mismatched archives instead of silently mis-deserialising.</p>
+      </article>
+      <article class="doc-entry" id="doc-kv-count">
+        <h3><a class="doc-anchor" href="#doc-kv-count">#</a> <code>kv_count</code></h3>
+        <p><code>kv_len(STORE)</code> → entry count.</p>
+      </article>
+      <article class="doc-entry" id="doc-kv-del">
+        <h3><a class="doc-anchor" href="#doc-kv-del">#</a> <code>kv_del</code></h3>
+        <p><code>kv_del(STORE, KEY)</code> → <code>1</code> if the key existed, <code>0</code> otherwise. Marks store dirty so the next <code>kv_commit</code> persists the removal.</p>
+      </article>
+      <article class="doc-entry" id="doc-kv-exists">
+        <h3><a class="doc-anchor" href="#doc-kv-exists">#</a> <code>kv_exists</code></h3>
+        <p><code>kv_exists(STORE, KEY)</code> → <code>1</code> / <code>0</code>. Constant-time hash lookup.</p>
+      </article>
+      <article class="doc-entry" id="doc-kv-get">
+        <h3><a class="doc-anchor" href="#doc-kv-get">#</a> <code>kv_get</code></h3>
+        <p><code>kv_get(STORE, KEY)</code> → value or <code>undef</code>. Compound values come back as refs (<code>-&gt;[i]</code> / <code>-&gt;{k}</code> arrow deref works directly). Reads are zero-copy validation on the mmap&#39;d archive when no write has occurred since open.</p>
+      </article>
+      <article class="doc-entry" id="doc-kv-info">
+        <h3><a class="doc-anchor" href="#doc-kv-info">#</a> <code>kv_info</code></h3>
+        <p><code>kv_stats(STORE)</code> → hashref with <code>path</code>, <code>entries</code>, <code>dirty</code>, <code>format_version</code>, <code>created_at_secs</code>, <code>last_commit_secs</code>, <code>commit_count</code>, <code>stryke_version</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-kv-keys">
+        <h3><a class="doc-anchor" href="#doc-kv-keys">#</a> <code>kv_keys</code></h3>
+        <p><code>kv_keys(STORE [, PREFIX])</code> → sorted array of keys, optionally filtered by prefix. Use prefixes like <code>users:</code> / <code>log:</code> as namespaces.</p>
+        <pre><code class="lang-perl">for my $k (kv_keys($db, &quot;users:&quot;)) { p kv_get($db, $k) }
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-kv-new">
+        <h3><a class="doc-anchor" href="#doc-kv-new">#</a> <code>kv_new</code></h3>
+        <p><code>kv_open(PATH)</code> → KvStore handle. Open or create a rkyv-archived KV store at <code>PATH</code>. Missing file → empty store, no I/O until first commit. Existing file → mmap + check_archived_root + deserialize into the in-memory mirror.</p>
+        <pre><code class="lang-perl">my $db = kv_open(&quot;/tmp/cache.rkyv&quot;);
+kv_put($db, &quot;users:alice&quot;, { name =&gt; &quot;Alice&quot;, age =&gt; 30 });
+kv_commit($db);
+my $u = kv_get($db, &quot;users:alice&quot;);
+p $u-&gt;{name}                           # Alice
+</code></pre>
+        <p>World&#39;s-first as scripting-lang stdlib: zero-copy archive KV with SQLite-shaped ergonomics. Reads are <code>mmap + validate + cast</code>; no parse, no allocate per row. Family: <code>kv_put</code>, <code>kv_get</code>, <code>kv_del</code>, <code>kv_exists</code>, <code>kv_keys</code>, <code>kv_scan</code>, <code>kv_len</code>, <code>kv_commit</code>, <code>kv_batch</code>, <code>kv_close</code>, <code>kv_stats</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-kv-put">
+        <h3><a class="doc-anchor" href="#doc-kv-put">#</a> <code>kv_put</code></h3>
+        <p><code>kv_put(STORE, KEY, VALUE)</code> → previous value or <code>undef</code>. Scalars round-trip lossless; arrayrefs become <code>Array</code>, hashrefs become <code>Hash</code>. Mutation is in-memory until <code>kv_commit</code> rewrites the archive atomically (tmp + rename).</p>
+      </article>
+      <article class="doc-entry" id="doc-kv-scan">
+        <h3><a class="doc-anchor" href="#doc-kv-scan">#</a> <code>kv_scan</code></h3>
+        <p><code>kv_scan(STORE, PREFIX)</code> → array of <code>[KEY, VALUE]</code> arrayref pairs (sorted by key). For lazy streaming over network connections see Phase 2 <code>kv_connect</code> / <code>WireFrame::StreamChunk</code>.</p>
+        <pre><code class="lang-perl">for my $row (kv_scan($db, &quot;users:&quot;)) {
+    my ($key, $val) = @$row;
+    say &quot;$key -&gt; $val-&gt;{name}&quot;;
+}
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-kwh-to-joules">
         <h3><a class="doc-anchor" href="#doc-kwh-to-joules">#</a> <code>kwh_to_joules</code></h3>
         <p><code>kwh_to_joules</code> — convert from <code>kwh</code> to <code>joules</code>. Category: *astronomy / music / color / units*.</p>
@@ -40002,6 +40083,12 @@ keys %main:: |&gt; sort |&gt; p                    # browse every top-level name
         <pre><code class="lang-perl">p mallat_pyramid_step $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-man">
+        <h3><a class="doc-anchor" href="#doc-man">#</a> <code>man</code></h3>
+        <p><code>man</code> — operation <code>man</code>. Category: *shell-like repl (tier s)*.</p>
+        <pre><code class="lang-perl">p man $x
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-manacher">
         <h3><a class="doc-anchor" href="#doc-manacher">#</a> <code>manacher</code></h3>
         <p><code>manacher</code> — operation <code>manacher</code>. Alias for <code>manacher_radii</code>. Category: *misc*.</p>
@@ -40074,6 +40161,12 @@ keys %main:: |&gt; sort |&gt; p                    # browse every top-level name
         <h3><a class="doc-anchor" href="#doc-mannwhitneyu">#</a> <code>mannwhitneyu</code></h3>
         <p><code>mannwhitneyu</code> — operation <code>mannwhitneyu</code>. Category: *r / scipy distributions and tests*.</p>
         <pre><code class="lang-perl">p mannwhitneyu $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-manpage">
+        <h3><a class="doc-anchor" href="#doc-manpage">#</a> <code>manpage</code></h3>
+        <p><code>manpage</code> — operation <code>manpage</code>. Alias for <code>man</code>. Category: *shell-like repl (tier s)*.</p>
+        <pre><code class="lang-perl">p manpage $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-map-bp">
