@@ -2615,6 +2615,8 @@ Wire it into VS Code, JetBrains, or any LSP-aware editor by pointing the client 
 }
 ```
 
+For JetBrains IDEs (RustRover, IDEA Ultimate, GoLand, PyCharm Pro, WebStorm, RubyMine, PhpStorm, CLion, Rider, DataGrip, Aqua) there is a first-class plugin under [`editors/intellij/`](editors/intellij/) — `.stk` file type, lexer-driven highlighting, LSP client wired to `st --lsp`, run configurations with optional `--no-interop`, color settings page, and a context-menu *Run with stryke* action. Build with `./gradlew buildPlugin` and install the zip from `build/distributions/`. Community editions are not supported (no LSP API).
+
 ---
 
 ## [0x12] LANGUAGE REFLECTION

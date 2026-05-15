@@ -5041,6 +5041,48 @@ Pin: `my_in_inner_block_shadow_value_seen_inside_only` in
 Severity: **bug** (Perl-parity gap; affects idiomatic block-scoping).
 
 
+## BUG-234 — `\$` literal in `s/// replacement` is silently dropped
+
+```sh
+$ s -e '
+    my $s = "price 50";
+    $s =~ s/price/\$/;
+    print "[$s]\n"
+'
+[ 50]
+
+$ perl -e '
+    my $s = "price 50";
+    $s =~ s/price/\$/;
+    print "[$s]\n"
+'
+[$ 50]
+```
+
+`\$` inside a s/// replacement string is intended to emit a literal
+dollar character (the alternative to interpolating `$var`). Stryke
+drops it silently — the literal `$` is replaced by an empty string,
+giving `[ 50]` instead of `[$ 50]`.
+
+Workaround: insert via `chr(36)` and concat into the replacement
+variable form:
+
+```stryke
+my $d = chr(36);
+$s =~ s/price/$d/;
+```
+
+Note: as an additional gotcha, the *expected output literal* `"$ 50"`
+interpolates `$ ` as a special variable (empty string), so the
+comparison string also needs `chr(36) . " 50"`.
+
+Pin: `s_replacement_dollar_literal_via_chr` in
+`tests/suite/regex_substitution_pin.rs`.
+
+Severity: **bug** (parity gap; silent corrupted output for any
+dollar-aware text — prices, shell-script generation, regex docs).
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't

@@ -1,0 +1,162 @@
+#!/usr/bin/env stryke
+
+# API health-check dashboard demo. Simulates endpoint pings, classifies
+# responses as 2xx/4xx/5xx, computes per-endpoint p50/p99 latency, and
+# raises alerts when error rate exceeds a threshold.
+#
+# Patterns:
+#   * per-endpoint hash of t-digest handles
+#   * status-code → class via integer math (no regex needed)
+#   * topk for noisiest endpoints
+#   * sketch (HLL) for distinct request ID cardinality
+
+# ── endpoints to monitor ────────────────────────────────────────────
+
+my @endpoints = (
+    "/api/users",
+    "/api/orders",
+    "/api/products",
+    "/api/payments",
+    "/health",
+    "/metrics",
+)
+
+# Simulate per-endpoint failure rates.
+my %failure_rate = (
+    "/api/users"    => 0.05,
+    "/api/orders"   => 0.10,
+    "/api/products" => 0.03,
+    "/api/payments" => 0.25,  # noisy
+    "/health"       => 0.01,
+    "/metrics"      => 0.02,
+)
+
+# ── per-endpoint sketches ──────────────────────────────────────────
+
+my %latency
+my %total
+my %ok
+my %client_err
+my %server_err
+
+for my $ep (@endpoints) {
+    $latency{$ep} = t_digest(100)
+    $total{$ep} = 0
+    $ok{$ep} = 0
+    $client_err{$ep} = 0
+    $server_err{$ep} = 0
+}
+
+# ── simulate a ping ────────────────────────────────────────────────
+
+fn Demo::API::ping($ep) {
+    my $latency_ms = int(rand() * 500) + 5    # 5..505 ms
+    my $code
+    if (rand() < $failure_rate{$ep}) {
+        # 70% server, 30% client when failing.
+        $code = rand() < 0.7 ? 500 + int(rand() * 4) : 400 + int(rand() * 5)
+    } else {
+        $code = 200 + int(rand() * 5)
+    }
+    return +{ code => $code, latency_ms => $latency_ms }
+}
+
+# ── classify response ──────────────────────────────────────────────
+
+fn Demo::API::record($ep, $resp) {
+    $total{$ep} = $total{$ep} + 1
+    td_add($latency{$ep}, $resp->{latency_ms})
+    my $cls = int($resp->{code} / 100)
+    if    ($cls == 2) { $ok{$ep}         = $ok{$ep}         + 1 }
+    elsif ($cls == 4) { $client_err{$ep} = $client_err{$ep} + 1 }
+    elsif ($cls == 5) { $server_err{$ep} = $server_err{$ep} + 1 }
+}
+
+# ── simulate N pings per endpoint ──────────────────────────────────
+
+my $pings_per_ep = 200
+my $hll_req = hll(14)
+my $tk_noisy = topk(3)
+
+printf "── simulating %d pings × %d endpoints = %d requests ──\n",
+    $pings_per_ep, len(@endpoints), $pings_per_ep * len(@endpoints)
+
+for my $i (1:$pings_per_ep) {
+    for my $ep (@endpoints) {
+        my $resp = Demo::API::ping($ep)
+        Demo::API::record($ep, $resp)
+        my $cls = int($resp->{code} / 100)
+        hll_add($hll_req, "$ep#$i#$cls")
+        if ($cls >= 4) {
+            topk_add($tk_noisy, $ep)
+        }
+    }
+}
+
+# ── dashboard ──────────────────────────────────────────────────────
+
+p ""
+p "── per-endpoint dashboard ───────────────────────────────────────"
+printf "  %-15s %6s %6s %6s %6s %6s %7s %7s\n",
+    "endpoint", "total", "2xx", "4xx", "5xx", "%err", "p50", "p99"
+p   "  --------------- ------ ------ ------ ------ ------ ------- -------"
+for my $ep (@endpoints) {
+    my $n = $total{$ep}
+    my $err = $client_err{$ep} + $server_err{$ep}
+    my $pct = 100.0 * $err / $n
+    my $p50 = int(td_quantile($latency{$ep}, 0.50))
+    my $p99 = int(td_quantile($latency{$ep}, 0.99))
+    printf "  %-15s %6d %6d %6d %6d %5.1f%% %6dms %6dms\n",
+        $ep, $n, $ok{$ep}, $client_err{$ep}, $server_err{$ep},
+        $pct, $p50, $p99
+}
+
+# ── alerts: > 15% error rate ───────────────────────────────────────
+
+p ""
+p "── alerts (error rate > 15%) ───────────────────────"
+my @alerts
+for my $ep (@endpoints) {
+    my $err = $client_err{$ep} + $server_err{$ep}
+    my $pct = 100.0 * $err / $total{$ep}
+    if ($pct > 15.0) {
+        push @alerts, +{ ep => $ep, rate => $pct }
+    }
+}
+if (len(@alerts) == 0) {
+    p "  (no service exceeds threshold)"
+} else {
+    for my $alert (sort { $_1->{rate} <=> $_0->{rate} } @alerts) {
+        printf "  ALERT %-15s : %.1f%% errors\n", $alert->{ep}, $alert->{rate}
+    }
+}
+
+# ── noisiest endpoints via TopK ────────────────────────────────────
+
+p ""
+p "── noisiest endpoints (TopK) ────────────────────────"
+my @hits = topk_top($tk_noisy)
+for my $h (@hits) {
+    printf "  %-15s : %d errors\n", $h->[0], $h->[1]
+}
+
+# ── global latency rollup ───────────────────────────────────────────
+
+p ""
+p "── global latency rollup ────────────────────────────"
+my $global_lat = t_digest(100)
+# Sketch algebra: merge all per-endpoint t-digests.
+my $merged = $latency{$endpoints[0]} + $latency{$endpoints[1]} +
+             $latency{$endpoints[2]} + $latency{$endpoints[3]} +
+             $latency{$endpoints[4]} + $latency{$endpoints[5]}
+printf "  global p50 : %d ms\n", int(td_quantile($merged, 0.50))
+printf "  global p90 : %d ms\n", int(td_quantile($merged, 0.90))
+printf "  global p99 : %d ms\n", int(td_quantile($merged, 0.99))
+
+# ── HLL distinct request count sanity ──────────────────────────────
+
+p ""
+p "── HLL distinct request signatures ──────────────────"
+my $expected = $pings_per_ep * len(@endpoints)
+printf "  HLL distinct (request#endpoint#class) : %d\n", hll_count($hll_req)
+printf "  total requests                         : %d\n", $expected

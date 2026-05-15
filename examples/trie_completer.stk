@@ -1,0 +1,148 @@
+#!/usr/bin/env stryke
+
+# Trie-based autocomplete demo. Builds a trie from a corpus of words
+# (with frequency counts), then for any prefix returns top-K suggestions
+# ranked by descending frequency. Patterns:
+#   * trie as nested hashref (no autoviv, per BUG-216 — explicit init)
+#   * DFS to enumerate all completions of a prefix
+#   * TopK for streaming hot-suggestions telemetry
+#   * t-digest for per-query latency
+
+# ── trie structure ──────────────────────────────────────────────────
+# Each node:
+#   +{ children => +{ <char> => <node> }, word_end => 0|1, count => N }
+
+fn Demo::Trie::make_node() {
+    +{ children => +{}, word_end => 0, count => 0 }
+}
+
+fn Demo::Trie::insert($root, $word, $weight) {
+    my $node = $root
+    for my $i (0:len($word) - 1) {
+        my $ch = substr($word, $i, 1)
+        if (!exists $node->{children}->{$ch}) {
+            $node->{children}->{$ch} = Demo::Trie::make_node()
+        }
+        $node = $node->{children}->{$ch}
+    }
+    $node->{word_end} = 1
+    $node->{count}    = $node->{count} + $weight
+}
+
+# Walk to the node at the end of a prefix, or return undef if not present.
+fn Demo::Trie::walk_to($root, $prefix) {
+    my $node = $root
+    for my $i (0:len($prefix) - 1) {
+        my $ch = substr($prefix, $i, 1)
+        return undef unless exists $node->{children}->{$ch}
+        $node = $node->{children}->{$ch}
+    }
+    return $node
+}
+
+# DFS from a node, accumulating (word, count) pairs.
+fn Demo::Trie::dfs($node, $prefix, $acc) {
+    if ($node->{word_end}) {
+        push @$acc, [$prefix, $node->{count}]
+    }
+    for my $ch (sort { _0 cmp _1 } keys %{$node->{children}}) {
+        Demo::Trie::dfs($node->{children}->{$ch}, $prefix . $ch, $acc)
+    }
+}
+
+# Top-K completions for a prefix, sorted by count desc.
+fn Demo::Trie::complete($root, $prefix, $k) {
+    my $node = Demo::Trie::walk_to($root, $prefix)
+    return [] unless defined $node
+    my @results
+    Demo::Trie::dfs($node, $prefix, \@results)
+    @results = sort {
+        ($_1->[1] <=> $_0->[1]) || ($_0->[0] cmp $_1->[0])
+    } @results
+    @results = @results[0:($k - 1)] if len(@results) > $k
+    return \@results
+}
+
+# ── build trie from corpus ──────────────────────────────────────────
+
+my @corpus = (
+    # word, frequency weight.
+    ["apple",     50], ["application", 25], ["apply",      35],
+    ["approach",  20], ["approximate", 10], ["april",       8],
+    ["banana",    30], ["band",        18], ["bandwidth",   12],
+    ["basic",     22], ["basically",   15], ["beam",         5],
+    ["cargo",     14], ["carry",       28], ["carrot",       7],
+    ["cat",       40], ["catch",       16], ["category",     9],
+    ["dart",       6], ["darting",      3], ["dash",        11],
+    ["data",      45], ["database",    33], ["datacenter",  19],
+)
+
+mysync $td_query = t_digest(100)
+mysync $tk_queries = topk(3)
+
+my $root = Demo::Trie::make_node()
+for my $entry (@corpus) {
+    Demo::Trie::insert($root, $entry->[0], $entry->[1])
+}
+printf "── trie built: %d words inserted ─────────────────────\n",
+    len(@corpus)
+
+# ── query suggestions for various prefixes ─────────────────────────
+
+my @prefixes = ("ap", "ba", "ca", "da", "z", "")
+
+for my $p (@prefixes) {
+    my $t0 = now_ns()
+    my $results = Demo::Trie::complete($root, $p, 5)
+    td_add($td_query, (now_ns() - $t0) / 1000.0)
+    topk_add($tk_queries, $p)
+    printf "\n── prefix '%s' (%d suggestions) ─────────────\n",
+        $p, len(@$results)
+    if (len(@$results) == 0) {
+        p "  (no matches)"
+    } else {
+        for my $r (@$results) {
+            printf "  %-15s : freq %d\n", $r->[0], $r->[1]
+        }
+    }
+}
+
+# ── full DFS to count words in trie ────────────────────────────────
+
+my @all
+Demo::Trie::dfs($root, "", \@all)
+p ""
+printf "── trie statistics ──────────────────────────────────\n"
+printf "  total words : %d (expected %d)\n", len(@all), len(@corpus)
+my $total_count = 0
+$total_count += $_->[1] for @all
+printf "  total frequency sum : %d\n", $total_count
+
+# ── distinct first-letter cardinality via HLL ──────────────────────
+
+p ""
+p "── HLL distinct first-letter starters ───────────────"
+my $hll = hll(14)
+for my $entry (@corpus) {
+    hll_add($hll, substr($entry->[0], 0, 1))
+}
+my %distinct_letters
+$distinct_letters{substr($_->[0], 0, 1)} = 1 for @corpus
+printf "  HLL distinct first letters : %d\n", hll_count($hll)
+printf "  exact                       : %d\n", len(keys %distinct_letters)
+
+# ── query telemetry ────────────────────────────────────────────────
+
+p ""
+p "── most-queried prefixes (TopK) ─────────────────────"
+my @hits = topk_top($tk_queries)
+for my $h (@hits) {
+    printf "  '%s' : %d queries\n", $h->[0], $h->[1]
+}
+
+# ── per-query latency ──────────────────────────────────────────────
+
+p ""
+p "── per-query complete() latency (t-digest) ──────────"
+printf "  p50  : %.1f µs\n", td_quantile($td_query, 0.50)
+printf "  p99  : %.1f µs\n", td_quantile($td_query, 0.99)

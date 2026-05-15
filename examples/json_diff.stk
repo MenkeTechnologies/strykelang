@@ -1,0 +1,199 @@
+#!/usr/bin/env stryke
+
+# Recursive JSON diff demo. Walks two arbitrary JSON-like structures
+# and produces a path-based add/remove/change report. Patterns:
+#   * recursive descent over hashref / arrayref
+#   * path tracking via array of segments
+#   * sketch (TopK) for most-changed paths
+#   * t-digest for per-comparison latency
+
+# ── recursive diff ──────────────────────────────────────────────────
+
+mysync @diffs
+
+fn Demo::JD::diff($lhs, $rhs, $path) {
+    my $rl = ref($lhs)
+    my $rr = ref($rhs)
+    if ($rl eq "" && $rr eq "") {
+        if (!defined($lhs) && !defined($rhs)) {
+            return
+        }
+        if (!defined($lhs)) {
+            push @diffs, +{ op => "add", path => $path, value => $rhs }
+            return
+        }
+        if (!defined($rhs)) {
+            push @diffs, +{ op => "remove", path => $path, old => $lhs }
+            return
+        }
+        if ($lhs ne $rhs) {
+            push @diffs, +{ op => "change", path => $path, old => $lhs, new => $rhs }
+        }
+        return
+    }
+    if ($rl ne $rr) {
+        push @diffs, +{ op => "type-change", path => $path, old => $rl, new => $rr }
+        return
+    }
+    if ($rl =~ /HASH/) {
+        my %all_keys
+        $all_keys{$_} = 1 for keys %$lhs
+        $all_keys{$_} = 1 for keys %$rhs
+        for my $k (sort { _0 cmp _1 } keys %all_keys) {
+            my $kp = $path eq "" ? $k : "$path.$k"
+            if (exists $lhs->{$k} && !exists $rhs->{$k}) {
+                push @diffs, +{ op => "remove", path => $kp, old => $lhs->{$k} }
+            } elsif (!exists $lhs->{$k} && exists $rhs->{$k}) {
+                push @diffs, +{ op => "add", path => $kp, value => $rhs->{$k} }
+            } else {
+                Demo::JD::diff($lhs->{$k}, $rhs->{$k}, $kp)
+            }
+        }
+        return
+    }
+    if ($rl =~ /ARRAY/) {
+        my $ll = len(@$lhs)
+        my $lr = len(@$rhs)
+        my $maxlen = $ll > $lr ? $ll : $lr
+        for my $i (0:$maxlen - 1) {
+            my $ip = "$path\[$i\]"
+            if ($i >= $ll) {
+                push @diffs, +{ op => "add", path => $ip, value => $rhs->[$i] }
+            } elsif ($i >= $lr) {
+                push @diffs, +{ op => "remove", path => $ip, old => $lhs->[$i] }
+            } else {
+                Demo::JD::diff($lhs->[$i], $rhs->[$i], $ip)
+            }
+        }
+        return
+    }
+    # Other ref types: compare via stringification.
+    if ("$lhs" ne "$rhs") {
+        push @diffs, +{ op => "change", path => $path, old => "$lhs", new => "$rhs" }
+    }
+}
+
+# ── instrument with t-digest ─────────────────────────────────────────
+
+my $td_lat = t_digest(100)
+
+fn Demo::JD::diff_root($lhs, $rhs) {
+    @diffs = ()
+    my $t0 = now_ns()
+    Demo::JD::diff($lhs, $rhs, "")
+    td_add($td_lat, (now_ns() - $t0) / 1000.0)
+    return \@diffs
+}
+
+# ── sample data ────────────────────────────────────────────────────
+
+my $old_doc = +{
+    user => +{
+        name => "alice",
+        age  => 30,
+        addr => +{
+            city  => "Brooklyn",
+            zip   => "11211",
+        },
+        tags  => ["admin", "beta"],
+    },
+    settings => +{
+        theme   => "dark",
+        verbose => 1,
+    },
+    counts => +{ likes => 42, posts => 8 },
+}
+
+my $new_doc = +{
+    user => +{
+        name => "alice",
+        age  => 31,                    # changed
+        addr => +{
+            city  => "Brooklyn",
+            zip   => "11215",          # changed
+            country => "USA",          # added
+        },
+        tags  => ["admin", "beta", "early-access"],   # array grew
+    },
+    settings => +{
+        theme   => "light",            # changed
+        # verbose removed
+    },
+    counts => +{ likes => 100, posts => 8 },         # likes changed
+    new_field => "added_root",                       # added at root
+}
+
+p "── computing diff between old and new ──────────────"
+my $diffs = Demo::JD::diff_root($old_doc, $new_doc)
+
+# ── render report ──────────────────────────────────────────────────
+
+p ""
+printf "── %d differences found ───────────────────────────────\n",
+    len(@$diffs)
+for my $d (@$diffs) {
+    my $op = $d->{op}
+    if    ($op eq "add") {
+        printf "  + %-30s  %s\n", $d->{path}, $d->{value}
+    } elsif ($op eq "remove") {
+        printf "  - %-30s  was: %s\n", $d->{path}, $d->{old}
+    } elsif ($op eq "change") {
+        printf "  ~ %-30s  %s -> %s\n", $d->{path}, $d->{old}, $d->{new}
+    } elsif ($op eq "type-change") {
+        printf "  ! %-30s  type %s -> %s\n", $d->{path}, $d->{old}, $d->{new}
+    }
+}
+
+# ── per-op rollup ──────────────────────────────────────────────────
+
+p ""
+p "── per-op rollup ────────────────────────────────────"
+my %ops
+$ops{$_->{op}}++ for @$diffs
+for my $op (sort { _0 cmp _1 } keys %ops) {
+    printf "  %-12s : %d\n", $op, $ops{$op}
+}
+
+# ── TopK: most-affected path prefixes ──────────────────────────────
+
+p ""
+p "── most-affected top-level branches (TopK) ──────────"
+my $tk = topk(3)
+for my $d (@$diffs) {
+    my @segs = split /\./, $d->{path}
+    next if len(@segs) == 0
+    topk_add($tk, $segs[0])
+}
+my @hits = topk_top($tk)
+for my $h (@hits) {
+    printf "  %-20s : %d changes\n", $h->[0], $h->[1]
+}
+
+# ── round-trip: applying diffs should produce $new_doc again ───────
+# (Conceptual; not implementing patcher here. Just verify same diff
+# twice yields same length.)
+
+p ""
+p "── determinism check ────────────────────────────────"
+my $r1 = Demo::JD::diff_root($old_doc, $new_doc)
+my $n1 = len(@$r1)
+my $r2 = Demo::JD::diff_root($old_doc, $new_doc)
+my $n2 = len(@$r2)
+printf "  diff(old, new) call 1 : %d changes\n", $n1
+printf "  diff(old, new) call 2 : %d changes\n", $n2
+printf "  deterministic         : %s\n", ($n1 == $n2) ? "YES" : "no"
+
+# ── no-op: diffing a doc against itself ────────────────────────────
+
+p ""
+p "── no-op: diff(old, old) ────────────────────────────"
+my $self_diff = Demo::JD::diff_root($old_doc, $old_doc)
+printf "  changes when comparing identical docs : %d (expected 0)\n",
+    len(@$self_diff)
+
+# ── per-comparison latency ─────────────────────────────────────────
+
+p ""
+p "── diff() latency (t-digest) ────────────────────────"
+printf "  p50  : %.1f µs\n", td_quantile($td_lat, 0.50)
+printf "  p99  : %.1f µs\n", td_quantile($td_lat, 0.99)
