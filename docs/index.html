@@ -645,7 +645,7 @@ scp load_test node{1:100}:/tmp/</pre>
  │ %pc perl5 core 185    %e  stryke ext 10082  %d   4228          │
  │ %c  categories 306    %p  primaries  8790                      │
  └────────────────────────────────────────────────────────────────┘
-  >> PARALLEL PERL5 INTERPRETER // RUST-POWERED v0.14.1 &lt;&lt;
+  >> PARALLEL PERL5 INTERPRETER // RUST-POWERED v0.14.2 &lt;&lt;
 </pre>
 
         <h3 style="color:#39ff14;">Shell-Like Builtins (no PATH walk, no fork)</h3>
@@ -1742,6 +1742,67 @@ STRYKE_CACHE=0 stryke app.stk  <span class="comment"># disable caching for this 
         </table>
 
         <p style="font-size:11px;color:var(--text-muted);margin-top:1rem;">When a port lands in another language, a one-sentence credit in that language's docs (feature reference / release notes / &ldquo;Influences&rdquo; section) referring to stryke as the invention source is the asked attribution form. See <a href="../CREATORS.md#porting-stryke-ideas-to-other-languages">CREATORS.md</a> for the exact wording.</p>
+      </section>
+
+      <section class="tutorial-section">
+        <h2>Demo gallery — runnable feature tours</h2>
+        <p>Every demo runs clean under <code>stryke --no-interop</code> (idiomatic stryke, no Perl 5 shortcuts). Each is pinned by a behavior test in <code>tests/suite/demos_pin.rs</code> so regressions trip CI.</p>
+
+        <h3>rkyv KV store</h3>
+        <ul>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/kvstore_basics.stk"><code>kvstore_basics.stk</code></a> — open / put / get / del / keys / commit / reopen</li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/kvstore_cache.stk"><code>kvstore_cache.stk</code></a> — persistent memoization across process restarts (cold 1.01s → warm 0.00s)</li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/kvstore_namespace.stk"><code>kvstore_namespace.stk</code></a> — prefix-namespaced "tables", batch atomicity, rollback</li>
+        </ul>
+
+        <h3>Sketches &amp; probabilistic data structures</h3>
+        <ul>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/sketch_algebra.stk"><code>sketch_algebra.stk</code></a> — <strong>world-first</strong> operator overloads <code>+ | &amp; ^ -</code> on Bloom / HLL / CMS / TopK / t-digest / Roaring</li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/sketches_tier2.stk"><code>sketches_tier2.stk</code></a> — rate limiter, hash ring, SimHash, MinHash, interval tree, BK-tree, rope, diff</li>
+        </ul>
+
+        <h3>Numerical &amp; modern IDs</h3>
+        <ul>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/numerical_ids.stk"><code>numerical_ids.stk</code></a> — ULID (sortable + monotonic), Kahan compensated summation, Welford online stats</li>
+        </ul>
+
+        <h3>Language fundamentals</h3>
+        <ul>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/pipe_forward.stk"><code>pipe_forward.stk</code></a> — <code>|&gt;</code> F#/Elixir-style threading</li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/thread_macro.stk"><code>thread_macro.stk</code></a> — <code>~&gt;</code> chain, partial application, block stages</li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/implicit_params.stk"><code>implicit_params.stk</code></a> — <strong>world-first</strong> <code>_0</code>/<code>_1</code>/<code>_N</code> + outer-topic chain <code>_&lt;</code>/<code>_&lt;&lt;</code></li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/algebraic_match.stk"><code>algebraic_match.stk</code></a> — <code>enum</code> + exhaustive <code>match</code></li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/string_coordinates.stk"><code>string_coordinates.stk</code></a> — bytes vs codepoints, <code>length</code> vs <code>len</code>, <code>index</code> vs <code>cindex</code></li>
+        </ul>
+
+        <h3>Parallelism &amp; concurrency</h3>
+        <ul>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/parallel_primitives.stk"><code>parallel_primitives.stk</code></a> — <code>pmap</code> (0.05s vs 0.40s serial), <code>pgrep</code>, <code>pfor</code>, <code>psort</code>, <code>preduce</code>, <code>pmap_reduce</code>, <code>fan</code></li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/async_tasks.stk"><code>async_tasks.stk</code></a> — <code>async { }</code> + <code>await</code>, <code>spawn</code> alias, racing tasks, async ingestors → sketch</li>
+        </ul>
+
+        <h3>OOP, AOP, regex, glob</h3>
+        <ul>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/oop_classes.stk"><code>oop_classes.stk</code></a> — typed fields, <code>BUILD</code> hook, <code>extends</code>, method dispatch</li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/aop_intercepts.stk"><code>aop_intercepts.stk</code></a> — <code>before</code>/<code>after</code>/<code>around</code>, <code>proceed()</code>, glob-pattern intercepts</li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/regex_three_tier.stk"><code>regex_three_tier.stk</code></a> — regex / fancy-regex / pcre2 auto-tier escalation, named captures</li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/glob_qualifiers.stk"><code>glob_qualifiers.stk</code></a> — <strong>world-first</strong> zsh-style qualifiers <code>(N)</code> <code>(.)</code> <code>(/)</code> <code>(D)</code> <code>(oL)</code> <code>(Lk+1)</code> in a scripting language</li>
+        </ul>
+
+        <h3>Practical I/O</h3>
+        <ul>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/iterator_ops.stk"><code>iterator_ops.stk</code></a> — <code>enumerate</code>, <code>dedup</code>, <code>nth</code>, <code>range</code>, <code>flatten</code>, <code>zip</code>, colon-range <code>0:9</code></li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/file_streams.stk"><code>file_streams.stk</code></a> — <code>slurp</code>/<code>spurt</code>, glob recursive, <code>find</code>, file metadata</li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/crypto.stk"><code>crypto.stk</code></a> — SHA-2 / SHA-3 / BLAKE3 / MD5, HMAC, Argon2, JWT</li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/codecs.stk"><code>codecs.stk</code></a> — JSON / YAML / TOML / CSV roundtrips, cross-format conversion</li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/datetime.stk"><code>datetime.stk</code></a> — <code>strftime</code>, ISO 8601, RFC 2822, time arithmetic, ISO keys sort chronologically</li>
+        </ul>
+
+        <h3>Shell &amp; reflection</h3>
+        <ul>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/shell_repl.stk"><code>shell_repl.stk</code></a> — <code>whoami</code>, <code>pushd</code>/<code>popd</code>, <code>strftime</code>, <code>tac</code>, <code>tree</code>, <code>mktemp</code></li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/reflection_hashes.stk"><code>reflection_hashes.stk</code></a> — <code>%b</code> / <code>%a</code> / <code>%k</code> / <code>%all</code> / <code>%c</code> / <code>%d</code> queries, alias inversion</li>
+        </ul>
       </section>
 
       <section class="tutorial-section">

@@ -1,0 +1,70 @@
+#!/usr/bin/env stryke
+
+# Stryke file I/O — small, composable builtins that play well with
+# pipe-forward. `slurp`/`spurt` for whole-file, `fr` to iterate lines
+# lazily, `glob`/`find` for tree walking.
+
+my $tmp = "/tmp/stryke_file_streams_demo.txt";
+unlink($tmp);
+
+p "── spurt: whole-file write ────────────────────────────";
+spurt($tmp, "alpha\nbeta\ngamma\ndelta\nepsilon\n");
+p "  wrote: $tmp";
+p "  size : ", file_size($tmp), " bytes";
+
+p "";
+p "── slurp: whole-file read ─────────────────────────────";
+my $contents = slurp($tmp);
+p "  bytes read: ", length($contents);
+p "  lines     : ", len([split(/\n/, $contents)]);
+
+p "";
+p "── Line-by-line iteration via slurp + split ───────────";
+my @lines = split(/\n/, slurp($tmp));
+my $i = 0;
+for my $line (@lines) {
+    next if len($line) == 0;
+    $i++;
+    printf "  line %d : %s\n", $i, $line;
+}
+
+p "";
+p "── pipe-forward — count + uppercase + spurt back ──────";
+slurp($tmp)
+    |> split(/\n/)
+    |> grep { len($_) > 0 }
+    |> map  { uc($_) }
+    |> join("\n")
+    |> >{ spurt($tmp, $_); _ };
+p "  reformatted contents:";
+p "    $_" for split(/\n/, slurp($tmp));
+
+p "";
+p "── glob — pattern match in dir ────────────────────────";
+my @stk = glob("examples/*.stk");
+printf "  examples/*.stk      : %d files\n", len(@stk);
+
+p "";
+p "── glob recursive — `**/*` ────────────────────────────";
+my @nested = glob("examples/**/*.stk(N)");
+printf "  examples/**/*.stk    : %d files\n", len(@nested);
+
+p "";
+p "── find — alt to glob with predicate logic ────────────";
+my @big_demos = find("examples", "*.stk");
+my @over_1kb;
+for my $f (@big_demos) {
+    push @over_1kb, $f if file_size($f) > 1024;
+}
+printf "  examples/*.stk > 1KB : %d files\n", len(@over_1kb);
+p "  examples:";
+p "    $_  (", file_size($_), " bytes)" for @over_1kb[0..2];
+
+p "";
+p "── File metadata via file_* builtins ──────────────────";
+my $f = "examples/kvstore_basics.stk";
+printf "  %-30s %d bytes\n", $f, file_size($f);
+printf "  mime              : %s\n", file_mime($f);
+printf "  kind              : %s\n", file_kind($f);
+
+unlink($tmp);

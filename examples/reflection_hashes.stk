@@ -1,0 +1,75 @@
+#!/usr/bin/env stryke
+
+# Stryke reflection — the language reflects on itself at runtime via a
+# family of hashes. Every callable spelling, every category, every doc
+# string is accessible without any tooling external to the binary.
+#
+#   %b        — primaries only (10,292)
+#   %a        — aliases (641)
+#   %k        — language keywords (85)
+#   %all      — every callable + keyword (11,018 — disjoint union)
+#   %c        — category → array of names
+#   %d        — name → one-line doc
+#   %parameters — zsh-style live binding view
+#   %main::, %Foo:: — package stashes (Perl-spec symbol tables)
+
+p "── Reflection census ──────────────────────────────────";
+printf "  primaries (%%b) : %d\n", len(keys %b);
+printf "  aliases  (%%a) : %d\n", len(keys %a);
+printf "  keywords (%%k) : %d\n", len(keys %k);
+printf "  total    (%%all): %d\n", len(keys %all);
+my $invariant = (keys %b) + (keys %a) + (keys %k);
+printf "  invariant: %%b + %%a + %%k = %d %s %%all\n",
+    $invariant, ($invariant == keys %all) ? "==" : "!=";
+
+p "";
+p "── %c — categories ─────────────────────────────────────";
+my @cats = sort keys %c;
+printf "  total categories: %d\n", len(@cats);
+p "  first 10:";
+p "    $_" for @cats[0..9];
+
+p "";
+p "── Pick a category, count its members ─────────────────";
+for my $cat (sort keys %c) {
+    next unless $cat =~ /^(sketch|crypto|regex|kvstore|parallel)/i;
+    printf "    %-30s : %d\n", $cat, len(@{$c{$cat}});
+}
+
+p "";
+p "── %d — one-line docs ────────────────────────────────";
+for my $name (qw(bloom_filter ulid kahan_sum kv_open hll t_digest)) {
+    my $doc = $d{$name};
+    if (defined $doc) {
+        # one-line snip
+        my $snip = substr($doc, 0, 80);
+        $snip .= "…" if len($doc) > 80;
+        printf "  %-14s : %s\n", $name, $snip;
+    } else {
+        printf "  %-14s : (no doc)\n", $name;
+    }
+}
+
+p "";
+p "── Inverted index — which aliases point to canonical name? ─";
+# Find every alias of `bloom_filter`. Under --no-interop the short
+# `$a{...}` accessor is reserved; use `$stryke::aliases{...}` or
+# copy to a local hash. Both forms read the same reflection table.
+my %al = %a;
+my @aliases_of_bloom;
+for my $alias (sort keys %al) {
+    push @aliases_of_bloom, $alias if $al{$alias} eq "bloom_filter";
+}
+p "  aliases of 'bloom_filter' : ", join(", ", @aliases_of_bloom);
+
+p "";
+p "── Which builtins start with kv_? ─────────────────────";
+my @kv_names = sort grep { /^kv_/ } keys %all;
+p "  ", join(", ", @kv_names);
+
+p "";
+p "── Census by category (top 10 by member count) ────────";
+my @ranked = sort { len(@{$c{$_1}}) <=> len(@{$c{$_0}}) } keys %c;
+for my $cat (@ranked[0..9]) {
+    printf "    %-30s : %d\n", $cat, len(@{$c{$cat}});
+}
