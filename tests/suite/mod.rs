@@ -152,6 +152,7 @@ mod fs_io;
 mod glob_zsh_qualifiers;
 mod implicit_coderef_from_bare_positional;
 mod jwt_and_log;
+mod kvstore;
 mod language_extensions;
 mod lib_api;
 mod list_builtins;

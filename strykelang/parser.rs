@@ -13578,6 +13578,12 @@ impl Parser {
             | "rope" | "rope_insert" | "rope_delete" | "rope_substring"
             | "rope_to_string" | "rope_len"
             | "myers_diff" | "patience_diff"
+            // ── rkyv KV store ──────────────────────────────────────────────
+            | "kv_open" | "kv_new" | "kv_put" | "kv_set" | "kv_get"
+            | "kv_del" | "kv_delete" | "kv_remove" | "kv_exists" | "kv_has"
+            | "kv_keys" | "kv_scan" | "kv_len" | "kv_count" | "kv_size"
+            | "kv_commit" | "kv_flush" | "kv_batch" | "kv_close"
+            | "kv_stats" | "kv_info"
             // ── aop ────────────────────────────────────────────────────────
             | "proceed" | "intercept_list" | "intercept_remove" | "intercept_clear"
             // ── parallel ────────────────────────────────────────────────────

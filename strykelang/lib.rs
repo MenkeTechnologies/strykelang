@@ -53,6 +53,7 @@ pub mod format;
 pub mod getopts;
 mod jit;
 mod jwt;
+pub mod kvstore;
 pub mod lexer;
 pub mod list_builtins;
 pub mod lsp;

@@ -1,7 +1,7 @@
 .\" stryke(1) — man page for the stryke / s binary
 .\" Render with:  man -l man/stryke.1
 .\" Install:      cp man/stryke.1 /usr/local/share/man/man1/  (or $MANPATH/man1/)
-.TH STRYKE 1 "May 2026" "stryke 0.14.1" "User Commands"
+.TH STRYKE 1 "May 2026" "stryke 0.14.2" "User Commands"
 .SH NAME
 stryke, s \- highly parallel Perl 5 interpreter with shell-grade REPL
 .SH SYNOPSIS
@@ -27,7 +27,7 @@ stryke, s \- highly parallel Perl 5 interpreter with shell-grade REPL
 is a single-binary Perl 5 interpreter written in Rust, with parallel
 extensions (pmap / pgrep / pfor / psort / preduce), a Cranelift JIT,
 pipe-forward (\fB|>\fR) syntax, the thread macro (\fB~>\fR), and a
-shell-grade REPL exposing 10,267 builtins as immediately-callable
+shell-grade REPL exposing 10,292 builtins as immediately-callable
 barewords (no \fBuse\fR / \fBrequire\fR / \fBimport\fR).
 .PP
 The binary is invoked as \fBs\fR by default; \fBstryke\fR and \fBst\fR
@@ -284,6 +284,68 @@ Roaring andnot (set difference).
 Shape mismatch (HLL precision differs, Bloom capacity differs)
 falls back to the default numeric/bitwise path \(em no panic, no
 silent truncation.
+.SH RKYV KV STORE
+First-class CRUD store with rkyv as the on-disk and on-wire codec.
+World-first \(em no other scripting language ships a zero-copy
+archive KV as core builtins. Reads are
+.RB mmap " + " validate " + " cast
+(same primitive
+.B script_cache.rs
+already uses for cached bytecode); no parse, no allocate per row.
+.TP
+.B kv_open(\fIpath\fR)
+Open or create a store; returns a handle. Missing file
+\(em empty store, no I/O until first commit.
+.TP
+.BR kv_put "(\fIstore\fR, \fIkey\fR, \fIvalue\fR)"
+Write key\(rA value. Returns the previous value or
+.BR undef .
+.TP
+.BR kv_get "(\fIstore\fR, \fIkey\fR)"
+Return the value or
+.BR undef .
+Arrays come back as arrayrefs, hashes as hashrefs.
+.TP
+.BR kv_del "(\fIstore\fR, \fIkey\fR)"
+Delete. Returns 1 if the key existed, 0 otherwise.
+.TP
+.BR kv_exists "(\fIstore\fR, \fIkey\fR)"
+1 / 0.
+.TP
+.BR kv_keys "(\fIstore\fR [, \fIprefix\fR])"
+Sorted keys, optional prefix filter.
+.TP
+.BR kv_scan "(\fIstore\fR, \fIprefix\fR)"
+Array of
+.RB [ key ", " value ]
+arrayref pairs.
+.TP
+.BR kv_len "(\fIstore\fR)"
+Entry count.
+.TP
+.BR kv_commit "(\fIstore\fR)"
+Atomic rewrite to disk (tmp + rename).
+.TP
+.BR kv_batch "(\fIstore\fR, [[\fBop\fR, \fIk\fR, \fIv\fR], ...])"
+All-or-nothing multi-op; rolls back the in-memory state if any op rejects.
+.TP
+.BR kv_close "(\fIstore\fR)"
+Auto-commits if dirty.
+.TP
+.BR kv_stats "(\fIstore\fR)"
+Hashref of metadata
+.RI ( entries ", " commit_count ", " last_commit_secs ", " format_version ", " created_at_secs ", " stryke_version ).
+.PP
+Storage format is versioned (magic
+.B STKV
++
+.BR format_version )
+so reopening a future store fails fast instead of silently
+mis-deserialising. Phase 2 ships
+.B stryke kvd
+server + remote
+.B kv_connect
+client over the same archive format.
 .SH REPL & SHELL-LIKE BUILTINS
 The
 .B s
@@ -521,13 +583,13 @@ hashes, queryable at the REPL with \fBkeys %\fIHASH\fR:
 .PP
 .RS 4
 .B %b
-.RB "\(em " "10,267 primary builtins (callable-only)"
+.RB "\(em " "10,292 primary builtins (callable-only)"
 .br
 .B %a
 .RB "\(em " "641 aliases (name \(-> primary)"
 .br
 .B %all
-.RB "\(em " "10,993 keys: %b + %a + %k"
+.RB "\(em " "11,018 keys: %b + %a + %k"
 .br
 .B %k
 .RB "\(em " "85 keywords (if/while/sub/...)"
