@@ -1,0 +1,226 @@
+#!/usr/bin/env stryke
+
+# Recursive-descent expression parser/evaluator. Handles:
+#   * Integer literals
+#   * Binary +, -, *, / with standard precedence
+#   * Unary minus
+#   * Parenthesised sub-expressions
+#   * AOP `around` on the eval step to instrument call count + depth
+#
+# This is a deliberately small ~150-line demo of stryke's suitability
+# for compiler-shop work — tokenizer, parser, evaluator, all in one
+# script.
+
+# ── tokenizer ────────────────────────────────────────────────────────
+
+fn Demo::Expr::tokenize($src) {
+    my @tokens
+    my $i = 0
+    my $n = len($src)
+    while ($i < $n) {
+        my $c = substr($src, $i, 1)
+        if ($c eq " " || $c eq "\t" || $c eq "\n") {
+            $i++
+            next
+        }
+        if ($c =~ /[0-9]/) {
+            my $j = $i
+            while ($j < $n && substr($src, $j, 1) =~ /[0-9]/) {
+                $j++
+            }
+            push @tokens, +{ kind => "num", value => substr($src, $i, $j - $i) + 0 }
+            $i = $j
+            next
+        }
+        if ($c eq "+" || $c eq "-" || $c eq "*" || $c eq "/") {
+            push @tokens, +{ kind => "op", value => $c }
+            $i++
+            next
+        }
+        if ($c eq "(" || $c eq ")") {
+            push @tokens, +{ kind => $c eq "(" ? "lparen" : "rparen" }
+            $i++
+            next
+        }
+        die "Unexpected char: '$c' at position $i\n"
+    }
+    return \@tokens
+}
+
+# ── parser state ─────────────────────────────────────────────────────
+
+mysync $tokens
+mysync $pos
+
+fn Demo::Expr::peek() {
+    return undef if $pos >= len(@$tokens)
+    return $tokens->[$pos]
+}
+
+fn Demo::Expr::advance() {
+    my $t = Demo::Expr::peek()
+    $pos++
+    return $t
+}
+
+# ── recursive-descent ────────────────────────────────────────────────
+# expr   := term (('+' | '-') term)*
+# term   := factor (('*' | '/') factor)*
+# factor := NUMBER | '-' factor | '(' expr ')'
+
+fn Demo::Expr::parse_factor() {
+    my $t = Demo::Expr::peek()
+    die "Unexpected end of input\n" unless defined $t
+    if ($t->{kind} eq "num") {
+        Demo::Expr::advance()
+        return +{ kind => "num", value => $t->{value} }
+    }
+    if ($t->{kind} eq "op" && $t->{value} eq "-") {
+        Demo::Expr::advance()
+        my $operand = Demo::Expr::parse_factor()
+        return +{ kind => "neg", operand => $operand }
+    }
+    if ($t->{kind} eq "lparen") {
+        Demo::Expr::advance()
+        my $inner = Demo::Expr::parse_expr()
+        my $rp = Demo::Expr::peek()
+        die "Expected ')'\n" unless defined($rp) && $rp->{kind} eq "rparen"
+        Demo::Expr::advance()
+        return $inner
+    }
+    die "Unexpected token: $t->{kind}/$t->{value}\n"
+}
+
+fn Demo::Expr::parse_term() {
+    my $left = Demo::Expr::parse_factor()
+    while (1) {
+        my $t = Demo::Expr::peek()
+        last unless defined $t
+        last unless $t->{kind} eq "op"
+        last unless ($t->{value} eq "*" || $t->{value} eq "/")
+        Demo::Expr::advance()
+        my $right = Demo::Expr::parse_factor()
+        $left = +{ kind => "bin", op => $t->{value}, left => $left, right => $right }
+    }
+    return $left
+}
+
+fn Demo::Expr::parse_expr() {
+    my $left = Demo::Expr::parse_term()
+    while (1) {
+        my $t = Demo::Expr::peek()
+        last unless defined $t
+        last unless $t->{kind} eq "op"
+        last unless ($t->{value} eq "+" || $t->{value} eq "-")
+        Demo::Expr::advance()
+        my $right = Demo::Expr::parse_term()
+        $left = +{ kind => "bin", op => $t->{value}, left => $left, right => $right }
+    }
+    return $left
+}
+
+fn Demo::Expr::parse($src) {
+    $tokens = Demo::Expr::tokenize($src)
+    $pos = 0
+    my $ast = Demo::Expr::parse_expr()
+    die "Trailing tokens after parse\n" if $pos < len(@$tokens)
+    return $ast
+}
+
+# ── tree-walking evaluator ───────────────────────────────────────────
+
+fn Demo::Expr::eval_ast($ast) {
+    my $k = $ast->{kind}
+    if ($k eq "num") {
+        return $ast->{value}
+    }
+    if ($k eq "neg") {
+        return -Demo::Expr::eval_ast($ast->{operand})
+    }
+    if ($k eq "bin") {
+        my $l = Demo::Expr::eval_ast($ast->{left})
+        my $r = Demo::Expr::eval_ast($ast->{right})
+        return $l + $r if $ast->{op} eq "+"
+        return $l - $r if $ast->{op} eq "-"
+        return $l * $r if $ast->{op} eq "*"
+        return $l / $r if $ast->{op} eq "/"
+    }
+    die "Unknown node kind: $k\n"
+}
+
+# ── AOP-instrument: count visits + record per-call latency ───────────
+
+mysync $eval_calls = 0
+mysync $eval_lat = t_digest(100)
+
+around "Demo::Expr::eval_ast" {
+    $eval_calls = $eval_calls + 1
+    my $t0 = now_ns()
+    my $r = proceed(@INTERCEPT_ARGS)
+    td_add($eval_lat, (now_ns() - $t0) / 1000.0)
+    $r
+}
+
+# ── test cases ────────────────────────────────────────────────────────
+
+my @cases = (
+    ["3 + 4",                       7],
+    ["10 - 4",                      6],
+    ["2 * 3 + 4",                  10],
+    ["2 + 3 * 4",                  14],
+    ["(2 + 3) * 4",                20],
+    ["-5 + 10",                     5],
+    ["100 / 4",                    25],
+    ["2 * (3 + (4 - 1)) * 5",      60],
+    ["1 + 2 + 3 + 4 + 5",          15],
+    ["10 * 10 * 10",             1000],
+    ["-(2 + 3)",                   -5],
+    ["((1)) + ((2))",               3],
+)
+
+p "── parsed and evaluated expressions ─────────────────"
+my $passed = 0
+for my $c (@cases) {
+    my $src      = $c->[0]
+    my $expected = $c->[1]
+    my $ast = eval { Demo::Expr::parse($src) }
+    if ($@) {
+        printf "  %-30s -> parse error: %s", $src, $@
+        next
+    }
+    my $got = Demo::Expr::eval_ast($ast)
+    my $ok = $got == $expected ? "ok" : "FAIL"
+    $passed++ if $got == $expected
+    printf "  %-30s = %-6d (expected %d)  %s\n",
+        $src, $got, $expected, $ok
+}
+
+p ""
+printf "── %d / %d cases passed ─────────────────────────────\n",
+    $passed, len(@cases)
+
+# ── eval instrumentation ────────────────────────────────────────────
+
+p ""
+p "── AOP instrumentation: eval_ast hits ───────────────"
+printf "  total eval_ast calls : %d\n", $eval_calls
+printf "  p50 per-call latency : %.1f µs\n", td_quantile($eval_lat, 0.5)
+printf "  p99 per-call latency : %.1f µs\n", td_quantile($eval_lat, 0.99)
+
+# ── error-path: invalid input ────────────────────────────────────────
+
+p ""
+p "── error handling on invalid input ──────────────────"
+my @bad = ("1 + ", "((1 + 2)", "1 +", "1 ** 2")
+for my $src (@bad) {
+    my $r = eval { Demo::Expr::parse($src) }
+    if ($@) {
+        my $msg = $@
+        $msg =~ s/\n$//
+        printf "  %-15s -> error: %s\n", $src, $msg
+    } else {
+        printf "  %-15s -> parsed OK (unexpected!)\n", $src
+    }
+}
+
+intercept_clear("Demo::Expr::eval_ast")

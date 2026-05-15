@@ -1,0 +1,168 @@
+#!/usr/bin/env stryke
+
+# Pub-sub event dispatcher demo. Register subscribers, emit events,
+# route via topic patterns, and observe through AOP middleware.
+# Shows:
+#   * hashref-of-arrayref-of-coderef subscription registry
+#   * glob-style topic patterns ("user.*" → matches user.created)
+#   * AOP `around` to count + time every event dispatch
+#   * mysync for cross-closure mutable counters
+#   * t-digest for per-event latency percentiles
+#   * sketch algebra: union per-topic stats
+
+# ── registry: topic_pattern -> arrayref-of-coderef ──────────────────
+
+my %subs
+
+fn Demo::Bus::subscribe($pattern, $handler) {
+    $subs{$pattern} = [] unless exists $subs{$pattern}
+    push @{$subs{$pattern}}, $handler
+}
+
+# ── pattern match: glob-style "user.*" → "user.created", "user.deleted"
+#
+# Note: an earlier version of this demo built a regex from the pattern
+# via `s/\./\\./g; s/\*/[^.]+/g; /^$re$/`, but BUG-218 (regex
+# variable-interpolation result is cached across calls within a loop)
+# made the hand-rolled approach unreliable. Using the `glob_match`
+# builtin sidesteps the bug and is also more direct.
+
+fn Demo::Bus::pattern_matches($pattern, $topic) {
+    glob_match($pattern, $topic) ? 1 : 0
+}
+
+# ── emit: walk registry, call every matching handler ─────────────────
+
+mysync $emit_count = 0
+mysync $handler_calls = 0
+
+fn Demo::Bus::emit($topic, $payload) {
+    $emit_count++
+    my @matched
+    for my $pat (keys %subs) {
+        if (Demo::Bus::pattern_matches($pat, $topic)) {
+            push @matched, $pat
+            for my $handler (@{$subs{$pat}}) {
+                $handler->($topic, $payload)
+                $handler_calls++
+            }
+        }
+    }
+    return \@matched
+}
+
+# ── instrumentation: AOP around-advice for latency ──────────────────
+
+mysync $event_latency = t_digest(100)
+
+around "Demo::Bus::emit" {
+    my $t0 = now_ns()
+    my $r = proceed(@INTERCEPT_ARGS)
+    td_add($event_latency, (now_ns() - $t0) / 1000.0)
+    $r
+}
+
+# ── subscribers ─────────────────────────────────────────────────────
+
+mysync %seen_by_topic
+
+Demo::Bus::subscribe("user.created", fn($topic, $p) {
+    $seen_by_topic{"user.created"} = ($seen_by_topic{"user.created"} // 0) + 1
+})
+
+Demo::Bus::subscribe("user.*", fn($topic, $p) {
+    $seen_by_topic{"user.*"} = ($seen_by_topic{"user.*"} // 0) + 1
+})
+
+Demo::Bus::subscribe("order.placed", fn($topic, $p) {
+    $seen_by_topic{"order.placed"} = ($seen_by_topic{"order.placed"} // 0) + 1
+})
+
+Demo::Bus::subscribe("order.*", fn($topic, $p) {
+    $seen_by_topic{"order.*"} = ($seen_by_topic{"order.*"} // 0) + 1
+})
+
+Demo::Bus::subscribe("*", fn($topic, $p) {
+    $seen_by_topic{"*"} = ($seen_by_topic{"*"} // 0) + 1
+})
+
+printf "── %d subscriber patterns registered ─────────────────\n",
+    len(keys %subs)
+for my $pat (sort { _0 cmp _1 } keys %subs) {
+    printf "  %-16s -> %d handler(s)\n",
+        $pat, len(@{$subs{$pat}})
+}
+
+# ── emit a stream of events ─────────────────────────────────────────
+
+my @events = (
+    ["user.created", +{ id => 1, name => "alice" }],
+    ["user.created", +{ id => 2, name => "bob"   }],
+    ["user.deleted", +{ id => 1 }],
+    ["order.placed", +{ order_id => 100, total => 50.0 }],
+    ["order.placed", +{ order_id => 101, total => 75.5 }],
+    ["order.shipped", +{ order_id => 100 }],
+    ["payment.processed", +{ amount => 50.0 }],
+)
+
+p ""
+printf "── emitting %d events ────────────────────────────────\n", len(@events)
+for my $e (@events) {
+    my $matched = Demo::Bus::emit($e->[0], $e->[1])
+    printf "  %-18s -> matched %d pattern(s) [%s]\n",
+        $e->[0], len(@{$matched}), join(", ", @{$matched})
+}
+
+# ── dispatch rollup ─────────────────────────────────────────────────
+
+p ""
+p "── per-pattern hit counts ───────────────────────────"
+for my $pat (sort { _0 cmp _1 } keys %seen_by_topic) {
+    printf "  %-16s : %d\n", $pat, $seen_by_topic{$pat}
+}
+
+p ""
+p "── totals ───────────────────────────────────────────"
+printf "  events emitted   : %d\n", $emit_count
+printf "  handler calls    : %d\n", $handler_calls
+printf "  fanout ratio     : %.2f x\n", $handler_calls / $emit_count
+
+p ""
+p "── dispatch latency (t-digest) ──────────────────────"
+printf "  p50 : %.1f µs\n", td_quantile($event_latency, 0.50)
+printf "  p95 : %.1f µs\n", td_quantile($event_latency, 0.95)
+printf "  p99 : %.1f µs\n", td_quantile($event_latency, 0.99)
+
+# ── distinct event topics via HLL ───────────────────────────────────
+
+p ""
+p "── topic cardinality (HLL) ──────────────────────────"
+mysync $hll = hll(14)
+for my $e (@events) {
+    hll_add($hll, $e->[0])
+}
+printf "  HLL distinct estimate : %d\n", hll_count($hll)
+my %distinct
+$distinct{$_->[0]} = 1 for @events
+printf "  exact distinct topics : %d\n", len(keys %distinct)
+
+# ── pattern-match smoke test (proves the glob-pattern logic) ─────────
+
+p ""
+p "── pattern-match smoke test ─────────────────────────"
+my @cases = (
+    ["user.*",       "user.created",      1],
+    ["user.*",       "user.deleted",      1],
+    ["user.*",       "order.placed",      0],
+    ["*",            "anything.at.all",   1],
+    ["order.placed", "order.placed",      1],
+    ["order.placed", "order.shipped",     0],
+)
+for my $c (@cases) {
+    my $got = Demo::Bus::pattern_matches($c->[0], $c->[1])
+    my $ok = $got == $c->[2] ? "ok" : "FAIL"
+    printf "  %-14s vs %-22s : got=%d expect=%d  %s\n",
+        $c->[0], $c->[1], $got, $c->[2], $ok
+}
+
+intercept_clear("Demo::Bus::emit")

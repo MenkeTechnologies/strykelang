@@ -1,0 +1,137 @@
+#!/usr/bin/env stryke
+
+# Simple cron-like scheduler demo. Tasks have a cadence (seconds), a
+# name, and a callback. On each tick, due tasks fire and the next-run
+# time advances. Tracks per-task fire count + last-run latency.
+#
+# Patterns:
+#   * task as hashref with closure callback
+#   * priority-queue-like next-run sort
+#   * mysync for cross-task counter state
+#   * t-digest for per-task duration
+
+# ── task registry ──────────────────────────────────────────────────
+
+my @tasks   # each: { name, cadence, next_run, callback, fires, td }
+
+fn Demo::Sched::register($name, $cadence, $callback) {
+    push @tasks, +{
+        name     => $name,
+        cadence  => $cadence,
+        next_run => 0,           # ready immediately
+        callback => $callback,
+        fires    => 0,
+        td       => t_digest(100),
+    }
+}
+
+# ── tick: advance virtual clock and fire ready tasks ───────────────
+
+mysync $total_fires = 0
+mysync $now_virtual = 0
+
+fn Demo::Sched::tick($delta) {
+    $now_virtual = $now_virtual + $delta
+    my $fired = 0
+    # Find all tasks ready now.
+    my @ready = grep { $_->{next_run} <= $now_virtual } @tasks
+    # Sort by next_run for stable order.
+    @ready = sort { $_0->{next_run} <=> $_1->{next_run} } @ready
+    for my $task (@ready) {
+        my $t0 = now_ns()
+        $task->{callback}->($task, $now_virtual)
+        td_add($task->{td}, (now_ns() - $t0) / 1000.0)
+        $task->{fires}    = $task->{fires} + 1
+        $task->{next_run} = $now_virtual + $task->{cadence}
+        $total_fires      = $total_fires + 1
+        $fired++
+    }
+    return $fired
+}
+
+# ── register a few tasks ───────────────────────────────────────────
+
+mysync @log
+
+Demo::Sched::register("heartbeat", 5, fn($task, $now) {
+    push @log, "[t=${now}s] heartbeat ping"
+})
+
+Demo::Sched::register("backup", 30, fn($task, $now) {
+    push @log, "[t=${now}s] backup snapshot"
+})
+
+Demo::Sched::register("cleanup", 10, fn($task, $now) {
+    push @log, "[t=${now}s] cleanup tmp files"
+})
+
+Demo::Sched::register("metrics", 5, fn($task, $now) {
+    push @log, "[t=${now}s] metrics flush"
+})
+
+printf "── %d scheduled tasks ─────────────────────────────────\n",
+    len(@tasks)
+for my $t (@tasks) {
+    printf "  %-12s cadence=%ds\n", $t->{name}, $t->{cadence}
+}
+
+# ── advance the clock in 1-second steps over 60s simulated ─────────
+
+p ""
+p "── simulating 60s of clock ticks ────────────────────"
+my $simulated_seconds = 60
+for my $sec (1:$simulated_seconds) {
+    Demo::Sched::tick(1)
+}
+
+# ── log replay ──────────────────────────────────────────────────────
+
+p ""
+printf "── %d events fired during simulation ─────────────────\n",
+    len(@log)
+for my $entry (@log) { p "  $entry" }
+
+# ── per-task rollup ────────────────────────────────────────────────
+
+p ""
+p "── per-task rollup ──────────────────────────────────"
+for my $t (sort { $_1->{fires} <=> $_0->{fires} } @tasks) {
+    printf "  %-12s fires=%2d  next_run=%ds\n",
+        $t->{name}, $t->{fires}, $t->{next_run}
+}
+printf "  total fires : %d\n", $total_fires
+
+# ── expected counts sanity check ───────────────────────────────────
+
+p ""
+p "── expected vs actual fire counts ───────────────────"
+for my $t (sort { $_0->{name} cmp $_1->{name} } @tasks) {
+    # 60s / cadence + 1 for t=0 firing.
+    my $expected = int($simulated_seconds / $t->{cadence}) + 1
+    my $match = $t->{fires} == $expected ? "ok" : "diff"
+    printf "  %-12s : expected=%d actual=%d  %s\n",
+        $t->{name}, $expected, $t->{fires}, $match
+}
+
+# ── callback latency stats ─────────────────────────────────────────
+
+p ""
+p "── per-task callback latency (t-digest) ─────────────"
+for my $t (sort { $_0->{name} cmp $_1->{name} } @tasks) {
+    my $p50 = td_quantile($t->{td}, 0.5)
+    my $p99 = td_quantile($t->{td}, 0.99)
+    printf "  %-12s p50=%.1f µs p99=%.1f µs\n", $t->{name}, $p50, $p99
+}
+
+# ── sketch-based: distinct task names that fired (HLL) ─────────────
+
+p ""
+p "── HLL distinct tasks fired ─────────────────────────"
+my $hll = hll(14)
+for my $entry (@log) {
+    if ($entry =~ /\] (\w+)/) {
+        hll_add($hll, $1)
+    }
+}
+printf "  HLL distinct task names : %d\n", hll_count($hll)
+printf "  exact registered tasks  : %d\n", len(@tasks)

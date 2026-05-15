@@ -1,0 +1,155 @@
+#!/usr/bin/env stryke
+
+# CSV pivot demo: read a CSV of sales records, pivot by (region × month)
+# with sum aggregation, and produce a wide-format table with row +
+# column margins. Patterns:
+#   * spew/slurp for in-memory CSV roundtrip
+#   * to_csv / from_csv codecs
+#   * pivot via hash-of-hashes (with explicit autoviv per BUG-216)
+#   * sorted axis traversal for stable column order
+#   * sprintf for column alignment
+
+# ── sample dataset ───────────────────────────────────────────────────
+
+my @rows = (
+    +{ region => "us-west", month => "Jan", product => "widget", amount => 100.00 },
+    +{ region => "us-west", month => "Jan", product => "gadget", amount =>  50.00 },
+    +{ region => "us-west", month => "Feb", product => "widget", amount => 150.00 },
+    +{ region => "us-west", month => "Mar", product => "widget", amount => 200.00 },
+    +{ region => "us-east", month => "Jan", product => "widget", amount =>  75.50 },
+    +{ region => "us-east", month => "Feb", product => "gadget", amount => 125.00 },
+    +{ region => "us-east", month => "Mar", product => "widget", amount =>  80.00 },
+    +{ region => "us-east", month => "Mar", product => "gadget", amount =>  90.00 },
+    +{ region => "eu",      month => "Jan", product => "widget", amount => 110.00 },
+    +{ region => "eu",      month => "Feb", product => "widget", amount => 140.00 },
+    +{ region => "eu",      month => "Feb", product => "gadget", amount =>  60.00 },
+    +{ region => "ap",      month => "Mar", product => "widget", amount => 200.00 },
+    +{ region => "ap",      month => "Mar", product => "gadget", amount =>  50.00 },
+)
+
+printf "── %d sales records ────────────────────────────────\n", len(@rows)
+
+# ── round-trip through CSV codec (and a temp file) ──────────────────
+
+my $tmp = "/tmp/stryke_csv_pivot_demo.csv"
+spew($tmp, to_csv(\@rows))
+my $rows_back = from_csv(slurp($tmp))
+printf "  CSV file size : %d bytes\n", -s $tmp
+printf "  rows on read  : %d\n", len(@{$rows_back})
+unlink $tmp
+
+# ── pivot: region × month, sum(amount) ──────────────────────────────
+
+my %pivot
+my %row_total
+my %col_total
+my $grand_total = 0
+
+for my $row (@{$rows_back}) {
+    my $rg = $row->{region}
+    my $mo = $row->{month}
+    my $am = $row->{amount} + 0   # numeric coerce from CSV string
+
+    $pivot{$rg} = +{} unless exists $pivot{$rg}
+    $pivot{$rg}->{$mo} = ($pivot{$rg}->{$mo} // 0) + $am
+    $row_total{$rg}    = ($row_total{$rg}    // 0) + $am
+    $col_total{$mo}    = ($col_total{$mo}    // 0) + $am
+    $grand_total                                    += $am
+}
+
+# ── stable axis order ───────────────────────────────────────────────
+
+my @regions = sort { _0 cmp _1 } keys %pivot
+# Months: explicit calendar order, not lexical.
+my @months  = ("Jan", "Feb", "Mar")
+@months = grep { exists $col_total{$_} } @months
+
+# ── print the pivot ─────────────────────────────────────────────────
+
+p ""
+p "── pivot: SUM(amount) by region × month ─────────────"
+
+# Header row.
+printf "  %-10s", "region"
+for my $m (@months) {
+    printf " %10s", $m
+}
+printf " %10s\n", "TOTAL"
+
+# Underline.
+my $dashes = "-" x 10
+printf "  %s", $dashes
+for my $m (@months) {
+    printf " %s", $dashes
+}
+printf " %s\n", $dashes
+
+# Data rows.
+for my $r (@regions) {
+    printf "  %-10s", $r
+    for my $m (@months) {
+        my $v = $pivot{$r}->{$m} // 0
+        if ($v > 0) {
+            printf " %10.2f", $v
+        } else {
+            printf " %10s", "—"
+        }
+    }
+    printf " %10.2f\n", $row_total{$r}
+}
+
+# Column totals.
+printf "  %s", $dashes
+for my $m (@months) {
+    printf " %s", $dashes
+}
+printf " %s\n", $dashes
+
+printf "  %-10s", "TOTAL"
+for my $m (@months) {
+    printf " %10.2f", $col_total{$m}
+}
+printf " %10.2f\n", $grand_total
+
+# ── pivot rollup as percentages ──────────────────────────────────────
+
+p ""
+p "── share of grand total (%) by region ───────────────"
+for my $r (sort { $row_total{_1} <=> $row_total{_0} } keys %row_total) {
+    my $share = 100.0 * $row_total{$r} / $grand_total
+    printf "  %-10s : %5.1f%%\n", $r, $share
+}
+
+# ── product-level pivot via pipe-forward composition ────────────────
+
+p ""
+p "── product breakdown (pipe-forward composition) ─────"
+my %by_product
+for my $row (@{$rows_back}) {
+    $by_product{$row->{product}} = ($by_product{$row->{product}} // 0) + ($row->{amount} + 0)
+}
+my @products = sort { $by_product{_1} <=> $by_product{_0} } keys %by_product
+for my $p (@products) {
+    printf "  %-8s : %8.2f (%5.1f%%)\n",
+        $p, $by_product{$p}, 100.0 * $by_product{$p} / $grand_total
+}
+
+# ── TopK regions via SpaceSaving ─────────────────────────────────────
+
+p ""
+p "── TopK regions by sales count (TopK sketch) ────────"
+mysync $tk = topk(3)
+topk_add($tk, $_->{region}) for @{$rows_back}
+my @top = topk_top($tk)
+for my $h (@top) {
+    printf "  %-10s : %d records\n", $h->[0], $h->[1]
+}
+
+# ── distinct product cardinality (HLL) ──────────────────────────────
+
+p ""
+p "── distinct cardinality (HLL) ───────────────────────"
+mysync $hll = hll(14)
+hll_add($hll, $_->{product}) for @{$rows_back}
+printf "  HLL distinct products : %d\n", hll_count($hll)
+printf "  exact distinct        : %d\n", len(@products)

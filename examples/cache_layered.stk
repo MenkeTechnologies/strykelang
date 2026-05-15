@@ -1,0 +1,192 @@
+#!/usr/bin/env stryke
+
+# Layered cache demo: how to combine
+#   * an in-process memo hash (fastest hit)
+#   * a Bloom filter for negative caching (cheap "definitely not there")
+#   * an on-disk rkyv KV store (persists across runs)
+# behind one `lookup($key)` API. Showcases AOP-driven instrumentation
+# without touching the cache code itself.
+
+# ── L0: in-process memo (hash) ───────────────────────────────────────
+
+mysync %l0
+mysync $l0_hits   = 0
+mysync $l0_misses = 0
+
+# ── L1: Bloom filter for negative answers ────────────────────────────
+
+mysync $bloom = bloom_filter(10000, 0.01)
+mysync $negatives_cached = 0
+mysync $bloom_skips      = 0
+
+# ── L2: rkyv KV store (persistent) ───────────────────────────────────
+
+my $kv_path = "/tmp/cache_layered_demo.rkyv"
+unlink $kv_path if -e $kv_path
+mysync $kv = kv_open($kv_path)
+mysync $l2_hits   = 0
+mysync $l2_misses = 0
+
+# ── L3: simulated upstream ("slow database") ─────────────────────────
+# 10 known keys; everything else returns undef.
+
+my %upstream = (
+    user_alice   => "Alice Smith, age 30",
+    user_bob     => "Bob Jones, age 28",
+    user_carol   => "Carol Wong, age 35",
+    user_dave    => "Dave Lee, age 42",
+    user_eve     => "Eve Martinez, age 25",
+    user_frank   => "Frank O'Brien, age 38",
+    user_grace   => "Grace Kim, age 31",
+    user_henry   => "Henry Wallace, age 29",
+    user_irene   => "Irene Patel, age 36",
+    user_jack    => "Jack Norris, age 40",
+)
+
+mysync $upstream_calls = 0
+
+fn Demo::Cache::upstream_fetch($key) {
+    $upstream_calls++
+    # Simulate slow query: burn 200 µs.
+    my $end = now_ns() + 200_000
+    while (now_ns() < $end) { }
+    return $upstream{$key}   # undef for unknown keys
+}
+
+# ── unified lookup with all layers ───────────────────────────────────
+
+fn Demo::Cache::lookup($key) {
+    # L0: in-process hash.
+    if (exists $l0{$key}) {
+        $l0_hits++
+        return $l0{$key}
+    }
+    $l0_misses++
+
+    # L1: Bloom filter — if probably-not-in upstream, short-circuit.
+    # We only ever add NEGATIVE answers to bloom (one-way membership).
+    if (bloom_contains($bloom, "neg:" . $key)) {
+        $bloom_skips++
+        return undef
+    }
+
+    # L2: persistent KV.
+    my $v = kv_get($kv, $key)
+    if (defined $v) {
+        $l2_hits++
+        $l0{$key} = $v        # promote to L0 for next time
+        return $v
+    }
+    $l2_misses++
+
+    # L3: upstream.
+    my $u = Demo::Cache::upstream_fetch($key)
+    if (defined $u) {
+        kv_put($kv, $key, $u)   # warm L2
+        $l0{$key} = $u           # warm L0
+        return $u
+    }
+    # Negative result: remember via Bloom so we don't ask again.
+    bloom_add($bloom, "neg:" . $key)
+    $negatives_cached++
+    return undef
+}
+
+# ── workload ────────────────────────────────────────────────────────
+
+my @queries
+my @known = sort { _0 cmp _1 } keys %upstream
+my @unknown = ("user_unknown_1", "user_unknown_2", "user_zzz", "user_xyz")
+
+# 30 queries: a mix of repeats, knowns, and unknowns.
+for my $i (1:30) {
+    if ($i % 7 == 0) {
+        push @queries, $unknown[$i % len(@unknown)]
+    } elsif ($i % 3 == 0) {
+        push @queries, $known[($i * 7) % len(@known)]
+    } else {
+        push @queries, $known[$i % len(@known)]
+    }
+}
+
+printf "── %d queries against %d-key upstream ────────────────\n",
+    len(@queries), len(@known)
+
+# ── execute workload ────────────────────────────────────────────────
+
+my $start = now_ns()
+my @results = map { Demo::Cache::lookup($_) } @queries
+my $elapsed_us = (now_ns() - $start) / 1000.0
+
+# ── per-query summary (compact) ─────────────────────────────────────
+
+p ""
+p "── per-query results (compact) ──────────────────────"
+my $defined = 0
+my $miss    = 0
+for my $i (0:len(@results)-1) {
+    if (defined $results[$i]) {
+        $defined++
+    } else {
+        $miss++
+    }
+}
+printf "  defined : %d\n", $defined
+printf "  missing : %d\n", $miss
+
+# ── layer-by-layer hit rates ────────────────────────────────────────
+
+p ""
+p "── cache layer hit rates ────────────────────────────"
+my $total = len(@queries)
+printf "  L0 (memo)         hits=%-3d  misses=%-3d  hitrate=%.0f%%\n",
+    $l0_hits, $l0_misses, 100.0 * $l0_hits / $total
+printf "  L1 (Bloom-)       skips=%-3d  (negatives short-circuited)\n",
+    $bloom_skips
+printf "  L2 (rkyv KV)      hits=%-3d  misses=%-3d  hitrate=%.0f%%\n",
+    $l2_hits, $l2_misses,
+    $l2_hits + $l2_misses > 0 ? 100.0 * $l2_hits / ($l2_hits + $l2_misses) : 0.0
+printf "  L3 (upstream)     calls=%-3d  (neg-cached=%d)\n",
+    $upstream_calls, $negatives_cached
+printf "  total elapsed     %.1f µs (avg %.1f µs/query)\n",
+    $elapsed_us, $elapsed_us / $total
+
+# ── persist L2 and verify ───────────────────────────────────────────
+
+p ""
+p "── persistence check ────────────────────────────────"
+kv_commit($kv)
+my $stats = kv_stats($kv)
+printf "  KV stored keys    : %d\n", $stats->{keys} // 0
+printf "  KV file size      : %d bytes\n", $stats->{file_size} // 0
+kv_close($kv)
+
+# ── second round: open KV from disk to prove persistence ────────────
+
+p ""
+p "── re-open KV from disk and verify ──────────────────"
+my $kv2 = kv_open($kv_path)
+my $alice = kv_get($kv2, "user_alice")
+printf "  user_alice from disk : %s\n", defined($alice) ? $alice : "(not found)"
+my $stats2 = kv_stats($kv2)
+printf "  KV keys on reopen    : %d\n", $stats2->{keys} // 0
+kv_close($kv2)
+
+unlink $kv_path
+
+# ── AOP-instrumented variant: count + latency of upstream_fetch ─────
+
+p ""
+p "── AOP instrumentation: upstream latency ────────────"
+mysync $upstream_latency = t_digest(100)
+around "Demo::Cache::upstream_fetch" {
+    my $t0 = now_ns()
+    my $r = proceed(@INTERCEPT_ARGS)
+    td_add($upstream_latency, (now_ns() - $t0) / 1000.0)
+    $r
+}
+# Re-run a few queries to populate the latency digest.
+Demo::Cache::upstream_fetch($_) for ("user_alice", "user_bob", "user_carol")
+printf "  upstream p50         : %.1f µs\n", td_quantile($upstream_latency, 0.5)
+printf "  upstream p99         : %.1f µs\n", td_quantile($upstream_latency, 0.99)
+intercept_clear("Demo::Cache::upstream_fetch")

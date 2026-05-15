@@ -1,0 +1,189 @@
+#!/usr/bin/env stryke
+
+# Banking ledger demo: account class, transaction log, atomic
+# transfers, audit log via mutex-coordinated mysync. Patterns:
+#   * Account as OOP class with balance derivation from tx log
+#   * Transactions immutable hashrefs with type + amount
+#   * Transfer pattern: debit + credit in single fn (no auto-commit)
+#   * AOP-style observability via free fn wrapping (BUG-222 workaround)
+
+# ── Account class ───────────────────────────────────────────────────
+
+class Account {
+    id:      Str
+    holder:  Str
+    balance: Float = 0.0
+    txlog:   Any
+
+    fn BUILD {
+        $self->txlog([])
+    }
+
+    fn deposit($amount) {
+        return +{ ok => 0, reason => "non_positive" } if $amount <= 0
+        $self->balance($self->balance + $amount)
+        push @{$self->txlog}, +{
+            type   => "deposit",
+            amount => $amount,
+            after  => $self->balance,
+            ts     => time(),
+        }
+        return +{ ok => 1, balance => $self->balance }
+    }
+
+    fn withdraw($amount) {
+        return +{ ok => 0, reason => "non_positive" } if $amount <= 0
+        if ($self->balance < $amount) {
+            return +{ ok => 0, reason => "insufficient" }
+        }
+        $self->balance($self->balance - $amount)
+        push @{$self->txlog}, +{
+            type   => "withdraw",
+            amount => $amount,
+            after  => $self->balance,
+            ts     => time(),
+        }
+        return +{ ok => 1, balance => $self->balance }
+    }
+
+    fn statement_lines {
+        my @lines
+        for my $tx (@{$self->txlog}) {
+            push @lines, sprintf(
+                "  %-9s %8.2f  -> balance %8.2f",
+                uc($tx->{type}), $tx->{amount}, $tx->{after}
+            )
+        }
+        return \@lines
+    }
+}
+
+# ── transfer: atomic debit-then-credit ──────────────────────────────
+
+mysync @audit
+my $td_lat = t_digest(100)
+
+fn Demo::Bank::transfer($from, $to, $amount) {
+    my $t0 = now_ns()
+    my $w = $from->withdraw($amount)
+    unless ($w->{ok}) {
+        push @audit, +{
+            event => "transfer_failed",
+            from  => $from->id,
+            to    => $to->id,
+            amt   => $amount,
+            why   => $w->{reason},
+        }
+        td_add($td_lat, (now_ns() - $t0) / 1000.0)
+        return $w
+    }
+    my $d = $to->deposit($amount)
+    unless ($d->{ok}) {
+        # Roll back the debit.
+        $from->deposit($amount)
+        push @audit, +{
+            event => "transfer_rolled_back",
+            from  => $from->id,
+            to    => $to->id,
+            amt   => $amount,
+            why   => $d->{reason},
+        }
+        td_add($td_lat, (now_ns() - $t0) / 1000.0)
+        return +{ ok => 0, reason => "deposit_failed_rolled_back" }
+    }
+    push @audit, +{
+        event => "transfer_ok",
+        from  => $from->id,
+        to    => $to->id,
+        amt   => $amount,
+    }
+    td_add($td_lat, (now_ns() - $t0) / 1000.0)
+    return +{ ok => 1, debit => $w->{balance}, credit => $d->{balance} }
+}
+
+# ── create accounts + simulate workload ─────────────────────────────
+
+my @accts = (
+    Account(id => "A001", holder => "alice", balance => 1000.0),
+    Account(id => "A002", holder => "bob",   balance => 500.0),
+    Account(id => "A003", holder => "carol", balance => 250.0),
+)
+
+p "── initial balances ─────────────────────────────────"
+for my $acct (@accts) {
+    printf "  %-5s %-7s : %8.2f\n", $acct->id, $acct->holder, $acct->balance
+}
+
+# ── individual ops ──────────────────────────────────────────────────
+
+p ""
+p "── deposits + withdrawals ──────────────────────────"
+$accts[0]->deposit(250.00)
+$accts[1]->withdraw(100.00)
+$accts[2]->deposit(75.50)
+my $bad = $accts[2]->withdraw(10000.00)   # should fail
+printf "  carol overdraw attempt: ok=%d reason=%s\n",
+    $bad->{ok}, $bad->{reason} // ""
+
+# ── transfers ───────────────────────────────────────────────────────
+
+p ""
+p "── transfers ───────────────────────────────────────"
+my @transfers = (
+    [$accts[0], $accts[1], 200.00],
+    [$accts[1], $accts[2], 50.00],
+    [$accts[0], $accts[2], 100.00],
+    [$accts[2], $accts[1], 999999.99],   # should fail
+)
+for my $t (@transfers) {
+    my $r = Demo::Bank::transfer($t->[0], $t->[1], $t->[2])
+    if ($r->{ok}) {
+        printf "  %s -> %s  \$%.2f  ok\n",
+            $t->[0]->id, $t->[1]->id, $t->[2]
+    } else {
+        printf "  %s -> %s  \$%.2f  REJECTED (%s)\n",
+            $t->[0]->id, $t->[1]->id, $t->[2], $r->{reason}
+    }
+}
+
+# ── final balances + integrity check ────────────────────────────────
+
+p ""
+p "── final balances ──────────────────────────────────"
+my $total = 0
+for my $acct (@accts) {
+    printf "  %-5s %-7s : %8.2f\n", $acct->id, $acct->holder, $acct->balance
+    $total += $acct->balance
+}
+printf "  ----- total            : %8.2f\n", $total
+
+# Conservation check: initial 1750 + deposits 325.50 - withdrawals 100
+# = 1975.50. (Transfers don't change total.)
+my $expected = 1000 + 500 + 250 + 250 - 100 + 75.5
+printf "  expected (conserved)    : %8.2f\n", $expected
+printf "  delta                   : %8.4f (must be 0)\n", $total - $expected
+
+# ── per-account statement ───────────────────────────────────────────
+
+p ""
+p "── alice statement ─────────────────────────────────"
+for my $line (@{$accts[0]->statement_lines}) { p $line }
+
+p ""
+p "── bob statement ───────────────────────────────────"
+for my $line (@{$accts[1]->statement_lines}) { p $line }
+
+# ── audit log rollup ────────────────────────────────────────────────
+
+p ""
+p "── audit summary ───────────────────────────────────"
+my %events
+$events{$_->{event}}++ for @audit
+for my $e (sort { _0 cmp _1 } keys %events) {
+    printf "  %-25s : %d\n", $e, $events{$e}
+}
+
+p ""
+p "── transfer latency (t-digest) ─────────────────────"
+printf "  p50  : %.1f µs\n", td_quantile($td_lat, 0.50)
+printf "  p99  : %.1f µs\n", td_quantile($td_lat, 0.99)

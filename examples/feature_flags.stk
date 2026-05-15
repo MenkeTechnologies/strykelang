@@ -1,0 +1,144 @@
+#!/usr/bin/env stryke
+
+# Feature-flag system demo. Each flag has a rollout percentage. Users
+# are bucketed sticky-deterministically via a hash of (user_id, flag).
+# Evaluation telemetry is recorded via mysync counters + sketches.
+#
+# Patterns:
+#   * sha-style bucket hash → modulo 100 = percentage
+#   * sticky: same user always gets same answer
+#   * HLL for distinct user count per flag
+#   * t-digest for evaluation latency
+
+# ── flag definitions ───────────────────────────────────────────────
+
+my %flags = (
+    "new_checkout" => 25,    # 25% rollout
+    "dark_mode"    => 50,
+    "ai_assist"    => 10,
+    "fast_search"  => 75,
+    "beta_dashboard" => 100, # everyone
+)
+
+printf "── %d feature flags ──────────────────────────────────\n",
+    len(keys %flags)
+for my $f (sort { _0 cmp _1 } keys %flags) {
+    printf "  %-18s : %d%% rollout\n", $f, $flags{$f}
+}
+
+# ── bucket: sticky hash of (user, flag) → 0..99 ────────────────────
+
+fn Demo::FF::bucket($user, $flag) {
+    # Simple FNV-style accumulator over codepoints. Stable across runs.
+    my $key = "$user|$flag"
+    my $h = 2166136261
+    for my $i (0:len($key) - 1) {
+        my $c = ord(substr($key, $i, 1))
+        $h = ($h ^ $c) * 16777619
+        $h = $h % 4294967296   # 32-bit wrap
+    }
+    return $h % 100
+}
+
+# ── evaluation ─────────────────────────────────────────────────────
+
+mysync %hll_per_flag    # flag -> HLL of users who hit
+mysync %enabled_count   # flag -> count of "enabled" evaluations
+mysync %total_count     # flag -> count of total evaluations
+mysync $td_eval = t_digest(100)
+
+for my $f (keys %flags) {
+    $hll_per_flag{$f} = hll(14)
+    $enabled_count{$f} = 0
+    $total_count{$f} = 0
+}
+
+fn Demo::FF::is_enabled($user, $flag) {
+    my $t0 = now_ns()
+    my $rollout = $flags{$flag} // 0
+    my $bucket  = Demo::FF::bucket($user, $flag)
+    my $enabled = $bucket < $rollout
+    hll_add($hll_per_flag{$flag}, $user)
+    $total_count{$flag}   = $total_count{$flag} + 1
+    $enabled_count{$flag} = $enabled_count{$flag} + 1 if $enabled
+    td_add($td_eval, (now_ns() - $t0) / 1000.0)
+    return $enabled
+}
+
+# ── simulate 1000 users hitting all flags ──────────────────────────
+
+p ""
+p "── simulating 1000 users × 5 flags = 5000 evaluations ──"
+for my $i (1:1000) {
+    my $user = "user-$i"
+    for my $f (keys %flags) {
+        Demo::FF::is_enabled($user, $f)
+    }
+}
+
+# ── rollout accuracy: observed vs target percentage ────────────────
+
+p ""
+p "── observed rollout vs target ───────────────────────"
+for my $f (sort { _0 cmp _1 } keys %flags) {
+    my $target = $flags{$f}
+    my $total  = $total_count{$f}
+    my $on     = $enabled_count{$f}
+    my $pct    = 100.0 * $on / $total
+    my $delta  = $pct - $target
+    printf "  %-18s target=%3d%%  observed=%5.1f%%  delta=%+5.1f%%\n",
+        $f, $target, $pct, $delta
+}
+
+# ── stickiness check: same user, repeated query, same result ──────
+
+p ""
+p "── stickiness check ─────────────────────────────────"
+my $stable = 0
+my $flips = 0
+for my $i (1:100) {
+    my $user = "user-$i"
+    for my $f (keys %flags) {
+        my $r1 = Demo::FF::is_enabled($user, $f)
+        my $r2 = Demo::FF::is_enabled($user, $f)
+        my $r3 = Demo::FF::is_enabled($user, $f)
+        if ($r1 == $r2 && $r2 == $r3) {
+            $stable++
+        } else {
+            $flips++
+        }
+    }
+}
+printf "  stable evaluations : %d / %d\n", $stable, $stable + $flips
+printf "  flips              : %d (must be 0)\n", $flips
+
+# ── distinct users per flag (HLL) ──────────────────────────────────
+
+p ""
+p "── distinct users per flag (HLL) ────────────────────"
+for my $f (sort { _0 cmp _1 } keys %flags) {
+    my $est = hll_count($hll_per_flag{$f})
+    printf "  %-18s : %d distinct users\n", $f, $est
+}
+
+# ── TopK most-evaluated flags ──────────────────────────────────────
+
+p ""
+p "── TopK most-evaluated flags (telemetry) ────────────"
+my $tk = topk(3)
+for my $f (keys %flags) {
+    for my $i (1:$total_count{$f}) {
+        topk_add($tk, $f)
+    }
+}
+my @top = topk_top($tk)
+for my $h (@top) {
+    printf "  %-18s : %d evaluations\n", $h->[0], $h->[1]
+}
+
+# ── evaluation latency ────────────────────────────────────────────
+
+p ""
+p "── evaluation latency (t-digest) ────────────────────"
+printf "  p50  : %.1f µs\n", td_quantile($td_eval, 0.50)
+printf "  p99  : %.1f µs\n", td_quantile($td_eval, 0.99)

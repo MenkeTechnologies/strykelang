@@ -1,0 +1,172 @@
+#!/usr/bin/env stryke
+
+# JSON Lines (.ndjson) log analyzer demo. Real-world pattern:
+#   1. Service writes structured logs as one JSON object per line.
+#   2. Analyst reads the file, filters by level, aggregates by service,
+#      uses sketches for cardinality and percentile-latency rollups.
+# This demo synthesises a sample log to /tmp, then analyses it.
+#
+# Patterns:
+#   * spew + slurp for file IO
+#   * split /\n/ to iterate lines (BUG: no lines_of builtin)
+#   * from_json per line for structured parsing
+#   * HLL for distinct trace IDs
+#   * TopK for noisiest services
+#   * t-digest for global latency percentiles
+#   * grep / map / pipe-forward for filtering pipeline
+
+# ── synthesise a sample JSONL log ────────────────────────────────────
+
+my $tmp = "/tmp/stryke_jsonl_demo.ndjson"
+unlink $tmp if -e $tmp
+
+my @services = ("api-gateway", "auth", "billing", "search", "notifier")
+my @levels   = ("INFO", "INFO", "INFO", "INFO", "WARN", "WARN", "ERROR")
+
+# Write 100 log lines.
+my @lines
+for my $i (1:100) {
+    my $svc   = $services[$i % len(@services)]
+    my $level = $levels[$i % len(@levels)]
+    my $global_lat   = int(rand() * 500) + 10            # 10..510 ms
+    my $trace = "trace-" . int(rand() * 30)       # 30 distinct traces
+    my $rec = +{
+        ts      => sprintf("2026-05-15T12:%02d:%02d", int($i / 10), $i % 60),
+        service => $svc,
+        level   => $level,
+        trace   => $trace,
+        latency_ms => $global_lat,
+        msg     => "request $i from $svc",
+    }
+    push @lines, to_json($rec)
+}
+spew($tmp, join("\n", @lines) . "\n")
+printf "── synthesised %d log lines, %d bytes ────────────────\n",
+    len(@lines), -s $tmp
+
+# ── read back + parse ───────────────────────────────────────────────
+
+my @records
+my $parse_errs = 0
+for my $line (split /\n/, slurp($tmp)) {
+    next if len($line) == 0
+    my $rec = eval { from_json($line) }
+    if (defined($rec) && ref($rec) =~ /HASH/) {
+        push @records, $rec
+    } else {
+        $parse_errs++
+    }
+}
+printf "  parsed %d records (%d parse errors)\n",
+    len(@records), $parse_errs
+
+# ── filter by level ─────────────────────────────────────────────────
+
+p ""
+p "── breakdown by level ───────────────────────────────"
+my %by_level
+$by_level{$_->{level}}++ for @records
+for my $lvl (sort { _0 cmp _1 } keys %by_level) {
+    printf "  %-6s : %d\n", $lvl, $by_level{$lvl}
+}
+
+# ── ERROR records only ──────────────────────────────────────────────
+
+p ""
+p "── error log (first 5) ──────────────────────────────"
+my @errors = grep { $_->{level} eq "ERROR" } @records
+my $shown = 0
+for my $e (@errors) {
+    last if $shown >= 5
+    printf "  %s [%s] %s (%dms)\n",
+        $e->{ts}, $e->{service}, $e->{msg}, $e->{latency_ms}
+    $shown++
+}
+printf "  ... %d more error records\n", len(@errors) - $shown if len(@errors) > $shown
+
+# ── per-service rollup ──────────────────────────────────────────────
+
+p ""
+p "── per-service rollup ───────────────────────────────"
+my %svc_count
+my %svc_lat_sum
+my %svc_lat_count
+for my $r (@records) {
+    my $s = $r->{service}
+    $svc_count{$s}++
+    $svc_lat_sum{$s} += $r->{latency_ms}
+    $svc_lat_count{$s}++
+}
+printf "  %-14s %5s %10s %10s\n", "service", "n", "avg_ms", "total_ms"
+for my $s (sort { $svc_count{_1} <=> $svc_count{_0} } keys %svc_count) {
+    my $avg = $svc_lat_sum{$s} / $svc_lat_count{$s}
+    printf "  %-14s %5d %10.1f %10d\n", $s, $svc_count{$s}, $avg, $svc_lat_sum{$s}
+}
+
+# ── HLL: distinct trace ids ─────────────────────────────────────────
+
+p ""
+p "── distinct cardinality (HLL) ───────────────────────"
+mysync $hll = hll(14)
+mysync %distinct_traces
+for my $r (@records) {
+    hll_add($hll, $r->{trace})
+    $distinct_traces{$r->{trace}} = 1
+}
+printf "  HLL distinct trace IDs : %d\n", hll_count($hll)
+printf "  exact (hash keys)      : %d\n", len(keys %distinct_traces)
+
+# ── TopK: noisiest services ─────────────────────────────────────────
+
+p ""
+p "── TopK noisiest services ───────────────────────────"
+mysync $tk = topk(3)
+topk_add($tk, $_->{service}) for @records
+my @top = topk_top($tk)
+for my $h (@top) {
+    printf "  %-14s : %d records\n", $h->[0], $h->[1]
+}
+
+# ── global latency percentiles via t-digest ─────────────────────────
+
+p ""
+p "── global latency percentiles (t-digest) ────────────"
+my $gtd = t_digest(100)
+for my $r (@records) {
+    td_add($gtd, $r->{latency_ms})
+}
+printf "  p50  : %d ms\n", int(td_quantile($gtd, 0.50))
+printf "  p90  : %d ms\n", int(td_quantile($gtd, 0.90))
+printf "  p99  : %d ms\n", int(td_quantile($gtd, 0.99))
+
+# ── per-service p99 latency via separate t-digests ──────────────────
+
+p ""
+p "── per-service p99 latency ──────────────────────────"
+my %svc_td
+for my $r (@records) {
+    $svc_td{$r->{service}} = t_digest(100) unless exists $svc_td{$r->{service}}
+    td_add($svc_td{$r->{service}}, $r->{latency_ms})
+}
+for my $s (sort { _0 cmp _1 } keys %svc_td) {
+    my $p99 = int(td_quantile($svc_td{$s}, 0.99))
+    my $p50 = int(td_quantile($svc_td{$s}, 0.50))
+    printf "  %-14s p50=%4d ms  p99=%4d ms\n", $s, $p50, $p99
+}
+
+# ── error-rate by service (errors / total per service) ──────────────
+
+p ""
+p "── error-rate by service ────────────────────────────"
+my %svc_err
+for my $r (@records) {
+    $svc_err{$r->{service}}++ if $r->{level} eq "ERROR"
+}
+for my $s (sort { _0 cmp _1 } keys %svc_count) {
+    my $err = $svc_err{$s} // 0
+    my $rate = 100.0 * $err / $svc_count{$s}
+    printf "  %-14s : %d / %d  (%.1f%% errors)\n",
+        $s, $err, $svc_count{$s}, $rate
+}
+
+unlink $tmp

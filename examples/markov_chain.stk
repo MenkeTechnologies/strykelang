@@ -1,0 +1,107 @@
+#!/usr/bin/env stryke
+
+# Markov-chain text generator. Builds an n-gram transition table over
+# a corpus, then samples new sentences by following the chain. Composes
+# hash-of-hash, regex tokenization, random sampling, and idiomatic
+# stryke list operations.
+
+# ── corpus ────────────────────────────────────────────────────────────
+
+my @corpus = (
+    "the quick brown fox jumps over the lazy dog",
+    "the lazy dog sleeps under the warm sun",
+    "the brown fox runs fast through the forest",
+    "the warm sun shines on the green forest",
+    "the green forest hides the brown fox at night",
+    "the dog barks at the brown fox in the forest",
+    "the fox jumps over the fence into the forest",
+    "the lazy cat watches the brown fox from the wall",
+    "the cat sleeps in the warm sun all afternoon",
+    "the dog and the cat watch the brown fox together",
+)
+
+# ── build bigram → next-word distribution ─────────────────────────────
+
+p "── building bigram model ──────────────────────────────"
+my %next   # word → arrayref of follow-up words (with repeats = freq)
+
+for my $sentence (@corpus) {
+    my @words = split /\s+/, $sentence
+    for my $i (0:len(@words)-2) {
+        my $w  = $words[$i]
+        my $nx = $words[$i + 1]
+        $next{$w} = [] unless exists $next{$w}
+        push @{$next{$w}}, $nx
+    }
+}
+
+printf "  trained on %d sentences, %d distinct words\n",
+    len(@corpus), len(keys %next)
+
+# ── inspect a few transition lists ────────────────────────────────────
+
+p ""
+p "── sample transitions for 'the' ───────────────────────"
+my @after_the = @{$next{"the"}}
+printf "  after 'the': %d follow-ups\n", len(@after_the)
+my %freq
+for my $w (@after_the) { $freq{$w}++ }
+my @top = sort { $freq{_1} <=> $freq{_0} } keys %freq
+for my $w (@top[0:4]) {
+    printf "    %-12s × %d\n", $w, $freq{$w}
+}
+
+# ── generate sentences ────────────────────────────────────────────────
+
+fn pick_random($arr) {
+    my @items = @$arr
+    $items[int(rand() * len(@items))]
+}
+
+fn generate_sentence($start, $max_len) {
+    my @out = ($start)
+    my $cur = $start
+    for (1:$max_len) {
+        if (exists $next{$cur} && len(@{$next{$cur}}) > 0) {
+            $cur = pick_random($next{$cur})
+            push @out, $cur
+        } else {
+            last
+        }
+    }
+    join(" ", @out)
+}
+
+p ""
+p "── generated sentences (5 samples starting with 'the') ─"
+srand(42)   # deterministic for the demo
+for my $i (1:5) {
+    printf "  %d. %s\n", $i, generate_sentence("the", 12)
+}
+
+# ── distinct generated count over many samples (via HLL) ──────────────
+
+p ""
+p "── distinct generated sentences over 1000 samples ─────"
+my $h = hll(14)
+srand(42)
+for (1:1000) {
+    hll_add($h, generate_sentence("the", 12))
+}
+printf "  HLL estimate : %d unique sentences from 1000 samples\n",
+    hll_count($h)
+
+# ── frequency of starter words via CMS ────────────────────────────────
+
+p ""
+p "── starter-word distribution via CMS ──────────────────"
+my $c = cms(2048, 5)
+srand(42)
+for (1:1000) {
+    my $sent = generate_sentence("the", 12)
+    my @ws = split /\s+/, $sent
+    cms_add($c, $ws[1]) if len(@ws) >= 2
+}
+for my $w ("quick", "lazy", "brown", "warm", "green", "dog", "cat") {
+    printf "  word-after-the=%-8s × %d\n", $w, cms_count($c, $w)
+}

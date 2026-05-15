@@ -1,0 +1,151 @@
+#!/usr/bin/env stryke
+
+# Bigram + trigram Markov text generator. Builds a probabilistic
+# transition model from a corpus, then samples weighted next-words to
+# generate new sentences.
+#
+# Patterns:
+#   * sliding_pairs / sliding triples for n-gram extraction
+#   * hash-of-hash-of-int for transition counts
+#   * cumulative weighted sampling via rand()
+#   * TopK on most-common bigrams
+#   * t-digest for per-token generation latency
+
+# ── corpus ──────────────────────────────────────────────────────────
+
+my $corpus = q{
+    the quick brown fox jumps over the lazy dog
+    the lazy dog sleeps under the warm sun
+    the quick brown fox runs through the forest
+    the wise owl watches over the sleeping forest
+    the forest is quiet under the moon
+    the moon shines bright over the lake
+    the lake reflects the moon and the stars
+    the stars twinkle bright in the night sky
+    the quick fox dreams of the lazy dog
+}
+
+# ── tokenize ────────────────────────────────────────────────────────
+
+my @tokens = split /\s+/, $corpus
+@tokens = grep { len($_) > 0 } @tokens
+printf "── corpus: %d tokens, %d distinct ────────────────\n",
+    len(@tokens), len(keys %{+{ map { $_ => 1 } @tokens }})
+
+# ── build bigram transition table ───────────────────────────────────
+
+my %trans   # trans{prev}{next} = count
+my %totals  # totals{prev} = sum of next counts
+for my $i (0:len(@tokens) - 2) {
+    my $prev = $tokens[$i]
+    my $next = $tokens[$i + 1]
+    $trans{$prev} = +{} unless exists $trans{$prev}
+    $trans{$prev}->{$next} = ($trans{$prev}->{$next} // 0) + 1
+    $totals{$prev} = ($totals{$prev} // 0) + 1
+}
+
+printf "  %d distinct preceding contexts\n", len(keys %trans)
+
+# ── weighted-pick next token given previous ─────────────────────────
+
+fn Demo::Markov::next_token($prev) {
+    return undef unless exists $trans{$prev}
+    my $follow = $trans{$prev}
+    my $total = $totals{$prev}
+    my $pick = rand() * $total
+    my $sum = 0
+    for my $candidate (keys %$follow) {
+        $sum += $follow->{$candidate}
+        return $candidate if $sum >= $pick
+    }
+    # Fallback: last key.
+    my @keys = keys %$follow
+    return $keys[-1]
+}
+
+# ── generate sample sentences ───────────────────────────────────────
+
+my $td_gen = t_digest(100)
+
+fn Demo::Markov::generate($seed, $max_len) {
+    my @out = ($seed)
+    my $current = $seed
+    for my $i (1:$max_len) {
+        my $t0 = now_ns()
+        my $nxt = Demo::Markov::next_token($current)
+        td_add($td_gen, (now_ns() - $t0) / 1000.0)
+        last unless defined $nxt
+        push @out, $nxt
+        $current = $nxt
+    }
+    return \@out
+}
+
+p ""
+p "── generated samples (bigram, seed=\"the\") ───────────"
+for my $i (1:5) {
+    my $words = Demo::Markov::generate("the", 12)
+    printf "  %d: %s\n", $i, join(" ", @$words)
+}
+
+p ""
+p "── generated samples (seed=\"forest\") ───────────────"
+for my $i (1:3) {
+    my $words = Demo::Markov::generate("forest", 10)
+    printf "  %d: %s\n", $i, join(" ", @$words)
+}
+
+# ── top transitions analysis ────────────────────────────────────────
+
+p ""
+p "── most-common bigrams (TopK sketch) ────────────────"
+my $tk = topk(5)
+for my $prev (keys %trans) {
+    for my $next (keys %{$trans{$prev}}) {
+        my $count = $trans{$prev}->{$next}
+        for my $i (1:$count) {
+            topk_add($tk, "$prev -> $next")
+        }
+    }
+}
+my @hits = topk_top($tk)
+for my $h (@hits) {
+    printf "  %-25s : %d\n", $h->[0], $h->[1]
+}
+
+# ── distinct bigrams (HLL) ──────────────────────────────────────────
+
+p ""
+p "── distinct bigram cardinality (HLL) ────────────────"
+my $hll = hll(14)
+my %seen_bg
+for my $prev (keys %trans) {
+    for my $next (keys %{$trans{$prev}}) {
+        hll_add($hll, "$prev|$next")
+        $seen_bg{"$prev|$next"} = 1
+    }
+}
+printf "  HLL distinct bigrams : %d\n", hll_count($hll)
+printf "  exact distinct       : %d\n", len(keys %seen_bg)
+
+# ── most "branching" contexts (most distinct successors) ────────────
+
+p ""
+p "── highest-entropy contexts (most successor choices) ─"
+my @ctx_sorted = sort { len(keys %{$trans{_1}}) <=> len(keys %{$trans{_0}}) } keys %trans
+my $shown = 0
+for my $ctx (@ctx_sorted) {
+    last if $shown >= 5
+    my @nexts = sort { _0 cmp _1 } keys %{$trans{$ctx}}
+    printf "  %-12s -> %d choices: %s\n",
+        $ctx, len(@nexts), join(", ", @nexts)
+    $shown++
+}
+
+# ── per-token generation latency ────────────────────────────────────
+
+p ""
+p "── per-token next_token latency (t-digest) ──────────"
+printf "  p50  : %.1f µs\n", td_quantile($td_gen, 0.50)
+printf "  p90  : %.1f µs\n", td_quantile($td_gen, 0.90)
+printf "  p99  : %.1f µs\n", td_quantile($td_gen, 0.99)
