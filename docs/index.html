@@ -429,6 +429,19 @@ f("*.txt") |&gt; map { [_, slurp(_) |&gt; split(/\s+/) |&gt; scalar] }
           <li><strong><code>@[...]</code></strong> — sugar for <code>@{[...]}</code> (deref anonymous arrayref inline).</li>
           <li><strong><code>%[k =&gt; v]</code></strong> — sugar for <code>%{+{k =&gt; v}}</code> (deref anonymous hashref inline, sidesteps the block-vs-hashref ambiguity).</li>
         </ul>
+
+        <h3>Sketch algebra — operator overloads on probabilistic data structures <em>(world-first)</em></h3>
+        <p>Probabilistic data structures are first-class operands for <code>+ | &amp; ^ -</code>. No other language ships this as a syntactic primitive — Python/Ruby/Node/Java/Wolfram all require library function calls like <code>bloom_union(a,b)</code> or <code>roaring.intersect(b)</code>. Operators are functional: a new sketch is returned, neither operand is mutated.</p>
+<pre>my $u = $bloom_a + $bloom_b;       # Bloom union (also: |)
+my $u = $hll_a   + $hll_b;         # HyperLogLog union (also: |)
+my $u = $cms_a   + $cms_b;         # Count-Min counter sum
+my $u = $topk_a  + $topk_b;        # SpaceSaving heavy-hitter merge
+my $u = $td_a    + $td_b;          # t-digest centroid merge
+my $u = $rb_a | $rb_b;             # Roaring union
+my $i = $rb_a &amp; $rb_b;             # Roaring intersection
+my $x = $rb_a ^ $rb_b;             # Roaring symmetric difference
+my $d = $rb_a - $rb_b;             # Roaring andnot</pre>
+        <p>Shape mismatch (HLL precision differs, Bloom capacity differs) falls back to the default numeric/bitwise operator path — no panic, no silent truncation.</p>
       </section>
 
       <section class="tutorial-section">

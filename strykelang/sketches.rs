@@ -2965,6 +2965,116 @@ pub(crate) fn builtin_bloom_deserialize(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Sketch algebra — operator overloads on probabilistic data structures.
+//
+// World-first: no other language ships `bf1 + bf2` (Bloom union),
+// `hll1 + hll2` (HLL merge), `cms1 + cms2` (counter sum),
+// `tk1 + tk2` (SpaceSaving merge), `td1 + td2` (centroid merge),
+// `rb1 | rb2` / `& ^ -` (Roaring set algebra) as syntactic primitives.
+// Everywhere else these are library function calls.
+//
+// Returned value is a *new* sketch — operators are functional, never
+// mutate either operand. Sketches all derive Clone so the deep copy is
+// cheap (Vec / HashMap clone, no allocator churn beyond that).
+// ─────────────────────────────────────────────────────────────────────
+
+/// Which arithmetic / bitwise op the caller is dispatching.
+#[derive(Copy, Clone, Debug)]
+pub enum SketchOp {
+    /// `+` — union for Bloom/HLL/Roaring, sum for CMS, merge for TopK/TDigest.
+    Add,
+    /// `|` — set union (Bloom/HLL/Roaring).
+    Or,
+    /// `&` — set intersection (Roaring only — Bloom/HLL union-only).
+    And,
+    /// `^` — symmetric difference (Roaring only).
+    Xor,
+    /// `-` — andnot / set difference (Roaring only).
+    Sub,
+}
+
+/// Try to dispatch a binary operator on two stryke values as a sketch
+/// algebra op. Returns `Some(new_sketch_value)` if both operands are
+/// matching sketch HeapObjects, `None` otherwise so the caller can fall
+/// back to its default numeric / bitwise path.
+///
+/// All branches lock the operand mutexes briefly, clone the inner sketch
+/// data, run the merge on the clone, and wrap the result in a fresh
+/// `Arc<Mutex<…>>`. Operators do not mutate either operand.
+pub fn try_sketch_binop(
+    op: SketchOp,
+    a: &StrykeValue,
+    b: &StrykeValue,
+) -> Option<StrykeValue> {
+    // Bloom + Bloom → union. Also valid for `|`.
+    if matches!(op, SketchOp::Add | SketchOp::Or) {
+        if let (Some(la), Some(lb)) = (a.as_bloom_filter(), b.as_bloom_filter()) {
+            let mut out = la.lock().clone();
+            let other = lb.lock().clone();
+            if !out.merge(&other) {
+                return None; // shape mismatch — fall through to numeric add
+            }
+            return Some(StrykeValue::bloom_filter(Arc::new(Mutex::new(out))));
+        }
+    }
+    // HLL + HLL → union. Also valid for `|`.
+    if matches!(op, SketchOp::Add | SketchOp::Or) {
+        if let (Some(la), Some(lb)) = (a.as_hll_sketch(), b.as_hll_sketch()) {
+            let mut out = la.lock().clone();
+            let other = lb.lock().clone();
+            if !out.merge(&other) {
+                return None;
+            }
+            return Some(StrykeValue::hll_sketch(Arc::new(Mutex::new(out))));
+        }
+    }
+    // CMS + CMS → pointwise counter sum (only `+` makes semantic sense).
+    if matches!(op, SketchOp::Add) {
+        if let (Some(la), Some(lb)) = (a.as_cms_sketch(), b.as_cms_sketch()) {
+            let mut out = la.lock().clone();
+            let other = lb.lock().clone();
+            if !out.merge(&other) {
+                return None;
+            }
+            return Some(StrykeValue::cms_sketch(Arc::new(Mutex::new(out))));
+        }
+    }
+    // TopK + TopK → SpaceSaving merge.
+    if matches!(op, SketchOp::Add) {
+        if let (Some(la), Some(lb)) = (a.as_topk_sketch(), b.as_topk_sketch()) {
+            let mut out = la.lock().clone();
+            let other = lb.lock().clone();
+            if !out.merge(&other) {
+                return None;
+            }
+            return Some(StrykeValue::topk_sketch(Arc::new(Mutex::new(out))));
+        }
+    }
+    // TDigest + TDigest → centroid merge.
+    if matches!(op, SketchOp::Add) {
+        if let (Some(la), Some(lb)) = (a.as_tdigest_sketch(), b.as_tdigest_sketch()) {
+            let mut out = la.lock().clone();
+            let mut other = lb.lock().clone();
+            out.merge(&mut other);
+            return Some(StrykeValue::tdigest_sketch(Arc::new(Mutex::new(out))));
+        }
+    }
+    // Roaring — full set algebra: `+` and `|` union, `&` intersect, `^` xor, `-` andnot.
+    if let (Some(la), Some(lb)) = (a.as_roaring_bitmap(), b.as_roaring_bitmap()) {
+        let mut out = la.lock().clone();
+        let other = lb.lock().clone();
+        match op {
+            SketchOp::Add | SketchOp::Or => out.union_with(&other),
+            SketchOp::And => out.intersect_with(&other),
+            SketchOp::Xor => out.xor_with(&other),
+            SketchOp::Sub => out.andnot_with(&other),
+        }
+        return Some(StrykeValue::roaring_bitmap(Arc::new(Mutex::new(out))));
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

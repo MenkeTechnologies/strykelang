@@ -3656,6 +3656,13 @@ impl<'a> VM<'a> {
                         let b = self.pop();
                         let a = self.pop();
                         self.push_binop_with_overload(BinOp::Add, a, b, |a, b| {
+                            if let Some(s) = crate::sketches::try_sketch_binop(
+                                crate::sketches::SketchOp::Add,
+                                a,
+                                b,
+                            ) {
+                                return Ok(s);
+                            }
                             Ok(crate::value::compat_add(a, b))
                         })
                     }
@@ -3663,6 +3670,13 @@ impl<'a> VM<'a> {
                         let b = self.pop();
                         let a = self.pop();
                         self.push_binop_with_overload(BinOp::Sub, a, b, |a, b| {
+                            if let Some(s) = crate::sketches::try_sketch_binop(
+                                crate::sketches::SketchOp::Sub,
+                                a,
+                                b,
+                            ) {
+                                return Ok(s);
+                            }
                             Ok(crate::value::compat_sub(a, b))
                         })
                     }
@@ -4013,6 +4027,12 @@ impl<'a> VM<'a> {
                         let lv = self.pop();
                         if let Some(s) = crate::value::set_intersection(&lv, &rv) {
                             self.push(s);
+                        } else if let Some(s) = crate::sketches::try_sketch_binop(
+                            crate::sketches::SketchOp::And,
+                            &lv,
+                            &rv,
+                        ) {
+                            self.push(s);
                         } else {
                             self.push(StrykeValue::integer(lv.to_int() & rv.to_int()));
                         }
@@ -4023,15 +4043,29 @@ impl<'a> VM<'a> {
                         let lv = self.pop();
                         if let Some(s) = crate::value::set_union(&lv, &rv) {
                             self.push(s);
+                        } else if let Some(s) = crate::sketches::try_sketch_binop(
+                            crate::sketches::SketchOp::Or,
+                            &lv,
+                            &rv,
+                        ) {
+                            self.push(s);
                         } else {
                             self.push(StrykeValue::integer(lv.to_int() | rv.to_int()));
                         }
                         Ok(())
                     }
                     Op::BitXor => {
-                        let b = self.pop().to_int();
-                        let a = self.pop().to_int();
-                        self.push(StrykeValue::integer(a ^ b));
+                        let rv = self.pop();
+                        let lv = self.pop();
+                        if let Some(s) = crate::sketches::try_sketch_binop(
+                            crate::sketches::SketchOp::Xor,
+                            &lv,
+                            &rv,
+                        ) {
+                            self.push(s);
+                        } else {
+                            self.push(StrykeValue::integer(lv.to_int() ^ rv.to_int()));
+                        }
                         Ok(())
                     }
                     Op::BitNot => {
