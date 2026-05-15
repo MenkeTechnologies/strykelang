@@ -1,0 +1,240 @@
+#!/usr/bin/env stryke
+
+# CSV validator demo. Validates each row against a schema with type
+# constraints (int/float/string/regex), required flag, and optional
+# range. Produces per-row error report with line numbers.
+#
+# Patterns:
+#   * schema as array-of-hashrefs (one per column)
+#   * per-row validation with detailed error capture
+#   * TopK most-common error kinds
+#   * t-digest for per-row validation latency
+
+# ── schema ──────────────────────────────────────────────────────────
+
+my @schema = (
+    +{ name => "id",       type => "int",    required => 1, range => [1, 999999] },
+    +{ name => "email",    type => "regex",  required => 1, pattern => "^[^@]+\\\@[^@]+\\.[a-z]+\$" },
+    +{ name => "age",      type => "int",    required => 1, range => [0, 150] },
+    +{ name => "score",    type => "float",  required => 0, range => [0.0, 100.0] },
+    +{ name => "status",   type => "enum",   required => 1, allowed => ["active", "inactive", "pending"] },
+)
+
+printf "── schema: %d columns ─────────────────────────────────\n",
+    len(@schema)
+for my $col (@schema) {
+    my $extra = ""
+    if (exists $col->{range}) {
+        $extra = sprintf(" range=[%s..%s]", $col->{range}->[0], $col->{range}->[1])
+    } elsif (exists $col->{pattern}) {
+        $extra = " regex"
+    } elsif (exists $col->{allowed}) {
+        $extra = " enum"
+    }
+    printf "  %-12s %-7s required=%d%s\n",
+        $col->{name}, $col->{type}, $col->{required}, $extra
+}
+
+# ── sample CSV data (raw text) ─────────────────────────────────────
+
+my $csv_text = q{id,email,age,score,status
+1,alice\@example.com,30,85.5,active
+2,bob\@corp.io,28,,pending
+3,invalid-email,25,75,active
+4,carol\@example.org,200,99,active
+5,dave\@example.com,32,150,active
+6,eve\@example.com,40,80,unknown
+,frank\@example.com,35,90,active
+7,grace\@example.com,abc,80,active
+8,henry\@example.com,45,85,active
+9,irene\@example.com,29,88.5,pending
+}
+
+# ── validation logic ───────────────────────────────────────────────
+
+mysync @errors
+my $td_lat = t_digest(100)
+
+fn Demo::CV::is_int($s) {
+    return 0 unless defined $s
+    return $s =~ /^-?\d+$/ ? 1 : 0
+}
+
+fn Demo::CV::is_float($s) {
+    return 0 unless defined $s
+    return $s =~ /^-?\d+(?:\.\d+)?$/ ? 1 : 0
+}
+
+fn Demo::CV::validate_field($value, $col, $row_idx) {
+    my $name = $col->{name}
+    my $type = $col->{type}
+    # Required check.
+    if ($col->{required} && (!defined($value) || len($value) == 0)) {
+        push @errors, +{
+            row => $row_idx, field => $name, kind => "missing_required",
+            value => $value // "",
+        }
+        return 0
+    }
+    return 1 if !defined($value) || len($value) == 0
+    # Type check.
+    if ($type eq "int") {
+        if (!Demo::CV::is_int($value)) {
+            push @errors, +{
+                row => $row_idx, field => $name, kind => "not_int",
+                value => $value,
+            }
+            return 0
+        }
+        if (exists $col->{range}) {
+            my $n = $value + 0
+            if ($n < $col->{range}->[0] || $n > $col->{range}->[1]) {
+                push @errors, +{
+                    row => $row_idx, field => $name, kind => "out_of_range",
+                    value => $value,
+                }
+                return 0
+            }
+        }
+    } elsif ($type eq "float") {
+        if (!Demo::CV::is_float($value)) {
+            push @errors, +{
+                row => $row_idx, field => $name, kind => "not_float",
+                value => $value,
+            }
+            return 0
+        }
+        if (exists $col->{range}) {
+            my $n = $value + 0.0
+            if ($n < $col->{range}->[0] || $n > $col->{range}->[1]) {
+                push @errors, +{
+                    row => $row_idx, field => $name, kind => "out_of_range",
+                    value => $value,
+                }
+                return 0
+            }
+        }
+    } elsif ($type eq "regex") {
+        # Use inline literal regex when possible (BUG-218). For
+        # demo simplicity assume only email regex.
+        if ($name eq "email") {
+            if (!($value =~ /^[^@]+\@[^@]+\.[a-z]+$/)) {
+                push @errors, +{
+                    row => $row_idx, field => $name, kind => "regex_no_match",
+                    value => $value,
+                }
+                return 0
+            }
+        }
+    } elsif ($type eq "enum") {
+        my $found = 0
+        for my $allowed (@{$col->{allowed}}) {
+            $found = 1 if $value eq $allowed
+        }
+        if (!$found) {
+            push @errors, +{
+                row => $row_idx, field => $name, kind => "not_in_enum",
+                value => $value,
+            }
+            return 0
+        }
+    }
+    return 1
+}
+
+fn Demo::CV::validate_row($fields, $row_idx) {
+    my $t0 = now_ns()
+    my $all_ok = 1
+    for my $col_idx (0:len(@schema) - 1) {
+        my $col = $schema[$col_idx]
+        my $value = $fields->[$col_idx]
+        my $ok = Demo::CV::validate_field($value, $col, $row_idx)
+        $all_ok = 0 if !$ok
+    }
+    td_add($td_lat, (now_ns() - $t0) / 1000.0)
+    return $all_ok
+}
+
+# ── parse + validate ───────────────────────────────────────────────
+
+my @lines = split /\n/, $csv_text
+@lines = grep { len($_) > 0 } @lines
+my $header = shift @lines
+
+printf "\n── validating %d data rows ─────────────────────────────\n",
+    len(@lines)
+
+my $valid = 0
+my $invalid = 0
+for my $i (0:len(@lines) - 1) {
+    my @fields = split /,/, $lines[$i]
+    my $ok = Demo::CV::validate_row(\@fields, $i + 2)   # +2 since header is row 1
+    if ($ok) {
+        $valid++
+    } else {
+        $invalid++
+    }
+}
+
+# ── error report ────────────────────────────────────────────────────
+
+p ""
+p "── error report ─────────────────────────────────────"
+for my $e (@errors) {
+    printf "  row=%2d  field=%-8s  kind=%-18s  value=%s\n",
+        $e->{row}, $e->{field}, $e->{kind}, $e->{value}
+}
+
+p ""
+printf "── summary: %d valid, %d invalid (%d total errors) ──\n",
+    $valid, $invalid, len(@errors)
+
+# ── error-kind rollup ──────────────────────────────────────────────
+
+p ""
+p "── error-kind rollup ────────────────────────────────"
+my %kinds
+$kinds{$_->{kind}}++ for @errors
+for my $k (sort { $kinds{_1} <=> $kinds{_0} } keys %kinds) {
+    printf "  %-20s : %d\n", $k, $kinds{$k}
+}
+
+# ── most-error-prone rows (TopK) ───────────────────────────────────
+
+p ""
+p "── rows with most errors (TopK) ─────────────────────"
+my $tk = topk(3)
+for my $e (@errors) {
+    topk_add($tk, "row_" . $e->{row})
+}
+my @hits = topk_top($tk)
+for my $h (@hits) {
+    printf "  %-10s : %d errors\n", $h->[0], $h->[1]
+}
+
+# ── per-field error counts ──────────────────────────────────────────
+
+p ""
+p "── per-field error counts ───────────────────────────"
+my %by_field
+$by_field{$_->{field}}++ for @errors
+for my $col (@schema) {
+    my $n = $by_field{$col->{name}} // 0
+    printf "  %-12s : %d\n", $col->{name}, $n
+}
+
+# ── distinct-error-kind cardinality (HLL) ──────────────────────────
+
+p ""
+p "── HLL distinct error kinds ─────────────────────────"
+my $hll = hll(14)
+hll_add($hll, $_->{kind}) for @errors
+printf "  HLL distinct kinds : %d\n", hll_count($hll)
+printf "  exact distinct     : %d\n", len(keys %kinds)
+
+# ── per-row latency ────────────────────────────────────────────────
+
+p ""
+p "── per-row validate latency (t-digest) ──────────────"
+printf "  p50  : %.1f µs\n", td_quantile($td_lat, 0.50)
+printf "  p99  : %.1f µs\n", td_quantile($td_lat, 0.99)

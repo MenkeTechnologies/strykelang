@@ -1,0 +1,84 @@
+<idea-plugin>
+    <id>com.menketechnologies.stryke</id>
+    <name>Stryke</name>
+    <vendor email="linux.dev25@gmail.com" url="https://github.com/MenkeTechnologies/strykelang">MenkeTechnologies</vendor>
+
+    <description><![CDATA[
+        <p>JetBrains IDE support for <b>stryke</b> — a massively parallel scripting language
+        (Rust bytecode VM + Cranelift JIT) embeddable in zshrs.</p>
+
+        <ul>
+            <li><b>.stk</b> file association with syntax highlighting (keywords, sigils, pipes, regex).</li>
+            <li><b>LSP integration</b> via <code>st --lsp</code>: completion, hover, goto-definition,
+                find-references, rename, document symbols, diagnostics.</li>
+            <li><b>Run configurations</b> for <code>.stk</code> scripts with optional
+                <code>--no-interop</code> strict-parser mode.</li>
+            <li><b>Color settings page</b> for tweaking token colors.</li>
+            <li><b>Settings → Tools → Stryke</b> to point at a non-PATH <code>st</code> binary.</li>
+        </ul>
+
+        <p><b>Requirements:</b> a paid JetBrains IDE on 2024.2+ (RustRover, IDEA Ultimate, GoLand, PyCharm Pro,
+        WebStorm, etc.) because stryke uses the platform LSP API. Community editions are not supported.</p>
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <h3>0.14.4</h3>
+        <ul>
+            <li>Initial release. .stk file type, lexer-based highlighting, LSP client, run configurations.</li>
+        </ul>
+    ]]></change-notes>
+
+    <!-- Platform LSP API (paid IDEs) -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.ultimate</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- File type -->
+        <fileType
+            name="Stryke"
+            implementationClass="com.menketechnologies.stryke.StrykeFileType"
+            fieldName="INSTANCE"
+            language="Stryke"
+            extensions="stk"/>
+
+        <!-- Highlighter -->
+        <lang.syntaxHighlighterFactory
+            language="Stryke"
+            implementationClass="com.menketechnologies.stryke.StrykeSyntaxHighlighterFactory"/>
+
+        <!-- Color settings page -->
+        <colorSettingsPage implementation="com.menketechnologies.stryke.StrykeColorSettingsPage"/>
+
+        <!-- Commenter (line comment with #) -->
+        <lang.commenter language="Stryke" implementationClass="com.menketechnologies.stryke.StrykeCommenter"/>
+
+        <!-- LSP server provider -->
+        <platform.lsp.serverSupportProvider
+            implementation="com.menketechnologies.stryke.lsp.StrykeLspServerSupportProvider"/>
+
+        <!-- Settings -->
+        <applicationService serviceImplementation="com.menketechnologies.stryke.StrykeSettings"/>
+        <applicationConfigurable
+            parentId="tools"
+            instance="com.menketechnologies.stryke.StrykeSettingsConfigurable"
+            id="com.menketechnologies.stryke.settings"
+            displayName="Stryke"/>
+
+        <!-- Run configuration -->
+        <configurationType implementation="com.menketechnologies.stryke.run.StrykeRunConfigurationType"/>
+        <runConfigurationProducer
+            implementation="com.menketechnologies.stryke.run.StrykeRunConfigurationProducer"/>
+    </extensions>
+
+    <actions>
+        <action
+            id="Stryke.RunFile"
+            class="com.menketechnologies.stryke.actions.RunStrykeFileAction"
+            text="Run with stryke"
+            description="Run the selected .stk file with the stryke interpreter"
+            icon="com.menketechnologies.stryke.StrykeIcons.FILE">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>

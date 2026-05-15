@@ -1,0 +1,140 @@
+#!/usr/bin/env stryke
+
+# Dijkstra shortest-path demo with focus on rendering. Different from
+# priority_queue.stk (which combined PQ + Dijkstra); this one renders
+# the resulting tree as ASCII.
+
+# ── graph: small road network (miles between cities) ───────────────
+
+my %graph = (
+    "A" => +{ "B" => 4,  "C" => 2 },
+    "B" => +{ "A" => 4,  "C" => 5,  "D" => 10 },
+    "C" => +{ "A" => 2,  "B" => 5,  "D" => 3,  "E" => 12 },
+    "D" => +{ "B" => 10, "C" => 3,  "E" => 4,  "F" => 8 },
+    "E" => +{ "C" => 12, "D" => 4,  "F" => 6 },
+    "F" => +{ "D" => 8,  "E" => 6 },
+)
+
+p "── graph (weighted, undirected) ─────────────────────"
+for my $u (sort { _0 cmp _1 } keys %graph) {
+    my @parts
+    for my $v (sort { _0 cmp _1 } keys %{$graph{$u}}) {
+        push @parts, sprintf("%s(%d)", $v, $graph{$u}->{$v})
+    }
+    printf "  %s : %s\n", $u, join(", ", @parts)
+}
+
+# ── min-priority queue (linear insert, small N) ────────────────────
+
+fn Demo::PQ::new() { [] }
+fn Demo::PQ::push($pq, $prio, $item) {
+    my $n = len(@$pq)
+    my $i = 0
+    while ($i < $n && $pq->[$i]->[0] <= $prio) { $i++ }
+    splice(@$pq, $i, 0, [$prio, $item])
+}
+fn Demo::PQ::pop($pq) {
+    return undef if len(@$pq) == 0
+    return shift @$pq
+}
+
+# ── Dijkstra ───────────────────────────────────────────────────────
+
+fn Demo::Path::dijkstra($g, $source) {
+    my %dist
+    my %prev
+    $dist{$source} = 0
+    my $pq = Demo::PQ::new()
+    Demo::PQ::push($pq, 0, $source)
+    while (len(@$pq) > 0) {
+        my $top = Demo::PQ::pop($pq)
+        my $d = $top->[0]
+        my $u = $top->[1]
+        next if defined($dist{$u}) && $d > $dist{$u}
+        my $edges = $g->{$u} // +{}
+        for my $v (keys %$edges) {
+            my $w = $edges->{$v}
+            my $alt = $d + $w
+            if (!exists($dist{$v}) || $alt < $dist{$v}) {
+                $dist{$v} = $alt
+                $prev{$v} = $u
+                Demo::PQ::push($pq, $alt, $v)
+            }
+        }
+    }
+    return +{ dist => \%dist, prev => \%prev }
+}
+
+fn Demo::Path::reconstruct($prev, $source, $target) {
+    return [$source] if $source eq $target
+    return undef unless exists $prev->{$target}
+    my @path = ($target)
+    my $cur = $target
+    while ($cur ne $source && exists $prev->{$cur}) {
+        $cur = $prev->{$cur}
+        unshift @path, $cur
+    }
+    return \@path
+}
+
+# ── run Dijkstra from A ────────────────────────────────────────────
+
+my $result = Demo::Path::dijkstra(\%graph, "A")
+
+p ""
+p "── shortest distances from A ────────────────────────"
+for my $city (sort { _0 cmp _1 } keys %{$result->{dist}}) {
+    printf "  %s : %d\n", $city, $result->{dist}->{$city}
+}
+
+# ── reconstruct paths ───────────────────────────────────────────────
+
+p ""
+p "── reconstructed shortest paths ─────────────────────"
+for my $target (sort { _0 cmp _1 } keys %{$result->{dist}}) {
+    next if $target eq "A"
+    my $path = Demo::Path::reconstruct($result->{prev}, "A", $target)
+    if (defined $path) {
+        printf "  A -> %s (%d): %s\n",
+            $target, $result->{dist}->{$target}, join(" -> ", @$path)
+    } else {
+        printf "  A -> %s : unreachable\n", $target
+    }
+}
+
+# ── shortest-path tree as ASCII (parent -> child) ─────────────────
+
+p ""
+p "── shortest-path tree (parent -> child) ─────────────"
+my %children
+$children{$_} = [] for keys %graph
+for my $city (keys %{$result->{prev}}) {
+    my $parent = $result->{prev}->{$city}
+    push @{$children{$parent}}, $city
+}
+
+fn Demo::Path::render_tree($node, $children_ref, $indent, $is_last) {
+    my @lines
+    my $prefix = $indent . ($is_last ? "└─ " : "├─ ")
+    push @lines, "$prefix$node"
+    my @kids = sort { _0 cmp _1 } @{$children_ref->{$node} // []}
+    for my $i (0:len(@kids) - 1) {
+        my $kid = $kids[$i]
+        my $kid_is_last = ($i == len(@kids) - 1)
+        my $child_indent = $indent . ($is_last ? "   " : "│  ")
+        my $sub_lines = Demo::Path::render_tree($kid, $children_ref, $child_indent, $kid_is_last)
+        push @lines, @$sub_lines
+    }
+    return \@lines
+}
+
+my $tree_lines = Demo::Path::render_tree("A", \%children, "", 1)
+for my $line (@$tree_lines) { p "  $line" }
+
+# ── total edges in shortest-path tree ───────────────────────────────
+
+p ""
+my $tree_edges = 0
+$tree_edges += len(@{$children{$_}}) for keys %children
+printf "── shortest-path tree has %d edges (V-1 = %d expected) ──\n",
+    $tree_edges, len(keys %graph) - 1
