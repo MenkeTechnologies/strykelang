@@ -1,0 +1,88 @@
+#!/usr/bin/env stryke
+
+# ETL pipeline demo — composes six builtin families end-to-end:
+# 1. csv decode      (codec)
+# 2. pipe-forward    (|>)
+# 3. grep / map      (iterator)
+# 4. Count-Min sketch (probabilistic)
+# 5. rkyv KV store   (persistence)
+# 6. JSON encode     (codec)
+#
+# Workflow: load orders CSV → filter completed → fold-count totals per
+# country in a CMS → persist the aggregate to KV → emit a JSON report.
+
+# ── source data (inline CSV) ───────────────────────────────────────────
+
+my $orders_csv = "id,country,status,amount\n" .
+                 "1,US,completed,120\n" .
+                 "2,US,pending,80\n"   .
+                 "3,DE,completed,200\n" .
+                 "4,FR,completed,150\n" .
+                 "5,US,completed,75\n"  .
+                 "6,DE,cancelled,90\n"  .
+                 "7,FR,completed,100\n" .
+                 "8,US,completed,200\n"
+
+# ── parse + filter via pipe-forward ────────────────────────────────────
+# `from_csv` returns an arrayref of row hashrefs — explicit `@{…}`
+# deref unfolds it into a flat array so `grep`/`map` see each row
+# rather than the wrapping ref.
+
+my @rows = @{from_csv($orders_csv)}
+printf "loaded %d rows from CSV\n", len(@rows)
+
+my @completed = grep { $_->{status} eq "completed" } @rows
+printf "kept %d completed rows\n", len(@completed)
+
+# ── aggregate into a CMS (heavy-hitter sketch) by country ──────────────
+
+my $cms_orders = cms(2048, 5)
+my $cms_amount = cms(2048, 5)
+my $hll = hll(14)
+
+for my $row (@completed) {
+    cms_add($cms_orders, $row->{country})
+    cms_add($cms_amount, $row->{country}, $row->{amount})
+    hll_add($hll, $row->{id})
+}
+
+p "── per-country order counts (via CMS) ──"
+my @countries = ("US", "DE", "FR", "JP")   # JP absent in data — should report 0
+for my $c (@countries) {
+    printf "  %-3s : %d orders  %d total amount\n",
+        $c, cms_count($cms_orders, $c), cms_count($cms_amount, $c)
+}
+
+printf "distinct order ids seen (HLL est) : %d\n", hll_count($hll)
+
+# ── persist to rkyv KV ─────────────────────────────────────────────────
+
+my $store = "/tmp/etl_pipeline_demo.rkyv"
+unlink($store)
+my $db = kv_open($store)
+for my $c (@countries) {
+    kv_put($db, "totals:" . $c, +{
+        orders => cms_count($cms_orders, $c),
+        amount => cms_count($cms_amount, $c),
+    })
+}
+kv_put($db, "summary:hll_distinct", hll_count($hll))
+kv_commit($db)
+printf "wrote %d keys to %s\n", kv_len($db), $store
+
+# ── reopen + emit JSON report ──────────────────────────────────────────
+
+my $db2 = kv_open($store)
+my $report = +{
+    generated_at  => time(),
+    distinct_ids  => kv_get($db2, "summary:hll_distinct"),
+    countries     => +{},
+}
+for my $c (@countries) {
+    $report->{countries}->{$c} = kv_get($db2, "totals:" . $c)
+}
+p "── JSON report ──"
+p to_json($report)
+
+# ── cleanup ────────────────────────────────────────────────────────────
+unlink($store)

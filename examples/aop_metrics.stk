@@ -1,0 +1,95 @@
+#!/usr/bin/env stryke
+
+# AOP metrics — practical production pattern. Register `around` advice
+# on every function in a namespace to record call count + total
+# latency. Final report sorted by total wall time. Zero overhead when
+# no advice matches (per-call cost is glob-match + Vec lookup).
+
+# ── set up shared metrics store ────────────────────────────────────────
+# `mysync` so the advice closures can mutate the shared map without
+# stryke complaining about "cannot modify outer-scope from inside a
+# closure" (the default capture-by-value rule).
+
+mysync %metrics
+
+# ── instrument every Svc::* function in one shot ──────────────────────
+
+around "Svc::*" {
+    my $name = $INTERCEPT_NAME
+    my $t1 = now_ns()
+    my $rv = proceed()
+    my $dt = now_ns() - $t1
+    # Pre-vivify the entry — `$h{k}->{x}++` doesn't autoviv `$h{k}` to
+    # a hashref the way Perl does. Use an explicit `unless exists`
+    # init (avoids `//=` which the around-body lowering rejects).
+    $metrics{$name} = +{ count => 0, total_ns => 0 } unless exists $metrics{$name}
+    $metrics{$name}->{count}++
+    $metrics{$name}->{total_ns} += $dt
+    $rv
+}
+
+# ── service functions to instrument ───────────────────────────────────
+
+fn Svc::fast    { sleep 0.005; "ok" }
+fn Svc::medium  { sleep 0.020; "ok" }
+fn Svc::slow    { sleep 0.050; "ok" }
+fn Svc::flaky   { sleep 0.010; rand() < 0.3 ? "error" : "ok" }
+
+# ── simulate a workload ───────────────────────────────────────────────
+
+p "── simulating mixed workload ──────────────────────────"
+my @workload = (
+    ("fast")    x 50,
+    ("medium")  x 20,
+    ("slow")    x 5,
+    ("flaky")   x 30,
+)
+
+my $t_start = now_ns()
+for my $kind (@workload) {
+    if    ($kind eq "fast")   { Svc::fast()   }
+    elsif ($kind eq "medium") { Svc::medium() }
+    elsif ($kind eq "slow")   { Svc::slow()   }
+    elsif ($kind eq "flaky")  { Svc::flaky()  }
+}
+my $wall_ms = (now_ns() - $t_start) / 1e6
+printf "  %d total calls, %.0f ms wall\n", len(@workload), $wall_ms
+
+# ── metrics report — sort by total time descending ────────────────────
+
+p ""
+p "── metrics report (sorted by total time desc) ─────────"
+my @names = sort { $metrics{$_1}->{total_ns} <=> $metrics{$_0}->{total_ns} } keys %metrics
+
+printf "  %-15s %8s  %10s  %10s  %10s\n",
+    "function", "count", "total_ms", "avg_us", "% wall"
+for my $name (@names) {
+    my $m = $metrics{$name}
+    my $total_ms = $m->{total_ns} / 1e6
+    my $avg_us   = ($m->{total_ns} / $m->{count}) / 1e3
+    my $pct      = 100.0 * $m->{total_ns} / ($wall_ms * 1e6)
+    printf "    %-15s %8d  %10.2f  %10.2f  %9.1f%%\n",
+        $name, $m->{count}, $total_ms, $avg_us, $pct
+}
+
+# ── derived insights ──────────────────────────────────────────────────
+
+p ""
+p "── derived insights ───────────────────────────────────"
+my $total_calls = 0
+$total_calls += $metrics{$_}->{count} for keys %metrics
+printf "  total calls across all fns : %d\n", $total_calls
+
+my $hottest = $names[0]
+my $coldest = $names[-1]
+printf "  hottest by total time      : %s (%.2f ms)\n",
+    $hottest, $metrics{$hottest}->{total_ns} / 1e6
+printf "  coldest by total time      : %s (%.2f ms)\n",
+    $coldest, $metrics{$coldest}->{total_ns} / 1e6
+
+# ── housekeeping ──────────────────────────────────────────────────────
+
+p ""
+p "── intercept registry ─────────────────────────────────"
+printf "  active intercepts : %d\n", len(intercept_list())
+p "  (use intercept_clear() in tests to remove advice cleanly)"

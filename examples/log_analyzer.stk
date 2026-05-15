@@ -1,0 +1,125 @@
+#!/usr/bin/env stryke
+
+# Log analyzer — practical regex + pipe-forward + sketches + KV demo.
+#
+# Parses simulated access-log lines, aggregates IP stats via CMS and
+# HLL, persists results to a rkyv KV store, then emits a JSON report.
+# Composes seven builtin families end to end.
+
+# ── synthetic log corpus ───────────────────────────────────────────────
+# Common Log Format: <ip> - - [<time>] "<method> <path> HTTP/<ver>" <status> <bytes>
+
+my $log = join("\n",
+    '10.0.0.1 - - [15/May/2026:09:00:01 +0000] "GET /api/users HTTP/1.1" 200 1234',
+    '10.0.0.5 - - [15/May/2026:09:00:02 +0000] "GET /api/items HTTP/1.1" 200 567',
+    '10.0.0.1 - - [15/May/2026:09:00:03 +0000] "POST /api/users HTTP/1.1" 201 89',
+    '10.0.0.7 - - [15/May/2026:09:00:04 +0000] "GET /api/users HTTP/1.1" 200 1234',
+    '10.0.0.1 - - [15/May/2026:09:00:05 +0000] "GET /api/orders HTTP/1.1" 500 256',
+    '10.0.0.5 - - [15/May/2026:09:00:06 +0000] "GET /api/items HTTP/1.1" 404 89',
+    '10.0.0.1 - - [15/May/2026:09:00:07 +0000] "DELETE /api/items HTTP/1.1" 204 0',
+    '10.0.0.7 - - [15/May/2026:09:00:08 +0000] "GET / HTTP/1.1" 200 4567',
+    '10.0.0.5 - - [15/May/2026:09:00:09 +0000] "GET /api/health HTTP/1.1" 200 12',
+    '10.0.0.1 - - [15/May/2026:09:00:10 +0000] "GET /api/users HTTP/1.1" 200 1234',
+)
+
+p "── parse log lines ────────────────────────────────────";
+my @parsed
+for my $line (split /\n/, $log) {
+    if ($line =~ /^(\S+) \S+ \S+ \[(.*?)\] "(\S+) (\S+) HTTP\/\S+" (\d+) (\d+)/) {
+        push @parsed, +{
+            ip     => $1,
+            time   => $2,
+            method => $3,
+            path   => $4,
+            status => $5 + 0,
+            bytes  => $6 + 0,
+        }
+    }
+}
+printf "  parsed %d log lines\n", len(@parsed)
+
+# ── per-IP aggregation via CMS + HLL ───────────────────────────────────
+
+p "";
+p "── aggregate via Count-Min + HyperLogLog ──────────────";
+my $ip_hits    = cms(2048, 5)
+my $ip_bytes   = cms(2048, 5)
+my $ip_distinct = hll(14)
+my $errors     = cms(2048, 5)
+
+for my $rec (@parsed) {
+    cms_add($ip_hits,  $rec->{ip})
+    cms_add($ip_bytes, $rec->{ip}, $rec->{bytes})
+    hll_add($ip_distinct, $rec->{ip})
+    cms_add($errors, "5xx") if $rec->{status} >= 500
+    cms_add($errors, "4xx") if $rec->{status} >= 400 && $rec->{status} < 500
+}
+
+my @ips = ("10.0.0.1", "10.0.0.5", "10.0.0.7")
+printf "  distinct IPs (HLL) : %d  (truth: %d)\n", hll_count($ip_distinct), len(@ips)
+printf "  4xx errors         : %d\n", cms_count($errors, "4xx")
+printf "  5xx errors         : %d\n", cms_count($errors, "5xx")
+p "  per-IP stats:"
+for my $ip (@ips) {
+    printf "    %-10s  hits=%d  bytes=%d\n",
+        $ip, cms_count($ip_hits, $ip), cms_count($ip_bytes, $ip)
+}
+
+# ── path popularity via TopK ───────────────────────────────────────────
+
+p "";
+p "── top paths via SpaceSaving ──────────────────────────";
+my $top_paths = topk(5)
+topk_add($top_paths, $_->{path}) for @parsed
+for my $row (topk_heavies($top_paths)) {
+    printf "    %-15s × %d\n", $row->[0], $row->[1]
+}
+
+# ── status-code histogram via hash ─────────────────────────────────────
+
+p "";
+p "── status histogram via hash + pipe ───────────────────";
+my %status
+$status{$_->{status}}++ for @parsed
+for my $s (sort { _0 <=> _1 } keys %status) {
+    printf "    %d  ×  %d\n", $s, $status{$s}
+}
+
+# ── persist to KV ──────────────────────────────────────────────────────
+
+p "";
+p "── persist aggregate to rkyv KV ───────────────────────";
+my $path = "/tmp/log_analyzer_demo.rkyv"
+unlink($path)
+my $db = kv_open($path)
+
+for my $ip (@ips) {
+    kv_put($db, "ip:" . $ip, +{
+        hits  => cms_count($ip_hits,  $ip),
+        bytes => cms_count($ip_bytes, $ip),
+    })
+}
+kv_put($db, "summary", +{
+    distinct_ips => hll_count($ip_distinct),
+    errors_4xx   => cms_count($errors, "4xx"),
+    errors_5xx   => cms_count($errors, "5xx"),
+    total_lines  => len(@parsed),
+    generated_at => strftime("%Y-%m-%dT%H:%M:%SZ", time()),
+})
+kv_commit($db)
+printf "  wrote %d keys to %s\n", kv_len($db), $path
+
+# ── reopen + emit JSON report ──────────────────────────────────────────
+
+p "";
+p "── reopen + JSON report ───────────────────────────────";
+my $db2 = kv_open($path)
+my $summary = kv_get($db2, "summary")
+p "  summary:"
+printf "    distinct_ips : %d\n", $summary->{distinct_ips}
+printf "    total_lines  : %d\n", $summary->{total_lines}
+printf "    errors 4xx   : %d\n", $summary->{errors_4xx}
+printf "    errors 5xx   : %d\n", $summary->{errors_5xx}
+printf "    generated_at : %s\n", $summary->{generated_at}
+
+unlink($path)
