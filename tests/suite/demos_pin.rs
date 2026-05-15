@@ -847,6 +847,84 @@ fn iso_keys_sort_chronologically() {
     assert_eq!(eval_int(code), 1);
 }
 
+// ── run / source ──────────────────────────────────────────────────────
+
+#[test]
+fn run_binary_returns_zero_on_success() {
+    let code = r#"
+        run("true")
+    "#;
+    assert_eq!(eval_int(code), 0);
+}
+
+#[test]
+fn run_binary_returns_negative_one_on_missing_command() {
+    let code = r#"
+        run("definitely-not-a-real-binary-xyzqq")
+    "#;
+    assert_eq!(eval_int(code), -1);
+}
+
+#[test]
+fn run_stryke_script_isolates_state() {
+    let code = r#"
+        my $tmp = "/tmp/stryke_test_run_iso.stk";
+        spurt($tmp, q{my $leaked = "child"; p ""});
+        my $rc = run($tmp);
+        unlink($tmp);
+        # The subprocess returned 0 AND $leaked is undef in parent.
+        ($rc == 0 && !defined($leaked)) ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn source_injects_variables_into_caller() {
+    let code = r#"
+        my $tmp = "/tmp/stryke_test_source_var.stk";
+        spurt($tmp, q{our $LIBV = "1.2.3"});
+        source($tmp);
+        unlink($tmp);
+        $LIBV eq "1.2.3" ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn source_injects_function_definitions() {
+    let code = r#"
+        my $tmp = "/tmp/stryke_test_source_fn.stk";
+        spurt($tmp, q{fn Test::Lib::pi { 314 }});
+        source($tmp);
+        unlink($tmp);
+        Test::Lib::pi() == 314 ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn source_missing_file_dies() {
+    let code = r#"
+        my $err = 0;
+        eval { source("/tmp/stryke_test_definitely_not_there_xyz.stk") };
+        $err = 1 if $@;
+        $err
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn src_alias_for_source() {
+    let code = r#"
+        my $tmp = "/tmp/stryke_test_src_alias.stk";
+        spurt($tmp, q{our $SRCALIAS = 42});
+        src($tmp);
+        unlink($tmp);
+        $SRCALIAS == 42 ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
 #[test]
 fn thread_macro_composes_with_sketches_and_kv() {
     let path = format!(

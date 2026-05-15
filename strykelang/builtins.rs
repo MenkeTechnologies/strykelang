@@ -3518,6 +3518,8 @@ pub(crate) fn try_builtin(
         "set_title" | "set_term_title" | "window_title" => Some(builtin_set_title(args)),
         "beep" | "ring_bell" => Some(builtin_beep()),
         "man" | "manpage" => Some(builtin_man(args, line)),
+        "run" | "exec_script" => Some(builtin_run(args, line)),
+        "source" | "src" => Some(builtin_source(interp, args, line)),
         // ── Shell-like REPL builtins (Tier A) ──
         "rm" | "rm_file" => Some(builtin_rm(interp, args, line)),
         "mktemp" | "mktemp_file" => Some(builtin_mktemp(args, line)),
@@ -21159,6 +21161,87 @@ fn builtin_man(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
     match std::process::Command::new("man").args(&argv).status() {
         Ok(status) => Ok(StrykeValue::integer(status.code().unwrap_or(0) as i64)),
         Err(_) => Ok(StrykeValue::UNDEF),
+    }
+}
+
+/// `run(TARGET, ...args)` — execute a stryke script or external binary
+/// as a subprocess. Inherits stdin / stdout / stderr so the child's
+/// output is visible in the parent. Returns the child's exit code as
+/// an integer (`-1` on spawn failure).
+///
+/// Routing:
+///   - `TARGET` ending in `.stk` → spawn the current stryke binary on
+///     the script (`$STRYKE_EXE script.stk ARGS...`). State stays in
+///     the child; use `source` if you want the script's defs in your
+///     REPL.
+///   - `TARGET` with a `/` → spawn the path directly.
+///   - bare name → resolve via `PATH` (let the OS find it).
+///
+/// Companion: `source` runs a stryke script *in the current
+/// interpreter* (variables / fns / classes leak in), while `run` runs
+/// it isolated. Pick based on whether you want state-sharing or
+/// process-level isolation.
+fn builtin_run(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
+    let target = match args.first() {
+        Some(v) => v.to_string(),
+        None => return Ok(StrykeValue::UNDEF),
+    };
+    let extra: Vec<String> = args.iter().skip(1).map(|v| v.to_string()).collect();
+
+    let (cmd, mut argv): (String, Vec<String>) = if target.ends_with(".stk") {
+        // Stryke script: spawn current binary (argv[0]) so we don't
+        // depend on `s` / `stryke` being on PATH. Fall back to `s` if
+        // current_exe() is unobtainable.
+        let exe = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.to_str().map(|s| s.to_string()))
+            .unwrap_or_else(|| "s".to_string());
+        (exe, vec![target])
+    } else {
+        (target, vec![])
+    };
+    argv.extend(extra);
+
+    let status = std::process::Command::new(&cmd).args(&argv).status();
+    match status {
+        Ok(s) => Ok(StrykeValue::integer(s.code().unwrap_or(-1) as i64)),
+        Err(_) => Ok(StrykeValue::integer(-1)),
+    }
+}
+
+/// `source(PATH)` — read a stryke script from `PATH` and execute it in
+/// the *current* interpreter. Variables, subs, classes, enums, and
+/// pragmas defined in the file become visible in the calling scope —
+/// same semantics as `do "file"` (Perl 5) or `source FILE` (shell).
+/// Returns the last expression's value, or `undef` on read failure.
+///
+/// Designed for REPL workflows: `source "demo.stk"` loads a working
+/// environment without forking. For isolated execution, use `run`.
+fn builtin_source(
+    interp: &mut VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> PerlResult<StrykeValue> {
+    let path = match args.first() {
+        Some(v) => v.to_string(),
+        None => {
+            return Err(PerlError::runtime(
+                "source: missing path argument".to_string(),
+                line,
+            ));
+        }
+    };
+    let resolved = interp.resolve_stryke_path_string(&path);
+    match crate::perl_fs::read_file_text_perl_compat(&resolved) {
+        Ok(code) => {
+            let code = crate::data_section::strip_perl_end_marker(&code);
+            crate::parse_and_run_string_in_file(code, interp, &resolved)
+                .or(Ok(StrykeValue::UNDEF))
+        }
+        Err(e) => Err(PerlError::runtime(
+            format!("source: cannot read {}: {}", resolved, e),
+            line,
+        )),
     }
 }
 

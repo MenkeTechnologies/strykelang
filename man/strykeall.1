@@ -119,7 +119,7 @@ stryke, s \- highly parallel Perl 5 interpreter with shell-grade REPL
 .B stryke
 is a single-binary Perl 5 interpreter written in Rust with parallel
 extensions, a Cranelift JIT, pipe-forward (\fB|>\fR), the thread macro
-(\fB~>\fR), 10,292 primary builtins in
+(\fB~>\fR), 10,296 primary builtins in
 .BR %b ,
 and an interactive REPL that doubles as a Unix shell.
 .PP
@@ -1162,9 +1162,9 @@ climbs one nesting level.
 .PP
 .RS 4
 .EX
-keys %b           # 10,292 primary builtin names → category
+keys %b           # 10,296 primary builtin names → category
 keys %a           # 641 aliases (name → primary)
-keys %all         # 11,018 = %b ∪ %a ∪ %k
+keys %all         # 11,022 = %b ∪ %a ∪ %k
 keys %k           # 85 keywords (if, sub, my, our, …)
 keys %pc          # 185 Perl 5 core names (subset of %b)
 keys %e           # 10,082 stryke extensions (subset of %b)
@@ -1331,7 +1331,7 @@ client \(em the same rkyv archive bytes travel over TCP.
 .B rm mktemp mktempdir whereis nice renice tree comm column xargs
 .B openurl xdg_open curl_get curl_post
 .B iconv strftime tac rev_lines tty_raw tty_cooked
-.B man manpage
+.B man manpage run exec_script source src
 .SS "15.17 AI / ML / Vectors"
 .B ai prompt stream_prompt embed embed_batch ai_cost ai_routing
 .B ai_filter ai_map ai_classify ai_sort ai_match ai_dedupe
@@ -1831,7 +1831,7 @@ The release profile uses
 .B "panic = \"abort\""
 ,
 .B "strip = true"
-to maximize per-builtin density. 40 MB binary for 10,292 primaries
+to maximize per-builtin density. 40 MB binary for 10,296 primaries
 ≈ 3.9 KB amortized per builtin.
 .SH "27. DEBUGGING"
 .PP
