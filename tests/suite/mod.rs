@@ -1,5 +1,6 @@
 //! Interpreter integration tests grouped by area. See `tests/integration.rs` for the harness.
 
+mod ai_extract_contract;
 mod algebraic_match;
 mod aop;
 mod aot_build;
@@ -157,7 +158,9 @@ mod implicit_coderef_from_bare_positional;
 mod jwt_and_log;
 mod kvstore;
 mod language_extensions;
+mod len_semantics_pin;
 mod lib_api;
+mod library_fixes_2026_05;
 mod list_builtins;
 mod lsp_stdio_completion;
 mod lsp_words_filter_and_specials;
@@ -204,7 +207,9 @@ mod scoping;
 mod semantic_edge;
 mod serialization;
 mod shell_repl;
+mod sketch_correctness_pin;
 mod sketches;
+mod string_coordinates_pin;
 mod slice_colon;
 mod special_globals;
 mod string_extensions;

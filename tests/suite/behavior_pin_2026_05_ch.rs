@@ -332,9 +332,16 @@ fn uniq_variadic_deduplicates_neighbors_ch() {
 }
 
 #[test]
-fn uniq_single_array_bucket_treated_as_atom_ch() {
+fn uniq_single_array_bucket_dereferenced_ch() {
+    // BUG-126/140 fix (2026-05-15): `uniq([1, 2, 2, 3])` now derefs the
+    // single arrayref argument and yields a flat uniq list. Previously
+    // the arrayref was treated as one atom and returned unchanged
+    // (`[1, 2, 2, 3]`). Fix in `strykelang/list_builtins.rs::uniq_list`
+    // — added an `as_array_ref` branch alongside `as_array_vec`. Full
+    // regression coverage in
+    // `tests/suite/library_fixes_2026_05.rs::uniq_*`.
     assert_eq!(
         eval_string(r#"stringify(uniq([1, 2, 2, 3]))"#),
-        "[1, 2, 2, 3]"
+        "(1, 2, 3)"
     );
 }
