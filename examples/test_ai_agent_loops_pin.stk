@@ -1,0 +1,74 @@
+#!/usr/bin/env stryke
+
+# AI Agent Loops & Advanced Primitives (2026-05-15)
+# Testing Tool Use, Sessions, Extraction, and Vector Memory.
+# Compliance: docs/STYLE_GUIDE.md
+# Mode: --no-interop
+
+# Run with STRYKE_AI_MODE=mock-only in the environment to avoid hitting
+# the network. The test installs `ai_mock_install` patterns below.
+
+# ── 1. AI Sessions (Multi-turn) ─────────────────────────────────────────────
+
+ai_mock_install("(?i)hi", "Hello! How can I help?")
+ai_mock_install("(?i)name", "My name is StrykeAgent.")
+
+my $sess_obj = ai_session_new(system => "You are a helpful assistant")
+ai_session_send($sess_obj, "hi") |> aeq "Hello! How can I help?", "Session turn 1";
+ai_session_send($sess_obj, "what is your name?") |> aeq "My name is StrykeAgent.", "Session turn 2";
+my @sess_hist = ai_session_history($sess_obj)
+@sess_hist |> len |> { _ >= 4 } |> aok "Session history length (system + 2 turns)";
+@sess_hist[1]->{content} |> aeq "hi", "Session history first user message";
+ai_session_reset($sess_obj)
+ai_session_history($sess_obj) |> len |> aeq 1, "Session history after reset (system only)";
+ai_session_close($sess_obj)
+
+# ── 2. AI Extraction with Schema ────────────────────────────────────────────
+
+ai_mock_install("(?i)extract user", '{"name":"Alice","age":30}')
+my $u_schema = { name => "string", age => "int" }
+my $u_obj = ai_extract("Alice is 30 years old", "extract user", schema => $u_schema)
+$u_obj->{name} |> aeq "Alice", "ai_extract name";
+$u_obj->{age}  |> aeq 30, "ai_extract age";
+# ── 3. Tool Function Mocking ────────────────────────────────────────────────
+
+# tool fn automatically registers for the agent loop
+# Using un-namespaced name for compatibility in this turn
+tool fn get_temp($city: string) "Get current temperature" {
+    $city eq "San Francisco" ? 65 : 75
+}
+
+# Mocking the agent's decision to use a tool
+ai_mock_install("(?i)weather.*SF", '{"tool_calls":[{"name":"get_temp","args":{"city":"San Francisco"}}]}')
+# Mocking the final response after tool execution
+ai_mock_install("(?i)65 degrees", "The weather in San Francisco is 65 degrees.")
+
+my $r_loop = ai "What is the weather in SF?";
+$r_loop |> { /65/ } |> aok "Agent used get_temp via mock";
+# ── 4. AI Vector Memory (Mock Mode) ─────────────────────────────────────────
+
+ai_memory_clear()
+ai_memory_save("doc1", "Stryke is a fast language", { category => "tech" })
+ai_memory_save("doc2", "Apples are delicious", { category => "food" })
+
+ai_memory_count() |> aeq 2, "ai_memory_count after save";
+my @m_results = ai_memory_recall("fast language", top_k => 1)
+@m_results |> len |> aeq 1, "ai_memory_recall count";
+@m_results[0]->{id} |> aeq "doc1", "ai_memory_recall match";
+@m_results[0]->{metadata}->{category} |> aeq "tech", "ai_memory_recall metadata";
+ai_memory_forget("doc1")
+ai_memory_count() |> aeq 1, "ai_memory_count after forget";
+ai_memory_clear()
+ai_memory_count() |> aeq 0, "ai_memory_count after clear";
+# ── 5. AI Budget and Cost ───────────────────────────────────────────────────
+
+ai_budget(10.0) # $10.0 cap
+ai_cost() |> { _ >= 0 } |> aok "ai_cost is numeric";
+# ── 6. MCP (Model Context Protocol) ─────────────────────────────────────────
+
+mcp_server "system_info_srv" {
+    fn uptime { "up 2 hours" }
+}
+
+exists %all{mcp_connect} |> aok "mcp_connect exists";
+test_run

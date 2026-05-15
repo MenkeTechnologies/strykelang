@@ -245,11 +245,11 @@ s 'p to_yaml read_json "data.json"'</pre>
             </tr>
           </thead>
           <tbody>
-            <tr><td>Sum 1:100</td><td style="color:#0f0;"><code>s 'p sum 1:100'</code> <b>19c</b></td><td>45c</td><td>28c</td><td>38c</td></tr>
-            <tr><td>Word freq</td><td style="color:#0f0;"><code>s -an 'freq(@F) |&gt; dd'</code> <b>25c</b></td><td>61c</td><td>—</td><td>—</td></tr>
-            <tr><td>SHA256 file</td><td style="color:#0f0;"><code>s 'p s256"f"'</code> <b>14c</b></td><td>70c+</td><td>—</td><td>80c+</td></tr>
-            <tr><td>CSV → JSON</td><td style="color:#0f0;"><code>s 'csv_read("f") |&gt; tj |&gt; p'</code> <b>33c</b></td><td>needs modules</td><td>needs modules</td><td>90c</td></tr>
-            <tr><td>Parallel map</td><td style="color:#0f0;"><code>s '1:1e6 |&gt; pmap{_ * 2}'</code> <b>30c</b></td><td>—</td><td>—</td><td>—</td></tr>
+            <tr><td>Sum 1:100</td><td style="color:#0f0;"><code>s 'p sum 1:100'</code> <b>15c</b></td><td>45c</td><td>28c</td><td>38c</td></tr>
+            <tr><td>Word freq</td><td style="color:#0f0;"><code>s -an 'freq(@F) |&gt; dd'</code> <b>22c</b></td><td>61c</td><td>—</td><td>—</td></tr>
+            <tr><td>SHA256 file</td><td style="color:#0f0;"><code>s 'p s256"f"'</code> <b>13c</b></td><td>70c+</td><td>—</td><td>80c+</td></tr>
+            <tr><td>CSV → JSON</td><td style="color:#0f0;"><code>s 'csv_read("f") |&gt; tj |&gt; p'</code> <b>28c</b></td><td>needs modules</td><td>needs modules</td><td>90c</td></tr>
+            <tr><td>Parallel map</td><td style="color:#0f0;"><code>s '1:1e6 |&gt; pmap{_ * 2}'</code> <b>24c</b></td><td>—</td><td>—</td><td>—</td></tr>
           </tbody>
         </table>
       </section>
@@ -1614,6 +1614,14 @@ STRYKE_CACHE=0 stryke app.stk  <span class="comment"># disable caching for this 
               <td><strong>yes</strong> — UTF-8 / element-aligned</td>
             </tr>
             <tr style="background: rgba(0, 229, 255, 0.05);">
+              <td><code>~d&gt;</code> / <code>~d&gt;&gt;</code></td>
+              <td><strong>stryke</strong> — <em>distributed</em></td>
+              <td>same chunk-block semantics as <code>~p&gt;</code> but chunks ship to remote workers on a cluster via <code>pmap_on</code> (ssh job-queue, fault-tolerant retry). Syntax: <code>~d&gt; on $cluster SOURCE stage1 stage2 ...</code></td>
+              <td><strong>distributed</strong> (M hosts × N slots each)</td>
+              <td>n/a (eager)</td>
+              <td><strong>yes</strong> — per-slot chunk boundaries</td>
+            </tr>
+            <tr style="background: rgba(0, 229, 255, 0.05);">
               <td><code>par { BLOCK }</code> / <code>par_reduce { … } [{ … }]</code></td>
               <td><strong>stryke</strong></td>
               <td>generic parallel-chunk thread-stage with auto-merge (hash-of-num &rarr; key-wise add, num &rarr; sum, array/string &rarr; concat)</td>
@@ -1672,6 +1680,11 @@ STRYKE_CACHE=0 stryke app.stk  <span class="comment"># disable caching for this 
               <td><strong>Streaming &amp; chunk-parallel thread macros</strong></td>
               <td><code>~s&gt;</code> &middot; <code>~s&gt;&gt;</code> &middot; <code>~p&gt;</code> &middot; <code>~p&gt;&gt;</code></td>
               <td>Threading macros with execution semantics baked into the operator: <code>~s&gt;</code> / <code>~s&gt;&gt;</code> run each stage as a worker connected by bounded channels (per-item streaming with backpressure), <code>~p&gt;</code> / <code>~p&gt;&gt;</code> chunk the input and run the whole pipeline per-chunk in parallel with an auto-merger (canonical histogram merge for hash-of-numeric, numeric add, array/string concat). <code>||&gt;</code> / <code>|then|</code> mid-pipeline boundary switches a <code>~p&gt;</code> back to sequential <code>~&gt;</code> for terminal stages. No other language overloads its threading macros with concurrent / chunk-parallel semantics — Clojure's <code>-&gt;</code> family is purely syntactic.</td>
+            </tr>
+            <tr>
+              <td><strong>Distributed thread macros</strong></td>
+              <td><code>~d&gt;</code> &middot; <code>~d&gt;&gt;</code></td>
+              <td>Same chunk-block semantics as <code>~p&gt;</code> / <code>~p&gt;&gt;</code>, but the work-stealing pool spans <em>multiple hosts</em>. Syntax: <code>~d&gt; on $cluster SOURCE stage1 stage2 ...</code>. Chunks ship over ssh to remote workers on a <code>cluster()</code> handle, executed in parallel across M hosts × N slots each, results streamed back over the same JOB-frame protocol that backs <code>pmap_on</code> (retry on transient failure, ordered merge on completion). The threading-macro syntax is identical to <code>~p&gt;</code> — only the dispatcher changes — so a local pipeline scales to a cluster by swapping one operator. World-first: no other language exposes distributed compute through a thread-macro operator. Sugar for <code>dist_reduce on $cluster { stages } SOURCE</code>.</td>
             </tr>
             <tr>
               <td><strong>Mid-chain threading-mode-switch operator</strong></td>
