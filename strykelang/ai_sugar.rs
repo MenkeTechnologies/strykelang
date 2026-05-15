@@ -68,7 +68,18 @@ pub(crate) fn desugar_tool_fn(code: &str) -> String {
         // Skip over strings / regex / comments — same shape as the
         // existing `desugar_rust_blocks`.
         match c {
-            b'\n' | b' ' | b'\t' | b'\r' => {
+            // Newline is a statement boundary in stryke (Perl/shell rule).
+            // Without this reset, any line that didn't end with `;` `{` `}`
+            // leaves `can_start_stmt=false`, causing a top-level `tool fn`
+            // on the next line to be silently skipped by this desugar and
+            // surface as a raw parser error ("Expected LBrace, got Ident").
+            b'\n' => {
+                out.push(c as char);
+                i += 1;
+                can_start_stmt = true;
+                continue;
+            }
+            b' ' | b'\t' | b'\r' => {
                 out.push(c as char);
                 i += 1;
                 continue;
@@ -465,7 +476,14 @@ fn desugar_mcp_server(code: &str) -> String {
     while i < bytes.len() {
         let c = bytes[i];
         match c {
-            b'\n' | b' ' | b'\t' | b'\r' => {
+            // Newline is a statement boundary — same fix as `desugar_tool_fn`.
+            b'\n' => {
+                out.push(c as char);
+                i += 1;
+                can_start_stmt = true;
+                continue;
+            }
+            b' ' | b'\t' | b'\r' => {
                 out.push(c as char);
                 i += 1;
                 continue;

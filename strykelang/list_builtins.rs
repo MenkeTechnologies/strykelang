@@ -312,30 +312,40 @@ fn uniq_with_want(
 }
 
 /// Adjacent-unique like Perl 5 `uniq` (DWIM string/undef; refs compared by string form).
+///
+/// Fix for BUG-126/140: a single arrayref argument (`uniq([1,1,2,2])` or
+/// `uniq(\@arr)`) used to be treated as one atom because only plain
+/// `Array` values (`as_array_vec`) were recognised — the `ArrayRef`
+/// branch fell through to the scalar `else` and pushed the ref itself.
+/// Now both plain arrays and arrayrefs unfold into their elements.
 fn uniq_list(args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
     let mut out = Vec::new();
     let mut seen = std::collections::HashSet::new();
+    let mut push_val = |x: &StrykeValue, out: &mut Vec<StrykeValue>, seen: &mut std::collections::HashSet<String>| {
+        let key = x.to_string();
+        if seen.insert(key) {
+            out.push(x.clone());
+        }
+    };
     for arg in args {
         if arg.is_iterator() {
             let iter = arg.clone().into_iterator();
             while let Some(x) = iter.next_item() {
-                let key = x.to_string();
-                if seen.insert(key) {
-                    out.push(x);
-                }
+                push_val(&x, &mut out, &mut seen);
             }
         } else if let Some(arr) = arg.as_array_vec() {
-            for x in arr {
-                let key = x.to_string();
-                if seen.insert(key) {
-                    out.push(x.clone());
-                }
+            for x in &arr {
+                push_val(x, &mut out, &mut seen);
+            }
+        } else if let Some(arr_ref) = arg.as_array_ref() {
+            // BUG-126/140 fix — deref arrayref args so `uniq([1,1,2,2])`
+            // unfolds to (1, 1, 2, 2) → (1, 2) instead of returning the
+            // ref as a single atom.
+            for x in arr_ref.read().iter() {
+                push_val(x, &mut out, &mut seen);
             }
         } else {
-            let key = arg.to_string();
-            if seen.insert(key) {
-                out.push(arg.clone());
-            }
+            push_val(arg, &mut out, &mut seen);
         }
     }
     Ok(StrykeValue::array(out))

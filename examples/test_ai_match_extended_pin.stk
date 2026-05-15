@@ -2,51 +2,43 @@
 
 # Pinning batch Native-R (2026-05-10): Extended AI Match Tests
 # Compliance: docs/STYLE_GUIDE.md
+#
+# `ai_match(item, criterion, ...)` is a SINGLE-ITEM binary matcher
+# returning `1` if the LLM says the item matches the criterion, `0`
+# otherwise. The prompt template is
+#   Does this item match the criterion "<criterion>"? Reply ONLY with
+#   `true` or `false`.
+#   Item: <item>
+# To match a list against a criterion, `pmap` / `grep` over `ai_match`.
 
-# ── AI Match: Strings ───────────────────────────────────────────────────
+# ── ai_match — single item, true verdict ────────────────────────────────────
 
-ai_mock_install(
-    "Match items from the first list to items in the second list. For each item in the first list, output the index of the best match from the second list, or -1 for no good match. Hint: fruit similarity",
-    '[1, -1, 0]'
-);
+ai_mock_install('(?is)Does this item match the criterion.*positive', "true")
+ai_match(42, "is a positive number") |> aeq 1, "ai_match positive number"
 
-my @list1_string = ("apple", "banana", "grape");
-my @list2_string = ("grapefruit", "apple pie");
-my $matched_string = ai_match(\@list1_string, against => \@list2_string, hint => "fruit similarity");
+# ── ai_match — single item, false verdict ───────────────────────────────────
 
-join(",", @{$matched_string}) |> aeq "1,-1,0", "ai_match strings";
+ai_mock_install('(?is)Does this item match the criterion.*negative', "false")
+ai_match(42, "is a negative number") |> aeq 0, "ai_match negative number"
 
-# ── AI Match: Numbers ───────────────────────────────────────────────────
+# ── ai_match — robust to phrasing of "true" / "yes" ─────────────────────────
 
-ai_mock_install(
-    "Match items from the first list to items in the second list. For each item in the first list, output the index of the best match from the second list, or -1 for no good match. Hint: closest number",
-    '[0, 2, -1]'
-);
+ai_mock_install('(?is)Does this item match the criterion.*fruit', "yes")
+ai_match("apple", "is a fruit") |> aeq 1, "ai_match accepts 'yes' as true"
 
-my @list1_numeric = (10, 20, 30);
-my @list2_numeric = (11, 2, 22);
-my $matched_numeric = ai_match(\@list1_numeric, against => \@list2_numeric, hint => "closest number");
+# ── ai_match — false verdicts also accepted ─────────────────────────────────
 
-join(",", @{$matched_numeric}) |> aeq "0,2,-1", "ai_match numbers";
+# Mock returns "false" — verifies the negative path through the
+# response parser (matches /true/ when absent, /false/ presence wins).
+ai_mock_install('(?is)criterion.*orange', "false")
+ai_match("blueberry", "is an orange") |> aeq 0, "ai_match returns 0 on 'false'"
 
-# ── AI Match: By Hash Key ───────────────────────────────────────────────
+# ── ai_match — composes with pmap for parallel verdicts ─────────────────────
 
-ai_mock_install(
-    "Match items from the first list to items in the second list. For each item in the first list, output the index of the best match from the second list, or -1 for no good match. Hint: similar name and age",
-    '[1, 0]'
-);
-
-my @list1_hash = (
-    +{ name => "Alice", age => 30 },
-    +{ name => "Bob", age => 25 }
-);
-my @list2_hash = (
-    +{ name => "Robert", age => 26 },
-    +{ name => "Alicia", age => 29 }
-);
-my $matched_hash = ai_match(\@list1_hash, against => \@list2_hash, hint => "similar name and age");
-
-join(",", @{$matched_hash}) |> aeq "1,0", "ai_match by hash key";
-
+# `pmap` over ai_match produces a verdict-per-item array. With mocks
+# the result is deterministic — each call routes to the same mock.
+ai_mock_install('(?is)criterion.*even', "true")
+my @verdicts = map { ai_match($_, "is even") } (2, 4, 6)
+join(",", @verdicts) |> aeq "1,1,1", "ai_match via map yields verdict array"
 
 test_run

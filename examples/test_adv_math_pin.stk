@@ -20,8 +20,10 @@ polylog(2, 0.5) |> maps { abs(_ - 0.582) < 0.01 } |> aok "polylog(2, 0.5)"
 
 # ── Quantum Primitives ─────────────────────────────────────────────────────
 
-# pauli_x returns a matrix that stringifies as '0110' (len 4) but serializes as an array
-pauli_x() |> len |> aeq 4, "pauli_x flat length"
+# pauli_x() returns the 2×2 Pauli X gate as a nested arrayref [[0,1],[1,0]].
+# `len` gives the outer (row) count = 2. The original assertion of flat-
+# length-4 conflated `length(stringified)` with `len(arrayref)`.
+pauli_x() |> len |> aeq 2, "pauli_x row count"
 # bell_state(0) returns coefficient 1/sqrt(2)
 bell_state(0) |> maps { abs(_ - 0.707) < 0.001 } |> aok "bell_state(0) coeff"
 

@@ -2811,6 +2811,12 @@ pub(crate) fn ai_memory_save(args: &[StrykeValue], line: usize) -> Result<Stryke
         .map(|v| {
             if v.is_undef() {
                 String::new()
+            } else if v.as_hash_map().is_some() || v.as_hash_ref().is_some() {
+                // JSON-encode hash/hashref metadata so `ai_memory_recall`
+                // can decode it back to a hashref. Stringifying the ref
+                // would give `HASH(0x…)` and lose the keys.
+                serde_json::to_string(&perl_to_json(v))
+                    .unwrap_or_else(|_| v.to_string())
             } else {
                 v.to_string()
             }
@@ -2926,13 +2932,23 @@ pub(crate) fn ai_memory_recall(args: &[StrykeValue], line: usize) -> Result<Stry
             m.insert("id".into(), StrykeValue::string(id.clone()));
             m.insert("content".into(), StrykeValue::string(content.clone()));
             m.insert("score".into(), StrykeValue::float(score));
-            m.insert("metadata".into(), StrykeValue::string(meta.clone()));
+            // Decode JSON-encoded metadata back into a hashref so callers
+            // can `->{metadata}->{key}` without an extra parse step.
+            let meta_v = if meta.is_empty() {
+                StrykeValue::UNDEF
+            } else {
+                match serde_json::from_str::<serde_json::Value>(meta) {
+                    Ok(v) => json_to_perl(&v),
+                    Err(_) => StrykeValue::string(meta.clone()),
+                }
+            };
+            m.insert("metadata".into(), meta_v);
             StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
         })
         .collect();
-    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
-        out,
-    ))))
+    // Return a flat list (same convention as `ai_session_history`) so
+    // `my @hits = ai_memory_recall(...)` works without dereffing.
+    Ok(StrykeValue::array(out))
 }
 
 pub(crate) fn ai_memory_forget(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
@@ -5321,19 +5337,24 @@ pub(crate) fn ai_session_history(args: &[StrykeValue], line: usize) -> Result<St
             line,
         )
     })?;
-    let items: Vec<StrykeValue> = sess
-        .messages
-        .iter()
-        .map(|(role, content)| {
-            let mut m = IndexMap::new();
-            m.insert("role".into(), StrykeValue::string(role.clone()));
-            m.insert("content".into(), StrykeValue::string(content.clone()));
-            StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
-        })
-        .collect();
-    Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
-        items,
-    ))))
+    let mk_row = |role: &str, content: &str| {
+        let mut m = IndexMap::new();
+        m.insert("role".into(), StrykeValue::string(role.to_string()));
+        m.insert("content".into(), StrykeValue::string(content.to_string()));
+        StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
+    };
+    // Include the system prompt as the first row when present — callers
+    // expect "system + N turns" to match the chat-completion wire shape.
+    let mut items: Vec<StrykeValue> = Vec::with_capacity(sess.messages.len() + 1);
+    if !sess.system.is_empty() {
+        items.push(mk_row("system", &sess.system));
+    }
+    for (role, content) in &sess.messages {
+        items.push(mk_row(role, content));
+    }
+    // Return as a flat list (same convention as `ai_memory_recall`) so
+    // `my @hist = ai_session_history($s)` works without dereffing.
+    Ok(StrykeValue::array(items))
 }
 
 pub(crate) fn ai_session_close(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
