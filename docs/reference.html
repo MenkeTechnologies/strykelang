@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.14.2 · 10192 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.14.2 · 10194 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -330,7 +330,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">8520</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">8522</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -11990,7 +11990,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">8520 topics</p>
+      <p class="chapter-meta">8522 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$!</code></h3>
         <p><code>$!</code> — the OS error from the most recent system call, in stringified form (e.g. <code>&quot;No such file or directory&quot;</code>) or as an <code>errno</code> integer in numeric context. Set by <code>open</code>, <code>close</code>, <code>chdir</code>, <code>read</code>, <code>write</code>, and other syscalls when they fail. The value persists until the next failing call, so always check it *immediately* after the failing operation — intermediate clean Perl code does not touch it, but any subsequent syscall will.</p>
@@ -27122,6 +27122,21 @@ p escvel(1.989e30, 6.96e8)      # ~617 km/s (Sun)
         <p><code>exe</code> — operation <code>exe</code>. Category: *filesystem extensions*.</p>
         <pre><code class="lang-perl">p exe $x
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-exec-script">
+        <h3><a class="doc-anchor" href="#doc-exec-script">#</a> <code>exec_script</code></h3>
+        <p><code>run(TARGET, ...args)</code> → exit code. Spawn a stryke script or external binary as a subprocess. Inherits stdin/stdout/stderr so output streams to the parent. Returns the child&#39;s exit code (<code>-1</code> on spawn failure).</p>
+        <p>Routing:</p>
+        <ul>
+          <li><code>TARGET</code> ending in <code>.stk</code> → spawned via the current stryke binary (<code>$STRYKE_EXE script.stk ARGS…</code>)</li>
+          <li><code>TARGET</code> containing <code>/</code> → spawned as a direct path</li>
+          <li>bare name → resolved via <code>PATH</code></li>
+        </ul>
+        <pre><code class="lang-perl">my $rc = run(&quot;echo&quot;, &quot;hello&quot;)             # 0
+my $rc = run(&quot;./build.stk&quot;, &quot;--release&quot;)  # spawns isolated stryke proc
+run(&quot;git&quot;, &quot;status&quot;) == 0 or die &quot;git failed&quot;
+</code></pre>
+        <p>Isolation: state defined in a script run via <code>run</code> does NOT leak into the caller (subprocess). Use <code>source</code> if you want the script&#39;s <code>our</code> vars / <code>fn</code> defs in your REPL.</p>
       </article>
       <article class="doc-entry" id="doc-executables">
         <h3><a class="doc-anchor" href="#doc-executables">#</a> <code>executables</code></h3>
@@ -56216,6 +56231,15 @@ p sortino(\@returns, 0.0)   # penalizes only negative returns
         <p><code>soundex_v2(name) → string</code> — Apache Refined Soundex (longer code, no length cap, 9 finer-grained groups: BP, FV, CKS, GJ, QXZ, DT, L, MN, R).</p>
         <pre><code class="lang-perl">p soundex_v2(&quot;Robert&quot;)
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-source">
+        <h3><a class="doc-anchor" href="#doc-source">#</a> <code>source</code></h3>
+        <p><code>source(PATH)</code> → last expression value. Read a stryke script from <code>PATH</code> and execute it in the *current* interpreter. Variables (<code>our</code>/<code>my</code>), subroutines, classes, enums, and pragmas defined in the file become visible in the calling scope — same semantics as <code>do &quot;file&quot;</code> (Perl 5) or <code>source FILE</code> (POSIX shell).</p>
+        <pre><code class="lang-perl">source(&quot;config.stk&quot;)
+p $LIB_VERSION                  # leaked from config.stk
+Demo::Lib::greet(&quot;alice&quot;)       # leaked fn defined in config.stk
+</code></pre>
+        <p>Designed for REPL workflows: <code>source</code> a working environment without forking. Returns <code>undef</code> if the file can&#39;t be parsed, dies on file-read failure. For isolated execution (no state-leak), use <code>run</code> instead.</p>
       </article>
       <article class="doc-entry" id="doc-spaceship">
         <h3><a class="doc-anchor" href="#doc-spaceship">#</a> <code>spaceship</code></h3>

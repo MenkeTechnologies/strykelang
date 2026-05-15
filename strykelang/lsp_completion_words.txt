@@ -3212,6 +3212,7 @@ CORE::exclude_first
 CORE::exclude_last
 CORE::exe
 CORE::exec
+CORE::exec_script
 CORE::executables
 CORE::exists
 CORE::exists_key
@@ -8740,6 +8741,7 @@ CORE::rtt_min
 CORE::rudin_shapiro
 CORE::ruin_probability_lundberg
 CORE::rule_of_72
+CORE::run
 CORE::run_code_tool
 CORE::run_length_decode
 CORE::run_length_decode_str
@@ -9443,6 +9445,7 @@ CORE::soundex
 CORE::soundex_phonetic
 CORE::soundex_v1
 CORE::soundex_v2
+CORE::source
 CORE::spaceship
 CORE::span
 CORE::span_fn
@@ -9561,6 +9564,7 @@ CORE::squares_seq
 CORE::squeezing_db
 CORE::squish
 CORE::srand
+CORE::src
 CORE::sregex
 CORE::srem
 CORE::srgb_to_rgb
@@ -14201,6 +14205,7 @@ exclude_first
 exclude_last
 exe
 exec
+exec_script
 executables
 exists
 exists_key
@@ -19749,6 +19754,7 @@ rtt_min
 rudin_shapiro
 ruin_probability_lundberg
 rule_of_72
+run
 run_code_tool
 run_length_decode
 run_length_decode_str
@@ -20453,6 +20459,7 @@ soundex
 soundex_phonetic
 soundex_v1
 soundex_v2
+source
 spaceship
 span
 span_fn
@@ -20571,6 +20578,7 @@ squares_seq
 squeezing_db
 squish
 srand
+src
 sregex
 srem
 srgb_to_rgb

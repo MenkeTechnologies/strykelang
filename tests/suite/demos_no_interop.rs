@@ -104,3 +104,4 @@ demo_runs_no_interop!(demo_crypto,                "examples/crypto.stk");
 demo_runs_no_interop!(demo_codecs,                "examples/codecs.stk");
 demo_runs_no_interop!(demo_async_tasks,           "examples/async_tasks.stk");
 demo_runs_no_interop!(demo_datetime,              "examples/datetime.stk");
+demo_runs_no_interop!(demo_run_source,            "examples/run_source.stk");
