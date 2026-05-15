@@ -662,6 +662,33 @@ magic in sort/reduce.
 .TP
 .B $_<<
 .RB "Outer-outer (each " < " climbs one chain level)."
+.SS "4.13  Sketch Algebra (stryke extension)"
+.PP
+Probabilistic data structures are first-class operands for
+.BR + " | & ^ - " .
+No other language ships this as a syntactic primitive \(em
+everywhere else these are library function calls
+.RB ( bloom_union(a, b) ", " hll.merge(other) ", " roaring.intersect ).
+Operators are functional: a fresh sketch is returned, neither
+operand is mutated.
+.PP
+.RS 4
+.EX
+my $u = $bloom_a + $bloom_b;       # Bloom union (also: |)
+my $u = $hll_a   + $hll_b;         # HyperLogLog union (also: |)
+my $u = $cms_a   + $cms_b;         # Count-Min counter sum
+my $u = $topk_a  + $topk_b;        # SpaceSaving heavy-hitter merge
+my $u = $td_a    + $td_b;          # t-digest centroid merge
+my $u = $rb_a | $rb_b;             # Roaring union
+my $i = $rb_a & $rb_b;             # Roaring intersection
+my $x = $rb_a ^ $rb_b;             # Roaring symmetric difference
+my $d = $rb_a - $rb_b;             # Roaring andnot (set difference)
+.EE
+.RE
+.PP
+Mismatched shapes (e.g. HLL precision mismatch, Bloom capacity
+mismatch) fall back to the default numeric/bitwise operator path
+\(em no panic, no truncation.
 .SH "5.  CONTROL FLOW"
 .SS "5.1  Conditionals"
 .PP

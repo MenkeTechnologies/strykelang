@@ -245,6 +245,45 @@ Execute BLOCK N times (default N = rayon pool size).
 .TP
 .BR fan_cap " [N] {BLOCK}"
 Like \fBfan\fR; returns list of block return values (index order).
+.SH SKETCH ALGEBRA
+Probabilistic data structures are first-class operands for
+.BR + " | & ^ - " .
+World-first \(em no other language treats these as syntactic
+primitives. Operators are functional; neither operand is mutated.
+.TP
+.B $bloom_a + $bloom_b
+Bloom-filter union (also
+.BR | ).
+.TP
+.B $hll_a + $hll_b
+HyperLogLog union (also
+.BR | ).
+.TP
+.B $cms_a + $cms_b
+Count-Min Sketch pointwise counter sum.
+.TP
+.B $topk_a + $topk_b
+SpaceSaving heavy-hitter merge.
+.TP
+.B $td_a + $td_b
+t-digest centroid merge.
+.TP
+.B $rb_a | $rb_b
+Roaring union (also
+.BR + ).
+.TP
+.B $rb_a & $rb_b
+Roaring intersection.
+.TP
+.B $rb_a ^ $rb_b
+Roaring symmetric difference.
+.TP
+.B $rb_a - $rb_b
+Roaring andnot (set difference).
+.PP
+Shape mismatch (HLL precision differs, Bloom capacity differs)
+falls back to the default numeric/bitwise path \(em no panic, no
+silent truncation.
 .SH REPL & SHELL-LIKE BUILTINS
 The
 .B s

@@ -1214,3 +1214,133 @@ fn tier2_builtins_in_b_hash() {
     }
 }
 
+// ── Sketch algebra — operator overloads on probabilistic data structures ─
+
+#[test]
+fn bloom_plus_is_union() {
+    let code = r#"
+        my $a = bloom_filter(1000, 0.01);
+        my $b = bloom_filter(1000, 0.01);
+        bloom_add($a, "alice");
+        bloom_add($b, "bob");
+        my $u = $a + $b;
+        bloom_contains($u, "alice") + bloom_contains($u, "bob") + (bloom_contains($a, "bob") ? 0 : 1) + (bloom_contains($b, "alice") ? 0 : 1)
+    "#;
+    assert_eq!(eval_int(code), 4);
+}
+
+#[test]
+fn bloom_pipe_alias_for_plus() {
+    let code = r#"
+        my $a = bloom_filter(1000, 0.01);
+        my $b = bloom_filter(1000, 0.01);
+        bloom_add($a, "x");
+        bloom_add($b, "y");
+        my $u = $a | $b;
+        bloom_contains($u, "x") + bloom_contains($u, "y")
+    "#;
+    assert_eq!(eval_int(code), 2);
+}
+
+#[test]
+fn hll_plus_is_union() {
+    let code = r#"
+        my $a = hll(14);
+        my $b = hll(14);
+        for my $i (1..100_000)     { hll_add($a, "k" . $i) }
+        for my $i (100_001..200_000) { hll_add($b, "k" . $i) }
+        my $u = $a + $b;
+        my $c = hll_count($u);
+        (abs($c - 200_000) / 200_000) < 0.02 ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn cms_plus_sums_counters() {
+    let code = r#"
+        my $a = cms(2048, 5);
+        my $b = cms(2048, 5);
+        for (1..100) { cms_add($a, "hot") }
+        for (1..50)  { cms_add($b, "hot") }
+        my $u = $a + $b;
+        cms_count($u, "hot") >= 150 ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn topk_plus_merges_heavies() {
+    let code = r#"
+        my $a = topk(5);
+        my $b = topk(5);
+        for (1..100) { topk_add($a, "alpha") }
+        for (1..100) { topk_add($b, "beta")  }
+        my $u = $a + $b;
+        my @h = topk_heavies($u);
+        my $found = 0;
+        for my $row (@h) {
+            $found++ if $row->[0] eq "alpha" || $row->[0] eq "beta";
+        }
+        $found
+    "#;
+    assert_eq!(eval_int(code), 2);
+}
+
+#[test]
+fn tdigest_plus_merges_quantiles() {
+    let code = r#"
+        my $a = t_digest(100);
+        my $b = t_digest(100);
+        for my $i (1..1000)    { td_add($a, $i) }
+        for my $i (1001..2000) { td_add($b, $i) }
+        my $u = $a + $b;
+        my $med = td_quantile($u, 0.5);
+        (abs($med - 1000) < 50) ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn roaring_full_set_algebra() {
+    let code = r#"
+        my $a = roaring();
+        my $b = roaring();
+        for (1..10)  { rb_add($a, $_) }
+        for (5..15)  { rb_add($b, $_) }
+        my $u = $a | $b;
+        my $i = $a & $b;
+        my $x = $a ^ $b;
+        my $d = $a - $b;
+        rb_len($u) + rb_len($i) * 10 + rb_len($x) * 100 + rb_len($d) * 1000
+    "#;
+    // |∪|=15, |∩|=6, |△|=9, |a\b|=4 → 15 + 60 + 900 + 4000 = 4975
+    assert_eq!(eval_int(code), 4975);
+}
+
+#[test]
+fn roaring_plus_is_union_alias() {
+    let code = r#"
+        my $a = roaring();
+        my $b = roaring();
+        rb_add($a, $_) for 1..5;
+        rb_add($b, $_) for 4..8;
+        my $u = $a + $b;
+        rb_len($u)
+    "#;
+    assert_eq!(eval_int(code), 8);
+}
+
+#[test]
+fn sketch_operators_do_not_mutate_operands() {
+    let code = r#"
+        my $a = roaring();
+        my $b = roaring();
+        rb_add($a, $_) for 1..3;
+        rb_add($b, $_) for 4..6;
+        my $u = $a + $b;
+        rb_len($a) == 3 && rb_len($b) == 3 ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
