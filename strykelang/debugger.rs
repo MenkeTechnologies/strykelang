@@ -786,6 +786,65 @@ mod tests {
         assert!(!dbg.should_stop(10));
     }
 
+    /// Regression for the "step-in fires on the same line" bug. The same-
+    /// line guard must treat a depth change (sub entered or returned) as
+    /// forward progress, otherwise step-in lands on the next opcode of the
+    /// call site (which has the same source line as the call) and the
+    /// user has to click step-in twice to actually enter the sub.
+    #[test]
+    fn same_line_guard_yields_to_depth_change_on_step_in() {
+        let mut dbg = Debugger::new();
+        // Stopped at line 10, depth 0 (caller's frame).
+        dbg.last_stop_line = Some(10);
+        dbg.last_stop_depth = 0;
+        // step-in arms step_mode.
+        dbg.step_mode = true;
+        // Same line, same depth (still in caller) → skip.
+        assert!(!dbg.should_stop(10));
+        // Depth bumps (entered the sub) → fire even on same source line.
+        dbg.enter_sub("callee");
+        assert!(dbg.should_stop(10));
+    }
+
+    /// And the inverse — when call_depth shrinks past `step_out_depth`,
+    /// step-out should fire even though we may land on the same line as
+    /// the call site (when callee tail-returns at the call line).
+    #[test]
+    fn step_out_fires_when_returning_to_same_line() {
+        let mut dbg = Debugger::new();
+        // Inside callee at depth 1, stopped at line 5.
+        dbg.enter_sub("callee");
+        dbg.last_stop_line = Some(5);
+        dbg.last_stop_depth = 1;
+        dbg.step_out_depth = Some(1);
+        // Still inside callee — don't fire.
+        assert!(!dbg.should_stop(5));
+        // Callee returned — depth drops.
+        dbg.leave_sub();
+        // Same source line as the call site but depth dropped → fire.
+        assert!(dbg.should_stop(5));
+    }
+
+    /// Step-over requires the *exact* depth-aware guard the production
+    /// debugger uses (`call_depth <= step_over_depth`). The earlier
+    /// non-depth guard let step-over follow execution into UDFs because
+    /// call_depth never moved.
+    #[test]
+    fn step_over_skips_into_nested_frame_and_resumes_after_return() {
+        let mut dbg = Debugger::new();
+        dbg.step_mode = false;
+        // Step-over from the call site (depth 0) at line 10.
+        dbg.step_over_depth = Some(0);
+        dbg.enter_sub("callee");
+        // Deeper than the request — skip every line inside the sub.
+        assert!(!dbg.should_stop(20));
+        assert!(!dbg.should_stop(21));
+        // Sub returns → depth back to 0 → fire at the line after the
+        // call.
+        dbg.leave_sub();
+        assert!(dbg.should_stop(11));
+    }
+
     #[test]
     fn format_value_undef() {
         assert_eq!(format_value(&StrykeValue::UNDEF), "undef");

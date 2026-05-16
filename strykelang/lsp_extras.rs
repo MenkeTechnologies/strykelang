@@ -953,7 +953,7 @@ pub fn compute_folding_ranges(
                 in_pod = Some(line);
                 // close any pending comment run
                 if let Some(start) = comment_run_start.take() {
-                    if line.saturating_sub(start) >= 2 {
+                    if line.saturating_sub(start) >= 3 {
                         ranges.push(make_fold(start, line - 1, Some(FoldingRangeKind::Comment)));
                     }
                 }
@@ -1051,7 +1051,7 @@ pub fn compute_folding_ranges(
                 in_str = Some(b as char);
                 // Comment run ends at any code.
                 if let Some(start) = comment_run_start.take() {
-                    if line.saturating_sub(start) >= 2 {
+                    if line.saturating_sub(start) >= 3 {
                         ranges.push(make_fold(start, line.saturating_sub(1), Some(FoldingRangeKind::Comment)));
                     }
                 }
@@ -1061,7 +1061,7 @@ pub fn compute_folding_ranges(
             }
             b'{' => {
                 if let Some(start) = comment_run_start.take() {
-                    if line.saturating_sub(start) >= 2 {
+                    if line.saturating_sub(start) >= 3 {
                         ranges.push(make_fold(start, line.saturating_sub(1), Some(FoldingRangeKind::Comment)));
                     }
                 }
@@ -1083,7 +1083,7 @@ pub fn compute_folding_ranges(
             }
             _ => {
                 if let Some(start) = comment_run_start.take() {
-                    if line.saturating_sub(start) >= 2 {
+                    if line.saturating_sub(start) >= 3 {
                         ranges.push(make_fold(start, line.saturating_sub(1), Some(FoldingRangeKind::Comment)));
                     }
                 }
@@ -1094,7 +1094,7 @@ pub fn compute_folding_ranges(
         }
     }
     if let Some(start) = comment_run_start {
-        if line.saturating_sub(start) >= 2 {
+        if line.saturating_sub(start) >= 3 {
             ranges.push(make_fold(start, line, Some(FoldingRangeKind::Comment)));
         }
     }
@@ -1172,4 +1172,164 @@ pub fn compute_formatting(
         },
         new_text: formatted,
     }]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use lsp_types::{CodeActionContext, TextDocumentIdentifier};
+    use std::str::FromStr;
+
+    fn doc(uri: &str, text: &str) -> (HashMap<String, String>, Uri) {
+        let mut docs = HashMap::new();
+        docs.insert(uri.to_string(), text.to_string());
+        (docs, Uri::from_str(uri).unwrap())
+    }
+
+    fn pos(line: u32, character: u32) -> Position {
+        Position { line, character }
+    }
+
+    fn range(s_line: u32, s_char: u32, e_line: u32, e_char: u32) -> Range {
+        Range { start: pos(s_line, s_char), end: pos(e_line, e_char) }
+    }
+
+    fn code_actions(text: &str, r: Range) -> Vec<CodeActionOrCommand> {
+        let (docs, uri) = doc("file:///t.stk", text);
+        let params = CodeActionParams {
+            text_document: TextDocumentIdentifier { uri },
+            range: r,
+            context: CodeActionContext {
+                diagnostics: Vec::new(),
+                only: None,
+                trigger_kind: None,
+            },
+            work_done_progress_params: Default::default(),
+            partial_result_params: Default::default(),
+        };
+        compute_code_actions(&docs, &params)
+    }
+
+    fn titles(actions: &[CodeActionOrCommand]) -> Vec<String> {
+        actions
+            .iter()
+            .filter_map(|a| match a {
+                CodeActionOrCommand::CodeAction(ca) => Some(ca.title.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    // ── compute_code_actions ─────────────────────────────────────────────
+
+    #[test]
+    fn code_actions_for_empty_selection_are_line_local_only() {
+        let actions = code_actions("my $x = 1 + 2\np $x\n", range(0, 0, 0, 0));
+        let t = titles(&actions);
+        assert!(t.iter().any(|s| s.contains("Wrap line in")), "wrap-in-p offered");
+        assert!(t.iter().any(|s| s.contains("Comment line")), "toggle comment offered");
+        // No refactorings on an empty range.
+        assert!(!t.iter().any(|s| s.contains("Extract")), "no Extract on empty range");
+    }
+
+    #[test]
+    fn code_actions_for_single_line_selection_offer_extract_var_and_const() {
+        // Select "1 + 2" on `my $x = 1 + 2`.
+        let actions = code_actions("my $x = 1 + 2\np $x\n", range(0, 8, 0, 13));
+        let t = titles(&actions);
+        assert!(t.iter().any(|s| s.contains("Extract to variable")), "var: got {t:?}");
+        assert!(t.iter().any(|s| s.contains("Extract to constant")), "const: got {t:?}");
+        // Function extract requires multi-line.
+        assert!(!t.iter().any(|s| s.contains("Extract to function")), "no fn: got {t:?}");
+    }
+
+    #[test]
+    fn code_actions_for_multi_line_selection_offer_extract_function() {
+        let text = "my $x = 1\nmy $y = 2\np $x + $y\n";
+        // Span all three statements.
+        let actions = code_actions(text, range(0, 0, 2, 9));
+        let t = titles(&actions);
+        assert!(t.iter().any(|s| s.contains("Extract to function")), "fn: got {t:?}");
+        // Single-line extracts are not offered here.
+        assert!(!t.iter().any(|s| s.contains("Extract to variable")), "no var: got {t:?}");
+    }
+
+    #[test]
+    fn extract_variable_action_inserts_decl_above_and_replaces_selection() {
+        let actions = code_actions("my $x = 1 + 2\n", range(0, 8, 0, 13));
+        let var_action = actions
+            .iter()
+            .find_map(|a| match a {
+                CodeActionOrCommand::CodeAction(ca) if ca.title.contains("variable") => {
+                    ca.edit.clone()
+                }
+                _ => None,
+            })
+            .expect("extract-variable action present");
+        let changes = var_action.changes.expect("workspace edit has changes");
+        let (_uri, edits) = changes.iter().next().unwrap();
+        // Two edits: one inserts the decl line above, one replaces the
+        // selection with the placeholder name.
+        assert_eq!(edits.len(), 2, "two edits emitted");
+        let new_decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        assert!(new_decl.new_text.contains("$extracted"), "uses placeholder name");
+        assert!(new_decl.new_text.contains("1 + 2"), "captures the selected expression");
+        let replace = edits.iter().find(|e| e.new_text == "$extracted").unwrap();
+        assert_eq!(replace.range.start.character, 8);
+        assert_eq!(replace.range.end.character, 13);
+    }
+
+    // ── compute_folding_ranges ───────────────────────────────────────────
+
+    fn fold_ranges(text: &str) -> Vec<FoldingRange> {
+        let (docs, uri) = doc("file:///t.stk", text);
+        let params = FoldingRangeParams {
+            text_document: TextDocumentIdentifier { uri },
+            work_done_progress_params: Default::default(),
+            partial_result_params: Default::default(),
+        };
+        compute_folding_ranges(&docs, &params)
+    }
+
+    #[test]
+    fn folding_brace_block_is_emitted() {
+        let text = "fn f {\n    my $x = 1\n}\n";
+        let ranges = fold_ranges(text);
+        assert!(
+            ranges.iter().any(|r| r.start_line == 0 && r.end_line == 2),
+            "expected fold for fn body: got {ranges:?}"
+        );
+    }
+
+    #[test]
+    fn folding_emits_for_pod_block_as_comment() {
+        let text = "=pod\nsome doc\nmore doc\n=cut\nmy $x = 1\n";
+        let ranges = fold_ranges(text);
+        let pod = ranges.iter().find(|r| r.start_line == 0).expect("POD fold");
+        assert_eq!(pod.end_line, 3, "POD ends at `=cut` line");
+        assert_eq!(pod.kind, Some(FoldingRangeKind::Comment), "marked as comment");
+    }
+
+    #[test]
+    fn folding_groups_three_or_more_comment_lines() {
+        let text = "# a\n# b\n# c\nmy $x = 1\n";
+        let ranges = fold_ranges(text);
+        let cmt = ranges
+            .iter()
+            .find(|r| r.start_line == 0 && r.kind == Some(FoldingRangeKind::Comment))
+            .expect("comment-run fold");
+        // At least 3 lines (0..2). End line is the last comment line.
+        assert!(cmt.end_line >= 2, "covers 3+ comment lines: got {cmt:?}");
+    }
+
+    #[test]
+    fn folding_ignores_two_line_comment_runs() {
+        // Only 2 comment lines → not foldable (3+ threshold).
+        let text = "# a\n# b\nmy $x = 1\n";
+        let ranges = fold_ranges(text);
+        let has_comment_fold = ranges
+            .iter()
+            .any(|r| r.start_line == 0 && r.kind == Some(FoldingRangeKind::Comment));
+        assert!(!has_comment_fold, "2 comment lines is below the fold threshold");
+    }
 }

@@ -1490,3 +1490,40 @@ pub fn run_with_args(args: &[String]) -> i32 {
     shared.emit_event("terminated", json!({}));
     exit_code
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── is_magic_block_param classifier ─────────────────────────────────
+    //
+    // Drives the Variables panel's three-tier sort: user `my` vars first,
+    // then magic block params (`$_`, `$_N`, `$a`, `$b`), then builtins.
+    // Misclassifying a user variable as magic would silently push it to
+    // the wrong bucket.
+
+    #[test]
+    fn magic_block_param_matches_underscore_topic_and_sort_pair() {
+        assert!(is_magic_block_param("_"), "$_ topic");
+        assert!(is_magic_block_param("_0"), "$_0 first positional");
+        assert!(is_magic_block_param("_1"), "$_1 second positional");
+        assert!(is_magic_block_param("_42"), "$_N N-th positional");
+        assert!(is_magic_block_param("a"), "$a sort/reduce");
+        assert!(is_magic_block_param("b"), "$b sort/reduce");
+    }
+
+    #[test]
+    fn magic_block_param_rejects_user_names() {
+        assert!(!is_magic_block_param("name"));
+        assert!(
+            !is_magic_block_param("_name"),
+            "underscore-prefix is not a topic alias"
+        );
+        assert!(!is_magic_block_param("a1"));
+        assert!(
+            !is_magic_block_param("ab"),
+            "$ab is a user var, not a magic block param"
+        );
+        assert!(!is_magic_block_param(""));
+    }
+}
