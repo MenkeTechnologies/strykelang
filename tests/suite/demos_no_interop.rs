@@ -193,3 +193,5 @@ demo_runs_no_interop!(demo_bingo_simulator,       "examples/bingo_simulator.stk"
 demo_runs_no_interop!(demo_port_scanner_sim,      "examples/port_scanner_sim.stk");
 demo_runs_no_interop!(demo_tax_calculator,        "examples/tax_calculator.stk");
 demo_runs_no_interop!(demo_crc32_checksum,        "examples/crc32_checksum.stk");
+demo_runs_no_interop!(demo_mandelbrot_ascii,      "examples/mandelbrot_ascii.stk");
+demo_runs_no_interop!(demo_knapsack_optimizer,    "examples/knapsack_optimizer.stk");

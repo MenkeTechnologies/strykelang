@@ -1,0 +1,190 @@
+#!/usr/bin/env stryke
+
+# 0/1 Knapsack DP solver — fill a capacity-limited bag to maximise
+# total value. Classic DP textbook problem.
+#
+# Demonstrates:
+#   * 2D DP table init via nested (0) x N pattern.
+#   * Item-by-item / capacity-by-capacity table fill.
+#   * Backtracking through the table to recover the chosen items.
+#   * pmap parallel over multiple problem instances.
+#   * t-digest of value-per-weight efficiency across instances.
+#   * TopK on most-chosen items across all instances.
+#   * HLL distinct item names across instances.
+
+# ── one solver ────────────────────────────────────────────────────
+
+fn Demo::KS::solve($items_ref, $capacity) {
+    my $n = len(@$items_ref);
+    my @dp;
+    for my $i (0:$n) {
+        push @dp, [(0) x ($capacity + 1)];
+    }
+
+    for my $i (1:$n) {
+        my $item = $items_ref->[$i - 1];
+        my $w = $item->{w};
+        my $v = $item->{v};
+        for my $cap (0:$capacity) {
+            if ($w > $cap) {
+                $dp[$i]->[$cap] = $dp[$i - 1]->[$cap];
+            } else {
+                my $skip = $dp[$i - 1]->[$cap];
+                my $take = $dp[$i - 1]->[$cap - $w] + $v;
+                $dp[$i]->[$cap] = $skip > $take ? $skip : $take;
+            }
+        }
+    }
+
+    # Backtrack
+    my @chosen;
+    my $cap = $capacity;
+    for my $i (rev 1:$n) {
+        if ($dp[$i]->[$cap] != $dp[$i - 1]->[$cap]) {
+            unshift @chosen, $items_ref->[$i - 1];
+            $cap -= $items_ref->[$i - 1]->{w};
+        }
+    }
+
+    {
+        max_value => $dp[$n]->[$capacity],
+        chosen    => \@chosen,
+        used_w    => $capacity - $cap,
+    }
+}
+
+# ── problem instances ─────────────────────────────────────────────
+
+my @instances = (
+    {
+        name     => "camping",
+        capacity => 15,
+        items    => [
+            { name => "tent",       w => 6,  v => 25 },
+            { name => "sleeping",   w => 4,  v => 18 },
+            { name => "stove",      w => 3,  v => 12 },
+            { name => "water",      w => 5,  v => 20 },
+            { name => "food",       w => 4,  v => 22 },
+            { name => "first-aid",  w => 2,  v => 15 },
+            { name => "map",        w => 1,  v => 8  },
+        ],
+    },
+    {
+        name     => "burglary",
+        capacity => 25,
+        items    => [
+            { name => "tv",         w => 10, v => 100 },
+            { name => "laptop",     w => 3,  v => 80  },
+            { name => "console",    w => 5,  v => 60  },
+            { name => "ring",       w => 1,  v => 50  },
+            { name => "necklace",   w => 1,  v => 45  },
+            { name => "watch",      w => 1,  v => 30  },
+            { name => "earrings",   w => 1,  v => 25  },
+            { name => "stereo",     w => 8,  v => 70  },
+            { name => "speakers",   w => 6,  v => 40  },
+            { name => "tablet",     w => 2,  v => 55  },
+        ],
+    },
+    {
+        name     => "groceries",
+        capacity => 20,
+        items    => [
+            { name => "milk",       w => 4,  v => 5 },
+            { name => "bread",      w => 2,  v => 3 },
+            { name => "cheese",     w => 3,  v => 7 },
+            { name => "apples",     w => 5,  v => 6 },
+            { name => "pasta",      w => 2,  v => 4 },
+            { name => "sauce",      w => 1,  v => 3 },
+            { name => "rice",       w => 4,  v => 4 },
+            { name => "coffee",     w => 1,  v => 8 },
+            { name => "tea",        w => 1,  v => 5 },
+            { name => "eggs",       w => 2,  v => 5 },
+        ],
+    },
+    {
+        name     => "rock-tour",
+        capacity => 30,
+        items    => [
+            { name => "guitar",     w => 8,  v => 120 },
+            { name => "bass",       w => 7,  v => 80  },
+            { name => "drums",      w => 15, v => 200 },
+            { name => "amp",        w => 12, v => 100 },
+            { name => "cables",     w => 2,  v => 30  },
+            { name => "mic",        w => 1,  v => 60  },
+            { name => "stand",      w => 4,  v => 25  },
+            { name => "synth",      w => 6,  v => 90  },
+            { name => "pedals",     w => 3,  v => 50  },
+            { name => "tuner",      w => 1,  v => 20  },
+        ],
+    },
+);
+
+# ── sketches ──────────────────────────────────────────────────────
+
+my $td_eff   = t_digest(100);
+my $tk_item  = topk(16);
+my $hll_name = hll(12);
+
+# ── parallel solve ────────────────────────────────────────────────
+
+print "0/1 knapsack solver — ", len(@instances), " instances\n";
+print "─" x 60, "\n";
+
+my $t0 = now_ns();
+my @results = pmap { Demo::KS::solve($_->{items}, $_->{capacity}) } @instances;
+my $elapsed_us = (now_ns() - $t0) / 1000.0;
+
+# ── report each ───────────────────────────────────────────────────
+
+for my $i (0:len(@instances) - 1) {
+    my $inst = $instances[$i];
+    my $res  = $results[$i];
+    my $cap  = $inst->{capacity};
+    my $val  = $res->{max_value};
+    my $used = $res->{used_w};
+    my $eff  = $used > 0 ? $val / $used : 0;
+    td_add($td_eff, $eff);
+
+    printf("\n[%s] capacity=%d  max_value=%d  weight_used=%d/%d (%.0f%% full)  eff=%.2f v/w\n",
+           $inst->{name}, $cap, $val, $used, $cap, 100 * $used / $cap, $eff);
+
+    for my $item (@{$res->{chosen}}) {
+        printf("    %-12s w=%2d  v=%4d\n", $item->{name}, $item->{w}, $item->{v});
+        topk_add($tk_item, $item->{name});
+        hll_add($hll_name, $item->{name});
+    }
+    printf("    ── chose %d/%d items\n",
+           len(@{$res->{chosen}}), len(@{$inst->{items}}));
+}
+
+printf("\nsolved all in %.0f us (parallel pmap)\n", $elapsed_us);
+
+# ── distribution ─────────────────────────────────────────────────
+
+print "\nvalue-per-weight efficiency across instances:\n";
+printf("  p10 = %.2f\n", td_quantile($td_eff, 0.10));
+printf("  p50 = %.2f\n", td_quantile($td_eff, 0.50));
+printf("  p90 = %.2f\n", td_quantile($td_eff, 0.90));
+
+# ── most-chosen items overall ────────────────────────────────────
+
+print "\nmost-chosen items overall (TopK):\n";
+my @top = topk_top($tk_item, 8);
+for my $p (@top) {
+    printf("  %-12s count=%d\n", $p->[0], $p->[1]);
+}
+
+# ── distinct items ───────────────────────────────────────────────
+
+my $hll_n = hll_count($hll_name);
+my %seen;
+for my $inst (@instances) {
+    for my $it (@{$inst->{items}}) {
+        $seen{$it->{name}} = 1;
+    }
+}
+my $total_distinct_items = len(keys %seen);
+printf("\ndistinct chosen items: HLL=%.1f vs catalog-distinct=%d\n",
+       $hll_n, $total_distinct_items);
+
+print "\nknapsack optimizer done\n";
