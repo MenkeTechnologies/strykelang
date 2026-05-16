@@ -2742,6 +2742,25 @@ impl VMHelper {
         }
     }
 
+    /// Notify the debugger that a user sub call is about to happen. No-op
+    /// when no debugger is attached. Paired with [`Self::debugger_leave_sub`]
+    /// after the call returns — the depth counter is what makes step-over
+    /// skip past UDFs instead of stepping into them.
+    #[inline]
+    pub fn debugger_enter_sub(&mut self, name: &str) {
+        if let Some(dbg) = &mut self.debugger {
+            dbg.enter_sub(name);
+        }
+    }
+
+    /// Pair to [`Self::debugger_enter_sub`].
+    #[inline]
+    pub fn debugger_leave_sub(&mut self) {
+        if let Some(dbg) = &mut self.debugger {
+            dbg.leave_sub();
+        }
+    }
+
     /// Populate [`Self::env`] and the `%ENV` hash from [`std::env::vars`] once.
     /// Deferred from [`Self::new`] to reduce interpreter startup when `%ENV` is unused.
     pub fn materialize_env_if_needed(&mut self) {
@@ -7643,9 +7662,19 @@ impl VMHelper {
                 self.english_note_lexical_scalar(var);
                 let mut i = 0usize;
                 'outer: while i < items.len() {
-                    self.scope
-                        .set_scalar(var, items[i].clone())
-                        .map_err(|e| FlowOrError::Error(e.at_line(stmt.line)))?;
+                    // For the implicit topic loop (`for (@list) { ... }`,
+                    // var=="_"), use `set_topic` so `$_`, `$_0`, `_`, `_0`
+                    // all alias the iter value. Plain `set_scalar("_", ...)`
+                    // only updates `$_` and leaves `$_0` undef, violating
+                    // the four-way aliasing invariant. Explicit named loops
+                    // (`for my $x (@list)`) keep the simple scalar binding.
+                    if var == "_" {
+                        self.scope.set_topic(items[i].clone());
+                    } else {
+                        self.scope
+                            .set_scalar(var, items[i].clone())
+                            .map_err(|e| FlowOrError::Error(e.at_line(stmt.line)))?;
+                    }
                     'inner: loop {
                         match self.exec_block_smart(body) {
                             Ok(_) => break 'inner,
@@ -19186,10 +19215,12 @@ impl VMHelper {
                     if let Some(p) = &mut self.profiler {
                         p.enter_sub(&sub.name);
                     }
+                    self.debugger_enter_sub(&sub.name);
                     let n = crate::fib_like_tail::eval_fib_like_recursive_add(n0, pat);
                     if let (Some(p), Some(t0)) = (&mut self.profiler, t0) {
                         p.exit_sub(t0.elapsed());
                     }
+                    self.debugger_leave_sub();
                     self.wantarray_kind = saved;
                     self.scope_pop_hook();
                     self.current_sub_stack.pop();
@@ -19204,6 +19235,7 @@ impl VMHelper {
         if let Some(p) = &mut self.profiler {
             p.enter_sub(&sub.name);
         }
+        self.debugger_enter_sub(&sub.name);
         // Always evaluate the function body's last expression in List context so
         // `@array` returns the array contents, not the count. The caller adapts the
         // return value to their own wantarray context after receiving it.
@@ -19211,6 +19243,7 @@ impl VMHelper {
         if let (Some(p), Some(t0)) = (&mut self.profiler, t0) {
             p.exit_sub(t0.elapsed());
         }
+        self.debugger_leave_sub();
         // For goto &sub, capture @_ before popping the frame
         let goto_args = if matches!(result, Err(FlowOrError::Flow(Flow::GotoSub(_)))) {
             Some(self.scope.get_array("_"))

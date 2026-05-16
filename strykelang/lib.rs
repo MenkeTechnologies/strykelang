@@ -56,6 +56,7 @@ mod jwt;
 pub mod kvstore;
 pub mod lexer;
 pub mod list_builtins;
+pub mod dap;
 pub mod lsp;
 pub mod lsp_docs_domains;
 pub mod lsp_extras;

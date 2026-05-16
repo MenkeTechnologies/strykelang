@@ -1046,7 +1046,16 @@ pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut VMHelper, filename: 
     interp.scope.declare_array("INC", inc_dirs);
 
     if cli.debugger.is_some() {
-        eprintln!("stryke: debugger not yet implemented, running normally");
+        // Install the TTY debugger (REPL on stdin/stderr, perl -d style).
+        // The DAP debugger is wired separately via `st --dap` in lib.rs::run().
+        let mut dbg = stryke::debugger::Debugger::new();
+        if filename != "-e" && filename != "-" && filename != "repl" {
+            dbg.set_file(filename);
+            if let Ok(src) = std::fs::read_to_string(filename) {
+                dbg.load_source(&src);
+            }
+        }
+        interp.debugger = Some(dbg);
     }
 }
 
@@ -1147,6 +1156,13 @@ fn main() {
 
     if args.len() == 2 && args[1] == "--lsp" {
         process::exit(stryke::run_lsp_stdio());
+    }
+
+    if args.len() >= 2 && args[1] == "--dap" {
+        // `st --dap` (stdio) or `st --dap HOST:PORT` (TCP socket — used by
+        // the JetBrains plugin to avoid sharing stdout with OSProcessHandler).
+        let rest: Vec<String> = args.iter().skip(2).cloned().collect();
+        process::exit(stryke::dap::run_with_args(&rest));
     }
 
     // `stryke agent` — distributed load testing agent

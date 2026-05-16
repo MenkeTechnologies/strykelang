@@ -68,6 +68,19 @@
         <configurationType implementation="com.menketechnologies.stryke.run.StrykeRunConfigurationType"/>
         <runConfigurationProducer
             implementation="com.menketechnologies.stryke.run.StrykeRunConfigurationProducer"/>
+        <programRunner implementation="com.menketechnologies.stryke.run.StrykeProgramRunner"/>
+        <programRunner implementation="com.menketechnologies.stryke.run.StrykeDebugRunner"/>
+
+        <!-- Debugger: line-breakpoint type -->
+        <xdebugger.breakpointType implementation="com.menketechnologies.stryke.dap.StrykeBreakpointType"/>
+
+        <!-- Reflection tool window -->
+        <toolWindow
+            id="Stryke"
+            anchor="right"
+            secondary="false"
+            icon="com.menketechnologies.stryke.StrykeIcons.FILE"
+            factoryClass="com.menketechnologies.stryke.toolwindow.StrykeReflectionToolWindowFactory"/>
     </extensions>
 
     <actions>

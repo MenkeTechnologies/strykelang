@@ -19,9 +19,12 @@ use lsp_types::request::GotoDefinition;
 use lsp_types::request::HoverRequest;
 use lsp_types::request::PrepareRenameRequest;
 use lsp_types::request::References;
+use lsp_types::request::CodeActionRequest;
 use lsp_types::request::Rename;
 use lsp_types::request::Request as RequestTrait;
 use lsp_types::request::ResolveCompletionItem;
+use lsp_types::request::SemanticTokensFullRequest;
+use lsp_types::request::SignatureHelpRequest;
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionOptions, CompletionParams, CompletionResponse,
     DeclarationCapability, Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams,
@@ -60,12 +63,21 @@ pub(crate) fn run_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync>
         )),
         completion_provider: Some(CompletionOptions {
             resolve_provider: Some(true),
-            trigger_characters: Some(vec![
-                "$".to_string(),
-                "@".to_string(),
-                "%".to_string(),
-                ":".to_string(),
-            ]),
+            trigger_characters: Some({
+                // Sigils + namespace separator AND every lowercase letter, so
+                // bare-keyword / builtin completion auto-pops as you type
+                // (`pu` → push, `my` → mysync, etc.) — matches REPL behavior.
+                let mut v: Vec<String> = vec![
+                    "$".to_string(),
+                    "@".to_string(),
+                    "%".to_string(),
+                    ":".to_string(),
+                    "_".to_string(),
+                ];
+                for c in 'a'..='z' { v.push(c.to_string()); }
+                for c in 'A'..='Z' { v.push(c.to_string()); }
+                v
+            }),
             ..Default::default()
         }),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
@@ -78,6 +90,13 @@ pub(crate) fn run_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync>
         })),
         document_highlight_provider: Some(OneOf::Left(true)),
         document_symbol_provider: Some(OneOf::Left(true)),
+        semantic_tokens_provider: Some(crate::lsp_extras::semantic_tokens_options()),
+        signature_help_provider: Some(lsp_types::SignatureHelpOptions {
+            trigger_characters: Some(vec!["(".to_string(), ",".to_string()]),
+            retrigger_characters: Some(vec![",".to_string()]),
+            work_done_progress_options: WorkDoneProgressOptions::default(),
+        }),
+        code_action_provider: Some(lsp_types::CodeActionProviderCapability::Simple(true)),
         ..Default::default()
     };
 
@@ -324,6 +343,85 @@ fn dispatch_request(
         };
         let result = rename_symbol(docs, params);
         let resp = Response::new_ok(id, result);
+        conn.sender.send(resp.into()).expect("lsp channel");
+        return Ok(());
+    }
+
+    if req.method == SemanticTokensFullRequest::METHOD {
+        let req_id = req.id.clone();
+        let (id, params) = match req
+            .extract::<lsp_types::SemanticTokensParams>(SemanticTokensFullRequest::METHOD)
+        {
+            Ok(p) => p,
+            Err(ExtractError::JsonError { method, error }) => {
+                let resp = Response::new_err(
+                    req_id,
+                    ErrorCode::InvalidParams as i32,
+                    format!("{method}: {error}"),
+                );
+                conn.sender.send(resp.into()).expect("lsp channel");
+                return Ok(());
+            }
+            Err(ExtractError::MethodMismatch(_)) => unreachable!(),
+        };
+        let uri = params.text_document.uri;
+        let tokens = docs
+            .get(uri.as_str())
+            .map(|t| crate::lsp_extras::compute_semantic_tokens(t))
+            .unwrap_or(lsp_types::SemanticTokens {
+                result_id: None,
+                data: Vec::new(),
+            });
+        let resp = Response::new_ok(id, Some(tokens));
+        conn.sender.send(resp.into()).expect("lsp channel");
+        return Ok(());
+    }
+
+    if req.method == SignatureHelpRequest::METHOD {
+        let req_id = req.id.clone();
+        let (id, params) = match req
+            .extract::<lsp_types::SignatureHelpParams>(SignatureHelpRequest::METHOD)
+        {
+            Ok(p) => p,
+            Err(ExtractError::JsonError { method, error }) => {
+                let resp = Response::new_err(
+                    req_id,
+                    ErrorCode::InvalidParams as i32,
+                    format!("{method}: {error}"),
+                );
+                conn.sender.send(resp.into()).expect("lsp channel");
+                return Ok(());
+            }
+            Err(ExtractError::MethodMismatch(_)) => unreachable!(),
+        };
+        let uri = &params.text_document_position_params.text_document.uri;
+        let result = docs
+            .get(uri.as_str())
+            .and_then(|t| crate::lsp_extras::compute_signature_help(t, &params, doc_for_label_text));
+        let resp = Response::new_ok(id, result);
+        conn.sender.send(resp.into()).expect("lsp channel");
+        return Ok(());
+    }
+
+    if req.method == CodeActionRequest::METHOD {
+        let req_id = req.id.clone();
+        let (id, params) = match req
+            .extract::<lsp_types::CodeActionParams>(CodeActionRequest::METHOD)
+        {
+            Ok(p) => p,
+            Err(ExtractError::JsonError { method, error }) => {
+                let resp = Response::new_err(
+                    req_id,
+                    ErrorCode::InvalidParams as i32,
+                    format!("{method}: {error}"),
+                );
+                conn.sender.send(resp.into()).expect("lsp channel");
+                return Ok(());
+            }
+            Err(ExtractError::MethodMismatch(_)) => unreachable!(),
+        };
+        let actions = crate::lsp_extras::compute_code_actions(docs, &params);
+        let resp = Response::new_ok(id, Some(actions));
         conn.sender.send(resp.into()).expect("lsp channel");
         return Ok(());
     }
@@ -928,7 +1026,9 @@ fn hover_markdown_for_word(word: &str, text: &str, path: &str) -> Option<String>
     if let Some(doc) = doc_for_label(word) {
         return Some(documentation_to_string(&doc));
     }
-    None
+    // Category-based fallback so every builtin in `CATEGORY_MAP` gets a hover
+    // card — same path `stryke docs <name>` uses for un-hand-written names.
+    doc_stub_for(word)
 }
 
 fn hover(docs: &HashMap<String, String>, params: HoverParams) -> Option<Hover> {
@@ -1814,6 +1914,9 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         // ── Typing (stryke) ──
         "typed" => "`typed` adds optional runtime type annotations to lexical variables and subroutine parameters. When a `typed` declaration is in effect, stryke inserts a lightweight check at assignment time that verifies the value matches the declared type (`Int`, `Str`, `Float`, `Bool`, `ArrayRef`, `HashRef`, or a user-defined `struct` name). This is especially useful for catching accidental type mismatches at function boundaries in larger programs. The annotation is purely a runtime guard — it has zero impact on pipeline performance because the check is only performed once at the point of assignment, not on every read.\n\n```perl\ntyped my $x : Int = 42\ntyped my $name : Str = \"hello\"\ntyped my $pi : Float = 3.14\nmy $add = fn ($x: Int, $y: Int) { $x + $y }\np $add->(3, 4)   # 7\n```\n\nNote: assigning a value of the wrong type raises a runtime exception immediately.\n\nYou can mix typed and untyped variables freely in the same scope, so adopting `typed` is incremental — annotate the variables that matter and leave the rest dynamic. Subroutine parameters declared with type annotations in `fn` are checked on every call, giving you contract-style validation at function boundaries without a separate assertion library.\n\n```perl\ntyped my @nums : Int = (1, 2, 3)\ntyped my %cfg : Str = (host => \"localhost\", port => \"8080\")\n```",
         "struct" => "`struct` declares a named record type with typed fields, giving stryke lightweight struct semantics similar to Rust structs or Python dataclasses. Structs support multiple construction syntaxes, default values, field mutation, user-defined methods, functional updates, and structural equality.\n\n**Declaration:**\n```perl\nstruct Point { x => Float, y => Float }           # typed fields\nstruct Point { x => Float = 0.0, y => Float = 0.0 } # with defaults\nstruct Pair { key, value }                        # untyped (Any)\n```\n\n**Construction:**\n```perl\nmy $p = Point(x => 1.5, y => 2.0)  # function-call with named args\nmy $p = Point(1.5, 2.0)            # positional (declaration order)\nmy $p = Point->new(x => 1.5, y => 2.0) # traditional OO style\nmy $p = Point()                    # uses defaults if defined\n```\n\n**Field access (getter/setter):**\n```perl\np $p->x       # getter (0 args)\n$p->x(3.0)    # setter (1 arg)\n```\n\n**User-defined methods:**\n```perl\nstruct Circle {\n    radius => Float,\n    fn area { 3.14159 * $self->radius ** 2 }\n    fn scale($factor: Float) {\n        Circle(radius => $self->radius * $factor)\n    }\n}\nmy $c = Circle(radius => 5)\np $c->area        # 78.53975\np $c->scale(2)    # Circle(radius => 10)\n```\n\n**Built-in methods:**\n```perl\nmy $q = $p->with(x => 5)  # functional update — new instance\nmy $h = $p->to_hash       # { x => 1.5, y => 2.0 }\nmy @f = $p->fields        # (x, y)\nmy $c = $p->clone         # deep copy\n```\n\n**Smart stringify:**\n```perl\np $p  # Point(x => 1.5, y => 2)\n```\n\n**Structural equality:**\n```perl\nmy $x = Point(1, 2)\nmy $y = Point(1, 2)\np $x == $y  # 1 (compares all fields)\n```\n\nNote: field type is checked at construction and mutation; unknown field names are fatal errors.",
+
+        // ── Enums (algebraic data types) ──
+        "enum" => "`enum` declares a tagged-union / algebraic data type — a finite set of named variants, each optionally carrying a typed payload. Stryke enums pair with `match` for exhaustive pattern dispatch (the compiler errors on missing arms unless you write `_ =>`).\n\n**Declaration:**\n```perl\nenum Sig { Hup, Int, Term, Kill }                    # tag-only variants\nenum Color { Red, Green, Blue }\nenum ResultStatus { Ok => Int, Err => Str }          # variants with payload\nenum Shape {                                          # variants with payload + methods\n    Circle => Float,\n    Square => Float,\n    fn area($self) {\n        match ($self) {\n            Shape::Circle(\\$r) => 3.14159 * \\$r * \\$r,\n            Shape::Square(\\$s) => \\$s * \\$s,\n        }\n    }\n}\n```\n\n**Constructing variants:**\n```perl\nmy \\$s = Sig::Term                                   # tag-only construction\nmy \\$ok = ResultStatus::Ok(42)                       # payload construction\nmy \\$err = ResultStatus::Err(\"boom\")\np \\$ok                                               # ResultStatus::Ok(42)\n```\n\n**Pattern matching:**\n```perl\nfn handle(\\$sig) {\n    match (\\$sig) {\n        Sig::Hup  => \"reload config\",\n        Sig::Int  => \"graceful shutdown\",\n        Sig::Term => \"drain + stop\",\n        Sig::Kill => \"(no handler — kernel reaps)\",\n    }\n}\n# Bind the payload in the arm:\nmatch (\\$result) {\n    ResultStatus::Ok(\\$value)  => p \"got \\$value\",\n    ResultStatus::Err(\\$msg)   => die \\$msg,\n}\n```\n\n**Iteration / reflection:**\n```perl\nfor my \\$v (Sig::Hup, Sig::Int, Sig::Term, Sig::Kill) { p \\$v }\np Sig::values |> ep                                  # every variant\np ResultStatus::Ok(1)->variant                       # \"Ok\"\np ResultStatus::Ok(1)->payload                       # 1\n```\n\nNote: `EnumName::Variant` namespaces the variant tag; `EnumName::Variant(payload)` constructs one with data. The compiler tracks payload types per variant — `match` arms must bind a compatible pattern.\n\nSee also: `match`, `struct` (single-shape records), `class` (full OO).",
 
         // ── Classes (full OOP) ──
         "class" => "`class` declares a full object-oriented class with typed fields, inheritance, traits, instance methods, and static methods. Classes provide modern OOP semantics with a clean syntax.\n\n**Declaration:**\n```perl\nclass Animal {\n    name: Str\n    age: Int = 0\n    fn speak { p \"Animal: \" . $self->name }\n}\n```\n\n**Inheritance with `extends`:**\n```perl\nclass Dog extends Animal {\n    breed: Str = \"Mixed\"\n    fn bark { p \"Woof! I am \" . $self->name }\n    fn speak { p $self->name . \" barks!\" }  # override\n}\n```\n\n**Construction (named or positional):**\n```perl\nmy $dog = Dog(name => \"Rex\", age => 5, breed => \"Lab\")\nmy $dog = Dog(\"Rex\", 5, \"Lab\")  # positional\n```\n\n**Field access (getter/setter):**\n```perl\np $dog->name      # getter\n$dog->age(6)      # setter\n```\n\n**Static methods (`fn Self.name`):**\n```perl\nclass Math {\n    fn Self.add($x, $y) { $x + $y }\n    fn Self.pi { 3.14159 }\n}\np Math::add(3, 4)  # 7\np Math::pi()       # 3.14159\n```\n\n**Traits (interfaces):**\n```perl\ntrait Printable { fn to_str }\nclass Item impl Printable {\n    name: Str\n    fn to_str { $self->name }\n}\n```\n\n**Multiple inheritance:**\n```perl\nclass C extends A, B { }\n```\n\n**isa checks:**\n```perl\np $dog->isa(\"Dog\")    # 1\np $dog->isa(\"Animal\") # 1 (parent)\np $dog->isa(\"Cat\")    # \"\" (false)\n```\n\n**Built-in methods:**\n```perl\nmy @f = $dog->fields()        # (name, age, breed)\nmy $h = $dog->to_hash()       # { name => \"Rex\", ... }\nmy $d2 = $dog->with(age => 1) # functional update\nmy $d3 = $dog->clone()        # deep copy\n```\n\n**Visibility (pub/priv):**\n```perl\nclass Secret {\n    pub visible: Int = 1\n    priv hidden: Int = 42\n    pub fn get_hidden { $self->hidden }  # internal access ok\n}\n```\n\nNote: inherited fields come first in the values array; method lookup walks the inheritance chain.",

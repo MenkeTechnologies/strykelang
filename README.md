@@ -937,6 +937,8 @@ stryke-specific long flags:
 | `--no-interop` | Reject Perl-isms (`sub`, `say`, `reverse`, `scalar`, `$a`/`$b` outside sort blocks); force idiomatic stryke (`fn`, `p`, `rev`, `len`, `$_0`/`$_1`). See [\[0x08a\]](#0x08a-no-interop-mode) |
 | `--explain CODE` | Print expanded hint for an error code (e.g. `E0001`) |
 | `--lsp` | Language server over stdio ([\[0x11\]](#0x11-language-server-stryke-lsp)) |
+| `--dap [HOST:PORT]` | Debug Adapter Protocol server. With no arg → stdio; with `HOST:PORT` → connects to a TCP socket the spawner is listening on. Used by the JetBrains plugin under [`editors/intellij/`](editors/intellij/) |
+| `-d` | TTY debugger (`perl -d` style REPL on stdin/stderr). Use with `--`: `stryke -d -- script.stk` |
 | `-j N` / `--threads N` | Set number of parallel threads (rayon) |
 | `--remote-worker` | Persistent cluster worker over stdio ([\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster)) |
 | `--remote-worker-v1` | Legacy one-shot cluster worker over stdio |
@@ -2604,6 +2606,9 @@ spec:
 - **Hover docs** for builtins (`pmap`, `cluster`, `fetch_json`, `dataframe`, …) — including the parallel and cluster primitives from sections [\[0x03\]](#0x03-parallel-primitives) and [\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster), every Perl special variable (`$!`, `$@`, `$_`, `@_`, `@ARGV`, `%ENV`, `$1`..`$9`, `$^A`..`$^X`, `@+`/`@-`, …), the `__NAME__` compile-time tokens (`__END__`, `__DATA__`, `__FILE__`, `__LINE__`, `__PACKAGE__`, `__SUB__`), every phase block (`BEGIN`/`UNITCHECK`/`CHECK`/`INIT`/`END`/`BUILD`), and the reflection-hash short aliases (`%a`/`%b`/`%c`/`%d`/`%e`/`%k`/`%o`/`%p`/`%pc`/`%v`, `%parameters`, `%limits`, `%term`)
 - **Symbol lookup** for subs and packages within the open file
 - **Completion** for built-in function names and the keywords listed in [\[0x08\]](#0x08-supported-perl-features)
+- **Semantic tokens** for server-driven syntax coloring — keywords, builtins (with `defaultLibrary` modifier), sigil variables, pipe operators, regex literals, numbers, strings, comments — beyond what any client-side lexer can know
+- **Signature help** — parameter hints derived from the same doc strings that drive hover; active-parameter tracking as you type past commas
+- **Code actions** — line-local quickfixes (*wrap line in `p`*, *toggle line comment*) — more diagnostic-tied actions to come
 
 Wire it into VS Code, JetBrains, or any LSP-aware editor by pointing the client at `stryke lsp` (or `stryke --lsp`) as the language-server command. There is no separate `stryke-lsp` binary — the same `stryke` you run scripts with also acts as its own language server.
 
@@ -2615,7 +2620,26 @@ Wire it into VS Code, JetBrains, or any LSP-aware editor by pointing the client 
 }
 ```
 
-For JetBrains IDEs (RustRover, IDEA Ultimate, GoLand, PyCharm Pro, WebStorm, RubyMine, PhpStorm, CLion, Rider, DataGrip, Aqua) there is a first-class plugin under [`editors/intellij/`](editors/intellij/) — `.stk` file type, lexer-driven highlighting, LSP client wired to `st --lsp`, run configurations with optional `--no-interop`, color settings page, and a context-menu *Run with stryke* action. Build with `./gradlew buildPlugin` and install the zip from `build/distributions/`. Community editions are not supported (no LSP API).
+For JetBrains IDEs (RustRover, IDEA Ultimate, GoLand, PyCharm Pro, WebStorm, RubyMine, PhpStorm, CLion, Rider, DataGrip, Aqua) there is a first-class plugin under [`editors/intellij/`](editors/intellij/):
+
+- `.stk` file association, **44-slot color scheme**, hand-rolled lexer with finer-grained token categories (declaration vs control keywords, sigil variants, topic / block-param / special-var splits, pipe / arrow / range / regex-bind operators)
+- **LSP client** wired to `stryke --lsp` — completion, hover (full markdown cards), goto / refs / rename, semantic tokens, signature help, code actions, diagnostics
+- **Run configurations** with `--no-interop` / `--disasm` / `--profile` / `--flame` / `-d` toggles; context-menu *Run with stryke* on any `.stk`
+- **Debugger** over the Debug Adapter Protocol (`stryke --dap`): line + function breakpoints from the gutter, Continue / Step Over / Step Into / Step Out / Pause / Run-to-Cursor, frames with file:line, **recursive hash & array drill-down** in the Variables panel, real-time `p` / `print` output in the Console, **Evaluate dialog** with scalar prelude injection so `$a * $b` returns the right value from the paused frame. The CLI debugger `stryke -d file.stk` is a separate TTY front-end on the same `Debugger` state machine — both share breakpoint / step / scope inspection logic.
+- **Reflection tool window** (*View → Tool Windows → Stryke*) — searchable trees of `%stryke::all`, `%stryke::builtins`, `%stryke::keywords`, `%stryke::operators`, `%stryke::special_vars`, `%stryke::perl_compats`, `%stryke::extensions`, `%stryke::aliases`, `%stryke::descriptions` (≈25k entries). Left-click a leaf for an ANSI-rendered docs popup; right-click for *Show Docs* / *Copy Name*.
+
+Build with `./gradlew buildPlugin` and install the zip from `editors/intellij/build/distributions/`. Community editions are not supported (no LSP API). See [`editors/intellij/README.md`](editors/intellij/README.md) for the full feature list, settings, and architecture.
+
+### `stryke --dap` — Debug Adapter Protocol
+
+The same `stryke` binary that runs scripts also speaks the standard DAP protocol. Two transport modes:
+
+- **Stdio** (`stryke --dap`) — DAP messages over stdin/stdout. Useful for shell testing and clients that drive adapters over their own stdio.
+- **TCP** (`stryke --dap HOST:PORT`) — connects to a listening socket the client opened first. This is what the JetBrains plugin uses; it keeps stryke's stdout/stderr free for the program's own `p`/`print` output (which the IDE's `OSProcessHandler` reads independently).
+
+Supported DAP requests: `initialize`, `setBreakpoints` (line), `setFunctionBreakpoints`, `setExceptionBreakpoints`, `configurationDone`, `launch`, `threads`, `stackTrace`, `scopes`, `variables` (recursive — every hash/array gets a `variablesReference` for drill-down), `continue`, `next`, `stepIn`, `stepOut`, `pause`, `evaluate`, `terminate`, `disconnect`. Supported events: `initialized`, `stopped`, `output`, `process`, `thread`, `exited`, `terminated`.
+
+The TTY CLI debugger (`stryke -d`) and the DAP server (`stryke --dap`) share a single `Debugger` state machine — breakpoints, step modes, scope inspection, call-stack tracking. The only difference is the front-end transport.
 
 ---
 

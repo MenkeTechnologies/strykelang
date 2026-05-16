@@ -59,7 +59,7 @@ This document outlines the path to mass worldwide adoption. ✅ marks shipped, �
 
 ## Phase 6 — Tooling for adoption — ⏳ PARTIAL
 44. ✅ LSP server (rust-analyzer-class) — full hover/completion surface in `strykelang/lsp.rs`.
-45. ⏭️ DAP debugger integration.
+45. ✅ DAP debugger integration — `stryke --dap [HOST:PORT]` (stdio or TCP), shared `Debugger` state machine with the TTY `-d` front-end. JetBrains plugin under `editors/intellij/` consumes it with full XDebugProcess: line + function breakpoints, step over / into / out / pause / run-to-cursor, frames, recursive variable drill-down, Evaluate dialog with scalar prelude injection, real-time Console output.
 46. ⏭️ Profiler with flamegraphs and allocation tracking — `zpwrFlame` works at the shell level; in-process language profiler deferred.
 47. ⏳ Advanced linter (n+1, hot-loop AI calls, dead code).
 
@@ -140,9 +140,11 @@ This document outlines the path to mass worldwide adoption. ✅ marks shipped, �
 ## Phase 4: Ecosystem (2027)
 
 ### IDE Support
-- [ ] VS Code extension (LSP-based)
-- [ ] IntelliJ plugin
-- [ ] Neovim plugin
+- [ ] VS Code extension (LSP-based) — coc + vscode-settings.json bridge available in `editors/`
+- [x] **IntelliJ plugin** — `editors/intellij/`. Full LSP client (semantic tokens, signature help, code actions), DAP debugger (line/function breakpoints, step over/in/out, recursive variable drill-down, Evaluate dialog), reflection tool window with 9 tabs of `%stryke::*` (≈25k entries), 44-slot color scheme. Works in RustRover, IDEA Ultimate, GoLand, PyCharm Pro, WebStorm, RubyMine, PhpStorm, CLion, Rider, DataGrip, Aqua (paid editions only — LSP API not in Community).
+- [x] Neovim plugin — `editors/stryke.lua` + ALE / vim-lsp / coc.nvim integration via `stryke --lsp`
+- [x] Vim plugin — `editors/stryke.vim`
+- [x] Helix support — `editors/helix-languages.toml`
 - [ ] Syntax highlighting for 10+ editors
 
 ### Package Management

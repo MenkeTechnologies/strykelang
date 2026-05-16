@@ -7,7 +7,7 @@ import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.configurations.LocatableConfigurationBase
 import com.intellij.execution.configurations.RunConfiguration
 import com.intellij.execution.configurations.RuntimeConfigurationException
-import com.intellij.execution.process.OSProcessHandler
+import com.intellij.execution.process.KillableColoredProcessHandler
 import com.intellij.execution.process.ProcessHandler
 import com.intellij.execution.process.ProcessTerminatedListener
 import com.intellij.execution.runners.ExecutionEnvironment
@@ -44,6 +44,16 @@ class StrykeRunConfiguration(
                     .withCharset(Charsets.UTF_8)
 
                 if (options.noInterop) cmd.addParameter("--no-interop")
+                if (options.disasm) cmd.addParameter("--disasm")
+                if (options.profile) cmd.addParameter("--profile")
+                if (options.flame) cmd.addParameter("--flame")
+
+                if (options.debugFlag) {
+                    cmd.addParameter("-d")
+                    val dFlags = options.debugFlags.orEmpty()
+                    if (dFlags.isNotBlank()) cmd.addParameter("-D$dFlags")
+                }
+
                 splitArgs(options.interpreterArgs.orEmpty()).forEach { cmd.addParameter(it) }
                 cmd.addParameter(options.scriptPath.orEmpty())
                 splitArgs(options.scriptArgs.orEmpty()).forEach { cmd.addParameter(it) }
@@ -52,7 +62,11 @@ class StrykeRunConfiguration(
                     ?: FileUtil.toSystemDependentName(project.basePath ?: ".")
                 cmd.withWorkDirectory(wd)
 
-                val handler = OSProcessHandler(cmd)
+                // KillableColoredProcessHandler interprets ANSI escape codes
+                // (`\e[32m`, etc.) into IntelliJ Console color tokens, so the
+                // colorful test-runner / `p` output renders the same as in a
+                // real terminal instead of showing literal `[32m✓[0m`.
+                val handler = KillableColoredProcessHandler(cmd)
                 ProcessTerminatedListener.attach(handler)
                 return handler
             }

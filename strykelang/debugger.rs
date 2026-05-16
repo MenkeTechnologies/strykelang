@@ -1,10 +1,21 @@
 //! Interactive debugger for stryke programs.
 //!
 //! Provides breakpoint-based debugging with single-stepping, variable inspection,
-//! and call stack display. Activated via `-d` flag.
+//! and call stack display. Two front-ends share this state machine:
+//!
+//! * **TTY/CLI** (default, via `-d`) — `prompt()` reads commands from stdin and
+//!   writes to stderr. Same UX as `perl -d`.
+//! * **DAP** (via `--dap`) — `prompt()` instead routes through
+//!   [`crate::dap::DapShared`], emitting `stopped` events and condvar-waiting
+//!   for resume. Stdin is owned by the DAP reader thread; the debugger never
+//!   touches it in DAP mode.
+//!
+//! The split is per-instance, not compile-time: `Debugger::set_dap_backend`
+//! configures the DAP backend. With no backend set, TTY behavior runs.
 
 use std::collections::HashSet;
 use std::io::{self, BufRead, Write};
+use std::sync::{Arc, Mutex};
 
 use crate::scope::Scope;
 use crate::value::StrykeValue;
@@ -25,6 +36,11 @@ pub struct Debugger {
     call_depth: usize,
     /// Last line we stopped at (avoid repeated stops on same line).
     last_stop_line: Option<usize>,
+    /// Call depth at the last stop. Paired with [`Self::last_stop_line`] so the
+    /// same-line guard treats a depth change (sub entered or returned) as
+    /// forward progress — stepIn must fire when we enter a sub even if the
+    /// first opcode inside reports the same source line as the call site.
+    last_stop_depth: usize,
     /// Current source file name.
     pub file: String,
     /// Source lines (for display).
@@ -35,6 +51,17 @@ pub struct Debugger {
     watches: Vec<String>,
     /// Command history.
     history: Vec<String>,
+    /// Optional DAP backend. When `Some`, `prompt()` emits a `stopped` event
+    /// and condvar-waits instead of reading from stdin.
+    dap_backend: Option<DapBackendHandle>,
+}
+
+/// Opaque handle into [`crate::dap::DapShared`] + the shared breakpoint state.
+/// Kept as `Arc<dyn Any>` so debugger.rs does not depend on dap.rs at compile
+/// time (and tests work without DAP).
+pub struct DapBackendHandle {
+    pub shared: Arc<crate::dap::DapShared>,
+    pub bp_state: Arc<Mutex<crate::dap::BreakpointState>>,
 }
 
 impl Default for Debugger {
@@ -53,11 +80,110 @@ impl Debugger {
             step_out_depth: None,
             call_depth: 0,
             last_stop_line: None,
+            last_stop_depth: 0,
             file: String::new(),
             source_lines: Vec::new(),
             enabled: true,
             watches: Vec::new(),
             history: Vec::new(),
+            dap_backend: None,
+        }
+    }
+
+    /// Add a line breakpoint programmatically (used by the DAP server before
+    /// the VM starts). TTY users add via the `b N` command.
+    pub fn add_breakpoint_line(&mut self, line: usize) {
+        self.breakpoints.insert(line);
+    }
+
+    /// Add a function breakpoint programmatically.
+    pub fn add_breakpoint_sub(&mut self, name: &str) {
+        self.sub_breakpoints.insert(name.to_string());
+    }
+
+    /// Clear every line breakpoint (the DAP server re-sends the full set on
+    /// every `setBreakpoints` request).
+    pub fn clear_line_breakpoints(&mut self) {
+        self.breakpoints.clear();
+    }
+
+    /// Replace the entire line-breakpoint set in one shot.
+    pub fn set_line_breakpoints(&mut self, lines: &[usize]) {
+        self.breakpoints = lines.iter().copied().collect();
+    }
+
+    /// Toggle step-mode (controls whether `should_stop` returns true on every
+    /// new line). The DAP server flips this in response to `next` / `stepIn`.
+    pub fn set_step_mode(&mut self, on: bool) {
+        self.step_mode = on;
+    }
+
+    /// Request a step-over from the next stop.
+    pub fn request_step_over(&mut self) {
+        self.step_over_depth = Some(self.call_depth);
+    }
+
+    /// Request a step-out from the next stop.
+    pub fn request_step_out(&mut self) {
+        self.step_out_depth = Some(self.call_depth);
+    }
+
+    /// Install a DAP backend. After this call, `prompt()` will route through
+    /// the DAP server instead of TTY.
+    pub fn set_dap_backend(
+        &mut self,
+        shared: Arc<crate::dap::DapShared>,
+        bp_state: Arc<Mutex<crate::dap::BreakpointState>>,
+    ) {
+        self.dap_backend = Some(DapBackendHandle { shared, bp_state });
+    }
+
+    /// True when this debugger instance is wired to a DAP front-end.
+    #[inline]
+    pub fn is_dap(&self) -> bool {
+        self.dap_backend.is_some()
+    }
+
+    /// Snapshot helper: current breakpoint lines, sorted.
+    pub fn breakpoint_lines(&self) -> Vec<usize> {
+        let mut v: Vec<usize> = self.breakpoints.iter().copied().collect();
+        v.sort_unstable();
+        v
+    }
+
+    /// Build a [`crate::dap::PauseSnapshot`] for the current stop. Used only
+    /// in DAP mode; harmless in TTY mode (returns an empty default).
+    fn build_snapshot(
+        &self,
+        line: usize,
+        scope: &Scope,
+        call_stack: &[(String, usize)],
+        reason: &str,
+    ) -> crate::dap::PauseSnapshot {
+        let mut frames: Vec<crate::dap::FrameSnap> = Vec::new();
+        // Innermost (current) frame first
+        frames.push(crate::dap::FrameSnap {
+            name: "<current>".to_string(),
+            file: self.file.clone(),
+            line,
+        });
+        for (name, l) in call_stack.iter().rev() {
+            frames.push(crate::dap::FrameSnap {
+                name: name.clone(),
+                file: self.file.clone(),
+                line: *l,
+            });
+        }
+        let mut var_ref_map = std::collections::HashMap::new();
+        let locals = crate::dap::capture_locals_with_map(scope, &mut var_ref_map);
+        crate::dap::PauseSnapshot {
+            file: self.file.clone(),
+            line,
+            reason: reason.to_string(),
+            frames,
+            locals,
+            globals: Vec::new(),
+            var_ref_map,
         }
     }
 
@@ -77,8 +203,23 @@ impl Debugger {
             return false;
         }
 
-        // Avoid stopping on the same line repeatedly (unless stepping)
-        if !self.step_mode && self.last_stop_line == Some(line) {
+        if std::env::var("STRYKE_DBG_TRACE").is_ok() {
+            eprintln!("[ss] line={} bp_set={:?}", line, self.breakpoints.iter().collect::<Vec<_>>());
+        }
+
+        // Line 0 is the VM's "no source mapping" sentinel — synthetic teardown
+        // ops, prelude bytecode, etc. Never user-visible. Skip silently or the
+        // IDE pauses on an invalid frame (no Variables, no source highlight).
+        if line == 0 {
+            return false;
+        }
+
+        // Same-line guard: skip when we haven't made progress since the last
+        // stop. Progress = the source line moved OR the call depth changed
+        // (sub entered/returned). Without the depth half, stepIn would fire
+        // on the next opcode of the call site (same line) instead of the
+        // first opcode inside the sub.
+        if self.last_stop_line == Some(line) && self.call_depth == self.last_stop_depth {
             return false;
         }
 
@@ -127,6 +268,12 @@ impl Debugger {
     }
 
     /// Interactive debugger prompt. Returns true to continue, false to quit.
+    ///
+    /// Two paths:
+    /// * **DAP** — emit a `stopped` event with a snapshot, condvar-wait for
+    ///   the next resume command, apply step-mode flags from the shared
+    ///   breakpoint state, and return.
+    /// * **TTY** — original `perl -d`-style REPL on stdin/stderr.
     pub fn prompt(
         &mut self,
         line: usize,
@@ -134,7 +281,37 @@ impl Debugger {
         call_stack: &[(String, usize)],
     ) -> DebugAction {
         self.last_stop_line = Some(line);
+        self.last_stop_depth = self.call_depth;
         self.step_mode = false;
+
+        // DAP front-end: route through the shared state, return early.
+        if let Some(backend) = self.dap_backend.as_ref() {
+            let reason = if self.breakpoints.contains(&line) {
+                "breakpoint"
+            } else {
+                "step"
+            };
+            let snap = self.build_snapshot(line, scope, call_stack, reason);
+            let shared = backend.shared.clone();
+            let bp = backend.bp_state.clone();
+            let action = shared.pause(snap);
+            // Read any step-kind set by the DAP reader thread.
+            if let Ok(mut g) = bp.lock() {
+                if let Some(kind) = g.pending_step.take() {
+                    match kind {
+                        crate::dap::StepKind::Over => self.step_over_depth = Some(self.call_depth),
+                        crate::dap::StepKind::Into => self.step_mode = true,
+                        crate::dap::StepKind::Out => self.step_out_depth = Some(self.call_depth),
+                    }
+                }
+                // Sync line breakpoints (client may have sent new ones while paused)
+                if let Some(lines) = g.line_breakpoints.get(&self.file) {
+                    let lines = lines.clone();
+                    self.set_line_breakpoints(&lines);
+                }
+            }
+            return action;
+        }
 
         // Print location and source context
         self.print_location(line);
@@ -459,7 +636,7 @@ pub enum DebugAction {
     Prompt,
 }
 
-fn format_value(val: &StrykeValue) -> String {
+pub(crate) fn format_value(val: &StrykeValue) -> String {
     if val.is_undef() {
         "undef".to_string()
     } else if let Some(s) = val.as_str() {
