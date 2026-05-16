@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+
+# Anagram grouper — read words from stdin (or use the embedded sample),
+# group by sorted-char signature, print each group of ≥ 2 words.
+# Parses clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len`
+#   * `split(//, $word)` for char iteration, `sort` + `join` for the
+#     normalized key
+#   * `||=` hash-of-array bucket init
+#   * Topic `_` inside `grep` and `maps` blocks
+#   * `lc` to fold case
+#
+# Run: stryke --no-interop examples/anagram_finder_no_interop.stk
+#      echo -e "rat\ntar\nart\ncat\nact\ndog" | stryke --no-interop examples/anagram_finder_no_interop.stk
+
+# Signature of a word = its letters sorted lexicographically. Anagrams
+# share the same signature.
+fn signature($word) {
+    join("", sort split(//, lc($word)))
+}
+
+my @sample = (
+    "rat", "tar", "art", "star", "arts", "cat", "act",
+    "dog", "god", "silent", "listen",
+    "stop", "tops", "pots", "opts", "spot", "post",
+    "stressed", "desserts", "heart", "earth", "hater",
+    "throne", "north", "banana", "saved", "vades",
+)
+my @words = @sample
+# If stdin is piped (not a tty), replace the sample with the input
+# word list.
+if (!-t STDIN) {
+    my @stdin = grep { len(_) > 0 } map { _ =~ /(\w+)/g } <STDIN>
+    @words = @stdin if len(@stdin) > 0
+}
+
+# Bucket words by signature.
+my %groups
+for my $w (@words) {
+    my $sig = signature($w)
+    $groups{$sig} ||= []
+    push @{$groups{$sig}}, $w
+}
+
+# Filter groups of ≥ 2 words and order by size desc, then key asc.
+my @signatures = grep { len(@{$groups{_}}) >= 2 } keys %groups
+my @ranked = sort {
+    len(@{$groups{$_1}}) <=> len(@{$groups{$_0}})
+} @signatures
+
+p "── Anagram groups (n=", len(@words), " words, ", len(@ranked), " groups ≥ 2) ──"
+for my $sig (@ranked) {
+    my @group = sort @{$groups{$sig}}
+    printf "  [%s]  %s\n", $sig, join(", ", @group)
+}
