@@ -116,6 +116,17 @@ jobs:
         env:
           ST: ${{ github.workspace }}/target/release/stryke
         run: ./target/release/stryke examples/check_no_interop.stk
+      - name: Run `*_no_interop.stk` demos end-to-end with built-in asserts
+        # Every `examples/*_no_interop.stk` demo carries its own
+        # `die`-on-regression self-tests (round-trip checks, known-output
+        # tables, cross-impl comparisons). The runner here is itself a
+        # stryke script (pmap-parallelized across demos) and exits
+        # non-zero if any demo's assertions trip — so a clean step here
+        # means every documented stryke idiom in the showcase set still
+        # holds under --no-interop.
+        env:
+          ST: ${{ github.workspace }}/target/release/stryke
+        run: ./target/release/stryke examples/run_no_interop_demos.stk
       - name: Run ruby interp
         run: ./target/release/stryke examples/ruby/Ruby.stk
       - name: Run Scheme R5RS-subset interpreter (~5k lines, 356 tests)

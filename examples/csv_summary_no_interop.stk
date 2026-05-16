@@ -71,3 +71,12 @@ for my $region (sort keys %by_region) {
 my $total = sum(map { _->{qty} * _->{price} } @rows)
 p ""
 printf "  grand total revenue: %.2f\n", $total
+
+# Built-in self-test (only fires when running the embedded sample, not
+# a piped-in CSV).
+if ($text eq $sample) {
+    die "expected 8 rows in sample"     unless len(@rows) == 8
+    die "expected 3 regions in sample"  unless len(keys %by_region) == 3
+    die "grand total should be 388.25"  unless $total == 388.25
+    p "  ALL PASS"
+}

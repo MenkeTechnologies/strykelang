@@ -20740,4 +20740,43 @@ mod tests {
         parse_ok("our $VERSION = 1.0");
         parse_ok("our @EXPORT = (1, 2, 3)");
     }
+
+    /// Regex binding operators — `=~` (match) and `!~` (negated match).
+    /// Used in roman_numerals_no_interop for input validation.
+    #[test]
+    fn regex_binding_operators_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("p 1 if $s =~ /^\\d+$/");
+        parse_ok("p 0 unless $s !~ /[A-Z]/");
+        parse_ok("my @m = $s =~ /(\\w+)/g");
+    }
+
+    /// Nested data-structure literals — hash of array of hash, the
+    /// shape used by csv_summary_no_interop (`%by_region` is a
+    /// hash of arrays of hashrefs).
+    #[test]
+    fn nested_data_structure_literals_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my %h = (a => [1, 2, 3], b => [4, 5])");
+        parse_ok("my @rows = (+{ x => 1 }, +{ x => 2 })");
+        parse_ok("my %grid = (cells => [+{ row => 1 }, +{ row => 2 }])");
+    }
+
+    /// Anonymous fn with explicit params — `fn ($x, $y) { ... }`.
+    /// Complements the `fn { _0 + _1 }` implicit-positional form.
+    #[test]
+    fn anonymous_fn_with_explicit_params_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $add = fn ($x, $y) { $x + $y }");
+        parse_ok("my $h = fn ($v, %opts) { p $v; p %opts }");
+    }
+
+    /// `package Foo;` and `package Foo::Bar;` declarations — qualified
+    /// namespace setup. Still legal in strict mode.
+    #[test]
+    fn package_declaration_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("package Foo; my $x = 1");
+        parse_ok("package Foo::Bar::Baz; our $VERSION = 0.01");
+    }
 }

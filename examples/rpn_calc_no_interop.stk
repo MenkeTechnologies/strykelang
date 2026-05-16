@@ -55,18 +55,28 @@ if (len(@ARGV) > 0) {
     exit 0
 }
 
-# Demo grid — classic RPN examples.
+# Demo grid — classic RPN examples paired with expected results so the
+# CI runner has a built-in self-test.
 p "── RPN calculator demo ──"
 my @cases = (
-    "3 4 +",                # 7
-    "5 1 2 + 4 * + 3 -",    # 14
-    "10 5 / 2 *",           # 4
-    "2 8 **",               # 256
-    "5 3 min 10 max",       # 5 (min then max)
-    "20 7 %",               # 6
+    +{ expr => "3 4 +",             want =>   7 },
+    +{ expr => "5 1 2 + 4 * + 3 -", want =>  14 },
+    +{ expr => "10 5 / 2 *",        want =>   4 },
+    +{ expr => "2 8 **",            want => 256 },
+    +{ expr => "5 3 min 10 max",    want =>  10 },  # min(5,3)=3, max(3,10)=10
+    +{ expr => "20 7 %",            want =>   6 },
 )
-for my $e (@cases) {
-    my $r = eval { run_rpn($e) }
-    if ($@) { printf "  %-30s -> error: %s\n", $e, $@ }
-    else    { printf "  %-30s -> %s\n",        $e, $r }
+my $fail = 0
+for my $c (@cases) {
+    my $r = eval { run_rpn($c->{expr}) }
+    if ($@) {
+        printf "  %-30s -> error: %s\n", $c->{expr}, $@
+        $fail++
+    } else {
+        my $ok = ($r == $c->{want})
+        $fail++ unless $ok
+        printf "  %-30s -> %s   %s\n", $c->{expr}, $r, $ok ? "" : "FAIL"
+    }
 }
+die "rpn: $fail / " . len(@cases) . " cases failed" if $fail > 0
+p "  ALL PASS"

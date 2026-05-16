@@ -49,6 +49,13 @@ p "── Binary search demo ──"
 p "haystack: (", join(", ", @hay), ")"
 p ""
 printf "  %-8s %s\n", "needle", "index"
+my @expected = (-1, -1, 0, -1, 1, -1, 2, -1, 3, -1, 4, -1, 5, -1, 6, -1)
+my $fail = 0
 for my $n (0:15) {
-    printf "  %-8d %s\n", $n, bsearch_idx($n, @hay) == -1 ? "—" : bsearch_idx($n, @hay)
+    my $got = bsearch_idx($n, @hay)
+    $fail++ if $got != $expected[$n]
+    printf "  %-8d %s\n", $n, $got == -1 ? "—" : $got
 }
+die "bsearch: $fail mismatches against expected table" if $fail > 0
+p ""
+p "  ALL PASS (16 lookups matched expected indices)"
