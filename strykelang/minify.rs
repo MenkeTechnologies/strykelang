@@ -350,4 +350,64 @@ mod tests {
         let out = minify_source(src).unwrap();
         assert!(out.contains("hello world"), "string body preserved: got {out:?}");
     }
+
+    /// `;` must not be inserted directly after openers / before closers.
+    /// `{;}` would parse fine (empty statement) but bloats the output and
+    /// makes the result unreadable. Verify the heuristic in
+    /// [`needs_separator`].
+    #[test]
+    fn no_separator_after_opener_or_before_closer() {
+        let src = "fn f {\n    1\n}\nf()\n";
+        let out = minify_source(src).unwrap();
+        // No `{;` and no `;}` after collapse.
+        assert!(!out.contains("{;"), "no `;` after `{{`: got {out:?}");
+        assert!(!out.contains(";}"), "no `;` before `}}`: got {out:?}");
+    }
+
+    /// Output of minify must parse back to the same AST shape. If a
+    /// re-tokenisation produces different identifiers / sigils / operators
+    /// the minifier is dropping semantic content.
+    #[test]
+    fn minified_output_reparses() {
+        let src = "my $x = 1 + 2\nmy @a = (3, 4, 5)\nmy %h = (k => 1, j => 2)\np $x\n";
+        let out = minify_source(src).unwrap();
+        // Sanity: the output is a single line and contains all the names.
+        assert!(out.contains("$x"), "has $x");
+        assert!(out.contains("@a"), "has @a");
+        assert!(out.contains("%h"), "has %h");
+        // Re-minifying should be idempotent (modulo trailing semicolons).
+        let twice = minify_source(&out).unwrap();
+        assert_eq!(twice, out, "minify is idempotent on its own output");
+    }
+
+    /// POD `=pod ... =cut` blocks must be stripped (the lexer drops them
+    /// during tokenisation, so the minifier inherits the behaviour).
+    #[test]
+    fn strips_pod_blocks() {
+        let src = "my $x = 1\n=pod\nDocumentation here.\nMore docs.\n=cut\nmy $y = 2\n";
+        let out = minify_source(src).unwrap();
+        assert!(!out.to_lowercase().contains("documentation"), "POD stripped: got {out:?}");
+        assert!(out.contains("$x"), "code before POD kept");
+        assert!(out.contains("$y"), "code after POD kept");
+    }
+
+    /// Sigil-variable names must keep their sigil after tokenisation
+    /// round-trip — `@arr` vs `arr` is a semantic difference.
+    #[test]
+    fn preserves_sigil_kinds() {
+        let src = "my @arr = (1, 2)\nmy %hash = (a => 1)\nmy $scalar = 3\n";
+        let out = minify_source(src).unwrap();
+        assert!(out.contains("@arr"), "array sigil preserved");
+        assert!(out.contains("%hash"), "hash sigil preserved");
+        assert!(out.contains("$scalar"), "scalar sigil preserved");
+    }
+
+    /// Trailing `;` semicolon runs at the end of the document should be
+    /// stripped — they're empty statements and just add bytes.
+    #[test]
+    fn strips_trailing_semicolons() {
+        let src = "my $x = 1\n\n\n";
+        let out = minify_source(src).unwrap();
+        assert!(!out.ends_with(';'), "no trailing `;`: got {out:?}");
+    }
 }

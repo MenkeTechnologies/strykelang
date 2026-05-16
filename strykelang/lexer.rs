@@ -3779,4 +3779,72 @@ mod tests {
         assert!(matches!(t[0].0, Token::Ident(ref s) if s == "sub"));
         assert!(matches!(t[1].0, Token::Ident(ref s) if s == "x"));
     }
+
+    /// Regression for the fat-arrow lookahead drift. Every identifier is
+    /// followed by a speculative `skip_whitespace_and_comments` peek for
+    /// `=>`, which advances `self.line` over any intervening newlines.
+    /// Restoring only `self.pos` (the original bug) leaves the line counter
+    /// drifted +1 per newline crossed, so every subsequent statement
+    /// reports a wrong source line and breakpoints on those lines silently
+    /// drop. With the save/restore fix, the line numbers match the source.
+    #[test]
+    fn fat_arrow_lookahead_does_not_drift_line() {
+        let src = "x\ny\nz\n";
+        let mut l = Lexer::new(src);
+        let t = l.tokenize().expect("tokenize");
+        // Token lines should match source lines.
+        assert!(matches!(t[0].0, Token::Ident(ref s) if s == "x"));
+        assert_eq!(t[0].1, 1, "x is on line 1");
+        assert!(matches!(t[1].0, Token::Ident(ref s) if s == "y"));
+        assert_eq!(t[1].1, 2, "y is on line 2");
+        assert!(matches!(t[2].0, Token::Ident(ref s) if s == "z"));
+        assert_eq!(t[2].1, 3, "z is on line 3");
+    }
+
+    /// Specific case from the bug report: a class-body with a typed field
+    /// followed by code. The bug had `=>` lookahead consume the `\n` after
+    /// `Int`, then the recursive next_token / outer tokenize re-process the
+    /// same `\n`, double-incrementing `self.line`. With the fix, statements
+    /// after the class body report their real source lines.
+    #[test]
+    fn class_field_does_not_drift_subsequent_statement_line() {
+        let src = "class Foo {\n    x: Int\n}\nmy $y = 1\np $y\n";
+        let mut l = Lexer::new(src);
+        let t = l.tokenize().expect("tokenize");
+        // Find the `my` token after the class body.
+        let my_line = t
+            .iter()
+            .find_map(|(tok, line)| match tok {
+                Token::Ident(s) if s == "my" => Some(*line),
+                _ => None,
+            })
+            .expect("expected `my` token");
+        assert_eq!(my_line, 4, "my $y = 1 lives on source line 4");
+    }
+
+    /// POD blocks (`=pod ... =cut`) advance `self.line` many lines during
+    /// the skip but the original tokenize loop captured `line` *before*
+    /// calling next_token, then pushed (token, captured_line) — so the
+    /// first token after POD got the pre-POD line instead of its real
+    /// post-skip line. Now next_token stamps `self.token_start_line` after
+    /// the skip and tokenize reads from there.
+    #[test]
+    fn token_after_pod_block_uses_post_skip_line() {
+        let src = "\
+=pod
+big POD
+block here
+=cut
+my $x = 1
+";
+        let mut l = Lexer::new(src);
+        let t = l.tokenize().expect("tokenize");
+        // First non-Eof token is `my`, on source line 5.
+        let (first_tok, first_line) = t
+            .iter()
+            .find(|(tok, _)| !matches!(tok, Token::Eof))
+            .expect("non-empty tokens");
+        assert!(matches!(first_tok, Token::Ident(ref s) if s == "my"));
+        assert_eq!(*first_line, 5, "my $x lives on source line 5 (after POD ends)");
+    }
 }
