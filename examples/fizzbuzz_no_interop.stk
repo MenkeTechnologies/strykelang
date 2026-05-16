@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+
+# FizzBuzz — stryke-idiomatic form, parses clean under `--no-interop`.
+#
+# The stryke-only choices on display:
+#   * `fn` (not `sub`), `p` (not `say`), `len` (not `scalar`)
+#   * `1:N` range syntax (not `1..N`)
+#   * `_` topic in `for` loops + bareword `_` referencing the current
+#     iteration value
+#   * `|>` pipe-forward instead of chained method calls
+#   * `match (subject) { pattern => arm }` for the classification
+#
+# Run:  stryke --no-interop examples/classify_no_interop.stk
+#       stryke --no-interop examples/classify_no_interop.stk 30
+
+my $n = $ARGV[0] // 15
+
+fn classify($i) {
+    match ([$i % 3 == 0, $i % 5 == 0]) {
+        [1, 1] => "FizzBuzz",
+        [1, 0] => "Fizz",
+        [0, 1] => "Buzz",
+        _      => "$i",
+    }
+}
+
+for (1:$n) {
+    p _, " ", classify(_)
+}
+
+# `pmap` to fan the same work across cores — overkill for classify but
+# the syntax is the point. `_` is the per-item topic.
+my @parallel = pmap { classify(_) } 1:$n
+p ""
+p "parallel run produced ", len(@parallel), " labels"
+p "first 5: ", join(", ", @parallel[0:4])

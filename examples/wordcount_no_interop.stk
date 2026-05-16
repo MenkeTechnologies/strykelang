@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+
+# Word-frequency counter — stryke idioms only (`--no-interop` clean).
+#
+# Stryke choices on display:
+#   * `fn`, `p`, `len` (not `sub` / `say` / `scalar`)
+#   * `|>` pipe-forward and `pgrep` parallel filter
+#   * postfix-`for` on a `printf` line — Perl-compat statement modifier
+#   * topic `_` referencing the iteration value in `for` loops
+#
+# Run: echo "the quick brown fox jumps over the lazy dog the fox" \
+#        | stryke --no-interop examples/wordcount_no_interop.stk
+
+my $text = join("\n", <STDIN>)
+die "no input — pipe text on stdin" if len($text) == 0
+
+my @words = split(/\W+/, lc($text)) |> pgrep { len(_) > 0 } _
+
+my %freq
+$freq{_}++ for @words
+
+p "total words : ", len(@words)
+p "unique words: ", len(keys %freq)
+p ""
+p "frequencies (alphabetical):"
+for my $w (sort keys %freq) {
+    printf "  %5d  %s\n", $freq{$w}, $w
+}

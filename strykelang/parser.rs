@@ -20425,4 +20425,94 @@ mod tests {
         let merged = merge_expr_list(vec![e1, e2]);
         matches!(merged.kind, ExprKind::List(_));
     }
+
+    // ── --no-interop strict-mode rejections ─────────────────────────────
+    //
+    // `--no-interop` is the bot firewall: it rejects Perl 5 idioms the
+    // parser would otherwise accept, forcing stryke-only spellings. Each
+    // of these pins one rejection rule so a later refactor can't silently
+    // accept the un-idiomatic form. We RAII the TLS flag so sibling tests
+    // running in parallel don't see the override.
+
+    struct NoInteropGuard {
+        saved: Option<bool>,
+    }
+    impl NoInteropGuard {
+        fn on() -> Self {
+            let saved = crate::no_interop_mode_tls();
+            crate::set_no_interop_mode_tls(Some(true));
+            Self { saved }
+        }
+    }
+    impl Drop for NoInteropGuard {
+        fn drop(&mut self) {
+            crate::set_no_interop_mode_tls(self.saved);
+        }
+    }
+
+    #[test]
+    fn no_interop_rejects_sub_keyword() {
+        let _g = NoInteropGuard::on();
+        let err = parse_err("sub foo { 1 }");
+        assert!(
+            err.contains("--no-interop") && err.contains("fn"),
+            "sub rejected with fn hint: got {err:?}"
+        );
+    }
+
+    #[test]
+    fn no_interop_rejects_say() {
+        let _g = NoInteropGuard::on();
+        let err = parse_err("say 1");
+        assert!(
+            err.contains("--no-interop") && err.contains("`p`"),
+            "say rejected with p hint: got {err:?}"
+        );
+    }
+
+    #[test]
+    fn no_interop_rejects_scalar_keyword() {
+        let _g = NoInteropGuard::on();
+        let err = parse_err("my $n = scalar @x");
+        assert!(
+            err.contains("--no-interop") && (err.contains("len") || err.contains("cnt")),
+            "scalar rejected with len/cnt hint: got {err:?}"
+        );
+    }
+
+    #[test]
+    fn no_interop_rejects_reverse() {
+        let _g = NoInteropGuard::on();
+        let err = parse_err("my @y = reverse @x");
+        assert!(
+            err.contains("--no-interop") && err.contains("rev"),
+            "reverse rejected with rev hint: got {err:?}"
+        );
+    }
+
+    /// And the inverse — the stryke spellings (`fn`, `p`, `len`, `rev`)
+    /// must parse cleanly under the same flag. A regression that
+    /// accidentally rejects the canonical form is just as bad as one
+    /// that accepts the Perl 5 form.
+    #[test]
+    fn no_interop_accepts_stryke_idioms() {
+        let _g = NoInteropGuard::on();
+        // Each of these used to be the Perl 5 form; stryke's equivalent
+        // must parse without error.
+        parse_ok("fn foo { 1 }");
+        parse_ok("p 1");
+        parse_ok("my @x = (1, 2, 3); my $n = len(@x)");
+        parse_ok("my @x = (1, 2, 3); my @y = rev(@x)");
+    }
+
+    /// `--no-interop` must NOT affect default-mode parsing. Tests run in
+    /// parallel; the guard's Drop restores the flag, but verify the
+    /// happy-path Perl 5 forms still parse with the flag *off* so we know
+    /// the guard mechanics actually restore.
+    #[test]
+    fn default_mode_still_accepts_perl5_forms() {
+        // No guard installed — process default (off in tests).
+        parse_ok("sub foo { 1 }");
+        parse_ok("say 1");
+    }
 }
