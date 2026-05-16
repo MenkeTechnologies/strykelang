@@ -1,0 +1,111 @@
+#!/usr/bin/env stryke
+
+# Knuth-Morris-Pratt string search — O(n+m) substring matching with
+# a precomputed failure function. Parses clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len`
+#   * Failure table built first (failure[i] = length of longest
+#     proper prefix of pattern[0..i] that is also a suffix)
+#   * Main loop walks haystack with one pointer, restarts on
+#     mismatch by jumping back through the failure table
+#   * All UDFs namespaced `KMP::*` so they don't shadow stryke
+#     stdlib if it ever grows a builtin substring searcher
+#   * Built-in `die` invariants — every match site has a known
+#     occurrence count, plus a cross-check against `index`
+#
+# Run: stryke --no-interop examples/kmp_no_interop.stk
+
+fn KMP::failure_table($pat) {
+    my @pc = split(//, $pat)
+    my $m  = len(@pc)
+    return [] if $m == 0
+    my @f  = (0) x $m
+    my $k  = 0
+    for my $i (1:$m - 1) {
+        while ($k > 0 && $pc[$k] ne $pc[$i]) {
+            $k = $f[$k - 1]
+        }
+        $k++ if $pc[$k] eq $pc[$i]
+        $f[$i] = $k
+    }
+    \@f
+}
+
+fn KMP::find_all($haystack, $pat) {
+    my @needles
+    my @hc = split(//, $haystack)
+    my @pc = split(//, $pat)
+    my $n = len(@hc)
+    my $m = len(@pc)
+    return \@needles if $m == 0 || $m > $n
+    my $fail_ref = KMP::failure_table($pat)
+    my $q = 0
+    for my $i (0:$n - 1) {
+        while ($q > 0 && $pc[$q] ne $hc[$i]) {
+            $q = $fail_ref->[$q - 1]
+        }
+        $q++ if $pc[$q] eq $hc[$i]
+        if ($q == $m) {
+            push @needles, $i - $m + 1
+            $q = $fail_ref->[$m - 1]
+        }
+    }
+    \@needles
+}
+
+fn KMP::first($haystack, $pat) {
+    my $all = KMP::find_all($haystack, $pat)
+    len(@$all) > 0 ? $all->[0] : -1
+}
+
+# Demo grid — (haystack, pattern, expected first-match index,
+# expected total occurrences).
+my @cases = (
+    +{ hay => "ABABDABACDABABCABAB", pat => "ABABCABAB",  first => 10, count => 1  },
+    +{ hay => "AAAAAA",              pat => "AA",         first =>  0, count => 5  },  # overlapping
+    +{ hay => "GCATCGCAGAGAGTATACAGTACG", pat => "GCAGAGAG", first => 5, count => 1 },
+    +{ hay => "hello world",         pat => "world",      first =>  6, count => 1  },
+    +{ hay => "hello world",         pat => "hello",      first =>  0, count => 1  },
+    +{ hay => "hello world",         pat => "xyz",        first => -1, count => 0  },
+    +{ hay => "ababababab",          pat => "abab",       first =>  0, count => 4  },  # overlapping
+    +{ hay => "abcabcabc",           pat => "abc",        first =>  0, count => 3  },  # disjoint
+    +{ hay => "",                    pat => "x",          first => -1, count => 0  },  # empty hay
+    +{ hay => "hello",               pat => "",           first => -1, count => 0  },  # empty pat
+)
+
+p "── KMP substring-search demo ──"
+my $fail = 0
+for my $c (@cases) {
+    my $first = KMP::first($c->{hay}, $c->{pat})
+    my $all   = KMP::find_all($c->{hay}, $c->{pat})
+    my $cnt   = len(@$all)
+    my $ok    = ($first == $c->{first} && $cnt == $c->{count})
+    $fail++ unless $ok
+    printf "  hay=%-26s pat=%-10s first=%-3d cnt=%-2d expect=(%d,%d)  %s\n",
+        "\"" . $c->{hay} . "\"",
+        "\"" . $c->{pat} . "\"",
+        $first, $cnt, $c->{first}, $c->{count},
+        $ok ? "" : "FAIL"
+}
+die "$fail / " . len(@cases) . " KMP cases failed" if $fail > 0
+
+# Cross-check: KMP::first must agree with stryke's builtin index().
+for my $c (@cases) {
+    next if len($c->{pat}) == 0   # builtin behaves differently on empty pat
+    my $kmp = KMP::first($c->{hay}, $c->{pat})
+    my $idx = index($c->{hay}, $c->{pat})
+    die "KMP::first disagrees with builtin index" unless $kmp == $idx
+}
+
+# Hits are sorted and distinct.
+for my $c (@cases) {
+    my $hits = KMP::find_all($c->{hay}, $c->{pat})
+    next if len(@$hits) < 2
+    for my $i (1:len(@$hits) - 1) {
+        die "hits not sorted" unless $hits->[$i] > $hits->[$i - 1]
+    }
+}
+
+p ""
+p "  ALL PASS (10 cases + cross-check vs index + sorted-distinct invariant)"
