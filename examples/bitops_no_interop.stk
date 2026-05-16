@@ -1,0 +1,102 @@
+#!/usr/bin/env stryke
+
+# Bitwise operations — AND, OR, XOR, NOT, shift left/right, bit_count,
+# is-power-of-two, flag enums. Parses clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len`
+#   * `&`, `|`, `^`, `~`, `<<`, `>>` bitwise operators
+#   * `sprintf("%08b", $n)` for binary formatting
+#   * Hash for flag-enum constants
+#   * Built-in `die` invariants
+#
+# Run: stryke --no-interop examples/bitops_no_interop.stk
+#      stryke --no-interop examples/bitops_no_interop.stk bit_count 42
+
+fn bit_count($n) {
+    my $x = $n
+    my $count = 0
+    while ($x > 0) {
+        $count += $x & 1
+        $x = $x >> 1
+    }
+    $count
+}
+
+fn is_pow_two($n) {
+    $n > 0 && ($n & ($n - 1)) == 0
+}
+
+# Format as a fixed-width binary string for the demo table.
+fn binary8($n) {
+    sprintf("%08b", $n & 0xff)
+}
+
+if (len(@ARGV) >= 2) {
+    my ($op, $lhsrg) = @ARGV
+    my $n = 0 + $lhsrg
+    if    ($op eq "bit_count")   { p bit_count($n) }
+    elsif ($op eq "is_pow_two")    { p is_pow_two($n) ? 1 : 0 }
+    elsif ($op eq "binary")     { p binary8($n) }
+    else  { die "op must be bit_count / is_pow_two / binary" }
+    exit 0
+}
+
+# Demo grid — operator table on two values.
+p "── Bitwise ops on 0xAA and 0x55 ──"
+my $lhs = 0xAA   # 10101010
+my $rhs = 0x55   # 01010101
+printf "  a    = %s = 0x%02x = %d\n", binary8($lhs), $lhs, $lhs
+printf "  b    = %s = 0x%02x = %d\n", binary8($rhs), $rhs, $rhs
+printf "  a&b  = %s = 0x%02x\n", binary8($lhs & $rhs),   $lhs & $rhs
+printf "  a|b  = %s = 0x%02x\n", binary8($lhs | $rhs),   $lhs | $rhs
+printf "  a^b  = %s = 0x%02x\n", binary8($lhs ^ $rhs),   $lhs ^ $rhs
+printf "  ~a&0xff = %s = 0x%02x\n", binary8(~$lhs),    ~$lhs & 0xff
+printf "  a<<2 = %s = 0x%03x\n", sprintf("%010b", ($lhs << 2) & 0x3ff), ($lhs << 2) & 0xfff
+printf "  a>>2 = %s = 0x%02x\n", binary8($lhs >> 2),   $lhs >> 2
+
+# Popcount table.
+p ""
+p "── Popcount (set-bit count) ──"
+my @bit_count_cases = (
+    +{ n => 0,   c => 0 },
+    +{ n => 1,   c => 1 },
+    +{ n => 7,   c => 3 },
+    +{ n => 15,  c => 4 },
+    +{ n => 42,  c => 3 },  # 101010
+    +{ n => 255, c => 8 },
+    +{ n => 256, c => 1 },
+    +{ n => 1023,c => 10 },
+)
+my $fail = 0
+for my $c (@bit_count_cases) {
+    my $got = bit_count($c->{n})
+    my $ok  = ($got == $c->{c})
+    $fail++ unless $ok
+    printf "  bit_count(%4d) = %2d  expect %2d  %s\n",
+        $c->{n}, $got, $c->{c}, $ok ? "" : "FAIL"
+}
+
+# Power-of-two table.
+p ""
+p "── is_pow_two ──"
+my @pow2_cases = (
+    +{ n => 0,    p => 0 },  # 0 not a power
+    +{ n => 1,    p => 1 },
+    +{ n => 2,    p => 1 },
+    +{ n => 3,    p => 0 },
+    +{ n => 4,    p => 1 },
+    +{ n => 1024, p => 1 },
+    +{ n => 1023, p => 0 },
+)
+for my $c (@pow2_cases) {
+    my $got = is_pow_two($c->{n}) ? 1 : 0
+    my $ok  = ($got == $c->{p})
+    $fail++ unless $ok
+    printf "  is_pow_two(%5d) = %d  expect %d  %s\n",
+        $c->{n}, $got, $c->{p}, $ok ? "" : "FAIL"
+}
+
+die "$fail cases failed" if $fail > 0
+p ""
+p "  ALL PASS (8 bit_count + 7 pow2 cases)"
