@@ -21160,4 +21160,58 @@ mod tests {
         parse_ok("my $h = +{a=>1}; my @k = keys %{$h}");
         parse_ok("my $h = +{a=>+{b=>1}}; my @k = keys %{$h->{a}}");
     }
+
+    /// Namespaced fn definition — `fn Module::method($x) { ... }`.
+    /// All UDFs in the examples/ demos use this form so future stryke
+    /// stdlib additions don't shadow user code (or vice versa).
+    #[test]
+    fn namespaced_fn_decl_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("fn Module::method($x) { $x * 2 }");
+        parse_ok("fn Foo::Bar::helper { 42 }");
+        parse_ok("fn Demo::run { p \"running\" }");
+    }
+
+    /// Calling a namespaced fn — `Module::method($arg)`. Also used as
+    /// a method on an explicit invocant in some contexts.
+    #[test]
+    fn namespaced_fn_call_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("fn Module::add($x, $y) { $x + $y } p Module::add(2, 3)");
+        // `caller` itself is a stryke builtin — use a namespaced caller
+        // to avoid the clash.
+        parse_ok(
+            "fn Foo::Bar::baz { 1 } fn Demo::main { Foo::Bar::baz() + Foo::Bar::baz() }",
+        );
+    }
+
+    /// `index($haystack, $needle)` builtin — the canonical string
+    /// substring-position lookup that KMP cross-checks against.
+    #[test]
+    fn index_builtin_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $i = index(\"hello world\", \"world\")");
+        parse_ok("my $i = index($s, $pat, 0)");
+    }
+
+    /// `for my $i (rev 1:N)` — reverse iteration over a colon range.
+    /// Already pinned in `rev_over_range_parses` but here for the
+    /// `rev (list)` form on an array literal.
+    #[test]
+    fn rev_on_array_literal_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my @r = rev (1, 2, 3, 4)");
+        parse_ok("for my $x (rev (\"a\", \"b\", \"c\")) { p $x }");
+    }
+
+    /// Numeric comparison + string comparison side by side — the
+    /// pattern used by sort blocks with secondary tie-breaking
+    /// (numeric primary, string secondary). `$a` / `$b` are reserved
+    /// under --no-interop; use `$_0` / `$_1` for sort comparator args.
+    #[test]
+    fn numeric_and_string_comparison_in_one_expr_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $r = $_0 <=> $_1 || $name cmp $other");
+        parse_ok("p 1 if $x == $y && $name eq \"foo\"");
+    }
 }
