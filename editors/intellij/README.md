@@ -27,7 +27,15 @@ parallel scripting language (Rust bytecode VM + Cranelift JIT + Rayon).
 ### LSP
 - LSP client wired to `st --lsp` over stdio. Server capabilities:
   - `completion` with trigger characters `$` `@` `%` `:` `_` and all
-    letters, plus `resolveProvider`
+    letters, plus `resolveProvider`. Includes **60+ snippet templates**
+    keyed by prefix: control flow (`if`, `ifelse`, `ifelsif`, `elsif`,
+    `else`, `while`, `until`, `for`, `forrange`, `foreach`, `do`,
+    `match`, `try`, `given`), declarations (`my`, `fn`, `sub`, `class`,
+    `struct`, `enum`, `trait`), parallel primitives (`pmap`, `pmaps`,
+    `pgrep`, `pfor`, `preduce`, ...), phase blocks (`BEGIN`, `END`),
+    module setup (`use`, `strict`, `shebang`, `main`), web / SVG / system
+    / git scaffolds, and a full `test` file template. Tab walks the
+    `${1:...}` placeholders to the final `${0}` cursor.
   - `hover` (full markdown cards from `lsp_docs_domains.rs`; falls back to
     category-stub for any builtin in `CATEGORY_MAP` that lacks a hand-
     written card)
@@ -67,12 +75,21 @@ parallel scripting language (Rust bytecode VM + Cranelift JIT + Rayon).
   - Function breakpoints (Run → View Breakpoints → +)
   - Continue / Step Over / Step Into / Step Out / Pause / Run to Cursor
   - **Frames** with file:line per frame, source navigation
-  - **Variables panel** with user-defined vars sorted to top, stryke
-    built-ins (`$stryke::VERSION`, `%ENV`, `%term`, `@INC`, …) at the
-    bottom, `__synthetic__` compiler internals hidden
+  - **Variables panel** sorted in three tiers — user `my` vars on top,
+    magic block params (`$_`, `$_0`, `$_1`, …, `$a`, `$b`) in the middle,
+    stryke built-ins (`$stryke::VERSION`, `%ENV`, `%term`, `@INC`, …) at
+    the bottom. `__synthetic__` compiler internals are hidden.
   - **Recursive hash / array expansion** — `[N] (key => val, …)` summary
     with disclosure triangles, click to drill in to `key = value` rows,
-    works to arbitrary depth (capped at 12 to avoid cycles)
+    works to arbitrary depth (capped at 12 to avoid cycles).
+  - **Rich object drill-down** for user-defined types and sketches:
+    `StructInstance` / `ClassInstance` (one row per field, visibility
+    marker `+` / `#` / `-` for class fields, `__class` and `__isa`
+    metadata rows), `EnumInstance` (variant + carried data), `Set`
+    (`Set(N) {a, b, c}` with one row per element), and every sketch type
+    (`TDigestSketch` exposes count / min / max / mean / sum / p50-p99 /
+    compression; `BloomFilter` exposes inserted / bit_count / k / fpr;
+    `HllSketch` / `CmsSketch` / `TopKSketch` similarly).
   - **Evaluate** dialog — pure expressions (`55 + 3`, `sqrt(2)`, `len(@INC)`)
     plus expressions using current frame's scalars (`$a * $b`) via prelude
     injection into a `st -e` subprocess
@@ -183,12 +200,22 @@ Plugin side (`com.menketechnologies.stryke.dap`):
 
 Stryke side (`strykelang/dap.rs` + `strykelang/debugger.rs`):
 - `Debugger` state machine (breakpoints, step modes, call depth)
-  shared between TTY and DAP front-ends.
+  shared between TTY and DAP front-ends. Step-over depends on
+  `enter_sub` / `leave_sub` being called at every VM call dispatch site
+  (`vm.rs:2192..` and `vm_helper.rs:19216..`) so `call_depth` matches
+  the program's logical call stack — without these hooks step-over
+  drops into UDFs instead of skipping them.
+- Same-line guard tracks both `last_stop_line` and `last_stop_depth`
+  (`debugger.rs:38..`). Without the depth half, step-in fires on the
+  same source line as the call site (first opcode of the call setup
+  has the same line as `my $r = foo()`), requiring the user to click
+  step-in twice to actually enter `foo`.
 - `set_topic` for implicit `for (@arr) { … }` loops so `$_` / `$_0` /
   `_` / `_0` all alias.
 - Snapshot capture (`capture_locals_with_map`) walks the scope, builds
-  per-variable refs for hashes / arrays, recursively expanding their
-  children into a `var_ref_map` (depth-capped, count-capped) so the DAP
+  per-variable refs for hashes / arrays / structs / classes / enums /
+  sets / sketches, recursively expanding their children into a
+  `var_ref_map` (depth-capped at 12, count-capped at 2000) so the DAP
   `variables` request resolves any ref to its rows.
 - stdout/stderr autoflush + flush on every pause so output lands in the
   Console before the suspend UI takes over.
