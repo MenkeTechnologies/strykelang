@@ -1,0 +1,195 @@
+#!/usr/bin/env stryke
+
+# Genetic-algorithm demo: evolve a population of bit strings toward
+# a target string. Classic toy GA. Target: "TO_BE_OR_NOT_TO_BE"
+#
+# Demonstrates:
+#   * Random initialization of population.
+#   * Fitness = char-by-char match count.
+#   * Tournament selection.
+#   * One-point crossover.
+#   * Point mutation with low rate.
+#   * Elitism: top-k kept verbatim.
+#   * t-digest on per-generation best fitness.
+#   * TopK SpaceSaving on "winning" characters by position.
+#   * HLL distinct best-found genomes.
+
+# ── target ─────────────────────────────────────────────────────────
+
+my $TARGET = "TO_BE_OR_NOT_TO_BE";
+my $TGT_LEN = length($TARGET);
+
+# ── parameters ─────────────────────────────────────────────────────
+
+my $POP    = 200;
+my $GENS   = 60;
+my $MUT    = 0.05;     # 5% per-char mutation rate
+my $TOURN  = 5;        # tournament size
+my $ELITE  = 5;        # top-K kept across generations
+my $ALPHA  = "ABCDEFGHIJKLMNOPQRSTUVWXYZ_";
+
+# ── sketches ──────────────────────────────────────────────────────
+
+my $td_gen = t_digest(100);
+my $tk_pos = topk(20);
+my $hll_g  = hll(12);
+
+# ── random helpers ─────────────────────────────────────────────────
+
+fn Demo::GA::rand_char() {
+    my $i = int(rand(length($ALPHA)));
+    substr($ALPHA, $i, 1)
+}
+
+fn Demo::GA::rand_genome() {
+    my @chars;
+    for my $i (1:$TGT_LEN) {
+        push @chars, Demo::GA::rand_char();
+    }
+    join("", @chars)
+}
+
+# ── fitness: number of matching chars (0..TGT_LEN) ────────────────
+
+fn Demo::GA::fitness($g) {
+    my $score = 0;
+    for my $i (0:$TGT_LEN - 1) {
+        $score++ if substr($g, $i, 1) eq substr($TARGET, $i, 1);
+    }
+    $score
+}
+
+# ── tournament selection: best of K random ────────────────────────
+
+fn Demo::GA::tournament($pop_ref) {
+    my $best;
+    my $best_fit = -1;
+    for my $i (1:$TOURN) {
+        my $idx = int(rand(len(@$pop_ref)));
+        my $g = $pop_ref->[$idx];
+        my $f = Demo::GA::fitness($g);
+        if ($f > $best_fit) {
+            $best = $g;
+            $best_fit = $f;
+        }
+    }
+    $best
+}
+
+# ── crossover: one-point ──────────────────────────────────────────
+
+fn Demo::GA::crossover($parent_a, $parent_b) {
+    my $point = int(rand($TGT_LEN));
+    substr($parent_a, 0, $point) . substr($parent_b, $point)
+}
+
+# ── mutation ──────────────────────────────────────────────────────
+
+fn Demo::GA::mutate($g) {
+    my @chars = split //, $g;
+    for my $i (0:len(@chars) - 1) {
+        if (rand() < $MUT) {
+            $chars[$i] = Demo::GA::rand_char();
+        }
+    }
+    join("", @chars)
+}
+
+# ── seed population ───────────────────────────────────────────────
+
+srand(42);   # deterministic run
+my @pop;
+for my $i (1:$POP) {
+    push @pop, Demo::GA::rand_genome();
+}
+
+print "genetic algorithm demo\n";
+print "target: \"$TARGET\" (len=$TGT_LEN, pop=$POP, gens=$GENS)\n";
+print "─" x 60, "\n";
+
+my $best_ever_fit = -1;
+my $best_ever     = "";
+my $best_gen      = 0;
+
+# ── evolve ────────────────────────────────────────────────────────
+
+for my $gen (1:$GENS) {
+    my $t0 = now_ns();
+
+    # Evaluate fitness for the whole pop in parallel.
+    my @fits = pmap { Demo::GA::fitness($_) } @pop;
+
+    # Sort by fitness desc.
+    my @ranked = map { $_->[1] }
+                 sort { $_1->[0] <=> $_0->[0] }
+                 map { [$fits[$_], $pop[$_]] }
+                 (0:len(@pop) - 1);
+
+    my $cur_best_fit = Demo::GA::fitness($ranked[0]);
+    my $cur_best     = $ranked[0];
+
+    td_add($td_gen, $cur_best_fit);
+    hll_add($hll_g, $cur_best);
+
+    for my $i (0:$TGT_LEN - 1) {
+        if (substr($cur_best, $i, 1) eq substr($TARGET, $i, 1)) {
+            topk_add($tk_pos, "pos-$i");
+        }
+    }
+
+    if ($cur_best_fit > $best_ever_fit) {
+        $best_ever_fit = $cur_best_fit;
+        $best_ever     = $cur_best;
+        $best_gen      = $gen;
+    }
+
+    if ($gen % 10 == 0 || $gen == 1 || $cur_best_fit == $TGT_LEN) {
+        printf("  gen %3d  best=%-22s fit=%2d/%d  best_ever=%2d (gen %d)\n",
+               $gen, $cur_best, $cur_best_fit, $TGT_LEN,
+               $best_ever_fit, $best_gen);
+    }
+
+    last if $cur_best_fit == $TGT_LEN;
+
+    # Build next pop: elitism + breed.
+    my @next_pop;
+    for my $i (0:$ELITE - 1) {
+        push @next_pop, $ranked[$i];
+    }
+    while (len(@next_pop) < $POP) {
+        my $parent_a = Demo::GA::tournament(\@pop);
+        my $parent_b = Demo::GA::tournament(\@pop);
+        my $child    = Demo::GA::crossover($parent_a, $parent_b);
+        $child = Demo::GA::mutate($child);
+        push @next_pop, $child;
+    }
+    @pop = @next_pop;
+}
+
+# ── summary ────────────────────────────────────────────────────────
+
+print "\nbest ever: \"$best_ever\" (fitness $best_ever_fit/$TGT_LEN at gen $best_gen)\n";
+my $hits = $best_ever eq $TARGET ? "PERFECT MATCH" : "partial match";
+print "result: $hits\n";
+
+# ── per-position-hit ranking ──────────────────────────────────────
+
+print "\nmost-frequently-correct positions (TopK):\n";
+my @top = topk_top($tk_pos, 6);
+for my $p (@top) {
+    printf("  %-7s correct_gens=%d\n", $p->[0], $p->[1]);
+}
+
+# ── distinct genomes seen as best ─────────────────────────────────
+
+my $hll_n = hll_count($hll_g);
+printf("\ndistinct best-of-generation genomes seen: HLL=%.1f\n", $hll_n);
+
+# ── per-gen fitness distribution ──────────────────────────────────
+
+print "\nbest-fitness distribution across generations:\n";
+printf("  p10 = %.1f\n", td_quantile($td_gen, 0.10));
+printf("  p50 = %.1f\n", td_quantile($td_gen, 0.50));
+printf("  p90 = %.1f\n", td_quantile($td_gen, 0.90));
+
+print "\ngenetic algorithm done\n";
