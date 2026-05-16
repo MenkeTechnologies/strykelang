@@ -5742,6 +5742,93 @@ Severity: **bug** (P2; breaks any "self-identification" or
 log-tagging idiom that relies on `__PACKAGE__`).
 
 
+## BUG-257 — `$\`` and `$'` regex pre/post-match vars not parseable
+
+```sh
+$ s -e 'my $s = "abc"; $s =~ /b/; print $`'
+Expected variable name after $ at -e line 1.
+```
+
+In Perl, `$\`` (prematch) and `$'` (postmatch) are special punctuation
+variables populated after a successful regex match. Stryke's lexer
+doesn't recognize `\`` or `'` as valid variable-name characters, so
+attempting to use them is a parse-time syntax error.
+
+Workaround: use the Perl 5.18+ named forms, which stryke DOES support:
+
+```stryke
+$s =~ /middle/;
+my $pre  = ${^PREMATCH};    # works
+my $post = ${^POSTMATCH};   # works
+my $whole = ${^MATCH};      # works (or `$&`)
+```
+
+Pin: `prematch_via_caret_prematch_form`,
+`postmatch_via_caret_postmatch_form` in
+`tests/suite/regex_match_vars_pin.rs`.
+
+Severity: **polish** (modern named forms work; only legacy
+punctuation form is missing).
+
+
+## BUG-258 — `m//` in list context returns boolean, not captures
+
+```sh
+$ s -e 'my @c = ("alice=30" =~ /^(\w+)=(\d+)/); print join("|", @c), "\n"'
+1
+```
+
+In Perl, `m//` in list context returns the capture groups as a list
+(or empty list if no match). The classic idiom is:
+
+```perl
+my ($key, $val) = ($s =~ /^(\w+)=(\d+)/);
+```
+
+Stryke returns just `(1)` (the boolean match result wrapped in a
+list of length 1), breaking destructuring. The destructured `$val`
+becomes `undef`.
+
+Workaround: match first, then read `$1, $2, ...`:
+
+```stryke
+$s =~ /^(\w+)=(\d+)/;
+my ($key, $val) = ($1, $2);
+```
+
+Pin: `list_context_match_returns_boolean_per_bug_258`,
+`captures_via_numbered_vars_after_match` in
+`tests/suite/regex_match_vars_pin.rs`.
+
+Severity: **bug** (P1; breaks one of the most common Perl regex
+idioms; silent destruct-to-undef makes failures very hard to spot).
+
+
+## BUG-259 — Bitwise shift by amount >= 64 panics
+
+```sh
+$ s -e 'print (0 << 100), "\n"'
+thread 'main' panicked at strykelang/vm.rs:4079:56:
+attempt to shift left with overflow
+```
+
+In Perl, shifting by any amount >= the width is defined (0 for left
+shift of any non-mega value past 64; sign-extended for negative
+right-shifted past width). Stryke's VM uses Rust's checked shift,
+which panics on `shift_amount >= 64` for i64.
+
+Workaround: clamp the shift amount before applying.
+
+```stryke
+my $shift = $candidate < 64 ? $candidate : 63;
+my $r = 1 << $shift;
+```
+
+Severity: **bug** (P2; uncatchable Rust panic on a defined Perl
+operation; mainly affects bit-manipulation code that loops over
+positions without bounds-checking).
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't

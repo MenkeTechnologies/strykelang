@@ -191,3 +191,5 @@ demo_runs_no_interop!(demo_genetic_algorithm,     "examples/genetic_algorithm.st
 demo_runs_no_interop!(demo_barcode_scanner,       "examples/barcode_scanner.stk");
 demo_runs_no_interop!(demo_bingo_simulator,       "examples/bingo_simulator.stk");
 demo_runs_no_interop!(demo_port_scanner_sim,      "examples/port_scanner_sim.stk");
+demo_runs_no_interop!(demo_tax_calculator,        "examples/tax_calculator.stk");
+demo_runs_no_interop!(demo_crc32_checksum,        "examples/crc32_checksum.stk");
