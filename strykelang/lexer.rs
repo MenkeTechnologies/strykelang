@@ -25,6 +25,13 @@ pub struct Lexer {
     input: Vec<char>,
     pos: usize,
     pub line: usize,
+    /// Line where the most recently-returned token starts. Set by
+    /// [`Self::next_token`] right after its leading
+    /// `skip_whitespace_and_comments` call so the value reflects the
+    /// **emitted** token's source position even when the call recursed
+    /// through a POD / heredoc skip (which advances `self.line` many
+    /// lines before producing the real token). Read by [`Self::tokenize`].
+    pub token_start_line: usize,
     /// Tracks whether the last token was a term (value/variable/close-delim)
     /// to disambiguate `/` as division vs regex and `{` as hash-ref vs block.
     last_was_term: bool,
@@ -67,6 +74,7 @@ impl Lexer {
             input: input.chars().collect(),
             pos: 0,
             line: 1,
+            token_start_line: 1,
             last_was_term: false,
             last_was_arrow: false,
             prev_arrow: false,
@@ -1497,6 +1505,11 @@ impl Lexer {
 
     pub fn next_token(&mut self) -> PerlResult<Token> {
         self.skip_whitespace_and_comments();
+        // Stamp the start line for [`Self::tokenize`]. Recursive calls
+        // through POD / heredoc skip will overwrite this with the post-
+        // skip line, so the emitted token always reports the source line
+        // it actually lives on.
+        self.token_start_line = self.line;
 
         if self.pos >= self.input.len() {
             return Ok(Token::Eof);
@@ -2296,20 +2309,24 @@ impl Lexer {
                         }
                         // `qw` followed by `=>` is an autoquoted hash key, not qw().
                         let start_pos = self.pos;
+                        let start_line = self.line;
                         self.skip_whitespace_only();
                         if let Some(c) = self.peek() {
                             if c == '=' && self.peek_at(1) == Some('>') {
                                 self.pos = start_pos;
+                                self.line = start_line;
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(ident));
                             }
                             if matches!(c, ';' | ',' | ')' | ']' | '}' | '\n') {
                                 self.pos = start_pos;
+                                self.line = start_line;
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(ident));
                             }
                         }
                         self.pos = start_pos; // restore for read_qw
+                        self.line = start_line;
                         let tok = self.read_qw()?;
                         self.last_was_term = true;
                         return Ok(tok);
@@ -2324,17 +2341,20 @@ impl Lexer {
                         // Also treat as identifier if followed by terminators like `;`, `,`, `)`, etc.
                         // Must check AFTER skipping whitespace to handle `q => 5`.
                         let start_pos = self.pos;
+                        let start_line = self.line;
                         self.skip_whitespace_only();
                         if let Some(c) = self.peek() {
                             // `=` followed by `>` is fat comma — `q` is a bareword key
                             if c == '=' && self.peek_at(1) == Some('>') {
                                 self.pos = start_pos; // restore position
+                                self.line = start_line;
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(ident));
                             }
                             // Other terminators: `q` is an identifier
                             if matches!(c, ';' | ',' | ')' | ']' | '}' | '\n') {
                                 self.pos = start_pos;
+                                self.line = start_line;
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(ident));
                             }
@@ -2368,15 +2388,18 @@ impl Lexer {
                         }
                         // `qx` followed by `=>` is an autoquoted hash key.
                         let start_pos = self.pos;
+                        let start_line = self.line;
                         self.skip_whitespace_only();
                         if let Some(c) = self.peek() {
                             if c == '=' && self.peek_at(1) == Some('>') {
                                 self.pos = start_pos;
+                                self.line = start_line;
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(ident));
                             }
                             if matches!(c, ';' | ',' | ')' | ']' | '}' | '\n') {
                                 self.pos = start_pos;
+                                self.line = start_line;
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(ident));
                             }
@@ -2403,15 +2426,18 @@ impl Lexer {
                         }
                         // `qr` followed by `=>` is an autoquoted hash key.
                         let start_pos = self.pos;
+                        let start_line = self.line;
                         self.skip_whitespace_only();
                         if let Some(c) = self.peek() {
                             if c == '=' && self.peek_at(1) == Some('>') {
                                 self.pos = start_pos;
+                                self.line = start_line;
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(ident));
                             }
                             if matches!(c, ';' | ',' | ')' | ']' | '}' | '\n') {
                                 self.pos = start_pos;
+                                self.line = start_line;
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(ident));
                             }
@@ -2461,20 +2487,24 @@ impl Lexer {
                         // `m` followed by terminators is a bareword, not match operator.
                         // Must check AFTER skipping whitespace to handle `m => "val"`.
                         let start_pos = self.pos;
+                        let start_line = self.line;
                         self.skip_whitespace_only();
                         if let Some(d) = self.peek() {
                             if d == '=' && self.peek_at(1) == Some('>') {
                                 self.pos = start_pos;
+                                self.line = start_line;
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(ident));
                             }
                             if matches!(d, ';' | ',' | ')' | ']' | '}' | '>' | ':' | '\n') {
                                 self.pos = start_pos;
+                                self.line = start_line;
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(ident));
                             }
                         }
                         self.pos = start_pos;
+                        self.line = start_line;
                         // m/pattern/flags — try parsing as regex, but backtrack if
                         // unterminated (handles thread stages where `/m/` is a grep filter)
                         if self.suppress_m_regex == 0 {
@@ -2547,25 +2577,30 @@ impl Lexer {
                         // bareword `s` alone in struct fields, list literals, and
                         // function args.
                         let start_pos = self.pos;
+                        let start_line = self.line;
                         self.skip_whitespace_only();
                         if let Some(d) = self.peek() {
                             if d == '=' && self.peek_at(1) == Some('>') {
                                 self.pos = start_pos;
+                                self.line = start_line;
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(ident));
                             }
                             if matches!(d, ';' | ')' | ']' | '}' | '>' | ':' | '\n') {
                                 self.pos = start_pos;
+                                self.line = start_line;
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(ident));
                             }
                             if d == ',' && !self.lookahead_is_comma_delim_subst() {
                                 self.pos = start_pos;
+                                self.line = start_line;
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(ident));
                             }
                         }
                         self.pos = start_pos;
+                        self.line = start_line;
                         // s/pattern/replacement/flags
                         if let Some(delim) = self.peek() {
                             if !delim.is_alphanumeric() && delim != '_' && delim != ' ' {
@@ -2668,20 +2703,24 @@ impl Lexer {
                         }
                         // Now skip whitespace to check for `=>` or `=`
                         let start_pos = self.pos;
+                        let start_line = self.line;
                         self.skip_whitespace_only();
                         if let Some(d) = self.peek() {
                             // `=` alone (not `==` comparison) means assignment — y is an identifier
                             if d == '=' && self.peek_at(1) != Some('=') {
                                 self.pos = start_pos;
+                                self.line = start_line;
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(ident));
                             }
                         }
                         self.pos = start_pos;
+                        self.line = start_line;
                         // Check for function signature pattern: y(...) { — this is `fn y`, not tr
                         if self.peek() == Some('(') {
                             // Scan ahead to see if there's ) followed by {
                             let scan_pos = self.pos;
+                            let scan_line = self.line;
                             self.advance(); // skip (
                             let mut depth = 1;
                             while depth > 0 {
@@ -2703,6 +2742,7 @@ impl Lexer {
                             self.skip_whitespace_only();
                             let is_func_def = self.peek() == Some('{');
                             self.pos = scan_pos;
+                            self.line = scan_line;
                             if is_func_def {
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(ident));
@@ -2740,15 +2780,25 @@ impl Lexer {
                     _ => {}
                 }
 
-                // Fat arrow lookahead: ident followed by => is a string
+                // Fat arrow lookahead: ident followed by => is a string.
+                // CRITICAL: save AND restore `self.line` too. `skip_whitespace_and_comments`
+                // increments `self.line` for each `\n` it skips, and restoring only
+                // `self.pos` leaves the line counter drifted by N. The drift bleeds into
+                // every subsequent token (every `class { field\n field\n }` line shift
+                // appearing on `my` / `p` / etc. after the class, and bytecode `lines[]`
+                // metadata that no longer matches the source — breaking the DAP debugger
+                // since BPs key off original line numbers).
                 let saved_pos2 = self.pos;
+                let saved_line2 = self.line;
                 self.skip_whitespace_and_comments();
                 if self.peek() == Some('=') && self.peek_at(1) == Some('>') {
                     self.pos = saved_pos2;
+                    self.line = saved_line2;
                     self.last_was_term = true;
                     return Ok(Token::Ident(ident));
                 }
                 self.pos = saved_pos2;
+                self.line = saved_line2;
 
                 // Perl: `x` is the string-repetition infix operator only after a complete term.
                 // After `sub`, `package`, `(`, etc. a term is expected — bare `x` must be an
@@ -2983,13 +3033,14 @@ impl Lexer {
     pub fn tokenize(&mut self) -> PerlResult<Vec<(Token, usize)>> {
         let mut tokens = Vec::new();
         loop {
-            // Skip whitespace/comments first so `self.line` reflects the
-            // line where the upcoming token *starts*, not where the previous
-            // token ended.  `next_token()` calls `skip_whitespace_and_comments`
-            // again internally, but that second call is a harmless no-op.
-            self.skip_whitespace_and_comments();
-            let line = self.line;
+            // `next_token` internally skips whitespace + POD / heredoc and
+            // stamps `self.token_start_line` to the line where the emitted
+            // token actually starts. Use that, not a pre-call snapshot of
+            // `self.line` — POD blocks can advance the line counter by
+            // many lines before the real token is produced (see
+            // `token_start_line` doc).
             let tok = self.next_token()?;
+            let line = self.token_start_line;
             if self.last_was_bare_positional {
                 self.bare_positional_indices.insert(tokens.len());
             }

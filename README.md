@@ -230,6 +230,8 @@ stryke serve 3000 -e '"hello " . $req->{path}'  # one-liner HTTP server
 stryke build script.stk -o myapp             # bake into a standalone binary ([0x0D])
 stryke fmt -i .                              # format all .stk files recursively in place
 stryke fmt lib/utils.stk                     # print formatted source to stdout
+stryke minify app.stk                        # one-liner output (strip comments / POD, collapse newlines → `;`)
+stryke minify -i lib/*.stk                   # minify in place — output still parses to the same AST
 stryke check *.stk                           # parse + compile without executing (CI/editor)
 stryke disasm script.stk                     # disassemble bytecode (learning/debugging)
 stryke profile script.stk                    # run with profiling, structured output
@@ -946,6 +948,7 @@ stryke-specific long flags:
 | `doc [TOPIC]` | Interactive reference book with vim-style navigation (`stryke doc`, `stryke doc pmap`, `stryke doc --toc`) |
 | `serve [PORT] [SCRIPT]` | HTTP server (default port 8000): static files (`stryke serve`), script (`stryke serve 8080 app.stk`), one-liner (`stryke serve 3000 -e 'EXPR'`) |
 | `fmt [-i] FILE...` | Format source files in place or to stdout (`stryke fmt -i .` formats all recursively) |
+| `minify [-i] FILE...` | Strip comments / POD / blank lines and collapse statements onto a single line with `;` separators. Output still parses to the same AST as the input. |
 | `check FILE...` | Parse + compile without executing; report errors with `file:line:col` (CI/editor integration) |
 | `disasm FILE` | Disassemble bytecode to stderr (learning the VM, debugging perf) |
 | `profile [--flame] [--json] FILE` | Run with profiling; `--flame` generates SVG, `-o FILE` writes to file |
@@ -2623,7 +2626,7 @@ Wire it into VS Code, JetBrains, or any LSP-aware editor by pointing the client 
 For JetBrains IDEs (RustRover, IDEA Ultimate, GoLand, PyCharm Pro, WebStorm, RubyMine, PhpStorm, CLion, Rider, DataGrip, Aqua) there is a first-class plugin under [`editors/intellij/`](editors/intellij/):
 
 - `.stk` file association, **44-slot color scheme**, hand-rolled lexer with finer-grained token categories (declaration vs control keywords, sigil variants, topic / block-param / special-var splits, pipe / arrow / range / regex-bind operators)
-- **LSP client** wired to `stryke --lsp` — completion, hover (full markdown cards), goto / refs / rename, semantic tokens, signature help, code actions, diagnostics
+- **LSP client** wired to `stryke --lsp` — completion (with 60+ snippets), hover (full markdown cards), goto / refs / rename, semantic tokens, signature help, **code actions** (Wrap-in-`p`, Comment / Uncomment, *Extract to variable / constant / function*), **folding ranges** (every `{ … }` block + `=pod ... =cut` + 3+ `#`-line comment runs), **document formatting** (Cmd-Opt-L pipes through `fmt::format_program`), diagnostics
 - **Run configurations** with `--no-interop` / `--disasm` / `--profile` / `--flame` / `-d` toggles; context-menu *Run with stryke* on any `.stk`
 - **Debugger** over the Debug Adapter Protocol (`stryke --dap`): line + function breakpoints from the gutter, Continue / Step Over / Step Into / Step Out / Pause / Run-to-Cursor, frames with file:line, **recursive hash & array drill-down** in the Variables panel, real-time `p` / `print` output in the Console, **Evaluate dialog** with scalar prelude injection so `$a * $b` returns the right value from the paused frame. The CLI debugger `stryke -d file.stk` is a separate TTY front-end on the same `Debugger` state machine — both share breakpoint / step / scope inspection logic.
 - **Reflection tool window** (*View → Tool Windows → Stryke*) — searchable trees of `%stryke::all`, `%stryke::builtins`, `%stryke::keywords`, `%stryke::operators`, `%stryke::special_vars`, `%stryke::perl_compats`, `%stryke::extensions`, `%stryke::aliases`, `%stryke::descriptions` (≈25k entries). Left-click a leaf for an ANSI-rendered docs popup; right-click for *Show Docs* / *Copy Name*.

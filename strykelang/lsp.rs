@@ -96,7 +96,24 @@ pub(crate) fn run_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync>
             retrigger_characters: Some(vec![",".to_string()]),
             work_done_progress_options: WorkDoneProgressOptions::default(),
         }),
-        code_action_provider: Some(lsp_types::CodeActionProviderCapability::Simple(true)),
+        // Advertise the refactoring kinds we produce so IntelliJ surfaces
+        // them under Refactor This (Ctrl-T) and shows the right grouping in
+        // the Alt-Enter menu. `Simple(true)` would still work but clients
+        // that filter by `only` (per the `CodeActionContext.only` field)
+        // skip handlers that don't list the kinds they can emit.
+        code_action_provider: Some(lsp_types::CodeActionProviderCapability::Options(
+            lsp_types::CodeActionOptions {
+                code_action_kinds: Some(vec![
+                    lsp_types::CodeActionKind::REFACTOR_EXTRACT,
+                    lsp_types::CodeActionKind::REFACTOR_REWRITE,
+                    lsp_types::CodeActionKind::QUICKFIX,
+                ]),
+                resolve_provider: None,
+                work_done_progress_options: WorkDoneProgressOptions::default(),
+            },
+        )),
+        folding_range_provider: Some(lsp_types::FoldingRangeProviderCapability::Simple(true)),
+        document_formatting_provider: Some(OneOf::Left(true)),
         ..Default::default()
     };
 
@@ -422,6 +439,52 @@ fn dispatch_request(
         };
         let actions = crate::lsp_extras::compute_code_actions(docs, &params);
         let resp = Response::new_ok(id, Some(actions));
+        conn.sender.send(resp.into()).expect("lsp channel");
+        return Ok(());
+    }
+
+    if req.method == lsp_types::request::FoldingRangeRequest::METHOD {
+        let req_id = req.id.clone();
+        let (id, params) = match req
+            .extract::<lsp_types::FoldingRangeParams>(lsp_types::request::FoldingRangeRequest::METHOD)
+        {
+            Ok(p) => p,
+            Err(ExtractError::JsonError { method, error }) => {
+                let resp = Response::new_err(
+                    req_id,
+                    ErrorCode::InvalidParams as i32,
+                    format!("{method}: {error}"),
+                );
+                conn.sender.send(resp.into()).expect("lsp channel");
+                return Ok(());
+            }
+            Err(ExtractError::MethodMismatch(_)) => unreachable!(),
+        };
+        let ranges = crate::lsp_extras::compute_folding_ranges(docs, &params);
+        let resp = Response::new_ok(id, Some(ranges));
+        conn.sender.send(resp.into()).expect("lsp channel");
+        return Ok(());
+    }
+
+    if req.method == lsp_types::request::Formatting::METHOD {
+        let req_id = req.id.clone();
+        let (id, params) = match req
+            .extract::<lsp_types::DocumentFormattingParams>(lsp_types::request::Formatting::METHOD)
+        {
+            Ok(p) => p,
+            Err(ExtractError::JsonError { method, error }) => {
+                let resp = Response::new_err(
+                    req_id,
+                    ErrorCode::InvalidParams as i32,
+                    format!("{method}: {error}"),
+                );
+                conn.sender.send(resp.into()).expect("lsp channel");
+                return Ok(());
+            }
+            Err(ExtractError::MethodMismatch(_)) => unreachable!(),
+        };
+        let edits = crate::lsp_extras::compute_formatting(docs, &params);
+        let resp = Response::new_ok(id, Some(edits));
         conn.sender.send(resp.into()).expect("lsp channel");
         return Ok(());
     }
@@ -6939,6 +7002,111 @@ fn push_snippet_completions(filter: &str, items: &mut Vec<CompletionItem>) {
             "given",
             "given (${1:expr}) {\n\twhen (${2:val}) { ${3} }\n\tdefault { ${0} }\n}\n",
             "given/when switch (snippet)",
+        ),
+        (
+            "match",
+            "match (${1:subject}) {\n\t${2:pattern} => ${3:expr},\n\t_ => ${0:default},\n}\n",
+            "Algebraic match (snippet)",
+        ),
+        (
+            "ifelse",
+            "if (${1:condition}) {\n\t${2}\n} else {\n\t${0}\n}\n",
+            "if / else block (snippet)",
+        ),
+        (
+            "ifelsif",
+            "if (${1:condition}) {\n\t${2}\n} elsif (${3:other_cond}) {\n\t${4}\n} else {\n\t${0}\n}\n",
+            "if / elsif / else chain (snippet)",
+        ),
+        (
+            "elsif",
+            "elsif (${1:condition}) {\n\t${0}\n}",
+            "elsif clause (snippet)",
+        ),
+        (
+            "else",
+            "else {\n\t${0}\n}",
+            "else clause (snippet)",
+        ),
+        (
+            "for",
+            "for (my \\$${1:i} = 0; \\$${1:i} < ${2:n}; \\$${1:i}++) {\n\t${0}\n}\n",
+            "C-style for loop (snippet)",
+        ),
+        (
+            "forrange",
+            "for my \\$${1:i} (${2:1}:${3:10}) {\n\t${0}\n}\n",
+            "for over a range (snippet)",
+        ),
+        (
+            "do",
+            "do {\n\t${1}\n} while (${0:condition});\n",
+            "do / while loop (snippet)",
+        ),
+        (
+            "until",
+            "until (${1:condition}) {\n\t${0}\n}\n",
+            "until loop (snippet)",
+        ),
+        (
+            "eval",
+            "eval {\n\t${0}\n};\nif (\\$@) {\n\twarn \"\\$@\";\n}\n",
+            "eval block with error check (snippet)",
+        ),
+        (
+            "sub",
+            "sub ${1:name} {\n\tmy (${2:\\$args}) = @_;\n\t${0}\n}\n",
+            "Perl-compat sub declaration (snippet)",
+        ),
+        (
+            "class",
+            "class ${1:Name} {\n\t${2:field}: ${3:Type}\n\n\tfn ${4:method} {\n\t\t${0}\n\t}\n}\n",
+            "Class declaration (snippet)",
+        ),
+        (
+            "struct",
+            "struct ${1:Name} {\n\t${2:field} => ${3:Type},\n\t${0}\n}\n",
+            "Struct declaration (snippet)",
+        ),
+        (
+            "enum",
+            "enum ${1:Name} {\n\t${2:Variant1},\n\t${3:Variant2}(${4:Type}),\n\t${0}\n}\n",
+            "Enum declaration (snippet)",
+        ),
+        (
+            "trait",
+            "trait ${1:Name} {\n\tfn ${2:required};\n\tfn ${3:with_default} {\n\t\t${0}\n\t}\n}\n",
+            "Trait declaration (snippet)",
+        ),
+        (
+            "BEGIN",
+            "BEGIN {\n\t${0}\n}\n",
+            "BEGIN phase block (snippet)",
+        ),
+        (
+            "END",
+            "END {\n\t${0}\n}\n",
+            "END phase block (snippet)",
+        ),
+        (
+            "use",
+            "use ${1:Module}${2: qw(${3:imports})};\n",
+            "use statement (snippet)",
+        ),
+        (
+            "strict",
+            "use strict;\nuse warnings;\n${0}",
+            "strict + warnings header (snippet)",
+        ),
+        (
+            "shebang",
+            "#!/usr/bin/env stryke\n${0}",
+            "stryke shebang (snippet)",
+        ),
+        (
+            "main",
+            "#!/usr/bin/env stryke\n\nfn main {\n\t${0}\n}\n\nmain()\n",
+            "main entrypoint scaffold (snippet)",
         ),
         (
             "pmap",
