@@ -20,14 +20,14 @@ fn Set::make(@items) {
     # @items is empty (with $_ = undef), which would seed a phantom ""
     # key. Skip when there's nothing to iterate.
     if (len(@items) > 0) {
-        $s{$_} = 1 for @items
+        $s{_} = 1 for @items
     }
     \%s
 }
 
 fn Set::union($xs, $ys) {
     my %out = %$xs
-    $out{$_} = 1 for keys %$ys
+    $out{_} = 1 for keys %$ys
     \%out
 }
 
