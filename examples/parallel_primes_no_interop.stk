@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+
+# Parallel prime sieve — shows `pmap` distributing work across rayon
+# workers. Parses clean under `--no-interop`.
+#
+# Trial-division primality, but each candidate is checked on a
+# different worker. Not the fastest sieve (the Eratosthenes sieve in
+# `builtins_*` is), but pedagogically clear and a real workload that
+# benefits from parallelism.
+#
+# Run: stryke --no-interop examples/parallel_primes_no_interop.stk
+#      stryke --no-interop examples/parallel_primes_no_interop.stk 50000
+
+my $upper = $ARGV[0] // 10000
+
+fn check_prime($n) {
+    return 0 if $n < 2
+    return 1 if $n == 2
+    return 0 if $n % 2 == 0
+    my $i = 3
+    while ($i * $i <= $n) {
+        return 0 if $n % $i == 0
+        $i += 2
+    }
+    1
+}
+
+# Sequential baseline.
+my $t0 = now_ns()
+my @seq = grep { check_prime(_) } 2:$upper
+my $seq_ms = (now_ns() - $t0) / 1_000_000
+
+# Parallel — `pmap` farms the predicate evaluations to rayon workers,
+# `pgrep` filters in parallel.
+my $t1 = now_ns()
+my @par = pgrep { check_prime(_) } 2:$upper
+my $par_ms = (now_ns() - $t1) / 1_000_000
+
+# Verify the two agree (commutative + deterministic).
+my $seq_join = join(",", @seq)
+my $par_join = join(",", sort { $_0 <=> $_1 } @par)
+die "parallel sieve drifted from sequential" unless $seq_join eq $par_join
+
+p "found ", len(@seq), " primes up to $upper"
+p "first 10: ", join(", ", @seq[0:9])
+p "last  10: ", join(", ", @seq[-10:-1])
+printf "sequential: %.2f ms\n", $seq_ms
+printf "parallel  : %.2f ms\n", $par_ms
+printf "speedup   : %.2fx\n", $seq_ms / $par_ms if $par_ms > 0

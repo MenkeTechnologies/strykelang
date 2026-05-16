@@ -1,0 +1,53 @@
+#!/usr/bin/env stryke
+
+# Temperature converter — every pairwise conversion between Celsius,
+# Fahrenheit, and Kelvin via a single `match` arm table. Parses clean
+# under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn` with named params and default values (`$from = "C"`, ...)
+#   * `p` and `printf` (not `say`)
+#   * if/elsif chain on a string key — the portable shape for string-eq
+#     dispatch in stryke. `eq` is the string comparator (not `==`).
+#   * Tuple destructuring in `my ($v, $f, $t) = @ARGV`
+#   * `uc` for uppercase, `0 + $s` for string -> number coercion
+#
+# Run: stryke --no-interop examples/temperature_converter_no_interop.stk
+#      stryke --no-interop examples/temperature_converter_no_interop.stk 100 C K
+
+fn convert($value, $from = "C", $to = "C") {
+    # Pair-key dispatch via if/elsif — `match` over string literals
+    # does not currently fall through to string equality on plain
+    # scalars, so the explicit chain is the portable form.
+    my $key = $from . $to
+    if    ($key eq "CC") { $value }
+    elsif ($key eq "CF") { $value * 9.0 / 5.0 + 32 }
+    elsif ($key eq "CK") { $value + 273.15 }
+    elsif ($key eq "FC") { ($value - 32) * 5.0 / 9.0 }
+    elsif ($key eq "FF") { $value }
+    elsif ($key eq "FK") { ($value - 32) * 5.0 / 9.0 + 273.15 }
+    elsif ($key eq "KC") { $value - 273.15 }
+    elsif ($key eq "KF") { ($value - 273.15) * 9.0 / 5.0 + 32 }
+    elsif ($key eq "KK") { $value }
+    else                 { die "unknown unit pair: $from -> $to" }
+}
+
+if (len(@ARGV) >= 3) {
+    my ($value, $from, $to) = @ARGV
+    my $out = convert(0 + $value, uc($from), uc($to))
+    printf "%g %s = %g %s\n", $value, $from, $out, $to
+    exit 0
+}
+
+# No args -> demo grid for boiling / freezing / absolute zero.
+p "── Stryke temperature converter ──"
+for my $celsius (0, 100, -40, -273.15) {
+    printf "%7.2f C  ->  %7.2f F  /  %7.2f K\n",
+        $celsius,
+        convert($celsius, "C", "F"),
+        convert($celsius, "C", "K")
+}
+
+p ""
+my $absz = convert(0, "K", "C")
+p "(absolute zero round-trip: $absz C = -273.15 C ✓)" if $absz == -273.15
