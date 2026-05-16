@@ -1,0 +1,72 @@
+#!/usr/bin/env stryke
+
+# Reverse Polish Notation calculator — read an expression as
+# whitespace-separated tokens, push numbers, pop operands for each
+# operator. Parses clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn` (not `sub`), `p` (not `say`), `len` (not `scalar`)
+#   * `push` / `pop` on a `my @stack` accumulator
+#   * if/elsif chain on the operator token (the portable stryke
+#     dispatch shape — see also temperature_converter / state_machine)
+#   * `die` for input errors; outer `eval { ... }` catches them
+#   * String split on `\s+` for whitespace tokenisation
+#
+# Run: stryke --no-interop examples/rpn_calc_no_interop.stk
+#      stryke --no-interop examples/rpn_calc_no_interop.stk "3 4 + 2 *"
+#      stryke --no-interop examples/rpn_calc_no_interop.stk "5 1 2 + 4 * + 3 -"
+
+fn run_rpn($expr) {  # `rpn` itself is a stryke builtin — namespace ours
+
+    my @stack
+    my @tokens = grep { len(_) > 0 } split(/\s+/, $expr)
+    for my $tok (@tokens) {
+        if ($tok =~ /^-?\d+(\.\d+)?$/) {
+            push @stack, 0 + $tok
+            next
+        }
+        die "stack underflow at `$tok` (need 2 operands)" if len(@stack) < 2
+        # `$a` / `$b` are reserved for sort/reduce blocks — strict mode
+        # rejects them as plain var names. Use `$lhs` / `$rhs`.
+        my $rhs = pop @stack
+        my $lhs = pop @stack
+        if    ($tok eq "+")   { push @stack, $lhs + $rhs }
+        elsif ($tok eq "-")   { push @stack, $lhs - $rhs }
+        elsif ($tok eq "*")   { push @stack, $lhs * $rhs }
+        elsif ($tok eq "/")   { die "division by zero" if $rhs == 0; push @stack, $lhs / $rhs }
+        elsif ($tok eq "%")   { die "modulo by zero"   if $rhs == 0; push @stack, $lhs % $rhs }
+        elsif ($tok eq "**")  { push @stack, $lhs ** $rhs }
+        elsif ($tok eq "min") { push @stack, $lhs < $rhs ? $lhs : $rhs }
+        elsif ($tok eq "max") { push @stack, $lhs > $rhs ? $lhs : $rhs }
+        else  { die "unknown operator `$tok`" }
+    }
+    die "expected 1 value on stack, got " . len(@stack) if len(@stack) != 1
+    $stack[0]
+}
+
+if (len(@ARGV) > 0) {
+    my $expr = join(" ", @ARGV)
+    my $result = eval { run_rpn($expr) }
+    if ($@) {
+        p "error: $@"
+        exit 1
+    }
+    p "$expr  =>  $result"
+    exit 0
+}
+
+# Demo grid — classic RPN examples.
+p "── RPN calculator demo ──"
+my @cases = (
+    "3 4 +",                # 7
+    "5 1 2 + 4 * + 3 -",    # 14
+    "10 5 / 2 *",           # 4
+    "2 8 **",               # 256
+    "5 3 min 10 max",       # 5 (min then max)
+    "20 7 %",               # 6
+)
+for my $e (@cases) {
+    my $r = eval { run_rpn($e) }
+    if ($@) { printf "  %-30s -> error: %s\n", $e, $@ }
+    else    { printf "  %-30s -> %s\n",        $e, $r }
+}

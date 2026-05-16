@@ -1,0 +1,54 @@
+#!/usr/bin/env stryke
+
+# ASCII histogram — count occurrences in a list, print a bar chart.
+# Parses clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len` (no `sub`, no `say`, no `scalar`)
+#   * `x` string-repeat operator for the bar
+#   * `sort { $_0 <=> $_1 }` for descending sort (using stryke's strict
+#     positional names, not `$a` / `$b`)
+#   * `||=` defined-or-assign for the hash bucket init
+#   * `1:$n` colon-range
+#
+# Run: stryke --no-interop examples/histogram_no_interop.stk
+#      stryke --no-interop examples/histogram_no_interop.stk 1 2 2 3 3 3 4 4 4 4
+
+my @data
+if (len(@ARGV) > 0) {
+    @data = map { 0 + _ } @ARGV
+} else {
+    # Roll 200 imaginary d6 dice to populate a clear demo distribution.
+    srand(42)
+    @data = map { 1 + int(rand(6)) } 1:200
+}
+
+# Count occurrences.
+my %counts
+for my $v (@data) {
+    $counts{$v} ||= 0
+    $counts{$v}++
+}
+
+my @keys = sort { $_0 <=> $_1 } keys %counts
+my $max  = 0
+for my $k (@keys) {
+    $max = $counts{$k} if $counts{$k} > $max
+}
+
+# Scale bars to fit a 40-column maximum width.
+my $width = 40
+p "── Histogram (n=", len(@data), ", max bucket = $max) ──"
+for my $k (@keys) {
+    my $n   = $counts{$k}
+    my $bar = "#" x int($n * $width / $max)
+    printf "  %4s  %5d  %s\n", $k, $n, $bar
+}
+
+# Summary statistics — `sum` / `mean` builtins.
+p ""
+my $total = sum(@data)
+printf "  sum   = %d\n", $total
+printf "  mean  = %.2f\n", $total / len(@data)
+printf "  min   = %d\n", min(@data)
+printf "  max   = %d\n", max(@data)
