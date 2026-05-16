@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+
+# Traffic-light state machine — transition table dispatched via if/elsif
+# on a string state-tag. Parses clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn` definitions, default-param signature (`$cycles = 6`)
+#   * `p` and `printf` (not `say`)
+#   * if/elsif chain on a tag string — the portable shape for stryke
+#     dispatch (see also temperature_converter_no_interop.stk)
+#   * `1:$n` colon-range in `for` header
+#
+# Run: stryke --no-interop examples/state_machine_no_interop.stk
+#      stryke --no-interop examples/state_machine_no_interop.stk 10
+
+fn next_state($s) {
+    if    ($s eq "red")    { "green" }
+    elsif ($s eq "green")  { "yellow" }
+    elsif ($s eq "yellow") { "red" }
+    else                   { die "unknown light: $s" }
+}
+
+fn label($s) {
+    if    ($s eq "red")    { "RED   (STOP)" }
+    elsif ($s eq "yellow") { "YELLOW(SLOW)" }
+    elsif ($s eq "green")  { "GREEN (GO  )" }
+    else                   { die "unknown light: $s" }
+}
+
+fn duration_sec($s) {
+    if    ($s eq "red")    { 30 }
+    elsif ($s eq "yellow") { 5 }
+    elsif ($s eq "green")  { 25 }
+    else                   { die "unknown light: $s" }
+}
+
+my $cycles = $ARGV[0] // 6
+my $state  = "red"
+my $elapsed = 0
+
+p "── Traffic-light cycle ($cycles transitions) ──"
+for (1:$cycles) {
+    my $dt = duration_sec($state)
+    printf "  t=%-4ds %s   (hold %ds)\n", $elapsed, label($state), $dt
+    $elapsed += $dt
+    $state = next_state($state)
+}
+p ""
+p "total cycle length so far: ${elapsed}s"

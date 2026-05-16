@@ -3867,6 +3867,59 @@ mod tests {
         assert_eq!(my_line, 2, "my $y = 2 lives on source line 2");
     }
 
+    /// Bareword `_N` (underscore + ≥1 digit) lexes to `ScalarVar(_N)` —
+    /// the implicit-closure-positional name that works without a sigil.
+    /// The lexer carves these out at line 2241 so the parser sees them
+    /// as variables, not as undefined sub names.
+    #[test]
+    fn bareword_underscore_n_lexes_as_scalar_var() {
+        let mut l = Lexer::new("_1");
+        let t = l.tokenize().expect("tokenize");
+        assert!(
+            matches!(t[0].0, Token::ScalarVar(ref s) if s == "_1"),
+            "_1 → ScalarVar(_1): got {:?}",
+            t[0].0
+        );
+    }
+
+    #[test]
+    fn bareword_underscore_n_two_digits_lexes_as_scalar_var() {
+        let mut l = Lexer::new("_42");
+        let t = l.tokenize().expect("tokenize");
+        assert!(
+            matches!(t[0].0, Token::ScalarVar(ref s) if s == "_42"),
+            "_42 → ScalarVar(_42): got {:?}",
+            t[0].0
+        );
+    }
+
+    /// Bare `_` (no digit) stays an Ident so the existing topic /
+    /// bareword-call machinery keeps working — `_` can be a sub call,
+    /// a bareword filename, etc., context-dependent.
+    #[test]
+    fn bare_underscore_alone_lexes_as_ident() {
+        let mut l = Lexer::new("_");
+        let t = l.tokenize().expect("tokenize");
+        assert!(
+            matches!(t[0].0, Token::Ident(ref s) if s == "_"),
+            "_ → Ident(_): got {:?}",
+            t[0].0
+        );
+    }
+
+    /// `_foo` is a user-defined identifier — NOT a topic alias.
+    /// Only `_<digits>` is reserved for the positional slot family.
+    #[test]
+    fn underscore_prefix_word_is_plain_ident() {
+        let mut l = Lexer::new("_foo");
+        let t = l.tokenize().expect("tokenize");
+        assert!(
+            matches!(t[0].0, Token::Ident(ref s) if s == "_foo"),
+            "_foo → Ident(_foo): got {:?}",
+            t[0].0
+        );
+    }
+
     /// POD blocks (`=pod ... =cut`) advance `self.line` many lines during
     /// the skip but the original tokenize loop captured `line` *before*
     /// calling next_token, then pushed (token, captured_line) — so the
