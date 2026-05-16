@@ -76,6 +76,26 @@ fn capture_skip_bootstrap_hash(name: &str) -> bool {
 /// `_N<<<`, `_N<<<<`. Returns `None` for `_`, `_<`, etc. (slot 0, which never
 /// needs to bump `max_active_slot`).
 #[inline]
+/// Return the alias name for a topic-variant if `_` ↔ `_0` apply at any
+/// chain level. `_` ↔ `_0`, `_<` ↔ `_0<`, `_<<<` ↔ `_0<<<`, etc. Anything
+/// else (`_1`, `_2<<`, …) has no alias (those are positional-only slots).
+fn topic_alias(name: &str) -> Option<String> {
+    if name == "_" { return Some("_0".to_string()); }
+    if name == "_0" { return Some("_".to_string()); }
+    // _<+ → _0<+, _0<+ → _<+
+    if let Some(rest) = name.strip_prefix("_0") {
+        if rest.chars().all(|c| c == '<') && !rest.is_empty() {
+            return Some(format!("_{rest}"));
+        }
+    }
+    if let Some(rest) = name.strip_prefix('_') {
+        if rest.chars().all(|c| c == '<') && !rest.is_empty() {
+            return Some(format!("_0{rest}"));
+        }
+    }
+    None
+}
+
 fn parse_positional_topic_slot(name: &str) -> Option<usize> {
     let bytes = name.as_bytes();
     if bytes.len() < 2 || bytes[0] != b'_' || !bytes[1].is_ascii_digit() {
@@ -1094,6 +1114,52 @@ impl Scope {
         names
     }
 
+    /// Names of every array binding visible across frames (deduplicated).
+    pub fn all_array_names(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        for frame in &self.frames {
+            for (name, _) in &frame.arrays {
+                if !names.contains(name) {
+                    names.push(name.clone());
+                }
+            }
+            for (name, _) in &frame.shared_arrays {
+                if !names.contains(name) {
+                    names.push(name.clone());
+                }
+            }
+            for (name, _) in &frame.atomic_arrays {
+                if !names.contains(name) {
+                    names.push(name.clone());
+                }
+            }
+        }
+        names
+    }
+
+    /// Names of every hash binding visible across frames (deduplicated).
+    pub fn all_hash_names(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        for frame in &self.frames {
+            for (name, _) in &frame.hashes {
+                if !names.contains(name) {
+                    names.push(name.clone());
+                }
+            }
+            for (name, _) in &frame.shared_hashes {
+                if !names.contains(name) {
+                    names.push(name.clone());
+                }
+            }
+            for (name, _) in &frame.atomic_hashes {
+                if !names.contains(name) {
+                    names.push(name.clone());
+                }
+            }
+        }
+        names
+    }
+
     /// True if any frame or atomic slot holds an array named `name`.
     #[inline]
     pub fn array_binding_exists(&self, name: &str) -> bool {
@@ -1255,7 +1321,17 @@ impl Scope {
         // break the "topic chain is lexical, not iterative" invariant.
         if Self::is_topic_variant_name(name) {
             if let Some(frame) = self.frames.last_mut() {
-                frame.set_scalar_raw(name, val);
+                frame.set_scalar_raw(name, val.clone());
+                // Documented language invariant: `$_` and `$_0` are the same
+                // variable (the topic ≡ positional slot 0). For deeper
+                // chain levels they're also aliased: `$_<` ≡ `$_0<`, etc.
+                // Mirror the write so reads of either name return the same
+                // value. This fixes for-loop bindings where the foreach
+                // compile path emits `Op::SetScalarPlain("_")` — without the
+                // mirror, `$_0` stays undef.
+                if let Some(alias) = topic_alias(name) {
+                    frame.set_scalar_raw(&alias, val);
+                }
             }
             return Ok(());
         }

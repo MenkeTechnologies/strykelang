@@ -2191,6 +2191,7 @@ impl<'a> VM<'a> {
             if let Some(p) = &mut self.interp.profiler {
                 p.enter_sub(name);
             }
+            self.interp.debugger_enter_sub(name);
 
             // Fib-shaped recursive-add fast path: if the target sub is tagged with a
             // `fib_like` pattern (detected at sub-registration time in the compiler and
@@ -2214,6 +2215,7 @@ impl<'a> VM<'a> {
                             if let (Some(p), Some(t0)) = (&mut self.interp.profiler, sub_prof_t0) {
                                 p.exit_sub(t0.elapsed());
                             }
+                            self.interp.debugger_leave_sub();
                             self.interp.wantarray_kind = saved_wa;
                             return Ok(());
                         }
@@ -2308,6 +2310,7 @@ impl<'a> VM<'a> {
                     if let Some(p) = &mut self.interp.profiler {
                         p.enter_sub(name);
                     }
+                    self.interp.debugger_enter_sub(name);
                     // Only substitute $_ when argc == 0; passing an empty array keeps args empty.
                     let args = if argc == 0 {
                         self.interp.with_topic_default_args(args)
@@ -2343,6 +2346,7 @@ impl<'a> VM<'a> {
                             if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
                                 p.exit_sub(t0.elapsed());
                             }
+                            self.interp.debugger_leave_sub();
                             return Err(e);
                         }
                         Err(_) => self.push(StrykeValue::UNDEF),
@@ -2350,6 +2354,7 @@ impl<'a> VM<'a> {
                     if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
                         p.exit_sub(t0.elapsed());
                     }
+                    self.interp.debugger_leave_sub();
                 } else if !name.contains("::")
                     && matches!(
                         name,
@@ -2410,6 +2415,7 @@ impl<'a> VM<'a> {
                     if let Some(p) = &mut self.interp.profiler {
                         p.enter_sub(name);
                     }
+                    self.interp.debugger_enter_sub(name);
                     let saved_wa = self.interp.wantarray_kind;
                     self.interp.wantarray_kind = want;
                     let out = self
@@ -2425,6 +2431,7 @@ impl<'a> VM<'a> {
                             if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
                                 p.exit_sub(t0.elapsed());
                             }
+                            self.interp.debugger_leave_sub();
                             return Err(e);
                         }
                         Err(_) => self.push(StrykeValue::UNDEF),
@@ -2432,6 +2439,7 @@ impl<'a> VM<'a> {
                     if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
                         p.exit_sub(t0.elapsed());
                     }
+                    self.interp.debugger_leave_sub();
                 } else if let Some(result) = self.interp.try_autoload_call(
                     name,
                     if argc == 0 {
@@ -2447,6 +2455,7 @@ impl<'a> VM<'a> {
                     if let Some(p) = &mut self.interp.profiler {
                         p.enter_sub(name);
                     }
+                    self.interp.debugger_enter_sub(name);
                     match result {
                         Ok(v) => self.push(v),
                         Err(crate::vm_helper::FlowOrError::Flow(
@@ -2456,6 +2465,7 @@ impl<'a> VM<'a> {
                             if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
                                 p.exit_sub(t0.elapsed());
                             }
+                            self.interp.debugger_leave_sub();
                             return Err(e);
                         }
                         Err(_) => self.push(StrykeValue::UNDEF),
@@ -2463,6 +2473,7 @@ impl<'a> VM<'a> {
                     if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
                         p.exit_sub(t0.elapsed());
                     }
+                    self.interp.debugger_leave_sub();
                 } else if let Some(def) = self.interp.struct_defs.get(name).cloned() {
                     // Struct constructor: Point(x => 1, y => 2) or Point(1, 2)
                     let result = self.interp.struct_construct(&def, args, self.line());
@@ -4283,6 +4294,7 @@ impl<'a> VM<'a> {
                                     p.exit_sub(t0.elapsed());
                                 }
                             }
+                            self.interp.debugger_leave_sub();
                             self.interp.wantarray_kind = frame.saved_wantarray;
                             self.stack.truncate(frame.stack_base);
                             self.interp.pop_scope_to_depth(frame.scope_depth);
@@ -4333,6 +4345,7 @@ impl<'a> VM<'a> {
                                     p.exit_sub(t0.elapsed());
                                 }
                             }
+                            self.interp.debugger_leave_sub();
                             self.interp.wantarray_kind = frame.saved_wantarray;
                             self.stack.truncate(frame.stack_base);
                             self.interp.pop_scope_to_depth(frame.scope_depth);
@@ -8801,9 +8814,11 @@ impl<'a> VM<'a> {
         let mut sub_prof_t0 = None;
         if let Some(nidx) = self.sub_entry_name_idx(entry_ip) {
             sub_prof_t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
+            let nm_owned = self.names[nidx as usize].to_string();
             if let Some(p) = &mut self.interp.profiler {
-                p.enter_sub(self.names[nidx as usize].as_str());
+                p.enter_sub(nm_owned.as_str());
             }
+            self.interp.debugger_enter_sub(nm_owned.as_str());
         }
         self.call_stack.push(CallFrame {
             return_ip: 0,

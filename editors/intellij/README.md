@@ -5,23 +5,91 @@ parallel scripting language (Rust bytecode VM + Cranelift JIT + Rayon).
 
 ## Features
 
-- **`.stk` file association** with a hand-rolled lexer that highlights keywords, builtins,
-  sigil variables (`$`, `@`, `%`), pipes (`|>`, `~>`), regex literals, strings, comments, numbers.
-- **LSP client** wired to `st --lsp`: completion, hover (with the full `lsp_docs_domains.rs`
-  cards), goto-definition, find-references, rename, document symbols, diagnostics, document
-  highlights.
-- **Run configurations** with optional `--no-interop` (strict stryke parser) toggle, plus
-  context-menu *Run with stryke* on any `.stk` file.
-- **Color settings page** under *Settings → Editor → Color Scheme → Stryke*.
-- **`#`-line comment** support (Ctrl/Cmd-`/`).
+### Editor
+- **`.stk` file association** with a hand-rolled lexer that tokenizes
+  comments / doc-comments, strings / heredocs, integers / floats, regex
+  literals + flags, declaration keywords (`my` / `our` / `use` / `package`),
+  function-declaration keywords (`fn` / `sub` / `class` / `struct` / `trait`
+  / `enum`), control flow (`if` / `while` / `for` / `return`), phase blocks
+  (`BEGIN` / `END` / `INIT` / `CHECK`), word operators (`and` / `or` / `eq`
+  / `cmp` / `x`), booleans / `undef`, builtins (general + parallel like
+  `pmap` / `pgrep`), package paths (`Foo::Bar`), sigil variables split by
+  type (`$x` scalar, `@x` array, `%x` hash, `$!`/`$@` special, `$_`/`@_`
+  topic, `_0`/`_1` block params), arrow / fat-comma / pipe / range / regex-
+  bind operators, parens / braces / brackets / commas / semicolons.
+- **44 color slots** under *Settings → Editor → Color Scheme → Stryke* —
+  every token category is independently themeable with stable
+  `STRYKE_*` `TextAttributesKey` names.
+- **`#`-line comments** (Ctrl/Cmd-`/`).
+
+### LSP
+- LSP client wired to `st --lsp` over stdio. Server capabilities:
+  - `completion` with trigger characters `$` `@` `%` `:` `_` and all
+    letters, plus `resolveProvider`
+  - `hover` (full markdown cards from `lsp_docs_domains.rs`; falls back to
+    category-stub for any builtin in `CATEGORY_MAP` that lacks a hand-
+    written card)
+  - `definition` / `declaration` / `references` / `documentHighlight`
+  - `rename` with prepare
+  - `documentSymbol`
+  - `semanticTokens` (full document)
+  - `signatureHelp` (parameter hints with active-arg tracking)
+  - `codeAction` (line-local quickfixes)
+  - `publishDiagnostics` (parse + compile errors with line/col)
+
+### Run / Debug
+- **Run configurations** for `.stk` files with `--no-interop` / `--disasm`
+  / `--profile` / `--flame` / `-d` / `-D` toggles, working directory,
+  script args, interpreter args.
+- **Context-menu *Run with stryke*** on any `.stk` file in the editor or
+  project view; auto-creates a run config.
+- **Debugger** (DAP-backed over TCP socket):
+  - Line breakpoints from the gutter (toggle, enable/disable)
+  - Function breakpoints (Run → View Breakpoints → +)
+  - Continue / Step Over / Step Into / Step Out / Pause / Run to Cursor
+  - **Frames** with file:line per frame, source navigation
+  - **Variables panel** with user-defined vars sorted to top, stryke
+    built-ins (`$stryke::VERSION`, `%ENV`, `%term`, `@INC`, …) at the
+    bottom, `__synthetic__` compiler internals hidden
+  - **Recursive hash / array expansion** — `[N] (key => val, …)` summary
+    with disclosure triangles, click to drill in to `key = value` rows,
+    works to arbitrary depth (capped at 12 to avoid cycles)
+  - **Evaluate** dialog — pure expressions (`55 + 3`, `sqrt(2)`, `len(@INC)`)
+    plus expressions using current frame's scalars (`$a * $b`) via prelude
+    injection into a `st -e` subprocess
+  - **Console** shows the program's `p` / `print` / `printf` output in
+    real time (autoflush + flush-on-pause)
+  - **Two separate debuggers, sharing the runtime state machine**:
+    - `st -d file.stk` — TTY REPL, `perl -d` style, runs in the shell
+    - `st --dap [HOST:PORT]` — Debug Adapter Protocol server consumed by
+      this plugin
+
+### Reflection tool window
+- *View → Tool Windows → Stryke* (right edge).
+- **9 tabs** — `%all` plus `%builtins` / `%keywords` / `%operators` /
+  `%special_vars` / `%perl_compats` / `%extensions` / `%aliases` /
+  `%descriptions` — fed live from `stryke -e 'p tj({%stryke::*})'` on
+  first open (≈25k entries).
+- Each tab is a tree grouped by category, with a per-tab search field that
+  filters across name + category.
+- **Left-click on any leaf → docs popup** anchored at the click. Renders
+  `stryke docs <name>` with ANSI colors interpreted via IntelliJ's
+  `AnsiEscapeDecoder` + `ConsoleView` (so the popup matches what
+  `stryke docs <name>` looks like in your terminal).
+- **Right-click on any leaf → context menu** with *Show Docs* + *Copy
+  Name*.
+- Toolbar: *Refresh* (re-runs `stryke -e` and reloads) + *Settings* (jumps
+  to Stryke settings).
 
 ## Requirements
 
-- A paid JetBrains IDE on **2024.2+** (RustRover, IDEA Ultimate, GoLand, PyCharm Pro,
-  WebStorm, RubyMine, PhpStorm, CLion, Rider, DataGrip, Aqua).
-- The LSP API is **not available in Community editions**, so the plugin will not load there.
-- `st` (the stryke binary) must be on `$PATH`, or configured under
-  *Settings → Tools → Stryke → Stryke executable*.
+- A paid JetBrains IDE on **2024.2+** (RustRover, IDEA Ultimate, GoLand,
+  PyCharm Pro, WebStorm, RubyMine, PhpStorm, CLion, Rider, DataGrip,
+  Aqua). The LSP API isn't in Community editions, so the plugin won't
+  load there.
+- The `stryke` binary on `$PATH`, or configured under *Settings → Tools →
+  Stryke → Stryke executable*. The plugin will look for `st`, then
+  `stryke`, on `$PATH`.
 
 ## Building
 
@@ -32,28 +100,85 @@ cd editors/intellij
 ./gradlew verifyPlugin            # plugin verifier against recommended IDE matrix
 ```
 
-The first build downloads the IntelliJ Platform SDK (~1 GB), takes a few minutes, and is cached.
+First build downloads the IntelliJ Platform SDK (~1 GB), takes a few
+minutes, and is cached under `editors/intellij/.intellijPlatform/` (which
+is gitignored).
 
 ## Installing
 
 1. *Settings → Plugins → ⚙ → Install Plugin from Disk…*
 2. Pick `build/distributions/stryke-intellij-<version>.zip`.
 3. Restart the IDE.
-4. Open any `.stk` file. The LSP starts automatically.
+4. Open any `.stk` file. The LSP starts automatically; the debugger
+   activates when you click Debug.
 
 ## Configuration
 
-| Setting | Default | Notes |
-|---------|---------|-------|
-| `Stryke executable` | first `st` (then `stryke`) on `$PATH` | Settings → Tools → Stryke |
-| LSP transport | stdio | spawned with `st --lsp` |
-| Run config `--no-interop` | off | enables strict stryke parser (no Perl 5 fallbacks) |
+*Settings → Tools → Stryke*:
+
+| Section | Setting | Default | Notes |
+|---------|---------|---------|-------|
+| Interpreter | Stryke executable | first `st` then `stryke` on `$PATH` | absolute path or blank |
+| LSP | Enable LSP | on | master toggle |
+| LSP | Extra LSP args | empty | passed after `--lsp` |
+| LSP | LSP environment | empty | `KEY=VAL` pairs (e.g. `RUST_LOG=info`) |
+| LSP | Auto-restart LSP on settings change | on | |
+| LSP | Show builtin hovers | on | server-provided cards |
+| LSP | Log LSP traffic to file | off | + path picker |
+| Editor | Disable lexer highlighting | off | rely only on LSP semantic tokens |
+| Editor | File extensions | `stk` | comma-separated; add `pl`, `pm` etc. |
+| Run configs | Default `--no-interop` | off | strict stryke parser by default |
+
+Color scheme entries: *Settings → Editor → Color Scheme → Stryke* (44
+sub-categories grouped under Comments / Strings / Numbers / Regex /
+Keywords / Names / Variables / Operators / Punctuation / Errors).
+
+## How the debugger works
+
+Plugin side (`com.menketechnologies.stryke.dap`):
+1. `StrykeDebugRunner.doExecute` opens a `ServerSocket(0)` on
+   `127.0.0.1`, captures the port.
+2. Spawns `st --dap 127.0.0.1:<port>` via `KillableColoredProcessHandler`.
+3. Waits up to 10 s for stryke to connect back, then runs DAP over that
+   socket — `OSProcessHandler` keeps the process's stdio for Console
+   output, exclusively.
+4. Creates an `XDebugSession` via `XDebuggerManager.startSession` and
+   returns the descriptor via `getMockRunContentDescriptorIfInitialized`
+   reflection (avoids the platform's split-debugger
+   `Logger.error("[Split debugger] …")` toast that the deprecated
+   `runContentDescriptor` getter fires).
+5. `StrykeDebugProcess.createConsole` builds a `ConsoleView` and
+   `attachToProcess(processHandler)` so program stdout streams in real
+   time.
+6. `StrykeDapClient` reads Content-Length-framed JSON-RPC from the
+   socket — byte-based (not char-based) so multi-byte UTF-8 in variable
+   reprs doesn't desync framing.
+7. On `stopped` event, `onStopped` synchronously fetches `stackTrace` +
+   `scopes` + `variables`, builds `StrykeStackFrame` objects with
+   pre-populated children, calls `session.positionReached`. No async
+   expansion on the UI thread — IntelliJ 2026.1's split-debugger drops
+   those.
+8. `StrykeEvaluator` sends `evaluate` requests for the Evaluate dialog;
+   stryke does scalar-prelude injection so `$a * $b` returns the right
+   value from the paused frame.
+
+Stryke side (`strykelang/dap.rs` + `strykelang/debugger.rs`):
+- `Debugger` state machine (breakpoints, step modes, call depth)
+  shared between TTY and DAP front-ends.
+- `set_topic` for implicit `for (@arr) { … }` loops so `$_` / `$_0` /
+  `_` / `_0` all alias.
+- Snapshot capture (`capture_locals_with_map`) walks the scope, builds
+  per-variable refs for hashes / arrays, recursively expanding their
+  children into a `var_ref_map` (depth-capped, count-capped) so the DAP
+  `variables` request resolves any ref to its rows.
+- stdout/stderr autoflush + flush on every pause so output lands in the
+  Console before the suspend UI takes over.
 
 ## Plugin architecture
 
 ```
 editors/intellij/
-├── build.gradle.kts                   # IntelliJ Platform Gradle Plugin 2.1.0
+├── build.gradle.kts                   # IntelliJ Platform Gradle Plugin 2.16
 ├── gradle.properties                  # platform version, plugin version, JVM
 ├── settings.gradle.kts
 └── src/main/
@@ -61,11 +186,12 @@ editors/intellij/
     │   ├── StrykeLanguage.kt          # Language singleton
     │   ├── StrykeFileType.kt          # .stk → Stryke
     │   ├── StrykeIcons.kt             # icon loader
+    │   ├── StrykeColors.kt            # 44 STRYKE_* TextAttributesKey constants
     │   ├── StrykeTokenTypes.kt        # token type enum
     │   ├── StrykeLexer.kt             # hand-rolled lexer
     │   ├── StrykeSyntaxHighlighter.kt # token → color mapping
     │   ├── StrykeColorSettingsPage.kt # IDE color-scheme entries
-    │   ├── StrykeCommenter.kt         # # line comment
+    │   ├── StrykeCommenter.kt         # `#` line comment
     │   ├── StrykeSettings.kt          # persistent settings
     │   ├── StrykeSettingsConfigurable.kt
     │   ├── lsp/
@@ -76,7 +202,21 @@ editors/intellij/
     │   │   ├── StrykeRunConfigurationOptions.kt
     │   │   ├── StrykeRunConfiguration.kt
     │   │   ├── StrykeRunConfigurationEditor.kt
-    │   │   └── StrykeRunConfigurationProducer.kt
+    │   │   ├── StrykeRunConfigurationProducer.kt
+    │   │   ├── StrykeProgramRunner.kt    # Run executor
+    │   │   └── StrykeDebugRunner.kt      # Debug executor (DAP)
+    │   ├── dap/
+    │   │   ├── StrykeDapClient.kt        # byte-based DAP protocol client
+    │   │   ├── StrykeDebugProcess.kt     # XDebugProcess
+    │   │   ├── StrykeDebuggerEditorsProvider.kt
+    │   │   ├── StrykeBreakpointType.kt   # xdebugger.breakpointType
+    │   │   ├── StrykeBreakpointHandler.kt
+    │   │   ├── StrykeStackFrame.kt
+    │   │   ├── StrykeSuspendContext.kt
+    │   │   ├── StrykeValue.kt            # XValue with recursive children
+    │   │   └── StrykeEvaluator.kt        # Evaluate dialog backend
+    │   ├── toolwindow/
+    │   │   └── StrykeReflectionToolWindow.kt
     │   └── actions/
     │       └── RunStrykeFileAction.kt
     └── resources/
@@ -86,16 +226,35 @@ editors/intellij/
 
 ## Version compatibility
 
-Plugin version tracks the strykelang Cargo version. The `pluginSinceBuild` /
-`pluginUntilBuild` range in `gradle.properties` constrains the supported IDE builds.
+Plugin version tracks the strykelang Cargo version. `gradle.properties`
+controls the supported IDE range via `pluginSinceBuild` /
+`pluginUntilBuild`. Currently targets `2024.2.4` SDK against builds
+`242 .. 261.*`.
 
-## Limitations (v1)
+## Limitations
 
-- No PSI tree or structural navigation — relies entirely on the LSP for symbol navigation.
-- No debugger integration.
-- Lexer is a regex-class scanner; complex constructs (heredocs, `qw()`, nested string
-  interpolation) are not fully tokenized — they fall back to "string".
-- Sketch inspector / reflection panels are not yet implemented (future work).
+- **No PSI tree or structural navigation** — relies entirely on the LSP
+  for symbol navigation.
+- **Debugger v1**: no conditional or hit-count breakpoints, no exception
+  breakpoints, no watch expressions, no Set Value, single-thread only.
+  Step-into across `use`d modules works only if the called sub has line
+  mapping in the same compilation unit.
+- **Evaluator** injects only scalars from the current frame. Expressions
+  referencing user-defined `@arr` / `%hash` see them as empty in the
+  subprocess. Builtins / globals (`@INC`, `%ENV`, etc.) work.
+- **Lexer** is a regex-class scanner; complex constructs (heredocs,
+  `qw()`, nested string interpolation) are not fully tokenized — they
+  fall back to "string". Server-side semantic tokens fill in where the
+  lexer is approximate.
+- **`[Split debugger]` toast on Debug start** — the IDE's deprecated
+  `XDebugSession.runContentDescriptor` accessor fires `Logger.error`
+  even when bypassed via reflection if any third-party code touches it
+  during session bring-up. JetBrains' own debug runners suffer the same
+  noise in 2024.3+. Cosmetic only; the debugger works.
+- **Reflection hashes (`%stryke::*`)** populate lazily on first user
+  access in DAP mode (eager `ensure_reflection_hashes` triggers a VM
+  stack overflow that's still TBD). The standalone Stryke tool window
+  fetches them via `st -e` and is unaffected.
 
 ## License
 
