@@ -23,8 +23,8 @@
             <li><b>Run configurations</b> for <code>.stk</code> scripts with toggles for
                 <code>--no-interop</code> / <code>--disasm</code> / <code>--profile</code> /
                 <code>--flame</code> / <code>-d</code> / <code>-D</code>.</li>
-            <li><b>Comments</b>: <code>#</code> line comments (Cmd-/) and <code>=pod ... =cut</code>
-                block comments (Cmd-Opt-/).</li>
+            <li><b>Comments</b>: <code>#</code> line comments (Cmd-/). Multi-line selection +
+                Cmd-/ prepends <code>#</code> to every line.</li>
             <li><b>Reflection tool window</b> with 9 tabs of <code>%stryke::*</code> (~25k entries) —
                 searchable trees, left-click for docs popup, right-click for Show Docs / Copy Name.</li>
             <li><b>Settings → Tools → Stryke</b> to point at a non-PATH <code>st</code> binary or pass
@@ -44,7 +44,6 @@
             <li>LSP folding ranges (brace blocks, POD, comment runs) and document formatting.</li>
             <li>60+ snippet completions (match, if/elsif/else, class/struct/enum/trait, parallel
                 primitives, web / SVG / git scaffolds, full test-file template).</li>
-            <li><code>=pod ... =cut</code> block comments wired via Commenter.</li>
             <li>Debugger Variables panel: rich drill-down for struct / class / enum / set / sketch
                 types; topic and Perl-5 sort/reduce params (<code>$_</code>, <code>$_N</code>,
                 <code>$a</code>, <code>$b</code>) sort below user <code>my</code> vars.</li>

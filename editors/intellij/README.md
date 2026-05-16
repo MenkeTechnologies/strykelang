@@ -20,9 +20,12 @@ parallel scripting language (Rust bytecode VM + Cranelift JIT + Rayon).
 - **44 color slots** under *Settings → Editor → Color Scheme → Stryke* —
   every token category is independently themeable with stable
   `STRYKE_*` `TextAttributesKey` names.
-- **Comments**:
-  - `#` line comments — Ctrl/Cmd-`/`
-  - `=pod ... =cut` block comments — Ctrl/Cmd-Opt-`/`
+- **Comments**: `#` line comments — Ctrl/Cmd-`/`. (Stryke's only
+  multi-line comment form is POD `=pod ... =cut`, which requires
+  column-0 markers; IntelliJ's block-comment action inserts at the
+  selection anchors so the markers would land mid-expression. For
+  block-style commenting select multiple lines and use Cmd-`/` —
+  IntelliJ prepends `# ` to each line.)
 
 ### LSP
 - LSP client wired to `st --lsp` over stdio. Server capabilities:
@@ -53,7 +56,10 @@ parallel scripting language (Rust bytecode VM + Cranelift JIT + Rayon).
     - *Extract to function* — wraps the selection in
       `fn extracted_fn { … }` and replaces the span with a call
       (multi-line selection; v1 does no free-variable analysis)
-    - Surfaced under Alt-Enter and Refactor → Refactor This (Ctrl-T)
+    - Surfaced under **Alt-Enter** (intentions / context actions). The
+      IntelliJ Refactor menu (Ctrl-T) is reserved for native PSI-based
+      refactorings; LSP-driven extract / inline / rewrite kinds show up
+      in the intentions popup, not under that menu.
   - `foldingRange` — fold every `{ … }` block (`fn`, `class`, `struct`,
     `enum`, `if`, `while`, `for`, hash literals, ...), `=pod` ... `=cut`
     POD blocks, and 3+ consecutive `#`-line comment runs.
