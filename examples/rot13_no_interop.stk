@@ -1,0 +1,79 @@
+#!/usr/bin/env stryke
+
+# ROT13 — letter-rotation cipher, self-inverse: rot13_str(rot13_str(s)) == s.
+# Cousin to caesar_no_interop but specialised (shift fixed at 13) and
+# documents the self-inverse property. Parses clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len`
+#   * `ord` / `chr` for char-int math
+#   * `maps { ... } @list` (stryke spelling of map)
+#   * `split //` + `join "" `for char round-trip
+#   * Built-in `die` invariants — self-inverse, known fixed points
+#
+# Run: stryke --no-interop examples/rot13_no_interop.stk
+#      stryke --no-interop examples/rot13_no_interop.stk "Hello, World!"
+
+fn rot13_char($ch) {
+    my $c = ord($ch)
+    if ($c >= ord("A") && $c <= ord("Z")) {
+        return chr(($c - ord("A") + 13) % 26 + ord("A"))
+    }
+    if ($c >= ord("a") && $c <= ord("z")) {
+        return chr(($c - ord("a") + 13) % 26 + ord("a"))
+    }
+    $ch
+}
+
+fn rot13_str($text) {
+    join("", maps { rot13_char(_) } split(//, $text))
+}
+
+if (len(@ARGV) >= 1) {
+    p rot13_str(join(" ", @ARGV))
+    exit 0
+}
+
+# Demo grid — each plaintext paired with its expected ROT13 form.
+my @cases = (
+    +{ plain => "Hello",     cipher => "Uryyb"     },
+    +{ plain => "Uryyb",     cipher => "Hello"     },  # self-inverse
+    +{ plain => "ROT13",     cipher => "EBG13"     },
+    +{ plain => "abc xyz",   cipher => "nop klm"   },
+    +{ plain => "",          cipher => ""          },
+    +{ plain => "Hello, World!", cipher => "Uryyb, Jbeyq!" },
+    +{ plain => "The quick brown fox jumps over the lazy dog",
+       cipher => "Gur dhvpx oebja sbk whzcf bire gur ynml qbt" },
+    +{ plain => "Why did the chicken cross the road?",
+       cipher => "Jul qvq gur puvpxra pebff gur ebnq?" },
+)
+
+p "── ROT13 demo ──"
+my $fail = 0
+for my $c (@cases) {
+    my $got = rot13_str($c->{plain})
+    my $ok  = ($got eq $c->{cipher})
+    $fail++ unless $ok
+    printf "  %-50s -> %s  %s\n",
+        "\"" . $c->{plain} . "\"",
+        "\"" . $got . "\"",
+        $ok ? "" : "FAIL (want \"" . $c->{cipher} . "\")"
+}
+die "$fail / " . len(@cases) . " ROT13 cases failed" if $fail > 0
+
+# Self-inverse invariant — rot13_str(rot13_str(s)) == s for every test input.
+for my $c (@cases) {
+    my $twice = rot13_str(rot13_str($c->{plain}))
+    die "self-inverse failed" unless $twice eq $c->{plain}
+}
+
+# Fixed-point invariant — letters at positions A, a are rotated by 13.
+die "rot13_str(A) must be N"  unless rot13_str("A") eq "N"
+die "rot13_str(N) must be A"  unless rot13_str("N") eq "A"
+die "rot13_str(a) must be n"  unless rot13_str("a") eq "n"
+die "rot13_str(z) must be m"  unless rot13_str("z") eq "m"
+die "rot13_str(5) must be 5"  unless rot13_str("5") eq "5"   # digits unchanged
+die "rot13_str(!) must be !"  unless rot13_str("!") eq "!"   # punct unchanged
+
+p ""
+p "  ALL PASS (8 fixture cases + 8 self-inverse + 6 fixed-point checks)"
