@@ -1,0 +1,129 @@
+#!/usr/bin/env stryke
+
+# Bloom-filter dedup demo. Stream a sequence of records (with
+# intentional duplicates), use a Bloom filter to short-circuit
+# already-seen items, fall back to exact-set check when Bloom says
+# "maybe". Measures and reports false-positive rate empirically.
+#
+# Patterns:
+#   * Bloom filter sized for expected cardinality + target FPR
+#   * exact hash-set as ground truth (for FPR measurement)
+#   * t-digest for per-record check latency
+#   * TopK for most-duplicated items
+
+# ── parameters ──────────────────────────────────────────────────────
+
+my $capacity = 10000
+my $fpr_target = 0.01
+my $bloom = bloom_filter($capacity, $fpr_target)
+
+mysync %exact            # ground truth set
+mysync $true_positives = 0
+mysync $false_positives = 0
+mysync $true_negatives  = 0
+mysync $duplicates_skipped = 0
+
+my $td_check = t_digest(100)
+my $tk_dups = topk(5)
+
+# ── seen-check ──────────────────────────────────────────────────────
+
+fn Demo::Dedup::is_seen($item) {
+    my $t0 = now_ns()
+    # Fast path: Bloom check (may have false positives).
+    my $bloom_says = bloom_contains($bloom, $item)
+    my $really_seen = exists $exact{$item}
+    if ($bloom_says) {
+        if ($really_seen) {
+            $true_positives = $true_positives + 1
+            $duplicates_skipped = $duplicates_skipped + 1
+            td_add($td_check, (now_ns() - $t0) / 1000.0)
+            return 1
+        } else {
+            # False positive — must fall back to exact (which says no).
+            $false_positives = $false_positives + 1
+        }
+    } else {
+        $true_negatives = $true_negatives + 1
+    }
+    # Not yet seen — record.
+    bloom_add($bloom, $item)
+    $exact{$item} = 1
+    td_add($td_check, (now_ns() - $t0) / 1000.0)
+    return 0
+}
+
+# ── generate workload: 5000 records, mostly duplicates ──────────────
+# 1000 distinct items, drawn 5000 times with bias toward popular ones.
+
+my @records
+for my $i (1:5000) {
+    my $bucket = int(rand() * rand() * 1000)
+    push @records, "item-$bucket"
+    topk_add($tk_dups, "item-$bucket")
+}
+printf "── workload: %d records (target ~1000 distinct) ──────\n",
+    len(@records)
+
+# ── process workload ───────────────────────────────────────────────
+
+for my $rec (@records) {
+    Demo::Dedup::is_seen($rec)
+}
+
+# ── rollup ──────────────────────────────────────────────────────────
+
+p ""
+p "── dedup rollup ─────────────────────────────────────"
+printf "  records processed       : %d\n", len(@records)
+printf "  distinct items seen      : %d\n", len(keys %exact)
+printf "  duplicates skipped       : %d\n", $duplicates_skipped
+printf "  Bloom true-positives     : %d\n", $true_positives
+printf "  Bloom false-positives    : %d\n", $false_positives
+printf "  Bloom true-negatives     : %d\n", $true_negatives
+
+# ── FPR measurement ────────────────────────────────────────────────
+
+p ""
+p "── false-positive rate (measured) ───────────────────"
+my $fpr_denominator = $false_positives + $true_negatives
+my $observed_fpr = $fpr_denominator > 0
+                   ? 100.0 * $false_positives / $fpr_denominator
+                   : 0.0
+printf "  observed FPR : %.3f%% (target: %.1f%%)\n",
+    $observed_fpr, 100 * $fpr_target
+
+# ── TopK most-duplicated items ──────────────────────────────────────
+
+p ""
+p "── most-duplicated items (TopK) ─────────────────────"
+my @hits = topk_top($tk_dups)
+for my $h (@hits) {
+    printf "  %-15s : %d occurrences\n", $h->[0], $h->[1]
+}
+
+# ── HLL cardinality estimate ────────────────────────────────────────
+
+p ""
+p "── HLL distinct cardinality ─────────────────────────"
+my $hll = hll(14)
+hll_add($hll, $_) for @records
+printf "  HLL distinct : %d\n", hll_count($hll)
+printf "  exact        : %d\n", len(keys %exact)
+
+# ── per-check latency ──────────────────────────────────────────────
+
+p ""
+p "── per-check latency (t-digest) ─────────────────────"
+printf "  p50  : %.1f µs\n", td_quantile($td_check, 0.50)
+printf "  p99  : %.1f µs\n", td_quantile($td_check, 0.99)
+
+# ── memory comparison: Bloom vs exact set ──────────────────────────
+
+p ""
+p "── memory profile (qualitative) ─────────────────────"
+printf "  exact set keys  : %d (each key ~10-20 bytes + hash overhead)\n",
+    len(keys %exact)
+printf "  Bloom filter    : ~%d bits for capacity %d at FPR %.2f%%\n",
+    int(- $capacity * log($fpr_target) / (log(2) * log(2))), $capacity, 100 * $fpr_target
+printf "  Bloom advantage : roughly 10-20x smaller for membership-only\n"

@@ -1,0 +1,216 @@
+#!/usr/bin/env stryke
+
+# DNS zone-file validator demo. Parses BIND-style zone records, checks
+# syntax for A/AAAA/CNAME/MX/TXT, flags duplicates, reports stats.
+#
+# Patterns:
+#   * line-by-line parse with regex per record type
+#   * hash-of-arrayref for records grouped by name
+#   * sketch (HLL) for distinct host count
+#   * TopK for record-type frequency
+
+# ── sample zone (intentionally contains errors) ────────────────────
+
+my $zone_text = q{
+$ORIGIN example.com.
+$TTL 3600
+
+@               IN SOA  ns1.example.com. admin.example.com. (
+                        2026051501 ; serial
+                        3600       ; refresh
+                        1800       ; retry
+                        604800     ; expire
+                        300 )      ; minimum
+@               IN NS   ns1.example.com.
+@               IN NS   ns2.example.com.
+
+ns1             IN A    192.0.2.1
+ns2             IN A    192.0.2.2
+www             IN A    192.0.2.10
+www             IN A    192.0.2.11
+api             IN A    192.0.2.20
+api             IN AAAA 2001:db8::20
+blog            IN CNAME www
+mail            IN MX 10 mx1.example.com.
+mail            IN MX 20 mx2.example.com.
+@               IN TXT  "v=spf1 mx -all"
+www             IN A    BADIP
+nonexistent     IN CNAME www
+www             IN CNAME blog
+}
+
+# ── parse + validate ───────────────────────────────────────────────
+
+mysync @records
+mysync @errors
+my $td_parse = t_digest(100)
+my $tk_types = topk(5)
+
+fn Demo::Zone::parse_line($line, $line_num) {
+    my $t0 = now_ns()
+    # Strip comments + leading/trailing whitespace.
+    $line =~ s/;.*$//
+    $line =~ s/^\s+|\s+$//g
+    if (len($line) == 0) {
+        td_add($td_parse, (now_ns() - $t0) / 1000.0)
+        return undef
+    }
+    # Skip directives.
+    if ($line =~ /^\$/) {
+        td_add($td_parse, (now_ns() - $t0) / 1000.0)
+        return undef
+    }
+    # Match: NAME [TTL] IN TYPE RDATA
+    if ($line =~ /^(\S+)\s+IN\s+(\S+)\s+(.+)$/) {
+        my $name = $1
+        my $type = $2
+        my $rdata = $3
+        topk_add($tk_types, $type)
+        my $rec = +{ line => $line_num, name => $name, type => $type, rdata => $rdata }
+        td_add($td_parse, (now_ns() - $t0) / 1000.0)
+        return $rec
+    }
+    td_add($td_parse, (now_ns() - $t0) / 1000.0)
+    return undef
+}
+
+# ── per-type validators ────────────────────────────────────────────
+
+fn Demo::Zone::validate_a($rec) {
+    # IPv4: 4 octets 0-255.
+    return $rec->{rdata} =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/ ? 1 : 0
+}
+
+fn Demo::Zone::validate_aaaa($rec) {
+    # Rough IPv6: hex segments separated by colons.
+    return $rec->{rdata} =~ /^[\da-fA-F:]+$/ ? 1 : 0
+}
+
+fn Demo::Zone::validate_cname($rec) {
+    # Single hostname target.
+    return $rec->{rdata} =~ /^[\w.\-]+\.?$/ ? 1 : 0
+}
+
+fn Demo::Zone::validate_mx($rec) {
+    # priority hostname.
+    return $rec->{rdata} =~ /^\d+\s+[\w.\-]+\.?$/ ? 1 : 0
+}
+
+fn Demo::Zone::validate_txt($rec) {
+    # quoted string.
+    return $rec->{rdata} =~ /^".*"$/ ? 1 : 0
+}
+
+# ── load + validate ────────────────────────────────────────────────
+
+my $line_num = 0
+for my $line (split /\n/, $zone_text) {
+    $line_num++
+    my $rec = Demo::Zone::parse_line($line, $line_num)
+    next unless defined $rec
+    push @records, $rec
+    my $ok = 0
+    my $type = $rec->{type}
+    if    ($type eq "A")     { $ok = Demo::Zone::validate_a($rec) }
+    elsif ($type eq "AAAA")  { $ok = Demo::Zone::validate_aaaa($rec) }
+    elsif ($type eq "CNAME") { $ok = Demo::Zone::validate_cname($rec) }
+    elsif ($type eq "MX")    { $ok = Demo::Zone::validate_mx($rec) }
+    elsif ($type eq "TXT")   { $ok = Demo::Zone::validate_txt($rec) }
+    elsif ($type eq "NS")    { $ok = Demo::Zone::validate_cname($rec) }
+    elsif ($type eq "SOA")   { $ok = 1 }  # complex; skip strict check
+    else { $ok = 0 }
+    if (!$ok) {
+        push @errors, +{
+            line => $rec->{line},
+            kind => "invalid_${type}_rdata",
+            name => $rec->{name},
+            rdata => $rec->{rdata},
+        }
+    }
+}
+
+printf "── parsed %d records ────────────────────────────────\n",
+    len(@records)
+
+# ── detect duplicate records (same name + type + rdata) ────────────
+
+my %seen
+for my $r (@records) {
+    my $key = "$r->{name}/$r->{type}/$r->{rdata}"
+    if (exists $seen{$key}) {
+        push @errors, +{
+            line => $r->{line},
+            kind => "duplicate",
+            name => $r->{name},
+            rdata => $r->{rdata},
+        }
+    } else {
+        $seen{$key} = 1
+    }
+}
+
+# ── detect CNAME conflicting with A (RFC 2181 §10.1.1) ────────────
+
+my %has_a
+for my $r (@records) {
+    $has_a{$r->{name}} = 1 if $r->{type} eq "A"
+}
+for my $r (@records) {
+    if ($r->{type} eq "CNAME" && exists $has_a{$r->{name}}) {
+        push @errors, +{
+            line => $r->{line},
+            kind => "cname_conflicts_with_a",
+            name => $r->{name},
+        }
+    }
+}
+
+# ── per-type rollup ────────────────────────────────────────────────
+
+p ""
+p "── records by type ──────────────────────────────────"
+my %by_type
+$by_type{$_->{type}}++ for @records
+for my $t (sort { _0 cmp _1 } keys %by_type) {
+    printf "  %-8s : %d\n", $t, $by_type{$t}
+}
+
+# ── error report ────────────────────────────────────────────────────
+
+p ""
+p "── validation errors ─────────────────────────────────"
+for my $e (@errors) {
+    my $extra = exists $e->{rdata} ? " rdata='$e->{rdata}'" : ""
+    printf "  line %2d: %-25s name=%s%s\n",
+        $e->{line}, $e->{kind}, $e->{name}, $extra
+}
+
+p ""
+printf "── %d errors found ──────────────────────────────────\n", len(@errors)
+
+# ── HLL distinct hostnames ──────────────────────────────────────────
+
+p ""
+p "── HLL distinct hostnames ───────────────────────────"
+my $hll = hll(14)
+hll_add($hll, $_->{name}) for @records
+my %distinct_names
+$distinct_names{$_->{name}} = 1 for @records
+printf "  HLL  : %d\n", hll_count($hll)
+printf "  exact : %d\n", len(keys %distinct_names)
+
+# ── TopK record types ──────────────────────────────────────────────
+
+p ""
+p "── TopK most-common types (sketch) ──────────────────"
+my @hits = topk_top($tk_types)
+for my $h (@hits) {
+    printf "  %-8s : %d\n", $h->[0], $h->[1]
+}
+
+# ── per-line parse latency ─────────────────────────────────────────
+
+p ""
+p "── per-line parse latency (t-digest) ────────────────"
+printf "  p50  : %.1f µs\n", td_quantile($td_parse, 0.50)
+printf "  p99  : %.1f µs\n", td_quantile($td_parse, 0.99)

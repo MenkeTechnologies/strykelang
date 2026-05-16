@@ -1,0 +1,150 @@
+#!/usr/bin/env stryke
+
+# Directory-tree diff demo. Compares two simulated directory snapshots
+# (filename -> size hashes), reports added/removed/changed/same.
+# Patterns:
+#   * hash diff via key-set intersection / difference
+#   * size-change detection
+#   * sketch (HLL) for distinct paths in union
+#   * TopK largest files
+
+# ── snapshots ──────────────────────────────────────────────────────
+
+my %before = (
+    "src/main.rs"        => 1024,
+    "src/lib.rs"         => 2048,
+    "src/parser.rs"      => 4096,
+    "src/lexer.rs"       => 3072,
+    "tests/unit.rs"      => 512,
+    "tests/integ.rs"     => 768,
+    "Cargo.toml"         => 256,
+    "README.md"          => 1536,
+    "LICENSE"            => 128,
+    "examples/demo.stk"  => 384,
+)
+
+my %after = (
+    "src/main.rs"        => 1024,           # unchanged
+    "src/lib.rs"         => 3072,           # grew
+    "src/parser.rs"      => 4096,           # unchanged
+    "src/lexer.rs"       => 2048,           # shrank
+    # tests/unit.rs removed
+    "tests/integ.rs"     => 1024,           # grew
+    "tests/new_test.rs"  => 256,            # new
+    "Cargo.toml"         => 256,            # unchanged
+    "README.md"          => 2048,           # grew
+    "LICENSE"            => 128,            # unchanged
+    "examples/demo.stk"  => 512,            # grew
+    "examples/bonus.stk" => 768,            # new
+    "CHANGELOG.md"       => 320,            # new
+)
+
+# ── diff ───────────────────────────────────────────────────────────
+
+my %all_paths
+$all_paths{$_} = 1 for keys %before
+$all_paths{$_} = 1 for keys %after
+
+my @added
+my @removed
+my @changed
+my @same
+
+for my $path (sort { _0 cmp _1 } keys %all_paths) {
+    my $bsz = $before{$path}
+    my $asz = $after{$path}
+    if (defined $bsz && !defined $asz) {
+        push @removed, +{ path => $path, was => $bsz }
+    } elsif (!defined $bsz && defined $asz) {
+        push @added, +{ path => $path, size => $asz }
+    } elsif ($bsz == $asz) {
+        push @same, +{ path => $path, size => $asz }
+    } else {
+        push @changed, +{ path => $path, before => $bsz, after => $asz, delta => $asz - $bsz }
+    }
+}
+
+printf "── snapshot diff: %d → %d paths ───────────────────────\n",
+    len(keys %before), len(keys %after)
+
+# ── added ──────────────────────────────────────────────────────────
+
+p ""
+printf "── added (%d) ────────────────────────────────────────\n", len(@added)
+for my $entry (@added) {
+    printf "  + %-30s %5d B\n", $entry->{path}, $entry->{size}
+}
+
+# ── removed ────────────────────────────────────────────────────────
+
+p ""
+printf "── removed (%d) ──────────────────────────────────────\n", len(@removed)
+for my $entry (@removed) {
+    printf "  - %-30s %5d B (was)\n", $entry->{path}, $entry->{was}
+}
+
+# ── changed (size differs) ─────────────────────────────────────────
+
+p ""
+printf "── changed (%d) ──────────────────────────────────────\n", len(@changed)
+for my $entry (sort { abs($_1->{delta}) <=> abs($_0->{delta}) } @changed) {
+    my $sign = $entry->{delta} > 0 ? "+" : ""
+    printf "  ~ %-30s %5d → %5d  (delta %s%d)\n",
+        $entry->{path}, $entry->{before}, $entry->{after}, $sign, $entry->{delta}
+}
+
+# ── unchanged ──────────────────────────────────────────────────────
+
+p ""
+printf "── unchanged (%d) ───────────────────────────────────\n", len(@same)
+for my $entry (@same) {
+    printf "  = %-30s %5d B\n", $entry->{path}, $entry->{size}
+}
+
+# ── stats ───────────────────────────────────────────────────────────
+
+p ""
+p "── stats ────────────────────────────────────────────"
+my $before_total = 0
+$before_total += $_ for values %before
+my $after_total = 0
+$after_total += $_ for values %after
+printf "  before total bytes : %d\n", $before_total
+printf "  after total bytes  : %d\n", $after_total
+printf "  growth             : %+d bytes (%.1f%%)\n",
+    $after_total - $before_total,
+    100.0 * ($after_total - $before_total) / $before_total
+
+# ── largest files (after) via TopK ─────────────────────────────────
+
+p ""
+p "── largest files in `after` (TopK) ──────────────────"
+my $tk = topk(5)
+for my $path (keys %after) {
+    for my $i (1:int($after{$path} / 100)) {
+        topk_add($tk, $path)
+    }
+}
+my @hits = topk_top($tk)
+for my $h (@hits) {
+    printf "  %-30s ~%d B\n", $h->[0], $h->[1] * 100
+}
+
+# ── HLL distinct paths in union ────────────────────────────────────
+
+p ""
+p "── HLL distinct paths (union) ───────────────────────"
+my $hll = hll(14)
+hll_add($hll, $_) for keys %before
+hll_add($hll, $_) for keys %after
+printf "  HLL   : %d\n", hll_count($hll)
+printf "  exact : %d\n", len(keys %all_paths)
+
+# ── churn rate ──────────────────────────────────────────────────────
+
+p ""
+p "── churn metrics ────────────────────────────────────"
+my $churn = len(@added) + len(@removed) + len(@changed)
+my $total_paths = len(keys %all_paths)
+printf "  churn rate : %.1f%% (%d / %d paths affected)\n",
+    100.0 * $churn / $total_paths, $churn, $total_paths

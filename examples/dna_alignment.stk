@@ -1,0 +1,161 @@
+#!/usr/bin/env stryke
+
+# Needleman-Wunsch DNA sequence alignment. Computes optimal global
+# alignment between two sequences using dynamic programming. Patterns:
+#   * 2D DP table as array-of-arrayref
+#   * scoring: match=+2, mismatch=-1, gap=-2
+#   * traceback to reconstruct alignment
+#   * t-digest for per-cell latency
+
+# ── parameters ─────────────────────────────────────────────────────
+
+my $match_score    =  2
+my $mismatch_score = -1
+my $gap_penalty    = -2
+
+# ── helpers ────────────────────────────────────────────────────────
+
+fn Demo::DNA::score($a_ch, $b_ch) {
+    return $a_ch eq $b_ch ? $match_score : $mismatch_score
+}
+
+fn Demo::DNA::max3($n1, $n2, $n3) {
+    my $m = $n1 > $n2 ? $n1 : $n2
+    return $m > $n3 ? $m : $n3
+}
+
+# ── DP table construction ──────────────────────────────────────────
+
+mysync $td_cell = t_digest(100)
+
+fn Demo::DNA::align($seq_a, $seq_b) {
+    my $m = len($seq_a)
+    my $n = len($seq_b)
+    my @table
+    my @trace   # back-pointer: "diag", "up", "left"
+    # Initialize.
+    for my $i (0:$m) {
+        $table[$i] = []
+        $trace[$i] = []
+        for my $j (0:$n) {
+            $table[$i]->[$j] = 0
+            $trace[$i]->[$j] = ""
+        }
+    }
+    for my $i (1:$m) {
+        $table[$i]->[0] = $i * $gap_penalty
+        $trace[$i]->[0] = "up"
+    }
+    for my $j (1:$n) {
+        $table[0]->[$j] = $j * $gap_penalty
+        $trace[0]->[$j] = "left"
+    }
+    # Fill.
+    for my $i (1:$m) {
+        for my $j (1:$n) {
+            my $t0 = now_ns()
+            my $ac = substr($seq_a, $i - 1, 1)
+            my $bc = substr($seq_b, $j - 1, 1)
+            my $diag = $table[$i - 1]->[$j - 1] + Demo::DNA::score($ac, $bc)
+            my $up   = $table[$i - 1]->[$j] + $gap_penalty
+            my $left = $table[$i]->[$j - 1] + $gap_penalty
+            my $best = Demo::DNA::max3($diag, $up, $left)
+            $table[$i]->[$j] = $best
+            if ($best == $diag) {
+                $trace[$i]->[$j] = "diag"
+            } elsif ($best == $up) {
+                $trace[$i]->[$j] = "up"
+            } else {
+                $trace[$i]->[$j] = "left"
+            }
+            td_add($td_cell, (now_ns() - $t0) / 1000.0)
+        }
+    }
+    return +{ table => \@table, trace => \@trace, score => $table[$m]->[$n] }
+}
+
+# ── traceback ──────────────────────────────────────────────────────
+
+fn Demo::DNA::traceback($seq_a, $seq_b, $trace) {
+    my $i = len($seq_a)
+    my $j = len($seq_b)
+    my @a_aligned
+    my @b_aligned
+    while ($i > 0 || $j > 0) {
+        my $dir = $trace->[$i]->[$j]
+        if ($dir eq "diag") {
+            unshift @a_aligned, substr($seq_a, $i - 1, 1)
+            unshift @b_aligned, substr($seq_b, $j - 1, 1)
+            $i = $i - 1
+            $j = $j - 1
+        } elsif ($dir eq "up") {
+            unshift @a_aligned, substr($seq_a, $i - 1, 1)
+            unshift @b_aligned, "-"
+            $i = $i - 1
+        } else {
+            unshift @a_aligned, "-"
+            unshift @b_aligned, substr($seq_b, $j - 1, 1)
+            $j = $j - 1
+        }
+    }
+    return +{
+        a => join("", @a_aligned),
+        b => join("", @b_aligned),
+    }
+}
+
+# ── workload ───────────────────────────────────────────────────────
+
+my @pairs = (
+    ["GATTACA",      "GCATGCU"],
+    ["AGTACGCA",     "TATGC"],
+    ["ACGTACGT",     "ACGTACGT"],
+    ["CAGCTAGCG",    "CTAGCG"],
+)
+
+printf "── aligning %d sequence pairs ──────────────────────────\n",
+    len(@pairs)
+
+for my $pair (@pairs) {
+    my $sa = $pair->[0]
+    my $sb = $pair->[1]
+    my $r = Demo::DNA::align($sa, $sb)
+    my $tb = Demo::DNA::traceback($sa, $sb, $r->{trace})
+    # Build the match line.
+    my $match_line = ""
+    for my $i (0:len($tb->{a}) - 1) {
+        my $ca = substr($tb->{a}, $i, 1)
+        my $cb = substr($tb->{b}, $i, 1)
+        if ($ca eq $cb)             { $match_line .= "|" }
+        elsif ($ca eq "-" || $cb eq "-") { $match_line .= " " }
+        else                              { $match_line .= "." }
+    }
+    p ""
+    printf "── %s vs %s ───────────────────────\n", $sa, $sb
+    printf "  score : %d\n", $r->{score}
+    printf "  align A : %s\n", $tb->{a}
+    printf "          %s\n", $match_line
+    printf "  align B : %s\n", $tb->{b}
+    # Count match/mismatch/gap.
+    my $matches    = grep { $_ eq "|" } split //, $match_line
+    my $mismatches = grep { $_ eq "." } split //, $match_line
+    my $gaps       = grep { $_ eq " " } split //, $match_line
+    printf "  matches=%d mismatches=%d gaps=%d\n",
+        $matches, $mismatches, $gaps
+}
+
+# ── overall stats ──────────────────────────────────────────────────
+
+p ""
+p "── per-cell DP latency (t-digest) ───────────────────"
+printf "  p50  : %.1f µs\n", td_quantile($td_cell, 0.50)
+printf "  p99  : %.1f µs\n", td_quantile($td_cell, 0.99)
+
+# ── identity case ──────────────────────────────────────────────────
+
+p ""
+p "── identity case: ACGTACGT vs ACGTACGT ──────────────"
+my $iden = Demo::DNA::align("ACGTACGT", "ACGTACGT")
+printf "  score expected : %d (len * match_score = 8*2 = 16)\n", $iden->{score}
+my $expected = len("ACGTACGT") * $match_score
+printf "  match : %s\n", $iden->{score} == $expected ? "YES" : "NO"

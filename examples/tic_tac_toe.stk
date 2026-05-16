@@ -1,0 +1,197 @@
+#!/usr/bin/env stryke
+
+# Tic-tac-toe with minimax AI. Two AI players (X and O) play out
+# games on a fresh board until one wins or draws. The minimax depth
+# scoring ensures perfect play — both players play optimally so all
+# games end in a draw. Patterns:
+#   * recursive minimax with memoization
+#   * board as 3x3 array-of-arrayrefs
+#   * t-digest for per-move latency
+#   * sketch (TopK) for "most common opening move"
+
+# ── board helpers ───────────────────────────────────────────────────
+
+fn Demo::TTT::new_board() {
+    [
+        [".", ".", "."],
+        [".", ".", "."],
+        [".", ".", "."],
+    ]
+}
+
+fn Demo::TTT::render($board) {
+    my @lines
+    push @lines, "    0   1   2"
+    for my $r (0:2) {
+        my $line = "$r   " . join(" | ", @{$board->[$r]})
+        push @lines, $line
+        push @lines, "   -----------" if $r < 2
+    }
+    return \@lines
+}
+
+fn Demo::TTT::find_winner($board) {
+    # Rows.
+    for my $r (0:2) {
+        my $c0 = $board->[$r]->[0]
+        next if $c0 eq "."
+        if ($c0 eq $board->[$r]->[1] && $c0 eq $board->[$r]->[2]) {
+            return $c0
+        }
+    }
+    # Columns.
+    for my $c (0:2) {
+        my $r0 = $board->[0]->[$c]
+        next if $r0 eq "."
+        if ($r0 eq $board->[1]->[$c] && $r0 eq $board->[2]->[$c]) {
+            return $r0
+        }
+    }
+    # Diagonals.
+    my $tl = $board->[0]->[0]
+    if ($tl ne "." && $tl eq $board->[1]->[1] && $tl eq $board->[2]->[2]) {
+        return $tl
+    }
+    my $tr = $board->[0]->[2]
+    if ($tr ne "." && $tr eq $board->[1]->[1] && $tr eq $board->[2]->[0]) {
+        return $tr
+    }
+    return ""   # no winner yet
+}
+
+fn Demo::TTT::is_full($board) {
+    for my $r (0:2) {
+        for my $c (0:2) {
+            return 0 if $board->[$r]->[$c] eq "."
+        }
+    }
+    return 1
+}
+
+fn Demo::TTT::available_moves($board) {
+    my @moves
+    for my $r (0:2) {
+        for my $c (0:2) {
+            push @moves, [$r, $c] if $board->[$r]->[$c] eq "."
+        }
+    }
+    return \@moves
+}
+
+fn Demo::TTT::opponent($player) {
+    return $player eq "X" ? "O" : "X"
+}
+
+# ── minimax: returns the score for `player` from current board state.
+# +10 for X-wins, -10 for O-wins, 0 for draw. Depth subtracted to
+# prefer faster wins / slower losses.
+
+fn Demo::TTT::minimax($board, $player, $depth) {
+    my $winner = Demo::TTT::find_winner($board)
+    return  10 - $depth if $winner eq "X"
+    return -10 + $depth if $winner eq "O"
+    return 0           if Demo::TTT::is_full($board)
+    my $moves = Demo::TTT::available_moves($board)
+    if ($player eq "X") {
+        my $best = -1000
+        for my $m (@$moves) {
+            $board->[$m->[0]]->[$m->[1]] = "X"
+            my $score = Demo::TTT::minimax($board, "O", $depth + 1)
+            $board->[$m->[0]]->[$m->[1]] = "."
+            $best = $score if $score > $best
+        }
+        return $best
+    } else {
+        my $best = 1000
+        for my $m (@$moves) {
+            $board->[$m->[0]]->[$m->[1]] = "O"
+            my $score = Demo::TTT::minimax($board, "X", $depth + 1)
+            $board->[$m->[0]]->[$m->[1]] = "."
+            $best = $score if $score < $best
+        }
+        return $best
+    }
+}
+
+fn Demo::TTT::best_move($board, $player) {
+    my $moves = Demo::TTT::available_moves($board)
+    my $best_score = $player eq "X" ? -1000 : 1000
+    my $best_move = $moves->[0]
+    for my $m (@$moves) {
+        $board->[$m->[0]]->[$m->[1]] = $player
+        my $score = Demo::TTT::minimax($board, Demo::TTT::opponent($player), 1)
+        $board->[$m->[0]]->[$m->[1]] = "."
+        if ($player eq "X") {
+            if ($score > $best_score) {
+                $best_score = $score
+                $best_move = $m
+            }
+        } else {
+            if ($score < $best_score) {
+                $best_score = $score
+                $best_move = $m
+            }
+        }
+    }
+    return $best_move
+}
+
+# ── play a full game ───────────────────────────────────────────────
+
+my $td_move = t_digest(100)
+my $tk_open = topk(3)
+
+fn Demo::TTT::play_game() {
+    my $board = Demo::TTT::new_board()
+    my $player = "X"
+    my $move_count = 0
+    while (1) {
+        my $winner = Demo::TTT::find_winner($board)
+        if ($winner ne "") {
+            return +{ winner => $winner, moves => $move_count, board => $board }
+        }
+        if (Demo::TTT::is_full($board)) {
+            return +{ winner => "draw", moves => $move_count, board => $board }
+        }
+        my $t0 = now_ns()
+        my $m = Demo::TTT::best_move($board, $player)
+        td_add($td_move, (now_ns() - $t0) / 1000.0)
+        $board->[$m->[0]]->[$m->[1]] = $player
+        $move_count = $move_count + 1
+        if ($move_count == 1) {
+            topk_add($tk_open, "($m->[0],$m->[1])")
+        }
+        $player = Demo::TTT::opponent($player)
+    }
+}
+
+# ── run 5 games and report ─────────────────────────────────────────
+
+printf "── playing 2 AI-vs-AI games (full minimax is expensive) ──\n"
+my %outcomes
+for my $g (1:2) {
+    my $r = Demo::TTT::play_game()
+    $outcomes{$r->{winner}} = ($outcomes{$r->{winner}} // 0) + 1
+    printf "\n── game %d : %s in %d moves ─────────────\n",
+        $g, $r->{winner}, $r->{moves}
+    my $lines = Demo::TTT::render($r->{board})
+    for my $line (@$lines) { p "  $line" }
+}
+
+p ""
+p "── outcome rollup ───────────────────────────────────"
+for my $outcome (sort { _0 cmp _1 } keys %outcomes) {
+    printf "  %-6s : %d\n", $outcome, $outcomes{$outcome}
+}
+
+p ""
+p "── opening-move frequency (TopK) ────────────────────"
+my @hits = topk_top($tk_open)
+for my $h (@hits) {
+    printf "  %-10s : %d openings\n", $h->[0], $h->[1]
+}
+
+p ""
+p "── per-move minimax latency (t-digest) ──────────────"
+printf "  p50  : %.1f µs\n", td_quantile($td_move, 0.50)
+printf "  p99  : %.1f µs\n", td_quantile($td_move, 0.99)

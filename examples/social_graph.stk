@@ -1,0 +1,161 @@
+#!/usr/bin/env stryke
+
+# Social-graph analytics demo. Follows network with:
+#   * mutual-friend computation
+#   * in/out degree distribution
+#   * clustering coefficient (per node)
+#   * influencer detection via degree
+#   * sketch (HLL) for distinct-edge cardinality
+
+# ── adjacency (directed: follower -> followee) ──────────────────────
+
+my %follows = (
+    alice   => +{ map { $_ => 1 } qw(bob carol dave eve frank) },
+    bob     => +{ map { $_ => 1 } qw(alice carol grace) },
+    carol   => +{ map { $_ => 1 } qw(alice dave henry) },
+    dave    => +{ map { $_ => 1 } qw(alice carol) },
+    eve     => +{ map { $_ => 1 } qw(alice irene) },
+    frank   => +{ map { $_ => 1 } qw(alice grace) },
+    grace   => +{ map { $_ => 1 } qw(frank bob) },
+    henry   => +{ map { $_ => 1 } qw(carol irene) },
+    irene   => +{ map { $_ => 1 } qw(eve henry jack) },
+    jack    => +{ map { $_ => 1 } qw(irene) },
+)
+
+# ── reverse-index: who follows X? ──────────────────────────────────
+
+my %followers
+$followers{$_} = +{} for keys %follows
+for my $u (keys %follows) {
+    for my $v (keys %{$follows{$u}}) {
+        $followers{$v} = +{} unless exists $followers{$v}
+        $followers{$v}->{$u} = 1
+    }
+}
+
+# ── in/out degrees ──────────────────────────────────────────────────
+
+my $td_degree = t_digest(100)
+my $tk_influencers = topk(5)
+my $hll_edges = hll(14)
+
+printf "── degree distribution (out / in) ───────────────────\n"
+printf "  %-8s %5s %5s\n", "user", "out", "in"
+my %all_users
+$all_users{$_} = 1 for keys %follows
+$all_users{$_} = 1 for keys %followers
+for my $u (sort { _0 cmp _1 } keys %all_users) {
+    my $out = exists $follows{$u} ? len(keys %{$follows{$u}}) : 0
+    my $in  = exists $followers{$u} ? len(keys %{$followers{$u}}) : 0
+    td_add($td_degree, $in)
+    for my $i (1:$in) {
+        topk_add($tk_influencers, $u)
+    }
+    printf "  %-8s %5d %5d\n", $u, $out, $in
+}
+
+# ── mutuals (X and Y both follow each other) ──────────────────────
+
+p ""
+p "── mutual follows (directed both ways) ──────────────"
+my %seen_pairs
+for my $u (sort { _0 cmp _1 } keys %follows) {
+    for my $v (sort { _0 cmp _1 } keys %{$follows{$u}}) {
+        next unless exists $follows{$v} && exists $follows{$v}->{$u}
+        my $key = $u lt $v ? "$u|$v" : "$v|$u"
+        next if exists $seen_pairs{$key}
+        $seen_pairs{$key} = 1
+        printf "  %s <-> %s\n", $u, $v
+    }
+}
+
+# ── shared connections (common followees) ─────────────────────────
+
+fn Demo::SG::shared($u1, $u2) {
+    return +{} unless exists $follows{$u1}
+    my %shared
+    for my $f (keys %{$follows{$u1}}) {
+        if (exists $follows{$u2} && exists $follows{$u2}->{$f}) {
+            $shared{$f} = 1
+        }
+    }
+    return \%shared
+}
+
+p ""
+p "── shared followees ─────────────────────────────────"
+my @pairs = (
+    ["alice", "bob"],
+    ["alice", "dave"],
+    ["bob",   "carol"],
+    ["eve",   "irene"],
+)
+for my $pair (@pairs) {
+    my $s = Demo::SG::shared($pair->[0], $pair->[1])
+    my @keys = sort { _0 cmp _1 } keys %$s
+    printf "  %s & %s share %d: %s\n",
+        $pair->[0], $pair->[1], len(@keys),
+        len(@keys) > 0 ? join(", ", @keys) : "(none)"
+}
+
+# ── clustering coefficient (rough) ─────────────────────────────────
+
+p ""
+p "── clustering coefficient per user ──────────────────"
+for my $u (sort { _0 cmp _1 } keys %all_users) {
+    next unless exists $follows{$u}
+    my @neighbors = keys %{$follows{$u}}
+    my $n = len(@neighbors)
+    if ($n < 2) {
+        printf "  %-8s : n/a (degree < 2)\n", $u
+        next
+    }
+    my $edges_among = 0
+    for my $i (0:$n - 2) {
+        for my $j ($i + 1 : $n - 1) {
+            my $n1 = $neighbors[$i]
+            my $n2 = $neighbors[$j]
+            if (exists $follows{$n1} && exists $follows{$n1}->{$n2}) {
+                $edges_among++
+            }
+            if (exists $follows{$n2} && exists $follows{$n2}->{$n1}) {
+                $edges_among++
+            }
+        }
+    }
+    my $max_edges = $n * ($n - 1)   # directed
+    my $cc = $max_edges > 0 ? $edges_among / $max_edges : 0
+    printf "  %-8s : %.3f (edges %d / %d)\n", $u, $cc, $edges_among, $max_edges
+}
+
+# ── influencer ranking via TopK ────────────────────────────────────
+
+p ""
+p "── most-followed (TopK, by in-degree) ───────────────"
+my @hits = topk_top($tk_influencers)
+for my $h (@hits) {
+    printf "  %-8s : %d followers\n", $h->[0], $h->[1]
+}
+
+# ── HLL distinct-edge sanity ───────────────────────────────────────
+
+p ""
+p "── HLL distinct edges ───────────────────────────────"
+my $total_edges = 0
+for my $u (keys %follows) {
+    $total_edges += len(keys %{$follows{$u}})
+    for my $v (keys %{$follows{$u}}) {
+        hll_add($hll_edges, "$u->$v")
+    }
+}
+printf "  HLL   : %d\n", hll_count($hll_edges)
+printf "  exact : %d\n", $total_edges
+
+# ── degree distribution percentiles ────────────────────────────────
+
+p ""
+p "── in-degree percentiles (t-digest) ─────────────────"
+printf "  p10  : %d\n", int(td_quantile($td_degree, 0.10))
+printf "  p50  : %d\n", int(td_quantile($td_degree, 0.50))
+printf "  p90  : %d\n", int(td_quantile($td_degree, 0.90))
+printf "  p99  : %d\n", int(td_quantile($td_degree, 0.99))

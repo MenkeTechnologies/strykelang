@@ -1,0 +1,146 @@
+#!/usr/bin/env stryke
+
+# Text statistics demo. Computes word/sentence/paragraph counts,
+# average word length, character frequency histogram, and a
+# Flesch-Kincaid-like readability score. Patterns:
+#   * split on regex for tokenization
+#   * hash for character histogram with bar visualization
+#   * vowel-counting via split // and grep
+#   * t-digest for per-sentence length distribution
+
+# ── corpus ───────────────────────────────────────────────────────────
+
+my $text = q{
+The quick brown fox jumps over the lazy dog. This is a short paragraph
+demonstrating simple text-statistics computation.
+
+A second paragraph follows here. It has fewer sentences. But each one
+is reasonably long, with multiple commas and clauses. The reader should
+find this text accessible.
+
+Finally, the third paragraph is short. Very short!
+}
+
+# ── tokenize ────────────────────────────────────────────────────────
+
+my @paragraphs = split /\n\n+/, $text
+@paragraphs = grep { len($_) > 0 } @paragraphs
+
+my @sentences
+for my $para (@paragraphs) {
+    my @s = split /[.!?]+/, $para
+    @s = grep { len($_) > 0 && $_ =~ /\w/ } @s
+    push @sentences, @s
+}
+
+my @words
+for my $sent (@sentences) {
+    my @w = split /\W+/, lc($sent)
+    @w = grep { len($_) > 0 } @w
+    push @words, @w
+}
+
+printf "── text statistics ────────────────────────────────────\n"
+printf "  paragraphs : %d\n", len(@paragraphs)
+printf "  sentences  : %d\n", len(@sentences)
+printf "  words      : %d\n", len(@words)
+printf "  chars      : %d (bytes)\n", length($text)
+printf "  chars      : %d (codepoints)\n", len($text)
+
+# ── per-sentence stats ─────────────────────────────────────────────
+
+my $td_words_per_sent = t_digest(100)
+for my $sent (@sentences) {
+    my @w = split /\W+/, lc($sent)
+    @w = grep { len($_) > 0 } @w
+    td_add($td_words_per_sent, len(@w))
+}
+
+p ""
+p "── words per sentence (t-digest) ────────────────────"
+printf "  p10  : %d\n", int(td_quantile($td_words_per_sent, 0.10))
+printf "  p50  : %d\n", int(td_quantile($td_words_per_sent, 0.50))
+printf "  p90  : %d\n", int(td_quantile($td_words_per_sent, 0.90))
+
+# ── word-length distribution ───────────────────────────────────────
+
+my %by_len
+for my $w (@words) {
+    $by_len{len($w)} = ($by_len{len($w)} // 0) + 1
+}
+
+p ""
+p "── word-length distribution ─────────────────────────"
+for my $l (sort { _0 <=> _1 } keys %by_len) {
+    my $bar = "#" x $by_len{$l}
+    printf "  %2d-char (%2d): %s\n", $l, $by_len{$l}, $bar
+}
+
+# ── vowel/consonant ratio ──────────────────────────────────────────
+
+my %is_vowel = (a => 1, e => 1, i => 1, o => 1, u => 1)
+my $vowels = 0
+my $consonants = 0
+for my $w (@words) {
+    for my $i (0:len($w) - 1) {
+        my $ch = substr($w, $i, 1)
+        if (exists $is_vowel{$ch}) {
+            $vowels = $vowels + 1
+        } else {
+            $consonants = $consonants + 1
+        }
+    }
+}
+
+p ""
+p "── vowel/consonant ratio ────────────────────────────"
+printf "  vowels     : %d (%.1f%%)\n", $vowels, 100.0 * $vowels / ($vowels + $consonants)
+printf "  consonants : %d (%.1f%%)\n", $consonants, 100.0 * $consonants / ($vowels + $consonants)
+
+# ── readability score (Flesch-Kincaid Grade Level approximation) ──
+
+my $words_per_sent  = len(@words) / len(@sentences)
+my $syllables_per_word = ($vowels + $consonants) / len(@words) / 3.0   # crude
+my $fkgl = 0.39 * $words_per_sent + 11.8 * $syllables_per_word - 15.59
+
+p ""
+p "── readability score (Flesch-Kincaid approx) ────────"
+printf "  words/sentence    : %.2f\n", $words_per_sent
+printf "  syllables/word    : %.2f (approx)\n", $syllables_per_word
+printf "  FK grade level    : %.2f\n", $fkgl
+
+# ── most-common words via TopK ─────────────────────────────────────
+
+p ""
+p "── most-common words (TopK) ─────────────────────────"
+my $tk = topk(8)
+topk_add($tk, $_) for @words
+my @hits = topk_top($tk)
+for my $h (@hits) {
+    printf "  %-12s : %d\n", $h->[0], $h->[1]
+}
+
+# ── distinct-word cardinality (HLL) ────────────────────────────────
+
+p ""
+p "── distinct-word cardinality (HLL) ──────────────────"
+my $hll = hll(14)
+hll_add($hll, $_) for @words
+my %distinct
+$distinct{$_} = 1 for @words
+printf "  HLL distinct : %d\n", hll_count($hll)
+printf "  exact        : %d\n", len(keys %distinct)
+printf "  type-token ratio (vocab diversity) : %.2f\n",
+    len(keys %distinct) / len(@words)
+
+# ── longest words ──────────────────────────────────────────────────
+
+p ""
+p "── longest words (top 5) ────────────────────────────"
+my @uniq_words = keys %distinct
+my @longest = sort { len($_1) <=> len($_0) } @uniq_words
+for my $i (0:4) {
+    last if $i >= len(@longest)
+    my $w = $longest[$i]
+    printf "  %-20s (%d chars)\n", $w, len($w)
+}

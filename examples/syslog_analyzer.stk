@@ -1,0 +1,150 @@
+#!/usr/bin/env stryke
+
+# Syslog analyzer. Parses simplified RFC3164-style log lines, classifies
+# severity, time-buckets, finds top noisy hosts, detects anomalies via
+# threshold. Patterns:
+#   * regex parse with capture-save idiom
+#   * hash-of-arrayref per host
+#   * t-digest for severity-distribution
+#   * TopK for noisiest hosts
+#   * sketch (Bloom) for fast known-host lookup
+
+# ── sample syslog ──────────────────────────────────────────────────
+
+my $syslog = q{2026-05-15T12:00:01 host1 sshd[1234]: Failed password for root
+2026-05-15T12:00:05 host1 sshd[1235]: Failed password for admin
+2026-05-15T12:00:07 host2 nginx: 200 OK /api/users 12ms
+2026-05-15T12:00:12 host1 sshd[1236]: Failed password for root
+2026-05-15T12:00:14 host3 cron[999]: job 'backup' started
+2026-05-15T12:00:18 host2 nginx: 200 OK /api/users 8ms
+2026-05-15T12:00:22 host1 sshd[1237]: Failed password for root
+2026-05-15T12:00:25 host4 systemd: error: service api-gateway crashed
+2026-05-15T12:00:28 host2 nginx: 500 ERROR /api/users
+2026-05-15T12:00:33 host1 sshd[1238]: Failed password for admin
+2026-05-15T12:00:40 host3 cron[999]: job 'backup' completed
+2026-05-15T12:00:45 host5 kernel: out of memory: killed process 9999
+2026-05-15T12:00:50 host2 nginx: 200 OK /api/orders 25ms
+2026-05-15T12:01:00 host1 sshd[1239]: Failed password for root
+2026-05-15T12:01:10 host4 systemd: error: service db-pool crashed
+2026-05-15T12:01:20 host2 nginx: 200 OK /api/orders 14ms
+}
+
+# ── severity classifier ────────────────────────────────────────────
+
+fn Demo::Syslog::severity($line) {
+    return "critical" if $line =~ /kernel:|out of memory|panic/i
+    return "error"    if $line =~ /\berror:|\bcrashed\b/i
+    return "warn"     if $line =~ /\bfailed\b|\b500\b/i
+    return "info"     if $line =~ /\b200\b|started|completed/i
+    return "debug"
+}
+
+# ── parser + stats ─────────────────────────────────────────────────
+
+my $td_severity = t_digest(100)
+my $tk_hosts = topk(3)
+my $bloom_seen = bloom_filter(100, 0.01)
+my $hll_hosts = hll(14)
+
+my %per_host
+my %per_severity
+my @parsed
+
+for my $line (split /\n/, $syslog) {
+    next if len($line) == 0
+    if ($line =~ /^(\S+)\s+(\S+)\s+([\w\[\]]+):\s*(.+)$/) {
+        my $ts   = $1
+        my $host = $2
+        my $tag  = $3
+        my $msg  = $4
+        my $sev  = Demo::Syslog::severity($line)
+        push @parsed, +{ ts => $ts, host => $host, tag => $tag, msg => $msg, sev => $sev }
+        $per_host{$host} = [] unless exists $per_host{$host}
+        push @{$per_host{$host}}, +{ ts => $ts, sev => $sev, msg => $msg }
+        $per_severity{$sev}++
+        topk_add($tk_hosts, $host)
+        bloom_add($bloom_seen, $host)
+        hll_add($hll_hosts, $host)
+        # Severity weight for t-digest.
+        my %w = (critical => 5, error => 4, warn => 3, info => 1, debug => 0)
+        td_add($td_severity, $w{$sev} // 0)
+    }
+}
+
+printf "── parsed %d log lines ─────────────────────────────────\n",
+    len(@parsed)
+
+# ── severity rollup ────────────────────────────────────────────────
+
+p ""
+p "── severity rollup ──────────────────────────────────"
+for my $sev (sort { $per_severity{$_1} <=> $per_severity{$_0} } keys %per_severity) {
+    printf "  %-10s : %d\n", $sev, $per_severity{$sev}
+}
+
+# ── per-host rollup ────────────────────────────────────────────────
+
+p ""
+p "── per-host activity ────────────────────────────────"
+for my $host (sort { len(@{$per_host{$_1}}) <=> len(@{$per_host{$_0}}) } keys %per_host) {
+    my $entries = $per_host{$host}
+    my %sev_breakdown
+    $sev_breakdown{$_->{sev}}++ for @$entries
+    my @sev_parts
+    for my $sev (sort { _0 cmp _1 } keys %sev_breakdown) {
+        push @sev_parts, "$sev=$sev_breakdown{$sev}"
+    }
+    printf "  %-7s : %2d events  (%s)\n",
+        $host, len(@$entries), join(", ", @sev_parts)
+}
+
+# ── anomaly detection: hosts with > 3 errors/warns ──────────────────
+
+p ""
+p "── anomalies (host with > 3 error/warn events) ──────"
+my $detected = 0
+for my $host (keys %per_host) {
+    my $entries = $per_host{$host}
+    my $bad = grep { $_->{sev} eq "error" || $_->{sev} eq "warn" || $_->{sev} eq "critical" } @$entries
+    if ($bad > 3) {
+        printf "  ALERT %-7s : %d high-severity events\n", $host, $bad
+        $detected++
+    }
+}
+if ($detected == 0) {
+    p "  (none detected)"
+}
+
+# ── TopK noisy hosts via sketch ────────────────────────────────────
+
+p ""
+p "── TopK noisy hosts (sketch) ────────────────────────"
+my @hits = topk_top($tk_hosts)
+for my $h (@hits) {
+    printf "  %-7s : %d events\n", $h->[0], $h->[1]
+}
+
+# ── Bloom-based fast known-host lookup ─────────────────────────────
+
+p ""
+p "── known-host check (Bloom) ─────────────────────────"
+for my $probe ("host1", "host5", "host99", "host3") {
+    printf "  %-8s : %s\n",
+        $probe,
+        bloom_contains($bloom_seen, $probe) ? "✓ seen" : "✗ unknown"
+}
+
+# ── HLL distinct hosts ─────────────────────────────────────────────
+
+p ""
+p "── HLL distinct hosts ───────────────────────────────"
+printf "  HLL   : %d\n", hll_count($hll_hosts)
+printf "  exact : %d\n", len(keys %per_host)
+
+# ── severity-weight stats ──────────────────────────────────────────
+
+p ""
+p "── severity-weight distribution (t-digest) ──────────"
+printf "  p50  : %.1f\n", td_quantile($td_severity, 0.50)
+printf "  p90  : %.1f\n", td_quantile($td_severity, 0.90)
+printf "  p99  : %.1f\n", td_quantile($td_severity, 0.99)

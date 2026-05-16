@@ -1,0 +1,196 @@
+#!/usr/bin/env stryke
+
+# In-memory clipboard manager. Tracks copy entries with timestamps,
+# supports retrieval by index/recent/search, dedups exact repeats,
+# expires entries past TTL.
+#
+# Patterns:
+#   * array-of-hashrefs as ordered history
+#   * mysync for cross-call state
+#   * sketch (Bloom + HLL) for fast dedup + cardinality
+#   * t-digest for entry-length distribution
+
+# ── state ───────────────────────────────────────────────────────────
+
+mysync @history
+mysync %seen_recent     # quick dedup (content -> last seen ts)
+my $bloom = bloom_filter(1000, 0.01)
+my $td_len = t_digest(100)
+my $tk_kinds = topk(3)
+my $hll_content = hll(14)
+
+my $ttl_seconds = 300       # 5 minutes
+my $max_entries = 50
+
+# ── classify content ───────────────────────────────────────────────
+
+fn Demo::CB::classify($content) {
+    return "url"       if $content =~ m{^https?://}
+    return "email"     if $content =~ /\@/
+    return "phone"     if $content =~ /\d{3}-\d{3}-\d{4}/
+    return "code"      if $content =~ /[{}();]/
+    return "longtext"  if len($content) > 100
+    return "shorttext"
+}
+
+# ── copy: insert (with dedup + classification) ────────────────────
+
+fn Demo::CB::copy($content) {
+    my $now = time()
+    # Quick dedup: if same content within last 5 sec, ignore.
+    if (exists $seen_recent{$content} && $now - $seen_recent{$content} < 5) {
+        return +{ ok => 0, reason => "duplicate_recent" }
+    }
+    my $kind = Demo::CB::classify($content)
+    my $entry = +{
+        ts => $now,
+        content => $content,
+        kind => $kind,
+        len => len($content),
+    }
+    push @history, $entry
+    $seen_recent{$content} = $now
+    bloom_add($bloom, $content)
+    td_add($td_len, len($content))
+    topk_add($tk_kinds, $kind)
+    hll_add($hll_content, $content)
+    # Cap history size.
+    if (len(@history) > $max_entries) {
+        shift @history
+    }
+    return +{ ok => 1, kind => $kind, len => len($content) }
+}
+
+# ── search by substring ───────────────────────────────────────────
+
+fn Demo::CB::search($pattern) {
+    my @hits
+    for my $entry (@history) {
+        if (index(lc($entry->{content}), lc($pattern)) >= 0) {
+            push @hits, $entry
+        }
+    }
+    return \@hits
+}
+
+# ── retrieve recent ───────────────────────────────────────────────
+
+fn Demo::CB::recent($n) {
+    my $start = len(@history) - $n
+    $start = 0 if $start < 0
+    my @slice = @history[$start : len(@history) - 1]
+    return \@slice
+}
+
+# ── seen check (via Bloom) ────────────────────────────────────────
+
+fn Demo::CB::was_copied($content) {
+    return bloom_contains($bloom, $content) ? 1 : 0
+}
+
+# ── sample workload ───────────────────────────────────────────────
+
+my @copies = (
+    "https://example.com/article/1",
+    "alice\@corp.io",
+    "555-123-4567",
+    "let x = 42;",
+    "https://example.com/article/2",
+    "short note",
+    "https://example.com/article/1",   # duplicate (within 5s)
+    "Here is a longer chunk of text. It contains multiple sentences. " .
+        "It will be classified as longtext because it exceeds 100 characters.",
+    "bob\@gmail.com",
+    "x = { foo: 'bar', baz: 42 }",
+    "https://search.example.org/q=stryke",
+    "alice\@corp.io",   # exact repeat (but more than 5s gap in real life — we'll see)
+    "555-867-5309",
+)
+
+p "── copying entries ──────────────────────────────────"
+my $ok_count = 0
+my $dup_count = 0
+for my $content (@copies) {
+    my $r = Demo::CB::copy($content)
+    if ($r->{ok}) {
+        $ok_count++
+        printf "  + [%s] %dB: %s\n",
+            $r->{kind}, $r->{len}, substr($content, 0, 50)
+    } else {
+        $dup_count++
+        printf "  - SKIPPED (dup): %s\n", substr($content, 0, 50)
+    }
+}
+
+printf "\n  accepted: %d, deduped: %d\n", $ok_count, $dup_count
+
+# ── search ─────────────────────────────────────────────────────────
+
+p ""
+p "── search 'example.com' ─────────────────────────────"
+my $matches = Demo::CB::search("example.com")
+for my $m (@$matches) {
+    printf "  [%s] %s\n", $m->{kind}, substr($m->{content}, 0, 50)
+}
+
+# ── recent N ───────────────────────────────────────────────────────
+
+p ""
+p "── recent 3 entries ─────────────────────────────────"
+my $r3 = Demo::CB::recent(3)
+for my $e (@$r3) {
+    printf "  [%s] %s\n", $e->{kind}, substr($e->{content}, 0, 50)
+}
+
+# ── Bloom-based seen check ─────────────────────────────────────────
+
+p ""
+p "── Bloom 'was-copied' check ─────────────────────────"
+my @probes = (
+    "alice\@corp.io",     # was copied
+    "https://example.com/article/1",  # was copied
+    "never-copied-string-xyz",
+    "555-123-4567",       # was copied
+)
+for my $probe (@probes) {
+    my $known = Demo::CB::was_copied($probe)
+    printf "  %s '%s'\n",
+        $known ? "✓ yes" : "✗ no ",
+        substr($probe, 0, 40)
+}
+
+# ── classification breakdown ──────────────────────────────────────
+
+p ""
+p "── by-kind breakdown ────────────────────────────────"
+my %by_kind
+$by_kind{$_->{kind}}++ for @history
+for my $k (sort { _0 cmp _1 } keys %by_kind) {
+    printf "  %-10s : %d\n", $k, $by_kind{$k}
+}
+
+# ── HLL distinct content ──────────────────────────────────────────
+
+p ""
+p "── HLL distinct content cardinality ─────────────────"
+my %exact_distinct
+$exact_distinct{$_->{content}} = 1 for @history
+printf "  HLL   : %d\n", hll_count($hll_content)
+printf "  exact : %d\n", len(keys %exact_distinct)
+
+# ── TopK most-common kind ─────────────────────────────────────────
+
+p ""
+p "── TopK most-common content kinds ───────────────────"
+my @top_kinds = topk_top($tk_kinds)
+for my $h (@top_kinds) {
+    printf "  %-10s : %d\n", $h->[0], $h->[1]
+}
+
+# ── content-length distribution ───────────────────────────────────
+
+p ""
+p "── content-length distribution (t-digest) ───────────"
+printf "  p50  : %d chars\n", int(td_quantile($td_len, 0.50))
+printf "  p90  : %d chars\n", int(td_quantile($td_len, 0.90))
+printf "  p99  : %d chars\n", int(td_quantile($td_len, 0.99))

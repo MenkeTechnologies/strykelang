@@ -1,0 +1,258 @@
+#!/usr/bin/env stryke
+
+# Mini calculator interpreter demo (no actual REPL — just runs a
+# preset list of expressions). Supports +, -, *, /, parens, variables,
+# and history reference ($1, $2 etc).
+#
+# Patterns:
+#   * recursive descent: expr := term (('+' | '-') term)*
+#   * variable binding via hash
+#   * AOP-style trace mode (when enabled, log each call's args)
+#   * t-digest for per-expression eval latency
+
+# ── tokenizer ──────────────────────────────────────────────────────
+
+fn Demo::Calc::tokenize($src) {
+    my @tokens
+    my $i = 0
+    my $n = len($src)
+    while ($i < $n) {
+        my $c = substr($src, $i, 1)
+        if ($c eq " " || $c eq "\t") { $i++; next }
+        if ($c =~ /[0-9]/) {
+            my $j = $i
+            while ($j < $n && substr($src, $j, 1) =~ /[0-9.]/) { $j++ }
+            push @tokens, +{ kind => "num", value => substr($src, $i, $j - $i) + 0.0 }
+            $i = $j
+            next
+        }
+        if ($c eq "+" || $c eq "-" || $c eq "*" || $c eq "/") {
+            push @tokens, +{ kind => "op", value => $c }
+            $i++
+            next
+        }
+        if ($c eq "(") { push @tokens, +{ kind => "lparen" }; $i++; next }
+        if ($c eq ")") { push @tokens, +{ kind => "rparen" }; $i++; next }
+        if ($c eq "=") { push @tokens, +{ kind => "assign" }; $i++; next }
+        if ($c =~ /[a-zA-Z_]/) {
+            my $j = $i
+            while ($j < $n && substr($src, $j, 1) =~ /[a-zA-Z_0-9]/) { $j++ }
+            push @tokens, +{ kind => "name", value => substr($src, $i, $j - $i) }
+            $i = $j
+            next
+        }
+        if ($c eq "\$") {
+            # History reference: $N
+            my $j = $i + 1
+            while ($j < $n && substr($src, $j, 1) =~ /[0-9]/) { $j++ }
+            push @tokens, +{ kind => "histref", value => substr($src, $i + 1, $j - $i - 1) + 0 }
+            $i = $j
+            next
+        }
+        die "Unexpected character '$c' at position $i\n"
+    }
+    return \@tokens
+}
+
+# ── parser state ───────────────────────────────────────────────────
+
+mysync $tokens
+mysync $pos
+
+fn Demo::Calc::peek() {
+    return undef if $pos >= len(@$tokens)
+    return $tokens->[$pos]
+}
+
+fn Demo::Calc::advance() {
+    my $t = Demo::Calc::peek()
+    $pos++
+    return $t
+}
+
+# ── recursive-descent: expr → term { (+|-) term }* ────────────────
+
+mysync %vars
+mysync @history
+mysync $trace_enabled = 0
+mysync $td_eval = t_digest(100)
+
+fn Demo::Calc::parse_factor() {
+    my $t = Demo::Calc::peek()
+    die "unexpected end\n" unless defined $t
+    if ($t->{kind} eq "num") {
+        Demo::Calc::advance()
+        return +{ kind => "num", value => $t->{value} }
+    }
+    if ($t->{kind} eq "name") {
+        Demo::Calc::advance()
+        return +{ kind => "var", name => $t->{value} }
+    }
+    if ($t->{kind} eq "histref") {
+        Demo::Calc::advance()
+        return +{ kind => "hist", index => $t->{value} }
+    }
+    if ($t->{kind} eq "op" && $t->{value} eq "-") {
+        Demo::Calc::advance()
+        my $operand = Demo::Calc::parse_factor()
+        return +{ kind => "neg", operand => $operand }
+    }
+    if ($t->{kind} eq "lparen") {
+        Demo::Calc::advance()
+        my $inner = Demo::Calc::parse_expr()
+        my $rp = Demo::Calc::peek()
+        die "expected )\n" unless defined($rp) && $rp->{kind} eq "rparen"
+        Demo::Calc::advance()
+        return $inner
+    }
+    die "unexpected token kind: $t->{kind}\n"
+}
+
+fn Demo::Calc::parse_term() {
+    my $left = Demo::Calc::parse_factor()
+    while (1) {
+        my $t = Demo::Calc::peek()
+        last unless defined $t
+        last unless $t->{kind} eq "op"
+        last unless ($t->{value} eq "*" || $t->{value} eq "/")
+        Demo::Calc::advance()
+        my $right = Demo::Calc::parse_factor()
+        $left = +{ kind => "bin", op => $t->{value}, left => $left, right => $right }
+    }
+    return $left
+}
+
+fn Demo::Calc::parse_expr() {
+    my $left = Demo::Calc::parse_term()
+    while (1) {
+        my $t = Demo::Calc::peek()
+        last unless defined $t
+        last unless $t->{kind} eq "op"
+        last unless ($t->{value} eq "+" || $t->{value} eq "-")
+        Demo::Calc::advance()
+        my $right = Demo::Calc::parse_term()
+        $left = +{ kind => "bin", op => $t->{value}, left => $left, right => $right }
+    }
+    return $left
+}
+
+fn Demo::Calc::parse($src) {
+    $tokens = Demo::Calc::tokenize($src)
+    $pos = 0
+    # Check for assignment: name = expr.
+    if (len(@$tokens) >= 2 &&
+        $tokens->[0]->{kind} eq "name" &&
+        $tokens->[1]->{kind} eq "assign") {
+        my $name = $tokens->[0]->{value}
+        $pos = 2
+        my $rhs = Demo::Calc::parse_expr()
+        return +{ kind => "assign", name => $name, rhs => $rhs }
+    }
+    my $ast = Demo::Calc::parse_expr()
+    return $ast
+}
+
+# ── evaluator ──────────────────────────────────────────────────────
+
+fn Demo::Calc::eval_ast($ast) {
+    if ($trace_enabled) {
+        printf "  trace: eval %s\n", $ast->{kind}
+    }
+    my $k = $ast->{kind}
+    if ($k eq "num") { return $ast->{value} }
+    if ($k eq "neg") { return -Demo::Calc::eval_ast($ast->{operand}) }
+    if ($k eq "bin") {
+        my $l = Demo::Calc::eval_ast($ast->{left})
+        my $r = Demo::Calc::eval_ast($ast->{right})
+        return $l + $r if $ast->{op} eq "+"
+        return $l - $r if $ast->{op} eq "-"
+        return $l * $r if $ast->{op} eq "*"
+        return $l / $r if $ast->{op} eq "/"
+        die "unknown op $ast->{op}\n"
+    }
+    if ($k eq "var") {
+        return $vars{$ast->{name}} // 0
+    }
+    if ($k eq "hist") {
+        my $idx = $ast->{index}
+        die "no history\n" if $idx > len(@history) || $idx < 1
+        return $history[$idx - 1]
+    }
+    if ($k eq "assign") {
+        my $v = Demo::Calc::eval_ast($ast->{rhs})
+        $vars{$ast->{name}} = $v
+        return $v
+    }
+    die "unknown ast kind: $k\n"
+}
+
+fn Demo::Calc::eval($src) {
+    my $t0 = now_ns()
+    my $ast = eval { Demo::Calc::parse($src) }
+    if ($@) {
+        td_add($td_eval, (now_ns() - $t0) / 1000.0)
+        return +{ ok => 0, error => $@ }
+    }
+    my $v = eval { Demo::Calc::eval_ast($ast) }
+    td_add($td_eval, (now_ns() - $t0) / 1000.0)
+    if ($@) {
+        return +{ ok => 0, error => $@ }
+    }
+    push @history, $v
+    return +{ ok => 1, value => $v }
+}
+
+# ── workload ───────────────────────────────────────────────────────
+
+my @inputs = (
+    "3 + 4",
+    "(2 + 3) * 4",
+    "x = 10",
+    "y = 20",
+    "x + y",
+    "x * y",
+    "z = (x + y) * 2",
+    "z / 6",
+    "-(x + y)",
+    "\$1 + \$5",
+    "1 / 0",          # division by zero — produces inf or NaN
+    "((1) + ((2))",   # parse error
+)
+
+p "── calculator runs (history-aware) ──────────────────"
+for my $i (0:len(@inputs) - 1) {
+    my $src = $inputs[$i]
+    my $r = Demo::Calc::eval($src)
+    if ($r->{ok}) {
+        printf "  %2d: %-25s = %g\n", $i + 1, $src, $r->{value}
+    } else {
+        my $msg = $r->{error}
+        $msg =~ s/\n$//
+        printf "  %2d: %-25s ! ERROR: %s\n", $i + 1, $src, $msg
+    }
+}
+
+# ── final state ────────────────────────────────────────────────────
+
+p ""
+p "── final variables ──────────────────────────────────"
+for my $k (sort { _0 cmp _1 } keys %vars) {
+    printf "  %s = %g\n", $k, $vars{$k}
+}
+
+p ""
+p "── history (most recent 5) ──────────────────────────"
+my $hstart = len(@history) > 5 ? len(@history) - 5 : 0
+for my $i ($hstart : len(@history) - 1) {
+    printf "  \$%d = %g\n", $i + 1, $history[$i]
+}
+
+# ── stats ───────────────────────────────────────────────────────────
+
+p ""
+p "── stats ────────────────────────────────────────────"
+printf "  inputs processed : %d\n", len(@inputs)
+printf "  history entries  : %d\n", len(@history)
+printf "  vars defined     : %d\n", len(keys %vars)
+printf "  p50 latency      : %.1f µs\n", td_quantile($td_eval, 0.50)
+printf "  p99 latency      : %.1f µs\n", td_quantile($td_eval, 0.99)

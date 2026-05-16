@@ -1,0 +1,157 @@
+#!/usr/bin/env stryke
+
+# Snake game simulator with greedy autopilot. Runs N games, tracks
+# average score (fruit eaten), and visualizes the longest game.
+# Patterns:
+#   * 20x20 grid with snake body as arrayref of [row, col]
+#   * fruit placement with rng
+#   * autopilot: BFS-style "head toward fruit"
+#   * t-digest for score-per-game
+
+my $H = 20
+my $W = 20
+
+# ── helpers ─────────────────────────────────────────────────────────
+
+fn Demo::Snake::manhattan($p1, $p2) {
+    return abs($p1->[0] - $p2->[0]) + abs($p1->[1] - $p2->[1])
+}
+
+fn Demo::Snake::random_empty_cell($snake_set) {
+    while (1) {
+        my $r = int(rand() * $H)
+        my $c = int(rand() * $W)
+        my $key = "$r,$c"
+        return [$r, $c] unless exists $snake_set->{$key}
+    }
+}
+
+# ── single game ─────────────────────────────────────────────────────
+
+fn Demo::Snake::play_one() {
+    my @snake = ([int($H / 2), int($W / 2)])
+    my %snake_set
+    $snake_set{$snake[0]->[0] . "," . $snake[0]->[1]} = 1
+    my $fruit = Demo::Snake::random_empty_cell(\%snake_set)
+    my $score = 0
+    my $steps = 0
+    my $max_steps = 500
+    while ($steps < $max_steps) {
+        $steps = $steps + 1
+        my $head = $snake[-1]
+        # Greedy: pick direction that gets closer to fruit + doesn't hit body.
+        my @dirs = ([0, 1], [0, -1], [1, 0], [-1, 0])
+        my $best_dir = undef
+        my $best_dist = 99999
+        for my $d (@dirs) {
+            my $nr = $head->[0] + $d->[0]
+            my $nc = $head->[1] + $d->[1]
+            next if $nr < 0 || $nr >= $H || $nc < 0 || $nc >= $W
+            my $key = "$nr,$nc"
+            # Body collision (excluding tail which will move).
+            next if exists $snake_set{$key} && !($nr == $snake[0]->[0] && $nc == $snake[0]->[1])
+            my $d2 = abs($nr - $fruit->[0]) + abs($nc - $fruit->[1])
+            if ($d2 < $best_dist) {
+                $best_dist = $d2
+                $best_dir = $d
+            }
+        }
+        last unless defined $best_dir   # stuck
+        my $nr = $head->[0] + $best_dir->[0]
+        my $nc = $head->[1] + $best_dir->[1]
+        push @snake, [$nr, $nc]
+        $snake_set{"$nr,$nc"} = 1
+        # Did we eat the fruit?
+        if ($nr == $fruit->[0] && $nc == $fruit->[1]) {
+            $score = $score + 1
+            $fruit = Demo::Snake::random_empty_cell(\%snake_set)
+        } else {
+            # Move tail.
+            my $tail = shift @snake
+            delete $snake_set{$tail->[0] . "," . $tail->[1]}
+        }
+    }
+    return +{ score => $score, steps => $steps, length => len(@snake) }
+}
+
+# ── render snake on grid ───────────────────────────────────────────
+
+fn Demo::Snake::render($snake, $fruit) {
+    my @grid
+    for my $r (0:$H - 1) {
+        $grid[$r] = []
+        for my $c (0:$W - 1) {
+            $grid[$r]->[$c] = "."
+        }
+    }
+    # Body.
+    for my $seg (@$snake) {
+        $grid[$seg->[0]]->[$seg->[1]] = "o"
+    }
+    # Head.
+    my $head = $snake->[-1]
+    $grid[$head->[0]]->[$head->[1]] = "O"
+    # Fruit.
+    $grid[$fruit->[0]]->[$fruit->[1]] = "*"
+    my @lines
+    for my $r (0:$H - 1) {
+        push @lines, join("", @{$grid[$r]})
+    }
+    return \@lines
+}
+
+# ── run N games ─────────────────────────────────────────────────────
+
+my $N = 50
+my $td_score = t_digest(100)
+my $tk_scores = topk(5)
+my $hll_scores = hll(14)
+
+printf "── simulating %d games ─────────────────────────────────\n", $N
+my $total_score = 0
+my $max_score = 0
+for my $i (1:$N) {
+    my $r = Demo::Snake::play_one()
+    $total_score = $total_score + $r->{score}
+    $max_score = $r->{score} if $r->{score} > $max_score
+    td_add($td_score, $r->{score})
+    topk_add($tk_scores, "score_" . $r->{score})
+    hll_add($hll_scores, $r->{score})
+}
+
+# ── stats ───────────────────────────────────────────────────────────
+
+p ""
+p "── per-game score distribution (t-digest) ───────────"
+printf "  p10  : %d\n", int(td_quantile($td_score, 0.10))
+printf "  p50  : %d\n", int(td_quantile($td_score, 0.50))
+printf "  p90  : %d\n", int(td_quantile($td_score, 0.90))
+printf "  p99  : %d\n", int(td_quantile($td_score, 0.99))
+printf "  max  : %d\n", $max_score
+printf "  mean : %.2f\n", $total_score / $N
+
+# ── most-common score buckets (TopK) ───────────────────────────────
+
+p ""
+p "── most-common score buckets (TopK) ─────────────────"
+my @hits = topk_top($tk_scores)
+for my $h (@hits) {
+    printf "  %-10s : %d games\n", $h->[0], $h->[1]
+}
+
+# ── distinct score buckets (HLL) ──────────────────────────────────
+
+p ""
+p "── distinct score values seen (HLL) ─────────────────"
+printf "  HLL : %d\n", hll_count($hll_scores)
+
+# ── single sample render ───────────────────────────────────────────
+
+p ""
+p "── sample frame of one game ─────────────────────────"
+my @snake = ([5, 5], [5, 6], [5, 7], [6, 7], [7, 7], [7, 8], [7, 9])
+my $fruit = [10, 10]
+my $frame = Demo::Snake::render(\@snake, $fruit)
+for my $line (@$frame) { p "  $line" }
+p ""
+p "  Legend: O=head, o=body, *=fruit, .=empty"

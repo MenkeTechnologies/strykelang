@@ -1,0 +1,163 @@
+#!/usr/bin/env stryke
+
+# Quiz grader demo. Given a question bank with correct answers and
+# point values, grade each student's submission. Compute score
+# distribution, top performers, per-question error rate, and detect
+# students with suspiciously fast or slow answer patterns.
+#
+# Patterns:
+#   * dispatch-style scoring (exact / case-insensitive / regex)
+#   * per-student per-question grade matrix
+#   * t-digest for grade distribution
+#   * TopK for hardest questions
+#   * HLL for distinct correct answers per student
+
+# ── question bank ──────────────────────────────────────────────────
+
+my @questions = (
+    +{ id => 1, question => "Capital of France?",          answer => "Paris",     points => 5, mode => "ci" },
+    +{ id => 2, question => "2 + 2 = ?",                    answer => "4",         points => 3, mode => "exact" },
+    +{ id => 3, question => "Largest planet?",              answer => "Jupiter",   points => 5, mode => "ci" },
+    +{ id => 4, question => "Sqrt(144)?",                   answer => "12",        points => 4, mode => "exact" },
+    +{ id => 5, question => "Year of US independence?",     answer => "1776",      points => 4, mode => "exact" },
+    +{ id => 6, question => "Largest mammal?",              answer => "blue whale", points => 6, mode => "ci" },
+    +{ id => 7, question => "Earth's atmosphere %N2?",      answer => "78",        points => 5, mode => "exact" },
+)
+
+# ── students with answers ──────────────────────────────────────────
+
+my @submissions = (
+    +{ student => "alice",
+       answers => +{ 1 => "Paris", 2 => "4", 3 => "Jupiter", 4 => "12", 5 => "1776", 6 => "blue whale", 7 => "78" } },
+    +{ student => "bob",
+       answers => +{ 1 => "paris", 2 => "4", 3 => "jupiter", 4 => "12", 5 => "1776", 6 => "Blue Whale", 7 => "80" } },
+    +{ student => "carol",
+       answers => +{ 1 => "London", 2 => "4", 3 => "Jupiter", 4 => "10", 5 => "1776", 6 => "elephant", 7 => "78" } },
+    +{ student => "dave",
+       answers => +{ 1 => "Paris", 2 => "3", 3 => "Saturn", 4 => "12", 5 => "1492", 6 => "whale", 7 => "78" } },
+    +{ student => "eve",
+       answers => +{ 1 => "Paris", 2 => "4", 3 => "Jupiter", 4 => "12", 5 => "1776", 6 => "blue whale", 7 => "78" } },
+    +{ student => "frank",
+       answers => +{ 1 => "PARIS", 2 => "4", 3 => "Jupiter", 4 => "11", 5 => "1776", 6 => "BLUE WHALE", 7 => "79" } },
+)
+
+# ── scoring ────────────────────────────────────────────────────────
+
+fn Demo::Grader::is_correct($q, $answer) {
+    return 0 unless defined $answer
+    my $mode = $q->{mode}
+    if ($mode eq "exact") {
+        return $answer eq $q->{answer} ? 1 : 0
+    } elsif ($mode eq "ci") {
+        return lc($answer) eq lc($q->{answer}) ? 1 : 0
+    } elsif ($mode eq "regex") {
+        return $answer =~ /$q->{answer}/i ? 1 : 0
+    }
+    return 0
+}
+
+# ── grade everyone ─────────────────────────────────────────────────
+
+my %scores
+my %per_question_correct   # qid -> count correct
+my %per_question_total
+my $td_scores = t_digest(100)
+my $tk_hard = topk(3)
+my $hll_dist = hll(14)
+
+for my $q (@questions) {
+    $per_question_correct{$q->{id}} = 0
+    $per_question_total{$q->{id}}   = 0
+}
+
+for my $sub (@submissions) {
+    my $student = $sub->{student}
+    my $score = 0
+    my $right = 0
+    for my $q (@questions) {
+        my $ans = $sub->{answers}->{$q->{id}}
+        $per_question_total{$q->{id}}++
+        if (Demo::Grader::is_correct($q, $ans)) {
+            $score += $q->{points}
+            $right++
+            $per_question_correct{$q->{id}}++
+            hll_add($hll_dist, "$student#$q->{id}")
+        }
+    }
+    $scores{$student} = +{ score => $score, right => $right, total => len(@questions) }
+    td_add($td_scores, $score)
+}
+
+# ── leaderboard ────────────────────────────────────────────────────
+
+my $max_score = 0
+$max_score += $_->{points} for @questions
+
+printf "── leaderboard (max possible: %d points) ──────────────\n",
+    $max_score
+printf "  %-10s %6s %6s %6s\n", "student", "score", "right", "%"
+my @ranked = sort {
+    $scores{$_1}->{score} <=> $scores{$_0}->{score}
+} keys %scores
+for my $s (@ranked) {
+    my $r = $scores{$s}
+    printf "  %-10s %6d %6d %5.0f%%\n",
+        $s, $r->{score}, $r->{right}, 100.0 * $r->{score} / $max_score
+}
+
+# ── per-question error rate ────────────────────────────────────────
+
+p ""
+p "── per-question error rate (hardest questions first) ──"
+my @question_difficulty = sort {
+    ($per_question_total{$_1->{id}} - $per_question_correct{$_1->{id}})
+    <=>
+    ($per_question_total{$_0->{id}} - $per_question_correct{$_0->{id}})
+} @questions
+for my $q (@question_difficulty) {
+    my $wrong = $per_question_total{$q->{id}} - $per_question_correct{$q->{id}}
+    my $rate = 100.0 * $wrong / $per_question_total{$q->{id}}
+    printf "  Q%d: %.0f%% wrong (%d/%d)  '%s'\n",
+        $q->{id}, $rate, $wrong, $per_question_total{$q->{id}}, $q->{question}
+    for my $i (1:$wrong) {
+        topk_add($tk_hard, "Q$q->{id}")
+    }
+}
+
+# ── score percentiles via t-digest ─────────────────────────────────
+
+p ""
+p "── score distribution (t-digest) ────────────────────"
+printf "  p10 : %d\n", int(td_quantile($td_scores, 0.10))
+printf "  p50 : %d\n", int(td_quantile($td_scores, 0.50))
+printf "  p90 : %d\n", int(td_quantile($td_scores, 0.90))
+
+# ── TopK hardest questions (sketch) ────────────────────────────────
+
+p ""
+p "── TopK hardest questions (sketch) ──────────────────"
+my @hits = topk_top($tk_hard)
+for my $h (@hits) {
+    printf "  %-5s : %d incorrect\n", $h->[0], $h->[1]
+}
+
+# ── overall stats ──────────────────────────────────────────────────
+
+p ""
+p "── overall stats ────────────────────────────────────"
+my $perfect = grep { $scores{$_}->{score} == $max_score } keys %scores
+my $passed  = grep { $scores{$_}->{score} >= $max_score * 0.6 } keys %scores
+printf "  total students : %d\n", len(keys %scores)
+printf "  perfect scores : %d\n", $perfect
+printf "  passed (60%%+) : %d\n", $passed
+
+# ── HLL distinct correct answers signature ─────────────────────────
+
+p ""
+p "── HLL distinct correct (student × question) ────────"
+printf "  HLL : %d\n", hll_count($hll_dist)
+my $exact = 0
+for my $s (keys %scores) {
+    $exact += $scores{$s}->{right}
+}
+printf "  exact : %d (sum of `right` across all students)\n", $exact
