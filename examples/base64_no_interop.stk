@@ -1,0 +1,100 @@
+#!/usr/bin/env stryke
+
+# Base64 encode / decode — the standard RFC 4648 alphabet
+# (A-Z a-z 0-9 + /) with `=` padding. Parses clean under `--no-interop`.
+#
+# Algorithm:
+#   * Pack 3 input bytes → 4 sextets (6-bit chunks)
+#   * Each sextet indexes the alphabet
+#   * Pad with `=` so output length is multiple of 4
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len`
+#   * `ord`/`chr` for byte ↔ int, bitops for sextet pack/unpack
+#   * Hash for reverse lookup table
+#   * Built-in `die` invariants — every test vector round-trips
+#
+# Run: stryke --no-interop examples/base64_no_interop.stk
+#      stryke --no-interop examples/base64_no_interop.stk encode "Hello"
+#      stryke --no-interop examples/base64_no_interop.stk decode SGVsbG8=
+
+my $ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+my @ALPHA = split(//, $ALPHABET)
+my %REVERSE
+for my $i (0:63) { $REVERSE{$ALPHA[$i]} = $i }
+
+fn b64_encode($s) {
+    my @bytes = map { ord(_) } split(//, $s)
+    my $n = len(@bytes)
+    my $out = ""
+    my $i = 0
+    while ($i < $n) {
+        my $b1 = $bytes[$i]
+        my $b2 = $i + 1 < $n ? $bytes[$i + 1] : 0
+        my $b3 = $i + 2 < $n ? $bytes[$i + 2] : 0
+        my $combined = ($b1 << 16) | ($b2 << 8) | $b3
+        $out .= $ALPHA[($combined >> 18) & 0x3f]
+        $out .= $ALPHA[($combined >> 12) & 0x3f]
+        $out .= ($i + 1 < $n) ? $ALPHA[($combined >> 6) & 0x3f] : "="
+        $out .= ($i + 2 < $n) ? $ALPHA[$combined & 0x3f]        : "="
+        $i += 3
+    }
+    $out
+}
+
+fn b64_decode($s) {
+    my @chars = grep { _ ne "=" } split(//, $s)
+    my $out = ""
+    my $i = 0
+    while ($i < len(@chars)) {
+        my $s1 = $REVERSE{$chars[$i]}     // 0
+        my $s2 = $i + 1 < len(@chars) ? ($REVERSE{$chars[$i + 1]} // 0) : 0
+        my $s3 = $i + 2 < len(@chars) ? ($REVERSE{$chars[$i + 2]} // 0) : 0
+        my $s4 = $i + 3 < len(@chars) ? ($REVERSE{$chars[$i + 3]} // 0) : 0
+        my $combined = ($s1 << 18) | ($s2 << 12) | ($s3 << 6) | $s4
+        $out .= chr(($combined >> 16) & 0xff)
+        $out .= chr(($combined >>  8) & 0xff) if $i + 2 < len(@chars)
+        $out .= chr( $combined        & 0xff) if $i + 3 < len(@chars)
+        $i += 4
+    }
+    $out
+}
+
+if (len(@ARGV) >= 2) {
+    my ($mode, $arg) = @ARGV
+    if    ($mode eq "encode") { p b64_encode($arg) }
+    elsif ($mode eq "decode") { p b64_decode($arg) }
+    else  { die "mode must be 'encode' or 'decode'" }
+    exit 0
+}
+
+# Demo grid — every case round-trips through encode then decode.
+# Pairs taken from RFC 4648 §10 test vectors.
+my @cases = (
+    +{ plain => "",        b64 => ""         },
+    +{ plain => "f",       b64 => "Zg=="     },
+    +{ plain => "fo",      b64 => "Zm8="     },
+    +{ plain => "foo",     b64 => "Zm9v"     },
+    +{ plain => "foob",    b64 => "Zm9vYg==" },
+    +{ plain => "fooba",   b64 => "Zm9vYmE=" },
+    +{ plain => "foobar",  b64 => "Zm9vYmFy" },
+    +{ plain => "Hello, World!", b64 => "SGVsbG8sIFdvcmxkIQ==" },
+)
+
+p "── Base64 demo (RFC 4648 test vectors) ──"
+my $fail = 0
+for my $c (@cases) {
+    my $enc       = b64_encode($c->{plain})
+    my $roundtrip = b64_decode($enc)
+    my $ok_enc    = ($enc eq $c->{b64})
+    my $ok_rt     = ($roundtrip eq $c->{plain})
+    $fail++ unless $ok_enc && $ok_rt
+    printf "  %-20s -> %-25s round-trip=%s  %s\n",
+        "\"" . $c->{plain} . "\"",
+        "\"" . $enc . "\"",
+        $ok_rt ? "OK" : "FAIL",
+        $ok_enc ? "" : "(enc want \"" . $c->{b64} . "\")"
+}
+die "$fail / " . len(@cases) . " base64 cases failed" if $fail > 0
+p ""
+p "  ALL PASS (8 RFC 4648 vectors, encode + round-trip both verified)"
