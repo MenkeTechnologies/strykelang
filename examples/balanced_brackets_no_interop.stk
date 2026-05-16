@@ -1,0 +1,70 @@
+#!/usr/bin/env stryke
+
+# Balanced-brackets checker — `()`, `[]`, `{}` must nest and pair
+# correctly. Stack-based linear scan. Parses clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len`
+#   * Stack via `push`/`pop` on a `my @stack`
+#   * Hash table `%pair` mapping closer → opener for O(1) lookup
+#   * `split //` for char iteration; topic `_` inside grep
+#   * `die`-on-regression invariants at the end (CI catchers)
+#
+# Run: stryke --no-interop examples/balanced_brackets_no_interop.stk
+#      stryke --no-interop examples/balanced_brackets_no_interop.stk "({[]})"
+
+fn balanced($s) {
+    my %pair = (")" => "(", "]" => "[", "}" => "{")
+    my %openers = ("(" => 1, "[" => 1, "{" => 1)
+    my @stack
+    for my $ch (split(//, $s)) {
+        if (exists $openers{$ch}) {
+            push @stack, $ch
+        } elsif (exists $pair{$ch}) {
+            return 0 if len(@stack) == 0
+            return 0 if pop(@stack) ne $pair{$ch}
+        }
+        # Anything else is whitespace / letters — ignore.
+    }
+    len(@stack) == 0
+}
+
+if (len(@ARGV) >= 1) {
+    my $s = $ARGV[0]
+    p balanced($s) ? "balanced" : "unbalanced"
+    exit balanced($s) ? 0 : 1
+}
+
+# Demo table — each row is (input, expected). Lines mix bracket kinds
+# and free text.
+my @cases = (
+    +{ s => "()",                ok => 1 },
+    +{ s => "[]",                ok => 1 },
+    +{ s => "{}",                ok => 1 },
+    +{ s => "()[]{}",            ok => 1 },
+    +{ s => "(())",              ok => 1 },
+    +{ s => "({[]})",            ok => 1 },
+    +{ s => "()(()[])",          ok => 1 },
+    +{ s => "foo(bar[baz])",     ok => 1 },  # free text ok
+    +{ s => "fn add(a, b) { a + b }", ok => 1 },
+    +{ s => "(",                 ok => 0 },  # unclosed
+    +{ s => ")",                 ok => 0 },  # extra closer
+    +{ s => "(]",                ok => 0 },  # mismatched
+    +{ s => "([)]",              ok => 0 },  # interleaved
+    +{ s => "((((",              ok => 0 },
+    +{ s => "{[}",               ok => 0 },
+)
+
+p "── Balanced-brackets demo ──"
+my $fail = 0
+for my $c (@cases) {
+    my $got = balanced($c->{s})
+    my $ok  = ($got == $c->{ok})
+    $fail++ unless $ok
+    printf "  %-32s  expect=%-3s got=%-3s  %s\n",
+        $c->{s}, $c->{ok} ? "OK" : "NO", $got ? "OK" : "NO",
+        $ok ? "" : "FAIL"
+}
+die "$fail / " . len(@cases) . " cases failed" if $fail > 0
+p ""
+p "  ALL PASS (15 cases including matched, mismatched, interleaved)"

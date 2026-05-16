@@ -20779,4 +20779,47 @@ mod tests {
         parse_ok("package Foo; my $x = 1");
         parse_ok("package Foo::Bar::Baz; our $VERSION = 0.01");
     }
+
+    /// `next` / `last` / `redo` loop-control statements (used in
+    /// balanced_brackets / brainfuck / sieve demos to break out of
+    /// inner loops).
+    #[test]
+    fn loop_control_keywords_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("for my $i (1:10) { next if $i % 2; p $i }");
+        parse_ok("while (1) { last if $done }");
+        parse_ok("my $rerun = 0; for (1:5) { if ($rerun) { redo } }");
+    }
+
+    /// Labelled loops + labelled `next` / `last`. Used when you need
+    /// to break out of nested loops.
+    #[test]
+    fn labelled_loops_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("OUTER: for my $i (1:10) { last OUTER if $i > 5 }");
+        parse_ok(
+            "OUTER: for my $i (1:3) { INNER: for my $j (1:3) { next OUTER if $j > $i } }",
+        );
+    }
+
+    /// String-repeat operator `x` — `\"-\" x 40` for a separator line,
+    /// `(0) x N` for an initialized array. Both shapes appear in the
+    /// histogram / sieve / brainfuck demos.
+    #[test]
+    fn string_repeat_x_operator_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $sep = \"-\" x 40");
+        parse_ok("my @zeros = (0) x 100");
+        parse_ok("my $bar = \"#\" x $count");
+    }
+
+    /// `chomp` / `chop` builtins — mutate-in-place string ops on the
+    /// topic or an explicit lvalue. Used in stdin-reading scripts.
+    #[test]
+    fn chomp_chop_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("chomp(my $line = <STDIN>)");
+        parse_ok("my $s = \"hi\\n\"; chomp $s");
+        parse_ok("my $t = \"hi\"; chop $t");
+    }
 }
