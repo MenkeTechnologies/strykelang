@@ -410,4 +410,52 @@ mod tests {
         let out = minify_source(src).unwrap();
         assert!(!out.ends_with(';'), "no trailing `;`: got {out:?}");
     }
+
+    /// Regex literals are single tokens — pattern + flags + delimiter all
+    /// emit together. Minify must preserve them so a `s/foo/bar/g` keeps
+    /// working after the pass. NB the lexer encodes `s///` as a special
+    /// Ident with NUL-separated fields (`\0s\0PAT\0REPL\0FLAGS\0DELIM`),
+    /// so the raw `/abc/` form does not appear in the output — but the
+    /// pattern + replacement strings themselves do.
+    #[test]
+    fn preserves_regex_pattern_and_flags() {
+        let src = "my $s = \"abc\"\n$s =~ s/abc/xyz/g\n";
+        let out = minify_source(src).unwrap();
+        assert!(out.contains("abc"), "subst pattern preserved: got {out:?}");
+        assert!(out.contains("xyz"), "subst replacement preserved: got {out:?}");
+    }
+
+    /// Plain `m/pattern/flags` lexes to a real `Token::Regex` (not the
+    /// NUL-fielded `s///` encoding). Verify it round-trips properly.
+    #[test]
+    fn preserves_match_regex_literal() {
+        let src = "my $s = \"hi\"\nif ($s =~ /h.*/) { p 1 }\n";
+        let out = minify_source(src).unwrap();
+        // The pattern body survives.
+        assert!(out.contains("h.*"), "regex pattern preserved: got {out:?}");
+    }
+
+    /// `;` injection between successive `my` declarations on different
+    /// lines is the most common minify case — make sure both decls are
+    /// preserved with proper sigils.
+    #[test]
+    fn back_to_back_my_decls_get_one_separator() {
+        let src = "my $a = 1\nmy $b = 2\n";
+        let out = minify_source(src).unwrap();
+        // Exactly one `;` between the two statements (no `;;` runs).
+        let semis = out.matches(';').count();
+        assert_eq!(semis, 1, "exactly one `;` between two decls: got {out:?}");
+        assert!(out.contains("$a"), "first decl kept");
+        assert!(out.contains("$b"), "second decl kept");
+    }
+
+    /// Unicode source must round-trip — Rust string slicing on byte
+    /// boundaries would panic if the lexer accidentally split mid-char.
+    #[test]
+    fn preserves_unicode_in_strings() {
+        let src = "p \"αβγ — Δ\"\nmy $x = 1\n";
+        let out = minify_source(src).unwrap();
+        assert!(out.contains("αβγ"), "Greek letters preserved");
+        assert!(out.contains("Δ"), "uppercase delta preserved");
+    }
 }
