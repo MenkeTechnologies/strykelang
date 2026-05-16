@@ -1,0 +1,107 @@
+#!/usr/bin/env stryke
+
+# Graph BFS — breadth-first shortest path on an unweighted directed
+# graph. Adjacency list = hash mapping `node => [neighbours...]`.
+# Parses clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len`
+#   * Queue via array + `shift @q` for FIFO, `push` to enqueue
+#   * Hash for visited-set + parent-pointer back-tracking
+#   * Built-in `die` invariants on known shortest paths
+#
+# Run: stryke --no-interop examples/graph_bfs_no_interop.stk
+
+fn bfs_shortest($graph_ref, $src, $dst) {
+    return [$src] if $src eq $dst
+    my %parent
+    my %seen = ($src => 1)
+    my @q = ($src)
+    while (len(@q) > 0) {
+        my $u = shift @q
+        my $neighbours = $graph_ref->{$u}
+        next unless defined $neighbours
+        for my $v (@$neighbours) {
+            next if exists $seen{$v}
+            $seen{$v} = 1
+            $parent{$v} = $u
+            if ($v eq $dst) {
+                # Walk back to reconstruct.
+                my @path = ($dst)
+                my $cur = $dst
+                while (exists $parent{$cur}) {
+                    $cur = $parent{$cur}
+                    unshift @path, $cur
+                }
+                return \@path
+            }
+            push @q, $v
+        }
+    }
+    # No path.
+    [ ]
+}
+
+fn path_len($graph_ref, $src, $dst) {
+    my $path = bfs_shortest($graph_ref, $src, $dst)
+    len(@$path) == 0 ? -1 : len(@$path) - 1
+}
+
+# Build a small sample graph:
+#
+#     A → B → C → D
+#     ↓       ↓
+#     E       F
+#     ↓       ↓
+#     G ← ← ← ← H
+#
+# Distances from A: A=0, B=1, C=2, D=3, E=1, F=3, G=2, H=4 (A→E→G,
+# but G also reachable A→B→C→F→H→G; BFS picks the shorter one).
+my $G = +{
+    A => ["B", "E"],
+    B => ["C"],
+    C => ["D", "F"],
+    D => [],
+    E => ["G"],
+    F => ["H"],
+    G => [],
+    H => ["G"],
+}
+
+# Reference table — (src, dst, expected path_len).
+my @cases = (
+    +{ src => "A", dst => "A", dist => 0 },
+    +{ src => "A", dst => "B", dist => 1 },
+    +{ src => "A", dst => "C", dist => 2 },
+    +{ src => "A", dst => "D", dist => 3 },
+    +{ src => "A", dst => "E", dist => 1 },
+    +{ src => "A", dst => "F", dist => 3 },
+    +{ src => "A", dst => "G", dist => 2 },  # via E, not via H
+    +{ src => "A", dst => "H", dist => 4 },
+    +{ src => "B", dst => "A", dist => -1 }, # unreachable (one-way)
+    +{ src => "D", dst => "A", dist => -1 },
+    +{ src => "C", dst => "G", dist => 3 },  # C→F→H→G
+)
+
+p "── Graph BFS shortest-path demo ──"
+my $fail = 0
+for my $c (@cases) {
+    my $d = path_len($G, $c->{src}, $c->{dst})
+    my $p = bfs_shortest($G, $c->{src}, $c->{dst})
+    my $ok = ($d == $c->{dist})
+    $fail++ unless $ok
+    printf "  %s -> %s  d=%2d  expect=%2d  path=[%s]  %s\n",
+        $c->{src}, $c->{dst}, $d, $c->{dist},
+        join(",", @$p),
+        $ok ? "" : "FAIL"
+}
+die "$fail / " . len(@cases) . " BFS cases failed" if $fail > 0
+
+# Triangle inequality (in graph terms): d(A,C) <= d(A,B) + d(B,C).
+my $d_ac = path_len($G, "A", "C")
+my $d_ab = path_len($G, "A", "B")
+my $d_bc = path_len($G, "B", "C")
+die "triangle inequality A-B-C" unless $d_ac <= $d_ab + $d_bc
+
+p ""
+p "  ALL PASS (11 BFS cases + triangle inequality invariant)"

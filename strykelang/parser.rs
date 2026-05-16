@@ -21016,4 +21016,51 @@ mod tests {
         parse_ok("my $s = \"a\"; $s .= \"b\"");
         parse_ok("my $out = \"\"; $out .= \"x\" for (1:3)");
     }
+
+    /// `unshift @arr, $v` — push to the FRONT of an array; used by
+    /// graph_bfs for back-tracking the path.
+    #[test]
+    fn unshift_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my @path = (3, 4); unshift @path, 2; unshift @path, 1");
+        parse_ok("my @q; unshift @q, $_ for (1:5)");
+    }
+
+    /// `defined` and `// 0` defined-or fallback. Used by the
+    /// graph_bfs neighbour lookup (`$REVERSE{$ch} // 0`).
+    #[test]
+    fn defined_or_fallback_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $x; my $y = $x // 0");
+        parse_ok("my %h = (a=>1); my $v = $h{missing} // -1");
+        parse_ok("p 1 if defined $foo");
+    }
+
+    /// `for my $x (rev 0:N)` — reverse a range with the stryke `rev`
+    /// keyword. Used by knapsack back-tracking.
+    #[test]
+    fn rev_over_range_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("for my $i (rev 0:9) { p $i }");
+        parse_ok("my @r = rev (1, 2, 3, 4)");
+    }
+
+    /// Array deref `@$ref`, `@{$expr}`. Used freely in graph_bfs +
+    /// knapsack to walk arrays-of-arrayrefs.
+    #[test]
+    fn array_deref_forms_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $r = [1, 2, 3]; my @copy = @$r");
+        parse_ok("my $r = [1, 2, 3]; my @copy = @{$r}");
+        parse_ok("my @rs = ([1], [2, 3]); my @flat; push @flat, @$_ for @rs");
+    }
+
+    /// Hashref via `[k]` doesn't exist — but `$ref->{k}` and `${$ref}{k}`
+    /// are the two equivalent shapes. Pin both.
+    #[test]
+    fn hashref_subscript_alt_forms_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $h = +{a=>1}; p $h->{a}");
+        parse_ok("my $h = +{a=>1}; p ${$h}{a}");
+    }
 }
