@@ -20692,4 +20692,52 @@ mod tests {
         let _g = NoInteropGuard::on();
         parse_ok("fn handle({ name => $name, qty => $qty }) { p \"$name x $qty\" }");
     }
+
+    /// Anonymous fn (`fn { ... }`) — the implicit-positional closure
+    /// shape. Used as a first-class value: assigned, returned, passed.
+    #[test]
+    fn anonymous_fn_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $f = fn { _0 * 2 }");
+        parse_ok("my @doubled = maps { _0 * 2 } (1, 2, 3)");
+    }
+
+    /// Ternary `cond ? a : b` chains for inline branching.
+    #[test]
+    fn ternary_and_chained_ternary_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $r = $x > 0 ? \"pos\" : \"neg\"");
+        parse_ok("my $r = $x > 0 ? \"pos\" : $x < 0 ? \"neg\" : \"zero\"");
+    }
+
+    /// Negative indices on array slice — `@arr[-3:-1]` for the last
+    /// three elements. Used in the parallel_primes demo.
+    #[test]
+    fn array_slice_with_negative_indices_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my @arr = (1,2,3,4,5); my @tail = @arr[-3:-1]");
+        parse_ok("my @arr = (1,2,3); my @last_two = @arr[-2:]");
+    }
+
+    /// `state $x` declarations (function-local persistent storage)
+    /// used by the memoised-fib demo for the cache hash.
+    #[test]
+    fn state_variable_declaration_parses() {
+        let _g = NoInteropGuard::on();
+        // Use clearly-non-builtin fn names (`counter` / `memo` clash
+        // with stryke builtins).
+        parse_ok("fn my_counter { state $n = 0; $n++; $n }");
+        parse_ok(
+            "fn my_memo($k) { state %cache; $cache{$k} //= compute($k) }",
+        );
+    }
+
+    /// `our` declarations are package-globals — still legal in strict
+    /// mode (just sub/say/scalar/reverse are rejected, not `our`).
+    #[test]
+    fn our_declaration_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("our $VERSION = 1.0");
+        parse_ok("our @EXPORT = (1, 2, 3)");
+    }
 }

@@ -1,0 +1,73 @@
+#!/usr/bin/env stryke
+
+# Roman numerals — integer ↔ Roman conversion, both directions.
+# Parses clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len`
+#   * Parallel arrays for the value/glyph table (paired walk)
+#   * `1:N` range, `while` loop, `last` to break
+#   * `=~ /pat/` regex match for input validation
+#   * Hash lookup for the decode table
+#
+# Run: stryke --no-interop examples/roman_numerals_no_interop.stk
+#      stryke --no-interop examples/roman_numerals_no_interop.stk 1994
+#      stryke --no-interop examples/roman_numerals_no_interop.stk MMXXVI
+
+fn to_roman($n) {
+    die "out of range (1..3999): $n" if $n < 1 || $n > 3999
+    my @vals  = (1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1)
+    my @glyph = ("M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I")
+    my $out = ""
+    my $rem = $n
+    for my $i (0:len(@vals) - 1) {
+        while ($rem >= $vals[$i]) {
+            $out .= $glyph[$i]
+            $rem -= $vals[$i]
+        }
+    }
+    $out
+}
+
+fn from_roman($s) {
+    die "not a Roman numeral: $s" unless $s =~ /^[MDCLXVI]+$/i
+    my %val = (M => 1000, D => 500, C => 100, L => 50, X => 10, V => 5, I => 1)
+    my @chars = split(//, uc($s))
+    my $total = 0
+    for my $i (0:len(@chars) - 1) {
+        my $here = $val{$chars[$i]}
+        my $next = $i + 1 < len(@chars) ? $val{$chars[$i + 1]} : 0
+        $total += $here < $next ? -$here : $here
+    }
+    $total
+}
+
+if (len(@ARGV) >= 1) {
+    my $arg = $ARGV[0]
+    if ($arg =~ /^\d+$/) {
+        p to_roman(0 + $arg)
+    } else {
+        p from_roman($arg)
+    }
+    exit 0
+}
+
+# Demo grid.
+p "── Integer → Roman ──"
+for my $n (1, 4, 9, 14, 40, 90, 400, 944, 1994, 2026, 3999) {
+    printf "  %4d  ->  %s\n", $n, to_roman($n)
+}
+
+p ""
+p "── Roman → Integer ──"
+for my $s ("I", "IV", "IX", "XIV", "XL", "XC", "CD", "CMXLIV", "MCMXCIV", "MMXXVI", "MMMCMXCIX") {
+    printf "  %-10s -> %d\n", $s, from_roman($s)
+}
+
+p ""
+p "── Round-trip check 1..2026 ──"
+my $bad = 0
+for my $n (1:2026) {
+    $bad++ if from_roman(to_roman($n)) != $n
+}
+p "  failures: $bad / 2026"

@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+
+# Three Fibonacci implementations compared — naive recursion, memoised
+# recursion, and the iterative loop. Parses clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn` (not `sub`), `p` (not `say`), `len` (not `scalar`)
+#   * `state` declarations for the memoisation cache that survives
+#     between calls without exposing a globally-visible name
+#   * `now_ns()` for nanosecond wall-clock timing
+#   * `printf` for column-aligned tables
+#
+# Run: stryke --no-interop examples/fibonacci_no_interop.stk
+#      stryke --no-interop examples/fibonacci_no_interop.stk 30
+
+fn fib_naive($n) {
+    return $n if $n < 2
+    fib_naive($n - 1) + fib_naive($n - 2)
+}
+
+fn fib_memo($n) {
+    state %cache
+    return $cache{$n} if exists $cache{$n}
+    my $v = $n < 2 ? $n : fib_memo($n - 1) + fib_memo($n - 2)
+    $cache{$n} = $v
+    $v
+}
+
+fn fib_iter($n) {
+    return $n if $n < 2
+    # `$a` / `$b` are reserved in strict mode — use $prev / $curr.
+    my ($prev, $curr) = (0, 1)
+    for (2:$n) {
+        ($prev, $curr) = ($curr, $prev + $curr)
+    }
+    $curr
+}
+
+my $n = $ARGV[0] // 25
+
+p "── Fibonacci($n) — three implementations ──"
+printf "  %-10s %12s %12s\n", "method", "fib($n)", "time (ms)"
+printf "  %-10s %12s %12s\n", "------", "-------", "---------"
+
+for my $impl ("naive", "memo", "iter") {
+    my $t0 = now_ns()
+    my $r
+    if    ($impl eq "naive") { $r = fib_naive($n) }
+    elsif ($impl eq "memo")  { $r = fib_memo($n)  }
+    else                     { $r = fib_iter($n)  }
+    my $ms = (now_ns() - $t0) / 1_000_000
+    printf "  %-10s %12d %12.3f\n", $impl, $r, $ms
+}
+
+p ""
+p "(naive blows up exponentially; iter is O(n) and stays sub-millisecond"
+p " well past n=10k)"
