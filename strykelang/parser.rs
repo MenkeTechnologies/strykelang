@@ -20645,4 +20645,51 @@ mod tests {
         parse_ok("my $row = +{ region => \"north\", qty => 10 }");
         parse_ok("my @rows = (+{ a => 1 }, +{ a => 2 })");
     }
+
+    /// `eval { … }` block + `$@` error-variable inspection is the
+    /// canonical exception form used in `rpn_calc_no_interop.stk`.
+    #[test]
+    fn eval_block_and_dollar_at_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $r = eval { 1 + 2 }; p $@ if $@");
+        parse_ok("eval { die \"boom\" }; p $@");
+    }
+
+    /// `try { … } catch ($e) { … }` is the stryke-extension exception
+    /// shape (Perl-5-on-steroids); must parse under `--no-interop`.
+    #[test]
+    fn try_catch_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("try { die \"boom\" } catch ($e) { p $e }");
+    }
+
+    /// File-test operators (`-d`, `-f`, `-r`, `-e`, …) are unary prefix
+    /// ops on a filename or filehandle. Stryke inherits the Perl shape.
+    #[test]
+    fn file_test_operators_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("p 1 if -d \"/tmp\"");
+        parse_ok("p 2 if -f \"/etc/hosts\"");
+        parse_ok("p 3 if -e $0");
+        parse_ok("my $sz = -s \"/etc/hosts\"");
+    }
+
+    /// `~>` (thread-first) and `~>>` (thread-last) macros — stryke's
+    /// signature pipeline operators alongside `|>`. Pin the basic
+    /// parsing shape.
+    #[test]
+    fn thread_macros_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $r = ~> 5 +1 *2");
+        parse_ok("my @r = ~> (1,2,3) maps { _ * 2 }");
+    }
+
+    /// Hash-destructure parameter — `fn f({ a => $a, b => $b })` —
+    /// is a stryke-extension signature shape used to unpack a hashref
+    /// at call time.
+    #[test]
+    fn hash_destructure_sub_signature_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("fn handle({ name => $name, qty => $qty }) { p \"$name x $qty\" }");
+    }
 }
