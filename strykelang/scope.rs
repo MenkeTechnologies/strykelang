@@ -3139,4 +3139,59 @@ mod tests {
             .unwrap();
         assert_eq!(s.get_hash_element("hx", "k").to_int(), 2);
     }
+
+    // ── topic_alias / outer-chain aliasing ──────────────────────────────
+    //
+    // The debugger and `for (@arr) { … }` loops depend on `$_` ↔ `$_0`
+    // (and outer-chain analogues `_<` ↔ `_0<`) reading the same slot.
+    // If `topic_alias` ever drops a mapping the user sees ghost values
+    // in the Variables panel where `$_` and `$_0` disagree.
+
+    #[test]
+    fn topic_alias_pairs_underscore_with_zero() {
+        assert_eq!(topic_alias("_").as_deref(), Some("_0"));
+        assert_eq!(topic_alias("_0").as_deref(), Some("_"));
+    }
+
+    #[test]
+    fn topic_alias_pairs_outer_chain_with_zero_form() {
+        // `_<` ↔ `_0<`, `_<<<` ↔ `_0<<<`, etc.
+        assert_eq!(topic_alias("_<").as_deref(), Some("_0<"));
+        assert_eq!(topic_alias("_0<").as_deref(), Some("_<"));
+        assert_eq!(topic_alias("_<<<").as_deref(), Some("_0<<<"));
+        assert_eq!(topic_alias("_0<<<").as_deref(), Some("_<<<"));
+    }
+
+    #[test]
+    fn topic_alias_has_no_pair_for_other_positionals() {
+        // `_1`, `_2`, etc. are positional-only — no `$_` alias.
+        assert!(topic_alias("_1").is_none());
+        assert!(topic_alias("_2").is_none());
+        assert!(topic_alias("_42").is_none());
+        // `_<+digits` is mixed (slice index) — not a chevron-only chain.
+        assert!(topic_alias("_<5").is_none());
+        // Plain identifiers.
+        assert!(topic_alias("foo").is_none());
+        assert!(topic_alias("_foo").is_none());
+    }
+
+    // ── parse_positional_topic_slot ─────────────────────────────────────
+
+    #[test]
+    fn positional_topic_slot_parses_underscore_n() {
+        // Only N >= 1 — `_0` is the topic alias for `_` (see
+        // [`topic_alias`]), not a positional slot.
+        assert_eq!(parse_positional_topic_slot("_1"), Some(1));
+        assert_eq!(parse_positional_topic_slot("_2"), Some(2));
+        assert_eq!(parse_positional_topic_slot("_42"), Some(42));
+    }
+
+    #[test]
+    fn positional_topic_slot_rejects_non_positional_names() {
+        assert!(parse_positional_topic_slot("_").is_none(), "bare _ has no slot");
+        assert!(parse_positional_topic_slot("_0").is_none(), "_0 is the topic alias, not positional");
+        assert!(parse_positional_topic_slot("_foo").is_none(), "named");
+        assert!(parse_positional_topic_slot("foo").is_none());
+        assert!(parse_positional_topic_slot("").is_none());
+    }
 }

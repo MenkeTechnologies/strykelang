@@ -9547,4 +9547,66 @@ literal line
         );
         assert_last_halt(&chunk);
     }
+
+    /// Regression for the class-field line-drift bug at the compiler level.
+    /// A class body with a typed field used to push every subsequent
+    /// statement's bytecode `lines[i]` off by +1 per field, so DAP
+    /// breakpoints set on the post-class lines silently dropped. With the
+    /// lexer's fat-arrow / qw / ... lookaheads correctly restoring
+    /// `self.line`, the compiled chunk's `lines[]` matches the source.
+    #[test]
+    fn class_field_emits_correct_op_lines_for_subsequent_statements() {
+        let chunk = compile_snippet(
+            "class Foo {\n    x: Int\n}\nmy $y = 1\np $y\n",
+        )
+        .expect("compile");
+        // `my $y = 1` is at source line 4. Find any op with line 4 — it
+        // proves the compiler emitted bytecode for that statement on the
+        // correct source line. Before the fix, line 4 would not appear
+        // (the ops would carry line 5 instead).
+        let has_line_4 = chunk.lines.iter().any(|&l| l == 4);
+        assert!(
+            has_line_4,
+            "expected at least one op tagged with source line 4 (my $y = 1), got lines {:?}",
+            chunk.lines
+        );
+        // And `p $y` is at line 5; same regression catch.
+        let has_line_5 = chunk.lines.iter().any(|&l| l == 5);
+        assert!(
+            has_line_5,
+            "expected at least one op tagged with source line 5 (p $y), got lines {:?}",
+            chunk.lines
+        );
+        // And the inverse — *no* op should be on line 6 (file only has
+        // 5 logical lines plus a trailing newline). A line-6 op means the
+        // counter drifted past the file.
+        let has_line_6 = chunk.lines.iter().any(|&l| l == 6);
+        assert!(
+            !has_line_6,
+            "no op should report line 6 in a 5-line file; lines {:?}",
+            chunk.lines
+        );
+    }
+
+    /// Same check but for class with *two* typed fields (the original
+    /// reproduction had 2 fields giving a +2 drift on subsequent ops).
+    #[test]
+    fn class_with_two_fields_does_not_drift_op_lines() {
+        let chunk = compile_snippet(
+            "class Foo {\n    x: Int\n    y: Int\n}\nmy $a = 1\nmy $b = 2\np $a\np $b\n",
+        )
+        .expect("compile");
+        // `my $a = 1` is at source line 5; `my $b = 2` at line 6;
+        // `p $a` at line 7; `p $b` at line 8.
+        for expected in [5, 6, 7, 8] {
+            assert!(
+                chunk.lines.iter().any(|&l| l == expected),
+                "expected an op on line {expected}, got {:?}",
+                chunk.lines
+            );
+        }
+        // And no op past the end of the file.
+        let max_line = chunk.lines.iter().copied().max().unwrap_or(0);
+        assert!(max_line <= 8, "no op past source line 8: max was {max_line}");
+    }
 }
