@@ -1,0 +1,81 @@
+#!/usr/bin/env stryke
+
+# Luhn checksum — the mod-10 algorithm credit cards and IMEIs use.
+# Parses clean under `--no-interop`.
+#
+# Algorithm: walk digits right-to-left, double every second; if the
+# doubled value is > 9 subtract 9; sum all; valid iff sum % 10 == 0.
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len`
+#   * `split //` for digit iteration, `0 + $c` for char→int coerce
+#   * `rev` (the no-interop-friendly spelling, not `reverse`)
+#   * Built-in `die` invariants — every demo case has a known
+#     validity from the literature
+#
+# Run: stryke --no-interop examples/luhn_no_interop.stk
+#      stryke --no-interop examples/luhn_no_interop.stk 4532015112830366
+#      stryke --no-interop examples/luhn_no_interop.stk 4532015112830367
+
+fn luhn_ok($num) {
+    my @digits = grep { _ =~ /\d/ } split(//, "$num")
+    return 0 if len(@digits) == 0
+    my $sum = 0
+    my $double = 0
+    for my $d (rev @digits) {
+        my $n = 0 + $d
+        $n = $n * 2 if $double
+        $n -= 9 if $n > 9
+        $sum += $n
+        $double = !$double
+    }
+    $sum % 10 == 0
+}
+
+if (len(@ARGV) >= 1) {
+    my $num = $ARGV[0]
+    if (luhn_ok($num)) {
+        p "$num: VALID"
+        exit 0
+    } else {
+        p "$num: INVALID"
+        exit 1
+    }
+}
+
+# Demo grid — known valid + invalid card numbers from public test sets.
+my @cases = (
+    # Visa test numbers (all valid).
+    +{ num => "4111111111111111", ok => 1, label => "Visa test #1" },
+    +{ num => "4532015112830366", ok => 1, label => "Visa test #2" },
+    +{ num => "4485275742308327", ok => 1, label => "Visa test #3" },
+    # MasterCard test number.
+    +{ num => "5425233430109903", ok => 1, label => "MC test"      },
+    # Amex.
+    +{ num => "374245455400126",  ok => 1, label => "Amex test"    },
+    # Discover.
+    +{ num => "6011000990139424", ok => 1, label => "Disc test"    },
+    # Mutations — flipping the last digit invalidates.
+    +{ num => "4532015112830367", ok => 0, label => "Visa+1 flip"  },
+    +{ num => "5425233430109904", ok => 0, label => "MC+1 flip"    },
+    # Random not-a-card string.
+    +{ num => "1234567812345678", ok => 0, label => "garbage"      },
+    # Trivial single zero passes (sum = 0).
+    +{ num => "0",                ok => 1, label => "zero"         },
+)
+
+p "── Luhn checksum demo ──"
+my $fail = 0
+for my $c (@cases) {
+    my $got = luhn_ok($c->{num}) ? 1 : 0
+    my $ok  = ($got == $c->{ok})
+    $fail++ unless $ok
+    printf "  %-18s %-13s expect=%-7s got=%-7s %s\n",
+        $c->{num}, $c->{label},
+        $c->{ok}  ? "valid"   : "invalid",
+        $got      ? "valid"   : "invalid",
+        $ok ? "" : "FAIL"
+}
+die "$fail / " . len(@cases) . " Luhn cases failed" if $fail > 0
+p ""
+p "  ALL PASS (10 cases — 6 valid card numbers + 4 invalid)"
