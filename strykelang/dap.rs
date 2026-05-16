@@ -48,14 +48,6 @@ const MAX_VAR_REPR: usize = 200;
 
 // ─── DAP wire types ────────────────────────────────────────────────────────
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct DapHeader {
-    seq: u64,
-    #[serde(rename = "type")]
-    msg_type: String,
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 struct DapRequest {
     seq: u64,
@@ -79,7 +71,7 @@ pub(crate) struct PauseSnapshot {
     pub frames: Vec<FrameSnap>,
     pub locals: Vec<VarSnap>,
     pub globals: Vec<VarSnap>,
-    /// Container varRef → children. Built by [`capture_locals`] by walking
+    /// Container varRef → children. Built by [`capture_locals_with_map`] by walking
     /// nested arrays / hashes recursively. The DAP `variables` request reads
     /// from this map for any non-scope varRef.
     pub var_ref_map: HashMap<u32, Vec<VarChild>>,
@@ -148,7 +140,7 @@ impl DapShared {
 
     /// Called by the VM thread when it has detected a stop. Captures the
     /// snapshot, sends a `stopped` event, then condvar-waits for resume.
-    pub fn pause(&self, snap: PauseSnapshot) -> DebugAction {
+    pub(crate) fn pause(&self, snap: PauseSnapshot) -> DebugAction {
         // Flush stdout/stderr so any `p`/`print`/`say` output the user
         // produced since the last pause is visible in the Console BEFORE the
         // suspend UI shows. Without this, stdout is block-buffered (piped to
@@ -221,20 +213,6 @@ impl DapShared {
             "success": success,
             "command": req.command,
             "body": body,
-        });
-        self.write_message(msg);
-    }
-
-    fn emit_error(&self, req: &DapRequest, message: &str) {
-        let seq = self.next_seq();
-        let msg = json!({
-            "seq": seq,
-            "type": "response",
-            "request_seq": req.seq,
-            "success": false,
-            "command": req.command,
-            "message": message,
-            "body": { "error": { "format": message } },
         });
         self.write_message(msg);
     }
@@ -1241,11 +1219,6 @@ fn is_magic_block_param(name: &str) -> bool {
     false
 }
 
-/// Backwards-compat shim — call sites that don't want the map yet.
-pub(crate) fn capture_locals(scope: &crate::scope::Scope) -> Vec<VarSnap> {
-    let mut map = HashMap::new();
-    capture_locals_with_map(scope, &mut map)
-}
 
 fn should_hide(name: &str) -> bool {
     if name.is_empty() {
@@ -1277,7 +1250,7 @@ fn is_builtin_like(name: &str) -> bool {
     // Common stryke built-in arrays/hashes
     matches!(
         name,
-        "INC" | "ARGV" | "ENV" | "INC" | "SIG"
+        "INC" | "ARGV" | "ENV" | "SIG"
             | "path" | "p" | "fpath" | "f"
             | "term" | "uname" | "limits"
             | "-" | "+" | "~" | "/" | "\\" | "\"" | "," | "!" | "@" | "&" | "'" | "`" | "?" | "$"
