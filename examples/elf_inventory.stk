@@ -1,0 +1,178 @@
+#!/usr/bin/env stryke
+
+# AoC 2022 day-1 style: each elf carries a list of food items with
+# calorie counts. Goal: find the top-N elves by total calories.
+#
+# Demonstrates:
+#   * blank-line-delimited group parsing.
+#   * Heap-style top-N selection (Schwartzian transform).
+#   * pmap parallel per-elf summation.
+#   * t-digest on per-elf calorie distribution.
+#   * HLL distinct food-item names across the camp.
+#   * TopK SpaceSaving for "most-carried food item".
+
+# ── corpus: 12 elves' packs separated by blank lines ───────────────
+
+my $corpus = q{
+1000
+2000
+3000
+
+4000
+
+5000
+6000
+
+7000
+8000
+9000
+
+10000
+
+3500
+4500
+5500
+6500
+
+12000
+
+1100
+1200
+1300
+1400
+1500
+
+9000
+9100
+
+2200
+2300
+2400
+
+15000
+
+8500
+850
+85
+};
+
+# ── parse into elves ──────────────────────────────────────────────
+
+my @elves;
+my @current;
+for my $line (split /\n/, $corpus) {
+    my $trimmed = $line;
+    $trimmed =~ s/^\s+|\s+$//g;
+    if (len($trimmed) == 0) {
+        if (len(@current) > 0) {
+            push @elves, [@current];
+            @current = ();
+        }
+    } else {
+        push @current, $trimmed + 0;
+    }
+}
+push @elves, [@current] if len(@current) > 0;
+
+printf("parsed %d elves\n", len(@elves));
+
+# ── sketches ──────────────────────────────────────────────────────
+
+my $td_cal   = t_digest(100);
+my $tk_food  = topk(8);
+my $hll_food = hll(12);
+
+# ── food name table (synthetic, by calorie band) ──────────────────
+
+fn Demo::Elf::food_name($cal) {
+    if ($cal < 1000) {
+        "trail-mix"
+    } elsif ($cal < 2000) {
+        "energy-bar"
+    } elsif ($cal < 4000) {
+        "ration-pack"
+    } elsif ($cal < 7000) {
+        "stew"
+    } elsif ($cal < 10000) {
+        "feast"
+    } else {
+        "banquet"
+    }
+}
+
+# ── per-elf summation in parallel ─────────────────────────────────
+
+my @sums = pmap { sum(@$_) } @elves;
+
+# ── update sketches ──────────────────────────────────────────────
+
+for my $i (0:len(@elves) - 1) {
+    my $pack = $elves[$i];
+    my $sum  = $sums[$i];
+    td_add($td_cal, $sum);
+    for my $cal (@$pack) {
+        my $food = Demo::Elf::food_name($cal);
+        topk_add($tk_food, $food);
+        hll_add($hll_food, $food);
+    }
+}
+
+# ── top-3 elves via Schwartzian ───────────────────────────────────
+
+my @ranked = map { $_->[1] }
+             sort { $_1->[0] <=> $_0->[0] }
+             map { [$sums[$_], $_] }
+             (0:len(@elves) - 1);
+
+print "\ntop-3 elves by total calories:\n";
+print "─" x 40, "\n";
+for my $rank (0:2) {
+    my $idx = $ranked[$rank];
+    my $items = $elves[$idx];
+    printf("  #%d  elf %2d: %6d cal (%d items)\n",
+           $rank + 1, $idx, $sums[$idx], len(@$items));
+}
+
+# ── top-3 sum (the "answer" in AoC day-1 part 2) ──────────────────
+
+my $top3_sum = $sums[$ranked[0]] + $sums[$ranked[1]] + $sums[$ranked[2]];
+printf("\nsum of top-3 calories: %d\n", $top3_sum);
+
+# ── full ranking ──────────────────────────────────────────────────
+
+print "\nfull ranking:\n";
+for my $rank (0:len(@ranked) - 1) {
+    my $idx = $ranked[$rank];
+    printf("  rank %2d: elf %2d -> %6d cal\n",
+           $rank + 1, $idx, $sums[$idx]);
+}
+
+# ── calorie distribution (t-digest) ───────────────────────────────
+
+print "\nper-elf calorie distribution:\n";
+printf("  p10 = %7.0f cal\n", td_quantile($td_cal, 0.10));
+printf("  p50 = %7.0f cal\n", td_quantile($td_cal, 0.50));
+printf("  p90 = %7.0f cal\n", td_quantile($td_cal, 0.90));
+printf("  max ~ %7.0f cal\n", td_quantile($td_cal, 0.99));
+
+# ── most-carried food (TopK SpaceSaving) ──────────────────────────
+
+print "\nmost-carried food items (SpaceSaving k=8):\n";
+my @top_food = topk_top($tk_food, 5);
+for my $p (@top_food) {
+    printf("  %-12s count=%d\n", $p->[0], $p->[1]);
+}
+
+# ── distinct food bands ───────────────────────────────────────────
+
+my $hll_n = hll_count($hll_food);
+printf("\ndistinct food bands: HLL=%.1f (max possible = 6)\n", $hll_n);
+
+# ── parallel summary stat ─────────────────────────────────────────
+
+my $total_cal = sum(@sums);
+my $mean_cal = $total_cal / len(@elves);
+printf("\ncamp totals: %d elves, %d total cal, %.0f mean cal/elf\n",
+       len(@elves), $total_cal, $mean_cal);
+
+print "\nelf inventory done\n";

@@ -5431,6 +5431,134 @@ Severity: **polish** (clear closure-factory workaround; design decision
 on whether `mysync` should imply per-fn persistence is open).
 
 
+## BUG-245 — Coderefs stringify as `CODE(__ANON__)` instead of `CODE(0x<addr>)`
+
+```sh
+$ s -e 'my $c = sub { 1 }; print "$c\n"'
+CODE(__ANON__)
+```
+
+Perl stringifies anonymous coderefs as `CODE(0x<hexaddr>)`, with the
+hex address identifying that particular closure instance. Stryke
+returns the literal string `CODE(__ANON__)` for every anonymous
+coderef, which prevents using string comparison to distinguish two
+distinct closures.
+
+Pin: `coderef_string_form_is_code_anon_not_hex_addr` in
+`tests/suite/string_interpolation_pin.rs`.
+
+Severity: **polish** (no semantic loss; affects only debug-print
+output and identity-by-string-form patterns).
+
+
+## BUG-246 — `$$ref` does not deref inside double-quoted string
+
+```sh
+$ s -e 'my $x = 7; my $r = \$x; print "val=$$r\n"'
+val=SCALAR(0x...)
+```
+
+In Perl, `"$$r"` inside a qq-string evaluates the scalar deref
+`$$r` and inserts the value (`7`). Stryke instead interpolates `$r`
+as the ref's stringification, leaving the result as
+`SCALAR(0x...)`-style output.
+
+Workaround: use the `${\ EXPR }` form, which always works:
+
+```stryke
+my $x = 7;
+my $r = \$x;
+print "val=${\ $$r }\n";   # val=7
+```
+
+Pin: `scalar_ref_double_dollar_does_not_deref_in_interp` (broken
+form) and `scalar_ref_deref_works_via_backslash_block` (working
+idiom) in `tests/suite/string_interpolation_pin.rs`.
+
+Severity: **bug** (P2; common Perl idiom silently produces wrong
+output instead of erroring; workaround exists but is non-obvious).
+
+
+## BUG-247 — `length($str)` returns byte-count, not char-count
+
+```sh
+$ s -e 'my $s = "snowman:\x{2603}"; print length($s), "\n"'
+11
+```
+
+The string is 9 characters (`snowman:` = 8 chars + ☃ = 1 char). Stryke
+returns 11 (the UTF-8 byte length: 8 + 3). Perl with `use utf8` returns
+9; without `use utf8` returns the byte length.
+
+Stryke has no equivalent of `use utf8` — string lengths are always
+byte-counted. For char-count, the user needs an explicit codepoint
+iterator (no first-class helper exists yet).
+
+Pin: `unicode_interp_length_is_byte_count` in
+`tests/suite/string_interpolation_pin.rs`.
+
+Severity: **parity** (matches Perl's *default* behavior without
+`use utf8`; documented here so users don't expect `use utf8` semantics).
+
+
+## BUG-248 — `caller(N)` returns wrong package and line
+
+```sh
+$ s -e '
+package Demo::P1;
+sub here { my @c = caller(0); print "pkg=$c[0] line=$c[2]\n"; }
+package Demo::P2;
+sub call_p1 { Demo::P1::here() }
+package main;
+Demo::P2::call_p1();'
+pkg=main line=3
+```
+
+In Perl, `caller(0)` inside `here` would report `pkg=Demo::P2` (the
+calling sub's package) and the line of the `Demo::P1::here()` call
+site within `call_p1` (line 5). Stryke reports `pkg=main` and `line=3`
+(the line where `caller(0)` itself was invoked).
+
+Both fields are observable but neither matches Perl. The current
+shape is pinned so any future fix is deliberate; downstream code that
+inspects caller info for stack traces or AOP attribution will give
+the wrong attribution today.
+
+Pin: `caller_package_always_main_per_bug_248`,
+`caller_line_is_callee_site_not_invocation_site` in
+`tests/suite/caller_stack_pin.rs`.
+
+Severity: **bug** (P1; stack-walking is wrong on two of three fields;
+affects logging, AOP, error-reporting code paths).
+
+
+## BUG-249 — `caller(N)` never returns empty list
+
+```sh
+$ s -e 'my @c = caller(0); print "len=", scalar(@c), "\n"'
+len=3
+
+$ s -e 'sub f { my @c = caller(99); print "deep=", scalar(@c), "\n" } f()'
+deep=3
+```
+
+Perl returns an empty list when `caller(N)` is called at the top
+level (no caller) or past the bottom of the stack. Stryke always
+returns a 3-tuple (`main`, file, line), making it impossible to
+detect "no caller" by checking list length.
+
+`scalar(caller(0))` further returns the field count (3) rather than
+the package, breaking the common Perl idiom `if (caller()) { ... }`.
+
+Pin: `caller_at_top_level_returns_non_empty`,
+`caller_past_stack_depth_returns_non_empty`,
+`caller_scalar_context_is_field_count_not_package` in
+`tests/suite/caller_stack_pin.rs`.
+
+Severity: **bug** (P2; breaks "am I being called as main script?"
+guard pattern in Perl scripts).
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't
