@@ -1,0 +1,90 @@
+#!/usr/bin/env stryke
+
+# Shunting-yard — Dijkstra's algorithm for converting infix expressions
+# (`3 + 4 * 2`) to postfix / Reverse Polish (`3 4 2 * +`). Pairs with
+# `rpn_calc_no_interop.stk` — feed the output of one into the input of
+# the other. Parses clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len`
+#   * Hash table for operator precedence; another for left/right assoc
+#   * Stack via `push`/`pop` on `my @ops`
+#   * `split /\s+/` for tokenisation
+#   * Built-in `die` invariants for every demo case
+#
+# Run: stryke --no-interop examples/shunting_yard_no_interop.stk
+#      stryke --no-interop examples/shunting_yard_no_interop.stk "3 + 4 * 2"
+
+my %PREC = ("+" => 2, "-" => 2, "*" => 3, "/" => 3, "%" => 3, "**" => 4)
+my %RIGHT_ASSOC = ("**" => 1)
+
+fn is_op($tok) {
+    exists $PREC{$tok}
+}
+
+fn to_postfix($expr) {
+    my @toks = grep { len(_) > 0 } split(/\s+/, $expr)
+    my @out
+    my @ops
+    for my $tok (@toks) {
+        if (is_op($tok)) {
+            while (len(@ops) > 0 &&
+                   $ops[-1] ne "(" &&
+                   ($PREC{$ops[-1]} > $PREC{$tok} ||
+                    ($PREC{$ops[-1]} == $PREC{$tok} && !exists $RIGHT_ASSOC{$tok}))) {
+                push @out, pop @ops
+            }
+            push @ops, $tok
+        } elsif ($tok eq "(") {
+            push @ops, $tok
+        } elsif ($tok eq ")") {
+            while (len(@ops) > 0 && $ops[-1] ne "(") {
+                push @out, pop @ops
+            }
+            die "mismatched parens" unless len(@ops) > 0
+            pop @ops  # discard "("
+        } elsif ($tok =~ /^-?\d+(\.\d+)?$/) {
+            push @out, $tok
+        } else {
+            die "unknown token: $tok"
+        }
+    }
+    while (len(@ops) > 0) {
+        die "mismatched parens" if $ops[-1] eq "("
+        push @out, pop @ops
+    }
+    join(" ", @out)
+}
+
+if (len(@ARGV) >= 1) {
+    p to_postfix($ARGV[0])
+    exit 0
+}
+
+# Demo grid — classic examples.
+my @cases = (
+    +{ infix => "3 + 4",                 postfix => "3 4 +"                  },
+    +{ infix => "3 + 4 * 2",             postfix => "3 4 2 * +"              },
+    +{ infix => "( 3 + 4 ) * 2",         postfix => "3 4 + 2 *"              },
+    +{ infix => "3 + 4 - 2",             postfix => "3 4 + 2 -"              },
+    +{ infix => "2 ** 3 ** 2",           postfix => "2 3 2 ** **"            },  # right-assoc
+    +{ infix => "5 + 1 * 2 - 3 / 4",     postfix => "5 1 2 * + 3 4 / -"      },
+    +{ infix => "( 1 + 2 ) * ( 3 + 4 )", postfix => "1 2 + 3 4 + *"          },
+    +{ infix => "42",                    postfix => "42"                     },
+)
+
+p "── Shunting-yard demo (infix → postfix) ──"
+my $fail = 0
+for my $c (@cases) {
+    my $got = to_postfix($c->{infix})
+    my $ok  = ($got eq $c->{postfix})
+    $fail++ unless $ok
+    printf "  %-28s -> %-22s expect %-22s %s\n",
+        "\"" . $c->{infix} . "\"",
+        "\"" . $got . "\"",
+        "\"" . $c->{postfix} . "\"",
+        $ok ? "" : "FAIL"
+}
+die "$fail / " . len(@cases) . " shunting-yard cases failed" if $fail > 0
+p ""
+p "  ALL PASS (8 cases: precedence, parens, right-assoc, single token)"

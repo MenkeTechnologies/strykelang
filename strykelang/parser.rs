@@ -20909,4 +20909,60 @@ mod tests {
         let _g = NoInteropGuard::on();
         parse_ok("my %h = (a=>1, b=>2, c=>3); my @v = @h{'a','c'}");
     }
+
+    /// Bitwise operators — `&`, `|`, `^`, `~`, `<<`, `>>`. Used by
+    /// bitops_no_interop. Each binds tighter than the comparison
+    /// operators, looser than the arithmetic ones (Perl precedence).
+    #[test]
+    fn bitwise_operators_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $x = 0xAA; my $y = $x & 0x0F");
+        parse_ok("my $x = 1; my $y = $x | 2 | 4");
+        parse_ok("my $x = 0xFF; my $y = $x ^ 0x80");
+        parse_ok("my $x = 0xAA; my $y = ~$x & 0xff");
+        parse_ok("my $x = 1; my $y = $x << 4");
+        parse_ok("my $x = 0xF0; my $y = $x >> 2");
+    }
+
+    /// `0x`, `0b`, `0o` numeric literal prefixes — hex / binary /
+    /// octal. Used freely in bitops + numeric-conversion demos.
+    #[test]
+    fn numeric_literal_prefixes_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $hex = 0xCAFEBABE");
+        parse_ok("my $bin = 0b1101");
+        parse_ok("my $hex8 = 0xff & 0x0f");
+    }
+
+    /// Negative array index — `$arr[-1]`, `$arr[-2]`. Used by
+    /// shunting_yard (`$ops[-1]` to peek stack top).
+    #[test]
+    fn negative_array_index_parses() {
+        let _g = NoInteropGuard::on();
+        // `@a` / `@b` array names share the `$a` / `$b` reservation in
+        // strict mode — use `@arr` instead.
+        parse_ok("my @arr = (1, 2, 3); p $arr[-1]");
+        parse_ok("my @stack = (10, 20, 30); p $stack[-1] if len(@stack) > 0");
+    }
+
+    /// `last` / `next` / `return` as standalone statements (already
+    /// pinned alongside `last LABEL` but not as the lone-line form).
+    #[test]
+    fn loop_control_standalone_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("while (1) { last }");
+        parse_ok("for my $i (1:10) { next if $i == 3 }");
+        parse_ok("fn ret { return 42 }");
+    }
+
+    /// `shift @args` / `pop @args` — common destructuring shape inside
+    /// functions for "first arg" / "last arg" pickoff (used by morse
+    /// to peel the mode off `@ARGV`).
+    #[test]
+    fn shift_pop_on_array_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my @a = (1, 2, 3); my $first = shift @a");
+        parse_ok("my @a = (1, 2, 3); my $last  = pop @a");
+        parse_ok("fn drop_first(@xs) { shift @xs; @xs }");
+    }
 }
