@@ -1,0 +1,113 @@
+#!/usr/bin/env stryke
+
+# Mortgage amortization — given principal, annual rate, and term in
+# years, compute the monthly payment + amortization table (principal
+# vs interest per month). Parses clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len`
+#   * Float arithmetic with `**`, `/`, `*`
+#   * Hash for the per-month row, array-of-hashref for the schedule
+#   * `int($x * 100 + 0.5) / 100` for round-to-cent
+#   * Built-in `die` invariants — final balance ≈ 0, sum-of-payments
+#     equals principal + total interest, etc.
+#
+# Run: stryke --no-interop examples/mortgage_no_interop.stk
+#      stryke --no-interop examples/mortgage_no_interop.stk 300000 6.5 30
+
+fn round2($x) {
+    int($x * 100 + 0.5) / 100
+}
+
+# Monthly payment formula: P * r / (1 - (1+r)^-n)
+# where r = annual_rate/12, n = total months.
+fn monthly_payment($principal, $annual_rate_pct, $years) {
+    my $r = $annual_rate_pct / 100 / 12
+    my $n = $years * 12
+    return $principal / $n if $r == 0  # interest-free edge case
+    $principal * $r / (1 - (1 + $r) ** -$n)
+}
+
+fn amortize($principal, $annual_rate_pct, $years) {
+    my $pmt = monthly_payment($principal, $annual_rate_pct, $years)
+    my $r   = $annual_rate_pct / 100 / 12
+    my $n   = $years * 12
+    my $balance = $principal
+    my @schedule
+    for my $m (1:$n) {
+        my $interest  = $balance * $r
+        my $principal_paid = $pmt - $interest
+        $balance -= $principal_paid
+        push @schedule, +{
+            month     => $m,
+            payment   => round2($pmt),
+            interest  => round2($interest),
+            principal => round2($principal_paid),
+            balance   => round2($balance),
+        }
+    }
+    +{ payment => round2($pmt), schedule => \@schedule }
+}
+
+my ($principal, $rate, $years) = (200000, 6.0, 30)
+if (len(@ARGV) >= 3) {
+    $principal = 0 + $ARGV[0]
+    $rate      = 0 + $ARGV[1]
+    $years     = 0 + $ARGV[2]
+}
+
+my $result = amortize($principal, $rate, $years)
+my $pmt    = $result->{payment}
+my $sched  = $result->{schedule}
+my $n      = len(@$sched)
+
+p "── Mortgage amortization ──"
+printf "  principal : \$%d\n", $principal
+printf "  rate      : %.2f%% APR\n", $rate
+printf "  term      : %d years (%d monthly payments)\n", $years, $n
+printf "  payment   : \$%.2f / month\n", $pmt
+
+# Print first 3 + last 3 rows.
+p ""
+printf "  %-5s %12s %12s %12s %14s\n", "month", "payment", "interest", "principal", "balance"
+for my $i (0:2) {
+    my $row = $sched->[$i]
+    printf "  %-5d %12.2f %12.2f %12.2f %14.2f\n",
+        $row->{month}, $row->{payment}, $row->{interest}, $row->{principal}, $row->{balance}
+}
+p "  ..."
+for my $i ($n - 3:$n - 1) {
+    my $row = $sched->[$i]
+    printf "  %-5d %12.2f %12.2f %12.2f %14.2f\n",
+        $row->{month}, $row->{payment}, $row->{interest}, $row->{principal}, $row->{balance}
+}
+
+# Built-in self-tests on financial identities.
+my $total_paid     = 0
+my $total_interest = 0
+my $total_principal = 0
+for my $row (@$sched) {
+    $total_paid      += $row->{payment}
+    $total_interest  += $row->{interest}
+    $total_principal += $row->{principal}
+}
+
+p ""
+printf "  total paid     : \$%.2f\n", $total_paid
+printf "  total interest : \$%.2f\n", $total_interest
+printf "  total principal: \$%.2f\n", $total_principal
+
+# Final balance should be near zero (within rounding tolerance).
+my $final = $sched->[$n - 1]{balance}
+die "final balance not near zero (got $final)" unless abs($final) < 1.0
+
+# Sum-of-payments should equal sum-of-interest + sum-of-principal
+# (within accumulated round-to-cent error across 360 months).
+my $sum_split = $total_interest + $total_principal
+die "split sum != total paid" unless abs($total_paid - $sum_split) < 2.0
+
+# total_principal should be ≈ original principal.
+die "principal sum ≠ original" unless abs($total_principal - $principal) < 1.0
+
+p ""
+p "  ALL PASS (final balance ≈ 0, principal sum ≈ loan amount)"

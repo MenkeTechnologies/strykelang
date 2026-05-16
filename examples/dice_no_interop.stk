@@ -1,0 +1,148 @@
+#!/usr/bin/env stryke
+
+# Dice-notation roller — parse "2d6+3" / "1d20" / "3d4-1" style
+# expressions and roll them. Parses clean under `--no-interop`.
+#
+# Grammar:
+#   expr   := term ( ('+' | '-') term )*
+#   term   := dice | integer
+#   dice   := <count>d<sides>      (count defaults to 1)
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len`
+#   * `=~` regex match against the full expression
+#   * `srand` + `rand` for seedable rolling
+#   * Hash accumulator for per-die histograms
+#   * Built-in `die` invariants — minimum / maximum bounds, individual
+#     d6 / d20 rolls stay within face range
+#
+# Run: stryke --no-interop examples/dice_no_interop.stk
+#      stryke --no-interop examples/dice_no_interop.stk 2d6+3
+#      stryke --no-interop examples/dice_no_interop.stk 1d20
+
+fn roll_die($sides) {
+    die "bad side count: $sides" unless $sides >= 2
+    1 + int(rand($sides))
+}
+
+# Split a strict-mode-friendly dice expression into signed terms.
+# Stryke's regex engine doesn't support lookahead split, so we
+# tokenise manually: scan for +/- and slice on the boundaries.
+fn split_terms($e) {
+    my @terms
+    my $sign = "+"
+    my $buf  = ""
+    for my $ch (split(//, $e)) {
+        if ($ch eq "+" || $ch eq "-") {
+            push @terms, +{ sign => $sign, body => $buf } if len($buf) > 0
+            $sign = $ch
+            $buf = ""
+        } else {
+            $buf .= $ch
+        }
+    }
+    push @terms, +{ sign => $sign, body => $buf } if len($buf) > 0
+    @terms
+}
+
+fn roll_dice_notation($expr) {
+    my $e = $expr
+    $e =~ s/\s+//g
+    my $total = 0
+    my @rolls
+    for my $t (split_terms($e)) {
+        my $s = ($t->{sign} eq "-") ? -1 : 1
+        my $p = $t->{body}
+        if ($p =~ /^(\d*)d(\d+)$/) {
+            my $count = len($1) > 0 ? (0 + $1) : 1
+            my $sides = 0 + $2
+            for (1:$count) {
+                my $r = roll_die($sides)
+                push @rolls, +{ sides => $sides, value => $r, sign => $s }
+                $total += $s * $r
+            }
+        } elsif ($p =~ /^\d+$/) {
+            $total += $s * (0 + $p)
+            push @rolls, +{ sides => 0, value => 0 + $p, sign => $s }
+        } else {
+            die "bad term: $p"
+        }
+    }
+    +{ total => $total, rolls => \@rolls }
+}
+
+# Compute min/max bounds for a notation without actually rolling.
+fn bounds($expr) {
+    my $e = $expr
+    $e =~ s/\s+//g
+    my $min = 0
+    my $max = 0
+    for my $t (split_terms($e)) {
+        my $s = ($t->{sign} eq "-") ? -1 : 1
+        my $p = $t->{body}
+        if ($p =~ /^(\d*)d(\d+)$/) {
+            my $count = len($1) > 0 ? (0 + $1) : 1
+            my $sides = 0 + $2
+            if ($s == 1) {
+                $min += $count
+                $max += $count * $sides
+            } else {
+                $min -= $count * $sides
+                $max -= $count
+            }
+        } elsif ($p =~ /^\d+$/) {
+            $min += $s * (0 + $p)
+            $max += $s * (0 + $p)
+        }
+    }
+    +{ min => $min, max => $max }
+}
+
+srand(42)  # deterministic for the demo / self-test
+
+if (len(@ARGV) >= 1) {
+    my $r = roll_dice_notation($ARGV[0])
+    p $r->{total}
+    exit 0
+}
+
+# Demo + self-test on bounds invariants.
+my @cases = (
+    +{ expr => "1d6"      },
+    +{ expr => "2d6"      },
+    +{ expr => "1d20"     },
+    +{ expr => "3d6+5"    },
+    +{ expr => "4d4-2"    },
+    +{ expr => "1d100"    },
+    +{ expr => "2d10+1d6" },
+)
+
+p "── Dice-notation demo (seed=42, 5 rolls each) ──"
+my $fail = 0
+for my $c (@cases) {
+    my $bnd = bounds($c->{expr})
+    printf "  %-12s bounds=[%4d..%4d]  rolls:", $c->{expr}, $bnd->{min}, $bnd->{max}
+    for (1:5) {
+        my $r = roll_dice_notation($c->{expr})
+        printf " %d", $r->{total}
+        if ($r->{total} < $bnd->{min} || $r->{total} > $bnd->{max}) {
+            $fail++
+        }
+    }
+    p ""
+}
+die "$fail rolls fell outside bounds" if $fail > 0
+
+# Individual face-value invariant: every d6 roll must be in [1..6].
+for (1:200) {
+    my $f = roll_die(6)
+    die "d6 out of range: $f" unless $f >= 1 && $f <= 6
+}
+# d20 likewise.
+for (1:200) {
+    my $f = roll_die(20)
+    die "d20 out of range: $f" unless $f >= 1 && $f <= 20
+}
+
+p ""
+p "  ALL PASS (7 notations × 5 rolls each within bounds, 400 face-value invariants)"

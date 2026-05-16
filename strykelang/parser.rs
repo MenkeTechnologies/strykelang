@@ -21063,4 +21063,55 @@ mod tests {
         parse_ok("my $h = +{a=>1}; p $h->{a}");
         parse_ok("my $h = +{a=>1}; p ${$h}{a}");
     }
+
+    /// `abs($x)`, `int($x)`, `sqrt($x)` — common numeric builtins
+    /// invoked as functions.
+    #[test]
+    fn numeric_builtins_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $x = abs(-5)");
+        parse_ok("my $f = int(3.7)");
+        parse_ok("my $s = sqrt(2)");
+        parse_ok("my $n = int($x * 100 + 0.5) / 100");
+    }
+
+    /// `local $var` declaration — dynamic-scoped binding restored
+    /// on block exit. Different from `my` (lexical) and `our`
+    /// (package-global).
+    #[test]
+    fn local_declaration_parses() {
+        let _g = NoInteropGuard::on();
+        // Strict mode rejects `sub` — use anonymous `fn` for the scope.
+        parse_ok("our $g = 1; (fn { local $g = 99; p $g })->()");
+    }
+
+    /// `srand($seed)` and `rand($n)` — deterministic random with
+    /// optional bound. Used by dice + histogram demos for repeatable
+    /// CI output.
+    #[test]
+    fn srand_rand_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("srand(42); my $r = rand(6)");
+        parse_ok("srand(); my $r = int(rand(100))");
+    }
+
+    /// `substr($s, $i, $n)` for slicing strings (2-arg + 3-arg forms).
+    /// Used by base64 + soundex + RPN demos.
+    #[test]
+    fn substr_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $s = \"hello\"; p substr($s, 0, 1)");
+        parse_ok("my $s = \"hello\"; p substr($s, 1)");
+        parse_ok("my $s = \"hello\"; p substr($s, -2)");
+    }
+
+    /// Underscore separator in numeric literals — `1_000_000` for
+    /// readability. Used in `pmap { ... } 1:1_000` style code.
+    #[test]
+    fn underscore_separators_in_numbers_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $n = 1_000_000");
+        parse_ok("my $r = 1_000_000 / 365");
+        parse_ok("my $hex = 0xff_ff");
+    }
 }
