@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+
+# Fold / reduce — accumulator pattern. The bareword positional names
+# `_0` (accumulator) and `_1` (element) shine inside `reduce { … }`:
+# they're stryke's world-first answer to Perl 5's magic `$a` / `$b`,
+# and read tighter than any sigil-and-name spelling.
+#
+# Strict-mode style rule: bareword `_`, `_0`, `_1` are the canonical
+# names in code contexts. Sigil-prefixed `$_`, `$_0`, `$_1` belong in
+# string interpolation only (where the bareword would just be text).
+#
+# Run: stryke --no-interop examples/fold_no_interop.stk
+
+# Classic folds. `reduce { _0 + _1 }` reads "fold by adding element to
+# accumulator" — the order is `accumulator op element`, mirroring the
+# left-fold convention.
+
+# Sum of 1..10 = 55
+my $sum = (1:10) |> reduce { _0 + _1 }
+p "sum 1..10 = $sum (expect 55)"
+die "sum off" unless $sum == 55
+
+# Product 1..6 = 720 (= 6!)
+my $prod = (1:6) |> reduce { _0 * _1 }
+p "6!   = $prod (expect 720)"
+die "fact 6 off" unless $prod == 720
+
+# Maximum of an unsorted list, by folding with the bigger-of-two pick.
+my $mx = (3, -1, 4, 1, 5, 9, 2, 6) |> reduce { _0 > _1 ? _0 : _1 }
+p "max  = $mx (expect 9)"
+die "max off" unless $mx == 9
+
+# Concat 26 lowercase letters into "a".."z" without a temp var.
+my $alphabet = ("a", "b", "c", "d", "e", "f", "g", "h", "i", "j",
+                "k", "l", "m", "n", "o", "p", "q", "r", "s", "t",
+                "u", "v", "w", "x", "y", "z")
+              |> reduce { _0 . _1 }
+p "abc  = $alphabet (expect a..z all 26)"
+die "alphabet off" unless len($alphabet) == 26
+
+# Difference fold (left-fold non-commutative op): 100 - 1 - 2 - 3 - 4
+# = 90. Demonstrates the order: `_0` is the accumulator built up so
+# far, `_1` is the next element.
+my $diff = (100, 1, 2, 3, 4) |> reduce { _0 - _1 }
+p "diff = $diff (expect 90)"
+die "diff off" unless $diff == 90
+
+# Count occurrences via grep + len — a simple alternative to a fold
+# when you only need a single count, not a per-key map.
+my $a_count = ("a", "b", "a", "c", "a", "b") |> grep { _ eq "a" } |> len
+p "a-count = $a_count (expect 3)"
+die "count off" unless $a_count == 3
+
+p ""
+p "  ALL PASS (sum, factorial, max, alphabet concat, difference fold, count)"
