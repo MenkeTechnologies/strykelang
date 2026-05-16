@@ -14,7 +14,7 @@
 #
 # Run: stryke --no-interop examples/knapsack_no_interop.stk
 
-fn ks_solve($capacity, $weights_ref, $values_ref) {  # `knapsack` is a builtin
+fn Knapsack::solve($capacity, $weights_ref, $values_ref) {  # `knapsack` is a builtin
 
     my @weights = @$weights_ref
     my @values  = @$values_ref
@@ -71,7 +71,7 @@ my @cases = (
 p "── 0/1 Knapsack demo ──"
 my $fail = 0
 for my $c (@cases) {
-    my $r = ks_solve($c->{cap}, $c->{w}, $c->{v})
+    my $r = Knapsack::solve($c->{cap}, $c->{w}, $c->{v})
     my $got = $r->{value}
     my $ok  = ($got == $c->{best})
     $fail++ unless $ok
@@ -84,7 +84,7 @@ die "$fail / " . len(@cases) . " knapsack cases failed" if $fail > 0
 
 # Invariant: total value reported equals sum of picked-item values.
 my $c = $cases[4]   # the (50, [10,20,30], [60,100,120]) case
-my $r = ks_solve($c->{cap}, $c->{w}, $c->{v})
+my $r = Knapsack::solve($c->{cap}, $c->{w}, $c->{v})
 my $sum_picked_value  = 0
 my $sum_picked_weight = 0
 for my $i (@{$r->{picks}}) {

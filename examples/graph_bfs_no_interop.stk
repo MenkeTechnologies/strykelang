@@ -12,7 +12,7 @@
 #
 # Run: stryke --no-interop examples/graph_bfs_no_interop.stk
 
-fn bfs_shortest($graph_ref, $src, $dst) {
+fn BFS::shortest($graph_ref, $src, $dst) {
     return [$src] if $src eq $dst
     my %parent
     my %seen = ($src => 1)
@@ -42,8 +42,8 @@ fn bfs_shortest($graph_ref, $src, $dst) {
     [ ]
 }
 
-fn path_len($graph_ref, $src, $dst) {
-    my $path = bfs_shortest($graph_ref, $src, $dst)
+fn BFS::path_len($graph_ref, $src, $dst) {
+    my $path = BFS::shortest($graph_ref, $src, $dst)
     len(@$path) == 0 ? -1 : len(@$path) - 1
 }
 
@@ -68,7 +68,7 @@ my $G = +{
     H => ["G"],
 }
 
-# Reference table — (src, dst, expected path_len).
+# Reference table — (src, dst, expected BFS::path_len).
 my @cases = (
     +{ src => "A", dst => "A", dist => 0 },
     +{ src => "A", dst => "B", dist => 1 },
@@ -86,8 +86,8 @@ my @cases = (
 p "── Graph BFS shortest-path demo ──"
 my $fail = 0
 for my $c (@cases) {
-    my $d = path_len($G, $c->{src}, $c->{dst})
-    my $p = bfs_shortest($G, $c->{src}, $c->{dst})
+    my $d = BFS::path_len($G, $c->{src}, $c->{dst})
+    my $p = BFS::shortest($G, $c->{src}, $c->{dst})
     my $ok = ($d == $c->{dist})
     $fail++ unless $ok
     printf "  %s -> %s  d=%2d  expect=%2d  path=[%s]  %s\n",
@@ -98,9 +98,9 @@ for my $c (@cases) {
 die "$fail / " . len(@cases) . " BFS cases failed" if $fail > 0
 
 # Triangle inequality (in graph terms): d(A,C) <= d(A,B) + d(B,C).
-my $d_ac = path_len($G, "A", "C")
-my $d_ab = path_len($G, "A", "B")
-my $d_bc = path_len($G, "B", "C")
+my $d_ac = BFS::path_len($G, "A", "C")
+my $d_ab = BFS::path_len($G, "A", "B")
+my $d_bc = BFS::path_len($G, "B", "C")
 die "triangle inequality A-B-C" unless $d_ac <= $d_ab + $d_bc
 
 p ""

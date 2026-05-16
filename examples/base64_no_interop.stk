@@ -23,7 +23,7 @@ my @ALPHA = split(//, $ALPHABET)
 my %REVERSE
 for my $i (0:63) { $REVERSE{$ALPHA[$i]} = $i }
 
-fn b64_encode($s) {
+fn B64::encode($s) {
     my @bytes = map { ord(_) } split(//, $s)
     my $n = len(@bytes)
     my $out = ""
@@ -42,7 +42,7 @@ fn b64_encode($s) {
     $out
 }
 
-fn b64_decode($s) {
+fn B64::decode($s) {
     my @chars = grep { _ ne "=" } split(//, $s)
     my $out = ""
     my $i = 0
@@ -62,8 +62,8 @@ fn b64_decode($s) {
 
 if (len(@ARGV) >= 2) {
     my ($mode, $arg) = @ARGV
-    if    ($mode eq "encode") { p b64_encode($arg) }
-    elsif ($mode eq "decode") { p b64_decode($arg) }
+    if    ($mode eq "encode") { p B64::encode($arg) }
+    elsif ($mode eq "decode") { p B64::decode($arg) }
     else  { die "mode must be 'encode' or 'decode'" }
     exit 0
 }
@@ -84,8 +84,8 @@ my @cases = (
 p "── Base64 demo (RFC 4648 test vectors) ──"
 my $fail = 0
 for my $c (@cases) {
-    my $enc       = b64_encode($c->{plain})
-    my $roundtrip = b64_decode($enc)
+    my $enc       = B64::encode($c->{plain})
+    my $roundtrip = B64::decode($enc)
     my $ok_enc    = ($enc eq $c->{b64})
     my $ok_rt     = ($roundtrip eq $c->{plain})
     $fail++ unless $ok_enc && $ok_rt

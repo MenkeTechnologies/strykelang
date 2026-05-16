@@ -20,7 +20,7 @@
 my %PREC = ("+" => 2, "-" => 2, "*" => 3, "/" => 3, "%" => 3, "**" => 4)
 my %RIGHT_ASSOC = ("**" => 1)
 
-fn infix_to_rpn($expr) {
+fn Calc::to_rpn($expr) {
     my @toks = grep { len(_) > 0 } split(/\s+/, $expr)
     my @out
     my @ops
@@ -54,7 +54,7 @@ fn infix_to_rpn($expr) {
     @out
 }
 
-fn eval_rpn_tokens(@toks) {
+fn Calc::eval_rpn(@toks) {
     my @stack
     for my $tok (@toks) {
         if ($tok =~ /^-?\d+(\.\d+)?$/) {
@@ -76,14 +76,14 @@ fn eval_rpn_tokens(@toks) {
     $stack[0]
 }
 
-fn calc($expr) {
-    my @rpn = infix_to_rpn($expr)
-    eval_rpn_tokens(@rpn)
+fn Calc::run($expr) {
+    my @rpn = Calc::to_rpn($expr)
+    Calc::eval_rpn(@rpn)
 }
 
 if (len(@ARGV) >= 1) {
     my $expr = join(" ", @ARGV)
-    my $r = eval { calc($expr) }
+    my $r = eval { Calc::run($expr) }
     if ($@) {
         p "error: $@"
         exit 1
@@ -110,7 +110,7 @@ my @cases = (
 p "── Full infix calculator demo (shunt + RPN) ──"
 my $fail = 0
 for my $c (@cases) {
-    my $got = eval { calc($c->{expr}) }
+    my $got = eval { Calc::run($c->{expr}) }
     if ($@) {
         printf "  %-30s -> ERROR: %s\n", $c->{expr}, $@
         $fail++

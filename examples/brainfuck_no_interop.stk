@@ -23,7 +23,7 @@
 # Run: stryke --no-interop examples/brainfuck_no_interop.stk
 #      stryke --no-interop examples/brainfuck_no_interop.stk '++++++++[>++++++++<-]>+.'
 
-fn build_jumps(@code) {
+fn BF::build_jumps(@code) {
     my %fwd
     my %back
     my @stack
@@ -41,9 +41,9 @@ fn build_jumps(@code) {
     (\%fwd, \%back)
 }
 
-fn brainfuck($src) {
+fn BF::run($src) {
     my @code = grep { _ =~ /[\+\-<>\[\]\.,]/ } split(//, $src)
-    my ($fwd_ref, $back_ref) = build_jumps(@code)
+    my ($fwd_ref, $back_ref) = BF::build_jumps(@code)
 
     my @tape = (0) x 1024  # 1k tape — enough for demo programs
     my $dp   = 0           # data pointer
@@ -65,7 +65,7 @@ fn brainfuck($src) {
 }
 
 if (len(@ARGV) >= 1) {
-    p brainfuck($ARGV[0])
+    p BF::run($ARGV[0])
     exit 0
 }
 
@@ -74,17 +74,17 @@ p "── Brainfuck demos ──"
 
 # 1) Emit 'A' (ASCII 65) — 8 * 8 + 1 = 65
 my $prog_a = "++++++++[>++++++++<-]>+."
-my $out_a = brainfuck($prog_a)
+my $out_a = BF::run($prog_a)
 p "  print 'A': $out_a"
 
 # 2) Emit 'H' (ASCII 72) — 9 * 8 = 72
 my $prog_h = "+++++++++[>++++++++<-]>."
-my $out_h  = brainfuck($prog_h)
+my $out_h  = BF::run($prog_h)
 p "  print 'H': $out_h"
 
 # 3) Two-letter 'HI' — 'H' from above (72), shift +1 to get 'I' (73).
 my $prog_hi = "+++++++++[>++++++++<-]>.+."
-my $out_hi  = brainfuck($prog_hi)
+my $out_hi  = BF::run($prog_hi)
 p "  print 'HI': $out_hi"
 
 # Built-in self-test: every program must emit the expected output.

@@ -14,7 +14,7 @@
 #
 # Run: stryke --no-interop examples/set_ops_no_interop.stk
 
-fn mk_set(@items) {
+fn Set::make(@items) {
     my %s
     # Explicit guard: stryke's `for @items` runs one iteration even when
     # @items is empty (with $_ = undef), which would seed a phantom ""
@@ -25,13 +25,13 @@ fn mk_set(@items) {
     \%s
 }
 
-fn set_union($xs, $ys) {
+fn Set::union($xs, $ys) {
     my %out = %$xs
     $out{$_} = 1 for keys %$ys
     \%out
 }
 
-fn set_intersect($xs, $ys) {
+fn Set::intersect($xs, $ys) {
     my %out
     for my $k (keys %$xs) {
         $out{$k} = 1 if exists $ys->{$k}
@@ -39,7 +39,7 @@ fn set_intersect($xs, $ys) {
     \%out
 }
 
-fn set_diff($xs, $ys) {
+fn Set::diff($xs, $ys) {
     my %out
     for my $k (keys %$xs) {
         $out{$k} = 1 unless exists $ys->{$k}
@@ -47,57 +47,57 @@ fn set_diff($xs, $ys) {
     \%out
 }
 
-fn sym_diff($xs, $ys) {
+fn Set::sym_diff($xs, $ys) {
     my %out
     for my $k (keys %$xs) { $out{$k} = 1 unless exists $ys->{$k} }
     for my $k (keys %$ys) { $out{$k} = 1 unless exists $xs->{$k} }
     \%out
 }
 
-fn sub_of($xs, $ys) {
+fn Set::subset_of($xs, $ys) {
     for my $k (keys %$xs) { return 0 unless exists $ys->{$k} }
     1
 }
 
-fn set_eq($xs, $ys) {
-    sub_of($xs, $ys) && sub_of($ys, $xs)
+fn Set::equals($xs, $ys) {
+    Set::subset_of($xs, $ys) && Set::subset_of($ys, $xs)
 }
 
-fn show($label, $s) {
+fn Set::show($label, $s) {
     my @k = sort keys %$s
     printf "  %-12s {%s}\n", $label . ":", join(", ", @k)
 }
 
-my $A = mk_set(1, 2, 3, 4, 5)
-my $B = mk_set(4, 5, 6, 7, 8)
+my $A = Set::make(1, 2, 3, 4, 5)
+my $B = Set::make(4, 5, 6, 7, 8)
 
 p "── Set operations demo ──"
-show("A",        $A)
-show("B",        $B)
-show("A ∪ B",    set_union($A, $B))
-show("A ∩ B",    set_intersect($A, $B))
-show("A − B",    set_diff($A, $B))
-show("B − A",    set_diff($B, $A))
-show("A △ B",    sym_diff($A, $B))
+Set::show("A",        $A)
+Set::show("B",        $B)
+Set::show("A ∪ B",    Set::union($A, $B))
+Set::show("A ∩ B",    Set::intersect($A, $B))
+Set::show("A − B",    Set::diff($A, $B))
+Set::show("B − A",    Set::diff($B, $A))
+Set::show("A △ B",    Set::sym_diff($A, $B))
 
 # Built-in self-tests on the algebraic identities.
-my $U  = set_union($A, $B)
-my $I  = set_intersect($A, $B)
-my $SD = sym_diff($A, $B)
+my $U  = Set::union($A, $B)
+my $I  = Set::intersect($A, $B)
+my $SD = Set::sym_diff($A, $B)
 
 # |A ∪ B| = |A| + |B| - |A ∩ B| = 5 + 5 - 2 = 8
 die "inclusion-exclusion broken" unless len(keys %$U)  == 8
 die "intersection size != 2"     unless len(keys %$I)  == 2
-die "sym_diff size != 6"         unless len(keys %$SD) == 6
+die "Set::sym_diff size != 6"         unless len(keys %$SD) == 6
 
 # Self-relations.
-die "A subset-of A" unless sub_of($A, $A)
-die "A equals A"    unless set_eq($A, $A)
-die "A not equal B" unless !set_eq($A, $B)
+die "A subset-of A" unless Set::subset_of($A, $A)
+die "A equals A"    unless Set::equals($A, $A)
+die "A not equal B" unless !Set::equals($A, $B)
 
 # Disjoint sets: |A ∩ disjoint| = 0.
-my $D = mk_set(10, 11, 12)
-my $disj_intersect = set_intersect($A, $D)
+my $D = Set::make(10, 11, 12)
+my $disj_intersect = Set::intersect($A, $D)
 die "disjoint intersect == empty" unless len(keys %$disj_intersect) == 0
 
 p ""

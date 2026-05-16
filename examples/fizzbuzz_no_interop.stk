@@ -10,12 +10,12 @@
 #   * `|>` pipe-forward instead of chained method calls
 #   * `match (subject) { pattern => arm }` for the classification
 #
-# Run:  stryke --no-interop examples/classify_no_interop.stk
-#       stryke --no-interop examples/classify_no_interop.stk 30
+# Run:  stryke --no-interop examples/FizzBuzz::classify_no_interop.stk
+#       stryke --no-interop examples/FizzBuzz::classify_no_interop.stk 30
 
 my $n = $ARGV[0] // 15
 
-fn classify($i) {
+fn FizzBuzz::classify($i) {
     match ([$i % 3 == 0, $i % 5 == 0]) {
         [1, 1] => "FizzBuzz",
         [1, 0] => "Fizz",
@@ -25,19 +25,19 @@ fn classify($i) {
 }
 
 for (1:$n) {
-    p _, " ", classify(_)
+    p _, " ", FizzBuzz::classify(_)
 }
 
-# `pmap` to fan the same work across cores — overkill for classify but
+# `pmap` to fan the same work across cores — overkill for FizzBuzz::classify but
 # the syntax is the point. `_` is the per-item topic.
-my @parallel = pmap { classify(_) } 1:$n
+my @parallel = pmap { FizzBuzz::classify(_) } 1:$n
 p ""
 p "parallel run produced ", len(@parallel), " labels"
 p "first 5: ", join(", ", @parallel[0:4])
 
 # Built-in self-tests against the known FizzBuzz table.
-die "classify(3) must be Fizz"      unless classify(3)  eq "Fizz"
-die "classify(5) must be Buzz"      unless classify(5)  eq "Buzz"
-die "classify(15) must be FizzBuzz" unless classify(15) eq "FizzBuzz"
-die "classify(1) must be \"1\""     unless classify(1)  eq "1"
+die "FizzBuzz::classify(3) must be Fizz"      unless FizzBuzz::classify(3)  eq "Fizz"
+die "FizzBuzz::classify(5) must be Buzz"      unless FizzBuzz::classify(5)  eq "Buzz"
+die "FizzBuzz::classify(15) must be FizzBuzz" unless FizzBuzz::classify(15) eq "FizzBuzz"
+die "FizzBuzz::classify(1) must be \"1\""     unless FizzBuzz::classify(1)  eq "1"
 p "  ALL PASS"

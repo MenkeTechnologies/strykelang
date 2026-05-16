@@ -13,7 +13,7 @@
 #      stryke --no-interop examples/collatz_no_interop.stk 27
 #      stryke --no-interop examples/collatz_no_interop.stk 100000
 
-fn cz_steps($n) {
+fn Collatz::steps($n) {
     die "n must be positive: $n" unless $n > 0
     state %cache
     return $cache{$n} if exists $cache{$n}
@@ -27,7 +27,7 @@ fn cz_steps($n) {
     $steps
 }
 
-fn cz_path($n) {
+fn Collatz::path($n) {
     my @path = ($n)
     my $x = $n
     while ($x > 1) {
@@ -39,8 +39,8 @@ fn cz_path($n) {
 
 if (len(@ARGV) >= 1) {
     my $n = 0 + $ARGV[0]
-    p "trajectory of $n: ", join(" -> ", cz_path($n))
-    p "steps: ", cz_steps($n)
+    p "trajectory of $n: ", join(" -> ", Collatz::path($n))
+    p "steps: ", Collatz::steps($n)
     exit 0
 }
 
@@ -62,10 +62,10 @@ my @cases = (
 p "── Collatz step counts (OEIS A006577) ──"
 my $fail = 0
 for my $c (@cases) {
-    my $got = cz_steps($c->{n})
+    my $got = Collatz::steps($c->{n})
     my $ok  = ($got == $c->{s})
     $fail++ unless $ok
-    printf "  cz_steps(%6d) = %4d   expect %4d  %s\n",
+    printf "  Collatz::steps(%6d) = %4d   expect %4d  %s\n",
         $c->{n}, $got, $c->{s}, $ok ? "" : "FAIL"
 }
 die "$fail / " . len(@cases) . " collatz cases failed" if $fail > 0
@@ -74,7 +74,7 @@ die "$fail / " . len(@cases) . " collatz cases failed" if $fail > 0
 my $best_n     = 1
 my $best_steps = 0
 for my $n (1:100) {
-    my $s = cz_steps($n)
+    my $s = Collatz::steps($n)
     if ($s > $best_steps) {
         $best_steps = $s
         $best_n     = $n

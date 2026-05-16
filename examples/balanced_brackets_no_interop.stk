@@ -10,10 +10,10 @@
 #   * `split //` for char iteration; topic `_` inside grep
 #   * `die`-on-regression invariants at the end (CI catchers)
 #
-# Run: stryke --no-interop examples/balanced_brackets_no_interop.stk
-#      stryke --no-interop examples/balanced_brackets_no_interop.stk "({[]})"
+# Run: stryke --no-interop examples/Brackets::balanced_brackets_no_interop.stk
+#      stryke --no-interop examples/Brackets::balanced_brackets_no_interop.stk "({[]})"
 
-fn balanced($s) {
+fn Brackets::balanced($s) {
     my %pair = (")" => "(", "]" => "[", "}" => "{")
     my %openers = ("(" => 1, "[" => 1, "{" => 1)
     my @stack
@@ -31,8 +31,8 @@ fn balanced($s) {
 
 if (len(@ARGV) >= 1) {
     my $s = $ARGV[0]
-    p balanced($s) ? "balanced" : "unbalanced"
-    exit balanced($s) ? 0 : 1
+    p Brackets::balanced($s) ? "Brackets::balanced" : "unBrackets::balanced"
+    exit Brackets::balanced($s) ? 0 : 1
 }
 
 # Demo table — each row is (input, expected). Lines mix bracket kinds
@@ -58,7 +58,7 @@ my @cases = (
 p "── Balanced-brackets demo ──"
 my $fail = 0
 for my $c (@cases) {
-    my $got = balanced($c->{s})
+    my $got = Brackets::balanced($c->{s})
     my $ok  = ($got == $c->{ok})
     $fail++ unless $ok
     printf "  %-32s  expect=%-3s got=%-3s  %s\n",

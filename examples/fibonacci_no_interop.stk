@@ -13,20 +13,20 @@
 # Run: stryke --no-interop examples/fibonacci_no_interop.stk
 #      stryke --no-interop examples/fibonacci_no_interop.stk 30
 
-fn fib_naive($n) {
+fn Fib::naive($n) {
     return $n if $n < 2
-    fib_naive($n - 1) + fib_naive($n - 2)
+    Fib::naive($n - 1) + Fib::naive($n - 2)
 }
 
-fn fib_memo($n) {
+fn Fib::memo($n) {
     state %cache
     return $cache{$n} if exists $cache{$n}
-    my $v = $n < 2 ? $n : fib_memo($n - 1) + fib_memo($n - 2)
+    my $v = $n < 2 ? $n : Fib::memo($n - 1) + Fib::memo($n - 2)
     $cache{$n} = $v
     $v
 }
 
-fn fib_iter($n) {
+fn Fib::iter($n) {
     return $n if $n < 2
     # `$a` / `$b` are reserved in strict mode — use $prev / $curr.
     my ($prev, $curr) = (0, 1)
@@ -45,9 +45,9 @@ printf "  %-10s %12s %12s\n", "------", "-------", "---------"
 for my $impl ("naive", "memo", "iter") {
     my $t0 = now_ns()
     my $r
-    if    ($impl eq "naive") { $r = fib_naive($n) }
-    elsif ($impl eq "memo")  { $r = fib_memo($n)  }
-    else                     { $r = fib_iter($n)  }
+    if    ($impl eq "naive") { $r = Fib::naive($n) }
+    elsif ($impl eq "memo")  { $r = Fib::memo($n)  }
+    else                     { $r = Fib::iter($n)  }
     my $ms = (now_ns() - $t0) / 1_000_000
     printf "  %-10s %12d %12.3f\n", $impl, $r, $ms
 }
@@ -59,8 +59,8 @@ p " well past n=10k)"
 # Built-in self-test against a known fib table.
 my %expected = (0 => 0, 1 => 1, 5 => 5, 10 => 55, 20 => 6765, 25 => 75025)
 for my $k (sort { $_0 <=> $_1 } keys %expected) {
-    die "fib_iter($k) != $expected{$k}" unless fib_iter($k) == $expected{$k}
-    die "fib_memo($k) != $expected{$k}" unless fib_memo($k) == $expected{$k}
-    die "fib_naive($k) != $expected{$k}" unless fib_naive($k) == $expected{$k}
+    die "Fib::iter($k) != $expected{$k}" unless Fib::iter($k) == $expected{$k}
+    die "Fib::memo($k) != $expected{$k}" unless Fib::memo($k) == $expected{$k}
+    die "Fib::naive($k) != $expected{$k}" unless Fib::naive($k) == $expected{$k}
 }
 p "  ALL PASS (matched 6 reference fib values across all 3 impls)"

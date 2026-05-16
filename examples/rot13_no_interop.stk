@@ -1,6 +1,6 @@
 #!/usr/bin/env stryke
 
-# ROT13 — letter-rotation cipher, self-inverse: rot13_str(rot13_str(s)) == s.
+# ROT13 — letter-rotation cipher, self-inverse: Rot13::str(Rot13::str(s)) == s.
 # Cousin to caesar_no_interop but specialised (shift fixed at 13) and
 # documents the self-inverse property. Parses clean under `--no-interop`.
 #
@@ -14,7 +14,7 @@
 # Run: stryke --no-interop examples/rot13_no_interop.stk
 #      stryke --no-interop examples/rot13_no_interop.stk "Hello, World!"
 
-fn rot13_char($ch) {
+fn Rot13::char($ch) {
     my $c = ord($ch)
     if ($c >= ord("A") && $c <= ord("Z")) {
         return chr(($c - ord("A") + 13) % 26 + ord("A"))
@@ -25,12 +25,12 @@ fn rot13_char($ch) {
     $ch
 }
 
-fn rot13_str($text) {
-    join("", maps { rot13_char(_) } split(//, $text))
+fn Rot13::str($text) {
+    join("", maps { Rot13::char(_) } split(//, $text))
 }
 
 if (len(@ARGV) >= 1) {
-    p rot13_str(join(" ", @ARGV))
+    p Rot13::str(join(" ", @ARGV))
     exit 0
 }
 
@@ -51,7 +51,7 @@ my @cases = (
 p "── ROT13 demo ──"
 my $fail = 0
 for my $c (@cases) {
-    my $got = rot13_str($c->{plain})
+    my $got = Rot13::str($c->{plain})
     my $ok  = ($got eq $c->{cipher})
     $fail++ unless $ok
     printf "  %-50s -> %s  %s\n",
@@ -61,19 +61,19 @@ for my $c (@cases) {
 }
 die "$fail / " . len(@cases) . " ROT13 cases failed" if $fail > 0
 
-# Self-inverse invariant — rot13_str(rot13_str(s)) == s for every test input.
+# Self-inverse invariant — Rot13::str(Rot13::str(s)) == s for every test input.
 for my $c (@cases) {
-    my $twice = rot13_str(rot13_str($c->{plain}))
+    my $twice = Rot13::str(Rot13::str($c->{plain}))
     die "self-inverse failed" unless $twice eq $c->{plain}
 }
 
 # Fixed-point invariant — letters at positions A, a are rotated by 13.
-die "rot13_str(A) must be N"  unless rot13_str("A") eq "N"
-die "rot13_str(N) must be A"  unless rot13_str("N") eq "A"
-die "rot13_str(a) must be n"  unless rot13_str("a") eq "n"
-die "rot13_str(z) must be m"  unless rot13_str("z") eq "m"
-die "rot13_str(5) must be 5"  unless rot13_str("5") eq "5"   # digits unchanged
-die "rot13_str(!) must be !"  unless rot13_str("!") eq "!"   # punct unchanged
+die "Rot13::str(A) must be N"  unless Rot13::str("A") eq "N"
+die "Rot13::str(N) must be A"  unless Rot13::str("N") eq "A"
+die "Rot13::str(a) must be n"  unless Rot13::str("a") eq "n"
+die "Rot13::str(z) must be m"  unless Rot13::str("z") eq "m"
+die "Rot13::str(5) must be 5"  unless Rot13::str("5") eq "5"   # digits unchanged
+die "Rot13::str(!) must be !"  unless Rot13::str("!") eq "!"   # punct unchanged
 
 p ""
 p "  ALL PASS (8 fixture cases + 8 self-inverse + 6 fixed-point checks)"

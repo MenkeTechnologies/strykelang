@@ -1,6 +1,6 @@
 #!/usr/bin/env stryke
 
-# Bitwise operations — AND, OR, XOR, NOT, shift left/right, bit_count,
+# Bitwise operations — AND, OR, XOR, NOT, shift left/right, Bits::popcount,
 # is-power-of-two, flag enums. Parses clean under `--no-interop`.
 #
 # Stryke choices:
@@ -11,9 +11,9 @@
 #   * Built-in `die` invariants
 #
 # Run: stryke --no-interop examples/bitops_no_interop.stk
-#      stryke --no-interop examples/bitops_no_interop.stk bit_count 42
+#      stryke --no-interop examples/bitops_no_interop.stk Bits::popcount 42
 
-fn bit_count($n) {
+fn Bits::popcount($n) {
     my $x = $n
     my $count = 0
     while ($x > 0) {
@@ -23,22 +23,22 @@ fn bit_count($n) {
     $count
 }
 
-fn is_pow_two($n) {
+fn Bits::is_pow2($n) {
     $n > 0 && ($n & ($n - 1)) == 0
 }
 
 # Format as a fixed-width binary string for the demo table.
-fn binary8($n) {
+fn Bits::bin8($n) {
     sprintf("%08b", $n & 0xff)
 }
 
 if (len(@ARGV) >= 2) {
     my ($op, $lhsrg) = @ARGV
     my $n = 0 + $lhsrg
-    if    ($op eq "bit_count")   { p bit_count($n) }
-    elsif ($op eq "is_pow_two")    { p is_pow_two($n) ? 1 : 0 }
-    elsif ($op eq "binary")     { p binary8($n) }
-    else  { die "op must be bit_count / is_pow_two / binary" }
+    if    ($op eq "Bits::popcount")   { p Bits::popcount($n) }
+    elsif ($op eq "Bits::is_pow2")    { p Bits::is_pow2($n) ? 1 : 0 }
+    elsif ($op eq "binary")     { p Bits::bin8($n) }
+    else  { die "op must be Bits::popcount / Bits::is_pow2 / binary" }
     exit 0
 }
 
@@ -46,19 +46,19 @@ if (len(@ARGV) >= 2) {
 p "── Bitwise ops on 0xAA and 0x55 ──"
 my $lhs = 0xAA   # 10101010
 my $rhs = 0x55   # 01010101
-printf "  a    = %s = 0x%02x = %d\n", binary8($lhs), $lhs, $lhs
-printf "  b    = %s = 0x%02x = %d\n", binary8($rhs), $rhs, $rhs
-printf "  a&b  = %s = 0x%02x\n", binary8($lhs & $rhs),   $lhs & $rhs
-printf "  a|b  = %s = 0x%02x\n", binary8($lhs | $rhs),   $lhs | $rhs
-printf "  a^b  = %s = 0x%02x\n", binary8($lhs ^ $rhs),   $lhs ^ $rhs
-printf "  ~a&0xff = %s = 0x%02x\n", binary8(~$lhs),    ~$lhs & 0xff
+printf "  a    = %s = 0x%02x = %d\n", Bits::bin8($lhs), $lhs, $lhs
+printf "  b    = %s = 0x%02x = %d\n", Bits::bin8($rhs), $rhs, $rhs
+printf "  a&b  = %s = 0x%02x\n", Bits::bin8($lhs & $rhs),   $lhs & $rhs
+printf "  a|b  = %s = 0x%02x\n", Bits::bin8($lhs | $rhs),   $lhs | $rhs
+printf "  a^b  = %s = 0x%02x\n", Bits::bin8($lhs ^ $rhs),   $lhs ^ $rhs
+printf "  ~a&0xff = %s = 0x%02x\n", Bits::bin8(~$lhs),    ~$lhs & 0xff
 printf "  a<<2 = %s = 0x%03x\n", sprintf("%010b", ($lhs << 2) & 0x3ff), ($lhs << 2) & 0xfff
-printf "  a>>2 = %s = 0x%02x\n", binary8($lhs >> 2),   $lhs >> 2
+printf "  a>>2 = %s = 0x%02x\n", Bits::bin8($lhs >> 2),   $lhs >> 2
 
 # Popcount table.
 p ""
 p "── Popcount (set-bit count) ──"
-my @bit_count_cases = (
+my @Bits::popcount_cases = (
     +{ n => 0,   c => 0 },
     +{ n => 1,   c => 1 },
     +{ n => 7,   c => 3 },
@@ -69,17 +69,17 @@ my @bit_count_cases = (
     +{ n => 1023,c => 10 },
 )
 my $fail = 0
-for my $c (@bit_count_cases) {
-    my $got = bit_count($c->{n})
+for my $c (@Bits::popcount_cases) {
+    my $got = Bits::popcount($c->{n})
     my $ok  = ($got == $c->{c})
     $fail++ unless $ok
-    printf "  bit_count(%4d) = %2d  expect %2d  %s\n",
+    printf "  Bits::popcount(%4d) = %2d  expect %2d  %s\n",
         $c->{n}, $got, $c->{c}, $ok ? "" : "FAIL"
 }
 
 # Power-of-two table.
 p ""
-p "── is_pow_two ──"
+p "── Bits::is_pow2 ──"
 my @pow2_cases = (
     +{ n => 0,    p => 0 },  # 0 not a power
     +{ n => 1,    p => 1 },
@@ -90,13 +90,13 @@ my @pow2_cases = (
     +{ n => 1023, p => 0 },
 )
 for my $c (@pow2_cases) {
-    my $got = is_pow_two($c->{n}) ? 1 : 0
+    my $got = Bits::is_pow2($c->{n}) ? 1 : 0
     my $ok  = ($got == $c->{p})
     $fail++ unless $ok
-    printf "  is_pow_two(%5d) = %d  expect %d  %s\n",
+    printf "  Bits::is_pow2(%5d) = %d  expect %d  %s\n",
         $c->{n}, $got, $c->{p}, $ok ? "" : "FAIL"
 }
 
 die "$fail cases failed" if $fail > 0
 p ""
-p "  ALL PASS (8 bit_count + 7 pow2 cases)"
+p "  ALL PASS (8 Bits::popcount + 7 pow2 cases)"
