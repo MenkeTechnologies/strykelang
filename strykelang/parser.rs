@@ -20515,4 +20515,81 @@ mod tests {
         parse_ok("sub foo { 1 }");
         parse_ok("say 1");
     }
+
+    /// `$a` / `$b` outside a sort or reduce block is rejected under
+    /// `--no-interop` — stryke routes the user to `$_0` / `$_1`
+    /// implicit-positional names which work everywhere (including in
+    /// sort blocks). Pins the lexer arm at `parser.rs::18964` shape.
+    #[test]
+    fn no_interop_rejects_bare_dollar_a_dollar_b() {
+        let _g = NoInteropGuard::on();
+        // Bare reference outside a block context.
+        let err = parse_err("my $x = $a + $b");
+        assert!(
+            err.contains("--no-interop") || err.contains("$_0") || err.contains("$_1"),
+            "$a/$b rejected with positional hint: got {err:?}"
+        );
+    }
+
+    /// And inside a sort block too: stryke's strict mode wants
+    /// `$_0` / `$_1` even there (per the temperature_converter and
+    /// quicksort_no_interop examples).
+    #[test]
+    fn no_interop_rejects_dollar_a_inside_sort_block() {
+        let _g = NoInteropGuard::on();
+        let err = parse_err("my @s = sort { $a <=> $b } (3, 1, 2)");
+        assert!(
+            err.contains("--no-interop") || err.contains("$_0") || err.contains("$_1"),
+            "$a in sort block rejected: got {err:?}"
+        );
+    }
+
+    /// And the inverse — `$_0` / `$_1` inside a sort block parses
+    /// clean under `--no-interop`.
+    #[test]
+    fn no_interop_accepts_positional_underscore_in_sort_block() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my @s = sort { $_0 <=> $_1 } (3, 1, 2)");
+    }
+
+    // ── stryke-specific grammar pins (parse with the flag on or off) ────
+
+    /// Colon ranges `start:end` are stryke-canonical (not `..`).
+    /// `1:10`, `0:N`, `-5:5` all parse.
+    #[test]
+    fn colon_range_parses_in_for_loop() {
+        let _g = NoInteropGuard::on();
+        parse_ok("for my $i (1:10) { p $i }");
+        parse_ok("my @r = 0:99");
+        parse_ok("my @r = -5:5");
+    }
+
+    /// Postfix `if` / `unless` / `for` modifiers parse on a statement.
+    #[test]
+    fn postfix_statement_modifiers_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("p _ for (1, 2, 3)");
+        parse_ok("p 1 if 1");
+        parse_ok("p 0 unless 0");
+    }
+
+    /// Pipe-forward `|>` desugars at parse time — verify it accepts both
+    /// the bare-function (`x |> f`) and the block (`x |> { _ * 2 }`) forms.
+    #[test]
+    fn pipe_forward_accepts_both_function_and_block_rhs() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $r = 1:10 |> sum");
+        parse_ok("my @r = 1:10 |> maps { _ * 2 }");
+        parse_ok("my @r = 1:10 |> grep { _ % 2 == 0 } |> maps { _ + 1 }");
+    }
+
+    /// `_0`, `_1`, ... bareword positional params (no sigil).
+    #[test]
+    fn bareword_positional_underscore_n_parses_in_blocks() {
+        let _g = NoInteropGuard::on();
+        // `_0` / `_1` inside a sort block: the canonical strict spelling.
+        parse_ok("my @s = sort { _0 <=> _1 } (3, 1, 2)");
+        // And inside a maps block as the per-item topic.
+        parse_ok("my @r = maps { _0 * 2 } (1, 2, 3)");
+    }
 }

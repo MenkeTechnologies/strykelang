@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+
+# Quicksort — classic divide-and-conquer, stryke-idiomatic form,
+# parses clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn` and recursive self-call
+#   * `len` for length (not `scalar`)
+#   * `grep` block + topic `_` for partitioning
+#   * Array slicing with `[1:]` (stryke ranges) — the tail-slice idiom
+#   * `p` for output (not `say`)
+#
+# Run:  stryke --no-interop examples/quicksort_no_interop.stk
+#       stryke --no-interop examples/quicksort_no_interop.stk 9 3 7 1 5 2 8 4 6
+
+fn quicksort(@xs) {
+    return @xs if len(@xs) <= 1
+    my $pivot = $xs[0]
+    my @rest  = @xs[1:]
+    my @lo    = grep { _ <  $pivot } @rest
+    my @hi    = grep { _ >= $pivot } @rest
+    (quicksort(@lo), $pivot, quicksort(@hi))
+}
+
+my @input
+if (len(@ARGV) > 0) {
+    @input = map { 0 + _ } @ARGV
+} else {
+    # Default test list — covers duplicates, negatives, mid-large size.
+    @input = (5, -3, 8, 1, 5, 9, -1, 7, 2, 0, 5, 4)
+}
+
+p "input : (", join(", ", @input), ")"
+my @sorted = quicksort(@input)
+p "sorted: (", join(", ", @sorted), ")"
+
+# Invariant check — sort block. Under `--no-interop`, `$a` / `$b` are
+# rejected even inside sort/reduce; stryke uses positional `$_0` / `$_1`
+# instead (the implicit-closure-param spelling).
+my @golden = sort { $_0 <=> $_1 } @input
+my $got    = join(",", @sorted)
+my $want   = join(",", @golden)
+die "quicksort drifted! got=$got want=$want" unless $got eq $want
+p "verified against stryke's built-in sort"
