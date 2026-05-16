@@ -1,0 +1,207 @@
+#!/usr/bin/env stryke
+
+# Barcode-scanner simulator: UPC-A check-digit verification,
+# EAN-13 verification, scan-log analytics.
+#
+# Demonstrates:
+#   * UPC-A 12-digit check via weighted sum (3,1,3,1,... × digits[:11]).
+#   * EAN-13 13-digit check via different weight pattern (1,3,1,3,...).
+#   * Bloom filter for "known SKU".
+#   * CMS for scan frequency.
+#   * TopK SpaceSaving for top sellers.
+#   * HLL distinct unique products scanned.
+#   * t-digest for per-scan validation latency.
+
+# ── product catalog (UPC-A 12-digit codes) ──────────────────────────
+
+my %catalog = (
+    "036000291452" => "Coca-Cola 12oz",
+    "012000028533" => "Pepsi 12oz",
+    "041800000111" => "Milk Gallon",
+    "070038641704" => "Cheerios Box",
+    "028400064057" => "Lay's Chips",
+    "021000615056" => "Kraft Macaroni",
+    "060383049294" => "Toothpaste",
+    "012000028519" => "Mountain Dew",
+    "066721006080" => "Oreo Cookies",
+    "024000162018" => "Heinz Ketchup",
+    "027400028120" => "Snickers Bar",
+    "041000050541" => "Maxwell Coffee",
+);
+
+# ── sketches ──────────────────────────────────────────────────────
+
+my $bf_known = bloom(128, 0.01);
+for my $code (keys %catalog) { bloom_add($bf_known, $code) }
+
+my $cms_scans = cms(8, 512);
+my $tk_top    = topk(8);
+my $hll_uniq  = hll(12);
+my $td_lat    = t_digest(100);
+
+# ── UPC-A check-digit verification ────────────────────────────────
+# digit[12] must equal (10 - ((sum_odd*3 + sum_even) mod 10)) mod 10
+
+fn Demo::BC::upca_check($code) {
+    return 0 unless length($code) == 12;
+    my @d = split //, $code;
+    return 0 if grep { !/^[0-9]$/ } @d;
+
+    my $odd_sum  = 0;
+    my $even_sum = 0;
+    for my $i (0:10) {
+        if ($i % 2 == 0) {
+            $odd_sum += $d[$i];
+        } else {
+            $even_sum += $d[$i];
+        }
+    }
+    my $total = $odd_sum * 3 + $even_sum;
+    my $check = (10 - ($total % 10)) % 10;
+    $check == $d[11] ? 1 : 0
+}
+
+# ── EAN-13 check-digit (13 chars, alternating 1,3,1,3,...) ────────
+
+fn Demo::BC::ean13_check($code) {
+    return 0 unless length($code) == 13;
+    my @d = split //, $code;
+    return 0 if grep { !/^[0-9]$/ } @d;
+
+    my $sum = 0;
+    for my $i (0:11) {
+        if ($i % 2 == 0) {
+            $sum += $d[$i];
+        } else {
+            $sum += $d[$i] * 3;
+        }
+    }
+    my $check = (10 - ($sum % 10)) % 10;
+    $check == $d[12] ? 1 : 0
+}
+
+# ── compute UPC-A check digit (for generation) ──────────────────────
+
+fn Demo::BC::upca_calc_check($code11) {
+    my @d = split //, $code11;
+    my $odd_sum  = 0;
+    my $even_sum = 0;
+    for my $i (0:10) {
+        if ($i % 2 == 0) {
+            $odd_sum += $d[$i];
+        } else {
+            $even_sum += $d[$i];
+        }
+    }
+    my $total = $odd_sum * 3 + $even_sum;
+    (10 - ($total % 10)) % 10
+}
+
+# ── verify each catalog entry self-consistent ─────────────────────
+
+print "barcode scanner — UPC-A check-digit verification\n";
+print "─" x 60, "\n";
+
+my $cat_ok = 0;
+my $cat_bad = 0;
+for my $code (sort keys %catalog) {
+    my $ok = Demo::BC::upca_check($code);
+    if ($ok) { $cat_ok++ } else { $cat_bad++ }
+    printf("  %s  %-18s  %s\n",
+           $code, $catalog{$code}, $ok ? "ok" : "INVALID CHECK");
+}
+print "\ncatalog: $cat_ok valid / $cat_bad invalid (of ", len(keys %catalog), ")\n";
+
+# ── verify computed check matches expected ────────────────────────
+
+print "\nverify Demo::BC::upca_calc_check matches stored:\n";
+my $calc_ok = 0;
+my $calc_bad = 0;
+for my $code (sort keys %catalog) {
+    my $first_11 = substr($code, 0, 11);
+    my $expect = substr($code, 11, 1) + 0;
+    my $got = Demo::BC::upca_calc_check($first_11);
+    if ($got == $expect) { $calc_ok++ } else { $calc_bad++ }
+}
+printf("  calc matches stored: %d ok / %d bad\n", $calc_ok, $calc_bad);
+
+# ── EAN-13 sample verification ────────────────────────────────────
+
+my @ean_samples = (
+    "5901234123457",
+    "4006381333931",
+    "9783161484100",
+    "0123456789012",   # synthetic invalid
+);
+
+print "\nEAN-13 sample verification:\n";
+for my $code (@ean_samples) {
+    my $ok = Demo::BC::ean13_check($code);
+    printf("  %s  %s\n", $code, $ok ? "valid" : "invalid");
+}
+
+# ── simulated scan stream ─────────────────────────────────────────
+
+print "\nsimulated scan stream (200 scans):\n";
+srand(42);
+my @cat_codes = sort keys %catalog;
+
+my $valid = 0;
+my $unknown = 0;
+my $bad_check = 0;
+
+for my $i (1:200) {
+    my $code;
+    if (rand() < 0.85) {
+        $code = $cat_codes[int(rand(len(@cat_codes)))];
+    } else {
+        # Garbage scan: random 12-digit string (likely fails check).
+        my @digits;
+        for my $k (1:12) { push @digits, int(rand(10)) }
+        $code = join("", @digits);
+    }
+
+    my $t0 = now_ns();
+
+    my $bloom_hit = bloom_contains($bf_known, $code);
+    my $check_ok  = Demo::BC::upca_check($code);
+
+    if ($bloom_hit && exists $catalog{$code} && $check_ok) {
+        $valid++;
+        cms_add($cms_scans, $code, 1);
+        topk_add($tk_top, $catalog{$code});
+        hll_add($hll_uniq, $code);
+    } elsif (!$check_ok) {
+        $bad_check++;
+    } else {
+        $unknown++;
+    }
+
+    td_add($td_lat, (now_ns() - $t0) / 1000.0);
+}
+
+printf("\nscan results: %d valid / %d unknown / %d bad-check (total 200)\n",
+       $valid, $unknown, $bad_check);
+
+# ── top sellers (TopK) ──────────────────────────────────────────
+
+print "\ntop sellers (SpaceSaving k=8):\n";
+my @top = topk_top($tk_top, 5);
+for my $p (@top) {
+    printf("  %-20s scans=%d\n", $p->[0], $p->[1]);
+}
+
+# ── distinct unique products (HLL) ────────────────────────────────
+
+my $hll_n = hll_count($hll_uniq);
+printf("\ndistinct products seen: HLL=%.1f vs catalog=%d\n",
+       $hll_n, len(keys %catalog));
+
+# ── latency ───────────────────────────────────────────────────────
+
+print "\nper-scan latency:\n";
+printf("  p50 = %.1f us\n", td_quantile($td_lat, 0.50));
+printf("  p95 = %.1f us\n", td_quantile($td_lat, 0.95));
+printf("  p99 = %.1f us\n", td_quantile($td_lat, 0.99));
+
+print "\nbarcode scanner done\n";

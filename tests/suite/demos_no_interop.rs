@@ -187,3 +187,5 @@ demo_runs_no_interop!(demo_vending_machine,       "examples/vending_machine.stk"
 demo_runs_no_interop!(demo_elf_inventory,         "examples/elf_inventory.stk");
 demo_runs_no_interop!(demo_prime_sieve,           "examples/prime_sieve.stk");
 demo_runs_no_interop!(demo_huffman_coding,        "examples/huffman_coding.stk");
+demo_runs_no_interop!(demo_genetic_algorithm,     "examples/genetic_algorithm.stk");
+demo_runs_no_interop!(demo_barcode_scanner,       "examples/barcode_scanner.stk");
