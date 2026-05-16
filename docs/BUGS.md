@@ -5829,6 +5829,70 @@ operation; mainly affects bit-manipulation code that loops over
 positions without bounds-checking).
 
 
+## BUG-260 — Loop labels containing digits silently break loop control
+
+```sh
+$ s -e '
+my @seen;
+LOOP1: for my $i (1:3) {
+    for my $j (1:3) {
+        next LOOP1 if $j == 2;
+        push @seen, "$i-$j";
+    }
+}
+print "[", join(",", @seen), "]\n"'
+[]
+```
+
+In Perl, any identifier (letters, digits, underscores; starting with
+a non-digit) is a valid label. Stryke accepts the label syntactically
+but `next LABEL` / `last LABEL` / `redo LABEL` silently fail when the
+label contains digits — no error, no warning, the loop simply
+produces empty output.
+
+Working: letter-only labels (e.g. `OUTER`, `ALPHA`, `LOOP_OUTER`).
+Broken: `L1`, `LOOP1`, `A1`, `ABC1` (any digit anywhere).
+
+Workaround: use letter-only label names.
+
+Pin: `labels_containing_digits_silently_break_per_bug_260` in
+`tests/suite/loop_control_pin.rs`.
+
+Severity: **bug** (P2; silent loop-control failure on a valid Perl
+label naming convention; very common to use numbered labels).
+
+
+## BUG-261 — `redo if EXPR;` statement-modifier form fails to parse
+
+```sh
+$ s -e '
+my $i = 0;
+for my $x (1:3) {
+    $i++;
+    redo if $i < 5;
+}'
+Expected LParen, got ScalarVar("i") at -e line 5.
+```
+
+In Perl, all loop-control verbs (`next`, `last`, `redo`) accept
+the statement-modifier form: `next if EXPR`, `last unless COND`, etc.
+Stryke supports `next if` and `last if` but not `redo if` — the
+parser rejects the bare-`redo` form as an attempt to call `redo` as
+a function.
+
+Workaround: wrap in block form.
+
+```stryke
+if (EXPR) { redo; }
+```
+
+Pin: `redo_statement_modifier_fails_per_bug_261` in
+`tests/suite/loop_control_pin.rs`.
+
+Severity: **polish** (workaround is trivial; only affects one
+statement-modifier combo; `next if` / `last if` both work fine).
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't

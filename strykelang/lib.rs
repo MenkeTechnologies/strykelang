@@ -58,6 +58,7 @@ pub mod lexer;
 pub mod list_builtins;
 pub mod lsp;
 pub mod lsp_docs_domains;
+pub mod lsp_extras;
 mod map_grep_fast;
 mod map_stream;
 pub mod mcp;
