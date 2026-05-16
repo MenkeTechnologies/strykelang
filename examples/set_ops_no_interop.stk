@@ -1,0 +1,104 @@
+#!/usr/bin/env stryke
+
+# Set operations — union, intersection, difference, symmetric
+# difference, subset / equality. Parses clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len`
+#   * Hash-as-set: keys = elements, values = sentinel 1
+#   * Pass hashes as references `\%h` to keep separate args (bare `%h`
+#     flattens to a list and merges)
+#   * `keys` / `exists` for membership and listing
+#   * `sort` for deterministic output ordering
+#   * Built-in `die` invariants
+#
+# Run: stryke --no-interop examples/set_ops_no_interop.stk
+
+fn mk_set(@items) {
+    my %s
+    # Explicit guard: stryke's `for @items` runs one iteration even when
+    # @items is empty (with $_ = undef), which would seed a phantom ""
+    # key. Skip when there's nothing to iterate.
+    if (len(@items) > 0) {
+        $s{$_} = 1 for @items
+    }
+    \%s
+}
+
+fn set_union($xs, $ys) {
+    my %out = %$xs
+    $out{$_} = 1 for keys %$ys
+    \%out
+}
+
+fn set_intersect($xs, $ys) {
+    my %out
+    for my $k (keys %$xs) {
+        $out{$k} = 1 if exists $ys->{$k}
+    }
+    \%out
+}
+
+fn set_diff($xs, $ys) {
+    my %out
+    for my $k (keys %$xs) {
+        $out{$k} = 1 unless exists $ys->{$k}
+    }
+    \%out
+}
+
+fn sym_diff($xs, $ys) {
+    my %out
+    for my $k (keys %$xs) { $out{$k} = 1 unless exists $ys->{$k} }
+    for my $k (keys %$ys) { $out{$k} = 1 unless exists $xs->{$k} }
+    \%out
+}
+
+fn sub_of($xs, $ys) {
+    for my $k (keys %$xs) { return 0 unless exists $ys->{$k} }
+    1
+}
+
+fn set_eq($xs, $ys) {
+    sub_of($xs, $ys) && sub_of($ys, $xs)
+}
+
+fn show($label, $s) {
+    my @k = sort keys %$s
+    printf "  %-12s {%s}\n", $label . ":", join(", ", @k)
+}
+
+my $A = mk_set(1, 2, 3, 4, 5)
+my $B = mk_set(4, 5, 6, 7, 8)
+
+p "── Set operations demo ──"
+show("A",        $A)
+show("B",        $B)
+show("A ∪ B",    set_union($A, $B))
+show("A ∩ B",    set_intersect($A, $B))
+show("A − B",    set_diff($A, $B))
+show("B − A",    set_diff($B, $A))
+show("A △ B",    sym_diff($A, $B))
+
+# Built-in self-tests on the algebraic identities.
+my $U  = set_union($A, $B)
+my $I  = set_intersect($A, $B)
+my $SD = sym_diff($A, $B)
+
+# |A ∪ B| = |A| + |B| - |A ∩ B| = 5 + 5 - 2 = 8
+die "inclusion-exclusion broken" unless len(keys %$U)  == 8
+die "intersection size != 2"     unless len(keys %$I)  == 2
+die "sym_diff size != 6"         unless len(keys %$SD) == 6
+
+# Self-relations.
+die "A subset-of A" unless sub_of($A, $A)
+die "A equals A"    unless set_eq($A, $A)
+die "A not equal B" unless !set_eq($A, $B)
+
+# Disjoint sets: |A ∩ disjoint| = 0.
+my $D = mk_set(10, 11, 12)
+my $disj_intersect = set_intersect($A, $D)
+die "disjoint intersect == empty" unless len(keys %$disj_intersect) == 0
+
+p ""
+p "  ALL PASS (union/intersect/diff/sym-diff sizes + inclusion-exclusion)"

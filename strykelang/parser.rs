@@ -20862,4 +20862,51 @@ mod tests {
         parse_ok("my $r = $row->{region}");
         parse_ok("$obj->set(1)->get");
     }
+
+    /// Hash dereference syntaxes — `%$href`, `keys %$href`,
+    /// `$href->{key}`, `%{ expr }`. Used by set_ops_no_interop.
+    #[test]
+    fn hash_deref_forms_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $h = +{a=>1}; my %copy = %$h");
+        parse_ok("my $h = +{a=>1}; my @k = keys %$h");
+        parse_ok("my $h = +{a=>1}; p $h->{a}");
+        parse_ok("my $h = +{a=>1, b=>2}; p len(keys %{$h})");
+    }
+
+    /// `unless` postfix on a `die` — the canonical assertion shape
+    /// every demo uses for self-tests.
+    #[test]
+    fn die_unless_assertion_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("die \"x must be 1\" unless 1 == 1");
+        parse_ok("die \"empty list\" if len(@x) == 0");
+        parse_ok("my $x = 1; die \"hi\" unless $x");
+    }
+
+    /// `qw(...)` quote-words literal — the bareword-list shape used in
+    /// the older example scripts.
+    #[test]
+    fn qw_literal_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my @w = qw(red green blue)");
+        parse_ok("for my $name (qw(Alice Bob Carol)) { p $name }");
+    }
+
+    /// Array slice with explicit indices — `@arr[0, 2, 4]`. Different
+    /// from range slice `@arr[1:3]`.
+    #[test]
+    fn array_slice_with_explicit_indices_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my @a = (10, 20, 30, 40); my @s = @a[0, 2]");
+        parse_ok("my @a = (10, 20, 30); my @s = @a[2, 0, 1]");
+    }
+
+    /// Hash slice — `@h{'a', 'b'}` returns the list of values at keys
+    /// 'a' and 'b'. Different sigil context than scalar hash access.
+    #[test]
+    fn hash_slice_with_keys_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my %h = (a=>1, b=>2, c=>3); my @v = @h{'a','c'}");
+    }
 }
