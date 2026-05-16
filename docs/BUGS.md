@@ -5559,6 +5559,37 @@ Severity: **bug** (P2; breaks "am I being called as main script?"
 guard pattern in Perl scripts).
 
 
+## BUG-250 — `chomp` ignores `local $/` (input record separator)
+
+```sh
+$ s -e 'local $/ = "END"; my $s = "dataEND"; chomp($s); print "[$s]\n"'
+[dataEND]
+```
+
+In Perl, `chomp` strips whatever string `$/` holds, so `local $/ = "END"`
+makes `chomp("dataEND")` strip the trailing `"END"`. Stryke `chomp`
+always strips a trailing `\n` regardless of `$/`, so the assignment to
+`$/` has no effect on the operation.
+
+This breaks the common Perl record-stream idiom:
+
+```perl
+local $/ = "---END---";
+while (my $rec = <$fh>) {
+    chomp $rec;     # would strip "---END---" in Perl; stryke leaves it
+    ...
+}
+```
+
+Workaround: explicit `$s =~ s/\Q$sep\E\z//` substitution.
+
+Pin: `chomp_does_not_honor_local_record_separator_per_bug_250` in
+`tests/suite/chomp_chop_pin.rs`.
+
+Severity: **bug** (P2; quietly produces wrong output on every
+record-mode parser written in Perl style; workaround exists).
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't

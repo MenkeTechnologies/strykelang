@@ -1,0 +1,199 @@
+#!/usr/bin/env stryke
+
+# Huffman coding: build a tree from frequency counts, encode a corpus,
+# decode it back, verify round-trip integrity.
+#
+# Demonstrates:
+#   * Frequency table via hash counting.
+#   * Min-heap tree assembly via repeated sorted-list pop.
+#   * Tree-walk to assign bit codes.
+#   * Bit string encode/decode.
+#   * t-digest for per-message encode latency.
+#   * HLL distinct symbols.
+#   * TopK SpaceSaving for "most frequent symbol".
+#   * Compression-ratio reporting.
+
+# ── corpus (mix of letters) ─────────────────────────────────────────
+
+my @messages = (
+    "the quick brown fox jumps over the lazy dog",
+    "huffman coding is a lossless data compression algorithm",
+    "stryke beats perl 5 on every benchmark we have run so far",
+    "in the morning the fox returns to the forest",
+    "abracadabra abracadabra abracadabra",
+    "mississippi mississippi mississippi mississippi",
+    "abcdefghijklmnopqrstuvwxyz",
+    "aaaaaaaabbbbbbcccccddddd",
+    "one two three four five six seven eight nine ten",
+    "the rain in spain falls mainly on the plain",
+);
+
+# ── sketches ──────────────────────────────────────────────────────
+
+my $td_enc  = t_digest(100);
+my $hll_sym = hll(12);
+my $tk_sym  = topk(16);
+
+# ── frequency count for a corpus blob ─────────────────────────────
+
+fn Demo::HC::freq($text) {
+    my %f;
+    for my $c (split //, $text) {
+        $f{$c} = ($f{$c} // 0) + 1;
+    }
+    \%f
+}
+
+# ── build Huffman tree ─────────────────────────────────────────────
+# Tree nodes are hashrefs:
+#   leaf: { sym => CHAR, w => WEIGHT }
+#   internal: { w => WEIGHT, l => NODE, r => NODE }
+
+fn Demo::HC::build_tree($fref) {
+    my @heap;
+    for my $sym (keys %$fref) {
+        push @heap, { sym => $sym, w => $fref->{$sym} };
+    }
+    return undef if len(@heap) == 0;
+    while (len(@heap) > 1) {
+        @heap = sort { $_0->{w} <=> $_1->{w} } @heap;
+        my $first = shift @heap;
+        my $second = shift @heap;
+        my $merged = { w => $first->{w} + $second->{w}, l => $first, r => $second };
+        push @heap, $merged;
+    }
+    $heap[0]
+}
+
+# ── assign codes by depth-first walk ───────────────────────────────
+
+fn Demo::HC::assign_codes($node, $prefix, $cref) {
+    return unless defined $node;
+    if (exists $node->{sym}) {
+        $cref->{$node->{sym}} = ($prefix eq "" ? "0" : $prefix);
+        return;
+    }
+    Demo::HC::assign_codes($node->{l}, $prefix . "0", $cref);
+    Demo::HC::assign_codes($node->{r}, $prefix . "1", $cref);
+}
+
+# ── encode ────────────────────────────────────────────────────────
+
+fn Demo::HC::encode($text, $cref) {
+    my @bits;
+    for my $c (split //, $text) {
+        push @bits, $cref->{$c} // "";
+    }
+    join("", @bits)
+}
+
+# ── decode using tree walk ─────────────────────────────────────────
+
+fn Demo::HC::decode($bits, $root) {
+    my @out;
+    my $node = $root;
+    return $root->{sym} x length($bits) if exists $root->{sym};
+    for my $bit (split //, $bits) {
+        $node = ($bit eq "0") ? $node->{l} : $node->{r};
+        if (exists $node->{sym}) {
+            push @out, $node->{sym};
+            $node = $root;
+        }
+    }
+    join("", @out)
+}
+
+# ── run each message through encode -> decode ─────────────────────
+
+print "huffman coding demo — encode/decode round-trip\n";
+print "─" x 60, "\n";
+
+my $rt_ok = 0;
+my $rt_fail = 0;
+my $total_in_bits  = 0;
+my $total_out_bits = 0;
+
+for my $msg (@messages) {
+    my $freq = Demo::HC::freq($msg);
+
+    for my $sym (keys %$freq) {
+        hll_add($hll_sym, $sym);
+        topk_add($tk_sym, $sym);
+    }
+
+    my $tree = Demo::HC::build_tree($freq);
+    my %codes;
+    Demo::HC::assign_codes($tree, "", \%codes);
+
+    my $t0 = now_ns();
+    my $bits = Demo::HC::encode($msg, \%codes);
+    td_add($td_enc, (now_ns() - $t0) / 1000.0);
+
+    my $back = Demo::HC::decode($bits, $tree);
+    my $ok = $back eq $msg ? 1 : 0;
+    if ($ok) { $rt_ok++ } else { $rt_fail++ }
+
+    my $in_bits  = length($msg) * 8;
+    my $out_bits = length($bits);
+    $total_in_bits  += $in_bits;
+    $total_out_bits += $out_bits;
+
+    my $ratio = $in_bits > 0 ? $out_bits / $in_bits : 0;
+    printf("  %-50s  symbols=%2d  bits=%4d  ratio=%.2f  %s\n",
+           substr($msg, 0, 50),
+           len(keys %$freq),
+           $out_bits,
+           $ratio,
+           $ok ? "ok" : "MISMATCH");
+}
+
+print "\nround-trip: $rt_ok ok / $rt_fail mismatch (of ", len(@messages), " messages)\n";
+
+# ── corpus-wide compression ratio ──────────────────────────────────
+
+my $corpus_ratio = $total_in_bits > 0 ? $total_out_bits / $total_in_bits : 0;
+printf("\ntotal compression: in=%d bits  out=%d bits  ratio=%.2f%% (lower is better)\n",
+       $total_in_bits, $total_out_bits, 100 * $corpus_ratio);
+
+# ── sample code table from a tree built on the whole corpus ───────
+
+my $blob = join(" ", @messages);
+my $bfreq = Demo::HC::freq($blob);
+my $btree = Demo::HC::build_tree($bfreq);
+my %big_codes;
+Demo::HC::assign_codes($btree, "", \%big_codes);
+
+print "\ncorpus-wide code table (top 12 by frequency):\n";
+my @by_freq = sort { $bfreq->{$_1} <=> $bfreq->{$_0} } keys %$bfreq;
+for my $sym (@by_freq[0:11]) {
+    my $shown = $sym eq " " ? "(space)" : $sym;
+    printf("  %-7s freq=%4d  code=%s\n",
+           $shown, $bfreq->{$sym}, $big_codes{$sym});
+}
+
+# ── distinct symbols ──────────────────────────────────────────────
+
+my $hll_n = hll_count($hll_sym);
+my %exact_seen;
+for my $msg (@messages) {
+    for my $c (split //, $msg) { $exact_seen{$c} = 1 }
+}
+printf("\ndistinct symbols: HLL=%.1f vs exact=%d\n", $hll_n, len(keys %exact_seen));
+
+# ── most-frequent symbols (TopK) ──────────────────────────────────
+
+print "\nmost-frequent symbols (SpaceSaving k=16):\n";
+my @top_sym = topk_top($tk_sym, 5);
+for my $p (@top_sym) {
+    my $shown = $p->[0] eq " " ? "(space)" : $p->[0];
+    printf("  %-7s count=%d\n", $shown, $p->[1]);
+}
+
+# ── encode latency ────────────────────────────────────────────────
+
+print "\nencode latency (per message):\n";
+printf("  p50 = %.1f us\n", td_quantile($td_enc, 0.50));
+printf("  p95 = %.1f us\n", td_quantile($td_enc, 0.95));
+printf("  p99 = %.1f us\n", td_quantile($td_enc, 0.99));
+
+print "\nhuffman coding done\n";
