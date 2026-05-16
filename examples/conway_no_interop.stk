@@ -1,0 +1,140 @@
+#!/usr/bin/env stryke
+
+# Conway's Game of Life — 2D cellular automaton. Each cell is alive
+# (1) or dead (0). Rules:
+#   * Live cell with 2 or 3 live neighbours survives, else dies.
+#   * Dead cell with exactly 3 live neighbours becomes alive.
+#
+# Parses clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len`
+#   * 2D state via flat array index `r*W + c`
+#   * Hash-of-string for known stable / oscillating patterns
+#   * Built-in `die` invariants — block is stable, blinker oscillates
+#
+# Run: stryke --no-interop examples/conway_no_interop.stk
+#      stryke --no-interop examples/conway_no_interop.stk blinker 6
+
+my $W = 8
+my $H = 8
+
+# Build a fresh grid (flat array, length W*H, all zeros).
+fn empty_grid {
+    my @g = (0) x ($W * $H)
+    \@g
+}
+
+fn cell($g, $r, $c) {
+    return 0 if $r < 0 || $r >= $H || $c < 0 || $c >= $W
+    $g->[$r * $W + $c]
+}
+
+fn set_cell($g, $r, $c, $v) {
+    $g->[$r * $W + $c] = $v if $r >= 0 && $r < $H && $c >= 0 && $c < $W
+}
+
+fn live_neighbours($g, $r, $c) {
+    my $n = 0
+    for my $dr (-1, 0, 1) {
+        for my $dc (-1, 0, 1) {
+            next if $dr == 0 && $dc == 0
+            $n += cell($g, $r + $dr, $c + $dc)
+        }
+    }
+    $n
+}
+
+fn advance_gen($g) {  # `step` itself is a stryke builtin
+
+    my $next = empty_grid()
+    for my $r (0:$H - 1) {
+        for my $c (0:$W - 1) {
+            my $alive = cell($g, $r, $c)
+            my $n = live_neighbours($g, $r, $c)
+            my $new_state = 0
+            if ($alive && ($n == 2 || $n == 3)) { $new_state = 1 }
+            if (!$alive && $n == 3)             { $new_state = 1 }
+            set_cell($next, $r, $c, $new_state)
+        }
+    }
+    $next
+}
+
+fn count_live($g) {
+    my $n = 0
+    $n += $_ for @$g
+    $n
+}
+
+fn render($g) {
+    my $out = ""
+    for my $r (0:$H - 1) {
+        for my $c (0:$W - 1) {
+            $out .= cell($g, $r, $c) ? "#" : "."
+        }
+        $out .= "\n"
+    }
+    $out
+}
+
+# Seed patterns — encoded as list of (row, col) live coordinates.
+fn make_grid(@coords) {
+    my $g = empty_grid()
+    my $i = 0
+    while ($i < len(@coords)) {
+        set_cell($g, $coords[$i], $coords[$i + 1], 1)
+        $i += 2
+    }
+    $g
+}
+
+my $BLOCK   = make_grid(2, 2,   2, 3,   3, 2,   3, 3)
+my $BLINKER = make_grid(3, 2,   3, 3,   3, 4)
+my $GLIDER  = make_grid(1, 2,   2, 3,   3, 1,   3, 2,   3, 3)
+
+if (len(@ARGV) >= 2) {
+    my ($pattern, $generations) = @ARGV
+    my $g = ($pattern eq "block")   ? $BLOCK
+          : ($pattern eq "blinker") ? $BLINKER
+          : ($pattern eq "glider")  ? $GLIDER
+          : die "unknown pattern: $pattern (block|blinker|glider)"
+
+    p "── Generation 0 ──"
+    p render($g)
+    for my $i (1:$generations) {
+        $g = advance_gen($g)
+        p "── Generation $i (live=", count_live($g), ") ──"
+        p render($g)
+    }
+    exit 0
+}
+
+p "── Game of Life self-test ──"
+
+# Block (2x2): stable for all time.
+my $g = $BLOCK
+my $live0 = count_live($g)
+for (1:5) { $g = advance_gen($g) }
+die "block should be stable" unless count_live($g) == $live0 && $live0 == 4
+p "  block: stable at 4 live cells across 5 generations  OK"
+
+# Blinker (3-in-a-row): oscillates between horizontal and vertical.
+$g = $BLINKER
+my $g_horiz = render($g)
+$g = advance_gen($g)
+my $g_vert  = render($g)
+die "blinker should change after 1 step" if $g_horiz eq $g_vert
+$g = advance_gen($g)
+die "blinker should return to start after 2 steps" unless render($g) eq $g_horiz
+p "  blinker: oscillates with period 2  OK"
+
+# Glider: moves diagonally, returns to same shape after 4 generations.
+$g = $GLIDER
+my $glider_live = count_live($g)
+for (1:4) { $g = advance_gen($g) }
+die "glider should keep 5 live cells" unless count_live($g) == $glider_live
+p "  glider: preserves 5 live cells across 4 generations  OK"
+
+p ""
+p "  ALL PASS (block stable, blinker period-2, glider preserves count)"

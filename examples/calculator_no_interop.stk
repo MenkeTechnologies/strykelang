@@ -1,0 +1,127 @@
+#!/usr/bin/env stryke
+
+# Full infix calculator — composes the shunting-yard converter and the
+# RPN evaluator from earlier demos: infix string → RPN tokens →
+# numeric result. Both phases share the operator-precedence table.
+# Parses clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len`
+#   * Hash tables for precedence + associativity
+#   * Stack-based RPN with `push` / `pop`
+#   * if/elsif on operator tokens (the portable stryke dispatch shape)
+#   * `eval { ... }` to catch `die` from the converter / evaluator
+#   * Built-in `die` invariants — every demo case has an expected value
+#
+# Run: stryke --no-interop examples/calculator_no_interop.stk
+#      stryke --no-interop examples/calculator_no_interop.stk "3 + 4 * 2"
+#      stryke --no-interop examples/calculator_no_interop.stk "( 5 + 1 ) * 7"
+
+my %PREC = ("+" => 2, "-" => 2, "*" => 3, "/" => 3, "%" => 3, "**" => 4)
+my %RIGHT_ASSOC = ("**" => 1)
+
+fn infix_to_rpn($expr) {
+    my @toks = grep { len(_) > 0 } split(/\s+/, $expr)
+    my @out
+    my @ops
+    for my $tok (@toks) {
+        if (exists $PREC{$tok}) {
+            while (len(@ops) > 0 &&
+                   $ops[-1] ne "(" &&
+                   ($PREC{$ops[-1]} > $PREC{$tok} ||
+                    ($PREC{$ops[-1]} == $PREC{$tok} && !exists $RIGHT_ASSOC{$tok}))) {
+                push @out, pop @ops
+            }
+            push @ops, $tok
+        } elsif ($tok eq "(") {
+            push @ops, $tok
+        } elsif ($tok eq ")") {
+            while (len(@ops) > 0 && $ops[-1] ne "(") {
+                push @out, pop @ops
+            }
+            die "mismatched parens" unless len(@ops) > 0
+            pop @ops
+        } elsif ($tok =~ /^-?\d+(\.\d+)?$/) {
+            push @out, $tok
+        } else {
+            die "unknown token: $tok"
+        }
+    }
+    while (len(@ops) > 0) {
+        die "mismatched parens" if $ops[-1] eq "("
+        push @out, pop @ops
+    }
+    @out
+}
+
+fn eval_rpn_tokens(@toks) {
+    my @stack
+    for my $tok (@toks) {
+        if ($tok =~ /^-?\d+(\.\d+)?$/) {
+            push @stack, 0 + $tok
+            next
+        }
+        die "stack underflow at $tok" if len(@stack) < 2
+        my $rhs = pop @stack
+        my $lhs = pop @stack
+        if    ($tok eq "+")  { push @stack, $lhs + $rhs }
+        elsif ($tok eq "-")  { push @stack, $lhs - $rhs }
+        elsif ($tok eq "*")  { push @stack, $lhs * $rhs }
+        elsif ($tok eq "/")  { die "div-by-zero" if $rhs == 0; push @stack, $lhs / $rhs }
+        elsif ($tok eq "%")  { die "mod-by-zero" if $rhs == 0; push @stack, $lhs % $rhs }
+        elsif ($tok eq "**") { push @stack, $lhs ** $rhs }
+        else                  { die "unknown op $tok" }
+    }
+    die "expected 1 value on stack, got " . len(@stack) if len(@stack) != 1
+    $stack[0]
+}
+
+fn calc($expr) {
+    my @rpn = infix_to_rpn($expr)
+    eval_rpn_tokens(@rpn)
+}
+
+if (len(@ARGV) >= 1) {
+    my $expr = join(" ", @ARGV)
+    my $r = eval { calc($expr) }
+    if ($@) {
+        p "error: $@"
+        exit 1
+    }
+    printf "%s  =  %s\n", $expr, $r
+    exit 0
+}
+
+# Demo grid — composes shunting-yard + RPN evaluator.
+my @cases = (
+    +{ expr => "3 + 4",                       want =>  7    },
+    +{ expr => "3 + 4 * 2",                   want => 11    },   # precedence: *, then +
+    +{ expr => "( 3 + 4 ) * 2",               want => 14    },   # parens override
+    +{ expr => "10 - 4 - 1",                  want =>  5    },   # left-assoc -
+    +{ expr => "100 / 10 / 2",                want =>  5    },   # left-assoc /
+    +{ expr => "2 ** 3 ** 2",                 want => 512   },   # right-assoc **
+    +{ expr => "( 2 ** 3 ) ** 2",             want => 64    },   # parens force left
+    +{ expr => "5 + 1 * 2 - 3 / 4",           want => 6.25  },
+    +{ expr => "( 1 + 2 ) * ( 3 + 4 )",       want => 21    },
+    +{ expr => "20 % 7",                      want =>  6    },
+    +{ expr => "42",                          want => 42    },
+)
+
+p "── Full infix calculator demo (shunt + RPN) ──"
+my $fail = 0
+for my $c (@cases) {
+    my $got = eval { calc($c->{expr}) }
+    if ($@) {
+        printf "  %-30s -> ERROR: %s\n", $c->{expr}, $@
+        $fail++
+        next
+    }
+    my $ok = ($got == $c->{want})
+    $fail++ unless $ok
+    printf "  %-30s -> %-10s expect %-10s %s\n",
+        "\"" . $c->{expr} . "\"", $got, $c->{want},
+        $ok ? "" : "FAIL"
+}
+die "$fail / " . len(@cases) . " calculator cases failed" if $fail > 0
+p ""
+p "  ALL PASS (11 cases: precedence, parens, left/right associativity, integer + float)"

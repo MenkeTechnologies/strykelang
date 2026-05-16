@@ -20965,4 +20965,55 @@ mod tests {
         parse_ok("my @a = (1, 2, 3); my $last  = pop @a");
         parse_ok("fn drop_first(@xs) { shift @xs; @xs }");
     }
+
+    /// Special internal names — `__FILE__`, `__LINE__`, `__PACKAGE__`
+    /// — accessed by tooling and error reporting.
+    #[test]
+    fn special_internal_names_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("p __FILE__");
+        parse_ok("p __LINE__");
+        parse_ok("p __PACKAGE__");
+        parse_ok("p __FILE__ . \":\" . __LINE__");
+    }
+
+    /// Nested ternary RHS with parens / chained alternatives. Used by
+    /// the conway demo's pattern dispatch.
+    #[test]
+    fn deeply_nested_ternary_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my $g = ($p eq \"a\") ? 1 : ($p eq \"b\") ? 2 : ($p eq \"c\") ? 3 : 4",
+        );
+    }
+
+    /// Array-of-hashref + index-into-hash subscript chain:
+    /// `$rows[0]->{name}`, `$rows[-1]->{score}`. Used in csv_summary
+    /// and ranking demos.
+    #[test]
+    fn array_of_hashref_chained_subscript_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my @rows = (+{name=>'a',sc=>1}); p $rows[0]->{name}");
+        parse_ok("my @rows = (+{n=>10},+{n=>20}); p $rows[-1]->{n}");
+    }
+
+    /// Nested `for` loops with two index variables — the 2D grid walk
+    /// shape used in conway.
+    #[test]
+    fn nested_for_loops_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "for my $r (0:5) { for my $c (0:5) { p \"$r,$c\" } }",
+        );
+    }
+
+    /// Compound assignment `$x .= ...` (string append). Used by every
+    /// demo that builds output strings incrementally (brainfuck,
+    /// RLE encode, Caesar).
+    #[test]
+    fn dot_assign_string_append_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $s = \"a\"; $s .= \"b\"");
+        parse_ok("my $out = \"\"; $out .= \"x\" for (1:3)");
+    }
 }
