@@ -1,0 +1,76 @@
+#!/usr/bin/env stryke
+
+# Slugify — turn a free-form title into a URL-safe slug. Lowercase,
+# collapse non-alphanumeric runs into single dashes, strip leading +
+# trailing dashes. Parses clean under `--no-interop`.
+#
+# All UDFs namespaced `Slug::*`.
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len`
+#   * `lc`, `=~ s///g` regex substitution
+#   * `die` invariants — slugs match `^[a-z0-9-]+$`, two equivalent
+#     inputs produce the same slug
+#
+# Run: stryke --no-interop examples/slugify_no_interop.stk
+#      stryke --no-interop examples/slugify_no_interop.stk "Hello, World!"
+
+fn Slug::make($title) {
+    my $s = lc($title)
+    # Replace any run of non-[a-z0-9] with a single dash.
+    $s =~ s/[^a-z0-9]+/-/g
+    # Strip leading + trailing dashes.
+    $s =~ s/^-+//
+    $s =~ s/-+$//
+    $s
+}
+
+if (len(@ARGV) >= 1) {
+    p Slug::make(join(" ", @ARGV))
+    exit 0
+}
+
+# Demo grid — (input, expected slug).
+my @cases = (
+    +{ title => "Hello World",            slug => "hello-world" },
+    +{ title => "Hello, World!",          slug => "hello-world" },
+    +{ title => "  Leading and Trailing  ", slug => "leading-and-trailing" },
+    +{ title => "Spaces  --  Galore!!!", slug => "spaces-galore" },
+    +{ title => "UPPERCASE",              slug => "uppercase" },
+    +{ title => "Already-a-slug",         slug => "already-a-slug" },
+    +{ title => "Mixed_Cases_123",        slug => "mixed-cases-123" },
+    +{ title => "",                       slug => "" },
+    +{ title => "!@#\$%",                 slug => "" },  # all stripped
+    +{ title => "C++ vs Rust",            slug => "c-vs-rust" },
+    +{ title => "A man, a plan, a canal", slug => "a-man-a-plan-a-canal" },
+)
+
+p "── Slugify demo ──"
+my $fail = 0
+for my $c (@cases) {
+    my $got = Slug::make($c->{title})
+    my $ok  = ($got eq $c->{slug})
+    $fail++ unless $ok
+    printf "  %-30s -> %-30s %s\n",
+        "\"" . $c->{title} . "\"",
+        "\"" . $got . "\"",
+        $ok ? "" : "FAIL (want \"" . $c->{slug} . "\")"
+}
+die "$fail / " . len(@cases) . " slug cases failed" if $fail > 0
+
+# Universal invariants:
+#   * Empty input gives empty slug.
+#   * Any non-empty result matches /^[a-z0-9-]+$/.
+#   * No leading or trailing dash.
+#   * Case-fold idempotency: lc($x) and uc($x) slugify to the same thing.
+for my $c (@cases) {
+    my $s = Slug::make($c->{title})
+    next if len($s) == 0
+    die "slug \"$s\" has illegal chars" unless $s =~ /^[a-z0-9-]+$/
+    die "slug starts with dash"         if substr($s, 0, 1) eq "-"
+    die "slug ends with dash"           if substr($s, len($s) - 1, 1) eq "-"
+    die "case fold idempotency" unless Slug::make(lc($c->{title})) eq Slug::make(uc($c->{title}))
+}
+
+p ""
+p "  ALL PASS (11 cases + slug-shape + leading/trailing + case-fold idempotency)"
