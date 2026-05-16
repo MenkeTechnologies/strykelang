@@ -14,20 +14,20 @@
 # Run: stryke --no-interop examples/palindrome_no_interop.stk
 #      stryke --no-interop examples/palindrome_no_interop.stk "A man, a plan, a canal: Panama"
 
-fn pal_check($s) {
+fn Pal::strict($s) {
     $s eq join("", rev split(//, $s))
 }
 
-fn pal_check_lenient($s) {
+fn Pal::lenient($s) {
     my $clean = lc($s)
     $clean =~ s/[^a-z0-9]//g
-    pal_check($clean)
+    Pal::strict($clean)
 }
 
 if (len(@ARGV) >= 1) {
     my $s = $ARGV[0]
-    printf "  strict : %s\n", pal_check($s)         ? "YES" : "NO"
-    printf "  lenient: %s\n", pal_check_lenient($s) ? "YES" : "NO"
+    printf "  strict : %s\n", Pal::strict($s)         ? "YES" : "NO"
+    printf "  lenient: %s\n", Pal::lenient($s) ? "YES" : "NO"
     exit 0
 }
 
@@ -52,8 +52,8 @@ p "── Palindrome demo ──"
 printf "  %-40s %-8s %-8s\n", "input", "strict", "lenient"
 my $fail = 0
 for my $c (@cases) {
-    my $st = pal_check($c->{s})         ? 1 : 0
-    my $le = pal_check_lenient($c->{s}) ? 1 : 0
+    my $st = Pal::strict($c->{s})         ? 1 : 0
+    my $le = Pal::lenient($c->{s}) ? 1 : 0
     my $ok = ($st == $c->{strict} && $le == $c->{lenient})
     $fail++ unless $ok
     printf "  %-40s %-8s %-8s %s\n",

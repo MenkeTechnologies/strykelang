@@ -15,7 +15,7 @@
 # Run: stryke --no-interop examples/temperature_converter_no_interop.stk
 #      stryke --no-interop examples/temperature_converter_no_interop.stk 100 C K
 
-fn convert($value, $from = "C", $to = "C") {
+fn Temp::convert($value, $from = "C", $to = "C") {
     # Pair-key dispatch via if/elsif — `match` over string literals
     # does not currently fall through to string equality on plain
     # scalars, so the explicit chain is the portable form.
@@ -34,7 +34,7 @@ fn convert($value, $from = "C", $to = "C") {
 
 if (len(@ARGV) >= 3) {
     my ($value, $from, $to) = @ARGV
-    my $out = convert(0 + $value, uc($from), uc($to))
+    my $out = Temp::convert(0 + $value, uc($from), uc($to))
     printf "%g %s = %g %s\n", $value, $from, $out, $to
     exit 0
 }
@@ -44,14 +44,14 @@ p "── Stryke temperature converter ──"
 for my $celsius (0, 100, -40, -273.15) {
     printf "%7.2f C  ->  %7.2f F  /  %7.2f K\n",
         $celsius,
-        convert($celsius, "C", "F"),
-        convert($celsius, "C", "K")
+        Temp::convert($celsius, "C", "F"),
+        Temp::convert($celsius, "C", "K")
 }
 
 p ""
 # Built-in self-tests against known constants.
-die "100 C -> F should be 212"     unless convert(100, "C", "F") == 212
-die "0 C -> K should be 273.15"    unless convert(0,   "C", "K") == 273.15
-die "32 F -> C should be 0"        unless convert(32,  "F", "C") == 0
-die "0 K -> C should be -273.15"   unless convert(0,   "K", "C") == -273.15
+die "100 C -> F should be 212"     unless Temp::convert(100, "C", "F") == 212
+die "0 C -> K should be 273.15"    unless Temp::convert(0,   "C", "K") == 273.15
+die "32 F -> C should be 0"        unless Temp::convert(32,  "F", "C") == 0
+die "0 K -> C should be -273.15"   unless Temp::convert(0,   "K", "C") == -273.15
 p "  ALL PASS (boiling/freezing/abs-zero match known constants)"

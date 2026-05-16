@@ -15,7 +15,7 @@
 #       stryke --no-interop examples/caesar_cipher_no_interop.stk encode "Hello, World!" 7
 #       stryke --no-interop examples/caesar_cipher_no_interop.stk decode "Olssv, Dvysk!" 7
 
-fn shift_one($ch, $by) {
+fn Caesar::shift_one($ch, $by) {
     my $code = ord($ch)
     if ($code >= ord("A") && $code <= ord("Z")) {
         return chr(((($code - ord("A")) + $by) % 26 + 26) % 26 + ord("A"))
@@ -26,8 +26,8 @@ fn shift_one($ch, $by) {
     $ch
 }
 
-fn caesar($text, $shift = 3) {
-    join("", maps { shift_one(_, $shift) } split(//, $text))
+fn Caesar::cipher($text, $shift = 3) {
+    join("", maps { Caesar::shift_one(_, $shift) } split(//, $text))
 }
 
 if (len(@ARGV) >= 2) {
@@ -35,7 +35,7 @@ if (len(@ARGV) >= 2) {
     my $text  = $ARGV[1]
     my $shift = $ARGV[2] // 3
     my $by    = $mode eq "decode" ? -(0 + $shift) : 0 + $shift
-    p caesar($text, $by)
+    p Caesar::cipher($text, $by)
     exit 0
 }
 
@@ -45,8 +45,8 @@ p "── Caesar demo (round-trip plain ↔ cipher) ──"
 p "plain : $plain"
 my $any_failed = 0
 for my $s (1:6) {
-    my $enc = caesar($plain, $s)
-    my $dec = caesar($enc, -$s)
+    my $enc = Caesar::cipher($plain, $s)
+    my $dec = Caesar::cipher($enc, -$s)
     my $ok  = ($dec eq $plain)
     $any_failed++ unless $ok
     printf "  shift %d: %s   (round-trip %s)\n", $s, $enc, $ok ? "OK" : "FAIL"

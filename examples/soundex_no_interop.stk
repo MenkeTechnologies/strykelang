@@ -37,7 +37,7 @@ my %CODE = (
     R => 6,
 )
 
-fn soundex_code($name) {
+fn Soundex::code($name) {
     return "" if len($name) == 0
     my $up = uc($name)
     $up =~ s/[^A-Z]//g
@@ -71,7 +71,7 @@ fn soundex_code($name) {
 }
 
 if (len(@ARGV) >= 1) {
-    p soundex_code($ARGV[0])
+    p Soundex::code($ARGV[0])
     exit 0
 }
 
@@ -100,7 +100,7 @@ my @cases = (
 p "── Soundex demo ──"
 my $fail = 0
 for my $c (@cases) {
-    my $got = soundex_code($c->{name})
+    my $got = Soundex::code($c->{name})
     my $ok  = ($got eq $c->{code})
     $fail++ unless $ok
     printf "  %-14s -> %s  expect %s  %s\n",
@@ -109,9 +109,9 @@ for my $c (@cases) {
 die "$fail / " . len(@cases) . " soundex cases failed" if $fail > 0
 
 # Collision check: phonetic neighbours must share their code.
-die "Robert and Rupert should collide" unless soundex_code("Robert") eq soundex_code("Rupert")
-die "Smith and Smyth should collide"   unless soundex_code("Smith")  eq soundex_code("Smyth")
-die "Ashcraft and Ashcroft should collide" unless soundex_code("Ashcraft") eq soundex_code("Ashcroft")
+die "Robert and Rupert should collide" unless Soundex::code("Robert") eq Soundex::code("Rupert")
+die "Smith and Smyth should collide"   unless Soundex::code("Smith")  eq Soundex::code("Smyth")
+die "Ashcraft and Ashcroft should collide" unless Soundex::code("Ashcraft") eq Soundex::code("Ashcroft")
 
 p ""
 p "  ALL PASS (13 reference codes + 3 phonetic-collision invariants)"

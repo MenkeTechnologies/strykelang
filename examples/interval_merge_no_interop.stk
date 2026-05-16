@@ -19,7 +19,7 @@
 #
 # Run: stryke --no-interop examples/interval_merge_no_interop.stk
 
-fn merge_intervals($intervals_ref) {
+fn Intervals::merge($intervals_ref) {
     # Deep-copy each interval so the algorithm's extend-in-place doesn't
     # mutate the caller's input. Without this, the array of arrayrefs is
     # shared and the caller sees their input changed underneath them.
@@ -40,7 +40,7 @@ fn merge_intervals($intervals_ref) {
     \@merged
 }
 
-fn show_intervals($intervals) {
+fn Intervals::show($intervals) {
     join(", ", map { "[" . _->[0] . "," . _->[1] . "]" } @$intervals)
 }
 
@@ -96,12 +96,12 @@ my @cases = (
 p "── Interval merge demo ──"
 my $fail = 0
 for my $c (@cases) {
-    my $got = merge_intervals($c->{input})
-    my $got_str  = show_intervals($got)
-    my $want_str = show_intervals($c->{merged})
+    my $got = Intervals::merge($c->{input})
+    my $got_str  = Intervals::show($got)
+    my $want_str = Intervals::show($c->{merged})
     my $ok = ($got_str eq $want_str)
     $fail++ unless $ok
-    printf "  %-22s in =%s\n", $c->{label}, show_intervals($c->{input})
+    printf "  %-22s in =%s\n", $c->{label}, Intervals::show($c->{input})
     printf "  %-22s out=%s  %s\n", "", $got_str, $ok ? "" : "FAIL (want " . $want_str . ")"
 }
 die "$fail / " . len(@cases) . " interval cases failed" if $fail > 0
@@ -110,7 +110,7 @@ die "$fail / " . len(@cases) . " interval cases failed" if $fail > 0
 #   * sorted by start
 #   * no two intervals overlap
 for my $c (@cases) {
-    my $m = merge_intervals($c->{input})
+    my $m = Intervals::merge($c->{input})
     next if len(@$m) < 2
     for my $i (1:len(@$m) - 1) {
         die "output not sorted by start"  unless $m->[$i][0] >= $m->[$i - 1][0]

@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 
 # Anagram grouper — read words from stdin (or use the embedded sample),
-# group by sorted-char signature, print each group of ≥ 2 words.
+# group by sorted-char Anagram::sig, print each group of ≥ 2 words.
 # Parses clean under `--no-interop`.
 #
 # Stryke choices:
@@ -16,8 +16,8 @@
 #      echo -e "rat\ntar\nart\ncat\nact\ndog" | stryke --no-interop examples/anagram_finder_no_interop.stk
 
 # Signature of a word = its letters sorted lexicographically. Anagrams
-# share the same signature.
-fn signature($word) {
+# share the same Anagram::sig.
+fn Anagram::sig($word) {
     join("", sort split(//, lc($word)))
 }
 
@@ -36,19 +36,19 @@ if (!-t STDIN) {
     @words = @stdin if len(@stdin) > 0
 }
 
-# Bucket words by signature.
+# Bucket words by Anagram::sig.
 my %groups
 for my $w (@words) {
-    my $sig = signature($w)
+    my $sig = Anagram::sig($w)
     $groups{$sig} ||= []
     push @{$groups{$sig}}, $w
 }
 
 # Filter groups of ≥ 2 words and order by size desc, then key asc.
-my @signatures = grep { len(@{$groups{_}}) >= 2 } keys %groups
+my @Anagram::sigs = grep { len(@{$groups{_}}) >= 2 } keys %groups
 my @ranked = sort {
     len(@{$groups{$_1}}) <=> len(@{$groups{$_0}})
-} @signatures
+} @Anagram::sigs
 
 p "── Anagram groups (n=", len(@words), " words, ", len(@ranked), " groups ≥ 2) ──"
 for my $sig (@ranked) {
@@ -61,7 +61,7 @@ if (len(@words) == len(@sample)) {
     # The 27-word sample has 9 anagram groups of size ≥ 2.
     die "expected 9 groups, got " . len(@ranked) unless len(@ranked) == 9
     # The "opst" bucket should contain six tokens.
-    my $sig_opst = signature("opts")
+    my $sig_opst = Anagram::sig("opts")
     die "opst bucket should have 6 words" unless len(@{$groups{$sig_opst}}) == 6
     p ""
     p "  ALL PASS (9 groups found, opst bucket has 6 words as expected)"

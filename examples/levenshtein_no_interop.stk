@@ -16,7 +16,7 @@
 # Run: stryke --no-interop examples/levenshtein_no_interop.stk
 #      stryke --no-interop examples/levenshtein_no_interop.stk kitten sitting
 
-fn lev_dist($s1, $s2) {
+fn Lev::dist($s1, $s2) {
     my @ac = split(//, $s1)
     my @bc = split(//, $s2)
     my $m  = len(@ac)
@@ -44,7 +44,7 @@ fn lev_dist($s1, $s2) {
 }
 
 if (len(@ARGV) >= 2) {
-    p lev_dist($ARGV[0], $ARGV[1])
+    p Lev::dist($ARGV[0], $ARGV[1])
     exit 0
 }
 
@@ -65,7 +65,7 @@ my @cases = (
 p "── Levenshtein edit-distance demo ──"
 my $fail = 0
 for my $c (@cases) {
-    my $got = lev_dist($c->{a}, $c->{b})
+    my $got = Lev::dist($c->{a}, $c->{b})
     my $ok  = ($got == $c->{d})
     $fail++ unless $ok
     printf "  d(%-10s , %-10s) = %d  expect %d  %s\n",

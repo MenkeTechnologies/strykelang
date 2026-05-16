@@ -13,21 +13,21 @@
 # Run: stryke --no-interop examples/state_machine_no_interop.stk
 #      stryke --no-interop examples/state_machine_no_interop.stk 10
 
-fn next_state($s) {
+fn Light::next($s) {
     if    ($s eq "red")    { "green" }
     elsif ($s eq "green")  { "yellow" }
     elsif ($s eq "yellow") { "red" }
     else                   { die "unknown light: $s" }
 }
 
-fn label($s) {
+fn Light::label($s) {
     if    ($s eq "red")    { "RED   (STOP)" }
     elsif ($s eq "yellow") { "YELLOW(SLOW)" }
     elsif ($s eq "green")  { "GREEN (GO  )" }
     else                   { die "unknown light: $s" }
 }
 
-fn duration_sec($s) {
+fn Light::duration_sec($s) {
     if    ($s eq "red")    { 30 }
     elsif ($s eq "yellow") { 5 }
     elsif ($s eq "green")  { 25 }
@@ -40,18 +40,18 @@ my $elapsed = 0
 
 p "── Traffic-light cycle ($cycles transitions) ──"
 for (1:$cycles) {
-    my $dt = duration_sec($state)
-    printf "  t=%-4ds %s   (hold %ds)\n", $elapsed, label($state), $dt
+    my $dt = Light::duration_sec($state)
+    printf "  t=%-4ds %s   (hold %ds)\n", $elapsed, Light::label($state), $dt
     $elapsed += $dt
-    $state = next_state($state)
+    $state = Light::next($state)
 }
 p ""
 p "total cycle length so far: ${elapsed}s"
 
 # Built-in self-test: one full red→green→yellow→red cycle is 60s.
-my $one_cycle = duration_sec("red") + duration_sec("green") + duration_sec("yellow")
+my $one_cycle = Light::duration_sec("red") + Light::duration_sec("green") + Light::duration_sec("yellow")
 die "one cycle should be 60s, got ${one_cycle}s" unless $one_cycle == 60
-die "next(red)->green failed"    unless next_state("red")    eq "green"
-die "next(green)->yellow failed" unless next_state("green")  eq "yellow"
-die "next(yellow)->red failed"   unless next_state("yellow") eq "red"
+die "next(red)->green failed"    unless Light::next("red")    eq "green"
+die "next(green)->yellow failed" unless Light::next("green")  eq "yellow"
+die "next(yellow)->red failed"   unless Light::next("yellow") eq "red"
 p "  ALL PASS (transition table closed, cycle = 60s)"

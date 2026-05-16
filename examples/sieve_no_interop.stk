@@ -13,7 +13,7 @@
 # Run: stryke --no-interop examples/sieve_no_interop.stk
 #      stryke --no-interop examples/sieve_no_interop.stk 1000
 
-fn eratosthenes($n) {
+fn Sieve::run($n) {
     return () if $n < 2
     my @is_prime = (1) x ($n + 1)
     $is_prime[0] = 0
@@ -37,7 +37,7 @@ fn eratosthenes($n) {
 my $upper = $ARGV[0] // 100
 
 my $t0 = now_ns()
-my @primes = eratosthenes($upper)
+my @primes = Sieve::run($upper)
 my $ms = (now_ns() - $t0) / 1_000_000
 
 p "── Sieve of Eratosthenes (n ≤ $upper) ──"

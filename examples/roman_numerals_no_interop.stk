@@ -14,7 +14,7 @@
 #      stryke --no-interop examples/roman_numerals_no_interop.stk 1994
 #      stryke --no-interop examples/roman_numerals_no_interop.stk MMXXVI
 
-fn to_roman($n) {
+fn Roman::to($n) {
     die "out of range (1..3999): $n" if $n < 1 || $n > 3999
     my @vals  = (1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1)
     my @glyph = ("M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I")
@@ -29,7 +29,7 @@ fn to_roman($n) {
     $out
 }
 
-fn from_roman($s) {
+fn Roman::from($s) {
     die "not a Roman numeral: $s" unless $s =~ /^[MDCLXVI]+$/i
     my %val = (M => 1000, D => 500, C => 100, L => 50, X => 10, V => 5, I => 1)
     my @chars = split(//, uc($s))
@@ -45,9 +45,9 @@ fn from_roman($s) {
 if (len(@ARGV) >= 1) {
     my $arg = $ARGV[0]
     if ($arg =~ /^\d+$/) {
-        p to_roman(0 + $arg)
+        p Roman::to(0 + $arg)
     } else {
-        p from_roman($arg)
+        p Roman::from($arg)
     }
     exit 0
 }
@@ -55,20 +55,20 @@ if (len(@ARGV) >= 1) {
 # Demo grid.
 p "── Integer → Roman ──"
 for my $n (1, 4, 9, 14, 40, 90, 400, 944, 1994, 2026, 3999) {
-    printf "  %4d  ->  %s\n", $n, to_roman($n)
+    printf "  %4d  ->  %s\n", $n, Roman::to($n)
 }
 
 p ""
 p "── Roman → Integer ──"
 for my $s ("I", "IV", "IX", "XIV", "XL", "XC", "CD", "CMXLIV", "MCMXCIV", "MMXXVI", "MMMCMXCIX") {
-    printf "  %-10s -> %d\n", $s, from_roman($s)
+    printf "  %-10s -> %d\n", $s, Roman::from($s)
 }
 
 p ""
 p "── Round-trip check 1..2026 ──"
 my $bad = 0
 for my $n (1:2026) {
-    $bad++ if from_roman(to_roman($n)) != $n
+    $bad++ if Roman::from(Roman::to($n)) != $n
 }
 p "  failures: $bad / 2026"
 die "roman round-trip failed!" if $bad > 0
