@@ -6,7 +6,7 @@
 # Stryke choices:
 #   * `fn`, `p`, `printf`, `len` (no `sub`, no `say`, no `scalar`)
 #   * `x` string-repeat operator for the bar
-#   * `sort { $_0 <=> $_1 }` for descending sort (using stryke's strict
+#   * `sort { _0 <=> _1 }` for descending sort (using stryke's strict
 #     positional names, not `$a` / `$b`)
 #   * `||=` defined-or-assign for the hash bucket init
 #   * `1:$n` colon-range
@@ -30,7 +30,7 @@ for my $v (@data) {
     $counts{$v}++
 }
 
-my @keys = sort { $_0 <=> $_1 } keys %counts
+my @keys = sort { _0 <=> _1 } keys %counts
 my $max  = 0
 for my $k (@keys) {
     $max = $counts{$k} if $counts{$k} > $max

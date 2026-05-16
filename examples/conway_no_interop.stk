@@ -63,7 +63,7 @@ fn Life::step($g) {  # `step` itself is a stryke builtin
 
 fn Life::count_live($g) {
     my $n = 0
-    $n += $_ for @$g
+    $n += _ for @$g
     $n
 }
 

@@ -1,0 +1,77 @@
+#!/usr/bin/env stryke
+
+# Boyer-Moore majority-vote — find an element that appears more than
+# `n/2` times in O(n) time and O(1) extra space. The candidate that
+# survives the cancellation walk is guaranteed to be the majority IF
+# one exists. A second linear pass verifies. Parses clean under
+# `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * `|> reduce` fold for the candidate walk — no for-loop
+#   * `|> grep |> len` verify chain (rule 3)
+#   * implicit closure topic `_` / `_0` / `_1` (rule 12)
+#   * implicit return — no `return` on tail (rule 7)
+#   * `#{…}` interpolation (rule 1a)
+#   * paren-less list-operator calls (rule 8)
+#
+# Namespaced UDFs `BM::*`.
+#
+# Run: stryke --no-interop examples/boyer_moore_no_interop.stk
+
+# Reduce-fold candidate walk — seed `{cand, count}` is prepended so
+# stryke's one-block reduce uses head-of-list as the accumulator.
+fn BM::candidate($xs_ref) {
+    my $state = (+{cand => undef, count => 0}, @$xs_ref) |> reduce {
+        my ($cand, $count) = (_0->{cand}, _0->{count})
+        +{
+            cand  => $count == 0 ? _1 : $cand,
+            count => $count == 0 ? 1
+                   : (_1 eq $cand ? $count + 1 : $count - 1)
+        }
+    }
+    $state->{cand}
+}
+
+fn BM::majority($xs_ref) {
+    return undef if len(@$xs_ref) == 0
+    my $cand = BM::candidate $xs_ref
+    my $hits = @$xs_ref |> grep { _ eq $cand } |> len
+    $hits > len(@$xs_ref) / 2 ? $cand : undef
+}
+
+my @cases = (
+    +{ xs => [3, 2, 3],                          maj => 3      },  # LC 169 #1
+    +{ xs => [2, 2, 1, 1, 1, 2, 2],              maj => 2      },  # LC 169 #2
+    +{ xs => [1, 2, 3, 4],                       maj => undef  },  # no majority
+    +{ xs => [1],                                maj => 1      },  # single
+    +{ xs => [1, 1, 2, 2, 3],                    maj => undef  },  # tie / minority
+    +{ xs => ["a", "a", "b", "a", "c", "a"],     maj => "a"    },  # string majority
+    +{ xs => [1, 1, 1, 1, 2],                    maj => 1      },  # heavy majority
+    +{ xs => [],                                 maj => undef  },  # empty
+)
+
+p "── Boyer-Moore majority demo ──"
+my $fail = 0
+for my $c (@cases) {
+    my $got    = BM::majority $c->{xs}
+    my $got_s  = defined $got      ? $got      : "—"
+    my $want_s = defined $c->{maj} ? $c->{maj} : "—"
+    my $ok = (!defined $got && !defined $c->{maj}) ||
+             (defined $got && defined $c->{maj} && $got eq $c->{maj})
+    $fail++ unless $ok
+    my @xs = @{$c->{xs}}
+    p "  xs=[@xs]  got=#{$got_s}  expect=#{$want_s}  #{$ok ? \"\" : \"FAIL\"}"
+}
+die "$fail / #{len @cases} majority cases failed" if $fail > 0
+
+# Universal invariant: if BM::majority returns a value, that value
+# really appears more than n/2 times. One-line pipe-chain count.
+for my $c (@cases) {
+    my $m = BM::majority $c->{xs}
+    next unless defined $m
+    my $hits = @{$c->{xs}} |> grep { _ eq $m } |> len
+    die "returned $m but doesn't dominate" unless $hits > len(@{$c->{xs}}) / 2
+}
+
+p ""
+p "  ALL PASS (8 cases + majority-dominates invariant)"

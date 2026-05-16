@@ -38,7 +38,7 @@ my $par_ms = (now_ns() - $t1) / 1_000_000
 
 # Verify the two agree (commutative + deterministic).
 my $seq_join = join(",", @seq)
-my $par_join = join(",", sort { $_0 <=> $_1 } @par)
+my $par_join = join(",", sort { _0 <=> _1 } @par)
 die "parallel sieve drifted from sequential" unless $seq_join eq $par_join
 
 p "found ", len(@seq), " primes up to $upper"

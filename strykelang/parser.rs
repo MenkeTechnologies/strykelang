@@ -21256,4 +21256,44 @@ mod tests {
         parse_ok("p \"first=$_0 second=$_1\"");
         parse_ok("p \"got: $_\"");
     }
+
+    /// Bareword `_` topic inside a `for $_` -style postfix-for body.
+    /// Used in Conway's life-counter — `$n += _ for @$g`.
+    #[test]
+    fn bareword_topic_in_postfix_for_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $n = 0; $n += _ for (1, 2, 3, 4)");
+        parse_ok("my %h; $h{_}++ for (\"a\", \"b\", \"a\")");
+    }
+
+    /// Bareword `_` with hash-subscript on the outer side —
+    /// `$h{_}++` is tighter than `$h{$_}++` (no sigil on key).
+    #[test]
+    fn bareword_topic_as_hash_key_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my %h; $h{_}++ for (\"a\", \"b\", \"a\")");
+        parse_ok(
+            "my @arr = (1, 2, 3); my %seen; $seen{$arr[_]}++ for (0, 1, 2)",
+        );
+    }
+
+    /// Hashref subscript inside a `grep` block using the bareword
+    /// topic — the FirstU::pipe_find shape: `grep { $seen{$c[_]} == 1 }`.
+    #[test]
+    fn bareword_topic_inside_subscript_chain_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my @c = (\"a\", \"b\", \"c\"); my %seen = (a => 1, b => 2, c => 1); \
+             my @hits = grep { $seen{$c[_]} == 1 } (0, 1, 2)",
+        );
+    }
+
+    /// `ref($x)` builtin — used by flatten to discriminate arrayref
+    /// from scalar leaves.
+    #[test]
+    fn ref_builtin_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $x = [1, 2]; p ref($x)");
+        parse_ok("my $r = +{a => 1}; p 1 if ref($r) eq \"HASH\"");
+    }
 }
