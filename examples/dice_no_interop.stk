@@ -20,7 +20,7 @@
 #      stryke --no-interop examples/dice_no_interop.stk 2d6+3
 #      stryke --no-interop examples/dice_no_interop.stk 1d20
 
-fn roll_die($sides) {
+fn Dice::roll1($sides) {
     die "bad side count: $sides" unless $sides >= 2
     1 + int(rand($sides))
 }
@@ -28,7 +28,7 @@ fn roll_die($sides) {
 # Split a strict-mode-friendly dice expression into signed terms.
 # Stryke's regex engine doesn't support lookahead split, so we
 # tokenise manually: scan for +/- and slice on the boundaries.
-fn split_terms($e) {
+fn Dice::split_terms($e) {
     my @terms
     my $sign = "+"
     my $buf  = ""
@@ -45,19 +45,19 @@ fn split_terms($e) {
     @terms
 }
 
-fn roll_dice_notation($expr) {
+fn Dice::roll($expr) {
     my $e = $expr
     $e =~ s/\s+//g
     my $total = 0
     my @rolls
-    for my $t (split_terms($e)) {
+    for my $t (Dice::split_terms($e)) {
         my $s = ($t->{sign} eq "-") ? -1 : 1
         my $p = $t->{body}
         if ($p =~ /^(\d*)d(\d+)$/) {
             my $count = len($1) > 0 ? (0 + $1) : 1
             my $sides = 0 + $2
             for (1:$count) {
-                my $r = roll_die($sides)
+                my $r = Dice::roll1($sides)
                 push @rolls, +{ sides => $sides, value => $r, sign => $s }
                 $total += $s * $r
             }
@@ -72,12 +72,12 @@ fn roll_dice_notation($expr) {
 }
 
 # Compute min/max bounds for a notation without actually rolling.
-fn bounds($expr) {
+fn Dice::bounds($expr) {
     my $e = $expr
     $e =~ s/\s+//g
     my $min = 0
     my $max = 0
-    for my $t (split_terms($e)) {
+    for my $t (Dice::split_terms($e)) {
         my $s = ($t->{sign} eq "-") ? -1 : 1
         my $p = $t->{body}
         if ($p =~ /^(\d*)d(\d+)$/) {
@@ -101,7 +101,7 @@ fn bounds($expr) {
 srand(42)  # deterministic for the demo / self-test
 
 if (len(@ARGV) >= 1) {
-    my $r = roll_dice_notation($ARGV[0])
+    my $r = Dice::roll($ARGV[0])
     p $r->{total}
     exit 0
 }
@@ -120,10 +120,10 @@ my @cases = (
 p "── Dice-notation demo (seed=42, 5 rolls each) ──"
 my $fail = 0
 for my $c (@cases) {
-    my $bnd = bounds($c->{expr})
+    my $bnd = Dice::bounds($c->{expr})
     printf "  %-12s bounds=[%4d..%4d]  rolls:", $c->{expr}, $bnd->{min}, $bnd->{max}
     for (1:5) {
-        my $r = roll_dice_notation($c->{expr})
+        my $r = Dice::roll($c->{expr})
         printf " %d", $r->{total}
         if ($r->{total} < $bnd->{min} || $r->{total} > $bnd->{max}) {
             $fail++
@@ -135,12 +135,12 @@ die "$fail rolls fell outside bounds" if $fail > 0
 
 # Individual face-value invariant: every d6 roll must be in [1..6].
 for (1:200) {
-    my $f = roll_die(6)
+    my $f = Dice::roll1(6)
     die "d6 out of range: $f" unless $f >= 1 && $f <= 6
 }
 # d20 likewise.
 for (1:200) {
-    my $f = roll_die(20)
+    my $f = Dice::roll1(20)
     die "d20 out of range: $f" unless $f >= 1 && $f <= 20
 }
 

@@ -18,16 +18,16 @@
 my %PREC = ("+" => 2, "-" => 2, "*" => 3, "/" => 3, "%" => 3, "**" => 4)
 my %RIGHT_ASSOC = ("**" => 1)
 
-fn is_op($tok) {
+fn Shunt::is_op($tok) {
     exists $PREC{$tok}
 }
 
-fn to_postfix($expr) {
+fn Shunt::to_rpn($expr) {
     my @toks = grep { len(_) > 0 } split(/\s+/, $expr)
     my @out
     my @ops
     for my $tok (@toks) {
-        if (is_op($tok)) {
+        if (Shunt::is_op($tok)) {
             while (len(@ops) > 0 &&
                    $ops[-1] ne "(" &&
                    ($PREC{$ops[-1]} > $PREC{$tok} ||
@@ -57,7 +57,7 @@ fn to_postfix($expr) {
 }
 
 if (len(@ARGV) >= 1) {
-    p to_postfix($ARGV[0])
+    p Shunt::to_rpn($ARGV[0])
     exit 0
 }
 
@@ -76,7 +76,7 @@ my @cases = (
 p "── Shunting-yard demo (infix → postfix) ──"
 my $fail = 0
 for my $c (@cases) {
-    my $got = to_postfix($c->{infix})
+    my $got = Shunt::to_rpn($c->{infix})
     my $ok  = ($got eq $c->{postfix})
     $fail++ unless $ok
     printf "  %-28s -> %-22s expect %-22s %s\n",

@@ -14,7 +14,7 @@
 #      stryke --no-interop examples/rle_no_interop.stk encode "aaaabbbcc"
 #      stryke --no-interop examples/rle_no_interop.stk decode "4a3b2c"
 
-fn rle_enc($s) {
+fn RLE::enc($s) {
     return "" if len($s) == 0
     my @chars = split(//, $s)
     my $out  = ""
@@ -33,7 +33,7 @@ fn rle_enc($s) {
     $out
 }
 
-fn rle_dec($s) {
+fn RLE::dec($s) {
     # Walk the string by hand: pick up the digit run, then one letter,
     # then repeat. Avoids relying on /g list-capture semantics.
     my @chars = split(//, $s)
@@ -54,8 +54,8 @@ fn rle_dec($s) {
 
 if (len(@ARGV) >= 2) {
     my ($mode, $arg) = @ARGV
-    if    ($mode eq "encode") { p rle_enc($arg) }
-    elsif ($mode eq "decode") { p rle_dec($arg) }
+    if    ($mode eq "encode") { p RLE::enc($arg) }
+    elsif ($mode eq "decode") { p RLE::dec($arg) }
     else  { die "mode must be 'encode' or 'decode'" }
     exit 0
 }
@@ -75,8 +75,8 @@ my @cases = (
 p "── RLE encode / decode demo ──"
 my $fail = 0
 for my $c (@cases) {
-    my $enc       = rle_enc($c->{s})
-    my $roundtrip = rle_dec($enc)
+    my $enc       = RLE::enc($c->{s})
+    my $roundtrip = RLE::dec($enc)
     my $ok_enc    = ($enc eq $c->{expected})
     my $ok_rt     = ($roundtrip eq $c->{s})
     $fail++ unless $ok_enc && $ok_rt

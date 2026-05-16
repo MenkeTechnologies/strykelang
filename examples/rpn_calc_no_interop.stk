@@ -16,7 +16,7 @@
 #      stryke --no-interop examples/rpn_calc_no_interop.stk "3 4 + 2 *"
 #      stryke --no-interop examples/rpn_calc_no_interop.stk "5 1 2 + 4 * + 3 -"
 
-fn run_rpn($expr) {  # `rpn` itself is a stryke builtin — namespace ours
+fn RPN::eval($expr) {  # `rpn` itself is a stryke builtin — namespace ours
 
     my @stack
     my @tokens = grep { len(_) > 0 } split(/\s+/, $expr)
@@ -46,7 +46,7 @@ fn run_rpn($expr) {  # `rpn` itself is a stryke builtin — namespace ours
 
 if (len(@ARGV) > 0) {
     my $expr = join(" ", @ARGV)
-    my $result = eval { run_rpn($expr) }
+    my $result = eval { RPN::eval($expr) }
     if ($@) {
         p "error: $@"
         exit 1
@@ -68,7 +68,7 @@ my @cases = (
 )
 my $fail = 0
 for my $c (@cases) {
-    my $r = eval { run_rpn($c->{expr}) }
+    my $r = eval { RPN::eval($c->{expr}) }
     if ($@) {
         printf "  %-30s -> error: %s\n", $c->{expr}, $@
         $fail++

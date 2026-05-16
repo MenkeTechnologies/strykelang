@@ -15,21 +15,21 @@
 # Run: stryke --no-interop examples/mortgage_no_interop.stk
 #      stryke --no-interop examples/mortgage_no_interop.stk 300000 6.5 30
 
-fn round2($x) {
+fn Mortgage::round2($x) {
     int($x * 100 + 0.5) / 100
 }
 
 # Monthly payment formula: P * r / (1 - (1+r)^-n)
 # where r = annual_rate/12, n = total months.
-fn monthly_payment($principal, $annual_rate_pct, $years) {
+fn Mortgage::payment($principal, $annual_rate_pct, $years) {
     my $r = $annual_rate_pct / 100 / 12
     my $n = $years * 12
     return $principal / $n if $r == 0  # interest-free edge case
     $principal * $r / (1 - (1 + $r) ** -$n)
 }
 
-fn amortize($principal, $annual_rate_pct, $years) {
-    my $pmt = monthly_payment($principal, $annual_rate_pct, $years)
+fn Mortgage::amortize($principal, $annual_rate_pct, $years) {
+    my $pmt = Mortgage::payment($principal, $annual_rate_pct, $years)
     my $r   = $annual_rate_pct / 100 / 12
     my $n   = $years * 12
     my $balance = $principal
@@ -40,13 +40,13 @@ fn amortize($principal, $annual_rate_pct, $years) {
         $balance -= $principal_paid
         push @schedule, +{
             month     => $m,
-            payment   => round2($pmt),
-            interest  => round2($interest),
-            principal => round2($principal_paid),
-            balance   => round2($balance),
+            payment   => Mortgage::round2($pmt),
+            interest  => Mortgage::round2($interest),
+            principal => Mortgage::round2($principal_paid),
+            balance   => Mortgage::round2($balance),
         }
     }
-    +{ payment => round2($pmt), schedule => \@schedule }
+    +{ payment => Mortgage::round2($pmt), schedule => \@schedule }
 }
 
 my ($principal, $rate, $years) = (200000, 6.0, 30)
@@ -56,7 +56,7 @@ if (len(@ARGV) >= 3) {
     $years     = 0 + $ARGV[2]
 }
 
-my $result = amortize($principal, $rate, $years)
+my $result = Mortgage::amortize($principal, $rate, $years)
 my $pmt    = $result->{payment}
 my $sched  = $result->{schedule}
 my $n      = len(@$sched)

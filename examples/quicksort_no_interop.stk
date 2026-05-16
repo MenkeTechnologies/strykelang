@@ -10,16 +10,16 @@
 #   * Array slicing with `[1:]` (stryke ranges) — the tail-slice idiom
 #   * `p` for output (not `say`)
 #
-# Run:  stryke --no-interop examples/quicksort_no_interop.stk
-#       stryke --no-interop examples/quicksort_no_interop.stk 9 3 7 1 5 2 8 4 6
+# Run:  stryke --no-interop examples/QSort::run_no_interop.stk
+#       stryke --no-interop examples/QSort::run_no_interop.stk 9 3 7 1 5 2 8 4 6
 
-fn quicksort(@xs) {
+fn QSort::run(@xs) {
     return @xs if len(@xs) <= 1
     my $pivot = $xs[0]
     my @rest  = @xs[1:]
     my @lo    = grep { _ <  $pivot } @rest
     my @hi    = grep { _ >= $pivot } @rest
-    (quicksort(@lo), $pivot, quicksort(@hi))
+    (QSort::run(@lo), $pivot, QSort::run(@hi))
 }
 
 my @input
@@ -31,7 +31,7 @@ if (len(@ARGV) > 0) {
 }
 
 p "input : (", join(", ", @input), ")"
-my @sorted = quicksort(@input)
+my @sorted = QSort::run(@input)
 p "sorted: (", join(", ", @sorted), ")"
 
 # Invariant check — sort block. Under `--no-interop`, `$a` / `$b` are
@@ -40,12 +40,12 @@ p "sorted: (", join(", ", @sorted), ")"
 my @golden = sort { $_0 <=> $_1 } @input
 my $got    = join(",", @sorted)
 my $want   = join(",", @golden)
-die "quicksort drifted! got=$got want=$want" unless $got eq $want
+die "QSort::run drifted! got=$got want=$want" unless $got eq $want
 p "verified against stryke's built-in sort"
 
 # Cross-check on a second hand-picked input.
 my @rev   = (10, 9, 8, 7, 6, 5, 4, 3, 2, 1)
-my @asc   = quicksort(@rev)
+my @asc   = QSort::run(@rev)
 my $want  = "1,2,3,4,5,6,7,8,9,10"
-die "quicksort failed on reversed input: " . join(",", @asc) unless join(",", @asc) eq $want
+die "QSort::run failed on reversed input: " . join(",", @asc) unless join(",", @asc) eq $want
 p "  ALL PASS (reversed-input case also clean)"

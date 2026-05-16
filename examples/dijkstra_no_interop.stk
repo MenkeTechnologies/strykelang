@@ -17,7 +17,7 @@
 #
 # Run: stryke --no-interop examples/dijkstra_no_interop.stk
 
-fn dijkstra_path($graph_ref, $src) {
+fn Dijkstra::run($graph_ref, $src) {
     my %dist
     my %parent
     my %visited
@@ -59,7 +59,7 @@ fn dijkstra_path($graph_ref, $src) {
     +{ dist => \%dist, parent => \%parent }
 }
 
-fn path_to($parent_ref, $src, $dst) {
+fn Dijkstra::path($parent_ref, $src, $dst) {
     my @path = ($dst)
     my $cur = $dst
     while ($cur ne $src) {
@@ -89,7 +89,7 @@ my $G = +{
     F => [],
 }
 
-my $result = dijkstra_path($G, "A")
+my $result = Dijkstra::run($G, "A")
 
 # Expected shortest distances from A.
 my %expected = (A => 0, B => 2, C => 3, D => 4, E => 5, F => 7)
@@ -100,7 +100,7 @@ for my $node (sort keys %expected) {
     my $got = $result->{dist}{$node}
     my $ok  = ($got == $expected{$node})
     $fail++ unless $ok
-    my $path = path_to($result->{parent}, "A", $node)
+    my $path = Dijkstra::path($result->{parent}, "A", $node)
     printf "  A -> %s  dist=%d  expect=%d  path=[%s]  %s\n",
         $node, $got, $expected{$node},
         join(",", @$path),
@@ -115,7 +115,7 @@ die "triangle inequality A-E-F" unless $result->{dist}{F} <= $result->{dist}{E} 
 
 # Unreachable: starting from F (which has no outgoing edges to most
 # nodes), only F itself has a finite distance.
-my $r2 = dijkstra_path($G, "F")
+my $r2 = Dijkstra::run($G, "F")
 die "F can reach itself in 0" unless $r2->{dist}{F} == 0
 die "F unreachable from itself to A"  unless $r2->{dist}{A} == -1
 die "F unreachable from itself to B"  unless $r2->{dist}{B} == -1
