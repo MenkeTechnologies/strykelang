@@ -258,13 +258,13 @@ p substr($s, 1, 3)     # "ell"  — start=1, len=3 (Perl-style; works in compat 
 p $s[1:99]             # "ello" — clamps to end gracefully; Perl would warn
 ```
 
-**Open-ended slices** are supported via negative indexing — `-1` is the last char, so `$s[2:-1]` reads as "from index 2 to end" and `$s[0:N]` reads as "from start to N":
+**Open-ended slices** are supported,  so `$s[2:]` reads as "from index 2 to end" and `$s[0:N]` reads as "from start to N":
 
 ```stryke
 my $s = "hello"
-p $s[2:-1]              # "llo"  — index 2 through last
+p $s[2:]              # "llo"  — index 2 through last
 p $s[0:2]               # "hel"  — start through index 2
-p $s[-3:-1]             # "llo"  — last 3 chars
+p $s[-3:]             # "llo"  — last 3 chars
 ```
 
 For arrays, the open-ended bracket forms also work directly:
@@ -274,8 +274,6 @@ my @a = (10, 20, 30, 40, 50)
 p @a[2:]                # 30, 40, 50  — from index 2 to end
 p @a[:2]                # 10, 20, 30  — start through index 2
 ```
-
-Strings require both ends spelled out (use `-1` for "to end" and `0` for "from start"); arrays accept the bare `[N:]` / `[:N]` forms.
 
 ---
 
@@ -292,13 +290,13 @@ Inside-out reading is the single biggest readability tax in mainstream languages
 
 **Rule:** if you wrote two open parens in a row (`f(g(`), refactor to a pipeline. The only exception is constructor-style call sites where the arg is a literal struct (`Point(1, 2)`).
 
-The threading-operator family is stryke's three-axis universal-access protocol — every value, every callable, and every reflection-metadata access flows through `~>` `~p>` `~p>` without adapter code.
+The threading-operator family is stryke's universal-access protocol — every value, every callable, and every reflection-metadata access flows through `~>` `~p>` `~p>` `~s>` `~d>` without adapter code.
 
 ---
 
 ## 7. Pipeline / threading operators
 
-stryke ships **five** distinct threading operators. Each has its own syntactic shape and execution semantics — they are not interchangeable.
+stryke ships distinct threading operators. Each has its own syntactic shape and execution semantics — they are not interchangeable.
 
 ### 7.1 `|>` — pipe-forward (one stage at a time)
 

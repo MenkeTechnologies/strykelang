@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+
+# Recursive list flattening — collapse an arbitrarily nested array
+# tree into a flat list of leaves. Parses clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * expression-bodied `fn name = …` (rule 6)
+#   * `|> flat_maps` pipeline, no for / no push (rule 3)
+#   * implicit closure topic `_` (rule 12)
+#   * `#{…}` / `@arr` interpolation, no `.` concat (rule 1a)
+#   * paren-less list-operator calls where precedence allows (rule 8)
+#
+# Namespaced UDFs `Flat::*` so future stdlib `flatten` doesn't shadow.
+#
+# Run: stryke --no-interop examples/flatten_no_interop.stk
+
+fn Flat::flatten($r)    = @$r |> flat_maps { ref(_) eq "ARRAY" ? Flat::flatten(_) : (_) }
+fn Flat::leaf_count($r) = Flat::flatten($r) |> len
+
+# Demo grid — (input, expected flat).
+my @cases = (
+    +{ input => [],                        flat => []                },
+    +{ input => [1, 2, 3],                 flat => [1, 2, 3]         },
+    +{ input => [1, [2, 3], 4],            flat => [1, 2, 3, 4]      },
+    +{ input => [[1, 2], [3, 4]],          flat => [1, 2, 3, 4]      },
+    +{ input => [1, [2, [3, [4, [5]]]]],   flat => [1, 2, 3, 4, 5]   },
+    +{ input => [[[1]], [[2], [3]], 4],    flat => [1, 2, 3, 4]      },
+    +{ input => [[], [1, []], [], [2]],    flat => [1, 2]            },  # empties drop
+    +{ input => ["a", ["b", ["c"]], "d"],  flat => ["a","b","c","d"] },
+)
+
+p "── Recursive flatten demo ──"
+my $fail = 0
+for my $c (@cases) {
+    my @got      = Flat::flatten($c->{input})
+    my @want     = @{$c->{flat}}
+    my $ok       = "@got" eq "@want"
+    $fail++ unless $ok
+    p "  in=(#{len @{$c->{input}}} items)  out=[@got]  expect=[@want]  #{$ok ? \"\" : \"FAIL\"}"
+}
+die "$fail / #{len @cases} flatten cases failed" if $fail > 0
+
+# Universal invariant: flattened length equals total leaf count.
+for my $c (@cases) {
+    my @f = Flat::flatten($c->{input})
+    die "leaf count != flat length" unless Flat::leaf_count($c->{input}) == len @f
+}
+
+p ""
+p "  ALL PASS (8 cases + leaf-count invariant)"
