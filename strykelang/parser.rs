@@ -21114,4 +21114,50 @@ mod tests {
         parse_ok("my $r = 1_000_000 / 365");
         parse_ok("my $hex = 0xff_ff");
     }
+
+    /// 2D array-of-arrayref construction `[[a,b], [c,d]]` and access
+    /// `$grid->[0]->[1]`. Used by interval_merge and dijkstra demos.
+    #[test]
+    fn arrayref_of_arrayref_access_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $grid = [[1, 2], [3, 4]]");
+        parse_ok("my $grid = [[1, 2], [3, 4]]; p $grid->[0]->[1]");
+        parse_ok("my $grid = [[1, 2], [3, 4]]; p $grid->[1][0]");
+    }
+
+    /// Mutating array element via arrow-arrow chain — `$ref->[0]->[1] = $v`.
+    /// Used by interval_merge to extend an interval's end in place.
+    #[test]
+    fn arrow_chain_assignment_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $g = [[0, 0]]; $g->[0]->[1] = 99");
+        parse_ok("my $g = [[0, 0]]; $g->[0][1] = 99");
+    }
+
+    /// Tuple destructure from arrayref element — `my ($a, $b) = @$e`.
+    /// Pin the no-interop renames (`$a` reserved).
+    #[test]
+    fn tuple_destructure_from_arrayref_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $e = [10, 20]; my ($lhs, $rhs) = @$e");
+        parse_ok("my $e = [\"x\", 1]; my ($name, $weight) = ($e->[0], $e->[1])");
+    }
+
+    /// `next unless` / `last unless` postfix on a loop body. Common
+    /// guard shape inside the rolling-stats sliding loops.
+    #[test]
+    fn next_last_unless_postfix_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("for my $i (1:10) { next unless $i % 2 == 0; p $i }");
+        parse_ok("while (1) { last unless $live }");
+    }
+
+    /// `keys %{ ... }` with parenthesised hash dereference — the
+    /// shape used by deepish hash-of-hash access.
+    #[test]
+    fn keys_on_braced_hash_deref_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $h = +{a=>1}; my @k = keys %{$h}");
+        parse_ok("my $h = +{a=>+{b=>1}}; my @k = keys %{$h->{a}}");
+    }
 }

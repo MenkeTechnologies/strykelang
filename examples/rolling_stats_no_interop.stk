@@ -1,0 +1,129 @@
+#!/usr/bin/env stryke
+
+# Rolling-window statistics — for a stream of values, compute min /
+# max / sum / mean / variance over a sliding window of size N. The
+# kind of pre-processing that backs latency dashboards and stock
+# alpha calculations. Parses clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len`
+#   * Naive O(window·N) implementation — a deque-based O(N) variant
+#     exists but the goal here is clarity, not performance.
+#   * `min` / `max` / `sum` builtins
+#   * Built-in `die` invariants — known windows of a known series
+#
+# Run: stryke --no-interop examples/rolling_stats_no_interop.stk
+
+fn slice($arr, $start, $end) {
+    my @out
+    for my $i ($start:$end) {
+        push @out, $arr->[$i] if $i >= 0 && $i < len(@$arr)
+    }
+    @out
+}
+
+fn win_mean($values_ref, $win) {
+    my @out
+    my $n = len(@$values_ref)
+    for my $i (0:$n - 1) {
+        my $lo = $i - $win + 1
+        $lo = 0 if $lo < 0
+        my @slice = slice($values_ref, $lo, $i)
+        push @out, sum(@slice) / len(@slice)
+    }
+    \@out
+}
+
+fn win_min($values_ref, $win) {
+    my @out
+    my $n = len(@$values_ref)
+    for my $i (0:$n - 1) {
+        my $lo = $i - $win + 1
+        $lo = 0 if $lo < 0
+        my @slice = slice($values_ref, $lo, $i)
+        push @out, min(@slice)
+    }
+    \@out
+}
+
+fn win_max($values_ref, $win) {
+    my @out
+    my $n = len(@$values_ref)
+    for my $i (0:$n - 1) {
+        my $lo = $i - $win + 1
+        $lo = 0 if $lo < 0
+        my @slice = slice($values_ref, $lo, $i)
+        push @out, max(@slice)
+    }
+    \@out
+}
+
+# Variance with Bessel's correction (sample variance, n-1 denom).
+fn win_var($values_ref, $win) {
+    my @out
+    my $n = len(@$values_ref)
+    for my $i (0:$n - 1) {
+        my $lo = $i - $win + 1
+        $lo = 0 if $lo < 0
+        my @slice = slice($values_ref, $lo, $i)
+        if (len(@slice) < 2) {
+            push @out, 0
+            next
+        }
+        my $mean = sum(@slice) / len(@slice)
+        my $sq = 0
+        for my $v (@slice) {
+            $sq += ($v - $mean) ** 2
+        }
+        push @out, $sq / (len(@slice) - 1)
+    }
+    \@out
+}
+
+# Demo dataset — a small synthetic time series.
+my @series = (1, 3, 2, 5, 4, 6, 7, 9, 8, 10)
+my $win = 3
+
+my $means = win_mean(\@series, $win)
+my $mins  = win_min(\@series, $win)
+my $maxs  = win_max(\@series, $win)
+my $vars  = win_var(\@series, $win)
+
+p "── Rolling stats (window=$win) over (", join(",", @series), ") ──"
+printf "  %-4s %-4s %-8s %-4s %-4s %-8s\n",
+    "i", "x", "mean", "min", "max", "var"
+for my $i (0:len(@series) - 1) {
+    printf "  %-4d %-4d %-8.3f %-4d %-4d %-8.3f\n",
+        $i, $series[$i], $means->[$i], $mins->[$i], $maxs->[$i], $vars->[$i]
+}
+
+# Built-in invariants:
+#   * min <= mean <= max for every window
+#   * var >= 0
+#   * sliding window of size 1 gives x == mean == min == max
+my $n = len(@series)
+for my $i (0:$n - 1) {
+    die "min > mean at i=$i" unless $mins->[$i] <= $means->[$i]
+    die "mean > max at i=$i" unless $means->[$i] <= $maxs->[$i]
+    die "var < 0 at i=$i"    unless $vars->[$i] >= 0
+}
+
+# Single-element window degenerates to identity.
+my $solo_mean = win_mean(\@series, 1)
+my $solo_min  = win_min(\@series, 1)
+my $solo_max  = win_max(\@series, 1)
+for my $i (0:$n - 1) {
+    die "win=1 mean != x[$i]" unless $solo_mean->[$i] == $series[$i]
+    die "win=1 min  != x[$i]" unless $solo_min->[$i]  == $series[$i]
+    die "win=1 max  != x[$i]" unless $solo_max->[$i]  == $series[$i]
+}
+
+# Final window mean — full coverage.
+# Last 3 elements: (8, 10) wait — series is (1,3,2,5,4,6,7,9,8,10), so
+# last 3 = (9, 8, 10). Mean = 27/3 = 9.
+die "last-window mean should be 9" unless $means->[$n - 1] == 9
+die "last-window min should be 8"  unless $mins->[$n - 1]  == 8
+die "last-window max should be 10" unless $maxs->[$n - 1]  == 10
+
+p ""
+p "  ALL PASS (10 rows × 3 ordering invariants + win=1 identity + final window)"
