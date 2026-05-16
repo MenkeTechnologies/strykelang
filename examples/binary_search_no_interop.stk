@@ -1,0 +1,54 @@
+#!/usr/bin/env stryke
+
+# Binary search — iterative form. Parses clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn` with mixed-sigil signature `($needle, @haystack)` — the
+#     array sigil slurps trailing args, so the scalar goes first
+#   * `len(@x)` for length (not `scalar`)
+#   * `last` to break out of a `while` loop, `return` for early exit
+#   * `printf` for table output
+#   * `p` not `say`
+#
+# Run: stryke --no-interop examples/binary_search_no_interop.stk
+#      stryke --no-interop examples/binary_search_no_interop.stk 42 1 5 9 42 99
+
+fn bsearch_idx($target, @xs) {
+    my $lo = 0
+    my $hi = len(@xs) - 1
+    while ($lo <= $hi) {
+        my $mid = ($lo + $hi) >> 1  # bit-shift avoids the int/float coerce
+        my $v   = $xs[$mid]
+        return $mid if $v == $target
+        if ($v < $target) {
+            $lo = $mid + 1
+        } else {
+            $hi = $mid - 1
+        }
+    }
+    -1
+}
+
+if (len(@ARGV) >= 2) {
+    my $needle  = 0 + $ARGV[0]
+    my @hayargs = map { 0 + _ } @ARGV[1:]
+    my @sorted  = sort { $_0 <=> $_1 } @hayargs
+    my $idx     = bsearch_idx($needle, @sorted)
+    if ($idx >= 0) {
+        p "found $needle at sorted index $idx"
+        p "  sorted: (", join(", ", @sorted), ")"
+    } else {
+        p "$needle not in (", join(", ", @sorted), ")"
+    }
+    exit 0
+}
+
+# Demo grid: search for every value 0..15 in [2, 4, 6, 8, 10, 12, 14].
+my @hay = (2, 4, 6, 8, 10, 12, 14)
+p "── Binary search demo ──"
+p "haystack: (", join(", ", @hay), ")"
+p ""
+printf "  %-8s %s\n", "needle", "index"
+for my $n (0:15) {
+    printf "  %-8d %s\n", $n, bsearch_idx($n, @hay) == -1 ? "—" : bsearch_idx($n, @hay)
+}

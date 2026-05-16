@@ -20592,4 +20592,57 @@ mod tests {
         // And inside a maps block as the per-item topic.
         parse_ok("my @r = maps { _0 * 2 } (1, 2, 3)");
     }
+
+    /// Declarative types — `struct`, `enum`, `class`, `trait` — must
+    /// parse under `--no-interop` (they're stryke extensions, not Perl 5
+    /// shapes). Pin each via a minimal declaration.
+    #[test]
+    fn no_interop_accepts_struct_decl() {
+        let _g = NoInteropGuard::on();
+        parse_ok("struct Point { x => Int, y => Int }");
+    }
+
+    #[test]
+    fn no_interop_accepts_enum_decl() {
+        let _g = NoInteropGuard::on();
+        parse_ok("enum Color { Red, Green, Blue }");
+        // Data-carrying variants use the `Variant => Type` shape, not
+        // `Variant(Type)` — the latter is reserved for pattern
+        // destructuring in match arms.
+        parse_ok("enum Maybe { Just => Int, Nothing }");
+    }
+
+    #[test]
+    fn no_interop_accepts_class_decl_with_methods() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "class Rect {\n    width: Float\n    height: Float\n\n    fn area { $self->width * $self->height }\n}",
+        );
+    }
+
+    #[test]
+    fn no_interop_accepts_trait_decl() {
+        let _g = NoInteropGuard::on();
+        parse_ok("trait Greeter { fn greet; fn loudly { p \"GREET\" } }");
+    }
+
+    /// Compound-assign operators — `||=` defined-or-assign, `//=` exists-
+    /// or-assign — are stryke- and Perl-compat and should round-trip.
+    /// These are the lazy-init idiom for hash-of-array buckets used in
+    /// `csv_summary_no_interop.stk`.
+    #[test]
+    fn defined_or_assign_compound_operators_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $h = {}; $h->{x} ||= []");
+        parse_ok("my $v; $v //= 0");
+    }
+
+    /// `+{ ... }` is the unambiguous hashref literal (vs `{ ... }` block).
+    /// Used in the CSV demo to push rows.
+    #[test]
+    fn explicit_hashref_literal_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $row = +{ region => \"north\", qty => 10 }");
+        parse_ok("my @rows = (+{ a => 1 }, +{ a => 2 })");
+    }
 }
