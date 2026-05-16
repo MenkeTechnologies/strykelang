@@ -1526,4 +1526,100 @@ mod tests {
         );
         assert!(!is_magic_block_param(""));
     }
+
+    // ── should_hide — synthetic compiler vars ───────────────────────────
+    //
+    // The Variables panel hides anything wrapped in double underscores
+    // (`__foreach_i__`, `__INTERCEPT_NAME__`, etc.) — those are compiler-
+    // internal synthetic names, never user-facing. The check is "starts
+    // and ends with `__` AND length > 4" so we don't accidentally hide
+    // `__` itself or `__x__` style user names that happen to have the
+    // marker shape.
+
+    #[test]
+    fn should_hide_dunder_synthetic_names() {
+        assert!(should_hide("__foreach_i__"));
+        assert!(should_hide("__INTERCEPT_NAME__"));
+        assert!(should_hide("__list_assign_tmp__"));
+    }
+
+    #[test]
+    fn should_hide_keeps_user_visible_names() {
+        assert!(!should_hide("x"));
+        assert!(!should_hide("my_var"));
+        assert!(!should_hide("_"));
+        assert!(!should_hide("_0"));
+        assert!(!should_hide("__"));
+        // Single-leading-underscore is a user var (per
+        // is_magic_block_param), not a synthetic.
+        assert!(!should_hide("_foo"));
+    }
+
+    #[test]
+    fn should_hide_empty_name() {
+        assert!(should_hide(""));
+    }
+
+    // ── fmt_f — number formatting for sketch panel rows ─────────────────
+
+    #[test]
+    fn fmt_f_trims_trailing_zeros() {
+        assert_eq!(fmt_f(1.0), "1");
+        assert_eq!(fmt_f(1.5), "1.5");
+        assert_eq!(fmt_f(0.0), "0");
+        assert_eq!(fmt_f(-2.5), "-2.5");
+    }
+
+    #[test]
+    fn fmt_f_uses_scientific_for_extremes() {
+        // Very small.
+        assert!(fmt_f(1e-10).contains('e'));
+        // Very large.
+        assert!(fmt_f(1e20).contains('e'));
+    }
+
+    #[test]
+    fn fmt_f_handles_non_finite() {
+        // NaN / inf round-trip through Rust's default Display.
+        assert_eq!(fmt_f(f64::NAN), "NaN");
+        assert_eq!(fmt_f(f64::INFINITY), "inf");
+    }
+
+    // ── is_builtin_like — bottom-bucket sort classifier ─────────────────
+
+    #[test]
+    fn is_builtin_like_matches_stryke_builtin_arrays_and_hashes() {
+        assert!(is_builtin_like("INC"));
+        assert!(is_builtin_like("ARGV"));
+        assert!(is_builtin_like("ENV"));
+        assert!(is_builtin_like("path"));
+        assert!(is_builtin_like("p"));
+        assert!(is_builtin_like("term"));
+    }
+
+    #[test]
+    fn is_builtin_like_matches_caret_prefixed_specials() {
+        // `$^O`, `$^X`, etc. — the `^` prefix marks them as Perl special
+        // variables visible only via the caret-name form.
+        assert!(is_builtin_like("^O"));
+        assert!(is_builtin_like("^X"));
+        assert!(is_builtin_like("^HOOK"));
+    }
+
+    #[test]
+    fn is_builtin_like_matches_pipeline_outer_topic_chains() {
+        // `_<`, `_<<`, `_0<`, ... — outer-topic chain naming.
+        assert!(is_builtin_like("_<"));
+        assert!(is_builtin_like("_<<"));
+        assert!(is_builtin_like("_0<"));
+        assert!(is_builtin_like("_5<<<"));
+    }
+
+    #[test]
+    fn is_builtin_like_rejects_plain_user_names() {
+        assert!(!is_builtin_like("x"));
+        assert!(!is_builtin_like("my_var"));
+        assert!(!is_builtin_like("_5"));
+        assert!(!is_builtin_like(""));
+    }
 }

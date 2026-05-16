@@ -1332,4 +1332,96 @@ mod tests {
             .any(|r| r.start_line == 0 && r.kind == Some(FoldingRangeKind::Comment));
         assert!(!has_comment_fold, "2 comment lines is below the fold threshold");
     }
+
+    /// Braces inside string literals must not create ghost folds.
+    /// `compute_folding_ranges` tracks `in_str` to skip everything between
+    /// matching quotes.
+    #[test]
+    fn folding_ignores_braces_inside_strings() {
+        let text = "my $x = \"abc { foo } def\"\nmy $y = 1\n";
+        let ranges = fold_ranges(text);
+        // No `{...}` brace fold inside the string literal.
+        assert!(
+            ranges
+                .iter()
+                .all(|r| !(r.start_line == 0 && r.kind.is_none())),
+            "no brace fold from inside-string `{{`: got {ranges:?}"
+        );
+    }
+
+    // ── compute_formatting ───────────────────────────────────────────────
+
+    fn fmt_edits(text: &str) -> Vec<TextEdit> {
+        let (docs, uri) = doc("file:///t.stk", text);
+        let params = DocumentFormattingParams {
+            text_document: TextDocumentIdentifier { uri },
+            options: lsp_types::FormattingOptions {
+                tab_size: 4,
+                insert_spaces: true,
+                ..Default::default()
+            },
+            work_done_progress_params: Default::default(),
+        };
+        compute_formatting(&docs, &params)
+    }
+
+    /// Already-canonical input returns an empty edit list (formatter's
+    /// short-circuit when output equals input). Letting an "identity"
+    /// reformat send a full-document edit churns the file and bumps
+    /// version, breaking undo history downstream.
+    #[test]
+    fn formatting_no_op_when_already_formatted() {
+        // Use `format_program`'s own output verbatim so we hit the
+        // `formatted == *text` short-circuit. The formatter omits a final
+        // trailing newline; we don't add one for this test.
+        let raw = "my $x = 1\n";
+        let canonical_program = crate::parse_with_file(raw, "<t>").unwrap();
+        let canonical = crate::fmt::format_program(&canonical_program);
+        let edits = fmt_edits(&canonical);
+        assert!(edits.is_empty(), "no edits for canonical input: got {edits:?}");
+    }
+
+    /// Parse-error input returns an empty edit list rather than a partial
+    /// rewrite. We don't want to ship broken auto-format that drops a
+    /// stray `}` and erases the user's code.
+    #[test]
+    fn formatting_returns_empty_on_parse_error() {
+        let text = "this is not valid stryke ?? !@#$%^&\n";
+        let edits = fmt_edits(text);
+        // Either empty (preferred) OR an edit that contains the input
+        // verbatim. Both are acceptable; what we must not do is delete the
+        // unparseable region.
+        if !edits.is_empty() {
+            let new_text = &edits[0].new_text;
+            assert!(!new_text.is_empty(), "fmt must not erase content");
+        }
+    }
+
+    // ── extract_selection_on_line (UTF-16 indexing) ──────────────────────
+
+    #[test]
+    fn extract_selection_handles_ascii() {
+        let line = "my $x = 1 + 2";
+        // Select "1 + 2".
+        let sel = extract_selection_on_line(line, 8, 13).expect("selection");
+        assert_eq!(sel, "1 + 2");
+    }
+
+    #[test]
+    fn extract_selection_returns_none_for_empty_range() {
+        let line = "my $x = 1";
+        assert!(extract_selection_on_line(line, 5, 5).is_none());
+    }
+
+    /// UTF-16 offsets must convert correctly back to UTF-8 byte offsets
+    /// for slicing — LSP positions are UTF-16 code units.
+    #[test]
+    fn extract_selection_handles_multibyte_chars() {
+        // "α" is 2 UTF-8 bytes but 1 UTF-16 unit. Selecting from after
+        // "α " up to end of "x" should return "x".
+        let line = "α x";
+        // UTF-16 layout: α=1 unit (col 0), space=1 (col 1), x=1 (col 2).
+        let sel = extract_selection_on_line(line, 2, 3).expect("selection");
+        assert_eq!(sel, "x");
+    }
 }

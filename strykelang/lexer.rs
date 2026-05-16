@@ -3822,6 +3822,51 @@ mod tests {
         assert_eq!(my_line, 4, "my $y = 1 lives on source line 4");
     }
 
+    /// Same shape as `fat_arrow_lookahead_does_not_drift_line` but for the
+    /// `qw` bareword-vs-quote-operator lookahead. When `qw` is followed by
+    /// terminators (here a newline + closing paren) it's lexed as an Ident,
+    /// not a `qw(...)` list. The `skip_whitespace_only` call inside the
+    /// lookahead advances `self.line` for the `\n` it consumes; without
+    /// restoring `self.line` the next token's line drifted +1.
+    #[test]
+    fn qw_bareword_lookahead_does_not_drift_line() {
+        // `qw` followed by `)` (treated as bareword) on its own line, then
+        // a new statement. The post-class-field pattern: a newline between
+        // `qw` and the next statement must not bump the line counter.
+        let src = "(qw\n)\nmy $x = 1\n";
+        let mut l = Lexer::new(src);
+        let t = l.tokenize().expect("tokenize");
+        let my_line = t
+            .iter()
+            .find_map(|(tok, line)| match tok {
+                Token::Ident(s) if s == "my" => Some(*line),
+                _ => None,
+            })
+            .expect("expected `my` token");
+        assert_eq!(my_line, 3, "my $x = 1 lives on source line 3");
+    }
+
+    /// `m` as a bareword (the parser handles `$obj->m`, sort `m`-prefix,
+    /// etc.) goes through the same skip-whitespace-only lookahead as `qw`.
+    /// Newlines between `m` and the next non-terminator must not drift
+    /// the lexer's `self.line` past restoration.
+    #[test]
+    fn m_bareword_lookahead_does_not_drift_line() {
+        // `$obj->m` — after `->`, `m` is a method name; the followup token
+        // tracking must keep its source line.
+        let src = "$obj->m\nmy $y = 2\n";
+        let mut l = Lexer::new(src);
+        let t = l.tokenize().expect("tokenize");
+        let my_line = t
+            .iter()
+            .find_map(|(tok, line)| match tok {
+                Token::Ident(s) if s == "my" => Some(*line),
+                _ => None,
+            })
+            .expect("expected `my` token");
+        assert_eq!(my_line, 2, "my $y = 2 lives on source line 2");
+    }
+
     /// POD blocks (`=pod ... =cut`) advance `self.line` many lines during
     /// the skip but the original tokenize loop captured `line` *before*
     /// calling next_token, then pushed (token, captured_line) — so the
