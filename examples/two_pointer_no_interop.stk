@@ -1,0 +1,133 @@
+#!/usr/bin/env stryke
+
+# Two-pointer technique — the classic algorithmic shape where two
+# indices walk toward each other (or in the same direction) to solve
+# a problem in O(n). Demonstrates palindrome check, sorted two-sum,
+# and array-pair sum. Parses clean under `--no-interop`.
+#
+# Strict-mode style rule applied: bareword `_`, `_0`, `_1` in code
+# contexts. UDFs namespaced `TwoPtr::*`.
+#
+# Run: stryke --no-interop examples/two_pointer_no_interop.stk
+
+# ── Palindrome check via two pointers ────────────────────────────────
+fn TwoPtr::is_pal($s) {
+    my @c = split(//, lc($s))
+    my $i = 0
+    my $j = len(@c) - 1
+    while ($i < $j) {
+        return 0 if $c[$i] ne $c[$j]
+        $i++
+        $j--
+    }
+    1
+}
+
+# ── Sorted two-sum via two pointers (O(n), no hash needed) ───────────
+fn TwoPtr::two_sum_sorted($nums_ref, $target) {
+    my @nums = @$nums_ref
+    my $i = 0
+    my $j = len(@nums) - 1
+    while ($i < $j) {
+        my $s = $nums[$i] + $nums[$j]
+        return [$i, $j] if $s == $target
+        if ($s < $target) { $i++ } else { $j-- }
+    }
+    []
+}
+
+# ── Container-with-most-water ────────────────────────────────────────
+# Each index has a "height"; pick two indices to form a container, the
+# water held is min(h[i], h[j]) * (j - i). Two-pointer beats O(n^2)
+# brute force.
+fn TwoPtr::max_water($heights_ref) {
+    my @h = @$heights_ref
+    my $i = 0
+    my $j = len(@h) - 1
+    my $best = 0
+    while ($i < $j) {
+        my $hi = $h[$i]
+        my $hj = $h[$j]
+        my $area = ($hi < $hj ? $hi : $hj) * ($j - $i)
+        $best = $area if $area > $best
+        if ($hi < $hj) { $i++ } else { $j-- }
+    }
+    $best
+}
+
+p "── Palindrome check ──"
+my @pal_cases = (
+    +{ s => "racecar",  ok => 1 },
+    +{ s => "RaceCar",  ok => 1 },
+    +{ s => "level",    ok => 1 },
+    +{ s => "hello",    ok => 0 },
+    +{ s => "a",        ok => 1 },
+    +{ s => "",         ok => 1 },
+    +{ s => "ab",       ok => 0 },
+    +{ s => "aba",      ok => 1 },
+)
+my $fail = 0
+for my $c (@pal_cases) {
+    my $got = TwoPtr::is_pal($c->{s})
+    my $ok  = ($got == $c->{ok})
+    $fail++ unless $ok
+    printf "  %-12s -> %d  expect %d  %s\n",
+        "\"" . $c->{s} . "\"", $got, $c->{ok}, $ok ? "" : "FAIL"
+}
+
+p ""
+p "── Sorted two-sum ──"
+my @ts_cases = (
+    +{ nums => [1, 2, 3, 4, 6], target =>  6, want => [1, 3] },
+    +{ nums => [2, 3, 4],       target =>  6, want => [0, 2] },
+    +{ nums => [-2, -1, 0, 3],  target =>  3, want => [2, 3] },  # 0 + 3 = 3
+    +{ nums => [1, 2, 3, 4],    target => 99, want => []     },
+)
+for my $c (@ts_cases) {
+    my $got = TwoPtr::two_sum_sorted($c->{nums}, $c->{target})
+    my $g_str = "[" . join(",", @$got) . "]"
+    my $w_str = "[" . join(",", @{$c->{want}}) . "]"
+    my $ok = ($g_str eq $w_str)
+    $fail++ unless $ok
+    printf "  nums=%-22s target=%-3d -> %-10s expect %-10s %s\n",
+        "[" . join(",", @{$c->{nums}}) . "]",
+        $c->{target}, $g_str, $w_str, $ok ? "" : "FAIL"
+}
+
+p ""
+p "── Max water (container) ──"
+my @mw_cases = (
+    +{ h => [1, 8, 6, 2, 5, 4, 8, 3, 7],  best => 49 },  # LC #11 classic
+    +{ h => [1, 1],                       best =>  1 },
+    +{ h => [4, 3, 2, 1, 4],              best => 16 },
+    +{ h => [1, 2, 1],                    best =>  2 },
+)
+for my $c (@mw_cases) {
+    my $got = TwoPtr::max_water($c->{h})
+    my $ok  = ($got == $c->{best})
+    $fail++ unless $ok
+    printf "  h=%-30s best=%-4d expect %-4d %s\n",
+        "[" . join(",", @{$c->{h}}) . "]",
+        $got, $c->{best}, $ok ? "" : "FAIL"
+}
+
+die "$fail demos failed" if $fail > 0
+
+# Universal invariants:
+#  * Reversing a palindrome string equals the string itself.
+#  * Sorted two-sum's returned indices: i < j, nums[i] + nums[j] = target.
+for my $c (@pal_cases) {
+    my @c = split(//, lc($c->{s}))
+    my $rev = join("", rev @c)
+    my $real = (join("", @c) eq $rev) ? 1 : 0
+    die "pal disagrees with reverse for \"$c->{s}\"" unless TwoPtr::is_pal($c->{s}) == $real
+}
+for my $c (@ts_cases) {
+    my $r = TwoPtr::two_sum_sorted($c->{nums}, $c->{target})
+    next if len(@$r) == 0
+    die "indices not increasing" unless $r->[0] < $r->[1]
+    die "indices don't sum to target" unless $c->{nums}[$r->[0]] + $c->{nums}[$r->[1]] == $c->{target}
+}
+
+p ""
+p "  ALL PASS (8 + 4 + 4 demo cases + reverse-cross-check + index-sum invariants)"

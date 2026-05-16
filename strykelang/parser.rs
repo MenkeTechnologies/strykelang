@@ -21214,4 +21214,46 @@ mod tests {
         parse_ok("my $r = $_0 <=> $_1 || $name cmp $other");
         parse_ok("p 1 if $x == $y && $name eq \"foo\"");
     }
+
+    /// Bareword positional names — `_0`, `_1`, `_N` without sigil —
+    /// are stryke's idiomatic spelling in code contexts. The sigil
+    /// form (`$_0`, `$_1`) is reserved for string interpolation where
+    /// a bareword would just be a literal substring. Pin the bareword
+    /// shape in every common closure position.
+    #[test]
+    fn bareword_positional_in_sort_reduce_blocks_parses() {
+        let _g = NoInteropGuard::on();
+        // Sort comparator with bareword positional names.
+        parse_ok("my @s = sort { _0 <=> _1 } (3, 1, 2)");
+        // Reduce accumulator + element.
+        parse_ok("my $r = (1, 2, 3) |> reduce { _0 + _1 }");
+        // Reduce on string concat — _0 acc, _1 next.
+        parse_ok("my $s = (\"a\", \"b\") |> reduce { _0 . _1 }");
+    }
+
+    /// Bareword topic `_` inside `maps` / `grep` / `pmap` / `pgrep`
+    /// closure bodies. Tightest form; no sigil needed.
+    #[test]
+    fn bareword_topic_in_maps_grep_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my @r = (1, 2, 3) |> maps { _ * 2 }");
+        parse_ok("my @r = (1, 2, 3, 4) |> grep { _ % 2 == 0 }");
+        parse_ok("my @r = 1:100 |> pmap { _ ** 3 }");
+        parse_ok("my @r = 1:100 |> pgrep { _ % 7 == 0 }");
+    }
+
+    /// `_` and `_1` in arithmetic expression context (no sigil).
+    /// Inside string interpolation, only the sigil form `${_}` /
+    /// `$_0` / `$_1` works — pin the contrast.
+    #[test]
+    fn bareword_vs_sigil_in_string_interp_parses() {
+        let _g = NoInteropGuard::on();
+        // Bareword in code: tight, idiomatic.
+        parse_ok("my @r = (5, 10) |> maps { _ + 1 }");
+        // Sigil in string interp: the bareword would just be the
+        // literal characters underscore-zero, so the sigil form is
+        // required here.
+        parse_ok("p \"first=$_0 second=$_1\"");
+        parse_ok("p \"got: $_\"");
+    }
 }
