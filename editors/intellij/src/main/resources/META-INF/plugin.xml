@@ -8,13 +8,27 @@
         (Rust bytecode VM + Cranelift JIT) embeddable in zshrs.</p>
 
         <ul>
-            <li><b>.stk</b> file association with syntax highlighting (keywords, sigils, pipes, regex).</li>
-            <li><b>LSP integration</b> via <code>st --lsp</code>: completion, hover, goto-definition,
-                find-references, rename, document symbols, diagnostics.</li>
-            <li><b>Run configurations</b> for <code>.stk</code> scripts with optional
-                <code>--no-interop</code> strict-parser mode.</li>
-            <li><b>Color settings page</b> for tweaking token colors.</li>
-            <li><b>Settings → Tools → Stryke</b> to point at a non-PATH <code>st</code> binary.</li>
+            <li><b>.stk</b> file association with a 44-slot color scheme (keywords / declarations /
+                control flow / sigils / operators / regex / topic vars / block params).</li>
+            <li><b>LSP integration</b> via <code>st --lsp</code>: completion (with 60+ snippet templates),
+                hover, goto-definition, find-references, rename, document symbols, signature help,
+                semantic tokens, diagnostics, <b>code actions</b> (Extract to variable / constant / function),
+                <b>folding ranges</b> (every <code>{ ... }</code>, <code>=pod ... =cut</code>, comment runs),
+                <b>document formatting</b> (Cmd-Opt-L → reformat through stryke's built-in formatter).</li>
+            <li><b>Debugger</b> over Debug Adapter Protocol (<code>st --dap</code>): line + function
+                breakpoints from the gutter, step over / into / out / pause / run-to-cursor, frames,
+                recursive Variables panel that drills through hashes, arrays, structs, classes, enums,
+                sets, and every sketch type (TDigest / Bloom / HLL / CMS / TopK with their stats),
+                Evaluate dialog, real-time Console output.</li>
+            <li><b>Run configurations</b> for <code>.stk</code> scripts with toggles for
+                <code>--no-interop</code> / <code>--disasm</code> / <code>--profile</code> /
+                <code>--flame</code> / <code>-d</code> / <code>-D</code>.</li>
+            <li><b>Comments</b>: <code>#</code> line comments (Cmd-/) and <code>=pod ... =cut</code>
+                block comments (Cmd-Opt-/).</li>
+            <li><b>Reflection tool window</b> with 9 tabs of <code>%stryke::*</code> (~25k entries) —
+                searchable trees, left-click for docs popup, right-click for Show Docs / Copy Name.</li>
+            <li><b>Settings → Tools → Stryke</b> to point at a non-PATH <code>st</code> binary or pass
+                extra LSP args / env.</li>
         </ul>
 
         <p><b>Requirements:</b> a paid JetBrains IDE on 2024.2+ (RustRover, IDEA Ultimate, GoLand, PyCharm Pro,
@@ -24,7 +38,21 @@
     <change-notes><![CDATA[
         <h3>0.14.4</h3>
         <ul>
-            <li>Initial release. .stk file type, lexer-based highlighting, LSP client, run configurations.</li>
+            <li>Initial release: .stk file type, 44-slot color scheme, lexer-based highlighting,
+                LSP client, run configurations, DAP debugger, reflection tool window.</li>
+            <li>LSP code actions: Extract to variable / constant / function.</li>
+            <li>LSP folding ranges (brace blocks, POD, comment runs) and document formatting.</li>
+            <li>60+ snippet completions (match, if/elsif/else, class/struct/enum/trait, parallel
+                primitives, web / SVG / git scaffolds, full test-file template).</li>
+            <li><code>=pod ... =cut</code> block comments wired via Commenter.</li>
+            <li>Debugger Variables panel: rich drill-down for struct / class / enum / set / sketch
+                types; topic and Perl-5 sort/reduce params (<code>$_</code>, <code>$_N</code>,
+                <code>$a</code>, <code>$b</code>) sort below user <code>my</code> vars.</li>
+            <li>Step-over / step-in fixes: depth tracking via debugger enter_sub / leave_sub hooks,
+                and a depth-aware same-line guard so step-in enters UDFs on a single click.</li>
+            <li>Lexer line-drift fix: fat-arrow lookahead and qw/q/qq/qx/qr/m/s/tr/y bareword-vs-
+                quote-operator lookaheads now restore <code>self.line</code> alongside <code>self.pos</code>,
+                so breakpoints fire on the correct line in scripts containing class fields.</li>
         </ul>
     ]]></change-notes>
 
