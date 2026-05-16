@@ -1,0 +1,91 @@
+#!/usr/bin/env stryke
+
+# Run-length encoding — collapse `aaab → 3a1b`, decode back. Parses
+# clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len`
+#   * `split //` for char iteration, `.` for string concat
+#   * `"=~ /(\d+)(\w)/g"` regex match for decode tokens
+#   * `"$char" x $n` string-repeat operator
+#   * Built-in `die` invariants — every demo case must round-trip
+#
+# Run: stryke --no-interop examples/rle_no_interop.stk
+#      stryke --no-interop examples/rle_no_interop.stk encode "aaaabbbcc"
+#      stryke --no-interop examples/rle_no_interop.stk decode "4a3b2c"
+
+fn rle_enc($s) {
+    return "" if len($s) == 0
+    my @chars = split(//, $s)
+    my $out  = ""
+    my $prev = $chars[0]
+    my $run  = 1
+    for my $i (1:len(@chars) - 1) {
+        if ($chars[$i] eq $prev) {
+            $run++
+        } else {
+            $out .= $run . $prev
+            $prev = $chars[$i]
+            $run  = 1
+        }
+    }
+    $out .= $run . $prev
+    $out
+}
+
+fn rle_dec($s) {
+    # Walk the string by hand: pick up the digit run, then one letter,
+    # then repeat. Avoids relying on /g list-capture semantics.
+    my @chars = split(//, $s)
+    my $out = ""
+    my $i = 0
+    while ($i < len(@chars)) {
+        my $num = ""
+        while ($i < len(@chars) && $chars[$i] =~ /\d/) {
+            $num .= $chars[$i]
+            $i++
+        }
+        last if $i >= len(@chars)
+        $out .= $chars[$i] x (0 + $num) if len($num) > 0
+        $i++
+    }
+    $out
+}
+
+if (len(@ARGV) >= 2) {
+    my ($mode, $arg) = @ARGV
+    if    ($mode eq "encode") { p rle_enc($arg) }
+    elsif ($mode eq "decode") { p rle_dec($arg) }
+    else  { die "mode must be 'encode' or 'decode'" }
+    exit 0
+}
+
+# Demo grid — each input must round-trip cleanly.
+my @cases = (
+    +{ s => "",                expected => ""              },
+    +{ s => "a",               expected => "1a"            },
+    +{ s => "aaa",             expected => "3a"            },
+    +{ s => "aaabbb",          expected => "3a3b"          },
+    +{ s => "aaaabbbcc",       expected => "4a3b2c"        },
+    +{ s => "abcabc",          expected => "1a1b1c1a1b1c"  },
+    +{ s => "Mississippi",     expected => "1M1i2s1i2s1i2p1i" },
+    +{ s => "aaAAaa",          expected => "2a2A2a"        }, # case-sensitive
+)
+
+p "── RLE encode / decode demo ──"
+my $fail = 0
+for my $c (@cases) {
+    my $enc       = rle_enc($c->{s})
+    my $roundtrip = rle_dec($enc)
+    my $ok_enc    = ($enc eq $c->{expected})
+    my $ok_rt     = ($roundtrip eq $c->{s})
+    $fail++ unless $ok_enc && $ok_rt
+    printf "  %-15s -> %-22s (round-trip: %s)  %s\n",
+        "\"" . $c->{s} . "\"",
+        "\"" . $enc . "\"",
+        $ok_rt ? "OK" : "FAIL",
+        $ok_enc ? "" : "(enc want \"" . $c->{expected} . "\")"
+}
+die "$fail / " . len(@cases) . " RLE cases failed" if $fail > 0
+p ""
+p "  ALL PASS (8 cases, encode + round-trip both verified)"

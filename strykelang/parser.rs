@@ -20822,4 +20822,44 @@ mod tests {
         parse_ok("my $s = \"hi\\n\"; chomp $s");
         parse_ok("my $t = \"hi\"; chop $t");
     }
+
+    /// Substitution operator `s/pat/repl/flags` — used by
+    /// palindrome_no_interop to strip non-alphanumerics.
+    #[test]
+    fn substitution_operator_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $s = \"abc\"; $s =~ s/b/X/");
+        parse_ok("my $s = \"AaBb\"; $s =~ s/[a-z]//g");
+        parse_ok("my $s = \"Hello\"; $s =~ s/(.)/\\1\\1/g");
+    }
+
+    /// `sprintf` for column-aligned strings — used by every demo's
+    /// table output.
+    #[test]
+    fn sprintf_parses_with_format_specs() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $row = sprintf(\"%-10s %5d\", \"foo\", 42)");
+        parse_ok("p sprintf(\"%.3f ms\", 1.234)");
+        parse_ok("p sprintf(\"%04x\", 255)");
+    }
+
+    /// `<STDIN>` diamond reads — list and scalar context. Used by
+    /// wordcount / csv_summary / anagram demos.
+    #[test]
+    fn diamond_stdin_reads_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $line = <STDIN>");
+        parse_ok("my @lines = <STDIN>");
+        parse_ok("while (my $line = <STDIN>) { p $line }");
+    }
+
+    /// Chained method calls — `$obj->foo->bar(arg)`. Used in
+    /// build_destroy and class demos.
+    #[test]
+    fn chained_method_calls_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("$obj->foo->bar");
+        parse_ok("my $r = $row->{region}");
+        parse_ok("$obj->set(1)->get");
+    }
 }

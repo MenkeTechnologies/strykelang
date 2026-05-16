@@ -1,0 +1,86 @@
+#!/usr/bin/env stryke
+
+# Collatz conjecture — apply n → n/2 (if even) or 3n+1 (if odd), count
+# steps until reaching 1. Parses clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len`
+#   * `while`, `state` for memoisation (function-local persistent cache)
+#   * `int($n / 2)` for floor division; `%` for parity test
+#   * Built-in `die` invariants
+#
+# Run: stryke --no-interop examples/collatz_no_interop.stk
+#      stryke --no-interop examples/collatz_no_interop.stk 27
+#      stryke --no-interop examples/collatz_no_interop.stk 100000
+
+fn cz_steps($n) {
+    die "n must be positive: $n" unless $n > 0
+    state %cache
+    return $cache{$n} if exists $cache{$n}
+    my $x = $n
+    my $steps = 0
+    while ($x > 1) {
+        $x = ($x % 2 == 0) ? int($x / 2) : 3 * $x + 1
+        $steps++
+    }
+    $cache{$n} = $steps
+    $steps
+}
+
+fn cz_path($n) {
+    my @path = ($n)
+    my $x = $n
+    while ($x > 1) {
+        $x = ($x % 2 == 0) ? int($x / 2) : 3 * $x + 1
+        push @path, $x
+    }
+    @path
+}
+
+if (len(@ARGV) >= 1) {
+    my $n = 0 + $ARGV[0]
+    p "trajectory of $n: ", join(" -> ", cz_path($n))
+    p "steps: ", cz_steps($n)
+    exit 0
+}
+
+# Reference table — known step counts from OEIS A006577.
+my @cases = (
+    +{ n => 1,    s => 0 },
+    +{ n => 2,    s => 1 },
+    +{ n => 3,    s => 7 },
+    +{ n => 4,    s => 2 },
+    +{ n => 5,    s => 5 },
+    +{ n => 6,    s => 8 },
+    +{ n => 7,    s => 16 },
+    +{ n => 27,   s => 111 },   # classic example — long trajectory
+    +{ n => 97,   s => 118 },
+    +{ n => 871,  s => 178 },
+    +{ n => 6171, s => 261 },
+)
+
+p "── Collatz step counts (OEIS A006577) ──"
+my $fail = 0
+for my $c (@cases) {
+    my $got = cz_steps($c->{n})
+    my $ok  = ($got == $c->{s})
+    $fail++ unless $ok
+    printf "  cz_steps(%6d) = %4d   expect %4d  %s\n",
+        $c->{n}, $got, $c->{s}, $ok ? "" : "FAIL"
+}
+die "$fail / " . len(@cases) . " collatz cases failed" if $fail > 0
+
+# Find the longest trajectory under 100.
+my $best_n     = 1
+my $best_steps = 0
+for my $n (1:100) {
+    my $s = cz_steps($n)
+    if ($s > $best_steps) {
+        $best_steps = $s
+        $best_n     = $n
+    }
+}
+p ""
+p "longest trajectory under 100: n=$best_n, $best_steps steps"
+die "longest under 100 should be n=97 with 118 steps" unless $best_n == 97 && $best_steps == 118
+p "  ALL PASS (11 reference counts + longest-under-100 invariant)"

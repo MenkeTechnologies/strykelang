@@ -1,0 +1,67 @@
+#!/usr/bin/env stryke
+
+# Palindrome checker — strict (exact equality) and lenient (ignore
+# case + non-alphanumerics) variants. Parses clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len`
+#   * `=~ s/pat/repl/g` for in-place stripping (regex substitution)
+#   * `lc` / `rev` (stryke's reversal) — `reverse` is rejected in
+#     strict mode, `rev` is the canonical spelling
+#   * `eq` for string equality
+#   * Built-in `die` invariants
+#
+# Run: stryke --no-interop examples/palindrome_no_interop.stk
+#      stryke --no-interop examples/palindrome_no_interop.stk "A man, a plan, a canal: Panama"
+
+fn pal_check($s) {
+    $s eq join("", rev split(//, $s))
+}
+
+fn pal_check_lenient($s) {
+    my $clean = lc($s)
+    $clean =~ s/[^a-z0-9]//g
+    pal_check($clean)
+}
+
+if (len(@ARGV) >= 1) {
+    my $s = $ARGV[0]
+    printf "  strict : %s\n", pal_check($s)         ? "YES" : "NO"
+    printf "  lenient: %s\n", pal_check_lenient($s) ? "YES" : "NO"
+    exit 0
+}
+
+# Demo grid — paired (input, strict, lenient).
+my @cases = (
+    +{ s => "racecar",                          strict => 1, lenient => 1 },
+    +{ s => "hello",                            strict => 0, lenient => 0 },
+    +{ s => "",                                 strict => 1, lenient => 1 },
+    +{ s => "a",                                strict => 1, lenient => 1 },
+    +{ s => "abba",                             strict => 1, lenient => 1 },
+    +{ s => "abca",                             strict => 0, lenient => 0 },
+    +{ s => "Racecar",                          strict => 0, lenient => 1 }, # case
+    +{ s => "A man, a plan, a canal: Panama",   strict => 0, lenient => 1 }, # spaces+punct
+    +{ s => "Was it a car or a cat I saw?",     strict => 0, lenient => 1 },
+    +{ s => "No 'x' in Nixon",                  strict => 0, lenient => 1 },
+    +{ s => "Hello, World!",                    strict => 0, lenient => 0 },
+    +{ s => "12321",                            strict => 1, lenient => 1 },
+    +{ s => "12345",                            strict => 0, lenient => 0 },
+)
+
+p "── Palindrome demo ──"
+printf "  %-40s %-8s %-8s\n", "input", "strict", "lenient"
+my $fail = 0
+for my $c (@cases) {
+    my $st = pal_check($c->{s})         ? 1 : 0
+    my $le = pal_check_lenient($c->{s}) ? 1 : 0
+    my $ok = ($st == $c->{strict} && $le == $c->{lenient})
+    $fail++ unless $ok
+    printf "  %-40s %-8s %-8s %s\n",
+        "\"" . $c->{s} . "\"",
+        $st ? "YES" : "no",
+        $le ? "YES" : "no",
+        $ok ? "" : "FAIL"
+}
+die "$fail / " . len(@cases) . " palindrome cases failed" if $fail > 0
+p ""
+p "  ALL PASS (13 reference cases match expected table)"
