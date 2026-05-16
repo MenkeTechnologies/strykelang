@@ -1,0 +1,124 @@
+#!/usr/bin/env stryke
+
+# Dijkstra's algorithm — single-source shortest paths on a weighted
+# graph (non-negative edges). Complements `graph_bfs_no_interop.stk`
+# which solves the unweighted case. Parses clean under `--no-interop`.
+#
+# Adjacency list: `{ node => [[neighbour, weight], ...] }`.
+# Uses a naive linear-scan "extract min" — sufficient for small
+# graphs; a real binary heap would land it at O((V+E) log V).
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len`
+#   * Hash for distance + parent maps
+#   * Array-of-arrayref for edge list
+#   * Built-in `die` invariants — triangle inequality + known
+#     shortest-distance tables
+#
+# Run: stryke --no-interop examples/dijkstra_no_interop.stk
+
+fn dijkstra_path($graph_ref, $src) {
+    my %dist
+    my %parent
+    my %visited
+    # Seed distances. nil-as-undef stays away from numeric comparison.
+    for my $u (keys %$graph_ref) {
+        $dist{$u} = -1   # sentinel for "infinity"
+    }
+    $dist{$src} = 0
+
+    my $iter = 0
+    while (1) {
+        # Pick the unvisited node with smallest known distance.
+        my $u
+        my $best = -1
+        for my $k (keys %dist) {
+            next if exists $visited{$k}
+            next if $dist{$k} == -1   # still infinity
+            if ($best == -1 || $dist{$k} < $best) {
+                $best = $dist{$k}
+                $u = $k
+            }
+        }
+        last unless defined $u
+        $visited{$u} = 1
+
+        my $edges = $graph_ref->{$u}
+        next unless defined $edges
+        for my $e (@$edges) {
+            my ($v, $w) = ($e->[0], $e->[1])
+            my $alt = $dist{$u} + $w
+            if ($dist{$v} == -1 || $alt < $dist{$v}) {
+                $dist{$v}   = $alt
+                $parent{$v} = $u
+            }
+        }
+        $iter++
+        last if $iter > 10000   # safety
+    }
+    +{ dist => \%dist, parent => \%parent }
+}
+
+fn path_to($parent_ref, $src, $dst) {
+    my @path = ($dst)
+    my $cur = $dst
+    while ($cur ne $src) {
+        return [] unless exists $parent_ref->{$cur}
+        $cur = $parent_ref->{$cur}
+        unshift @path, $cur
+    }
+    \@path
+}
+
+# Sample graph — 6 nodes (A..F) with weighted directed edges.
+#
+#       A --2-- B --1-- C
+#       |       |       |
+#       4       3       5
+#       |       |       |
+#       D --7-- E --2-- F
+#
+# Shortest A -> F via B-C-F = 2+1+5 = 8, via D-E-F = 4+7+2 = 13,
+# via B-E-F = 2+3+2 = 7. So 7 wins.
+my $G = +{
+    A => [["B", 2], ["D", 4]],
+    B => [["C", 1], ["E", 3]],
+    C => [["F", 5]],
+    D => [["E", 7]],
+    E => [["F", 2]],
+    F => [],
+}
+
+my $result = dijkstra_path($G, "A")
+
+# Expected shortest distances from A.
+my %expected = (A => 0, B => 2, C => 3, D => 4, E => 5, F => 7)
+
+p "── Dijkstra from A ──"
+my $fail = 0
+for my $node (sort keys %expected) {
+    my $got = $result->{dist}{$node}
+    my $ok  = ($got == $expected{$node})
+    $fail++ unless $ok
+    my $path = path_to($result->{parent}, "A", $node)
+    printf "  A -> %s  dist=%d  expect=%d  path=[%s]  %s\n",
+        $node, $got, $expected{$node},
+        join(",", @$path),
+        $ok ? "" : "FAIL"
+}
+die "$fail / 6 dijkstra cases failed" if $fail > 0
+
+# Triangle inequality: d(A, F) <= d(A, B) + edge(B, F-via-shortest).
+# Already implicit in the table, but pin it explicitly: A->F is 7,
+# A->E is 5, edge(E, F)=2, so A->F should be <= 5 + 2.
+die "triangle inequality A-E-F" unless $result->{dist}{F} <= $result->{dist}{E} + 2
+
+# Unreachable: starting from F (which has no outgoing edges to most
+# nodes), only F itself has a finite distance.
+my $r2 = dijkstra_path($G, "F")
+die "F can reach itself in 0" unless $r2->{dist}{F} == 0
+die "F unreachable from itself to A"  unless $r2->{dist}{A} == -1
+die "F unreachable from itself to B"  unless $r2->{dist}{B} == -1
+
+p ""
+p "  ALL PASS (6 shortest-distance cases + triangle inequality + unreachable invariants)"
