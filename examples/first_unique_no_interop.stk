@@ -1,0 +1,76 @@
+#!/usr/bin/env stryke
+
+# First-unique-character — return the index of the first character in
+# a string that appears exactly once. Classic LeetCode #387. Returns
+# -1 when none. Parses clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * `|> first` pipe-chain, no for-loop (rules 3, 12)
+#   * implicit closure topic `_` (rule 12)
+#   * `#{…}` interpolation (rule 1a)
+#   * `[N]` indexing not `substr` (rule 6a)
+#   * paren-less calls where precedence allows (rule 8)
+#
+# Namespaced UDFs `FirstU::*`.
+#
+# Run: stryke --no-interop examples/first_unique_no_interop.stk
+#      stryke --no-interop examples/first_unique_no_interop.stk leetcode
+
+fn FirstU::find($s) {
+    my @c = split //, $s
+    my %seen
+    $seen{_}++ for @c
+    my $r = 0:len(@c) - 1 |> first { $seen{$c[_]} == 1 }
+    defined $r ? $r : -1
+}
+
+# Pipe-chain variant — grep+head instead of first+default.
+fn FirstU::pipe_find($s) {
+    my @c = split //, $s
+    my %seen
+    $seen{_}++ for @c
+    my @hits = 0:len(@c) - 1 |> grep { $seen{$c[_]} == 1 }
+    len(@hits) > 0 ? $hits[0] : -1
+}
+
+if (len(@ARGV) >= 1) {
+    p FirstU::find $ARGV[0]
+    exit 0
+}
+
+my @cases = (
+    +{ s => "leetcode",     idx =>  0 },
+    +{ s => "loveleetcode", idx =>  2 },
+    +{ s => "aabb",         idx => -1 },
+    +{ s => "",             idx => -1 },
+    +{ s => "a",            idx =>  0 },
+    +{ s => "aabbccd",      idx =>  6 },
+    +{ s => "abcabc",       idx => -1 },
+    +{ s => "stress",       idx =>  1 },  # s,t,r,e,s,s — 't' first unique at 1
+    +{ s => "z",            idx =>  0 },
+)
+
+p "── First unique character demo ──"
+my $fail = 0
+for my $c (@cases) {
+    my $got1 = FirstU::find      $c->{s}
+    my $got2 = FirstU::pipe_find $c->{s}
+    my $ok   = $got1 == $c->{idx} && $got2 == $c->{idx}
+    $fail++ unless $ok
+    p "  \"$c->{s}\" -> #{$got1} (pipe #{$got2})  expect #{$c->{idx}}  #{$ok ? \"\" : \"FAIL\"}"
+}
+die "$fail / #{len @cases} cases failed" if $fail > 0
+
+# Universal invariant: if a unique char exists, that char appears
+# exactly once. One-line pipe-chain count.
+for my $c (@cases) {
+    my $i = FirstU::find $c->{s}
+    next if $i == -1
+    my $s     = $c->{s}
+    my $ch    = $s[$i]
+    my $count = split(//, $s) |> grep { _ eq $ch } |> len
+    die "first-unique result not actually unique" unless $count == 1
+}
+
+p ""
+p "  ALL PASS (9 cases × 2 impls cross-check + uniqueness invariant)"
