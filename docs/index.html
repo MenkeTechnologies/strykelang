@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <meta name="description" content="stryke — the hottest language ever created. Server farms first. 100% TDP load testing, distributed agents, parallel Perl 5 interpreter in Rust. ~382k-line Rust slice (production + tests + tooling), 10,296 builtins (11,022 keys in %all), 346-opcode VM + Cranelift JIT.">
+  <meta name="description" content="stryke — the hottest language ever created. Server farms first. 100% TDP load testing, distributed agents, parallel Perl 5 interpreter in Rust. ~416k-line Rust slice (production + tests + tooling), 10,296 builtins (11,022 keys in %all), 346-opcode VM + Cranelift JIT, LSP server, DAP debugger, JetBrains plugin.">
   <title>stryke — Documentation</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -149,7 +149,7 @@
             <span class="sep">/</span>
             <a href="https://docs.rs/strykelang" target="_blank" rel="noopener noreferrer">docs.rs</a>
           </nav>
-          <p class="docs-build-line" id="strykeBuildLine">stryke v0.14.4 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 10,296 builtins (11,022 keys in %all)</p>
+          <p class="docs-build-line" id="strykeBuildLine">stryke v0.14.4 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 10,296 builtins (11,022 keys in %all) · LSP + DAP + JetBrains plugin</p>
         </div>
         <div class="tutorial-toolbar">
           <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -640,12 +640,12 @@ scp load_test node{1:100}:/tmp/</pre>
  │ SYSTEM  status: ONLINE // os: macos arch: aarch64 pid: 30386   │
  │ CORES   18    MEM  56.2 / 64.0 GiB available                   │
  ├────────────────────────────────────────────────────────────────┤
- │ %b  builtins   10267  %a  aliases    641    %all 10993         │
+ │ %b  builtins   10296  %a  aliases    641    %all 11022         │
  │ %k  keywords   85     %o  operators  70     %v   97            │
- │ %pc perl5 core 185    %e  stryke ext 10082  %d   4228          │
- │ %c  categories 306    %p  primaries  8790                      │
+ │ %pc perl5 core 185    %e  stryke ext 10111  %d   4255          │
+ │ %c  categories 307    %p  primaries  8805                      │
  └────────────────────────────────────────────────────────────────┘
-  >> PARALLEL PERL5 INTERPRETER // RUST-POWERED v0.14.2 &lt;&lt;
+  >> PARALLEL PERL5 INTERPRETER // RUST-POWERED v0.14.4 &lt;&lt;
 </pre>
 
         <h3 style="color:#39ff14;">Shell-Like Builtins (no PATH walk, no fork)</h3>
@@ -1426,6 +1426,10 @@ p $d-&gt;isa("Cat")                      <span class="comment"># ""  (false)</sp
 -n / -p / -i           // stdin line-mode + in-place edit
 -j N                   // parallel threads for multi-file execution
 --script               // force script lookup when name conflicts with builtin
+-d -- SCRIPT           // TTY debugger (perl -d style REPL on stdin/stderr)
+--dap                  // DAP server over stdio (Debug Adapter Protocol)
+--dap HOST:PORT        // DAP server over TCP (JetBrains plugin transport)
+--lsp                  // LSP server over stdio (semantic tokens, hover, ...)
 
 // Subcommands
 s build SCRIPT -o OUT  // AOT compile to standalone binary
@@ -1471,6 +1475,52 @@ s faf                       <span class="comment"># fire_and_forget alias (same 
 
 <span class="comment"># Force script when name conflicts</span>
 s --script basename         <span class="comment"># run ./basename script, not builtin</span></pre>
+      </section>
+
+      <section class="tutorial-section" id="editor-tooling" style="border: 2px solid #b967ff; background: linear-gradient(135deg, rgba(185,103,255,0.08) 0%, transparent 50%);">
+        <h2 style="color:#b967ff;">Editor tooling — LSP, DAP debugger, JetBrains plugin</h2>
+        <p>The same <code>stryke</code> binary that runs scripts also serves Language Server Protocol and Debug Adapter Protocol — no separate <code>stryke-lsp</code> / <code>stryke-dap</code> binaries to install. Editors point their LSP/DAP clients at <code>stryke --lsp</code> / <code>stryke --dap</code> and get hover docs, completion, semantic tokens, line breakpoints, step over/into/out, and recursive variable drill-down.</p>
+
+        <h3>LSP — <code>stryke --lsp</code></h3>
+        <ul>
+          <li><strong>Hover</strong> over any builtin → category + signature + description from <code>%stryke::descriptions</code> / <code>%stryke::categories</code> (4,255 documented names)</li>
+          <li><strong>Completion</strong> with full builtin set (every spelling in <code>%all</code> — 11,022 keys including 641 aliases)</li>
+          <li><strong>Semantic tokens</strong> — keywords, builtins, sigils, types, regex flags get distinct token categories so themes can paint them independently</li>
+          <li><strong>Signature help</strong> on function-call cursor</li>
+          <li><strong>Code actions</strong> — server-side fix suggestions for common diagnostics</li>
+          <li><strong>Go-to-definition</strong> for user subs + classes + structs + enums</li>
+        </ul>
+
+        <h3>DAP debugger — <code>stryke --dap</code></h3>
+        <p>Standard Debug Adapter Protocol over stdio or TCP. Same <code>Debugger</code> state machine the TTY REPL (<code>stryke -d</code>) uses — breakpoints, step modes, scope inspection, call-stack tracking all shared. Just two front-ends on one core.</p>
+        <ul>
+          <li><strong>Line breakpoints</strong> — gutter clicks fire on the exact source line; lexer-line drift fixed so class declarations don't poison subsequent BPs</li>
+          <li><strong>Function breakpoints</strong> — stop on entry to any named sub</li>
+          <li><strong>Step over / step into / step out</strong> — depth-tracking on every UDF entry/exit so step-over stays in the current frame instead of diving into call sites</li>
+          <li><strong>Pause / Continue / Run-to-Cursor</strong></li>
+          <li><strong>Recursive Variables panel</strong> — every hash, array, struct, enum variant, class instance, and sketch (<code>TDigestSketch</code>, <code>BloomFilter</code>, <code>HllSketch</code>, <code>CmsSketch</code>, <code>TopKSketch</code>) expands inline. Class fields show visibility markers (<code>+pub</code>, <code>#protected</code>, <code>-priv</code>) plus the <code>__class</code> / <code>__isa</code> chain</li>
+          <li><strong>Magic-block-param sort</strong> — user <code>my $foo</code> vars first, then topic family (<code>$_</code>, <code>$_0</code>, <code>$_1</code>, …), then <code>$a</code>/<code>$b</code>, then runtime builtins. Compiler-synthetic <code>__foreach_i__</code> etc. hidden</li>
+          <li><strong>Evaluate dialog</strong> with scalar prelude injection so <code>$a * $b</code> returns the right value from the paused frame</li>
+          <li><strong>Console output</strong> — <code>p</code> / <code>print</code> / <code>say</code> stream into the IDE Console in real-time (forced <code>$| = 1</code> autoflush in DAP mode)</li>
+        </ul>
+
+        <h3>JetBrains plugin — <code>editors/intellij/</code></h3>
+        <p>First-class JVM plugin for the entire JetBrains paid lineup: <strong>RustRover, IDEA Ultimate, GoLand, PyCharm Pro, WebStorm, RubyMine, PhpStorm, CLion, Rider, DataGrip, Aqua</strong>. Built on the IntelliJ Platform Gradle Plugin 2.16.0, Kotlin 2.0.21, JDK 17. Community editions are not supported — LSP API is paid-only on the JetBrains side.</p>
+        <ul>
+          <li><strong><code>.stk</code> file association</strong> with 44-slot color scheme — keywords, sigils, builtins, types, regex bodies/flags, heredocs, sub names, class fields, all paint independently</li>
+          <li><strong>LSP client</strong> consuming <code>stryke --lsp</code> — semantic tokens, completion, hover, signature help, code actions</li>
+          <li><strong>DAP debugger</strong> consuming <code>stryke --dap HOST:PORT</code> (TCP transport keeps <code>OSProcessHandler</code> stdout/stderr free for the program's own <code>p</code>/<code>print</code> output)</li>
+          <li><strong>Reflection tool window</strong> — 9 tabs on the live <code>%stryke::*</code> hashes (≈11k builtin names, 641 aliases, 85 keywords, 307 categories, 4,255 descriptions, 8,805 primaries, 10,111 extensions, 185 perl_compats). Left single-click opens the docs popup; right-click inserts at cursor</li>
+          <li><strong>Run configurations + gutter run icons</strong> — execute, debug, or profile any <code>.stk</code> file with one click</li>
+        </ul>
+
+        <h3>Other editors</h3>
+        <ul>
+          <li><strong>Neovim</strong> — <code>editors/stryke.lua</code> + ALE / vim-lsp / coc.nvim integration via <code>stryke --lsp</code></li>
+          <li><strong>Vim</strong> — <code>editors/stryke.vim</code></li>
+          <li><strong>Helix</strong> — <code>editors/helix-languages.toml</code></li>
+          <li><strong>VS Code</strong> — coc + <code>editors/vscode-settings.json</code> bridge</li>
+        </ul>
       </section>
 
       <section class="tutorial-section" id="bytecode-cache">

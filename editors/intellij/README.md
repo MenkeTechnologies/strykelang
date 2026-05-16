@@ -20,7 +20,9 @@ parallel scripting language (Rust bytecode VM + Cranelift JIT + Rayon).
 - **44 color slots** under *Settings → Editor → Color Scheme → Stryke* —
   every token category is independently themeable with stable
   `STRYKE_*` `TextAttributesKey` names.
-- **`#`-line comments** (Ctrl/Cmd-`/`).
+- **Comments**:
+  - `#` line comments — Ctrl/Cmd-`/`
+  - `=pod ... =cut` block comments — Ctrl/Cmd-Opt-`/`
 
 ### LSP
 - LSP client wired to `st --lsp` over stdio. Server capabilities:
@@ -34,7 +36,24 @@ parallel scripting language (Rust bytecode VM + Cranelift JIT + Rayon).
   - `documentSymbol`
   - `semanticTokens` (full document)
   - `signatureHelp` (parameter hints with active-arg tracking)
-  - `codeAction` (line-local quickfixes)
+  - `codeAction` — line-local quickfixes (*Wrap line in `p`*,
+    *Comment / Uncomment line*) plus refactorings:
+    - *Extract to variable* — `my $name = …` inserted above the line,
+      selection replaced with `$name` (single-line selection)
+    - *Extract to constant* — same but `my frozen $NAME = …` with an
+      uppercase placeholder (single-line selection)
+    - *Extract to function* — wraps the selection in
+      `fn extracted_fn { … }` and replaces the span with a call
+      (multi-line selection; v1 does no free-variable analysis)
+    - Surfaced under Alt-Enter and Refactor → Refactor This (Ctrl-T)
+  - `foldingRange` — fold every `{ … }` block (`fn`, `class`, `struct`,
+    `enum`, `if`, `while`, `for`, hash literals, ...), `=pod` ... `=cut`
+    POD blocks, and 3+ consecutive `#`-line comment runs.
+    Cmd-Shift-Minus collapses all, Cmd-Shift-Plus expands all.
+  - `formatting` — Cmd/Ctrl-Opt-`L` (or `Code → Reformat File…`) pipes
+    the document through stryke's built-in formatter (`fmt::format_program`):
+    4-space indent, normalized spacing around operators, single-line
+    rewrites for short blocks.
   - `publishDiagnostics` (parse + compile errors with line/col)
 
 ### Run / Debug

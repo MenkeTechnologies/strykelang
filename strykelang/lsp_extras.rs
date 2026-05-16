@@ -20,7 +20,8 @@
 //! is `O(text length)` with a single pass.
 
 use lsp_types::{
-    CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, Position, Range,
+    CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams,
+    DocumentFormattingParams, FoldingRange, FoldingRangeKind, FoldingRangeParams, Position, Range,
     SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens,
     SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
     SemanticTokensServerCapabilities, SignatureHelp, SignatureHelpParams, SignatureInformation,
@@ -563,10 +564,14 @@ fn position_to_offset(text: &str, pos: &Position) -> Option<usize> {
 
 /// Compute code actions for a range.
 ///
-/// v1: a single hand-curated quickfix — *Wrap selection in `p ` (print)*. The
-/// goal is to advertise the capability with at least one genuinely useful
-/// transformation; richer diagnostic-tied fixes follow in v2 once the lint
-/// pipeline emits structured codes.
+/// The mix of actions is range-aware:
+/// * Single line, empty selection: line-local quickfixes (wrap in `p`,
+///   toggle comment).
+/// * Single line, non-empty selection: extract-variable and extract-constant.
+/// * Multi-line selection: extract-function (wraps the selection in a
+///   `fn name { ... }` declaration and replaces the original span with a
+///   call). v1 doesn't do free-variable analysis — the user manually
+///   parameterizes after extraction.
 pub fn compute_code_actions(
     docs: &HashMap<String, String>,
     params: &CodeActionParams,
@@ -577,6 +582,8 @@ pub fn compute_code_actions(
     };
     let mut out: Vec<CodeActionOrCommand> = Vec::new();
     let range = params.range;
+
+    // ── Line-local quickfixes (always offered for the current line) ──
     if let Some(line_text) = nth_line(text, range.start.line as usize) {
         let trimmed = line_text.trim_start();
         if !trimmed.is_empty()
@@ -587,10 +594,242 @@ pub fn compute_code_actions(
         {
             out.push(wrap_in_p_action(uri, range.start.line, line_text));
         }
-        // Toggle line comment.
         out.push(toggle_comment_action(uri, range.start.line, line_text));
     }
+
+    // ── Refactorings (need a real selection) ──
+    let same_line = range.start.line == range.end.line;
+    let nonempty_range = range.start.line != range.end.line
+        || range.start.character != range.end.character;
+    if nonempty_range {
+        if same_line {
+            if let Some(line_text) = nth_line(text, range.start.line as usize) {
+                if let Some(selection) =
+                    extract_selection_on_line(line_text, range.start.character, range.end.character)
+                {
+                    if !selection.trim().is_empty() {
+                        out.push(extract_variable_action(uri, line_text, range, selection));
+                        out.push(extract_constant_action(uri, line_text, range, selection));
+                    }
+                }
+            }
+        } else {
+            // Multi-line selection → extract function.
+            if let Some(block) = extract_selection_multiline(text, range) {
+                if !block.text.trim().is_empty() {
+                    out.push(extract_function_action(uri, range, &block));
+                }
+            }
+        }
+    }
+
     out
+}
+
+/// Char-indexed UTF-16 slice of a single line. Used by the extract-variable
+/// and extract-constant builders so the replaced span aligns with what the
+/// client sees in the editor (LSP positions are UTF-16 code units).
+fn extract_selection_on_line<'a>(line_text: &'a str, start: u32, end: u32) -> Option<&'a str> {
+    let utf16: Vec<u16> = line_text.encode_utf16().collect();
+    let s = start.min(utf16.len() as u32) as usize;
+    let e = end.min(utf16.len() as u32) as usize;
+    if e <= s {
+        return None;
+    }
+    // Convert UTF-16 offsets back to UTF-8 byte offsets.
+    let (mut u16_seen, mut s_byte, mut e_byte) = (0usize, None::<usize>, None::<usize>);
+    for (i, ch) in line_text.char_indices() {
+        if u16_seen == s {
+            s_byte = Some(i);
+        }
+        u16_seen += ch.len_utf16();
+        if u16_seen == e {
+            e_byte = Some(i + ch.len_utf8());
+            break;
+        }
+    }
+    let s_byte = s_byte?;
+    let e_byte = e_byte.unwrap_or(line_text.len());
+    Some(&line_text[s_byte..e_byte])
+}
+
+/// Span of selected text across multiple lines, plus its inferred indentation
+/// (the leading whitespace of the first selected line). The extract-function
+/// builder uses the indent to keep the inserted call at the same column.
+struct MultilineBlock {
+    text: String,
+    indent: String,
+    /// Line where the new `fn` declaration should be inserted (one line
+    /// above the selection's first line).
+    insertion_line: u32,
+}
+
+fn extract_selection_multiline(text: &str, range: Range) -> Option<MultilineBlock> {
+    let lines: Vec<&str> = text.lines().collect();
+    let start_line = range.start.line as usize;
+    let end_line = range.end.line as usize;
+    if start_line >= lines.len() {
+        return None;
+    }
+    let end_line = end_line.min(lines.len() - 1);
+    if end_line < start_line {
+        return None;
+    }
+    let first = lines.get(start_line)?;
+    let indent: String = first.chars().take_while(|c| c.is_whitespace()).collect();
+    let mut buf = String::new();
+    for (i, l) in lines[start_line..=end_line].iter().enumerate() {
+        if i > 0 {
+            buf.push('\n');
+        }
+        buf.push_str(l);
+    }
+    Some(MultilineBlock {
+        text: buf,
+        indent,
+        insertion_line: range.start.line,
+    })
+}
+
+fn extract_variable_action(
+    uri: &Uri,
+    line_text: &str,
+    range: Range,
+    selection: &str,
+) -> CodeActionOrCommand {
+    extract_to_local(
+        uri,
+        line_text,
+        range,
+        selection,
+        "extracted",
+        "Extract to variable (`my $name = …`)",
+        false,
+    )
+}
+
+fn extract_constant_action(
+    uri: &Uri,
+    line_text: &str,
+    range: Range,
+    selection: &str,
+) -> CodeActionOrCommand {
+    extract_to_local(
+        uri,
+        line_text,
+        range,
+        selection,
+        "EXTRACTED",
+        "Extract to constant (`my frozen $NAME = …`)",
+        true,
+    )
+}
+
+/// Shared body of extract-variable and extract-constant. Inserts a
+/// declaration line above the selection (preserving the line's indent) and
+/// replaces the selection with `$name`.
+fn extract_to_local(
+    uri: &Uri,
+    line_text: &str,
+    range: Range,
+    selection: &str,
+    placeholder: &str,
+    title: &str,
+    frozen: bool,
+) -> CodeActionOrCommand {
+    let leading_ws: String = line_text.chars().take_while(|c| c.is_whitespace()).collect();
+    let decl = if frozen {
+        format!("{leading_ws}my frozen ${placeholder} = {selection}\n")
+    } else {
+        format!("{leading_ws}my ${placeholder} = {selection}\n")
+    };
+    let insert = TextEdit {
+        range: Range {
+            start: Position { line: range.start.line, character: 0 },
+            end: Position { line: range.start.line, character: 0 },
+        },
+        new_text: decl,
+    };
+    let replace = TextEdit {
+        range,
+        new_text: format!("${placeholder}"),
+    };
+    let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
+    changes.insert(uri.clone(), vec![insert, replace]);
+    CodeActionOrCommand::CodeAction(CodeAction {
+        title: title.to_string(),
+        kind: Some(CodeActionKind::REFACTOR_EXTRACT),
+        diagnostics: None,
+        edit: Some(WorkspaceEdit {
+            changes: Some(changes),
+            document_changes: None,
+            change_annotations: None,
+        }),
+        command: None,
+        is_preferred: None,
+        disabled: None,
+        data: None,
+    })
+}
+
+fn extract_function_action(
+    uri: &Uri,
+    range: Range,
+    block: &MultilineBlock,
+) -> CodeActionOrCommand {
+    // Re-indent the selected body so the new fn keeps consistent leading
+    // whitespace inside its braces (one extra `    ` past the call site).
+    let body_indent = format!("{}    ", block.indent);
+    let body: String = block
+        .text
+        .lines()
+        .map(|l| {
+            // Strip the original indent if present; otherwise leave the
+            // line as-is (preserves blank lines without polluting them).
+            let stripped = l.strip_prefix(&block.indent).unwrap_or(l);
+            if stripped.is_empty() {
+                String::new()
+            } else {
+                format!("{body_indent}{stripped}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let fn_text = format!(
+        "{indent}fn extracted_fn {{\n{body}\n{indent}}}\n\n",
+        indent = block.indent,
+        body = body
+    );
+    let insert_fn = TextEdit {
+        range: Range {
+            start: Position { line: block.insertion_line, character: 0 },
+            end: Position { line: block.insertion_line, character: 0 },
+        },
+        new_text: fn_text,
+    };
+    // Replace the selected range with `extracted_fn()`. Use the full
+    // selection range — LSP applies edits in reverse line order so the
+    // insertion above stays at the right place.
+    let replace = TextEdit {
+        range,
+        new_text: format!("{}extracted_fn()", block.indent),
+    };
+    let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
+    changes.insert(uri.clone(), vec![insert_fn, replace]);
+    CodeActionOrCommand::CodeAction(CodeAction {
+        title: "Extract to function (`fn extracted_fn { … }`)".to_string(),
+        kind: Some(CodeActionKind::REFACTOR_EXTRACT),
+        diagnostics: None,
+        edit: Some(WorkspaceEdit {
+            changes: Some(changes),
+            document_changes: None,
+            change_annotations: None,
+        }),
+        command: None,
+        is_preferred: None,
+        disabled: None,
+        data: None,
+    })
 }
 
 fn wrap_in_p_action(uri: &Uri, line: u32, line_text: &str) -> CodeActionOrCommand {
@@ -665,4 +904,272 @@ fn toggle_comment_action(uri: &Uri, line: u32, line_text: &str) -> CodeActionOrC
 
 fn nth_line(text: &str, n: usize) -> Option<&str> {
     text.lines().nth(n)
+}
+
+// ---------------------------------------------------------------------------
+// Folding ranges
+// ---------------------------------------------------------------------------
+
+/// Compute foldable line ranges for the document.
+///
+/// Sources of foldability:
+/// * **Brace blocks** — every matching `{` ... `}` pair on different lines.
+///   Covers `fn`, `class`, `struct`, `enum`, `if`, `while`, `for`, hash
+///   literals, and any `{...}` expression.
+/// * **POD blocks** — `=pod ... =cut` and other `=head1` etc. POD openers
+///   up to the next `=cut`.
+/// * **Comment runs** — three or more consecutive `#`-prefixed lines.
+///
+/// Position-string scanning ignores braces inside `# ... \n` comments, `"..."`,
+/// `'...'`, and POD blocks so block-delimiter braces in literals don't
+/// produce ghost folds. The pass is `O(N)` over the source.
+pub fn compute_folding_ranges(
+    docs: &HashMap<String, String>,
+    params: &FoldingRangeParams,
+) -> Vec<FoldingRange> {
+    let uri = &params.text_document.uri;
+    let Some(text) = docs.get(uri.as_str()) else {
+        return Vec::new();
+    };
+
+    let mut ranges: Vec<FoldingRange> = Vec::new();
+    let mut brace_stack: Vec<u32> = Vec::new();
+    let mut in_str: Option<char> = None; // Some(quote_char) while inside string
+    let mut in_pod: Option<u32> = None; // Some(start_line) while inside =pod block
+    let mut comment_run_start: Option<u32> = None;
+    let mut line: u32 = 0;
+    let mut col_is_zero = true;
+
+    let bytes = text.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+
+        // POD block start: `=word` at column 0. Lasts until `=cut` at column 0.
+        if col_is_zero && in_pod.is_none() && in_str.is_none() && b == b'=' {
+            // `=ident...` is POD; `==` and `=~` and `=>` are operators
+            let next = bytes.get(i + 1).copied();
+            if matches!(next, Some(c) if c.is_ascii_alphabetic()) {
+                in_pod = Some(line);
+                // close any pending comment run
+                if let Some(start) = comment_run_start.take() {
+                    if line.saturating_sub(start) >= 2 {
+                        ranges.push(make_fold(start, line - 1, Some(FoldingRangeKind::Comment)));
+                    }
+                }
+            }
+        }
+        if col_is_zero && in_pod.is_some() && b == b'=' {
+            // Check for `=cut`
+            if bytes.get(i..i + 4) == Some(b"=cut".as_slice()) {
+                let start = in_pod.take().unwrap();
+                // Advance to end of `=cut` line
+                let mut j = i + 4;
+                while j < bytes.len() && bytes[j] != b'\n' {
+                    j += 1;
+                }
+                let end_line = line;
+                if end_line > start {
+                    ranges.push(make_fold(start, end_line, Some(FoldingRangeKind::Comment)));
+                }
+                i = j;
+                if i < bytes.len() && bytes[i] == b'\n' {
+                    line += 1;
+                    col_is_zero = true;
+                    i += 1;
+                }
+                continue;
+            }
+        }
+
+        if in_pod.is_some() {
+            if b == b'\n' {
+                line += 1;
+                col_is_zero = true;
+            } else {
+                col_is_zero = false;
+            }
+            i += 1;
+            continue;
+        }
+
+        // Track string state — skip braces / comments inside strings.
+        if let Some(q) = in_str {
+            match b {
+                b'\\' => {
+                    i += 2;
+                    continue;
+                }
+                c if c == q as u8 => {
+                    in_str = None;
+                }
+                b'\n' => {
+                    line += 1;
+                    col_is_zero = true;
+                    i += 1;
+                    continue;
+                }
+                _ => {}
+            }
+            col_is_zero = false;
+            i += 1;
+            continue;
+        }
+
+        // Line comments — `# ... \n`. Track consecutive runs for fold.
+        if b == b'#' {
+            // Same line as a non-comment token? Don't start a run.
+            if col_is_zero || all_whitespace_before(bytes, i, line, &line_starts_cache(text)) {
+                if comment_run_start.is_none() {
+                    comment_run_start = Some(line);
+                }
+            }
+            while i < bytes.len() && bytes[i] != b'\n' {
+                i += 1;
+            }
+            // Don't consume the newline — handled below.
+            col_is_zero = false;
+            continue;
+        }
+
+        match b {
+            b'\n' => {
+                line += 1;
+                col_is_zero = true;
+                // If this is a fully blank line, keep the comment run alive
+                // only when the NEXT line also starts with `#`. Simpler: end
+                // the run on any non-comment line (handled when we see a
+                // non-`#` token at column 0 below).
+                i += 1;
+                continue;
+            }
+            b' ' | b'\t' => {
+                i += 1;
+                continue;
+            }
+            b'"' | b'\'' => {
+                in_str = Some(b as char);
+                // Comment run ends at any code.
+                if let Some(start) = comment_run_start.take() {
+                    if line.saturating_sub(start) >= 2 {
+                        ranges.push(make_fold(start, line.saturating_sub(1), Some(FoldingRangeKind::Comment)));
+                    }
+                }
+                col_is_zero = false;
+                i += 1;
+                continue;
+            }
+            b'{' => {
+                if let Some(start) = comment_run_start.take() {
+                    if line.saturating_sub(start) >= 2 {
+                        ranges.push(make_fold(start, line.saturating_sub(1), Some(FoldingRangeKind::Comment)));
+                    }
+                }
+                brace_stack.push(line);
+                col_is_zero = false;
+                i += 1;
+                continue;
+            }
+            b'}' => {
+                if let Some(open_line) = brace_stack.pop() {
+                    // Only fold when the close is on a later line.
+                    if line > open_line {
+                        ranges.push(make_fold(open_line, line, None));
+                    }
+                }
+                col_is_zero = false;
+                i += 1;
+                continue;
+            }
+            _ => {
+                if let Some(start) = comment_run_start.take() {
+                    if line.saturating_sub(start) >= 2 {
+                        ranges.push(make_fold(start, line.saturating_sub(1), Some(FoldingRangeKind::Comment)));
+                    }
+                }
+                col_is_zero = false;
+                i += 1;
+                continue;
+            }
+        }
+    }
+    if let Some(start) = comment_run_start {
+        if line.saturating_sub(start) >= 2 {
+            ranges.push(make_fold(start, line, Some(FoldingRangeKind::Comment)));
+        }
+    }
+
+    ranges
+}
+
+fn make_fold(start_line: u32, end_line: u32, kind: Option<FoldingRangeKind>) -> FoldingRange {
+    FoldingRange {
+        start_line,
+        start_character: None,
+        end_line,
+        end_character: None,
+        kind,
+        collapsed_text: None,
+    }
+}
+
+fn line_starts_cache(text: &str) -> Vec<usize> {
+    let mut v = vec![0];
+    for (i, b) in text.bytes().enumerate() {
+        if b == b'\n' {
+            v.push(i + 1);
+        }
+    }
+    v
+}
+
+fn all_whitespace_before(bytes: &[u8], pos: usize, line: u32, starts: &[usize]) -> bool {
+    let start = starts.get(line as usize).copied().unwrap_or(0);
+    bytes[start..pos].iter().all(|c| matches!(*c, b' ' | b'\t'))
+}
+
+// ---------------------------------------------------------------------------
+// Formatting
+// ---------------------------------------------------------------------------
+
+/// Reformat the whole document by piping it through `s fmt --stdin`. Returns
+/// a single full-file `TextEdit` on success, an empty list on parse / IO
+/// failure (so the user sees their original text instead of a partial
+/// rewrite). Honours `params.options.insert_spaces` / `tab_size` only when
+/// `s fmt` accepts them on its CLI; today's stryke formatter is opinionated
+/// (4-space indent, like `gofmt`) so client preferences are advisory.
+pub fn compute_formatting(
+    docs: &HashMap<String, String>,
+    params: &DocumentFormattingParams,
+) -> Vec<TextEdit> {
+    let uri = &params.text_document.uri;
+    let Some(text) = docs.get(uri.as_str()) else {
+        return Vec::new();
+    };
+
+    let program = match crate::parse_with_file(text, "<lsp>") {
+        Ok(p) => p,
+        Err(_) => return Vec::new(),
+    };
+    let formatted = crate::fmt::format_program(&program);
+    if formatted == *text {
+        return Vec::new();
+    }
+
+    // Full-document replacement edit.
+    let line_count = text.lines().count() as u32;
+    let last_char = text
+        .lines()
+        .last()
+        .map(|l| l.encode_utf16().count() as u32)
+        .unwrap_or(0);
+    let end_line = if text.ends_with('\n') { line_count } else { line_count.saturating_sub(1) };
+    let end_char = if text.ends_with('\n') { 0 } else { last_char };
+    vec![TextEdit {
+        range: Range {
+            start: Position { line: 0, character: 0 },
+            end: Position { line: end_line, character: end_char },
+        },
+        new_text: formatted,
+    }]
 }

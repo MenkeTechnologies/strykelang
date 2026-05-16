@@ -1257,6 +1257,10 @@ fn main() {
         process::exit(run_fmt_subcommand(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "minify" {
+        process::exit(run_minify_subcommand(&args[2..]));
+    }
+
     // `stryke bench [FILE|DIR]` — discover and run benchmark files.
     if args.len() >= 2 && args[1] == "bench" {
         process::exit(run_bench_subcommand(&args[0], &args[2..]));
@@ -4740,6 +4744,98 @@ fn run_fmt_subcommand(args: &[String]) -> i32 {
             }
         } else {
             print!("{}", formatted);
+        }
+    }
+    if errors > 0 {
+        1
+    } else {
+        0
+    }
+}
+
+/// `stryke minify FILE...` — strip comments / POD / extraneous whitespace,
+/// collapse statements onto a single line with `;` separators. Result is
+/// still valid stryke source that parses to the same AST as the input.
+fn run_minify_subcommand(args: &[String]) -> i32 {
+    let mut files: Vec<String> = Vec::new();
+    let mut in_place = false;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "-i" | "--in-place" => in_place = true,
+            "-h" | "--help" => {
+                println!("usage: stryke minify [-i] FILE...");
+                println!();
+                println!("Minify stryke source: strip comments / POD / blank lines, collapse");
+                println!("statements onto a single line with `;` separators. Output parses");
+                println!("identically to the input.");
+                println!();
+                println!("Options:");
+                println!("  -i, --in-place   Rewrite files in place (default: print to stdout)");
+                println!();
+                println!("Examples:");
+                println!("  stryke minify app.stk              # print minified source to stdout");
+                println!("  stryke minify -i lib/*.stk          # rewrite files in place");
+                println!("  stryke minify -i .                  # minify all .stk files recursively");
+                return 0;
+            }
+            s if s.starts_with('-') => {
+                eprintln!("stryke minify: unknown option: {}", s);
+                eprintln!("usage: stryke minify [-i] FILE...");
+                return 2;
+            }
+            s => files.push(s.to_string()),
+        }
+        i += 1;
+    }
+    if files.is_empty() {
+        eprintln!("stryke minify: no input files");
+        eprintln!("usage: stryke minify [-i] FILE...");
+        return 2;
+    }
+    let mut expanded: Vec<String> = Vec::new();
+    for f in &files {
+        let p = std::path::Path::new(f);
+        if p.is_dir() {
+            collect_stryke_files(p, &mut expanded);
+        } else {
+            expanded.push(f.clone());
+        }
+    }
+    if expanded.is_empty() {
+        eprintln!("stryke minify: no .stk/.pl/.pm files found");
+        return 1;
+    }
+    let mut errors = 0;
+    for f in &expanded {
+        let code = match std::fs::read_to_string(f) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("stryke minify: {}: {}", f, e);
+                errors += 1;
+                continue;
+            }
+        };
+        let minified = match stryke::minify::minify_source(&code) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("stryke minify: {}: {}", f, e);
+                errors += 1;
+                continue;
+            }
+        };
+        if in_place {
+            if minified == code {
+                continue;
+            }
+            if let Err(e) = std::fs::write(f, &minified) {
+                eprintln!("stryke minify: {}: {}", f, e);
+                errors += 1;
+            } else {
+                eprintln!("  minified {} ({} → {} bytes)", f, code.len(), minified.len());
+            }
+        } else {
+            println!("{}", minified);
         }
     }
     if errors > 0 {
