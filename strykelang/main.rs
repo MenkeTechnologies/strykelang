@@ -443,6 +443,9 @@ fn print_cyberpunk_help() {
     );
     println!("  fmt [-i] FILE...       {G}//{N} Format source files (stryke fmt -i .)");
     println!(
+        "  minify [-i] FILE...    {G}//{N} Strip comments / POD / blank lines, collapse to one line w/ `;` (stryke minify app.stk)"
+    );
+    println!(
         "  bench [FILE|DIR]       {G}//{N} Run benchmarks from bench/ or benches/ (stryke bench)"
     );
     println!(
