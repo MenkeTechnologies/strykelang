@@ -1,0 +1,208 @@
+#!/usr/bin/env stryke
+
+# Simulated port-scanner: scans a set of host:port pairs against a
+# synthetic responder table, captures latency, banners, version
+# fingerprints. NO real network IO — purely a simulation that
+# illustrates the scan/analyse pipeline.
+#
+# Demonstrates:
+#   * Hash-of-arrays for host->port-table.
+#   * pmap parallel scanning.
+#   * Bloom filter to short-circuit "well-known closed" ports.
+#   * CMS for popular services across the scan corpus.
+#   * t-digest for response latency.
+#   * TopK SpaceSaving for most-banner-grabbed banners.
+#   * HLL distinct hosts reachable.
+
+# ── synthetic "internet" — host => { port => banner } ──────────────
+
+my %hosts = (
+    "alpha.example"   => { 22 => "OpenSSH_9.6", 80 => "nginx/1.25.3", 443 => "nginx/1.25.3" },
+    "beta.example"    => { 22 => "OpenSSH_8.4", 80 => "Apache/2.4.57", 443 => "Apache/2.4.57", 3306 => "MySQL-8.0.36" },
+    "gamma.example"   => { 80 => "lighttpd/1.4.71", 443 => "lighttpd/1.4.71", 5432 => "PostgreSQL-16.2" },
+    "delta.example"   => { 22 => "OpenSSH_9.6", 6379 => "Redis-7.2", 9092 => "Kafka-3.6" },
+    "epsilon.example" => { 22 => "OpenSSH_9.0", 80 => "caddy/2.7.6", 443 => "caddy/2.7.6" },
+    "zeta.example"    => { 22 => "OpenSSH_8.9", 80 => "nginx/1.24.0", 5432 => "PostgreSQL-15.6" },
+    "eta.example"     => { },   # dead host
+    "theta.example"   => { 22 => "OpenSSH_9.6", 1080 => "SOCKS5", 8080 => "haproxy-2.9" },
+);
+
+# ── ports of interest ─────────────────────────────────────────────
+
+my @port_set = (21, 22, 25, 53, 80, 110, 143, 443, 465, 587, 993, 995,
+                1080, 3306, 5432, 6379, 8080, 9092, 11211);
+
+# ── sketches ──────────────────────────────────────────────────────
+
+my $td_lat   = t_digest(200);
+my $cms_svc  = cms(8, 512);
+my $tk_bnr   = topk(16);
+my $hll_host = hll(12);
+my $bf_closed = bloom(128, 0.01);
+
+# Seed bloom with "well-known closed" ports for our network.
+my @well_known_closed = (135, 137, 139, 445);
+for my $p (@well_known_closed) {
+    bloom_add($bf_closed, "p:$p");
+}
+
+# ── scan a single host:port pair ───────────────────────────────────
+
+fn Demo::PS::probe($host, $port) {
+    # Pretend a real syscall happens here; we just look it up.
+    my $t0 = now_ns();
+
+    my $latency_us;
+    my $status;
+    my $banner;
+
+    if (bloom_contains($bf_closed, "p:$port")) {
+        $latency_us = int(rand(500)) + 100;
+        $status = "filtered";
+        $banner = "";
+    } elsif (exists $hosts{$host}) {
+        my $ports = $hosts{$host};
+        if (exists $ports->{$port}) {
+            $latency_us = int(rand(3000)) + 200;
+            $status = "open";
+            $banner = $ports->{$port};
+        } else {
+            $latency_us = int(rand(800)) + 100;
+            $status = "closed";
+            $banner = "";
+        }
+    } else {
+        $latency_us = int(rand(15000)) + 5000;
+        $status = "timeout";
+        $banner = "";
+    }
+
+    td_add($td_lat, $latency_us);
+
+    {
+        host    => $host,
+        port    => $port,
+        latency => $latency_us,
+        status  => $status,
+        banner  => $banner,
+    }
+}
+
+# ── generate scan plan ────────────────────────────────────────────
+
+my @plan;
+for my $h (sort keys %hosts) {
+    for my $p (@port_set) {
+        push @plan, [$h, $p];
+    }
+}
+# Add a few unreachable hosts to demonstrate "timeout" path.
+for my $h ("ghost.example", "void.example") {
+    for my $p (@port_set) {
+        push @plan, [$h, $p];
+    }
+}
+# Add the well-known-closed ports to show the bloom-filter shortcut.
+for my $h (sort keys %hosts) {
+    for my $p (@well_known_closed) {
+        push @plan, [$h, $p];
+    }
+}
+
+print "port scanner sim — ", len(@plan), " (host,port) pairs across ",
+      len(keys %hosts), " hosts\n";
+print "─" x 60, "\n";
+
+# ── parallel scan ─────────────────────────────────────────────────
+
+my $t_scan = now_ns();
+my @results = pmap {
+    my $pair = $_;
+    Demo::PS::probe($pair->[0], $pair->[1])
+} @plan;
+my $elapsed_us = (now_ns() - $t_scan) / 1000.0;
+
+printf("scan complete: %d probes in %.0f us total\n",
+       len(@results), $elapsed_us);
+
+# ── post-process ──────────────────────────────────────────────────
+
+my $n_open     = 0;
+my $n_closed   = 0;
+my $n_filtered = 0;
+my $n_timeout  = 0;
+
+for my $r (@results) {
+    if ($r->{status} eq "open") {
+        $n_open++;
+        cms_add($cms_svc, $r->{banner}, 1);
+        topk_add($tk_bnr, $r->{banner});
+        hll_add($hll_host, $r->{host});
+    } elsif ($r->{status} eq "closed") {
+        $n_closed++;
+    } elsif ($r->{status} eq "filtered") {
+        $n_filtered++;
+    } else {
+        $n_timeout++;
+    }
+}
+
+printf("\nstatus breakdown:\n");
+printf("  open     = %4d\n", $n_open);
+printf("  closed   = %4d\n", $n_closed);
+printf("  filtered = %4d (well-known-closed via bloom)\n", $n_filtered);
+printf("  timeout  = %4d (host unreachable)\n", $n_timeout);
+
+# ── per-host open-port report ─────────────────────────────────────
+
+print "\nopen-port report:\n";
+my %by_host;
+for my $r (@results) {
+    next unless $r->{status} eq "open";
+    $by_host{$r->{host}} = [] unless exists $by_host{$r->{host}};
+    push @{$by_host{$r->{host}}}, $r;
+}
+
+for my $h (sort keys %by_host) {
+    my @sorted_ports = sort { $_0->{port} <=> $_1->{port} } @{$by_host{$h}};
+    printf("  %-18s\n", $h);
+    for my $r (@sorted_ports) {
+        printf("      %5d  %s  (%d us)\n",
+               $r->{port}, $r->{banner}, $r->{latency});
+    }
+}
+
+if ($n_timeout > 0) {
+    print "\nunreachable hosts:\n";
+    my %seen_timeout;
+    for my $r (@results) {
+        $seen_timeout{$r->{host}} = 1 if $r->{status} eq "timeout";
+    }
+    for my $h (sort keys %seen_timeout) {
+        printf("  %-18s\n", $h);
+    }
+}
+
+# ── top banners ──────────────────────────────────────────────────
+
+print "\nmost-common banners (TopK):\n";
+my @bnrs = topk_top($tk_bnr, 6);
+for my $p (@bnrs) {
+    printf("  %-22s count=%d\n", $p->[0], $p->[1]);
+}
+
+# ── distinct reachable hosts ──────────────────────────────────────
+
+my $hll_n = hll_count($hll_host);
+my $exact_open_hosts = len(keys %by_host);
+printf("\ndistinct reachable hosts: HLL=%.1f vs exact=%d\n",
+       $hll_n, $exact_open_hosts);
+
+# ── latency stats ─────────────────────────────────────────────────
+
+print "\nprobe latency:\n";
+printf("  p50 = %5.0f us\n", td_quantile($td_lat, 0.50));
+printf("  p95 = %5.0f us\n", td_quantile($td_lat, 0.95));
+printf("  p99 = %5.0f us\n", td_quantile($td_lat, 0.99));
+
+print "\nport scanner sim done\n";
