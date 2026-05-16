@@ -1,0 +1,184 @@
+#!/usr/bin/env stryke
+
+# Recipe meal-planner demo. Given a set of recipes with ingredients,
+# pick N recipes for the week, aggregate shopping list, roll up
+# nutrients, filter by dietary tags. Patterns:
+#   * recipes as array-of-hashref
+#   * ingredient aggregation via hash sum
+#   * tag-based filtering
+#   * t-digest for nutrient distribution
+#   * sketch (HLL) for distinct-ingredient cardinality
+
+# ── recipe database ────────────────────────────────────────────────
+
+my @recipes = (
+    +{
+        name => "Pasta Marinara",
+        tags => ["vegetarian"],
+        ingredients => +{ pasta => 200, tomato => 300, garlic => 5, oliveoil => 30 },
+        kcal => 480, protein => 14, carbs => 80, fat => 12,
+    },
+    +{
+        name => "Chicken Stir-Fry",
+        tags => [],
+        ingredients => +{ chicken => 200, bellpepper => 100, soysauce => 20, rice => 150, garlic => 5 },
+        kcal => 620, protein => 38, carbs => 70, fat => 16,
+    },
+    +{
+        name => "Vegan Buddha Bowl",
+        tags => ["vegetarian", "vegan"],
+        ingredients => +{ quinoa => 150, chickpea => 100, tomato => 100, spinach => 50, oliveoil => 15 },
+        kcal => 510, protein => 18, carbs => 75, fat => 14,
+    },
+    +{
+        name => "Salmon Teriyaki",
+        tags => ["pescatarian"],
+        ingredients => +{ salmon => 200, soysauce => 25, rice => 150, ginger => 5 },
+        kcal => 580, protein => 36, carbs => 55, fat => 22,
+    },
+    +{
+        name => "Greek Salad",
+        tags => ["vegetarian", "gluten-free"],
+        ingredients => +{ tomato => 200, cucumber => 100, feta => 80, oliveoil => 20, olives => 30 },
+        kcal => 340, protein => 12, carbs => 18, fat => 24,
+    },
+    +{
+        name => "Beef Tacos",
+        tags => [],
+        ingredients => +{ beef => 200, tortilla => 80, tomato => 50, lettuce => 30, cheese => 40 },
+        kcal => 650, protein => 35, carbs => 50, fat => 28,
+    },
+    +{
+        name => "Lentil Soup",
+        tags => ["vegetarian", "vegan", "gluten-free"],
+        ingredients => +{ lentils => 150, tomato => 100, carrot => 80, onion => 60, oliveoil => 15 },
+        kcal => 420, protein => 22, carbs => 60, fat => 8,
+    },
+)
+
+# ── helper: does recipe have tag? ──────────────────────────────────
+
+fn Demo::Recipe::has_tag($recipe, $tag) {
+    for my $t (@{$recipe->{tags}}) {
+        return 1 if $t eq $tag
+    }
+    return 0
+}
+
+# ── plan: choose recipes for the week ──────────────────────────────
+
+p "── recipe catalog ───────────────────────────────────"
+for my $r (@recipes) {
+    my $tags = len(@{$r->{tags}}) > 0
+             ? "[" . join(",", @{$r->{tags}}) . "]"
+             : "[none]"
+    printf "  %-22s %s  %d kcal\n", $r->{name}, $tags, $r->{kcal}
+}
+
+# ── vegetarian-only plan (5 meals) ─────────────────────────────────
+
+my @veg = grep { Demo::Recipe::has_tag($_, "vegetarian") } @recipes
+p ""
+printf "── vegetarian recipes (%d) ───────────────────────────\n", len(@veg)
+for my $r (@veg) {
+    printf "  - %s\n", $r->{name}
+}
+
+# ── pick weekly plan ───────────────────────────────────────────────
+
+p ""
+p "── 5-meal weekly plan (varied tags) ─────────────────"
+my @plan = (
+    $recipes[0],   # Pasta Marinara
+    $recipes[3],   # Salmon Teriyaki
+    $recipes[6],   # Lentil Soup
+    $recipes[4],   # Greek Salad
+    $recipes[2],   # Vegan Buddha Bowl
+)
+for my $r (@plan) {
+    printf "  - %s (%d kcal)\n", $r->{name}, $r->{kcal}
+}
+
+# ── aggregate shopping list ────────────────────────────────────────
+
+my %shopping
+my $hll_ingredients = hll(14)
+my $tk_common = topk(5)
+
+for my $r (@plan) {
+    for my $ing (keys %{$r->{ingredients}}) {
+        my $qty = $r->{ingredients}->{$ing}
+        $shopping{$ing} = ($shopping{$ing} // 0) + $qty
+        hll_add($hll_ingredients, $ing)
+        for my $i (1:int($qty / 10)) {
+            topk_add($tk_common, $ing)
+        }
+    }
+}
+
+p ""
+p "── aggregated shopping list ─────────────────────────"
+for my $ing (sort { $shopping{$_1} <=> $shopping{$_0} } keys %shopping) {
+    printf "  %-12s %4d g\n", $ing, $shopping{$ing}
+}
+
+# ── nutrient rollup ────────────────────────────────────────────────
+
+my $total_kcal = 0
+my $total_protein = 0
+my $total_carbs = 0
+my $total_fat = 0
+for my $r (@plan) {
+    $total_kcal    += $r->{kcal}
+    $total_protein += $r->{protein}
+    $total_carbs   += $r->{carbs}
+    $total_fat     += $r->{fat}
+}
+
+p ""
+p "── weekly nutrient totals ───────────────────────────"
+printf "  total kcal     : %d\n", $total_kcal
+printf "  total protein  : %d g\n", $total_protein
+printf "  total carbs    : %d g\n", $total_carbs
+printf "  total fat      : %d g\n", $total_fat
+printf "  daily avg kcal : %.0f\n", $total_kcal / 5
+
+# ── per-recipe macro distribution (t-digest of kcal) ──────────────
+
+p ""
+p "── per-recipe kcal distribution (t-digest) ──────────"
+my $td_kcal = t_digest(100)
+td_add($td_kcal, $_->{kcal}) for @recipes
+printf "  p10  : %d\n", int(td_quantile($td_kcal, 0.10))
+printf "  p50  : %d\n", int(td_quantile($td_kcal, 0.50))
+printf "  p90  : %d\n", int(td_quantile($td_kcal, 0.90))
+
+# ── HLL distinct ingredients ───────────────────────────────────────
+
+p ""
+p "── HLL distinct ingredients in shopping list ────────"
+printf "  HLL   : %d\n", hll_count($hll_ingredients)
+printf "  exact : %d\n", len(keys %shopping)
+
+# ── most-used ingredient (TopK) ────────────────────────────────────
+
+p ""
+p "── most-bought ingredient (TopK) ────────────────────"
+my @hits = topk_top($tk_common)
+for my $h (@hits) {
+    printf "  %-12s : ~%d g\n", $h->[0], $h->[1] * 10
+}
+
+# ── tag distribution across all recipes ────────────────────────────
+
+p ""
+p "── recipe-tag distribution ──────────────────────────"
+my %by_tag
+for my $r (@recipes) {
+    for my $t (@{$r->{tags}}) {
+        $by_tag{$t}++
+    }
+}
+for my $t (sort { $by_tag{$_1} <=> $by_tag{$_0} } keys %by_tag) {
+    printf "  %-15s : %d recipes\n", $t, $by_tag{$t}
+}

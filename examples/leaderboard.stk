@@ -1,0 +1,153 @@
+#!/usr/bin/env stryke
+
+# Game leaderboard demo. Players post scores over multiple sessions;
+# the leaderboard maintains all-time totals and a recent-bias view
+# with exponential decay. Patterns:
+#   * hash-of-arrayref for per-player score history
+#   * exponential time-decay weighting
+#   * t-digest for global score percentiles
+#   * TopK for hot players
+#   * sketch (HLL) for distinct-player cardinality
+
+# ── score events ───────────────────────────────────────────────────
+
+my @sessions = (
+    # Each session: player, score, age_in_days (lower = more recent)
+    ["alice",   240, 0],   ["bob",     180, 0],   ["carol",   320, 0],
+    ["dave",    150, 1],   ["alice",   180, 1],   ["eve",     200, 1],
+    ["bob",     260, 2],   ["carol",   400, 2],   ["frank",   100, 2],
+    ["alice",   300, 3],   ["dave",    220, 3],   ["grace",   170, 3],
+    ["eve",     350, 4],   ["bob",     310, 4],   ["henry",   140, 4],
+    ["carol",   270, 5],   ["alice",   190, 5],   ["frank",   180, 5],
+    ["irene",   260, 6],   ["dave",    140, 6],
+    ["jack",    310, 7],   ["alice",   220, 7],
+    ["grace",   200, 8],   ["bob",     150, 8],
+    ["eve",     280, 9],   ["henry",   160, 9],
+)
+
+printf "── %d score events from %d sessions ──────────────────\n",
+    len(@sessions), len(@sessions)
+
+# ── per-player aggregates ──────────────────────────────────────────
+
+my %total
+my %sessions_count
+my %best
+my %recent_weighted
+
+# Decay weight: exp(-age/half_life). With half_life = 3 days, an
+# event 3 days old counts ~0.37x, 6 days ~0.14x.
+my $half_life = 3.0
+
+for my $s (@sessions) {
+    my $player = $s->[0]
+    my $score  = $s->[1]
+    my $age    = $s->[2]
+
+    $total{$player}            = ($total{$player}            // 0) + $score
+    $sessions_count{$player}   = ($sessions_count{$player}   // 0) + 1
+    $best{$player}             = $score if !exists $best{$player} || $score > $best{$player}
+
+    my $decay = exp(-$age / $half_life)
+    $recent_weighted{$player}  = ($recent_weighted{$player}  // 0) + $score * $decay
+}
+
+# ── all-time top 10 ────────────────────────────────────────────────
+
+p ""
+p "── all-time top 10 (by total score) ─────────────────"
+printf "  %-8s %6s %6s %6s\n", "player", "total", "best", "n"
+my @top = sort { $total{$_1} <=> $total{$_0} } keys %total
+my $shown = 0
+for my $p (@top) {
+    last if $shown >= 10
+    printf "  %-8s %6d %6d %6d\n",
+        $p, $total{$p}, $best{$p}, $sessions_count{$p}
+    $shown++
+}
+
+# ── recent-bias top 5 (with decay) ─────────────────────────────────
+
+p ""
+p "── recent-bias top 5 (decay half-life: 3 days) ──────"
+my @recent_top = sort { $recent_weighted{$_1} <=> $recent_weighted{$_0} } keys %recent_weighted
+$shown = 0
+for my $p (@recent_top) {
+    last if $shown >= 5
+    printf "  %-8s weighted=%.1f raw=%d\n",
+        $p, $recent_weighted{$p}, $total{$p}
+    $shown++
+}
+
+# ── score percentiles via t-digest ─────────────────────────────────
+
+my $td = t_digest(100)
+td_add($td, $_->[1]) for @sessions
+
+p ""
+p "── score distribution (t-digest) ────────────────────"
+printf "  p10 : %d\n", int(td_quantile($td, 0.10))
+printf "  p50 : %d\n", int(td_quantile($td, 0.50))
+printf "  p90 : %d\n", int(td_quantile($td, 0.90))
+printf "  p99 : %d\n", int(td_quantile($td, 0.99))
+
+# ── distinct-player cardinality (HLL) ──────────────────────────────
+
+p ""
+p "── distinct-player cardinality (HLL) ────────────────"
+my $hll = hll(14)
+hll_add($hll, $_->[0]) for @sessions
+printf "  HLL distinct players : %d\n", hll_count($hll)
+printf "  exact                : %d\n", len(keys %total)
+
+# ── TopK hottest players via session count ─────────────────────────
+
+p ""
+p "── TopK most-active players ─────────────────────────"
+my $tk = topk(3)
+topk_add($tk, $_->[0]) for @sessions
+my @hits = topk_top($tk)
+for my $h (@hits) {
+    printf "  %-8s : %d sessions\n", $h->[0], $h->[1]
+}
+
+# ── tier classification ────────────────────────────────────────────
+
+p ""
+p "── tier classification (by total score) ─────────────"
+my @tiers = (
+    [800, "Diamond"],
+    [600, "Gold"],
+    [400, "Silver"],
+    [200, "Bronze"],
+    [0,   "Rookie"],
+)
+my %by_tier
+for my $p (keys %total) {
+    my $t = $total{$p}
+    for my $tier (@tiers) {
+        if ($t >= $tier->[0]) {
+            $by_tier{$tier->[1]} = [] unless exists $by_tier{$tier->[1]}
+            push @{$by_tier{$tier->[1]}}, $p
+            last
+        }
+    }
+}
+for my $tier (@tiers) {
+    my $players = $by_tier{$tier->[1]} // []
+    next if len(@$players) == 0
+    my @sorted = sort { $total{$_1} <=> $total{$_0} } @$players
+    printf "  %-8s (%d) : %s\n",
+        $tier->[1], len(@sorted), join(", ", @sorted)
+}
+
+# ── overall stats ───────────────────────────────────────────────────
+
+p ""
+p "── overall stats ────────────────────────────────────"
+my $total_score = 0
+$total_score += $_ for values %total
+printf "  total points awarded : %d\n", $total_score
+printf "  avg score per session : %.1f\n", $total_score / len(@sessions)
+printf "  highest individual    : %s @ %d points\n",
+    $top[0], $total{$top[0]}

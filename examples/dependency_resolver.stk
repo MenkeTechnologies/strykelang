@@ -1,0 +1,176 @@
+#!/usr/bin/env stryke
+
+# Package dependency resolver demo. Given a set of packages each with
+# dependencies (name + version constraints), produce an install plan
+# via topological sort, detect cycles and conflicts.
+#
+# Patterns:
+#   * package as hashref with name, version, deps
+#   * topological sort via DFS coloring
+#   * version-constraint check (simplified: >= only)
+#   * t-digest for per-package resolution latency
+
+# ── package catalog ────────────────────────────────────────────────
+
+my %catalog = (
+    "app"         => +{ version => "1.0.0", deps => +{ "web" => "1.0", "db" => "2.0" } },
+    "web"         => +{ version => "1.2.0", deps => +{ "http" => "0.9", "tls" => "1.5" } },
+    "db"          => +{ version => "2.1.0", deps => +{ "io" => "1.0", "tls" => "1.5" } },
+    "http"        => +{ version => "1.0.0", deps => +{ "io" => "1.0" } },
+    "tls"         => +{ version => "1.8.0", deps => +{ "crypto" => "0.5" } },
+    "io"          => +{ version => "1.2.0", deps => +{} },
+    "crypto"      => +{ version => "0.6.0", deps => +{ "io" => "1.0" } },
+    "unused"      => +{ version => "1.0.0", deps => +{} },
+)
+
+# ── version compare (simplified semver) ────────────────────────────
+
+fn Demo::Dep::version_lt($v1, $v2) {
+    my @ap = split /\./, $v1
+    my @bp = split /\./, $v2
+    my $n = len(@ap) > len(@bp) ? len(@ap) : len(@bp)
+    for my $i (0:$n - 1) {
+        my $av = ($ap[$i] // 0) + 0
+        my $bv = ($bp[$i] // 0) + 0
+        return 1 if $av < $bv
+        return 0 if $av > $bv
+    }
+    return 0
+}
+
+fn Demo::Dep::version_ge($v1, $v2) {
+    return !Demo::Dep::version_lt($v1, $v2)
+}
+
+# ── topological sort via DFS ───────────────────────────────────────
+
+mysync %color    # white=0, gray=1, black=2
+mysync @order
+mysync $cycle_found = 0
+mysync @conflicts
+
+my $td_visit = t_digest(100)
+
+fn Demo::Dep::visit($pkg) {
+    my $c = $color{$pkg} // 0
+    return if $c == 2
+    if ($c == 1) {
+        $cycle_found = 1
+        return
+    }
+    $color{$pkg} = 1
+    my $t0 = now_ns()
+    if (!exists $catalog{$pkg}) {
+        push @conflicts, "missing:$pkg"
+        $color{$pkg} = 2
+        return
+    }
+    my $info = $catalog{$pkg}
+    for my $dep (keys %{$info->{deps}}) {
+        my $required = $info->{deps}->{$dep}
+        if (!exists $catalog{$dep}) {
+            push @conflicts, "missing_dep:$pkg->$dep"
+            next
+        }
+        my $available = $catalog{$dep}->{version}
+        if (!Demo::Dep::version_ge($available, $required)) {
+            push @conflicts, "version:$pkg->$dep needs >=$required got $available"
+        }
+        Demo::Dep::visit($dep)
+    }
+    $color{$pkg} = 2
+    push @order, $pkg
+    td_add($td_visit, (now_ns() - $t0) / 1000.0)
+}
+
+# ── resolve root package ───────────────────────────────────────────
+
+p "── catalog ──────────────────────────────────────────"
+for my $name (sort { _0 cmp _1 } keys %catalog) {
+    my $info = $catalog{$name}
+    my $dep_str = len(keys %{$info->{deps}}) > 0
+                ? join(", ", map { "$_ >= " . $info->{deps}->{$_} } sort keys %{$info->{deps}})
+                : "(no deps)"
+    printf "  %-10s @%-7s : %s\n", $name, $info->{version}, $dep_str
+}
+
+# ── resolve install order for "app" ────────────────────────────────
+
+Demo::Dep::visit("app")
+
+p ""
+p "── install plan (deps-first topological order) ──────"
+my $idx = 0
+for my $pkg (@order) {
+    $idx++
+    my $info = $catalog{$pkg}
+    printf "  %2d. %-10s @ %s\n", $idx, $pkg, $info->{version}
+}
+
+# ── conflict report ────────────────────────────────────────────────
+
+p ""
+if (len(@conflicts) == 0 && !$cycle_found) {
+    p "── resolution: OK (no conflicts) ─────────────────────"
+} else {
+    p "── conflicts detected ────────────────────────────────"
+    for my $c (@conflicts) {
+        printf "  ! %s\n", $c
+    }
+    printf "  cycle: %s\n", $cycle_found ? "YES" : "no"
+}
+
+# ── unused packages ────────────────────────────────────────────────
+
+my %installed
+$installed{$_} = 1 for @order
+my @unused = grep { !exists $installed{$_} } keys %catalog
+p ""
+printf "── unused packages: %d ────────────────────────────────\n",
+    len(@unused)
+for my $u (sort { _0 cmp _1 } @unused) {
+    printf "  %s\n", $u
+}
+
+# ── cycle test on fresh graph ──────────────────────────────────────
+
+p ""
+p "── cycle-detection: inject A → B → A ────────────────"
+my %cyclic = (
+    "A" => +{ version => "1.0", deps => +{ "B" => "1.0" } },
+    "B" => +{ version => "1.0", deps => +{ "A" => "1.0" } },
+)
+# Local cycle visit (separate state).
+mysync %ccolor
+mysync @corder
+mysync $cfound = 0
+fn Demo::Dep::cyclic_visit($pkg, $graph) {
+    my $c = $ccolor{$pkg} // 0
+    return if $c == 2
+    if ($c == 1) { $cfound = 1; return }
+    $ccolor{$pkg} = 1
+    for my $dep (keys %{$graph->{$pkg}->{deps}}) {
+        Demo::Dep::cyclic_visit($dep, $graph)
+    }
+    $ccolor{$pkg} = 2
+    push @corder, $pkg
+}
+Demo::Dep::cyclic_visit("A", \%cyclic)
+printf "  cycle detected: %s (expected YES)\n",
+    $cfound ? "YES" : "no"
+
+# ── per-package visit latency ──────────────────────────────────────
+
+p ""
+p "── per-package visit latency (t-digest) ─────────────"
+printf "  p50  : %.1f µs\n", td_quantile($td_visit, 0.50)
+printf "  p99  : %.1f µs\n", td_quantile($td_visit, 0.99)
+
+# ── HLL distinct packages installed ────────────────────────────────
+
+p ""
+p "── HLL distinct installed packages ──────────────────"
+my $hll = hll(14)
+hll_add($hll, $_) for @order
+printf "  HLL   : %d\n", hll_count($hll)
+printf "  exact : %d\n", len(@order)

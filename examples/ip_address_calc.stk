@@ -1,0 +1,140 @@
+#!/usr/bin/env stryke
+
+# IPv4 address calculator. Parses CIDR notation, computes network/
+# broadcast/host range, mask manipulation. Patterns:
+#   * regex parsing of dotted-quad + CIDR
+#   * bitwise arithmetic on 32-bit integers
+#   * t-digest for per-CIDR computation latency
+
+# ── helpers ─────────────────────────────────────────────────────────
+
+fn Demo::IP::parse_dotted($s) {
+    if ($s =~ /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/) {
+        my $o1 = $1; my $o2 = $2; my $o3 = $3; my $o4 = $4
+        return undef if $o1 > 255 || $o2 > 255 || $o3 > 255 || $o4 > 255
+        return ($o1 << 24) | ($o2 << 16) | ($o3 << 8) | $o4
+    }
+    return undef
+}
+
+fn Demo::IP::to_dotted($n) {
+    return sprintf("%d.%d.%d.%d",
+        ($n >> 24) & 0xFF,
+        ($n >> 16) & 0xFF,
+        ($n >>  8) & 0xFF,
+         $n        & 0xFF)
+}
+
+fn Demo::IP::mask_from_prefix($prefix) {
+    return 0 if $prefix <= 0
+    return 0xFFFFFFFF if $prefix >= 32
+    # Top `prefix` bits set.
+    return (0xFFFFFFFF << (32 - $prefix)) & 0xFFFFFFFF
+}
+
+fn Demo::IP::parse_cidr($s) {
+    if ($s =~ m{^(\d+\.\d+\.\d+\.\d+)/(\d+)$}) {
+        # Save captures BEFORE calling parse_dotted (which uses regex,
+        # clobbering $1/$2).
+        my $dotted = $1
+        my $prefix = $2 + 0
+        my $ip = Demo::IP::parse_dotted($dotted)
+        return undef unless defined $ip && $prefix >= 0 && $prefix <= 32
+        return +{ ip => $ip, prefix => $prefix }
+    }
+    return undef
+}
+
+fn Demo::IP::network_address($cidr) {
+    my $mask = Demo::IP::mask_from_prefix($cidr->{prefix})
+    return $cidr->{ip} & $mask
+}
+
+fn Demo::IP::broadcast_address($cidr) {
+    my $mask = Demo::IP::mask_from_prefix($cidr->{prefix})
+    return $cidr->{ip} | (0xFFFFFFFF ^ $mask)
+}
+
+fn Demo::IP::host_count($cidr) {
+    return 0 if $cidr->{prefix} >= 31
+    my $bits = 32 - $cidr->{prefix}
+    return (1 << $bits) - 2   # excluding network and broadcast
+}
+
+# ── workload ───────────────────────────────────────────────────────
+
+my $td_calc = t_digest(100)
+
+my @inputs = (
+    "192.168.1.0/24",
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.0.2.0/26",
+    "203.0.113.5/30",
+    "127.0.0.1/32",
+    "0.0.0.0/0",
+    "256.0.0.1/24",     # invalid
+)
+
+printf "── analyzing %d CIDR blocks ─────────────────────────────\n",
+    len(@inputs)
+
+for my $s (@inputs) {
+    my $t0 = now_ns()
+    my $c = Demo::IP::parse_cidr($s)
+    td_add($td_calc, (now_ns() - $t0) / 1000.0)
+    if (!defined $c) {
+        printf "  %-22s : INVALID\n", $s
+        next
+    }
+    my $net = Demo::IP::network_address($c)
+    my $bcast = Demo::IP::broadcast_address($c)
+    my $hosts = Demo::IP::host_count($c)
+    my $mask = Demo::IP::mask_from_prefix($c->{prefix})
+    printf "  %-22s :\n", $s
+    printf "    address    : %s\n", Demo::IP::to_dotted($c->{ip})
+    printf "    mask       : %s (/%d)\n",
+        Demo::IP::to_dotted($mask), $c->{prefix}
+    printf "    network    : %s\n", Demo::IP::to_dotted($net)
+    printf "    broadcast  : %s\n", Demo::IP::to_dotted($bcast)
+    printf "    hosts      : %d\n", $hosts
+}
+
+# ── subnet containment check ───────────────────────────────────────
+
+fn Demo::IP::contains($cidr, $ip_n) {
+    my $mask = Demo::IP::mask_from_prefix($cidr->{prefix})
+    return ($cidr->{ip} & $mask) == ($ip_n & $mask)
+}
+
+p ""
+p "── subnet containment tests ─────────────────────────"
+my @probes = (
+    ["192.168.1.42", "192.168.1.0/24"],
+    ["192.168.2.42", "192.168.1.0/24"],
+    ["10.5.5.5",     "10.0.0.0/8"],
+    ["172.17.0.1",   "172.16.0.0/12"],
+    ["8.8.8.8",      "0.0.0.0/0"],
+)
+for my $probe (@probes) {
+    my $ip = Demo::IP::parse_dotted($probe->[0])
+    my $net = Demo::IP::parse_cidr($probe->[1])
+    my $inside = Demo::IP::contains($net, $ip) ? "yes" : "no"
+    printf "  %-16s in %-20s : %s\n",
+        $probe->[0], $probe->[1], $inside
+}
+
+# ── netmask shorthand reference ────────────────────────────────────
+
+p ""
+p "── prefix → dotted-mask reference ───────────────────"
+for my $p (8, 16, 24, 26, 28, 30) {
+    printf "  /%-2d : %s\n", $p, Demo::IP::to_dotted(Demo::IP::mask_from_prefix($p))
+}
+
+# ── stats ───────────────────────────────────────────────────────────
+
+p ""
+p "── per-CIDR computation latency (t-digest) ──────────"
+printf "  p50  : %.1f µs\n", td_quantile($td_calc, 0.50)
+printf "  p99  : %.1f µs\n", td_quantile($td_calc, 0.99)

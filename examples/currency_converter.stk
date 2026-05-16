@@ -1,0 +1,162 @@
+#!/usr/bin/env stryke
+
+# Multi-currency converter using a hub-and-spoke USD rate table.
+#
+# Demonstrates:
+#   * Hash-of-hash for rate cache (pair -> rate).
+#   * Computed cross-rates via USD pivot.
+#   * sprintf format width / precision per ISO 4217 minor units.
+#   * pgrep parallel filter for "find pairs trending up".
+#   * TopK SpaceSaving for "most-converted target".
+#   * HLL distinct origin currencies.
+#   * t-digest for per-conversion latency.
+
+# ── USD-anchored rates (units of currency per 1 USD) ─────────────────
+
+my %usd_per = (
+    USD => 1.0,
+    EUR => 0.92,
+    GBP => 0.79,
+    JPY => 149.5,
+    CHF => 0.88,
+    CAD => 1.36,
+    AUD => 1.51,
+    INR => 83.2,
+    CNY => 7.24,
+    SGD => 1.34,
+    SEK => 10.55,
+    NOK => 10.72,
+    MXN => 17.05,
+    BRL => 5.05,
+    ZAR => 18.7,
+);
+
+# ── ISO 4217 minor-unit table (digits after the decimal) ─────────────
+
+my %minor_units = (
+    USD => 2, EUR => 2, GBP => 2, CHF => 2, CAD => 2, AUD => 2,
+    SGD => 2, SEK => 2, NOK => 2, MXN => 2, BRL => 2, ZAR => 2,
+    INR => 2, CNY => 2,
+    JPY => 0,
+);
+
+# ── sketches & metrics ──────────────────────────────────────────────
+
+my $td_conv  = t_digest(100);
+my $tk_dst   = topk(8);
+my $hll_src  = hll(12);
+
+# ── core conversion: USD pivot ──────────────────────────────────────
+
+fn Demo::FX::convert($amount, $from, $to) {
+    return undef unless exists $usd_per{$from} && exists $usd_per{$to};
+    my $in_usd = $amount / $usd_per{$from};
+    my $out    = $in_usd * $usd_per{$to};
+    $out
+}
+
+fn Demo::FX::pair_rate($from, $to) {
+    Demo::FX::convert(1.0, $from, $to)
+}
+
+fn Demo::FX::fmt($amount, $code) {
+    my $digits = $minor_units{$code} // 2;
+    sprintf("%.*f %s", $digits, $amount, $code)
+}
+
+# ── demo: convert a sample basket ───────────────────────────────────
+
+my @basket = (
+    [100,     "USD", "EUR"],
+    [100,     "USD", "JPY"],
+    [50,      "GBP", "USD"],
+    [1000,    "INR", "USD"],
+    [2500,    "MXN", "EUR"],
+    [10000,   "JPY", "GBP"],
+    [500,     "CAD", "AUD"],
+    [1500,    "BRL", "CNY"],
+    [200,     "CHF", "ZAR"],
+    [75.50,   "EUR", "SGD"],
+    [99.99,   "AUD", "NOK"],
+    [123.45,  "SEK", "USD"],
+);
+
+print "currency converter — USD-pivoted rate table\n";
+print "─" x 60, "\n";
+
+for my $row (@basket) {
+    my $amt  = $row->[0];
+    my $from = $row->[1];
+    my $to   = $row->[2];
+
+    my $t0 = now_ns();
+    my $r  = Demo::FX::convert($amt, $from, $to);
+    td_add($td_conv, (now_ns() - $t0) / 1000.0);
+
+    topk_add($tk_dst, $to);
+    hll_add($hll_src, $from);
+
+    if (defined($r)) {
+        printf("%14s -> %s\n",
+               Demo::FX::fmt($amt, $from),
+               Demo::FX::fmt($r, $to));
+    } else {
+        printf("%14s -> ERROR: unknown currency (%s or %s)\n",
+               Demo::FX::fmt($amt, $from), $from, $to);
+    }
+}
+
+# ── identity check: USD->X->USD round-trip ──────────────────────────
+
+print "\nround-trip stability (USD -> X -> USD on \$1000):\n";
+my $base = 1000.0;
+my @codes = sort grep { $_ ne "USD" } keys %usd_per;
+my @rt_errors;
+for my $code (@codes) {
+    my $there = Demo::FX::convert($base, "USD", $code);
+    my $back  = Demo::FX::convert($there, $code, "USD");
+    my $delta = abs($back - $base);
+    push @rt_errors, $delta;
+    printf("  USD->%s->USD : \$%.6f  (delta %.2e)\n",
+           $code, $back, $delta);
+}
+
+my $max_err = 0;
+for my $e (@rt_errors) { $max_err = $e if $e > $max_err }
+printf("\nmax round-trip delta across %d currencies: %.2e (must be ~0)\n",
+       len(@codes), $max_err);
+
+# ── parallel scan: which currencies are weaker than the JPY benchmark? ─
+
+my @weak_vs_jpy = pgrep {
+    Demo::FX::pair_rate("USD", $_) > Demo::FX::pair_rate("USD", "JPY") / 10
+} @codes;
+@weak_vs_jpy = sort @weak_vs_jpy;
+print "\ncurrencies where 1 USD buys > JPY/10 units: ",
+      join(",", @weak_vs_jpy), "\n";
+
+# ── top destinations ────────────────────────────────────────────────
+
+print "\nmost-converted target (SpaceSaving k=8):\n";
+my @top = topk_top($tk_dst, 5);
+for my $p (@top) {
+    printf("  %s  count=%d\n", $p->[0], $p->[1]);
+}
+
+# ── distinct sources ────────────────────────────────────────────────
+
+my $hll_n = hll_count($hll_src);
+my %seen_src;
+for my $row (@basket) { $seen_src{$row->[1]} = 1 }
+my $exact_src = len(keys %seen_src);
+printf("\ndistinct origin currencies: HLL=%.1f vs exact=%d\n",
+       $hll_n, $exact_src);
+
+# ── latency ─────────────────────────────────────────────────────────
+
+print "\nconversion latency:\n";
+printf("  p50 = %.1f us\n",  td_quantile($td_conv, 0.50));
+printf("  p95 = %.1f us\n",  td_quantile($td_conv, 0.95));
+printf("  p99 = %.1f us\n",  td_quantile($td_conv, 0.99));
+
+print "\ncurrency converter done\n";

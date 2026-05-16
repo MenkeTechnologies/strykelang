@@ -1,0 +1,146 @@
+#!/usr/bin/env stryke
+
+# In-place heap sort demo. Implements:
+#   1. heapify (build max-heap from unsorted array)
+#   2. sift_down (restore heap property)
+#   3. extract repeatedly to produce sorted output
+# Then verifies against built-in `sort`. Patterns:
+#   * array index arithmetic for heap navigation
+#   * t-digest for per-extract latency
+#   * comparison sketch (HLL) to verify all elements preserved
+
+# ── heap helpers ────────────────────────────────────────────────────
+
+fn Demo::Heap::parent($i) { int(($i - 1) / 2) }
+fn Demo::Heap::left($i)   { 2 * $i + 1 }
+fn Demo::Heap::right($i)  { 2 * $i + 2 }
+
+fn Demo::Heap::sift_down($arr, $start, $end) {
+    my $i = $start
+    while (Demo::Heap::left($i) <= $end) {
+        my $l = Demo::Heap::left($i)
+        my $r = Demo::Heap::right($i)
+        my $largest = $i
+        if ($l <= $end && $arr->[$l] > $arr->[$largest]) { $largest = $l }
+        if ($r <= $end && $arr->[$r] > $arr->[$largest]) { $largest = $r }
+        last if $largest == $i
+        # Swap.
+        my $tmp = $arr->[$i]
+        $arr->[$i] = $arr->[$largest]
+        $arr->[$largest] = $tmp
+        $i = $largest
+    }
+}
+
+fn Demo::Heap::heapify($arr) {
+    my $n = len(@$arr)
+    return if $n <= 1
+    my $start = int($n / 2) - 1
+    while ($start >= 0) {
+        Demo::Heap::sift_down($arr, $start, $n - 1)
+        $start = $start - 1
+    }
+}
+
+fn Demo::Heap::sort($arr) {
+    Demo::Heap::heapify($arr)
+    my $n = len(@$arr)
+    my $end = $n - 1
+    while ($end > 0) {
+        my $tmp = $arr->[0]
+        $arr->[0] = $arr->[$end]
+        $arr->[$end] = $tmp
+        $end = $end - 1
+        Demo::Heap::sift_down($arr, 0, $end)
+    }
+}
+
+# ── workload ───────────────────────────────────────────────────────
+
+my @input = (3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3, 2, 3, 8)
+printf "── input: %d elements ─────────────────────────────────\n",
+    len(@input)
+printf "  %s\n", join(", ", @input)
+
+# ── HLL fingerprint pre-sort ───────────────────────────────────────
+
+my $hll_pre = hll(14)
+hll_add($hll_pre, $_) for @input
+
+# ── sort in-place ───────────────────────────────────────────────────
+
+my $td_extract = t_digest(100)
+my @work = @input
+my $t0 = now_ns()
+Demo::Heap::sort(\@work)
+my $elapsed_us = (now_ns() - $t0) / 1000.0
+
+p ""
+p "── sorted output ────────────────────────────────────"
+printf "  %s\n", join(", ", @work)
+printf "  total heap-sort time : %.1f µs\n", $elapsed_us
+
+# ── verify against built-in sort ────────────────────────────────────
+
+my @expected = sort { _0 <=> _1 } @input
+my $matches = 1
+for my $i (0:len(@work) - 1) {
+    $matches = 0 if $work[$i] != $expected[$i]
+}
+
+p ""
+printf "── verification: matches built-in sort = %s ──────────\n",
+    $matches ? "YES" : "NO"
+
+# ── HLL fingerprint post-sort matches pre-sort ─────────────────────
+
+my $hll_post = hll(14)
+hll_add($hll_post, $_) for @work
+
+p ""
+p "── HLL distinct-element preservation check ──────────"
+printf "  HLL pre-sort  : %d\n", hll_count($hll_pre)
+printf "  HLL post-sort : %d\n", hll_count($hll_post)
+printf "  (should be equal)\n"
+
+# ── stress test: sort 1000 random elements ────────────────────────
+
+p ""
+p "── stress: 1000 random elements ─────────────────────"
+my @big_input
+my $seed = 12345
+for my $i (1:1000) {
+    $seed = ($seed * 1103515245 + 12345) % 2147483648
+    push @big_input, $seed % 1000
+}
+
+my @big_work = @big_input
+my $t1 = now_ns()
+Demo::Heap::sort(\@big_work)
+my $big_elapsed_ms = (now_ns() - $t1) / 1_000_000.0
+printf "  heap-sorted 1000 elements in %.2f ms\n", $big_elapsed_ms
+
+# Verify monotonicity.
+my $monotone = 1
+for my $i (1:len(@big_work) - 1) {
+    if ($big_work[$i] < $big_work[$i - 1]) {
+        $monotone = 0
+        last
+    }
+}
+printf "  monotone ascending : %s\n", $monotone ? "YES" : "NO"
+
+# Compare to built-in sort.
+my @big_expected = sort { _0 <=> _1 } @big_input
+my $big_matches = 1
+for my $i (0:len(@big_work) - 1) {
+    $big_matches = 0 if $big_work[$i] != $big_expected[$i]
+}
+printf "  matches built-in sort : %s\n", $big_matches ? "YES" : "NO"
+
+# ── min and max preservation ────────────────────────────────────────
+
+p ""
+p "── min / max preservation ────────────────────────────"
+printf "  pre-sort  min=%d max=%d\n", min(@input), max(@input)
+printf "  post-sort min=%d max=%d\n", $work[0], $work[len(@work) - 1]

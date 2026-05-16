@@ -1,0 +1,171 @@
+#!/usr/bin/env stryke
+
+# Calendar event planner. Schedule events with start/end times,
+# detect conflicts, find free slots in a workday window. Patterns:
+#   * events as array-of-hashref sorted by start time
+#   * interval overlap detection
+#   * free-slot computation between sorted events
+#   * t-digest for event-duration distribution
+
+# ── events (minutes from start of day) ─────────────────────────────
+
+my @events = (
+    +{ title => "morning standup",   start => 9*60,       duration => 30 },
+    +{ title => "1:1 with manager",  start => 10*60,      duration => 30 },
+    +{ title => "code review",       start => 10*60 + 30, duration => 60 },
+    +{ title => "lunch",             start => 12*60,      duration => 60 },
+    +{ title => "design review",     start => 13*60,      duration => 90 },
+    +{ title => "focused work",      start => 15*60,      duration => 90 },
+    +{ title => "team meeting",      start => 16*60 + 30, duration => 60 },
+    +{ title => "overlap conflict",  start => 10*60 + 45, duration => 30 },
+)
+
+# ── helpers ────────────────────────────────────────────────────────
+
+fn Demo::Cal::mins_to_time($m) {
+    return sprintf("%02d:%02d", int($m / 60), $m % 60)
+}
+
+fn Demo::Cal::end($ev) {
+    return $ev->{start} + $ev->{duration}
+}
+
+fn Demo::Cal::overlaps($e1, $e2) {
+    my $e1_end = Demo::Cal::end($e1)
+    my $e2_end = Demo::Cal::end($e2)
+    return $e1->{start} < $e2_end && $e2->{start} < $e1_end
+}
+
+# ── sort events ────────────────────────────────────────────────────
+
+my @sorted = sort { $_0->{start} <=> $_1->{start} } @events
+
+p "── events (chronological) ───────────────────────────"
+for my $e (@sorted) {
+    printf "  %s - %s : %s\n",
+        Demo::Cal::mins_to_time($e->{start}),
+        Demo::Cal::mins_to_time(Demo::Cal::end($e)),
+        $e->{title}
+}
+
+# ── detect conflicts ───────────────────────────────────────────────
+
+my @conflicts
+for my $i (0:len(@sorted) - 2) {
+    for my $j ($i + 1 : len(@sorted) - 1) {
+        if (Demo::Cal::overlaps($sorted[$i], $sorted[$j])) {
+            push @conflicts, [$sorted[$i], $sorted[$j]]
+        }
+    }
+}
+
+p ""
+if (len(@conflicts) == 0) {
+    p "── no conflicts ─────────────────────────────────────"
+} else {
+    printf "── %d conflicts ──────────────────────────────────────\n",
+        len(@conflicts)
+    for my $c (@conflicts) {
+        my $e1 = $c->[0]
+        my $e2 = $c->[1]
+        printf "  CONFLICT: %s [%s-%s] vs %s [%s-%s]\n",
+            $e1->{title},
+            Demo::Cal::mins_to_time($e1->{start}),
+            Demo::Cal::mins_to_time(Demo::Cal::end($e1)),
+            $e2->{title},
+            Demo::Cal::mins_to_time($e2->{start}),
+            Demo::Cal::mins_to_time(Demo::Cal::end($e2))
+    }
+}
+
+# ── find free slots within work day (9-18) ────────────────────────
+
+my $work_start = 9 * 60
+my $work_end = 18 * 60
+
+# Remove conflict events for free-slot computation (use only first
+# of each conflicting pair).
+my %dropped
+for my $c (@conflicts) {
+    # Drop the later event.
+    $dropped{$c->[1]->{title}} = 1
+}
+my @clean = grep { !exists $dropped{$_->{title}} } @sorted
+
+p ""
+p "── free slots within work day (9:00-18:00) ──────────"
+my @free
+my $prev_end = $work_start
+for my $e (@clean) {
+    if ($e->{start} > $prev_end) {
+        push @free, +{ start => $prev_end, end => $e->{start} }
+    }
+    $prev_end = Demo::Cal::end($e) if Demo::Cal::end($e) > $prev_end
+}
+if ($prev_end < $work_end) {
+    push @free, +{ start => $prev_end, end => $work_end }
+}
+
+for my $f (@free) {
+    my $dur = $f->{end} - $f->{start}
+    printf "  %s - %s (%d min free)\n",
+        Demo::Cal::mins_to_time($f->{start}),
+        Demo::Cal::mins_to_time($f->{end}),
+        $dur
+}
+
+# ── duration distribution ──────────────────────────────────────────
+
+my $td_duration = t_digest(100)
+td_add($td_duration, $_->{duration}) for @events
+
+p ""
+p "── event-duration distribution (t-digest) ───────────"
+printf "  p10  : %d min\n", int(td_quantile($td_duration, 0.10))
+printf "  p50  : %d min\n", int(td_quantile($td_duration, 0.50))
+printf "  p90  : %d min\n", int(td_quantile($td_duration, 0.90))
+
+# ── overall stats ──────────────────────────────────────────────────
+
+my $total_busy = 0
+$total_busy += $_->{duration} for @clean
+my $work_total = $work_end - $work_start
+my $total_free = 0
+$total_free += ($_->{end} - $_->{start}) for @free
+
+p ""
+p "── workday summary ──────────────────────────────────"
+printf "  workday window : %d min (9:00-18:00)\n", $work_total
+printf "  total busy     : %d min (%.0f%%)\n",
+    $total_busy, 100.0 * $total_busy / $work_total
+printf "  total free     : %d min (%.0f%%)\n",
+    $total_free, 100.0 * $total_free / $work_total
+printf "  events         : %d (%d after conflict removal)\n",
+    len(@events), len(@clean)
+
+# ── HLL distinct titles ────────────────────────────────────────────
+
+p ""
+p "── HLL distinct event titles ────────────────────────"
+my $hll = hll(14)
+hll_add($hll, $_->{title}) for @events
+my %titles
+$titles{$_->{title}} = 1 for @events
+printf "  HLL   : %d\n", hll_count($hll)
+printf "  exact : %d\n", len(keys %titles)
+
+# ── busy times via TopK ────────────────────────────────────────────
+
+p ""
+p "── peak-hour heatmap (top 3 busiest hours via TopK) ──"
+my $tk = topk(3)
+for my $e (@clean) {
+    my $h = int($e->{start} / 60)
+    for my $i (1:$e->{duration}) {
+        topk_add($tk, sprintf("%02d:00", $h))
+    }
+}
+my @hits = topk_top($tk)
+for my $h (@hits) {
+    printf "  %s : %d busy minutes\n", $h->[0], $h->[1]
+}

@@ -1,0 +1,228 @@
+#!/usr/bin/env stryke
+
+# E-commerce order processor demo. Validates cart, computes subtotal +
+# tax + shipping, applies discounts, generates an invoice. Patterns:
+#   * cart as array-of-hashrefs
+#   * tax-rate by state (lookup table)
+#   * discount rules (free-shipping threshold, percent-off codes)
+#   * t-digest for per-order processing latency
+#   * sketch (HLL) for distinct-product cardinality
+#   * audit log via mysync
+
+# ── product catalogue ──────────────────────────────────────────────
+
+my %catalog = (
+    "WIDGET-A" => +{ name => "Premium Widget",  price => 49.99 },
+    "WIDGET-B" => +{ name => "Basic Widget",    price => 19.99 },
+    "GADGET-A" => +{ name => "Smart Gadget",    price => 129.99 },
+    "GADGET-B" => +{ name => "Eco Gadget",      price => 89.99 },
+    "DOODAD-A" => +{ name => "Lux Doodad",      price => 299.99 },
+    "THINGY-A" => +{ name => "Premium Thingy",  price => 24.99 },
+    "THINGY-B" => +{ name => "Basic Thingy",    price => 9.99 },
+)
+
+# ── tax rates by state ─────────────────────────────────────────────
+
+my %tax_rates = (
+    "CA" => 0.0725,
+    "NY" => 0.08875,
+    "TX" => 0.0625,
+    "WA" => 0.065,
+    "OR" => 0.0,     # no sales tax
+)
+
+# ── discount codes ─────────────────────────────────────────────────
+
+my %discounts = (
+    "WELCOME10" => +{ kind => "percent", value => 0.10 },
+    "SAVE25"    => +{ kind => "percent", value => 0.25 },
+    "FLAT50"    => +{ kind => "flat",    value => 50.00 },
+)
+
+my $free_shipping_threshold = 100.00
+my $standard_shipping = 7.99
+
+# ── core processor ─────────────────────────────────────────────────
+
+mysync @audit
+my $td_proc = t_digest(100)
+my $hll_skus = hll(14)
+my $tk_popular = topk(3)
+
+fn Demo::Order::process($order) {
+    my $t0 = now_ns()
+    my @line_items
+    my $errors = 0
+    my $subtotal = 0.0
+    # 1. Validate + compute line items.
+    for my $entry (@{$order->{cart}}) {
+        my $sku = $entry->{sku}
+        my $qty = $entry->{qty}
+        if (!exists $catalog{$sku}) {
+            push @audit, +{ order => $order->{id}, error => "unknown_sku", sku => $sku }
+            $errors = $errors + 1
+            next
+        }
+        if ($qty <= 0) {
+            push @audit, +{ order => $order->{id}, error => "bad_qty", sku => $sku, qty => $qty }
+            $errors = $errors + 1
+            next
+        }
+        my $product = $catalog{$sku}
+        my $line_total = $product->{price} * $qty
+        push @line_items, +{
+            sku => $sku,
+            name => $product->{name},
+            price => $product->{price},
+            qty => $qty,
+            line_total => $line_total,
+        }
+        $subtotal = $subtotal + $line_total
+        hll_add($hll_skus, $sku)
+        topk_add($tk_popular, $sku)
+    }
+    if ($errors > 0) {
+        td_add($td_proc, (now_ns() - $t0) / 1000.0)
+        return +{
+            ok => 0,
+            order_id => $order->{id},
+            errors => $errors,
+        }
+    }
+    # 2. Apply discount.
+    my $discount_amount = 0.0
+    if (exists $order->{discount} && exists $discounts{$order->{discount}}) {
+        my $d = $discounts{$order->{discount}}
+        if ($d->{kind} eq "percent") {
+            $discount_amount = $subtotal * $d->{value}
+        } else {
+            $discount_amount = $d->{value} > $subtotal ? $subtotal : $d->{value}
+        }
+    }
+    my $discounted = $subtotal - $discount_amount
+    # 3. Compute tax.
+    my $tax_rate = $tax_rates{$order->{state}} // 0.0
+    my $tax = $discounted * $tax_rate
+    # 4. Shipping.
+    my $shipping = $discounted >= $free_shipping_threshold ? 0.0 : $standard_shipping
+    # 5. Grand total.
+    my $total = $discounted + $tax + $shipping
+    td_add($td_proc, (now_ns() - $t0) / 1000.0)
+    push @audit, +{ order => $order->{id}, status => "ok", total => $total }
+    return +{
+        ok => 1,
+        order_id => $order->{id},
+        line_items => \@line_items,
+        subtotal => $subtotal,
+        discount => $discount_amount,
+        tax => $tax,
+        tax_rate => $tax_rate,
+        shipping => $shipping,
+        total => $total,
+    }
+}
+
+# ── render invoice ─────────────────────────────────────────────────
+
+fn Demo::Order::render_invoice($result) {
+    my @lines
+    push @lines, sprintf("── Order #%d ─────────────────────────────",
+                        $result->{order_id})
+    for my $li (@{$result->{line_items}}) {
+        push @lines, sprintf("  %-18s  %2d x %7.2f = %7.2f",
+            $li->{name}, $li->{qty}, $li->{price}, $li->{line_total})
+    }
+    push @lines, sprintf("  %-30s  %10.2f", "Subtotal", $result->{subtotal})
+    if ($result->{discount} > 0) {
+        push @lines, sprintf("  %-30s -%10.2f", "Discount", $result->{discount})
+    }
+    push @lines, sprintf("  %-30s  %10.2f", sprintf("Tax (%.3f%%)", 100 * $result->{tax_rate}), $result->{tax})
+    push @lines, sprintf("  %-30s  %10.2f", "Shipping", $result->{shipping})
+    push @lines, "  -" x 50
+    push @lines, sprintf("  %-30s  %10.2f", "TOTAL", $result->{total})
+    return \@lines
+}
+
+# ── sample orders ──────────────────────────────────────────────────
+
+my @orders = (
+    +{ id => 1, state => "CA", cart => [
+        +{ sku => "WIDGET-A", qty => 2 },
+        +{ sku => "THINGY-A", qty => 5 },
+    ]},
+    +{ id => 2, state => "OR", cart => [
+        +{ sku => "GADGET-A", qty => 1 },
+        +{ sku => "DOODAD-A", qty => 1 },
+    ], discount => "WELCOME10" },
+    +{ id => 3, state => "NY", cart => [
+        +{ sku => "WIDGET-B", qty => 3 },
+        +{ sku => "THINGY-B", qty => 10 },
+    ], discount => "FLAT50" },
+    +{ id => 4, state => "TX", cart => [
+        +{ sku => "BAD-SKU", qty => 1 },
+    ]},
+    +{ id => 5, state => "WA", cart => [
+        +{ sku => "GADGET-B", qty => 1 },
+        +{ sku => "WIDGET-A", qty => 3 },
+    ], discount => "SAVE25" },
+)
+
+printf "── processing %d orders ───────────────────────────────\n",
+    len(@orders)
+
+my @successful
+my @failed
+for my $order (@orders) {
+    my $result = Demo::Order::process($order)
+    if ($result->{ok}) {
+        push @successful, $result
+        p ""
+        my $lines = Demo::Order::render_invoice($result)
+        for my $line (@$lines) { p "$line" }
+    } else {
+        push @failed, $result
+    }
+}
+
+# ── rollup ──────────────────────────────────────────────────────────
+
+p ""
+p "── rollup ───────────────────────────────────────────"
+printf "  orders processed : %d\n", len(@orders)
+printf "  successful       : %d\n", len(@successful)
+printf "  failed           : %d\n", len(@failed)
+my $total_revenue = 0
+$total_revenue += $_->{total} for @successful
+printf "  total revenue    : %.2f\n", $total_revenue
+
+# ── most-popular products (TopK) ───────────────────────────────────
+
+p ""
+p "── most-popular SKUs (TopK) ─────────────────────────"
+my @hits = topk_top($tk_popular)
+for my $h (@hits) {
+    printf "  %-10s : %d orders\n", $h->[0], $h->[1]
+}
+
+# ── distinct SKUs (HLL) ────────────────────────────────────────────
+
+p ""
+p "── HLL distinct SKUs ordered ────────────────────────"
+printf "  HLL : %d\n", hll_count($hll_skus)
+
+# ── failed orders detail ───────────────────────────────────────────
+
+if (len(@failed) > 0) {
+    p ""
+    p "── failed orders ────────────────────────────────────"
+    for my $f (@failed) {
+        printf "  order #%d: %d errors\n", $f->{order_id}, $f->{errors}
+    }
+}
+
+# ── per-order processing latency ───────────────────────────────────
+
+p ""
+p "── per-order processing latency (t-digest) ──────────"
+printf "  p50  : %.1f µs\n", td_quantile($td_proc, 0.50)
+printf "  p99  : %.1f µs\n", td_quantile($td_proc, 0.99)

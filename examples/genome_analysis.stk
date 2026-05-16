@@ -1,0 +1,164 @@
+#!/usr/bin/env stryke
+
+# DNA sequence analysis demo. Patterns:
+#   * GC content (% G + C nucleotides)
+#   * codon frequency (consecutive 3-bases)
+#   * reverse complement
+#   * ORF (open reading frame) detection between start/stop codons
+#   * t-digest for per-codon scan latency
+#   * sketch (TopK) for most-frequent codons
+
+# ── sample DNA sequence (synthetic) ────────────────────────────────
+
+my $dna = "ATGAAACCTGCAGGCCCTGGGTAAGTCATGGCTCCTGAATAGTTTAAACCG" .
+          "ATGGCCATTGGCAAGTTGCATGCTAGCTGAACGCATGAGCAACGTCCATAA" .
+          "CGTGCTACGACGCATAGCCTAGCATGCAGCGTAGACGCATCAGTGCATGTC"
+
+printf "── DNA sequence: %d bases ───────────────────────────\n",
+    length($dna)
+
+# ── GC content ──────────────────────────────────────────────────────
+
+my $ng = 0
+my $nc = 0
+my $na = 0
+my $nt = 0
+my $other = 0
+for my $i (0:length($dna) - 1) {
+    my $ch = substr($dna, $i, 1)
+    if    ($ch eq "G") { $ng++ }
+    elsif ($ch eq "C") { $nc++ }
+    elsif ($ch eq "A") { $na++ }
+    elsif ($ch eq "T") { $nt++ }
+    else               { $other++ }
+}
+
+my $total = $na + $nc + $ng + $nt
+my $gc_pct = 100.0 * ($ng + $nc) / $total
+
+p ""
+p "── nucleotide composition ───────────────────────────"
+printf "  A : %4d (%.1f%%)\n", $na, 100.0 * $na / $total
+printf "  C : %4d (%.1f%%)\n", $nc, 100.0 * $nc / $total
+printf "  G : %4d (%.1f%%)\n", $ng, 100.0 * $ng / $total
+printf "  T : %4d (%.1f%%)\n", $nt, 100.0 * $nt / $total
+printf "  GC content : %.1f%%\n", $gc_pct
+
+# ── codon frequency ─────────────────────────────────────────────────
+
+my %codon_count
+my $td_scan = t_digest(100)
+my $tk_codons = topk(5)
+
+my $i = 0
+while ($i + 3 <= length($dna)) {
+    my $t0 = now_ns()
+    my $codon = substr($dna, $i, 3)
+    $codon_count{$codon} = ($codon_count{$codon} // 0) + 1
+    topk_add($tk_codons, $codon)
+    td_add($td_scan, (now_ns() - $t0) / 1000.0)
+    $i = $i + 3
+}
+
+p ""
+printf "── codon frequencies (top 10 of %d distinct) ──────────\n",
+    len(keys %codon_count)
+my @sorted_codons = sort { $codon_count{$_1} <=> $codon_count{$_0} } keys %codon_count
+my $shown = 0
+for my $codon (@sorted_codons) {
+    last if $shown >= 10
+    printf "  %s : %d\n", $codon, $codon_count{$codon}
+    $shown++
+}
+
+# ── reverse complement ──────────────────────────────────────────────
+
+my %complement = (A => "T", T => "A", G => "C", C => "G")
+
+fn Demo::Genome::reverse_complement($seq) {
+    my $rc = ""
+    for my $i (rev(0:length($seq) - 1)) {
+        my $ch = substr($seq, $i, 1)
+        $rc .= ($complement{$ch} // "N")
+    }
+    return $rc
+}
+
+my $rc = Demo::Genome::reverse_complement($dna)
+p ""
+p "── reverse complement (first 60 bases) ──────────────"
+printf "  orig : %s\n", substr($dna, 0, 60)
+printf "  rc   : %s\n", substr($rc, 0, 60)
+printf "  rc length : %d (must match input)\n", length($rc)
+
+# ── ORF detection (between ATG start and TAA/TAG/TGA stop) ─────────
+
+p ""
+p "── open reading frames (ATG..STOP) ───────────────────"
+my @orfs
+for my $frame (0:2) {
+    my $j = $frame
+    while ($j + 3 <= length($dna)) {
+        my $codon = substr($dna, $j, 3)
+        if ($codon eq "ATG") {
+            # Look for stop codon.
+            my $k = $j + 3
+            while ($k + 3 <= length($dna)) {
+                my $next = substr($dna, $k, 3)
+                if ($next eq "TAA" || $next eq "TAG" || $next eq "TGA") {
+                    my $orf_len = $k + 3 - $j
+                    if ($orf_len >= 30) {   # minimum length filter
+                        push @orfs, +{
+                            frame => $frame,
+                            start => $j,
+                            end   => $k + 3,
+                            length => $orf_len,
+                            stop_codon => $next,
+                        }
+                    }
+                    last
+                }
+                $k = $k + 3
+            }
+        }
+        $j = $j + 3
+    }
+}
+
+@orfs = sort { $_1->{length} <=> $_0->{length} } @orfs
+printf "  found %d ORFs (≥30 bases)\n", len(@orfs)
+my $orf_shown = 0
+for my $orf (@orfs) {
+    last if $orf_shown >= 5
+    printf "  frame=%d start=%-3d end=%-3d length=%-3d stop=%s\n",
+        $orf->{frame}, $orf->{start}, $orf->{end},
+        $orf->{length}, $orf->{stop_codon}
+    $orf_shown++
+}
+
+# ── distinct codons (HLL) ──────────────────────────────────────────
+
+p ""
+p "── HLL distinct codons ──────────────────────────────"
+my $hll = hll(14)
+for my $codon (keys %codon_count) {
+    hll_add($hll, $codon)
+}
+printf "  HLL distinct codons : %d\n", hll_count($hll)
+printf "  exact               : %d (max 64)\n", len(keys %codon_count)
+
+# ── TopK most-frequent codons (sketch) ─────────────────────────────
+
+p ""
+p "── TopK most-frequent codons ────────────────────────"
+my @hits = topk_top($tk_codons)
+for my $h (@hits) {
+    printf "  %s : %d hits\n", $h->[0], $h->[1]
+}
+
+# ── latency ─────────────────────────────────────────────────────────
+
+p ""
+p "── per-codon scan latency (t-digest) ────────────────"
+printf "  p50  : %.1f µs\n", td_quantile($td_scan, 0.50)
+printf "  p99  : %.1f µs\n", td_quantile($td_scan, 0.99)

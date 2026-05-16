@@ -1,0 +1,168 @@
+#!/usr/bin/env stryke
+
+# Markdown-to-HTML parser demo. Supports a subset:
+#   * # / ## / ### headers
+#   * **bold** and *italic*
+#   * `code` spans
+#   * - unordered list items
+#   * [text](url) links
+#   * paragraph wrapping
+# Patterns:
+#   * line-by-line state machine
+#   * regex-based inline transformations (capture-save idiom)
+#   * t-digest for per-line render latency
+
+# ── inline transforms ──────────────────────────────────────────────
+
+fn Demo::MD::inline($text) {
+    # Apply inline rules in order: code first (so * inside `code` isn't
+    # treated as emphasis), then bold, italic, links.
+    $text =~ s/`([^`]+)`/<code>$1<\/code>/g
+    $text =~ s/\*\*([^*]+)\*\*/<strong>$1<\/strong>/g
+    $text =~ s/\*([^*]+)\*/<em>$1<\/em>/g
+    # Links: [text](url)
+    $text =~ s/\[([^\]]+)\]\(([^)]+)\)/<a href="$2">$1<\/a>/g
+    return $text
+}
+
+# ── line-level parser ───────────────────────────────────────────────
+
+fn Demo::MD::parse($md) {
+    my @lines = split /\n/, $md
+    my @html
+    my $in_list = 0
+    my @para_buf
+    fn Demo::MD::flush_para($para_buf_ref, $html_ref) {
+        if (len(@$para_buf_ref) > 0) {
+            my $combined = join(" ", @$para_buf_ref)
+            push @$html_ref, "<p>" . Demo::MD::inline($combined) . "</p>"
+            @$para_buf_ref = ()
+        }
+    }
+    for my $line (@lines) {
+        # Heading.
+        if ($line =~ /^(\#{1,6})\s+(.+)$/) {
+            Demo::MD::flush_para(\@para_buf, \@html)
+            if ($in_list) {
+                push @html, "</ul>"
+                $in_list = 0
+            }
+            my $hashes = $1
+            my $text = $2
+            my $level = len($hashes)
+            push @html, "<h${level}>" . Demo::MD::inline($text) . "</h${level}>"
+            next
+        }
+        # List item.
+        if ($line =~ /^-\s+(.+)$/) {
+            Demo::MD::flush_para(\@para_buf, \@html)
+            my $item = $1
+            if (!$in_list) {
+                push @html, "<ul>"
+                $in_list = 1
+            }
+            push @html, "  <li>" . Demo::MD::inline($item) . "</li>"
+            next
+        }
+        # Blank line: paragraph break.
+        if ($line =~ /^\s*$/) {
+            if ($in_list) {
+                push @html, "</ul>"
+                $in_list = 0
+            }
+            Demo::MD::flush_para(\@para_buf, \@html)
+            next
+        }
+        # Plain line: accumulate into paragraph.
+        if ($in_list) {
+            push @html, "</ul>"
+            $in_list = 0
+        }
+        push @para_buf, $line
+    }
+    Demo::MD::flush_para(\@para_buf, \@html)
+    if ($in_list) {
+        push @html, "</ul>"
+    }
+    return \@html
+}
+
+# ── sample markdown ────────────────────────────────────────────────
+
+my $md = q{# Stryke Language
+
+Stryke is a *fast*, **parallel** programming language with `JIT` support.
+
+## Features
+
+- Bytecode VM with Cranelift JIT
+- **Parallel** primitives via rayon
+- Sketch algebra ([HLL](https://hll.example), TopK, t-digest)
+- AOP intercepts
+
+## Performance
+
+Stryke is designed to be the **fastest** scripting language for
+text-processing workloads. The `pmap` builtin enables data-parallel
+processing across all CPU cores.
+
+### Links
+
+Check out the [documentation](https://stryke.example/docs)
+for more details.
+}
+
+# ── render ──────────────────────────────────────────────────────────
+
+my $td_render = t_digest(100)
+my $start = now_ns()
+my $html = Demo::MD::parse($md)
+my $elapsed = (now_ns() - $start) / 1000.0
+
+p "── rendered HTML ────────────────────────────────────"
+for my $line (@$html) { p "  $line" }
+
+p ""
+printf "── stats ───────────────────────────────────────────\n"
+my @input_lines = split /\n/, $md
+printf "  input lines  : %d\n", len(@input_lines)
+printf "  output lines : %d\n", len(@$html)
+printf "  render time  : %.1f µs\n", $elapsed
+
+# ── tag-type rollup ───────────────────────────────────────────────
+
+p ""
+p "── tag-type distribution ─────────────────────────────"
+my %tags
+for my $line (@$html) {
+    while ($line =~ /<(\w+)/g) {
+        $tags{$1}++
+    }
+}
+for my $tag (sort { $tags{$_1} <=> $tags{$_0} } keys %tags) {
+    printf "  <%s> : %d\n", $tag, $tags{$tag}
+}
+
+# ── HLL distinct tags ──────────────────────────────────────────────
+
+p ""
+p "── HLL distinct tags ────────────────────────────────"
+my $hll = hll(14)
+hll_add($hll, $_) for keys %tags
+printf "  HLL   : %d\n", hll_count($hll)
+printf "  exact : %d\n", len(keys %tags)
+
+# ── TopK most-used tags ────────────────────────────────────────────
+
+p ""
+p "── TopK most-used tags ──────────────────────────────"
+my $tk = topk(5)
+for my $tag (keys %tags) {
+    for my $i (1:$tags{$tag}) {
+        topk_add($tk, $tag)
+    }
+}
+my @hits = topk_top($tk)
+for my $h (@hits) {
+    printf "  <%s> : %d\n", $h->[0], $h->[1]
+}

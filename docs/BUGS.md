@@ -5083,6 +5083,354 @@ Severity: **bug** (parity gap; silent corrupted output for any
 dollar-aware text — prices, shell-script generation, regex docs).
 
 
+## BUG-235 — `@h{@arrayvar}` hash-slice with array-variable keys returns one empty element
+
+```sh
+$ s -e '
+    my %h = (a => 1, b => 2, c => 3);
+    my @v1 = @h{qw(a c)};
+    print "qw:    n=", scalar(@v1), " ", join(",", @v1), "\n";
+
+    my @v2 = @h{"a","c"};
+    print "lit:   n=", scalar(@v2), " ", join(",", @v2), "\n";
+
+    my @keys = ("a", "c");
+    my @v3 = @h{@keys};
+    print "array: n=", scalar(@v3), "\n"
+'
+qw:    n=2 1,3
+lit:   n=2 1,3
+array: n=1
+```
+
+Three forms of hash slice are documented; in Perl all three return the
+same per-key values. In stryke, the `@h{@arrayvar}` form (array
+variable interpolated as the key list) returns a single empty element
+instead of the per-key values. The `qw(...)` and `"a","b"` literal-list
+forms work correctly.
+
+Workaround: replace `@h{@keys}` with per-key arrow lookups in a loop:
+
+```stryke
+my @v;
+for my $k (@keys) {
+    push @v, $h{$k};
+}
+```
+
+Pin: `hash_value_slice_with_array_keys_returns_empty_buggy` in
+`tests/suite/hash_slice_pin.rs`.
+
+Severity: **bug** (parity gap; affects every "subset extract" pattern
+where the key list is computed dynamically).
+
+
+## BUG-236 — `delete @h{LIST}` slice form rejected with "delete requires hash or array element"
+
+```sh
+$ s -e '
+    my %h = (a => 1, b => 2, c => 3);
+    delete @h{qw(a c)}
+'
+delete requires hash or array element at -e line 3.
+
+$ perl -e '
+    my %h = (a => 1, b => 2, c => 3);
+    delete @h{qw(a c)};
+    print join(",", sort keys %h), "\n"
+'
+b
+```
+
+The slice form `delete @h{LIST}` for batch-removing multiple keys is
+explicitly rejected at runtime. Only single-key `delete $h{K}` is
+accepted.
+
+Workaround: loop over the key list and delete each key individually:
+
+```stryke
+for my $k (qw(a c)) {
+    delete $h{$k};
+}
+```
+
+Pin: `delete_per_key_workaround_for_batch_delete` in
+`tests/suite/hash_slice_pin.rs`.
+
+Severity: **bug** (parity gap; affects bulk cleanup patterns).
+
+
+## BUG-237 — `split /(?<=...)\s/` ignores lookbehind, splits on every whitespace
+
+```sh
+$ s -e '
+    my $s = "Hi. How are you? I am fine.";
+    my @parts = split /(?<=[.!?])\s/, $s;
+    print "n=", scalar(@parts), "\n";
+    for my $p (@parts) { print "  [$p]\n" }
+'
+n=7
+  [Hi.]
+  [How]
+  [are]
+  [you?]
+  [I]
+  [am]
+  [fine.]
+
+$ perl -e '
+    my $s = "Hi. How are you? I am fine.";
+    my @parts = split /(?<=[.!?])\s/, $s;
+    print scalar(@parts), "\n"
+'
+3
+```
+
+The lookbehind assertion `(?<=[.!?])` in a `split` pattern is silently
+ignored — the regex splits on every whitespace regardless. In Perl,
+the same form correctly splits only on whitespace that follows a
+sentence-ending punctuation character (so it preserves the punctuation
+with its sentence).
+
+Direct `=~ /(?<=...)X/` matches DO honor lookbehind correctly (per
+`regex_lookaround_pin.rs` other tests); the issue is specifically in
+the split-pattern compilation path.
+
+Workaround: split on the punctuation directly via `[.!?]+` and post-
+filter empty matches.
+
+Pin: `split_lookbehind_does_not_constrain_correctly` in
+`tests/suite/regex_lookaround_pin.rs`.
+
+Severity: **bug** (parity gap; affects sentence-splitting and any
+boundary-preserving tokenization).
+
+
+## BUG-238 — `when ($_ < N)` arithmetic clause smart-matches instead of boolean-evaluating
+
+```sh
+$ s -e '
+    my $x = 50;
+    given ($x) {
+        when ($_ < 10)  { print "low\n" }
+        when ($_ < 100) { print "mid\n" }
+        default         { print "high\n" }
+    }
+'
+high
+```
+
+In Perl 5.10+, `when ($_ < 100)` is treated as a boolean expression
+(distinct from value smart-match) and the clause fires when the
+expression is truthy. Stryke smart-matches the value of `$_ < 100`
+(which is `1` for true) against `$_` (which is 50), getting no match
+— so neither `when` clause fires and `default` always wins.
+
+Affects every range-style dispatch idiom. Workaround: use literal-
+value clauses only, and fall back to `if/elsif` inside `default` for
+threshold checks.
+
+Pin: `given_when_arithmetic_clause_falls_through_to_default` in
+`tests/suite/given_when_pin.rs`.
+
+Severity: **bug** (parity gap; affects every value-bucketing pattern).
+
+
+## BUG-239 — `return` inside `given/when` block errors at compile-time
+
+```sh
+$ s -e '
+    fn ca($cmd) {
+        given ($cmd) {
+            when ("start") { return "starting" }
+            default        { return "unknown" }
+        }
+    }
+    print ca("start"), "\n"
+'
+unexpected control flow in tree-assisted opcode at -e line 3.
+```
+
+`return` from inside a `given/when` body fails to lower in the
+tree-assisted opcode pass. Stryke compile-time rejects the program.
+
+Affects: any state-machine / classifier function that wants to
+return early per branch. Forces the user to assign each branch's
+result to a local variable and return it after the block exits.
+
+Workaround:
+
+```stryke
+fn classify($n) {
+    my $r;
+    given ($n) {
+        when (0) { $r = "zero" }
+        default  { $r = "other" }
+    }
+    return $r
+}
+```
+
+Pin: `given_when_threshold_via_local_variable` in
+`tests/suite/given_when_pin.rs`.
+
+Severity: **bug** (parity gap + workaround friction).
+
+
+## BUG-240 — CSV `from_csv` does not unescape doubled-double-quote `""` in quoted fields
+
+```sh
+$ s -e '
+    my $csv = qq{name,quip\n"bob","he said ""hi"""\n};
+    my $back = from_csv($csv);
+    print "quip=[", $back->[0]->{quip}, "]\n"
+'
+quip=[he said ""hi]
+
+$ perl -MText::CSV -e '
+    use Text::CSV;
+    my $csv = Text::CSV->new();
+    open(my $fh, "<", \qq{name,quip\n"bob","he said ""hi"""\n});
+    $csv->getline($fh);   # header
+    my $row = $csv->getline($fh);
+    print "quip=[", $row->[1], "]\n"
+'
+quip=[he said "hi"]
+```
+
+The CSV standard (RFC 4180) and Perl's `Text::CSV` both unescape `""`
+inside a quoted field to a literal `"`. Stryke's `from_csv` does not
+perform this unescaping — the result contains the raw double-quotes
+and loses the closing pair.
+
+Affects: any CSV containing quoted text fields with embedded quotes
+(common for product descriptions, error messages, JSON-in-CSV
+embeddings). Workaround: post-process the parsed values with a
+`s/""/"/g` substitution.
+
+Pin: `from_csv_escaped_quote_partial_unescape` in
+`tests/suite/csv_codec_pin.rs`.
+
+Severity: **bug** (correctness; affects data import from spreadsheets).
+
+
+## BUG-241 — `url_encode` percent-encodes RFC 3986 unreserved characters `-_.~`
+
+```sh
+$ s -e 'print url_encode("ABCabc123-_.~"), "\n"'
+ABCabc123%2D%5F%2E%7E
+
+$ perl -MURI::Escape -e 'print uri_escape("ABCabc123-_.~"), "\n"'
+ABCabc123-_.~
+```
+
+RFC 3986 §2.3 designates `-` `_` `.` `~` as *unreserved* characters
+that MUST NOT be encoded. Stryke's `url_encode` percent-encodes them
+anyway. Round-tripping through `url_decode` still produces the
+original string, so behavior is conservative (over-encodes but never
+under-encodes), but the output is non-canonical and may cause
+mismatches when comparing URLs against external tools.
+
+Pin: `url_encode_aggressive_encodes_unreserved_chars` in
+`tests/suite/encoding_pin.rs`.
+
+Severity: **polish** (over-conservative encoding; round-trip safe).
+
+
+## BUG-242 — `index(STR, NEEDLE, START)` panics when `START >= length(STR)`
+
+```sh
+$ s -e 'my $r = index("hello", "h", 10); print "r=$r\n"'
+thread 'main' panicked at strykelang/vm_helper.rs:12561:31:
+start byte index 10 is out of bounds of `hello`
+```
+
+Perl's `index` returns `-1` cleanly when the start offset is past the
+string length. Stryke panics with a Rust-level "out of bounds" error
+that aborts the program — the panic is NOT catchable by `eval { ... }`
+since it's a Rust panic, not a Perl-level die.
+
+Affects: any code that uses `index(STR, NEEDLE, START)` in a loop
+without bounds-checking the start offset (common pattern for find-all
+occurrence iteration).
+
+Workaround: guard `index` with explicit length check:
+
+```stryke
+my $start = ...;
+my $r = $start >= length($s) ? -1 : index($s, $needle, $start);
+```
+
+Or use `=~ //g` for the same pattern; it manages position internally.
+
+Pin: `index_with_start_at_end_returns_minus_one` (boundary case at
+exact length is safe) in `tests/suite/string_search_pin.rs`.
+
+Severity: **bug** (P1; uncatchable Rust panic; common loop-pattern hazard).
+
+
+## BUG-243 — Heredoc not accepted as function argument or in ternary
+
+```sh
+$ s -e 'fn echo($s) { $s } print echo(<<END)
+hello
+END'
+... parse error: Expected RParen, got Ident ...
+```
+
+Stryke's parser only accepts heredoc bodies in *statement* contexts —
+assignment, top-level expression. Passing `<<TAG` directly as a
+function argument or as a ternary branch fails parsing.
+
+Workaround: assign to a `my` variable first, then pass.
+
+```stryke
+my $body = <<END;
+hello
+END
+print echo($body);
+```
+
+Pin: `heredoc_in_var_then_passed_to_fn`,
+`heredoc_in_ternary_via_temp_var` in `tests/suite/heredoc_pin.rs`.
+
+Severity: **polish** (workaround is one extra line; no semantic loss).
+
+
+## BUG-244 — `mysync` inside `fn` body reinitialises on each call
+
+```sh
+$ s -e '
+fn counter() {
+    mysync $n = 0;
+    $n = $n + 1;
+    return $n
+}
+print counter(), " ", counter(), " ", counter(), "\n"'
+1 1 1
+```
+
+`mysync` was intended as cross-closure shared state; inside a top-level
+fn body it does not act as a "static" variable that persists across
+calls — each invocation reinitialises `$n` to `0`. The closest stryke
+idiom for static-like persistence is the closure-factory pattern:
+
+```stryke
+my $counter = do {
+    my $n = 0;
+    sub { $n = $n + 1 }
+};
+print $counter->(), " ", $counter->(), " ", $counter->(), "\n";
+# 1 2 3
+```
+
+Pin: `mysync_inside_fn_reinit_per_call_not_static` in
+`tests/suite/local_scope_pin.rs`.
+
+Severity: **polish** (clear closure-factory workaround; design decision
+on whether `mysync` should imply per-fn persistence is open).
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't

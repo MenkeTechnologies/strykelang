@@ -1,0 +1,182 @@
+#!/usr/bin/env stryke
+
+# Payroll calculator demo. Computes gross pay (regular + overtime),
+# federal + state taxes via brackets, fixed deductions, and net pay.
+# Patterns:
+#   * tax-bracket lookup via sorted array iteration
+#   * per-employee hashref input
+#   * t-digest for per-payment latency
+#   * HLL for distinct employee cardinality
+#   * TopK for highest earners
+
+# ── tax brackets (simplified) ──────────────────────────────────────
+
+my @federal_brackets = (
+    +{ upto => 12000,  rate => 0.10 },
+    +{ upto => 45000,  rate => 0.12 },
+    +{ upto => 100000, rate => 0.22 },
+    +{ upto => 200000, rate => 0.24 },
+    +{ upto => 999999999, rate => 0.32 },
+)
+
+my %state_rates = (
+    "CA" => 0.093,
+    "NY" => 0.0685,
+    "TX" => 0.0,
+    "WA" => 0.0,
+    "FL" => 0.0,
+    "OR" => 0.099,
+)
+
+# ── compute tax via brackets ───────────────────────────────────────
+
+fn Demo::PR::federal_tax($annual_gross) {
+    my $tax = 0
+    my $prev = 0
+    for my $bracket (@federal_brackets) {
+        if ($annual_gross > $bracket->{upto}) {
+            $tax += ($bracket->{upto} - $prev) * $bracket->{rate}
+            $prev = $bracket->{upto}
+        } else {
+            $tax += ($annual_gross - $prev) * $bracket->{rate}
+            return $tax
+        }
+    }
+    return $tax
+}
+
+fn Demo::PR::state_tax($annual_gross, $state) {
+    my $rate = $state_rates{$state} // 0.05
+    return $annual_gross * $rate
+}
+
+# ── process one paycheck ───────────────────────────────────────────
+
+my $td_calc = t_digest(100)
+my $hll_employees = hll(14)
+my $tk_top = topk(3)
+
+fn Demo::PR::compute($emp) {
+    my $t0 = now_ns()
+    my $hourly = $emp->{hourly_rate}
+    my $hours  = $emp->{hours}
+    my $reg_hours = $hours > 40 ? 40 : $hours
+    my $ot_hours  = $hours > 40 ? $hours - 40 : 0
+    my $reg_pay = $reg_hours * $hourly
+    my $ot_pay  = $ot_hours * $hourly * 1.5
+    my $gross_period = $reg_pay + $ot_pay
+    # Annualize for tax-bracket lookup (assume biweekly).
+    my $periods_per_year = 26
+    my $annual_est = $gross_period * $periods_per_year
+    # Per-period taxes proportional.
+    my $fed_annual   = Demo::PR::federal_tax($annual_est)
+    my $state_annual = Demo::PR::state_tax($annual_est, $emp->{state})
+    my $fed_period   = $fed_annual   / $periods_per_year
+    my $state_period = $state_annual / $periods_per_year
+    # FICA: 7.65% on gross.
+    my $fica = $gross_period * 0.0765
+    # Misc deductions (health insurance, retirement).
+    my $misc = $emp->{misc_deduction} // 0
+    my $total_deductions = $fed_period + $state_period + $fica + $misc
+    my $net = $gross_period - $total_deductions
+    td_add($td_calc, (now_ns() - $t0) / 1000.0)
+    hll_add($hll_employees, $emp->{name})
+    for my $i (1:int($net / 100)) {
+        topk_add($tk_top, $emp->{name})
+    }
+    return +{
+        name => $emp->{name},
+        gross => $gross_period,
+        federal => $fed_period,
+        state_tax => $state_period,
+        fica => $fica,
+        misc => $misc,
+        net => $net,
+        annual_gross_est => $annual_est,
+    }
+}
+
+# ── sample employees (biweekly period) ─────────────────────────────
+
+my @employees = (
+    +{ name => "alice",  hourly_rate => 32.50, hours => 80, state => "CA", misc_deduction => 150 },
+    +{ name => "bob",    hourly_rate => 18.00, hours => 80, state => "NY", misc_deduction => 75  },
+    +{ name => "carol",  hourly_rate => 45.00, hours => 90, state => "TX", misc_deduction => 100 },
+    +{ name => "dave",   hourly_rate => 25.00, hours => 60, state => "WA", misc_deduction => 50  },
+    +{ name => "eve",    hourly_rate => 28.50, hours => 80, state => "CA", misc_deduction => 200 },
+    +{ name => "frank",  hourly_rate => 60.00, hours => 50, state => "OR", misc_deduction => 250 },
+    +{ name => "grace",  hourly_rate => 22.00, hours => 88, state => "FL", misc_deduction => 0   },
+)
+
+printf "── processing %d paychecks (biweekly) ────────────────\n",
+    len(@employees)
+
+my @results = map { Demo::PR::compute($_) } @employees
+
+# ── per-employee report ────────────────────────────────────────────
+
+p ""
+printf "  %-7s %5s %8s %8s %8s %8s %8s\n",
+    "name", "hrs", "gross", "fed", "state", "fica", "net"
+p "  ------- ----- -------- -------- -------- -------- --------"
+for my $i (0:len(@employees) - 1) {
+    my $emp = $employees[$i]
+    my $r = $results[$i]
+    printf "  %-7s %5d %8.2f %8.2f %8.2f %8.2f %8.2f\n",
+        $r->{name},
+        $emp->{hours},
+        $r->{gross},
+        $r->{federal},
+        $r->{state_tax},
+        $r->{fica},
+        $r->{net}
+}
+
+# ── rollup ──────────────────────────────────────────────────────────
+
+my $total_gross = 0
+my $total_net = 0
+my $total_taxes = 0
+for my $r (@results) {
+    $total_gross += $r->{gross}
+    $total_net += $r->{net}
+    $total_taxes += $r->{federal} + $r->{state_tax} + $r->{fica}
+}
+
+p ""
+p "── batch rollup ─────────────────────────────────────"
+printf "  employees    : %d\n", len(@employees)
+printf "  total gross  : \$%.2f\n", $total_gross
+printf "  total taxes  : \$%.2f (%.1f%%)\n",
+    $total_taxes, 100.0 * $total_taxes / $total_gross
+printf "  total net    : \$%.2f\n", $total_net
+
+# ── top earners (TopK) ─────────────────────────────────────────────
+
+p ""
+p "── TopK earners (by net pay tier) ───────────────────"
+my @hits = topk_top($tk_top)
+for my $h (@hits) {
+    printf "  %-8s : ~\$%d\n", $h->[0], $h->[1] * 100
+}
+
+# ── HLL distinct employees ─────────────────────────────────────────
+
+p ""
+p "── HLL distinct employees ───────────────────────────"
+printf "  HLL   : %d\n", hll_count($hll_employees)
+printf "  exact : %d\n", len(@employees)
+
+# ── net pay percentiles ────────────────────────────────────────────
+
+p ""
+p "── net pay distribution (t-digest of latency, plus stats) ──"
+my $td_net = t_digest(100)
+td_add($td_net, $_->{net}) for @results
+printf "  p10 net : \$%.2f\n", td_quantile($td_net, 0.10)
+printf "  p50 net : \$%.2f\n", td_quantile($td_net, 0.50)
+printf "  p90 net : \$%.2f\n", td_quantile($td_net, 0.90)
+
+p ""
+printf "  per-paycheck calc p50 : %.1f µs\n", td_quantile($td_calc, 0.50)
+printf "  per-paycheck calc p99 : %.1f µs\n", td_quantile($td_calc, 0.99)

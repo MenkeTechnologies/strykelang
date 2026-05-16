@@ -1,0 +1,165 @@
+#!/usr/bin/env stryke
+
+# URL shortener demo. Generates a short ID for each long URL via FNV
+# hash + base36 encoding, stores mappings in an rkyv KV store, tracks
+# click counts. Patterns:
+#   * deterministic hash → short ID (sticky)
+#   * collision detection via incremental rehash
+#   * kv_open / kv_put / kv_get for persistence
+#   * t-digest for shorten latency
+#   * TopK for most-clicked URLs
+
+# ── hash helper ────────────────────────────────────────────────────
+
+fn Demo::Short::fnv($s) {
+    my $h = 2166136261
+    for my $i (0:len($s) - 1) {
+        my $c = ord(substr($s, $i, 1))
+        $h = ($h ^ $c) * 16777619
+        $h = $h % 4294967296
+    }
+    return $h
+}
+
+# Convert an integer to base36 (0-9 + a-z).
+fn Demo::Short::to_base36($n) {
+    my $alphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
+    my $s = ""
+    while ($n > 0) {
+        my $d = $n % 36
+        $s = substr($alphabet, $d, 1) . $s
+        $n = int($n / 36)
+    }
+    return len($s) == 0 ? "0" : $s
+}
+
+# ── shortener state ─────────────────────────────────────────────────
+
+my $kv_path = "/tmp/stryke_shortener.rkyv"
+unlink $kv_path if -e $kv_path
+my $kv = kv_open($kv_path)
+mysync %short_to_long   # short_id -> long_url
+mysync %click_count
+
+my $td_shorten = t_digest(100)
+my $tk_clicks = topk(3)
+mysync $collisions = 0
+
+fn Demo::Short::shorten($long_url) {
+    my $t0 = now_ns()
+    my $hash = Demo::Short::fnv($long_url)
+    # Truncate to 6 base36 chars (~2 billion space).
+    my $base = $hash % (36 ** 6)
+    my $short = Demo::Short::to_base36($base)
+    # Pad to 6 chars with leading zeros.
+    while (len($short) < 6) {
+        $short = "0" . $short
+    }
+    # Collision handling: if short already maps to a different URL,
+    # rehash by appending a counter.
+    my $attempt = 0
+    while (exists $short_to_long{$short} && $short_to_long{$short} ne $long_url) {
+        $collisions = $collisions + 1
+        $attempt = $attempt + 1
+        my $rehash = Demo::Short::fnv($long_url . "#$attempt")
+        my $base2 = $rehash % (36 ** 6)
+        $short = Demo::Short::to_base36($base2)
+        while (len($short) < 6) {
+            $short = "0" . $short
+        }
+    }
+    $short_to_long{$short} = $long_url
+    $click_count{$short} = 0
+    kv_put($kv, $short, $long_url)
+    td_add($td_shorten, (now_ns() - $t0) / 1000.0)
+    return $short
+}
+
+fn Demo::Short::expand($short) {
+    my $r = $short_to_long{$short}
+    if (defined $r) {
+        $click_count{$short} = $click_count{$short} + 1
+        topk_add($tk_clicks, $short)
+        return $r
+    }
+    return undef
+}
+
+# ── workload ───────────────────────────────────────────────────────
+
+my @urls = (
+    "https://example.com/article/about-us",
+    "https://example.com/article/products",
+    "https://docs.example.com/getting-started",
+    "https://docs.example.com/api/reference",
+    "https://blog.example.com/2026/05/post-1",
+    "https://blog.example.com/2026/05/post-2",
+    "https://blog.example.com/2026/05/post-3",
+    "https://shop.example.com/cart",
+    "https://shop.example.com/checkout",
+    "https://api.example.com/v1/users",
+)
+
+printf "── shortening %d URLs ────────────────────────────────\n",
+    len(@urls)
+my %short_ids
+for my $url (@urls) {
+    my $s = Demo::Short::shorten($url)
+    $short_ids{$url} = $s
+    printf "  %s\n    -> short/%s\n", substr($url, 0, 50), $s
+}
+
+# ── simulate clicks ─────────────────────────────────────────────────
+
+p ""
+p "── simulating 100 clicks (weighted toward first URLs) ──"
+for my $i (1:100) {
+    # Weighted: earlier URLs more popular.
+    my $idx = int(rand() * rand() * len(@urls))
+    my $short = $short_ids{$urls[$idx]}
+    Demo::Short::expand($short)
+}
+
+# ── click-count report ────────────────────────────────────────────
+
+p ""
+p "── click counts (sorted) ────────────────────────────"
+my @sorted = sort { $click_count{$_1} <=> $click_count{$_0} } keys %click_count
+for my $s (@sorted) {
+    next if $click_count{$s} == 0
+    my $url = $short_to_long{$s}
+    printf "  short/%s : %d clicks  ->  %s\n",
+        $s, $click_count{$s}, substr($url, 0, 40)
+}
+
+# ── TopK most-clicked ──────────────────────────────────────────────
+
+p ""
+p "── TopK most-clicked (sketch) ────────────────────────"
+my @hits = topk_top($tk_clicks)
+for my $h (@hits) {
+    printf "  short/%s : %d clicks\n", $h->[0], $h->[1]
+}
+
+# ── KV persistence check ──────────────────────────────────────────
+
+p ""
+p "── KV persistence ───────────────────────────────────"
+kv_close($kv)
+my $kv2 = kv_open($kv_path)
+my $kv_count = kv_len($kv2)
+my $first_short = $short_ids{$urls[0]}
+my $back = kv_get($kv2, $first_short)
+printf "  KV stored shorts : %d\n", $kv_count
+printf "  reload first url : %s\n", substr($back // "(missing)", 0, 50)
+kv_close($kv2)
+unlink $kv_path
+
+# ── stats ───────────────────────────────────────────────────────────
+
+p ""
+p "── stats ────────────────────────────────────────────"
+printf "  URLs shortened : %d\n", len(@urls)
+printf "  collisions     : %d (incremental rehashes needed)\n", $collisions
+printf "  p50 latency    : %.1f µs\n", td_quantile($td_shorten, 0.50)
+printf "  p99 latency    : %.1f µs\n", td_quantile($td_shorten, 0.99)

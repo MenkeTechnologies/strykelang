@@ -1,0 +1,163 @@
+#!/usr/bin/env stryke
+
+# Snakes and Ladders simulator. Plays N games on a 100-cell board with
+# preset snakes and ladders, tracks move counts, computes win-rate
+# stats over a large number of solo games. Patterns:
+#   * dice roll via rand()
+#   * board state as scalar position
+#   * snake/ladder lookup via hash
+#   * t-digest for moves-per-game distribution
+#   * TopK for most-landed-on cells
+
+# ── board (snakes go down, ladders go up) ──────────────────────────
+
+my %hops = (
+    # ladders
+    4   => 14,
+    9   => 31,
+    20  => 38,
+    28  => 84,
+    40  => 59,
+    51  => 67,
+    63  => 81,
+    71  => 91,
+    # snakes
+    17  => 7,
+    54  => 34,
+    62  => 19,
+    64  => 60,
+    87  => 36,
+    93  => 73,
+    95  => 75,
+    99  => 78,
+)
+
+# ── one game ───────────────────────────────────────────────────────
+
+fn Demo::BG::play_one() {
+    my $pos = 0
+    my $moves = 0
+    my $hops_used = 0
+    while ($pos < 100) {
+        my $roll = int(rand() * 6) + 1
+        $moves = $moves + 1
+        my $new_pos = $pos + $roll
+        # Overshoot rule: stay put if overshoot 100.
+        if ($new_pos > 100) {
+            next
+        }
+        $pos = $new_pos
+        if (exists $hops{$pos}) {
+            $pos = $hops{$pos}
+            $hops_used = $hops_used + 1
+        }
+    }
+    return +{ moves => $moves, hops => $hops_used }
+}
+
+# ── simulate N games ───────────────────────────────────────────────
+
+my $N = 1000
+my $td_moves = t_digest(100)
+my $tk_landings = topk(5)
+
+printf "── simulating %d games ─────────────────────────────────\n", $N
+
+my $total_hops = 0
+for my $i (1:$N) {
+    my $r = Demo::BG::play_one()
+    td_add($td_moves, $r->{moves})
+    $total_hops += $r->{hops}
+}
+
+# ── moves-per-game stats ───────────────────────────────────────────
+
+p ""
+p "── moves-per-game distribution ──────────────────────"
+printf "  p10 : %d\n", int(td_quantile($td_moves, 0.10))
+printf "  p50 : %d\n", int(td_quantile($td_moves, 0.50))
+printf "  p90 : %d\n", int(td_quantile($td_moves, 0.90))
+printf "  p99 : %d\n", int(td_quantile($td_moves, 0.99))
+
+p ""
+printf "── total snake/ladder hops across %d games : %d ──────\n",
+    $N, $total_hops
+printf "  average hops per game : %.1f\n", $total_hops / $N
+
+# ── track landings via one trace ───────────────────────────────────
+
+p ""
+p "── tracing one specific game for landings (TopK) ────"
+my $pos = 0
+my $moves = 0
+while ($pos < 100) {
+    my $roll = int(rand() * 6) + 1
+    $moves++
+    my $new_pos = $pos + $roll
+    if ($new_pos > 100) { next }
+    $pos = $new_pos
+    topk_add($tk_landings, "cell_$pos")
+    if (exists $hops{$pos}) {
+        $pos = $hops{$pos}
+        topk_add($tk_landings, "cell_$pos")
+    }
+}
+printf "  traced game ended in %d moves\n", $moves
+
+my @hits = topk_top($tk_landings)
+p "  TopK landings (this trace):"
+for my $h (@hits) {
+    printf "    %-8s : %d times\n", $h->[0], $h->[1]
+}
+
+# ── board snapshot ────────────────────────────────────────────────
+
+p ""
+p "── board map (10x10) ────────────────────────────────"
+for my $row (rev(0:9)) {
+    my $line = "  "
+    for my $col (0:9) {
+        # Boustrophedon: even rows L-R, odd rows R-L.
+        my $cell
+        if ($row % 2 == 0) {
+            $cell = $row * 10 + $col + 1
+        } else {
+            $cell = $row * 10 + (10 - $col)
+        }
+        my $marker = "."
+        if    (exists $hops{$cell} && $hops{$cell} > $cell) { $marker = "L" }  # ladder up
+        elsif (exists $hops{$cell} && $hops{$cell} < $cell) { $marker = "S" }  # snake down
+        $line .= sprintf("%3d%s ", $cell, $marker)
+    }
+    p $line
+}
+p "  Legend: L=ladder base, S=snake head, .=plain cell"
+
+# ── HLL distinct cells reached across many games ─────────────────
+
+p ""
+p "── HLL distinct cells visited (1 sample game) ───────"
+my $hll = hll(14)
+$pos = 0
+while ($pos < 100) {
+    my $roll = int(rand() * 6) + 1
+    my $new_pos = $pos + $roll
+    if ($new_pos > 100) { next }
+    $pos = $new_pos
+    hll_add($hll, "c_$pos")
+    if (exists $hops{$pos}) {
+        $pos = $hops{$pos}
+        hll_add($hll, "c_$pos")
+    }
+}
+printf "  HLL distinct cells : %d\n", hll_count($hll)
+
+# ── overall stats ──────────────────────────────────────────────────
+
+p ""
+p "── theoretical minimum vs observed ──────────────────"
+printf "  theoretical min moves (perfect-luck path) : ~7\n"
+printf "  observed p10 moves                          : %d\n",
+    int(td_quantile($td_moves, 0.10))
+printf "  observed median moves                       : %d\n",
+    int(td_quantile($td_moves, 0.50))
