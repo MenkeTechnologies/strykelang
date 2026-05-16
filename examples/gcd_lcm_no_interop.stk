@@ -1,0 +1,80 @@
+#!/usr/bin/env stryke
+
+# Euclidean GCD + LCM — number-theory pair, world's-oldest algorithm
+# (Euclid, c. 300 BC). Recursive expression-bodied `fn` is one line
+# per definition. Parses clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * expression-bodied `fn name = …` (rule 6)
+#   * implicit closure params `_0` / `_1` (rule 12)
+#   * implicit return (rule 7)
+#   * `|> reduce` to fold over a list (rule 3)
+#
+# Namespaced UDFs `N::*` (number-theory).
+#
+# Run: stryke --no-interop examples/gcd_lcm_no_interop.stk
+
+fn N::gcd      = _1 == 0 ? _0 : N::gcd(_1, _0 % _1)
+fn N::lcm      = _0 * _1 / N::gcd(_0, _1)
+fn N::gcd_list = @{_} |> reduce { N::gcd(_0, _1) }
+fn N::lcm_list = @{_} |> reduce { N::lcm(_0, _1) }
+
+my @pair_cases = (
+    +{ a => 48,  b => 18,  gcd =>  6,   lcm => 144  },
+    +{ a => 100, b => 75,  gcd => 25,   lcm => 300  },
+    +{ a => 7,   b => 13,  gcd =>  1,   lcm =>  91  },  # coprime
+    +{ a => 12,  b => 12,  gcd => 12,   lcm =>  12  },
+    +{ a => 0,   b => 5,   gcd =>  5,   lcm =>   0  },
+    +{ a => 5,   b => 0,   gcd =>  5,   lcm =>   0  },
+    +{ a => 270, b => 192, gcd =>  6,   lcm => 8640 },
+    +{ a => 1071,b => 462, gcd =>  21,  lcm => 23562},  # Euclid's example
+)
+
+p "── GCD / LCM demo ──"
+my $fail = 0
+for my $c (@pair_cases) {
+    my $g  = N::gcd $c->{a}, $c->{b}
+    my $l  = N::lcm $c->{a}, $c->{b}
+    my $ok = $g == $c->{gcd} && $l == $c->{lcm}
+    $fail++ unless $ok
+    p "  gcd(#{$c->{a}},#{$c->{b}})=#{$g}  lcm=#{$l}  expect g=#{$c->{gcd}} l=#{$c->{lcm}}  #{$ok ? \"\" : \"FAIL\"}"
+}
+die "#{$fail} / #{len @pair_cases} GCD/LCM cases failed" if $fail > 0
+
+# Reduce across a list — gcd_list/lcm_list.
+my @list_cases = (
+    +{ xs => [12, 18, 24],          gcd =>  6,   lcm =>  72  },
+    +{ xs => [4, 6, 8, 10],         gcd =>  2,   lcm => 120  },
+    +{ xs => [7, 11, 13],           gcd =>  1,   lcm => 1001 },  # pairwise coprime
+    +{ xs => [100],                 gcd => 100,  lcm => 100  },
+    +{ xs => [2, 4, 8, 16, 32],     gcd =>  2,   lcm =>  32  },
+)
+
+p ""
+p "── GCD / LCM over a list ──"
+for my $c (@list_cases) {
+    my $g  = N::gcd_list $c->{xs}
+    my $l  = N::lcm_list $c->{xs}
+    my $ok = $g == $c->{gcd} && $l == $c->{lcm}
+    $fail++ unless $ok
+    my @xs = @{$c->{xs}}
+    p "  list=[@xs]  gcd=#{$g}  lcm=#{$l}  expect g=#{$c->{gcd}} l=#{$c->{lcm}}  #{$ok ? \"\" : \"FAIL\"}"
+}
+die "#{$fail} aggregate failures" if $fail > 0
+
+# Universal invariants:
+#   * gcd(a, b) divides both a and b
+#   * lcm(a, b) is divisible by both a and b
+#   * gcd(a, b) * lcm(a, b) == a * b   (when both > 0)
+for my $c (@pair_cases) {
+    my ($x, $y, $g, $l) = ($c->{a}, $c->{b}, $c->{gcd}, $c->{lcm})
+    next if $x == 0 || $y == 0
+    die "gcd doesn't divide a"  unless $x % $g == 0
+    die "gcd doesn't divide b"  unless $y % $g == 0
+    die "lcm not divisible by a" unless $l % $x == 0
+    die "lcm not divisible by b" unless $l % $y == 0
+    die "gcd*lcm != a*b" unless $g * $l == $x * $y
+}
+
+p ""
+p "  ALL PASS (8 pairs + 5 lists + 5 number-theory invariants)"

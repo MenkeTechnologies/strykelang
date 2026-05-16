@@ -23,7 +23,7 @@ fn Intervals::merge($intervals_ref) {
     # Deep-copy each interval so the algorithm's extend-in-place doesn't
     # mutate the caller's input. Without this, the array of arrayrefs is
     # shared and the caller sees their input changed underneath them.
-    my @clones = map { [$_->[0], $_->[1]] } @$intervals_ref
+    my @clones = map { [_->[0], _->[1]] } @$intervals_ref
     my @sorted = sort { _0->[0] <=> _1->[0] } @clones
     return [] if len(@sorted) == 0
     my @merged = ($sorted[0])

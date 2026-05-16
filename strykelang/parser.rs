@@ -21296,4 +21296,93 @@ mod tests {
         parse_ok("my $x = [1, 2]; p ref($x)");
         parse_ok("my $r = +{a => 1}; p 1 if ref($r) eq \"HASH\"");
     }
+
+    /// Expression-bodied recursive `fn` — style guide rule 6. The body
+    /// is a single ternary that re-invokes the same fn; Kadane / gcd /
+    /// lcm demos all use this shape.
+    #[test]
+    fn expression_bodied_recursive_fn_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("fn N::gcd = _1 == 0 ? _0 : N::gcd(_1, _0 % _1)");
+        parse_ok("fn N::lcm = _0 * _1 / N::gcd(_0, _1)");
+    }
+
+    /// Expression-bodied `fn` whose body is a `|> reduce` over the
+    /// implicit topic — used by gcd_list / lcm_list.
+    #[test]
+    fn expression_bodied_pipe_reduce_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("fn N::gcd = _1 == 0 ? _0 : N::gcd(_1, _0 % _1); \
+                  fn N::gcd_list = @{_} |> reduce { N::gcd(_0, _1) }");
+    }
+
+    /// Reduce-fold with a hashref accumulator seeded by prepending the
+    /// init to the input — Boyer-Moore / Kadane idiom.
+    #[test]
+    fn reduce_fold_with_hashref_accumulator_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my @xs = (3, 2, 3); \
+             my $st = (+{cur => 0, best => -100}, @xs) |> reduce { \
+                +{ cur => _1, best => _0->{best} } \
+             }",
+        );
+    }
+
+    /// Native array-deref slicing `@$arr[$lo:$hi]` — used by
+    /// rolling_stats to slice the input window.
+    #[test]
+    fn array_deref_slice_with_variable_bounds_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my @a = (10, 20, 30, 40, 50); my $r = \\@a; \
+             my $lo = 1; my $hi = 3; \
+             my @s = @$r[$lo:$hi]",
+        );
+    }
+
+    /// `min(@$v[$lo:$hi])` / `max(@$v[$lo:$hi])` — rolling_stats hot
+    /// path. Paren-less `min @$v[..]` parses wrong; pinned with parens.
+    #[test]
+    fn min_max_over_array_deref_slice_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my @a = (1, 3, 2, 5); my $r = \\@a; \
+             my $lo = 0; my $hi = 2; \
+             my $m1 = min(@$r[$lo:$hi]); \
+             my $m2 = max(@$r[$lo:$hi])",
+        );
+    }
+
+    /// `flat_maps` with recursive call inside the block — flatten
+    /// demo's central idiom; verifies the recursive call inside a
+    /// pipeline stage parses cleanly.
+    #[test]
+    fn flat_maps_with_recursive_call_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "fn Flat::flatten($r) = @$r |> flat_maps { \
+                ref(_) eq \"ARRAY\" ? Flat::flatten(_) : (_) \
+             }",
+        );
+    }
+
+    /// Inner `map { _->[$i] }` capturing outer lexical `$i` — zip's
+    /// N-list helper. Bareword topic inside, `$i` is the lexical.
+    #[test]
+    fn nested_map_with_outer_lexical_capture_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my @lists = ([1,2,3], [10,20,30]); \
+             my @r = 0:2 |> maps { my $i = _; [map { _->[$i] } @lists] }",
+        );
+    }
+
+    /// `@{_}` deref of the topic — required when sigil-form `@$_` is
+    /// being avoided per style guide. zip's `len(@{_})` shape.
+    #[test]
+    fn array_deref_of_bareword_topic_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my @lists = ([1,2,3], [10,20,30]); p min(map { len(@{_}) } @lists)");
+    }
 }
