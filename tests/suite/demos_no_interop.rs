@@ -189,3 +189,5 @@ demo_runs_no_interop!(demo_prime_sieve,           "examples/prime_sieve.stk");
 demo_runs_no_interop!(demo_huffman_coding,        "examples/huffman_coding.stk");
 demo_runs_no_interop!(demo_genetic_algorithm,     "examples/genetic_algorithm.stk");
 demo_runs_no_interop!(demo_barcode_scanner,       "examples/barcode_scanner.stk");
+demo_runs_no_interop!(demo_bingo_simulator,       "examples/bingo_simulator.stk");
+demo_runs_no_interop!(demo_port_scanner_sim,      "examples/port_scanner_sim.stk");

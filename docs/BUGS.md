@@ -5667,6 +5667,81 @@ Severity: **bug** (P1; breaks the most common idiom for splicing one
 array into another; very surprising silent data loss).
 
 
+## BUG-254 — `index(STR, NEEDLE, NEG)` panics with overflow
+
+```sh
+$ s -e 'index("abc", "b", -1)'
+thread 'main' panicked at strykelang/vm.rs:9281:22:
+start byte index 18446744073709551615 is out of bounds of `abc`
+```
+
+In Perl, `index(STR, NEEDLE, POS)` treats a negative `POS` as `0`,
+so the search starts from the beginning. Stryke casts the negative
+to `u64` (giving an enormous value), then panics on the out-of-bounds
+slice — uncatchable by `eval { ... }` since it's a Rust panic.
+
+Workaround: clamp the offset before calling.
+
+```stryke
+my $start = $candidate < 0 ? 0 : $candidate;
+my $r = index($s, $needle, $start);
+```
+
+Related to BUG-242 (`index` panic on start past end). The unified
+fix would be to clamp `start` to `[0, length($str)]`.
+
+Severity: **bug** (P1; uncatchable panic on a common Perl idiom).
+
+
+## BUG-255 — `rindex(STR, NEEDLE, NEG)` panics or returns wrong result
+
+```sh
+$ s -e 'rindex("abc", "b", -1)'
+thread 'main' panicked at strykelang/vm.rs:9289:30:
+attempt to add with overflow
+
+$ s -e 'print rindex("abracadabra", "ab", -5), "\n"'
+7
+```
+
+In Perl, negative `POS` means "search must end at or before this
+position". A negative-of-haystack-length+1 effectively means "no
+match possible" → returns `-1`. Stryke either:
+  * Panics with `attempt to add with overflow` for `-1`, or
+  * Returns the unbounded last match for other negatives (e.g. `-5`
+    on `"abracadabra"` returns `7`, ignoring the constraint).
+
+Workaround: clamp before calling.
+
+Severity: **bug** (P1; both panic AND silent-wrong-answer
+modes).
+
+
+## BUG-256 — `__PACKAGE__` inside a sub returns "main"
+
+```sh
+$ s -e '
+package Demo::P1;
+sub here { __PACKAGE__ }
+package main;
+print Demo::P1::here(), "\n"'
+main
+```
+
+In Perl, `__PACKAGE__` is a compile-time constant set to the
+currently-active package at the point of compilation. A sub defined
+inside `package Demo::P1` should always return `"Demo::P1"`. Stryke
+always returns `"main"` regardless of the enclosing `package`
+declaration, mirroring the BUG-248 caller-package issue: stryke does
+not track the lexical package binding for sub bodies.
+
+Pin: `package_inside_sub_returns_main_per_bug_256` in
+`tests/suite/dunder_globals_pin.rs`.
+
+Severity: **bug** (P2; breaks any "self-identification" or
+log-tagging idiom that relies on `__PACKAGE__`).
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't
