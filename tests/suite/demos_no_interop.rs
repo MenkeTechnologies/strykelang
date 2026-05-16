@@ -183,3 +183,5 @@ demo_runs_no_interop!(demo_dna_alignment,         "examples/dna_alignment.stk");
 demo_runs_no_interop!(demo_load_balancer,         "examples/load_balancer.stk");
 demo_runs_no_interop!(demo_morse_code,            "examples/morse_code.stk");
 demo_runs_no_interop!(demo_currency_converter,    "examples/currency_converter.stk");
+demo_runs_no_interop!(demo_vending_machine,       "examples/vending_machine.stk");
+demo_runs_no_interop!(demo_elf_inventory,         "examples/elf_inventory.stk");
