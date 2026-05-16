@@ -7703,4 +7703,87 @@ mod completion_tests {
             assert!(doc_text_for(b).is_some(), "Doc for '{}' should exist", b);
         }
     }
+
+    // ── snippet completions ──────────────────────────────────────────────
+    //
+    // The 60+ snippet table at `push_snippet_completions` drives every
+    // tab-completable scaffold (control-flow, classes, parallel
+    // primitives, web boilerplate). These tests pin a representative
+    // sample of triggers + their shape so accidentally dropping an entry
+    // or reordering kinds becomes a test failure.
+
+    fn snippet_labels_for(prefix: &str) -> Vec<String> {
+        let mut items = Vec::new();
+        super::push_snippet_completions(prefix, &mut items);
+        items
+            .into_iter()
+            .filter(|i| matches!(i.kind, Some(lsp_types::CompletionItemKind::SNIPPET)))
+            .map(|i| i.filter_text.unwrap_or_default())
+            .collect()
+    }
+
+    #[test]
+    fn snippet_match_keyword_is_present() {
+        let triggers = snippet_labels_for("m");
+        assert!(triggers.iter().any(|t| t == "match"), "match snippet: got {triggers:?}");
+        assert!(triggers.iter().any(|t| t == "main"), "main scaffold: got {triggers:?}");
+    }
+
+    #[test]
+    fn snippet_if_family_includes_three_variants() {
+        let triggers = snippet_labels_for("if");
+        assert!(triggers.iter().any(|t| t == "if"), "plain if: got {triggers:?}");
+        assert!(triggers.iter().any(|t| t == "ifelse"), "if/else: got {triggers:?}");
+        assert!(triggers.iter().any(|t| t == "ifelsif"), "if/elsif/else: got {triggers:?}");
+    }
+
+    #[test]
+    fn snippet_class_struct_enum_trait_emit() {
+        // Each declarative-type keyword has its own scaffold; a missing
+        // one is a real regression (we lost the Rosetta-style scaffolds).
+        for kw in &["class", "struct", "enum", "trait"] {
+            let triggers = snippet_labels_for(kw);
+            assert!(
+                triggers.iter().any(|t| t == kw),
+                "expected `{kw}` snippet, got {triggers:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn snippet_body_contains_tabstop_placeholder() {
+        // Every scaffold-style snippet must include at least one
+        // `${1:placeholder}` or `${0}` cursor so Tab navigates through
+        // the holes. A snippet body without tabstops devolves to a
+        // text-insert and the UX collapses.
+        let mut items = Vec::new();
+        super::push_snippet_completions("fn", &mut items);
+        let fn_snip = items
+            .iter()
+            .find(|i| {
+                matches!(i.kind, Some(lsp_types::CompletionItemKind::SNIPPET))
+                    && i.filter_text.as_deref() == Some("fn")
+            })
+            .expect("fn snippet present");
+        let body = fn_snip.insert_text.as_deref().unwrap_or("");
+        assert!(
+            body.contains("${1") || body.contains("${0"),
+            "fn snippet has a tabstop placeholder: got {body:?}"
+        );
+    }
+
+    #[test]
+    fn snippet_filter_with_empty_prefix_returns_full_table() {
+        // The lookahead pass uses an empty filter when the cursor is at
+        // column 0 / after whitespace — every snippet should be offered.
+        let triggers = snippet_labels_for("");
+        // A floor we can rely on without enumerating every entry — the
+        // SNIPS table holds 60+ entries.
+        assert!(
+            triggers.len() >= 50,
+            "empty filter yields all snippets, got {} ({:?}…)",
+            triggers.len(),
+            triggers.iter().take(5).collect::<Vec<_>>()
+        );
+    }
 }

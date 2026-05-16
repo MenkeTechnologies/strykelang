@@ -1622,4 +1622,103 @@ mod tests {
         assert!(!is_builtin_like("_5"));
         assert!(!is_builtin_like(""));
     }
+
+    // ── try_sketch_child — Variables-panel drill-down ───────────────────
+    //
+    // The Variables panel renders sketches and user-defined types with a
+    // one-line summary repr plus an expandable `var_ref` holding labelled
+    // sub-rows (count / min / max / p99 / per-field / per-element).
+    // These tests build the underlying values directly and inspect the
+    // emitted VarChild to pin the drill-down contract.
+
+    use std::sync::Arc;
+    // `Mutex` here is the parking_lot variant the sketch types use — std::sync::Mutex
+    // has a different signature (returns LockResult) and the wrong inner type.
+    use parking_lot::Mutex;
+
+    fn drill(value: &crate::value::StrykeValue) -> (VarChild, HashMap<u32, Vec<VarChild>>) {
+        let mut map: HashMap<u32, Vec<VarChild>> = HashMap::new();
+        let mut ctx = CaptureCtx { next_ref: CONTAINER_REF_BASE, map: &mut map };
+        let child = try_sketch_child("$v", value, 0, &mut ctx).expect("sketch drill yields VarChild");
+        (child, map)
+    }
+
+    #[test]
+    fn drill_tdigest_empty_summarises_compression() {
+        let arc = Arc::new(Mutex::new(crate::sketches::TDigestSketch::new(100)));
+        let v = crate::value::StrykeValue::tdigest_sketch(arc);
+        let (row, map) = drill(&v);
+        assert!(row.repr.contains("TDigestSketch"), "type tag in repr");
+        assert!(row.repr.contains("empty"), "empty marker shown");
+        let kids = map.get(&row.var_ref).expect("expandable");
+        let names: Vec<&str> = kids.iter().map(|c| c.name.as_str()).collect();
+        assert!(names.contains(&"count"), "count row");
+        assert!(names.contains(&"compression"), "compression row");
+    }
+
+    #[test]
+    fn drill_tdigest_populated_emits_quantile_rows() {
+        let s = crate::sketches::TDigestSketch::new(100);
+        let arc = Arc::new(Mutex::new(s));
+        // Feed a small distribution.
+        {
+            let mut g = arc.lock();
+            for i in 1..=100 {
+                g.add(i as f64);
+            }
+        }
+        let v = crate::value::StrykeValue::tdigest_sketch(arc);
+        let (row, map) = drill(&v);
+        let kids = map.get(&row.var_ref).expect("expandable");
+        let names: Vec<&str> = kids.iter().map(|c| c.name.as_str()).collect();
+        for p in ["count", "min", "max", "mean", "sum", "p50", "p90", "p95", "p99"] {
+            assert!(names.contains(&p), "{p} row present in {names:?}");
+        }
+        // Inline repr captures n / min / max / p50 / p99.
+        assert!(row.repr.contains("n=100"), "count in inline repr: {}", row.repr);
+        assert!(row.repr.contains("min="), "min in inline repr: {}", row.repr);
+        assert!(row.repr.contains("p99="), "p99 in inline repr: {}", row.repr);
+    }
+
+    #[test]
+    fn drill_bloom_filter_exposes_inserted_bits_k_fpr() {
+        let mut bf = crate::sketches::BloomFilter::new(1000, 0.01);
+        bf.add(b"hello");
+        bf.add(b"world");
+        let v = crate::value::StrykeValue::bloom_filter(Arc::new(Mutex::new(bf)));
+        let (row, map) = drill(&v);
+        assert!(row.repr.starts_with("BloomFilter("), "type tag: {}", row.repr);
+        let kids = map.get(&row.var_ref).expect("expandable");
+        let names: Vec<&str> = kids.iter().map(|c| c.name.as_str()).collect();
+        for f in ["inserted", "bit_count", "k", "estimated_fpr"] {
+            assert!(names.contains(&f), "{f} row present in {names:?}");
+        }
+    }
+
+    #[test]
+    fn drill_hll_exposes_cardinality_precision_registers() {
+        let mut h = crate::sketches::HllSketch::new(12);
+        for i in 0..50u32 {
+            h.add(&i.to_le_bytes());
+        }
+        let v = crate::value::StrykeValue::hll_sketch(Arc::new(Mutex::new(h)));
+        let (row, map) = drill(&v);
+        assert!(row.repr.starts_with("HllSketch("), "type tag: {}", row.repr);
+        let kids = map.get(&row.var_ref).expect("expandable");
+        let names: Vec<&str> = kids.iter().map(|c| c.name.as_str()).collect();
+        for f in ["cardinality", "precision", "registers"] {
+            assert!(names.contains(&f), "{f} row present in {names:?}");
+        }
+    }
+
+    #[test]
+    fn drill_non_sketch_returns_none() {
+        // A plain integer is not a sketch / struct / class / set —
+        // try_sketch_child must defer to the generic scalar path.
+        let v = crate::value::StrykeValue::integer(42);
+        let mut map: HashMap<u32, Vec<VarChild>> = HashMap::new();
+        let mut ctx = CaptureCtx { next_ref: CONTAINER_REF_BASE, map: &mut map };
+        let child = try_sketch_child("$v", &v, 0, &mut ctx);
+        assert!(child.is_none(), "non-sketch returns None");
+    }
 }

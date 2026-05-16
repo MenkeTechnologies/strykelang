@@ -1424,4 +1424,95 @@ mod tests {
         let sel = extract_selection_on_line(line, 2, 3).expect("selection");
         assert_eq!(sel, "x");
     }
+
+    // ── semantic tokens ──────────────────────────────────────────────────
+
+    /// The legend exposes the stable type/modifier index space. Reordering
+    /// either array (or accidentally dropping an entry) silently shifts
+    /// every emitted token's interpretation in the client. Pin the order
+    /// and total count.
+    #[test]
+    fn semantic_tokens_legend_is_stable() {
+        let leg = semantic_tokens_legend();
+        // Snapshot the first few — full enumeration would just duplicate
+        // the table; the exact ordering matters most at the head where
+        // indices like TY_KEYWORD = 0 are hard-coded throughout.
+        assert_eq!(leg.token_types.first().unwrap(), &SemanticTokenType::KEYWORD);
+        assert_eq!(leg.token_types[1], SemanticTokenType::FUNCTION);
+        assert_eq!(leg.token_types[2], SemanticTokenType::VARIABLE);
+        assert!(leg.token_types.len() >= 10, "12 stable type slots");
+        assert!(leg.token_modifiers.len() >= 5, "modifiers present");
+    }
+
+    #[test]
+    fn semantic_tokens_empty_text_yields_no_tokens() {
+        let t = compute_semantic_tokens("");
+        assert!(t.data.is_empty(), "empty input -> empty token list");
+    }
+
+    /// Strings, numbers, and comments are the easiest token kinds to
+    /// verify — they have unmistakable shape and don't depend on the
+    /// stryke parser. Confirm at least one token of each emits for a
+    /// representative line.
+    #[test]
+    fn semantic_tokens_recognise_strings_numbers_and_comments() {
+        let t = compute_semantic_tokens("# header\nmy $x = \"hi\" + 42\n");
+        // Compute (delta_line, delta_start) running totals to find the
+        // string and number positions.
+        assert!(!t.data.is_empty(), "tokens emitted: {:?}", t.data);
+        let types: Vec<u32> = t.data.iter().map(|tok| tok.token_type).collect();
+        // TY_COMMENT = 6, TY_STRING = 4, TY_NUMBER = 5.
+        assert!(types.contains(&6), "comment token emitted");
+        assert!(types.contains(&4), "string token emitted");
+        assert!(types.contains(&5), "number token emitted");
+    }
+
+    // ── signature help ───────────────────────────────────────────────────
+
+    /// `compute_signature_help` walks backward from the cursor through
+    /// `name(` and counts commas to set `active_parameter`. Verify the
+    /// arg index advances as the user types more commas.
+    #[test]
+    fn signature_help_tracks_active_param_index() {
+        let text = "say(a, b, c"; // cursor right after the last `c`
+        let pos = Position { line: 0, character: 11 };
+        let params = lsp_types::SignatureHelpParams {
+            text_document_position_params: lsp_types::TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier {
+                    uri: Uri::from_str("file:///t.stk").unwrap(),
+                },
+                position: pos,
+            },
+            context: None,
+            work_done_progress_params: Default::default(),
+        };
+        // Stub `doc_for` — give every name a trivial signature so we don't
+        // need the real LSP doc map in unit tests.
+        let stub = |_name: &str| -> Option<&'static str> { Some("```\nsay LIST\n```") };
+        let help = compute_signature_help(text, &params, stub);
+        assert!(help.is_some(), "expected signature help");
+        let h = help.unwrap();
+        // Three commas not seen (we're inside the 3rd arg) ⇒ active_param = 2
+        // (0-indexed: a=0, b=1, c=2).
+        assert_eq!(h.active_parameter, Some(2), "active param = 2 inside 3rd arg");
+    }
+
+    #[test]
+    fn signature_help_returns_none_outside_call() {
+        let text = "my $x = 1";
+        let pos = Position { line: 0, character: 9 };
+        let params = lsp_types::SignatureHelpParams {
+            text_document_position_params: lsp_types::TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier {
+                    uri: Uri::from_str("file:///t.stk").unwrap(),
+                },
+                position: pos,
+            },
+            context: None,
+            work_done_progress_params: Default::default(),
+        };
+        let stub = |_: &str| -> Option<&'static str> { None };
+        let help = compute_signature_help(text, &params, stub);
+        assert!(help.is_none(), "no active call → no signature help");
+    }
 }
