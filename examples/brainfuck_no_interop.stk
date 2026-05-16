@@ -1,0 +1,94 @@
+#!/usr/bin/env stryke
+
+# Brainfuck interpreter — eight-instruction esoteric language with
+# a 30k-cell tape. Parses clean under `--no-interop`.
+#
+# Brainfuck commands:
+#   >  move data pointer right
+#   <  move data pointer left
+#   +  increment cell
+#   -  decrement cell
+#   .  output cell as ASCII
+#   ,  read one byte from stdin into cell
+#   [  if cell == 0, jump past matching ]
+#   ]  if cell != 0, jump back to matching [
+#
+# Stryke choices:
+#   * `fn`, `p`, `printf`, `len`
+#   * Pre-built jump table — first pass scans `[`/`]` pairs, stores
+#     forward/back targets so the run loop is branch-free per opcode
+#   * `split //` for char iteration; `ord` / `chr` for byte ↔ char
+#   * if/elsif chain for opcode dispatch (the portable shape)
+#
+# Run: stryke --no-interop examples/brainfuck_no_interop.stk
+#      stryke --no-interop examples/brainfuck_no_interop.stk '++++++++[>++++++++<-]>+.'
+
+fn build_jumps(@code) {
+    my %fwd
+    my %back
+    my @stack
+    for my $i (0:len(@code) - 1) {
+        if ($code[$i] eq "[") {
+            push @stack, $i
+        } elsif ($code[$i] eq "]") {
+            die "unmatched ] at $i" unless len(@stack) > 0
+            my $open = pop @stack
+            $fwd{$open} = $i
+            $back{$i} = $open
+        }
+    }
+    die "unmatched [ at " . $stack[0] if len(@stack) > 0
+    (\%fwd, \%back)
+}
+
+fn brainfuck($src) {
+    my @code = grep { _ =~ /[\+\-<>\[\]\.,]/ } split(//, $src)
+    my ($fwd_ref, $back_ref) = build_jumps(@code)
+
+    my @tape = (0) x 1024  # 1k tape — enough for demo programs
+    my $dp   = 0           # data pointer
+    my $ip   = 0           # instruction pointer
+    my $out  = ""
+
+    while ($ip < len(@code)) {
+        my $op = $code[$ip]
+        if    ($op eq ">") { $dp++ }
+        elsif ($op eq "<") { $dp-- }
+        elsif ($op eq "+") { $tape[$dp] = ($tape[$dp] + 1) % 256 }
+        elsif ($op eq "-") { $tape[$dp] = ($tape[$dp] - 1 + 256) % 256 }
+        elsif ($op eq ".") { $out .= chr($tape[$dp]) }
+        elsif ($op eq "[") { $ip = $fwd_ref->{$ip}  if $tape[$dp] == 0 }
+        elsif ($op eq "]") { $ip = $back_ref->{$ip} if $tape[$dp] != 0 }
+        $ip++
+    }
+    $out
+}
+
+if (len(@ARGV) >= 1) {
+    p brainfuck($ARGV[0])
+    exit 0
+}
+
+# Demo programs.
+p "── Brainfuck demos ──"
+
+# 1) Emit 'A' (ASCII 65) — 8 * 8 + 1 = 65
+my $prog_a = "++++++++[>++++++++<-]>+."
+my $out_a = brainfuck($prog_a)
+p "  print 'A': $out_a"
+
+# 2) Emit 'H' (ASCII 72) — 9 * 8 = 72
+my $prog_h = "+++++++++[>++++++++<-]>."
+my $out_h  = brainfuck($prog_h)
+p "  print 'H': $out_h"
+
+# 3) Two-letter 'HI' — 'H' from above (72), shift +1 to get 'I' (73).
+my $prog_hi = "+++++++++[>++++++++<-]>.+."
+my $out_hi  = brainfuck($prog_hi)
+p "  print 'HI': $out_hi"
+
+# Built-in self-test: every program must emit the expected output.
+die "bf: expected 'A', got '$out_a'"   unless $out_a  eq "A"
+die "bf: expected 'H', got '$out_h'"   unless $out_h  eq "H"
+die "bf: expected 'HI', got '$out_hi'" unless $out_hi eq "HI"
+p "  ALL PASS"

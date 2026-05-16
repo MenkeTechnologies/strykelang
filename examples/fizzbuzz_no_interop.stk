@@ -34,3 +34,10 @@ my @parallel = pmap { classify(_) } 1:$n
 p ""
 p "parallel run produced ", len(@parallel), " labels"
 p "first 5: ", join(", ", @parallel[0:4])
+
+# Built-in self-tests against the known FizzBuzz table.
+die "classify(3) must be Fizz"      unless classify(3)  eq "Fizz"
+die "classify(5) must be Buzz"      unless classify(5)  eq "Buzz"
+die "classify(15) must be FizzBuzz" unless classify(15) eq "FizzBuzz"
+die "classify(1) must be \"1\""     unless classify(1)  eq "1"
+p "  ALL PASS"

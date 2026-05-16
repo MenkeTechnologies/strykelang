@@ -55,3 +55,12 @@ for my $impl ("naive", "memo", "iter") {
 p ""
 p "(naive blows up exponentially; iter is O(n) and stays sub-millisecond"
 p " well past n=10k)"
+
+# Built-in self-test against a known fib table.
+my %expected = (0 => 0, 1 => 1, 5 => 5, 10 => 55, 20 => 6765, 25 => 75025)
+for my $k (sort { $_0 <=> $_1 } keys %expected) {
+    die "fib_iter($k) != $expected{$k}" unless fib_iter($k) == $expected{$k}
+    die "fib_memo($k) != $expected{$k}" unless fib_memo($k) == $expected{$k}
+    die "fib_naive($k) != $expected{$k}" unless fib_naive($k) == $expected{$k}
+}
+p "  ALL PASS (matched 6 reference fib values across all 3 impls)"

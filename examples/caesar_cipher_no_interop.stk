@@ -43,9 +43,13 @@ if (len(@ARGV) >= 2) {
 my $plain = "The quick brown fox jumps over the lazy dog."
 p "── Caesar demo (round-trip plain ↔ cipher) ──"
 p "plain : $plain"
+my $any_failed = 0
 for my $s (1:6) {
     my $enc = caesar($plain, $s)
     my $dec = caesar($enc, -$s)
-    printf "  shift %d: %s   (round-trip %s)\n",
-        $s, $enc, ($dec eq $plain) ? "OK" : "FAIL"
+    my $ok  = ($dec eq $plain)
+    $any_failed++ unless $ok
+    printf "  shift %d: %s   (round-trip %s)\n", $s, $enc, $ok ? "OK" : "FAIL"
 }
+die "caesar round-trip failed" if $any_failed > 0
+p "  ALL PASS"

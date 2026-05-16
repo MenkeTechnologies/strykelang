@@ -71,3 +71,5 @@ for my $n (1:2026) {
     $bad++ if from_roman(to_roman($n)) != $n
 }
 p "  failures: $bad / 2026"
+die "roman round-trip failed!" if $bad > 0
+p "  ALL PASS"

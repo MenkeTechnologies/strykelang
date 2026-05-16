@@ -1,0 +1,96 @@
+#!/usr/bin/env stryke
+
+# Base converter — integer ↔ arbitrary-base 2..36 string, both
+# directions. Parses clean under `--no-interop`.
+#
+# Stryke choices:
+#   * `fn` with default-valued params (`$base = 10`)
+#   * `chr` / `ord` for digit ↔ char round-trip
+#   * `while` loop with manual digit accumulation
+#   * String `.` concat, `uc` for canonical alphabet
+#   * `die` for bad inputs; outer `eval { ... }` to catch in demo
+#
+# Run: stryke --no-interop examples/base_convert_no_interop.stk
+#      stryke --no-interop examples/base_convert_no_interop.stk to 255 16
+#      stryke --no-interop examples/base_convert_no_interop.stk from FF 16
+
+fn digit_char($d) {
+    return chr(ord("0") + $d)        if $d < 10
+    return chr(ord("A") + $d - 10)   if $d < 36
+    die "digit out of range: $d"
+}
+
+fn digit_value($ch) {
+    my $c = ord(uc($ch))
+    return $c - ord("0")          if $c >= ord("0") && $c <= ord("9")
+    return $c - ord("A") + 10     if $c >= ord("A") && $c <= ord("Z")
+    die "not a digit char: $ch"
+}
+
+fn enc_base($n, $base = 10) {
+    die "base out of range (2..36): $base" if $base < 2 || $base > 36
+    return "-" . enc_base(-$n, $base) if $n < 0
+    return "0" if $n == 0
+    my $s = ""
+    my $x = $n
+    while ($x > 0) {
+        $s = digit_char($x % $base) . $s
+        $x = int($x / $base)
+    }
+    $s
+}
+
+fn dec_base($s, $base = 10) {
+    die "base out of range (2..36): $base" if $base < 2 || $base > 36
+    my $sign = 1
+    my $body = $s
+    if (substr($body, 0, 1) eq "-") {
+        $sign = -1
+        $body = substr($body, 1)
+    }
+    die "empty number" if len($body) == 0
+    my $total = 0
+    for my $ch (split(//, uc($body))) {
+        my $d = digit_value($ch)
+        die "digit '$ch' >= base $base" if $d >= $base
+        $total = $total * $base + $d
+    }
+    $sign * $total
+}
+
+if (len(@ARGV) >= 2) {
+    my $mode = $ARGV[0]
+    if ($mode eq "to") {
+        my $n    = 0 + $ARGV[1]
+        my $base = 0 + ($ARGV[2] // 10)
+        p enc_base($n, $base)
+    } elsif ($mode eq "from") {
+        my $s    = $ARGV[1]
+        my $base = 0 + ($ARGV[2] // 10)
+        p dec_base($s, $base)
+    } else {
+        die "mode must be 'to' or 'from'"
+    }
+    exit 0
+}
+
+# Demo grid: decimal 255 in every base 2..36.
+p "── 255 in every base 2..36 ──"
+for my $bs (2:36) {
+    my $s = enc_base(255, $bs)
+    printf "  base %2d: %s\n", $bs, $s
+}
+
+# Round-trip check 0..200 across bases 2..36 — built-in self-test so
+# the CI runner can `die` on regressions.
+p ""
+p "── Round-trip 0..200 across bases 2..36 ──"
+my $failures = 0
+for my $bs (2:36) {
+    for my $n (0:200) {
+        $failures++ if dec_base(enc_base($n, $bs), $bs) != $n
+    }
+}
+p "  failures: $failures / ", 35 * 201
+die "base-convert round-trip failed!" if $failures > 0
+p "  ALL PASS"

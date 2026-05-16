@@ -49,5 +49,9 @@ for my $celsius (0, 100, -40, -273.15) {
 }
 
 p ""
-my $absz = convert(0, "K", "C")
-p "(absolute zero round-trip: $absz C = -273.15 C ✓)" if $absz == -273.15
+# Built-in self-tests against known constants.
+die "100 C -> F should be 212"     unless convert(100, "C", "F") == 212
+die "0 C -> K should be 273.15"    unless convert(0,   "C", "K") == 273.15
+die "32 F -> C should be 0"        unless convert(32,  "F", "C") == 0
+die "0 K -> C should be -273.15"   unless convert(0,   "K", "C") == -273.15
+p "  ALL PASS (boiling/freezing/abs-zero match known constants)"

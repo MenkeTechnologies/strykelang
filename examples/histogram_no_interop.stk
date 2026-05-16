@@ -52,3 +52,11 @@ printf "  sum   = %d\n", $total
 printf "  mean  = %.2f\n", $total / len(@data)
 printf "  min   = %d\n", min(@data)
 printf "  max   = %d\n", max(@data)
+
+# Built-in self-test on a hand-counted input (only fires when no @ARGV
+# overrides — the d6 simulation has known min/max range 1..6).
+if (len(@ARGV) == 0) {
+    die "d6 values must be in 1..6" unless min(@data) >= 1 && max(@data) <= 6
+    die "200 d6 rolls should sum 200..1200" unless $total >= 200 && $total <= 1200
+    p "  ALL PASS (d6 distribution within expected bounds)"
+}

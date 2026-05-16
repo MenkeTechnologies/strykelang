@@ -47,3 +47,11 @@ for (1:$cycles) {
 }
 p ""
 p "total cycle length so far: ${elapsed}s"
+
+# Built-in self-test: one full red→green→yellow→red cycle is 60s.
+my $one_cycle = duration_sec("red") + duration_sec("green") + duration_sec("yellow")
+die "one cycle should be 60s, got ${one_cycle}s" unless $one_cycle == 60
+die "next(red)->green failed"    unless next_state("red")    eq "green"
+die "next(green)->yellow failed" unless next_state("green")  eq "yellow"
+die "next(yellow)->red failed"   unless next_state("yellow") eq "red"
+p "  ALL PASS (transition table closed, cycle = 60s)"

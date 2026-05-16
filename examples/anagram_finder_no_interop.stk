@@ -55,3 +55,14 @@ for my $sig (@ranked) {
     my @group = sort @{$groups{$sig}}
     printf "  [%s]  %s\n", $sig, join(", ", @group)
 }
+
+# Built-in self-test on the embedded sample (skip when stdin override).
+if (len(@words) == len(@sample)) {
+    # The 27-word sample has 9 anagram groups of size ≥ 2.
+    die "expected 9 groups, got " . len(@ranked) unless len(@ranked) == 9
+    # The "opst" bucket should contain six tokens.
+    my $sig_opst = signature("opts")
+    die "opst bucket should have 6 words" unless len(@{$groups{$sig_opst}}) == 6
+    p ""
+    p "  ALL PASS (9 groups found, opst bucket has 6 words as expected)"
+}

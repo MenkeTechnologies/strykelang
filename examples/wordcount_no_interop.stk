@@ -12,7 +12,10 @@
 #        | stryke --no-interop examples/wordcount_no_interop.stk
 
 my $text = join("\n", <STDIN>)
-die "no input — pipe text on stdin" if len($text) == 0
+# Fall back to the canonical pangram so the CI / docs run cleanly even
+# when stdin is closed.
+my $pangram = "the quick brown fox jumps over the lazy dog the fox"
+$text = $pangram if len($text) == 0
 
 my @words = split(/\W+/, lc($text)) |> pgrep { len(_) > 0 } _
 
@@ -25,4 +28,12 @@ p ""
 p "frequencies (alphabetical):"
 for my $w (sort keys %freq) {
     printf "  %5d  %s\n", $freq{$w}, $w
+}
+
+# Built-in self-test — only fires for the canonical pangram input.
+if ($text =~ /quick brown fox/) {
+    die "expected 'the' to appear 3 times" unless $freq{the} == 3
+    die "expected 'fox' to appear 2 times" unless $freq{fox} == 2
+    die "expected 8 unique words" unless len(keys %freq) == 8
+    p "  ALL PASS (pangram counts match expected table)"
 }

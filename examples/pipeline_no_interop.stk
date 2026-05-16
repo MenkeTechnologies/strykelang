@@ -34,3 +34,10 @@ p ""
 p "── one-shot product via the standard `product` ───────"
 my $product = 1:5 |> product
 p "  1*2*3*4*5 = ", $product, " (expected 120)"
+
+# Built-in self-tests against the printed expectations.
+die "sum of even squares 1..20 must be 1540" unless $total == 1540
+die "expected 333 cubes mod 3 in 1..1000"    unless len(@cubes_div3) == 333
+die "product 1..5 must be 120"               unless $product == 120
+p ""
+p "  ALL PASS"
