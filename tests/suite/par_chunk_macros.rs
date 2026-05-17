@@ -193,18 +193,14 @@ fn par_reduce_with_no_merge_block_chains_via_pipe() {
 }
 
 #[test]
-fn par_outside_thread_macro_is_unknown() {
-    // `par { … }` is ONLY valid as a thread-stage; as a top-level
-    // expression there's no `par` builtin to dispatch to. The exact
-    // ErrorKind ends up as `Runtime` (undefined-sub falls under it),
-    // so assert by message text rather than kind.
-    let _guard = GLOBAL_FLAGS_LOCK.read();
-    let program = stryke::parse(r#"par { letters } "abc""#).expect("parse failed");
-    let mut interp = stryke::vm_helper::VMHelper::new();
-    let err = interp.execute(&program).expect_err("should fail");
-    assert!(
-        err.to_string().contains("Undefined subroutine"),
-        "expected undefined-sub error, got: {}",
-        err
-    );
+fn par_outside_thread_macro_runs_at_top_level() {
+    // `par { BLOCK } LIST` is callable as a top-level expression,
+    // not just an `~>` thread-macro stage. Previously emitted
+    // "Undefined subroutine &par" — now flows through the same
+    // `ExprKind::ParExpr` runtime path as the macro form. Verified
+    // by running the docs example (`par { letters } "Hello, World 123"`
+    // → "HelloWorld") via `~>` and matching the result here.
+    let n = eval_int(r#"~> "abc def" par { letters } |> len"#);
+    // 6 letters ("a","b","c","d","e","f") — flattened concat across chunks.
+    assert_eq!(n, 6);
 }
