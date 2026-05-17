@@ -1,0 +1,246 @@
+#!/usr/bin/env stryke
+
+# Single CI entry: validate the entire examples/ tree in one pass.
+#
+# Phases run **sequentially** (one at a time) so `test` worker pools and
+# `system` subprocess bursts never stack. Work **inside** each phase is still
+# parallel, capped by RUN_ALL_CI_JOBS (default 16) to avoid EMFILE.
+#
+# Phases (default: all):
+#   parse     — `check_no_interop` on every top-level examples/*.stk
+#   run       — execute every top-level examples/*.stk under --no-interop
+#   demos     — execute every examples/*_no_interop.stk (built-in asserts)
+#   project   — `test examples/project/t`
+#   rosetta   — `test examples/rosetta/t`
+#   exercism  — per-exercise check + test (sequential; each calls `test`)
+#   ruby      — examples/ruby/Ruby.stk embedded suite
+#   scheme    — examples/scheme/Scheme.stk embedded suite
+#
+# Usage:  stryke examples/run_all_ci.stk [--summary] [--only=parse,run,...]
+# Env:    ST=path/to/stryke (defaults to $^X)
+#         RUN_ALL_CI_JOBS / CI_JOBS — max parallel workers inside a phase (default 16)
+# Exit:   0 if every selected phase passes, 1 otherwise.
+
+$| = 1
+
+my %opts = %{ getopts([
+    "summary",
+    "only=s",
+]) }
+my $summary = $opts{summary} // 0
+my $only    = $opts{only} // ""
+
+# Resolve examples/ dir regardless of cwd: `s run_all_ci.stk` from examples/ may
+# leave __FILE__ as `examples/run_all_ci.stk` while cwd is already examples/.
+my $script = realpath(__FILE__)
+$script = realpath($0) if $script eq ""
+my $ex_dir = $script ne "" ? dirname($script) : realpath(".")
+my $st      = $ENV{ST} // $^X
+my $jobs    = $ENV{RUN_ALL_CI_JOBS} // $ENV{CI_JOBS} // 16
+$jobs = 16 if $jobs < 1
+
+my %META = map { ($_ => 1) } qw(
+    check_no_interop
+    run_no_interop_demos
+    exercism_run_all
+    run_all_ci
+)
+
+my %want
+if ($only ne "") {
+    for (split /,/, $only) {
+        if (_ !~ /^(?:parse|run|demos|project|rosetta|exercism|ruby|scheme)$/) {
+            die "unknown --only phase: " . _
+        }
+        $want{_} = 1
+    }
+} else {
+    %want = map { ($_ => 1) } qw(parse run demos project rosetta exercism ruby scheme)
+}
+
+fn Ci::basename($path) {
+    my @parts = split m{/}, $path
+    my $file = $parts[-1]
+    $file =~ s/\.stk$//
+    $file
+}
+
+fn Ci::is_meta($path) {
+    exists $META{Ci::basename($path)}
+}
+
+mysync @failures
+
+fn Ci::fail($phase, $detail) {
+    push @failures, +{ phase => $phase, detail => $detail }
+    p "  FAIL [$phase] $detail"
+}
+
+fn Ci::header($name) {
+    if (!$summary) { p "" }
+    p "── $name ──"
+}
+
+fn Ci::parse_file($f) = system("$st --no-interop -c \"$f\" >/dev/null 2>&1") == 0
+
+fn Ci::run_file($f) = system("$st --no-interop \"$f\" </dev/null >/dev/null 2>&1") == 0
+
+fn Ci::run_suite($path) {
+    my $cmd = "$st \"$path\" </dev/null"
+    if ($summary) {
+        my $rc = system("$cmd >/dev/null 2>&1")
+        if ($rc != 0) {
+            system($cmd)
+        }
+        return $rc == 0
+    }
+    system($cmd) == 0
+}
+
+fn Ci::report_run_results($phase, @files, @oks) {
+    my $bad = 0
+    for (0 .. len(@files) - 1) {
+        if (!@oks[$_]) {
+            Ci::fail($phase, @files[$_])
+            $bad += 1
+        } elsif (!$summary) {
+            p "  OK   @files[$_]"
+        }
+    }
+    my $label = $phase eq "parse" ? "--no-interop clean" : "passed"
+    p "$phase: #{len(@files) - $bad}/#{len(@files)} $label"
+}
+
+fn Ci::phase_parse {
+    Ci::header("parse")
+    my @files = sort grep { !Ci::is_meta(_) } glob("$ex_dir/*.stk")
+    die "no examples in $ex_dir" unless len(@files)
+
+    my @oks = pmap_chunked $jobs { Ci::parse_file(_) } @files
+    Ci::report_run_results("parse", @files, @oks)
+}
+
+fn Ci::phase_run {
+    Ci::header("run")
+    my @files = sort grep { !Ci::is_meta(_) } glob("$ex_dir/*.stk")
+    my @oks = pmap_chunked $jobs { Ci::run_file(_) } @files
+    Ci::report_run_results("run", @files, @oks)
+}
+
+fn Ci::phase_demos {
+    Ci::header("demos")
+    my @files = sort grep {
+        _ =~ /_no_interop\.stk$/ && !Ci::is_meta(_)
+    } glob("$ex_dir/*_no_interop.stk")
+    die "no *_no_interop.stk in $ex_dir" unless len(@files)
+
+    my @oks = pmap_chunked $jobs { Ci::run_file(_) } @files
+    Ci::report_run_results("demos", @files, @oks)
+}
+
+fn Ci::phase_project {
+    Ci::header("project")
+    my $rc = test("$ex_dir/project/t", { quiet => $summary })
+    Ci::fail("project", "test examples/project/t exit $rc") if $rc != 0
+    p "project: " . ($rc == 0 ? "pass" : "FAIL")
+}
+
+fn Ci::phase_rosetta {
+    Ci::header("rosetta")
+    my $rc = test("$ex_dir/rosetta/t", { quiet => $summary })
+    Ci::fail("rosetta", "test examples/rosetta/t exit $rc") if $rc != 0
+    p "rosetta: " . ($rc == 0 ? "pass" : "FAIL")
+}
+
+fn Ci::exercism_one($d) {
+    my @parts = split m{/}, $d
+    my $name  = $parts[-1]
+    my $err   = ""
+
+    for (glob("$d/*.stk")) {
+        if (check_no_interop($_, { quiet => 1 }) != 0) {
+            $err = "--no-interop"
+            last
+        }
+    }
+
+    if (!$err && test("$d/t", { quiet => 1 }) != 0) {
+        $err = "test"
+    }
+
+    if ($err) {
+        Ci::fail("exercism", "$name [$err]")
+        return 0
+    }
+    if (!$summary) { p "  OK   $name" }
+    1
+}
+
+fn Ci::phase_exercism {
+    Ci::header("exercism")
+    my $ex_root = "$ex_dir/exercism"
+    my @dirs = ~> "$ex_root/*/" glob sort
+    die "no exercises in $ex_root" unless len(@dirs)
+
+    # Sequential: each exercise calls `test` (spawns a worker pool).
+    my $pass = 0
+    for (@dirs) {
+        $pass += Ci::exercism_one(_)
+    }
+
+    p "exercism: $pass/#{len(@dirs)} passed"
+}
+
+fn Ci::phase_ruby {
+    Ci::header("ruby")
+    my $path = "$ex_dir/ruby/Ruby.stk"
+    if (!Ci::run_suite($path)) {
+        Ci::fail("ruby", "exit")
+    }
+    p "ruby: pass"
+}
+
+fn Ci::phase_scheme {
+    Ci::header("scheme")
+    my $path = "$ex_dir/scheme/Scheme.stk"
+    if (!Ci::run_suite($path)) {
+        Ci::fail("scheme", "exit")
+    }
+    p "scheme: pass"
+}
+
+fn Ci::run_phase($name) {
+    if ($name eq "parse")      { Ci::phase_parse() }
+    elsif ($name eq "run")     { Ci::phase_run() }
+    elsif ($name eq "demos")    { Ci::phase_demos() }
+    elsif ($name eq "project")  { Ci::phase_project() }
+    elsif ($name eq "rosetta")  { Ci::phase_rosetta() }
+    elsif ($name eq "exercism") { Ci::phase_exercism() }
+    elsif ($name eq "ruby")     { Ci::phase_ruby() }
+    elsif ($name eq "scheme")   { Ci::phase_scheme() }
+    else { die "internal: unknown phase $name" }
+}
+
+my @phases = grep { $want{$_} } qw(parse run demos project rosetta exercism ruby scheme)
+die "no phases selected" unless len(@phases)
+
+if (!$summary) {
+    p "run_all_ci: #{len(@phases)} phase(s), jobs=$jobs"
+}
+
+for (@phases) {
+    Ci::run_phase(_)
+}
+
+# ── final report ──────────────────────────────────────────────────────────────
+
+p ""
+if (len(@failures)) {
+    p "run_all_ci: #{len(@failures)} failure(s):"
+    for (@failures) {
+        p "  [$_->{phase}] $_->{detail}"
+    }
+    exit 1
+}
+
+p "run_all_ci: ALL PASS (#{len(@phases)} phase(s): @{[join ', ', @phases]})"

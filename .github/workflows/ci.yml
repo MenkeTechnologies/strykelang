@@ -96,50 +96,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release --locked
-      - name: Run stryke test on example project
-        run: ./target/release/s test examples/project/t
-      - name: Run stryke test on rosetta project
-        run: ./target/release/s test examples/rosetta/t
-      - name: Run stryke test on exercism project
-        # Each exercise is its own dir with `t/test_*.stk` inside, where
-        # the test does `require "./Module.stk"`. The runner is itself a
-        # stryke script — pmap-parallelized, ~2.7x faster than the bash
-        # version that ran exercises sequentially.
+      - name: Examples CI (parse, run, demos, project, rosetta, exercism, ruby, scheme)
+        # Single stryke orchestrator replaces the former seven separate steps.
+        # All phases run in parallel (pmaps); each phase parallelizes its own
+        # files (pmap/pmaps/test worker pool). Uses in-process check/test where
+        # possible instead of spawning stryke per file for syntax checks.
         env:
           ST: ${{ github.workspace }}/target/release/stryke
-        run: ./target/release/stryke examples/exercism_run_all.stk --summary
-      - name: Idiomatic-stryke check on top-level examples
-        # `--no-interop` rejects Perl-isms ($a/$b, sub/say/reverse). Demos
-        # under examples/*.stk are showcases — they MUST parse clean under
-        # strict mode so they teach idiomatic stryke, not Perl 5. The
-        # checker is itself a stryke script (pmap-parallelized).
-        env:
-          ST: ${{ github.workspace }}/target/release/stryke
-        run: ./target/release/stryke examples/check_no_interop.stk
-      - name: Run `*_no_interop.stk` demos end-to-end with built-in asserts
-        # Every `examples/*_no_interop.stk` demo carries its own
-        # `die`-on-regression self-tests (round-trip checks, known-output
-        # tables, cross-impl comparisons). The runner here is itself a
-        # stryke script (pmap-parallelized across demos) and exits
-        # non-zero if any demo's assertions trip — so a clean step here
-        # means every documented stryke idiom in the showcase set still
-        # holds under --no-interop.
-        env:
-          ST: ${{ github.workspace }}/target/release/stryke
-        run: ./target/release/stryke examples/run_no_interop_demos.stk
-      - name: Run ruby interp
-        run: ./target/release/stryke examples/ruby/Ruby.stk
-      - name: Run Scheme R5RS-subset interpreter (~5k lines, 356 tests)
-        # `examples/scheme/Scheme.stk` is a single-file Scheme interpreter
-        # implemented in stryke — tokenizer, parser, evaluator, ~150 built-ins,
-        # and an embedded test suite of 356 assertions covering arithmetic,
-        # list/string/vector ops, special forms (let/let*/letrec, cond, case,
-        # quasiquote, do), closures, recursion, plus end-to-end programs
-        # (mergesort, quicksort, sieve, BST, N-queens, Dijkstra, BFS, λ-calc
-        # β-reduction, Y combinator factorial, ...). It exercises the stryke
-        # parser + bytecode VM at scale on a single 5k-line program; any
-        # regression in the language surfaces here.
-        run: ./target/release/stryke examples/scheme/Scheme.stk
+        run: ./target/release/stryke examples/run_all_ci.stk --summary
 
   release-build:
     name: Release Build
