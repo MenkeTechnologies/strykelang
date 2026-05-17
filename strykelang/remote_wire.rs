@@ -40,7 +40,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::ast::Block;
-use crate::value::{PerlSub, StrykeValue};
+use crate::value::{StrykeSub, StrykeValue};
 use crate::vm_helper::{FlowOrError, VMHelper};
 
 /// Frame-kind discriminator. Stored as the first byte of every wire payload after the
@@ -360,7 +360,7 @@ pub fn capture_entries_to_json(
     Ok(out)
 }
 
-pub fn build_subs_prelude(subs: &HashMap<String, Arc<PerlSub>>) -> String {
+pub fn build_subs_prelude(subs: &HashMap<String, Arc<StrykeSub>>) -> String {
     let mut names: Vec<_> = subs.keys().cloned().collect();
     names.sort();
     let mut s = String::new();

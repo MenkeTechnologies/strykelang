@@ -8,15 +8,15 @@ use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 
 use crate::error::{StrykeError, StrykeResult};
 use crate::scope::{AtomicArray, AtomicHash};
-use crate::value::{PerlSub, StrykeValue};
+use crate::value::{StrykeSub, StrykeValue};
 use crate::vm_helper::{VMHelper, WantarrayCtx};
 
 /// Expand `pattern`, register native watches, then block dispatching each matching path to `sub` on a
 /// rayon worker (`$_` = path string).
 pub fn run_pwatch(
     pattern: &str,
-    sub: Arc<PerlSub>,
-    subs: HashMap<String, Arc<PerlSub>>,
+    sub: Arc<StrykeSub>,
+    subs: HashMap<String, Arc<StrykeSub>>,
     scalars: Vec<(String, StrykeValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,

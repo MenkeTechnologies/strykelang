@@ -17,12 +17,12 @@ use crate::perl_regex::PerlCompiledRegex;
 
 /// Handle returned by `async { ... }` / `spawn { ... }`; join with `await`.
 #[derive(Debug)]
-pub struct PerlAsyncTask {
+pub struct StrykeAsyncTask {
     pub(crate) result: Arc<Mutex<Option<StrykeResult<StrykeValue>>>>,
     pub(crate) join: Arc<Mutex<Option<std::thread::JoinHandle<()>>>>,
 }
 
-impl Clone for PerlAsyncTask {
+impl Clone for StrykeAsyncTask {
     fn clone(&self) -> Self {
         Self {
             result: self.result.clone(),
@@ -31,7 +31,7 @@ impl Clone for PerlAsyncTask {
     }
 }
 
-impl PerlAsyncTask {
+impl StrykeAsyncTask {
     /// Join the worker thread (once) and return the block's value or error.
     pub fn await_result(&self) -> StrykeResult<StrykeValue> {
         if let Some(h) = self.join.lock().take() {
@@ -48,7 +48,7 @@ impl PerlAsyncTask {
 
 /// Pull-based lazy iterator.  Sources (`frs`, `drs`) produce one; transform
 /// stages (`rev`) wrap one; terminals (`e`/`fore`) consume one item at a time.
-pub trait PerlIterator: Send + Sync {
+pub trait StrykeIterator: Send + Sync {
     /// Return the next item, or `None` when exhausted.
     fn next_item(&self) -> Option<StrykeValue>;
 
@@ -62,7 +62,7 @@ pub trait PerlIterator: Send + Sync {
     }
 }
 
-impl fmt::Debug for dyn PerlIterator {
+impl fmt::Debug for dyn StrykeIterator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("PerlIterator")
     }
@@ -156,7 +156,7 @@ impl FsWalkIterator {
     }
 }
 
-impl PerlIterator for FsWalkIterator {
+impl StrykeIterator for FsWalkIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         loop {
             {
@@ -180,12 +180,12 @@ impl PerlIterator for FsWalkIterator {
 /// at the item level, not list reversal. `~> $s chars rev` and friends rely
 /// on this reversing the sequence (`a,b,c,d` → `d,c,b,a`).
 pub struct RevIterator {
-    source: Arc<dyn PerlIterator>,
+    source: Arc<dyn StrykeIterator>,
     drained: Mutex<Option<Vec<StrykeValue>>>,
 }
 
 impl RevIterator {
-    pub fn new(source: Arc<dyn PerlIterator>) -> Self {
+    pub fn new(source: Arc<dyn StrykeIterator>) -> Self {
         Self {
             source,
             drained: Mutex::new(None),
@@ -193,7 +193,7 @@ impl RevIterator {
     }
 }
 
-impl PerlIterator for RevIterator {
+impl StrykeIterator for RevIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         let mut g = self.drained.lock();
         if g.is_none() {
@@ -225,7 +225,7 @@ pub type PerlSet = IndexMap<String, StrykeValue>;
 #[derive(Debug, Clone)]
 pub struct PerlHeap {
     pub items: Vec<StrykeValue>,
-    pub cmp: Arc<PerlSub>,
+    pub cmp: Arc<StrykeSub>,
 }
 
 /// One SSH worker lane: a single `ssh HOST PE_PATH --remote-worker` process. The persistent
@@ -573,7 +573,7 @@ pub(crate) enum HeapObject {
     ArrayBindingRef(String),
     /// `\\%name` — aliases the live hash in scope.
     HashBindingRef(String),
-    CodeRef(Arc<PerlSub>),
+    CodeRef(Arc<StrykeSub>),
     /// Compiled regex: pattern source and flag chars (e.g. `"i"`, `"g"`) for re-match without re-parse.
     Regex(Arc<PerlCompiledRegex>, String, String),
     Blessed(Arc<BlessedRef>),
@@ -582,7 +582,7 @@ pub(crate) enum HeapObject {
     Set(Arc<PerlSet>),
     ChannelTx(Arc<Sender<StrykeValue>>),
     ChannelRx(Arc<Receiver<StrykeValue>>),
-    AsyncTask(Arc<PerlAsyncTask>),
+    AsyncTask(Arc<StrykeAsyncTask>),
     Generator(Arc<PerlGenerator>),
     Deque(Arc<Mutex<VecDeque<StrykeValue>>>),
     Heap(Arc<Mutex<PerlHeap>>),
@@ -626,7 +626,7 @@ pub(crate) enum HeapObject {
     EnumInst(Arc<EnumInstance>),
     ClassInst(Arc<ClassInstance>),
     /// Lazy pull-based iterator (`frs`, `drs`, `rev` wrapping, etc.).
-    Iterator(Arc<dyn PerlIterator>),
+    Iterator(Arc<dyn StrykeIterator>),
     /// Numeric/string dualvar: **`$!`** (errno + message) and **`$@`** (numeric flag or code + message).
     ErrnoDual {
         code: i32,
@@ -749,7 +749,7 @@ pub struct FibLikeRecAddPattern {
 }
 
 #[derive(Debug, Clone)]
-pub struct PerlSub {
+pub struct StrykeSub {
     pub name: String,
     pub params: Vec<SubSigParam>,
     pub body: Block,
@@ -765,57 +765,57 @@ pub struct PerlSub {
 /// Operations queued on a [`StrykeValue::pipeline`](crate::value::StrykeValue::pipeline) value until `collect()`.
 #[derive(Debug, Clone)]
 pub enum PipelineOp {
-    Filter(Arc<PerlSub>),
-    Map(Arc<PerlSub>),
+    Filter(Arc<StrykeSub>),
+    Map(Arc<StrykeSub>),
     /// `tap` / `peek` — run block for side effects; `@_` is the current stage list; value unchanged.
-    Tap(Arc<PerlSub>),
+    Tap(Arc<StrykeSub>),
     Take(i64),
     /// Parallel map (`pmap`) — optional stderr progress bar (same as `pmap ..., progress => 1`).
     PMap {
-        sub: Arc<PerlSub>,
+        sub: Arc<StrykeSub>,
         progress: bool,
     },
     /// Parallel grep (`pgrep`).
     PGrep {
-        sub: Arc<PerlSub>,
+        sub: Arc<StrykeSub>,
         progress: bool,
     },
     /// Parallel foreach (`pfor`) — side effects only; stream order preserved.
     PFor {
-        sub: Arc<PerlSub>,
+        sub: Arc<StrykeSub>,
         progress: bool,
     },
     /// `pmap_chunked N { }` — chunk size + block.
     PMapChunked {
         chunk: i64,
-        sub: Arc<PerlSub>,
+        sub: Arc<StrykeSub>,
         progress: bool,
     },
     /// `psort` / `psort { $a <=> $b }` — parallel sort.
     PSort {
-        cmp: Option<Arc<PerlSub>>,
+        cmp: Option<Arc<StrykeSub>>,
         progress: bool,
     },
     /// `pcache { }` — parallel memoized map.
     PCache {
-        sub: Arc<PerlSub>,
+        sub: Arc<StrykeSub>,
         progress: bool,
     },
     /// `preduce { }` — must be last before `collect()`; `collect()` returns a scalar.
     PReduce {
-        sub: Arc<PerlSub>,
+        sub: Arc<StrykeSub>,
         progress: bool,
     },
     /// `preduce_init EXPR, { }` — scalar result; must be last before `collect()`.
     PReduceInit {
         init: StrykeValue,
-        sub: Arc<PerlSub>,
+        sub: Arc<StrykeSub>,
         progress: bool,
     },
     /// `pmap_reduce { } { }` — scalar result; must be last before `collect()`.
     PMapReduce {
-        map: Arc<PerlSub>,
-        reduce: Arc<PerlSub>,
+        map: Arc<StrykeSub>,
+        reduce: Arc<StrykeSub>,
         progress: bool,
     },
 }
@@ -1193,7 +1193,7 @@ impl StrykeValue {
 
     /// Wrap a lazy iterator as a StrykeValue.
     #[inline]
-    pub fn iterator(it: Arc<dyn PerlIterator>) -> Self {
+    pub fn iterator(it: Arc<dyn StrykeIterator>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Iterator(it)))
     }
 
@@ -1207,7 +1207,7 @@ impl StrykeValue {
     }
 
     /// Extract the iterator Arc (panics if not an iterator).
-    pub fn into_iterator(&self) -> Arc<dyn PerlIterator> {
+    pub fn into_iterator(&self) -> Arc<dyn StrykeIterator> {
         if nanbox::is_heap(self.0) {
             if let HeapObject::Iterator(it) = &*self.heap_arc() {
                 return Arc::clone(it);
@@ -1257,12 +1257,12 @@ impl StrykeValue {
     }
 
     #[inline]
-    pub fn code_ref(c: Arc<PerlSub>) -> Self {
+    pub fn code_ref(c: Arc<StrykeSub>) -> Self {
         Self::from_heap(Arc::new(HeapObject::CodeRef(c)))
     }
 
     #[inline]
-    pub fn as_code_ref(&self) -> Option<Arc<PerlSub>> {
+    pub fn as_code_ref(&self) -> Option<Arc<StrykeSub>> {
         self.with_heap(|h| match h {
             HeapObject::CodeRef(sub) => Some(Arc::clone(sub)),
             _ => None,
@@ -1402,7 +1402,7 @@ impl StrykeValue {
     }
 
     #[inline]
-    pub fn as_async_task(&self) -> Option<Arc<PerlAsyncTask>> {
+    pub fn as_async_task(&self) -> Option<Arc<StrykeAsyncTask>> {
         self.with_heap(|h| match h {
             HeapObject::AsyncTask(t) => Some(Arc::clone(t)),
             _ => None,
@@ -1685,7 +1685,7 @@ impl StrykeValue {
     }
 
     #[inline]
-    pub fn async_task(t: Arc<PerlAsyncTask>) -> Self {
+    pub fn async_task(t: Arc<StrykeAsyncTask>) -> Self {
         Self::from_heap(Arc::new(HeapObject::AsyncTask(t)))
     }
 
@@ -4564,11 +4564,11 @@ mod tests {
 
     #[test]
     fn to_number_undef_and_non_numeric_refs_are_zero() {
-        use super::PerlSub;
+        use super::StrykeSub;
 
         assert_eq!(StrykeValue::UNDEF.to_number(), 0.0);
         assert_eq!(
-            StrykeValue::code_ref(Arc::new(PerlSub {
+            StrykeValue::code_ref(Arc::new(StrykeSub {
                 name: "f".into(),
                 params: vec![],
                 body: vec![],
@@ -4673,8 +4673,8 @@ mod tests {
 
     #[test]
     fn display_code_ref_includes_sub_name() {
-        use super::PerlSub;
-        let c = StrykeValue::code_ref(Arc::new(PerlSub {
+        use super::StrykeSub;
+        let c = StrykeValue::code_ref(Arc::new(StrykeSub {
             name: "foo".into(),
             params: vec![],
             body: vec![],
