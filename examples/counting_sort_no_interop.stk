@@ -1,0 +1,110 @@
+#!/usr/bin/env stryke
+
+# Counting sort — non-comparison O(n + k) sort where k is the value
+# range. Great when values are small integers (k « n²). Beats every
+# comparison sort theoretically when k = O(n). Stable when implemented
+# carefully (we are). Parses clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * implicit return on tail (rule 7)
+#   * `#{…}` interpolation (rule 1a)
+#   * `:` ranges, `len` (rules 4, 5)
+#
+# Namespaced UDFs `CSort::*`.
+#
+# Run: stryke --no-interop examples/counting_sort_no_interop.stk
+
+# Sort non-negative integers up to $max. Returns a new arrayref.
+fn CSort::sort_nonneg($xs, $max) {
+    my $n = len @$xs
+    return [] if $n == 0
+    my @count = (0) x ($max + 1)
+    for my $v (@$xs) {
+        die "out-of-range value $v" if $v < 0 || $v > $max
+        $count[$v]++
+    }
+    # Cumulative count (positions): count[v] = first index where v could go.
+    my $running = 0
+    for my $v (0:$max) {
+        my $c = $count[$v]
+        $count[$v] = $running
+        $running += $c
+    }
+    my @out = (0) x $n
+    for my $v (@$xs) {
+        $out[$count[$v]] = $v
+        $count[$v]++
+    }
+    \@out
+}
+
+# General signed-integer sort: shift to non-negative, sort, shift back.
+fn CSort::sort($xs) {
+    return [] if len(@$xs) == 0
+    my $min = $xs->[0]
+    my $max = $xs->[0]
+    for my $v (@$xs) {
+        $min = $v if $v < $min
+        $max = $v if $v > $max
+    }
+    my $offset = -$min
+    my @shifted
+    push @shifted, $_ + $offset for @$xs
+    my $sorted = CSort::sort_nonneg(\@shifted, $max + $offset)
+    my @out
+    push @out, $_ - $offset for @$sorted
+    \@out
+}
+
+p "── Counting sort demo ──"
+
+my @cases = (
+    +{ input => [],                          sorted => []                  },
+    +{ input => [42],                        sorted => [42]                },
+    +{ input => [5, 4, 3, 2, 1],             sorted => [1, 2, 3, 4, 5]     },
+    +{ input => [1, 2, 3, 4, 5],             sorted => [1, 2, 3, 4, 5]     },
+    +{ input => [3, 3, 3, 3],                sorted => [3, 3, 3, 3]        },
+    +{ input => [9, 1, 8, 2, 7, 3, 6, 4, 5], sorted => [1, 2, 3, 4, 5, 6, 7, 8, 9] },
+    +{ input => [-3, -1, -4, -1, -5],        sorted => [-5, -4, -3, -1, -1]},  # negatives
+    +{ input => [-2, 0, 5, -10, 10],         sorted => [-10, -2, 0, 5, 10] },
+    +{ input => [0, 0, 0, 0],                sorted => [0, 0, 0, 0]        },
+)
+
+my $fail = 0
+for my $c (@cases) {
+    my $got    = CSort::sort($c->{input})
+    my $got_s  = join(",", @$got)
+    my $want_s = join(",", @{$c->{sorted}})
+    my $ok     = $got_s eq $want_s
+    $fail++ unless $ok
+    p "  [@{$c->{input}}] → [@$got]  #{$ok ? \"\" : \"FAIL (want [$want_s])\"}"
+}
+die "#{$fail} / #{len @cases} counting-sort cases failed" if $fail > 0
+
+# Universal invariants:
+#   * output non-decreasing
+#   * length preserved
+#   * multiset preserved
+for my $c (@cases) {
+    my $r = CSort::sort($c->{input})
+    die "length changed" unless len(@$r) == len(@{$c->{input}})
+    next if len(@$r) < 2
+    for my $i (1:len(@$r) - 1) {
+        die "non-decreasing violated at $i" unless $r->[$i] >= $r->[$i - 1]
+    }
+    # multiset
+    my @sorted_brute = sort { _0 <=> _1 } @{$c->{input}}
+    die "multiset changed" unless join(",", @$r) eq join(",", @sorted_brute)
+}
+
+# Stress: 500 random values in 0:99 — counting sort vs builtin sort.
+srand(42)
+my @big
+push @big, int(rand 100) for 1:500
+my $cs    = CSort::sort_nonneg(\@big, 99)
+my @brute = sort { _0 <=> _1 } @big
+die "500-stress disagreement" unless join(",", @$cs) eq join(",", @brute)
+p "  500-value random stress: counting-sort agrees with builtin sort  OK"
+
+p ""
+p "  ALL PASS (9 cases + invariants + 500-element stress)"

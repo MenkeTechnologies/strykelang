@@ -1,0 +1,105 @@
+#!/usr/bin/env stryke
+
+# Bellman-Ford shortest paths — single-source SSSP that tolerates
+# negative edge weights and detects negative cycles. O(V·E). Relax
+# every edge V-1 times; a Vth round of relaxation must NOT improve
+# anything, else there's a negative cycle on the path. Parses clean
+# under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * implicit return on tail (rule 7)
+#   * `#{…}` interpolation (rule 1a)
+#   * `len`, `:` ranges (rules 4, 5)
+#
+# Namespaced UDFs `BF::*`.
+#
+# Run: stryke --no-interop examples/bellman_ford_no_interop.stk
+
+# Returns { dist => [d0, d1, ...], pred => [...], has_neg_cycle => 0/1 }.
+# Edges are arrayrefs [u, v, w]. Unreachable distance = ∞.
+fn BF::solve($v, $src, $edges) {
+    my $INF = 1e18
+    my @dist = ($INF) x $v
+    my @pred = (-1) x $v
+    $dist[$src] = 0
+    for (1:$v - 1) {
+        my $any_relax = 0
+        for my $e (@$edges) {
+            my ($u, $w, $cost) = @$e
+            next if $dist[$u] >= $INF
+            if ($dist[$u] + $cost < $dist[$w]) {
+                $dist[$w] = $dist[$u] + $cost
+                $pred[$w] = $u
+                $any_relax = 1
+            }
+        }
+        last unless $any_relax
+    }
+    # One more pass: any further relaxation = negative cycle reachable.
+    my $neg = 0
+    for my $e (@$edges) {
+        my ($u, $w, $cost) = @$e
+        next if $dist[$u] >= $INF
+        if ($dist[$u] + $cost < $dist[$w]) {
+            $neg = 1
+            last
+        }
+    }
+    +{ dist => \@dist, pred => \@pred, has_neg_cycle => $neg }
+}
+
+fn BF::is_inf($x) = $x >= 1e17
+
+p "── Bellman-Ford demo ──"
+
+# 5-vertex graph from CLRS Fig 24.4. Source = 0.
+# Edges: (0,1,6), (0,2,7), (1,2,8), (1,3,5), (1,4,-4),
+#        (2,3,-3), (2,4,9), (3,1,-2), (4,0,2), (4,3,7)
+# Expected dist: 0→0=0, 0→1=2, 0→2=7, 0→3=4, 0→4=-2
+my @edges = (
+    [0, 1,  6], [0, 2,  7],
+    [1, 2,  8], [1, 3,  5], [1, 4, -4],
+    [2, 3, -3], [2, 4,  9],
+    [3, 1, -2],
+    [4, 0,  2], [4, 3,  7],
+)
+my $r = BF::solve(5, 0, \@edges)
+die "no neg cycle expected" if $r->{has_neg_cycle}
+my @want = (0, 2, 7, 4, -2)
+for my $i (0:4) {
+    my $got = $r->{dist}[$i]
+    die "0→$i should be $want[$i], got $got" unless $got == $want[$i]
+}
+p "  CLRS 5-vertex with negative edges: all distances correct  OK"
+
+# Disconnected: only edges (0,1,5), (2,3,7) — vertex 4 isolated.
+my @disc = ([0, 1, 5], [2, 3, 7])
+my $r2 = BF::solve(5, 0, \@disc)
+die "no neg cycle"             if     $r2->{has_neg_cycle}
+die "0→0 = 0"                  unless $r2->{dist}[0] == 0
+die "0→1 = 5"                  unless $r2->{dist}[1] == 5
+die "0→2 unreachable"          unless BF::is_inf($r2->{dist}[2])
+die "0→4 unreachable"          unless BF::is_inf($r2->{dist}[4])
+p "  disconnected graph: reachable + unreachable both correct  OK"
+
+# Negative cycle: 0 → 1 → 2 → 0 with sum -1.
+my @cyc = ([0, 1, 1], [1, 2, 1], [2, 0, -3])
+my $r3 = BF::solve(3, 0, \@cyc)
+die "negative cycle should be detected" unless $r3->{has_neg_cycle}
+p "  negative cycle 0→1→2→0 (sum -1): detected  OK"
+
+# Single vertex, no edges. dist = [0].
+my $r4 = BF::solve(1, 0, [])
+die "single vertex acyclic" if     $r4->{has_neg_cycle}
+die "0→0 = 0"               unless $r4->{dist}[0] == 0
+
+# Universal invariants on the CLRS example:
+#   * Every dist[v] reachable from 0 satisfies dist[v] <= dist[u] + w(u,v)
+for my $e (@edges) {
+    my ($u, $w, $cost) = @$e
+    next if BF::is_inf($r->{dist}[$u])
+    die "relaxation violation on edge ($u,$w,$cost)" if $r->{dist}[$u] + $cost < $r->{dist}[$w]
+}
+
+p ""
+p "  ALL PASS (CLRS 5-V + disconnected + neg-cycle + single-V + relaxation invariant)"
