@@ -221,7 +221,8 @@ fn whereis_finds_known_binary() {
 
 #[test]
 fn whereis_empty_for_nonexistent_binary() {
-    let code = r#"my @r = whereis("definitely_not_a_real_command_xyz_12345"); scalar(@r) == 0 ? 1 : 0"#;
+    let code =
+        r#"my @r = whereis("definitely_not_a_real_command_xyz_12345"); scalar(@r) == 0 ? 1 : 0"#;
     assert_eq!(eval_int(code), 1);
 }
 
@@ -231,7 +232,10 @@ fn nice_returns_set_priority() {
     // priority — but lowering (positive nice value) always succeeds
     // for a non-privileged process.
     let n = eval_int(r#"nice(5)"#);
-    assert!(n == 5 || n == 0, "nice(5) returned {n}; expected 5 or undef→0");
+    assert!(
+        n == 5 || n == 0,
+        "nice(5) returned {n}; expected 5 or undef→0"
+    );
 }
 
 #[test]
@@ -277,7 +281,8 @@ fn xargs_maps_callable_over_args() {
 #[test]
 fn strftime_now_renders_iso_format() {
     // %Y-%m-%d gives 10 chars; verify shape.
-    let code = r#"my $s = strftime("%Y-%m-%d"); length($s) == 10 && $s =~ /^\d{4}-\d{2}-\d{2}$/ ? 1 : 0"#;
+    let code =
+        r#"my $s = strftime("%Y-%m-%d"); length($s) == 10 && $s =~ /^\d{4}-\d{2}-\d{2}$/ ? 1 : 0"#;
     assert_eq!(eval_int(code), 1);
 }
 
@@ -294,18 +299,12 @@ fn strftime_with_explicit_epoch() {
 
 #[test]
 fn iconv_passthrough_for_same_encoding() {
-    assert_eq!(
-        eval_string(r#"iconv("hello", "utf-8", "utf-8")"#),
-        "hello"
-    );
+    assert_eq!(eval_string(r#"iconv("hello", "utf-8", "utf-8")"#), "hello");
 }
 
 #[test]
 fn tac_reverses_a_list() {
-    assert_eq!(
-        eval_string(r#"join(",", tac(["a", "b", "c"]))"#),
-        "c,b,a"
-    );
+    assert_eq!(eval_string(r#"join(",", tac(["a", "b", "c"]))"#), "c,b,a");
 }
 
 #[test]

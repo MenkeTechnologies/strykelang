@@ -33,9 +33,8 @@ use crate::profiler::Profiler;
 use crate::scope::Scope;
 use crate::sort_fast::{detect_sort_block_fast, sort_magic_cmp};
 use crate::value::{
-    perl_list_range_expand, CaptureResult, StrykeAsyncTask, PerlBarrier, PerlDataFrame,
-    PerlGenerator, PerlHeap, PerlPpool, StrykeSub, PipelineInner, PipelineOp, RemoteCluster,
-    StrykeValue,
+    perl_list_range_expand, CaptureResult, PerlBarrier, PerlDataFrame, PerlGenerator, PerlHeap,
+    PerlPpool, PipelineInner, PipelineOp, RemoteCluster, StrykeAsyncTask, StrykeSub, StrykeValue,
 };
 
 /// Merge two counting-hash accumulators (parallel `preduce_init` partials).
@@ -2162,7 +2161,10 @@ impl VMHelper {
     /// and host aliases in *your* config are missing. When **`SUDO_USER`** is set and the effective
     /// uid is **0**, we set **`HOME`** for this subprocess to **`SUDO_USER`'s** passwd home so your
     /// `~/.ssh/config` and keys apply.
-    pub(crate) fn ssh_builtin_execute(&mut self, args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    pub(crate) fn ssh_builtin_execute(
+        &mut self,
+        args: &[StrykeValue],
+    ) -> StrykeResult<StrykeValue> {
         use std::process::Command;
         let mut cmd = Command::new("ssh");
         #[cfg(unix)]
@@ -2291,11 +2293,10 @@ impl VMHelper {
             _ => return Err(StrykeError::runtime("tie: invalid target kind", line)),
         };
         let tie_fn = format!("{}::{}", pkg, tie_ctor);
-        let sub = self
-            .subs
-            .get(&tie_fn)
-            .cloned()
-            .ok_or_else(|| StrykeError::runtime(format!("tie: cannot find &{}", tie_fn), line))?;
+        let sub =
+            self.subs.get(&tie_fn).cloned().ok_or_else(|| {
+                StrykeError::runtime(format!("tie: cannot find &{}", tie_fn), line)
+            })?;
         let mut call_args = vec![StrykeValue::string(pkg.clone())];
         call_args.extend(it);
         let obj = match self.call_sub(&sub, call_args, WantarrayCtx::Scalar, line) {
@@ -4129,7 +4130,9 @@ impl VMHelper {
     }
 
     pub(crate) fn resolve_stryke_path_string(&self, path: &str) -> String {
-        self.resolve_stryke_path(path).to_string_lossy().into_owned()
+        self.resolve_stryke_path(path)
+            .to_string_lossy()
+            .into_owned()
     }
 
     /// `cd DIR` / `cd()` — set the interpreter working directory for relative path builtins
@@ -8894,7 +8897,10 @@ impl VMHelper {
                 if let Some(s) = val.as_str() {
                     return Ok(StrykeValue::string(self.resolve_io_handle_name(&s)));
                 }
-                Err(StrykeError::runtime("Can't dereference non-reference as typeglob", line).into())
+                Err(
+                    StrykeError::runtime("Can't dereference non-reference as typeglob", line)
+                        .into(),
+                )
             }
         }
     }
@@ -10790,7 +10796,9 @@ impl VMHelper {
                 } else if let Some(s) = obj.as_str() {
                     s // Class->method()
                 } else {
-                    return Err(StrykeError::runtime("Can't call method on non-object", line).into());
+                    return Err(
+                        StrykeError::runtime("Can't call method on non-object", line).into(),
+                    );
                 };
                 if method == "VERSION" && !*super_call {
                     if let Some(ver) = self.package_version_scalar(class.as_str())? {
@@ -13724,7 +13732,9 @@ impl VMHelper {
             .render_format_template(&tmpl, line)
             .map_err(|e| match e {
                 FlowOrError::Error(e) => e,
-                FlowOrError::Flow(_) => StrykeError::runtime("write: unexpected control flow", line),
+                FlowOrError::Flow(_) => {
+                    StrykeError::runtime("write: unexpected control flow", line)
+                }
             })?;
         self.write_formatted_print(handle_name.as_str(), &out, line)?;
         Ok(StrykeValue::integer(1))
@@ -13923,9 +13933,11 @@ impl VMHelper {
             BinOp::Div => {
                 if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
                     if b == 0 {
-                        return Err(
-                            StrykeError::division_by_zero("Illegal division by zero", _line).into(),
-                        );
+                        return Err(StrykeError::division_by_zero(
+                            "Illegal division by zero",
+                            _line,
+                        )
+                        .into());
                     }
                     if a % b == 0 {
                         StrykeValue::integer(a / b)
@@ -13935,9 +13947,11 @@ impl VMHelper {
                 } else {
                     let d = rv.to_number();
                     if d == 0.0 {
-                        return Err(
-                            StrykeError::division_by_zero("Illegal division by zero", _line).into(),
-                        );
+                        return Err(StrykeError::division_by_zero(
+                            "Illegal division by zero",
+                            _line,
+                        )
+                        .into());
                     }
                     StrykeValue::float(lv.to_number() / d)
                 }
@@ -14371,7 +14385,9 @@ impl VMHelper {
                 *data = StrykeValue::hash(map);
                 return Ok(StrykeValue::UNDEF);
             }
-            return Err(StrykeError::runtime("Can't assign into non-hash blessed ref", line).into());
+            return Err(
+                StrykeError::runtime("Can't assign into non-hash blessed ref", line).into(),
+            );
         }
         if let Some(r) = container.as_hash_ref() {
             r.write().insert(key, val);
@@ -14688,9 +14704,11 @@ impl VMHelper {
         line: usize,
     ) -> Result<StrykeValue, FlowOrError> {
         if indices.is_empty() {
-            return Err(
-                StrykeError::runtime("array slice increment needs at least one index", line).into(),
-            );
+            return Err(StrykeError::runtime(
+                "array slice increment needs at least one index",
+                line,
+            )
+            .into());
         }
         let last_idx = *indices.last().expect("non-empty indices");
         let last_old = self.read_arrow_array_element(container.clone(), last_idx, line)?;
@@ -16996,7 +17014,10 @@ impl VMHelper {
                 }
                 "does" => {
                     if args.len() != 1 {
-                        return Some(Err(StrykeError::runtime("does requires one argument", line)));
+                        return Some(Err(StrykeError::runtime(
+                            "does requires one argument",
+                            line,
+                        )));
                     }
                     let trait_name = args[0].to_string();
                     let implements = c.def.implements.contains(&trait_name);
@@ -17008,7 +17029,10 @@ impl VMHelper {
                 }
                 "methods" => {
                     if !args.is_empty() {
-                        return Some(Err(StrykeError::runtime("methods takes no arguments", line)));
+                        return Some(Err(StrykeError::runtime(
+                            "methods takes no arguments",
+                            line,
+                        )));
                     }
                     let mut names = Vec::new();
                     self.collect_class_method_names(&c.def, &mut names);
@@ -17741,7 +17765,10 @@ impl VMHelper {
             }
             "take" => {
                 if args.len() != 1 {
-                    return Err(StrykeError::runtime("pipeline take expects 1 argument", line));
+                    return Err(StrykeError::runtime(
+                        "pipeline take expects 1 argument",
+                        line,
+                    ));
                 }
                 let n = args[0].to_int();
                 self.pipeline_push(&p, PipelineOp::Take(n), line)?;
@@ -19276,10 +19303,11 @@ impl VMHelper {
                 {
                     self.call_sub(&target_sub, goto_args, want, _line)
                 } else {
-                    Err(
-                        StrykeError::runtime(format!("Undefined subroutine &{}", target_name), _line)
-                            .into(),
+                    Err(StrykeError::runtime(
+                        format!("Undefined subroutine &{}", target_name),
+                        _line,
                     )
+                    .into())
                 }
             }
             Err(FlowOrError::Flow(Flow::Yield(_))) => {
@@ -19491,9 +19519,10 @@ impl VMHelper {
                         .match_array_pattern_elems(&arr, elems, line)
                         .map_err(|e| match e {
                             FlowOrError::Error(stryke) => stryke,
-                            FlowOrError::Flow(_) => {
-                                StrykeError::runtime("unexpected flow in method array destruct", line)
-                            }
+                            FlowOrError::Flow(_) => StrykeError::runtime(
+                                "unexpected flow in method array destruct",
+                                line,
+                            ),
                         })?;
                     let Some(binds) = binds else {
                         return Err(StrykeError::runtime(
@@ -20474,8 +20503,8 @@ impl VMHelper {
             .map_err(|e| StrykeError::runtime(e, line))?;
         let subs_prelude = crate::remote_wire::build_subs_prelude(&self.subs);
         let block_src = crate::fmt::format_block(block);
-        let item_jsons =
-            crate::cluster::perl_items_to_json(&items).map_err(|e| StrykeError::runtime(e, line))?;
+        let item_jsons = crate::cluster::perl_items_to_json(&items)
+            .map_err(|e| StrykeError::runtime(e, line))?;
 
         // Progress bar (best effort) — ticks once per result. The dispatcher itself is
         // synchronous from the caller's POV, so we drive the bar before/after the call.
@@ -20531,7 +20560,10 @@ impl VMHelper {
         })?;
         let mmap = unsafe {
             memmap2::Mmap::map(&file).map_err(|e| {
-                FlowOrError::Error(StrykeError::runtime(format!("par_lines: mmap: {}", e), line))
+                FlowOrError::Error(StrykeError::runtime(
+                    format!("par_lines: mmap: {}", e),
+                    line,
+                ))
             })?
         };
         let data: &[u8] = &mmap;

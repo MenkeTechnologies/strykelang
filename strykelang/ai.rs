@@ -2815,8 +2815,7 @@ pub(crate) fn ai_memory_save(args: &[StrykeValue], line: usize) -> Result<Stryke
                 // JSON-encode hash/hashref metadata so `ai_memory_recall`
                 // can decode it back to a hashref. Stringifying the ref
                 // would give `HASH(0x…)` and lose the keys.
-                serde_json::to_string(&perl_to_json(v))
-                    .unwrap_or_else(|_| v.to_string())
+                serde_json::to_string(&perl_to_json(v)).unwrap_or_else(|_| v.to_string())
             } else {
                 v.to_string()
             }
@@ -3705,8 +3704,9 @@ pub(crate) fn ai_speak(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
     std::io::Read::read_to_end(&mut resp.into_reader(), &mut buf)
         .map_err(|e| StrykeError::runtime(format!("ai_speak: read body: {}", e), line))?;
     if !output.is_empty() {
-        std::fs::write(&output, &buf)
-            .map_err(|e| StrykeError::runtime(format!("ai_speak: write {}: {}", output, e), line))?;
+        std::fs::write(&output, &buf).map_err(|e| {
+            StrykeError::runtime(format!("ai_speak: write {}: {}", output, e), line)
+        })?;
     }
     Ok(StrykeValue::bytes(Arc::new(buf)))
 }
@@ -3797,8 +3797,9 @@ pub(crate) fn ai_image(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
     let mut images: Vec<Vec<u8>> = Vec::new();
     for item in &data {
         if let Some(b64) = item["b64_json"].as_str() {
-            let bytes = base64_decode_lenient(b64)
-                .ok_or_else(|| StrykeError::runtime("ai_image: invalid base64 in response", line))?;
+            let bytes = base64_decode_lenient(b64).ok_or_else(|| {
+                StrykeError::runtime("ai_image: invalid base64 in response", line)
+            })?;
             images.push(bytes);
         } else if let Some(url) = item["url"].as_str() {
             let r = agent
@@ -3806,8 +3807,9 @@ pub(crate) fn ai_image(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
                 .call()
                 .map_err(|e| StrykeError::runtime(format!("ai_image: download: {}", e), line))?;
             let mut buf = Vec::new();
-            std::io::Read::read_to_end(&mut r.into_reader(), &mut buf)
-                .map_err(|e| StrykeError::runtime(format!("ai_image: read download: {}", e), line))?;
+            std::io::Read::read_to_end(&mut r.into_reader(), &mut buf).map_err(|e| {
+                StrykeError::runtime(format!("ai_image: read download: {}", e), line)
+            })?;
             images.push(buf);
         }
     }
@@ -4052,8 +4054,9 @@ fn finalize_image_response(
     }
     if images.len() == 1 {
         if !output.is_empty() {
-            std::fs::write(output, &images[0])
-                .map_err(|e| StrykeError::runtime(format!("image: write {}: {}", output, e), line))?;
+            std::fs::write(output, &images[0]).map_err(|e| {
+                StrykeError::runtime(format!("image: write {}: {}", output, e), line)
+            })?;
         }
         Ok(StrykeValue::bytes(Arc::new(images.remove(0))))
     } else {
@@ -4064,8 +4067,9 @@ fn finalize_image_response(
                 } else {
                     format!("{}_{}", output, i + 1)
                 };
-                std::fs::write(&p, b)
-                    .map_err(|e| StrykeError::runtime(format!("image: write {}: {}", p, e), line))?;
+                std::fs::write(&p, b).map_err(|e| {
+                    StrykeError::runtime(format!("image: write {}: {}", p, e), line)
+                })?;
             }
         }
         let arr: Vec<StrykeValue> = images
@@ -4823,8 +4827,9 @@ fn build_document_block(spec: &str, title: Option<&str>, line: usize) -> Result<
     // Treat as a path if it points at an existing file.
     let p = std::path::Path::new(spec);
     let mut block = if p.is_file() {
-        let bytes = std::fs::read(p)
-            .map_err(|e| StrykeError::runtime(format!("ai_grounded: read {}: {}", spec, e), line))?;
+        let bytes = std::fs::read(p).map_err(|e| {
+            StrykeError::runtime(format!("ai_grounded: read {}: {}", spec, e), line)
+        })?;
         let is_pdf = bytes.starts_with(b"%PDF-") || spec.to_lowercase().ends_with(".pdf");
         if is_pdf {
             use base64::Engine;
@@ -4944,8 +4949,9 @@ fn ai_batch_anthropic(
     let max_wait = opt_int(opts, "max_wait_secs", 24 * 3600).max(60) as u64;
 
     let key_env = config().lock().api_key_env.clone();
-    let api_key = std::env::var(&key_env)
-        .map_err(|_| StrykeError::runtime(format!("ai_batch: ${} env var not set", key_env), line))?;
+    let api_key = std::env::var(&key_env).map_err(|_| {
+        StrykeError::runtime(format!("ai_batch: ${} env var not set", key_env), line)
+    })?;
     let agent = ureq::AgentBuilder::new()
         .timeout(Duration::from_secs(60))
         .build();
@@ -5144,9 +5150,9 @@ pub(crate) fn ai_pmap(args: &[StrykeValue], line: usize) -> Result<StrykeValue> 
     // back in order. Uses the existing cluster.rs run_cluster API
     // which handles serialization.
     let cluster_pv = cluster_v.unwrap();
-    let cluster = cluster_pv
-        .as_remote_cluster()
-        .ok_or_else(|| StrykeError::runtime("ai_pmap: cluster arg is not a cluster handle", line))?;
+    let cluster = cluster_pv.as_remote_cluster().ok_or_else(|| {
+        StrykeError::runtime("ai_pmap: cluster arg is not a cluster handle", line)
+    })?;
     let num_workers = cluster.slots.len().max(1);
     let shards = shard_items(&items, num_workers);
 
@@ -5533,9 +5539,9 @@ fn call_anthropic_with_retry(
             .send_json(body.clone())
         {
             Ok(resp) => {
-                return resp
-                    .into_json()
-                    .map_err(|e| StrykeError::runtime(format!("ai: anthropic decode: {}", e), line));
+                return resp.into_json().map_err(|e| {
+                    StrykeError::runtime(format!("ai: anthropic decode: {}", e), line)
+                });
             }
             Err(ureq::Error::Status(code, resp)) => {
                 if attempt + 1 < max_attempts && should_retry(code) {
@@ -6225,9 +6231,9 @@ pub(crate) fn ai_file_anthropic_list(args: &[StrykeValue], line: usize) -> Resul
         .set("anthropic-beta", ANTHROPIC_FILES_BETA)
         .call()
         .map_err(|e| StrykeError::runtime(format!("ai_file_anthropic_list: {}", e), line))?;
-    let json: serde_json::Value = resp
-        .into_json()
-        .map_err(|e| StrykeError::runtime(format!("ai_file_anthropic_list: decode: {}", e), line))?;
+    let json: serde_json::Value = resp.into_json().map_err(|e| {
+        StrykeError::runtime(format!("ai_file_anthropic_list: decode: {}", e), line)
+    })?;
     let data = json["data"].as_array().cloned().unwrap_or_default();
     let arr: Vec<StrykeValue> = data.iter().map(json_to_perl_hash).collect();
     Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(

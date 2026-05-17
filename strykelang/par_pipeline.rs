@@ -74,9 +74,9 @@ fn parse_args(args: &[StrykeValue]) -> Result<ParPipelineSpec, StrykeError> {
     let stages_items = list_from_value(stages_val);
     let mut stages: Vec<Arc<StrykeSub>> = Vec::with_capacity(stages_items.len());
     for v in stages_items {
-        let s = v
-            .as_code_ref()
-            .ok_or_else(|| StrykeError::runtime("par_pipeline: each stage must be a CODE ref", 0))?;
+        let s = v.as_code_ref().ok_or_else(|| {
+            StrykeError::runtime("par_pipeline: each stage must be a CODE ref", 0)
+        })?;
         stages.push(s);
     }
     let workers_val = map

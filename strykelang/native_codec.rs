@@ -803,7 +803,10 @@ pub(crate) fn des3_decrypt(
         .decode(ciphertext_b64.to_string().trim())
         .map_err(|e| StrykeError::runtime(format!("des3_decrypt: invalid base64: {}", e), 0))?;
     if data.len() < 8 {
-        return Err(StrykeError::runtime("des3_decrypt: ciphertext too short", 0));
+        return Err(StrykeError::runtime(
+            "des3_decrypt: ciphertext too short",
+            0,
+        ));
     }
     let iv: [u8; 8] = data[..8].try_into().unwrap();
     let ciphertext = &mut data[8..];
@@ -1124,7 +1127,10 @@ pub(crate) fn cast5_decrypt(
         .decode(ciphertext_b64.to_string().trim())
         .map_err(|e| StrykeError::runtime(format!("cast5_decrypt: invalid base64: {}", e), 0))?;
     if data.len() < 8 {
-        return Err(StrykeError::runtime("cast5_decrypt: ciphertext too short", 0));
+        return Err(StrykeError::runtime(
+            "cast5_decrypt: ciphertext too short",
+            0,
+        ));
     }
     let iv: [u8; 8] = data[..8].try_into().unwrap();
     let ciphertext = &mut data[8..];
@@ -1302,9 +1308,9 @@ pub(crate) fn secretbox_open(
     }
     let nonce: [u8; 24] = data[..24].try_into().unwrap();
     let cipher = XSalsa20Poly1305::new(key_bytes.as_slice().into());
-    let plaintext = cipher
-        .decrypt((&nonce).into(), &data[24..])
-        .map_err(|_| StrykeError::runtime("secretbox: decryption failed (bad key or tampered)", 0))?;
+    let plaintext = cipher.decrypt((&nonce).into(), &data[24..]).map_err(|_| {
+        StrykeError::runtime("secretbox: decryption failed (bad key or tampered)", 0)
+    })?;
     Ok(StrykeValue::string(
         String::from_utf8_lossy(&plaintext).into_owned(),
     ))
@@ -1386,7 +1392,9 @@ pub(crate) fn nacl_box_open(
     let salsa_box = SalsaBox::new(&pk, &sk);
     let plaintext = salsa_box
         .decrypt((&nonce).into(), &data[24..])
-        .map_err(|_| StrykeError::runtime("nacl_box: decryption failed (bad key or tampered)", 0))?;
+        .map_err(|_| {
+            StrykeError::runtime("nacl_box: decryption failed (bad key or tampered)", 0)
+        })?;
     Ok(StrykeValue::string(
         String::from_utf8_lossy(&plaintext).into_owned(),
     ))
@@ -1652,7 +1660,9 @@ pub(crate) fn rsa_decrypt_pkcs1(
     })?;
     let ciphertext = base64::engine::general_purpose::STANDARD
         .decode(ciphertext_b64.to_string().trim())
-        .map_err(|e| StrykeError::runtime(format!("rsa_decrypt_pkcs1: invalid base64: {}", e), 0))?;
+        .map_err(|e| {
+            StrykeError::runtime(format!("rsa_decrypt_pkcs1: invalid base64: {}", e), 0)
+        })?;
     let plaintext = priv_key
         .decrypt(Pkcs1v15Encrypt, &ciphertext)
         .map_err(|e| StrykeError::runtime(format!("rsa_decrypt_pkcs1: {}", e), 0))?;
@@ -1745,10 +1755,12 @@ pub(crate) fn ecdsa_p256_verify(
     })?;
     let point = EncodedPoint::from_bytes(&pub_bytes)
         .map_err(|e| StrykeError::runtime(format!("ecdsa_p256_verify: invalid point: {}", e), 0))?;
-    let vk = VerifyingKey::from_encoded_point(&point)
-        .map_err(|e| StrykeError::runtime(format!("ecdsa_p256_verify: invalid pubkey: {}", e), 0))?;
-    let sig_bytes = hex::decode(sig_hex.to_string().trim())
-        .map_err(|e| StrykeError::runtime(format!("ecdsa_p256_verify: invalid hex sig: {}", e), 0))?;
+    let vk = VerifyingKey::from_encoded_point(&point).map_err(|e| {
+        StrykeError::runtime(format!("ecdsa_p256_verify: invalid pubkey: {}", e), 0)
+    })?;
+    let sig_bytes = hex::decode(sig_hex.to_string().trim()).map_err(|e| {
+        StrykeError::runtime(format!("ecdsa_p256_verify: invalid hex sig: {}", e), 0)
+    })?;
     let sig = Signature::from_der(&sig_bytes).map_err(|e| {
         StrykeError::runtime(format!("ecdsa_p256_verify: invalid signature: {}", e), 0)
     })?;
@@ -1805,10 +1817,12 @@ pub(crate) fn ecdsa_p384_verify(
     })?;
     let point = EncodedPoint::from_bytes(&pub_bytes)
         .map_err(|e| StrykeError::runtime(format!("ecdsa_p384_verify: invalid point: {}", e), 0))?;
-    let vk = VerifyingKey::from_encoded_point(&point)
-        .map_err(|e| StrykeError::runtime(format!("ecdsa_p384_verify: invalid pubkey: {}", e), 0))?;
-    let sig_bytes = hex::decode(sig_hex.to_string().trim())
-        .map_err(|e| StrykeError::runtime(format!("ecdsa_p384_verify: invalid hex sig: {}", e), 0))?;
+    let vk = VerifyingKey::from_encoded_point(&point).map_err(|e| {
+        StrykeError::runtime(format!("ecdsa_p384_verify: invalid pubkey: {}", e), 0)
+    })?;
+    let sig_bytes = hex::decode(sig_hex.to_string().trim()).map_err(|e| {
+        StrykeError::runtime(format!("ecdsa_p384_verify: invalid hex sig: {}", e), 0)
+    })?;
     let sig = Signature::from_der(&sig_bytes).map_err(|e| {
         StrykeError::runtime(format!("ecdsa_p384_verify: invalid signature: {}", e), 0)
     })?;
@@ -1835,8 +1849,9 @@ pub(crate) fn ecdsa_secp256k1_sign(
     message: &StrykeValue,
 ) -> StrykeResult<StrykeValue> {
     use k256::ecdsa::{signature::Signer, SigningKey};
-    let priv_bytes = hex::decode(priv_hex.to_string().trim())
-        .map_err(|e| StrykeError::runtime(format!("ecdsa_secp256k1_sign: invalid hex: {}", e), 0))?;
+    let priv_bytes = hex::decode(priv_hex.to_string().trim()).map_err(|e| {
+        StrykeError::runtime(format!("ecdsa_secp256k1_sign: invalid hex: {}", e), 0)
+    })?;
     if priv_bytes.len() != 32 {
         return Err(StrykeError::runtime(
             format!(
@@ -1846,8 +1861,9 @@ pub(crate) fn ecdsa_secp256k1_sign(
             0,
         ));
     }
-    let sk = SigningKey::from_bytes(priv_bytes.as_slice().into())
-        .map_err(|e| StrykeError::runtime(format!("ecdsa_secp256k1_sign: invalid key: {}", e), 0))?;
+    let sk = SigningKey::from_bytes(priv_bytes.as_slice().into()).map_err(|e| {
+        StrykeError::runtime(format!("ecdsa_secp256k1_sign: invalid key: {}", e), 0)
+    })?;
     let sig: k256::ecdsa::Signature = sk.sign(&bytes_from_value(message));
     Ok(StrykeValue::string(hex::encode(sig.to_der().as_bytes())))
 }
@@ -1893,10 +1909,12 @@ pub(crate) fn ecdh_p256(
     their_pub_hex: &StrykeValue,
 ) -> StrykeResult<StrykeValue> {
     use p256::{EncodedPoint, PublicKey};
-    let priv_bytes = hex::decode(my_priv_hex.to_string().trim())
-        .map_err(|e| StrykeError::runtime(format!("ecdh_p256: invalid hex private key: {}", e), 0))?;
-    let pub_bytes = hex::decode(their_pub_hex.to_string().trim())
-        .map_err(|e| StrykeError::runtime(format!("ecdh_p256: invalid hex public key: {}", e), 0))?;
+    let priv_bytes = hex::decode(my_priv_hex.to_string().trim()).map_err(|e| {
+        StrykeError::runtime(format!("ecdh_p256: invalid hex private key: {}", e), 0)
+    })?;
+    let pub_bytes = hex::decode(their_pub_hex.to_string().trim()).map_err(|e| {
+        StrykeError::runtime(format!("ecdh_p256: invalid hex public key: {}", e), 0)
+    })?;
     if priv_bytes.len() != 32 {
         return Err(StrykeError::runtime(
             format!(
@@ -1923,10 +1941,12 @@ pub(crate) fn ecdh_p384(
     their_pub_hex: &StrykeValue,
 ) -> StrykeResult<StrykeValue> {
     use p384::{EncodedPoint, PublicKey};
-    let priv_bytes = hex::decode(my_priv_hex.to_string().trim())
-        .map_err(|e| StrykeError::runtime(format!("ecdh_p384: invalid hex private key: {}", e), 0))?;
-    let pub_bytes = hex::decode(their_pub_hex.to_string().trim())
-        .map_err(|e| StrykeError::runtime(format!("ecdh_p384: invalid hex public key: {}", e), 0))?;
+    let priv_bytes = hex::decode(my_priv_hex.to_string().trim()).map_err(|e| {
+        StrykeError::runtime(format!("ecdh_p384: invalid hex private key: {}", e), 0)
+    })?;
+    let pub_bytes = hex::decode(their_pub_hex.to_string().trim()).map_err(|e| {
+        StrykeError::runtime(format!("ecdh_p384: invalid hex public key: {}", e), 0)
+    })?;
     if priv_bytes.len() != 48 {
         return Err(StrykeError::runtime(
             format!(
@@ -1961,7 +1981,10 @@ pub(crate) fn argon2_hash(password: &StrykeValue) -> StrykeResult<StrykeValue> {
 }
 
 /// Verify password against Argon2 PHC hash string.
-pub(crate) fn argon2_verify(password: &StrykeValue, hash: &StrykeValue) -> StrykeResult<StrykeValue> {
+pub(crate) fn argon2_verify(
+    password: &StrykeValue,
+    hash: &StrykeValue,
+) -> StrykeResult<StrykeValue> {
     use argon2::{password_hash::PasswordHash, password_hash::PasswordVerifier, Argon2};
     let hash_str = hash.to_string();
     let parsed = PasswordHash::new(&hash_str)
@@ -1980,7 +2003,10 @@ pub(crate) fn bcrypt_hash(password: &StrykeValue) -> StrykeResult<StrykeValue> {
 }
 
 /// Verify password against bcrypt hash.
-pub(crate) fn bcrypt_verify(password: &StrykeValue, hash: &StrykeValue) -> StrykeResult<StrykeValue> {
+pub(crate) fn bcrypt_verify(
+    password: &StrykeValue,
+    hash: &StrykeValue,
+) -> StrykeResult<StrykeValue> {
     let ok = bcrypt::verify(password.to_string(), &hash.to_string())
         .map_err(|e| StrykeError::runtime(format!("bcrypt_verify: {}", e), 0))?;
     Ok(StrykeValue::integer(i64::from(ok)))
@@ -2000,7 +2026,10 @@ pub(crate) fn scrypt_hash(password: &StrykeValue) -> StrykeResult<StrykeValue> {
 }
 
 /// Verify password against scrypt PHC hash.
-pub(crate) fn scrypt_verify(password: &StrykeValue, hash: &StrykeValue) -> StrykeResult<StrykeValue> {
+pub(crate) fn scrypt_verify(
+    password: &StrykeValue,
+    hash: &StrykeValue,
+) -> StrykeResult<StrykeValue> {
     use scrypt::{
         password_hash::{PasswordHash, PasswordVerifier},
         Scrypt,
@@ -2214,8 +2243,9 @@ pub(crate) fn ed25519_verify(
     message: &StrykeValue,
     signature: &StrykeValue,
 ) -> StrykeResult<StrykeValue> {
-    let pub_bytes = hex::decode(public_key.to_string().trim())
-        .map_err(|e| StrykeError::runtime(format!("ed25519_verify: invalid hex pubkey: {}", e), 0))?;
+    let pub_bytes = hex::decode(public_key.to_string().trim()).map_err(|e| {
+        StrykeError::runtime(format!("ed25519_verify: invalid hex pubkey: {}", e), 0)
+    })?;
     let sig_bytes = hex::decode(signature.to_string().trim())
         .map_err(|e| StrykeError::runtime(format!("ed25519_verify: invalid hex sig: {}", e), 0))?;
     if pub_bytes.len() != 32 {
@@ -2262,10 +2292,12 @@ pub(crate) fn x25519_dh(
     my_private: &StrykeValue,
     their_public: &StrykeValue,
 ) -> StrykeResult<StrykeValue> {
-    let priv_bytes = hex::decode(my_private.to_string().trim())
-        .map_err(|e| StrykeError::runtime(format!("x25519_dh: invalid hex private key: {}", e), 0))?;
-    let pub_bytes = hex::decode(their_public.to_string().trim())
-        .map_err(|e| StrykeError::runtime(format!("x25519_dh: invalid hex public key: {}", e), 0))?;
+    let priv_bytes = hex::decode(my_private.to_string().trim()).map_err(|e| {
+        StrykeError::runtime(format!("x25519_dh: invalid hex private key: {}", e), 0)
+    })?;
+    let pub_bytes = hex::decode(their_public.to_string().trim()).map_err(|e| {
+        StrykeError::runtime(format!("x25519_dh: invalid hex public key: {}", e), 0)
+    })?;
     if priv_bytes.len() != 32 || pub_bytes.len() != 32 {
         return Err(StrykeError::runtime("x25519_dh: keys must be 32 bytes", 0));
     }
@@ -2850,10 +2882,16 @@ pub(crate) fn datetime_parse_rfc3339(v: &StrykeValue) -> StrykeResult<StrykeValu
 }
 
 /// `strftime` formatting for UTC epoch seconds. `fmt` uses chrono's `strftime` specifiers.
-pub(crate) fn datetime_strftime(epoch: &StrykeValue, fmt: &StrykeValue) -> StrykeResult<StrykeValue> {
+pub(crate) fn datetime_strftime(
+    epoch: &StrykeValue,
+    fmt: &StrykeValue,
+) -> StrykeResult<StrykeValue> {
     let sec = epoch.to_number();
     if !sec.is_finite() {
-        return Err(StrykeError::runtime("datetime_strftime: non-finite epoch", 0));
+        return Err(StrykeError::runtime(
+            "datetime_strftime: non-finite epoch",
+            0,
+        ));
     }
     let pattern = fmt.to_string();
     let t = Utc

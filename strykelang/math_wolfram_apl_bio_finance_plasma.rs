@@ -635,7 +635,7 @@ fn builtin_theil_index(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 fn builtin_herfindahl_hirschman(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let shares: Vec<f64> = args
         .iter()
-        .flat_map(|a| arg_to_vec(a))
+        .flat_map(arg_to_vec)
         .map(|v| v.to_number())
         .collect();
     let s: f64 = shares.iter().map(|x| x * x).sum();

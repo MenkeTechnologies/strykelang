@@ -707,7 +707,7 @@ fn builtin_medfilt_1d(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let raw_k = args.get(1).map(|v| v.to_number() as i64).unwrap_or(3);
     // Force odd, ≥ 1.
     let mut k = raw_k.max(1) as usize;
-    if k % 2 == 0 {
+    if k.is_multiple_of(2) {
         k += 1;
     }
     let half = k / 2;

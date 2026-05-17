@@ -50,7 +50,7 @@
 //! can `pmap { gh_repo(...) }` over a list including dead names without
 //! aborting the whole pipeline.
 
-use crate::error::{StrykeResult, StrykeError};
+use crate::error::{StrykeError, StrykeResult};
 use crate::value::StrykeValue;
 use indexmap::IndexMap;
 use parking_lot::RwLock;
@@ -81,9 +81,9 @@ fn json_to_perl(v: serde_json::Value) -> StrykeValue {
             }
         }
         serde_json::Value::String(s) => StrykeValue::string(s),
-        serde_json::Value::Array(a) => {
-            StrykeValue::array_ref(Arc::new(RwLock::new(a.into_iter().map(json_to_perl).collect())))
-        }
+        serde_json::Value::Array(a) => StrykeValue::array_ref(Arc::new(RwLock::new(
+            a.into_iter().map(json_to_perl).collect(),
+        ))),
         serde_json::Value::Object(o) => {
             let mut map = IndexMap::new();
             for (k, v) in o {

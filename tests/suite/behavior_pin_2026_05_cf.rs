@@ -428,10 +428,7 @@ fn db_power_two_reference_cf() {
 
 #[test]
 fn db_voltage_missing_reference_balloons_cf() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.14f", dB_voltage(2))"#),
-        "NaN"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.14f", dB_voltage(2))"#), "NaN");
 }
 
 #[test]

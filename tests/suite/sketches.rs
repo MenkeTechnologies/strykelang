@@ -306,27 +306,18 @@ fn hll_legacy_aliases_route_to_fast_path() {
 
 #[test]
 fn hll_ref_type_is_hllsketch() {
-    assert_eq!(
-        eval_string(r#"my $h = hll(12); ref($h)"#),
-        "HllSketch"
-    );
+    assert_eq!(eval_string(r#"my $h = hll(12); ref($h)"#), "HllSketch");
 }
 
 #[test]
 fn hll_precision_returned_matches_construction() {
-    assert_eq!(
-        eval_int(r#"my $h = hll(13); hll_precision($h)"#),
-        13
-    );
+    assert_eq!(eval_int(r#"my $h = hll(13); hll_precision($h)"#), 13);
 }
 
 #[test]
 fn hll_precision_clamped_to_legal_range() {
     // Precision clamps to [4, 18]; 200 should clamp to 18 (m=262144).
-    assert_eq!(
-        eval_int(r#"my $h = hll(200); hll_precision($h)"#),
-        18
-    );
+    assert_eq!(eval_int(r#"my $h = hll(200); hll_precision($h)"#), 18);
     assert_eq!(eval_int(r#"my $h = hll(1); hll_precision($h)"#), 4);
 }
 
@@ -441,10 +432,7 @@ fn cms_legacy_aliases_route() {
 
 #[test]
 fn cms_ref_type_is_cmssketch() {
-    assert_eq!(
-        eval_string(r#"my $c = cms(); ref($c)"#),
-        "CmsSketch"
-    );
+    assert_eq!(eval_string(r#"my $c = cms(); ref($c)"#), "CmsSketch");
 }
 
 // ── TopK (SpaceSaving) ────────────────────────────────────────────────
@@ -533,10 +521,7 @@ fn topk_serialize_roundtrip() {
 
 #[test]
 fn topk_ref_type_is_topksketch() {
-    assert_eq!(
-        eval_string(r#"my $t = topk(10); ref($t)"#),
-        "TopKSketch"
-    );
+    assert_eq!(eval_string(r#"my $t = topk(10); ref($t)"#), "TopKSketch");
 }
 
 #[test]
@@ -651,10 +636,7 @@ fn td_legacy_aliases_route() {
 
 #[test]
 fn roaring_construct_from_args() {
-    assert_eq!(
-        eval_int(r#"my $r = roaring(1, 2, 3, 5, 8); rb_len($r)"#),
-        5
-    );
+    assert_eq!(eval_int(r#"my $r = roaring(1, 2, 3, 5, 8); rb_len($r)"#), 5);
 }
 
 #[test]
@@ -1094,9 +1076,7 @@ fn rope_insert_at_position() {
 #[test]
 fn rope_delete_range() {
     assert_eq!(
-        eval_string(
-            r#"my $r = rope("Hello, world!"); rope_delete($r, 5, 13); rope_to_string($r)"#
-        ),
+        eval_string(r#"my $r = rope("Hello, world!"); rope_delete($r, 5, 13); rope_to_string($r)"#),
         "Hello"
     );
 }
@@ -1343,4 +1323,3 @@ fn sketch_operators_do_not_mutate_operands() {
     "#;
     assert_eq!(eval_int(code), 1);
 }
-

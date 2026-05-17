@@ -321,7 +321,9 @@ fn uniq_with_want(
 fn uniq_list(args: &[StrykeValue]) -> crate::error::StrykeResult<StrykeValue> {
     let mut out = Vec::new();
     let mut seen = std::collections::HashSet::new();
-    let push_val = |x: &StrykeValue, out: &mut Vec<StrykeValue>, seen: &mut std::collections::HashSet<String>| {
+    let push_val = |x: &StrykeValue,
+                    out: &mut Vec<StrykeValue>,
+                    seen: &mut std::collections::HashSet<String>| {
         let key = x.to_string();
         if seen.insert(key) {
             out.push(x.clone());
@@ -1182,9 +1184,9 @@ fn pairgrep_map(
 }
 
 fn pair_accessor(args: &[StrykeValue], idx: usize) -> crate::error::StrykeResult<StrykeValue> {
-    let obj = args
-        .first()
-        .ok_or_else(|| crate::error::StrykeError::runtime("Pair::key/value: missing invocant", 0))?;
+    let obj = args.first().ok_or_else(|| {
+        crate::error::StrykeError::runtime("Pair::key/value: missing invocant", 0)
+    })?;
     pair_field(obj, idx)
 }
 

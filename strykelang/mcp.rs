@@ -148,9 +148,9 @@ pub(crate) fn mcp_connect(args: &[StrykeValue], line: usize) -> Result<StrykeVal
     cmd.stdin(Stdio::piped());
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::null());
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| StrykeError::runtime(format!("mcp_connect: spawn {}: {}", parts[0], e), line))?;
+    let mut child = cmd.spawn().map_err(|e| {
+        StrykeError::runtime(format!("mcp_connect: spawn {}: {}", parts[0], e), line)
+    })?;
     let stdin = child
         .stdin
         .take()

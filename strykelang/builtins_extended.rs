@@ -7016,6 +7016,7 @@ fn builtin_floyd_warshall(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 ///   * `0.0` (zero-as-absent, classic adjacency-matrix style), OR
 ///   * `f64::INFINITY` (use INFINITY for absent so zero-weight edges remain
 ///     real edges — preferred for graphs that legitimately have weight-0 edges).
+///
 /// Self-loops `(u, u)` are always ignored.
 fn builtin_prim_mst(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let w = args_to_matrix(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));

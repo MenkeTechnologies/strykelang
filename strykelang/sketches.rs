@@ -16,9 +16,9 @@
 
 #![allow(dead_code)]
 
-use std::sync::Arc;
 use parking_lot::Mutex;
-use xxhash_rust::xxh3::{xxh3_64, xxh3_128};
+use std::sync::Arc;
+use xxhash_rust::xxh3::{xxh3_128, xxh3_64};
 
 use crate::error::{StrykeError, StrykeResult};
 use crate::value::StrykeValue;
@@ -441,8 +441,7 @@ impl CmsSketch {
     }
 
     pub fn serialize(&self) -> Vec<u8> {
-        let mut out =
-            Vec::with_capacity(16 + self.counters.len() * 4);
+        let mut out = Vec::with_capacity(16 + self.counters.len() * 4);
         out.extend_from_slice(b"STKCMS\x00\x01");
         out.extend_from_slice(&self.width.to_le_bytes());
         out.extend_from_slice(&self.depth.to_le_bytes());
@@ -539,7 +538,7 @@ impl TopKSketch {
             .iter()
             .map(|(k, (c, e))| (k.clone(), *c, *e))
             .collect();
-        all.sort_by(|a, b| b.1.cmp(&a.1));
+        all.sort_by_key(|t| std::cmp::Reverse(t.1));
         all.truncate(n);
         all
     }
@@ -559,7 +558,7 @@ impl TopKSketch {
         // online algorithm. Cost: O(total_count) — heavy for large
         // sketches. Document; callers can use bigger k to avoid this.
         let mut sorted: Vec<_> = other.entries.iter().collect();
-        sorted.sort_by(|a, b| b.1.0.cmp(&a.1.0)); // largest first
+        sorted.sort_by_key(|t| std::cmp::Reverse(t.1 .0)); // largest first
         for (key, (count, _)) in sorted {
             for _ in 0..*count {
                 self.add(key);
@@ -704,10 +703,8 @@ impl TDigestSketch {
     pub fn merge(&mut self, other: &mut TDigestSketch) {
         self.flush();
         other.flush();
-        self.digest = tdigest::TDigest::merge_digests(vec![
-            self.digest.clone(),
-            other.digest.clone(),
-        ]);
+        self.digest =
+            tdigest::TDigest::merge_digests(vec![self.digest.clone(), other.digest.clone()]);
     }
 
     pub fn clear(&mut self) {
@@ -763,6 +760,11 @@ impl RoaringBitmapSketch {
         }
     }
 
+    // Method name intentionally mirrors `FromIterator::from_iter` because
+    // the caller-facing API exposes it via reflection. clippy flags the
+    // overlap; silenced rather than renamed to avoid a breaking API
+    // change for existing stryke callers.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_iter<I: IntoIterator<Item = u32>>(items: I) -> Self {
         Self {
             inner: items.into_iter().collect(),
@@ -882,8 +884,7 @@ impl RateLimiterSketch {
             self.tokens = (self.tokens - elapsed_s * self.rate_per_sec).max(0.0);
         } else {
             // Token: refill over time, clamp to capacity.
-            self.tokens =
-                (self.tokens + elapsed_s * self.rate_per_sec).min(self.capacity);
+            self.tokens = (self.tokens + elapsed_s * self.rate_per_sec).min(self.capacity);
         }
         self.last_refill_us = now;
     }
@@ -1180,7 +1181,11 @@ impl IntervalTreeSketch {
         Self { items: Vec::new() }
     }
     pub fn insert(&mut self, start: i64, end: i64, payload: StrykeValue) {
-        let (lo, hi) = if start <= end { (start, end) } else { (end, start) };
+        let (lo, hi) = if start <= end {
+            (start, end)
+        } else {
+            (end, start)
+        };
         self.items.push((lo, hi, payload));
     }
     pub fn query_point(&self, p: i64) -> Vec<(i64, i64, StrykeValue)> {
@@ -1200,7 +1205,8 @@ impl IntervalTreeSketch {
     }
     pub fn remove(&mut self, start: i64, end: i64) -> usize {
         let before = self.items.len();
-        self.items.retain(|(lo, hi, _)| !(*lo == start && *hi == end));
+        self.items
+            .retain(|(lo, hi, _)| !(*lo == start && *hi == end));
         before - self.items.len()
     }
     pub fn len(&self) -> usize {
@@ -1277,7 +1283,9 @@ impl BkTreeSketch {
     /// Find all words within `max_dist` of `query`. Pre-sorted by
     /// distance ascending.
     pub fn query(&self, query: &str, max_dist: u32) -> Vec<(String, u32)> {
-        let Some(ref r) = self.root else { return Vec::new() };
+        let Some(ref r) = self.root else {
+            return Vec::new();
+        };
         let mut out = Vec::new();
         let mut stack = vec![r];
         while let Some(node) = stack.pop() {
@@ -1424,6 +1432,11 @@ impl RopeSketch {
         self.chunks.iter().map(|c| c.len()).sum()
     }
 
+    // Inherent `to_string` shadows the `Display`-derived trait method;
+    // kept inherent because the rope's caller-facing API is direct and we
+    // don't want the `Display` impl semantics (which would format through
+    // `write!`).
+    #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {
         self.chunks.concat()
     }
@@ -1559,7 +1572,11 @@ pub fn myers_diff<T: AsRef<str> + Clone>(a: &[T], b: &[T]) -> Vec<(char, T)> {
     for d in (0..=d_end).rev() {
         let v_prev = &trace[d];
         let k = x - y;
-        let prev_k = if k == -(d as i32) || (k != d as i32 && v_prev[(k - 1 + offset as i32) as usize] < v_prev[(k + 1 + offset as i32) as usize]) {
+        let prev_k = if k == -(d as i32)
+            || (k != d as i32
+                && v_prev[(k - 1 + offset as i32) as usize]
+                    < v_prev[(k + 1 + offset as i32) as usize])
+        {
             k + 1
         } else {
             k - 1
@@ -1713,10 +1730,7 @@ fn key_bytes(v: &StrykeValue) -> Vec<u8> {
 /// (default `0.01`). Bit count is `ceil(-n ln p / (ln 2)^2)` rounded up
 /// to a power of two; probe count is `k = ceil((m/n) ln 2)`, capped at
 /// 32. Capacity must be > 0; FPR is clamped to `[1e-12, 0.5]`.
-pub(crate) fn builtin_bloom_filter(
-    args: &[StrykeValue],
-    line: usize,
-) -> StrykeResult<StrykeValue> {
+pub(crate) fn builtin_bloom_filter(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     let capacity = args.first().map(|v| v.to_int()).unwrap_or(1000).max(1) as u64;
     let fpr = args.get(1).map(|v| v.to_number()).unwrap_or(0.01);
     if !fpr.is_finite() || fpr <= 0.0 || fpr >= 1.0 {
@@ -1733,7 +1747,11 @@ pub(crate) fn builtin_bloom_filter(
 /// the key was newly inserted (k bits flipped from 0→1), `0` if every
 /// probe already hit a set bit (key already present, or false positive).
 pub(crate) fn builtin_bloom_add(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let bf = bf_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "bloom_add", line)?;
+    let bf = bf_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "bloom_add",
+        line,
+    )?;
     let key = key_bytes(args.get(1).unwrap_or(&StrykeValue::UNDEF));
     let newly = bf.lock().add(&key);
     Ok(StrykeValue::integer(if newly { 1 } else { 0 }))
@@ -1758,7 +1776,11 @@ pub(crate) fn builtin_bloom_contains(
 /// `bloom_len(BF)` — items inserted so far (newly-added count; collisions
 /// don't increment). Upper-bound-ish after merges.
 pub(crate) fn builtin_bloom_len(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let bf = bf_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "bloom_len", line)?;
+    let bf = bf_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "bloom_len",
+        line,
+    )?;
     let n = bf.lock().inserted();
     Ok(StrykeValue::integer(n as i64))
 }
@@ -1776,7 +1798,11 @@ pub(crate) fn builtin_bloom_clear(args: &[StrykeValue], line: usize) -> StrykeRe
 /// geometry (same bit count and `k`). Returns `1` on success, `0` if
 /// geometries differ.
 pub(crate) fn builtin_bloom_merge(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let bf = bf_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "bloom_merge", line)?;
+    let bf = bf_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "bloom_merge",
+        line,
+    )?;
     let other = bf_lock_arg(
         args.get(1).unwrap_or(&StrykeValue::UNDEF),
         "bloom_merge",
@@ -1793,7 +1819,11 @@ pub(crate) fn builtin_bloom_merge(args: &[StrykeValue], line: usize) -> StrykeRe
 /// running insertion count. Useful for "is this filter saturated?" checks
 /// — when it exceeds your target FPR, rebuild with a larger capacity.
 pub(crate) fn builtin_bloom_fpr(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let bf = bf_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "bloom_fpr", line)?;
+    let bf = bf_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "bloom_fpr",
+        line,
+    )?;
     let fpr = bf.lock().estimated_fpr();
     Ok(StrykeValue::float(fpr))
 }
@@ -1801,7 +1831,11 @@ pub(crate) fn builtin_bloom_fpr(args: &[StrykeValue], line: usize) -> StrykeResu
 /// `bloom_bits(BF)` — total bit count of the underlying array (always a
 /// power of two ≥ 64).
 pub(crate) fn builtin_bloom_bits(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let bf = bf_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "bloom_bits", line)?;
+    let bf = bf_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "bloom_bits",
+        line,
+    )?;
     let n = bf.lock().bit_count();
     Ok(StrykeValue::integer(n as i64))
 }
@@ -1822,16 +1856,14 @@ pub(crate) fn builtin_bloom_serialize(
     Ok(StrykeValue::bytes(Arc::new(bytes)))
 }
 
-/// `bloom_deserialize(BYTES)` — load a filter from `bloom_serialize`
-/// output. Returns `undef` on format mismatch (wrong magic, truncated
-/// payload, or future version).
+// `bloom_deserialize(BYTES)` — load a filter from `bloom_serialize`
+// output. Returns `undef` on format mismatch (wrong magic, truncated
+// payload, or future version). Orphan doc lifted to a comment — the
+// previously-attached fn was relocated; clippy flagged the dangling
+// doc-comment that no longer documents any item.
 // ── HLL builtins ─────────────────────────────────────────────────────────
 
-fn hll_lock_arg(
-    v: &StrykeValue,
-    fname: &str,
-    line: usize,
-) -> StrykeResult<Arc<Mutex<HllSketch>>> {
+fn hll_lock_arg(v: &StrykeValue, fname: &str, line: usize) -> StrykeResult<Arc<Mutex<HllSketch>>> {
     v.as_hll_sketch()
         .ok_or_else(|| StrykeError::runtime(format!("{fname}: expected HllSketch operand"), line))
 }
@@ -1857,23 +1889,29 @@ pub(crate) fn builtin_hll_add(args: &[StrykeValue], line: usize) -> StrykeResult
 }
 
 /// `hll_count(HLL)` — estimated number of distinct items inserted.
-pub(crate) fn builtin_hll_count(
-    args: &[StrykeValue],
-    line: usize,
-) -> StrykeResult<StrykeValue> {
-    let h = hll_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "hll_count", line)?;
+pub(crate) fn builtin_hll_count(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
+    let h = hll_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "hll_count",
+        line,
+    )?;
     let n = h.lock().count();
     Ok(StrykeValue::float(n))
 }
 
 /// `hll_merge(HLL, OTHER)` — union with another HLL of identical precision.
 /// Returns `1` on success, `0` on precision mismatch.
-pub(crate) fn builtin_hll_merge(
-    args: &[StrykeValue],
-    line: usize,
-) -> StrykeResult<StrykeValue> {
-    let h = hll_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "hll_merge", line)?;
-    let o = hll_lock_arg(args.get(1).unwrap_or(&StrykeValue::UNDEF), "hll_merge", line)?;
+pub(crate) fn builtin_hll_merge(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
+    let h = hll_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "hll_merge",
+        line,
+    )?;
+    let o = hll_lock_arg(
+        args.get(1).unwrap_or(&StrykeValue::UNDEF),
+        "hll_merge",
+        line,
+    )?;
     let ok = {
         let og = o.lock();
         h.lock().merge(&og)
@@ -1882,10 +1920,7 @@ pub(crate) fn builtin_hll_merge(
 }
 
 /// `hll_clear(HLL)` — zero every register. Returns the same HLL.
-pub(crate) fn builtin_hll_clear(
-    args: &[StrykeValue],
-    line: usize,
-) -> StrykeResult<StrykeValue> {
+pub(crate) fn builtin_hll_clear(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     let hll_v = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let h = hll_lock_arg(&hll_v, "hll_clear", line)?;
     h.lock().clear();
@@ -1944,11 +1979,7 @@ pub(crate) fn builtin_hll_precision(
 
 // ── CMS builtins ─────────────────────────────────────────────────────────
 
-fn cms_lock_arg(
-    v: &StrykeValue,
-    fname: &str,
-    line: usize,
-) -> StrykeResult<Arc<Mutex<CmsSketch>>> {
+fn cms_lock_arg(v: &StrykeValue, fname: &str, line: usize) -> StrykeResult<Arc<Mutex<CmsSketch>>> {
     v.as_cms_sketch()
         .ok_or_else(|| StrykeError::runtime(format!("{fname}: expected CmsSketch operand"), line))
 }
@@ -1960,9 +1991,9 @@ fn cms_lock_arg(
 pub(crate) fn builtin_cms(args: &[StrykeValue], _line: usize) -> StrykeResult<StrykeValue> {
     let width = args.first().map(|v| v.to_int().max(8)).unwrap_or(2048) as u32;
     let depth = args.get(1).map(|v| v.to_int().max(1)).unwrap_or(5) as u32;
-    Ok(StrykeValue::cms_sketch(Arc::new(Mutex::new(CmsSketch::new(
-        width, depth,
-    )))))
+    Ok(StrykeValue::cms_sketch(Arc::new(Mutex::new(
+        CmsSketch::new(width, depth),
+    ))))
 }
 
 /// `cms_add(CMS, KEY, COUNT=1)` — add `COUNT` occurrences of `KEY`.
@@ -1978,7 +2009,11 @@ pub(crate) fn builtin_cms_add(args: &[StrykeValue], line: usize) -> StrykeResult
 /// `cms_count(CMS, KEY)` — estimated count of `KEY`. Always an upper
 /// bound on the true count; never under-reports.
 pub(crate) fn builtin_cms_count(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let c = cms_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "cms_count", line)?;
+    let c = cms_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "cms_count",
+        line,
+    )?;
     let key = key_bytes(args.get(1).unwrap_or(&StrykeValue::UNDEF));
     let n = c.lock().count(&key);
     Ok(StrykeValue::integer(n as i64))
@@ -1987,8 +2022,16 @@ pub(crate) fn builtin_cms_count(args: &[StrykeValue], line: usize) -> StrykeResu
 /// `cms_merge(CMS, OTHER)` — sum counters from `OTHER` into `CMS`
 /// (geometries must match: same width and depth).
 pub(crate) fn builtin_cms_merge(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let c = cms_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "cms_merge", line)?;
-    let o = cms_lock_arg(args.get(1).unwrap_or(&StrykeValue::UNDEF), "cms_merge", line)?;
+    let c = cms_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "cms_merge",
+        line,
+    )?;
+    let o = cms_lock_arg(
+        args.get(1).unwrap_or(&StrykeValue::UNDEF),
+        "cms_merge",
+        line,
+    )?;
     let ok = {
         let og = o.lock();
         c.lock().merge(&og)
@@ -2051,7 +2094,9 @@ fn topk_lock_arg(
 /// space.
 pub(crate) fn builtin_topk(args: &[StrykeValue], _line: usize) -> StrykeResult<StrykeValue> {
     let k = args.first().map(|v| v.to_int().max(1)).unwrap_or(10) as usize;
-    Ok(StrykeValue::topk_sketch(Arc::new(Mutex::new(TopKSketch::new(k)))))
+    Ok(StrykeValue::topk_sketch(Arc::new(Mutex::new(
+        TopKSketch::new(k),
+    ))))
 }
 
 /// `topk_add(TOPK, KEY)` — observe one occurrence of `KEY`.
@@ -2066,10 +2111,7 @@ pub(crate) fn builtin_topk_add(args: &[StrykeValue], line: usize) -> StrykeResul
 /// `topk_heavies(TOPK, N=K)` — top `N` entries by frequency, sorted
 /// descending. Returns an array of arrayrefs `[key, count, error_floor]`
 /// — truth lies in `[count - error_floor, count]`.
-pub(crate) fn builtin_topk_heavies(
-    args: &[StrykeValue],
-    line: usize,
-) -> StrykeResult<StrykeValue> {
+pub(crate) fn builtin_topk_heavies(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     let t = topk_lock_arg(
         args.first().unwrap_or(&StrykeValue::UNDEF),
         "topk_heavies",
@@ -2100,10 +2142,7 @@ pub(crate) fn builtin_topk_heavies(
 
 /// `topk_count(TOPK, KEY)` — estimated count of `KEY`. `0` if the key
 /// isn't currently tracked (i.e. wasn't heavy enough to survive).
-pub(crate) fn builtin_topk_count(
-    args: &[StrykeValue],
-    line: usize,
-) -> StrykeResult<StrykeValue> {
+pub(crate) fn builtin_topk_count(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     let t = topk_lock_arg(
         args.first().unwrap_or(&StrykeValue::UNDEF),
         "topk_count",
@@ -2115,10 +2154,7 @@ pub(crate) fn builtin_topk_count(
 }
 
 /// `topk_size(TOPK)` — current number of tracked entries (`<= K`).
-pub(crate) fn builtin_topk_size(
-    args: &[StrykeValue],
-    line: usize,
-) -> StrykeResult<StrykeValue> {
+pub(crate) fn builtin_topk_size(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     let t = topk_lock_arg(
         args.first().unwrap_or(&StrykeValue::UNDEF),
         "topk_size",
@@ -2132,12 +2168,17 @@ pub(crate) fn builtin_topk_size(
 /// Replays each `(key, count)` pair through the standard online update;
 /// cost is O(sum_of_counts), so prefer larger K for heavy workloads.
 /// Returns `1`.
-pub(crate) fn builtin_topk_merge(
-    args: &[StrykeValue],
-    line: usize,
-) -> StrykeResult<StrykeValue> {
-    let t = topk_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "topk_merge", line)?;
-    let o = topk_lock_arg(args.get(1).unwrap_or(&StrykeValue::UNDEF), "topk_merge", line)?;
+pub(crate) fn builtin_topk_merge(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
+    let t = topk_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "topk_merge",
+        line,
+    )?;
+    let o = topk_lock_arg(
+        args.get(1).unwrap_or(&StrykeValue::UNDEF),
+        "topk_merge",
+        line,
+    )?;
     let ok = {
         let og = o.lock();
         t.lock().merge(&og)
@@ -2146,10 +2187,7 @@ pub(crate) fn builtin_topk_merge(
 }
 
 /// `topk_clear(TOPK)` — drop all tracked keys.
-pub(crate) fn builtin_topk_clear(
-    args: &[StrykeValue],
-    line: usize,
-) -> StrykeResult<StrykeValue> {
+pub(crate) fn builtin_topk_clear(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     let topk_v = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let t = topk_lock_arg(&topk_v, "topk_clear", line)?;
     t.lock().clear();
@@ -2194,8 +2232,9 @@ fn td_lock_arg(
     fname: &str,
     line: usize,
 ) -> StrykeResult<Arc<Mutex<TDigestSketch>>> {
-    v.as_tdigest_sketch()
-        .ok_or_else(|| StrykeError::runtime(format!("{fname}: expected TDigestSketch operand"), line))
+    v.as_tdigest_sketch().ok_or_else(|| {
+        StrykeError::runtime(format!("{fname}: expected TDigestSketch operand"), line)
+    })
 }
 
 /// `t_digest(COMPRESSION=100)` / `td(C)` — streaming-quantile sketch.
@@ -2204,7 +2243,9 @@ fn td_lock_arg(
 /// data with O(100) bytes of state.
 pub(crate) fn builtin_t_digest(args: &[StrykeValue], _line: usize) -> StrykeResult<StrykeValue> {
     let c = args.first().map(|v| v.to_int().max(20)).unwrap_or(100) as usize;
-    Ok(StrykeValue::tdigest_sketch(Arc::new(Mutex::new(TDigestSketch::new(c)))))
+    Ok(StrykeValue::tdigest_sketch(Arc::new(Mutex::new(
+        TDigestSketch::new(c),
+    ))))
 }
 
 pub(crate) fn builtin_td_add(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
@@ -2215,18 +2256,23 @@ pub(crate) fn builtin_td_add(args: &[StrykeValue], line: usize) -> StrykeResult<
     Ok(td_v)
 }
 
-pub(crate) fn builtin_td_quantile(
-    args: &[StrykeValue],
-    line: usize,
-) -> StrykeResult<StrykeValue> {
-    let t = td_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "td_quantile", line)?;
+pub(crate) fn builtin_td_quantile(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
+    let t = td_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "td_quantile",
+        line,
+    )?;
     let q = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
     let v = t.lock().quantile(q);
     Ok(StrykeValue::float(v))
 }
 
 pub(crate) fn builtin_td_count(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let t = td_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "td_count", line)?;
+    let t = td_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "td_count",
+        line,
+    )?;
     let n = t.lock().count();
     Ok(StrykeValue::integer(n as i64))
 }
@@ -2256,7 +2302,11 @@ pub(crate) fn builtin_td_mean(args: &[StrykeValue], line: usize) -> StrykeResult
 }
 
 pub(crate) fn builtin_td_merge(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let t = td_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "td_merge", line)?;
+    let t = td_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "td_merge",
+        line,
+    )?;
     let o = td_lock_arg(args.get(1).unwrap_or(&StrykeValue::UNDEF), "td_merge", line)?;
     {
         let mut og = o.lock();
@@ -2272,11 +2322,12 @@ pub(crate) fn builtin_td_clear(args: &[StrykeValue], line: usize) -> StrykeResul
     Ok(td_v)
 }
 
-pub(crate) fn builtin_td_serialize(
-    args: &[StrykeValue],
-    line: usize,
-) -> StrykeResult<StrykeValue> {
-    let t = td_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "td_serialize", line)?;
+pub(crate) fn builtin_td_serialize(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
+    let t = td_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "td_serialize",
+        line,
+    )?;
     let bytes = t.lock().serialize();
     Ok(StrykeValue::bytes(Arc::new(bytes)))
 }
@@ -2306,8 +2357,9 @@ fn rb_lock_arg(
     fname: &str,
     line: usize,
 ) -> StrykeResult<Arc<Mutex<RoaringBitmapSketch>>> {
-    v.as_roaring_bitmap()
-        .ok_or_else(|| StrykeError::runtime(format!("{fname}: expected RoaringBitmap operand"), line))
+    v.as_roaring_bitmap().ok_or_else(|| {
+        StrykeError::runtime(format!("{fname}: expected RoaringBitmap operand"), line)
+    })
 }
 
 fn value_to_u32(v: &StrykeValue) -> u32 {
@@ -2361,7 +2413,11 @@ pub(crate) fn builtin_rb_add(args: &[StrykeValue], line: usize) -> StrykeResult<
 }
 
 pub(crate) fn builtin_rb_remove(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let rb = rb_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "rb_remove", line)?;
+    let rb = rb_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "rb_remove",
+        line,
+    )?;
     let mut g = rb.lock();
     let mut removed = 0i64;
     for a in &args[1..] {
@@ -2372,11 +2428,12 @@ pub(crate) fn builtin_rb_remove(args: &[StrykeValue], line: usize) -> StrykeResu
     Ok(StrykeValue::integer(removed))
 }
 
-pub(crate) fn builtin_rb_contains(
-    args: &[StrykeValue],
-    line: usize,
-) -> StrykeResult<StrykeValue> {
-    let rb = rb_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "rb_contains", line)?;
+pub(crate) fn builtin_rb_contains(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
+    let rb = rb_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "rb_contains",
+        line,
+    )?;
     let v = args.get(1).map(value_to_u32).unwrap_or(0);
     let hit = rb.lock().contains(v);
     Ok(StrykeValue::integer(if hit { 1 } else { 0 }))
@@ -2402,14 +2459,17 @@ pub(crate) fn builtin_rb_max(args: &[StrykeValue], line: usize) -> StrykeResult<
         .unwrap_or(StrykeValue::UNDEF))
 }
 
-pub(crate) fn builtin_rb_to_array(
-    args: &[StrykeValue],
-    line: usize,
-) -> StrykeResult<StrykeValue> {
-    let rb = rb_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "rb_to_array", line)?;
+pub(crate) fn builtin_rb_to_array(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
+    let rb = rb_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "rb_to_array",
+        line,
+    )?;
     let vec = rb.lock().to_vec();
     Ok(StrykeValue::array(
-        vec.into_iter().map(|v| StrykeValue::integer(v as i64)).collect(),
+        vec.into_iter()
+            .map(|v| StrykeValue::integer(v as i64))
+            .collect(),
     ))
 }
 
@@ -2453,13 +2513,14 @@ pub(crate) fn builtin_rb_xor(args: &[StrykeValue], line: usize) -> StrykeResult<
     Ok(rb_v)
 }
 
-pub(crate) fn builtin_rb_andnot(
-    args: &[StrykeValue],
-    line: usize,
-) -> StrykeResult<StrykeValue> {
+pub(crate) fn builtin_rb_andnot(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     let rb_v = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let a = rb_lock_arg(&rb_v, "rb_andnot", line)?;
-    let b = rb_lock_arg(args.get(1).unwrap_or(&StrykeValue::UNDEF), "rb_andnot", line)?;
+    let b = rb_lock_arg(
+        args.get(1).unwrap_or(&StrykeValue::UNDEF),
+        "rb_andnot",
+        line,
+    )?;
     {
         let bg = b.lock();
         a.lock().andnot_with(&bg);
@@ -2474,11 +2535,12 @@ pub(crate) fn builtin_rb_clear(args: &[StrykeValue], line: usize) -> StrykeResul
     Ok(rb_v)
 }
 
-pub(crate) fn builtin_rb_serialize(
-    args: &[StrykeValue],
-    line: usize,
-) -> StrykeResult<StrykeValue> {
-    let rb = rb_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "rb_serialize", line)?;
+pub(crate) fn builtin_rb_serialize(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
+    let rb = rb_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "rb_serialize",
+        line,
+    )?;
     let bytes = rb.lock().serialize();
     Ok(StrykeValue::bytes(Arc::new(bytes)))
 }
@@ -2512,7 +2574,10 @@ fn rl_lock_arg(
         .ok_or_else(|| StrykeError::runtime(format!("{fname}: expected RateLimiter operand"), line))
 }
 
-pub(crate) fn builtin_token_bucket(args: &[StrykeValue], _line: usize) -> StrykeResult<StrykeValue> {
+pub(crate) fn builtin_token_bucket(
+    args: &[StrykeValue],
+    _line: usize,
+) -> StrykeResult<StrykeValue> {
     let capacity = args.first().map(|v| v.to_number()).unwrap_or(100.0);
     let rate = args.get(1).map(|v| v.to_number()).unwrap_or(10.0);
     Ok(StrykeValue::rate_limiter(Arc::new(Mutex::new(
@@ -2520,7 +2585,10 @@ pub(crate) fn builtin_token_bucket(args: &[StrykeValue], _line: usize) -> Stryke
     ))))
 }
 
-pub(crate) fn builtin_leaky_bucket(args: &[StrykeValue], _line: usize) -> StrykeResult<StrykeValue> {
+pub(crate) fn builtin_leaky_bucket(
+    args: &[StrykeValue],
+    _line: usize,
+) -> StrykeResult<StrykeValue> {
     let capacity = args.first().map(|v| v.to_number()).unwrap_or(100.0);
     let drain = args.get(1).map(|v| v.to_number()).unwrap_or(10.0);
     Ok(StrykeValue::rate_limiter(Arc::new(Mutex::new(
@@ -2529,13 +2597,25 @@ pub(crate) fn builtin_leaky_bucket(args: &[StrykeValue], _line: usize) -> Stryke
 }
 
 pub(crate) fn builtin_rl_try_take(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let rl = rl_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "rl_try_take", line)?;
+    let rl = rl_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "rl_try_take",
+        line,
+    )?;
     let cost = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    Ok(StrykeValue::integer(if rl.lock().try_take(cost) { 1 } else { 0 }))
+    Ok(StrykeValue::integer(if rl.lock().try_take(cost) {
+        1
+    } else {
+        0
+    }))
 }
 
 pub(crate) fn builtin_rl_available(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let rl = rl_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "rl_available", line)?;
+    let rl = rl_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "rl_available",
+        line,
+    )?;
     let n = rl.lock().available();
     Ok(StrykeValue::float(n))
 }
@@ -2552,7 +2632,10 @@ fn hr_lock_arg(
 }
 
 pub(crate) fn builtin_hash_ring(args: &[StrykeValue], _line: usize) -> StrykeResult<StrykeValue> {
-    let vnodes = args.first().map(|v| v.to_int().max(1) as u32).unwrap_or(128);
+    let vnodes = args
+        .first()
+        .map(|v| v.to_int().max(1) as u32)
+        .unwrap_or(128);
     Ok(StrykeValue::hash_ring(Arc::new(Mutex::new(
         HashRingSketch::new(vnodes),
     ))))
@@ -2571,7 +2654,11 @@ pub(crate) fn builtin_hr_add(args: &[StrykeValue], line: usize) -> StrykeResult<
 }
 
 pub(crate) fn builtin_hr_remove(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let hr = hr_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "hr_remove", line)?;
+    let hr = hr_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "hr_remove",
+        line,
+    )?;
     let mut removed = 0i64;
     for a in &args[1..] {
         if hr.lock().remove_node(&a.to_string()) {
@@ -2591,7 +2678,11 @@ pub(crate) fn builtin_hr_get(args: &[StrykeValue], line: usize) -> StrykeResult<
 }
 
 pub(crate) fn builtin_hr_nodes(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let hr = hr_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "hr_nodes", line)?;
+    let hr = hr_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "hr_nodes",
+        line,
+    )?;
     let names = hr.lock().nodes();
     Ok(StrykeValue::array(
         names.into_iter().map(StrykeValue::string).collect(),
@@ -2610,7 +2701,9 @@ fn sh_lock_arg(
 }
 
 pub(crate) fn builtin_simhash(_args: &[StrykeValue], _line: usize) -> StrykeResult<StrykeValue> {
-    Ok(StrykeValue::simhash(Arc::new(Mutex::new(SimHashSketch::new()))))
+    Ok(StrykeValue::simhash(Arc::new(Mutex::new(
+        SimHashSketch::new(),
+    ))))
 }
 
 pub(crate) fn builtin_sh_add(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
@@ -2623,7 +2716,11 @@ pub(crate) fn builtin_sh_add(args: &[StrykeValue], line: usize) -> StrykeResult<
 }
 
 pub(crate) fn builtin_sh_digest(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let sh = sh_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "sh_digest", line)?;
+    let sh = sh_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "sh_digest",
+        line,
+    )?;
     let d = sh.lock().digest();
     Ok(StrykeValue::integer(d as i64))
 }
@@ -2632,8 +2729,16 @@ pub(crate) fn builtin_sh_similarity(
     args: &[StrykeValue],
     line: usize,
 ) -> StrykeResult<StrykeValue> {
-    let a = sh_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "sh_similarity", line)?;
-    let b = sh_lock_arg(args.get(1).unwrap_or(&StrykeValue::UNDEF), "sh_similarity", line)?;
+    let a = sh_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "sh_similarity",
+        line,
+    )?;
+    let b = sh_lock_arg(
+        args.get(1).unwrap_or(&StrykeValue::UNDEF),
+        "sh_similarity",
+        line,
+    )?;
     let sim = {
         let ag = a.lock();
         let bg = b.lock();
@@ -2654,8 +2759,13 @@ fn mh_lock_arg(
 }
 
 pub(crate) fn builtin_minhash(args: &[StrykeValue], _line: usize) -> StrykeResult<StrykeValue> {
-    let k = args.first().map(|v| v.to_int().max(1) as u32).unwrap_or(128);
-    Ok(StrykeValue::minhash(Arc::new(Mutex::new(MinHashSketch::new(k)))))
+    let k = args
+        .first()
+        .map(|v| v.to_int().max(1) as u32)
+        .unwrap_or(128);
+    Ok(StrykeValue::minhash(Arc::new(Mutex::new(
+        MinHashSketch::new(k),
+    ))))
 }
 
 pub(crate) fn builtin_mh_add(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
@@ -2666,12 +2776,17 @@ pub(crate) fn builtin_mh_add(args: &[StrykeValue], line: usize) -> StrykeResult<
     Ok(mh_v)
 }
 
-pub(crate) fn builtin_mh_jaccard(
-    args: &[StrykeValue],
-    line: usize,
-) -> StrykeResult<StrykeValue> {
-    let a = mh_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "mh_jaccard", line)?;
-    let b = mh_lock_arg(args.get(1).unwrap_or(&StrykeValue::UNDEF), "mh_jaccard", line)?;
+pub(crate) fn builtin_mh_jaccard(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
+    let a = mh_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "mh_jaccard",
+        line,
+    )?;
+    let b = mh_lock_arg(
+        args.get(1).unwrap_or(&StrykeValue::UNDEF),
+        "mh_jaccard",
+        line,
+    )?;
     let j = {
         let ag = a.lock();
         let bg = b.lock();
@@ -2681,7 +2796,11 @@ pub(crate) fn builtin_mh_jaccard(
 }
 
 pub(crate) fn builtin_mh_merge(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let a = mh_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "mh_merge", line)?;
+    let a = mh_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "mh_merge",
+        line,
+    )?;
     let b = mh_lock_arg(args.get(1).unwrap_or(&StrykeValue::UNDEF), "mh_merge", line)?;
     let ok = {
         let bg = b.lock();
@@ -2697,15 +2816,18 @@ fn it_lock_arg(
     fname: &str,
     line: usize,
 ) -> StrykeResult<Arc<Mutex<IntervalTreeSketch>>> {
-    v.as_interval_tree()
-        .ok_or_else(|| StrykeError::runtime(format!("{fname}: expected IntervalTree operand"), line))
+    v.as_interval_tree().ok_or_else(|| {
+        StrykeError::runtime(format!("{fname}: expected IntervalTree operand"), line)
+    })
 }
 
 pub(crate) fn builtin_interval_tree(
     _args: &[StrykeValue],
     _line: usize,
 ) -> StrykeResult<StrykeValue> {
-    Ok(StrykeValue::interval_tree(Arc::new(Mutex::new(IntervalTreeSketch::new()))))
+    Ok(StrykeValue::interval_tree(Arc::new(Mutex::new(
+        IntervalTreeSketch::new(),
+    ))))
 }
 
 pub(crate) fn builtin_it_insert(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
@@ -2722,7 +2844,11 @@ pub(crate) fn builtin_it_query_point(
     args: &[StrykeValue],
     line: usize,
 ) -> StrykeResult<StrykeValue> {
-    let it = it_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "it_query_point", line)?;
+    let it = it_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "it_query_point",
+        line,
+    )?;
     let p = args.get(1).map(|v| v.to_int()).unwrap_or(0);
     let rows = it.lock().query_point(p);
     Ok(StrykeValue::array(
@@ -2742,7 +2868,11 @@ pub(crate) fn builtin_it_query_range(
     args: &[StrykeValue],
     line: usize,
 ) -> StrykeResult<StrykeValue> {
-    let it = it_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "it_query_range", line)?;
+    let it = it_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "it_query_range",
+        line,
+    )?;
     let lo = args.get(1).map(|v| v.to_int()).unwrap_or(0);
     let hi = args.get(2).map(|v| v.to_int()).unwrap_or(lo);
     let rows = it.lock().query_range(lo, hi);
@@ -2760,7 +2890,11 @@ pub(crate) fn builtin_it_query_range(
 }
 
 pub(crate) fn builtin_it_remove(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let it = it_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "it_remove", line)?;
+    let it = it_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "it_remove",
+        line,
+    )?;
     let start = args.get(1).map(|v| v.to_int()).unwrap_or(0);
     let end = args.get(2).map(|v| v.to_int()).unwrap_or(start);
     let n = it.lock().remove(start, end);
@@ -2785,7 +2919,9 @@ fn bk_lock_arg(
 }
 
 pub(crate) fn builtin_bk_tree(_args: &[StrykeValue], _line: usize) -> StrykeResult<StrykeValue> {
-    Ok(StrykeValue::bk_tree(Arc::new(Mutex::new(BkTreeSketch::new()))))
+    Ok(StrykeValue::bk_tree(Arc::new(Mutex::new(
+        BkTreeSketch::new(),
+    ))))
 }
 
 pub(crate) fn builtin_bk_insert(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
@@ -2801,7 +2937,11 @@ pub(crate) fn builtin_bk_insert(args: &[StrykeValue], line: usize) -> StrykeResu
 }
 
 pub(crate) fn builtin_bk_query(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let bk = bk_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "bk_query", line)?;
+    let bk = bk_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "bk_query",
+        line,
+    )?;
     let query = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let max_dist = args.get(2).map(|v| v.to_int().max(0) as u32).unwrap_or(2);
     let rows = bk.lock().query(&query, max_dist);
@@ -2836,7 +2976,9 @@ fn rope_lock_arg(
 
 pub(crate) fn builtin_rope(args: &[StrykeValue], _line: usize) -> StrykeResult<StrykeValue> {
     let initial = args.first().map(|v| v.to_string()).unwrap_or_default();
-    Ok(StrykeValue::rope(Arc::new(Mutex::new(RopeSketch::from_string(&initial)))))
+    Ok(StrykeValue::rope(Arc::new(Mutex::new(
+        RopeSketch::from_string(&initial),
+    ))))
 }
 
 pub(crate) fn builtin_rope_insert(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
@@ -2852,7 +2994,10 @@ pub(crate) fn builtin_rope_delete(args: &[StrykeValue], line: usize) -> StrykeRe
     let rp_v = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let rp = rope_lock_arg(&rp_v, "rope_delete", line)?;
     let start = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
-    let end = args.get(2).map(|v| v.to_int().max(0) as usize).unwrap_or(start);
+    let end = args
+        .get(2)
+        .map(|v| v.to_int().max(0) as usize)
+        .unwrap_or(start);
     rp.lock().delete(start, end);
     Ok(rp_v)
 }
@@ -2861,9 +3006,16 @@ pub(crate) fn builtin_rope_substring(
     args: &[StrykeValue],
     line: usize,
 ) -> StrykeResult<StrykeValue> {
-    let rp = rope_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "rope_substring", line)?;
+    let rp = rope_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "rope_substring",
+        line,
+    )?;
     let start = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
-    let end = args.get(2).map(|v| v.to_int().max(0) as usize).unwrap_or(start);
+    let end = args
+        .get(2)
+        .map(|v| v.to_int().max(0) as usize)
+        .unwrap_or(start);
     let s = rp.lock().substring(start, end);
     Ok(StrykeValue::string(s))
 }
@@ -2872,13 +3024,21 @@ pub(crate) fn builtin_rope_to_string(
     args: &[StrykeValue],
     line: usize,
 ) -> StrykeResult<StrykeValue> {
-    let rp = rope_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "rope_to_string", line)?;
+    let rp = rope_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "rope_to_string",
+        line,
+    )?;
     let s = rp.lock().to_string();
     Ok(StrykeValue::string(s))
 }
 
 pub(crate) fn builtin_rope_len(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let rp = rope_lock_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "rope_len", line)?;
+    let rp = rope_lock_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "rope_len",
+        line,
+    )?;
     let n = rp.lock().len();
     Ok(StrykeValue::integer(n as i64))
 }
@@ -2917,7 +3077,7 @@ pub(crate) fn builtin_myers_diff(args: &[StrykeValue], _line: usize) -> StrykeRe
     let a = list_arg_as_strings(args.first().unwrap_or(&StrykeValue::UNDEF));
     let b = list_arg_as_strings(args.get(1).unwrap_or(&StrykeValue::UNDEF));
     let ops = myers_diff(&a, &b);
-    let typed: Vec<(char, String)> = ops.into_iter().map(|(op, v)| (op, v)).collect();
+    let typed: Vec<(char, String)> = ops.into_iter().collect();
     Ok(ops_to_value(typed))
 }
 
@@ -2930,7 +3090,7 @@ pub(crate) fn builtin_patience_diff(
     let a = list_arg_as_strings(args.first().unwrap_or(&StrykeValue::UNDEF));
     let b = list_arg_as_strings(args.get(1).unwrap_or(&StrykeValue::UNDEF));
     let ops = patience_diff(&a, &b);
-    let typed: Vec<(char, String)> = ops.into_iter().map(|(op, v)| (op, v)).collect();
+    let typed: Vec<(char, String)> = ops.into_iter().collect();
     Ok(ops_to_value(typed))
 }
 
@@ -3002,11 +3162,7 @@ pub enum SketchOp {
 /// All branches lock the operand mutexes briefly, clone the inner sketch
 /// data, run the merge on the clone, and wrap the result in a fresh
 /// `Arc<Mutex<…>>`. Operators do not mutate either operand.
-pub fn try_sketch_binop(
-    op: SketchOp,
-    a: &StrykeValue,
-    b: &StrykeValue,
-) -> Option<StrykeValue> {
+pub fn try_sketch_binop(op: SketchOp, a: &StrykeValue, b: &StrykeValue) -> Option<StrykeValue> {
     // Bloom + Bloom → union. Also valid for `|`.
     if matches!(op, SketchOp::Add | SketchOp::Or) {
         if let (Some(la), Some(lb)) = (a.as_bloom_filter(), b.as_bloom_filter()) {

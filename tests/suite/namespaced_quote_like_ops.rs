@@ -38,22 +38,10 @@ fn fn_def_named_m_under_namespace_runs() {
 fn fn_def_named_q_qq_qx_qr_under_namespace_runs() {
     // All four short quote-like operators must be callable as namespaced
     // function names with a body, not just sub-ref form.
-    assert_eq!(
-        eval_int(r#"fn Foo::q($n) { $n + 1 } Foo::q(10)"#),
-        11
-    );
-    assert_eq!(
-        eval_int(r#"fn Foo::qq($n) { $n + 2 } Foo::qq(10)"#),
-        12
-    );
-    assert_eq!(
-        eval_int(r#"fn Foo::qx($n) { $n + 3 } Foo::qx(10)"#),
-        13
-    );
-    assert_eq!(
-        eval_int(r#"fn Foo::qr($n) { $n + 4 } Foo::qr(10)"#),
-        14
-    );
+    assert_eq!(eval_int(r#"fn Foo::q($n) { $n + 1 } Foo::q(10)"#), 11);
+    assert_eq!(eval_int(r#"fn Foo::qq($n) { $n + 2 } Foo::qq(10)"#), 12);
+    assert_eq!(eval_int(r#"fn Foo::qx($n) { $n + 3 } Foo::qx(10)"#), 13);
+    assert_eq!(eval_int(r#"fn Foo::qr($n) { $n + 4 } Foo::qr(10)"#), 14);
 }
 
 #[test]

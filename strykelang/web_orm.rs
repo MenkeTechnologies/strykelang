@@ -171,7 +171,9 @@ pub(crate) fn web_model_where(args: &[StrykeValue], line: usize) -> Result<Stryk
             v.as_hash_map()
                 .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         })
-        .ok_or_else(|| StrykeError::runtime("web_model_where: second arg must be a hashref", line))?;
+        .ok_or_else(|| {
+            StrykeError::runtime("web_model_where: second arg must be a hashref", line)
+        })?;
     let mut sql = format!("SELECT * FROM {}", quote_ident(&table));
     let mut bindings: Vec<rusqlite::types::Value> = Vec::new();
     if !cond.is_empty() {

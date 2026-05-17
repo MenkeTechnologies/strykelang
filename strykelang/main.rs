@@ -4779,7 +4779,9 @@ fn run_minify_subcommand(args: &[String]) -> i32 {
                 println!("Examples:");
                 println!("  stryke minify app.stk              # print minified source to stdout");
                 println!("  stryke minify -i lib/*.stk          # rewrite files in place");
-                println!("  stryke minify -i .                  # minify all .stk files recursively");
+                println!(
+                    "  stryke minify -i .                  # minify all .stk files recursively"
+                );
                 return 0;
             }
             s if s.starts_with('-') => {
@@ -4835,7 +4837,12 @@ fn run_minify_subcommand(args: &[String]) -> i32 {
                 eprintln!("stryke minify: {}: {}", f, e);
                 errors += 1;
             } else {
-                eprintln!("  minified {} ({} → {} bytes)", f, code.len(), minified.len());
+                eprintln!(
+                    "  minified {} ({} → {} bytes)",
+                    f,
+                    code.len(),
+                    minified.len()
+                );
             }
         } else {
             println!("{}", minified);

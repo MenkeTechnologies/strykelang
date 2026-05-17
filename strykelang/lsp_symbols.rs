@@ -35,7 +35,9 @@ use std::collections::HashMap;
 
 use lsp_types::{Position, Range};
 
-use crate::ast::{Block, Expr, ExprKind, Program, Sigil, Statement, StmtKind, SubSigParam, VarDecl};
+use crate::ast::{
+    Block, Expr, ExprKind, Program, Sigil, Statement, StmtKind, SubSigParam, VarDecl,
+};
 
 /// Stable handle to a unique declaration.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -63,7 +65,6 @@ pub struct Symbol {
     pub package: String,
     /// 0-based source line of the declaration.
     pub decl_line: u32,
-    scope: ScopeId,
 }
 
 #[derive(Clone, Debug)]
@@ -103,7 +104,7 @@ impl SymbolTable {
                 continue;
             }
             if let Some(n) = needle {
-                if r.name == n {
+                if name_matches(&r.name, n) {
                     return Some(r.symbol);
                 }
             } else if best.is_none() {
@@ -115,7 +116,7 @@ impl SymbolTable {
                 continue;
             }
             if let Some(n) = needle {
-                if d.name == n {
+                if name_matches(&d.name, n) {
                     return Some(d.id);
                 }
             } else if best.is_none() {
@@ -126,10 +127,22 @@ impl SymbolTable {
     }
 
     /// Every (line, name) pair belonging to `id` — declaration + references.
+    ///
+    /// Symbols declared inside a `package` are stored with the package-
+    /// qualified name (`Util::greet`), but the declaration site in the
+    /// source text uses the bare name (`fn greet { … }`). Emit BOTH the
+    /// qualified and the bare-tail name at the decl line so
+    /// [`Self::ranges_for`] can locate either spelling.
     pub fn occurrences(&self, id: SymbolId) -> Vec<(u32, String)> {
         let mut out: Vec<(u32, String)> = Vec::new();
         if let Some(sym) = self.symbols.iter().find(|s| s.id == id) {
             out.push((sym.decl_line, sym.name.clone()));
+            if let Some(idx) = sym.name.rfind("::") {
+                let tail = &sym.name[idx + 2..];
+                if !tail.is_empty() && tail != sym.name {
+                    out.push((sym.decl_line, tail.to_string()));
+                }
+            }
         }
         for r in &self.refs {
             if r.symbol == id {
@@ -158,7 +171,7 @@ impl SymbolTable {
                 for (start_byte, _) in lt.match_indices(name) {
                     // Reject substring matches that aren't bounded by non-
                     // identifier chars (so `foo` doesn't match inside `foobar`).
-                    let prev = lt[..start_byte].chars().rev().next();
+                    let prev = lt[..start_byte].chars().next_back();
                     let next = lt[start_byte + name.len()..].chars().next();
                     if !is_ident_boundary_before(prev) || !is_ident_boundary_after(next, name) {
                         continue;
@@ -293,7 +306,6 @@ impl Builder {
             kind,
             package: self.current_package(),
             decl_line: line,
-            scope,
         });
         self.scope_bindings[scope.0 as usize].insert(display, id);
         id
@@ -305,9 +317,9 @@ impl Builder {
         let pkg = self.current_package();
         // Store under the qualified name (Pkg::name) AND the bare name in
         // the current scope so references can resolve either form.
-        let qualified = if name.contains("::") {
-            name.to_string()
-        } else if pkg == "main" {
+        // Both `contains("::")` and `pkg == "main"` skip the prefix —
+        // collapsed into one branch.
+        let qualified = if name.contains("::") || pkg == "main" {
             name.to_string()
         } else {
             format!("{pkg}::{name}")
@@ -318,7 +330,6 @@ impl Builder {
             kind,
             package: pkg.clone(),
             decl_line: line,
-            scope,
         });
         self.package_namespace.insert((pkg, qualified.clone()), id);
         // Also register the bare name in the current lexical scope so an
@@ -341,10 +352,7 @@ impl Builder {
         }
         // Strip current-package prefix and retry.
         if let Some(stripped) = name.strip_prefix(&format!("{pkg}::")) {
-            if let Some(&id) = self
-                .package_namespace
-                .get(&(pkg, stripped.to_string()))
-            {
+            if let Some(&id) = self.package_namespace.get(&(pkg, stripped.to_string())) {
                 return Some(id);
             }
         }
@@ -386,6 +394,7 @@ impl Builder {
     }
 
     fn walk_stmt(&mut self, stmt: &Statement) {
+        let line0 = ast_line_to_lsp(stmt.line);
         match &stmt.kind {
             StmtKind::Expression(e) => self.walk_expr(e),
             StmtKind::My(decls) | StmtKind::State(decls) | StmtKind::Local(decls) => {
@@ -396,12 +405,12 @@ impl Builder {
                     _ => SymbolKind::Local,
                 };
                 for d in decls {
-                    self.walk_var_decl(d, stmt.line as u32, kind.clone());
+                    self.walk_var_decl(d, line0, kind.clone());
                 }
             }
             StmtKind::Our(decls) | StmtKind::OurSync(decls) => {
                 for d in decls {
-                    let sym = self.declare_local(d.sigil, &d.name, stmt.line as u32, SymbolKind::Our);
+                    let sym = self.declare_local(d.sigil, &d.name, line0, SymbolKind::Our);
                     let display = sigil_prefix(d.sigil) + &d.name;
                     let pkg = self.current_package();
                     self.package_namespace.insert((pkg, display), sym);
@@ -412,17 +421,17 @@ impl Builder {
             }
             StmtKind::MySync(decls) => {
                 for d in decls {
-                    self.walk_var_decl(d, stmt.line as u32, SymbolKind::Local);
+                    self.walk_var_decl(d, line0, SymbolKind::Local);
                 }
             }
             StmtKind::Block(b) | StmtKind::StmtGroup(b) => self.walk_block(b),
             StmtKind::SubDecl {
                 name, params, body, ..
             } => {
-                self.declare_package_symbol(name, stmt.line as u32, SymbolKind::Sub);
+                self.declare_package_symbol(name, line0, SymbolKind::Sub);
                 let _scope = self.push_scope();
                 for p in params {
-                    self.walk_sub_param(p, stmt.line as u32);
+                    self.walk_sub_param(p, line0);
                 }
                 for s in body {
                     self.walk_stmt(s);
@@ -431,18 +440,22 @@ impl Builder {
             }
             StmtKind::Package { name } => {
                 self.package_stack.push(name.clone());
-                self.declare_package_symbol(name, stmt.line as u32, SymbolKind::Package);
+                self.declare_package_symbol(name, line0, SymbolKind::Package);
             }
             StmtKind::StructDecl { def } => {
-                self.declare_package_symbol(&def.name, stmt.line as u32, SymbolKind::Type);
+                self.declare_package_symbol(&def.name, line0, SymbolKind::Type);
                 self.walk_generic_stmt(stmt);
             }
             StmtKind::EnumDecl { def } => {
-                self.declare_package_symbol(&def.name, stmt.line as u32, SymbolKind::Type);
+                self.declare_package_symbol(&def.name, line0, SymbolKind::Type);
                 self.walk_generic_stmt(stmt);
             }
             StmtKind::ClassDecl { def, .. } => {
-                self.declare_package_symbol(&def.name, stmt.line as u32, SymbolKind::Type);
+                self.declare_package_symbol(&def.name, line0, SymbolKind::Type);
+                self.walk_generic_stmt(stmt);
+            }
+            StmtKind::TraitDecl { def } => {
+                self.declare_package_symbol(&def.name, line0, SymbolKind::Type);
                 self.walk_generic_stmt(stmt);
             }
             _ => {
@@ -462,7 +475,7 @@ impl Builder {
     }
 
     fn walk_expr(&mut self, e: &Expr) {
-        let line = e.line as u32;
+        let line = ast_line_to_lsp(e.line);
         match &e.kind {
             ExprKind::ScalarVar(n) => self.record_ref(&format!("${n}"), line),
             ExprKind::ArrayVar(n) => self.record_ref(&format!("@{n}"), line),
@@ -473,6 +486,11 @@ impl Builder {
                     self.walk_expr(a);
                 }
             }
+            // Method-call receivers and package-qualified paths show up as
+            // `Bareword("Point")` in `Point->new(...)`, `Foo::bar(...)`, etc.
+            // Treat each as a reference so renaming a struct / class / enum
+            // / package picks up the usage sites, not just the declaration.
+            ExprKind::Bareword(n) => self.record_ref(n, line),
             ExprKind::Do(inner) => self.walk_expr(inner),
             _ => self.walk_generic_expr(e),
         }
@@ -512,7 +530,7 @@ impl Builder {
             Ok(v) => v,
             Err(_) => return,
         };
-        self.walk_json(&v, stmt.line as u32);
+        self.walk_json(&v, ast_line_to_lsp(stmt.line));
     }
 
     fn walk_generic_expr(&mut self, e: &Expr) {
@@ -520,12 +538,17 @@ impl Builder {
             Ok(v) => v,
             Err(_) => return,
         };
-        self.walk_json(&v, e.line as u32);
+        self.walk_json(&v, ast_line_to_lsp(e.line));
     }
 
     /// Walk a JSON value looking for the recognizable shapes we care about:
     /// `ScalarVar`/`ArrayVar`/`HashVar`/`FuncCall.name` for references. Best-
     /// effort fallback for AST variants not explicitly handled above.
+    ///
+    /// Line numbers carried by AST nodes are 1-based; LSP positions are
+    /// 0-based. Every JSON `"line"` field is run through
+    /// [`ast_line_to_lsp`] before being recorded — the parent `line` arg is
+    /// already 0-based by contract from the callers above.
     fn walk_json(&mut self, v: &serde_json::Value, line: u32) {
         match v {
             serde_json::Value::Object(map) => {
@@ -538,12 +561,18 @@ impl Builder {
                 if let Some(s) = map.get("HashVar").and_then(|x| x.as_str()) {
                     self.record_ref(&format!("%{s}"), line);
                 }
+                if let Some(s) = map.get("Bareword").and_then(|x| x.as_str()) {
+                    // `Point->new(...)`, `Foo::Bar->method()`, qualified
+                    // bareword calls — pick up the receiver as a ref so
+                    // class/struct/enum/package rename catches usages.
+                    self.record_ref(s, line);
+                }
                 if let Some(call) = map.get("FuncCall").and_then(|x| x.as_object()) {
                     if let Some(name) = call.get("name").and_then(|x| x.as_str()) {
                         let used_line = call
                             .get("line")
                             .and_then(|x| x.as_u64())
-                            .map(|n| n as u32)
+                            .map(|n| ast_line_to_lsp(n as usize))
                             .unwrap_or(line);
                         self.record_ref(name, used_line);
                     }
@@ -551,7 +580,7 @@ impl Builder {
                 let next_line = map
                     .get("line")
                     .and_then(|x| x.as_u64())
-                    .map(|n| n as u32)
+                    .map(|n| ast_line_to_lsp(n as usize))
                     .unwrap_or(line);
                 for (_k, vv) in map {
                     self.walk_json(vv, next_line);
@@ -567,6 +596,24 @@ impl Builder {
     }
 }
 
+/// AST line numbers are 1-based (column-1 of the source). LSP `Position`
+/// lines are 0-based. Convert exactly once at the boundary so every line
+/// stored on a [`Symbol`] / [`SymbolRef`] is in LSP space and matches the
+/// `(line, character)` the editor sends back.
+fn ast_line_to_lsp(line1: usize) -> u32 {
+    (line1.saturating_sub(1)) as u32
+}
+
+/// `stored` is the symbol/ref's canonical name (possibly package-qualified
+/// like `Util::greet`); `needle` is what the editor extracted at the cursor.
+/// A bare-name cursor (`greet`) should still resolve to a qualified
+/// declaration in the same package, so accept either an exact match or a
+/// `::needle` tail. This is what lets `fn greet` declared inside
+/// `package Util` answer cursor hits on the bare `greet` token.
+fn name_matches(stored: &str, needle: &str) -> bool {
+    stored == needle || stored.ends_with(&format!("::{needle}"))
+}
+
 fn sigil_prefix(s: Sigil) -> String {
     match s {
         Sigil::Scalar => "$".to_string(),
@@ -575,4 +622,3 @@ fn sigil_prefix(s: Sigil) -> String {
         _ => "*".to_string(), // Typeglob and any future sigils
     }
 }
-

@@ -1680,7 +1680,11 @@ pub fn simpson_integrate(args: &[StrykeValue]) -> StrykeValue {
         return trapezoidal_integrate(args);
     }
     let intervals = n - 1;
-    let end_idx = if intervals % 2 == 0 { n } else { n - 3 };
+    let end_idx = if intervals.is_multiple_of(2) {
+        n
+    } else {
+        n - 3
+    };
     let mut sum = xs[0] + xs[end_idx - 1];
     for i in 1..end_idx - 1 {
         sum += if i % 2 == 1 { 4.0 * xs[i] } else { 2.0 * xs[i] };

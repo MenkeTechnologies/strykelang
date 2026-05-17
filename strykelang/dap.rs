@@ -129,7 +129,7 @@ impl DapShared {
                 is_paused: false,
                 snapshot: PauseSnapshot::default(),
                 pause_request: false,
-                }),
+            }),
             cv: Condvar::new(),
             seq: AtomicU64::new(1),
             writer: Mutex::new(writer),
@@ -181,10 +181,7 @@ impl DapShared {
     }
 
     pub fn want_pause(&self) -> bool {
-        self.inner
-            .lock()
-            .map(|g| g.pause_request)
-            .unwrap_or(false)
+        self.inner.lock().map(|g| g.pause_request).unwrap_or(false)
     }
 
     fn resume_with(&self, action: DebugAction) {
@@ -219,6 +216,18 @@ impl DapShared {
 
     pub fn emit_event(&self, event: &str, body: Value) {
         let seq = self.next_seq();
+        // INFO for milestones the user cares about (stopped/terminated/exited);
+        // TRACE for chatty ones (`output`, `thread`, `module`, etc.) so the
+        // default INFO log stays readable while DEBUG/TRACE unlock the firehose.
+        let milestone = matches!(
+            event,
+            "stopped" | "terminated" | "exited" | "initialized" | "process" | "breakpoint"
+        );
+        if milestone {
+            crate::slog_info!("dap.evt", "→ {} seq={}", event, seq);
+        } else {
+            crate::slog_trace!("dap.evt", "→ {} seq={}", event, seq);
+        }
         let msg = json!({
             "seq": seq,
             "type": "event",
@@ -239,7 +248,10 @@ pub fn spawn_reader_with_input(
     shared: Arc<DapShared>,
     bp_state: Arc<Mutex<BreakpointState>>,
     input: Box<dyn Read + Send>,
-) -> (thread::JoinHandle<()>, std::sync::mpsc::Receiver<LaunchParams>) {
+) -> (
+    thread::JoinHandle<()>,
+    std::sync::mpsc::Receiver<LaunchParams>,
+) {
     let (tx, rx) = std::sync::mpsc::channel::<LaunchParams>();
     let h = thread::spawn(move || {
         let mut reader = BufReader::new(input);
@@ -273,7 +285,7 @@ fn read_message<R: Read>(reader: &mut BufReader<R>) -> io::Result<Option<Vec<u8>
         if n == 0 {
             return Ok(None);
         }
-        let line = line.trim_end_matches(|c| c == '\r' || c == '\n');
+        let line = line.trim_end_matches(['\r', '\n']);
         if line.is_empty() {
             break;
         }
@@ -320,6 +332,7 @@ fn handle_request(
     launch_tx: &std::sync::mpsc::Sender<LaunchParams>,
     req: &DapRequest,
 ) {
+    crate::slog_trace!("dap.req", "seq={} command={}", req.seq, req.command);
     match req.command.as_str() {
         "initialize" => {
             shared.emit_response(
@@ -368,6 +381,7 @@ fn handle_request(
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
+            crate::slog_info!("dap.bp", "setBreakpoints path={} lines={:?}", path, bps);
             {
                 let mut bp = bp_state.lock().expect("bp lock");
                 bp.line_breakpoints.insert(path.clone(), bps.clone());
@@ -458,6 +472,14 @@ fn handle_request(
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false),
             };
+            crate::slog_info!(
+                "dap.launch",
+                "program={} stopOnEntry={} noDebug={} cwd={:?}",
+                lp.program,
+                lp.stop_on_entry,
+                lp.no_debug,
+                lp.cwd
+            );
             let _ = launch_tx.send(lp);
             shared.emit_response(req, true, json!({}));
         }
@@ -520,22 +542,26 @@ fn handle_request(
                 1000 => snap
                     .locals
                     .iter()
-                    .map(|v| json!({
-                        "name": v.name,
-                        "value": v.repr,
-                        "type": v.kind,
-                        "variablesReference": v.var_ref,
-                    }))
+                    .map(|v| {
+                        json!({
+                            "name": v.name,
+                            "value": v.repr,
+                            "type": v.kind,
+                            "variablesReference": v.var_ref,
+                        })
+                    })
                     .collect(),
                 2000 => snap
                     .globals
                     .iter()
-                    .map(|v| json!({
-                        "name": v.name,
-                        "value": v.repr,
-                        "type": v.kind,
-                        "variablesReference": v.var_ref,
-                    }))
+                    .map(|v| {
+                        json!({
+                            "name": v.name,
+                            "value": v.repr,
+                            "type": v.kind,
+                            "variablesReference": v.var_ref,
+                        })
+                    })
                     .collect(),
                 _ => snap
                     .var_ref_map
@@ -543,12 +569,14 @@ fn handle_request(
                     .map(|children| {
                         children
                             .iter()
-                            .map(|c| json!({
-                                "name": c.name,
-                                "value": c.repr,
-                                "type": "",
-                                "variablesReference": c.var_ref,
-                            }))
+                            .map(|c| {
+                                json!({
+                                    "name": c.name,
+                                    "value": c.repr,
+                                    "type": "",
+                                    "variablesReference": c.var_ref,
+                                })
+                            })
                             .collect::<Vec<Value>>()
                     })
                     .unwrap_or_default(),
@@ -556,6 +584,7 @@ fn handle_request(
             shared.emit_response(req, true, json!({ "variables": vars }));
         }
         "continue" => {
+            crate::slog_debug!("dap.flow", "continue");
             shared.resume_with(DebugAction::Continue);
             shared.emit_response(req, true, json!({ "allThreadsContinued": true }));
         }
@@ -563,21 +592,25 @@ fn handle_request(
             // CRITICAL ORDER: set pending_step BEFORE resume_with. The VM
             // thread reads `pending_step` immediately after cv.wait returns,
             // so the step kind must be in place before we notify the cv.
+            crate::slog_debug!("dap.flow", "next (step over)");
             request_step(bp_state, StepKind::Over);
             shared.resume_with(DebugAction::Continue);
             shared.emit_response(req, true, json!({}));
         }
         "stepIn" => {
+            crate::slog_debug!("dap.flow", "stepIn");
             request_step(bp_state, StepKind::Into);
             shared.resume_with(DebugAction::Continue);
             shared.emit_response(req, true, json!({}));
         }
         "stepOut" => {
+            crate::slog_debug!("dap.flow", "stepOut");
             request_step(bp_state, StepKind::Out);
             shared.resume_with(DebugAction::Continue);
             shared.emit_response(req, true, json!({}));
         }
         "pause" => {
+            crate::slog_debug!("dap.flow", "pause requested");
             let mut g = shared.inner.lock().expect("dap lock");
             g.pause_request = true;
             shared.emit_response(req, true, json!({}));
@@ -601,12 +634,14 @@ fn handle_request(
             );
         }
         "terminate" | "disconnect" => {
+            crate::slog_info!("dap", "{} received, tearing down", req.command);
             shared.disconnected.store(true, Ordering::SeqCst);
             shared.resume_with(DebugAction::Quit);
             shared.emit_response(req, true, json!({}));
             shared.emit_event("terminated", json!({}));
         }
-        _ => {
+        other => {
+            crate::slog_trace!("dap", "unknown command={}", other);
             shared.emit_response(req, true, json!({}));
         }
     }
@@ -628,7 +663,9 @@ fn request_step(bp_state: &Arc<Mutex<BreakpointState>>, kind: StepKind) {
 }
 
 fn leaf(path: &str) -> String {
-    path.rsplit_once('/').map(|(_, t)| t.to_string()).unwrap_or_else(|| path.to_string())
+    path.rsplit_once('/')
+        .map(|(_, t)| t.to_string())
+        .unwrap_or_else(|| path.to_string())
 }
 
 fn truncate(s: &str, n: usize) -> String {
@@ -673,13 +710,23 @@ fn evaluate_expression(expr: &str, snap: &PauseSnapshot) -> String {
     // names would shadow real specials and `my $!` etc. don't compile.
     let mut prelude = String::new();
     for v in &snap.locals {
-        if v.kind != "scalar" { continue; }
-        if !v.name.starts_with('$') { continue; }
+        if v.kind != "scalar" {
+            continue;
+        }
+        if !v.name.starts_with('$') {
+            continue;
+        }
         let bare = &v.name[1..];
-        if bare.is_empty() || is_builtin_like(bare) { continue; }
+        if bare.is_empty() || is_builtin_like(bare) {
+            continue;
+        }
         // The repr is already in stryke-source form (e.g. `42`, `"hello"`, `undef`)
         // produced by `crate::debugger::format_value`.
-        let repr = if v.repr.is_empty() { "undef" } else { v.repr.as_str() };
+        let repr = if v.repr.is_empty() {
+            "undef"
+        } else {
+            v.repr.as_str()
+        };
         prelude.push_str(&format!("my ${bare} = {repr};\n"));
     }
     // Wrap the expression so its value is printed. `p (EXPR)` prints any
@@ -698,7 +745,11 @@ fn evaluate_expression(expr: &str, snap: &PauseSnapshot) -> String {
                 let s = String::from_utf8_lossy(&out.stdout)
                     .trim_end_matches('\n')
                     .to_string();
-                if s.is_empty() { "(no output)".to_string() } else { s }
+                if s.is_empty() {
+                    "(no output)".to_string()
+                } else {
+                    s
+                }
             } else {
                 let err = String::from_utf8_lossy(&out.stderr);
                 let msg = err.lines().next().unwrap_or("").trim();
@@ -739,7 +790,12 @@ const MAX_VAR_DEPTH: u32 = 12;
 /// Build a child row for one value (scalar, array, or hash). For containers
 /// at depth < [`MAX_VAR_DEPTH`] this allocates a varRef and recursively
 /// populates [`CaptureCtx::map`] so the IDE can expand it.
-fn build_child(name: String, value: &crate::value::StrykeValue, depth: u32, ctx: &mut CaptureCtx) -> VarChild {
+fn build_child(
+    name: String,
+    value: &crate::value::StrykeValue,
+    depth: u32,
+    ctx: &mut CaptureCtx,
+) -> VarChild {
     // Opaque sketch objects (TDigest, Bloom, HLL, CMS, TopK, ...) — render a
     // useful summary instead of the bare type name, and make the row
     // expandable so the user can drill into the actual stats (count, p50,
@@ -749,10 +805,9 @@ fn build_child(name: String, value: &crate::value::StrykeValue, depth: u32, ctx:
         return rich;
     }
     // Hash or hashref — handle both `HeapObject::Hash` and `HeapObject::HashRef`.
-    let hash_contents: Option<indexmap::IndexMap<String, crate::value::StrykeValue>> =
-        value.as_hash_map().or_else(|| {
-            value.as_hash_ref().map(|arc| arc.read().clone())
-        });
+    let hash_contents: Option<indexmap::IndexMap<String, crate::value::StrykeValue>> = value
+        .as_hash_map()
+        .or_else(|| value.as_hash_ref().map(|arc| arc.read().clone()));
     if let Some(map) = hash_contents {
         if depth >= MAX_VAR_DEPTH || map.is_empty() {
             // At depth limit, use the non-recursive short repr — format_value
@@ -764,19 +819,27 @@ fn build_child(name: String, value: &crate::value::StrykeValue, depth: u32, ctx:
                 var_ref: 0,
             };
         }
-        let preview: Vec<String> = map.iter().take(4).map(|(k, v)| {
-            format!("{k} => {}", short_scalar_repr(v))
-        }).collect();
+        let preview: Vec<String> = map
+            .iter()
+            .take(4)
+            .map(|(k, v)| format!("{k} => {}", short_scalar_repr(v)))
+            .collect();
         let repr = format!(
             "[{}] ({}{})",
             map.len(),
             preview.join(", "),
-            if map.len() > 4 { format!(", … {} more", map.len() - 4) } else { String::new() },
+            if map.len() > 4 {
+                format!(", … {} more", map.len() - 4)
+            } else {
+                String::new()
+            },
         );
         let var_ref = ctx.alloc_ref();
-        let children: Vec<VarChild> = map.iter().take(2000).map(|(k, v)| {
-            build_child(k.clone(), v, depth + 1, ctx)
-        }).collect();
+        let children: Vec<VarChild> = map
+            .iter()
+            .take(2000)
+            .map(|(k, v)| build_child(k.clone(), v, depth + 1, ctx))
+            .collect();
         ctx.map.insert(var_ref, children);
         return VarChild {
             name,
@@ -789,13 +852,14 @@ fn build_child(name: String, value: &crate::value::StrykeValue, depth: u32, ctx:
     // arm for ArrayRef, returning the same ref wrapped, which produces a
     // self-referential descent that wastes stack until MAX_VAR_DEPTH and can
     // overflow on otherwise small data.
-    let array_contents: Option<Vec<crate::value::StrykeValue>> = if let Some(arc) = value.as_array_ref() {
-        Some(arc.read().clone())
-    } else if value.as_array_vec().is_some() {
-        Some(value.to_list())
-    } else {
-        None
-    };
+    let array_contents: Option<Vec<crate::value::StrykeValue>> =
+        if let Some(arc) = value.as_array_ref() {
+            Some(arc.read().clone())
+        } else if value.as_array_vec().is_some() {
+            Some(value.to_list())
+        } else {
+            None
+        };
     if let Some(list) = array_contents {
         if depth >= MAX_VAR_DEPTH || list.is_empty() {
             return VarChild {
@@ -809,12 +873,19 @@ fn build_child(name: String, value: &crate::value::StrykeValue, depth: u32, ctx:
             "[{}] ({}{})",
             list.len(),
             preview.join(", "),
-            if list.len() > 6 { format!(", … {} more", list.len() - 6) } else { String::new() },
+            if list.len() > 6 {
+                format!(", … {} more", list.len() - 6)
+            } else {
+                String::new()
+            },
         );
         let var_ref = ctx.alloc_ref();
-        let children: Vec<VarChild> = list.iter().take(2000).enumerate().map(|(i, v)| {
-            build_child(format!("[{i}]"), v, depth + 1, ctx)
-        }).collect();
+        let children: Vec<VarChild> = list
+            .iter()
+            .take(2000)
+            .enumerate()
+            .map(|(i, v)| build_child(format!("[{i}]"), v, depth + 1, ctx))
+            .collect();
         ctx.map.insert(var_ref, children);
         return VarChild {
             name,
@@ -838,7 +909,7 @@ fn fmt_f(v: f64) -> String {
         return v.to_string();
     }
     let av = v.abs();
-    if av != 0.0 && (av < 1e-3 || av >= 1e15) {
+    if av != 0.0 && !(1e-3..1e15).contains(&av) {
         return format!("{:e}", v);
     }
     // Trim a {:.6} representation: "12.300000" -> "12.3", "5.000000" -> "5".
@@ -856,7 +927,11 @@ fn fmt_f(v: f64) -> String {
 
 /// Helper: produce a leaf row for a sketch sub-stat (e.g. `count`, `p50`).
 fn sketch_leaf(name: &str, repr: String) -> VarChild {
-    VarChild { name: name.to_string(), repr: truncate(&repr, MAX_VAR_REPR), var_ref: 0 }
+    VarChild {
+        name: name.to_string(),
+        repr: truncate(&repr, MAX_VAR_REPR),
+        var_ref: 0,
+    }
 }
 
 /// When `value` is a sketch heap object, return a rich [`VarChild`] with a
@@ -879,16 +954,28 @@ fn try_sketch_child(
         let (repr, children) = if n == 0 {
             (
                 "TDigestSketch(empty)".to_string(),
-                vec![sketch_leaf("count", "0".to_string()), sketch_leaf("compression", g.compression().to_string())],
+                vec![
+                    sketch_leaf("count", "0".to_string()),
+                    sketch_leaf("compression", g.compression().to_string()),
+                ],
             )
         } else {
             let (mn, mx) = (g.min(), g.max());
             let (mean, sum) = (g.mean(), g.sum());
-            let (p50, p90, p95, p99) = (g.quantile(0.50), g.quantile(0.90), g.quantile(0.95), g.quantile(0.99));
+            let (p50, p90, p95, p99) = (
+                g.quantile(0.50),
+                g.quantile(0.90),
+                g.quantile(0.95),
+                g.quantile(0.99),
+            );
             let compression = g.compression();
             let repr = format!(
                 "TDigestSketch(n={}, min={}, max={}, p50={}, p99={})",
-                n, fmt_f(mn), fmt_f(mx), fmt_f(p50), fmt_f(p99)
+                n,
+                fmt_f(mn),
+                fmt_f(mx),
+                fmt_f(p50),
+                fmt_f(p99)
             );
             let kids = vec![
                 sketch_leaf("count", n.to_string()),
@@ -906,7 +993,11 @@ fn try_sketch_child(
         };
         let var_ref = ctx.alloc_ref();
         ctx.map.insert(var_ref, children);
-        return Some(VarChild { name: name.to_string(), repr: truncate(&repr, MAX_VAR_REPR), var_ref });
+        return Some(VarChild {
+            name: name.to_string(),
+            repr: truncate(&repr, MAX_VAR_REPR),
+            var_ref,
+        });
     }
 
     if let Some(arc) = value.as_bloom_filter() {
@@ -915,7 +1006,13 @@ fn try_sketch_child(
         let bits = g.bit_count();
         let k = g.k();
         let fpr = g.estimated_fpr();
-        let repr = format!("BloomFilter(n={}, bits={}, k={}, fpr={})", n, bits, k, fmt_f(fpr));
+        let repr = format!(
+            "BloomFilter(n={}, bits={}, k={}, fpr={})",
+            n,
+            bits,
+            k,
+            fmt_f(fpr)
+        );
         let children = vec![
             sketch_leaf("inserted", n.to_string()),
             sketch_leaf("bit_count", bits.to_string()),
@@ -924,7 +1021,11 @@ fn try_sketch_child(
         ];
         let var_ref = ctx.alloc_ref();
         ctx.map.insert(var_ref, children);
-        return Some(VarChild { name: name.to_string(), repr: truncate(&repr, MAX_VAR_REPR), var_ref });
+        return Some(VarChild {
+            name: name.to_string(),
+            repr: truncate(&repr, MAX_VAR_REPR),
+            var_ref,
+        });
     }
 
     if let Some(arc) = value.as_hll_sketch() {
@@ -940,7 +1041,11 @@ fn try_sketch_child(
         ];
         let var_ref = ctx.alloc_ref();
         ctx.map.insert(var_ref, children);
-        return Some(VarChild { name: name.to_string(), repr: truncate(&repr, MAX_VAR_REPR), var_ref });
+        return Some(VarChild {
+            name: name.to_string(),
+            repr: truncate(&repr, MAX_VAR_REPR),
+            var_ref,
+        });
     }
 
     if let Some(arc) = value.as_cms_sketch() {
@@ -952,7 +1057,11 @@ fn try_sketch_child(
         ];
         let var_ref = ctx.alloc_ref();
         ctx.map.insert(var_ref, children);
-        return Some(VarChild { name: name.to_string(), repr: truncate(&repr, MAX_VAR_REPR), var_ref });
+        return Some(VarChild {
+            name: name.to_string(),
+            repr: truncate(&repr, MAX_VAR_REPR),
+            var_ref,
+        });
     }
 
     if let Some(arc) = value.as_topk_sketch() {
@@ -960,10 +1069,14 @@ fn try_sketch_child(
         let k = g.k();
         let n = g.size();
         let heavies = g.heavies(k.min(10));
-        let preview: Vec<String> = heavies.iter().take(3).map(|(key, count, _err)| {
-            let key_s = String::from_utf8_lossy(key);
-            format!("({}, {})", key_s, count)
-        }).collect();
+        let preview: Vec<String> = heavies
+            .iter()
+            .take(3)
+            .map(|(key, count, _err)| {
+                let key_s = String::from_utf8_lossy(key);
+                format!("({}, {})", key_s, count)
+            })
+            .collect();
         let repr = format!("TopKSketch(k={}, n={}, top=[{}])", k, n, preview.join(", "));
         let mut children = vec![
             sketch_leaf("k", k.to_string()),
@@ -978,28 +1091,49 @@ fn try_sketch_child(
         }
         let var_ref = ctx.alloc_ref();
         ctx.map.insert(var_ref, children);
-        return Some(VarChild { name: name.to_string(), repr: truncate(&repr, MAX_VAR_REPR), var_ref });
+        return Some(VarChild {
+            name: name.to_string(),
+            repr: truncate(&repr, MAX_VAR_REPR),
+            var_ref,
+        });
     }
 
     // ─── User-defined record/object types ──────────────────────────────────
     // Struct: `struct Point { x: Num, y: Num }` → drill into named fields.
     if let Some(inst) = value.as_struct_inst() {
         let values = inst.values.read().clone();
-        let preview: Vec<String> = inst.def.fields.iter().zip(values.iter()).take(4).map(|(f, v)| {
-            format!("{}={}", f.name, short_scalar_repr(v))
-        }).collect();
+        let preview: Vec<String> = inst
+            .def
+            .fields
+            .iter()
+            .zip(values.iter())
+            .take(4)
+            .map(|(f, v)| format!("{}={}", f.name, short_scalar_repr(v)))
+            .collect();
         let repr = format!(
             "{}({}{})",
             inst.def.name,
             preview.join(", "),
-            if inst.def.fields.len() > 4 { format!(", … {} more", inst.def.fields.len() - 4) } else { String::new() },
+            if inst.def.fields.len() > 4 {
+                format!(", … {} more", inst.def.fields.len() - 4)
+            } else {
+                String::new()
+            },
         );
         let var_ref = ctx.alloc_ref();
-        let children: Vec<VarChild> = inst.def.fields.iter().zip(values.iter()).map(|(f, v)| {
-            build_child(f.name.clone(), v, depth + 1, ctx)
-        }).collect();
+        let children: Vec<VarChild> = inst
+            .def
+            .fields
+            .iter()
+            .zip(values.iter())
+            .map(|(f, v)| build_child(f.name.clone(), v, depth + 1, ctx))
+            .collect();
         ctx.map.insert(var_ref, children);
-        return Some(VarChild { name: name.to_string(), repr: truncate(&repr, MAX_VAR_REPR), var_ref });
+        return Some(VarChild {
+            name: name.to_string(),
+            repr: truncate(&repr, MAX_VAR_REPR),
+            var_ref,
+        });
     }
 
     // Enum: `enum Maybe { Just(T), Nothing }` → show `Type::Variant(data…)`,
@@ -1022,7 +1156,11 @@ fn try_sketch_child(
         }
         let var_ref = ctx.alloc_ref();
         ctx.map.insert(var_ref, children);
-        return Some(VarChild { name: name.to_string(), repr: truncate(&repr, MAX_VAR_REPR), var_ref });
+        return Some(VarChild {
+            name: name.to_string(),
+            repr: truncate(&repr, MAX_VAR_REPR),
+            var_ref,
+        });
     }
 
     // Class instance: `class Point { pub x: Num, pub y: Num }`. Drill into
@@ -1031,18 +1169,30 @@ fn try_sketch_child(
     // the dispatch target without forcing the user to evaluate `ref $obj`.
     if let Some(inst) = value.as_class_inst() {
         let values = inst.values.read().clone();
-        let preview: Vec<String> = inst.def.fields.iter().zip(values.iter()).take(4).map(|(f, v)| {
-            format!("{}={}", f.name, short_scalar_repr(v))
-        }).collect();
+        let preview: Vec<String> = inst
+            .def
+            .fields
+            .iter()
+            .zip(values.iter())
+            .take(4)
+            .map(|(f, v)| format!("{}={}", f.name, short_scalar_repr(v)))
+            .collect();
         let repr = format!(
             "{}({}{})",
             inst.def.name,
             preview.join(", "),
-            if inst.def.fields.len() > 4 { format!(", … {} more", inst.def.fields.len() - 4) } else { String::new() },
+            if inst.def.fields.len() > 4 {
+                format!(", … {} more", inst.def.fields.len() - 4)
+            } else {
+                String::new()
+            },
         );
         let mut children = vec![sketch_leaf("__class", inst.def.name.clone())];
         if !inst.isa_chain.is_empty() {
-            children.push(sketch_leaf("__isa", format!("[{}]", inst.isa_chain.join(", "))));
+            children.push(sketch_leaf(
+                "__isa",
+                format!("[{}]", inst.isa_chain.join(", ")),
+            ));
         }
         for (f, v) in inst.def.fields.iter().zip(values.iter()) {
             let vis_marker = match f.visibility {
@@ -1050,11 +1200,20 @@ fn try_sketch_child(
                 crate::ast::Visibility::Protected => "#",
                 crate::ast::Visibility::Public => "+",
             };
-            children.push(build_child(format!("{}{}", vis_marker, f.name), v, depth + 1, ctx));
+            children.push(build_child(
+                format!("{}{}", vis_marker, f.name),
+                v,
+                depth + 1,
+                ctx,
+            ));
         }
         let var_ref = ctx.alloc_ref();
         ctx.map.insert(var_ref, children);
-        return Some(VarChild { name: name.to_string(), repr: truncate(&repr, MAX_VAR_REPR), var_ref });
+        return Some(VarChild {
+            name: name.to_string(),
+            repr: truncate(&repr, MAX_VAR_REPR),
+            var_ref,
+        });
     }
 
     // Set: ordered set of distinct elements. `PerlSet = IndexMap<String, StrykeValue>`
@@ -1066,19 +1225,35 @@ fn try_sketch_child(
         let repr = format!(
             "Set({}){}",
             len,
-            if arc.is_empty() { String::new() } else { format!(" {{{}{}}}",
-                preview.join(", "),
-                if len > 6 { format!(", … {} more", len - 6) } else { String::new() }
-            ) },
+            if arc.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    " {{{}{}}}",
+                    preview.join(", "),
+                    if len > 6 {
+                        format!(", … {} more", len - 6)
+                    } else {
+                        String::new()
+                    }
+                )
+            },
         );
         let var_ref = if arc.is_empty() { 0 } else { ctx.alloc_ref() };
         if var_ref != 0 {
-            let children: Vec<VarChild> = arc.values().take(2000).enumerate().map(|(i, v)| {
-                build_child(format!("[{}]", i), v, depth + 1, ctx)
-            }).collect();
+            let children: Vec<VarChild> = arc
+                .values()
+                .take(2000)
+                .enumerate()
+                .map(|(i, v)| build_child(format!("[{}]", i), v, depth + 1, ctx))
+                .collect();
             ctx.map.insert(var_ref, children);
         }
-        return Some(VarChild { name: name.to_string(), repr: truncate(&repr, MAX_VAR_REPR), var_ref });
+        return Some(VarChild {
+            name: name.to_string(),
+            repr: truncate(&repr, MAX_VAR_REPR),
+            var_ref,
+        });
     }
 
     None
@@ -1100,13 +1275,18 @@ pub(crate) fn capture_locals_with_map(
     scope: &crate::scope::Scope,
     map: &mut HashMap<u32, Vec<VarChild>>,
 ) -> Vec<VarSnap> {
-    let mut ctx = CaptureCtx { next_ref: CONTAINER_REF_BASE, map };
+    let mut ctx = CaptureCtx {
+        next_ref: CONTAINER_REF_BASE,
+        map,
+    };
     let mut user: Vec<VarSnap> = Vec::new();
     let mut topic: Vec<VarSnap> = Vec::new();
     let mut builtin: Vec<VarSnap> = Vec::new();
 
     for name in scope.all_scalar_names().into_iter().take(256) {
-        if should_hide(&name) { continue; }
+        if should_hide(&name) {
+            continue;
+        }
         let v = scope.get_scalar(&name);
         // A scalar might HOLD a hashref/arrayref (refs in stryke).
         let child = build_child(format!("${name}"), &v, 0, &mut ctx);
@@ -1116,27 +1296,45 @@ pub(crate) fn capture_locals_with_map(
             kind: "scalar".into(),
             var_ref: child.var_ref,
         };
-        if is_magic_block_param(&name) { topic.push(snap); }
-        else if is_builtin_like(&name) { builtin.push(snap); }
-        else { user.push(snap); }
+        if is_magic_block_param(&name) {
+            topic.push(snap);
+        } else if is_builtin_like(&name) {
+            builtin.push(snap);
+        } else {
+            user.push(snap);
+        }
     }
     for name in scope.all_array_names().into_iter().take(64) {
-        if should_hide(&name) { continue; }
+        if should_hide(&name) {
+            continue;
+        }
         let arr = scope.get_array(&name);
         let preview: Vec<String> = arr.iter().take(8).map(short_scalar_repr).collect();
         let repr = format!(
             "[{}]{}",
             arr.len(),
-            if arr.is_empty() { String::new() } else { format!(" ({}{})",
-                preview.join(", "),
-                if arr.len() > 8 { format!(", … {} more", arr.len() - 8) } else { String::new() }
-            ) },
+            if arr.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    " ({}{})",
+                    preview.join(", "),
+                    if arr.len() > 8 {
+                        format!(", … {} more", arr.len() - 8)
+                    } else {
+                        String::new()
+                    }
+                )
+            },
         );
         let var_ref = if arr.is_empty() { 0 } else { ctx.alloc_ref() };
         if var_ref != 0 {
-            let children: Vec<VarChild> = arr.iter().take(2000).enumerate().map(|(i, v)| {
-                build_child(format!("[{i}]"), v, 1, &mut ctx)
-            }).collect();
+            let children: Vec<VarChild> = arr
+                .iter()
+                .take(2000)
+                .enumerate()
+                .map(|(i, v)| build_child(format!("[{i}]"), v, 1, &mut ctx))
+                .collect();
             ctx.map.insert(var_ref, children);
         }
         let snap = VarSnap {
@@ -1145,27 +1343,46 @@ pub(crate) fn capture_locals_with_map(
             kind: "array".into(),
             var_ref,
         };
-        if is_builtin_like(&name) { builtin.push(snap); } else { user.push(snap); }
+        if is_builtin_like(&name) {
+            builtin.push(snap);
+        } else {
+            user.push(snap);
+        }
     }
     for name in scope.all_hash_names().into_iter().take(64) {
-        if should_hide(&name) { continue; }
+        if should_hide(&name) {
+            continue;
+        }
         let h = scope.get_hash(&name);
-        let preview: Vec<String> = h.iter().take(6).map(|(k, v)| {
-            format!("{k} => {}", short_scalar_repr(v))
-        }).collect();
+        let preview: Vec<String> = h
+            .iter()
+            .take(6)
+            .map(|(k, v)| format!("{k} => {}", short_scalar_repr(v)))
+            .collect();
         let repr = format!(
             "[{}]{}",
             h.len(),
-            if h.is_empty() { String::new() } else { format!(" ({}{})",
-                preview.join(", "),
-                if h.len() > 6 { format!(", … {} more", h.len() - 6) } else { String::new() }
-            ) },
+            if h.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    " ({}{})",
+                    preview.join(", "),
+                    if h.len() > 6 {
+                        format!(", … {} more", h.len() - 6)
+                    } else {
+                        String::new()
+                    }
+                )
+            },
         );
         let var_ref = if h.is_empty() { 0 } else { ctx.alloc_ref() };
         if var_ref != 0 {
-            let children: Vec<VarChild> = h.iter().take(2000).map(|(k, v)| {
-                build_child(k.clone(), v, 1, &mut ctx)
-            }).collect();
+            let children: Vec<VarChild> = h
+                .iter()
+                .take(2000)
+                .map(|(k, v)| build_child(k.clone(), v, 1, &mut ctx))
+                .collect();
             ctx.map.insert(var_ref, children);
         }
         let snap = VarSnap {
@@ -1174,7 +1391,11 @@ pub(crate) fn capture_locals_with_map(
             kind: "hash".into(),
             var_ref,
         };
-        if is_builtin_like(&name) { builtin.push(snap); } else { user.push(snap); }
+        if is_builtin_like(&name) {
+            builtin.push(snap);
+        } else {
+            user.push(snap);
+        }
     }
 
     let by_sigil_name = |a: &VarSnap, b: &VarSnap| a.name.cmp(&b.name);
@@ -1219,7 +1440,6 @@ fn is_magic_block_param(name: &str) -> bool {
     false
 }
 
-
 fn should_hide(name: &str) -> bool {
     if name.is_empty() {
         return true;
@@ -1250,10 +1470,31 @@ fn is_builtin_like(name: &str) -> bool {
     // Common stryke built-in arrays/hashes
     matches!(
         name,
-        "INC" | "ARGV" | "ENV" | "SIG"
-            | "path" | "p" | "fpath" | "f"
-            | "term" | "uname" | "limits"
-            | "-" | "+" | "~" | "/" | "\\" | "\"" | "," | "!" | "@" | "&" | "'" | "`" | "?" | "$"
+        "INC"
+            | "ARGV"
+            | "ENV"
+            | "SIG"
+            | "path"
+            | "p"
+            | "fpath"
+            | "f"
+            | "term"
+            | "uname"
+            | "limits"
+            | "-"
+            | "+"
+            | "~"
+            | "/"
+            | "\\"
+            | "\""
+            | ","
+            | "!"
+            | "@"
+            | "&"
+            | "'"
+            | "`"
+            | "?"
+            | "$"
     ) || name.starts_with("stryke::")
 }
 
@@ -1273,27 +1514,41 @@ pub fn run() -> i32 {
 }
 
 pub fn run_with_args(args: &[String]) -> i32 {
+    crate::slog_info!(
+        "dap",
+        "starting --dap pid={} args={:?} version={} log_level={:?}",
+        std::process::id(),
+        args,
+        env!("CARGO_PKG_VERSION"),
+        crate::stryke_log::current_level()
+    );
     let connect_addr = args.iter().find(|a| a.contains(':')).cloned();
     let (reader, writer): (Box<dyn Read + Send>, Box<dyn Write + Send>) = match connect_addr {
         Some(addr) => {
             // TCP mode: connect to the spawner's server socket.
             match std::net::TcpStream::connect(&addr) {
                 Ok(s) => {
+                    crate::slog_info!("dap", "connected tcp {}", addr);
                     let r = s.try_clone().expect("dap: tcp clone");
                     (Box::new(r), Box::new(s))
                 }
                 Err(e) => {
+                    crate::slog_error!("dap", "tcp connect {} failed: {}", addr, e);
                     eprintln!("stryke --dap: connect {addr}: {e}");
                     return 2;
                 }
             }
         }
-        None => (Box::new(io::stdin()), Box::new(io::stdout())),
+        None => {
+            crate::slog_info!("dap", "stdio mode");
+            (Box::new(io::stdin()), Box::new(io::stdout()))
+        }
     };
 
     let shared = DapShared::new(writer);
     let bp_state = Arc::new(Mutex::new(BreakpointState::default()));
-    let (_reader_handle, launch_rx) = spawn_reader_with_input(shared.clone(), bp_state.clone(), reader);
+    let (_reader_handle, launch_rx) =
+        spawn_reader_with_input(shared.clone(), bp_state.clone(), reader);
 
     // Wait for `launch` request before starting the VM.
     let lp = match launch_rx.recv() {
@@ -1455,7 +1710,11 @@ pub fn run_with_args(args: &[String]) -> i32 {
                     }),
                 );
             }
-            if shared.was_disconnected() { 0 } else { 1 }
+            if shared.was_disconnected() {
+                0
+            } else {
+                1
+            }
         }
     };
 
@@ -1611,8 +1870,12 @@ mod tests {
 
     fn drill(value: &crate::value::StrykeValue) -> (VarChild, HashMap<u32, Vec<VarChild>>) {
         let mut map: HashMap<u32, Vec<VarChild>> = HashMap::new();
-        let mut ctx = CaptureCtx { next_ref: CONTAINER_REF_BASE, map: &mut map };
-        let child = try_sketch_child("$v", value, 0, &mut ctx).expect("sketch drill yields VarChild");
+        let mut ctx = CaptureCtx {
+            next_ref: CONTAINER_REF_BASE,
+            map: &mut map,
+        };
+        let child =
+            try_sketch_child("$v", value, 0, &mut ctx).expect("sketch drill yields VarChild");
         (child, map)
     }
 
@@ -1644,13 +1907,27 @@ mod tests {
         let (row, map) = drill(&v);
         let kids = map.get(&row.var_ref).expect("expandable");
         let names: Vec<&str> = kids.iter().map(|c| c.name.as_str()).collect();
-        for p in ["count", "min", "max", "mean", "sum", "p50", "p90", "p95", "p99"] {
+        for p in [
+            "count", "min", "max", "mean", "sum", "p50", "p90", "p95", "p99",
+        ] {
             assert!(names.contains(&p), "{p} row present in {names:?}");
         }
         // Inline repr captures n / min / max / p50 / p99.
-        assert!(row.repr.contains("n=100"), "count in inline repr: {}", row.repr);
-        assert!(row.repr.contains("min="), "min in inline repr: {}", row.repr);
-        assert!(row.repr.contains("p99="), "p99 in inline repr: {}", row.repr);
+        assert!(
+            row.repr.contains("n=100"),
+            "count in inline repr: {}",
+            row.repr
+        );
+        assert!(
+            row.repr.contains("min="),
+            "min in inline repr: {}",
+            row.repr
+        );
+        assert!(
+            row.repr.contains("p99="),
+            "p99 in inline repr: {}",
+            row.repr
+        );
     }
 
     #[test]
@@ -1660,7 +1937,11 @@ mod tests {
         bf.add(b"world");
         let v = crate::value::StrykeValue::bloom_filter(Arc::new(Mutex::new(bf)));
         let (row, map) = drill(&v);
-        assert!(row.repr.starts_with("BloomFilter("), "type tag: {}", row.repr);
+        assert!(
+            row.repr.starts_with("BloomFilter("),
+            "type tag: {}",
+            row.repr
+        );
         let kids = map.get(&row.var_ref).expect("expandable");
         let names: Vec<&str> = kids.iter().map(|c| c.name.as_str()).collect();
         for f in ["inserted", "bit_count", "k", "estimated_fpr"] {
@@ -1690,7 +1971,10 @@ mod tests {
         // try_sketch_child must defer to the generic scalar path.
         let v = crate::value::StrykeValue::integer(42);
         let mut map: HashMap<u32, Vec<VarChild>> = HashMap::new();
-        let mut ctx = CaptureCtx { next_ref: CONTAINER_REF_BASE, map: &mut map };
+        let mut ctx = CaptureCtx {
+            next_ref: CONTAINER_REF_BASE,
+            map: &mut map,
+        };
         let child = try_sketch_child("$v", &v, 0, &mut ctx);
         assert!(child.is_none(), "non-sketch returns None");
     }

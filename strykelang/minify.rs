@@ -92,11 +92,7 @@ fn needs_separator(prev: &Token, next: &Token) -> bool {
             | Token::Colon
     ) && !matches!(
         next,
-        Token::RBrace
-            | Token::RParen
-            | Token::RBracket
-            | Token::Semicolon
-            | Token::Comma
+        Token::RBrace | Token::RParen | Token::RBracket | Token::Semicolon | Token::Comma
     )
 }
 
@@ -127,19 +123,13 @@ fn needs_space(prev: &Token, next: &Token) -> bool {
 }
 
 fn is_identifier_like(t: &Token) -> bool {
-    matches!(
-        t,
-        Token::Ident(_) | Token::Integer(_) | Token::Float(_)
-    )
+    matches!(t, Token::Ident(_) | Token::Integer(_) | Token::Float(_))
 }
 
 fn is_sigil_var(t: &Token) -> bool {
     matches!(
         t,
-        Token::ScalarVar(_)
-            | Token::DerefScalarVar(_)
-            | Token::ArrayVar(_)
-            | Token::HashVar(_)
+        Token::ScalarVar(_) | Token::DerefScalarVar(_) | Token::ArrayVar(_) | Token::HashVar(_)
     )
 }
 
@@ -348,7 +338,10 @@ mod tests {
     fn preserves_strings() {
         let src = "p \"hello world\"\n";
         let out = minify_source(src).unwrap();
-        assert!(out.contains("hello world"), "string body preserved: got {out:?}");
+        assert!(
+            out.contains("hello world"),
+            "string body preserved: got {out:?}"
+        );
     }
 
     /// `;` must not be inserted directly after openers / before closers.
@@ -386,7 +379,10 @@ mod tests {
     fn strips_pod_blocks() {
         let src = "my $x = 1\n=pod\nDocumentation here.\nMore docs.\n=cut\nmy $y = 2\n";
         let out = minify_source(src).unwrap();
-        assert!(!out.to_lowercase().contains("documentation"), "POD stripped: got {out:?}");
+        assert!(
+            !out.to_lowercase().contains("documentation"),
+            "POD stripped: got {out:?}"
+        );
         assert!(out.contains("$x"), "code before POD kept");
         assert!(out.contains("$y"), "code after POD kept");
     }
@@ -422,7 +418,10 @@ mod tests {
         let src = "my $s = \"abc\"\n$s =~ s/abc/xyz/g\n";
         let out = minify_source(src).unwrap();
         assert!(out.contains("abc"), "subst pattern preserved: got {out:?}");
-        assert!(out.contains("xyz"), "subst replacement preserved: got {out:?}");
+        assert!(
+            out.contains("xyz"),
+            "subst replacement preserved: got {out:?}"
+        );
     }
 
     /// Plain `m/pattern/flags` lexes to a real `Token::Regex` (not the

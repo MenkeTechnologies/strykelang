@@ -401,10 +401,7 @@ fn cosine_similarity_orthogonal_cw() {
 #[test]
 fn mode_variadic_vs_single_arrayref_bug_cw() {
     assert_eq!(eval_string(r#"stringify(mode(1, 2, 2, 3))"#), "2");
-    assert_eq!(
-        eval_string(r#"stringify(mode([1, 2, 2, 3]))"#),
-        "2"
-    );
+    assert_eq!(eval_string(r#"stringify(mode([1, 2, 2, 3]))"#), "2");
 }
 
 #[test]

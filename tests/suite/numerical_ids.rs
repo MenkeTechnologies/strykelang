@@ -125,10 +125,7 @@ fn kahan_aliases_route_to_same_impl() {
 #[test]
 fn welford_mean_matches_textbook() {
     // (2+4+4+4+5+5+7+9)/8 = 5
-    assert_eq!(
-        eval_string(r#"welford_mean(2, 4, 4, 4, 5, 5, 7, 9)"#),
-        "5"
-    );
+    assert_eq!(eval_string(r#"welford_mean(2, 4, 4, 4, 5, 5, 7, 9)"#), "5");
 }
 
 #[test]

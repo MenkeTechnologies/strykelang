@@ -2640,7 +2640,13 @@ impl fmt::Display for StrykeValue {
             HeapObject::Heap(h) => write!(f, "Heap({})", h.lock().items.len()),
             HeapObject::BloomFilter(b) => {
                 let g = b.lock();
-                write!(f, "BloomFilter(n={}, bits={}, k={})", g.inserted(), g.bit_count(), g.k())
+                write!(
+                    f,
+                    "BloomFilter(n={}, bits={}, k={})",
+                    g.inserted(),
+                    g.bit_count(),
+                    g.k()
+                )
             }
             HeapObject::HllSketch(s) => {
                 let g = s.lock();
@@ -2673,7 +2679,12 @@ impl fmt::Display for StrykeValue {
             }
             HeapObject::HashRing(s) => {
                 let g = s.lock();
-                write!(f, "HashRing(nodes={}, vnodes={})", g.node_count(), g.vnodes_per_node)
+                write!(
+                    f,
+                    "HashRing(nodes={}, vnodes={})",
+                    g.node_count(),
+                    g.vnodes_per_node
+                )
             }
             HeapObject::SimHash(s) => {
                 let g = s.lock();

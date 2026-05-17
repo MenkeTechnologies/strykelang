@@ -16,8 +16,8 @@ use crate::perl_fs::read_file_text_perl_compat;
 use crate::pmap_progress::{FanProgress, PmapProgress};
 use crate::sort_fast::{sort_magic_cmp, SortBlockFast};
 use crate::value::{
-    perl_list_range_expand, StrykeAsyncTask, PerlBarrier, PerlHeap, StrykeSub, PipelineInner,
-    PipelineOp, StrykeValue,
+    perl_list_range_expand, PerlBarrier, PerlHeap, PipelineInner, PipelineOp, StrykeAsyncTask,
+    StrykeSub, StrykeValue,
 };
 use crate::vm_helper::{
     fold_preduce_init_step, merge_preduce_init_partials, preduce_init_fold_identity, Flow,
@@ -2607,14 +2607,20 @@ impl<'a> VM<'a> {
                 Ok(s) => s,
                 Err(FlowOrError::Error(e)) => return Err(e),
                 Err(FlowOrError::Flow(_)) => {
-                    return Err(StrykeError::runtime("concat: unexpected control flow", line));
+                    return Err(StrykeError::runtime(
+                        "concat: unexpected control flow",
+                        line,
+                    ));
                 }
             };
             let sb = match self.interp.stringify_value(b, line) {
                 Ok(s) => s,
                 Err(FlowOrError::Error(e)) => return Err(e),
                 Err(FlowOrError::Flow(_)) => {
-                    return Err(StrykeError::runtime("concat: unexpected control flow", line));
+                    return Err(StrykeError::runtime(
+                        "concat: unexpected control flow",
+                        line,
+                    ));
                 }
             };
             let mut s = sa;
@@ -8513,7 +8519,10 @@ impl<'a> VM<'a> {
                     }
                     Op::TryContinueNormal => {
                         let frame = self.try_stack.last().ok_or_else(|| {
-                            StrykeError::runtime("TryContinueNormal without active try", self.line())
+                            StrykeError::runtime(
+                                "TryContinueNormal without active try",
+                                self.line(),
+                            )
                         })?;
                         let Op::TryPush {
                             finally_ip,
@@ -8707,7 +8716,10 @@ impl<'a> VM<'a> {
                         let rhs = self.pop();
                         let n = names[*name_idx as usize].as_str();
                         let op = scalar_compound_op_from_byte(*op_b).ok_or_else(|| {
-                            StrykeError::runtime("ScalarCompoundAssign: invalid op byte", self.line())
+                            StrykeError::runtime(
+                                "ScalarCompoundAssign: invalid op byte",
+                                self.line(),
+                            )
                         })?;
                         let en = self.interp.english_scalar_name(n);
                         let val = self
@@ -9056,7 +9068,10 @@ impl<'a> VM<'a> {
                         Ok(s) => s,
                         Err(FlowOrError::Error(e)) => return Err(e),
                         Err(FlowOrError::Flow(_)) => {
-                            return Err(StrykeError::runtime("join: unexpected control flow", line));
+                            return Err(StrykeError::runtime(
+                                "join: unexpected control flow",
+                                line,
+                            ));
                         }
                     };
                     strs.push(s);
@@ -9170,9 +9185,10 @@ impl<'a> VM<'a> {
                 match self.interp.perl_sprintf_stringify(&fmt, rest, line) {
                     Ok(s) => Ok(StrykeValue::string(s)),
                     Err(FlowOrError::Error(e)) => Err(e),
-                    Err(FlowOrError::Flow(_)) => {
-                        Err(StrykeError::runtime("sprintf: unexpected control flow", line))
-                    }
+                    Err(FlowOrError::Flow(_)) => Err(StrykeError::runtime(
+                        "sprintf: unexpected control flow",
+                        line,
+                    )),
                 }
             }
             Some(BuiltinId::Reverse) => {
@@ -9372,7 +9388,10 @@ impl<'a> VM<'a> {
                     Ok(s) => s,
                     Err(FlowOrError::Error(e)) => return Err(e),
                     Err(FlowOrError::Flow(_)) => {
-                        return Err(StrykeError::runtime("printf: unexpected control flow", line));
+                        return Err(StrykeError::runtime(
+                            "printf: unexpected control flow",
+                            line,
+                        ));
                     }
                 };
                 print!("{}", out);
@@ -9439,8 +9458,7 @@ impl<'a> VM<'a> {
                     .to_string();
                 if std::env::set_current_dir(&path).is_ok() {
                     if let Ok(c) = std::env::current_dir() {
-                        self.interp.stryke_pwd =
-                            std::fs::canonicalize(&c).unwrap_or(c);
+                        self.interp.stryke_pwd = std::fs::canonicalize(&c).unwrap_or(c);
                     }
                     Ok(StrykeValue::integer(1))
                 } else {
@@ -9474,12 +9492,12 @@ impl<'a> VM<'a> {
             Some(BuiltinId::Getcwd) => self.interp.builtin_getcwd_execute(&args, line),
             Some(BuiltinId::Pipe) => self.interp.builtin_pipe_execute(&args, line),
             Some(BuiltinId::Rename) => {
-                let old = self
-                    .interp
-                    .resolve_stryke_path_string(&args.first().map(|v| v.to_string()).unwrap_or_default());
-                let new = self
-                    .interp
-                    .resolve_stryke_path_string(&args.get(1).map(|v| v.to_string()).unwrap_or_default());
+                let old = self.interp.resolve_stryke_path_string(
+                    &args.first().map(|v| v.to_string()).unwrap_or_default(),
+                );
+                let new = self.interp.resolve_stryke_path_string(
+                    &args.get(1).map(|v| v.to_string()).unwrap_or_default(),
+                );
                 Ok(crate::perl_fs::rename_paths(&old, &new))
             }
             Some(BuiltinId::Chmod) => {
@@ -9512,37 +9530,37 @@ impl<'a> VM<'a> {
                 )))
             }
             Some(BuiltinId::Stat) => {
-                let path = self
-                    .interp
-                    .resolve_stryke_path_string(&args.first().map(|v| v.to_string()).unwrap_or_default());
+                let path = self.interp.resolve_stryke_path_string(
+                    &args.first().map(|v| v.to_string()).unwrap_or_default(),
+                );
                 Ok(crate::perl_fs::stat_path(&path, false))
             }
             Some(BuiltinId::Lstat) => {
-                let path = self
-                    .interp
-                    .resolve_stryke_path_string(&args.first().map(|v| v.to_string()).unwrap_or_default());
+                let path = self.interp.resolve_stryke_path_string(
+                    &args.first().map(|v| v.to_string()).unwrap_or_default(),
+                );
                 Ok(crate::perl_fs::stat_path(&path, true))
             }
             Some(BuiltinId::Link) => {
-                let old = self
-                    .interp
-                    .resolve_stryke_path_string(&args.first().map(|v| v.to_string()).unwrap_or_default());
-                let new = self
-                    .interp
-                    .resolve_stryke_path_string(&args.get(1).map(|v| v.to_string()).unwrap_or_default());
+                let old = self.interp.resolve_stryke_path_string(
+                    &args.first().map(|v| v.to_string()).unwrap_or_default(),
+                );
+                let new = self.interp.resolve_stryke_path_string(
+                    &args.get(1).map(|v| v.to_string()).unwrap_or_default(),
+                );
                 Ok(crate::perl_fs::link_hard(&old, &new))
             }
             Some(BuiltinId::Symlink) => {
                 let old = args.first().map(|v| v.to_string()).unwrap_or_default();
-                let new = self
-                    .interp
-                    .resolve_stryke_path_string(&args.get(1).map(|v| v.to_string()).unwrap_or_default());
+                let new = self.interp.resolve_stryke_path_string(
+                    &args.get(1).map(|v| v.to_string()).unwrap_or_default(),
+                );
                 Ok(crate::perl_fs::link_sym(&old, &new))
             }
             Some(BuiltinId::Readlink) => {
-                let path = self
-                    .interp
-                    .resolve_stryke_path_string(&args.first().map(|v| v.to_string()).unwrap_or_default());
+                let path = self.interp.resolve_stryke_path_string(
+                    &args.first().map(|v| v.to_string()).unwrap_or_default(),
+                );
                 Ok(crate::perl_fs::read_link(&path))
             }
             Some(BuiltinId::Glob) => {
@@ -9775,7 +9793,10 @@ impl<'a> VM<'a> {
                         cmp: Arc::clone(&sub),
                     }))))
                 } else {
-                    Err(StrykeError::runtime("heap() requires a code reference", line))
+                    Err(StrykeError::runtime(
+                        "heap() requires a code reference",
+                        line,
+                    ))
                 }
             }
             Some(BuiltinId::BarrierNew) => {
