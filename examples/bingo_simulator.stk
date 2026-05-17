@@ -31,7 +31,7 @@ my $hll_card  = hll(12)
 fn Demo::Bingo::shuffle($aref) {
     my @arr = @$aref
     for my $i (rev 1:len(@arr) - 1) {
-        my $j = int(rand($i + 1))
+        my $j = int(rand $i + 1)
         my $tmp = $arr[$i]
         $arr[$i] = $arr[$j]
         $arr[$j] = $tmp

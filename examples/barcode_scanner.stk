@@ -156,7 +156,7 @@ for my $i (1:200) {
     } else {
         # Garbage scan: random 12-digit string (likely fails check).
         my @digits
-        for my $k (1:12) { push @digits, int(rand(10)) }
+        for my $k (1:12) { push @digits, int(rand 10) }
         $code = join("", @digits)
     }
 

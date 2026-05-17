@@ -130,7 +130,7 @@ my @queries = (
 for my $q (@queries) {
     p ""
     printf "── query: %s ────────────────────────────────\n", $q->[2]
-    my $scores = Demo::II::search(join(" ", @{$q->[0]}), $q->[1])
+    my $scores = Demo::II::search(@{$q->[0]} |> join(" "), $q->[1])
     if (len(keys %$scores) == 0) {
         p "  (no results)"
     } else {
