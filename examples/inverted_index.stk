@@ -45,7 +45,7 @@ my %index    # term -> hashref { doc_id -> term_freq }
 fn Demo::II::tokenize($s) {
     my @toks = split /\W+/, lc($s)
     @toks = grep { len(_) > 0 } @toks
-    return \@toks
+    \@toks
 }
 
 for my $doc (@docs) {
@@ -65,7 +65,7 @@ printf "── index built: %d docs, %d distinct terms ────────�
 my $td_query = t_digest(100)
 
 fn Demo::II::posting($term) {
-    return $index{$term} // +{}
+    $index{$term} // +{}
 }
 
 fn Demo::II::query_or($terms) {
@@ -76,7 +76,7 @@ fn Demo::II::query_or($terms) {
             $scores{$doc_id} = ($scores{$doc_id} // 0) + $post->{$doc_id}
         }
     }
-    return \%scores
+    \%scores
 }
 
 fn Demo::II::query_and($terms) {
@@ -97,7 +97,7 @@ fn Demo::II::query_and($terms) {
         }
         %scores = %new
     }
-    return \%scores
+    \%scores
 }
 
 fn Demo::II::search($query, $mode) {
@@ -106,14 +106,14 @@ fn Demo::II::search($query, $mode) {
     my $scores = $mode eq "and" ? Demo::II::query_and($toks)
                                 : Demo::II::query_or($toks)
     td_add($td_query, (now_ns() - $t0) / 1000.0)
-    return $scores
+    $scores
 }
 
 fn Demo::II::doc_by_id($id) {
     for my $d (@docs) {
         return $d if $d->{id} == $id
     }
-    return undef
+    undef
 }
 
 # ── run sample queries ─────────────────────────────────────────────

@@ -18,7 +18,7 @@ class Device {
     id: Int = 0
     name: Str = "generic"
     
-    fn identify { "Device #" . $self->id . " (" . $self->name . ")" }
+    fn identify = "Device #" . $self->id . " (" . $self->name . ")"
 }
 
 # Concrete class implementing multiple traits

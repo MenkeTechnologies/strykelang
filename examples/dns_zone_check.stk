@@ -71,34 +71,34 @@ fn Demo::Zone::parse_line($line, $line_num) {
         return $rec
     }
     td_add($td_parse, (now_ns() - $t0) / 1000.0)
-    return undef
+    undef
 }
 
 # ── per-type validators ────────────────────────────────────────────
 
 fn Demo::Zone::validate_a($rec) {
     # IPv4: 4 octets 0-255.
-    return $rec->{rdata} =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/ ? 1 : 0
+    $rec->{rdata} =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/ ? 1 : 0
 }
 
 fn Demo::Zone::validate_aaaa($rec) {
     # Rough IPv6: hex segments separated by colons.
-    return $rec->{rdata} =~ /^[\da-fA-F:]+$/ ? 1 : 0
+    $rec->{rdata} =~ /^[\da-fA-F:]+$/ ? 1 : 0
 }
 
 fn Demo::Zone::validate_cname($rec) {
     # Single hostname target.
-    return $rec->{rdata} =~ /^[\w.\-]+\.?$/ ? 1 : 0
+    $rec->{rdata} =~ /^[\w.\-]+\.?$/ ? 1 : 0
 }
 
 fn Demo::Zone::validate_mx($rec) {
     # priority hostname.
-    return $rec->{rdata} =~ /^\d+\s+[\w.\-]+\.?$/ ? 1 : 0
+    $rec->{rdata} =~ /^\d+\s+[\w.\-]+\.?$/ ? 1 : 0
 }
 
 fn Demo::Zone::validate_txt($rec) {
     # quoted string.
-    return $rec->{rdata} =~ /^".*"$/ ? 1 : 0
+    $rec->{rdata} =~ /^".*"$/ ? 1 : 0
 }
 
 # ── load + validate ────────────────────────────────────────────────

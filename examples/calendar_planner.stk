@@ -23,17 +23,17 @@ my @events = (
 # ── helpers ────────────────────────────────────────────────────────
 
 fn Demo::Cal::mins_to_time($m) {
-    return sprintf("%02d:%02d", int($m / 60), $m % 60)
+    sprintf("%02d:%02d", int($m / 60), $m % 60)
 }
 
 fn Demo::Cal::end($ev) {
-    return $ev->{start} + $ev->{duration}
+    $ev->{start} + $ev->{duration}
 }
 
 fn Demo::Cal::overlaps($e1, $e2) {
     my $e1_end = Demo::Cal::end($e1)
     my $e2_end = Demo::Cal::end($e2)
-    return $e1->{start} < $e2_end && $e2->{start} < $e1_end
+    $e1->{start} < $e2_end && $e2->{start} < $e1_end
 }
 
 # ── sort events ────────────────────────────────────────────────────

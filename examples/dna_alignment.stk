@@ -16,12 +16,12 @@ my $gap_penalty    = -2
 # ── helpers ────────────────────────────────────────────────────────
 
 fn Demo::DNA::score($a_ch, $b_ch) {
-    return $a_ch eq $b_ch ? $match_score : $mismatch_score
+    $a_ch eq $b_ch ? $match_score : $mismatch_score
 }
 
 fn Demo::DNA::max3($n1, $n2, $n3) {
     my $m = $n1 > $n2 ? $n1 : $n2
-    return $m > $n3 ? $m : $n3
+    $m > $n3 ? $m : $n3
 }
 
 # ── DP table construction ──────────────────────────────────────────
@@ -71,7 +71,7 @@ fn Demo::DNA::align($seq_a, $seq_b) {
             td_add($td_cell, (now_ns() - $t0) / 1000.0)
         }
     }
-    return +{ table => \@table, trace => \@trace, score => $table[$m]->[$n] }
+    +{ table => \@table, trace => \@trace, score => $table[$m]->[$n] }
 }
 
 # ── traceback ──────────────────────────────────────────────────────

@@ -12,9 +12,9 @@ p "  uc, rev      : $r"
 
 p ""
 p "── Partial application — extra args after function ────"
-fn Demo::Tm::add($x, $y)    { $x + $y }
-fn Demo::Tm::double($n)     { $n * 2 }
-fn Demo::Tm::wrap($s, $l, $r) { "$l$s$r" }
+fn Demo::Tm::add($x, $y)    = $x + $y
+fn Demo::Tm::double($n)     = $n * 2
+fn Demo::Tm::wrap($s, $l, $r) = "$l$s$r"
 
 my $n = ~> 5 Demo::Tm::add(10) Demo::Tm::double
 p "  5 -> +10 -> *2 = $n"

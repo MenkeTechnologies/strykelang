@@ -31,7 +31,7 @@ fn Demo::Queue::execute($job) {
     if (rand() < $job->{fail_rate}) {
         return +{ ok => 0, error => "transient_fail:" . $job->{id} }
     }
-    return +{ ok => 1, result => "ok:" . $job->{id} . " (spin=$spin)" }
+    +{ ok => 1, result => "ok:" . $job->{id} . " (spin=$spin)" }
 }
 
 # ── retry-with-linear-backoff wrapper ────────────────────────────────
@@ -49,7 +49,7 @@ fn Demo::Queue::run_with_retry($job, $max_attempts) {
         my $end = now_ns() + $delay_us * 1000
         while (now_ns() < $end) { }
     }
-    return +{ ok => 0, error => "retries_exhausted", attempts => $attempt }
+    +{ ok => 0, error => "retries_exhausted", attempts => $attempt }
 }
 
 # ── instrumentation: AOP `around` records latency ────────────────────

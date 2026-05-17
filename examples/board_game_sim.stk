@@ -52,7 +52,7 @@ fn Demo::BG::play_one() {
             $hops_used = $hops_used + 1
         }
     }
-    return +{ moves => $moves, hops => $hops_used }
+    +{ moves => $moves, hops => $hops_used }
 }
 
 # ── simulate N games ───────────────────────────────────────────────

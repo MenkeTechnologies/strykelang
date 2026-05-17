@@ -36,7 +36,7 @@ fn Demo::Diff::lcs_table($old_ref, $new_ref) {
             }
         }
     }
-    return \@table
+    \@table
 }
 
 # ── Diff emission via back-pointer walk ────────────────────────────
@@ -61,7 +61,7 @@ fn Demo::Diff::emit($old_ref, $new_ref) {
             $i--
         }
     }
-    return \@ops
+    \@ops
 }
 
 # ── Unified-diff format ─────────────────────────────────────────────
@@ -76,7 +76,7 @@ fn Demo::Diff::render($ops_ref, $a_name, $b_name) {
         elsif ($sigil eq "+") { push @out, "+" . $op->{line} }
         elsif ($sigil eq "-") { push @out, "-" . $op->{line} }
     }
-    return join("\n", @out)
+    join("\n", @out)
 }
 
 # ── Apply patch: rebuild target from source + ops ──────────────────
@@ -96,7 +96,7 @@ fn Demo::Diff::apply($source_ref, $ops_ref) {
             $i++
         }
     }
-    return \@out
+    \@out
 }
 
 # ── Sample texts ────────────────────────────────────────────────────

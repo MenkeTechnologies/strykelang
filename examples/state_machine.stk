@@ -42,7 +42,7 @@ fn Demo::FSM::transition($from, $event, $ctx) {
     return undef unless exists $transitions{$from}->{$event}
     my $rule = $transitions{$from}->{$event}
     return undef unless $rule->{guard}->($ctx)
-    return $rule->{to}
+    $rule->{to}
 }
 
 # ── instrumented variant ─────────────────────────────────────────────
@@ -81,7 +81,7 @@ fn Demo::FSM::run_order($order_id, $script) {
                 $state, $event
         }
     }
-    return $state
+    $state
 }
 
 my $now = time()

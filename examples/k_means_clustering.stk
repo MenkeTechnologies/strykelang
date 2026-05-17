@@ -19,7 +19,7 @@ my @points
 fn Demo::Km::near($cx, $cy, $spread) {
     my $dx = (rand() - 0.5) * 2 * $spread
     my $dy = (rand() - 0.5) * 2 * $spread
-    return [$cx + $dx, $cy + $dy]
+    [$cx + $dx, $cy + $dy]
 }
 
 for my $c (@cluster_centers) {
@@ -43,7 +43,7 @@ for my $i (0:$K - 1) {
 fn Demo::Km::distance_sq($p1, $p2) {
     my $dx = $p1->[0] - $p2->[0]
     my $dy = $p1->[1] - $p2->[1]
-    return $dx * $dx + $dy * $dy
+    $dx * $dx + $dy * $dy
 }
 
 fn Demo::Km::assign_clusters($points_ref, $centroids_ref) {
@@ -60,7 +60,7 @@ fn Demo::Km::assign_clusters($points_ref, $centroids_ref) {
         }
         push @assignments, $best
     }
-    return \@assignments
+    \@assignments
 }
 
 fn Demo::Km::recompute_centroids($points_ref, $assignments_ref, $k) {
@@ -86,7 +86,7 @@ fn Demo::Km::recompute_centroids($points_ref, $assignments_ref, $k) {
             push @new_cents, [0, 0]   # empty cluster fallback
         }
     }
-    return \@new_cents
+    \@new_cents
 }
 
 my $td_iter = t_digest(100)

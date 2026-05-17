@@ -35,11 +35,11 @@ fn Demo::Dep::version_lt($v1, $v2) {
         return 1 if $av < $bv
         return 0 if $av > $bv
     }
-    return 0
+    0
 }
 
 fn Demo::Dep::version_ge($v1, $v2) {
-    return !Demo::Dep::version_lt($v1, $v2)
+    !Demo::Dep::version_lt($v1, $v2)
 }
 
 # ── topological sort via DFS ───────────────────────────────────────

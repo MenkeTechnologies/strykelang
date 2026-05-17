@@ -22,7 +22,7 @@ fn Demo::MD::inline($text) {
     $text =~ s/\*([^*]+)\*/<em>$1<\/em>/g
     # Links: [text](url)
     $text =~ s/\[([^\]]+)\]\(([^)]+)\)/<a href="$2">$1<\/a>/g
-    return $text
+    $text
 }
 
 # ── line-level parser ───────────────────────────────────────────────
@@ -84,7 +84,7 @@ fn Demo::MD::parse($md) {
     if ($in_list) {
         push @html, "</ul>"
     }
-    return \@html
+    \@html
 }
 
 # ── sample markdown ────────────────────────────────────────────────
