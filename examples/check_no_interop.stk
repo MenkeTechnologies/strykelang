@@ -4,6 +4,8 @@
 #
 # Usage: stryke examples/check_no_interop.stk [--summary]
 
+my %opts = %{ getopts(["summary"]) }
 my $runner = dirname(__FILE__) . "/run_all_ci.stk"
-my $flags  = len(@ARGV) ? " " . join(" ", @ARGV) : ""
-exit system("$^X \"$runner\" --only=parse$flags") >> 8
+my $cmd    = "$^X \"$runner\" --only=parse"
+$cmd .= " --summary" if $opts{summary}
+exit system($cmd) >> 8
