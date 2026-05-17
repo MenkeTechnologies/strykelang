@@ -1314,10 +1314,10 @@ mod tests {
     #[test]
     fn complex_basic_ops() {
         let a = complex_new(&[f(3.0), f(4.0)]);
-        assert_eq!(complex_real(&[a.clone()]).to_number(), 3.0);
-        assert_eq!(complex_imag(&[a.clone()]).to_number(), 4.0);
-        assert_eq!(complex_magnitude(&[a.clone()]).to_number(), 5.0);
-        let conj = complex_conjugate(&[a.clone()]);
+        assert_eq!(complex_real(std::slice::from_ref(&a)).to_number(), 3.0);
+        assert_eq!(complex_imag(std::slice::from_ref(&a)).to_number(), 4.0);
+        assert_eq!(complex_magnitude(std::slice::from_ref(&a)).to_number(), 5.0);
+        let conj = complex_conjugate(std::slice::from_ref(&a));
         assert_eq!(complex_imag(&[conj]).to_number(), -4.0);
     }
 

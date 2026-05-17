@@ -41,7 +41,10 @@ fn lambert_w0_at_e_equals_one_principal_cc() {
 /// BUG-128 — initial guess branch uses \(\ln x - \ln\ln x\); **`x == 1` ⇒ `\ln(\ln 1)` is undefined**, entire iterate becomes NaN.
 #[test]
 fn lambert_w0_at_exactly_one_is_nan_bug_cc() {
-    assert_eq!(eval_string(r#"sprintf("%.12f", lambert_w0(1))"#), "0.567143290410");
+    assert_eq!(
+        eval_string(r#"sprintf("%.12f", lambert_w0(1))"#),
+        "0.567143290410"
+    );
 }
 
 #[test]
@@ -79,7 +82,10 @@ fn wright_omega_exponential_branch_cc() {
 /// Same NaN cascade as **`lambert_w0`** at argument **1**, because \(\omega(0)=W(e^0)=W(1)\).
 #[test]
 fn wright_omega_zero_is_nan_bug_cc() {
-    assert_eq!(eval_string(r#"sprintf("%.12f", wright_omega(0))"#), "0.567143290410");
+    assert_eq!(
+        eval_string(r#"sprintf("%.12f", wright_omega(0))"#),
+        "0.567143290410"
+    );
 }
 
 #[test]

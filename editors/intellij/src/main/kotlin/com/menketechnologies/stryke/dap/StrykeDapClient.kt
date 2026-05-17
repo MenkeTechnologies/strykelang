@@ -97,8 +97,15 @@ class StrykeDapClient(
             output.write(header)
             output.write(body)
             output.flush()
+            val cmd = msg.get("command")?.asString
+            val seqStr = msg.get("seq")?.asString ?: msg.get("seq")?.asInt?.toString()
+            com.menketechnologies.stryke.StrykeDebugLog.log(
+                "dap",
+                "→ seq=$seqStr type=${msg.get("type")?.asString} command=$cmd bytes=${body.size}",
+            )
         } catch (e: Exception) {
             LOG.warn("DAP send failed", e)
+            com.menketechnologies.stryke.StrykeDebugLog.log("dap", "send failed: ${e.message}")
             alive = false
         }
     }
@@ -144,16 +151,33 @@ class StrykeDapClient(
             val body = String(bodyBytes, StandardCharsets.UTF_8)
             onLog("← $body")
             val obj = try { JsonParser.parseString(body).asJsonObject } catch (_: Exception) { continue }
-            when (obj.get("type")?.asString) {
+            val msgType = obj.get("type")?.asString
+            when (msgType) {
                 "response" -> {
                     val reqSeq = obj.get("request_seq")?.asInt ?: continue
+                    val cmd = obj.get("command")?.asString
+                    val success = obj.get("success")?.asBoolean
+                    com.menketechnologies.stryke.StrykeDebugLog.log(
+                        "dap",
+                        "← response req_seq=$reqSeq command=$cmd success=$success bytes=$contentLength",
+                    )
                     pending[reqSeq]?.set(obj.getAsJsonObject("body") ?: JsonObject())
                     pendingLatch[reqSeq]?.countDown()
                 }
                 "event" -> {
                     val event = obj.get("event")?.asString ?: continue
                     val eventBody = obj.getAsJsonObject("body") ?: JsonObject()
-                    try { onEvent(event, eventBody) } catch (e: Exception) { LOG.warn("event handler", e) }
+                    com.menketechnologies.stryke.StrykeDebugLog.log(
+                        "dap",
+                        "← event=$event bytes=$contentLength",
+                    )
+                    try { onEvent(event, eventBody) } catch (e: Exception) {
+                        LOG.warn("event handler", e)
+                        com.menketechnologies.stryke.StrykeDebugLog.log(
+                            "dap",
+                            "event handler threw: ${e.message}",
+                        )
+                    }
                 }
             }
         }

@@ -69,14 +69,18 @@ pub(crate) fn jwt_decode(
     let payload_bytes = base64url_decode(parts[1])?;
     let payload_str = std::str::from_utf8(&payload_bytes)
         .map_err(|_| StrykeError::runtime("jwt_decode: payload is not UTF-8", line))?;
-    let payload_json: JsonValue = serde_json::from_str(payload_str)
-        .map_err(|e| StrykeError::runtime(format!("jwt_decode: invalid payload JSON: {e}"), line))?;
+    let payload_json: JsonValue = serde_json::from_str(payload_str).map_err(|e| {
+        StrykeError::runtime(format!("jwt_decode: invalid payload JSON: {e}"), line)
+    })?;
 
     let now = Utc::now().timestamp();
     if let Some(exp) = payload_json.get("exp") {
         let exp_t = jwt_claim_time(exp, line)?;
         if now >= exp_t {
-            return Err(StrykeError::runtime("jwt_decode: token expired (exp)", line));
+            return Err(StrykeError::runtime(
+                "jwt_decode: token expired (exp)",
+                line,
+            ));
         }
     }
     if let Some(nbf) = payload_json.get("nbf") {

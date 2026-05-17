@@ -80,8 +80,12 @@ fn capture_skip_bootstrap_hash(name: &str) -> bool {
 /// chain level. `_` ↔ `_0`, `_<` ↔ `_0<`, `_<<<` ↔ `_0<<<`, etc. Anything
 /// else (`_1`, `_2<<`, …) has no alias (those are positional-only slots).
 fn topic_alias(name: &str) -> Option<String> {
-    if name == "_" { return Some("_0".to_string()); }
-    if name == "_0" { return Some("_".to_string()); }
+    if name == "_" {
+        return Some("_0".to_string());
+    }
+    if name == "_0" {
+        return Some("_".to_string());
+    }
     // _<+ → _0<+, _0<+ → _<+
     if let Some(rest) = name.strip_prefix("_0") {
         if rest.chars().all(|c| c == '<') && !rest.is_empty() {
@@ -848,7 +852,11 @@ impl Scope {
     }
 
     /// `local @name` — not valid for `mysync` arrays.
-    pub fn local_set_array(&mut self, name: &str, val: Vec<StrykeValue>) -> Result<(), StrykeError> {
+    pub fn local_set_array(
+        &mut self,
+        name: &str,
+        val: Vec<StrykeValue>,
+    ) -> Result<(), StrykeError> {
         if self.find_atomic_array(name).is_some() {
             return Err(StrykeError::runtime(
                 "local cannot be used on mysync arrays",
@@ -1353,8 +1361,9 @@ impl Scope {
             }
             if frame.has_scalar(name) {
                 if let Some(ty) = frame.typed_scalars.get(name) {
-                    ty.check_value(&val)
-                        .map_err(|msg| StrykeError::type_error(format!("`${}`: {}", name, msg), 0))?;
+                    ty.check_value(&val).map_err(|msg| {
+                        StrykeError::type_error(format!("`${}`: {}", name, msg), 0)
+                    })?;
                 }
                 frame.set_scalar(name, val);
                 return Ok(());
@@ -2479,7 +2488,11 @@ impl Scope {
         Ok(())
     }
 
-    pub fn delete_hash_element(&mut self, name: &str, key: &str) -> Result<StrykeValue, StrykeError> {
+    pub fn delete_hash_element(
+        &mut self,
+        name: &str,
+        key: &str,
+    ) -> Result<StrykeValue, StrykeError> {
         canon_main!(name);
         if let Some(ah) = self.find_atomic_hash(name) {
             return Ok(ah.0.lock().shift_remove(key).unwrap_or(StrykeValue::UNDEF));
@@ -3188,8 +3201,14 @@ mod tests {
 
     #[test]
     fn positional_topic_slot_rejects_non_positional_names() {
-        assert!(parse_positional_topic_slot("_").is_none(), "bare _ has no slot");
-        assert!(parse_positional_topic_slot("_0").is_none(), "_0 is the topic alias, not positional");
+        assert!(
+            parse_positional_topic_slot("_").is_none(),
+            "bare _ has no slot"
+        );
+        assert!(
+            parse_positional_topic_slot("_0").is_none(),
+            "_0 is the topic alias, not positional"
+        );
         assert!(parse_positional_topic_slot("_foo").is_none(), "named");
         assert!(parse_positional_topic_slot("foo").is_none());
         assert!(parse_positional_topic_slot("").is_none());

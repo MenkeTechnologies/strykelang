@@ -4590,7 +4590,9 @@ impl Parser {
     }
 
     /// Optional `sub` parens: either a Perl 5 prototype string or a stryke **`$name` / `{ k => $v }`** signature.
-    fn parse_sub_sig_or_prototype_opt(&mut self) -> StrykeResult<(Vec<SubSigParam>, Option<String>)> {
+    fn parse_sub_sig_or_prototype_opt(
+        &mut self,
+    ) -> StrykeResult<(Vec<SubSigParam>, Option<String>)> {
         if !matches!(self.peek(), Token::LParen) {
             return Ok((vec![], None));
         }
@@ -5389,7 +5391,11 @@ impl Parser {
         self.parse_stmt_postfix_modifier(stmt)
     }
 
-    fn parse_decl_hash_destructure(&mut self, keyword: &str, line: usize) -> StrykeResult<Statement> {
+    fn parse_decl_hash_destructure(
+        &mut self,
+        keyword: &str,
+        line: usize,
+    ) -> StrykeResult<Statement> {
         let MatchPattern::Hash(pairs) = self.parse_match_hash_pattern()? else {
             unreachable!("parse_match_hash_pattern returns Hash");
         };
@@ -7869,7 +7875,11 @@ impl Parser {
     /// `par_reduce { stage1 |> stage2 |> ... } SOURCE`, with optional
     /// `||>` or `|then|` mid-pipeline boundary that switches to a normal
     /// `~>` / `~>>` continuation operating on the auto-merged result.
-    fn parse_thread_macro_chunk_par(&mut self, line: usize, thread_last: bool) -> StrykeResult<Expr> {
+    fn parse_thread_macro_chunk_par(
+        &mut self,
+        line: usize,
+        thread_last: bool,
+    ) -> StrykeResult<Expr> {
         // Source: same parsing rules as `~>`.
         self.suppress_parenless_call = self.suppress_parenless_call.saturating_add(1);
         let source_expr = self.parse_thread_input();
@@ -13304,7 +13314,10 @@ impl Parser {
     }
 
     /// Parse fan/fan_cap arguments: optional count + block or blockless expression.
-    fn parse_fan_count_and_block(&mut self, line: usize) -> StrykeResult<(Option<Box<Expr>>, Block)> {
+    fn parse_fan_count_and_block(
+        &mut self,
+        line: usize,
+    ) -> StrykeResult<(Option<Box<Expr>>, Block)> {
         // `fan { BLOCK }` — no count
         if matches!(self.peek(), Token::LBrace) {
             let block = self.parse_block()?;
@@ -20767,9 +20780,7 @@ mod tests {
         // Use clearly-non-builtin fn names (`counter` / `memo` clash
         // with stryke builtins).
         parse_ok("fn my_counter { state $n = 0; $n++; $n }");
-        parse_ok(
-            "fn my_memo($k) { state %cache; $cache{$k} //= compute($k) }",
-        );
+        parse_ok("fn my_memo($k) { state %cache; $cache{$k} //= compute($k) }");
     }
 
     /// `our` declarations are package-globals — still legal in strict
@@ -20837,9 +20848,7 @@ mod tests {
     fn labelled_loops_parse() {
         let _g = NoInteropGuard::on();
         parse_ok("OUTER: for my $i (1:10) { last OUTER if $i > 5 }");
-        parse_ok(
-            "OUTER: for my $i (1:3) { INNER: for my $j (1:3) { next OUTER if $j > $i } }",
-        );
+        parse_ok("OUTER: for my $i (1:3) { INNER: for my $j (1:3) { next OUTER if $j > $i } }");
     }
 
     /// String-repeat operator `x` — `\"-\" x 40` for a separator line,
@@ -21022,9 +21031,7 @@ mod tests {
     #[test]
     fn deeply_nested_ternary_parses() {
         let _g = NoInteropGuard::on();
-        parse_ok(
-            "my $g = ($p eq \"a\") ? 1 : ($p eq \"b\") ? 2 : ($p eq \"c\") ? 3 : 4",
-        );
+        parse_ok("my $g = ($p eq \"a\") ? 1 : ($p eq \"b\") ? 2 : ($p eq \"c\") ? 3 : 4");
     }
 
     /// Array-of-hashref + index-into-hash subscript chain:
@@ -21042,9 +21049,7 @@ mod tests {
     #[test]
     fn nested_for_loops_parse() {
         let _g = NoInteropGuard::on();
-        parse_ok(
-            "for my $r (0:5) { for my $c (0:5) { p \"$r,$c\" } }",
-        );
+        parse_ok("for my $r (0:5) { for my $c (0:5) { p \"$r,$c\" } }");
     }
 
     /// Compound assignment `$x .= ...` (string append). Used by every
@@ -21220,9 +21225,7 @@ mod tests {
         parse_ok("fn Module::add($x, $y) { $x + $y } p Module::add(2, 3)");
         // `caller` itself is a stryke builtin — use a namespaced caller
         // to avoid the clash.
-        parse_ok(
-            "fn Foo::Bar::baz { 1 } fn Demo::main { Foo::Bar::baz() + Foo::Bar::baz() }",
-        );
+        parse_ok("fn Foo::Bar::baz { 1 } fn Demo::main { Foo::Bar::baz() + Foo::Bar::baz() }");
     }
 
     /// `index($haystack, $needle)` builtin — the canonical string
@@ -21312,9 +21315,7 @@ mod tests {
     fn bareword_topic_as_hash_key_parses() {
         let _g = NoInteropGuard::on();
         parse_ok("my %h; $h{_}++ for (\"a\", \"b\", \"a\")");
-        parse_ok(
-            "my @arr = (1, 2, 3); my %seen; $seen{$arr[_]}++ for (0, 1, 2)",
-        );
+        parse_ok("my @arr = (1, 2, 3); my %seen; $seen{$arr[_]}++ for (0, 1, 2)");
     }
 
     /// Hashref subscript inside a `grep` block using the bareword
@@ -21352,8 +21353,10 @@ mod tests {
     #[test]
     fn expression_bodied_pipe_reduce_parses() {
         let _g = NoInteropGuard::on();
-        parse_ok("fn N::gcd = _1 == 0 ? _0 : N::gcd(_1, _0 % _1); \
-                  fn N::gcd_list = @{_} |> reduce { N::gcd(_0, _1) }");
+        parse_ok(
+            "fn N::gcd = _1 == 0 ? _0 : N::gcd(_1, _0 % _1); \
+                  fn N::gcd_list = @{_} |> reduce { N::gcd(_0, _1) }",
+        );
     }
 
     /// Reduce-fold with a hashref accumulator seeded by prepending the
@@ -21457,9 +21460,7 @@ mod tests {
     #[test]
     fn hashref_init_with_range_and_repeat_parses() {
         let _g = NoInteropGuard::on();
-        parse_ok(
-            "fn UF::new($n) = +{ parent => [0:$n - 1], rank => [(0) x $n], count => $n }",
-        );
+        parse_ok("fn UF::new($n) = +{ parent => [0:$n - 1], rank => [(0) x $n], count => $n }");
     }
 
     /// Postfix-for over an arrayref-deref: `Trie::insert($t, $_) for @$words`.
@@ -21612,9 +21613,7 @@ mod tests {
     #[test]
     fn recursive_expression_body_with_ternary_parses() {
         let _g = NoInteropGuard::on();
-        parse_ok(
-            "fn J::s($n, $k) = $n == 1 ? 0 : (J::s($n - 1, $k) + $k) % $n",
-        );
+        parse_ok("fn J::s($n, $k) = $n == 1 ? 0 : (J::s($n - 1, $k) + $k) % $n");
     }
 
     /// All quote-like single/two-letter operators (`s`, `m`, `q`, `qq`,

@@ -340,8 +340,5 @@ fn uniq_single_array_bucket_dereferenced_ch() {
     // — added an `as_array_ref` branch alongside `as_array_vec`. Full
     // regression coverage in
     // `tests/suite/library_fixes_2026_05.rs::uniq_*`.
-    assert_eq!(
-        eval_string(r#"stringify(uniq([1, 2, 2, 3]))"#),
-        "(1, 2, 3)"
-    );
+    assert_eq!(eval_string(r#"stringify(uniq([1, 2, 2, 3]))"#), "(1, 2, 3)");
 }

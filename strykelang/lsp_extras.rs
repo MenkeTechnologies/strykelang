@@ -20,12 +20,12 @@
 //! is `O(text length)` with a single pass.
 
 use lsp_types::{
-    CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams,
-    DocumentFormattingParams, FoldingRange, FoldingRangeKind, FoldingRangeParams, Position, Range,
-    SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens,
-    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
-    SemanticTokensServerCapabilities, SignatureHelp, SignatureHelpParams, SignatureInformation,
-    TextEdit, Uri, WorkDoneProgressOptions, WorkspaceEdit,
+    CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, DocumentFormattingParams,
+    FoldingRange, FoldingRangeKind, FoldingRangeParams, Position, Range, SemanticToken,
+    SemanticTokenModifier, SemanticTokenType, SemanticTokens, SemanticTokensFullOptions,
+    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities, SignatureHelp,
+    SignatureHelpParams, SignatureInformation, TextEdit, Uri, WorkDoneProgressOptions,
+    WorkspaceEdit,
 };
 use std::collections::HashMap;
 
@@ -115,7 +115,11 @@ pub fn compute_semantic_tokens(text: &str) -> SemanticTokens {
             return;
         }
         let delta_line = line - *prev_line;
-        let delta_start = if delta_line == 0 { col - *prev_char } else { col };
+        let delta_start = if delta_line == 0 {
+            col - *prev_char
+        } else {
+            col
+        };
         tokens.push(SemanticToken {
             delta_line,
             delta_start,
@@ -155,7 +159,16 @@ pub fn compute_semantic_tokens(text: &str) -> SemanticTokens {
                 len += utf16_len(chars[i]);
                 i += 1;
             }
-            push(&mut tokens, &mut prev_line, &mut prev_char, line, start_col, len, TY_COMMENT, 0);
+            push(
+                &mut tokens,
+                &mut prev_line,
+                &mut prev_char,
+                line,
+                start_col,
+                len,
+                TY_COMMENT,
+                0,
+            );
             col += len;
             continue;
         }
@@ -191,7 +204,9 @@ pub fn compute_semantic_tokens(text: &str) -> SemanticTokens {
                              len: &mut u32,
                              col: &mut u32| {
                 if *len > 0 {
-                    push(tokens, prev_line, prev_char, line, *start_col, *len, TY_STRING, 0);
+                    push(
+                        tokens, prev_line, prev_char, line, *start_col, *len, TY_STRING, 0,
+                    );
                     *col += *len;
                     *start_col = *col;
                     *len = 0;
@@ -207,7 +222,16 @@ pub fn compute_semantic_tokens(text: &str) -> SemanticTokens {
                 if ch == quote {
                     len += utf16_len(ch);
                     i += 1;
-                    push(&mut tokens, &mut prev_line, &mut prev_char, line, start_col, len, TY_STRING, 0);
+                    push(
+                        &mut tokens,
+                        &mut prev_line,
+                        &mut prev_char,
+                        line,
+                        start_col,
+                        len,
+                        TY_STRING,
+                        0,
+                    );
                     col += len;
                     closed = true;
                     break;
@@ -217,8 +241,25 @@ pub fn compute_semantic_tokens(text: &str) -> SemanticTokens {
                 }
                 // `#{EXPR}` interpolation — embedded code.
                 if ch == '#' && i + 1 < chars.len() && chars[i + 1] == '{' {
-                    flush_lit(&mut tokens, &mut prev_line, &mut prev_char, line, &mut start_col, &mut len, &mut col);
-                    push(&mut tokens, &mut prev_line, &mut prev_char, line, col, 2, TY_OPERATOR, 0);
+                    flush_lit(
+                        &mut tokens,
+                        &mut prev_line,
+                        &mut prev_char,
+                        line,
+                        &mut start_col,
+                        &mut len,
+                        &mut col,
+                    );
+                    push(
+                        &mut tokens,
+                        &mut prev_line,
+                        &mut prev_char,
+                        line,
+                        col,
+                        2,
+                        TY_OPERATOR,
+                        0,
+                    );
                     col += 2;
                     i += 2;
                     // Walk the expression interior; track `{ }` nesting so
@@ -241,7 +282,16 @@ pub fn compute_semantic_tokens(text: &str) -> SemanticTokens {
                         } else if ich == '}' {
                             depth -= 1;
                             if depth == 0 {
-                                push(&mut tokens, &mut prev_line, &mut prev_char, line, col, 1, TY_OPERATOR, 0);
+                                push(
+                                    &mut tokens,
+                                    &mut prev_line,
+                                    &mut prev_char,
+                                    line,
+                                    col,
+                                    1,
+                                    TY_OPERATOR,
+                                    0,
+                                );
                                 col += 1;
                                 i += 1;
                                 break;
@@ -254,6 +304,79 @@ pub fn compute_semantic_tokens(text: &str) -> SemanticTokens {
                     len = 0;
                     continue;
                 }
+                // `@{[ EXPR ]}` — Perl-style array-deref interpolation.
+                // Acts the same way as `#{ EXPR }`: emit `@{[` and `]}` as
+                // OPERATOR tokens, then leave EXPR un-tokenized so the
+                // client renders the interior as code (variables get
+                // their own variable color, function calls hover, etc.).
+                // Without this, the entire `@{[FN]}` got swallowed by the
+                // generic `@{…}` block-deref branch below and the IDE
+                // colored `FN` as part of the variable token, killing
+                // hover / goto-def for the embedded expression.
+                if ch == '@' && i + 2 < chars.len() && chars[i + 1] == '{' && chars[i + 2] == '[' {
+                    flush_lit(
+                        &mut tokens,
+                        &mut prev_line,
+                        &mut prev_char,
+                        line,
+                        &mut start_col,
+                        &mut len,
+                        &mut col,
+                    );
+                    push(
+                        &mut tokens,
+                        &mut prev_line,
+                        &mut prev_char,
+                        line,
+                        col,
+                        3,
+                        TY_OPERATOR,
+                        0,
+                    );
+                    col += 3;
+                    i += 3;
+                    let mut bracket_depth: i32 = 1;
+                    let mut brace_depth: i32 = 1;
+                    while i < chars.len() {
+                        let ich = chars[i];
+                        if ich == '\n' {
+                            line += 1;
+                            col = 0;
+                            i += 1;
+                            continue;
+                        }
+                        if ich == '[' {
+                            bracket_depth += 1;
+                        } else if ich == '{' {
+                            brace_depth += 1;
+                        } else if ich == '}' {
+                            brace_depth -= 1;
+                        } else if ich == ']' {
+                            bracket_depth -= 1;
+                            if bracket_depth == 0 && i + 1 < chars.len() && chars[i + 1] == '}' {
+                                push(
+                                    &mut tokens,
+                                    &mut prev_line,
+                                    &mut prev_char,
+                                    line,
+                                    col,
+                                    2,
+                                    TY_OPERATOR,
+                                    0,
+                                );
+                                col += 2;
+                                i += 2;
+                                break;
+                            }
+                        }
+                        col += utf16_len(ich);
+                        i += 1;
+                    }
+                    start_col = col;
+                    len = 0;
+                    let _ = brace_depth;
+                    continue;
+                }
                 // Sigil-variable interpolation: `$name`, `@name`, `%name`,
                 // optionally followed by `::Pkg::name`. Also handles a few
                 // bracket / arrow follow-ons like `$h{k}`, `$arr[i]`,
@@ -263,7 +386,15 @@ pub fn compute_semantic_tokens(text: &str) -> SemanticTokens {
                     let nxt = chars[i + 1];
                     let starts_var = nxt == '_' || nxt.is_alphabetic() || nxt == '{';
                     if starts_var {
-                        flush_lit(&mut tokens, &mut prev_line, &mut prev_char, line, &mut start_col, &mut len, &mut col);
+                        flush_lit(
+                            &mut tokens,
+                            &mut prev_line,
+                            &mut prev_char,
+                            line,
+                            &mut start_col,
+                            &mut len,
+                            &mut col,
+                        );
                         let var_start_col = col;
                         let mut var_len = utf16_len(ch); // the sigil
                         i += 1;
@@ -274,13 +405,18 @@ pub fn compute_semantic_tokens(text: &str) -> SemanticTokens {
                             i += 1;
                             while i < chars.len() && depth > 0 {
                                 let bc = chars[i];
-                                if bc == '\n' { break; }
-                                if bc == '{' { depth += 1; }
-                                else if bc == '}' {
+                                if bc == '\n' {
+                                    break;
+                                }
+                                if bc == '{' {
+                                    depth += 1;
+                                } else if bc == '}' {
                                     depth -= 1;
                                     var_len += utf16_len(bc);
                                     i += 1;
-                                    if depth == 0 { break; }
+                                    if depth == 0 {
+                                        break;
+                                    }
                                     continue;
                                 }
                                 var_len += utf16_len(bc);
@@ -308,10 +444,7 @@ pub fn compute_semantic_tokens(text: &str) -> SemanticTokens {
                             // the IDE highlights e.g. `$h{key}` as one
                             // variable, not "variable + string + ...".
                             loop {
-                                if i + 1 < chars.len()
-                                    && chars[i] == '-'
-                                    && chars[i + 1] == '>'
-                                {
+                                if i + 1 < chars.len() && chars[i] == '-' && chars[i + 1] == '>' {
                                     var_len += 2;
                                     i += 2;
                                 }
@@ -330,16 +463,18 @@ pub fn compute_semantic_tokens(text: &str) -> SemanticTokens {
                                 i += 1;
                                 while i < chars.len() && depth > 0 {
                                     let bc = chars[i];
-                                    if bc == '\n' { break; }
-                                    if bc == chars[i.saturating_sub(0)] && false {
-                                        // unreachable; placeholder
+                                    if bc == '\n' {
+                                        break;
                                     }
-                                    if bc == '{' || bc == '[' { depth += 1; }
-                                    else if bc == close {
+                                    if bc == '{' || bc == '[' {
+                                        depth += 1;
+                                    } else if bc == close {
                                         depth -= 1;
                                         var_len += utf16_len(bc);
                                         i += 1;
-                                        if depth == 0 { break; }
+                                        if depth == 0 {
+                                            break;
+                                        }
                                         continue;
                                     }
                                     var_len += utf16_len(bc);
@@ -348,7 +483,16 @@ pub fn compute_semantic_tokens(text: &str) -> SemanticTokens {
                             }
                         }
                         if var_len > utf16_len(ch) {
-                            push(&mut tokens, &mut prev_line, &mut prev_char, line, var_start_col, var_len, TY_VARIABLE, 0);
+                            push(
+                                &mut tokens,
+                                &mut prev_line,
+                                &mut prev_char,
+                                line,
+                                var_start_col,
+                                var_len,
+                                TY_VARIABLE,
+                                0,
+                            );
                             col += var_len;
                             start_col = col;
                             len = 0;
@@ -371,7 +515,16 @@ pub fn compute_semantic_tokens(text: &str) -> SemanticTokens {
             // Hit end-of-line or end-of-file before closing quote. Emit
             // whatever literal run we have so it's still rendered as string.
             if !closed && len > 0 {
-                push(&mut tokens, &mut prev_line, &mut prev_char, line, start_col, len, TY_STRING, 0);
+                push(
+                    &mut tokens,
+                    &mut prev_line,
+                    &mut prev_char,
+                    line,
+                    start_col,
+                    len,
+                    TY_STRING,
+                    0,
+                );
                 col += len;
             }
             continue;
@@ -400,7 +553,16 @@ pub fn compute_semantic_tokens(text: &str) -> SemanticTokens {
                 len += utf16_len(ch);
                 i += 1;
             }
-            push(&mut tokens, &mut prev_line, &mut prev_char, line, start_col, len, TY_STRING, 0);
+            push(
+                &mut tokens,
+                &mut prev_line,
+                &mut prev_char,
+                line,
+                start_col,
+                len,
+                TY_STRING,
+                0,
+            );
             col += len;
             continue;
         }
@@ -421,7 +583,16 @@ pub fn compute_semantic_tokens(text: &str) -> SemanticTokens {
                 len += 1;
                 i += 1;
             }
-            push(&mut tokens, &mut prev_line, &mut prev_char, line, start_col, len, TY_NUMBER, 0);
+            push(
+                &mut tokens,
+                &mut prev_line,
+                &mut prev_char,
+                line,
+                start_col,
+                len,
+                TY_NUMBER,
+                0,
+            );
             col += len;
             continue;
         }
@@ -462,22 +633,53 @@ pub fn compute_semantic_tokens(text: &str) -> SemanticTokens {
                     }
                 }
             }
-            push(&mut tokens, &mut prev_line, &mut prev_char, line, start_col, len, TY_VARIABLE, 0);
+            push(
+                &mut tokens,
+                &mut prev_line,
+                &mut prev_char,
+                line,
+                start_col,
+                len,
+                TY_VARIABLE,
+                0,
+            );
             col += len;
             continue;
         }
         // Pipe operators
         if c == '|' && peek(&chars, i + 1) == Some('>') {
             let start_col = col;
-            let len = if peek(&chars, i + 2) == Some('>') { 3 } else { 2 };
-            push(&mut tokens, &mut prev_line, &mut prev_char, line, start_col, len, TY_MACRO, 0);
+            let len = if peek(&chars, i + 2) == Some('>') {
+                3
+            } else {
+                2
+            };
+            push(
+                &mut tokens,
+                &mut prev_line,
+                &mut prev_char,
+                line,
+                start_col,
+                len,
+                TY_MACRO,
+                0,
+            );
             i += len as usize;
             col += len;
             continue;
         }
         if c == '~' && peek(&chars, i + 1) == Some('>') {
             let start_col = col;
-            push(&mut tokens, &mut prev_line, &mut prev_char, line, start_col, 2, TY_MACRO, 0);
+            push(
+                &mut tokens,
+                &mut prev_line,
+                &mut prev_char,
+                line,
+                start_col,
+                2,
+                TY_MACRO,
+                0,
+            );
             i += 2;
             col += 2;
             continue;
@@ -518,7 +720,16 @@ pub fn compute_semantic_tokens(text: &str) -> SemanticTokens {
                 len += 1;
                 i += 1;
             }
-            push(&mut tokens, &mut prev_line, &mut prev_char, line, start_col, len, TY_REGEXP, 0);
+            push(
+                &mut tokens,
+                &mut prev_line,
+                &mut prev_char,
+                line,
+                start_col,
+                len,
+                TY_REGEXP,
+                0,
+            );
             col += len;
             continue;
         }
@@ -532,14 +743,32 @@ pub fn compute_semantic_tokens(text: &str) -> SemanticTokens {
             let word: String = chars[start_i..i].iter().collect();
             let len_u16 = word.encode_utf16().count() as u32;
             let (ty, modifiers) = classify_word(&word);
-            push(&mut tokens, &mut prev_line, &mut prev_char, line, start_col, len_u16, ty, modifiers);
+            push(
+                &mut tokens,
+                &mut prev_line,
+                &mut prev_char,
+                line,
+                start_col,
+                len_u16,
+                ty,
+                modifiers,
+            );
             col += len_u16;
             continue;
         }
         // Operator (single char)
         if is_operator_char(c) {
             let start_col = col;
-            push(&mut tokens, &mut prev_line, &mut prev_char, line, start_col, 1, TY_OPERATOR, 0);
+            push(
+                &mut tokens,
+                &mut prev_line,
+                &mut prev_char,
+                line,
+                start_col,
+                1,
+                TY_OPERATOR,
+                0,
+            );
             i += 1;
             col += 1;
             continue;
@@ -566,18 +795,51 @@ fn utf16_len(c: char) -> u32 {
 fn is_special_var_char(c: char) -> bool {
     matches!(
         c,
-        '_' | '!' | '@' | '$' | ',' | ';' | '/' | '\\' | '"' | '\''
-            | '&' | '`' | '+' | '-' | '.' | '0'..='9' | '?' | '<' | '>' | '('
-            | ')' | '['  | ']' | '~' | '^'
+        '_' | '!'
+            | '@'
+            | '$'
+            | ','
+            | ';'
+            | '/'
+            | '\\'
+            | '"'
+            | '\''
+            | '&'
+            | '`'
+            | '+'
+            | '-'
+            | '.'
+            | '0'..='9' | '?' | '<' | '>' | '(' | ')' | '[' | ']' | '~' | '^'
     )
 }
 
 fn is_operator_char(c: char) -> bool {
     matches!(
         c,
-        '+' | '-' | '*' | '/' | '%' | '=' | '<' | '>' | '!' | '&' | '|'
-            | '^' | '~' | '?' | ':' | ';' | ',' | '.' | '(' | ')' | '[' | ']'
-            | '{' | '}' | '\\'
+        '+' | '-'
+            | '*'
+            | '/'
+            | '%'
+            | '='
+            | '<'
+            | '>'
+            | '!'
+            | '&'
+            | '|'
+            | '^'
+            | '~'
+            | '?'
+            | ':'
+            | ';'
+            | ','
+            | '.'
+            | '('
+            | ')'
+            | '['
+            | ']'
+            | '{'
+            | '}'
+            | '\\'
     )
 }
 
@@ -622,9 +884,7 @@ static BUILTIN_NAMES: std::sync::OnceLock<std::collections::HashSet<String>> =
     std::sync::OnceLock::new();
 
 fn builtin_names() -> &'static std::collections::HashSet<String> {
-    BUILTIN_NAMES.get_or_init(|| {
-        crate::builtins::all_hash_map().into_keys().collect()
-    })
+    BUILTIN_NAMES.get_or_init(|| crate::builtins::all_hash_map().into_keys().collect())
 }
 
 // ---------------------------------------------------------------------------
@@ -816,8 +1076,8 @@ pub fn compute_code_actions(
 
     // ── Refactorings (need a real selection) ──
     let same_line = range.start.line == range.end.line;
-    let nonempty_range = range.start.line != range.end.line
-        || range.start.character != range.end.character;
+    let nonempty_range =
+        range.start.line != range.end.line || range.start.character != range.end.character;
     if nonempty_range {
         // Offer all three Extract refactorings whenever the user has any
         // non-empty selection. IntelliJ's keymap-driven Cmd-Opt-V / -C / -M
@@ -853,11 +1113,8 @@ pub fn compute_code_actions(
                     // single contiguous string with newlines elided so the
                     // generated `my $name = …` body is one line. Trim the
                     // block text and collapse whitespace runs.
-                    let joined: String = block
-                        .text
-                        .split_whitespace()
-                        .collect::<Vec<_>>()
-                        .join(" ");
+                    let joined: String =
+                        block.text.split_whitespace().collect::<Vec<_>>().join(" ");
                     // Use the first selected line as the anchor for the
                     // single-line action builders.
                     let first_line = nth_line(text, range.start.line as usize).unwrap_or("");
@@ -875,7 +1132,7 @@ pub fn compute_code_actions(
 /// Char-indexed UTF-16 slice of a single line. Used by the extract-variable
 /// and extract-constant builders so the replaced span aligns with what the
 /// client sees in the editor (LSP positions are UTF-16 code units).
-fn extract_selection_on_line<'a>(line_text: &'a str, start: u32, end: u32) -> Option<&'a str> {
+fn extract_selection_on_line(line_text: &str, start: u32, end: u32) -> Option<&str> {
     let utf16: Vec<u16> = line_text.encode_utf16().collect();
     let s = start.min(utf16.len() as u32) as usize;
     let e = end.min(utf16.len() as u32) as usize;
@@ -974,6 +1231,11 @@ fn extract_constant_action(
 /// Shared body of extract-variable and extract-constant. Inserts a
 /// declaration line above the selection (preserving the line's indent) and
 /// replaces the selection with `$name`.
+// `lsp_types::Uri` is immutable in practice but uses interior types that
+// trip clippy's mutable_key_type lint — the HashMap<Uri, _> pattern is
+// idiomatic across the LSP crate, so silence the false positive on each
+// fn that builds a `WorkspaceEdit`.
+#[allow(clippy::mutable_key_type)]
 fn extract_to_local(
     uri: &Uri,
     line_text: &str,
@@ -983,7 +1245,10 @@ fn extract_to_local(
     title: &str,
     frozen: bool,
 ) -> CodeActionOrCommand {
-    let leading_ws: String = line_text.chars().take_while(|c| c.is_whitespace()).collect();
+    let leading_ws: String = line_text
+        .chars()
+        .take_while(|c| c.is_whitespace())
+        .collect();
     let decl = if frozen {
         format!("{leading_ws}my frozen ${placeholder} = {selection}\n")
     } else {
@@ -991,8 +1256,14 @@ fn extract_to_local(
     };
     let insert = TextEdit {
         range: Range {
-            start: Position { line: range.start.line, character: 0 },
-            end: Position { line: range.start.line, character: 0 },
+            start: Position {
+                line: range.start.line,
+                character: 0,
+            },
+            end: Position {
+                line: range.start.line,
+                character: 0,
+            },
         },
         new_text: decl,
     };
@@ -1018,11 +1289,8 @@ fn extract_to_local(
     })
 }
 
-fn extract_function_action(
-    uri: &Uri,
-    range: Range,
-    block: &MultilineBlock,
-) -> CodeActionOrCommand {
+#[allow(clippy::mutable_key_type)]
+fn extract_function_action(uri: &Uri, range: Range, block: &MultilineBlock) -> CodeActionOrCommand {
     // Re-indent the selected body so the new fn keeps consistent leading
     // whitespace inside its braces (one extra `    ` past the call site).
     let body_indent = format!("{}    ", block.indent);
@@ -1048,8 +1316,14 @@ fn extract_function_action(
     );
     let insert_fn = TextEdit {
         range: Range {
-            start: Position { line: block.insertion_line, character: 0 },
-            end: Position { line: block.insertion_line, character: 0 },
+            start: Position {
+                line: block.insertion_line,
+                character: 0,
+            },
+            end: Position {
+                line: block.insertion_line,
+                character: 0,
+            },
         },
         new_text: fn_text,
     };
@@ -1078,8 +1352,12 @@ fn extract_function_action(
     })
 }
 
+#[allow(clippy::mutable_key_type)]
 fn wrap_in_p_action(uri: &Uri, line: u32, line_text: &str) -> CodeActionOrCommand {
-    let leading_ws: String = line_text.chars().take_while(|c| c.is_whitespace()).collect();
+    let leading_ws: String = line_text
+        .chars()
+        .take_while(|c| c.is_whitespace())
+        .collect();
     let body = line_text[leading_ws.len()..].trim_end();
     let new_text = format!("{leading_ws}p {body}");
     let edit = TextEdit {
@@ -1110,13 +1388,17 @@ fn wrap_in_p_action(uri: &Uri, line: u32, line_text: &str) -> CodeActionOrComman
     })
 }
 
+#[allow(clippy::mutable_key_type)]
 fn toggle_comment_action(uri: &Uri, line: u32, line_text: &str) -> CodeActionOrCommand {
     let trimmed = line_text.trim_start();
-    let leading_ws: String = line_text.chars().take_while(|c| c.is_whitespace()).collect();
-    let (new_text, title) = if trimmed.starts_with("# ") {
-        (format!("{leading_ws}{}", &trimmed[2..]), "Uncomment line")
-    } else if trimmed.starts_with('#') {
-        (format!("{leading_ws}{}", &trimmed[1..]), "Uncomment line")
+    let leading_ws: String = line_text
+        .chars()
+        .take_while(|c| c.is_whitespace())
+        .collect();
+    let (new_text, title) = if let Some(rest) = trimmed.strip_prefix("# ") {
+        (format!("{leading_ws}{rest}"), "Uncomment line")
+    } else if let Some(rest) = trimmed.strip_prefix('#') {
+        (format!("{leading_ws}{rest}"), "Uncomment line")
     } else {
         (format!("{leading_ws}# {trimmed}"), "Comment line")
     };
@@ -1265,10 +1547,10 @@ pub fn compute_folding_ranges(
         // Line comments — `# ... \n`. Track consecutive runs for fold.
         if b == b'#' {
             // Same line as a non-comment token? Don't start a run.
-            if col_is_zero || all_whitespace_before(bytes, i, line, &line_starts_cache(text)) {
-                if comment_run_start.is_none() {
-                    comment_run_start = Some(line);
-                }
+            if (col_is_zero || all_whitespace_before(bytes, i, line, &line_starts_cache(text)))
+                && comment_run_start.is_none()
+            {
+                comment_run_start = Some(line);
             }
             while i < bytes.len() && bytes[i] != b'\n' {
                 i += 1;
@@ -1298,7 +1580,11 @@ pub fn compute_folding_ranges(
                 // Comment run ends at any code.
                 if let Some(start) = comment_run_start.take() {
                     if line.saturating_sub(start) >= 3 {
-                        ranges.push(make_fold(start, line.saturating_sub(1), Some(FoldingRangeKind::Comment)));
+                        ranges.push(make_fold(
+                            start,
+                            line.saturating_sub(1),
+                            Some(FoldingRangeKind::Comment),
+                        ));
                     }
                 }
                 col_is_zero = false;
@@ -1308,7 +1594,11 @@ pub fn compute_folding_ranges(
             b'{' => {
                 if let Some(start) = comment_run_start.take() {
                     if line.saturating_sub(start) >= 3 {
-                        ranges.push(make_fold(start, line.saturating_sub(1), Some(FoldingRangeKind::Comment)));
+                        ranges.push(make_fold(
+                            start,
+                            line.saturating_sub(1),
+                            Some(FoldingRangeKind::Comment),
+                        ));
                     }
                 }
                 brace_stack.push(line);
@@ -1330,7 +1620,11 @@ pub fn compute_folding_ranges(
             _ => {
                 if let Some(start) = comment_run_start.take() {
                     if line.saturating_sub(start) >= 3 {
-                        ranges.push(make_fold(start, line.saturating_sub(1), Some(FoldingRangeKind::Comment)));
+                        ranges.push(make_fold(
+                            start,
+                            line.saturating_sub(1),
+                            Some(FoldingRangeKind::Comment),
+                        ));
                     }
                 }
                 col_is_zero = false;
@@ -1409,18 +1703,32 @@ pub fn compute_formatting(
         .last()
         .map(|l| l.encode_utf16().count() as u32)
         .unwrap_or(0);
-    let end_line = if text.ends_with('\n') { line_count } else { line_count.saturating_sub(1) };
+    let end_line = if text.ends_with('\n') {
+        line_count
+    } else {
+        line_count.saturating_sub(1)
+    };
     let end_char = if text.ends_with('\n') { 0 } else { last_char };
     vec![TextEdit {
         range: Range {
-            start: Position { line: 0, character: 0 },
-            end: Position { line: end_line, character: end_char },
+            start: Position {
+                line: 0,
+                character: 0,
+            },
+            end: Position {
+                line: end_line,
+                character: end_char,
+            },
         },
         new_text: formatted,
     }]
 }
 
 #[cfg(test)]
+// `lsp_types::Uri` is hashable but clippy flags it as a mutable key
+// type. Silenced at the module level so LSP-shaped `HashMap<Uri, _>`
+// reads in test bodies don't have to add per-site allows.
+#[allow(clippy::mutable_key_type)]
 mod tests {
     use super::*;
     use lsp_types::{CodeActionContext, TextDocumentIdentifier};
@@ -1437,7 +1745,10 @@ mod tests {
     }
 
     fn range(s_line: u32, s_char: u32, e_line: u32, e_char: u32) -> Range {
-        Range { start: pos(s_line, s_char), end: pos(e_line, e_char) }
+        Range {
+            start: pos(s_line, s_char),
+            end: pos(e_line, e_char),
+        }
     }
 
     fn code_actions(text: &str, r: Range) -> Vec<CodeActionOrCommand> {
@@ -1472,10 +1783,19 @@ mod tests {
     fn code_actions_for_empty_selection_are_line_local_only() {
         let actions = code_actions("my $x = 1 + 2\np $x\n", range(0, 0, 0, 0));
         let t = titles(&actions);
-        assert!(t.iter().any(|s| s.contains("Wrap line in")), "wrap-in-p offered");
-        assert!(t.iter().any(|s| s.contains("Comment line")), "toggle comment offered");
+        assert!(
+            t.iter().any(|s| s.contains("Wrap line in")),
+            "wrap-in-p offered"
+        );
+        assert!(
+            t.iter().any(|s| s.contains("Comment line")),
+            "toggle comment offered"
+        );
         // No refactorings on an empty range.
-        assert!(!t.iter().any(|s| s.contains("Extract")), "no Extract on empty range");
+        assert!(
+            !t.iter().any(|s| s.contains("Extract")),
+            "no Extract on empty range"
+        );
     }
 
     #[test]
@@ -1486,9 +1806,18 @@ mod tests {
         // for every shortcut to be functional.
         let actions = code_actions("my $x = 1 + 2\np $x\n", range(0, 8, 0, 13));
         let t = titles(&actions);
-        assert!(t.iter().any(|s| s.contains("Extract to variable")), "var: got {t:?}");
-        assert!(t.iter().any(|s| s.contains("Extract to constant")), "const: got {t:?}");
-        assert!(t.iter().any(|s| s.contains("Extract to function")), "fn: got {t:?}");
+        assert!(
+            t.iter().any(|s| s.contains("Extract to variable")),
+            "var: got {t:?}"
+        );
+        assert!(
+            t.iter().any(|s| s.contains("Extract to constant")),
+            "const: got {t:?}"
+        );
+        assert!(
+            t.iter().any(|s| s.contains("Extract to function")),
+            "fn: got {t:?}"
+        );
     }
 
     #[test]
@@ -1496,9 +1825,18 @@ mod tests {
         let text = "my $x = 1\nmy $y = 2\np $x + $y\n";
         let actions = code_actions(text, range(0, 0, 2, 9));
         let t = titles(&actions);
-        assert!(t.iter().any(|s| s.contains("Extract to function")), "fn: got {t:?}");
-        assert!(t.iter().any(|s| s.contains("Extract to variable")), "var: got {t:?}");
-        assert!(t.iter().any(|s| s.contains("Extract to constant")), "const: got {t:?}");
+        assert!(
+            t.iter().any(|s| s.contains("Extract to function")),
+            "fn: got {t:?}"
+        );
+        assert!(
+            t.iter().any(|s| s.contains("Extract to variable")),
+            "var: got {t:?}"
+        );
+        assert!(
+            t.iter().any(|s| s.contains("Extract to constant")),
+            "const: got {t:?}"
+        );
     }
 
     #[test]
@@ -1518,9 +1856,18 @@ mod tests {
         // Two edits: one inserts the decl line above, one replaces the
         // selection with the placeholder name.
         assert_eq!(edits.len(), 2, "two edits emitted");
-        let new_decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
-        assert!(new_decl.new_text.contains("$extracted"), "uses placeholder name");
-        assert!(new_decl.new_text.contains("1 + 2"), "captures the selected expression");
+        let new_decl = edits
+            .iter()
+            .find(|e| e.new_text.starts_with("my "))
+            .unwrap();
+        assert!(
+            new_decl.new_text.contains("$extracted"),
+            "uses placeholder name"
+        );
+        assert!(
+            new_decl.new_text.contains("1 + 2"),
+            "captures the selected expression"
+        );
         let replace = edits.iter().find(|e| e.new_text == "$extracted").unwrap();
         assert_eq!(replace.range.start.character, 8);
         assert_eq!(replace.range.end.character, 13);
@@ -1554,7 +1901,11 @@ mod tests {
         let ranges = fold_ranges(text);
         let pod = ranges.iter().find(|r| r.start_line == 0).expect("POD fold");
         assert_eq!(pod.end_line, 3, "POD ends at `=cut` line");
-        assert_eq!(pod.kind, Some(FoldingRangeKind::Comment), "marked as comment");
+        assert_eq!(
+            pod.kind,
+            Some(FoldingRangeKind::Comment),
+            "marked as comment"
+        );
     }
 
     #[test]
@@ -1577,7 +1928,10 @@ mod tests {
         let has_comment_fold = ranges
             .iter()
             .any(|r| r.start_line == 0 && r.kind == Some(FoldingRangeKind::Comment));
-        assert!(!has_comment_fold, "2 comment lines is below the fold threshold");
+        assert!(
+            !has_comment_fold,
+            "2 comment lines is below the fold threshold"
+        );
     }
 
     /// Braces inside string literals must not create ghost folds.
@@ -1625,7 +1979,10 @@ mod tests {
         let canonical_program = crate::parse_with_file(raw, "<t>").unwrap();
         let canonical = crate::fmt::format_program(&canonical_program);
         let edits = fmt_edits(&canonical);
-        assert!(edits.is_empty(), "no edits for canonical input: got {edits:?}");
+        assert!(
+            edits.is_empty(),
+            "no edits for canonical input: got {edits:?}"
+        );
     }
 
     /// Parse-error input returns an empty edit list rather than a partial
@@ -1684,7 +2041,10 @@ mod tests {
         // Snapshot the first few — full enumeration would just duplicate
         // the table; the exact ordering matters most at the head where
         // indices like TY_KEYWORD = 0 are hard-coded throughout.
-        assert_eq!(leg.token_types.first().unwrap(), &SemanticTokenType::KEYWORD);
+        assert_eq!(
+            leg.token_types.first().unwrap(),
+            &SemanticTokenType::KEYWORD
+        );
         assert_eq!(leg.token_types[1], SemanticTokenType::FUNCTION);
         assert_eq!(leg.token_types[2], SemanticTokenType::VARIABLE);
         assert!(leg.token_types.len() >= 10, "12 stable type slots");
@@ -1731,7 +2091,11 @@ mod tests {
             t.data,
         );
         // At least one string token (the literal runs around the interp).
-        assert!(types.contains(&4), "TY_STRING for literal run: {:?}", t.data);
+        assert!(
+            types.contains(&4),
+            "TY_STRING for literal run: {:?}",
+            t.data
+        );
         // The `#{` and `}` interp markers come through as operator tokens.
         assert!(
             types.iter().filter(|&&ty| ty == 7).count() >= 2,
@@ -1749,7 +2113,11 @@ mod tests {
         let t = compute_semantic_tokens(text);
         // No comment token leaks.
         let types: Vec<u32> = t.data.iter().map(|tok| tok.token_type).collect();
-        assert!(!types.contains(&6), "no comment inside string: {:?}", t.data);
+        assert!(
+            !types.contains(&6),
+            "no comment inside string: {:?}",
+            t.data
+        );
     }
 
     #[test]
@@ -1766,7 +2134,11 @@ mod tests {
             t.data,
         );
         // Plus at least one STRING token for the surrounding quote chars.
-        assert!(types.contains(&4), "expected TY_STRING somewhere: {:?}", t.data);
+        assert!(
+            types.contains(&4),
+            "expected TY_STRING somewhere: {:?}",
+            t.data
+        );
         // No comment leaks.
         assert!(!types.contains(&6), "no comment in string: {:?}", t.data);
     }
@@ -1790,9 +2162,7 @@ mod tests {
         let text = r#"p "got $h{key} done""#;
         let t = compute_semantic_tokens(text);
         // Variable tokens with length >= 4 (covers $h{ + key + })
-        let var_tokens: Vec<_> = t.data.iter()
-            .filter(|tok| tok.token_type == 2)
-            .collect();
+        let var_tokens: Vec<_> = t.data.iter().filter(|tok| tok.token_type == 2).collect();
         assert!(
             var_tokens.iter().any(|t| t.length >= 6),
             "expected a variable token covering `$h{{key}}` (>=6 chars): {:?}",
@@ -1805,12 +2175,126 @@ mod tests {
         // `"$h->{k}"` — the whole referent is one variable.
         let text = r#"p "got $h->{key} done""#;
         let t = compute_semantic_tokens(text);
-        let var_tokens: Vec<_> = t.data.iter()
-            .filter(|tok| tok.token_type == 2)
-            .collect();
+        let var_tokens: Vec<_> = t.data.iter().filter(|tok| tok.token_type == 2).collect();
         assert!(
             var_tokens.iter().any(|t| t.length >= 8),
             "expected a variable token covering `$h->{{key}}` (>=8 chars): {:?}",
+            t.data,
+        );
+    }
+
+    #[test]
+    fn percent_hash_variable_inside_string_emits_a_variable_token() {
+        // `"%h"` — `%h` should be a TY_VARIABLE token like `$h` / `@h`.
+        let text = r#"p "stats: %h end""#;
+        let t = compute_semantic_tokens(text);
+        let var_count = t.data.iter().filter(|tok| tok.token_type == 2).count();
+        assert!(
+            var_count >= 1,
+            "expected at least one TY_VARIABLE for `%h`: {:?}",
+            t.data,
+        );
+    }
+
+    #[test]
+    fn multiple_interpolations_on_one_line() {
+        // `"$a/$b/$c"` — three separate variable tokens interleaved with
+        // string literal runs. Exercises the delta-encoding inside the loop.
+        let text = r#"p "$a/$b/$c""#;
+        let t = compute_semantic_tokens(text);
+        let var_count = t.data.iter().filter(|tok| tok.token_type == 2).count();
+        assert_eq!(var_count, 3, "three variables: {:?}", t.data);
+    }
+
+    #[test]
+    fn escaped_quote_does_not_terminate_string() {
+        // `"a \" $b"` — the escaped quote must not end the string, so
+        // `$b` is still interpolated.
+        let text = r#"p "a \" $b done""#;
+        let t = compute_semantic_tokens(text);
+        let var_count = t.data.iter().filter(|tok| tok.token_type == 2).count();
+        assert_eq!(var_count, 1, "one var after escaped quote: {:?}", t.data);
+        // No comment leaks.
+        let types: Vec<u32> = t.data.iter().map(|tok| tok.token_type).collect();
+        assert!(!types.contains(&6));
+    }
+
+    #[test]
+    fn hash_interp_with_function_call_inside() {
+        // `"#{len(@xs)}"` — the interpolated expression is `len(@xs)`; the
+        // server emits `#{`/`}` as OPERATOR tokens and leaves the interior
+        // for the client. Exactly the contract `dollar_variable_inside_…`
+        // verifies, but for the more complex interp form the user just
+        // reported. Two OPERATOR tokens for `#{` and `}` mark the bounds.
+        let text = r#"p "got #{len(@xs)} items""#;
+        let t = compute_semantic_tokens(text);
+        let types: Vec<u32> = t.data.iter().map(|tok| tok.token_type).collect();
+        assert!(!types.contains(&6), "no comment: {:?}", t.data);
+        let op_count = types.iter().filter(|&&ty| ty == 7).count();
+        assert!(
+            op_count >= 2,
+            "expected `#{{` + `}}` operator tokens: {:?}",
+            t.data
+        );
+    }
+
+    #[test]
+    fn array_deref_interpolation_at_bracket_in_string() {
+        // `@{[FN()]}` — Perl-style array-deref interpolation. Must come
+        // through with TY_OPERATOR for `@{[` + `]}`, NOT as a single
+        // monolithic TY_VARIABLE token covering the entire `@{[FN()]}`
+        // expression. The bug was that the general `@{…}` block-deref
+        // branch swallowed the whole thing, killing hover on `FN`.
+        let text = r#"p "got @{[FN()]} items""#;
+        let t = compute_semantic_tokens(text);
+        let types: Vec<u32> = t.data.iter().map(|tok| tok.token_type).collect();
+        assert!(!types.contains(&6), "no comment in string: {:?}", t.data);
+        // Two OPERATOR tokens — one for `@{[`, one for `]}`.
+        let op_count = types.iter().filter(|&&ty| ty == 7).count();
+        assert!(
+            op_count >= 2,
+            "expected `@{{[` + `]}}` operator tokens; got {:?}",
+            t.data,
+        );
+        // No giant 8+ length VARIABLE token swallowing the whole interp.
+        let big_var = t
+            .data
+            .iter()
+            .any(|tok| tok.token_type == 2 && tok.length >= 8);
+        assert!(
+            !big_var,
+            "must not emit a single VARIABLE token covering all of `@{{[FN()]}}`: {:?}",
+            t.data,
+        );
+    }
+
+    #[test]
+    fn array_deref_interpolation_nested_brackets() {
+        // `@{[ FN([1,2]) ]}` — nested `[]` inside the interp must NOT
+        // close it early; depth tracking required.
+        let text = r#"p "h: @{[ FN([1,2]) ]} end""#;
+        let t = compute_semantic_tokens(text);
+        let types: Vec<u32> = t.data.iter().map(|tok| tok.token_type).collect();
+        assert!(!types.contains(&6), "no comment leak: {:?}", t.data);
+        let op_count = types.iter().filter(|&&ty| ty == 7).count();
+        assert!(
+            op_count >= 2,
+            "matched `@{{[` + `]}}` despite inner brackets: {:?}",
+            t.data,
+        );
+    }
+
+    #[test]
+    fn shebang_line_emits_a_comment_token() {
+        // `#!/usr/bin/env stryke` is a single comment line — the entire
+        // line must come out as one TY_COMMENT token, not a sequence of
+        // builtins / identifiers.
+        let text = "#!/usr/bin/env stryke\nmy $x = 1;";
+        let t = compute_semantic_tokens(text);
+        let first_line: Vec<_> = t.data.iter().take(1).collect();
+        assert!(
+            !first_line.is_empty() && first_line[0].token_type == 6,
+            "first token must be a comment for the shebang line: {:?}",
             t.data,
         );
     }
@@ -1822,7 +2306,11 @@ mod tests {
         let text = r#"my $x = 'hash # mark'"#;
         let t = compute_semantic_tokens(text);
         let types: Vec<u32> = t.data.iter().map(|tok| tok.token_type).collect();
-        assert!(!types.contains(&6), "no comment in single-quote string: {:?}", t.data);
+        assert!(
+            !types.contains(&6),
+            "no comment in single-quote string: {:?}",
+            t.data
+        );
         assert!(types.contains(&4), "string token emitted: {:?}", t.data);
     }
 
@@ -1834,7 +2322,10 @@ mod tests {
     #[test]
     fn signature_help_tracks_active_param_index() {
         let text = "say(a, b, c"; // cursor right after the last `c`
-        let pos = Position { line: 0, character: 11 };
+        let pos = Position {
+            line: 0,
+            character: 11,
+        };
         let params = lsp_types::SignatureHelpParams {
             text_document_position_params: lsp_types::TextDocumentPositionParams {
                 text_document: TextDocumentIdentifier {
@@ -1853,13 +2344,20 @@ mod tests {
         let h = help.unwrap();
         // Three commas not seen (we're inside the 3rd arg) ⇒ active_param = 2
         // (0-indexed: a=0, b=1, c=2).
-        assert_eq!(h.active_parameter, Some(2), "active param = 2 inside 3rd arg");
+        assert_eq!(
+            h.active_parameter,
+            Some(2),
+            "active param = 2 inside 3rd arg"
+        );
     }
 
     #[test]
     fn signature_help_returns_none_outside_call() {
         let text = "my $x = 1";
-        let pos = Position { line: 0, character: 9 };
+        let pos = Position {
+            line: 0,
+            character: 9,
+        };
         let params = lsp_types::SignatureHelpParams {
             text_document_position_params: lsp_types::TextDocumentPositionParams {
                 text_document: TextDocumentIdentifier {

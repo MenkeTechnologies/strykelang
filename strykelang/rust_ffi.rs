@@ -137,7 +137,11 @@ fn registry() -> &'static Arc<Mutex<Registry>> {
 
 /// Lookup hook: returns `Some(Ok(result))` if `name` is a registered FFI function,
 /// `None` otherwise. Called from [`crate::builtins::try_builtin`]'s fallback arm.
-pub fn try_call(name: &str, args: &[StrykeValue], line: usize) -> Option<StrykeResult<StrykeValue>> {
+pub fn try_call(
+    name: &str,
+    args: &[StrykeValue],
+    line: usize,
+) -> Option<StrykeResult<StrykeValue>> {
     let entry = {
         let guard = registry().lock();
         guard.entries.get(name).cloned()?

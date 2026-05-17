@@ -9563,22 +9563,20 @@ literal line
     /// `self.line`, the compiled chunk's `lines[]` matches the source.
     #[test]
     fn class_field_emits_correct_op_lines_for_subsequent_statements() {
-        let chunk = compile_snippet(
-            "class Foo {\n    x: Int\n}\nmy $y = 1\np $y\n",
-        )
-        .expect("compile");
+        let chunk =
+            compile_snippet("class Foo {\n    x: Int\n}\nmy $y = 1\np $y\n").expect("compile");
         // `my $y = 1` is at source line 4. Find any op with line 4 — it
         // proves the compiler emitted bytecode for that statement on the
         // correct source line. Before the fix, line 4 would not appear
         // (the ops would carry line 5 instead).
-        let has_line_4 = chunk.lines.iter().any(|&l| l == 4);
+        let has_line_4 = chunk.lines.contains(&4);
         assert!(
             has_line_4,
             "expected at least one op tagged with source line 4 (my $y = 1), got lines {:?}",
             chunk.lines
         );
         // And `p $y` is at line 5; same regression catch.
-        let has_line_5 = chunk.lines.iter().any(|&l| l == 5);
+        let has_line_5 = chunk.lines.contains(&5);
         assert!(
             has_line_5,
             "expected at least one op tagged with source line 5 (p $y), got lines {:?}",
@@ -9587,7 +9585,7 @@ literal line
         // And the inverse — *no* op should be on line 6 (file only has
         // 5 logical lines plus a trailing newline). A line-6 op means the
         // counter drifted past the file.
-        let has_line_6 = chunk.lines.iter().any(|&l| l == 6);
+        let has_line_6 = chunk.lines.contains(&6);
         assert!(
             !has_line_6,
             "no op should report line 6 in a 5-line file; lines {:?}",
@@ -9607,13 +9605,16 @@ literal line
         // `p $a` at line 7; `p $b` at line 8.
         for expected in [5, 6, 7, 8] {
             assert!(
-                chunk.lines.iter().any(|&l| l == expected),
+                chunk.lines.contains(&expected),
                 "expected an op on line {expected}, got {:?}",
                 chunk.lines
             );
         }
         // And no op past the end of the file.
         let max_line = chunk.lines.iter().copied().max().unwrap_or(0);
-        assert!(max_line <= 8, "no op past source line 8: max was {max_line}");
+        assert!(
+            max_line <= 8,
+            "no op past source line 8: max was {max_line}"
+        );
     }
 }

@@ -2158,7 +2158,7 @@ mod tests {
         let xs = as_vec_f64(&r);
         assert_eq!(xs.len(), 100);
         for v in xs {
-            assert!(v >= 1.0 && v <= 5.0);
+            assert!((1.0..=5.0).contains(&v));
         }
     }
 }

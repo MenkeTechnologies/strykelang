@@ -1146,7 +1146,10 @@ mod tests {
         let s = specs(&["count|n=i", "rate=f"]);
         let out = call(&[a, s]).unwrap();
         assert_eq!(hget(&out, "count").to_int(), 42);
-        assert!((hget(&out, "rate").to_number() - 3.14).abs() < 1e-9);
+        // The literal `3.14` is sample input data, not meant to approximate π.
+        #[allow(clippy::approx_constant)]
+        let expected = 3.14_f64;
+        assert!((hget(&out, "rate").to_number() - expected).abs() < 1e-9);
     }
 
     #[test]

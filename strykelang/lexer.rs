@@ -2320,7 +2320,7 @@ impl Lexer {
                             self.skip_whitespace_only();
                             let bare = match self.peek() {
                                 None => true,
-                                Some(c) if matches!(c, ',' | ';' | ')' | ']' | '}' | '(') => true,
+                                Some(',' | ';' | ')' | ']' | '}' | '(') => true,
                                 Some('=') if self.peek_at(1) == Some('>') => true,
                                 Some(c) if !c.is_alphabetic() && c != '_' => true,
                                 _ => false,
@@ -4048,6 +4048,9 @@ my $x = 1
             .find(|(tok, _)| !matches!(tok, Token::Eof))
             .expect("non-empty tokens");
         assert!(matches!(first_tok, Token::Ident(ref s) if s == "my"));
-        assert_eq!(*first_line, 5, "my $x lives on source line 5 (after POD ends)");
+        assert_eq!(
+            *first_line, 5,
+            "my $x lives on source line 5 (after POD ends)"
+        );
     }
 }

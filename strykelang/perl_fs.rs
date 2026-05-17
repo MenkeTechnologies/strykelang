@@ -8,9 +8,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 
-use parking_lot::Mutex;
 use crate::pmap_progress::PmapProgress;
 use crate::value::StrykeValue;
+use parking_lot::Mutex;
 
 /// zshrs `glob()` and [`StrykeGlobOptsGuard`] both touch zshrs process-global option
 /// state. `glob_par` invokes `stryke_glob` from rayon workers while other threads run
@@ -136,7 +136,11 @@ pub(crate) fn stryke_glob(pattern: &str) -> Vec<String> {
                 {
                     if let Some(rest) = p.strip_prefix(pref) {
                         let r = rest.trim_start_matches('/');
-                        return if r.is_empty() { ".".to_string() } else { r.to_string() };
+                        return if r.is_empty() {
+                            ".".to_string()
+                        } else {
+                            r.to_string()
+                        };
                     }
                 }
                 p

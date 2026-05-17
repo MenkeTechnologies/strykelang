@@ -204,7 +204,11 @@ impl Debugger {
         }
 
         if std::env::var("STRYKE_DBG_TRACE").is_ok() {
-            eprintln!("[ss] line={} bp_set={:?}", line, self.breakpoints.iter().collect::<Vec<_>>());
+            eprintln!(
+                "[ss] line={} bp_set={:?}",
+                line,
+                self.breakpoints.iter().collect::<Vec<_>>()
+            );
         }
 
         // Line 0 is the VM's "no source mapping" sentinel — synthetic teardown

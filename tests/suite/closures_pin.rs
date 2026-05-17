@@ -2,6 +2,7 @@
 //!   * `my $x = ...` is captured **by value** at closure creation.
 //!   * `mysync $x = ...` is captured **by reference** (mutations
 //!     visible across closure boundaries).
+//!
 //! This split is load-bearing for AOP advice + parallel primitives.
 
 use crate::common::*;

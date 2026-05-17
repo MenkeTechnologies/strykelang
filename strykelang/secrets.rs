@@ -99,10 +99,9 @@ pub fn secrets_encrypt(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
         .map(|v| v.to_string())
         .ok_or_else(|| StrykeError::runtime("secrets_encrypt: plaintext required", line))?;
     let opts = parse_opts(&args[1..]);
-    let key_str = opts
-        .get("key")
-        .map(|v| v.to_string())
-        .ok_or_else(|| StrykeError::runtime("secrets_encrypt: key => $32byte_key required", line))?;
+    let key_str = opts.get("key").map(|v| v.to_string()).ok_or_else(|| {
+        StrykeError::runtime("secrets_encrypt: key => $32byte_key required", line)
+    })?;
     let key_bytes = decode_key(&key_str, "secrets_encrypt", line)?;
 
     let cipher = Aes256Gcm::new_from_slice(&key_bytes)
@@ -130,10 +129,9 @@ pub fn secrets_decrypt(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
         .map(|v| v.to_string())
         .ok_or_else(|| StrykeError::runtime("secrets_decrypt: envelope required", line))?;
     let opts = parse_opts(&args[1..]);
-    let key_str = opts
-        .get("key")
-        .map(|v| v.to_string())
-        .ok_or_else(|| StrykeError::runtime("secrets_decrypt: key => $32byte_key required", line))?;
+    let key_str = opts.get("key").map(|v| v.to_string()).ok_or_else(|| {
+        StrykeError::runtime("secrets_decrypt: key => $32byte_key required", line)
+    })?;
     let key_bytes = decode_key(&key_str, "secrets_decrypt", line)?;
 
     let raw = match base64::engine::general_purpose::STANDARD.decode(envelope.as_bytes()) {

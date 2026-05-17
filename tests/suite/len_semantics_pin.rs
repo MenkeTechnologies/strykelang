@@ -141,10 +141,7 @@ fn pipe_forward_into_len_works_on_string() {
 
 #[test]
 fn pipe_forward_into_len_chains_with_grep() {
-    assert_eq!(
-        eval_int("(1:10) |> grep { _ % 2 == 0 } |> len"),
-        5
-    );
+    assert_eq!(eval_int("(1:10) |> grep { _ % 2 == 0 } |> len"), 5);
 }
 
 // ── Hands-off the dispatch path ───────────────────────────────────────

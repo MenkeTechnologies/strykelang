@@ -8,7 +8,7 @@ use parking_lot::Mutex;
 use crate::ast::Expr;
 use crate::error::{StrykeError, StrykeResult};
 use crate::scope::{AtomicArray, AtomicHash};
-use crate::value::{StrykeIterator, StrykeSub, PipelineOp, StrykeValue};
+use crate::value::{PipelineOp, StrykeIterator, StrykeSub, StrykeValue};
 use crate::vm_helper::{FlowOrError, VMHelper, WantarrayCtx};
 
 struct VecPullIter {
