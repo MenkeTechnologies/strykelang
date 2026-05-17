@@ -37,7 +37,7 @@ fn MC::trials($n, $k) {
 }
 
 # Mean of arrayref.
-fn MC::mean($xs) = sum(@$xs) / len(@$xs)
+fn MC::mean = sum(@{$_0}) / len(@{$_0})
 
 # Sample variance via Bessel's correction (n-1 denominator).
 fn MC::var($xs) {

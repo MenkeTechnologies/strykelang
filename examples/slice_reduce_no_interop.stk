@@ -72,7 +72,7 @@ die "prefix-sums" unless "@$sums" eq "1 3 6 10 15"
 
 p ""
 p "── 5. frequency hashref via reduce + hashref accumulator ──"
-fn Stat::freq_via_reduce($xs) = reduce { $_0->{$_1}++; $_0 } +{}, @$xs
+fn Stat::freq_via_reduce = reduce { $_0->{$_1}++; $_0 } +{}, @{$_0}
 my $freq = Stat::freq_via_reduce(["apple", "banana", "apple", "cherry", "banana", "apple"])
 for my $k (sort keys %$freq) {
     printf("  %-10s %d\n", $k, $freq->{$k})
