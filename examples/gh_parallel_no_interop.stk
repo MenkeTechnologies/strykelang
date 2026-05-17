@@ -1,0 +1,79 @@
+#!/usr/bin/env stryke
+
+# Demo: pair `gh_*` REST builtins with `pmap` for parallel GitHub queries.
+#
+# IMPORTANT: this script needs network access (`api.github.com`). Set
+# `STRYKE_SKIP_NETWORK=1` in your env (CI does this by default) to short-
+# circuit and exit 0 without hitting the wire — the script then only
+# verifies the builtins are reflected in `%b`.
+#
+# Without the skip flag the demo:
+#   1. Lists all public repos for the `MenkeTechnologies` user
+#   2. pmap-fetches stargazer count + language for each in parallel
+#   3. Histograms languages with `freq`
+#   4. Prints top-10 starred repos
+#
+# Auth: set `GITHUB_TOKEN` to bump from 60 → 5000 req/hour. Not required.
+#
+# Run: stryke --no-interop examples/gh_parallel_no_interop.stk
+
+# ── 0. wiring check (always runs, no network needed) ─────────────────────────
+my %builtins = %stryke::builtins
+my @must_exist = qw(
+    gh_get gh_user gh_org gh_repo gh_repos gh_rate_limit gh_zen
+    gh_issues gh_prs gh_commits gh_branches gh_tags gh_releases
+    gh_languages gh_topics gh_readme gh_search_repos
+)
+for my $name (@must_exist) {
+    die "$name not in %builtins — gh_* wiring broken" unless exists $builtins{$name}
+}
+p "  wiring: " . len(@must_exist) . "/" . len(@must_exist) . " gh_* names present in %builtins"
+
+# ── 1. CI / offline short-circuit ────────────────────────────────────────────
+if ($ENV{STRYKE_SKIP_NETWORK}) {
+    p "  STRYKE_SKIP_NETWORK set — skipping network portion (CI-safe)"
+    p ""
+    p "  ALL PASS  (wiring check only)"
+    exit 0
+}
+
+# ── 2. enumerate user repos ──────────────────────────────────────────────────
+p ""
+p "── fetching repos for MenkeTechnologies ──"
+my @repos = gh_repos("MenkeTechnologies")
+p "  total repos: " . len(@repos)
+die "expected at least 100 repos" unless len(@repos) >= 100
+
+# ── 3. parallel fetch of full repo details for top-N by star ────────────────
+p ""
+p "── top-10 repos by stars (parallel detail fetch) ──"
+my @top10 = (sort { _1->{stargazers_count} <=> _0->{stargazers_count} } @repos)[0:9]
+my @full = pmap { gh_repo($_->{full_name}) } @top10
+printf("  %-30s  %-12s  %5s\n", "repo", "lang", "★")
+printf("  %s\n", "─" x 55)
+for my $r (@full) {
+    printf("  %-30s  %-12s  %5d\n",
+        $r->{name},
+        $r->{language} || "-",
+        $r->{stargazers_count})
+}
+
+# ── 4. language breakdown across the WHOLE repo set ──────────────────────────
+p ""
+p "── language histogram (across all repos) ──"
+my $by_lang = freq(map { _->{language} || "unknown" } @repos)
+my @sorted = sort { $by_lang->{_1} <=> $by_lang->{_0} } keys %$by_lang
+for my $k (@sorted[0:9]) {
+    printf("  %-16s  %4d\n", $k, $by_lang->{$k})
+}
+
+# ── 5. rate-limit footer ─────────────────────────────────────────────────────
+p ""
+my $rl = gh_rate_limit()
+printf("  api budget: %d/%d remaining (resets in %ds)\n",
+    $rl->{rate}{remaining},
+    $rl->{rate}{limit},
+    $rl->{rate}{reset} - time)
+
+p ""
+p "  ALL PASS"

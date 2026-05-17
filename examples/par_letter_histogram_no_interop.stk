@@ -1,0 +1,56 @@
+#!/usr/bin/env stryke
+
+# Parallel histogram across a multi-paragraph corpus, built three different
+# ways — sequential, prefix `par`, and `~p>` chunk-parallel macro — with
+# assertion that all three converge to the same letter frequencies.
+#
+# Demonstrates:
+#   * `par { letters }` returns a flat list that downstream `freq` consumes
+#   * `~p>` auto-merges hash<num> outputs key-wise with `+`
+#   * All three approaches must produce IDENTICAL hashrefs
+#
+# Run: stryke --no-interop examples/par_letter_histogram_no_interop.stk
+
+my $text = q{
+The quick brown fox jumps over the lazy dog.
+Sphinx of black quartz, judge my vow.
+Pack my box with five dozen liquor jugs.
+How vexingly quick daft zebras jump.
+Waltz, bad nymph, for quick jigs vex.
+}
+
+# ── 1. Sequential baseline ───────────────────────────────────────────────────
+my $seq = freq(letters $text)
+
+# ── 2. Top-level prefix par ──────────────────────────────────────────────────
+my @letters_par = par { letters } $text
+my $par = freq(@letters_par)
+
+# ── 3. Chunk-parallel `~p>` macro with auto-merge ───────────────────────────
+my $pmacro = ~p> $text letters freq
+
+# ── 4. Cross-check: identical keys + identical values ────────────────────────
+fn Hist::assert_same($name, $h1, $h2) {
+    my @ka = sort keys %$h1
+    my @kb = sort keys %$h2
+    die "$name: key set differs" unless "@ka" eq "@kb"
+    for my $k (@ka) {
+        die "$name: count of '$k' differs ($h1->{$k} vs $h2->{$k})" unless $h1->{$k} == $h2->{$k}
+    }
+}
+
+Hist::assert_same("seq vs par",    $seq, $par)
+Hist::assert_same("seq vs pmacro", $seq, $pmacro)
+
+# ── 5. Print top-5 letters ──────────────────────────────────────────────────
+p "── all three approaches converge — top-5 letters ──"
+my @top = (sort { $seq->{$_1} <=> $seq->{$_0} } keys %$seq)[0:4]
+for my $k (@top) {
+    printf("  %s  %3d\n", $k, $seq->{$k})
+}
+
+p ""
+p "  letters total: " . sum(values %$seq)
+p "  distinct:      " . len(keys %$seq)
+p ""
+p "  ALL PASS  (seq, par, ~p> all agree)"

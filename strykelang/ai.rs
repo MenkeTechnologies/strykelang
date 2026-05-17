@@ -479,7 +479,7 @@ struct AnthropicStreamIter {
     model: String,
 }
 
-impl crate::value::PerlIterator for AnthropicStreamIter {
+impl crate::value::StrykeIterator for AnthropicStreamIter {
     fn next_item(&self) -> Option<StrykeValue> {
         use std::io::BufRead;
         if *self.done.lock() {
@@ -547,7 +547,7 @@ fn make_string_chunked_iter(s: String) -> StrykeValue {
     struct Iter {
         chars: parking_lot::Mutex<std::collections::VecDeque<char>>,
     }
-    impl crate::value::PerlIterator for Iter {
+    impl crate::value::StrykeIterator for Iter {
         fn next_item(&self) -> Option<StrykeValue> {
             self.chars
                 .lock()
@@ -1830,7 +1830,7 @@ struct CompiledTool {
     description: String,
     input_schema: serde_json::Value,
     /// Stryke coderef for explicit/registered tools.
-    run_sub: Option<Arc<crate::value::PerlSub>>,
+    run_sub: Option<Arc<crate::value::StrykeSub>>,
     /// (handle_id, server-side tool name) for MCP-routed tools.
     mcp_handle_id: Option<(u64, String)>,
     /// Built-in native tool registry id (web_search, fetch_url, etc.)
@@ -2643,7 +2643,7 @@ pub(crate) struct RegisteredTool {
     pub name: String,
     pub description: String,
     pub parameters: StrykeValue,
-    pub run_sub: Arc<crate::value::PerlSub>,
+    pub run_sub: Arc<crate::value::StrykeSub>,
 }
 
 static REGISTERED: OnceLock<Mutex<Vec<RegisteredTool>>> = OnceLock::new();
@@ -3181,7 +3181,7 @@ impl VMHelper {
         &mut self,
         prompt: &str,
         opts: IndexMap<String, StrykeValue>,
-        on_chunk_sub: &Arc<crate::value::PerlSub>,
+        on_chunk_sub: &Arc<crate::value::StrykeSub>,
         line: usize,
     ) -> Result<StrykeValue> {
         let model = opt_str(&opts, "model", &config().lock().model);

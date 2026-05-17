@@ -79,7 +79,7 @@ ai_memory_count() |> aeq 0, "ai_memory_count after clear"
 # `ai_budget` requires a coderef body it runs under the cap; calling it
 # without one is invalid. Demonstrate the proper shape, then check
 # `ai_cost()` returns a numeric usd field afterwards.
-ai_budget(10.0, sub { 1 })
+ai_budget(10.0, fn { 1 })
 ai_cost()->{usd} |> { _ >= 0 } |> aok "ai_cost is numeric"
 
 # ── 6. MCP (Model Context Protocol) ─────────────────────────────────────────

@@ -1,0 +1,59 @@
+#!/usr/bin/env stryke
+
+# Demo: the three callable shapes of `par { ... }`.
+#
+#   1. Top-level PREFIX form     — `par { BLOCK } LIST` yields a flat list
+#   2. Top-level POSTFIX form    — `{ BLOCK } par LIST` runs as a statement
+#                                  (side-effecting, no return binding)
+#   3. Thread-macro stage        — `~> SRC par { BLOCK }` inside `~>`/`~>>`
+#
+# All three feed the same `ExprKind::ParExpr` runtime path. Each chunk
+# runs on a fresh sub-VM with the chunk bound to `_` and `_0`. Below the
+# chunk threshold the runtime collapses to a single chunk — results are
+# identical to the serial spelling.
+#
+# Run: stryke --no-interop examples/par_top_level_no_interop.stk
+
+p "── 1. prefix form  →  par { BLOCK } LIST ──"
+my @letters = par { letters } "Hello, World 123"
+p "  letters: @letters"
+die "expected 10 letters, got " . len(@letters) unless len(@letters) == 10
+
+# Chain a `|>` onto the prefix-form result; the flat list flows in.
+my $n = par { letters } "abc def" |> len
+p "  chained len: $n"
+die "expected 6 from chained len, got $n" unless $n == 6
+
+# Parallel `letters` over a longer string — same shape, just bigger input.
+my @big = par { letters } "Aardvarks Eat Quietly Underneath Big Crooked Yew Trees"
+p "  big letters n = " . len(@big)
+die "expected 47 letters" unless len(@big) == 47
+
+p ""
+p "── 2. postfix form  →  { BLOCK } par LIST  (statement-level) ──"
+my $log_chunks = 0
+{ $log_chunks++ } par "abc def"
+p "  postfix block fired #{$log_chunks} chunk(s)"
+die "expected at least one chunk" unless $log_chunks >= 1
+
+# Postfix is side-effecting — accumulate into an outer hash.
+my %seen
+{ for my $c (split //, _) { $seen{$c}++ } } par "abracadabra"
+p "  unique chars seen: " . len(keys %seen)
+die "expected 5 unique chars (a b r c d)" unless len(keys %seen) == 5
+
+p ""
+p "── 3. thread-macro stage  →  ~> SRC par { BLOCK } ──"
+my @macro_letters = ~> "Hello, World 123" par { letters }
+p "  macro letters: @macro_letters"
+die "macro stage must match prefix form" unless "@macro_letters" eq "@letters"
+
+# Chunk-parallel letter extraction across a multi-clause sentence, then a
+# sequential `freq` to histogram the result. Demonstrates that `par`
+# auto-flattens chunk outputs into a single list that downstream stages see.
+my $hist = ~> "abracadabra was the magic word" par { letters } |> freq
+p "  letter freq keys: " . len(keys %$hist)
+die "expected 'a' to dominate the histogram" unless $hist->{a} >= 6
+
+p ""
+p "  ALL PASS  (prefix list / postfix stmt / macro-stage all converge)"

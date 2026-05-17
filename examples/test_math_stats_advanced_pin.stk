@@ -68,7 +68,7 @@ hhi(0.3, 0.3, 0.4) |> aeq 0.34, "BUG-169 (FIXED): hhi variadic sums squares of a
 # BUG-170 (FIXED): moving_average now accepts either (WINDOW, LIST) or
 # (LIST, WINDOW). When WINDOW > len, returns an empty list.
 my @ma_170 = moving_average([1,2,3], 5)
-scalar(@ma_170) |> aeq 0, "BUG-170 (FIXED): moving_average(LIST, WINDOW); WINDOW > len → empty"
+len(@ma_170) |> aeq 0, "BUG-170 (FIXED): moving_average(LIST, WINDOW); WINDOW > len → empty"
 
 # BUG-176: base_convert(255, 16) parses "255" as base-16 -> 597
 base_convert(255, 16) |> aeq 597, "BUG-176: base_convert two-arg numeric parses as FROM radix"

@@ -11,7 +11,7 @@ use crossbeam::channel::{unbounded, Receiver, Sender};
 
 use crate::error::{StrykeError, StrykeResult};
 use crate::scope::{AtomicArray, AtomicHash};
-use crate::value::{PerlPpool, PerlSub, StrykeValue};
+use crate::value::{PerlPpool, StrykeSub, StrykeValue};
 use crate::vm_helper::{Flow, FlowOrError, VMHelper};
 
 /// Shared pool state (jobs in, results out-of-order; `PerlPpool::collect` reorders).
@@ -27,9 +27,9 @@ pub struct PpoolInner {
 
 pub(crate) struct PoolJob {
     order: u64,
-    sub: Arc<PerlSub>,
+    sub: Arc<StrykeSub>,
     arg: StrykeValue,
-    subs: HashMap<String, Arc<PerlSub>>,
+    subs: HashMap<String, Arc<StrykeSub>>,
     capture: Vec<(String, StrykeValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,
@@ -241,7 +241,7 @@ mod tests {
             _ => panic!("expected block"),
         };
 
-        let sub_val = StrykeValue::code_ref(Arc::new(PerlSub {
+        let sub_val = StrykeValue::code_ref(Arc::new(StrykeSub {
             name: "anon".to_string(),
             params: vec![],
             body,

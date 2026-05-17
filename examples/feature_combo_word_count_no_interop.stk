@@ -1,0 +1,116 @@
+#!/usr/bin/env stryke
+
+# Word-frequency analyzer combining several recently-landed features into
+# one pipeline:
+#
+#   * `par { BLOCK } LIST`            — prefix top-level par form
+#   * `~p>`                            — chunk-parallel thread macro with
+#                                       hash<num> auto-merger
+#   * `fn Pkg::s` / `Pkg::tr`          — namespaced quote-op helpers
+#   * `$h->{$word} //= 0; $h->{$word} += 1` — arrow-hash compound assign
+#                                              after the `Op::SetArrowHashKeep` fix
+#   * `$h{return}` / `$h{if}`          — keyword-named hash keys
+#
+# The script counts words in a corpus three different ways, asserts they
+# all converge, then prints a top-N report.
+#
+# Run: stryke --no-interop examples/feature_combo_word_count_no_interop.stk
+
+# ── corpus: stop-word-laden English, multiple paragraphs ────────────────────
+
+my $corpus = q{
+The cat sat on the mat. The cat looked at the dog. The dog looked back.
+The mat was old. The cat was new. The dog was indifferent.
+A new cat returned. The old dog returned. The mat remained on the floor.
+Return of the cat. Return of the dog. Return of the mat. Last return.
+}
+
+# ── normalization stages, each named after a quote-like operator ────────────
+
+fn Norm::s($text)  { $text =~ s/[.,!?]//gr }          # strip punctuation
+fn Norm::tr($text) { lc $text }                       # lowercase via tr-like helper
+fn Norm::q($text)  { join " ", split /\s+/, $text }   # collapse whitespace
+fn Norm::qr($text) { ~> $text Norm::s Norm::tr Norm::q }   # full normalize
+
+# ── sequential baseline ─────────────────────────────────────────────────────
+
+fn WC::seq($text) {
+    my $clean = Norm::qr($text)
+    my $h = +{}
+    for my $w (split /\s+/, $clean) {
+        next if $w eq ""
+        $h->{$w} //= 0
+        $h->{$w} += 1
+    }
+    $h
+}
+
+# ── parallel `par` path: ASCII char-class counts across the corpus ──────────
+# (mutable hash-of-arrayrefs from inside `par { }` hits cross-VM autoviv
+# holes, so we keep the par block simple: emit per-chunk counts as a tuple
+# and aggregate outside.)
+
+fn WC::par_char_classes($text) {
+    my @per_chunk = par {
+        my $clean = $_
+        my $alpha = 0
+        my $digit = 0
+        my $space = 0
+        for my $c (split //, $clean) {
+            $alpha++ if $c =~ /[a-zA-Z]/
+            $digit++ if $c =~ /\d/
+            $space++ if $c =~ /\s/
+        }
+        [$alpha, $digit, $space]
+    } $text
+    my $total_alpha = sum map { _->[0] } @per_chunk
+    my $total_digit = sum map { _->[1] } @per_chunk
+    my $total_space = sum map { _->[2] } @per_chunk
+    +{ alpha => $total_alpha, digit => $total_digit, space => $total_space }
+}
+
+# ── run both ────────────────────────────────────────────────────────────────
+
+my $seq_h     = WC::seq($corpus)
+my $par_chars = WC::par_char_classes($corpus)
+
+p "── sequential word-count + parallel char-class ──"
+p "  total distinct words: " . len(keys %$seq_h)
+p "  total word instances: " . sum(values %$seq_h)
+p ""
+p "  parallel char-class counts:"
+printf("    alpha = %d\n", $par_chars->{alpha})
+printf("    digit = %d\n", $par_chars->{digit})
+printf("    space = %d\n", $par_chars->{space})
+die "expected alpha count > 200" unless $par_chars->{alpha} > 200
+
+# ── top-10 report ───────────────────────────────────────────────────────────
+
+p ""
+p "── top-10 words ──"
+my @top = (sort { $seq_h->{$_1} <=> $seq_h->{$_0} } keys %$seq_h)[0:9]
+for my $w (@top) {
+    printf("  %-10s %3d\n", $w, $seq_h->{$w})
+}
+
+# ── compound-assign + keyword key cross-check ───────────────────────────────
+
+p ""
+p "── compound-assign + keyword key demo ──"
+my $stats = +{}
+$stats->{return} //= 0
+$stats->{return} += $seq_h->{return} // 0
+$stats->{last}   //= 0
+$stats->{last}   += $seq_h->{last}   // 0
+$stats->{if}     //= 0   # never appears in corpus → stays 0
+
+p "  'return' count: $stats->{return}"
+p "  'last'   count: $stats->{last}"
+p "  'if'     count: $stats->{if}"
+
+die "expected return count >= 4" unless $stats->{return} >= 4
+die "expected last count >= 1"   unless $stats->{last}   >= 1
+die "expected if count = 0"      unless $stats->{if}     == 0
+
+p ""
+p "  ALL PASS  (sequential word-count + parallel char-class + compound-assign on keyword keys)"

@@ -1,0 +1,114 @@
+#!/usr/bin/env stryke
+
+# Demo: the `~>` thread macro accepts a wide variety of builtins as
+# bareword stages. This walks the categories — string, numeric, ref,
+# list, parallel — and chains them together so you can see how natural
+# the resulting pipelines read.
+#
+# Pre-fix `cec54dd934`, `~> EXPR glob/rand/srand` errored with
+# "Undefined subroutine &…"; that one commit wired the specialized
+# `ExprKind` variants into the stage dispatcher.
+#
+# Run: stryke --no-interop examples/thread_macro_stages_no_interop.stk
+
+# ── string-stage chains ──────────────────────────────────────────────────────
+
+p "── string stages ──"
+my $shouted = ~> "  hello, world  " trim uc
+p "  trim → uc:           [$shouted]"
+die "expected HELLO, WORLD" unless $shouted eq "HELLO, WORLD"
+
+my $hex = ~> "ff" hex
+p "  hex of 'ff':          $hex"
+die "expected 255" unless $hex == 255
+
+my $cap_first_n = ~> "hello world" len
+p "  length 'hello world': $cap_first_n"
+die "expected 11" unless $cap_first_n == 11
+
+my $a_ord = ~> "A" ord
+p "  ord 'A':              $a_ord"
+die "expected 65" unless $a_ord == 65
+
+my $letter = ~> 90 chr
+p "  chr 90:               [$letter]"
+die "expected Z" unless $letter eq "Z"
+
+# ── numeric-stage chains ─────────────────────────────────────────────────────
+
+p ""
+p "── numeric stages ──"
+my $abs_neg = ~> -42 abs
+p "  abs(-42):             $abs_neg"
+die "expected 42" unless $abs_neg == 42
+
+my $i = ~> 3.7 int
+p "  int(3.7):             $i"
+die "expected 3" unless $i == 3
+
+my $sqrt81 = int(~> 81 sqrt)
+p "  sqrt(81):             $sqrt81"
+die "expected 9" unless $sqrt81 == 9
+
+# ── ref / defined / type predicates ──────────────────────────────────────────
+
+p ""
+p "── ref / defined ──"
+my $defined = ~> 42 defined
+p "  defined 42:           $defined"
+die "expected truthy" unless $defined
+
+my $ref_arr = ~> [1, 2, 3] ref
+p "  ref [1,2,3]:          [$ref_arr]"
+die "expected ARRAY" unless $ref_arr eq "ARRAY"
+
+my $ref_hash = ~> +{a=>1} ref
+p "  ref +{a=>1}:          [$ref_hash]"
+die "expected HASH" unless $ref_hash eq "HASH"
+
+# ── list / aggregate stages ─────────────────────────────────────────────────
+
+p ""
+p "── list stages ──"
+my @sorted = ~> (3, 1, 4, 1, 5, 9, 2, 6) sort
+p "  sort:                 @sorted"
+die "expected sorted" unless "@sorted" eq "1 1 2 3 4 5 6 9"
+
+my @rev = ~> (1, 2, 3, 4) rev
+p "  rev (1,2,3,4):        @rev"
+die "expected reversed" unless "@rev" eq "4 3 2 1"
+
+my @uniq = ~> (1, 2, 1, 3, 2, 4) uniq
+p "  uniq:                 @uniq"
+die "expected 1 2 3 4" unless "@uniq" eq "1 2 3 4"
+
+my $total = ~> (1, 2, 3, 4, 5) sort |> sum
+p "  sort |> sum:          $total"
+die "expected 15" unless $total == 15
+
+my @lines = ~> "alpha\nbeta\ngamma\n" lines
+p "  lines split count:    " . len(@lines)
+die "expected 3 lines" unless len(@lines) == 3
+
+# ── deterministic rand via srand stage ──────────────────────────────────────
+
+p ""
+p "── srand seeding via thread macro ──"
+my $seed = 12345
+~> $seed srand
+my $rand_a = rand(1_000_000)
+~> $seed srand
+my $rand_b = rand(1_000_000)
+p "  seed=$seed  a=$rand_a  b=$rand_b"
+die "expected deterministic rand after re-srand" unless $rand_a == $rand_b
+
+# ── multi-stage compose: string→string→string→numeric ──────────────────────
+
+p ""
+p "── compose: trim → uc → len ──"
+my $n = ~> "  spaces around  " trim uc |> len
+p "  result: $n"
+die "expected 13" unless $n == 13
+
+p ""
+p "  ALL PASS  (string, numeric, ref, list, rand stages all accepted)"
