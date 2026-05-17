@@ -1309,33 +1309,170 @@ fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option
     if !is_valid_rename_ident(&params.new_name) {
         return None;
     }
-    let uri = params.text_document_position.text_document.uri;
-    let text = docs.get(uri.as_str())?;
-    let path = uri_to_path(&uri);
-    let (needle, _) = identifier_needle_at_position(text, params.text_document_position.position)?;
-    let sub_map = sub_map_for_doc(text, &path)?;
-    resolve_sub_decl_line(&sub_map, needle.as_str())?;
+    let active_uri = params.text_document_position.text_document.uri;
+    let active_text = docs.get(active_uri.as_str())?;
+    let active_path = uri_to_path(&active_uri);
+    let (needle, _) =
+        identifier_needle_at_position(active_text, params.text_document_position.position)?;
     if needle == params.new_name {
         return Some(WorkspaceEdit::default());
     }
-    let mut edits: Vec<TextEdit> = highlights_for_identifier(text, needle.as_str())
-        .into_iter()
-        .map(|h| TextEdit {
-            range: h.range,
-            new_text: params.new_name.clone(),
-        })
-        .collect();
-    edits.sort_by(|a, b| cmp_range_start_desc(&a.range, &b.range));
-    if edits.is_empty() {
-        return None;
-    }
+
+    // ── Scope-aware rename ─────────────────────────────────────────────
+    // Build the symbol table for the active file, resolve the symbol at
+    // the cursor, then emit edits for every textual occurrence that
+    // resolves to the SAME symbol (NOT every textual match of the same
+    // string spelling — that would cross-rename shadowed `my $x` in
+    // sibling blocks, sibling fns, etc.).
+    //
+    // Cross-file: build the symbol table for every other open document
+    // and emit edits there too, but only for symbols whose qualified name
+    // matches the active symbol's qualified name. Cross-package scoping
+    // means a local `my $x` in file A does NOT rename a `my $x` in file
+    // B — they're different lexical scopes resolving to different ids.
+    let table = match crate::lsp_symbols::SymbolTable::build(active_text, &active_path) {
+        Some(t) => t,
+        None => {
+            // Parse failure — fall back to nothing rather than a wrong
+            // mechanical rename. The user will see "rename returned no
+            // changes" and can fix the syntax error first.
+            return None;
+        }
+    };
+    let cursor_pos = params.text_document_position.position;
+    let active_symbol_id = table.symbol_at(cursor_pos.line, Some(&needle))?;
+    let active_sym = table
+        .symbols
+        .iter()
+        .find(|s| s.id == active_symbol_id)
+        .cloned()?;
+
     #[allow(clippy::mutable_key_type)]
     let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
-    changes.insert(uri, edits);
+    let mut total = 0usize;
+
+    let mut emit_edits = |uri_str: &str, ranges: Vec<Range>, changes: &mut HashMap<Uri, Vec<TextEdit>>, total: &mut usize| {
+        if ranges.is_empty() {
+            return;
+        }
+        let mut edits: Vec<TextEdit> = ranges
+            .into_iter()
+            .map(|range| TextEdit {
+                range,
+                new_text: params.new_name.clone(),
+            })
+            .collect();
+        edits.sort_by(|a, b| cmp_range_start_desc(&a.range, &b.range));
+        *total += edits.len();
+        if let Ok(u) = uri_str.parse::<Uri>() {
+            changes.insert(u, edits);
+        }
+    };
+
+    // Active file.
+    let ranges = table.ranges_for(active_symbol_id);
+    emit_edits(active_uri.as_str(), ranges, &mut changes, &mut total);
+
+    // Other open files — symbols cross-file only for package-scoped
+    // declarations (Sub / Type / Our / Package); a `Local`/`Param` is
+    // file-local and must NOT touch other files.
+    let crosses_files = matches!(
+        active_sym.kind,
+        crate::lsp_symbols::SymbolKind::Sub
+            | crate::lsp_symbols::SymbolKind::Type
+            | crate::lsp_symbols::SymbolKind::Our
+            | crate::lsp_symbols::SymbolKind::Package
+    );
+    if crosses_files {
+        for (other_uri_str, other_text) in docs.iter() {
+            if other_uri_str == active_uri.as_str() {
+                continue;
+            }
+            let other_path = match other_uri_str.parse::<Uri>() {
+                Ok(u) => uri_to_path(&u),
+                Err(_) => other_uri_str.clone(),
+            };
+            let Some(other_table) =
+                crate::lsp_symbols::SymbolTable::build(other_text, &other_path)
+            else {
+                continue;
+            };
+            // Find the same symbol by qualified name in the other file.
+            let matches: Vec<_> = other_table
+                .symbols
+                .iter()
+                .filter(|s| s.name == active_sym.name && s.package == active_sym.package)
+                .map(|s| s.id)
+                .collect();
+            let mut all_ranges: Vec<Range> = Vec::new();
+            for id in matches {
+                all_ranges.extend(other_table.ranges_for(id));
+            }
+            // Also catch references to the qualified name that don't have
+            // their own declaration in this file.
+            for r in &other_table.refs {
+                if r.name == active_sym.name {
+                    // Already covered by ranges_for when the decl exists
+                    // in this file. If it doesn't, the reference resolved
+                    // to a different symbol via fallback — emit the range.
+                    let already_decl_local = other_table
+                        .symbols
+                        .iter()
+                        .any(|s| s.id == r.symbol && s.name == active_sym.name);
+                    if !already_decl_local {
+                        // Re-scan line text for the bare needle.
+                        all_ranges.extend(scan_ranges_for_needle(
+                            other_text,
+                            r.line,
+                            &active_sym.name,
+                        ));
+                    }
+                }
+            }
+            emit_edits(other_uri_str, all_ranges, &mut changes, &mut total);
+        }
+    }
+
+    if total == 0 {
+        return None;
+    }
     Some(WorkspaceEdit {
         changes: Some(changes),
         ..Default::default()
     })
+}
+
+/// Scan a single line for textual occurrences of `name`, returning LSP
+/// ranges with UTF-16 columns. Used for cross-file reference matches
+/// where we don't have a declaration in the local file.
+fn scan_ranges_for_needle(text: &str, line0: u32, name: &str) -> Vec<Range> {
+    let mut out: Vec<Range> = Vec::new();
+    let Some(line_text) = text.lines().nth(line0 as usize) else {
+        return out;
+    };
+    for (start_byte, _) in line_text.match_indices(name) {
+        let end_byte = start_byte + name.len();
+        let prev = line_text[..start_byte].chars().rev().next();
+        let next = line_text[end_byte..].chars().next();
+        let prev_ok = prev.map_or(true, |c| !c.is_alphanumeric() && c != '_' && c != ':');
+        let next_ok = next.map_or(true, |c| !c.is_alphanumeric() && c != '_' && c != ':');
+        if !prev_ok || !next_ok {
+            continue;
+        }
+        let c0 = line_text[..start_byte].encode_utf16().count() as u32;
+        let c1 = line_text[..end_byte].encode_utf16().count() as u32;
+        out.push(Range {
+            start: Position {
+                line: line0,
+                character: c0,
+            },
+            end: Position {
+                line: line0,
+                character: c1,
+            },
+        });
+    }
+    out
 }
 
 // ── completion: builtins, file subs/vars, sigils, `Foo::`, snippets, resolve ─
