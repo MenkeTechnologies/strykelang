@@ -10,7 +10,7 @@ fn Rosetta::McCarthy91::compute($n) {
 }
 
 # Test cases from 0 to 100 in parallel
-0 : 100 |> pmap { Rosetta::McCarthy91::compute(_) } |> map {
+0 : 100 |> pmap {Rosetta::McCarthy91::compute} |> map {
     assert_eq(_, 91, "parallel M == 91")
 }
 

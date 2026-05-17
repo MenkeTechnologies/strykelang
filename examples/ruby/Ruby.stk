@@ -150,7 +150,7 @@ fn Rb::inspect($v) {
     }
     return ":" . $v->{val} if Rb::is_sym($v)
     if (Rb::is_array($v)) {
-        return "[" . join(", ", map { Rb::inspect($_) } @{$v->{items}}) . "]"
+        return "[" . join(", ", map {Rb::inspect} @{$v->{items}}) . "]"
     }
     if (Rb::is_hash($v)) {
         my @parts
@@ -1786,7 +1786,7 @@ fn Rb::iter_items($it) {
         return [map { Rb::v_array([$_->[0], $_->[1]]) } @{$it->{pairs}}]
     }
     if (Rb::is_str($it)) {
-        return [map { Rb::v_str($_) } split //, $it->{val}]
+        return [map {Rb::v_str} split //, $it->{val}]
     }
     die "cannot iterate " . $it->{type}
 }
@@ -2185,7 +2185,7 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
     }
     if ($name eq "join") {
         my $sep = scalar(@$args) ? $args->[0]{val} : ""
-        return Rb::v_str(join($sep, map { Rb::to_s($_) } @$items))
+        return Rb::v_str(join($sep, map {Rb::to_s} @$items))
     }
     if ($name eq "sort") {
         if (defined $block) {
@@ -2339,7 +2339,7 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         return Rb::v_nil()
     }
     if ($name eq "to_a")    { return $a }
-    if ($name eq "compact") { return Rb::v_array([grep { !Rb::is_nil($_) } @$items]) }
+    if ($name eq "compact") { return Rb::v_array([grep { !Rb::is_nil(_) } @$items]) }
     if ($name eq "none?") {
         for my $e (@$items) {
             if (defined $block) {
@@ -2628,16 +2628,16 @@ fn Rb::str_m($s, $name, $args, $block, $ctx) {
     if ($name eq "downcase")  { return Rb::v_str(lc($v)) }
     if ($name eq "capitalize"){ return Rb::v_str(uc(substr($v, 0, 1)) . lc(substr($v, 1))) }
     if ($name eq "reverse")   { return Rb::v_str(scalar reverse $v) }
-    if ($name eq "chars")     { return Rb::v_array([map { Rb::v_str($_) } split //, $v]) }
+    if ($name eq "chars")     { return Rb::v_array([map {Rb::v_str} split //, $v]) }
     if ($name eq "split") {
         # Bare split / split(" ") — split on runs of whitespace, drop leading empties.
         if (!scalar(@$args) || (Rb::is_str($args->[0]) && $args->[0]{val} eq " ")) {
             my $r = $v
             $r =~ s/^\s+//
-            return Rb::v_array([map { Rb::v_str($_) } split /\s+/, $r])
+            return Rb::v_array([map {Rb::v_str} split /\s+/, $r])
         }
         my $sep = $args->[0]{val}
-        return Rb::v_array([map { Rb::v_str($_) } split /\Q$sep\E/, $v])
+        return Rb::v_array([map {Rb::v_str} split /\Q$sep\E/, $v])
     }
     if ($name eq "index") {
         my $needle = $args->[0]{val}
@@ -2698,7 +2698,7 @@ fn Rb::str_m($s, $name, $args, $block, $ctx) {
         return Rb::v_array(\@b)
     }
     if ($name eq "lines") {
-        return Rb::v_array([map { Rb::v_str($_) } split /(?<=\n)/, $v])
+        return Rb::v_array([map {Rb::v_str} split /(?<=\n)/, $v])
     }
     if ($name eq "strip" || $name eq "trim") {
         my $r = $v
@@ -2806,7 +2806,7 @@ fn Rb::str_m($s, $name, $args, $block, $ctx) {
     if ($name eq "scan") {
         my $pat = $args->[0]{val}
         my @hits = ($v =~ /$pat/g)
-        return Rb::v_array([map { Rb::v_str($_) } @hits])
+        return Rb::v_array([map {Rb::v_str} @hits])
     }
     if ($name eq "count") {
         my $n = 0
@@ -3100,7 +3100,7 @@ fn Rb::int_m($n, $name, $args, $block, $ctx) {
         my $x = abs($v)
         if ($x == 0) { @d = (0) }
         while ($x > 0) { push @d, $x % $base; $x = int($x / $base) }
-        return Rb::v_array([map { Rb::v_int($_) } @d])
+        return Rb::v_array([map {Rb::v_int} @d])
     }
     if ($name eq "bit_length") {
         my $x = $v < 0 ? ~$v : $v

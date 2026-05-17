@@ -18,7 +18,7 @@ my @test_words = ("abacus", "back", "cabin", "abc", "bac", "acb", "a_b_c", "aard
 # aardvark: no c. No.
 # brice: no a. No.
 
-my @abc = @test_words |> grep { Rosetta::ABCWords::is_abc(_) }
+my @abc = @test_words |> grep {Rosetta::ABCWords::is_abc}
 assert_eq join(",", @abc), "abacus,abc,a_b_c", "find abc words"
 
 # Piped version

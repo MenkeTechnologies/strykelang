@@ -3,7 +3,7 @@
 # concat, substring, indexing, comparison, and search.
 
 fn Rosetta::BinStr::from_bytes(@bytes) {
-    join("", ~> @bytes map { chr(_) })
+    join("", ~> @bytes map {chr})
 }
 
 fn Rosetta::BinStr::byte_at($s, $i) { ord(substr($s, $i, 1)) }

@@ -88,11 +88,7 @@ fn Ci::run_file($f) = system("$st --no-interop \"$f\" </dev/null >/dev/null 2>&1
 
 fn Ci::run_suite($path) {
     my $cmd = "$st \"$path\" </dev/null"
-    if ($summary) {
-        my $rc = system("$cmd >/dev/null 2>&1")
-        system($cmd) if $rc != 0
-        return $rc == 0
-    }
+    return system("$cmd >/dev/null 2>&1") == 0 if $summary
     system($cmd) == 0
 }
 
@@ -112,9 +108,12 @@ fn Ci::count_asserts($path) {
     $n
 }
 
-fn Ci::count_tests_tree($root) {
-    ~p> Ci::find_test_stk($root) map { Ci::count_asserts } sum
+fn Ci::count_tests_paths(@stk) {
+    return 0 unless len(@stk)
+    ~p> @stk map { Ci::count_asserts } sum
 }
+
+fn Ci::count_tests_tree($root) = Ci::count_tests_paths(Ci::find_test_stk($root))
 
 fn Ci::report_run_results($phase, @files, @oks) {
     my $bad = 0
@@ -157,7 +156,11 @@ fn Ci::phase_demos {
 
 fn Ci::run_test_tree($phase, $root, $label) {
     Ci::header($phase)
-    my $tests_n = Ci::count_tests_tree($root)
+    my @stk   = Ci::find_test_stk($root)
+    my $nf    = len(@stk)
+    die "no tests in $root" unless $nf
+    p "$phase: running $nf test files..." if $summary
+    my $tests_n = Ci::count_tests_paths(@stk)
     my $rc      = test($root, { quiet => $summary })
     Ci::add_tests($rc == 0 ? $tests_n : 0, $tests_n)
     Ci::fail($phase, "test $label exit $rc") if $rc != 0
@@ -226,17 +229,17 @@ my @only_specs = @{ $opts{only} // [] }
 my %want
 if (len(@only_specs)) {
     for (@only_specs) {
-        for (split /,/, $_) {
-            if ($_ !~ /^(?:parse|run|demos|project|rosetta|exercism|ruby|scheme)$/) {
+        for (split /,/, _) {
+            if (_ !~ /^(?:parse|run|demos|project|rosetta|exercism|ruby|scheme)$/) {
                 die "unknown --only phase: " . $_
             }
-            $want{$_} = 1
+            $want{_} = 1
         }
     }
 } else {
-    %want = map { ($_ => 1) } @all_phases
+    %want = map { (_ => 1) } @all_phases
 }
-my @phases = grep { $want{$_} } @all_phases
+my @phases = grep { $want{_} } @all_phases
 die "no phases selected" unless len(@phases)
 
 p "run_all_ci: #{len(@phases)} phase(s), jobs=$jobs" unless $summary
@@ -251,5 +254,5 @@ if (len(@failures)) {
     exit 1
 }
 
-p "run_all_ci: ALL PASS (#{len(@phases)} phase(s): @{[join ', ', @phases]})"
+p "run_all_ci: ALL PASS (#{len(@phases)} phase(s): #{join ', ', @phases})"
 Ci::print_totals()

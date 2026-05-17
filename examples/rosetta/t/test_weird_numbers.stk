@@ -56,7 +56,7 @@ assert_eq Rosetta::Weird::is(24),  0, "24 = 4+8+12"
 assert_eq Rosetta::Weird::is(836), 1, "836 is weird"
 
 # First few weird numbers
-my @w = ~> 2:5000 |> grep { Rosetta::Weird::is(_) }
+my @w = ~> 2:5000 |> grep {Rosetta::Weird::is}
 assert_eq join(",", @w), "70,836,4030", "weirds ≤ 5000"
 
 # Pipe form

@@ -271,7 +271,7 @@ fn Project::Iterators::grep_regex {
 
 fn Project::Iterators::grep_defined {
     my @arr = (1, undef, 2, undef, 3)
-    len(grep { defined(_) } @arr)
+    len(grep {defined} @arr)
 }
 
 fn Project::Iterators::grep_first {

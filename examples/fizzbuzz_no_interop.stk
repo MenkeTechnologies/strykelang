@@ -30,7 +30,7 @@ for (1:$n) {
 
 # `pmap` to fan the same work across cores — overkill for FizzBuzz::classify but
 # the syntax is the point. `_` is the per-item topic.
-my @parallel = pmap { FizzBuzz::classify(_) } 1:$n
+my @parallel = pmap {FizzBuzz::classify} 1:$n
 p ""
 p "parallel run produced ", len(@parallel), " labels"
 p "first 5: ", join(", ", @parallel[0:4])

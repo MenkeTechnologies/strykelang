@@ -34,7 +34,7 @@ fn Demo::IR::tokenize($s) {
 
 # ── document length + avg ────────────────────────────────────────────
 
-my @tokens_per_doc = map { Demo::IR::tokenize(_) } @docs
+my @tokens_per_doc = map {Demo::IR::tokenize} @docs
 my @doc_lengths    = map { len(@{_}) } @tokens_per_doc
 my $avgdl          = sum(@doc_lengths) / len @doc_lengths
 printf "  total terms: %d, avg doc length: %.1f\n",

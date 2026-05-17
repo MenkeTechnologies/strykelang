@@ -12,7 +12,7 @@ fn Rosetta::HLL::rotl32($x, $r) {
 
 # MurmurHash3_x86_32 — uniform high bits, the canonical HLL hash.
 fn Rosetta::HLL::hash32($s) {
-    my @bytes = $s |> chars() |> map { ord(_) }
+    my @bytes = $s |> chars() |> map {ord}
     my $len = len(@bytes)
     my $nblocks = int($len / 4)
     my $h1 = 0

@@ -14,7 +14,7 @@ my @tasks = map {
     async { sleep 0.2; _ } 
 } (1:5)
 
-my @results = map { await(_) } @tasks
+my @results = map {await} @tasks
 my $elapsed = el() - $start
 
 assert_eq len(@results), 5, "all tasks finished"

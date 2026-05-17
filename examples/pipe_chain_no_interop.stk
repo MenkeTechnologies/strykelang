@@ -26,7 +26,7 @@ die "count off" unless $count == 500
 # Word stats on a sentence — pipe a list of words through several
 # stages. Topic `_` rebinds at every step.
 my @words = split(/\s+/, "the quick brown fox jumps over the lazy dog")
-my $total_letters = @words |> maps { len(_) } |> reduce { _0 + _1 }
+my $total_letters = @words |> maps {len} |> reduce { _0 + _1 }
 p "total letters in the pangram: $total_letters (expect 35)"
 die "letters off" unless $total_letters == 35
 

@@ -2,7 +2,7 @@
 # Rosetta Code: SQL-based authentication
 
 fn Rosetta::SQLAuth::hash_pw($pw) {
-    join(":", map { ord($_) } split //, $pw)
+    join(":", map {ord} split //, $pw)
 }
 
 fn Rosetta::SQLAuth::database() {

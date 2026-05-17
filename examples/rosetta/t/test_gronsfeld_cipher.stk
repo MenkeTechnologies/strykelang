@@ -7,7 +7,7 @@ fn Rosetta::Gronsfeld::encode($text, $key) {
     return "" if len($k) == 0
     
     my @t_chars = $t |> chars()
-    my @k_digits = $k |> chars() |> map { int(_) }
+    my @k_digits = $k |> chars() |> map {int}
     my $k_len = len(@k_digits)
     
     my @res = ~> 0:(len(@t_chars)-1) map {
@@ -28,7 +28,7 @@ fn Rosetta::Gronsfeld::decode($text, $key) {
     return "" if len($k) == 0
     
     my @t_chars = $t |> chars()
-    my @k_digits = $k |> chars() |> map { int(_) }
+    my @k_digits = $k |> chars() |> map {int}
     my $k_len = len(@k_digits)
     
     my @res = ~> 0:(len(@t_chars)-1) map {

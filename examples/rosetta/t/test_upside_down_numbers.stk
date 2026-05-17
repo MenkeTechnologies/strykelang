@@ -20,7 +20,7 @@ fn Rosetta::UpsideDown::is($n) {
 }
 
 fn Rosetta::UpsideDown::list_below($limit) {
-    0:$limit |> grep { Rosetta::UpsideDown::is(_) }
+    0:$limit |> grep {Rosetta::UpsideDown::is}
 }
 
 # Sanity on rejected digits

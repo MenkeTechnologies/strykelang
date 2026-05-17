@@ -35,7 +35,7 @@ fn Rosetta::ChenPrimes::is_chen($p) {
 }
 
 fn Rosetta::ChenPrimes::generate($limit) {
-    ~> 2:$limit pgrep { Rosetta::ChenPrimes::is_chen(_) }
+    ~> 2:$limit pgrep {Rosetta::ChenPrimes::is_chen}
 }
 
 # 2 is a Chen prime because 2+2=4 is a semiprime (2*2)

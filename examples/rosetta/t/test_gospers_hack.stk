@@ -39,7 +39,7 @@ my @seq = Rosetta::GospersHack::sequence(0b111, 8)
 assert_eq join(",", @seq), "7,11,13,14,19,21,22,25", "3-bit sequence"
 
 # All elements share popcount with the seed
-my @pops = ~> @seq map { Rosetta::GospersHack::popcount(_) }
+my @pops = ~> @seq map {Rosetta::GospersHack::popcount}
 assert_eq join(",", @pops), "3,3,3,3,3,3,3,3", "popcount preserved"
 
 # Pipeline form

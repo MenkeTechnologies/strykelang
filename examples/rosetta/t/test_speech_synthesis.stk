@@ -2,7 +2,7 @@
 # Rosetta Code: Speech synthesis
 
 fn Rosetta::Speech::say($voice, $text) {
-    { voice => $voice, phonemes => join("-", map { lc($_) } split //, $text) }
+    { voice => $voice, phonemes => join("-", map {lc} split //, $text) }
 }
 
 my $utterance = Rosetta::Speech::say("Ada", "Hi")

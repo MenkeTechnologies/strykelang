@@ -41,7 +41,7 @@ my @urls = (
     "$base/get?b=2",
     "$base/get?c=3",
 )
-my @tasks   = map { fetch_async(_) } @urls
+my @tasks   = map {fetch_async} @urls
 my @results = map { await _ }        @tasks
 
 assert_eq cnt(@results), 3,             "parallel fetch got 3 results"

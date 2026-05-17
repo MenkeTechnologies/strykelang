@@ -41,7 +41,7 @@ fn Rosetta::Game21::is_winning_position($total) {
 }
 
 # Optimal moves at every total below 21
-my @moves = ~> 0:20 |> map { Rosetta::Game21::optimal_move(_) }
+my @moves = ~> 0:20 |> map {Rosetta::Game21::optimal_move}
 # After move from 0 we should reach 1; from 1 (losing) we pick 1; etc.
 assert_eq $moves[0], 1, "from 0 → +1 → 1"
 assert_eq $moves[1], 1, "from 1 (losing) → +1"

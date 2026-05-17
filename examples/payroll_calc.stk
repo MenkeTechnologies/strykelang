@@ -111,7 +111,7 @@ my @employees = (
 printf "── processing %d paychecks (biweekly) ────────────────\n",
     len @employees
 
-my @results = map { Demo::PR::compute(_) } @employees
+my @results = map {Demo::PR::compute} @employees
 
 # ── per-employee report ────────────────────────────────────────────
 

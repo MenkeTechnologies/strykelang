@@ -26,7 +26,7 @@ fn Rot13::char($ch) {
 }
 
 fn Rot13::str($text) {
-    join("", maps { Rot13::char(_) } split(//, $text))
+    join("", maps {Rot13::char} split(//, $text))
 }
 
 if (len(@ARGV) >= 1) {

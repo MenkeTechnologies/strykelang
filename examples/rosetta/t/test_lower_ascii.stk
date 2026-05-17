@@ -2,7 +2,7 @@
 # Rosetta Code: Generate lower case ASCII alphabet
 
 fn Rosetta::LowerAscii::all() {
-    ~> 97:122 map { chr(_) }
+    ~> 97:122 map {chr}
 }
 
 fn Rosetta::LowerAscii::concat() {

@@ -8,7 +8,7 @@ fn Rosetta::ArmstrongNumbers::is_armstrong($n) {
 }
 
 fn Rosetta::ArmstrongNumbers::solve($max) {
-    ~> 1:$max grep { Rosetta::ArmstrongNumbers::is_armstrong($_) }
+    ~> 1:$max grep {Rosetta::ArmstrongNumbers::is_armstrong}
 }
 
 my @res = Rosetta::ArmstrongNumbers::solve(500)

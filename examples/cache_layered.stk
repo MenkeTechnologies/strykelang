@@ -115,7 +115,7 @@ printf "── %d queries against %d-key upstream ──────────
 # ── execute workload ────────────────────────────────────────────────
 
 my $start = now_ns()
-my @results = map { Demo::Cache::lookup(_) } @queries
+my @results = map {Demo::Cache::lookup} @queries
 my $elapsed_us = (now_ns() - $start) / 1000.0
 
 # ── per-query summary (compact) ─────────────────────────────────────

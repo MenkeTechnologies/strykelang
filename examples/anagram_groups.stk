@@ -114,7 +114,7 @@ printf "  exact (hash keys) : %d\n", len(keys %groups)
 
 p ""
 p "── pipe-forward composition ──────────────────────────"
-my @all_canonical = map { Demo::Anagram::canonical(_) } @words
+my @all_canonical = map {Demo::Anagram::canonical} @words
 my @distinct_keys = sort { _0 cmp _1 } uniq(@all_canonical)
 printf "  distinct canonical forms (composed): %d\n", len @distinct_keys
 printf "  alphabetically first: %s\n", $distinct_keys[0]

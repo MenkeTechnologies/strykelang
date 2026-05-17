@@ -15,7 +15,7 @@ fn Project::Math::factorial_n ($n) {
 }
 
 fn Project::Math::primes_under ($max) {
-    my @result = grep { is_prime(_) } 2:$max
+    my @result = grep {is_prime} 2:$max
     @result
 }
 

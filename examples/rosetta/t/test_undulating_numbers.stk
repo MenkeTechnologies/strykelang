@@ -19,7 +19,7 @@ fn Rosetta::Undulating::is($n) {
 }
 
 fn Rosetta::Undulating::list_below($limit) {
-    100:$limit |> grep { Rosetta::Undulating::is(_) }
+    100:$limit |> grep {Rosetta::Undulating::is}
 }
 
 # Direct cases
@@ -33,7 +33,7 @@ assert_eq Rosetta::Undulating::is(99),   0, "99 too short"
 assert_eq Rosetta::Undulating::is(98989),1, "98989 undulates"
 
 # Count of three-digit undulating numbers: 9 * 9 = 81
-my @u3 = ~> 100:999 |> grep { Rosetta::Undulating::is(_) }
+my @u3 = ~> 100:999 |> grep {Rosetta::Undulating::is}
 assert_eq len(@u3), 81, "81 three-digit undulating numbers"
 
 # First 10 undulating numbers ≥ 100

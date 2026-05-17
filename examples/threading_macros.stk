@@ -46,7 +46,7 @@ p "  I/O-mixed: $mixed items"
 
 # Streaming JSON parse + transform.
 my @raw = (q({"id":1,"v":10}), q({"id":2,"v":20}), q({"id":3,"v":30}))
-my $parsed = ~s> [@raw] map { from_json(_) } map { _->{v} * 2 }
+my $parsed = ~s> [@raw] map {from_json} map { _->{v} * 2 }
 p "  JSON pipeline: $parsed items"
 
 # Log-line filter: errors only, uppercased.
@@ -81,16 +81,16 @@ p "\n═══ par_reduce"
 
 # Single-block form: type-aware auto-merge (hash<num> → key-wise add,
 # numeric → sum, array → concat, string → concat).
-my $tot_len = ~> "abcdefghij" par_reduce { len(_) }
+my $tot_len = ~> "abcdefghij" par_reduce {len}
 p "  auto-sum: $tot_len"
 
 # Two-block form: explicit pairwise reducer with `_0` / `_1`.
-my $manual = ~> "abcdefghij" par_reduce { len(_) } { _0 + _1 }
+my $manual = ~> "abcdefghij" par_reduce {len} { _0 + _1 }
 p "  explicit reducer: $manual"
 
 # Maximum word length via custom reducer.
 my $max_word = ~> "the quick brown fox jumps over the lazy dog" words \
-    par_reduce { len(_) } { _0 > _1 ? _0 : _1 }
+    par_reduce {len} { _0 > _1 ? _0 : _1 }
 p "  max word length: $max_word"
 
 # ── 6. par { BLOCK } — generic parallel-chunk wrapper ───────────
@@ -112,7 +112,7 @@ my $words = ~p> c("**.stk") words freq
 p "  unique words across .stk: ", len(keys %$words)
 
 # Total character count across the corpus (per_reduce + auto-merge).
-my $total_chars = ~p> c("**.stk") par_reduce { len(_) }
+my $total_chars = ~p> c("**.stk") par_reduce {len}
 p "  total chars: $total_chars"
 
 # Total line count across the corpus.

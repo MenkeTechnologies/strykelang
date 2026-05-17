@@ -38,7 +38,7 @@ assert_ok  Rosetta::Isograms::is_n_isogram("happenchance", 2), "happenchance is 
 
 # pipeline filter
 my @words = ("hello","listen","quick","subdermatoglyphic","mom")
-my @hets = ~> @words grep { Rosetta::Isograms::is_heterogram(_) }
+my @hets = ~> @words grep {Rosetta::Isograms::is_heterogram}
 assert_eq join(",", @hets), "listen,quick,subdermatoglyphic", "filter heterograms"
 
 test_run

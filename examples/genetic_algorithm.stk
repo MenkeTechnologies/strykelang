@@ -116,7 +116,7 @@ for my $gen (1:$GENS) {
     my $t0 = now_ns()
 
     # Evaluate fitness for the whole pop in parallel.
-    my @fits = pmap { Demo::GA::fitness(_) } @pop
+    my @fits = pmap {Demo::GA::fitness} @pop
 
     # Sort by fitness desc.
     my @ranked = map { _->[1] }

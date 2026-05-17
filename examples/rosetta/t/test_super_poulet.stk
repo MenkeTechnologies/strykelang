@@ -70,7 +70,7 @@ assert_eq Rosetta::SuperPoulet::is(15), 0, "15 not super-Poulet"
 assert_eq Rosetta::SuperPoulet::is(7),  0, "7 (prime) excluded"
 
 # First 5 super-Poulet numbers
-my @sp = ~> 4:5500 |> grep { Rosetta::SuperPoulet::is(_) }
+my @sp = ~> 4:5500 |> grep {Rosetta::SuperPoulet::is}
 assert_eq join(",", @sp[0:4]), "341,1387,2047,2701,3277", "first 5 super-Poulet"
 
 # Pipe form

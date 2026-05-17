@@ -19,7 +19,7 @@ fn Rosetta::Murmur::fmix32($h) {
 }
 
 fn Rosetta::Murmur::hash($text, $seed) {
-    my @bytes = $text |> chars() |> map { ord(_) }
+    my @bytes = $text |> chars() |> map {ord}
     my $len = len(@bytes)
     my $nblocks = int($len / 4)
     my $h1 = Rosetta::Murmur::u32($seed)

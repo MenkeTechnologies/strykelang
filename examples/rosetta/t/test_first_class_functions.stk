@@ -28,7 +28,7 @@ my $r = 27 |> Math::Funcs::cube_root
 assert_ok abs($r - 3) < 1e-9, "pipe cbrt"
 
 # coderefs through map
-my @vals = (1, 2, 3, 4) |> map { Math::Funcs::cube($_) }
+my @vals = (1, 2, 3, 4) |> map {Math::Funcs::cube}
 assert_eq join(",", @vals), "1,8,27,64", "map coderef"
 
 test_run

@@ -19,7 +19,7 @@ fn Rosetta::Nth::ordinal($n) {
 }
 
 fn Rosetta::Nth::range($lo, $hi) {
-    $lo:$hi |> map { Rosetta::Nth::ordinal(_) }
+    $lo:$hi |> map {Rosetta::Nth::ordinal}
 }
 
 # Spot checks

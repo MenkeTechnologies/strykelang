@@ -13,7 +13,7 @@ fn Rosetta::CountOctal::to_octal($n) {
 }
 
 fn Rosetta::CountOctal::range($lo, $hi) {
-    ~> $lo:$hi map { Rosetta::CountOctal::to_octal(_) }
+    ~> $lo:$hi map {Rosetta::CountOctal::to_octal}
 }
 
 assert_eq Rosetta::CountOctal::to_octal(0),  "0",   "0"

@@ -1696,7 +1696,7 @@ fn Sch::install_builtins($env) {
         my $init = $args->[1]
         my @lists = @$args[2..(scalar(@$args) - 1)]
         # Materialize each list to an array so we can walk in reverse
-        my @arrs = map { Sch::sch_list_to_array($_) } @lists
+        my @arrs = map {Sch::sch_list_to_array} @lists
         my $min_len = -1
         for my $a (@arrs) {
             $min_len = scalar(@$a) if $min_len < 0 || scalar(@$a) < $min_len
@@ -2371,7 +2371,7 @@ fn Sch::install_builtins($env) {
         my $s = Sch::sch_str_arg($args, 0, "string-split")
         my $sep = Sch::sch_str_arg($args, 1, "string-split")
         my @parts = $sep eq "" ? split(//, $s) : split(/\Q$sep\E/, $s, -1)
-        my @items = map { Sch::make_str($_) } @parts
+        my @items = map {Sch::make_str} @parts
         Sch::sch_list_from_array(\@items)
     }))
     Sch::env_define($env, "string-pad-left", Sch::make_builtin("string-pad-left", -2, fn($args) {

@@ -121,7 +121,7 @@ fn Project::Threading::pipeline_with_transform {
 
 fn Project::Threading::pipeline_multi_step {
     (1:50)
-        |> grep { is_prime(_) }
+        |> grep {is_prime}
         |> map { _ * 2 }
         |> sum
 }
