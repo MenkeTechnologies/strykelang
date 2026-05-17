@@ -41,9 +41,14 @@ fn assert_rejects_dollar_a_or_b(out: &std::process::Output, name: &str) {
         String::from_utf8_lossy(&out.stderr)
     );
     let stderr = String::from_utf8_lossy(&out.stderr);
+    // Robust shape — don't pin exact wording. The diagnostic must:
+    // (a) name the rejected variable (`$a` or `$b`),
+    // (b) mention `--no-interop` so the user knows which mode is active.
+    // Suggested-alternative wording is allowed to evolve without breaking
+    // tests (was `$_0` / `$_1`, now `_` / `_1` / `$_` / `$_1`).
     assert!(
-        stderr.contains("$_0") && stderr.contains("$_1") && stderr.contains(name),
-        "diagnostic must mention both $_0/$_1 and the rejected name `{name}`: stderr={stderr}"
+        stderr.contains(name) && stderr.contains("--no-interop"),
+        "diagnostic must mention the rejected name `{name}` and `--no-interop`: stderr={stderr}"
     );
 }
 
