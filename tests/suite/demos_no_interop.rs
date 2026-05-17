@@ -1,5 +1,6 @@
-//! CI pin: every public demo under `examples/*.stk` must run clean
-//! under `stryke --no-interop`.
+//! Local `cargo test` pin: every public demo under `examples/*.stk` must run
+//! clean under `stryke --no-interop`. CI runs the same coverage via
+//! `examples/run_all_ci.stk` (single orchestrator in the `stryke-test` job).
 //!
 //! Rationale per CLAUDE.md: `--no-interop` is the bot firewall — it
 //! enforces stryke idioms at parse time (no `scalar`, no `length`,

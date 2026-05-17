@@ -1,29 +1,9 @@
 #!/usr/bin/env stryke
-# Run `stryke --no-interop -c FILE` against every demo in examples/.
-# Usage: stryke /path/to/examples/check_no_interop.stk     (from anywhere)
-# Env:   ST=path/to/stryke (defaults to "stryke" on PATH)
-# Exit: 0 if every file parses clean, 1 otherwise.
+# Parse-check every top-level examples/*.stk under --no-interop.
+# CI uses examples/run_all_ci.stk; this wrapper runs the parse phase only.
+#
+# Usage: stryke examples/check_no_interop.stk [--summary]
 
-my $st  = $ENV{ST} // "stryke"
-my $dir = dirname(__FILE__)
-my @files = sort(glob("$dir/*.stk"))
-die "no examples found in $dir" unless len(@files)
-
-my @results = pmap {
-    +{ file => _, ok => system("$st --no-interop -c \"$_\" >/dev/null 2>&1") == 0 }
-} @files
-
-p sprintf("  %-4s %s", _->{ok} ? "OK" : "FAIL", _->{file}) for @results
-
-my @failed = grep { !_->{ok} } @results
-my $total  = len(@results)
-my $pass   = $total - len(@failed)
-
-p ""
-p "examples: $pass/$total --no-interop clean (#{len(@failed)} failed)"
-
-if (len(@failed)) {
-    p "failed:"
-    p "  ", _->{file} for @failed
-    exit 1
-}
+my $runner = dirname(__FILE__) . "/run_all_ci.stk"
+my $flags  = len(@ARGV) ? " " . join(" ", @ARGV) : ""
+exit system("$^X \"$runner\" --only=parse$flags") >> 8
