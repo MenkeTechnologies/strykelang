@@ -4,7 +4,7 @@
 fn Rosetta::TwoSum::find($arr, $target) {
     my %seen
     my $n = len(@$arr)
-    for my $i (0..$n-1) {
+    for my $i (0:$n-1) {
         my $need = $target - $arr->[$i]
         if (exists $seen{$need}) {
             return [$seen{$need}, $i]

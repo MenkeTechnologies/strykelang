@@ -6,7 +6,7 @@
 
 fn Rosetta::Extend::repeat_str($str, $n) {
     my $res = ""
-    for (1..$n) { $res .= $str }
+    for (1:$n) { $res .= $str }
     $res
 }
 

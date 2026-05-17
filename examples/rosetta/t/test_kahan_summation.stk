@@ -42,7 +42,7 @@ assert_ok abs($k - $n) < 1e-9, "matches naive on tame data"
 # Specific Kahan demo: 1 + 1e-100 + ... + 1e-100 (1e10 of them)
 # (Skipped at scale; verify shape on smaller version)
 my @demo = (1.0)
-for my $i (1..1000) { push @demo, 1e-15 }
+for my $i (1:1000) { push @demo, 1e-15 }
 my $ks = Rosetta::Kahan::sum(@demo)
 my $expected = 1.0 + 1000 * 1e-15
 my $rel_err = abs($ks - $expected) / $expected

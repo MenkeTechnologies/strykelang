@@ -3,7 +3,7 @@
 # Uses sort with numeric comparison
 
 # Test with a randomized list
-my @data = ~> 1..100 map { int(rand(1000)) }
+my @data = ~> 1:100 map { int(rand(1000)) }
 my @sorted = sort { _0 <=> _1 } @data
 
 # Verify order: every adjacent pair must be non-decreasing

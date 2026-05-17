@@ -20,7 +20,7 @@
 
 fn Rosetta::Twelve::evaluate($s) {
     my $count_true = 0
-    for my $i (1..12) { $count_true++ if $s->[$i] }
+    for my $i (1:12) { $count_true++ if $s->[$i] }
     [
         0,                                    # 0 unused
         1,                                    # 1 meta-true
@@ -44,7 +44,7 @@ fn Rosetta::Twelve::is_consistent($s) {
     # but for *checking* a candidate we use a simpler heuristic: it's
     # consistent iff the candidate's bit matches the derived bit for
     # every other statement and we ignore statement 5's predicate.
-    for my $i (1..12) {
+    for my $i (1:12) {
         next if $i == 5    # uniqueness predicate is meta
         return 0 if (!!$s->[$i]) != (!!$derived->[$i])
     }
@@ -56,7 +56,7 @@ fn Rosetta::Twelve::all_solutions() {
     for my $bits (0..(1 << 12) - 1) {
         my @s
         push @s, 0    # placeholder for index 0 (unused)
-        for my $i (0..11) { push @s, ($bits >> $i) & 1 }
+        for my $i (0:11) { push @s, ($bits >> $i) & 1 }
         push @sols, [@s] if Rosetta::Twelve::is_consistent(\@s)
     }
     @sols
@@ -64,7 +64,7 @@ fn Rosetta::Twelve::all_solutions() {
 
 # Run the search — count candidate self-consistent assignments
 my @sols = Rosetta::Twelve::all_solutions()
-assert_ok scalar(@sols) >= 1, "at least one consistent assignment"
+assert_ok len(@sols) >= 1, "at least one consistent assignment"
 
 # Verify each candidate has S1 true (the meta statement)
 for my $sol (@sols) {
@@ -74,7 +74,7 @@ for my $sol (@sols) {
 # Verify S6 (parity) consistency: count of true ≡ S6 bit
 for my $sol (@sols) {
     my $count = 0
-    for my $i (1..12) { $count++ if $sol->[$i] }
+    for my $i (1:12) { $count++ if $sol->[$i] }
     assert_eq $sol->[6], $count % 2 == 0 ? 1 : 0, "S6 parity matches count"
 }
 

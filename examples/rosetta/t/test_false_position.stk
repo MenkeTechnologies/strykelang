@@ -5,7 +5,7 @@ fn Rosetta::FalsePosition::solve($f, $a, $b, $tol) {
     my $fa = $f->($a)
     my $fb = $f->($b)
     
-    for my $i (1..100) {
+    for my $i (1:100) {
         my $c = ($a * $fb - $b * $fa) / ($fb - $fa)
         my $fc = $f->($c)
         if (abs($fc) < $tol) { return $c }

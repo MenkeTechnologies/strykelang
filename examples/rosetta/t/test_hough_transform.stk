@@ -12,8 +12,8 @@ fn Rosetta::Hough::transform($img) {
     # We'll use 1 degree increments
     my $PI = 3.14159265
     
-    for my $y (0 .. $rows - 1) {
-        for my $x (0 .. $cols - 1) {
+    for my $y (0:$rows - 1) {
+        for my $x (0:$cols - 1) {
             if ($img->[$y][$x]) {
                 for (my $theta = 0; $theta < 180; $theta += 5) { # Use 5 deg steps for speed
                     my $rad = $theta * $PI / 180.0
@@ -28,9 +28,9 @@ fn Rosetta::Hough::transform($img) {
 
 # 10x10 image with a horizontal line at y=5
 my $img = []
-for my $y (0..9) {
+for my $y (0:9) {
     my @row
-    for my $x (0..9) {
+    for my $x (0:9) {
         push @row, ($y == 5 ? 1 : 0)
     }
     push @$img, \@row
@@ -44,9 +44,9 @@ assert_ok $acc->{"5,90"} >= 10, "Horizontal line detected at theta=90, rho=5"
 
 # Another test: Vertical line at x=3
 my $img2 = []
-for my $y (0..9) {
+for my $y (0:9) {
     my @row
-    for my $x (0..9) {
+    for my $x (0:9) {
         push @row, ($x == 3 ? 1 : 0)
     }
     push @$img2, \@row

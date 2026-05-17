@@ -7,7 +7,7 @@ fn Rosetta::Zip::zip($l1, $l2) {
     my $len2 = len(@$l2)
     if ($len2 < $len) { $len = $len2 }
     
-    for my $i (0..$len-1) {
+    for my $i (0:$len-1) {
         push @res, [$l1->[$i], $l2->[$i]]
     }
     \@res

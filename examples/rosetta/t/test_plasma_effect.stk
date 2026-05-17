@@ -4,9 +4,9 @@
 fn Rosetta::Plasma::render($w, $h) {
     my @rows
     my @chars = split //, " .:-=+*#%@"
-    for my $y (0 .. $h - 1) {
+    for my $y (0:$h - 1) {
         my @row
-        for my $x (0 .. $w - 1) {
+        for my $x (0:$w - 1) {
             my $v = (($x * $x) + ($y * 3) + ($x * 5)) % len(@chars)
             push @row, $chars[$v]
         }

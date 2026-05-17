@@ -36,7 +36,7 @@ fn Rosetta::Machin::tan_k_atan($k, $n) {
     $k = abs($k)
     return [0, 1] if $k == 0
     my $r = $base
-    for my $i (2..$k) {
+    for my $i (2:$k) {
         $r = Math::Rat::tan_sum($r, $base)
     }
     [$sign * $r->[0], $r->[1]]

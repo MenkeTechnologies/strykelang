@@ -2,7 +2,7 @@
 # Rosetta Code: Arithmetic-geometric mean
 
 fn Rosetta::AGM::compute($a, $g) {
-    for my $i (1..10) {
+    for my $i (1:10) {
         my $next_a = ($a + $g) / 2
         my $next_g = sqrt($a * $g)
         $a = $next_a

@@ -12,7 +12,7 @@ fn Rosetta::SimKey::send($kbd, $text) {
 
 fn Rosetta::SimKey::read($kbd, $n) {
     my @out
-    for my $i (1 .. $n) {
+    for my $i (1:$n) {
         last if !len(@{$kbd->{queue}})
         push @out, shift @{$kbd->{queue}}
     }

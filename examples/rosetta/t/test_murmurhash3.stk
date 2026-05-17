@@ -26,7 +26,7 @@ fn Rosetta::Murmur::hash($text, $seed) {
     my $c1 = 0xcc9e2d51
     my $c2 = 0x1b873593
 
-    for my $i (0..$nblocks - 1) {
+    for my $i (0:$nblocks - 1) {
         my $b = $i * 4
         my $k1 = $bytes[$b] | ($bytes[$b + 1] << 8) | ($bytes[$b + 2] << 16) | ($bytes[$b + 3] << 24)
         $k1 = Rosetta::Murmur::u32($k1 * $c1)

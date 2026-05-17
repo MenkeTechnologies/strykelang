@@ -11,7 +11,7 @@ fn Rosetta::Range::extract_ranges(@nums) {
         my $start = $nums[0]
         my $end = $nums[0]
         
-        for my $i (1..$#nums) {
+        for my $i (1:$#nums) {
             if ($nums[$i] == $end + 1) {
                 $end = $nums[$i]
             } else {
@@ -29,7 +29,7 @@ fn Rosetta::Range::expand_range($spec) {
     my @result
     for my $part ($spec |> split /,/) {
         if ($part =~ /^(-?\d+)-(-?\d+)$/) {
-            push @result, ($1..$2)
+            push @result, ($1:$2)
         } else {
             push @result, int($part)
         }

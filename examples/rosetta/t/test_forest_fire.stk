@@ -19,8 +19,8 @@ fn Rosetta::ForestFire::step($grid, $p, $f) {
             } elsif ($cell == 1) {
                 # 2. Any tree will burn if at least one neighbor is burning
                 my $on_fire = 0
-                for my $dr (-1..1) {
-                    for my $dc (-1..1) {
+                for my $dr (-1:1) {
+                    for my $dc (-1:1) {
                         next if $dr == 0 && $dc == 0
                         my $nr = $r + $dr
                         my $nc = $c + $dc

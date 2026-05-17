@@ -12,23 +12,23 @@ fn Rosetta::HeldKarp::solve($dist) {
     my %dp
     my %parent
     # Base: paths starting at 0, visiting only {0, j}, ending at j.
-    for my $j (1..$n - 1) {
+    for my $j (1:$n - 1) {
         my $key = ((1 | (1 << $j)) << 8) | $j
         $dp{$key} = $dist->[0][$j]
         $parent{$key} = 0
     }
-    for my $size (3..$n) {
+    for my $size (3:$n) {
         # Enumerate all subsets of {1..n-1} of size $size-1, always including 0.
         my @subsets
         Rosetta::HeldKarp::enumerate_subsets($n - 1, $size - 1, \@subsets)
         for my $bits (@subsets) {
             my $mask = ($bits << 1) | 1   # always include city 0
-            for my $j (1..$n - 1) {
+            for my $j (1:$n - 1) {
                 next if !(($mask >> $j) & 1)
                 my $best = $INF
                 my $best_k = -1
                 my $prev_mask = $mask ^ (1 << $j)
-                for my $k (1..$n - 1) {
+                for my $k (1:$n - 1) {
                     next if $k == $j
                     next if !(($prev_mask >> $k) & 1)
                     my $key_prev = ($prev_mask << 8) | $k
@@ -47,7 +47,7 @@ fn Rosetta::HeldKarp::solve($dist) {
     # Close the cycle.
     my $best_cost = 1e18
     my $best_last = -1
-    for my $j (1..$n - 1) {
+    for my $j (1:$n - 1) {
         my $key = ($full << 8) | $j
         next if !exists $dp{$key}
         my $cand = $dp{$key} + $dist->[$j][0]

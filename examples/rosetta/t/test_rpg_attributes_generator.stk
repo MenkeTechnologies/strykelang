@@ -48,7 +48,7 @@ assert_ok abs($mean - 12.24) < 0.3, sprintf("mean ≈ 12.24 (got %.2f)", $mean)
 # A complete set always satisfies the campaign rules
 for my $i (~> 1:50) {
     my @set = Rosetta::RpgAttr::generate_set()
-    assert_eq scalar(@set), 6, "6 attributes"
+    assert_eq len(@set), 6, "6 attributes"
     my $set_sum = 0
     my $high_count = 0
     for my $v (@set) {
@@ -61,6 +61,6 @@ for my $i (~> 1:50) {
 }
 
 # Pipe form
-() |> fn { my @s = Rosetta::RpgAttr::generate_set(); scalar(@s) } |> assert_eq(6, "pipe count")
+() |> fn { my @s = Rosetta::RpgAttr::generate_set(); len(@s) } |> assert_eq(6, "pipe count")
 
 test_run

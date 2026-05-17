@@ -18,7 +18,7 @@ fn Rosetta::Reservoir::sample($stream, $k) {
     \@reservoir
 }
 
-my @stream = (1..100)
+my @stream = (1:100)
 my $sample = Rosetta::Reservoir::sample(\@stream, 10)
 
 assert_eq len(@$sample), 10, "reservoir size = k"

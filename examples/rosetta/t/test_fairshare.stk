@@ -4,7 +4,7 @@
 
 fn Rosetta::Fair::sequence($base, $count) {
     my @out
-    for my $n (0..$count-1) {
+    for my $n (0:$count-1) {
         my $s = 0
         my $x = $n
         while ($x > 0) { $s += $x % $base; $x = int($x / $base) }
@@ -30,12 +30,12 @@ my @t5 = Rosetta::Fair::sequence(5, 25)
 # Counts of each digit should each be 5 (uniform distribution at this size).
 my %cnt
 for my $v (@t5) { $cnt{$v} = ($cnt{$v} // 0) + 1 }
-for my $d (0..4) {
+for my $d (0:4) {
     assert_eq $cnt{$d}, 5, "k=5 digit $d appears 5 times in first 25"
 }
 
 # Each base's first element is 0
-for my $k (2..6) {
+for my $k (2:6) {
     my @s = Rosetta::Fair::sequence($k, 1)
     assert_eq $s[0], 0, "first term k=$k is 0"
 }

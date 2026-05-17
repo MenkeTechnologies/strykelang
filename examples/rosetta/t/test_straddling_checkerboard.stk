@@ -7,7 +7,7 @@ fn Rosetta::Checkerboard::encode($msg, $alphabet, $sp1, $sp2) {
     
     # 1. Fill map
     my $char_idx = 0
-    for my $i (0 .. 9) {
+    for my $i (0:9) {
         if ($i == $sp1 || $i == $sp2) {
             next
         }
@@ -16,12 +16,12 @@ fn Rosetta::Checkerboard::encode($msg, $alphabet, $sp1, $sp2) {
     }
     
     # 2. Fill rows for $sp1 and $sp2
-    for my $i (0 .. 9) {
+    for my $i (0:9) {
         $map{$alpha_chars[$char_idx]} = "$sp1$i"
         $char_idx++
         if ($char_idx >= len(@alpha_chars)) { last }
     }
-    for my $i (0 .. 9) {
+    for my $i (0:9) {
         if ($char_idx >= len(@alpha_chars)) { last }
         $map{$alpha_chars[$char_idx]} = "$sp2$i"
         $char_idx++
@@ -48,7 +48,7 @@ my $enc = Rosetta::Checkerboard::encode($msg, $alphabet, $sp1, $sp2)
 
 # E (0), T (1), SPACE (3), O (4), N (5), R (7), I (8), S (9)
 # Row 2 (sp1): H (20), D (21), L (22), F (23), C (24)...
-assert_ok length($enc) > 0, "Encoded message"
+assert_ok len($enc) > 0, "Encoded message"
 assert_ok $enc =~ /^24/, "C starts with 24"
 
 # Full check for CHECK

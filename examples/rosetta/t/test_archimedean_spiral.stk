@@ -3,7 +3,7 @@
 
 fn Rosetta::Spiral::generate($a, $b, $points, $step) {
     my @coords
-    for my $i (0..$points-1) {
+    for my $i (0:$points-1) {
         my $theta = $i * $step
         my $r = $a + $b * $theta
         my $x = $r * cos($theta)

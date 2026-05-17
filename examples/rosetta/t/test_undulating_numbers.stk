@@ -6,7 +6,7 @@
 
 fn Rosetta::Undulating::is($n) {
     my $s = "$n"
-    return 0 if length($s) < 3
+    return 0 if len($s) < 3
     my @d = split //, $s
     my $a = $d[0]
     my $b = $d[1]
@@ -34,11 +34,11 @@ assert_eq Rosetta::Undulating::is(98989),1, "98989 undulates"
 
 # Count of three-digit undulating numbers: 9 * 9 = 81
 my @u3 = ~> 100:999 |> grep { Rosetta::Undulating::is(_) }
-assert_eq scalar(@u3), 81, "81 three-digit undulating numbers"
+assert_eq len(@u3), 81, "81 three-digit undulating numbers"
 
 # First 10 undulating numbers ≥ 100
 my @u = Rosetta::Undulating::list_below(199)
-assert_eq join(",", @u[0..8]),
+assert_eq join(",", @u[0:8]),
     "101,121,131,141,151,161,171,181,191",
     "first batch ≤ 199 (a = 1 family)"
 

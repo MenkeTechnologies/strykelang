@@ -5,7 +5,7 @@ fn Rosetta::Lucas::generate($n) {
     if ($n == 0) { return [2] }
     if ($n == 1) { return [2, 1] }
     my @res = (2, 1)
-    for my $i (2 .. $n) {
+    for my $i (2:$n) {
         push @res, $res[$i - 1] + $res[$i - 2]
     }
     \@res

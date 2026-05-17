@@ -71,7 +71,7 @@ fn Rosetta::MazeGen::reachable($grid, $w, $h) {
             push @queue, $n
         }
     }
-    scalar(keys %seen)
+    len(keys %seen)
 }
 
 # Generation produces a connected maze
@@ -93,8 +93,8 @@ assert_ok $all_visited, "every cell visited during carve"
 
 # Walls reciprocal: if cell A has its E wall down, cell to its right has W wall down
 my $reciprocal_ok = 1
-for my $r (0..9) {
-    for my $c (0..8) {
+for my $r (0:9) {
+    for my $c (0:8) {
         my $a = $maze_cell_e_open = !$big->[$r][$c]{E}
         my $b = !$big->[$r][$c + 1]{W}
         $reciprocal_ok = 0 if $a != $b

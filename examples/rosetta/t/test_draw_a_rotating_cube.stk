@@ -3,7 +3,7 @@
 
 fn Rosetta::RotCube::blank($w, $h) {
     my @rows
-    for my $y (0 .. $h - 1) {
+    for my $y (0:$h - 1) {
         push @rows, " " x $w
     }
     \@rows

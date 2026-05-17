@@ -9,7 +9,7 @@ fn Rosetta::Lucas::compute($n) {
     } else {
         my $a = 2
         my $b = 1
-        for my $i (2..$n) {
+        for my $i (2:$n) {
             my $c = $a + $b
             ($a, $b) = ($b, $c)
         }

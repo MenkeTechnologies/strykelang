@@ -21,7 +21,7 @@ fn Rosetta::Untouchable::aliquot($n) {
 
 fn Rosetta::Untouchable::is_set($limit) {
     my %touched
-    for my $k (1..$limit + 200) {
+    for my $k (1:$limit + 200) {
         my $a = Rosetta::Untouchable::aliquot($k)
         $touched{$a} = 1 if $a >= 1 && $a <= $limit
     }

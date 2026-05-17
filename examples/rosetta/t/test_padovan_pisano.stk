@@ -5,7 +5,7 @@
 fn Rosetta::Padovan::nth($n) {
     return 1 if $n < 3
     my ($_0, $_1, $c) = (1, 1, 1)
-    for (3 .. $n) {
+    for (3:$n) {
         ($_0, $_1, $c) = ($_1, $c, $_0 + $_1)
     }
     $c
@@ -19,10 +19,10 @@ fn Rosetta::Padovan::sequence($count) {
 my @seq = Rosetta::Padovan::sequence(12)
 assert_eq join(",", @seq),
     "1,1,1,2,2,3,4,5,7,9,12,16",
-    "Padovan(0..11)"
+    "Padovan(0:11)"
 
 # Recurrence sanity: P(n) == P(n-2) + P(n-3) for all n >= 3.
-for my $n (3 .. 20) {
+for my $n (3:20) {
     my $lhs = Rosetta::Padovan::nth($n)
     my $rhs = Rosetta::Padovan::nth($n - 2) + Rosetta::Padovan::nth($n - 3)
     assert_eq $lhs, $rhs, "recurrence n=$n"

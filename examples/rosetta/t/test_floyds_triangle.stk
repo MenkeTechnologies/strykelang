@@ -4,9 +4,9 @@
 fn Rosetta::FloydTriangle::generate($n) {
     my @rows = ()
     my $curr = 1
-    for my $i (1..$n) {
+    for my $i (1:$n) {
         my @row = ()
-        for my $j (1..$i) {
+        for my $j (1:$i) {
             push @row, $curr
             $curr = $curr + 1
         }

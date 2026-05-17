@@ -60,19 +60,19 @@ my @poke = ("audino", "bagon", "baltoy", "banette", "bidoof", "braviary",
             "tirtouga", "trapinch", "treecko", "tyrogue", "vigoroth",
             "vulpix", "wailord", "wartortle", "whismur", "wingull",
             "yamask")
-my @pchain = Rosetta::ChainWords::longest(\@poke[0..14])    # subset for speed
+my @pchain = Rosetta::ChainWords::longest(\@poke[0:14])    # subset for speed
 assert_ok Rosetta::ChainWords::is_valid_chain(\@pchain), "Pokémon subset chain valid"
 
 # Single word forms a trivial chain
 my @one = Rosetta::ChainWords::longest(["alpha"])
-assert_eq scalar(@one), 1, "single-word chain"
+assert_eq len(@one), 1, "single-word chain"
 assert_eq $one[0], "alpha", "single word preserved"
 
 # Disjoint dictionary: nothing chains
 my @disjoint = ("cat", "moon", "frog")
 my @no_chain = Rosetta::ChainWords::longest(\@disjoint)
 # Best is any single word
-assert_eq scalar(@no_chain), 1, "disjoint dict → length 1"
+assert_eq len(@no_chain), 1, "disjoint dict → length 1"
 
 # Validity helper
 assert_eq Rosetta::ChainWords::is_valid_chain(["cat", "tap", "pen"]), 1, "valid 3-chain"

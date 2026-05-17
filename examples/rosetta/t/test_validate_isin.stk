@@ -4,7 +4,7 @@
 # Algorithm: convert letters to digits (A=10, B=11, ..., Z=35), then Luhn-mod-10.
 
 fn Rosetta::ISIN::is_valid($isin) {
-    return 0 if length($isin) != 12
+    return 0 if len($isin) != 12
     return 0 if $isin !~ /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/
     my $digits = ""
     my @cs = ~> $isin chars
@@ -19,7 +19,7 @@ fn Rosetta::ISIN::is_valid($isin) {
     my @ds = ~> $digits chars
     my $sum = 0
     my $n = len(@ds)
-    for my $i (0..$n-1) {
+    for my $i (0:$n-1) {
         my $d = int($ds[$n - 1 - $i])
         if ($i % 2 == 1) {
             $d *= 2

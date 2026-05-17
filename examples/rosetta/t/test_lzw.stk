@@ -3,7 +3,7 @@
 
 fn Rosetta::LZW::encode($text) {
     my %dict
-    for my $i (0..255) { $dict{chr($i)} = $i }
+    for my $i (0:255) { $dict{chr($i)} = $i }
     
     my @chars = $text |> chars
     my @result
@@ -28,7 +28,7 @@ fn Rosetta::LZW::encode($text) {
 fn Rosetta::LZW::decode($codes_ref) {
     my @codes = @$codes_ref
     my %dict
-    for my $i (0..255) { $dict{$i} = chr($i) }
+    for my $i (0:255) { $dict{$i} = chr($i) }
     
     my $dict_size = 256
     my $w = $dict{shift @codes}

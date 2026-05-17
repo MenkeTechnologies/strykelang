@@ -25,7 +25,7 @@ fn Rosetta::NameGame::transform_v2($name, $letter) {
 }
 
 fn Rosetta::NameGame::lyrics($name) {
-    return undef if length($name) < 1
+    return undef if len($name) < 1
     my $cap = uc(substr($name, 0, 1)) . lc(substr($name, 1))
     my $b = Rosetta::NameGame::transform_v2($cap, "B")
     my $f = Rosetta::NameGame::transform_v2($cap, "F")

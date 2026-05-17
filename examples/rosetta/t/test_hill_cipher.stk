@@ -39,7 +39,7 @@ fn Rosetta::Hill::matrix_mod_inverse($matrix, $mod) {
 
 fn Rosetta::Hill::codec($text, $key_matrix, $mod) {
     my $t = $text |> uc() |> { _ =~ s/[^A-Z]//gr }
-    if (length($t) % 2 != 0) { $t .= "X" }
+    if (len($t) % 2 != 0) { $t .= "X" }
     
     my @chars = $t |> chars() |> map { ord(_) - ord("A") }
     my @res

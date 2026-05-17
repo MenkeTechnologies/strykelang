@@ -98,7 +98,7 @@ assert_ok Rosetta::AVL::is_balanced($root), "balanced after 6 inserts"
 
 # Insert sequential 1..100 — naive BST would be O(n) deep; AVL stays O(log n)
 my $r2
-for my $v (1..100) {
+for my $v (1:100) {
     $r2 = Rosetta::AVL::insert($r2, $v)
 }
 assert_eq len(@{Rosetta::AVL::sorted($r2)}), 100, "100 keys all inserted"

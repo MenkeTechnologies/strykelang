@@ -9,7 +9,7 @@ fn Rosetta::MonteCarloPi::estimate($n) {
         my $x = rand()
         my $y = rand()
         $x*$x + $y*$y <= 1.0 ? 1 : 0
-    } (1..$n)
+    } (1:$n)
     
     $count = sum(@results)
     4.0 * $count / $n

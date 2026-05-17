@@ -19,7 +19,7 @@ fn Rosetta::Sisyphus::is_prime($n) {
 fn Rosetta::Sisyphus::sequence($k) {
     return [] if $k < 1
     my @s = (1)
-    for my $n (2..$k) {
+    for my $n (2:$k) {
         my $prev = $s[-1]
         push @s, Rosetta::Sisyphus::is_prime($n) ? $prev - $n : $prev + $n
     }
@@ -35,7 +35,7 @@ assert_eq join(",", @$s),
 # Sanity: every prime index strictly decreases, every composite ≥ 4 increases
 my $every_drop = 1
 my $every_rise = 1
-for my $i (1..29) {
+for my $i (1:29) {
     my $delta = $s->[$i] - $s->[$i - 1]
     if (Rosetta::Sisyphus::is_prime($i + 1)) {
         $every_drop = 0 if $delta != -($i + 1)

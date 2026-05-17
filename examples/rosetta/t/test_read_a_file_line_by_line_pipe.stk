@@ -3,7 +3,7 @@
 
 fn Rosetta::ReadFile::setup($path) {
     open my $fh, '>', $path or die "Could not write"
-    print $fh "line 1\nline 2\nline 3\n"
+    p $fh "line 1\nline 2\nline 3"
     close $fh
 }
 

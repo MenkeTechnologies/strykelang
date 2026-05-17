@@ -3,9 +3,9 @@
 
 fn Rosetta::FloydWarshall::solve($n, $edges) {
     my $dist = []
-    for my $i (0..$n-1) {
+    for my $i (0:$n-1) {
         $dist->[$i] = []
-        for my $j (0..$n-1) {
+        for my $j (0:$n-1) {
             $dist->[$i][$j] = ($i == $j ? 0 : 1000000)
         }
     }
@@ -17,9 +17,9 @@ fn Rosetta::FloydWarshall::solve($n, $edges) {
         $dist->[$u][$v] = $w
     }
     
-    for my $k (0..$n-1) {
-        for my $i (0..$n-1) {
-            for my $j (0..$n-1) {
+    for my $k (0:$n-1) {
+        for my $i (0:$n-1) {
+            for my $j (0:$n-1) {
                 if ($dist->[$i][$k] + $dist->[$k][$j] < $dist->[$i][$j]) {
                     $dist->[$i][$j] = $dist->[$i][$k] + $dist->[$k][$j]
                 }

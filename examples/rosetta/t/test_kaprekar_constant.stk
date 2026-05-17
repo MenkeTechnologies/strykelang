@@ -16,7 +16,7 @@ fn Rosetta::KaprekarConstant::step($n) {
 
 fn Rosetta::KaprekarConstant::reaches($n) {
     my $curr = $n
-    for my $i (1..10) {
+    for my $i (1:10) {
         if ($curr != 6174) {
             $curr = Rosetta::KaprekarConstant::step($curr)
         }

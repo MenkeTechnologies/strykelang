@@ -19,8 +19,8 @@ assert_eq Rosetta::IdiomCase::lowers(),
 assert_eq Rosetta::IdiomCase::uppers(),
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
     "all 26 uppercase ASCII"
-assert_eq length(Rosetta::IdiomCase::lowers()), 26, "26 lowers"
-assert_eq length(Rosetta::IdiomCase::uppers()), 26, "26 uppers"
+assert_eq len(Rosetta::IdiomCase::lowers()), 26, "26 lowers"
+assert_eq len(Rosetta::IdiomCase::uppers()), 26, "26 uppers"
 
 assert_ok  Rosetta::IdiomCase::is_letter("a"), "a"
 assert_ok  Rosetta::IdiomCase::is_letter("Z"), "Z"

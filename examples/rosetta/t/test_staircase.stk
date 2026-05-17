@@ -7,7 +7,7 @@ fn Rosetta::Staircase::staircase($n) {
     } else {
         my $a = 1
         my $b = 1
-        for my $i (2..$n) {
+        for my $i (2:$n) {
             ($a, $b) = ($b, $a + $b)
         }
         $b

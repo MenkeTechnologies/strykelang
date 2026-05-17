@@ -4,7 +4,7 @@
 fn Rosetta::Recaman::generate($n) {
     my @a = (0)
     my %used = ("0" => 1)
-    for my $i (1..$n) {
+    for my $i (1:$n) {
         my $prev = $a[$i-1]
         my $next = $prev - $i
         if ($next > 0 && !exists $used{$next}) {

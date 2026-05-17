@@ -10,7 +10,7 @@ my @data = (1, 2, 10, 11, 20, 21)
 my @sorted = Rosetta::LexicographicSort::solve(@data)
 assert_eq join(",", @sorted), "1,10,11,2,20,21", "lexicographic sort of numbers"
 
-my @data2 = (1..13)
+my @data2 = (1:13)
 my @sorted2 = Rosetta::LexicographicSort::solve(@data2)
 assert_eq $sorted2[1], "10", "second element is 10"
 assert_eq $sorted2[4], "13", "fifth element is 13"

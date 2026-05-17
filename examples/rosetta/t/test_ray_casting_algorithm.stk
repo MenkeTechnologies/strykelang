@@ -9,7 +9,7 @@ fn Rosetta::RayCasting::is_inside($point, $polygon) {
     my $n = len(@$polygon)
     
     my $p1 = $polygon->[0]
-    for my $i (1 .. $n) {
+    for my $i (1:$n) {
         my $p2 = $polygon->[$i % $n]
         
         my $y_min = $p1->[1] < $p2->[1] ? $p1->[1] : $p2->[1]

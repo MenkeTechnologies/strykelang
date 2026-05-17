@@ -53,7 +53,7 @@ my %top_set = map { $_ => 1 } @$top
 assert_eq exists($top_set{"a.txt"}), 1, "a.txt at top"
 assert_eq exists($top_set{"b.txt"}), 1, "b.txt at top"
 assert_eq exists($top_set{"sub"}),   1, "sub at top"
-assert_eq scalar(@$top), 3, "exactly 3 entries at top"
+assert_eq len(@$top), 3, "exactly 3 entries at top"
 
 # Sub directory listing
 my $sub = Rosetta::Walk::list_immediate("$base/sub")
@@ -73,7 +73,7 @@ assert_eq exists($all_set{"sub/deep/d.txt"}),      1, "sub/deep/d.txt"
 
 # Walking a non-directory returns empty
 my $nope = Rosetta::Walk::list_immediate("/tmp/stk_no_such_$$")
-assert_eq scalar(@$nope), 0, "missing dir → empty"
+assert_eq len(@$nope), 0, "missing dir → empty"
 
 # Cleanup
 system("rm -rf $base")

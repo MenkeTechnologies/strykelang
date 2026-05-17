@@ -4,7 +4,7 @@
 # O(n·m) worst case, O(n/m) average — matches the stronger BM in practice.
 
 fn Rosetta::Horspool::build_shift($pat) {
-    my $m = length($pat)
+    my $m = len($pat)
     my %shift
     for my $i (~> 0:$m - 2) {
         $shift{substr($pat, $i, 1)} = $m - 1 - $i
@@ -13,8 +13,8 @@ fn Rosetta::Horspool::build_shift($pat) {
 }
 
 fn Rosetta::Horspool::search($text, $pat) {
-    my $n = length($text)
-    my $m = length($pat)
+    my $n = len($text)
+    my $m = len($pat)
     return 0  if $m == 0
     return -1 if $m > $n
     my $shift = Rosetta::Horspool::build_shift($pat)
@@ -32,8 +32,8 @@ fn Rosetta::Horspool::search($text, $pat) {
 }
 
 fn Rosetta::Horspool::search_all($text, $pat) {
-    my $n = length($text)
-    my $m = length($pat)
+    my $n = len($text)
+    my $m = len($pat)
     my @hits
     return \@hits  if $m == 0 || $m > $n
     my $shift = Rosetta::Horspool::build_shift($pat)

@@ -58,9 +58,9 @@ assert_ok $diff <= 30, sprintf("black/white roughly balanced (Δ = %d)", $diff)
 
 # At radius r the bounding box is (2r+1) × (2r+1) plus newlines
 my @lines = split /\n/, $art
-assert_eq scalar(@lines), 17, "17 rows for r=8"
+assert_eq len(@lines), 17, "17 rows for r=8"
 for my $line (@lines) {
-    assert_eq length($line), 17, "row width 17"
+    assert_eq len($line), 17, "row width 17"
 }
 
 # Cell at exact origin: classify it

@@ -2,11 +2,11 @@
 # Rosetta Code: Rule 110
 
 fn Rosetta::Rule110::next_gen($state) {
-    my $len = length($state)
+    my $len = len($state)
     my $padded = "0" . $state . "0"
     my @chars = chars($padded)
     
-    my $next_state = ~> 1..$len map {
+    my $next_state = ~> 1:$len map {
         my $pattern = $chars[_-1] . $chars[_] . $chars[_+1]
         # Rule 110:
         # 111 -> 0, 110 -> 1, 101 -> 1, 100 -> 0

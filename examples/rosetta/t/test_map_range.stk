@@ -12,10 +12,10 @@ fn Rosetta::MapRange::approx_eq($a, $b) {
 }
 
 # Standard sample: [0,10] → [-1,0], 0..10 should map to -1..0
-for my $i (0..10) {
+for my $i (0:10) {
     my $expected = $i / 10 - 1
     my $got      = Rosetta::MapRange::map(0, 10, -1, 0, $i)
-    assert_ok Rosetta::MapRange::approx_eq($got, $expected), "0..10 -> -1..0 at $i"
+    assert_ok Rosetta::MapRange::approx_eq($got, $expected), "0:10 -> -1:0 at $i"
 }
 
 # Identity map

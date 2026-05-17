@@ -12,7 +12,7 @@ fn Rosetta::ErdosWoods::gcd($x, $y) {
 }
 
 fn Rosetta::ErdosWoods::valid_a($a, $k) {
-    for my $i (1..$k - 1) {
+    for my $i (1:$k - 1) {
         my $m = $a + $i
         return 0 if Rosetta::ErdosWoods::gcd($m, $a) == 1
                  && Rosetta::ErdosWoods::gcd($m, $a + $k) == 1
@@ -22,7 +22,7 @@ fn Rosetta::ErdosWoods::valid_a($a, $k) {
 
 fn Rosetta::ErdosWoods::is($k, $a_max) {
     return 0 if $k < 2
-    for my $a (2..$a_max) {
+    for my $a (2:$a_max) {
         return 1 if Rosetta::ErdosWoods::valid_a($a, $k)
     }
     0

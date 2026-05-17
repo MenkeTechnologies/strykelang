@@ -6,11 +6,11 @@ fn Rosetta::MatrixPow::mul($a, $b) {
     my $n = len(@{$a->[0]})
     my $p = len(@{$b->[0]})
     my @res = ()
-    for my $i (0..$m-1) {
+    for my $i (0:$m-1) {
         $res[$i] = []
-        for my $j (0..$p-1) {
+        for my $j (0:$p-1) {
             my $sum = 0
-            for my $k (0..$n-1) {
+            for my $k (0:$n-1) {
                 $sum += $a->[$i][$k] * $b->[$k][$j]
             }
             $res[$i][$j] = $sum
@@ -22,9 +22,9 @@ fn Rosetta::MatrixPow::mul($a, $b) {
 fn Rosetta::MatrixPow::compute($a, $n) {
     my $size = len(@$a)
     my @res = ()
-    for my $i (0..$size-1) {
+    for my $i (0:$size-1) {
         $res[$i] = []
-        for my $j (0..$size-1) {
+        for my $j (0:$size-1) {
             $res[$i][$j] = ($i == $j ? 1 : 0)
         }
     }

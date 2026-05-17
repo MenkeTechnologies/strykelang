@@ -35,7 +35,7 @@ fn Rosetta::TwelveDays::verse($day) {
 
 fn Rosetta::TwelveDays::all() {
     my @verses
-    for my $day (1..12) {
+    for my $day (1:12) {
         push @verses, Rosetta::TwelveDays::verse($day)
     }
     join("\n\n", @verses)

@@ -9,7 +9,7 @@ fn Rosetta::Subfactorial::compute($n) {
     } else {
         my $s0 = 1
         my $s1 = 0
-        for my $i (2..$n) {
+        for my $i (2:$n) {
             my $s2 = ($i - 1) * ($s1 + $s0)
             ($s0, $s1) = ($s1, $s2)
         }

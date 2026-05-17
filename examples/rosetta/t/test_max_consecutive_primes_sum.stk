@@ -5,7 +5,7 @@
 fn Rosetta::MaxConsPrime::primes_below($n) {
     return [] if $n < 2
     my @sieve
-    for my $i (0..$n-1) { $sieve[$i] = 1 }
+    for my $i (0:$n-1) { $sieve[$i] = 1 }
     $sieve[0] = 0; $sieve[1] = 0
     my $i = 2
     while ($i * $i < $n) {
@@ -16,7 +16,7 @@ fn Rosetta::MaxConsPrime::primes_below($n) {
         $i += 1
     }
     my @ps
-    for my $k (2..$n-1) { push @ps, $k if $sieve[$k] }
+    for my $k (2:$n-1) { push @ps, $k if $sieve[$k] }
     \@ps
 }
 
@@ -35,8 +35,8 @@ fn Rosetta::MaxConsPrime::run($limit) {
     my $best_sum = 0
     my $best_len = 0
     my $n = len(@$primes)
-    for my $i (0..$n-1) {
-        for my $j ($i + 1..$n) {
+    for my $i (0:$n-1) {
+        for my $j ($i + 1:$n) {
             my $sum = $ps[$j] - $ps[$i]
             last if $sum >= $limit
             my $len = $j - $i

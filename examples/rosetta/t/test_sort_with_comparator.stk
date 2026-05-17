@@ -2,7 +2,7 @@
 # Rosetta Code: Sort using a custom comparator (string length, then lex)
 
 fn Rosetta::CustomSort::sort_by_length(@words) {
-    sort { length(_0) <=> length(_1) || _0 cmp _1 } @words
+    sort { len(_0) <=> len(_1) || _0 cmp _1 } @words
 }
 
 fn Rosetta::CustomSort::sort_by_field($items, $field) {
@@ -47,7 +47,7 @@ assert_eq join(",", @ci), "apple,BANANA,Cherry,date", "case-insensitive lex"
 
 # Inline comparator
 my @words2 = ("aaa", "b", "cc")
-my @by_len_only = sort { length(_0) <=> length(_1) } @words2
+my @by_len_only = sort { len(_0) <=> len(_1) } @words2
 assert_eq join(",", @by_len_only), "b,cc,aaa", "inline len comparator"
 
 # Spaceship operator on numbers

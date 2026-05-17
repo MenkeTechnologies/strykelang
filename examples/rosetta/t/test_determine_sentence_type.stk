@@ -33,7 +33,7 @@ fn Rosetta::SentType::classify_all($paragraph) {
     for my $p (@parts) {
         my $trim = $p
         $trim =~ s/^\s+//
-        push @out, Rosetta::SentType::classify($trim) if length($trim) > 0
+        push @out, Rosetta::SentType::classify($trim) if len($trim) > 0
     }
     @out
 }

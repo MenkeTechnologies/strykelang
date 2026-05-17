@@ -16,7 +16,7 @@ fn Rosetta::AntiPrimes::divisor_count($n) {
 fn Rosetta::AntiPrimes::list($limit) {
     my @res
     my $max_d = 0
-    for my $n (1..$limit) {
+    for my $n (1:$limit) {
         my $d = Rosetta::AntiPrimes::divisor_count($n)
         if ($d > $max_d) {
             push @res, $n

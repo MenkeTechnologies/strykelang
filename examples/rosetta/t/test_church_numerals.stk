@@ -41,7 +41,7 @@ fn Rosetta::Church::to_int($n) {
 
 fn Rosetta::Church::from_int($k) {
     my $n = Rosetta::Church::zero()
-    for (1..$k) { $n = Rosetta::Church::succ($n) }
+    for (1:$k) { $n = Rosetta::Church::succ($n) }
     $n
 }
 

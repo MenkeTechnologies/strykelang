@@ -3,9 +3,9 @@
 
 fn Rosetta::Madelung::compute($n) {
     my $sum = 0.0
-    for my $i (-$n..$n) {
-        for my $j (-$n..$n) {
-            for my $k (-$n..$n) {
+    for my $i (-$n:$n) {
+        for my $j (-$n:$n) {
+            for my $k (-$n:$n) {
                 if ($i == 0 && $j == 0 && $k == 0) {
                     next
                 }

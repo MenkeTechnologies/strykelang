@@ -14,7 +14,7 @@ assert_eq Rosetta::APlusB::add(-5, 10), 5, "-5+10=5"
 assert_eq Rosetta::APlusB::add(0, 0), 0, "0+0=0"
 assert_eq Rosetta::APlusB::add(1000000, 1), 1000001, "large numbers"
 
-assert_eq Rosetta::APlusB::sum_list(1, 2, 3, 4, 5), 15, "sum 1..5"
+assert_eq Rosetta::APlusB::sum_list(1, 2, 3, 4, 5), 15, "sum 1:5"
 assert_eq Rosetta::APlusB::sum_list(10, 20, 30), 60, "sum 10,20,30"
 
 test_run

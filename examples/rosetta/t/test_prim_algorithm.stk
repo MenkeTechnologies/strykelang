@@ -3,7 +3,7 @@
 
 fn Rosetta::Prim::solve($n, $edges) {
     my $adj = {}
-    for my $i (0..$n-1) { $adj->{$i} = [] }
+    for my $i (0:$n-1) { $adj->{$i} = [] }
     for my $e (@$edges) {
         my ($u, $v, $w) = @$e
         push @{$adj->{$u}}, [$v, $w]

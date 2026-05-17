@@ -2,7 +2,7 @@
 # Rosetta Code: Anagrams/Deranged anagrams
 
 fn Rosetta::AnagramsDeranged::is_derangement($s1, $s2) {
-    if (length($s1) != length($s2)) { return 0 }
+    if (len($s1) != len($s2)) { return 0 }
     my @a1 = ~> $s1 chars
     my @a2 = ~> $s2 chars
     for my $i (0..len(@a1)-1) {
@@ -34,7 +34,7 @@ fn Rosetta::AnagramsDeranged::solve($words) {
             for my $i (0..len(@list)-2) {
                 for my $j ($i+1..len(@list)-1) {
                     if (Rosetta::AnagramsDeranged::is_derangement($list[$i], $list[$j])) {
-                        my $len = length($list[$i])
+                        my $len = len($list[$i])
                         if ($len >= $max_len) {
                             $max_len = $len
                             @best = ($list[$i], $list[$j])
@@ -50,7 +50,7 @@ fn Rosetta::AnagramsDeranged::solve($words) {
 my $words = [qw(dots stod stop pots tops post spot)]
 my $res = Rosetta::AnagramsDeranged::solve($words)
 # dots and stod are deranged anagrams (length 4)
-assert_eq length($res->[0]), 4, "max length deranged anagram"
+assert_eq len($res->[0]), 4, "max length deranged anagram"
 
 assert_ok Rosetta::AnagramsDeranged::is_derangement("dots", "stod"), "dots/stod is derangement"
 assert_ok !Rosetta::AnagramsDeranged::is_derangement("abc", "acb"), "abc/acb is not (a matches)"

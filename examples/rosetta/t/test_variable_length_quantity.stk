@@ -65,12 +65,12 @@ assert_ok !defined(Rosetta::Vlq::encode(-1)), "negative rejected"
 
 # Round-trip every byte from 0..2000
 my $rt_ok = 1
-for my $n (0..2000) {
+for my $n (0:2000) {
     my $bs = Rosetta::Vlq::encode($n)
     my $r  = Rosetta::Vlq::decode($bs)
     $rt_ok = 0 if $r->[0] != $n
 }
-assert_ok $rt_ok, "0..2000 round-trip"
+assert_ok $rt_ok, "0:2000 round-trip"
 
 # Pipe form
 0x80 |> Rosetta::Vlq::encode |> Rosetta::Vlq::hex |> assert_eq("81 00", "pipe encode 0x80")

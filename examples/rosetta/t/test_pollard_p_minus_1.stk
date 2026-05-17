@@ -21,7 +21,7 @@ fn Rosetta::PollardPm1::factor($n, $b_max) {
     return $n if $n <= 1
     return 2 if $n % 2 == 0
     my $a = 2
-    for my $j (2..$b_max) {
+    for my $j (2:$b_max) {
         $a = Rosetta::PollardPm1::pow_mod($a, $j, $n)
         my $g = Rosetta::PollardPm1::gcd($a - 1, $n)
         if ($g > 1 && $g < $n) {

@@ -8,11 +8,11 @@ fn Rosetta::Walsh::build($n) {
     for my $i (~> 1:$n) {
         my $size = len(@m)
         my @new
-        for my $r (0..$size - 1) {
+        for my $r (0:$size - 1) {
             my @top = (@{$m[$r]}, @{$m[$r]})
             push @new, \@top
         }
-        for my $r (0..$size - 1) {
+        for my $r (0:$size - 1) {
             my @bot = (@{$m[$r]}, map { -$_ } @{$m[$r]})
             push @new, \@bot
         }
@@ -23,10 +23,10 @@ fn Rosetta::Walsh::build($n) {
 
 fn Rosetta::Walsh::is_hadamard($m) {
     my $n = len(@$m)
-    for my $i (0..$n - 1) {
-        for my $j ($i + 1..$n - 1) {
+    for my $i (0:$n - 1) {
+        for my $j ($i + 1:$n - 1) {
             my $dot = 0
-            for my $k (0..$n - 1) {
+            for my $k (0:$n - 1) {
                 $dot += $m->[$i][$k] * $m->[$j][$k]
             }
             return 0 if $dot != 0

@@ -15,7 +15,7 @@ fn Rosetta::ColourPinstripe::row($width, $stripe_w) {
 }
 
 fn Rosetta::ColourPinstripe::render($width, $max_w) {
-    my @rows = ~> 1 .. $max_w map { Rosetta::ColourPinstripe::row($width, _) }
+    my @rows = ~> 1:$max_w map { Rosetta::ColourPinstripe::row($width, _) }
     \@rows
 }
 

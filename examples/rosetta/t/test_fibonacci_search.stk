@@ -50,7 +50,7 @@ assert_eq Rosetta::FibSearch::find([42], 42), 0, "single match"
 assert_eq Rosetta::FibSearch::find([42], 7), -1, "single miss"
 
 # Power-of-fib aligned size
-my @fib_size = (1..21)
+my @fib_size = (1:21)
 assert_eq Rosetta::FibSearch::find(\@fib_size, 13), 12, "fib-size find 13 -> idx 12"
 assert_eq Rosetta::FibSearch::find(\@fib_size, 1), 0, "fib-size first"
 assert_eq Rosetta::FibSearch::find(\@fib_size, 21), 20, "fib-size last"

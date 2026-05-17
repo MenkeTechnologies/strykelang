@@ -7,7 +7,7 @@
 fn Rosetta::SelfDescribing::is($n) {
     my @digits = "$n" |> chars
     my $len = len(@digits)
-    for my $i (0 .. $len - 1) {
+    for my $i (0:$len - 1) {
         my $expected = $digits[$i] + 0
         my $actual = len(grep { _ + 0 == $i } @digits)
         return 0 unless $actual == $expected

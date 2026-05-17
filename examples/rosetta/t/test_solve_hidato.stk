@@ -72,16 +72,16 @@ my %seen
 for my $row (@$sol) {
     for my $v (@$row) { $seen{$v}++ }
 }
-for my $i (1..9) {
+for my $i (1:9) {
     assert_eq $seen{$i}, 1, sprintf("number %d used once", $i)
 }
 
 # Adjacency property: each pair (k, k+1) is king-adjacent.
 my %pos
-for my $r (0..2) {
-    for my $c (0..2) { $pos{$sol->[$r][$c]} = [$r, $c] }
+for my $r (0:2) {
+    for my $c (0:2) { $pos{$sol->[$r][$c]} = [$r, $c] }
 }
-for my $k (1..8) {
+for my $k (1:8) {
     my ($r1, $c1) = @{$pos{$k}}
     my ($r2, $c2) = @{$pos{$k + 1}}
     assert_ok abs($r1 - $r2) <= 1 && abs($c1 - $c2) <= 1,

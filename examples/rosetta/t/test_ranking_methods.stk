@@ -8,7 +8,7 @@
 
 fn Rosetta::Rank::sort_indices_desc($values) {
     my $n = len(@$values)
-    my @idx = (0..$n - 1)
+    my @idx = (0:$n - 1)
     @idx = sort {
         ($values->[$b] <=> $values->[$a]) || ($a <=> $b)
     } @idx
@@ -20,7 +20,7 @@ fn Rosetta::Rank::standard($values) {
     my $n = len(@$idx)
     my @ranks = (0) x $n
     my $rank = 1
-    for my $i (0..$n - 1) {
+    for my $i (0:$n - 1) {
         if ($i > 0 && $values->[$idx->[$i]] != $values->[$idx->[$i - 1]]) {
             $rank = $i + 1
         }
@@ -55,7 +55,7 @@ fn Rosetta::Rank::dense($values) {
     my $n = len(@$idx)
     my @ranks = (0) x $n
     my $rank = 1
-    for my $i (0..$n - 1) {
+    for my $i (0:$n - 1) {
         if ($i > 0 && $values->[$idx->[$i]] != $values->[$idx->[$i - 1]]) {
             $rank++
         }
@@ -68,7 +68,7 @@ fn Rosetta::Rank::ordinal($values) {
     my $idx = Rosetta::Rank::sort_indices_desc($values)
     my $n = len(@$idx)
     my @ranks = (0) x $n
-    for my $i (0..$n - 1) {
+    for my $i (0:$n - 1) {
         $ranks[$idx->[$i]] = $i + 1
     }
     \@ranks

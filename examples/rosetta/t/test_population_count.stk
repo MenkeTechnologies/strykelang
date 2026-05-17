@@ -35,13 +35,13 @@ assert_eq Rosetta::PopCount::count(0b1010101010), 5, "popcount of alternating"
 # Evil and odious classification (rosetta task)
 # First 30 evil numbers: 0, 3, 5, 6, 9, 10, 12, 15, 17, 18, 20, 23, 24, 27, 29, 30, 33, …
 my @evil = ~> 0:35 |> grep { Rosetta::PopCount::is_evil(_) }
-assert_eq join(",", @evil[0..9]),
+assert_eq join(",", @evil[0:9]),
     "0,3,5,6,9,10,12,15,17,18",
     "first 10 evil numbers"
 
 # First 10 odious numbers: 1, 2, 4, 7, 8, 11, 13, 14, 16, 19, …
 my @odious = ~> 0:35 |> grep { Rosetta::PopCount::is_odious(_) }
-assert_eq join(",", @odious[0..9]),
+assert_eq join(",", @odious[0:9]),
     "1,2,4,7,8,11,13,14,16,19",
     "first 10 odious numbers"
 
@@ -52,7 +52,7 @@ my @pop3 = ~> 1:30 |> map {
     Rosetta::PopCount::count($p)
 }
 # 3^0=1 → 1; 3^1=3 → 2; 3^2=9 → 2; 3^3=27 → 4; 3^4=81 → 3; …
-assert_eq join(",", @pop3[0..6]), "1,2,2,4,3,6,6", "popcount(3^0..6)"
+assert_eq join(",", @pop3[0:6]), "1,2,2,4,3,6,6", "popcount(3^0:6)"
 
 # Pipe form
 0xFFFF |> Rosetta::PopCount::count |> assert_eq(16, "pipe popcount(0xFFFF)")

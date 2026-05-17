@@ -59,9 +59,9 @@ assert_eq Rosetta::Reals::contains($j, 0), 0, "0 ∉ (0, 1]"
 assert_eq Rosetta::Reals::contains($j, 1), 1, "1 ∈ (0, 1]"
 
 # Empty intervals
-assert_eq Rosetta::Reals::is_empty(Rosetta::Reals::interval(2, 1, 0, 0)), 1, "2..1 empty"
-assert_eq Rosetta::Reals::is_empty(Rosetta::Reals::interval(0, 0, 1, 0)), 1, "(0..0] empty"
-assert_eq Rosetta::Reals::is_empty(Rosetta::Reals::interval(0, 0, 0, 0)), 0, "[0..0] non-empty (singleton)"
+assert_eq Rosetta::Reals::is_empty(Rosetta::Reals::interval(2, 1, 0, 0)), 1, "2:1 empty"
+assert_eq Rosetta::Reals::is_empty(Rosetta::Reals::interval(0, 0, 1, 0)), 1, "(0:0] empty"
+assert_eq Rosetta::Reals::is_empty(Rosetta::Reals::interval(0, 0, 0, 0)), 0, "[0:0] non-empty (singleton)"
 
 # Intersection
 my $a = Rosetta::Reals::interval(0, 3, 0, 0)   # [0, 3]

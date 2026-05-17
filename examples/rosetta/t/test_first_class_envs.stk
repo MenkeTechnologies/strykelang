@@ -43,7 +43,7 @@ assert_eq $envs[2]->{get}->(), -1, "env 2 unaffected"
 
 # Environments are first-class: pass into a function, store in a hash, etc.
 fn Rosetta::FCEnv::ramp_up($env, $n) {
-    for (1..$n) { $env->{inc}->() }
+    for (1:$n) { $env->{inc}->() }
     $env->{get}->()
 }
 

@@ -3,7 +3,7 @@
 
 fn Rosetta::CreateFile::create($path) {
     open my $fh, '>', $path or die "Could not create file"
-    print $fh "test string for Rosetta Code\n"
+    p $fh "test string for Rosetta Code"
     close $fh
 }
 

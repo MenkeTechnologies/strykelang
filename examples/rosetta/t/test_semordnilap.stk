@@ -37,7 +37,7 @@ assert_eq Rosetta::Semord::is_pair("hello",    "world"),    0, "no relation"
 my @dict = ("stressed", "desserts", "level", "lager", "regal",
             "spans", "snaps", "loop", "pool", "wolf", "fish")
 my @ps = Rosetta::Semord::pairs(\@dict)
-assert_eq scalar(@ps), 4, "4 semordnilap pairs"
+assert_eq len(@ps), 4, "4 semordnilap pairs"
 
 # Specific pairs present
 my %got
@@ -53,8 +53,8 @@ assert_eq exists($got{"loop|pool"}),         1, "loop pair found"
 # Ordering invariance: pairs(["a","b"]) == pairs(["b","a"])
 my @ab = Rosetta::Semord::pairs(["spans", "snaps"])
 my @ba = Rosetta::Semord::pairs(["snaps", "spans"])
-assert_eq scalar(@ab), 1, "ab order: 1 pair"
-assert_eq scalar(@ba), 1, "ba order: 1 pair"
+assert_eq len(@ab), 1, "ab order: 1 pair"
+assert_eq len(@ba), 1, "ba order: 1 pair"
 
 # Pipe form
 "stressed" |> Rosetta::Semord::reverse_str |> assert_eq("desserts", "pipe reverse")

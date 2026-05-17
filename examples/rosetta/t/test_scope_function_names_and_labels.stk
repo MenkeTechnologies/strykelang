@@ -7,9 +7,9 @@ fn Rosetta::ScopeNames::helper_name() {
 
 fn Rosetta::ScopeNames::walk() {
     my @trace
-    for my $outer (1 .. 3) {
+    for my $outer (1:3) {
         push @trace, "outer-$outer"
-        for my $inner (1 .. 3) {
+        for my $inner (1:3) {
             push @trace, "inner-$outer-$inner"
             if ($outer == 2 && $inner == 2) {
                 push @trace, "break-outer"

@@ -8,7 +8,7 @@ fn Rosetta::Lychrel::check_palindrome($s) {
 
 fn Rosetta::Lychrel::check($n, $max_iter) {
     my $curr = $n
-    for my $i (1..$max_iter) {
+    for my $i (1:$max_iter) {
         my $rev = ~> "$curr" chars rev |> join ""
         $curr = $curr + $rev
         if (Rosetta::Lychrel::check_palindrome("$curr")) {

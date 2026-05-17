@@ -14,7 +14,7 @@ fn Rosetta::RDP::simplify($pts, $eps) {
     return [@$pts] if $n < 3
     my $max_d = 0
     my $idx = 0
-    for my $i (1..$n - 2) {
+    for my $i (1:$n - 2) {
         my $d = Rosetta::RDP::perp_dist($pts->[$i], $pts->[0], $pts->[$n - 1])
         if ($d > $max_d) {
             $max_d = $d
@@ -22,8 +22,8 @@ fn Rosetta::RDP::simplify($pts, $eps) {
         }
     }
     if ($max_d > $eps) {
-        my @left_pts = @$pts[0..$idx]
-        my @right_pts = @$pts[$idx..$n - 1]
+        my @left_pts = @$pts[0:$idx]
+        my @right_pts = @$pts[$idx:$n - 1]
         my $l = Rosetta::RDP::simplify(\@left_pts, $eps)
         my $r = Rosetta::RDP::simplify(\@right_pts, $eps)
         my @combined = @$l[0..len(@$l) - 2]

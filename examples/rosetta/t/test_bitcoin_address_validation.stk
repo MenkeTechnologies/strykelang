@@ -4,7 +4,7 @@
 fn Rosetta::Bitcoin::validate($addr) {
     my $decoded = base58_decode($addr)
     my $hex = unpack("H*", $decoded)
-    return 0 if length($hex) != 50
+    return 0 if len($hex) != 50
     
     my $payload_hex = substr($hex, 0, 42)
     my $checksum_hex = substr($hex, 42, 8)

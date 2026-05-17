@@ -4,7 +4,7 @@
 fn Rosetta::Wheels::matches_at_shift($a, $b, $shift) {
     my $n = len(@$a)
     my $count = 0
-    for my $i (0 .. $n - 1) {
+    for my $i (0:$n - 1) {
         my $j = ($i + $shift) % $n
         if ($a->[$i] == $b->[$j]) { $count++ }
     }
@@ -15,7 +15,7 @@ fn Rosetta::Wheels::best_shift($a, $b) {
     my $n = len(@$a)
     my $best_shift = 0
     my $best_count = -1
-    for my $shift (0 .. $n - 1) {
+    for my $shift (0:$n - 1) {
         my $count = Rosetta::Wheels::matches_at_shift($a, $b, $shift)
         if ($count > $best_count) {
             $best_shift = $shift

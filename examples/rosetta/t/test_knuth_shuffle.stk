@@ -18,7 +18,7 @@ assert_eq len(@$shuffled), 5, "shuffled length"
 
 my %counts
 for my $x (@$shuffled) { $counts{$x}++ }
-for my $i (1..5) {
+for my $i (1:5) {
     assert_eq $counts{$i}, 1, "contains $i"
 }
 

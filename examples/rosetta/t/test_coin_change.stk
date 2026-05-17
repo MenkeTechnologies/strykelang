@@ -5,7 +5,7 @@ fn Rosetta::CoinChange::min_coins($coins, $amount) {
     my $inf = $amount + 1
     my @dp = ($inf) x ($amount + 1)
     $dp[0] = 0
-    for my $a (1..$amount) {
+    for my $a (1:$amount) {
         for my $c (@$coins) {
             if ($c <= $a && $dp[$a - $c] + 1 < $dp[$a]) {
                 $dp[$a] = $dp[$a - $c] + 1

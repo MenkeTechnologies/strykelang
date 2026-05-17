@@ -8,9 +8,9 @@ fn Rosetta::ConjT::transpose($m) {
     my $rows = len(@$m)
     my $cols = len(@{$m->[0]})
     my @out
-    for my $j (0..$cols-1) {
+    for my $j (0:$cols-1) {
         my @row
-        for my $i (0..$rows-1) {
+        for my $i (0:$rows-1) {
             push @row, $m->[$i]->[$j]
         }
         push @out, \@row

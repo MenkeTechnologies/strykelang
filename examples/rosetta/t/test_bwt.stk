@@ -2,7 +2,7 @@
 # Rosetta Code: Burrows-Wheeler transform
 
 fn Rosetta::BWT::transform($text) {
-    my $len = length($text)
+    my $len = len($text)
     return "" if $len == 0
     
     my @chars = $text |> chars()
@@ -29,7 +29,7 @@ fn Rosetta::BWT::transform($text) {
 }
 
 fn Rosetta::BWT::inverse($bwt) {
-    my $len = length($bwt)
+    my $len = len($bwt)
     return "" if $len == 0
     
     my @bwt_chars = $bwt |> chars()

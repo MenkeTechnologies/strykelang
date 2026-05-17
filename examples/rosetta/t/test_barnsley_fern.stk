@@ -5,7 +5,7 @@ fn Rosetta::BarnsleyFern::solve($iters) {
     my ($x, $y) = (0.0, 0.0)
     my @points
     
-    for (1..$iters) {
+    for (1:$iters) {
         my $r = rand()
         my ($nx, $ny)
         

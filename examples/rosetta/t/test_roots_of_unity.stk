@@ -5,7 +5,7 @@ fn Rosetta::RootsUnity::compute($n) {
     return [[1, 0]] if $n == 0
     my $two_pi = 2 * 3.14159265358979323846
     my @roots
-    for my $k (0..$n-1) {
+    for my $k (0:$n-1) {
         my $angle = $two_pi * $k / $n
         push @roots, [cos($angle), sin($angle)]
     }
@@ -43,7 +43,7 @@ for my $n (3, 5, 6, 8, 12) {
         # Compute z^n via repeated complex multiplication
         my $a = 1
         my $b = 0
-        for my $i (1..$n) {
+        for my $i (1:$n) {
             my $na = $a * $z->[0] - $b * $z->[1]
             my $nb = $a * $z->[1] + $b * $z->[0]
             $a = $na

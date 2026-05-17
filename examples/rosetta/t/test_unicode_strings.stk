@@ -5,7 +5,7 @@
 
 fn Rosetta::Unicode::char_count($s) {
     my @chars = split //, $s
-    scalar(@chars)
+    len(@chars)
 }
 
 fn Rosetta::Unicode::byte_count($s) {
@@ -50,7 +50,7 @@ assert_eq uc("αβγ"), "ΑΒΓ", "lowercase Greek → upper"
 
 # Substring via character split (substr operates byte-wise)
 my @greek_chars = split //, "αβγδε"
-assert_eq join("", @greek_chars[1..2]), "βγ", "Greek substring via split"
+assert_eq join("", @greek_chars[1:2]), "βγ", "Greek substring via split"
 
 # Concatenation works across scripts
 assert_eq "a" . "α" . "あ", "aαあ", "concatenated multi-script"

@@ -23,7 +23,7 @@ fn Rosetta::Mertens::moebius($n) {
 
 fn Rosetta::Mertens::compute($n) {
     my $sum = 0
-    for my $k (1..$n) {
+    for my $k (1:$n) {
         $sum += Rosetta::Mertens::moebius($k)
     }
     $sum

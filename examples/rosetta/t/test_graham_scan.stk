@@ -11,7 +11,7 @@ fn Rosetta::Graham::hull($points) {
 
     # Pivot: lowest y, then lowest x
     my $piv = 0
-    for my $i (1..$n-1) {
+    for my $i (1:$n-1) {
         if ($points->[$i][1] < $points->[$piv][1]
             || ($points->[$i][1] == $points->[$piv][1]
                 && $points->[$i][0] < $points->[$piv][0])) {

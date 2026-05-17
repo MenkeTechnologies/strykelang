@@ -27,7 +27,7 @@ fn Rosetta::SqNotCube::list($count) {
 my $r = Rosetta::SqNotCube::list(30)
 my $sq_only = $r->[0]
 my $both    = $r->[1]
-my @first10 = @{$sq_only}[0..9]
+my @first10 = @{$sq_only}[0:9]
 assert_eq join(",", @first10), "4,9,16,25,36,49,81,100,121,144", "first 10 squares-not-cubes"
 
 # Squares that are also cubes (= 6th powers): 1, 64, 729, 4096, 15625, 46656, ...

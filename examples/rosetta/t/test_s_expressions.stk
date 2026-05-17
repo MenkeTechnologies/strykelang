@@ -6,7 +6,7 @@
 fn Rosetta::SExpr::tokenize($s) {
     my @tokens
     my $i = 0
-    my $n = length($s)
+    my $n = len($s)
     while ($i < $n) {
         my $c = substr($s, $i, 1)
         if ($c =~ /\s/) { $i++; next }
@@ -52,7 +52,7 @@ fn Rosetta::SExpr::parse_tokens($tokens, $pos) {
 }
 
 fn Rosetta::SExpr::coerce($t) {
-    return { type => "string", value => substr($t, 1, length($t) - 2) }
+    return { type => "string", value => substr($t, 1, len($t) - 2) }
         if substr($t, 0, 1) eq '"'
     return { type => "int",    value => $t + 0 }    if $t =~ /^-?\d+$/
     return { type => "float",  value => $t + 0 }    if $t =~ /^-?\d+\.\d+$/
@@ -87,7 +87,7 @@ assert_eq join("|", @$tk3), '(|say|"hello world"|)', "tokenise string"
 # Parse + structure
 my $p = Rosetta::SExpr::parse("(add 1 2)")
 assert_eq ref($p), "ARRAY", "list parsed"
-assert_eq scalar(@$p), 3, "3 items"
+assert_eq len(@$p), 3, "3 items"
 assert_eq $p->[0]{type},  "symbol", "first is symbol"
 assert_eq $p->[0]{value}, "add",    "symbol = add"
 assert_eq $p->[1]{type},  "int",    "1 is int"

@@ -26,6 +26,6 @@ assert_eq Rosetta::CountOctal::to_octal(512),"1000","512 -> 1000"
 my @first17 = Rosetta::CountOctal::range(0, 16)
 assert_eq join(",", @first17),
     "0,1,2,3,4,5,6,7,10,11,12,13,14,15,16,17,20",
-    "0..16 in octal"
+    "0:16 in octal"
 
 test_run

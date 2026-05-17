@@ -8,7 +8,7 @@ fn Rosetta::RangeExpansion::solve($s) {
         if ($p =~ /(-?\d+)-(-?\d+)/) {
             my $start = $1
             my $end = $2
-            push @res, ($start .. $end)
+            push @res, ($start:$end)
         } else {
             push @res, $p
         }

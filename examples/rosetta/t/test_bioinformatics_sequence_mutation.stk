@@ -38,7 +38,7 @@ fn Rosetta::SequenceMutation::demo() {
     my $mutated = Bio::mutate($seq, 0.2)
     "Mutated:   $mutated" |> p
     
-    assert_ok length($mutated) >= 0, "Mutated sequence has valid length"
+    assert_ok len($mutated) >= 0, "Mutated sequence has valid length"
     # Ensure mutated sequence only contains A, C, G, T, or is empty
     assert_ok $mutated =~ /^[ACGT]*$/, "Mutated sequence contains valid nucleotides"
 }

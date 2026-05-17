@@ -21,7 +21,7 @@ fn Rosetta::RisesFalls::list_below($limit) {
 }
 
 # Single digits are trivially equal (0 == 0)
-for my $n (1..9) {
+for my $n (1:9) {
     assert_eq Rosetta::RisesFalls::has_equal($n), 1, sprintf("%d has 0=0", $n)
 }
 

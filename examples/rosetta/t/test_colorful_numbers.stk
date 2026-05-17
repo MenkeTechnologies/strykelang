@@ -23,14 +23,14 @@ fn Rosetta::Colorful::is_colorful($n) {
 
 fn Rosetta::Colorful::all_under($limit) {
     my @res
-    for my $n (0..$limit) {
+    for my $n (0:$limit) {
         push @res, $n if Rosetta::Colorful::is_colorful($n)
     }
     @res
 }
 
 # Single-digit numbers are colorful trivially.
-for my $n (0..9) {
+for my $n (0:9) {
     assert_ok Rosetta::Colorful::is_colorful($n), "single $n"
 }
 

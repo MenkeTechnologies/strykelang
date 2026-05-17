@@ -13,14 +13,14 @@ fn Rosetta::ColourBars::row($width) {
 
 fn Rosetta::ColourBars::render($width, $height) {
     my $line = Rosetta::ColourBars::row($width)
-    my @rows = ~> 1 .. $height map { $line }
+    my @rows = ~> 1:$height map { $line }
     \@rows
 }
 
 fn Rosetta::ColourBars::unique($text) {
     my %seen
     for my $ch (split //, $text) { $seen{$ch} = 1 if $ch =~ /[A-Z]/ }
-    scalar(keys %seen)
+    len(keys %seen)
 }
 
 my $bars = Rosetta::ColourBars::render(32, 4)

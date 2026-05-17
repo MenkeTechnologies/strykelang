@@ -4,7 +4,7 @@
 fn Rosetta::Metronome::schedule($bpm, $beats) {
     my $interval = 60.0 / $bpm
     my @times
-    for my $i (0 .. $beats - 1) {
+    for my $i (0:$beats - 1) {
         push @times, $i * $interval
     }
     \@times

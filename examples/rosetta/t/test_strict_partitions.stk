@@ -5,9 +5,9 @@
 fn Rosetta::StrictPart::count($n) {
     return 1 if $n == 0
     my @dp
-    for my $i (0..$n) { $dp[$i] = 0 }
+    for my $i (0:$n) { $dp[$i] = 0 }
     $dp[0] = 1
-    for my $part (1..$n) {
+    for my $part (1:$n) {
         for (my $i = $n; $i >= $part; $i -= 1) {
             $dp[$i] += $dp[$i - $part]
         }
@@ -35,12 +35,12 @@ fn Rosetta::StrictPart::enumerate($n, $max_part) {
 
 # OEIS A000009: 1, 1, 1, 2, 2, 3, 4, 5, 6, 8, 10, 12, 15, 18, 22, 27, 32, 38, 46, 54, 64
 my @want = (1, 1, 1, 2, 2, 3, 4, 5, 6, 8, 10, 12, 15, 18, 22, 27, 32, 38, 46, 54, 64)
-for my $n (0..20) {
+for my $n (0:20) {
     assert_eq Rosetta::StrictPart::count($n), $want[$n], "strict_count($n)"
 }
 
 # count agrees with enumeration size for small n
-for my $n (0..10) {
+for my $n (0:10) {
     my $en = Rosetta::StrictPart::enumerate($n, $n)
     my $cnt = len(@$en)
     my $expected = Rosetta::StrictPart::count($n)

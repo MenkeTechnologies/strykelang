@@ -4,7 +4,7 @@
 fn Rosetta::Repunit::generate($n) {
     # A repunit is a number like 1, 11, 111, ...
     my $res = 0
-    for my $i (1 .. $n) {
+    for my $i (1:$n) {
         $res = $res * 10 + 1
     }
     $res

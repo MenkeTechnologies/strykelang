@@ -10,7 +10,7 @@ fn Rosetta::CocktailSort::sort($list) {
     
     while ($swapped) {
         $swapped = 0
-        for my $i ($start..$end - 1) {
+        for my $i ($start:$end - 1) {
             if ($arr[$i] > $arr[$i + 1]) {
                 ($arr[$i], $arr[$i + 1]) = ($arr[$i + 1], $arr[$i])
                 $swapped = 1
@@ -20,7 +20,7 @@ fn Rosetta::CocktailSort::sort($list) {
         if ($swapped) {
             $swapped = 0
             $end--
-            for my $i (~> ($start..$end - 1) rev) {
+            for my $i (~> ($start:$end - 1) rev) {
                 if ($arr[$i] > $arr[$i + 1]) {
                     ($arr[$i], $arr[$i + 1]) = ($arr[$i + 1], $arr[$i])
                     $swapped = 1

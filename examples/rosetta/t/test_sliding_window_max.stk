@@ -39,9 +39,9 @@ fn Rosetta::SlidingMax::naive_max($arr, $k) {
     my $n = len(@$arr)
     return [] if $k <= 0 || $k > $n
     my @out
-    for my $i (0..$n - $k) {
+    for my $i (0:$n - $k) {
         my $m = $arr->[$i]
-        for my $j ($i + 1..$i + $k - 1) { $m = $arr->[$j] if $arr->[$j] > $m }
+        for my $j ($i + 1:$i + $k - 1) { $m = $arr->[$j] if $arr->[$j] > $m }
         push @out, $m
     }
     \@out

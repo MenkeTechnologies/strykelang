@@ -27,7 +27,7 @@ fn Rosetta::Mean::harmonic(@nums) {
     }
 }
 
-assert_eq Rosetta::Mean::arithmetic(1, 2, 3, 4, 5), 3, "mean 1..5"
+assert_eq Rosetta::Mean::arithmetic(1, 2, 3, 4, 5), 3, "mean 1:5"
 assert_eq Rosetta::Mean::arithmetic(10, 20, 30), 20, "mean 10,20,30"
 assert_eq Rosetta::Mean::arithmetic(5), 5, "mean single"
 

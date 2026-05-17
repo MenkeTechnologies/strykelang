@@ -23,7 +23,7 @@ fn Rosetta::Ascending::is_ascending($n) {
 }
 
 my @ascending
-for my $i (2..500) {
+for my $i (2:500) {
     if (Rosetta::Ascending::is_ascending($i) && Rosetta::Ascending::is_prime($i)) {
         push @ascending, $i
     }

@@ -2,15 +2,15 @@
 # Rosetta Code: Compare length of two strings
 
 fn Rosetta::CompareLength::shorter($a, $b) {
-    length($a) < length($b) ? $a : $b
+    len($a) < len($b) ? $a : $b
 }
 
 fn Rosetta::CompareLength::cmp_len($a, $b) {
-    length($a) <=> length($b)
+    len($a) <=> len($b)
 }
 
 fn Rosetta::CompareLength::sort_by_length(@strs) {
-    ~> @strs sort { length($a) <=> length($b) }
+    ~> @strs sort { len($a) <=> len($b) }
 }
 
 assert_eq Rosetta::CompareLength::shorter("hi", "hello"), "hi", "shorter picks hi"
@@ -24,7 +24,7 @@ assert_eq join(",", @sorted), "a,bb,ccc,dddd", "sorted by length"
 
 # pipeline form
 my @descending = ("alpha","beta","gammaring","delta")
-    |> sort { length($b) <=> length($a) }
+    |> sort { len($b) <=> len($a) }
 assert_eq $descending[0], "gammaring", "longest via pipe"
 
 test_run

@@ -42,12 +42,12 @@ assert_eq Rosetta::Nth::ordinal(123),"123rd","123rd"
 my @first_25 = Rosetta::Nth::range(1, 25)
 assert_eq join(" ", @first_25),
     "1st 2nd 3rd 4th 5th 6th 7th 8th 9th 10th 11th 12th 13th 14th 15th 16th 17th 18th 19th 20th 21st 22nd 23rd 24th 25th",
-    "1..25 ordinals"
+    "1:25 ordinals"
 
 my @teens = Rosetta::Nth::range(250, 265)
 assert_eq join(" ", @teens),
     "250th 251st 252nd 253rd 254th 255th 256th 257th 258th 259th 260th 261st 262nd 263rd 264th 265th",
-    "250..265 ordinals"
+    "250:265 ordinals"
 
 # Pipe form
 21 |> Rosetta::Nth::ordinal |> assert_eq("21st", "pipe 21st")

@@ -3,7 +3,7 @@
 
 fn Rosetta::Turtle::new($width, $height) {
     my @rows
-    for my $y (0 .. $height - 1) {
+    for my $y (0:$height - 1) {
         push @rows, ("." x $width)
     }
     { x => 1, y => 1, dir => 0, rows => \@rows, width => $width, height => $height }
@@ -20,7 +20,7 @@ fn Rosetta::Turtle::turn_right($turtle) {
 }
 
 fn Rosetta::Turtle::forward($turtle, $steps) {
-    for my $step (1 .. $steps) {
+    for my $step (1:$steps) {
         if ($turtle->{dir} == 0) { $turtle->{x}++ }
         elsif ($turtle->{dir} == 1) { $turtle->{y}++ }
         elsif ($turtle->{dir} == 2) { $turtle->{x}-- }
@@ -35,7 +35,7 @@ fn Rosetta::Turtle::render($turtle) {
 
 my $turtle = Rosetta::Turtle::new(8, 8)
 Rosetta::Turtle::plot($turtle)
-for my $i (1 .. 4) {
+for my $i (1:4) {
     Rosetta::Turtle::forward($turtle, 2)
     Rosetta::Turtle::turn_right($turtle)
 }

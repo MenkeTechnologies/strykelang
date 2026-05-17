@@ -8,14 +8,14 @@ fn Rosetta::NatSort::tokens($s) {
     my $is_digit = 0
     for my $c ($s |> chars) {
         my $cd = ($c =~ /\d/) ? 1 : 0
-        if (length($cur) > 0 && $cd != $is_digit) {
+        if (len($cur) > 0 && $cd != $is_digit) {
             push @parts, $is_digit ? [$cur + 0, "n"] : [$cur, "s"]
             $cur = ""
         }
         $cur .= $c
         $is_digit = $cd
     }
-    push @parts, $is_digit ? [$cur + 0, "n"] : [$cur, "s"] if length($cur) > 0
+    push @parts, $is_digit ? [$cur + 0, "n"] : [$cur, "s"] if len($cur) > 0
     \@parts
 }
 
@@ -23,7 +23,7 @@ fn Rosetta::NatSort::compare($_0, $_1) {
     my $ta = Rosetta::NatSort::tokens($_0)
     my $tb = Rosetta::NatSort::tokens($_1)
     my $len = len(@$ta) < len(@$tb) ? len(@$ta) : len(@$tb)
-    for my $i (0 .. $len - 1) {
+    for my $i (0:$len - 1) {
         my ($va, $ka) = ($ta->[$i][0], $ta->[$i][1])
         my ($vb, $kb) = ($tb->[$i][0], $tb->[$i][1])
         if ($ka eq "n" && $kb eq "n") {

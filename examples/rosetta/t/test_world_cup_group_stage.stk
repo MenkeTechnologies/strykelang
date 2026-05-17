@@ -19,15 +19,15 @@ fn Rosetta::WorldCup::points_for_outcome($pair, $outcome) {
 fn Rosetta::WorldCup::all_standings() {
     my $pairs = Rosetta::WorldCup::all_pairs()
     my @results
-    for my $code (0..728) {
+    for my $code (0:728) {
         my @outs
         my $c = $code
-        for my $p (0..5) {
+        for my $p (0:5) {
             push @outs, $c % 3
             $c = int($c / 3)
         }
         my @pts = (0, 0, 0, 0)
-        for my $i (0..5) {
+        for my $i (0:5) {
             my $pair = $pairs->[$i]
             my $game = Rosetta::WorldCup::points_for_outcome($pair, $outs[$i])
             $pts[$pair->[0]] += $game->[0]
@@ -45,7 +45,7 @@ fn Rosetta::WorldCup::rank_distribution() {
         my @sorted = sort { $b <=> $a } @$std
         my $team0_pts = $std->[0]
         my $rank = 0
-        for my $i (0..3) {
+        for my $i (0:3) {
             $rank++ if $sorted[$i] > $team0_pts
         }
         $rank_counts[$rank]++
@@ -55,11 +55,11 @@ fn Rosetta::WorldCup::rank_distribution() {
 
 # Six games, every pair once
 my $pairs = Rosetta::WorldCup::all_pairs()
-assert_eq scalar(@$pairs), 6, "6 game pairs"
+assert_eq len(@$pairs), 6, "6 game pairs"
 
 # 3^6 = 729 total outcome tables
 my $standings = Rosetta::WorldCup::all_standings()
-assert_eq scalar(@$standings), 729, "729 outcome tables"
+assert_eq len(@$standings), 729, "729 outcome tables"
 
 # Sum of points across 4 teams in any single table lies in [12, 18]:
 # each draw contributes 2, each decisive contributes 3, over 6 games.
@@ -96,7 +96,7 @@ for my $c (@$r) { $tot += $c }
 assert_eq $tot, 729, "rank counts sum to 729"
 
 # Every rank slot has at least one outcome (no rank is unreachable)
-for my $i (0..3) {
+for my $i (0:3) {
     assert_ok $r->[$i] > 0, sprintf("rank %d has > 0 outcomes", $i)
 }
 
