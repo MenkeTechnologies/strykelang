@@ -61,6 +61,6 @@ printf "  examples/^kvstore_*.stk(N) : %d files\n", len @not_kv
 p ""
 p "── Compose with pipe-forward ──────────────────────────"
 my $stk_lines = glob("examples/*.stk")
-    |> map { slurp(_) |> split(/\n/) |> len }
+    |> map { ~> _ slurp split(/\n/) len }
     |> sum
 printf "  total .stk lines under examples/ : %d\n", $stk_lines

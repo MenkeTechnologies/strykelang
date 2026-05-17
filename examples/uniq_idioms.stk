@@ -39,7 +39,7 @@ p "  sort+uniq noisy     → ", join(",", @canonical)
 p ""
 p "── pipe-forward composition: count distinct tokens ────"
 my $text = "the quick brown fox jumps over the lazy dog the fox"
-my $distinct = $text |> split(/\s+/) |> uniq |> len
+my $distinct = ~> $text split(/\s+/) uniq len
 p "  distinct words in   : '$text'"
 p "  count               : $distinct"
 
