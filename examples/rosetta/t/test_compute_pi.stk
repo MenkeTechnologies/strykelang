@@ -5,7 +5,7 @@ fn Rosetta::Pi::leibniz($n) {
     # 4 * (1 - 1/3 + 1/5 - 1/7 + ...)  — slow O(1/n) convergence
     my $sum = 0.0
     my $sign = 1
-    for my $k (0..$n-1) {
+    for my $k (0:$n-1) {
         $sum += $sign / (2 * $k + 1)
         $sign = -$sign
     }
@@ -16,7 +16,7 @@ fn Rosetta::Pi::nilakantha($n) {
     # 3 + 4/(2*3*4) - 4/(4*5*6) + 4/(6*7*8) - ... — much faster
     my $sum = 3.0
     my $sign = 1
-    for my $k (1..$n) {
+    for my $k (1:$n) {
         my $a = 2 * $k
         my $b = $a + 1
         my $c = $b + 1
@@ -32,7 +32,7 @@ fn Rosetta::Pi::machin_arctan($x_num, $x_den, $terms) {
     my $num = $x_num
     my $den = $x_den
     my $sign = 1
-    for my $k (0..$terms-1) {
+    for my $k (0:$terms-1) {
         $sum += $sign * $num / ((2 * $k + 1) * $den)
         $num *= $x_num * $x_num
         $den *= $x_den * $x_den

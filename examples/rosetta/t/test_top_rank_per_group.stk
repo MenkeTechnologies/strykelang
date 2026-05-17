@@ -21,7 +21,7 @@ fn Rosetta::TopRank::compute($records, $group_key, $score_key, $n) {
         } @rs
         my @top
         my $take = $n < len(@sorted) ? $n : len(@sorted)
-        for my $i (0..$take - 1) {
+        for my $i (0:$take - 1) {
             push @top, $sorted[$i][1]
         }
         $out{$g} = \@top
@@ -50,7 +50,7 @@ my @employees = (
 my $r = Rosetta::TopRank::compute(\@employees, "dept", "salary", 2)
 
 # D101: Woltman 53500, McClellan 41500
-assert_eq scalar(@{$r->{D101}}), 2, "D101 has 2 entries"
+assert_eq len(@{$r->{D101}}), 2, "D101 has 2 entries"
 assert_eq $r->{D101}[0]{name}, "George Woltman",  "D101 #1"
 assert_eq $r->{D101}[1]{name}, "David McClellan", "D101 #2"
 
@@ -63,19 +63,19 @@ assert_eq $r->{D202}[0]{name}, "Rich Holcomb",   "D202 #1"
 assert_eq $r->{D202}[1]{name}, "Claire Buckman", "D202 #2"
 
 # D190 has only 2 — top 2 returns both
-assert_eq scalar(@{$r->{D190}}), 2, "D190 has 2 entries"
+assert_eq len(@{$r->{D190}}), 2, "D190 has 2 entries"
 
 # Top 1 per group
 my $top1 = Rosetta::TopRank::compute(\@employees, "dept", "salary", 1)
 for my $g ("D101", "D050", "D202", "D190") {
-    assert_eq scalar(@{$top1->{$g}}), 1, sprintf("%s has 1 entry", $g)
+    assert_eq len(@{$top1->{$g}}), 1, sprintf("%s has 1 entry", $g)
 }
 
 # Top 100 returns all in each group
 my $all = Rosetta::TopRank::compute(\@employees, "dept", "salary", 100)
 my $total = 0
-for my $g (keys %$all) { $total += scalar(@{$all->{$g}}) }
-assert_eq $total, scalar(@employees), "all 13 records returned"
+for my $g (keys %$all) { $total += len(@{$all->{$g}}) }
+assert_eq $total, len(@employees), "all 13 records returned"
 
 # Pipe form
 \@employees |> fn { Rosetta::TopRank::compute(_, "dept", "salary", 1) }

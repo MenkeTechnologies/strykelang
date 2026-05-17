@@ -12,9 +12,9 @@ fn Rosetta::OHalloran::reachable($limit) {
     my $a = 1
     while (2 * $a * (2 * $a) >= 0) {
         last if $a * $a >= $limit
-        for my $b ($a..$limit) {
+        for my $b ($a:$limit) {
             last if 2 * ($a * $b + $a + $b) > $limit
-            for my $c ($b..$limit) {
+            for my $c ($b:$limit) {
                 my $s = 2 * ($a * $b + $a * $c + $b * $c)
                 last if $s > $limit
                 $h{$s} = 1
@@ -28,7 +28,7 @@ fn Rosetta::OHalloran::reachable($limit) {
 fn Rosetta::OHalloran::list_below($limit) {
     my $reach = Rosetta::OHalloran::reachable($limit)
     my @out
-    for my $n (6..$limit) {
+    for my $n (6:$limit) {
         next if $n % 2 != 0
         push @out, $n if !exists $reach->{$n}
     }

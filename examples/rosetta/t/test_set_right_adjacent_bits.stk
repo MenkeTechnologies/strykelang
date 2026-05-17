@@ -9,9 +9,9 @@ fn Rosetta::SetRight::apply($s, $k) {
     my @bits = split //, $s
     my $n = len(@bits)
     my @out = (0) x $n
-    for my $i (0..$n - 1) {
+    for my $i (0:$n - 1) {
         if ($bits[$i] eq "1") {
-            for my $j ($i..$i + $k) {
+            for my $j ($i:$i + $k) {
                 $out[$j] = 1 if $j < $n
             }
         }

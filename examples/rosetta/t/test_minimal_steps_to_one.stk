@@ -11,7 +11,7 @@ fn Rosetta::MinSteps::compute($n) {
     return [0, [1]] if $n == 1
     my @best = (0, 0)        # best[k] = (steps, parent)
     my @parent = (0, 0)
-    for my $k (2..$n) {
+    for my $k (2:$n) {
         my $b = $best[$k - 1] + 1
         my $p = $k - 1
         if ($k % 2 == 0 && $best[int($k / 2)] + 1 < $b) {

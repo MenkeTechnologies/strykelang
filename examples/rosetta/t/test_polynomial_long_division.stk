@@ -22,7 +22,7 @@ fn Rosetta::PolyDiv::divmod($num, $den) {
     while ($deg_r >= $deg_d) {
         my $coef = $r[$deg_r] / $d[$deg_d]
         $q[$deg_r - $deg_d] = $coef
-        for my $i (0..$deg_d) {
+        for my $i (0:$deg_d) {
             $r[$deg_r - $deg_d + $i] -= $coef * $d[$i]
         }
         $deg_r--
@@ -30,7 +30,7 @@ fn Rosetta::PolyDiv::divmod($num, $den) {
             $deg_r--
         }
     }
-    my @rem = $deg_r >= 0 ? @r[0..$deg_r] : (0)
+    my @rem = $deg_r >= 0 ? @r[0:$deg_r] : (0)
     [Rosetta::PolyDiv::trim(\@q), Rosetta::PolyDiv::trim(\@rem)]
 }
 

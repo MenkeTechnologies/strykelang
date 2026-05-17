@@ -10,7 +10,7 @@ fn Rosetta::Motzkin::compute($n) {
         $memo{$n}
     } else {
         my $res = Rosetta::Motzkin::compute($n-1)
-        for my $i (0..$n-2) {
+        for my $i (0:$n-2) {
             $res += Rosetta::Motzkin::compute($i) * Rosetta::Motzkin::compute($n-2-$i)
         }
         $memo{$n} = $res

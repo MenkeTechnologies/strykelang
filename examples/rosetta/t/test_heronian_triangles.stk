@@ -11,9 +11,9 @@ fn Rosetta::Heronian::gcd($a, $b) {
 fn Rosetta::Heronian::generate($max_p) {
     my @triangles
     
-    for my $c (1..$max_p) {
-        for my $b (1..$c) {
-            for my $a (1..$b) {
+    for my $c (1:$max_p) {
+        for my $b (1:$c) {
+            for my $a (1:$b) {
                 if ($a + $b > $c) {
                     my $s = ($a + $b + $c) / 2
                     if ($s > $a && $s > $b && $s > $c) {

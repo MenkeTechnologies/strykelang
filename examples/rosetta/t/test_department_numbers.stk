@@ -5,10 +5,10 @@
 
 fn Rosetta::DeptNum::solutions() {
     my @sols
-    for my $p (1..7) {
-        for my $s (1..7) {
+    for my $p (1:7) {
+        for my $s (1:7) {
             next if $s == $p || $s % 2 != 0
-            for my $f (1..7) {
+            for my $f (1:7) {
                 next if $f == $p || $f == $s
                 next unless $p + $s + $f == 12
                 push @sols, [$p, $s, $f]

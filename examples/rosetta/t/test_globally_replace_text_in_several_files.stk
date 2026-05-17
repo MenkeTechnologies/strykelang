@@ -26,6 +26,6 @@ my ($files, $modified) = Rosetta::GlobalReplace::run("World", "Stryke", "file1.t
 
 assert_eq $files->{"file1.txt"}, "Hello Stryke", "file1 replaced"
 assert_eq $files->{"file2.txt"}, "Stryke is big", "file2 replaced"
-assert_eq scalar(@$modified), 2, "Two files modified"
+assert_eq len(@$modified), 2, "Two files modified"
 
 test_run

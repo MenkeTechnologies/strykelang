@@ -5,7 +5,7 @@
 fn Rosetta::Tokenizer::lex($src) {
     my @out
     my $i = 0
-    my $n = length($src)
+    my $n = len($src)
     while ($i < $n) {
         my $c = substr($src, $i, 1)
         if ($c =~ /\s/) {

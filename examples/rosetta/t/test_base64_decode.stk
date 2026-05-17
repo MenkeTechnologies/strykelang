@@ -5,7 +5,7 @@ fn Rosetta::Base64Decode::custom($str) {
     my $alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
     my %vals
     my @alpha_chars = $alphabet |> chars
-    for my $i (0..63) { $vals{$alpha_chars[$i]} = $i }
+    for my $i (0:63) { $vals{$alpha_chars[$i]} = $i }
     
     my @chars = $str |> chars
     my @res

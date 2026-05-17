@@ -5,9 +5,9 @@ fn Rosetta::PancakeSort::flip {
     my $list = _
     my $k = _1
     my @arr = @$list
-    my @sub = @arr[0..$k]
+    my @sub = @arr[0:$k]
     my @flipped = ~> @sub rev
-    for my $i (0..$k) {
+    for my $i (0:$k) {
         $arr[$i] = $flipped[$i]
     }
     \@arr
@@ -22,10 +22,10 @@ fn Rosetta::PancakeSort::pancake_sort {
         return \@arr
     }
     
-    for my $curr (~> (1..$n) rev) {
+    for my $curr (~> (1:$n) rev) {
         # find index of max in 0..$curr-1
         my $max_idx = 0
-        for my $i (1..$curr-1) {
+        for my $i (1:$curr-1) {
             if ($arr[$i] > $arr[$max_idx]) {
                 $max_idx = $i
             }

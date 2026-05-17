@@ -3,7 +3,7 @@
 
 fn Rosetta::PascalRow::pascal_row($n) {
     my @row = (1)
-    for my $i (1..$n) {
+    for my $i (1:$n) {
         my $val = $row[$i-1] * ($n - $i + 1) / $i
         push @row, int($val + 0.5)
     }

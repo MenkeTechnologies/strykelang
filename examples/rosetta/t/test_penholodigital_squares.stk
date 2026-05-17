@@ -5,7 +5,7 @@
 
 fn Rosetta::Penholo::is_pen($n) {
     my $s = "$n"
-    return 0 if length($s) != 9
+    return 0 if len($s) != 9
     my %seen
     for my $c (split //, $s) {
         return 0 if $c eq "0"
@@ -19,7 +19,7 @@ fn Rosetta::Penholo::squares_below($limit) {
     my @out
     my $k = int(sqrt($limit))
     while ($k * $k > $limit) { $k-- }
-    for my $r (1..$k) {
+    for my $r (1:$k) {
         my $sq = $r * $r
         push @out, $sq if Rosetta::Penholo::is_pen($sq)
     }

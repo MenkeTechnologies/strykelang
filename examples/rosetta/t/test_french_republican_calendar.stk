@@ -45,7 +45,7 @@ fn Rosetta::Republican::greg_to_abs($y, $m, $d) {
     my @m_days = (0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
     if (Rosetta::Republican::check_leap($y)) { $m_days[2] = 29 }
     
-    for (1 .. $m - 1) {
+    for (1:$m - 1) {
         $days += $m_days[_]
     }
     $days + $d

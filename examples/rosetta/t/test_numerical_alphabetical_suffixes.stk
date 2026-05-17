@@ -30,7 +30,7 @@ fn Rosetta::SiSuffix::parse($s) {
     my $prefix = $2
     my $unit = $3
     my $factor
-    if (length($prefix) >= 2 && substr($prefix, -1) eq "i") {
+    if (len($prefix) >= 2 && substr($prefix, -1) eq "i") {
         my $key = uc(substr($prefix, 0, 1)) . "i"
         $factor = Rosetta::SiSuffix::iec_factor($key)
     } else {

@@ -4,7 +4,7 @@
 fn Rosetta::TakeNotes::add_note($file, $note) {
     # Append the note to the file with a newline
     open my $fh, '>>', $file or die "Could not open $file"
-    print $fh "$note\n"
+    p $fh "$note"
     close $fh
 }
 

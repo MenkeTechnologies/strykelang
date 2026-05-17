@@ -33,12 +33,12 @@ fn Rosetta::EliasGamma::encode_list($xs) {
 
 fn Rosetta::EliasGamma::decode_one($s, $pos_ref) {
     my $i = $$pos_ref
-    return undef if $i >= length($s)
+    return undef if $i >= len($s)
     # Count leading zeros.
     my $zeros = 0
-    while ($i + $zeros < length($s) && substr($s, $i + $zeros, 1) eq "0") { $zeros++ }
+    while ($i + $zeros < len($s) && substr($s, $i + $zeros, 1) eq "0") { $zeros++ }
     my $total = 2 * $zeros + 1
-    return undef if $i + $total > length($s)
+    return undef if $i + $total > len($s)
     my $bits = substr($s, $i + $zeros, $zeros + 1)
     my $val = 0
     ~> split(//, $bits) ep { $val = $val * 2 + (_ eq "1" ? 1 : 0) }
@@ -49,7 +49,7 @@ fn Rosetta::EliasGamma::decode_one($s, $pos_ref) {
 fn Rosetta::EliasGamma::decode_list($s) {
     my $pos = 0
     my @out
-    while ($pos < length($s)) {
+    while ($pos < len($s)) {
         my $v = Rosetta::EliasGamma::decode_one($s, \$pos)
         last if !defined $v
         push @out, $v

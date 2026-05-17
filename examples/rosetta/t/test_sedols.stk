@@ -15,7 +15,7 @@ fn Rosetta::Sedol::char_value($c) {
 fn Rosetta::Sedol::checksum($six) {
     my @w = (1, 3, 1, 7, 3, 9)
     my $sum = 0
-    for my $i (0..5) {
+    for my $i (0:5) {
         my $v = Rosetta::Sedol::char_value(substr($six, $i, 1))
         return -1 if $v < 0
         $sum += $v * $w[$i]
@@ -24,7 +24,7 @@ fn Rosetta::Sedol::checksum($six) {
 }
 
 fn Rosetta::Sedol::is_valid($s) {
-    return 0 if length($s) != 7
+    return 0 if len($s) != 7
     my $cd = Rosetta::Sedol::checksum(substr($s, 0, 6))
     return 0 if $cd < 0
     substr($s, 6, 1) eq "$cd"

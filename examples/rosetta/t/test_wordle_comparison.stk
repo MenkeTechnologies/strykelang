@@ -6,23 +6,23 @@
 # absent. Each target letter can only feed one Y/G match.
 
 fn Rosetta::Wordle::compare($target, $guess) {
-    return undef if length($target) != length($guess)
-    my $n = length($target)
+    return undef if len($target) != len($guess)
+    my $n = len($target)
     my @t = split //, $target
     my @g = split //, $guess
     my @res = ("-") x $n
     my @consumed = (0) x $n
     # Pass 1: greens
-    for my $i (0..$n - 1) {
+    for my $i (0:$n - 1) {
         if ($g[$i] eq $t[$i]) {
             $res[$i] = "G"
             $consumed[$i] = 1
         }
     }
     # Pass 2: yellows
-    for my $i (0..$n - 1) {
+    for my $i (0:$n - 1) {
         next if $res[$i] eq "G"
-        for my $j (0..$n - 1) {
+        for my $j (0:$n - 1) {
             next if $consumed[$j]
             next if $i == $j
             if ($g[$i] eq $t[$j]) {

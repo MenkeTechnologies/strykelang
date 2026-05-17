@@ -7,7 +7,7 @@ fn Rosetta::Mail::compose($from, $to, $subject, $body) {
 
 fn Rosetta::Mail::send($outbox, $message) {
     push @$outbox, $message
-    scalar(@$outbox)
+    len(@$outbox)
 }
 
 my @outbox

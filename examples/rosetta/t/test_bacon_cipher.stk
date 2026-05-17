@@ -18,7 +18,7 @@ fn Rosetta::Bacon::decode($text) {
     my $t = $text |> lc() |> { _ =~ s/[^ab]//gr }
     
     my @res
-    for (my $i = 0; $i < length($t); $i += 5) {
+    for (my $i = 0; $i < len($t); $i += 5) {
         my $chunk = substr($t, $i, 5)
         my $bin = $chunk =~ tr/ab/01/r
         push @res, chr(oct("0b$bin") + ord("A"))

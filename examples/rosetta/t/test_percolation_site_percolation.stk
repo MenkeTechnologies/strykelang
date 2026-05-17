@@ -6,7 +6,7 @@ fn Rosetta::SitePerc::key($r, $c) { "$r,$c" }
 fn Rosetta::SitePerc::percolates($n, $open_sites) {
     my %open = map { Rosetta::SitePerc::key($_->[0], $_->[1]) => 1 } @$open_sites
     my @queue
-    for my $c (0 .. $n - 1) {
+    for my $c (0:$n - 1) {
         push @queue, [0, $c] if $open{Rosetta::SitePerc::key(0, $c)}
     }
 

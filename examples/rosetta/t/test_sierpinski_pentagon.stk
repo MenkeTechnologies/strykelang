@@ -7,7 +7,7 @@
 fn Rosetta::SierpPent::vertices($cx, $cy, $r) {
     my $pi = 4 * atan2(1, 1)
     my @pts
-    for my $k (0..4) {
+    for my $k (0:4) {
         my $angle = $pi / 2 + 2 * $pi * $k / 5
         push @pts, [$cx + $r * cos($angle), $cy + $r * sin($angle)]
     }
@@ -54,7 +54,7 @@ my $d5 = Rosetta::SierpPent::recurse(0, 0, 1, 5)
 assert_eq len(@$d5), 3125, "depth 5 → 3125"
 
 # count_at sanity
-for my $d (0..6) {
+for my $d (0:6) {
     assert_eq Rosetta::SierpPent::count_at($d), 5 ** $d,
         sprintf("count_at(%d) = 5^%d", $d, $d)
 }
@@ -65,7 +65,7 @@ for my $p (@$d1) {
     my $key = sprintf("%.6f,%.6f", $p->[0], $p->[1])
     $seen{$key}++
 }
-assert_eq scalar(keys %seen), 5, "5 distinct child positions"
+assert_eq len(keys %seen), 5, "5 distinct child positions"
 
 # Pipe form
 3 |> Rosetta::SierpPent::count_at |> assert_eq(125, "pipe count_at(3)")

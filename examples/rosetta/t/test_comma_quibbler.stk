@@ -8,7 +8,7 @@ fn Rosetta::CommaQuibbler::quibble(@list) {
     } elsif ($len == 1) {
         "{" . $list[0] . "}"
     } else {
-        my @init = @list[0..$len-2]
+        my @init = @list[0:$len-2]
         my $last = $list[-1]
         "{" . join(", ", @init) . " and " . $last . "}"
     }

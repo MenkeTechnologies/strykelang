@@ -9,7 +9,7 @@ fn Rosetta::Nonogram::line_patterns($length, $clues) {
     }
     my $first = $clues->[0]
     my $max_start = $length - $first
-    for my $start (0 .. $max_start) {
+    for my $start (0:$max_start) {
         my $prefix = ("." x $start) . ("#" x $first)
         push @patterns, $prefix . ("." x ($length - len(split //, $prefix)))
     }

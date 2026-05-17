@@ -8,7 +8,7 @@ fn Rosetta::LinSieve::sieve($n) {
     return { primes => [], spf => [] } if $n < 2
     my @spf = ~> 0:$n |> map { 0 }
     my @primes
-    for my $i (2..$n) {
+    for my $i (2:$n) {
         if ($spf[$i] == 0) {
             $spf[$i] = $i
             push @primes, $i
@@ -59,7 +59,7 @@ assert_eq $r->{spf}[29], 29, "spf(29) = 29 (prime)"
 # Cross-check primes up to 100 vs naive.
 my $r100 = Rosetta::LinSieve::sieve(100)
 my $count = 0
-for my $i (2..100) {
+for my $i (2:100) {
     $count++ if Rosetta::LinSieve::is_prime_naive($i)
 }
 assert_eq len(@{$r100->{primes}}), $count, "prime count up to 100"

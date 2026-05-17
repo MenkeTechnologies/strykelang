@@ -42,18 +42,18 @@ my @lines = (
 )
 
 my $events = Rosetta::License::parse(\@lines)
-assert_eq scalar(@$events), 7, "7 events parsed"
+assert_eq len(@$events), 7, "7 events parsed"
 
 # Each event has direction and timestamp
 for my $e (@$events) {
     assert_ok $e->[0] eq "IN" || $e->[0] eq "OUT", "direction valid"
-    assert_ok length($e->[1]) > 0, "timestamp non-empty"
+    assert_ok len($e->[1]) > 0, "timestamp non-empty"
 }
 
 # Peak: 4 licenses at job 4005's OUT
 my $r = Rosetta::License::max_in_use($events)
 assert_eq $r->[0], 4, "peak = 4 licenses"
-assert_ok scalar(@{$r->[1]}) >= 1, "at least one peak time"
+assert_ok len(@{$r->[1]}) >= 1, "at least one peak time"
 
 # Empty log
 my $empty = Rosetta::License::max_in_use([])
@@ -64,6 +64,6 @@ my $one = Rosetta::License::max_in_use([["OUT", "now"]])
 assert_eq $one->[0], 1, "single OUT peak = 1"
 
 # Pipe form
-\@lines |> Rosetta::License::parse |> fn { scalar(@$_) } |> assert_eq(7, "pipe count")
+\@lines |> Rosetta::License::parse |> fn { len(@$_) } |> assert_eq(7, "pipe count")
 
 test_run

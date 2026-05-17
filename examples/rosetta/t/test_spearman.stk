@@ -48,7 +48,7 @@ my $y = [2, 1, 4, 3, 5]
 # Ranks of y: 2, 1, 4, 3, 5
 # Pearson of ranks: 0.8
 my $rho = Rosetta::Stats::spearman($x, $y)
-assert_ok abs($rho - 0.8) < 1e-10, "Spearman rho for (1..5) example"
+assert_ok abs($rho - 0.8) < 1e-10, "Spearman rho for (1:5) example"
 
 # Perfect correlation
 my $x2 = [1, 2, 3]

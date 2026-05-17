@@ -4,7 +4,7 @@
 fn Rosetta::ConstantE::compute($iters) {
     my $e = 1.0
     my $term = 1.0
-    for my $k (1..$iters) {
+    for my $k (1:$iters) {
         $term /= $k
         $e += $term
     }

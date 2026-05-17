@@ -4,13 +4,13 @@
 fn Rosetta::Nbonacci::generate($n, $count) {
     my @seq
     # Initial sequence: n-1 zeros and one 1
-    for my $i (1..$n-1) { push @seq, 0 }
+    for my $i (1:$n-1) { push @seq, 0 }
     push @seq, 1
     
     while (len(@seq) < $count) {
         my $len = len(@seq)
         my $sum = 0
-        for my $i ($len - $n .. $len - 1) {
+        for my $i ($len - $n:$len - 1) {
             $sum += $seq[$i]
         }
         push @seq, $sum

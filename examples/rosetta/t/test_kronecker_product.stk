@@ -8,12 +8,12 @@ fn Rosetta::KroneckerProduct::compute($a, $b) {
     my $q = len(@{$b->[0]})
     
     my @res = ()
-    for my $i (0..$m*$p-1) { $res[$i] = [] }
+    for my $i (0:$m*$p-1) { $res[$i] = [] }
     
-    for my $i (0..$m-1) {
-        for my $j (0..$n-1) {
-            for my $k (0..$p-1) {
-                for my $l (0..$q-1) {
+    for my $i (0:$m-1) {
+        for my $j (0:$n-1) {
+            for my $k (0:$p-1) {
+                for my $l (0:$q-1) {
                     $res[$i*$p + $k][$j*$q + $l] = $a->[$i][$j] * $b->[$k][$l]
                 }
             }

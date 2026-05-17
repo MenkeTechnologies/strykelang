@@ -22,7 +22,7 @@ fn Rosetta::MadLibs::fill($template, $values) {
         my $val = $values->{$key}
         my $idx
         while (($idx = index($out, $tag)) >= 0) {
-            $out = substr($out, 0, $idx) . $val . substr($out, $idx + length($tag))
+            $out = substr($out, 0, $idx) . $val . substr($out, $idx + len($tag))
         }
     }
     $out
@@ -52,7 +52,7 @@ assert_eq $story, "Alice the fox sat on a log.", "all placeholders filled"
 
 # Missing placeholders surface
 my @miss = Rosetta::MadLibs::missing($tpl, { NAME => "X" })
-assert_eq scalar(@miss), 2, "two missing"
+assert_eq len(@miss), 2, "two missing"
 my %miss_set = map { $_ => 1 } @miss
 assert_eq exists($miss_set{ANIMAL}), 1, "ANIMAL missing"
 assert_eq exists($miss_set{OBJECT}), 1, "OBJECT missing"

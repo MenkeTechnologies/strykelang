@@ -45,9 +45,9 @@ fn Rosetta::MazeSolve::shortest_path($grid, $start, $goal) {
 fn Rosetta::MazeSolve::open_grid($w, $h) {
     # Test fixture: a fully-open w × h grid (no internal walls).
     my @grid
-    for my $r (0..$h - 1) {
+    for my $r (0:$h - 1) {
         my @row
-        for my $c (0..$w - 1) {
+        for my $c (0:$w - 1) {
             push @row, {
                 N => $r == 0      ? 1 : 0,
                 S => $r == $h - 1 ? 1 : 0,

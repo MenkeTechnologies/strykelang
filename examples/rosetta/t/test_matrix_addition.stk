@@ -6,8 +6,8 @@ fn Rosetta::MatrixAdd::matrix_add {
     my $m2 = _1
     my $rows = len(@$m1)
     my $cols = len(@{$m1->[0]})
-    my @res = ~> 0..$rows-1 map {
-        my @row = ~> 0..$cols-1 map { $m1->[_<][_] + $m2->[_<][_] }
+    my @res = ~> 0:$rows-1 map {
+        my @row = ~> 0:$cols-1 map { $m1->[_<][_] + $m2->[_<][_] }
         \@row
     }
     \@res

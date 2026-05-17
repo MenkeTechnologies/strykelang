@@ -7,9 +7,9 @@ fn Rosetta::LowestPath::sum($grid) {
     my $cols = len(@{$grid->[0]})
 
     my @dp
-    for my $r (0..$rows-1) {
+    for my $r (0:$rows-1) {
         $dp[$r] = []
-        for my $c (0..$cols-1) {
+        for my $c (0:$cols-1) {
             my $cell = $grid->[$r]->[$c]
             if ($r == 0 && $c == 0) {
                 $dp[$r][$c] = $cell

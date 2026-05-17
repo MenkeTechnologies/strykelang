@@ -7,7 +7,7 @@ fn Rosetta::MathFuncs::gamma($z) {
     if ($z < 0.5) { return 3.1415926535 / (sin(3.1415926535 * $z) * Rosetta::MathFuncs::gamma(1 - $z)) }
     my $curr_z = $z - 1
     my $x = $p[0]
-    for my $i (1..8) { $x = $x + $p[$i] / ($curr_z + $i) }
+    for my $i (1:8) { $x = $x + $p[$i] / ($curr_z + $i) }
     my $t = $curr_z + 7 + 0.5
     sqrt(2 * 3.1415926535) * $t**($curr_z + 0.5) * exp(0 - $t) * $x
 }
@@ -15,7 +15,7 @@ fn Rosetta::MathFuncs::gamma($z) {
 fn Rosetta::MathFuncs::zeta($s) {
     # Simple series for s > 1
     my $sum = 0.0
-    for my $n (1..1000) { $sum = $sum + 1.0 / ($n ** $s) }
+    for my $n (1:1000) { $sum = $sum + 1.0 / ($n ** $s) }
     $sum
 }
 

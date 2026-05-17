@@ -5,11 +5,11 @@
 fn Rosetta::Lagrange::eval($pts, $x) {
     my $n = len(@$pts)
     my $sum = 0.0
-    for my $i (0..$n-1) {
+    for my $i (0:$n-1) {
         my $xi = $pts->[$i][0]
         my $yi = $pts->[$i][1]
         my $term = $yi
-        for my $j (0..$n-1) {
+        for my $j (0:$n-1) {
             next if $j == $i
             my $xj = $pts->[$j][0]
             $term = $term * ($x - $xj) / ($xi - $xj)

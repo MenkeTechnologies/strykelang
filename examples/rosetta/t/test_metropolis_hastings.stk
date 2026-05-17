@@ -82,7 +82,7 @@ assert_ok $left_visits > 100,  "left mode visited"
 assert_ok $right_visits > 100, "right mode visited"
 
 # Mean / variance helpers
-assert_ok abs(Rosetta::MH::mean([1, 2, 3, 4, 5]) - 3) < 1e-9, "mean(1..5) = 3"
-assert_ok abs(Rosetta::MH::variance([1, 2, 3, 4, 5]) - 2) < 1e-9, "variance(1..5) = 2"
+assert_ok abs(Rosetta::MH::mean([1, 2, 3, 4, 5]) - 3) < 1e-9, "mean(1:5) = 3"
+assert_ok abs(Rosetta::MH::variance([1, 2, 3, 4, 5]) - 2) < 1e-9, "variance(1:5) = 2"
 
 test_run

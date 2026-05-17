@@ -8,7 +8,7 @@ fn Rosetta::SelfDescriptive::check($n) {
     my %counts
     for my $x (@d) { $counts{$x}++ }
     
-    for my $i (0..$len-1) {
+    for my $i (0:$len-1) {
         my $val = $d[$i]
         my $count = $counts{$i} || 0
         if ($val != $count) { return 0 }

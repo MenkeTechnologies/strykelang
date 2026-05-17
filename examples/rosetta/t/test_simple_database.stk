@@ -36,7 +36,7 @@ fn Rosetta::SimpleDb::delete_row($db, $key) {
 }
 
 fn Rosetta::SimpleDb::count($db) {
-    scalar(keys %{$db->{rows}})
+    len(keys %{$db->{rows}})
 }
 
 fn Rosetta::SimpleDb::find_where($db, $field, $value) {
@@ -82,7 +82,7 @@ assert_eq Rosetta::SimpleDb::find($db, 1)->{name}, "renamed", "name updated"
 
 # Find by attribute
 my $thirties = Rosetta::SimpleDb::find_where($db, "age", 30)
-assert_eq scalar(@$thirties), 1, "1 row aged 30 (Alice was bumped to 31)"
+assert_eq len(@$thirties), 1, "1 row aged 30 (Alice was bumped to 31)"
 assert_eq $thirties->[0]{name}, "Carol", "Carol still 30"
 
 # Delete

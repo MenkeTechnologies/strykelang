@@ -3,11 +3,11 @@
 
 fn Rosetta::SubGen::seed($seed) {
     my @s
-    for my $i (0..54) { $s[$i] = 0 }
+    for my $i (0:54) { $s[$i] = 0 }
     $s[0] = $seed
     my $a = 1
     my $b = $seed
-    for my $i (1..54) {
+    for my $i (1:54) {
         my $j = (21 * $i) % 55
         $s[$j] = $a
         my $t = $b - $a
@@ -17,7 +17,7 @@ fn Rosetta::SubGen::seed($seed) {
     }
     # Discard first 165 outputs
     my $state = { ring => \@s, ip => 0, ip2 => 31 }
-    for my $i (1..165) {
+    for my $i (1:165) {
         Rosetta::SubGen::next($state)
     }
     $state
@@ -38,7 +38,7 @@ fn Rosetta::SubGen::next($state) {
 # Reproducibility
 my $a = Rosetta::SubGen::seed(292929)
 my $b = Rosetta::SubGen::seed(292929)
-for my $i (1..200) {
+for my $i (1:200) {
     my $va = Rosetta::SubGen::next($a)
     my $vb = Rosetta::SubGen::next($b)
     assert_eq $va, $vb, "step $i deterministic"
@@ -48,7 +48,7 @@ for my $i (1..200) {
 my $c = Rosetta::SubGen::seed(1)
 my $d = Rosetta::SubGen::seed(2)
 my $diff = 0
-for my $i (1..50) {
+for my $i (1:50) {
     my $vc = Rosetta::SubGen::next($c)
     my $vd = Rosetta::SubGen::next($d)
     $diff = 1 if $vc != $vd
@@ -57,7 +57,7 @@ assert_eq $diff, 1, "different seeds diverge"
 
 # All values in [0, 1e9)
 my $e = Rosetta::SubGen::seed(42)
-for my $i (1..100) {
+for my $i (1:100) {
     my $v = Rosetta::SubGen::next($e)
     assert_ok $v >= 0,          "value >= 0"
     assert_ok $v < 1000000000,  "value < 1e9"
@@ -67,7 +67,7 @@ for my $i (1..100) {
 # the expected reference. (Spot check first 6 outputs.)
 my $f = Rosetta::SubGen::seed(292929)
 my @first6
-for my $i (1..6) { push @first6, Rosetta::SubGen::next($f) }
+for my $i (1:6) { push @first6, Rosetta::SubGen::next($f) }
 # We don't pin to a specific reference here (different impls discard differently),
 # but assert that the 6 outputs are distinct (extremely likely for any decent generator).
 my %seen

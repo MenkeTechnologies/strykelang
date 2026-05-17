@@ -37,13 +37,13 @@ fn Rosetta::SkipList::insert($sl, $key) {
     if (defined($cur) && $cur->{k} == $key) { return }
     my $lvl = Rosetta::SkipList::random_level($sl)
     if ($lvl > $sl->{level}) {
-        for my $i ($sl->{level} + 1..$lvl) {
+        for my $i ($sl->{level} + 1:$lvl) {
             $update[$i] = $sl->{head}
         }
         $sl->{level} = $lvl
     }
     my $node = { k => $key, fwd => [(undef) x ($lvl + 1)], lvl => $lvl }
-    for my $i (0..$lvl) {
+    for my $i (0:$lvl) {
         $node->{fwd}[$i] = $update[$i]{fwd}[$i]
         $update[$i]{fwd}[$i] = $node
     }
@@ -101,7 +101,7 @@ assert_ok !Rosetta::SkipList::contains($empty, 42), "empty contains nothing"
 
 # Insert 1..100 sequentially — should still produce sorted output
 my $big = Rosetta::SkipList::new(16)
-for my $k (1..100) {
+for my $k (1:100) {
     Rosetta::SkipList::insert($big, $k)
 }
 my $bk = Rosetta::SkipList::sorted_keys($big)

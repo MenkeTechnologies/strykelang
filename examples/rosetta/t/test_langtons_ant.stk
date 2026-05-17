@@ -5,7 +5,7 @@ fn Rosetta::LangtonsAnt::simulate($steps) {
     my %grid # 0 is white, 1 is black
     my $x = 0; my $y = 0; my $dir = 0 # 0:N, 1:E, 2:S, 3:W
     
-    for my $i (1..$steps) {
+    for my $i (1:$steps) {
         my $k = "$x,$y"
         my $color = $grid{$k} || 0
         

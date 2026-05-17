@@ -6,15 +6,15 @@ fn Rosetta::Diamond::row($char, $max_char) {
     my $max_dist = ord($max_char) - ord("A")
     my $outer = $max_dist - $dist
     my $res = ""
-    for my $i (1..$outer) { $res = $res . " " }
+    for my $i (1:$outer) { $res = $res . " " }
     $res = $res . $char
     if ($dist > 0) {
         my $inner = 2 * $dist - 1
-        for my $i (1..$inner) { $res = $res . " " }
+        for my $i (1:$inner) { $res = $res . " " }
         $res = $res . $char
     }
     # Symmetric trailing spaces not strictly needed for visualization but good for tests
-    for my $i (1..$outer) { $res = $res . " " }
+    for my $i (1:$outer) { $res = $res . " " }
     $res
 }
 

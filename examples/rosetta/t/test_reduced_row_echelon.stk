@@ -10,7 +10,7 @@ fn Rosetta::Rref::compute($m_in) {
     return [] if $rows == 0
     my $cols = len(@{$m[0]})
     my $lead = 0
-    for my $r (0..$rows - 1) {
+    for my $r (0:$rows - 1) {
         return \@m if $lead >= $cols
         my $i = $r
         while ($i < $rows && abs($m[$i][$lead]) < 1e-12) { $i++ }
@@ -21,11 +21,11 @@ fn Rosetta::Rref::compute($m_in) {
         }
         ($m[$i], $m[$r]) = ($m[$r], $m[$i])
         my $pivot = $m[$r][$lead]
-        for my $c (0..$cols - 1) { $m[$r][$c] /= $pivot }
-        for my $j (0..$rows - 1) {
+        for my $c (0:$cols - 1) { $m[$r][$c] /= $pivot }
+        for my $j (0:$rows - 1) {
             next if $j == $r
             my $factor = $m[$j][$lead]
-            for my $c (0..$cols - 1) {
+            for my $c (0:$cols - 1) {
                 $m[$j][$c] -= $factor * $m[$r][$c]
             }
         }

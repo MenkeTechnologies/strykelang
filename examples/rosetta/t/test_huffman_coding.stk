@@ -36,7 +36,7 @@ my $tree = Rosetta::HuffmanCoding::build_tree($freqs)
 my $codes = {}
 Rosetta::HuffmanCoding::get_codes($tree, "", $codes)
 
-assert_eq length($codes->{f}), 1, "f should have shortest code"
-assert_ok length($codes->{a}) > length($codes->{f}), "a should have longer code than f"
+assert_eq len($codes->{f}), 1, "f should have shortest code"
+assert_ok len($codes->{a}) > len($codes->{f}), "a should have longer code than f"
 
 test_run

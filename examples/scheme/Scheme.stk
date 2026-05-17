@@ -2635,7 +2635,7 @@ package main
 
 # Helper: evaluate a Scheme source string and return its last result as a
 # stryke string (using `write` formatting — quoted strings, #t / #f bools).
-fn run($src) {
+fn Sch::run_test($src) {
     Sch::sch_eval_str($src)
 }
 
@@ -2643,244 +2643,244 @@ fn run($src) {
 
 # ── Self-evaluating atoms ──────────────────────────────────────────────────
 
-assert_eq run("42"),         "42",     "self-eval: integer"
-assert_eq run("-7"),         "-7",     "self-eval: negative"
-assert_eq run("0"),          "0",      "self-eval: zero"
-assert_eq run("3.14"),       "3.14",   "self-eval: real"
-assert_eq run("#t"),         "#t",     "self-eval: true"
-assert_eq run("#f"),         "#f",     "self-eval: false"
-assert_eq run("\"hi\""),     "\"hi\"", "self-eval: string"
-assert_eq run("#\\a"),       "#\\a",   "self-eval: char"
-assert_eq run("#\\space"),   "#\\space", "self-eval: named char"
-assert_eq run("#\\newline"), "#\\newline", "self-eval: newline char"
+assert_eq Sch::run_test("42"),         "42",     "self-eval: integer"
+assert_eq Sch::run_test("-7"),         "-7",     "self-eval: negative"
+assert_eq Sch::run_test("0"),          "0",      "self-eval: zero"
+assert_eq Sch::run_test("3.14"),       "3.14",   "self-eval: real"
+assert_eq Sch::run_test("#t"),         "#t",     "self-eval: true"
+assert_eq Sch::run_test("#f"),         "#f",     "self-eval: false"
+assert_eq Sch::run_test("\"hi\""),     "\"hi\"", "self-eval: string"
+assert_eq Sch::run_test("#\\a"),       "#\\a",   "self-eval: char"
+assert_eq Sch::run_test("#\\space"),   "#\\space", "self-eval: named char"
+assert_eq Sch::run_test("#\\newline"), "#\\newline", "self-eval: newline char"
 
 # ── Arithmetic ─────────────────────────────────────────────────────────────
 
-assert_eq run("(+ 1 2 3)"),        "6",   "arith: + variadic"
-assert_eq run("(+)"),              "0",   "arith: + identity"
-assert_eq run("(- 10 3 2)"),       "5",   "arith: - chained"
-assert_eq run("(- 5)"),            "-5",  "arith: - negate"
-assert_eq run("(* 2 3 4)"),        "24",  "arith: *"
-assert_eq run("(*)"),              "1",   "arith: * identity"
-assert_eq run("(/ 100 5 2)"),      "10",  "arith: / chained"
-assert_eq run("(quotient 17 5)"),  "3",   "arith: quotient"
-assert_eq run("(remainder 17 5)"), "2",   "arith: remainder"
-assert_eq run("(modulo 17 5)"),    "2",   "arith: modulo"
-assert_eq run("(modulo -7 3)"),    "2",   "arith: modulo negative dividend"
-assert_eq run("(modulo 7 -3)"),    "-2",  "arith: modulo negative divisor"
-assert_eq run("(abs -42)"),        "42",  "arith: abs"
-assert_eq run("(abs 42)"),         "42",  "arith: abs positive"
-assert_eq run("(min 3 1 4 1 5)"),  "1",   "arith: min"
-assert_eq run("(max 3 1 4 1 5)"),  "5",   "arith: max"
-assert_eq run("(expt 2 10)"),      "1024", "arith: expt"
-assert_eq run("(expt 3 0)"),       "1",   "arith: expt zero"
-assert_eq run("(gcd 12 18)"),      "6",   "arith: gcd"
-assert_eq run("(gcd 12 18 24)"),   "6",   "arith: gcd variadic"
-assert_eq run("(lcm 4 6)"),        "12",  "arith: lcm"
-assert_eq run("(floor 3.7)"),      "3",   "arith: floor positive"
-assert_eq run("(floor -3.2)"),     "-4",  "arith: floor negative"
-assert_eq run("(ceiling 3.2)"),    "4",   "arith: ceiling positive"
-assert_eq run("(ceiling -3.7)"),   "-3",  "arith: ceiling negative"
-assert_eq run("(truncate 3.7)"),   "3",   "arith: truncate positive"
-assert_eq run("(truncate -3.7)"),  "-3",  "arith: truncate negative"
+assert_eq Sch::run_test("(+ 1 2 3)"),        "6",   "arith: + variadic"
+assert_eq Sch::run_test("(+)"),              "0",   "arith: + identity"
+assert_eq Sch::run_test("(- 10 3 2)"),       "5",   "arith: - chained"
+assert_eq Sch::run_test("(- 5)"),            "-5",  "arith: - negate"
+assert_eq Sch::run_test("(* 2 3 4)"),        "24",  "arith: *"
+assert_eq Sch::run_test("(*)"),              "1",   "arith: * identity"
+assert_eq Sch::run_test("(/ 100 5 2)"),      "10",  "arith: / chained"
+assert_eq Sch::run_test("(quotient 17 5)"),  "3",   "arith: quotient"
+assert_eq Sch::run_test("(remainder 17 5)"), "2",   "arith: remainder"
+assert_eq Sch::run_test("(modulo 17 5)"),    "2",   "arith: modulo"
+assert_eq Sch::run_test("(modulo -7 3)"),    "2",   "arith: modulo negative dividend"
+assert_eq Sch::run_test("(modulo 7 -3)"),    "-2",  "arith: modulo negative divisor"
+assert_eq Sch::run_test("(abs -42)"),        "42",  "arith: abs"
+assert_eq Sch::run_test("(abs 42)"),         "42",  "arith: abs positive"
+assert_eq Sch::run_test("(min 3 1 4 1 5)"),  "1",   "arith: min"
+assert_eq Sch::run_test("(max 3 1 4 1 5)"),  "5",   "arith: max"
+assert_eq Sch::run_test("(expt 2 10)"),      "1024", "arith: expt"
+assert_eq Sch::run_test("(expt 3 0)"),       "1",   "arith: expt zero"
+assert_eq Sch::run_test("(gcd 12 18)"),      "6",   "arith: gcd"
+assert_eq Sch::run_test("(gcd 12 18 24)"),   "6",   "arith: gcd variadic"
+assert_eq Sch::run_test("(lcm 4 6)"),        "12",  "arith: lcm"
+assert_eq Sch::run_test("(floor 3.7)"),      "3",   "arith: floor positive"
+assert_eq Sch::run_test("(floor -3.2)"),     "-4",  "arith: floor negative"
+assert_eq Sch::run_test("(ceiling 3.2)"),    "4",   "arith: ceiling positive"
+assert_eq Sch::run_test("(ceiling -3.7)"),   "-3",  "arith: ceiling negative"
+assert_eq Sch::run_test("(truncate 3.7)"),   "3",   "arith: truncate positive"
+assert_eq Sch::run_test("(truncate -3.7)"),  "-3",  "arith: truncate negative"
 
 # ── Numeric comparison ─────────────────────────────────────────────────────
 
-assert_eq run("(= 1 1)"),       "#t",  "compare: = true"
-assert_eq run("(= 1 2)"),       "#f",  "compare: = false"
-assert_eq run("(= 5 5 5 5)"),   "#t",  "compare: = chain"
-assert_eq run("(< 1 2 3)"),     "#t",  "compare: < chain"
-assert_eq run("(< 1 2 2)"),     "#f",  "compare: < not strict"
-assert_eq run("(<= 1 2 2)"),    "#t",  "compare: <="
-assert_eq run("(> 3 2 1)"),     "#t",  "compare: >"
-assert_eq run("(>= 3 3 2)"),    "#t",  "compare: >="
+assert_eq Sch::run_test("(= 1 1)"),       "#t",  "compare: = true"
+assert_eq Sch::run_test("(= 1 2)"),       "#f",  "compare: = false"
+assert_eq Sch::run_test("(= 5 5 5 5)"),   "#t",  "compare: = chain"
+assert_eq Sch::run_test("(< 1 2 3)"),     "#t",  "compare: < chain"
+assert_eq Sch::run_test("(< 1 2 2)"),     "#f",  "compare: < not strict"
+assert_eq Sch::run_test("(<= 1 2 2)"),    "#t",  "compare: <="
+assert_eq Sch::run_test("(> 3 2 1)"),     "#t",  "compare: >"
+assert_eq Sch::run_test("(>= 3 3 2)"),    "#t",  "compare: >="
 
 # ── Predicates ──────────────────────────────────────────────────────────────
 
-assert_eq run("(zero? 0)"),     "#t",  "pred: zero?"
-assert_eq run("(zero? 1)"),     "#f",  "pred: zero? false"
-assert_eq run("(positive? 5)"), "#t",  "pred: positive?"
-assert_eq run("(negative? -3)"),"#t",  "pred: negative?"
-assert_eq run("(odd? 3)"),      "#t",  "pred: odd?"
-assert_eq run("(even? 6)"),     "#t",  "pred: even?"
-assert_eq run("(null? '())"),   "#t",  "pred: null? on '()"
-assert_eq run("(null? '(1))"),  "#f",  "pred: null? on (1)"
-assert_eq run("(pair? '(1))"),  "#t",  "pred: pair?"
-assert_eq run("(pair? '())"),   "#f",  "pred: pair? on nil"
-assert_eq run("(list? '(1 2 3))"),  "#t",  "pred: list?"
-assert_eq run("(list? '())"),       "#t",  "pred: list? on nil"
-assert_eq run("(list? '(1 2 . 3))"),"#f",  "pred: list? on improper"
-assert_eq run("(number? 42)"),       "#t",  "pred: number?"
-assert_eq run("(integer? 42)"),      "#t",  "pred: integer?"
-assert_eq run("(integer? 4.2)"),     "#f",  "pred: integer? false"
-assert_eq run("(string? \"hi\")"),   "#t",  "pred: string?"
-assert_eq run("(symbol? 'x)"),       "#t",  "pred: symbol?"
-assert_eq run("(boolean? #t)"),      "#t",  "pred: boolean?"
-assert_eq run("(boolean? 0)"),       "#f",  "pred: boolean? on 0"
-assert_eq run("(char? #\\a)"),       "#t",  "pred: char?"
-assert_eq run("(procedure? +)"),     "#t",  "pred: procedure?"
-assert_eq run("(procedure? 42)"),    "#f",  "pred: procedure? false"
-assert_eq run("(not #f)"),           "#t",  "pred: not #f"
-assert_eq run("(not 0)"),            "#f",  "pred: not 0 (Scheme: 0 is truthy)"
-assert_eq run("(not '())"),          "#f",  "pred: not '() (Scheme: () is truthy)"
-assert_eq run("(not \"\")"),         "#f",  "pred: not \"\" (Scheme: \"\" is truthy)"
+assert_eq Sch::run_test("(zero? 0)"),     "#t",  "pred: zero?"
+assert_eq Sch::run_test("(zero? 1)"),     "#f",  "pred: zero? false"
+assert_eq Sch::run_test("(positive? 5)"), "#t",  "pred: positive?"
+assert_eq Sch::run_test("(negative? -3)"),"#t",  "pred: negative?"
+assert_eq Sch::run_test("(odd? 3)"),      "#t",  "pred: odd?"
+assert_eq Sch::run_test("(even? 6)"),     "#t",  "pred: even?"
+assert_eq Sch::run_test("(null? '())"),   "#t",  "pred: null? on '()"
+assert_eq Sch::run_test("(null? '(1))"),  "#f",  "pred: null? on (1)"
+assert_eq Sch::run_test("(pair? '(1))"),  "#t",  "pred: pair?"
+assert_eq Sch::run_test("(pair? '())"),   "#f",  "pred: pair? on nil"
+assert_eq Sch::run_test("(list? '(1 2 3))"),  "#t",  "pred: list?"
+assert_eq Sch::run_test("(list? '())"),       "#t",  "pred: list? on nil"
+assert_eq Sch::run_test("(list? '(1 2 . 3))"),"#f",  "pred: list? on improper"
+assert_eq Sch::run_test("(number? 42)"),       "#t",  "pred: number?"
+assert_eq Sch::run_test("(integer? 42)"),      "#t",  "pred: integer?"
+assert_eq Sch::run_test("(integer? 4.2)"),     "#f",  "pred: integer? false"
+assert_eq Sch::run_test("(string? \"hi\")"),   "#t",  "pred: string?"
+assert_eq Sch::run_test("(symbol? 'x)"),       "#t",  "pred: symbol?"
+assert_eq Sch::run_test("(boolean? #t)"),      "#t",  "pred: boolean?"
+assert_eq Sch::run_test("(boolean? 0)"),       "#f",  "pred: boolean? on 0"
+assert_eq Sch::run_test("(char? #\\a)"),       "#t",  "pred: char?"
+assert_eq Sch::run_test("(procedure? +)"),     "#t",  "pred: procedure?"
+assert_eq Sch::run_test("(procedure? 42)"),    "#f",  "pred: procedure? false"
+assert_eq Sch::run_test("(not #f)"),           "#t",  "pred: not #f"
+assert_eq Sch::run_test("(not 0)"),            "#f",  "pred: not 0 (Scheme: 0 is truthy)"
+assert_eq Sch::run_test("(not '())"),          "#f",  "pred: not '() (Scheme: () is truthy)"
+assert_eq Sch::run_test("(not \"\")"),         "#f",  "pred: not \"\" (Scheme: \"\" is truthy)"
 
 # ── Pair / list ─────────────────────────────────────────────────────────────
 
-assert_eq run("(cons 1 2)"),         "(1 . 2)",  "pair: cons makes pair"
-assert_eq run("(cons 1 '())"),       "(1)",      "pair: cons onto nil"
-assert_eq run("(cons 1 '(2 3))"),    "(1 2 3)",  "pair: cons prepend"
-assert_eq run("(car '(1 2 3))"),     "1",        "pair: car"
-assert_eq run("(cdr '(1 2 3))"),     "(2 3)",    "pair: cdr"
-assert_eq run("(car (cdr '(1 2 3)))"), "2",      "pair: cadr (manual)"
-assert_eq run("(list 1 2 3)"),       "(1 2 3)",  "pair: list"
-assert_eq run("(list)"),             "()",       "pair: list empty"
-assert_eq run("(length '(a b c d))"), "4",       "list: length"
-assert_eq run("(length '())"),       "0",        "list: length empty"
-assert_eq run("(reverse '(1 2 3))"), "(3 2 1)",  "list: reverse"
-assert_eq run("(reverse '())"),      "()",       "list: reverse empty"
-assert_eq run("(append '(1 2) '(3 4))"), "(1 2 3 4)", "list: append"
-assert_eq run("(append '() '(1 2))"),    "(1 2)",     "list: append nil"
-assert_eq run("(append '(1) '(2) '(3))"), "(1 2 3)",  "list: append 3"
-assert_eq run("(list-ref '(a b c d) 2)"), "c",        "list: list-ref"
-assert_eq run("(member 3 '(1 2 3 4))"),   "(3 4)",    "list: member found"
-assert_eq run("(member 9 '(1 2 3))"),     "#f",       "list: member not found"
+assert_eq Sch::run_test("(cons 1 2)"),         "(1 . 2)",  "pair: cons makes pair"
+assert_eq Sch::run_test("(cons 1 '())"),       "(1)",      "pair: cons onto nil"
+assert_eq Sch::run_test("(cons 1 '(2 3))"),    "(1 2 3)",  "pair: cons prepend"
+assert_eq Sch::run_test("(car '(1 2 3))"),     "1",        "pair: car"
+assert_eq Sch::run_test("(cdr '(1 2 3))"),     "(2 3)",    "pair: cdr"
+assert_eq Sch::run_test("(car (cdr '(1 2 3)))"), "2",      "pair: cadr (manual)"
+assert_eq Sch::run_test("(list 1 2 3)"),       "(1 2 3)",  "pair: list"
+assert_eq Sch::run_test("(list)"),             "()",       "pair: list empty"
+assert_eq Sch::run_test("(length '(a b c d))"), "4",       "list: length"
+assert_eq Sch::run_test("(length '())"),       "0",        "list: length empty"
+assert_eq Sch::run_test("(reverse '(1 2 3))"), "(3 2 1)",  "list: reverse"
+assert_eq Sch::run_test("(reverse '())"),      "()",       "list: reverse empty"
+assert_eq Sch::run_test("(append '(1 2) '(3 4))"), "(1 2 3 4)", "list: append"
+assert_eq Sch::run_test("(append '() '(1 2))"),    "(1 2)",     "list: append nil"
+assert_eq Sch::run_test("(append '(1) '(2) '(3))"), "(1 2 3)",  "list: append 3"
+assert_eq Sch::run_test("(list-ref '(a b c d) 2)"), "c",        "list: list-ref"
+assert_eq Sch::run_test("(member 3 '(1 2 3 4))"),   "(3 4)",    "list: member found"
+assert_eq Sch::run_test("(member 9 '(1 2 3))"),     "#f",       "list: member not found"
 
 # ── Equality ────────────────────────────────────────────────────────────────
 
-assert_eq run("(eq? 'a 'a)"),         "#t",  "eq: same symbol"
-assert_eq run("(eq? 'a 'b)"),         "#f",  "eq: diff symbols"
-assert_eq run("(eqv? 1 1)"),          "#t",  "eqv: same number"
-assert_eq run("(eqv? 1 1.0)"),        "#t",  "eqv: int vs real same value"
-assert_eq run("(equal? '(1 2 3) '(1 2 3))"), "#t",  "equal?: same list"
-assert_eq run("(equal? '(1 2) '(1 2 3))"),   "#f",  "equal?: diff lengths"
-assert_eq run("(equal? \"abc\" \"abc\")"),   "#t",  "equal?: strings"
+assert_eq Sch::run_test("(eq? 'a 'a)"),         "#t",  "eq: same symbol"
+assert_eq Sch::run_test("(eq? 'a 'b)"),         "#f",  "eq: diff symbols"
+assert_eq Sch::run_test("(eqv? 1 1)"),          "#t",  "eqv: same number"
+assert_eq Sch::run_test("(eqv? 1 1.0)"),        "#t",  "eqv: int vs real same value"
+assert_eq Sch::run_test("(equal? '(1 2 3) '(1 2 3))"), "#t",  "equal?: same list"
+assert_eq Sch::run_test("(equal? '(1 2) '(1 2 3))"),   "#f",  "equal?: diff lengths"
+assert_eq Sch::run_test("(equal? \"abc\" \"abc\")"),   "#t",  "equal?: strings"
 
 # ── Special forms ───────────────────────────────────────────────────────────
 
-assert_eq run("'foo"),                  "foo",       "quote: bare symbol"
-assert_eq run("'(1 2 3)"),              "(1 2 3)",   "quote: list"
-assert_eq run("'()"),                   "()",        "quote: empty"
-assert_eq run("(if #t 1 2)"),           "1",         "if: true branch"
-assert_eq run("(if #f 1 2)"),           "2",         "if: false branch"
-assert_eq run("(if 0 'truthy 'falsy)"), "truthy",    "if: 0 is truthy"
-assert_eq run("(if '() 'truthy 'falsy)"),"truthy",   "if: () is truthy"
-assert_eq run("(begin 1 2 3)"),         "3",         "begin: sequence"
-assert_eq run("(and)"),                 "#t",        "and: empty"
-assert_eq run("(and 1 2 3)"),           "3",         "and: returns last"
-assert_eq run("(and 1 #f 3)"),          "#f",        "and: short-circuit"
-assert_eq run("(or)"),                  "#f",        "or: empty"
-assert_eq run("(or #f #f 5)"),          "5",         "or: first truthy"
-assert_eq run("(or #f #f #f)"),         "#f",        "or: all false"
-assert_eq run("(when #t 1 2 3)"),       "3",         "when: true returns last"
-assert_eq run("(unless #f 1 2 3)"),     "3",         "unless: false returns last"
+assert_eq Sch::run_test("'foo"),                  "foo",       "quote: bare symbol"
+assert_eq Sch::run_test("'(1 2 3)"),              "(1 2 3)",   "quote: list"
+assert_eq Sch::run_test("'()"),                   "()",        "quote: empty"
+assert_eq Sch::run_test("(if #t 1 2)"),           "1",         "if: true branch"
+assert_eq Sch::run_test("(if #f 1 2)"),           "2",         "if: false branch"
+assert_eq Sch::run_test("(if 0 'truthy 'falsy)"), "truthy",    "if: 0 is truthy"
+assert_eq Sch::run_test("(if '() 'truthy 'falsy)"),"truthy",   "if: () is truthy"
+assert_eq Sch::run_test("(begin 1 2 3)"),         "3",         "begin: sequence"
+assert_eq Sch::run_test("(and)"),                 "#t",        "and: empty"
+assert_eq Sch::run_test("(and 1 2 3)"),           "3",         "and: returns last"
+assert_eq Sch::run_test("(and 1 #f 3)"),          "#f",        "and: short-circuit"
+assert_eq Sch::run_test("(or)"),                  "#f",        "or: empty"
+assert_eq Sch::run_test("(or #f #f 5)"),          "5",         "or: first truthy"
+assert_eq Sch::run_test("(or #f #f #f)"),         "#f",        "or: all false"
+assert_eq Sch::run_test("(when #t 1 2 3)"),       "3",         "when: true returns last"
+assert_eq Sch::run_test("(unless #f 1 2 3)"),     "3",         "unless: false returns last"
 
-assert_eq run("(cond ((= 1 2) 'no) ((= 1 1) 'yes) (else 'never))"),
+assert_eq Sch::run_test("(cond ((= 1 2) 'no) ((= 1 1) 'yes) (else 'never))"),
     "yes", "cond: middle clause matches"
-assert_eq run("(cond ((= 1 2) 'no) (else 'yes))"),
+assert_eq Sch::run_test("(cond ((= 1 2) 'no) (else 'yes))"),
     "yes", "cond: else fallback"
-assert_eq run("(cond ((+ 1 2) => (lambda (x) (* x 10))) (else 'no))"),
+assert_eq Sch::run_test("(cond ((+ 1 2) => (lambda (x) (* x 10))) (else 'no))"),
     "30", "cond: => arrow"
 
-assert_eq run("(case 2 ((1) 'one) ((2 3) 'two-or-three) (else 'other))"),
+assert_eq Sch::run_test("(case 2 ((1) 'one) ((2 3) 'two-or-three) (else 'other))"),
     "two-or-three", "case: matches multi-datum"
-assert_eq run("(case 99 ((1) 'one) ((2 3) 'tt) (else 'other))"),
+assert_eq Sch::run_test("(case 99 ((1) 'one) ((2 3) 'tt) (else 'other))"),
     "other", "case: else"
 
-assert_eq run("(let ((x 1) (y 2)) (+ x y))"), "3", "let: simple"
-assert_eq run("(let ((x 10)) (let ((x 20)) x))"), "20", "let: shadowing"
-assert_eq run("(let* ((x 1) (y (+ x 1))) y)"), "2", "let*: sequential"
-assert_eq run("(letrec ((even? (lambda (n) (if (= n 0) #t (odd? (- n 1))))) (odd? (lambda (n) (if (= n 0) #f (even? (- n 1)))))) (even? 10))"),
+assert_eq Sch::run_test("(let ((x 1) (y 2)) (+ x y))"), "3", "let: simple"
+assert_eq Sch::run_test("(let ((x 10)) (let ((x 20)) x))"), "20", "let: shadowing"
+assert_eq Sch::run_test("(let* ((x 1) (y (+ x 1))) y)"), "2", "let*: sequential"
+assert_eq Sch::run_test("(letrec ((even? (lambda (n) (if (= n 0) #t (odd? (- n 1))))) (odd? (lambda (n) (if (= n 0) #f (even? (- n 1)))))) (even? 10))"),
     "#t", "letrec: mutual recursion"
 
 # ── Lambdas, closures, recursion ────────────────────────────────────────────
 
-assert_eq run("((lambda (x) (* x x)) 5)"), "25", "lambda: square"
-assert_eq run("((lambda (x y) (+ x y)) 3 4)"), "7", "lambda: 2-arg"
-assert_eq run("((lambda args args) 1 2 3)"), "(1 2 3)", "lambda: rest-only"
-assert_eq run("((lambda (a . rest) rest) 1 2 3)"), "(2 3)", "lambda: dotted rest"
-assert_eq run("(define f (lambda (x) (* x 2))) (f 21)"), "42", "lambda: define"
-assert_eq run("(define (sq x) (* x x)) (sq 7)"), "49", "lambda: (define (f x))"
-assert_eq run("(define (fact n) (if (= n 0) 1 (* n (fact (- n 1))))) (fact 5)"),
+assert_eq Sch::run_test("((lambda (x) (* x x)) 5)"), "25", "lambda: square"
+assert_eq Sch::run_test("((lambda (x y) (+ x y)) 3 4)"), "7", "lambda: 2-arg"
+assert_eq Sch::run_test("((lambda args args) 1 2 3)"), "(1 2 3)", "lambda: rest-only"
+assert_eq Sch::run_test("((lambda (a . rest) rest) 1 2 3)"), "(2 3)", "lambda: dotted rest"
+assert_eq Sch::run_test("(define f (lambda (x) (* x 2))) (f 21)"), "42", "lambda: define"
+assert_eq Sch::run_test("(define (sq x) (* x x)) (sq 7)"), "49", "lambda: (define (f x))"
+assert_eq Sch::run_test("(define (fact n) (if (= n 0) 1 (* n (fact (- n 1))))) (fact 5)"),
     "120", "lambda: factorial"
-assert_eq run("(define (fact n) (if (= n 0) 1 (* n (fact (- n 1))))) (fact 10)"),
+assert_eq Sch::run_test("(define (fact n) (if (= n 0) 1 (* n (fact (- n 1))))) (fact 10)"),
     "3628800", "lambda: factorial 10"
 
 # Closure
-assert_eq run("(define (mk-adder n) (lambda (x) (+ x n))) ((mk-adder 5) 7)"),
+assert_eq Sch::run_test("(define (mk-adder n) (lambda (x) (+ x n))) ((mk-adder 5) 7)"),
     "12", "closure: simple adder"
-assert_eq run("(define (mk-counter) (let ((n 0)) (lambda () (set! n (+ n 1)) n))) (define c (mk-counter)) (c) (c) (c)"),
+assert_eq Sch::run_test("(define (mk-counter) (let ((n 0)) (lambda () (set! n (+ n 1)) n))) (define c (mk-counter)) (c) (c) (c)"),
     "3", "closure: counter with set!"
 
 # ── Higher-order ────────────────────────────────────────────────────────────
 
-assert_eq run("(map (lambda (x) (* x x)) '(1 2 3 4))"),
+assert_eq Sch::run_test("(map (lambda (x) (* x x)) '(1 2 3 4))"),
     "(1 4 9 16)", "map: square"
-assert_eq run("(map + '(1 2 3) '(10 20 30))"),
+assert_eq Sch::run_test("(map + '(1 2 3) '(10 20 30))"),
     "(11 22 33)", "map: zip"
-assert_eq run("(filter odd? '(1 2 3 4 5))"),
+assert_eq Sch::run_test("(filter odd? '(1 2 3 4 5))"),
     "(1 3 5)", "filter: odd"
-assert_eq run("(fold-left + 0 '(1 2 3 4 5))"),
+assert_eq Sch::run_test("(fold-left + 0 '(1 2 3 4 5))"),
     "15", "fold-left: sum"
-assert_eq run("(fold-right cons '() '(1 2 3))"),
+assert_eq Sch::run_test("(fold-right cons '() '(1 2 3))"),
     "(1 2 3)", "fold-right: identity"
-assert_eq run("(apply + '(1 2 3 4 5))"),
+assert_eq Sch::run_test("(apply + '(1 2 3 4 5))"),
     "15", "apply: list of args"
-assert_eq run("(apply + 1 2 '(3 4))"),
+assert_eq Sch::run_test("(apply + 1 2 '(3 4))"),
     "10", "apply: leading args + list"
 
 # ── String operations ──────────────────────────────────────────────────────
 
-assert_eq run("(string-length \"hello\")"),  "5",      "string: length"
-assert_eq run("(string-length \"\")"),       "0",      "string: length empty"
-assert_eq run("(substring \"hello\" 1 4)"),  "\"ell\"", "string: substring"
-assert_eq run("(string-append \"foo\" \"bar\")"), "\"foobar\"", "string: append"
-assert_eq run("(string=? \"abc\" \"abc\")"),  "#t",    "string: =?"
-assert_eq run("(string<? \"abc\" \"abd\")"),  "#t",    "string: <?"
-assert_eq run("(string-upcase \"foo\")"),     "\"FOO\"", "string: upcase"
-assert_eq run("(string-downcase \"FOO\")"),   "\"foo\"", "string: downcase"
+assert_eq Sch::run_test("(string-length \"hello\")"),  "5",      "string: length"
+assert_eq Sch::run_test("(string-length \"\")"),       "0",      "string: length empty"
+assert_eq Sch::run_test("(substring \"hello\" 1 4)"),  "\"ell\"", "string: substring"
+assert_eq Sch::run_test("(string-append \"foo\" \"bar\")"), "\"foobar\"", "string: append"
+assert_eq Sch::run_test("(string=? \"abc\" \"abc\")"),  "#t",    "string: =?"
+assert_eq Sch::run_test("(string<? \"abc\" \"abd\")"),  "#t",    "string: <?"
+assert_eq Sch::run_test("(string-upcase \"foo\")"),     "\"FOO\"", "string: upcase"
+assert_eq Sch::run_test("(string-downcase \"FOO\")"),   "\"foo\"", "string: downcase"
 
 # ── Vector operations ──────────────────────────────────────────────────────
 
-assert_eq run("(vector 1 2 3)"),         "#(1 2 3)",  "vector: literal"
-assert_eq run("(vector-length #(a b c))"),"3",         "vector: length"
-assert_eq run("(vector-ref #(a b c) 1)"), "b",         "vector: ref"
-assert_eq run("(vector->list #(1 2 3))"), "(1 2 3)",   "vector: ->list"
-assert_eq run("(list->vector '(a b c))"), "#(a b c)",  "vector: <-list"
+assert_eq Sch::run_test("(vector 1 2 3)"),         "#(1 2 3)",  "vector: literal"
+assert_eq Sch::run_test("(vector-length #(a b c))"),"3",         "vector: length"
+assert_eq Sch::run_test("(vector-ref #(a b c) 1)"), "b",         "vector: ref"
+assert_eq Sch::run_test("(vector->list #(1 2 3))"), "(1 2 3)",   "vector: ->list"
+assert_eq Sch::run_test("(list->vector '(a b c))"), "#(a b c)",  "vector: <-list"
 
 # ── Quasiquote ──────────────────────────────────────────────────────────────
 
-assert_eq run("`(1 2 ,(+ 1 2) 4)"),
+assert_eq Sch::run_test("`(1 2 ,(+ 1 2) 4)"),
     "(1 2 3 4)", "quasiquote: unquote single"
-assert_eq run("`(1 ,@(list 2 3) 4)"),
+assert_eq Sch::run_test("`(1 ,@(list 2 3) 4)"),
     "(1 2 3 4)", "quasiquote: unquote-splicing"
 
 # ── do loop ────────────────────────────────────────────────────────────────
 
-assert_eq run("(do ((i 0 (+ i 1)) (s 0 (+ s i))) ((= i 5) s))"),
+assert_eq Sch::run_test("(do ((i 0 (+ i 1)) (s 0 (+ s i))) ((= i 5) s))"),
     "10", "do: sum 0..4"
 
 # ── Mini real programs ─────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (fib n)
       (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2)))))
     (fib 10)
 '), "55", "program: fibonacci"
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (reverse-iter lst acc)
       (if (null? lst) acc (reverse-iter (cdr lst) (cons (car lst) acc))))
     (reverse-iter (list 1 2 3 4 5) (list))
 '), "(5 4 3 2 1)", "program: iterative reverse"
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (length-iter lst n)
       (if (null? lst) n (length-iter (cdr lst) (+ n 1))))
     (length-iter (list 1 2 3 4 5 6 7 8 9 10) 0)
 '), "10", "program: iterative length"
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (mk-counter init)
       (lambda ()
         (set! init (+ init 1))
@@ -2889,14 +2889,14 @@ assert_eq run('
     (c) (c) (c) (c)
 '), "104", "program: counter via closure + set!"
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (compose f g) (lambda (x) (f (g x))))
     (define inc (lambda (x) (+ x 1)))
     (define dbl (lambda (x) (* x 2)))
     ((compose dbl inc) 5)
 '), "12", "program: function composition"
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (make-account balance)
       (define (deposit amt) (set! balance (+ balance amt)) balance)
       (define (withdraw amt) (set! balance (- balance amt)) balance)
@@ -2917,126 +2917,126 @@ assert_eq run('
 
 # ── iota / list-building ────────────────────────────────────────────────────
 
-assert_eq run("(iota 5)"),                    "(0 1 2 3 4)",  "iota: count only"
-assert_eq run("(iota 5 10)"),                 "(10 11 12 13 14)", "iota: start"
-assert_eq run("(iota 5 0 2)"),                "(0 2 4 6 8)",  "iota: step"
-assert_eq run("(iota 0)"),                    "()",           "iota: zero count"
+assert_eq Sch::run_test("(iota 5)"),                    "(0 1 2 3 4)",  "iota: count only"
+assert_eq Sch::run_test("(iota 5 10)"),                 "(10 11 12 13 14)", "iota: start"
+assert_eq Sch::run_test("(iota 5 0 2)"),                "(0 2 4 6 8)",  "iota: step"
+assert_eq Sch::run_test("(iota 0)"),                    "()",           "iota: zero count"
 
 # ── List accessors (cxr family) ─────────────────────────────────────────────
 
-assert_eq run("(caar '((1 2) (3 4)))"),       "1",     "cxr: caar"
-assert_eq run("(cadr '(1 2 3))"),             "2",     "cxr: cadr"
-assert_eq run("(cdar '((1 2) 3))"),           "(2)",   "cxr: cdar"
-assert_eq run("(cddr '(1 2 3))"),             "(3)",   "cxr: cddr"
-assert_eq run("(caddr '(1 2 3 4))"),          "3",     "cxr: caddr"
-assert_eq run("(cadddr '(1 2 3 4 5))"),       "4",     "cxr: cadddr"
-assert_eq run("(first '(a b c))"),            "a",     "cxr: first"
-assert_eq run("(second '(a b c))"),           "b",     "cxr: second"
-assert_eq run("(third '(a b c))"),            "c",     "cxr: third"
-assert_eq run("(fourth '(a b c d e))"),       "d",     "cxr: fourth"
-assert_eq run("(fifth '(a b c d e))"),        "e",     "cxr: fifth"
-assert_eq run("(last '(1 2 3))"),             "3",     "cxr: last"
-assert_eq run("(last-pair '(1 2 3))"),        "(3)",   "cxr: last-pair"
+assert_eq Sch::run_test("(caar '((1 2) (3 4)))"),       "1",     "cxr: caar"
+assert_eq Sch::run_test("(cadr '(1 2 3))"),             "2",     "cxr: cadr"
+assert_eq Sch::run_test("(cdar '((1 2) 3))"),           "(2)",   "cxr: cdar"
+assert_eq Sch::run_test("(cddr '(1 2 3))"),             "(3)",   "cxr: cddr"
+assert_eq Sch::run_test("(caddr '(1 2 3 4))"),          "3",     "cxr: caddr"
+assert_eq Sch::run_test("(cadddr '(1 2 3 4 5))"),       "4",     "cxr: cadddr"
+assert_eq Sch::run_test("(first '(a b c))"),            "a",     "cxr: first"
+assert_eq Sch::run_test("(second '(a b c))"),           "b",     "cxr: second"
+assert_eq Sch::run_test("(third '(a b c))"),            "c",     "cxr: third"
+assert_eq Sch::run_test("(fourth '(a b c d e))"),       "d",     "cxr: fourth"
+assert_eq Sch::run_test("(fifth '(a b c d e))"),        "e",     "cxr: fifth"
+assert_eq Sch::run_test("(last '(1 2 3))"),             "3",     "cxr: last"
+assert_eq Sch::run_test("(last-pair '(1 2 3))"),        "(3)",   "cxr: last-pair"
 
 # ── take / drop / partition ─────────────────────────────────────────────────
 
-assert_eq run("(take '(a b c d e) 2)"),       "(a b)",     "take: prefix"
-assert_eq run("(take '(a b c) 0)"),           "()",        "take: zero"
-assert_eq run("(drop '(a b c d e) 2)"),       "(c d e)",   "drop: suffix"
-assert_eq run("(drop '(a b c) 0)"),           "(a b c)",   "drop: zero"
-assert_eq run("(take-right '(a b c d e) 2)"), "(d e)",     "take-right"
-assert_eq run("(drop-right '(a b c d e) 2)"), "(a b c)",   "drop-right"
+assert_eq Sch::run_test("(take '(a b c d e) 2)"),       "(a b)",     "take: prefix"
+assert_eq Sch::run_test("(take '(a b c) 0)"),           "()",        "take: zero"
+assert_eq Sch::run_test("(drop '(a b c d e) 2)"),       "(c d e)",   "drop: suffix"
+assert_eq Sch::run_test("(drop '(a b c) 0)"),           "(a b c)",   "drop: zero"
+assert_eq Sch::run_test("(take-right '(a b c d e) 2)"), "(d e)",     "take-right"
+assert_eq Sch::run_test("(drop-right '(a b c d e) 2)"), "(a b c)",   "drop-right"
 
-assert_eq run("(count odd? '(1 2 3 4 5))"),   "3",         "count: odd?"
-assert_eq run("(count zero? '(0 1 0 2 0))"),  "3",         "count: zero?"
-assert_eq run("(remove odd? '(1 2 3 4 5))"),  "(2 4)",     "remove: odd?"
-assert_eq run("(remove (lambda (x) (> x 3)) '(1 2 3 4 5))"),
+assert_eq Sch::run_test("(count odd? '(1 2 3 4 5))"),   "3",         "count: odd?"
+assert_eq Sch::run_test("(count zero? '(0 1 0 2 0))"),  "3",         "count: zero?"
+assert_eq Sch::run_test("(remove odd? '(1 2 3 4 5))"),  "(2 4)",     "remove: odd?"
+assert_eq Sch::run_test("(remove (lambda (x) (> x 3)) '(1 2 3 4 5))"),
     "(1 2 3)", "remove: > 3"
 
-assert_eq run("(concatenate '((1 2) (3) () (4 5)))"),
+assert_eq Sch::run_test("(concatenate '((1 2) (3) () (4 5)))"),
     "(1 2 3 4 5)", "concatenate"
-assert_eq run("(delete-duplicates '(1 2 3 2 1 4))"),
+assert_eq Sch::run_test("(delete-duplicates '(1 2 3 2 1 4))"),
     "(1 2 3 4)", "delete-duplicates: equal?"
-assert_eq run("(delete-duplicates '(\"a\" \"A\" \"a\") string-ci=?)"),
+assert_eq Sch::run_test("(delete-duplicates '(\"a\" \"A\" \"a\") string-ci=?)"),
     "(\"a\")", "delete-duplicates: with predicate"
 
 # ── any / every / find / list-index ────────────────────────────────────────
 
-assert_eq run("(every positive? '(1 2 3))"), "#t",  "every: all positive"
-assert_eq run("(every positive? '(1 -2 3))"), "#f", "every: one negative"
-assert_eq run("(any negative? '(1 2 -3))"),  "#t",  "any: one negative"
-assert_eq run("(any negative? '(1 2 3))"),   "#f",  "any: none negative"
-assert_eq run("(find odd? '(2 4 5 6 7))"),   "5",   "find: first odd"
-assert_eq run("(find odd? '(2 4 6))"),       "#f",  "find: not found"
-assert_eq run("(list-index odd? '(2 4 5 6))"), "2", "list-index: pos"
-assert_eq run("(list-index zero? '(1 2 3))"), "#f", "list-index: not found"
+assert_eq Sch::run_test("(every positive? '(1 2 3))"), "#t",  "every: all positive"
+assert_eq Sch::run_test("(every positive? '(1 -2 3))"), "#f", "every: one negative"
+assert_eq Sch::run_test("(any negative? '(1 2 -3))"),  "#t",  "any: one negative"
+assert_eq Sch::run_test("(any negative? '(1 2 3))"),   "#f",  "any: none negative"
+assert_eq Sch::run_test("(find odd? '(2 4 5 6 7))"),   "5",   "find: first odd"
+assert_eq Sch::run_test("(find odd? '(2 4 6))"),       "#f",  "find: not found"
+assert_eq Sch::run_test("(list-index odd? '(2 4 5 6))"), "2", "list-index: pos"
+assert_eq Sch::run_test("(list-index zero? '(1 2 3))"), "#f", "list-index: not found"
 
 # ── String ops ─────────────────────────────────────────────────────────────
 
-assert_eq run("(string-contains \"hello world\" \"world\")"), "6",  "str: contains"
-assert_eq run("(string-contains \"hello\" \"xyz\")"),         "#f", "str: contains miss"
-assert_eq run("(string-trim \"  hi  \")"),  "\"hi\"",         "str: trim"
-assert_eq run("(string-trim-left \"  hi  \")"), "\"hi  \"",   "str: trim-left"
-assert_eq run("(string-trim-right \"  hi  \")"), "\"  hi\"",  "str: trim-right"
-assert_eq run("(string-reverse \"abc\")"),    "\"cba\"",      "str: reverse"
-assert_eq run("(string-prefix? \"foo\" \"foobar\")"), "#t",   "str: prefix? yes"
-assert_eq run("(string-prefix? \"bar\" \"foobar\")"), "#f",   "str: prefix? no"
-assert_eq run("(string-suffix? \"bar\" \"foobar\")"), "#t",   "str: suffix? yes"
-assert_eq run("(string-suffix? \"foo\" \"foobar\")"), "#f",   "str: suffix? no"
-assert_eq run("(string-null? \"\")"),         "#t",           "str: null? yes"
-assert_eq run("(string-null? \"a\")"),        "#f",           "str: null? no"
-assert_eq run("(string-pad-left \"7\" 4 #\\0)"), "\"0007\"",  "str: pad-left zero"
-assert_eq run("(string-pad-right \"7\" 4)"),  "\"7   \"",     "str: pad-right space"
-assert_eq run("(string-count \"abcabcabc\" \"abc\")"), "3",   "str: count"
-assert_eq run("(string-replace \"hello world\" \"world\" \"Scheme\")"),
+assert_eq Sch::run_test("(string-contains \"hello world\" \"world\")"), "6",  "str: contains"
+assert_eq Sch::run_test("(string-contains \"hello\" \"xyz\")"),         "#f", "str: contains miss"
+assert_eq Sch::run_test("(string-trim \"  hi  \")"),  "\"hi\"",         "str: trim"
+assert_eq Sch::run_test("(string-trim-left \"  hi  \")"), "\"hi  \"",   "str: trim-left"
+assert_eq Sch::run_test("(string-trim-right \"  hi  \")"), "\"  hi\"",  "str: trim-right"
+assert_eq Sch::run_test("(string-reverse \"abc\")"),    "\"cba\"",      "str: reverse"
+assert_eq Sch::run_test("(string-prefix? \"foo\" \"foobar\")"), "#t",   "str: prefix? yes"
+assert_eq Sch::run_test("(string-prefix? \"bar\" \"foobar\")"), "#f",   "str: prefix? no"
+assert_eq Sch::run_test("(string-suffix? \"bar\" \"foobar\")"), "#t",   "str: suffix? yes"
+assert_eq Sch::run_test("(string-suffix? \"foo\" \"foobar\")"), "#f",   "str: suffix? no"
+assert_eq Sch::run_test("(string-null? \"\")"),         "#t",           "str: null? yes"
+assert_eq Sch::run_test("(string-null? \"a\")"),        "#f",           "str: null? no"
+assert_eq Sch::run_test("(string-pad-left \"7\" 4 #\\0)"), "\"0007\"",  "str: pad-left zero"
+assert_eq Sch::run_test("(string-pad-right \"7\" 4)"),  "\"7   \"",     "str: pad-right space"
+assert_eq Sch::run_test("(string-count \"abcabcabc\" \"abc\")"), "3",   "str: count"
+assert_eq Sch::run_test("(string-replace \"hello world\" \"world\" \"Scheme\")"),
     "\"hello Scheme\"", "str: replace"
-assert_eq run("(string-replace \"aaa\" \"a\" \"bb\")"),
+assert_eq Sch::run_test("(string-replace \"aaa\" \"a\" \"bb\")"),
     "\"bbbbbb\"", "str: replace expand"
 
-assert_eq run("(string-split \"a,b,c\" \",\")"), "(\"a\" \"b\" \"c\")", "str: split"
-assert_eq run("(string-split \"abc\" \"\")"),    "(\"a\" \"b\" \"c\")", "str: split empty sep"
-assert_eq run("(string-join '(\"a\" \"b\" \"c\") \"-\")"), "\"a-b-c\"", "str: join"
+assert_eq Sch::run_test("(string-split \"a,b,c\" \",\")"), "(\"a\" \"b\" \"c\")", "str: split"
+assert_eq Sch::run_test("(string-split \"abc\" \"\")"),    "(\"a\" \"b\" \"c\")", "str: split empty sep"
+assert_eq Sch::run_test("(string-join '(\"a\" \"b\" \"c\") \"-\")"), "\"a-b-c\"", "str: join"
 
-assert_eq run("(string-ci=? \"ABC\" \"abc\")"), "#t",  "str: ci=? yes"
-assert_eq run("(string-ci=? \"ABC\" \"abd\")"), "#f",  "str: ci=? no"
+assert_eq Sch::run_test("(string-ci=? \"ABC\" \"abc\")"), "#t",  "str: ci=? yes"
+assert_eq Sch::run_test("(string-ci=? \"ABC\" \"abd\")"), "#f",  "str: ci=? no"
 
 # ── Math ────────────────────────────────────────────────────────────────────
 
-assert_eq run("(square 7)"),            "49",   "math: square"
-assert_eq run("(cube 3)"),              "27",   "math: cube"
-assert_eq run("(exact? 5)"),            "#t",   "math: exact? int"
-assert_eq run("(exact? 5.5)"),          "#f",   "math: exact? real"
-assert_eq run("(inexact? 5.5)"),        "#t",   "math: inexact?"
+assert_eq Sch::run_test("(square 7)"),            "49",   "math: square"
+assert_eq Sch::run_test("(cube 3)"),              "27",   "math: cube"
+assert_eq Sch::run_test("(exact? 5)"),            "#t",   "math: exact? int"
+assert_eq Sch::run_test("(exact? 5.5)"),          "#f",   "math: exact? real"
+assert_eq Sch::run_test("(inexact? 5.5)"),        "#t",   "math: inexact?"
 
 # ── Hash tables ────────────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define h (make-hash))
     (hash-set! h "a" 1)
     (hash-set! h "b" 2)
     (hash-ref h "a")
 '), "1", "hash: set/ref"
-assert_eq run('
+assert_eq Sch::run_test('
     (define h (make-hash))
     (hash-set! h "a" 1)
     (hash-has-key? h "a")
 '), "#t", "hash: has-key? yes"
-assert_eq run('
+assert_eq Sch::run_test('
     (define h (make-hash))
     (hash-has-key? h "x")
 '), "#f", "hash: has-key? no"
-assert_eq run('
+assert_eq Sch::run_test('
     (define h (make-hash))
     (hash-ref h "x" "default")
 '), "\"default\"", "hash: ref default"
-assert_eq run('
+assert_eq Sch::run_test('
     (define h (make-hash))
     (hash-set! h "a" 1)
     (hash-set! h "b" 2)
     (hash-set! h "c" 3)
     (hash-count h)
 '), "3", "hash: count"
-assert_eq run('
+assert_eq Sch::run_test('
     (define h (make-hash))
     (hash-set! h "a" 1)
     (hash-remove! h "a")
@@ -3055,7 +3055,7 @@ assert_eq run('
 
 # ── Sorting: insertion sort ────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (insert x sorted)
       (cond ((null? sorted) (list x))
             ((<= x (car sorted)) (cons x sorted))
@@ -3069,7 +3069,7 @@ assert_eq run('
 
 # ── Sorting: mergesort ──────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (split lst)
       (if (or (null? lst) (null? (cdr lst)))
           (cons lst (list))
@@ -3094,7 +3094,7 @@ assert_eq run('
 
 # ── Sorting: quicksort ──────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (qsort lst)
       (if (or (null? lst) (null? (cdr lst)))
           lst
@@ -3109,7 +3109,7 @@ assert_eq run('
 
 # ── Numeric: Sieve of Eratosthenes ─────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (sieve lst)
       (if (null? lst)
           (list)
@@ -3121,7 +3121,7 @@ assert_eq run('
 
 # ── Numeric: Pascal's triangle row ─────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (pascal-row n)
       (let loop ((row (list 1)) (k 0))
         (if (= k n)
@@ -3138,7 +3138,7 @@ assert_eq run('
 
 # ── Numeric: Tower of Hanoi (count only) ───────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (hanoi-count n)
       (if (= n 0) 0 (+ 1 (* 2 (hanoi-count (- n 1))))))
     (hanoi-count 8)
@@ -3146,7 +3146,7 @@ assert_eq run('
 
 # ── Numeric: Ackermann (small) ─────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (ackermann m n)
       (cond ((= m 0) (+ n 1))
             ((= n 0) (ackermann (- m 1) 1))
@@ -3154,7 +3154,7 @@ assert_eq run('
     (ackermann 2 3)
 '), "9", "program: Ackermann(2,3)"
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (ackermann m n)
       (cond ((= m 0) (+ n 1))
             ((= n 0) (ackermann (- m 1) 1))
@@ -3164,7 +3164,7 @@ assert_eq run('
 
 # ── Numeric: GCD via Euclidean ──────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (my-gcd a b)
       (if (= b 0) a (my-gcd b (modulo a b))))
     (list (my-gcd 48 18) (my-gcd 100 75) (my-gcd 17 13))
@@ -3172,7 +3172,7 @@ assert_eq run('
 
 # ── Numeric: Fibonacci with memoization (iterative) ────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (fib-iter n)
       (let loop ((i 0) (a 0) (b 1))
         (if (= i n) a (loop (+ i 1) b (+ a b)))))
@@ -3181,7 +3181,7 @@ assert_eq run('
 
 # ── Strings: reverse via fold ──────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (string-rev s)
       (list->string (reverse (string->list s))))
     (string-rev "hello world")
@@ -3189,7 +3189,7 @@ assert_eq run('
 
 # ── Strings: caesar cipher ─────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (caesar-shift c n)
       (if (and (char>=? c #\a) (char<=? c #\z))
           (integer->char (+ (modulo (- (+ (char->integer c) n)
@@ -3203,7 +3203,7 @@ assert_eq run('
     (caesar-encrypt "hello" 3)
 '), "\"khoor\"", "program: Caesar cipher +3"
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (caesar-shift c n)
       (if (and (char>=? c #\a) (char<=? c #\z))
           (integer->char (+ (modulo (- (+ (char->integer c) n)
@@ -3219,7 +3219,7 @@ assert_eq run('
 
 # ── Strings: run-length encoding ───────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (rle lst)
       (if (null? lst)
           (list)
@@ -3236,7 +3236,7 @@ assert_eq run('
 
 # ── Numeric: Newton sqrt ────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (good-enough? guess x)
       (< (abs (- (* guess guess) x)) 0.0001))
     (define (improve guess x)
@@ -3252,7 +3252,7 @@ assert_eq run('
 
 # ── Numeric: Y-combinator factorial ────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define Y
       (lambda (f)
         ((lambda (x) (f (lambda (v) ((x x) v))))
@@ -3264,7 +3264,7 @@ assert_eq run('
 
 # ── List: matrix transpose ─────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (transpose m)
       (if (null? (car m))
           (list)
@@ -3272,7 +3272,7 @@ assert_eq run('
     (transpose (list (list 1 2 3) (list 4 5 6)))
 '), "((1 4) (2 5) (3 6))", "program: matrix transpose 2×3"
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (transpose m)
       (if (null? (car m))
           (list)
@@ -3282,7 +3282,7 @@ assert_eq run('
 
 # ── List: zip ──────────────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (zip2 a b)
       (cond ((or (null? a) (null? b)) (list))
             (else (cons (list (car a) (car b))
@@ -3292,19 +3292,19 @@ assert_eq run('
 
 # ── Set ops via lists ──────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (set-union a b)
       (delete-duplicates (append a b)))
     (set-union (list 1 2 3) (list 2 3 4))
 '), "(1 2 3 4)", "program: set union"
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (set-intersect a b)
       (filter (lambda (x) (member x b)) a))
     (set-intersect (list 1 2 3 4) (list 3 4 5 6))
 '), "(3 4)", "program: set intersection"
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (set-difference a b)
       (filter (lambda (x) (not (member x b))) a))
     (set-difference (list 1 2 3 4) (list 2 4))
@@ -3312,7 +3312,7 @@ assert_eq run('
 
 # ── Tree: binary search tree ───────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (bst-empty) (list))
     (define (bst-empty? t) (null? t))
     (define (bst-node v l r) (list v l r))
@@ -3339,7 +3339,7 @@ assert_eq run('
 
 # ── Tree: depth ─────────────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (tree-depth t)
       (cond ((null? t) 0)
             ((not (pair? t)) 0)
@@ -3350,7 +3350,7 @@ assert_eq run('
 
 # ── Tree: count leaves ──────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (count-leaves t)
       (cond ((null? t) 0)
             ((not (pair? t)) 1)
@@ -3361,7 +3361,7 @@ assert_eq run('
 
 # ── String: Levenshtein distance ───────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (lev a b)
       (cond ((null? a) (length b))
             ((null? b) (length a))
@@ -3374,7 +3374,7 @@ assert_eq run('
 
 # ── String: count words ─────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (count-words s)
       (length (filter (lambda (w) (not (string-null? w)))
                       (string-split s " "))))
@@ -3383,7 +3383,7 @@ assert_eq run('
 
 # ── String: palindrome check ───────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (palindrome? s)
       (let* ((clean (filter char-alphabetic? (string->list s)))
              (lower (map char-downcase clean)))
@@ -3395,7 +3395,7 @@ assert_eq run('
 
 # ── List: power set ─────────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (power-set s)
       (if (null? s)
           (list (list))
@@ -3407,7 +3407,7 @@ assert_eq run('
 
 # ── Numeric: integer to digits ──────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (digits n)
       (if (< n 10)
           (list n)
@@ -3418,7 +3418,7 @@ assert_eq run('
 
 # ── Numeric: digit sum ─────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (digit-sum n)
       (if (< n 10) n
           (+ (remainder n 10) (digit-sum (quotient n 10)))))
@@ -3427,7 +3427,7 @@ assert_eq run('
 
 # ── Numeric: prime test ─────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (prime? n)
       (cond ((< n 2) #f)
             ((= n 2) #t)
@@ -3442,7 +3442,7 @@ assert_eq run('
 
 # ── Numeric: factorize ──────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (factorize n)
       (let loop ((n n) (d 2) (out (list)))
         (cond ((<= n 1) (reverse out))
@@ -3454,7 +3454,7 @@ assert_eq run('
 
 # ── Numeric: Collatz steps ──────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (collatz-steps n)
       (let loop ((n n) (steps 0))
         (cond ((= n 1) steps)
@@ -3465,7 +3465,7 @@ assert_eq run('
 
 # ── List: sum of squares of evens ──────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (sum-sq-evens lst)
       (fold-left + 0 (map square (filter even? lst))))
     (sum-sq-evens (iota 11))
@@ -3475,7 +3475,7 @@ assert_eq run('
 
 # Vowel count — uses (integer->char N) to dodge stryke's `\u` Unicode-escape
 # quirk in `'...'` strings. Equivalent semantics, no embedded `#\u` literal.
-assert_eq run('
+assert_eq Sch::run_test('
     (define (is-vowel? c)
       (let ((d (char-downcase c)))
         (or (eqv? d #\a) (eqv? d #\e) (eqv? d #\i) (eqv? d #\o)
@@ -3487,7 +3487,7 @@ assert_eq run('
 
 # ── String: tokenize words ─────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (tokenize-words s)
       (let loop ((cs (string->list s)) (cur (list)) (out (list)))
         (cond ((null? cs)
@@ -3502,7 +3502,7 @@ assert_eq run('
 
 # ── List: chunked / partition into N-element groups ────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (chunk-of-n lst n)
       (cond ((null? lst) (list))
             ((<= (length lst) n) (list lst))
@@ -3513,7 +3513,7 @@ assert_eq run('
 
 # ── List: rotate ───────────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (rotate-left lst n)
       (let* ((len (length lst))
              (k (modulo n len)))
@@ -3523,7 +3523,7 @@ assert_eq run('
 
 # ── List: interleave ───────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (interleave a b)
       (cond ((null? a) b)
             ((null? b) a)
@@ -3535,7 +3535,7 @@ assert_eq run('
 
 # ── String: roman numeral encoder (1..3999) ────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define roman-pairs
       (list (cons 1000 "M") (cons 900 "CM") (cons 500 "D") (cons 400 "CD")
             (cons 100  "C") (cons 90  "XC") (cons 50  "L") (cons 40  "XL")
@@ -3553,7 +3553,7 @@ assert_eq run('
 
 # ── Numeric: number to English (under 100) ─────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define ones-words
       (vector "" "one" "two" "three" "four" "five" "six" "seven" "eight" "nine"))
     (define teens-words
@@ -3579,7 +3579,7 @@ assert_eq run('
 
 # ── Logic: knapsack (small, 0/1 brute force) ───────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define items (list (list 2 3) (list 3 4) (list 4 5) (list 5 6)))
     (define (knapsack items capacity)
       (cond ((null? items) 0)
@@ -3595,7 +3595,7 @@ assert_eq run('
 
 # ── Tree: associative-list lookup chain ────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define alist
       (list (cons (quote alice) 30)
             (cons (quote bob)   25)
@@ -3608,7 +3608,7 @@ assert_eq run('
 
 # ── Closures: bank account family ──────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (make-account balance)
       (lambda (op . args)
         (cond ((eq? op (quote deposit))
@@ -3629,7 +3629,7 @@ assert_eq run('
 
 # ── Closures: lazy Fibonacci streams (small) ───────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (make-fib-iter)
       (let ((a 0) (b 1))
         (lambda ()
@@ -3643,7 +3643,7 @@ assert_eq run('
 
 # ── Numeric: digit reversal ─────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (rev-digits n)
       (let loop ((n n) (out 0))
         (if (zero? n) out
@@ -3653,7 +3653,7 @@ assert_eq run('
 
 # ── Numeric: digit count ───────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (count-digits n)
       (if (< (abs n) 10) 1 (+ 1 (count-digits (quotient n 10)))))
     (list (count-digits 0) (count-digits 9) (count-digits 100) (count-digits 1234567))
@@ -3661,7 +3661,7 @@ assert_eq run('
 
 # ── Higher-order: function composition with multiple stages ────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (compose . fs)
       (if (null? fs)
           (lambda (x) x)
@@ -3674,7 +3674,7 @@ assert_eq run('
 
 # ── Currying / partial application ──────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (curry2 f) (lambda (a) (lambda (b) (f a b))))
     (define add-five ((curry2 +) 5))
     (define mul-six ((curry2 *) 6))
@@ -3683,7 +3683,7 @@ assert_eq run('
 
 # ── String: convert to title case ──────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (title-case s)
       (let loop ((cs (string->list s)) (boundary #t) (out (list)))
         (cond ((null? cs) (list->string (reverse out)))
@@ -3701,7 +3701,7 @@ assert_eq run('
 # Build a tiny lambda calculus on top of Scheme: lambda forms as
 # (λ var body), application as (f x). Test that beta reduction works.
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (lc-subst expr var val)
       (cond ((symbol? expr)
              (if (eq? expr var) val expr))
@@ -3727,7 +3727,7 @@ assert_eq run('
     (lc-step (list (list (quote lam) (quote x) (quote x)) (quote y)))
 '), "y", "program: λ-calc β-reduction (identity)"
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (lc-subst expr var val)
       (cond ((symbol? expr)
              (if (eq? expr var) val expr))
@@ -3760,7 +3760,7 @@ assert_eq run('
 # parens, no precedence needed for the subset). Demonstrates string
 # processing + recursive parsing.
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (calc-eval-postfix tokens)
       (let loop ((stack (list)) (tokens tokens))
         (cond ((null? tokens) (car stack))
@@ -3784,7 +3784,7 @@ assert_eq run('
 
 # ── Number base conversion ──────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (to-base n base)
       (if (< n base)
           (list n)
@@ -3793,7 +3793,7 @@ assert_eq run('
     (to-base 255 16)
 '), "(15 15)", "program: 255 base 16 = (15 15)"
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (to-base n base)
       (if (< n base)
           (list n)
@@ -3804,7 +3804,7 @@ assert_eq run('
 
 # ── Mathematical: integer logarithm ────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (int-log n base)
       (let loop ((n n) (e 0))
         (if (< n base) e (loop (quotient n base) (+ e 1)))))
@@ -3813,7 +3813,7 @@ assert_eq run('
 
 # ── List: max + min in one pass ────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (min-max lst)
       (let loop ((lst (cdr lst)) (mn (car lst)) (mx (car lst)))
         (cond ((null? lst) (cons mn mx))
@@ -3825,7 +3825,7 @@ assert_eq run('
 
 # ── List: most common element ──────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (most-common lst)
       (let loop ((lst lst) (counts (list)))
         (if (null? lst)
@@ -3844,7 +3844,7 @@ assert_eq run('
 
 # ── String: anagram check ───────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (sort-chars s)
       (define (insert c lst)
         (cond ((null? lst) (list c))
@@ -3862,7 +3862,7 @@ assert_eq run('
 
 # ── List: flatten ───────────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (flatten lst)
       (cond ((null? lst) (list))
             ((pair? (car lst))
@@ -3873,7 +3873,7 @@ assert_eq run('
 
 # ── Numeric: sum of multiples (Project Euler 1) ────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (sum-multiples-3-or-5-below n)
       (fold-left + 0
         (filter (lambda (x) (or (zero? (modulo x 3)) (zero? (modulo x 5))))
@@ -3883,7 +3883,7 @@ assert_eq run('
 
 # ── Numeric: even Fibonacci sum (Project Euler 2) ──────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (even-fib-sum-under limit)
       (let loop ((a 1) (b 2) (sum 0))
         (if (> b limit) sum
@@ -3894,7 +3894,7 @@ assert_eq run('
 
 # ── Tree: BST find ─────────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (bst-empty) (list))
     (define (bst-empty? t) (null? t))
     (define (bst-node v l r) (list v l r))
@@ -3919,7 +3919,7 @@ assert_eq run('
 
 # ── List: cycle detection (Floyd's tortoise and hare, simplified) ──────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (has-cycle? lst)
       (define (run slow fast)
         (cond ((or (null? fast) (null? (cdr fast))) #f)
@@ -3936,7 +3936,7 @@ assert_eq run('
 
 # ── Stack via cons / pop via cdr ───────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (make-stack) (list (list)))
     (define (stack-push! s v) (set-car! s (cons v (car s))))
     (define (stack-pop! s)
@@ -3954,7 +3954,7 @@ assert_eq run('
 
 # ── Queue via two stacks ────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (make-queue) (list (list) (list)))
     (define (in-stack q) (car q))
     (define (out-stack q) (cadr q))
@@ -3979,7 +3979,7 @@ assert_eq run('
 
 # ── Higher-order: numeric integration via midpoint rule ────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (integrate f a b n)
       (let* ((h (/ (- b a) n))
              (sum
@@ -3995,7 +3995,7 @@ assert_eq run('
 
 # ── List: extending stdlib ──────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (list-tabulate n proc)
       (let loop ((i 0) (out (list)))
         (if (= i n) (reverse out)
@@ -4005,7 +4005,7 @@ assert_eq run('
 
 # ── String: word frequency map ──────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (word-frequency s)
       (let* ((words (filter (lambda (w) (not (string-null? w)))
                             (string-split s " ")))
@@ -4023,7 +4023,7 @@ assert_eq run('
 
 # ── Permutations of a list ─────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (insert-everywhere x lst)
       (cond ((null? lst) (list (list x)))
             (else (cons (cons x lst)
@@ -4038,7 +4038,7 @@ assert_eq run('
     (length (permutations (list 1 2 3 4)))
 '), "24", "program: permutations count = 4! = 24"
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (insert-everywhere x lst)
       (cond ((null? lst) (list (list x)))
             (else (cons (cons x lst)
@@ -4055,7 +4055,7 @@ assert_eq run('
 
 # ── Combinations of size k ─────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (combinations lst k)
       (cond ((= k 0) (list (list)))
             ((null? lst) (list))
@@ -4066,7 +4066,7 @@ assert_eq run('
     (length (combinations (list 1 2 3 4 5) 3))
 '), "10", "program: C(5,3) = 10"
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (combinations lst k)
       (cond ((= k 0) (list (list)))
             ((null? lst) (list))
@@ -4079,7 +4079,7 @@ assert_eq run('
 
 # ── N-queens (count solutions for N=4) ─────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (safe? row col placed)
       (let loop ((p placed) (i 1))
         (cond ((null? p) #t)
@@ -4100,7 +4100,7 @@ assert_eq run('
     (length (n-queens 4))
 '), "2", "program: N-queens N=4 has 2 solutions"
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (safe? row col placed)
       (let loop ((p placed) (i 1))
         (cond ((null? p) #t)
@@ -4123,7 +4123,7 @@ assert_eq run('
 
 # ── Sudoku validator (no solver — just check a 9x9 board) ──────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (no-dups? lst)
       (cond ((null? lst) #t)
             ((member (car lst) (cdr lst)) #f)
@@ -4147,7 +4147,7 @@ assert_eq run('
 
 # ── Pattern matching: simple wildcards (?, *) ──────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (match-glob pat str)
       (cond ((null? pat) (null? str))
             ((eqv? (car pat) #\*)
@@ -4166,7 +4166,7 @@ assert_eq run('
 
 # ── Conway's Game of Life (one tick, 5x5 board) ────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (neighbors b r c)
       (let loop ((dr -1) (dc -1) (count 0))
         (cond ((> dr 1) count)
@@ -4203,7 +4203,7 @@ assert_eq run('
 
 # ── Dijkstra-style shortest path on a tiny adjacency list ──────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     ;; Graph: ((vertex (neighbor . cost) ...) ...)
     (define graph
       (list (list (quote A) (cons (quote B) 1) (cons (quote C) 4))
@@ -4254,7 +4254,7 @@ assert_eq run('
 
 # ── BFS over a graph (find reachable set) ──────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define graph
       (list (cons (quote A) (list (quote B) (quote C)))
             (cons (quote B) (list (quote D)))
@@ -4279,7 +4279,7 @@ assert_eq run('
 
 # ── DFS in-order traversal of a binary tree ────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     ;; Tree node: (value left right) or () for empty
     (define t (list 1
                     (list 2 (list 4 (list) (list)) (list 5 (list) (list)))
@@ -4294,7 +4294,7 @@ assert_eq run('
 
 # ── Tree pre-order / post-order ────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define t (list 1 (list 2 (list 4 (list) (list)) (list 5 (list) (list)))
                       (list 3 (list) (list 6 (list) (list)))))
     (define (pre-order tree)
@@ -4312,7 +4312,7 @@ assert_eq run('
 
 # ── Tree from sorted list (balanced BST) ───────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (sorted->tree lst)
       (let* ((n (length lst))
              (mid (quotient n 2)))
@@ -4331,7 +4331,7 @@ assert_eq run('
 
 # ── String: KMP-style substring search (naive) ─────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (substring-index hay needle)
       (let* ((h (string->list hay))
              (n (string->list needle))
@@ -4352,7 +4352,7 @@ assert_eq run('
 
 # ── Number theory: perfect numbers ─────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (proper-divisors n)
       (filter (lambda (d) (zero? (modulo n d)))
               (iota (- n 1) 1)))
@@ -4363,7 +4363,7 @@ assert_eq run('
 
 # ── Number theory: Pythagorean triples ─────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     ;; Brute-force search for Pythagorean triples (a ≤ b ≤ c ≤ n).
     (define (pythagorean-triples-up-to n)
       (let outer ((a 3) (out (list)))
@@ -4382,7 +4382,7 @@ assert_eq run('
 
 # ── Geometric: 2D distance ─────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (distance p1 p2)
       (sqrt (+ (square (- (car p1) (car p2)))
                (square (- (cadr p1) (cadr p2))))))
@@ -4392,7 +4392,7 @@ assert_eq run('
 
 # ── Linear algebra: dot product ────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (dot u v)
       (fold-left + 0 (map * u v)))
     (dot (list 1 2 3) (list 4 5 6))
@@ -4400,13 +4400,13 @@ assert_eq run('
 
 # ── Linear algebra: matrix-vector multiply ─────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (mv-mul mat vec)
       (map (lambda (row) (fold-left + 0 (map * row vec))) mat))
     (mv-mul (list (list 1 0 0) (list 0 1 0) (list 0 0 1)) (list 7 8 9))
 '), "(7 8 9)", "program: identity matrix × vector"
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (mv-mul mat vec)
       (map (lambda (row) (fold-left + 0 (map * row vec))) mat))
     (mv-mul (list (list 1 2 3) (list 4 5 6)) (list 1 1 1))
@@ -4414,7 +4414,7 @@ assert_eq run('
 
 # ── Lazy: stream-take from a generator ─────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (make-counter start)
       (let ((n start))
         (lambda ()
@@ -4427,7 +4427,7 @@ assert_eq run('
 
 # ── Lazy: prime stream filter ──────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (make-counter start)
       (let ((n start))
         (lambda ()
@@ -4452,7 +4452,7 @@ assert_eq run('
 
 # ── Numeric: fast exponent (binary) ────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (fast-expt b n)
       (cond ((= n 0) 1)
             ((even? n) (square (fast-expt b (quotient n 2))))
@@ -4462,7 +4462,7 @@ assert_eq run('
 
 # ── Numeric: integer square root (binary search) ───────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (isqrt n)
       (let loop ((lo 0) (hi n))
         (if (>= lo hi)
@@ -4477,7 +4477,7 @@ assert_eq run('
 
 # ── Numeric: greatest common divisor of a list ────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (my-gcd a b)
       (if (= b 0) a (my-gcd b (modulo a b))))
     (define (gcd-list lst) (fold-left my-gcd 0 lst))
@@ -4486,7 +4486,7 @@ assert_eq run('
 
 # ── String: count occurrences of a substring ───────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (count-occurrences hay needle)
       (let* ((h (string->list hay))
              (n (string->list needle)))
@@ -4504,7 +4504,7 @@ assert_eq run('
 
 # ── String: tokenize CSV-ish (no quoting) ──────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (csv-split line)
       (string-split line ","))
     (csv-split "alpha,bravo,charlie,delta")
@@ -4512,7 +4512,7 @@ assert_eq run('
 
 # ── List: zip3 (three-way) ─────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (zip3 a b c)
       (cond ((or (null? a) (null? b) (null? c)) (list))
             (else (cons (list (car a) (car b) (car c))
@@ -4522,7 +4522,7 @@ assert_eq run('
 
 # ── List: span / break ─────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (span pred lst)
       (let loop ((lst lst) (acc (list)))
         (cond ((null? lst) (cons (reverse acc) (list)))
@@ -4533,7 +4533,7 @@ assert_eq run('
 
 # ── String: Pig Latin (simple) ─────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (vowel? c)
       (memv (char-downcase c) (list #\a #\e #\i #\o)))
     (define (pig-word w)
@@ -4550,7 +4550,7 @@ assert_eq run('
 
 # ── Numeric: harmonic number ───────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (harmonic n)
       (let loop ((i 1) (sum 0))
         (if (> i n) sum (loop (+ i 1) (+ sum (/ 1 i))))))
@@ -4560,7 +4560,7 @@ assert_eq run('
 
 # ── List: argmax ───────────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (argmax f lst)
       (let loop ((best (car lst)) (best-f (f (car lst))) (rest (cdr lst)))
         (cond ((null? rest) best)
@@ -4572,7 +4572,7 @@ assert_eq run('
 
 # ── List: zip-with-index ───────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (zip-with-index lst)
       (let loop ((lst lst) (i 0) (out (list)))
         (if (null? lst)
@@ -4584,7 +4584,7 @@ assert_eq run('
 
 # ── String: alternate uppercase / lowercase ────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (alternating-case s)
       (let loop ((cs (string->list s)) (i 0) (out (list)))
         (if (null? cs)
@@ -4598,7 +4598,7 @@ assert_eq run('
 
 # ── Numeric: digital root ──────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (digital-root n)
       (cond ((< n 10) n)
             (else (digital-root
@@ -4609,7 +4609,7 @@ assert_eq run('
 
 # ── String: word reverse (in-place by words) ───────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (reverse-words s)
       (string-join (reverse (string-split s " ")) " "))
     (reverse-words "the quick brown fox")
@@ -4617,7 +4617,7 @@ assert_eq run('
 
 # ── String: starts-with-vowel-count ────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (vowel-start? s)
       (and (> (string-length s) 0)
            (memv (char-downcase (string-ref s 0))
@@ -4628,7 +4628,7 @@ assert_eq run('
 
 # ── List: cumulative sums ──────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (cumsum lst)
       (let loop ((lst lst) (acc 0) (out (list)))
         (if (null? lst)
@@ -4640,7 +4640,7 @@ assert_eq run('
 
 # ── Numeric: Mersenne primes (small) ───────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (prime? n)
       (cond ((< n 2) #f)
             ((= n 2) #t)
@@ -4657,7 +4657,7 @@ assert_eq run('
 
 # ── List: take-while / drop-while ──────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (take-while pred lst)
       (let loop ((lst lst) (acc (list)))
         (cond ((null? lst) (reverse acc))
@@ -4666,7 +4666,7 @@ assert_eq run('
     (take-while (lambda (x) (< x 5)) (list 1 2 3 4 5 6 7))
 '), "(1 2 3 4)", "program: take-while < 5"
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (drop-while pred lst)
       (cond ((null? lst) (list))
             ((pred (car lst)) (drop-while pred (cdr lst)))
@@ -4676,7 +4676,7 @@ assert_eq run('
 
 # ── Numeric: gcd via fold ──────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (my-gcd a b)
       (if (= b 0) a (my-gcd b (modulo a b))))
     (fold-left my-gcd 0 (list 12 18 24 30 36))
@@ -4684,7 +4684,7 @@ assert_eq run('
 
 # ── Map: shift each char in a string by an offset ──────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (shift-string s n)
       (list->string (map (lambda (c) (integer->char (+ (char->integer c) n)))
                          (string->list s))))
@@ -4693,7 +4693,7 @@ assert_eq run('
 
 # ── List: rotate-right via take/drop ───────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (rotate-right lst n)
       (let* ((len (length lst))
              (k (modulo n len))
@@ -4704,7 +4704,7 @@ assert_eq run('
 
 # ── List: dedupe consecutive ────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (dedupe-consecutive lst)
       (cond ((null? lst) (list))
             ((null? (cdr lst)) lst)
@@ -4716,7 +4716,7 @@ assert_eq run('
 
 # ── Lazy: nth Fibonacci via accumulator ────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (fib-tail n)
       (let loop ((i 0) (a 0) (b 1))
         (if (= i n) a (loop (+ i 1) b (+ a b)))))
@@ -4725,7 +4725,7 @@ assert_eq run('
 
 # ── Numeric: triangle-number identity ───────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (triangle n) (quotient (* n (+ n 1)) 2))
     (define (sum-to n) (fold-left + 0 (iota n 1)))
     (every = (map triangle (iota 10 1)) (map sum-to (iota 10 1)))
@@ -4733,7 +4733,7 @@ assert_eq run('
 
 # ── Numeric: number to binary string ───────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (bin-string n)
       (if (zero? n) "0"
           (let loop ((n n) (out ""))
@@ -4745,7 +4745,7 @@ assert_eq run('
 
 # ── List: assoc with default ───────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (assoc-default key alist default)
       (let ((p (assoc key alist)))
         (if p (cdr p) default)))
@@ -4755,7 +4755,7 @@ assert_eq run('
 
 # ── String: most frequent char ─────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (most-frequent-char s)
       (let* ((cs (string->list s))
              (pairs (map (lambda (c)
@@ -4771,7 +4771,7 @@ assert_eq run('
 
 # ── Numeric: count digits in base ──────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (count-digits-in-base n b)
       (let loop ((n n) (count 0))
         (if (< n b) (+ count 1)
@@ -4784,7 +4784,7 @@ assert_eq run('
 
 # ── List: sum of pairs ─────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (sum-pairs lst)
       (cond ((or (null? lst) (null? (cdr lst))) (list))
             (else (cons (+ (car lst) (cadr lst))
@@ -4794,7 +4794,7 @@ assert_eq run('
 
 # ── List: find max with index ──────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (max-with-index lst)
       (let loop ((lst (cdr lst)) (i 1) (best (car lst)) (bi 0))
         (cond ((null? lst) (cons bi best))
@@ -4805,7 +4805,7 @@ assert_eq run('
 
 # ── Lexical: closures vs mutation ──────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (make-toggler)
       (let ((state #f))
         (lambda ()
@@ -4817,7 +4817,7 @@ assert_eq run('
 
 # ── Numeric: Stein binary GCD ──────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (binary-gcd a b)
       (cond ((= a 0) b)
             ((= b 0) a)
@@ -4832,7 +4832,7 @@ assert_eq run('
 
 # ── Lambda calculus: Church numerals (small) ───────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (church n)
       (lambda (f)
         (lambda (x)
@@ -4847,7 +4847,7 @@ assert_eq run('
 
 # ── Mini-CSV with quoted fields ────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (split-quoted-csv line)
       (let loop ((cs (string->list line))
                  (cur (list))
@@ -4866,7 +4866,7 @@ assert_eq run('
 
 # ── List: skip-take chunking ───────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (skip-take lst skip take-n)
       (let drop-loop ((lst lst) (k skip))
         (if (or (zero? k) (null? lst))
@@ -4880,7 +4880,7 @@ assert_eq run('
 
 # ── Higher-order: identity / const / always ────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (id x) x)
     (define (const k) (lambda (x) k))
     (list (id 42) ((const 99) 0) ((const "hello") (list 1 2 3)))
@@ -4888,7 +4888,7 @@ assert_eq run('
 
 # ── List: enumerated select ─────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (zip-with-index lst)
       (let loop ((lst lst) (i 0) (out (list)))
         (if (null? lst)
@@ -4903,7 +4903,7 @@ assert_eq run('
 
 # ── Numeric: triangular number test ────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (triangle? n)
       ;; n is triangular iff 8n+1 is a perfect square and odd.
       (let* ((m (+ (* 8 n) 1))
@@ -4920,7 +4920,7 @@ assert_eq run('
 
 # ── Fold: chain of decorators ──────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (decorate-with prefix suffix proc)
       (lambda (x) (string-append prefix (proc x) suffix)))
     (define greet (lambda (name) (string-append "hello, " name)))
@@ -4932,7 +4932,7 @@ assert_eq run('
 
 # ── List: string-numbers from list ─────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (numbers->csv lst)
       (string-join (map number->string lst) ","))
     (numbers->csv (list 1 2 3 4 5))
@@ -4940,7 +4940,7 @@ assert_eq run('
 
 # ── List: zip-shorter ──────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (zip-shorter . lists)
       (cond ((any null? lists) (list))
             (else (cons (map car lists)
@@ -4950,7 +4950,7 @@ assert_eq run('
 
 # ── Numeric: sum of squares formula vs iteration ───────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (sum-sq-formula n)
       (quotient (* n (+ n 1) (+ (* 2 n) 1)) 6))
     (define (sum-sq-iter n)
@@ -4961,7 +4961,7 @@ assert_eq run('
 
 # ── Numeric: nth root via binary search ────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (nth-root x n)
       ;; Integer nth root, lower bound when not exact.
       (let loop ((lo 0) (hi x))
@@ -4976,7 +4976,7 @@ assert_eq run('
 
 # ── List: window of size N ─────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (windows lst n)
       (cond ((< (length lst) n) (list))
             (else (cons (take lst n)
@@ -4986,7 +4986,7 @@ assert_eq run('
 
 # ── Numeric: count digits matching predicate ───────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (digits n)
       (if (< n 10) (list n)
           (append (digits (quotient n 10)) (list (remainder n 10)))))
@@ -4995,7 +4995,7 @@ assert_eq run('
 
 # ── String: count alphabetic chars ─────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (count-alpha s)
       (count char-alphabetic? (string->list s)))
     (count-alpha "Hello, World 2026!")
@@ -5003,7 +5003,7 @@ assert_eq run('
 
 # ── List: drop nth element ─────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (drop-nth lst n)
       (append (take lst n) (drop lst (+ n 1))))
     (drop-nth (list "a" "b" "c" "d" "e") 2)
@@ -5011,7 +5011,7 @@ assert_eq run('
 
 # ── List: insert at index ─────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (insert-at lst n v)
       (append (take lst n) (cons v (drop lst n))))
     (insert-at (list 1 2 3 4 5) 2 "*")
@@ -5019,7 +5019,7 @@ assert_eq run('
 
 # ── Numeric: integer log2 (bit length) ─────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (int-log2 n)
       (let loop ((n n) (k 0))
         (if (<= n 1) k (loop (quotient n 2) (+ k 1)))))
@@ -5028,7 +5028,7 @@ assert_eq run('
 
 # ── List: argmin ──────────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (argmin f lst)
       (let loop ((best (car lst)) (best-f (f (car lst))) (rest (cdr lst)))
         (cond ((null? rest) best)
@@ -5040,7 +5040,7 @@ assert_eq run('
 
 # ── String: ROT13 ──────────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (rot13-char c)
       (cond ((and (char>=? c #\a) (char<=? c #\z))
              (integer->char (+ (modulo (- (+ (char->integer c) 13)
@@ -5058,7 +5058,7 @@ assert_eq run('
 
 # ── String: censor (replace pattern with *s) ────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (censor s patterns)
       (fold-left (lambda (acc p)
                    (string-replace acc p (make-string (string-length p) #\*)))
@@ -5068,7 +5068,7 @@ assert_eq run('
 
 # ── List: split-at ─────────────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (split-at lst n)
       (cons (take lst n) (drop lst n)))
     (split-at (list 1 2 3 4 5) 3)
@@ -5076,7 +5076,7 @@ assert_eq run('
 
 # ── Numeric: power-of-two test ────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (power-of-two? n)
       (and (positive? n)
            (let loop ((n n))
@@ -5088,7 +5088,7 @@ assert_eq run('
 
 # ── Numeric: integer base log (n in base b, integer answer) ────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (int-log-base n b)
       (if (< n b) 0
           (+ 1 (int-log-base (quotient n b) b))))
@@ -5098,7 +5098,7 @@ assert_eq run('
 
 # ── List: alist-update (set or insert) ─────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (alist-update key val alist)
       (let ((existing (assoc key alist)))
         (if existing
@@ -5111,7 +5111,7 @@ assert_eq run('
 
 # ── Numeric: hailstone sequence (Collatz path) ─────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (hailstone n)
       (let loop ((n n) (out (list n)))
         (cond ((= n 1) (reverse out))
@@ -5122,7 +5122,7 @@ assert_eq run('
 
 # ── String: justify (single space between words) ───────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (normalize-spaces s)
       (string-join
         (filter (lambda (w) (not (string-null? w)))
@@ -5133,7 +5133,7 @@ assert_eq run('
 
 # ── List: alternate skip ───────────────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (every-nth lst n)
       (let loop ((lst lst) (i 0) (out (list)))
         (cond ((null? lst) (reverse out))
@@ -5145,7 +5145,7 @@ assert_eq run('
 
 # ── Numeric: digit prefix removal ──────────────────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (drop-leading-digits s)
       (list->string
         (let loop ((cs (string->list s)) (in-prefix #t))
@@ -5159,7 +5159,7 @@ assert_eq run('
 
 # ── String: simple template substitution {name} ────────────────────────────
 
-assert_eq run('
+assert_eq Sch::run_test('
     (define (template tmpl bindings)
       (fold-left (lambda (s pair)
                    (string-replace s

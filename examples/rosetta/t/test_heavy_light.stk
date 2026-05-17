@@ -183,7 +183,7 @@ assert_eq Rosetta::HLD::path_sum($tiny, 0, 0), 42, "single node = 42"
 # Path graph 0-1-2-3-4 with values 1..5: full path sum = 15
 my $line = Rosetta::HLD::build(5, [[0, 1], [1, 2], [2, 3], [3, 4]], 0, [1, 2, 3, 4, 5])
 assert_eq Rosetta::HLD::path_sum($line, 0, 4), 15, "line full sum"
-assert_eq Rosetta::HLD::path_sum($line, 1, 3), 9,  "line [1..3] = 2+3+4"
+assert_eq Rosetta::HLD::path_sum($line, 1, 3), 9,  "line [1:3] = 2+3+4"
 assert_eq Rosetta::HLD::path_sum($line, 2, 2), 3,  "line single"
 
 test_run

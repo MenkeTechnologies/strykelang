@@ -12,11 +12,11 @@ fn Rosetta::AnimatedSpinners::deciseconds($duration_sec) {
 fn Rosetta::AnimatedSpinners::spin($duration_sec) {
     my @spinners = ("|", "/", "-", "\\")
     my $frames = Rosetta::AnimatedSpinners::deciseconds($duration_sec)
-    for my $i (0 .. $frames - 1) {
+    for my $i (0:$frames - 1) {
         my $char = $spinners[$i % len(@spinners)]
         print "\r$char Spinning..."
     }
-    print "\rDone!       \n"
+    p "\rDone!       "
     return $frames
 }
 

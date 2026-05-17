@@ -2,7 +2,7 @@
 # Rosetta Code: Insertion Sort
 
 fn Rosetta::InsertionSort::sort(@arr) {
-    for my $i (1..$#arr) {
+    for my $i (1:$#arr) {
         my $key = $arr[$i]
         my $j = $i - 1
         while ($j >= 0 && $arr[$j] > $key) {

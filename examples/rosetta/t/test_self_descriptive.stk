@@ -6,7 +6,7 @@ fn Rosetta::SelfDescriptive::check($n) {
     my @chars = split //, $s
     my $len = len(@chars)
 
-    for my $i (0..$len-1) {
+    for my $i (0:$len-1) {
         my $digit_at_pos_i = int(substr($s, $i, 1))
         my $char_to_count = str($i)
         my $count = 0

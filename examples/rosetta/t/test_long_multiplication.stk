@@ -20,9 +20,9 @@ fn Rosetta::LongMul::multiply($_0, $_1) {
     my $la = len(@$da)
     my $lb = len(@$db)
     my @prod
-    for my $i (0 .. $la + $lb - 1) { $prod[$i] = 0 }
-    for my $i (0 .. $la - 1) {
-        for my $j (0 .. $lb - 1) {
+    for my $i (0:$la + $lb - 1) { $prod[$i] = 0 }
+    for my $i (0:$la - 1) {
+        for my $j (0:$lb - 1) {
             $prod[$i + $j] += $da->[$i] * $db->[$j]
             $prod[$i + $j + 1] += int($prod[$i + $j] / 10)
             $prod[$i + $j] = $prod[$i + $j] % 10

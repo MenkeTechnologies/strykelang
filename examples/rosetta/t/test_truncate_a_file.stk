@@ -39,7 +39,7 @@ assert_eq Rosetta::Truncate::file($tmp, 50), 1, "truncate to 50 ok"
 my $size_50 = -s $tmp
 assert_eq $size_50, 50, "file is 50 bytes after"
 my $remainder = Rosetta::Truncate::read_file($tmp)
-assert_eq length($remainder), 50, "content length is 50"
+assert_eq len($remainder), 50, "content length is 50"
 
 # Content prefix preserved
 assert_eq $remainder, "x" x 50, "first 50 bytes preserved"

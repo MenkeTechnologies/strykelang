@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Collatz — find the n <= N producing the longest hailstone sequence
 
-fn Rosetta::CollatzMax::length($n) {
+fn Rosetta::CollatzMax::len($n) {
     my $count = 1
     while ($n > 1) {
         if ($n % 2 == 0) {
@@ -30,8 +30,8 @@ fn Rosetta::CollatzMax::peak($n) {
 fn Rosetta::CollatzMax::longest_under($limit) {
     my $best_n = 1
     my $best_len = 1
-    for my $i (1..$limit) {
-        my $l = Rosetta::CollatzMax::length($i)
+    for my $i (1:$limit) {
+        my $l = Rosetta::CollatzMax::len($i)
         if ($l > $best_len) {
             $best_len = $l
             $best_n = $i
@@ -41,10 +41,10 @@ fn Rosetta::CollatzMax::longest_under($limit) {
 }
 
 # Length tests (sequence count INCLUDES start and 1)
-assert_eq Rosetta::CollatzMax::length(1), 1, "len(1) = 1"
-assert_eq Rosetta::CollatzMax::length(2), 2, "len(2) = 2 (2,1)"
-assert_eq Rosetta::CollatzMax::length(3), 8, "len(3) = 8"
-assert_eq Rosetta::CollatzMax::length(27), 112, "len(27) = 112"
+assert_eq Rosetta::CollatzMax::len(1), 1, "len(1) = 1"
+assert_eq Rosetta::CollatzMax::len(2), 2, "len(2) = 2 (2,1)"
+assert_eq Rosetta::CollatzMax::len(3), 8, "len(3) = 8"
+assert_eq Rosetta::CollatzMax::len(27), 112, "len(27) = 112"
 
 # Longest under 100 -> n=97 (length 119)
 my $r1 = Rosetta::CollatzMax::longest_under(100)
@@ -62,8 +62,8 @@ assert_eq Rosetta::CollatzMax::peak(3), 16, "peak(3) = 16"
 assert_eq Rosetta::CollatzMax::peak(1), 1, "peak(1) = 1"
 
 # Powers of 2 just halve down: peak = self, length = log2(n) + 1
-assert_eq Rosetta::CollatzMax::length(8), 4, "len(8) = 4 (8,4,2,1)"
+assert_eq Rosetta::CollatzMax::len(8), 4, "len(8) = 4 (8,4,2,1)"
 assert_eq Rosetta::CollatzMax::peak(8), 8, "peak(8) = 8"
-assert_eq Rosetta::CollatzMax::length(1024), 11, "len(1024) = 11"
+assert_eq Rosetta::CollatzMax::len(1024), 11, "len(1024) = 11"
 
 test_run

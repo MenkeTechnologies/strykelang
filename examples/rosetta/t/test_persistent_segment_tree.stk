@@ -79,12 +79,12 @@ my $v1 = Rosetta::PSeg::update($t, 0, 3, 5)
 assert_eq Rosetta::PSeg::query($t, $v1, 0, 7), 5, "v1 full sum"
 assert_eq Rosetta::PSeg::query($t, 0, 0, 7), 0, "v0 still 0"
 assert_eq Rosetta::PSeg::query($t, $v1, 3, 3), 5, "v1 idx 3"
-assert_eq Rosetta::PSeg::query($t, $v1, 4, 7), 0, "v1 [4..7] empty"
+assert_eq Rosetta::PSeg::query($t, $v1, 4, 7), 0, "v1 [4:7] empty"
 
 # v2: add 7 at index 6
 my $v2 = Rosetta::PSeg::update($t, $v1, 6, 7)
 assert_eq Rosetta::PSeg::query($t, $v2, 0, 7), 12, "v2 full sum"
-assert_eq Rosetta::PSeg::query($t, $v2, 0, 5), 5,  "v2 [0..5]"
+assert_eq Rosetta::PSeg::query($t, $v2, 0, 5), 5,  "v2 [0:5]"
 assert_eq Rosetta::PSeg::query($t, $v2, 6, 6), 7,  "v2 idx 6"
 assert_eq Rosetta::PSeg::query($t, $v1, 0, 7), 5, "v1 unchanged"
 
@@ -96,7 +96,7 @@ assert_eq Rosetta::PSeg::query($t, $v3, 0, 0), 3,  "v3 idx 0"
 # v4: branch off v1 instead of v3
 my $v4 = Rosetta::PSeg::update($t, $v1, 7, 9)
 assert_eq Rosetta::PSeg::query($t, $v4, 0, 7), 14, "v4 full sum (branch from v1)"
-assert_eq Rosetta::PSeg::query($t, $v4, 6, 7), 9, "v4 [6..7] (no v2/v3 contributions)"
+assert_eq Rosetta::PSeg::query($t, $v4, 6, 7), 9, "v4 [6:7] (no v2/v3 contributions)"
 assert_eq Rosetta::PSeg::query($t, $v3, 0, 7), 15, "v3 still 15"
 
 # Persistence: every historical query must remain valid.
@@ -107,7 +107,7 @@ assert_eq Rosetta::PSeg::query($t, $v2, 0, 7), 12, "v2 immutable"
 # Cross-check via naive arrays for each version.
 fn Rosetta::PSeg::naive_sum($arr, $lo, $hi) {
     my $s = 0
-    for my $i ($lo..$hi) { $s += $arr->[$i] }
+    for my $i ($lo:$hi) { $s += $arr->[$i] }
     $s
 }
 
@@ -120,15 +120,15 @@ my @v4_arr = @v1_arr; $v4_arr[7] += 9
 for my $r ([0, 7], [0, 3], [3, 6], [4, 7]) {
     my ($lo, $hi) = @$r
     assert_eq Rosetta::PSeg::query($t, 0,   $lo, $hi),
-              Rosetta::PSeg::naive_sum(\@v0_arr, $lo, $hi), "v0 [$lo..$hi]"
+              Rosetta::PSeg::naive_sum(\@v0_arr, $lo, $hi), "v0 [$lo:$hi]"
     assert_eq Rosetta::PSeg::query($t, $v1, $lo, $hi),
-              Rosetta::PSeg::naive_sum(\@v1_arr, $lo, $hi), "v1 [$lo..$hi]"
+              Rosetta::PSeg::naive_sum(\@v1_arr, $lo, $hi), "v1 [$lo:$hi]"
     assert_eq Rosetta::PSeg::query($t, $v2, $lo, $hi),
-              Rosetta::PSeg::naive_sum(\@v2_arr, $lo, $hi), "v2 [$lo..$hi]"
+              Rosetta::PSeg::naive_sum(\@v2_arr, $lo, $hi), "v2 [$lo:$hi]"
     assert_eq Rosetta::PSeg::query($t, $v3, $lo, $hi),
-              Rosetta::PSeg::naive_sum(\@v3_arr, $lo, $hi), "v3 [$lo..$hi]"
+              Rosetta::PSeg::naive_sum(\@v3_arr, $lo, $hi), "v3 [$lo:$hi]"
     assert_eq Rosetta::PSeg::query($t, $v4, $lo, $hi),
-              Rosetta::PSeg::naive_sum(\@v4_arr, $lo, $hi), "v4 [$lo..$hi]"
+              Rosetta::PSeg::naive_sum(\@v4_arr, $lo, $hi), "v4 [$lo:$hi]"
 }
 
 test_run

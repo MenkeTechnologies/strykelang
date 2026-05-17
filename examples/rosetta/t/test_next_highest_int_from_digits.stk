@@ -15,7 +15,7 @@ fn Rosetta::NextHigh::compute($n) {
     ($d[$i], $d[$j]) = ($d[$j], $d[$i])
     my @suffix = @d[$i + 1..len(@d) - 1]
     @suffix = sort @suffix
-    @d = (@d[0..$i], @suffix)
+    @d = (@d[0:$i], @suffix)
     join("", @d) + 0
 }
 

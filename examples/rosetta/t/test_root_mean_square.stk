@@ -10,9 +10,9 @@ fn Rosetta::RootMeanSquare::root_mean_square {
     }
 }
 
-my @data = (1..10)
+my @data = (1:10)
 my $rms = Rosetta::RootMeanSquare::root_mean_square(@data)
-assert_ok abs($rms - 6.2048) < 0.001, "RMS of 1..10"
+assert_ok abs($rms - 6.2048) < 0.001, "RMS of 1:10"
 
 my @data2 = (10, 20, 30)
 my $rms2 = Rosetta::RootMeanSquare::root_mean_square(@data2)

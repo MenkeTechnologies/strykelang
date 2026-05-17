@@ -4,7 +4,7 @@
 fn Rosetta::SumPrimes::sum_below($n) {
     return 0 if $n < 3
     my @sieve
-    for my $i (0..$n-1) { $sieve[$i] = 1 }
+    for my $i (0:$n-1) { $sieve[$i] = 1 }
     $sieve[0] = 0; $sieve[1] = 0
     my $i = 2
     while ($i * $i < $n) {
@@ -15,7 +15,7 @@ fn Rosetta::SumPrimes::sum_below($n) {
         $i += 1
     }
     my $sum = 0
-    for my $k (2..$n-1) { $sum += $k if $sieve[$k] }
+    for my $k (2:$n-1) { $sum += $k if $sieve[$k] }
     $sum
 }
 

@@ -38,12 +38,12 @@ assert_eq Rosetta::DivDigits::is(48), 1, "48 qualifies"
 
 # First few in OEIS A007424/A036459 — first 10:
 my @hits = ~> 10:200 |> grep { Rosetta::DivDigits::is(_) }
-assert_eq join(",", @hits[0..9]),
+assert_eq join(",", @hits[0:9]),
     "22,33,44,48,55,66,77,88,99,122",
     "first 10 qualifying numbers"
 
 # Properties
-for my $n (@hits[0..9]) {
+for my $n (@hits[0:9]) {
     my @d = Rosetta::DivDigits::digits($n)
     my $prod = 1
     my $all_div = 1

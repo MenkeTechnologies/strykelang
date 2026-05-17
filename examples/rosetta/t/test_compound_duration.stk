@@ -24,6 +24,6 @@ assert_eq Rosetta::CompoundDuration::fmt(7259), "2 hr, 59 sec", "duration 7259s"
 assert_eq Rosetta::CompoundDuration::fmt(86400 + 3600 + 60 + 1), "1 d, 1 hr, 1 min, 1 sec", "all units"
 
 # Builtin check (if signature is similar)
-assert_ok length(format_duration(3600)) > 0, "builtin format_duration"
+assert_ok len(format_duration(3600)) > 0, "builtin format_duration"
 
 test_run

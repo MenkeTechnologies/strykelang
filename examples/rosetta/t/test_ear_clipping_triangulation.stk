@@ -18,14 +18,14 @@ fn Rosetta::EarClip::triangulate($poly) {
     my @pts = map { [_->[0], _->[1]] } @$poly
     my $n = len(@pts)
     return [] if $n < 3
-    my @indices = (0..$n - 1)
+    my @indices = (0:$n - 1)
     my @tris
     my $guard = 0
     while (len(@indices) > 3) {
         last if ++$guard > 1000
         my $found = 0
         my $m = len(@indices)
-        for my $ii (0..$m - 1) {
+        for my $ii (0:$m - 1) {
             my $prev = $indices[($ii - 1 + $m) % $m]
             my $cur = $indices[$ii]
             my $next = $indices[($ii + 1) % $m]
@@ -34,7 +34,7 @@ fn Rosetta::EarClip::triangulate($poly) {
             my $c = $pts[$next]
             next if Rosetta::EarClip::cross($a, $b, $c) <= 0   # not convex
             my $is_ear = 1
-            for my $jj (0..$m - 1) {
+            for my $jj (0:$m - 1) {
                 next if $jj == ($ii - 1 + $m) % $m || $jj == $ii || $jj == ($ii + 1) % $m
                 if (Rosetta::EarClip::point_in_tri($pts[$indices[$jj]], $a, $b, $c)) {
                     $is_ear = 0

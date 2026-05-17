@@ -4,7 +4,7 @@
 # where a_n is the parameter producing a 2^n-cycle in the logistic map.
 
 fn Rosetta::Feig::iterate_logistic($r, $x, $iters) {
-    for (1..$iters) { $x = $r * $x * (1 - $x) }
+    for (1:$iters) { $x = $r * $x * (1 - $x) }
     $x
 }
 

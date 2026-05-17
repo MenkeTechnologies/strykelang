@@ -34,10 +34,10 @@ my $tmp = "/tmp/stk_rmlines_$$"
 unlink($tmp)
 
 # Build 10-line file
-my $lines = join("\n", map { "line $_" } (1..10)) . "\n"
+my $lines = join("\n", map { "line $_" } (1:10)) . "\n"
 Rosetta::RmLines::write_file($tmp, $lines)
 my @initial = split /\n/, Rosetta::RmLines::read_file($tmp), -1
-assert_eq scalar(@initial), 11, "11 'lines' (10 + trailing empty)"
+assert_eq len(@initial), 11, "11 'lines' (10 + trailing empty)"
 
 # Remove 3 lines starting at 4
 assert_eq Rosetta::RmLines::remove($tmp, 4, 3), 1, "remove 3 lines from 4"
@@ -53,7 +53,7 @@ assert_ok $still_has_kept, "kept lines still present"
 
 # Removed lines absent
 my $absent = 1
-for my $i (4..6) {
+for my $i (4:6) {
     my $needle = "line $i"
     for my $line (@after) {
         $absent = 0 if $line eq $needle

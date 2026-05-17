@@ -3,9 +3,9 @@
 
 fn Rosetta::PascalMatrix::pascal_matrix($n) {
     my @matrix = ()
-    for my $i (0..$n-1) {
+    for my $i (0:$n-1) {
         $matrix[$i] = []
-        for my $j (0..$n-1) {
+        for my $j (0:$n-1) {
             if ($i == 0 || $j == 0) {
                 $matrix[$i][$j] = 1
             } else {

@@ -11,26 +11,26 @@ fn Rosetta::Farey::totient($n) {
         1
     } else {
         my $count = 0
-        for my $i (1..$n) {
+        for my $i (1:$n) {
             if (Rosetta::Farey::gcd($i, $n) == 1) { $count++ }
         }
         $count
     }
 }
 
-fn Rosetta::Farey::length($n) {
+fn Rosetta::Farey::len($n) {
     my $sum = 0
-    for my $i (1..$n) {
+    for my $i (1:$n) {
         $sum += Rosetta::Farey::totient($i)
     }
     $sum + 1
 }
 
-assert_eq Rosetta::Farey::length(1), 2, "F1 length"
-assert_eq Rosetta::Farey::length(2), 3, "F2 length"
-assert_eq Rosetta::Farey::length(3), 5, "F3 length"
-assert_eq Rosetta::Farey::length(4), 7, "F4 length"
-assert_eq Rosetta::Farey::length(5), 11, "F5 length"
+assert_eq Rosetta::Farey::len(1), 2, "F1 length"
+assert_eq Rosetta::Farey::len(2), 3, "F2 length"
+assert_eq Rosetta::Farey::len(3), 5, "F3 length"
+assert_eq Rosetta::Farey::len(4), 7, "F4 length"
+assert_eq Rosetta::Farey::len(5), 11, "F5 length"
 
 5 |> Rosetta::Farey::length |> assert_eq(11, "pipe Farey length")
 

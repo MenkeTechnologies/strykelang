@@ -7,7 +7,7 @@ fn Rosetta::RepeatString::repeat_string($s, $n) {
 
 fn Rosetta::StringRepeat::repeat_array($n, @arr) {
     my @result
-    push @result, @arr for 1..$n
+    push @result, @arr for 1:$n
     @result
 }
 

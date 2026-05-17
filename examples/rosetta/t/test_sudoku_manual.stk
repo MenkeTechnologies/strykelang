@@ -2,14 +2,14 @@
 # Rosetta Code: Sudoku Solver (4x4 Manual)
 
 fn Rosetta::SudokuManual::is_valid($grid, $r, $c, $v) {
-    for my $i (0..3) {
+    for my $i (0:3) {
         if ($grid->[$r]->[$i] == $v) { return 0 }
         if ($grid->[$i]->[$c] == $v) { return 0 }
     }
     my $br = int($r / 2) * 2
     my $bc = int($c / 2) * 2
-    for my $i (0..1) {
-        for my $j (0..1) {
+    for my $i (0:1) {
+        for my $j (0:1) {
             if ($grid->[$br+$i]->[$bc+$j] == $v) { return 0 }
         }
     }
@@ -17,10 +17,10 @@ fn Rosetta::SudokuManual::is_valid($grid, $r, $c, $v) {
 }
 
 fn Rosetta::Solve::solve($grid) {
-    for my $r (0..3) {
-        for my $c (0..3) {
+    for my $r (0:3) {
+        for my $c (0:3) {
             if ($grid->[$r]->[$c] == 0) {
-                for my $v (1..4) {
+                for my $v (1:4) {
                     if (Rosetta::SudokuManual::is_valid($grid, $r, $c, $v)) {
                         $grid->[$r]->[$c] = $v
                         if (Rosetta::Solve::solve($grid)) { return 1 }
@@ -45,9 +45,9 @@ my $grid = $grids[0]
 
 if (Rosetta::Solve::solve($grid)) {
     my $ok = 1
-    for my $i (0..3) {
+    for my $i (0:3) {
         my %row; my %col
-        for my $j (0..3) {
+        for my $j (0:3) {
             $row{$grid->[$i]->[$j]} = 1
             $col{$grid->[$j]->[$i]} = 1
         }

@@ -32,7 +32,7 @@ fn Rosetta::Rare::is_rare($n) {
 
 fn Rosetta::Rare::list($limit) {
     my @res
-    for my $n (10..$limit) {
+    for my $n (10:$limit) {
         push @res, $n if Rosetta::Rare::is_rare($n)
     }
     \@res

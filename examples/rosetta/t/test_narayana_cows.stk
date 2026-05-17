@@ -8,7 +8,7 @@ fn Rosetta::NarayanaCows::compute($n) {
         my $a0 = 1
         my $a1 = 1
         my $a2 = 1
-        for my $i (3..$n) {
+        for my $i (3:$n) {
             my $a3 = $a2 + $a0
             ($a0, $a1, $a2) = ($a1, $a2, $a3)
         }

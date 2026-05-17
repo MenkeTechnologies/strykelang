@@ -4,9 +4,9 @@
 fn Rosetta::LatinSquares::generate($n) {
     # Generate a simple shifted Latin square
     my @square
-    for my $r (0 .. $n - 1) {
+    for my $r (0:$n - 1) {
         my @row
-        for my $c (0 .. $n - 1) {
+        for my $c (0:$n - 1) {
             push @row, ($r + $c) % $n
         }
         push @square, \@row
@@ -34,9 +34,9 @@ fn Rosetta::LatinSquares::shuffle($array) {
 fn Rosetta::LatinSquares::transpose($matrix) {
     my $n = len(@$matrix)
     my @res
-    for my $c (0 .. $n - 1) {
+    for my $c (0:$n - 1) {
         my @row
-        for my $r (0 .. $n - 1) {
+        for my $r (0:$n - 1) {
             push @row, $matrix->[$r][$c]
         }
         push @res, \@row
@@ -53,9 +53,9 @@ fn Rosetta::LatinSquares::is_latin($matrix) {
         return 0 if len(keys %seen) != $n
     }
     # Check columns
-    for my $c (0 .. $n - 1) {
+    for my $c (0:$n - 1) {
         my %seen
-        for my $r (0 .. $n - 1) {
+        for my $r (0:$n - 1) {
             $seen{$matrix->[$r][$c]} = 1
         }
         return 0 if len(keys %seen) != $n

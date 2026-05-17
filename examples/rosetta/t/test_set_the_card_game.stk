@@ -3,10 +3,10 @@
 
 fn Rosetta::SetGame::deck() {
     my @deck
-    for my $n (0 .. 2) {
-        for my $c (0 .. 2) {
-            for my $s (0 .. 2) {
-                for my $sh (0 .. 2) {
+    for my $n (0:2) {
+        for my $c (0:2) {
+            for my $s (0:2) {
+                for my $sh (0:2) {
                     push @deck, [$n, $c, $s, $sh]
                 }
             }
@@ -32,20 +32,20 @@ fn Rosetta::SetGame::shuffle($cards, $seed) {
 fn Rosetta::SetGame::deal($seed, $n) {
     my $shuffled = Rosetta::SetGame::shuffle(Rosetta::SetGame::deck(), $seed)
     my @hand
-    for my $i (0 .. $n - 1) { push @hand, $shuffled->[$i] }
+    for my $i (0:$n - 1) { push @hand, $shuffled->[$i] }
     \@hand
 }
 
 fn Rosetta::SetGame::is_set($a, $b, $c) {
-    ~> 0 .. 3 all { (($a->[_] + $b->[_] + $c->[_]) % 3) == 0 }
+    ~> 0:3 all { (($a->[_] + $b->[_] + $c->[_]) % 3) == 0 }
 }
 
 fn Rosetta::SetGame::find_sets($cards) {
     my @sets
     my $n = len(@$cards)
-    for my $i (0 .. $n - 3) {
-        for my $j ($i + 1 .. $n - 2) {
-            for my $k ($j + 1 .. $n - 1) {
+    for my $i (0:$n - 3) {
+        for my $j ($i + 1:$n - 2) {
+            for my $k ($j + 1:$n - 1) {
                 if (Rosetta::SetGame::is_set($cards->[$i], $cards->[$j], $cards->[$k])) {
                     push @sets, [$cards->[$i], $cards->[$j], $cards->[$k]]
                 }
@@ -61,9 +61,9 @@ my $hand = Rosetta::SetGame::deal(12345, 12)
 my %hand_seen = map { join(",", @$_) => 1 } @$hand
 
 assert_eq len(@$deck), 81, "full deck has 81 cards"
-assert_eq scalar(keys %seen), 81, "all deck cards unique"
+assert_eq len(keys %seen), 81, "all deck cards unique"
 assert_eq len(@$hand), 12, "dealt 12 cards"
-assert_eq scalar(keys %hand_seen), 12, "dealt cards unique"
+assert_eq len(keys %hand_seen), 12, "dealt cards unique"
 
 my $known = [
     [0,0,0,0], [1,1,1,1], [2,2,2,2],

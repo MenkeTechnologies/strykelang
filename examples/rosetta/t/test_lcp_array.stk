@@ -6,7 +6,7 @@
 # Build a suffix array via O(n² log n) sort — fine for the test sizes
 # here; production would use SA-IS or DC3.
 fn Rosetta::LCP::suffix_array($s) {
-    my $n = length($s)
+    my $n = len($s)
     my @suffixes
     for my $i (~> 0:$n - 1) { push @suffixes, [substr($s, $i), $i] }
     @suffixes = sort { _0->[0] cmp _1->[0] } @suffixes
@@ -16,7 +16,7 @@ fn Rosetta::LCP::suffix_array($s) {
 
 # Kasai's algorithm.
 fn Rosetta::LCP::kasai($s, $sa) {
-    my $n = length($s)
+    my $n = len($s)
     my @rank = ~> 0:$n - 1 |> map { 0 }
     for my $i (~> 0:$n - 1) { $rank[$sa->[$i]] = $i }
     my @lcp = ~> 0:$n - 1 |> map { 0 }
@@ -39,14 +39,14 @@ fn Rosetta::LCP::kasai($s, $sa) {
 # Naive LCP for cross-check.
 fn Rosetta::LCP::common_prefix_len($a, $b) {
     my $i = 0
-    my $la = length($a)
-    my $lb = length($b)
+    my $la = len($a)
+    my $lb = len($b)
     while ($i < $la && $i < $lb && substr($a, $i, 1) eq substr($b, $i, 1)) { $i++ }
     $i
 }
 
 fn Rosetta::LCP::naive($s, $sa) {
-    my $n = length($s)
+    my $n = len($s)
     my @lcp = ~> 0:$n - 1 |> map { 0 }
     for my $i (~> 1:$n - 1) {
         $lcp[$i] = Rosetta::LCP::common_prefix_len(substr($s, $sa->[$i]), substr($s, $sa->[$i - 1]))

@@ -19,7 +19,7 @@ fn Rosetta::RadixSort::sort($list) {
             push @{$buckets[$digit]}, $x
         }
         @arr = ()
-        for my $i (0..9) {
+        for my $i (0:9) {
             push @arr, @{$buckets[$i]}
         }
         $exp *= 10

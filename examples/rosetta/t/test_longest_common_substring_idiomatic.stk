@@ -10,7 +10,7 @@ fn Rosetta::LongestCommonSubstring::solve($s1, $s2) {
     my $max_len = 0
     my $end_idx = 0
     
-    my @dp = map { [ map { 0 } 0..$n2 ] } 0..$n1
+    my @dp = map { [ map { 0 } 0:$n2 ] } 0:$n1
     
     for (my $i = 1; $i <= $n1; $i++) {
         for (my $j = 1; $j <= $n2; $j++) {

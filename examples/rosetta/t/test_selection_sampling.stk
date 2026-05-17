@@ -4,7 +4,7 @@
 fn Rosetta::SelectionSampling::solve($n, $max) {
     my @sample = ()
     my $m = 0 # items selected so far
-    for my $i (1..$max) {
+    for my $i (1:$max) {
         if (int(rand($max - $i + 1)) < ($n - $m)) {
             push @sample, $i
             $m++

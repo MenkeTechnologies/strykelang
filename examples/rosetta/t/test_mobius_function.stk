@@ -26,7 +26,7 @@ fn Rosetta::Mobius::mu($n) {
 
 # Known values from OEIS A008683
 my @expected = (1, -1, -1, 0, -1, 1, -1, 0, 0, 1, -1, 0, -1, 1, 1, 0, -1, 0, -1, 0)
-for my $i (0..19) {
+for my $i (0:19) {
     assert_eq Rosetta::Mobius::mu($i + 1), $expected[$i], "mu(" . ($i + 1) . ") = " . $expected[$i]
 }
 
@@ -37,7 +37,7 @@ assert_eq Rosetta::Mobius::mu(105), -1, "mu(105=3*5*7) = -1"
 
 # Mertens function partial sum
 my $mertens = 0
-for my $n (1..100) {
+for my $n (1:100) {
     $mertens += Rosetta::Mobius::mu($n)
 }
 assert_eq $mertens, 1, "M(100) = 1"

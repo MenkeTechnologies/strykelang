@@ -3,7 +3,7 @@
 
 fn Rosetta::HofstadterQ::compute($n) {
     my @q = (0, 1, 1)
-    for my $i (3..$n) {
+    for my $i (3:$n) {
         my $prev1 = $q[$i - 1]
         my $prev2 = $q[$i - 2]
         my $val = $q[$i - $prev1] + $q[$i - $prev2]

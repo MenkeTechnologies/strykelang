@@ -10,7 +10,7 @@ fn Rosetta::Polyspiral::walk($n, $step, $delta_deg) {
     my $x = 0
     my $y = 0
     my @pts = ([$x, $y])
-    for my $i (1..$n) {
+    for my $i (1:$n) {
         $x += $step * cos($angle)
         $y += $step * sin($angle)
         push @pts, [$x, $y]
@@ -25,7 +25,7 @@ fn Rosetta::Polyspiral::walk_growing($n, $delta_deg) {
     my $x = 0
     my $y = 0
     my @pts = ([$x, $y])
-    for my $i (1..$n) {
+    for my $i (1:$n) {
         $x += $i * cos($angle)
         $y += $i * sin($angle)
         push @pts, [$x, $y]

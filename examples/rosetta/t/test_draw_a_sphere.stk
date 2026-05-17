@@ -18,7 +18,7 @@ fn Rosetta::Sphere::draw($radius) {
     my ($lx, $ly, $lz) = (-0.577350269, -0.577350269, 0.577350269)
     my @lines
 
-    for my $y (-$radius..$radius) {
+    for my $y (-$radius:$radius) {
         my $line = ""
         for my $xi ((-$radius * 2)..($radius * 2)) {
             my $x = $xi / 2
@@ -55,7 +55,7 @@ fn Rosetta::Sphere::unique_shades($text) {
         next if $ch =~ /\s/
         $seen{$ch} = 1
     }
-    scalar(keys %seen)
+    len(keys %seen)
 }
 
 my $sphere = Rosetta::Sphere::draw(8)

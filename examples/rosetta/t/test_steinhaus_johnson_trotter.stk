@@ -6,7 +6,7 @@ fn Rosetta::SJT::mobile_index($a, $dir) {
     my $n = len(@$a)
     my $best = -1
     my $best_val = -1
-    for my $i (0..$n-1) {
+    for my $i (0:$n-1) {
         my $d = $dir->[$i]
         my $j = $i + $d
         next if $j < 0 || $j >= $n
@@ -19,7 +19,7 @@ fn Rosetta::SJT::mobile_index($a, $dir) {
 }
 
 fn Rosetta::SJT::all($n) {
-    my @a = (1..$n)
+    my @a = (1:$n)
     my @dir = (-1) x $n
     my @perms = ([@a])
     while (1) {
@@ -29,7 +29,7 @@ fn Rosetta::SJT::all($n) {
         my $j = $idx + $dir[$idx]
         ($a[$idx], $a[$j]) = ($a[$j], $a[$idx])
         ($dir[$idx], $dir[$j]) = ($dir[$j], $dir[$idx])
-        for my $k (0..$n-1) {
+        for my $k (0:$n-1) {
             $dir[$k] = -$dir[$k] if $a[$k] > $val
         }
         push @perms, [@a]
@@ -58,14 +58,14 @@ assert_eq $sigs[5], "213", "final swap"
 fn Rosetta::SJT::diff_count($x, $y) {
     my $n = len(@$x)
     my $d = 0
-    for my $i (0..$n-1) {
+    for my $i (0:$n-1) {
         $d++ if $x->[$i] != $y->[$i]
     }
     $d
 }
 my $p4 = Rosetta::SJT::all(4)
 assert_eq len(@$p4), 24, "4! = 24"
-for my $i (1..23) {
+for my $i (1:23) {
     my $d = Rosetta::SJT::diff_count($p4->[$i-1], $p4->[$i])
     assert_eq $d, 2, "consecutive perms differ in 2 positions (adjacent swap)"
 }

@@ -16,7 +16,7 @@ fn Rosetta::Tournament::sort($arr) {
     my $inf = 1e18
     # Tree stored in array of length 2*size; leaves at [size..2*size-1].
     my @tree = ($inf) x (2 * $size)
-    for my $i (0..$n - 1) {
+    for my $i (0:$n - 1) {
         $tree[$size + $i] = $arr->[$i]
     }
     # Build internal nodes (min of children).
@@ -26,7 +26,7 @@ fn Rosetta::Tournament::sort($arr) {
         $tree[$i] = $l < $r ? $l : $r
     }
     my @out
-    for (1..$n) {
+    for (1:$n) {
         my $min = $tree[1]
         push @out, $min
         # Find the leaf carrying the min and replace with +inf.

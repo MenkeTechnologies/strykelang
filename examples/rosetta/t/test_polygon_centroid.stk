@@ -6,7 +6,7 @@ fn Rosetta::Centroid::compute($poly) {
     my $cx = 0.0
     my $cy = 0.0
     my $area = 0.0
-    for my $i (0..$n - 1) {
+    for my $i (0:$n - 1) {
         my $j = ($i + 1) % $n
         my $cross = $poly->[$i][0] * $poly->[$j][1] - $poly->[$j][0] * $poly->[$i][1]
         $area += $cross
@@ -29,8 +29,8 @@ assert_ok Rosetta::Centroid::close($c->[1], 0), "centered square cy = 0"
 # Square with corner at origin
 my $off = [[0, 0], [4, 0], [4, 4], [0, 4]]
 my $co = Rosetta::Centroid::compute($off)
-assert_ok Rosetta::Centroid::close($co->[0], 2), "0..4 square cx = 2"
-assert_ok Rosetta::Centroid::close($co->[1], 2), "0..4 square cy = 2"
+assert_ok Rosetta::Centroid::close($co->[0], 2), "0:4 square cx = 2"
+assert_ok Rosetta::Centroid::close($co->[1], 2), "0:4 square cy = 2"
 
 # Right triangle: centroid = (sum_x/3, sum_y/3)
 my $tri = [[0, 0], [3, 0], [0, 3]]

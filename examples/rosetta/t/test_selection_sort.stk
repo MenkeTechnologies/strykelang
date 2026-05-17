@@ -3,9 +3,9 @@
 
 fn Rosetta::SelectionSort::sort(@arr) {
     my $n = len(@arr)
-    for my $i (0..$n-2) {
+    for my $i (0:$n-2) {
         my $min_idx = $i
-        for my $j ($i+1..$n-1) {
+        for my $j ($i+1:$n-1) {
             $min_idx = $j if $arr[$j] < $arr[$min_idx]
         }
         if ($min_idx != $i) {

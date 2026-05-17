@@ -76,7 +76,7 @@ fn Rosetta::Calipers::naive_diameter($pts) {
     my $n = len(@$pts)
     my $best = 0
     for my $i (~> 0:$n - 1) {
-        for my $j ($i + 1..$n - 1) {
+        for my $j ($i + 1:$n - 1) {
             my $d = Rosetta::Calipers::dist2($pts->[$i], $pts->[$j])
             $best = $d if $d > $best
         }

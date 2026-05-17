@@ -10,7 +10,7 @@ fn Rosetta::MkdirP::create($path) {
     my $cur = ""
     $cur = "/" if substr($path, 0, 1) eq "/"
     for my $p (@parts) {
-        next if length($p) == 0
+        next if len($p) == 0
         $cur = $cur eq "/" ? "/$p" : ($cur eq "" ? $p : "$cur/$p")
         next if -d $cur
         my $r = mkdir($cur)

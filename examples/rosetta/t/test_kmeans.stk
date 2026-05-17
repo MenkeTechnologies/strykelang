@@ -9,21 +9,21 @@ fn Rosetta::KMeans::solve($points, $k, $max_iters) {
     # Initialize centroids (pick distant points for stability in this small example)
     my @centroids = ([@{$points->[0]}], [@{$points->[3]}])
     my $n = len(@$points)
-    my @assignments = ~> 0..$n-1 map { -1 }
+    my @assignments = ~> 0:$n-1 map { -1 }
     
-    for (1..$max_iters) {
+    for (1:$max_iters) {
         # Assignment step: each point picks the nearest centroid by index.
         my @new_assignments = map {
             my $p_idx = _
             min_by { Rosetta::KMeans::distance($points->[$p_idx], $centroids[_]) } 0:$k-1
-        } 0..$n-1
+        } 0:$n-1
         my $changed = ~> 0:$n-1 any { $new_assignments[_] != $assignments[_] }
         @assignments = @new_assignments
         last if !$changed
         
         # Update step
-        my @counts = map { 0 } 0..$k-1
-        my @sums = map { [ map { 0 } 0..len(@{$points->[0]})-1 ] } 0..$k-1
+        my @counts = map { 0 } 0:$k-1
+        my @sums = map { [ map { 0 } 0..len(@{$points->[0]})-1 ] } 0:$k-1
         
         for (my $i = 0; $i < $n; $i++) {
             my $c_idx = $assignments[$i]

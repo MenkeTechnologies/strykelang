@@ -5,7 +5,7 @@
 # core idea: fixed minrun + bottom-up merge.
 
 fn Rosetta::Tim::insertion_range($arr, $lo, $hi) {
-    for my $i ($lo + 1..$hi) {
+    for my $i ($lo + 1:$hi) {
         my $x = $arr->[$i]
         my $j = $i - 1
         while ($j >= $lo && $arr->[$j] > $x) {
@@ -17,8 +17,8 @@ fn Rosetta::Tim::insertion_range($arr, $lo, $hi) {
 }
 
 fn Rosetta::Tim::merge_range($arr, $lo, $mid, $hi) {
-    my @left = @$arr[$lo..$mid]
-    my @right = @$arr[$mid + 1..$hi]
+    my @left = @$arr[$lo:$mid]
+    my @right = @$arr[$mid + 1:$hi]
     my ($i, $j, $k) = (0, 0, $lo)
     while ($i < len(@left) && $j < len(@right)) {
         if ($left[$i] <= $right[$j]) { $arr->[$k++] = $left[$i++] }

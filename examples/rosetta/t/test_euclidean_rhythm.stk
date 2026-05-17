@@ -24,7 +24,7 @@ fn Rosetta::Euclidean::rotate_to_pulse($pattern) {
     my $i = 0
     while ($i < len(@p) && $p[$i] != 1) { $i++ }
     return \@p if $i == 0 || $i == len(@p)
-    my @rot = (@p[$i..len(@p) - 1], @p[0..$i - 1])
+    my @rot = (@p[$i..len(@p) - 1], @p[0:$i - 1])
     \@rot
 }
 

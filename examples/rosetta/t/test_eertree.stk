@@ -9,20 +9,20 @@ fn Rosetta::Eertree::distinct_palindromes($s) {
     # Manacher-flavored: for each center, expand maximally; collect distinct strings.
     my %seen
     # odd-length palindromes
-    for my $c (0..$n-1) {
+    for my $c (0:$n-1) {
         my $l = $c
         my $r = $c
         while ($l >= 0 && $r < $n && $chars[$l] eq $chars[$r]) {
-            $seen{ join("", @chars[$l..$r]) } = 1
+            $seen{ join("", @chars[$l:$r]) } = 1
             $l -= 1; $r += 1
         }
     }
     # even-length palindromes
-    for my $c (0..$n-2) {
+    for my $c (0:$n-2) {
         my $l = $c
         my $r = $c + 1
         while ($l >= 0 && $r < $n && $chars[$l] eq $chars[$r]) {
-            $seen{ join("", @chars[$l..$r]) } = 1
+            $seen{ join("", @chars[$l:$r]) } = 1
             $l -= 1; $r += 1
         }
     }

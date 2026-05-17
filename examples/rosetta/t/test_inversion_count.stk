@@ -4,7 +4,7 @@
 # counts how many later elements were dragged past current ones.
 
 fn Rosetta::Inv::merge_count($arr, $aux, $lo, $mid, $hi) {
-    for my $k ($lo..$hi) { $aux->[$k] = $arr->[$k] }
+    for my $k ($lo:$hi) { $aux->[$k] = $arr->[$k] }
     my ($i, $j, $k) = ($lo, $mid + 1, $lo)
     my $count = 0
     while ($i <= $mid && $j <= $hi) {
@@ -41,7 +41,7 @@ fn Rosetta::Inv::naive($input) {
     my $n = len(@$input)
     my $count = 0
     for my $i (~> 0:$n - 2) {
-        for my $j ($i + 1..$n - 1) {
+        for my $j ($i + 1:$n - 1) {
             $count++ if $input->[$i] > $input->[$j]
         }
     }
@@ -82,10 +82,10 @@ assert_eq join(",", @copy), join(",", @orig), "input is preserved"
 
 # Large input — no inversions when already sorted.
 my @big = ~> 1:1000
-assert_eq Rosetta::Inv::count(\@big), 0, "1..1000 sorted = 0"
+assert_eq Rosetta::Inv::count(\@big), 0, "1:1000 sorted = 0"
 
 # Reverse 1..100 — n*(n-1)/2 = 4950
-my @rev_100 = reverse @big[0..99]
+my @rev_100 = reverse @big[0:99]
 assert_eq Rosetta::Inv::count(\@rev_100), 4950, "reverse 100 = 4950"
 
 test_run

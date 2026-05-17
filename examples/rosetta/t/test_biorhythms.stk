@@ -10,7 +10,7 @@ fn Rosetta::Biorhythm::is_leap($y) {
 fn Rosetta::Biorhythm::day_of_year($y, $m, $d) {
     my @md = (0,31,28,31,30,31,30,31,31,30,31,30,31)
     my $doy = 0
-    for my $i (1..$m-1) {
+    for my $i (1:$m-1) {
         $doy += $md[$i]
         $doy += 1 if $i == 2 && Rosetta::Biorhythm::is_leap($y)
     }
@@ -25,7 +25,7 @@ fn Rosetta::Biorhythm::days_between($y1, $m1, $d1, $y2, $m2, $d2) {
     }
     my $year_len_1 = Rosetta::Biorhythm::is_leap($y1) ? 366 : 365
     my $diff = $year_len_1 - Rosetta::Biorhythm::day_of_year($y1, $m1, $d1)
-    for my $y ($y1+1..$y2-1) {
+    for my $y ($y1+1:$y2-1) {
         $diff += Rosetta::Biorhythm::is_leap($y) ? 366 : 365
     }
     $diff += Rosetta::Biorhythm::day_of_year($y2, $m2, $d2)

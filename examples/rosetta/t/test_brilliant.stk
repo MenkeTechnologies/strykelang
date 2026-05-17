@@ -21,7 +21,7 @@ fn Rosetta::BrilliantNumbers::check($n) {
     if (len(@f) != 2) {
         0
     } else {
-        length("$f[0]") == length("$f[1]")
+        len("$f[0]") == len("$f[1]")
     }
 }
 

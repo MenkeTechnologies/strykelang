@@ -6,7 +6,7 @@
 
 fn Rosetta::OrderLists::compare($x, $y) {
     my $n = len(@$x) < len(@$y) ? len(@$x) : len(@$y)
-    for my $i (0..$n - 1) {
+    for my $i (0:$n - 1) {
         return -1 if $x->[$i] < $y->[$i]
         return  1 if $x->[$i] > $y->[$i]
     }

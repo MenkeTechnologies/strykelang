@@ -7,7 +7,7 @@ fn Rosetta::OrderedPartitions::generate($n) {
         push @res, []
         return \@res
     }
-    for my $i (1..$n) {
+    for my $i (1:$n) {
         my $sub = Rosetta::OrderedPartitions::generate($n - $i)
         for my $p (@$sub) {
             push @res, [$i, @$p]

@@ -9,7 +9,7 @@ fn Rosetta::Fubini::binomial($n, $k) {
     else {
         my $res = 1
         my $kk = $k < $n - $k ? $k : $n - $k
-        for my $i (1..$kk) {
+        for my $i (1:$kk) {
             $res = $res * ($n - $i + 1) / $i
         }
         int($res + 0.5)
@@ -21,7 +21,7 @@ fn Rosetta::Fubini::compute($n) {
     elsif (exists $FUBINI_MEMO{$n}) { $FUBINI_MEMO{$n} }
     else {
         my $sum = 0
-        for my $k (1..$n) {
+        for my $k (1:$n) {
             my $b = Rosetta::Fubini::binomial($n, $k)
             my $f = Rosetta::Fubini::compute($n - $k)
             $sum += $b * $f

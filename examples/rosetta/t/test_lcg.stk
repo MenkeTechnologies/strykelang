@@ -8,7 +8,7 @@ fn Rosetta::LCG::next_val($x) {
 
 my $x = 1 # seed
 my @res
-for my $i (1..5) {
+for my $i (1:5) {
     $x = Rosetta::LCG::next_val($x)
     push @res, $x
 }

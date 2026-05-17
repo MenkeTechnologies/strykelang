@@ -14,9 +14,9 @@ fn Rosetta::TwosComp::to_bits($n, $bits) {
 }
 
 fn Rosetta::TwosComp::from_bits($s) {
-    my $bits = length($s)
+    my $bits = len($s)
     my $u = 0
-    for my $i (0..$bits - 1) {
+    for my $i (0:$bits - 1) {
         my $c = substr($s, $i, 1)
         $u = $u * 2 + ($c eq "1" ? 1 : 0)
     }
@@ -26,7 +26,7 @@ fn Rosetta::TwosComp::from_bits($s) {
 }
 
 fn Rosetta::TwosComp::negate_bits($s) {
-    Rosetta::TwosComp::to_bits(-Rosetta::TwosComp::from_bits($s), length($s))
+    Rosetta::TwosComp::to_bits(-Rosetta::TwosComp::from_bits($s), len($s))
 }
 
 # Encoding
@@ -44,7 +44,7 @@ assert_eq Rosetta::TwosComp::from_bits("00000000"), 0,    "00000000 → 0"
 
 # Round-trip on every 8-bit signed value
 my $rt_ok = 1
-for my $i (-128..127) {
+for my $i (-128:127) {
     my $back = Rosetta::TwosComp::from_bits(Rosetta::TwosComp::to_bits($i, 8))
     $rt_ok = 0 if $back != $i
 }

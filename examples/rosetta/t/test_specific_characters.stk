@@ -42,7 +42,7 @@ assert_eq $s->{punctuation},  2, "comma + bang"
 
 # Empty string
 my $e = Rosetta::SpecChar::summarize("")
-assert_eq scalar(keys %$e), 0, "empty input"
+assert_eq len(keys %$e), 0, "empty input"
 
 # Pipe form
 "abc 123" |> Rosetta::SpecChar::summarize |> fn { $_->{digit} } |> assert_eq(3, "pipe digit count")

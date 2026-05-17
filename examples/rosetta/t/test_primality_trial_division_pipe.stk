@@ -10,7 +10,7 @@ fn Rosetta::Primality::is_prime($n) {
     if ($limit < 3) { return 1 }
     
     # Check odd numbers from 3 to sqrt(n)
-    my @candidates = (3, 5 .. $limit) # This might not be right syntax for step
+    my @candidates = (3, 5:$limit) # This might not be right syntax for step
     # Better: generate range and filter
     3:$limit |> grep { _ % 2 != 0 } |> all { $n % _ != 0 }
 }

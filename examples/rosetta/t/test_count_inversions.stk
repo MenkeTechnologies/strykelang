@@ -6,8 +6,8 @@ fn Rosetta::Inversions::merge_count($a) {
     my $n = len(@$a)
     return [[@$a], 0] if $n <= 1
     my $mid = int($n / 2)
-    my @left = @$a[0..$mid - 1]
-    my @right = @$a[$mid..$n - 1]
+    my @left = @$a[0:$mid - 1]
+    my @right = @$a[$mid:$n - 1]
     my $l = Rosetta::Inversions::merge_count(\@left)
     my $r = Rosetta::Inversions::merge_count(\@right)
     my @ml = @{$l->[0]}
@@ -36,8 +36,8 @@ fn Rosetta::Inversions::count($a) {
 assert_eq Rosetta::Inversions::count([1, 2, 3, 4, 5]), 0, "sorted -> 0"
 
 # Reverse sorted -> n*(n-1)/2 inversions
-assert_eq Rosetta::Inversions::count([5, 4, 3, 2, 1]), 10, "5..1 -> 10"
-assert_eq Rosetta::Inversions::count([4, 3, 2, 1]), 6, "4..1 -> 6"
+assert_eq Rosetta::Inversions::count([5, 4, 3, 2, 1]), 10, "5:1 -> 10"
+assert_eq Rosetta::Inversions::count([4, 3, 2, 1]), 6, "4:1 -> 6"
 
 # Single swap
 assert_eq Rosetta::Inversions::count([1, 3, 2, 4, 5]), 1, "one swap -> 1"

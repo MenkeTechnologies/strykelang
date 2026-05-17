@@ -16,7 +16,7 @@ fn Rosetta::Piprimes::is_prime($n) {
 fn Rosetta::Piprimes::find() {
     my $pi = "31415926535897932384626433832795028841971693993751"
     my @primes
-    for my $i (1 .. 6) {
+    for my $i (1:6) {
         my $prefix = substr($pi, 0, $i)
         my $num = int($prefix)
         if (Rosetta::Piprimes::is_prime($num)) {

@@ -3,7 +3,7 @@
 
 fn Rosetta::MonteCarlo::pi_sequential($samples) {
     my $inside = 0
-    for my $i (1..$samples) {
+    for my $i (1:$samples) {
         my $x = rand()
         my $y = rand()
         if ($x * $x + $y * $y <= 1.0) {
@@ -18,7 +18,7 @@ fn Rosetta::MonteCarlo::pi_parallel($samples, $workers) {
     my @results = ~> 1:$workers pmap {
         my $inside = 0
         srand(_ + now_ns)
-        for my $i (1..$chunk) {
+        for my $i (1:$chunk) {
             my $x = rand()
             my $y = rand()
             if ($x * $x + $y * $y <= 1.0) {
