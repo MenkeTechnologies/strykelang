@@ -1,0 +1,120 @@
+#!/usr/bin/env stryke
+
+# Subset sum — classic NP-complete decision problem solved in pseudo-
+# polynomial time via DP. Two implementations:
+#   * decision: does any subset of @xs sum to $target?
+#   * reconstruct: return one witness subset (or undef)
+# Parses clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * implicit return on tail (rule 7)
+#   * `#{…}` interpolation (rule 1a)
+#   * `:` ranges, `len` (rules 4, 5)
+#
+# Namespaced UDFs `SS::*`.
+#
+# Run: stryke --no-interop examples/subset_sum_no_interop.stk
+
+# Decision: dp[i][j] = "can we sum to j using xs[0..i-1]?"
+fn SS::can_sum($xs, $target) {
+    return 1 if $target == 0
+    return 0 if $target < 0
+    my $n = len @$xs
+    my @dp
+    for my $i (0:$n) { $dp[$i] = [(0) x ($target + 1)] }
+    for my $i (0:$n) { $dp[$i][0] = 1 }       # empty subset sums to 0
+    for my $i (1:$n) {
+        my $v = $xs->[$i - 1]
+        for my $j (1:$target) {
+            $dp[$i][$j] = $dp[$i - 1][$j]
+            $dp[$i][$j] = 1 if $j >= $v && $dp[$i - 1][$j - $v] == 1
+        }
+    }
+    $dp[$n][$target]
+}
+
+# Reconstruct one witness subset. Returns arrayref of values, or undef
+# if no subset sums to target.
+fn SS::find_subset($xs, $target) {
+    return [] if $target == 0
+    return undef if $target < 0
+    my $n = len @$xs
+    my @dp
+    for my $i (0:$n) { $dp[$i] = [(0) x ($target + 1)] }
+    for my $i (0:$n) { $dp[$i][0] = 1 }
+    for my $i (1:$n) {
+        my $v = $xs->[$i - 1]
+        for my $j (1:$target) {
+            $dp[$i][$j] = $dp[$i - 1][$j]
+            $dp[$i][$j] = 1 if $j >= $v && $dp[$i - 1][$j - $v] == 1
+        }
+    }
+    return undef unless $dp[$n][$target]
+    # Walk back: at each i, prefer to skip if dp[i-1][j] is true; else take.
+    my @out
+    my $j = $target
+    for (my $i = $n; $i > 0; $i--) {
+        my $v = $xs->[$i - 1]
+        if ($j >= $v && $dp[$i - 1][$j - $v] == 1) {
+            unshift @out, $v
+            $j -= $v
+        }
+    }
+    \@out
+}
+
+p "── Subset sum demo ──"
+
+my @cases = (
+    +{ xs => [3, 34, 4, 12, 5, 2],  target =>  9, ok => 1 },  # 4+5 or 3+4+2 or ...
+    +{ xs => [3, 34, 4, 12, 5, 2],  target => 30, ok => 0 },  # not reachable
+    +{ xs => [1, 2, 3, 4, 5],       target => 11, ok => 1 },  # 1+2+3+5 or 2+4+5
+    +{ xs => [1, 2, 3, 4, 5],       target => 16, ok => 0 },  # max sum is 15
+    +{ xs => [1, 2, 3, 4, 5],       target => 15, ok => 1 },  # all of them
+    +{ xs => [],                    target =>  0, ok => 1 },  # empty sums to 0
+    +{ xs => [],                    target =>  5, ok => 0 },
+    +{ xs => [42],                  target => 42, ok => 1 },  # single match
+    +{ xs => [42],                  target => 41, ok => 0 },
+    +{ xs => [2, 4, 6, 8, 10],      target =>  7, ok => 0 },  # all even, odd unreachable
+    +{ xs => [2, 4, 6, 8, 10],      target => 14, ok => 1 },  # 4+10 or 6+8 or 2+4+8
+)
+
+my $fail = 0
+for my $c (@cases) {
+    my $can     = SS::can_sum($c->{xs}, $c->{target})
+    my $witness = SS::find_subset($c->{xs}, $c->{target})
+    my $ok = $can == $c->{ok}
+    if ($c->{ok}) {
+        die "find_subset returned undef" unless defined $witness
+        my $sum = 0
+        $sum += $_ for @$witness
+        $ok = $ok && $sum == $c->{target}
+    } else {
+        $ok = $ok && !defined $witness
+    }
+    $fail++ unless $ok
+    my $w_s = defined $witness ? "[" . join(",", @$witness) . "]" : "undef"
+    p "  SS([@{$c->{xs}}], #{$c->{target}}) can=#{$can} witness=$w_s  expect can=#{$c->{ok}}  #{$ok ? \"\" : \"FAIL\"}"
+}
+die "#{$fail} / #{len @cases} subset-sum cases failed" if $fail > 0
+
+# Universal invariants:
+#   * can_sum(_, 0) = 1 (empty subset)
+#   * Witness subset elements all appear in input (as multiset)
+#   * Witness subset sums exactly to target
+for my $c (@cases) {
+    die "can_sum(_, 0) != 1" unless SS::can_sum($c->{xs}, 0)
+    next unless $c->{ok}
+    my $w = SS::find_subset($c->{xs}, $c->{target})
+    next unless defined $w
+    # Check witness elements are a sub-multiset of input.
+    my %avail
+    for my $v (@{$c->{xs}}) { $avail{$v}++ }
+    for my $v (@$w) {
+        die "witness uses unavailable $v" unless $avail{$v} > 0
+        $avail{$v}--
+    }
+}
+
+p ""
+p "  ALL PASS (11 cases + sum-correctness + sub-multiset invariant)"
