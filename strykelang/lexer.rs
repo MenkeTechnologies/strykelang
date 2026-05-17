@@ -1558,7 +1558,9 @@ impl Lexer {
                 if crate::no_interop_mode() && (name == "a" || name == "b") {
                     return Err(self.syntax_err(
                         format!(
-                            "stryke uses `$_0` / `$_1` instead of `${}` (--no-interop is active)",
+                            "stryke uses `_` / `_1` (bareword in code) or `$_` / `$_1` \
+                             (sigil inside string interpolation / when whitespace \
+                             would change parsing) instead of `${}` (--no-interop is active)",
                             name
                         ),
                         self.line,
@@ -2271,6 +2273,65 @@ impl Lexer {
                 // Special multi-char constructs
                 match ident.as_str() {
                     "format" => {
+                        // `$obj->format` — method call, not format declaration.
+                        if self.prev_arrow {
+                            self.last_was_term = true;
+                            return Ok(Token::Ident(ident));
+                        }
+                        // `Foo::format` — namespaced identifier tail.
+                        if ident_start >= 2
+                            && self.input.get(ident_start.saturating_sub(2)) == Some(&':')
+                            && self.input.get(ident_start.saturating_sub(1)) == Some(&':')
+                        {
+                            self.last_was_term = true;
+                            return Ok(Token::Ident(ident));
+                        }
+                        // Hash-key bareword contexts: `$h{format}`, `{format => ...}`,
+                        // `$h{format,...}`. The char immediately before `format`
+                        // (modulo whitespace) being `{` means we're inside a
+                        // hash-subscript or hash-literal — `format` is the key,
+                        // not the FORMAT keyword.
+                        {
+                            let mut p = ident_start;
+                            while p > 0 {
+                                match self.input.get(p - 1) {
+                                    Some(&' ') | Some(&'\t') => p -= 1,
+                                    _ => break,
+                                }
+                            }
+                            if p > 0 && self.input.get(p - 1) == Some(&'{') {
+                                self.last_was_term = true;
+                                return Ok(Token::Ident(ident));
+                            }
+                        }
+                        // Lookahead-disambiguation: shapes that prove
+                        // `format` is a bareword, not a declaration keyword.
+                        // `}` / `,` / `;` / `)` / `]` — list/hash/expr context.
+                        // `=>` — autoquoted hash key.
+                        // `(` — function call (format() / format($x)).
+                        // EOF — bare ident at end of input.
+                        // A real `format NAME = ... .` declaration always has
+                        // an identifier between `format` and `=`; if no
+                        // identifier is found at the expected slot, it's
+                        // a bareword.
+                        {
+                            let saved_pos = self.pos;
+                            let saved_line = self.line;
+                            self.skip_whitespace_only();
+                            let bare = match self.peek() {
+                                None => true,
+                                Some(c) if matches!(c, ',' | ';' | ')' | ']' | '}' | '(') => true,
+                                Some('=') if self.peek_at(1) == Some('>') => true,
+                                Some(c) if !c.is_alphabetic() && c != '_' => true,
+                                _ => false,
+                            };
+                            self.pos = saved_pos;
+                            self.line = saved_line;
+                            if bare {
+                                self.last_was_term = true;
+                                return Ok(Token::Ident(ident));
+                            }
+                        }
                         self.skip_whitespace_and_comments();
                         let fname = self.read_package_qualified_identifier();
                         self.skip_whitespace_and_comments();
