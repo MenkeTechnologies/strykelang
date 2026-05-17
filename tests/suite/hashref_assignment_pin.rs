@@ -328,3 +328,68 @@ fn count_keys_via_len() {
     "#;
     assert_eq!(eval_int(code), 1);
 }
+
+// ── Compound-assign on hash arrow-deref leaves the new value on stack ──
+//
+// Regression: `$h->{k} OP= v` compiled `Op::SetArrowHash` (no-keep), so
+// the statement-level `Pop` after the expression then popped a slot
+// from the CALLER'S frame, silently corrupting any expression that called
+// the same sub multiple times. The fix: emit `Op::SetArrowHashKeep` so
+// the new value lives on the stack as the expression value and the
+// statement-level Pop only discards that single value.
+//
+// Shape-1: same sub called twice in one expression — Add must see both
+// return values, not one + caller-stack-junk.
+
+#[test]
+fn arrow_hash_compound_assign_no_caller_stack_corruption_add() {
+    let code = r#"
+        fn FOO::dec($x) { $x->{n} -= 1; 1 }
+        my $h = +{ n => 10 };
+        FOO::dec($h) + FOO::dec($h) + FOO::dec($h)
+    "#;
+    assert_eq!(eval_int(code), 3);
+}
+
+// Shape-2: accumulator in a single-statement for-body — every iteration's
+// fn return value must contribute to the sum.
+#[test]
+fn arrow_hash_compound_assign_no_caller_stack_corruption_for_loop() {
+    let code = r#"
+        fn FOO::dec($x) { $x->{n} -= 1; 1 }
+        my $h = +{ n => 10 };
+        my $tot = 0;
+        for (1:5) { $tot += FOO::dec($h) }
+        $tot
+    "#;
+    assert_eq!(eval_int(code), 5);
+}
+
+// Shape-3: each of the four common compound ops on hash arrow-deref —
+// all must leave their new value on the stack.
+#[test]
+fn arrow_hash_compound_assign_keep_new_value_minus_eq() {
+    let code = r#"
+        my $h = +{ n => 10 };
+        $h->{n} -= 3
+    "#;
+    assert_eq!(eval_int(code), 7);
+}
+
+#[test]
+fn arrow_hash_compound_assign_keep_new_value_plus_eq() {
+    let code = r#"
+        my $h = +{ n => 10 };
+        $h->{n} += 5
+    "#;
+    assert_eq!(eval_int(code), 15);
+}
+
+#[test]
+fn arrow_hash_compound_assign_keep_new_value_mul_eq() {
+    let code = r#"
+        my $h = +{ n => 4 };
+        $h->{n} *= 6
+    "#;
+    assert_eq!(eval_int(code), 24);
+}

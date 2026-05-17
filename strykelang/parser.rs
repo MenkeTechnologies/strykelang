@@ -12779,6 +12779,14 @@ impl Parser {
                 }
             }
             "wantarray" => {
+                if crate::no_interop_mode() {
+                    return Err(self.syntax_err(
+                        "stryke `wantarray` is rejected under --no-interop — \
+                         use explicit return-shape (`@result` vs `$scalar`) \
+                         or pass a flag arg instead of context-sniffing",
+                        line,
+                    ));
+                }
                 if matches!(self.peek(), Token::LParen) {
                     self.advance();
                     self.expect(&Token::RParen)?;
@@ -18984,7 +18992,9 @@ impl Parser {
         if crate::no_interop_mode() && (name == "a" || name == "b") {
             return Err(self.syntax_err(
                 format!(
-                    "stryke uses `$_0` / `$_1` instead of `${}` (--no-interop is active)",
+                    "stryke uses `_` / `_1` (bareword in code) or `$_` / `$_1` \
+                     (sigil inside string interpolation / when whitespace would \
+                     change parsing) instead of `${}` (--no-interop is active)",
                     name
                 ),
                 line,
@@ -22010,5 +22020,33 @@ mod tests {
                 } \
              }",
         );
+    }
+
+    /// `format` is a Perl FORMAT-declaration keyword. The lexer must
+    /// NOT eat `format` when it appears as a hash key
+    /// (`$h{format}`, `{format => ...}`), a method name
+    /// (`$obj->format`), a namespaced tail (`Foo::format`), or a
+    /// list/expr item with terminator follow-up. Previously
+    /// `$opts{format} = "csv"` triggered "Expected '=' after format
+    /// name" because the lexer greedily entered format-decl mode.
+    #[test]
+    fn format_as_hash_key_parses() {
+        parse_ok("my %opts; $opts{format} = \"csv\"");
+        parse_ok("my %opts = (format => \"csv\", level => 9)");
+        parse_ok("my $h = +{ format => \"csv\" }");
+        parse_ok("my @keys = ($h->{format}, $h->{level})");
+    }
+
+    /// `format` after `->` is a method name, not the format keyword.
+    #[test]
+    fn format_as_method_call_parses() {
+        parse_ok("class Foo { val: Str; fn format($self) { \"x\" } } my $f = Foo(val => \"y\"); my $s = $f->format()");
+    }
+
+    /// `format` after `::` is a namespaced fn name tail.
+    #[test]
+    fn format_as_namespaced_tail_parses() {
+        parse_ok("fn Foo::format($x) = $x . \"!\"");
+        parse_ok("fn Foo::format($x) = $x . \"!\"; my $r = Foo::format(\"hi\")");
     }
 }

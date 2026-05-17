@@ -4751,7 +4751,14 @@ impl Compiler {
                             self.emit_op(Op::Swap, line, Some(root));
                             self.emit_op(Op::Rot, line, Some(root));
                             self.emit_op(Op::Swap, line, Some(root));
-                            self.emit_op(Op::SetArrowHash, line, Some(root));
+                            // Use ...Keep so the new value remains on the stack
+                            // as the expression's value — the statement-level
+                            // `Pop` emitted by `StmtKind::Expression` will discard
+                            // it. Previously emitted `SetArrowHash` (no-keep)
+                            // left nothing, and that `Pop` then popped a slot
+                            // from the CALLER's stack frame — silently corrupting
+                            // multi-call expressions like `dec($n) + dec($n)`.
+                            self.emit_op(Op::SetArrowHashKeep, line, Some(root));
                         }
                     }
                 } else if let ExprKind::ArrowDeref {
