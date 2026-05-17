@@ -1,0 +1,124 @@
+#!/usr/bin/env stryke
+
+# Quickselect (Hoare's algorithm) — find the kth smallest element of
+# an unsorted array in expected O(n) time. Same partition step as
+# quicksort but recurse into only ONE side. Worst-case O(n²) on
+# adversarial input; median-of-medians fixes that but complicates the
+# code. Parses clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * implicit return on tail (rule 7)
+#   * `#{…}` interpolation (rule 1a)
+#   * `len`, `:` ranges (rules 4, 5)
+#
+# Namespaced UDFs `QS::*`.
+#
+# Run: stryke --no-interop examples/kth_smallest_no_interop.stk
+
+# Lomuto-style partition. Returns the final pivot index. Mutates arr.
+fn QS::partition($arr, $lo, $hi) {
+    my $pivot = $arr->[$hi]
+    my $i = $lo - 1
+    for my $j ($lo:$hi - 1) {
+        if ($arr->[$j] <= $pivot) {
+            $i++
+            ($arr->[$i], $arr->[$j]) = ($arr->[$j], $arr->[$i])
+        }
+    }
+    ($arr->[$i + 1], $arr->[$hi]) = ($arr->[$hi], $arr->[$i + 1])
+    $i + 1
+}
+
+# 0-indexed: find arr[k] when arr is sorted. k=0 → minimum.
+fn QS::select($arr_ref, $k) {
+    my @arr = @$arr_ref
+    die "k out of range" if $k < 0 || $k >= len(@arr)
+    my $lo = 0
+    my $hi = len(@arr) - 1
+    while ($lo < $hi) {
+        my $p = QS::partition(\@arr, $lo, $hi)
+        if    ($p == $k) { return $arr[$k] }
+        elsif ($p < $k)  { $lo = $p + 1 }
+        else             { $hi = $p - 1 }
+    }
+    $arr[$k]
+}
+
+# Convenience: median.
+fn QS::median($arr) {
+    my $n = len @$arr
+    QS::select($arr, int($n / 2))
+}
+
+# Convenience: kth largest (1-indexed for human-friendly use).
+fn QS::kth_largest($arr, $k) = QS::select($arr, len(@$arr) - $k)
+
+# Brute reference for cross-checking.
+fn QS::brute_select($arr, $k) {
+    my @sorted = sort { _0 <=> _1 } @$arr
+    $sorted[$k]
+}
+
+p "── Quickselect demo ──"
+
+my @cases = (
+    +{ arr => [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5], k => 0, expect => 1 },  # min
+    +{ arr => [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5], k => 1, expect => 1 },  # second smallest (dup)
+    +{ arr => [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5], k => 5, expect => 4 },  # median
+    +{ arr => [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5], k =>10, expect => 9 },  # max
+    +{ arr => [42],                              k => 0, expect => 42},
+    +{ arr => [5, 4, 3, 2, 1],                   k => 0, expect => 1 },
+    +{ arr => [5, 4, 3, 2, 1],                   k => 4, expect => 5 },
+    +{ arr => [-5, -10, 0, 10, 5],               k => 0, expect => -10},
+    +{ arr => [-5, -10, 0, 10, 5],               k => 4, expect => 10 },
+    +{ arr => [7, 7, 7, 7, 7],                   k => 2, expect => 7 },
+)
+
+my $fail = 0
+for my $c (@cases) {
+    my $got   = QS::select($c->{arr}, $c->{k})
+    my $brute = QS::brute_select($c->{arr}, $c->{k})
+    my $ok    = $got == $c->{expect} && $brute == $c->{expect}
+    $fail++ unless $ok
+    p "  select([@{$c->{arr}}], k=#{$c->{k}}) = #{$got}  expect #{$c->{expect}}  #{$ok ? \"\" : \"FAIL\"}"
+}
+die "#{$fail} / #{len @cases} quickselect cases failed" if $fail > 0
+
+# Median + kth_largest sanity.
+die "median [1,2,3,4,5] = 3"     unless QS::median([1, 2, 3, 4, 5]) == 3
+die "kth_largest k=1 of 1..5 = 5" unless QS::kth_largest([1, 2, 3, 4, 5], 1) == 5
+die "kth_largest k=3 of 1..5 = 3" unless QS::kth_largest([1, 2, 3, 4, 5], 3) == 3
+p "  median + kth_largest convenience fns  OK"
+
+# Stress: 500 random values, every k in 0..499, cross-check vs sort.
+srand(42)
+my @big
+push @big, int(rand 1000) for 1:500
+my @sorted = sort { _0 <=> _1 } @big
+for my $k (0:499) {
+    my $qs    = QS::select(\@big, $k)
+    my $brute = $sorted[$k]
+    die "disagreement at k=$k: qs=$qs brute=$brute" unless $qs == $brute
+}
+p "  500-element stress: all 500 ranks agree with full sort  OK"
+
+# Universal invariants:
+#   * select(arr, 0)         == min(arr)
+#   * select(arr, len-1)     == max(arr)
+#   * Successive selects produce a non-decreasing sequence
+for my $c (@cases) {
+    next if len(@{$c->{arr}}) < 2
+    my $min_sel = QS::select($c->{arr}, 0)
+    my $max_sel = QS::select($c->{arr}, len(@{$c->{arr}}) - 1)
+    my $min_real = $c->{arr}->[0]
+    my $max_real = $c->{arr}->[0]
+    for my $v (@{$c->{arr}}) {
+        $min_real = $v if $v < $min_real
+        $max_real = $v if $v > $max_real
+    }
+    die "min mismatch" unless $min_sel == $min_real
+    die "max mismatch" unless $max_sel == $max_real
+}
+
+p ""
+p "  ALL PASS (10 cases + median/kth_largest + 500x500 stress + min/max invariants)"
