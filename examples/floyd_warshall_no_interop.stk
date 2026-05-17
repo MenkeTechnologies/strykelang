@@ -1,0 +1,101 @@
+#!/usr/bin/env stryke
+
+# Floyd-Warshall — all-pairs shortest paths on a weighted graph.
+# O(V³) time, O(V²) space. Works for negative edges (no negative
+# cycles). The triple-nested loop k/i/j is the algorithm's
+# signature. Parses clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * 2-D distance matrix as nested arrayrefs
+#   * implicit return on tail (rule 7)
+#   * `#{…}` interpolation (rule 1a)
+#   * `min(a, b)` builtin
+#
+# Namespaced UDFs `FW::*`.
+#
+# Run: stryke --no-interop examples/floyd_warshall_no_interop.stk
+
+# Take V vertices and an edge list [u, v, weight], return distance
+# matrix `dist` where dist[i][j] = shortest path i→j (∞ if no path).
+fn FW::solve($v, $edges) {
+    my $INF = 1e18
+    my @d
+    for my $i (0:$v - 1) { $d[$i] = [($INF) x $v] }
+    for my $i (0:$v - 1) { $d[$i][$i] = 0 }
+    for my $e (@$edges) {
+        my ($u, $w, $cost) = @$e
+        $d[$u][$w] = $cost if $cost < $d[$u][$w]
+    }
+    # Triple loop: try to improve i→j by routing through k.
+    for my $k (0:$v - 1) {
+        for my $i (0:$v - 1) {
+            for my $j (0:$v - 1) {
+                my $via_k = $d[$i][$k] + $d[$k][$j]
+                $d[$i][$j] = $via_k if $via_k < $d[$i][$j]
+            }
+        }
+    }
+    \@d
+}
+
+fn FW::is_inf($x) = $x >= 1e17
+
+p "── Floyd-Warshall demo ──"
+
+# Classic textbook 4-vertex DAG.
+#   0 → 1 (3), 0 → 3 (7)
+#   1 → 0 (8), 1 → 2 (2)
+#   2 → 0 (5), 2 → 3 (1)
+#   3 → 0 (2)
+# Shortest 0→2 = 0→1→2 = 5. Shortest 0→3 = 0→1→2→3 = 6.
+my @edges = (
+    [0, 1, 3], [0, 3, 7],
+    [1, 0, 8], [1, 2, 2],
+    [2, 0, 5], [2, 3, 1],
+    [3, 0, 2],
+)
+my $d = FW::solve(4, \@edges)
+
+die "0→0 should be 0"  unless $d->[0][0] == 0
+die "0→1 should be 3"  unless $d->[0][1] == 3
+die "0→2 should be 5"  unless $d->[0][2] == 5
+die "0→3 should be 6"  unless $d->[0][3] == 6
+die "1→0 should be 5"  unless $d->[1][0] == 5  # via 1→2→3→0 = 2+1+2 = 5
+die "1→3 should be 3"  unless $d->[1][3] == 3
+die "2→0 should be 3"  unless $d->[2][0] == 3  # via 2→3→0 = 1+2 = 3
+die "2→1 should be 6"  unless $d->[2][1] == 6  # via 2→3→0→1 = 1+2+3 = 6
+die "3→2 should be 7"  unless $d->[3][2] == 7  # via 3→0→1→2 = 2+3+2 = 7
+p "  textbook 4-vertex DAG: all key dist entries match  OK"
+
+# Disconnected: vertex 3 isolated from the others.
+my @disc = ([0, 1, 1], [1, 2, 1])
+my $d2 = FW::solve(4, \@disc)
+die "0→1 = 1"          unless $d2->[0][1] == 1
+die "0→2 = 2"          unless $d2->[0][2] == 2
+die "0→3 unreachable"  unless FW::is_inf($d2->[0][3])
+die "3→0 unreachable"  unless FW::is_inf($d2->[3][0])
+p "  isolated vertex: reported as unreachable (∞)  OK"
+
+# Negative edges (no negative cycle).
+my @neg = ([0, 1, 4], [1, 2, -2], [0, 2, 3])
+my $d3 = FW::solve(3, \@neg)
+die "0→2 via 1 = 2 (4+(-2))" unless $d3->[0][2] == 2
+p "  negative edge: 0→1→2 wins (4 + -2 = 2) over direct 0→2 (3)  OK"
+
+# Universal invariants:
+#   * Diagonal is always 0 (i→i = 0)
+#   * Triangle: d[i][j] <= d[i][k] + d[k][j]   (when both finite)
+for my $i (0:3) {
+    die "diag at $i not 0" unless $d->[$i][$i] == 0
+}
+for my $i (0:3) {
+    for my $j (0:3) {
+        for my $k (0:3) {
+            next if FW::is_inf($d->[$i][$k]) || FW::is_inf($d->[$k][$j])
+            die "triangle violation at $i,$j,$k" if $d->[$i][$j] > $d->[$i][$k] + $d->[$k][$j]
+        }
+    }
+}
+
+p ""
+p "  ALL PASS (textbook 4-V DAG + isolated vertex + negative edges + diag/triangle invariants)"

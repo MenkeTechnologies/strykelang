@@ -1,0 +1,120 @@
+#!/usr/bin/env stryke
+
+# Longest Common Subsequence (LCS) — given two sequences, find the
+# longest sequence appearing in both as a subsequence (not necessarily
+# contiguous). Classic dynamic programming, O(m·n) time and space.
+# Used in diff tools, bioinformatics (DNA alignment), version control.
+# Parses clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * 2-D DP table explicitly initialized (no autoviv under --no-interop)
+#   * implicit return on tail (rule 7)
+#   * `#{…}` interpolation (rule 1a)
+#   * `len`, `:` ranges (rules 4, 5)
+#   * `max(a, b)` builtin
+#
+# Namespaced UDFs `LCS::*`.
+#
+# Run: stryke --no-interop examples/lcs_no_interop.stk
+
+# Build the DP table. d[i][j] = LCS length of a[0..i-1] and b[0..j-1].
+fn LCS::table($s, $t) {
+    my @sa = split //, $s
+    my @tb = split //, $t
+    my $m = len @sa
+    my $n = len @tb
+    my @d
+    for my $i (0:$m) { $d[$i] = [(0) x ($n + 1)] }
+    for my $i (1:$m) {
+        for my $j (1:$n) {
+            if ($sa[$i - 1] eq $tb[$j - 1]) {
+                $d[$i][$j] = $d[$i - 1][$j - 1] + 1
+            } else {
+                $d[$i][$j] = max($d[$i - 1][$j], $d[$i][$j - 1])
+            }
+        }
+    }
+    \@d
+}
+
+fn LCS::length($s, $t) {
+    my $d = LCS::table($s, $t)
+    $d->[len($s)][len($t)]
+}
+
+# Reconstruct one LCS string from the table by walking diagonally.
+fn LCS::trace($s, $t) {
+    my @sa = split //, $s
+    my @tb = split //, $t
+    my $d = LCS::table($s, $t)
+    my @out
+    my $i = len @sa
+    my $j = len @tb
+    while ($i > 0 && $j > 0) {
+        if ($sa[$i - 1] eq $tb[$j - 1]) {
+            unshift @out, $sa[$i - 1]
+            $i--
+            $j--
+        } elsif ($d->[$i - 1][$j] >= $d->[$i][$j - 1]) {
+            $i--
+        } else {
+            $j--
+        }
+    }
+    join("", @out)
+}
+
+my @cases = (
+    +{ s => "",          t => "",          len => 0, lcs => ""      },
+    +{ s => "abc",       t => "abc",       len => 3, lcs => "abc"   },
+    +{ s => "abc",       t => "def",       len => 0, lcs => ""      },
+    +{ s => "ABCBDAB",   t => "BDCAB",     len => 4, lcs => "BCAB"  },  # classic
+    +{ s => "AGGTAB",    t => "GXTXAYB",   len => 4, lcs => "GTAB"  },  # bio-style
+    +{ s => "thisisa",   t => "test",      len => 2, lcs => "ts"    },
+    +{ s => "kitten",    t => "sitting",   len => 4, lcs => "ittn"  },
+    +{ s => "abcdef",    t => "azced",     len => 3, lcs => "acd"   },
+    +{ s => "abcdef",    t => "abcdef",    len => 6, lcs => "abcdef"},
+    +{ s => "abcdef",    t => "fedcba",    len => 1, lcs => "a"     },
+)
+
+p "── LCS demo ──"
+my $fail = 0
+for my $c (@cases) {
+    my $got_len = LCS::length($c->{s}, $c->{t})
+    my $got_str = LCS::trace($c->{s}, $c->{t})
+    my $ok = $got_len == $c->{len} && $got_str eq $c->{lcs}
+    $fail++ unless $ok
+    p "  LCS(\"$c->{s}\",\"$c->{t}\") len=#{$got_len} str=\"$got_str\"  expect len=#{$c->{len}} str=\"$c->{lcs}\"  #{$ok ? \"\" : \"FAIL\"}"
+}
+die "$fail / #{len @cases} LCS cases failed" if $fail > 0
+
+# Universal invariants:
+#   * symmetric in length: LCS(s, t) == LCS(t, s) (length only)
+#   * LCS length <= min(len(s), len(t))
+#   * Every char of the LCS appears in BOTH inputs (in order)
+for my $c (@cases) {
+    my $l_st = LCS::length($c->{s}, $c->{t})
+    my $l_ts = LCS::length($c->{t}, $c->{s})
+    die "asymmetric on \"$c->{s}\",\"$c->{t}\"" unless $l_st == $l_ts
+    my $cap = len($c->{s}) < len($c->{t}) ? len($c->{s}) : len($c->{t})
+    die "len > min" if $l_st > $cap
+}
+
+# Subsequence check on the traced result.
+for my $c (@cases) {
+    my $lcs = LCS::trace($c->{s}, $c->{t})
+    next if $lcs eq ""
+    # Verify lcs is a subsequence of both s and t.
+    for my $haystack ($c->{s}, $c->{t}) {
+        my @h = split //, $haystack
+        my $hi = 0
+        for my $ch (split //, $lcs) {
+            while ($hi < len(@h) && $h[$hi] ne $ch) { $hi++ }
+            die "$lcs not a subsequence of $haystack" if $hi >= len(@h)
+            $hi++
+        }
+    }
+}
+
+p ""
+p "  ALL PASS (10 cases + symmetry + min-bound + subsequence invariant)"
