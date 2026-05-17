@@ -159,8 +159,225 @@ pub fn compute_semantic_tokens(text: &str) -> SemanticTokens {
             col += len;
             continue;
         }
-        // Strings
-        if c == '"' || c == '\'' || c == '`' {
+        // Strings.
+        //
+        // Double-quoted strings get an interpolation-aware lexer: a `#{`
+        // inside `"..."` opens an embedded expression that runs until the
+        // matching `}`. We emit the literal run as TY_STRING, then `#{` and
+        // `}` as TY_OPERATOR (so the IDE doesn't color them as comment text
+        // or string text), and we leave the interior characters un-tokenized
+        // so completion / hover land on them as code — the same way the
+        // IntelliJ plugin's lexer treats them.
+        //
+        // `#` is NEVER a comment opener inside a string. The previous
+        // behavior leaked the comment dispatch into strings on certain
+        // edits.
+        if c == '"' {
+            let quote = c;
+            // `start_col`/`len` track the current LITERAL run (a contiguous
+            // span of plain string text). When we hit an interpolated `$var`,
+            // `@var`, `%var`, or `#{EXPR}`, we flush the run as TY_STRING and
+            // emit the interpolation as a real VARIABLE / OPERATOR token so
+            // the IDE colors it distinctly from the surrounding text.
+            let mut start_col = col;
+            let mut len = utf16_len(c);
+            let mut closed = false;
+            i += 1;
+            let flush_lit = |tokens: &mut Vec<SemanticToken>,
+                             prev_line: &mut u32,
+                             prev_char: &mut u32,
+                             line: u32,
+                             start_col: &mut u32,
+                             len: &mut u32,
+                             col: &mut u32| {
+                if *len > 0 {
+                    push(tokens, prev_line, prev_char, line, *start_col, *len, TY_STRING, 0);
+                    *col += *len;
+                    *start_col = *col;
+                    *len = 0;
+                }
+            };
+            while i < chars.len() {
+                let ch = chars[i];
+                if ch == '\\' && i + 1 < chars.len() && chars[i + 1] != '\n' {
+                    len += utf16_len(ch) + utf16_len(chars[i + 1]);
+                    i += 2;
+                    continue;
+                }
+                if ch == quote {
+                    len += utf16_len(ch);
+                    i += 1;
+                    push(&mut tokens, &mut prev_line, &mut prev_char, line, start_col, len, TY_STRING, 0);
+                    col += len;
+                    closed = true;
+                    break;
+                }
+                if ch == '\n' {
+                    break;
+                }
+                // `#{EXPR}` interpolation — embedded code.
+                if ch == '#' && i + 1 < chars.len() && chars[i + 1] == '{' {
+                    flush_lit(&mut tokens, &mut prev_line, &mut prev_char, line, &mut start_col, &mut len, &mut col);
+                    push(&mut tokens, &mut prev_line, &mut prev_char, line, col, 2, TY_OPERATOR, 0);
+                    col += 2;
+                    i += 2;
+                    // Walk the expression interior; track `{ }` nesting so
+                    // nested hash literals inside the interp don't close
+                    // it early. We deliberately don't emit semantic tokens
+                    // for the interior here — the IDE's normal token
+                    // pipeline handles them on the client side; here we
+                    // just skip past the bytes.
+                    let mut depth: i32 = 1;
+                    while i < chars.len() && depth > 0 {
+                        let ich = chars[i];
+                        if ich == '\n' {
+                            line += 1;
+                            col = 0;
+                            i += 1;
+                            continue;
+                        }
+                        if ich == '{' {
+                            depth += 1;
+                        } else if ich == '}' {
+                            depth -= 1;
+                            if depth == 0 {
+                                push(&mut tokens, &mut prev_line, &mut prev_char, line, col, 1, TY_OPERATOR, 0);
+                                col += 1;
+                                i += 1;
+                                break;
+                            }
+                        }
+                        col += utf16_len(ich);
+                        i += 1;
+                    }
+                    start_col = col;
+                    len = 0;
+                    continue;
+                }
+                // Sigil-variable interpolation: `$name`, `@name`, `%name`,
+                // optionally followed by `::Pkg::name`. Also handles a few
+                // bracket / arrow follow-ons like `$h{k}`, `$arr[i]`,
+                // `$h->{k}`, `$arr->[i]` so the variable token covers the
+                // full referent, not just the bare sigil-ident.
+                if (ch == '$' || ch == '@' || ch == '%') && i + 1 < chars.len() {
+                    let nxt = chars[i + 1];
+                    let starts_var = nxt == '_' || nxt.is_alphabetic() || nxt == '{';
+                    if starts_var {
+                        flush_lit(&mut tokens, &mut prev_line, &mut prev_char, line, &mut start_col, &mut len, &mut col);
+                        let var_start_col = col;
+                        let mut var_len = utf16_len(ch); // the sigil
+                        i += 1;
+                        // ${...} block deref — opaque, consume balanced braces.
+                        if i < chars.len() && chars[i] == '{' {
+                            let mut depth: i32 = 1;
+                            var_len += utf16_len(chars[i]);
+                            i += 1;
+                            while i < chars.len() && depth > 0 {
+                                let bc = chars[i];
+                                if bc == '\n' { break; }
+                                if bc == '{' { depth += 1; }
+                                else if bc == '}' {
+                                    depth -= 1;
+                                    var_len += utf16_len(bc);
+                                    i += 1;
+                                    if depth == 0 { break; }
+                                    continue;
+                                }
+                                var_len += utf16_len(bc);
+                                i += 1;
+                            }
+                        } else {
+                            // Plain `name` or `Pkg::name`.
+                            while i < chars.len() {
+                                let bc = chars[i];
+                                if bc == '_' || bc.is_alphanumeric() {
+                                    var_len += utf16_len(bc);
+                                    i += 1;
+                                    continue;
+                                }
+                                if bc == ':' && i + 1 < chars.len() && chars[i + 1] == ':' {
+                                    var_len += 2;
+                                    i += 2;
+                                    continue;
+                                }
+                                break;
+                            }
+                            // Optional one-level subscript / arrow chain:
+                            // `{k}`, `[i]`, `->{k}`, `->[i]`. Keeps the
+                            // VARIABLE token covering the whole referent so
+                            // the IDE highlights e.g. `$h{key}` as one
+                            // variable, not "variable + string + ...".
+                            loop {
+                                if i + 1 < chars.len()
+                                    && chars[i] == '-'
+                                    && chars[i + 1] == '>'
+                                {
+                                    var_len += 2;
+                                    i += 2;
+                                }
+                                let open = if i < chars.len() {
+                                    match chars[i] {
+                                        '{' => Some('}'),
+                                        '[' => Some(']'),
+                                        _ => None,
+                                    }
+                                } else {
+                                    None
+                                };
+                                let Some(close) = open else { break };
+                                let mut depth: i32 = 1;
+                                var_len += utf16_len(chars[i]);
+                                i += 1;
+                                while i < chars.len() && depth > 0 {
+                                    let bc = chars[i];
+                                    if bc == '\n' { break; }
+                                    if bc == chars[i.saturating_sub(0)] && false {
+                                        // unreachable; placeholder
+                                    }
+                                    if bc == '{' || bc == '[' { depth += 1; }
+                                    else if bc == close {
+                                        depth -= 1;
+                                        var_len += utf16_len(bc);
+                                        i += 1;
+                                        if depth == 0 { break; }
+                                        continue;
+                                    }
+                                    var_len += utf16_len(bc);
+                                    i += 1;
+                                }
+                            }
+                        }
+                        if var_len > utf16_len(ch) {
+                            push(&mut tokens, &mut prev_line, &mut prev_char, line, var_start_col, var_len, TY_VARIABLE, 0);
+                            col += var_len;
+                            start_col = col;
+                            len = 0;
+                            continue;
+                        }
+                        // No name followed — treat the bare sigil as plain
+                        // literal text. Fall through and append.
+                        len = var_len;
+                        // i already advanced past the sigil; restore by
+                        // backing up one so the bottom-of-loop bump treats
+                        // the sigil as a normal char.
+                        // (Actually we've already accounted for it in `len`,
+                        // so just skip the bottom `len += utf16_len(ch)`.)
+                        continue;
+                    }
+                }
+                len += utf16_len(ch);
+                i += 1;
+            }
+            // Hit end-of-line or end-of-file before closing quote. Emit
+            // whatever literal run we have so it's still rendered as string.
+            if !closed && len > 0 {
+                push(&mut tokens, &mut prev_line, &mut prev_char, line, start_col, len, TY_STRING, 0);
+                col += len;
+            }
+            continue;
+        }
+        // Single-quote and backtick strings: no interpolation, simple span.
+        if c == '\'' || c == '`' {
             let quote = c;
             let start_col = col;
             let mut len = utf16_len(c);
@@ -602,6 +819,13 @@ pub fn compute_code_actions(
     let nonempty_range = range.start.line != range.end.line
         || range.start.character != range.end.character;
     if nonempty_range {
+        // Offer all three Extract refactorings whenever the user has any
+        // non-empty selection. IntelliJ's keymap-driven Cmd-Opt-V / -C / -M
+        // each filters down to the one that matches its title — if Variable
+        // is missing from the response, Cmd-Opt-V silently no-ops, which
+        // surfaces as "the menu item does nothing". Always emitting all
+        // three keeps every shortcut functional regardless of whether the
+        // selection spans one line or many.
         if same_line {
             if let Some(line_text) = nth_line(text, range.start.line as usize) {
                 if let Some(selection) =
@@ -610,13 +834,35 @@ pub fn compute_code_actions(
                     if !selection.trim().is_empty() {
                         out.push(extract_variable_action(uri, line_text, range, selection));
                         out.push(extract_constant_action(uri, line_text, range, selection));
+                        // Also offer extract-to-function on single-line
+                        // selections — wraps the selected expression in a
+                        // `fn extracted_fn { … }`.
+                        if let Some(block) = extract_selection_multiline(text, range) {
+                            out.push(extract_function_action(uri, range, &block));
+                        }
                     }
                 }
             }
         } else {
-            // Multi-line selection → extract function.
+            // Multi-line selection → all three. Variable / Constant treat
+            // the joined selection as a single expression; Function wraps
+            // the block.
             if let Some(block) = extract_selection_multiline(text, range) {
                 if !block.text.trim().is_empty() {
+                    // For Variable/Constant we need the selection as a
+                    // single contiguous string with newlines elided so the
+                    // generated `my $name = …` body is one line. Trim the
+                    // block text and collapse whitespace runs.
+                    let joined: String = block
+                        .text
+                        .split_whitespace()
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    // Use the first selected line as the anchor for the
+                    // single-line action builders.
+                    let first_line = nth_line(text, range.start.line as usize).unwrap_or("");
+                    out.push(extract_variable_action(uri, first_line, range, &joined));
+                    out.push(extract_constant_action(uri, first_line, range, &joined));
                     out.push(extract_function_action(uri, range, &block));
                 }
             }
@@ -1233,25 +1479,26 @@ mod tests {
     }
 
     #[test]
-    fn code_actions_for_single_line_selection_offer_extract_var_and_const() {
-        // Select "1 + 2" on `my $x = 1 + 2`.
+    fn code_actions_for_single_line_selection_offer_all_three_extracts() {
+        // Any non-empty selection must offer Variable, Constant, AND
+        // Function — IntelliJ's keymap-driven Cmd-Opt-V / -C / -M each
+        // filter for the one that matches, so all three must be present
+        // for every shortcut to be functional.
         let actions = code_actions("my $x = 1 + 2\np $x\n", range(0, 8, 0, 13));
         let t = titles(&actions);
         assert!(t.iter().any(|s| s.contains("Extract to variable")), "var: got {t:?}");
         assert!(t.iter().any(|s| s.contains("Extract to constant")), "const: got {t:?}");
-        // Function extract requires multi-line.
-        assert!(!t.iter().any(|s| s.contains("Extract to function")), "no fn: got {t:?}");
+        assert!(t.iter().any(|s| s.contains("Extract to function")), "fn: got {t:?}");
     }
 
     #[test]
-    fn code_actions_for_multi_line_selection_offer_extract_function() {
+    fn code_actions_for_multi_line_selection_offer_all_three_extracts() {
         let text = "my $x = 1\nmy $y = 2\np $x + $y\n";
-        // Span all three statements.
         let actions = code_actions(text, range(0, 0, 2, 9));
         let t = titles(&actions);
         assert!(t.iter().any(|s| s.contains("Extract to function")), "fn: got {t:?}");
-        // Single-line extracts are not offered here.
-        assert!(!t.iter().any(|s| s.contains("Extract to variable")), "no var: got {t:?}");
+        assert!(t.iter().any(|s| s.contains("Extract to variable")), "var: got {t:?}");
+        assert!(t.iter().any(|s| s.contains("Extract to constant")), "const: got {t:?}");
     }
 
     #[test]
@@ -1465,6 +1712,118 @@ mod tests {
         assert!(types.contains(&6), "comment token emitted");
         assert!(types.contains(&4), "string token emitted");
         assert!(types.contains(&5), "number token emitted");
+    }
+
+    #[test]
+    fn double_quote_string_with_hash_interpolation_is_not_a_comment() {
+        // Pin the fix for the JetBrains plugin / LSP bug where `#` inside
+        // a `"..."` was treated as starting a comment, breaking
+        // syntax-highlighting on lines like:
+        //     p "examples: $pass/$total clean (#{len(@failed)} failed)"
+        let text = r#"p "clean (#{len(@failed)} failed)""#;
+        let t = compute_semantic_tokens(text);
+        let types: Vec<u32> = t.data.iter().map(|tok| tok.token_type).collect();
+        // NO comment token should appear anywhere — `#{...}` is interpolation,
+        // not a comment opener.
+        assert!(
+            !types.contains(&6),
+            "TY_COMMENT must not appear inside a double-quoted string: tokens = {:?}",
+            t.data,
+        );
+        // At least one string token (the literal runs around the interp).
+        assert!(types.contains(&4), "TY_STRING for literal run: {:?}", t.data);
+        // The `#{` and `}` interp markers come through as operator tokens.
+        assert!(
+            types.iter().filter(|&&ty| ty == 7).count() >= 2,
+            "TY_OPERATOR for `#{{` and `}}`: tokens = {:?}",
+            t.data,
+        );
+    }
+
+    #[test]
+    fn nested_braces_inside_interpolation_stay_balanced() {
+        // `#{ +{ x => 1 } }` — the inner hash literal must not close the
+        // outer interpolation. After the inner `}`, depth drops to 1,
+        // then the next `}` drops to 0 and closes the interp.
+        let text = r#"p "h: #{ +{ x => 1 } }""#;
+        let t = compute_semantic_tokens(text);
+        // No comment token leaks.
+        let types: Vec<u32> = t.data.iter().map(|tok| tok.token_type).collect();
+        assert!(!types.contains(&6), "no comment inside string: {:?}", t.data);
+    }
+
+    #[test]
+    fn dollar_variable_inside_string_emits_a_variable_token() {
+        // `"$pass/$total"` — both `$pass` and `$total` must come through as
+        // TY_VARIABLE tokens, with TY_STRING for the surrounding literal runs.
+        let text = r#"p "$pass/$total""#;
+        let t = compute_semantic_tokens(text);
+        let types: Vec<u32> = t.data.iter().map(|tok| tok.token_type).collect();
+        let var_count = types.iter().filter(|&&ty| ty == 2).count(); // TY_VARIABLE = 2
+        assert_eq!(
+            var_count, 2,
+            "expected 2 variable tokens for `$pass` and `$total`; got tokens = {:?}",
+            t.data,
+        );
+        // Plus at least one STRING token for the surrounding quote chars.
+        assert!(types.contains(&4), "expected TY_STRING somewhere: {:?}", t.data);
+        // No comment leaks.
+        assert!(!types.contains(&6), "no comment in string: {:?}", t.data);
+    }
+
+    #[test]
+    fn array_variable_inside_string_emits_a_variable_token() {
+        let text = r#"p "@names is the list""#;
+        let t = compute_semantic_tokens(text);
+        let types: Vec<u32> = t.data.iter().map(|tok| tok.token_type).collect();
+        assert!(
+            types.iter().filter(|&&ty| ty == 2).count() >= 1,
+            "expected at least one variable token for `@names`: {:?}",
+            t.data,
+        );
+    }
+
+    #[test]
+    fn hash_subscript_inside_string_covered_by_one_variable_token() {
+        // `"$h{key}"` — the whole `$h{key}` should be one variable token,
+        // not split into `$h` + literal + `{key}`.
+        let text = r#"p "got $h{key} done""#;
+        let t = compute_semantic_tokens(text);
+        // Variable tokens with length >= 4 (covers $h{ + key + })
+        let var_tokens: Vec<_> = t.data.iter()
+            .filter(|tok| tok.token_type == 2)
+            .collect();
+        assert!(
+            var_tokens.iter().any(|t| t.length >= 6),
+            "expected a variable token covering `$h{{key}}` (>=6 chars): {:?}",
+            t.data,
+        );
+    }
+
+    #[test]
+    fn arrow_subscript_inside_string_covered_by_one_variable_token() {
+        // `"$h->{k}"` — the whole referent is one variable.
+        let text = r#"p "got $h->{key} done""#;
+        let t = compute_semantic_tokens(text);
+        let var_tokens: Vec<_> = t.data.iter()
+            .filter(|tok| tok.token_type == 2)
+            .collect();
+        assert!(
+            var_tokens.iter().any(|t| t.length >= 8),
+            "expected a variable token covering `$h->{{key}}` (>=8 chars): {:?}",
+            t.data,
+        );
+    }
+
+    #[test]
+    fn single_quote_string_with_hash_is_not_a_comment_either() {
+        // Single-quote strings have no interpolation, but `#` inside them
+        // must still NOT trigger a comment.
+        let text = r#"my $x = 'hash # mark'"#;
+        let t = compute_semantic_tokens(text);
+        let types: Vec<u32> = t.data.iter().map(|tok| tok.token_type).collect();
+        assert!(!types.contains(&6), "no comment in single-quote string: {:?}", t.data);
+        assert!(types.contains(&4), "string token emitted: {:?}", t.data);
     }
 
     // ── signature help ───────────────────────────────────────────────────

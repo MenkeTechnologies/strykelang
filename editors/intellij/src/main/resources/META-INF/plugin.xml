@@ -68,6 +68,12 @@
             language="Stryke"
             extensions="stk"/>
 
+        <!-- Parser definition (flat — token-stream PSI, no nested AST). Required
+             for line-comment toggle, brace match, code actions, structure view. -->
+        <lang.parserDefinition
+            language="Stryke"
+            implementationClass="com.menketechnologies.stryke.StrykeParserDefinition"/>
+
         <!-- Highlighter -->
         <lang.syntaxHighlighterFactory
             language="Stryke"
@@ -78,6 +84,21 @@
 
         <!-- Commenter (line comment with #) -->
         <lang.commenter language="Stryke" implementationClass="com.menketechnologies.stryke.StrykeCommenter"/>
+
+        <!-- Brace / quote auto-pairing -->
+        <lang.braceMatcher language="Stryke" implementationClass="com.menketechnologies.stryke.StrykeBraceMatcher"/>
+        <lang.quoteHandler language="Stryke" implementationClass="com.menketechnologies.stryke.StrykeQuoteHandler"/>
+
+        <!-- Refactoring bridge: hooks Cmd-Opt-M / Cmd-Opt-V / Cmd-Opt-C / Ctrl-T
+             into LSP code actions; hooks Shift-F6 into LSP rename. -->
+        <lang.refactoringSupport
+            language="Stryke"
+            implementationClass="com.menketechnologies.stryke.refactor.StrykeRefactoringSupportProvider"/>
+        <renameHandler implementation="com.menketechnologies.stryke.refactor.StrykeRenameHandler"/>
+
+        <!-- Balloon notifications surfaced by the refactoring bridge when an
+             LSP call fails / returns no matching action. -->
+        <notificationGroup id="Stryke Refactoring" displayType="BALLOON"/>
 
         <!-- LSP server provider -->
         <platform.lsp.serverSupportProvider
