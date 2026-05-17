@@ -21473,4 +21473,76 @@ mod tests {
              my $ok = len($w) >= len($pre) && $w[0:len($pre) - 1] eq $pre",
         );
     }
+
+    /// Sort comparator with `_0->[N] <=> _1->[N]` — sorting an
+    /// array-of-arrayrefs by a positional field. Kruskal MST pattern.
+    #[test]
+    fn sort_block_with_arrow_deref_topic_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my @edges = ([0,1,4], [2,3,1], [1,2,2]); \
+             my @sorted = sort { _0->[2] <=> _1->[2] } @edges",
+        );
+    }
+
+    /// C-style `for` header with declarations and post-decrement —
+    /// Knuth shuffle's inner loop walks high-to-low.
+    #[test]
+    fn cstyle_for_with_postdecrement_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my @arr = (1, 2, 3, 4, 5); \
+             my $n = len(@arr); \
+             for (my $i = $n - 1; $i > 0; $i--) { p $arr[$i] }",
+        );
+    }
+
+    /// Tuple-swap on array-deref index pairs — Knuth-shuffle inner
+    /// step swaps `$r->[$i]` and `$r->[$j]` via destructure.
+    #[test]
+    fn tuple_swap_arrayref_index_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my @arr = (1, 2, 3); my $r = \\@arr; my $i = 0; my $j = 2; \
+             ($r->[$i], $r->[$j]) = ($r->[$j], $r->[$i])",
+        );
+    }
+
+    /// Recursive backtracking — N-queens pushes a column, recurses,
+    /// then pops. Verifies array mutation inside recursive fn calls.
+    #[test]
+    fn recursive_backtracking_arrayref_mutation_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "fn Q::go($n, $cols, $count_ref) { \
+                my $r = len(@$cols); \
+                if ($r == $n) { $$count_ref++; return } \
+                for my $c (0:$n - 1) { \
+                    push @$cols, $c; \
+                    Q::go($n, $cols, $count_ref); \
+                    pop @$cols \
+                } \
+             }",
+        );
+    }
+
+    /// Doubly-linked list as a hash-of-{prev,next} — LRU cache's
+    /// node-table pattern. `$nodes->{$k}{prev}` chain.
+    #[test]
+    fn nested_hashref_chain_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my $c = +{ nodes => +{ a => +{ val => 1, prev => undef, next => \"b\" } } }; \
+             my $p = $c->{nodes}{a}{prev}; \
+             my $n = $c->{nodes}{a}{next}",
+        );
+    }
+
+    /// `$$count_ref++` — dereference a scalar-ref and post-increment.
+    /// Used in Queens::recur to update a shared counter.
+    #[test]
+    fn scalar_ref_postincrement_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $n = 0; my $ref = \\$n; $$ref++; p $n");
+    }
 }
