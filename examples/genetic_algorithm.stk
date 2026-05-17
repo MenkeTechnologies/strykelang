@@ -37,7 +37,7 @@ my $hll_g  = hll(12)
 # ── random helpers ─────────────────────────────────────────────────
 
 fn Demo::GA::rand_char() {
-    my $i = int(rand(len($ALPHA)))
+    my $i = $ALPHA |> len |> rand |> int
     substr($ALPHA, $i, 1)
 }
 
@@ -65,7 +65,7 @@ fn Demo::GA::tournament($pop_ref) {
     my $best
     my $best_fit = -1
     for my $i (1:$TOURN) {
-        my $idx = int(rand(len(@$pop_ref)))
+        my $idx = @$pop_ref |> len |> rand |> int
         my $g = $pop_ref->[$idx]
         my $f = Demo::GA::fitness($g)
         if ($f > $best_fit) {
