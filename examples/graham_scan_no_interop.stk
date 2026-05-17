@@ -83,7 +83,7 @@ my @set1 = (
 )
 my $hull1 = Hull::scan(\@set1)
 # Hull should be the bounding rectangle-ish: (0,0), (3,1), (4,4), (0,3).
-my @hull_strs = map { Hull::fmt(_) } @$hull1
+my @hull_strs = map {Hull::fmt} @$hull1
 die "8-point set hull len: got #{len @$hull1}" unless len(@$hull1) == 4
 die "hull must include (0,0)" unless grep { _ eq "(0,0)" } @hull_strs
 die "hull must include (4,4)" unless grep { _ eq "(4,4)" } @hull_strs
@@ -95,7 +95,7 @@ p "  8-point set: 4-vertex hull (0,0)/(3,1)/(4,4)/(0,3)  OK"
 my @square = ([0,0], [4,0], [4,4], [0,4], [2,2])
 my $h2 = Hull::scan(\@square)
 die "square hull = 4 corners" unless len(@$h2) == 4
-my @h2s = sort map { Hull::fmt(_) } @$h2
+my @h2s = sort map {Hull::fmt} @$h2
 die "square corners only" unless join(" ", @h2s) eq "(0,0) (0,4) (4,0) (4,4)"
 p "  square w/ interior point: interior excluded, 4 corners only  OK"
 

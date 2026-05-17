@@ -8,7 +8,7 @@ fn Rosetta::OTP::generate_pad($len) {
 }
 
 fn Rosetta::OTP::encrypt($text, $pad) {
-    my @chars = $text |> chars |> map { ord(_) }
+    my @chars = $text |> chars |> map {ord}
     [~> 0:len(@chars)-1 map { $chars[_] ^ $pad->[_] }]
 }
 

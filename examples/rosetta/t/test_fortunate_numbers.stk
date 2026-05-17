@@ -48,7 +48,7 @@ fn Rosetta::Fortunate::fortunate($n) {
 }
 
 # OEIS A005235: 3, 5, 7, 13, 23, 17, 19, 23, 37, 61, ...
-my @first8 = ~> 1:8 map { Rosetta::Fortunate::fortunate(_) }
+my @first8 = ~> 1:8 map {Rosetta::Fortunate::fortunate}
 assert_eq join(",", @first8), "3,5,7,13,23,17,19,23", "first 8 fortunate"
 
 assert_eq Rosetta::Fortunate::primorial(1), 2,    "primorial(1)=2"

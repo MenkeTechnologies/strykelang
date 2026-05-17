@@ -16,7 +16,7 @@ fn Rosetta::SelfDescribing::is($n) {
 }
 
 fn Rosetta::SelfDescribing::find_below($limit) {
-    ~> 0:$limit grep { Rosetta::SelfDescribing::is(_) }
+    ~> 0:$limit grep {Rosetta::SelfDescribing::is}
 }
 
 assert_ok Rosetta::SelfDescribing::is(1210),     "1210 is self-describing"

@@ -15,7 +15,7 @@ isweak($b_22) |> maps { !_ } |> aok "BUG-022: isweak always false today"
 
 my $s_38 = "abc"
 $s_38 =~ /a/g
-pos($s_38) |> maps { !defined(_) } |> aok "BUG-038: pos() is undef outside while loop"
+pos($s_38) |> maps {!defined} |> aok "BUG-038: pos() is undef outside while loop"
 
 # ── 3. Math Constants (BUG-064) ───────────────────────────────────────────
 

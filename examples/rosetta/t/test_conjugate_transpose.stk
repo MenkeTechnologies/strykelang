@@ -22,7 +22,7 @@ fn Rosetta::ConjT::ctrans($m) {
     my $t = Rosetta::ConjT::transpose($m)
     my @out
     for my $row (@$t) {
-        my @r = ~> @$row map { Rosetta::ConjT::conj(_) }
+        my @r = ~> @$row map {Rosetta::ConjT::conj}
         push @out, \@r
     }
     \@out

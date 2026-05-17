@@ -43,7 +43,7 @@ fn Rosetta::SubUnit::is($n) {
 }
 
 fn Rosetta::SubUnit::find_below($limit) {
-    1:$limit |> grep { Rosetta::SubUnit::is(_) }
+    1:$limit |> grep {Rosetta::SubUnit::is}
 }
 
 # Helper sanity

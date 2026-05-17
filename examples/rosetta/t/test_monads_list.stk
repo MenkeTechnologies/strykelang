@@ -25,13 +25,13 @@ fn Rosetta::ListMonad::sq($x) {
 }
 
 my $l1 = [1, 2, 3]
-my $res1 = Rosetta::ListMonad::bind($l1, fn { Rosetta::ListMonad::plus_minus(_) })
+my $res1 = Rosetta::ListMonad::bind($l1, fn {Rosetta::ListMonad::plus_minus})
 # Expected: [1, -1, 2, -2, 3, -3]
 
 assert_eq join(",", @$res1), "1,-1,2,-2,3,-3", "plus_minus bind"
 
 # Chain bind: plus_minus then square
-my $res2 = Rosetta::ListMonad::bind($res1, fn { Rosetta::ListMonad::sq(_) })
+my $res2 = Rosetta::ListMonad::bind($res1, fn {Rosetta::ListMonad::sq})
 # Expected: [1, 1, -1, 1, 2, 4, -2, 4, 3, 9, -3, 9]
 
 assert_eq join(",", @$res2), "1,1,-1,1,2,4,-2,4,3,9,-3,9", "chained bind"

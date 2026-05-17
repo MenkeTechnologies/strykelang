@@ -59,7 +59,7 @@ assert_eq $first[0], 24, "first E-N number is 24"
 24 |> Rosetta::ErdosNicolas::is |> assert_eq(1, "pipe is(24)")
 
 # Threaded: scan a small window
-my @hits = ~> 1:100 |> grep { Rosetta::ErdosNicolas::is(_) }
+my @hits = ~> 1:100 |> grep {Rosetta::ErdosNicolas::is}
 assert_eq join(",", @hits), "24", "only 24 in 1:100"
 
 test_run

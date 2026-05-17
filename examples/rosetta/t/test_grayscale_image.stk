@@ -11,7 +11,7 @@ fn Rosetta::Grayscale::convert_grid($grid) {
     # Use parallel map for grid conversion, ensuring results are array refs
     [ ~> @$grid map {
         my $row = _
-        [ ~> @$row map { Rosetta::Grayscale::convert(_) } ]
+        [ ~> @$row map {Rosetta::Grayscale::convert} ]
     } ]
 }
 

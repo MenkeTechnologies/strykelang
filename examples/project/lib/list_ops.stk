@@ -18,13 +18,13 @@ fn Project::ListOps::map_square {
 
 fn Project::ListOps::map_string {
     my @a = qw(a b c)
-    my @r = map { uc(_) } @a
+    my @r = map {uc} @a
     join(",", @r)
 }
 
 fn Project::ListOps::map_length {
     my @a = qw(one two three)
-    my @r = map { len(_) } @a
+    my @r = map {len} @a
     join(",", @r)
 }
 
@@ -87,7 +87,7 @@ fn Project::ListOps::grep_string_match {
 
 fn Project::ListOps::grep_defined {
     my @a = (1, undef, 2, undef, 3)
-    my @r = grep { defined(_) } @a
+    my @r = grep {defined} @a
     join(",", @r)
 }
 

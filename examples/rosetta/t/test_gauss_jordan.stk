@@ -40,6 +40,6 @@ my $M = [
 my $V = [ 8, -11, -3 ]
 
 my @sol = Rosetta::GaussJordan::solve($M, $V)
-assert_eq join(",", ~> @sol map { round(_) }), "2,3,-1", "Gauss-Jordan solution"
+assert_eq join(",", ~> @sol map {round}), "2,3,-1", "Gauss-Jordan solution"
 
 test_run

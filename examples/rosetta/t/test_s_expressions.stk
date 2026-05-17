@@ -65,7 +65,7 @@ fn Rosetta::SExpr::parse($s) {
 }
 
 fn Rosetta::SExpr::render($node) {
-    return "(" . join(" ", map { Rosetta::SExpr::render($_) } @$node) . ")"
+    return "(" . join(" ", map {Rosetta::SExpr::render} @$node) . ")"
         if ref($node) eq "ARRAY"
     if (ref($node) eq "HASH") {
         return '"' . $node->{value} . '"' if $node->{type} eq "string"

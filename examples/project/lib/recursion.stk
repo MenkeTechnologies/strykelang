@@ -148,7 +148,7 @@ fn Project::Recursion::flatten_nested($arr) {
 fn Project::Recursion::clone_deep($data) {
     return $data unless ref($data)
     if (ref($data) eq "ARRAY") {
-        my @cloned = map { Project::Recursion::clone_deep(_) } @$data
+        my @cloned = map {Project::Recursion::clone_deep} @$data
         my $ret = [@cloned]
         return $ret
     }

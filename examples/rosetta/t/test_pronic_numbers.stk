@@ -11,7 +11,7 @@ fn Rosetta::PronicNumbers::is_pronic($n) {
 }
 
 fn Rosetta::PronicNumbers::pronic_list($max) {
-    ~> 0:$max filter { Rosetta::PronicNumbers::is_pronic(_) }
+    ~> 0:$max filter {Rosetta::PronicNumbers::is_pronic}
 }
 
 assert_ok Rosetta::PronicNumbers::is_pronic(0), "0 is pronic (0*1)"

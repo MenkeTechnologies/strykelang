@@ -79,6 +79,6 @@ assert_eq len(@$nope), 0, "missing dir → empty"
 system("rm -rf $base")
 
 # Pipe form (uses immediate listing of /tmp)
-"/tmp" |> Rosetta::Walk::list_immediate |> fn { ref($_) } |> assert_eq("ARRAY", "pipe returns arrayref")
+"/tmp" |> Rosetta::Walk::list_immediate |> fn {ref} |> assert_eq("ARRAY", "pipe returns arrayref")
 
 test_run

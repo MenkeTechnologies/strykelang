@@ -33,7 +33,7 @@ web_pluralize(2, "post") |> aeq "2 posts", "pluralize plural"
 
 my $signed = web_signed("payload")
 web_unsigned($signed) |> aeq "payload", "signed roundtrip"
-web_unsigned("tampered") |> maps { !defined(_) } |> aok "unsigned tampered is undef"
+web_unsigned("tampered") |> maps {!defined} |> aok "unsigned tampered is undef"
 
 # ── Security & Ident ───────────────────────────────────────────────────────
 

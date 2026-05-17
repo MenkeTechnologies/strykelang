@@ -54,7 +54,7 @@ assert_eq len(@small), 0, "no Ormiston triple ≤ 10000"
 # multiset. Verify that *every* triple (when found) satisfies this.
 my $valid = 1
 for my $t (@small) {
-    my @ks = map { Rosetta::Ormiston::digit_key($_) } @$t
+    my @ks = map {Rosetta::Ormiston::digit_key} @$t
     $valid = 0 if $ks[0] ne $ks[1] || $ks[1] ne $ks[2]
 }
 assert_ok $valid, "every found triple shares digit multiset"

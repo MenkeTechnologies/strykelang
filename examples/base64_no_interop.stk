@@ -24,7 +24,7 @@ my %REVERSE
 for my $i (0:63) { $REVERSE{$ALPHA[$i]} = $i }
 
 fn B64::encode($s) {
-    my @bytes = map { ord(_) } split(//, $s)
+    my @bytes = map {ord} split(//, $s)
     my $n = len(@bytes)
     my $out = ""
     my $i = 0

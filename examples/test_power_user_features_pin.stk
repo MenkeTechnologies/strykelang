@@ -42,7 +42,7 @@ await($h1) |> aeq 42, "async await result"
 await($h2) |> aeq 100, "spawn await result"
 
 my @handles = map { my $v = _; async { sleep 0.01; $v * 2 } } 1:5
-my @results = map { await(_) } @handles
+my @results = map {await} @handles
 @results |> join(",") |> aeq "2,4,6,8,10", "await results"
 
 # ── 3. Cryptography ─────────────────────────────────────────────────────────

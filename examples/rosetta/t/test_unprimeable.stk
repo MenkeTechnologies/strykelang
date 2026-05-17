@@ -46,7 +46,7 @@ assert_eq Rosetta::Unprimeable::is(13), 0, "primes excluded"
 
 # First few unprimeables (rosetta task: 35 such numbers ≤ 1000;
 # the smallest is 200).
-my @u = ~> 10:1000 |> grep { Rosetta::Unprimeable::is(_) }
+my @u = ~> 10:1000 |> grep {Rosetta::Unprimeable::is}
 assert_ok len(@u) > 0, "found some unprimeables ≤ 1000"
 assert_eq $u[0], 200, "smallest unprimeable is 200"
 

@@ -29,7 +29,7 @@ assert_eq Rosetta::SmallestN::tau(1), 1, "τ(1) = 1"
 assert_eq Rosetta::SmallestN::tau(64), 7, "τ(64) = 7 (1,2,4,8,16,32,64)"
 
 # OEIS A005179 — first 12 terms
-my @a = ~> 1:12 |> map { Rosetta::SmallestN::find(_) }
+my @a = ~> 1:12 |> map {Rosetta::SmallestN::find}
 assert_eq join(",", @a),
     "1,2,4,6,16,12,64,24,36,48,1024,60",
     "first 12 of A005179"

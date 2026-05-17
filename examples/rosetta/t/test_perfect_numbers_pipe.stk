@@ -12,7 +12,7 @@ fn Rosetta::PerfectNumbers::is_perfect($n) {
 }
 
 fn Rosetta::PerfectNumbers::find_up_to($max) {
-    ~> 2:$max grep { Rosetta::PerfectNumbers::is_perfect(_) }
+    ~> 2:$max grep {Rosetta::PerfectNumbers::is_perfect}
 }
 
 assert_ok Rosetta::PerfectNumbers::is_perfect(6), "6 is perfect"

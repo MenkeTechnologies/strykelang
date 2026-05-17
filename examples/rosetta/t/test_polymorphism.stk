@@ -55,7 +55,7 @@ assert_eq Rosetta::Poly::perimeter($t),  12, "3-4-5 triangle perimeter"
 
 # Same call site, different dispatch
 my @shapes = ($c, $r, $sq, $t)
-my @areas = map { Rosetta::Poly::area($_) } @shapes
+my @areas = map {Rosetta::Poly::area} @shapes
 assert_eq len(@areas), 4, "4 areas computed"
 
 # Unknown kind

@@ -6,7 +6,7 @@ fn Rosetta::Stats::geometric_mean(@data) {
     if ($n == 0) { return 0 }
     
     # G = exp( (sum of ln(x_i)) / n )
-    my $log_sum = @data |> map { log(_) } |> sum()
+    my $log_sum = @data |> map {log} |> sum()
     return exp($log_sum / $n)
 }
 
