@@ -22,14 +22,14 @@ p ""
 p "── Kahan / Neumaier compensated summation ─────────────"
 my @nasty = (1e20, 1, -1e20, 1, -1e20, 1e20);   # naive sum loses precision
 my $naive = 0
-$naive += $_ for @nasty
+$naive += _ for @nasty
 printf "  naive sum  : %g     (digits lost to cancellation)\n", $naive
 printf "  kahan_sum  : %g     (precision recovered)\n", kahan_sum(@nasty)
 
 p ""
-my @stream = map { 1e10 + $_ * 1e-3 } (1:10_000)
+my @stream = map { 1e10 + _ * 1e-3 } (1:10_000)
 my $naive2 = 0
-$naive2 += $_ for @stream
+$naive2 += _ for @stream
 my $kahan2 = kahan_sum(@stream)
 printf "  10k terms of (1e10 + i*1e-3):\n"
 printf "    naive sum  : %.6f\n", $naive2

@@ -102,7 +102,7 @@ for my $L (@lengths) {
 printf("\nthroughput test on %d strings (len 10:10000)\n", len(@workload))
 
 my @crcs = pmap {
-    my $s = $_
+    my $s = _
     my $t0 = now_ns()
     my $c = Demo::CRC::crc32($s)
     my $elapsed_us = (now_ns() - $t0) / 1000.0

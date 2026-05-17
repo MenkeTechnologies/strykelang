@@ -89,7 +89,7 @@ p "── catalog ────────────────────�
 for my $name (sort { _0 cmp _1 } keys %catalog) {
     my $info = $catalog{$name}
     my $dep_str = len(keys %{$info->{deps}}) > 0
-                ? join(", ", map { "$_ >= " . $info->{deps}->{$_} } sort keys %{$info->{deps}})
+                ? join(", ", map { "$_ >= " . $info->{deps}->{_} } sort keys %{$info->{deps}})
                 : "(no deps)"
     printf "  %-10s @%-7s : %s\n", $name, $info->{version}, $dep_str
 }
@@ -123,8 +123,8 @@ if (len(@conflicts) == 0 && !$cycle_found) {
 # ── unused packages ────────────────────────────────────────────────
 
 my %installed
-$installed{$_} = 1 for @order
-my @unused = grep { !exists $installed{$_} } keys %catalog
+$installed{_} = 1 for @order
+my @unused = grep { !exists $installed{_} } keys %catalog
 p ""
 printf "── unused packages: %d ────────────────────────────────\n",
     len(@unused)
@@ -171,6 +171,6 @@ printf "  p99  : %.1f µs\n", td_quantile($td_visit, 0.99)
 p ""
 p "── HLL distinct installed packages ──────────────────"
 my $hll = hll(14)
-hll_add($hll, $_) for @order
+hll_add($hll, _) for @order
 printf "  HLL   : %d\n", hll_count($hll)
 printf "  exact : %d\n", len(@order)

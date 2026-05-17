@@ -32,7 +32,7 @@ for my $line (split /\n/, $corpus) {
     next if len($line) == 0
     my $t0 = now_ns()
     my @words = split /\W+/, lc($line)
-    @words = grep { len($_) > 0 } @words
+    @words = grep { len(_) > 0 } @words
     td_add($td_tok, (now_ns() - $t0) / 1000.0)
     for my $w (@words) {
         $counts{$w} = ($counts{$w} // 0) + 1
@@ -42,7 +42,7 @@ for my $line (split /\n/, $corpus) {
 # ── stats ───────────────────────────────────────────────────────────
 
 my $total_words = 0
-$total_words += $_ for values %counts
+$total_words += _ for values %counts
 my $distinct = len(keys %counts)
 
 printf "── corpus: %d total words, %d distinct ───────────────\n",
@@ -108,7 +108,7 @@ for my $l (sort { _0 <=> _1 } keys %by_length) {
 # ── singletons: words appearing exactly once ───────────────────────
 
 p ""
-my @singletons = grep { $counts{$_} == 1 } keys %counts
+my @singletons = grep { $counts{_} == 1 } keys %counts
 @singletons = sort { _0 cmp _1 } @singletons
 printf "── singletons (%d total) ──────────────────────────────\n",
     len(@singletons)

@@ -23,7 +23,7 @@ my @routes  # each entry: [method, pattern, handler, segments_with_param_marker]
 fn Demo::Router::register($method, $pattern, $handler) {
     my @raw_segs = split /\//, $pattern
     # First element is empty (leading "/"); drop it.
-    @raw_segs = grep { len($_) > 0 } @raw_segs
+    @raw_segs = grep { len(_) > 0 } @raw_segs
     my @parsed
     for my $seg (@raw_segs) {
         if (substr($seg, 0, 1) eq ":") {
@@ -39,7 +39,7 @@ fn Demo::Router::register($method, $pattern, $handler) {
 
 fn Demo::Router::dispatch($method, $path) {
     my @path_segs = split /\//, $path
-    @path_segs = grep { len($_) > 0 } @path_segs
+    @path_segs = grep { len(_) > 0 } @path_segs
 
     for my $route (@routes) {
         next unless $route->[0] eq $method

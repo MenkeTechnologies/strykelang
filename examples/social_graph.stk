@@ -10,22 +10,22 @@
 # ── adjacency (directed: follower -> followee) ──────────────────────
 
 my %follows = (
-    alice   => +{ map { $_ => 1 } qw(bob carol dave eve frank) },
-    bob     => +{ map { $_ => 1 } qw(alice carol grace) },
-    carol   => +{ map { $_ => 1 } qw(alice dave henry) },
-    dave    => +{ map { $_ => 1 } qw(alice carol) },
-    eve     => +{ map { $_ => 1 } qw(alice irene) },
-    frank   => +{ map { $_ => 1 } qw(alice grace) },
-    grace   => +{ map { $_ => 1 } qw(frank bob) },
-    henry   => +{ map { $_ => 1 } qw(carol irene) },
-    irene   => +{ map { $_ => 1 } qw(eve henry jack) },
-    jack    => +{ map { $_ => 1 } qw(irene) },
+    alice   => +{ map { _ => 1 } qw(bob carol dave eve frank) },
+    bob     => +{ map { _ => 1 } qw(alice carol grace) },
+    carol   => +{ map { _ => 1 } qw(alice dave henry) },
+    dave    => +{ map { _ => 1 } qw(alice carol) },
+    eve     => +{ map { _ => 1 } qw(alice irene) },
+    frank   => +{ map { _ => 1 } qw(alice grace) },
+    grace   => +{ map { _ => 1 } qw(frank bob) },
+    henry   => +{ map { _ => 1 } qw(carol irene) },
+    irene   => +{ map { _ => 1 } qw(eve henry jack) },
+    jack    => +{ map { _ => 1 } qw(irene) },
 )
 
 # ── reverse-index: who follows X? ──────────────────────────────────
 
 my %followers
-$followers{$_} = +{} for keys %follows
+$followers{_} = +{} for keys %follows
 for my $u (keys %follows) {
     for my $v (keys %{$follows{$u}}) {
         $followers{$v} = +{} unless exists $followers{$v}
@@ -42,8 +42,8 @@ my $hll_edges = hll(14)
 printf "── degree distribution (out / in) ───────────────────\n"
 printf "  %-8s %5s %5s\n", "user", "out", "in"
 my %all_users
-$all_users{$_} = 1 for keys %follows
-$all_users{$_} = 1 for keys %followers
+$all_users{_} = 1 for keys %follows
+$all_users{_} = 1 for keys %followers
 for my $u (sort { _0 cmp _1 } keys %all_users) {
     my $out = exists $follows{$u} ? len(keys %{$follows{$u}}) : 0
     my $in  = exists $followers{$u} ? len(keys %{$followers{$u}}) : 0

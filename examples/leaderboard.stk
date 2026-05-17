@@ -82,7 +82,7 @@ for my $p (@recent_top) {
 # ── score percentiles via t-digest ─────────────────────────────────
 
 my $td = t_digest(100)
-td_add($td, $_->[1]) for @sessions
+td_add($td, _->[1]) for @sessions
 
 p ""
 p "── score distribution (t-digest) ────────────────────"
@@ -96,7 +96,7 @@ printf "  p99 : %d\n", int(td_quantile($td, 0.99))
 p ""
 p "── distinct-player cardinality (HLL) ────────────────"
 my $hll = hll(14)
-hll_add($hll, $_->[0]) for @sessions
+hll_add($hll, _->[0]) for @sessions
 printf "  HLL distinct players : %d\n", hll_count($hll)
 printf "  exact                : %d\n", len(keys %total)
 
@@ -105,7 +105,7 @@ printf "  exact                : %d\n", len(keys %total)
 p ""
 p "── TopK most-active players ─────────────────────────"
 my $tk = topk(3)
-topk_add($tk, $_->[0]) for @sessions
+topk_add($tk, _->[0]) for @sessions
 my @hits = topk_top($tk)
 for my $h (@hits) {
     printf "  %-8s : %d sessions\n", $h->[0], $h->[1]
@@ -146,7 +146,7 @@ for my $tier (@tiers) {
 p ""
 p "── overall stats ────────────────────────────────────"
 my $total_score = 0
-$total_score += $_ for values %total
+$total_score += _ for values %total
 printf "  total points awarded : %d\n", $total_score
 printf "  avg score per session : %.1f\n", $total_score / len(@sessions)
 printf "  highest individual    : %s @ %d points\n",

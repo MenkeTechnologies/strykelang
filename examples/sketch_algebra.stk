@@ -8,8 +8,8 @@
 p "── Bloom union via + ──────────────────────────────────"
 my $alice = bloom_filter(1000, 0.01)
 my $bob   = bloom_filter(1000, 0.01)
-bloom_add($alice, $_) for ("alice", "anna", "alex")
-bloom_add($bob,   $_) for ("bob", "ben", "beth")
+bloom_add($alice, _) for ("alice", "anna", "alex")
+bloom_add($bob,   _) for ("bob", "ben", "beth")
 
 my $both = $alice + $bob;             # union: who's in either set?
 p "alice in 'both': ", bloom_contains($both, "alice")
@@ -45,8 +45,8 @@ p ""
 p "── Roaring full set algebra |  &  ^  - ───────────────"
 my $reds   = roaring()
 my $blues  = roaring()
-rb_add($reds,  $_) for (1:10)
-rb_add($blues, $_) for (5:15)
+rb_add($reds,  _) for (1:10)
+rb_add($blues, _) for (5:15)
 
 printf "  reds ∪ blues : %d members  (|: union)\n",        rb_len($reds | $blues)
 printf "  reds ∩ blues : %d members  (&: intersection)\n", rb_len($reds & $blues)
@@ -57,8 +57,8 @@ p ""
 p "── t-digest centroid merge via + (streaming quantiles) ─"
 my $td_us = t_digest(100)
 my $td_eu = t_digest(100)
-td_add($td_us, $_) for (1:1000);          # US latencies 1:1000ms
-td_add($td_eu, $_) for (1001:2000);       # EU latencies 1001:2000ms
+td_add($td_us, _) for (1:1000);          # US latencies 1:1000ms
+td_add($td_eu, _) for (1001:2000);       # EU latencies 1001:2000ms
 
 my $global = $td_us + $td_eu
 printf "  global p50: %.0fms\n", td_quantile($global, 0.50)

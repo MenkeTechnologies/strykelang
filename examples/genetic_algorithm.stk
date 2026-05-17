@@ -116,12 +116,12 @@ for my $gen (1:$GENS) {
     my $t0 = now_ns()
 
     # Evaluate fitness for the whole pop in parallel.
-    my @fits = pmap { Demo::GA::fitness($_) } @pop
+    my @fits = pmap { Demo::GA::fitness(_) } @pop
 
     # Sort by fitness desc.
-    my @ranked = map { $_->[1] }
+    my @ranked = map { _->[1] }
                  sort { $_1->[0] <=> $_0->[0] }
-                 map { [$fits[$_], $pop[$_]] }
+                 map { [$fits[_], $pop[_]] }
                  (0:len(@pop) - 1)
 
     my $cur_best_fit = Demo::GA::fitness($ranked[0])

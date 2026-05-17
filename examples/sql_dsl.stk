@@ -77,7 +77,7 @@ for my $r (sort { _0 cmp _1 } keys %by_region) {
 p ""
 p "── APPROX_PERCENTILE via t-digest ───────────────────"
 my $td = t_digest(100)
-td_add($td, $_->{amount}) for @orders
+td_add($td, _->{amount}) for @orders
 printf "  p50  : \$%.2f\n", td_quantile($td, 0.50)
 printf "  p90  : \$%.2f\n", td_quantile($td, 0.90)
 printf "  p95  : \$%.2f\n", td_quantile($td, 0.95)
@@ -88,7 +88,7 @@ printf "  p99  : \$%.2f\n", td_quantile($td, 0.99)
 p ""
 p "── TOP 3 customers by order count (TopK sketch) ─────"
 my $tk = topk(3)
-topk_add($tk, $_->{customer}) for @orders
+topk_add($tk, _->{customer}) for @orders
 my @top = topk_top($tk)
 for my $hit (@top) {
     printf "  %-7s : %d orders\n", $hit->[0], $hit->[1]
@@ -98,7 +98,7 @@ for my $hit (@top) {
 
 p ""
 p "── SELECT DISTINCT customer ─────────────────────────"
-my @customers = map { $_->{customer} } @orders
+my @customers = map { _->{customer} } @orders
 my @distinct = sort { _0 cmp _1 } uniq(@customers)
 printf "  distinct customers (%d): %s\n",
     len(@distinct), join(", ", @distinct)
@@ -107,7 +107,7 @@ printf "  distinct customers (%d): %s\n",
 
 p ""
 p "── HAVING SUM(amount) > 200 ─────────────────────────"
-my @big_customers = grep { $by_customer{$_} > 200 } keys %by_customer
+my @big_customers = grep { $by_customer{_} > 200 } keys %by_customer
 for my $c (sort { $by_customer{_1} <=> $by_customer{_0} } @big_customers) {
     printf "  %-7s  \$%.2f\n", $c, $by_customer{$c}
 }

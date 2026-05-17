@@ -164,7 +164,7 @@ for my $probe (@probes) {
 p ""
 p "── by-kind breakdown ────────────────────────────────"
 my %by_kind
-$by_kind{$_->{kind}}++ for @history
+$by_kind{_->{kind}}++ for @history
 for my $k (sort { _0 cmp _1 } keys %by_kind) {
     printf "  %-10s : %d\n", $k, $by_kind{$k}
 }
@@ -174,7 +174,7 @@ for my $k (sort { _0 cmp _1 } keys %by_kind) {
 p ""
 p "── HLL distinct content cardinality ─────────────────"
 my %exact_distinct
-$exact_distinct{$_->{content}} = 1 for @history
+$exact_distinct{_->{content}} = 1 for @history
 printf "  HLL   : %d\n", hll_count($hll_content)
 printf "  exact : %d\n", len(keys %exact_distinct)
 

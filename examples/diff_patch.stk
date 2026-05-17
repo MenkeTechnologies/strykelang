@@ -152,7 +152,7 @@ printf "  matches new version : %s\n", $match ? "YES" : "NO"
 # ── Op counts ───────────────────────────────────────────────────────
 
 my %counts
-$counts{$_->{op}}++ for @$ops
+$counts{_->{op}}++ for @$ops
 p ""
 p "── op-count rollup ─────────────────────────────────"
 printf "  =  (kept)    : %d\n", $counts{"="} // 0

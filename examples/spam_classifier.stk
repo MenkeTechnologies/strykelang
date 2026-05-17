@@ -25,8 +25,8 @@ my @train = (
     +{ label => "ham",  text => "looking forward to our project meeting tomorrow" },
 )
 
-my $sp_cnt = grep { $_->{label} eq "spam" } @train
-my $hm_cnt = grep { $_->{label} eq "ham"  } @train
+my $sp_cnt = grep { _->{label} eq "spam" } @train
+my $hm_cnt = grep { _->{label} eq "ham"  } @train
 printf "── training: %d examples (%d spam, %d ham) ────────────\n", len(@train), $sp_cnt, $hm_cnt
 
 # ── train: count word occurrences per class ────────────────────────
@@ -65,7 +65,7 @@ my $td_lat = t_digest(100)
 fn Demo::NB::classify($text) {
     my $t0 = now_ns()
     my @words = split /\s+/, lc($text)
-    @words = grep { len($_) > 0 } @words
+    @words = grep { len(_) > 0 } @words
     my $vsize = len(keys %vocab)
     my $total = $class_count{spam} + $class_count{ham}
     my %log_score

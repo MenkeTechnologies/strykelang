@@ -89,7 +89,7 @@ p "── per-host activity ─────────────────�
 for my $host (sort { len(@{$per_host{$_1}}) <=> len(@{$per_host{$_0}}) } keys %per_host) {
     my $entries = $per_host{$host}
     my %sev_breakdown
-    $sev_breakdown{$_->{sev}}++ for @$entries
+    $sev_breakdown{_->{sev}}++ for @$entries
     my @sev_parts
     for my $sev (sort { _0 cmp _1 } keys %sev_breakdown) {
         push @sev_parts, "$sev=$sev_breakdown{$sev}"
@@ -105,7 +105,7 @@ p "── anomalies (host with > 3 error/warn events) ──────"
 my $detected = 0
 for my $host (keys %per_host) {
     my $entries = $per_host{$host}
-    my $bad = grep { $_->{sev} eq "error" || $_->{sev} eq "warn" || $_->{sev} eq "critical" } @$entries
+    my $bad = grep { _->{sev} eq "error" || _->{sev} eq "warn" || _->{sev} eq "critical" } @$entries
     if ($bad > 3) {
         printf "  ALERT %-7s : %d high-severity events\n", $host, $bad
         $detected++

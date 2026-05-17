@@ -49,8 +49,8 @@ fn Demo::Morse::encode($text) {
     my @encoded_words
     for my $w (@words) {
         my @chars = split //, $w
-        @chars = grep { exists $enc{$_} } @chars
-        my @symbols = map { $enc{$_} } @chars
+        @chars = grep { exists $enc{_} } @chars
+        my @symbols = map { $enc{_} } @chars
         for my $s (@symbols) {
             topk_add($tk_sym, $s)
         }
@@ -66,7 +66,7 @@ fn Demo::Morse::decode($code) {
     my @out_words
     for my $w (@words) {
         my @syms = split / +/, $w
-        my @chars = map { exists $dec{$_} ? $dec{$_} : "?" } @syms
+        my @chars = map { exists $dec{_} ? $dec{_} : "?" } @syms
         push @out_words, join("", @chars)
     }
     join(" ", @out_words)

@@ -49,7 +49,7 @@ for my $val (5, 7, 13, 4, 17) {
 p ""
 p "── distinct cardinality via HLL ───────────────────────"
 my $h = hll(14)
-hll_add($h, $_) for (@s1, @s2, @s3)
+hll_add($h, _) for (@s1, @s2, @s3)
 printf "  HLL distinct estimate : %d\n", hll_count($h)
 printf "  exact                  : %d\n", len(@merged)
 

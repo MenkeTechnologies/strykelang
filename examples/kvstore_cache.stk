@@ -30,7 +30,7 @@ fn Demo::KvCache::cached($db, $n) {
 my @inputs = (1, 2, 3, 4, 5)
 my $start = now_ns()
 
-my @results = map { Demo::KvCache::cached($db, $_) } @inputs
+my @results = map { Demo::KvCache::cached($db, _) } @inputs
 
 my $elapsed = (now_ns() - $start) / 1_000_000_000
 kv_commit($db);                        # persist for the next run

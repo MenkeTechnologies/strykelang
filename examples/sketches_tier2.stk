@@ -13,7 +13,7 @@ p "  (first 5 succeed, rest blocked until tokens refill)"
 p ""
 p "── Consistent hash ring ───────────────────────────────"
 my $ring = hash_ring(150);             # 150 virtual nodes per real
-hr_add($ring, $_) for ("us-east", "us-west", "eu-central")
+hr_add($ring, _) for ("us-east", "us-west", "eu-central")
 my %hits
 for my $i (1:10_000) { $hits{hr_get($ring, "user:$i")}++ }
 for my $node (sort keys %hits) {
@@ -33,9 +33,9 @@ p "── SimHash (near-duplicate document detection) ────────"
 my $doc1 = simhash()
 my $doc2 = simhash()
 my $doc3 = simhash()
-sh_add($doc1, $_) for split /\s+/, "the quick brown fox jumps over the lazy dog"
-sh_add($doc2, $_) for split /\s+/, "the quick brown fox jumps over the lazy cat"
-sh_add($doc3, $_) for split /\s+/, "completely unrelated text about photosynthesis"
+sh_add($doc1, _) for split /\s+/, "the quick brown fox jumps over the lazy dog"
+sh_add($doc2, _) for split /\s+/, "the quick brown fox jumps over the lazy cat"
+sh_add($doc3, _) for split /\s+/, "completely unrelated text about photosynthesis"
 printf "  doc1 vs doc2 (near-dup): similarity %.3f\n", sh_similarity($doc1, $doc2)
 printf "  doc1 vs doc3 (distant):  similarity %.3f\n", sh_similarity($doc1, $doc3)
 
@@ -43,8 +43,8 @@ p ""
 p "── MinHash (Jaccard similarity over k-shingles) ───────"
 my $set_a = minhash(128)
 my $set_b = minhash(128)
-mh_add($set_a, $_) for ("apple", "banana", "cherry", "date", "fig")
-mh_add($set_b, $_) for ("banana", "cherry", "date", "fig", "grape")
+mh_add($set_a, _) for ("apple", "banana", "cherry", "date", "fig")
+mh_add($set_b, _) for ("banana", "cherry", "date", "fig", "grape")
 printf "  Jaccard(A, B) ≈ %.3f  (truth: 4/6 = 0.667)\n", mh_jaccard($set_a, $set_b)
 
 p ""
@@ -55,18 +55,18 @@ it_insert($it, 8,  16, "midday")
 it_insert($it, 14, 22, "evening")
 it_insert($it, 20, 28, "night")
 p "  intervals covering t=12:  ",
-    join(", ", map { sprintf("[%d-%d] %s", $_->[0], $_->[1], $_->[2]) } it_query_point($it, 12))
+    join(", ", map { sprintf("[%d-%d] %s", _->[0], _->[1], _->[2]) } it_query_point($it, 12))
 p "  intervals covering t=21:  ",
-    join(", ", map { sprintf("[%d-%d] %s", $_->[0], $_->[1], $_->[2]) } it_query_point($it, 21))
+    join(", ", map { sprintf("[%d-%d] %s", _->[0], _->[1], _->[2]) } it_query_point($it, 21))
 
 p ""
 p "── BK-tree (fuzzy / typo-tolerant search) ─────────────"
 my $bk = bk_tree()
-bk_insert($bk, $_) for ("apple", "apply", "ape", "april", "banana", "band")
+bk_insert($bk, _) for ("apple", "apply", "ape", "april", "banana", "band")
 p "  within edit-distance 1 of 'aple': ",
-    join(", ", map { sprintf("%s(d=%d)", $_->[0], $_->[1]) } bk_query($bk, "aple", 1))
+    join(", ", map { sprintf("%s(d=%d)", _->[0], _->[1]) } bk_query($bk, "aple", 1))
 p "  within edit-distance 2 of 'bant': ",
-    join(", ", map { sprintf("%s(d=%d)", $_->[0], $_->[1]) } bk_query($bk, "bant", 2))
+    join(", ", map { sprintf("%s(d=%d)", _->[0], _->[1]) } bk_query($bk, "bant", 2))
 
 p ""
 p "── Rope (fast string edits in long documents) ─────────"

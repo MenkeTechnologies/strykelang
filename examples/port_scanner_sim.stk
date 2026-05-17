@@ -116,7 +116,7 @@ p "─" x 60
 
 my $t_scan = now_ns()
 my @results = pmap {
-    my $pair = $_
+    my $pair = _
     Demo::PS::probe($pair->[0], $pair->[1])
 } @plan
 my $elapsed_us = (now_ns() - $t_scan) / 1000.0

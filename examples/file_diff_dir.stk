@@ -42,8 +42,8 @@ my %after = (
 # ── diff ───────────────────────────────────────────────────────────
 
 my %all_paths
-$all_paths{$_} = 1 for keys %before
-$all_paths{$_} = 1 for keys %after
+$all_paths{_} = 1 for keys %before
+$all_paths{_} = 1 for keys %after
 
 my @added
 my @removed
@@ -106,9 +106,9 @@ for my $entry (@same) {
 p ""
 p "── stats ────────────────────────────────────────────"
 my $before_total = 0
-$before_total += $_ for values %before
+$before_total += _ for values %before
 my $after_total = 0
-$after_total += $_ for values %after
+$after_total += _ for values %after
 printf "  before total bytes : %d\n", $before_total
 printf "  after total bytes  : %d\n", $after_total
 printf "  growth             : %+d bytes (%.1f%%)\n",
@@ -135,8 +135,8 @@ for my $h (@hits) {
 p ""
 p "── HLL distinct paths (union) ───────────────────────"
 my $hll = hll(14)
-hll_add($hll, $_) for keys %before
-hll_add($hll, $_) for keys %after
+hll_add($hll, _) for keys %before
+hll_add($hll, _) for keys %after
 printf "  HLL   : %d\n", hll_count($hll)
 printf "  exact : %d\n", len(keys %all_paths)
 

@@ -119,7 +119,7 @@ Demo::FSM::run_order(3, \@order3)
 p ""
 p "── audit log summary ────────────────────────────────"
 my $total      = len(@$audit_log)
-my $ok         = grep { $_->{status} eq "ok" } @$audit_log
+my $ok         = grep { _->{status} eq "ok" } @$audit_log
 my $rejected   = $total - $ok
 printf "  total transitions  : %d\n", $total
 printf "  successful         : %d\n", $ok
@@ -146,7 +146,7 @@ printf "  p99  : %.1f µs\n", td_quantile($tlat, 0.99)
 
 p ""
 p "── illegal transitions (audit log) ──────────────────"
-my @rejects = grep { $_->{status} eq "rejected" } @$audit_log
+my @rejects = grep { _->{status} eq "rejected" } @$audit_log
 for my $r (@rejects) {
     printf "  REJECTED: %-10s --%-8s-->\n", $r->{from}, $r->{event}
 }

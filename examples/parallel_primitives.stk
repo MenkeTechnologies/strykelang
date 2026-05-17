@@ -29,7 +29,7 @@ p "── pfor — fire-and-forget parallel iteration ────────�
 my $path = "/tmp/parallel_pfor_demo.rkyv"
 unlink($path)
 my $db = kv_open($path)
-pfor { kv_put($db, "key-$_", $_ * $_) } (1:100)
+pfor { kv_put($db, "key-$_", _ * _) } (1:100)
 kv_commit($db)
 p "  pfor wrote ", kv_len($db), " keys in parallel"
 unlink($path)

@@ -38,7 +38,7 @@ my %cache
 fn Math::slow_factorial($n) {
     sleep 0.05;                          # pretend it's expensive
     my $r = 1
-    $r *= $_ for (2:$n)
+    $r *= _ for (2:$n)
     $r
 }
 around "Math::slow_factorial" {

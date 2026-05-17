@@ -32,10 +32,10 @@ p ""
 p "── pipe-forward — count + uppercase + spurt back ──────"
 slurp($tmp)
     |> split(/\n/)
-    |> grep { len($_) > 0 }
-    |> map  { uc($_) }
+    |> grep { len(_) > 0 }
+    |> map  { uc(_) }
     |> join("\n")
-    |> >{ spurt($tmp, $_); _ }
+    |> >{ spurt($tmp, _); _ }
 p "  reformatted contents:"
 p "    $_" for split(/\n/, slurp($tmp))
 
@@ -58,7 +58,7 @@ for my $f (@big_demos) {
 }
 printf "  examples/*.stk > 1KB : %d files\n", len(@over_1kb)
 p "  examples:"
-p "    $_  (", file_size($_), " bytes)" for @over_1kb[0:2]
+p "    $_  (", file_size(_), " bytes)" for @over_1kb[0:2]
 
 p ""
 p "── File metadata via file_* builtins ──────────────────"

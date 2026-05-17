@@ -118,7 +118,7 @@ if ($solved) {
 
 p ""
 p "── solver stats ─────────────────────────────────────"
-my $empty_count = grep { $_ == 0 } @puzzle
+my $empty_count = grep { _ == 0 } @puzzle
 printf "  empty cells in input  : %d\n", $empty_count
 printf "  total tries           : %d\n", $try_count
 printf "  total elapsed         : %.2f ms\n", $elapsed_ms

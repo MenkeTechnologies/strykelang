@@ -148,7 +148,7 @@ for my $tag (sort { $tags{$_1} <=> $tags{$_0} } keys %tags) {
 p ""
 p "── HLL distinct tags ────────────────────────────────"
 my $hll = hll(14)
-hll_add($hll, $_) for keys %tags
+hll_add($hll, _) for keys %tags
 printf "  HLL   : %d\n", hll_count($hll)
 printf "  exact : %d\n", len(keys %tags)
 

@@ -77,7 +77,7 @@ for my $name (@names) {
 p ""
 p "── derived insights ───────────────────────────────────"
 my $total_calls = 0
-$total_calls += $metrics{$_}->{count} for keys %metrics
+$total_calls += $metrics{_}->{count} for keys %metrics
 printf "  total calls across all fns : %d\n", $total_calls
 
 my $hottest = $names[0]

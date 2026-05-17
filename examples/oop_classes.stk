@@ -76,6 +76,6 @@ class UserCache {
     fn seen($name) { bloom_contains($self->bloom, $name) }
 }
 my $cache = UserCache(capacity => 5000)
-$cache->add($_) for ("alice", "bob", "carol")
+$cache->add(_) for ("alice", "bob", "carol")
 p "  cache->seen(alice)  : ", $cache->seen("alice")
 p "  cache->seen(daniel) : ", $cache->seen("daniel")

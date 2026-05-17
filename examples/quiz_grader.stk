@@ -91,7 +91,7 @@ for my $sub (@submissions) {
 # ── leaderboard ────────────────────────────────────────────────────
 
 my $max_score = 0
-$max_score += $_->{points} for @questions
+$max_score += _->{points} for @questions
 
 printf "── leaderboard (max possible: %d points) ──────────────\n",
     $max_score
@@ -145,8 +145,8 @@ for my $h (@hits) {
 
 p ""
 p "── overall stats ────────────────────────────────────"
-my $perfect = grep { $scores{$_}->{score} == $max_score } keys %scores
-my $passed  = grep { $scores{$_}->{score} >= $max_score * 0.6 } keys %scores
+my $perfect = grep { $scores{_}->{score} == $max_score } keys %scores
+my $passed  = grep { $scores{_}->{score} >= $max_score * 0.6 } keys %scores
 printf "  total students : %d\n", len(keys %scores)
 printf "  perfect scores : %d\n", $perfect
 printf "  passed (60%%+) : %d\n", $passed

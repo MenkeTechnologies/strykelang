@@ -109,7 +109,7 @@ for my $row (@basket) {
 
 p "\nround-trip stability (USD -> X -> USD on \$1000):"
 my $base = 1000.0
-my @codes = sort grep { $_ ne "USD" } keys %usd_per
+my @codes = sort grep { _ ne "USD" } keys %usd_per
 my @rt_errors
 for my $code (@codes) {
     my $there = Demo::FX::convert($base, "USD", $code)
@@ -128,7 +128,7 @@ printf("\nmax round-trip delta across %d currencies: %.2e (must be ~0)\n",
 # ── parallel scan: which currencies are weaker than the JPY benchmark? ─
 
 my @weak_vs_jpy = pgrep {
-    Demo::FX::pair_rate("USD", $_) > Demo::FX::pair_rate("USD", "JPY") / 10
+    Demo::FX::pair_rate("USD", _) > Demo::FX::pair_rate("USD", "JPY") / 10
 } @codes
 @weak_vs_jpy = sort @weak_vs_jpy
 p "\ncurrencies where 1 USD buys > JPY/10 units: ",

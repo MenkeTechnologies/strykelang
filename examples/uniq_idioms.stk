@@ -49,7 +49,7 @@ my @words = split(/\s+/, "alpha beta alpha gamma beta alpha")
 my @unique_words = uniq(@words)
 p "  unique tokens       : ", join(",", @unique_words)
 for my $w (@unique_words) {
-    my @hits = grep { $_ eq $w } @words
+    my @hits = grep { _ eq $w } @words
     printf "    %-7s × %d\n", $w, len(@hits)
 }
 
@@ -62,5 +62,5 @@ p "── nested arrayrefs collapse via ref-stringification ──"
 #   uniq(map { to_json($_) } @nested)
 my @r6 = uniq([[1, 2], [1, 2], [3, 4]])
 printf "  uniq([[1,2],[1,2],[3,4]]) → %d atom (all refs stringify to ARRAY(0x...))\n", len(@r6)
-my @r7 = uniq(map { to_json($_) } [1, 2], [1, 2], [3, 4])
+my @r7 = uniq(map { to_json(_) } [1, 2], [1, 2], [3, 4])
 p "  value-aware via to_json:    ", join("  |  ", @r7)

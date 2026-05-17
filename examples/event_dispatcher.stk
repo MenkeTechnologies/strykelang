@@ -143,7 +143,7 @@ for my $e (@events) {
 }
 printf "  HLL distinct estimate : %d\n", hll_count($hll)
 my %distinct
-$distinct{$_->[0]} = 1 for @events
+$distinct{_->[0]} = 1 for @events
 printf "  exact distinct topics : %d\n", len(keys %distinct)
 
 # ── pattern-match smoke test (proves the glob-pattern logic) ─────────

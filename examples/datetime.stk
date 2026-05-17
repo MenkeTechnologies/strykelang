@@ -63,5 +63,5 @@ unlink($path)
 
 p ""
 p "── strftime composes with pipe-forward ────────────────"
-my @stamps = (1:5) |> map { strftime("%H:%M:%S", $now - $_ * 10) }
+my @stamps = (1:5) |> map { strftime("%H:%M:%S", $now - _ * 10) }
 p "  stamps : ", join(", ", @stamps)

@@ -24,19 +24,19 @@ Finally, the third paragraph is short. Very short!
 # ── tokenize ────────────────────────────────────────────────────────
 
 my @paragraphs = split /\n\n+/, $text
-@paragraphs = grep { len($_) > 0 } @paragraphs
+@paragraphs = grep { len(_) > 0 } @paragraphs
 
 my @sentences
 for my $para (@paragraphs) {
     my @s = split /[.!?]+/, $para
-    @s = grep { len($_) > 0 && $_ =~ /\w/ } @s
+    @s = grep { len(_) > 0 && _ =~ /\w/ } @s
     push @sentences, @s
 }
 
 my @words
 for my $sent (@sentences) {
     my @w = split /\W+/, lc($sent)
-    @w = grep { len($_) > 0 } @w
+    @w = grep { len(_) > 0 } @w
     push @words, @w
 }
 
@@ -52,7 +52,7 @@ printf "  chars      : %d (codepoints)\n", len($text)
 my $td_words_per_sent = t_digest(100)
 for my $sent (@sentences) {
     my @w = split /\W+/, lc($sent)
-    @w = grep { len($_) > 0 } @w
+    @w = grep { len(_) > 0 } @w
     td_add($td_words_per_sent, len(@w))
 }
 
@@ -114,7 +114,7 @@ printf "  FK grade level    : %.2f\n", $fkgl
 p ""
 p "── most-common words (TopK) ─────────────────────────"
 my $tk = topk(8)
-topk_add($tk, $_) for @words
+topk_add($tk, _) for @words
 my @hits = topk_top($tk)
 for my $h (@hits) {
     printf "  %-12s : %d\n", $h->[0], $h->[1]
@@ -125,9 +125,9 @@ for my $h (@hits) {
 p ""
 p "── distinct-word cardinality (HLL) ──────────────────"
 my $hll = hll(14)
-hll_add($hll, $_) for @words
+hll_add($hll, _) for @words
 my %distinct
-$distinct{$_} = 1 for @words
+$distinct{_} = 1 for @words
 printf "  HLL distinct : %d\n", hll_count($hll)
 printf "  exact        : %d\n", len(keys %distinct)
 printf "  type-token ratio (vocab diversity) : %.2f\n",

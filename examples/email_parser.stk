@@ -176,7 +176,7 @@ printf "  exact : %d\n", len(keys %by_sender)
 
 p ""
 p "── ham vs spam ─────────────────────────────────────"
-my $spam = grep { $_->{spam}->{score} >= 4 } @processed
+my $spam = grep { _->{spam}->{score} >= 4 } @processed
 my $ham  = len(@processed) - $spam
 printf "  ham  : %d\n", $ham
 printf "  spam : %d\n", $spam
