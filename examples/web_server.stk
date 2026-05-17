@@ -34,10 +34,26 @@ fn Demo::Web::handler($req) {
     }
 }
 
-# If we are running this script directly, we can start the server.
-# The `serve` builtin can be called from code.
-if ($0 eq __FILE__ || $0 =~ /web_server\.stk$/) {
-    my $port = $ARGV[0] // 8080
+# Handler self-test (no bind) — keeps `stryke examples/web_server.stk` batch-safe.
+my $root = Demo::Web::handler(+{
+    path => "/", method => "GET", peer => "test", port => 1,
+})
+die "root status" unless $root->{status} == 200
+die "root body"   unless $root->{body} =~ /Welcome to Stryke/
+
+my $info = Demo::Web::handler(+{
+    path => "/api/info", method => "GET", peer => "test", port => 1,
+})
+die "info status" unless $info->{status} == 200
+die "info json"   unless $info->{body} =~ /"engine"/
+
+die "404" if defined Demo::Web::handler(+{
+    path => "/nope", method => "GET", peer => "test", port => 1,
+})
+
+# Blocking server only when a port is passed explicitly on the CLI.
+if (len(@ARGV) && $ARGV[0] =~ /^\d+$/) {
+    my $port = $ARGV[0]
     p "Starting Stryke server on port $port..."
     serve($port, \&Demo::Web::handler)
 }

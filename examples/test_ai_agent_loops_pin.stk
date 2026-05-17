@@ -9,6 +9,9 @@
 # the network. Mocks below install the deterministic responses each
 # assertion expects.
 
+# Deterministic embeddings for ai_memory_* (no API key required).
+ai_mock_install("embed:probe", "")
+
 # ── 1. AI Sessions (Multi-turn) ─────────────────────────────────────────────
 
 # Mocks use the FIRST regex that matches; later prompts (extraction

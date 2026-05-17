@@ -5,6 +5,7 @@
 
 # ── AI Primitives (Extra) ──────────────────────────────────────────────────
 
+env_set("STRYKE_AI_MODE", "mock-only")
 ai_models("openai")->[0] |> aeq "mock-model-1", "ai_models mock-only first"
 ai_mock_install("image", "BINARY_DATA")
 ai_image("cat") |> aeq "BINARY_DATA", "ai_image mock"
