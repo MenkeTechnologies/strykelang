@@ -128,9 +128,9 @@ for my $q (@question_difficulty) {
 
 p ""
 p "── score distribution (t-digest) ────────────────────"
-printf "  p10 : %d\n", int(td_quantile($td_scores, 0.10))
-printf "  p50 : %d\n", int(td_quantile($td_scores, 0.50))
-printf "  p90 : %d\n", int(td_quantile($td_scores, 0.90))
+printf "  p10 : %d\n", ~> td_quantile($td_scores, 0.10) int
+printf "  p50 : %d\n", ~> td_quantile($td_scores, 0.50) int
+printf "  p90 : %d\n", ~> td_quantile($td_scores, 0.90) int
 
 # ── TopK hardest questions (sketch) ────────────────────────────────
 

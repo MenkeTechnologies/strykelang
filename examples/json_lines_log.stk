@@ -135,9 +135,9 @@ my $gtd = t_digest(100)
 for my $r (@records) {
     td_add($gtd, $r->{latency_ms})
 }
-printf "  p50  : %d ms\n", int(td_quantile($gtd, 0.50))
-printf "  p90  : %d ms\n", int(td_quantile($gtd, 0.90))
-printf "  p99  : %d ms\n", int(td_quantile($gtd, 0.99))
+printf "  p50  : %d ms\n", ~> td_quantile($gtd, 0.50) int
+printf "  p90  : %d ms\n", ~> td_quantile($gtd, 0.90) int
+printf "  p99  : %d ms\n", ~> td_quantile($gtd, 0.99) int
 
 # ── per-service p99 latency via separate t-digests ──────────────────
 
@@ -149,8 +149,8 @@ for my $r (@records) {
     td_add($svc_td{$r->{service}}, $r->{latency_ms})
 }
 for my $s (sort { _0 cmp _1 } keys %svc_td) {
-    my $p99 = int(td_quantile($svc_td{$s}, 0.99))
-    my $p50 = int(td_quantile($svc_td{$s}, 0.50))
+    my $p99 = ~> td_quantile($svc_td{$s}, 0.99) int
+    my $p50 = ~> td_quantile($svc_td{$s}, 0.50) int
     printf "  %-14s p50=%4d ms  p99=%4d ms\n", $s, $p50, $p99
 }
 
