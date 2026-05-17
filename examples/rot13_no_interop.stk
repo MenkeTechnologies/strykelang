@@ -25,9 +25,7 @@ fn Rot13::char($ch) {
     $ch
 }
 
-fn Rot13::str($text) {
-    join("", maps {Rot13::char} split(//, $text))
-}
+fn Rot13::str = join("", maps {Rot13::char} split(//, _))
 
 if (len(@ARGV) >= 1) {
     p Rot13::str(join(" ", @ARGV))
