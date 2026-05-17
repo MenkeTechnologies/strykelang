@@ -12,7 +12,7 @@
 // ── 1. CAS-lite (real coefficients) ──────────────────────────────────────────
 
 /// `factor_quadratic A, B, C` — return real roots of a x² + b x + c = 0.
-fn builtin_factor_quadratic(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_factor_quadratic(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let (a, b, c) = f3(args);
     if a.abs() < 1e-15 {
         if b.abs() < 1e-15 {
@@ -32,7 +32,7 @@ fn builtin_factor_quadratic(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `complete_square A, B, C` → `[h, k]` for a(x-h)² + k.
-fn builtin_complete_square(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_complete_square(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let (a, b, c) = f3(args);
     if a.abs() < 1e-15 {
         return Err(StrykeError::runtime("complete_square: a must be non-zero", 0));
@@ -45,7 +45,7 @@ fn builtin_complete_square(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// Heaviside-cover-up partial-fraction decomposition. Inputs: numerator
 /// coefficients (low-to-high), distinct real roots of the denominator. Returns
 /// residue at each root: r_i = num(root_i) / Π_{j≠i}(root_i - root_j).
-fn builtin_partial_fraction_simple(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_partial_fraction_simple(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let num: Vec<f64> = poly_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let roots: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
@@ -87,7 +87,7 @@ fn builtin_gauss_chebyshev_quad(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let n = args.get(1).map(|v| v.to_number() as usize).unwrap_or(16).max(2);
     let (xs, ws) = cheb_t_nodes_weights(n);
@@ -173,7 +173,7 @@ fn builtin_gauss_hermite_quad(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let n = args.get(1).map(|v| v.to_number() as usize).unwrap_or(20).max(2);
     let (xs, ws) = gauss_hermite_nodes_weights(n);
@@ -258,7 +258,7 @@ fn builtin_gauss_laguerre_quad(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let n = args.get(1).map(|v| v.to_number() as usize).unwrap_or(20).max(2);
     let (xs, ws) = gauss_laguerre_nodes_weights(n);
@@ -274,7 +274,7 @@ fn builtin_clenshaw_curtis_quad(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -305,7 +305,7 @@ fn builtin_tanh_sinh_quad(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -337,7 +337,7 @@ fn builtin_gauss_legendre_2d(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let ax = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let bx = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -378,7 +378,7 @@ fn builtin_monte_carlo_2d(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     use rand::Rng;
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let ax = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -419,7 +419,7 @@ fn builtin_simulated_annealing(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     use rand::Rng;
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let x0: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
@@ -464,7 +464,7 @@ fn builtin_simulated_annealing(
 
 /// Two-phase simplex for `max cᵀ x  s.t. A x ≤ b, x ≥ 0` (b ≥ 0). Args: c, A, b.
 /// Returns `[x*, value]`. Returns NaN-filled vector if infeasible/unbounded.
-fn builtin_simplex_lp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_simplex_lp(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let c: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -574,7 +574,7 @@ fn builtin_particle_swarm(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     use rand::Rng;
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let bounds = matrix_from_value(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
@@ -636,7 +636,7 @@ fn builtin_particle_swarm(
 // ── 4. More distributions ────────────────────────────────────────────────────
 
 /// Generalized Extreme Value PDF.
-fn builtin_gev_pdf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gev_pdf(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let mu = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let sigma = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -655,7 +655,7 @@ fn builtin_gev_pdf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `gev_cdf` — Gev cdf. Returns a float.
-fn builtin_gev_cdf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gev_cdf(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let mu = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let sigma = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -671,7 +671,7 @@ fn builtin_gev_cdf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `gev_sample` — Gev sample. Returns a float.
-fn builtin_gev_sample(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gev_sample(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     use rand::Rng;
     let mu = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let sigma = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -687,7 +687,7 @@ fn builtin_gev_sample(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Generalized Pareto PDF.
-fn builtin_gen_pareto_pdf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gen_pareto_pdf(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let mu = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let sigma = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -708,7 +708,7 @@ fn builtin_gen_pareto_pdf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `gen_pareto_cdf` — Gen pareto cdf. Returns a float.
-fn builtin_gen_pareto_cdf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gen_pareto_cdf(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let mu = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let sigma = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -724,7 +724,7 @@ fn builtin_gen_pareto_cdf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `gen_pareto_sample` — Gen pareto sample. Returns a float.
-fn builtin_gen_pareto_sample(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gen_pareto_sample(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     use rand::Rng;
     let mu = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let sigma = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -740,7 +740,7 @@ fn builtin_gen_pareto_sample(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Skew-normal PDF (Azzalini).
-fn builtin_skew_normal_pdf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_skew_normal_pdf(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let xi = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let omega = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -753,7 +753,7 @@ fn builtin_skew_normal_pdf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `skew_normal_cdf` — Skew normal cdf. Returns a float.
-fn builtin_skew_normal_cdf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_skew_normal_cdf(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     // Owen's T uses series expansion; here we integrate the PDF numerically.
     let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let xi = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -779,7 +779,7 @@ fn builtin_skew_normal_cdf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Mixture-of-Gaussians PDF: weights × means × stds.
-fn builtin_mixture_normal_pdf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mixture_normal_pdf(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let weights: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
@@ -802,7 +802,7 @@ fn builtin_mixture_normal_pdf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Categorical (multinoulli) sample. Args: probability vector. Returns index.
-fn builtin_categorical_sample(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_categorical_sample(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     use rand::Rng;
     let probs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
@@ -821,7 +821,7 @@ fn builtin_categorical_sample(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Multinomial PMF. Args: counts, probs.
-fn builtin_multinomial_pmf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_multinomial_pmf(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let counts: Vec<i64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number() as i64)
@@ -843,7 +843,7 @@ fn builtin_multinomial_pmf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Multinomial sample. Args: n, probs. Returns counts vector.
-fn builtin_multinomial_sample(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_multinomial_sample(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     use rand::Rng;
     let n = args.first().map(|v| v.to_number() as i64).unwrap_or(0).max(0);
     let probs: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
@@ -867,7 +867,7 @@ fn builtin_multinomial_sample(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `truncated_normal_pdf` — Truncated normal pdf. Returns a float.
-fn builtin_truncated_normal_pdf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_truncated_normal_pdf(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let mu = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let sigma = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -888,7 +888,7 @@ fn builtin_truncated_normal_pdf(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// `truncated_normal_sample` — Truncated normal sample. Returns a float.
-fn builtin_truncated_normal_sample(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_truncated_normal_sample(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     use rand::Rng;
     let mu = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let sigma = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -910,7 +910,7 @@ fn builtin_truncated_normal_sample(args: &[StrykeValue]) -> PerlResult<StrykeVal
 // ── 5. Clustering / dimensionality reduction ─────────────────────────────────
 
 /// DBSCAN with squared Euclidean ε. Returns label per point (-1 = noise).
-fn builtin_dbscan(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_dbscan(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pts = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let eps = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
     let min_pts = args.get(2).map(|v| v.to_number() as usize).unwrap_or(5);
@@ -955,7 +955,7 @@ fn builtin_dbscan(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// 1-D Gaussian-mixture EM. Args: data, k, max_iter. Returns [pi, mu, sigma].
-fn builtin_gmm_em_1d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gmm_em_1d(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let data: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -1016,7 +1016,7 @@ fn builtin_gmm_em_1d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Silhouette score of a clustering (mean over points).
-fn builtin_silhouette_score(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_silhouette_score(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pts = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let labels: Vec<i64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
@@ -1066,7 +1066,7 @@ fn builtin_silhouette_score(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Davies-Bouldin clustering index (lower is better).
-fn builtin_davies_bouldin_index(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_davies_bouldin_index(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pts = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let labels: Vec<i64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
@@ -1141,7 +1141,7 @@ fn builtin_davies_bouldin_index(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Calinski-Harabasz index (variance ratio criterion, higher is better).
-fn builtin_calinski_harabasz_index(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_calinski_harabasz_index(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pts = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let labels: Vec<i64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
@@ -1208,7 +1208,7 @@ fn builtin_calinski_harabasz_index(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Classical multi-dimensional scaling (PCoA) on a distance matrix → 2-D coords.
-fn builtin_mds_2d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mds_2d(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let d = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = d.len();
     if n == 0 {
@@ -1247,7 +1247,7 @@ fn builtin_mds_2d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Mean-shift clustering on points (Gaussian kernel, given bandwidth h).
-fn builtin_mean_shift(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mean_shift(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pts = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let h = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-6);
     let max_iter = args.get(2).map(|v| v.to_number() as usize).unwrap_or(50);
@@ -1297,7 +1297,7 @@ fn builtin_mean_shift(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // ── 6. Neural-net primitives ─────────────────────────────────────────────────
 
 /// `batch_norm` — Batch norm. Returns a float.
-fn builtin_batch_norm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_batch_norm(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -1318,7 +1318,7 @@ fn builtin_batch_norm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// of N rows × `group_size` features each. Differs from BatchNorm: each row is
 /// normalized using its OWN mean/variance (over the feature axis only), not
 /// pooled across the batch.
-fn builtin_layer_norm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_layer_norm(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let group_size = args.get(1).map(|v| v.to_number() as usize).unwrap_or(xs.len()).max(1);
@@ -1336,7 +1336,7 @@ fn builtin_layer_norm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Dropout mask (shape n) with prob p of being zero.
-fn builtin_dropout_mask(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_dropout_mask(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     use rand::Rng;
     let n = args.first().map(|v| v.to_number() as usize).unwrap_or(0);
     let p = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
@@ -1351,7 +1351,7 @@ fn builtin_dropout_mask(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `max_pool_1d` — Max pool 1d. Returns a float.
-fn builtin_max_pool_1d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_max_pool_1d(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -1371,7 +1371,7 @@ fn builtin_max_pool_1d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `avg_pool_1d` — Avg pool 1d. Returns a float.
-fn builtin_avg_pool_1d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_avg_pool_1d(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -1388,7 +1388,7 @@ fn builtin_avg_pool_1d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Stable softmax: y_i = exp(x_i - max(x)) / Σ exp(x_j - max(x)).
-fn builtin_attention_softmax(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_attention_softmax(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -1405,7 +1405,7 @@ fn builtin_attention_softmax(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Sinusoidal positional encoding of length `length` × `d_model`.
-fn builtin_positional_encoding(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_positional_encoding(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let length = args.first().map(|v| v.to_number() as usize).unwrap_or(0);
     let d_model = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
     let mut m = vec![vec![0.0_f64; d_model]; length];
@@ -1423,7 +1423,7 @@ fn builtin_positional_encoding(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Glorot (Xavier) uniform init.
-fn builtin_glorot_init(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_glorot_init(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     use rand::Rng;
     let fan_in = args.first().map(|v| v.to_number() as usize).unwrap_or(0);
     let fan_out = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
@@ -1436,7 +1436,7 @@ fn builtin_glorot_init(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// He init (gaussian, std = √(2 / fan_in)).
-fn builtin_he_init(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_he_init(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     use rand::Rng;
     let fan_in = args.first().map(|v| v.to_number() as usize).unwrap_or(0);
     let fan_out = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
@@ -1459,7 +1459,7 @@ fn builtin_he_init(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// Single Adam optimisation step. Args: param, grad, m, v, lr, beta1, beta2,
 /// eps, t. Returns [param', m', v'].
 #[allow(dead_code)]
-fn builtin_adam_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_adam_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let param: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -1503,7 +1503,7 @@ fn builtin_adam_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Single RMSProp step. Args: param, grad, v_old, lr, decay, eps. Returns [param', v'].
 #[allow(dead_code)]
-fn builtin_rmsprop_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rmsprop_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let param: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -1536,7 +1536,7 @@ fn builtin_rmsprop_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // ── 7. Time series advanced ──────────────────────────────────────────────────
 
 /// `ewma` — Ewma. Returns a float.
-fn builtin_ewma(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ewma(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -1556,7 +1556,7 @@ fn builtin_ewma(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `ccf` — Ccf. Returns a float.
-fn builtin_ccf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ccf(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -1588,7 +1588,7 @@ fn builtin_ccf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Periodogram (squared magnitude / N) at `m` Fourier bins.
-fn builtin_periodogram(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_periodogram(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -1609,7 +1609,7 @@ fn builtin_periodogram(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Welch's PSD (segment averaging, Hann window).
-fn builtin_welch_psd(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_welch_psd(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -1655,7 +1655,7 @@ fn builtin_welch_psd(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Build a lag-feature matrix for autoregressive learning.
-fn builtin_lag_features(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lag_features(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -1677,7 +1677,7 @@ fn builtin_lag_features(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // ── 8. Image processing ──────────────────────────────────────────────────────
 
 /// `median_filter_2d` — Median filter 2d.
-fn builtin_median_filter_2d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_median_filter_2d(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let img = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let radius = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1).max(1);
     let h = img.len();
@@ -1703,7 +1703,7 @@ fn builtin_median_filter_2d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Otsu's threshold for grayscale 0..255.
-fn builtin_threshold_otsu(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_threshold_otsu(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let img: Vec<u8> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .flat_map(|row| {
@@ -1742,7 +1742,7 @@ fn builtin_threshold_otsu(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Histogram equalisation for grayscale 0..255.
-fn builtin_histogram_equalize(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_histogram_equalize(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let img: Vec<Vec<u8>> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|row| {
@@ -1778,7 +1778,7 @@ fn builtin_histogram_equalize(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `erode_2d` — Erode 2d.
-fn builtin_erode_2d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_erode_2d(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let img = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let radius = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1).max(1);
     let h = img.len();
@@ -1803,7 +1803,7 @@ fn builtin_erode_2d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `dilate_2d` — Dilate 2d.
-fn builtin_dilate_2d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_dilate_2d(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let img = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let radius = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1).max(1);
     let h = img.len();
@@ -1830,7 +1830,7 @@ fn builtin_dilate_2d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // ── 9. Loss functions ────────────────────────────────────────────────────────
 
 /// `mse_loss` — Mse loss. Returns a float.
-fn builtin_mse_loss(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mse_loss(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let (a, b) = vec_pair(args);
     let n = a.len().min(b.len()).max(1);
     let s: f64 = a.iter().zip(b.iter()).map(|(x, y)| (x - y).powi(2)).sum();
@@ -1838,7 +1838,7 @@ fn builtin_mse_loss(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `mae_loss` — Mae loss. Returns a float.
-fn builtin_mae_loss(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mae_loss(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let (a, b) = vec_pair(args);
     let n = a.len().min(b.len()).max(1);
     let s: f64 = a.iter().zip(b.iter()).map(|(x, y)| (x - y).abs()).sum();
@@ -1846,7 +1846,7 @@ fn builtin_mae_loss(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `huber_loss` — Huber loss. Returns a float.
-fn builtin_huber_loss(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_huber_loss(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let (a, b) = vec_pair(args);
     let delta = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
     let n = a.len().min(b.len()).max(1);
@@ -1868,7 +1868,7 @@ fn builtin_huber_loss(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // ── 10. Spatial / geographic ─────────────────────────────────────────────────
 
 /// Vincenty formula for geodesic distance (WGS-84 ellipsoid).
-fn builtin_vincenty_distance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_vincenty_distance(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lat1 = args.first().map(|v| v.to_number().to_radians()).unwrap_or(0.0);
     let lon1 = args.get(1).map(|v| v.to_number().to_radians()).unwrap_or(0.0);
     let lat2 = args.get(2).map(|v| v.to_number().to_radians()).unwrap_or(0.0);
@@ -1933,7 +1933,7 @@ fn builtin_vincenty_distance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `mercator_project` — Mercator project. Returns a float.
-fn builtin_mercator_project(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mercator_project(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lat = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let lon = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let r = args.get(2).map(|v| v.to_number()).unwrap_or(6378137.0);
@@ -1943,7 +1943,7 @@ fn builtin_mercator_project(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Destination given start lat/lon, bearing (deg), distance (m). Spherical earth.
-fn builtin_destination_from_bearing(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_destination_from_bearing(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lat1 = args.first().map(|v| v.to_number().to_radians()).unwrap_or(0.0);
     let lon1 = args.get(1).map(|v| v.to_number().to_radians()).unwrap_or(0.0);
     let bearing = args.get(2).map(|v| v.to_number().to_radians()).unwrap_or(0.0);
@@ -1963,7 +1963,7 @@ fn builtin_destination_from_bearing(args: &[StrykeValue]) -> PerlResult<StrykeVa
 // ── 11. Integer sequences ────────────────────────────────────────────────────
 
 /// `recaman` — Recaman. Returns an integer.
-fn builtin_recaman(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_recaman(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(0) as usize;
     let mut seen: std::collections::HashSet<i64> = std::collections::HashSet::new();
     let mut out: Vec<StrykeValue> = Vec::with_capacity(n + 1);
@@ -1985,7 +1985,7 @@ fn builtin_recaman(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `sylvester` — Sylvester. Returns an integer.
-fn builtin_sylvester(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sylvester(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(0) as usize;
     let mut out: Vec<StrykeValue> = Vec::with_capacity(n + 1);
     let mut a: i128 = 2;
@@ -2001,7 +2001,7 @@ fn builtin_sylvester(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `happy_q` — Happy q. Returns an integer.
-fn builtin_happy_q(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_happy_q(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut n = i1(args).abs();
     let mut seen = std::collections::HashSet::new();
     while n != 1 && !seen.contains(&n) {
@@ -2018,7 +2018,7 @@ fn builtin_happy_q(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `amicable_pair_q` — Amicable pair q. Returns an integer.
-fn builtin_amicable_pair_q(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_amicable_pair_q(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let (a, b) = i2(args);
     let sum_proper = |x: i64| -> i64 {
         if x < 1 {
@@ -2050,7 +2050,7 @@ fn builtin_amicable_pair_q(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `aliquot_sequence` — Aliquot sequence. Returns an integer.
-fn builtin_aliquot_sequence(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_aliquot_sequence(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut n = i1(args).max(1);
     let max_steps = args.get(1).map(|v| v.to_number() as usize).unwrap_or(50);
     let sum_proper = |x: i64| -> i64 {
@@ -2085,7 +2085,7 @@ fn builtin_aliquot_sequence(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Magic constant of an n×n magic square: M(n) = n(n²+1)/2.
-fn builtin_magic_constant(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_magic_constant(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     Ok(StrykeValue::integer(n * (n * n + 1) / 2))
 }
@@ -2093,7 +2093,7 @@ fn builtin_magic_constant(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // ── 12. Graph link metrics ───────────────────────────────────────────────────
 
 /// `clustering_coefficient_local` — Clustering coefficient local. Returns a float.
-fn builtin_clustering_coefficient_local(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_clustering_coefficient_local(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_list(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = adj.len();
     let sets: Vec<std::collections::HashSet<usize>> = adj
@@ -2121,7 +2121,7 @@ fn builtin_clustering_coefficient_local(args: &[StrykeValue]) -> PerlResult<Stry
 }
 
 /// `clustering_coefficient_global` — Clustering coefficient global. Returns a float.
-fn builtin_clustering_coefficient_global(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_clustering_coefficient_global(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let local = builtin_clustering_coefficient_local(args)?;
     let arr = arg_to_vec(&local);
     let s: f64 = arr.iter().map(|v| v.to_number()).sum();
@@ -2133,7 +2133,7 @@ fn builtin_clustering_coefficient_global(args: &[StrykeValue]) -> PerlResult<Str
 }
 
 /// `assortativity` — Assortativity. Returns a float.
-fn builtin_assortativity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_assortativity(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_list(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let degrees: Vec<f64> = adj.iter().map(|n| n.len() as f64).collect();
     let mut sum_jk = 0.0_f64;
@@ -2160,7 +2160,7 @@ fn builtin_assortativity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `common_neighbors` — Common neighbors. Returns an integer.
-fn builtin_common_neighbors(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_common_neighbors(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_list(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let u = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
     let v = args.get(2).map(|v| v.to_number() as usize).unwrap_or(0);
@@ -2174,7 +2174,7 @@ fn builtin_common_neighbors(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `jaccard_neighbors` — Jaccard neighbors. Returns a float.
-fn builtin_jaccard_neighbors(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_jaccard_neighbors(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_list(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let u = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
     let v = args.get(2).map(|v| v.to_number() as usize).unwrap_or(0);
@@ -2193,7 +2193,7 @@ fn builtin_jaccard_neighbors(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `adamic_adar` — Adamic adar. Returns a float.
-fn builtin_adamic_adar(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_adamic_adar(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_list(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let u = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
     let v = args.get(2).map(|v| v.to_number() as usize).unwrap_or(0);
@@ -2214,7 +2214,7 @@ fn builtin_adamic_adar(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `preferential_attachment_score` — Preferential attachment score. Returns an integer.
-fn builtin_preferential_attachment_score(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_preferential_attachment_score(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_list(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let u = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
     let v = args.get(2).map(|v| v.to_number() as usize).unwrap_or(0);
@@ -2256,7 +2256,7 @@ fn norm3(a: [f64; 3]) -> f64 {
 }
 
 /// `triangle_3d_normal` — Triangle 3d normal. Returns a float.
-fn builtin_triangle_3d_normal(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_triangle_3d_normal(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p1 = vec3(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let p2 = vec3(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     let p3 = vec3(&args.get(2).cloned().unwrap_or(StrykeValue::UNDEF));
@@ -2270,7 +2270,7 @@ fn builtin_triangle_3d_normal(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `triangle_3d_area` — Triangle 3d area. Returns a float.
-fn builtin_triangle_3d_area(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_triangle_3d_area(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p1 = vec3(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let p2 = vec3(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     let p3 = vec3(&args.get(2).cloned().unwrap_or(StrykeValue::UNDEF));
@@ -2278,7 +2278,7 @@ fn builtin_triangle_3d_area(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `tetrahedron_volume` — Tetrahedron volume. Returns a float.
-fn builtin_tetrahedron_volume(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_tetrahedron_volume(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = vec3(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let b = vec3(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     let c = vec3(&args.get(2).cloned().unwrap_or(StrykeValue::UNDEF));
@@ -2290,7 +2290,7 @@ fn builtin_tetrahedron_volume(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `plane_from_3_points` — Plane from 3 points. Returns a float.
-fn builtin_plane_from_3_points(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_plane_from_3_points(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p1 = vec3(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let p2 = vec3(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     let p3 = vec3(&args.get(2).cloned().unwrap_or(StrykeValue::UNDEF));
@@ -2305,7 +2305,7 @@ fn builtin_plane_from_3_points(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// `point_to_plane_distance` — Point to plane distance. Returns a float.
-fn builtin_point_to_plane_distance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_point_to_plane_distance(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pt = vec3(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let plane = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     let n = [
@@ -2319,7 +2319,7 @@ fn builtin_point_to_plane_distance(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Möller-Trumbore ray-triangle intersection.
-fn builtin_ray_triangle_intersect(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ray_triangle_intersect(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let origin = vec3(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let dir = vec3(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     let a = vec3(&args.get(2).cloned().unwrap_or(StrykeValue::UNDEF));
@@ -2351,7 +2351,7 @@ fn builtin_ray_triangle_intersect(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Ray-sphere intersection — returns nearest non-negative t or NaN.
-fn builtin_ray_sphere_intersect(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ray_sphere_intersect(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let origin = vec3(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let dir = vec3(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     let center = vec3(&args.get(2).cloned().unwrap_or(StrykeValue::UNDEF));
@@ -2377,7 +2377,7 @@ fn builtin_ray_sphere_intersect(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// AABB (axis-aligned bounding box) overlap test in 3D.
-fn builtin_aabb_overlap(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_aabb_overlap(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a_min = vec3(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let a_max = vec3(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     let b_min = vec3(&args.get(2).cloned().unwrap_or(StrykeValue::UNDEF));
@@ -2391,7 +2391,7 @@ fn builtin_aabb_overlap(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // ── 14. Iterative numerical solvers ──────────────────────────────────────────
 
 /// `gauss_seidel` — Gauss seidel. Returns a list.
-fn builtin_gauss_seidel(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gauss_seidel(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let b: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
@@ -2422,7 +2422,7 @@ fn builtin_gauss_seidel(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `jacobi_iteration` — Jacobi iteration. Returns a list.
-fn builtin_jacobi_iteration(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_jacobi_iteration(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let b: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
@@ -2453,7 +2453,7 @@ fn builtin_jacobi_iteration(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `sor_solve` — Sor solve. Returns a list.
-fn builtin_sor_solve(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sor_solve(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let b: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
@@ -2485,7 +2485,7 @@ fn builtin_sor_solve(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Thomas algorithm: solves tridiagonal A x = d. Args: a (sub), b (main), c (super), d.
-fn builtin_thomas_tridiag_solve(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_thomas_tridiag_solve(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -2523,7 +2523,7 @@ fn builtin_richardson_extrapolation(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let h0 = args.get(1).map(|v| v.to_number()).unwrap_or(0.1);
     let levels = args.get(2).map(|v| v.to_number() as usize).unwrap_or(5).max(1);
@@ -2544,7 +2544,7 @@ fn builtin_finite_difference_5pt(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let x = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let h = args.get(2).map(|v| v.to_number()).unwrap_or(1e-3);
@@ -2558,7 +2558,7 @@ fn builtin_finite_difference_5pt(
 // ── 15. Algebraic / cryptographic ────────────────────────────────────────────
 
 /// Tonelli-Shanks: solves x² ≡ n (mod p) with p odd prime. Returns smaller root or -1.
-fn builtin_tonelli_shanks_sqrt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_tonelli_shanks_sqrt(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).rem_euclid(args.get(1).map(|v| v.to_number() as i64).unwrap_or(2));
     let p = args.get(1).map(|v| v.to_number() as i64).unwrap_or(2);
     if p < 2 {
@@ -2610,7 +2610,7 @@ fn builtin_tonelli_shanks_sqrt(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Baby-step Giant-step: finds smallest x with g^x ≡ h (mod p), or -1.
-fn builtin_baby_step_giant_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_baby_step_giant_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let g = args.first().map(|v| v.to_number() as i64).unwrap_or(0);
     let h = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     let p = args.get(2).map(|v| v.to_number() as i64).unwrap_or(2).max(2);
@@ -2633,7 +2633,7 @@ fn builtin_baby_step_giant_step(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Pollard's rho factorisation. Returns one non-trivial factor of n (>1).
-fn builtin_pollard_rho_factor(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pollard_rho_factor(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     if n < 2 {
         return Ok(StrykeValue::integer(1));
@@ -2661,7 +2661,7 @@ fn builtin_pollard_rho_factor(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Modular LCM via gcd-based formula.
-fn builtin_modular_lcm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_modular_lcm(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs: Vec<i64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number() as i64)
@@ -2678,7 +2678,7 @@ fn builtin_modular_lcm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Generalised Chinese Remainder over arbitrary (not coprime) moduli.
-fn builtin_crt_general(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_crt_general(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r: Vec<i64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number() as i64)
@@ -2727,7 +2727,7 @@ fn builtin_crt_general(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // ── 16. Physics / chemistry ──────────────────────────────────────────────────
 
 /// Van-der-Waals pressure: P = nRT/(V-nb) − a n²/V².
-fn builtin_van_der_waals_p(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_van_der_waals_p(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = args.first().map(|v| v.to_number()).unwrap_or(1.0);
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(298.0);
     let v = args.get(2).map(|v| v.to_number()).unwrap_or(0.0224);
@@ -2738,7 +2738,7 @@ fn builtin_van_der_waals_p(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Nernst equation: E = E0 - (RT/nF) ln(Q).
-fn builtin_nernst_equation(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_nernst_equation(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let e0 = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let t = args.get(2).map(|v| v.to_number()).unwrap_or(298.15);
@@ -2749,7 +2749,7 @@ fn builtin_nernst_equation(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Arrhenius rate: k = A exp(-Ea / RT).
-fn builtin_arrhenius_rate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_arrhenius_rate(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = args.first().map(|v| v.to_number()).unwrap_or(1.0);
     let ea = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let t = args.get(2).map(|v| v.to_number()).unwrap_or(298.15);
@@ -2758,7 +2758,7 @@ fn builtin_arrhenius_rate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `reduced_mass` — Reduced mass. Returns a float.
-fn builtin_reduced_mass(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_reduced_mass(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m1 = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let m2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if m1 + m2 <= 0.0 {
@@ -2768,7 +2768,7 @@ fn builtin_reduced_mass(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `ph_to_concentration` — Ph to concentration. Returns a float.
-fn builtin_ph_to_concentration(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ph_to_concentration(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ph = args.first().map(|v| v.to_number()).unwrap_or(7.0);
     Ok(StrykeValue::float(10.0_f64.powf(-ph)))
 }

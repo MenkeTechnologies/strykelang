@@ -6,7 +6,7 @@ fn b77_to_floats(v: &StrykeValue) -> Vec<f64> {
 }
 
 /// `image_resize` — bilinear new pixel = weighted average of 4 source pixels.
-fn builtin_image_resize(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_resize(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p00 = f1(args);
     let p01 = args.get(1).map(|v| v.to_number()).unwrap_or(p00);
     let p10 = args.get(2).map(|v| v.to_number()).unwrap_or(p00);
@@ -20,7 +20,7 @@ fn builtin_image_resize(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `image_grayscale` — luminance Y = 0.299 R + 0.587 G + 0.114 B (Rec. 601).
-fn builtin_image_grayscale(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_grayscale(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = f1(args);
     let g = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let b = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -28,14 +28,14 @@ fn builtin_image_grayscale(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `image_threshold` — binary threshold: 1 if ≥ T else 0.
-fn builtin_image_threshold(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_threshold(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = f1(args);
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(127.0);
     Ok(StrykeValue::integer(if p >= t { 1 } else { 0 }))
 }
 
 /// `image_blur_gaussian` — 1-D Gaussian kernel coef at offset k for σ.
-fn builtin_image_blur_gaussian(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_blur_gaussian(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let k = f1(args);
     let sigma = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-15);
     let coef = (-(k * k) / (2.0 * sigma * sigma)).exp()
@@ -44,13 +44,13 @@ fn builtin_image_blur_gaussian(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// `image_blur_box` — box-blur kernel value: 1 / (2k+1).
-fn builtin_image_blur_box(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_blur_box(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let k = i1(args).max(0) as f64;
     Ok(StrykeValue::float(1.0 / (2.0 * k + 1.0)))
 }
 
 /// `image_sharpen` — apply unsharp mask: I + α (I − blur).
-fn builtin_image_sharpen(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_sharpen(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let i = f1(args);
     let blur = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let alpha = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -58,7 +58,7 @@ fn builtin_image_sharpen(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `image_edge_canny` — Canny non-max-suppression: keep magnitude if local max.
-fn builtin_image_edge_canny(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_edge_canny(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mag = f1(args);
     let n_left = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let n_right = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -72,14 +72,14 @@ fn builtin_image_edge_canny(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// `image_edge_sobel` — Sobel Gx kernel = [[−1,0,1],[−2,0,2],[−1,0,1]];
 /// returns gradient magnitude √(Gx² + Gy²).
-fn builtin_image_edge_sobel(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_edge_sobel(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let gx = f1(args);
     let gy = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float((gx * gx + gy * gy).sqrt()))
 }
 
 /// `image_edge_laplacian` — Laplacian = ∇²I = Σ_n (I_n − 4 I).
-fn builtin_image_edge_laplacian(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_edge_laplacian(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = f1(args);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let s = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -89,13 +89,13 @@ fn builtin_image_edge_laplacian(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// `image_dilate` — morphological dilation: max in window.
-fn builtin_image_dilate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_dilate(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = b77_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     Ok(StrykeValue::float(v.iter().cloned().fold(f64::NEG_INFINITY, f64::max)))
 }
 
 /// `image_erode` — morphological erosion: min in window.
-fn builtin_image_erode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_erode(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = b77_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     Ok(StrykeValue::float(v.iter().cloned().fold(f64::INFINITY, f64::min)))
 }
@@ -104,7 +104,7 @@ fn builtin_image_erode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// max). Args: array of pixel windows: window 1 = inner-erode neighbourhood
 /// for the centre pixel; we apply min then return that single eroded value
 /// (caller dilates over the eroded image in a second pass).
-fn builtin_image_morphology_open(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_morphology_open(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let inner = b77_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let outer = args.get(1).map(b77_to_floats).unwrap_or_default();
     let eroded = inner.iter().cloned().fold(f64::INFINITY, f64::min);
@@ -117,7 +117,7 @@ fn builtin_image_morphology_open(args: &[StrykeValue]) -> PerlResult<StrykeValue
 
 /// `image_morphology_close` — dilation followed by erosion: max of window's
 /// max-pool, then min over outer windows.
-fn builtin_image_morphology_close(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_morphology_close(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let inner = b77_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let outer = args.get(1).map(b77_to_floats).unwrap_or_default();
     let dilated = inner.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
@@ -126,14 +126,14 @@ fn builtin_image_morphology_close(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// `image_histogram` — counts at given bin (0..255).
-fn builtin_image_histogram(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_histogram(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pixels = b77_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let bin = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     Ok(StrykeValue::integer(pixels.iter().filter(|&&p| p as i64 == bin).count() as i64))
 }
 
 /// `image_equalize` — histogram equalization: cdf-based intensity remap.
-fn builtin_image_equalize(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_equalize(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let cdf_p = f1(args);
     let cdf_min = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let n = args.get(2).map(|v| v.to_number()).unwrap_or(1.0).max(1.0);
@@ -142,40 +142,40 @@ fn builtin_image_equalize(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `image_clahe` — Contrast Limited Adaptive Histogram Equalization clip step.
-fn builtin_image_clahe(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_clahe(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let count = f1(args);
     let clip = args.get(1).map(|v| v.to_number()).unwrap_or(40.0);
     Ok(StrykeValue::float(count.min(clip)))
 }
 
 /// `image_contrast` — linear contrast: out = α·(in − 128) + 128.
-fn builtin_image_contrast(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_contrast(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = f1(args);
     let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(alpha * (p - 128.0) + 128.0))
 }
 
 /// `image_brightness` — additive brightness: out = in + β.
-fn builtin_image_brightness(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_brightness(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = f1(args);
     let beta = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(p + beta))
 }
 
 /// `image_gamma` — power-law: out = 255 · (in/255)^γ.
-fn builtin_image_gamma(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_gamma(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = f1(args).max(0.0);
     let gamma = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-15);
     Ok(StrykeValue::float(255.0 * (p / 255.0).powf(gamma)))
 }
 
 /// `image_invert` — out = 255 − in.
-fn builtin_image_invert(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_invert(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     Ok(StrykeValue::float(255.0 - f1(args)))
 }
 
 /// `image_sepia` — sepia tone: out_r = 0.393R + 0.769G + 0.189B.
-fn builtin_image_sepia(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_sepia(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = f1(args);
     let g = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let b = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -183,7 +183,7 @@ fn builtin_image_sepia(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `image_posterize` — quantize to N levels per channel.
-fn builtin_image_posterize(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_posterize(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = f1(args);
     let levels = args.get(1).map(|v| v.to_number()).unwrap_or(8.0).max(1.0);
     let step = 255.0 / levels;
@@ -191,14 +191,14 @@ fn builtin_image_posterize(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `image_solarize` — invert pixels above threshold.
-fn builtin_image_solarize(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_solarize(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = f1(args);
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(128.0);
     Ok(StrykeValue::float(if p > t { 255.0 - p } else { p }))
 }
 
 /// `convolve_2d` — element of 2-D convolution sum at one position.
-fn builtin_convolve_2d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_convolve_2d(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let kernel = b77_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let pixels = args.get(1).map(b77_to_floats).unwrap_or_default();
     let n = kernel.len().min(pixels.len());
@@ -207,7 +207,7 @@ fn builtin_convolve_2d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `filter_median` — median of pixel window.
-fn builtin_filter_median(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_filter_median(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut v = b77_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     if v.is_empty() { return Ok(StrykeValue::float(0.0)); }
     v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
@@ -217,7 +217,7 @@ fn builtin_filter_median(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `filter_bilateral` — bilateral filter weight for spatial / range distance.
-fn builtin_filter_bilateral(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_filter_bilateral(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dx = f1(args);
     let dy = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let dp = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -229,14 +229,14 @@ fn builtin_filter_bilateral(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `filter_nlmeans` — non-local means weight: exp(−|Patch_i − Patch_j|² / h²).
-fn builtin_filter_nlmeans(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_filter_nlmeans(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dist_sq = f1(args).max(0.0);
     let h = args.get(1).map(|v| v.to_number()).unwrap_or(10.0).max(1e-15);
     Ok(StrykeValue::float((-dist_sq / (h * h)).exp()))
 }
 
 /// `gabor_filter` — Gabor kernel value at (x, y) with frequency f, σ, θ.
-fn builtin_gabor_filter(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gabor_filter(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let f = args.get(2).map(|v| v.to_number()).unwrap_or(0.1);
@@ -251,7 +251,7 @@ fn builtin_gabor_filter(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `hog_features` — HOG cell magnitude binning bin count.
-fn builtin_hog_features(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hog_features(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mag = f1(args);
     let theta = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let n_bins = args.get(2).map(|v| v.to_number()).unwrap_or(9.0).max(1.0);
@@ -261,7 +261,7 @@ fn builtin_hog_features(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `harris_corners` — Harris response: det(M) − k · trace(M)².
-fn builtin_harris_corners(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_harris_corners(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ixx = f1(args);
     let iyy = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let ixy = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -272,7 +272,7 @@ fn builtin_harris_corners(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `shi_tomasi_corners` — Shi-Tomasi minimum eigenvalue criterion.
-fn builtin_shi_tomasi_corners(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_shi_tomasi_corners(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ixx = f1(args);
     let iyy = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let ixy = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -282,21 +282,21 @@ fn builtin_shi_tomasi_corners(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `sift_keypoints` — DoG response: difference of two Gaussian-blurred values.
-fn builtin_sift_keypoints(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sift_keypoints(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let g_high = f1(args);
     let g_low = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(g_high - g_low))
 }
 
 /// `orb_keypoints` — FAST score: count of n contiguous bright/dark pixels.
-fn builtin_orb_keypoints(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_orb_keypoints(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n_bright = i1(args);
     let n_dark = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     Ok(StrykeValue::integer(n_bright.max(n_dark)))
 }
 
 /// `surf_keypoints` — SURF determinant of Hessian approx via box filters.
-fn builtin_surf_keypoints(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_surf_keypoints(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dxx = f1(args);
     let dyy = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let dxy = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -304,7 +304,7 @@ fn builtin_surf_keypoints(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `template_match` — normalised cross-correlation: Σ(I−Ī)(T−T̄) / √(σ_I·σ_T).
-fn builtin_template_match(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_template_match(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let cov = f1(args);
     let var_i = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-15);
     let var_t = args.get(2).map(|v| v.to_number()).unwrap_or(1.0).max(1e-15);
@@ -312,21 +312,21 @@ fn builtin_template_match(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `face_detect_haar` — Haar feature: rectangle-difference sum.
-fn builtin_face_detect_haar(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_face_detect_haar(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let bright = f1(args);
     let dark = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(bright - dark))
 }
 
 /// `watershed_segment` — flooding fill water level threshold.
-fn builtin_watershed_segment(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_watershed_segment(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let elevations = b77_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let level = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::integer(elevations.iter().filter(|&&e| e <= level).count() as i64))
 }
 
 /// `slic_superpixels` — k-means iteration step over (x, y, l*, a*, b*).
-fn builtin_slic_superpixels(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_slic_superpixels(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dist_color = f1(args);
     let dist_space = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let m = args.get(2).map(|v| v.to_number()).unwrap_or(10.0);
@@ -336,14 +336,14 @@ fn builtin_slic_superpixels(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `felzenszwalb_segment` — internal-difference threshold τ(C) = k / |C|.
-fn builtin_felzenszwalb_segment(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_felzenszwalb_segment(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let k = f1(args);
     let c_size = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1.0);
     Ok(StrykeValue::float(k / c_size))
 }
 
 /// `graph_cut_segment` — energy E = Σ data(p) + λ Σ smooth(p,q).
-fn builtin_graph_cut_segment(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_graph_cut_segment(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let data_term = f1(args);
     let smooth_term = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let lambda = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -351,7 +351,7 @@ fn builtin_graph_cut_segment(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `hough_lines` — accumulator vote at (ρ, θ).
-fn builtin_hough_lines(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hough_lines(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let theta = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -359,7 +359,7 @@ fn builtin_hough_lines(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `hough_circles` — circle accumulator: (x − a)² + (y − b)² = r².
-fn builtin_hough_circles(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hough_circles(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let a = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -368,14 +368,14 @@ fn builtin_hough_circles(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `ransac_homography` — inlier count given consensus threshold.
-fn builtin_ransac_homography(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ransac_homography(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let residuals = b77_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::integer(residuals.iter().filter(|&&r| r.abs() < t).count() as i64))
 }
 
 /// `optical_flow_lk` — Lucas-Kanade matrix solve: u = (A^T A)⁻¹ A^T b (det form).
-fn builtin_optical_flow_lk(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_optical_flow_lk(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ixx = f1(args);
     let iyy = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let ixy = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -387,14 +387,14 @@ fn builtin_optical_flow_lk(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `optical_flow_farneback` — quadratic polynomial expansion coefficient.
-fn builtin_optical_flow_farneback(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_optical_flow_farneback(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = f1(args);
     let theta = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(r * theta.cos()))
 }
 
 /// `corner_subpix` — subpixel refinement via paraboloid fit.
-fn builtin_corner_subpix(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_corner_subpix(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let f0 = f1(args);
     let f1v = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let f2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -404,7 +404,7 @@ fn builtin_corner_subpix(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `image_rotate` — rotate (x, y) about origin by angle θ, return new x.
-fn builtin_image_rotate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_rotate(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let theta = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -412,21 +412,21 @@ fn builtin_image_rotate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `image_flip_h` — horizontal flip: x' = (W − 1) − x.
-fn builtin_image_flip_h(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_flip_h(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let w = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(w - 1.0 - x))
 }
 
 /// `image_flip_v` — vertical flip: y' = (H − 1) − y.
-fn builtin_image_flip_v(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_flip_v(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let h = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(h - 1.0 - y))
 }
 
 /// `image_emboss` — emboss kernel response: 2I − N − S − 128.
-fn builtin_image_emboss(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_emboss(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let i = f1(args);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let s = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -436,7 +436,7 @@ fn builtin_image_emboss(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// `image_motion_blur` — convolve pixels with linear motion kernel along angle
 /// θ. Returns weighted sum: each tap weight = (1 − |k − L/2| / (L/2)) / Z
 /// (triangular kernel, Z = sum of weights). Args: pixels along motion line, L.
-fn builtin_image_motion_blur(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_image_motion_blur(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pixels = b77_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let l = pixels.len() as f64;
     if l == 0.0 { return Ok(StrykeValue::float(0.0)); }

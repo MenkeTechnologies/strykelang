@@ -9,7 +9,7 @@ use std::thread::{self, JoinHandle};
 
 use crossbeam::channel::{unbounded, Receiver, Sender};
 
-use crate::error::{StrykeError, PerlResult};
+use crate::error::{StrykeError, StrykeResult};
 use crate::scope::{AtomicArray, AtomicHash};
 use crate::value::{PerlPpool, PerlSub, StrykeValue};
 use crate::vm_helper::{Flow, FlowOrError, VMHelper};
@@ -41,7 +41,7 @@ impl PerlPpool {
         interp: &mut VMHelper,
         args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         if args.is_empty() {
             return Err(StrykeError::runtime(
                 "submit() expects a code reference and optional argument for $_",
@@ -87,7 +87,7 @@ impl PerlPpool {
         Ok(StrykeValue::UNDEF)
     }
 
-    pub(crate) fn collect(&self, line: usize) -> PerlResult<StrykeValue> {
+    pub(crate) fn collect(&self, line: usize) -> StrykeResult<StrykeValue> {
         let start = self.0.collect_from.load(Ordering::SeqCst);
         let end = self.0.next_order.load(Ordering::SeqCst);
         let n = (end - start) as usize;
@@ -197,7 +197,7 @@ fn worker_loop(job_rx: Receiver<PoolJob>, result_tx: Sender<(u64, StrykeValue)>)
 
 /// Create a pool with `workers` OS threads (clamped to 1..=256). Each thread runs jobs
 /// sequentially; new [`VMHelper`] values are constructed per job (cheap vs thread spawn).
-pub fn create_pool(workers: usize) -> PerlResult<StrykeValue> {
+pub fn create_pool(workers: usize) -> StrykeResult<StrykeValue> {
     let workers = workers.clamp(1, 256);
     let (job_tx, job_rx): (Sender<PoolJob>, Receiver<PoolJob>) = unbounded();
     type ResultMsg = (u64, StrykeValue);

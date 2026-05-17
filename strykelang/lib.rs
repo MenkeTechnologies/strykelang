@@ -29,6 +29,7 @@ pub mod builtins_iter;
 pub mod builtins_mathx;
 pub mod builtins_misc;
 pub mod builtins_misc2;
+pub mod builtins_github;
 pub mod builtins_net;
 pub mod builtins_quant;
 pub mod builtins_validate;
@@ -129,7 +130,7 @@ pub use vm_helper::{
     perl_bracket_version, FEAT_SAY, FEAT_STATE, FEAT_SWITCH, FEAT_UNICODE_STRINGS,
 };
 
-use error::{StrykeError, PerlResult};
+use error::{StrykeError, StrykeResult};
 use vm_helper::VMHelper;
 
 // ── Perl 5 strict-compat mode (`--compat`) ──────────────────────────────────
@@ -243,23 +244,23 @@ pub fn deconvert_to_perl_with_options(
     deconvert::deconvert_program_with_options(p, opts)
 }
 
-pub fn parse(code: &str) -> PerlResult<ast::Program> {
+pub fn parse(code: &str) -> StrykeResult<ast::Program> {
     parse_with_file(code, "-e")
 }
 
 /// Parse with a **source path** for lexer/parser diagnostics (`… at FILE line N`), e.g. a script
 /// path or a required `.pm` absolute path. Use [`parse`] for snippets where `-e` is appropriate.
-pub fn parse_with_file(code: &str, file: &str) -> PerlResult<ast::Program> {
+pub fn parse_with_file(code: &str, file: &str) -> StrykeResult<ast::Program> {
     parse_with_file_inner(code, file, false)
 }
 
 /// Like [`parse_with_file`], but marks the parser as loading a module. Modules are allowed to
 /// shadow stryke builtins (e.g. `sub blessed { ... }` in Scalar::Util.pm) unless `--no-interop`.
-pub fn parse_module_with_file(code: &str, file: &str) -> PerlResult<ast::Program> {
+pub fn parse_module_with_file(code: &str, file: &str) -> StrykeResult<ast::Program> {
     parse_with_file_inner(code, file, true)
 }
 
-fn parse_with_file_inner(code: &str, file: &str, is_module: bool) -> PerlResult<ast::Program> {
+fn parse_with_file_inner(code: &str, file: &str, is_module: bool) -> StrykeResult<ast::Program> {
     // `rust { ... }` FFI blocks are desugared at source level into BEGIN-wrapped builtin
     // calls — the parity roadmap forbids new `StmtKind` variants for new behavior, so this
     // pre-pass is the right shape. No-op for programs that don't mention `rust`.
@@ -281,7 +282,7 @@ fn parse_with_file_inner(code: &str, file: &str, is_module: bool) -> PerlResult<
 /// Parse and execute a string of Perl code within an existing interpreter.
 /// Compile and execute via the bytecode VM.
 /// Uses [`VMHelper::file`] for both parse diagnostics and `__FILE__` during this execution.
-pub fn parse_and_run_string(code: &str, interp: &mut VMHelper) -> PerlResult<StrykeValue> {
+pub fn parse_and_run_string(code: &str, interp: &mut VMHelper) -> StrykeResult<StrykeValue> {
     let file = interp.file.clone();
     parse_and_run_string_in_file(code, interp, &file)
 }
@@ -292,7 +293,7 @@ pub fn parse_and_run_string_in_file(
     code: &str,
     interp: &mut VMHelper,
     file: &str,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     parse_and_run_string_in_file_inner(code, interp, file, false)
 }
 
@@ -302,7 +303,7 @@ pub fn parse_and_run_module_in_file(
     code: &str,
     interp: &mut VMHelper,
     file: &str,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     parse_and_run_string_in_file_inner(code, interp, file, true)
 }
 
@@ -311,7 +312,7 @@ fn parse_and_run_string_in_file_inner(
     interp: &mut VMHelper,
     file: &str,
     is_module: bool,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let program = if is_module {
         parse_module_with_file(code, file)?
     } else {
@@ -344,7 +345,7 @@ pub fn run_lsp_stdio() -> i32 {
 }
 
 /// Parse and execute a string of Perl code with a fresh interpreter.
-pub fn run(code: &str) -> PerlResult<StrykeValue> {
+pub fn run(code: &str) -> StrykeResult<StrykeValue> {
     let program = parse(code)?;
     let mut interp = VMHelper::new();
     let v = interp.execute(&program)?;
@@ -362,7 +363,7 @@ pub fn run(code: &str) -> PerlResult<StrykeValue> {
 pub fn try_vm_execute(
     program: &ast::Program,
     interp: &mut VMHelper,
-) -> Option<PerlResult<StrykeValue>> {
+) -> Option<StrykeResult<StrykeValue>> {
     if let Err(e) = interp.prepare_program_top_level(program) {
         return Some(Err(e));
     }
@@ -408,7 +409,7 @@ pub fn try_vm_execute(
 /// Shared execution tail used by both the cache-hit and compile paths in
 /// [`try_vm_execute`]. Pulled out so the rkyv-cache fast path does not duplicate
 /// the flip-flop / BEGIN-END / struct-def wiring every VM run depends on.
-fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut VMHelper) -> PerlResult<StrykeValue> {
+fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut VMHelper) -> StrykeResult<StrykeValue> {
     interp.clear_flip_flop_state();
     interp.prepare_flip_flop_vm_slots(chunk.flip_flop_slots);
     if interp.disasm_bytecode {
@@ -568,7 +569,7 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut VMHelper) -> PerlResu
 
 /// Compile program and run only the prelude (BEGIN/CHECK/INIT phase blocks) via the VM.
 /// Stores the compiled chunk on `interp.line_mode_chunk` for per-line re-execution.
-pub fn compile_and_run_prelude(program: &ast::Program, interp: &mut VMHelper) -> PerlResult<()> {
+pub fn compile_and_run_prelude(program: &ast::Program, interp: &mut VMHelper) -> StrykeResult<()> {
     interp.prepare_program_top_level(program)?;
     let comp = compiler::Compiler::new()
         .with_source_file(interp.file.clone())
@@ -658,9 +659,9 @@ pub fn run_line_body(
     interp: &mut VMHelper,
     line_str: &str,
     is_last_input_line: bool,
-) -> PerlResult<Option<String>> {
+) -> StrykeResult<Option<String>> {
     interp.line_mode_eof_pending = is_last_input_line;
-    let result: PerlResult<Option<String>> = (|| {
+    let result: StrykeResult<Option<String>> = (|| {
         interp.line_number += 1;
         interp
             .scope
@@ -692,7 +693,7 @@ pub fn run_line_body(
 
 /// Parse + register top-level subs / `use` (same as the VM path), then compile to bytecode without running.
 /// Also runs static analysis to detect undefined variables and subroutines.
-pub fn lint_program(program: &ast::Program, interp: &mut VMHelper) -> PerlResult<()> {
+pub fn lint_program(program: &ast::Program, interp: &mut VMHelper) -> StrykeResult<()> {
     interp.prepare_program_top_level(program)?;
     // Strict-vars-style "Global symbol …" errors fire only when the source
     // itself has `use strict;` (or `use strict 'vars';`). `stryke check` on

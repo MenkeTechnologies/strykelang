@@ -21,9 +21,9 @@ use rayon::prelude::*;
 use caseless::default_case_fold_str;
 
 use crate::ast::*;
-use crate::builtins::PerlSocket;
+use crate::builtins::StrykeSocket;
 use crate::crypt_util::perl_crypt;
-use crate::error::{ErrorKind, StrykeError, PerlResult};
+use crate::error::{ErrorKind, StrykeError, StrykeResult};
 use crate::mro::linearize_c3;
 use crate::perl_decode::decode_utf8_or_latin1;
 use crate::perl_fs::read_file_text_perl_compat;
@@ -767,7 +767,7 @@ pub struct VMHelper {
     /// Child processes for `open(H, "-|", cmd)` / `open(H, "|-", cmd)`; waited on `close`.
     pub(crate) pipe_children: HashMap<String, Child>,
     /// Sockets from `socket` / `accept` / `connect`.
-    pub(crate) socket_handles: HashMap<String, PerlSocket>,
+    pub(crate) socket_handles: HashMap<String, StrykeSocket>,
     /// `wantarray()` inside the current subroutine (`WantarrayCtx`; VM threads it on `Call`/`MethodCall`/`ArrowCall`).
     pub(crate) wantarray_kind: WantarrayCtx,
     /// `struct Name { ... }` definitions (merged from VM chunks).
@@ -2011,7 +2011,7 @@ impl VMHelper {
         args: &[StrykeValue],
         ctx: WantarrayCtx,
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         match name {
             "puniq" => {
                 let (list_src, show_prog) = match args.len() {
@@ -2162,7 +2162,7 @@ impl VMHelper {
     /// and host aliases in *your* config are missing. When **`SUDO_USER`** is set and the effective
     /// uid is **0**, we set **`HOME`** for this subprocess to **`SUDO_USER`'s** passwd home so your
     /// `~/.ssh/config` and keys apply.
-    pub(crate) fn ssh_builtin_execute(&mut self, args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    pub(crate) fn ssh_builtin_execute(&mut self, args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         use std::process::Command;
         let mut cmd = Command::new("ssh");
         #[cfg(unix)]
@@ -2279,7 +2279,7 @@ impl VMHelper {
         target_name: &str,
         class_and_args: Vec<StrykeValue>,
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         let mut it = class_and_args.into_iter();
         let class = it.next().unwrap_or(StrykeValue::UNDEF);
         let pkg = class.to_string();
@@ -2401,7 +2401,7 @@ impl VMHelper {
         lhs: &str,
         rhs: &str,
         line: usize,
-    ) -> PerlResult<()> {
+    ) -> StrykeResult<()> {
         let lhs_sub = self.qualify_typeglob_sub_key(lhs);
         let rhs_sub = self.qualify_typeglob_sub_key(rhs);
         match self.subs.get(&rhs_sub).cloned() {
@@ -2443,7 +2443,7 @@ impl VMHelper {
         basename: &str,
         lines: &[String],
         line: usize,
-    ) -> PerlResult<()> {
+    ) -> StrykeResult<()> {
         let pkg = self.current_package();
         let key = format!("{}::{}", pkg, basename);
         let tmpl = crate::format::parse_format_template(lines).map_err(|e| e.at_line(line))?;
@@ -2492,7 +2492,7 @@ impl VMHelper {
         lhs: &str,
         rhs: Option<&str>,
         line: usize,
-    ) -> PerlResult<()> {
+    ) -> StrykeResult<()> {
         let old = self.glob_handle_alias.remove(lhs);
         let Some(frame) = self.glob_restore_frames.last_mut() else {
             return Err(StrykeError::runtime(
@@ -2654,7 +2654,7 @@ impl VMHelper {
     /// IGNORE). That matters for `SIGINT` / `SIGTERM` / `SIGALRM`, where default is terminate — so
     /// Ctrl+C is not “trapped” when no handler is installed (including parallel `pmap` / `progress`
     /// workers that call `perl_signal::poll`).
-    pub(crate) fn invoke_sig_handler(&mut self, sig: &str) -> PerlResult<()> {
+    pub(crate) fn invoke_sig_handler(&mut self, sig: &str) -> StrykeResult<()> {
         self.touch_env_hash("SIG");
         let v = self.scope.get_hash_element("SIG", sig);
         if v.is_undef() {
@@ -2682,7 +2682,7 @@ impl VMHelper {
     /// Dispatch `$SIG{__WARN__}` if a coderef is installed; fall back to stderr.
     /// Recursion is guarded by temporarily clearing the slot during dispatch so
     /// a `__WARN__` handler that itself calls `warn` does not loop.
-    pub(crate) fn fire_pseudosig_warn(&mut self, msg: &str, line: usize) -> PerlResult<()> {
+    pub(crate) fn fire_pseudosig_warn(&mut self, msg: &str, line: usize) -> StrykeResult<()> {
         self.touch_env_hash("SIG");
         let slot = self.scope.get_hash_element("SIG", "__WARN__");
         if let Some(sub) = slot.as_code_ref() {
@@ -2708,7 +2708,7 @@ impl VMHelper {
     /// and the die still propagates afterwards. If the handler itself dies,
     /// that error replaces the original. Recursion is guarded by temporarily
     /// clearing the slot during dispatch.
-    pub(crate) fn fire_pseudosig_die(&mut self, msg: &str, line: usize) -> PerlResult<()> {
+    pub(crate) fn fire_pseudosig_die(&mut self, msg: &str, line: usize) -> StrykeResult<()> {
         self.touch_env_hash("SIG");
         let slot = self.scope.get_hash_element("SIG", "__DIE__");
         if let Some(sub) = slot.as_code_ref() {
@@ -2730,7 +2730,7 @@ impl VMHelper {
 
     /// POSIX default for signals we deliver via `perl_signal::poll` (Unix).
     #[inline]
-    fn default_sig_action(sig: &str) -> PerlResult<()> {
+    fn default_sig_action(sig: &str) -> StrykeResult<()> {
         match sig {
             // 128 + signal number (common shell convention)
             "INT" => std::process::exit(130),
@@ -2861,7 +2861,7 @@ impl VMHelper {
         container: StrykeValue,
         key: &str,
         line: usize,
-    ) -> PerlResult<bool> {
+    ) -> StrykeResult<bool> {
         if let Some(r) = container.as_hash_ref() {
             return Ok(r.read().contains_key(key));
         }
@@ -2891,7 +2891,7 @@ impl VMHelper {
         container: StrykeValue,
         key: &str,
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         if let Some(r) = container.as_hash_ref() {
             return Ok(r.write().shift_remove(key).unwrap_or(StrykeValue::UNDEF));
         }
@@ -2922,7 +2922,7 @@ impl VMHelper {
         container: StrykeValue,
         idx: i64,
         line: usize,
-    ) -> PerlResult<bool> {
+    ) -> StrykeResult<bool> {
         if let Some(a) = container.as_array_ref() {
             let arr = a.read();
             let i = if idx < 0 {
@@ -2944,7 +2944,7 @@ impl VMHelper {
         container: StrykeValue,
         idx: i64,
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         if let Some(a) = container.as_array_ref() {
             let mut arr = a.write();
             let i = if idx < 0 {
@@ -3189,7 +3189,7 @@ impl VMHelper {
         module: &str,
         imports: &[Expr],
         line: usize,
-    ) -> PerlResult<()> {
+    ) -> StrykeResult<()> {
         if imports.is_empty() {
             return self.import_all_from_module(module, line);
         }
@@ -3206,7 +3206,7 @@ impl VMHelper {
         Ok(())
     }
 
-    fn import_all_from_module(&mut self, module: &str, line: usize) -> PerlResult<()> {
+    fn import_all_from_module(&mut self, module: &str, line: usize) -> StrykeResult<()> {
         if let Some(lists) = self.module_export_lists.get(module) {
             let export: Vec<String> = lists.export.clone();
             for short in export {
@@ -3233,7 +3233,7 @@ impl VMHelper {
     }
 
     /// Copy `Module::name` into the caller stash (`name` must exist as a sub).
-    fn import_named_sub(&mut self, module: &str, short: &str, line: usize) -> PerlResult<()> {
+    fn import_named_sub(&mut self, module: &str, short: &str, line: usize) -> StrykeResult<()> {
         let qual = format!("{}::{}", module, short);
         let sub = self.subs.get(&qual).cloned().ok_or_else(|| {
             StrykeError::runtime(
@@ -3249,7 +3249,7 @@ impl VMHelper {
         Ok(())
     }
 
-    fn import_one_symbol(&mut self, module: &str, export: &str, line: usize) -> PerlResult<()> {
+    fn import_one_symbol(&mut self, module: &str, export: &str, line: usize) -> StrykeResult<()> {
         if let Some(lists) = self.module_export_lists.get(module) {
             let allowed: HashSet<&str> = lists
                 .export
@@ -3348,7 +3348,7 @@ impl VMHelper {
     }
 
     /// Compile-time pragma import list (`'refs'`, `qw(refs subs)`, version integers).
-    fn pragma_import_strings(imports: &[Expr], default_line: usize) -> PerlResult<Vec<String>> {
+    fn pragma_import_strings(imports: &[Expr], default_line: usize) -> StrykeResult<Vec<String>> {
         let mut out = Vec::new();
         for e in imports {
             match &e.kind {
@@ -3391,7 +3391,7 @@ impl VMHelper {
         Ok(out)
     }
 
-    fn apply_use_strict(&mut self, imports: &[Expr], line: usize) -> PerlResult<()> {
+    fn apply_use_strict(&mut self, imports: &[Expr], line: usize) -> StrykeResult<()> {
         if imports.is_empty() {
             self.strict_refs = true;
             self.strict_subs = true;
@@ -3415,7 +3415,7 @@ impl VMHelper {
         Ok(())
     }
 
-    fn apply_no_strict(&mut self, imports: &[Expr], line: usize) -> PerlResult<()> {
+    fn apply_no_strict(&mut self, imports: &[Expr], line: usize) -> StrykeResult<()> {
         if imports.is_empty() {
             self.strict_refs = false;
             self.strict_subs = false;
@@ -3439,7 +3439,7 @@ impl VMHelper {
         Ok(())
     }
 
-    fn apply_use_feature(&mut self, imports: &[Expr], line: usize) -> PerlResult<()> {
+    fn apply_use_feature(&mut self, imports: &[Expr], line: usize) -> StrykeResult<()> {
         let items = Self::pragma_import_strings(imports, line)?;
         if items.is_empty() {
             return Err(StrykeError::runtime(
@@ -3458,7 +3458,7 @@ impl VMHelper {
         Ok(())
     }
 
-    fn apply_no_feature(&mut self, imports: &[Expr], line: usize) -> PerlResult<()> {
+    fn apply_no_feature(&mut self, imports: &[Expr], line: usize) -> StrykeResult<()> {
         if imports.is_empty() {
             self.feature_bits = 0;
             return Ok(());
@@ -3475,7 +3475,7 @@ impl VMHelper {
         Ok(())
     }
 
-    fn apply_feature_bundle(&mut self, v: &str, line: usize) -> PerlResult<()> {
+    fn apply_feature_bundle(&mut self, v: &str, line: usize) -> StrykeResult<()> {
         let key = v.trim();
         match key {
             "5.10" | "5.010" | "5.10.0" => {
@@ -3504,7 +3504,7 @@ impl VMHelper {
         }
     }
 
-    fn apply_feature_name(&mut self, name: &str, enable: bool, line: usize) -> PerlResult<()> {
+    fn apply_feature_name(&mut self, name: &str, enable: bool, line: usize) -> StrykeResult<()> {
         let bit = match name {
             "say" => FEAT_SAY,
             "state" => FEAT_STATE,
@@ -3548,7 +3548,7 @@ impl VMHelper {
     }
 
     /// `require EXPR` — load once, record `%INC`, return `1` on success.
-    pub(crate) fn require_execute(&mut self, spec: &str, line: usize) -> PerlResult<StrykeValue> {
+    pub(crate) fn require_execute(&mut self, spec: &str, line: usize) -> StrykeResult<StrykeValue> {
         let t = spec.trim();
         if t.is_empty() {
             return Err(StrykeError::runtime("require: empty argument", line));
@@ -3589,7 +3589,7 @@ impl VMHelper {
     }
 
     /// `%^HOOK` entries `require__before` / `require__after` (Perl 5.37+): coderef `(filename)`.
-    fn invoke_require_hook(&mut self, key: &str, path: &str, line: usize) -> PerlResult<()> {
+    fn invoke_require_hook(&mut self, key: &str, path: &str, line: usize) -> StrykeResult<()> {
         let v = self.scope.get_hash_element("^HOOK", key);
         if v.is_undef() {
             return Ok(());
@@ -3617,7 +3617,7 @@ impl VMHelper {
         }
     }
 
-    fn require_absolute_path(&mut self, path: &Path, line: usize) -> PerlResult<StrykeValue> {
+    fn require_absolute_path(&mut self, path: &Path, line: usize) -> StrykeResult<StrykeValue> {
         let canon = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
         let key = canon.to_string_lossy().into_owned();
         if self.scope.exists_hash_element("INC", &key) {
@@ -3641,7 +3641,7 @@ impl VMHelper {
         Ok(StrykeValue::integer(1))
     }
 
-    fn require_relative_path(&mut self, path: &Path, line: usize) -> PerlResult<StrykeValue> {
+    fn require_relative_path(&mut self, path: &Path, line: usize) -> StrykeResult<StrykeValue> {
         if !path.exists() {
             return Err(StrykeError::runtime(
                 format!(
@@ -3654,7 +3654,7 @@ impl VMHelper {
         self.require_absolute_path(path, line)
     }
 
-    fn require_from_inc(&mut self, relpath: &str, line: usize) -> PerlResult<StrykeValue> {
+    fn require_from_inc(&mut self, relpath: &str, line: usize) -> StrykeResult<StrykeValue> {
         if self.scope.exists_hash_element("INC", relpath) {
             return Ok(StrykeValue::integer(1));
         }
@@ -3743,7 +3743,7 @@ impl VMHelper {
         module: &str,
         imports: &[Expr],
         line: usize,
-    ) -> PerlResult<()> {
+    ) -> StrykeResult<()> {
         match module {
             "strict" => self.apply_use_strict(imports, line),
             "utf8" => {
@@ -3801,7 +3801,7 @@ impl VMHelper {
         module: &str,
         imports: &[Expr],
         line: usize,
-    ) -> PerlResult<()> {
+    ) -> StrykeResult<()> {
         match module {
             "strict" => self.apply_no_strict(imports, line),
             "utf8" => {
@@ -3840,7 +3840,7 @@ impl VMHelper {
     }
 
     /// `use Env qw(@PATH)` / `use Env '@PATH'` — populate `%ENV`-style paths from the process environment.
-    fn apply_use_env(&mut self, imports: &[Expr], line: usize) -> PerlResult<()> {
+    fn apply_use_env(&mut self, imports: &[Expr], line: usize) -> StrykeResult<()> {
         let names = Self::pragma_import_strings(imports, line)?;
         for n in names {
             let key = n.trim_start_matches('@');
@@ -3857,7 +3857,7 @@ impl VMHelper {
     }
 
     /// `use open ':encoding(UTF-8)'`, `qw(:std :encoding(UTF-8))`, `:utf8`, etc.
-    fn apply_use_open(&mut self, imports: &[Expr], line: usize) -> PerlResult<()> {
+    fn apply_use_open(&mut self, imports: &[Expr], line: usize) -> StrykeResult<()> {
         let items = Self::pragma_import_strings(imports, line)?;
         for item in items {
             let s = item.trim();
@@ -3877,7 +3877,7 @@ impl VMHelper {
     }
 
     /// `use constant NAME => EXPR` / `use constant 1.03` — do not load core `constant.pm` (it uses syntax we do not parse yet).
-    fn apply_use_constant(&mut self, imports: &[Expr], line: usize) -> PerlResult<()> {
+    fn apply_use_constant(&mut self, imports: &[Expr], line: usize) -> StrykeResult<()> {
         if imports.is_empty() {
             return Ok(());
         }
@@ -3941,7 +3941,7 @@ impl VMHelper {
         name: &str,
         val: &StrykeValue,
         line: usize,
-    ) -> PerlResult<()> {
+    ) -> StrykeResult<()> {
         let key = self.qualify_sub_key(name);
         let ret_expr = self.perl_value_to_const_literal_expr(val, line)?;
         let body = vec![Statement {
@@ -3964,7 +3964,7 @@ impl VMHelper {
     }
 
     /// Build a literal expression for `return EXPR` in a constant sub (scalar/aggregate only).
-    fn perl_value_to_const_literal_expr(&self, v: &StrykeValue, line: usize) -> PerlResult<Expr> {
+    fn perl_value_to_const_literal_expr(&self, v: &StrykeValue, line: usize) -> StrykeResult<Expr> {
         if v.is_undef() {
             return Ok(Expr {
                 kind: ExprKind::Undef,
@@ -4050,7 +4050,7 @@ impl VMHelper {
     }
 
     /// Register subs, run `use` in source order, collect `BEGIN`/`END` (before `BEGIN` execution).
-    pub(crate) fn prepare_program_top_level(&mut self, program: &Program) -> PerlResult<()> {
+    pub(crate) fn prepare_program_top_level(&mut self, program: &Program) -> StrykeResult<()> {
         // Reset per-interpreter pragma flags. Each new program scan starts
         // clean; pragmas activate only when the program contains `use utf8;`
         // / `use bigint;` etc. (Globals like `BIGINT_PRAGMA` stay sticky
@@ -4139,7 +4139,7 @@ impl VMHelper {
         &mut self,
         args: &[StrykeValue],
         _line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         let dest: PathBuf = if args.is_empty() {
             let home = std::env::var_os("HOME")
                 .or_else(|| std::env::var_os("USERPROFILE"))
@@ -4179,7 +4179,7 @@ impl VMHelper {
         mode_s: String,
         file_opt: Option<String>,
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         // Perl two-arg `open $fh, EXPR` when EXPR is a single string:
         // - leading `|`  → pipe to command (write to child's stdin)
         // - trailing `|` → pipe from command (read child's stdout)
@@ -4402,7 +4402,7 @@ impl VMHelper {
         name: &str,
         args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         match self.list_higher_order_block_builtin_exec(name, args, line) {
             Ok(v) => Ok(v),
             Err(FlowOrError::Error(e)) => Err(e),
@@ -4639,7 +4639,7 @@ impl VMHelper {
         &mut self,
         args: &[StrykeValue],
         _line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         let mut count = 0i64;
         for a in args {
             let p = a.to_string();
@@ -4659,7 +4659,7 @@ impl VMHelper {
         &mut self,
         args: &[StrykeValue],
         _line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         let paths: Vec<String> = args
             .iter()
             .map(|v| self.resolve_stryke_path_string(&v.to_string()))
@@ -4672,7 +4672,7 @@ impl VMHelper {
         &mut self,
         args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         if args.len() < 3 {
             return Err(StrykeError::runtime(
                 "utime requires at least three arguments (atime, mtime, files...)",
@@ -4702,7 +4702,7 @@ impl VMHelper {
         &mut self,
         args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         #[cfg(unix)]
         {
             let _ = line;
@@ -4730,7 +4730,7 @@ impl VMHelper {
         &mut self,
         args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         if !args.is_empty() {
             return Err(StrykeError::runtime("getcwd takes no arguments", line));
         }
@@ -4748,7 +4748,7 @@ impl VMHelper {
         &mut self,
         args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         let path = args
             .first()
             .ok_or_else(|| StrykeError::runtime("realpath: need path", line))?
@@ -4771,7 +4771,7 @@ impl VMHelper {
         &mut self,
         args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         if args.len() != 2 {
             return Err(StrykeError::runtime(
                 "pipe requires exactly two arguments",
@@ -4827,7 +4827,7 @@ impl VMHelper {
         }
     }
 
-    pub(crate) fn close_builtin_execute(&mut self, name: String) -> PerlResult<StrykeValue> {
+    pub(crate) fn close_builtin_execute(&mut self, name: String) -> StrykeResult<StrykeValue> {
         self.output_handles.remove(&name);
         self.input_handles.remove(&name);
         self.io_file_slots.remove(&name);
@@ -4857,7 +4857,7 @@ impl VMHelper {
         &self,
         args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         match args.len() {
             0 => Ok(StrykeValue::integer(if self.eof_without_arg_is_true() {
                 1
@@ -4886,7 +4886,7 @@ impl VMHelper {
     pub(crate) fn readline_builtin_execute(
         &mut self,
         handle: Option<&str>,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         // `<>` / `readline` with no handle: iterate `@ARGV` files, else stdin.
         if handle.is_none() {
             let argv = self.scope.get_array("ARGV");
@@ -5068,7 +5068,7 @@ impl VMHelper {
     pub(crate) fn readline_builtin_execute_list(
         &mut self,
         handle: Option<&str>,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         let mut lines = Vec::new();
         loop {
             let v = self.readline_builtin_execute(handle)?;
@@ -5314,7 +5314,7 @@ impl VMHelper {
         right: i64,
         slot: usize,
         exclusive: bool,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         if self.flip_flop_active.len() <= slot {
             self.flip_flop_active.resize(slot + 1, false);
         }
@@ -5420,7 +5420,7 @@ impl VMHelper {
         slot: usize,
         exclusive: bool,
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         let dot = self.scalar_flipflop_dot_line();
         let subject = self.scope.get_scalar("_").to_string();
         let left_re = self
@@ -5463,7 +5463,7 @@ impl VMHelper {
         exclusive: bool,
         line: usize,
         right_m: bool,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         let dot = self.scalar_flipflop_dot_line();
         let subject = self.scope.get_scalar("_").to_string();
         let left_re = self
@@ -5497,7 +5497,7 @@ impl VMHelper {
         exclusive: bool,
         line: usize,
         rhs_line: i64,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         let dot = self.scalar_flipflop_dot_line();
         let subject = self.scope.get_scalar("_").to_string();
         let left_re = self
@@ -5534,7 +5534,7 @@ impl VMHelper {
         slot: usize,
         exclusive: bool,
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         let dot = self.scalar_flipflop_dot_line();
         let subject = self.scope.get_scalar("_").to_string();
         let left_re = self
@@ -5837,7 +5837,7 @@ impl VMHelper {
         &mut self,
         raw: &str,
         line: usize,
-    ) -> PerlResult<String> {
+    ) -> StrykeResult<String> {
         self.materialize_env_if_needed();
         let mut out = String::new();
         let mut rest = raw;
@@ -6072,7 +6072,7 @@ impl VMHelper {
         &mut self,
         args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         if args.is_empty() {
             return Err(StrykeError::runtime("splice: missing array", line));
         }
@@ -6100,7 +6100,7 @@ impl VMHelper {
         &mut self,
         args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         if args.is_empty() {
             return Err(StrykeError::runtime("unshift: missing array", line));
         }
@@ -6220,7 +6220,7 @@ impl VMHelper {
         )))
     }
 
-    pub fn execute(&mut self, program: &Program) -> PerlResult<StrykeValue> {
+    pub fn execute(&mut self, program: &Program) -> StrykeResult<StrykeValue> {
         // Snapshot the (possibly empty) class registry into the
         // thread-local that the free-function serializers consult, so
         // that `to_json($obj)` can resolve inheritance fields without
@@ -6237,7 +6237,7 @@ impl VMHelper {
     }
 
     /// Run `END` blocks (after `-n`/`-p` line loop when prelude used [`Self::line_mode_skip_main`]).
-    pub fn run_end_blocks(&mut self) -> PerlResult<()> {
+    pub fn run_end_blocks(&mut self) -> StrykeResult<()> {
         self.global_phase = "END".to_string();
         let ends = std::mem::take(&mut self.end_blocks);
         for block in &ends {
@@ -6251,13 +6251,13 @@ impl VMHelper {
 
     /// After a **top-level** program finishes (post-`END`), set `${^GLOBAL_PHASE}` to **`DESTRUCT`**
     /// and drain remaining `DESTROY` callbacks.
-    pub fn run_global_teardown(&mut self) -> PerlResult<()> {
+    pub fn run_global_teardown(&mut self) -> StrykeResult<()> {
         self.global_phase = "DESTRUCT".to_string();
         self.drain_pending_destroys(0)
     }
 
     /// Run queued `DESTROY` methods from blessed objects whose last reference was dropped.
-    pub(crate) fn drain_pending_destroys(&mut self, line: usize) -> PerlResult<()> {
+    pub(crate) fn drain_pending_destroys(&mut self, line: usize) -> StrykeResult<()> {
         loop {
             let batch = crate::pending_destroy::take_queue();
             if batch.is_empty() {
@@ -6424,7 +6424,7 @@ impl VMHelper {
         let env = self.env.clone();
         let argv = self.argv.clone();
         let inc = self.scope.get_array("INC");
-        let (tx, rx) = channel::<PerlResult<StrykeValue>>();
+        let (tx, rx) = channel::<StrykeResult<StrykeValue>>();
         let _handle = std::thread::spawn(move || {
             let mut interp = VMHelper::new();
             interp.subs = subs;
@@ -6448,7 +6448,7 @@ impl VMHelper {
             interp.scope.restore_capture(&scalars);
             interp.scope.restore_atomics(&aar, &ahash);
             interp.enable_parallel_guard();
-            let out: PerlResult<StrykeValue> = match interp.exec_block(&block) {
+            let out: StrykeResult<StrykeValue> = match interp.exec_block(&block) {
                 Ok(v) => Ok(v),
                 Err(FlowOrError::Error(e)) => Err(e),
                 Err(FlowOrError::Flow(Flow::Yield(_))) => {
@@ -6842,7 +6842,7 @@ impl VMHelper {
     }
 
     /// `->next` on a `gen { }` value: two-element **array ref** `(value, more)`; `more` is 0 when done.
-    pub(crate) fn generator_next(&mut self, gen: &Arc<PerlGenerator>) -> PerlResult<StrykeValue> {
+    pub(crate) fn generator_next(&mut self, gen: &Arc<PerlGenerator>) -> StrykeResult<StrykeValue> {
         let pair = |value: StrykeValue, more: i64| {
             StrykeValue::array_ref(Arc::new(RwLock::new(vec![
                 value,
@@ -8261,7 +8261,7 @@ impl VMHelper {
                 target,
                 initializer,
             } => {
-                let rhs_name = |init: &Expr| -> PerlResult<Option<String>> {
+                let rhs_name = |init: &Expr| -> StrykeResult<Option<String>> {
                     match &init.kind {
                         ExprKind::Typeglob(rhs) => Ok(Some(rhs.clone())),
                         _ => Err(StrykeError::runtime(
@@ -13667,7 +13667,7 @@ impl VMHelper {
         &self,
         v: &StrykeValue,
         line: usize,
-    ) -> PerlResult<String> {
+    ) -> StrykeResult<String> {
         if let Some(n) = v.as_io_handle_name() {
             let n = self.resolve_io_handle_name(&n);
             if self.is_bound_handle(&n) {
@@ -13696,7 +13696,7 @@ impl VMHelper {
         &mut self,
         args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         let handle_name = match args.len() {
             0 => self.default_print_handle.clone(),
             1 => self.resolve_write_output_handle(&args[0], line)?,
@@ -15686,7 +15686,7 @@ impl VMHelper {
     pub(crate) fn package_version_scalar(
         &mut self,
         package: &str,
-    ) -> PerlResult<Option<StrykeValue>> {
+    ) -> StrykeResult<Option<StrykeValue>> {
         let saved_pkg = self.scope.get_scalar("__PACKAGE__");
         let _ = self
             .scope
@@ -16424,7 +16424,7 @@ impl VMHelper {
         method: &str,
         args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         match method {
             "print" => self.io_handle_print(name, args, false, line),
             "say" => self.io_handle_print(name, args, true, line),
@@ -16496,7 +16496,7 @@ impl VMHelper {
         }
     }
 
-    fn io_handle_flush(&mut self, handle_name: &str, line: usize) -> PerlResult<StrykeValue> {
+    fn io_handle_flush(&mut self, handle_name: &str, line: usize) -> StrykeResult<StrykeValue> {
         match handle_name {
             "STDOUT" => {
                 let _ = IoWrite::flush(&mut io::stdout());
@@ -16524,7 +16524,7 @@ impl VMHelper {
         args: &[StrykeValue],
         newline: bool,
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         if newline && (self.feature_bits & FEAT_SAY) == 0 {
             return Err(StrykeError::runtime(
                 "say() is disabled (enable with use feature 'say' or use feature ':5.10')",
@@ -16559,7 +16559,7 @@ impl VMHelper {
         handle_name: &str,
         output: &str,
         line: usize,
-    ) -> PerlResult<()> {
+    ) -> StrykeResult<()> {
         match handle_name {
             "STDOUT" => {
                 if !self.suppress_stdout {
@@ -16595,7 +16595,7 @@ impl VMHelper {
         handle_name: &str,
         args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         let (fmt, rest): (String, &[StrykeValue]) = if args.is_empty() {
             let s = match self.stringify_value(self.scope.get_scalar("_").clone(), line) {
                 Ok(s) => s,
@@ -16658,7 +16658,7 @@ impl VMHelper {
         method: &str,
         args: &[StrykeValue],
         line: usize,
-    ) -> Option<PerlResult<StrykeValue>> {
+    ) -> Option<StrykeResult<StrykeValue>> {
         if let Some(name) = receiver.as_io_handle_name() {
             return Some(self.io_handle_method(&name, method, args, line));
         }
@@ -17160,7 +17160,7 @@ impl VMHelper {
         method: &str,
         args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         match method {
             "nrow" | "nrows" => {
                 if !args.is_empty() {
@@ -17318,7 +17318,7 @@ impl VMHelper {
         method: &str,
         args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         match method {
             "has" | "contains" | "member" => {
                 if args.len() != 1 {
@@ -17355,7 +17355,7 @@ impl VMHelper {
         method: &str,
         args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         match method {
             "push_back" => {
                 if args.len() != 1 {
@@ -17387,7 +17387,7 @@ impl VMHelper {
         method: &str,
         args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         match method {
             "push" => {
                 if args.len() != 1 {
@@ -17435,7 +17435,7 @@ impl VMHelper {
         method: &str,
         args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         match method {
             "submit" => pool.submit(self, args, line),
             "collect" => {
@@ -17457,7 +17457,7 @@ impl VMHelper {
         method: &str,
         args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         match method {
             "wait" => {
                 if !args.is_empty() {
@@ -17479,7 +17479,7 @@ impl VMHelper {
         method: &str,
         args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         if !args.is_empty() {
             return Err(StrykeError::runtime(
                 format!("capture: {} takes no arguments", method),
@@ -17502,7 +17502,7 @@ impl VMHelper {
         &mut self,
         args: &[StrykeValue],
         _line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         let mut items = Vec::new();
         for v in args {
             if let Some(a) = v.as_array_vec() {
@@ -17528,7 +17528,7 @@ impl VMHelper {
         &mut self,
         args: &[StrykeValue],
         _line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         let mut items = Vec::new();
         let mut workers: usize = 0;
         let mut buffer: usize = 256;
@@ -17610,7 +17610,7 @@ impl VMHelper {
         &mut self,
         args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         if args.is_empty() {
             return Err(StrykeError::runtime(
                 "collect() expects at least one argument",
@@ -17633,7 +17633,7 @@ impl VMHelper {
         p: &Arc<Mutex<PipelineInner>>,
         op: PipelineOp,
         line: usize,
-    ) -> PerlResult<()> {
+    ) -> StrykeResult<()> {
         let mut g = p.lock();
         if g.has_scalar_terminal {
             return Err(StrykeError::runtime(
@@ -17657,7 +17657,7 @@ impl VMHelper {
         args: &[StrykeValue],
         line: usize,
         name: &str,
-    ) -> PerlResult<(Arc<PerlSub>, bool)> {
+    ) -> StrykeResult<(Arc<PerlSub>, bool)> {
         if args.is_empty() {
             return Err(StrykeError::runtime(
                 format!("pipeline {}: expects at least 1 argument (code ref)", name),
@@ -17689,7 +17689,7 @@ impl VMHelper {
         method: &str,
         args: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         match method {
             "filter" | "f" | "grep" => {
                 if args.len() != 1 {
@@ -18050,7 +18050,7 @@ impl VMHelper {
         &mut self,
         p: &Arc<Mutex<PipelineInner>>,
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         let (mut v, ops, par_stream, streaming, streaming_workers, streaming_buffer) = {
             let g = p.lock();
             (
@@ -18470,7 +18470,7 @@ impl VMHelper {
         workers_per_stage: usize,
         buffer: usize,
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         use crossbeam::channel::{bounded, Receiver, Sender};
 
         // Validate: reject ops that require all items (can't stream).
@@ -18838,7 +18838,7 @@ impl VMHelper {
         &mut self,
         v: &StrykeValue,
         line: usize,
-    ) -> PerlResult<IndexMap<String, StrykeValue>> {
+    ) -> StrykeResult<IndexMap<String, StrykeValue>> {
         let Some(m) = self.match_subject_as_hash(v) else {
             return Err(StrykeError::runtime(
                 format!(
@@ -18857,7 +18857,7 @@ impl VMHelper {
         sub: &PerlSub,
         argv: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<()> {
+    ) -> StrykeResult<()> {
         if sub.params.is_empty() {
             return Ok(());
         }
@@ -19394,7 +19394,7 @@ impl VMHelper {
         params: &[SubSigParam],
         argv: &[StrykeValue],
         line: usize,
-    ) -> PerlResult<()> {
+    ) -> StrykeResult<()> {
         let mut i = 0;
         for param in params {
             match param {
@@ -20657,7 +20657,7 @@ impl VMHelper {
         args: &[StrykeValue],
         line: usize,
         has_progress: bool,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         let show_progress = if has_progress {
             args.last().map(|v| v.is_true()).unwrap_or(false)
         } else {
@@ -20972,7 +20972,7 @@ impl VMHelper {
         line_str: &str,
         _program: &Program,
         is_last_input_line: bool,
-    ) -> PerlResult<Option<String>> {
+    ) -> StrykeResult<Option<String>> {
         let chunk = self
             .line_mode_chunk
             .as_ref()

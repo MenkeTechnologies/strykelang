@@ -10,7 +10,7 @@ fn b38_to_floats(v: &StrykeValue) -> Vec<f64> {
 }
 
 /// Full Nernst potential: E = E° - (RT / nF) ln Q
-fn builtin_nernst_potential_full(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_nernst_potential_full(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let e_std = f1(args);
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(298.15);
     let n = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -20,14 +20,14 @@ fn builtin_nernst_potential_full(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 /// Electrode potential step under reference shift
-fn builtin_electrode_potential_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_electrode_potential_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let e = f1(args);
     let shift = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(e + shift))
 }
 
 /// Exchange current density i₀ from rate constant: i₀ = nFk⁰ c
-fn builtin_exchange_current_density(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_exchange_current_density(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     let k0 = args.get(1).map(|v| v.to_number()).unwrap_or(1e-6);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -35,7 +35,7 @@ fn builtin_exchange_current_density(args: &[StrykeValue]) -> PerlResult<StrykeVa
 }
 
 /// Butler-Volmer current: i = i₀ [exp(αₐ Fη/RT) - exp(-α_c Fη/RT)]
-fn builtin_butler_volmer_current(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_butler_volmer_current(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let i0 = f1(args);
     let eta = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let t = args.get(2).map(|v| v.to_number()).unwrap_or(298.15);
@@ -46,7 +46,7 @@ fn builtin_butler_volmer_current(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 /// Tafel anodic branch: i = i₀ exp(αₐFη/RT)
-fn builtin_tafel_anodic_current(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_tafel_anodic_current(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let i0 = f1(args);
     let eta = args.get(1).map(|v| v.to_number()).unwrap_or(0.1);
     let t = args.get(2).map(|v| v.to_number()).unwrap_or(298.15);
@@ -55,7 +55,7 @@ fn builtin_tafel_anodic_current(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Tafel cathodic branch: i = -i₀ exp(-α_cFη/RT)
-fn builtin_tafel_cathodic_current(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_tafel_cathodic_current(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let i0 = f1(args);
     let eta = args.get(1).map(|v| v.to_number()).unwrap_or(0.1);
     let t = args.get(2).map(|v| v.to_number()).unwrap_or(298.15);
@@ -64,7 +64,7 @@ fn builtin_tafel_cathodic_current(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Mass transport overpotential: η_mt = (RT/nF) ln(1 - i/i_lim)
-fn builtin_mass_transport_overpotential(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mass_transport_overpotential(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let i = f1(args);
     let i_lim = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let n = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -74,7 +74,7 @@ fn builtin_mass_transport_overpotential(args: &[StrykeValue]) -> PerlResult<Stry
 }
 
 /// Limiting current density: i_lim = nFD c / δ
-fn builtin_limiting_current_density(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_limiting_current_density(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     let d = args.get(1).map(|v| v.to_number()).unwrap_or(1e-9);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -84,7 +84,7 @@ fn builtin_limiting_current_density(args: &[StrykeValue]) -> PerlResult<StrykeVa
 }
 
 /// Diffusion layer thickness δ = D / k_d
-fn builtin_diffusion_layer_thickness(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_diffusion_layer_thickness(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let d = f1(args);
     let kd = args.get(1).map(|v| v.to_number()).unwrap_or(1e-3);
     if kd <= 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -92,7 +92,7 @@ fn builtin_diffusion_layer_thickness(args: &[StrykeValue]) -> PerlResult<StrykeV
 }
 
 /// Faradaic efficiency = q_actual / q_theoretical
-fn builtin_faradaic_efficiency(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_faradaic_efficiency(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let q_actual = f1(args);
     let q_theoretical = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if q_theoretical == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -100,7 +100,7 @@ fn builtin_faradaic_efficiency(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Coulombic efficiency cell = Q_discharge / Q_charge
-fn builtin_coulombic_efficiency_cell(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_coulombic_efficiency_cell(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let q_dis = f1(args);
     let q_chg = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if q_chg == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -108,7 +108,7 @@ fn builtin_coulombic_efficiency_cell(args: &[StrykeValue]) -> PerlResult<StrykeV
 }
 
 /// Energy efficiency cell = E_dis · Q_dis / (E_chg · Q_chg)
-fn builtin_energy_efficiency_cell(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_energy_efficiency_cell(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let e_dis = f1(args);
     let q_dis = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let e_chg = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -119,7 +119,7 @@ fn builtin_energy_efficiency_cell(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Voltaic efficiency = V_dis / V_chg
-fn builtin_voltaic_efficiency(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_voltaic_efficiency(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v_dis = f1(args);
     let v_chg = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if v_chg == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -127,14 +127,14 @@ fn builtin_voltaic_efficiency(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Charge capacity (Ah) of battery from current and time: Q = I·t
-fn builtin_charge_capacity_battery(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_charge_capacity_battery(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let i = f1(args);
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(i * t))
 }
 
 /// Energy density (Wh/kg)
-fn builtin_energy_density_battery(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_energy_density_battery(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let energy = f1(args);
     let mass = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if mass <= 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -142,7 +142,7 @@ fn builtin_energy_density_battery(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Power density (W/kg)
-fn builtin_power_density_battery(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_power_density_battery(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let power = f1(args);
     let mass = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if mass <= 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -150,7 +150,7 @@ fn builtin_power_density_battery(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 /// Specific capacity (mAh/g): Q / m
-fn builtin_specific_capacity_active(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_specific_capacity_active(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let q_mah = f1(args);
     let m_g = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if m_g <= 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -158,7 +158,7 @@ fn builtin_specific_capacity_active(args: &[StrykeValue]) -> PerlResult<StrykeVa
 }
 
 /// Columbic capacity Li half-cell (theoretical): nF/M
-fn builtin_columbic_capacity_lihalfcell(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_columbic_capacity_lihalfcell(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     let m = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if m <= 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -166,14 +166,14 @@ fn builtin_columbic_capacity_lihalfcell(args: &[StrykeValue]) -> PerlResult<Stry
 }
 
 /// Ragone point energy vs power product
-fn builtin_ragone_point(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ragone_point(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let e = f1(args);
     let p = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(e * p))
 }
 
 /// Peukert capacity Cp = I^k · t
-fn builtin_peukert_capacity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_peukert_capacity(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let i = f1(args);
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let k = args.get(2).map(|v| v.to_number()).unwrap_or(1.2);
@@ -181,7 +181,7 @@ fn builtin_peukert_capacity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Peukert exponent fit from two (I, t) pairs
-fn builtin_peukert_exponent_fit(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_peukert_exponent_fit(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let i1_v = f1(args);
     let t1 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let i2 = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -193,7 +193,7 @@ fn builtin_peukert_exponent_fit(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Shepherd voltage step: V = E0 - K·Q/(Q-Q_used) - R·I + A·exp(-B·Q_used)
-fn builtin_shepherd_voltage_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_shepherd_voltage_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let e0 = f1(args);
     let k = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let q = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -208,7 +208,7 @@ fn builtin_shepherd_voltage_step(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 /// Nernst-Planck flux J = -D∇c - zFD/(RT) c ∇φ (1-D scalar)
-fn builtin_nernst_planck_flux(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_nernst_planck_flux(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let d = f1(args);
     let dc = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let z = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -219,7 +219,7 @@ fn builtin_nernst_planck_flux(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Debye length: λ_D = √(ε_r ε₀ kT / Σ nᵢ zᵢ² e²)
-fn builtin_debye_length_electrolyte(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_debye_length_electrolyte(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let eps_r = f1(args);
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(298.15);
     let i_strength = args.get(2).map(|v| v.to_number()).unwrap_or(0.1);
@@ -230,7 +230,7 @@ fn builtin_debye_length_electrolyte(args: &[StrykeValue]) -> PerlResult<StrykeVa
 }
 
 /// Debye-Hückel activity log γ = -A √I / (1 + B·a √I)
-fn builtin_debye_huckel_activity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_debye_huckel_activity(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     let i_strength = args.get(1).map(|v| v.to_number()).unwrap_or(0.01);
     let a = args.get(2).map(|v| v.to_number()).unwrap_or(0.509);
@@ -241,7 +241,7 @@ fn builtin_debye_huckel_activity(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 /// Gouy-Chapman potential at distance x: ψ = ψ₀ exp(-x/λ_D)
-fn builtin_gouy_chapman_potential(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gouy_chapman_potential(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let psi0 = f1(args);
     let x = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let lambda_d = args.get(2).map(|v| v.to_number()).unwrap_or(1e-9);
@@ -250,7 +250,7 @@ fn builtin_gouy_chapman_potential(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Stern layer capacitance per unit area: C_S = ε ε₀ / d_S
-fn builtin_stern_layer_capacitance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_stern_layer_capacitance(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let eps_r = f1(args);
     let d_s = args.get(1).map(|v| v.to_number()).unwrap_or(0.5e-9);
     let eps0 = 8.854_187_812_8e-12;
@@ -259,7 +259,7 @@ fn builtin_stern_layer_capacitance(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Double layer capacitance: 1/C_dl = 1/C_S + 1/C_diff
-fn builtin_double_layer_capacitance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_double_layer_capacitance(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let c_s = f1(args);
     let c_d = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if c_s <= 0.0 || c_d <= 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -267,12 +267,12 @@ fn builtin_double_layer_capacitance(args: &[StrykeValue]) -> PerlResult<StrykeVa
 }
 
 /// Helmholtz capacitance per area = ε ε₀ / d
-fn builtin_helmholtz_capacitance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_helmholtz_capacitance(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_stern_layer_capacitance(args)
 }
 
 /// Zeta potential estimate from electrophoretic mobility (Smoluchowski): ζ = μ_e η / (ε ε₀)
-fn builtin_zeta_potential_estimate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_zeta_potential_estimate(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mu = f1(args);
     let eta = args.get(1).map(|v| v.to_number()).unwrap_or(1e-3);
     let eps_r = args.get(2).map(|v| v.to_number()).unwrap_or(78.5);
@@ -281,7 +281,7 @@ fn builtin_zeta_potential_estimate(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Electroosmotic velocity v_eo = -ε ε₀ ζ E / η
-fn builtin_electroosmotic_velocity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_electroosmotic_velocity(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let zeta = f1(args);
     let e_field = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let eps_r = args.get(2).map(|v| v.to_number()).unwrap_or(78.5);
@@ -291,19 +291,19 @@ fn builtin_electroosmotic_velocity(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Hagen-Poiseuille electroosmotic flow rate
-fn builtin_hagen_poiseuille_eo(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hagen_poiseuille_eo(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = f1(args);
     let area = args.get(1).map(|x| x.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(v * area))
 }
 
 /// Diffuse layer thickness ≈ Debye length
-fn builtin_diffuse_layer_thickness(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_diffuse_layer_thickness(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_debye_length_electrolyte(args)
 }
 
 /// Poisson-Boltzmann step: ψ' = -ψ/λ_D² · sinh(zeψ/kT)
-fn builtin_poisson_boltzmann_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_poisson_boltzmann_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let psi = f1(args);
     let lambda_d = args.get(1).map(|v| v.to_number()).unwrap_or(1e-9);
     let z = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -314,7 +314,7 @@ fn builtin_poisson_boltzmann_step(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Linearized PB step: ψ' = -ψ/λ_D²
-fn builtin_linearized_pb_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_linearized_pb_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let psi = f1(args);
     let lambda_d = args.get(1).map(|v| v.to_number()).unwrap_or(1e-9);
     if lambda_d <= 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -322,7 +322,7 @@ fn builtin_linearized_pb_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Electrochemical impedance Z = R + 1/(jωC) magnitude
-fn builtin_electrochem_impedance_z(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_electrochem_impedance_z(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = f1(args);
     let omega = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -331,7 +331,7 @@ fn builtin_electrochem_impedance_z(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Randles circuit Z = Rs + 1/(jωCdl + 1/(Rct + Zw))
-fn builtin_randles_circuit_z(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_randles_circuit_z(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let rs = f1(args);
     let rct = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let cdl = args.get(2).map(|v| v.to_number()).unwrap_or(1e-6);
@@ -343,7 +343,7 @@ fn builtin_randles_circuit_z(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Warburg impedance: Z_W = σ / √ω · (1 - j) → magnitude
-fn builtin_warburg_impedance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_warburg_impedance(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let sigma = f1(args);
     let omega = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if omega <= 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
@@ -351,7 +351,7 @@ fn builtin_warburg_impedance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Cole-Cole equation EIS: ε* = ε∞ + (ε_s - ε∞) / (1 + (jωτ)^(1-α))
-fn builtin_cole_cole_eis(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cole_cole_eis(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let eps_inf = f1(args);
     let eps_s = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let omega = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -363,14 +363,14 @@ fn builtin_cole_cole_eis(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Nyquist plot phase angle from impedance components
-fn builtin_nyquist_phase(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_nyquist_phase(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z_re = f1(args);
     let z_im = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(z_im.atan2(z_re)))
 }
 
 /// Charge transfer resistance from i₀: Rct = RT/(nFi₀)
-fn builtin_charge_transfer_resistance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_charge_transfer_resistance(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let i0 = f1(args);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let t = args.get(2).map(|v| v.to_number()).unwrap_or(298.15);
@@ -379,7 +379,7 @@ fn builtin_charge_transfer_resistance(args: &[StrykeValue]) -> PerlResult<Stryke
 }
 
 /// Solution resistance estimate from conductivity κ and cell length L, area A
-fn builtin_solution_resistance_estimate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_solution_resistance_estimate(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let kappa = f1(args);
     let l = args.get(1).map(|v| v.to_number()).unwrap_or(0.01);
     let a = args.get(2).map(|v| v.to_number()).unwrap_or(1e-4);
@@ -388,7 +388,7 @@ fn builtin_solution_resistance_estimate(args: &[StrykeValue]) -> PerlResult<Stry
 }
 
 /// Ionic conductivity Arrhenius: σ = σ₀ exp(-E_a/RT)
-fn builtin_ionic_conductivity_arrhenius(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ionic_conductivity_arrhenius(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s0 = f1(args);
     let ea = args.get(1).map(|v| v.to_number()).unwrap_or(20_000.0);
     let t = args.get(2).map(|v| v.to_number()).unwrap_or(298.15);
@@ -396,7 +396,7 @@ fn builtin_ionic_conductivity_arrhenius(args: &[StrykeValue]) -> PerlResult<Stry
 }
 
 /// Nernst-Einstein D = RTλ/(z²F²)
-fn builtin_nernst_einstein_diffusivity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_nernst_einstein_diffusivity(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lambda = f1(args);
     let z = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let t = args.get(2).map(|v| v.to_number()).unwrap_or(298.15);
@@ -406,14 +406,14 @@ fn builtin_nernst_einstein_diffusivity(args: &[StrykeValue]) -> PerlResult<Stryk
 }
 
 /// Walden product: Λη
-fn builtin_walden_product(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_walden_product(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lambda = f1(args);
     let eta = args.get(1).map(|v| v.to_number()).unwrap_or(1e-3);
     Ok(StrykeValue::float(lambda * eta))
 }
 
 /// Kohlrausch's law of independent ion migration: Λ° = ν₊λ°₊ + ν₋λ°₋
-fn builtin_kohlrausch_law(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_kohlrausch_law(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let nu_p = f1(args);
     let lambda_p = args.get(1).map(|v| v.to_number()).unwrap_or(50.0);
     let nu_n = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -422,7 +422,7 @@ fn builtin_kohlrausch_law(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Onsager relation: J_i = Σ L_{ij} X_j → simple scalar
-fn builtin_onsager_relation_two_species(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_onsager_relation_two_species(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let l11 = f1(args);
     let x1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let l12 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -431,7 +431,7 @@ fn builtin_onsager_relation_two_species(args: &[StrykeValue]) -> PerlResult<Stry
 }
 
 /// Trasatti charge from voltammetry: Q = ∫ I dV / v
-fn builtin_trasatti_voltammetry_charge(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_trasatti_voltammetry_charge(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let int_idv = f1(args);
     let scan_rate = args.get(1).map(|v| v.to_number()).unwrap_or(0.1);
     if scan_rate == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -439,7 +439,7 @@ fn builtin_trasatti_voltammetry_charge(args: &[StrykeValue]) -> PerlResult<Stryk
 }
 
 /// Randles-Sevcik peak current: ip = 0.4463 nFAC √(nFvD/RT)
-fn builtin_randles_sevcik_peak(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_randles_sevcik_peak(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     let area = args.get(1).map(|v| v.to_number()).unwrap_or(1e-4);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -451,7 +451,7 @@ fn builtin_randles_sevcik_peak(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Levich current at rotating disk: i_L = 0.62 nFAC D^(2/3) ω^(1/2) ν^(-1/6)
-fn builtin_levich_current_rde(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_levich_current_rde(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     let area = args.get(1).map(|v| v.to_number()).unwrap_or(1e-4);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -462,14 +462,14 @@ fn builtin_levich_current_rde(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Koutecky-Levich intercept: 1/i = 1/i_K + 1/(B·ω^1/2)
-fn builtin_koutecky_levich_intercept(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_koutecky_levich_intercept(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let i_k = f1(args);
     if i_k == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
     Ok(StrykeValue::float(1.0 / i_k))
 }
 
 /// Mott-Schottky capacitance plot: 1/C² = 2/(εε₀eN_d)·(V - V_fb - kT/e)
-fn builtin_mott_schottky_capacitance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mott_schottky_capacitance(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = f1(args);
     let v_fb = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let nd = args.get(2).map(|v| v.to_number()).unwrap_or(1e22);
@@ -482,7 +482,7 @@ fn builtin_mott_schottky_capacitance(args: &[StrykeValue]) -> PerlResult<StrykeV
 }
 
 /// Flat-band potential from MS plot intercept
-fn builtin_flat_band_potential(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_flat_band_potential(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let intercept = f1(args);
     let slope = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if slope == 0.0 { return Ok(StrykeValue::float(intercept)); }
@@ -490,21 +490,21 @@ fn builtin_flat_band_potential(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Schottky barrier height ϕ_B = ϕ_M - χ
-fn builtin_schottky_barrier_height(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_schottky_barrier_height(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let phi_m = f1(args);
     let chi = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(phi_m - chi))
 }
 
 /// Photocurrent density from quantum efficiency: J_ph = e φ Φ
-fn builtin_photocurrent_density(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_photocurrent_density(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let phi = f1(args);
     let flux = args.get(1).map(|v| v.to_number()).unwrap_or(1e16);
     Ok(StrykeValue::float(B38_E_CHARGE * phi * flux))
 }
 
 /// External quantum efficiency
-fn builtin_quantum_efficiency_photo(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_quantum_efficiency_photo(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n_e = f1(args);
     let n_ph = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if n_ph == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -512,13 +512,13 @@ fn builtin_quantum_efficiency_photo(args: &[StrykeValue]) -> PerlResult<StrykeVa
 }
 
 /// Overall PEC efficiency η_total = η_abs · η_sep · η_redox
-fn builtin_overall_efficiency_pec(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_overall_efficiency_pec(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = b38_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     Ok(StrykeValue::float(v.iter().product()))
 }
 
 /// Fuel cell polarization: V = V_ocv - η_act - i·R - η_conc
-fn builtin_fuel_cell_polarization(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_fuel_cell_polarization(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v_ocv = f1(args);
     let eta_act = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let i_r = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -527,7 +527,7 @@ fn builtin_fuel_cell_polarization(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Electrolyzer cell voltage: V = E_rev + η_anode + η_cathode + i·R
-fn builtin_electrolyzer_voltage(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_electrolyzer_voltage(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let e_rev = f1(args);
     let eta_a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let eta_c = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -536,7 +536,7 @@ fn builtin_electrolyzer_voltage(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Faraday efficiency for H₂ evolution
-fn builtin_faraday_efficiency_h2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_faraday_efficiency_h2(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n_h2 = f1(args);
     let total_charge = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if total_charge == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -544,19 +544,19 @@ fn builtin_faraday_efficiency_h2(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 /// OER overpotential η_OER = E_app - 1.23 V vs RHE
-fn builtin_overpotential_oer(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_overpotential_oer(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let e_app = f1(args);
     Ok(StrykeValue::float(e_app - 1.23))
 }
 
 /// HER overpotential η_HER = E_app - 0 V vs RHE (i.e., E_app since H+/H₂ is 0 V)
-fn builtin_overpotential_her(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_overpotential_her(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let e_app = f1(args);
     Ok(StrykeValue::float(e_app))
 }
 
 /// Electrocrystallization step: progress = 1 - exp(-k·t^m)
-fn builtin_electrocrystallization_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_electrocrystallization_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let k = f1(args);
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let m = args.get(2).map(|v| v.to_number()).unwrap_or(2.0);
@@ -564,7 +564,7 @@ fn builtin_electrocrystallization_step(args: &[StrykeValue]) -> PerlResult<Stryk
 }
 
 /// Nucleation rate constant J = A exp(-ΔG*/kT)
-fn builtin_nucleation_rate_constant(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_nucleation_rate_constant(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let dg = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let t = args.get(2).map(|v| v.to_number()).unwrap_or(298.15);
@@ -572,7 +572,7 @@ fn builtin_nucleation_rate_constant(args: &[StrykeValue]) -> PerlResult<StrykeVa
 }
 
 /// Metal corrosion rate (mm/year): CR = i·M·k / (n·F·ρ)
-fn builtin_metal_corrosion_rate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_metal_corrosion_rate(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let i = f1(args);
     let m = args.get(1).map(|v| v.to_number()).unwrap_or(56.0);
     let n = args.get(2).map(|v| v.to_number()).unwrap_or(2.0);
@@ -583,7 +583,7 @@ fn builtin_metal_corrosion_rate(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Pourbaix diagram E vs pH line: E = E₀ - (0.0591 m / n) pH
-fn builtin_pourbaix_line_value(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pourbaix_line_value(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let e0 = f1(args);
     let m = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let n = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -593,14 +593,14 @@ fn builtin_pourbaix_line_value(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Mixed potential step toward intersection of anodic/cathodic
-fn builtin_mixed_potential_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mixed_potential_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let i_a = f1(args);
     let i_c = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(i_a - i_c))
 }
 
 /// ECL yield η_ecl
-fn builtin_electrochemiluminescence_yield(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_electrochemiluminescence_yield(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n_photons = f1(args);
     let n_charge = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if n_charge == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -608,7 +608,7 @@ fn builtin_electrochemiluminescence_yield(args: &[StrykeValue]) -> PerlResult<St
 }
 
 /// Solid electrolyte capacity Q = nFm/M
-fn builtin_solid_electrolyte_capacity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_solid_electrolyte_capacity(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     let m_active = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let molar_mass = args.get(2).map(|v| v.to_number()).unwrap_or(50.0);
@@ -617,7 +617,7 @@ fn builtin_solid_electrolyte_capacity(args: &[StrykeValue]) -> PerlResult<Stryke
 }
 
 /// Ionic liquid viscosity step (VFT): η = η₀ exp(B/(T-T₀))
-fn builtin_ionic_liquid_viscosity_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ionic_liquid_viscosity_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let eta0 = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(700.0);
     let t = args.get(2).map(|v| v.to_number()).unwrap_or(298.15);
@@ -627,7 +627,7 @@ fn builtin_ionic_liquid_viscosity_step(args: &[StrykeValue]) -> PerlResult<Stryk
 }
 
 /// Lithium-ion diffusivity in graphite anode (Arrhenius)
-fn builtin_lithium_ion_diffusivity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lithium_ion_diffusivity(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let d0 = f1(args);
     let ea = args.get(1).map(|v| v.to_number()).unwrap_or(35_000.0);
     let t = args.get(2).map(|v| v.to_number()).unwrap_or(298.15);
@@ -635,7 +635,7 @@ fn builtin_lithium_ion_diffusivity(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// State of charge from coulomb counting: SoC = SoC₀ - (1/Q) ∫I dt
-fn builtin_soc_estimate_coulomb(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_soc_estimate_coulomb(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let soc0 = f1(args);
     let q_total = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let charge_drawn = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -644,7 +644,7 @@ fn builtin_soc_estimate_coulomb(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// SoH from capacity fade: SoH = Q_now / Q_initial
-fn builtin_soh_capacity_fade(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_soh_capacity_fade(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let q_now = f1(args);
     let q_init = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if q_init == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -652,13 +652,13 @@ fn builtin_soh_capacity_fade(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// OCV-Li-ion step approximation by polynomial fit
-fn builtin_ocv_lithium_ion_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ocv_lithium_ion_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let soc = f1(args);
     Ok(StrykeValue::float(3.0 + 1.2 * soc - 0.3 * soc.powi(2)))
 }
 
 /// Kalman filter SoC update: SoC = SoC_pred + K(z - h(x))
-fn builtin_state_of_charge_kalman(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_state_of_charge_kalman(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let soc_pred = f1(args);
     let k = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
     let z = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -667,21 +667,21 @@ fn builtin_state_of_charge_kalman(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Thermal runaway threshold check
-fn builtin_thermal_runaway_threshold(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_thermal_runaway_threshold(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let t = f1(args);
     let t_thresh = args.get(1).map(|v| v.to_number()).unwrap_or(80.0);
     Ok(StrykeValue::integer(if t >= t_thresh { 1 } else { 0 }))
 }
 
 /// Joule heating in battery: P = I²R
-fn builtin_joule_heating_battery(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_joule_heating_battery(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let i = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(0.01);
     Ok(StrykeValue::float(i * i * r))
 }
 
 /// Calorimetric heat in battery (CV/dT): Q = mc dT
-fn builtin_calorimetric_heat_battery(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_calorimetric_heat_battery(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m = f1(args);
     let c = args.get(1).map(|v| v.to_number()).unwrap_or(900.0);
     let dt = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -689,21 +689,21 @@ fn builtin_calorimetric_heat_battery(args: &[StrykeValue]) -> PerlResult<StrykeV
 }
 
 /// Abuse test voltage cutoff
-fn builtin_abuse_test_voltage(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_abuse_test_voltage(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = f1(args);
     let v_max = args.get(1).map(|v| v.to_number()).unwrap_or(4.5);
     Ok(StrykeValue::integer(if v >= v_max { 1 } else { 0 }))
 }
 
 /// Swelling strain step ε = 3α dT (cubic expansion)
-fn builtin_swelling_strain_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_swelling_strain_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let alpha = f1(args);
     let dt = args.get(1).map(|v| v.to_number()).unwrap_or(10.0);
     Ok(StrykeValue::float(3.0 * alpha * dt))
 }
 
 /// SEI resistance growth R(t) = R₀ + k √t
-fn builtin_sei_resistance_growth(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sei_resistance_growth(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r0 = f1(args);
     let k = args.get(1).map(|v| v.to_number()).unwrap_or(0.01);
     let t = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -716,7 +716,7 @@ fn builtin_sei_resistance_growth(args: &[StrykeValue]) -> PerlResult<StrykeValue
 /// density (g/m³). For PVDF (ρ_b ≈ 1.78 g/cm³ = 1.78e6 g/m³, t_b ≈ 5e-9 m), this
 /// gives 5–8 wt% at 50 m²/g, matching empirical practice for Li-ion electrodes.
 /// Args: A_s (m²/g), t_b (m), ρ_b (g/m³).
-fn builtin_binder_content_optimal(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_binder_content_optimal(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a_s = f1(args).max(0.0);
     let t_b = args.get(1).map(|v| v.to_number()).unwrap_or(5e-9).max(0.0);
     let rho_b = args.get(2).map(|v| v.to_number()).unwrap_or(1.78e6).max(0.0);
@@ -725,7 +725,7 @@ fn builtin_binder_content_optimal(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Porosity of active layer ε = 1 - ρ/ρ_solid
-fn builtin_porosity_active_layer(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_porosity_active_layer(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let rho = f1(args);
     let rho_solid = args.get(1).map(|v| v.to_number()).unwrap_or(2.5);
     if rho_solid == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -733,7 +733,7 @@ fn builtin_porosity_active_layer(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 /// Bruggeman tortuosity τ = ε^(1-α), α = 1.5 typical
-fn builtin_tortuosity_estimate_bruggeman(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_tortuosity_estimate_bruggeman(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let eps = f1(args);
     let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(1.5);
     if eps <= 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
@@ -741,7 +741,7 @@ fn builtin_tortuosity_estimate_bruggeman(args: &[StrykeValue]) -> PerlResult<Str
 }
 
 /// Electrolyte decomposition temperature (from pyrolysis kinetics)
-fn builtin_electrolyte_decomposition_temp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_electrolyte_decomposition_temp(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ea = f1(args);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(1e10);
     let beta = args.get(2).map(|v| v.to_number()).unwrap_or(10.0);
@@ -749,7 +749,7 @@ fn builtin_electrolyte_decomposition_temp(args: &[StrykeValue]) -> PerlResult<St
 }
 
 /// Gibbs-Thomson undercooling: ΔT = 2γT_m/(ρLΔr)
-fn builtin_gibbs_thomson_undercooling(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gibbs_thomson_undercooling(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let gamma = f1(args);
     let tm = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let rho = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -761,7 +761,7 @@ fn builtin_gibbs_thomson_undercooling(args: &[StrykeValue]) -> PerlResult<Stryke
 }
 
 /// Nernst diffusion-layer δ_N for rotating disk
-fn builtin_nernst_diffusion_layer(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_nernst_diffusion_layer(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let d = f1(args);
     let nu = args.get(1).map(|v| v.to_number()).unwrap_or(1e-6);
     let omega = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -770,7 +770,7 @@ fn builtin_nernst_diffusion_layer(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Diffusion coefficient aqueous estimate (Stokes-Einstein): D = kT/(6πηr)
-fn builtin_diff_coeff_aqueous_estimate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_diff_coeff_aqueous_estimate(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let t = f1(args);
     let eta = args.get(1).map(|v| v.to_number()).unwrap_or(1e-3);
     let r = args.get(2).map(|v| v.to_number()).unwrap_or(1e-10);
@@ -780,7 +780,7 @@ fn builtin_diff_coeff_aqueous_estimate(args: &[StrykeValue]) -> PerlResult<Stryk
 }
 
 /// Mean salt activity coefficient from Debye-Hückel
-fn builtin_salt_activity_coefficient(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_salt_activity_coefficient(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z_p = f1(args);
     let z_n = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let i_strength = args.get(2).map(|v| v.to_number()).unwrap_or(0.01);
@@ -788,35 +788,35 @@ fn builtin_salt_activity_coefficient(args: &[StrykeValue]) -> PerlResult<StrykeV
 }
 
 /// Pitzer mean activity coefficient (lowest-order)
-fn builtin_mean_activity_coeff_pitzer(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mean_activity_coeff_pitzer(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m = f1(args);
     let beta0 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float((2.0 * beta0 * m).exp()))
 }
 
 /// Pitzer osmotic coefficient
-fn builtin_osmotic_coefficient_pitzer(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_osmotic_coefficient_pitzer(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m = f1(args);
     let beta0 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(1.0 + beta0 * m))
 }
 
 /// Debye-Hückel screening factor κ
-fn builtin_debye_huckel_screening_factor(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_debye_huckel_screening_factor(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lambda_d = f1(args);
     if lambda_d == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
     Ok(StrykeValue::float(1.0 / lambda_d))
 }
 
 /// pH at isoelectric point: pI = (pKa + pKb) / 2
-fn builtin_ph_at_isoelectric(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ph_at_isoelectric(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pka = f1(args);
     let pkb = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float((pka + pkb) / 2.0))
 }
 
 /// Buffer capacity β = 2.303 [HA] [A-] / ([HA] + [A-])
-fn builtin_buffer_capacity_acid_base(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_buffer_capacity_acid_base(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ha = f1(args);
     let a_minus = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let total = ha + a_minus;
@@ -825,14 +825,14 @@ fn builtin_buffer_capacity_acid_base(args: &[StrykeValue]) -> PerlResult<StrykeV
 }
 
 /// Henderson-Hasselbalch solve [A-]/[HA] = 10^(pH - pKa)
-fn builtin_henderson_hasselbalch_solve(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_henderson_hasselbalch_solve(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ph = f1(args);
     let pka = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(10f64.powf(ph - pka)))
 }
 
 /// Titration endpoint index: argmax dpH/dV
-fn builtin_titration_endpoint_index(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_titration_endpoint_index(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = b38_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     if v.len() < 2 { return Ok(StrykeValue::integer(0)); }
     let mut best = 0_usize;

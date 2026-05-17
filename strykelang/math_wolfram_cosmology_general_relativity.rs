@@ -8,7 +8,7 @@ const PARSEC_M: f64 = 3.0857e16;
 const SOLAR_MASS_KG: f64 = 1.98892e30;
 
 // Hubble parameter H(z) for flat ΛCDM
-fn builtin_hubble_lcdm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hubble_lcdm(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     let h0 = args.get(1).map(|v| v.to_number()).unwrap_or(70.0);
     let omega_m = args.get(2).map(|v| v.to_number()).unwrap_or(0.315);
@@ -17,7 +17,7 @@ fn builtin_hubble_lcdm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Hubble time t_H = 1/H0 in seconds (H0 in km/s/Mpc → SI conversion)
-fn builtin_hubble_time(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hubble_time(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let h0_kmsmpc = f1(args);
     let h0_si = h0_kmsmpc * 1000.0 / (1e6 * PARSEC_M);
     if h0_si == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
@@ -25,7 +25,7 @@ fn builtin_hubble_time(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Hubble distance D_H = c / H0 in meters
-fn builtin_hubble_distance_si(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hubble_distance_si(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let h0_kmsmpc = f1(args);
     let h0_si = h0_kmsmpc * 1000.0 / (1e6 * PARSEC_M);
     if h0_si == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
@@ -33,7 +33,7 @@ fn builtin_hubble_distance_si(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Critical density ρ_c (kg/m³) from H0 in km/s/Mpc
-fn builtin_critical_density_si(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_critical_density_si(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let h0_kmsmpc = f1(args);
     let h0_si = h0_kmsmpc * 1000.0 / (1e6 * PARSEC_M);
     let pi = std::f64::consts::PI;
@@ -41,7 +41,7 @@ fn builtin_critical_density_si(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 // Comoving distance D_C(z) — trapezoidal integration of c/H(z')
-fn builtin_comoving_distance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_comoving_distance(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     let h0 = args.get(1).map(|v| v.to_number()).unwrap_or(70.0);
     let omega_m = args.get(2).map(|v| v.to_number()).unwrap_or(0.315);
@@ -63,14 +63,14 @@ fn builtin_comoving_distance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Luminosity distance D_L = (1+z) * D_C
 
 // Angular diameter distance D_A = D_C / (1+z)
-fn builtin_angular_diameter_distance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_angular_diameter_distance(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     let dc = builtin_comoving_distance(args)?.to_number();
     Ok(StrykeValue::float(dc / (1.0 + z)))
 }
 
 // Lookback time t_L(z) — integral of 1/((1+z')H(z'))
-fn builtin_lookback_time(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lookback_time(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     let h0 = args.get(1).map(|v| v.to_number()).unwrap_or(70.0);
     let omega_m = args.get(2).map(|v| v.to_number()).unwrap_or(0.315);
@@ -88,7 +88,7 @@ fn builtin_lookback_time(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Age of universe at redshift z
-fn builtin_age_at_z(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_age_at_z(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     let h0 = args.get(1).map(|v| v.to_number()).unwrap_or(70.0);
     let omega_m = args.get(2).map(|v| v.to_number()).unwrap_or(0.315);
@@ -106,20 +106,20 @@ fn builtin_age_at_z(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Cosmic scale factor a(t) = 1/(1+z)
-fn builtin_scale_factor(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_scale_factor(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     Ok(StrykeValue::float(1.0 / (1.0 + z)))
 }
 
 // Redshift from scale factor z = 1/a - 1
-fn builtin_redshift_from_a(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_redshift_from_a(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     if a == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
     Ok(StrykeValue::float(1.0 / a - 1.0))
 }
 
 // Density parameter Ω(z) = Ω_0 (1+z)^3 / E(z)^2
-fn builtin_omega_m_at_z(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_omega_m_at_z(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     let omega_m_0 = args.get(1).map(|v| v.to_number()).unwrap_or(0.315);
     let omega_l_0 = args.get(2).map(|v| v.to_number()).unwrap_or(0.685);
@@ -129,12 +129,12 @@ fn builtin_omega_m_at_z(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Equation-of-state parameter w for ΛCDM (constant -1)
-fn builtin_lcdm_eos() -> PerlResult<StrykeValue> {
+fn builtin_lcdm_eos() -> StrykeResult<StrykeValue> {
     Ok(StrykeValue::float(-1.0))
 }
 
 // w(z) for CPL parametrization w(z) = w0 + wa·z/(1+z)
-fn builtin_cpl_w(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cpl_w(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     let w0 = args.get(1).map(|v| v.to_number()).unwrap_or(-1.0);
     let wa = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -142,7 +142,7 @@ fn builtin_cpl_w(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Friedmann II: deceleration q = ½ Ω_m(z) - Ω_Λ(z)
-fn builtin_deceleration_q(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_deceleration_q(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     let omega_m_0 = args.get(1).map(|v| v.to_number()).unwrap_or(0.315);
     let omega_l_0 = args.get(2).map(|v| v.to_number()).unwrap_or(0.685);
@@ -153,13 +153,13 @@ fn builtin_deceleration_q(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Schwarzschild radius (alternate signature)
-fn builtin_schwarzschild_radius_kg(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_schwarzschild_radius_kg(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_kg = f1(args);
     Ok(StrykeValue::float(2.0 * G_NEWTON_B31 * m_kg / (C_LIGHT_B31 * C_LIGHT_B31)))
 }
 
 // Kerr ergosphere radius (equatorial, prograde)
-fn builtin_kerr_ergosphere_eq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_kerr_ergosphere_eq(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_kg = f1(args);
     let a_param = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let rs = 2.0 * G_NEWTON_B31 * m_kg / (C_LIGHT_B31 * C_LIGHT_B31);
@@ -167,7 +167,7 @@ fn builtin_kerr_ergosphere_eq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Kerr horizon radius r+ = M + sqrt(M^2 - a^2)
-fn builtin_kerr_horizon(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_kerr_horizon(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_kg = f1(args);
     let a_param = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let m_geom = G_NEWTON_B31 * m_kg / (C_LIGHT_B31 * C_LIGHT_B31);
@@ -177,7 +177,7 @@ fn builtin_kerr_horizon(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Hawking temperature T = ℏc³/(8πGMk_B)
 
 // Black hole entropy S = k_B A / (4 ℓ_P^2)
-fn builtin_bh_entropy(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bh_entropy(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_kg = f1(args);
     let pi = std::f64::consts::PI;
     let rs = 2.0 * G_NEWTON_B31 * m_kg / (C_LIGHT_B31 * C_LIGHT_B31);
@@ -188,7 +188,7 @@ fn builtin_bh_entropy(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Black hole evaporation timescale τ ≈ 5120πG²M³/(ℏc⁴)
-fn builtin_bh_evaporation_time(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bh_evaporation_time(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_kg = f1(args);
     let pi = std::f64::consts::PI;
     let hbar = H_PLANCK_B31 / (2.0 * pi);
@@ -197,21 +197,21 @@ fn builtin_bh_evaporation_time(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 // Innermost stable circular orbit (ISCO, Schwarzschild) r = 6M
-fn builtin_schwarzschild_isco(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_schwarzschild_isco(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_kg = f1(args);
     let rs = 2.0 * G_NEWTON_B31 * m_kg / (C_LIGHT_B31 * C_LIGHT_B31);
     Ok(StrykeValue::float(3.0 * rs))
 }
 
 // Photon sphere r = 1.5 r_s for Schwarzschild
-fn builtin_photon_sphere_radius(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_photon_sphere_radius(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_kg = f1(args);
     let rs = 2.0 * G_NEWTON_B31 * m_kg / (C_LIGHT_B31 * C_LIGHT_B31);
     Ok(StrykeValue::float(1.5 * rs))
 }
 
 // Tidal force at distance r from mass M (at radial separation Δr)
-fn builtin_tidal_force(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_tidal_force(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_kg = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let dr = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -221,7 +221,7 @@ fn builtin_tidal_force(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Gravitational time dilation factor at radius r outside mass M
-fn builtin_grav_dilation_factor(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_grav_dilation_factor(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_kg = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if r == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -231,7 +231,7 @@ fn builtin_grav_dilation_factor(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 // Frame-dragging angular velocity Lense-Thirring at r outside Kerr
-fn builtin_lense_thirring_omega(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lense_thirring_omega(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_kg = f1(args);
     let a_param = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let r = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -240,7 +240,7 @@ fn builtin_lense_thirring_omega(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 // Gravitational wave strain h ≈ G(M c²) / (r c⁴) (rough order-of-magnitude)
-fn builtin_gw_strain_amplitude(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gw_strain_amplitude(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_chirp_kg = f1(args);
     let f_gw = args.get(1).map(|v| v.to_number()).unwrap_or(100.0);
     let dist_m = args.get(2).map(|v| v.to_number()).unwrap_or(1e22);
@@ -251,7 +251,7 @@ fn builtin_gw_strain_amplitude(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 // Chirp mass (m1, m2 in kg) M_c = (m1 m2)^(3/5) / (m1+m2)^(1/5)
-fn builtin_chirp_mass(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_chirp_mass(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m1 = f1(args);
     let m2 = args.get(1).map(|v| v.to_number()).unwrap_or(m1);
     if m1 + m2 == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -259,7 +259,7 @@ fn builtin_chirp_mass(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Gravitational binding energy of uniform sphere U = -3GM²/(5R)
-fn builtin_grav_binding_energy(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_grav_binding_energy(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if r == 0.0 { return Ok(StrykeValue::float(f64::NEG_INFINITY)); }
@@ -267,7 +267,7 @@ fn builtin_grav_binding_energy(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 // Roche limit (rigid body, dense satellite) d ≈ R_p (2 ρ_p / ρ_s)^(1/3)
-fn builtin_roche_limit_rigid(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_roche_limit_rigid(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r_planet = f1(args);
     let rho_planet = args.get(1).map(|v| v.to_number()).unwrap_or(5500.0);
     let rho_sat = args.get(2).map(|v| v.to_number()).unwrap_or(2500.0).max(1e-12);
@@ -275,7 +275,7 @@ fn builtin_roche_limit_rigid(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Roche limit fluid d ≈ 2.44 R_p (ρ_p / ρ_s)^(1/3)
-fn builtin_roche_limit_fluid(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_roche_limit_fluid(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r_planet = f1(args);
     let rho_planet = args.get(1).map(|v| v.to_number()).unwrap_or(5500.0);
     let rho_sat = args.get(2).map(|v| v.to_number()).unwrap_or(2500.0).max(1e-12);
@@ -285,12 +285,12 @@ fn builtin_roche_limit_fluid(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Hill radius (spherical) r_H ≈ a (m / 3 M)^(1/3)
 
 // Lagrangian L1 distance from secondary (Hill approximation)
-fn builtin_lagrange_l1(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lagrange_l1(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_hill_radius(args)
 }
 
 // Sphere of influence (Laplace) r ≈ a (m/M)^(2/5)
-fn builtin_sphere_of_influence(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sphere_of_influence(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a_orbit = f1(args);
     let m_secondary = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let m_primary = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -301,7 +301,7 @@ fn builtin_sphere_of_influence(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 // Synodic period 1/T = |1/T1 - 1/T2|
 
 // Schwarzschild radial velocity for falling object from rest at infinity
-fn builtin_freefall_velocity_schwarzschild(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_freefall_velocity_schwarzschild(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_kg = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if r == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
@@ -309,7 +309,7 @@ fn builtin_freefall_velocity_schwarzschild(args: &[StrykeValue]) -> PerlResult<S
 }
 
 // Einstein ring radius (point lens at distance D_l, source at D_s)
-fn builtin_einstein_ring_radius(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_einstein_ring_radius(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_kg = f1(args);
     let d_ls = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let d_l = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -319,14 +319,14 @@ fn builtin_einstein_ring_radius(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 // Microlensing magnification for u = β/θ_E
-fn builtin_microlensing_magnification(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_microlensing_magnification(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let u = f1(args);
     if u == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
     Ok(StrykeValue::float((u * u + 2.0) / (u * (u * u + 4.0).sqrt())))
 }
 
 // Cosmic distance modulus DM = 5 log10(D_L/10 pc) — D_L in meters
-fn builtin_cosmic_distance_modulus_si(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cosmic_distance_modulus_si(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let d_l_m = f1(args);
     if d_l_m <= 0.0 { return Ok(StrykeValue::float(f64::NEG_INFINITY)); }
     let d_l_pc = d_l_m / PARSEC_M;
@@ -334,12 +334,12 @@ fn builtin_cosmic_distance_modulus_si(args: &[StrykeValue]) -> PerlResult<Stryke
 }
 
 // CMB temperature today (default 2.725 K)
-fn builtin_cmb_temperature() -> PerlResult<StrykeValue> {
+fn builtin_cmb_temperature() -> StrykeResult<StrykeValue> {
     Ok(StrykeValue::float(2.725))
 }
 
 // CMB temperature at redshift z
-fn builtin_cmb_temperature_at_z(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cmb_temperature_at_z(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     Ok(StrykeValue::float(2.725 * (1.0 + z)))
 }
@@ -347,14 +347,14 @@ fn builtin_cmb_temperature_at_z(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 // Wien displacement law λ_max T = 2.898e-3 m·K
 
 // Stefan-Boltzmann power per area σT⁴
-fn builtin_stefan_boltzmann_si(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_stefan_boltzmann_si(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let t = f1(args);
     let sigma = 5.670374419e-8;
     Ok(StrykeValue::float(sigma * t.powi(4)))
 }
 
 // Planck spectral radiance B(λ,T)
-fn builtin_planck_spectral_radiance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_planck_spectral_radiance(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lambda = f1(args);
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(5800.0);
     if lambda <= 0.0 || t <= 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -366,7 +366,7 @@ fn builtin_planck_spectral_radiance(args: &[StrykeValue]) -> PerlResult<StrykeVa
 }
 
 // Schwarzschild metric coefficient g_tt = -(1 - 2M/r)
-fn builtin_schwarzschild_g_tt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_schwarzschild_g_tt(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_kg = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if r == 0.0 { return Ok(StrykeValue::float(f64::NEG_INFINITY)); }
@@ -374,7 +374,7 @@ fn builtin_schwarzschild_g_tt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Schwarzschild g_rr = 1/(1-2M/r)
-fn builtin_schwarzschild_g_rr(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_schwarzschild_g_rr(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_kg = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let factor = 1.0 - 2.0 * G_NEWTON_B31 * m_kg / (r * C_LIGHT_B31 * C_LIGHT_B31);
@@ -383,7 +383,7 @@ fn builtin_schwarzschild_g_rr(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Riemann invariant Kretschmann scalar for Schwarzschild K = 48 M²/r⁶
-fn builtin_kretschmann_schwarzschild(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_kretschmann_schwarzschild(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_kg = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let m_geom = G_NEWTON_B31 * m_kg / (C_LIGHT_B31 * C_LIGHT_B31);
@@ -392,7 +392,7 @@ fn builtin_kretschmann_schwarzschild(args: &[StrykeValue]) -> PerlResult<StrykeV
 }
 
 // Newtonian Hill velocity at Hill radius (orbital velocity around secondary)
-fn builtin_hill_velocity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hill_velocity(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_secondary = f1(args);
     let r_hill = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if r_hill == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
@@ -400,14 +400,14 @@ fn builtin_hill_velocity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Vacuum energy density ρ_vac = Λ c²/(8πG)
-fn builtin_vacuum_energy_density(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_vacuum_energy_density(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lambda_cosm = f1(args);
     let pi = std::f64::consts::PI;
     Ok(StrykeValue::float(lambda_cosm * C_LIGHT_B31 * C_LIGHT_B31 / (8.0 * pi * G_NEWTON_B31)))
 }
 
 // Sound horizon at recombination (rough fit)
-fn builtin_sound_horizon_recomb(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sound_horizon_recomb(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let omega_b = f1(args);
     let omega_m = args.get(1).map(|v| v.to_number()).unwrap_or(0.315);
     let h0 = args.get(2).map(|v| v.to_number()).unwrap_or(70.0);
@@ -417,17 +417,17 @@ fn builtin_sound_horizon_recomb(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 // BAO scale today (rough fit ~150 Mpc)
-fn builtin_bao_scale_today() -> PerlResult<StrykeValue> {
+fn builtin_bao_scale_today() -> StrykeResult<StrykeValue> {
     Ok(StrykeValue::float(150.0))
 }
 
 // Sigma8 power spectrum normalization (default value)
-fn builtin_sigma8_default() -> PerlResult<StrykeValue> {
+fn builtin_sigma8_default() -> StrykeResult<StrykeValue> {
     Ok(StrykeValue::float(0.811))
 }
 
 // Gravitational lensing convergence κ = Σ / Σ_crit (dimensionless)
-fn builtin_lensing_convergence(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lensing_convergence(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let sigma = f1(args);
     let sigma_crit = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if sigma_crit == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
@@ -435,7 +435,7 @@ fn builtin_lensing_convergence(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 // Critical surface density Σ_crit
-fn builtin_sigma_crit(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sigma_crit(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let d_s = f1(args);
     let d_l = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let d_ls = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -445,7 +445,7 @@ fn builtin_sigma_crit(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Geodesic precession (Schwarzschild) Δφ per orbit
-fn builtin_perihelion_precession(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_perihelion_precession(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_kg = f1(args);
     let a_orbit = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let e = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -456,7 +456,7 @@ fn builtin_perihelion_precession(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 // Shapiro delay (one-way) for ray passing close to mass M with impact b
-fn builtin_shapiro_delay(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_shapiro_delay(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_kg = f1(args);
     let r1 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let r2 = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -467,7 +467,7 @@ fn builtin_shapiro_delay(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Light deflection angle by point mass α = 4GM/(bc²)
-fn builtin_light_deflection_angle(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_light_deflection_angle(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_kg = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if b == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
@@ -477,21 +477,21 @@ fn builtin_light_deflection_angle(args: &[StrykeValue]) -> PerlResult<StrykeValu
 // Chandrasekhar mass limit (electron-degenerate)
 
 // Tolman-Oppenheimer-Volkoff (TOV) limit (neutron star)
-fn builtin_tov_mass_limit() -> PerlResult<StrykeValue> {
+fn builtin_tov_mass_limit() -> StrykeResult<StrykeValue> {
     Ok(StrykeValue::float(2.16 * SOLAR_MASS_KG))
 }
 
 // Eddington luminosity L_Edd = 4πGMm_p c / σ_T
 
 // Stellar main-sequence lifetime (Sun-relative scaling) τ ≈ 10 Gyr (M/M_sun)^-2.5
-fn builtin_main_sequence_lifetime(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_main_sequence_lifetime(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_solar = f1(args);
     if m_solar <= 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
     Ok(StrykeValue::float(1e10 * m_solar.powf(-2.5)))
 }
 
 // Schwarzschild T(r) free-fall coordinate time integral (rough)
-fn builtin_schwarzschild_freefall_time(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_schwarzschild_freefall_time(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_kg = f1(args);
     let r0 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if m_kg <= 0.0 || r0 <= 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
@@ -500,7 +500,7 @@ fn builtin_schwarzschild_freefall_time(args: &[StrykeValue]) -> PerlResult<Stryk
 }
 
 // Friedmann eq: ρ_total at z given Ω's
-fn builtin_friedmann_density_total(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_friedmann_density_total(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     let h0 = args.get(1).map(|v| v.to_number()).unwrap_or(70.0);
     let omega_m = args.get(2).map(|v| v.to_number()).unwrap_or(0.315);
@@ -512,7 +512,7 @@ fn builtin_friedmann_density_total(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 // Cosmological constant from Ω_Λ and H0
-fn builtin_cosmological_constant(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cosmological_constant(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let omega_l = f1(args);
     let h0_kmsmpc = args.get(1).map(|v| v.to_number()).unwrap_or(70.0);
     let h0_si = h0_kmsmpc * 1000.0 / (1e6 * PARSEC_M);
@@ -520,7 +520,7 @@ fn builtin_cosmological_constant(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 // Planck length
-fn builtin_planck_energy() -> PerlResult<StrykeValue> {
+fn builtin_planck_energy() -> StrykeResult<StrykeValue> {
     let pi = std::f64::consts::PI;
     let hbar = H_PLANCK_B31 / (2.0 * pi);
     let m_p = (hbar * C_LIGHT_B31 / G_NEWTON_B31).sqrt();

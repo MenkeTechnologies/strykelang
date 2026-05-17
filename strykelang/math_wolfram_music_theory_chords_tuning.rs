@@ -9,7 +9,7 @@ const B64_A4: f64 = 440.0;
 const B64_MIDI_A4: i64 = 69;
 
 /// Cents between two frequencies: 1200 · log₂(f₂/f₁).
-fn builtin_cents_between_freqs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cents_between_freqs(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let f1_v = f1(args).max(1e-9);
     let f2 = args.get(1).map(|v| v.to_number()).unwrap_or(f1_v).max(1e-9);
     Ok(StrykeValue::float(1200.0 * (f2 / f1_v).log2()))
@@ -17,7 +17,7 @@ fn builtin_cents_between_freqs(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 
 /// Note name from MIDI number. Returns the integer of the (note class · 100 +
 /// octave). Note classes: C=0, C#=1, D=2, ..., B=11. Octave per MIDI standard.
-fn builtin_note_name_from_midi(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_note_name_from_midi(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let midi = i1(args);
     let pc = midi.rem_euclid(12);
     let octave = midi.div_euclid(12) - 1;
@@ -26,7 +26,7 @@ fn builtin_note_name_from_midi(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 
 /// Interval quality + size from semitones. Returns size·100 + quality_id.
 /// quality_id: 0=perfect, 1=major, 2=minor, 3=augmented, 4=diminished.
-fn builtin_interval_quality_size(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_interval_quality_size(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let semis = i1(args).rem_euclid(12);
     let (size, quality) = match semis {
         0 => (1, 0),  // perfect unison
@@ -48,7 +48,7 @@ fn builtin_interval_quality_size(args: &[StrykeValue]) -> PerlResult<StrykeValue
 
 /// Major scale pitches (C major: C D E F G A B = 0 2 4 5 7 9 11). Args: tonic
 /// pitch class, returns the 7 pitch classes packed as p₀·1e6 + ... + p₆.
-fn builtin_scale_pitches_major(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_scale_pitches_major(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let tonic = i1(args).rem_euclid(12);
     let intervals = [0_i64, 2, 4, 5, 7, 9, 11];
     let mut packed = 0_i64;
@@ -60,7 +60,7 @@ fn builtin_scale_pitches_major(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Natural minor: 0 2 3 5 7 8 10.
-fn builtin_scale_pitches_minor(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_scale_pitches_minor(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let tonic = i1(args).rem_euclid(12);
     let intervals = [0_i64, 2, 3, 5, 7, 8, 10];
     let mut packed = 0_i64;
@@ -72,7 +72,7 @@ fn builtin_scale_pitches_minor(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Dorian mode: 0 2 3 5 7 9 10.
-fn builtin_mode_pitches_dorian(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mode_pitches_dorian(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let tonic = i1(args).rem_euclid(12);
     let intervals = [0_i64, 2, 3, 5, 7, 9, 10];
     let mut packed = 0_i64;
@@ -83,7 +83,7 @@ fn builtin_mode_pitches_dorian(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Phrygian: 0 1 3 5 7 8 10.
-fn builtin_mode_pitches_phrygian(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mode_pitches_phrygian(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let tonic = i1(args).rem_euclid(12);
     let intervals = [0_i64, 1, 3, 5, 7, 8, 10];
     let mut packed = 0_i64;
@@ -94,7 +94,7 @@ fn builtin_mode_pitches_phrygian(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 /// Lydian: 0 2 4 6 7 9 11.
-fn builtin_mode_pitches_lydian(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mode_pitches_lydian(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let tonic = i1(args).rem_euclid(12);
     let intervals = [0_i64, 2, 4, 6, 7, 9, 11];
     let mut packed = 0_i64;
@@ -106,7 +106,7 @@ fn builtin_mode_pitches_lydian(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 
 /// Chord root + inversion from pitch-class set. Args: pitch classes ascending.
 /// Returns root_pc·10 + inversion.
-fn builtin_chord_root_inversion(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_chord_root_inversion(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pcs = b64_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     if pcs.is_empty() { return Ok(StrykeValue::integer(0)); }
     let bass = pcs[0] as i64;
@@ -124,7 +124,7 @@ fn builtin_chord_root_inversion(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Chord quality classify (major / minor / dim / aug / 7th). Returns id 0..7.
-fn builtin_chord_quality_classify(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_chord_quality_classify(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pcs = b64_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     if pcs.is_empty() { return Ok(StrykeValue::integer(-1)); }
     let bass = pcs[0] as i64;
@@ -148,7 +148,7 @@ fn builtin_chord_quality_classify(args: &[StrykeValue]) -> PerlResult<StrykeValu
 
 /// Chord voicing close: returns sum of interval gaps in semitones between
 /// consecutive ascending pitches. Tighter (lower sum) → closer voicing.
-fn builtin_chord_voicing_close(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_chord_voicing_close(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut pcs = b64_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     pcs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     if pcs.len() < 2 { return Ok(StrykeValue::float(0.0)); }
@@ -157,27 +157,27 @@ fn builtin_chord_voicing_close(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Number of sharps in a major key signature (C=0, G=1, D=2, ..., F#=6, C#=7).
-fn builtin_key_signature_sharps(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_key_signature_sharps(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let tonic = i1(args).rem_euclid(12);
     let order = [0_i64, 7, 2, 9, 4, 11, 6, 1, 8, 3, 10, 5];
     Ok(StrykeValue::integer(order.iter().position(|&t| t == tonic).unwrap_or(0) as i64))
 }
 
 /// Number of flats: C=0, F=1, B♭=2, ... (anti-circle).
-fn builtin_key_signature_flats(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_key_signature_flats(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let tonic = i1(args).rem_euclid(12);
     let order = [0_i64, 5, 10, 3, 8, 1, 6, 11, 4, 9, 2, 7];
     Ok(StrykeValue::integer(order.iter().position(|&t| t == tonic).unwrap_or(0) as i64))
 }
 
 /// Tempo BPM → milliseconds per beat: 60000 / BPM.
-fn builtin_tempo_to_ms(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_tempo_to_ms(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let bpm = f1(args).max(1e-9);
     Ok(StrykeValue::float(60000.0 / bpm))
 }
 
 /// Beat to seconds at given BPM.
-fn builtin_beat_to_seconds(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_beat_to_seconds(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let beats = f1(args);
     let bpm = args.get(1).map(|v| v.to_number()).unwrap_or(120.0).max(1e-9);
     Ok(StrykeValue::float(beats * 60.0 / bpm))
@@ -185,7 +185,7 @@ fn builtin_beat_to_seconds(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Time-signature subdivision count: numerator · power-of-2 from denominator.
 /// 4/4 with quarter subdivisions = 4 ticks; 6/8 with eighth subdivisions = 6.
-fn builtin_time_sig_subdivision(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_time_sig_subdivision(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let num = i1(args);
     let denom = args.get(1).map(|v| v.to_number() as i64).unwrap_or(4);
     let sub_div_factor = args.get(2).map(|v| v.to_number() as i64).unwrap_or(denom);
@@ -193,14 +193,14 @@ fn builtin_time_sig_subdivision(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Equal-tempered frequency: f = A4 · 2^((n - 69) / 12) for MIDI n.
-fn builtin_equal_tempered_freq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_equal_tempered_freq(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     Ok(StrykeValue::float(B64_A4 * 2f64.powf((n - B64_MIDI_A4 as f64) / 12.0)))
 }
 
 /// Just intonation frequency for tonic + interval (pure ratios). Args: tonic
 /// freq, interval semitones (0..11). 5-limit JI ratios per ratio table.
-fn builtin_just_intonation_freq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_just_intonation_freq(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let tonic = f1(args);
     let semis = i1(&args[1..]).rem_euclid(12);
     let ratios = [
@@ -211,7 +211,7 @@ fn builtin_just_intonation_freq(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Pythagorean tuning: ratios via stacked perfect 5ths (3/2)^n / 2^k.
-fn builtin_pythagorean_freq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pythagorean_freq(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let tonic = f1(args);
     let semis = i1(&args[1..]).rem_euclid(12);
     let ratios = [
@@ -223,7 +223,7 @@ fn builtin_pythagorean_freq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Quarter-comma meantone tuning ratios. The fifth is tempered to 5^(1/4) (≈
 /// 696.578 cents). Cleaner thirds at the cost of impure fifths.
-fn builtin_mean_tone_freq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mean_tone_freq(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let tonic = f1(args);
     let semis = i1(&args[1..]).rem_euclid(12);
     let fifth = 5f64.powf(1.0 / 4.0);
@@ -234,7 +234,7 @@ fn builtin_mean_tone_freq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Werckmeister III "well-tempered": closest ratios from standard table.
-fn builtin_werckmeister_iii(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_werckmeister_iii(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let tonic = f1(args);
     let semis = i1(&args[1..]).rem_euclid(12);
     let cents = [0.0_f64, 90.225, 192.180, 294.135, 390.225, 498.045,
@@ -243,7 +243,7 @@ fn builtin_werckmeister_iii(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Kirnberger III well-tempered tuning.
-fn builtin_kirnberger_iii(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_kirnberger_iii(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let tonic = f1(args);
     let semis = i1(&args[1..]).rem_euclid(12);
     let cents = [0.0_f64, 90.225, 193.157, 294.135, 386.314, 498.045,
@@ -253,14 +253,14 @@ fn builtin_kirnberger_iii(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Dynamics dB level: pp = -54, p = -42, mp = -30, mf = -18, f = -6, ff = +6,
 /// fff = +18, given dynamic ID 0..7.
-fn builtin_dynamics_db_level(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_dynamics_db_level(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let id = i1(args).clamp(0, 7) as usize;
     let levels = [-54.0_f64, -42.0, -30.0, -18.0, -12.0, -6.0, 6.0, 18.0];
     Ok(StrykeValue::float(levels[id]))
 }
 
 /// Harmonic partial frequency: f_n = n · f₀.
-fn builtin_harmonics_partial(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_harmonics_partial(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let f0 = f1(args);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(n * f0))

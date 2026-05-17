@@ -8,7 +8,7 @@ fn b59_to_floats(v: &StrykeValue) -> Vec<f64> {
 /// PID with anti-windup (clamping). Args: setpoint, measurement, kp, ki, kd,
 /// dt, integral_state, prev_error, output_min, output_max. Returns (control,
 /// new_integral, new_prev_error) packed as control + integral·1e-6 + err·1e-12.
-fn builtin_pid_anti_windup(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pid_anti_windup(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let sp = f1(args);
     let pv = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let kp = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -28,7 +28,7 @@ fn builtin_pid_anti_windup(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Ziegler-Nichols PID tuning rule (closed-loop): given Ku, Tu return Kp,Ki,Kd.
 /// Standard "classic PID": Kp = 0.6 Ku, Ti = Tu/2, Td = Tu/8 → Ki = Kp/Ti, Kd = Kp·Td.
-fn builtin_pid_ziegler_nichols(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pid_ziegler_nichols(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ku = f1(args);
     let tu = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-9);
     let kp = 0.6 * ku;
@@ -39,7 +39,7 @@ fn builtin_pid_ziegler_nichols(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 
 /// Smith predictor: y_pred(t) = y(t) + G·(u(t) − u(t − τ)), feed back as if τ
 /// were zero. Returns the corrected error signal.
-fn builtin_smith_predictor_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_smith_predictor_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let setpoint = f1(args);
     let plant_meas = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let model_now = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -50,7 +50,7 @@ fn builtin_smith_predictor_step(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 
 /// Continuous-time LQR scalar gain: K = R⁻¹ B^T P, with P solving A^TP + PA -
 /// PBR⁻¹B^TP + Q = 0. Solve scalar ARE: A·P − P²·B²/R + Q = 0 (when A is scalar).
-fn builtin_lqr_gain_continuous(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lqr_gain_continuous(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let q = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -62,7 +62,7 @@ fn builtin_lqr_gain_continuous(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 
 /// Discrete-time LQR scalar: solve P = A^TP A − A^TP B (R + B^TP B)⁻¹ B^TP A + Q
 /// by iteration on a scalar. K = (R + B^TP B)⁻¹ B^TP A.
-fn builtin_lqr_gain_discrete(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lqr_gain_discrete(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let q = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -81,34 +81,34 @@ fn builtin_lqr_gain_discrete(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// LQG: combined LQR + Kalman. Single-step state estimate update, returns the
 /// control u given current x_hat.
-fn builtin_lqg_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lqg_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x_hat = f1(args);
     let lqr_k = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(-lqr_k * x_hat))
 }
 
 /// H∞ norm of SISO transfer function H(s) = b/(s+a): ||H||_∞ = |b/a|.
-fn builtin_h_infinity_norm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_h_infinity_norm(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let b = f1(args);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-12);
     Ok(StrykeValue::float(b.abs() / a))
 }
 
 /// Bode gain margin (dB) at phase-crossover frequency: GM = -20·log₁₀|G(jω_pc)|.
-fn builtin_bode_gain_margin(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bode_gain_margin(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let g_at_pc = f1(args).abs();
     if g_at_pc <= 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
     Ok(StrykeValue::float(-20.0 * g_at_pc.log10()))
 }
 
 /// Bode phase margin (degrees) at gain-crossover frequency: PM = ∠G(jω_gc) + 180°.
-fn builtin_bode_phase_margin(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bode_phase_margin(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let phase_gc = f1(args);
     Ok(StrykeValue::float(phase_gc + 180.0))
 }
 
 /// Nyquist encirclement count of the −1 point.
-fn builtin_nyquist_encirclement(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_nyquist_encirclement(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pts = b59_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let n = pts.len() / 2;
     if n < 3 { return Ok(StrykeValue::integer(0)); }
@@ -125,7 +125,7 @@ fn builtin_nyquist_encirclement(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Nichols chart M-circle radius for a closed-loop magnitude in dB.
-fn builtin_nichols_chart_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_nichols_chart_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_db = f1(args);
     let m = 10f64.powf(m_db / 20.0);
     if (m - 1.0).abs() < 1e-9 { return Ok(StrykeValue::float(0.5)); }
@@ -135,7 +135,7 @@ fn builtin_nichols_chart_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Servo position controller producing velocity command via P + velocity feed-fwd.
-fn builtin_servo_position_velocity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_servo_position_velocity(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pos_err = f1(args);
     let vel_ff = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let kp = args.get(2).map(|v| v.to_number()).unwrap_or(10.0);
@@ -143,7 +143,7 @@ fn builtin_servo_position_velocity(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Servo torque output: τ = J·α + B·ω + τ_load.
-fn builtin_servo_torque_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_servo_torque_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let inertia = f1(args);
     let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let damping = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -154,7 +154,7 @@ fn builtin_servo_torque_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Madgwick AHRS step on quaternion: q ← q + (q̇ − β·∇F) · dt. Returns updated
 /// q_w component (gyroscope only, no magnetometer correction here).
-fn builtin_imu_madgwick_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_imu_madgwick_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let q_w = f1(args);
     let omega = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let dt = args.get(2).map(|v| v.to_number()).unwrap_or(0.01);
@@ -163,7 +163,7 @@ fn builtin_imu_madgwick_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Mahony AHRS: complementary filter integrating gyro + accel with PI feedback.
-fn builtin_imu_mahony_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_imu_mahony_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let q_x = f1(args);
     let omega = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let err = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -175,7 +175,7 @@ fn builtin_imu_mahony_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Quaternion from accelerometer (gravity vector). For (ax, ay, az) gravity:
 /// q_w = sqrt((1 + az) / 2), q_x = -ay / (2 q_w), q_y = ax / (2 q_w).
-fn builtin_quaternion_from_imu(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_quaternion_from_imu(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ax = f1(args);
     let ay = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let az = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -188,14 +188,14 @@ fn builtin_quaternion_from_imu(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 
 /// Single Denavit-Hartenberg homogeneous transform element. Returns the (1,4)
 /// element (x translation in DH frame): a·cos θ.
-fn builtin_denavit_hartenberg_h(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_denavit_hartenberg_h(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let theta = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(a * theta.cos()))
 }
 
 /// Forward kinematics for an n-link planar chain. Sum link cos contributions.
-fn builtin_forward_kinematics_dh(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_forward_kinematics_dh(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lengths = b59_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let angles = b59_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let n = lengths.len().min(angles.len());
@@ -211,7 +211,7 @@ fn builtin_forward_kinematics_dh(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 /// Inverse kinematics for 2-link planar arm: returns elbow angle θ₂ (radians).
-fn builtin_inverse_kinematics_2link(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_inverse_kinematics_2link(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let l1 = f1(args);
     let l2 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let x = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -222,7 +222,7 @@ fn builtin_inverse_kinematics_2link(args: &[StrykeValue]) -> PerlResult<StrykeVa
 }
 
 /// 2-DOF planar Jacobian determinant det J = l1·l2·sin θ₂.
-fn builtin_jacobian_2dof(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_jacobian_2dof(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let l1 = f1(args);
     let l2 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let theta2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -230,7 +230,7 @@ fn builtin_jacobian_2dof(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Yoshikawa manipulability w = sqrt(det(J·J^T)). For 2-DOF planar: |l1·l2·sinθ₂|.
-fn builtin_manipulability_yoshikawa(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_manipulability_yoshikawa(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let l1 = f1(args);
     let l2 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let theta2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -238,7 +238,7 @@ fn builtin_manipulability_yoshikawa(args: &[StrykeValue]) -> PerlResult<StrykeVa
 }
 
 /// Singularity check for 2-link arm: |sin θ₂| < eps.
-fn builtin_singularity_check_2link(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_singularity_check_2link(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let theta2 = f1(args);
     let eps = args.get(1).map(|v| v.to_number()).unwrap_or(1e-3);
     Ok(StrykeValue::integer(if theta2.sin().abs() < eps { 1 } else { 0 }))
@@ -246,7 +246,7 @@ fn builtin_singularity_check_2link(args: &[StrykeValue]) -> PerlResult<StrykeVal
 
 /// Dubins LSL path length: L = |R(α + β)| + d (heuristic). Args: |start - end|,
 /// turning radius R, change-in-heading α, change-in-heading β.
-fn builtin_path_dubins_lsl(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_path_dubins_lsl(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let d = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-9);
     let alpha = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -255,12 +255,12 @@ fn builtin_path_dubins_lsl(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Dubins RSR path length.
-fn builtin_path_dubins_rsr(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_path_dubins_rsr(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_path_dubins_lsl(args)
 }
 
 /// Reeds-Shepp shortest path length (admits reversal). Lower-bound: d.
-fn builtin_path_reeds_shepp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_path_reeds_shepp(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let d = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-9);
     let alpha = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -269,21 +269,21 @@ fn builtin_path_reeds_shepp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// RRT extend: take a max step δ from nearest node toward a sample.
-fn builtin_rrt_extend(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rrt_extend(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dist = f1(args);
     let delta = args.get(1).map(|v| v.to_number()).unwrap_or(0.1);
     Ok(StrykeValue::float(dist.min(delta)))
 }
 
 /// RRT* rewire: cost reduction if connecting via candidate parent.
-fn builtin_rrt_star_rewire(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rrt_star_rewire(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let cost_existing = f1(args);
     let cost_via_new = args.get(1).map(|v| v.to_number()).unwrap_or(cost_existing);
     Ok(StrykeValue::float((cost_existing - cost_via_new).max(0.0)))
 }
 
 /// PRM node connect: pass if distance ≤ neighbour radius AND no collision.
-fn builtin_prm_node_connect(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_prm_node_connect(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dist = f1(args);
     let radius = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let collision = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0);

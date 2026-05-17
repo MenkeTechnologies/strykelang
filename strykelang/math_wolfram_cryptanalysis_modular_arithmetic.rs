@@ -15,7 +15,7 @@
 // Multiplicative order of a mod n
 
 // Discrete log baby-step giant-step (m steps, n = order)
-fn builtin_bsgs_discrete_log(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bsgs_discrete_log(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let g = i1(args);
     let h = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
     let p = args.get(2).map(|v| v.to_number() as i64).unwrap_or(2);
@@ -45,7 +45,7 @@ fn builtin_bsgs_discrete_log(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Pollard rho factorization
 
 // Pollard p-1 factorization (B-smoothness)
-fn builtin_pollard_p_minus_1(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pollard_p_minus_1(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     let b = args.get(1).map(|v| v.to_number() as i64).unwrap_or(100);
     if n <= 3 { return Ok(StrykeValue::integer(n)); }
@@ -65,7 +65,7 @@ fn pow_mod_helper(mut base: i128, mut exp: i128, m: i128) -> i128 {
 }
 
 // Fermat factorization (slow, for n = pq with p,q close)
-fn builtin_fermat_factor(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_fermat_factor(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     if n <= 0 { return Ok(StrykeValue::integer(0)); }
     let mut a = (n as f64).sqrt().ceil() as i64;
@@ -84,7 +84,7 @@ fn builtin_fermat_factor(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Trial division smallest prime factor
-fn builtin_trial_smallest_factor(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_trial_smallest_factor(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     if n <= 1 { return Ok(StrykeValue::integer(n)); }
     if n % 2 == 0 { return Ok(StrykeValue::integer(2)); }
@@ -103,7 +103,7 @@ fn builtin_trial_smallest_factor(args: &[StrykeValue]) -> PerlResult<StrykeValue
 // Möbius function μ(n)
 
 // Mertens function M(n) = Σ μ(k)
-fn builtin_mertens(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mertens(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(1);
     let mut total = 0_i64;
     for k in 1..=n {
@@ -131,7 +131,7 @@ fn builtin_mertens(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // von Mangoldt Λ(n)
 
 // Liouville λ(n)
-fn builtin_liouville(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_liouville(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut n = i1(args).max(1);
     let mut prime_count = 0_i64;
     let mut p = 2_i64;
@@ -146,7 +146,7 @@ fn builtin_liouville(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Squarefree predicate
 
 // Smooth number check (B-smooth)
-fn builtin_is_b_smooth(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_is_b_smooth(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut n = i1(args);
     let b = args.get(1).map(|v| v.to_number() as i64).unwrap_or(10);
     if n <= 0 { return Ok(StrykeValue::integer(0)); }
@@ -159,7 +159,7 @@ fn builtin_is_b_smooth(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Primorial p_n# = product of first n primes
-fn builtin_primorial_n(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_primorial_n(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     let mut count = 0_i64;
     let mut prod = 1_i128;
@@ -185,7 +185,7 @@ fn builtin_primorial_n(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Catalan's pseudoprime base 2 test
-fn builtin_pseudoprime_base2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pseudoprime_base2(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     if n < 4 { return Ok(StrykeValue::integer(0)); }
     fn pow_mod(mut b: i128, mut e: i128, m: i128) -> i128 {
@@ -196,7 +196,7 @@ fn builtin_pseudoprime_base2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Strong pseudoprime test for base a
-fn builtin_strong_pseudoprime(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_strong_pseudoprime(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     let a = args.get(1).map(|v| v.to_number() as i64).unwrap_or(2);
     if n < 3 || n % 2 == 0 { return Ok(StrykeValue::integer(0)); }
@@ -224,7 +224,7 @@ fn builtin_strong_pseudoprime(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // AKS primality witness step: tests whether (X + a)^n ≡ X^n + a (mod X^r - 1, n)
 // holds for given (n, r, a). Uses square-and-multiply over the ring R = ℤ_n[X]/(X^r-1).
 // Returns 1 if the congruence holds (n passes the step), 0 if a counter-example.
-fn builtin_aks_witness_count(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_aks_witness_count(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(2);
     let r = args.get(1).map(|v| v.to_number() as i64).unwrap_or(7).max(2);
     let a = args.get(2).map(|v| v.to_number() as i64).unwrap_or(1).rem_euclid(n);
@@ -261,7 +261,7 @@ fn builtin_aks_witness_count(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Quadratic sieve smoothness (return 1 if x² mod n is B-smooth)
-fn builtin_qs_relation(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_qs_relation(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = i1(args);
     let n = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
     let b = args.get(2).map(|v| v.to_number() as i64).unwrap_or(10);
@@ -276,7 +276,7 @@ fn builtin_qs_relation(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Index calculus easy case (small group)
-fn builtin_index_calculus_naive(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_index_calculus_naive(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let g = i1(args);
     let h = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
     let p = args.get(2).map(|v| v.to_number() as i64).unwrap_or(2);
@@ -290,7 +290,7 @@ fn builtin_index_calculus_naive(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 // LLL reduction one-pass (reduces 2x2 lattice basis vectors)
-fn builtin_lll_2x2_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lll_2x2_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let b1: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let b2: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
@@ -312,14 +312,14 @@ fn builtin_lll_2x2_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Coppersmith's theorem (1996): for a monic polynomial f(X) ∈ ℤ[X] of degree d
 // reduced mod N, there is a polynomial-time algorithm (LLL-based) that finds
 // every root x₀ ∈ ℤ with |x₀| < N^(1/d) − ε. This returns the exact bound N^(1/d).
-fn builtin_coppersmith_bound(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_coppersmith_bound(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     let degree = args.get(1).map(|v| v.to_number()).unwrap_or(2.0).max(1.0);
     Ok(StrykeValue::float(n.powf(1.0 / degree)))
 }
 
 // Shor period-finding measurement probability for r | period
-fn builtin_shor_period_prob(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_shor_period_prob(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = f1(args);
     let q = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if q == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -327,7 +327,7 @@ fn builtin_shor_period_prob(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // RSA key exponent inverse e * d ≡ 1 mod φ(n)
-fn builtin_rsa_d_from_e(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rsa_d_from_e(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let e = i1(args);
     let phi_n = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
     fn ext_gcd(a: i64, b: i64) -> (i64, i64, i64) {
@@ -340,12 +340,12 @@ fn builtin_rsa_d_from_e(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Diffie-Hellman shared secret
-fn builtin_dh_secret(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_dh_secret(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_mod_exp(args)
 }
 
 // ElGamal encryption pair (g^k, h * y^k)
-fn builtin_elgamal_encrypt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_elgamal_encrypt(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let g = i1(args);
     let h = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     let y = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -361,7 +361,7 @@ fn builtin_elgamal_encrypt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // ECC point doubling on y² = x³ + ax + b (over GF(p))
-fn builtin_ecc_point_double(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ecc_point_double(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = i1(args);
     let y = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     let a = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -379,7 +379,7 @@ fn builtin_ecc_point_double(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Continued fraction expansion of √n (first k terms)
-fn builtin_continued_fraction_sqrt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_continued_fraction_sqrt(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     let k = args.get(1).map(|v| v.to_number() as usize).unwrap_or(10);
     let a0 = (n as f64).sqrt() as i64;
@@ -397,7 +397,7 @@ fn builtin_continued_fraction_sqrt(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 // Pell equation x² - n·y² = 1 fundamental solution (small n)
-fn builtin_pell_fundamental(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pell_fundamental(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     if n <= 0 { return Ok(StrykeValue::array(vec![StrykeValue::integer(1), StrykeValue::integer(0)])); }
     let sqrt_n = (n as f64).sqrt() as i64;
@@ -421,7 +421,7 @@ fn builtin_pell_fundamental(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Sum of two squares representation (Gaussian integers)
-fn builtin_sum_two_squares(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sum_two_squares(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     let limit = (n as f64).sqrt() as i64;
     for a in 0..=limit {
@@ -441,7 +441,7 @@ fn builtin_sum_two_squares(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // For an imaginary quadratic field K = ℚ(√−d), n = 2 and r₂ = 1, giving
 //   M_K = (2/π) · √d.
 // Args: |d|, degree n, number of complex places r₂.
-fn builtin_class_number_bound(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_class_number_bound(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let d = f1(args).abs();
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(2.0).max(1.0);
     let r2 = args.get(2).map(|v| v.to_number()).unwrap_or(1.0).max(0.0);
@@ -455,7 +455,7 @@ fn builtin_class_number_bound(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Smith normal form reduction (1 step on 2x2 integer matrix)
-fn builtin_smith_normal_2x2_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_smith_normal_2x2_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     if m.len() < 2 || m[0].len() < 2 { return Ok(StrykeValue::array(vec![])); }
     let a = m[0][0]; let b = m[0][1]; let c = m[1][0]; let d = m[1][1];
@@ -464,14 +464,14 @@ fn builtin_smith_normal_2x2_step(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 // Stark unit (for heuristic class group computations)
-fn builtin_regulator_naive(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_regulator_naive(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let d = f1(args);
     if d <= 0.0 { return Ok(StrykeValue::float(0.0)); }
     Ok(StrykeValue::float(d.ln()))
 }
 
 // Power-residue check x^(N-1) mod N for fixed base
-fn builtin_power_residue_check(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_power_residue_check(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = i1(args);
     let n = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
     if n <= 1 { return Ok(StrykeValue::integer(0)); }
@@ -483,7 +483,7 @@ fn builtin_power_residue_check(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 // Wieferich-like prime test
-fn builtin_wieferich_check(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_wieferich_check(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = i1(args);
     if p <= 2 { return Ok(StrykeValue::integer(0)); }
     fn pow_mod(mut b: i128, mut e: i128, m: i128) -> i128 {
@@ -495,7 +495,7 @@ fn builtin_wieferich_check(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Wilson's theorem ((p-1)! ≡ -1 mod p) test
-fn builtin_wilson_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_wilson_test(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = i1(args);
     if p < 2 { return Ok(StrykeValue::integer(0)); }
     let mut fact = 1_i128;
@@ -504,7 +504,7 @@ fn builtin_wilson_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Goldbach decomposition (find one p+q = n for even n)
-fn builtin_goldbach_pair(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_goldbach_pair(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     if n < 4 || !n % 2 == 0 { return Ok(StrykeValue::integer(0)); }
     fn is_prime(n: i64) -> bool {
@@ -522,7 +522,7 @@ fn builtin_goldbach_pair(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Frequency analysis distance from English (chi-squared)
-fn builtin_english_likeness(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_english_likeness(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string().to_ascii_uppercase()).unwrap_or_default();
     let mut counts = vec![0_f64; 26];
     let mut total = 0_f64;
@@ -545,7 +545,7 @@ fn builtin_english_likeness(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // XOR cipher break: best single-byte key by lowest English chi²
-fn builtin_xor_break_singlebyte(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_xor_break_singlebyte(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let bytes: Vec<u8> = s.bytes().collect();
     let english = [0.0817, 0.0149, 0.0278, 0.0425, 0.1270, 0.0223, 0.0202, 0.0609,
@@ -581,7 +581,7 @@ fn builtin_xor_break_singlebyte(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 // Bit reverse 32
 
 // Bit reverse 64
-fn builtin_bit_reverse_64(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bit_reverse_64(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = i1(args) as u64;
     Ok(StrykeValue::integer(x.reverse_bits() as i64))
 }
@@ -591,7 +591,7 @@ fn builtin_bit_reverse_64(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Leading zeros count
 
 // Galois field GF(2^8) multiply (AES-like)
-fn builtin_gf256_multiply(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gf256_multiply(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut a = i1(args) as u8;
     let mut b = args.get(1).map(|v| v.to_number() as u8).unwrap_or(0);
     let mut p = 0_u8;
@@ -606,7 +606,7 @@ fn builtin_gf256_multiply(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Hash combiner (boost-style)
-fn builtin_hash_combine(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hash_combine(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let h1 = i1(args) as u64;
     let h2 = args.get(1).map(|v| v.to_number() as u64).unwrap_or(0);
     let combined = h1 ^ (h2.wrapping_add(0x9e3779b9).wrapping_add(h1 << 6).wrapping_add(h1 >> 2));

@@ -45,7 +45,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::ast::Program;
 use crate::bytecode::Chunk;
-use crate::error::{StrykeError, PerlResult};
+use crate::error::{StrykeError, StrykeResult};
 use crate::value::StrykeValue;
 
 /// Magic header bytes — fail-fast if a wrong-format file is mmap'd.
@@ -294,7 +294,7 @@ impl ScriptCache {
         mtime_nsecs: i64,
         program: &Program,
         chunk: &Chunk,
-    ) -> PerlResult<()> {
+    ) -> StrykeResult<()> {
         let program_bytes =
             bincode::serialize(program).map_err(|e| StrykeError::runtime(e.to_string(), 0))?;
         let chunk_bytes =
@@ -455,7 +455,7 @@ fn read_owned_shard(path: &Path) -> Option<ScriptShard> {
     archived.deserialize(&mut rkyv::Infallible).ok()
 }
 
-fn write_shard_atomic(path: &Path, shard: &ScriptShard) -> PerlResult<()> {
+fn write_shard_atomic(path: &Path, shard: &ScriptShard) -> StrykeResult<()> {
     let bytes = rkyv::to_bytes::<_, 4096>(shard)
         .map_err(|e| StrykeError::runtime(format!("rkyv serialize: {}", e), 0))?;
 
@@ -557,7 +557,7 @@ pub fn try_load(path: &Path) -> Option<CachedScript> {
 }
 
 /// Store a compiled script in the cache.
-pub fn try_save(path: &Path, program: &Program, chunk: &Chunk) -> PerlResult<()> {
+pub fn try_save(path: &Path, program: &Program, chunk: &Chunk) -> StrykeResult<()> {
     let Some(cache) = CACHE.as_ref() else {
         return Ok(());
     };

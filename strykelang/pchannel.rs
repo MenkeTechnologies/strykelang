@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use crossbeam::channel::{self, Receiver, Select};
 
-use crate::error::{StrykeError, PerlResult};
+use crate::error::{StrykeError, StrykeResult};
 use crate::value::StrykeValue;
 
 /// `pchannel()` — two-element list `(tx, rx)` for `my ($tx, $rx) = pchannel`.
@@ -28,7 +28,7 @@ pub fn create_bounded_pair(capacity: usize) -> StrykeValue {
 
 /// Multiplexed receive — `crossbeam_channel::Select` over several `pchannel` receivers.
 /// Returns `(value, index)` where `index` is **0-based** (first argument is `0`), like Go's `select`.
-pub fn pselect_recv(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+pub fn pselect_recv(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     if args.is_empty() {
         return Err(StrykeError::runtime(
             "pselect() expects at least one pchannel receiver",
@@ -68,7 +68,7 @@ pub fn pselect_recv_with_optional_timeout(
     args: &[StrykeValue],
     timeout: Option<Duration>,
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     if args.is_empty() {
         return Err(StrykeError::runtime(
             "pselect() expects at least one pchannel receiver",
@@ -119,7 +119,7 @@ pub fn dispatch_method(
     method: &str,
     args: &[StrykeValue],
     line: usize,
-) -> Option<PerlResult<StrykeValue>> {
+) -> Option<StrykeResult<StrykeValue>> {
     if method == "send" {
         if let Some(tx) = receiver.as_channel_tx() {
             if args.len() != 1 {

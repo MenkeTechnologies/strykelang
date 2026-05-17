@@ -7,7 +7,7 @@ use crate::ast::{
     Block, DerefKind, Expr, ExprKind, MatchArrayElem, Program, Sigil, Statement, StmtKind,
     StringPart, SubSigParam,
 };
-use crate::error::{ErrorKind, StrykeError, PerlResult};
+use crate::error::{ErrorKind, StrykeError, StrykeResult};
 
 static BUILTINS: OnceLock<HashSet<&'static str>> = OnceLock::new();
 
@@ -163,7 +163,7 @@ impl StaticAnalyzer {
             .push(StrykeError::new(kind, msg, line, &self.file));
     }
 
-    pub fn analyze(mut self, program: &Program) -> PerlResult<()> {
+    pub fn analyze(mut self, program: &Program) -> StrykeResult<()> {
         for stmt in &program.statements {
             self.collect_declarations_stmt(stmt);
         }
@@ -971,7 +971,7 @@ fn is_topic_var(name: &str) -> bool {
     name.starts_with('_') && name.len() > 1 && name[1..].chars().all(|c| c.is_ascii_digit())
 }
 
-pub fn analyze_program(program: &Program, file: &str) -> PerlResult<()> {
+pub fn analyze_program(program: &Program, file: &str) -> StrykeResult<()> {
     StaticAnalyzer::new(file).analyze(program)
 }
 
@@ -983,7 +983,7 @@ pub fn analyze_program_with_strict(
     program: &Program,
     file: &str,
     strict_vars: bool,
-) -> PerlResult<()> {
+) -> StrykeResult<()> {
     StaticAnalyzer::with_strict_vars(file, strict_vars).analyze(program)
 }
 
@@ -998,7 +998,7 @@ mod tests {
     /// for `stryke check` — strict-vars-style errors are gated on the
     /// source actually doing `use strict;`); this helper exercises the
     /// strict-on path that the rest of the tests below assume.
-    fn lint(code: &str) -> PerlResult<()> {
+    fn lint(code: &str) -> StrykeResult<()> {
         let prog = parse_with_file(code, "test.stk").expect("parse");
         analyze_program_with_strict(&prog, "test.stk", true)
     }
