@@ -21861,4 +21861,80 @@ mod tests {
              while ($i + $z[$i] < $n && $c[$z[$i]] eq $c[$i + $z[$i]]) { $z[$i]++ }",
         );
     }
+
+    /// BFS expansion with parent-linked hashref nodes — A* /
+    /// general pathfinding shape. Inner `for` over neighbor offsets.
+    #[test]
+    fn bfs_with_parent_link_node_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my @open = (+{ r => 0, c => 0, g => 0, parent => undef }); \
+             while (len(@open) > 0) { \
+                my $cur = shift @open; \
+                for my $d ([-1, 0], [1, 0], [0, -1], [0, 1]) { \
+                    my ($dr, $dc) = @$d; \
+                    push @open, +{ \
+                        r => $cur->{r} + $dr, c => $cur->{c} + $dc, \
+                        g => $cur->{g} + 1, parent => $cur \
+                    } \
+                } \
+                last \
+             }",
+        );
+    }
+
+    /// Cross-product sort comparator with collinear tiebreak —
+    /// Graham scan's polar sort.
+    #[test]
+    fn cross_product_sort_comparator_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "fn Hull::cross($p1, $p2, $p3) = \
+                ($p2->[0] - $p1->[0]) * ($p3->[1] - $p1->[1]) - \
+                ($p2->[1] - $p1->[1]) * ($p3->[0] - $p1->[0]); \
+             my $pivot = [0, 0]; my @pts = ([1, 1], [2, 0]); \
+             my @sorted = sort { \
+                my $c = Hull::cross($pivot, _0, _1); \
+                $c == 0 ? 0 : ($c < 0 ? 1 : -1) \
+             } @pts",
+        );
+    }
+
+    /// Lomuto partition + recursive bisection — quickselect's loop.
+    /// Inner loop with `$i++` + swap on each match.
+    #[test]
+    fn lomuto_partition_loop_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "fn QS::partition($arr, $lo, $hi) { \
+                my $pivot = $arr->[$hi]; \
+                my $i = $lo - 1; \
+                for my $j ($lo:$hi - 1) { \
+                    if ($arr->[$j] <= $pivot) { \
+                        $i++; \
+                        ($arr->[$i], $arr->[$j]) = ($arr->[$j], $arr->[$i]) \
+                    } \
+                } \
+                ($arr->[$i + 1], $arr->[$hi]) = ($arr->[$hi], $arr->[$i + 1]); \
+                $i + 1 \
+             }",
+        );
+    }
+
+    /// `do { x } while (cond)` shape with diff-then-gcd — Pollard rho's
+    /// tortoise-and-hare loop. Tests absolute-difference via ternary.
+    #[test]
+    fn tortoise_hare_diff_loop_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my $x = 2; my $y = 2; my $n = 35; my $d = 1; \
+             while ($d == 1) { \
+                $x = ($x * $x + 1) % $n; \
+                $y = ($y * $y + 1) % $n; \
+                $y = ($y * $y + 1) % $n; \
+                my $diff = $x > $y ? $x - $y : $y - $x; \
+                $d = $diff \
+             }",
+        );
+    }
 }

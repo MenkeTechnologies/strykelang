@@ -1,0 +1,139 @@
+#!/usr/bin/env stryke
+
+# Graham scan — compute the convex hull of a 2-D point set in
+# O(n log n). Pick the lowest-y point as pivot, polar-sort the rest
+# around it, then push points onto a stack popping when a right turn
+# (clockwise) appears. Returns hull vertices in counter-clockwise
+# order. Parses clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * implicit return on tail (rule 7)
+#   * `#{…}` interpolation (rule 1a)
+#   * `len`, `:` ranges (rules 4, 5)
+#
+# Namespaced UDFs `Hull::*`.
+#
+# Run: stryke --no-interop examples/graham_scan_no_interop.stk
+
+# Cross product of vectors (p1→p2) × (p1→p3).
+# > 0 → counter-clockwise turn
+# < 0 → clockwise turn
+# = 0 → collinear
+fn Hull::cross($p1, $p2, $p3) =
+    ($p2->[0] - $p1->[0]) * ($p3->[1] - $p1->[1]) -
+    ($p2->[1] - $p1->[1]) * ($p3->[0] - $p1->[0])
+
+# Squared distance — used to break collinear ties.
+fn Hull::dist2($p1, $p2) =
+    ($p1->[0] - $p2->[0]) ** 2 + ($p1->[1] - $p2->[1]) ** 2
+
+# Compute convex hull. Returns arrayref of vertices in CCW order.
+# Degenerate cases (0, 1, 2 points): return the input as-is.
+fn Hull::scan($points) {
+    my @pts = @$points
+    my $n = len @pts
+    return \@pts if $n < 3
+
+    # Find pivot: lowest y, leftmost x as tiebreaker.
+    my $pivot_i = 0
+    for my $i (1:$n - 1) {
+        if ($pts[$i][1] < $pts[$pivot_i][1] ||
+            ($pts[$i][1] == $pts[$pivot_i][1] && $pts[$i][0] < $pts[$pivot_i][0])) {
+            $pivot_i = $i
+        }
+    }
+    my $pivot = $pts[$pivot_i]
+    # Swap pivot to position 0.
+    ($pts[0], $pts[$pivot_i]) = ($pts[$pivot_i], $pts[0])
+
+    # Sort remaining points by polar angle around pivot.
+    # Use cross product to compare angles without trig.
+    my @rest = @pts[1:$n - 1]
+    @rest = sort {
+        my $c = Hull::cross($pivot, _0, _1)
+        if ($c == 0) {
+            # Collinear: nearer point first (it'll be skipped later).
+            Hull::dist2($pivot, _0) <=> Hull::dist2($pivot, _1)
+        } else {
+            $c < 0 ? 1 : -1
+        }
+    } @rest
+
+    # Push onto hull stack, popping right turns.
+    my @hull = ($pivot, $rest[0])
+    for my $i (1:len(@rest) - 1) {
+        while (len(@hull) >= 2 &&
+               Hull::cross($hull[-2], $hull[-1], $rest[$i]) <= 0) {
+            pop @hull
+        }
+        push @hull, $rest[$i]
+    }
+    \@hull
+}
+
+# Render a point as "(x,y)" for stable comparison.
+fn Hull::fmt($p) = "(" . $p->[0] . "," . $p->[1] . ")"
+
+p "── Graham scan convex hull demo ──"
+
+# Classic 7-point set with a known 4-vertex hull.
+my @set1 = (
+    [0, 3], [1, 1], [2, 2], [4, 4],
+    [0, 0], [1, 2], [3, 1], [3, 3],
+)
+my $hull1 = Hull::scan(\@set1)
+# Hull should be the bounding rectangle-ish: (0,0), (3,1), (4,4), (0,3).
+my @hull_strs = map { Hull::fmt(_) } @$hull1
+die "8-point set hull len: got #{len @$hull1}" unless len(@$hull1) == 4
+die "hull must include (0,0)" unless grep { _ eq "(0,0)" } @hull_strs
+die "hull must include (4,4)" unless grep { _ eq "(4,4)" } @hull_strs
+die "hull must include (0,3)" unless grep { _ eq "(0,3)" } @hull_strs
+die "hull must include (3,1)" unless grep { _ eq "(3,1)" } @hull_strs
+p "  8-point set: 4-vertex hull (0,0)/(3,1)/(4,4)/(0,3)  OK"
+
+# Square — all 4 corners are hull vertices, interior point excluded.
+my @square = ([0,0], [4,0], [4,4], [0,4], [2,2])
+my $h2 = Hull::scan(\@square)
+die "square hull = 4 corners" unless len(@$h2) == 4
+my @h2s = sort map { Hull::fmt(_) } @$h2
+die "square corners only" unless join(" ", @h2s) eq "(0,0) (0,4) (4,0) (4,4)"
+p "  square w/ interior point: interior excluded, 4 corners only  OK"
+
+# Triangle — already a hull.
+my @tri = ([0, 0], [4, 0], [2, 3])
+my $h3 = Hull::scan(\@tri)
+die "triangle hull = 3" unless len(@$h3) == 3
+p "  triangle: hull = 3 input vertices  OK"
+
+# Degenerate: 2 points.
+my $h4 = Hull::scan([[1, 1], [3, 3]])
+die "2-pt input → 2-pt result" unless len(@$h4) == 2
+
+# Collinear points: hull should be just the two extremes.
+my @colinear = ([0, 0], [1, 1], [2, 2], [3, 3], [4, 4])
+my $h5 = Hull::scan(\@colinear)
+die "collinear hull = 2 endpoints" unless len(@$h5) == 2
+p "  5 collinear points: hull = 2 endpoints  OK"
+
+# Universal invariants:
+#   * Hull vertices are a subset of input points
+#   * Walking the hull, every cross product is non-negative (CCW)
+for my $set ([\@set1], [\@square]) {
+    my $input = $set->[0]
+    my $h = Hull::scan($input)
+    my %input_set
+    for my $p (@$input) { $input_set{Hull::fmt($p)} = 1 }
+    for my $hp (@$h) {
+        die "hull vertex not in input" unless exists $input_set{Hull::fmt($hp)}
+    }
+    next if len(@$h) < 3
+    for my $i (0:len(@$h) - 1) {
+        my $p0 = $h->[$i]
+        my $p1 = $h->[($i + 1) % len(@$h)]
+        my $p2 = $h->[($i + 2) % len(@$h)]
+        die "CCW invariant violated" if Hull::cross($p0, $p1, $p2) < 0
+    }
+}
+
+p ""
+p "  ALL PASS (8-pt + square + triangle + 2-pt + collinear + subset/CCW invariants)"
