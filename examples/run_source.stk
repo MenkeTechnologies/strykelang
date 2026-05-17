@@ -7,33 +7,33 @@
 #   source(PATH)           — execute a stryke script in *this* interpreter
 #                            (vars, fns, classes leak into the caller)
 
-p "── run a binary — output streams to parent ────────────";
-my $rc = run("echo", "hello", "from", "run");
-p "  exit code: $rc";
+p "── run a binary — output streams to parent ────────────"
+my $rc = run("echo", "hello", "from", "run")
+p "  exit code: $rc"
 
-p "";
-p "── run a binary that doesn't exist ────────────────────";
-my $rc2 = run("definitely-not-a-real-binary-xyz");
-p "  exit code on missing binary: $rc2  (negative on spawn failure)";
+p ""
+p "── run a binary that doesn't exist ────────────────────"
+my $rc2 = run("definitely-not-a-real-binary-xyz")
+p "  exit code on missing binary: $rc2  (negative on spawn failure)"
 
-p "";
-p "── run a stryke script — isolated state ───────────────";
-my $tmp = "/tmp/stryke_run_demo_child.stk";
+p ""
+p "── run a stryke script — isolated state ───────────────"
+my $tmp = "/tmp/stryke_run_demo_child.stk"
 spurt($tmp, join("\n",
     'p "  [child] running in a separate process";',
     'p "  [child] args      : ", join(",", @ARGV);',
     'p "  [child] cpid pid  : $$";',
     'my $secret = "this stays in the child";',
     "",
-));
-my $rc3 = run($tmp, "arg1", "arg2", "arg3");
-p "  parent exit code  : $rc3";
-p "  parent sees \$secret? ", (defined $secret ? "yes (BUG)" : "no");
-unlink($tmp);
+))
+my $rc3 = run($tmp, "arg1", "arg2", "arg3")
+p "  parent exit code  : $rc3"
+p "  parent sees \$secret? ", (defined $secret ? "yes (BUG)" : "no")
+unlink($tmp)
 
-p "";
-p "── source a stryke script — state INTO this interp ────";
-my $lib = "/tmp/stryke_source_demo_lib.stk";
+p ""
+p "── source a stryke script — state INTO this interp ────"
+my $lib = "/tmp/stryke_source_demo_lib.stk"
 spurt($lib, join("\n",
     '# A small "library" — sourcing it injects definitions into the caller.',
     'our $LIB_NAME    = "demo-lib";',
@@ -41,47 +41,47 @@ spurt($lib, join("\n",
     'fn Demo::Lib::greet($who) { "hello from $LIB_NAME v$LIB_VERSION: $who!" }',
     'fn Demo::Lib::add($x, $y) { $x + $y }',
     "",
-));
+))
 
-source($lib);
-p "  after source:";
-p "    LIB_NAME     : $LIB_NAME";
-p "    LIB_VERSION  : $LIB_VERSION";
-p "    greet('bob') : ", Demo::Lib::greet("bob");
-p "    add(2, 3)    : ", Demo::Lib::add(2, 3);
+source($lib)
+p "  after source:"
+p "    LIB_NAME     : $LIB_NAME"
+p "    LIB_VERSION  : $LIB_VERSION"
+p "    greet('bob') : ", Demo::Lib::greet("bob")
+p "    add(2, 3)    : ", Demo::Lib::add(2, 3)
 
-unlink($lib);
+unlink($lib)
 
-p "";
-p "── source loads multiple fn definitions at once ───────";
-my $lib2 = "/tmp/stryke_source_demo_lib2.stk";
+p ""
+p "── source loads multiple fn definitions at once ───────"
+my $lib2 = "/tmp/stryke_source_demo_lib2.stk"
 spurt($lib2, join("\n",
     'fn Demo::Newfn::one   { 1 }',
     'fn Demo::Newfn::two   { 2 }',
     'fn Demo::Newfn::three { 3 }',
     "",
-));
-source($lib2);
-my $sum = Demo::Newfn::one() + Demo::Newfn::two() + Demo::Newfn::three();
-p "  one()+two()+three() after source : $sum";
-unlink($lib2);
+))
+source($lib2)
+my $sum = Demo::Newfn::one() + Demo::Newfn::two() + Demo::Newfn::three()
+p "  one()+two()+three() after source : $sum"
+unlink($lib2)
 
-p "";
-p "── Composing run + KV store ───────────────────────────";
+p ""
+p "── Composing run + KV store ───────────────────────────"
 # A self-contained script that writes to a KV store, then we read it
 # from the parent. Demonstrates the file-system as the IPC channel.
-my $worker = "/tmp/stryke_run_worker.stk";
-my $kvpath = "/tmp/stryke_run_kv.rkyv";
-unlink($kvpath);
+my $worker = "/tmp/stryke_run_worker.stk"
+my $kvpath = "/tmp/stryke_run_kv.rkyv"
+unlink($kvpath)
 spurt($worker, join("\n",
     'my $db = kv_open("' . $kvpath . '");',
     'kv_put($db, "from_child", "value-set-in-subprocess");',
     'kv_commit($db);',
     "",
-));
-run($worker);
+))
+run($worker)
 
-my $db = kv_open($kvpath);
-p "  parent reads child's write: ", kv_get($db, "from_child");
-unlink($worker);
-unlink($kvpath);
+my $db = kv_open($kvpath)
+p "  parent reads child's write: ", kv_get($db, "from_child")
+unlink($worker)
+unlink($kvpath)

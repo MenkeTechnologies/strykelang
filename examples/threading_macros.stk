@@ -81,11 +81,11 @@ p "\n═══ par_reduce"
 
 # Single-block form: type-aware auto-merge (hash<num> → key-wise add,
 # numeric → sum, array → concat, string → concat).
-my $tot_len = ~> "abcdefghij" par_reduce { length(_) }
+my $tot_len = ~> "abcdefghij" par_reduce { len(_) }
 p "  auto-sum: $tot_len"
 
 # Two-block form: explicit pairwise reducer with `_0` / `_1`.
-my $manual = ~> "abcdefghij" par_reduce { length(_) } { _0 + _1 }
+my $manual = ~> "abcdefghij" par_reduce { len(_) } { _0 + _1 }
 p "  explicit reducer: $manual"
 
 # Maximum word length via custom reducer.
@@ -112,7 +112,7 @@ my $words = ~p> c("**.stk") words freq
 p "  unique words across .stk: ", len(keys %$words)
 
 # Total character count across the corpus (per_reduce + auto-merge).
-my $total_chars = ~p> c("**.stk") par_reduce { length(_) }
+my $total_chars = ~p> c("**.stk") par_reduce { len(_) }
 p "  total chars: $total_chars"
 
 # Total line count across the corpus.

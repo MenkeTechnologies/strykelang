@@ -15,34 +15,34 @@
 # ── one solver ────────────────────────────────────────────────────
 
 fn Demo::KS::solve($items_ref, $capacity) {
-    my $n = len(@$items_ref);
-    my @dp;
+    my $n = len(@$items_ref)
+    my @dp
     for my $i (0:$n) {
-        push @dp, [(0) x ($capacity + 1)];
+        push @dp, [(0) x ($capacity + 1)]
     }
 
     for my $i (1:$n) {
-        my $item = $items_ref->[$i - 1];
-        my $w = $item->{w};
-        my $v = $item->{v};
+        my $item = $items_ref->[$i - 1]
+        my $w = $item->{w}
+        my $v = $item->{v}
         for my $cap (0:$capacity) {
             if ($w > $cap) {
-                $dp[$i]->[$cap] = $dp[$i - 1]->[$cap];
+                $dp[$i]->[$cap] = $dp[$i - 1]->[$cap]
             } else {
-                my $skip = $dp[$i - 1]->[$cap];
-                my $take = $dp[$i - 1]->[$cap - $w] + $v;
-                $dp[$i]->[$cap] = $skip > $take ? $skip : $take;
+                my $skip = $dp[$i - 1]->[$cap]
+                my $take = $dp[$i - 1]->[$cap - $w] + $v
+                $dp[$i]->[$cap] = $skip > $take ? $skip : $take
             }
         }
     }
 
     # Backtrack
-    my @chosen;
-    my $cap = $capacity;
+    my @chosen
+    my $cap = $capacity
     for my $i (rev 1:$n) {
         if ($dp[$i]->[$cap] != $dp[$i - 1]->[$cap]) {
-            unshift @chosen, $items_ref->[$i - 1];
-            $cap -= $items_ref->[$i - 1]->{w};
+            unshift @chosen, $items_ref->[$i - 1]
+            $cap -= $items_ref->[$i - 1]->{w}
         }
     }
 
@@ -117,74 +117,73 @@ my @instances = (
             { name => "tuner",      w => 1,  v => 20  },
         ],
     },
-);
+)
 
 # ── sketches ──────────────────────────────────────────────────────
 
-my $td_eff   = t_digest(100);
-my $tk_item  = topk(16);
-my $hll_name = hll(12);
+my $td_eff   = t_digest(100)
+my $tk_item  = topk(16)
+my $hll_name = hll(12)
 
 # ── parallel solve ────────────────────────────────────────────────
 
-print "0/1 knapsack solver — ", len(@instances), " instances\n";
-print "─" x 60, "\n";
-
-my $t0 = now_ns();
-my @results = pmap { Demo::KS::solve($_->{items}, $_->{capacity}) } @instances;
-my $elapsed_us = (now_ns() - $t0) / 1000.0;
+p "0/1 knapsack solver — ", len(@instances), " instances"
+p "─" x 60
+my $t0 = now_ns()
+my @results = pmap { Demo::KS::solve($_->{items}, $_->{capacity}) } @instances
+my $elapsed_us = (now_ns() - $t0) / 1000.0
 
 # ── report each ───────────────────────────────────────────────────
 
 for my $i (0:len(@instances) - 1) {
-    my $inst = $instances[$i];
-    my $res  = $results[$i];
-    my $cap  = $inst->{capacity};
-    my $val  = $res->{max_value};
-    my $used = $res->{used_w};
-    my $eff  = $used > 0 ? $val / $used : 0;
-    td_add($td_eff, $eff);
+    my $inst = $instances[$i]
+    my $res  = $results[$i]
+    my $cap  = $inst->{capacity}
+    my $val  = $res->{max_value}
+    my $used = $res->{used_w}
+    my $eff  = $used > 0 ? $val / $used : 0
+    td_add($td_eff, $eff)
 
     printf("\n[%s] capacity=%d  max_value=%d  weight_used=%d/%d (%.0f%% full)  eff=%.2f v/w\n",
-           $inst->{name}, $cap, $val, $used, $cap, 100 * $used / $cap, $eff);
+           $inst->{name}, $cap, $val, $used, $cap, 100 * $used / $cap, $eff)
 
     for my $item (@{$res->{chosen}}) {
-        printf("    %-12s w=%2d  v=%4d\n", $item->{name}, $item->{w}, $item->{v});
-        topk_add($tk_item, $item->{name});
-        hll_add($hll_name, $item->{name});
+        printf("    %-12s w=%2d  v=%4d\n", $item->{name}, $item->{w}, $item->{v})
+        topk_add($tk_item, $item->{name})
+        hll_add($hll_name, $item->{name})
     }
     printf("    ── chose %d/%d items\n",
-           len(@{$res->{chosen}}), len(@{$inst->{items}}));
+           len(@{$res->{chosen}}), len(@{$inst->{items}}))
 }
 
-printf("\nsolved all in %.0f us (parallel pmap)\n", $elapsed_us);
+printf("\nsolved all in %.0f us (parallel pmap)\n", $elapsed_us)
 
 # ── distribution ─────────────────────────────────────────────────
 
-print "\nvalue-per-weight efficiency across instances:\n";
-printf("  p10 = %.2f\n", td_quantile($td_eff, 0.10));
-printf("  p50 = %.2f\n", td_quantile($td_eff, 0.50));
-printf("  p90 = %.2f\n", td_quantile($td_eff, 0.90));
+p "\nvalue-per-weight efficiency across instances:"
+printf("  p10 = %.2f\n", td_quantile($td_eff, 0.10))
+printf("  p50 = %.2f\n", td_quantile($td_eff, 0.50))
+printf("  p90 = %.2f\n", td_quantile($td_eff, 0.90))
 
 # ── most-chosen items overall ────────────────────────────────────
 
-print "\nmost-chosen items overall (TopK):\n";
-my @top = topk_top($tk_item, 8);
+p "\nmost-chosen items overall (TopK):"
+my @top = topk_top($tk_item, 8)
 for my $p (@top) {
-    printf("  %-12s count=%d\n", $p->[0], $p->[1]);
+    printf("  %-12s count=%d\n", $p->[0], $p->[1])
 }
 
 # ── distinct items ───────────────────────────────────────────────
 
-my $hll_n = hll_count($hll_name);
-my %seen;
+my $hll_n = hll_count($hll_name)
+my %seen
 for my $inst (@instances) {
     for my $it (@{$inst->{items}}) {
-        $seen{$it->{name}} = 1;
+        $seen{$it->{name}} = 1
     }
 }
-my $total_distinct_items = len(keys %seen);
+my $total_distinct_items = len(keys %seen)
 printf("\ndistinct chosen items: HLL=%.1f vs catalog-distinct=%d\n",
-       $hll_n, $total_distinct_items);
+       $hll_n, $total_distinct_items)
 
-print "\nknapsack optimizer done\n";
+p "\nknapsack optimizer done"

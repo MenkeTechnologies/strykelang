@@ -7,9 +7,9 @@
 # in-memory state) — if any op rejects, everything rolls back to the
 # entry-time snapshot.
 
-my $path = "/tmp/kvstore_namespace.rkyv";
-unlink($path);
-my $db = kv_open($path);
+my $path = "/tmp/kvstore_namespace.rkyv"
+unlink($path)
+my $db = kv_open($path)
 
 # ─── insert into two "tables" via prefix ─────────────────────────────
 my $n = kv_batch($db, [
@@ -19,21 +19,21 @@ my $n = kv_batch($db, [
     ["put", "logs:001",    { ts => 1700000001, msg => "boot"     }],
     ["put", "logs:002",    { ts => 1700000123, msg => "request"  }],
     ["put", "logs:003",    { ts => 1700000456, msg => "shutdown" }],
-]);
-kv_commit($db);
-p "applied $n ops in one batch";
+])
+kv_commit($db)
+p "applied $n ops in one batch"
 
 # ─── scan one namespace ──────────────────────────────────────────────
-p "── users ──";
+p "── users ──"
 for my $row (kv_scan($db, "users:")) {
-    my ($key, $val) = @$row;
-    printf "  %-14s age=%d  role=%s\n", $key, $val->{age}, $val->{role};
+    my ($key, $val) = @$row
+    printf "  %-14s age=%d  role=%s\n", $key, $val->{age}, $val->{role}
 }
 
-p "── logs ──";
+p "── logs ──"
 for my $row (kv_scan($db, "logs:")) {
-    my ($key, $val) = @$row;
-    printf "  %-10s ts=%d  msg=%s\n", $key, $val->{ts}, $val->{msg};
+    my ($key, $val) = @$row
+    printf "  %-10s ts=%d  msg=%s\n", $key, $val->{ts}, $val->{msg}
 }
 
 # ─── atomic rollback demo: one bad op aborts the whole batch ─────────
@@ -43,17 +43,17 @@ eval {
         ["put", "users:eve",     { age => 22 }],
         ["NUKE_EVERYTHING", "*"],                # unknown op kind → throws
         ["put", "users:fingers", { age => 12 }],
-    ]);
-};
+    ])
+}
 if ($@) {
-    p "batch rejected — store unchanged:";
-    p "  dave   exists: ", kv_exists($db, "users:dave");
-    p "  eve    exists: ", kv_exists($db, "users:eve");
-    p "  alice  exists: ", kv_exists($db, "users:alice"), "  (untouched by rollback)";
+    p "batch rejected — store unchanged:"
+    p "  dave   exists: ", kv_exists($db, "users:dave")
+    p "  eve    exists: ", kv_exists($db, "users:eve")
+    p "  alice  exists: ", kv_exists($db, "users:alice"), "  (untouched by rollback)"
 }
 
-my $stats = kv_stats($db);
+my $stats = kv_stats($db)
 printf "\nstore: %d entries, %d commits, format v%d\n",
-    $stats->{entries}, $stats->{commit_count}, $stats->{format_version};
+    $stats->{entries}, $stats->{commit_count}, $stats->{format_version}
 
-unlink($path);
+unlink($path)

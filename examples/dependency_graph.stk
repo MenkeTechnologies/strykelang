@@ -125,7 +125,7 @@ for my $li (0:len(@layers) - 1) {
 printf "  total layers: %d (would allow up to %d-way parallel build)\n",
     len(@layers),
     do {
-        my $max = 0;
+        my $max = 0
         for my $l (@layers) { $max = len(@$l) if len(@$l) > $max }
         $max
     }

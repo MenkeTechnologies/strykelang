@@ -10,33 +10,33 @@
 #   bob deleted, still here: 0
 #   reopened from disk, found 2 users
 
-my $path = "/tmp/kvstore_basics.rkyv";
+my $path = "/tmp/kvstore_basics.rkyv"
 unlink($path);                                   # fresh demo each run
 
 # ─── open or create ──────────────────────────────────────────────────
-my $db = kv_open($path);
-p "opened: ", $path;
+my $db = kv_open($path)
+p "opened: ", $path
 
 # ─── put ─────────────────────────────────────────────────────────────
-kv_put($db, "alice", { age => 30, role => "admin" });
-kv_put($db, "bob",   { age => 28, role => "user"  });
-kv_put($db, "carol", { age => 41, role => "user"  });
-p "stored ", kv_len($db), " users";
+kv_put($db, "alice", { age => 30, role => "admin" })
+kv_put($db, "bob",   { age => 28, role => "user"  })
+kv_put($db, "carol", { age => 41, role => "user"  })
+p "stored ", kv_len($db), " users"
 
 # ─── get (compound values come back as hashrefs) ─────────────────────
-my $alice = kv_get($db, "alice");
-p "alice -> ", to_json($alice);
+my $alice = kv_get($db, "alice")
+p "alice -> ", to_json($alice)
 
 # ─── delete ──────────────────────────────────────────────────────────
-kv_del($db, "bob");
-p "bob deleted, still here: ", kv_exists($db, "bob");
+kv_del($db, "bob")
+p "bob deleted, still here: ", kv_exists($db, "bob")
 
 # ─── keys (sorted) ───────────────────────────────────────────────────
-p "remaining keys: ", join(", ", kv_keys($db));
+p "remaining keys: ", join(", ", kv_keys($db))
 
 # ─── commit + reopen for durability proof ────────────────────────────
-kv_commit($db);
-my $db2 = kv_open($path);
-p "reopened from disk, found ", kv_len($db2), " users";
+kv_commit($db)
+my $db2 = kv_open($path)
+p "reopened from disk, found ", kv_len($db2), " users"
 
-unlink($path);
+unlink($path)

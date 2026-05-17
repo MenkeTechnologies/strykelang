@@ -15,7 +15,7 @@ my $dna = "ATGAAACCTGCAGGCCCTGGGTAAGTCATGGCTCCTGAATAGTTTAAACCG" .
           "CGTGCTACGACGCATAGCCTAGCATGCAGCGTAGACGCATCAGTGCATGTC"
 
 printf "── DNA sequence: %d bases ───────────────────────────\n",
-    length($dna)
+    len($dna)
 
 # ── GC content ──────────────────────────────────────────────────────
 
@@ -24,7 +24,7 @@ my $nc = 0
 my $na = 0
 my $nt = 0
 my $other = 0
-for my $i (0:length($dna) - 1) {
+for my $i (0:len($dna) - 1) {
     my $ch = substr($dna, $i, 1)
     if    ($ch eq "G") { $ng++ }
     elsif ($ch eq "C") { $nc++ }
@@ -51,7 +51,7 @@ my $td_scan = t_digest(100)
 my $tk_codons = topk(5)
 
 my $i = 0
-while ($i + 3 <= length($dna)) {
+while ($i + 3 <= len($dna)) {
     my $t0 = now_ns()
     my $codon = substr($dna, $i, 3)
     $codon_count{$codon} = ($codon_count{$codon} // 0) + 1
@@ -77,7 +77,7 @@ my %complement = (A => "T", T => "A", G => "C", C => "G")
 
 fn Demo::Genome::reverse_complement($seq) {
     my $rc = ""
-    for my $i (rev(0:length($seq) - 1)) {
+    for my $i (rev(0:len($seq) - 1)) {
         my $ch = substr($seq, $i, 1)
         $rc .= ($complement{$ch} // "N")
     }
@@ -89,7 +89,7 @@ p ""
 p "── reverse complement (first 60 bases) ──────────────"
 printf "  orig : %s\n", substr($dna, 0, 60)
 printf "  rc   : %s\n", substr($rc, 0, 60)
-printf "  rc length : %d (must match input)\n", length($rc)
+printf "  rc length : %d (must match input)\n", len($rc)
 
 # ── ORF detection (between ATG start and TAA/TAG/TGA stop) ─────────
 
@@ -98,12 +98,12 @@ p "── open reading frames (ATG..STOP) ────────────�
 my @orfs
 for my $frame (0:2) {
     my $j = $frame
-    while ($j + 3 <= length($dna)) {
+    while ($j + 3 <= len($dna)) {
         my $codon = substr($dna, $j, 3)
         if ($codon eq "ATG") {
             # Look for stop codon.
             my $k = $j + 3
-            while ($k + 3 <= length($dna)) {
+            while ($k + 3 <= len($dna)) {
                 my $next = substr($dna, $k, 3)
                 if ($next eq "TAA" || $next eq "TAG" || $next eq "TGA") {
                     my $orf_len = $k + 3 - $j

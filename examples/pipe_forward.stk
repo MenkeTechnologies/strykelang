@@ -4,50 +4,50 @@
 # threaded into the first argument of the next call. Zero runtime cost —
 # parse-time only. Reads exactly like the data flows.
 
-p "── Basics ─────────────────────────────────────────────";
+p "── Basics ─────────────────────────────────────────────"
 my $r1 = 5 |> sqrt |> int;                     # int(sqrt(5)) = 2
-p "  5 |> sqrt |> int = $r1";
+p "  5 |> sqrt |> int = $r1"
 
 # Multi-arg: LHS threads into position 1; remaining args follow.
-my $r2 = "hello world" |> split(/ /);
-p "  'hello world' |> split(/ /) = (", join(",", $r2), ")";
+my $r2 = "hello world" |> split(/ /)
+p "  'hello world' |> split(/ /) = (", join(",", $r2), ")"
 
-p "";
-p "── Real pipeline — top-5 longest words ───────────────";
-my $text = "The quick brown fox jumps over the lazy dog repeatedly";
-my @top = $text |> split(/\s+/) |> sort { len(_1) <=> len(_0) };
-my @top5 = @top[0..4];
-p "  top 5: ", join(", ", @top5);
+p ""
+p "── Real pipeline — top-5 longest words ───────────────"
+my $text = "The quick brown fox jumps over the lazy dog repeatedly"
+my @top = $text |> split(/\s+/) |> sort { len(_1) <=> len(_0) }
+my @top5 = @top[0:4]
+p "  top 5: ", join(", ", @top5)
 
-p "";
-p "── Composing with sketches and KV ─────────────────────";
-my $words = bloom_filter(1000, 0.01);
-$text |> split(/\s+/) |> map { bloom_add($words, $_) };
-p "  'fox'  in bloom : ", bloom_contains($words, "fox");
-p "  'cat'  in bloom : ", bloom_contains($words, "cat");
+p ""
+p "── Composing with sketches and KV ─────────────────────"
+my $words = bloom_filter(1000, 0.01)
+$text |> split(/\s+/) |> map { bloom_add($words, $_) }
+p "  'fox'  in bloom : ", bloom_contains($words, "fox")
+p "  'cat'  in bloom : ", bloom_contains($words, "cat")
 
-p "";
-p "── Pipe into grep / map / sort / sum ──────────────────";
-my $total = (1..100)
+p ""
+p "── Pipe into grep / map / sort / sum ──────────────────"
+my $total = (1:100)
     |> map { $_ * $_ }
     |> grep { $_ % 2 == 0 }
-    |> sum;
-p "  sum of even squares 1..100 = $total";
+    |> sum
+p "  sum of even squares 1:100 = $total"
 
-p "";
-p "── Pipe-RHS sugar — `>{ BLOCK }` IIFE stage ───────────";
+p ""
+p "── Pipe-RHS sugar — `>{ BLOCK }` IIFE stage ───────────"
 # `>{ ... }` is an inline lambda you can wedge anywhere in a chain.
-my $info = (1..5) |> >{ "n=" . len(_) . "; first=" . _->[0] };
-p "  IIFE stage : $info";
+my $info = (1:5) |> >{ "n=" . len(_) . "; first=" . _->[0] }
+p "  IIFE stage : $info"
 
-p "";
-p "── Pipe into a builtin that needs args 2..N ───────────";
+p ""
+p "── Pipe into a builtin that needs args 2..N ───────────"
 # `sprintf` takes format + values; `|>` threads the value into position 1
 # of the format string slot, so reverse the role with explicit args.
-my $msg = 42 |> sprintf("answer=%d");
-p "  sprintf via |>  : $msg";
+my $msg = 42 |> sprintf("answer=%d")
+p "  sprintf via |>  : $msg"
 
-p "";
-p "── Pipe through reflection — query %b at runtime ──────";
-my $count = keys(%b) |> len;
-printf "  primary builtins reachable from REPL: %d\n", $count;
+p ""
+p "── Pipe through reflection — query %b at runtime ──────"
+my $count = keys(%b) |> len
+printf "  primary builtins reachable from REPL: %d\n", $count

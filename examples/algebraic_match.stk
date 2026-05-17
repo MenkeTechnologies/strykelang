@@ -4,7 +4,7 @@
 # variants and value literals. Each arm is `pattern => expression`.
 # Result of the chosen arm is the value of the whole match expression.
 
-p "── Enum + match on signal codes ───────────────────────";
+p "── Enum + match on signal codes ───────────────────────"
 enum Sig { Hup, Int, Term, Kill }
 
 fn Demo::handle($sig) {
@@ -17,11 +17,11 @@ fn Demo::handle($sig) {
 }
 
 for my $s (Sig::Hup, Sig::Int, Sig::Term, Sig::Kill) {
-    p "  handler: ", Demo::handle($s);
+    p "  handler: ", Demo::handle($s)
 }
 
-p "";
-p "── Match on integer / string / wildcard ───────────────";
+p ""
+p "── Match on integer / string / wildcard ───────────────"
 fn Demo::http_status($code) {
     match ($code) {
         200 => "OK",
@@ -34,11 +34,11 @@ fn Demo::http_status($code) {
     }
 }
 for my $c (200, 204, 404, 500, 418) {
-    printf "  %d → %s\n", $c, Demo::http_status($c);
+    printf "  %d → %s\n", $c, Demo::http_status($c)
 }
 
-p "";
-p "── Match drives a per-tag dispatcher ──────────────────";
+p ""
+p "── Match drives a per-tag dispatcher ──────────────────"
 enum Op { Add, Sub, Mul, Div }
 
 fn Demo::eval2($op, $x, $y) {
@@ -49,14 +49,14 @@ fn Demo::eval2($op, $x, $y) {
         Op::Div => $x / $y,
     }
 }
-p "  Add(8,3)  = ", Demo::eval2(Op::Add, 8, 3);
-p "  Sub(8,3)  = ", Demo::eval2(Op::Sub, 8, 3);
-p "  Mul(8,3)  = ", Demo::eval2(Op::Mul, 8, 3);
-p "  Div(8,3)  = ", Demo::eval2(Op::Div, 8, 3);
+p "  Add(8,3)  = ", Demo::eval2(Op::Add, 8, 3)
+p "  Sub(8,3)  = ", Demo::eval2(Op::Sub, 8, 3)
+p "  Mul(8,3)  = ", Demo::eval2(Op::Mul, 8, 3)
+p "  Div(8,3)  = ", Demo::eval2(Op::Div, 8, 3)
 
-p "";
-p "── Match composes with pipe-forward ───────────────────";
-my @codes = (200, 201, 404, 500, 200, 503);
+p ""
+p "── Match composes with pipe-forward ───────────────────"
+my @codes = (200, 201, 404, 500, 200, 503)
 my @categorized = @codes |> map {
     match ($_) {
         200 => "ok",
@@ -67,14 +67,14 @@ my @categorized = @codes |> map {
         503 => "server-err",
         _   => "other",
     }
-};
-p "  categorised: ", join(", ", @categorized);
+}
+p "  categorised: ", join(", ", @categorized)
 
-p "";
-p "── Match as an expression — bind the result ───────────";
+p ""
+p "── Match as an expression — bind the result ───────────"
 my $cat = match (200) {
     200 => "ok",
     404 => "miss",
     500 => "crash",
-};
-p "  expression result: $cat";
+}
+p "  expression result: $cat"

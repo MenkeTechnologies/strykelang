@@ -1,74 +1,74 @@
 #!/usr/bin/env stryke
 
 # Stryke crypto primitives — all in-binary, no external deps.
-# Hashes return hex strings; signing/verification round-trips cleanly;
+# Hashes return hex strings; signing/verification round-trips cleanly
 # Argon2 / JWT cover the common app-server use cases.
 
-p "── Cryptographic hashes ───────────────────────────────";
-my $msg = "the quick brown fox";
-printf "  md5        : %s\n", md5($msg);
-printf "  sha256     : %s\n", sha256($msg);
-printf "  sha512     : %s  (truncated)\n", substr(sha512($msg), 0, 32) . "…";
-printf "  sha3_256   : %s\n", sha3_256($msg);
-printf "  blake3     : %s\n", blake3($msg);
+p "── Cryptographic hashes ───────────────────────────────"
+my $msg = "the quick brown fox"
+printf "  md5        : %s\n", md5($msg)
+printf "  sha256     : %s\n", sha256($msg)
+printf "  sha512     : %s  (truncated)\n", substr(sha512($msg), 0, 32) . "…"
+printf "  sha3_256   : %s\n", sha3_256($msg)
+printf "  blake3     : %s\n", blake3($msg)
 
-p "";
-p "── HMAC — keyed authentication tag ────────────────────";
-my $secret = "shared-secret-32-bytes-or-bigger";
-printf "  hmac_sha256: %s\n", hmac_sha256($secret, $msg);
-p "  same key+message always produces the same tag:";
-printf "    pass 1   : %s\n", substr(hmac_sha256($secret, $msg), 0, 32);
-printf "    pass 2   : %s\n", substr(hmac_sha256($secret, $msg), 0, 32);
+p ""
+p "── HMAC — keyed authentication tag ────────────────────"
+my $secret = "shared-secret-32-bytes-or-bigger"
+printf "  hmac_sha256: %s\n", hmac_sha256($secret, $msg)
+p "  same key+message always produces the same tag:"
+printf "    pass 1   : %s\n", substr(hmac_sha256($secret, $msg), 0, 32)
+printf "    pass 2   : %s\n", substr(hmac_sha256($secret, $msg), 0, 32)
 
-p "";
-p "── Argon2id password hashing ──────────────────────────";
-my $pw = "correct horse battery staple";
-my $hash = argon2_hash($pw);
-p "  stored hash : ", substr($hash, 0, 50), "…";
-p "  verify OK   : ", argon2_verify($pw, $hash);
-p "  verify bad  : ", argon2_verify("wrong-password", $hash);
+p ""
+p "── Argon2id password hashing ──────────────────────────"
+my $pw = "correct horse battery staple"
+my $hash = argon2_hash($pw)
+p "  stored hash : ", substr($hash, 0, 50), "…"
+p "  verify OK   : ", argon2_verify($pw, $hash)
+p "  verify bad  : ", argon2_verify("wrong-password", $hash)
 
-p "";
-p "── JWT — claims + signing in one ──────────────────────";
+p ""
+p "── JWT — claims + signing in one ──────────────────────"
 my $claims = {
     iss => "stryke-demo",
     sub => "alice",
     iat => time(),
     exp => time() + 3600,
     role => "admin",
-};
-my $token = jwt_encode($claims, "jwt-secret");
-p "  token        : ", substr($token, 0, 50), "…";
-my $back = jwt_decode($token, "jwt-secret");
-p "  decoded sub  : ", $back->{sub};
-p "  decoded role : ", $back->{role};
+}
+my $token = jwt_encode($claims, "jwt-secret")
+p "  token        : ", substr($token, 0, 50), "…"
+my $back = jwt_decode($token, "jwt-secret")
+p "  decoded sub  : ", $back->{sub}
+p "  decoded role : ", $back->{role}
 
-p "";
-p "── Bad-tampering JWT — verify fails ───────────────────";
+p ""
+p "── Bad-tampering JWT — verify fails ───────────────────"
 my $bad = substr($token, 0, -3) . "AAA";    # corrupt last 3 chars
-my $err = 0;
-eval { jwt_decode($bad, "jwt-secret") };
-$err = 1 if $@;
-p "  tampered token rejects (eval `\$@` set): $err";
+my $err = 0
+eval { jwt_decode($bad, "jwt-secret") }
+$err = 1 if $@
+p "  tampered token rejects (eval `\$@` set): $err"
 
-p "";
-p "── Cross-feature: HMAC-tagged + KV-stored manifest ────";
-my $path = "/tmp/stryke_crypto_demo.rkyv";
-unlink($path);
-my $db = kv_open($path);
+p ""
+p "── Cross-feature: HMAC-tagged + KV-stored manifest ────"
+my $path = "/tmp/stryke_crypto_demo.rkyv"
+unlink($path)
+my $db = kv_open($path)
 my $manifest_json = to_json({
     version => "0.14.2",
     files   => ["stryke", "s", "st"],
-});
-my $tag = hmac_sha256("manifest-signing-key", $manifest_json);
-kv_put($db, "manifest:json", $manifest_json);
-kv_put($db, "manifest:tag",  $tag);
-kv_commit($db);
+})
+my $tag = hmac_sha256("manifest-signing-key", $manifest_json)
+kv_put($db, "manifest:json", $manifest_json)
+kv_put($db, "manifest:tag",  $tag)
+kv_commit($db)
 
-my $db2 = kv_open($path);
-my $j2 = kv_get($db2, "manifest:json");
-my $t2 = kv_get($db2, "manifest:tag");
-my $recomputed = hmac_sha256("manifest-signing-key", $j2);
+my $db2 = kv_open($path)
+my $j2 = kv_get($db2, "manifest:json")
+my $t2 = kv_get($db2, "manifest:tag")
+my $recomputed = hmac_sha256("manifest-signing-key", $j2)
 p "  manifest tag verifies after KV roundtrip: ",
-    ($t2 eq $recomputed) ? 1 : 0;
-unlink($path);
+    ($t2 eq $recomputed) ? 1 : 0
+unlink($path)

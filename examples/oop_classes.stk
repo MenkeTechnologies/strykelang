@@ -4,39 +4,39 @@
 # Auto-generated constructor, typed fields with defaults, BUILD hooks,
 # `extends` for single inheritance with C3 MRO.
 
-p "── Class with typed fields + default ──────────────────";
+p "── Class with typed fields + default ──────────────────"
 class User {
     name: Str
     age:  Int
     role: Str = "guest"
 }
-my $u = User(name => "alice", age => 30);
-p "  name=", $u->name;
-p "  age =", $u->age;
+my $u = User(name => "alice", age => 30)
+p "  name=", $u->name
+p "  age =", $u->age
 p "  role=", $u->role;   # default
 
-p "";
-p "── BUILD hook — invariants + computed fields ──────────";
+p ""
+p "── BUILD hook — invariants + computed fields ──────────"
 class Rectangle {
     width:  Float
     height: Float
     area:   Float = 0
 
     fn BUILD {
-        die "width must be > 0"  if $self->width  <= 0;
-        die "height must be > 0" if $self->height <= 0;
-        $self->area($self->width * $self->height);
+        die "width must be > 0"  if $self->width  <= 0
+        die "height must be > 0" if $self->height <= 0
+        $self->area($self->width * $self->height)
     }
 }
-my $r = Rectangle(width => 4, height => 5);
-printf "  4x5 rect: area=%.0f\n", $r->area;
+my $r = Rectangle(width => 4, height => 5)
+printf "  4x5 rect: area=%.0f\n", $r->area
 
 # Bad input fires the die from BUILD.
-eval { Rectangle(width => -1, height => 5) };
-p "  invariant fires: $@" if $@;
+eval { Rectangle(width => -1, height => 5) }
+p "  invariant fires: $@" if $@
 
-p "";
-p "── extends — single inheritance + super-call ──────────";
+p ""
+p "── extends — single inheritance + super-call ──────────"
 class Animal {
     name: Str
     fn speak { p "  generic animal noise from ", $self->name }
@@ -45,11 +45,11 @@ class Dog extends Animal {
     breed: Str
     fn speak { p "  ", $self->name, " (a ", $self->breed, ") barks!" }
 }
-my $d = Dog(name => "rex", breed => "shepherd");
-$d->speak;
+my $d = Dog(name => "rex", breed => "shepherd")
+$d->speak
 
-p "";
-p "── Method dispatch — multiple methods on one class ────";
+p ""
+p "── Method dispatch — multiple methods on one class ────"
 class Counter {
     n: Int = 0
     fn inc      { $self->n($self->n + 1) }
@@ -57,15 +57,15 @@ class Counter {
     fn value    { $self->n }
     fn reset    { $self->n(0) }
 }
-my $c = Counter();
-$c->inc for 1..5;
-$c->dec for 1..2;
-printf "  counter after 5 inc, 2 dec : %d\n", $c->value;
-$c->reset;
-printf "  after reset                 : %d\n", $c->value;
+my $c = Counter()
+$c->inc for 1:5
+$c->dec for 1:2
+printf "  counter after 5 inc, 2 dec : %d\n", $c->value
+$c->reset
+printf "  after reset                 : %d\n", $c->value
 
-p "";
-p "── Composition with sketches ──────────────────────────";
+p ""
+p "── Composition with sketches ──────────────────────────"
 # Embed a Bloom filter inside a class for typed access.
 class UserCache {
     bloom:    Any
@@ -75,7 +75,7 @@ class UserCache {
     fn add($name)  { bloom_add($self->bloom, $name) }
     fn seen($name) { bloom_contains($self->bloom, $name) }
 }
-my $cache = UserCache(capacity => 5000);
-$cache->add($_) for ("alice", "bob", "carol");
-p "  cache->seen(alice)  : ", $cache->seen("alice");
-p "  cache->seen(daniel) : ", $cache->seen("daniel");
+my $cache = UserCache(capacity => 5000)
+$cache->add($_) for ("alice", "bob", "carol")
+p "  cache->seen(alice)  : ", $cache->seen("alice")
+p "  cache->seen(daniel) : ", $cache->seen("daniel")
