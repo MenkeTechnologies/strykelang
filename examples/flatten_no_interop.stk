@@ -14,8 +14,8 @@
 #
 # Run: stryke --no-interop examples/flatten_no_interop.stk
 
-fn Flat::flatten($r)    = @$r |> flat_maps { ref(_) eq "ARRAY" ? Flat::flatten(_) : (_) }
-fn Flat::leaf_count($r) = Flat::flatten($r) |> len
+fn Flat::flatten    = @{$_0} |> flat_maps { ref(_) eq "ARRAY" ? Flat::flatten(_) : (_) }
+fn Flat::leaf_count = Flat::flatten(_) |> len
 
 # Demo grid — (input, expected flat).
 my @cases = (

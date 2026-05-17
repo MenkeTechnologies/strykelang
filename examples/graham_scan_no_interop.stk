@@ -19,13 +19,13 @@
 # > 0 → counter-clockwise turn
 # < 0 → clockwise turn
 # = 0 → collinear
-fn Hull::cross($p1, $p2, $p3) =
-    ($p2->[0] - $p1->[0]) * ($p3->[1] - $p1->[1]) -
-    ($p2->[1] - $p1->[1]) * ($p3->[0] - $p1->[0])
+fn Hull::cross =
+    (_1->[0] - _0->[0]) * (_2->[1] - _0->[1]) -
+    (_1->[1] - _0->[1]) * (_2->[0] - _0->[0])
 
 # Squared distance — used to break collinear ties.
-fn Hull::dist2($p1, $p2) =
-    ($p1->[0] - $p2->[0]) ** 2 + ($p1->[1] - $p2->[1]) ** 2
+fn Hull::dist2 =
+    (_0->[0] - _1->[0]) ** 2 + (_0->[1] - _1->[1]) ** 2
 
 # Compute convex hull. Returns arrayref of vertices in CCW order.
 # Degenerate cases (0, 1, 2 points): return the input as-is.
@@ -72,7 +72,7 @@ fn Hull::scan($points) {
 }
 
 # Render a point as "(x,y)" for stable comparison.
-fn Hull::fmt($p) = "(" . $p->[0] . "," . $p->[1] . ")"
+fn Hull::fmt = "(" . _->[0] . "," . _->[1] . ")"
 
 p "── Graham scan convex hull demo ──"
 

@@ -48,7 +48,7 @@ fn BF::solve($v, $src, $edges) {
     +{ dist => \@dist, pred => \@pred, has_neg_cycle => $neg }
 }
 
-fn BF::is_inf($x) = $x >= 1e17
+fn BF::is_inf = _ >= 1e17
 
 p "── Bellman-Ford demo ──"
 

@@ -11,9 +11,9 @@
 
 # ── heap helpers ────────────────────────────────────────────────────
 
-fn Demo::Heap::parent($i) = int(($i - 1) / 2)
-fn Demo::Heap::left($i)   = 2 * $i + 1
-fn Demo::Heap::right($i)  = 2 * $i + 2
+fn Demo::Heap::parent = int((_ - 1) / 2)
+fn Demo::Heap::left   = 2 * _ + 1
+fn Demo::Heap::right  = 2 * _ + 2
 
 fn Demo::Heap::sift_down($arr, $start, $end) {
     my $i = $start

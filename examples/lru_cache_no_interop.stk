@@ -20,15 +20,15 @@
 # nodes[key] = { val, prev, next }
 # head = most-recently-used; tail = least-recently-used (next eviction).
 
-fn LRU::new($cap) = +{
-    cap   => $cap,
+fn LRU::new = +{
+    cap   => _0,
     size  => 0,
     head  => undef,
     tail  => undef,
     nodes => +{},
 }
 
-fn LRU::has($c, $k) = exists $c->{nodes}{$k} ? 1 : 0
+fn LRU::has = exists $_0->{nodes}{_1} ? 1 : 0
 
 # Detach the node from its current position in the LL.
 fn LRU::detach($c, $k) {

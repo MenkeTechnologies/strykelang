@@ -17,11 +17,11 @@
 # Run: stryke --no-interop examples/fenwick_tree_no_interop.stk
 
 # Internal: lowest-set-bit isolation. `x & -x` returns the bit value.
-fn Fenwick::lsb($x) = $x & -$x
+fn Fenwick::lsb = _ & -_
 
 # Construct an empty Fenwick tree of size $n. 1-indexed internally,
 # we expose 0-indexed externally.
-fn Fenwick::new($n) = +{ size => $n, bit => [(0) x ($n + 1)] }
+fn Fenwick::new = +{ size => _0, bit => [(0) x (_0 + 1)] }
 
 # Point update: add $delta to position $i (0-indexed).
 fn Fenwick::add($f, $i, $delta) {

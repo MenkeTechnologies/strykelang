@@ -14,11 +14,11 @@
 #
 # Run: stryke --no-interop examples/hangman_no_interop.stk
 
-fn Hangman::new($word, $tries) = +{
-    word      => lc($word),
+fn Hangman::new = +{
+    word      => lc($_0),
     guessed   => +{},
     wrong     => 0,
-    max_wrong => $tries,
+    max_wrong => _1,
 }
 
 # Returns "hit" / "miss" / "already" so the caller can score.
@@ -37,7 +37,7 @@ fn Hangman::display($g) = split(//, $g->{word})
     |> join("")
 
 fn Hangman::won($g)  = Hangman::display($g) eq $g->{word} ? 1 : 0
-fn Hangman::lost($g) = $g->{wrong} >= $g->{max_wrong}    ? 1 : 0
+fn Hangman::lost($g) = $g->{wrong} >= $g->{max_wrong} ? 1 : 0
 
 p "── Hangman demo ──"
 

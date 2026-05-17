@@ -38,7 +38,7 @@ fn FW::solve($v, $edges) {
     \@d
 }
 
-fn FW::is_inf($x) = $x >= 1e17
+fn FW::is_inf = _ >= 1e17
 
 p "── Floyd-Warshall demo ──"
 

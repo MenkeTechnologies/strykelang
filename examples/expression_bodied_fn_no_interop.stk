@@ -1,20 +1,20 @@
 #!/usr/bin/env stryke
 
-# Demo: stryke's expression-bodied `fn` form — `fn NAME(PARAMS) = EXPR`.
-# No braces, no semicolons, no explicit return. The body IS the
-# expression that gets evaluated. Ideal for one-liner helpers,
-# recursive math, pipe-forward chains, and tiny composable building
-# blocks.
+# Demo: stryke's expression-bodied `fn` form — `fn NAME = EXPR`.
+# No param list when the body uses `_` / `_0`..`_N`; no braces, no
+# semicolons, no explicit return. The body IS the expression that gets
+# evaluated. Ideal for one-liner helpers, recursive math, pipe-forward
+# chains, and tiny composable building blocks.
 #
 # Run: stryke --no-interop examples/expression_bodied_fn_no_interop.stk
 
 # ── tiny one-liner helpers ──────────────────────────────────────────────────
 
-fn Math::sq($n)     = $n * $n
-fn Math::cube($n)   = $n * $n * $n
-fn Math::dbl($n)    = $n * 2
-fn Math::tpl($n)    = $n * 3
-fn Math::clamp($n, $lo, $hi) = $n < $lo ? $lo : ($n > $hi ? $hi : $n)
+fn Math::sq     = _ * _
+fn Math::cube  = _ * _ * _
+fn Math::dbl   = _ * 2
+fn Math::tpl   = _ * 3
+fn Math::clamp = _0 < _1 ? _1 : (_0 > _2 ? _2 : _0)
 
 p "── 5 one-liners ──"
 printf("  sq(7) = %d   cube(4) = %d   dbl(13) = %d   tpl(5) = %d\n",
@@ -29,10 +29,10 @@ die "clamp lower" unless Math::clamp(-3,  0, 100) == 0
 
 # ── recursive expression bodies ─────────────────────────────────────────────
 
-fn Math::fact($n) = $n <= 1 ? 1 : $n * Math::fact($n - 1)
-fn Math::fib($n)  = $n < 2 ? $n : Math::fib($n - 1) + Math::fib($n - 2)
-fn Math::gcd($x, $y) = $y == 0 ? $x : Math::gcd($y, $x % $y)
-fn Math::lcm($x, $y) = $x * $y / Math::gcd($x, $y)
+fn Math::fact = _ <= 1 ? 1 : _ * Math::fact(_ - 1)
+fn Math::fib  = _ < 2 ? _ : Math::fib(_ - 1) + Math::fib(_ - 2)
+fn Math::gcd  = _1 == 0 ? _0 : Math::gcd(_1, _0 % _1)
+fn Math::lcm  = _0 * _1 / Math::gcd(_0, _1)
 
 p ""
 p "── recursive one-liners ──"
@@ -46,8 +46,8 @@ die "lcm"   unless Math::lcm(6, 8) == 24
 
 # ── mutual recursion ────────────────────────────────────────────────────────
 
-fn Parity::is_even($n) = $n == 0 ? 1 : Parity::is_odd($n - 1)
-fn Parity::is_odd($n)  = $n == 0 ? 0 : Parity::is_even($n - 1)
+fn Parity::is_even = _ == 0 ? 1 : Parity::is_odd(_ - 1)
+fn Parity::is_odd  = _ == 0 ? 0 : Parity::is_even(_ - 1)
 
 p ""
 p "── mutual recursion ──"
@@ -60,9 +60,9 @@ die "even0"  unless Parity::is_even(0)  == 1
 
 # ── pipe-forward inside expression body ─────────────────────────────────────
 
-fn Text::clean($s) = $s |> trim |> lc
-fn Text::nwords($s) = $s |> trim |> len
-fn Text::shout($s) = $s |> trim |> uc
+fn Text::clean  = _ |> trim |> lc
+fn Text::nwords = _ |> trim |> len
+fn Text::shout  = _ |> trim |> uc
 
 p ""
 p "── pipe-forward bodies ──"
@@ -74,8 +74,8 @@ die "shout" unless Text::shout("  world  ") eq "WORLD"
 
 # ── thread-macro inside expression body ────────────────────────────────────
 
-fn Stat::int_sqrt($n) = int(~> $n sqrt)
-fn Stat::word_count($s) = ~> $s lines len
+fn Stat::int_sqrt   = int(~> _ sqrt)
+fn Stat::word_count = ~> _ lines len
 
 p ""
 p "── thread-macro bodies ──"
@@ -91,8 +91,8 @@ die "wc"    unless Stat::word_count("a\nb\nc\n") == 3
 
 my $tax_rate = 0.08
 
-fn Money::with_tax($amount) = $amount * (1 + $tax_rate)
-fn Money::tip_15($amount) = $amount * 0.15
+fn Money::with_tax = _ * (1 + $tax_rate)
+fn Money::tip_15   = _ * 0.15
 
 p ""
 p "── closure-capture of outer lexical ──"
@@ -104,8 +104,8 @@ die "tip"  unless abs(Money::tip_15(50.00) - 7.50) < 0.001
 
 # ── compose: expression-bodied fns as building blocks of a pipeline ─────────
 
-fn Pipeline::normalize($s) = $s |> trim |> lc
-fn Pipeline::tokenize($s)  = $s |> Pipeline::normalize |> chars |> len
+fn Pipeline::normalize = _ |> trim |> lc
+fn Pipeline::tokenize  = _ |> Pipeline::normalize |> chars |> len
 
 p ""
 p "── compose multiple expr-bodied fns into a pipeline ──"

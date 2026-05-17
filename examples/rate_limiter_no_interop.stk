@@ -16,10 +16,10 @@
 # Run: stryke --no-interop examples/rate_limiter_no_interop.stk
 
 # Construct a bucket: capacity tokens, refill_rate tokens-per-time-unit.
-fn Rate::new($capacity, $refill_rate) = +{
-    capacity    => $capacity,
-    refill_rate => $refill_rate,
-    tokens      => $capacity,    # start full
+fn Rate::new = +{
+    capacity    => _0,
+    refill_rate => _1,
+    tokens      => _0,    # start full
     last_t      => 0,
 }
 
