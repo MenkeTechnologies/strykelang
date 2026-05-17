@@ -33,7 +33,7 @@ fn Rosetta::Radix::from_base($s, $base) {
     if (substr($s, 0, 1) eq "-") { $sign = -1; $i = 1 }
     if (substr($s, 0, 1) eq "+") { $i = 1 }
     my $v = 0
-    while ($i < len($s)) {
+    while ($i < length($s)) {
         my $d = Rosetta::Radix::char_to_digit(substr($s, $i, 1))
         return undef if $d < 0 || $d >= $base
         $v = $v * $base + $d

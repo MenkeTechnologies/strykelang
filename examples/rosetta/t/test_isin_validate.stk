@@ -35,7 +35,7 @@ fn Rosetta::Isin::luhn_check($digits) {
 }
 
 fn Rosetta::Isin::is_valid($s) {
-    return 0 if len($s) != 12
+    return 0 if length($s) != 12
     return 0 unless substr($s, 0, 2)  =~ /^[A-Z]{2}$/
     return 0 unless substr($s, 2, 9)  =~ /^[A-Z0-9]{9}$/
     return 0 unless substr($s, 11, 1) =~ /^[0-9]$/

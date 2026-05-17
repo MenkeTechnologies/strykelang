@@ -14,7 +14,7 @@ fn Rosetta::TwosComp::to_bits($n, $bits) {
 }
 
 fn Rosetta::TwosComp::from_bits($s) {
-    my $bits = len($s)
+    my $bits = length($s)
     my $u = 0
     for my $i (0:$bits - 1) {
         my $c = substr($s, $i, 1)
@@ -26,7 +26,7 @@ fn Rosetta::TwosComp::from_bits($s) {
 }
 
 fn Rosetta::TwosComp::negate_bits($s) {
-    Rosetta::TwosComp::to_bits(-Rosetta::TwosComp::from_bits($s), len($s))
+    Rosetta::TwosComp::to_bits(-Rosetta::TwosComp::from_bits($s), length($s))
 }
 
 # Encoding

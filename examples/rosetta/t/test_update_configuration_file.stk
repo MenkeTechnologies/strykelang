@@ -16,7 +16,7 @@ fn Rosetta::ConfigUpdate::parse($contents) {
     my %cfg
     for my $line (split /\n/, $contents) {
         my $t = Rosetta::ConfigUpdate::trim($line)
-        next if len($t) == 0
+        next if length($t) == 0
         next if substr($t, 0, 1) eq "#" || substr($t, 0, 1) eq ";"
         my $eq = index($t, "=")
         my ($key, $val)

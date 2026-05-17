@@ -12,7 +12,7 @@ fn Rosetta::BalancedNumbers::sum_digits($n) {
 
 fn Rosetta::BalancedNumbers::check($n) {
     my $s = "$n"
-    my $len = len($s)
+    my $len = length($s)
     my $half = int($len / 2)
     if ($half == 0) {
         1

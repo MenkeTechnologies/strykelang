@@ -4,7 +4,7 @@
 fn Rosetta::Benford::first_digit($n) {
     my $s = "$n"
     $s =~ s/^[0\W]+//; # remove leading zeros and non-digits
-    return -1 if len($s) == 0
+    return -1 if length($s) == 0
     substr($s, 0, 1) + 0
 }
 

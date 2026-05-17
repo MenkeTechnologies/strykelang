@@ -2,11 +2,11 @@
 # Rosetta Code: Substring Operations
 
 fn Rosetta::Substring::starts_with($str, $prefix) {
-    substr($str, 0, len($prefix)) eq $prefix
+    substr($str, 0, length($prefix)) eq $prefix
 }
 
 fn Rosetta::Substring::ends_with($str, $suffix) {
-    substr($str, -len($suffix)) eq $suffix
+    substr($str, -length($suffix)) eq $suffix
 }
 
 fn Rosetta::Substring::contains($str, $sub) {

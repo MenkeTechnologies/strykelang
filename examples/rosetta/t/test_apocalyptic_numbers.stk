@@ -7,7 +7,7 @@ fn Rosetta::Apoc::pow2($n) {
         # Multiply $s (decimal string) by 2
         my $carry = 0
         my $result = ""
-        for my $j (~> 0:len($s)-1 rev) {
+        for my $j (~> 0:length($s)-1 rev) {
             my $d = int(substr($s, $j, 1)) * 2 + $carry
             $result = ($d % 10) . $result
             $carry = int($d / 10)

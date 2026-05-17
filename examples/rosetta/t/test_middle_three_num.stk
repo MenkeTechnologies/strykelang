@@ -3,7 +3,7 @@
 
 fn Rosetta::MiddleThreeNum::middle_three($n) {
     my $s = abs($n) . ""
-    my $len = len($s)
+    my $len = length($s)
     if ($len < 3 || $len % 2 == 0) {
         return "error"
     }
