@@ -37,8 +37,8 @@ fn Demo::JD::diff($lhs, $rhs, $path) {
     }
     if ($rl =~ /HASH/) {
         my %all_keys
-        $all_keys{$_} = 1 for keys %$lhs
-        $all_keys{$_} = 1 for keys %$rhs
+        $all_keys{_} = 1 for keys %$lhs
+        $all_keys{_} = 1 for keys %$rhs
         for my $k (sort { _0 cmp _1 } keys %all_keys) {
             my $kp = $path eq "" ? $k : "$path.$k"
             if (exists $lhs->{$k} && !exists $rhs->{$k}) {
@@ -149,7 +149,7 @@ for my $d (@$diffs) {
 p ""
 p "── per-op rollup ────────────────────────────────────"
 my %ops
-$ops{$_->{op}}++ for @$diffs
+$ops{_->{op}}++ for @$diffs
 for my $op (sort { _0 cmp _1 } keys %ops) {
     printf "  %-12s : %d\n", $op, $ops{$op}
 }

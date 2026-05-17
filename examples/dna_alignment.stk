@@ -137,9 +137,9 @@ for my $pair (@pairs) {
     printf "          %s\n", $match_line
     printf "  align B : %s\n", $tb->{b}
     # Count match/mismatch/gap.
-    my $matches    = grep { $_ eq "|" } split //, $match_line
-    my $mismatches = grep { $_ eq "." } split //, $match_line
-    my $gaps       = grep { $_ eq " " } split //, $match_line
+    my $matches    = grep { _ eq "|" } split //, $match_line
+    my $mismatches = grep { _ eq "." } split //, $match_line
+    my $gaps       = grep { _ eq " " } split //, $match_line
     printf "  matches=%d mismatches=%d gaps=%d\n",
         $matches, $mismatches, $gaps
 }

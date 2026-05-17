@@ -107,7 +107,7 @@ for my $target (sort { _0 cmp _1 } keys %{$result->{dist}}) {
 p ""
 p "── shortest-path tree (parent -> child) ─────────────"
 my %children
-$children{$_} = [] for keys %graph
+$children{_} = [] for keys %graph
 for my $city (keys %{$result->{prev}}) {
     my $parent = $result->{prev}->{$city}
     push @{$children{$parent}}, $city
@@ -135,6 +135,6 @@ for my $line (@$tree_lines) { p "  $line" }
 
 p ""
 my $tree_edges = 0
-$tree_edges += len(@{$children{$_}}) for keys %children
+$tree_edges += len(@{$children{_}}) for keys %children
 printf "── shortest-path tree has %d edges (V-1 = %d expected) ──\n",
     $tree_edges, len(keys %graph) - 1

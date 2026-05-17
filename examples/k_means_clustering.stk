@@ -124,7 +124,7 @@ printf "── converged at iter %d ──────────────�
 
 my $final_assn = Demo::Km::assign_clusters(\@points, \@centroids)
 my %cluster_count
-$cluster_count{$_}++ for @$final_assn
+$cluster_count{_}++ for @$final_assn
 
 p ""
 p "── cluster sizes ───────────────────────────────────"
@@ -168,7 +168,7 @@ for my $row (rev(0:19)) {
 p ""
 p "── HLL distinct-cluster sanity ──────────────────────"
 my $hll = hll(14)
-hll_add($hll, $_) for @$final_assn
+hll_add($hll, _) for @$final_assn
 printf "  HLL distinct clusters : %d\n", hll_count($hll)
 printf "  expected              : %d\n", $K
 

@@ -78,7 +78,7 @@ fn Demo::MB::render_row($row) {
 p "Mandelbrot — ${W}x${H} ASCII, max_iter=$MAX_ITER"
 p "─" x ($W + 2)
 my $t0 = now_ns()
-my @rows = pmap { Demo::MB::render_row($_) } (0:$H - 1)
+my @rows = pmap { Demo::MB::render_row(_) } (0:$H - 1)
 my $elapsed_us = (now_ns() - $t0) / 1000.0
 
 for my $r (@rows) {

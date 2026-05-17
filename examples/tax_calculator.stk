@@ -121,7 +121,7 @@ p "\nparallel comparison @ \$$compare_income (sorted by lowest tax):"
 p "─" x 50
 my @codes = sort keys %tax_codes
 my @per_code = pmap {
-    my $code = $_
+    my $code = _
     my $r = Demo::Tax::owed($compare_income, $tax_codes{$code})
     [$code, $r->{owed}, $r->{effective_pct}]
 } @codes

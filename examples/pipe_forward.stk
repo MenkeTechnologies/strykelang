@@ -22,15 +22,15 @@ p "  top 5: ", join(", ", @top5)
 p ""
 p "── Composing with sketches and KV ─────────────────────"
 my $words = bloom_filter(1000, 0.01)
-$text |> split(/\s+/) |> map { bloom_add($words, $_) }
+$text |> split(/\s+/) |> map { bloom_add($words, _) }
 p "  'fox'  in bloom : ", bloom_contains($words, "fox")
 p "  'cat'  in bloom : ", bloom_contains($words, "cat")
 
 p ""
 p "── Pipe into grep / map / sort / sum ──────────────────"
 my $total = (1:100)
-    |> map { $_ * $_ }
-    |> grep { $_ % 2 == 0 }
+    |> map { _ * _ }
+    |> grep { _ % 2 == 0 }
     |> sum
 p "  sum of even squares 1:100 = $total"
 

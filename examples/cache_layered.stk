@@ -115,7 +115,7 @@ printf "── %d queries against %d-key upstream ──────────
 # ── execute workload ────────────────────────────────────────────────
 
 my $start = now_ns()
-my @results = map { Demo::Cache::lookup($_) } @queries
+my @results = map { Demo::Cache::lookup(_) } @queries
 my $elapsed_us = (now_ns() - $start) / 1000.0
 
 # ── per-query summary (compact) ─────────────────────────────────────
@@ -186,7 +186,7 @@ around "Demo::Cache::upstream_fetch" {
     $r
 }
 # Re-run a few queries to populate the latency digest.
-Demo::Cache::upstream_fetch($_) for ("user_alice", "user_bob", "user_carol")
+Demo::Cache::upstream_fetch(_) for ("user_alice", "user_bob", "user_carol")
 printf "  upstream p50         : %.1f µs\n", td_quantile($upstream_latency, 0.5)
 printf "  upstream p99         : %.1f µs\n", td_quantile($upstream_latency, 0.99)
 intercept_clear("Demo::Cache::upstream_fetch")

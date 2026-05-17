@@ -70,7 +70,7 @@ for my $ip (@ips) {
 p ""
 p "── top paths via SpaceSaving ──────────────────────────"
 my $top_paths = topk(5)
-topk_add($top_paths, $_->{path}) for @parsed
+topk_add($top_paths, _->{path}) for @parsed
 for my $row (topk_heavies($top_paths)) {
     printf "    %-15s × %d\n", $row->[0], $row->[1]
 }
@@ -80,7 +80,7 @@ for my $row (topk_heavies($top_paths)) {
 p ""
 p "── status histogram via hash + pipe ───────────────────"
 my %status
-$status{$_->{status}}++ for @parsed
+$status{_->{status}}++ for @parsed
 for my $s (sort { _0 <=> _1 } keys %status) {
     printf "    %d  ×  %d\n", $s, $status{$s}
 }

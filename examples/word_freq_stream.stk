@@ -32,7 +32,7 @@ p "── corpus shape ───────────────────
 printf "  %d chunks, ~%d words each\n",
     len(@corpus), len([split(/\s+/, $corpus[0])])
 my $total_words = 0
-$total_words += len([split(/\s+/, $_)]) for @corpus
+$total_words += len([split(/\s+/, _)]) for @corpus
 printf "  %d total words across all chunks\n", $total_words
 
 # ── per-chunk pipeline → list of (cms, topk) pairs ────────────────────
@@ -107,14 +107,14 @@ p ""
 p "── distinct-word count via HLL ────────────────────────"
 my $hll = hll(14)
 for my $chunk (@corpus) {
-    hll_add($hll, $_) for split(/\s+/, $chunk)
+    hll_add($hll, _) for split(/\s+/, $chunk)
 }
 printf "  HLL estimate : %d distinct words\n", hll_count($hll)
 
 # Ground truth via plain Perl-style dedupe (only ok at this small scale).
 my %seen
 for my $chunk (@corpus) {
-    $seen{$_}++ for split(/\s+/, $chunk)
+    $seen{_}++ for split(/\s+/, $chunk)
 }
 printf "  exact distinct (small N): %d\n", len(keys %seen)
 
@@ -128,7 +128,7 @@ p ""
 p "── determinism check (re-run produces same top word) ──"
 my @per_chunk_2 = pmap {
     my $tk = topk(50)
-    topk_add($tk, $_) for split(/\s+/, _)
+    topk_add($tk, _) for split(/\s+/, _)
     $tk
 } @corpus
 my $merged_2 = $per_chunk_2[0]

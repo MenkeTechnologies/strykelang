@@ -31,7 +31,7 @@ my $orders_csv = "id,country,status,amount\n" .
 my @rows = @{from_csv($orders_csv)}
 printf "loaded %d rows from CSV\n", len(@rows)
 
-my @completed = grep { $_->{status} eq "completed" } @rows
+my @completed = grep { _->{status} eq "completed" } @rows
 printf "kept %d completed rows\n", len(@completed)
 
 # ── aggregate into a CMS (heavy-hitter sketch) by country ──────────────

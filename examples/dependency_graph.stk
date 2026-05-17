@@ -92,7 +92,7 @@ for my $pkg (keys %deps) {
 
 my @layers
 my %remaining
-$remaining{$_} = 1 for keys %deps
+$remaining{_} = 1 for keys %deps
 my $layer_idx = 0
 
 while (len(keys %remaining) > 0) {
@@ -113,7 +113,7 @@ while (len(keys %remaining) > 0) {
         last
     }
     push @layers, \@layer_pkgs
-    delete $remaining{$_} for @layer_pkgs
+    delete $remaining{_} for @layer_pkgs
     $layer_idx++
 }
 
@@ -135,7 +135,7 @@ printf "  total layers: %d (would allow up to %d-way parallel build)\n",
 p ""
 p "── reverse dependencies (who depends on each pkg?) ──"
 my %dependents
-$dependents{$_} = [] for keys %deps
+$dependents{_} = [] for keys %deps
 for my $pkg (keys %deps) {
     for my $d (@{$deps{$pkg}}) {
         $dependents{$d} = [] unless exists $dependents{$d}

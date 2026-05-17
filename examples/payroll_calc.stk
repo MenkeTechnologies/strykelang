@@ -111,7 +111,7 @@ my @employees = (
 printf "── processing %d paychecks (biweekly) ────────────────\n",
     len(@employees)
 
-my @results = map { Demo::PR::compute($_) } @employees
+my @results = map { Demo::PR::compute(_) } @employees
 
 # ── per-employee report ────────────────────────────────────────────
 
@@ -172,7 +172,7 @@ printf "  exact : %d\n", len(@employees)
 p ""
 p "── net pay distribution (t-digest of latency, plus stats) ──"
 my $td_net = t_digest(100)
-td_add($td_net, $_->{net}) for @results
+td_add($td_net, _->{net}) for @results
 printf "  p10 net : \$%.2f\n", td_quantile($td_net, 0.10)
 printf "  p50 net : \$%.2f\n", td_quantile($td_net, 0.50)
 printf "  p90 net : \$%.2f\n", td_quantile($td_net, 0.90)
