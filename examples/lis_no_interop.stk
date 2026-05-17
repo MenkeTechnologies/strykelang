@@ -1,0 +1,128 @@
+#!/usr/bin/env stryke
+
+# Longest Increasing Subsequence (LIS) — find the longest subsequence
+# of an array where each element is strictly greater than the previous
+# (not contiguous). Two implementations:
+#   * naive  O(n²) DP — clear and concise
+#   * patience O(n log n) — tail-array binary search trick
+# Parses clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * implicit return on tail (rule 7)
+#   * `len`, `:` ranges (rules 4, 5)
+#   * `#{…}` interpolation (rule 1a)
+#
+# Namespaced UDFs `LIS::*`.
+#
+# Run: stryke --no-interop examples/lis_no_interop.stk
+
+# Naive O(n²) DP — clearest implementation. dp[i] = length of LIS
+# ending at index i.
+fn LIS::naive_len($xs) {
+    my $n = len @$xs
+    return 0 if $n == 0
+    my @dp = (1) x $n
+    for my $i (1:$n - 1) {
+        for my $j (0:$i - 1) {
+            $dp[$i] = $dp[$j] + 1 if $xs->[$j] < $xs->[$i] && $dp[$j] + 1 > $dp[$i]
+        }
+    }
+    my $best = $dp[0]
+    for my $v (@dp) { $best = $v if $v > $best }
+    $best
+}
+
+# Patience-sort O(n log n) — maintain `tails` where tails[k] is the
+# smallest possible tail of any length-(k+1) increasing subseq seen so
+# far. Binary-search-insert each element. Length of tails = LIS length.
+fn LIS::patience_len($xs) {
+    my @tails
+    for my $x (@$xs) {
+        my $lo = 0
+        my $hi = len @tails
+        while ($lo < $hi) {
+            my $mid = int(($lo + $hi) / 2)
+            if ($tails[$mid] < $x) { $lo = $mid + 1 }
+            else                   { $hi = $mid }
+        }
+        if ($lo == len @tails) { push @tails, $x }
+        else                   { $tails[$lo] = $x }
+    }
+    len @tails
+}
+
+# Reconstruct an LIS (one of, if ties) via DP traceback.
+fn LIS::trace($xs) {
+    my $n = len @$xs
+    return [] if $n == 0
+    my @dp = (1) x $n
+    my @prev = (-1) x $n
+    for my $i (1:$n - 1) {
+        for my $j (0:$i - 1) {
+            if ($xs->[$j] < $xs->[$i] && $dp[$j] + 1 > $dp[$i]) {
+                $dp[$i] = $dp[$j] + 1
+                $prev[$i] = $j
+            }
+        }
+    }
+    # Find best end-position.
+    my $best_i = 0
+    for my $i (0:$n - 1) {
+        $best_i = $i if $dp[$i] > $dp[$best_i]
+    }
+    my @out
+    my $i = $best_i
+    while ($i != -1) {
+        unshift @out, $xs->[$i]
+        $i = $prev[$i]
+    }
+    \@out
+}
+
+p "── LIS demo ──"
+
+my @cases = (
+    +{ xs => [],                              len => 0 },
+    +{ xs => [42],                            len => 1 },
+    +{ xs => [1, 2, 3, 4, 5],                 len => 5 },  # already increasing
+    +{ xs => [5, 4, 3, 2, 1],                 len => 1 },  # strictly decreasing
+    +{ xs => [3, 3, 3, 3],                    len => 1 },  # all equal (strict <)
+    +{ xs => [10, 22, 9, 33, 21, 50, 41, 60], len => 5 },  # classic LeetCode
+    +{ xs => [3, 10, 2, 1, 20],               len => 3 },  # 3, 10, 20
+    +{ xs => [50, 3, 10, 7, 40, 80],          len => 4 },  # 3, 7, 40, 80
+    +{ xs => [-7, 10, 9, 2, 3, 4, 5],         len => 5 },  # -7, 2, 3, 4, 5
+)
+
+my $fail = 0
+for my $c (@cases) {
+    my $naive    = LIS::naive_len($c->{xs})
+    my $patience = LIS::patience_len($c->{xs})
+    my $trace    = LIS::trace($c->{xs})
+    my $tlen     = len @$trace
+    my $ok = $naive == $c->{len} && $patience == $c->{len} && $tlen == $c->{len}
+    $fail++ unless $ok
+    p "  LIS([@{$c->{xs}}]) naive=$naive patience=$patience trace=[@$trace] (len $tlen)  expect #{$c->{len}}  #{$ok ? \"\" : \"FAIL\"}"
+}
+die "#{$fail} / #{len @cases} LIS cases failed" if $fail > 0
+
+# Universal invariants:
+#   * The traced subsequence is strictly increasing
+#   * The traced subsequence appears in original order in $xs
+#   * Both implementations agree on length
+for my $c (@cases) {
+    next if len(@{$c->{xs}}) == 0
+    my $r = LIS::trace($c->{xs})
+    next if len(@$r) < 2
+    for my $i (1:len(@$r) - 1) {
+        die "trace not strictly increasing at $i" unless $r->[$i] > $r->[$i - 1]
+    }
+    # In-order subsequence check.
+    my $j = 0
+    for my $v (@{$c->{xs}}) {
+        $j++ if $j < len(@$r) && $v == $r->[$j]
+    }
+    die "trace not a subsequence of input" unless $j == len(@$r)
+}
+
+p ""
+p "  ALL PASS (9 cases + strictly-increasing + subseq invariants + naive/patience agreement)"

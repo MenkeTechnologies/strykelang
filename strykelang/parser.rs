@@ -21707,4 +21707,82 @@ mod tests {
         let _g = NoInteropGuard::on();
         parse_ok("my $s = \"abc\"; my $r = join(\"\", rev split //, $s)");
     }
+
+    /// C-style `for` with explicit init / cond / decrement step —
+    /// heap-sort's sift-down walks the heap children from end down.
+    #[test]
+    fn cstyle_for_decrement_with_arrayref_swap_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my @arr = (1, 2, 3); my $r = \\@arr; \
+             for (my $end = len(@arr) - 1; $end > 0; $end--) { \
+                ($r->[0], $r->[$end]) = ($r->[$end], $r->[0]) \
+             }",
+        );
+    }
+
+    /// `shift @q` inside a while-loop driving a BFS-style queue —
+    /// Kahn's topological sort.
+    #[test]
+    fn shift_in_while_loop_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my @q = (0, 1, 2); my @out; \
+             while (len(@q) > 0) { my $u = shift @q; push @out, $u }",
+        );
+    }
+
+    /// Modular exponentiation by squaring — Miller-Rabin's core. While
+    /// loop with `int($e / 2)`, modular multiply, and conditional update.
+    #[test]
+    fn mod_pow_squaring_loop_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "fn MR::mod_pow($base, $exp, $m) { \
+                my $result = 1; my $bs = $base % $m; my $e = $exp; \
+                while ($e > 0) { \
+                    $result = ($result * $bs) % $m if $e % 2 == 1; \
+                    $e = int($e / 2); \
+                    $bs = ($bs * $bs) % $m \
+                } \
+                $result \
+             }",
+        );
+    }
+
+    /// 2-D DP traceback: walk back from dp[n][target], conditionally
+    /// taking or skipping each item. Subset-sum reconstruct shape.
+    #[test]
+    fn dp_traceback_walk_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my @xs = (1, 2, 3); my $n = 3; my $target = 4; \
+             my @dp; for my $i (0:$n) { $dp[$i] = [(0) x ($target + 1)] } \
+             my @out; my $j = $target; \
+             for (my $i = $n; $i > 0; $i--) { \
+                my $v = $xs[$i - 1]; \
+                if ($j >= $v && $dp[$i - 1][$j - $v] == 1) { \
+                    unshift @out, $v; $j -= $v \
+                } \
+             }",
+        );
+    }
+
+    /// Binary search inside a `for` loop — LIS patience-sort variant
+    /// using `tails` array. while-loop with `int(($lo+$hi)/2)`.
+    #[test]
+    fn binary_search_in_for_loop_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my @xs = (3, 1, 4, 1, 5); my @tails; \
+             for my $x (@xs) { \
+                my $lo = 0; my $hi = len @tails; \
+                while ($lo < $hi) { \
+                    my $mid = int(($lo + $hi) / 2); \
+                    if ($tails[$mid] < $x) { $lo = $mid + 1 } else { $hi = $mid } \
+                } \
+                if ($lo == len @tails) { push @tails, $x } else { $tails[$lo] = $x } \
+             }",
+        );
+    }
 }
