@@ -3,7 +3,7 @@ use std::fmt;
 use crate::value::StrykeValue;
 
 #[derive(Debug, Clone)]
-pub struct PerlError {
+pub struct StrykeError {
     pub kind: ErrorKind,
     pub message: String,
     pub line: usize,
@@ -32,7 +32,7 @@ pub enum ErrorKind {
     Exit(i32),
 }
 
-impl PerlError {
+impl StrykeError {
     pub fn new(
         kind: ErrorKind,
         message: impl Into<String>,
@@ -93,7 +93,7 @@ impl PerlError {
     }
 }
 
-impl fmt::Display for PerlError {
+impl fmt::Display for StrykeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.kind {
             ErrorKind::Die => write!(f, "{}", self.message),
@@ -125,9 +125,9 @@ impl fmt::Display for PerlError {
     }
 }
 
-impl std::error::Error for PerlError {}
+impl std::error::Error for StrykeError {}
 
-pub type PerlResult<T> = Result<T, PerlError>;
+pub type PerlResult<T> = Result<T, StrykeError>;
 
 /// Long-form hints for `stryke --explain CODE` (rustc-style).
 pub fn explain_error(code: &str) -> Option<&'static str> {
@@ -154,7 +154,7 @@ mod tests {
 
     #[test]
     fn syntax_error_display_includes_message_and_line() {
-        let e = PerlError::syntax("bad token", 7);
+        let e = StrykeError::syntax("bad token", 7);
         let s = e.to_string();
         assert!(s.contains("bad token"));
         assert!(s.contains("line 7"));
@@ -162,19 +162,19 @@ mod tests {
 
     #[test]
     fn die_error_display_is_message_only() {
-        let e = PerlError::die("halt", 1);
+        let e = StrykeError::die("halt", 1);
         assert_eq!(e.to_string(), "halt");
     }
 
     #[test]
     fn exit_error_display_is_empty() {
-        let e = PerlError::new(ErrorKind::Exit(0), "ignored", 1, "-e");
+        let e = StrykeError::new(ErrorKind::Exit(0), "ignored", 1, "-e");
         assert_eq!(e.to_string(), "");
     }
 
     #[test]
     fn runtime_error_display_includes_file_and_line() {
-        let e = PerlError::runtime("boom", 3);
+        let e = StrykeError::runtime("boom", 3);
         let s = e.to_string();
         assert!(s.contains("boom"));
         assert!(s.contains("-e"));
@@ -183,7 +183,7 @@ mod tests {
 
     #[test]
     fn division_by_zero_kind_matches_message_display() {
-        let e = PerlError::new(ErrorKind::DivisionByZero, "divide by zero", 2, "t.pl");
+        let e = StrykeError::new(ErrorKind::DivisionByZero, "divide by zero", 2, "t.pl");
         assert_eq!(e.kind, ErrorKind::DivisionByZero);
         let s = e.to_string();
         assert!(s.contains("divide by zero"));
@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn type_error_display_matches_runtime_shape() {
-        let e = PerlError::type_error("expected array", 9);
+        let e = StrykeError::type_error("expected array", 9);
         assert_eq!(e.kind, ErrorKind::Type);
         let s = e.to_string();
         assert!(s.contains("expected array"));
@@ -202,7 +202,7 @@ mod tests {
 
     #[test]
     fn at_line_overrides_line_number() {
-        let e = PerlError::runtime("x", 1).at_line(99);
+        let e = StrykeError::runtime("x", 1).at_line(99);
         assert_eq!(e.line, 99);
         assert!(e.to_string().contains("line 99"));
     }
@@ -222,7 +222,7 @@ mod tests {
 
     #[test]
     fn perl_error_implements_std_error() {
-        let e: Box<dyn std::error::Error> = Box::new(PerlError::syntax("x", 1));
+        let e: Box<dyn std::error::Error> = Box::new(StrykeError::syntax("x", 1));
         assert!(!e.to_string().is_empty());
     }
 }

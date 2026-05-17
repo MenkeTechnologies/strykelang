@@ -7,7 +7,7 @@ use crate::ast::{
     Block, DerefKind, Expr, ExprKind, MatchArrayElem, Program, Sigil, Statement, StmtKind,
     StringPart, SubSigParam,
 };
-use crate::error::{ErrorKind, PerlError, PerlResult};
+use crate::error::{ErrorKind, StrykeError, PerlResult};
 
 static BUILTINS: OnceLock<HashSet<&'static str>> = OnceLock::new();
 
@@ -46,7 +46,7 @@ impl Scope {
 
 pub struct StaticAnalyzer {
     scopes: Vec<Scope>,
-    errors: Vec<PerlError>,
+    errors: Vec<StrykeError>,
     file: String,
     current_package: String,
     /// When `false` (the `stryke check` default), strict-vars-style
@@ -160,7 +160,7 @@ impl StaticAnalyzer {
 
     fn error(&mut self, kind: ErrorKind, msg: String, line: usize) {
         self.errors
-            .push(PerlError::new(kind, msg, line, &self.file));
+            .push(StrykeError::new(kind, msg, line, &self.file));
     }
 
     pub fn analyze(mut self, program: &Program) -> PerlResult<()> {

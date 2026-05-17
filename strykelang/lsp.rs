@@ -42,7 +42,7 @@ use percent_encoding::percent_decode_str;
 
 use crate::ast::MatchArrayElem;
 use crate::ast::{Block, Sigil, Statement, StmtKind, SubSigParam, VarDecl};
-use crate::error::{ErrorKind, PerlError};
+use crate::error::{ErrorKind, StrykeError};
 use crate::vm_helper::VMHelper;
 
 pub(crate) fn run_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -593,7 +593,7 @@ fn compute_diagnostics(text: &str, path: &str) -> Vec<Diagnostic> {
     out
 }
 
-fn perror_to_diagnostic(e: &PerlError, source: &str) -> Diagnostic {
+fn perror_to_diagnostic(e: &StrykeError, source: &str) -> Diagnostic {
     let severity = Some(match e.kind {
         ErrorKind::Syntax
         | ErrorKind::Runtime

@@ -178,7 +178,7 @@ fn builtin_adams_bashforth_4(
     let f_call = |interp: &mut VMHelper, t: f64, y: f64| -> PerlResult<f64> {
         let sub = f
             .as_code_ref()
-            .ok_or_else(|| PerlError::runtime("expected code ref", line))?;
+            .ok_or_else(|| StrykeError::runtime("expected code ref", line))?;
         let r = exec_to_perl_result(
             interp.call_sub(
                 &sub,
@@ -235,7 +235,7 @@ fn builtin_heun_method(
     let f_call = |interp: &mut VMHelper, t: f64, y: f64| -> PerlResult<f64> {
         let sub = f
             .as_code_ref()
-            .ok_or_else(|| PerlError::runtime("expected code ref", line))?;
+            .ok_or_else(|| StrykeError::runtime("expected code ref", line))?;
         let r = exec_to_perl_result(
             interp.call_sub(
                 &sub,
@@ -274,7 +274,7 @@ fn builtin_rk45_cash_karp(
     let f_call = |interp: &mut VMHelper, t: f64, y: f64| -> PerlResult<f64> {
         let sub = f
             .as_code_ref()
-            .ok_or_else(|| PerlError::runtime("expected code ref", line))?;
+            .ok_or_else(|| StrykeError::runtime("expected code ref", line))?;
         let r = exec_to_perl_result(
             interp.call_sub(
                 &sub,
@@ -347,7 +347,7 @@ fn builtin_milne_pc(
     let f_call = |interp: &mut VMHelper, t: f64, y: f64| -> PerlResult<f64> {
         let sub = f
             .as_code_ref()
-            .ok_or_else(|| PerlError::runtime("expected code ref", line))?;
+            .ok_or_else(|| StrykeError::runtime("expected code ref", line))?;
         let r = exec_to_perl_result(
             interp.call_sub(
                 &sub,
@@ -401,7 +401,7 @@ fn builtin_modified_midpoint_ode(
     let f_call = |interp: &mut VMHelper, t: f64, y: f64| -> PerlResult<f64> {
         let sub = f
             .as_code_ref()
-            .ok_or_else(|| PerlError::runtime("expected code ref", line))?;
+            .ok_or_else(|| StrykeError::runtime("expected code ref", line))?;
         let r = exec_to_perl_result(
             interp.call_sub(
                 &sub,
@@ -443,7 +443,7 @@ fn builtin_backward_euler(
     let f_call = |interp: &mut VMHelper, t: f64, y: f64| -> PerlResult<f64> {
         let sub = f
             .as_code_ref()
-            .ok_or_else(|| PerlError::runtime("expected code ref", line))?;
+            .ok_or_else(|| StrykeError::runtime("expected code ref", line))?;
         let r = exec_to_perl_result(
             interp.call_sub(
                 &sub,
@@ -489,7 +489,7 @@ fn builtin_crank_nicolson_ode(
     let f_call = |interp: &mut VMHelper, t: f64, y: f64| -> PerlResult<f64> {
         let sub = f
             .as_code_ref()
-            .ok_or_else(|| PerlError::runtime("expected code ref", line))?;
+            .ok_or_else(|| StrykeError::runtime("expected code ref", line))?;
         let r = exec_to_perl_result(
             interp.call_sub(
                 &sub,

@@ -9,7 +9,7 @@ use std::thread::{self, JoinHandle};
 
 use crossbeam::channel::{unbounded, Receiver, Sender};
 
-use crate::error::{PerlError, PerlResult};
+use crate::error::{StrykeError, PerlResult};
 use crate::scope::{AtomicArray, AtomicHash};
 use crate::value::{PerlPpool, PerlSub, StrykeValue};
 use crate::vm_helper::{Flow, FlowOrError, VMHelper};
@@ -43,13 +43,13 @@ impl PerlPpool {
         line: usize,
     ) -> PerlResult<StrykeValue> {
         if args.is_empty() {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "submit() expects a code reference and optional argument for $_",
                 line,
             ));
         }
         let Some(sub) = args[0].as_code_ref() else {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "submit() first argument must be a CODE ref",
                 line,
             ));
@@ -77,13 +77,13 @@ impl PerlPpool {
             .0
             .job_tx
             .lock()
-            .map_err(|_| PerlError::runtime("ppool: job queue poisoned", line))?;
+            .map_err(|_| StrykeError::runtime("ppool: job queue poisoned", line))?;
         let Some(sender) = tx.as_ref() else {
-            return Err(PerlError::runtime("ppool: pool shut down", line));
+            return Err(StrykeError::runtime("ppool: pool shut down", line));
         };
         sender
             .send(job)
-            .map_err(|_| PerlError::runtime("ppool: submit failed (pool shut down)", line))?;
+            .map_err(|_| StrykeError::runtime("ppool: submit failed (pool shut down)", line))?;
         Ok(StrykeValue::UNDEF)
     }
 
@@ -103,7 +103,7 @@ impl PerlPpool {
                 .0
                 .pending
                 .lock()
-                .map_err(|_| PerlError::runtime("ppool: pending buffer poisoned", line))?;
+                .map_err(|_| StrykeError::runtime("ppool: pending buffer poisoned", line))?;
             let mut keep = VecDeque::new();
             for (o, v) in pending.drain(..) {
                 if o >= start && o < end {
@@ -123,11 +123,11 @@ impl PerlPpool {
             .0
             .result_rx
             .lock()
-            .map_err(|_| PerlError::runtime("ppool: collect lock poisoned", line))?;
+            .map_err(|_| StrykeError::runtime("ppool: collect lock poisoned", line))?;
 
         while count < n {
             let (o, v) = rx.recv().map_err(|_| {
-                PerlError::runtime("ppool: result channel closed (workers stopped)", line)
+                StrykeError::runtime("ppool: result channel closed (workers stopped)", line)
             })?;
             if o < start {
                 continue;
@@ -136,7 +136,7 @@ impl PerlPpool {
                 self.0
                     .pending
                     .lock()
-                    .map_err(|_| PerlError::runtime("ppool: pending buffer poisoned", line))?
+                    .map_err(|_| StrykeError::runtime("ppool: pending buffer poisoned", line))?
                     .push_back((o, v));
                 continue;
             }

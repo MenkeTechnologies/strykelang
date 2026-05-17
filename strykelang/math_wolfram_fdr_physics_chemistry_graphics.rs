@@ -347,7 +347,7 @@ fn builtin_mixed_nash_2x2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 fn builtin_minimax_2x2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let m = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     if m.len() != 2 || m[0].len() != 2 {
-        return Err(PerlError::runtime("minimax_2x2: 2×2 matrix required", 0));
+        return Err(StrykeError::runtime("minimax_2x2: 2×2 matrix required", 0));
     }
     // row min then max
     let row_max = m
@@ -906,7 +906,7 @@ fn builtin_ackermann_limited(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         ack(m - 1, inner, depth + 1)
     }
     if m > 3 || (m == 3 && n > 14) {
-        return Err(PerlError::runtime("ackermann_limited: arguments too large", 0));
+        return Err(StrykeError::runtime("ackermann_limited: arguments too large", 0));
     }
     Ok(StrykeValue::integer(ack(m, n, 0)))
 }
@@ -1077,7 +1077,7 @@ fn builtin_concurrence_2qubit(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .map(|v| v.to_number())
         .collect();
     if psi.len() != 4 {
-        return Err(PerlError::runtime("concurrence_2qubit: 4-vector required", 0));
+        return Err(StrykeError::runtime("concurrence_2qubit: 4-vector required", 0));
     }
     Ok(StrykeValue::float(2.0 * (psi[0] * psi[3] - psi[1] * psi[2]).abs()))
 }

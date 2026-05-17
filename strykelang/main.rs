@@ -9,7 +9,7 @@ use rand::Rng;
 use rayon::prelude::*;
 
 use stryke::ast::Program;
-use stryke::error::{ErrorKind, PerlError};
+use stryke::error::{ErrorKind, StrykeError};
 use stryke::perl_fs::{
     decode_utf8_or_latin1, read_file_text_perl_compat, read_line_perl_compat,
     read_logical_line_perl_compat,
@@ -672,7 +672,7 @@ fn run_line_mode_loop(
     interp: &mut VMHelper,
     program: &Program,
     slurp: bool,
-) -> Result<(), PerlError> {
+) -> Result<(), StrykeError> {
     let inplace = cli.inplace.is_some();
     let use_argv_files = !interp.argv.is_empty();
     let suppressed_stdout_for_inplace = inplace && use_argv_files;
@@ -694,7 +694,7 @@ fn run_line_mode_loop(
                     local.line_number = 0;
                     local.argv_current_file = path.clone();
                     let content = read_file_text_perl_compat(&path).map_err(|e| {
-                        PerlError::new(
+                        StrykeError::new(
                             ErrorKind::IO,
                             format!("Can't open {}: {}", path, e),
                             0,
@@ -703,7 +703,7 @@ fn run_line_mode_loop(
                     })?;
                     if let Some(output) = local.process_line(&content, program, true)? {
                         commit_in_place_edit(Path::new(&path), &local.inplace_edit, &output)
-                            .map_err(|e| PerlError::new(ErrorKind::IO, e.to_string(), 0, "-e"))?;
+                            .map_err(|e| StrykeError::new(ErrorKind::IO, e.to_string(), 0, "-e"))?;
                     }
                     Ok(())
                 })?;
@@ -712,7 +712,7 @@ fn run_line_mode_loop(
                     interp.line_number = 0;
                     interp.argv_current_file = path.clone();
                     let content = read_file_text_perl_compat(&path).map_err(|e| {
-                        PerlError::new(
+                        StrykeError::new(
                             ErrorKind::IO,
                             format!("Can't open {}: {}", path, e),
                             0,
@@ -723,7 +723,7 @@ fn run_line_mode_loop(
                         if inplace {
                             commit_in_place_edit(Path::new(&path), &interp.inplace_edit, &output)
                                 .map_err(|e| {
-                                    PerlError::new(ErrorKind::IO, e.to_string(), 0, "-e")
+                                    StrykeError::new(ErrorKind::IO, e.to_string(), 0, "-e")
                                 })?;
                         } else if cli.print_mode {
                             print!("{}", output);
@@ -759,7 +759,7 @@ fn run_line_mode_loop(
                 local.line_number = 0;
                 local.argv_current_file = path.clone();
                 let file = File::open(&path).map_err(|e| {
-                    PerlError::new(
+                    StrykeError::new(
                         ErrorKind::IO,
                         format!("Can't open {}: {}", path, e),
                         0,
@@ -774,7 +774,7 @@ fn run_line_mode_loop(
                         s
                     } else {
                         match read_logical_line_perl_compat(&mut reader).map_err(|e| {
-                            PerlError::new(
+                            StrykeError::new(
                                 ErrorKind::IO,
                                 format!("Error reading {}: {}", path, e),
                                 0,
@@ -786,7 +786,7 @@ fn run_line_mode_loop(
                         }
                     };
                     let is_last = match read_logical_line_perl_compat(&mut reader).map_err(|e| {
-                        PerlError::new(
+                        StrykeError::new(
                             ErrorKind::IO,
                             format!("Error reading {}: {}", path, e),
                             0,
@@ -805,7 +805,7 @@ fn run_line_mode_loop(
                     }
                 }
                 commit_in_place_edit(Path::new(&path), &local.inplace_edit, &accumulated)
-                    .map_err(|e| PerlError::new(ErrorKind::IO, e.to_string(), 0, "-e"))?;
+                    .map_err(|e| StrykeError::new(ErrorKind::IO, e.to_string(), 0, "-e"))?;
                 Ok(())
             })?;
         } else {
@@ -813,7 +813,7 @@ fn run_line_mode_loop(
                 interp.line_number = 0;
                 interp.argv_current_file = path.clone();
                 let file = File::open(&path).map_err(|e| {
-                    PerlError::new(
+                    StrykeError::new(
                         ErrorKind::IO,
                         format!("Can't open {}: {}", path, e),
                         0,
@@ -828,7 +828,7 @@ fn run_line_mode_loop(
                         s
                     } else {
                         match read_logical_line_perl_compat(&mut reader).map_err(|e| {
-                            PerlError::new(
+                            StrykeError::new(
                                 ErrorKind::IO,
                                 format!("Error reading {}: {}", path, e),
                                 0,
@@ -840,7 +840,7 @@ fn run_line_mode_loop(
                         }
                     };
                     let is_last = match read_logical_line_perl_compat(&mut reader).map_err(|e| {
-                        PerlError::new(
+                        StrykeError::new(
                             ErrorKind::IO,
                             format!("Error reading {}: {}", path, e),
                             0,
@@ -866,7 +866,7 @@ fn run_line_mode_loop(
                 }
                 if inplace {
                     commit_in_place_edit(Path::new(&path), &interp.inplace_edit, &accumulated)
-                        .map_err(|e| PerlError::new(ErrorKind::IO, e.to_string(), 0, "-e"))?;
+                        .map_err(|e| StrykeError::new(ErrorKind::IO, e.to_string(), 0, "-e"))?;
                 }
             }
         }
@@ -886,7 +886,7 @@ fn run_line_mode_loop(
             } else {
                 let mut lock = io::stdin().lock();
                 read_line_perl_compat(&mut lock, &mut current).map_err(|e| {
-                    PerlError::new(ErrorKind::IO, format!("Error reading stdin: {e}"), 0, "-e")
+                    StrykeError::new(ErrorKind::IO, format!("Error reading stdin: {e}"), 0, "-e")
                 })?
             };
             if n == 0 {
@@ -896,7 +896,7 @@ fn run_line_mode_loop(
                 let mut lock = io::stdin().lock();
                 let mut peek = String::new();
                 let n = read_line_perl_compat(&mut lock, &mut peek).map_err(|e| {
-                    PerlError::new(ErrorKind::IO, format!("Error reading stdin: {e}"), 0, "-e")
+                    StrykeError::new(ErrorKind::IO, format!("Error reading stdin: {e}"), 0, "-e")
                 })?;
                 if n == 0 {
                     (true, None)

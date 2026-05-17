@@ -36,7 +36,7 @@ use std::hash::Hasher;
 use std::sync::Arc;
 use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519StaticSecret};
 
-use crate::error::{PerlError, PerlResult};
+use crate::error::{StrykeError, PerlResult};
 use crate::value::StrykeValue;
 
 type HmacSha256 = Hmac<Sha256>;
@@ -103,7 +103,7 @@ pub(crate) fn sha1_digest(v: &StrykeValue) -> PerlResult<StrykeValue> {
 /// HMAC-SHA256(key, message); both taken as bytes from string values; returns lowercase hex.
 pub(crate) fn hmac_sha256(key: &StrykeValue, msg: &StrykeValue) -> PerlResult<StrykeValue> {
     let mut mac = <HmacSha256 as Mac>::new_from_slice(&bytes_from_value(key))
-        .map_err(|e| PerlError::runtime(format!("hmac_sha256: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("hmac_sha256: {}", e), 0))?;
     Mac::update(&mut mac, &bytes_from_value(msg));
     let out = mac.finalize().into_bytes();
     Ok(StrykeValue::string(hex::encode(out)))
@@ -234,7 +234,7 @@ pub(crate) fn murmur3_32(v: &StrykeValue, seed: &StrykeValue) -> PerlResult<Stry
         seed.to_int() as u32
     };
     let hash = murmur3::murmur3_32(&mut std::io::Cursor::new(bytes_from_value(v)), s)
-        .map_err(|e| PerlError::runtime(format!("murmur3: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("murmur3: {}", e), 0))?;
     Ok(StrykeValue::string(format!("{:08x}", hash)))
 }
 
@@ -246,7 +246,7 @@ pub(crate) fn murmur3_128(v: &StrykeValue, seed: &StrykeValue) -> PerlResult<Str
         seed.to_int() as u32
     };
     let hash = murmur3::murmur3_x64_128(&mut std::io::Cursor::new(bytes_from_value(v)), s)
-        .map_err(|e| PerlError::runtime(format!("murmur3: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("murmur3: {}", e), 0))?;
     Ok(StrykeValue::string(format!("{:032x}", hash)))
 }
 
@@ -275,7 +275,7 @@ pub(crate) fn siphash_keyed(
 /// HMAC-SHA1; returns lowercase hex (40 chars).
 pub(crate) fn hmac_sha1(key: &StrykeValue, msg: &StrykeValue) -> PerlResult<StrykeValue> {
     let mut mac = <HmacSha1 as Mac>::new_from_slice(&bytes_from_value(key))
-        .map_err(|e| PerlError::runtime(format!("hmac_sha1: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("hmac_sha1: {}", e), 0))?;
     Mac::update(&mut mac, &bytes_from_value(msg));
     Ok(StrykeValue::string(hex::encode(
         mac.finalize().into_bytes(),
@@ -285,7 +285,7 @@ pub(crate) fn hmac_sha1(key: &StrykeValue, msg: &StrykeValue) -> PerlResult<Stry
 /// HMAC-SHA384; returns lowercase hex (96 chars).
 pub(crate) fn hmac_sha384(key: &StrykeValue, msg: &StrykeValue) -> PerlResult<StrykeValue> {
     let mut mac = <HmacSha384 as Mac>::new_from_slice(&bytes_from_value(key))
-        .map_err(|e| PerlError::runtime(format!("hmac_sha384: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("hmac_sha384: {}", e), 0))?;
     Mac::update(&mut mac, &bytes_from_value(msg));
     Ok(StrykeValue::string(hex::encode(
         mac.finalize().into_bytes(),
@@ -295,7 +295,7 @@ pub(crate) fn hmac_sha384(key: &StrykeValue, msg: &StrykeValue) -> PerlResult<St
 /// HMAC-SHA512; returns lowercase hex (128 chars).
 pub(crate) fn hmac_sha512(key: &StrykeValue, msg: &StrykeValue) -> PerlResult<StrykeValue> {
     let mut mac = <HmacSha512 as Mac>::new_from_slice(&bytes_from_value(key))
-        .map_err(|e| PerlError::runtime(format!("hmac_sha512: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("hmac_sha512: {}", e), 0))?;
     Mac::update(&mut mac, &bytes_from_value(msg));
     Ok(StrykeValue::string(hex::encode(
         mac.finalize().into_bytes(),
@@ -305,7 +305,7 @@ pub(crate) fn hmac_sha512(key: &StrykeValue, msg: &StrykeValue) -> PerlResult<St
 /// HMAC-MD5; returns lowercase hex (32 chars). Legacy, avoid for new code.
 pub(crate) fn hmac_md5(key: &StrykeValue, msg: &StrykeValue) -> PerlResult<StrykeValue> {
     let mut mac = <HmacMd5 as Mac>::new_from_slice(&bytes_from_value(key))
-        .map_err(|e| PerlError::runtime(format!("hmac_md5: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("hmac_md5: {}", e), 0))?;
     Mac::update(&mut mac, &bytes_from_value(msg));
     Ok(StrykeValue::string(hex::encode(
         mac.finalize().into_bytes(),
@@ -332,7 +332,7 @@ pub(crate) fn hkdf_sha256(
     let out_len = len.to_int().max(1) as usize;
     let mut okm = vec![0u8; out_len];
     hk.expand(&info_bytes, &mut okm)
-        .map_err(|e| PerlError::runtime(format!("hkdf_sha256: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("hkdf_sha256: {}", e), 0))?;
     Ok(StrykeValue::string(hex::encode(okm)))
 }
 
@@ -353,7 +353,7 @@ pub(crate) fn hkdf_sha512(
     let out_len = len.to_int().max(1) as usize;
     let mut okm = vec![0u8; out_len];
     hk.expand(&info_bytes, &mut okm)
-        .map_err(|e| PerlError::runtime(format!("hkdf_sha512: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("hkdf_sha512: {}", e), 0))?;
     Ok(StrykeValue::string(hex::encode(okm)))
 }
 
@@ -372,7 +372,7 @@ pub(crate) fn base32_decode(v: &StrykeValue) -> PerlResult<StrykeValue> {
     let s = v.to_string();
     let decoded = base32::decode(base32::Alphabet::Rfc4648 { padding: true }, s.trim())
         .or_else(|| base32::decode(base32::Alphabet::Rfc4648 { padding: false }, s.trim()))
-        .ok_or_else(|| PerlError::runtime("base32_decode: invalid base32", 0))?;
+        .ok_or_else(|| StrykeError::runtime("base32_decode: invalid base32", 0))?;
     Ok(StrykeValue::bytes(Arc::new(decoded)))
 }
 
@@ -423,7 +423,7 @@ pub(crate) fn base58_decode(v: &StrykeValue) -> PerlResult<StrykeValue> {
             .iter()
             .position(|&b| b == c as u8)
             .ok_or_else(|| {
-                PerlError::runtime(format!("base58_decode: invalid character '{}'", c), 0)
+                StrykeError::runtime(format!("base58_decode: invalid character '{}'", c), 0)
             })?;
         let mut carry = val;
         for digit in &mut digits {
@@ -461,7 +461,7 @@ pub(crate) fn totp_generate(
             secret_str.trim(),
         )
     })
-    .ok_or_else(|| PerlError::runtime("totp: invalid base32 secret", 0))?;
+    .ok_or_else(|| StrykeError::runtime("totp: invalid base32 secret", 0))?;
     let num_digits = if digits.is_undef() {
         6
     } else {
@@ -497,7 +497,7 @@ pub(crate) fn totp_verify(
             secret_str.trim(),
         )
     })
-    .ok_or_else(|| PerlError::runtime("totp_verify: invalid base32 secret", 0))?;
+    .ok_or_else(|| StrykeError::runtime("totp_verify: invalid base32 secret", 0))?;
     let user_code = code.to_string();
     let win = if window.is_undef() {
         1i64
@@ -535,7 +535,7 @@ pub(crate) fn hotp_generate(
             secret_str.trim(),
         )
     })
-    .ok_or_else(|| PerlError::runtime("hotp: invalid base32 secret", 0))?;
+    .ok_or_else(|| StrykeError::runtime("hotp: invalid base32 secret", 0))?;
     let count = counter.to_int() as u64;
     let num_digits = if digits.is_undef() {
         6
@@ -560,7 +560,7 @@ pub(crate) fn aes_cbc_encrypt(
 
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() != 32 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "aes_cbc_encrypt: key must be 32 bytes, got {}",
                 key_bytes.len()
@@ -575,7 +575,7 @@ pub(crate) fn aes_cbc_encrypt(
     } else {
         let iv = bytes_from_value(iv);
         if iv.len() != 16 {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("aes_cbc_encrypt: iv must be 16 bytes, got {}", iv.len()),
                 0,
             ));
@@ -590,7 +590,7 @@ pub(crate) fn aes_cbc_encrypt(
     let cipher = Aes256CbcEnc::new(key_bytes.as_slice().into(), iv_bytes.as_slice().into());
     let ciphertext = cipher
         .encrypt_padded_mut::<Pkcs7>(&mut buf, plaintext_bytes.len())
-        .map_err(|e| PerlError::runtime(format!("aes_cbc_encrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("aes_cbc_encrypt: {}", e), 0))?;
     let mut result = iv_bytes;
     result.extend_from_slice(ciphertext);
     Ok(StrykeValue::string(
@@ -608,7 +608,7 @@ pub(crate) fn aes_cbc_decrypt(
 
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() != 32 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "aes_cbc_decrypt: key must be 32 bytes, got {}",
                 key_bytes.len()
@@ -618,9 +618,9 @@ pub(crate) fn aes_cbc_decrypt(
     }
     let mut data = base64::engine::general_purpose::STANDARD
         .decode(ciphertext_b64.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("aes_cbc_decrypt: invalid base64: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("aes_cbc_decrypt: invalid base64: {}", e), 0))?;
     if data.len() < 16 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "aes_cbc_decrypt: ciphertext too short",
             0,
         ));
@@ -630,7 +630,7 @@ pub(crate) fn aes_cbc_decrypt(
     let cipher = Aes256CbcDec::new(key_bytes.as_slice().into(), (&iv).into());
     let plaintext = cipher
         .decrypt_padded_mut::<Pkcs7>(ciphertext)
-        .map_err(|e| PerlError::runtime(format!("aes_cbc_decrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("aes_cbc_decrypt: {}", e), 0))?;
     Ok(StrykeValue::string(
         String::from_utf8_lossy(plaintext).into_owned(),
     ))
@@ -650,7 +650,7 @@ pub(crate) fn blowfish_encrypt(
 
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() < 4 || key_bytes.len() > 56 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "blowfish_encrypt: key must be 4-56 bytes, got {}",
                 key_bytes.len()
@@ -665,7 +665,7 @@ pub(crate) fn blowfish_encrypt(
     } else {
         let iv = bytes_from_value(iv);
         if iv.len() != 8 {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("blowfish_encrypt: iv must be 8 bytes, got {}", iv.len()),
                 0,
             ));
@@ -678,10 +678,10 @@ pub(crate) fn blowfish_encrypt(
     let mut buf = vec![0u8; padded_len];
     buf[..plaintext_bytes.len()].copy_from_slice(&plaintext_bytes);
     let cipher = BlowfishCbcEnc::new_from_slices(&key_bytes, &iv_bytes)
-        .map_err(|e| PerlError::runtime(format!("blowfish_encrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("blowfish_encrypt: {}", e), 0))?;
     let ciphertext = cipher
         .encrypt_padded_mut::<Pkcs7>(&mut buf, plaintext_bytes.len())
-        .map_err(|e| PerlError::runtime(format!("blowfish_encrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("blowfish_encrypt: {}", e), 0))?;
     let mut result = iv_bytes;
     result.extend_from_slice(ciphertext);
     Ok(StrykeValue::string(
@@ -699,7 +699,7 @@ pub(crate) fn blowfish_decrypt(
 
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() < 4 || key_bytes.len() > 56 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "blowfish_decrypt: key must be 4-56 bytes, got {}",
                 key_bytes.len()
@@ -709,9 +709,9 @@ pub(crate) fn blowfish_decrypt(
     }
     let mut data = base64::engine::general_purpose::STANDARD
         .decode(ciphertext_b64.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("blowfish_decrypt: invalid base64: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("blowfish_decrypt: invalid base64: {}", e), 0))?;
     if data.len() < 8 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "blowfish_decrypt: ciphertext too short",
             0,
         ));
@@ -719,10 +719,10 @@ pub(crate) fn blowfish_decrypt(
     let iv: [u8; 8] = data[..8].try_into().unwrap();
     let ciphertext = &mut data[8..];
     let cipher = BlowfishCbcDec::new_from_slices(&key_bytes, &iv)
-        .map_err(|e| PerlError::runtime(format!("blowfish_decrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("blowfish_decrypt: {}", e), 0))?;
     let plaintext = cipher
         .decrypt_padded_mut::<Pkcs7>(ciphertext)
-        .map_err(|e| PerlError::runtime(format!("blowfish_decrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("blowfish_decrypt: {}", e), 0))?;
     Ok(StrykeValue::string(
         String::from_utf8_lossy(plaintext).into_owned(),
     ))
@@ -742,7 +742,7 @@ pub(crate) fn des3_encrypt(
 
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() != 24 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "des3_encrypt: key must be 24 bytes, got {}",
                 key_bytes.len()
@@ -757,7 +757,7 @@ pub(crate) fn des3_encrypt(
     } else {
         let iv = bytes_from_value(iv);
         if iv.len() != 8 {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("des3_encrypt: iv must be 8 bytes, got {}", iv.len()),
                 0,
             ));
@@ -770,10 +770,10 @@ pub(crate) fn des3_encrypt(
     let mut buf = vec![0u8; padded_len];
     buf[..plaintext_bytes.len()].copy_from_slice(&plaintext_bytes);
     let cipher = Des3CbcEnc::new_from_slices(&key_bytes, &iv_bytes)
-        .map_err(|e| PerlError::runtime(format!("des3_encrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("des3_encrypt: {}", e), 0))?;
     let ciphertext = cipher
         .encrypt_padded_mut::<Pkcs7>(&mut buf, plaintext_bytes.len())
-        .map_err(|e| PerlError::runtime(format!("des3_encrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("des3_encrypt: {}", e), 0))?;
     let mut result = iv_bytes;
     result.extend_from_slice(ciphertext);
     Ok(StrykeValue::string(
@@ -791,7 +791,7 @@ pub(crate) fn des3_decrypt(
 
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() != 24 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "des3_decrypt: key must be 24 bytes, got {}",
                 key_bytes.len()
@@ -801,17 +801,17 @@ pub(crate) fn des3_decrypt(
     }
     let mut data = base64::engine::general_purpose::STANDARD
         .decode(ciphertext_b64.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("des3_decrypt: invalid base64: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("des3_decrypt: invalid base64: {}", e), 0))?;
     if data.len() < 8 {
-        return Err(PerlError::runtime("des3_decrypt: ciphertext too short", 0));
+        return Err(StrykeError::runtime("des3_decrypt: ciphertext too short", 0));
     }
     let iv: [u8; 8] = data[..8].try_into().unwrap();
     let ciphertext = &mut data[8..];
     let cipher = Des3CbcDec::new_from_slices(&key_bytes, &iv)
-        .map_err(|e| PerlError::runtime(format!("des3_decrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("des3_decrypt: {}", e), 0))?;
     let plaintext = cipher
         .decrypt_padded_mut::<Pkcs7>(ciphertext)
-        .map_err(|e| PerlError::runtime(format!("des3_decrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("des3_decrypt: {}", e), 0))?;
     Ok(StrykeValue::string(
         String::from_utf8_lossy(plaintext).into_owned(),
     ))
@@ -831,7 +831,7 @@ pub(crate) fn twofish_encrypt(
 
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() != 16 && key_bytes.len() != 24 && key_bytes.len() != 32 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "twofish_encrypt: key must be 16/24/32 bytes, got {}",
                 key_bytes.len()
@@ -846,7 +846,7 @@ pub(crate) fn twofish_encrypt(
     } else {
         let iv = bytes_from_value(iv);
         if iv.len() != 16 {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("twofish_encrypt: iv must be 16 bytes, got {}", iv.len()),
                 0,
             ));
@@ -859,10 +859,10 @@ pub(crate) fn twofish_encrypt(
     let mut buf = vec![0u8; padded_len];
     buf[..plaintext_bytes.len()].copy_from_slice(&plaintext_bytes);
     let cipher = TwofishCbcEnc::new_from_slices(&key_bytes, &iv_bytes)
-        .map_err(|e| PerlError::runtime(format!("twofish_encrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("twofish_encrypt: {}", e), 0))?;
     let ciphertext = cipher
         .encrypt_padded_mut::<Pkcs7>(&mut buf, plaintext_bytes.len())
-        .map_err(|e| PerlError::runtime(format!("twofish_encrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("twofish_encrypt: {}", e), 0))?;
     let mut result = iv_bytes;
     result.extend_from_slice(ciphertext);
     Ok(StrykeValue::string(
@@ -880,7 +880,7 @@ pub(crate) fn twofish_decrypt(
 
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() != 16 && key_bytes.len() != 24 && key_bytes.len() != 32 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "twofish_decrypt: key must be 16/24/32 bytes, got {}",
                 key_bytes.len()
@@ -890,9 +890,9 @@ pub(crate) fn twofish_decrypt(
     }
     let mut data = base64::engine::general_purpose::STANDARD
         .decode(ciphertext_b64.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("twofish_decrypt: invalid base64: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("twofish_decrypt: invalid base64: {}", e), 0))?;
     if data.len() < 16 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "twofish_decrypt: ciphertext too short",
             0,
         ));
@@ -900,10 +900,10 @@ pub(crate) fn twofish_decrypt(
     let iv: [u8; 16] = data[..16].try_into().unwrap();
     let ciphertext = &mut data[16..];
     let cipher = TwofishCbcDec::new_from_slices(&key_bytes, &iv)
-        .map_err(|e| PerlError::runtime(format!("twofish_decrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("twofish_decrypt: {}", e), 0))?;
     let plaintext = cipher
         .decrypt_padded_mut::<Pkcs7>(ciphertext)
-        .map_err(|e| PerlError::runtime(format!("twofish_decrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("twofish_decrypt: {}", e), 0))?;
     Ok(StrykeValue::string(
         String::from_utf8_lossy(plaintext).into_owned(),
     ))
@@ -927,7 +927,7 @@ pub(crate) fn camellia_encrypt(
     } else {
         let iv = bytes_from_value(iv);
         if iv.len() != 16 {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("camellia_encrypt: iv must be 16 bytes, got {}", iv.len()),
                 0,
             ));
@@ -944,32 +944,32 @@ pub(crate) fn camellia_encrypt(
         16 => {
             type Enc = cbc::Encryptor<camellia::Camellia128>;
             let cipher = Enc::new_from_slices(&key_bytes, &iv_bytes)
-                .map_err(|e| PerlError::runtime(format!("camellia_encrypt: {}", e), 0))?;
+                .map_err(|e| StrykeError::runtime(format!("camellia_encrypt: {}", e), 0))?;
             cipher
                 .encrypt_padded_mut::<Pkcs7>(&mut buf, plaintext_bytes.len())
-                .map_err(|e| PerlError::runtime(format!("camellia_encrypt: {}", e), 0))?
+                .map_err(|e| StrykeError::runtime(format!("camellia_encrypt: {}", e), 0))?
                 .to_vec()
         }
         24 => {
             type Enc = cbc::Encryptor<camellia::Camellia192>;
             let cipher = Enc::new_from_slices(&key_bytes, &iv_bytes)
-                .map_err(|e| PerlError::runtime(format!("camellia_encrypt: {}", e), 0))?;
+                .map_err(|e| StrykeError::runtime(format!("camellia_encrypt: {}", e), 0))?;
             cipher
                 .encrypt_padded_mut::<Pkcs7>(&mut buf, plaintext_bytes.len())
-                .map_err(|e| PerlError::runtime(format!("camellia_encrypt: {}", e), 0))?
+                .map_err(|e| StrykeError::runtime(format!("camellia_encrypt: {}", e), 0))?
                 .to_vec()
         }
         32 => {
             type Enc = cbc::Encryptor<camellia::Camellia256>;
             let cipher = Enc::new_from_slices(&key_bytes, &iv_bytes)
-                .map_err(|e| PerlError::runtime(format!("camellia_encrypt: {}", e), 0))?;
+                .map_err(|e| StrykeError::runtime(format!("camellia_encrypt: {}", e), 0))?;
             cipher
                 .encrypt_padded_mut::<Pkcs7>(&mut buf, plaintext_bytes.len())
-                .map_err(|e| PerlError::runtime(format!("camellia_encrypt: {}", e), 0))?
+                .map_err(|e| StrykeError::runtime(format!("camellia_encrypt: {}", e), 0))?
                 .to_vec()
         }
         _ => {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!(
                     "camellia_encrypt: key must be 16/24/32 bytes, got {}",
                     key_bytes.len()
@@ -996,9 +996,9 @@ pub(crate) fn camellia_decrypt(
     let key_bytes = bytes_from_value(key);
     let mut data = base64::engine::general_purpose::STANDARD
         .decode(ciphertext_b64.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("camellia_decrypt: invalid base64: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("camellia_decrypt: invalid base64: {}", e), 0))?;
     if data.len() < 16 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "camellia_decrypt: ciphertext too short",
             0,
         ));
@@ -1010,32 +1010,32 @@ pub(crate) fn camellia_decrypt(
         16 => {
             type Dec = cbc::Decryptor<camellia::Camellia128>;
             let cipher = Dec::new_from_slices(&key_bytes, &iv)
-                .map_err(|e| PerlError::runtime(format!("camellia_decrypt: {}", e), 0))?;
+                .map_err(|e| StrykeError::runtime(format!("camellia_decrypt: {}", e), 0))?;
             cipher
                 .decrypt_padded_mut::<Pkcs7>(ciphertext)
-                .map_err(|e| PerlError::runtime(format!("camellia_decrypt: {}", e), 0))?
+                .map_err(|e| StrykeError::runtime(format!("camellia_decrypt: {}", e), 0))?
                 .to_vec()
         }
         24 => {
             type Dec = cbc::Decryptor<camellia::Camellia192>;
             let cipher = Dec::new_from_slices(&key_bytes, &iv)
-                .map_err(|e| PerlError::runtime(format!("camellia_decrypt: {}", e), 0))?;
+                .map_err(|e| StrykeError::runtime(format!("camellia_decrypt: {}", e), 0))?;
             cipher
                 .decrypt_padded_mut::<Pkcs7>(ciphertext)
-                .map_err(|e| PerlError::runtime(format!("camellia_decrypt: {}", e), 0))?
+                .map_err(|e| StrykeError::runtime(format!("camellia_decrypt: {}", e), 0))?
                 .to_vec()
         }
         32 => {
             type Dec = cbc::Decryptor<camellia::Camellia256>;
             let cipher = Dec::new_from_slices(&key_bytes, &iv)
-                .map_err(|e| PerlError::runtime(format!("camellia_decrypt: {}", e), 0))?;
+                .map_err(|e| StrykeError::runtime(format!("camellia_decrypt: {}", e), 0))?;
             cipher
                 .decrypt_padded_mut::<Pkcs7>(ciphertext)
-                .map_err(|e| PerlError::runtime(format!("camellia_decrypt: {}", e), 0))?
+                .map_err(|e| StrykeError::runtime(format!("camellia_decrypt: {}", e), 0))?
                 .to_vec()
         }
         _ => {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!(
                     "camellia_decrypt: key must be 16/24/32 bytes, got {}",
                     key_bytes.len()
@@ -1063,7 +1063,7 @@ pub(crate) fn cast5_encrypt(
 
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() < 5 || key_bytes.len() > 16 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "cast5_encrypt: key must be 5-16 bytes, got {}",
                 key_bytes.len()
@@ -1078,7 +1078,7 @@ pub(crate) fn cast5_encrypt(
     } else {
         let iv = bytes_from_value(iv);
         if iv.len() != 8 {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("cast5_encrypt: iv must be 8 bytes, got {}", iv.len()),
                 0,
             ));
@@ -1091,10 +1091,10 @@ pub(crate) fn cast5_encrypt(
     let mut buf = vec![0u8; padded_len];
     buf[..plaintext_bytes.len()].copy_from_slice(&plaintext_bytes);
     let cipher = Cast5CbcEnc::new_from_slices(&key_bytes, &iv_bytes)
-        .map_err(|e| PerlError::runtime(format!("cast5_encrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("cast5_encrypt: {}", e), 0))?;
     let ciphertext = cipher
         .encrypt_padded_mut::<Pkcs7>(&mut buf, plaintext_bytes.len())
-        .map_err(|e| PerlError::runtime(format!("cast5_encrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("cast5_encrypt: {}", e), 0))?;
     let mut result = iv_bytes;
     result.extend_from_slice(ciphertext);
     Ok(StrykeValue::string(
@@ -1112,7 +1112,7 @@ pub(crate) fn cast5_decrypt(
 
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() < 5 || key_bytes.len() > 16 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "cast5_decrypt: key must be 5-16 bytes, got {}",
                 key_bytes.len()
@@ -1122,17 +1122,17 @@ pub(crate) fn cast5_decrypt(
     }
     let mut data = base64::engine::general_purpose::STANDARD
         .decode(ciphertext_b64.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("cast5_decrypt: invalid base64: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("cast5_decrypt: invalid base64: {}", e), 0))?;
     if data.len() < 8 {
-        return Err(PerlError::runtime("cast5_decrypt: ciphertext too short", 0));
+        return Err(StrykeError::runtime("cast5_decrypt: ciphertext too short", 0));
     }
     let iv: [u8; 8] = data[..8].try_into().unwrap();
     let ciphertext = &mut data[8..];
     let cipher = Cast5CbcDec::new_from_slices(&key_bytes, &iv)
-        .map_err(|e| PerlError::runtime(format!("cast5_decrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("cast5_decrypt: {}", e), 0))?;
     let plaintext = cipher
         .decrypt_padded_mut::<Pkcs7>(ciphertext)
-        .map_err(|e| PerlError::runtime(format!("cast5_decrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("cast5_decrypt: {}", e), 0))?;
     Ok(StrykeValue::string(
         String::from_utf8_lossy(plaintext).into_owned(),
     ))
@@ -1148,7 +1148,7 @@ pub(crate) fn salsa20_crypt(key: &StrykeValue, data: &StrykeValue) -> PerlResult
 
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() != 32 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("salsa20: key must be 32 bytes, got {}", key_bytes.len()),
             0,
         ));
@@ -1175,16 +1175,16 @@ pub(crate) fn salsa20_decrypt(
 
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() != 32 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("salsa20: key must be 32 bytes, got {}", key_bytes.len()),
             0,
         ));
     }
     let data = base64::engine::general_purpose::STANDARD
         .decode(ciphertext_b64.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("salsa20: invalid base64: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("salsa20: invalid base64: {}", e), 0))?;
     if data.len() < 8 {
-        return Err(PerlError::runtime("salsa20: ciphertext too short", 0));
+        return Err(StrykeError::runtime("salsa20: ciphertext too short", 0));
     }
     let nonce: [u8; 8] = data[..8].try_into().unwrap();
     let mut buf = data[8..].to_vec();
@@ -1203,7 +1203,7 @@ pub(crate) fn xsalsa20_crypt(key: &StrykeValue, data: &StrykeValue) -> PerlResul
 
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() != 32 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("xsalsa20: key must be 32 bytes, got {}", key_bytes.len()),
             0,
         ));
@@ -1230,16 +1230,16 @@ pub(crate) fn xsalsa20_decrypt(
 
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() != 32 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("xsalsa20: key must be 32 bytes, got {}", key_bytes.len()),
             0,
         ));
     }
     let data = base64::engine::general_purpose::STANDARD
         .decode(ciphertext_b64.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("xsalsa20: invalid base64: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("xsalsa20: invalid base64: {}", e), 0))?;
     if data.len() < 24 {
-        return Err(PerlError::runtime("xsalsa20: ciphertext too short", 0));
+        return Err(StrykeError::runtime("xsalsa20: ciphertext too short", 0));
     }
     let nonce: [u8; 24] = data[..24].try_into().unwrap();
     let mut buf = data[24..].to_vec();
@@ -1262,7 +1262,7 @@ pub(crate) fn secretbox_seal(
 
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() != 32 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("secretbox: key must be 32 bytes, got {}", key_bytes.len()),
             0,
         ));
@@ -1272,7 +1272,7 @@ pub(crate) fn secretbox_seal(
     rand::thread_rng().fill_bytes(&mut nonce);
     let ciphertext = cipher
         .encrypt((&nonce).into(), bytes_from_value(plaintext).as_ref())
-        .map_err(|e| PerlError::runtime(format!("secretbox: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("secretbox: {}", e), 0))?;
     let mut result = nonce.to_vec();
     result.extend(ciphertext);
     Ok(StrykeValue::string(
@@ -1289,22 +1289,22 @@ pub(crate) fn secretbox_open(
 
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() != 32 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("secretbox: key must be 32 bytes, got {}", key_bytes.len()),
             0,
         ));
     }
     let data = base64::engine::general_purpose::STANDARD
         .decode(ciphertext_b64.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("secretbox: invalid base64: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("secretbox: invalid base64: {}", e), 0))?;
     if data.len() < 24 + 16 {
-        return Err(PerlError::runtime("secretbox: ciphertext too short", 0));
+        return Err(StrykeError::runtime("secretbox: ciphertext too short", 0));
     }
     let nonce: [u8; 24] = data[..24].try_into().unwrap();
     let cipher = XSalsa20Poly1305::new(key_bytes.as_slice().into());
     let plaintext = cipher
         .decrypt((&nonce).into(), &data[24..])
-        .map_err(|_| PerlError::runtime("secretbox: decryption failed (bad key or tampered)", 0))?;
+        .map_err(|_| StrykeError::runtime("secretbox: decryption failed (bad key or tampered)", 0))?;
     Ok(StrykeValue::string(
         String::from_utf8_lossy(&plaintext).into_owned(),
     ))
@@ -1334,22 +1334,22 @@ pub(crate) fn nacl_box_seal(
     use crypto_box::{aead::Aead, PublicKey, SalsaBox, SecretKey};
 
     let pk_bytes = hex::decode(recipient_pk_hex.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("nacl_box: invalid public key hex: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("nacl_box: invalid public key hex: {}", e), 0))?;
     let sk_bytes = hex::decode(sender_sk_hex.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("nacl_box: invalid secret key hex: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("nacl_box: invalid secret key hex: {}", e), 0))?;
     if pk_bytes.len() != 32 || sk_bytes.len() != 32 {
-        return Err(PerlError::runtime("nacl_box: keys must be 32 bytes", 0));
+        return Err(StrykeError::runtime("nacl_box: keys must be 32 bytes", 0));
     }
     let pk = PublicKey::from_slice(&pk_bytes)
-        .map_err(|e| PerlError::runtime(format!("nacl_box: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("nacl_box: {}", e), 0))?;
     let sk = SecretKey::from_slice(&sk_bytes)
-        .map_err(|e| PerlError::runtime(format!("nacl_box: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("nacl_box: {}", e), 0))?;
     let salsa_box = SalsaBox::new(&pk, &sk);
     let mut nonce = [0u8; 24];
     rand::thread_rng().fill_bytes(&mut nonce);
     let ciphertext = salsa_box
         .encrypt((&nonce).into(), bytes_from_value(plaintext).as_ref())
-        .map_err(|e| PerlError::runtime(format!("nacl_box: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("nacl_box: {}", e), 0))?;
     let mut result = nonce.to_vec();
     result.extend(ciphertext);
     Ok(StrykeValue::string(
@@ -1366,27 +1366,27 @@ pub(crate) fn nacl_box_open(
     use crypto_box::{aead::Aead, PublicKey, SalsaBox, SecretKey};
 
     let pk_bytes = hex::decode(sender_pk_hex.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("nacl_box: invalid public key hex: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("nacl_box: invalid public key hex: {}", e), 0))?;
     let sk_bytes = hex::decode(recipient_sk_hex.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("nacl_box: invalid secret key hex: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("nacl_box: invalid secret key hex: {}", e), 0))?;
     if pk_bytes.len() != 32 || sk_bytes.len() != 32 {
-        return Err(PerlError::runtime("nacl_box: keys must be 32 bytes", 0));
+        return Err(StrykeError::runtime("nacl_box: keys must be 32 bytes", 0));
     }
     let pk = PublicKey::from_slice(&pk_bytes)
-        .map_err(|e| PerlError::runtime(format!("nacl_box: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("nacl_box: {}", e), 0))?;
     let sk = SecretKey::from_slice(&sk_bytes)
-        .map_err(|e| PerlError::runtime(format!("nacl_box: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("nacl_box: {}", e), 0))?;
     let data = base64::engine::general_purpose::STANDARD
         .decode(ciphertext_b64.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("nacl_box: invalid base64: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("nacl_box: invalid base64: {}", e), 0))?;
     if data.len() < 24 + 16 {
-        return Err(PerlError::runtime("nacl_box: ciphertext too short", 0));
+        return Err(StrykeError::runtime("nacl_box: ciphertext too short", 0));
     }
     let nonce: [u8; 24] = data[..24].try_into().unwrap();
     let salsa_box = SalsaBox::new(&pk, &sk);
     let plaintext = salsa_box
         .decrypt((&nonce).into(), &data[24..])
-        .map_err(|_| PerlError::runtime("nacl_box: decryption failed (bad key or tampered)", 0))?;
+        .map_err(|_| StrykeError::runtime("nacl_box: decryption failed (bad key or tampered)", 0))?;
     Ok(StrykeValue::string(
         String::from_utf8_lossy(&plaintext).into_owned(),
     ))
@@ -1398,7 +1398,7 @@ pub(crate) fn nacl_box_open(
 pub(crate) fn qr_ascii(data: &StrykeValue) -> PerlResult<StrykeValue> {
     use qrcode::QrCode;
     let code = QrCode::new(data.to_string().as_bytes())
-        .map_err(|e| PerlError::runtime(format!("qr_ascii: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("qr_ascii: {}", e), 0))?;
     let string = code
         .render::<char>()
         .quiet_zone(true)
@@ -1413,7 +1413,7 @@ pub(crate) fn qr_png(data: &StrykeValue, size: &StrykeValue) -> PerlResult<Stryk
     use qrcode::QrCode;
 
     let code = QrCode::new(data.to_string().as_bytes())
-        .map_err(|e| PerlError::runtime(format!("qr_png: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("qr_png: {}", e), 0))?;
     let scale = if size.is_undef() {
         8u32
     } else {
@@ -1433,7 +1433,7 @@ pub(crate) fn qr_png(data: &StrykeValue, size: &StrykeValue) -> PerlResult<Stryk
             img.height(),
             image::ExtendedColorType::L8,
         )
-        .map_err(|e| PerlError::runtime(format!("qr_png: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("qr_png: {}", e), 0))?;
     Ok(StrykeValue::string(
         base64::engine::general_purpose::STANDARD.encode(&png_bytes),
     ))
@@ -1445,7 +1445,7 @@ pub(crate) fn qr_svg(data: &StrykeValue) -> PerlResult<StrykeValue> {
     use qrcode::QrCode;
 
     let code = QrCode::new(data.to_string().as_bytes())
-        .map_err(|e| PerlError::runtime(format!("qr_svg: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("qr_svg: {}", e), 0))?;
     let svg_string = code
         .render()
         .min_dimensions(200, 200)
@@ -1461,7 +1461,7 @@ pub(crate) fn qr_svg(data: &StrykeValue) -> PerlResult<StrykeValue> {
 pub(crate) fn barcode_code128(data: &StrykeValue) -> PerlResult<StrykeValue> {
     use barcoders::sym::code128::Code128;
     let barcode = Code128::new(data.to_string())
-        .map_err(|e| PerlError::runtime(format!("barcode_code128: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("barcode_code128: {}", e), 0))?;
     let encoded = barcode.encode();
     let ascii: String = encoded
         .iter()
@@ -1474,7 +1474,7 @@ pub(crate) fn barcode_code128(data: &StrykeValue) -> PerlResult<StrykeValue> {
 pub(crate) fn barcode_code39(data: &StrykeValue) -> PerlResult<StrykeValue> {
     use barcoders::sym::code39::Code39;
     let barcode = Code39::new(data.to_string())
-        .map_err(|e| PerlError::runtime(format!("barcode_code39: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("barcode_code39: {}", e), 0))?;
     let encoded = barcode.encode();
     let ascii: String = encoded
         .iter()
@@ -1487,7 +1487,7 @@ pub(crate) fn barcode_code39(data: &StrykeValue) -> PerlResult<StrykeValue> {
 pub(crate) fn barcode_ean13(data: &StrykeValue) -> PerlResult<StrykeValue> {
     use barcoders::sym::ean13::EAN13;
     let barcode = EAN13::new(data.to_string())
-        .map_err(|e| PerlError::runtime(format!("barcode_ean13: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("barcode_ean13: {}", e), 0))?;
     let encoded = barcode.encode();
     let ascii: String = encoded
         .iter()
@@ -1511,29 +1511,29 @@ pub(crate) fn barcode_svg(
         "code128" | "" => {
             use barcoders::sym::code128::Code128;
             Code128::new(&data_str)
-                .map_err(|e| PerlError::runtime(format!("barcode_svg: {}", e), 0))?
+                .map_err(|e| StrykeError::runtime(format!("barcode_svg: {}", e), 0))?
                 .encode()
         }
         "code39" => {
             use barcoders::sym::code39::Code39;
             Code39::new(&data_str)
-                .map_err(|e| PerlError::runtime(format!("barcode_svg: {}", e), 0))?
+                .map_err(|e| StrykeError::runtime(format!("barcode_svg: {}", e), 0))?
                 .encode()
         }
         "ean13" => {
             use barcoders::sym::ean13::EAN13;
             EAN13::new(&data_str)
-                .map_err(|e| PerlError::runtime(format!("barcode_svg: {}", e), 0))?
+                .map_err(|e| StrykeError::runtime(format!("barcode_svg: {}", e), 0))?
                 .encode()
         }
         "upca" => {
             use barcoders::sym::ean13::UPCA;
             UPCA::new(&data_str)
-                .map_err(|e| PerlError::runtime(format!("barcode_svg: {}", e), 0))?
+                .map_err(|e| StrykeError::runtime(format!("barcode_svg: {}", e), 0))?
                 .encode()
         }
         _ => {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!(
                     "barcode_svg: unknown type '{}', use code128/code39/ean13/upca",
                     bc_type
@@ -1545,7 +1545,7 @@ pub(crate) fn barcode_svg(
 
     let svg = SVG::new(50)
         .generate(&encoded)
-        .map_err(|e| PerlError::runtime(format!("barcode_svg: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("barcode_svg: {}", e), 0))?;
     Ok(StrykeValue::string(svg))
 }
 
@@ -1556,7 +1556,7 @@ pub(crate) fn poly1305_mac(key: &StrykeValue, msg: &StrykeValue) -> PerlResult<S
     use poly1305::{universal_hash::UniversalHash, Key, Poly1305};
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() != 32 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("poly1305: key must be 32 bytes, got {}", key_bytes.len()),
             0,
         ));
@@ -1575,14 +1575,14 @@ pub(crate) fn rsa_keygen(bits: &StrykeValue) -> PerlResult<StrykeValue> {
     let key_bits = bits.to_int().max(2048) as usize;
     let mut rng = rand::thread_rng();
     let priv_key = RsaPrivateKey::new(&mut rng, key_bits)
-        .map_err(|e| PerlError::runtime(format!("rsa_keygen: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("rsa_keygen: {}", e), 0))?;
     let pub_key = priv_key.to_public_key();
     let priv_pem = priv_key
         .to_pkcs8_pem(rsa::pkcs8::LineEnding::LF)
-        .map_err(|e| PerlError::runtime(format!("rsa_keygen: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("rsa_keygen: {}", e), 0))?;
     let pub_pem = pub_key
         .to_public_key_pem(rsa::pkcs8::LineEnding::LF)
-        .map_err(|e| PerlError::runtime(format!("rsa_keygen: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("rsa_keygen: {}", e), 0))?;
     Ok(StrykeValue::array(vec![
         StrykeValue::string(priv_pem.to_string()),
         StrykeValue::string(pub_pem),
@@ -1595,12 +1595,12 @@ pub(crate) fn rsa_encrypt(
     plaintext: &StrykeValue,
 ) -> PerlResult<StrykeValue> {
     let pub_key = RsaPublicKey::from_public_key_pem(&pub_pem.to_string())
-        .map_err(|e| PerlError::runtime(format!("rsa_encrypt: invalid public key: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("rsa_encrypt: invalid public key: {}", e), 0))?;
     let mut rng = rand::thread_rng();
     let padding = Oaep::new::<Sha256>();
     let ciphertext = pub_key
         .encrypt(&mut rng, padding, &bytes_from_value(plaintext))
-        .map_err(|e| PerlError::runtime(format!("rsa_encrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("rsa_encrypt: {}", e), 0))?;
     Ok(StrykeValue::string(
         base64::engine::general_purpose::STANDARD.encode(&ciphertext),
     ))
@@ -1612,14 +1612,14 @@ pub(crate) fn rsa_decrypt(
     ciphertext_b64: &StrykeValue,
 ) -> PerlResult<StrykeValue> {
     let priv_key = RsaPrivateKey::from_pkcs8_pem(&priv_pem.to_string())
-        .map_err(|e| PerlError::runtime(format!("rsa_decrypt: invalid private key: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("rsa_decrypt: invalid private key: {}", e), 0))?;
     let ciphertext = base64::engine::general_purpose::STANDARD
         .decode(ciphertext_b64.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("rsa_decrypt: invalid base64: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("rsa_decrypt: invalid base64: {}", e), 0))?;
     let padding = Oaep::new::<Sha256>();
     let plaintext = priv_key
         .decrypt(padding, &ciphertext)
-        .map_err(|e| PerlError::runtime(format!("rsa_decrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("rsa_decrypt: {}", e), 0))?;
     Ok(StrykeValue::string(
         String::from_utf8_lossy(&plaintext).into_owned(),
     ))
@@ -1631,12 +1631,12 @@ pub(crate) fn rsa_encrypt_pkcs1(
     plaintext: &StrykeValue,
 ) -> PerlResult<StrykeValue> {
     let pub_key = RsaPublicKey::from_public_key_pem(&pub_pem.to_string()).map_err(|e| {
-        PerlError::runtime(format!("rsa_encrypt_pkcs1: invalid public key: {}", e), 0)
+        StrykeError::runtime(format!("rsa_encrypt_pkcs1: invalid public key: {}", e), 0)
     })?;
     let mut rng = rand::thread_rng();
     let ciphertext = pub_key
         .encrypt(&mut rng, Pkcs1v15Encrypt, &bytes_from_value(plaintext))
-        .map_err(|e| PerlError::runtime(format!("rsa_encrypt_pkcs1: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("rsa_encrypt_pkcs1: {}", e), 0))?;
     Ok(StrykeValue::string(
         base64::engine::general_purpose::STANDARD.encode(&ciphertext),
     ))
@@ -1648,14 +1648,14 @@ pub(crate) fn rsa_decrypt_pkcs1(
     ciphertext_b64: &StrykeValue,
 ) -> PerlResult<StrykeValue> {
     let priv_key = RsaPrivateKey::from_pkcs8_pem(&priv_pem.to_string()).map_err(|e| {
-        PerlError::runtime(format!("rsa_decrypt_pkcs1: invalid private key: {}", e), 0)
+        StrykeError::runtime(format!("rsa_decrypt_pkcs1: invalid private key: {}", e), 0)
     })?;
     let ciphertext = base64::engine::general_purpose::STANDARD
         .decode(ciphertext_b64.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("rsa_decrypt_pkcs1: invalid base64: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("rsa_decrypt_pkcs1: invalid base64: {}", e), 0))?;
     let plaintext = priv_key
         .decrypt(Pkcs1v15Encrypt, &ciphertext)
-        .map_err(|e| PerlError::runtime(format!("rsa_decrypt_pkcs1: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("rsa_decrypt_pkcs1: {}", e), 0))?;
     Ok(StrykeValue::string(
         String::from_utf8_lossy(&plaintext).into_owned(),
     ))
@@ -1664,7 +1664,7 @@ pub(crate) fn rsa_decrypt_pkcs1(
 /// RSA-PKCS1v15-SHA256 sign. private_key_pem, message. Returns base64 signature.
 pub(crate) fn rsa_sign(priv_pem: &StrykeValue, message: &StrykeValue) -> PerlResult<StrykeValue> {
     let priv_key = RsaPrivateKey::from_pkcs8_pem(&priv_pem.to_string())
-        .map_err(|e| PerlError::runtime(format!("rsa_sign: invalid private key: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("rsa_sign: invalid private key: {}", e), 0))?;
     let signing_key = RsaSigningKey::<Sha256>::new_unprefixed(priv_key);
     let sig = signing_key.sign(&bytes_from_value(message));
     Ok(StrykeValue::string(
@@ -1679,13 +1679,13 @@ pub(crate) fn rsa_verify(
     signature_b64: &StrykeValue,
 ) -> PerlResult<StrykeValue> {
     let pub_key = RsaPublicKey::from_public_key_pem(&pub_pem.to_string())
-        .map_err(|e| PerlError::runtime(format!("rsa_verify: invalid public key: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("rsa_verify: invalid public key: {}", e), 0))?;
     let sig_bytes = base64::engine::general_purpose::STANDARD
         .decode(signature_b64.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("rsa_verify: invalid base64: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("rsa_verify: invalid base64: {}", e), 0))?;
     let verifying_key = RsaVerifyingKey::<Sha256>::new_unprefixed(pub_key);
     let sig = rsa::pkcs1v15::Signature::try_from(sig_bytes.as_slice())
-        .map_err(|e| PerlError::runtime(format!("rsa_verify: invalid signature: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("rsa_verify: invalid signature: {}", e), 0))?;
     let ok = verifying_key
         .verify(&bytes_from_value(message), &sig)
         .is_ok();
@@ -1714,11 +1714,11 @@ pub(crate) fn ecdsa_p256_sign(
 ) -> PerlResult<StrykeValue> {
     use p256::ecdsa::{signature::Signer, SigningKey};
     let priv_bytes = hex::decode(priv_hex.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("ecdsa_p256_sign: invalid hex: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ecdsa_p256_sign: invalid hex: {}", e), 0))?;
     // `GenericArray::from_slice` (used by `.into()`) panics on length
     // mismatch — explicit length check returns a proper PerlError.
     if priv_bytes.len() != 32 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "ecdsa_p256_sign: private key must be 32 bytes (got {})",
                 priv_bytes.len()
@@ -1727,7 +1727,7 @@ pub(crate) fn ecdsa_p256_sign(
         ));
     }
     let sk = SigningKey::from_bytes(priv_bytes.as_slice().into())
-        .map_err(|e| PerlError::runtime(format!("ecdsa_p256_sign: invalid key: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ecdsa_p256_sign: invalid key: {}", e), 0))?;
     let sig: p256::ecdsa::Signature = sk.sign(&bytes_from_value(message));
     Ok(StrykeValue::string(hex::encode(sig.to_der().as_bytes())))
 }
@@ -1741,16 +1741,16 @@ pub(crate) fn ecdsa_p256_verify(
     use p256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
     use p256::EncodedPoint;
     let pub_bytes = hex::decode(pub_hex.to_string().trim()).map_err(|e| {
-        PerlError::runtime(format!("ecdsa_p256_verify: invalid hex pubkey: {}", e), 0)
+        StrykeError::runtime(format!("ecdsa_p256_verify: invalid hex pubkey: {}", e), 0)
     })?;
     let point = EncodedPoint::from_bytes(&pub_bytes)
-        .map_err(|e| PerlError::runtime(format!("ecdsa_p256_verify: invalid point: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ecdsa_p256_verify: invalid point: {}", e), 0))?;
     let vk = VerifyingKey::from_encoded_point(&point)
-        .map_err(|e| PerlError::runtime(format!("ecdsa_p256_verify: invalid pubkey: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ecdsa_p256_verify: invalid pubkey: {}", e), 0))?;
     let sig_bytes = hex::decode(sig_hex.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("ecdsa_p256_verify: invalid hex sig: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ecdsa_p256_verify: invalid hex sig: {}", e), 0))?;
     let sig = Signature::from_der(&sig_bytes).map_err(|e| {
-        PerlError::runtime(format!("ecdsa_p256_verify: invalid signature: {}", e), 0)
+        StrykeError::runtime(format!("ecdsa_p256_verify: invalid signature: {}", e), 0)
     })?;
     let ok = vk.verify(&bytes_from_value(message), &sig).is_ok();
     Ok(StrykeValue::integer(i64::from(ok)))
@@ -1776,9 +1776,9 @@ pub(crate) fn ecdsa_p384_sign(
 ) -> PerlResult<StrykeValue> {
     use p384::ecdsa::{signature::Signer, SigningKey};
     let priv_bytes = hex::decode(priv_hex.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("ecdsa_p384_sign: invalid hex: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ecdsa_p384_sign: invalid hex: {}", e), 0))?;
     if priv_bytes.len() != 48 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "ecdsa_p384_sign: private key must be 48 bytes (got {})",
                 priv_bytes.len()
@@ -1787,7 +1787,7 @@ pub(crate) fn ecdsa_p384_sign(
         ));
     }
     let sk = SigningKey::from_bytes(priv_bytes.as_slice().into())
-        .map_err(|e| PerlError::runtime(format!("ecdsa_p384_sign: invalid key: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ecdsa_p384_sign: invalid key: {}", e), 0))?;
     let sig: p384::ecdsa::Signature = sk.sign(&bytes_from_value(message));
     Ok(StrykeValue::string(hex::encode(sig.to_der().as_bytes())))
 }
@@ -1801,16 +1801,16 @@ pub(crate) fn ecdsa_p384_verify(
     use p384::ecdsa::{signature::Verifier, Signature, VerifyingKey};
     use p384::EncodedPoint;
     let pub_bytes = hex::decode(pub_hex.to_string().trim()).map_err(|e| {
-        PerlError::runtime(format!("ecdsa_p384_verify: invalid hex pubkey: {}", e), 0)
+        StrykeError::runtime(format!("ecdsa_p384_verify: invalid hex pubkey: {}", e), 0)
     })?;
     let point = EncodedPoint::from_bytes(&pub_bytes)
-        .map_err(|e| PerlError::runtime(format!("ecdsa_p384_verify: invalid point: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ecdsa_p384_verify: invalid point: {}", e), 0))?;
     let vk = VerifyingKey::from_encoded_point(&point)
-        .map_err(|e| PerlError::runtime(format!("ecdsa_p384_verify: invalid pubkey: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ecdsa_p384_verify: invalid pubkey: {}", e), 0))?;
     let sig_bytes = hex::decode(sig_hex.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("ecdsa_p384_verify: invalid hex sig: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ecdsa_p384_verify: invalid hex sig: {}", e), 0))?;
     let sig = Signature::from_der(&sig_bytes).map_err(|e| {
-        PerlError::runtime(format!("ecdsa_p384_verify: invalid signature: {}", e), 0)
+        StrykeError::runtime(format!("ecdsa_p384_verify: invalid signature: {}", e), 0)
     })?;
     let ok = vk.verify(&bytes_from_value(message), &sig).is_ok();
     Ok(StrykeValue::integer(i64::from(ok)))
@@ -1836,9 +1836,9 @@ pub(crate) fn ecdsa_secp256k1_sign(
 ) -> PerlResult<StrykeValue> {
     use k256::ecdsa::{signature::Signer, SigningKey};
     let priv_bytes = hex::decode(priv_hex.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("ecdsa_secp256k1_sign: invalid hex: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ecdsa_secp256k1_sign: invalid hex: {}", e), 0))?;
     if priv_bytes.len() != 32 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "ecdsa_secp256k1_sign: private key must be 32 bytes (got {})",
                 priv_bytes.len()
@@ -1847,7 +1847,7 @@ pub(crate) fn ecdsa_secp256k1_sign(
         ));
     }
     let sk = SigningKey::from_bytes(priv_bytes.as_slice().into())
-        .map_err(|e| PerlError::runtime(format!("ecdsa_secp256k1_sign: invalid key: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ecdsa_secp256k1_sign: invalid key: {}", e), 0))?;
     let sig: k256::ecdsa::Signature = sk.sign(&bytes_from_value(message));
     Ok(StrykeValue::string(hex::encode(sig.to_der().as_bytes())))
 }
@@ -1861,22 +1861,22 @@ pub(crate) fn ecdsa_secp256k1_verify(
     use k256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
     use k256::EncodedPoint;
     let pub_bytes = hex::decode(pub_hex.to_string().trim()).map_err(|e| {
-        PerlError::runtime(
+        StrykeError::runtime(
             format!("ecdsa_secp256k1_verify: invalid hex pubkey: {}", e),
             0,
         )
     })?;
     let point = EncodedPoint::from_bytes(&pub_bytes).map_err(|e| {
-        PerlError::runtime(format!("ecdsa_secp256k1_verify: invalid point: {}", e), 0)
+        StrykeError::runtime(format!("ecdsa_secp256k1_verify: invalid point: {}", e), 0)
     })?;
     let vk = VerifyingKey::from_encoded_point(&point).map_err(|e| {
-        PerlError::runtime(format!("ecdsa_secp256k1_verify: invalid pubkey: {}", e), 0)
+        StrykeError::runtime(format!("ecdsa_secp256k1_verify: invalid pubkey: {}", e), 0)
     })?;
     let sig_bytes = hex::decode(sig_hex.to_string().trim()).map_err(|e| {
-        PerlError::runtime(format!("ecdsa_secp256k1_verify: invalid hex sig: {}", e), 0)
+        StrykeError::runtime(format!("ecdsa_secp256k1_verify: invalid hex sig: {}", e), 0)
     })?;
     let sig = Signature::from_der(&sig_bytes).map_err(|e| {
-        PerlError::runtime(
+        StrykeError::runtime(
             format!("ecdsa_secp256k1_verify: invalid signature: {}", e),
             0,
         )
@@ -1894,11 +1894,11 @@ pub(crate) fn ecdh_p256(
 ) -> PerlResult<StrykeValue> {
     use p256::{EncodedPoint, PublicKey};
     let priv_bytes = hex::decode(my_priv_hex.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("ecdh_p256: invalid hex private key: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ecdh_p256: invalid hex private key: {}", e), 0))?;
     let pub_bytes = hex::decode(their_pub_hex.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("ecdh_p256: invalid hex public key: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ecdh_p256: invalid hex public key: {}", e), 0))?;
     if priv_bytes.len() != 32 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "ecdh_p256: private key must be 32 bytes (got {})",
                 priv_bytes.len()
@@ -1907,12 +1907,12 @@ pub(crate) fn ecdh_p256(
         ));
     }
     let point = EncodedPoint::from_bytes(&pub_bytes)
-        .map_err(|e| PerlError::runtime(format!("ecdh_p256: invalid point: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ecdh_p256: invalid point: {}", e), 0))?;
     let their_pk = PublicKey::from_encoded_point(&point)
         .into_option()
-        .ok_or_else(|| PerlError::runtime("ecdh_p256: invalid public key", 0))?;
+        .ok_or_else(|| StrykeError::runtime("ecdh_p256: invalid public key", 0))?;
     let my_sk = p256::SecretKey::from_bytes(priv_bytes.as_slice().into())
-        .map_err(|e| PerlError::runtime(format!("ecdh_p256: invalid private key: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ecdh_p256: invalid private key: {}", e), 0))?;
     let shared = p256::ecdh::diffie_hellman(my_sk.to_nonzero_scalar(), their_pk.as_affine());
     Ok(StrykeValue::string(hex::encode(shared.raw_secret_bytes())))
 }
@@ -1924,11 +1924,11 @@ pub(crate) fn ecdh_p384(
 ) -> PerlResult<StrykeValue> {
     use p384::{EncodedPoint, PublicKey};
     let priv_bytes = hex::decode(my_priv_hex.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("ecdh_p384: invalid hex private key: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ecdh_p384: invalid hex private key: {}", e), 0))?;
     let pub_bytes = hex::decode(their_pub_hex.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("ecdh_p384: invalid hex public key: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ecdh_p384: invalid hex public key: {}", e), 0))?;
     if priv_bytes.len() != 48 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "ecdh_p384: private key must be 48 bytes (got {})",
                 priv_bytes.len()
@@ -1937,12 +1937,12 @@ pub(crate) fn ecdh_p384(
         ));
     }
     let point = EncodedPoint::from_bytes(&pub_bytes)
-        .map_err(|e| PerlError::runtime(format!("ecdh_p384: invalid point: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ecdh_p384: invalid point: {}", e), 0))?;
     let their_pk = PublicKey::from_encoded_point(&point)
         .into_option()
-        .ok_or_else(|| PerlError::runtime("ecdh_p384: invalid public key", 0))?;
+        .ok_or_else(|| StrykeError::runtime("ecdh_p384: invalid public key", 0))?;
     let my_sk = p384::SecretKey::from_bytes(priv_bytes.as_slice().into())
-        .map_err(|e| PerlError::runtime(format!("ecdh_p384: invalid private key: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ecdh_p384: invalid private key: {}", e), 0))?;
     let shared = p384::ecdh::diffie_hellman(my_sk.to_nonzero_scalar(), their_pk.as_affine());
     Ok(StrykeValue::string(hex::encode(shared.raw_secret_bytes())))
 }
@@ -1956,7 +1956,7 @@ pub(crate) fn argon2_hash(password: &StrykeValue) -> PerlResult<StrykeValue> {
     let argon = Argon2::default();
     let hash = argon
         .hash_password(password.to_string().as_bytes(), &salt)
-        .map_err(|e| PerlError::runtime(format!("argon2_hash: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("argon2_hash: {}", e), 0))?;
     Ok(StrykeValue::string(hash.to_string()))
 }
 
@@ -1965,7 +1965,7 @@ pub(crate) fn argon2_verify(password: &StrykeValue, hash: &StrykeValue) -> PerlR
     use argon2::{password_hash::PasswordHash, password_hash::PasswordVerifier, Argon2};
     let hash_str = hash.to_string();
     let parsed = PasswordHash::new(&hash_str)
-        .map_err(|e| PerlError::runtime(format!("argon2_verify: invalid hash: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("argon2_verify: invalid hash: {}", e), 0))?;
     let ok = Argon2::default()
         .verify_password(password.to_string().as_bytes(), &parsed)
         .is_ok();
@@ -1975,14 +1975,14 @@ pub(crate) fn argon2_verify(password: &StrykeValue, hash: &StrykeValue) -> PerlR
 /// Bcrypt password hash. Returns standard bcrypt string ($2b$...).
 pub(crate) fn bcrypt_hash(password: &StrykeValue) -> PerlResult<StrykeValue> {
     let hash = bcrypt::hash(password.to_string(), bcrypt::DEFAULT_COST)
-        .map_err(|e| PerlError::runtime(format!("bcrypt_hash: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("bcrypt_hash: {}", e), 0))?;
     Ok(StrykeValue::string(hash))
 }
 
 /// Verify password against bcrypt hash.
 pub(crate) fn bcrypt_verify(password: &StrykeValue, hash: &StrykeValue) -> PerlResult<StrykeValue> {
     let ok = bcrypt::verify(password.to_string(), &hash.to_string())
-        .map_err(|e| PerlError::runtime(format!("bcrypt_verify: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("bcrypt_verify: {}", e), 0))?;
     Ok(StrykeValue::integer(i64::from(ok)))
 }
 
@@ -1995,7 +1995,7 @@ pub(crate) fn scrypt_hash(password: &StrykeValue) -> PerlResult<StrykeValue> {
     let salt = SaltString::generate(&mut rand::thread_rng());
     let hash = Scrypt
         .hash_password(password.to_string().as_bytes(), &salt)
-        .map_err(|e| PerlError::runtime(format!("scrypt_hash: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("scrypt_hash: {}", e), 0))?;
     Ok(StrykeValue::string(hash.to_string()))
 }
 
@@ -2007,7 +2007,7 @@ pub(crate) fn scrypt_verify(password: &StrykeValue, hash: &StrykeValue) -> PerlR
     };
     let hash_str = hash.to_string();
     let parsed = PasswordHash::new(&hash_str)
-        .map_err(|e| PerlError::runtime(format!("scrypt_verify: invalid hash: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("scrypt_verify: invalid hash: {}", e), 0))?;
     let ok = Scrypt
         .verify_password(password.to_string().as_bytes(), &parsed)
         .is_ok();
@@ -2057,19 +2057,19 @@ pub(crate) fn random_bytes_hex(n: &StrykeValue) -> PerlResult<StrykeValue> {
 pub(crate) fn aes_encrypt(key: &StrykeValue, plaintext: &StrykeValue) -> PerlResult<StrykeValue> {
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() != 32 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("aes_encrypt: key must be 32 bytes, got {}", key_bytes.len()),
             0,
         ));
     }
     let cipher = <Aes256Gcm as AesKeyInit>::new_from_slice(&key_bytes)
-        .map_err(|e| PerlError::runtime(format!("aes_encrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("aes_encrypt: {}", e), 0))?;
     let mut nonce_bytes = [0u8; 12];
     rand::thread_rng().fill_bytes(&mut nonce_bytes);
     let nonce = AesNonce::from_slice(&nonce_bytes);
     let ciphertext = cipher
         .encrypt(nonce, bytes_from_value(plaintext).as_ref())
-        .map_err(|e| PerlError::runtime(format!("aes_encrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("aes_encrypt: {}", e), 0))?;
     let mut out = nonce_bytes.to_vec();
     out.extend(ciphertext);
     Ok(StrykeValue::string(
@@ -2084,22 +2084,22 @@ pub(crate) fn aes_decrypt(
 ) -> PerlResult<StrykeValue> {
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() != 32 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("aes_decrypt: key must be 32 bytes, got {}", key_bytes.len()),
             0,
         ));
     }
     let cipher = <Aes256Gcm as AesKeyInit>::new_from_slice(&key_bytes)
-        .map_err(|e| PerlError::runtime(format!("aes_decrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("aes_decrypt: {}", e), 0))?;
     let data = base64::engine::general_purpose::STANDARD
         .decode(ciphertext_b64.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("aes_decrypt: invalid base64: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("aes_decrypt: invalid base64: {}", e), 0))?;
     if data.len() < 12 {
-        return Err(PerlError::runtime("aes_decrypt: ciphertext too short", 0));
+        return Err(StrykeError::runtime("aes_decrypt: ciphertext too short", 0));
     }
     let nonce = AesNonce::from_slice(&data[..12]);
     let plaintext = cipher.decrypt(nonce, &data[12..]).map_err(|_| {
-        PerlError::runtime("aes_decrypt: decryption failed (bad key or tampered)", 0)
+        StrykeError::runtime("aes_decrypt: decryption failed (bad key or tampered)", 0)
     })?;
     Ok(StrykeValue::string(
         String::from_utf8_lossy(&plaintext).into_owned(),
@@ -2114,7 +2114,7 @@ pub(crate) fn chacha_encrypt(
 ) -> PerlResult<StrykeValue> {
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() != 32 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "chacha_encrypt: key must be 32 bytes, got {}",
                 key_bytes.len()
@@ -2123,13 +2123,13 @@ pub(crate) fn chacha_encrypt(
         ));
     }
     let cipher = <ChaCha20Poly1305 as ChachaKeyInit>::new_from_slice(&key_bytes)
-        .map_err(|e| PerlError::runtime(format!("chacha_encrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("chacha_encrypt: {}", e), 0))?;
     let mut nonce_bytes = [0u8; 12];
     rand::thread_rng().fill_bytes(&mut nonce_bytes);
     let nonce = ChachaNonce::from_slice(&nonce_bytes);
     let ciphertext = cipher
         .encrypt(nonce, bytes_from_value(plaintext).as_ref())
-        .map_err(|e| PerlError::runtime(format!("chacha_encrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("chacha_encrypt: {}", e), 0))?;
     let mut out = nonce_bytes.to_vec();
     out.extend(ciphertext);
     Ok(StrykeValue::string(
@@ -2144,7 +2144,7 @@ pub(crate) fn chacha_decrypt(
 ) -> PerlResult<StrykeValue> {
     let key_bytes = bytes_from_value(key);
     if key_bytes.len() != 32 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "chacha_decrypt: key must be 32 bytes, got {}",
                 key_bytes.len()
@@ -2153,19 +2153,19 @@ pub(crate) fn chacha_decrypt(
         ));
     }
     let cipher = <ChaCha20Poly1305 as ChachaKeyInit>::new_from_slice(&key_bytes)
-        .map_err(|e| PerlError::runtime(format!("chacha_decrypt: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("chacha_decrypt: {}", e), 0))?;
     let data = base64::engine::general_purpose::STANDARD
         .decode(ciphertext_b64.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("chacha_decrypt: invalid base64: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("chacha_decrypt: invalid base64: {}", e), 0))?;
     if data.len() < 12 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "chacha_decrypt: ciphertext too short",
             0,
         ));
     }
     let nonce = ChachaNonce::from_slice(&data[..12]);
     let plaintext = cipher.decrypt(nonce, &data[12..]).map_err(|_| {
-        PerlError::runtime("chacha_decrypt: decryption failed (bad key or tampered)", 0)
+        StrykeError::runtime("chacha_decrypt: decryption failed (bad key or tampered)", 0)
     })?;
     Ok(StrykeValue::string(
         String::from_utf8_lossy(&plaintext).into_owned(),
@@ -2191,9 +2191,9 @@ pub(crate) fn ed25519_sign(
     message: &StrykeValue,
 ) -> PerlResult<StrykeValue> {
     let key_bytes = hex::decode(private_key.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("ed25519_sign: invalid hex key: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ed25519_sign: invalid hex key: {}", e), 0))?;
     if key_bytes.len() != 32 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "ed25519_sign: key must be 32 bytes, got {}",
                 key_bytes.len()
@@ -2215,11 +2215,11 @@ pub(crate) fn ed25519_verify(
     signature: &StrykeValue,
 ) -> PerlResult<StrykeValue> {
     let pub_bytes = hex::decode(public_key.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("ed25519_verify: invalid hex pubkey: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ed25519_verify: invalid hex pubkey: {}", e), 0))?;
     let sig_bytes = hex::decode(signature.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("ed25519_verify: invalid hex sig: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ed25519_verify: invalid hex sig: {}", e), 0))?;
     if pub_bytes.len() != 32 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "ed25519_verify: pubkey must be 32 bytes, got {}",
                 pub_bytes.len()
@@ -2228,7 +2228,7 @@ pub(crate) fn ed25519_verify(
         ));
     }
     if sig_bytes.len() != 64 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "ed25519_verify: signature must be 64 bytes, got {}",
                 sig_bytes.len()
@@ -2239,7 +2239,7 @@ pub(crate) fn ed25519_verify(
     let pub_arr: [u8; 32] = pub_bytes.try_into().unwrap();
     let sig_arr: [u8; 64] = sig_bytes.try_into().unwrap();
     let verifying_key = VerifyingKey::from_bytes(&pub_arr)
-        .map_err(|e| PerlError::runtime(format!("ed25519_verify: invalid pubkey: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("ed25519_verify: invalid pubkey: {}", e), 0))?;
     let sig = ed25519_dalek::Signature::from_bytes(&sig_arr);
     let ok = verifying_key
         .verify(&bytes_from_value(message), &sig)
@@ -2263,11 +2263,11 @@ pub(crate) fn x25519_dh(
     their_public: &StrykeValue,
 ) -> PerlResult<StrykeValue> {
     let priv_bytes = hex::decode(my_private.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("x25519_dh: invalid hex private key: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("x25519_dh: invalid hex private key: {}", e), 0))?;
     let pub_bytes = hex::decode(their_public.to_string().trim())
-        .map_err(|e| PerlError::runtime(format!("x25519_dh: invalid hex public key: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("x25519_dh: invalid hex public key: {}", e), 0))?;
     if priv_bytes.len() != 32 || pub_bytes.len() != 32 {
-        return Err(PerlError::runtime("x25519_dh: keys must be 32 bytes", 0));
+        return Err(StrykeError::runtime("x25519_dh: keys must be 32 bytes", 0));
     }
     let priv_arr: [u8; 32] = priv_bytes.try_into().unwrap();
     let pub_arr: [u8; 32] = pub_bytes.try_into().unwrap();
@@ -2362,7 +2362,7 @@ pub(crate) fn math_gammaincc_reg(a: &StrykeValue, x: &StrykeValue) -> PerlResult
 /// Raw HMAC-SHA256 bytes (for JWT and other binary signatures).
 pub(crate) fn hmac_sha256_raw(key: &StrykeValue, msg: &StrykeValue) -> PerlResult<Vec<u8>> {
     let mut mac = <HmacSha256 as Mac>::new_from_slice(&bytes_from_value(key))
-        .map_err(|e| PerlError::runtime(format!("hmac_sha256: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("hmac_sha256: {}", e), 0))?;
     Mac::update(&mut mac, &bytes_from_value(msg));
     Ok(mac.finalize().into_bytes().to_vec())
 }
@@ -2374,10 +2374,10 @@ pub(crate) fn hmac_sha256_verify_raw(
     tag: &[u8],
 ) -> PerlResult<()> {
     let mut mac = <HmacSha256 as Mac>::new_from_slice(&bytes_from_value(key))
-        .map_err(|e| PerlError::runtime(format!("hmac_sha256: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("hmac_sha256: {}", e), 0))?;
     Mac::update(&mut mac, &bytes_from_value(msg));
     mac.verify_slice(tag)
-        .map_err(|_| PerlError::runtime("HMAC verification failed", 0))
+        .map_err(|_| StrykeError::runtime("HMAC verification failed", 0))
 }
 
 /// JWT / RFC 4648 URL-safe base64 **without** padding.
@@ -2386,14 +2386,14 @@ pub(crate) fn base64url_encode(data: &[u8]) -> String {
 }
 
 /// Decode URL-safe base64 (adds `=` padding as needed).
-pub(crate) fn base64url_decode(s: &str) -> Result<Vec<u8>, PerlError> {
+pub(crate) fn base64url_decode(s: &str) -> Result<Vec<u8>, StrykeError> {
     let s = s.trim().replace(' ', "");
     let pad = (4 - (s.len() % 4)) % 4;
     let mut padded = s;
     padded.push_str(&"=".repeat(pad));
     base64::engine::general_purpose::URL_SAFE
         .decode(padded.as_bytes())
-        .map_err(|e| PerlError::runtime(format!("base64url_decode: {}", e), 0))
+        .map_err(|e| StrykeError::runtime(format!("base64url_decode: {}", e), 0))
 }
 
 /// Random UUID (v4) as hyphenated lowercase string.
@@ -2414,7 +2414,7 @@ pub(crate) fn base64_decode(v: &StrykeValue) -> PerlResult<StrykeValue> {
     let s = v.to_string();
     let raw = base64::engine::general_purpose::STANDARD
         .decode(s.trim())
-        .map_err(|e| PerlError::runtime(format!("base64_decode: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("base64_decode: {}", e), 0))?;
     Ok(StrykeValue::string(
         String::from_utf8_lossy(&raw).into_owned(),
     ))
@@ -2429,7 +2429,7 @@ pub(crate) fn hex_encode(v: &StrykeValue) -> PerlResult<StrykeValue> {
 pub(crate) fn hex_decode(v: &StrykeValue) -> PerlResult<StrykeValue> {
     let s = v.to_string();
     let raw =
-        hex::decode(s.trim()).map_err(|e| PerlError::runtime(format!("hex_decode: {}", e), 0))?;
+        hex::decode(s.trim()).map_err(|e| StrykeError::runtime(format!("hex_decode: {}", e), 0))?;
     Ok(StrykeValue::string(
         String::from_utf8_lossy(&raw).into_owned(),
     ))
@@ -2439,10 +2439,10 @@ pub(crate) fn gzip(v: &StrykeValue) -> PerlResult<StrykeValue> {
     let b = bytes_from_value(v);
     let mut enc = GzEncoder::new(Vec::new(), Compression::default());
     enc.write_all(&b)
-        .map_err(|e| PerlError::runtime(format!("gzip: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("gzip: {}", e), 0))?;
     let out = enc
         .finish()
-        .map_err(|e| PerlError::runtime(format!("gzip: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("gzip: {}", e), 0))?;
     Ok(StrykeValue::bytes(Arc::new(out)))
 }
 
@@ -2451,21 +2451,21 @@ pub(crate) fn gunzip(v: &StrykeValue) -> PerlResult<StrykeValue> {
     let mut dec = GzDecoder::new(&b[..]);
     let mut out = Vec::new();
     dec.read_to_end(&mut out)
-        .map_err(|e| PerlError::runtime(format!("gunzip: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("gunzip: {}", e), 0))?;
     Ok(StrykeValue::bytes(Arc::new(out)))
 }
 
 pub(crate) fn zstd_compress(v: &StrykeValue) -> PerlResult<StrykeValue> {
     let b = bytes_from_value(v);
     let out =
-        zstd::encode_all(&b[..], 3).map_err(|e| PerlError::runtime(format!("zstd: {}", e), 0))?;
+        zstd::encode_all(&b[..], 3).map_err(|e| StrykeError::runtime(format!("zstd: {}", e), 0))?;
     Ok(StrykeValue::bytes(Arc::new(out)))
 }
 
 pub(crate) fn zstd_decode(v: &StrykeValue) -> PerlResult<StrykeValue> {
     let b = bytes_from_value(v);
     let out = zstd::decode_all(&b[..])
-        .map_err(|e| PerlError::runtime(format!("zstd_decode: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("zstd_decode: {}", e), 0))?;
     Ok(StrykeValue::bytes(Arc::new(out)))
 }
 
@@ -2479,7 +2479,7 @@ pub(crate) fn brotli_compress(v: &StrykeValue) -> PerlResult<StrykeValue> {
         let mut writer = brotli::CompressorWriter::new(&mut output, 4096, 6, 22);
         writer
             .write_all(&input)
-            .map_err(|e| PerlError::runtime(format!("brotli: {}", e), 0))?;
+            .map_err(|e| StrykeError::runtime(format!("brotli: {}", e), 0))?;
     }
     Ok(StrykeValue::bytes(Arc::new(output)))
 }
@@ -2492,7 +2492,7 @@ pub(crate) fn brotli_decompress(v: &StrykeValue) -> PerlResult<StrykeValue> {
         let mut reader = brotli::Decompressor::new(&input[..], 4096);
         reader
             .read_to_end(&mut output)
-            .map_err(|e| PerlError::runtime(format!("brotli_decode: {}", e), 0))?;
+            .map_err(|e| StrykeError::runtime(format!("brotli_decode: {}", e), 0))?;
     }
     Ok(StrykeValue::bytes(Arc::new(output)))
 }
@@ -2508,10 +2508,10 @@ pub(crate) fn xz_compress(v: &StrykeValue) -> PerlResult<StrykeValue> {
         let mut encoder = xz2::write::XzEncoder::new(&mut output, 6);
         encoder
             .write_all(&input)
-            .map_err(|e| PerlError::runtime(format!("xz: {}", e), 0))?;
+            .map_err(|e| StrykeError::runtime(format!("xz: {}", e), 0))?;
         encoder
             .finish()
-            .map_err(|e| PerlError::runtime(format!("xz: {}", e), 0))?;
+            .map_err(|e| StrykeError::runtime(format!("xz: {}", e), 0))?;
     }
     Ok(StrykeValue::bytes(Arc::new(output)))
 }
@@ -2524,7 +2524,7 @@ pub(crate) fn xz_decompress(v: &StrykeValue) -> PerlResult<StrykeValue> {
         let mut decoder = xz2::read::XzDecoder::new(&input[..]);
         decoder
             .read_to_end(&mut output)
-            .map_err(|e| PerlError::runtime(format!("xz_decode: {}", e), 0))?;
+            .map_err(|e| StrykeError::runtime(format!("xz_decode: {}", e), 0))?;
     }
     Ok(StrykeValue::bytes(Arc::new(output)))
 }
@@ -2542,10 +2542,10 @@ pub(crate) fn bzip2_compress(v: &StrykeValue) -> PerlResult<StrykeValue> {
         let mut encoder = BzEncoder::new(&mut output, Compression::default());
         encoder
             .write_all(&input)
-            .map_err(|e| PerlError::runtime(format!("bzip2: {}", e), 0))?;
+            .map_err(|e| StrykeError::runtime(format!("bzip2: {}", e), 0))?;
         encoder
             .finish()
-            .map_err(|e| PerlError::runtime(format!("bzip2: {}", e), 0))?;
+            .map_err(|e| StrykeError::runtime(format!("bzip2: {}", e), 0))?;
     }
     Ok(StrykeValue::bytes(Arc::new(output)))
 }
@@ -2559,7 +2559,7 @@ pub(crate) fn bzip2_decompress(v: &StrykeValue) -> PerlResult<StrykeValue> {
         let mut decoder = BzDecoder::new(&input[..]);
         decoder
             .read_to_end(&mut output)
-            .map_err(|e| PerlError::runtime(format!("bzip2_decode: {}", e), 0))?;
+            .map_err(|e| StrykeError::runtime(format!("bzip2_decode: {}", e), 0))?;
     }
     Ok(StrykeValue::bytes(Arc::new(output)))
 }
@@ -2577,7 +2577,7 @@ pub(crate) fn lz4_compress(v: &StrykeValue) -> PerlResult<StrykeValue> {
 pub(crate) fn lz4_decompress(v: &StrykeValue) -> PerlResult<StrykeValue> {
     let input = bytes_from_value(v);
     let output = lz4_flex::decompress_size_prepended(&input)
-        .map_err(|e| PerlError::runtime(format!("lz4_decode: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("lz4_decode: {}", e), 0))?;
     Ok(StrykeValue::bytes(Arc::new(output)))
 }
 
@@ -2589,7 +2589,7 @@ pub(crate) fn snappy_compress(v: &StrykeValue) -> PerlResult<StrykeValue> {
     let mut encoder = snap::raw::Encoder::new();
     let output = encoder
         .compress_vec(&input)
-        .map_err(|e| PerlError::runtime(format!("snappy: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("snappy: {}", e), 0))?;
     Ok(StrykeValue::bytes(Arc::new(output)))
 }
 
@@ -2599,7 +2599,7 @@ pub(crate) fn snappy_decompress(v: &StrykeValue) -> PerlResult<StrykeValue> {
     let mut decoder = snap::raw::Decoder::new();
     let output = decoder
         .decompress_vec(&input)
-        .map_err(|e| PerlError::runtime(format!("snappy_decode: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("snappy_decode: {}", e), 0))?;
     Ok(StrykeValue::bytes(Arc::new(output)))
 }
 
@@ -2611,10 +2611,10 @@ pub(crate) fn tar_create(dir: &StrykeValue) -> PerlResult<StrykeValue> {
     let mut archive = tar::Builder::new(Vec::new());
     archive
         .append_dir_all(".", &dir_path)
-        .map_err(|e| PerlError::runtime(format!("tar_create: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("tar_create: {}", e), 0))?;
     let output = archive
         .into_inner()
-        .map_err(|e| PerlError::runtime(format!("tar_create: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("tar_create: {}", e), 0))?;
     Ok(StrykeValue::bytes(Arc::new(output)))
 }
 
@@ -2628,7 +2628,7 @@ pub(crate) fn tar_extract(
     let mut archive = tar::Archive::new(&data[..]);
     archive
         .unpack(&dest)
-        .map_err(|e| PerlError::runtime(format!("tar_extract: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("tar_extract: {}", e), 0))?;
     Ok(StrykeValue::integer(1))
 }
 
@@ -2639,12 +2639,12 @@ pub(crate) fn tar_list(tar_data: &StrykeValue) -> PerlResult<StrykeValue> {
     let mut files = Vec::new();
     for entry in archive
         .entries()
-        .map_err(|e| PerlError::runtime(format!("tar_list: {}", e), 0))?
+        .map_err(|e| StrykeError::runtime(format!("tar_list: {}", e), 0))?
     {
-        let entry = entry.map_err(|e| PerlError::runtime(format!("tar_list: {}", e), 0))?;
+        let entry = entry.map_err(|e| StrykeError::runtime(format!("tar_list: {}", e), 0))?;
         let path = entry
             .path()
-            .map_err(|e| PerlError::runtime(format!("tar_list: {}", e), 0))?;
+            .map_err(|e| StrykeError::runtime(format!("tar_list: {}", e), 0))?;
         files.push(StrykeValue::string(path.to_string_lossy().into_owned()));
     }
     Ok(StrykeValue::array(files))
@@ -2674,7 +2674,7 @@ pub(crate) fn lzw_compress(v: &StrykeValue) -> PerlResult<StrykeValue> {
     let mut encoder = Encoder::new(BitOrder::Msb, 8);
     let output = encoder
         .encode(&input)
-        .map_err(|e| PerlError::runtime(format!("lzw: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("lzw: {}", e), 0))?;
     Ok(StrykeValue::bytes(Arc::new(output)))
 }
 
@@ -2685,7 +2685,7 @@ pub(crate) fn lzw_decompress(v: &StrykeValue) -> PerlResult<StrykeValue> {
     let mut decoder = Decoder::new(BitOrder::Msb, 8);
     let output = decoder
         .decode(&input)
-        .map_err(|e| PerlError::runtime(format!("lzw_decode: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("lzw_decode: {}", e), 0))?;
     Ok(StrykeValue::bytes(Arc::new(output)))
 }
 
@@ -2709,12 +2709,12 @@ pub(crate) fn zip_create(dir: &StrykeValue) -> PerlResult<StrykeValue> {
             base: &Path,
             current: &Path,
             options: SimpleFileOptions,
-        ) -> Result<(), PerlError> {
+        ) -> Result<(), StrykeError> {
             for entry in std::fs::read_dir(current)
-                .map_err(|e| PerlError::runtime(format!("zip_create: {}", e), 0))?
+                .map_err(|e| StrykeError::runtime(format!("zip_create: {}", e), 0))?
             {
                 let entry =
-                    entry.map_err(|e| PerlError::runtime(format!("zip_create: {}", e), 0))?;
+                    entry.map_err(|e| StrykeError::runtime(format!("zip_create: {}", e), 0))?;
                 let path = entry.path();
                 let name = path
                     .strip_prefix(base)
@@ -2724,15 +2724,15 @@ pub(crate) fn zip_create(dir: &StrykeValue) -> PerlResult<StrykeValue> {
 
                 if path.is_dir() {
                     zip.add_directory(&name, options)
-                        .map_err(|e| PerlError::runtime(format!("zip_create: {}", e), 0))?;
+                        .map_err(|e| StrykeError::runtime(format!("zip_create: {}", e), 0))?;
                     add_dir_recursive(zip, base, &path, options)?;
                 } else {
                     zip.start_file(&name, options)
-                        .map_err(|e| PerlError::runtime(format!("zip_create: {}", e), 0))?;
+                        .map_err(|e| StrykeError::runtime(format!("zip_create: {}", e), 0))?;
                     let content = std::fs::read(&path)
-                        .map_err(|e| PerlError::runtime(format!("zip_create: {}", e), 0))?;
+                        .map_err(|e| StrykeError::runtime(format!("zip_create: {}", e), 0))?;
                     std::io::Write::write_all(zip, &content)
-                        .map_err(|e| PerlError::runtime(format!("zip_create: {}", e), 0))?;
+                        .map_err(|e| StrykeError::runtime(format!("zip_create: {}", e), 0))?;
                 }
             }
             Ok(())
@@ -2741,7 +2741,7 @@ pub(crate) fn zip_create(dir: &StrykeValue) -> PerlResult<StrykeValue> {
         let base = Path::new(&dir_path);
         add_dir_recursive(&mut zip, base, base, options)?;
         zip.finish()
-            .map_err(|e| PerlError::runtime(format!("zip_create: {}", e), 0))?;
+            .map_err(|e| StrykeError::runtime(format!("zip_create: {}", e), 0))?;
     }
     Ok(StrykeValue::bytes(Arc::new(buffer.into_inner())))
 }
@@ -2759,30 +2759,30 @@ pub(crate) fn zip_extract(
     let dest = dest_dir.to_string();
     let cursor = std::io::Cursor::new(data);
     let mut archive = zip::ZipArchive::new(cursor)
-        .map_err(|e| PerlError::runtime(format!("zip_extract: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("zip_extract: {}", e), 0))?;
 
     for i in 0..archive.len() {
         let mut file = archive
             .by_index(i)
-            .map_err(|e| PerlError::runtime(format!("zip_extract: {}", e), 0))?;
+            .map_err(|e| StrykeError::runtime(format!("zip_extract: {}", e), 0))?;
         let outpath = Path::new(&dest).join(file.name());
 
         if file.is_dir() {
             fs::create_dir_all(&outpath)
-                .map_err(|e| PerlError::runtime(format!("zip_extract: {}", e), 0))?;
+                .map_err(|e| StrykeError::runtime(format!("zip_extract: {}", e), 0))?;
         } else {
             if let Some(p) = outpath.parent() {
                 fs::create_dir_all(p)
-                    .map_err(|e| PerlError::runtime(format!("zip_extract: {}", e), 0))?;
+                    .map_err(|e| StrykeError::runtime(format!("zip_extract: {}", e), 0))?;
             }
             let mut outfile = fs::File::create(&outpath)
-                .map_err(|e| PerlError::runtime(format!("zip_extract: {}", e), 0))?;
+                .map_err(|e| StrykeError::runtime(format!("zip_extract: {}", e), 0))?;
             let mut content = Vec::new();
             std::io::Read::read_to_end(&mut file, &mut content)
-                .map_err(|e| PerlError::runtime(format!("zip_extract: {}", e), 0))?;
+                .map_err(|e| StrykeError::runtime(format!("zip_extract: {}", e), 0))?;
             outfile
                 .write_all(&content)
-                .map_err(|e| PerlError::runtime(format!("zip_extract: {}", e), 0))?;
+                .map_err(|e| StrykeError::runtime(format!("zip_extract: {}", e), 0))?;
         }
     }
     Ok(StrykeValue::integer(1))
@@ -2793,7 +2793,7 @@ pub(crate) fn zip_list(zip_data: &StrykeValue) -> PerlResult<StrykeValue> {
     let data = bytes_from_value(zip_data);
     let cursor = std::io::Cursor::new(data);
     let archive = zip::ZipArchive::new(cursor)
-        .map_err(|e| PerlError::runtime(format!("zip_list: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("zip_list: {}", e), 0))?;
 
     let mut files = Vec::new();
     for i in 0..archive.len() {
@@ -2818,7 +2818,7 @@ pub(crate) fn datetime_utc() -> PerlResult<StrykeValue> {
 pub(crate) fn datetime_from_epoch(v: &StrykeValue) -> PerlResult<StrykeValue> {
     let sec = v.to_number();
     if !sec.is_finite() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "datetime_from_epoch: non-finite value",
             0,
         ));
@@ -2826,7 +2826,7 @@ pub(crate) fn datetime_from_epoch(v: &StrykeValue) -> PerlResult<StrykeValue> {
     let t = Utc
         .timestamp_opt(sec.floor() as i64, fraction_nanos(sec))
         .single()
-        .ok_or_else(|| PerlError::runtime("datetime_from_epoch: out of range", 0))?;
+        .ok_or_else(|| StrykeError::runtime("datetime_from_epoch: out of range", 0))?;
     Ok(StrykeValue::string(
         t.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true),
     ))
@@ -2844,7 +2844,7 @@ pub(crate) fn datetime_parse_rfc3339(v: &StrykeValue) -> PerlResult<StrykeValue>
     let t = DateTime::parse_from_rfc3339(s.trim())
         .map(|dt| dt.with_timezone(&Utc))
         .or_else(|_| s.trim().parse::<DateTime<Utc>>())
-        .map_err(|e| PerlError::runtime(format!("datetime_parse_rfc3339: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("datetime_parse_rfc3339: {}", e), 0))?;
     let secs = t.timestamp() as f64 + f64::from(t.timestamp_subsec_nanos()) / 1e9;
     Ok(StrykeValue::float(secs))
 }
@@ -2853,13 +2853,13 @@ pub(crate) fn datetime_parse_rfc3339(v: &StrykeValue) -> PerlResult<StrykeValue>
 pub(crate) fn datetime_strftime(epoch: &StrykeValue, fmt: &StrykeValue) -> PerlResult<StrykeValue> {
     let sec = epoch.to_number();
     if !sec.is_finite() {
-        return Err(PerlError::runtime("datetime_strftime: non-finite epoch", 0));
+        return Err(StrykeError::runtime("datetime_strftime: non-finite epoch", 0));
     }
     let pattern = fmt.to_string();
     let t = Utc
         .timestamp_opt(sec.floor() as i64, fraction_nanos(sec))
         .single()
-        .ok_or_else(|| PerlError::runtime("datetime_strftime: out of range", 0))?;
+        .ok_or_else(|| StrykeError::runtime("datetime_strftime: out of range", 0))?;
     let out = t.format(&pattern).to_string();
     Ok(StrykeValue::string(out))
 }
@@ -2873,12 +2873,12 @@ pub(crate) fn datetime_now_tz(tz_name: &StrykeValue) -> PerlResult<StrykeValue> 
     ))
 }
 
-fn parse_tz(tz_name: &StrykeValue) -> Result<Tz, PerlError> {
+fn parse_tz(tz_name: &StrykeValue) -> Result<Tz, StrykeError> {
     tz_name
         .to_string()
         .trim()
         .parse()
-        .map_err(|_| PerlError::runtime(format!("unknown timezone {:?}", tz_name.to_string()), 0))
+        .map_err(|_| StrykeError::runtime(format!("unknown timezone {:?}", tz_name.to_string()), 0))
 }
 
 /// Unix epoch seconds (UTC float) formatted with [`chrono::format::strftime`] in an IANA timezone.
@@ -2889,7 +2889,7 @@ pub(crate) fn datetime_format_tz(
 ) -> PerlResult<StrykeValue> {
     let sec = epoch.to_number();
     if !sec.is_finite() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "datetime_format_tz: non-finite epoch",
             0,
         ));
@@ -2899,7 +2899,7 @@ pub(crate) fn datetime_format_tz(
     let t = Utc
         .timestamp_opt(sec.floor() as i64, fraction_nanos(sec))
         .single()
-        .ok_or_else(|| PerlError::runtime("datetime_format_tz: out of range", 0))?;
+        .ok_or_else(|| StrykeError::runtime("datetime_format_tz: out of range", 0))?;
     let local = t.with_timezone(&tz);
     Ok(StrykeValue::string(local.format(&pattern).to_string()))
 }
@@ -2913,7 +2913,7 @@ pub(crate) fn datetime_parse_local(
     let tz: Tz = parse_tz(tz_name)?;
     let text = s.to_string();
     let naive = parse_naive_datetime(text.trim()).ok_or_else(|| {
-        PerlError::runtime(
+        StrykeError::runtime(
             "datetime_parse_local: expected YYYY-MM-DD [HH:MM:SS] or YYYY-MM-DDTHH:MM:SS",
             0,
         )
@@ -2921,7 +2921,7 @@ pub(crate) fn datetime_parse_local(
     let mapped = tz
         .from_local_datetime(&naive)
         .single()
-        .ok_or_else(|| PerlError::runtime("datetime_parse_local: invalid local time", 0))?;
+        .ok_or_else(|| StrykeError::runtime("datetime_parse_local: invalid local time", 0))?;
     let utc = mapped.with_timezone(&Utc);
     let secs = utc.timestamp() as f64 + f64::from(utc.timestamp_subsec_nanos()) / 1e9;
     Ok(StrykeValue::float(secs))
@@ -2946,7 +2946,7 @@ pub(crate) fn datetime_add_seconds(
     let a = epoch.to_number();
     let b = secs.to_number();
     if !a.is_finite() || !b.is_finite() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "datetime_add_seconds: non-finite values",
             0,
         ));
@@ -2964,7 +2964,7 @@ pub(crate) fn datetime_add_seconds(
 /// `'@id'`) so `@` is not interpolated inside double quotes.
 pub(crate) fn xml_decode(s: &str) -> PerlResult<StrykeValue> {
     let doc = roxmltree::Document::parse(s.trim())
-        .map_err(|e| PerlError::runtime(format!("xml_decode: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("xml_decode: {}", e), 0))?;
     let root = doc.root_element();
     let name = root.tag_name().name().to_string();
     let inner = xml_element_to_perl(root)?;
@@ -3042,7 +3042,7 @@ fn escape_xml_attr_value(s: &str, out: &mut String) {
 
 fn xml_write_element(out: &mut String, tag: &str, v: &StrykeValue) -> PerlResult<()> {
     if !is_valid_xml_element_name(tag) {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("xml_encode: invalid element name `{tag}`"),
             0,
         ));
@@ -3082,7 +3082,7 @@ fn xml_write_element(out: &mut String, tag: &str, v: &StrykeValue) -> PerlResult
     } else if let Some(r) = v.as_hash_ref() {
         r.read().clone()
     } else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "xml_encode: element value must be hash(ref), string, or number",
             0,
         ));
@@ -3100,7 +3100,7 @@ fn xml_write_element(out: &mut String, tag: &str, v: &StrykeValue) -> PerlResult
         if k.starts_with('@') && k.len() > 1 {
             let an = &k[1..];
             if !is_valid_xml_element_name(an) {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!("xml_encode: invalid attribute name `{an}`"),
                     0,
                 ));
@@ -3110,7 +3110,7 @@ fn xml_write_element(out: &mut String, tag: &str, v: &StrykeValue) -> PerlResult
             text = Some(val.to_string());
         } else {
             if !is_valid_xml_element_name(&k) {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!("xml_encode: invalid child element name `{k}`"),
                     0,
                 ));
@@ -3160,20 +3160,20 @@ pub(crate) fn xml_encode(v: &StrykeValue) -> PerlResult<StrykeValue> {
     } else if let Some(r) = v.as_hash_ref() {
         r.read().clone()
     } else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "xml_encode: need hash or hashref with one root element key",
             0,
         ));
     };
     if map.len() != 1 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "xml_encode: top-level hash must have exactly one key (root element name)",
             0,
         ));
     }
     let (root_name, inner) = map.iter().next().expect("one");
     if !is_valid_xml_element_name(root_name) {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("xml_encode: invalid root element name `{root_name}`"),
             0,
         ));
@@ -3189,7 +3189,7 @@ pub(crate) fn xml_encode(v: &StrykeValue) -> PerlResult<StrykeValue> {
 
 pub(crate) fn toml_decode(s: &str) -> PerlResult<StrykeValue> {
     let v: toml::Value = toml::from_str(s.trim())
-        .map_err(|e| PerlError::runtime(format!("toml_decode: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("toml_decode: {}", e), 0))?;
     Ok(toml_to_perl(v))
 }
 
@@ -3197,7 +3197,7 @@ pub(crate) fn toml_decode(s: &str) -> PerlResult<StrykeValue> {
 pub(crate) fn toml_encode(v: &StrykeValue) -> PerlResult<StrykeValue> {
     let j = crate::native_data::perl_to_json_value(v)?;
     let s =
-        toml::to_string(&j).map_err(|e| PerlError::runtime(format!("toml_encode: {}", e), 0))?;
+        toml::to_string(&j).map_err(|e| StrykeError::runtime(format!("toml_encode: {}", e), 0))?;
     Ok(StrykeValue::string(s))
 }
 
@@ -3221,7 +3221,7 @@ fn toml_to_perl(v: toml::Value) -> StrykeValue {
 
 pub(crate) fn yaml_decode(s: &str) -> PerlResult<StrykeValue> {
     let v: serde_yaml::Value = serde_yaml::from_str(s.trim())
-        .map_err(|e| PerlError::runtime(format!("yaml_decode: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("yaml_decode: {}", e), 0))?;
     Ok(yaml_to_perl(v))
 }
 
@@ -3229,7 +3229,7 @@ pub(crate) fn yaml_decode(s: &str) -> PerlResult<StrykeValue> {
 pub(crate) fn yaml_encode(v: &StrykeValue) -> PerlResult<StrykeValue> {
     let j = crate::native_data::perl_to_json_value(v)?;
     let s = serde_yaml::to_string(&j)
-        .map_err(|e| PerlError::runtime(format!("yaml_encode: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("yaml_encode: {}", e), 0))?;
     Ok(StrykeValue::string(s))
 }
 

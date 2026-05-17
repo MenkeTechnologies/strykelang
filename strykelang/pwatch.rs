@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 
-use crate::error::{PerlError, PerlResult};
+use crate::error::{StrykeError, PerlResult};
 use crate::scope::{AtomicArray, AtomicHash};
 use crate::value::{PerlSub, StrykeValue};
 use crate::vm_helper::{VMHelper, WantarrayCtx};
@@ -29,7 +29,7 @@ pub fn run_pwatch(
     // during initial expansion via [`crate::perl_fs::stryke_glob`] below.
     let (pattern_no_qual, _qual) = zsh::glob::split_qualifier(pattern);
     let gpat = glob::Pattern::new(pattern_no_qual)
-        .map_err(|e| PerlError::runtime(format!("pwatch: invalid glob pattern: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("pwatch: invalid glob pattern: {}", e), line))?;
 
     let expanded: Vec<PathBuf> = crate::perl_fs::stryke_glob(pattern)
         .into_iter()
@@ -75,7 +75,7 @@ pub fn run_pwatch(
     }
 
     if watch_specs.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "pwatch: no paths to watch (glob matched nothing and no parent directory found)",
             line,
         ));
@@ -84,12 +84,12 @@ pub fn run_pwatch(
     let (tx, rx) = std::sync::mpsc::channel();
     let mut watcher: RecommendedWatcher =
         RecommendedWatcher::new(move |res| drop(tx.send(res)), Config::default()).map_err(|e| {
-            PerlError::runtime(format!("pwatch: could not create watcher: {}", e), line)
+            StrykeError::runtime(format!("pwatch: could not create watcher: {}", e), line)
         })?;
 
     for (path, mode) in &watch_specs {
         watcher.watch(path, *mode).map_err(|e| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 format!("pwatch: cannot watch {}: {}", path.display(), e),
                 line,
             )
@@ -102,7 +102,7 @@ pub fn run_pwatch(
     use std::time::Duration;
     loop {
         if crate::perl_signal::pending("INT") || crate::perl_signal::pending("TERM") {
-            return Err(PerlError::runtime("pwatch: interrupted", line));
+            return Err(StrykeError::runtime("pwatch: interrupted", line));
         }
         match rx.recv_timeout(Duration::from_millis(100)) {
             Ok(Ok(event)) => {
@@ -130,11 +130,11 @@ pub fn run_pwatch(
                 }
             }
             Ok(Err(e)) => {
-                return Err(PerlError::runtime(format!("pwatch: {}", e), line));
+                return Err(StrykeError::runtime(format!("pwatch: {}", e), line));
             }
             Err(RecvTimeoutError::Timeout) => continue,
             Err(RecvTimeoutError::Disconnected) => {
-                return Err(PerlError::runtime("pwatch: watcher channel closed", line));
+                return Err(StrykeError::runtime("pwatch: watcher channel closed", line));
             }
         }
     }

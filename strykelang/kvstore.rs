@@ -31,7 +31,7 @@ use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 
-use crate::error::{PerlError, PerlResult};
+use crate::error::{StrykeError, PerlResult};
 use crate::value::StrykeValue;
 
 /// Magic header bytes — fail-fast on wrong-format file.
@@ -207,10 +207,10 @@ impl KvStore {
             });
         }
         let bytes = std::fs::read(&path).map_err(|e| {
-            PerlError::runtime(format!("kv_open: read {}: {}", path.display(), e), 0)
+            StrykeError::runtime(format!("kv_open: read {}: {}", path.display(), e), 0)
         })?;
         let archived = rkyv::check_archived_root::<KvRoot>(&bytes[..]).map_err(|e| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 format!(
                     "kv_open: corrupt or wrong-format file {}: {}",
                     path.display(),
@@ -220,13 +220,13 @@ impl KvStore {
             )
         })?;
         if archived.header.magic != KV_MAGIC {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("kv_open: bad magic in {}", path.display()),
                 0,
             ));
         }
         if archived.header.format_version != KV_FORMAT_VERSION {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!(
                     "kv_open: format version {} (expected {})",
                     archived.header.format_version, KV_FORMAT_VERSION
@@ -236,7 +236,7 @@ impl KvStore {
         }
         let root: KvRoot = archived
             .deserialize(&mut rkyv::Infallible)
-            .map_err(|_| PerlError::runtime("kv_open: deserialize failed", 0))?;
+            .map_err(|_| StrykeError::runtime("kv_open: deserialize failed", 0))?;
         Ok(Self {
             path,
             root,
@@ -299,12 +299,12 @@ impl KvStore {
         self.root.header.last_commit_secs = now_secs();
         self.root.header.commit_count = self.root.header.commit_count.saturating_add(1);
         let bytes = rkyv::to_bytes::<_, 4096>(&self.root)
-            .map_err(|e| PerlError::runtime(format!("kv_commit: rkyv: {}", e), 0))?;
+            .map_err(|e| StrykeError::runtime(format!("kv_commit: rkyv: {}", e), 0))?;
 
         let parent = self
             .path
             .parent()
-            .ok_or_else(|| PerlError::runtime("kv_commit: path has no parent", 0))?;
+            .ok_or_else(|| StrykeError::runtime("kv_commit: path has no parent", 0))?;
         let _ = std::fs::create_dir_all(parent);
 
         let pid = std::process::id();
@@ -321,15 +321,15 @@ impl KvStore {
 
         {
             let mut f = File::create(&tmp_path)
-                .map_err(|e| PerlError::runtime(format!("kv_commit: tmp create: {}", e), 0))?;
+                .map_err(|e| StrykeError::runtime(format!("kv_commit: tmp create: {}", e), 0))?;
             f.write_all(&bytes)
-                .map_err(|e| PerlError::runtime(format!("kv_commit: tmp write: {}", e), 0))?;
+                .map_err(|e| StrykeError::runtime(format!("kv_commit: tmp write: {}", e), 0))?;
             f.sync_all()
-                .map_err(|e| PerlError::runtime(format!("kv_commit: tmp fsync: {}", e), 0))?;
+                .map_err(|e| StrykeError::runtime(format!("kv_commit: tmp fsync: {}", e), 0))?;
         }
 
         std::fs::rename(&tmp_path, &self.path)
-            .map_err(|e| PerlError::runtime(format!("kv_commit: rename: {}", e), 0))?;
+            .map_err(|e| StrykeError::runtime(format!("kv_commit: rename: {}", e), 0))?;
         self.dirty = false;
         Ok(())
     }
@@ -359,7 +359,7 @@ fn now_secs() -> u64 {
 
 fn store_arg(v: &StrykeValue, fn_name: &str, line: usize) -> PerlResult<Arc<Mutex<KvStore>>> {
     v.as_kv_store().ok_or_else(|| {
-        PerlError::runtime(
+        StrykeError::runtime(
             format!("{}: first argument must be a KvStore handle", fn_name),
             line,
         )
@@ -383,10 +383,10 @@ fn as_any_array(v: &StrykeValue) -> Option<Vec<StrykeValue>> {
 pub(crate) fn builtin_kv_open(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     let path_v = args
         .first()
-        .ok_or_else(|| PerlError::runtime("kv_open: missing path argument", line))?;
+        .ok_or_else(|| StrykeError::runtime("kv_open: missing path argument", line))?;
     let path = path_v.to_string();
     let store = KvStore::open(Path::new(&path))
-        .map_err(|e| PerlError::runtime(format!("kv_open: {}", e.message), line))?;
+        .map_err(|e| StrykeError::runtime(format!("kv_open: {}", e.message), line))?;
     Ok(StrykeValue::kv_store(Arc::new(Mutex::new(store))))
 }
 
@@ -486,7 +486,7 @@ pub(crate) fn builtin_kv_commit(args: &[StrykeValue], line: usize) -> PerlResult
     let s = store_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "kv_commit", line)?;
     s.lock()
         .commit()
-        .map_err(|e| PerlError::runtime(format!("kv_commit: {}", e.message), line))?;
+        .map_err(|e| StrykeError::runtime(format!("kv_commit: {}", e.message), line))?;
     Ok(StrykeValue::integer(1))
 }
 
@@ -497,9 +497,9 @@ pub(crate) fn builtin_kv_batch(args: &[StrykeValue], line: usize) -> PerlResult<
     let s = store_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "kv_batch", line)?;
     let ops_v = args
         .get(1)
-        .ok_or_else(|| PerlError::runtime("kv_batch: missing ops array", line))?;
+        .ok_or_else(|| StrykeError::runtime("kv_batch: missing ops array", line))?;
     let ops = as_any_array(ops_v).ok_or_else(|| {
-        PerlError::runtime("kv_batch: ops must be an array of triples", line)
+        StrykeError::runtime("kv_batch: ops must be an array of triples", line)
     })?;
 
     // Snapshot the entries map so we can roll back if any op rejects.
@@ -508,7 +508,7 @@ pub(crate) fn builtin_kv_batch(args: &[StrykeValue], line: usize) -> PerlResult<
     let result: PerlResult<usize> = (|| {
         for (i, op_v) in ops.iter().enumerate() {
             let op_arr = as_any_array(op_v).ok_or_else(|| {
-                PerlError::runtime(format!("kv_batch: op {} is not an array", i), line)
+                StrykeError::runtime(format!("kv_batch: op {} is not an array", i), line)
             })?;
             let kind = op_arr
                 .first()
@@ -520,7 +520,7 @@ pub(crate) fn builtin_kv_batch(args: &[StrykeValue], line: usize) -> PerlResult<
                         .get(1)
                         .map(|v| v.to_string())
                         .ok_or_else(|| {
-                            PerlError::runtime(format!("kv_batch: op {}: put missing key", i), line)
+                            StrykeError::runtime(format!("kv_batch: op {}: put missing key", i), line)
                         })?;
                     let v = op_arr.get(2).cloned().unwrap_or(StrykeValue::UNDEF);
                     s.lock().put(k, WireValue::from_stryke(&v));
@@ -530,12 +530,12 @@ pub(crate) fn builtin_kv_batch(args: &[StrykeValue], line: usize) -> PerlResult<
                         .get(1)
                         .map(|v| v.to_string())
                         .ok_or_else(|| {
-                            PerlError::runtime(format!("kv_batch: op {}: del missing key", i), line)
+                            StrykeError::runtime(format!("kv_batch: op {}: del missing key", i), line)
                         })?;
                     s.lock().del(&k);
                 }
                 other => {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("kv_batch: op {}: unknown kind '{}'", i, other),
                         line,
                     ));
@@ -565,7 +565,7 @@ pub(crate) fn builtin_kv_close(args: &[StrykeValue], line: usize) -> PerlResult<
     let mut g = s.lock();
     if g.dirty {
         g.commit()
-            .map_err(|e| PerlError::runtime(format!("kv_close: {}", e.message), line))?;
+            .map_err(|e| StrykeError::runtime(format!("kv_close: {}", e.message), line))?;
     }
     Ok(StrykeValue::integer(1))
 }

@@ -804,13 +804,13 @@ fn builtin_rfc3339_parse(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let parts_date_time: Vec<&str> = s.split('T').collect();
     if parts_date_time.len() != 2 {
-        return Err(PerlError::runtime("rfc3339_parse: missing 'T'", 0));
+        return Err(StrykeError::runtime("rfc3339_parse: missing 'T'", 0));
     }
     let date_parts: Vec<&str> = parts_date_time[0].split('-').collect();
     let time_str = parts_date_time[1].trim_end_matches('Z');
     let time_parts: Vec<&str> = time_str.split(':').collect();
     if date_parts.len() != 3 || time_parts.len() != 3 {
-        return Err(PerlError::runtime("rfc3339_parse: malformed", 0));
+        return Err(StrykeError::runtime("rfc3339_parse: malformed", 0));
     }
     let y: i64 = date_parts[0].parse().unwrap_or(0);
     let mo: i64 = date_parts[1].parse().unwrap_or(1);

@@ -20,7 +20,7 @@ use std::sync::Arc;
 use parking_lot::Mutex;
 use xxhash_rust::xxh3::{xxh3_64, xxh3_128};
 
-use crate::error::{PerlError, PerlResult};
+use crate::error::{StrykeError, PerlResult};
 use crate::value::StrykeValue;
 
 /// Power-of-two-sized bit array. Indexing is `bit & (cap - 1)` so we
@@ -1696,7 +1696,7 @@ fn longest_increasing_subseq(pairs: &[(usize, usize)]) -> Vec<(usize, usize)> {
 
 fn bf_lock_arg(v: &StrykeValue, fname: &str, line: usize) -> PerlResult<Arc<Mutex<BloomFilter>>> {
     v.as_bloom_filter()
-        .ok_or_else(|| PerlError::runtime(format!("{fname}: expected BloomFilter operand"), line))
+        .ok_or_else(|| StrykeError::runtime(format!("{fname}: expected BloomFilter operand"), line))
 }
 
 fn key_bytes(v: &StrykeValue) -> Vec<u8> {
@@ -1720,7 +1720,7 @@ pub(crate) fn builtin_bloom_filter(
     let capacity = args.first().map(|v| v.to_int()).unwrap_or(1000).max(1) as u64;
     let fpr = args.get(1).map(|v| v.to_number()).unwrap_or(0.01);
     if !fpr.is_finite() || fpr <= 0.0 || fpr >= 1.0 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "bloom_filter: FPR must be in (0, 1)",
             line,
         ));
@@ -1833,7 +1833,7 @@ fn hll_lock_arg(
     line: usize,
 ) -> PerlResult<Arc<Mutex<HllSketch>>> {
     v.as_hll_sketch()
-        .ok_or_else(|| PerlError::runtime(format!("{fname}: expected HllSketch operand"), line))
+        .ok_or_else(|| StrykeError::runtime(format!("{fname}: expected HllSketch operand"), line))
 }
 
 /// `hll(PRECISION=14)` / `hyperloglog(PRECISION)` — construct a HyperLogLog
@@ -1950,7 +1950,7 @@ fn cms_lock_arg(
     line: usize,
 ) -> PerlResult<Arc<Mutex<CmsSketch>>> {
     v.as_cms_sketch()
-        .ok_or_else(|| PerlError::runtime(format!("{fname}: expected CmsSketch operand"), line))
+        .ok_or_else(|| StrykeError::runtime(format!("{fname}: expected CmsSketch operand"), line))
 }
 
 /// `count_min_sketch(WIDTH=2048, DEPTH=5)` / `cms(W, D)` — construct a
@@ -2043,7 +2043,7 @@ fn topk_lock_arg(
     line: usize,
 ) -> PerlResult<Arc<Mutex<TopKSketch>>> {
     v.as_topk_sketch()
-        .ok_or_else(|| PerlError::runtime(format!("{fname}: expected TopKSketch operand"), line))
+        .ok_or_else(|| StrykeError::runtime(format!("{fname}: expected TopKSketch operand"), line))
 }
 
 /// `topk(K=10)` / `top_k_sketch(K)` — construct a SpaceSaving top-K
@@ -2195,7 +2195,7 @@ fn td_lock_arg(
     line: usize,
 ) -> PerlResult<Arc<Mutex<TDigestSketch>>> {
     v.as_tdigest_sketch()
-        .ok_or_else(|| PerlError::runtime(format!("{fname}: expected TDigestSketch operand"), line))
+        .ok_or_else(|| StrykeError::runtime(format!("{fname}: expected TDigestSketch operand"), line))
 }
 
 /// `t_digest(COMPRESSION=100)` / `td(C)` — streaming-quantile sketch.
@@ -2307,7 +2307,7 @@ fn rb_lock_arg(
     line: usize,
 ) -> PerlResult<Arc<Mutex<RoaringBitmapSketch>>> {
     v.as_roaring_bitmap()
-        .ok_or_else(|| PerlError::runtime(format!("{fname}: expected RoaringBitmap operand"), line))
+        .ok_or_else(|| StrykeError::runtime(format!("{fname}: expected RoaringBitmap operand"), line))
 }
 
 fn value_to_u32(v: &StrykeValue) -> u32 {
@@ -2509,7 +2509,7 @@ fn rl_lock_arg(
     line: usize,
 ) -> PerlResult<Arc<Mutex<RateLimiterSketch>>> {
     v.as_rate_limiter()
-        .ok_or_else(|| PerlError::runtime(format!("{fname}: expected RateLimiter operand"), line))
+        .ok_or_else(|| StrykeError::runtime(format!("{fname}: expected RateLimiter operand"), line))
 }
 
 pub(crate) fn builtin_token_bucket(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
@@ -2548,7 +2548,7 @@ fn hr_lock_arg(
     line: usize,
 ) -> PerlResult<Arc<Mutex<HashRingSketch>>> {
     v.as_hash_ring()
-        .ok_or_else(|| PerlError::runtime(format!("{fname}: expected HashRing operand"), line))
+        .ok_or_else(|| StrykeError::runtime(format!("{fname}: expected HashRing operand"), line))
 }
 
 pub(crate) fn builtin_hash_ring(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
@@ -2606,7 +2606,7 @@ fn sh_lock_arg(
     line: usize,
 ) -> PerlResult<Arc<Mutex<SimHashSketch>>> {
     v.as_simhash()
-        .ok_or_else(|| PerlError::runtime(format!("{fname}: expected SimHash operand"), line))
+        .ok_or_else(|| StrykeError::runtime(format!("{fname}: expected SimHash operand"), line))
 }
 
 pub(crate) fn builtin_simhash(_args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
@@ -2650,7 +2650,7 @@ fn mh_lock_arg(
     line: usize,
 ) -> PerlResult<Arc<Mutex<MinHashSketch>>> {
     v.as_minhash()
-        .ok_or_else(|| PerlError::runtime(format!("{fname}: expected MinHash operand"), line))
+        .ok_or_else(|| StrykeError::runtime(format!("{fname}: expected MinHash operand"), line))
 }
 
 pub(crate) fn builtin_minhash(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
@@ -2698,7 +2698,7 @@ fn it_lock_arg(
     line: usize,
 ) -> PerlResult<Arc<Mutex<IntervalTreeSketch>>> {
     v.as_interval_tree()
-        .ok_or_else(|| PerlError::runtime(format!("{fname}: expected IntervalTree operand"), line))
+        .ok_or_else(|| StrykeError::runtime(format!("{fname}: expected IntervalTree operand"), line))
 }
 
 pub(crate) fn builtin_interval_tree(
@@ -2781,7 +2781,7 @@ fn bk_lock_arg(
     line: usize,
 ) -> PerlResult<Arc<Mutex<BkTreeSketch>>> {
     v.as_bk_tree()
-        .ok_or_else(|| PerlError::runtime(format!("{fname}: expected BkTree operand"), line))
+        .ok_or_else(|| StrykeError::runtime(format!("{fname}: expected BkTree operand"), line))
 }
 
 pub(crate) fn builtin_bk_tree(_args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
@@ -2831,7 +2831,7 @@ fn rope_lock_arg(
     line: usize,
 ) -> PerlResult<Arc<Mutex<RopeSketch>>> {
     v.as_rope()
-        .ok_or_else(|| PerlError::runtime(format!("{fname}: expected Rope operand"), line))
+        .ok_or_else(|| StrykeError::runtime(format!("{fname}: expected Rope operand"), line))
 }
 
 pub(crate) fn builtin_rope(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue> {
