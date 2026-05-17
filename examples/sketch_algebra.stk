@@ -5,76 +5,76 @@
 # are syntactic primitives. Everywhere else these are library function
 # calls. Operators are functional — neither operand is mutated.
 
-p "── Bloom union via + ──────────────────────────────────";
-my $alice = bloom_filter(1000, 0.01);
-my $bob   = bloom_filter(1000, 0.01);
-bloom_add($alice, $_) for ("alice", "anna", "alex");
-bloom_add($bob,   $_) for ("bob", "ben", "beth");
+p "── Bloom union via + ──────────────────────────────────"
+my $alice = bloom_filter(1000, 0.01)
+my $bob   = bloom_filter(1000, 0.01)
+bloom_add($alice, $_) for ("alice", "anna", "alex")
+bloom_add($bob,   $_) for ("bob", "ben", "beth")
 
 my $both = $alice + $bob;             # union: who's in either set?
-p "alice in 'both': ", bloom_contains($both, "alice");
-p "ben   in 'both': ", bloom_contains($both, "ben");
+p "alice in 'both': ", bloom_contains($both, "alice")
+p "ben   in 'both': ", bloom_contains($both, "ben")
 p "carol in 'both': ", bloom_contains($both, "carol");    # very likely 0
-p "alice still NOT in bob (operands unchanged): ", bloom_contains($bob, "alice");
+p "alice still NOT in bob (operands unchanged): ", bloom_contains($bob, "alice")
 
-p "";
-p "── HLL union via + (cardinality of A ∪ B) ────────────";
-my $hll_a = hll(14);
-my $hll_b = hll(14);
-hll_add($hll_a, "user:$_") for (1..50_000);
-hll_add($hll_b, "user:$_") for (40_000..90_000);   # 10k overlap
+p ""
+p "── HLL union via + (cardinality of A ∪ B) ────────────"
+my $hll_a = hll(14)
+my $hll_b = hll(14)
+hll_add($hll_a, "user:$_") for (1:50_000)
+hll_add($hll_b, "user:$_") for (40_000:90_000);   # 10k overlap
 
-my $union = $hll_a + $hll_b;
-printf "  |A| ≈ %d\n", hll_count($hll_a);
-printf "  |B| ≈ %d\n", hll_count($hll_b);
-printf "  |A ∪ B| ≈ %d  (truth ≈ 90,000)\n", hll_count($union);
+my $union = $hll_a + $hll_b
+printf "  |A| ≈ %d\n", hll_count($hll_a)
+printf "  |B| ≈ %d\n", hll_count($hll_b)
+printf "  |A ∪ B| ≈ %d  (truth ≈ 90,000)\n", hll_count($union)
 
-p "";
-p "── Count-Min counter sum via + ────────────────────────";
-my $cms_morning = cms(2048, 5);
-my $cms_evening = cms(2048, 5);
-cms_add($cms_morning, "GET /home") for (1..1000);
-cms_add($cms_evening, "GET /home") for (1..2500);
-cms_add($cms_evening, "GET /api")  for (1..600);
+p ""
+p "── Count-Min counter sum via + ────────────────────────"
+my $cms_morning = cms(2048, 5)
+my $cms_evening = cms(2048, 5)
+cms_add($cms_morning, "GET /home") for (1:1000)
+cms_add($cms_evening, "GET /home") for (1:2500)
+cms_add($cms_evening, "GET /api")  for (1:600)
 
-my $cms_day = $cms_morning + $cms_evening;
-printf "  /home all day: ≥ %d hits\n", cms_count($cms_day, "GET /home");
-printf "  /api  all day: ≥ %d hits\n", cms_count($cms_day, "GET /api");
+my $cms_day = $cms_morning + $cms_evening
+printf "  /home all day: ≥ %d hits\n", cms_count($cms_day, "GET /home")
+printf "  /api  all day: ≥ %d hits\n", cms_count($cms_day, "GET /api")
 
-p "";
-p "── Roaring full set algebra |  &  ^  - ───────────────";
-my $reds   = roaring();
-my $blues  = roaring();
-rb_add($reds,  $_) for (1..10);
-rb_add($blues, $_) for (5..15);
+p ""
+p "── Roaring full set algebra |  &  ^  - ───────────────"
+my $reds   = roaring()
+my $blues  = roaring()
+rb_add($reds,  $_) for (1:10)
+rb_add($blues, $_) for (5:15)
 
-printf "  reds ∪ blues : %d members  (|: union)\n",        rb_len($reds | $blues);
-printf "  reds ∩ blues : %d members  (&: intersection)\n", rb_len($reds & $blues);
-printf "  reds △ blues : %d members  (^: sym.diff)\n",     rb_len($reds ^ $blues);
-printf "  reds \\ blues : %d members  (-: andnot)\n",       rb_len($reds - $blues);
+printf "  reds ∪ blues : %d members  (|: union)\n",        rb_len($reds | $blues)
+printf "  reds ∩ blues : %d members  (&: intersection)\n", rb_len($reds & $blues)
+printf "  reds △ blues : %d members  (^: sym.diff)\n",     rb_len($reds ^ $blues)
+printf "  reds \\ blues : %d members  (-: andnot)\n",       rb_len($reds - $blues)
 
-p "";
-p "── t-digest centroid merge via + (streaming quantiles) ─";
-my $td_us = t_digest(100);
-my $td_eu = t_digest(100);
-td_add($td_us, $_) for (1..1000);          # US latencies 1..1000ms
-td_add($td_eu, $_) for (1001..2000);       # EU latencies 1001..2000ms
+p ""
+p "── t-digest centroid merge via + (streaming quantiles) ─"
+my $td_us = t_digest(100)
+my $td_eu = t_digest(100)
+td_add($td_us, $_) for (1:1000);          # US latencies 1:1000ms
+td_add($td_eu, $_) for (1001:2000);       # EU latencies 1001:2000ms
 
-my $global = $td_us + $td_eu;
-printf "  global p50: %.0fms\n", td_quantile($global, 0.50);
-printf "  global p99: %.0fms\n", td_quantile($global, 0.99);
+my $global = $td_us + $td_eu
+printf "  global p50: %.0fms\n", td_quantile($global, 0.50)
+printf "  global p99: %.0fms\n", td_quantile($global, 0.99)
 
-p "";
-p "── TopK SpaceSaving merge via + ─────────────────────";
-my $tk_a = topk(3);
-my $tk_b = topk(3);
-topk_add($tk_a, "alpha") for (1..200);
-topk_add($tk_a, "beta")  for (1..150);
-topk_add($tk_b, "gamma") for (1..300);
-topk_add($tk_b, "beta")  for (1..100);
+p ""
+p "── TopK SpaceSaving merge via + ─────────────────────"
+my $tk_a = topk(3)
+my $tk_b = topk(3)
+topk_add($tk_a, "alpha") for (1:200)
+topk_add($tk_a, "beta")  for (1:150)
+topk_add($tk_b, "gamma") for (1:300)
+topk_add($tk_b, "beta")  for (1:100)
 
-my $tk_all = $tk_a + $tk_b;
-p "  merged heavy hitters:";
+my $tk_all = $tk_a + $tk_b
+p "  merged heavy hitters:"
 for my $row (topk_heavies($tk_all)) {
-    printf "    %-8s count=%d\n", $row->[0], $row->[1];
+    printf "    %-8s count=%d\n", $row->[0], $row->[1]
 }

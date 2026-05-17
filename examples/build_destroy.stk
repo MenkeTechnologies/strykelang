@@ -51,7 +51,7 @@ class Dog extends Animal {
 }
 
 my $d = Dog(name => "Rex", breed => "Lab")
-p "build trail = " . $d->trail      # Animal:Rex;Dog:Lab;
+p "build trail = " . $d->trail      # Animal:Rex;Dog:Lab
 
 # ─────────────────────────────────────────────────────────────────────────
 # 3. DESTROY chain — child runs before parent.
@@ -76,4 +76,4 @@ class FileResource extends Resource {
     p "live: " . $f->label . " → " . $f->path
 }
 
-p "destroy trail = " . Resource::audit()   # F:/tmp/app.log;R:logger;
+p "destroy trail = " . Resource::audit()   # F:/tmp/app.log;R:logger

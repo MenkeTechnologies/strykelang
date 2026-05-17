@@ -16,35 +16,35 @@
 
 # ── viewport ──────────────────────────────────────────────────────
 
-my $W = 70;
-my $H = 28;
-my $X_MIN = -2.0;
-my $X_MAX =  0.8;
-my $Y_MIN = -1.1;
-my $Y_MAX =  1.1;
+my $W = 70
+my $H = 28
+my $X_MIN = -2.0
+my $X_MAX =  0.8
+my $Y_MIN = -1.1
+my $Y_MAX =  1.1
 
-my $MAX_ITER = 80;
+my $MAX_ITER = 80
 
-my $RAMP = " .:-=+*#%@";
+my $RAMP = " .:-=+*#%@"
 
 # ── sketches ──────────────────────────────────────────────────────
 
-my $td_iter = t_digest(200);
-my $tk_ch   = topk(12);
-my $hll_iter = hll(12);
+my $td_iter = t_digest(200)
+my $tk_ch   = topk(12)
+my $hll_iter = hll(12)
 
 # ── core iteration: number of steps until |z| > 2, capped at MAX ──
 
 fn Demo::MB::iter($cx, $cy) {
-    my $x = 0.0;
-    my $y = 0.0;
-    my $n = 0;
+    my $x = 0.0
+    my $y = 0.0
+    my $n = 0
     while ($n < $MAX_ITER && ($x * $x + $y * $y) <= 4.0) {
-        my $xn = $x * $x - $y * $y + $cx;
-        my $yn = 2.0 * $x * $y + $cy;
-        $x = $xn;
-        $y = $yn;
-        $n++;
+        my $xn = $x * $x - $y * $y + $cx
+        my $yn = 2.0 * $x * $y + $cy
+        $x = $xn
+        $y = $yn
+        $n++
     }
     $n
 }
@@ -52,20 +52,20 @@ fn Demo::MB::iter($cx, $cy) {
 # ── render one row, returns the string and a list of iter counts ──
 
 fn Demo::MB::render_row($row) {
-    my $cy = $Y_MIN + ($row / ($H - 1)) * ($Y_MAX - $Y_MIN);
-    my @chars;
-    my @iters;
+    my $cy = $Y_MIN + ($row / ($H - 1)) * ($Y_MAX - $Y_MIN)
+    my @chars
+    my @iters
     for my $col (0:$W - 1) {
-        my $cx = $X_MIN + ($col / ($W - 1)) * ($X_MAX - $X_MIN);
-        my $n = Demo::MB::iter($cx, $cy);
-        push @iters, $n;
-        my $ramp_idx;
+        my $cx = $X_MIN + ($col / ($W - 1)) * ($X_MAX - $X_MIN)
+        my $n = Demo::MB::iter($cx, $cy)
+        push @iters, $n
+        my $ramp_idx
         if ($n >= $MAX_ITER) {
-            $ramp_idx = length($RAMP) - 1;
+            $ramp_idx = len($RAMP) - 1
         } else {
-            $ramp_idx = int(($n / $MAX_ITER) * (length($RAMP) - 1));
+            $ramp_idx = int(($n / $MAX_ITER) * (len($RAMP) - 1))
         }
-        push @chars, substr($RAMP, $ramp_idx, 1);
+        push @chars, substr($RAMP, $ramp_idx, 1)
     }
     {
         text  => join("", @chars),
@@ -75,52 +75,50 @@ fn Demo::MB::render_row($row) {
 
 # ── parallel render all rows ──────────────────────────────────────
 
-print "Mandelbrot — ${W}x${H} ASCII, max_iter=$MAX_ITER\n";
-print "─" x ($W + 2), "\n";
-
-my $t0 = now_ns();
-my @rows = pmap { Demo::MB::render_row($_) } (0:$H - 1);
-my $elapsed_us = (now_ns() - $t0) / 1000.0;
+p "Mandelbrot — ${W}x${H} ASCII, max_iter=$MAX_ITER"
+p "─" x ($W + 2)
+my $t0 = now_ns()
+my @rows = pmap { Demo::MB::render_row($_) } (0:$H - 1)
+my $elapsed_us = (now_ns() - $t0) / 1000.0
 
 for my $r (@rows) {
-    print "|", $r->{text}, "|\n";
+    p "|", $r->{text}, "|"
 }
-print "─" x ($W + 2), "\n";
-
+p "─" x ($W + 2)
 # ── update sketches from collected per-pixel data ─────────────────
 
-my $total_pixels = 0;
+my $total_pixels = 0
 for my $r (@rows) {
     for my $n (@{$r->{iters}}) {
-        td_add($td_iter, $n);
-        hll_add($hll_iter, $n);
-        $total_pixels++;
+        td_add($td_iter, $n)
+        hll_add($hll_iter, $n)
+        $total_pixels++
     }
     for my $c (split //, $r->{text}) {
-        topk_add($tk_ch, $c);
+        topk_add($tk_ch, $c)
     }
 }
 
 # ── stats ────────────────────────────────────────────────────────
 
 printf("\nrendered %d pixels in %.0f us total (%.2f us/px)\n",
-       $total_pixels, $elapsed_us, $elapsed_us / $total_pixels);
+       $total_pixels, $elapsed_us, $elapsed_us / $total_pixels)
 
-print "\niteration count distribution:\n";
-printf("  p10 = %2.0f\n", td_quantile($td_iter, 0.10));
-printf("  p50 = %2.0f\n", td_quantile($td_iter, 0.50));
-printf("  p90 = %2.0f\n", td_quantile($td_iter, 0.90));
-printf("  max ~ %2.0f\n", td_quantile($td_iter, 0.99));
+p "\niteration count distribution:"
+printf("  p10 = %2.0f\n", td_quantile($td_iter, 0.10))
+printf("  p50 = %2.0f\n", td_quantile($td_iter, 0.50))
+printf("  p90 = %2.0f\n", td_quantile($td_iter, 0.90))
+printf("  max ~ %2.0f\n", td_quantile($td_iter, 0.99))
 
-print "\nshading character frequency (top 6):\n";
-my @top = topk_top($tk_ch, 6);
+p "\nshading character frequency (top 6):"
+my @top = topk_top($tk_ch, 6)
 for my $p (@top) {
-    my $shown = $p->[0] eq " " ? "(space)" : $p->[0];
-    printf("  %-7s count=%d\n", $shown, $p->[1]);
+    my $shown = $p->[0] eq " " ? "(space)" : $p->[0]
+    printf("  %-7s count=%d\n", $shown, $p->[1])
 }
 
-my $hll_n = hll_count($hll_iter);
+my $hll_n = hll_count($hll_iter)
 printf("\ndistinct iteration counts: HLL=%.1f (max possible = %d)\n",
-       $hll_n, $MAX_ITER + 1);
+       $hll_n, $MAX_ITER + 1)
 
-print "\nMandelbrot done\n";
+p "\nMandelbrot done"

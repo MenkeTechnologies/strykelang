@@ -117,13 +117,11 @@ my @row
 for my $w (@singletons) {
     push @row, sprintf("%-12s", $w)
     if (len(@row) == $cols) {
-        print "  ", join(" ", @row), "\n"
-        @row = ()
+        p "  ", join(" ", @row)        @row = ()
     }
 }
 if (len(@row) > 0) {
-    print "  ", join(" ", @row), "\n"
-}
+    p "  ", join(" ", @row)}
 
 # ── tokenize latency ───────────────────────────────────────────────
 

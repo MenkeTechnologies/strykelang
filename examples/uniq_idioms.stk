@@ -4,47 +4,47 @@
 # arrayref-aware (post BUG-126/140 fix). Order-preserving: first
 # occurrence of each distinct value wins.
 
-p "── variadic — flat args ───────────────────────────────";
+p "── variadic — flat args ───────────────────────────────"
 my @r1 = uniq(1, 1, 2, 2, 3, 3, 1)
 p "  uniq(1,1,2,2,3,3,1) → ", join(",", @r1)
 
-p "";
-p "── arrayref literal — derefs automatically ────────────";
+p ""
+p "── arrayref literal — derefs automatically ────────────"
 my @r2 = uniq([1, 1, 2, 2, 3])
 p "  uniq([1,1,2,2,3])   → ", join(",", @r2)
 
-p "";
-p "── named array via \\@arr backslash ────────────────────";
+p ""
+p "── named array via \\@arr backslash ────────────────────"
 my @data = (5, 5, 4, 4, 3, 3, 2, 2, 1, 1)
 my @r3 = uniq(\@data)
 p "  uniq(\\\@data)        → ", join(",", @r3)
 
-p "";
-p "── mixed: scalars + arrayref unfolded in place ────────";
+p ""
+p "── mixed: scalars + arrayref unfolded in place ────────"
 my @r4 = uniq("a", "a", [10, 10, 20, 20], "b", "b", 30)
 p "  uniq('a','a',[10,10,20,20],'b','b',30):"
 p "    → ", join(",", @r4)
 
-p "";
-p "── empty arrayref → empty result ──────────────────────";
+p ""
+p "── empty arrayref → empty result ──────────────────────"
 my @r5 = uniq([])
 p "  uniq([])            → (", join(",", @r5), ") len=", len(@r5)
 
-p "";
-p "── chained with sort (sort + uniq for canonical form) ─";
+p ""
+p "── chained with sort (sort + uniq for canonical form) ─"
 my @noisy = (3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5)
 my @canonical = uniq(sort { _0 <=> _1 } @noisy)
 p "  sort+uniq noisy     → ", join(",", @canonical)
 
-p "";
-p "── pipe-forward composition: count distinct tokens ────";
+p ""
+p "── pipe-forward composition: count distinct tokens ────"
 my $text = "the quick brown fox jumps over the lazy dog the fox"
 my $distinct = $text |> split(/\s+/) |> uniq |> len
 p "  distinct words in   : '$text'"
 p "  count               : $distinct"
 
-p "";
-p "── word-frequency table via uniq + grep ───────────────";
+p ""
+p "── word-frequency table via uniq + grep ───────────────"
 my @words = split(/\s+/, "alpha beta alpha gamma beta alpha")
 my @unique_words = uniq(@words)
 p "  unique tokens       : ", join(",", @unique_words)
@@ -53,8 +53,8 @@ for my $w (@unique_words) {
     printf "    %-7s × %d\n", $w, len(@hits)
 }
 
-p "";
-p "── nested arrayrefs collapse via ref-stringification ──";
+p ""
+p "── nested arrayrefs collapse via ref-stringification ──"
 # Outer arrayref derefs once; inner arrayrefs are compared by string
 # form. Stryke (like Perl) stringifies every arrayref as ARRAY(0x…),
 # so any sequence of arrayrefs uniqs down to a single atom. For

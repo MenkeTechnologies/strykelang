@@ -3,67 +3,67 @@
 # Stryke `async { BLOCK }` + `await EXPR` — JavaScript-shaped concurrency
 # on top of the rayon pool. `spawn` is a Rust-style alias.
 
-p "── Single task — async + await ────────────────────────";
-my $t1 = now_ns();
-my $h = async { sleep 0.1; "result-A" };
+p "── Single task — async + await ────────────────────────"
+my $t1 = now_ns()
+my $h = async { sleep 0.1; "result-A" }
 # (do other work while task runs)
-sleep 0.05;
-my $r = await($h);
-my $dt = (now_ns() - $t1) / 1e9;
-printf "  joined: %s after %.2fs   (target ≈ 0.10s)\n", $r, $dt;
+sleep 0.05
+my $r = await($h)
+my $dt = (now_ns() - $t1) / 1e9
+printf "  joined: %s after %.2fs   (target ≈ 0.10s)\n", $r, $dt
 
-p "";
-p "── Fan-out — spawn N tasks, await in order ────────────";
-my $t2 = now_ns();
+p ""
+p "── Fan-out — spawn N tasks, await in order ────────────"
+my $t2 = now_ns()
 my @handles = map {
-    my $i = $_;
+    my $i = $_
     async { sleep 0.05; $i * $i }
-} (1..8);
-my @results = map { await($_) } @handles;
-my $elapsed = (now_ns() - $t2) / 1e9;
-printf "  8 tasks × 50ms : %.2fs   (serial ≈ 0.40s)\n", $elapsed;
-p "  results        : ", join(",", @results);
+} (1:8)
+my @results = map { await($_) } @handles
+my $elapsed = (now_ns() - $t2) / 1e9
+printf "  8 tasks × 50ms : %.2fs   (serial ≈ 0.40s)\n", $elapsed
+p "  results        : ", join(",", @results)
 
-p "";
-p "── spawn alias — same semantics as async ──────────────";
-my $h2 = spawn { 1..100 |> sum };
-p "  spawn result : ", await($h2);
+p ""
+p "── spawn alias — same semantics as async ──────────────"
+my $h2 = spawn { 1:100 |> sum }
+p "  spawn result : ", await($h2)
 
-p "";
-p "── await passes through non-task values ───────────────";
-my $not_task = 42;
+p ""
+p "── await passes through non-task values ───────────────"
+my $not_task = 42
 p "  await(42)    : ", await($not_task);   # no-op pass-through
 
-p "";
-p "── Race-via-poll: fastest result wins ─────────────────";
+p ""
+p "── Race-via-poll: fastest result wins ─────────────────"
 my @racers = map {
-    my $delay = rand() * 0.1;
+    my $delay = rand() * 0.1
     async { sleep $delay; { id => _0, delay_ms => int($delay * 1000) } }
-} (1..5);
-my @done = map { await($_) } @racers;
+} (1:5)
+my @done = map { await($_) } @racers
 # Sort by recorded delay
-my @ranked = sort { _0->{delay_ms} <=> _1->{delay_ms} } @done;
-p "  ranking by completion time:";
+my @ranked = sort { _0->{delay_ms} <=> _1->{delay_ms} } @done
+p "  ranking by completion time:"
 for my $row (@ranked) {
-    printf "    racer %d  delay=%dms\n", $row->{id}, $row->{delay_ms};
+    printf "    racer %d  delay=%dms\n", $row->{id}, $row->{delay_ms}
 }
 
-p "";
-p "── Cross-feature: async tasks each write to a sketch ──";
-my $bloom = bloom_filter(10_000, 0.01);
+p ""
+p "── Cross-feature: async tasks each write to a sketch ──"
+my $bloom = bloom_filter(10_000, 0.01)
 my @ingestors = map {
-    my $shard = $_;
+    my $shard = $_
     async {
-        for my $i (1..100) {
-            bloom_add($bloom, "shard-$shard-key-$i");
+        for my $i (1:100) {
+            bloom_add($bloom, "shard-$shard-key-$i")
         }
         "shard-$shard done"
     }
-} (1..4);
-my @done2 = map { await($_) } @ingestors;
-p "  ingestors: ", join("; ", @done2);
-my $hits = 0;
-$hits++ if bloom_contains($bloom, "shard-2-key-50");
-$hits++ if bloom_contains($bloom, "shard-4-key-99");
-$hits++ if bloom_contains($bloom, "shard-1-key-1");
-p "  expected-3 hits after concurrent ingest: $hits";
+} (1:4)
+my @done2 = map { await($_) } @ingestors
+p "  ingestors: ", join("; ", @done2)
+my $hits = 0
+$hits++ if bloom_contains($bloom, "shard-2-key-50")
+$hits++ if bloom_contains($bloom, "shard-4-key-99")
+$hits++ if bloom_contains($bloom, "shard-1-key-1")
+p "  expected-3 hits after concurrent ingest: $hits"

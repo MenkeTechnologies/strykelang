@@ -1,6 +1,6 @@
 #!/usr/bin/env stryke
 
-# Game leaderboard demo. Players post scores over multiple sessions;
+# Game leaderboard demo. Players post scores over multiple sessions
 # the leaderboard maintains all-time totals and a recent-bias view
 # with exponential decay. Patterns:
 #   * hash-of-arrayref for per-player score history

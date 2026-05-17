@@ -8,59 +8,59 @@
 # Backed by the zshrs glob engine — single source of truth, zero
 # stryke-side reimplementation.
 
-p "── Plain glob (no qualifiers) ─────────────────────────";
-my @stk = glob("examples/*.stk");
-printf "  examples/*.stk : %d files\n", len(@stk);
+p "── Plain glob (no qualifiers) ─────────────────────────"
+my @stk = glob("examples/*.stk")
+printf "  examples/*.stk : %d files\n", len(@stk)
 
-p "";
-p "── (N) — null-glob: no match → empty list, no error ───";
-my @none = glob("nonexistent/*.xyz(N)");
-p "  nonexistent/*.xyz(N) : ", len(@none), " (empty, no error)";
+p ""
+p "── (N) — null-glob: no match → empty list, no error ───"
+my @none = glob("nonexistent/*.xyz(N)")
+p "  nonexistent/*.xyz(N) : ", len(@none), " (empty, no error)"
 
-p "";
-p "── (.) — plain files only (no dirs) ───────────────────";
-my @files = glob("examples/*(.)");
-printf "  examples/*(.) : %d files\n", len(@files);
+p ""
+p "── (.) — plain files only (no dirs) ───────────────────"
+my @files = glob("examples/*(.)")
+printf "  examples/*(.) : %d files\n", len(@files)
 
-p "";
-p "── (/) — directories only ─────────────────────────────";
-my @dirs = glob("examples/*(/)");
+p ""
+p "── (/) — directories only ─────────────────────────────"
+my @dirs = glob("examples/*(/)")
 printf "  examples/*(/) : %d dirs : %s\n",
     len(@dirs),
-    len(@dirs) > 0 ? join(", ", @dirs[0..($#dirs < 3 ? $#dirs : 3)]) : "(none)";
+    len(@dirs) > 0 ? join(", ", @dirs[0..($#dirs < 3 ? $#dirs : 3)]) : "(none)"
 
-p "";
-p "── (D) — include dotfiles (hidden) ────────────────────";
-my @vis = glob(".(N)");
-my @all = glob("*(DN)");
-printf "  visible       : %d\n", len(@vis);
-printf "  including .*  : %d\n", len(@all);
+p ""
+p "── (D) — include dotfiles (hidden) ────────────────────"
+my @vis = glob(".(N)")
+my @all = glob("*(DN)")
+printf "  visible       : %d\n", len(@vis)
+printf "  including .*  : %d\n", len(@all)
 
-p "";
-p "── Sort qualifiers — (oL) by Length ascending ─────────";
-my @by_len = glob("examples/*.stk(oL)");
-p "  first 3 shortest names:";
-for my $f (@by_len[0..2]) { p "    $f  (", len($f) - len("examples/"), " chars after dir)" }
+p ""
+p "── Sort qualifiers — (oL) by Length ascending ─────────"
+my @by_len = glob("examples/*.stk(oL)")
+p "  first 3 shortest names:"
+for my $f (@by_len[0:2]) { p "    $f  (", len($f) - len("examples/"), " chars after dir)" }
 
-p "";
-p "── (Lk+1) — size > 1 KB ───────────────────────────────";
-my @big = glob("examples/*.stk(Lk+1)");
-printf "  examples/*.stk(Lk+1) : %d files > 1 KB\n", len(@big);
+p ""
+p "── (Lk+1) — size > 1 KB ───────────────────────────────"
+my @big = glob("examples/*.stk(Lk+1)")
+printf "  examples/*.stk(Lk+1) : %d files > 1 KB\n", len(@big)
 
-p "";
-p "── Combine: (.N) — files only, null-glob ──────────────";
-my @safe = glob("nothing-matches*(.N)");
-p "  safe empty result : ", len(@safe);
+p ""
+p "── Combine: (.N) — files only, null-glob ──────────────"
+my @safe = glob("nothing-matches*(.N)")
+p "  safe empty result : ", len(@safe)
 
-p "";
-p "── (^...) — negation ──────────────────────────────────";
+p ""
+p "── (^...) — negation ──────────────────────────────────"
 # Everything in examples/ except the kvstore demos
-my @not_kv = glob("examples/^kvstore_*.stk(N)");
-printf "  examples/^kvstore_*.stk(N) : %d files\n", len(@not_kv);
+my @not_kv = glob("examples/^kvstore_*.stk(N)")
+printf "  examples/^kvstore_*.stk(N) : %d files\n", len(@not_kv)
 
-p "";
-p "── Compose with pipe-forward ──────────────────────────";
+p ""
+p "── Compose with pipe-forward ──────────────────────────"
 my $stk_lines = glob("examples/*.stk")
     |> map { slurp($_) |> split(/\n/) |> len }
-    |> sum;
-printf "  total .stk lines under examples/ : %d\n", $stk_lines;
+    |> sum
+printf "  total .stk lines under examples/ : %d\n", $stk_lines

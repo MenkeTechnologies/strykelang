@@ -44,7 +44,7 @@ printf "── text statistics ────────────────�
 printf "  paragraphs : %d\n", len(@paragraphs)
 printf "  sentences  : %d\n", len(@sentences)
 printf "  words      : %d\n", len(@words)
-printf "  chars      : %d (bytes)\n", length($text)
+printf "  chars      : %d (bytes)\n", len($text)
 printf "  chars      : %d (codepoints)\n", len($text)
 
 # ── per-sentence stats ─────────────────────────────────────────────

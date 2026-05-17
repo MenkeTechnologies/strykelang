@@ -10,8 +10,8 @@
 #   first run  — every key misses, full compute
 #   second run — every key hits the rkyv cache
 
-my $path = "/tmp/kvstore_cache.rkyv";
-my $db   = kv_open($path);
+my $path = "/tmp/kvstore_cache.rkyv"
+my $db   = kv_open($path)
 
 fn Demo::KvCache::expensive($n) {
     sleep 0.2;                         # pretend this is HTTP / SQL / AI
@@ -19,29 +19,29 @@ fn Demo::KvCache::expensive($n) {
 }
 
 fn Demo::KvCache::cached($db, $n) {
-    my $key = "compute:$n";
-    my $hit = kv_get($db, $key);
-    return $hit if defined $hit;
-    my $val = Demo::KvCache::expensive($n);
-    kv_put($db, $key, $val);
+    my $key = "compute:$n"
+    my $hit = kv_get($db, $key)
+    return $hit if defined $hit
+    my $val = Demo::KvCache::expensive($n)
+    kv_put($db, $key, $val)
     $val
 }
 
-my @inputs = (1, 2, 3, 4, 5);
-my $start = now_ns();
+my @inputs = (1, 2, 3, 4, 5)
+my $start = now_ns()
 
-my @results = map { Demo::KvCache::cached($db, $_) } @inputs;
+my @results = map { Demo::KvCache::cached($db, $_) } @inputs
 
-my $elapsed = (now_ns() - $start) / 1_000_000_000;
+my $elapsed = (now_ns() - $start) / 1_000_000_000
 kv_commit($db);                        # persist for the next run
 
-p "results: ", join(", ", @results);
+p "results: ", join(", ", @results)
 printf "elapsed: %.2fs (cold compute ≈ %.2fs)\n",
-    $elapsed, len(@inputs) * 0.2;
+    $elapsed, len(@inputs) * 0.2
 
-my $stats = kv_stats($db);
+my $stats = kv_stats($db)
 printf "store: %d entries, %d commits\n",
-    $stats->{entries}, $stats->{commit_count};
+    $stats->{entries}, $stats->{commit_count}
 
-p "→ run again: every result is a zero-copy archive read";
-p "→ to reset:  unlink('$path')";
+p "→ run again: every result is a zero-copy archive read"
+p "→ to reset:  unlink('$path')"

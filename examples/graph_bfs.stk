@@ -9,7 +9,7 @@
 #   * AOP `around` to count node visits without touching BFS body
 
 # ── graph data ────────────────────────────────────────────────────────
-# A small undirected graph of US-ish city neighbors. Edges are symmetric;
+# A small undirected graph of US-ish city neighbors. Edges are symmetric
 # we build both directions by hand for clarity.
 
 my %g = (

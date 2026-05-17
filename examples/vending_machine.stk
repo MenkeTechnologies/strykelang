@@ -23,105 +23,105 @@ my %inv = (
     "C1" => ["Chocolate",   125, 10],
     "C2" => ["Granola Bar", 175, 6],
     "C3" => ["Trail Mix",   250, 4],
-);
+)
 
 # ── coin denominations (cents, descending — greedy works) ───────────
 
-my @denoms = (100, 25, 10, 5, 1);
-my %coin_name = (100 => "dollar", 25 => "quarter", 10 => "dime", 5 => "nickel", 1 => "penny");
+my @denoms = (100, 25, 10, 5, 1)
+my %coin_name = (100 => "dollar", 25 => "quarter", 10 => "dime", 5 => "nickel", 1 => "penny")
 
 # ── sketches ──────────────────────────────────────────────────────
 
-my $bf_slots = bloom(64, 0.01);
+my $bf_slots = bloom(64, 0.01)
 for my $code (keys %inv) { bloom_add($bf_slots, $code) }
 
-my $cms_pop = cms(8, 256);
-my $td_lat  = t_digest(100);
-my $hll_cust = hll(12);
+my $cms_pop = cms(8, 256)
+my $td_lat  = t_digest(100)
+my $hll_cust = hll(12)
 
 # ── FSM states ─────────────────────────────────────────────────────
 
-my $S_IDLE       = "IDLE";
-my $S_INSERTING  = "INSERTING";
-my $S_SELECTING  = "SELECTING";
-my $S_DISPENSE   = "DISPENSE";
-my $S_REFUND     = "REFUND";
+my $S_IDLE       = "IDLE"
+my $S_INSERTING  = "INSERTING"
+my $S_SELECTING  = "SELECTING"
+my $S_DISPENSE   = "DISPENSE"
+my $S_REFUND     = "REFUND"
 
 # ── transaction runner ────────────────────────────────────────────
 
 fn Demo::VM::transact($payment, $slot, $cust_id) {
-    my $t0 = now_ns();
-    my $state = $S_IDLE;
-    my @log;
+    my $t0 = now_ns()
+    my $state = $S_IDLE
+    my @log
 
     # IDLE -> INSERTING
-    push @log, "[$state] cust=$cust_id paid=" . sprintf("%.2f", $payment / 100);
-    $state = $S_INSERTING;
+    push @log, "[$state] cust=$cust_id paid=" . sprintf("%.2f", $payment / 100)
+    $state = $S_INSERTING
 
     # bloom check first (probabilistic; followed by exact)
-    my $slot_in_bloom = bloom_contains($bf_slots, $slot);
+    my $slot_in_bloom = bloom_contains($bf_slots, $slot)
     unless ($slot_in_bloom && exists $inv{$slot}) {
-        push @log, "[$state] slot $slot not recognized -> REFUND";
-        $state = $S_REFUND;
-        td_add($td_lat, (now_ns() - $t0) / 1000.0);
-        return { state => $state, change_cents => $payment, change_coins => [], log => \@log };
+        push @log, "[$state] slot $slot not recognized -> REFUND"
+        $state = $S_REFUND
+        td_add($td_lat, (now_ns() - $t0) / 1000.0)
+        return { state => $state, change_cents => $payment, change_coins => [], log => \@log }
     }
 
     # INSERTING -> SELECTING
-    push @log, "[$state] coin accepted, slot=$slot";
-    $state = $S_SELECTING;
+    push @log, "[$state] coin accepted, slot=$slot"
+    $state = $S_SELECTING
 
-    my $item  = $inv{$slot};
-    my $name  = $item->[0];
-    my $price = $item->[1];
-    my $stock = $item->[2];
+    my $item  = $inv{$slot}
+    my $name  = $item->[0]
+    my $price = $item->[1]
+    my $stock = $item->[2]
 
     if ($stock <= 0) {
-        push @log, "[$state] $name out of stock -> REFUND";
-        $state = $S_REFUND;
-        td_add($td_lat, (now_ns() - $t0) / 1000.0);
-        return { state => $state, change_cents => $payment, change_coins => [], log => \@log };
+        push @log, "[$state] $name out of stock -> REFUND"
+        $state = $S_REFUND
+        td_add($td_lat, (now_ns() - $t0) / 1000.0)
+        return { state => $state, change_cents => $payment, change_coins => [], log => \@log }
     }
 
     if ($payment < $price) {
         push @log, sprintf("[%s] insufficient: \$%.2f < \$%.2f -> REFUND",
-                           $state, $payment / 100, $price / 100);
-        $state = $S_REFUND;
-        td_add($td_lat, (now_ns() - $t0) / 1000.0);
-        return { state => $state, change_cents => $payment, change_coins => [], log => \@log };
+                           $state, $payment / 100, $price / 100)
+        $state = $S_REFUND
+        td_add($td_lat, (now_ns() - $t0) / 1000.0)
+        return { state => $state, change_cents => $payment, change_coins => [], log => \@log }
     }
 
     # SELECTING -> DISPENSE
-    push @log, "[$state] dispensing $name (\$" . sprintf("%.2f", $price / 100) . ")";
-    $state = $S_DISPENSE;
-    $inv{$slot}->[2] = $stock - 1;
-    cms_add($cms_pop, $slot, 1);
-    hll_add($hll_cust, $cust_id);
+    push @log, "[$state] dispensing $name (\$" . sprintf("%.2f", $price / 100) . ")"
+    $state = $S_DISPENSE
+    $inv{$slot}->[2] = $stock - 1
+    cms_add($cms_pop, $slot, 1)
+    hll_add($hll_cust, $cust_id)
 
-    my $change = $payment - $price;
-    my @coins_out;
+    my $change = $payment - $price
+    my @coins_out
 
     # CHANGE: greedy
     if ($change > 0) {
-        my $remaining = $change;
+        my $remaining = $change
         for my $d (@denoms) {
-            my $n = int($remaining / $d);
+            my $n = int($remaining / $d)
             if ($n > 0) {
-                push @coins_out, [$d, $n];
-                $remaining -= $n * $d;
+                push @coins_out, [$d, $n]
+                $remaining -= $n * $d
             }
         }
         my @coin_strs = map {
             $_->[1] . " x " . $coin_name{$_->[0]}
-        } @coins_out;
+        } @coins_out
         push @log, "[$state] change \$" . sprintf("%.2f", $change / 100)
-                   . " = " . join(", ", @coin_strs);
+                   . " = " . join(", ", @coin_strs)
     } else {
-        push @log, "[$state] exact change, no coins returned";
+        push @log, "[$state] exact change, no coins returned"
     }
 
-    td_add($td_lat, (now_ns() - $t0) / 1000.0);
-    return { state => $state, change_cents => $change, change_coins => \@coins_out, log => \@log };
+    td_add($td_lat, (now_ns() - $t0) / 1000.0)
+    return { state => $state, change_cents => $change, change_coins => \@coins_out, log => \@log }
 }
 
 # ── transaction script ────────────────────────────────────────────
@@ -139,60 +139,59 @@ my @txs = (
     [500, "A1", "C001"],   # cola again, big change
     [250, "C1", "C009"],   # chocolate, big change
     [300, "A1", "C010"],   # cola, change
-);
+)
 
-print "vending machine — FSM transcript\n";
-print "─" x 60, "\n";
-
-my $success = 0;
-my $refunded = 0;
+p "vending machine — FSM transcript"
+p "─" x 60
+my $success = 0
+my $refunded = 0
 
 for my $tx (@txs) {
-    my $r = Demo::VM::transact($tx->[0], $tx->[1], $tx->[2]);
+    my $r = Demo::VM::transact($tx->[0], $tx->[1], $tx->[2])
     for my $line (@{$r->{log}}) {
-        print "  $line\n";
+        p "  $line"
     }
-    print "  -> final state: $r->{state}\n\n";
+    p "  -> final state: $r->{state}\n"
     if ($r->{state} eq $S_DISPENSE) { $success++ } else { $refunded++ }
 }
 
-print "transactions: $success dispensed / $refunded refunded\n";
+p "transactions: $success dispensed / $refunded refunded"
 
 # ── final inventory ────────────────────────────────────────────────
 
-print "\nremaining inventory:\n";
+p "\nremaining inventory:"
 for my $slot (sort keys %inv) {
-    my $row = $inv{$slot};
+    my $row = $inv{$slot}
     printf("  %-3s %-14s \$%.2f  stock=%d\n",
-           $slot, $row->[0], $row->[1] / 100, $row->[2]);
+           $slot, $row->[0], $row->[1] / 100, $row->[2])
 }
 
 # ── slot popularity (CMS) ──────────────────────────────────────────
 
-print "\nslot demand (CMS estimated):\n";
-my @ranked = sort { cms_count($cms_pop, $_1) <=> cms_count($cms_pop, $_0) } keys %inv;
+p "\nslot demand (CMS estimated):"
+my @ranked = sort { cms_count($cms_pop, $_1) <=> cms_count($cms_pop, $_0) } keys %inv
 for my $slot (@ranked[0:4]) {
-    my $est = cms_count($cms_pop, $slot);
-    printf("  %-3s  est_purchases=%d\n", $slot, $est);
+    my $est = cms_count($cms_pop, $slot)
+    printf("  %-3s  est_purchases=%d\n", $slot, $est)
 }
 
 # ── distinct customers ────────────────────────────────────────────
 
-my $hll_n = hll_count($hll_cust);
-my %seen_cust;
+my $hll_n = hll_count($hll_cust)
+my %seen_cust
 for my $tx (@txs) {
     if (exists $inv{$tx->[1]} && $tx->[0] >= ($inv{$tx->[1]}->[1] // 9999)) {
-        $seen_cust{$tx->[2]} = 1;
+        $seen_cust{$tx->[2]} = 1
     }
 }
 printf("\ndistinct paying customers: HLL=%.1f vs exact=%d\n",
-       $hll_n, len(keys %seen_cust));
+       $hll_n, len(keys %seen_cust))
 
 # ── latency ────────────────────────────────────────────────────────
 
-print "\ntransaction latency:\n";
-printf("  p50 = %.1f us\n", td_quantile($td_lat, 0.50));
-printf("  p95 = %.1f us\n", td_quantile($td_lat, 0.95));
-printf("  p99 = %.1f us\n", td_quantile($td_lat, 0.99));
+p "\ntransaction latency:"
+printf("  p50 = %.1f us\n", td_quantile($td_lat, 0.50))
+printf("  p95 = %.1f us\n", td_quantile($td_lat, 0.95))
+printf("  p99 = %.1f us\n", td_quantile($td_lat, 0.99))
 
-print "\nvending machine done\n";
+p "\nvending machine done"
