@@ -11628,7 +11628,11 @@ impl VMHelper {
                 // parsing, PATH/FPATH split, term-info ioctl, IndexMap
                 // declarations). On 18-core machines, splitting 18 ways
                 // makes setup overhead dominate the actual work.
-                let list_val = self.eval_expr(list)?;
+                // List context for the operand so `@arr` flattens to its
+                // elements instead of numifying to the array length —
+                // matches PMapExpr's eval shape so `par { } @arr` and
+                // `pmap { } @arr` agree on input semantics.
+                let list_val = self.eval_expr_ctx(list, WantarrayCtx::List)?;
                 let n_threads = rayon::current_num_threads().clamp(1, 8);
                 let chunks = par_chunk_value(&list_val, n_threads);
                 if chunks.len() < 2 {
