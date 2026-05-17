@@ -17,7 +17,7 @@ fn Rosetta::ISBN13::compute_check($digits12) {
 
 fn Rosetta::ISBN13::is_valid($isbn) {
     my $clean = Rosetta::ISBN13::clean($isbn)
-    return 0 unless len($clean) == 13
+    return 0 unless length($clean) == 13
     return 0 unless $clean =~ /^\d+$/
     my $check = Rosetta::ISBN13::compute_check(substr($clean, 0, 12))
     $check == (substr($clean, 12, 1) + 0)

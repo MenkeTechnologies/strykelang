@@ -60,7 +60,7 @@ assert_ok $diff <= 30, sprintf("black/white roughly balanced (Δ = %d)", $diff)
 my @lines = split /\n/, $art
 assert_eq len(@lines), 17, "17 rows for r=8"
 for my $line (@lines) {
-    assert_eq len($line), 17, "row width 17"
+    assert_eq length($line), 17, "row width 17"
 }
 
 # Cell at exact origin: classify it

@@ -7,7 +7,7 @@
 #   - include the centre letter at least once.
 
 fn Rosetta::WordWheel::valid($word, $wheel, $centre, $min_len) {
-    return 0 if len($word) < $min_len
+    return 0 if length($word) < $min_len
     my $w = lc($word)
     return 0 if index($w, lc($centre)) < 0
     my %avail

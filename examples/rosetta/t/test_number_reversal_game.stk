@@ -21,7 +21,7 @@ fn Rosetta::NumberReversal::solve(@items) {
         my $state = $curr->{state}
         my $moves = $curr->{moves}
         
-        for my $i (2 .. len($state)) {
+        for my $i (2 .. length($state)) {
             my $prefix = substr($state, 0, $i)
             my $suffix = substr($state, $i)
             

@@ -8,7 +8,7 @@ fn Rosetta::Abbreviation::solve($commands_str, $input_str) {
     @commands |> map {
         my $cmd = _
         my $last_upper = -1
-        for (my $i = 0; $i < len($cmd); $i++) {
+        for (my $i = 0; $i < length($cmd); $i++) {
             if (substr($cmd, $i, 1) =~ /[A-Z]/) {
                 $last_upper = $i
             }
@@ -17,10 +17,10 @@ fn Rosetta::Abbreviation::solve($commands_str, $input_str) {
         my $full = lc($cmd)
         my $min_len = $last_upper + 1
         
-        if ($min_len == 0 && len($full) > 0) {
+        if ($min_len == 0 && length($full) > 0) {
             $abbrevs{$full} = $full
         } else {
-            for (my $i = $min_len; $i <= len($full); $i++) {
+            for (my $i = $min_len; $i <= length($full); $i++) {
                 my $abbr = substr($full, 0, $i)
                 $abbrevs{$abbr} = $full
             }

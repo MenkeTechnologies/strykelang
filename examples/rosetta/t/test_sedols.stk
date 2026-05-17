@@ -24,7 +24,7 @@ fn Rosetta::Sedol::checksum($six) {
 }
 
 fn Rosetta::Sedol::is_valid($s) {
-    return 0 if len($s) != 7
+    return 0 if length($s) != 7
     my $cd = Rosetta::Sedol::checksum(substr($s, 0, 6))
     return 0 if $cd < 0
     substr($s, 6, 1) eq "$cd"

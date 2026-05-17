@@ -7,7 +7,7 @@ fn Rosetta::LongestPalindromicSubstring::is_palindrome($s) {
 }
 
 fn Rosetta::LongestPalindromicSubstring::find($s) {
-    my $len = len($s)
+    my $len = length($s)
     if ($len <= 1) { return $s }
     
     my $max_str = substr($s, 0, 1)
@@ -16,8 +16,8 @@ fn Rosetta::LongestPalindromicSubstring::find($s) {
     for my $i (0:$len-1) {
         for my $j ($i+$max_len:$len-1) {
             my $sub = substr($s, $i, $j - $i + 1)
-            if (len($sub) > $max_len && Rosetta::LongestPalindromicSubstring::is_palindrome($sub)) {
-                $max_len = len($sub)
+            if (length($sub) > $max_len && Rosetta::LongestPalindromicSubstring::is_palindrome($sub)) {
+                $max_len = length($sub)
                 $max_str = $sub
             }
         }

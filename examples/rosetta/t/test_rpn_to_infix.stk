@@ -15,7 +15,7 @@ fn Rosetta::RpnToInfix::is_op($t) { $t =~ /^[+\-*\/^]$/ }
 fn Rosetta::RpnToInfix::convert($expr) {
     my @stack
     for my $t (split /\s+/, $expr) {
-        next if len($t) == 0
+        next if length($t) == 0
         if (!Rosetta::RpnToInfix::is_op($t)) {
             push @stack, [$t, 99]
             next
@@ -40,7 +40,7 @@ fn Rosetta::RpnToInfix::convert($expr) {
 fn Rosetta::RpnToInfix::convert_full_paren($expr) {
     my @stack
     for my $t (split /\s+/, $expr) {
-        next if len($t) == 0
+        next if length($t) == 0
         if (!Rosetta::RpnToInfix::is_op($t)) {
             push @stack, $t
             next

@@ -20,7 +20,7 @@ fn Rosetta::RailFence::encode($text, $rails) {
 
 fn Rosetta::RailFence::decode($text, $rails) {
     return $text if $rails <= 1
-    my $len = len($text)
+    my $len = length($text)
     my @fence_pattern = map { [] } 1:$rails
     my $rail = 0
     my $dir = 1

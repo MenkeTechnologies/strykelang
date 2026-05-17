@@ -49,7 +49,7 @@ fn Rosetta::Superperm::find_short($n) {
             # Check overlap from largest to smallest
             my $current_overlap = 0
             for (my $o = $n - 1; $o >= 1; $o--) {
-                my $end = substr($res, len($res) - $o)
+                my $end = substr($res, length($res) - $o)
                 my $start = substr($p, 0, $o)
                 if ($end eq $start) {
                     $current_overlap = $o
@@ -72,12 +72,12 @@ fn Rosetta::Superperm::find_short($n) {
 
 # Test n=2
 my $s2 = Rosetta::Superperm::find_short(2)
-assert_eq len($s2), 3, "n=2 minimal length is 3"
+assert_eq length($s2), 3, "n=2 minimal length is 3"
 assert_ok Rosetta::Superperm::is_superperm($s2, 2), "is superperm n=2"
 
 # Test n=3
 my $s3 = Rosetta::Superperm::find_short(3)
-assert_eq len($s3), 9, "n=3 minimal length is 9"
+assert_eq length($s3), 9, "n=3 minimal length is 9"
 assert_ok Rosetta::Superperm::is_superperm($s3, 3), "is superperm n=3"
 
 test_run
