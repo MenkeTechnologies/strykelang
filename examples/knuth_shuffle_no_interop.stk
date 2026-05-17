@@ -1,0 +1,81 @@
+#!/usr/bin/env stryke
+
+# Knuth (Fisher-Yates) shuffle — in-place uniform random permutation
+# in O(n). Walk the array from end to start, swap each element with
+# a random earlier-or-self index. Every permutation has equal 1/n!
+# probability. Parses clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * `int(rand $i + 1)` paren-less idiom (rule 8)
+#   * tuple-swap destructure `($a[$i], $a[$j]) = ($a[$j], $a[$i])`
+#   * implicit return on tail (rule 7)
+#   * `#{…}` interpolation (rule 1a)
+#
+# Namespaced UDFs `Shuffle::*`.
+#
+# Run: stryke --no-interop examples/knuth_shuffle_no_interop.stk
+
+# In-place shuffle of an arrayref. Returns the (now-shuffled) ref so
+# call sites can chain.
+fn Shuffle::knuth($r) {
+    my $n = len(@$r)
+    for (my $i = $n - 1; $i > 0; $i--) {
+        my $j = int(rand $i + 1)
+        ($r->[$i], $r->[$j]) = ($r->[$j], $r->[$i])
+    }
+    $r
+}
+
+# Non-mutating variant: deep-copy first, then in-place shuffle the copy.
+fn Shuffle::shuffled($r) {
+    my @copy = @$r
+    Shuffle::knuth(\@copy)
+    \@copy
+}
+
+p "── Knuth shuffle demo ──"
+
+srand(42)   # deterministic across runs
+
+# Length and element-set must be preserved by a shuffle.
+my @orig = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+my $sh = Shuffle::shuffled(\@orig)
+die "length changed by shuffle" unless len(@$sh) == len(@orig)
+die "elements changed by shuffle" unless join(",", sort { _0 <=> _1 } @$sh) eq join(",", @orig)
+p "  shuffle preserves length + multiset  OK"
+
+# Shuffling a length-1 or length-0 array is identity.
+die "empty stays empty" unless len(@{Shuffle::shuffled([])}) == 0
+die "single stays single" unless join(",", @{Shuffle::shuffled([42])}) eq "42"
+p "  shuffle of [] and [42] is identity  OK"
+
+# Statistical fairness: shuffle a 4-element array N times, count how
+# often each permutation appears. With N=24000 and 24 perms, each
+# should appear ~1000 times. Allow ±35% (loose for low-bias sanity).
+my $N = 24000
+my %freq
+for (1:$N) {
+    my $p = Shuffle::shuffled([1, 2, 3, 4])
+    $freq{join(",", @$p)}++
+}
+die "should see all 24 permutations" unless len(keys %freq) == 24
+my $expected = $N / 24
+my $low  = int($expected * 0.65)
+my $high = int($expected * 1.35)
+for my $k (keys %freq) {
+    my $count = $freq{$k}
+    die "perm $k count $count out of [$low, $high]" unless $count >= $low && $count <= $high
+}
+p "  fairness: all 24 perms within ±35% of expected #{$expected}  OK"
+
+# In-place vs deep-copy: knuth() mutates, shuffled() doesn't.
+my @a = (1, 2, 3, 4, 5)
+my $before = join(",", @a)
+my $r = Shuffle::shuffled(\@a)
+die "shuffled() must NOT mutate input" unless join(",", @a) eq $before
+my $r2 = Shuffle::knuth(\@a)
+die "knuth() MUST mutate input"        if     join(",", @a) eq $before
+p "  in-place vs non-mutating contract held  OK"
+
+p ""
+p "  ALL PASS (preserves+identity-edge+fairness@24k+mutation-contract)"
