@@ -10,51 +10,51 @@
 // ── 1. Figurate / OEIS sequences ────────────────────────────────────────────
 
 /// Tetrahedral number T_n = n(n+1)(n+2)/6.
-fn builtin_tetrahedral_number(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_tetrahedral_number(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(0);
     Ok(StrykeValue::integer(n * (n + 1) * (n + 2) / 6))
 }
 
 /// Square-pyramidal number n(n+1)(2n+1)/6.
-fn builtin_square_pyramidal_number(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_square_pyramidal_number(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(0);
     Ok(StrykeValue::integer(n * (n + 1) * (2 * n + 1) / 6))
 }
 
 /// Octahedral number n(2n²+1)/3.
-fn builtin_octahedral_number(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_octahedral_number(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(0);
     Ok(StrykeValue::integer(n * (2 * n * n + 1) / 3))
 }
 
 /// Pentagonal-pyramidal n²(n+1)/2.
-fn builtin_pentagonal_pyramidal_number(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pentagonal_pyramidal_number(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(0);
     Ok(StrykeValue::integer(n * n * (n + 1) / 2))
 }
 
 /// Cake number C_n = (n³ + 5n + 6)/6 (number of regions cutting a 3-D cake with n planes).
-fn builtin_cake_number(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cake_number(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(0);
     Ok(StrykeValue::integer((n * n * n + 5 * n + 6) / 6))
 }
 
 /// Cuban number c_n = (3n² + 6n + 1)·... Wait, define properly:
 /// Cuban prime → not number. Use cuban polynomial: a_n = (n+1)³ - n³.
-fn builtin_cuban_number(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cuban_number(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(0);
     let a = (n + 1).pow(3) - n.pow(3);
     Ok(StrykeValue::integer(a))
 }
 
 /// Centered hexagonal number 3n(n−1) + 1.
-fn builtin_centered_hexagonal_number(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_centered_hexagonal_number(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(1);
     Ok(StrykeValue::integer(3 * n * (n - 1) + 1))
 }
 
 /// Test if N is a Carmichael number: composite, n > 1, and a^n ≡ a (mod n) for all a coprime to n.
-fn builtin_carmichael_q(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_carmichael_q(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     if n < 4 || is_prime_check(n) {
         return Ok(StrykeValue::integer(0));
@@ -85,7 +85,7 @@ fn builtin_carmichael_q(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Test if N is sphenic (product of three distinct primes).
-fn builtin_sphenic_q(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sphenic_q(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     if n < 30 {
         return Ok(StrykeValue::integer(0));
@@ -98,7 +98,7 @@ fn builtin_sphenic_q(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Smooth-up-to-B test (every prime factor ≤ 7). Convenient alias for batch-9 b_smooth_q with B=7.
-fn builtin_seven_smooth_q(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_seven_smooth_q(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     let factors = prime_factorize(n);
     Ok(StrykeValue::integer(if factors.iter().all(|&f| f <= 7) { 1 } else { 0 }))
@@ -107,7 +107,7 @@ fn builtin_seven_smooth_q(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // ── 2. Set theory ───────────────────────────────────────────────────────────
 
 /// N-way Cartesian product of arrays.
-fn builtin_cartesian_product_n(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cartesian_product_n(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lists = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let parsed: Vec<Vec<StrykeValue>> = lists.iter().map(arg_to_vec).collect();
     if parsed.is_empty() {
@@ -131,7 +131,7 @@ fn builtin_cartesian_product_n(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Multiset union (max counts).
-fn builtin_multiset_union(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_multiset_union(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let b = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     let mut counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
@@ -156,7 +156,7 @@ fn builtin_multiset_union(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Multiset intersection (min counts).
-fn builtin_multiset_intersection(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_multiset_intersection(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let b = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     let mut counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
@@ -179,7 +179,7 @@ fn builtin_multiset_intersection(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 /// Multiset difference (subtract counts, floor 0).
-fn builtin_multiset_difference(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_multiset_difference(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let b = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     let mut counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
@@ -205,7 +205,7 @@ fn builtin_multiset_difference(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 
 /// Durand-Kerner iteration on a polynomial. Returns approximate complex roots
 /// as `[Re, Im]` pairs. Coefficients are low-to-high.
-fn builtin_polynomial_roots_dk(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_polynomial_roots_dk(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let coeffs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -284,7 +284,7 @@ fn builtin_polynomial_roots_dk(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 
 /// Lin-Bairstow factorisation: extracts one quadratic factor x² + ux + v from
 /// a polynomial. Returns `[u, v, deflated_coeffs]`.
-fn builtin_lin_bairstow_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lin_bairstow_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut a: Vec<f64> = poly_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     if a.len() < 3 {
         return Ok(StrykeValue::array(vec![]));
@@ -330,7 +330,7 @@ fn builtin_lin_bairstow_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // ── 4. Tree / heap / Fenwick / segment-tree utilities ───────────────────────
 
 /// Sift-down on a 0-indexed binary max-heap (in-place semantics).
-fn builtin_heap_sift_down(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_heap_sift_down(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut arr: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -357,7 +357,7 @@ fn builtin_heap_sift_down(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Build a Fenwick (BIT) tree from an array. Returns the prefix-sum tree.
-fn builtin_fenwick_build(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_fenwick_build(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let arr: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -375,7 +375,7 @@ fn builtin_fenwick_build(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Prefix sum on a Fenwick tree up to (and including) `i`.
-fn builtin_fenwick_query(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_fenwick_query(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let bit: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -390,7 +390,7 @@ fn builtin_fenwick_query(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Segment-tree sum query on a 1-D array `[arr, l, r]` (inclusive).
-fn builtin_segment_tree_sum(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_segment_tree_sum(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let arr: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -407,7 +407,7 @@ fn builtin_segment_tree_sum(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // ── 5. String algorithms ────────────────────────────────────────────────────
 
 /// KMP failure function.
-fn builtin_kmp_failure(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_kmp_failure(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let chars: Vec<char> = s.chars().collect();
     let n = chars.len();
@@ -426,7 +426,7 @@ fn builtin_kmp_failure(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Z-array (Z-algorithm).
-fn builtin_z_array(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_z_array(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let chars: Vec<char> = s.chars().collect();
     let n = chars.len();
@@ -455,7 +455,7 @@ fn builtin_z_array(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Naïve suffix array (O(n² log n) — for educational use; longest expected n ~ a few thousand).
-fn builtin_suffix_array_naive(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_suffix_array_naive(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let n = s.chars().count();
     let mut idx: Vec<usize> = (0..n).collect();
@@ -467,7 +467,7 @@ fn builtin_suffix_array_naive(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Manacher's algorithm: longest palindromic-substring radii (odd lengths only).
-fn builtin_manacher_radii(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_manacher_radii(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let chars: Vec<char> = s.chars().collect();
     let n = chars.len();
@@ -495,7 +495,7 @@ fn builtin_manacher_radii(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Polynomial Rabin-Karp rolling hash of a string with prime modulus.
-fn builtin_rabin_karp_hash(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rabin_karp_hash(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let base = args.get(1).map(|v| v.to_number() as u64).unwrap_or(257);
     let modulus = args.get(2).map(|v| v.to_number() as u64).unwrap_or(1_000_000_007);
@@ -507,7 +507,7 @@ fn builtin_rabin_karp_hash(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Longest-common-prefix array from sorted suffix array (Kasai-like O(n)).
-fn builtin_lcp_array(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lcp_array(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let bytes = s.as_bytes();
     let n = bytes.len();
@@ -535,7 +535,7 @@ fn builtin_lcp_array(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // ── 6. Regex helpers ────────────────────────────────────────────────────────
 
 /// Escape regex metacharacters in a literal string.
-fn builtin_regex_escape_simple(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_regex_escape_simple(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let mut out = String::with_capacity(s.len() * 2);
     for c in s.chars() {
@@ -551,7 +551,7 @@ fn builtin_regex_escape_simple(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Boyer-Moore-Horspool string search; returns first index or -1.
-fn builtin_horspool_search(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_horspool_search(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let text = args.first().map(|v| v.to_string()).unwrap_or_default();
     let pattern = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let tb = text.as_bytes();
@@ -586,7 +586,7 @@ fn builtin_horspool_search(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Largest-Processing-Time list scheduling onto m identical machines.
 /// Returns assigned-machine index per job (in original order) and the makespan.
-fn builtin_lpt_schedule(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lpt_schedule(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let jobs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -615,7 +615,7 @@ fn builtin_lpt_schedule(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Johnson's two-machine flow-shop scheduling. Returns the optimal sequence as
 /// 0-based job indices. Args: list of `[a_i, b_i]` pairs.
-fn builtin_johnsons_rule(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_johnsons_rule(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let raw = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let jobs: Vec<(f64, f64)> = raw
         .iter()
@@ -652,19 +652,19 @@ fn builtin_johnsons_rule(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // ── 8. Bit twiddling ────────────────────────────────────────────────────────
 
 /// Reverse the bits of a 32-bit integer.
-fn builtin_bit_reverse_32(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bit_reverse_32(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args) as u32;
     Ok(StrykeValue::integer(n.reverse_bits() as i64))
 }
 
 /// Convert a binary number to its Gray-code value.
-fn builtin_bin_to_gray(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bin_to_gray(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args) as u64;
     Ok(StrykeValue::integer((n ^ (n >> 1)) as i64))
 }
 
 /// Convert a Gray-code value back to its binary representation.
-fn builtin_gray_to_bin(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gray_to_bin(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut g = i1(args) as u64;
     let mut n = g;
     g >>= 1;
@@ -676,7 +676,7 @@ fn builtin_gray_to_bin(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Swap two arbitrary bit positions in a 64-bit integer.
-fn builtin_swap_bits_pos(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_swap_bits_pos(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut n = i1(args);
     let i = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     let j = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -689,13 +689,13 @@ fn builtin_swap_bits_pos(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Hamming weight of an integer (popcount).
-fn builtin_hamming_weight(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hamming_weight(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args) as u64;
     Ok(StrykeValue::integer(n.count_ones() as i64))
 }
 
 /// Hamming distance between two integers.
-fn builtin_hamming_distance_int(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hamming_distance_int(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = i1(args) as u64;
     let b = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0) as u64;
     Ok(StrykeValue::integer((a ^ b).count_ones() as i64))
@@ -704,7 +704,7 @@ fn builtin_hamming_distance_int(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 // ── 9. Finance ──────────────────────────────────────────────────────────────
 
 /// Internal Rate of Return via Newton iteration.
-fn builtin_internal_rate_of_return(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_internal_rate_of_return(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let cf: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -733,7 +733,7 @@ fn builtin_internal_rate_of_return(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Modified IRR. Args: cashflows, finance_rate, reinvest_rate.
-fn builtin_modified_irr(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_modified_irr(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let cf: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -762,7 +762,7 @@ fn builtin_modified_irr(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Payback period (fractional) given initial outflow and uniform-period cashflows.
-fn builtin_payback_period_simple(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_payback_period_simple(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let cf: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -786,7 +786,7 @@ fn pad2(n: i64) -> String {
 }
 
 /// Format Y/M/D h:m:s as RFC 3339 ("YYYY-MM-DDThh:mm:ssZ").
-fn builtin_rfc3339_format(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rfc3339_format(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = args.first().map(|v| v.to_number() as i64).unwrap_or(0);
     let mo = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
     let d = args.get(2).map(|v| v.to_number() as i64).unwrap_or(1);
@@ -800,7 +800,7 @@ fn builtin_rfc3339_format(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Parse "YYYY-MM-DDThh:mm:ssZ" into [Y, M, D, h, m, s]. Naïve, UTC only.
-fn builtin_rfc3339_parse(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rfc3339_parse(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let parts_date_time: Vec<&str> = s.split('T').collect();
     if parts_date_time.len() != 2 {
@@ -829,7 +829,7 @@ fn builtin_rfc3339_parse(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Format Y/M/D as ISO 8601 ordinal date "YYYY-DDD".
-fn builtin_iso_ordinal_date(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_iso_ordinal_date(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = args.first().map(|v| v.to_number() as i64).unwrap_or(0);
     let m = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
     let d = args.get(2).map(|v| v.to_number() as i64).unwrap_or(1);

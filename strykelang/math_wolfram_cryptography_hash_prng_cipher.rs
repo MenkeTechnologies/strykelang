@@ -1,7 +1,7 @@
 // cryptography deep: hash mixers, KDFs, PRNGs, ciphers, primality.
 
 // FNV-1a 32-bit
-fn builtin_fnv1a_32(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_fnv1a_32(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let mut h = 2166136261_u32;
     for b in s.bytes() {
@@ -11,7 +11,7 @@ fn builtin_fnv1a_32(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::integer(h as i64))
 }
 // FNV-1a 64-bit
-fn builtin_fnv1a_64(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_fnv1a_64(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let mut h = 14695981039346656037_u64;
     for b in s.bytes() {
@@ -22,7 +22,7 @@ fn builtin_fnv1a_64(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 // DJB2 hash
 // SDBM hash
-fn builtin_sdbm_hash(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sdbm_hash(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let mut h = 0_u32;
     for b in s.bytes() {
@@ -32,7 +32,7 @@ fn builtin_sdbm_hash(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 // MurmurHash3 x86_32 (one-shot)
 #[allow(dead_code)]
-fn builtin_murmur3_32(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_murmur3_32(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let seed = args.get(1).map(|v| v.to_number() as u32).unwrap_or(0);
     let bytes = s.as_bytes();
@@ -73,7 +73,7 @@ fn builtin_murmur3_32(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 // xxHash32 (one-shot, simplified)
 #[allow(dead_code)]
-fn builtin_xxhash32(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_xxhash32(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let seed = args.get(1).map(|v| v.to_number() as u32).unwrap_or(0);
     let bytes = s.as_bytes();
@@ -122,7 +122,7 @@ fn builtin_xxhash32(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // SipHash24 (simplified one-shot, 64-bit)
-fn builtin_siphash24(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_siphash24(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let k0 = args.get(1).map(|v| v.to_number() as u64).unwrap_or(0);
     let k1 = args.get(2).map(|v| v.to_number() as u64).unwrap_or(0);
@@ -168,7 +168,7 @@ fn builtin_siphash24(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // first 8 bytes (big-endian). Real construction:
 //   T = U_1 XOR U_2 XOR ... XOR U_iter
 //   U_1 = HMAC-SHA1(P, S || INT(1));  U_j = HMAC-SHA1(P, U_{j-1})
-fn builtin_pbkdf2_hmac_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pbkdf2_hmac_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     use hmac::{Hmac, Mac};
     type HSha1 = Hmac<sha1::Sha1>;
     let pw = args.first().map(|v| v.to_string()).unwrap_or_default();
@@ -197,7 +197,7 @@ fn builtin_pbkdf2_hmac_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Scrypt salsa20/8 word mixer (single round)
-fn builtin_scrypt_round(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_scrypt_round(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs: Vec<u32> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number() as u32).collect();
     if xs.len() < 16 { return Ok(StrykeValue::array(xs.into_iter().map(|v| StrykeValue::integer(v as i64)).collect())); }
@@ -213,7 +213,7 @@ fn builtin_scrypt_round(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Bcrypt-style cost (just iterations)
-fn builtin_bcrypt_cost_iters(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bcrypt_cost_iters(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let cost = i1(args).clamp(4, 31) as u32;
     Ok(StrykeValue::integer(1_i64 << cost))
 }
@@ -223,7 +223,7 @@ fn builtin_bcrypt_cost_iters(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // We implement the canonical GB round-function (Blake2b's G with rotations
 // 32, 24, 16, 63) over each 16-word group and treat the array as a single
 // row pass (one full P invocation), which is the load-bearing primitive.
-fn builtin_argon2_block_mix(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_argon2_block_mix(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs: Vec<u64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number() as u64).collect();
     let ys: Vec<u64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
@@ -261,7 +261,7 @@ fn builtin_argon2_block_mix(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // HKDF expand step (one block)
-fn builtin_hkdf_expand_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hkdf_expand_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let prk = args.first().map(|v| v.to_string()).unwrap_or_default();
     let info = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let counter = args.get(2).map(|v| v.to_number() as u8).unwrap_or(1);
@@ -274,7 +274,7 @@ fn builtin_hkdf_expand_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Linear feedback shift register (Galois LFSR) step
-fn builtin_lfsr_galois_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lfsr_galois_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let state = i1(args) as u64;
     let mask = args.get(1).map(|v| v.to_number() as u64).unwrap_or(0xb400);
     let next = if state & 1 != 0 { (state >> 1) ^ mask } else { state >> 1 };
@@ -282,7 +282,7 @@ fn builtin_lfsr_galois_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Mersenne Twister mt19937 next (32 bits) — single-step from seeded state
-fn builtin_mt19937_temper(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mt19937_temper(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut y = i1(args) as u32;
     y ^= y >> 11;
     y ^= (y << 7) & 0x9d2c5680;
@@ -292,7 +292,7 @@ fn builtin_mt19937_temper(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // xorshift64
-fn builtin_xorshift64(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_xorshift64(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut x = i1(args) as u64;
     x ^= x << 13;
     x ^= x >> 7;
@@ -300,7 +300,7 @@ fn builtin_xorshift64(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::integer(x as i64))
 }
 // xorshift32
-fn builtin_xorshift32(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_xorshift32(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut x = i1(args) as u32;
     x ^= x << 13;
     x ^= x >> 17;
@@ -308,7 +308,7 @@ fn builtin_xorshift32(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::integer(x as i64))
 }
 // PCG32 step
-fn builtin_pcg32_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pcg32_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let state = i1(args) as u64;
     let inc = args.get(1).map(|v| v.to_number() as u64).unwrap_or(0xda3e39cb94b95bdb);
     let new_state = state.wrapping_mul(6364136223846793005).wrapping_add(inc | 1);
@@ -319,13 +319,13 @@ fn builtin_pcg32_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // LCG step (numerical recipes constants)
-fn builtin_lcg_numrec_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lcg_numrec_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = i1(args) as u64;
     Ok(StrykeValue::integer((s.wrapping_mul(1664525).wrapping_add(1013904223) & 0xffffffff) as i64))
 }
 
 // SplitMix64 step
-fn builtin_splitmix64_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_splitmix64_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = i1(args) as u64;
     let mut z = s.wrapping_add(0x9E3779B97F4A7C15);
     z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
@@ -335,7 +335,7 @@ fn builtin_splitmix64_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Wyhash mix
-fn builtin_wyhash_mix(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_wyhash_mix(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = i1(args) as u64;
     let b = args.get(1).map(|v| v.to_number() as u64).unwrap_or(0);
     let r = (a as u128).wrapping_mul(b as u128);
@@ -351,7 +351,7 @@ fn builtin_wyhash_mix(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Adler-32
 
 // XOR cipher (returns string of XOR with single key byte)
-fn builtin_xor_cipher_byte(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_xor_cipher_byte(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let key = args.get(1).map(|v| v.to_number() as u8).unwrap_or(0);
     let out: Vec<u8> = s.bytes().map(|b| b ^ key).collect();
@@ -363,7 +363,7 @@ fn builtin_xor_cipher_byte(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // ROT13
 
 // Rail fence cipher encrypt
-fn builtin_railfence_encrypt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_railfence_encrypt(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let rails = args.get(1).map(|v| v.to_number() as usize).unwrap_or(3).max(1);
     if rails == 1 { return Ok(StrykeValue::string(s)); }
@@ -380,7 +380,7 @@ fn builtin_railfence_encrypt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Beaufort cipher (key-based, modulo 26)
-fn builtin_beaufort(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_beaufort(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let key = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let kb: Vec<u8> = key.bytes().filter(|c| c.is_ascii_alphabetic())
@@ -400,7 +400,7 @@ fn builtin_beaufort(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Affine cipher: E(x) = (a*x + b) mod 26
-fn builtin_affine_encrypt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_affine_encrypt(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let a = args.get(1).map(|v| v.to_number() as i64).unwrap_or(5).rem_euclid(26) as u8;
     let b = args.get(2).map(|v| v.to_number() as i64).unwrap_or(8).rem_euclid(26) as u8;
@@ -415,7 +415,7 @@ fn builtin_affine_encrypt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Substitution cipher (key as 26-char string)
-fn builtin_substitution_encrypt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_substitution_encrypt(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let key = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let key_bytes = key.as_bytes();
@@ -429,7 +429,7 @@ fn builtin_substitution_encrypt(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 // Frequency analysis
-fn builtin_letter_frequency(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_letter_frequency(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string().to_ascii_uppercase()).unwrap_or_default();
     let mut counts = vec![0_i64; 26];
     let mut total = 0_i64;
@@ -443,7 +443,7 @@ fn builtin_letter_frequency(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Chi-squared distance (English freq baseline)
-fn builtin_english_chi2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_english_chi2(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let observed: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let english = [0.0817, 0.0149, 0.0278, 0.0425, 0.1270, 0.0223, 0.0202, 0.0609,
@@ -458,7 +458,7 @@ fn builtin_english_chi2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Index of coincidence
-fn builtin_index_of_coincidence(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_index_of_coincidence(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string().to_ascii_uppercase()).unwrap_or_default();
     let mut counts = vec![0_i64; 26];
     let mut total = 0_i64;
@@ -472,7 +472,7 @@ fn builtin_index_of_coincidence(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 // Kasiski distance pattern (simplified: count 3-gram repeats)
-fn builtin_kasiski_repeats(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_kasiski_repeats(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string().to_ascii_uppercase()).unwrap_or_default();
     let bytes: Vec<u8> = s.bytes().filter(|c| c.is_ascii_alphabetic()).collect();
     if bytes.len() < 6 { return Ok(StrykeValue::integer(0)); }
@@ -486,7 +486,7 @@ fn builtin_kasiski_repeats(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // AKS-like deterministic primality (simplified: Miller-Rabin with first 12 witnesses)
-fn builtin_deterministic_prime(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_deterministic_prime(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     if n < 2 { return Ok(StrykeValue::integer(0)); }
     if n < 4 { return Ok(StrykeValue::integer(1)); }
@@ -521,7 +521,7 @@ fn builtin_deterministic_prime(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 
 // Pollard rho (simple)
 #[allow(dead_code)]
-fn builtin_pollard_rho(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pollard_rho(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     if n <= 1 { return Ok(StrykeValue::integer(n)); }
     if n % 2 == 0 { return Ok(StrykeValue::integer(2)); }
@@ -543,7 +543,7 @@ fn builtin_pollard_rho(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Diffie-Hellman shared key (simplified mod p)
-fn builtin_dh_shared(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_dh_shared(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a_pub = i1(args) as i128;
     let b_priv = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1) as i128;
     let p = args.get(2).map(|v| v.to_number() as i64).unwrap_or(23) as i128;
@@ -562,7 +562,7 @@ fn builtin_dh_shared(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // RSA encrypt simple
-fn builtin_rsa_encrypt_simple(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rsa_encrypt_simple(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m = i1(args) as i128;
     let e = args.get(1).map(|v| v.to_number() as i64).unwrap_or(65537) as i128;
     let n = args.get(2).map(|v| v.to_number() as i64).unwrap_or(1) as i128;
@@ -581,7 +581,7 @@ fn builtin_rsa_encrypt_simple(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // PRNG quality: monobit test
-fn builtin_monobit_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_monobit_test(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let bits: Vec<i64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number() as i64).collect();
     let n = bits.len() as f64;
@@ -598,7 +598,7 @@ fn builtin_monobit_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // φᵐ(r) = (n−m+1)⁻¹ Σ_{i=1}^{n−m+1} ln C_i^m(r), and
 // C_i^m(r) = (#{j: max_{k<m}|x_{i+k}−x_{j+k}| ≤ r}) / (n−m+1).
 // Args: data array, embedding dim m (default 2), tolerance r (default 0.2·σ).
-fn builtin_approximate_entropy(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_approximate_entropy(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let m = args.get(1).map(|v| v.to_number() as usize).unwrap_or(2).max(1);

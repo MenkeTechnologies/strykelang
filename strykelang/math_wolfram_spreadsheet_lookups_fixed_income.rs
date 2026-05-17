@@ -12,7 +12,7 @@ fn b57_to_pairs(v: &StrykeValue) -> Vec<(f64, f64)> {
 
 /// VLOOKUP exact: search column 0 of `table` for `key`, return col_index entry.
 /// `table` is flat [k0, v0, w0, k1, v1, w1, ...] of n_cols-wide rows.
-fn builtin_vlookup(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_vlookup(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let key = f1(args);
     let table = b57_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let n_cols = args.get(2).map(|v| v.to_number() as usize).unwrap_or(2).max(1);
@@ -28,7 +28,7 @@ fn builtin_vlookup(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// HLOOKUP: search row 0, return entry from row_index.
-fn builtin_hlookup(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hlookup(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let key = f1(args);
     let table = b57_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let n_cols = args.get(2).map(|v| v.to_number() as usize).unwrap_or(2).max(1);
@@ -44,7 +44,7 @@ fn builtin_hlookup(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// XLOOKUP: like VLOOKUP but with explicit lookup and return arrays + default.
-fn builtin_xlookup(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_xlookup(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let key = f1(args);
     let lookup = b57_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let returns = b57_to_floats(args.get(2).unwrap_or(&StrykeValue::array(vec![])));
@@ -58,7 +58,7 @@ fn builtin_xlookup(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// INDEX(array, row, col) for a flat row-major matrix.
-fn builtin_index_match(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_index_match(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let arr = b57_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let n_cols = args.get(1).map(|v| v.to_number() as usize).unwrap_or(1).max(1);
     let row = args.get(2).map(|v| v.to_number() as usize).unwrap_or(0);
@@ -69,7 +69,7 @@ fn builtin_index_match(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// INDIRECT: dispatch to a sub-array by string-ID lookup table. Args: id, table
 /// of [id_n, value_n] pairs.
-fn builtin_indirect(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_indirect(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let id = f1(args);
     let pairs = b57_to_pairs(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     for (k, v) in pairs {
@@ -79,14 +79,14 @@ fn builtin_indirect(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// CHOOSE(index, list...) — pick by 1-based index from an array.
-fn builtin_choose(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_choose(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let i = i1(args).max(1) as usize - 1;
     let v = arg_to_vec(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     if i < v.len() { Ok(v[i].clone()) } else { Ok(StrykeValue::UNDEF) }
 }
 
 /// OFFSET(start_index, rows, cols, n_cols) → linear index.
-fn builtin_offset(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_offset(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let start = i1(args);
     let rows = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     let cols = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -96,7 +96,7 @@ fn builtin_offset(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// SUMIF: sum values whose paired key matches predicate (>, <, =, !=, etc).
 /// Args: key array, value array, target, op_id (0==, 1>, 2<, 3>=, 4<=, 5!=).
-fn builtin_sumif(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sumif(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let keys = b57_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let vals = b57_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let target = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -119,7 +119,7 @@ fn builtin_sumif(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// COUNTIF: count entries satisfying predicate.
-fn builtin_countif(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_countif(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let keys = b57_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let target = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let op = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -136,7 +136,7 @@ fn builtin_countif(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// AVERAGEIF
-fn builtin_averageif(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_averageif(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = builtin_sumif(args)?.to_number();
     let n = builtin_countif(&[args[0].clone(),
         args.get(2).cloned().unwrap_or(StrykeValue::float(0.0)),
@@ -147,7 +147,7 @@ fn builtin_averageif(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// SUMIFS: sum where ALL of N predicates pass (op_array same length as
 /// predicate_array, predicates are flattened triples (target, op)).
-fn builtin_sumifs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sumifs(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let vals = b57_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let preds = arg_to_vec(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let mut s = 0.0_f64;
@@ -176,7 +176,7 @@ fn builtin_sumifs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// COUNTIFS
-fn builtin_countifs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_countifs(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let preds = arg_to_vec(args.first().unwrap_or(&StrykeValue::array(vec![])));
     if preds.is_empty() { return Ok(StrykeValue::integer(0)); }
     let len = b57_to_floats(&preds[0]).len();
@@ -206,7 +206,7 @@ fn builtin_countifs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// AVERAGEIFS
-fn builtin_averageifs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_averageifs(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = builtin_sumifs(args)?.to_number();
     let n = builtin_countifs(&[args.get(1).cloned().unwrap_or(StrykeValue::array(vec![]))])?
         .to_number();
@@ -215,7 +215,7 @@ fn builtin_averageifs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// SUMPRODUCT: Σ a_i · b_i.
-fn builtin_sumproduct(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sumproduct(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = b57_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let b = b57_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let n = a.len().min(b.len());
@@ -223,7 +223,7 @@ fn builtin_sumproduct(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// RANK.EQ — descending rank with ties getting same lowest rank.
-fn builtin_rank_eq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rank_eq(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let arr = b57_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let above = arr.iter().filter(|&&v| v > x).count();
@@ -231,7 +231,7 @@ fn builtin_rank_eq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// RANK.AVG — average rank for ties.
-fn builtin_rank_avg(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rank_avg(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let arr = b57_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let above = arr.iter().filter(|&&v| v > x).count() as f64;
@@ -240,7 +240,7 @@ fn builtin_rank_avg(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// PERCENTRANK.INC: (k - 1) / (n - 1) where k = #{values ≤ x}.
-fn builtin_percentrank(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_percentrank(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let arr = b57_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let n = arr.len();
@@ -250,7 +250,7 @@ fn builtin_percentrank(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// QUARTILE.INC (linear interpolation) and QUARTILE.EXC (n+1 method).
-fn builtin_quartile_inc(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_quartile_inc(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut arr = b57_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let q = args.get(1).map(|v| v.to_number() as i64).unwrap_or(2);
     if arr.is_empty() { return Ok(StrykeValue::float(0.0)); }
@@ -265,7 +265,7 @@ fn builtin_quartile_inc(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `quartile_exc`
-fn builtin_quartile_exc(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_quartile_exc(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut arr = b57_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let q = args.get(1).map(|v| v.to_number() as i64).unwrap_or(2);
     if arr.is_empty() { return Ok(StrykeValue::float(0.0)); }
@@ -281,7 +281,7 @@ fn builtin_quartile_exc(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// XNPV: Σ cf_i / (1+r)^((d_i - d_0) / 365). Args: rate, cashflow array, days array.
-fn builtin_xnpv(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_xnpv(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = f1(args);
     let cfs = b57_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let days = b57_to_floats(args.get(2).unwrap_or(&StrykeValue::array(vec![])));
@@ -293,7 +293,7 @@ fn builtin_xnpv(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// PPMT: principal portion of loan payment for period n (per-period rate).
-fn builtin_ppmt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ppmt(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = f1(args);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let nper = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -307,7 +307,7 @@ fn builtin_ppmt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// IPMT: interest portion of period n.
-fn builtin_ipmt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ipmt(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = f1(args);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let nper = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -320,7 +320,7 @@ fn builtin_ipmt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// RATE: Newton iteration on PV + PMT·a(rate) + FV·(1+rate)^(-n) = 0.
-fn builtin_rate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rate(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     let pmt = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let pv = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -340,7 +340,7 @@ fn builtin_rate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Macauley duration: Σ t·CF_t·(1+y)^(-t) / Σ CF_t·(1+y)^(-t).
-fn builtin_macauley_duration(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_macauley_duration(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let cfs = b57_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     if cfs.is_empty() { return Ok(StrykeValue::float(0.0)); }
@@ -357,7 +357,7 @@ fn builtin_macauley_duration(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Convexity: Σ t(t+1)·CF_t·(1+y)^(-t-2) / Σ CF_t·(1+y)^(-t).
-fn builtin_convexity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_convexity(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let cfs = b57_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     if cfs.is_empty() { return Ok(StrykeValue::float(0.0)); }
@@ -374,7 +374,7 @@ fn builtin_convexity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Yield to maturity: Newton on bond price. Args: price, face, coupon_rate
 /// (annual), n_years, frequency.
-fn builtin_yield_to_maturity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_yield_to_maturity(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let price = f1(args);
     let face = args.get(1).map(|v| v.to_number()).unwrap_or(100.0);
     let cr = args.get(2).map(|v| v.to_number()).unwrap_or(0.05);
@@ -404,7 +404,7 @@ fn builtin_yield_to_maturity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Accrued interest = face · coupon_rate · (days_since_last_coupon / 365).
-fn builtin_accrued_interest(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_accrued_interest(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let face = f1(args);
     let cr = args.get(1).map(|v| v.to_number()).unwrap_or(0.05);
     let days_since = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -413,28 +413,28 @@ fn builtin_accrued_interest(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Clean price = dirty price − accrued.
-fn builtin_clean_price(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_clean_price(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dirty = f1(args);
     let accrued = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(dirty - accrued))
 }
 
 /// Dirty price = clean + accrued.
-fn builtin_dirty_price(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_dirty_price(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let clean = f1(args);
     let accrued = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(clean + accrued))
 }
 
 /// Coupon count between settle and maturity at given frequency.
-fn builtin_coupon_count(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_coupon_count(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let years = f1(args);
     let freq = args.get(1).map(|v| v.to_number()).unwrap_or(2.0);
     Ok(StrykeValue::integer((years * freq).ceil() as i64))
 }
 
 /// Brier score for binary forecasts: BS = (1/N) Σ (p_i − o_i)².
-fn builtin_skill_score(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_skill_score(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = b57_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let o = b57_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let n = p.len().min(o.len());
@@ -447,7 +447,7 @@ fn builtin_skill_score(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Reliability (calibration) discretized into 10 bins.
-fn builtin_reliability_diagram(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_reliability_diagram(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = b57_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let o = b57_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let n = p.len().min(o.len());
@@ -473,7 +473,7 @@ fn builtin_reliability_diagram(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 
 /// Taylor diagram score: combines correlation and stddev ratio. S = 4·(1+r) /
 /// ((σ_r + 1/σ_r)² · (1+1)). Args: r (correlation), σ_norm = σ_model/σ_ref.
-fn builtin_taylor_diagram_score(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_taylor_diagram_score(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = f1(args).clamp(-1.0, 1.0);
     let sigma_norm = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-9);
     let denom = (sigma_norm + 1.0 / sigma_norm).powi(2) * 2.0;

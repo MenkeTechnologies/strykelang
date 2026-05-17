@@ -33,7 +33,7 @@ use stryke::remote_wire::{
     frame_kind, read_typed_frame, send_msg, write_typed_frame, HelloAck, HelloMsg, JobMsg,
     JobRespMsg, SessionAck, SessionInit, PROTO_VERSION,
 };
-use stryke::value::{PerlSub, StrykeValue};
+use stryke::value::{StrykeSub, StrykeValue};
 
 fn tmp_path(tag: &str) -> PathBuf {
     std::env::temp_dir().join(format!(
@@ -121,7 +121,7 @@ fn perl_items_to_json_maps_scalars() {
 
 #[test]
 fn perl_items_to_json_rejects_code_reference_items() {
-    let cb = StrykeValue::code_ref(Arc::new(PerlSub {
+    let cb = StrykeValue::code_ref(Arc::new(StrykeSub {
         name: "cb".into(),
         params: vec![],
         body: vec![],

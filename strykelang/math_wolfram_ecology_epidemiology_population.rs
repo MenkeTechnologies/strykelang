@@ -3,7 +3,7 @@
 // Lotka-Volterra predator-prey step (returns next state [x, y])
 
 // Logistic growth dN/dt = rN(1 - N/K)
-fn builtin_logistic_growth_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_logistic_growth_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
     let k = args.get(2).map(|v| v.to_number()).unwrap_or(100.0);
@@ -12,7 +12,7 @@ fn builtin_logistic_growth_step(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 // Logistic growth analytic solution N(t)
-fn builtin_logistic_growth_analytic(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_logistic_growth_analytic(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n0 = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
     let k = args.get(2).map(|v| v.to_number()).unwrap_or(100.0);
@@ -22,7 +22,7 @@ fn builtin_logistic_growth_analytic(args: &[StrykeValue]) -> PerlResult<StrykeVa
 }
 
 // Gompertz growth dN/dt = r*N*ln(K/N)
-fn builtin_gompertz_growth_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gompertz_growth_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args).max(1e-12);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(0.1);
     let k = args.get(2).map(|v| v.to_number()).unwrap_or(100.0);
@@ -31,7 +31,7 @@ fn builtin_gompertz_growth_step(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 // Allee effect dN/dt = rN(1-N/K)(N/A - 1)
-fn builtin_allee_growth_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_allee_growth_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
     let k = args.get(2).map(|v| v.to_number()).unwrap_or(100.0);
@@ -46,7 +46,7 @@ fn builtin_allee_growth_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Doubling time T = ln(2)/r
 
 // Population doubling rate from N0/N1/Δt
-fn builtin_growth_rate_from_ratio(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_growth_rate_from_ratio(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n0 = f1(args);
     let n1 = args.get(1).map(|v| v.to_number()).unwrap_or(n0);
     let dt = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -57,7 +57,7 @@ fn builtin_growth_rate_from_ratio(args: &[StrykeValue]) -> PerlResult<StrykeValu
 // SIR model step (returns [S, I, R])
 
 // SEIR model step
-fn builtin_seir_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_seir_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = f1(args);
     let e = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let i = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -85,7 +85,7 @@ fn builtin_seir_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // SEIRD step (with deaths)
-fn builtin_seird_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_seird_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = f1(args);
     let e = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let i = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -118,7 +118,7 @@ fn builtin_seird_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // SIS step (no recovered, just S↔I)
-fn builtin_sis_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sis_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = f1(args);
     let i = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let beta = args.get(2).map(|v| v.to_number()).unwrap_or(0.3);
@@ -132,7 +132,7 @@ fn builtin_sis_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Basic reproduction number R0 = β/γ
-fn builtin_r0_basic(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_r0_basic(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let beta = f1(args);
     let gamma = args.get(1).map(|v| v.to_number()).unwrap_or(0.1);
     if gamma == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
@@ -140,7 +140,7 @@ fn builtin_r0_basic(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Effective reproduction number Rt = R0 * S/N
-fn builtin_rt_effective(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rt_effective(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r0 = f1(args);
     let s = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let n = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -149,14 +149,14 @@ fn builtin_rt_effective(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Herd immunity threshold = 1 - 1/R0
-fn builtin_herd_immunity_threshold(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_herd_immunity_threshold(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r0 = f1(args);
     if r0 <= 1.0 { return Ok(StrykeValue::float(0.0)); }
     Ok(StrykeValue::float(1.0 - 1.0 / r0))
 }
 
 // Generation time from serial interval (approx)
-fn builtin_generation_time(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_generation_time(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let serial = f1(args);
     let cv = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
     Ok(StrykeValue::float(serial * (1.0 - 0.5 * cv * cv)))
@@ -164,7 +164,7 @@ fn builtin_generation_time(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 // Shannon diversity index H = -sum(p_i * ln p_i)
 #[allow(dead_code)]
-fn builtin_shannon_diversity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_shannon_diversity(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let counts: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let total: f64 = counts.iter().sum();
@@ -176,7 +176,7 @@ fn builtin_shannon_diversity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 // Simpson diversity D = sum(p_i^2)
 #[allow(dead_code)]
-fn builtin_simpson_diversity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_simpson_diversity(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let counts: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let total: f64 = counts.iter().sum();
@@ -186,7 +186,7 @@ fn builtin_simpson_diversity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Inverse Simpson 1/D
-fn builtin_inverse_simpson(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_inverse_simpson(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let counts: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let total: f64 = counts.iter().sum();
@@ -197,7 +197,7 @@ fn builtin_inverse_simpson(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Pielou evenness J = H / ln(S)
-fn builtin_pielou_evenness(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pielou_evenness(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let counts: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let nz: Vec<f64> = counts.iter().copied().filter(|&c| c > 0.0).collect();
@@ -209,7 +209,7 @@ fn builtin_pielou_evenness(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Margalef richness D = (S - 1) / ln(N)
-fn builtin_margalef_richness(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_margalef_richness(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let counts: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let nz: usize = counts.iter().filter(|&&c| c > 0.0).count();
@@ -219,7 +219,7 @@ fn builtin_margalef_richness(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Menhinick richness D = S / sqrt(N)
-fn builtin_menhinick_richness(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_menhinick_richness(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let counts: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let nz: usize = counts.iter().filter(|&&c| c > 0.0).count();
@@ -229,7 +229,7 @@ fn builtin_menhinick_richness(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Berger-Parker dominance = max(p_i)
-fn builtin_berger_parker(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_berger_parker(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let counts: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let total: f64 = counts.iter().sum();
@@ -241,7 +241,7 @@ fn builtin_berger_parker(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Jaccard similarity = |A∩B| / |A∪B|
 
 // Sorensen-Dice similarity 2|A∩B| / (|A|+|B|)
-fn builtin_sorensen_dice(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sorensen_dice(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a: std::collections::HashSet<String> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_string()).collect();
     let b: std::collections::HashSet<String> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
@@ -254,7 +254,7 @@ fn builtin_sorensen_dice(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 // Bray-Curtis dissimilarity
 #[allow(dead_code)]
-fn builtin_bray_curtis(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bray_curtis(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let b: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
@@ -270,7 +270,7 @@ fn builtin_bray_curtis(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Rao's quadratic entropy
-fn builtin_rao_quadratic_entropy(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rao_quadratic_entropy(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let total: f64 = p.iter().sum();
@@ -290,7 +290,7 @@ fn builtin_rao_quadratic_entropy(args: &[StrykeValue]) -> PerlResult<StrykeValue
 // Hardy-Weinberg expected genotype freq (p², 2pq, q²)
 
 // Selection coefficient → next allele freq
-fn builtin_selection_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_selection_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = f1(args);
     let s = args.get(1).map(|v| v.to_number()).unwrap_or(0.1);
     let q = 1.0 - p;
@@ -302,7 +302,7 @@ fn builtin_selection_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Fst from population freqs
 
 // Nei's genetic distance D = -ln(I)
-fn builtin_nei_genetic_distance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_nei_genetic_distance(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p1: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let p2: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
@@ -321,7 +321,7 @@ fn builtin_nei_genetic_distance(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 // Wright's effective population size: Ne_harmonic = N / (sum 1/N_i)
-fn builtin_effective_pop_size(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_effective_pop_size(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ns: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     if ns.is_empty() { return Ok(StrykeValue::float(0.0)); }
@@ -331,7 +331,7 @@ fn builtin_effective_pop_size(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Carrying capacity from r and steady state
-fn builtin_carrying_capacity_from_data(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_carrying_capacity_from_data(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ns: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     if ns.is_empty() { return Ok(StrykeValue::float(0.0)); }
@@ -339,7 +339,7 @@ fn builtin_carrying_capacity_from_data(args: &[StrykeValue]) -> PerlResult<Stryk
 }
 
 // Mark-recapture Petersen estimator: N = (M*C)/R
-fn builtin_petersen_estimator(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_petersen_estimator(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m = f1(args);
     let c = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let r = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -348,7 +348,7 @@ fn builtin_petersen_estimator(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Lincoln-Petersen with Chapman correction: N = ((M+1)(C+1)/(R+1)) - 1
-fn builtin_chapman_estimator(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_chapman_estimator(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m = f1(args);
     let c = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let r = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -356,7 +356,7 @@ fn builtin_chapman_estimator(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Lotka–Volterra competition model — two species
-fn builtin_lv_competition_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lv_competition_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n1 = f1(args);
     let n2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let r1 = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
@@ -372,7 +372,7 @@ fn builtin_lv_competition_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 // Holling type II functional response: f(N) = a*N/(1+a*h*N)
-fn builtin_holling_type2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_holling_type2(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let h = args.get(2).map(|v| v.to_number()).unwrap_or(0.1);
@@ -382,7 +382,7 @@ fn builtin_holling_type2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Holling type III: a*N²/(1+a*h*N²)
-fn builtin_holling_type3(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_holling_type3(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let h = args.get(2).map(|v| v.to_number()).unwrap_or(0.1);
@@ -393,14 +393,14 @@ fn builtin_holling_type3(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 // Holling Type I functional response f(N) = a·N: prey-density-proportional
 // consumption by a predator. Linear up to satiation; defining formula.
-fn builtin_holling_type1(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_holling_type1(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(a * n))
 }
 
 // Leslie matrix step (population vector × Leslie matrix)
-fn builtin_leslie_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_leslie_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n_vec: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let leslie = matrix_from_value(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
@@ -418,7 +418,7 @@ fn builtin_leslie_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Net reproductive rate R0 = sum(l_x * m_x)
-fn builtin_net_reproductive_rate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_net_reproductive_rate(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lx: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let mx: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
@@ -428,7 +428,7 @@ fn builtin_net_reproductive_rate(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 // Generation time T = sum(x * l_x * m_x) / R0
-fn builtin_generation_time_demo(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_generation_time_demo(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lx: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let mx: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
@@ -441,7 +441,7 @@ fn builtin_generation_time_demo(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 // Per-capita finite rate λ from R0 and T (approx)
-fn builtin_finite_rate_lambda(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_finite_rate_lambda(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r0 = f1(args);
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if t == 0.0 { return Ok(StrykeValue::float(1.0)); }
@@ -449,7 +449,7 @@ fn builtin_finite_rate_lambda(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Body mass to metabolic rate (Kleiber's): B = B0 * M^(3/4)
-fn builtin_kleibers_law(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_kleibers_law(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m = f1(args);
     let b0 = args.get(1).map(|v| v.to_number()).unwrap_or(70.0);
     Ok(StrykeValue::float(b0 * m.powf(0.75)))
@@ -459,7 +459,7 @@ fn builtin_kleibers_law(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // surface-to-volume thermoregulation response. Empirical fit (Meiri & Dayan 2003,
 // J Biogeogr) for endotherms: log10(M) ≈ log10(M₀) + k · |lat°|, k ≈ 0.005..0.01.
 // Args: equator-baseline mass M₀, |latitude° |, slope k.
-fn builtin_bergmann_adjust(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bergmann_adjust(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m0 = f1(args);
     let lat_deg = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).abs();
     let k = args.get(2).map(|v| v.to_number()).unwrap_or(0.0067);
@@ -467,7 +467,7 @@ fn builtin_bergmann_adjust(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Q10 temperature coefficient: rate2 = rate1 * Q10^((T2-T1)/10)
-fn builtin_q10(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_q10(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let rate1 = f1(args);
     let q10 = args.get(1).map(|v| v.to_number()).unwrap_or(2.0);
     let t1 = args.get(2).map(|v| v.to_number()).unwrap_or(20.0);
@@ -476,7 +476,7 @@ fn builtin_q10(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Species-area curve S = c*A^z
-fn builtin_species_area(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_species_area(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let c = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let z = args.get(2).map(|v| v.to_number()).unwrap_or(0.25);
@@ -484,14 +484,14 @@ fn builtin_species_area(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Intrinsic rate r = b - d
-fn builtin_intrinsic_growth_rate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_intrinsic_growth_rate(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let b = f1(args);
     let d = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(b - d))
 }
 
 // MacArthur-Wilson immigration rate I(S) = I_max(1 - S/P)
-fn builtin_macarthur_wilson_immigration(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_macarthur_wilson_immigration(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = f1(args);
     let p = args.get(1).map(|v| v.to_number()).unwrap_or(100.0);
     let i_max = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -500,7 +500,7 @@ fn builtin_macarthur_wilson_immigration(args: &[StrykeValue]) -> PerlResult<Stry
 }
 
 // MacArthur-Wilson extinction rate E(S) = E_max * S/P
-fn builtin_macarthur_wilson_extinction(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_macarthur_wilson_extinction(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = f1(args);
     let p = args.get(1).map(|v| v.to_number()).unwrap_or(100.0);
     let e_max = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -509,7 +509,7 @@ fn builtin_macarthur_wilson_extinction(args: &[StrykeValue]) -> PerlResult<Stryk
 }
 
 // Equilibrium species count S* (where I=E)
-fn builtin_island_equilibrium(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_island_equilibrium(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = f1(args);
     let i_max = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let e_max = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);

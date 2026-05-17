@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 
-use crate::error::{StrykeError, PerlResult};
+use crate::error::{StrykeError, StrykeResult};
 use crate::scope::{AtomicArray, AtomicHash};
 use crate::value::{PerlSub, StrykeValue};
 use crate::vm_helper::{VMHelper, WantarrayCtx};
@@ -21,7 +21,7 @@ pub fn run_pwatch(
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     // pwatch's runtime matcher (`gpat.matches`) runs on every filesystem
     // event, so it can only check pattern shape — not stat-based qualifiers
     // like `(/)`. Strip the trailing qualifier suffix via zshrs's parser so

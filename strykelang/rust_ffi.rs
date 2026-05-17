@@ -57,7 +57,7 @@ use std::sync::Arc;
 use parking_lot::Mutex;
 use sha2::{Digest, Sha256};
 
-use crate::error::{StrykeError, PerlResult};
+use crate::error::{StrykeError, StrykeResult};
 use crate::value::StrykeValue;
 
 /// One registered FFI entry: a function signature kind + a raw symbol pointer.
@@ -137,7 +137,7 @@ fn registry() -> &'static Arc<Mutex<Registry>> {
 
 /// Lookup hook: returns `Some(Ok(result))` if `name` is a registered FFI function,
 /// `None` otherwise. Called from [`crate::builtins::try_builtin`]'s fallback arm.
-pub fn try_call(name: &str, args: &[StrykeValue], line: usize) -> Option<PerlResult<StrykeValue>> {
+pub fn try_call(name: &str, args: &[StrykeValue], line: usize) -> Option<StrykeResult<StrykeValue>> {
     let entry = {
         let guard = registry().lock();
         guard.entries.get(name).cloned()?
@@ -147,7 +147,7 @@ pub fn try_call(name: &str, args: &[StrykeValue], line: usize) -> Option<PerlRes
 
 /// Perl builtin `__stryke_rust_compile(BASE64, LINE)` — invoked at BEGIN time by the code
 /// produced by [`crate::rust_sugar::desugar_rust_blocks`]. Idempotent per body hash.
-pub fn compile_and_register(body_b64: &str, line: usize) -> PerlResult<()> {
+pub fn compile_and_register(body_b64: &str, line: usize) -> StrykeResult<()> {
     use base64::Engine as _;
     let body = base64::engine::general_purpose::STANDARD
         .decode(body_b64)
@@ -301,7 +301,7 @@ fn auto_no_mangle(body: &str) -> String {
     out
 }
 
-fn invoke_rustc(src: &PathBuf, out: &PathBuf, line: usize) -> PerlResult<()> {
+fn invoke_rustc(src: &PathBuf, out: &PathBuf, line: usize) -> StrykeResult<()> {
     let rustc = std::env::var("RUSTC").unwrap_or_else(|_| "rustc".to_string());
     let status = std::process::Command::new(&rustc)
         .arg("--edition=2021")
@@ -337,7 +337,7 @@ fn invoke_rustc(src: &PathBuf, out: &PathBuf, line: usize) -> PerlResult<()> {
 }
 
 #[cfg(unix)]
-fn dlopen_lib(path: &Path, line: usize) -> PerlResult<usize> {
+fn dlopen_lib(path: &Path, line: usize) -> StrykeResult<usize> {
     use std::ffi::CString;
     let cpath = CString::new(path.to_string_lossy().as_bytes())
         .map_err(|e| StrykeError::runtime(format!("rust FFI: dlopen path nul: {}", e), line))?;
@@ -362,7 +362,7 @@ fn dlopen_lib(path: &Path, line: usize) -> PerlResult<usize> {
 }
 
 #[cfg(not(unix))]
-fn dlopen_lib(_path: &Path, line: usize) -> PerlResult<usize> {
+fn dlopen_lib(_path: &Path, line: usize) -> StrykeResult<usize> {
     Err(StrykeError::runtime(
         "rust FFI: only unix (Linux/macOS) is supported in v1".to_string(),
         line,
@@ -370,7 +370,7 @@ fn dlopen_lib(_path: &Path, line: usize) -> PerlResult<usize> {
 }
 
 #[cfg(unix)]
-fn dlsym_lookup(handle: usize, name: &str, line: usize) -> PerlResult<*const ()> {
+fn dlsym_lookup(handle: usize, name: &str, line: usize) -> StrykeResult<*const ()> {
     let cname = CString::new(name)
         .map_err(|e| StrykeError::runtime(format!("rust FFI: symbol nul: {}", e), line))?;
     // SAFETY: handle came from a successful dlopen; dlsym returns a function pointer or NULL.
@@ -385,7 +385,7 @@ fn dlsym_lookup(handle: usize, name: &str, line: usize) -> PerlResult<*const ()>
 }
 
 #[cfg(not(unix))]
-fn dlsym_lookup(_h: usize, _n: &str, line: usize) -> PerlResult<*const ()> {
+fn dlsym_lookup(_h: usize, _n: &str, line: usize) -> StrykeResult<*const ()> {
     Err(StrykeError::runtime(
         "rust FFI: only unix supported in v1".to_string(),
         line,
@@ -526,7 +526,7 @@ fn invoke(
     entry: &FfiEntry,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let expected = entry.sig.arity();
     if args.len() != expected {
         return Err(StrykeError::runtime(

@@ -11,7 +11,7 @@ use caseless::default_case_fold_str;
 use crate::ast::{BinOp, Block, Expr, MatchArm, PerlTypeName, Sigil, SubSigParam};
 use crate::bytecode::{BuiltinId, Chunk, Op, RuntimeSubDecl, SpliceExprEntry};
 use crate::compiler::scalar_compound_op_from_byte;
-use crate::error::{ErrorKind, StrykeError, PerlResult};
+use crate::error::{ErrorKind, StrykeError, StrykeResult};
 use crate::perl_fs::read_file_text_perl_compat;
 use crate::pmap_progress::{FanProgress, PmapProgress};
 use crate::sort_fast::{sort_magic_cmp, SortBlockFast};
@@ -224,7 +224,7 @@ impl ParallelBlockVmShared {
 }
 
 #[inline]
-fn vm_interp_result(r: Result<StrykeValue, FlowOrError>, line: usize) -> PerlResult<StrykeValue> {
+fn vm_interp_result(r: Result<StrykeValue, FlowOrError>, line: usize) -> StrykeResult<StrykeValue> {
     match r {
         Ok(v) => Ok(v),
         Err(FlowOrError::Error(e)) => Err(e),
@@ -481,7 +481,7 @@ impl<'a> VM<'a> {
         start: usize,
         end: usize,
         op_count: &mut u64,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         let resume_ip = self.ip;
         let saved_mode = self.block_region_mode;
         let saved_end = self.block_region_end;
@@ -544,7 +544,7 @@ impl<'a> VM<'a> {
         block_idx: u16,
         peel_array_ref: bool,
         op_count: &mut u64,
-    ) -> PerlResult<()> {
+    ) -> StrykeResult<()> {
         if list.len() == 1 {
             if let Some(p) = list[0].as_pipeline() {
                 if peel_array_ref {
@@ -613,7 +613,7 @@ impl<'a> VM<'a> {
         expr_idx: u16,
         peel_array_ref: bool,
         op_count: &mut u64,
-    ) -> PerlResult<()> {
+    ) -> StrykeResult<()> {
         let idx = expr_idx as usize;
         let dispatch_coderef = !crate::compat_mode();
         // EXPR-form `map EXPR, LIST`: no block boundary, so use
@@ -660,7 +660,7 @@ impl<'a> VM<'a> {
         val: StrykeValue,
         item: &StrykeValue,
         dispatch: bool,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         if !dispatch {
             return Ok(val);
         }
@@ -682,7 +682,7 @@ impl<'a> VM<'a> {
         list: Vec<StrykeValue>,
         block_idx: u16,
         op_count: &mut u64,
-    ) -> PerlResult<()> {
+    ) -> StrykeResult<()> {
         if list.is_empty() {
             self.push(StrykeValue::array(vec![]));
             return Ok(());
@@ -693,7 +693,7 @@ impl<'a> VM<'a> {
         let mut prev_key: Option<StrykeValue> = None;
 
         let eval_key =
-            |vm: &mut VM, item: StrykeValue, op_count: &mut u64| -> PerlResult<StrykeValue> {
+            |vm: &mut VM, item: StrykeValue, op_count: &mut u64| -> StrykeResult<StrykeValue> {
                 vm.interp.scope.set_topic(item);
                 if let Some(&(start, end)) =
                     vm.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
@@ -742,7 +742,7 @@ impl<'a> VM<'a> {
         list: Vec<StrykeValue>,
         expr_idx: u16,
         op_count: &mut u64,
-    ) -> PerlResult<()> {
+    ) -> StrykeResult<()> {
         if list.is_empty() {
             self.push(StrykeValue::array(vec![]));
             return Ok(());
@@ -1307,7 +1307,7 @@ impl<'a> VM<'a> {
         argc: u8,
         wa: u8,
         super_call: bool,
-    ) -> PerlResult<()> {
+    ) -> StrykeResult<()> {
         let method_owned = self.names[name_idx as usize].clone();
         let argc = argc as usize;
         let want = WantarrayCtx::from_byte(wa);
@@ -1520,7 +1520,7 @@ impl<'a> VM<'a> {
         n: usize,
         line: usize,
         progress: bool,
-    ) -> PerlResult<()> {
+    ) -> StrykeResult<()> {
         let block = self.blocks[block_idx as usize].clone();
         let subs = self.interp.subs.clone();
         let (scope_capture, atomic_arrays, atomic_hashes) =
@@ -1585,7 +1585,7 @@ impl<'a> VM<'a> {
         n: usize,
         line: usize,
         progress: bool,
-    ) -> PerlResult<()> {
+    ) -> StrykeResult<()> {
         let block = self.blocks[block_idx as usize].clone();
         let subs = self.interp.subs.clone();
         let (scope_capture, atomic_arrays, atomic_hashes) =
@@ -1641,7 +1641,7 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn require_scalar_mutable(&self, name: &str) -> PerlResult<()> {
+    fn require_scalar_mutable(&self, name: &str) -> StrykeResult<()> {
         if self.interp.scope.is_scalar_frozen(name) {
             return Err(StrykeError::syntax(
                 format!("cannot assign to frozen variable `${}`", name),
@@ -1651,7 +1651,7 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn require_array_mutable(&self, name: &str) -> PerlResult<()> {
+    fn require_array_mutable(&self, name: &str) -> StrykeResult<()> {
         if self.interp.scope.is_array_frozen(name) {
             return Err(StrykeError::syntax(
                 format!("cannot modify frozen array `@{}`", name),
@@ -1661,7 +1661,7 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn require_hash_mutable(&self, name: &str) -> PerlResult<()> {
+    fn require_hash_mutable(&self, name: &str) -> StrykeResult<()> {
         if self.interp.scope.is_hash_frozen(name) || Self::is_reflection_hash(name) {
             return Err(StrykeError::syntax(
                 format!("cannot modify frozen hash `%{}`", name),
@@ -1681,7 +1681,7 @@ impl<'a> VM<'a> {
     /// [`VM::set_jit_enabled`] disabled it). For block JIT, `block_jit_validate` runs once per attempt;
     /// buffers may use `StrykeValue::raw_bits` for `defined`-style control flow. Then the main opcode
     /// interpreter loop.
-    pub fn execute(&mut self) -> PerlResult<StrykeValue> {
+    pub fn execute(&mut self) -> StrykeResult<StrykeValue> {
         let ops_ref: &Vec<Op> = &self.ops;
         let ops = ops_ref as *const Vec<Op>;
         // SAFETY: ops doesn't change during execution; pointer avoids borrow on self
@@ -1949,7 +1949,7 @@ impl<'a> VM<'a> {
     }
 
     /// `die` / runtime errors inside `try` jump to `catch_ip` unless the error is [`ErrorKind::Exit`].
-    fn try_recover_from_exception(&mut self, e: &StrykeError) -> PerlResult<bool> {
+    fn try_recover_from_exception(&mut self, e: &StrykeError) -> StrykeResult<bool> {
         if matches!(e.kind, ErrorKind::Exit(_)) {
             return Ok(false);
         }
@@ -1982,7 +1982,7 @@ impl<'a> VM<'a> {
         argc: usize,
         want: WantarrayCtx,
         preserve_arrays: bool,
-    ) -> PerlResult<()> {
+    ) -> StrykeResult<()> {
         use crate::ast::AdviceKind;
 
         let line = self.line();
@@ -2128,7 +2128,7 @@ impl<'a> VM<'a> {
         &mut self,
         adv: &crate::aop::Intercept,
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         let idx = adv.body_block_idx as usize;
         let range = self
             .block_bytecode_ranges
@@ -2163,7 +2163,7 @@ impl<'a> VM<'a> {
         wa_byte: u8,
         // Pre-resolved sub for `Op::CallStaticSubId` (stash lookup once in `VM::new`).
         closure_sub_hint: Option<Arc<PerlSub>>,
-    ) -> PerlResult<()> {
+    ) -> StrykeResult<()> {
         let name_owned = self.names[name_idx as usize].clone();
         let name = name_owned.as_str();
         let argc = argc_u8 as usize;
@@ -2581,9 +2581,9 @@ impl<'a> VM<'a> {
         a: StrykeValue,
         b: StrykeValue,
         default: F,
-    ) -> PerlResult<()>
+    ) -> StrykeResult<()>
     where
-        F: FnOnce(&StrykeValue, &StrykeValue) -> PerlResult<StrykeValue>,
+        F: FnOnce(&StrykeValue, &StrykeValue) -> StrykeResult<StrykeValue>,
     {
         let line = self.line();
         if let Some(exec_res) = self.interp.try_overload_binop(op, &a, &b, line) {
@@ -2598,7 +2598,7 @@ impl<'a> VM<'a> {
         &mut self,
         a: StrykeValue,
         b: StrykeValue,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         let line = self.line();
         if let Some(exec_res) = self.interp.try_overload_binop(BinOp::Concat, &a, &b, line) {
             vm_interp_result(exec_res, line)
@@ -2628,7 +2628,7 @@ impl<'a> VM<'a> {
         mut last: StrykeValue,
         op_count: &mut u64,
         init_dispatch: bool,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         if init_dispatch {
             self.halt = false;
             self.exit_main_dispatch = false;
@@ -2723,7 +2723,7 @@ impl<'a> VM<'a> {
             // Closure: `?` / `return Err` inside `match op` must not return from
             // `run_main_dispatch_loop` — they must become `__op_res` so `try_recover_from_exception`
             // can run before propagating.
-            let __op_res: PerlResult<()> = (|| -> PerlResult<()> {
+            let __op_res: StrykeResult<()> = (|| -> StrykeResult<()> {
                 match op {
                     Op::Nop => Ok(()),
                     // ── Constants ──
@@ -8448,7 +8448,7 @@ impl<'a> VM<'a> {
                         let subs = self.interp.subs.clone();
                         let (scope_capture, atomic_arrays, atomic_hashes) =
                             self.interp.scope.capture_with_atomics();
-                        let result_slot: Arc<Mutex<Option<PerlResult<StrykeValue>>>> =
+                        let result_slot: Arc<Mutex<Option<StrykeResult<StrykeValue>>>> =
                             Arc::new(Mutex::new(None));
                         let join_slot: Arc<Mutex<Option<std::thread::JoinHandle<()>>>> =
                             Arc::new(Mutex::new(None));
@@ -8805,7 +8805,7 @@ impl<'a> VM<'a> {
         entry_ip: usize,
         want: WantarrayCtx,
         args: &[i64],
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         let saved_wa = self.interp.wantarray_kind;
         for a in args {
             self.push(StrykeValue::integer(*a));
@@ -8867,7 +8867,7 @@ impl<'a> VM<'a> {
         None
     }
 
-    fn exec_builtin(&mut self, id: u16, args: Vec<StrykeValue>) -> PerlResult<StrykeValue> {
+    fn exec_builtin(&mut self, id: u16, args: Vec<StrykeValue>) -> StrykeResult<StrykeValue> {
         let line = self.line();
         let bid = BuiltinId::from_u16(id);
         match bid {
@@ -10059,7 +10059,7 @@ mod tests {
     use crate::bytecode::{Chunk, Op};
     use crate::value::StrykeValue;
 
-    fn run_chunk(chunk: &Chunk) -> PerlResult<StrykeValue> {
+    fn run_chunk(chunk: &Chunk) -> StrykeResult<StrykeValue> {
         let mut interp = VMHelper::new();
         let mut vm = VM::new(chunk, &mut interp);
         vm.execute()

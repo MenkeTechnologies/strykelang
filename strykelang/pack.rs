@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use crate::error::{StrykeError, PerlResult};
+use crate::error::{StrykeError, StrykeResult};
 use crate::value::StrykeValue;
 
 #[derive(Clone, Copy, Debug)]
@@ -96,7 +96,7 @@ fn take_arg<'a>(args: &mut &'a [StrykeValue]) -> Result<&'a StrykeValue, String>
 }
 
 /// `pack TEMPLATE, LIST`
-pub fn perl_pack(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+pub fn perl_pack(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     if args.is_empty() {
         return Err(StrykeError::runtime("pack: not enough arguments", line));
     }
@@ -370,7 +370,7 @@ fn pack_impl(template: &str, args: &mut &[StrykeValue]) -> Result<Vec<u8>, Strin
 }
 
 /// `unpack TEMPLATE, SCALAR`
-pub fn perl_unpack(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+pub fn perl_unpack(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     if args.len() < 2 {
         return Err(StrykeError::runtime("unpack: not enough arguments", line));
     }

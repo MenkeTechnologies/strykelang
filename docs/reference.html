@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.14.5 · 10195 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.14.7 · 10228 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -330,7 +330,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">8523</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">8556</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -702,11 +702,20 @@ fn first_n { @_[0..$_[-1]-1] }              # first_n(list, n)
       </article>
       <article class="doc-entry" id="doc-par">
         <h3><a class="doc-anchor" href="#doc-par">#</a> <code>par</code></h3>
-        <p>Generic parallel-chunk thread-stage — only valid inside <code>~&gt;</code>/<code>~&gt;&gt;</code>. Splits the threaded value into chunks, runs <code>BLOCK</code> on each chunk in parallel, and flattens chunk outputs into a single list.</p>
-        <pre><code class="lang-perl">my @a = ~&gt; &quot;Hello, World 123&quot; par { letters }    # H e l l o W o r l d
-~&gt; @huge par { map { _ ** 2 } |&gt; sum } |&gt; sum p   # parallel sum-of-squares
+        <p>Generic parallel-chunk evaluator. Splits the input list into chunks, runs <code>BLOCK</code> on each chunk in parallel with the chunk bound to <code>_</code> / <code>_0</code>, and flattens chunk outputs into a single list. Callable in three shapes:</p>
+        <pre><code class="lang-perl"># 1. Top-level prefix form
+par { BLOCK } LIST
+my @r = par { letters } &quot;Hello, World 123&quot;      # H e l l o W o r l d
+my @s = par { map { _ ** 2 } _ } @huge           # parallel squares
+
+# 2. Top-level postfix form
+my @r = { letters } par &quot;Hello, World 123&quot;
+
+# 3. As a `~&gt;` / `~&gt;&gt;` thread-macro stage
+~&gt; &quot;abc def&quot; par { letters }                     # a b c d e f
+~&gt; @huge par { map { _ ** 2 } |&gt; sum } |&gt; sum p  # parallel sum-of-squares
 </code></pre>
-        <p>Each chunk gets a fresh sub-VM with the chunk bound to <code>_</code> and <code>$_[0]</code>. List-returning ops keep their values; the runtime auto-flattens. Use <code>par_reduce</code> when you need a final merge step rather than flat concat. <code>par { … }</code> is *only* a thread-stage; calling it as a top-level expression is an undefined-sub error.</p>
+        <p>Each chunk gets a fresh sub-VM with the chunk bound to <code>_</code> and <code>_0</code>. List-returning ops keep their values; the runtime auto-flattens. Use <code>par_reduce</code> when you need an explicit merge step rather than flat concat.</p>
       </article>
       <article class="doc-entry" id="doc-par-reduce">
         <h3><a class="doc-anchor" href="#doc-par-reduce">#</a> <code>par_reduce</code></h3>
@@ -1433,15 +1442,15 @@ my @pixels = nrm @raw_intensities
       <article class="doc-entry" id="doc-compose">
         <h3><a class="doc-anchor" href="#doc-compose">#</a> <code>compose</code></h3>
         <p><code>compose</code> (alias <code>comp</code>) creates a right-to-left function composition. Given <code>compose(\&amp;f, \&amp;g)</code>, calling the result with <code>x</code> computes <code>f(g(x))</code>. Chain any number of functions — they apply from right to left (last argument first). This is the standard mathematical function composition found in Haskell, Clojure, and Ramda. The returned code ref can be stored, passed around, or used in pipelines.</p>
-        <pre><code class="lang-perl">my $double = fn { $_[0] * 2 }
-my $inc    = fn { $_[0] + 1 }
+        <pre><code class="lang-perl">my $double = fn { _0 * 2 }
+my $inc    = fn { _0 + 1 }
 my $f = compose($inc, $double)
 p $f-&gt;(5)   # 11  (double 5 → 10, inc 10 → 11)
 
 my $pipeline = compose(
-    fn { join &quot;,&quot;, @{$_[0]} },
-    fn { [sort @{$_[0]}] },
-    fn { [grep { _ &gt; 2 } @{$_[0]}] },
+    fn { join &quot;,&quot;, @{_0} },
+    fn { [sort @{_0}] },
+    fn { [grep { _ &gt; 2 } @{_0}] },
 )
 p $pipeline-&gt;([3,1,4,1,5])  # 3,4,5
 </code></pre>
@@ -1449,11 +1458,11 @@ p $pipeline-&gt;([3,1,4,1,5])  # 3,4,5
       <article class="doc-entry" id="doc-partial">
         <h3><a class="doc-anchor" href="#doc-partial">#</a> <code>partial</code></h3>
         <p><code>partial</code> returns a partially applied function — the bound arguments are prepended to any arguments supplied at call time. <code>partial(\&amp;f, @bound)-&gt;(x)</code> is equivalent to <code>f(@bound, x)</code>. This is the standard partial application from functional programming, useful for creating specialized versions of general functions without closures.</p>
-        <pre><code class="lang-perl">my $add = fn { $_[0] + $_[1] }
+        <pre><code class="lang-perl">my $add = fn { _0 + _1 }
 my $add5 = partial($add, 5)
 p $add5-&gt;(3)   # 8
 
-my $log = fn { p &quot;[$_[0]] $_[1]&quot; }
+my $log = fn { p &quot;[#{_0}] #{_1}&quot; }
 my $warn_log = partial($log, &quot;WARN&quot;)
 $warn_log-&gt;(&quot;disk full&quot;)   # [WARN] disk full
 </code></pre>
@@ -1461,7 +1470,7 @@ $warn_log-&gt;(&quot;disk full&quot;)   # [WARN] disk full
       <article class="doc-entry" id="doc-curry">
         <h3><a class="doc-anchor" href="#doc-curry">#</a> <code>curry</code></h3>
         <p><code>curry</code> auto-curries a function with a given arity. The curried function accumulates arguments across calls and invokes the original only when enough have been collected. <code>curry(\&amp;f, N)-&gt;(a)-&gt;(b)</code> calls <code>f(a, b)</code> when N=2. If all arguments are supplied at once, it calls immediately.</p>
-        <pre><code class="lang-perl">my $add = curry(fn { $_[0] + $_[1] }, 2)
+        <pre><code class="lang-perl">my $add = curry(fn { _0 + _1 }, 2)
 my $add5 = $add-&gt;(5)
 p $add5-&gt;(3)       # 8
 p $add-&gt;(10, 20)   # 30  (enough args — calls immediately)
@@ -1471,12 +1480,12 @@ p $add-&gt;(10, 20)   # 30  (enough args — calls immediately)
         <h3><a class="doc-anchor" href="#doc-memoize">#</a> <code>memoize</code></h3>
         <p><code>memoize</code> (alias <code>memo</code>) wraps a function so that repeated calls with the same arguments return a cached result instead of re-executing the function. Arguments are stringified and joined as the cache key. This is essential for expensive pure functions like recursive algorithms, API lookups with stable results, or any computation where the same inputs always produce the same output.</p>
         <pre><code class="lang-perl">my $fib = memoize(fn {
-    my $n = $_[0]
+    my $n = _0
     $n &lt; 2 ? $n : $fib-&gt;($n-1) + $fib-&gt;($n-2)
 })
 p $fib-&gt;(30)   # instant (without memoize: ~1B calls)
 
-my $fetch_user = memo(fn { fetch_json(&quot;https://api/users/$_[0]&quot;) })
+my $fetch_user = memo(fn { fetch_json(&quot;https://api/users/#{_0}&quot;) })
 $fetch_user-&gt;(42)   # hits API
 $fetch_user-&gt;(42)   # returns cached
 </code></pre>
@@ -1502,7 +1511,7 @@ my @defaults = map { constantly(0)-&gt;() } 1:5   # [0,0,0,0,0]
       <article class="doc-entry" id="doc-complement">
         <h3><a class="doc-anchor" href="#doc-complement">#</a> <code>complement</code></h3>
         <p><code>complement</code> (alias <code>compl</code>) wraps a predicate function and returns a new function that negates its boolean result. <code>complement(\&amp;even?)-&gt;(3)</code> returns true. This is the functional equivalent of <code>!f(x)</code> without creating a closure.</p>
-        <pre><code class="lang-perl">my $even = fn { $_[0] % 2 == 0 }
+        <pre><code class="lang-perl">my $even = fn { _0 % 2 == 0 }
 my $odd = complement($even)
 p $odd-&gt;(3)   # 1
 p $odd-&gt;(4)   # 0
@@ -1520,7 +1529,7 @@ p &quot;@r&quot;   # 1 5 2.8
       <article class="doc-entry" id="doc-fnil">
         <h3><a class="doc-anchor" href="#doc-fnil">#</a> <code>fnil</code></h3>
         <p><code>fnil</code> wraps a function so that any <code>undef</code> arguments are replaced with the given defaults before the function is called. This eliminates repetitive <code>// $default</code> patterns inside function bodies.</p>
-        <pre><code class="lang-perl">my $greet = fnil(fn { &quot;Hello, $_[0]!&quot; }, &quot;World&quot;)
+        <pre><code class="lang-perl">my $greet = fnil(fn { &quot;Hello, #{_0}!&quot; }, &quot;World&quot;)
 p $greet-&gt;(undef)    # Hello, World!
 p $greet-&gt;(&quot;Alice&quot;)  # Hello, Alice!
 </code></pre>
@@ -5056,8 +5065,8 @@ p sin_integral(10)   # ≈ 1.6583
       <p class="chapter-meta">6 topics</p>
       <article class="doc-entry" id="doc-numerical-gradient">
         <h3><a class="doc-anchor" href="#doc-numerical-gradient">#</a> <code>numerical_gradient</code></h3>
-        <p><code>numerical_gradient F, POINT [, H]</code> — central-difference ∇f. F receives a single arrayref <code>$_[0]</code>.</p>
-        <pre><code class="lang-perl">fn quad { my @y = @{$_[0]}; $y[0]**2 + 2*$y[1]**2 }
+        <p><code>numerical_gradient F, POINT [, H]</code> — central-difference ∇f. F receives a single arrayref <code>_0</code>.</p>
+        <pre><code class="lang-perl">fn quad { my @y = @{_0}; $y[0]**2 + 2*$y[1]**2 }
 my @g = ngrad(\&amp;quad, [3, 4])    # (6, 16)
 </code></pre>
       </article>
@@ -10611,7 +10620,7 @@ my $r = ai &quot;extract user&quot;, schema =&gt; +{ name =&gt; &quot;string&quo
         <p><code>stream_prompt $prompt, on_chunk =&gt; sub { ... }</code> — Anthropic SSE streaming. With <code>on_chunk</code>, fires once per text-delta. Without, returns a <code>PerlIterator</code>-backed handle: <code>for my $chunk in stream_prompt(&quot;...&quot;) { print $chunk }</code>.</p>
         <pre><code class="lang-perl">my $state = +{ buf =&gt; &quot;&quot; };
 stream_prompt(&quot;write a haiku&quot;,
-    on_chunk =&gt; sub { $state-&gt;{buf} .= $_[0]; print $_[0] });
+    on_chunk =&gt; sub { $state-&gt;{buf} .= _0; print _0 });
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-chat">
@@ -10712,7 +10721,7 @@ my @vecs = @{ embed([&quot;a&quot;, &quot;b&quot;, &quot;c&quot;]) }
         <p><code>ai_register_tool($name, $description, +{params}, sub { ... })</code> — register a tool that the bare <code>ai($prompt)</code> call auto-attaches to its agent loop. Idempotent re-register on same name.</p>
         <pre><code class="lang-perl">ai_register_tool(&quot;weather&quot;, &quot;Get weather&quot;,
     +{ city =&gt; &quot;string&quot; },
-    sub { fetch &quot;https://api.weather.com/&quot; . uri_encode($_[0]-&gt;{city}) });
+    sub { fetch &quot;https://api.weather.com/&quot; . uri_encode(_0-&gt;{city}) });
 ai_clear_tools();
 </code></pre>
         <p>For parser-level sugar, use <code>tool fn</code> instead.</p>
@@ -11990,7 +11999,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">8523 topics</p>
+      <p class="chapter-meta">8556 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$!</code></h3>
         <p><code>$!</code> — the OS error from the most recent system call, in stringified form (e.g. <code>&quot;No such file or directory&quot;</code>) or as an <code>errno</code> integer in numeric context. Set by <code>open</code>, <code>close</code>, <code>chdir</code>, <code>read</code>, <code>write</code>, and other syscalls when they fail. The value persists until the next failing call, so always check it *immediately* after the failing operation — intermediate clean Perl code does not touch it, but any subsequent syscall will.</p>
@@ -16115,7 +16124,7 @@ p bernoulli(4)   # -0.0333
       <article class="doc-entry" id="doc-bisect">
         <h3><a class="doc-anchor" href="#doc-bisect">#</a> <code>bisect</code></h3>
         <p><code>bisection</code> (alias <code>bisect</code>) finds a root of f(x)=0 in [a,b] via the bisection method. Takes a code ref, a, b, and optional tolerance.</p>
-        <pre><code class="lang-perl">my $root = bisect(fn { $_[0]**2 - 2 }, 1, 2)  # √2 ≈ 1.4142
+        <pre><code class="lang-perl">my $root = bisect(fn { _0**2 - 2 }, 1, 2)  # √2 ≈ 1.4142
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-bisimulation-step">
@@ -25348,7 +25357,7 @@ my $D2 = dist_mat([[0,0],[1,1]], &quot;manhattan&quot;)  # Manhattan
       <article class="doc-entry" id="doc-do-call">
         <h3><a class="doc-anchor" href="#doc-do-call">#</a> <code>do_call</code></h3>
         <p><code>do_call</code> — call a function with args from a list. Like R&#39;s do.call().</p>
-        <pre><code class="lang-perl">my $result = docall(fn { $_[0] + $_[1] }, [3, 4])  # 7
+        <pre><code class="lang-perl">my $result = docall(fn { _0 + _1 }, [3, 4])  # 7
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-docs">
@@ -27054,7 +27063,7 @@ p escvel(1.989e30, 6.96e8)      # ~617 km/s (Sun)
       <article class="doc-entry" id="doc-euler-method">
         <h3><a class="doc-anchor" href="#doc-euler-method">#</a> <code>euler_method</code></h3>
         <p><code>euler_ode</code> (alias <code>euler_method</code>) solves an ODE dy/dt = f(t,y) using the Euler method. Returns [[t,y], ...].</p>
-        <pre><code class="lang-perl">my $sol = euler_ode(fn { $_[1] }, 0, 1, 0.01, 100)  # exponential growth
+        <pre><code class="lang-perl">my $sol = euler_ode(fn { _1 }, 0, 1, 0.01, 100)  # exponential growth
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-euler-number">
@@ -30256,6 +30265,223 @@ p geomser(1, 0.5, 10)    # ~1.998 (converging to 2)
         <pre><code class="lang-perl">p gfx_zonal_harmonic_step $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-gh-branches">
+        <h3><a class="doc-anchor" href="#doc-gh-branches">#</a> <code>gh_branches</code></h3>
+        <p><code>gh_branches(OWNER, REPO)</code> — paginated list of branches.</p>
+        <pre><code class="lang-perl">my @br = gh_branches(&quot;MenkeTechnologies&quot;, &quot;zpwr&quot;)
+p pluck(\@br, &quot;name&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-commits">
+        <h3><a class="doc-anchor" href="#doc-gh-commits">#</a> <code>gh_commits</code></h3>
+        <p><code>gh_commits(OWNER, REPO)</code> — paginated list of commits.</p>
+        <pre><code class="lang-perl">my @c = gh_commits(&quot;MenkeTechnologies&quot;, &quot;zpwr&quot;)
+p pluck(\@c, &quot;sha&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-contributors">
+        <h3><a class="doc-anchor" href="#doc-gh-contributors">#</a> <code>gh_contributors</code></h3>
+        <p><code>gh_contributors(OWNER, REPO)</code> — paginated list of contributors.</p>
+        <pre><code class="lang-perl">my @c = gh_contributors(&quot;MenkeTechnologies&quot;, &quot;zpwr&quot;)
+p pluck(\@c, &quot;login&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-emojis">
+        <h3><a class="doc-anchor" href="#doc-gh-emojis">#</a> <code>gh_emojis</code></h3>
+        <p><code>gh_emojis()</code> — <code>{ name =&gt; url }</code> hashref of GitHub&#39;s emoji set.</p>
+      </article>
+      <article class="doc-entry" id="doc-gh-followers">
+        <h3><a class="doc-anchor" href="#doc-gh-followers">#</a> <code>gh_followers</code></h3>
+        <p><code>gh_followers(USER)</code> — paginated list of a user&#39;s followers (flat list of hashrefs).</p>
+        <pre><code class="lang-perl">my @f = gh_followers(&quot;MenkeTechnologies&quot;)
+p &quot;followers: &quot; . len(@f)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-following">
+        <h3><a class="doc-anchor" href="#doc-gh-following">#</a> <code>gh_following</code></h3>
+        <p><code>gh_following(USER)</code> — paginated list of users a user is following.</p>
+        <pre><code class="lang-perl">my @f = gh_following(&quot;MenkeTechnologies&quot;)
+p pluck(\@f, &quot;login&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-forks">
+        <h3><a class="doc-anchor" href="#doc-gh-forks">#</a> <code>gh_forks</code></h3>
+        <p><code>gh_forks(OWNER, REPO)</code> — paginated list of forks.</p>
+        <pre><code class="lang-perl">my @f = gh_forks(&quot;MenkeTechnologies&quot;, &quot;zpwr&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-get">
+        <h3><a class="doc-anchor" href="#doc-gh-get">#</a> <code>gh_get</code></h3>
+        <p><code>gh_get(PATH)</code> — GET an arbitrary GitHub REST endpoint. <code>PATH</code> is a relative path (<code>/users/octocat</code>) or full URL. Returns parsed JSON as a stryke value (hashref/arrayref/scalar); 404 → <code>undef</code>. Authenticates via <code>GITHUB_TOKEN</code> env var when present (5000 req/hour); otherwise unauthenticated (60 req/hour).</p>
+        <pre><code class="lang-perl">my $u = gh_get(&quot;/users/MenkeTechnologies&quot;)
+p $u-&gt;{public_repos}
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-gist">
+        <h3><a class="doc-anchor" href="#doc-gh-gist">#</a> <code>gh_gist</code></h3>
+        <p><code>gh_gist(ID)</code> — fetch a single gist by ID.</p>
+        <pre><code class="lang-perl">my $g = gh_gist(&quot;aa5a315d61ae9438b18d&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-gists">
+        <h3><a class="doc-anchor" href="#doc-gh-gists">#</a> <code>gh_gists</code></h3>
+        <p><code>gh_gists(USER)</code> — paginated list of a user&#39;s public gists.</p>
+        <pre><code class="lang-perl">my @g = gh_gists(&quot;MenkeTechnologies&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-issues">
+        <h3><a class="doc-anchor" href="#doc-gh-issues">#</a> <code>gh_issues</code></h3>
+        <p><code>gh_issues(OWNER, REPO)</code> — paginated list of issues for a repo (includes PRs by GitHub convention; filter <code>_-&gt;{pull_request}</code> to separate).</p>
+        <pre><code class="lang-perl">my @issues = gh_issues(&quot;MenkeTechnologies&quot;, &quot;zpwr&quot;)
+my @real = grep { !exists _-&gt;{pull_request} } @issues
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-languages">
+        <h3><a class="doc-anchor" href="#doc-gh-languages">#</a> <code>gh_languages</code></h3>
+        <p><code>gh_languages(OWNER, REPO)</code> (alias <code>gh_langs</code>) — <code>{ language =&gt; bytes }</code> hashref of language breakdown.</p>
+        <pre><code class="lang-perl">my $h = gh_languages(&quot;MenkeTechnologies&quot;, &quot;zpwr&quot;)
+for my $k (sort { $h-&gt;{_1} &lt;=&gt; $h-&gt;{_0} } keys %$h) { p &quot;#{$k}: #{$h-&gt;{$k}}&quot; }
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-meta">
+        <h3><a class="doc-anchor" href="#doc-gh-meta">#</a> <code>gh_meta</code></h3>
+        <p><code>gh_meta()</code> — GitHub service metadata hashref (IP ranges, hooks, importer).</p>
+      </article>
+      <article class="doc-entry" id="doc-gh-org">
+        <h3><a class="doc-anchor" href="#doc-gh-org">#</a> <code>gh_org</code></h3>
+        <p><code>gh_org(ORG)</code> — fetch an organization&#39;s profile as a hashref.</p>
+        <pre><code class="lang-perl">my $o = gh_org(&quot;github&quot;)
+p &quot;#{$o-&gt;{login}}: #{$o-&gt;{public_repos}} repos&quot;
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-org-repos">
+        <h3><a class="doc-anchor" href="#doc-gh-org-repos">#</a> <code>gh_org_repos</code></h3>
+        <p><code>gh_org_repos(ORG)</code> — paginated list of an org&#39;s repos.</p>
+        <pre><code class="lang-perl">my @r = gh_org_repos(&quot;github&quot;)
+p &quot;#{len(@r)} repos&quot;
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-prs">
+        <h3><a class="doc-anchor" href="#doc-gh-prs">#</a> <code>gh_prs</code></h3>
+        <p><code>gh_prs(OWNER, REPO)</code> (alias <code>gh_pulls</code>) — paginated list of pull requests.</p>
+        <pre><code class="lang-perl">my @prs = gh_prs(&quot;MenkeTechnologies&quot;, &quot;zpwr&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-rate-limit">
+        <h3><a class="doc-anchor" href="#doc-gh-rate-limit">#</a> <code>gh_rate_limit</code></h3>
+        <p><code>gh_rate_limit()</code> — current rate-limit status as a hashref. Use to check budget before launching a <code>pmap</code>.</p>
+        <pre><code class="lang-perl">my $rl = gh_rate_limit()
+p $rl-&gt;{rate}{remaining}
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-readme">
+        <h3><a class="doc-anchor" href="#doc-gh-readme">#</a> <code>gh_readme</code></h3>
+        <p><code>gh_readme(OWNER, REPO)</code> — README content as a decoded UTF-8 string (handles base64 transparently).</p>
+        <pre><code class="lang-perl">my $md = gh_readme(&quot;MenkeTechnologies&quot;, &quot;zpwr&quot;)
+p &quot;#{len($md)} bytes&quot;
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-releases">
+        <h3><a class="doc-anchor" href="#doc-gh-releases">#</a> <code>gh_releases</code></h3>
+        <p><code>gh_releases(OWNER, REPO)</code> — paginated list of releases.</p>
+        <pre><code class="lang-perl">my @r = gh_releases(&quot;MenkeTechnologies&quot;, &quot;zpwr&quot;)
+p pluck(\@r, &quot;tag_name&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-repo">
+        <h3><a class="doc-anchor" href="#doc-gh-repo">#</a> <code>gh_repo</code></h3>
+        <p><code>gh_repo(OWNER, REPO)</code> or <code>gh_repo(&quot;OWNER/REPO&quot;)</code> — fetch a single repo as a hashref. 404 → <code>undef</code>.</p>
+        <pre><code class="lang-perl">my $r = gh_repo(&quot;MenkeTechnologies/zpwr&quot;)
+p &quot;★ #{$r-&gt;{stargazers_count}}  ⑂ #{$r-&gt;{forks_count}}  lang #{$r-&gt;{language}}&quot;
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-repos">
+        <h3><a class="doc-anchor" href="#doc-gh-repos">#</a> <code>gh_repos</code></h3>
+        <p><code>gh_repos(USER)</code> — paginated list of a user&#39;s public repos (flat list of hashrefs). Pairs naturally with <code>pmap</code> for parallel per-repo work.</p>
+        <pre><code class="lang-perl">my @repos = gh_repos(&quot;MenkeTechnologies&quot;)
+my @top = sort { _1-&gt;{stargazers_count} &lt;=&gt; _0-&gt;{stargazers_count} } @repos
+p pluck(\@top[0:9], &quot;full_name&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-runs">
+        <h3><a class="doc-anchor" href="#doc-gh-runs">#</a> <code>gh_runs</code></h3>
+        <p><code>gh_runs(OWNER, REPO)</code> — array of workflow-run hashrefs (auto-extracts <code>workflow_runs</code>).</p>
+        <pre><code class="lang-perl">my @r = gh_runs(&quot;MenkeTechnologies&quot;, &quot;zpwr&quot;)
+p pluck(\@r[0:9], &quot;status&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-search-code">
+        <h3><a class="doc-anchor" href="#doc-gh-search-code">#</a> <code>gh_search_code</code></h3>
+        <p><code>gh_search_code(QUERY)</code> — paginated code search results (requires auth; pass <code>GITHUB_TOKEN</code>).</p>
+        <pre><code class="lang-perl">my @hits = gh_search_code(&quot;org:MenkeTechnologies fn main&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-search-issues">
+        <h3><a class="doc-anchor" href="#doc-gh-search-issues">#</a> <code>gh_search_issues</code></h3>
+        <p><code>gh_search_issues(QUERY)</code> — paginated issue / PR search results.</p>
+        <pre><code class="lang-perl">my @i = gh_search_issues(&quot;author:MenkeTechnologies is:pr is:merged&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-search-repos">
+        <h3><a class="doc-anchor" href="#doc-gh-search-repos">#</a> <code>gh_search_repos</code></h3>
+        <p><code>gh_search_repos(QUERY)</code> — paginated repo search results.</p>
+        <pre><code class="lang-perl">my @r = gh_search_repos(&quot;language:rust stars:&gt;10000&quot;)
+p pluck(\@r[0:9], &quot;full_name&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-search-users">
+        <h3><a class="doc-anchor" href="#doc-gh-search-users">#</a> <code>gh_search_users</code></h3>
+        <p><code>gh_search_users(QUERY)</code> — paginated user search results.</p>
+        <pre><code class="lang-perl">my @u = gh_search_users(&quot;location:berlin language:rust&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-stargazers">
+        <h3><a class="doc-anchor" href="#doc-gh-stargazers">#</a> <code>gh_stargazers</code></h3>
+        <p><code>gh_stargazers(OWNER, REPO)</code> — paginated list of users who starred a repo.</p>
+        <pre><code class="lang-perl">my @s = gh_stargazers(&quot;MenkeTechnologies&quot;, &quot;zpwr&quot;)
+p pluck(\@s, &quot;login&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-starred">
+        <h3><a class="doc-anchor" href="#doc-gh-starred">#</a> <code>gh_starred</code></h3>
+        <p><code>gh_starred(USER)</code> — paginated list of repos starred by USER.</p>
+        <pre><code class="lang-perl">my @s = gh_starred(&quot;MenkeTechnologies&quot;)
+p pluck(\@s, &quot;full_name&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-tags">
+        <h3><a class="doc-anchor" href="#doc-gh-tags">#</a> <code>gh_tags</code></h3>
+        <p><code>gh_tags(OWNER, REPO)</code> — paginated list of tags.</p>
+        <pre><code class="lang-perl">my @t = gh_tags(&quot;MenkeTechnologies&quot;, &quot;zpwr&quot;)
+p pluck(\@t, &quot;name&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-topics">
+        <h3><a class="doc-anchor" href="#doc-gh-topics">#</a> <code>gh_topics</code></h3>
+        <p><code>gh_topics(OWNER, REPO)</code> — array of topic name strings (auto-extracts <code>names</code> key from the API response).</p>
+        <pre><code class="lang-perl">p gh_topics(&quot;MenkeTechnologies&quot;, &quot;zpwr&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-user">
+        <h3><a class="doc-anchor" href="#doc-gh-user">#</a> <code>gh_user</code></h3>
+        <p><code>gh_user(USERNAME)</code> — fetch a user&#39;s profile as a hashref. 404 → <code>undef</code>.</p>
+        <pre><code class="lang-perl">my $u = gh_user(&quot;MenkeTechnologies&quot;)
+p &quot;#{$u-&gt;{login}}: #{$u-&gt;{public_repos}} repos, #{$u-&gt;{followers}} followers&quot;
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-workflows">
+        <h3><a class="doc-anchor" href="#doc-gh-workflows">#</a> <code>gh_workflows</code></h3>
+        <p><code>gh_workflows(OWNER, REPO)</code> — array of workflow hashrefs (auto-extracts <code>workflows</code> key).</p>
+        <pre><code class="lang-perl">my @w = gh_workflows(&quot;MenkeTechnologies&quot;, &quot;zpwr&quot;)
+p pluck(\@w, &quot;name&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gh-zen">
+        <h3><a class="doc-anchor" href="#doc-gh-zen">#</a> <code>gh_zen</code></h3>
+        <p><code>gh_zen()</code> — fetch GitHub&#39;s design-philosophy random aphorism as a plain string.</p>
+        <pre><code class="lang-perl">p gh_zen()
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-ghz-state">
         <h3><a class="doc-anchor" href="#doc-ghz-state">#</a> <code>ghz_state</code></h3>
         <p><code>ghz_state</code> — operation <code>ghz state</code>. Category: *quantum*.</p>
@@ -30450,7 +30676,7 @@ p gini(0, 0, 0, 100)   # ~0.75 (high inequality)
       <article class="doc-entry" id="doc-golden">
         <h3><a class="doc-anchor" href="#doc-golden">#</a> <code>golden</code></h3>
         <p><code>golden_section</code> (aliases <code>golden</code>, <code>gss</code>) finds the minimum of f on [a,b] via golden-section search.</p>
-        <pre><code class="lang-perl">my $xmin = golden(fn { ($_[0]-3)**2 }, 0, 10)  # 3.0
+        <pre><code class="lang-perl">my $xmin = golden(fn { (_0-3)**2 }, 0, 10)  # 3.0
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-golden-ratio">
@@ -44516,7 +44742,7 @@ p powmod(3, 13, 50)    # 7
       <article class="doc-entry" id="doc-newton">
         <h3><a class="doc-anchor" href="#doc-newton">#</a> <code>newton</code></h3>
         <p><code>newton_method</code> (aliases <code>newton</code>, <code>newton_raphson</code>) finds a root via Newton-Raphson. Takes f, f&#39;, x0, and optional tolerance.</p>
-        <pre><code class="lang-perl">my $root = newton(fn { $_[0]**2 - 2 }, fn { 2*$_[0] }, 1.5)  # √2
+        <pre><code class="lang-perl">my $root = newton(fn { _0**2 - 2 }, fn { 2*_0 }, 1.5)  # √2
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-newtons-to-lbf">
@@ -53251,7 +53477,7 @@ p rope_to_string($r)                  # &quot;Hello, beautiful world!&quot;
       <article class="doc-entry" id="doc-sapply">
         <h3><a class="doc-anchor" href="#doc-sapply">#</a> <code>sapply</code></h3>
         <p><code>sapply</code> — apply a function to each element, return a vector. Like R&#39;s sapply().</p>
-        <pre><code class="lang-perl">my @sq = @{sapply([1,2,3,4], fn { $_[0] ** 2 })}  # [1,4,9,16]
+        <pre><code class="lang-perl">my @sq = @{sapply([1,2,3,4], fn { _0 ** 2 })}  # [1,4,9,16]
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-sarimax-fit">
@@ -58222,7 +58448,7 @@ p $t{a}  # 3
       <article class="doc-entry" id="doc-tapply">
         <h3><a class="doc-anchor" href="#doc-tapply">#</a> <code>tapply</code></h3>
         <p><code>tapply</code> — apply a function by group. Takes data, group labels, and function. Returns hash. Like R&#39;s tapply().</p>
-        <pre><code class="lang-perl">my %means = %{tapply([1,2,3,4], [&quot;a&quot;,&quot;a&quot;,&quot;b&quot;,&quot;b&quot;], fn { avg(@{$_[0]}) })}
+        <pre><code class="lang-perl">my %means = %{tapply([1,2,3,4], [&quot;a&quot;,&quot;a&quot;,&quot;b&quot;,&quot;b&quot;], fn { avg(@{_0}) })}
 p $means{a}  # 1.5
 p $means{b}  # 3.5
 </code></pre>
@@ -61674,7 +61900,7 @@ p scalar wha(&quot;perl&quot;)        # number of perls on PATH
       <article class="doc-entry" id="doc-which-fn">
         <h3><a class="doc-anchor" href="#doc-which-fn">#</a> <code>which_fn</code></h3>
         <p><code>which_fn</code> — return indices where a predicate is true. Like R&#39;s which().</p>
-        <pre><code class="lang-perl">my @idx = @{which_fn([1,5,3,8,2], fn { $_[0] &gt; 3 })}  # [1, 3]
+        <pre><code class="lang-perl">my @idx = @{which_fn([1,5,3,8,2], fn { _0 &gt; 3 })}  # [1, 3]
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-white">

@@ -6,14 +6,14 @@ fn b54_to_floats(v: &StrykeValue) -> Vec<f64> {
 }
 
 /// iota_n: APL ⍳N → [0, 1, ..., N-1].
-fn builtin_iota_n(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_iota_n(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(0);
     let v: Vec<StrykeValue> = (0..n).map(StrykeValue::integer).collect();
     Ok(StrykeValue::array(v))
 }
 
 /// reduce_axis: f/array along last axis with op id (0=add, 1=mul, 2=max, 3=min, 4=or, 5=and).
-fn builtin_reduce_axis(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_reduce_axis(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = b54_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let op = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     if v.is_empty() {
@@ -31,7 +31,7 @@ fn builtin_reduce_axis(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// scan_axis: f\array prefix scan (cumulative).
-fn builtin_scan_axis(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_scan_axis(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = b54_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let op = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     if v.is_empty() { return Ok(StrykeValue::array(vec![])); }
@@ -51,7 +51,7 @@ fn builtin_scan_axis(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// fold_axis: like reduce but takes an explicit initial value.
-fn builtin_fold_axis(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_fold_axis(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let init = f1(args);
     let v = b54_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let op = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -66,7 +66,7 @@ fn builtin_fold_axis(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// rotate_axis: APL φ — cyclically shift array by k (positive = left).
-fn builtin_rotate_axis(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rotate_axis(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = arg_to_vec(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let n = v.len();
     if n == 0 { return Ok(StrykeValue::array(vec![])); }
@@ -78,7 +78,7 @@ fn builtin_rotate_axis(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// transpose_axis: J |. — reverse the leading axis of a flat row-major matrix.
 /// Args: matrix as flat array, n_rows.
-fn builtin_transpose_axis(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_transpose_axis(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = arg_to_vec(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let rows = args.get(1).map(|v| v.to_number() as usize).unwrap_or(1).max(1);
     let cols = v.len() / rows;
@@ -93,7 +93,7 @@ fn builtin_transpose_axis(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// reshape_dim: APL ρ — reshape into grid of given size, padding from cycle.
-fn builtin_reshape_dim(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_reshape_dim(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = arg_to_vec(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let n = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
     if v.is_empty() { return Ok(StrykeValue::array(vec![StrykeValue::integer(0); n])); }
@@ -103,7 +103,7 @@ fn builtin_reshape_dim(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// encode_base: APL ⊤ → digits of n in mixed radix [b1, b2, ...]. Returns
 /// digits little-endian.
-fn builtin_encode_base(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_encode_base(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut n = i1(args);
     let radix = arg_to_vec(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let mut out: Vec<StrykeValue> = Vec::with_capacity(radix.len());
@@ -117,7 +117,7 @@ fn builtin_encode_base(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// decode_base: APL ⊥ → fold digits in mixed radix back to integer (digits
 /// little-endian).
-fn builtin_decode_base(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_decode_base(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let digits = arg_to_vec(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let radix = arg_to_vec(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let mut acc = 0_i64;
@@ -131,7 +131,7 @@ fn builtin_decode_base(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// nub_list: APL ∪ — preserve first occurrences only.
-fn builtin_nub_list(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_nub_list(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = arg_to_vec(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let mut seen = std::collections::HashSet::new();
     let mut out = Vec::with_capacity(v.len());
@@ -143,7 +143,7 @@ fn builtin_nub_list(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// nub_count: |∪x — count of distinct elements.
-fn builtin_nub_count(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_nub_count(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = arg_to_vec(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let mut seen = std::collections::HashSet::new();
     for x in v { seen.insert(format!("{:?}", x)); }
@@ -151,7 +151,7 @@ fn builtin_nub_count(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// membership_idx: APL ∊ — element-wise membership of x in y, returns 0/1 array.
-fn builtin_membership_idx(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_membership_idx(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = arg_to_vec(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let y = arg_to_vec(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let yset: std::collections::HashSet<String> = y.iter().map(|v| format!("{:?}", v)).collect();
@@ -163,7 +163,7 @@ fn builtin_membership_idx(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// deal_n_k: APL k?n — random k-subset of [0..n) without replacement, given seed
 /// for deterministic output (xorshift).
-fn builtin_deal_n_k(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_deal_n_k(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(0) as usize;
     let k = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0).min(n);
     let mut seed = args.get(2).map(|v| v.to_number() as u64).unwrap_or(0xdeadbeef);
@@ -179,7 +179,7 @@ fn builtin_deal_n_k(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// roll_n: APL ?n — single uniform draw from [0, n) given seed.
-fn builtin_roll_n(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_roll_n(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(1);
     let mut seed = args.get(1).map(|v| v.to_number() as u64).unwrap_or(0xdeadbeef);
     seed ^= seed << 13; seed ^= seed >> 7; seed ^= seed << 17;
@@ -187,7 +187,7 @@ fn builtin_roll_n(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// permute_idx: APL x⌷y — gather y at indices x.
-fn builtin_permute_idx(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_permute_idx(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let idx = arg_to_vec(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let src = arg_to_vec(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let n = src.len();
@@ -199,7 +199,7 @@ fn builtin_permute_idx(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// invert_perm: given perm π, return σ with σ[π[i]] = i.
-fn builtin_invert_perm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_invert_perm(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = arg_to_vec(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let n = p.len();
     let mut out = vec![StrykeValue::integer(0); n];

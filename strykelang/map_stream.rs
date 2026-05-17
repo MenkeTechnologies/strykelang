@@ -6,7 +6,7 @@ use std::sync::Arc;
 use parking_lot::Mutex;
 
 use crate::ast::Expr;
-use crate::error::{StrykeError, PerlResult};
+use crate::error::{StrykeError, StrykeResult};
 use crate::scope::{AtomicArray, AtomicHash};
 use crate::value::{PerlIterator, PerlSub, PipelineOp, StrykeValue};
 use crate::vm_helper::{FlowOrError, VMHelper, WantarrayCtx};
@@ -333,7 +333,7 @@ impl VMHelper {
         list_val: StrykeValue,
         block: &crate::ast::Block,
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         if let Some(p) = list_val.as_pipeline() {
             let sub = self.anon_coderef_from_block(block);
             self.pipeline_push(&p, PipelineOp::Filter(sub), line)?;
@@ -369,7 +369,7 @@ impl VMHelper {
         list_val: StrykeValue,
         expr: &Expr,
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         if list_val.as_pipeline().is_some()
             || list_val
                 .as_array_vec()
@@ -402,7 +402,7 @@ impl VMHelper {
         block: &crate::ast::Block,
         peel: bool,
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         if !peel {
             if let Some(p) = list_val.as_pipeline() {
                 let sub = self.anon_coderef_from_block(block);
@@ -453,7 +453,7 @@ impl VMHelper {
         expr: &Expr,
         peel: bool,
         line: usize,
-    ) -> PerlResult<StrykeValue> {
+    ) -> StrykeResult<StrykeValue> {
         if list_val.as_pipeline().is_some()
             || list_val
                 .as_array_vec()

@@ -1,7 +1,7 @@
 // signal processing deep: windows, IIR/FIR designs, biquads, transforms.
 
 // Hamming window
-fn builtin_hamming_window(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hamming_window(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(1) as usize;
     let pi = std::f64::consts::PI;
     let out: Vec<StrykeValue> = (0..n).map(|i| {
@@ -10,7 +10,7 @@ fn builtin_hamming_window(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::array(out))
 }
 // Hann window
-fn builtin_hann_window(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hann_window(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(1) as usize;
     let pi = std::f64::consts::PI;
     let out: Vec<StrykeValue> = (0..n).map(|i| {
@@ -19,7 +19,7 @@ fn builtin_hann_window(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::array(out))
 }
 // Blackman window
-fn builtin_blackman_window(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_blackman_window(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(1) as usize;
     let pi = std::f64::consts::PI;
     let out: Vec<StrykeValue> = (0..n).map(|i| {
@@ -29,7 +29,7 @@ fn builtin_blackman_window(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::array(out))
 }
 // Blackman-Harris window
-fn builtin_blackman_harris_window(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_blackman_harris_window(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(1) as usize;
     let pi = std::f64::consts::PI;
     let a0 = 0.35875; let a1 = 0.48829; let a2 = 0.14128; let a3 = 0.01168;
@@ -40,7 +40,7 @@ fn builtin_blackman_harris_window(args: &[StrykeValue]) -> PerlResult<StrykeValu
     Ok(StrykeValue::array(out))
 }
 // Bartlett (triangular) window
-fn builtin_bartlett_window(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bartlett_window(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(1) as usize;
     let nm1 = (n as f64 - 1.0).max(1.0);
     let out: Vec<StrykeValue> = (0..n).map(|i| {
@@ -49,7 +49,7 @@ fn builtin_bartlett_window(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::array(out))
 }
 // Welch window
-fn builtin_welch_window(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_welch_window(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(1) as usize;
     let nm1 = (n as f64 - 1.0).max(1.0);
     let out: Vec<StrykeValue> = (0..n).map(|i| {
@@ -59,7 +59,7 @@ fn builtin_welch_window(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::array(out))
 }
 // Kaiser window (β param)
-fn builtin_kaiser_window(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_kaiser_window(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = args.first().map(|v| v.to_number() as usize).unwrap_or(64).max(1);
     let beta = args.get(1).map(|v| v.to_number()).unwrap_or(8.6);
     fn i0(x: f64) -> f64 {
@@ -81,7 +81,7 @@ fn builtin_kaiser_window(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::array(out))
 }
 // Tukey (cosine-tapered) window with α
-fn builtin_tukey_window(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_tukey_window(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = args.first().map(|v| v.to_number() as usize).unwrap_or(64).max(1);
     let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(0.5).clamp(0.0, 1.0);
     let pi = std::f64::consts::PI;
@@ -99,7 +99,7 @@ fn builtin_tukey_window(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::array(out))
 }
 // Gaussian window
-fn builtin_gaussian_window(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gaussian_window(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = args.first().map(|v| v.to_number() as usize).unwrap_or(64).max(1);
     let sigma = args.get(1).map(|v| v.to_number()).unwrap_or(0.4);
     let nm1_2 = (n as f64 - 1.0) / 2.0;
@@ -111,7 +111,7 @@ fn builtin_gaussian_window(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Hilbert transform via DFT (returns analytic signal magnitude — simplified)
-fn builtin_hilbert_envelope(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hilbert_envelope(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let n = xs.len();
@@ -151,7 +151,7 @@ fn builtin_hilbert_envelope(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 // Biquad filter: process one sample, given state
 // Returns [y, x1, x2, y1, y2]
-fn builtin_biquad_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_biquad_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let b0 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let b1 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -170,7 +170,7 @@ fn builtin_biquad_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Lowpass biquad design (RBJ cookbook)
-fn builtin_biquad_lowpass_coeffs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_biquad_lowpass_coeffs(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let fc = f1(args);
     let fs = args.get(1).map(|v| v.to_number()).unwrap_or(44100.0);
     let q = args.get(2).map(|v| v.to_number()).unwrap_or(0.707);
@@ -190,7 +190,7 @@ fn builtin_biquad_lowpass_coeffs(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 // Highpass biquad design
-fn builtin_biquad_highpass_coeffs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_biquad_highpass_coeffs(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let fc = f1(args);
     let fs = args.get(1).map(|v| v.to_number()).unwrap_or(44100.0);
     let q = args.get(2).map(|v| v.to_number()).unwrap_or(0.707);
@@ -210,7 +210,7 @@ fn builtin_biquad_highpass_coeffs(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 // Bandpass biquad
-fn builtin_biquad_bandpass_coeffs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_biquad_bandpass_coeffs(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let fc = f1(args);
     let fs = args.get(1).map(|v| v.to_number()).unwrap_or(44100.0);
     let q = args.get(2).map(|v| v.to_number()).unwrap_or(0.707);
@@ -230,7 +230,7 @@ fn builtin_biquad_bandpass_coeffs(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 // Notch biquad
-fn builtin_biquad_notch_coeffs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_biquad_notch_coeffs(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let fc = f1(args);
     let fs = args.get(1).map(|v| v.to_number()).unwrap_or(44100.0);
     let q = args.get(2).map(|v| v.to_number()).unwrap_or(10.0);
@@ -250,7 +250,7 @@ fn builtin_biquad_notch_coeffs(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 // All-pass biquad
-fn builtin_biquad_allpass_coeffs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_biquad_allpass_coeffs(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let fc = f1(args);
     let fs = args.get(1).map(|v| v.to_number()).unwrap_or(44100.0);
     let q = args.get(2).map(|v| v.to_number()).unwrap_or(0.707);
@@ -270,7 +270,7 @@ fn builtin_biquad_allpass_coeffs(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 // Peak (parametric EQ) biquad
-fn builtin_biquad_peak_coeffs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_biquad_peak_coeffs(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let fc = f1(args);
     let fs = args.get(1).map(|v| v.to_number()).unwrap_or(44100.0);
     let q = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -292,7 +292,7 @@ fn builtin_biquad_peak_coeffs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Low shelf
-fn builtin_biquad_lowshelf_coeffs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_biquad_lowshelf_coeffs(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let fc = f1(args);
     let fs = args.get(1).map(|v| v.to_number()).unwrap_or(44100.0);
     let s = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
@@ -316,7 +316,7 @@ fn builtin_biquad_lowshelf_coeffs(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 // High shelf
-fn builtin_biquad_highshelf_coeffs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_biquad_highshelf_coeffs(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let fc = f1(args);
     let fs = args.get(1).map(|v| v.to_number()).unwrap_or(44100.0);
     let s = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
@@ -340,7 +340,7 @@ fn builtin_biquad_highshelf_coeffs(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 // Butterworth lowpass IIR cutoff prewarp (just compute warped freq)
-fn builtin_butterworth_prewarp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_butterworth_prewarp(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let fc = f1(args);
     let fs = args.get(1).map(|v| v.to_number()).unwrap_or(44100.0);
     let omega = 2.0 * std::f64::consts::PI * fc / fs;
@@ -348,7 +348,7 @@ fn builtin_butterworth_prewarp(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 // Butterworth filter order from spec: ceil(log10((10^(αs/10)-1)/(10^(αp/10)-1)) / (2 log10(ωs/ωp)))
-fn builtin_butterworth_order(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_butterworth_order(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let alpha_p = f1(args);
     let alpha_s = args.get(1).map(|v| v.to_number()).unwrap_or(40.0);
     let omega_p = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -361,7 +361,7 @@ fn builtin_butterworth_order(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // FIR moving average (length L)
-fn builtin_fir_moving_average(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_fir_moving_average(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let l = args.get(1).map(|v| v.to_number() as usize).unwrap_or(3).max(1);
@@ -379,7 +379,7 @@ fn builtin_fir_moving_average(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // FIR low-pass via windowed-sinc
-fn builtin_fir_lowpass_design(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_fir_lowpass_design(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = args.first().map(|v| v.to_number() as usize).unwrap_or(31).max(1);
     let fc = args.get(1).map(|v| v.to_number()).unwrap_or(0.25);
     let pi = std::f64::consts::PI;
@@ -400,7 +400,7 @@ fn builtin_fir_lowpass_design(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Power spectral density via periodogram (DFT-based)
 
 // Spectrogram (windowed periodogram)
-fn builtin_spectrogram_simple(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_spectrogram_simple(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let win = args.get(1).map(|v| v.to_number() as usize).unwrap_or(64).max(1);
@@ -430,7 +430,7 @@ fn builtin_spectrogram_simple(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Zero padding
-fn builtin_zero_pad(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_zero_pad(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs: Vec<StrykeValue> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let target = args.get(1).map(|v| v.to_number() as usize).unwrap_or(xs.len());
     let mut out = xs.clone();
@@ -439,7 +439,7 @@ fn builtin_zero_pad(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Resample (nearest neighbor, ratio)
-fn builtin_resample_nearest(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_resample_nearest(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let ratio = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -453,7 +453,7 @@ fn builtin_resample_nearest(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Resample linear
-fn builtin_resample_linear(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_resample_linear(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let ratio = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -470,7 +470,7 @@ fn builtin_resample_linear(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Quantize to N bits
-fn builtin_quantize(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_quantize(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let bits = args.get(1).map(|v| v.to_number() as i32).unwrap_or(16).clamp(1, 31);
@@ -483,7 +483,7 @@ fn builtin_quantize(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Mu-law encode
-fn builtin_mu_law_encode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mu_law_encode(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let mu = args.get(1).map(|v| v.to_number()).unwrap_or(255.0);
     let s = x.signum();
@@ -492,7 +492,7 @@ fn builtin_mu_law_encode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Mu-law decode
-fn builtin_mu_law_decode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mu_law_decode(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let mu = args.get(1).map(|v| v.to_number()).unwrap_or(255.0);
     let s = y.signum();
@@ -501,7 +501,7 @@ fn builtin_mu_law_decode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // A-law encode
-fn builtin_a_law_encode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_a_law_encode(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(87.6);
     let s = x.signum();
@@ -515,7 +515,7 @@ fn builtin_a_law_encode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // A-law decode
-fn builtin_a_law_decode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_a_law_decode(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(87.6);
     let s = y.signum();
@@ -529,7 +529,7 @@ fn builtin_a_law_decode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Chirp signal sample (linear)
-fn builtin_chirp_linear(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_chirp_linear(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let t = f1(args);
     let f0 = args.get(1).map(|v| v.to_number()).unwrap_or(100.0);
     let f1_ = args.get(2).map(|v| v.to_number()).unwrap_or(1000.0);

@@ -16,7 +16,7 @@ fn b81_to_bytes(v: &StrykeValue) -> Vec<u8> {
 
 /// `mirr_excel` — Modified IRR: ((FV(positive)/PV(negative))^(1/(n−1))) − 1.
 /// Args: positive_cf_fv, negative_cf_pv, n_periods.
-fn builtin_mirr_excel(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mirr_excel(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pos_fv = f1(args).max(1e-15);
     let neg_pv = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).abs().max(1e-15);
     let n = args.get(2).map(|v| v.to_number()).unwrap_or(2.0).max(2.0);
@@ -24,7 +24,7 @@ fn builtin_mirr_excel(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `accrint` — Accrued interest on a security: par · rate · (days/freq_basis).
-fn builtin_accrint(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_accrint(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let par = f1(args);
     let rate = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let days = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -34,7 +34,7 @@ fn builtin_accrint(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// `cumipmt` — cumulative interest paid between periods s and e (annuity).
 /// Args: rate, n_periods, pv, period_start, period_end, type (0=end, 1=begin).
-fn builtin_cumipmt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cumipmt(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let rate = f1(args);
     let _n = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let pv = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -53,7 +53,7 @@ fn builtin_cumipmt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `cumprinc` — cumulative principal paid between periods s and e.
-fn builtin_cumprinc(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cumprinc(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let rate = f1(args);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let pv = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -73,7 +73,7 @@ fn builtin_cumprinc(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `dollarde` — convert fractional dollar (1.04 = 1+4/32) to decimal.
-fn builtin_dollarde(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_dollarde(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let frac_dollar = f1(args);
     let frac_denom = args.get(1).map(|v| v.to_number()).unwrap_or(8.0).max(1.0);
     let whole = frac_dollar.trunc();
@@ -83,7 +83,7 @@ fn builtin_dollarde(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `dollarfr` — convert decimal dollar back to fractional notation.
-fn builtin_dollarfr(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_dollarfr(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dec = f1(args);
     let frac_denom = args.get(1).map(|v| v.to_number()).unwrap_or(8.0).max(1.0);
     let whole = dec.trunc();
@@ -93,7 +93,7 @@ fn builtin_dollarfr(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `received` — amount received at maturity = par / (1 − discount · days/basis).
-fn builtin_received(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_received(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let par = f1(args);
     let discount = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let days = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -102,7 +102,7 @@ fn builtin_received(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `yieldmat` — Yield of security paying interest at maturity.
-fn builtin_yieldmat(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_yieldmat(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let rate = f1(args);
     let pr = args.get(1).map(|v| v.to_number()).unwrap_or(100.0).max(1e-15);
     let days_settle = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -115,7 +115,7 @@ fn builtin_yieldmat(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `yielddisc` — Yield on discounted security.
-fn builtin_yielddisc(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_yielddisc(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pr = f1(args).max(1e-15);
     let redemption = args.get(1).map(|v| v.to_number()).unwrap_or(100.0);
     let dsm = args.get(2).map(|v| v.to_number()).unwrap_or(1.0).max(1e-15);
@@ -124,7 +124,7 @@ fn builtin_yielddisc(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `duration_macaulay` — Macaulay duration: weighted-average time to cashflows.
-fn builtin_duration_macaulay(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_duration_macaulay(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let cfs = b81_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.05);
     let mut pv_total = 0.0;
@@ -139,7 +139,7 @@ fn builtin_duration_macaulay(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `mduration` — modified duration = Macaulay / (1 + y/freq).
-fn builtin_mduration(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mduration(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mac_dur = f1(args);
     let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.05);
     let freq = args.get(2).map(|v| v.to_number()).unwrap_or(1.0).max(1.0);
@@ -147,7 +147,7 @@ fn builtin_mduration(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `odddyield` — odd-period yield iteration: solves price = Σ cf / (1+y)^t.
-fn builtin_odddyield(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_odddyield(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pr = f1(args);
     let cfs = args.get(1).map(b81_to_floats).unwrap_or_default();
     let mut y: f64 = 0.05;
@@ -170,7 +170,7 @@ fn builtin_odddyield(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `disc_excel` — DISC: discount rate of security.
-fn builtin_disc_excel(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_disc_excel(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pr = f1(args);
     let redemption = args.get(1).map(|v| v.to_number()).unwrap_or(100.0).max(1e-15);
     let dsm = args.get(2).map(|v| v.to_number()).unwrap_or(1.0).max(1e-15);
@@ -179,21 +179,21 @@ fn builtin_disc_excel(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `effect` — effective annual rate from nominal: (1 + nom/n)^n − 1.
-fn builtin_effect(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_effect(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let nom = f1(args);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1.0);
     Ok(StrykeValue::float((1.0 + nom / n).powf(n) - 1.0))
 }
 
 /// `nominal` — inverse of `effect`: nom = n · ((1+eff)^(1/n) − 1).
-fn builtin_nominal(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_nominal(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let eff = f1(args);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1.0);
     Ok(StrykeValue::float(n * ((1.0 + eff).powf(1.0 / n) - 1.0)))
 }
 
 /// `intrate` — interest rate of fully invested security.
-fn builtin_intrate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_intrate(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let invest = f1(args).max(1e-15);
     let redemption = args.get(1).map(|v| v.to_number()).unwrap_or(100.0);
     let dsm = args.get(2).map(|v| v.to_number()).unwrap_or(1.0).max(1e-15);
@@ -202,7 +202,7 @@ fn builtin_intrate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `price_disc` — price of discounted security: redemption · (1 − disc · dsm/basis).
-fn builtin_price_disc(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_price_disc(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let discount = f1(args);
     let redemption = args.get(1).map(|v| v.to_number()).unwrap_or(100.0);
     let dsm = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -213,7 +213,7 @@ fn builtin_price_disc(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // ───── Hash families (non-cryptographic) ─────
 
 /// `cityhash64` — Google CityHash64 8-byte input fast path: rotate-and-mix.
-fn builtin_cityhash64(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cityhash64(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let bytes = b81_to_bytes(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let mut h: u64 = 14_097_894_508_562_428_488;
     for &b in &bytes {
@@ -225,7 +225,7 @@ fn builtin_cityhash64(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `farmhash_64` — FarmHash 64-bit (CityHash successor): 5-prime mix.
-fn builtin_farmhash_64(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_farmhash_64(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let bytes = b81_to_bytes(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let mut h: u64 = 0xcbf29ce484222325;
     for &b in &bytes {
@@ -236,7 +236,7 @@ fn builtin_farmhash_64(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `metro_hash_64` — MetroHash 64: 4 rotors + length-mix.
-fn builtin_metro_hash_64(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_metro_hash_64(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let bytes = b81_to_bytes(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let mut h: u64 = 0xd6d018f5_u64.wrapping_add(bytes.len() as u64);
     let k0: u64 = 0xd6d018f5;
@@ -249,7 +249,7 @@ fn builtin_metro_hash_64(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `spookyhash_128` — SpookyHash V2 128-bit: returns lo64.
-fn builtin_spookyhash_128(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_spookyhash_128(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let bytes = b81_to_bytes(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let mut h: u64 = 0xdeadbeef_deadbeef;
     for &b in &bytes {
@@ -260,7 +260,7 @@ fn builtin_spookyhash_128(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `t1ha` — T1HA: rotate-multiply hash, fast on x86_64.
-fn builtin_t1ha(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_t1ha(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let bytes = b81_to_bytes(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let mut h: u64 = 0xaaaaaaaaaaaaaaaa;
     for &b in &bytes {
@@ -271,7 +271,7 @@ fn builtin_t1ha(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `highway_hash` — Google HighwayHash 64-bit one-shot.
-fn builtin_highway_hash(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_highway_hash(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let bytes = b81_to_bytes(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let mut v0: u64 = 0xdbe6d5d5fe4cce2f;
     let mut v1: u64 = 0xa4093822299f31d0;
@@ -286,7 +286,7 @@ fn builtin_highway_hash(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `fnv0_32` — FNV-0 (offset 0); foundation for FNV-1.
-fn builtin_fnv0_32(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_fnv0_32(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let bytes = b81_to_bytes(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let mut h: u32 = 0;
     for &b in &bytes { h = h.wrapping_mul(0x01000193) ^ (b as u32); }
@@ -295,14 +295,14 @@ fn builtin_fnv0_32(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 
 /// `lose_lose` — K&R book hash: h += c.
-fn builtin_lose_lose(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lose_lose(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let bytes = b81_to_bytes(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let h: u64 = bytes.iter().map(|&b| b as u64).sum();
     Ok(StrykeValue::integer(h as i64))
 }
 
 /// `oat_hash` — Bob Jenkins one-at-a-time hash.
-fn builtin_oat_hash(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_oat_hash(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let bytes = b81_to_bytes(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let mut h: u32 = 0;
     for &b in &bytes {
@@ -321,7 +321,7 @@ fn builtin_oat_hash(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// `lz4_encode_block` — compute LZ4 block-format token: 4-bit literal length
 /// followed by literal bytes, then 2-byte little-endian offset, then 4-bit
 /// match length. Returns total encoded byte count.
-fn builtin_lz4_encode_block(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lz4_encode_block(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lit_len = i1(args).max(0);
     let match_len = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0).max(0);
     let lit_overflow = if lit_len >= 15 { 1 + (lit_len - 15) / 255 } else { 0 };
@@ -331,7 +331,7 @@ fn builtin_lz4_encode_block(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// `snappy_encode` — Snappy literal token: tag = (len-1) << 2 if len ≤ 60,
 /// else tag = (60 + size_bytes) << 2 with size in following bytes.
-fn builtin_snappy_encode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_snappy_encode(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lit_len = i1(args).max(1);
     if lit_len <= 60 { return Ok(StrykeValue::integer((lit_len - 1) << 2)); }
     let extra_bytes = match lit_len {
@@ -345,7 +345,7 @@ fn builtin_snappy_encode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// `zstd_encode_step` — Zstd block header: 3-byte little-endian header packing
 /// (last_block_flag, block_type, block_size).
-fn builtin_zstd_encode_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_zstd_encode_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let last = i1(args).clamp(0, 1);
     let block_type = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0).clamp(0, 3);
     let size = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0).max(0);
@@ -354,14 +354,14 @@ fn builtin_zstd_encode_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// `brotli_encode_meta` — Brotli meta-block header: ISLAST + ISLASTEMPTY +
 /// MNIBBLES + MLEN. Returns header bytes count for given ML.
-fn builtin_brotli_encode_meta(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_brotli_encode_meta(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ml = i1(args).max(0);
     let nibbles = if ml == 0 { 4 } else { ((ml as f64 + 1.0).log2() / 4.0).ceil() as i64 };
     Ok(StrykeValue::integer(1 + nibbles))
 }
 
 /// `lzma_encode_step` — LZMA range coder normalisation: shift range into [2³², ∞).
-fn builtin_lzma_encode_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lzma_encode_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut range = f1(args);
     let mut shifts = 0_i64;
     while range < (1u64 << 24) as f64 && shifts < 32 {
@@ -372,7 +372,7 @@ fn builtin_lzma_encode_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `bz2_encode_step` — BZ2 RLE pre-pass: count of run characters emitted.
-fn builtin_bz2_encode_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bz2_encode_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let bytes = b81_to_bytes(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let mut emitted = 0_i64;
     let mut run = 1_i64;
@@ -384,27 +384,27 @@ fn builtin_bz2_encode_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `lzo_encode_step` — LZO encoder block-header byte: 4-bit literal-len + flag.
-fn builtin_lzo_encode_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lzo_encode_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lit_len = i1(args).clamp(0, 15);
     let match_off = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     Ok(StrykeValue::integer((lit_len << 4) | (match_off & 0x0F)))
 }
 
 /// `deflate_encode_huffman` — Huffman-tree size for given alphabet.
-fn builtin_deflate_encode_huffman(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_deflate_encode_huffman(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let alphabet = i1(args).max(1);
     Ok(StrykeValue::integer(2 * alphabet - 1))
 }
 
 /// `lzw_encode` — LZW dictionary-grow step: 9 bits at start, 10 bits at 512 entries, etc.
-fn builtin_lzw_encode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lzw_encode(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dict_size = i1(args).max(1);
     let bits = (dict_size as f64).log2().ceil() as i64;
     Ok(StrykeValue::integer(bits.max(9)))
 }
 
 /// `gzip_encode_step` — write gzip member header: 10 fixed bytes + optional FNAME / FCOMMENT.
-fn builtin_gzip_encode_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gzip_encode_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let fname_len = i1(args).max(0);
     let fcomment_len = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0).max(0);
     let extra_len = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0).max(0);
@@ -414,7 +414,7 @@ fn builtin_gzip_encode_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // ───── URI / URL operations ─────
 
 /// `uri_template_expand` — expand RFC 6570 template variable count: each {var} = 1 substitution.
-fn builtin_uri_template_expand(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_uri_template_expand(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let bytes = b81_to_bytes(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let mut count = 0_i64;
     let mut depth = 0_i64;
@@ -427,7 +427,7 @@ fn builtin_uri_template_expand(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 
 /// `uri_resolve` — RFC 3986 reference resolution: returns 1 if absolute URI,
 /// 2 if network-path, 3 if absolute-path, 4 if relative-path.
-fn builtin_uri_resolve(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_uri_resolve(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let bytes = b81_to_bytes(args.first().unwrap_or(&StrykeValue::array(vec![])));
     if bytes.starts_with(b"//") { return Ok(StrykeValue::integer(2)); }
     if bytes.starts_with(b"/") { return Ok(StrykeValue::integer(3)); }
@@ -438,7 +438,7 @@ fn builtin_uri_resolve(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// `uri_normalize` — apply RFC 3986 normalisation: lowercase scheme/host,
 /// percent-encode upper-case, remove default port, ./.. dot-segment removal.
 /// Returns count of changes applied.
-fn builtin_uri_normalize(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_uri_normalize(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let bytes = b81_to_bytes(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let mut changes = 0_i64;
     for &b in &bytes {
@@ -449,7 +449,7 @@ fn builtin_uri_normalize(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `percent_decode_url` — decode %XX sequences. Returns decoded byte for given hex pair.
-fn builtin_percent_decode_url(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_percent_decode_url(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let hi = i1(args) as u8;
     let lo = args.get(1).map(|v| v.to_number() as u8).unwrap_or(0);
     let h = hi_lo_to_byte(hi, lo);
@@ -467,7 +467,7 @@ fn hi_lo_to_byte(hi: u8, lo: u8) -> u8 {
 }
 
 /// `url_encode_form` — application/x-www-form-urlencoded byte encoding.
-fn builtin_url_encode_form(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_url_encode_form(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let b = i1(args) as u8;
     if b == b' ' { return Ok(StrykeValue::integer(b'+' as i64)); }
     if b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'.' || b == b'~' {
@@ -481,13 +481,13 @@ fn nibble_to_hex(n: u8) -> u8 {
 }
 
 /// `url_decode_form` — decode +→space, %XX→byte. Returns decoded byte.
-fn builtin_url_decode_form(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_url_decode_form(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let b = i1(args) as u8;
     Ok(StrykeValue::integer(if b == b'+' { b' ' as i64 } else { b as i64 }))
 }
 
 /// `punycode_decode_step` — decode one Punycode digit: 'a'-'z' → 0-25, '0'-'9' → 26-35.
-fn builtin_punycode_decode_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_punycode_decode_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let b = i1(args) as u8;
     let v = if b.is_ascii_lowercase() { (b - b'a') as i64 }
             else if b.is_ascii_uppercase() { (b - b'A') as i64 }
@@ -498,7 +498,7 @@ fn builtin_punycode_decode_step(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 
 /// `idn_normalize` — IDN ToASCII: count of labels needing Punycode conversion
 /// (non-ASCII bytes per dot-separated label).
-fn builtin_idn_normalize(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_idn_normalize(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let bytes = b81_to_bytes(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let mut count = 0_i64;
     let mut label_has_non_ascii = false;
@@ -516,7 +516,7 @@ fn builtin_idn_normalize(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// `url_origin` — extract origin: scheme + "://" + host + ":" + port.
 /// Returns hash of (scheme_len, host_len, port).
-fn builtin_url_origin(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_url_origin(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let scheme_len = i1(args);
     let host_len = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     let port = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -527,7 +527,7 @@ fn builtin_url_origin(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// `etag_validate` — strong/weak ETag match: weak (W/"...") matches only on
 /// weak comparison; strong matches both. Returns 1 if match, 0 if not.
-fn builtin_etag_validate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_etag_validate(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let stored_weak = i1(args).clamp(0, 1);
     let request_weak = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0).clamp(0, 1);
     let bodies_match = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0).clamp(0, 1);
@@ -541,7 +541,7 @@ fn builtin_etag_validate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// `cache_control_parse` — extract max-age value (or 0 if no-cache, -1 if no-store).
 /// Args: hashed flags (bit 0 = no-cache, bit 1 = no-store, bit 2 = public, bit 3 = private),
 /// max-age value.
-fn builtin_cache_control_parse(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cache_control_parse(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let flags = i1(args);
     let max_age = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     if flags & 2 != 0 { return Ok(StrykeValue::integer(-1)); }
@@ -550,13 +550,13 @@ fn builtin_cache_control_parse(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// `vary_match` — RFC 7234: do request headers in the Vary list match cached values?
-fn builtin_vary_match(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_vary_match(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mismatches = i1(args);
     Ok(StrykeValue::integer(if mismatches == 0 { 1 } else { 0 }))
 }
 
 /// `content_negotiate` — Accept q-value picker: returns index of best match.
-fn builtin_content_negotiate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_content_negotiate(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let q_values = b81_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     if q_values.is_empty() { return Ok(StrykeValue::integer(-1)); }
     let mut best = (0_i64, q_values[0]);
@@ -567,7 +567,7 @@ fn builtin_content_negotiate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `accept_lang_pick` — Accept-Language: pick highest q match against supported list.
-fn builtin_accept_lang_pick(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_accept_lang_pick(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let q_supported = b81_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let q_requested = args.get(1).map(b81_to_floats).unwrap_or_default();
     let n = q_supported.len().min(q_requested.len());
@@ -580,7 +580,7 @@ fn builtin_accept_lang_pick(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `range_header_parse` — RFC 7233: parse "bytes=A-B"; returns clamped end.
-fn builtin_range_header_parse(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_range_header_parse(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let start = i1(args);
     let end = args.get(1).map(|v| v.to_number() as i64).unwrap_or(-1);
     let total = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -589,19 +589,19 @@ fn builtin_range_header_parse(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `if_match_check` — If-Match: return 1 if any quoted ETag matches, 0 if none.
-fn builtin_if_match_check(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_if_match_check(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n_match = i1(args);
     Ok(StrykeValue::integer(if n_match > 0 { 1 } else { 0 }))
 }
 
 /// `if_none_match_check` — If-None-Match: 1 if zero matches, else 0 (i.e. send 304).
-fn builtin_if_none_match_check(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_if_none_match_check(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n_match = i1(args);
     Ok(StrykeValue::integer(if n_match == 0 { 1 } else { 0 }))
 }
 
 /// `digest_auth_quote` — H(A1) = MD5(user:realm:password) — returns 32-hex digest length 32.
-fn builtin_digest_auth_quote(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_digest_auth_quote(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let user_len = i1(args).max(0);
     let realm_len = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0).max(0);
     let pass_len = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0).max(0);
@@ -609,7 +609,7 @@ fn builtin_digest_auth_quote(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// `www_auth_parse` — challenge selector: 0=Basic, 1=Digest, 2=Bearer, 3=Negotiate.
-fn builtin_www_auth_parse(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_www_auth_parse(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let scheme = i1(args).clamp(0, 3);
     Ok(StrykeValue::integer(scheme))
 }

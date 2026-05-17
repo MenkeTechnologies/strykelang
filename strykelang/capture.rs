@@ -3,14 +3,14 @@
 use std::process::Command;
 use std::sync::Arc;
 
-use crate::error::{StrykeError, PerlResult};
+use crate::error::{StrykeError, StrykeResult};
 use crate::perl_decode::decode_utf8_or_latin1;
 use crate::value::{CaptureResult, StrykeValue};
 use crate::vm_helper::VMHelper;
 
 /// Run `cmd` through `sh -c` and return stdout as a string (Perl `` `...` `` / `qx`).
 /// Updates [`VMHelper::child_exit_status`] (`$?`) like [`run_capture`] and `system`.
-pub fn run_readpipe(interp: &mut VMHelper, cmd: &str, line: usize) -> PerlResult<StrykeValue> {
+pub fn run_readpipe(interp: &mut VMHelper, cmd: &str, line: usize) -> StrykeResult<StrykeValue> {
     let output = match Command::new("sh").arg("-c").arg(cmd).output() {
         Ok(o) => o,
         Err(e) => {
@@ -25,7 +25,7 @@ pub fn run_readpipe(interp: &mut VMHelper, cmd: &str, line: usize) -> PerlResult
 
 /// Run `cmd` through `sh -c` and return stdout, stderr, and exit code.
 /// Updates [`VMHelper::child_exit_status`] (`$?`) like `system` and backticks.
-pub fn run_capture(interp: &mut VMHelper, cmd: &str, line: usize) -> PerlResult<StrykeValue> {
+pub fn run_capture(interp: &mut VMHelper, cmd: &str, line: usize) -> StrykeResult<StrykeValue> {
     let output = match Command::new("sh").arg("-c").arg(cmd).output() {
         Ok(o) => o,
         Err(e) => {

@@ -3,7 +3,7 @@
 use chrono::Utc;
 use serde_json::Value as JsonValue;
 
-use crate::error::{StrykeError, PerlResult};
+use crate::error::{StrykeError, StrykeResult};
 use crate::native_codec::{
     base64url_decode, base64url_encode, hmac_sha256_raw, hmac_sha256_verify_raw,
 };
@@ -15,7 +15,7 @@ pub(crate) fn jwt_encode(
     secret: &StrykeValue,
     alg: &str,
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     if alg != "HS256" {
         return Err(StrykeError::runtime(
             format!("jwt_encode: only alg HS256 is supported (got {alg})"),
@@ -38,7 +38,7 @@ pub(crate) fn jwt_decode(
     token: &str,
     secret: &StrykeValue,
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let parts: Vec<&str> = token.trim().split('.').collect();
     if parts.len() != 3 {
         return Err(StrykeError::runtime(
@@ -92,7 +92,7 @@ pub(crate) fn jwt_decode(
     json_decode(payload_str)
 }
 
-fn jwt_claim_time(v: &JsonValue, line: usize) -> PerlResult<i64> {
+fn jwt_claim_time(v: &JsonValue, line: usize) -> StrykeResult<i64> {
     if let Some(i) = v.as_i64() {
         return Ok(i);
     }
@@ -108,7 +108,7 @@ fn jwt_claim_time(v: &JsonValue, line: usize) -> PerlResult<i64> {
     ))
 }
 
-pub(crate) fn jwt_decode_unsafe(token: &str, line: usize) -> PerlResult<StrykeValue> {
+pub(crate) fn jwt_decode_unsafe(token: &str, line: usize) -> StrykeResult<StrykeValue> {
     let parts: Vec<&str> = token.trim().split('.').collect();
     if parts.len() != 3 {
         return Err(StrykeError::runtime(

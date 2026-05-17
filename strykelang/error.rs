@@ -127,7 +127,7 @@ impl fmt::Display for StrykeError {
 
 impl std::error::Error for StrykeError {}
 
-pub type PerlResult<T> = Result<T, StrykeError>;
+pub type StrykeResult<T> = Result<T, StrykeError>;
 
 /// Long-form hints for `stryke --explain CODE` (rustc-style).
 pub fn explain_error(code: &str) -> Option<&'static str> {
