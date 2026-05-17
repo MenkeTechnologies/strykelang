@@ -15,42 +15,42 @@
 
 # ── constants ─────────────────────────────────────────────────────
 
-my $N_CARDS    = 100;
-my $N_GAMES    = 50;
-my $COLS       = ["B", "I", "N", "G", "O"];
-my @col_ranges = ([1, 15], [16, 30], [31, 45], [46, 60], [61, 75]);
+my $N_CARDS    = 100
+my $N_GAMES    = 50
+my $COLS       = ["B", "I", "N", "G", "O"]
+my @col_ranges = ([1, 15], [16, 30], [31, 45], [46, 60], [61, 75])
 
 # ── sketches ──────────────────────────────────────────────────────
 
-my $td_draws  = t_digest(200);
-my $tk_pat    = topk(16);
-my $hll_card  = hll(12);
+my $td_draws  = t_digest(200)
+my $tk_pat    = topk(16)
+my $hll_card  = hll(12)
 
 # ── card builder ──────────────────────────────────────────────────
 
 fn Demo::Bingo::shuffle($aref) {
-    my @arr = @$aref;
+    my @arr = @$aref
     for my $i (rev 1:len(@arr) - 1) {
-        my $j = int(rand($i + 1));
-        my $tmp = $arr[$i];
-        $arr[$i] = $arr[$j];
-        $arr[$j] = $tmp;
+        my $j = int(rand($i + 1))
+        my $tmp = $arr[$i]
+        $arr[$i] = $arr[$j]
+        $arr[$j] = $tmp
     }
     @arr
 }
 
 fn Demo::Bingo::new_card() {
-    my @grid;
+    my @grid
     for my $row (0:4) {
-        push @grid, [0, 0, 0, 0, 0];
+        push @grid, [0, 0, 0, 0, 0]
     }
     for my $col (0:4) {
-        my $r = $col_ranges[$col];
-        my @pool = ($r->[0]:$r->[1]);
-        my @shuffled = Demo::Bingo::shuffle(\@pool);
-        my @col_nums = @shuffled[0:4];
+        my $r = $col_ranges[$col]
+        my @pool = ($r->[0]:$r->[1])
+        my @shuffled = Demo::Bingo::shuffle(\@pool)
+        my @col_nums = @shuffled[0:4]
         for my $row (0:4) {
-            $grid[$row]->[$col] = $col_nums[$row];
+            $grid[$row]->[$col] = $col_nums[$row]
         }
     }
     $grid[2]->[2] = 0;   # FREE center
@@ -60,7 +60,7 @@ fn Demo::Bingo::new_card() {
 # ── marking & win check ──────────────────────────────────────────
 
 fn Demo::Bingo::is_marked($card, $row, $col, $drawn) {
-    my $n = $card->[$row]->[$col];
+    my $n = $card->[$row]->[$col]
     return 1 if $n == 0;            # FREE
     exists $drawn->{$n} ? 1 : 0
 }
@@ -68,42 +68,42 @@ fn Demo::Bingo::is_marked($card, $row, $col, $drawn) {
 fn Demo::Bingo::check_win($card, $drawn) {
     # rows
     for my $r (0:4) {
-        my $all_marked = 1;
+        my $all_marked = 1
         for my $c (0:4) {
-            $all_marked = 0 unless Demo::Bingo::is_marked($card, $r, $c, $drawn);
+            $all_marked = 0 unless Demo::Bingo::is_marked($card, $r, $c, $drawn)
         }
-        return "row-$r" if $all_marked;
+        return "row-$r" if $all_marked
     }
     # cols
     for my $c (0:4) {
-        my $all_marked = 1;
+        my $all_marked = 1
         for my $r (0:4) {
-            $all_marked = 0 unless Demo::Bingo::is_marked($card, $r, $c, $drawn);
+            $all_marked = 0 unless Demo::Bingo::is_marked($card, $r, $c, $drawn)
         }
-        return "col-$c" if $all_marked;
+        return "col-$c" if $all_marked
     }
     # diag-down-right
-    my $d1 = 1;
+    my $d1 = 1
     for my $i (0:4) {
-        $d1 = 0 unless Demo::Bingo::is_marked($card, $i, $i, $drawn);
+        $d1 = 0 unless Demo::Bingo::is_marked($card, $i, $i, $drawn)
     }
-    return "diag-dr" if $d1;
+    return "diag-dr" if $d1
     # diag-down-left
-    my $d2 = 1;
+    my $d2 = 1
     for my $i (0:4) {
-        $d2 = 0 unless Demo::Bingo::is_marked($card, $i, 4 - $i, $drawn);
+        $d2 = 0 unless Demo::Bingo::is_marked($card, $i, 4 - $i, $drawn)
     }
-    return "diag-dl" if $d2;
-    "";
+    return "diag-dl" if $d2
+    ""
 }
 
 # ── card signature for identity ───────────────────────────────────
 
 fn Demo::Bingo::sig($card) {
-    my @flat;
+    my @flat
     for my $r (0:4) {
         for my $c (0:4) {
-            push @flat, $card->[$r]->[$c];
+            push @flat, $card->[$r]->[$c]
         }
     }
     join(",", @flat)
@@ -112,15 +112,15 @@ fn Demo::Bingo::sig($card) {
 # ── single game ───────────────────────────────────────────────────
 
 fn Demo::Bingo::play_one($cards_ref) {
-    my @all_nums = (1:75);
-    my @order = Demo::Bingo::shuffle(\@all_nums);
-    my %drawn;
+    my @all_nums = (1:75)
+    my @order = Demo::Bingo::shuffle(\@all_nums)
+    my %drawn
     for my $draw_idx (0:74) {
-        my $n = $order[$draw_idx];
-        $drawn{$n} = 1;
+        my $n = $order[$draw_idx]
+        $drawn{$n} = 1
         for my $card_idx (0:len(@$cards_ref) - 1) {
-            my $card = $cards_ref->[$card_idx];
-            my $pat  = Demo::Bingo::check_win($card, \%drawn);
+            my $card = $cards_ref->[$card_idx]
+            my $pat  = Demo::Bingo::check_win($card, \%drawn)
             if ($pat ne "") {
                 return {
                     winner    => $card_idx,
@@ -128,68 +128,67 @@ fn Demo::Bingo::play_one($cards_ref) {
                     draws     => $draw_idx + 1,
                     last_num  => $n,
                     sig       => Demo::Bingo::sig($card),
-                };
+                }
             }
         }
     }
-    return { winner => -1, pattern => "", draws => 75, last_num => 0, sig => "" };
+    return { winner => -1, pattern => "", draws => 75, last_num => 0, sig => "" }
 }
 
 # ── run N games ───────────────────────────────────────────────────
 
-srand(123);
-print "bingo simulator: $N_GAMES games over $N_CARDS cards each\n";
-print "─" x 60, "\n";
-
+srand(123)
+p "bingo simulator: $N_GAMES games over $N_CARDS cards each"
+p "─" x 60
 # Shared cards across games (re-shuffled draw each game).
-my @cards;
+my @cards
 for my $i (1:$N_CARDS) {
-    push @cards, Demo::Bingo::new_card();
+    push @cards, Demo::Bingo::new_card()
 }
 
-my $games_played = 0;
-my $no_win = 0;
+my $games_played = 0
+my $no_win = 0
 
 for my $g (1:$N_GAMES) {
-    my $r = Demo::Bingo::play_one(\@cards);
-    $games_played++;
+    my $r = Demo::Bingo::play_one(\@cards)
+    $games_played++
     if ($r->{winner} == -1) {
-        $no_win++;
-        next;
+        $no_win++
+        next
     }
-    td_add($td_draws, $r->{draws});
-    topk_add($tk_pat, $r->{pattern});
-    hll_add($hll_card, $r->{sig});
+    td_add($td_draws, $r->{draws})
+    topk_add($tk_pat, $r->{pattern})
+    hll_add($hll_card, $r->{sig})
     if ($g <= 5 || $g == $N_GAMES) {
         printf("  game %2d: card %3d wins via %-7s in %2d draws (last=%2d)\n",
-               $g, $r->{winner}, $r->{pattern}, $r->{draws}, $r->{last_num});
+               $g, $r->{winner}, $r->{pattern}, $r->{draws}, $r->{last_num})
     }
 }
 
 # ── summary ──────────────────────────────────────────────────────
 
 printf("\nplayed %d games; %d had no winner within 75 draws\n",
-       $games_played, $no_win);
+       $games_played, $no_win)
 
-print "\ndraws-to-bingo distribution:\n";
+p "\ndraws-to-bingo distribution:"
 printf("  min ~ %.0f  p25=%.0f  p50=%.0f  p75=%.0f  max~%.0f\n",
        td_quantile($td_draws, 0.01),
        td_quantile($td_draws, 0.25),
        td_quantile($td_draws, 0.50),
        td_quantile($td_draws, 0.75),
-       td_quantile($td_draws, 0.99));
+       td_quantile($td_draws, 0.99))
 
-print "\nwinning patterns (TopK):\n";
-my @pats = topk_top($tk_pat, 10);
+p "\nwinning patterns (TopK):"
+my @pats = topk_top($tk_pat, 10)
 for my $p (@pats) {
-    printf("  %-10s wins=%d\n", $p->[0], $p->[1]);
+    printf("  %-10s wins=%d\n", $p->[0], $p->[1])
 }
 
 # ── distinct winning cards ────────────────────────────────────────
 
-my $hll_n = hll_count($hll_card);
-my $wins = $games_played - $no_win;
+my $hll_n = hll_count($hll_card)
+my $wins = $games_played - $no_win
 printf("\ndistinct winning cards: HLL=%.1f (of %d games with a winner)\n",
-       $hll_n, $wins);
+       $hll_n, $wins)
 
-print "\nbingo simulator done\n";
+p "\nbingo simulator done"

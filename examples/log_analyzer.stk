@@ -22,7 +22,7 @@ my $log = join("\n",
     '10.0.0.1 - - [15/May/2026:09:00:10 +0000] "GET /api/users HTTP/1.1" 200 1234',
 )
 
-p "── parse log lines ────────────────────────────────────";
+p "── parse log lines ────────────────────────────────────"
 my @parsed
 for my $line (split /\n/, $log) {
     if ($line =~ /^(\S+) \S+ \S+ \[(.*?)\] "(\S+) (\S+) HTTP\/\S+" (\d+) (\d+)/) {
@@ -40,8 +40,8 @@ printf "  parsed %d log lines\n", len(@parsed)
 
 # ── per-IP aggregation via CMS + HLL ───────────────────────────────────
 
-p "";
-p "── aggregate via Count-Min + HyperLogLog ──────────────";
+p ""
+p "── aggregate via Count-Min + HyperLogLog ──────────────"
 my $ip_hits    = cms(2048, 5)
 my $ip_bytes   = cms(2048, 5)
 my $ip_distinct = hll(14)
@@ -67,8 +67,8 @@ for my $ip (@ips) {
 
 # ── path popularity via TopK ───────────────────────────────────────────
 
-p "";
-p "── top paths via SpaceSaving ──────────────────────────";
+p ""
+p "── top paths via SpaceSaving ──────────────────────────"
 my $top_paths = topk(5)
 topk_add($top_paths, $_->{path}) for @parsed
 for my $row (topk_heavies($top_paths)) {
@@ -77,8 +77,8 @@ for my $row (topk_heavies($top_paths)) {
 
 # ── status-code histogram via hash ─────────────────────────────────────
 
-p "";
-p "── status histogram via hash + pipe ───────────────────";
+p ""
+p "── status histogram via hash + pipe ───────────────────"
 my %status
 $status{$_->{status}}++ for @parsed
 for my $s (sort { _0 <=> _1 } keys %status) {
@@ -87,8 +87,8 @@ for my $s (sort { _0 <=> _1 } keys %status) {
 
 # ── persist to KV ──────────────────────────────────────────────────────
 
-p "";
-p "── persist aggregate to rkyv KV ───────────────────────";
+p ""
+p "── persist aggregate to rkyv KV ───────────────────────"
 my $path = "/tmp/log_analyzer_demo.rkyv"
 unlink($path)
 my $db = kv_open($path)
@@ -111,8 +111,8 @@ printf "  wrote %d keys to %s\n", kv_len($db), $path
 
 # ── reopen + emit JSON report ──────────────────────────────────────────
 
-p "";
-p "── reopen + JSON report ───────────────────────────────";
+p ""
+p "── reopen + JSON report ───────────────────────────────"
 my $db2 = kv_open($path)
 my $summary = kv_get($db2, "summary")
 p "  summary:"

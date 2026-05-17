@@ -178,7 +178,7 @@ printf "  matches old version : %s\n", $rev_match ? "YES" : "NO"
 # ── LCS length ───────────────────────────────────────────────────────
 
 p ""
-p "── LCS length (shared lines) ───────────────────────"
+p "── LCS len(shared lines) ───────────────────────"
 my $tbl = Demo::Diff::lcs_table(\@old, \@new)
 my $lcs_len = $tbl->[len(@old)]->[len(@new)]
 printf "  LCS length = %d (out of max %d)\n",

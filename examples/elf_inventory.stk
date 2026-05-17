@@ -54,33 +54,33 @@ my $corpus = q{
 8500
 850
 85
-};
+}
 
 # ── parse into elves ──────────────────────────────────────────────
 
-my @elves;
-my @current;
+my @elves
+my @current
 for my $line (split /\n/, $corpus) {
-    my $trimmed = $line;
-    $trimmed =~ s/^\s+|\s+$//g;
+    my $trimmed = $line
+    $trimmed =~ s/^\s+|\s+$//g
     if (len($trimmed) == 0) {
         if (len(@current) > 0) {
-            push @elves, [@current];
-            @current = ();
+            push @elves, [@current]
+            @current = ()
         }
     } else {
-        push @current, $trimmed + 0;
+        push @current, $trimmed + 0
     }
 }
-push @elves, [@current] if len(@current) > 0;
+push @elves, [@current] if len(@current) > 0
 
-printf("parsed %d elves\n", len(@elves));
+printf("parsed %d elves\n", len(@elves))
 
 # ── sketches ──────────────────────────────────────────────────────
 
-my $td_cal   = t_digest(100);
-my $tk_food  = topk(8);
-my $hll_food = hll(12);
+my $td_cal   = t_digest(100)
+my $tk_food  = topk(8)
+my $hll_food = hll(12)
 
 # ── food name table (synthetic, by calorie band) ──────────────────
 
@@ -102,18 +102,18 @@ fn Demo::Elf::food_name($cal) {
 
 # ── per-elf summation in parallel ─────────────────────────────────
 
-my @sums = pmap { sum(@$_) } @elves;
+my @sums = pmap { sum(@$_) } @elves
 
 # ── update sketches ──────────────────────────────────────────────
 
 for my $i (0:len(@elves) - 1) {
-    my $pack = $elves[$i];
-    my $sum  = $sums[$i];
-    td_add($td_cal, $sum);
+    my $pack = $elves[$i]
+    my $sum  = $sums[$i]
+    td_add($td_cal, $sum)
     for my $cal (@$pack) {
-        my $food = Demo::Elf::food_name($cal);
-        topk_add($tk_food, $food);
-        hll_add($hll_food, $food);
+        my $food = Demo::Elf::food_name($cal)
+        topk_add($tk_food, $food)
+        hll_add($hll_food, $food)
     }
 }
 
@@ -122,57 +122,56 @@ for my $i (0:len(@elves) - 1) {
 my @ranked = map { $_->[1] }
              sort { $_1->[0] <=> $_0->[0] }
              map { [$sums[$_], $_] }
-             (0:len(@elves) - 1);
+             (0:len(@elves) - 1)
 
-print "\ntop-3 elves by total calories:\n";
-print "─" x 40, "\n";
-for my $rank (0:2) {
-    my $idx = $ranked[$rank];
-    my $items = $elves[$idx];
+p "\ntop-3 elves by total calories:"
+p "─" x 40for my $rank (0:2) {
+    my $idx = $ranked[$rank]
+    my $items = $elves[$idx]
     printf("  #%d  elf %2d: %6d cal (%d items)\n",
-           $rank + 1, $idx, $sums[$idx], len(@$items));
+           $rank + 1, $idx, $sums[$idx], len(@$items))
 }
 
 # ── top-3 sum (the "answer" in AoC day-1 part 2) ──────────────────
 
-my $top3_sum = $sums[$ranked[0]] + $sums[$ranked[1]] + $sums[$ranked[2]];
-printf("\nsum of top-3 calories: %d\n", $top3_sum);
+my $top3_sum = $sums[$ranked[0]] + $sums[$ranked[1]] + $sums[$ranked[2]]
+printf("\nsum of top-3 calories: %d\n", $top3_sum)
 
 # ── full ranking ──────────────────────────────────────────────────
 
-print "\nfull ranking:\n";
+p "\nfull ranking:"
 for my $rank (0:len(@ranked) - 1) {
-    my $idx = $ranked[$rank];
+    my $idx = $ranked[$rank]
     printf("  rank %2d: elf %2d -> %6d cal\n",
-           $rank + 1, $idx, $sums[$idx]);
+           $rank + 1, $idx, $sums[$idx])
 }
 
 # ── calorie distribution (t-digest) ───────────────────────────────
 
-print "\nper-elf calorie distribution:\n";
-printf("  p10 = %7.0f cal\n", td_quantile($td_cal, 0.10));
-printf("  p50 = %7.0f cal\n", td_quantile($td_cal, 0.50));
-printf("  p90 = %7.0f cal\n", td_quantile($td_cal, 0.90));
-printf("  max ~ %7.0f cal\n", td_quantile($td_cal, 0.99));
+p "\nper-elf calorie distribution:"
+printf("  p10 = %7.0f cal\n", td_quantile($td_cal, 0.10))
+printf("  p50 = %7.0f cal\n", td_quantile($td_cal, 0.50))
+printf("  p90 = %7.0f cal\n", td_quantile($td_cal, 0.90))
+printf("  max ~ %7.0f cal\n", td_quantile($td_cal, 0.99))
 
 # ── most-carried food (TopK SpaceSaving) ──────────────────────────
 
-print "\nmost-carried food items (SpaceSaving k=8):\n";
-my @top_food = topk_top($tk_food, 5);
+p "\nmost-carried food items (SpaceSaving k=8):"
+my @top_food = topk_top($tk_food, 5)
 for my $p (@top_food) {
-    printf("  %-12s count=%d\n", $p->[0], $p->[1]);
+    printf("  %-12s count=%d\n", $p->[0], $p->[1])
 }
 
 # ── distinct food bands ───────────────────────────────────────────
 
-my $hll_n = hll_count($hll_food);
-printf("\ndistinct food bands: HLL=%.1f (max possible = 6)\n", $hll_n);
+my $hll_n = hll_count($hll_food)
+printf("\ndistinct food bands: HLL=%.1f (max possible = 6)\n", $hll_n)
 
 # ── parallel summary stat ─────────────────────────────────────────
 
-my $total_cal = sum(@sums);
-my $mean_cal = $total_cal / len(@elves);
+my $total_cal = sum(@sums)
+my $mean_cal = $total_cal / len(@elves)
 printf("\ncamp totals: %d elves, %d total cal, %.0f mean cal/elf\n",
-       len(@elves), $total_cal, $mean_cal);
+       len(@elves), $total_cal, $mean_cal)
 
-print "\nelf inventory done\n";
+p "\nelf inventory done"

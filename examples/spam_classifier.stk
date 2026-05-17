@@ -100,7 +100,7 @@ my @test = (
 
 printf "\n── classification of %d test messages ─────────────\n", len(@test)
 my $correct = 0
-my $tp = 0; my $fp = 0; my $tn = 0; my $fn = 0;
+my $tp = 0; my $fp = 0; my $tn = 0; my $fn = 0
 for my $msg (@test) {
     my $pred = Demo::NB::classify($msg->{text})
     my $true = $msg->{true_label}

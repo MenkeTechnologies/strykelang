@@ -3,65 +3,65 @@
 # Stryke date/time builtins — `time` for the epoch, `strftime` for
 # formatting, arithmetic on integers for delta math.
 
-p "── Current epoch ──────────────────────────────────────";
-my $now = time();
-p "  time()                 : $now seconds since 1970-01-01 UTC";
+p "── Current epoch ──────────────────────────────────────"
+my $now = time()
+p "  time()                 : $now seconds since 1970-01-01 UTC"
 
-p "";
-p "── Common format strings ──────────────────────────────";
-printf "  ISO 8601 (Z)        : %s\n", strftime("%Y-%m-%dT%H:%M:%SZ", $now);
-printf "  ISO 8601 (offset)   : %s\n", strftime("%Y-%m-%dT%H:%M:%S%z", $now);
-printf "  RFC 2822            : %s\n", strftime("%a, %d %b %Y %H:%M:%S %z", $now);
-printf "  date only           : %s\n", strftime("%Y-%m-%d", $now);
-printf "  time only           : %s\n", strftime("%H:%M:%S", $now);
-printf "  day of year         : %s\n", strftime("%j", $now);
-printf "  week of year (ISO)  : %s\n", strftime("%V", $now);
-printf "  weekday name        : %s\n", strftime("%A", $now);
-printf "  month name (short)  : %s\n", strftime("%b", $now);
+p ""
+p "── Common format strings ──────────────────────────────"
+printf "  ISO 8601 (Z)        : %s\n", strftime("%Y-%m-%dT%H:%M:%SZ", $now)
+printf "  ISO 8601 (offset)   : %s\n", strftime("%Y-%m-%dT%H:%M:%S%z", $now)
+printf "  RFC 2822            : %s\n", strftime("%a, %d %b %Y %H:%M:%S %z", $now)
+printf "  date only           : %s\n", strftime("%Y-%m-%d", $now)
+printf "  time only           : %s\n", strftime("%H:%M:%S", $now)
+printf "  day of year         : %s\n", strftime("%j", $now)
+printf "  week of year (ISO)  : %s\n", strftime("%V", $now)
+printf "  weekday name        : %s\n", strftime("%A", $now)
+printf "  month name (short)  : %s\n", strftime("%b", $now)
 
-p "";
-p "── Time arithmetic — epoch math ───────────────────────";
-my $hour_ago    = $now - 3600;
-my $tomorrow    = $now + 86400;
-my $week_later  = $now + 604800;
-printf "  1 hour ago    : %s\n", strftime("%Y-%m-%d %H:%M:%S", $hour_ago);
-printf "  tomorrow      : %s\n", strftime("%Y-%m-%d %H:%M:%S", $tomorrow);
-printf "  one week out  : %s\n", strftime("%Y-%m-%d %H:%M:%S", $week_later);
+p ""
+p "── Time arithmetic — epoch math ───────────────────────"
+my $hour_ago    = $now - 3600
+my $tomorrow    = $now + 86400
+my $week_later  = $now + 604800
+printf "  1 hour ago    : %s\n", strftime("%Y-%m-%d %H:%M:%S", $hour_ago)
+printf "  tomorrow      : %s\n", strftime("%Y-%m-%d %H:%M:%S", $tomorrow)
+printf "  one week out  : %s\n", strftime("%Y-%m-%d %H:%M:%S", $week_later)
 
-p "";
-p "── now_ns / now_micros — sub-second precision ─────────";
-my $t1 = now_ns();
-sleep 0.05;
-my $t2 = now_ns();
-my $dt_ms = ($t2 - $t1) / 1e6;
-printf "  measured sleep 0.05s as %.2f ms\n", $dt_ms;
+p ""
+p "── now_ns / now_micros — sub-second precision ─────────"
+my $t1 = now_ns()
+sleep 0.05
+my $t2 = now_ns()
+my $dt_ms = ($t2 - $t1) / 1e6
+printf "  measured sleep 0.05s as %.2f ms\n", $dt_ms
 
-p "";
-p "── Cross-feature: timestamp KV rows by ISO date ───────";
-my $path = "/tmp/stryke_datetime_demo.rkyv";
-unlink($path);
-my $db = kv_open($path);
-for my $i (1..5) {
+p ""
+p "── Cross-feature: timestamp KV rows by ISO date ───────"
+my $path = "/tmp/stryke_datetime_demo.rkyv"
+unlink($path)
+my $db = kv_open($path)
+for my $i (1:5) {
     my $event_time = $now - (5 - $i) * 60;        # 5,4,3,2,1 min ago
-    my $iso = strftime("%Y-%m-%dT%H:%M:%SZ", $event_time);
+    my $iso = strftime("%Y-%m-%dT%H:%M:%SZ", $event_time)
     kv_put($db, "event:$iso", {
         seq  => $i,
         msg  => "event #$i",
         utc  => $event_time,
-    });
+    })
 }
-kv_commit($db);
+kv_commit($db)
 
 # ISO 8601 keys sort lexicographically == chronologically.
-my $db2 = kv_open($path);
-p "  ISO keys sorted = chronological order:";
+my $db2 = kv_open($path)
+p "  ISO keys sorted = chronological order:"
 for my $k (kv_keys($db2)) {
-    my $row = kv_get($db2, $k);
-    printf "    %s  seq=%d  '%s'\n", $k, $row->{seq}, $row->{msg};
+    my $row = kv_get($db2, $k)
+    printf "    %s  seq=%d  '%s'\n", $k, $row->{seq}, $row->{msg}
 }
-unlink($path);
+unlink($path)
 
-p "";
-p "── strftime composes with pipe-forward ────────────────";
-my @stamps = (1..5) |> map { strftime("%H:%M:%S", $now - $_ * 10) };
-p "  stamps : ", join(", ", @stamps);
+p ""
+p "── strftime composes with pipe-forward ────────────────"
+my @stamps = (1:5) |> map { strftime("%H:%M:%S", $now - $_ * 10) }
+p "  stamps : ", join(", ", @stamps)

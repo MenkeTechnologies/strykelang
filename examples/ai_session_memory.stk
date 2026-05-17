@@ -23,7 +23,7 @@ ai_mock_install('(?i)stryke',              "Stryke is a parallel Perl 5 interpre
 
 # ── Sessions ────────────────────────────────────────────────────────────
 
-p "── multi-turn chat session ────────────────────────────";
+p "── multi-turn chat session ────────────────────────────"
 my $sess = ai_session_new(system => "You are a helpful assistant.")
 my $r1 = ai_session_send($sess, "hi")
 my $r2 = ai_session_send($sess, "what is your name?")
@@ -32,16 +32,16 @@ p "  asst: $r1"
 p "  user: what is your name?"
 p "  asst: $r2"
 
-p "";
-p "── history: system row + alternating user/assistant ───";
+p ""
+p "── history: system row + alternating user/assistant ───"
 my @hist = ai_session_history($sess)
 printf "  %d rows total:\n", len(@hist)
 for my $i (0:len(@hist)-1) {
     printf "    [%d] %-9s : %s\n", $i, $hist[$i]->{role}, $hist[$i]->{content}
 }
 
-p "";
-p "── reset: drop turns but keep system prompt ───────────";
+p ""
+p "── reset: drop turns but keep system prompt ───────────"
 ai_session_reset($sess)
 my @after = ai_session_history($sess)
 printf "  after reset: %d row(s) — role=%s\n", len(@after), $after[0]->{role}
@@ -50,8 +50,8 @@ ai_session_close($sess)
 
 # ── Vector memory ──────────────────────────────────────────────────────
 
-p "";
-p "── persistent vector memory ───────────────────────────";
+p ""
+p "── persistent vector memory ───────────────────────────"
 ai_memory_clear()
 
 ai_memory_save("doc:stryke",   "Stryke is a parallel Perl 5 interpreter in Rust", +{
@@ -71,8 +71,8 @@ ai_memory_save("doc:cooking",  "Apples poached with cinnamon are delicious", +{
 
 printf "  saved %d docs\n", ai_memory_count()
 
-p "";
-p "── recall returns FLAT array of hashref hits ──────────";
+p ""
+p "── recall returns FLAT array of hashref hits ──────────"
 my @hits = ai_memory_recall("Rust scripting", top_k => 3)
 printf "  recall yielded %d row(s) (top_k=3):\n", len(@hits)
 for my $h (@hits) {
@@ -81,15 +81,15 @@ for my $h (@hits) {
         $h->{id}, $meta->{category}, $meta->{priority}, $h->{content}
 }
 
-p "";
-p "── metadata round-trips as a navigable hashref ────────";
+p ""
+p "── metadata round-trips as a navigable hashref ────────"
 my $first = $hits[0]
 p "  first->{id}                      : ", $first->{id}
 p "  first->{metadata}->{category}    : ", $first->{metadata}->{category}
 p "  first->{metadata}->{priority}    : ", $first->{metadata}->{priority}
 
-p "";
-p "── forget one + clear ─────────────────────────────────";
+p ""
+p "── forget one + clear ─────────────────────────────────"
 ai_memory_forget("doc:cooking")
 printf "  after forget(doc:cooking)  : %d remaining\n", ai_memory_count()
 ai_memory_clear()

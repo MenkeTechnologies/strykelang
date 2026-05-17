@@ -52,33 +52,33 @@ my %tax_codes = (
         [85000,    25],
         [10**12,   40],
     ],
-);
+)
 
 # ── sketches ──────────────────────────────────────────────────────
 
-my $td_tax  = t_digest(200);
-my $tk_brk  = topk(16);
-my $hll_tier = hll(12);
+my $td_tax  = t_digest(200)
+my $tk_brk  = topk(16)
+my $hll_tier = hll(12)
 
 # ── compute tax owed for an income against one bracket schedule ────
 
 fn Demo::Tax::owed($income, $brackets_ref) {
-    my $owed = 0;
-    my $remaining = $income;
-    my $prev_cap = 0;
-    my $top_bracket_idx = -1;
+    my $owed = 0
+    my $remaining = $income
+    my $prev_cap = 0
+    my $top_bracket_idx = -1
 
     for my $i (0:len(@$brackets_ref) - 1) {
-        my $row = $brackets_ref->[$i];
-        my $cap  = $row->[0];
-        my $rate = $row->[1];
-        my $width = $cap - $prev_cap;
-        last if $remaining <= 0;
-        my $taxable = $remaining < $width ? $remaining : $width;
-        $owed += $taxable * $rate / 100;
-        $remaining -= $taxable;
-        $top_bracket_idx = $i if $taxable > 0;
-        $prev_cap = $cap;
+        my $row = $brackets_ref->[$i]
+        my $cap  = $row->[0]
+        my $rate = $row->[1]
+        my $width = $cap - $prev_cap
+        last if $remaining <= 0
+        my $taxable = $remaining < $width ? $remaining : $width
+        $owed += $taxable * $rate / 100
+        $remaining -= $taxable
+        $top_bracket_idx = $i if $taxable > 0
+        $prev_cap = $cap
     }
 
     return {
@@ -86,7 +86,7 @@ fn Demo::Tax::owed($income, $brackets_ref) {
         owed          => $owed,
         effective_pct => $income > 0 ? 100 * $owed / $income : 0,
         top_idx       => $top_bracket_idx,
-    };
+    }
 }
 
 # ── per-jurisdiction sweep over sample incomes ─────────────────────
@@ -94,73 +94,71 @@ fn Demo::Tax::owed($income, $brackets_ref) {
 my @sample_incomes = (
     15000, 25000, 35000, 45000, 60000, 75000, 100000,
     150000, 250000, 500000, 1000000,
-);
+)
 
-print "tax calculator — synthetic progressive brackets\n";
-print "─" x 65, "\n";
-
+p "tax calculator — synthetic progressive brackets"
+p "─" x 65
 for my $code (sort keys %tax_codes) {
-    my $brackets = $tax_codes{$code};
-    printf("\n[%s] %d brackets\n", $code, len(@$brackets));
+    my $brackets = $tax_codes{$code}
+    printf("\n[%s] %d brackets\n", $code, len(@$brackets))
     for my $income (@sample_incomes) {
-        my $r = Demo::Tax::owed($income, $brackets);
-        td_add($td_tax, $r->{owed});
-        topk_add($tk_brk, "$code:b$r->{top_idx}");
-        hll_add($hll_tier, "tier-" . int($income / 10000));
+        my $r = Demo::Tax::owed($income, $brackets)
+        td_add($td_tax, $r->{owed})
+        topk_add($tk_brk, "$code:b$r->{top_idx}")
+        hll_add($hll_tier, "tier-" . int($income / 10000))
         printf("    \$%9d -> owed \$%10.2f  eff=%.2f%%  top_bracket=%d\n",
                $income,
                $r->{owed},
                $r->{effective_pct},
-               $r->{top_idx});
+               $r->{top_idx})
     }
 }
 
 # ── parallel comparison across jurisdictions for one income ────────
 
-my $compare_income = 150000;
-print "\nparallel comparison @ \$$compare_income (sorted by lowest tax):\n";
-print "─" x 50, "\n";
-
-my @codes = sort keys %tax_codes;
+my $compare_income = 150000
+p "\nparallel comparison @ \$$compare_income (sorted by lowest tax):"
+p "─" x 50
+my @codes = sort keys %tax_codes
 my @per_code = pmap {
-    my $code = $_;
-    my $r = Demo::Tax::owed($compare_income, $tax_codes{$code});
+    my $code = $_
+    my $r = Demo::Tax::owed($compare_income, $tax_codes{$code})
     [$code, $r->{owed}, $r->{effective_pct}]
-} @codes;
+} @codes
 
-@per_code = sort { $_0->[1] <=> $_1->[1] } @per_code;
+@per_code = sort { $_0->[1] <=> $_1->[1] } @per_code
 for my $row (@per_code) {
     printf("  %-12s  owed=\$%10.2f  eff=%.2f%%\n",
-           $row->[0], $row->[1], $row->[2]);
+           $row->[0], $row->[1], $row->[2])
 }
 
 # ── largest spread across jurisdictions ────────────────────────────
 
-my $lowest  = $per_code[0]->[1];
-my $highest = $per_code[len(@per_code) - 1]->[1];
-my $spread  = $highest - $lowest;
+my $lowest  = $per_code[0]->[1]
+my $highest = $per_code[len(@per_code) - 1]->[1]
+my $spread  = $highest - $lowest
 printf("\nlowest=\$%.2f  highest=\$%.2f  spread=\$%.2f (%.1f%% diff)\n",
-       $lowest, $highest, $spread, 100 * $spread / ($lowest > 0 ? $lowest : 1));
+       $lowest, $highest, $spread, 100 * $spread / ($lowest > 0 ? $lowest : 1))
 
 # ── tax-paid distribution across all (jurisdiction, income) pairs ──
 
-print "\ntax-paid distribution (cross-jurisdiction):\n";
-printf("  p10 = \$%9.0f\n", td_quantile($td_tax, 0.10));
-printf("  p50 = \$%9.0f\n", td_quantile($td_tax, 0.50));
-printf("  p90 = \$%9.0f\n", td_quantile($td_tax, 0.90));
-printf("  p99 = \$%9.0f\n", td_quantile($td_tax, 0.99));
+p "\ntax-paid distribution (cross-jurisdiction):"
+printf("  p10 = \$%9.0f\n", td_quantile($td_tax, 0.10))
+printf("  p50 = \$%9.0f\n", td_quantile($td_tax, 0.50))
+printf("  p90 = \$%9.0f\n", td_quantile($td_tax, 0.90))
+printf("  p99 = \$%9.0f\n", td_quantile($td_tax, 0.99))
 
 # ── most-binding brackets (TopK) ──────────────────────────────────
 
-print "\nmost-binding (jurisdiction, bracket) pairs (TopK):\n";
-my @top = topk_top($tk_brk, 8);
+p "\nmost-binding (jurisdiction, bracket) pairs (TopK):"
+my @top = topk_top($tk_brk, 8)
 for my $p (@top) {
-    printf("  %-18s hits=%d\n", $p->[0], $p->[1]);
+    printf("  %-18s hits=%d\n", $p->[0], $p->[1])
 }
 
 # ── HLL distinct income tiers ─────────────────────────────────────
 
-my $hll_n = hll_count($hll_tier);
-printf("\ndistinct income tiers explored: HLL=%.1f\n", $hll_n);
+my $hll_n = hll_count($hll_tier)
+printf("\ndistinct income tiers explored: HLL=%.1f\n", $hll_n)
 
-print "\ntax calculator done\n";
+p "\ntax calculator done"

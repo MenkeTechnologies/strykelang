@@ -8,68 +8,68 @@
 #   $INTERCEPT_RV    — return value (after-advice only)
 #   proceed()        — call original (around-advice only)
 
-p "── before: pre-flight logging ─────────────────────────";
+p "── before: pre-flight logging ─────────────────────────"
 fn Acct::charge($user, $cents) {
-    p "  → debiting $cents¢ from $user";
+    p "  → debiting $cents¢ from $user"
     "charge_ok"
 }
 before "Acct::charge" {
-    p "  [audit] $INTERCEPT_NAME called with @INTERCEPT_ARGS";
+    p "  [audit] $INTERCEPT_NAME called with @INTERCEPT_ARGS"
 }
-Acct::charge("alice", 250);
+Acct::charge("alice", 250)
 
-p "";
-p "── after: post-action metric ──────────────────────────";
-my $tx_count = 0;
+p ""
+p "── after: post-action metric ──────────────────────────"
+my $tx_count = 0
 fn Acct::transfer($from, $to, $cents) {
-    p "  → moving $cents¢ : $from → $to";
+    p "  → moving $cents¢ : $from → $to"
     "transfer_ok"
 }
 after "Acct::transfer" {
-    $tx_count++;
-    p "  [metric] tx_count=$tx_count rv=$INTERCEPT_RV";
+    $tx_count++
+    p "  [metric] tx_count=$tx_count rv=$INTERCEPT_RV"
 }
-Acct::transfer("alice", "bob",   100);
-Acct::transfer("bob",   "carol", 50);
+Acct::transfer("alice", "bob",   100)
+Acct::transfer("bob",   "carol", 50)
 
-p "";
-p "── around: cache + memoize + timing ───────────────────";
-my %cache;
+p ""
+p "── around: cache + memoize + timing ───────────────────"
+my %cache
 fn Math::slow_factorial($n) {
     sleep 0.05;                          # pretend it's expensive
-    my $r = 1;
-    $r *= $_ for (2..$n);
+    my $r = 1
+    $r *= $_ for (2:$n)
     $r
 }
 around "Math::slow_factorial" {
     # Around bodies are block-lowered, so no literal `return` is allowed.
     # Use the block's final expression as the produced value instead.
-    my $n = $INTERCEPT_ARGS[0];
+    my $n = $INTERCEPT_ARGS[0]
     exists $cache{$n}
         ? do { p "  [cache] hit  for $n"; $cache{$n} }
         : do {
-            p "  [cache] miss for $n — computing";
-            my $r = proceed();
-            $cache{$n} = $r;
+            p "  [cache] miss for $n — computing"
+            my $r = proceed()
+            $cache{$n} = $r
             $r
-        };
+        }
 }
 for my $n (5, 7, 5, 10, 7) {
-    my $r = Math::slow_factorial($n);
-    p "  fact($n) = $r";
+    my $r = Math::slow_factorial($n)
+    p "  fact($n) = $r"
 }
 
-p "";
-p "── Glob-pattern intercept — fires on every Acct::* ────";
-my $audit = 0;
+p ""
+p "── Glob-pattern intercept — fires on every Acct::* ────"
+my $audit = 0
 before "Acct::*" {
-    $audit++;
+    $audit++
 }
-Acct::charge("dave", 75);
-Acct::transfer("dave", "eve", 25);
-p "  [audit] saw $audit Acct::* calls (cumulative since first 'before')";
+Acct::charge("dave", 75)
+Acct::transfer("dave", "eve", 25)
+p "  [audit] saw $audit Acct::* calls (cumulative since first 'before')"
 
-p "";
-p "── Intercept list / housekeeping ──────────────────────";
-my @list = intercept_list();
-p "  active intercepts: ", len(@list);
+p ""
+p "── Intercept list / housekeeping ──────────────────────"
+my @list = intercept_list()
+p "  active intercepts: ", len(@list)
