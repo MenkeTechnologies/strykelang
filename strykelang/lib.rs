@@ -923,9 +923,6 @@ mod builtins_extended_tests;
 mod lib_api_extended_tests;
 
 #[cfg(test)]
-mod cache_bench;
-
-#[cfg(test)]
 mod parallel_api_tests;
 
 #[cfg(test)]
