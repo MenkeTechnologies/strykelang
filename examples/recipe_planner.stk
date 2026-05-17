@@ -77,7 +77,7 @@ for my $r (@recipes) {
 
 # ── vegetarian-only plan (5 meals) ─────────────────────────────────
 
-my @veg = grep { Demo::Recipe::has_tag($_, "vegetarian") } @recipes
+my @veg = grep { Demo::Recipe::has_tag(_, "vegetarian") } @recipes
 p ""
 printf "── vegetarian recipes (%d) ───────────────────────────\n", len(@veg)
 for my $r (@veg) {
@@ -148,7 +148,7 @@ printf "  daily avg kcal : %.0f\n", $total_kcal / 5
 p ""
 p "── per-recipe kcal distribution (t-digest) ──────────"
 my $td_kcal = t_digest(100)
-td_add($td_kcal, $_->{kcal}) for @recipes
+td_add($td_kcal, _->{kcal}) for @recipes
 printf "  p10  : %d\n", int(td_quantile($td_kcal, 0.10))
 printf "  p50  : %d\n", int(td_quantile($td_kcal, 0.50))
 printf "  p90  : %d\n", int(td_quantile($td_kcal, 0.90))

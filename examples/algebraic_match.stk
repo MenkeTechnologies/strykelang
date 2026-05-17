@@ -58,7 +58,7 @@ p ""
 p "── Match composes with pipe-forward ───────────────────"
 my @codes = (200, 201, 404, 500, 200, 503)
 my @categorized = @codes |> map {
-    match ($_) {
+    match (_) {
         200 => "ok",
         201 => "ok",
         204 => "ok",

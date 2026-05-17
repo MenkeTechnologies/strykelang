@@ -119,7 +119,7 @@ for my $line (@log) {
 p ""
 p "── redaction counts by kind ─────────────────────────"
 my $total = 0
-$total += $redaction_count{$_} for keys %redaction_count
+$total += $redaction_count{_} for keys %redaction_count
 for my $kind (sort { $redaction_count{_1} <=> $redaction_count{_0} } keys %redaction_count) {
     next if $redaction_count{$kind} == 0
     printf "  %-13s : %d\n", $kind, $redaction_count{$kind}

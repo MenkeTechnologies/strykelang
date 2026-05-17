@@ -65,7 +65,7 @@ printf "  %s\n", join(", ", @input)
 # ── HLL fingerprint pre-sort ───────────────────────────────────────
 
 my $hll_pre = hll(14)
-hll_add($hll_pre, $_) for @input
+hll_add($hll_pre, _) for @input
 
 # ── sort in-place ───────────────────────────────────────────────────
 
@@ -95,7 +95,7 @@ printf "── verification: matches built-in sort = %s ────────
 # ── HLL fingerprint post-sort matches pre-sort ─────────────────────
 
 my $hll_post = hll(14)
-hll_add($hll_post, $_) for @work
+hll_add($hll_post, _) for @work
 
 p ""
 p "── HLL distinct-element preservation check ──────────"

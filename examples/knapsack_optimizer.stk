@@ -130,7 +130,7 @@ my $hll_name = hll(12)
 p "0/1 knapsack solver — ", len(@instances), " instances"
 p "─" x 60
 my $t0 = now_ns()
-my @results = pmap { Demo::KS::solve($_->{items}, $_->{capacity}) } @instances
+my @results = pmap { Demo::KS::solve(_->{items}, _->{capacity}) } @instances
 my $elapsed_us = (now_ns() - $t0) / 1000.0
 
 # ── report each ───────────────────────────────────────────────────

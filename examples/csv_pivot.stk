@@ -62,7 +62,7 @@ for my $row (@{$rows_back}) {
 my @regions = sort { _0 cmp _1 } keys %pivot
 # Months: explicit calendar order, not lexical.
 my @months  = ("Jan", "Feb", "Mar")
-@months = grep { exists $col_total{$_} } @months
+@months = grep { exists $col_total{_} } @months
 
 # ── print the pivot ─────────────────────────────────────────────────
 
@@ -139,7 +139,7 @@ for my $p (@products) {
 p ""
 p "── TopK regions by sales count (TopK sketch) ────────"
 mysync $tk = topk(3)
-topk_add($tk, $_->{region}) for @{$rows_back}
+topk_add($tk, _->{region}) for @{$rows_back}
 my @top = topk_top($tk)
 for my $h (@top) {
     printf "  %-10s : %d records\n", $h->[0], $h->[1]
@@ -150,6 +150,6 @@ for my $h (@top) {
 p ""
 p "── distinct cardinality (HLL) ───────────────────────"
 mysync $hll = hll(14)
-hll_add($hll, $_->{product}) for @{$rows_back}
+hll_add($hll, _->{product}) for @{$rows_back}
 printf "  HLL distinct products : %d\n", hll_count($hll)
 printf "  exact distinct        : %d\n", len(@products)

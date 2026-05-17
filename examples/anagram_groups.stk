@@ -95,7 +95,7 @@ printf "  distinct members: %s\n", join(", ", sort { _0 cmp _1 } @members)
 p ""
 p "── TopK hottest anagram families (sketch) ────────────"
 my $tk = topk(5)
-topk_add($tk, Demo::Anagram::canonical($_)) for @words
+topk_add($tk, Demo::Anagram::canonical(_)) for @words
 my @hits = topk_top($tk)
 for my $h (@hits) {
     printf "  '%s' : %d hits\n", $h->[0], $h->[1]
@@ -106,7 +106,7 @@ for my $h (@hits) {
 p ""
 p "── distinct canonical-key cardinality (HLL) ──────────"
 my $hll = hll(14)
-hll_add($hll, Demo::Anagram::canonical($_)) for @words
+hll_add($hll, Demo::Anagram::canonical(_)) for @words
 printf "  HLL distinct keys : %d\n", hll_count($hll)
 printf "  exact (hash keys) : %d\n", len(keys %groups)
 
@@ -114,7 +114,7 @@ printf "  exact (hash keys) : %d\n", len(keys %groups)
 
 p ""
 p "── pipe-forward composition ──────────────────────────"
-my @all_canonical = map { Demo::Anagram::canonical($_) } @words
+my @all_canonical = map { Demo::Anagram::canonical(_) } @words
 my @distinct_keys = sort { _0 cmp _1 } uniq(@all_canonical)
 printf "  distinct canonical forms (composed): %d\n", len(@distinct_keys)
 printf "  alphabetically first: %s\n", $distinct_keys[0]

@@ -58,7 +58,7 @@ fn Demo::URL::parse($url) {
 
 fn Demo::URL::parse_query($qs) {
     my @parts = split /&/, $qs
-    @parts = grep { len($_) > 0 } @parts
+    @parts = grep { len(_) > 0 } @parts
     my %params
     for my $p (@parts) {
         my @kv = split /=/, $p, 2
@@ -115,7 +115,7 @@ printf "── input: %d URLs ────────────────�
 
 # ── normalize each ──────────────────────────────────────────────────
 
-my @normalized = map { Demo::URL::normalize($_) } @urls
+my @normalized = map { Demo::URL::normalize(_) } @urls
 
 p ""
 p "── normalized forms ─────────────────────────────────"
@@ -162,9 +162,9 @@ for my $k (sort { $tracked_kinds{_1} <=> $tracked_kinds{_0} } keys %tracked_kind
 p ""
 p "── distinct cardinality (HLL) ───────────────────────"
 my $hll_raw = hll(14)
-hll_add($hll_raw, $_) for @urls
+hll_add($hll_raw, _) for @urls
 my $hll_norm = hll(14)
-hll_add($hll_norm, $_) for @normalized
+hll_add($hll_norm, _) for @normalized
 printf "  HLL distinct (raw URLs)        : %d\n", hll_count($hll_raw)
 printf "  HLL distinct (normalized URLs) : %d\n", hll_count($hll_norm)
 printf "  exact distinct (normalized)    : %d\n", len(@distinct)

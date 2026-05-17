@@ -28,9 +28,9 @@ my $corpus = q{
 # ── tokenize ────────────────────────────────────────────────────────
 
 my @tokens = split /\s+/, $corpus
-@tokens = grep { len($_) > 0 } @tokens
+@tokens = grep { len(_) > 0 } @tokens
 printf "── corpus: %d tokens, %d distinct ────────────────\n",
-    len(@tokens), len(keys %{+{ map { $_ => 1 } @tokens }})
+    len(@tokens), len(keys %{+{ map { _ => 1 } @tokens }})
 
 # ── build bigram transition table ───────────────────────────────────
 

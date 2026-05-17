@@ -86,7 +86,7 @@ printf "── submitted %d jobs ───────────────�
 # children). For a true parallel queue, use `pfor` with a channel; for
 # this demo we stay sequential so latency/topk roll up correctly.
 
-my @results = map { Demo::Queue::run_with_retry($_, 5) } @jobs
+my @results = map { Demo::Queue::run_with_retry(_, 5) } @jobs
 
 # ── per-job summary ──────────────────────────────────────────────────
 
@@ -105,9 +105,9 @@ for my $i (0:len(@results)-1) {
 
 # ── rollup stats ─────────────────────────────────────────────────────
 
-my $ok_count = grep { $_->{ok} } @results
+my $ok_count = grep { _->{ok} } @results
 my $fail_count = len(@results) - $ok_count
-my $total_attempts = sum(map { $_->{attempts} } @results)
+my $total_attempts = sum(map { _->{attempts} } @results)
 my $retries = $total_attempts - len(@results)
 
 p ""

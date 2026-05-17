@@ -104,7 +104,7 @@ for my $i (0:len(@$comps)-1) {
 
 p ""
 p "── degree distribution ──────────────────────────────"
-my @degs = map { len(@{$g{$_}}) } keys %g
+my @degs = map { len(@{$g{_}}) } keys %g
 my $max = reduce { _0 > _1 ? _0 : _1 } 0, @degs
 my $min = reduce { _0 < _1 ? _0 : _1 } 999, @degs
 my $avg = sum(@degs) / len(@degs)

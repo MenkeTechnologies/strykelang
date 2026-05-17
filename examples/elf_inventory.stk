@@ -102,7 +102,7 @@ fn Demo::Elf::food_name($cal) {
 
 # ── per-elf summation in parallel ─────────────────────────────────
 
-my @sums = pmap { sum(@$_) } @elves
+my @sums = pmap { sum(@_) } @elves
 
 # ── update sketches ──────────────────────────────────────────────
 
@@ -119,9 +119,9 @@ for my $i (0:len(@elves) - 1) {
 
 # ── top-3 elves via Schwartzian ───────────────────────────────────
 
-my @ranked = map { $_->[1] }
+my @ranked = map { _->[1] }
              sort { $_1->[0] <=> $_0->[0] }
-             map { [$sums[$_], $_] }
+             map { [$sums[_], _] }
              (0:len(@elves) - 1)
 
 p "\ntop-3 elves by total calories:"

@@ -34,7 +34,7 @@ fn Demo::Sched::tick($delta) {
     $now_virtual = $now_virtual + $delta
     my $fired = 0
     # Find all tasks ready now.
-    my @ready = grep { $_->{next_run} <= $now_virtual } @tasks
+    my @ready = grep { _->{next_run} <= $now_virtual } @tasks
     # Sort by next_run for stable order.
     @ready = sort { $_0->{next_run} <=> $_1->{next_run} } @ready
     for my $task (@ready) {

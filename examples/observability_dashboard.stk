@@ -97,12 +97,12 @@ p "── global rollup (sketch union via `+`) ───────────
 my $global_hll = $hll{api} + $hll{auth} + $hll{payment} + $hll{notify} + $hll{search}
 printf "  total events           : %d\n", len(@events)
 my $total_err = 0
-$total_err += $error_count{$_} for @services
+$total_err += $error_count{_} for @services
 printf "  total errors           : %d (%.1f%%)\n",
     $total_err, 100.0 * $total_err / len(@events)
 printf "  HLL distinct users      : %d\n", hll_count($global_hll)
 my %seen_users
-$seen_users{$_->{user}} = 1 for @events
+$seen_users{_->{user}} = 1 for @events
 printf "  exact distinct users    : %d\n", len(keys %seen_users)
 
 # ── top errors per service (TopK) ────────────────────────────────────

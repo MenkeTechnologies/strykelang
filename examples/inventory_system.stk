@@ -123,7 +123,7 @@ p ""
 p "── revenue ranking (TopK pareto) ────────────────────"
 my @by_rev = sort { _1->revenue <=> _0->revenue } values %inventory
 my $total_rev = 0
-$total_rev += $_->revenue for @by_rev
+$total_rev += _->revenue for @by_rev
 my $cum = 0
 my $i = 0
 my $eighty_at = 0
@@ -145,7 +145,7 @@ printf "  → 80%% of revenue comes from %d / %d products (pareto)\n",
 
 p ""
 p "── reorder candidates ───────────────────────────────"
-my @need_reorder = grep { $_->needs_reorder } values %inventory
+my @need_reorder = grep { _->needs_reorder } values %inventory
 if (len(@need_reorder) == 0) {
     p "  (none)"
 } else {
@@ -176,10 +176,10 @@ for my $h (@hits) {
 p ""
 p "── distinct cardinality (HLL) ───────────────────────"
 my $hll = hll(14)
-hll_add($hll, $_->{sku}) for @txlog
+hll_add($hll, _->{sku}) for @txlog
 printf "  HLL distinct SKUs in tx log : %d\n", hll_count($hll)
 my %seen
-$seen{$_->{sku}} = 1 for @txlog
+$seen{_->{sku}} = 1 for @txlog
 printf "  exact distinct                : %d\n", len(keys %seen)
 
 # ── transaction latency percentiles ─────────────────────────────────

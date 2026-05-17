@@ -112,7 +112,7 @@ fn Demo::VM::transact($payment, $slot, $cust_id) {
             }
         }
         my @coin_strs = map {
-            $_->[1] . " x " . $coin_name{$_->[0]}
+            _->[1] . " x " . $coin_name{_->[0]}
         } @coins_out
         push @log, "[$state] change \$" . sprintf("%.2f", $change / 100)
                    . " = " . join(", ", @coin_strs)

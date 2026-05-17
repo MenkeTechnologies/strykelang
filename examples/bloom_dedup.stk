@@ -107,7 +107,7 @@ for my $h (@hits) {
 p ""
 p "── HLL distinct cardinality ─────────────────────────"
 my $hll = hll(14)
-hll_add($hll, $_) for @records
+hll_add($hll, _) for @records
 printf "  HLL distinct : %d\n", hll_count($hll)
 printf "  exact        : %d\n", len(keys %exact)
 

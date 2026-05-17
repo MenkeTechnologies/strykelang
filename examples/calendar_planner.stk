@@ -90,7 +90,7 @@ for my $c (@conflicts) {
     # Drop the later event.
     $dropped{$c->[1]->{title}} = 1
 }
-my @clean = grep { !exists $dropped{$_->{title}} } @sorted
+my @clean = grep { !exists $dropped{_->{title}} } @sorted
 
 p ""
 p "── free slots within work day (9:00-18:00) ──────────"
@@ -117,7 +117,7 @@ for my $f (@free) {
 # ── duration distribution ──────────────────────────────────────────
 
 my $td_duration = t_digest(100)
-td_add($td_duration, $_->{duration}) for @events
+td_add($td_duration, _->{duration}) for @events
 
 p ""
 p "── event-duration distribution (t-digest) ───────────"
@@ -128,10 +128,10 @@ printf "  p90  : %d min\n", int(td_quantile($td_duration, 0.90))
 # ── overall stats ──────────────────────────────────────────────────
 
 my $total_busy = 0
-$total_busy += $_->{duration} for @clean
+$total_busy += _->{duration} for @clean
 my $work_total = $work_end - $work_start
 my $total_free = 0
-$total_free += ($_->{end} - $_->{start}) for @free
+$total_free += (_->{end} - _->{start}) for @free
 
 p ""
 p "── workday summary ──────────────────────────────────"
@@ -148,9 +148,9 @@ printf "  events         : %d (%d after conflict removal)\n",
 p ""
 p "── HLL distinct event titles ────────────────────────"
 my $hll = hll(14)
-hll_add($hll, $_->{title}) for @events
+hll_add($hll, _->{title}) for @events
 my %titles
-$titles{$_->{title}} = 1 for @events
+$titles{_->{title}} = 1 for @events
 printf "  HLL   : %d\n", hll_count($hll)
 printf "  exact : %d\n", len(keys %titles)
 

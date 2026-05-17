@@ -170,7 +170,7 @@ for my $r (@records) {
 p ""
 p "── records by type ──────────────────────────────────"
 my %by_type
-$by_type{$_->{type}}++ for @records
+$by_type{_->{type}}++ for @records
 for my $t (sort { _0 cmp _1 } keys %by_type) {
     printf "  %-8s : %d\n", $t, $by_type{$t}
 }
@@ -193,9 +193,9 @@ printf "── %d errors found ────────────────�
 p ""
 p "── HLL distinct hostnames ───────────────────────────"
 my $hll = hll(14)
-hll_add($hll, $_->{name}) for @records
+hll_add($hll, _->{name}) for @records
 my %distinct_names
-$distinct_names{$_->{name}} = 1 for @records
+$distinct_names{_->{name}} = 1 for @records
 printf "  HLL  : %d\n", hll_count($hll)
 printf "  exact : %d\n", len(keys %distinct_names)
 
