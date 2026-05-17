@@ -2,31 +2,20 @@
 
 # Single CI entry: validate the entire examples/ tree in one pass.
 #
-# Phases run **sequentially** (one at a time) so `test` worker pools and
-# `system` subprocess bursts never stack. Work **inside** each phase is still
-# parallel, capped by RUN_ALL_CI_JOBS (default 16) to avoid EMFILE.
-#
-# Phases (default: all):
-#   parse     — `stryke -c` on every top-level examples/*.stk
-#   run       — execute every top-level examples/*.stk under --no-interop
-#   demos     — execute every examples/*_no_interop.stk (built-in asserts)
-#   project   — `test examples/project/t`
-#   rosetta   — `test examples/rosetta/t`
-#   exercism  — per-exercise check + test (sequential; each calls `test`)
-#   ruby      — examples/ruby/Ruby.stk embedded suite
-#   scheme    — examples/scheme/Scheme.stk embedded suite
+# Phases: `~> @phases maps { ... }`. Parse/run/demos: `~> @files par { ... }`
+# (flat per-file bools). Test counting: `~p> ... map { ... } sum`. Exercism
+# dirs stay sequential (`maps`, not `par` — each dir calls `test`).
 #
 # Usage:  stryke examples/run_all_ci.stk [--summary] [--only PHASE]... [--jobs N]
-# Env:    ST=path/to/stryke (defaults to $^X)
-#         RUN_ALL_CI_JOBS / CI_JOBS — default for --jobs when omitted
-# Exit:   0 if every selected phase passes, 1 otherwise.
+# Help:   stryke examples/run_all_ci.stk -- --help
+# Env:    ST, RUN_ALL_CI_JOBS, CI_JOBS
 
 $| = 1
 
 my %opts = %{ getopts({
     "summary"   => { help => "one line per phase; suppress per-item OK lines" },
-    "only|o=s@" => { help => "phase(s) to run (repeatable; comma lists OK): parse run demos project rosetta exercism ruby scheme" },
-    "jobs|j=i"  => { help => "parallel workers for parse/run/demos (default: env or 16)", default => 0 },
+    "only|o=s@" => { help => "phase(s): parse run demos project rosetta exercism ruby scheme (repeat or comma)" },
+    "jobs|j=i"  => { help => "hint for rayon pool (logged only; ~p> uses runtime defaults)", default => 0 },
 }, {
     prog   => "run_all_ci",
     desc   => "Validate the entire examples/ tree in one CI pass.",
@@ -34,13 +23,11 @@ my %opts = %{ getopts({
 }) }
 my $summary = $opts{summary} // 0
 
-# Resolve examples/ dir regardless of cwd: `s run_all_ci.stk` from examples/ may
-# leave __FILE__ as `examples/run_all_ci.stk` while cwd is already examples/.
 my $script = realpath(__FILE__)
 $script = realpath($0) if $script eq ""
 my $ex_dir = $script ne "" ? dirname($script) : realpath(".")
-my $st      = $ENV{ST} // $^X
-my $jobs    = $opts{jobs} // $ENV{RUN_ALL_CI_JOBS} // $ENV{CI_JOBS} // 16
+my $st     = $ENV{ST} // $^X
+my $jobs   = $opts{jobs} // $ENV{RUN_ALL_CI_JOBS} // $ENV{CI_JOBS} // 16
 $jobs = 16 if $jobs < 1
 
 my %META = map { ($_ => 1) } qw(
@@ -51,30 +38,22 @@ my %META = map { ($_ => 1) } qw(
 )
 
 my @all_phases = qw(parse run demos project rosetta exercism ruby scheme)
-my %want
-my @only_specs = @{ $opts{only} // [] }
-if (len(@only_specs)) {
-    for (@only_specs) {
-        for (split /,/, $_) {
-            if (_ !~ /^(?:parse|run|demos|project|rosetta|exercism|ruby|scheme)$/) {
-                die "unknown --only phase: " . _
-            }
-            $want{_} = 1
-        }
-    }
-} else {
-    %want = map { ($_ => 1) } @all_phases
-}
 
 fn Ci::basename($path) {
     my @parts = split m{/}, $path
-    my $file = $parts[-1]
+    my $file  = $parts[-1]
     $file =~ s/\.stk$//
     $file
 }
 
-fn Ci::is_meta($path) {
-    exists $META{Ci::basename($path)}
+fn Ci::is_meta($path) = exists $META{Ci::basename($path)}
+
+fn Ci::top_stk_files() {
+    ~> glob("$ex_dir/*.stk") grep { !Ci::is_meta } sort
+}
+
+fn Ci::demo_stk_files() {
+    ~> glob("$ex_dir/*_no_interop.stk") grep { _ =~ /_no_interop\.stk$/ && !Ci::is_meta } sort
 }
 
 mysync @failures
@@ -99,7 +78,7 @@ fn Ci::fail($phase, $detail) {
 }
 
 fn Ci::header($name) {
-    if (!$summary) { p "" }
+    p "" unless $summary
     p "── $name ──"
 }
 
@@ -111,43 +90,35 @@ fn Ci::run_suite($path) {
     my $cmd = "$st \"$path\" </dev/null"
     if ($summary) {
         my $rc = system("$cmd >/dev/null 2>&1")
-        if ($rc != 0) {
-            system($cmd)
-        }
+        system($cmd) if $rc != 0
         return $rc == 0
     }
     system($cmd) == 0
 }
 
 fn Ci::find_test_stk($root) {
-    my $out = `find "$root" -type f \\( -name 'test_*.stk' -o -name 't_*.stk' \\) 2>/dev/null`
-    return [] if $out eq ""
-    sort grep { $_ ne "" } split /\n/, $out
+    my $raw = `find "$root" -type f \\( -name 'test_*.stk' -o -name 't_*.stk' \\) 2>/dev/null`
+    return [] if $raw eq ""
+    ~> split /\n/, $raw grep { _ ne "" } sort
 }
 
 fn Ci::count_asserts($path) {
     my $n = 0
-    open my $fh, "<", $path
-    while (my $line = <$fh>) {
-        if ($line =~ /^\s*(?:rb_test|assert_eq|assert_ok|assert_ne|assert_true|assert_false|assert_err|assert_dies)\b/) {
-            $n += 1
+    for (split /\n/, slurp($path)) {
+        if (_ =~ /^\s*(?:rb_test|assert_eq|assert_ok|assert_ne|assert_true|assert_false|assert_err|assert_dies)\b/) {
+            $n++
         }
     }
-    close $fh
     $n
 }
 
 fn Ci::count_tests_tree($root) {
-    my $n = 0
-    for (Ci::find_test_stk($root)) {
-        $n += Ci::count_asserts(_)
-    }
-    $n
+    ~p> Ci::find_test_stk($root) map { Ci::count_asserts } sum
 }
 
 fn Ci::report_run_results($phase, @files, @oks) {
     my $bad = 0
-    for (0 .. len(@files) - 1) {
+    for (0:len(@files) - 1) {
         if (!@oks[$_]) {
             Ci::fail($phase, @files[$_])
             $bad += 1
@@ -163,71 +134,49 @@ fn Ci::report_run_results($phase, @files, @oks) {
 
 fn Ci::phase_parse {
     Ci::header("parse")
-    my @files = sort grep { !Ci::is_meta(_) } glob("$ex_dir/*.stk")
+    my @files = Ci::top_stk_files()
     die "no examples in $ex_dir" unless len(@files)
-
-    my @oks = pmap_chunked $jobs { Ci::parse_file(_) } @files
+    my @oks = ~> @files par { Ci::parse_file }
     Ci::report_run_results("parse", @files, @oks)
 }
 
 fn Ci::phase_run {
     Ci::header("run")
-    my @files = sort grep { !Ci::is_meta(_) } glob("$ex_dir/*.stk")
-    my @oks = pmap_chunked $jobs { Ci::run_file(_) } @files
+    my @files = Ci::top_stk_files()
+    my @oks = ~> @files par { Ci::run_file }
     Ci::report_run_results("run", @files, @oks)
 }
 
 fn Ci::phase_demos {
     Ci::header("demos")
-    my @files = sort grep {
-        _ =~ /_no_interop\.stk$/ && !Ci::is_meta(_)
-    } glob("$ex_dir/*_no_interop.stk")
+    my @files = Ci::demo_stk_files()
     die "no *_no_interop.stk in $ex_dir" unless len(@files)
-
-    my @oks = pmap_chunked $jobs { Ci::run_file(_) } @files
+    my @oks = ~> @files par { Ci::run_file }
     Ci::report_run_results("demos", @files, @oks)
 }
 
-fn Ci::phase_project {
-    Ci::header("project")
-    my $root = "$ex_dir/project/t"
+fn Ci::run_test_tree($phase, $root, $label) {
+    Ci::header($phase)
     my $tests_n = Ci::count_tests_tree($root)
-    my $rc = test($root, { quiet => $summary })
+    my $rc      = test($root, { quiet => $summary })
     Ci::add_tests($rc == 0 ? $tests_n : 0, $tests_n)
-    if ($rc != 0) {
-        Ci::fail("project", "test examples/project/t exit $rc")
-    }
-    p "project: " . ($rc == 0 ? "pass ($tests_n tests)" : "FAIL")
-}
-
-fn Ci::phase_rosetta {
-    Ci::header("rosetta")
-    my $root = "$ex_dir/rosetta/t"
-    my $tests_n = Ci::count_tests_tree($root)
-    my $rc = test($root, { quiet => $summary })
-    Ci::add_tests($rc == 0 ? $tests_n : 0, $tests_n)
-    if ($rc != 0) {
-        Ci::fail("rosetta", "test examples/rosetta/t exit $rc")
-    }
-    p "rosetta: " . ($rc == 0 ? "pass ($tests_n tests)" : "FAIL")
+    Ci::fail($phase, "test $label exit $rc") if $rc != 0
+    p "$phase: " . ($rc == 0 ? "pass ($tests_n tests)" : "FAIL")
 }
 
 fn Ci::exercism_one($d) {
-    my @parts = split m{/}, $d
-    my $name  = $parts[-1]
-    my $err   = ""
+    my $name    = (split m{/}, $d)[-1]
     my $tests_n = Ci::count_tests_tree("$d/t")
+    my $err     = ""
 
     for (glob("$d/*.stk")) {
-        if (check_no_interop($_, { quiet => 1 }) != 0) {
+        if (check_no_interop(_, { quiet => 1 }) != 0) {
             $err = "--no-interop"
             last
         }
     }
 
-    if (!$err && test("$d/t", { quiet => 1 }) != 0) {
-        $err = "test"
-    }
+    $err = "test" if !$err && test("$d/t", { quiet => 1 }) != 0
 
     if ($err) {
         Ci::fail("exercism", "$name [$err]")
@@ -235,84 +184,69 @@ fn Ci::exercism_one($d) {
         return 0
     }
     Ci::add_tests($tests_n, $tests_n)
-    if (!$summary) { p "  OK   $name" }
+    p "  OK   $name" unless $summary
     1
 }
 
 fn Ci::phase_exercism {
     Ci::header("exercism")
     my $ex_root = "$ex_dir/exercism"
-    my @dirs = ~> "$ex_root/*/" glob sort
+    my @dirs    = ~> "$ex_root/*/" glob sort
     die "no exercises in $ex_root" unless len(@dirs)
 
-    my $pass = 0
-    for (@dirs) {
-        $pass += Ci::exercism_one(_)
-    }
+    my $pass = ~> @dirs maps { Ci::exercism_one } sum
     Ci::add_files($pass, len(@dirs))
-
     p "exercism: $pass/#{len(@dirs)} passed"
 }
 
-fn Ci::phase_ruby {
-    Ci::header("ruby")
-    my $path = "$ex_dir/ruby/Ruby.stk"
+fn Ci::run_embedded_suite($phase, $path) {
+    Ci::header($phase)
     my $tests_n = Ci::count_asserts($path)
-    my $ok = Ci::run_suite($path)
+    my $ok      = Ci::run_suite($path)
     Ci::add_tests($ok ? $tests_n : 0, $tests_n)
-    if (!$ok) {
-        Ci::fail("ruby", "exit")
-    }
-    p "ruby: " . ($ok ? "pass ($tests_n tests)" : "FAIL")
-}
-
-fn Ci::phase_scheme {
-    Ci::header("scheme")
-    my $path = "$ex_dir/scheme/Scheme.stk"
-    my $tests_n = Ci::count_asserts($path)
-    my $ok = Ci::run_suite($path)
-    Ci::add_tests($ok ? $tests_n : 0, $tests_n)
-    if (!$ok) {
-        Ci::fail("scheme", "exit")
-    }
-    p "scheme: " . ($ok ? "pass ($tests_n tests)" : "FAIL")
+    Ci::fail($phase, "exit") if !$ok
+    p "$phase: " . ($ok ? "pass ($tests_n tests)" : "FAIL")
 }
 
 fn Ci::run_phase($name) {
     if ($name eq "parse")      { Ci::phase_parse() }
-    elsif ($name eq "run")     { Ci::phase_run() }
+    elsif ($name eq "run")      { Ci::phase_run() }
     elsif ($name eq "demos")    { Ci::phase_demos() }
-    elsif ($name eq "project")  { Ci::phase_project() }
-    elsif ($name eq "rosetta")  { Ci::phase_rosetta() }
+    elsif ($name eq "project")  { Ci::run_test_tree("project", "$ex_dir/project/t", "examples/project/t") }
+    elsif ($name eq "rosetta")  { Ci::run_test_tree("rosetta", "$ex_dir/rosetta/t", "examples/rosetta/t") }
     elsif ($name eq "exercism") { Ci::phase_exercism() }
-    elsif ($name eq "ruby")     { Ci::phase_ruby() }
-    elsif ($name eq "scheme")   { Ci::phase_scheme() }
+    elsif ($name eq "ruby")     { Ci::run_embedded_suite("ruby", "$ex_dir/ruby/Ruby.stk") }
+    elsif ($name eq "scheme")   { Ci::run_embedded_suite("scheme", "$ex_dir/scheme/Scheme.stk") }
     else { die "internal: unknown phase $name" }
 }
 
-fn Ci::print_totals {
-    p "totals: files $files_ok/$files_n, tests $tests_ok/$tests_n"
-}
+fn Ci::print_totals() = p "totals: files $files_ok/$files_n, tests $tests_ok/$tests_n"
 
-my @phases = grep { $want{$_} } qw(parse run demos project rosetta exercism ruby scheme)
+my @only_specs = @{ $opts{only} // [] }
+my %want
+if (len(@only_specs)) {
+    for (@only_specs) {
+        for (split /,/, $_) {
+            if ($_ !~ /^(?:parse|run|demos|project|rosetta|exercism|ruby|scheme)$/) {
+                die "unknown --only phase: " . $_
+            }
+            $want{$_} = 1
+        }
+    }
+} else {
+    %want = map { ($_ => 1) } @all_phases
+}
+my @phases = grep { $want{$_} } @all_phases
 die "no phases selected" unless len(@phases)
 
-if (!$summary) {
-    p "run_all_ci: #{len(@phases)} phase(s), jobs=$jobs"
-}
+p "run_all_ci: #{len(@phases)} phase(s), jobs=$jobs" unless $summary
 
-for (@phases) {
-    Ci::run_phase(_)
-}
-
-# ── final report ──────────────────────────────────────────────────────────────
+~> @phases maps { Ci::run_phase }
 
 p ""
 if (len(@failures)) {
     p "run_all_ci: #{len(@failures)} failure(s):"
-    for (@failures) {
-        p "  [$_->{phase}] $_->{detail}"
-    }
+    for (@failures) { p "  [$_->{phase}] $_->{detail}" }
     Ci::print_totals()
     exit 1
 }

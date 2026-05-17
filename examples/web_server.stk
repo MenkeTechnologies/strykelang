@@ -52,13 +52,10 @@ die "404" if defined Demo::Web::handler(+{
 })
 
 # Blocking server only when a port is passed on the CLI.
-my %opts = %{ getopts([
-    "port|p=i",
-]) }
-my $port = $opts{port}
-if (!$port && len(@ARGV) && $ARGV[0] =~ /^\d+$/) {
-    $port = 0 + $ARGV[0]
-}
+my %opts = %{ getopts({
+    "port|p=i" => { help => "listen port (positional numeric argv also accepted)" },
+}) }
+my $port = $opts{port} // (len(@ARGV) && $ARGV[0] =~ /^\d+$/ ? 0 + $ARGV[0] : 0)
 if ($port) {
     p "Starting Stryke server on port $port..."
     serve($port, \&Demo::Web::handler)
