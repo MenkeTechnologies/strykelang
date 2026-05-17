@@ -29,7 +29,7 @@ for my $c (@cluster_centers) {
 }
 
 printf "── %d points across %d ground-truth clusters ──────────\n",
-    len(@points), len(@cluster_centers)
+    len(@points), len @cluster_centers
 
 # ── k-means main loop ────────────────────────────────────────────────
 

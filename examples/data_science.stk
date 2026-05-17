@@ -7,12 +7,12 @@ p "--- Stats: Analyzing a large dataset ---"
 # Generate 10k random samples
 my @data = map { rand(100) } (1:10000)
 
-printf "  Samples:    %d\n", len(@data)
+printf "  Samples:    %d\n", len @data
 printf "  Mean:       %.4f\n", mean(@data)
 printf "  Median:     %.4f\n", median(@data)
 printf "  StdDev:     %.4f\n", stddev(@data)
 printf "  Variance:   %.4f\n", variance(@data)
-printf "  Sum:        %.4f\n", sum(@data)
+printf "  Sum:        %.4f\n", sum @data
 
 p "\n--- Regression: Simple Linear Fit ---"
 # y = 2x + 5 + noise

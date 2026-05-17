@@ -106,7 +106,7 @@ my @events = (
 )
 
 p ""
-printf "── emitting %d events ────────────────────────────────\n", len(@events)
+printf "── emitting %d events ────────────────────────────────\n", len @events
 for my $e (@events) {
     my $matched = Demo::Bus::emit($e->[0], $e->[1])
     printf "  %-18s -> matched %d pattern(s) [%s]\n",

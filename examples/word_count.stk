@@ -31,7 +31,7 @@ my $td_tok = t_digest(100)
 for my $line (split /\n/, $corpus) {
     next if len($line) == 0
     my $t0 = now_ns()
-    my @words = split /\W+/, lc($line)
+    my @words = split /\W+/, lc $line
     @words = grep { len(_) > 0 } @words
     td_add($td_tok, (now_ns() - $t0) / 1000.0)
     for my $w (@words) {
@@ -56,7 +56,7 @@ my @sorted = sort {
     ($counts{$_1} <=> $counts{$_0}) || ($_0 cmp $_1)
 } keys %counts
 for my $i (0:9) {
-    last if $i >= len(@sorted)
+    last if $i >= len @sorted
     my $w = $sorted[$i]
     printf "  %2d. %-10s : %d\n", $i + 1, $w, $counts{$w}
 }
@@ -111,7 +111,7 @@ p ""
 my @singletons = grep { $counts{_} == 1 } keys %counts
 @singletons = sort { _0 cmp _1 } @singletons
 printf "── singletons (%d total) ──────────────────────────────\n",
-    len(@singletons)
+    len @singletons
 my $cols = 4
 my @row
 for my $w (@singletons) {

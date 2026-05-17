@@ -26,7 +26,7 @@ my @maze = (
     "####################",
 )
 
-my $H = len(@maze)
+my $H = len @maze
 my $W = len($maze[0])
 
 p "── maze ─────────────────────────────────────────────"
@@ -81,7 +81,7 @@ while (len(@queue) > 0 && $end_idx < 0) {
         next if $ch eq "#"
         my $t0 = now_ns()
         $step_count++
-        my $new_idx = len(@nodes)
+        my $new_idx = len @nodes
         $visited{$key} = $new_idx
         hll_add($hll_visited, $key)
         push @nodes, [$nr, $nc, $parent_idx]

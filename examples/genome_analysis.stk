@@ -15,7 +15,7 @@ my $dna = "ATGAAACCTGCAGGCCCTGGGTAAGTCATGGCTCCTGAATAGTTTAAACCG" .
           "CGTGCTACGACGCATAGCCTAGCATGCAGCGTAGACGCATCAGTGCATGTC"
 
 printf "── DNA sequence: %d bases ───────────────────────────\n",
-    len($dna)
+    len $dna
 
 # ── GC content ──────────────────────────────────────────────────────
 
@@ -89,7 +89,7 @@ p ""
 p "── reverse complement (first 60 bases) ──────────────"
 printf "  orig : %s\n", substr($dna, 0, 60)
 printf "  rc   : %s\n", substr($rc, 0, 60)
-printf "  rc length : %d (must match input)\n", len($rc)
+printf "  rc length : %d (must match input)\n", len $rc
 
 # ── ORF detection (between ATG start and TAA/TAG/TGA stop) ─────────
 
@@ -126,7 +126,7 @@ for my $frame (0:2) {
 }
 
 @orfs = sort { $_1->{length} <=> $_0->{length} } @orfs
-printf "  found %d ORFs (≥30 bases)\n", len(@orfs)
+printf "  found %d ORFs (≥30 bases)\n", len @orfs
 my $orf_shown = 0
 for my $orf (@orfs) {
     last if $orf_shown >= 5

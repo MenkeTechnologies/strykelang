@@ -169,8 +169,8 @@ printf("\ndistinct food bands: HLL=%.1f (max possible = 6)\n", $hll_n)
 
 # ── parallel summary stat ─────────────────────────────────────────
 
-my $total_cal = sum(@sums)
-my $mean_cal = $total_cal / len(@elves)
+my $total_cal = sum @sums
+my $mean_cal = $total_cal / len @elves
 printf("\ncamp totals: %d elves, %d total cal, %.0f mean cal/elf\n",
        len(@elves), $total_cal, $mean_cal)
 

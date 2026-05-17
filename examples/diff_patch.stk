@@ -15,8 +15,8 @@
 fn Demo::Diff::lcs_table($old_ref, $new_ref) {
     my @ol = @$old_ref
     my @nw = @$new_ref
-    my $m = len(@ol)
-    my $n = len(@nw)
+    my $m = len @ol
+    my $n = len @nw
     my @table
     # Initialize (m+1) x (n+1) table of zeros.
     for my $i (0:$m) {
@@ -46,8 +46,8 @@ fn Demo::Diff::emit($old_ref, $new_ref) {
     my @nw = @$new_ref
     my $tbl = Demo::Diff::lcs_table($old_ref, $new_ref)
     my @ops
-    my $i = len(@ol)
-    my $j = len(@nw)
+    my $i = len @ol
+    my $j = len @nw
     while ($i > 0 || $j > 0) {
         if ($i > 0 && $j > 0 && $ol[$i - 1] eq $nw[$j - 1]) {
             unshift @ops, +{ op => "=", line => $ol[$i - 1] }
@@ -145,8 +145,8 @@ if (len(@$reconstructed) != len(@new)) {
 
 p ""
 p "── patch round-trip verification ───────────────────"
-printf "  reconstructed lines : %d\n", len(@$reconstructed)
-printf "  expected lines      : %d\n", len(@new)
+printf "  reconstructed lines : %d\n", len @$reconstructed
+printf "  expected lines      : %d\n", len @new
 printf "  matches new version : %s\n", $match ? "YES" : "NO"
 
 # ── Op counts ───────────────────────────────────────────────────────
@@ -182,4 +182,4 @@ p "── LCS len(shared lines) ────────────────
 my $tbl = Demo::Diff::lcs_table(\@old, \@new)
 my $lcs_len = $tbl->[len(@old)]->[len(@new)]
 printf "  LCS length = %d (out of max %d)\n",
-    $lcs_len, len(@old) > len(@new) ? len(@new) : len(@old)
+    $lcs_len, len(@old) > len(@new) ? len(@new) : len @old

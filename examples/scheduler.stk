@@ -70,7 +70,7 @@ Demo::Sched::register("metrics", 5, fn($task, $now) {
 })
 
 printf "── %d scheduled tasks ─────────────────────────────────\n",
-    len(@tasks)
+    len @tasks
 for my $t (@tasks) {
     printf "  %-12s cadence=%ds\n", $t->{name}, $t->{cadence}
 }
@@ -88,7 +88,7 @@ for my $sec (1:$simulated_seconds) {
 
 p ""
 printf "── %d events fired during simulation ─────────────────\n",
-    len(@log)
+    len @log
 for my $entry (@log) { p "  $entry" }
 
 # ── per-task rollup ────────────────────────────────────────────────
@@ -134,4 +134,4 @@ for my $entry (@log) {
     }
 }
 printf "  HLL distinct task names : %d\n", hll_count($hll)
-printf "  exact registered tasks  : %d\n", len(@tasks)
+printf "  exact registered tasks  : %d\n", len @tasks

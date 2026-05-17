@@ -26,7 +26,7 @@ my @orders = (
     +{ id => 10, customer => "frank", region => "ap",      amount =>  175.20, items => 3 },
 )
 
-printf "── dataset: %d orders ─────────────────────────────\n", len(@orders)
+printf "── dataset: %d orders ─────────────────────────────\n", len @orders
 
 # ── SELECT id, customer, amount WHERE amount > 100 ──────────────────
 
@@ -146,4 +146,4 @@ printf "    us-east : %d\n", hll_count($h_east)
 printf "    eu      : %d\n", hll_count($h_eu)
 printf "    ap      : %d\n", hll_count($h_ap)
 printf "  union (HLL): %d distinct customers\n", hll_count($h_all)
-printf "  exact      : %d distinct customers\n", len(@distinct)
+printf "  exact      : %d distinct customers\n", len @distinct

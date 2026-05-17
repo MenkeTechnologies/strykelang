@@ -15,7 +15,7 @@ p "  size : ", file_size($tmp), " bytes"
 p ""
 p "── slurp: whole-file read ─────────────────────────────"
 my $contents = slurp($tmp)
-p "  bytes read: ", len($contents)
+p "  bytes read: ", len $contents
 p "  lines     : ", len([split(/\n/, $contents)])
 
 p ""
@@ -42,12 +42,12 @@ p "    $_" for split(/\n/, slurp($tmp))
 p ""
 p "── glob — pattern match in dir ────────────────────────"
 my @stk = glob("examples/*.stk")
-printf "  examples/*.stk      : %d files\n", len(@stk)
+printf "  examples/*.stk      : %d files\n", len @stk
 
 p ""
 p "── glob recursive — `**/*` ────────────────────────────"
 my @nested = glob("examples/**/*.stk(N)")
-printf "  examples/**/*.stk    : %d files\n", len(@nested)
+printf "  examples/**/*.stk    : %d files\n", len @nested
 
 p ""
 p "── find — alt to glob with predicate logic ────────────"
@@ -56,7 +56,7 @@ my @over_1kb
 for my $f (@big_demos) {
     push @over_1kb, $f if file_size($f) > 1024
 }
-printf "  examples/*.stk > 1KB : %d files\n", len(@over_1kb)
+printf "  examples/*.stk > 1KB : %d files\n", len @over_1kb
 p "  examples:"
 p "    $_  (", file_size(_), " bytes)" for @over_1kb[0:2]
 

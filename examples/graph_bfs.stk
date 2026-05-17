@@ -107,7 +107,7 @@ p "── degree distribution ────────────────�
 my @degs = map { len(@{$g{_}}) } keys %g
 my $max = reduce { _0 > _1 ? _0 : _1 } 0, @degs
 my $min = reduce { _0 < _1 ? _0 : _1 } 999, @degs
-my $avg = sum(@degs) / len(@degs)
+my $avg = sum(@degs) / len @degs
 printf "  min degree : %d\n", $min
 printf "  max degree : %d\n", $max
 printf "  avg degree : %.2f\n", $avg
@@ -151,4 +151,4 @@ fn Demo::BFS::reachable($graph, $start) {
 my $reach = Demo::BFS::reachable(\%g, "SF")
 my @sorted = sort { _0 cmp _1 } @$reach
 printf "  reachable from SF: %s\n", join(", ", @sorted)
-printf "  reach count       : %d\n", len(@sorted)
+printf "  reach count       : %d\n", len @sorted

@@ -79,7 +79,7 @@ for my $i (1:20) {
     push @jobs, Demo::Queue::make_job($i, $work, $fail)
 }
 
-printf "── submitted %d jobs ─────────────────────────────────\n", len(@jobs)
+printf "── submitted %d jobs ─────────────────────────────────\n", len @jobs
 
 # ── sequential execution (pmap defeats the AOP `around` instrumentation
 # because closures captured in advice don't sync writes back from worker
@@ -108,11 +108,11 @@ for my $i (0:len(@results)-1) {
 my $ok_count = grep { _->{ok} } @results
 my $fail_count = len(@results) - $ok_count
 my $total_attempts = sum(map { _->{attempts} } @results)
-my $retries = $total_attempts - len(@results)
+my $retries = $total_attempts - len @results
 
 p ""
 p "── batch rollup ─────────────────────────────────────"
-printf "  jobs submitted : %d\n", len(@jobs)
+printf "  jobs submitted : %d\n", len @jobs
 printf "  succeeded      : %d\n", $ok_count
 printf "  failed         : %d\n", $fail_count
 printf "  total attempts : %d (retries=%d)\n", $total_attempts, $retries

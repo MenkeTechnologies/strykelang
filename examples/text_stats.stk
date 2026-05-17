@@ -35,23 +35,23 @@ for my $para (@paragraphs) {
 
 my @words
 for my $sent (@sentences) {
-    my @w = split /\W+/, lc($sent)
+    my @w = split /\W+/, lc $sent
     @w = grep { len(_) > 0 } @w
     push @words, @w
 }
 
 printf "── text statistics ────────────────────────────────────\n"
-printf "  paragraphs : %d\n", len(@paragraphs)
-printf "  sentences  : %d\n", len(@sentences)
-printf "  words      : %d\n", len(@words)
-printf "  chars      : %d (bytes)\n", len($text)
-printf "  chars      : %d (codepoints)\n", len($text)
+printf "  paragraphs : %d\n", len @paragraphs
+printf "  sentences  : %d\n", len @sentences
+printf "  words      : %d\n", len @words
+printf "  chars      : %d (bytes)\n", len $text
+printf "  chars      : %d (codepoints)\n", len $text
 
 # ── per-sentence stats ─────────────────────────────────────────────
 
 my $td_words_per_sent = t_digest(100)
 for my $sent (@sentences) {
-    my @w = split /\W+/, lc($sent)
+    my @w = split /\W+/, lc $sent
     @w = grep { len(_) > 0 } @w
     td_add($td_words_per_sent, len(@w))
 }
@@ -99,7 +99,7 @@ printf "  consonants : %d (%.1f%%)\n", $consonants, 100.0 * $consonants / ($vowe
 
 # ── readability score (Flesch-Kincaid Grade Level approximation) ──
 
-my $words_per_sent  = len(@words) / len(@sentences)
+my $words_per_sent  = len(@words) / len @sentences
 my $syllables_per_word = ($vowels + $consonants) / len(@words) / 3.0   # crude
 my $fkgl = 0.39 * $words_per_sent + 11.8 * $syllables_per_word - 15.59
 
@@ -131,7 +131,7 @@ $distinct{_} = 1 for @words
 printf "  HLL distinct : %d\n", hll_count($hll)
 printf "  exact        : %d\n", len(keys %distinct)
 printf "  type-token ratio (vocab diversity) : %.2f\n",
-    len(keys %distinct) / len(@words)
+    len(keys %distinct) / len @words
 
 # ── longest words ──────────────────────────────────────────────────
 
@@ -140,7 +140,7 @@ p "── longest words (top 5) ────────────────
 my @uniq_words = keys %distinct
 my @longest = sort { len($_1) <=> len($_0) } @uniq_words
 for my $i (0:4) {
-    last if $i >= len(@longest)
+    last if $i >= len @longest
     my $w = $longest[$i]
-    printf "  %-20s (%d chars)\n", $w, len($w)
+    printf "  %-20s (%d chars)\n", $w, len $w
 }

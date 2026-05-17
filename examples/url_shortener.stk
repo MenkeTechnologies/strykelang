@@ -101,7 +101,7 @@ my @urls = (
 )
 
 printf "── shortening %d URLs ────────────────────────────────\n",
-    len(@urls)
+    len @urls
 my %short_ids
 for my $url (@urls) {
     my $s = Demo::Short::shorten($url)
@@ -159,7 +159,7 @@ unlink $kv_path
 
 p ""
 p "── stats ────────────────────────────────────────────"
-printf "  URLs shortened : %d\n", len(@urls)
+printf "  URLs shortened : %d\n", len @urls
 printf "  collisions     : %d (incremental rehashes needed)\n", $collisions
 printf "  p50 latency    : %.1f µs\n", td_quantile($td_shorten, 0.50)
 printf "  p99 latency    : %.1f µs\n", td_quantile($td_shorten, 0.99)

@@ -85,7 +85,7 @@ for my $entry (@corpus) {
     Demo::Trie::insert($root, $entry->[0], $entry->[1])
 }
 printf "── trie built: %d words inserted ─────────────────────\n",
-    len(@corpus)
+    len @corpus
 
 # ── query suggestions for various prefixes ─────────────────────────
 
@@ -97,7 +97,7 @@ for my $p (@prefixes) {
     td_add($td_query, (now_ns() - $t0) / 1000.0)
     topk_add($tk_queries, $p)
     printf "\n── prefix '%s' (%d suggestions) ─────────────\n",
-        $p, len(@$results)
+        $p, len @$results
     if (len(@$results) == 0) {
         p "  (no matches)"
     } else {
@@ -113,7 +113,7 @@ my @all
 Demo::Trie::dfs($root, "", \@all)
 p ""
 printf "── trie statistics ──────────────────────────────────\n"
-printf "  total words : %d (expected %d)\n", len(@all), len(@corpus)
+printf "  total words : %d (expected %d)\n", len(@all), len @corpus
 my $total_count = 0
 $total_count += _->[1] for @all
 printf "  total frequency sum : %d\n", $total_count

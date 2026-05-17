@@ -168,7 +168,7 @@ my @orders = (
 )
 
 printf "── processing %d orders ───────────────────────────────\n",
-    len(@orders)
+    len @orders
 
 my @successful
 my @failed
@@ -188,9 +188,9 @@ for my $order (@orders) {
 
 p ""
 p "── rollup ───────────────────────────────────────────"
-printf "  orders processed : %d\n", len(@orders)
-printf "  successful       : %d\n", len(@successful)
-printf "  failed           : %d\n", len(@failed)
+printf "  orders processed : %d\n", len @orders
+printf "  successful       : %d\n", len @successful
+printf "  failed           : %d\n", len @failed
 my $total_revenue = 0
 $total_revenue += _->{total} for @successful
 printf "  total revenue    : %.2f\n", $total_revenue

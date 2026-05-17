@@ -69,7 +69,7 @@ printf("  first 10: %s\n", join(", ", @primes[0:9]))
 printf("  last  10: %s\n", join(", ", @primes[len(@primes) - 10 : len(@primes) - 1]))
 
 # Sum of primes <= 200 — classic puzzle (expected: 4227).
-my $sum_le_200 = sum(@primes)
+my $sum_le_200 = sum @primes
 printf("  sum of primes <= 200: %d (expect 4227)\n", $sum_le_200)
 
 # ── parallel scan via pgrep ────────────────────────────────────────
@@ -165,7 +165,7 @@ for my $row (@pi_check) {
         for my $p (@scan_primes) { push @sub, $p if $p <= $lim }
         $source = "scan"
     }
-    my $got = len(@sub)
+    my $got = len @sub
     my $note = ($got == $expect) ? "ok" : "MISMATCH"
     printf("  pi(%-3d) %-7s -> %-3d (expect %-3d)  %s\n",
            $lim, $source, $got, $expect, $note)

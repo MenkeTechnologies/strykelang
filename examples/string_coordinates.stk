@@ -11,20 +11,20 @@
 
 p "── ASCII-only — both systems agree ────────────────────"
 my $ascii = "hello world"
-printf "  len(\"hello world\") : %d bytes\n",  len($ascii)
-printf "  len(   \"hello world\") : %d codepts\n", len($ascii)
+printf "  len(\"hello world\") : %d bytes\n",  len $ascii
+printf "  len(   \"hello world\") : %d codepts\n", len $ascii
 
 p ""
 p "── Multibyte UTF-8 — systems diverge ──────────────────"
 my $em = "hello — world";       # em dash is 3 bytes in UTF-8
-printf "  len('hello — world') : %d bytes\n",   len($em)
-printf "  len(   'hello — world') : %d codepts\n", len($em)
+printf "  len('hello — world') : %d bytes\n",   len $em
+printf "  len(   'hello — world') : %d codepts\n", len $em
 
 p ""
 p "── Emoji are multi-byte sequences ─────────────────────"
 my $em2 = "🔑 keys 🔐"
-printf "  len('🔑 keys 🔐') : %d bytes\n",   len($em2)
-printf "  len(   '🔑 keys 🔐') : %d codepts\n", len($em2)
+printf "  len('🔑 keys 🔐') : %d bytes\n",   len $em2
+printf "  len(   '🔑 keys 🔐') : %d codepts\n", len $em2
 
 p ""
 p "── Index vs cindex — byte vs codepoint search ─────────"
@@ -42,7 +42,7 @@ p ""
 p "── Iteration — for over codepoints ────────────────────"
 my $word = "🌟café🌟"
 printf "  word              : %s\n", $word
-printf "  len(word)         : %d codepoints\n", len($word)
+printf "  len(word)         : %d codepoints\n", len $word
 my @cps
 for my $i (0:len($word)-1) {
     push @cps, $word[$i]

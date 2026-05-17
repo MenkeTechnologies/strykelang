@@ -15,7 +15,7 @@
 fn Demo::Calc::tokenize($src) {
     my @tokens
     my $i = 0
-    my $n = len($src)
+    my $n = len $src
     while ($i < $n) {
         my $c = substr($src, $i, 1)
         if ($c eq " " || $c eq "\t") { $i++; next }
@@ -60,7 +60,7 @@ mysync $tokens
 mysync $pos
 
 fn Demo::Calc::peek() {
-    return undef if $pos >= len(@$tokens)
+    return undef if $pos >= len @$tokens
     $tokens->[$pos]
 }
 
@@ -251,8 +251,8 @@ for my $i ($hstart : len(@history) - 1) {
 
 p ""
 p "── stats ────────────────────────────────────────────"
-printf "  inputs processed : %d\n", len(@inputs)
-printf "  history entries  : %d\n", len(@history)
+printf "  inputs processed : %d\n", len @inputs
+printf "  history entries  : %d\n", len @history
 printf "  vars defined     : %d\n", len(keys %vars)
 printf "  p50 latency      : %.1f µs\n", td_quantile($td_eval, 0.50)
 printf "  p99 latency      : %.1f µs\n", td_quantile($td_eval, 0.99)

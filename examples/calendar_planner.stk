@@ -64,7 +64,7 @@ if (len(@conflicts) == 0) {
     p "── no conflicts ─────────────────────────────────────"
 } else {
     printf "── %d conflicts ──────────────────────────────────────\n",
-        len(@conflicts)
+        len @conflicts
     for my $c (@conflicts) {
         my $e1 = $c->[0]
         my $e2 = $c->[1]
@@ -141,7 +141,7 @@ printf "  total busy     : %d min (%.0f%%)\n",
 printf "  total free     : %d min (%.0f%%)\n",
     $total_free, 100.0 * $total_free / $work_total
 printf "  events         : %d (%d after conflict removal)\n",
-    len(@events), len(@clean)
+    len(@events), len @clean
 
 # ── HLL distinct titles ────────────────────────────────────────────
 
