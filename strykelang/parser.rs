@@ -21399,4 +21399,78 @@ mod tests {
         parse_ok("my $i = ~> 100 rand int");
         parse_ok("~> 42 srand");
     }
+
+    /// Recursive expression-bodied `fn` with path compression — the
+    /// union-find demo idiom: `fn UF::find($uf, $x) { ... }` body
+    /// re-invokes itself and writes the result into a hashref slot.
+    #[test]
+    fn recursive_fn_with_arrayref_assignment_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "fn UF::find($uf, $x) { \
+                return $x if $uf->{parent}[$x] == $x; \
+                $uf->{parent}[$x] = UF::find($uf, $uf->{parent}[$x]); \
+                $uf->{parent}[$x] \
+             }",
+        );
+    }
+
+    /// Hash-initialised with computed list inside arrayref literal —
+    /// `[0:$n - 1]` and `[(0) x $n]` as field values. Used by UF::new.
+    #[test]
+    fn hashref_init_with_range_and_repeat_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "fn UF::new($n) = +{ parent => [0:$n - 1], rank => [(0) x $n], count => $n }",
+        );
+    }
+
+    /// Postfix-for over an arrayref-deref: `Trie::insert($t, $_) for @$words`.
+    /// Used by Trie::from_words.
+    #[test]
+    fn postfix_for_arrayref_deref_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my @words = (\"a\", \"b\"); my $r = \\@words; my @out; push @out, $_ for @$r");
+    }
+
+    /// Tuple-swap destructure inside a block — UF::union flips ra/rb
+    /// for union-by-rank.
+    #[test]
+    fn tuple_swap_destructure_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $ra = 1; my $rb = 2; ($ra, $rb) = ($rb, $ra)");
+    }
+
+    /// 2-D array initialised with explicit row arrayrefs — the
+    /// `--no-interop` mode rejects 2-D autoviv (`$d[$i][$j] = X`
+    /// on un-initialized `@d`), so each row must be an arrayref
+    /// literal first. Damerau-Levenshtein demo's matrix setup.
+    #[test]
+    fn explicit_2d_array_row_init_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my @d; my $m = 3; my $n = 4; \
+             for my $i (0:$m) { $d[$i] = [(0) x ($n + 1)] }",
+        );
+    }
+
+    /// `min()` with 3 arguments — Damerau-Levenshtein uses this for the
+    /// deletion/insertion/substitution step.
+    #[test]
+    fn min_with_three_args_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $x = min(1, 2, 3)");
+        parse_ok("my @d; $d[0][0] = 5; my $r = min($d[0][0] + 1, $d[0][0] + 1, $d[0][0] + 0)");
+    }
+
+    /// String slice with `$s[N:M]` where M is `len(...)`-based.
+    /// Trie::count_with_prefix shape.
+    #[test]
+    fn string_slice_with_len_bound_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my $w = \"apple\"; my $pre = \"app\"; \
+             my $ok = len($w) >= len($pre) && $w[0:len($pre) - 1] eq $pre",
+        );
+    }
 }

@@ -1,0 +1,86 @@
+#!/usr/bin/env stryke
+
+# Merge sort — classic divide-and-conquer, O(n log n) worst-case,
+# stable, requires O(n) extra space. Complement to quicksort_no_interop
+# which is in-place but worst-case O(n²). Parses clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * native `@arr[a:b]` slicing instead of `splice`/`substr` (rule 6a)
+#   * implicit return on tail (rule 7)
+#   * `len(@$ref)` (rule 5)
+#   * `#{…}` interpolation (rule 1a)
+#
+# Namespaced UDFs `Merge::*`.
+#
+# Run: stryke --no-interop examples/mergesort_no_interop.stk
+
+# Sort a list of comparables. Stable: equal elements preserve order.
+fn Merge::sort($xs_ref) {
+    my @xs = @$xs_ref
+    return \@xs if len(@xs) <= 1
+    my $mid = int(len(@xs) / 2)
+    my @left  = @xs[0:$mid - 1]
+    my @right = @xs[$mid:len(@xs) - 1]
+    Merge::merge(Merge::sort(\@left), Merge::sort(\@right))
+}
+
+# Merge two already-sorted arrayrefs into a new sorted arrayref.
+fn Merge::merge($l, $r) {
+    my @out
+    my $i = 0
+    my $j = 0
+    while ($i < len(@$l) && $j < len(@$r)) {
+        if ($l->[$i] <= $r->[$j]) { push @out, $l->[$i]; $i++ }
+        else                      { push @out, $r->[$j]; $j++ }
+    }
+    push @out, @{$l}[$i:len(@$l) - 1] if $i < len(@$l)
+    push @out, @{$r}[$j:len(@$r) - 1] if $j < len(@$r)
+    \@out
+}
+
+my @cases = (
+    +{ input => [],                            sorted => []                            },
+    +{ input => [42],                          sorted => [42]                          },
+    +{ input => [3, 1, 2],                     sorted => [1, 2, 3]                     },
+    +{ input => [5, 4, 3, 2, 1],               sorted => [1, 2, 3, 4, 5]               },  # reverse
+    +{ input => [1, 2, 3, 4, 5],               sorted => [1, 2, 3, 4, 5]               },  # already sorted
+    +{ input => [3, 3, 3, 3],                  sorted => [3, 3, 3, 3]                  },  # all equal
+    +{ input => [-5, 0, 5, -10, 10],           sorted => [-10, -5, 0, 5, 10]           },
+    +{ input => [9, 1, 8, 2, 7, 3, 6, 4, 5],   sorted => [1, 2, 3, 4, 5, 6, 7, 8, 9]   },
+)
+
+p "── Merge sort demo ──"
+my $fail = 0
+for my $c (@cases) {
+    my $got     = Merge::sort($c->{input})
+    my $got_s   = join(",", @$got)
+    my $want_s  = join(",", @{$c->{sorted}})
+    my $ok      = $got_s eq $want_s
+    $fail++ unless $ok
+    p "  [@{$c->{input}}] → [@$got]  #{$ok ? \"\" : \"FAIL (want [$want_s])\"}"
+}
+die "#{$fail} / #{len @cases} sort cases failed" if $fail > 0
+
+# Universal invariant: output non-decreasing, length preserved.
+for my $c (@cases) {
+    my $r = Merge::sort($c->{input})
+    die "length changed on @{$c->{input}}" unless len(@$r) == len(@{$c->{input}})
+    next if len(@$r) < 2
+    for my $i (1:len(@$r) - 1) {
+        die "non-decreasing violated at $i" unless $r->[$i] >= $r->[$i - 1]
+    }
+}
+
+# Stress: shuffle 0:99 and re-sort.
+my @big = 0:99
+my @shuffled
+while (len(@big) > 0) {
+    my $i = int(rand @big)
+    push @shuffled, $big[$i]
+    splice @big, $i, 1
+}
+my $sorted = Merge::sort(\@shuffled)
+die "100-shuffle should round-trip" unless join(",", @$sorted) eq join(",", 0:99)
+
+p ""
+p "  ALL PASS (8 cases + non-decreasing/length invariants + 100-shuffle stress)"
