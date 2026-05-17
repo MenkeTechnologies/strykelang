@@ -16,7 +16,7 @@
 
 fn Demo::PQ::new() = []
 
-fn Demo::PQ::is_empty($pq) = len(@$pq) == 0
+fn Demo::PQ::is_empty = len(@{$_0}) == 0
 
 fn Demo::PQ::push($pq, $prio, $item) {
     # Find insertion point via linear scan (small N).

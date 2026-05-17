@@ -18,7 +18,7 @@
 
 # ── Mini union-find (inline) ─────────────────────────────────────────
 
-fn MST::UF::new($n) = +{ parent => [0:$n - 1], rank => [(0) x $n] }
+fn MST::UF::new = +{ parent => [0:_0 - 1], rank => [(0) x _0] }
 
 fn MST::UF::find($uf, $x) {
     return $x if $uf->{parent}[$x] == $x

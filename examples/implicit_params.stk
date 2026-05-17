@@ -29,7 +29,7 @@ p "  evens   : ", join(",", @evens)
 
 p ""
 p "── Multi-positional _0 / _1 / _2 in custom callbacks ──"
-fn Demo::compute($x, $y, $z) = $x + $y * $z
+fn Demo::compute = _0 + _1 * _2
 # A 3-arg block-form invocation uses _0, _1, _2:
 my $sum = Demo::compute(1, 2, 3)
 p "  Demo::compute(1,2,3) = $sum"

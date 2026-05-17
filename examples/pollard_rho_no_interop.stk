@@ -18,7 +18,7 @@
 fn Rho::gcd     = _1 == 0 ? _0 : Rho::gcd(_1, _0 % _1)
 
 # Pseudo-random step: f(x) = (x² + c) mod n.
-fn Rho::step($x, $c, $n) = ($x * $x + $c) % $n
+fn Rho::step = (_0 * _0 + _1) % _2
 
 # Try to find a non-trivial factor of n with given seed/constant.
 # Returns the factor, or n itself if the run hit n's own period.
