@@ -62,6 +62,7 @@ pub mod dap;
 pub mod lsp;
 pub mod lsp_docs_domains;
 pub mod lsp_extras;
+pub mod lsp_symbols;
 mod map_grep_fast;
 mod map_stream;
 pub mod mcp;

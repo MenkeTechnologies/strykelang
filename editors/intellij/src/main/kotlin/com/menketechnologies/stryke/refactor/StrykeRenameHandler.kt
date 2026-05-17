@@ -41,20 +41,24 @@ class StrykeRenameHandler : RenameHandler {
     override fun isRenaming(dataContext: DataContext): Boolean = isAvailableOnDataContext(dataContext)
 
     override fun invoke(project: Project, editor: Editor?, file: PsiFile?, dataContext: DataContext?) {
-        if (editor == null || file == null) return
-        val virtualFile = file.virtualFile ?: return
+        dbg("invoked")
+        if (editor == null) { dbg("ABORT: no editor"); return }
+        if (file == null) { dbg("ABORT: no file"); return }
+        val virtualFile = file.virtualFile ?: run { dbg("ABORT: no virtualFile"); return }
         val server = LspServerManager.getInstance(project)
             .getServersForProvider(StrykeLspServerSupportProvider::class.java)
-            .firstOrNull() ?: return
+            .firstOrNull()
+        if (server == null) { dbg("ABORT: no LSP server"); return }
+        dbg("server=${server.descriptor.presentableName} state=${server.state}")
 
         val offset = editor.caretModel.offset
         val doc = editor.document
         val line = doc.getLineNumber(offset)
         val col = offset - doc.getLineStartOffset(line)
         val pos = Position(line, col)
-
-        // Heuristic: pre-fill the dialog with the identifier under the caret.
         val identifier = identifierAt(doc.charsSequence, offset)
+        dbg("caret line=$line col=$col offset=$offset identifier='$identifier'")
+
         val newName = Messages.showInputDialog(
             project,
             "Rename '${identifier.ifEmpty { "<identifier>" }}' to:",
@@ -62,45 +66,127 @@ class StrykeRenameHandler : RenameHandler {
             null,
             identifier,
             null,
-        ) ?: return
-        if (newName.isBlank() || newName == identifier) return
+        )
+        if (newName == null) { dbg("ABORT: user cancelled"); return }
+        if (newName.isBlank()) { dbg("ABORT: blank newName"); return }
+        if (newName == identifier) { dbg("ABORT: unchanged"); return }
+        dbg("newName='$newName'")
 
         val params = RenameParams(
             TextDocumentIdentifier(server.getDocumentIdentifier(virtualFile).uri),
             pos,
             newName,
         )
-        val edit: WorkspaceEdit? = server.sendRequestSync(
-            LspServer.DEFAULT_REQUEST_TIMEOUT_MS,
-        ) { lsp4j -> lsp4j.textDocumentService.rename(params) }
-
-        if (edit == null) return
-
-        // Apply edits manually: for each URI in the WorkspaceEdit's
-        // `changes` map, find the document and run `applyTextEdits`. The
-        // platform's `Lsp4jUtilKt.applyTextEdits` handles document-version
-        // checks + reverse-sorted offset application for us.
-        val changes = edit.changes ?: emptyMap()
-        WriteCommandAction.runWriteCommandAction(project) {
-            for ((uri, edits) in changes) {
-                val vf = VirtualFileManager.getInstance().findFileByUrl(uri) ?: continue
-                val document = FileDocumentManager.getInstance().getDocument(vf) ?: continue
-                applyTextEdits(document, edits)
+        dbg("sending textDocument/rename uri=${params.textDocument.uri}")
+        val edit: WorkspaceEdit? = try {
+            server.sendRequestSync(LspServer.DEFAULT_REQUEST_TIMEOUT_MS) { lsp4j ->
+                lsp4j.textDocumentService.rename(params)
             }
+        } catch (t: Throwable) {
+            dbg("EXCEPTION sending rename: ${t::class.java.simpleName}: ${t.message}")
+            Messages.showErrorDialog(project, "LSP rename request failed: ${t.message}", "Rename")
+            return
+        }
+        if (edit == null) {
+            dbg("ABORT: LSP returned null WorkspaceEdit — server refused the rename for this identifier")
+            Messages.showWarningDialog(
+                project,
+                "LSP server returned no rename for '$identifier'. The server only renames named " +
+                    "function (sub/fn) declarations — local `my` variables and parameters aren't " +
+                    "yet supported by the rename provider.",
+                "Rename",
+            )
+            return
+        }
+        dbg("got WorkspaceEdit changes=${edit.changes?.size ?: 0} documentChanges=${edit.documentChanges?.size ?: 0}")
+
+        // WorkspaceEdit per the LSP spec has TWO mutually-exclusive forms:
+        //   - `changes`: Map<URI, TextEdit[]>            (simple form)
+        //   - `documentChanges`: TextDocumentEdit[]      (versioned form)
+        // Servers MAY emit either. Handle both — the prior code only
+        // checked `changes` and dropped servers that use `documentChanges`.
+        //
+        // `WriteCommandAction.runWriteCommandAction` provides both the
+        // CommandProcessor and WriteAction contexts required by
+        // `applyTextEdits` (IntentionAction.invoke Javadoc applies here
+        // too — document mutations need both wrappers).
+        WriteCommandAction.runWriteCommandAction(project) {
+            var totalEdits = 0
+            edit.changes?.forEach { (uri, edits) ->
+                val vf = VirtualFileManager.getInstance().findFileByUrl(uri)
+                if (vf == null) { dbg("no VirtualFile for uri=$uri"); return@forEach }
+                val document = FileDocumentManager.getInstance().getDocument(vf)
+                if (document == null) { dbg("no Document for $uri"); return@forEach }
+                dbg("applying ${edits.size} edits to $uri")
+                applyTextEdits(document, edits)
+                totalEdits += edits.size
+            }
+            edit.documentChanges?.forEach { dc ->
+                if (dc.isLeft) {
+                    val tde = dc.left ?: return@forEach
+                    val uri = tde.textDocument.uri
+                    val vf = VirtualFileManager.getInstance().findFileByUrl(uri)
+                    if (vf == null) { dbg("no VirtualFile for uri=$uri (docChanges)"); return@forEach }
+                    val document = FileDocumentManager.getInstance().getDocument(vf)
+                    if (document == null) { dbg("no Document for $uri (docChanges)"); return@forEach }
+                    dbg("applying ${tde.edits.size} edits to $uri (docChanges)")
+                    applyTextEdits(document, tde.edits)
+                    totalEdits += tde.edits.size
+                } else {
+                    dbg("skipping non-edit documentChange: ${dc.right?.javaClass?.simpleName}")
+                }
+            }
+            dbg("totalEdits applied = $totalEdits")
         }
         FileDocumentManager.getInstance().saveAllDocuments()
+        dbg("done")
+    }
+
+    private fun dbg(msg: String) {
+        com.menketechnologies.stryke.StrykeDebugLog.log("rename", msg)
     }
 
     override fun invoke(project: Project, elements: Array<PsiElement>, dataContext: DataContext?) {
         // Element-array form unused for our use case.
     }
 
+    /**
+     * Identifier span at `offset`, INCLUDING `::` package separators.
+     * `Foo::bar` is one identifier; `Foo::Baz::qux` is one identifier. A
+     * single `:` is not part of an identifier — only paired `::`. Without
+     * the namespace tail the rename dialog prefills with `bar`, sends
+     * `bar` to the LSP, and the LSP can't resolve a sub declaration for
+     * the unqualified name.
+     */
     private fun identifierAt(chars: CharSequence, offset: Int): String {
         if (offset < 0 || offset > chars.length) return ""
         var s = offset
         var e = offset
-        while (s > 0 && isIdentChar(chars[s - 1])) s--
-        while (e < chars.length && isIdentChar(chars[e])) e++
+        // Walk left
+        while (s > 0) {
+            val c = chars[s - 1]
+            if (isIdentChar(c)) { s--; continue }
+            // `::` between two letter/digit/underscore runs
+            if (c == ':' && s >= 2 && chars[s - 2] == ':' &&
+                s >= 3 && isIdentChar(chars[s - 3])
+            ) {
+                s -= 2
+                continue
+            }
+            break
+        }
+        // Walk right
+        while (e < chars.length) {
+            val c = chars[e]
+            if (isIdentChar(c)) { e++; continue }
+            if (c == ':' && e + 1 < chars.length && chars[e + 1] == ':' &&
+                e + 2 < chars.length && isIdentChar(chars[e + 2])
+            ) {
+                e += 2
+                continue
+            }
+            break
+        }
         if (s == e) return ""
         return chars.subSequence(s, e).toString()
     }

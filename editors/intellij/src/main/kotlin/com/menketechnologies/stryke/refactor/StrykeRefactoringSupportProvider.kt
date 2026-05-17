@@ -4,6 +4,7 @@ import com.intellij.lang.refactoring.RefactoringSupportProvider
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.DataContext
+import com.intellij.openapi.command.CommandProcessor
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.SelectionModel
@@ -78,28 +79,35 @@ private class LspExtractActionHandler(
         file: PsiFile?,
         dataContext: DataContext?,
     ) {
+        dbg("invoked")
         LOG.info("LspExtractActionHandler($refactoringName) invoked")
         if (editor == null) {
+            dbg("ABORT: no editor")
             notifyUser(project, "$refactoringName: no editor")
             return
         }
         if (file == null) {
+            dbg("ABORT: no file")
             notifyUser(project, "$refactoringName: no file")
             return
         }
         val virtualFile = file.virtualFile
         if (virtualFile == null) {
+            dbg("ABORT: file has no VirtualFile")
             notifyUser(project, "$refactoringName: file has no VirtualFile")
             return
         }
         val server = findStrykeLspServer(project)
         if (server == null) {
+            dbg("ABORT: no LSP server found via LspServerManager.getServersForProvider(StrykeLspServerSupportProvider::class.java)")
             notifyUser(project, "$refactoringName: LSP server not running. Check Help → Show Log for `Starting stryke LSP:`.")
             return
         }
+        dbg("file=${virtualFile.path} server=${server.descriptor.presentableName} state=${server.state}")
 
         val selection = editor.selectionModel
         val (range, hasSelection) = selectionRange(editor.document, selection)
+        dbg("selection: hasSelection=$hasSelection range=$range startOffset=${selection.selectionStart} endOffset=${selection.selectionEnd} text=${selection.selectedText?.take(80)?.replace('\n', '⏎')}")
         if (!hasSelection) {
             notifyUser(project, "$refactoringName: select an expression first, then invoke this action.")
             return
@@ -112,30 +120,83 @@ private class LspExtractActionHandler(
             CodeActionContext(emptyList()),
         )
 
-        val response: List<Either<org.eclipse.lsp4j.Command, CodeAction>>? = server.sendRequestSync(
-            LspServer.DEFAULT_REQUEST_TIMEOUT_MS,
-        ) { lsp4j -> lsp4j.textDocumentService.codeAction(params) }
+        dbg("sending textDocument/codeAction…")
+        val response: List<Either<org.eclipse.lsp4j.Command, CodeAction>>? = try {
+            server.sendRequestSync(
+                LspServer.DEFAULT_REQUEST_TIMEOUT_MS,
+            ) { lsp4j -> lsp4j.textDocumentService.codeAction(params) }
+        } catch (t: Throwable) {
+            dbg("EXCEPTION sending codeAction: ${t::class.java.simpleName}: ${t.message}")
+            notifyUser(project, "$refactoringName: LSP request threw ${t::class.java.simpleName}: ${t.message}")
+            return
+        }
 
         LOG.info("LspExtractActionHandler($refactoringName) got ${response?.size ?: 0} actions")
+        dbg("got ${response?.size ?: 0} actions")
         if (response.isNullOrEmpty()) {
             notifyUser(project, "$refactoringName: LSP returned no code actions for this range.")
             return
         }
         val candidates = response.mapNotNull { e -> if (e.isRight) e.right else null }
+        dbg("candidate titles: ${candidates.joinToString(" | ") { it.title }}")
         val match: CodeAction = candidates.firstOrNull { titleMatches(it.title.lowercase()) }
             ?: run {
                 val titles = candidates.joinToString("; ") { it.title }
                 val tail = if (hint != null) "  $hint" else ""
+                dbg("ABORT: no title matched filter; got: $titles")
                 notifyUser(project, "$refactoringName: no matching action. LSP returned: $titles$tail")
                 return
             }
 
         LOG.info("LspExtractActionHandler($refactoringName) applying '${match.title}'")
-        // Reuse the same wrapper IntelliJ uses for Alt-Enter intentions —
-        // it handles WorkspaceEdit application, commit, and undo grouping
-        // correctly without us reimplementing the edit flow.
-        val intention = LspIntentionAction(server, match)
-        intention.invoke(project, editor, file)
+        dbg("applying '${match.title}'")
+        // Per `IntentionAction.invoke` Javadoc:
+        //   "This method is called inside a command (see CommandProcessor).
+        //    If startInWriteAction() returns true, this method is also
+        //    called inside a write action."
+        //
+        // Two wrappers are required when invoking an IntentionAction
+        // programmatically from a non-Alt-Enter context:
+        //   1. CommandProcessor.executeCommand — provides the undo/redo
+        //      grouping and document-mutation context.
+        //   2. WriteCommandAction — required if `startInWriteAction()` is
+        //      true. `LspIntentionAction` returns false (it manages its
+        //      own WriteAction internally via WriteAction.run inside
+        //      invoke), so only CommandProcessor is needed at this layer.
+        //
+        // Plus: `isAvailable` MUST be called first to prime the wrapper's
+        // internal `uriToDocumentMap` — without that priming, `invoke` is
+        // a silent no-op (see the LspIntentionAction.class disassembly).
+        try {
+            val intention = LspIntentionAction(server, match)
+            val available = intention.isAvailable(project, editor, file)
+            dbg("isAvailable() = $available  startInWriteAction=${intention.startInWriteAction()}")
+            if (!available) {
+                notifyUser(project, "$refactoringName: LSP intention reported isAvailable=false; no edit applied.")
+                return
+            }
+            CommandProcessor.getInstance().executeCommand(
+                project,
+                {
+                    try {
+                        intention.invoke(project, editor, file)
+                        dbg("intention.invoke() returned cleanly inside CommandProcessor")
+                    } catch (t: Throwable) {
+                        dbg("EXCEPTION inside command: ${t::class.java.simpleName}: ${t.message}")
+                        throw t
+                    }
+                },
+                "Stryke: $refactoringName",
+                "stryke.refactor",
+            )
+        } catch (t: Throwable) {
+            dbg("EXCEPTION applying intention: ${t::class.java.simpleName}: ${t.message}")
+            notifyUser(project, "$refactoringName: applying the WorkspaceEdit threw ${t::class.java.simpleName}: ${t.message}")
+        }
+    }
+
+    private fun dbg(msg: String) {
+        com.menketechnologies.stryke.StrykeDebugLog.log("refactor:$refactoringName", msg)
     }
 
     override fun invoke(
