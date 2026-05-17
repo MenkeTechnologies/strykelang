@@ -2,24 +2,24 @@
 
 # ── Project::StringsAdvancedImpl::adv_levenshtein: minimum number of edits to change one string to another ─────
 fn Project::StringsAdvancedImpl::adv_levenshtein($s1, $s2) {
-    my $len1 = length($s1)
-    my $len2 = length($s2)
+    my $len1 = len($s1)
+    my $len2 = len($s2)
     
     return $len2 if $len1 == 0
     return $len1 if $len2 == 0
     
     my @d = ()
-    ~> 0..$len1 ep {
+    ~> 0:$len1 ep {
         $d[_] = []
         $d[_][0] = _
     }
-    ~> 0..$len2 ep {
+    ~> 0:$len2 ep {
         $d[0][_] = _
     }
     
-    for my $i (1..$len1) {
+    for my $i (1:$len1) {
         my $char1 = substr($s1, $i-1, 1)
-        for my $j (1..$len2) {
+        for my $j (1:$len2) {
             my $char2 = substr($s2, $j-1, 1)
             my $cost = ($char1 eq $char2) ? 0 : 1
             
@@ -40,20 +40,20 @@ fn Project::StringsAdvancedImpl::adv_levenshtein($s1, $s2) {
 
 # ── Project::StringsAdvancedImpl::adv_lcs: longest common subsequence length ─────
 fn Project::StringsAdvancedImpl::adv_lcs($s1, $s2) {
-    my $len1 = length($s1)
-    my $len2 = length($s2)
+    my $len1 = len($s1)
+    my $len2 = len($s2)
     
     my @dp = ()
-    for my $i (0..$len1) {
+    for my $i (0:$len1) {
         $dp[$i] = []
-        ~> 0..$len2 ep {
+        ~> 0:$len2 ep {
             $dp[$i][_] = 0
         }
     }
 
-    for my $i (1..$len1) {
+    for my $i (1:$len1) {
         my $char1 = substr($s1, $i-1, 1)
-        for my $j (1..$len2) {
+        for my $j (1:$len2) {
             my $char2 = substr($s2, $j-1, 1)
             if ($char1 eq $char2) {
                 $dp[$i][$j] = $dp[$i-1][$j-1] + 1
@@ -78,7 +78,7 @@ fn Project::StringsAdvancedImpl::adv_is_anagram($s1, $s2) {
     my $s2_clean = lc($s2)
     $s2_clean =~ s/\s+//g
     
-    return 0 if length($s1_clean) != length($s2_clean)
+    return 0 if len($s1_clean) != len($s2_clean)
     
     my @c1 = sort split("", $s1_clean)
     my @c2 = sort split("", $s2_clean)
@@ -94,7 +94,7 @@ fn Project::StringsAdvancedImpl::adv_word_frequency($s) {
     
     my %freq = ()
     ~> @words ep {
-        if (length(_) > 0) {
+        if (len(_) > 0) {
             $freq{_} = ($freq{_} // 0) + 1
         }
     }

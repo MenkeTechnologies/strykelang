@@ -22,15 +22,15 @@ assert_eq $url_decoded, "hello world?foo=bar", "url roundtrip"
 
 # SHA hashes
 my $sha256 = sha256("hello")
-assert_eq length($sha256), 64, "sha256 length"
+assert_eq len($sha256), 64, "sha256 length"
 my $sha512 = sha512("hello")
-assert_eq length($sha512), 128, "sha512 length"
+assert_eq len($sha512), 128, "sha512 length"
 my $sha1 = sha1("hello")
-assert_eq length($sha1), 40, "sha1 length"
+assert_eq len($sha1), 40, "sha1 length"
 
 # MD5
 my $md5 = md5("hello")
-assert_eq length($md5), 32, "md5 length"
+assert_eq len($md5), 32, "md5 length"
 
 # CRC32
 my $crc = crc32("hello")
@@ -38,7 +38,7 @@ assert_ok $crc > 0, "crc32 returns number"
 
 # UUID
 my $uuid = uuid()
-assert_eq length($uuid), 36, "uuid length with dashes"
+assert_eq len($uuid), 36, "uuid length with dashes"
 assert_ok $uuid =~ /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/, "uuid format"
 
 # Multiple UUIDs are unique
@@ -48,7 +48,7 @@ assert_ok $uuid ne $uuid2, "uuids are unique"
 # JSON roundtrip
 my $data = {name => "test", values => [1, 2, 3], nested => {a => 1}}
 my $json = to_json $data
-assert_ok length($json) > 0, "to_json produces output"
+assert_ok len($json) > 0, "to_json produces output"
 my $decoded = json_decode $json
 assert_eq $decoded->{name}, "test", "json roundtrip name"
 assert_eq $decoded->{values}[1], 2, "json roundtrip array"

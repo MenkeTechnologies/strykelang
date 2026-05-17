@@ -7,15 +7,15 @@ require "./lib/hashes_extended.stk"
 # ══════════════════════════════════════════════════════════════════════════════
 
 my %pairs = (a => 1, b => 2, c => 3)
-assert_eq scalar(keys %pairs), 3, "from pairs count"
+assert_eq len(keys %pairs), 3, "from pairs count"
 assert_eq $pairs{a}, 1, "from pairs value"
 
 my %list_h = qw(a 1 b 2 c 3)
-assert_eq scalar(keys %list_h), 3, "from list count"
+assert_eq len(keys %list_h), 3, "from list count"
 assert_eq $list_h{b}, 2, "from list value"
 
 my %empty_h = ()
-assert_eq scalar(keys %empty_h), 0, "empty count"
+assert_eq len(keys %empty_h), 0, "empty count"
 
 my %single_h = (key => "value")
 assert_eq $single_h{key}, "value", "single value"
@@ -145,14 +145,14 @@ assert_eq Project::HashesExtended::hash_group_by(), 3, "group by"
 
 # Empty hash operations
 my %empty_h = ()
-assert_eq scalar(keys %empty_h), 0, "empty keys"
-assert_eq scalar(values %empty_h), 0, "empty values"
+assert_eq len(keys %empty_h), 0, "empty keys"
+assert_eq len(values %empty_h), 0, "empty values"
 
 # Hash in boolean context
 my %bool_empty = ()
 my %bool_full = (x => 1)
-assert_eq scalar(keys %bool_empty), 0, "bool empty count"
-assert_eq scalar(keys %bool_full) > 0, 1, "bool full true"
+assert_eq len(keys %bool_empty), 0, "bool empty count"
+assert_eq len(keys %bool_full) > 0, 1, "bool full true"
 
 # Default value pattern
 my %dh = (a => 1)
@@ -185,15 +185,15 @@ assert_eq exists $uv{b} ? 1 : 0, 0, "missing not exists"
 
 # Large hash
 my %big
-~> 1..100 ep {
+~> 1:100 ep {
     $big{_} = _ * 2
 }
-assert_eq scalar(keys %big), 100, "large hash count"
+assert_eq len(keys %big), 100, "large hash count"
 assert_eq $big{50}, 100, "large hash access"
 
 # Hash to list
 my %f1 = (a => 1, b => 2)
 my @flist = %f1
-assert_eq scalar(@flist) >= 2, 1, "hash to list"
+assert_eq len(@flist) >= 2, 1, "hash to list"
 
 test_run

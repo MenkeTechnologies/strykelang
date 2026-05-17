@@ -24,17 +24,17 @@ assert_eq $is_even(5), 0, "5 not even"
 my @nums = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 
 my @doubled = map { _ * 2 } @nums
-assert_eq scalar(@doubled), 10, "map count"
+assert_eq len(@doubled), 10, "map count"
 assert_eq $doubled[0], 2, "map first"
 assert_eq $doubled[9], 20, "map last"
 
 my @evens = grep { _ % 2 == 0 } @nums
-assert_eq scalar(@evens), 5, "grep evens count"
+assert_eq len(@evens), 5, "grep evens count"
 assert_eq $evens[0], 2, "grep first even"
 assert_eq $evens[4], 10, "grep last even"
 
 my $sum_all = sum(@nums)
-assert_eq $sum_all, 55, "sum 1..10"
+assert_eq $sum_all, 55, "sum 1:10"
 
 my $max_val = max(@nums)
 assert_eq $max_val, 10, "max"
@@ -47,7 +47,7 @@ assert_eq $min_val, 1, "min"
 # ══════════════════════════════════════════════════════════════════════════════
 
 my @chain1 = map { _ * 2 } grep { _ % 2 == 0 } @nums
-assert_eq scalar(@chain1), 5, "chain count"
+assert_eq len(@chain1), 5, "chain count"
 assert_eq $chain1[0], 4, "chain first (2*2)"
 assert_eq $chain1[4], 20, "chain last (10*2)"
 
@@ -58,11 +58,11 @@ assert_eq $chain_sum, 330, "chain sum of squares >5"
 # PIPELINE OPERATOR
 # ══════════════════════════════════════════════════════════════════════════════
 
-my $piped = 1..10 |> grep { _ % 2 == 0 } |> map { _ * _ } |> sum
+my $piped = 1:10 |> grep { _ % 2 == 0 } |> map { _ * _ } |> sum
 assert_eq $piped, 220, "pipeline sum of even squares"
 
-my @piped_arr = 1..5 |> map { _ * 3 }
-assert_eq scalar(@piped_arr), 5, "pipeline to array count"
+my @piped_arr = 1:5 |> map { _ * 3 }
+assert_eq len(@piped_arr), 5, "pipeline to array count"
 assert_eq $piped_arr[0], 3, "pipeline array first"
 assert_eq $piped_arr[4], 15, "pipeline array last"
 
@@ -99,7 +99,7 @@ fn scan_fn($fn, $init, @items) {
 }
 
 my @running = scan_fn($add_fn, 0, 1, 2, 3, 4, 5)
-assert_eq scalar(@running), 6, "scan count"
+assert_eq len(@running), 6, "scan count"
 assert_eq $running[0], 0, "scan init"
 assert_eq $running[1], 1, "scan after 1"
 assert_eq $running[3], 6, "scan after 3"
@@ -125,8 +125,8 @@ fn partition_fn($pred, @items) {
 }
 
 my ($part_evens, $part_odds) = partition_fn($is_even, @nums)
-assert_eq scalar(@$part_evens), 5, "partition evens"
-assert_eq scalar(@$part_odds), 5, "partition odds"
+assert_eq len(@$part_evens), 5, "partition evens"
+assert_eq len(@$part_odds), 5, "partition odds"
 assert_eq $part_evens->[0], 2, "first even"
 assert_eq $part_odds->[0], 1, "first odd"
 
@@ -158,12 +158,12 @@ fn drop_while_fn($pred, @items) {
 
 my $lt5 = fn($x) { $x < 5 }
 my @taken = take_while_fn($lt5, 1, 2, 3, 4, 5, 6, 7)
-assert_eq scalar(@taken), 4, "take_while count"
+assert_eq len(@taken), 4, "take_while count"
 assert_eq $taken[0], 1, "take_while first"
 assert_eq $taken[3], 4, "take_while last"
 
 my @dropped = drop_while_fn($lt5, 1, 2, 3, 4, 5, 6, 7)
-assert_eq scalar(@dropped), 3, "drop_while count"
+assert_eq len(@dropped), 3, "drop_while count"
 assert_eq $dropped[0], 5, "drop_while first"
 assert_eq $dropped[2], 7, "drop_while last"
 
@@ -179,7 +179,7 @@ fn find_first_fn($pred, @items) {
 }
 
 fn find_idx_fn($pred, @items) {
-    for my $i (0..scalar(@items)-1) {
+    for my $i (0..len(@items)-1) {
         return $i if $pred($items[$i])
     }
     -1
@@ -240,13 +240,13 @@ fn chunk_fn($n, @items) {
     my @current
     for my $item (@items) {
         push @current, $item
-        if (scalar(@current) == $n) {
+        if (len(@current) == $n) {
             my $c = [@current]
             push @chunks, $c
             @current = ()
         }
     }
-    if (scalar(@current)) {
+    if (len(@current)) {
         my $c = [@current]
         push @chunks, $c
     }
@@ -254,13 +254,13 @@ fn chunk_fn($n, @items) {
 }
 
 my @chunked = chunk_fn(3, 1, 2, 3, 4, 5, 6, 7, 8)
-assert_eq scalar(@chunked), 3, "chunk count"
+assert_eq len(@chunked), 3, "chunk count"
 my $c0 = $chunked[0]
 my $c1 = $chunked[1]
 my $c2 = $chunked[2]
-assert_eq scalar(@$c0), 3, "chunk 0 size"
-assert_eq scalar(@$c1), 3, "chunk 1 size"
-assert_eq scalar(@$c2), 2, "chunk 2 size"
+assert_eq len(@$c0), 3, "chunk 0 size"
+assert_eq len(@$c1), 3, "chunk 1 size"
+assert_eq len(@$c2), 2, "chunk 2 size"
 assert_eq $c0->[0], 1, "chunk 0 first"
 assert_eq $c2->[1], 8, "chunk 2 last"
 

@@ -6,7 +6,7 @@ require "./lib/control_flow.stk"
 # ── FizzBuzz ────────────────────────────────────────────────────────
 
 my @fb = fizzbuzz(15)
-assert_eq scalar(@fb), 15, "fizzbuzz count"
+assert_eq len(@fb), 15, "fizzbuzz count"
 assert_eq $fb[0], 1, "fizzbuzz 1"
 assert_eq $fb[2], "Fizz", "fizzbuzz 3"
 assert_eq $fb[4], "Buzz", "fizzbuzz 5"
@@ -21,7 +21,7 @@ assert_eq Project::ControlFlow::collatz_steps(27), 111, "collatz 27"
 # ── Prime Finding ───────────────────────────────────────────────────
 
 my @primes = Project::ControlFlow::find_primes(50)
-assert_eq scalar(@primes), 15, "primes under 50 count"
+assert_eq len(@primes), 15, "primes under 50 count"
 assert_eq $primes[0], 2, "first prime"
 assert_eq $primes[-1], 47, "last prime under 50"
 
@@ -40,12 +40,12 @@ assert_eq Project::Math::lcm_of(21, 6), 42, "lcm basic"
 
 my @nums = (1, 5, 8, 12, 14, 20)
 my @pair = Project::ControlFlow::find_pair_sum(20, @nums)
-assert_eq scalar(@pair), 2, "Project::ControlFlow::find_pair_sum count"
+assert_eq len(@pair), 2, "Project::ControlFlow::find_pair_sum count"
 # 8 + 12 = 20
 my $sum = $pair[0] + $pair[1]
 assert_eq $sum, 20, "pair sum matches"
 
 my @no_pair = Project::ControlFlow::find_pair_sum(100, @nums)
-assert_eq scalar(@no_pair), 0, "Project::ControlFlow::find_pair_sum no match"
+assert_eq len(@no_pair), 0, "Project::ControlFlow::find_pair_sum no match"
 
 test_run

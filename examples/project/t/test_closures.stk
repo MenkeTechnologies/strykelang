@@ -51,7 +51,7 @@ assert_eq $step2(4), 24, "curried multiply"
 # ── Closure over loop variable ─────────────────────────────────────
 
 my @loop_fns = Project::Closures::make_closures_in_loop()
-assert_eq scalar(@loop_fns), 5, "loop closures count"
+assert_eq len(@loop_fns), 5, "loop closures count"
 
 my @explicit_fns = Project::Closures::make_closures_with_explicit_capture()
 assert_eq $explicit_fns[0](), 10, "explicit capture 0"
@@ -144,14 +144,14 @@ assert_eq Project::Closures::toggle_state(), "OFF", "toggle state second"
 assert_eq Project::Closures::toggle_state(), "ON", "toggle state third"
 
 my @buf1 = Project::Closures::ring_buffer_state(1)
-assert_eq scalar(@buf1), 1, "ring buffer size 1"
+assert_eq len(@buf1), 1, "ring buffer size 1"
 my @buf2 = Project::Closures::ring_buffer_state(2)
-assert_eq scalar(@buf2), 2, "ring buffer size 2"
+assert_eq len(@buf2), 2, "ring buffer size 2"
 Project::Closures::ring_buffer_state(3)
 Project::Closures::ring_buffer_state(4)
 Project::Closures::ring_buffer_state(5)
 my @buf5 = Project::Closures::ring_buffer_state(6)
-assert_eq scalar(@buf5), 5, "ring buffer max size"
+assert_eq len(@buf5), 5, "ring buffer max size"
 assert_eq $buf5[0], 2, "ring buffer oldest is 2"
 assert_eq $buf5[4], 6, "ring buffer newest is 6"
 

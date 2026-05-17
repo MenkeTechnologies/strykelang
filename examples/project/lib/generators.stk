@@ -28,7 +28,7 @@ fn Project::Generators::simple_fib_gen {
 # ── Project::Generators::take_gen: take N values from a generator ─────
 fn Project::Generators::take_gen($n, $g) {
     my @res;
-    for (1..$n) {
+    for (1:$n) {
         my $next = $g->next();
         # $next is [value, more_flag]
         # more_flag is 1 if yielded, 0 if exhausted

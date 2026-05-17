@@ -13,7 +13,7 @@ fn Project::Strings::get_initials ($name) {
 
 fn Project::Strings::truncate_str ($s, $max) {
     $max //= 50
-    length($s) > $max ? substr($s, 0, $max - 1) . "~" : $s
+    len($s) > $max ? substr($s, 0, $max - 1) . "~" : $s
 }
 
 fn Project::Strings::repeat_str ($s, $n) {
@@ -21,7 +21,7 @@ fn Project::Strings::repeat_str ($s, $n) {
 }
 
 fn Project::Strings::pad_center ($s, $width) {
-    my $pad = $width - length($s)
+    my $pad = $width - len($s)
     return $s if $pad <= 0
     my $left = int($pad / 2)
     my $right = $pad - $left
@@ -46,5 +46,5 @@ fn Project::Strings::caesar_cipher ($text, $shift) {
 
 # Count vowels in a string via pipeline
 fn Project::Strings::vowel_count ($s) {
-    scalar(grep { _ =~ /[aeiouAEIOU]/ } split("", $s))
+    len(grep { _ =~ /[aeiouAEIOU]/ } split("", $s))
 }

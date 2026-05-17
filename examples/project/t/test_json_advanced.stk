@@ -9,7 +9,7 @@ assert_ok $pretty =~ /items/, "json_pretty has items"
 
 # Minify
 my $minified = json_minify $pretty
-assert_ok length($minified) > 0, "minified has content"
+assert_ok len($minified) > 0, "minified has content"
 
 # Escape
 assert_eq escape_json("hello\nworld"), 'hello\\nworld', "escape newline"

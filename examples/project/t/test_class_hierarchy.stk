@@ -163,7 +163,7 @@ assert_eq $exec->total_reports(), 3, "executive total_reports (recursive)"
 assert_eq $exec->org_size(), 4, "executive org_size"
 
 my $chain = $emp1->chain_of_command()
-assert_eq scalar(@$chain), 3, "chain_of_command length"
+assert_eq len(@$chain), 3, "chain_of_command length"
 assert_eq $chain->[0]->name, "John Developer", "chain[0] is self"
 assert_eq $chain->[1]->name, "Jane Manager", "chain[1] is manager"
 assert_eq $chain->[2]->name, "Alice CEO", "chain[2] is exec"
@@ -180,7 +180,7 @@ $tech_dept->add_sub_department($eng_dept)
 $tech_dept->add_sub_department($qa_dept)
 
 assert_eq $eng_dept->parent->name, "Technology", "subdept parent"
-assert_eq scalar(@{$tech_dept->sub_departments}), 2, "tech_dept sub count"
+assert_eq len(@{$tech_dept->sub_departments}), 2, "tech_dept sub count"
 
 my $qa_eng = Employee(id => 300, name => "QA Person", employee_id => "QA001", department => "QA", salary => 80000.0, hire_date => "2022-01-01")
 $qa_dept->add_employee($qa_eng)
@@ -287,7 +287,7 @@ assert_ok $luxury_sports->is_supercar(), "luxury supercar"
 # ══════════════════════════════════════════════════════════════════════════════
 
 my $shapes = Project::ClassHierarchy::build_shape_scene()
-assert_eq scalar(@$shapes), 4, "Project::ClassHierarchy::build_shape_scene count"
+assert_eq len(@$shapes), 4, "Project::ClassHierarchy::build_shape_scene count"
 assert_ok $shapes->[0]->isa("Rectangle2D"), "shape[0] is Rectangle2D"
 assert_ok $shapes->[1]->isa("Circle2D"), "shape[1] is Circle2D"
 assert_ok $shapes->[2]->isa("Cube3D"), "shape[2] is Cube3D"
@@ -297,7 +297,7 @@ my $total_area = Project::ClassHierarchy::total_shape_area($shapes)
 assert_ok $total_area > 0, "Project::ClassHierarchy::total_shape_area positive"
 
 my $fleet = Project::ClassHierarchy::build_vehicle_fleet()
-assert_eq scalar(@$fleet), 3, "Project::ClassHierarchy::build_vehicle_fleet count"
+assert_eq len(@$fleet), 3, "Project::ClassHierarchy::build_vehicle_fleet count"
 assert_ok $fleet->[0]->isa("LuxurySportsCar"), "fleet[0] is LuxurySportsCar"
 assert_ok $fleet->[1]->isa("ElectricCar"), "fleet[1] is ElectricCar"
 assert_ok $fleet->[2]->isa("Truck"), "fleet[2] is Truck"

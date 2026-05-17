@@ -124,10 +124,10 @@ class MathUtil {
 
     fn Self.add_arrays($arr1, $arr2) {
         my @result = ()
-        my $max_len = scalar(@$arr1) > scalar(@$arr2) ? scalar(@$arr1) : scalar(@$arr2)
-        for my $i (0..$max_len - 1) {
-            my $val1 = $i < scalar(@$arr1) ? $arr1->[$i] : 0
-            my $val2 = $i < scalar(@$arr2) ? $arr2->[$i] : 0
+        my $max_len = len(@$arr1) > len(@$arr2) ? len(@$arr1) : len(@$arr2)
+        for my $i (0:$max_len - 1) {
+            my $val1 = $i < len(@$arr1) ? $arr1->[$i] : 0
+            my $val2 = $i < len(@$arr2) ? $arr2->[$i] : 0
             push @result, $val1 + $val2
         }
         \@result

@@ -11,7 +11,7 @@ assert_eq join(",", @pf28), "2,2,7", "Project::MathAdvanced::adv_prime_factors(2
 my @pf13 = Project::MathAdvanced::adv_prime_factors(13)
 assert_eq join(",", @pf13), "13", "Project::MathAdvanced::adv_prime_factors(13)"
 my @pf1 = Project::MathAdvanced::adv_prime_factors(1)
-assert_eq scalar(@pf1), 0, "Project::MathAdvanced::adv_prime_factors(1)"
+assert_eq len(@pf1), 0, "Project::MathAdvanced::adv_prime_factors(1)"
 
 # ── Project::MathAdvanced::adv_is_perfect ─────
 assert_ok Project::MathAdvanced::adv_is_perfect(6), "6 is perfect"

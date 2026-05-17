@@ -22,8 +22,8 @@ assert_eq $m_mul->[1][1], 8, "mul [1][1]"
 # ── Project::MathMatrix::adv_matrix_transpose ─────
 my $m5 = [[1, 2, 3], [4, 5, 6]]
 my $m_t = Project::MathMatrix::adv_matrix_transpose($m5)
-assert_eq scalar(@$m_t), 3, "transpose rows"
-assert_eq scalar(@{$m_t->[0]}), 2, "transpose cols"
+assert_eq len(@$m_t), 3, "transpose rows"
+assert_eq len(@{$m_t->[0]}), 2, "transpose cols"
 assert_eq $m_t->[0][1], 4, "transpose [0][1]"
 assert_eq $m_t->[2][1], 6, "transpose [2][1]"
 

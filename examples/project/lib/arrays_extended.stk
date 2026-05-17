@@ -5,7 +5,7 @@
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::ArraysExtended::arr_from_list { my @a = (1, 2, 3, 4, 5); @a }
-fn Project::ArraysExtended::arr_from_range { my @a = 1..10; @a }
+fn Project::ArraysExtended::arr_from_range { my @a = 1:10; @a }
 fn Project::ArraysExtended::arr_from_qw { my @a = qw(one two three); @a }
 fn Project::ArraysExtended::arr_empty { my @a = (); @a }
 fn Project::ArraysExtended::arr_single { my @a = (42); @a }
@@ -37,7 +37,7 @@ fn Project::ArraysExtended::arr_push_array {
 fn Project::ArraysExtended::arr_pop {
     my @a = (1, 2, 3)
     my $last = pop @a
-    ($last, scalar(@a))
+    ($last, len(@a))
 }
 
 fn Project::ArraysExtended::arr_pop_empty {
@@ -53,7 +53,7 @@ fn Project::ArraysExtended::arr_pop_empty {
 fn Project::ArraysExtended::arr_shift {
     my @a = (1, 2, 3)
     my $first = shift @a
-    ($first, scalar(@a))
+    ($first, len(@a))
 }
 
 fn Project::ArraysExtended::arr_shift_empty {
@@ -113,7 +113,7 @@ fn Project::ArraysExtended::arr_slice_indices {
 
 fn Project::ArraysExtended::arr_slice_range {
     my @a = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
-    @a[2..5]
+    @a[2:5]
 }
 
 fn Project::ArraysExtended::arr_slice_negative {
@@ -148,7 +148,7 @@ fn Project::ArraysExtended::arr_sort_reverse_numeric {
 
 fn Project::ArraysExtended::arr_sort_by_length {
     my @a = qw(bb aaa c dddd)
-    sort { length($a) <=> length($b) } @a
+    sort { len($a) <=> len($b) } @a
 }
 
 fn Project::ArraysExtended::arr_sort_case_insensitive {
@@ -263,7 +263,7 @@ fn Project::ArraysExtended::arr_last_index {
 fn Project::ArraysExtended::arr_wantarray_context {
     my @a = (1, 2, 3)
     my $count = @a
-    ($count, scalar(@a))
+    ($count, len(@a))
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -340,7 +340,7 @@ fn Project::ArraysExtended::arr_all_match {
 fn Project::ArraysExtended::arr_index_of {
     my @a = qw(a b c d e)
     my $idx = -1
-    for my $i (0..$#a) {
+    for my $i (0:$#a) {
         if ($a[$i] eq "c") {
             $idx = $i
             last
@@ -360,7 +360,7 @@ fn Project::ArraysExtended::arr_zip {
     my @a = (1, 2, 3)
     my @b = qw(a b c)
     my @result
-    for my $i (0..$#a) {
+    for my $i (0:$#a) {
         push @result, $a[$i], $b[$i]
     }
     @result

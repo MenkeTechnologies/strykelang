@@ -8,13 +8,13 @@ require "./lib/nested_oop.stk"
 # ══════════════════════════════════════════════════════════════════════════════
 
 my @points = Project::NestedOop::points_in_array()
-assert_eq scalar(@points), 3, "Project::NestedOop::points_in_array count"
+assert_eq len(@points), 3, "Project::NestedOop::points_in_array count"
 assert_eq $points[0]->x, 1, "Project::NestedOop::points_in_array[0].x"
 assert_eq $points[1]->y, 4, "Project::NestedOop::points_in_array[1].y"
 assert_eq $points[2]->x, 5, "Project::NestedOop::points_in_array[2].x"
 
 my $pts_ref = Project::NestedOop::points_in_arrayref()
-assert_eq scalar(@$pts_ref), 3, "Project::NestedOop::points_in_arrayref count"
+assert_eq len(@$pts_ref), 3, "Project::NestedOop::points_in_arrayref count"
 assert_eq $pts_ref->[0]->x, 10, "Project::NestedOop::points_in_arrayref->[0].x"
 assert_eq $pts_ref->[2]->y, 60, "Project::NestedOop::points_in_arrayref->[2].y"
 
@@ -25,14 +25,14 @@ assert_near $distances[0], 2.236, 0.01, "distance point 0"
 assert_near $distances[1], 5.0, 0.01, "distance point 1"
 
 my @filtered = Project::NestedOop::filter_points_in_quadrant(@points)
-assert_eq scalar(@filtered), 3, "filter quadrant 1"
+assert_eq len(@filtered), 3, "filter quadrant 1"
 
 my @sorted = Project::NestedOop::sort_points_by_x(@points)
 assert_eq $sorted[0]->x, 1, "sort by x first"
 assert_eq $sorted[2]->x, 5, "sort by x last"
 
 my $tasks = Project::NestedOop::tasks_in_array()
-assert_eq scalar(@$tasks), 4, "Project::NestedOop::tasks_in_array count"
+assert_eq len(@$tasks), 4, "Project::NestedOop::tasks_in_array count"
 assert_eq $tasks->[0]->title, "Setup", "task 0 title"
 assert_eq $tasks->[3]->id, 4, "task 3 id"
 
@@ -60,44 +60,44 @@ assert_eq $task_reg->{"TASK-002"}->id, 2, "Project::NestedOop::task_registry id"
 # ══════════════════════════════════════════════════════════════════════════════
 
 my $pq = Project::NestedOop::priority_queue()
-assert_eq scalar(@$pq), 4, "Project::NestedOop::priority_queue count"
+assert_eq len(@$pq), 4, "Project::NestedOop::priority_queue count"
 
 my $colors = Project::NestedOop::color_palette()
-assert_eq scalar(@$colors), 3, "Project::NestedOop::color_palette count"
+assert_eq len(@$colors), 3, "Project::NestedOop::color_palette count"
 
 my $workflow = Project::NestedOop::status_workflow()
-assert_eq scalar(@$workflow), 3, "Project::NestedOop::status_workflow count"
+assert_eq len(@$workflow), 3, "Project::NestedOop::status_workflow count"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ENUMS IN HASHES
 # ══════════════════════════════════════════════════════════════════════════════
 
 my $priority_map = Project::NestedOop::priority_labels()
-assert_eq scalar(keys %$priority_map), 4, "Project::NestedOop::priority_labels key count"
+assert_eq len(keys %$priority_map), 4, "Project::NestedOop::priority_labels key count"
 
 my $status_map = Project::NestedOop::status_by_id()
-assert_eq scalar(keys %$status_map), 4, "Project::NestedOop::status_by_id key count"
+assert_eq len(keys %$status_map), 4, "Project::NestedOop::status_by_id key count"
 
 my $color_map = Project::NestedOop::color_codes()
-assert_eq scalar(keys %$color_map), 3, "Project::NestedOop::color_codes key count"
+assert_eq len(keys %$color_map), 3, "Project::NestedOop::color_codes key count"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # CLASSES IN ARRAYS
 # ══════════════════════════════════════════════════════════════════════════════
 
 my $roster = Project::NestedOop::employee_roster()
-assert_eq scalar(@$roster), 4, "Project::NestedOop::employee_roster count"
+assert_eq len(@$roster), 4, "Project::NestedOop::employee_roster count"
 assert_eq $roster->[0]->name, "Alice", "roster[0].name"
 assert_eq $roster->[1]->department, "Marketing", "roster[1].department"
 assert_eq $roster->[2]->salary, 95000, "roster[2].salary"
 
 my $catalog = Project::NestedOop::product_catalog()
-assert_eq scalar(@$catalog), 3, "Project::NestedOop::product_catalog count"
+assert_eq len(@$catalog), 3, "Project::NestedOop::product_catalog count"
 assert_eq $catalog->[0]->sku, "SKU001", "catalog[0].sku"
 assert_eq $catalog->[1]->price, 2999, "catalog[1].price"
 
 my $eng_only = Project::NestedOop::filter_by_department($roster, "Engineering")
-assert_eq scalar(@$eng_only), 2, "Project::NestedOop::filter_by_department Engineering"
+assert_eq len(@$eng_only), 2, "Project::NestedOop::filter_by_department Engineering"
 
 assert_eq Project::NestedOop::total_salary($roster), 350000, "Project::NestedOop::total_salary"
 
@@ -110,7 +110,7 @@ assert_eq $discounted->[1]->price, 2699, "discount 10% on gadget"
 # ══════════════════════════════════════════════════════════════════════════════
 
 my $dir = Project::NestedOop::employee_directory()
-assert_eq scalar(keys %$dir), 3, "Project::NestedOop::employee_directory key count"
+assert_eq len(keys %$dir), 3, "Project::NestedOop::employee_directory key count"
 assert_eq $dir->{"emp001"}->name, "Alice", "directory emp001.name"
 assert_eq $dir->{"emp002"}->department, "Mkt", "directory emp002.department"
 
@@ -126,19 +126,19 @@ assert_eq $products->{"SKU002"}->price, 2999, "Project::NestedOop::product_by_sk
 
 my $tree = Project::NestedOop::tree_as_struct()
 assert_eq $tree->value, 10, "tree root value"
-assert_eq scalar(@{$tree->children}), 2, "tree root children count"
+assert_eq len(@{$tree->children}), 2, "tree root children count"
 assert_eq $tree->children->[0]->value, 5, "tree left child"
 assert_eq $tree->children->[1]->value, 15, "tree right child"
 
 my $edges = Project::NestedOop::graph_edges()
-assert_eq scalar(@$edges), 3, "Project::NestedOop::graph_edges count"
+assert_eq len(@$edges), 3, "Project::NestedOop::graph_edges count"
 assert_eq $edges->[0]->weight, 10, "edge 0 weight"
 assert_eq $edges->[0]->from->x, 0, "edge 0 from.x"
 assert_eq $edges->[1]->to->x, 2, "edge 1 to.x"
 
 my $grid = Project::NestedOop::nested_points()
-assert_eq scalar(@$grid), 3, "Project::NestedOop::nested_points rows"
-assert_eq scalar(@{$grid->[0]}), 3, "Project::NestedOop::nested_points cols"
+assert_eq len(@$grid), 3, "Project::NestedOop::nested_points rows"
+assert_eq len(@{$grid->[0]}), 3, "Project::NestedOop::nested_points cols"
 assert_eq $grid->[1][1]->x, 1, "grid[1][1].x"
 assert_eq $grid->[2][2]->y, 2, "grid[2][2].y"
 
@@ -149,14 +149,14 @@ assert_eq Project::NestedOop::sum_nested_points($grid), 18, "Project::NestedOop:
 # ══════════════════════════════════════════════════════════════════════════════
 
 my $groups = Project::NestedOop::point_groups()
-assert_eq scalar(@{$groups->{quadrant1}}), 3, "Project::NestedOop::point_groups q1 count"
-assert_eq scalar(@{$groups->{quadrant2}}), 2, "Project::NestedOop::point_groups q2 count"
+assert_eq len(@{$groups->{quadrant1}}), 3, "Project::NestedOop::point_groups q1 count"
+assert_eq len(@{$groups->{quadrant2}}), 2, "Project::NestedOop::point_groups q2 count"
 assert_eq $groups->{quadrant1}[0]->x, 1, "Project::NestedOop::point_groups q1[0].x"
 assert_eq $groups->{quadrant3}[1]->y, -2, "Project::NestedOop::point_groups q3[1].y"
 
 my $teams = Project::NestedOop::team_structure()
-assert_eq scalar(@{$teams->{engineering}}), 2, "Project::NestedOop::team_structure eng count"
-assert_eq scalar(@{$teams->{sales}}), 2, "Project::NestedOop::team_structure sales count"
+assert_eq len(@{$teams->{engineering}}), 2, "Project::NestedOop::team_structure eng count"
+assert_eq len(@{$teams->{sales}}), 2, "Project::NestedOop::team_structure sales count"
 assert_eq $teams->{marketing}[0]->name, "Carol", "Project::NestedOop::team_structure mkt[0].name"
 
 assert_eq Project::NestedOop::count_team_members($teams), 5, "Project::NestedOop::count_team_members"
@@ -187,9 +187,9 @@ $graph->add_edge("b", "c")
 
 assert_eq $graph->node_count(), 3, "graph node_count"
 my @a_neighbors = $graph->neighbors("a")
-assert_eq scalar(@a_neighbors), 1, "graph neighbors(a) count"
+assert_eq len(@a_neighbors), 1, "graph neighbors(a) count"
 my @b_neighbors = $graph->neighbors("b")
-assert_eq scalar(@b_neighbors), 1, "graph neighbors(b) count"
+assert_eq len(@b_neighbors), 1, "graph neighbors(b) count"
 
 my $queue = TaskQueue()
 $queue->enqueue(Task(1, "First", Priority::Low))
@@ -219,7 +219,7 @@ assert_eq Project::NestedOop::tree_sum($btree), 71, "Project::NestedOop::tree_su
 assert_eq Project::NestedOop::tree_depth($btree), 3, "Project::NestedOop::tree_depth"
 
 my @inorder = Project::NestedOop::tree_to_array($btree)
-assert_eq scalar(@inorder), 7, "Project::NestedOop::tree_to_array count"
+assert_eq len(@inorder), 7, "Project::NestedOop::tree_to_array count"
 assert_eq $inorder[0], 2, "inorder first"
 assert_eq $inorder[3], 10, "inorder middle"
 assert_eq $inorder[6], 20, "inorder last"
@@ -232,19 +232,19 @@ my $org = Project::NestedOop::organization_chart()
 assert_eq $org->{ceo}->name, "Alice", "org ceo name"
 assert_eq $org->{ceo}->salary, 500000, "org ceo salary"
 assert_eq $org->{departments}{engineering}{lead}->name, "Bob", "org eng lead"
-assert_eq scalar(@{$org->{departments}{engineering}{teams}}), 2, "org eng teams count"
+assert_eq len(@{$org->{departments}{engineering}{teams}}), 2, "org eng teams count"
 assert_eq $org->{departments}{engineering}{teams}[0]->name, "Backend", "org eng team 0 name"
 
 my $board = Project::NestedOop::project_board()
-assert_eq scalar(@{$board->{todo}}), 2, "board todo count"
-assert_eq scalar(@{$board->{in_progress}}), 1, "board in_progress count"
-assert_eq scalar(@{$board->{done}}), 2, "board done count"
+assert_eq len(@{$board->{todo}}), 2, "board todo count"
+assert_eq len(@{$board->{in_progress}}), 1, "board in_progress count"
+assert_eq len(@{$board->{done}}), 2, "board done count"
 assert_eq $board->{todo}[0]->title, "Design API", "board todo[0] title"
 assert_eq $board->{in_progress}[0]->id, 3, "board in_progress[0] id"
 
 my $moved_board = Project::NestedOop::move_task($board, 1, "todo", "in_progress")
-assert_eq scalar(@{$moved_board->{todo}}), 1, "after move todo count"
-assert_eq scalar(@{$moved_board->{in_progress}}), 2, "after move in_progress count"
+assert_eq len(@{$moved_board->{todo}}), 1, "after move todo count"
+assert_eq len(@{$moved_board->{in_progress}}), 2, "after move in_progress count"
 
 assert_eq Project::NestedOop::count_tasks_by_priority($board, Priority::Low), 2, "count low priority"
 assert_eq Project::NestedOop::count_tasks_by_priority($board, Priority::High), 1, "count high priority"
@@ -254,14 +254,14 @@ assert_eq Project::NestedOop::count_tasks_by_priority($board, Priority::High), 1
 # ══════════════════════════════════════════════════════════════════════════════
 
 my $matrix = Project::NestedOop::matrix_of_points()
-assert_eq scalar(@$matrix), 3, "matrix rows"
-assert_eq scalar(@{$matrix->[0]}), 3, "matrix cols"
+assert_eq len(@$matrix), 3, "matrix rows"
+assert_eq len(@{$matrix->[0]}), 3, "matrix cols"
 assert_eq $matrix->[0][0]->x, 0, "matrix[0][0].x"
 assert_eq $matrix->[2][2]->x, 2, "matrix[2][2].x"
 assert_eq $matrix->[1][2]->y, 2, "matrix[1][2].y"
 
 my @flat = Project::NestedOop::flatten_point_matrix($matrix)
-assert_eq scalar(@flat), 9, "Project::NestedOop::flatten_point_matrix count"
+assert_eq len(@flat), 9, "Project::NestedOop::flatten_point_matrix count"
 assert_eq $flat[0]->x, 0, "flat[0].x"
 assert_eq $flat[8]->x, 2, "flat[8].x"
 
@@ -284,13 +284,13 @@ assert_eq Project::NestedOop::total_regional_salary($offices, "eu"), 173000, "Pr
 # ══════════════════════════════════════════════════════════════════════════════
 
 my $mixed = Project::NestedOop::mixed_struct_types()
-assert_eq scalar(@$mixed), 3, "Project::NestedOop::mixed_struct_types count"
+assert_eq len(@$mixed), 3, "Project::NestedOop::mixed_struct_types count"
 assert_eq $mixed->[0]{type}, "point", "mixed[0].type"
 assert_eq $mixed->[1]{data}->name, "Alice", "mixed[1].data.name"
 assert_eq $mixed->[2]{data}->id, 1, "mixed[2].data.id"
 
 my @processed = Project::NestedOop::process_mixed($mixed)
-assert_eq scalar(@processed), 3, "Project::NestedOop::process_mixed count"
+assert_eq len(@processed), 3, "Project::NestedOop::process_mixed count"
 assert_eq $processed[0], "Point(1,2)", "processed[0]"
 assert_eq $processed[1], "Person:Alice", "processed[1]"
 assert_eq $processed[2], "Task#1", "processed[2]"
@@ -312,14 +312,14 @@ my @people_list = (
     Person("Dave", 17),
 )
 my $adults = Project::NestedOop::filter_adults([@people_list])
-assert_eq scalar(@$adults), 2, "Project::NestedOop::filter_adults count"
+assert_eq len(@$adults), 2, "Project::NestedOop::filter_adults count"
 
 my $sorted_people = Project::NestedOop::sort_by_age([@people_list])
 assert_eq $sorted_people->[0]->name, "Bob", "Project::NestedOop::sort_by_age first"
 assert_eq $sorted_people->[3]->name, "Alice", "Project::NestedOop::sort_by_age last"
 
 my $partitioned = Project::NestedOop::partition_by_age([@people_list], 20)
-assert_eq scalar(@{$partitioned->{young}}), 2, "partition young"
-assert_eq scalar(@{$partitioned->{old}}), 2, "partition old"
+assert_eq len(@{$partitioned->{young}}), 2, "partition young"
+assert_eq len(@{$partitioned->{old}}), 2, "partition old"
 
 test_run

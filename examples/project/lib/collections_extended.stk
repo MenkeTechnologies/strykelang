@@ -18,8 +18,8 @@ fn Project::CollectionsExtended::ext_zip($a_ref, $b_ref) {
     my @a = @$a_ref
     my @b = @$b_ref
     my @res = ()
-    my $len = scalar(@a) < scalar(@b) ? scalar(@a) : scalar(@b)
-    ~> 0..$len-1 ep {
+    my $len = len(@a) < len(@b) ? len(@a) : len(@b)
+    ~> 0:$len-1 ep {
         push @res, [$a[_], $b[_]]
     }
     @res
@@ -27,23 +27,23 @@ fn Project::CollectionsExtended::ext_zip($a_ref, $b_ref) {
 
 # ── Project::CollectionsExtended::ext_rotate: rotates a list by $n$ positions (right if positive, left if negative) ─────
 fn Project::CollectionsExtended::ext_rotate($n, @items) {
-    return @items if scalar(@items) <= 1
-    my $len = scalar(@items)
+    return @items if len(@items) <= 1
+    my $len = len(@items)
     my $shift = $n % $len
     if ($shift < 0) {
         $shift += $len
     }
     return @items if $shift == 0
     
-    my @part2 = @items[0..$len-$shift-1]
-    my @part1 = @items[$len-$shift..$len-1]
+    my @part2 = @items[0:$len-$shift-1]
+    my @part1 = @items[$len-$shift:$len-1]
     
     (@part1, @part2)
 }
 
 # ── Project::CollectionsExtended::ext_list_is_empty: checks if a list is empty ─────
 fn Project::CollectionsExtended::ext_list_is_empty {
-    if (scalar(@_) == 0) {
+    if (len(@_) == 0) {
         return 1
     }
     return 0
@@ -51,7 +51,7 @@ fn Project::CollectionsExtended::ext_list_is_empty {
 
 # ── Project::CollectionsExtended::ext_is_empty_hash: checks if a hash is empty ─────
 fn Project::CollectionsExtended::ext_is_empty_hash($href) {
-    scalar(keys %$href) == 0 ? 1 : 0
+    len(keys %$href) == 0 ? 1 : 0
 }
 
 # ── Project::CollectionsExtended::ext_first_where: returns first element matching a predicate ─────

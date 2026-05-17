@@ -15,12 +15,12 @@ assert_false Project::Types::ret_bool_false(), "implicit return false"
 # ── Array returns ────────────────────────────────────────────────────
 
 my @list = Project::Types::ret_list()
-assert_eq scalar(@list), 5, "implicit return list length"
+assert_eq len(@list), 5, "implicit return list length"
 assert_eq $list[0], 1, "implicit return list first"
 assert_eq $list[4], 5, "implicit return list last"
 
 my @empty = Project::Types::ret_empty_list()
-assert_eq scalar(@empty), 0, "implicit return empty list"
+assert_eq len(@empty), 0, "implicit return empty list"
 
 # ── Hash returns ─────────────────────────────────────────────────────
 
@@ -33,7 +33,7 @@ assert_eq $h{c}, 3, "implicit return hash c"
 
 my $ar = Project::Types::ret_aref()
 assert_eq ref($ar), "ARRAY", "implicit return aref type"
-assert_eq scalar(@$ar), 3, "implicit return aref length"
+assert_eq len(@$ar), 3, "implicit return aref length"
 assert_eq $ar->[0], 10, "implicit return aref first"
 assert_eq $ar->[2], 30, "implicit return aref last"
 

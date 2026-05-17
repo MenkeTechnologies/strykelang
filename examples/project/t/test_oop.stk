@@ -118,7 +118,7 @@ assert_eq $sum->z, 9, "vec3 add z"
 assert_eq Vec3::dot($v1, $v2), 32, "vec3 dot"
 
 my $unit = Vec3::new(1, 0, 0)
-assert_near Vec3::length($unit), 1.0, 0.001, "vec3 unit length"
+assert_near Vec3::len($unit), 1.0, 0.001, "vec3 unit length"
 
 my $norm = Vec3::normalize(Vec3::new(3, 0, 0))
 assert_near $norm->x, 1.0, 0.001, "vec3 normalize x"

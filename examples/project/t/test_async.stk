@@ -12,19 +12,19 @@ assert_eq await($t1), 42, "async return value"
 my $start = el()
 my @tasks = map { 
     async { sleep 0.2; _ } 
-} (1..5)
+} (1:5)
 
 my @results = map { await(_) } @tasks
 my $elapsed = el() - $start
 
-assert_eq scalar(@results), 5, "all tasks finished"
+assert_eq len(@results), 5, "all tasks finished"
 assert_eq join(",", sort @results), "1,2,3,4,5", "task results"
 assert_lt $elapsed, 0.8, "tasks ran in parallel" # 5 * 0.2 = 1.0 > 0.8
 
 # ── Channels (pchannel) ───────────────────────────────────────────
 my ($tx, $rx) = pchannel(10)
 async {
-    for (1..3) {
+    for (1:3) {
         $tx->send("msg $_")
         sleep 0.05
     }

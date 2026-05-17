@@ -130,7 +130,7 @@ my @circle_fields = $circle->fields()
 assert_contains join(",", @circle_fields), "radius", "circle has radius field"
 
 my @circle_methods = $circle->methods()
-assert_gt scalar(@circle_methods), 0, "circle has methods"
+assert_gt len(@circle_methods), 0, "circle has methods"
 
 my @parents = $circle->superclass()
 assert_contains join(",", @parents), "Shape", "circle parent is Shape"

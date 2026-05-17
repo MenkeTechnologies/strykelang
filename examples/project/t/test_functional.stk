@@ -25,7 +25,7 @@ assert_eq Fn::reduce($multiply, 1, 1, 2, 3, 4), 24, "reduce product"
 my @a = (1, 2, 3)
 my @b = ("a", "b", "c")
 my @zipped = Fn::zip(@a, @b)
-assert_eq scalar(@zipped), 3, "zip length"
+assert_eq len(@zipped), 3, "zip length"
 assert_eq $zipped[0]->[0], 1, "zip 0-0"
 assert_eq $zipped[0]->[1], "a", "zip 0-1"
 assert_eq $zipped[2]->[0], 3, "zip 2-0"
@@ -44,8 +44,8 @@ assert_eq $f_sub->(10, 3), -7, "flipped sub (3 - 10)"
 # ── Fn::partition ──────────────────────────────────────────────────────
 my $res = Fn::partition($is_even, 1, 2, 3, 4, 5, 6)
 my ($even, $odd) = @$res
-assert_eq scalar(@$even), 3, "partition even count"
-assert_eq scalar(@$odd), 3, "partition odd count"
+assert_eq len(@$even), 3, "partition even count"
+assert_eq len(@$odd), 3, "partition odd count"
 assert_eq $even->[0], 2, "first even"
 assert_eq $odd->[0], 1, "first odd"
 

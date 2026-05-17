@@ -24,7 +24,7 @@ class AdvancedLRUCache {
         if (exists $c->{$key}) {
             $self->_remove_from_order($key)
             $o = $self->order()
-        } elsif (scalar(@$o) >= $self->max_size()) {
+        } elsif (len(@$o) >= $self->max_size()) {
             my $oldest = shift @$o
             delete $c->{$oldest}
             delete $t->{$oldest}
@@ -71,7 +71,7 @@ class AdvancedLRUCache {
 
     fn size() {
         my $c = $self->cache()
-        return scalar(keys %$c)
+        return len(keys %$c)
     }
 
     fn _remove_from_order($key) {

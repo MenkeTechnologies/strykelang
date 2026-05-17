@@ -18,12 +18,12 @@ my @bfs = Project::GraphAlgorithms::adv_bfs($graph, "A")
 assert_eq $bfs[0], "A", "bfs 0"
 assert_ok grep { _ eq "B" } @bfs[1,2], "bfs 1 or 2 is B"
 assert_ok grep { _ eq "C" } @bfs[1,2], "bfs 1 or 2 is C"
-assert_eq scalar(@bfs), 6, "bfs all nodes"
+assert_eq len(@bfs), 6, "bfs all nodes"
 
 # ── Project::GraphAlgorithms::adv_dfs ─────
 my @dfs = Project::GraphAlgorithms::adv_dfs($graph, "A")
 assert_eq $dfs[0], "A", "dfs 0"
-assert_eq scalar(@dfs), 6, "dfs all nodes"
+assert_eq len(@dfs), 6, "dfs all nodes"
 
 # ── Project::GraphAlgorithms::adv_has_cycle ─────
 assert_false Project::GraphAlgorithms::adv_has_cycle($graph), "graph has no cycle"

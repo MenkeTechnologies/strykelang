@@ -22,7 +22,7 @@ assert_eq $light->{current}(), "red", "traffic cycled back"
 
 # Full cycle test
 my $light2 = Project::StateMachine::make_traffic_light()
-for (1..6) { $light2->{next}() }
+for (1:6) { $light2->{next}() }
 assert_eq $light2->{current}(), "red", "traffic after 6 transitions"
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -67,7 +67,7 @@ assert_eq $counter->{inc}(), 1, "counter inc 1"
 assert_eq $counter->{get}(), 1, "counter value 1"
 assert_false $counter->{at_min}(), "counter not at min"
 
-for (1..4) { $counter->{inc}() }
+for (1:4) { $counter->{inc}() }
 assert_eq $counter->{get}(), 5, "counter at max"
 assert_ok $counter->{at_max}(), "counter at max flag"
 assert_eq $counter->{inc}(), 0, "counter cant inc above max"
@@ -95,10 +95,10 @@ $toggle->{off}()
 assert_eq $toggle->{is_on}(), 0, "force off"
 
 # Multiple toggles
-for (1..10) { $toggle->{toggle}() }
+for (1:10) { $toggle->{toggle}() }
 assert_eq $toggle->{is_on}(), 0, "toggle even times"
 
-for (1..11) { $toggle->{toggle}() }
+for (1:11) { $toggle->{toggle}() }
 assert_eq $toggle->{is_on}(), 1, "toggle odd times"
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -112,7 +112,7 @@ my @chars = split("", $input)
     $parser->{feed}(_)
 }
 my $tokens = $parser->{tokens}()
-assert_eq scalar(@$tokens), 3, "parser token count"
+assert_eq len(@$tokens), 3, "parser token count"
 assert_eq $tokens->[0], "foo", "parser token 0"
 assert_eq $tokens->[1], "123", "parser token 1"
 assert_eq $tokens->[2], "bar456", "parser token 2"
