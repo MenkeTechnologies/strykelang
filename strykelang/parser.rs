@@ -21785,4 +21785,80 @@ mod tests {
              }",
         );
     }
+
+    /// Edge-relaxation loop with destructure + early-skip — Bellman-Ford
+    /// shape. Tests `my ($u, $w, $cost) = @$e` inside a for-loop.
+    #[test]
+    fn edge_relaxation_destructure_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my @edges = ([0, 1, 5], [1, 2, -3]); \
+             my @dist = (0, 1e18, 1e18); my $INF = 1e18; \
+             for my $e (@edges) { \
+                my ($u, $w, $cost) = @$e; \
+                next if $dist[$u] >= $INF; \
+                $dist[$w] = $dist[$u] + $cost if $dist[$u] + $cost < $dist[$w] \
+             }",
+        );
+    }
+
+    /// Bitwise `&` with negation: `$x & -$x` — Fenwick tree's
+    /// lowest-set-bit isolation.
+    #[test]
+    fn bitwise_and_with_negation_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("fn Fenwick::lsb($x) = $x & -$x");
+        parse_ok("my $k = 12; my $lo_bit = $k & -$k");
+    }
+
+    /// `@count[v] = old_v; running += c` — counting-sort cumulative
+    /// transform. Tests serial assign-and-update inside a for loop.
+    #[test]
+    fn counting_sort_cumulative_loop_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my @count = (3, 1, 2, 4); my $running = 0; \
+             for my $v (0:3) { \
+                my $c = $count[$v]; \
+                $count[$v] = $running; \
+                $running += $c \
+             }",
+        );
+    }
+
+    /// Recursive tree walk with hashref nodes — Huffman tree traversal
+    /// pattern. Validates that `defined $node` + `exists $node->{sym}`
+    /// + child-recursion all parse cleanly.
+    #[test]
+    fn recursive_tree_walk_with_hashref_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "fn Huff::walk($node, $prefix, $codes) { \
+                return unless defined $node; \
+                if (exists $node->{sym}) { \
+                    $codes->{$node->{sym}} = $prefix eq \"\" ? \"0\" : $prefix; \
+                    return \
+                } \
+                Huff::walk($node->{left},  $prefix . \"0\", $codes); \
+                Huff::walk($node->{right}, $prefix . \"1\", $codes) \
+             }",
+        );
+    }
+
+    /// Z-array maintained-window arithmetic — three-way min via
+    /// ternary, increment-while-match. Z-algorithm core.
+    #[test]
+    fn z_array_window_arithmetic_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my @c = (\"a\", \"b\", \"a\"); my $n = 3; \
+             my @z = (0) x $n; $z[0] = $n; \
+             my $l = 0; my $r = 0; my $i = 1; \
+             if ($i < $r) { \
+                my $inside = $r - $i < $z[$i - $l] ? $r - $i : $z[$i - $l]; \
+                $z[$i] = $inside \
+             } \
+             while ($i + $z[$i] < $n && $c[$z[$i]] eq $c[$i + $z[$i]]) { $z[$i]++ }",
+        );
+    }
 }
