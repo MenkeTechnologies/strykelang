@@ -121,9 +121,9 @@ td_add($td_duration, _->{duration}) for @events
 
 p ""
 p "── event-duration distribution (t-digest) ───────────"
-printf "  p10  : %d min\n", int(td_quantile($td_duration, 0.10))
-printf "  p50  : %d min\n", int(td_quantile($td_duration, 0.50))
-printf "  p90  : %d min\n", int(td_quantile($td_duration, 0.90))
+printf "  p10  : %d min\n", ~> td_quantile($td_duration, 0.10) int
+printf "  p50  : %d min\n", ~> td_quantile($td_duration, 0.50) int
+printf "  p90  : %d min\n", ~> td_quantile($td_duration, 0.90) int
 
 # ── overall stats ──────────────────────────────────────────────────
 

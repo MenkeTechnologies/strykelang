@@ -104,8 +104,8 @@ for my $ep (@endpoints) {
     my $n = $total{$ep}
     my $err = $client_err{$ep} + $server_err{$ep}
     my $pct = 100.0 * $err / $n
-    my $p50 = int(td_quantile($latency{$ep}, 0.50))
-    my $p99 = int(td_quantile($latency{$ep}, 0.99))
+    my $p50 = ~> td_quantile($latency{$ep}, 0.50) int
+    my $p99 = ~> td_quantile($latency{$ep}, 0.99) int
     printf "  %-15s %6d %6d %6d %6d %5.1f%% %6dms %6dms\n",
         $ep, $n, $ok{$ep}, $client_err{$ep}, $server_err{$ep},
         $pct, $p50, $p99
@@ -149,9 +149,9 @@ my $global_lat = t_digest(100)
 my $merged = $latency{$endpoints[0]} + $latency{$endpoints[1]} +
              $latency{$endpoints[2]} + $latency{$endpoints[3]} +
              $latency{$endpoints[4]} + $latency{$endpoints[5]}
-printf "  global p50 : %d ms\n", int(td_quantile($merged, 0.50))
-printf "  global p90 : %d ms\n", int(td_quantile($merged, 0.90))
-printf "  global p99 : %d ms\n", int(td_quantile($merged, 0.99))
+printf "  global p50 : %d ms\n", ~> td_quantile($merged, 0.50) int
+printf "  global p90 : %d ms\n", ~> td_quantile($merged, 0.90) int
+printf "  global p99 : %d ms\n", ~> td_quantile($merged, 0.99) int
 
 # ── HLL distinct request count sanity ──────────────────────────────
 
