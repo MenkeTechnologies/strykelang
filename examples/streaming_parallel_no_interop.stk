@@ -1,0 +1,115 @@
+#!/usr/bin/env stryke
+
+# Demo: the streaming parallel builtins `pmaps` / `pgreps` /
+# `pflat_maps` — lazy iterators backed by background worker threads.
+#
+# Contrast with `pmap` / `pgrep` / `pflat_map` (no trailing-s):
+#   * eager variants return in INPUT order (collect + re-sort)
+#   * streaming variants return in COMPLETION order (lower latency,
+#     non-deterministic order)
+#
+# Streaming is the right choice when the downstream stage is order-
+# insensitive (sum, count, uniq, freq, any sketch) or when you want to
+# start consuming results before all inputs finish.
+#
+# Run: stryke --no-interop examples/streaming_parallel_no_interop.stk
+
+p "── 1. pmaps: streaming square ──"
+my @squared = pmaps { _ * _ } 1:10
+my @sorted = sort { _0 <=> _1 } @squared
+p "  set-equal to serial map:  @sorted"
+die "set differs" unless "@sorted" eq "1 4 9 16 25 36 49 64 81 100"
+
+# Stream-then-sum is the classic order-insensitive pattern.
+my $sum_squares = pmaps { _ * _ } 1:100 |> sum
+p "  sum of squares 1..100:    $sum_squares"
+die "sum-squares" unless $sum_squares == 338350    # n(n+1)(2n+1)/6
+
+# ── 2. pgreps: streaming filter ────────────────────────────────────────────
+
+p ""
+p "── 2. pgreps: streaming filter ──"
+my @evens = pgreps { _ % 2 == 0 } 1:20
+my @evens_sorted = sort { _0 <=> _1 } @evens
+p "  evens 1..20:              @evens_sorted"
+die "evens" unless len(@evens_sorted) == 10
+
+my $how_many_primes_ish = len pgreps {
+    my $n = _
+    $n < 2  ? 0
+    : $n == 2 ? 1
+    : $n % 2 == 0 ? 0
+    : do {
+        my $is_prime = 1
+        my $i = 3
+        while ($i * $i <= $n) {
+            if ($n % $i == 0) { $is_prime = 0; last }
+            $i += 2
+        }
+        $is_prime
+    }
+} 1:100
+p "  primes 1..100:            $how_many_primes_ish"
+die "prime count" unless $how_many_primes_ish == 25
+
+# ── 3. pflat_maps: 1-to-N streaming flat-map ──────────────────────────────
+
+p ""
+p "── 3. pflat_maps: streaming 1-to-N expansion ──"
+my $total_items = len pflat_maps { (_, _ * 10, _ * 100) } 1:10
+p "  10 inputs × 3 outputs:    $total_items"
+die "expand" unless $total_items == 30
+
+# Combine with downstream uniq — pflat_maps emits, uniq dedupes.
+my @u = uniq(pflat_maps { (_ % 3, _ % 5, _ % 7) } 1:50)
+my @uniq_sorted = sort { _0 <=> _1 } @u
+p "  uniq mod-3/5/7 residues:  @uniq_sorted"
+die "residues" unless len(@uniq_sorted) == 7    # {0..6}
+
+# ── 4. real-ish workload: parallel char-class counts via pmaps ─────────────
+
+p ""
+p "── 4. char-class counts over a corpus ──"
+my $corpus = q{
+The quick brown fox jumps over the lazy dog 1234.
+Sphinx of black quartz, judge my vow 567.
+Pack my box with five dozen liquor jugs 89.
+}
+
+# Split corpus into lines, count {alpha, digit, space} per line in
+# parallel, then sum totals.
+my @lines = split /\n/, $corpus
+my @counts = pmaps {
+    my $line = _
+    my $na = 0; my $nd = 0; my $ns = 0
+    for my $c (split //, $line) {
+        $na++ if $c =~ /[a-zA-Z]/
+        $nd++ if $c =~ /\d/
+        $ns++ if $c =~ /\s/
+    }
+    [$na, $nd, $ns]
+} @lines
+
+my $alpha = sum map { _->[0] } @counts
+my $digit = sum map { _->[1] } @counts
+my $space = sum map { _->[2] } @counts
+printf("  alpha = %d   digit = %d   space = %d\n", $alpha, $digit, $space)
+die "alpha (got $alpha)"  unless $alpha > 80
+die "digit (got $digit)"  unless $digit == 9
+die "space (got $space)"  unless $space > 20
+
+# ── 5. fan-out then aggregate via pflat_maps + freq ───────────────────────
+
+p ""
+p "── 5. pflat_maps fan-out + freq aggregate ──"
+my @words = ("apple", "ant", "banana", "berry", "cherry")
+my @letters = pflat_maps { split //, _ } @words
+my $by_letter = freq(@letters)
+printf("  most common letter: %s (%d times)\n",
+    (sort { $by_letter->{$_1} <=> $by_letter->{$_0} } keys %$by_letter)[0],
+    (sort { $by_letter->{$_1} <=> $by_letter->{$_0} } values %$by_letter)[0])
+die "letter count (got " . len(@letters) . ")" unless len(@letters) == 25
+    # apple(5) + ant(3) + banana(6) + berry(5) + cherry(6) = 25
+
+p ""
+p "  ALL PASS  (pmaps + pgreps + pflat_maps, set / sum / count / freq)"

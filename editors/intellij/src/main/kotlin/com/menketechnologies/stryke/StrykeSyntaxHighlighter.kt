@@ -60,8 +60,14 @@ class StrykeSyntaxHighlighter : SyntaxHighlighterBase() {
             StrykeTokenTypes.REGEX_BIND -> StrykeColors.REGEX_BIND
 
             StrykeTokenTypes.PAREN -> StrykeColors.PAREN
+            StrykeTokenTypes.LPAREN -> StrykeColors.PAREN
+            StrykeTokenTypes.RPAREN -> StrykeColors.PAREN
             StrykeTokenTypes.BRACE -> StrykeColors.BRACE
+            StrykeTokenTypes.LBRACE -> StrykeColors.BRACE
+            StrykeTokenTypes.RBRACE -> StrykeColors.BRACE
             StrykeTokenTypes.BRACKET -> StrykeColors.BRACKET
+            StrykeTokenTypes.LBRACKET -> StrykeColors.BRACKET
+            StrykeTokenTypes.RBRACKET -> StrykeColors.BRACKET
             StrykeTokenTypes.COMMA -> StrykeColors.COMMA
             StrykeTokenTypes.SEMICOLON -> StrykeColors.SEMICOLON
             StrykeTokenTypes.DOT -> StrykeColors.DOT
