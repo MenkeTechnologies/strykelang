@@ -1,0 +1,88 @@
+#!/usr/bin/env stryke
+
+# Towers of Hanoi — recursive solver. Move N disks from peg A to peg
+# C using B as buffer, never placing a larger disk on a smaller one.
+# Optimal solution requires exactly 2^N - 1 moves. Parses clean under
+# `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * `fn name = expr` for the one-liner solver entry
+#   * implicit return on tail (rule 7)
+#   * `#{…}` interpolation (rule 1a)
+#
+# Namespaced UDFs `Hanoi::*`.
+#
+# Run: stryke --no-interop examples/hanoi_no_interop.stk
+
+# Returns the list of moves [from, to] that solve N disks.
+fn Hanoi::solve($n) {
+    my @moves
+    Hanoi::recur($n, "A", "C", "B", \@moves)
+    \@moves
+}
+
+# Recursive worker: move $n disks from $src to $dst via $aux, accumulating
+# into $log arrayref. Base case: 1 disk = one direct move.
+fn Hanoi::recur($n, $src, $dst, $aux, $log) {
+    return if $n == 0
+    if ($n == 1) {
+        push @$log, [$src, $dst]
+        return
+    }
+    Hanoi::recur($n - 1, $src, $aux, $dst, $log)
+    push @$log, [$src, $dst]
+    Hanoi::recur($n - 1, $aux, $dst, $src, $log)
+}
+
+# Pegs are arrays of disk-sizes, top-of-peg at the END.
+# This SIMULATES the moves and returns the final peg state — used to
+# verify that the solver's move-list is physically valid.
+fn Hanoi::simulate($n, $moves) {
+    my %peg = ( A => [rev 1:$n], B => [], C => [] )
+    for my $m (@$moves) {
+        my ($src, $dst) = @$m
+        die "illegal: src empty"       unless len(@{$peg{$src}}) > 0
+        my $disk = pop @{$peg{$src}}
+        if (len(@{$peg{$dst}}) > 0) {
+            my $top = $peg{$dst}[-1]
+            die "illegal: $disk on $top" unless $disk < $top
+        }
+        push @{$peg{$dst}}, $disk
+    }
+    \%peg
+}
+
+p "── Towers of Hanoi demo ──"
+
+# For N = 1..10, count moves = 2^N - 1.
+for my $n (1:10) {
+    my $moves = Hanoi::solve($n)
+    my $expected = 2 ** $n - 1
+    my $got = len(@$moves)
+    die "N=$n: expected $expected moves, got $got" unless $got == $expected
+}
+p "  N=1..10: move counts match 2^N - 1  OK"
+
+# For N=5, simulate the moves and check final state: all 5 disks on C,
+# stacked 5,4,3,2,1 (bottom to top).
+my $moves5 = Hanoi::solve(5)
+my $final = Hanoi::simulate(5, $moves5)
+die "A should be empty" unless len(@{$final->{A}}) == 0
+die "B should be empty" unless len(@{$final->{B}}) == 0
+die "C should have 5"   unless len(@{$final->{C}}) == 5
+die "C bottom→top must be 5,4,3,2,1" unless join(",", @{$final->{C}}) eq "5,4,3,2,1"
+p "  N=5 simulated: all 5 disks land on C, correctly stacked  OK"
+
+# Every move-from must be a different peg from move-to.
+my $moves7 = Hanoi::solve(7)
+for my $m (@$moves7) {
+    die "self-move detected" if $m->[0] eq $m->[1]
+}
+p "  N=7: no self-moves in the 127-move plan  OK"
+
+# Edge case: N=0 yields zero moves.
+my $zero = Hanoi::solve(0)
+die "N=0 should be 0 moves" unless len(@$zero) == 0
+
+p ""
+p "  ALL PASS (1:10 move counts + N=5 simulation + no-self-move + N=0 edge)"

@@ -1,0 +1,100 @@
+#!/usr/bin/env stryke
+
+# Kruskal's MST — build a minimum spanning tree by greedily adding
+# the cheapest edge that doesn't form a cycle. Cycle-detection rides
+# on a union-find (inlined here). O(E log E) — the sort dominates.
+# Parses clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * expression-bodied `fn name = expr` (rule 6) for UF one-liners
+#   * implicit return on tail (rule 7)
+#   * `sort { _0->[2] <=> _1->[2] }` block uses bareword positional
+#     params not `$a`/`$b` (rule 11)
+#   * `#{…}` interpolation (rule 1a)
+#
+# Namespaced UDFs `MST::*` (Kruskal) and `MST::UF::*` (inline UF).
+#
+# Run: stryke --no-interop examples/kruskal_no_interop.stk
+
+# ── Mini union-find (inline) ─────────────────────────────────────────
+
+fn MST::UF::new($n) = +{ parent => [0:$n - 1], rank => [(0) x $n] }
+
+fn MST::UF::find($uf, $x) {
+    return $x if $uf->{parent}[$x] == $x
+    $uf->{parent}[$x] = MST::UF::find($uf, $uf->{parent}[$x])
+    $uf->{parent}[$x]
+}
+
+fn MST::UF::union($uf, $x, $y) {
+    my $ra = MST::UF::find($uf, $x)
+    my $rb = MST::UF::find($uf, $y)
+    return 0 if $ra == $rb
+    if ($uf->{rank}[$ra] < $uf->{rank}[$rb]) { ($ra, $rb) = ($rb, $ra) }
+    $uf->{parent}[$rb] = $ra
+    $uf->{rank}[$ra]++ if $uf->{rank}[$ra] == $uf->{rank}[$rb]
+    1
+}
+
+# ── Kruskal proper ───────────────────────────────────────────────────
+
+# Edges are [u, v, weight]. Returns { tree => [edges...], cost => total }.
+fn MST::kruskal($n, $edges) {
+    my @sorted = sort { _0->[2] <=> _1->[2] } @$edges
+    my $uf     = MST::UF::new($n)
+    my @tree
+    my $cost   = 0
+    for my $e (@sorted) {
+        if (MST::UF::union($uf, $e->[0], $e->[1])) {
+            push @tree, $e
+            $cost += $e->[2]
+            last if len(@tree) == $n - 1
+        }
+    }
+    +{ tree => \@tree, cost => $cost }
+}
+
+p "── Kruskal MST demo ──"
+
+# Classic textbook graph (Cormen et al., Fig 23.4).
+# 9 vertices labeled 0:8, 14 edges. Expected MST weight = 37.
+my @edges = (
+    [0, 1,  4], [0, 7,  8], [1, 2,  8], [1, 7, 11], [2, 3,  7],
+    [2, 5,  4], [2, 8,  2], [3, 4,  9], [3, 5, 14], [4, 5, 10],
+    [5, 6,  2], [6, 7,  1], [6, 8,  6], [7, 8,  7],
+)
+my $r = MST::kruskal(9, \@edges)
+die "expected MST cost 37, got #{$r->{cost}}" unless $r->{cost} == 37
+die "MST must have V-1 = 8 edges"             unless len(@{$r->{tree}}) == 8
+p "  textbook 9-vertex graph: cost=37, edges=8  OK"
+
+# 4-vertex square: edges weighted 1,2,3,4 form a cycle. MST drops the
+# heaviest edge (weight 4), so total cost = 1+2+3 = 6.
+my @sq = ([0, 1, 1], [1, 2, 2], [2, 3, 3], [3, 0, 4])
+my $r2 = MST::kruskal(4, \@sq)
+die "square MST cost should be 6" unless $r2->{cost} == 6
+die "square MST should have 3 edges" unless len(@{$r2->{tree}}) == 3
+p "  4-vertex square: cost=6, dropped heaviest edge  OK"
+
+# Disconnected graph: 5 vertices, only 2 edges connecting {0,1} and {2,3}.
+# Vertex 4 is isolated. Kruskal returns a SPANNING FOREST — not full tree.
+my @disc = ([0, 1, 1], [2, 3, 1])
+my $r3 = MST::kruskal(5, \@disc)
+die "forest should have 2 edges" unless len(@{$r3->{tree}}) == 2
+die "forest cost should be 2"    unless $r3->{cost} == 2
+p "  disconnected graph: spanning forest, cost=2  OK"
+
+# Universal invariant: tree has exactly V-1 edges OR is a forest (when
+# graph itself is disconnected). And no cycles — verified by re-running
+# union-find over the tree edges: every union should succeed.
+for my $case ([9, \@edges], [4, \@sq]) {
+    my ($n, $eref) = @$case
+    my $res = MST::kruskal($n, $eref)
+    my $check = MST::UF::new($n)
+    for my $e (@{$res->{tree}}) {
+        die "tree contains a cycle" unless MST::UF::union($check, $e->[0], $e->[1])
+    }
+}
+
+p ""
+p "  ALL PASS (textbook 9-V, 4-V square, disconnected forest, cycle-free invariant)"

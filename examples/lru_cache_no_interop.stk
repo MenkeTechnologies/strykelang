@@ -1,0 +1,139 @@
+#!/usr/bin/env stryke
+
+# LRU cache — bounded-capacity key-value store that evicts the least-
+# recently-used entry on insertion overflow. Classic O(1) design uses
+# a hash for lookup + a doubly-linked list for eviction order; here
+# we use the hash-of-{prev,next} idiom for the linked list. Parses
+# clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * expression-bodied `fn name = expr` for predicates
+#   * implicit return on tail (rule 7)
+#   * `#{…}` interpolation (rule 1a)
+#
+# Namespaced UDFs `LRU::*`.
+#
+# Run: stryke --no-interop examples/lru_cache_no_interop.stk
+
+# Cache layout:
+#   { cap, size, head, tail, nodes }
+# nodes[key] = { val, prev, next }
+# head = most-recently-used; tail = least-recently-used (next eviction).
+
+fn LRU::new($cap) = +{
+    cap   => $cap,
+    size  => 0,
+    head  => undef,
+    tail  => undef,
+    nodes => +{},
+}
+
+fn LRU::has($c, $k) = exists $c->{nodes}{$k} ? 1 : 0
+
+# Detach the node from its current position in the LL.
+fn LRU::detach($c, $k) {
+    my $n = $c->{nodes}{$k}
+    my $p = $n->{prev}
+    my $x = $n->{next}
+    if (defined $p) { $c->{nodes}{$p}{next} = $x } else { $c->{head} = $x }
+    if (defined $x) { $c->{nodes}{$x}{prev} = $p } else { $c->{tail} = $p }
+    $n->{prev} = undef
+    $n->{next} = undef
+}
+
+# Attach the node at head (MRU position).
+fn LRU::attach_head($c, $k) {
+    my $h = $c->{head}
+    $c->{nodes}{$k}{prev} = undef
+    $c->{nodes}{$k}{next} = $h
+    if (defined $h) { $c->{nodes}{$h}{prev} = $k }
+    $c->{head} = $k
+    $c->{tail} = $k unless defined $c->{tail}
+}
+
+# get($k): return value if present, undef otherwise. Refreshes MRU.
+fn LRU::get($c, $k) {
+    return undef unless exists $c->{nodes}{$k}
+    LRU::detach($c, $k)
+    LRU::attach_head($c, $k)
+    $c->{nodes}{$k}{val}
+}
+
+# put($k, $v): insert / update; may evict LRU when at capacity.
+fn LRU::put($c, $k, $v) {
+    if (exists $c->{nodes}{$k}) {
+        $c->{nodes}{$k}{val} = $v
+        LRU::detach($c, $k)
+        LRU::attach_head($c, $k)
+        return
+    }
+    if ($c->{size} >= $c->{cap}) {
+        my $victim = $c->{tail}
+        LRU::detach($c, $victim)
+        delete $c->{nodes}{$victim}
+        $c->{size}--
+    }
+    $c->{nodes}{$k} = +{ val => $v, prev => undef, next => undef }
+    LRU::attach_head($c, $k)
+    $c->{size}++
+}
+
+# Iterate MRU → LRU, returning the key list.
+fn LRU::keys_mru($c) {
+    my @out
+    my $cur = $c->{head}
+    while (defined $cur) {
+        push @out, $cur
+        $cur = $c->{nodes}{$cur}{next}
+    }
+    @out
+}
+
+p "── LRU cache demo ──"
+
+# Capacity 3. Fill it, then access 'a' to make it MRU, then insert 'd'
+# — that should evict the actual LRU which is 'b'.
+my $c = LRU::new(3)
+LRU::put($c, "a", 1)
+LRU::put($c, "b", 2)
+LRU::put($c, "c", 3)
+die "size after 3 inserts" unless $c->{size} == 3
+die "MRU order = c,b,a"    unless join(",", LRU::keys_mru($c)) eq "c,b,a"
+
+# Access 'a' — promotes to MRU.
+my $v = LRU::get($c, "a")
+die "get a = 1"        unless $v == 1
+die "MRU order = a,c,b" unless join(",", LRU::keys_mru($c)) eq "a,c,b"
+
+# Insert 'd' at capacity — evicts 'b' (true LRU after the 'a' access).
+LRU::put($c, "d", 4)
+die "b should have been evicted" if LRU::has($c, "b")
+die "size still 3"               unless $c->{size} == 3
+die "MRU order = d,a,c"          unless join(",", LRU::keys_mru($c)) eq "d,a,c"
+p "  capacity-3, access-then-evict: order = d,a,c (expected d,a,c)  OK"
+
+# Update existing key — value changes, position refreshes to MRU.
+LRU::put($c, "c", 30)
+die "c value updated"           unless LRU::get($c, "c") == 30
+die "after update+get, MRU=c"   unless join(",", LRU::keys_mru($c)) eq "c,d,a"
+p "  update + refresh: c becomes MRU again  OK"
+
+# Miss returns undef without disturbing order.
+my $miss = LRU::get($c, "ZZZ")
+die "miss should be undef" if defined $miss
+die "miss preserves order" unless join(",", LRU::keys_mru($c)) eq "c,d,a"
+
+# Stress: cap=8, churn through 1000 keys. Final cache holds the last 8.
+my $big = LRU::new(8)
+for my $i (1:1000) { LRU::put($big, "k$i", $i * 10) }
+die "stress cap stays 8" unless $big->{size} == 8
+for my $i (993:1000) {
+    die "stress: k$i should be present" unless LRU::has($big, "k$i")
+}
+for my $i (1:990) {
+    die "stress: k$i should be evicted" if LRU::has($big, "k$i")
+}
+p "  stress: 1000 puts, only last 8 remain  OK"
+
+p ""
+p "  ALL PASS (basic eviction + update-refresh + miss-no-disturb + 1000-stress)"
