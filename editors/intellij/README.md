@@ -283,6 +283,76 @@ controls the supported IDE range via `pluginSinceBuild` /
 `pluginUntilBuild`. Currently targets `2024.2.4` SDK against builds
 `242 .. 261.*`.
 
+## Logs
+
+Two append-only logs, both under `~/.stryke/` (or `$STRYKE_HOME/` when
+that env var is set):
+
+| File | Source | Contents |
+|------|--------|----------|
+| `~/.stryke/stryke-plugin.log` | Kotlin (plugin) | LSP command line built, DAP `send` / receive (seq + command + bytes), rename / semantic-token routing, breakpoint handler steps |
+| `~/.stryke/stryke.log` | Rust (`stryke --lsp` / `--dap`) | Levelled events (`TRACE` / `DEBUG` / `INFO` / `WARN` / `ERROR`) from both daemons: startup, initialize, every request method (TRACE), didOpen/Change/Close + diagnostics (DEBUG), rename / hover outcomes, DAP launch / breakpoints / step / pause / disconnect, milestone events (`stopped` / `terminated` / `exited`) |
+
+Tail with `tail -f ~/.stryke/stryke.log ~/.stryke/stryke-plugin.log`.
+
+### Server log level (Rust side)
+
+`$STRYKE_LOG_LEVEL` accepts `trace`, `debug`, `info` (default), `warn`,
+`error` (case-insensitive). Lower levels include everything above.
+
+```sh
+export STRYKE_LOG_LEVEL=debug   # verbose for daily use
+export STRYKE_LOG_LEVEL=trace   # firehose, every request method logged
+```
+
+### Rotation
+
+`~/.stryke/stryke.log` rotates automatically when it crosses the
+threshold:
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `STRYKE_LOG_MAX_BYTES` | `5242880` (5 MiB) | Per-file size cap. `0` disables rotation. |
+| `STRYKE_LOG_MAX_FILES` | `5` | Number of `.1` … `.N` archives to keep alongside the active file. |
+
+When the active log hits the size cap, `stryke.log.N-1` shifts to
+`stryke.log.N` (eldest is overwritten), then the active file moves to
+`stryke.log.1`. Default bounds the log dir at roughly `(N+1) ×
+MAX_BYTES` = ~30 MiB.
+
+### Redirection / sandboxing
+
+`$STRYKE_LOG_FILE=/abs/path/to.log` overrides the resolved path entirely
+— used by tests and sandbox runs. Per-IDE chatter still goes to
+`idea.log` via `Logger.getInstance(...)`; these files are for
+plugin-and-server events specifically.
+
+## Refactor / Rename
+
+`Shift-F6` on any of these identifiers renames it across the workspace
+via the LSP server's `textDocument/rename`:
+
+- Scalar / array / hash variables (`$x`, `@xs`, `%h`) — the sigil is
+  included in the identifier extraction, so `$pass` and the `pass`
+  builtin no longer collide.
+- `my` / `state` / `our` declarations (and the `frozen my` constant form).
+- Subroutine / function declarations (`fn`, `sub`).
+- Struct / class / enum / trait names and their constructor / method
+  call sites (`Point->new`, `Color::Red`).
+- Package names declared via `package Foo::Bar;`.
+
+Cross-file rename fires when the symbol is package-scoped (sub, type,
+`our`, package). The server scans every other open document, finds
+exact-name matches in its `SymbolTable`, and falls back to a textual
+qualified-name scan for files that reference the symbol without
+re-declaring it. Locally-scoped `my`/`state` decls and sub parameters
+are file-scoped and never cross files.
+
+Hovering on the `format` key in `$opts{format}` or the `exec` selector
+in `$db->exec` no longer shows the `format` / `exec` builtin card —
+those identifiers are hash keys / method selectors, not builtin
+references.
+
 ## Limitations
 
 - **No PSI tree or structural navigation** — relies entirely on the LSP

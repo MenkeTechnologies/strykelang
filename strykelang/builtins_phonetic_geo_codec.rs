@@ -1664,7 +1664,7 @@ mod tests {
     #[test]
     fn base58_roundtrip() {
         let s = sv_s("hello world");
-        let enc = base58check_encode(&[s.clone()]);
+        let enc = base58check_encode(std::slice::from_ref(&s));
         let dec = base58check_decode(&[enc]);
         assert_eq!(dec.as_str_or_empty(), "hello world");
     }
@@ -1672,7 +1672,7 @@ mod tests {
     #[test]
     fn base91_roundtrip() {
         let s = sv_s("The quick brown fox");
-        let enc = base91_encode(&[s.clone()]);
+        let enc = base91_encode(std::slice::from_ref(&s));
         let dec = base91_decode(&[enc]);
         assert_eq!(dec.as_str_or_empty(), "The quick brown fox");
     }
@@ -1680,7 +1680,7 @@ mod tests {
     #[test]
     fn z85_roundtrip() {
         let s = sv_s("12345678"); // 8 bytes, divisible by 4
-        let enc = z85_encode(&[s.clone()]);
+        let enc = z85_encode(std::slice::from_ref(&s));
         let dec = z85_decode(&[enc]);
         assert_eq!(dec.as_str_or_empty(), "12345678");
     }

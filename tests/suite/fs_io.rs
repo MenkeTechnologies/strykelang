@@ -159,8 +159,7 @@ fn getcwd_contains_chdir_target() {
 
 #[test]
 fn cd_builtin_sets_relative_spurt_slurp() {
-    let base =
-        std::env::temp_dir().join(format!("stryke_itest_cd_rel_{}", std::process::id()));
+    let base = std::env::temp_dir().join(format!("stryke_itest_cd_rel_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     std::fs::create_dir_all(&base).unwrap();
     let inner = base.join("inner");
@@ -170,10 +169,7 @@ fn cd_builtin_sets_relative_spurt_slurp() {
         r#"cd("{pb}") && cd("inner") && spurt("x.txt", "ab") && (slurp("x.txt") eq "ab") ? 1 : 0"#
     );
     assert_eq!(eval_int(&code), 1);
-    assert_eq!(
-        std::fs::read_to_string(inner.join("x.txt")).unwrap(),
-        "ab"
-    );
+    assert_eq!(std::fs::read_to_string(inner.join("x.txt")).unwrap(), "ab");
     std::fs::remove_dir_all(&base).ok();
 }
 
@@ -378,8 +374,7 @@ fn move_renames_file_like_rename() {
 
 #[test]
 fn ls_builtin_long_format_tmp_dir() {
-    let dir: PathBuf =
-        std::env::temp_dir().join(format!("stryke_itest_ls_{}", std::process::id()));
+    let dir: PathBuf = std::env::temp_dir().join(format!("stryke_itest_ls_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("hello.txt"), "x").unwrap();
@@ -393,17 +388,13 @@ fn ls_builtin_long_format_tmp_dir() {
     #[cfg(unix)]
     assert!(out.contains("total "), "expected unix total line:\n{out}");
     #[cfg(unix)]
-    assert!(
-        out.contains("-rw"),
-        "expected regular file perms:\n{out}"
-    );
+    assert!(out.contains("-rw"), "expected regular file perms:\n{out}");
     std::fs::remove_dir_all(&dir).ok();
 }
 
 #[test]
 fn cp_alias_copies_like_copy() {
-    let dir: PathBuf =
-        std::env::temp_dir().join(format!("stryke_itest_cp_{}", std::process::id()));
+    let dir: PathBuf = std::env::temp_dir().join(format!("stryke_itest_cp_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let a = dir.join("src.bin");

@@ -136,7 +136,10 @@ fn rindex_empty_haystack_empty_needle() {
 #[test]
 fn rindex_start_beyond_length_clamps() {
     // Stryke clamps the start offset to the haystack length.
-    assert_eq!(eval_int(r#"rindex("abracadabra", "ab", 999) == 7 ? 1 : 0"#), 1);
+    assert_eq!(
+        eval_int(r#"rindex("abracadabra", "ab", 999) == 7 ? 1 : 0"#),
+        1
+    );
 }
 
 #[test]

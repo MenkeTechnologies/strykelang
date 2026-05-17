@@ -89,8 +89,16 @@ fn outer_chain_two_levels_visits_all_combinations() {
         "@r"
         "#,
     );
-    assert!(s.contains("1/_<=10/_<<=100"), "expected 1/10/100 case in {}", s);
-    assert!(s.contains("2/_<=20/_<<=200"), "expected 2/20/200 case in {}", s);
+    assert!(
+        s.contains("1/_<=10/_<<=100"),
+        "expected 1/10/100 case in {}",
+        s
+    );
+    assert!(
+        s.contains("2/_<=20/_<<=200"),
+        "expected 2/20/200 case in {}",
+        s
+    );
     // Cross-products: 2 * 2 * 2 = 8 combinations.
     let n_pieces = s.split_whitespace().count();
     assert_eq!(n_pieces, 8);

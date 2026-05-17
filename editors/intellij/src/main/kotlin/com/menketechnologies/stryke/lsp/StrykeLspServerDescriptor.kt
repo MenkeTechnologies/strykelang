@@ -71,6 +71,10 @@ class StrykeLspServerDescriptor(project: Project) :
         val settings = StrykeSettings.getInstance()
         val exe = resolveStExe()
         LOG.info("Starting stryke LSP: $exe --lsp ${settings.extraLspArgs}")
+        com.menketechnologies.stryke.StrykeDebugLog.log(
+            "lsp",
+            "createCommandLine exe=$exe args=--lsp ${settings.extraLspArgs} cwd=${project.basePath}",
+        )
         val cmd = GeneralCommandLine(exe)
             .withParameters("--lsp")
             .withWorkDirectory(project.basePath ?: PathManager.getHomePath())
@@ -84,6 +88,10 @@ class StrykeLspServerDescriptor(project: Project) :
         }
         if (settings.logLspToFile && settings.lspLogPath.isNotBlank()) {
             cmd.withEnvironment("STRYKE_LSP_LOG", settings.lspLogPath)
+            com.menketechnologies.stryke.StrykeDebugLog.log(
+                "lsp",
+                "STRYKE_LSP_LOG=${settings.lspLogPath}",
+            )
         }
         return cmd
     }

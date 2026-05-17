@@ -11,6 +11,7 @@ use lsp_types::notification::Notification as NotificationTrait;
 use lsp_types::notification::{
     DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, PublishDiagnostics,
 };
+use lsp_types::request::CodeActionRequest;
 use lsp_types::request::Completion;
 use lsp_types::request::DocumentHighlightRequest;
 use lsp_types::request::DocumentSymbolRequest;
@@ -19,7 +20,6 @@ use lsp_types::request::GotoDefinition;
 use lsp_types::request::HoverRequest;
 use lsp_types::request::PrepareRenameRequest;
 use lsp_types::request::References;
-use lsp_types::request::CodeActionRequest;
 use lsp_types::request::Rename;
 use lsp_types::request::Request as RequestTrait;
 use lsp_types::request::ResolveCompletionItem;
@@ -46,10 +46,18 @@ use crate::error::{ErrorKind, StrykeError};
 use crate::vm_helper::VMHelper;
 
 pub(crate) fn run_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    crate::slog_info!(
+        "lsp",
+        "starting --lsp pid={} version={} log_level={:?}",
+        std::process::id(),
+        env!("CARGO_PKG_VERSION"),
+        crate::stryke_log::current_level()
+    );
     let (conn, io_threads) = Connection::stdio();
 
     let (init_id, init_params) = conn.initialize_start()?;
     let _: lsp_types::InitializeParams = serde_json::from_value(init_params).unwrap_or_default();
+    crate::slog_info!("lsp", "initialize received id={init_id}");
 
     let caps = ServerCapabilities {
         text_document_sync: Some(TextDocumentSyncCapability::Options(
@@ -74,8 +82,12 @@ pub(crate) fn run_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync>
                     ":".to_string(),
                     "_".to_string(),
                 ];
-                for c in 'a'..='z' { v.push(c.to_string()); }
-                for c in 'A'..='Z' { v.push(c.to_string()); }
+                for c in 'a'..='z' {
+                    v.push(c.to_string());
+                }
+                for c in 'A'..='Z' {
+                    v.push(c.to_string());
+                }
                 v
             }),
             ..Default::default()
@@ -125,6 +137,7 @@ pub(crate) fn run_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync>
         }
     });
     conn.initialize_finish(init_id, init_result)?;
+    crate::slog_info!("lsp", "initialize complete, entering message loop");
 
     let mut docs: HashMap<String, String> = HashMap::new();
 
@@ -132,6 +145,7 @@ pub(crate) fn run_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync>
         match msg {
             Message::Request(req) => {
                 if conn.handle_shutdown(&req)? {
+                    crate::slog_info!("lsp", "shutdown received id={}", req.id);
                     break;
                 }
                 dispatch_request(&conn, &mut docs, req)?;
@@ -143,7 +157,9 @@ pub(crate) fn run_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync>
         }
     }
 
+    crate::slog_info!("lsp", "message loop exited, joining io threads");
     io_threads.join()?;
+    crate::slog_info!("lsp", "io threads joined, shutting down clean");
     Ok(())
 }
 
@@ -152,6 +168,7 @@ fn dispatch_request(
     docs: &mut HashMap<String, String>,
     req: Request,
 ) -> Result<(), ProtocolError> {
+    crate::slog_trace!("lsp.req", "method={} id={}", req.method, req.id);
     if req.method == DocumentSymbolRequest::METHOD {
         let req_id = req.id.clone();
         let (id, params) = match req.extract(DocumentSymbolRequest::METHOD) {
@@ -231,6 +248,11 @@ fn dispatch_request(
             Err(ExtractError::MethodMismatch(_)) => unreachable!(),
         };
         let result = hover(docs, params);
+        if result.is_some() {
+            crate::slog_trace!("lsp.hover", "ok");
+        } else {
+            crate::slog_trace!("lsp.hover", "none");
+        }
         let resp = Response::new_ok(id, result);
         conn.sender.send(resp.into()).expect("lsp channel");
         return Ok(());
@@ -359,6 +381,19 @@ fn dispatch_request(
             Err(ExtractError::MethodMismatch(_)) => unreachable!(),
         };
         let result = rename_symbol(docs, params);
+        match &result {
+            Some(we) => {
+                let n_files = we.changes.as_ref().map(|m| m.len()).unwrap_or(0)
+                    + we.document_changes.as_ref().map(|_| 1).unwrap_or(0);
+                let n_edits: usize = we
+                    .changes
+                    .as_ref()
+                    .map(|m| m.values().map(|v| v.len()).sum())
+                    .unwrap_or(0);
+                crate::slog_info!("lsp.rename", "ok files={n_files} edits={n_edits}");
+            }
+            None => crate::slog_debug!("lsp.rename", "none (no symbol at cursor)"),
+        }
         let resp = Response::new_ok(id, result);
         conn.sender.send(resp.into()).expect("lsp channel");
         return Ok(());
@@ -396,25 +431,24 @@ fn dispatch_request(
 
     if req.method == SignatureHelpRequest::METHOD {
         let req_id = req.id.clone();
-        let (id, params) = match req
-            .extract::<lsp_types::SignatureHelpParams>(SignatureHelpRequest::METHOD)
-        {
-            Ok(p) => p,
-            Err(ExtractError::JsonError { method, error }) => {
-                let resp = Response::new_err(
-                    req_id,
-                    ErrorCode::InvalidParams as i32,
-                    format!("{method}: {error}"),
-                );
-                conn.sender.send(resp.into()).expect("lsp channel");
-                return Ok(());
-            }
-            Err(ExtractError::MethodMismatch(_)) => unreachable!(),
-        };
+        let (id, params) =
+            match req.extract::<lsp_types::SignatureHelpParams>(SignatureHelpRequest::METHOD) {
+                Ok(p) => p,
+                Err(ExtractError::JsonError { method, error }) => {
+                    let resp = Response::new_err(
+                        req_id,
+                        ErrorCode::InvalidParams as i32,
+                        format!("{method}: {error}"),
+                    );
+                    conn.sender.send(resp.into()).expect("lsp channel");
+                    return Ok(());
+                }
+                Err(ExtractError::MethodMismatch(_)) => unreachable!(),
+            };
         let uri = &params.text_document_position_params.text_document.uri;
-        let result = docs
-            .get(uri.as_str())
-            .and_then(|t| crate::lsp_extras::compute_signature_help(t, &params, doc_for_label_text));
+        let result = docs.get(uri.as_str()).and_then(|t| {
+            crate::lsp_extras::compute_signature_help(t, &params, doc_for_label_text)
+        });
         let resp = Response::new_ok(id, result);
         conn.sender.send(resp.into()).expect("lsp channel");
         return Ok(());
@@ -422,21 +456,20 @@ fn dispatch_request(
 
     if req.method == CodeActionRequest::METHOD {
         let req_id = req.id.clone();
-        let (id, params) = match req
-            .extract::<lsp_types::CodeActionParams>(CodeActionRequest::METHOD)
-        {
-            Ok(p) => p,
-            Err(ExtractError::JsonError { method, error }) => {
-                let resp = Response::new_err(
-                    req_id,
-                    ErrorCode::InvalidParams as i32,
-                    format!("{method}: {error}"),
-                );
-                conn.sender.send(resp.into()).expect("lsp channel");
-                return Ok(());
-            }
-            Err(ExtractError::MethodMismatch(_)) => unreachable!(),
-        };
+        let (id, params) =
+            match req.extract::<lsp_types::CodeActionParams>(CodeActionRequest::METHOD) {
+                Ok(p) => p,
+                Err(ExtractError::JsonError { method, error }) => {
+                    let resp = Response::new_err(
+                        req_id,
+                        ErrorCode::InvalidParams as i32,
+                        format!("{method}: {error}"),
+                    );
+                    conn.sender.send(resp.into()).expect("lsp channel");
+                    return Ok(());
+                }
+                Err(ExtractError::MethodMismatch(_)) => unreachable!(),
+            };
         let actions = crate::lsp_extras::compute_code_actions(docs, &params);
         let resp = Response::new_ok(id, Some(actions));
         conn.sender.send(resp.into()).expect("lsp channel");
@@ -445,9 +478,9 @@ fn dispatch_request(
 
     if req.method == lsp_types::request::FoldingRangeRequest::METHOD {
         let req_id = req.id.clone();
-        let (id, params) = match req
-            .extract::<lsp_types::FoldingRangeParams>(lsp_types::request::FoldingRangeRequest::METHOD)
-        {
+        let (id, params) = match req.extract::<lsp_types::FoldingRangeParams>(
+            lsp_types::request::FoldingRangeRequest::METHOD,
+        ) {
             Ok(p) => p,
             Err(ExtractError::JsonError { method, error }) => {
                 let resp = Response::new_err(
@@ -503,12 +536,14 @@ fn dispatch_notification(
     docs: &mut HashMap<String, String>,
     not: Notification,
 ) -> Result<(), ProtocolError> {
+    crate::slog_trace!("lsp.not", "method={}", not.method);
     if let Ok(params) = not
         .clone()
         .extract::<DidOpenTextDocumentParams>(DidOpenTextDocument::METHOD)
     {
         let uri = params.text_document.uri;
         let text = params.text_document.text;
+        crate::slog_debug!("lsp.didOpen", "uri={} bytes={}", uri.as_str(), text.len());
         docs.insert(uri.to_string(), text.clone());
         publish_diagnostics(conn, &uri, &text, &uri_to_path(&uri))?;
         return Ok(());
@@ -519,12 +554,14 @@ fn dispatch_notification(
     {
         let uri = params.text_document.uri;
         let text = merge_full_change(docs.get(uri.as_str()), params.content_changes);
+        crate::slog_debug!("lsp.didChange", "uri={} bytes={}", uri.as_str(), text.len());
         docs.insert(uri.to_string(), text.clone());
         publish_diagnostics(conn, &uri, &text, &uri_to_path(&uri))?;
         return Ok(());
     }
     if let Ok(params) = not.extract::<DidCloseTextDocumentParams>(DidCloseTextDocument::METHOD) {
         let uri = params.text_document.uri;
+        crate::slog_debug!("lsp.didClose", "uri={}", uri.as_str());
         docs.remove(uri.as_str());
         let n = Notification::new(
             PublishDiagnostics::METHOD.to_string(),
@@ -570,6 +607,16 @@ fn publish_diagnostics(
     path: &str,
 ) -> Result<(), ProtocolError> {
     let diagnostics = compute_diagnostics(text, path);
+    if diagnostics.is_empty() {
+        crate::slog_trace!("lsp.diag", "clean uri={}", uri.as_str());
+    } else {
+        crate::slog_debug!(
+            "lsp.diag",
+            "uri={} count={}",
+            uri.as_str(),
+            diagnostics.len()
+        );
+    }
     let n = Notification::new(
         PublishDiagnostics::METHOD.to_string(),
         PublishDiagnosticsParams::new(uri.clone(), diagnostics, None),
@@ -1049,7 +1096,48 @@ fn identifier_span_bytes(line: &str, byte_col: usize) -> Option<(usize, usize)> 
             break;
         }
     }
+    // Cursor parked on the sigil itself (`$|foo`): no ident chars before
+    // `b`, but the next char(s) form an identifier. Grab them along with
+    // the sigil so the LSP sees `$foo`, not the empty span.
+    if start == end && b < line.len() {
+        if let Some(sigil) = line[b..].chars().next() {
+            if matches!(sigil, '$' | '@' | '%') {
+                let rest_start = b + sigil.len_utf8();
+                let mut rest_end = rest_start;
+                for (i, ch) in line[rest_start..].char_indices() {
+                    if is_ident_char(ch) {
+                        rest_end = rest_start + i + ch.len_utf8();
+                    } else {
+                        break;
+                    }
+                }
+                if rest_end > rest_start {
+                    return Some((b, rest_end));
+                }
+            }
+        }
+    }
     if start < end {
+        // Include a leading sigil so `$foo`/`@arr`/`%hash` are returned as
+        // one identifier. Without this, hover/rename/highlight on `$pass`
+        // strip to bare `pass` and collide with the builtin of that name;
+        // rename for variables silently fails because the SymbolTable
+        // stores names sigil-prefixed.
+        if start > 0 {
+            if let Some(prev_char) = line[..start].chars().next_back() {
+                if matches!(prev_char, '$' | '@' | '%') {
+                    let prev_byte = start - prev_char.len_utf8();
+                    let two_back = line[..prev_byte].chars().next_back();
+                    let standalone = match two_back {
+                        None => true,
+                        Some(c) => !c.is_ascii_alphanumeric() && c != '_',
+                    };
+                    if standalone {
+                        return Some((prev_byte, end));
+                    }
+                }
+            }
+        }
         Some((start, end))
     } else {
         None
@@ -1081,6 +1169,34 @@ fn documentation_to_string(doc: &Documentation) -> String {
 }
 
 fn hover_markdown_for_word(word: &str, text: &str, path: &str) -> Option<String> {
+    // Sigil-prefixed identifiers are variables, not builtins. Don't let
+    // `$pass`/`@pass`/`%pass` fall through to `doc_for_label("pass")` —
+    // that returned the `pass` builtin card and confused users. Try to
+    // resolve to a SymbolTable declaration; if that fails, return nothing
+    // rather than a misleading builtin doc.
+    if word.starts_with('$') || word.starts_with('@') || word.starts_with('%') {
+        if let Some(table) = crate::lsp_symbols::SymbolTable::build(text, path) {
+            for sym in &table.symbols {
+                if sym.name == word {
+                    let kind_str = match sym.kind {
+                        crate::lsp_symbols::SymbolKind::Local => "local variable",
+                        crate::lsp_symbols::SymbolKind::State => "state variable",
+                        crate::lsp_symbols::SymbolKind::Our => "package (`our`) variable",
+                        crate::lsp_symbols::SymbolKind::Param => "subroutine parameter",
+                        crate::lsp_symbols::SymbolKind::Sub => "subroutine",
+                        crate::lsp_symbols::SymbolKind::Type => "type",
+                        crate::lsp_symbols::SymbolKind::Package => "package",
+                    };
+                    return Some(format!(
+                        "{kind_str} `{}` — declared at line {}.",
+                        sym.name,
+                        sym.decl_line + 1
+                    ));
+                }
+            }
+        }
+        return None;
+    }
     let program = crate::parse_with_file(text, path).ok()?;
     let sub_map = collect_sub_fqn_map(&program);
     if let Some(ln) = resolve_sub_decl_line(&sub_map, word) {
@@ -1094,6 +1210,119 @@ fn hover_markdown_for_word(word: &str, text: &str, path: &str) -> Option<String>
     doc_stub_for(word)
 }
 
+/// Classification of the textual context around the cursor identifier.
+/// Used to decide whether the hover should fire and, when it doesn't,
+/// makes the reason loggable so users can see WHY a hover didn't show up
+/// without rebuilding the plugin.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum HoverGate {
+    /// Normal code position — let the builtin / sub / sigil-var lookup run.
+    Code,
+    /// Inside a `#` line comment or `#!` shebang.
+    Comment,
+    /// `$obj->method` — the identifier is a method-call selector.
+    MethodSelector,
+    /// `$h{key}` — the identifier is a hash subscript key.
+    HashKey,
+    /// `key =>` — the identifier is the LHS of a fat comma.
+    FatCommaKey,
+}
+
+/// Classify the identifier at `[start, end)` of `line_text` for hover
+/// suppression. Exposed so [`hover`] can log the decision and tests can
+/// pin every case without faking up a whole document.
+pub(crate) fn classify_hover_position(line_text: &str, start: usize, end: usize) -> HoverGate {
+    if line_starts_comment_before(line_text, start) {
+        return HoverGate::Comment;
+    }
+    // `->method`: skip back across whitespace then look for `->`.
+    {
+        let mut i = start;
+        while i > 0 {
+            let c = line_text.as_bytes()[i - 1];
+            if c == b' ' || c == b'\t' {
+                i -= 1;
+            } else {
+                break;
+            }
+        }
+        if i >= 2 && &line_text.as_bytes()[i - 2..i] == b"->" {
+            return HoverGate::MethodSelector;
+        }
+    }
+    let before = {
+        let mut j = start;
+        while j > 0 {
+            let c = line_text.as_bytes()[j - 1];
+            if c == b' ' || c == b'\t' {
+                j -= 1;
+                continue;
+            }
+            break;
+        }
+        if j == 0 {
+            None
+        } else {
+            Some(line_text.as_bytes()[j - 1])
+        }
+    };
+    let after = {
+        let mut j = end;
+        while j < line_text.len() {
+            let c = line_text.as_bytes()[j];
+            if c == b' ' || c == b'\t' {
+                j += 1;
+                continue;
+            }
+            break;
+        }
+        if j >= line_text.len() {
+            None
+        } else {
+            Some(line_text.as_bytes()[j])
+        }
+    };
+    if before == Some(b'{') && after == Some(b'}') {
+        let two_back = {
+            let mut j = start;
+            while j > 0 {
+                let c = line_text.as_bytes()[j - 1];
+                if c == b' ' || c == b'\t' {
+                    j -= 1;
+                    continue;
+                }
+                break;
+            }
+            if j >= 2 {
+                Some(line_text.as_bytes()[j - 2])
+            } else {
+                None
+            }
+        };
+        if two_back != Some(b'#') {
+            return HoverGate::HashKey;
+        }
+    }
+    if after == Some(b'=') {
+        let j = {
+            let mut k = end;
+            while k < line_text.len()
+                && (line_text.as_bytes()[k] == b' ' || line_text.as_bytes()[k] == b'\t')
+            {
+                k += 1;
+            }
+            k
+        };
+        if j + 1 < line_text.len()
+            && line_text.as_bytes()[j] == b'='
+            && line_text.as_bytes()[j + 1] == b'>'
+        {
+            return HoverGate::FatCommaKey;
+        }
+    }
+    HoverGate::Code
+}
+
 fn hover(docs: &HashMap<String, String>, params: HoverParams) -> Option<Hover> {
     let tdp = params.text_document_position_params;
     let uri = tdp.text_document.uri;
@@ -1103,12 +1332,53 @@ fn hover(docs: &HashMap<String, String>, params: HoverParams) -> Option<Hover> {
     let lines: Vec<&str> = text.lines().collect();
     let line_text = lines.get(pos.line as usize).copied()?;
     let byte_col = utf16_col_to_byte_idx(line_text, pos.character);
-    let (start, end) = identifier_span_bytes(line_text, byte_col)?;
+    let (start, end) = match identifier_span_bytes(line_text, byte_col) {
+        Some(p) => p,
+        None => {
+            crate::slog_trace!(
+                "lsp.hover",
+                "pos={}:{} no_identifier_at_cursor",
+                pos.line,
+                pos.character
+            );
+            return None;
+        }
+    };
     let word = line_text.get(start..end)?.to_string();
     if word.is_empty() {
+        crate::slog_trace!("lsp.hover", "pos={}:{} empty_word", pos.line, pos.character);
         return None;
     }
-    let md = hover_markdown_for_word(&word, text, &path)?;
+    let gate = classify_hover_position(line_text, start, end);
+    if gate != HoverGate::Code {
+        crate::slog_debug!(
+            "lsp.hover",
+            "pos={}:{} word={:?} gated={:?} (suppressed)",
+            pos.line,
+            pos.character,
+            word,
+            gate
+        );
+        return None;
+    }
+    let md = hover_markdown_for_word(&word, text, &path);
+    match &md {
+        Some(_) => crate::slog_debug!(
+            "lsp.hover",
+            "pos={}:{} word={:?} hit",
+            pos.line,
+            pos.character,
+            word
+        ),
+        None => crate::slog_trace!(
+            "lsp.hover",
+            "pos={}:{} word={:?} miss (no doc)",
+            pos.line,
+            pos.character,
+            word
+        ),
+    }
+    let md = md?;
     let range = range_on_line(line_text, pos.line, start, end);
     Some(Hover {
         contents: HoverContents::Markup(MarkupContent {
@@ -1117,6 +1387,62 @@ fn hover(docs: &HashMap<String, String>, params: HoverParams) -> Option<Hover> {
         }),
         range: Some(range),
     })
+}
+
+/// True when the identifier at `[start, end)` of `line_text` is being used
+/// as a hash key, method-call selector, or sits inside a `#` comment /
+/// shebang. Thin shim around [`classify_hover_position`] kept for the
+/// pre-existing test calls. Production code in [`hover`] uses the
+/// classifier directly so the precise reason can be logged.
+#[cfg(test)]
+fn is_non_builtin_position(line_text: &str, start: usize, end: usize) -> bool {
+    classify_hover_position(line_text, start, end) != HoverGate::Code
+}
+
+/// True if a bare `#` (comment opener) appears in `line[..end]` outside any
+/// `"..."` / `'...'` string literal. Handles both shebang (`#!/usr/bin/env
+/// stryke`, where `#` is at column 0) and inline comments (`do(); # foo`).
+///
+/// String-aware so `print "x #y"` doesn't false-positive — the `#` inside
+/// the literal opens nothing. Backslash-escapes inside string literals are
+/// honored so `"\""` doesn't accidentally close.
+fn line_starts_comment_before(line: &str, end: usize) -> bool {
+    let bytes = line.as_bytes();
+    let cap = end.min(bytes.len());
+    let mut in_dq = false;
+    let mut in_sq = false;
+    let mut i = 0;
+    while i < cap {
+        let c = bytes[i];
+        if in_dq {
+            if c == b'\\' && i + 1 < cap {
+                i += 2;
+                continue;
+            }
+            if c == b'"' {
+                in_dq = false;
+            }
+        } else if in_sq {
+            if c == b'\\' && i + 1 < cap {
+                i += 2;
+                continue;
+            }
+            if c == b'\'' {
+                in_sq = false;
+            }
+        } else {
+            if c == b'#' {
+                return true;
+            }
+            if c == b'"' {
+                in_dq = true;
+            } else if c == b'\'' {
+                in_sq = true;
+            }
+        }
+        i += 1;
+    }
+    false
 }
 
 fn goto_definition(
@@ -1135,6 +1461,20 @@ fn goto_definition(
     let word = line_text.get(start..end)?.to_string();
     if word.is_empty() {
         return None;
+    }
+    // Try the SymbolTable first so vars / classes / structs / enums /
+    // traits / packages / our-vars all resolve. Falls back to the bare
+    // sub map for parse-failure tolerance during typing.
+    if let Some(table) = crate::lsp_symbols::SymbolTable::build(text, &path) {
+        if let Some(id) = table.symbol_at(pos.line, Some(&word)) {
+            if let Some(sym) = table.symbols.iter().find(|s| s.id == id) {
+                // `decl_line` is 0-based (LSP); `line_range_utf16` expects 1-based.
+                return Some(GotoDefinitionResponse::Scalar(Location {
+                    uri: uri.clone(),
+                    range: line_range_utf16(text, sym.decl_line as usize + 1),
+                }));
+            }
+        }
     }
     let program = crate::parse_with_file(text, &path).ok()?;
     let sub_map = collect_sub_fqn_map(&program);
@@ -1276,9 +1616,30 @@ fn sub_map_for_doc(text: &str, path: &str) -> Option<HashMap<String, usize>> {
     Some(collect_sub_fqn_map(&program))
 }
 
+/// Split a `$foo` / `@bar` / `%baz` style identifier into its leading
+/// sigil (if any) and the rest. Returns `(None, name)` for bare names
+/// like `Util::greet` so callers can treat sigil-less inputs uniformly.
+fn split_sigil(s: &str) -> (Option<char>, &str) {
+    match s.chars().next() {
+        Some(c @ ('$' | '@' | '%')) => (Some(c), &s[c.len_utf8()..]),
+        _ => (None, s),
+    }
+}
+
 fn is_valid_rename_ident(s: &str) -> bool {
-    !s.is_empty()
-        && s.chars()
+    if s.is_empty() {
+        return false;
+    }
+    // Allow an optional leading sigil (`$`, `@`, `%`) so variables can
+    // be renamed. Everything after the (optional) sigil must be an
+    // ordinary identifier: alphanumeric, underscore, or `::` separator.
+    let rest = match s.chars().next() {
+        Some('$') | Some('@') | Some('%') => &s[1..],
+        _ => s,
+    };
+    !rest.is_empty()
+        && rest
+            .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == ':')
 }
 
@@ -1294,11 +1655,60 @@ fn prepare_rename(
     params: TextDocumentPositionParams,
 ) -> Option<PrepareRenameResponse> {
     let uri = params.text_document.uri;
-    let text = docs.get(uri.as_str())?;
+    let pos = params.position;
+    let text = match docs.get(uri.as_str()) {
+        Some(t) => t,
+        None => {
+            crate::slog_debug!(
+                "lsp.prepareRename",
+                "pos={}:{} no_doc_for_uri",
+                pos.line,
+                pos.character
+            );
+            return None;
+        }
+    };
     let path = uri_to_path(&uri);
-    let (needle, range) = identifier_needle_at_position(text, params.position)?;
-    let sub_map = sub_map_for_doc(text, &path)?;
-    resolve_sub_decl_line(&sub_map, needle.as_str())?;
+    let (needle, range) = match identifier_needle_at_position(text, pos) {
+        Some(p) => p,
+        None => {
+            crate::slog_debug!(
+                "lsp.prepareRename",
+                "pos={}:{} no_identifier",
+                pos.line,
+                pos.character
+            );
+            return None;
+        }
+    };
+    let resolved = crate::lsp_symbols::SymbolTable::build(text, &path)
+        .and_then(|t| t.symbol_at(pos.line, Some(&needle)));
+    if resolved.is_none() {
+        let sub_map = match sub_map_for_doc(text, &path) {
+            Some(m) => m,
+            None => {
+                crate::slog_debug!(
+                    "lsp.prepareRename",
+                    "needle={:?} parse_failed_no_fallback",
+                    needle
+                );
+                return None;
+            }
+        };
+        if resolve_sub_decl_line(&sub_map, needle.as_str()).is_none() {
+            crate::slog_debug!(
+                "lsp.prepareRename",
+                "needle={:?} not_in_symbol_table_or_sub_map (rejected)",
+                needle
+            );
+            return None;
+        }
+    }
+    crate::slog_debug!(
+        "lsp.prepareRename",
+        "needle={:?} placeholder accepted",
+        needle
+    );
     Some(PrepareRenameResponse::RangeWithPlaceholder {
         range,
         placeholder: needle,
@@ -1307,14 +1717,50 @@ fn prepare_rename(
 
 fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option<WorkspaceEdit> {
     if !is_valid_rename_ident(&params.new_name) {
+        crate::slog_warn!(
+            "lsp.rename",
+            "rejecting invalid new_name={:?}",
+            params.new_name
+        );
         return None;
     }
     let active_uri = params.text_document_position.text_document.uri;
-    let active_text = docs.get(active_uri.as_str())?;
+    let active_text = match docs.get(active_uri.as_str()) {
+        Some(t) => t,
+        None => {
+            crate::slog_warn!(
+                "lsp.rename",
+                "no doc for active uri={}",
+                active_uri.as_str()
+            );
+            return None;
+        }
+    };
     let active_path = uri_to_path(&active_uri);
     let (needle, _) =
-        identifier_needle_at_position(active_text, params.text_document_position.position)?;
-    if needle == params.new_name {
+        match identifier_needle_at_position(active_text, params.text_document_position.position) {
+            Some(p) => p,
+            None => {
+                crate::slog_debug!(
+                    "lsp.rename",
+                    "pos={}:{} no identifier at cursor",
+                    params.text_document_position.position.line,
+                    params.text_document_position.position.character
+                );
+                return None;
+            }
+        };
+    // Sigil-aware new name: if the cursor identifier is `$foo` and the user
+    // typed `bar`, splice on the same sigil so the replacement is `$bar`.
+    // If the user typed `$bar` outright, accept it as-is. This matches what
+    // an editor would render in the rename popup either way.
+    let effective_new = match needle.chars().next() {
+        Some(c @ ('$' | '@' | '%')) if !params.new_name.starts_with(['$', '@', '%']) => {
+            format!("{c}{}", params.new_name)
+        }
+        _ => params.new_name.clone(),
+    };
+    if needle == effective_new {
         return Some(WorkspaceEdit::default());
     }
 
@@ -1340,38 +1786,123 @@ fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option
         }
     };
     let cursor_pos = params.text_document_position.position;
-    let active_symbol_id = table.symbol_at(cursor_pos.line, Some(&needle))?;
+    let active_symbol_id = match table.symbol_at(cursor_pos.line, Some(&needle)) {
+        Some(id) => id,
+        None => {
+            crate::slog_debug!(
+                "lsp.rename",
+                "needle={:?} unresolved at {}:{}",
+                needle,
+                cursor_pos.line,
+                cursor_pos.character
+            );
+            return None;
+        }
+    };
     let active_sym = table
         .symbols
         .iter()
         .find(|s| s.id == active_symbol_id)
         .cloned()?;
+    crate::slog_debug!(
+        "lsp.rename",
+        "resolved needle={:?} → {:?} kind={:?} package={:?} decl_line={}",
+        needle,
+        active_sym.name,
+        active_sym.kind,
+        active_sym.package,
+        active_sym.decl_line
+    );
+
+    // ── Form: bare vs. package-qualified ────────────────────────────────
+    //
+    // Symbols declared in a package have TWO spellings the source can use:
+    //   bare      = `$level`      | `greet`
+    //   qualified = `$Util::level`| `Util::greet`
+    // The `SymbolTable` stores Sub/Type with the qualified form already
+    // baked in; Our/Package with the bare form. To rename ALL textual
+    // occurrences across files we need to scan for whichever spelling
+    // appears at each call site AND substitute with the matching spelling
+    // of the new name (preserving the `Util::` prefix where present).
+    let (sigil, bare_tail_of_stored) = split_sigil(&active_sym.name);
+    let bare_form = match sigil {
+        Some(c) => format!("{c}{}", bare_tail_of_stored),
+        None => bare_tail_of_stored.to_string(),
+    };
+    let qualified_form = if active_sym.package == "main" {
+        bare_form.clone()
+    } else {
+        match sigil {
+            Some(c) => format!("{c}{}::{}", active_sym.package, bare_tail_of_stored),
+            None => format!("{}::{}", active_sym.package, bare_tail_of_stored),
+        }
+    };
+    let (new_sigil, new_tail) = split_sigil(&effective_new);
+    let bare_new = match new_sigil {
+        Some(c) => format!("{c}{}", new_tail),
+        None => new_tail.to_string(),
+    };
+    let qualified_new = if active_sym.package == "main" {
+        bare_new.clone()
+    } else {
+        match new_sigil {
+            Some(c) => format!("{c}{}::{}", active_sym.package, new_tail),
+            None => format!("{}::{}", active_sym.package, new_tail),
+        }
+    };
+    crate::slog_trace!(
+        "lsp.rename",
+        "forms: bare={:?}→{:?} qualified={:?}→{:?}",
+        bare_form,
+        bare_new,
+        qualified_form,
+        qualified_new
+    );
 
     #[allow(clippy::mutable_key_type)]
     let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
     let mut total = 0usize;
 
-    let mut emit_edits = |uri_str: &str, ranges: Vec<Range>, changes: &mut HashMap<Uri, Vec<TextEdit>>, total: &mut usize| {
+    let push_edits = |uri_str: &str,
+                      ranges: Vec<Range>,
+                      new_text: &str,
+                      changes: &mut HashMap<Uri, Vec<TextEdit>>,
+                      total: &mut usize| {
         if ranges.is_empty() {
             return;
         }
-        let mut edits: Vec<TextEdit> = ranges
+        let new_edits: Vec<TextEdit> = ranges
             .into_iter()
             .map(|range| TextEdit {
                 range,
-                new_text: params.new_name.clone(),
+                new_text: new_text.to_string(),
             })
             .collect();
-        edits.sort_by(|a, b| cmp_range_start_desc(&a.range, &b.range));
-        *total += edits.len();
+        *total += new_edits.len();
         if let Ok(u) = uri_str.parse::<Uri>() {
-            changes.insert(u, edits);
+            let entry = changes.entry(u).or_default();
+            // Avoid duplicate edits at the same range — multiple scan
+            // passes may match the same span.
+            for e in new_edits {
+                if !entry.iter().any(|x| x.range == e.range) {
+                    entry.push(e);
+                }
+            }
+            entry.sort_by(|a, b| cmp_range_start_desc(&a.range, &b.range));
         }
     };
 
-    // Active file.
-    let ranges = table.ranges_for(active_symbol_id);
-    emit_edits(active_uri.as_str(), ranges, &mut changes, &mut total);
+    // Active file: every occurrence the SymbolTable knows about is a bare
+    // form (the declaration line uses `fn greet` / `our $level`, not the
+    // qualified spelling), so substitute with `bare_new`.
+    let active_ranges = table.ranges_for(active_symbol_id);
+    push_edits(
+        active_uri.as_str(),
+        active_ranges,
+        &bare_new,
+        &mut changes,
+        &mut total,
+    );
 
     // Other open files — symbols cross-file only for package-scoped
     // declarations (Sub / Type / Our / Package); a `Local`/`Param` is
@@ -1392,36 +1923,43 @@ fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option
                 Ok(u) => uri_to_path(&u),
                 Err(_) => other_uri_str.clone(),
             };
-            let Some(other_table) =
-                crate::lsp_symbols::SymbolTable::build(other_text, &other_path)
+            let Some(other_table) = crate::lsp_symbols::SymbolTable::build(other_text, &other_path)
             else {
                 continue;
             };
-            // Find the same symbol by qualified name in the other file.
+            // (1) Per-symbol ranges that the other file's SymbolTable
+            // already knows about — only fires when the other file
+            // re-declares the same name in the same package (rare).
             let matches: Vec<_> = other_table
                 .symbols
                 .iter()
                 .filter(|s| s.name == active_sym.name && s.package == active_sym.package)
                 .map(|s| s.id)
                 .collect();
-            let mut all_ranges: Vec<Range> = Vec::new();
+            let mut bare_ranges_other: Vec<Range> = Vec::new();
             for id in matches {
-                all_ranges.extend(other_table.ranges_for(id));
+                bare_ranges_other.extend(other_table.ranges_for(id));
             }
-            // Also catch references to the qualified name that don't have
-            // their own declaration in this file.
+            push_edits(
+                other_uri_str,
+                bare_ranges_other,
+                &bare_new,
+                &mut changes,
+                &mut total,
+            );
+
+            // (2) Recorded refs in the other file matching by name —
+            // captured when `resolve` succeeded via package-namespace
+            // fallback.
+            let mut bare_ref_ranges: Vec<Range> = Vec::new();
             for r in &other_table.refs {
                 if r.name == active_sym.name {
-                    // Already covered by ranges_for when the decl exists
-                    // in this file. If it doesn't, the reference resolved
-                    // to a different symbol via fallback — emit the range.
                     let already_decl_local = other_table
                         .symbols
                         .iter()
                         .any(|s| s.id == r.symbol && s.name == active_sym.name);
                     if !already_decl_local {
-                        // Re-scan line text for the bare needle.
-                        all_ranges.extend(scan_ranges_for_needle(
+                        bare_ref_ranges.extend(scan_ranges_for_needle(
                             other_text,
                             r.line,
                             &active_sym.name,
@@ -1429,7 +1967,59 @@ fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option
                     }
                 }
             }
-            emit_edits(other_uri_str, all_ranges, &mut changes, &mut total);
+            push_edits(
+                other_uri_str,
+                bare_ref_ranges,
+                &bare_new,
+                &mut changes,
+                &mut total,
+            );
+
+            // (3) Full-file textual scan for the QUALIFIED spelling.
+            // Necessary because file B may reference `Util::greet` /
+            // `$Util::level` without declaring it locally, in which case
+            // its SymbolTable never recorded a ref (the builder's
+            // `record_ref` requires resolution, and the decl is in a
+            // different file). The replacement preserves the `Util::`
+            // prefix — `Util::greet` → `Util::salute`, NOT bare `salute`.
+            if qualified_form != bare_form {
+                let mut qualified_ranges: Vec<Range> = Vec::new();
+                for line0 in 0..(other_text.lines().count() as u32) {
+                    qualified_ranges.extend(scan_ranges_for_needle(
+                        other_text,
+                        line0,
+                        &qualified_form,
+                    ));
+                }
+                push_edits(
+                    other_uri_str,
+                    qualified_ranges,
+                    &qualified_new,
+                    &mut changes,
+                    &mut total,
+                );
+            }
+            // Sub/Type stored as qualified — scan for that spelling too,
+            // since the stored name IS the source text the user typed.
+            if active_sym.name == qualified_form && qualified_form != bare_form {
+                // Already covered by branch above.
+            } else if active_sym.name.contains("::") {
+                let mut q_self_ranges: Vec<Range> = Vec::new();
+                for line0 in 0..(other_text.lines().count() as u32) {
+                    q_self_ranges.extend(scan_ranges_for_needle(
+                        other_text,
+                        line0,
+                        &active_sym.name,
+                    ));
+                }
+                push_edits(
+                    other_uri_str,
+                    q_self_ranges,
+                    &qualified_new,
+                    &mut changes,
+                    &mut total,
+                );
+            }
         }
     }
 
@@ -1452,10 +2042,10 @@ fn scan_ranges_for_needle(text: &str, line0: u32, name: &str) -> Vec<Range> {
     };
     for (start_byte, _) in line_text.match_indices(name) {
         let end_byte = start_byte + name.len();
-        let prev = line_text[..start_byte].chars().rev().next();
+        let prev = line_text[..start_byte].chars().next_back();
         let next = line_text[end_byte..].chars().next();
-        let prev_ok = prev.map_or(true, |c| !c.is_alphanumeric() && c != '_' && c != ':');
-        let next_ok = next.map_or(true, |c| !c.is_alphanumeric() && c != '_' && c != ':');
+        let prev_ok = prev.is_none_or(|c| !c.is_alphanumeric() && c != '_' && c != ':');
+        let next_ok = next.is_none_or(|c| !c.is_alphanumeric() && c != '_' && c != ':');
         if !prev_ok || !next_ok {
             continue;
         }
@@ -7793,9 +8383,41 @@ mod completion_tests {
 
     #[test]
     fn identifier_span_scalar() {
+        // Cursor on the letter — sigil-aware extraction grabs the whole
+        // `$foo`, which is what rename/hover/highlight need so the SymbolTable
+        // lookup matches and `$pass` no longer collides with the `pass` builtin.
         let line = "my $foo = 1;";
         let (s, e) = identifier_span_bytes(line, 4).unwrap();
-        assert_eq!(&line[s..e], "foo");
+        assert_eq!(&line[s..e], "$foo");
+    }
+
+    #[test]
+    fn identifier_span_scalar_cursor_on_sigil() {
+        let line = "my $foo = 1;";
+        let (s, e) = identifier_span_bytes(line, 3).unwrap();
+        assert_eq!(&line[s..e], "$foo");
+    }
+
+    #[test]
+    fn identifier_span_array() {
+        let line = "for (@xs) { p _ }";
+        let (s, e) = identifier_span_bytes(line, 6).unwrap();
+        assert_eq!(&line[s..e], "@xs");
+    }
+
+    #[test]
+    fn identifier_span_hash() {
+        let line = "p %env;";
+        let (s, e) = identifier_span_bytes(line, 3).unwrap();
+        assert_eq!(&line[s..e], "%env");
+    }
+
+    #[test]
+    fn identifier_span_bare_name_unchanged() {
+        // Bare names (sub calls, type names) keep their existing behavior.
+        let line = "MyClass->new";
+        let (s, e) = identifier_span_bytes(line, 3).unwrap();
+        assert_eq!(&line[s..e], "MyClass");
     }
 
     #[test]
@@ -7897,16 +8519,31 @@ mod completion_tests {
     #[test]
     fn snippet_match_keyword_is_present() {
         let triggers = snippet_labels_for("m");
-        assert!(triggers.iter().any(|t| t == "match"), "match snippet: got {triggers:?}");
-        assert!(triggers.iter().any(|t| t == "main"), "main scaffold: got {triggers:?}");
+        assert!(
+            triggers.iter().any(|t| t == "match"),
+            "match snippet: got {triggers:?}"
+        );
+        assert!(
+            triggers.iter().any(|t| t == "main"),
+            "main scaffold: got {triggers:?}"
+        );
     }
 
     #[test]
     fn snippet_if_family_includes_three_variants() {
         let triggers = snippet_labels_for("if");
-        assert!(triggers.iter().any(|t| t == "if"), "plain if: got {triggers:?}");
-        assert!(triggers.iter().any(|t| t == "ifelse"), "if/else: got {triggers:?}");
-        assert!(triggers.iter().any(|t| t == "ifelsif"), "if/elsif/else: got {triggers:?}");
+        assert!(
+            triggers.iter().any(|t| t == "if"),
+            "plain if: got {triggers:?}"
+        );
+        assert!(
+            triggers.iter().any(|t| t == "ifelse"),
+            "if/else: got {triggers:?}"
+        );
+        assert!(
+            triggers.iter().any(|t| t == "ifelsif"),
+            "if/elsif/else: got {triggers:?}"
+        );
     }
 
     #[test]
@@ -7957,5 +8594,642 @@ mod completion_tests {
             triggers.len(),
             triggers.iter().take(5).collect::<Vec<_>>()
         );
+    }
+}
+
+#[cfg(test)]
+// `lsp_types::Uri` flips clippy's mutable_key_type alarm despite being
+// effectively immutable; suppress at the test-module level so the LSP
+// `HashMap<Uri, Vec<TextEdit>>` access pattern doesn't fight the lint.
+#[allow(clippy::mutable_key_type)]
+mod rename_hover_tests {
+    use super::{hover_markdown_for_word, prepare_rename, rename_symbol};
+    use lsp_types::{
+        PartialResultParams, Position, PrepareRenameResponse, RenameParams, TextDocumentIdentifier,
+        TextDocumentPositionParams, Uri, WorkDoneProgressParams,
+    };
+    use std::collections::HashMap;
+    use std::str::FromStr;
+
+    fn uri(s: &str) -> Uri {
+        Uri::from_str(s).unwrap()
+    }
+
+    fn docs(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+        pairs
+            .iter()
+            .map(|(u, t)| ((*u).to_string(), (*t).to_string()))
+            .collect()
+    }
+
+    fn prepare(text: &str, line: u32, character: u32) -> Option<PrepareRenameResponse> {
+        let d = docs(&[("file:///a.stk", text)]);
+        prepare_rename(
+            &d,
+            TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier {
+                    uri: uri("file:///a.stk"),
+                },
+                position: Position { line, character },
+            },
+        )
+    }
+
+    fn rename(
+        text: &str,
+        line: u32,
+        character: u32,
+        new_name: &str,
+    ) -> Option<lsp_types::WorkspaceEdit> {
+        let d = docs(&[("file:///a.stk", text)]);
+        rename_symbol(
+            &d,
+            RenameParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier {
+                        uri: uri("file:///a.stk"),
+                    },
+                    position: Position { line, character },
+                },
+                new_name: new_name.to_string(),
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            },
+        )
+    }
+
+    // ── $pass hover bug regression ──────────────────────────────────────────
+
+    #[test]
+    fn hover_for_sigil_var_does_not_show_pass_builtin() {
+        // `$pass` is a user variable; without sigil-awareness the hover
+        // returned the `pass` builtin card (the bug).
+        let text = "my $pass = 1;\np $pass;\n";
+        let h = hover_markdown_for_word("$pass", text, "a.stk");
+        // Either None or a variable-card that names `$pass` — must NOT be
+        // the `pass` builtin doc (which doesn't contain the literal `$pass`).
+        if let Some(md) = h {
+            assert!(
+                md.contains("$pass"),
+                "hover for $pass must reference the variable, got: {md}"
+            );
+            assert!(
+                !md.to_lowercase().contains("builtin"),
+                "hover for $pass must not show builtin card, got: {md}"
+            );
+        }
+    }
+
+    #[test]
+    fn is_non_builtin_position_detects_method_call() {
+        use super::is_non_builtin_position;
+        // `$db->exec` — caret on `exec` should NOT fire the `exec` builtin.
+        let line = "$db->exec(\"SELECT 1\")";
+        let start = line.find("exec").unwrap();
+        let end = start + "exec".len();
+        assert!(is_non_builtin_position(line, start, end));
+    }
+
+    #[test]
+    fn is_non_builtin_position_detects_hash_key() {
+        use super::is_non_builtin_position;
+        // `$opts{format}` — caret on `format` should NOT fire `format` builtin.
+        let line = "$opts{format}";
+        let start = line.find("format").unwrap();
+        let end = start + "format".len();
+        assert!(is_non_builtin_position(line, start, end));
+    }
+
+    #[test]
+    fn is_non_builtin_position_detects_fat_comma_key() {
+        use super::is_non_builtin_position;
+        // `{ format => 1 }` — `format` is a key, not the builtin.
+        let line = "{ format => 1 }";
+        let start = line.find("format").unwrap();
+        let end = start + "format".len();
+        assert!(is_non_builtin_position(line, start, end));
+    }
+
+    #[test]
+    fn is_non_builtin_position_detects_shebang_line() {
+        use super::is_non_builtin_position;
+        // `#!/usr/bin/env stryke` — caret on `env` must NOT trigger the
+        // `env` builtin doc; the whole line is a shebang comment.
+        let line = "#!/usr/bin/env stryke";
+        let start = line.find("env").unwrap();
+        let end = start + "env".len();
+        assert!(is_non_builtin_position(line, start, end));
+    }
+
+    #[test]
+    fn is_non_builtin_position_allows_hover_inside_string_interpolation() {
+        use super::is_non_builtin_position;
+        // `p "msg #{FN}"` — caret on `FN` is INSIDE a `#{…}` interp block;
+        // the code there must still hover. The `{` before `FN` is the
+        // interpolation opener, not a hash-subscript brace.
+        let line = r#"p "msg #{FN}""#;
+        let start = line.find("FN").unwrap();
+        let end = start + "FN".len();
+        assert!(
+            !is_non_builtin_position(line, start, end),
+            "identifier inside `#{{…}}` interpolation must still hover"
+        );
+    }
+
+    #[test]
+    fn is_non_builtin_position_detects_inline_comment() {
+        use super::is_non_builtin_position;
+        // `let $x = 1; # exec the rest` — `exec` is inside a `#` comment;
+        // bare-name builtin hover must be suppressed.
+        let line = "let $x = 1; # exec the rest";
+        let start = line.find("exec").unwrap();
+        let end = start + "exec".len();
+        assert!(is_non_builtin_position(line, start, end));
+    }
+
+    #[test]
+    fn is_non_builtin_position_string_with_hash_is_not_comment() {
+        use super::is_non_builtin_position;
+        // `print "x #y"; foo` — the `#` lives inside a string literal,
+        // so the `foo` AFTER the closing quote is real code and must
+        // still hover as a builtin (i.e. is_non_builtin_position == false).
+        let line = r#"print "x #y"; foo"#;
+        let start = line.rfind("foo").unwrap();
+        let end = start + "foo".len();
+        assert!(
+            !is_non_builtin_position(line, start, end),
+            "code after a string containing `#` must still be code"
+        );
+    }
+
+    #[test]
+    fn is_non_builtin_position_negative_at_statement_position() {
+        use super::is_non_builtin_position;
+        // Bare `format` at statement position — keeps the builtin hover.
+        let line = "format REPORT =";
+        let start = 0;
+        let end = "format".len();
+        assert!(!is_non_builtin_position(line, start, end));
+    }
+
+    #[test]
+    fn hover_for_bare_pass_still_shows_builtin() {
+        // Sanity check — the bare `pass` keyword still shows the builtin.
+        let text = "pass;\n";
+        let h = hover_markdown_for_word("pass", text, "a.stk");
+        assert!(h.is_some(), "bare `pass` keeps its builtin hover");
+    }
+
+    // ── rename across kinds ────────────────────────────────────────────────
+
+    #[test]
+    fn rename_scalar_variable() {
+        // `my $foo = 1;  p $foo;` — caret on `$foo` (decl or use) should
+        // rename both occurrences. Pre-fix, the LSP returned None because
+        // the sigil was stripped to `foo`, missing the `$foo` symbol.
+        let text = "my $foo = 1;\np $foo;\n";
+        // Caret on the `f` of decl `$foo` (line 0, col 4).
+        let edit = rename(text, 0, 4, "$bar").expect("rename returns edits");
+        let changes = edit.changes.expect("workspace edit has changes");
+        let edits = changes.into_iter().next().expect("one file").1;
+        assert!(edits.len() >= 2, "$foo decl + ref renamed, got {:?}", edits);
+        for e in &edits {
+            assert_eq!(e.new_text, "$bar");
+        }
+    }
+
+    #[test]
+    fn rename_array_variable() {
+        let text = "my @xs = (1, 2);\nfor (@xs) { p _ }\n";
+        let edit = rename(text, 0, 4, "@ys").expect("rename @xs returns edits");
+        let edits = edit.changes.unwrap().into_iter().next().unwrap().1;
+        assert!(edits.len() >= 2);
+        for e in &edits {
+            assert_eq!(e.new_text, "@ys");
+        }
+    }
+
+    #[test]
+    fn rename_hash_variable() {
+        let text = "my %h = (a => 1);\np %h;\n";
+        let edit = rename(text, 0, 4, "%g").expect("rename %h returns edits");
+        let edits = edit.changes.unwrap().into_iter().next().unwrap().1;
+        assert!(edits.len() >= 2);
+        for e in &edits {
+            assert_eq!(e.new_text, "%g");
+        }
+    }
+
+    #[test]
+    fn rename_const_local() {
+        // `frozen my $K = …` is still a `my` decl in the AST — rename
+        // should work the same as a plain `my $K`.
+        let text = "frozen my $K = 42;\np $K;\n";
+        let edit = rename(text, 0, 11, "$KAY").expect("rename const returns edits");
+        let edits = edit.changes.unwrap().into_iter().next().unwrap().1;
+        assert!(edits.len() >= 2);
+        for e in &edits {
+            assert_eq!(e.new_text, "$KAY");
+        }
+    }
+
+    #[test]
+    fn rename_struct_type() {
+        let text = "struct Point { x, y }\nmy $p = Point->new(x => 1, y => 2);\n";
+        // Caret on `Point` decl (line 0, col 7).
+        let edit = rename(text, 0, 7, "Pt").expect("rename struct returns edits");
+        let edits = edit.changes.unwrap().into_iter().next().unwrap().1;
+        assert!(
+            edits.len() >= 2,
+            "struct decl + ctor call renamed, got {edits:?}"
+        );
+        for e in &edits {
+            assert_eq!(e.new_text, "Pt");
+        }
+    }
+
+    #[test]
+    fn rename_enum_type() {
+        let text = "enum Color { Red, Green, Blue }\nmy $c = Color::Red;\n";
+        // Caret on `Color` decl (line 0, col 5).
+        let edit = rename(text, 0, 5, "Hue").expect("rename enum returns edits");
+        let edits = edit.changes.unwrap().into_iter().next().unwrap().1;
+        assert!(!edits.is_empty());
+        for e in &edits {
+            assert_eq!(e.new_text, "Hue");
+        }
+    }
+
+    #[test]
+    fn rename_trait_type() {
+        // Trait names are declared via `StmtKind::TraitDecl`; the SymbolTable
+        // walker explicitly handles that variant, so renaming a trait at the
+        // decl site must emit at least one edit. (Stryke trait bodies don't
+        // require an `impl` site in the same file to test the basic gate.)
+        let text = "trait Drawable {\n    fn draw\n}\n";
+        // Caret on `Drawable` (line 0, col 6).
+        let edit = rename(text, 0, 6, "Renderable").expect("rename trait returns edits");
+        let edits = edit.changes.unwrap().into_iter().next().unwrap().1;
+        assert!(!edits.is_empty(), "trait decl renamed, got {edits:?}");
+        for e in &edits {
+            assert_eq!(e.new_text, "Renderable");
+        }
+    }
+
+    #[test]
+    fn rename_class_type() {
+        // Stryke class syntax: `class Name { fields\n methods }`.
+        let text = "class Animal {\n    name: Str\n}\nmy $a = Animal->new(name => \"cat\");\n";
+        // Caret on `Animal` decl (line 0, col 6).
+        let edit = rename(text, 0, 6, "Beast").expect("rename class returns edits");
+        let edits = edit.changes.unwrap().into_iter().next().unwrap().1;
+        assert!(!edits.is_empty());
+        for e in &edits {
+            assert_eq!(e.new_text, "Beast");
+        }
+    }
+
+    #[test]
+    fn rename_function_decl() {
+        let text = "fn greet { p \"hi\" }\ngreet();\n";
+        let edit = rename(text, 0, 3, "salute").expect("rename fn returns edits");
+        let edits = edit.changes.unwrap().into_iter().next().unwrap().1;
+        assert!(edits.len() >= 2);
+        for e in &edits {
+            assert_eq!(e.new_text, "salute");
+        }
+    }
+
+    // ── prepare_rename gate ────────────────────────────────────────────────
+
+    #[test]
+    fn prepare_rename_allows_scalar_var() {
+        // Pre-fix, prepare_rename only allowed subs and rejected `$foo`
+        // outright. IntelliJ then never even called textDocument/rename.
+        let r = prepare("my $foo = 1;\np $foo;\n", 0, 4);
+        assert!(r.is_some(), "prepare_rename must allow `$foo`");
+    }
+
+    #[test]
+    fn prepare_rename_allows_struct() {
+        let r = prepare("struct Point { x, y }\n", 0, 7);
+        assert!(r.is_some(), "prepare_rename must allow struct names");
+    }
+
+    #[test]
+    fn prepare_rename_allows_function() {
+        let r = prepare("fn greet { p \"hi\" }\n", 0, 3);
+        assert!(r.is_some(), "prepare_rename must allow fn names");
+    }
+
+    // ── cross-file rename ──────────────────────────────────────────────────
+
+    #[test]
+    fn rename_function_crosses_files() {
+        // A package-scoped sub renamed in file A should also patch file B
+        // where it's referenced — and the qualified reference in file B
+        // must keep its `Util::` prefix.
+        let a = "package Util;\nfn greet { p \"hi\" }\n";
+        let b = "use Util;\nUtil::greet();\n";
+        let d = docs(&[("file:///util.stk", a), ("file:///main.stk", b)]);
+        let edit = rename_symbol(
+            &d,
+            RenameParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier {
+                        uri: uri("file:///util.stk"),
+                    },
+                    position: Position {
+                        line: 1,
+                        character: 3,
+                    },
+                },
+                new_name: "salute".to_string(),
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            },
+        )
+        .expect("rename returns edits");
+        let changes = edit.changes.expect("changes present");
+        assert!(
+            changes.len() >= 2,
+            "rename must touch both files, got {} files: {:?}",
+            changes.len(),
+            changes.keys().collect::<Vec<_>>(),
+        );
+        let main_edits = changes
+            .iter()
+            .find(|(u, _)| u.as_str() == "file:///main.stk")
+            .map(|(_, v)| v.clone())
+            .expect("file B was edited");
+        // File B contained `Util::greet`; the replacement must be
+        // `Util::salute`, NOT bare `salute`.
+        assert!(
+            main_edits.iter().any(|e| e.new_text == "Util::salute"),
+            "qualified-form replacement preserves package prefix; got: {main_edits:?}",
+        );
+        let util_edits = changes
+            .iter()
+            .find(|(u, _)| u.as_str() == "file:///util.stk")
+            .map(|(_, v)| v.clone())
+            .expect("file A was edited");
+        // File A's `fn greet` decl uses the bare form; replacement is bare.
+        assert!(
+            util_edits.iter().any(|e| e.new_text == "salute"),
+            "bare-form replacement at the decl site: {util_edits:?}",
+        );
+    }
+
+    #[test]
+    fn rename_local_does_not_cross_files() {
+        // A `my $x` in file A must NOT rename `$x` in file B — different
+        // lexical scopes.
+        let a = "my $x = 1;\np $x;\n";
+        let b = "my $x = 2;\np $x;\n";
+        let d = docs(&[("file:///a.stk", a), ("file:///b.stk", b)]);
+        let edit = rename_symbol(
+            &d,
+            RenameParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier {
+                        uri: uri("file:///a.stk"),
+                    },
+                    position: Position {
+                        line: 0,
+                        character: 4,
+                    },
+                },
+                new_name: "$y".to_string(),
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            },
+        )
+        .expect("rename returns edits");
+        let changes = edit.changes.expect("changes present");
+        assert_eq!(changes.len(), 1, "local rename only touches its own file");
+        assert!(changes.keys().any(|u| u.as_str() == "file:///a.stk"));
+    }
+
+    // Silence the `unused` lint on the imported PartialResultParams etc.
+    #[allow(dead_code)]
+    fn _unused_imports_dummy() -> Option<PartialResultParams> {
+        None
+    }
+
+    // ── Typed hover-gate classifier (covers every case directly) ────────────
+
+    #[test]
+    fn classify_hover_gate_normal_code() {
+        use super::{classify_hover_position, HoverGate};
+        let line = "print foo";
+        let s = line.find("foo").unwrap();
+        let e = s + "foo".len();
+        assert_eq!(classify_hover_position(line, s, e), HoverGate::Code);
+    }
+
+    #[test]
+    fn classify_hover_gate_method_selector_with_space() {
+        use super::{classify_hover_position, HoverGate};
+        // `$db ->exec` (space between `$db` and `->`) — the gate still
+        // fires; we walk back across whitespace before checking `->`.
+        let line = "$db ->exec";
+        let s = line.find("exec").unwrap();
+        let e = s + "exec".len();
+        assert_eq!(
+            classify_hover_position(line, s, e),
+            HoverGate::MethodSelector
+        );
+    }
+
+    #[test]
+    fn classify_hover_gate_chained_method() {
+        use super::{classify_hover_position, HoverGate};
+        // `$db->cursor->exec` — the second `exec` is also a method selector.
+        let line = "$db->cursor->exec";
+        let s = line.rfind("exec").unwrap();
+        let e = s + "exec".len();
+        assert_eq!(
+            classify_hover_position(line, s, e),
+            HoverGate::MethodSelector
+        );
+    }
+
+    #[test]
+    fn classify_hover_gate_hash_key_with_whitespace() {
+        use super::{classify_hover_position, HoverGate};
+        // `$opts{ format }` (padded) — still a hash key.
+        let line = "$opts{ format }";
+        let s = line.find("format").unwrap();
+        let e = s + "format".len();
+        assert_eq!(classify_hover_position(line, s, e), HoverGate::HashKey);
+    }
+
+    #[test]
+    fn classify_hover_gate_interpolation_inside_string_is_code() {
+        use super::{classify_hover_position, HoverGate};
+        // `p "msg #{FN}"` — `FN` is inside `#{...}` interpolation; it's
+        // code, not a hash key, and not a comment (the `#` is in-string).
+        let line = r#"p "msg #{FN}""#;
+        let s = line.find("FN").unwrap();
+        let e = s + "FN".len();
+        assert_eq!(classify_hover_position(line, s, e), HoverGate::Code);
+    }
+
+    #[test]
+    fn classify_hover_gate_shebang() {
+        use super::{classify_hover_position, HoverGate};
+        let line = "#!/usr/bin/env stryke";
+        let s = line.find("env").unwrap();
+        let e = s + "env".len();
+        assert_eq!(classify_hover_position(line, s, e), HoverGate::Comment);
+    }
+
+    #[test]
+    fn classify_hover_gate_inline_comment() {
+        use super::{classify_hover_position, HoverGate};
+        let line = "do(); # exec all the things";
+        let s = line.find("exec").unwrap();
+        let e = s + "exec".len();
+        assert_eq!(classify_hover_position(line, s, e), HoverGate::Comment);
+    }
+
+    #[test]
+    fn classify_hover_gate_hash_in_string_followed_by_code() {
+        use super::{classify_hover_position, HoverGate};
+        // `print "#"; foo` — the `#` is inside the string literal, so
+        // `foo` after the closing `"` is real code. Use a doubled raw-
+        // string delimiter (`r##".."##`) so the inner `"#` doesn't
+        // accidentally terminate the literal.
+        let line = r##"print "#"; foo"##;
+        let s = line.rfind("foo").unwrap();
+        let e = s + "foo".len();
+        assert_eq!(classify_hover_position(line, s, e), HoverGate::Code);
+    }
+
+    #[test]
+    fn classify_hover_gate_single_quote_string_with_hash_then_code() {
+        use super::{classify_hover_position, HoverGate};
+        // `q'#'; bar` — single-quote literal containing `#`, then code.
+        let line = "q'#'; bar";
+        let s = line.find("bar").unwrap();
+        let e = s + "bar".len();
+        assert_eq!(classify_hover_position(line, s, e), HoverGate::Code);
+    }
+
+    #[test]
+    fn classify_hover_gate_fat_comma_at_line_start() {
+        use super::{classify_hover_position, HoverGate};
+        let line = "format => 1";
+        let s = 0;
+        let e = "format".len();
+        assert_eq!(classify_hover_position(line, s, e), HoverGate::FatCommaKey);
+    }
+
+    // ── More hover regression: var-shadow doesn't show env builtin ───────────
+
+    #[test]
+    fn hover_for_our_env_var_does_not_show_env_builtin() {
+        // `our $env = 1; print $env` — `$env` should NOT collide with the
+        // `%ENV` builtin hover even though the spelling overlaps.
+        let text = "our $env = 1;\np $env;\n";
+        let h = hover_markdown_for_word("$env", text, "a.stk");
+        if let Some(md) = h {
+            assert!(
+                md.contains("$env"),
+                "var hover must reference $env, got: {md}"
+            );
+            assert!(
+                !md.contains("`%ENV`"),
+                "must not show %ENV builtin card, got: {md}"
+            );
+        }
+    }
+
+    // ── prepare_rename rejects positions that don't resolve ────────────────
+
+    #[test]
+    fn prepare_rename_rejects_numeric_literal() {
+        let r = prepare("my $x = 42;\n", 0, 9);
+        // Caret on `42` — not an identifier; needle extraction yields no
+        // ident chars. prepareRename must return None.
+        assert!(r.is_none(), "rejects numeric literal");
+    }
+
+    #[test]
+    fn prepare_rename_rejects_in_a_pure_string() {
+        let r = prepare(r#"p "hello world""#, 0, 8);
+        // Caret on `hello` inside `"hello world"`. There's no symbol-table
+        // entry for "hello" and no sub by that name → reject.
+        assert!(r.is_none(), "string literal content is not renameable");
+    }
+
+    // ── Cross-file: rename `our` package var ──────────────────────────────
+
+    #[test]
+    fn rename_our_var_crosses_files() {
+        // `our $level` in file A, `$Util::level` in file B — renaming
+        // touches both files; file B keeps its `$Util::` prefix.
+        let a = "package Util;\nour $level = 1;\n";
+        let b = "use Util;\np $Util::level;\n";
+        let d = docs(&[("file:///util.stk", a), ("file:///main.stk", b)]);
+        let edit = rename_symbol(
+            &d,
+            RenameParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier {
+                        uri: uri("file:///util.stk"),
+                    },
+                    position: Position {
+                        line: 1,
+                        character: 5,
+                    },
+                },
+                new_name: "$threshold".to_string(),
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            },
+        )
+        .expect("our-var rename returns edits");
+        let changes = edit.changes.expect("changes present");
+        assert!(
+            changes.len() >= 2,
+            "our-var rename must touch both files, got {} files",
+            changes.len()
+        );
+        let main_edits = changes
+            .iter()
+            .find(|(u, _)| u.as_str() == "file:///main.stk")
+            .map(|(_, v)| v.clone())
+            .expect("file B was edited");
+        assert!(
+            main_edits.iter().any(|e| e.new_text == "$Util::threshold"),
+            "qualified our-var replacement preserves prefix: {main_edits:?}",
+        );
+    }
+
+    // ── Sigil splicing on rename input ─────────────────────────────────────
+
+    #[test]
+    fn rename_bare_new_name_gets_sigil_prefixed() {
+        // User types `bar` (no sigil) to rename `$foo` — must produce `$bar`.
+        let text = "my $foo = 1;\np $foo;\n";
+        let edit = rename(text, 0, 4, "bar").expect("rename returns edits");
+        let edits = edit.changes.unwrap().into_iter().next().unwrap().1;
+        assert!(edits.iter().all(|e| e.new_text == "$bar"));
+    }
+
+    #[test]
+    fn rename_explicit_sigil_passthrough() {
+        let text = "my $foo = 1;\np $foo;\n";
+        let edit = rename(text, 0, 4, "$bar").expect("rename returns edits");
+        let edits = edit.changes.unwrap().into_iter().next().unwrap().1;
+        assert!(edits.iter().all(|e| e.new_text == "$bar"));
+    }
+
+    #[test]
+    fn rename_rejects_invalid_new_name() {
+        let text = "my $foo = 1;\n";
+        // Spaces aren't valid identifier characters.
+        assert!(rename(text, 0, 4, "bad name").is_none());
+        // Empty string is invalid.
+        assert!(rename(text, 0, 4, "").is_none());
+        // A lone sigil isn't a complete name.
+        assert!(rename(text, 0, 4, "$").is_none());
     }
 }

@@ -668,7 +668,11 @@ fn perl_scalar_as_bytes(v: &StrykeValue) -> Vec<u8> {
 }
 
 /// `spurt` — Spurt. Returns an integer.
-fn builtin_spurt(interp: &VMHelper, args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
+fn builtin_spurt(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> StrykeResult<StrykeValue> {
     if args.len() < 2 {
         return Err(StrykeError::runtime("spurt needs PATH and CONTENT", line));
     }
@@ -821,9 +825,8 @@ fn builtin_file(interp: &VMHelper, args: &[StrykeValue], line: usize) -> StrykeR
         return Err(StrykeError::runtime("file: need path", line));
     }
     let p = Path::new(&path);
-    let lm = std::fs::symlink_metadata(p).map_err(|e| {
-        StrykeError::runtime(format!("file: {}: {e}", p.display()), line)
-    })?;
+    let lm = std::fs::symlink_metadata(p)
+        .map_err(|e| StrykeError::runtime(format!("file: {}: {e}", p.display()), line))?;
     if lm.file_type().is_symlink() {
         let tgt = std::fs::read_link(p).unwrap_or_else(|_| std::path::PathBuf::new());
         return Ok(StrykeValue::string(format!(
@@ -853,13 +856,12 @@ fn builtin_file(interp: &VMHelper, args: &[StrykeValue], line: usize) -> StrykeR
         }
     }
     if lm.is_file() {
-        let mut f = File::open(p).map_err(|e| {
-            StrykeError::runtime(format!("file: {}: {e}", p.display()), line)
-        })?;
+        let mut f = File::open(p)
+            .map_err(|e| StrykeError::runtime(format!("file: {}: {e}", p.display()), line))?;
         let mut buf = [0u8; 4096];
-        let n = f.read(&mut buf).map_err(|e| {
-            StrykeError::runtime(format!("file: {}: {e}", p.display()), line)
-        })?;
+        let n = f
+            .read(&mut buf)
+            .map_err(|e| StrykeError::runtime(format!("file: {}: {e}", p.display()), line))?;
         let desc = sniff_file_description(&buf[..n]);
         return Ok(StrykeValue::string(format!("{path}: {desc}")));
     }
@@ -914,9 +916,10 @@ fn sniff_file_description(buf: &[u8]) -> String {
     if buf.starts_with(b"<?xml") {
         return "XML document text".into();
     }
-    let ascii_lines = buf.iter().take(4096).all(|&b| {
-        b == 0x09 || b == 0x0a || b == 0x0d || b == 0x0c || (0x20..=0x7e).contains(&b)
-    }) && buf.iter().any(|&b| b == b'\n' || b == b'\r');
+    let ascii_lines =
+        buf.iter().take(4096).all(|&b| {
+            b == 0x09 || b == 0x0a || b == 0x0d || b == 0x0c || (0x20..=0x7e).contains(&b)
+        }) && buf.iter().any(|&b| b == b'\n' || b == b'\r');
     if ascii_lines {
         return "ASCII text".into();
     }
@@ -962,9 +965,8 @@ fn builtin_xxd(interp: &VMHelper, args: &[StrykeValue], line: usize) -> StrykeRe
         cols = head[1].to_int().clamp(1, 32) as usize;
     }
 
-    let mut f = std::fs::File::open(&path).map_err(|e| {
-        StrykeError::runtime(format!("xxd: {}: {e}", path), line)
-    })?;
+    let mut f = std::fs::File::open(&path)
+        .map_err(|e| StrykeError::runtime(format!("xxd: {}: {e}", path), line))?;
     let mut buf = Vec::new();
     (&mut f)
         .take(max_bytes as u64)
@@ -975,7 +977,7 @@ fn builtin_xxd(interp: &VMHelper, args: &[StrykeValue], line: usize) -> StrykeRe
 }
 
 fn format_xxd(data: &[u8], cols: usize) -> String {
-    let pairs = (cols + 1) / 2;
+    let pairs = cols.div_ceil(2);
     let hex_width = pairs * 5 - 1;
     let mut out = String::new();
     let mut off = 0usize;
@@ -2242,109 +2244,181 @@ pub(crate) fn try_builtin(
         "date_add_days" => Some(Ok(crate::builtins_linalg_graph_date::date_add_days(args))),
         "date_add_months" => Some(Ok(crate::builtins_linalg_graph_date::date_add_months(args))),
         "date_add_years" => Some(Ok(crate::builtins_linalg_graph_date::date_add_years(args))),
-        "date_business_days_between" => {
-            Some(Ok(crate::builtins_linalg_graph_date::date_business_days_between(args)))
-        }
+        "date_business_days_between" => Some(Ok(
+            crate::builtins_linalg_graph_date::date_business_days_between(args),
+        )),
         "date_day" => Some(Ok(crate::builtins_linalg_graph_date::date_day(args))),
         "date_dayofweek" => Some(Ok(crate::builtins_linalg_graph_date::date_dayofweek(args))),
         "date_dayofyear" => Some(Ok(crate::builtins_linalg_graph_date::date_dayofyear(args))),
-        "date_days_in_month" => Some(Ok(crate::builtins_linalg_graph_date::date_days_in_month(args))),
+        "date_days_in_month" => Some(Ok(crate::builtins_linalg_graph_date::date_days_in_month(
+            args,
+        ))),
         "date_diff_days" => Some(Ok(crate::builtins_linalg_graph_date::date_diff_days(args))),
         "date_diff_hours" => Some(Ok(crate::builtins_linalg_graph_date::date_diff_hours(args))),
-        "date_diff_minutes" => Some(Ok(crate::builtins_linalg_graph_date::date_diff_minutes(args))),
-        "date_diff_seconds" => Some(Ok(crate::builtins_linalg_graph_date::date_diff_seconds(args))),
+        "date_diff_minutes" => Some(Ok(crate::builtins_linalg_graph_date::date_diff_minutes(
+            args,
+        ))),
+        "date_diff_seconds" => Some(Ok(crate::builtins_linalg_graph_date::date_diff_seconds(
+            args,
+        ))),
         "date_easter" => Some(Ok(crate::builtins_linalg_graph_date::date_easter(args))),
-        "date_first_of_month" => Some(Ok(crate::builtins_linalg_graph_date::date_first_of_month(args))),
+        "date_first_of_month" => Some(Ok(crate::builtins_linalg_graph_date::date_first_of_month(
+            args,
+        ))),
         "date_hour" => Some(Ok(crate::builtins_linalg_graph_date::date_hour(args))),
         "date_is_leap" => Some(Ok(crate::builtins_linalg_graph_date::date_is_leap(args))),
         "date_is_weekend" => Some(Ok(crate::builtins_linalg_graph_date::date_is_weekend(args))),
         "date_iso_format" => Some(Ok(crate::builtins_linalg_graph_date::date_iso_format(args))),
         "date_iso_week" => Some(Ok(crate::builtins_linalg_graph_date::date_iso_week(args))),
-        "date_last_of_month" => Some(Ok(crate::builtins_linalg_graph_date::date_last_of_month(args))),
+        "date_last_of_month" => Some(Ok(crate::builtins_linalg_graph_date::date_last_of_month(
+            args,
+        ))),
         "date_minute" => Some(Ok(crate::builtins_linalg_graph_date::date_minute(args))),
         "date_month" => Some(Ok(crate::builtins_linalg_graph_date::date_month(args))),
         "date_quarter" => Some(Ok(crate::builtins_linalg_graph_date::date_quarter(args))),
         "date_second" => Some(Ok(crate::builtins_linalg_graph_date::date_second(args))),
-        "date_str_to_unix" => Some(Ok(crate::builtins_linalg_graph_date::date_str_to_unix(args))),
-        "date_unix_to_str" => Some(Ok(crate::builtins_linalg_graph_date::date_unix_to_str(args))),
+        "date_str_to_unix" => Some(Ok(crate::builtins_linalg_graph_date::date_str_to_unix(
+            args,
+        ))),
+        "date_unix_to_str" => Some(Ok(crate::builtins_linalg_graph_date::date_unix_to_str(
+            args,
+        ))),
         "date_weekofyear" => Some(Ok(crate::builtins_linalg_graph_date::date_weekofyear(args))),
         "date_year" => Some(Ok(crate::builtins_linalg_graph_date::date_year(args))),
         "ei" => Some(Ok(crate::builtins_linalg_graph_date::ei(args))),
         "expint" => Some(Ok(crate::builtins_linalg_graph_date::expint(args))),
-        "gamma_regularized_p" => Some(Ok(crate::builtins_linalg_graph_date::gamma_regularized_p(args))),
-        "gamma_regularized_q" => Some(Ok(crate::builtins_linalg_graph_date::gamma_regularized_q(args))),
-        "graph_articulation_points" => {
-            Some(Ok(crate::builtins_linalg_graph_date::graph_articulation_points(args)))
-        }
-        "graph_bellman_ford" => Some(Ok(crate::builtins_linalg_graph_date::graph_bellman_ford(args))),
-        "graph_betweenness" => Some(Ok(crate::builtins_linalg_graph_date::graph_betweenness(args))),
+        "gamma_regularized_p" => Some(Ok(crate::builtins_linalg_graph_date::gamma_regularized_p(
+            args,
+        ))),
+        "gamma_regularized_q" => Some(Ok(crate::builtins_linalg_graph_date::gamma_regularized_q(
+            args,
+        ))),
+        "graph_articulation_points" => Some(Ok(
+            crate::builtins_linalg_graph_date::graph_articulation_points(args),
+        )),
+        "graph_bellman_ford" => Some(Ok(crate::builtins_linalg_graph_date::graph_bellman_ford(
+            args,
+        ))),
+        "graph_betweenness" => Some(Ok(crate::builtins_linalg_graph_date::graph_betweenness(
+            args,
+        ))),
         "graph_bfs" => Some(Ok(crate::builtins_linalg_graph_date::graph_bfs(args))),
         "graph_bridges" => Some(Ok(crate::builtins_linalg_graph_date::graph_bridges(args))),
         "graph_closeness" => Some(Ok(crate::builtins_linalg_graph_date::graph_closeness(args))),
-        "graph_clustering_coefficient" => {
-            Some(Ok(crate::builtins_linalg_graph_date::graph_clustering_coefficient(args)))
-        }
-        "graph_color_greedy" => Some(Ok(crate::builtins_linalg_graph_date::graph_color_greedy(args))),
-        "graph_connected_components" => {
-            Some(Ok(crate::builtins_linalg_graph_date::graph_connected_components(args)))
-        }
-        "graph_cycle_detect" => Some(Ok(crate::builtins_linalg_graph_date::graph_cycle_detect(args))),
+        "graph_clustering_coefficient" => Some(Ok(
+            crate::builtins_linalg_graph_date::graph_clustering_coefficient(args),
+        )),
+        "graph_color_greedy" => Some(Ok(crate::builtins_linalg_graph_date::graph_color_greedy(
+            args,
+        ))),
+        "graph_connected_components" => Some(Ok(
+            crate::builtins_linalg_graph_date::graph_connected_components(args),
+        )),
+        "graph_cycle_detect" => Some(Ok(crate::builtins_linalg_graph_date::graph_cycle_detect(
+            args,
+        ))),
         "graph_degree" => Some(Ok(crate::builtins_linalg_graph_date::graph_degree(args))),
         "graph_dfs" => Some(Ok(crate::builtins_linalg_graph_date::graph_dfs(args))),
         "graph_dijkstra" => Some(Ok(crate::builtins_linalg_graph_date::graph_dijkstra(args))),
-        "graph_eccentricity" => Some(Ok(crate::builtins_linalg_graph_date::graph_eccentricity(args))),
-        "graph_eigenvector_centrality" => {
-            Some(Ok(crate::builtins_linalg_graph_date::graph_eigenvector_centrality(args)))
-        }
-        "graph_floyd_warshall" => Some(Ok(crate::builtins_linalg_graph_date::graph_floyd_warshall(args))),
-        "graph_from_edges" => Some(Ok(crate::builtins_linalg_graph_date::graph_from_edges(args))),
+        "graph_eccentricity" => Some(Ok(crate::builtins_linalg_graph_date::graph_eccentricity(
+            args,
+        ))),
+        "graph_eigenvector_centrality" => Some(Ok(
+            crate::builtins_linalg_graph_date::graph_eigenvector_centrality(args),
+        )),
+        "graph_floyd_warshall" => Some(Ok(
+            crate::builtins_linalg_graph_date::graph_floyd_warshall(args),
+        )),
+        "graph_from_edges" => Some(Ok(crate::builtins_linalg_graph_date::graph_from_edges(
+            args,
+        ))),
         "graph_has_path" => Some(Ok(crate::builtins_linalg_graph_date::graph_has_path(args))),
         "graph_in_degree" => Some(Ok(crate::builtins_linalg_graph_date::graph_in_degree(args))),
-        "graph_is_bipartite" => Some(Ok(crate::builtins_linalg_graph_date::graph_is_bipartite(args))),
-        "graph_is_connected" => Some(Ok(crate::builtins_linalg_graph_date::graph_is_connected(args))),
+        "graph_is_bipartite" => Some(Ok(crate::builtins_linalg_graph_date::graph_is_bipartite(
+            args,
+        ))),
+        "graph_is_connected" => Some(Ok(crate::builtins_linalg_graph_date::graph_is_connected(
+            args,
+        ))),
         "graph_kosaraju" => Some(Ok(crate::builtins_linalg_graph_date::graph_kosaraju(args))),
-        "graph_kruskal_mst" => Some(Ok(crate::builtins_linalg_graph_date::graph_kruskal_mst(args))),
-        "graph_out_degree" => Some(Ok(crate::builtins_linalg_graph_date::graph_out_degree(args))),
+        "graph_kruskal_mst" => Some(Ok(crate::builtins_linalg_graph_date::graph_kruskal_mst(
+            args,
+        ))),
+        "graph_out_degree" => Some(Ok(crate::builtins_linalg_graph_date::graph_out_degree(
+            args,
+        ))),
         "graph_pagerank" => Some(Ok(crate::builtins_linalg_graph_date::graph_pagerank(args))),
         "graph_prim_mst" => Some(Ok(crate::builtins_linalg_graph_date::graph_prim_mst(args))),
-        "graph_shortest_path" => Some(Ok(crate::builtins_linalg_graph_date::graph_shortest_path(args))),
+        "graph_shortest_path" => Some(Ok(crate::builtins_linalg_graph_date::graph_shortest_path(
+            args,
+        ))),
         "graph_strongly_connected_components" => Some(Ok(
             crate::builtins_linalg_graph_date::graph_strongly_connected_components(args),
         )),
         "graph_tarjan" => Some(Ok(crate::builtins_linalg_graph_date::graph_tarjan(args))),
-        "graph_to_adj_list" => Some(Ok(crate::builtins_linalg_graph_date::graph_to_adj_list(args))),
-        "graph_to_adj_matrix" => Some(Ok(crate::builtins_linalg_graph_date::graph_to_adj_matrix(args))),
-        "graph_topological_sort" => Some(Ok(crate::builtins_linalg_graph_date::graph_topological_sort(args))),
+        "graph_to_adj_list" => Some(Ok(crate::builtins_linalg_graph_date::graph_to_adj_list(
+            args,
+        ))),
+        "graph_to_adj_matrix" => Some(Ok(crate::builtins_linalg_graph_date::graph_to_adj_matrix(
+            args,
+        ))),
+        "graph_topological_sort" => Some(Ok(
+            crate::builtins_linalg_graph_date::graph_topological_sort(args),
+        )),
         "hypergeom_1f1" => Some(Ok(crate::builtins_linalg_graph_date::hypergeom_1f1(args))),
         "hypergeom_2f1" => Some(Ok(crate::builtins_linalg_graph_date::hypergeom_2f1(args))),
         "li" => Some(Ok(crate::builtins_linalg_graph_date::li(args))),
         "matrix_adjugate" => Some(Ok(crate::builtins_linalg_graph_date::matrix_adjugate(args))),
-        "matrix_cholesky_decompose" => {
-            Some(Ok(crate::builtins_linalg_graph_date::matrix_cholesky_decompose(args)))
-        }
+        "matrix_cholesky_decompose" => Some(Ok(
+            crate::builtins_linalg_graph_date::matrix_cholesky_decompose(args),
+        )),
         "matrix_cofactor" => Some(Ok(crate::builtins_linalg_graph_date::matrix_cofactor(args))),
         "matrix_cols" => Some(Ok(crate::builtins_linalg_graph_date::matrix_cols(args))),
         "matrix_concat_h" => Some(Ok(crate::builtins_linalg_graph_date::matrix_concat_h(args))),
         "matrix_concat_v" => Some(Ok(crate::builtins_linalg_graph_date::matrix_concat_v(args))),
-        "matrix_determinant" => Some(Ok(crate::builtins_linalg_graph_date::matrix_determinant(args))),
-        "matrix_from_cols" => Some(Ok(crate::builtins_linalg_graph_date::matrix_from_cols(args))),
+        "matrix_determinant" => Some(Ok(crate::builtins_linalg_graph_date::matrix_determinant(
+            args,
+        ))),
+        "matrix_from_cols" => Some(Ok(crate::builtins_linalg_graph_date::matrix_from_cols(
+            args,
+        ))),
         "matrix_get" => Some(Ok(crate::builtins_linalg_graph_date::matrix_get(args))),
-        "matrix_kronecker" => Some(Ok(crate::builtins_linalg_graph_date::matrix_kronecker(args))),
-        "matrix_lu_decompose" => Some(Ok(crate::builtins_linalg_graph_date::matrix_lu_decompose(args))),
+        "matrix_kronecker" => Some(Ok(crate::builtins_linalg_graph_date::matrix_kronecker(
+            args,
+        ))),
+        "matrix_lu_decompose" => Some(Ok(crate::builtins_linalg_graph_date::matrix_lu_decompose(
+            args,
+        ))),
         "matrix_minor" => Some(Ok(crate::builtins_linalg_graph_date::matrix_minor(args))),
         "matrix_new" => Some(Ok(crate::builtins_linalg_graph_date::matrix_new(args))),
-        "matrix_norm_frobenius" => Some(Ok(crate::builtins_linalg_graph_date::matrix_norm_frobenius(args))),
+        "matrix_norm_frobenius" => Some(Ok(
+            crate::builtins_linalg_graph_date::matrix_norm_frobenius(args),
+        )),
         "matrix_norm_l1" => Some(Ok(crate::builtins_linalg_graph_date::matrix_norm_l1(args))),
-        "matrix_norm_linf" => Some(Ok(crate::builtins_linalg_graph_date::matrix_norm_linf(args))),
-        "matrix_outer_product" => Some(Ok(crate::builtins_linalg_graph_date::matrix_outer_product(args))),
-        "matrix_qr_decompose" => Some(Ok(crate::builtins_linalg_graph_date::matrix_qr_decompose(args))),
+        "matrix_norm_linf" => Some(Ok(crate::builtins_linalg_graph_date::matrix_norm_linf(
+            args,
+        ))),
+        "matrix_outer_product" => Some(Ok(
+            crate::builtins_linalg_graph_date::matrix_outer_product(args),
+        )),
+        "matrix_qr_decompose" => Some(Ok(crate::builtins_linalg_graph_date::matrix_qr_decompose(
+            args,
+        ))),
         "matrix_reshape" => Some(Ok(crate::builtins_linalg_graph_date::matrix_reshape(args))),
         "matrix_rows" => Some(Ok(crate::builtins_linalg_graph_date::matrix_rows(args))),
         "matrix_set" => Some(Ok(crate::builtins_linalg_graph_date::matrix_set(args))),
-        "matrix_submatrix" => Some(Ok(crate::builtins_linalg_graph_date::matrix_submatrix(args))),
-        "matrix_swap_cols" => Some(Ok(crate::builtins_linalg_graph_date::matrix_swap_cols(args))),
-        "matrix_swap_rows" => Some(Ok(crate::builtins_linalg_graph_date::matrix_swap_rows(args))),
-        "matrix_to_string" => Some(Ok(crate::builtins_linalg_graph_date::matrix_to_string(args))),
+        "matrix_submatrix" => Some(Ok(crate::builtins_linalg_graph_date::matrix_submatrix(
+            args,
+        ))),
+        "matrix_swap_cols" => Some(Ok(crate::builtins_linalg_graph_date::matrix_swap_cols(
+            args,
+        ))),
+        "matrix_swap_rows" => Some(Ok(crate::builtins_linalg_graph_date::matrix_swap_rows(
+            args,
+        ))),
+        "matrix_to_string" => Some(Ok(crate::builtins_linalg_graph_date::matrix_to_string(
+            args,
+        ))),
         "matrix_vec_mul" => Some(Ok(crate::builtins_linalg_graph_date::matrix_vec_mul(args))),
         "si" => Some(Ok(crate::builtins_linalg_graph_date::si(args))),
         "sun_rise_unix" => Some(Ok(crate::builtins_linalg_graph_date::sun_rise_unix(args))),
@@ -2372,11 +2446,17 @@ pub(crate) fn try_builtin(
         "bit_rotate_left" => Some(Ok(crate::builtins_bits_music_stats::bit_rotate_left(args))),
         "bit_rotate_right" => Some(Ok(crate::builtins_bits_music_stats::bit_rotate_right(args))),
         "bit_swap_bytes" => Some(Ok(crate::builtins_bits_music_stats::bit_swap_bytes(args))),
-        "chi_square_goodness_fit" => Some(Ok(crate::builtins_bits_music_stats::chi_square_goodness_fit(args))),
-        "chi_square_independence" => Some(Ok(crate::builtins_bits_music_stats::chi_square_independence(args))),
+        "chi_square_goodness_fit" => Some(Ok(
+            crate::builtins_bits_music_stats::chi_square_goodness_fit(args),
+        )),
+        "chi_square_independence" => Some(Ok(
+            crate::builtins_bits_music_stats::chi_square_independence(args),
+        )),
         "chord_augmented" => Some(Ok(crate::builtins_bits_music_stats::chord_augmented(args))),
         "chord_diminished" => Some(Ok(crate::builtins_bits_music_stats::chord_diminished(args))),
-        "chord_diminished7" => Some(Ok(crate::builtins_bits_music_stats::chord_diminished7(args))),
+        "chord_diminished7" => Some(Ok(crate::builtins_bits_music_stats::chord_diminished7(
+            args,
+        ))),
         "chord_dominant7" => Some(Ok(crate::builtins_bits_music_stats::chord_dominant7(args))),
         "chord_major" => Some(Ok(crate::builtins_bits_music_stats::chord_major(args))),
         "chord_major7" => Some(Ok(crate::builtins_bits_music_stats::chord_major7(args))),
@@ -2404,11 +2484,17 @@ pub(crate) fn try_builtin(
         "justify_left" => Some(Ok(crate::builtins_bits_music_stats::justify_left(args))),
         "justify_right" => Some(Ok(crate::builtins_bits_music_stats::justify_right(args))),
         "kruskal_wallis" => Some(Ok(crate::builtins_bits_music_stats::kruskal_wallis(args))),
-        "ks_test_one_sample" => Some(Ok(crate::builtins_bits_music_stats::ks_test_one_sample(args))),
-        "ks_test_two_sample" => Some(Ok(crate::builtins_bits_music_stats::ks_test_two_sample(args))),
+        "ks_test_one_sample" => Some(Ok(crate::builtins_bits_music_stats::ks_test_one_sample(
+            args,
+        ))),
+        "ks_test_two_sample" => Some(Ok(crate::builtins_bits_music_stats::ks_test_two_sample(
+            args,
+        ))),
         "loose_hash" => Some(Ok(crate::builtins_bits_music_stats::loose_hash(args))),
         "mann_whitney_u" => Some(Ok(crate::builtins_bits_music_stats::mann_whitney_u(args))),
-        "midi_to_note_name" => Some(Ok(crate::builtins_bits_music_stats::midi_to_note_name(args))),
+        "midi_to_note_name" => Some(Ok(crate::builtins_bits_music_stats::midi_to_note_name(
+            args,
+        ))),
         "popcount_u32" => Some(Ok(crate::builtins_bits_music_stats::popcount_u32(args))),
         "popcount_u64" => Some(Ok(crate::builtins_bits_music_stats::popcount_u64(args))),
         "proportion_test" => Some(Ok(crate::builtins_bits_music_stats::proportion_test(args))),
@@ -2416,11 +2502,15 @@ pub(crate) fn try_builtin(
         "scale_blues" => Some(Ok(crate::builtins_bits_music_stats::scale_blues(args))),
         "scale_chromatic" => Some(Ok(crate::builtins_bits_music_stats::scale_chromatic(args))),
         "scale_dorian" => Some(Ok(crate::builtins_bits_music_stats::scale_dorian(args))),
-        "scale_harmonic_minor" => Some(Ok(crate::builtins_bits_music_stats::scale_harmonic_minor(args))),
+        "scale_harmonic_minor" => Some(Ok(crate::builtins_bits_music_stats::scale_harmonic_minor(
+            args,
+        ))),
         "scale_locrian" => Some(Ok(crate::builtins_bits_music_stats::scale_locrian(args))),
         "scale_lydian" => Some(Ok(crate::builtins_bits_music_stats::scale_lydian(args))),
         "scale_major" => Some(Ok(crate::builtins_bits_music_stats::scale_major(args))),
-        "scale_melodic_minor" => Some(Ok(crate::builtins_bits_music_stats::scale_melodic_minor(args))),
+        "scale_melodic_minor" => Some(Ok(crate::builtins_bits_music_stats::scale_melodic_minor(
+            args,
+        ))),
         "scale_minor" => Some(Ok(crate::builtins_bits_music_stats::scale_minor(args))),
         "scale_mixolydian" => Some(Ok(crate::builtins_bits_music_stats::scale_mixolydian(args))),
         "scale_pentatonic" => Some(Ok(crate::builtins_bits_music_stats::scale_pentatonic(args))),
@@ -2428,14 +2518,26 @@ pub(crate) fn try_builtin(
         "seconds_per_beat" => Some(Ok(crate::builtins_bits_music_stats::seconds_per_beat(args))),
         "strip_indent" => Some(Ok(crate::builtins_bits_music_stats::strip_indent(args))),
         "t_test_paired" => Some(Ok(crate::builtins_bits_music_stats::t_test_paired(args))),
-        "tempo_to_ms_per_beat" => Some(Ok(crate::builtins_bits_music_stats::tempo_to_ms_per_beat(args))),
+        "tempo_to_ms_per_beat" => Some(Ok(crate::builtins_bits_music_stats::tempo_to_ms_per_beat(
+            args,
+        ))),
         "truncate_middle" => Some(Ok(crate::builtins_bits_music_stats::truncate_middle(args))),
-        "unicode_codepoints" => Some(Ok(crate::builtins_bits_music_stats::unicode_codepoints(args))),
-        "wilcoxon_signed_rank" => Some(Ok(crate::builtins_bits_music_stats::wilcoxon_signed_rank(args))),
+        "unicode_codepoints" => Some(Ok(crate::builtins_bits_music_stats::unicode_codepoints(
+            args,
+        ))),
+        "wilcoxon_signed_rank" => Some(Ok(crate::builtins_bits_music_stats::wilcoxon_signed_rank(
+            args,
+        ))),
         "word_wrap" => Some(Ok(crate::builtins_bits_music_stats::word_wrap(args))),
-        "adler32_combine" => Some(Ok(crate::builtins_phonetic_geo_codec::adler32_combine(args))),
-        "base58check_decode" => Some(Ok(crate::builtins_phonetic_geo_codec::base58check_decode(args))),
-        "base58check_encode" => Some(Ok(crate::builtins_phonetic_geo_codec::base58check_encode(args))),
+        "adler32_combine" => Some(Ok(crate::builtins_phonetic_geo_codec::adler32_combine(
+            args,
+        ))),
+        "base58check_decode" => Some(Ok(crate::builtins_phonetic_geo_codec::base58check_decode(
+            args,
+        ))),
+        "base58check_encode" => Some(Ok(crate::builtins_phonetic_geo_codec::base58check_encode(
+            args,
+        ))),
         "base91_decode" => Some(Ok(crate::builtins_phonetic_geo_codec::base91_decode(args))),
         "basE91_decode" => Some(Ok(crate::builtins_phonetic_geo_codec::basE91_decode(args))),
         "base91_encode" => Some(Ok(crate::builtins_phonetic_geo_codec::base91_encode(args))),
@@ -2456,45 +2558,95 @@ pub(crate) fn try_builtin(
         "crc64_xz" => Some(Ok(crate::builtins_phonetic_geo_codec::crc64_xz(args))),
         "delta_decode" => Some(Ok(crate::builtins_phonetic_geo_codec::delta_decode(args))),
         "delta_encode" => Some(Ok(crate::builtins_phonetic_geo_codec::delta_encode(args))),
-        "destination_lat_lon" => Some(Ok(crate::builtins_phonetic_geo_codec::destination_lat_lon(args))),
+        "destination_lat_lon" => Some(Ok(crate::builtins_phonetic_geo_codec::destination_lat_lon(
+            args,
+        ))),
         "fletcher16" => Some(Ok(crate::builtins_phonetic_geo_codec::fletcher16(args))),
         "fletcher32" => Some(Ok(crate::builtins_phonetic_geo_codec::fletcher32(args))),
         "fletcher64" => Some(Ok(crate::builtins_phonetic_geo_codec::fletcher64(args))),
-        "full_moon_julian" => Some(Ok(crate::builtins_phonetic_geo_codec::full_moon_julian(args))),
-        "fuzzy_substring_match" => Some(Ok(crate::builtins_phonetic_geo_codec::fuzzy_substring_match(args))),
+        "full_moon_julian" => Some(Ok(crate::builtins_phonetic_geo_codec::full_moon_julian(
+            args,
+        ))),
+        "fuzzy_substring_match" => Some(Ok(
+            crate::builtins_phonetic_geo_codec::fuzzy_substring_match(args),
+        )),
         "gamma_correct" => Some(Ok(crate::builtins_phonetic_geo_codec::gamma_correct(args))),
-        "gamma_uncorrect" => Some(Ok(crate::builtins_phonetic_geo_codec::gamma_uncorrect(args))),
-        "geomag_declination" => Some(Ok(crate::builtins_phonetic_geo_codec::geomag_declination(args))),
+        "gamma_uncorrect" => Some(Ok(crate::builtins_phonetic_geo_codec::gamma_uncorrect(
+            args,
+        ))),
+        "geomag_declination" => Some(Ok(crate::builtins_phonetic_geo_codec::geomag_declination(
+            args,
+        ))),
         "huffman_decode" => Some(Ok(crate::builtins_phonetic_geo_codec::huffman_decode(args))),
         "huffman_encode" => Some(Ok(crate::builtins_phonetic_geo_codec::huffman_encode(args))),
         "julian_to_unix" => Some(Ok(crate::builtins_phonetic_geo_codec::julian_to_unix(args))),
-        "lambert_project" => Some(Ok(crate::builtins_phonetic_geo_codec::lambert_project(args))),
+        "lambert_project" => Some(Ok(crate::builtins_phonetic_geo_codec::lambert_project(
+            args,
+        ))),
         "lat_lon_to_utm" => Some(Ok(crate::builtins_phonetic_geo_codec::lat_lon_to_utm(args))),
-        "match_rating_compare" => Some(Ok(crate::builtins_phonetic_geo_codec::match_rating_compare(args))),
-        "mercator_project_x" => Some(Ok(crate::builtins_phonetic_geo_codec::mercator_project_x(args))),
-        "mercator_project_y" => Some(Ok(crate::builtins_phonetic_geo_codec::mercator_project_y(args))),
-        "mercator_unproject_lat" => Some(Ok(crate::builtins_phonetic_geo_codec::mercator_unproject_lat(args))),
-        "mercator_unproject_lon" => Some(Ok(crate::builtins_phonetic_geo_codec::mercator_unproject_lon(args))),
-        "modified_julian_date" => Some(Ok(crate::builtins_phonetic_geo_codec::modified_julian_date(args))),
+        "match_rating_compare" => Some(Ok(
+            crate::builtins_phonetic_geo_codec::match_rating_compare(args),
+        )),
+        "mercator_project_x" => Some(Ok(crate::builtins_phonetic_geo_codec::mercator_project_x(
+            args,
+        ))),
+        "mercator_project_y" => Some(Ok(crate::builtins_phonetic_geo_codec::mercator_project_y(
+            args,
+        ))),
+        "mercator_unproject_lat" => Some(Ok(
+            crate::builtins_phonetic_geo_codec::mercator_unproject_lat(args),
+        )),
+        "mercator_unproject_lon" => Some(Ok(
+            crate::builtins_phonetic_geo_codec::mercator_unproject_lon(args),
+        )),
+        "modified_julian_date" => Some(Ok(
+            crate::builtins_phonetic_geo_codec::modified_julian_date(args),
+        )),
         "moon_age_days" => Some(Ok(crate::builtins_phonetic_geo_codec::moon_age_days(args))),
-        "moon_distance_km" => Some(Ok(crate::builtins_phonetic_geo_codec::moon_distance_km(args))),
-        "new_moon_julian" => Some(Ok(crate::builtins_phonetic_geo_codec::new_moon_julian(args))),
+        "moon_distance_km" => Some(Ok(crate::builtins_phonetic_geo_codec::moon_distance_km(
+            args,
+        ))),
+        "new_moon_julian" => Some(Ok(crate::builtins_phonetic_geo_codec::new_moon_julian(
+            args,
+        ))),
         "nysiis" => Some(Ok(crate::builtins_phonetic_geo_codec::nysiis(args))),
         "phonex" => Some(Ok(crate::builtins_phonetic_geo_codec::phonex(args))),
-        "rgb_blend_color_burn" => Some(Ok(crate::builtins_phonetic_geo_codec::rgb_blend_color_burn(args))),
-        "rgb_blend_color_dodge" => Some(Ok(crate::builtins_phonetic_geo_codec::rgb_blend_color_dodge(args))),
-        "rgb_blend_darken" => Some(Ok(crate::builtins_phonetic_geo_codec::rgb_blend_darken(args))),
-        "rgb_blend_lighten" => Some(Ok(crate::builtins_phonetic_geo_codec::rgb_blend_lighten(args))),
-        "rgb_blend_multiply" => Some(Ok(crate::builtins_phonetic_geo_codec::rgb_blend_multiply(args))),
-        "rgb_blend_normal" => Some(Ok(crate::builtins_phonetic_geo_codec::rgb_blend_normal(args))),
-        "rgb_blend_overlay" => Some(Ok(crate::builtins_phonetic_geo_codec::rgb_blend_overlay(args))),
-        "rgb_blend_screen" => Some(Ok(crate::builtins_phonetic_geo_codec::rgb_blend_screen(args))),
+        "rgb_blend_color_burn" => Some(Ok(
+            crate::builtins_phonetic_geo_codec::rgb_blend_color_burn(args),
+        )),
+        "rgb_blend_color_dodge" => Some(Ok(
+            crate::builtins_phonetic_geo_codec::rgb_blend_color_dodge(args),
+        )),
+        "rgb_blend_darken" => Some(Ok(crate::builtins_phonetic_geo_codec::rgb_blend_darken(
+            args,
+        ))),
+        "rgb_blend_lighten" => Some(Ok(crate::builtins_phonetic_geo_codec::rgb_blend_lighten(
+            args,
+        ))),
+        "rgb_blend_multiply" => Some(Ok(crate::builtins_phonetic_geo_codec::rgb_blend_multiply(
+            args,
+        ))),
+        "rgb_blend_normal" => Some(Ok(crate::builtins_phonetic_geo_codec::rgb_blend_normal(
+            args,
+        ))),
+        "rgb_blend_overlay" => Some(Ok(crate::builtins_phonetic_geo_codec::rgb_blend_overlay(
+            args,
+        ))),
+        "rgb_blend_screen" => Some(Ok(crate::builtins_phonetic_geo_codec::rgb_blend_screen(
+            args,
+        ))),
         "rle_compress" => Some(Ok(crate::builtins_phonetic_geo_codec::rle_compress(args))),
         "rle_decompress" => Some(Ok(crate::builtins_phonetic_geo_codec::rle_decompress(args))),
         "season_of_year" => Some(Ok(crate::builtins_phonetic_geo_codec::season_of_year(args))),
-        "sidereal_time_greenwich" => Some(Ok(crate::builtins_phonetic_geo_codec::sidereal_time_greenwich(args))),
-        "sidereal_time_local" => Some(Ok(crate::builtins_phonetic_geo_codec::sidereal_time_local(args))),
-        "solar_noon_unix" => Some(Ok(crate::builtins_phonetic_geo_codec::solar_noon_unix(args))),
+        "sidereal_time_greenwich" => Some(Ok(
+            crate::builtins_phonetic_geo_codec::sidereal_time_greenwich(args),
+        )),
+        "sidereal_time_local" => Some(Ok(crate::builtins_phonetic_geo_codec::sidereal_time_local(
+            args,
+        ))),
+        "solar_noon_unix" => Some(Ok(crate::builtins_phonetic_geo_codec::solar_noon_unix(
+            args,
+        ))),
         "soundex_v1" => Some(Ok(crate::builtins_phonetic_geo_codec::soundex_v1(args))),
         "soundex_v2" => Some(Ok(crate::builtins_phonetic_geo_codec::soundex_v2(args))),
         "unix_to_julian" => Some(Ok(crate::builtins_phonetic_geo_codec::unix_to_julian(args))),
@@ -2502,21 +2654,31 @@ pub(crate) fn try_builtin(
         "utm_zone" => Some(Ok(crate::builtins_phonetic_geo_codec::utm_zone(args))),
         "varint_decode" => Some(Ok(crate::builtins_phonetic_geo_codec::varint_decode(args))),
         "varint_encode" => Some(Ok(crate::builtins_phonetic_geo_codec::varint_encode(args))),
-        "vincenty_bearing" => Some(Ok(crate::builtins_phonetic_geo_codec::vincenty_bearing(args))),
+        "vincenty_bearing" => Some(Ok(crate::builtins_phonetic_geo_codec::vincenty_bearing(
+            args,
+        ))),
         "z85_decode" => Some(Ok(crate::builtins_phonetic_geo_codec::z85_decode(args))),
         "z85_encode" => Some(Ok(crate::builtins_phonetic_geo_codec::z85_encode(args))),
         "zigzag_decode" => Some(Ok(crate::builtins_phonetic_geo_codec::zigzag_decode(args))),
         "zigzag_encode" => Some(Ok(crate::builtins_phonetic_geo_codec::zigzag_encode(args))),
-        "aabb_contains_point" => Some(Ok(crate::builtins_bio_geom_markov::aabb_contains_point(args))),
+        "aabb_contains_point" => Some(Ok(crate::builtins_bio_geom_markov::aabb_contains_point(
+            args,
+        ))),
         "aabb_intersects" => Some(Ok(crate::builtins_bio_geom_markov::aabb_intersects(args))),
         "aabb_new" => Some(Ok(crate::builtins_bio_geom_markov::aabb_new(args))),
         "aabb_union" => Some(Ok(crate::builtins_bio_geom_markov::aabb_union(args))),
         "aabb_volume" => Some(Ok(crate::builtins_bio_geom_markov::aabb_volume(args))),
-        "backward_algorithm" => Some(Ok(crate::builtins_bio_geom_markov::backward_algorithm(args))),
+        "backward_algorithm" => Some(Ok(crate::builtins_bio_geom_markov::backward_algorithm(
+            args,
+        ))),
         "bmp_header_read" => Some(Ok(crate::builtins_bio_geom_markov::bmp_header_read(args))),
-        "bootstrap_resample" => Some(Ok(crate::builtins_bio_geom_markov::bootstrap_resample(args))),
+        "bootstrap_resample" => Some(Ok(crate::builtins_bio_geom_markov::bootstrap_resample(
+            args,
+        ))),
         "codon_optimize" => Some(Ok(crate::builtins_bio_geom_markov::codon_optimize(args))),
-        "codon_to_amino_acid" => Some(Ok(crate::builtins_bio_geom_markov::codon_to_amino_acid(args))),
+        "codon_to_amino_acid" => Some(Ok(crate::builtins_bio_geom_markov::codon_to_amino_acid(
+            args,
+        ))),
         "codon_usage_table" => Some(Ok(crate::builtins_bio_geom_markov::codon_usage_table(args))),
         "dna_at_content" => Some(Ok(crate::builtins_bio_geom_markov::dna_at_content(args))),
         "dna_complement" => Some(Ok(crate::builtins_bio_geom_markov::dna_complement(args))),
@@ -2524,7 +2686,9 @@ pub(crate) fn try_builtin(
         "dna_kmer_count" => Some(Ok(crate::builtins_bio_geom_markov::dna_kmer_count(args))),
         "dna_kmer_index" => Some(Ok(crate::builtins_bio_geom_markov::dna_kmer_index(args))),
         "dna_melting_temp" => Some(Ok(crate::builtins_bio_geom_markov::dna_melting_temp(args))),
-        "dna_reverse_complement" => Some(Ok(crate::builtins_bio_geom_markov::dna_reverse_complement(args))),
+        "dna_reverse_complement" => Some(Ok(
+            crate::builtins_bio_geom_markov::dna_reverse_complement(args),
+        )),
         "dna_transcribe" => Some(Ok(crate::builtins_bio_geom_markov::dna_transcribe(args))),
         "dna_translate" => Some(Ok(crate::builtins_bio_geom_markov::dna_translate(args))),
         "elf_header_read" => Some(Ok(crate::builtins_bio_geom_markov::elf_header_read(args))),
@@ -2534,10 +2698,16 @@ pub(crate) fn try_builtin(
         // HeapObject-backed fast HLL in `sketches.rs` (RFC-1).
         "ico_header_read" => Some(Ok(crate::builtins_bio_geom_markov::ico_header_read(args))),
         "jpeg_markers" => Some(Ok(crate::builtins_bio_geom_markov::jpeg_markers(args))),
-        "levenshtein_edit_path" => Some(Ok(crate::builtins_bio_geom_markov::levenshtein_edit_path(args))),
-        "mach_o_header_read" => Some(Ok(crate::builtins_bio_geom_markov::mach_o_header_read(args))),
+        "levenshtein_edit_path" => Some(Ok(
+            crate::builtins_bio_geom_markov::levenshtein_edit_path(args),
+        )),
+        "mach_o_header_read" => Some(Ok(crate::builtins_bio_geom_markov::mach_o_header_read(
+            args,
+        ))),
         "markov_stationary" => Some(Ok(crate::builtins_bio_geom_markov::markov_stationary(args))),
-        "markov_transition_matrix" => Some(Ok(crate::builtins_bio_geom_markov::markov_transition_matrix(args))),
+        "markov_transition_matrix" => Some(Ok(
+            crate::builtins_bio_geom_markov::markov_transition_matrix(args),
+        )),
         "mat4_determinant" => Some(Ok(crate::builtins_bio_geom_markov::mat4_determinant(args))),
         "mat4_identity" => Some(Ok(crate::builtins_bio_geom_markov::mat4_identity(args))),
         "mat4_inverse" => Some(Ok(crate::builtins_bio_geom_markov::mat4_inverse(args))),
@@ -2554,12 +2724,20 @@ pub(crate) fn try_builtin(
         "mat4_transpose" => Some(Ok(crate::builtins_bio_geom_markov::mat4_transpose(args))),
         "nw_score" => Some(Ok(crate::builtins_bio_geom_markov::nw_score(args))),
         "permutation_test" => Some(Ok(crate::builtins_bio_geom_markov::permutation_test(args))),
-        "plane_distance_to_point" => Some(Ok(crate::builtins_bio_geom_markov::plane_distance_to_point(args))),
+        "plane_distance_to_point" => Some(Ok(
+            crate::builtins_bio_geom_markov::plane_distance_to_point(args),
+        )),
         "plane_normalize" => Some(Ok(crate::builtins_bio_geom_markov::plane_normalize(args))),
         "png_header_read" => Some(Ok(crate::builtins_bio_geom_markov::png_header_read(args))),
-        "protein_charge_at_ph" => Some(Ok(crate::builtins_bio_geom_markov::protein_charge_at_ph(args))),
-        "protein_hydrophobicity" => Some(Ok(crate::builtins_bio_geom_markov::protein_hydrophobicity(args))),
-        "protein_molecular_weight" => Some(Ok(crate::builtins_bio_geom_markov::protein_molecular_weight(args))),
+        "protein_charge_at_ph" => Some(Ok(crate::builtins_bio_geom_markov::protein_charge_at_ph(
+            args,
+        ))),
+        "protein_hydrophobicity" => Some(Ok(
+            crate::builtins_bio_geom_markov::protein_hydrophobicity(args),
+        )),
+        "protein_molecular_weight" => Some(Ok(
+            crate::builtins_bio_geom_markov::protein_molecular_weight(args),
+        )),
         "protein_pI" => Some(Ok(crate::builtins_bio_geom_markov::protein_pI(args))),
         "quat_conjugate" => Some(Ok(crate::builtins_bio_geom_markov::quat_conjugate(args))),
         "quat_dot" => Some(Ok(crate::builtins_bio_geom_markov::quat_dot(args))),
@@ -2570,16 +2748,30 @@ pub(crate) fn try_builtin(
         "quat_normalize" => Some(Ok(crate::builtins_bio_geom_markov::quat_normalize(args))),
         "quat_to_euler" => Some(Ok(crate::builtins_bio_geom_markov::quat_to_euler(args))),
         "quat_to_mat4" => Some(Ok(crate::builtins_bio_geom_markov::quat_to_mat4(args))),
-        "ray_aabb_intersect" => Some(Ok(crate::builtins_bio_geom_markov::ray_aabb_intersect(args))),
-        "ray_plane_intersect" => Some(Ok(crate::builtins_bio_geom_markov::ray_plane_intersect(args))),
+        "ray_aabb_intersect" => Some(Ok(crate::builtins_bio_geom_markov::ray_aabb_intersect(
+            args,
+        ))),
+        "ray_plane_intersect" => Some(Ok(crate::builtins_bio_geom_markov::ray_plane_intersect(
+            args,
+        ))),
         "rna_hamming" => Some(Ok(crate::builtins_bio_geom_markov::rna_hamming(args))),
-        "rna_reverse_complement" => Some(Ok(crate::builtins_bio_geom_markov::rna_reverse_complement(args))),
+        "rna_reverse_complement" => Some(Ok(
+            crate::builtins_bio_geom_markov::rna_reverse_complement(args),
+        )),
         "rna_to_dna" => Some(Ok(crate::builtins_bio_geom_markov::rna_to_dna(args))),
-        "sequence_identity_pct" => Some(Ok(crate::builtins_bio_geom_markov::sequence_identity_pct(args))),
-        "sequence_similarity_pct" => Some(Ok(crate::builtins_bio_geom_markov::sequence_similarity_pct(args))),
+        "sequence_identity_pct" => Some(Ok(
+            crate::builtins_bio_geom_markov::sequence_identity_pct(args),
+        )),
+        "sequence_similarity_pct" => Some(Ok(
+            crate::builtins_bio_geom_markov::sequence_similarity_pct(args),
+        )),
         "shuffle_resample" => Some(Ok(crate::builtins_bio_geom_markov::shuffle_resample(args))),
-        "sphere_aabb_intersect" => Some(Ok(crate::builtins_bio_geom_markov::sphere_aabb_intersect(args))),
-        "sphere_sphere_intersect" => Some(Ok(crate::builtins_bio_geom_markov::sphere_sphere_intersect(args))),
+        "sphere_aabb_intersect" => Some(Ok(
+            crate::builtins_bio_geom_markov::sphere_aabb_intersect(args),
+        )),
+        "sphere_sphere_intersect" => Some(Ok(
+            crate::builtins_bio_geom_markov::sphere_sphere_intersect(args),
+        )),
         "sw_score" => Some(Ok(crate::builtins_bio_geom_markov::sw_score(args))),
         "tar_header_read" => Some(Ok(crate::builtins_bio_geom_markov::tar_header_read(args))),
         "triangle_area_3d" => Some(Ok(crate::builtins_bio_geom_markov::triangle_area_3d(args))),
@@ -2603,83 +2795,107 @@ pub(crate) fn try_builtin(
         "vec4_sub" => Some(Ok(crate::builtins_bio_geom_markov::vec4_sub(args))),
         "viterbi_decode" => Some(Ok(crate::builtins_bio_geom_markov::viterbi_decode(args))),
         "wav_header_read" => Some(Ok(crate::builtins_bio_geom_markov::wav_header_read(args))),
-        "zip_central_directory" => Some(Ok(crate::builtins_bio_geom_markov::zip_central_directory(args))),
-        "zip_local_file_header" => Some(Ok(crate::builtins_bio_geom_markov::zip_local_file_header(args))),
+        "zip_central_directory" => Some(Ok(
+            crate::builtins_bio_geom_markov::zip_central_directory(args),
+        )),
+        "zip_local_file_header" => Some(Ok(
+            crate::builtins_bio_geom_markov::zip_local_file_header(args),
+        )),
         "alphabeta_value" => Some(Ok(crate::builtins_games_ml_chem::alphabeta_value(args))),
         "chem_arrhenius_k" => Some(Ok(crate::builtins_games_ml_chem::chem_arrhenius_k(args))),
         "chem_avogadro" => Some(Ok(crate::builtins_games_ml_chem::chem_avogadro(args))),
         "chem_balance_check" => Some(Ok(crate::builtins_games_ml_chem::chem_balance_check(args))),
-        "chem_boiling_point_elevation" => {
-            Some(Ok(crate::builtins_games_ml_chem::chem_boiling_point_elevation(args)))
-        }
-        "chem_buffer_capacity" => Some(Ok(crate::builtins_games_ml_chem::chem_buffer_capacity(args))),
-        "chem_celsius_to_fahrenheit" => {
-            Some(Ok(crate::builtins_games_ml_chem::chem_celsius_to_fahrenheit(args)))
-        }
-        "chem_celsius_to_kelvin" => Some(Ok(crate::builtins_games_ml_chem::chem_celsius_to_kelvin(args))),
+        "chem_boiling_point_elevation" => Some(Ok(
+            crate::builtins_games_ml_chem::chem_boiling_point_elevation(args),
+        )),
+        "chem_buffer_capacity" => Some(Ok(crate::builtins_games_ml_chem::chem_buffer_capacity(
+            args,
+        ))),
+        "chem_celsius_to_fahrenheit" => Some(Ok(
+            crate::builtins_games_ml_chem::chem_celsius_to_fahrenheit(args),
+        )),
+        "chem_celsius_to_kelvin" => Some(Ok(
+            crate::builtins_games_ml_chem::chem_celsius_to_kelvin(args),
+        )),
         "chem_concentration_to_molarity" => Some(Ok(
             crate::builtins_games_ml_chem::chem_concentration_to_molarity(args),
         )),
         "chem_dilution" => Some(Ok(crate::builtins_games_ml_chem::chem_dilution(args))),
-        "chem_fahrenheit_to_celsius" => {
-            Some(Ok(crate::builtins_games_ml_chem::chem_fahrenheit_to_celsius(args)))
-        }
-        "chem_fahrenheit_to_kelvin" => {
-            Some(Ok(crate::builtins_games_ml_chem::chem_fahrenheit_to_kelvin(args)))
-        }
+        "chem_fahrenheit_to_celsius" => Some(Ok(
+            crate::builtins_games_ml_chem::chem_fahrenheit_to_celsius(args),
+        )),
+        "chem_fahrenheit_to_kelvin" => Some(Ok(
+            crate::builtins_games_ml_chem::chem_fahrenheit_to_kelvin(args),
+        )),
         "chem_formula_parse" => Some(Ok(crate::builtins_games_ml_chem::chem_formula_parse(args))),
         "chem_freezing_point_depression" => Some(Ok(
             crate::builtins_games_ml_chem::chem_freezing_point_depression(args),
         )),
         "chem_h_from_ph" => Some(Ok(crate::builtins_games_ml_chem::chem_h_from_ph(args))),
-        "chem_henderson_hasselbalch" => {
-            Some(Ok(crate::builtins_games_ml_chem::chem_henderson_hasselbalch(args)))
-        }
-        "chem_ideal_gas_volume" => Some(Ok(crate::builtins_games_ml_chem::chem_ideal_gas_volume(args))),
-        "chem_isoelectric_estimate" => {
-            Some(Ok(crate::builtins_games_ml_chem::chem_isoelectric_estimate(args)))
-        }
-        "chem_kelvin_to_celsius" => Some(Ok(crate::builtins_games_ml_chem::chem_kelvin_to_celsius(args))),
-        "chem_kelvin_to_fahrenheit" => {
-            Some(Ok(crate::builtins_games_ml_chem::chem_kelvin_to_fahrenheit(args)))
-        }
-        "chem_kelvin_to_rankine" => Some(Ok(crate::builtins_games_ml_chem::chem_kelvin_to_rankine(args))),
+        "chem_henderson_hasselbalch" => Some(Ok(
+            crate::builtins_games_ml_chem::chem_henderson_hasselbalch(args),
+        )),
+        "chem_ideal_gas_volume" => Some(Ok(crate::builtins_games_ml_chem::chem_ideal_gas_volume(
+            args,
+        ))),
+        "chem_isoelectric_estimate" => Some(Ok(
+            crate::builtins_games_ml_chem::chem_isoelectric_estimate(args),
+        )),
+        "chem_kelvin_to_celsius" => Some(Ok(
+            crate::builtins_games_ml_chem::chem_kelvin_to_celsius(args),
+        )),
+        "chem_kelvin_to_fahrenheit" => Some(Ok(
+            crate::builtins_games_ml_chem::chem_kelvin_to_fahrenheit(args),
+        )),
+        "chem_kelvin_to_rankine" => Some(Ok(
+            crate::builtins_games_ml_chem::chem_kelvin_to_rankine(args),
+        )),
         "chem_molality" => Some(Ok(crate::builtins_games_ml_chem::chem_molality(args))),
         "chem_molar_mass" => Some(Ok(crate::builtins_games_ml_chem::chem_molar_mass(args))),
-        "chem_molarity_to_normality" => {
-            Some(Ok(crate::builtins_games_ml_chem::chem_molarity_to_normality(args)))
-        }
-        "chem_partial_pressure" => Some(Ok(crate::builtins_games_ml_chem::chem_partial_pressure(args))),
+        "chem_molarity_to_normality" => Some(Ok(
+            crate::builtins_games_ml_chem::chem_molarity_to_normality(args),
+        )),
+        "chem_partial_pressure" => Some(Ok(crate::builtins_games_ml_chem::chem_partial_pressure(
+            args,
+        ))),
         "chem_ph_from_h" => Some(Ok(crate::builtins_games_ml_chem::chem_ph_from_h(args))),
         "chem_pka_lookup" => Some(Ok(crate::builtins_games_ml_chem::chem_pka_lookup(args))),
-        "chem_rankine_to_kelvin" => Some(Ok(crate::builtins_games_ml_chem::chem_rankine_to_kelvin(args))),
+        "chem_rankine_to_kelvin" => Some(Ok(
+            crate::builtins_games_ml_chem::chem_rankine_to_kelvin(args),
+        )),
         "conditional_entropy" => Some(Ok(crate::builtins_games_ml_chem::conditional_entropy(args))),
-        "edmonds_karp_max_flow" => Some(Ok(crate::builtins_games_ml_chem::edmonds_karp_max_flow(args))),
-        "expectiminimax_value" => Some(Ok(crate::builtins_games_ml_chem::expectiminimax_value(args))),
+        "edmonds_karp_max_flow" => Some(Ok(crate::builtins_games_ml_chem::edmonds_karp_max_flow(
+            args,
+        ))),
+        "expectiminimax_value" => Some(Ok(crate::builtins_games_ml_chem::expectiminimax_value(
+            args,
+        ))),
         "job_schedule_ljf" => Some(Ok(crate::builtins_games_ml_chem::job_schedule_ljf(args))),
         "job_schedule_spt" => Some(Ok(crate::builtins_games_ml_chem::job_schedule_spt(args))),
         "joint_entropy" => Some(Ok(crate::builtins_games_ml_chem::joint_entropy(args))),
-        "js_divergence_distributions" => {
-            Some(Ok(crate::builtins_games_ml_chem::js_divergence_distributions(args)))
-        }
-        "kl_divergence_distributions" => {
-            Some(Ok(crate::builtins_games_ml_chem::kl_divergence_distributions(args)))
-        }
+        "js_divergence_distributions" => Some(Ok(
+            crate::builtins_games_ml_chem::js_divergence_distributions(args),
+        )),
+        "kl_divergence_distributions" => Some(Ok(
+            crate::builtins_games_ml_chem::kl_divergence_distributions(args),
+        )),
         "knapsack_fractional" => Some(Ok(crate::builtins_games_ml_chem::knapsack_fractional(args))),
         "knapsack_unbounded" => Some(Ok(crate::builtins_games_ml_chem::knapsack_unbounded(args))),
         "lp_simplex_max" => Some(Ok(crate::builtins_games_ml_chem::lp_simplex_max(args))),
         "lp_simplex_min" => Some(Ok(crate::builtins_games_ml_chem::lp_simplex_min(args))),
-        "matching_bipartite_greedy" => {
-            Some(Ok(crate::builtins_games_ml_chem::matching_bipartite_greedy(args)))
-        }
-        "matching_bipartite_hungarian" => {
-            Some(Ok(crate::builtins_games_ml_chem::matching_bipartite_hungarian(args)))
-        }
+        "matching_bipartite_greedy" => Some(Ok(
+            crate::builtins_games_ml_chem::matching_bipartite_greedy(args),
+        )),
+        "matching_bipartite_hungarian" => Some(Ok(
+            crate::builtins_games_ml_chem::matching_bipartite_hungarian(args),
+        )),
         "minimax_value" => Some(Ok(crate::builtins_games_ml_chem::minimax_value(args))),
         "mixed_strategy_2x2" => Some(Ok(crate::builtins_games_ml_chem::mixed_strategy_2x2(args))),
         "ml_attention_score" => Some(Ok(crate::builtins_games_ml_chem::ml_attention_score(args))),
         "ml_batch_norm" => Some(Ok(crate::builtins_games_ml_chem::ml_batch_norm(args))),
-        "ml_dot_product_attention" => Some(Ok(crate::builtins_games_ml_chem::ml_dot_product_attention(args))),
+        "ml_dot_product_attention" => Some(Ok(
+            crate::builtins_games_ml_chem::ml_dot_product_attention(args),
+        )),
         "ml_dropout_mask" => Some(Ok(crate::builtins_games_ml_chem::ml_dropout_mask(args))),
         "ml_elu_layer" => Some(Ok(crate::builtins_games_ml_chem::ml_elu_layer(args))),
         "ml_gelu_layer" => Some(Ok(crate::builtins_games_ml_chem::ml_gelu_layer(args))),
@@ -2692,7 +2908,9 @@ pub(crate) fn try_builtin(
         "ml_mish_layer" => Some(Ok(crate::builtins_games_ml_chem::ml_mish_layer(args))),
         "ml_mse_loss" => Some(Ok(crate::builtins_games_ml_chem::ml_mse_loss(args))),
         "ml_one_hot_encode" => Some(Ok(crate::builtins_games_ml_chem::ml_one_hot_encode(args))),
-        "ml_position_encoding" => Some(Ok(crate::builtins_games_ml_chem::ml_position_encoding(args))),
+        "ml_position_encoding" => Some(Ok(crate::builtins_games_ml_chem::ml_position_encoding(
+            args,
+        ))),
         "ml_relu_layer" => Some(Ok(crate::builtins_games_ml_chem::ml_relu_layer(args))),
         "ml_self_attention" => Some(Ok(crate::builtins_games_ml_chem::ml_self_attention(args))),
         "ml_sigmoid_layer" => Some(Ok(crate::builtins_games_ml_chem::ml_sigmoid_layer(args))),
@@ -2707,272 +2925,620 @@ pub(crate) fn try_builtin(
         "relative_entropy" => Some(Ok(crate::builtins_games_ml_chem::relative_entropy(args))),
         "tsp_2opt" => Some(Ok(crate::builtins_games_ml_chem::tsp_2opt(args))),
         "zero_sum_value" => Some(Ok(crate::builtins_games_ml_chem::zero_sum_value(args))),
-        "adaptive_threshold" => Some(Ok(crate::builtins_vision_ir_algorithms::adaptive_threshold(args))),
+        "adaptive_threshold" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::adaptive_threshold(args),
+        )),
         "bayes_factor" => Some(Ok(crate::builtins_vision_ir_algorithms::bayes_factor(args))),
-        "bayesian_beta_update" => Some(Ok(crate::builtins_vision_ir_algorithms::bayesian_beta_update(args))),
-        "bayesian_normal_update" => Some(Ok(crate::builtins_vision_ir_algorithms::bayesian_normal_update(args))),
+        "bayesian_beta_update" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::bayesian_beta_update(args),
+        )),
+        "bayesian_normal_update" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::bayesian_normal_update(args),
+        )),
         "bm25_score" => Some(Ok(crate::builtins_vision_ir_algorithms::bm25_score(args))),
-        "braycurtis_dist" => Some(Ok(crate::builtins_vision_ir_algorithms::braycurtis_dist(args))),
-        "canberra_dist" => Some(Ok(crate::builtins_vision_ir_algorithms::canberra_dist(args))),
-        "canny_edges_simple" => Some(Ok(crate::builtins_vision_ir_algorithms::canny_edges_simple(args))),
-        "chebyshev_norm" => Some(Ok(crate::builtins_vision_ir_algorithms::chebyshev_norm(args))),
-        "cidr_to_range" => Some(Ok(crate::builtins_vision_ir_algorithms::cidr_to_range(args))),
-        "ciede2000_color_distance" => Some(Ok(crate::builtins_vision_ir_algorithms::ciede2000_color_distance(args))),
-        "ciede76_color_distance" => Some(Ok(crate::builtins_vision_ir_algorithms::ciede76_color_distance(args))),
-        "ciede94_color_distance" => Some(Ok(crate::builtins_vision_ir_algorithms::ciede94_color_distance(args))),
+        "braycurtis_dist" => Some(Ok(crate::builtins_vision_ir_algorithms::braycurtis_dist(
+            args,
+        ))),
+        "canberra_dist" => Some(Ok(crate::builtins_vision_ir_algorithms::canberra_dist(
+            args,
+        ))),
+        "canny_edges_simple" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::canny_edges_simple(args),
+        )),
+        "chebyshev_norm" => Some(Ok(crate::builtins_vision_ir_algorithms::chebyshev_norm(
+            args,
+        ))),
+        "cidr_to_range" => Some(Ok(crate::builtins_vision_ir_algorithms::cidr_to_range(
+            args,
+        ))),
+        "ciede2000_color_distance" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::ciede2000_color_distance(args),
+        )),
+        "ciede76_color_distance" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::ciede76_color_distance(args),
+        )),
+        "ciede94_color_distance" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::ciede94_color_distance(args),
+        )),
         "conv1d_apply" => Some(Ok(crate::builtins_vision_ir_algorithms::conv1d_apply(args))),
         "conv2d_apply" => Some(Ok(crate::builtins_vision_ir_algorithms::conv2d_apply(args))),
         "correlate2d" => Some(Ok(crate::builtins_vision_ir_algorithms::correlate2d(args))),
-        "cosine_sim_sparse" => Some(Ok(crate::builtins_vision_ir_algorithms::cosine_sim_sparse(args))),
-        "credible_interval_beta" => Some(Ok(crate::builtins_vision_ir_algorithms::credible_interval_beta(args))),
-        "credible_interval_normal" => Some(Ok(crate::builtins_vision_ir_algorithms::credible_interval_normal(args))),
+        "cosine_sim_sparse" => Some(Ok(crate::builtins_vision_ir_algorithms::cosine_sim_sparse(
+            args,
+        ))),
+        "credible_interval_beta" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::credible_interval_beta(args),
+        )),
+        "credible_interval_normal" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::credible_interval_normal(args),
+        )),
         "dice_coeff" => Some(Ok(crate::builtins_vision_ir_algorithms::dice_coeff(args))),
-        "earth_mover_1d" => Some(Ok(crate::builtins_vision_ir_algorithms::earth_mover_1d(args))),
-        "epsilon_greedy_choose" => Some(Ok(crate::builtins_vision_ir_algorithms::epsilon_greedy_choose(args))),
+        "earth_mover_1d" => Some(Ok(crate::builtins_vision_ir_algorithms::earth_mover_1d(
+            args,
+        ))),
+        "epsilon_greedy_choose" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::epsilon_greedy_choose(args),
+        )),
         "fenwick_new" => Some(Ok(crate::builtins_vision_ir_algorithms::fenwick_new(args))),
-        "fenwick_query_prefix" => Some(Ok(crate::builtins_vision_ir_algorithms::fenwick_query_prefix(args))),
-        "fenwick_query_range" => Some(Ok(crate::builtins_vision_ir_algorithms::fenwick_query_range(args))),
-        "fenwick_update" => Some(Ok(crate::builtins_vision_ir_algorithms::fenwick_update(args))),
-        "gaussian_kernel" => Some(Ok(crate::builtins_vision_ir_algorithms::gaussian_kernel(args))),
-        "gradient_magnitude_2d" => Some(Ok(crate::builtins_vision_ir_algorithms::gradient_magnitude_2d(args))),
-        "harris_response" => Some(Ok(crate::builtins_vision_ir_algorithms::harris_response(args))),
-        "integral_image" => Some(Ok(crate::builtins_vision_ir_algorithms::integral_image(args))),
-        "ip_subnet_split" => Some(Ok(crate::builtins_vision_ir_algorithms::ip_subnet_split(args))),
-        "ipv6_global_unicast" => Some(Ok(crate::builtins_vision_ir_algorithms::ipv6_global_unicast(args))),
+        "fenwick_query_prefix" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::fenwick_query_prefix(args),
+        )),
+        "fenwick_query_range" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::fenwick_query_range(args),
+        )),
+        "fenwick_update" => Some(Ok(crate::builtins_vision_ir_algorithms::fenwick_update(
+            args,
+        ))),
+        "gaussian_kernel" => Some(Ok(crate::builtins_vision_ir_algorithms::gaussian_kernel(
+            args,
+        ))),
+        "gradient_magnitude_2d" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::gradient_magnitude_2d(args),
+        )),
+        "harris_response" => Some(Ok(crate::builtins_vision_ir_algorithms::harris_response(
+            args,
+        ))),
+        "integral_image" => Some(Ok(crate::builtins_vision_ir_algorithms::integral_image(
+            args,
+        ))),
+        "ip_subnet_split" => Some(Ok(crate::builtins_vision_ir_algorithms::ip_subnet_split(
+            args,
+        ))),
+        "ipv6_global_unicast" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::ipv6_global_unicast(args),
+        )),
         "jaccard_sim" => Some(Ok(crate::builtins_vision_ir_algorithms::jaccard_sim(args))),
-        "laplacian_kernel" => Some(Ok(crate::builtins_vision_ir_algorithms::laplacian_kernel(args))),
+        "laplacian_kernel" => Some(Ok(crate::builtins_vision_ir_algorithms::laplacian_kernel(
+            args,
+        ))),
         "lch_to_rgb" => Some(Ok(crate::builtins_vision_ir_algorithms::lch_to_rgb(args))),
-        "mahalanobis_sq" => Some(Ok(crate::builtins_vision_ir_algorithms::mahalanobis_sq(args))),
-        "manhattan_norm" => Some(Ok(crate::builtins_vision_ir_algorithms::manhattan_norm(args))),
-        "maximum_a_posteriori" => Some(Ok(crate::builtins_vision_ir_algorithms::maximum_a_posteriori(args))),
-        "minkowski_norm" => Some(Ok(crate::builtins_vision_ir_algorithms::minkowski_norm(args))),
-        "non_max_suppression" => Some(Ok(crate::builtins_vision_ir_algorithms::non_max_suppression(args))),
+        "mahalanobis_sq" => Some(Ok(crate::builtins_vision_ir_algorithms::mahalanobis_sq(
+            args,
+        ))),
+        "manhattan_norm" => Some(Ok(crate::builtins_vision_ir_algorithms::manhattan_norm(
+            args,
+        ))),
+        "maximum_a_posteriori" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::maximum_a_posteriori(args),
+        )),
+        "minkowski_norm" => Some(Ok(crate::builtins_vision_ir_algorithms::minkowski_norm(
+            args,
+        ))),
+        "non_max_suppression" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::non_max_suppression(args),
+        )),
         "oklch_to_rgb" => Some(Ok(crate::builtins_vision_ir_algorithms::oklch_to_rgb(args))),
-        "otsu_threshold" => Some(Ok(crate::builtins_vision_ir_algorithms::otsu_threshold(args))),
-        "overlap_coeff" => Some(Ok(crate::builtins_vision_ir_algorithms::overlap_coeff(args))),
-        "posterior_predictive_beta" => {
-            Some(Ok(crate::builtins_vision_ir_algorithms::posterior_predictive_beta(args)))
-        }
-        "posterior_predictive_normal" => {
-            Some(Ok(crate::builtins_vision_ir_algorithms::posterior_predictive_normal(args)))
-        }
-        "prior_jeffreys_uniform" => Some(Ok(crate::builtins_vision_ir_algorithms::prior_jeffreys_uniform(args))),
-        "qlearning_step" => Some(Ok(crate::builtins_vision_ir_algorithms::qlearning_step(args))),
-        "range_to_cidr" => Some(Ok(crate::builtins_vision_ir_algorithms::range_to_cidr(args))),
+        "otsu_threshold" => Some(Ok(crate::builtins_vision_ir_algorithms::otsu_threshold(
+            args,
+        ))),
+        "overlap_coeff" => Some(Ok(crate::builtins_vision_ir_algorithms::overlap_coeff(
+            args,
+        ))),
+        "posterior_predictive_beta" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::posterior_predictive_beta(args),
+        )),
+        "posterior_predictive_normal" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::posterior_predictive_normal(args),
+        )),
+        "prior_jeffreys_uniform" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::prior_jeffreys_uniform(args),
+        )),
+        "qlearning_step" => Some(Ok(crate::builtins_vision_ir_algorithms::qlearning_step(
+            args,
+        ))),
+        "range_to_cidr" => Some(Ok(crate::builtins_vision_ir_algorithms::range_to_cidr(
+            args,
+        ))),
         "rgb_to_lch" => Some(Ok(crate::builtins_vision_ir_algorithms::rgb_to_lch(args))),
         "rgb_to_oklch" => Some(Ok(crate::builtins_vision_ir_algorithms::rgb_to_oklch(args))),
-        "rl_discount_returns" => Some(Ok(crate::builtins_vision_ir_algorithms::rl_discount_returns(args))),
-        "rl_n_step_return" => Some(Ok(crate::builtins_vision_ir_algorithms::rl_n_step_return(args))),
+        "rl_discount_returns" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::rl_discount_returns(args),
+        )),
+        "rl_n_step_return" => Some(Ok(crate::builtins_vision_ir_algorithms::rl_n_step_return(
+            args,
+        ))),
         "rl_td_error" => Some(Ok(crate::builtins_vision_ir_algorithms::rl_td_error(args))),
         "sarsa_step" => Some(Ok(crate::builtins_vision_ir_algorithms::sarsa_step(args))),
-        "sliding_dot_product" => Some(Ok(crate::builtins_vision_ir_algorithms::sliding_dot_product(args))),
-        "sobel_x_kernel" => Some(Ok(crate::builtins_vision_ir_algorithms::sobel_x_kernel(args))),
-        "sobel_y_kernel" => Some(Ok(crate::builtins_vision_ir_algorithms::sobel_y_kernel(args))),
-        "softmax_choose" => Some(Ok(crate::builtins_vision_ir_algorithms::softmax_choose(args))),
-        "tanimoto_coeff" => Some(Ok(crate::builtins_vision_ir_algorithms::tanimoto_coeff(args))),
-        "tfidf_compute" => Some(Ok(crate::builtins_vision_ir_algorithms::tfidf_compute(args))),
-        "thompson_beta_choose" => Some(Ok(crate::builtins_vision_ir_algorithms::thompson_beta_choose(args))),
+        "sliding_dot_product" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::sliding_dot_product(args),
+        )),
+        "sobel_x_kernel" => Some(Ok(crate::builtins_vision_ir_algorithms::sobel_x_kernel(
+            args,
+        ))),
+        "sobel_y_kernel" => Some(Ok(crate::builtins_vision_ir_algorithms::sobel_y_kernel(
+            args,
+        ))),
+        "softmax_choose" => Some(Ok(crate::builtins_vision_ir_algorithms::softmax_choose(
+            args,
+        ))),
+        "tanimoto_coeff" => Some(Ok(crate::builtins_vision_ir_algorithms::tanimoto_coeff(
+            args,
+        ))),
+        "tfidf_compute" => Some(Ok(crate::builtins_vision_ir_algorithms::tfidf_compute(
+            args,
+        ))),
+        "thompson_beta_choose" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::thompson_beta_choose(args),
+        )),
         "trie_count" => Some(Ok(crate::builtins_vision_ir_algorithms::trie_count(args))),
         "trie_insert" => Some(Ok(crate::builtins_vision_ir_algorithms::trie_insert(args))),
         "trie_keys" => Some(Ok(crate::builtins_vision_ir_algorithms::trie_keys(args))),
         "trie_lookup" => Some(Ok(crate::builtins_vision_ir_algorithms::trie_lookup(args))),
         "trie_new" => Some(Ok(crate::builtins_vision_ir_algorithms::trie_new(args))),
-        "trie_prefix_search" => Some(Ok(crate::builtins_vision_ir_algorithms::trie_prefix_search(args))),
+        "trie_prefix_search" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::trie_prefix_search(args),
+        )),
         "trie_remove" => Some(Ok(crate::builtins_vision_ir_algorithms::trie_remove(args))),
-        "tversky_index" => Some(Ok(crate::builtins_vision_ir_algorithms::tversky_index(args))),
+        "tversky_index" => Some(Ok(crate::builtins_vision_ir_algorithms::tversky_index(
+            args,
+        ))),
         "ucb1_choose" => Some(Ok(crate::builtins_vision_ir_algorithms::ucb1_choose(args))),
-        "union_find_components" => Some(Ok(crate::builtins_vision_ir_algorithms::union_find_components(args))),
-        "union_find_find" => Some(Ok(crate::builtins_vision_ir_algorithms::union_find_find(args))),
-        "union_find_new" => Some(Ok(crate::builtins_vision_ir_algorithms::union_find_new(args))),
-        "union_find_union" => Some(Ok(crate::builtins_vision_ir_algorithms::union_find_union(args))),
-        "window_bartlett" => Some(Ok(crate::builtins_vision_ir_algorithms::window_bartlett(args))),
-        "window_blackman_harris" => Some(Ok(crate::builtins_vision_ir_algorithms::window_blackman_harris(args))),
-        "window_flat_top" => Some(Ok(crate::builtins_vision_ir_algorithms::window_flat_top(args))),
-        "window_gaussian" => Some(Ok(crate::builtins_vision_ir_algorithms::window_gaussian(args))),
+        "union_find_components" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::union_find_components(args),
+        )),
+        "union_find_find" => Some(Ok(crate::builtins_vision_ir_algorithms::union_find_find(
+            args,
+        ))),
+        "union_find_new" => Some(Ok(crate::builtins_vision_ir_algorithms::union_find_new(
+            args,
+        ))),
+        "union_find_union" => Some(Ok(crate::builtins_vision_ir_algorithms::union_find_union(
+            args,
+        ))),
+        "window_bartlett" => Some(Ok(crate::builtins_vision_ir_algorithms::window_bartlett(
+            args,
+        ))),
+        "window_blackman_harris" => Some(Ok(
+            crate::builtins_vision_ir_algorithms::window_blackman_harris(args),
+        )),
+        "window_flat_top" => Some(Ok(crate::builtins_vision_ir_algorithms::window_flat_top(
+            args,
+        ))),
+        "window_gaussian" => Some(Ok(crate::builtins_vision_ir_algorithms::window_gaussian(
+            args,
+        ))),
         "window_welch" => Some(Ok(crate::builtins_vision_ir_algorithms::window_welch(args))),
         "a_star_grid" => Some(Ok(crate::builtins_combin_audio_physics::a_star_grid(args))),
-        "all_pass_filter" => Some(Ok(crate::builtins_combin_audio_physics::all_pass_filter(args))),
+        "all_pass_filter" => Some(Ok(crate::builtins_combin_audio_physics::all_pass_filter(
+            args,
+        ))),
         "am_synth" => Some(Ok(crate::builtins_combin_audio_physics::am_synth(args))),
-        "bidirectional_bfs" => Some(Ok(crate::builtins_combin_audio_physics::bidirectional_bfs(args))),
-        "buoyancy_force" => Some(Ok(crate::builtins_combin_audio_physics::buoyancy_force(args))),
-        "center_of_mass_2d" => Some(Ok(crate::builtins_combin_audio_physics::center_of_mass_2d(args))),
-        "center_of_mass_3d" => Some(Ok(crate::builtins_combin_audio_physics::center_of_mass_3d(args))),
-        "centered_polygonal" => Some(Ok(crate::builtins_combin_audio_physics::centered_polygonal(args))),
-        "chorus_simple" => Some(Ok(crate::builtins_combin_audio_physics::chorus_simple(args))),
-        "collision_response_2d" => Some(Ok(crate::builtins_combin_audio_physics::collision_response_2d(args))),
+        "bidirectional_bfs" => Some(Ok(crate::builtins_combin_audio_physics::bidirectional_bfs(
+            args,
+        ))),
+        "buoyancy_force" => Some(Ok(crate::builtins_combin_audio_physics::buoyancy_force(
+            args,
+        ))),
+        "center_of_mass_2d" => Some(Ok(crate::builtins_combin_audio_physics::center_of_mass_2d(
+            args,
+        ))),
+        "center_of_mass_3d" => Some(Ok(crate::builtins_combin_audio_physics::center_of_mass_3d(
+            args,
+        ))),
+        "centered_polygonal" => Some(Ok(
+            crate::builtins_combin_audio_physics::centered_polygonal(args),
+        )),
+        "chorus_simple" => Some(Ok(crate::builtins_combin_audio_physics::chorus_simple(
+            args,
+        ))),
+        "collision_response_2d" => Some(Ok(
+            crate::builtins_combin_audio_physics::collision_response_2d(args),
+        )),
         "comb_filter" => Some(Ok(crate::builtins_combin_audio_physics::comb_filter(args))),
-        "compositions_count" => Some(Ok(crate::builtins_combin_audio_physics::compositions_count(args))),
-        "critical_damping" => Some(Ok(crate::builtins_combin_audio_physics::critical_damping(args))),
+        "compositions_count" => Some(Ok(
+            crate::builtins_combin_audio_physics::compositions_count(args),
+        )),
+        "critical_damping" => Some(Ok(crate::builtins_combin_audio_physics::critical_damping(
+            args,
+        ))),
         "cube_number" => Some(Ok(crate::builtins_combin_audio_physics::cube_number(args))),
-        "damping_factor" => Some(Ok(crate::builtins_combin_audio_physics::damping_factor(args))),
-        "decagonal_number" => Some(Ok(crate::builtins_combin_audio_physics::decagonal_number(args))),
-        "derangement_count" => Some(Ok(crate::builtins_combin_audio_physics::derangement_count(args))),
+        "damping_factor" => Some(Ok(crate::builtins_combin_audio_physics::damping_factor(
+            args,
+        ))),
+        "decagonal_number" => Some(Ok(crate::builtins_combin_audio_physics::decagonal_number(
+            args,
+        ))),
+        "derangement_count" => Some(Ok(crate::builtins_combin_audio_physics::derangement_count(
+            args,
+        ))),
         "dodecahedral" => Some(Ok(crate::builtins_combin_audio_physics::dodecahedral(args))),
-        "elastic_collision_1d" => Some(Ok(crate::builtins_combin_audio_physics::elastic_collision_1d(args))),
-        "exponential_search" => Some(Ok(crate::builtins_combin_audio_physics::exponential_search(args))),
+        "elastic_collision_1d" => Some(Ok(
+            crate::builtins_combin_audio_physics::elastic_collision_1d(args),
+        )),
+        "exponential_search" => Some(Ok(
+            crate::builtins_combin_audio_physics::exponential_search(args),
+        )),
         "fbm_noise_2d" => Some(Ok(crate::builtins_combin_audio_physics::fbm_noise_2d(args))),
-        "fibonacci_matrix" => Some(Ok(crate::builtins_combin_audio_physics::fibonacci_matrix(args))),
+        "fibonacci_matrix" => Some(Ok(crate::builtins_combin_audio_physics::fibonacci_matrix(
+            args,
+        ))),
         "fir_filter" => Some(Ok(crate::builtins_combin_audio_physics::fir_filter(args))),
-        "floyd_cycle_detect" => Some(Ok(crate::builtins_combin_audio_physics::floyd_cycle_detect(args))),
+        "floyd_cycle_detect" => Some(Ok(
+            crate::builtins_combin_audio_physics::floyd_cycle_detect(args),
+        )),
         "fm_synth_2op" => Some(Ok(crate::builtins_combin_audio_physics::fm_synth_2op(args))),
-        "gnomonic_number" => Some(Ok(crate::builtins_combin_audio_physics::gnomonic_number(args))),
-        "greedy_best_first" => Some(Ok(crate::builtins_combin_audio_physics::greedy_best_first(args))),
+        "gnomonic_number" => Some(Ok(crate::builtins_combin_audio_physics::gnomonic_number(
+            args,
+        ))),
+        "greedy_best_first" => Some(Ok(crate::builtins_combin_audio_physics::greedy_best_first(
+            args,
+        ))),
         "hash_2d_int" => Some(Ok(crate::builtins_combin_audio_physics::hash_2d_int(args))),
-        "heptagonal_number" => Some(Ok(crate::builtins_combin_audio_physics::heptagonal_number(args))),
-        "hexagonal_number" => Some(Ok(crate::builtins_combin_audio_physics::hexagonal_number(args))),
-        "hyperfactorial" => Some(Ok(crate::builtins_combin_audio_physics::hyperfactorial(args))),
+        "heptagonal_number" => Some(Ok(crate::builtins_combin_audio_physics::heptagonal_number(
+            args,
+        ))),
+        "hexagonal_number" => Some(Ok(crate::builtins_combin_audio_physics::hexagonal_number(
+            args,
+        ))),
+        "hyperfactorial" => Some(Ok(crate::builtins_combin_audio_physics::hyperfactorial(
+            args,
+        ))),
         "icosahedral" => Some(Ok(crate::builtins_combin_audio_physics::icosahedral(args))),
-        "ida_star_search" => Some(Ok(crate::builtins_combin_audio_physics::ida_star_search(args))),
-        "inelastic_collision_1d" => Some(Ok(crate::builtins_combin_audio_physics::inelastic_collision_1d(args))),
-        "interpolation_search" => Some(Ok(crate::builtins_combin_audio_physics::interpolation_search(args))),
-        "lattice_paths" => Some(Ok(crate::builtins_combin_audio_physics::lattice_paths(args))),
+        "ida_star_search" => Some(Ok(crate::builtins_combin_audio_physics::ida_star_search(
+            args,
+        ))),
+        "inelastic_collision_1d" => Some(Ok(
+            crate::builtins_combin_audio_physics::inelastic_collision_1d(args),
+        )),
+        "interpolation_search" => Some(Ok(
+            crate::builtins_combin_audio_physics::interpolation_search(args),
+        )),
+        "lattice_paths" => Some(Ok(crate::builtins_combin_audio_physics::lattice_paths(
+            args,
+        ))),
         "lift_force" => Some(Ok(crate::builtins_combin_audio_physics::lift_force(args))),
         "lucas_nth" => Some(Ok(crate::builtins_combin_audio_physics::lucas_nth(args))),
-        "moment_of_inertia_cylinder" => {
-            Some(Ok(crate::builtins_combin_audio_physics::moment_of_inertia_cylinder(args)))
-        }
-        "moment_of_inertia_disc" => Some(Ok(crate::builtins_combin_audio_physics::moment_of_inertia_disc(args))),
-        "moment_of_inertia_rod" => Some(Ok(crate::builtins_combin_audio_physics::moment_of_inertia_rod(args))),
-        "moment_of_inertia_sphere" => Some(Ok(crate::builtins_combin_audio_physics::moment_of_inertia_sphere(args))),
-        "mulberry32_next" => Some(Ok(crate::builtins_combin_audio_physics::mulberry32_next(args))),
-        "multinomial_coefficient" => Some(Ok(crate::builtins_combin_audio_physics::multinomial_coefficient(args))),
+        "moment_of_inertia_cylinder" => Some(Ok(
+            crate::builtins_combin_audio_physics::moment_of_inertia_cylinder(args),
+        )),
+        "moment_of_inertia_disc" => Some(Ok(
+            crate::builtins_combin_audio_physics::moment_of_inertia_disc(args),
+        )),
+        "moment_of_inertia_rod" => Some(Ok(
+            crate::builtins_combin_audio_physics::moment_of_inertia_rod(args),
+        )),
+        "moment_of_inertia_sphere" => Some(Ok(
+            crate::builtins_combin_audio_physics::moment_of_inertia_sphere(args),
+        )),
+        "mulberry32_next" => Some(Ok(crate::builtins_combin_audio_physics::mulberry32_next(
+            args,
+        ))),
+        "multinomial_coefficient" => Some(Ok(
+            crate::builtins_combin_audio_physics::multinomial_coefficient(args),
+        )),
         "narayana_cow" => Some(Ok(crate::builtins_combin_audio_physics::narayana_cow(args))),
-        "nonagonal_number" => Some(Ok(crate::builtins_combin_audio_physics::nonagonal_number(args))),
-        "octagonal_number" => Some(Ok(crate::builtins_combin_audio_physics::octagonal_number(args))),
-        "partitions_count" => Some(Ok(crate::builtins_combin_audio_physics::partitions_count(args))),
+        "nonagonal_number" => Some(Ok(crate::builtins_combin_audio_physics::nonagonal_number(
+            args,
+        ))),
+        "octagonal_number" => Some(Ok(crate::builtins_combin_audio_physics::octagonal_number(
+            args,
+        ))),
+        "partitions_count" => Some(Ok(crate::builtins_combin_audio_physics::partitions_count(
+            args,
+        ))),
         "pcg32_next" => Some(Ok(crate::builtins_combin_audio_physics::pcg32_next(args))),
         "pell_nth" => Some(Ok(crate::builtins_combin_audio_physics::pell_nth(args))),
         "perlin_2d" => Some(Ok(crate::builtins_combin_audio_physics::perlin_2d(args))),
         "perlin_3d" => Some(Ok(crate::builtins_combin_audio_physics::perlin_3d(args))),
-        "phaser_simple" => Some(Ok(crate::builtins_combin_audio_physics::phaser_simple(args))),
-        "poisson_brackets" => Some(Ok(crate::builtins_combin_audio_physics::poisson_brackets(args))),
+        "phaser_simple" => Some(Ok(crate::builtins_combin_audio_physics::phaser_simple(
+            args,
+        ))),
+        "poisson_brackets" => Some(Ok(crate::builtins_combin_audio_physics::poisson_brackets(
+            args,
+        ))),
         "primorial" => Some(Ok(crate::builtins_combin_audio_physics::primorial(args))),
-        "projectile_position" => Some(Ok(crate::builtins_combin_audio_physics::projectile_position(args))),
-        "projectile_velocity" => Some(Ok(crate::builtins_combin_audio_physics::projectile_velocity(args))),
-        "ridge_noise_2d" => Some(Ok(crate::builtins_combin_audio_physics::ridge_noise_2d(args))),
-        "ring_modulate" => Some(Ok(crate::builtins_combin_audio_physics::ring_modulate(args))),
-        "schroeder_reverb" => Some(Ok(crate::builtins_combin_audio_physics::schroeder_reverb(args))),
+        "projectile_position" => Some(Ok(
+            crate::builtins_combin_audio_physics::projectile_position(args),
+        )),
+        "projectile_velocity" => Some(Ok(
+            crate::builtins_combin_audio_physics::projectile_velocity(args),
+        )),
+        "ridge_noise_2d" => Some(Ok(crate::builtins_combin_audio_physics::ridge_noise_2d(
+            args,
+        ))),
+        "ring_modulate" => Some(Ok(crate::builtins_combin_audio_physics::ring_modulate(
+            args,
+        ))),
+        "schroeder_reverb" => Some(Ok(crate::builtins_combin_audio_physics::schroeder_reverb(
+            args,
+        ))),
         "simplex_2d" => Some(Ok(crate::builtins_combin_audio_physics::simplex_2d(args))),
-        "splitmix64_next" => Some(Ok(crate::builtins_combin_audio_physics::splitmix64_next(args))),
-        "spring_oscillator_pos" => Some(Ok(crate::builtins_combin_audio_physics::spring_oscillator_pos(args))),
-        "square_pyramidal" => Some(Ok(crate::builtins_combin_audio_physics::square_pyramidal(args))),
-        "super_factorial" => Some(Ok(crate::builtins_combin_audio_physics::super_factorial(args))),
-        "ternary_search" => Some(Ok(crate::builtins_combin_audio_physics::ternary_search(args))),
+        "splitmix64_next" => Some(Ok(crate::builtins_combin_audio_physics::splitmix64_next(
+            args,
+        ))),
+        "spring_oscillator_pos" => Some(Ok(
+            crate::builtins_combin_audio_physics::spring_oscillator_pos(args),
+        )),
+        "square_pyramidal" => Some(Ok(crate::builtins_combin_audio_physics::square_pyramidal(
+            args,
+        ))),
+        "super_factorial" => Some(Ok(crate::builtins_combin_audio_physics::super_factorial(
+            args,
+        ))),
+        "ternary_search" => Some(Ok(crate::builtins_combin_audio_physics::ternary_search(
+            args,
+        ))),
         "tetrahedral" => Some(Ok(crate::builtins_combin_audio_physics::tetrahedral(args))),
         "tetranacci" => Some(Ok(crate::builtins_combin_audio_physics::tetranacci(args))),
         "torque_arm" => Some(Ok(crate::builtins_combin_audio_physics::torque_arm(args))),
-        "turbulence_noise_2d" => Some(Ok(crate::builtins_combin_audio_physics::turbulence_noise_2d(args))),
-        "value_noise_2d" => Some(Ok(crate::builtins_combin_audio_physics::value_noise_2d(args))),
-        "wavetable_synth" => Some(Ok(crate::builtins_combin_audio_physics::wavetable_synth(args))),
+        "turbulence_noise_2d" => Some(Ok(
+            crate::builtins_combin_audio_physics::turbulence_noise_2d(args),
+        )),
+        "value_noise_2d" => Some(Ok(crate::builtins_combin_audio_physics::value_noise_2d(
+            args,
+        ))),
+        "wavetable_synth" => Some(Ok(crate::builtins_combin_audio_physics::wavetable_synth(
+            args,
+        ))),
         "worley_2d" => Some(Ok(crate::builtins_combin_audio_physics::worley_2d(args))),
-        "xorshift32_next" => Some(Ok(crate::builtins_combin_audio_physics::xorshift32_next(args))),
-        "andrew_monotone_hull" => Some(Ok(crate::builtins_ratings_geom_units::andrew_monotone_hull(args))),
-        "aperture_stop_to_fnumber" => Some(Ok(crate::builtins_ratings_geom_units::aperture_stop_to_fnumber(args))),
+        "xorshift32_next" => Some(Ok(crate::builtins_combin_audio_physics::xorshift32_next(
+            args,
+        ))),
+        "andrew_monotone_hull" => Some(Ok(
+            crate::builtins_ratings_geom_units::andrew_monotone_hull(args),
+        )),
+        "aperture_stop_to_fnumber" => Some(Ok(
+            crate::builtins_ratings_geom_units::aperture_stop_to_fnumber(args),
+        )),
         "arpad_predict" => Some(Ok(crate::builtins_ratings_geom_units::arpad_predict(args))),
-        "bilateral_filter_2d" => Some(Ok(crate::builtins_ratings_geom_units::bilateral_filter_2d(args))),
-        "black_hat_transform" => Some(Ok(crate::builtins_ratings_geom_units::black_hat_transform(args))),
-        "canny_edges_full" => Some(Ok(crate::builtins_ratings_geom_units::canny_edges_full(args))),
-        "case_alternating" => Some(Ok(crate::builtins_ratings_geom_units::case_alternating(args))),
+        "bilateral_filter_2d" => Some(Ok(crate::builtins_ratings_geom_units::bilateral_filter_2d(
+            args,
+        ))),
+        "black_hat_transform" => Some(Ok(crate::builtins_ratings_geom_units::black_hat_transform(
+            args,
+        ))),
+        "canny_edges_full" => Some(Ok(crate::builtins_ratings_geom_units::canny_edges_full(
+            args,
+        ))),
+        "case_alternating" => Some(Ok(crate::builtins_ratings_geom_units::case_alternating(
+            args,
+        ))),
         "case_constant" => Some(Ok(crate::builtins_ratings_geom_units::case_constant(args))),
         "case_dot" => Some(Ok(crate::builtins_ratings_geom_units::case_dot(args))),
         "case_pascal" => Some(Ok(crate::builtins_ratings_geom_units::case_pascal(args))),
         "case_path" => Some(Ok(crate::builtins_ratings_geom_units::case_path(args))),
         "case_sentence" => Some(Ok(crate::builtins_ratings_geom_units::case_sentence(args))),
         "case_swap" => Some(Ok(crate::builtins_ratings_geom_units::case_swap(args))),
-        "case_title_proper" => Some(Ok(crate::builtins_ratings_geom_units::case_title_proper(args))),
+        "case_title_proper" => Some(Ok(crate::builtins_ratings_geom_units::case_title_proper(
+            args,
+        ))),
         "case_train" => Some(Ok(crate::builtins_ratings_geom_units::case_train(args))),
         "closing_2d" => Some(Ok(crate::builtins_ratings_geom_units::closing_2d(args))),
-        "constants_au_meters" => Some(Ok(crate::builtins_ratings_geom_units::constants_au_meters(args))),
-        "constants_avogadro_n" => Some(Ok(crate::builtins_ratings_geom_units::constants_avogadro_n(args))),
-        "constants_bohr_radius" => Some(Ok(crate::builtins_ratings_geom_units::constants_bohr_radius(args))),
-        "constants_boltzmann_k" => Some(Ok(crate::builtins_ratings_geom_units::constants_boltzmann_k(args))),
-        "constants_earth_mass" => Some(Ok(crate::builtins_ratings_geom_units::constants_earth_mass(args))),
-        "constants_earth_radius" => Some(Ok(crate::builtins_ratings_geom_units::constants_earth_radius(args))),
-        "constants_electron_charge" => {
-            Some(Ok(crate::builtins_ratings_geom_units::constants_electron_charge(args)))
-        }
-        "constants_electron_mass" => Some(Ok(crate::builtins_ratings_geom_units::constants_electron_mass(args))),
-        "constants_faraday" => Some(Ok(crate::builtins_ratings_geom_units::constants_faraday(args))),
-        "constants_gas_r" => Some(Ok(crate::builtins_ratings_geom_units::constants_gas_r(args))),
-        "constants_gravitational_g" => {
-            Some(Ok(crate::builtins_ratings_geom_units::constants_gravitational_g(args)))
-        }
-        "constants_lightyear_meters" => {
-            Some(Ok(crate::builtins_ratings_geom_units::constants_lightyear_meters(args)))
-        }
-        "constants_neutron_mass" => Some(Ok(crate::builtins_ratings_geom_units::constants_neutron_mass(args))),
-        "constants_parsec_meters" => Some(Ok(crate::builtins_ratings_geom_units::constants_parsec_meters(args))),
-        "constants_planck_h" => Some(Ok(crate::builtins_ratings_geom_units::constants_planck_h(args))),
-        "constants_planck_hbar" => Some(Ok(crate::builtins_ratings_geom_units::constants_planck_hbar(args))),
-        "constants_planck" => Some(Ok(crate::builtins_ratings_geom_units::constants_planck(args))),
-        "constants_proton_mass" => Some(Ok(crate::builtins_ratings_geom_units::constants_proton_mass(args))),
-        "constants_rydberg" => Some(Ok(crate::builtins_ratings_geom_units::constants_rydberg(args))),
-        "constants_solar_mass" => Some(Ok(crate::builtins_ratings_geom_units::constants_solar_mass(args))),
-        "constants_solar_radius" => Some(Ok(crate::builtins_ratings_geom_units::constants_solar_radius(args))),
-        "constants_speed_of_light" => Some(Ok(crate::builtins_ratings_geom_units::constants_speed_of_light(args))),
-        "constants_stefan_boltzmann" => {
-            Some(Ok(crate::builtins_ratings_geom_units::constants_stefan_boltzmann(args)))
-        }
+        "constants_au_meters" => Some(Ok(crate::builtins_ratings_geom_units::constants_au_meters(
+            args,
+        ))),
+        "constants_avogadro_n" => Some(Ok(
+            crate::builtins_ratings_geom_units::constants_avogadro_n(args),
+        )),
+        "constants_bohr_radius" => Some(Ok(
+            crate::builtins_ratings_geom_units::constants_bohr_radius(args),
+        )),
+        "constants_boltzmann_k" => Some(Ok(
+            crate::builtins_ratings_geom_units::constants_boltzmann_k(args),
+        )),
+        "constants_earth_mass" => Some(Ok(
+            crate::builtins_ratings_geom_units::constants_earth_mass(args),
+        )),
+        "constants_earth_radius" => Some(Ok(
+            crate::builtins_ratings_geom_units::constants_earth_radius(args),
+        )),
+        "constants_electron_charge" => Some(Ok(
+            crate::builtins_ratings_geom_units::constants_electron_charge(args),
+        )),
+        "constants_electron_mass" => Some(Ok(
+            crate::builtins_ratings_geom_units::constants_electron_mass(args),
+        )),
+        "constants_faraday" => Some(Ok(crate::builtins_ratings_geom_units::constants_faraday(
+            args,
+        ))),
+        "constants_gas_r" => Some(Ok(crate::builtins_ratings_geom_units::constants_gas_r(
+            args,
+        ))),
+        "constants_gravitational_g" => Some(Ok(
+            crate::builtins_ratings_geom_units::constants_gravitational_g(args),
+        )),
+        "constants_lightyear_meters" => Some(Ok(
+            crate::builtins_ratings_geom_units::constants_lightyear_meters(args),
+        )),
+        "constants_neutron_mass" => Some(Ok(
+            crate::builtins_ratings_geom_units::constants_neutron_mass(args),
+        )),
+        "constants_parsec_meters" => Some(Ok(
+            crate::builtins_ratings_geom_units::constants_parsec_meters(args),
+        )),
+        "constants_planck_h" => Some(Ok(crate::builtins_ratings_geom_units::constants_planck_h(
+            args,
+        ))),
+        "constants_planck_hbar" => Some(Ok(
+            crate::builtins_ratings_geom_units::constants_planck_hbar(args),
+        )),
+        "constants_planck" => Some(Ok(crate::builtins_ratings_geom_units::constants_planck(
+            args,
+        ))),
+        "constants_proton_mass" => Some(Ok(
+            crate::builtins_ratings_geom_units::constants_proton_mass(args),
+        )),
+        "constants_rydberg" => Some(Ok(crate::builtins_ratings_geom_units::constants_rydberg(
+            args,
+        ))),
+        "constants_solar_mass" => Some(Ok(
+            crate::builtins_ratings_geom_units::constants_solar_mass(args),
+        )),
+        "constants_solar_radius" => Some(Ok(
+            crate::builtins_ratings_geom_units::constants_solar_radius(args),
+        )),
+        "constants_speed_of_light" => Some(Ok(
+            crate::builtins_ratings_geom_units::constants_speed_of_light(args),
+        )),
+        "constants_stefan_boltzmann" => Some(Ok(
+            crate::builtins_ratings_geom_units::constants_stefan_boltzmann(args),
+        )),
         "contour_area" => Some(Ok(crate::builtins_ratings_geom_units::contour_area(args))),
-        "contour_centroid" => Some(Ok(crate::builtins_ratings_geom_units::contour_centroid(args))),
+        "contour_centroid" => Some(Ok(crate::builtins_ratings_geom_units::contour_centroid(
+            args,
+        ))),
         "contour_find" => Some(Ok(crate::builtins_ratings_geom_units::contour_find(args))),
-        "contour_perimeter" => Some(Ok(crate::builtins_ratings_geom_units::contour_perimeter(args))),
+        "contour_perimeter" => Some(Ok(crate::builtins_ratings_geom_units::contour_perimeter(
+            args,
+        ))),
         "crop_factor" => Some(Ok(crate::builtins_ratings_geom_units::crop_factor(args))),
-        "delaunay_triangulate_2d" => Some(Ok(crate::builtins_ratings_geom_units::delaunay_triangulate_2d(args))),
-        "depth_of_field_far" => Some(Ok(crate::builtins_ratings_geom_units::depth_of_field_far(args))),
-        "depth_of_field_near" => Some(Ok(crate::builtins_ratings_geom_units::depth_of_field_near(args))),
-        "dh_compute_shared" => Some(Ok(crate::builtins_ratings_geom_units::dh_compute_shared(args))),
+        "delaunay_triangulate_2d" => Some(Ok(
+            crate::builtins_ratings_geom_units::delaunay_triangulate_2d(args),
+        )),
+        "depth_of_field_far" => Some(Ok(crate::builtins_ratings_geom_units::depth_of_field_far(
+            args,
+        ))),
+        "depth_of_field_near" => Some(Ok(crate::builtins_ratings_geom_units::depth_of_field_near(
+            args,
+        ))),
+        "dh_compute_shared" => Some(Ok(crate::builtins_ratings_geom_units::dh_compute_shared(
+            args,
+        ))),
         "dilation_2d" => Some(Ok(crate::builtins_ratings_geom_units::dilation_2d(args))),
         "ec_point_add" => Some(Ok(crate::builtins_ratings_geom_units::ec_point_add(args))),
-        "ec_point_double" => Some(Ok(crate::builtins_ratings_geom_units::ec_point_double(args))),
-        "ed25519_keypair_simple" => Some(Ok(crate::builtins_ratings_geom_units::ed25519_keypair_simple(args))),
-        "ed25519_sign_simple" => Some(Ok(crate::builtins_ratings_geom_units::ed25519_sign_simple(args))),
-        "ed25519_verify_simple" => Some(Ok(crate::builtins_ratings_geom_units::ed25519_verify_simple(args))),
+        "ec_point_double" => Some(Ok(crate::builtins_ratings_geom_units::ec_point_double(
+            args,
+        ))),
+        "ed25519_keypair_simple" => Some(Ok(
+            crate::builtins_ratings_geom_units::ed25519_keypair_simple(args),
+        )),
+        "ed25519_sign_simple" => Some(Ok(crate::builtins_ratings_geom_units::ed25519_sign_simple(
+            args,
+        ))),
+        "ed25519_verify_simple" => Some(Ok(
+            crate::builtins_ratings_geom_units::ed25519_verify_simple(args),
+        )),
         "erosion_2d" => Some(Ok(crate::builtins_ratings_geom_units::erosion_2d(args))),
         "exposure_value" => Some(Ok(crate::builtins_ratings_geom_units::exposure_value(args))),
         "field_of_view" => Some(Ok(crate::builtins_ratings_geom_units::field_of_view(args))),
-        "focal_length_35mm_equiv" => Some(Ok(crate::builtins_ratings_geom_units::focal_length_35mm_equiv(args))),
-        "glicko_rd_update" => Some(Ok(crate::builtins_ratings_geom_units::glicko_rd_update(args))),
-        "glicko_volatility" => Some(Ok(crate::builtins_ratings_geom_units::glicko_volatility(args))),
-        "graham_scan_hull" => Some(Ok(crate::builtins_ratings_geom_units::graham_scan_hull(args))),
+        "focal_length_35mm_equiv" => Some(Ok(
+            crate::builtins_ratings_geom_units::focal_length_35mm_equiv(args),
+        )),
+        "glicko_rd_update" => Some(Ok(crate::builtins_ratings_geom_units::glicko_rd_update(
+            args,
+        ))),
+        "glicko_volatility" => Some(Ok(crate::builtins_ratings_geom_units::glicko_volatility(
+            args,
+        ))),
+        "graham_scan_hull" => Some(Ok(crate::builtins_ratings_geom_units::graham_scan_hull(
+            args,
+        ))),
         "hu_moments" => Some(Ok(crate::builtins_ratings_geom_units::hu_moments(args))),
-        "hyperfocal_distance" => Some(Ok(crate::builtins_ratings_geom_units::hyperfocal_distance(args))),
-        "liang_barsky_clip" => Some(Ok(crate::builtins_ratings_geom_units::liang_barsky_clip(args))),
-        "minkowski_sum_2d" => Some(Ok(crate::builtins_ratings_geom_units::minkowski_sum_2d(args))),
+        "hyperfocal_distance" => Some(Ok(crate::builtins_ratings_geom_units::hyperfocal_distance(
+            args,
+        ))),
+        "liang_barsky_clip" => Some(Ok(crate::builtins_ratings_geom_units::liang_barsky_clip(
+            args,
+        ))),
+        "minkowski_sum_2d" => Some(Ok(crate::builtins_ratings_geom_units::minkowski_sum_2d(
+            args,
+        ))),
         "moment_image" => Some(Ok(crate::builtins_ratings_geom_units::moment_image(args))),
-        "morphological_gradient" => Some(Ok(crate::builtins_ratings_geom_units::morphological_gradient(args))),
+        "morphological_gradient" => Some(Ok(
+            crate::builtins_ratings_geom_units::morphological_gradient(args),
+        )),
         "opening_2d" => Some(Ok(crate::builtins_ratings_geom_units::opening_2d(args))),
-        "pagerank_tournament" => Some(Ok(crate::builtins_ratings_geom_units::pagerank_tournament(args))),
+        "pagerank_tournament" => Some(Ok(crate::builtins_ratings_geom_units::pagerank_tournament(
+            args,
+        ))),
         "polygon_offset" => Some(Ok(crate::builtins_ratings_geom_units::polygon_offset(args))),
-        "polygon_self_intersects" => Some(Ok(crate::builtins_ratings_geom_units::polygon_self_intersects(args))),
+        "polygon_self_intersects" => Some(Ok(
+            crate::builtins_ratings_geom_units::polygon_self_intersects(args),
+        )),
         "polygon_shrink" => Some(Ok(crate::builtins_ratings_geom_units::polygon_shrink(args))),
-        "polygon_simple_check" => Some(Ok(crate::builtins_ratings_geom_units::polygon_simple_check(args))),
-        "polygon_winding" => Some(Ok(crate::builtins_ratings_geom_units::polygon_winding(args))),
-        "prewitt_x_kernel" => Some(Ok(crate::builtins_ratings_geom_units::prewitt_x_kernel(args))),
-        "prewitt_y_kernel" => Some(Ok(crate::builtins_ratings_geom_units::prewitt_y_kernel(args))),
-        "ranking_average" => Some(Ok(crate::builtins_ratings_geom_units::ranking_average(args))),
-        "ranking_kendall_tau" => Some(Ok(crate::builtins_ratings_geom_units::ranking_kendall_tau(args))),
-        "ranking_spearman_rho" => Some(Ok(crate::builtins_ratings_geom_units::ranking_spearman_rho(args))),
-        "roberts_cross_kernel" => Some(Ok(crate::builtins_ratings_geom_units::roberts_cross_kernel(args))),
-        "rsa_keypair_simple" => Some(Ok(crate::builtins_ratings_geom_units::rsa_keypair_simple(args))),
-        "rsa_modular_exp" => Some(Ok(crate::builtins_ratings_geom_units::rsa_modular_exp(args))),
-        "scharr_x_kernel" => Some(Ok(crate::builtins_ratings_geom_units::scharr_x_kernel(args))),
-        "scharr_y_kernel" => Some(Ok(crate::builtins_ratings_geom_units::scharr_y_kernel(args))),
-        "schnorr_sign_simple" => Some(Ok(crate::builtins_ratings_geom_units::schnorr_sign_simple(args))),
-        "schnorr_verify_simple" => Some(Ok(crate::builtins_ratings_geom_units::schnorr_verify_simple(args))),
-        "shutter_speed_reciprocal" => Some(Ok(crate::builtins_ratings_geom_units::shutter_speed_reciprocal(args))),
-        "sobel_magnitude" => Some(Ok(crate::builtins_ratings_geom_units::sobel_magnitude(args))),
+        "polygon_simple_check" => Some(Ok(
+            crate::builtins_ratings_geom_units::polygon_simple_check(args),
+        )),
+        "polygon_winding" => Some(Ok(crate::builtins_ratings_geom_units::polygon_winding(
+            args,
+        ))),
+        "prewitt_x_kernel" => Some(Ok(crate::builtins_ratings_geom_units::prewitt_x_kernel(
+            args,
+        ))),
+        "prewitt_y_kernel" => Some(Ok(crate::builtins_ratings_geom_units::prewitt_y_kernel(
+            args,
+        ))),
+        "ranking_average" => Some(Ok(crate::builtins_ratings_geom_units::ranking_average(
+            args,
+        ))),
+        "ranking_kendall_tau" => Some(Ok(crate::builtins_ratings_geom_units::ranking_kendall_tau(
+            args,
+        ))),
+        "ranking_spearman_rho" => Some(Ok(
+            crate::builtins_ratings_geom_units::ranking_spearman_rho(args),
+        )),
+        "roberts_cross_kernel" => Some(Ok(
+            crate::builtins_ratings_geom_units::roberts_cross_kernel(args),
+        )),
+        "rsa_keypair_simple" => Some(Ok(crate::builtins_ratings_geom_units::rsa_keypair_simple(
+            args,
+        ))),
+        "rsa_modular_exp" => Some(Ok(crate::builtins_ratings_geom_units::rsa_modular_exp(
+            args,
+        ))),
+        "scharr_x_kernel" => Some(Ok(crate::builtins_ratings_geom_units::scharr_x_kernel(
+            args,
+        ))),
+        "scharr_y_kernel" => Some(Ok(crate::builtins_ratings_geom_units::scharr_y_kernel(
+            args,
+        ))),
+        "schnorr_sign_simple" => Some(Ok(crate::builtins_ratings_geom_units::schnorr_sign_simple(
+            args,
+        ))),
+        "schnorr_verify_simple" => Some(Ok(
+            crate::builtins_ratings_geom_units::schnorr_verify_simple(args),
+        )),
+        "shutter_speed_reciprocal" => Some(Ok(
+            crate::builtins_ratings_geom_units::shutter_speed_reciprocal(args),
+        )),
+        "sobel_magnitude" => Some(Ok(crate::builtins_ratings_geom_units::sobel_magnitude(
+            args,
+        ))),
         "sunny_16_rule" => Some(Ok(crate::builtins_ratings_geom_units::sunny_16_rule(args))),
         "swiss_pairing" => Some(Ok(crate::builtins_ratings_geom_units::swiss_pairing(args))),
-        "top_hat_transform" => Some(Ok(crate::builtins_ratings_geom_units::top_hat_transform(args))),
-        "tournament_score" => Some(Ok(crate::builtins_ratings_geom_units::tournament_score(args))),
-        "trueskill_simple" => Some(Ok(crate::builtins_ratings_geom_units::trueskill_simple(args))),
+        "top_hat_transform" => Some(Ok(crate::builtins_ratings_geom_units::top_hat_transform(
+            args,
+        ))),
+        "tournament_score" => Some(Ok(crate::builtins_ratings_geom_units::tournament_score(
+            args,
+        ))),
+        "trueskill_simple" => Some(Ok(crate::builtins_ratings_geom_units::trueskill_simple(
+            args,
+        ))),
         "unit_energy" => Some(Ok(crate::builtins_ratings_geom_units::unit_energy(args))),
         "unit_pressure" => Some(Ok(crate::builtins_ratings_geom_units::unit_pressure(args))),
-        "unit_temperature" => Some(Ok(crate::builtins_ratings_geom_units::unit_temperature(args))),
-        "unit_volume_metric_to_us" => Some(Ok(crate::builtins_ratings_geom_units::unit_volume_metric_to_us(args))),
-        "unit_volume_us_to_metric" => Some(Ok(crate::builtins_ratings_geom_units::unit_volume_us_to_metric(args))),
-        "voronoi_cell_2d" => Some(Ok(crate::builtins_ratings_geom_units::voronoi_cell_2d(args))),
+        "unit_temperature" => Some(Ok(crate::builtins_ratings_geom_units::unit_temperature(
+            args,
+        ))),
+        "unit_volume_metric_to_us" => Some(Ok(
+            crate::builtins_ratings_geom_units::unit_volume_metric_to_us(args),
+        )),
+        "unit_volume_us_to_metric" => Some(Ok(
+            crate::builtins_ratings_geom_units::unit_volume_us_to_metric(args),
+        )),
+        "voronoi_cell_2d" => Some(Ok(crate::builtins_ratings_geom_units::voronoi_cell_2d(
+            args,
+        ))),
         "zernike_radial" => Some(Ok(crate::builtins_ratings_geom_units::zernike_radial(args))),
         "convex_hull_3d" => Some(Ok(crate::builtins_ratings_geom_units::convex_hull_3d(args))),
         "tokenize_bpe" => Some(Ok(crate::builtins_misc2::tokenize_bpe(args))),
@@ -3580,9 +4146,7 @@ pub(crate) fn try_builtin(
         "welford_mean" => Some(builtin_welford_mean(interp, args)),
         "welford_variance" | "welford_var" => Some(builtin_welford_variance(interp, args)),
         "welford_stddev" | "welford_sd" => Some(builtin_welford_stddev(interp, args)),
-        "welford_pop_variance" | "welford_pvar" => {
-            Some(builtin_welford_pop_variance(interp, args))
-        }
+        "welford_pop_variance" | "welford_pvar" => Some(builtin_welford_pop_variance(interp, args)),
         "token" => Some(builtin_token(args)),
         // ── URL/email parts ──
         "email_domain" => Some(builtin_email_domain(interp, args)),
@@ -4034,9 +4598,7 @@ pub(crate) fn try_builtin(
             Some(crate::sketches::builtin_bloom_filter(args, line))
         }
         "bloom_add" => Some(crate::sketches::builtin_bloom_add(args, line)),
-        "bloom_contains" | "bloom_has" => {
-            Some(crate::sketches::builtin_bloom_contains(args, line))
-        }
+        "bloom_contains" | "bloom_has" => Some(crate::sketches::builtin_bloom_contains(args, line)),
         "bloom_len" | "bloom_count" => Some(crate::sketches::builtin_bloom_len(args, line)),
         "bloom_clear" | "bloom_reset" => Some(crate::sketches::builtin_bloom_clear(args, line)),
         "bloom_merge" | "bloom_union" => Some(crate::sketches::builtin_bloom_merge(args, line)),
@@ -4057,9 +4619,7 @@ pub(crate) fn try_builtin(
         "hll_count" | "hll_estimate" | "hyperloglog_estimate" | "hyperloglog_pp_estimate" => {
             Some(crate::sketches::builtin_hll_count(args, line))
         }
-        "hll_merge" | "hyperloglog_merge" => {
-            Some(crate::sketches::builtin_hll_merge(args, line))
-        }
+        "hll_merge" | "hyperloglog_merge" => Some(crate::sketches::builtin_hll_merge(args, line)),
         "hll_clear" | "hll_reset" => Some(crate::sketches::builtin_hll_clear(args, line)),
         "hll_precision" => Some(crate::sketches::builtin_hll_precision(args, line)),
         "hll_serialize" | "hll_to_bytes" => {
@@ -4113,9 +4673,7 @@ pub(crate) fn try_builtin(
         "td_mean" => Some(crate::sketches::builtin_td_mean(args, line)),
         "td_merge" => Some(crate::sketches::builtin_td_merge(args, line)),
         "td_clear" | "td_reset" => Some(crate::sketches::builtin_td_clear(args, line)),
-        "td_serialize" | "td_to_bytes" => {
-            Some(crate::sketches::builtin_td_serialize(args, line))
-        }
+        "td_serialize" | "td_to_bytes" => Some(crate::sketches::builtin_td_serialize(args, line)),
         "td_deserialize" | "td_from_bytes" => {
             Some(crate::sketches::builtin_td_deserialize(args, line))
         }
@@ -4138,9 +4696,7 @@ pub(crate) fn try_builtin(
             Some(crate::sketches::builtin_rb_andnot(args, line))
         }
         "rb_clear" | "rb_reset" => Some(crate::sketches::builtin_rb_clear(args, line)),
-        "rb_serialize" | "rb_to_bytes" => {
-            Some(crate::sketches::builtin_rb_serialize(args, line))
-        }
+        "rb_serialize" | "rb_to_bytes" => Some(crate::sketches::builtin_rb_serialize(args, line)),
         "rb_deserialize" | "rb_from_bytes" => {
             Some(crate::sketches::builtin_rb_deserialize(args, line))
         }
@@ -11602,9 +12158,9 @@ fn jwt_hash_alg_opt(h: &StrykeValue, line: usize) -> StrykeResult<Option<String>
 
 /// `jwt_encode` — Jwt encode.
 fn builtin_jwt_encode(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let payload = args
-        .first()
-        .ok_or_else(|| StrykeError::runtime("jwt_encode: need PAYLOAD, SECRET [, alg => …]", line))?;
+    let payload = args.first().ok_or_else(|| {
+        StrykeError::runtime("jwt_encode: need PAYLOAD, SECRET [, alg => …]", line)
+    })?;
     let secret = args
         .get(1)
         .ok_or_else(|| StrykeError::runtime("jwt_encode: need SECRET", line))?;
@@ -12342,13 +12898,13 @@ fn builtin_http_request(args: &[StrykeValue], line: usize) -> StrykeResult<Stryk
 }
 
 /// `read_bytes` — Read bytes.
-fn builtin_read_bytes(interp: &VMHelper, args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let path = interp.resolve_stryke_path_string(
-        &args
-            .first()
-            .map(|v| v.to_string())
-            .unwrap_or_default(),
-    );
+fn builtin_read_bytes(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> StrykeResult<StrykeValue> {
+    let path =
+        interp.resolve_stryke_path_string(&args.first().map(|v| v.to_string()).unwrap_or_default());
     let b = crate::perl_fs::read_file_bytes(&path)
         .map_err(|e| StrykeError::runtime(format!("read_bytes: {}", e), line))?;
     Ok(StrykeValue::bytes(b))
@@ -12505,9 +13061,8 @@ fn builtin_ls(interp: &VMHelper, args: &[StrykeValue], line: usize) -> StrykeRes
             use std::fmt::Write as _;
             let _ = writeln!(&mut out, "{}:", dir.display());
         }
-        let meta = std::fs::metadata(dir).map_err(|e| {
-            StrykeError::runtime(format!("ls: {}: {e}", dir.display()), line)
-        })?;
+        let meta = std::fs::metadata(dir)
+            .map_err(|e| StrykeError::runtime(format!("ls: {}: {e}", dir.display()), line))?;
         if !meta.is_dir() {
             return Err(StrykeError::runtime(
                 format!("ls: not a directory: {}", dir.display()),
@@ -12543,7 +13098,7 @@ fn ls_rwx_triple(
 #[cfg(unix)]
 fn ls_unix_mode_string(meta: &std::fs::Metadata) -> String {
     use std::os::unix::fs::{FileTypeExt, MetadataExt};
-    let mode = meta.mode() as u32;
+    let mode = meta.mode();
     let ft = meta.file_type();
     let tc = if ft.is_symlink() {
         'l'
@@ -12590,9 +13145,13 @@ fn ls_unix_mode_string(meta: &std::fs::Metadata) -> String {
 }
 
 #[cfg(unix)]
-fn ls_l_one_line_unix(dir: &std::path::Path, name: &str, meta: &std::fs::Metadata) -> StrykeResult<String> {
-    use std::os::unix::fs::MetadataExt;
+fn ls_l_one_line_unix(
+    dir: &std::path::Path,
+    name: &str,
+    meta: &std::fs::Metadata,
+) -> StrykeResult<String> {
     use chrono::{Datelike, Local, TimeZone};
+    use std::os::unix::fs::MetadataExt;
     let mode_str = ls_unix_mode_string(meta);
     let nlink = meta.nlink();
     let uid = meta.uid();
@@ -12602,7 +13161,11 @@ fn ls_l_one_line_unix(dir: &std::path::Path, name: &str, meta: &std::fs::Metadat
         .modified()
         .ok()
         .and_then(|st| st.duration_since(std::time::UNIX_EPOCH).ok())
-        .and_then(|d| Local.timestamp_opt(d.as_secs() as i64, d.subsec_nanos() as u32).single())
+        .and_then(|d| {
+            Local
+                .timestamp_opt(d.as_secs() as i64, d.subsec_nanos())
+                .single()
+        })
         .map(|dt| {
             let now = Local::now();
             if dt.year() == now.year() {
@@ -12636,7 +13199,11 @@ fn ls_l_one_line_windows(name: &str, meta: &std::fs::Metadata) -> StrykeResult<S
         .modified()
         .ok()
         .and_then(|st| st.duration_since(std::time::UNIX_EPOCH).ok())
-        .and_then(|d| Local.timestamp_opt(d.as_secs() as i64, d.subsec_nanos() as u32).single())
+        .and_then(|d| {
+            Local
+                .timestamp_opt(d.as_secs() as i64, d.subsec_nanos() as u32)
+                .single()
+        })
         .map(|dt| {
             let now = Local::now();
             if dt.year() == now.year() {
@@ -12646,9 +13213,7 @@ fn ls_l_one_line_windows(name: &str, meta: &std::fs::Metadata) -> StrykeResult<S
             }
         })
         .unwrap_or_else(|| "?".repeat(12));
-    Ok(format!(
-        "{attrs:#010x} {tag:<5} {len:>10} {ts} {name}"
-    ))
+    Ok(format!("{attrs:#010x} {tag:<5} {len:>10} {ts} {name}"))
 }
 
 fn format_ls_long_dir(dir: &std::path::Path, line: usize) -> StrykeResult<String> {
@@ -12672,9 +13237,8 @@ fn format_ls_long_dir(dir: &std::path::Path, line: usize) -> StrykeResult<String
         for entry in &entries {
             let name = entry.file_name().to_string_lossy().into_owned();
             let full = dir.join(&name);
-            let sm = std::fs::symlink_metadata(&full).map_err(|e| {
-                StrykeError::runtime(format!("ls: {}: {e}", full.display()), line)
-            })?;
+            let sm = std::fs::symlink_metadata(&full)
+                .map_err(|e| StrykeError::runtime(format!("ls: {}: {e}", full.display()), line))?;
             sum_blocks = sum_blocks.saturating_add(sm.blocks());
             rows.push((sm, name));
         }
@@ -12690,9 +13254,8 @@ fn format_ls_long_dir(dir: &std::path::Path, line: usize) -> StrykeResult<String
         for entry in &entries {
             let name = entry.file_name().to_string_lossy().into_owned();
             let full = dir.join(&name);
-            let sm = std::fs::symlink_metadata(&full).map_err(|e| {
-                StrykeError::runtime(format!("ls: {}: {e}", full.display()), line)
-            })?;
+            let sm = std::fs::symlink_metadata(&full)
+                .map_err(|e| StrykeError::runtime(format!("ls: {}: {e}", full.display()), line))?;
             out_lines.push(ls_l_one_line_windows(&name, &sm)?);
         }
     }
@@ -13030,7 +13593,7 @@ fn builtin_docs(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
             .filter(|t| crate::lsp::doc_text_for(t).is_some())
             .map(|t| StrykeValue::string(t.to_string()))
             .collect();
-        out.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+        out.sort_by_key(|a| a.to_string());
         out.dedup_by(|a, b| a.to_string() == b.to_string());
         return Ok(StrykeValue::array_ref(Arc::new(RwLock::new(out))));
     }
@@ -13325,7 +13888,11 @@ fn stringify_escape(s: &str) -> String {
 }
 
 /// `input` — read all of stdin. `input $fh` / `input "path"` — read from filehandle or file.
-fn builtin_input(interp: &VMHelper, args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
+fn builtin_input(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> StrykeResult<StrykeValue> {
     use std::io::Read;
     if args.is_empty() {
         let mut buf = String::new();
@@ -13788,7 +14355,11 @@ fn builtin_avg(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 /// `xopen PATH` — open a file/URL with the system handler (`open` on macOS,
 /// `xdg-open` on Linux, `start` on Windows). Returns the path unchanged so
 /// it can sit in a pipeline: `... |> to_file("r.html") |> xopen`.
-fn builtin_xopen(interp: &VMHelper, args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
+fn builtin_xopen(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> StrykeResult<StrykeValue> {
     use std::process::Command;
     let path = first_arg_or_topic(interp, args).to_string();
     #[cfg(target_os = "macos")]
@@ -14662,7 +15233,11 @@ fn builtin_top(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 }
 
 /// `to_file PATH, STRING` — write string to file, returns the string for further piping.
-fn builtin_to_file(interp: &VMHelper, args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
+fn builtin_to_file(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> StrykeResult<StrykeValue> {
     if args.len() < 2 {
         return Err(StrykeError::runtime(
             "to_file: need PATH and content".to_string(),
@@ -16929,7 +17504,11 @@ fn builtin_color256(args: &[StrykeValue], fg: bool) -> StrykeResult<StrykeValue>
     Ok(StrykeValue::string(format!("\x1b[{};5;{}m", layer, n)))
 }
 
-fn builtin_ansi_wrap(interp: &VMHelper, args: &[StrykeValue], code: u8) -> StrykeResult<StrykeValue> {
+fn builtin_ansi_wrap(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    code: u8,
+) -> StrykeResult<StrykeValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(StrykeValue::string(format!("\x1b[{}m{}\x1b[0m", code, s)))
 }
@@ -20827,16 +21406,15 @@ fn builtin_ulid(_args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
             let mask = (1u128 << 80) - 1;
             let next = (g.1.wrapping_add(1)) & mask;
             if next == 0 {
-                let fresh = ((rand::random::<u64>() as u128) << 16)
-                    | (rand::random::<u16>() as u128);
+                let fresh =
+                    ((rand::random::<u64>() as u128) << 16) | (rand::random::<u16>() as u128);
                 g.1 = fresh & mask;
             } else {
                 g.1 = next;
             }
         } else {
             // New millisecond: draw a fresh 80-bit random.
-            let fresh = ((rand::random::<u64>() as u128) << 16)
-                | (rand::random::<u16>() as u128);
+            let fresh = ((rand::random::<u64>() as u128) << 16) | (rand::random::<u16>() as u128);
             g.0 = ms;
             g.1 = fresh & ((1u128 << 80) - 1);
         }
@@ -20953,7 +21531,11 @@ fn dir_stack() -> &'static parking_lot::Mutex<Vec<std::path::PathBuf>> {
 /// `pushd(DIR)` — save current cwd to the dir stack, then `chdir(DIR)`.
 /// Returns the new cwd path. Per stryke convention, also updates
 /// `stryke_pwd` via the same path the `cd` builtin uses.
-fn builtin_pushd(interp: &mut VMHelper, args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
+fn builtin_pushd(
+    interp: &mut VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> StrykeResult<StrykeValue> {
     let dir_arg = args.first().map(|v| v.to_string());
     let cur = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
     let target: std::path::PathBuf = match dir_arg {
@@ -20975,7 +21557,11 @@ fn builtin_pushd(interp: &mut VMHelper, args: &[StrykeValue], line: usize) -> St
 
 /// `popd` — pop the top entry off the dir stack and `chdir` to it.
 /// Returns the new cwd. Errors when the stack is empty.
-fn builtin_popd(interp: &mut VMHelper, _args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
+fn builtin_popd(
+    interp: &mut VMHelper,
+    _args: &[StrykeValue],
+    line: usize,
+) -> StrykeResult<StrykeValue> {
     let top = dir_stack().lock().pop();
     match top {
         Some(path) => swap_to_dir(interp, &path, line),
@@ -21112,7 +21698,11 @@ fn builtin_history(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
                 let take = (n as usize).min(h.len());
                 let start = h.len() - take;
                 Ok(StrykeValue::array(
-                    h[start..].iter().cloned().map(StrykeValue::string).collect(),
+                    h[start..]
+                        .iter()
+                        .cloned()
+                        .map(StrykeValue::string)
+                        .collect(),
                 ))
             }
         }
@@ -21269,8 +21859,7 @@ fn builtin_source(
     match crate::perl_fs::read_file_text_perl_compat(&resolved) {
         Ok(code) => {
             let code = crate::data_section::strip_perl_end_marker(&code);
-            crate::parse_and_run_string_in_file(code, interp, &resolved)
-                .or(Ok(StrykeValue::UNDEF))
+            crate::parse_and_run_string_in_file(code, interp, &resolved).or(Ok(StrykeValue::UNDEF))
         }
         Err(e) => Err(StrykeError::runtime(
             format!("source: cannot read {}: {}", resolved, e),
@@ -21315,7 +21904,9 @@ fn builtin_mktemp(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue
     let (_f, persisted) = file
         .keep()
         .map_err(|e| StrykeError::runtime(format!("mktemp: persist: {e}"), line))?;
-    Ok(StrykeValue::string(persisted.to_string_lossy().into_owned()))
+    Ok(StrykeValue::string(
+        persisted.to_string_lossy().into_owned(),
+    ))
 }
 
 /// `mktempdir(PREFIX="stryke")` — create a fresh temp directory and
@@ -21353,7 +21944,9 @@ fn builtin_whereis(args: &[StrykeValue], _line: usize) -> StrykeResult<StrykeVal
             let candidate = dir.join(&name);
             if let Ok(m) = std::fs::metadata(&candidate) {
                 if m.is_file() {
-                    hits.push(StrykeValue::string(candidate.to_string_lossy().into_owned()));
+                    hits.push(StrykeValue::string(
+                        candidate.to_string_lossy().into_owned(),
+                    ));
                 }
             }
         }
@@ -21386,7 +21979,11 @@ fn builtin_whereis(args: &[StrykeValue], _line: usize) -> StrykeResult<StrykeVal
 fn builtin_nice(args: &[StrykeValue], _line: usize) -> StrykeResult<StrykeValue> {
     #[cfg(unix)]
     {
-        let prio = args.first().map(|v| v.to_int()).unwrap_or(10).clamp(-20, 19) as i32;
+        let prio = args
+            .first()
+            .map(|v| v.to_int())
+            .unwrap_or(10)
+            .clamp(-20, 19) as i32;
         let pid = unsafe { libc::getpid() };
         unsafe {
             // PRIO_PROCESS = 0
@@ -21428,7 +22025,11 @@ fn builtin_renice(args: &[StrykeValue], _line: usize) -> StrykeResult<StrykeValu
 /// `tree(PATH=".", max_depth=5)` — recursive directory listing with
 /// indentation. Returns a single multi-line string. Skips hidden
 /// entries (leading `.`) and respects `max_depth`.
-fn builtin_tree(interp: &VMHelper, args: &[StrykeValue], _line: usize) -> StrykeResult<StrykeValue> {
+fn builtin_tree(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    _line: usize,
+) -> StrykeResult<StrykeValue> {
     let root = args
         .first()
         .map(|v| v.to_string())
@@ -21456,11 +22057,7 @@ fn builtin_tree(interp: &VMHelper, args: &[StrykeValue], _line: usize) -> Stryke
         entries.sort_by_key(|e| e.file_name());
         let entries: Vec<_> = entries
             .into_iter()
-            .filter(|e| {
-                !e.file_name()
-                    .to_string_lossy()
-                    .starts_with('.')
-            })
+            .filter(|e| !e.file_name().to_string_lossy().starts_with('.'))
             .collect();
         let last_idx = entries.len().saturating_sub(1);
         for (i, entry) in entries.iter().enumerate() {
@@ -21555,7 +22152,10 @@ fn builtin_column(args: &[StrykeValue], _line: usize) -> StrykeResult<StrykeValu
     if items.is_empty() {
         return Ok(StrykeValue::string(String::new()));
     }
-    let term_cols = term_winsize().map(|(c, _)| c as usize).unwrap_or(80).max(20);
+    let term_cols = term_winsize()
+        .map(|(c, _)| c as usize)
+        .unwrap_or(80)
+        .max(20);
     let max_w = items.iter().map(|s| s.chars().count()).max().unwrap_or(1);
     let col_w = max_w + 2;
     let ncols = (term_cols / col_w).max(1);
@@ -21628,7 +22228,9 @@ fn builtin_openurl(args: &[StrykeValue], _line: usize) -> StrykeResult<StrykeVal
     let result = if cfg!(target_os = "macos") {
         std::process::Command::new("open").arg(&url).status()
     } else if cfg!(target_os = "windows") {
-        std::process::Command::new("cmd").args(["/c", "start", &url]).status()
+        std::process::Command::new("cmd")
+            .args(["/c", "start", &url])
+            .status()
     } else {
         std::process::Command::new("xdg-open").arg(&url).status()
     };
@@ -21686,8 +22288,14 @@ fn builtin_curl_post(args: &[StrykeValue], _line: usize) -> StrykeResult<StrykeV
 /// from/to-charsets pass STRING through unchanged.
 fn builtin_iconv(args: &[StrykeValue], _line: usize) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let from = args.get(1).map(|v| v.to_string().to_lowercase()).unwrap_or_default();
-    let to = args.get(2).map(|v| v.to_string().to_lowercase()).unwrap_or_default();
+    let from = args
+        .get(1)
+        .map(|v| v.to_string().to_lowercase())
+        .unwrap_or_default();
+    let to = args
+        .get(2)
+        .map(|v| v.to_string().to_lowercase())
+        .unwrap_or_default();
     // Normalise charset aliases.
     let norm = |c: &str| -> &'static str {
         match c {
@@ -21821,9 +22429,9 @@ fn builtin_is_ulid(interp: &VMHelper, args: &[StrykeValue]) -> StrykeResult<Stry
     if s.len() != 26 {
         return Ok(bool_iv(false));
     }
-    let ok = s.chars().all(|c| {
-        matches!(c, '0'..='9' | 'A'..='H' | 'J' | 'K' | 'M' | 'N' | 'P'..='T' | 'V'..='Z')
-    });
+    let ok = s.chars().all(
+        |c| matches!(c, '0'..='9' | 'A'..='H' | 'J' | 'K' | 'M' | 'N' | 'P'..='T' | 'V'..='Z'),
+    );
     Ok(bool_iv(ok))
 }
 
@@ -21950,7 +22558,10 @@ fn builtin_welford_stddev(interp: &VMHelper, args: &[StrykeValue]) -> StrykeResu
 
 /// `welford_pop_variance LIST` — population variance (n denominator),
 /// counterpart to `welford_variance` (sample, n-1).
-fn builtin_welford_pop_variance(_interp: &VMHelper, args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+fn builtin_welford_pop_variance(
+    _interp: &VMHelper,
+    args: &[StrykeValue],
+) -> StrykeResult<StrykeValue> {
     let xs = flatten_args(args);
     if xs.is_empty() {
         return Ok(StrykeValue::float(0.0));
@@ -22682,7 +23293,10 @@ fn builtin_constantly(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 /// `complement \&f` — returns a function that negates the boolean result of `f`.
 fn builtin_complement(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     if args.is_empty() {
-        return Err(StrykeError::runtime("complement: requires a function", line));
+        return Err(StrykeError::runtime(
+            "complement: requires a function",
+            line,
+        ));
     }
     let f = args[0].clone();
     if f.as_code_ref().is_none() {
@@ -30103,7 +30717,10 @@ fn builtin_power_set(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs = flatten_args(args);
     let n = xs.len();
     if n > 20 {
-        return Err(StrykeError::runtime("power_set: array too large (max 20)", 0));
+        return Err(StrykeError::runtime(
+            "power_set: array too large (max 20)",
+            0,
+        ));
     }
     let count = 1usize << n;
     let mut result = Vec::with_capacity(count);
@@ -33158,7 +33775,10 @@ fn builtin_string_sort(interp: &VMHelper, args: &[StrykeValue]) -> StrykeResult<
     Ok(StrykeValue::string(cs.into_iter().collect()))
 }
 /// `string_unique_chars` — String unique chars.
-fn builtin_string_unique_chars(interp: &VMHelper, args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+fn builtin_string_unique_chars(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+) -> StrykeResult<StrykeValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut seen = std::collections::HashSet::new();
     Ok(StrykeValue::string(
@@ -35111,7 +35731,9 @@ fn parse_xml_element(s: &str) -> StrykeResult<(StrykeValue, &str)> {
     let close_tag = format!("</{}>", tag_name);
     let content_start = tag_end + 1;
     let close_pos = find_matching_close_tag(&s[content_start..], &open_tag, &close_tag)
-        .ok_or_else(|| StrykeError::runtime(format!("Invalid XML: unclosed tag {}", tag_name), 0))?;
+        .ok_or_else(|| {
+            StrykeError::runtime(format!("Invalid XML: unclosed tag {}", tag_name), 0)
+        })?;
     let content = &s[content_start..content_start + close_pos];
     let rest = &s[content_start + close_pos + close_tag.len()..];
     let content = content.trim();
@@ -35516,7 +36138,11 @@ fn md_escape_into(buf: &mut String, s: &str) {
 ///   - Array of strings → one line per element
 ///   - Hashref → key-value table
 ///   - Array of hashrefs → tabular data
-fn builtin_to_pdf(interp: &VMHelper, args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
+fn builtin_to_pdf(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> StrykeResult<StrykeValue> {
     let content = first_arg_or_topic(interp, args);
     let path = args.get(1).map(|v| v.to_string());
 
@@ -35696,7 +36322,11 @@ fn builtin_xml_parse(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeVa
 
 /// `xpath EXPR, XML_STRING` — query XML with simple XPath-like expressions.
 /// Supports: `//tag`, `//tag[@attr]`, `//tag[@attr='val']`, `/root/child`.
-fn builtin_xpath(interp: &VMHelper, args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
+fn builtin_xpath(
+    interp: &VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> StrykeResult<StrykeValue> {
     let xpath_str = args.first().map(|v| v.to_string()).unwrap_or_default();
     let xml_str = if args.len() > 1 {
         args[1].to_string()
@@ -35820,17 +36450,17 @@ fn builtin_smtp_send(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeVa
         .map(|v| v.to_string())
         .ok_or_else(|| StrykeError::runtime("smtp_send: missing 'smtp_pass'", line))?;
 
-    let email = Message::builder()
-        .from(
-            from.parse()
-                .map_err(|e| StrykeError::runtime(format!("smtp_send: invalid from: {}", e), line))?,
-        )
-        .to(to
-            .parse()
-            .map_err(|e| StrykeError::runtime(format!("smtp_send: invalid to: {}", e), line))?)
-        .subject(subject)
-        .body(body)
-        .map_err(|e| StrykeError::runtime(format!("smtp_send: {}", e), line))?;
+    let email =
+        Message::builder()
+            .from(from.parse().map_err(|e| {
+                StrykeError::runtime(format!("smtp_send: invalid from: {}", e), line)
+            })?)
+            .to(to
+                .parse()
+                .map_err(|e| StrykeError::runtime(format!("smtp_send: invalid to: {}", e), line))?)
+            .subject(subject)
+            .body(body)
+            .map_err(|e| StrykeError::runtime(format!("smtp_send: {}", e), line))?;
 
     let creds = Credentials::new(user, pass);
     let mailer = SmtpTransport::starttls_relay(&host)
@@ -35992,12 +36622,14 @@ fn builtin_audio_convert(args: &[StrykeValue], line: usize) -> StrykeResult<Stry
             })?;
             let input = InterleavedPcm(&all_samples);
             let mut mp3_out = Vec::with_capacity(all_samples.len());
-            encoder
-                .encode_to_vec(input, &mut mp3_out)
-                .map_err(|e| StrykeError::runtime(format!("audio_convert: encode: {:?}", e), line))?;
+            encoder.encode_to_vec(input, &mut mp3_out).map_err(|e| {
+                StrykeError::runtime(format!("audio_convert: encode: {:?}", e), line)
+            })?;
             encoder
                 .flush_to_vec::<FlushNoGap>(&mut mp3_out)
-                .map_err(|e| StrykeError::runtime(format!("audio_convert: flush: {:?}", e), line))?;
+                .map_err(|e| {
+                    StrykeError::runtime(format!("audio_convert: flush: {:?}", e), line)
+                })?;
             std::fs::write(&output_path, &mp3_out)
                 .map_err(|e| StrykeError::runtime(format!("audio_convert: write: {}", e), line))?;
         }
@@ -36580,7 +37212,10 @@ fn builtin_read_lines(
 /// `append_file PATH, DATA` — append content to a file.
 fn builtin_append_file(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     if args.len() < 2 {
-        return Err(StrykeError::runtime("append_file needs PATH and DATA", line));
+        return Err(StrykeError::runtime(
+            "append_file needs PATH and DATA",
+            line,
+        ));
     }
     let path = args[0].to_string();
     let data = perl_scalar_as_bytes(&args[1]);
@@ -36644,7 +37279,10 @@ fn builtin_read_json(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeVa
 /// `write_json PATH, VALUE` — encode value as JSON and write to file.
 fn builtin_write_json(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     if args.len() < 2 {
-        return Err(StrykeError::runtime("write_json needs PATH and VALUE", line));
+        return Err(StrykeError::runtime(
+            "write_json needs PATH and VALUE",
+            line,
+        ));
     }
     let path = args[0].to_string();
     let val = &args[1];
@@ -37615,7 +38253,10 @@ unsafe fn errno_ptr() -> *mut libc::c_int {
 /// `getpriority` — Getpriority. Returns an integer.
 fn builtin_getpriority(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     if args.len() < 2 {
-        return Err(StrykeError::runtime("getpriority: need WHICH and WHO", line));
+        return Err(StrykeError::runtime(
+            "getpriority: need WHICH and WHO",
+            line,
+        ));
     }
     #[cfg(unix)]
     {
@@ -38905,11 +39546,18 @@ impl VMHelper {
 
     // ── socketpair(FH1, FH2, DOMAIN, TYPE, PROTOCOL) ──────────────────
     /// `socketpair` — Socketpair. Returns an integer.
-    fn builtin_socketpair(&mut self, args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
+    fn builtin_socketpair(
+        &mut self,
+        args: &[StrykeValue],
+        line: usize,
+    ) -> StrykeResult<StrykeValue> {
         #[cfg(unix)]
         {
             if args.len() < 5 {
-                return Err(StrykeError::runtime("socketpair: not enough arguments", line));
+                return Err(StrykeError::runtime(
+                    "socketpair: not enough arguments",
+                    line,
+                ));
             }
             let _fh1 = args[0].to_string();
             let _fh2 = args[1].to_string();
@@ -38932,7 +39580,11 @@ impl VMHelper {
 
     // ── formline(PICTURE, LIST) ────────────────────────────────────────
     /// `formline` — Formline.
-    fn builtin_formline(&mut self, args: &[StrykeValue], _line: usize) -> StrykeResult<StrykeValue> {
+    fn builtin_formline(
+        &mut self,
+        args: &[StrykeValue],
+        _line: usize,
+    ) -> StrykeResult<StrykeValue> {
         let picture = args.first().map(|v| v.to_string()).unwrap_or_default();
         let values: Vec<String> = args.iter().skip(1).map(|v| v.to_string()).collect();
         // Basic formline: substitute @<<< @>>> @||| fields with values
@@ -39462,12 +40114,12 @@ fn builtin_deep_merge(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeV
             line,
         ));
     }
-    let a = args[0]
-        .as_hash_ref()
-        .ok_or_else(|| StrykeError::runtime("deep_merge: first argument must be a hashref", line))?;
-    let b = args[1]
-        .as_hash_ref()
-        .ok_or_else(|| StrykeError::runtime("deep_merge: second argument must be a hashref", line))?;
+    let a = args[0].as_hash_ref().ok_or_else(|| {
+        StrykeError::runtime("deep_merge: first argument must be a hashref", line)
+    })?;
+    let b = args[1].as_hash_ref().ok_or_else(|| {
+        StrykeError::runtime("deep_merge: second argument must be a hashref", line)
+    })?;
     let merged = deep_merge_maps(&a.read(), &b.read());
     Ok(StrykeValue::hash_ref(Arc::new(RwLock::new(merged))))
 }

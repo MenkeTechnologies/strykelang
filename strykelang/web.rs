@@ -223,8 +223,9 @@ pub(crate) fn web_route(args: &[StrykeValue], line: usize) -> Result<StrykeValue
         ));
     }
     let (re_src, captures) = compile_pattern(&path);
-    let re = Regex::new(&re_src)
-        .map_err(|e| StrykeError::runtime(format!("web_route: bad pattern {}: {}", path, e), line))?;
+    let re = Regex::new(&re_src).map_err(|e| {
+        StrykeError::runtime(format!("web_route: bad pattern {}: {}", path, e), line)
+    })?;
     router().lock().routes.push(Route {
         verb,
         pattern: path,
@@ -824,7 +825,9 @@ pub(crate) fn web_load_locale(args: &[StrykeValue], line: usize) -> Result<Stryk
             v.as_hash_map()
                 .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         })
-        .ok_or_else(|| StrykeError::runtime("web_load_locale: second arg must be a hashref", line))?;
+        .ok_or_else(|| {
+            StrykeError::runtime("web_load_locale: second arg must be a hashref", line)
+        })?;
     let mut flat = IndexMap::new();
     for (k, v) in map {
         flat.insert(k, v.to_string());
@@ -2591,8 +2594,9 @@ impl VMHelper {
                 line,
             ));
         }
-        let listener = std::net::TcpListener::bind(format!("0.0.0.0:{}", port))
-            .map_err(|e| StrykeError::runtime(format!("web_boot_application: bind: {}", e), line))?;
+        let listener = std::net::TcpListener::bind(format!("0.0.0.0:{}", port)).map_err(|e| {
+            StrykeError::runtime(format!("web_boot_application: bind: {}", e), line)
+        })?;
         eprintln!("stryke web: serving on http://0.0.0.0:{}", port);
 
         for stream in listener.incoming() {

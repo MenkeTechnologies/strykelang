@@ -1,7 +1,9 @@
 //! Integration pins for combinations of the recently-landed features:
 //! `par` top-level + namespaced quote-op fns + arrow-hash compound-assign
-//! + keyword hash keys. These guard against regressions where one
-//! feature's parser/runtime path interacts badly with another's.
+//! + keyword hash keys.
+//!
+//! These guard against regressions where one feature's parser/runtime path
+//! interacts badly with another's.
 
 use crate::common::*;
 

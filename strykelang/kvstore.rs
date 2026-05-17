@@ -52,9 +52,7 @@ pub const KV_FORMAT_VERSION: u32 = 1;
 /// fields to break the cycle in the derive macro's bound generation.
 #[derive(Archive, RkyvDeserialize, RkyvSerialize, Debug, Clone)]
 #[archive(check_bytes)]
-#[archive(bound(
-    serialize = "__S: rkyv::ser::Serializer + rkyv::ser::ScratchSpace",
-))]
+#[archive(bound(serialize = "__S: rkyv::ser::Serializer + rkyv::ser::ScratchSpace",))]
 #[archive_attr(check_bytes(
     bound = "__C: rkyv::validation::ArchiveContext, <__C as rkyv::Fallible>::Error: std::error::Error"
 ))]
@@ -65,8 +63,16 @@ pub enum WireValue {
     Float(f64),
     Str(String),
     Bytes(Vec<u8>),
-    Array(#[omit_bounds] #[archive_attr(omit_bounds)] Vec<WireValue>),
-    Hash(#[omit_bounds] #[archive_attr(omit_bounds)] Vec<(String, WireValue)>),
+    Array(
+        #[omit_bounds]
+        #[archive_attr(omit_bounds)]
+        Vec<WireValue>,
+    ),
+    Hash(
+        #[omit_bounds]
+        #[archive_attr(omit_bounds)]
+        Vec<(String, WireValue)>,
+    ),
 }
 
 impl WireValue {
@@ -336,14 +342,38 @@ impl KvStore {
 
     pub fn stats(&self) -> Vec<(String, StrykeValue)> {
         vec![
-            ("path".into(), StrykeValue::string(self.path.display().to_string())),
-            ("entries".into(), StrykeValue::integer(self.root.entries.len() as i64)),
-            ("dirty".into(), StrykeValue::integer(if self.dirty { 1 } else { 0 })),
-            ("format_version".into(), StrykeValue::integer(self.root.header.format_version as i64)),
-            ("created_at_secs".into(), StrykeValue::integer(self.root.header.created_at_secs as i64)),
-            ("last_commit_secs".into(), StrykeValue::integer(self.root.header.last_commit_secs as i64)),
-            ("commit_count".into(), StrykeValue::integer(self.root.header.commit_count as i64)),
-            ("stryke_version".into(), StrykeValue::string(self.root.header.stryke_version.clone())),
+            (
+                "path".into(),
+                StrykeValue::string(self.path.display().to_string()),
+            ),
+            (
+                "entries".into(),
+                StrykeValue::integer(self.root.entries.len() as i64),
+            ),
+            (
+                "dirty".into(),
+                StrykeValue::integer(if self.dirty { 1 } else { 0 }),
+            ),
+            (
+                "format_version".into(),
+                StrykeValue::integer(self.root.header.format_version as i64),
+            ),
+            (
+                "created_at_secs".into(),
+                StrykeValue::integer(self.root.header.created_at_secs as i64),
+            ),
+            (
+                "last_commit_secs".into(),
+                StrykeValue::integer(self.root.header.last_commit_secs as i64),
+            ),
+            (
+                "commit_count".into(),
+                StrykeValue::integer(self.root.header.commit_count as i64),
+            ),
+            (
+                "stryke_version".into(),
+                StrykeValue::string(self.root.header.stryke_version.clone()),
+            ),
         ]
     }
 }
@@ -427,7 +457,11 @@ pub(crate) fn builtin_kv_del(args: &[StrykeValue], line: usize) -> StrykeResult<
 
 /// `kv_exists(store, key)` — 1 if key exists, 0 otherwise.
 pub(crate) fn builtin_kv_exists(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let s = store_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "kv_exists", line)?;
+    let s = store_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "kv_exists",
+        line,
+    )?;
     let k = key_arg(args.get(1).unwrap_or(&StrykeValue::UNDEF));
     let yes = s.lock().exists(&k);
     Ok(StrykeValue::integer(if yes { 1 } else { 0 }))
@@ -447,10 +481,7 @@ pub(crate) fn builtin_kv_keys(args: &[StrykeValue], line: usize) -> StrykeResult
 /// the Phase 2 wire transport ships streaming chunks.
 pub(crate) fn builtin_kv_scan(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     let s = store_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "kv_scan", line)?;
-    let prefix = args
-        .get(1)
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let prefix = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let g = s.lock();
     let mut pairs: Vec<(String, StrykeValue)> = g
         .root
@@ -465,10 +496,7 @@ pub(crate) fn builtin_kv_scan(args: &[StrykeValue], line: usize) -> StrykeResult
         .map(|(k, v)| {
             // Each pair is `[key, value]` as an arrayref so `$row->[0]` /
             // `$row->[1]` work directly.
-            StrykeValue::array_ref(Arc::new(RwLock::new(vec![
-                StrykeValue::string(k),
-                v,
-            ])))
+            StrykeValue::array_ref(Arc::new(RwLock::new(vec![StrykeValue::string(k), v])))
         })
         .collect();
     Ok(StrykeValue::array(arr))
@@ -483,7 +511,11 @@ pub(crate) fn builtin_kv_len(args: &[StrykeValue], line: usize) -> StrykeResult<
 
 /// `kv_commit(store)` — flush in-memory state to disk atomically.
 pub(crate) fn builtin_kv_commit(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let s = store_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "kv_commit", line)?;
+    let s = store_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "kv_commit",
+        line,
+    )?;
     s.lock()
         .commit()
         .map_err(|e| StrykeError::runtime(format!("kv_commit: {}", e.message), line))?;
@@ -494,13 +526,16 @@ pub(crate) fn builtin_kv_commit(args: &[StrykeValue], line: usize) -> StrykeResu
 /// all-or-nothing on the in-memory state. Caller invokes `kv_commit`
 /// afterwards for durability.
 pub(crate) fn builtin_kv_batch(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let s = store_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "kv_batch", line)?;
+    let s = store_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "kv_batch",
+        line,
+    )?;
     let ops_v = args
         .get(1)
         .ok_or_else(|| StrykeError::runtime("kv_batch: missing ops array", line))?;
-    let ops = as_any_array(ops_v).ok_or_else(|| {
-        StrykeError::runtime("kv_batch: ops must be an array of triples", line)
-    })?;
+    let ops = as_any_array(ops_v)
+        .ok_or_else(|| StrykeError::runtime("kv_batch: ops must be an array of triples", line))?;
 
     // Snapshot the entries map so we can roll back if any op rejects.
     let snapshot = s.lock().root.entries.clone();
@@ -510,28 +545,19 @@ pub(crate) fn builtin_kv_batch(args: &[StrykeValue], line: usize) -> StrykeResul
             let op_arr = as_any_array(op_v).ok_or_else(|| {
                 StrykeError::runtime(format!("kv_batch: op {} is not an array", i), line)
             })?;
-            let kind = op_arr
-                .first()
-                .map(|x| x.to_string())
-                .unwrap_or_default();
+            let kind = op_arr.first().map(|x| x.to_string()).unwrap_or_default();
             match kind.as_str() {
                 "put" => {
-                    let k = op_arr
-                        .get(1)
-                        .map(|v| v.to_string())
-                        .ok_or_else(|| {
-                            StrykeError::runtime(format!("kv_batch: op {}: put missing key", i), line)
-                        })?;
+                    let k = op_arr.get(1).map(|v| v.to_string()).ok_or_else(|| {
+                        StrykeError::runtime(format!("kv_batch: op {}: put missing key", i), line)
+                    })?;
                     let v = op_arr.get(2).cloned().unwrap_or(StrykeValue::UNDEF);
                     s.lock().put(k, WireValue::from_stryke(&v));
                 }
                 "del" => {
-                    let k = op_arr
-                        .get(1)
-                        .map(|v| v.to_string())
-                        .ok_or_else(|| {
-                            StrykeError::runtime(format!("kv_batch: op {}: del missing key", i), line)
-                        })?;
+                    let k = op_arr.get(1).map(|v| v.to_string()).ok_or_else(|| {
+                        StrykeError::runtime(format!("kv_batch: op {}: del missing key", i), line)
+                    })?;
                     s.lock().del(&k);
                 }
                 other => {
@@ -561,7 +587,11 @@ pub(crate) fn builtin_kv_batch(args: &[StrykeValue], line: usize) -> StrykeResul
 /// `kv_close(store)` — auto-commits if dirty, then no-op (the Arc drops
 /// on the last reference). Returns 1 always.
 pub(crate) fn builtin_kv_close(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let s = store_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "kv_close", line)?;
+    let s = store_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "kv_close",
+        line,
+    )?;
     let mut g = s.lock();
     if g.dirty {
         g.commit()
@@ -572,7 +602,11 @@ pub(crate) fn builtin_kv_close(args: &[StrykeValue], line: usize) -> StrykeResul
 
 /// `kv_stats(store)` — return a hash of store metadata.
 pub(crate) fn builtin_kv_stats(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let s = store_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "kv_stats", line)?;
+    let s = store_arg(
+        args.first().unwrap_or(&StrykeValue::UNDEF),
+        "kv_stats",
+        line,
+    )?;
     let pairs = s.lock().stats();
     let mut m: IndexMap<String, StrykeValue> = IndexMap::with_capacity(pairs.len());
     for (k, v) in pairs {

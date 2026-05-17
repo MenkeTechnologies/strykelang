@@ -23,7 +23,7 @@ pub fn render_doc(topic: &str, text: &str, colored: bool) -> String {
     } else {
         ("", "", "", "")
     };
-    let rule_len = topic.chars().count().max(20).min(76);
+    let rule_len = topic.chars().count().clamp(20, 76);
     let mut out = String::with_capacity(text.len() + 256);
     out.push_str(&format!("{c}{topic}{n}\n"));
     out.push_str(&format!("{d}{}{n}\n", "─".repeat(rule_len)));
