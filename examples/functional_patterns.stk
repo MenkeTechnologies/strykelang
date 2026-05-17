@@ -33,7 +33,7 @@ memoize(\&Demo::FuncPatterns::slow_lookup)
 # Hit each input twice; the second pass should be near-instant.
 my @inputs = (1, 2, 3, 4, 5, 1, 2, 3, 4, 5)
 my $start  = now_ns()
-my @res    = map { Demo::FuncPatterns::slow_lookup(_) } @inputs
+my @res    = map {Demo::FuncPatterns::slow_lookup} @inputs
 my $end    = now_ns()
 printf "  10 calls (5 unique) -> @res in %.2f ms\n", ($end - $start) / 1_000_000
 

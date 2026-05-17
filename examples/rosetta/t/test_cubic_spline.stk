@@ -67,7 +67,7 @@ assert_ok Rosetta::CubicSpline::approx($mid, 2.25, 0.5), "spline(1.5) ≈ 2.25"
 my $pi = atan2(0, -1)
 my @xs_sin
 for my $k (~> 0:8) { push @xs_sin, $k * $pi / 8 }
-my @ys_sin = map { sin(_0) } @xs_sin
+my @ys_sin = map {sin} @xs_sin
 my $sp_sin = Rosetta::CubicSpline::build(\@xs_sin, \@ys_sin)
 for my $t (0.1, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0) {
     my $v = Rosetta::CubicSpline::evaluate($sp_sin, $t)

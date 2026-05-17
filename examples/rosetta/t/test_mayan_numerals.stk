@@ -28,7 +28,7 @@ fn Rosetta::Mayan::digits_of($n) {
 
 fn Rosetta::Mayan::render($n) {
     my $d = Rosetta::Mayan::digits_of($n)
-    join("\n", map { Rosetta::Mayan::digit($_) } @$d)
+    join("\n", map {Rosetta::Mayan::digit} @$d)
 }
 
 fn Rosetta::Mayan::from_digits($digits) {

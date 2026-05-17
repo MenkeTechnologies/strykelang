@@ -10,7 +10,7 @@ fn Rosetta::Magic::constant($n) {
 }
 
 fn Rosetta::Magic::sequence($k) {
-    1:$k |> map { Rosetta::Magic::constant(_) }
+    1:$k |> map {Rosetta::Magic::constant}
 }
 
 # Direct values for n = 3..10

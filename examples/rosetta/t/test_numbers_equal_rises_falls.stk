@@ -17,7 +17,7 @@ fn Rosetta::RisesFalls::has_equal($n) {
 }
 
 fn Rosetta::RisesFalls::list_below($limit) {
-    1:$limit |> grep { Rosetta::RisesFalls::has_equal(_) }
+    1:$limit |> grep {Rosetta::RisesFalls::has_equal}
 }
 
 # Single digits are trivially equal (0 == 0)
@@ -48,7 +48,7 @@ assert_eq $seq[10], 22,   "a(11) = 22"
 121 |> Rosetta::RisesFalls::has_equal |> assert_eq(1, "pipe is(121)")
 
 # Complementary counts: in 100..999, total = 900; equal = quite a few
-my $eq_count = ~> 100:999 |> grep { Rosetta::RisesFalls::has_equal(_) } |> len
+my $eq_count = ~> 100:999 |> grep {Rosetta::RisesFalls::has_equal} |> len
 assert_ok $eq_count > 0, "some 3-digit numbers qualify"
 assert_ok $eq_count < 900, "but not all"
 

@@ -10,7 +10,7 @@ assert_ok !Exercism::Allergies::allergic_to("peanuts", 5),    "not allergic to p
 assert_ok  Exercism::Allergies::allergic_to("cats", 192),     "allergic to cats and something else"
 
 # list
-fn lst { join(",", @{Exercism::Allergies::list_allergies(_0)}) }
+fn lst { join(",", @{Exercism::Allergies::list_allergies}) }
 assert_eq lst(0),    "",                                                                "no allergies"
 assert_eq lst(1),    "eggs",                                                            "just eggs"
 assert_eq lst(2),    "peanuts",                                                         "just peanuts"

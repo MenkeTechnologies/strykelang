@@ -34,13 +34,13 @@ assert_eq Rosetta::PopCount::count(0b1010101010), 5, "popcount of alternating"
 
 # Evil and odious classification (rosetta task)
 # First 30 evil numbers: 0, 3, 5, 6, 9, 10, 12, 15, 17, 18, 20, 23, 24, 27, 29, 30, 33, …
-my @evil = ~> 0:35 |> grep { Rosetta::PopCount::is_evil(_) }
+my @evil = ~> 0:35 |> grep {Rosetta::PopCount::is_evil}
 assert_eq join(",", @evil[0:9]),
     "0,3,5,6,9,10,12,15,17,18",
     "first 10 evil numbers"
 
 # First 10 odious numbers: 1, 2, 4, 7, 8, 11, 13, 14, 16, 19, …
-my @odious = ~> 0:35 |> grep { Rosetta::PopCount::is_odious(_) }
+my @odious = ~> 0:35 |> grep {Rosetta::PopCount::is_odious}
 assert_eq join(",", @odious[0:9]),
     "1,2,4,7,8,11,13,14,16,19",
     "first 10 odious numbers"

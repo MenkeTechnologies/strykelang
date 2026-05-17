@@ -17,7 +17,7 @@ fn Rosetta::Fusc::fusc($n) {
 }
 
 fn Rosetta::Fusc::first_n($count) {
-    ~> 0:$count-1 map { Rosetta::Fusc::fusc(_) }
+    ~> 0:$count-1 map {Rosetta::Fusc::fusc}
 }
 
 # OEIS A002487: 0,1,1,2,1,3,2,3,1,4,3,5,2,5,3,4,1,...

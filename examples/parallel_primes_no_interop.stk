@@ -27,13 +27,13 @@ fn Primes::is_prime($n) {
 
 # Sequential baseline.
 my $t0 = now_ns()
-my @seq = grep { Primes::is_prime(_) } 2:$upper
+my @seq = grep {Primes::is_prime} 2:$upper
 my $seq_ms = (now_ns() - $t0) / 1_000_000
 
 # Parallel — `pmap` farms the predicate evaluations to rayon workers,
 # `pgrep` filters in parallel.
 my $t1 = now_ns()
-my @par = pgrep { Primes::is_prime(_) } 2:$upper
+my @par = pgrep {Primes::is_prime} 2:$upper
 my $par_ms = (now_ns() - $t1) / 1_000_000
 
 # Verify the two agree (commutative + deterministic).

@@ -18,7 +18,7 @@ fn Rosetta::IPv4::valid($s) {
 
 fn Rosetta::IPv4::octets($s) {
     return undef unless Rosetta::IPv4::valid($s)
-    [map { int(_) } split(/\./, $s)]
+    [map {int} split(/\./, $s)]
 }
 
 # Valid

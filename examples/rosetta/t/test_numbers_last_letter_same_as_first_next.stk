@@ -81,7 +81,7 @@ assert_ok !Rosetta::NumbersLastFirst::check(2), "2 fails: two (o), three (t)"
 assert_ok !Rosetta::NumbersLastFirst::check(3), "3 fails: three (e), four (f)"
 
 # Using pipeline to find matches in 1..200
-my @matches = 1:200 |> grep { Rosetta::NumbersLastFirst::check(_) }
+my @matches = 1:200 |> grep {Rosetta::NumbersLastFirst::check}
 assert_eq len(@matches), 17, "Found 17 matches in 1:200"
 
 test_run

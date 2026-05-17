@@ -28,7 +28,7 @@ assert_eq Rosetta::Commatize::insert(-1234567),  "-1,234,567","negative"
 assert_eq Rosetta::Commatize::insert(1234.567),  "1,234.567", "decimal"
 
 # pipeline of formatting
-my @fmts = (1234, 56, 9876543, 100) |> map { Rosetta::Commatize::insert(_) }
+my @fmts = (1234, 56, 9876543, 100) |> map {Rosetta::Commatize::insert}
 assert_eq join(";", @fmts), "1,234;56;9,876,543;100", "map commatize"
 
 test_run
