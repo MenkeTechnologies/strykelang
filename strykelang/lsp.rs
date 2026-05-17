@@ -56,8 +56,15 @@ pub(crate) fn run_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync>
     let (conn, io_threads) = Connection::stdio();
 
     let (init_id, init_params) = conn.initialize_start()?;
-    let _: lsp_types::InitializeParams = serde_json::from_value(init_params).unwrap_or_default();
+    let init_typed: lsp_types::InitializeParams =
+        serde_json::from_value(init_params).unwrap_or_default();
     crate::slog_info!("lsp", "initialize received id={init_id}");
+    let workspace_files = scan_workspace_from_init(&init_typed);
+    crate::slog_info!(
+        "lsp.workspace",
+        "scanned {} file(s) from workspace roots",
+        workspace_files.len()
+    );
 
     let caps = ServerCapabilities {
         text_document_sync: Some(TextDocumentSyncCapability::Options(
@@ -140,6 +147,14 @@ pub(crate) fn run_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync>
     crate::slog_info!("lsp", "initialize complete, entering message loop");
 
     let mut docs: HashMap<String, String> = HashMap::new();
+    // Workspace files are merged into the live docs map so cross-file
+    // rename / references picks them up even when the user never
+    // opened them in an editor tab. Subsequent `didOpen`/`didChange`
+    // overwrites the on-disk version with the live buffer, preserving
+    // unsaved edits.
+    for (uri, text) in workspace_files {
+        docs.insert(uri, text);
+    }
 
     for msg in &conn.receiver {
         match msg {
@@ -598,6 +613,138 @@ fn uri_to_path(uri: &Uri) -> String {
             .to_string();
     }
     s.to_string()
+}
+
+// ── Workspace scan (cross-file rename for unopened files) ───────────────
+//
+// Symmetric with zshrs's `scan_workspace_root`. On `initialize`, walk
+// every `rootUri` / `workspaceFolders` entry, read every `.stk` (and any
+// user-configured extension equivalents) into a map keyed by file://
+// URI, and merge into the LSP `docs` map. Lets `rename` /
+// `documentHighlight` see files the user never opened in an editor tab.
+
+const STK_EXT: &[&str] = &["stk"];
+const STK_SKIP_DIRS: &[&str] = &[
+    ".git",
+    ".hg",
+    ".svn",
+    "node_modules",
+    "target",
+    "build",
+    "dist",
+    ".idea",
+    ".vscode",
+    ".cache",
+    ".direnv",
+    ".venv",
+    "venv",
+    "__pycache__",
+];
+const STK_MAX_FILES: usize = 10_000;
+const STK_MAX_FILE_BYTES: u64 = 2 * 1024 * 1024;
+
+fn is_stryke_source_filename(name: &str) -> bool {
+    name.rsplit('.')
+        .next()
+        .filter(|ext| *ext != name)
+        .map(|ext| STK_EXT.contains(&ext))
+        .unwrap_or(false)
+}
+
+fn stk_path_to_uri(p: &std::path::Path) -> Option<String> {
+    let abs = if p.is_absolute() {
+        p.to_path_buf()
+    } else {
+        std::env::current_dir().ok()?.join(p)
+    };
+    Some(format!("file://{}", abs.to_str()?))
+}
+
+fn stk_uri_to_path(uri: &str) -> Option<std::path::PathBuf> {
+    uri.strip_prefix("file://").map(std::path::PathBuf::from)
+}
+
+fn scan_stryke_workspace_root(root: &std::path::Path, out: &mut HashMap<String, String>) {
+    let mut stack: Vec<std::path::PathBuf> = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        if out.len() >= STK_MAX_FILES {
+            crate::slog_warn!(
+                "lsp.workspace",
+                "scan capped at {} files",
+                STK_MAX_FILES
+            );
+            return;
+        }
+        let entries = match std::fs::read_dir(&dir) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        for ent in entries.flatten() {
+            let path = ent.path();
+            let name = match path.file_name().and_then(|n| n.to_str()) {
+                Some(n) => n,
+                None => continue,
+            };
+            let ty = match ent.file_type() {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+            if ty.is_dir() {
+                if STK_SKIP_DIRS.contains(&name) || name.starts_with('.') {
+                    continue;
+                }
+                stack.push(path);
+                continue;
+            }
+            if !ty.is_file() || !is_stryke_source_filename(name) {
+                continue;
+            }
+            let md = match ent.metadata() {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            if md.len() > STK_MAX_FILE_BYTES {
+                continue;
+            }
+            if let Ok(text) = std::fs::read_to_string(&path) {
+                if let Some(uri) = stk_path_to_uri(&path) {
+                    out.insert(uri, text);
+                    if out.len() >= STK_MAX_FILES {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Walk every root from `init.rootUri` / `init.workspace_folders` and
+/// return a map of `file://` URI → file text. Best-effort: filesystem
+/// errors are silently skipped so a partially-readable project still
+/// gets the files it can.
+fn scan_workspace_from_init(init: &lsp_types::InitializeParams) -> HashMap<String, String> {
+    let mut roots: Vec<std::path::PathBuf> = Vec::new();
+    #[allow(deprecated)]
+    if let Some(uri) = init.root_uri.as_ref() {
+        if let Some(p) = stk_uri_to_path(uri.as_str()) {
+            roots.push(p);
+        }
+    }
+    if let Some(folders) = init.workspace_folders.as_ref() {
+        for f in folders {
+            if let Some(p) = stk_uri_to_path(f.uri.as_str()) {
+                roots.push(p);
+            }
+        }
+    }
+    // Dedupe.
+    let mut seen = std::collections::HashSet::new();
+    roots.retain(|p| seen.insert(p.clone()));
+    let mut out: HashMap<String, String> = HashMap::new();
+    for r in &roots {
+        scan_stryke_workspace_root(r, &mut out);
+    }
+    out
 }
 
 fn publish_diagnostics(
@@ -9220,6 +9367,55 @@ mod rename_hover_tests {
         let edit = rename(text, 0, 4, "$bar").expect("rename returns edits");
         let edits = edit.changes.unwrap().into_iter().next().unwrap().1;
         assert!(edits.iter().all(|e| e.new_text == "$bar"));
+    }
+
+    #[test]
+    fn workspace_scan_picks_up_unopened_stk_files_and_skips_excluded_dirs() {
+        // Lay out a temp project with one `.stk` at the root, one in a
+        // subdir, plus one each inside `.git`, `node_modules`, `target`.
+        // The scan must read the first two and skip the rest.
+        let tmp = std::env::temp_dir().join(format!(
+            "stk-ws-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        std::fs::create_dir_all(tmp.join("sub")).unwrap();
+        std::fs::create_dir_all(tmp.join(".git")).unwrap();
+        std::fs::create_dir_all(tmp.join("node_modules")).unwrap();
+        std::fs::create_dir_all(tmp.join("target")).unwrap();
+        std::fs::write(tmp.join("main.stk"), "fn greet { p \"hi\" }\n").unwrap();
+        std::fs::write(tmp.join("sub").join("lib.stk"), "fn salute { p \"hi\" }\n").unwrap();
+        std::fs::write(tmp.join(".git").join("skip.stk"), "fn nope {}\n").unwrap();
+        std::fs::write(tmp.join("node_modules").join("skip.stk"), "fn nope {}\n").unwrap();
+        std::fs::write(tmp.join("target").join("skip.stk"), "fn nope {}\n").unwrap();
+        // Other file types ignored.
+        std::fs::write(tmp.join("readme.md"), "not stk\n").unwrap();
+
+        let mut out: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        super::scan_stryke_workspace_root(&tmp, &mut out);
+        assert_eq!(out.len(), 2, "two .stk files picked up: {:?}", out.keys().collect::<Vec<_>>());
+        assert!(out.keys().any(|k| k.ends_with("/main.stk")));
+        assert!(out.keys().any(|k| k.ends_with("/lib.stk")));
+        // Excluded dirs must contribute nothing.
+        for k in out.keys() {
+            assert!(
+                !k.contains("/.git/") && !k.contains("/node_modules/") && !k.contains("/target/"),
+                "no excluded-dir file leaked into scan: {k}",
+            );
+        }
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn is_stryke_source_filename_basic() {
+        use super::is_stryke_source_filename;
+        assert!(is_stryke_source_filename("foo.stk"));
+        assert!(!is_stryke_source_filename("foo.rs"));
+        assert!(!is_stryke_source_filename("foo"));
+        assert!(!is_stryke_source_filename(".gitignore"));
     }
 
     #[test]
