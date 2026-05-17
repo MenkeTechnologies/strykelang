@@ -23,7 +23,7 @@ use caseless::default_case_fold_str;
 use crate::ast::*;
 use crate::builtins::PerlSocket;
 use crate::crypt_util::perl_crypt;
-use crate::error::{ErrorKind, PerlError, PerlResult};
+use crate::error::{ErrorKind, StrykeError, PerlResult};
 use crate::mro::linearize_c3;
 use crate::perl_decode::decode_utf8_or_latin1;
 use crate::perl_fs::read_file_text_perl_compat;
@@ -182,11 +182,11 @@ pub(crate) type ExecResult = Result<StrykeValue, FlowOrError>;
 #[derive(Debug)]
 pub(crate) enum FlowOrError {
     Flow(Flow),
-    Error(PerlError),
+    Error(StrykeError),
 }
 
-impl From<PerlError> for FlowOrError {
-    fn from(e: PerlError) -> Self {
+impl From<StrykeError> for FlowOrError {
+    fn from(e: StrykeError) -> Self {
         FlowOrError::Error(e)
     }
 }
@@ -2015,11 +2015,11 @@ impl VMHelper {
         match name {
             "puniq" => {
                 let (list_src, show_prog) = match args.len() {
-                    0 => return Err(PerlError::runtime("puniq: expected LIST", line)),
+                    0 => return Err(StrykeError::runtime("puniq: expected LIST", line)),
                     1 => (&args[0], false),
                     2 => (&args[0], args[1].is_true()),
                     _ => {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             "puniq: expected LIST [, progress => EXPR]",
                             line,
                         ));
@@ -2041,14 +2041,14 @@ impl VMHelper {
                     2 => (&args[0], &args[1], false),
                     3 => (&args[0], &args[1], args[2].is_true()),
                     _ => {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             "pfirst: expected BLOCK, LIST [, progress => EXPR]",
                             line,
                         ));
                     }
                 };
                 let Some(sub) = code_val.as_code_ref() else {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "pfirst: first argument must be a code reference",
                         line,
                     ));
@@ -2084,14 +2084,14 @@ impl VMHelper {
                     2 => (&args[0], &args[1], false),
                     3 => (&args[0], &args[1], args[2].is_true()),
                     _ => {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             "pany: expected BLOCK, LIST [, progress => EXPR]",
                             line,
                         ));
                     }
                 };
                 let Some(sub) = code_val.as_code_ref() else {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "pany: first argument must be a code reference",
                         line,
                     ));
@@ -2119,7 +2119,7 @@ impl VMHelper {
                 pmap_progress.finish();
                 Ok(StrykeValue::integer(if b { 1 } else { 0 }))
             }
-            _ => Err(PerlError::runtime(
+            _ => Err(StrykeError::runtime(
                 format!("internal: unknown par_list builtin {name}"),
                 line,
             )),
@@ -2203,7 +2203,7 @@ impl VMHelper {
         self.eval_error_value = None;
     }
 
-    pub(crate) fn set_eval_error_from_perl_error(&mut self, e: &PerlError) {
+    pub(crate) fn set_eval_error_from_perl_error(&mut self, e: &StrykeError) {
         self.eval_error = e.to_string();
         self.eval_error_code = if self.eval_error.is_empty() { 0 } else { 1 };
         self.eval_error_value = e.die_value.clone();
@@ -2288,14 +2288,14 @@ impl VMHelper {
             0 => "TIESCALAR",
             1 => "TIEARRAY",
             2 => "TIEHASH",
-            _ => return Err(PerlError::runtime("tie: invalid target kind", line)),
+            _ => return Err(StrykeError::runtime("tie: invalid target kind", line)),
         };
         let tie_fn = format!("{}::{}", pkg, tie_ctor);
         let sub = self
             .subs
             .get(&tie_fn)
             .cloned()
-            .ok_or_else(|| PerlError::runtime(format!("tie: cannot find &{}", tie_fn), line))?;
+            .ok_or_else(|| StrykeError::runtime(format!("tie: cannot find &{}", tie_fn), line))?;
         let mut call_args = vec![StrykeValue::string(pkg.clone())];
         call_args.extend(it);
         let obj = match self.call_sub(&sub, call_args, WantarrayCtx::Scalar, line) {
@@ -2314,7 +2314,7 @@ impl VMHelper {
             2 => {
                 self.tied_hashes.insert(target_name.to_string(), obj);
             }
-            _ => return Err(PerlError::runtime("tie: invalid target kind", line)),
+            _ => return Err(StrykeError::runtime("tie: invalid target kind", line)),
         }
         Ok(StrykeValue::UNDEF)
     }
@@ -2495,7 +2495,7 @@ impl VMHelper {
     ) -> PerlResult<()> {
         let old = self.glob_handle_alias.remove(lhs);
         let Some(frame) = self.glob_restore_frames.last_mut() else {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "internal: no glob restore frame for local *GLOB",
                 line,
             ));
@@ -2873,7 +2873,7 @@ impl VMHelper {
             if let Some(hm) = data.as_hash_map() {
                 return Ok(hm.contains_key(key));
             }
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "exists argument is not a HASH reference",
                 line,
             ));
@@ -2905,12 +2905,12 @@ impl VMHelper {
                 *data = StrykeValue::hash(map);
                 return Ok(v);
             }
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "delete argument is not a HASH reference",
                 line,
             ));
         }
-        Err(PerlError::runtime(
+        Err(StrykeError::runtime(
             "delete argument is not a HASH reference",
             line,
         ))
@@ -2959,7 +2959,7 @@ impl VMHelper {
             arr[i] = StrykeValue::UNDEF;
             return Ok(old);
         }
-        Err(PerlError::runtime(
+        Err(StrykeError::runtime(
             "delete argument is not an ARRAY reference",
             line,
         ))
@@ -3040,7 +3040,7 @@ impl VMHelper {
         {
             return Ok(());
         }
-        Err(PerlError::runtime(
+        Err(StrykeError::runtime(
             format!(
                 "Global symbol \"${}\" requires explicit package name (did you forget to declare \"my ${}\"?)",
                 name, name
@@ -3054,7 +3054,7 @@ impl VMHelper {
         if !self.strict_vars || name.contains("::") || self.scope.array_binding_exists(name) {
             return Ok(());
         }
-        Err(PerlError::runtime(
+        Err(StrykeError::runtime(
             format!(
                 "Global symbol \"@{}\" requires explicit package name (did you forget to declare \"my @{}\"?)",
                 name, name
@@ -3073,7 +3073,7 @@ impl VMHelper {
         {
             return Ok(());
         }
-        Err(PerlError::runtime(
+        Err(StrykeError::runtime(
             format!(
                 "Global symbol \"%{}\" requires explicit package name (did you forget to declare \"my %{}\"?)",
                 name, name
@@ -3236,7 +3236,7 @@ impl VMHelper {
     fn import_named_sub(&mut self, module: &str, short: &str, line: usize) -> PerlResult<()> {
         let qual = format!("{}::{}", module, short);
         let sub = self.subs.get(&qual).cloned().ok_or_else(|| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 format!(
                     "`{}` is not defined in module `{}` (expected `{}`)",
                     short, module, qual
@@ -3258,7 +3258,7 @@ impl VMHelper {
                 .chain(lists.export_ok.iter().map(|s| s.as_str()))
                 .collect();
             if !allowed.contains(export) {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "`{}` is not exported by `{}` (not in @EXPORT or @EXPORT_OK)",
                         export, module
@@ -3371,7 +3371,7 @@ impl VMHelper {
                                 s.push_str(v);
                             }
                             _ => {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     "pragma import must be a compile-time string, qw(), or integer",
                                     e.line.max(default_line),
                                 ));
@@ -3381,7 +3381,7 @@ impl VMHelper {
                     out.push(s);
                 }
                 _ => {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "pragma import must be a compile-time string, qw(), or integer",
                         e.line.max(default_line),
                     ));
@@ -3405,7 +3405,7 @@ impl VMHelper {
                 "subs" => self.strict_subs = true,
                 "vars" => self.strict_vars = true,
                 _ => {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("Unknown strict mode `{}`", name),
                         line,
                     ));
@@ -3429,7 +3429,7 @@ impl VMHelper {
                 "subs" => self.strict_subs = false,
                 "vars" => self.strict_vars = false,
                 _ => {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("Unknown strict mode `{}`", name),
                         line,
                     ));
@@ -3442,7 +3442,7 @@ impl VMHelper {
     fn apply_use_feature(&mut self, imports: &[Expr], line: usize) -> PerlResult<()> {
         let items = Self::pragma_import_strings(imports, line)?;
         if items.is_empty() {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "use feature requires a feature name or bundle (e.g. qw(say) or :5.10)",
                 line,
             ));
@@ -3485,7 +3485,7 @@ impl VMHelper {
                 self.feature_bits |= FEAT_SAY | FEAT_SWITCH | FEAT_STATE | FEAT_UNICODE_STRINGS;
             }
             _ => {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!("unsupported feature bundle :{}", key),
                     line,
                 ));
@@ -3533,7 +3533,7 @@ impl VMHelper {
             | "class"
             | "array_base" => return Ok(()),
             _ => {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!("unknown feature `{}`", name),
                     line,
                 ));
@@ -3551,7 +3551,7 @@ impl VMHelper {
     pub(crate) fn require_execute(&mut self, spec: &str, line: usize) -> PerlResult<StrykeValue> {
         let t = spec.trim();
         if t.is_empty() {
-            return Err(PerlError::runtime("require: empty argument", line));
+            return Err(StrykeError::runtime("require: empty argument", line));
         }
         match t {
             "strict" => {
@@ -3607,7 +3607,7 @@ impl VMHelper {
             Ok(_) => Ok(()),
             Err(FlowOrError::Error(e)) => Err(e),
             Err(FlowOrError::Flow(Flow::Return(_))) => Ok(()),
-            Err(FlowOrError::Flow(other)) => Err(PerlError::runtime(
+            Err(FlowOrError::Flow(other)) => Err(StrykeError::runtime(
                 format!(
                     "require hook {:?} returned unexpected control flow: {:?}",
                     key, other
@@ -3625,7 +3625,7 @@ impl VMHelper {
         }
         self.invoke_require_hook("require__before", &key, line)?;
         let code = read_file_text_perl_compat(&canon).map_err(|e| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 format!("Can't open {} for reading: {}", canon.display(), e),
                 line,
             )
@@ -3643,7 +3643,7 @@ impl VMHelper {
 
     fn require_relative_path(&mut self, path: &Path, line: usize) -> PerlResult<StrykeValue> {
         if !path.exists() {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!(
                     "Can't locate {} (relative path does not exist)",
                     path.display()
@@ -3667,7 +3667,7 @@ impl VMHelper {
         // Resolution".
         if let Some(found) = Self::try_resolve_via_lockfile(relpath) {
             let code = read_file_text_perl_compat(&found).map_err(|e| {
-                PerlError::runtime(
+                StrykeError::runtime(
                     format!("Can't open {} for reading: {}", found.display(), e),
                     line,
                 )
@@ -3705,7 +3705,7 @@ impl VMHelper {
             let full = Path::new(&dir).join(relpath);
             if full.is_file() {
                 let code = read_file_text_perl_compat(&full).map_err(|e| {
-                    PerlError::runtime(
+                    StrykeError::runtime(
                         format!("Can't open {} for reading: {}", full.display(), e),
                         line,
                     )
@@ -3723,7 +3723,7 @@ impl VMHelper {
                 return Ok(StrykeValue::integer(1));
             }
         }
-        Err(PerlError::runtime(
+        Err(StrykeError::runtime(
             format!(
                 "Can't locate {} in @INC (push paths onto @INC or use -I DIR)",
                 relpath
@@ -3748,7 +3748,7 @@ impl VMHelper {
             "strict" => self.apply_use_strict(imports, line),
             "utf8" => {
                 if !imports.is_empty() {
-                    return Err(PerlError::runtime("use utf8 takes no arguments", line));
+                    return Err(StrykeError::runtime("use utf8 takes no arguments", line));
                 }
                 self.utf8_pragma = true;
                 Ok(())
@@ -3806,7 +3806,7 @@ impl VMHelper {
             "strict" => self.apply_no_strict(imports, line),
             "utf8" => {
                 if !imports.is_empty() {
-                    return Err(PerlError::runtime("no utf8 takes no arguments", line));
+                    return Err(StrykeError::runtime("no utf8 takes no arguments", line));
                 }
                 self.utf8_pragma = false;
                 Ok(())
@@ -3892,7 +3892,7 @@ impl VMHelper {
             match &imp.kind {
                 ExprKind::List(items) => {
                     if items.len() % 2 != 0 {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             format!(
                                 "use constant: expected even-length list of NAME => VALUE pairs, got {}",
                                 items.len()
@@ -3905,7 +3905,7 @@ impl VMHelper {
                         let name = match &items[i].kind {
                             ExprKind::String(s) => s.clone(),
                             _ => {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     "use constant: constant name must be a string literal",
                                     line,
                                 ));
@@ -3915,7 +3915,7 @@ impl VMHelper {
                             Ok(v) => v,
                             Err(FlowOrError::Error(e)) => return Err(e),
                             Err(FlowOrError::Flow(_)) => {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     "use constant: unexpected control flow in initializer",
                                     line,
                                 ));
@@ -3926,7 +3926,7 @@ impl VMHelper {
                     }
                 }
                 _ => {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "use constant: expected list of NAME => VALUE pairs",
                         line,
                     ));
@@ -4043,7 +4043,7 @@ impl VMHelper {
                 line,
             });
         }
-        Err(PerlError::runtime(
+        Err(StrykeError::runtime(
             format!("use constant: unsupported value type ({v:?})"),
             line,
         ))
@@ -4215,12 +4215,12 @@ impl VMHelper {
                 cmd.stdout(Stdio::piped());
                 let mut child = cmd.spawn().map_err(|e| {
                     self.apply_io_error_to_errno(&e);
-                    PerlError::runtime(format!("Can't open pipe from command: {}", e), line)
+                    StrykeError::runtime(format!("Can't open pipe from command: {}", e), line)
                 })?;
                 let stdout = child
                     .stdout
                     .take()
-                    .ok_or_else(|| PerlError::runtime("pipe: child has no stdout", line))?;
+                    .ok_or_else(|| StrykeError::runtime("pipe: child has no stdout", line))?;
                 self.input_handles
                     .insert(handle_name.clone(), BufReader::new(Box::new(stdout)));
                 self.pipe_children.insert(handle_name, child);
@@ -4230,12 +4230,12 @@ impl VMHelper {
                 cmd.stdin(Stdio::piped());
                 let mut child = cmd.spawn().map_err(|e| {
                     self.apply_io_error_to_errno(&e);
-                    PerlError::runtime(format!("Can't open pipe to command: {}", e), line)
+                    StrykeError::runtime(format!("Can't open pipe to command: {}", e), line)
                 })?;
                 let stdin = child
                     .stdin
                     .take()
-                    .ok_or_else(|| PerlError::runtime("pipe: child has no stdin", line))?;
+                    .ok_or_else(|| StrykeError::runtime("pipe: child has no stdin", line))?;
                 self.output_handles
                     .insert(handle_name.clone(), Box::new(stdin));
                 self.pipe_children.insert(handle_name, child);
@@ -4293,7 +4293,7 @@ impl VMHelper {
                 );
             }
             _ => {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!("Unknown open mode '{}'", actual_mode),
                     line,
                 ));
@@ -4317,7 +4317,7 @@ impl VMHelper {
             ExprKind::CodeRef { .. } => {
                 let cr = self.eval_expr(key_spec)?;
                 let Some(sub) = cr.as_code_ref() else {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "group_by/chunk_by: first argument must be { BLOCK }",
                         line,
                     )
@@ -4407,7 +4407,7 @@ impl VMHelper {
             Ok(v) => Ok(v),
             Err(FlowOrError::Error(e)) => Err(e),
             Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),
-            Err(FlowOrError::Flow(_)) => Err(PerlError::runtime(
+            Err(FlowOrError::Flow(_)) => Err(StrykeError::runtime(
                 format!("{name}: unsupported control flow in block"),
                 line,
             )),
@@ -4422,11 +4422,11 @@ impl VMHelper {
     ) -> ExecResult {
         if args.is_empty() {
             return Err(
-                PerlError::runtime(format!("{name}: expected {{ BLOCK }}, LIST"), line).into(),
+                StrykeError::runtime(format!("{name}: expected {{ BLOCK }}, LIST"), line).into(),
             );
         }
         let Some(sub) = args[0].as_code_ref() else {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("{name}: first argument must be {{ BLOCK }}"),
                 line,
             )
@@ -4626,7 +4626,7 @@ impl VMHelper {
                 }
                 Ok(StrykeValue::hash_ref(Arc::new(RwLock::new(counts))))
             }
-            _ => Err(PerlError::runtime(
+            _ => Err(StrykeError::runtime(
                 format!("internal: unknown list block builtin `{name}`"),
                 line,
             )
@@ -4674,7 +4674,7 @@ impl VMHelper {
         line: usize,
     ) -> PerlResult<StrykeValue> {
         if args.len() < 3 {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "utime requires at least three arguments (atime, mtime, files...)",
                 line,
             ));
@@ -4689,7 +4689,7 @@ impl VMHelper {
         let n = crate::perl_fs::utime_paths(at, mt, &paths);
         #[cfg(not(unix))]
         if !paths.is_empty() && n == 0 {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "utime is not supported on this platform",
                 line,
             ));
@@ -4718,7 +4718,7 @@ impl VMHelper {
         #[cfg(not(unix))]
         {
             let _ = args;
-            Err(PerlError::runtime(
+            Err(StrykeError::runtime(
                 "umask is not supported on this platform",
                 line,
             ))
@@ -4732,7 +4732,7 @@ impl VMHelper {
         line: usize,
     ) -> PerlResult<StrykeValue> {
         if !args.is_empty() {
-            return Err(PerlError::runtime("getcwd takes no arguments", line));
+            return Err(StrykeError::runtime("getcwd takes no arguments", line));
         }
         match std::env::current_dir() {
             Ok(p) => Ok(StrykeValue::string(p.to_string_lossy().into_owned())),
@@ -4751,10 +4751,10 @@ impl VMHelper {
     ) -> PerlResult<StrykeValue> {
         let path = args
             .first()
-            .ok_or_else(|| PerlError::runtime("realpath: need path", line))?
+            .ok_or_else(|| StrykeError::runtime("realpath: need path", line))?
             .to_string();
         if path.is_empty() {
-            return Err(PerlError::runtime("realpath: need path", line));
+            return Err(StrykeError::runtime("realpath: need path", line));
         }
         let path = self.resolve_stryke_path_string(&path);
         match crate::perl_fs::realpath_resolved(&path) {
@@ -4773,7 +4773,7 @@ impl VMHelper {
         line: usize,
     ) -> PerlResult<StrykeValue> {
         if args.len() != 2 {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "pipe requires exactly two arguments",
                 line,
             ));
@@ -4786,7 +4786,7 @@ impl VMHelper {
             let read_name = args[0].to_string();
             let write_name = args[1].to_string();
             if read_name.is_empty() || write_name.is_empty() {
-                return Err(PerlError::runtime("pipe: invalid handle name", line));
+                return Err(StrykeError::runtime("pipe: invalid handle name", line));
             }
             let mut fds = [0i32; 2];
             if unsafe { libc::pipe(fds.as_mut_ptr()) } != 0 {
@@ -4820,7 +4820,7 @@ impl VMHelper {
         #[cfg(not(unix))]
         {
             let _ = args;
-            Err(PerlError::runtime(
+            Err(StrykeError::runtime(
                 "pipe is not supported on this platform",
                 line,
             ))
@@ -4869,7 +4869,7 @@ impl VMHelper {
                 let at_eof = !self.has_input_handle(&name);
                 Ok(StrykeValue::integer(if at_eof { 1 } else { 0 }))
             }
-            _ => Err(PerlError::runtime("eof: too many arguments", line)),
+            _ => Err(StrykeError::runtime("eof: too many arguments", line)),
         }
     }
 
@@ -5428,7 +5428,7 @@ impl VMHelper {
             .map_err(|e| match e {
                 FlowOrError::Error(err) => err,
                 FlowOrError::Flow(_) => {
-                    PerlError::runtime("unexpected flow in regex flip-flop", line)
+                    StrykeError::runtime("unexpected flow in regex flip-flop", line)
                 }
             })?;
         let right_re = self
@@ -5436,7 +5436,7 @@ impl VMHelper {
             .map_err(|e| match e {
                 FlowOrError::Error(err) => err,
                 FlowOrError::Flow(_) => {
-                    PerlError::runtime("unexpected flow in regex flip-flop", line)
+                    StrykeError::runtime("unexpected flow in regex flip-flop", line)
                 }
             })?;
         let left_m = left_re.is_match(&subject);
@@ -5471,7 +5471,7 @@ impl VMHelper {
             .map_err(|e| match e {
                 FlowOrError::Error(err) => err,
                 FlowOrError::Flow(_) => {
-                    PerlError::runtime("unexpected flow in regex flip-flop", line)
+                    StrykeError::runtime("unexpected flow in regex flip-flop", line)
                 }
             })?;
         let left_m = left_re.is_match(&subject);
@@ -5505,7 +5505,7 @@ impl VMHelper {
             .map_err(|e| match e {
                 FlowOrError::Error(err) => err,
                 FlowOrError::Flow(_) => {
-                    PerlError::runtime("unexpected flow in regex flip-flop", line)
+                    StrykeError::runtime("unexpected flow in regex flip-flop", line)
                 }
             })?;
         let left_m = left_re.is_match(&subject);
@@ -5542,7 +5542,7 @@ impl VMHelper {
             .map_err(|e| match e {
                 FlowOrError::Error(err) => err,
                 FlowOrError::Flow(_) => {
-                    PerlError::runtime("unexpected flow in regex/eof flip-flop", line)
+                    StrykeError::runtime("unexpected flow in regex/eof flip-flop", line)
                 }
             })?;
         let left_m = left_re.is_match(&subject);
@@ -5580,7 +5580,7 @@ impl VMHelper {
         } else if fh == "STDIN" {
             std::io::stdin().read(&mut buf).unwrap_or(0)
         } else {
-            return Err(PerlError::runtime(format!("read: unopened handle {}", fh), line).into());
+            return Err(StrykeError::runtime(format!("read: unopened handle {}", fh), line).into());
         };
         buf.truncate(n);
         let read_str = crate::perl_fs::decode_utf8_or_latin1(&buf);
@@ -5846,7 +5846,7 @@ impl VMHelper {
             let after = &rest[idx + 5..];
             let end = after
                 .find('}')
-                .ok_or_else(|| PerlError::runtime("Unclosed $ENV{...} in s///", line))?;
+                .ok_or_else(|| StrykeError::runtime("Unclosed $ENV{...} in s///", line))?;
             let key = &after[..end];
             let val = self.scope.get_hash_element("ENV", key);
             out.push_str(&val.to_string());
@@ -5949,7 +5949,7 @@ impl VMHelper {
     ) -> ExecResult {
         let e_count = flags.chars().filter(|c| *c == 'e').count();
         if e_count == 0 {
-            return Err(PerlError::runtime("s///e: internal error (no e flag)", line).into());
+            return Err(StrykeError::runtime("s///e: internal error (no e flag)", line).into());
         }
 
         if flags.contains('g') {
@@ -6074,7 +6074,7 @@ impl VMHelper {
         line: usize,
     ) -> PerlResult<StrykeValue> {
         if args.is_empty() {
-            return Err(PerlError::runtime("splice: missing array", line));
+            return Err(StrykeError::runtime("splice: missing array", line));
         }
         let arr_name = args[0].to_string();
         let arr_len = self.scope.array_len(&arr_name);
@@ -6102,7 +6102,7 @@ impl VMHelper {
         line: usize,
     ) -> PerlResult<StrykeValue> {
         if args.is_empty() {
-            return Err(PerlError::runtime("unshift: missing array", line));
+            return Err(StrykeError::runtime("unshift: missing array", line));
         }
         let arr_name = args[0].to_string();
         let mut flat_vals: Vec<StrykeValue> = Vec::new();
@@ -6195,7 +6195,7 @@ impl VMHelper {
 
     pub(crate) fn run_bench_block(&mut self, body: &Block, n: usize, line: usize) -> ExecResult {
         if n == 0 {
-            return Err(FlowOrError::Error(PerlError::runtime(
+            return Err(FlowOrError::Error(StrykeError::runtime(
                 "bench: iteration count must be positive",
                 line,
             )));
@@ -6243,7 +6243,7 @@ impl VMHelper {
         for block in &ends {
             self.exec_block(block).map_err(|e| match e {
                 FlowOrError::Error(e) => e,
-                FlowOrError::Flow(_) => PerlError::runtime("Unexpected flow control in END", 0),
+                FlowOrError::Flow(_) => StrykeError::runtime("Unexpected flow control in END", 0),
             })?;
         }
         Ok(())
@@ -6276,7 +6276,7 @@ impl VMHelper {
                     Err(FlowOrError::Error(e)) => return Err(e),
                     Err(FlowOrError::Flow(Flow::Return(_))) => {}
                     Err(FlowOrError::Flow(other)) => {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             format!("DESTROY: unexpected control flow ({other:?})"),
                             line,
                         ));
@@ -6325,7 +6325,7 @@ impl VMHelper {
                 let line = block[pc].line;
                 let name = self.eval_expr(target)?.to_string();
                 pc = *map.get(&name).ok_or_else(|| {
-                    FlowOrError::Error(PerlError::runtime(
+                    FlowOrError::Error(StrykeError::runtime(
                         format!("goto: unknown label {}", name),
                         line,
                     ))
@@ -6395,7 +6395,7 @@ impl VMHelper {
                 Ok(v) => Ok(v),
                 Err(FlowOrError::Error(e)) => Err(e),
                 Err(FlowOrError::Flow(Flow::Yield(_))) => {
-                    Err(PerlError::runtime("yield inside async/spawn block", 0))
+                    Err(StrykeError::runtime("yield inside async/spawn block", 0))
                 }
                 Err(FlowOrError::Flow(_)) => Ok(StrykeValue::UNDEF),
             };
@@ -6452,7 +6452,7 @@ impl VMHelper {
                 Ok(v) => Ok(v),
                 Err(FlowOrError::Error(e)) => Err(e),
                 Err(FlowOrError::Flow(Flow::Yield(_))) => {
-                    Err(PerlError::runtime("yield inside eval_timeout block", 0))
+                    Err(StrykeError::runtime("yield inside eval_timeout block", 0))
                 }
                 Err(FlowOrError::Flow(_)) => Ok(StrykeValue::UNDEF),
             };
@@ -6462,7 +6462,7 @@ impl VMHelper {
         match rx.recv_timeout(dur) {
             Ok(Ok(v)) => Ok(v),
             Ok(Err(e)) => Err(FlowOrError::Error(e)),
-            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => Err(PerlError::runtime(
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => Err(StrykeError::runtime(
                 format!(
                     "eval_timeout: exceeded {} second(s) (worker continues in background)",
                     secs
@@ -6470,7 +6470,7 @@ impl VMHelper {
                 line,
             )
             .into()),
-            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => Err(PerlError::runtime(
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => Err(StrykeError::runtime(
                 "eval_timeout: worker thread panicked or disconnected",
                 line,
             )
@@ -6663,7 +6663,7 @@ impl VMHelper {
                     .map(|v| v.name.as_str())
                     .collect();
                 if !missing.is_empty() {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!(
                             "non-exhaustive match on enum `{}`: missing variant(s) {}",
                             e.def.name,
@@ -6728,7 +6728,7 @@ impl VMHelper {
                 return out;
             }
         }
-        Err(PerlError::runtime(
+        Err(StrykeError::runtime(
             "match: no arm matched the value (add a `_` catch-all)",
             line,
         )
@@ -6896,7 +6896,7 @@ impl VMHelper {
                         FlowOrError::Flow(Flow::Yield(_)) => {
                             unreachable!("yield handled above")
                         }
-                        FlowOrError::Flow(flow) => PerlError::runtime(
+                        FlowOrError::Flow(flow) => StrykeError::runtime(
                             format!("unexpected control flow in generator: {:?}", flow),
                             0,
                         ),
@@ -7023,7 +7023,7 @@ impl VMHelper {
         let h = if let Some(m) = self.match_subject_as_hash(container) {
             m
         } else {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "Hash slice dereference needs a hash or hash reference value",
                 line,
             )
@@ -7066,7 +7066,7 @@ impl VMHelper {
         if let Some(s) = container.as_str() {
             self.touch_env_hash(&s);
             if self.strict_refs {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "Can't use string (\"{}\") as a HASH ref while \"strict refs\" in use",
                         s
@@ -7080,7 +7080,7 @@ impl VMHelper {
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
             return Ok(StrykeValue::UNDEF);
         }
-        Err(PerlError::runtime(
+        Err(StrykeError::runtime(
             "Hash slice assignment needs a hash or hash reference value",
             line,
         )
@@ -7106,7 +7106,7 @@ impl VMHelper {
             }
         }
         if ks.is_empty() {
-            return Err(PerlError::runtime("assign to empty hash slice", line).into());
+            return Err(StrykeError::runtime("assign to empty hash slice", line).into());
         }
         let items = val.to_list();
         for (i, k) in ks.iter().enumerate() {
@@ -7135,7 +7135,7 @@ impl VMHelper {
             }
         }
         if ks.is_empty() {
-            return Err(PerlError::runtime("assign to empty hash slice", line).into());
+            return Err(StrykeError::runtime("assign to empty hash slice", line).into());
         }
         let items = val.to_list();
         if let Some(r) = container.as_hash_ref() {
@@ -7158,7 +7158,7 @@ impl VMHelper {
         }
         if let Some(s) = container.as_str() {
             if self.strict_refs {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "Can't use string (\"{}\") as a HASH ref while \"strict refs\" in use",
                         s
@@ -7176,7 +7176,7 @@ impl VMHelper {
             }
             return Ok(StrykeValue::UNDEF);
         }
-        Err(PerlError::runtime(
+        Err(StrykeError::runtime(
             "Hash slice assignment needs a hash or hash reference value",
             line,
         )
@@ -7209,7 +7209,7 @@ impl VMHelper {
             }
         }
         if ks.is_empty() {
-            return Err(PerlError::runtime("assign to empty hash slice", line).into());
+            return Err(StrykeError::runtime("assign to empty hash slice", line).into());
         }
         let last_key = ks.last().expect("non-empty ks");
         self.assign_hash_slice_one_key(container, last_key, new_val.clone(), line)?;
@@ -7248,7 +7248,7 @@ impl VMHelper {
             }
         }
         let last_key = ks.last().ok_or_else(|| {
-            PerlError::runtime("Hash slice increment needs at least one key", line)
+            StrykeError::runtime("Hash slice increment needs at least one key", line)
         })?;
         self.assign_hash_slice_one_key(container, last_key, new_val.clone(), line)?;
         Ok(if kind < 2 { new_val } else { last_old })
@@ -7296,7 +7296,7 @@ impl VMHelper {
             }
         }
         if ks.is_empty() {
-            return Err(PerlError::runtime("assign to empty hash slice", line).into());
+            return Err(StrykeError::runtime("assign to empty hash slice", line).into());
         }
         let last_key = ks.last().expect("non-empty ks");
         let container = StrykeValue::string(hash.to_string());
@@ -7332,7 +7332,7 @@ impl VMHelper {
             }
         }
         let last_key = ks.last().ok_or_else(|| {
-            PerlError::runtime("Hash slice increment needs at least one key", line)
+            StrykeError::runtime("Hash slice increment needs at least one key", line)
         })?;
         let container = StrykeValue::string(hash.to_string());
         self.assign_hash_slice_one_key(container, last_key, new_val.clone(), line)?;
@@ -7354,7 +7354,7 @@ impl VMHelper {
             match elem {
                 MatchArrayElem::Rest => {
                     if i != elems.len() - 1 {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             "internal: `*` must be last in array match pattern",
                             line,
                         )
@@ -7364,7 +7364,7 @@ impl VMHelper {
                 }
                 MatchArrayElem::RestBind(name) => {
                     if i != elems.len() - 1 {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             "internal: `@name` rest bind must be last in array match pattern",
                             line,
                         )
@@ -7738,7 +7738,7 @@ impl VMHelper {
             }
             StmtKind::StructDecl { def } => {
                 if self.struct_defs.contains_key(&def.name) {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("duplicate struct `{}`", def.name),
                         stmt.line,
                     )
@@ -7750,7 +7750,7 @@ impl VMHelper {
             }
             StmtKind::EnumDecl { def } => {
                 if self.enum_defs.contains_key(&def.name) {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("duplicate enum `{}`", def.name),
                         stmt.line,
                     )
@@ -7762,7 +7762,7 @@ impl VMHelper {
             }
             StmtKind::ClassDecl { def } => {
                 if self.class_defs.contains_key(&def.name) {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("duplicate class `{}`", def.name),
                         stmt.line,
                     )
@@ -7772,7 +7772,7 @@ impl VMHelper {
                 for parent_name in &def.extends {
                     if let Some(parent_def) = self.class_defs.get(parent_name) {
                         if parent_def.is_final {
-                            return Err(PerlError::runtime(
+                            return Err(StrykeError::runtime(
                                 format!("cannot extend final class `{}`", parent_name),
                                 stmt.line,
                             )
@@ -7782,7 +7782,7 @@ impl VMHelper {
                         for m in &def.methods {
                             if let Some(parent_method) = parent_def.method(&m.name) {
                                 if parent_method.is_final {
-                                    return Err(PerlError::runtime(
+                                    return Err(StrykeError::runtime(
                                         format!(
                                             "cannot override final method `{}` from class `{}`",
                                             m.name, parent_name
@@ -7802,7 +7802,7 @@ impl VMHelper {
                         for required in trait_def.required_methods() {
                             let has_method = def.methods.iter().any(|m| m.name == required.name);
                             if !has_method {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     format!(
                                         "class `{}` implements trait `{}` but does not define required method `{}`",
                                         def.name, trait_name, required.name
@@ -7830,7 +7830,7 @@ impl VMHelper {
                                     if m.body.is_none()
                                         && !def.methods.iter().any(|dm| dm.name == m.name)
                                     {
-                                        return Err(PerlError::runtime(
+                                        return Err(StrykeError::runtime(
                                             format!(
                                                 "class `{}` must implement abstract method `{}` from `{}`",
                                                 def.name, m.name, parent_name
@@ -7890,7 +7890,7 @@ impl VMHelper {
             }
             StmtKind::TraitDecl { def } => {
                 if self.trait_defs.contains_key(&def.name) {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("duplicate trait `{}`", def.name),
                         stmt.line,
                     )
@@ -7954,7 +7954,7 @@ impl VMHelper {
                                 self.scope.declare_hash(&decl.name, map);
                             }
                             Sigil::Typeglob => {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     "list assignment to typeglob (`my (*a,*b)=...`) is not supported",
                                     stmt.line,
                                 )
@@ -7976,7 +7976,7 @@ impl VMHelper {
                         if compound_init {
                             match decl.sigil {
                                 Sigil::Typeglob => {
-                                    return Err(PerlError::runtime(
+                                    return Err(StrykeError::runtime(
                                         "compound assignment on typeglob declaration is not supported",
                                         stmt.line,
                                     )
@@ -8042,7 +8042,7 @@ impl VMHelper {
                         };
                         match decl.sigil {
                             Sigil::Typeglob => {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     "`my *FH` / typeglob declaration is not supported",
                                     stmt.line,
                                 )
@@ -8176,7 +8176,7 @@ impl VMHelper {
                                 self.scope.local_set_hash(&decl.name, map)?;
                             }
                             Sigil::Typeglob => {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     "list assignment to typeglob (`local (*a,*b)=...`) is not supported",
                                     stmt.line,
                                 )
@@ -8209,7 +8209,7 @@ impl VMHelper {
                                         self.glob_handle_alias
                                             .insert(decl.name.clone(), rhs.clone());
                                     } else {
-                                        return Err(PerlError::runtime(
+                                        return Err(StrykeError::runtime(
                                             "local *GLOB = *OTHER — right side must be a typeglob",
                                             stmt.line,
                                         )
@@ -8264,7 +8264,7 @@ impl VMHelper {
                 let rhs_name = |init: &Expr| -> PerlResult<Option<String>> {
                     match &init.kind {
                         ExprKind::Typeglob(rhs) => Ok(Some(rhs.clone())),
-                        _ => Err(PerlError::runtime(
+                        _ => Err(StrykeError::runtime(
                             "local *GLOB = *OTHER — right side must be a typeglob",
                             stmt.line,
                         )),
@@ -8356,7 +8356,7 @@ impl VMHelper {
                             .local_set_array_element(&aname, idx, val.clone())?;
                     }
                     _ => {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             format!(
                                 "local on this lvalue is not supported yet ({:?})",
                                 target.kind
@@ -8377,7 +8377,7 @@ impl VMHelper {
                     };
                     match decl.sigil {
                         Sigil::Typeglob => {
-                            return Err(PerlError::runtime(
+                            return Err(StrykeError::runtime(
                                 "`mysync` does not support typeglob variables",
                                 stmt.line,
                             )
@@ -8427,7 +8427,7 @@ impl VMHelper {
                     };
                     match decl.sigil {
                         Sigil::Typeglob => {
-                            return Err(PerlError::runtime(
+                            return Err(StrykeError::runtime(
                                 "`oursync` does not support typeglob variables",
                                 stmt.line,
                             )
@@ -8516,7 +8516,7 @@ impl VMHelper {
                 if let ExprKind::SubroutineRef(name) = &target.kind {
                     return Err(Flow::GotoSub(name.clone()).into());
                 }
-                Err(PerlError::runtime("goto reached outside goto-aware block", stmt.line).into())
+                Err(StrykeError::runtime("goto reached outside goto-aware block", stmt.line).into())
             }
             StmtKind::EvalTimeout { timeout, body } => {
                 let secs = self.eval_expr(timeout)?.to_number();
@@ -8574,7 +8574,7 @@ impl VMHelper {
                 Err(FlowOrError::Flow(f)) => Err(FlowOrError::Flow(f)),
             },
             StmtKind::Given { topic, body } => self.exec_given(topic, body),
-            StmtKind::When { .. } | StmtKind::DefaultCase { .. } => Err(PerlError::runtime(
+            StmtKind::When { .. } | StmtKind::DefaultCase { .. } => Err(StrykeError::runtime(
                 "when/default may only appear inside a given block",
                 stmt.line,
             )
@@ -8621,7 +8621,7 @@ impl VMHelper {
         name: &str,
         op: BinOp,
         rhs: StrykeValue,
-    ) -> Result<StrykeValue, PerlError> {
+    ) -> Result<StrykeValue, StrykeError> {
         if op == BinOp::Concat {
             return self.scope.scalar_concat_inplace(name, &rhs);
         }
@@ -8761,7 +8761,7 @@ impl VMHelper {
                 }
                 if let Some(s) = val.as_str() {
                     if self.strict_refs {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             format!(
                                 "Can't use string (\"{}\") as a SCALAR ref while \"strict refs\" in use",
                                 s
@@ -8772,7 +8772,7 @@ impl VMHelper {
                     }
                     return Ok(self.get_special_var(&s));
                 }
-                Err(PerlError::runtime("Can't dereference non-reference as scalar", line).into())
+                Err(StrykeError::runtime("Can't dereference non-reference as scalar", line).into())
             }
             Sigil::Array => {
                 if let Some(r) = val.as_array_ref() {
@@ -8783,7 +8783,7 @@ impl VMHelper {
                 }
                 if val.is_undef() {
                     if self.strict_refs {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             "Can't use an undefined value as an ARRAY reference",
                             line,
                         )
@@ -8799,7 +8799,7 @@ impl VMHelper {
                 if val.is_integer_like() || val.is_float_like() || val.is_string_like() {
                     let s = val.to_string();
                     if self.strict_refs {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             format!(
                                 "Can't use string (\"{}\") as an ARRAY ref while \"strict refs\" in use",
                                 s
@@ -8810,7 +8810,7 @@ impl VMHelper {
                     }
                     return Ok(StrykeValue::array(self.scope.get_array(&s)));
                 }
-                Err(PerlError::runtime("Can't dereference non-reference as array", line).into())
+                Err(StrykeError::runtime("Can't dereference non-reference as array", line).into())
             }
             Sigil::Hash => {
                 if let Some(r) = val.as_hash_ref() {
@@ -8865,7 +8865,7 @@ impl VMHelper {
                 }
                 if val.is_undef() {
                     if self.strict_refs {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             "Can't use an undefined value as a HASH reference",
                             line,
                         )
@@ -8876,7 +8876,7 @@ impl VMHelper {
                 if val.is_integer_like() || val.is_float_like() || val.is_string_like() {
                     let s = val.to_string();
                     if self.strict_refs {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             format!(
                                 "Can't use string (\"{}\") as a HASH ref while \"strict refs\" in use",
                                 s
@@ -8888,13 +8888,13 @@ impl VMHelper {
                     self.touch_env_hash(&s);
                     return Ok(StrykeValue::hash(self.scope.get_hash(&s)));
                 }
-                Err(PerlError::runtime("Can't dereference non-reference as hash", line).into())
+                Err(StrykeError::runtime("Can't dereference non-reference as hash", line).into())
             }
             Sigil::Typeglob => {
                 if let Some(s) = val.as_str() {
                     return Ok(StrykeValue::string(self.resolve_io_handle_name(&s)));
                 }
-                Err(PerlError::runtime("Can't dereference non-reference as typeglob", line).into())
+                Err(StrykeError::runtime("Can't dereference non-reference as typeglob", line).into())
             }
         }
     }
@@ -8919,7 +8919,7 @@ impl VMHelper {
         }
         if let Some(s) = val.as_str() {
             if self.strict_refs {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "Can't use string (\"{}\") as an ARRAY ref while \"strict refs\" in use",
                         s
@@ -8934,7 +8934,7 @@ impl VMHelper {
             let inner = r.read().clone();
             return self.make_array_ref_alias(inner, line);
         }
-        Err(PerlError::runtime("Can't make array reference from value", line).into())
+        Err(StrykeError::runtime("Can't make array reference from value", line).into())
     }
 
     /// `\%{EXPR}` — shared by [`crate::bytecode::Op::MakeHashRefAlias`].
@@ -8947,7 +8947,7 @@ impl VMHelper {
         }
         if let Some(s) = val.as_str() {
             if self.strict_refs {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "Can't use string (\"{}\") as a HASH ref while \"strict refs\" in use",
                         s
@@ -8962,7 +8962,7 @@ impl VMHelper {
             let inner = r.read().clone();
             return self.make_hash_ref_alias(inner, line);
         }
-        Err(PerlError::runtime("Can't make hash reference from value", line).into())
+        Err(StrykeError::runtime("Can't make hash reference from value", line).into())
     }
 
     /// Process Perl case escapes: \U (uppercase), \L (lowercase), \u (ucfirst),
@@ -9564,14 +9564,14 @@ impl VMHelper {
             ExprKind::SubroutineRef(name) => self.call_named_sub(name, vec![], line, ctx),
             ExprKind::SubroutineCodeRef(name) => {
                 let sub = self.resolve_sub_by_name(name).ok_or_else(|| {
-                    PerlError::runtime(self.undefined_subroutine_resolve_message(name), line)
+                    StrykeError::runtime(self.undefined_subroutine_resolve_message(name), line)
                 })?;
                 Ok(StrykeValue::code_ref(sub))
             }
             ExprKind::DynamicSubCodeRef(expr) => {
                 let name = self.eval_expr(expr)?.to_string();
                 let sub = self.resolve_sub_by_name(&name).ok_or_else(|| {
-                    PerlError::runtime(self.undefined_subroutine_resolve_message(&name), line)
+                    StrykeError::runtime(self.undefined_subroutine_resolve_message(&name), line)
                 })?;
                 Ok(StrykeValue::code_ref(sub))
             }
@@ -9651,9 +9651,9 @@ impl VMHelper {
                             if let Some(sub) = callable.as_code_ref() {
                                 return self.call_sub(&sub, args, ctx, line);
                             }
-                            Err(PerlError::runtime("Not a code reference", line).into())
+                            Err(StrykeError::runtime("Not a code reference", line).into())
                         } else {
-                            Err(PerlError::runtime("Invalid call deref", line).into())
+                            Err(StrykeError::runtime("Invalid call deref", line).into())
                         }
                     }
                 }
@@ -10187,7 +10187,7 @@ impl VMHelper {
                             let left_re = self.compile_regex(left_pat, left_flags, line).map_err(
                                 |e| match e {
                                     FlowOrError::Error(err) => err,
-                                    FlowOrError::Flow(_) => PerlError::runtime(
+                                    FlowOrError::Flow(_) => StrykeError::runtime(
                                         "unexpected flow in regex flip-flop",
                                         line,
                                     ),
@@ -10197,7 +10197,7 @@ impl VMHelper {
                                 .compile_regex(right_pat, right_flags, line)
                                 .map_err(|e| match e {
                                     FlowOrError::Error(err) => err,
-                                    FlowOrError::Flow(_) => PerlError::runtime(
+                                    FlowOrError::Flow(_) => StrykeError::runtime(
                                         "unexpected flow in regex flip-flop",
                                         line,
                                     ),
@@ -10220,7 +10220,7 @@ impl VMHelper {
                             let left_re = self.compile_regex(left_pat, left_flags, line).map_err(
                                 |e| match e {
                                     FlowOrError::Error(err) => err,
-                                    FlowOrError::Flow(_) => PerlError::runtime(
+                                    FlowOrError::Flow(_) => StrykeError::runtime(
                                         "unexpected flow in regex/eof flip-flop",
                                         line,
                                     ),
@@ -10248,7 +10248,7 @@ impl VMHelper {
                             let left_re = self.compile_regex(left_pat, left_flags, line).map_err(
                                 |e| match e {
                                     FlowOrError::Error(err) => err,
-                                    FlowOrError::Flow(_) => PerlError::runtime(
+                                    FlowOrError::Flow(_) => StrykeError::runtime(
                                         "unexpected flow in regex flip-flop",
                                         line,
                                     ),
@@ -10268,7 +10268,7 @@ impl VMHelper {
                         }
                         (ExprKind::Regex(left_pat, left_flags), _) => {
                             if let ExprKind::Eof(Some(_)) = &to.kind {
-                                return Err(FlowOrError::Error(PerlError::runtime(
+                                return Err(FlowOrError::Error(StrykeError::runtime(
                                     "regex flip-flop with eof(HANDLE) is not supported",
                                     line,
                                 )));
@@ -10278,7 +10278,7 @@ impl VMHelper {
                             let left_re = self.compile_regex(left_pat, left_flags, line).map_err(
                                 |e| match e {
                                     FlowOrError::Error(err) => err,
-                                    FlowOrError::Flow(_) => PerlError::runtime(
+                                    FlowOrError::Flow(_) => StrykeError::runtime(
                                         "unexpected flow in regex flip-flop",
                                         line,
                                     ),
@@ -10339,7 +10339,7 @@ impl VMHelper {
                 let f = match from {
                     Some(e) => self.eval_expr(e)?,
                     None => {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             "open-ended slice range cannot be evaluated outside slice subscript",
                             line,
                         )
@@ -10349,7 +10349,7 @@ impl VMHelper {
                 let t = match to {
                     Some(e) => self.eval_expr(e)?,
                     None => {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             "open-ended slice range cannot be evaluated outside slice subscript",
                             line,
                         )
@@ -10415,7 +10415,7 @@ impl VMHelper {
                 // surrounding expression sees the assigned value, matching
                 // Perl: `if (my $x = 5) { … }` evaluates the condition as 5.
                 let first = decls.first().ok_or_else(|| {
-                    FlowOrError::Error(PerlError::runtime("MyExpr: empty decl list", line))
+                    FlowOrError::Error(StrykeError::runtime("MyExpr: empty decl list", line))
                 })?;
                 Ok(match first.sigil {
                     Sigil::Scalar => self.scope.get_scalar(&first.name),
@@ -10461,7 +10461,7 @@ impl VMHelper {
                     } else if fh == "STDIN" {
                         std::io::stdin().read(&mut buf).unwrap_or(0)
                     } else {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             format!("read: unopened handle {}", fh),
                             line,
                         )
@@ -10487,7 +10487,7 @@ impl VMHelper {
                 }
                 if matches!(dispatch_name, "group_by" | "chunk_by") {
                     if args.len() != 2 {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             "group_by/chunk_by: expected { BLOCK } or EXPR, LIST",
                             line,
                         )
@@ -10522,7 +10522,7 @@ impl VMHelper {
                         "partition" | "min_by" | "max_by" | "zip_with" | "count_by"
                     ) {
                     if args.len() != 2 {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             format!("{}: expected BLOCK, LIST", name),
                             line,
                         )
@@ -10608,7 +10608,7 @@ impl VMHelper {
                     list_out
                 } else if matches!(dispatch_name, "take" | "head" | "tail" | "drop") {
                     if args.is_empty() {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             "take/head/tail/drop: need LIST..., N or unary N",
                             line,
                         )
@@ -10629,7 +10629,7 @@ impl VMHelper {
                     let mut list_out = Vec::new();
                     match args.len() {
                         0 => {
-                            return Err(PerlError::runtime(
+                            return Err(StrykeError::runtime(
                                 format!("{name}: expected (LIST, N) or unary N after |>"),
                                 line,
                             )
@@ -10646,7 +10646,7 @@ impl VMHelper {
                             list_out.push(self.eval_expr(&args[1])?);
                         }
                         _ => {
-                            return Err(PerlError::runtime(
+                            return Err(StrykeError::runtime(
                                 format!(
                                     "{name}: expected exactly (LIST, N); use one list expression then size"
                                 ),
@@ -10790,7 +10790,7 @@ impl VMHelper {
                 } else if let Some(s) = obj.as_str() {
                     s // Class->method()
                 } else {
-                    return Err(PerlError::runtime("Can't call method on non-object", line).into());
+                    return Err(StrykeError::runtime("Can't call method on non-object", line).into());
                 };
                 if method == "VERSION" && !*super_call {
                     if let Some(ver) = self.package_version_scalar(class.as_str())? {
@@ -10838,7 +10838,7 @@ impl VMHelper {
                 let full_name = self
                     .resolve_method_full_name(&class, method, *super_call)
                     .ok_or_else(|| {
-                        PerlError::runtime(
+                        StrykeError::runtime(
                             format!(
                                 "Can't locate method \"{}\" for invocant \"{}\"",
                                 method, class
@@ -10856,7 +10856,7 @@ impl VMHelper {
                 {
                     r
                 } else {
-                    Err(PerlError::runtime(
+                    Err(StrykeError::runtime(
                         format!(
                             "Can't locate method \"{}\" in package \"{}\"",
                             method, class
@@ -10886,7 +10886,7 @@ impl VMHelper {
                         current.to_string()
                     };
                     self.fire_pseudosig_die(&msg, line)?;
-                    return Err(PerlError::die(msg, line).into());
+                    return Err(StrykeError::die(msg, line).into());
                 }
                 // Single ref argument: store the ref value in $@
                 if args.len() == 1 {
@@ -10898,7 +10898,7 @@ impl VMHelper {
                     {
                         let msg = v.to_string();
                         self.fire_pseudosig_die(&msg, line)?;
-                        return Err(PerlError::die_with_value(v, msg, line).into());
+                        return Err(StrykeError::die_with_value(v, msg, line).into());
                     }
                 }
                 let mut msg = String::new();
@@ -10914,7 +10914,7 @@ impl VMHelper {
                     msg.push('\n');
                 }
                 self.fire_pseudosig_die(&msg, line)?;
-                Err(PerlError::die(msg, line).into())
+                Err(StrykeError::die(msg, line).into())
             }
             ExprKind::Warn(args) => {
                 let mut msg = String::new();
@@ -11041,7 +11041,7 @@ impl VMHelper {
                 if items.len() == 1 {
                     if let Some(p) = items[0].as_pipeline() {
                         if *flatten_array_refs {
-                            return Err(PerlError::runtime(
+                            return Err(StrykeError::runtime(
                                 "flat_map onto a pipeline value is not supported in this form — use a pipeline ->map stage",
                                 line,
                             )
@@ -11233,7 +11233,7 @@ impl VMHelper {
                     Some(SortComparator::Code(code_expr)) => {
                         let sub = self.eval_expr(code_expr)?;
                         let Some(sub) = sub.as_code_ref() else {
-                            return Err(PerlError::runtime(
+                            return Err(StrykeError::runtime(
                                 "sort: comparator must be a code reference",
                                 line,
                             )
@@ -11675,7 +11675,7 @@ impl VMHelper {
                     })
                     .collect();
                 if let Some(msg) = first_err.lock().take() {
-                    return Err(FlowOrError::Error(PerlError::runtime(msg, line)));
+                    return Err(FlowOrError::Error(StrykeError::runtime(msg, line)));
                 }
                 let total: usize = per_chunk.iter().map(|v| v.len()).sum();
                 let mut out = Vec::with_capacity(total);
@@ -11756,7 +11756,7 @@ impl VMHelper {
                     })
                     .collect();
                 if let Some(msg) = first_err.lock().take() {
-                    return Err(FlowOrError::Error(PerlError::runtime(msg, line)));
+                    return Err(FlowOrError::Error(StrykeError::runtime(msg, line)));
                 }
                 if per_chunk.is_empty() {
                     return Ok(StrykeValue::UNDEF);
@@ -11792,7 +11792,7 @@ impl VMHelper {
                 // block.
                 let cluster_pv = self.eval_expr(cluster)?;
                 let Some(remote_cluster) = cluster_pv.as_remote_cluster() else {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "~d>: expected cluster(...) value after `on`",
                         line,
                     )
@@ -11806,7 +11806,7 @@ impl VMHelper {
                 let (scope_capture, atomic_arrays, atomic_hashes) =
                     self.scope.capture_with_atomics();
                 if !atomic_arrays.is_empty() || !atomic_hashes.is_empty() {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "~d>: mysync/atomic capture is not supported for remote workers",
                         line,
                     )
@@ -11828,7 +11828,7 @@ impl VMHelper {
                         let as_array = StrykeValue::array(drained);
                         chunk_items.push(
                             crate::remote_wire::perl_to_json_value(&as_array)
-                                .map_err(|e| PerlError::runtime(e, line))?,
+                                .map_err(|e| StrykeError::runtime(e, line))?,
                         );
                     }
                 }
@@ -11836,7 +11836,7 @@ impl VMHelper {
                     let as_array = StrykeValue::array(chunk_jsons_buf);
                     chunk_items.push(
                         crate::remote_wire::perl_to_json_value(&as_array)
-                            .map_err(|e| PerlError::runtime(e, line))?,
+                            .map_err(|e| StrykeError::runtime(e, line))?,
                     );
                 }
                 // Drop scope entries that can't be JSON-marshalled (the
@@ -11875,7 +11875,7 @@ impl VMHelper {
                     cap_json,
                     chunk_items,
                 )
-                .map_err(|e| PerlError::runtime(format!("~d> remote: {e}"), line))?;
+                .map_err(|e| StrykeError::runtime(format!("~d> remote: {e}"), line))?;
                 // Each chunk's extract returns a value; flat-concat across
                 // chunks to mirror `~p>`'s auto-merge for list-shaped output.
                 // Scalar-shaped chunk results stay as one element each.
@@ -11910,7 +11910,7 @@ impl VMHelper {
                     self.scope.capture_with_atomics();
 
                 let pmap_progress = PmapProgress::new(show_progress, items.len());
-                let first_err: Arc<Mutex<Option<PerlError>>> = Arc::new(Mutex::new(None));
+                let first_err: Arc<Mutex<Option<StrykeError>>> = Arc::new(Mutex::new(None));
                 items.into_par_iter().for_each(|item| {
                     if first_err.lock().is_some() {
                         return;
@@ -11928,7 +11928,7 @@ impl VMHelper {
                         Err(e) => {
                             let stryke = match e {
                                 FlowOrError::Error(stryke) => stryke,
-                                FlowOrError::Flow(_) => PerlError::runtime(
+                                FlowOrError::Flow(_) => StrykeError::runtime(
                                     "return/last/next/redo not supported inside pfor block",
                                     line,
                                 ),
@@ -12005,7 +12005,7 @@ impl VMHelper {
                     }
                     return Ok(StrykeValue::array(out));
                 }
-                let first_err: Arc<Mutex<Option<PerlError>>> = Arc::new(Mutex::new(None));
+                let first_err: Arc<Mutex<Option<StrykeError>>> = Arc::new(Mutex::new(None));
                 (0..n).into_par_iter().for_each(|i| {
                     if first_err.lock().is_some() {
                         return;
@@ -12026,7 +12026,7 @@ impl VMHelper {
                         Err(e) => {
                             let stryke = match e {
                                 FlowOrError::Error(stryke) => stryke,
-                                FlowOrError::Flow(_) => PerlError::runtime(
+                                FlowOrError::Flow(_) => StrykeError::runtime(
                                     "return/last/next/redo not supported inside fan block",
                                     line,
                                 ),
@@ -12069,7 +12069,7 @@ impl VMHelper {
             }
             ExprKind::Yield(e) => {
                 if !self.in_generator {
-                    return Err(PerlError::runtime("yield outside gen block", line).into());
+                    return Err(StrykeError::runtime("yield outside gen block", line).into());
                 }
                 let v = self.eval_expr(e)?;
                 Err(FlowOrError::Flow(Flow::Yield(v)))
@@ -12129,7 +12129,7 @@ impl VMHelper {
             ExprKind::Bench { body, times } => {
                 let n = self.eval_expr(times)?.to_int();
                 if n < 0 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "bench: iteration count must be non-negative",
                         line,
                     )
@@ -12151,7 +12151,7 @@ impl VMHelper {
                 crate::perl_fs::read_file_text_or_glob(&path)
                     .map(StrykeValue::string)
                     .map_err(|e| {
-                        FlowOrError::Error(PerlError::runtime(format!("slurp: {}", e), line))
+                        FlowOrError::Error(StrykeError::runtime(format!("slurp: {}", e), line))
                     })
             }
             ExprKind::Capture(e) => {
@@ -12161,7 +12161,7 @@ impl VMHelper {
                     .arg(&cmd)
                     .output()
                     .map_err(|e| {
-                        FlowOrError::Error(PerlError::runtime(format!("capture: {}", e), line))
+                        FlowOrError::Error(StrykeError::runtime(format!("capture: {}", e), line))
                     })?;
                 self.record_child_exit_status(output.status);
                 let exitcode = output.status.code().unwrap_or(-1) as i64;
@@ -12182,11 +12182,11 @@ impl VMHelper {
                 ureq::get(&url)
                     .call()
                     .map_err(|e| {
-                        FlowOrError::Error(PerlError::runtime(format!("fetch_url: {}", e), line))
+                        FlowOrError::Error(StrykeError::runtime(format!("fetch_url: {}", e), line))
                     })
                     .and_then(|r| {
                         r.into_string().map(StrykeValue::string).map_err(|e| {
-                            FlowOrError::Error(PerlError::runtime(
+                            FlowOrError::Error(StrykeError::runtime(
                                 format!("fetch_url: {}", e),
                                 line,
                             ))
@@ -12890,7 +12890,7 @@ impl VMHelper {
             }
 
             // I/O
-            ExprKind::OpenMyHandle { .. } => Err(PerlError::runtime(
+            ExprKind::OpenMyHandle { .. } => Err(StrykeError::runtime(
                 "internal: `open my $fh` handle used outside open()",
                 line,
             )
@@ -13180,7 +13180,7 @@ impl VMHelper {
                 } else {
                     0
                 };
-                Err(PerlError::new(ErrorKind::Exit(c), "", line, &self.file).into())
+                Err(StrykeError::new(ErrorKind::Exit(c), "", line, &self.file).into())
             }
             ExprKind::Chdir(expr) => {
                 let path = self.eval_expr(expr)?.to_string();
@@ -13683,7 +13683,7 @@ impl VMHelper {
         if self.is_bound_handle(&s) {
             return Ok(self.resolve_io_handle_name(&s));
         }
-        Err(PerlError::runtime(
+        Err(StrykeError::runtime(
             format!("write: invalid or unopened filehandle {}", s),
             line,
         ))
@@ -13701,7 +13701,7 @@ impl VMHelper {
             0 => self.default_print_handle.clone(),
             1 => self.resolve_write_output_handle(&args[0], line)?,
             _ => {
-                return Err(PerlError::runtime("write: too many arguments", line));
+                return Err(StrykeError::runtime("write: too many arguments", line));
             }
         };
         let pkg = self.current_package();
@@ -13715,7 +13715,7 @@ impl VMHelper {
             .get(&key)
             .map(Arc::clone)
             .ok_or_else(|| {
-                PerlError::runtime(
+                StrykeError::runtime(
                     format!("Unknown format `{}` in package `{}`", fmt_name, pkg),
                     line,
                 )
@@ -13724,7 +13724,7 @@ impl VMHelper {
             .render_format_template(&tmpl, line)
             .map_err(|e| match e {
                 FlowOrError::Error(e) => e,
-                FlowOrError::Flow(_) => PerlError::runtime("write: unexpected control flow", line),
+                FlowOrError::Flow(_) => StrykeError::runtime("write: unexpected control flow", line),
             })?;
         self.write_formatted_print(handle_name.as_str(), &out, line)?;
         Ok(StrykeValue::integer(1))
@@ -13924,7 +13924,7 @@ impl VMHelper {
                 if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
                     if b == 0 {
                         return Err(
-                            PerlError::division_by_zero("Illegal division by zero", _line).into(),
+                            StrykeError::division_by_zero("Illegal division by zero", _line).into(),
                         );
                     }
                     if a % b == 0 {
@@ -13936,7 +13936,7 @@ impl VMHelper {
                     let d = rv.to_number();
                     if d == 0.0 {
                         return Err(
-                            PerlError::division_by_zero("Illegal division by zero", _line).into(),
+                            StrykeError::division_by_zero("Illegal division by zero", _line).into(),
                         );
                     }
                     StrykeValue::float(lv.to_number() / d)
@@ -13945,7 +13945,7 @@ impl VMHelper {
             BinOp::Mod => {
                 let d = rv.to_int();
                 if d == 0 {
-                    return Err(PerlError::division_by_zero("Illegal modulus zero", _line).into());
+                    return Err(StrykeError::division_by_zero("Illegal modulus zero", _line).into());
                 }
                 StrykeValue::integer(crate::value::perl_mod_i64(lv.to_int(), d))
             }
@@ -14175,7 +14175,7 @@ impl VMHelper {
             (false, true) => "postincrement (++)",
             (false, false) => "postdecrement (--)",
         };
-        FlowOrError::Error(PerlError::runtime(
+        FlowOrError::Error(StrykeError::runtime(
             format!("Can't modify {agg} dereference in {op}"),
             line,
         ))
@@ -14216,7 +14216,7 @@ impl VMHelper {
         if ref_val.is_integer_like() || ref_val.is_float_like() || ref_val.is_string_like() {
             let s = ref_val.to_string();
             if self.strict_refs {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "Can't use string (\"{}\") as a SCALAR ref while \"strict refs\" in use",
                         s
@@ -14229,7 +14229,7 @@ impl VMHelper {
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
             return Ok(StrykeValue::UNDEF);
         }
-        Err(PerlError::runtime("Can't assign to non-scalar reference", line).into())
+        Err(StrykeError::runtime("Can't assign to non-scalar reference", line).into())
     }
 
     /// `@{ EXPR } = LIST` — array ref or package name string (mirrors [`Self::symbolic_deref`] for [`Sigil::Array`]).
@@ -14251,7 +14251,7 @@ impl VMHelper {
         }
         if let Some(s) = ref_val.as_str() {
             if self.strict_refs {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "Can't use string (\"{}\") as an ARRAY ref while \"strict refs\" in use",
                         s
@@ -14265,7 +14265,7 @@ impl VMHelper {
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
             return Ok(StrykeValue::UNDEF);
         }
-        Err(PerlError::runtime("Can't assign to non-array reference", line).into())
+        Err(StrykeError::runtime("Can't assign to non-array reference", line).into())
     }
 
     /// `*{ EXPR } = RHS` — symbolic glob name string (like `*{ $name } = …`); coderef via
@@ -14278,7 +14278,7 @@ impl VMHelper {
     ) -> ExecResult {
         let lhs_name = if let Some(s) = ref_val.as_str() {
             if self.strict_refs {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "Can't use string (\"{}\") as a symbol ref while \"strict refs\" in use",
                         s
@@ -14290,7 +14290,7 @@ impl VMHelper {
             s.to_string()
         } else {
             return Err(
-                PerlError::runtime("Can't assign to non-glob symbolic reference", line).into(),
+                StrykeError::runtime("Can't assign to non-glob symbolic reference", line).into(),
             );
         };
         let is_coderef = val.as_code_ref().is_some()
@@ -14334,7 +14334,7 @@ impl VMHelper {
         }
         if let Some(s) = ref_val.as_str() {
             if self.strict_refs {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "Can't use string (\"{}\") as a HASH ref while \"strict refs\" in use",
                         s
@@ -14349,7 +14349,7 @@ impl VMHelper {
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
             return Ok(StrykeValue::UNDEF);
         }
-        Err(PerlError::runtime("Can't assign to non-hash reference", line).into())
+        Err(StrykeError::runtime("Can't assign to non-hash reference", line).into())
     }
 
     /// `$href->{key} = $val` and blessed hash slots — shared by [`Self::assign_value`] and the VM.
@@ -14371,7 +14371,7 @@ impl VMHelper {
                 *data = StrykeValue::hash(map);
                 return Ok(StrykeValue::UNDEF);
             }
-            return Err(PerlError::runtime("Can't assign into non-hash blessed ref", line).into());
+            return Err(StrykeError::runtime("Can't assign into non-hash blessed ref", line).into());
         }
         if let Some(r) = container.as_hash_ref() {
             r.write().insert(key, val);
@@ -14384,7 +14384,7 @@ impl VMHelper {
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
             return Ok(StrykeValue::UNDEF);
         }
-        Err(PerlError::runtime("Can't assign to arrow hash deref on non-hash(-ref)", line).into())
+        Err(StrykeError::runtime("Can't assign to arrow hash deref on non-hash(-ref)", line).into())
     }
 
     /// For `$aref->[ix]` / `@$r[ix]` arrow-array ops: the container must be the array **reference** (scalar),
@@ -14459,7 +14459,7 @@ impl VMHelper {
                 return Ok(arr.get(i).cloned().unwrap_or(StrykeValue::UNDEF));
             }
         }
-        Err(PerlError::runtime("Can't use arrow deref on non-array-ref", line).into())
+        Err(StrykeError::runtime("Can't use arrow deref on non-array-ref", line).into())
     }
 
     /// Read `$href->{key}` — same as the VM [`crate::bytecode::Op::ArrowHash`].
@@ -14486,7 +14486,7 @@ impl VMHelper {
                 let h = r.read();
                 return Ok(h.get(key).cloned().unwrap_or(StrykeValue::UNDEF));
             }
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "Can't access hash field on non-hash blessed ref",
                 line,
             )
@@ -14497,7 +14497,7 @@ impl VMHelper {
             if let Some(idx) = s.def.field_index(key) {
                 return Ok(s.get_field(idx).unwrap_or(StrykeValue::UNDEF));
             }
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("struct {} has no field `{}`", s.def.name, key),
                 line,
             )
@@ -14508,13 +14508,13 @@ impl VMHelper {
             if let Some(idx) = c.def.field_index(key) {
                 return Ok(c.get_field(idx).unwrap_or(StrykeValue::UNDEF));
             }
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("class {} has no field `{}`", c.def.name, key),
                 line,
             )
             .into());
         }
-        Err(PerlError::runtime("Can't use arrow deref on non-hash-ref", line).into())
+        Err(StrykeError::runtime("Can't use arrow deref on non-hash-ref", line).into())
     }
 
     /// `$aref->[$i]++` / `$aref->[$i]--` — returns old value; shared by the VM.
@@ -14599,7 +14599,7 @@ impl VMHelper {
         line: usize,
     ) -> Result<StrykeValue, FlowOrError> {
         if indices.is_empty() {
-            return Err(PerlError::runtime("assign to empty array slice", line).into());
+            return Err(StrykeError::runtime("assign to empty array slice", line).into());
         }
         let vals = val.to_list();
         for (i, idx) in indices.iter().enumerate() {
@@ -14644,7 +14644,7 @@ impl VMHelper {
         line: usize,
     ) -> Result<StrykeValue, FlowOrError> {
         if indices.is_empty() {
-            return Err(PerlError::runtime("assign to empty array slice", line).into());
+            return Err(StrykeError::runtime("assign to empty array slice", line).into());
         }
         let vals = val.to_list();
         for (i, idx) in indices.iter().enumerate() {
@@ -14667,7 +14667,7 @@ impl VMHelper {
         line: usize,
     ) -> Result<StrykeValue, FlowOrError> {
         if indices.is_empty() {
-            return Err(PerlError::runtime("assign to empty array slice", line).into());
+            return Err(StrykeError::runtime("assign to empty array slice", line).into());
         }
         let last_idx = *indices.last().expect("non-empty indices");
         let last_old = self.read_arrow_array_element(container.clone(), last_idx, line)?;
@@ -14689,7 +14689,7 @@ impl VMHelper {
     ) -> Result<StrykeValue, FlowOrError> {
         if indices.is_empty() {
             return Err(
-                PerlError::runtime("array slice increment needs at least one index", line).into(),
+                StrykeError::runtime("array slice increment needs at least one index", line).into(),
             );
         }
         let last_idx = *indices.last().expect("non-empty indices");
@@ -14713,7 +14713,7 @@ impl VMHelper {
         line: usize,
     ) -> Result<StrykeValue, FlowOrError> {
         let last_idx = *indices.last().ok_or_else(|| {
-            PerlError::runtime("array slice increment needs at least one index", line)
+            StrykeError::runtime("array slice increment needs at least one index", line)
         })?;
         let last_old = self.scope.get_array_element(stash_array_name, last_idx);
         let new_val = if kind & 1 == 0 {
@@ -14737,7 +14737,7 @@ impl VMHelper {
         line: usize,
     ) -> Result<StrykeValue, FlowOrError> {
         if indices.is_empty() {
-            return Err(PerlError::runtime("assign to empty array slice", line).into());
+            return Err(StrykeError::runtime("assign to empty array slice", line).into());
         }
         let last_idx = *indices.last().expect("non-empty indices");
         let last_old = self.scope.get_array_element(stash_array_name, last_idx);
@@ -14775,7 +14775,7 @@ impl VMHelper {
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
             return Ok(StrykeValue::UNDEF);
         }
-        Err(PerlError::runtime("Can't assign to arrow array deref on non-array-ref", line).into())
+        Err(StrykeError::runtime("Can't assign to arrow array deref on non-array-ref", line).into())
     }
 
     /// `*name = $coderef` — install subroutine alias (tree [`assign_value`] and VM [`crate::bytecode::Op::TypeglobAssignFromValue`]).
@@ -14797,7 +14797,7 @@ impl VMHelper {
             self.subs.insert(lhs_sub, sub);
             return Ok(StrykeValue::UNDEF);
         }
-        Err(PerlError::runtime(
+        Err(StrykeError::runtime(
             "typeglob assignment requires a subroutine reference (e.g. *foo = \\&bar) or another typeglob (*foo = *bar)",
             line,
         )
@@ -14851,7 +14851,7 @@ impl VMHelper {
             // declared name without re-running the initializer.
             ExprKind::MyExpr { decls, .. } => {
                 let first = decls.first().ok_or_else(|| {
-                    FlowOrError::Error(PerlError::runtime(
+                    FlowOrError::Error(StrykeError::runtime(
                         "assign_value: empty MyExpr decl list",
                         target.line,
                     ))
@@ -14884,7 +14884,7 @@ impl VMHelper {
             ExprKind::ScalarVar(name) => {
                 let stor = self.tree_scalar_storage_name(name);
                 if self.scope.is_scalar_frozen(&stor) {
-                    return Err(FlowOrError::Error(PerlError::runtime(
+                    return Err(FlowOrError::Error(StrykeError::runtime(
                         format!("Modification of a frozen value: ${}", name),
                         target.line,
                     )));
@@ -14915,7 +14915,7 @@ impl VMHelper {
             }
             ExprKind::ArrayVar(name) => {
                 if self.scope.is_array_frozen(name) {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("Modification of a frozen value: @{}", name),
                         target.line,
                     )
@@ -14925,7 +14925,7 @@ impl VMHelper {
                     && !name.contains("::")
                     && !self.scope.array_binding_exists(name)
                 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!(
                             "Global symbol \"@{}\" requires explicit package name (did you forget to declare \"my @{}\"?)",
                             name, name
@@ -14940,7 +14940,7 @@ impl VMHelper {
             ExprKind::HashVar(name) => {
                 if self.strict_vars && !name.contains("::") && !self.scope.hash_binding_exists(name)
                 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!(
                             "Global symbol \"%{}\" requires explicit package name (did you forget to declare \"my %{}\"?)",
                             name, name
@@ -14964,7 +14964,7 @@ impl VMHelper {
                     && !array.contains("::")
                     && !self.scope.array_binding_exists(array)
                 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!(
                             "Global symbol \"@{}\" requires explicit package name (did you forget to declare \"my @{}\"?)",
                             array, array
@@ -14974,7 +14974,7 @@ impl VMHelper {
                     .into());
                 }
                 if self.scope.is_array_frozen(array) {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("Modification of a frozen value: @{}", array),
                         target.line,
                     )
@@ -15008,12 +15008,12 @@ impl VMHelper {
             ExprKind::ArraySlice { array, indices } => {
                 if indices.is_empty() {
                     return Err(
-                        PerlError::runtime("assign to empty array slice", target.line).into(),
+                        StrykeError::runtime("assign to empty array slice", target.line).into(),
                     );
                 }
                 self.check_strict_array_var(array, target.line)?;
                 if self.scope.is_array_frozen(array) {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("Modification of a frozen value: @{}", array),
                         target.line,
                     )
@@ -15026,7 +15026,7 @@ impl VMHelper {
             ExprKind::HashElement { hash, key } => {
                 if self.strict_vars && !hash.contains("::") && !self.scope.hash_binding_exists(hash)
                 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!(
                             "Global symbol \"%{}\" requires explicit package name (did you forget to declare \"my %{}\"?)",
                             hash, hash
@@ -15036,7 +15036,7 @@ impl VMHelper {
                     .into());
                 }
                 if self.scope.is_hash_frozen(hash) {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("Modification of a frozen value: %%{}", hash),
                         target.line,
                     )
@@ -15069,12 +15069,12 @@ impl VMHelper {
             ExprKind::HashSlice { hash, keys } => {
                 if keys.is_empty() {
                     return Err(
-                        PerlError::runtime("assign to empty hash slice", target.line).into(),
+                        StrykeError::runtime("assign to empty hash slice", target.line).into(),
                     );
                 }
                 if self.strict_vars && !hash.contains("::") && !self.scope.hash_binding_exists(hash)
                 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!(
                             "Global symbol \"%{}\" requires explicit package name (did you forget to declare \"my %{}\"?)",
                             hash, hash
@@ -15084,7 +15084,7 @@ impl VMHelper {
                     .into());
                 }
                 if self.scope.is_hash_frozen(hash) {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("Modification of a frozen value: %%{}", hash),
                         target.line,
                     )
@@ -15134,7 +15134,7 @@ impl VMHelper {
                     return Ok(StrykeValue::UNDEF);
                 }
                 Err(
-                    PerlError::runtime("assign to list slice: unsupported base", target.line)
+                    StrykeError::runtime("assign to list slice: unsupported base", target.line)
                         .into(),
                 )
             }
@@ -15480,7 +15480,7 @@ impl VMHelper {
         &mut self,
         name: &str,
         val: &StrykeValue,
-    ) -> Result<(), PerlError> {
+    ) -> Result<(), StrykeError> {
         let name = self.english_scalar_name(name);
         match name {
             "!" => {
@@ -15607,7 +15607,7 @@ impl VMHelper {
         match &expr.kind {
             ExprKind::ArrayVar(name) => Ok(name.clone()),
             ExprKind::ScalarVar(name) => Ok(name.clone()), // @_ written as shift of implicit
-            _ => Err(PerlError::runtime("Expected array", expr.line).into()),
+            _ => Err(StrykeError::runtime("Expected array", expr.line).into()),
         }
     }
 
@@ -15773,7 +15773,7 @@ impl VMHelper {
         if let Some(name) = target.as_str() {
             return self.call_named_sub(&name, arg_vals, line, want);
         }
-        Err(PerlError::runtime("Can't use non-code reference as a subroutine", line).into())
+        Err(StrykeError::runtime("Can't use non-code reference as a subroutine", line).into())
     }
 
     /// Bare `uniq` / `distinct` (alias of `uniq`) / `shuffle` / `chunked` / `windowed` / `zip` /
@@ -15806,7 +15806,7 @@ impl VMHelper {
         // surprising results downstream (e.g. `… |> grep {0} |> sum` = topic).
         match crate::list_builtins::dispatch_by_name(self, canonical, &args, want) {
             Some(r) => r,
-            None => Err(PerlError::runtime(
+            None => Err(StrykeError::runtime(
                 format!("internal: not a stryke list builtin: {name}"),
                 line,
             )
@@ -15843,13 +15843,13 @@ impl VMHelper {
             }
             "deque" => {
                 if !args.is_empty() {
-                    return Err(PerlError::runtime("deque() takes no arguments", line).into());
+                    return Err(StrykeError::runtime("deque() takes no arguments", line).into());
                 }
                 Ok(StrykeValue::deque(Arc::new(Mutex::new(VecDeque::new()))))
             }
             "defer__internal" => {
                 if args.len() != 1 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "defer__internal expects one coderef argument",
                         line,
                     )
@@ -15861,7 +15861,7 @@ impl VMHelper {
             "heap" => {
                 if args.len() != 1 {
                     return Err(
-                        PerlError::runtime("heap() expects one comparator sub", line).into(),
+                        StrykeError::runtime("heap() expects one comparator sub", line).into(),
                     );
                 }
                 if let Some(sub) = args[0].as_code_ref() {
@@ -15870,7 +15870,7 @@ impl VMHelper {
                         cmp: Arc::clone(&sub),
                     }))))
                 } else {
-                    Err(PerlError::runtime("heap() requires a code reference", line).into())
+                    Err(StrykeError::runtime("heap() requires a code reference", line).into())
                 }
             }
             "pipeline" => {
@@ -15908,7 +15908,7 @@ impl VMHelper {
             }
             "ppool" => {
                 if args.len() != 1 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "ppool() expects one argument (worker count)",
                         line,
                     )
@@ -15918,7 +15918,7 @@ impl VMHelper {
             }
             "barrier" => {
                 if args.len() != 1 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "barrier() expects one argument (party count)",
                         line,
                     )
@@ -15934,7 +15934,7 @@ impl VMHelper {
                     args.to_vec()
                 };
                 let c = RemoteCluster::from_list_args(&items)
-                    .map_err(|msg| PerlError::runtime(msg, line))?;
+                    .map_err(|msg| StrykeError::runtime(msg, line))?;
                 Ok(StrykeValue::remote_cluster(Arc::new(c)))
             }
             _ => {
@@ -15956,7 +15956,7 @@ impl VMHelper {
                                 };
                             }
                         }
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             format!(
                                 "static::{} — method not found on class {}",
                                 method_name, c.def.name
@@ -15965,7 +15965,7 @@ impl VMHelper {
                         )
                         .into());
                     }
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "static:: can only be used inside a class method",
                         line,
                     )
@@ -16020,7 +16020,7 @@ impl VMHelper {
                                     return Ok(args[0].clone());
                                 }
                                 _ => {
-                                    return Err(PerlError::runtime(
+                                    return Err(StrykeError::runtime(
                                         format!(
                                             "static field `{}::{}` takes 0 or 1 arguments",
                                             class_name, member_name
@@ -16037,7 +16037,7 @@ impl VMHelper {
                 if let Some(r) = self.try_autoload_call(name, args, line, want, None) {
                     return r;
                 }
-                Err(PerlError::runtime(self.undefined_subroutine_call_message(name), line).into())
+                Err(StrykeError::runtime(self.undefined_subroutine_call_message(name), line).into())
             }
         }
     }
@@ -16105,7 +16105,7 @@ impl VMHelper {
 
         // Prevent instantiation of abstract classes
         if def.is_abstract {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("cannot instantiate abstract class `{}`", def.name),
                 _line,
             )
@@ -16152,7 +16152,7 @@ impl VMHelper {
                 StrykeValue::UNDEF
             };
             ty.check_value(&val).map_err(|msg| {
-                PerlError::type_error(
+                StrykeError::type_error(
                     format!("class {} field `{}`: {}", def.name, name, msg),
                     _line,
                 )
@@ -16369,7 +16369,7 @@ impl VMHelper {
         line: usize,
     ) -> ExecResult {
         let variant_idx = def.variant_index(variant_name).ok_or_else(|| {
-            FlowOrError::Error(PerlError::runtime(
+            FlowOrError::Error(StrykeError::runtime(
                 format!("unknown variant `{}` for enum `{}`", variant_name, def.name),
                 line,
             ))
@@ -16377,7 +16377,7 @@ impl VMHelper {
         let variant = &def.variants[variant_idx];
         let data = if variant.ty.is_some() {
             if args.is_empty() {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "enum variant `{}::{}` requires data",
                         def.name, variant_name
@@ -16393,7 +16393,7 @@ impl VMHelper {
             }
         } else {
             if !args.is_empty() {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "enum variant `{}::{}` does not take data",
                         def.name, variant_name
@@ -16431,7 +16431,7 @@ impl VMHelper {
             "printf" => self.io_handle_printf(name, args, line),
             "getline" | "readline" => {
                 if !args.is_empty() {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("{}: too many arguments", method),
                         line,
                     ));
@@ -16440,20 +16440,20 @@ impl VMHelper {
             }
             "close" => {
                 if !args.is_empty() {
-                    return Err(PerlError::runtime("close: too many arguments", line));
+                    return Err(StrykeError::runtime("close: too many arguments", line));
                 }
                 self.close_builtin_execute(name.to_string())
             }
             "eof" => {
                 if !args.is_empty() {
-                    return Err(PerlError::runtime("eof: too many arguments", line));
+                    return Err(StrykeError::runtime("eof: too many arguments", line));
                 }
                 let at_eof = !self.has_input_handle(name);
                 Ok(StrykeValue::integer(if at_eof { 1 } else { 0 }))
             }
             "getc" => {
                 if !args.is_empty() {
-                    return Err(PerlError::runtime("getc: too many arguments", line));
+                    return Err(StrykeError::runtime("getc: too many arguments", line));
                 }
                 match crate::builtins::try_builtin(
                     self,
@@ -16462,7 +16462,7 @@ impl VMHelper {
                     line,
                 ) {
                     Some(r) => r,
-                    None => Err(PerlError::runtime("getc: not available", line)),
+                    None => Err(StrykeError::runtime("getc: not available", line)),
                 }
             }
             "binmode" => match crate::builtins::try_builtin(
@@ -16472,7 +16472,7 @@ impl VMHelper {
                 line,
             ) {
                 Some(r) => r,
-                None => Err(PerlError::runtime("binmode: not available", line)),
+                None => Err(StrykeError::runtime("binmode: not available", line)),
             },
             "fileno" => match crate::builtins::try_builtin(
                 self,
@@ -16481,15 +16481,15 @@ impl VMHelper {
                 line,
             ) {
                 Some(r) => r,
-                None => Err(PerlError::runtime("fileno: not available", line)),
+                None => Err(StrykeError::runtime("fileno: not available", line)),
             },
             "flush" => {
                 if !args.is_empty() {
-                    return Err(PerlError::runtime("flush: too many arguments", line));
+                    return Err(StrykeError::runtime("flush: too many arguments", line));
                 }
                 self.io_handle_flush(name, line)
             }
-            _ => Err(PerlError::runtime(
+            _ => Err(StrykeError::runtime(
                 format!("Unknown method for filehandle: {}", method),
                 line,
             )),
@@ -16508,7 +16508,7 @@ impl VMHelper {
                 if let Some(writer) = self.output_handles.get_mut(name) {
                     let _ = IoWrite::flush(&mut *writer);
                 } else {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("flush on unopened filehandle {}", name),
                         line,
                     ));
@@ -16526,7 +16526,7 @@ impl VMHelper {
         line: usize,
     ) -> PerlResult<StrykeValue> {
         if newline && (self.feature_bits & FEAT_SAY) == 0 {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "say() is disabled (enable with use feature 'say' or use feature ':5.10')",
                 line,
             ));
@@ -16580,7 +16580,7 @@ impl VMHelper {
                         let _ = writer.flush();
                     }
                 } else {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("print on unopened filehandle {}", name),
                         line,
                     ));
@@ -16601,7 +16601,7 @@ impl VMHelper {
                 Ok(s) => s,
                 Err(FlowOrError::Error(e)) => return Err(e),
                 Err(FlowOrError::Flow(_)) => {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "printf: unexpected control flow in sprintf",
                         line,
                     ));
@@ -16615,7 +16615,7 @@ impl VMHelper {
             Ok(s) => s,
             Err(FlowOrError::Error(e)) => return Err(e),
             Err(FlowOrError::Flow(_)) => {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     "printf: unexpected control flow in sprintf",
                     line,
                 ));
@@ -16641,7 +16641,7 @@ impl VMHelper {
                         let _ = writer.flush();
                     }
                 } else {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("printf on unopened filehandle {}", name),
                         line,
                     ));
@@ -16681,7 +16681,7 @@ impl VMHelper {
                         let field = &s.def.fields[idx];
                         let new_val = args[0].clone();
                         if let Err(msg) = field.ty.check_value(&new_val) {
-                            return Some(Err(PerlError::type_error(
+                            return Some(Err(StrykeError::type_error(
                                 format!("struct {} field `{}`: {}", s.def.name, field.name, msg),
                                 line,
                             )));
@@ -16690,7 +16690,7 @@ impl VMHelper {
                         return Some(Ok(new_val));
                     }
                     _ => {
-                        return Some(Err(PerlError::runtime(
+                        return Some(Err(StrykeError::runtime(
                             format!(
                                 "struct field `{}` takes 0 arguments (getter) or 1 argument (setter), got {}",
                                 method,
@@ -16713,7 +16713,7 @@ impl VMHelper {
                         if let Some(idx) = s.def.field_index(&k) {
                             let field = &s.def.fields[idx];
                             if let Err(msg) = field.ty.check_value(&v) {
-                                return Some(Err(PerlError::type_error(
+                                return Some(Err(StrykeError::type_error(
                                     format!(
                                         "struct {} field `{}`: {}",
                                         s.def.name, field.name, msg
@@ -16723,7 +16723,7 @@ impl VMHelper {
                             }
                             new_values[idx] = v;
                         } else {
-                            return Some(Err(PerlError::runtime(
+                            return Some(Err(StrykeError::runtime(
                                 format!("struct {}: unknown field `{}`", s.def.name, k),
                                 line,
                             )));
@@ -16737,7 +16737,7 @@ impl VMHelper {
                 "to_hash" => {
                     // Destructure to hash: $p->to_hash returns { x => ..., y => ... }
                     if !args.is_empty() {
-                        return Some(Err(PerlError::runtime(
+                        return Some(Err(StrykeError::runtime(
                             "struct to_hash takes no arguments",
                             line,
                         )));
@@ -16753,7 +16753,7 @@ impl VMHelper {
                     // Like to_hash but recurse: nested struct/class/hash/
                     // array values become plain hashref/arrayref trees.
                     if !args.is_empty() {
-                        return Some(Err(PerlError::runtime(
+                        return Some(Err(StrykeError::runtime(
                             "struct to_hash_rec takes no arguments",
                             line,
                         )));
@@ -16763,7 +16763,7 @@ impl VMHelper {
                 "fields" => {
                     // Field list: $p->fields returns field names
                     if !args.is_empty() {
-                        return Some(Err(PerlError::runtime(
+                        return Some(Err(StrykeError::runtime(
                             "struct fields takes no arguments",
                             line,
                         )));
@@ -16779,7 +16779,7 @@ impl VMHelper {
                 "clone" => {
                     // Clone: $p->clone deep copies
                     if !args.is_empty() {
-                        return Some(Err(PerlError::runtime(
+                        return Some(Err(StrykeError::runtime(
                             "struct clone takes no arguments",
                             line,
                         )));
@@ -16803,7 +16803,7 @@ impl VMHelper {
                         Ok(v) => Ok(v),
                         Err(FlowOrError::Error(e)) => Err(e),
                         Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),
-                        Err(FlowOrError::Flow(_)) => Err(PerlError::runtime(
+                        Err(FlowOrError::Flow(_)) => Err(StrykeError::runtime(
                             "unexpected control flow in struct method",
                             line,
                         )),
@@ -16838,7 +16838,7 @@ impl VMHelper {
                             .as_class_inst()
                             .map(|ci| ci.def.name.clone());
                         if caller_class.as_deref() != Some(owner_class.as_str()) {
-                            return Some(Err(PerlError::runtime(
+                            return Some(Err(StrykeError::runtime(
                                 format!("field `{}` of class {} is private", method, owner_class),
                                 line,
                             )));
@@ -16855,7 +16855,7 @@ impl VMHelper {
                             caller == owner_class || self.class_inherits_from(caller, owner_class)
                         });
                         if !allowed {
-                            return Some(Err(PerlError::runtime(
+                            return Some(Err(StrykeError::runtime(
                                 format!("field `{}` of class {} is protected", method, owner_class),
                                 line,
                             )));
@@ -16871,7 +16871,7 @@ impl VMHelper {
                     1 => {
                         let new_val = args[0].clone();
                         if let Err(msg) = ty.check_value(&new_val) {
-                            return Some(Err(PerlError::type_error(
+                            return Some(Err(StrykeError::type_error(
                                 format!("class {} field `{}`: {}", c.def.name, method, msg),
                                 line,
                             )));
@@ -16880,7 +16880,7 @@ impl VMHelper {
                         return Some(Ok(new_val));
                     }
                     _ => {
-                        return Some(Err(PerlError::runtime(
+                        return Some(Err(StrykeError::runtime(
                             format!(
                                 "class field `{}` takes 0 arguments (getter) or 1 argument (setter), got {}",
                                 method,
@@ -16902,14 +16902,14 @@ impl VMHelper {
                         if let Some(idx) = all_fields.iter().position(|(name, _, _)| name == &k) {
                             let (_, _, ref ty) = all_fields[idx];
                             if let Err(msg) = ty.check_value(&v) {
-                                return Some(Err(PerlError::type_error(
+                                return Some(Err(StrykeError::type_error(
                                     format!("class {} field `{}`: {}", c.def.name, k, msg),
                                     line,
                                 )));
                             }
                             new_values[idx] = v;
                         } else {
-                            return Some(Err(PerlError::runtime(
+                            return Some(Err(StrykeError::runtime(
                                 format!("class {}: unknown field `{}`", c.def.name, k),
                                 line,
                             )));
@@ -16926,7 +16926,7 @@ impl VMHelper {
                 }
                 "to_hash" => {
                     if !args.is_empty() {
-                        return Some(Err(PerlError::runtime(
+                        return Some(Err(StrykeError::runtime(
                             "class to_hash takes no arguments",
                             line,
                         )));
@@ -16946,7 +16946,7 @@ impl VMHelper {
                     // result is JSON-serializable end-to-end without any
                     // surviving ClassInstance/StructInstance leaves.
                     if !args.is_empty() {
-                        return Some(Err(PerlError::runtime(
+                        return Some(Err(StrykeError::runtime(
                             "class to_hash_rec takes no arguments",
                             line,
                         )));
@@ -16955,7 +16955,7 @@ impl VMHelper {
                 }
                 "fields" => {
                     if !args.is_empty() {
-                        return Some(Err(PerlError::runtime(
+                        return Some(Err(StrykeError::runtime(
                             "class fields takes no arguments",
                             line,
                         )));
@@ -16968,7 +16968,7 @@ impl VMHelper {
                 }
                 "clone" => {
                     if !args.is_empty() {
-                        return Some(Err(PerlError::runtime(
+                        return Some(Err(StrykeError::runtime(
                             "class clone takes no arguments",
                             line,
                         )));
@@ -16984,7 +16984,7 @@ impl VMHelper {
                 }
                 "isa" => {
                     if args.len() != 1 {
-                        return Some(Err(PerlError::runtime("isa requires one argument", line)));
+                        return Some(Err(StrykeError::runtime("isa requires one argument", line)));
                     }
                     let class_name = args[0].to_string();
                     let is_a = c.isa(&class_name);
@@ -16996,7 +16996,7 @@ impl VMHelper {
                 }
                 "does" => {
                     if args.len() != 1 {
-                        return Some(Err(PerlError::runtime("does requires one argument", line)));
+                        return Some(Err(StrykeError::runtime("does requires one argument", line)));
                     }
                     let trait_name = args[0].to_string();
                     let implements = c.def.implements.contains(&trait_name);
@@ -17008,7 +17008,7 @@ impl VMHelper {
                 }
                 "methods" => {
                     if !args.is_empty() {
-                        return Some(Err(PerlError::runtime("methods takes no arguments", line)));
+                        return Some(Err(StrykeError::runtime("methods takes no arguments", line)));
                     }
                     let mut names = Vec::new();
                     self.collect_class_method_names(&c.def, &mut names);
@@ -17018,7 +17018,7 @@ impl VMHelper {
                 }
                 "superclass" => {
                     if !args.is_empty() {
-                        return Some(Err(PerlError::runtime(
+                        return Some(Err(StrykeError::runtime(
                             "superclass takes no arguments",
                             line,
                         )));
@@ -17058,7 +17058,7 @@ impl VMHelper {
                             .as_class_inst()
                             .map(|ci| ci.def.name.clone());
                         if caller_class.as_deref() != Some(owner_class.as_str()) {
-                            return Some(Err(PerlError::runtime(
+                            return Some(Err(StrykeError::runtime(
                                 format!("method `{}` of class {} is private", method, owner_class),
                                 line,
                             )));
@@ -17075,7 +17075,7 @@ impl VMHelper {
                                 || self.class_inherits_from(caller, owner_class)
                         });
                         if !allowed {
-                            return Some(Err(PerlError::runtime(
+                            return Some(Err(StrykeError::runtime(
                                 format!(
                                     "method `{}` of class {} is protected",
                                     method, owner_class
@@ -17095,7 +17095,7 @@ impl VMHelper {
                             Ok(v) => Ok(v),
                             Err(FlowOrError::Error(e)) => Err(e),
                             Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),
-                            Err(FlowOrError::Flow(_)) => Err(PerlError::runtime(
+                            Err(FlowOrError::Flow(_)) => Err(StrykeError::runtime(
                                 "unexpected control flow in class method",
                                 line,
                             )),
@@ -17132,7 +17132,7 @@ impl VMHelper {
         if let Some(g) = receiver.as_generator() {
             if method == "next" {
                 if !args.is_empty() {
-                    return Some(Err(PerlError::runtime(
+                    return Some(Err(StrykeError::runtime(
                         "generator->next takes no arguments",
                         line,
                     )));
@@ -17164,7 +17164,7 @@ impl VMHelper {
         match method {
             "nrow" | "nrows" => {
                 if !args.is_empty() {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("dataframe {} takes no arguments", method),
                         line,
                     ));
@@ -17173,7 +17173,7 @@ impl VMHelper {
             }
             "ncol" | "ncols" => {
                 if !args.is_empty() {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("dataframe {} takes no arguments", method),
                         line,
                     ));
@@ -17182,13 +17182,13 @@ impl VMHelper {
             }
             "filter" => {
                 if args.len() != 1 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "dataframe filter expects 1 argument (sub)",
                         line,
                     ));
                 }
                 let Some(sub) = args[0].as_code_ref() else {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "dataframe filter expects a code reference",
                         line,
                     ));
@@ -17233,7 +17233,7 @@ impl VMHelper {
             }
             "group_by" => {
                 if args.len() != 1 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "dataframe group_by expects 1 column name",
                         line,
                     ));
@@ -17241,7 +17241,7 @@ impl VMHelper {
                 let key = args[0].to_string();
                 let inner = d.lock();
                 if inner.col_index(&key).is_none() {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("dataframe group_by: unknown column \"{}\"", key),
                         line,
                     ));
@@ -17255,7 +17255,7 @@ impl VMHelper {
             }
             "sum" => {
                 if args.len() != 1 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "dataframe sum expects 1 column name",
                         line,
                     ));
@@ -17263,7 +17263,7 @@ impl VMHelper {
                 let col_name = args[0].to_string();
                 let inner = d.lock();
                 let val_idx = inner.col_index(&col_name).ok_or_else(|| {
-                    PerlError::runtime(
+                    StrykeError::runtime(
                         format!("dataframe sum: unknown column \"{}\"", col_name),
                         line,
                     )
@@ -17271,7 +17271,7 @@ impl VMHelper {
                 match &inner.group_by {
                     Some(gcol) => {
                         let gi = inner.col_index(gcol).ok_or_else(|| {
-                            PerlError::runtime(
+                            StrykeError::runtime(
                                 format!("dataframe sum: unknown group column \"{}\"", gcol),
                                 line,
                             )
@@ -17304,7 +17304,7 @@ impl VMHelper {
                     }
                 }
             }
-            _ => Err(PerlError::runtime(
+            _ => Err(StrykeError::runtime(
                 format!("Unknown method for dataframe: {}", method),
                 line,
             )),
@@ -17322,7 +17322,7 @@ impl VMHelper {
         match method {
             "has" | "contains" | "member" => {
                 if args.len() != 1 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "set->has expects one argument (element)",
                         line,
                     ));
@@ -17332,17 +17332,17 @@ impl VMHelper {
             }
             "size" | "len" | "count" => {
                 if !args.is_empty() {
-                    return Err(PerlError::runtime("set->size takes no arguments", line));
+                    return Err(StrykeError::runtime("set->size takes no arguments", line));
                 }
                 Ok(StrykeValue::integer(s.len() as i64))
             }
             "values" | "list" | "elements" => {
                 if !args.is_empty() {
-                    return Err(PerlError::runtime("set->values takes no arguments", line));
+                    return Err(StrykeError::runtime("set->values takes no arguments", line));
                 }
                 Ok(StrykeValue::array(s.values().cloned().collect()))
             }
-            _ => Err(PerlError::runtime(
+            _ => Err(StrykeError::runtime(
                 format!("Unknown method for set: {}", method),
                 line,
             )),
@@ -17359,14 +17359,14 @@ impl VMHelper {
         match method {
             "push_back" => {
                 if args.len() != 1 {
-                    return Err(PerlError::runtime("push_back expects 1 argument", line));
+                    return Err(StrykeError::runtime("push_back expects 1 argument", line));
                 }
                 d.lock().push_back(args[0].clone());
                 Ok(StrykeValue::integer(d.lock().len() as i64))
             }
             "push_front" => {
                 if args.len() != 1 {
-                    return Err(PerlError::runtime("push_front expects 1 argument", line));
+                    return Err(StrykeError::runtime("push_front expects 1 argument", line));
                 }
                 d.lock().push_front(args[0].clone());
                 Ok(StrykeValue::integer(d.lock().len() as i64))
@@ -17374,7 +17374,7 @@ impl VMHelper {
             "pop_back" => Ok(d.lock().pop_back().unwrap_or(StrykeValue::UNDEF)),
             "pop_front" => Ok(d.lock().pop_front().unwrap_or(StrykeValue::UNDEF)),
             "size" | "len" => Ok(StrykeValue::integer(d.lock().len() as i64)),
-            _ => Err(PerlError::runtime(
+            _ => Err(StrykeError::runtime(
                 format!("Unknown method for deque: {}", method),
                 line,
             )),
@@ -17391,7 +17391,7 @@ impl VMHelper {
         match method {
             "push" => {
                 if args.len() != 1 {
-                    return Err(PerlError::runtime("heap push expects 1 argument", line));
+                    return Err(StrykeError::runtime("heap push expects 1 argument", line));
                 }
                 let mut g = h.lock();
                 let n = g.items.len();
@@ -17422,7 +17422,7 @@ impl VMHelper {
                 .first()
                 .cloned()
                 .unwrap_or(StrykeValue::UNDEF)),
-            _ => Err(PerlError::runtime(
+            _ => Err(StrykeError::runtime(
                 format!("Unknown method for heap: {}", method),
                 line,
             )),
@@ -17440,11 +17440,11 @@ impl VMHelper {
             "submit" => pool.submit(self, args, line),
             "collect" => {
                 if !args.is_empty() {
-                    return Err(PerlError::runtime("collect() takes no arguments", line));
+                    return Err(StrykeError::runtime("collect() takes no arguments", line));
                 }
                 pool.collect(line)
             }
-            _ => Err(PerlError::runtime(
+            _ => Err(StrykeError::runtime(
                 format!("Unknown method for ppool: {}", method),
                 line,
             )),
@@ -17461,12 +17461,12 @@ impl VMHelper {
         match method {
             "wait" => {
                 if !args.is_empty() {
-                    return Err(PerlError::runtime("wait() takes no arguments", line));
+                    return Err(StrykeError::runtime("wait() takes no arguments", line));
                 }
                 let _ = barrier.0.wait();
                 Ok(StrykeValue::integer(1))
             }
-            _ => Err(PerlError::runtime(
+            _ => Err(StrykeError::runtime(
                 format!("Unknown method for barrier: {}", method),
                 line,
             )),
@@ -17481,7 +17481,7 @@ impl VMHelper {
         line: usize,
     ) -> PerlResult<StrykeValue> {
         if !args.is_empty() {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("capture: {} takes no arguments", method),
                 line,
             ));
@@ -17491,7 +17491,7 @@ impl VMHelper {
             "stderr" => Ok(StrykeValue::string(c.stderr.clone())),
             "exitcode" => Ok(StrykeValue::integer(c.exitcode)),
             "failed" => Ok(StrykeValue::integer(if c.exitcode != 0 { 1 } else { 0 })),
-            _ => Err(PerlError::runtime(
+            _ => Err(StrykeError::runtime(
                 format!("Unknown method for capture: {}", method),
                 line,
             )),
@@ -17612,7 +17612,7 @@ impl VMHelper {
         line: usize,
     ) -> PerlResult<StrykeValue> {
         if args.is_empty() {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "collect() expects at least one argument",
                 line,
             ));
@@ -17636,7 +17636,7 @@ impl VMHelper {
     ) -> PerlResult<()> {
         let mut g = p.lock();
         if g.has_scalar_terminal {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "pipeline: cannot chain after preduce / preduce_init / pmap_reduce (must be last before collect)",
                 line,
             ));
@@ -17659,20 +17659,20 @@ impl VMHelper {
         name: &str,
     ) -> PerlResult<(Arc<PerlSub>, bool)> {
         if args.is_empty() {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("pipeline {}: expects at least 1 argument (code ref)", name),
                 line,
             ));
         }
         let Some(sub) = args[0].as_code_ref() else {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("pipeline {}: first argument must be a code reference", name),
                 line,
             ));
         };
         let progress = args.get(1).map(|x| x.is_true()).unwrap_or(false);
         if args.len() > 2 {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!(
                     "pipeline {}: at most 2 arguments (sub, optional progress flag)",
                     name
@@ -17693,13 +17693,13 @@ impl VMHelper {
         match method {
             "filter" | "f" | "grep" => {
                 if args.len() != 1 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "pipeline filter/grep expects 1 argument (sub)",
                         line,
                     ));
                 }
                 let Some(sub) = args[0].as_code_ref() else {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "pipeline filter/grep expects a code reference",
                         line,
                     ));
@@ -17709,13 +17709,13 @@ impl VMHelper {
             }
             "map" => {
                 if args.len() != 1 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "pipeline map expects 1 argument (sub)",
                         line,
                     ));
                 }
                 let Some(sub) = args[0].as_code_ref() else {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "pipeline map expects a code reference",
                         line,
                     ));
@@ -17725,13 +17725,13 @@ impl VMHelper {
             }
             "tap" | "peek" => {
                 if args.len() != 1 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "pipeline tap/peek expects 1 argument (sub)",
                         line,
                     ));
                 }
                 let Some(sub) = args[0].as_code_ref() else {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "pipeline tap/peek expects a code reference",
                         line,
                     ));
@@ -17741,7 +17741,7 @@ impl VMHelper {
             }
             "take" => {
                 if args.len() != 1 {
-                    return Err(PerlError::runtime("pipeline take expects 1 argument", line));
+                    return Err(StrykeError::runtime("pipeline take expects 1 argument", line));
                 }
                 let n = args[0].to_int();
                 self.pipeline_push(&p, PipelineOp::Take(n), line)?;
@@ -17764,21 +17764,21 @@ impl VMHelper {
             }
             "pmap_chunked" => {
                 if args.len() < 2 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "pipeline pmap_chunked expects chunk size and a code reference",
                         line,
                     ));
                 }
                 let chunk = args[0].to_int().max(1);
                 let Some(sub) = args[1].as_code_ref() else {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "pipeline pmap_chunked: second argument must be a code reference",
                         line,
                     ));
                 };
                 let progress = args.get(2).map(|x| x.is_true()).unwrap_or(false);
                 if args.len() > 3 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "pipeline pmap_chunked: chunk, sub, optional progress (at most 3 args)",
                         line,
                     ));
@@ -17806,7 +17806,7 @@ impl VMHelper {
                     }
                     2 => {
                         let Some(s) = args[0].as_code_ref() else {
-                            return Err(PerlError::runtime(
+                            return Err(StrykeError::runtime(
                                 "pipeline psort: with two arguments, the first must be a comparator sub",
                                 line,
                             ));
@@ -17814,7 +17814,7 @@ impl VMHelper {
                         (Some(s), args[1].is_true())
                     }
                     _ => {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             "pipeline psort: 0 args, 1 (sub or progress), or 2 (sub, progress)",
                             line,
                         ));
@@ -17835,21 +17835,21 @@ impl VMHelper {
             }
             "preduce_init" => {
                 if args.len() < 2 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "pipeline preduce_init expects init value and a code reference",
                         line,
                     ));
                 }
                 let init = args[0].clone();
                 let Some(sub) = args[1].as_code_ref() else {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "pipeline preduce_init: second argument must be a code reference",
                         line,
                     ));
                 };
                 let progress = args.get(2).map(|x| x.is_true()).unwrap_or(false);
                 if args.len() > 3 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "pipeline preduce_init: init, sub, optional progress (at most 3 args)",
                         line,
                     ));
@@ -17867,26 +17867,26 @@ impl VMHelper {
             }
             "pmap_reduce" => {
                 if args.len() < 2 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "pipeline pmap_reduce expects map sub and reduce sub",
                         line,
                     ));
                 }
                 let Some(map) = args[0].as_code_ref() else {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "pipeline pmap_reduce: first argument must be a code reference (map)",
                         line,
                     ));
                 };
                 let Some(reduce) = args[1].as_code_ref() else {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "pipeline pmap_reduce: second argument must be a code reference (reduce)",
                         line,
                     ));
                 };
                 let progress = args.get(2).map(|x| x.is_true()).unwrap_or(false);
                 if args.len() > 3 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "pipeline pmap_reduce: map, reduce, optional progress (at most 3 args)",
                         line,
                     ));
@@ -17904,7 +17904,7 @@ impl VMHelper {
             }
             "collect" => {
                 if !args.is_empty() {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "pipeline collect takes no arguments",
                         line,
                     ));
@@ -17916,7 +17916,7 @@ impl VMHelper {
                 // like `->map` — `$_` is each element (same as `map { } @_` over the stream).
                 if let Some(sub) = self.resolve_sub_by_name(method) {
                     if !args.is_empty() {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             format!(
                                 "pipeline ->{}: resolved subroutine takes no arguments; use a no-arg call or built-in ->map(sub {{ ... }}) / ->filter(sub {{ ... }})",
                                 method
@@ -17927,7 +17927,7 @@ impl VMHelper {
                     self.pipeline_push(&p, PipelineOp::Map(sub), line)?;
                     Ok(StrykeValue::pipeline(Arc::clone(&p)))
                 } else {
-                    Err(PerlError::runtime(
+                    Err(StrykeError::runtime(
                         format!("Unknown method for pipeline: {}", method),
                         line,
                     ))
@@ -18122,7 +18122,7 @@ impl VMHelper {
                         Ok(_) => {}
                         Err(FlowOrError::Error(e)) => return Err(e),
                         Err(FlowOrError::Flow(_)) => {
-                            return Err(PerlError::runtime(
+                            return Err(StrykeError::runtime(
                                 "tap: unsupported control flow in block",
                                 line,
                             ));
@@ -18175,7 +18175,7 @@ impl VMHelper {
                     let (scope_capture, atomic_arrays, atomic_hashes) =
                         self.scope.capture_with_atomics();
                     let pmap_progress = PmapProgress::new(progress, v.len());
-                    let first_err: Arc<Mutex<Option<PerlError>>> = Arc::new(Mutex::new(None));
+                    let first_err: Arc<Mutex<Option<StrykeError>>> = Arc::new(Mutex::new(None));
                     v.clone().into_par_iter().for_each(|item| {
                         if first_err.lock().is_some() {
                             return;
@@ -18194,7 +18194,7 @@ impl VMHelper {
                             Err(e) => {
                                 let stryke = match e {
                                     FlowOrError::Error(stryke) => stryke,
-                                    FlowOrError::Flow(_) => PerlError::runtime(
+                                    FlowOrError::Flow(_) => StrykeError::runtime(
                                         "return/last/next/redo not supported inside pipeline pfor block",
                                         line,
                                     ),
@@ -18481,7 +18481,7 @@ impl VMHelper {
                 | PipelineOp::PReduceInit { .. }
                 | PipelineOp::PMapReduce { .. }
                 | PipelineOp::PMapChunked { .. } => {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!(
                             "par_pipeline_stream: {:?} requires all items and cannot stream; use par_pipeline instead",
                             std::mem::discriminant(op)
@@ -18773,7 +18773,7 @@ impl VMHelper {
         });
 
         if let Some(msg) = err.lock().take() {
-            return Err(PerlError::runtime(msg, line));
+            return Err(StrykeError::runtime(msg, line));
         }
 
         let results = std::mem::take(&mut *results.lock());
@@ -18840,7 +18840,7 @@ impl VMHelper {
         line: usize,
     ) -> PerlResult<IndexMap<String, StrykeValue>> {
         let Some(m) = self.match_subject_as_hash(v) else {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!(
                     "sub signature hash destruct: expected HASH or HASH reference, got {}",
                     v.ref_type()
@@ -18872,7 +18872,7 @@ impl VMHelper {
                             Ok(v) => v,
                             Err(FlowOrError::Error(e)) => return Err(e),
                             Err(FlowOrError::Flow(_)) => {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     "unexpected control flow in parameter default",
                                     line,
                                 ))
@@ -18884,7 +18884,7 @@ impl VMHelper {
                     i += 1;
                     if let Some(t) = ty {
                         if let Err(e) = t.check_value(&val) {
-                            return Err(PerlError::runtime(
+                            return Err(StrykeError::runtime(
                                 format!("sub parameter ${}: {}", name, e),
                                 line,
                             ));
@@ -18903,7 +18903,7 @@ impl VMHelper {
                             Ok(v) => v,
                             Err(FlowOrError::Error(e)) => return Err(e),
                             Err(FlowOrError::Flow(_)) => {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     "unexpected control flow in parameter default",
                                     line,
                                 ))
@@ -18926,7 +18926,7 @@ impl VMHelper {
                             Ok(v) => v,
                             Err(FlowOrError::Error(e)) => return Err(e),
                             Err(FlowOrError::Flow(_)) => {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     "unexpected control flow in parameter default",
                                     line,
                                 ))
@@ -18948,7 +18948,7 @@ impl VMHelper {
                     let arg = argv.get(i).cloned().unwrap_or(StrykeValue::UNDEF);
                     i += 1;
                     let Some(arr) = self.match_subject_as_array(&arg) else {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             format!(
                                 "sub signature array destruct: expected ARRAY or ARRAY reference, got {}",
                                 arg.ref_type()
@@ -18960,13 +18960,13 @@ impl VMHelper {
                         .match_array_pattern_elems(&arr, elems, line)
                         .map_err(|e| match e {
                             FlowOrError::Error(stryke) => stryke,
-                            FlowOrError::Flow(_) => PerlError::runtime(
+                            FlowOrError::Flow(_) => StrykeError::runtime(
                                 "unexpected flow in sub signature array destruct",
                                 line,
                             ),
                         })?;
                     let Some(binds) = binds else {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             "sub signature array destruct: length or element mismatch",
                             line,
                         ));
@@ -19277,13 +19277,13 @@ impl VMHelper {
                     self.call_sub(&target_sub, goto_args, want, _line)
                 } else {
                     Err(
-                        PerlError::runtime(format!("Undefined subroutine &{}", target_name), _line)
+                        StrykeError::runtime(format!("Undefined subroutine &{}", target_name), _line)
                             .into(),
                     )
                 }
             }
             Err(FlowOrError::Flow(Flow::Yield(_))) => {
-                Err(PerlError::runtime("yield is only valid inside gen { }", 0).into())
+                Err(StrykeError::runtime("yield is only valid inside gen { }", 0).into())
             }
             Err(e) => Err(e),
         }
@@ -19406,7 +19406,7 @@ impl VMHelper {
                             Ok(v) => v,
                             Err(FlowOrError::Error(e)) => return Err(e),
                             Err(FlowOrError::Flow(_)) => {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     "unexpected control flow in parameter default",
                                     line,
                                 ))
@@ -19418,7 +19418,7 @@ impl VMHelper {
                     i += 1;
                     if let Some(ty) = ty_opt {
                         ty.check_value(&v).map_err(|msg| {
-                            PerlError::type_error(
+                            StrykeError::type_error(
                                 format!("method parameter ${}: {}", name, msg),
                                 line,
                             )
@@ -19437,7 +19437,7 @@ impl VMHelper {
                             Ok(v) => v,
                             Err(FlowOrError::Error(e)) => return Err(e),
                             Err(FlowOrError::Flow(_)) => {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     "unexpected control flow in parameter default",
                                     line,
                                 ))
@@ -19460,7 +19460,7 @@ impl VMHelper {
                             Ok(v) => v,
                             Err(FlowOrError::Error(e)) => return Err(e),
                             Err(FlowOrError::Flow(_)) => {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     "unexpected control flow in parameter default",
                                     line,
                                 ))
@@ -19482,7 +19482,7 @@ impl VMHelper {
                     let arg = argv.get(i).cloned().unwrap_or(StrykeValue::UNDEF);
                     i += 1;
                     let Some(arr) = self.match_subject_as_array(&arg) else {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             format!("method parameter: expected ARRAY, got {}", arg.ref_type()),
                             line,
                         ));
@@ -19492,11 +19492,11 @@ impl VMHelper {
                         .map_err(|e| match e {
                             FlowOrError::Error(stryke) => stryke,
                             FlowOrError::Flow(_) => {
-                                PerlError::runtime("unexpected flow in method array destruct", line)
+                                StrykeError::runtime("unexpected flow in method array destruct", line)
                             }
                         })?;
                     let Some(binds) = binds else {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             format!(
                                 "method parameter: array destructure failed at position {}",
                                 i
@@ -19591,7 +19591,7 @@ impl VMHelper {
         line: usize,
     ) -> ExecResult {
         if newline && (self.feature_bits & FEAT_SAY) == 0 {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "say() is disabled (enable with use feature 'say' or use feature ':5.10')",
                 line,
             )
@@ -19733,7 +19733,7 @@ impl VMHelper {
         }
         let arr_name = self.extract_array_name(Self::peel_array_builtin_operand(array))?;
         if self.scope.is_array_frozen(&arr_name) {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("Modification of a frozen value: @{}", arr_name),
                 line,
             )
@@ -19860,7 +19860,7 @@ impl VMHelper {
         }
         if let Some(s) = arr_ref.as_str() {
             if self.strict_refs {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "Can't use string (\"{}\") as an ARRAY ref while \"strict refs\" in use",
                         s
@@ -19883,7 +19883,7 @@ impl VMHelper {
             }
             return Ok(());
         }
-        Err(PerlError::runtime("push argument is not an ARRAY reference", line).into())
+        Err(StrykeError::runtime("push argument is not an ARRAY reference", line).into())
     }
 
     pub(crate) fn array_deref_len(
@@ -19899,7 +19899,7 @@ impl VMHelper {
         }
         if let Some(s) = arr_ref.as_str() {
             if self.strict_refs {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "Can't use string (\"{}\") as an ARRAY ref while \"strict refs\" in use",
                         s
@@ -19910,7 +19910,7 @@ impl VMHelper {
             }
             return Ok(self.scope.array_len(&s) as i64);
         }
-        Err(PerlError::runtime("argument is not an ARRAY reference", line).into())
+        Err(StrykeError::runtime("argument is not an ARRAY reference", line).into())
     }
 
     pub(crate) fn pop_array_deref(
@@ -19930,7 +19930,7 @@ impl VMHelper {
         }
         if let Some(s) = arr_ref.as_str() {
             if self.strict_refs {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "Can't use string (\"{}\") as an ARRAY ref while \"strict refs\" in use",
                         s
@@ -19944,7 +19944,7 @@ impl VMHelper {
                 .pop_from_array(&s)
                 .map_err(|e| FlowOrError::Error(e.at_line(line)));
         }
-        Err(PerlError::runtime("pop argument is not an ARRAY reference", line).into())
+        Err(StrykeError::runtime("pop argument is not an ARRAY reference", line).into())
     }
 
     pub(crate) fn shift_array_deref(
@@ -19968,7 +19968,7 @@ impl VMHelper {
         }
         if let Some(s) = arr_ref.as_str() {
             if self.strict_refs {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "Can't use string (\"{}\") as an ARRAY ref while \"strict refs\" in use",
                         s
@@ -19982,7 +19982,7 @@ impl VMHelper {
                 .shift_from_array(&s)
                 .map_err(|e| FlowOrError::Error(e.at_line(line)));
         }
-        Err(PerlError::runtime("shift argument is not an ARRAY reference", line).into())
+        Err(StrykeError::runtime("shift argument is not an ARRAY reference", line).into())
     }
 
     pub(crate) fn unshift_array_deref_multi(
@@ -20018,7 +20018,7 @@ impl VMHelper {
         }
         if let Some(s) = arr_ref.as_str() {
             if self.strict_refs {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "Can't use string (\"{}\") as an ARRAY ref while \"strict refs\" in use",
                         s
@@ -20037,7 +20037,7 @@ impl VMHelper {
             }
             return Ok(arr.len() as i64);
         }
-        Err(PerlError::runtime("unshift argument is not an ARRAY reference", line).into())
+        Err(StrykeError::runtime("unshift argument is not an ARRAY reference", line).into())
     }
 
     /// `splice @$aref, OFFSET, LENGTH, LIST` — uses [`Self::wantarray_kind`] (VM [`Op::WantarrayPush`]
@@ -20078,7 +20078,7 @@ impl VMHelper {
         }
         if let Some(s) = aref.as_str() {
             if self.strict_refs {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "Can't use string (\"{}\") as an ARRAY ref while \"strict refs\" in use",
                         s
@@ -20098,7 +20098,7 @@ impl VMHelper {
                 WantarrayCtx::List | WantarrayCtx::Void => StrykeValue::array(removed),
             });
         }
-        Err(PerlError::runtime("splice argument is not an ARRAY reference", line).into())
+        Err(StrykeError::runtime("splice argument is not an ARRAY reference", line).into())
     }
 
     pub(crate) fn eval_splice_expr(
@@ -20175,7 +20175,7 @@ impl VMHelper {
                     .collect(),
             ))
         } else {
-            Err(PerlError::runtime("keys requires hash", line).into())
+            Err(StrykeError::runtime("keys requires hash", line).into())
         }
     }
 
@@ -20200,7 +20200,7 @@ impl VMHelper {
         } else if let Some(r) = val.as_hash_ref() {
             Ok(StrykeValue::array(r.read().values().cloned().collect()))
         } else {
-            Err(PerlError::runtime("values requires hash", line).into())
+            Err(StrykeError::runtime("values requires hash", line).into())
         }
     }
 
@@ -20265,7 +20265,7 @@ impl VMHelper {
                 kind: DerefKind::Array,
             } => {
                 if !crate::compiler::arrow_deref_arrow_subscript_is_plain_scalar_index(index) {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "delete on array element needs scalar subscript",
                         line,
                     )
@@ -20276,7 +20276,7 @@ impl VMHelper {
                 self.delete_arrow_array_element(container, idx, line)
                     .map_err(Into::into)
             }
-            _ => Err(PerlError::runtime("delete requires hash or array element", line).into()),
+            _ => Err(StrykeError::runtime("delete requires hash or array element", line).into()),
         }
     }
 
@@ -20421,7 +20421,7 @@ impl VMHelper {
                 kind: DerefKind::Array,
             } => {
                 if !crate::compiler::arrow_deref_arrow_subscript_is_plain_scalar_index(index) {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "exists on array element needs scalar subscript",
                         line,
                     )
@@ -20438,7 +20438,7 @@ impl VMHelper {
                 let yes = self.exists_arrow_array_element(container, idx, line)?;
                 Ok(StrykeValue::integer(if yes { 1 } else { 0 }))
             }
-            _ => Err(PerlError::runtime("exists requires hash or array element", line).into()),
+            _ => Err(StrykeError::runtime("exists requires hash or array element", line).into()),
         }
     }
 
@@ -20459,30 +20459,30 @@ impl VMHelper {
         line: usize,
     ) -> Result<StrykeValue, FlowOrError> {
         let Some(cluster) = cluster_pv.as_remote_cluster() else {
-            return Err(PerlError::runtime("pmap_on: expected cluster(...) value", line).into());
+            return Err(StrykeError::runtime("pmap_on: expected cluster(...) value", line).into());
         };
         let items = list_pv.to_list();
         let (scope_capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
         if !atomic_arrays.is_empty() || !atomic_hashes.is_empty() {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "pmap_on: mysync/atomic capture is not supported for remote workers",
                 line,
             )
             .into());
         }
         let cap_json = crate::remote_wire::capture_entries_to_json(&scope_capture)
-            .map_err(|e| PerlError::runtime(e, line))?;
+            .map_err(|e| StrykeError::runtime(e, line))?;
         let subs_prelude = crate::remote_wire::build_subs_prelude(&self.subs);
         let block_src = crate::fmt::format_block(block);
         let item_jsons =
-            crate::cluster::perl_items_to_json(&items).map_err(|e| PerlError::runtime(e, line))?;
+            crate::cluster::perl_items_to_json(&items).map_err(|e| StrykeError::runtime(e, line))?;
 
         // Progress bar (best effort) — ticks once per result. The dispatcher itself is
         // synchronous from the caller's POV, so we drive the bar before/after the call.
         let pmap_progress = PmapProgress::new(show_progress, items.len());
         let result_values =
             crate::cluster::run_cluster(&cluster, subs_prelude, block_src, cap_json, item_jsons)
-                .map_err(|e| PerlError::runtime(format!("pmap_on remote: {e}"), line))?;
+                .map_err(|e| StrykeError::runtime(format!("pmap_on remote: {e}"), line))?;
         for _ in 0..result_values.len() {
             pmap_progress.tick();
         }
@@ -20518,7 +20518,7 @@ impl VMHelper {
         let sub = if let Some(s) = cb_val.as_code_ref() {
             s
         } else {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "par_lines: second argument must be a code reference",
                 line,
             )
@@ -20527,11 +20527,11 @@ impl VMHelper {
         let subs = self.subs.clone();
         let (scope_capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
         let file = std::fs::File::open(std::path::Path::new(&path_s)).map_err(|e| {
-            FlowOrError::Error(PerlError::runtime(format!("par_lines: {}", e), line))
+            FlowOrError::Error(StrykeError::runtime(format!("par_lines: {}", e), line))
         })?;
         let mmap = unsafe {
             memmap2::Mmap::map(&file).map_err(|e| {
-                FlowOrError::Error(PerlError::runtime(format!("par_lines: mmap: {}", e), line))
+                FlowOrError::Error(StrykeError::runtime(format!("par_lines: mmap: {}", e), line))
             })?
         };
         let data: &[u8] = &mmap;
@@ -20605,7 +20605,7 @@ impl VMHelper {
         let sub = if let Some(s) = cb_val.as_code_ref() {
             s
         } else {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "par_walk: second argument must be a code reference",
                 line,
             )
@@ -20669,7 +20669,7 @@ impl VMHelper {
             args
         };
         if slice.len() < 3 {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "par_sed: need pattern, replacement, and at least one file path",
                 line,
             ));
@@ -20686,7 +20686,7 @@ impl VMHelper {
                 Ok(r) => r,
                 Err(FlowOrError::Error(e)) => return Err(e),
                 Err(FlowOrError::Flow(f)) => {
-                    return Err(PerlError::runtime(format!("par_sed: {:?}", f), line))
+                    return Err(StrykeError::runtime(format!("par_sed: {:?}", f), line))
                 }
             }
         };
@@ -20695,11 +20695,11 @@ impl VMHelper {
         let touched = AtomicUsize::new(0);
         files.par_iter().try_for_each(|path| {
             let content = read_file_text_perl_compat(path)
-                .map_err(|e| PerlError::runtime(format!("par_sed {}: {}", path, e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("par_sed {}: {}", path, e), line))?;
             let new_s = re.replace_all(&content, &repl);
             if new_s != content {
                 std::fs::write(path, new_s.as_bytes())
-                    .map_err(|e| PerlError::runtime(format!("par_sed {}: {}", path, e), line))?;
+                    .map_err(|e| StrykeError::runtime(format!("par_sed {}: {}", path, e), line))?;
                 touched.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             }
             pmap.tick();
@@ -20723,7 +20723,7 @@ impl VMHelper {
         let sub = if let Some(s) = cb_val.as_code_ref() {
             s
         } else {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "pwatch: second argument must be a code reference",
                 line,
             )
@@ -20914,7 +20914,7 @@ impl VMHelper {
         }
         re_str.push_str(&expanded);
         let re = PerlCompiledRegex::compile(&re_str).map_err(|e| {
-            FlowOrError::Error(PerlError::runtime(
+            FlowOrError::Error(StrykeError::runtime(
                 format!("Invalid regex /{}/: {}", pattern, e),
                 line,
             ))

@@ -13,13 +13,13 @@
 //! provide one explicitly, so there's no implicit "secrets are
 //! protected" lie when no key was set.
 
-use crate::error::PerlError;
+use crate::error::StrykeError;
 use crate::value::StrykeValue;
 use aes_gcm::aead::Aead;
 use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
 use base64::Engine;
 
-type Result<T> = std::result::Result<T, PerlError>;
+type Result<T> = std::result::Result<T, StrykeError>;
 
 const KEY_LEN: usize = 32;
 const NONCE_LEN: usize = 12;
@@ -43,7 +43,7 @@ fn decode_key(s: &str, label: &str, line: usize) -> Result<Vec<u8>> {
     base64::engine::general_purpose::STANDARD
         .decode(s)
         .map_err(|e| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 format!("{}: key must be 32 raw bytes or base64 — {}", label, e),
                 line,
             )
@@ -52,7 +52,7 @@ fn decode_key(s: &str, label: &str, line: usize) -> Result<Vec<u8>> {
             if bytes.len() == KEY_LEN {
                 Ok(bytes)
             } else {
-                Err(PerlError::runtime(
+                Err(StrykeError::runtime(
                     format!(
                         "{}: decoded key is {} bytes, want {}",
                         label,
@@ -97,21 +97,21 @@ pub fn secrets_encrypt(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
     let plain = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("secrets_encrypt: plaintext required", line))?;
+        .ok_or_else(|| StrykeError::runtime("secrets_encrypt: plaintext required", line))?;
     let opts = parse_opts(&args[1..]);
     let key_str = opts
         .get("key")
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("secrets_encrypt: key => $32byte_key required", line))?;
+        .ok_or_else(|| StrykeError::runtime("secrets_encrypt: key => $32byte_key required", line))?;
     let key_bytes = decode_key(&key_str, "secrets_encrypt", line)?;
 
     let cipher = Aes256Gcm::new_from_slice(&key_bytes)
-        .map_err(|e| PerlError::runtime(format!("secrets_encrypt: key init: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("secrets_encrypt: key init: {}", e), line))?;
     let nonce_bytes = random_bytes(NONCE_LEN);
     let nonce = Nonce::from_slice(&nonce_bytes);
     let ciphertext = cipher
         .encrypt(nonce, plain.as_bytes())
-        .map_err(|e| PerlError::runtime(format!("secrets_encrypt: encrypt: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("secrets_encrypt: encrypt: {}", e), line))?;
 
     let mut out = Vec::with_capacity(NONCE_LEN + ciphertext.len());
     out.extend_from_slice(&nonce_bytes);
@@ -128,12 +128,12 @@ pub fn secrets_decrypt(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
     let envelope = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("secrets_decrypt: envelope required", line))?;
+        .ok_or_else(|| StrykeError::runtime("secrets_decrypt: envelope required", line))?;
     let opts = parse_opts(&args[1..]);
     let key_str = opts
         .get("key")
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("secrets_decrypt: key => $32byte_key required", line))?;
+        .ok_or_else(|| StrykeError::runtime("secrets_decrypt: key => $32byte_key required", line))?;
     let key_bytes = decode_key(&key_str, "secrets_decrypt", line)?;
 
     let raw = match base64::engine::general_purpose::STANDARD.decode(envelope.as_bytes()) {
@@ -144,7 +144,7 @@ pub fn secrets_decrypt(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
         return Ok(StrykeValue::UNDEF);
     }
     let cipher = Aes256Gcm::new_from_slice(&key_bytes)
-        .map_err(|e| PerlError::runtime(format!("secrets_decrypt: key init: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("secrets_decrypt: key init: {}", e), line))?;
     let nonce = Nonce::from_slice(&raw[..NONCE_LEN]);
     let pt = match cipher.decrypt(nonce, &raw[NONCE_LEN..]) {
         Ok(p) => p,
@@ -175,7 +175,7 @@ pub fn secrets_kdf(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let password = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("secrets_kdf: password required", line))?;
+        .ok_or_else(|| StrykeError::runtime("secrets_kdf: password required", line))?;
     let opts = parse_opts(&args[1..]);
     let salt = opts
         .get("salt")
@@ -188,7 +188,7 @@ pub fn secrets_kdf(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
 
     let mut out = [0u8; KEY_LEN];
     pbkdf2::pbkdf2::<Hmac<Sha256>>(password.as_bytes(), salt.as_bytes(), iterations, &mut out)
-        .map_err(|e| PerlError::runtime(format!("secrets_kdf: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("secrets_kdf: {}", e), line))?;
     Ok(StrykeValue::string(
         base64::engine::general_purpose::STANDARD.encode(out),
     ))

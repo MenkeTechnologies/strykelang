@@ -28,7 +28,7 @@
 //!   * `mcp_detach_from_ai($h)`
 //!   * `mcp_attached()`                              — list of attached IDs
 
-use crate::error::PerlError;
+use crate::error::StrykeError;
 use crate::value::StrykeValue;
 use indexmap::IndexMap;
 use parking_lot::Mutex;
@@ -38,7 +38,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::sync::OnceLock;
 
-type Result<T> = std::result::Result<T, PerlError>;
+type Result<T> = std::result::Result<T, StrykeError>;
 
 enum McpTransport {
     Stdio {
@@ -84,16 +84,16 @@ fn lookup(handle: &StrykeValue, line: usize) -> Result<Arc<Mutex<McpHandle>>> {
     let map = handle
         .as_hash_map()
         .or_else(|| handle.as_hash_ref().map(|h| h.read().clone()))
-        .ok_or_else(|| PerlError::runtime("mcp: handle must be a hashref", line))?;
+        .ok_or_else(|| StrykeError::runtime("mcp: handle must be a hashref", line))?;
     let id = map
         .get("__mcp_id__")
         .map(|v| v.to_int() as u64)
-        .ok_or_else(|| PerlError::runtime("mcp: hashref missing `__mcp_id__`", line))?;
+        .ok_or_else(|| StrykeError::runtime("mcp: hashref missing `__mcp_id__`", line))?;
     registry()
         .lock()
         .get(&id)
         .cloned()
-        .ok_or_else(|| PerlError::runtime(format!("mcp: handle id {} not found", id), line))
+        .ok_or_else(|| StrykeError::runtime(format!("mcp: handle id {} not found", id), line))
 }
 
 fn handle_id(v: &StrykeValue) -> Option<u64> {
@@ -115,7 +115,7 @@ fn make_handle_value(id: u64, name: &str) -> StrykeValue {
 
 pub(crate) fn mcp_connect(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let url = args.first().map(|v| v.to_string()).ok_or_else(|| {
-        PerlError::runtime("mcp_connect: usage: mcp_connect(\"stdio:CMD ARGS\")", line)
+        StrykeError::runtime("mcp_connect: usage: mcp_connect(\"stdio:CMD ARGS\")", line)
     })?;
     let name = args
         .get(1)
@@ -128,7 +128,7 @@ pub(crate) fn mcp_connect(args: &[StrykeValue], line: usize) -> Result<StrykeVal
     }
 
     let cmd_str = url.strip_prefix("stdio:").ok_or_else(|| {
-        PerlError::runtime(
+        StrykeError::runtime(
             format!(
                 "mcp_connect: unsupported transport `{}` — only `stdio:` and `http(s)://` wired",
                 url
@@ -138,7 +138,7 @@ pub(crate) fn mcp_connect(args: &[StrykeValue], line: usize) -> Result<StrykeVal
     })?;
     let parts = shell_split(cmd_str);
     if parts.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "mcp_connect: empty command after stdio:",
             line,
         ));
@@ -150,15 +150,15 @@ pub(crate) fn mcp_connect(args: &[StrykeValue], line: usize) -> Result<StrykeVal
     cmd.stderr(Stdio::null());
     let mut child = cmd
         .spawn()
-        .map_err(|e| PerlError::runtime(format!("mcp_connect: spawn {}: {}", parts[0], e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("mcp_connect: spawn {}: {}", parts[0], e), line))?;
     let stdin = child
         .stdin
         .take()
-        .ok_or_else(|| PerlError::runtime("mcp_connect: missing stdin", line))?;
+        .ok_or_else(|| StrykeError::runtime("mcp_connect: missing stdin", line))?;
     let stdout = child
         .stdout
         .take()
-        .ok_or_else(|| PerlError::runtime("mcp_connect: missing stdout", line))?;
+        .ok_or_else(|| StrykeError::runtime("mcp_connect: missing stdout", line))?;
     let stdout = BufReader::new(stdout);
 
     let mut handle = McpHandle {
@@ -191,16 +191,16 @@ pub(crate) fn mcp_connect(args: &[StrykeValue], line: usize) -> Result<StrykeVal
     });
     if let McpTransport::Stdio { stdin, stdout, .. } = &mut handle.transport {
         rpc_send(stdin, &init).map_err(|e| {
-            PerlError::runtime(format!("mcp_connect: send initialize: {}", e), line)
+            StrykeError::runtime(format!("mcp_connect: send initialize: {}", e), line)
         })?;
         rpc_recv(stdout, init_id)
-            .map_err(|e| PerlError::runtime(format!("mcp_connect: initialize: {}", e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("mcp_connect: initialize: {}", e), line))?;
         let initialized = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "notifications/initialized",
         });
         rpc_send(stdin, &initialized).map_err(|e| {
-            PerlError::runtime(format!("mcp_connect: send initialized: {}", e), line)
+            StrykeError::runtime(format!("mcp_connect: send initialized: {}", e), line)
         })?;
     }
 
@@ -214,7 +214,7 @@ pub(crate) fn mcp_connect(args: &[StrykeValue], line: usize) -> Result<StrykeVal
 pub(crate) fn mcp_tools(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h = lookup(
         args.first()
-            .ok_or_else(|| PerlError::runtime("mcp_tools: handle required", line))?,
+            .ok_or_else(|| StrykeError::runtime("mcp_tools: handle required", line))?,
         line,
     )?;
     let cached = h.lock().cached_tools.clone();
@@ -233,7 +233,7 @@ pub(crate) fn mcp_tools(args: &[StrykeValue], line: usize) -> Result<StrykeValue
 pub(crate) fn mcp_resources(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h = lookup(
         args.first()
-            .ok_or_else(|| PerlError::runtime("mcp_resources: handle required", line))?,
+            .ok_or_else(|| StrykeError::runtime("mcp_resources: handle required", line))?,
         line,
     )?;
     let cached = h.lock().cached_resources.clone();
@@ -252,7 +252,7 @@ pub(crate) fn mcp_resources(args: &[StrykeValue], line: usize) -> Result<StrykeV
 pub(crate) fn mcp_prompts(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h = lookup(
         args.first()
-            .ok_or_else(|| PerlError::runtime("mcp_prompts: handle required", line))?,
+            .ok_or_else(|| StrykeError::runtime("mcp_prompts: handle required", line))?,
         line,
     )?;
     let cached = h.lock().cached_prompts.clone();
@@ -273,13 +273,13 @@ pub(crate) fn mcp_prompts(args: &[StrykeValue], line: usize) -> Result<StrykeVal
 pub(crate) fn mcp_call(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h = lookup(
         args.first()
-            .ok_or_else(|| PerlError::runtime("mcp_call: handle required", line))?,
+            .ok_or_else(|| StrykeError::runtime("mcp_call: handle required", line))?,
         line,
     )?;
     let tool_name = args
         .get(1)
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("mcp_call: tool name required", line))?;
+        .ok_or_else(|| StrykeError::runtime("mcp_call: tool name required", line))?;
     let tool_args_v = args.get(2).cloned().unwrap_or(StrykeValue::UNDEF);
     let arguments = perl_to_json(&tool_args_v);
     let v = call_method(
@@ -297,13 +297,13 @@ pub(crate) fn mcp_call(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
 pub(crate) fn mcp_resource(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h = lookup(
         args.first()
-            .ok_or_else(|| PerlError::runtime("mcp_resource: handle required", line))?,
+            .ok_or_else(|| StrykeError::runtime("mcp_resource: handle required", line))?,
         line,
     )?;
     let uri = args
         .get(1)
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("mcp_resource: uri required", line))?;
+        .ok_or_else(|| StrykeError::runtime("mcp_resource: uri required", line))?;
     let v = call_method(
         &h,
         "resources/read",
@@ -316,13 +316,13 @@ pub(crate) fn mcp_resource(args: &[StrykeValue], line: usize) -> Result<StrykeVa
 pub(crate) fn mcp_prompt(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h = lookup(
         args.first()
-            .ok_or_else(|| PerlError::runtime("mcp_prompt: handle required", line))?,
+            .ok_or_else(|| StrykeError::runtime("mcp_prompt: handle required", line))?,
         line,
     )?;
     let name = args
         .get(1)
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("mcp_prompt: name required", line))?;
+        .ok_or_else(|| StrykeError::runtime("mcp_prompt: name required", line))?;
     let prompt_args_v = args.get(2).cloned().unwrap_or(StrykeValue::UNDEF);
     let arguments = perl_to_json(&prompt_args_v);
     let v = call_method(
@@ -342,7 +342,7 @@ pub(crate) fn mcp_prompt(args: &[StrykeValue], line: usize) -> Result<StrykeValu
 pub(crate) fn mcp_close(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h_v = args
         .first()
-        .ok_or_else(|| PerlError::runtime("mcp_close: handle required", line))?;
+        .ok_or_else(|| StrykeError::runtime("mcp_close: handle required", line))?;
     let h = lookup(h_v, line)?;
     let id = handle_id(h_v).unwrap_or(0);
     {
@@ -367,9 +367,9 @@ pub(crate) fn mcp_close(args: &[StrykeValue], line: usize) -> Result<StrykeValue
 pub(crate) fn mcp_attach_to_ai(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h_v = args
         .first()
-        .ok_or_else(|| PerlError::runtime("mcp_attach_to_ai: handle required", line))?;
+        .ok_or_else(|| StrykeError::runtime("mcp_attach_to_ai: handle required", line))?;
     let id = handle_id(h_v)
-        .ok_or_else(|| PerlError::runtime("mcp_attach_to_ai: handle id missing", line))?;
+        .ok_or_else(|| StrykeError::runtime("mcp_attach_to_ai: handle id missing", line))?;
     let mut g = attached().lock();
     if !g.contains(&id) {
         g.push(id);
@@ -380,9 +380,9 @@ pub(crate) fn mcp_attach_to_ai(args: &[StrykeValue], line: usize) -> Result<Stry
 pub(crate) fn mcp_detach_from_ai(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h_v = args
         .first()
-        .ok_or_else(|| PerlError::runtime("mcp_detach_from_ai: handle required", line))?;
+        .ok_or_else(|| StrykeError::runtime("mcp_detach_from_ai: handle required", line))?;
     let id = handle_id(h_v)
-        .ok_or_else(|| PerlError::runtime("mcp_detach_from_ai: handle id missing", line))?;
+        .ok_or_else(|| StrykeError::runtime("mcp_detach_from_ai: handle id missing", line))?;
     attached().lock().retain(|x| *x != id);
     Ok(StrykeValue::UNDEF)
 }
@@ -455,7 +455,7 @@ pub(crate) fn call_attached_tool(
     line: usize,
 ) -> Result<serde_json::Value> {
     let h = registry().lock().get(&handle_id).cloned().ok_or_else(|| {
-        PerlError::runtime(format!("mcp: attached handle {} gone", handle_id), line)
+        StrykeError::runtime(format!("mcp: attached handle {} gone", handle_id), line)
     })?;
     call_method(
         &h,
@@ -572,7 +572,7 @@ fn http_rpc(
     }
     let resp = req_builder
         .send_json(req.clone())
-        .map_err(|e| PerlError::runtime(format!("mcp http: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("mcp http: {}", e), line))?;
 
     // Stash session id if server set one.
     if let Some(sid) = resp.header("mcp-session-id") {
@@ -606,7 +606,7 @@ fn http_rpc(
                 }
             }
         }
-        Err(PerlError::runtime(
+        Err(StrykeError::runtime(
             "mcp http: SSE ended without matching response",
             line,
         ))
@@ -614,7 +614,7 @@ fn http_rpc(
         // Plain JSON response.
         let v: serde_json::Value = resp
             .into_json()
-            .map_err(|e| PerlError::runtime(format!("mcp http: decode: {}", e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("mcp http: decode: {}", e), line))?;
         Ok(v)
     }
 }
@@ -629,7 +629,7 @@ fn call_method(
 ) -> Result<serde_json::Value> {
     let mut g = h.lock();
     if g.closed {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("mcp: handle is closed for method {}", method),
             line,
         ));
@@ -644,9 +644,9 @@ fn call_method(
     let resp = match &mut g.transport {
         McpTransport::Stdio { stdin, stdout, .. } => {
             rpc_send(stdin, &req)
-                .map_err(|e| PerlError::runtime(format!("mcp: {}: send: {}", method, e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("mcp: {}: send: {}", method, e), line))?;
             rpc_recv(stdout, id)
-                .map_err(|e| PerlError::runtime(format!("mcp: {}: recv: {}", method, e), line))?
+                .map_err(|e| StrykeError::runtime(format!("mcp: {}: recv: {}", method, e), line))?
         }
         McpTransport::Http {
             url,
@@ -656,7 +656,7 @@ fn call_method(
         } => http_rpc(agent, url, bearer.as_deref(), session_id, &req, line)?,
     };
     if let Some(err) = resp.get("error") {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("mcp: {} returned error: {}", method, err),
             line,
         ));
@@ -806,7 +806,7 @@ impl crate::vm_helper::VMHelper {
         line: usize,
     ) -> Result<StrykeValue> {
         let name = args.first().map(|v| v.to_string()).ok_or_else(|| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 "mcp_server_start: usage: mcp_server_start(\"name\", +{tools => [...]})",
                 line,
             )
@@ -856,7 +856,7 @@ pub(crate) fn mcp_serve_registered_tools(
         .unwrap_or_else(|| "stryke-mcp".to_string());
     let registered = crate::ai::registered_tools().lock().clone();
     if registered.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "mcp_serve_registered_tools: no tools registered — call `tool fn name { ... }` or `ai_register_tool(...)` before serving",
             line,
         ));
@@ -886,7 +886,7 @@ fn compile_server_tool(v: &StrykeValue, line: usize) -> Result<ServerTool> {
         .as_hash_map()
         .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         .ok_or_else(|| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 "mcp_server_start: each tool must be +{name, description, parameters, run}",
                 line,
             )
@@ -894,20 +894,20 @@ fn compile_server_tool(v: &StrykeValue, line: usize) -> Result<ServerTool> {
     let name = map
         .get("name")
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("mcp_server_start: tool missing name", line))?;
+        .ok_or_else(|| StrykeError::runtime("mcp_server_start: tool missing name", line))?;
     let description = map
         .get("description")
         .map(|v| v.to_string())
         .unwrap_or_default();
     let parameters = map.get("parameters").cloned().unwrap_or(StrykeValue::UNDEF);
     let run_v = map.get("run").ok_or_else(|| {
-        PerlError::runtime(
+        StrykeError::runtime(
             format!("mcp_server_start: tool `{}` missing run coderef", name),
             line,
         )
     })?;
     let run_sub = run_v.as_code_ref().ok_or_else(|| {
-        PerlError::runtime(
+        StrykeError::runtime(
             format!("mcp_server_start: tool `{}` run must be a coderef", name),
             line,
         )
@@ -976,7 +976,7 @@ fn run_stdio_server(
         buf.clear();
         let n = reader
             .read_line(&mut buf)
-            .map_err(|e| PerlError::runtime(format!("mcp_server: read: {}", e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("mcp_server: read: {}", e), line))?;
         if n == 0 {
             break;
         }

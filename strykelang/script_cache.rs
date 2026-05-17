@@ -45,7 +45,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::ast::Program;
 use crate::bytecode::Chunk;
-use crate::error::{PerlError, PerlResult};
+use crate::error::{StrykeError, PerlResult};
 use crate::value::StrykeValue;
 
 /// Magic header bytes — fail-fast if a wrong-format file is mmap'd.
@@ -296,9 +296,9 @@ impl ScriptCache {
         chunk: &Chunk,
     ) -> PerlResult<()> {
         let program_bytes =
-            bincode::serialize(program).map_err(|e| PerlError::runtime(e.to_string(), 0))?;
+            bincode::serialize(program).map_err(|e| StrykeError::runtime(e.to_string(), 0))?;
         let chunk_bytes =
-            bincode::serialize(chunk).map_err(|e| PerlError::runtime(e.to_string(), 0))?;
+            bincode::serialize(chunk).map_err(|e| StrykeError::runtime(e.to_string(), 0))?;
 
         let _lock = match acquire_lock(&self.lock_path) {
             Some(l) => l,
@@ -457,7 +457,7 @@ fn read_owned_shard(path: &Path) -> Option<ScriptShard> {
 
 fn write_shard_atomic(path: &Path, shard: &ScriptShard) -> PerlResult<()> {
     let bytes = rkyv::to_bytes::<_, 4096>(shard)
-        .map_err(|e| PerlError::runtime(format!("rkyv serialize: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("rkyv serialize: {}", e), 0))?;
 
     let parent = path.parent().expect("cache path has parent");
     let _ = std::fs::create_dir_all(parent);
@@ -477,14 +477,14 @@ fn write_shard_atomic(path: &Path, shard: &ScriptShard) -> PerlResult<()> {
     ));
 
     {
-        let mut f = File::create(&tmp_path).map_err(|e| PerlError::runtime(e.to_string(), 0))?;
+        let mut f = File::create(&tmp_path).map_err(|e| StrykeError::runtime(e.to_string(), 0))?;
         f.write_all(&bytes)
-            .map_err(|e| PerlError::runtime(e.to_string(), 0))?;
+            .map_err(|e| StrykeError::runtime(e.to_string(), 0))?;
         f.sync_all()
-            .map_err(|e| PerlError::runtime(e.to_string(), 0))?;
+            .map_err(|e| StrykeError::runtime(e.to_string(), 0))?;
     }
 
-    std::fs::rename(&tmp_path, path).map_err(|e| PerlError::runtime(e.to_string(), 0))?;
+    std::fs::rename(&tmp_path, path).map_err(|e| StrykeError::runtime(e.to_string(), 0))?;
     Ok(())
 }
 

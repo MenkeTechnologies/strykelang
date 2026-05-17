@@ -15,7 +15,7 @@
 //! PASS 3 (next):         SQLite + Model ORM (find/all/where/save/destroy).
 //! PASS 4 (next):         Migrations (create_table/add_column/Migrator).
 
-use crate::error::PerlError;
+use crate::error::StrykeError;
 use crate::value::StrykeValue;
 use crate::vm_helper::{FlowOrError, VMHelper};
 use indexmap::IndexMap;
@@ -25,7 +25,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use std::sync::OnceLock;
 
-type Result<T> = std::result::Result<T, PerlError>;
+type Result<T> = std::result::Result<T, StrykeError>;
 
 // ── Global router + config state ────────────────────────────────────────
 //
@@ -206,7 +206,7 @@ fn compile_pattern(path: &str) -> (String, Vec<String>) {
 
 pub(crate) fn web_route(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 2 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "web_route: usage: web_route(\"VERB /path\", \"controller#action\")",
             line,
         ));
@@ -217,14 +217,14 @@ pub(crate) fn web_route(args: &[StrykeValue], line: usize) -> Result<StrykeValue
     let verb = parts.next().unwrap_or("").trim().to_ascii_uppercase();
     let path = parts.next().unwrap_or("").trim().to_string();
     if verb.is_empty() || path.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "web_route: spec must be \"VERB /path\"",
             line,
         ));
     }
     let (re_src, captures) = compile_pattern(&path);
     let re = Regex::new(&re_src)
-        .map_err(|e| PerlError::runtime(format!("web_route: bad pattern {}: {}", path, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("web_route: bad pattern {}: {}", path, e), line))?;
     router().lock().routes.push(Route {
         verb,
         pattern: path,
@@ -237,7 +237,7 @@ pub(crate) fn web_route(args: &[StrykeValue], line: usize) -> Result<StrykeValue
 
 pub(crate) fn web_resources(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "web_resources: usage: web_resources(\"posts\")",
             line,
         ));
@@ -278,7 +278,7 @@ pub(crate) fn web_resources(args: &[StrykeValue], line: usize) -> Result<StrykeV
 
 pub(crate) fn web_root(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "web_root: usage: web_root(\"controller#action\")",
             line,
         ));
@@ -296,7 +296,7 @@ pub(crate) fn web_application_config(args: &[StrykeValue], line: usize) -> Resul
     } else if let Some(hm) = cfg.as_hash_map() {
         hm.clone()
     } else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "web_application_config: arg must be a hashref",
             line,
         ));
@@ -338,7 +338,7 @@ pub(crate) fn web_render_dispatch(
 
 pub(crate) fn web_redirect(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "web_redirect: usage: web_redirect(\"/path\")",
             line,
         ));
@@ -426,7 +426,7 @@ fn register_filter(args: &[StrykeValue], line: usize, before: bool) -> Result<St
         .first()
         .map(|v| v.to_string())
         .ok_or_else(|| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 "web_before_action: usage: web_before_action(\"method\", controller => \"X\", only => [...], except => [...])",
                 line,
             )
@@ -436,7 +436,7 @@ fn register_filter(args: &[StrykeValue], line: usize, before: bool) -> Result<St
         .get("controller")
         .map(|v| v.to_string())
         .ok_or_else(|| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 "web_before_action: pass controller => \"PostsController\"",
                 line,
             )
@@ -506,7 +506,7 @@ pub(crate) fn web_session(_args: &[StrykeValue], _line: usize) -> Result<StrykeV
 
 pub(crate) fn web_session_set(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 2 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "web_session_set: usage: web_session_set(\"key\", $value)",
             line,
         ));
@@ -537,7 +537,7 @@ pub(crate) fn web_session_clear(_args: &[StrykeValue], _line: usize) -> Result<S
 
 pub(crate) fn web_set_cookie(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 2 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "web_set_cookie: usage: web_set_cookie(\"name\", \"value\", path => \"/\", max_age => 3600, http_only => 1, secure => 1, same_site => \"Lax\")",
             line,
         ));
@@ -583,7 +583,7 @@ pub(crate) fn web_cookies(_args: &[StrykeValue], _line: usize) -> Result<StrykeV
 /// emitted otherwise).
 pub(crate) fn web_flash_set(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 2 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "web_flash_set: usage: web_flash_set(\"notice\", \"Saved!\")",
             line,
         ));
@@ -607,7 +607,7 @@ pub(crate) fn web_flash_get(args: &[StrykeValue], _line: usize) -> Result<Stryke
 /// those keys. Mirrors Rails strong params; rejects everything else.
 pub(crate) fn web_permit(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "web_permit: usage: web_permit($params, \"key1\", \"key2\", ...)",
             line,
         ));
@@ -615,7 +615,7 @@ pub(crate) fn web_permit(args: &[StrykeValue], line: usize) -> Result<StrykeValu
     let src = args[0]
         .as_hash_map()
         .or_else(|| args[0].as_hash_ref().map(|h| h.read().clone()))
-        .ok_or_else(|| PerlError::runtime("web_permit: first arg must be a hashref", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_permit: first arg must be a hashref", line))?;
     let mut out = IndexMap::new();
     for keyv in &args[1..] {
         let k = keyv.to_string();
@@ -636,7 +636,7 @@ pub(crate) fn web_password_hash(args: &[StrykeValue], line: usize) -> Result<Str
     let pw = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("web_password_hash: password required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_password_hash: password required", line))?;
     let salt = random_bytes(16);
     let salt_hex = hex_encode(&salt);
     let combined = format!("{}{}", salt_hex, pw);
@@ -648,11 +648,11 @@ pub(crate) fn web_password_verify(args: &[StrykeValue], line: usize) -> Result<S
     let pw = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("web_password_verify: password required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_password_verify: password required", line))?;
     let stored = args
         .get(1)
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("web_password_verify: stored hash required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_password_verify: stored hash required", line))?;
     let parts: Vec<&str> = stored.splitn(3, '$').collect();
     if parts.len() != 3 || parts[0] != "web1" {
         return Ok(StrykeValue::integer(0));
@@ -762,7 +762,7 @@ pub(crate) fn web_cache_get(args: &[StrykeValue], _line: usize) -> Result<Stryke
 
 pub(crate) fn web_cache_set(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 2 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "web_cache_set: usage: web_cache_set(\"key\", \"value\", ttl => 60)",
             line,
         ));
@@ -817,14 +817,14 @@ pub(crate) fn web_load_locale(args: &[StrykeValue], line: usize) -> Result<Stryk
     let lang = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("web_load_locale: language required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_load_locale: language required", line))?;
     let map = args
         .get(1)
         .and_then(|v| {
             v.as_hash_map()
                 .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         })
-        .ok_or_else(|| PerlError::runtime("web_load_locale: second arg must be a hashref", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_load_locale: second arg must be a hashref", line))?;
     let mut flat = IndexMap::new();
     for (k, v) in map {
         flat.insert(k, v.to_string());
@@ -869,7 +869,7 @@ fn current_iso_time() -> String {
 /// `web_set_header("X-Frame-Options", "DENY")`.
 pub(crate) fn web_set_header(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 2 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "web_set_header: usage: web_set_header(\"name\", \"value\")",
             line,
         ));
@@ -953,11 +953,11 @@ fn secret_key() -> String {
 pub(crate) fn web_jwt_encode(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let payload = args
         .first()
-        .ok_or_else(|| PerlError::runtime("web_jwt_encode: payload (hashref) required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_jwt_encode: payload (hashref) required", line))?;
     let payload_map = payload
         .as_hash_map()
         .or_else(|| payload.as_hash_ref().map(|h| h.read().clone()))
-        .ok_or_else(|| PerlError::runtime("web_jwt_encode: payload must be a hashref", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_jwt_encode: payload must be a hashref", line))?;
     let mut wrapped = IndexMap::new();
     for (k, v) in payload_map {
         wrapped.insert(k, v);
@@ -1018,7 +1018,7 @@ fn rate_buckets() -> &'static Mutex<IndexMap<String, Vec<i64>>> {
 
 pub(crate) fn web_rate_limit(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 3 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "web_rate_limit: usage: web_rate_limit(\"key\", limit_n, window_seconds)",
             line,
         ));
@@ -1051,11 +1051,11 @@ pub(crate) fn web_otp_generate(args: &[StrykeValue], line: usize) -> Result<Stry
     let secret_b32 = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("web_otp_generate: secret required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_otp_generate: secret required", line))?;
     let key = match base32_decode(&secret_b32) {
         Some(k) => k,
         None => {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "web_otp_generate: bad base32 secret",
                 line,
             ))
@@ -1070,11 +1070,11 @@ pub(crate) fn web_otp_verify(args: &[StrykeValue], line: usize) -> Result<Stryke
     let secret_b32 = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("web_otp_verify: secret required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_otp_verify: secret required", line))?;
     let code = args
         .get(1)
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("web_otp_verify: code required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_otp_verify: code required", line))?;
     let key = match base32_decode(&secret_b32) {
         Some(k) => k,
         None => return Ok(StrykeValue::integer(0)),
@@ -1523,7 +1523,7 @@ thread_local! {
 
 pub(crate) fn web_content_for(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 2 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "web_content_for: usage: web_content_for(\"name\", \"<html>\")",
             line,
         ));
@@ -1556,7 +1556,7 @@ impl VMHelper {
         line: usize,
     ) -> Result<StrykeValue> {
         let name = args.first().map(|v| v.to_string()).ok_or_else(|| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 "web_render_partial: usage: web_render_partial(\"path\", locals_hashref)",
                 line,
             )
@@ -1583,7 +1583,7 @@ impl VMHelper {
             format!("app/views/{}/{}.html.erb", dir, underscore)
         };
         let src = std::fs::read_to_string(&path).map_err(|e| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 format!("web_render_partial: can't read {}: {}", path, e),
                 line,
             )
@@ -1712,7 +1712,7 @@ pub(crate) fn web_token_for(args: &[StrykeValue], line: usize) -> Result<StrykeV
     let user_id = args
         .first()
         .map(|v| v.to_int())
-        .ok_or_else(|| PerlError::runtime("web_token_for: user_id required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_token_for: user_id required", line))?;
     let purpose = args
         .get(1)
         .map(|v| v.to_string())
@@ -1803,7 +1803,7 @@ pub(crate) fn web_jsonapi_resource(args: &[StrykeValue], line: usize) -> Result<
     let kind = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("web_jsonapi_resource: type required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_jsonapi_resource: type required", line))?;
     let row = args
         .get(1)
         .and_then(|v| {
@@ -1838,7 +1838,7 @@ pub(crate) fn web_jsonapi_collection(args: &[StrykeValue], line: usize) -> Resul
     let kind = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("web_jsonapi_collection: type required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_jsonapi_collection: type required", line))?;
     let rows: Vec<StrykeValue> = match args.get(1) {
         Some(v) => v
             .as_array_ref()
@@ -2460,7 +2460,7 @@ impl VMHelper {
     ) -> Result<String> {
         let view_path = format!("app/views/{}.html.erb", name);
         let body_src = std::fs::read_to_string(&view_path).map_err(|e| {
-            PerlError::runtime(format!("web_render: can't read {}: {}", view_path, e), line)
+            StrykeError::runtime(format!("web_render: can't read {}: {}", view_path, e), line)
         })?;
         let body = self.render_erb(&body_src, locals, line)?;
 
@@ -2542,7 +2542,7 @@ impl VMHelper {
                     trim_trailing_ws_in_last_append(&mut program);
                 }
                 let close = find_substr(bytes, tag_start, b"%>")
-                    .ok_or_else(|| PerlError::runtime("erb: unclosed `<%` tag", line))?;
+                    .ok_or_else(|| StrykeError::runtime("erb: unclosed `<%` tag", line))?;
                 let mut content_end = close;
                 let mut after = close + 2;
                 if content_end > tag_start && bytes[content_end - 1] == b'-' {
@@ -2575,7 +2575,7 @@ impl VMHelper {
         program.push_str("$__erb_buf\n");
 
         let val = crate::parse_and_run_string(&program, self)
-            .map_err(|e| PerlError::runtime(format!("erb: {}", e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("erb: {}", e), line))?;
         Ok(val.to_string())
     }
 
@@ -2586,13 +2586,13 @@ impl VMHelper {
     ) -> Result<StrykeValue> {
         let port = args.first().map(|v| v.to_int()).unwrap_or(3000);
         if !(1..=65535).contains(&port) {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("web_boot_application: bad port {}", port),
                 line,
             ));
         }
         let listener = std::net::TcpListener::bind(format!("0.0.0.0:{}", port))
-            .map_err(|e| PerlError::runtime(format!("web_boot_application: bind: {}", e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("web_boot_application: bind: {}", e), line))?;
         eprintln!("stryke web: serving on http://0.0.0.0:{}", port);
 
         for stream in listener.incoming() {
@@ -2876,7 +2876,7 @@ impl VMHelper {
         action: &str,
         before: bool,
         line: usize,
-    ) -> std::result::Result<(), PerlError> {
+    ) -> std::result::Result<(), StrykeError> {
         let entries: Vec<FilterEntry> = {
             let g = filters_slot().lock();
             match g.get(class_name) {

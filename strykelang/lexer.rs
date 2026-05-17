@@ -1,4 +1,4 @@
-use crate::error::{ErrorKind, PerlError, PerlResult};
+use crate::error::{ErrorKind, StrykeError, PerlResult};
 use crate::token::{keyword_or_ident, Token};
 
 /// Private-use character for a literal `$` inside double-quoted / `qq` strings (from `\$` in source).
@@ -45,7 +45,7 @@ pub struct Lexer {
     /// [`Self::next_token`] call so identifier-decoding logic can read the
     /// previous-token state without racing against its own writes.
     prev_arrow: bool,
-    /// Source path for [`PerlError`] (e.g. real script or required `.pm` path).
+    /// Source path for [`StrykeError`] (e.g. real script or required `.pm` path).
     error_file: String,
     /// When > 0, the lexer treats `m` followed by `/` as a plain identifier
     /// instead of `m//` regex syntax. Used in thread/pipeline stages where
@@ -85,8 +85,8 @@ impl Lexer {
         }
     }
 
-    fn syntax_err(&self, message: impl Into<String>, line: usize) -> PerlError {
-        PerlError::new(ErrorKind::Syntax, message, line, self.error_file.clone())
+    fn syntax_err(&self, message: impl Into<String>, line: usize) -> StrykeError {
+        StrykeError::new(ErrorKind::Syntax, message, line, self.error_file.clone())
     }
 
     /// Used by the `s` / `tr` / `y` lexer arms when the identifier is followed

@@ -15,14 +15,14 @@
 //!   * Returns an i64 (operations completed) or a hashref of metrics
 //!   * Honors a duration in seconds (default 5s, max ~3600s)
 
-use crate::error::PerlError;
+use crate::error::StrykeError;
 use crate::value::StrykeValue;
 use indexmap::IndexMap;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-type Result<T> = std::result::Result<T, PerlError>;
+type Result<T> = std::result::Result<T, StrykeError>;
 
 fn cores() -> usize {
     std::thread::available_parallelism()
@@ -387,7 +387,7 @@ pub(crate) fn stress_net(args: &[StrykeValue], line: usize) -> Result<StrykeValu
     use std::io::Write;
     use std::net::TcpStream;
     let target = args.first().map(|v| v.to_string()).ok_or_else(|| {
-        PerlError::runtime(
+        StrykeError::runtime(
             "stress_net: usage: stress_net(\"host:port\", secs, conns)",
             line,
         )
@@ -426,7 +426,7 @@ pub(crate) fn stress_net(args: &[StrykeValue], line: usize) -> Result<StrykeValu
 /// 2xx responses across cores.
 pub(crate) fn stress_http(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let url = args.first().map(|v| v.to_string()).ok_or_else(|| {
-        PerlError::runtime(
+        StrykeError::runtime(
             "stress_http: usage: stress_http(\"http://...\", secs, conns)",
             line,
         )
@@ -465,7 +465,7 @@ pub(crate) fn stress_http(args: &[StrykeValue], line: usize) -> Result<StrykeVal
 /// resolves count.
 pub(crate) fn stress_dns(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let host = args.first().map(|v| v.to_string()).ok_or_else(|| {
-        PerlError::runtime(
+        StrykeError::runtime(
             "stress_dns: usage: stress_dns(\"host.example.com\", secs)",
             line,
         )
@@ -532,7 +532,7 @@ pub(crate) fn stress_fork(args: &[StrykeValue], _line: usize) -> Result<StrykeVa
 
 #[cfg(not(unix))]
 pub(crate) fn stress_fork(_args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
-    Err(PerlError::runtime("stress_fork: unix-only", line))
+    Err(StrykeError::runtime("stress_fork: unix-only", line))
 }
 
 /// `stress_thread(secs, count)` — thread spawn/join churn. Each round
@@ -713,7 +713,7 @@ pub(crate) fn stress_burst(args: &[StrykeValue], line: usize) -> Result<StrykeVa
     let name = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("stress_burst: workload name required", line))?;
+        .ok_or_else(|| StrykeError::runtime("stress_burst: workload name required", line))?;
     let on = args.get(1).map(|v| v.to_number()).unwrap_or(2.0).max(0.05);
     let off = args.get(2).map(|v| v.to_number()).unwrap_or(2.0).max(0.0);
     let total =
@@ -736,7 +736,7 @@ pub(crate) fn stress_ramp(args: &[StrykeValue], line: usize) -> Result<StrykeVal
     let name = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("stress_ramp: workload name required", line))?;
+        .ok_or_else(|| StrykeError::runtime("stress_ramp: workload name required", line))?;
     let start_pct = args.get(1).map(|v| v.to_number()).unwrap_or(10.0);
     let end_pct = args.get(2).map(|v| v.to_number()).unwrap_or(100.0);
     let total = args.get(3).map(|v| v.to_number()).unwrap_or(30.0).max(0.5);
@@ -763,7 +763,7 @@ pub(crate) fn stress_oscillate(args: &[StrykeValue], line: usize) -> Result<Stry
     let name = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("stress_oscillate: workload name required", line))?;
+        .ok_or_else(|| StrykeError::runtime("stress_oscillate: workload name required", line))?;
     let period = args.get(1).map(|v| v.to_number()).unwrap_or(10.0).max(1.0);
     let total = args
         .get(2)
@@ -803,7 +803,7 @@ fn run_named_stress(name: &str, secs: f64, line: usize) -> Result<StrykeValue> {
         "thread" | "stress_thread" => stress_thread(&arg, line),
         #[cfg(unix)]
         "fork" | "stress_fork" => stress_fork(&arg, line),
-        other => Err(PerlError::runtime(
+        other => Err(StrykeError::runtime(
             format!("stress_burst/ramp/oscillate: unknown workload `{}`", other),
             line,
         )),
@@ -1204,7 +1204,7 @@ pub(crate) fn stress_metrics_record(args: &[StrykeValue], line: usize) -> Result
     let name = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("stress_metrics_record: name required", line))?;
+        .ok_or_else(|| StrykeError::runtime("stress_metrics_record: name required", line))?;
     let value = args
         .get(1)
         .map(|v| v.as_float().unwrap_or_else(|| v.to_int() as f64))
@@ -1242,7 +1242,7 @@ pub(crate) fn stress_metrics_export(args: &[StrykeValue], line: usize) -> Result
     let path = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("stress_metrics_export: path required", line))?;
+        .ok_or_else(|| StrykeError::runtime("stress_metrics_export: path required", line))?;
     let mut format = "json".to_string();
     let mut i = 1;
     while i + 1 < args.len() {
@@ -1257,14 +1257,14 @@ pub(crate) fn stress_metrics_export(args: &[StrykeValue], line: usize) -> Result
         "json" => format_json(&g),
         "prom" | "prometheus" => format_prometheus(&g),
         other => {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("stress_metrics_export: unknown format `{}`", other),
                 line,
             ));
         }
     };
     std::fs::write(&path, &body).map_err(|e| {
-        PerlError::runtime(
+        StrykeError::runtime(
             format!("stress_metrics_export: write {}: {}", path, e),
             line,
         )
@@ -1319,7 +1319,7 @@ pub(crate) fn stress_metrics_watch(args: &[StrykeValue], line: usize) -> Result<
         i += 2;
     }
     if field.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "stress_metrics_watch: field => \"name\" required",
             line,
         ));

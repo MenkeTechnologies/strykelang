@@ -57,7 +57,7 @@ use std::sync::Arc;
 use parking_lot::Mutex;
 use sha2::{Digest, Sha256};
 
-use crate::error::{PerlError, PerlResult};
+use crate::error::{StrykeError, PerlResult};
 use crate::value::StrykeValue;
 
 /// One registered FFI entry: a function signature kind + a raw symbol pointer.
@@ -151,9 +151,9 @@ pub fn compile_and_register(body_b64: &str, line: usize) -> PerlResult<()> {
     use base64::Engine as _;
     let body = base64::engine::general_purpose::STANDARD
         .decode(body_b64)
-        .map_err(|e| PerlError::runtime(format!("rust FFI: invalid base64 body: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("rust FFI: invalid base64 body: {}", e), line))?;
     let body = String::from_utf8(body)
-        .map_err(|e| PerlError::runtime(format!("rust FFI: non-utf8 body: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("rust FFI: non-utf8 body: {}", e), line))?;
 
     // Hash the body (not the wrapped crate source): same body → same dylib across stryke
     // versions unless we bump the wrapper template.
@@ -163,7 +163,7 @@ pub fn compile_and_register(body_b64: &str, line: usize) -> PerlResult<()> {
     let hash = hex_short(&hasher.finalize());
 
     // Cache dir: `~/.stryke/ffi/<hash>.*`.
-    let cache_dir = ffi_cache_dir().map_err(|e| PerlError::runtime(e, line))?;
+    let cache_dir = ffi_cache_dir().map_err(|e| StrykeError::runtime(e, line))?;
     let lib_path = cache_dir.join(format!("lib{}{}", hash, dylib_ext()));
 
     // Compile if missing.
@@ -171,7 +171,7 @@ pub fn compile_and_register(body_b64: &str, line: usize) -> PerlResult<()> {
         let src_path = cache_dir.join(format!("{}.rs", hash));
         let wrapped = wrap_crate_source(&body);
         fs::write(&src_path, &wrapped)
-            .map_err(|e| PerlError::runtime(format!("rust FFI: write source: {}", e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("rust FFI: write source: {}", e), line))?;
         invoke_rustc(&src_path, &lib_path, line)?;
     }
 
@@ -182,7 +182,7 @@ pub fn compile_and_register(body_b64: &str, line: usize) -> PerlResult<()> {
     // each one against the shared library's symbol table.
     let decls = parse_extern_fns(&body);
     if decls.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "rust FFI: no `pub extern \"C\" fn ...` declarations found in block — v1 requires \
              at least one exported function"
                 .to_string(),
@@ -313,7 +313,7 @@ fn invoke_rustc(src: &PathBuf, out: &PathBuf, line: usize) -> PerlResult<()> {
     let out_res = match status {
         Ok(o) => o,
         Err(e) => {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!(
                     "rust FFI: failed to invoke `{}`: {}. Install Rust to use rust {{}} blocks.",
                     rustc, e
@@ -324,7 +324,7 @@ fn invoke_rustc(src: &PathBuf, out: &PathBuf, line: usize) -> PerlResult<()> {
     };
     if !out_res.status.success() {
         let stderr = String::from_utf8_lossy(&out_res.stderr);
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "rust FFI: rustc failed compiling {}:\n{}",
                 src.display(),
@@ -340,7 +340,7 @@ fn invoke_rustc(src: &PathBuf, out: &PathBuf, line: usize) -> PerlResult<()> {
 fn dlopen_lib(path: &Path, line: usize) -> PerlResult<usize> {
     use std::ffi::CString;
     let cpath = CString::new(path.to_string_lossy().as_bytes())
-        .map_err(|e| PerlError::runtime(format!("rust FFI: dlopen path nul: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("rust FFI: dlopen path nul: {}", e), line))?;
     // SAFETY: libc::dlopen with RTLD_NOW|RTLD_LOCAL is the standard portable load path.
     let handle = unsafe { libc::dlopen(cpath.as_ptr(), libc::RTLD_NOW | libc::RTLD_LOCAL) };
     if handle.is_null() {
@@ -353,7 +353,7 @@ fn dlopen_lib(path: &Path, line: usize) -> PerlResult<usize> {
                 CStr::from_ptr(e).to_string_lossy().into_owned()
             }
         };
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("rust FFI: dlopen {}: {}", path.display(), err),
             line,
         ));
@@ -363,7 +363,7 @@ fn dlopen_lib(path: &Path, line: usize) -> PerlResult<usize> {
 
 #[cfg(not(unix))]
 fn dlopen_lib(_path: &Path, line: usize) -> PerlResult<usize> {
-    Err(PerlError::runtime(
+    Err(StrykeError::runtime(
         "rust FFI: only unix (Linux/macOS) is supported in v1".to_string(),
         line,
     ))
@@ -372,11 +372,11 @@ fn dlopen_lib(_path: &Path, line: usize) -> PerlResult<usize> {
 #[cfg(unix)]
 fn dlsym_lookup(handle: usize, name: &str, line: usize) -> PerlResult<*const ()> {
     let cname = CString::new(name)
-        .map_err(|e| PerlError::runtime(format!("rust FFI: symbol nul: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("rust FFI: symbol nul: {}", e), line))?;
     // SAFETY: handle came from a successful dlopen; dlsym returns a function pointer or NULL.
     let sym = unsafe { libc::dlsym(handle as *mut libc::c_void, cname.as_ptr()) };
     if sym.is_null() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("rust FFI: symbol `{}` not found in compiled cdylib", name),
             line,
         ));
@@ -386,7 +386,7 @@ fn dlsym_lookup(handle: usize, name: &str, line: usize) -> PerlResult<*const ()>
 
 #[cfg(not(unix))]
 fn dlsym_lookup(_h: usize, _n: &str, line: usize) -> PerlResult<*const ()> {
-    Err(PerlError::runtime(
+    Err(StrykeError::runtime(
         "rust FFI: only unix supported in v1".to_string(),
         line,
     ))
@@ -529,7 +529,7 @@ fn invoke(
 ) -> PerlResult<StrykeValue> {
     let expected = entry.sig.arity();
     if args.len() != expected {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "rust FFI: {} expects {} args, got {}",
                 name,
@@ -600,14 +600,14 @@ fn invoke(
             FfiSig::StrToInt => {
                 let s = args[0].to_string();
                 let c = CString::new(s)
-                    .map_err(|e| PerlError::runtime(format!("rust FFI: arg nul: {}", e), line))?;
+                    .map_err(|e| StrykeError::runtime(format!("rust FFI: arg nul: {}", e), line))?;
                 let f: extern "C" fn(*const c_char) -> i64 = std::mem::transmute(entry.sym);
                 Ok(StrykeValue::integer(f(c.as_ptr())))
             }
             FfiSig::StrToStr => {
                 let s = args[0].to_string();
                 let c = CString::new(s)
-                    .map_err(|e| PerlError::runtime(format!("rust FFI: arg nul: {}", e), line))?;
+                    .map_err(|e| StrykeError::runtime(format!("rust FFI: arg nul: {}", e), line))?;
                 let f: extern "C" fn(*const c_char) -> *const c_char =
                     std::mem::transmute(entry.sym);
                 let ret = f(c.as_ptr());

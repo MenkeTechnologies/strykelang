@@ -13,22 +13,22 @@ use rusqlite::{types::Value, Connection};
 use serde_json::Value as JsonValue;
 
 use crate::ast::StructDef;
-use crate::error::{PerlError, PerlResult};
+use crate::error::{StrykeError, PerlResult};
 use crate::value::{HeapObject, PerlDataFrame, StructInstance, StrykeValue};
 
 /// Parallel row→hashref conversion after a sequential CSV parse (good CPU parallelism on wide files).
 pub(crate) fn par_csv_read(path: &str) -> PerlResult<StrykeValue> {
     let mut rdr = csv::Reader::from_path(path)
-        .map_err(|e| PerlError::runtime(format!("par_csv_read: {}: {}", path, e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("par_csv_read: {}: {}", path, e), 0))?;
     let headers: Vec<String> = rdr
         .headers()
-        .map_err(|e| PerlError::runtime(format!("par_csv_read: {}: {}", path, e), 0))?
+        .map_err(|e| StrykeError::runtime(format!("par_csv_read: {}: {}", path, e), 0))?
         .iter()
         .map(|s| s.to_string())
         .collect();
     let mut raw_rows: Vec<csv::StringRecord> = Vec::new();
     for rec in rdr.records() {
-        raw_rows.push(rec.map_err(|e| PerlError::runtime(format!("par_csv_read: {}", e), 0))?);
+        raw_rows.push(rec.map_err(|e| StrykeError::runtime(format!("par_csv_read: {}", e), 0))?);
     }
     let rows: Vec<StrykeValue> = raw_rows
         .into_par_iter()
@@ -100,7 +100,7 @@ pub(crate) fn dataframe_from_elements(val: &StrykeValue) -> PerlResult<StrykeVal
         ))));
     }
 
-    Err(PerlError::runtime(
+    Err(StrykeError::runtime(
         "dataframe expects a file path or a list of hashrefs/arrayrefs",
         0,
     ))
@@ -108,17 +108,17 @@ pub(crate) fn dataframe_from_elements(val: &StrykeValue) -> PerlResult<StrykeVal
 
 pub(crate) fn dataframe_from_path(path: &str) -> PerlResult<StrykeValue> {
     let mut rdr = csv::Reader::from_path(path)
-        .map_err(|e| PerlError::runtime(format!("dataframe: {}: {}", path, e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("dataframe: {}: {}", path, e), 0))?;
     let headers: Vec<String> = rdr
         .headers()
-        .map_err(|e| PerlError::runtime(format!("dataframe: {}: {}", path, e), 0))?
+        .map_err(|e| StrykeError::runtime(format!("dataframe: {}: {}", path, e), 0))?
         .iter()
         .map(|s| s.to_string())
         .collect();
     let ncols = headers.len();
     let mut cols: Vec<Vec<StrykeValue>> = (0..ncols).map(|_| Vec::new()).collect();
     for rec in rdr.records() {
-        let record = rec.map_err(|e| PerlError::runtime(format!("dataframe: {}", e), 0))?;
+        let record = rec.map_err(|e| StrykeError::runtime(format!("dataframe: {}", e), 0))?;
         for (i, col) in cols.iter_mut().enumerate().take(ncols) {
             let cell = record.get(i).unwrap_or("");
             col.push(StrykeValue::string(cell.to_string()));
@@ -134,16 +134,16 @@ pub(crate) fn dataframe_from_path(path: &str) -> PerlResult<StrykeValue> {
 
 pub(crate) fn csv_read(path: &str) -> PerlResult<StrykeValue> {
     let mut rdr = csv::Reader::from_path(path)
-        .map_err(|e| PerlError::runtime(format!("csv_read: {}: {}", path, e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("csv_read: {}: {}", path, e), 0))?;
     let headers: Vec<String> = rdr
         .headers()
-        .map_err(|e| PerlError::runtime(format!("csv_read: {}: {}", path, e), 0))?
+        .map_err(|e| StrykeError::runtime(format!("csv_read: {}: {}", path, e), 0))?
         .iter()
         .map(|s| s.to_string())
         .collect();
     let mut rows = Vec::new();
     for rec in rdr.records() {
-        let record = rec.map_err(|e| PerlError::runtime(format!("csv_read: {}", e), 0))?;
+        let record = rec.map_err(|e| StrykeError::runtime(format!("csv_read: {}", e), 0))?;
         let mut map = IndexMap::new();
         for (i, h) in headers.iter().enumerate() {
             let cell = record.get(i).unwrap_or("");
@@ -172,19 +172,19 @@ pub(crate) fn csv_write(path: &str, rows: &[StrykeValue]) -> PerlResult<StrykeVa
     }
 
     let mut wtr = csv::Writer::from_path(path)
-        .map_err(|e| PerlError::runtime(format!("csv_write: {}: {}", path, e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("csv_write: {}: {}", path, e), 0))?;
     wtr.write_record(&header)
-        .map_err(|e| PerlError::runtime(format!("csv_write: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("csv_write: {}", e), 0))?;
     for map in &normalized {
         let record: Vec<String> = header
             .iter()
             .map(|k| map.get(k).map(|v| v.to_string()).unwrap_or_default())
             .collect();
         wtr.write_record(&record)
-            .map_err(|e| PerlError::runtime(format!("csv_write: {}", e), 0))?;
+            .map_err(|e| StrykeError::runtime(format!("csv_write: {}", e), 0))?;
     }
     wtr.flush()
-        .map_err(|e| PerlError::runtime(format!("csv_write: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("csv_write: {}", e), 0))?;
     Ok(StrykeValue::integer(normalized.len() as i64))
 }
 
@@ -201,7 +201,7 @@ fn hash_like(v: &StrykeValue) -> PerlResult<IndexMap<String, StrykeValue>> {
             return Ok(h);
         }
     }
-    Err(PerlError::runtime(
+    Err(StrykeError::runtime(
         "csv_write: row must be hash or hashref",
         0,
     ))
@@ -209,7 +209,7 @@ fn hash_like(v: &StrykeValue) -> PerlResult<IndexMap<String, StrykeValue>> {
 
 pub(crate) fn sqlite_open(path: &str) -> PerlResult<StrykeValue> {
     let conn = Connection::open(path)
-        .map_err(|e| PerlError::runtime(format!("sqlite: {}: {}", path, e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("sqlite: {}: {}", path, e), 0))?;
     Ok(StrykeValue::sqlite_conn(Arc::new(Mutex::new(conn))))
 }
 
@@ -223,7 +223,7 @@ pub(crate) fn sqlite_dispatch(
     match method {
         "exec" => {
             if args.is_empty() {
-                return Err(PerlError::runtime("sqlite->exec needs SQL string", line));
+                return Err(StrykeError::runtime("sqlite->exec needs SQL string", line));
             }
             let sql = args[0].to_string();
             let params: Vec<Value> = args[1..].iter().map(perl_to_sql_value).collect();
@@ -232,7 +232,7 @@ pub(crate) fn sqlite_dispatch(
         }
         "query" => {
             if args.is_empty() {
-                return Err(PerlError::runtime("sqlite->query needs SQL string", line));
+                return Err(StrykeError::runtime("sqlite->query needs SQL string", line));
             }
             let sql = args[0].to_string();
             let params: Vec<Value> = args[1..].iter().map(perl_to_sql_value).collect();
@@ -240,14 +240,14 @@ pub(crate) fn sqlite_dispatch(
         }
         "last_insert_rowid" => {
             if !args.is_empty() {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     "sqlite->last_insert_rowid takes no arguments",
                     line,
                 ));
             }
             Ok(StrykeValue::integer(c.last_insert_rowid()))
         }
-        _ => Err(PerlError::runtime(
+        _ => Err(StrykeError::runtime(
             format!("unknown sqlite method: {}", method),
             line,
         )),
@@ -256,7 +256,7 @@ pub(crate) fn sqlite_dispatch(
 
 pub(crate) fn exec_sql(conn: &Connection, sql: &str, params: &[Value]) -> PerlResult<usize> {
     conn.execute(sql, rusqlite::params_from_iter(params.iter()))
-        .map_err(|e| PerlError::runtime(format!("sqlite exec: {}", e), 0))
+        .map_err(|e| StrykeError::runtime(format!("sqlite exec: {}", e), 0))
 }
 
 pub(crate) fn query_sql(
@@ -267,7 +267,7 @@ pub(crate) fn query_sql(
 ) -> PerlResult<StrykeValue> {
     let mut stmt = conn
         .prepare(sql)
-        .map_err(|e| PerlError::runtime(format!("sqlite query: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("sqlite query: {}", e), line))?;
     let col_count = stmt.column_count();
     let mut col_names = Vec::with_capacity(col_count);
     for i in 0..col_count {
@@ -279,17 +279,17 @@ pub(crate) fn query_sql(
     }
     let mut rows = stmt
         .query(rusqlite::params_from_iter(params.iter()))
-        .map_err(|e| PerlError::runtime(format!("sqlite query: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("sqlite query: {}", e), line))?;
     let mut rows_out = Vec::new();
     while let Some(row) = rows
         .next()
-        .map_err(|e| PerlError::runtime(format!("sqlite query: {}", e), line))?
+        .map_err(|e| StrykeError::runtime(format!("sqlite query: {}", e), line))?
     {
         let mut map = IndexMap::new();
         for (i, col_name) in col_names.iter().enumerate().take(col_count) {
             let v = row
                 .get::<_, Value>(i)
-                .map_err(|e| PerlError::runtime(format!("sqlite query: {}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("sqlite query: {}", e), line))?;
             map.insert(col_name.clone(), sqlite_value_to_perl(v));
         }
         rows_out.push(StrykeValue::hash_ref(Arc::new(RwLock::new(map))));
@@ -337,11 +337,11 @@ pub(crate) fn struct_new_with_defaults(
     let mut values = vec![StrykeValue::UNDEF; def.fields.len()];
     for (k, v) in provided {
         let idx = def.field_index(k).ok_or_else(|| {
-            PerlError::runtime(format!("struct {}: unknown field `{}`", def.name, k), line)
+            StrykeError::runtime(format!("struct {}: unknown field `{}`", def.name, k), line)
         })?;
         let field = &def.fields[idx];
         field.ty.check_value(v).map_err(|msg| {
-            PerlError::type_error(format!("struct {} field `{}`: {}", def.name, k, msg), line)
+            StrykeError::type_error(format!("struct {} field `{}`: {}", def.name, k, msg), line)
         })?;
         values[idx] = v.clone();
     }
@@ -351,7 +351,7 @@ pub(crate) fn struct_new_with_defaults(
                 // Skip type check if default is undef (nullable field pattern)
                 if !dv.is_undef() {
                     field.ty.check_value(dv).map_err(|msg| {
-                        PerlError::type_error(
+                        StrykeError::type_error(
                             format!(
                                 "struct {} field `{}` default: {}",
                                 def.name, field.name, msg
@@ -363,7 +363,7 @@ pub(crate) fn struct_new_with_defaults(
                 values[idx] = dv.clone();
             } else if field.default.is_none() && !matches!(field.ty, crate::ast::PerlTypeName::Any)
             {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "struct {}: missing field `{}` ({})",
                         def.name,
@@ -391,16 +391,16 @@ pub(crate) fn fetch(url: &str) -> PerlResult<StrykeValue> {
 pub(crate) fn fetch_json(url: &str) -> PerlResult<StrykeValue> {
     let s = http_get_body(url)?;
     let v: JsonValue = serde_json::from_str(&s)
-        .map_err(|e| PerlError::runtime(format!("fetch_json: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("fetch_json: {}", e), 0))?;
     Ok(json_to_perl(v))
 }
 
 fn http_get_body(url: &str) -> PerlResult<String> {
     ureq::get(url)
         .call()
-        .map_err(|e| PerlError::runtime(format!("fetch: {}", e), 0))?
+        .map_err(|e| StrykeError::runtime(format!("fetch: {}", e), 0))?
         .into_string()
-        .map_err(|e| PerlError::runtime(format!("fetch: {}", e), 0))
+        .map_err(|e| StrykeError::runtime(format!("fetch: {}", e), 0))
 }
 
 fn perl_hash_lookup(v: &StrykeValue, key: &str) -> Option<StrykeValue> {
@@ -453,7 +453,7 @@ fn apply_request_headers(
             .map(|(k, v)| (k.clone(), v.to_string()))
             .collect()
     } else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "http_request: headers must be a hash or hashref",
             0,
         ));
@@ -515,7 +515,7 @@ pub(crate) fn http_request(url: &str, opts: Option<&StrykeValue>) -> PerlResult<
     } else {
         req.send_bytes(&body)
     }
-    .map_err(|e| PerlError::runtime(format!("http_request: {}", e), 0))?;
+    .map_err(|e| StrykeError::runtime(format!("http_request: {}", e), 0))?;
 
     let status = resp.status();
     let status_text = resp.status_text().to_string();
@@ -535,12 +535,12 @@ pub(crate) fn http_request(url: &str, opts: Option<&StrykeValue>) -> PerlResult<
         let mut buf = Vec::new();
         resp.into_reader()
             .read_to_end(&mut buf)
-            .map_err(|e| PerlError::runtime(format!("http_request: body read: {}", e), 0))?;
+            .map_err(|e| StrykeError::runtime(format!("http_request: body read: {}", e), 0))?;
         StrykeValue::bytes(Arc::new(buf))
     } else {
         let s = resp
             .into_string()
-            .map_err(|e| PerlError::runtime(format!("http_request: body: {}", e), 0))?;
+            .map_err(|e| StrykeError::runtime(format!("http_request: body: {}", e), 0))?;
         StrykeValue::string(s)
     };
 
@@ -555,7 +555,7 @@ pub(crate) fn http_request(url: &str, opts: Option<&StrykeValue>) -> PerlResult<
 /// Parse JSON from the `body` field of an [`http_request`] result hashref.
 pub(crate) fn http_response_json_body(res: &StrykeValue) -> PerlResult<StrykeValue> {
     let body = perl_hash_lookup(res, "body")
-        .ok_or_else(|| PerlError::runtime("fetch_json: http response missing body", 0))?;
+        .ok_or_else(|| StrykeError::runtime("fetch_json: http response missing body", 0))?;
     let s = if let Some(b) = body.as_bytes_arc() {
         String::from_utf8_lossy(b.as_ref()).into_owned()
     } else {
@@ -567,13 +567,13 @@ pub(crate) fn http_response_json_body(res: &StrykeValue) -> PerlResult<StrykeVal
 /// Serialize a [`StrykeValue`] to a JSON string (arrays, hashes, refs, structs, scalars; not code/refs/IO).
 pub(crate) fn json_encode(v: &StrykeValue) -> PerlResult<String> {
     let j = perl_to_json_value(v)?;
-    serde_json::to_string(&j).map_err(|e| PerlError::runtime(format!("json_encode: {}", e), 0))
+    serde_json::to_string(&j).map_err(|e| StrykeError::runtime(format!("json_encode: {}", e), 0))
 }
 
 /// Parse a JSON string into [`StrykeValue`] (same mapping as [`fetch_json`]).
 pub(crate) fn json_decode(s: &str) -> PerlResult<StrykeValue> {
     let v: JsonValue = serde_json::from_str(s.trim())
-        .map_err(|e| PerlError::runtime(format!("json_decode: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("json_decode: {}", e), 0))?;
     Ok(json_to_perl(v))
 }
 
@@ -585,7 +585,7 @@ pub(crate) fn json_decode(s: &str) -> PerlResult<StrykeValue> {
 pub(crate) fn json_jq(data: &StrykeValue, filter_src: &str) -> PerlResult<StrykeValue> {
     let j = perl_to_json_value(data)?;
     let input: jaq_json::Val = serde_json::from_value(j)
-        .map_err(|e| PerlError::runtime(format!("json_jq: could not convert input: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("json_jq: could not convert input: {}", e), 0))?;
 
     let arena = jaq_core::load::Arena::default();
     let defs = jaq_core::defs()
@@ -598,7 +598,7 @@ pub(crate) fn json_jq(data: &StrykeValue, filter_src: &str) -> PerlResult<Stryke
     };
     let modules = loader
         .load(&arena, file)
-        .map_err(|e| PerlError::runtime(format!("json_jq: parse/load: {:?}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("json_jq: parse/load: {:?}", e), 0))?;
 
     type JData = JustLut<jaq_json::Val>;
     let filter = jaq_core::Compiler::default()
@@ -608,7 +608,7 @@ pub(crate) fn json_jq(data: &StrykeValue, filter_src: &str) -> PerlResult<Stryke
                 .chain(jaq_json::funs::<JData>()),
         )
         .compile(modules)
-        .map_err(|e| PerlError::runtime(format!("json_jq: compile: {:?}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("json_jq: compile: {:?}", e), 0))?;
 
     let ctx = jaq_core::Ctx::<JData>::new(&filter.lut, jaq_core::Vars::new([]));
     let mut results = Vec::new();
@@ -616,7 +616,7 @@ pub(crate) fn json_jq(data: &StrykeValue, filter_src: &str) -> PerlResult<Stryke
         match jaq_core::unwrap_valr(x) {
             Ok(v) => results.push(jaq_json_val_to_perl(v)?),
             Err(e) => {
-                return Err(PerlError::runtime(format!("json_jq: {}", e), 0));
+                return Err(StrykeError::runtime(format!("json_jq: {}", e), 0));
             }
         }
     }
@@ -690,13 +690,13 @@ pub(crate) fn perl_to_json_value(v: &StrykeValue) -> PerlResult<JsonValue> {
     if let Some(f) = v.as_float() {
         return serde_json::Number::from_f64(f)
             .map(JsonValue::Number)
-            .ok_or_else(|| PerlError::runtime("json_encode: non-finite float", 0));
+            .ok_or_else(|| StrykeError::runtime("json_encode: non-finite float", 0));
     }
     if crate::nanbox::is_raw_float_bits(v.0) {
         let f = f64::from_bits(v.0);
         return serde_json::Number::from_f64(f)
             .map(JsonValue::Number)
-            .ok_or_else(|| PerlError::runtime("json_encode: non-finite float", 0));
+            .ok_or_else(|| StrykeError::runtime("json_encode: non-finite float", 0));
     }
     if let Some(a) = v.as_array_vec() {
         let mut out = Vec::with_capacity(a.len());
@@ -795,7 +795,7 @@ pub(crate) fn perl_to_json_value(v: &StrykeValue) -> PerlResult<JsonValue> {
         return Ok(JsonValue::Array(rows));
     }
 
-    Err(PerlError::runtime(
+    Err(StrykeError::runtime(
         format!(
             "json_encode: value cannot be encoded as JSON ({})",
             v.type_name()

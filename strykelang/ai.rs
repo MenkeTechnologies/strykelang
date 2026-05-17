@@ -33,7 +33,7 @@
 //! and built-in defaults (`provider="anthropic"`,
 //! `model="claude-opus-4-5"`).
 
-use crate::error::PerlError;
+use crate::error::StrykeError;
 use crate::value::StrykeValue;
 use crate::vm_helper::{FlowOrError, VMHelper, WantarrayCtx};
 use indexmap::IndexMap;
@@ -43,7 +43,7 @@ use std::sync::Arc;
 use std::sync::OnceLock;
 use std::time::Duration;
 
-type Result<T> = std::result::Result<T, PerlError>;
+type Result<T> = std::result::Result<T, StrykeError>;
 
 // ── Config ─────────────────────────────────────────────────────────────
 
@@ -223,7 +223,7 @@ pub(crate) fn ai_prompt(args: &[StrykeValue], line: usize) -> Result<StrykeValue
     let prompt = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai/prompt: prompt required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai/prompt: prompt required", line))?;
     let opts = parse_opts(&args[1..]);
     let provider = opt_str(&opts, "provider", &config().lock().provider);
     let model = opt_str(&opts, "model", &config().lock().model);
@@ -251,7 +251,7 @@ pub(crate) fn ai_prompt(args: &[StrykeValue], line: usize) -> Result<StrykeValue
         return Ok(StrykeValue::string(resp));
     }
     if mock_only_mode() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "ai: STRYKE_AI_MODE=mock-only and no mock matched prompt {:?}",
                 truncate(&prompt, 60)
@@ -283,7 +283,7 @@ pub(crate) fn ai_prompt(args: &[StrykeValue], line: usize) -> Result<StrykeValue
     // 3. Cost ceiling.
     let ceiling = config().lock().max_cost_run_usd;
     if ceiling > 0.0 && current_cost_usd() >= ceiling {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "ai: max_cost_run_usd={:.2} exceeded (current ${:.4})",
                 ceiling,
@@ -378,7 +378,7 @@ pub(crate) fn ai_prompt(args: &[StrykeValue], line: usize) -> Result<StrykeValue
             line,
         )?,
         other => {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!(
                     "ai: provider `{}` not implemented (try anthropic/openai/ollama/local/gemini)",
                     other
@@ -414,14 +414,14 @@ pub(crate) fn ai_stream_prompt(args: &[StrykeValue], line: usize) -> Result<Stry
     let prompt = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("stream_prompt: prompt required", line))?;
+        .ok_or_else(|| StrykeError::runtime("stream_prompt: prompt required", line))?;
     let opts = parse_opts(&args[1..]);
 
     if let Some(resp) = match_mock(&prompt) {
         return Ok(make_string_chunked_iter(resp));
     }
     if mock_only_mode() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "stream_prompt: STRYKE_AI_MODE=mock-only and no mock matched",
             line,
         ));
@@ -439,7 +439,7 @@ pub(crate) fn ai_stream_prompt(args: &[StrykeValue], line: usize) -> Result<Stry
 
     let key_env = config().lock().api_key_env.clone();
     let api_key = std::env::var(&key_env).map_err(|_| {
-        PerlError::runtime(format!("stream_prompt: ${} env var not set", key_env), line)
+        StrykeError::runtime(format!("stream_prompt: ${} env var not set", key_env), line)
     })?;
     let mut body = serde_json::json!({
         "model": model,
@@ -463,7 +463,7 @@ pub(crate) fn ai_stream_prompt(args: &[StrykeValue], line: usize) -> Result<Stry
         .set("content-type", "application/json")
         .set("accept", "text/event-stream")
         .send_json(body)
-        .map_err(|e| PerlError::runtime(format!("stream_prompt: anthropic: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("stream_prompt: anthropic: {}", e), line))?;
     let reader = std::io::BufReader::new(resp.into_reader());
     let iter = AnthropicStreamIter {
         reader: parking_lot::Mutex::new(Some(reader)),
@@ -564,13 +564,13 @@ fn make_string_chunked_iter(s: String) -> StrykeValue {
 pub(crate) fn ai_chat(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let messages = args
         .first()
-        .ok_or_else(|| PerlError::runtime("chat: messages array required", line))?;
+        .ok_or_else(|| StrykeError::runtime("chat: messages array required", line))?;
     let arr = messages
         .as_array_ref()
         .map(|a| a.read().clone())
         .unwrap_or_else(|| messages.clone().to_list());
     if arr.is_empty() {
-        return Err(PerlError::runtime("chat: messages array is empty", line));
+        return Err(StrykeError::runtime("chat: messages array is empty", line));
     }
     // Find the last user-role message to use as the prompt; treat
     // earlier messages as system context. Phase 1 will hand the full
@@ -617,7 +617,7 @@ pub(crate) fn ai_embed(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
             vec![first.to_string()]
         }
     } else {
-        return Err(PerlError::runtime("embed: text required", line));
+        return Err(StrykeError::runtime("embed: text required", line));
     };
 
     if let Some(resp) = match_mock(&format!("embed:{}", inputs.join("|"))) {
@@ -632,7 +632,7 @@ pub(crate) fn ai_embed(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
         ))));
     }
     if mock_only_mode() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "embed: STRYKE_AI_MODE=mock-only and no embed mock installed",
             line,
         ));
@@ -653,7 +653,7 @@ pub(crate) fn ai_embed(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
         "voyage" => call_voyage_embed(&inputs, &cfg.embed_model, &api_key_env, line),
         "openai" => call_openai_embed(&inputs, &cfg.embed_model, &api_key_env, line),
         "ollama" => call_ollama_embed(&inputs, &cfg.embed_model, line),
-        other => Err(PerlError::runtime(
+        other => Err(StrykeError::runtime(
             format!("embed: provider `{}` not implemented", other),
             line,
         )),
@@ -841,7 +841,7 @@ pub(crate) fn ai_describe(args: &[StrykeValue], line: usize) -> Result<StrykeVal
     let img = args
         .first()
         .cloned()
-        .ok_or_else(|| PerlError::runtime("ai_describe: image path/url required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_describe: image path/url required", line))?;
     let opts = parse_opts(&args[1..]);
     let style = opt_str(&opts, "style", "concise");
     let suffix = match style.as_str() {
@@ -895,13 +895,13 @@ pub(crate) fn ai_mock_install(args: &[StrykeValue], line: usize) -> Result<Stryk
     let pattern = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_mock_install: pattern required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_mock_install: pattern required", line))?;
     let response = args
         .get(1)
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_mock_install: response required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_mock_install: response required", line))?;
     let re = regex::Regex::new(&pattern).map_err(|e| {
-        PerlError::runtime(
+        StrykeError::runtime(
             format!("ai_mock_install: bad regex `{}`: {}", pattern, e),
             line,
         )
@@ -949,7 +949,7 @@ pub(crate) fn ai_config_get(args: &[StrykeValue], _line: usize) -> Result<Stryke
             return Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
         }
         other => {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("ai_config_get: unknown key `{}`", other),
                 0,
             ))
@@ -961,7 +961,7 @@ pub(crate) fn ai_config_get(args: &[StrykeValue], _line: usize) -> Result<Stryke
 /// `ai_config_set("model", "claude-haiku-...")` — at-runtime override.
 pub(crate) fn ai_config_set(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 2 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "ai_config_set: usage: ai_config_set(\"key\", value)",
             line,
         ));
@@ -979,7 +979,7 @@ pub(crate) fn ai_config_set(args: &[StrykeValue], line: usize) -> Result<StrykeV
         "embed_model" => cfg.embed_model = val.to_string(),
         "embed_api_key_env" => cfg.embed_api_key_env = val.to_string(),
         other => {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("ai_config_set: unknown key `{}`", other),
                 line,
             ))
@@ -1005,7 +1005,7 @@ fn call_anthropic(
 ) -> Result<String> {
     let key_env = config().lock().api_key_env.clone();
     let api_key = std::env::var(&key_env)
-        .map_err(|_| PerlError::runtime(format!("ai: ${} env var not set", key_env), line))?;
+        .map_err(|_| StrykeError::runtime(format!("ai: ${} env var not set", key_env), line))?;
     let mut body = serde_json::json!({
         "model": model,
         "max_tokens": max_tokens,
@@ -1092,7 +1092,7 @@ fn call_anthropic(
     }
     *last_citations().lock() = citations;
     if out.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "ai: anthropic returned no content (raw: {})",
                 truncate(&json.to_string(), 200)
@@ -1145,10 +1145,10 @@ fn call_openai_with_base(
     }
     let resp = req
         .send_json(body)
-        .map_err(|e| PerlError::runtime(format!("ai: openai request: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai: openai request: {}", e), line))?;
     let json: serde_json::Value = resp
         .into_json()
-        .map_err(|e| PerlError::runtime(format!("ai: openai decode: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai: openai decode: {}", e), line))?;
 
     let usage = &json["usage"];
     let input = usage["prompt_tokens"].as_u64().unwrap_or(0);
@@ -1163,7 +1163,7 @@ fn call_openai_with_base(
         .unwrap_or("")
         .to_string();
     if text.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "ai: openai returned no content (raw: {})",
                 truncate(&json.to_string(), 200)
@@ -1183,7 +1183,7 @@ fn call_voyage_embed(
     line: usize,
 ) -> Result<StrykeValue> {
     let api_key = std::env::var(api_key_env)
-        .map_err(|_| PerlError::runtime(format!("embed: ${} not set", api_key_env), line))?;
+        .map_err(|_| StrykeError::runtime(format!("embed: ${} not set", api_key_env), line))?;
     let body = serde_json::json!({
         "input": inputs,
         "model": model,
@@ -1196,10 +1196,10 @@ fn call_voyage_embed(
         .set("authorization", &format!("Bearer {}", api_key))
         .set("content-type", "application/json")
         .send_json(body)
-        .map_err(|e| PerlError::runtime(format!("embed: voyage request: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("embed: voyage request: {}", e), line))?;
     let json: serde_json::Value = resp
         .into_json()
-        .map_err(|e| PerlError::runtime(format!("embed: voyage decode: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("embed: voyage decode: {}", e), line))?;
 
     if let Some(t) = json["usage"]["total_tokens"].as_u64() {
         EMBED_TOKENS.fetch_add(t, Ordering::Relaxed);
@@ -1217,7 +1217,7 @@ fn call_openai_embed(
     line: usize,
 ) -> Result<StrykeValue> {
     let api_key = std::env::var(api_key_env)
-        .map_err(|_| PerlError::runtime(format!("embed: ${} not set", api_key_env), line))?;
+        .map_err(|_| StrykeError::runtime(format!("embed: ${} not set", api_key_env), line))?;
     let body = serde_json::json!({
         "input": inputs,
         "model": model,
@@ -1230,10 +1230,10 @@ fn call_openai_embed(
         .set("authorization", &format!("Bearer {}", api_key))
         .set("content-type", "application/json")
         .send_json(body)
-        .map_err(|e| PerlError::runtime(format!("embed: openai request: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("embed: openai request: {}", e), line))?;
     let json: serde_json::Value = resp
         .into_json()
-        .map_err(|e| PerlError::runtime(format!("embed: openai decode: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("embed: openai decode: {}", e), line))?;
     if let Some(t) = json["usage"]["total_tokens"].as_u64() {
         EMBED_TOKENS.fetch_add(t, Ordering::Relaxed);
         // text-embedding-3-small is $0.02 / 1M.
@@ -1265,10 +1265,10 @@ fn call_ollama_embed(inputs: &[String], model: &str, line: usize) -> Result<Stry
         .post(&url)
         .set("content-type", "application/json")
         .send_json(body)
-        .map_err(|e| PerlError::runtime(format!("embed: ollama request: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("embed: ollama request: {}", e), line))?;
     let json: serde_json::Value = resp
         .into_json()
-        .map_err(|e| PerlError::runtime(format!("embed: ollama decode: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("embed: ollama decode: {}", e), line))?;
     // Ollama returns `{embeddings: [[...], [...]]}` — reshape into the
     // OpenAI-style `data: [{embedding: [...]}, ...]` we already parse.
     let embeddings = json["embeddings"].as_array().cloned().unwrap_or_default();
@@ -1282,12 +1282,12 @@ fn call_ollama_embed(inputs: &[String], model: &str, line: usize) -> Result<Stry
 fn embeddings_response_to_perl(data: &serde_json::Value) -> Result<StrykeValue> {
     let arr = data
         .as_array()
-        .ok_or_else(|| PerlError::runtime("embed: provider returned non-array data", 0))?;
+        .ok_or_else(|| StrykeError::runtime("embed: provider returned non-array data", 0))?;
     let mut all: Vec<StrykeValue> = Vec::with_capacity(arr.len());
     for item in arr {
         let vec_arr = item["embedding"]
             .as_array()
-            .ok_or_else(|| PerlError::runtime("embed: missing embedding array", 0))?;
+            .ok_or_else(|| StrykeError::runtime("embed: missing embedding array", 0))?;
         let floats: Vec<StrykeValue> = vec_arr
             .iter()
             .filter_map(|x| x.as_f64().map(StrykeValue::float))
@@ -1372,7 +1372,7 @@ impl VMHelper {
         let prompt = args
             .first()
             .map(|v| v.to_string())
-            .ok_or_else(|| PerlError::runtime("ai_agent: prompt required", line))?;
+            .ok_or_else(|| StrykeError::runtime("ai_agent: prompt required", line))?;
         let opts = parse_opts(&args[1..]);
 
         // Three sources contribute tools to the agent loop:
@@ -1413,7 +1413,7 @@ impl VMHelper {
             return Ok(StrykeValue::string(resp));
         }
         if mock_only_mode() {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!(
                     "ai_agent: STRYKE_AI_MODE=mock-only and no mock matched prompt {:?}",
                     truncate(&prompt, 60)
@@ -1497,7 +1497,7 @@ impl VMHelper {
                 &compiled,
                 line,
             ),
-            other => Err(PerlError::runtime(
+            other => Err(StrykeError::runtime(
                 format!("ai_agent: provider `{}` not supported in v0", other),
                 line,
             )),
@@ -1519,7 +1519,7 @@ impl VMHelper {
     ) -> Result<StrykeValue> {
         let key_env = config().lock().api_key_env.clone();
         let api_key = std::env::var(&key_env).map_err(|_| {
-            PerlError::runtime(format!("ai_agent: ${} env var not set", key_env), line)
+            StrykeError::runtime(format!("ai_agent: ${} env var not set", key_env), line)
         })?;
         let agent = ureq::AgentBuilder::new()
             .timeout(Duration::from_secs(timeout.max(1) as u64))
@@ -1543,7 +1543,7 @@ impl VMHelper {
             // Cost ceiling check on every turn.
             let ceiling = config().lock().max_cost_run_usd;
             if ceiling > 0.0 && current_cost_usd() >= ceiling {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "ai_agent: max_cost_run_usd={:.2} exceeded after turn {} (current ${:.4})",
                         ceiling,
@@ -1574,11 +1574,11 @@ impl VMHelper {
                 .set("content-type", "application/json")
                 .send_json(body)
                 .map_err(|e| {
-                    PerlError::runtime(format!("ai_agent: anthropic turn {}: {}", turn, e), line)
+                    StrykeError::runtime(format!("ai_agent: anthropic turn {}: {}", turn, e), line)
                 })?;
             let json: serde_json::Value = resp
                 .into_json()
-                .map_err(|e| PerlError::runtime(format!("ai_agent: decode: {}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("ai_agent: decode: {}", e), line))?;
 
             // Track tokens / cost for this turn.
             if let Some(input) = json["usage"]["input_tokens"].as_u64() {
@@ -1642,7 +1642,7 @@ impl VMHelper {
             }));
         }
 
-        Err(PerlError::runtime(
+        Err(StrykeError::runtime(
             format!("ai_agent: hit max_turns={} without final answer", max_turns),
             line,
         ))
@@ -1662,7 +1662,7 @@ impl VMHelper {
         line: usize,
     ) -> Result<StrykeValue> {
         let api_key = std::env::var("OPENAI_API_KEY")
-            .map_err(|_| PerlError::runtime("ai_agent: $OPENAI_API_KEY not set", line))?;
+            .map_err(|_| StrykeError::runtime("ai_agent: $OPENAI_API_KEY not set", line))?;
         let agent = ureq::AgentBuilder::new()
             .timeout(Duration::from_secs(timeout.max(1) as u64))
             .build();
@@ -1696,7 +1696,7 @@ impl VMHelper {
         for turn in 0..max_turns {
             let ceiling = config().lock().max_cost_run_usd;
             if ceiling > 0.0 && current_cost_usd() >= ceiling {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "ai_agent: max_cost_run_usd={:.2} exceeded after turn {}",
                         ceiling, turn
@@ -1721,11 +1721,11 @@ impl VMHelper {
                 .set("content-type", "application/json")
                 .send_json(body)
                 .map_err(|e| {
-                    PerlError::runtime(format!("ai_agent: openai turn {}: {}", turn, e), line)
+                    StrykeError::runtime(format!("ai_agent: openai turn {}: {}", turn, e), line)
                 })?;
             let json: serde_json::Value = resp
                 .into_json()
-                .map_err(|e| PerlError::runtime(format!("ai_agent: decode: {}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("ai_agent: decode: {}", e), line))?;
 
             if let Some(input) = json["usage"]["prompt_tokens"].as_u64() {
                 INPUT_TOKENS.fetch_add(input, Ordering::Relaxed);
@@ -1772,7 +1772,7 @@ impl VMHelper {
             ));
         }
 
-        Err(PerlError::runtime(
+        Err(StrykeError::runtime(
             format!("ai_agent: hit max_turns={} without final answer", max_turns),
             line,
         ))
@@ -1786,7 +1786,7 @@ impl VMHelper {
         line: usize,
     ) -> Result<serde_json::Value> {
         let tool = tools.iter().find(|t| t.name == name).ok_or_else(|| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 format!("ai_agent: model called unknown tool `{}`", name),
                 line,
             )
@@ -1805,7 +1805,7 @@ impl VMHelper {
         }
 
         let run_sub = tool.run_sub.as_ref().ok_or_else(|| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 format!("ai_agent: tool `{}` has no implementation", name),
                 line,
             )
@@ -1842,7 +1842,7 @@ fn compile_tool(v: &StrykeValue, line: usize) -> Result<CompiledTool> {
         .as_hash_map()
         .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         .ok_or_else(|| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 "ai_agent: each tool must be a hashref +{name, description, parameters, run}",
                 line,
             )
@@ -1850,7 +1850,7 @@ fn compile_tool(v: &StrykeValue, line: usize) -> Result<CompiledTool> {
     let name = map
         .get("name")
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_agent: tool missing `name`", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_agent: tool missing `name`", line))?;
     let description = map
         .get("description")
         .map(|v| v.to_string())
@@ -1873,13 +1873,13 @@ fn compile_tool(v: &StrykeValue, line: usize) -> Result<CompiledTool> {
     }
 
     let run_v = map.get("run").ok_or_else(|| {
-        PerlError::runtime(
+        StrykeError::runtime(
             format!("ai_agent: tool `{}` missing `run` coderef", name),
             line,
         )
     })?;
     let run_sub = run_v.as_code_ref().ok_or_else(|| {
-        PerlError::runtime(
+        StrykeError::runtime(
             format!("ai_agent: tool `{}` has non-coderef `run`", name),
             line,
         )
@@ -2064,7 +2064,7 @@ pub(crate) fn ai_classify(args: &[StrykeValue], line: usize) -> Result<StrykeVal
         })
         .unwrap_or_default();
     if labels.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "ai_classify: pass into => [\"label1\", \"label2\", ...]",
             line,
         ));
@@ -2090,11 +2090,11 @@ pub(crate) fn ai_match(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
     let item = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_match: item required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_match: item required", line))?;
     let criterion = args
         .get(1)
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_match: criterion required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_match: criterion required", line))?;
     let opts = parse_opts(&args[2.min(args.len())..]);
     let prompt = format!(
         "Does this item match the criterion {:?}? Reply ONLY with `true` or `false`.\nItem: {}",
@@ -2194,7 +2194,7 @@ fn parse_collection_args(
     line: usize,
 ) -> Result<(Vec<StrykeValue>, String, IndexMap<String, StrykeValue>)> {
     if args.len() < 2 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "{}: usage: {}(\\@items, \"criterion\", opts...)",
                 name, name
@@ -2360,14 +2360,14 @@ fn parse_json_array_of_int_arrays(raw: &str) -> Vec<Vec<i64>> {
 pub(crate) fn vec_cosine(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let a = floats_from(
         args.first()
-            .ok_or_else(|| PerlError::runtime("vec_cosine: a required", line))?,
+            .ok_or_else(|| StrykeError::runtime("vec_cosine: a required", line))?,
     );
     let b = floats_from(
         args.get(1)
-            .ok_or_else(|| PerlError::runtime("vec_cosine: b required", line))?,
+            .ok_or_else(|| StrykeError::runtime("vec_cosine: b required", line))?,
     );
     if a.len() != b.len() || a.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("vec_cosine: dim mismatch (a={}, b={})", a.len(), b.len()),
             line,
         ));
@@ -2392,11 +2392,11 @@ pub(crate) fn vec_cosine(args: &[StrykeValue], line: usize) -> Result<StrykeValu
 pub(crate) fn vec_search(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let q = floats_from(
         args.first()
-            .ok_or_else(|| PerlError::runtime("vec_search: query required", line))?,
+            .ok_or_else(|| StrykeError::runtime("vec_search: query required", line))?,
     );
     let cands_v = args
         .get(1)
-        .ok_or_else(|| PerlError::runtime("vec_search: candidates required", line))?;
+        .ok_or_else(|| StrykeError::runtime("vec_search: candidates required", line))?;
     let cands_arr = cands_v
         .as_array_ref()
         .map(|a| a.read().clone())
@@ -2444,7 +2444,7 @@ pub(crate) fn vec_search(args: &[StrykeValue], line: usize) -> Result<StrykeValu
 pub(crate) fn vec_topk(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let scores = floats_from(
         args.first()
-            .ok_or_else(|| PerlError::runtime("vec_topk: scores required", line))?,
+            .ok_or_else(|| StrykeError::runtime("vec_topk: scores required", line))?,
     );
     let k = args.get(1).map(|v| v.to_int()).unwrap_or(10).max(1) as usize;
     let mut indexed: Vec<(usize, f64)> = scores.into_iter().enumerate().collect();
@@ -2527,7 +2527,7 @@ pub(crate) fn ai_routing_get(args: &[StrykeValue], _line: usize) -> Result<Stryk
 /// loop uses the global default. Wires up in Phase 4.
 pub(crate) fn ai_routing_set(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 2 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "ai_routing_set: usage: ai_routing_set(\"op\", \"provider\")",
             line,
         ));
@@ -2654,7 +2654,7 @@ pub(crate) fn registered_tools() -> &'static Mutex<Vec<RegisteredTool>> {
 
 pub(crate) fn ai_register_tool(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 4 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "ai_register_tool: usage: ai_register_tool(\"name\", \"desc\", +{p=>\"type\"}, sub { ... })",
             line,
         ));
@@ -2664,7 +2664,7 @@ pub(crate) fn ai_register_tool(args: &[StrykeValue], line: usize) -> Result<Stry
     let params = args[2].clone();
     let run_sub = args[3]
         .as_code_ref()
-        .ok_or_else(|| PerlError::runtime("ai_register_tool: 4th arg must be a coderef", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_register_tool: 4th arg must be a coderef", line))?;
     let mut g = registered_tools().lock();
     g.retain(|t| t.name != name); // idempotent re-register
     g.push(RegisteredTool {
@@ -2738,7 +2738,7 @@ fn ensure_memory(path: Option<&str>) -> Result<()> {
         Some(p) => SqliteConn::open(p),
         None => SqliteConn::open_in_memory(),
     }
-    .map_err(|e| PerlError::runtime(format!("ai_memory: open: {}", e), 0))?;
+    .map_err(|e| StrykeError::runtime(format!("ai_memory: open: {}", e), 0))?;
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS ai_memory (
             id        TEXT PRIMARY KEY,
@@ -2749,7 +2749,7 @@ fn ensure_memory(path: Option<&str>) -> Result<()> {
          );
          CREATE INDEX IF NOT EXISTS ai_memory_saved ON ai_memory(saved_at);",
     )
-    .map_err(|e| PerlError::runtime(format!("ai_memory: schema: {}", e), 0))?;
+    .map_err(|e| StrykeError::runtime(format!("ai_memory: schema: {}", e), 0))?;
     *g = Some(MemoryStore {
         conn,
         embed_dim: None,
@@ -2782,10 +2782,10 @@ fn embed_one(text: &str, line: usize) -> Result<Vec<f32>> {
     // Single-input embed returns a flat array_ref of floats.
     let arr = v
         .as_array_ref()
-        .ok_or_else(|| PerlError::runtime("ai_memory: embed returned non-array", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_memory: embed returned non-array", line))?;
     let read = arr.read();
     if read.is_empty() {
-        return Err(PerlError::runtime("ai_memory: empty embedding", line));
+        return Err(StrykeError::runtime("ai_memory: empty embedding", line));
     }
     // Detect collection-shaped response: arr-of-arrs.
     if read[0].as_array_ref().is_some() {
@@ -2799,7 +2799,7 @@ fn embed_one(text: &str, line: usize) -> Result<Vec<f32>> {
 
 pub(crate) fn ai_memory_save(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.len() < 2 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "ai_memory_save: usage: ai_memory_save(\"id\", \"content\", metadata?, path?)",
             line,
         ));
@@ -2857,7 +2857,7 @@ pub(crate) fn ai_memory_save(args: &[StrykeValue], line: usize) -> Result<Stryke
                saved_at = excluded.saved_at",
             rusqlite::params![id, content, blob, metadata, now.to_string()],
         )
-        .map_err(|e| PerlError::runtime(format!("ai_memory: insert: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_memory: insert: {}", e), line))?;
     Ok(StrykeValue::UNDEF)
 }
 
@@ -2865,7 +2865,7 @@ pub(crate) fn ai_memory_recall(args: &[StrykeValue], line: usize) -> Result<Stry
     let query = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_memory_recall: query required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_memory_recall: query required", line))?;
     let opts = parse_opts(&args[1.min(args.len())..]);
     let top_k = opt_int(&opts, "top_k", 5).max(1) as usize;
     let path = opts.get("path").map(|v| v.to_string());
@@ -2884,7 +2884,7 @@ pub(crate) fn ai_memory_recall(args: &[StrykeValue], line: usize) -> Result<Stry
         let mut stmt = store
             .conn
             .prepare("SELECT id, content, embedding, COALESCE(metadata, '') FROM ai_memory")
-            .map_err(|e| PerlError::runtime(format!("ai_memory: prepare: {}", e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("ai_memory: prepare: {}", e), line))?;
         let iter = stmt
             .query_map([], |r| {
                 let id: String = r.get(0)?;
@@ -2893,7 +2893,7 @@ pub(crate) fn ai_memory_recall(args: &[StrykeValue], line: usize) -> Result<Stry
                 let meta: String = r.get(3)?;
                 Ok((id, content, blob_to_vec(&blob), meta))
             })
-            .map_err(|e| PerlError::runtime(format!("ai_memory: query: {}", e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("ai_memory: query: {}", e), line))?;
         for row in iter.flatten() {
             rows.push(row);
         }
@@ -2955,14 +2955,14 @@ pub(crate) fn ai_memory_forget(args: &[StrykeValue], line: usize) -> Result<Stry
     let id = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_memory_forget: id required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_memory_forget: id required", line))?;
     ensure_memory(None)?;
     let g = memory().lock();
     let store = g.as_ref().expect("memory ensured above");
     let n = store
         .conn
         .execute("DELETE FROM ai_memory WHERE id = ?1", rusqlite::params![id])
-        .map_err(|e| PerlError::runtime(format!("ai_memory: delete: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_memory: delete: {}", e), line))?;
     Ok(StrykeValue::integer(n as i64))
 }
 
@@ -2973,7 +2973,7 @@ pub(crate) fn ai_memory_count(_args: &[StrykeValue], line: usize) -> Result<Stry
     let n: i64 = store
         .conn
         .query_row("SELECT count(*) FROM ai_memory", [], |r| r.get(0))
-        .map_err(|e| PerlError::runtime(format!("ai_memory: count: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_memory: count: {}", e), line))?;
     Ok(StrykeValue::integer(n))
 }
 
@@ -2984,7 +2984,7 @@ pub(crate) fn ai_memory_clear(_args: &[StrykeValue], line: usize) -> Result<Stry
     let n = store
         .conn
         .execute("DELETE FROM ai_memory", [])
-        .map_err(|e| PerlError::runtime(format!("ai_memory: clear: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_memory: clear: {}", e), line))?;
     Ok(StrykeValue::integer(n as i64))
 }
 
@@ -3034,7 +3034,7 @@ impl VMHelper {
         let prompt = args
             .first()
             .map(|v| v.to_string())
-            .ok_or_else(|| PerlError::runtime("stream_prompt: prompt required", line))?;
+            .ok_or_else(|| StrykeError::runtime("stream_prompt: prompt required", line))?;
         let opts = parse_opts(&args[1..]);
         let on_chunk = opts.get("on_chunk").cloned();
         let on_chunk_sub = on_chunk.as_ref().and_then(|v| v.as_code_ref());
@@ -3059,7 +3059,7 @@ impl VMHelper {
             return Ok(StrykeValue::string(resp));
         }
         if mock_only_mode() {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "stream_prompt: STRYKE_AI_MODE=mock-only and no mock matched prompt",
                 line,
             ));
@@ -3080,7 +3080,7 @@ impl VMHelper {
 
         let key_env = config().lock().api_key_env.clone();
         let api_key = std::env::var(&key_env).map_err(|_| {
-            PerlError::runtime(format!("stream_prompt: ${} env var not set", key_env), line)
+            StrykeError::runtime(format!("stream_prompt: ${} env var not set", key_env), line)
         })?;
         let mut body = serde_json::json!({
             "model": model,
@@ -3105,7 +3105,7 @@ impl VMHelper {
             .set("content-type", "application/json")
             .set("accept", "text/event-stream")
             .send_json(body)
-            .map_err(|e| PerlError::runtime(format!("stream_prompt: anthropic: {}", e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("stream_prompt: anthropic: {}", e), line))?;
 
         let reader = std::io::BufReader::new(resp.into_reader());
         let mut full = String::new();
@@ -3191,7 +3191,7 @@ impl VMHelper {
         let timeout = opt_int(&opts, "timeout", 120);
 
         let api_key = std::env::var("OPENAI_API_KEY")
-            .map_err(|_| PerlError::runtime("stream_prompt: $OPENAI_API_KEY not set", line))?;
+            .map_err(|_| StrykeError::runtime("stream_prompt: $OPENAI_API_KEY not set", line))?;
         let mut messages: Vec<serde_json::Value> = Vec::new();
         if !system.is_empty() {
             messages.push(serde_json::json!({"role":"system","content":system}));
@@ -3216,7 +3216,7 @@ impl VMHelper {
             .set("content-type", "application/json")
             .set("accept", "text/event-stream")
             .send_json(body)
-            .map_err(|e| PerlError::runtime(format!("stream_prompt: openai: {}", e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("stream_prompt: openai: {}", e), line))?;
 
         let reader = std::io::BufReader::new(resp.into_reader());
         let mut full = String::new();
@@ -3295,14 +3295,14 @@ pub(crate) fn ai_vision(args: &[StrykeValue], line: usize) -> Result<StrykeValue
     let prompt = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_vision: prompt required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_vision: prompt required", line))?;
     let opts = parse_opts(&args[1..]);
     let image_v = opts.get("image").cloned().ok_or_else(|| {
-        PerlError::runtime("ai_vision: pass image => $bytes | $url | $path", line)
+        StrykeError::runtime("ai_vision: pass image => $bytes | $url | $path", line)
     })?;
     let provider = opt_str(&opts, "provider", &config().lock().provider);
     if provider != "anthropic" {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "ai_vision: provider `{}` not implemented (Anthropic only for v0)",
                 provider
@@ -3319,7 +3319,7 @@ pub(crate) fn ai_vision(args: &[StrykeValue], line: usize) -> Result<StrykeValue
         return Ok(StrykeValue::string(resp));
     }
     if mock_only_mode() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "ai_vision: STRYKE_AI_MODE=mock-only and no mock matched",
             line,
         ));
@@ -3329,7 +3329,7 @@ pub(crate) fn ai_vision(args: &[StrykeValue], line: usize) -> Result<StrykeValue
 
     let key_env = config().lock().api_key_env.clone();
     let api_key = std::env::var(&key_env).map_err(|_| {
-        PerlError::runtime(format!("ai_vision: ${} env var not set", key_env), line)
+        StrykeError::runtime(format!("ai_vision: ${} env var not set", key_env), line)
     })?;
     let mut body = serde_json::json!({
         "model": model,
@@ -3361,10 +3361,10 @@ pub(crate) fn ai_vision(args: &[StrykeValue], line: usize) -> Result<StrykeValue
         .set("anthropic-version", "2023-06-01")
         .set("content-type", "application/json")
         .send_json(body)
-        .map_err(|e| PerlError::runtime(format!("ai_vision: anthropic: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_vision: anthropic: {}", e), line))?;
     let json: serde_json::Value = resp
         .into_json()
-        .map_err(|e| PerlError::runtime(format!("ai_vision: decode: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_vision: decode: {}", e), line))?;
 
     if let Some(input) = json["usage"]["input_tokens"].as_u64() {
         INPUT_TOKENS.fetch_add(input, Ordering::Relaxed);
@@ -3401,14 +3401,14 @@ fn resolve_image_input(v: &StrykeValue, line: usize) -> Result<(String, String)>
         let resp = agent
             .get(&s)
             .call()
-            .map_err(|e| PerlError::runtime(format!("ai_vision: fetch image: {}", e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("ai_vision: fetch image: {}", e), line))?;
         let ct = resp
             .header("content-type")
             .unwrap_or("image/jpeg")
             .to_string();
         let mut buf = Vec::new();
         std::io::Read::read_to_end(&mut resp.into_reader(), &mut buf)
-            .map_err(|e| PerlError::runtime(format!("ai_vision: read image: {}", e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("ai_vision: read image: {}", e), line))?;
         (
             buf,
             ct.split(';')
@@ -3419,14 +3419,14 @@ fn resolve_image_input(v: &StrykeValue, line: usize) -> Result<(String, String)>
         )
     } else if std::path::Path::new(&s).exists() {
         let bytes = std::fs::read(&s)
-            .map_err(|e| PerlError::runtime(format!("ai_vision: read {}: {}", s, e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("ai_vision: read {}: {}", s, e), line))?;
         let ct = guess_media_type(&s);
         (bytes, ct)
     } else if let Some(arc) = v.as_bytes_arc() {
         // Raw bytes from stryke.
         ((*arc).clone(), "image/jpeg".to_string())
     } else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "ai_vision: image must be a URL, file path, or raw bytes",
             line,
         ));
@@ -3476,10 +3476,10 @@ fn call_ollama(
         .post(&url)
         .set("content-type", "application/json")
         .send_json(body)
-        .map_err(|e| PerlError::runtime(format!("ai: ollama request: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai: ollama request: {}", e), line))?;
     let json: serde_json::Value = resp
         .into_json()
-        .map_err(|e| PerlError::runtime(format!("ai: ollama decode: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai: ollama decode: {}", e), line))?;
     // Track tokens — Ollama returns prompt_eval_count + eval_count.
     let input = json["prompt_eval_count"].as_u64().unwrap_or(0);
     let output = json["eval_count"].as_u64().unwrap_or(0);
@@ -3488,7 +3488,7 @@ fn call_ollama(
     // Local model = $0 — no add_cost call.
     let response = json["response"].as_str().unwrap_or("").to_string();
     if response.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "ai: ollama returned empty response (raw: {})",
                 truncate(&json.to_string(), 200)
@@ -3514,7 +3514,7 @@ fn call_gemini(
     let api_key = std::env::var("GOOGLE_API_KEY")
         .or_else(|_| std::env::var("GEMINI_API_KEY"))
         .map_err(|_| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 "ai: $GOOGLE_API_KEY (or $GEMINI_API_KEY) not set for gemini provider",
                 line,
             )
@@ -3552,10 +3552,10 @@ fn call_gemini(
         .post(&url)
         .set("content-type", "application/json")
         .send_json(body)
-        .map_err(|e| PerlError::runtime(format!("ai: gemini request: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai: gemini request: {}", e), line))?;
     let json: serde_json::Value = resp
         .into_json()
-        .map_err(|e| PerlError::runtime(format!("ai: gemini decode: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai: gemini decode: {}", e), line))?;
     let usage = &json["usageMetadata"];
     let input = usage["promptTokenCount"].as_u64().unwrap_or(0);
     let output = usage["candidatesTokenCount"].as_u64().unwrap_or(0);
@@ -3575,7 +3575,7 @@ fn call_gemini(
         }
     }
     if text.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "ai: gemini returned no text (raw: {})",
                 truncate(&json.to_string(), 200)
@@ -3593,7 +3593,7 @@ fn call_gemini(
 /// a string. Accepts mp3/mp4/mpeg/mpga/m4a/wav/webm.
 pub(crate) fn ai_transcribe(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let path = args.first().map(|v| v.to_string()).ok_or_else(|| {
-        PerlError::runtime(
+        StrykeError::runtime(
             "ai_transcribe: usage: ai_transcribe(\"path/to/audio.mp3\")",
             line,
         )
@@ -3607,15 +3607,15 @@ pub(crate) fn ai_transcribe(args: &[StrykeValue], line: usize) -> Result<StrykeV
         return Ok(StrykeValue::string(resp));
     }
     if mock_only_mode() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "ai_transcribe: STRYKE_AI_MODE=mock-only and no transcribe mock installed",
             line,
         ));
     }
     let api_key = std::env::var("OPENAI_API_KEY")
-        .map_err(|_| PerlError::runtime("ai_transcribe: $OPENAI_API_KEY not set", line))?;
+        .map_err(|_| StrykeError::runtime("ai_transcribe: $OPENAI_API_KEY not set", line))?;
     let bytes = std::fs::read(&path)
-        .map_err(|e| PerlError::runtime(format!("ai_transcribe: read {}: {}", path, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_transcribe: read {}: {}", path, e), line))?;
 
     let body = build_multipart(&[
         ("model", model.as_bytes(), None),
@@ -3652,10 +3652,10 @@ pub(crate) fn ai_transcribe(args: &[StrykeValue], line: usize) -> Result<StrykeV
             &format!("multipart/form-data; boundary={}", boundary),
         )
         .send_bytes(&body)
-        .map_err(|e| PerlError::runtime(format!("ai_transcribe: request: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_transcribe: request: {}", e), line))?;
     let json: serde_json::Value = resp
         .into_json()
-        .map_err(|e| PerlError::runtime(format!("ai_transcribe: decode: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_transcribe: decode: {}", e), line))?;
     let text = json["text"].as_str().unwrap_or("").to_string();
     Ok(StrykeValue::string(text))
 }
@@ -3669,7 +3669,7 @@ pub(crate) fn ai_speak(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
     let text = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_speak: text required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_speak: text required", line))?;
     let opts = parse_opts(&args[1..]);
     let model = opt_str(&opts, "model", "tts-1");
     let voice = opt_str(&opts, "voice", "alloy");
@@ -3685,7 +3685,7 @@ pub(crate) fn ai_speak(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
         return Ok(StrykeValue::bytes(Arc::new(fake)));
     }
     let api_key = std::env::var("OPENAI_API_KEY")
-        .map_err(|_| PerlError::runtime("ai_speak: $OPENAI_API_KEY not set", line))?;
+        .map_err(|_| StrykeError::runtime("ai_speak: $OPENAI_API_KEY not set", line))?;
     let body = serde_json::json!({
         "model": model,
         "voice": voice,
@@ -3700,13 +3700,13 @@ pub(crate) fn ai_speak(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
         .set("authorization", &format!("Bearer {}", api_key))
         .set("content-type", "application/json")
         .send_json(body)
-        .map_err(|e| PerlError::runtime(format!("ai_speak: request: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_speak: request: {}", e), line))?;
     let mut buf = Vec::new();
     std::io::Read::read_to_end(&mut resp.into_reader(), &mut buf)
-        .map_err(|e| PerlError::runtime(format!("ai_speak: read body: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_speak: read body: {}", e), line))?;
     if !output.is_empty() {
         std::fs::write(&output, &buf)
-            .map_err(|e| PerlError::runtime(format!("ai_speak: write {}: {}", output, e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("ai_speak: write {}: {}", output, e), line))?;
     }
     Ok(StrykeValue::bytes(Arc::new(buf)))
 }
@@ -3725,7 +3725,7 @@ pub(crate) fn ai_image(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
     let prompt = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_image: prompt required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_image: prompt required", line))?;
     let opts = parse_opts(&args[1..]);
     let model = opt_str(&opts, "model", "dall-e-3");
     let size = opt_str(&opts, "size", "1024x1024");
@@ -3743,13 +3743,13 @@ pub(crate) fn ai_image(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
         return Ok(StrykeValue::bytes(Arc::new(bytes)));
     }
     if mock_only_mode() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "ai_image: STRYKE_AI_MODE=mock-only and no image mock installed",
             line,
         ));
     }
     let api_key = std::env::var("OPENAI_API_KEY")
-        .map_err(|_| PerlError::runtime("ai_image: $OPENAI_API_KEY not set", line))?;
+        .map_err(|_| StrykeError::runtime("ai_image: $OPENAI_API_KEY not set", line))?;
 
     let mut body = serde_json::json!({
         "model": model,
@@ -3782,13 +3782,13 @@ pub(crate) fn ai_image(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
         .set("authorization", &format!("Bearer {}", api_key))
         .set("content-type", "application/json")
         .send_json(body)
-        .map_err(|e| PerlError::runtime(format!("ai_image: request: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_image: request: {}", e), line))?;
     let json: serde_json::Value = resp
         .into_json()
-        .map_err(|e| PerlError::runtime(format!("ai_image: decode: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_image: decode: {}", e), line))?;
     let data = json["data"].as_array().cloned().unwrap_or_default();
     if data.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("ai_image: empty response: {}", json),
             line,
         ));
@@ -3798,16 +3798,16 @@ pub(crate) fn ai_image(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
     for item in &data {
         if let Some(b64) = item["b64_json"].as_str() {
             let bytes = base64_decode_lenient(b64)
-                .ok_or_else(|| PerlError::runtime("ai_image: invalid base64 in response", line))?;
+                .ok_or_else(|| StrykeError::runtime("ai_image: invalid base64 in response", line))?;
             images.push(bytes);
         } else if let Some(url) = item["url"].as_str() {
             let r = agent
                 .get(url)
                 .call()
-                .map_err(|e| PerlError::runtime(format!("ai_image: download: {}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("ai_image: download: {}", e), line))?;
             let mut buf = Vec::new();
             std::io::Read::read_to_end(&mut r.into_reader(), &mut buf)
-                .map_err(|e| PerlError::runtime(format!("ai_image: read download: {}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("ai_image: read download: {}", e), line))?;
             images.push(buf);
         }
     }
@@ -3815,7 +3815,7 @@ pub(crate) fn ai_image(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
     if images.len() == 1 {
         if !output.is_empty() {
             std::fs::write(&output, &images[0]).map_err(|e| {
-                PerlError::runtime(format!("ai_image: write {}: {}", output, e), line)
+                StrykeError::runtime(format!("ai_image: write {}: {}", output, e), line)
             })?;
         }
         Ok(StrykeValue::bytes(Arc::new(images.remove(0))))
@@ -3828,7 +3828,7 @@ pub(crate) fn ai_image(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
                     format!("{}_{}", output, i + 1)
                 };
                 std::fs::write(&p, b).map_err(|e| {
-                    PerlError::runtime(format!("ai_image: write {}: {}", p, e), line)
+                    StrykeError::runtime(format!("ai_image: write {}: {}", p, e), line)
                 })?;
             }
         }
@@ -3852,11 +3852,11 @@ pub(crate) fn ai_image_edit(args: &[StrykeValue], line: usize) -> Result<StrykeV
     let prompt = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_image_edit: prompt required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_image_edit: prompt required", line))?;
     let opts = parse_opts(&args[1..]);
     let image_path = opt_str(&opts, "image", "");
     if image_path.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "ai_image_edit: pass image => \"path/to/source.png\"",
             line,
         ));
@@ -3876,15 +3876,15 @@ pub(crate) fn ai_image_edit(args: &[StrykeValue], line: usize) -> Result<StrykeV
         return Ok(StrykeValue::bytes(Arc::new(bytes)));
     }
     if mock_only_mode() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "ai_image_edit: STRYKE_AI_MODE=mock-only and no image_edit mock installed",
             line,
         ));
     }
     let api_key = std::env::var("OPENAI_API_KEY")
-        .map_err(|_| PerlError::runtime("ai_image_edit: $OPENAI_API_KEY not set", line))?;
+        .map_err(|_| StrykeError::runtime("ai_image_edit: $OPENAI_API_KEY not set", line))?;
     let image_bytes = std::fs::read(&image_path).map_err(|e| {
-        PerlError::runtime(format!("ai_image_edit: read {}: {}", image_path, e), line)
+        StrykeError::runtime(format!("ai_image_edit: read {}: {}", image_path, e), line)
     })?;
     let image_filename = std::path::Path::new(&image_path)
         .file_name()
@@ -3906,7 +3906,7 @@ pub(crate) fn ai_image_edit(args: &[StrykeValue], line: usize) -> Result<StrykeV
     let mask_bytes;
     if !mask_path.is_empty() {
         mask_bytes = std::fs::read(&mask_path).map_err(|e| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 format!("ai_image_edit: read mask {}: {}", mask_path, e),
                 line,
             )
@@ -3941,10 +3941,10 @@ pub(crate) fn ai_image_edit(args: &[StrykeValue], line: usize) -> Result<StrykeV
             &format!("multipart/form-data; boundary={}", boundary),
         )
         .send_bytes(&body)
-        .map_err(|e| PerlError::runtime(format!("ai_image_edit: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_image_edit: {}", e), line))?;
     let json: serde_json::Value = resp
         .into_json()
-        .map_err(|e| PerlError::runtime(format!("ai_image_edit: decode: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_image_edit: decode: {}", e), line))?;
 
     finalize_image_response(&json, &output, line)
 }
@@ -3956,7 +3956,7 @@ pub(crate) fn ai_image_variation(args: &[StrykeValue], line: usize) -> Result<St
     let opts = parse_opts(args);
     let image_path = opt_str(&opts, "image", "");
     if image_path.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "ai_image_variation: pass image => \"path/to/source.png\"",
             line,
         ));
@@ -3972,9 +3972,9 @@ pub(crate) fn ai_image_variation(args: &[StrykeValue], line: usize) -> Result<St
         return Ok(StrykeValue::bytes(Arc::new(fake)));
     }
     let api_key = std::env::var("OPENAI_API_KEY")
-        .map_err(|_| PerlError::runtime("ai_image_variation: $OPENAI_API_KEY not set", line))?;
+        .map_err(|_| StrykeError::runtime("ai_image_variation: $OPENAI_API_KEY not set", line))?;
     let image_bytes = std::fs::read(&image_path).map_err(|e| {
-        PerlError::runtime(
+        StrykeError::runtime(
             format!("ai_image_variation: read {}: {}", image_path, e),
             line,
         )
@@ -4007,10 +4007,10 @@ pub(crate) fn ai_image_variation(args: &[StrykeValue], line: usize) -> Result<St
             &format!("multipart/form-data; boundary={}", boundary),
         )
         .send_bytes(&body)
-        .map_err(|e| PerlError::runtime(format!("ai_image_variation: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_image_variation: {}", e), line))?;
     let json: serde_json::Value = resp
         .into_json()
-        .map_err(|e| PerlError::runtime(format!("ai_image_variation: decode: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_image_variation: decode: {}", e), line))?;
 
     finalize_image_response(&json, &output, line)
 }
@@ -4025,7 +4025,7 @@ fn finalize_image_response(
 ) -> Result<StrykeValue> {
     let data = json["data"].as_array().cloned().unwrap_or_default();
     if data.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("image: empty response: {}", json),
             line,
         ));
@@ -4037,23 +4037,23 @@ fn finalize_image_response(
     for item in &data {
         if let Some(b64) = item["b64_json"].as_str() {
             let bytes = base64_decode_lenient(b64)
-                .ok_or_else(|| PerlError::runtime("image: invalid base64", line))?;
+                .ok_or_else(|| StrykeError::runtime("image: invalid base64", line))?;
             images.push(bytes);
         } else if let Some(url) = item["url"].as_str() {
             let r = agent
                 .get(url)
                 .call()
-                .map_err(|e| PerlError::runtime(format!("image: download: {}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("image: download: {}", e), line))?;
             let mut buf = Vec::new();
             std::io::Read::read_to_end(&mut r.into_reader(), &mut buf)
-                .map_err(|e| PerlError::runtime(format!("image: read download: {}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("image: read download: {}", e), line))?;
             images.push(buf);
         }
     }
     if images.len() == 1 {
         if !output.is_empty() {
             std::fs::write(output, &images[0])
-                .map_err(|e| PerlError::runtime(format!("image: write {}: {}", output, e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("image: write {}: {}", output, e), line))?;
         }
         Ok(StrykeValue::bytes(Arc::new(images.remove(0))))
     } else {
@@ -4065,7 +4065,7 @@ fn finalize_image_response(
                     format!("{}_{}", output, i + 1)
                 };
                 std::fs::write(&p, b)
-                    .map_err(|e| PerlError::runtime(format!("image: write {}: {}", p, e), line))?;
+                    .map_err(|e| StrykeError::runtime(format!("image: write {}: {}", p, e), line))?;
             }
         }
         let arr: Vec<StrykeValue> = images
@@ -4135,14 +4135,14 @@ pub(crate) fn ai_models(args: &[StrykeValue], line: usize) -> Result<StrykeValue
     let ids: Vec<String> = match provider.as_str() {
         "openai" => {
             let key = std::env::var("OPENAI_API_KEY")
-                .map_err(|_| PerlError::runtime("ai_models: $OPENAI_API_KEY not set", line))?;
+                .map_err(|_| StrykeError::runtime("ai_models: $OPENAI_API_KEY not set", line))?;
             let resp = agent
                 .get("https://api.openai.com/v1/models")
                 .set("authorization", &format!("Bearer {}", key))
                 .call()
-                .map_err(|e| PerlError::runtime(format!("ai_models: openai: {}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("ai_models: openai: {}", e), line))?;
             let json: serde_json::Value = resp.into_json().map_err(|e| {
-                PerlError::runtime(format!("ai_models: openai decode: {}", e), line)
+                StrykeError::runtime(format!("ai_models: openai decode: {}", e), line)
             })?;
             json["data"]
                 .as_array()
@@ -4155,15 +4155,15 @@ pub(crate) fn ai_models(args: &[StrykeValue], line: usize) -> Result<StrykeValue
         }
         "anthropic" | "claude" => {
             let key = std::env::var("ANTHROPIC_API_KEY")
-                .map_err(|_| PerlError::runtime("ai_models: $ANTHROPIC_API_KEY not set", line))?;
+                .map_err(|_| StrykeError::runtime("ai_models: $ANTHROPIC_API_KEY not set", line))?;
             let resp = agent
                 .get("https://api.anthropic.com/v1/models")
                 .set("x-api-key", &key)
                 .set("anthropic-version", "2023-06-01")
                 .call()
-                .map_err(|e| PerlError::runtime(format!("ai_models: anthropic: {}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("ai_models: anthropic: {}", e), line))?;
             let json: serde_json::Value = resp.into_json().map_err(|e| {
-                PerlError::runtime(format!("ai_models: anthropic decode: {}", e), line)
+                StrykeError::runtime(format!("ai_models: anthropic decode: {}", e), line)
             })?;
             json["data"]
                 .as_array()
@@ -4181,9 +4181,9 @@ pub(crate) fn ai_models(args: &[StrykeValue], line: usize) -> Result<StrykeValue
             let resp = agent
                 .get(&url)
                 .call()
-                .map_err(|e| PerlError::runtime(format!("ai_models: ollama: {}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("ai_models: ollama: {}", e), line))?;
             let json: serde_json::Value = resp.into_json().map_err(|e| {
-                PerlError::runtime(format!("ai_models: ollama decode: {}", e), line)
+                StrykeError::runtime(format!("ai_models: ollama decode: {}", e), line)
             })?;
             json["models"]
                 .as_array()
@@ -4197,7 +4197,7 @@ pub(crate) fn ai_models(args: &[StrykeValue], line: usize) -> Result<StrykeValue
         "gemini" | "google" => {
             let key = std::env::var("GOOGLE_API_KEY")
                 .or_else(|_| std::env::var("GEMINI_API_KEY"))
-                .map_err(|_| PerlError::runtime("ai_models: $GOOGLE_API_KEY not set", line))?;
+                .map_err(|_| StrykeError::runtime("ai_models: $GOOGLE_API_KEY not set", line))?;
             let url = format!(
                 "https://generativelanguage.googleapis.com/v1beta/models?key={}",
                 key
@@ -4205,9 +4205,9 @@ pub(crate) fn ai_models(args: &[StrykeValue], line: usize) -> Result<StrykeValue
             let resp = agent
                 .get(&url)
                 .call()
-                .map_err(|e| PerlError::runtime(format!("ai_models: gemini: {}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("ai_models: gemini: {}", e), line))?;
             let json: serde_json::Value = resp.into_json().map_err(|e| {
-                PerlError::runtime(format!("ai_models: gemini decode: {}", e), line)
+                StrykeError::runtime(format!("ai_models: gemini decode: {}", e), line)
             })?;
             json["models"]
                 .as_array()
@@ -4223,7 +4223,7 @@ pub(crate) fn ai_models(args: &[StrykeValue], line: usize) -> Result<StrykeValue
                 .unwrap_or_default()
         }
         other => {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!(
                     "ai_models: unknown provider `{}` (try openai|anthropic|ollama|gemini)",
                     other
@@ -4305,10 +4305,10 @@ pub(crate) fn ai_extract(args: &[StrykeValue], line: usize) -> Result<StrykeValu
     let prompt = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_extract: prompt required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_extract: prompt required", line))?;
     let opts = parse_opts(&args[1..]);
     let schema_v = opts.get("schema").cloned().ok_or_else(|| {
-        PerlError::runtime("ai_extract: pass schema => +{field => \"type\"}", line)
+        StrykeError::runtime("ai_extract: pass schema => +{field => \"type\"}", line)
     })?;
     let schema_str = describe_schema(&schema_v);
 
@@ -4340,7 +4340,7 @@ pub(crate) fn ai_extract(args: &[StrykeValue], line: usize) -> Result<StrykeValu
     let raw = ai_prompt(&call_args, line)?.to_string();
     let json_str = extract_first_json_object(&raw).unwrap_or(&raw);
     let parsed: serde_json::Value = serde_json::from_str(json_str).map_err(|e| {
-        PerlError::runtime(
+        StrykeError::runtime(
             format!(
                 "ai_extract: parse: {} (raw: {})",
                 e,
@@ -4504,7 +4504,7 @@ pub(crate) fn ai_summarize(args: &[StrykeValue], line: usize) -> Result<StrykeVa
     let text = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_summarize: text required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_summarize: text required", line))?;
     let opts = parse_opts(&args[1..]);
     let words = opt_int(&opts, "words", 50);
     let prompt = format!(
@@ -4521,7 +4521,7 @@ pub(crate) fn ai_translate(args: &[StrykeValue], line: usize) -> Result<StrykeVa
     let text = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_translate: text required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_translate: text required", line))?;
     let opts = parse_opts(&args[1..]);
     let target = opt_str(&opts, "to", "English");
     let prompt = format!(
@@ -4544,11 +4544,11 @@ impl VMHelper {
         let cap = args
             .first()
             .map(|v| v.to_number())
-            .ok_or_else(|| PerlError::runtime("ai_budget: usd cap required", line))?;
+            .ok_or_else(|| StrykeError::runtime("ai_budget: usd cap required", line))?;
         let body = args
             .get(1)
             .and_then(|v| v.as_code_ref())
-            .ok_or_else(|| PerlError::runtime("ai_budget: second arg must be a coderef", line))?;
+            .ok_or_else(|| StrykeError::runtime("ai_budget: second arg must be a coderef", line))?;
 
         let snapshot = current_cost_usd();
         let prev_cap = config().lock().max_cost_run_usd;
@@ -4562,7 +4562,7 @@ impl VMHelper {
         match result {
             Ok(v) => {
                 if spent > cap {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("ai_budget: spent ${:.4} (cap ${:.2})", spent, cap),
                         line,
                     ));
@@ -4592,15 +4592,15 @@ pub(crate) fn ai_pdf(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let prompt = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_pdf: prompt required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_pdf: prompt required", line))?;
     let opts = parse_opts(&args[1..]);
     let pdf_v = opts
         .get("pdf")
         .cloned()
-        .ok_or_else(|| PerlError::runtime("ai_pdf: pass pdf => $path|$url|$bytes", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_pdf: pass pdf => $path|$url|$bytes", line))?;
     let provider = opt_str(&opts, "provider", &config().lock().provider);
     if provider != "anthropic" {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "ai_pdf: provider `{}` not implemented (Anthropic only)",
                 provider
@@ -4617,7 +4617,7 @@ pub(crate) fn ai_pdf(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
         return Ok(StrykeValue::string(resp));
     }
     if mock_only_mode() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "ai_pdf: STRYKE_AI_MODE=mock-only and no mock matched",
             line,
         ));
@@ -4626,7 +4626,7 @@ pub(crate) fn ai_pdf(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let (b64, _) = resolve_pdf_input(&pdf_v, line)?;
     let key_env = config().lock().api_key_env.clone();
     let api_key = std::env::var(&key_env)
-        .map_err(|_| PerlError::runtime(format!("ai_pdf: ${} env var not set", key_env), line))?;
+        .map_err(|_| StrykeError::runtime(format!("ai_pdf: ${} env var not set", key_env), line))?;
     let want_citations = opt_int(&opts, "citations", 0) != 0;
     let title = opt_str(&opts, "title", "");
     let mut document = serde_json::json!({
@@ -4666,10 +4666,10 @@ pub(crate) fn ai_pdf(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
         .set("anthropic-version", "2023-06-01")
         .set("content-type", "application/json")
         .send_json(body)
-        .map_err(|e| PerlError::runtime(format!("ai_pdf: anthropic: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_pdf: anthropic: {}", e), line))?;
     let json: serde_json::Value = resp
         .into_json()
-        .map_err(|e| PerlError::runtime(format!("ai_pdf: decode: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_pdf: decode: {}", e), line))?;
 
     if let Some(input) = json["usage"]["input_tokens"].as_u64() {
         INPUT_TOKENS.fetch_add(input, Ordering::Relaxed);
@@ -4712,12 +4712,12 @@ pub(crate) fn ai_grounded(args: &[StrykeValue], line: usize) -> Result<StrykeVal
     let prompt = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_grounded: prompt required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_grounded: prompt required", line))?;
     let opts = parse_opts(&args[1..]);
     let docs_v = opts
         .get("documents")
         .cloned()
-        .ok_or_else(|| PerlError::runtime("ai_grounded: documents => [...] required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_grounded: documents => [...] required", line))?;
     let docs: Vec<String> = match docs_v.as_array_ref() {
         Some(arr) => arr.read().iter().map(|v| v.to_string()).collect(),
         None => vec![docs_v.to_string()],
@@ -4732,7 +4732,7 @@ pub(crate) fn ai_grounded(args: &[StrykeValue], line: usize) -> Result<StrykeVal
     let timeout = opt_int(&opts, "timeout", 180);
     let provider = opt_str(&opts, "provider", &config().lock().provider);
     if provider != "anthropic" {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "ai_grounded: provider `{}` not supported (Anthropic only)",
                 provider
@@ -4745,14 +4745,14 @@ pub(crate) fn ai_grounded(args: &[StrykeValue], line: usize) -> Result<StrykeVal
         return Ok(StrykeValue::string(resp));
     }
     if mock_only_mode() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "ai_grounded: STRYKE_AI_MODE=mock-only and no mock matched",
             line,
         ));
     }
     let key_env = config().lock().api_key_env.clone();
     let api_key = std::env::var(&key_env)
-        .map_err(|_| PerlError::runtime(format!("ai_grounded: ${} not set", key_env), line))?;
+        .map_err(|_| StrykeError::runtime(format!("ai_grounded: ${} not set", key_env), line))?;
 
     let mut content_blocks: Vec<serde_json::Value> = Vec::with_capacity(docs.len() + 1);
     for (i, doc) in docs.iter().enumerate() {
@@ -4781,10 +4781,10 @@ pub(crate) fn ai_grounded(args: &[StrykeValue], line: usize) -> Result<StrykeVal
         .set("anthropic-version", "2023-06-01")
         .set("content-type", "application/json")
         .send_json(body)
-        .map_err(|e| PerlError::runtime(format!("ai_grounded: anthropic: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_grounded: anthropic: {}", e), line))?;
     let json: serde_json::Value = resp
         .into_json()
-        .map_err(|e| PerlError::runtime(format!("ai_grounded: decode: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_grounded: decode: {}", e), line))?;
 
     if let Some(input) = json["usage"]["input_tokens"].as_u64() {
         INPUT_TOKENS.fetch_add(input, Ordering::Relaxed);
@@ -4824,7 +4824,7 @@ fn build_document_block(spec: &str, title: Option<&str>, line: usize) -> Result<
     let p = std::path::Path::new(spec);
     let mut block = if p.is_file() {
         let bytes = std::fs::read(p)
-            .map_err(|e| PerlError::runtime(format!("ai_grounded: read {}: {}", spec, e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("ai_grounded: read {}: {}", spec, e), line))?;
         let is_pdf = bytes.starts_with(b"%PDF-") || spec.to_lowercase().ends_with(".pdf");
         if is_pdf {
             use base64::Engine;
@@ -4881,7 +4881,7 @@ fn build_document_block(spec: &str, title: Option<&str>, line: usize) -> Result<
 pub(crate) fn ai_batch(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let prompts_v = args
         .first()
-        .ok_or_else(|| PerlError::runtime("ai_batch: prompt list required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_batch: prompt list required", line))?;
     let prompts: Vec<String> = if let Some(arr) = prompts_v.as_array_ref() {
         arr.read().iter().map(|v| v.to_string()).collect()
     } else {
@@ -4945,7 +4945,7 @@ fn ai_batch_anthropic(
 
     let key_env = config().lock().api_key_env.clone();
     let api_key = std::env::var(&key_env)
-        .map_err(|_| PerlError::runtime(format!("ai_batch: ${} env var not set", key_env), line))?;
+        .map_err(|_| StrykeError::runtime(format!("ai_batch: ${} env var not set", key_env), line))?;
     let agent = ureq::AgentBuilder::new()
         .timeout(Duration::from_secs(60))
         .build();
@@ -4976,14 +4976,14 @@ fn ai_batch_anthropic(
         .set("anthropic-version", "2023-06-01")
         .set("content-type", "application/json")
         .send_json(serde_json::json!({ "requests": requests }))
-        .map_err(|e| PerlError::runtime(format!("ai_batch: create: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_batch: create: {}", e), line))?;
     let create_json: serde_json::Value = create_resp
         .into_json()
-        .map_err(|e| PerlError::runtime(format!("ai_batch: create decode: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_batch: create decode: {}", e), line))?;
     let batch_id = create_json["id"]
         .as_str()
         .ok_or_else(|| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 format!(
                     "ai_batch: no batch id in response (raw: {})",
                     truncate(&create_json.to_string(), 200)
@@ -4998,7 +4998,7 @@ fn ai_batch_anthropic(
     let results_url: String;
     loop {
         if started.elapsed() > Duration::from_secs(max_wait) {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("ai_batch: max_wait_secs={} exceeded", max_wait),
                 line,
             ));
@@ -5011,15 +5011,15 @@ fn ai_batch_anthropic(
             .set("x-api-key", &api_key)
             .set("anthropic-version", "2023-06-01")
             .call()
-            .map_err(|e| PerlError::runtime(format!("ai_batch: status: {}", e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("ai_batch: status: {}", e), line))?;
         let status_json: serde_json::Value = status_resp
             .into_json()
-            .map_err(|e| PerlError::runtime(format!("ai_batch: status decode: {}", e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("ai_batch: status decode: {}", e), line))?;
         let status = status_json["processing_status"].as_str().unwrap_or("");
         if status == "ended" {
             results_url = status_json["results_url"]
                 .as_str()
-                .ok_or_else(|| PerlError::runtime("ai_batch: no results_url after ended", line))?
+                .ok_or_else(|| StrykeError::runtime("ai_batch: no results_url after ended", line))?
                 .to_string();
             break;
         }
@@ -5032,10 +5032,10 @@ fn ai_batch_anthropic(
         .set("x-api-key", &api_key)
         .set("anthropic-version", "2023-06-01")
         .call()
-        .map_err(|e| PerlError::runtime(format!("ai_batch: results: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_batch: results: {}", e), line))?;
     let body = results_resp
         .into_string()
-        .map_err(|e| PerlError::runtime(format!("ai_batch: read: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_batch: read: {}", e), line))?;
 
     // Map by custom_id and reorder.
     let mut by_id: IndexMap<String, String> = IndexMap::new();
@@ -5109,7 +5109,7 @@ fn ai_batch_anthropic(
 pub(crate) fn ai_pmap(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let items_v = args
         .first()
-        .ok_or_else(|| PerlError::runtime("ai_pmap: items array required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_pmap: items array required", line))?;
     let items: Vec<StrykeValue> = if let Some(arr) = items_v.as_array_ref() {
         arr.read().clone()
     } else {
@@ -5118,7 +5118,7 @@ pub(crate) fn ai_pmap(args: &[StrykeValue], line: usize) -> Result<StrykeValue> 
     let instruction = args
         .get(1)
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_pmap: instruction required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_pmap: instruction required", line))?;
     let opts = parse_opts(&args[2.min(args.len())..]);
 
     // For v0 we run sequentially via ai_map, which itself batches into
@@ -5146,7 +5146,7 @@ pub(crate) fn ai_pmap(args: &[StrykeValue], line: usize) -> Result<StrykeValue> 
     let cluster_pv = cluster_v.unwrap();
     let cluster = cluster_pv
         .as_remote_cluster()
-        .ok_or_else(|| PerlError::runtime("ai_pmap: cluster arg is not a cluster handle", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_pmap: cluster arg is not a cluster handle", line))?;
     let num_workers = cluster.slots.len().max(1);
     let shards = shard_items(&items, num_workers);
 
@@ -5165,7 +5165,7 @@ pub(crate) fn ai_pmap(args: &[StrykeValue], line: usize) -> Result<StrykeValue> 
 
     let results =
         crate::cluster::run_cluster(&cluster, String::new(), block_src, Vec::new(), serialized)
-            .map_err(|e| PerlError::runtime(format!("ai_pmap: cluster: {}", e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("ai_pmap: cluster: {}", e), line))?;
 
     // Concat shards.
     let mut out: Vec<StrykeValue> = Vec::with_capacity(items.len());
@@ -5260,19 +5260,19 @@ pub(crate) fn ai_session_send(args: &[StrykeValue], line: usize) -> Result<Stryk
         })
         .and_then(|m| m.get("__session_id__").map(|v| v.to_int() as u64))
         .ok_or_else(|| {
-            PerlError::runtime("ai_session_send: first arg must be a session handle", line)
+            StrykeError::runtime("ai_session_send: first arg must be a session handle", line)
         })?;
     let user_msg = args
         .get(1)
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_session_send: message required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_session_send: message required", line))?;
     let opts = parse_opts(&args[2.min(args.len())..]);
 
     // Snapshot session, append user message.
     let (system, model, provider, prior) = {
         let mut g = sessions().lock();
         let sess = g.get_mut(&id).ok_or_else(|| {
-            PerlError::runtime(format!("ai_session_send: session {} not found", id), line)
+            StrykeError::runtime(format!("ai_session_send: session {} not found", id), line)
         })?;
         sess.messages.push(("user".into(), user_msg.clone()));
         (
@@ -5329,10 +5329,10 @@ pub(crate) fn ai_session_history(args: &[StrykeValue], line: usize) -> Result<St
                 .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         })
         .and_then(|m| m.get("__session_id__").map(|v| v.to_int() as u64))
-        .ok_or_else(|| PerlError::runtime("ai_session_history: session handle required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_session_history: session handle required", line))?;
     let g = sessions().lock();
     let sess = g.get(&id).ok_or_else(|| {
-        PerlError::runtime(
+        StrykeError::runtime(
             format!("ai_session_history: session {} not found", id),
             line,
         )
@@ -5365,7 +5365,7 @@ pub(crate) fn ai_session_close(args: &[StrykeValue], line: usize) -> Result<Stry
                 .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         })
         .and_then(|m| m.get("__session_id__").map(|v| v.to_int() as u64))
-        .ok_or_else(|| PerlError::runtime("ai_session_close: session handle required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_session_close: session handle required", line))?;
     sessions().lock().shift_remove(&id);
     Ok(StrykeValue::UNDEF)
 }
@@ -5378,7 +5378,7 @@ pub(crate) fn ai_session_reset(args: &[StrykeValue], line: usize) -> Result<Stry
                 .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         })
         .and_then(|m| m.get("__session_id__").map(|v| v.to_int() as u64))
-        .ok_or_else(|| PerlError::runtime("ai_session_reset: session handle required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_session_reset: session handle required", line))?;
     let mut g = sessions().lock();
     if let Some(sess) = g.get_mut(&id) {
         sess.messages.clear();
@@ -5397,10 +5397,10 @@ pub(crate) fn ai_session_export(args: &[StrykeValue], line: usize) -> Result<Str
                 .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         })
         .and_then(|m| m.get("__session_id__").map(|v| v.to_int() as u64))
-        .ok_or_else(|| PerlError::runtime("ai_session_export: session handle required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_session_export: session handle required", line))?;
     let g = sessions().lock();
     let sess = g.get(&id).ok_or_else(|| {
-        PerlError::runtime(format!("ai_session_export: session {} not found", id), line)
+        StrykeError::runtime(format!("ai_session_export: session {} not found", id), line)
     })?;
     let json = serde_json::json!({
         "v": 1,
@@ -5420,9 +5420,9 @@ pub(crate) fn ai_session_import(args: &[StrykeValue], line: usize) -> Result<Str
     let s = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_session_import: json string required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_session_import: json string required", line))?;
     let json: serde_json::Value = serde_json::from_str(&s)
-        .map_err(|e| PerlError::runtime(format!("ai_session_import: parse: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_session_import: parse: {}", e), line))?;
     let messages = json["messages"]
         .as_array()
         .map(|arr| {
@@ -5470,7 +5470,7 @@ pub(crate) fn ai_template(args: &[StrykeValue], line: usize) -> Result<StrykeVal
     let tmpl = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_template: template required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_template: template required", line))?;
     let opts = parse_opts(&args[1..]);
     let mut out = String::with_capacity(tmpl.len());
     let bytes = tmpl.as_bytes();
@@ -5523,7 +5523,7 @@ fn call_anthropic_with_retry(
     line: usize,
 ) -> Result<serde_json::Value> {
     let max_attempts: u32 = 4;
-    let mut last_err: Option<PerlError> = None;
+    let mut last_err: Option<StrykeError> = None;
     for attempt in 0..max_attempts {
         match agent
             .post("https://api.anthropic.com/v1/messages")
@@ -5535,7 +5535,7 @@ fn call_anthropic_with_retry(
             Ok(resp) => {
                 return resp
                     .into_json()
-                    .map_err(|e| PerlError::runtime(format!("ai: anthropic decode: {}", e), line));
+                    .map_err(|e| StrykeError::runtime(format!("ai: anthropic decode: {}", e), line));
             }
             Err(ureq::Error::Status(code, resp)) => {
                 if attempt + 1 < max_attempts && should_retry(code) {
@@ -5543,7 +5543,7 @@ fn call_anthropic_with_retry(
                     continue;
                 }
                 let body_text = resp.into_string().unwrap_or_default();
-                last_err = Some(PerlError::runtime(
+                last_err = Some(StrykeError::runtime(
                     format!("ai: anthropic {}: {}", code, truncate(&body_text, 200)),
                     line,
                 ));
@@ -5554,7 +5554,7 @@ fn call_anthropic_with_retry(
                     std::thread::sleep(retry_delay(attempt));
                     continue;
                 }
-                last_err = Some(PerlError::runtime(
+                last_err = Some(StrykeError::runtime(
                     format!("ai: anthropic transport: {}", t),
                     line,
                 ));
@@ -5562,7 +5562,7 @@ fn call_anthropic_with_retry(
             }
         }
     }
-    Err(last_err.unwrap_or_else(|| PerlError::runtime("ai: anthropic call failed", line)))
+    Err(last_err.unwrap_or_else(|| StrykeError::runtime("ai: anthropic call failed", line)))
 }
 
 // ── Built-in tools (ready-to-pass tool specs) ─────────────────────────
@@ -5720,7 +5720,7 @@ pub(crate) fn native_tool_registry() -> &'static Mutex<IndexMap<i64, NativeToolF
 pub(crate) fn invoke_native_tool(id: i64, arg: StrykeValue, line: usize) -> Result<StrykeValue> {
     let f = native_tool_registry().lock().get(&id).cloned();
     let Some(f) = f else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("ai_native_tool: id {} not registered", id),
             line,
         ));
@@ -5751,10 +5751,10 @@ fn run_brave_search(q: &str, limit: i64, key: &str) -> Result<StrykeValue> {
         .set("X-Subscription-Token", key)
         .set("accept", "application/json")
         .call()
-        .map_err(|e| PerlError::runtime(format!("web_search: brave: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("web_search: brave: {}", e), 0))?;
     let json: serde_json::Value = resp
         .into_json()
-        .map_err(|e| PerlError::runtime(format!("web_search: decode: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("web_search: decode: {}", e), 0))?;
     let mut out: Vec<StrykeValue> = Vec::new();
     if let Some(results) = json["web"]["results"].as_array() {
         for r in results.iter().take(limit as usize) {
@@ -5788,10 +5788,10 @@ fn run_ddg_search(q: &str, limit: i64) -> Result<StrykeValue> {
         .get(&url)
         .set("user-agent", "Mozilla/5.0 (stryke web_search)")
         .call()
-        .map_err(|e| PerlError::runtime(format!("web_search: ddg: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("web_search: ddg: {}", e), 0))?;
     let body = resp
         .into_string()
-        .map_err(|e| PerlError::runtime(format!("web_search: read: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("web_search: read: {}", e), 0))?;
     let re = regex::Regex::new(
         r#"<a class="result__a" href="(?P<url>[^"]+)"[^>]*>(?P<title>[^<]+)</a>"#,
     )
@@ -5870,7 +5870,7 @@ fn run_python(code: &str) -> Result<StrykeValue> {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| PerlError::runtime(format!("run_code: spawn python3: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("run_code: spawn python3: {}", e), 0))?;
     if let Some(mut stdin) = child.stdin.take() {
         let _ = stdin.write_all(code.as_bytes());
     }
@@ -5888,7 +5888,7 @@ fn run_python(code: &str) -> Result<StrykeValue> {
     }
     let output = child
         .wait_with_output()
-        .map_err(|e| PerlError::runtime(format!("run_code: wait: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("run_code: wait: {}", e), 0))?;
     let mut combined = String::new();
     combined.push_str(&String::from_utf8_lossy(&output.stdout));
     if !output.stderr.is_empty() {
@@ -5910,18 +5910,18 @@ fn resolve_pdf_input(v: &StrykeValue, line: usize) -> Result<(String, String)> {
         let resp = agent
             .get(&s)
             .call()
-            .map_err(|e| PerlError::runtime(format!("ai_pdf: fetch: {}", e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("ai_pdf: fetch: {}", e), line))?;
         let mut buf = Vec::new();
         std::io::Read::read_to_end(&mut resp.into_reader(), &mut buf)
-            .map_err(|e| PerlError::runtime(format!("ai_pdf: read body: {}", e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("ai_pdf: read body: {}", e), line))?;
         buf
     } else if std::path::Path::new(&s).exists() {
         std::fs::read(&s)
-            .map_err(|e| PerlError::runtime(format!("ai_pdf: read {}: {}", s, e), line))?
+            .map_err(|e| StrykeError::runtime(format!("ai_pdf: read {}: {}", s, e), line))?
     } else if let Some(arc) = v.as_bytes_arc() {
         (*arc).clone()
     } else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "ai_pdf: pdf must be a URL, file path, or raw bytes",
             line,
         ));
@@ -5988,7 +5988,7 @@ pub(crate) fn ai_file_upload(args: &[StrykeValue], line: usize) -> Result<Stryke
     let path = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_file_upload: path required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_file_upload: path required", line))?;
     let opts = parse_opts(&args[1..]);
     let purpose = opt_str(&opts, "purpose", "user_data");
     let timeout = opt_int(&opts, "timeout", 120);
@@ -6004,9 +6004,9 @@ pub(crate) fn ai_file_upload(args: &[StrykeValue], line: usize) -> Result<Stryke
         return Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
     }
     let key = std::env::var("OPENAI_API_KEY")
-        .map_err(|_| PerlError::runtime("ai_file_upload: $OPENAI_API_KEY not set", line))?;
+        .map_err(|_| StrykeError::runtime("ai_file_upload: $OPENAI_API_KEY not set", line))?;
     let bytes = std::fs::read(&path)
-        .map_err(|e| PerlError::runtime(format!("ai_file_upload: read {}: {}", path, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_file_upload: read {}: {}", path, e), line))?;
     let filename = std::path::Path::new(&path)
         .file_name()
         .and_then(|n| n.to_str())
@@ -6031,10 +6031,10 @@ pub(crate) fn ai_file_upload(args: &[StrykeValue], line: usize) -> Result<Stryke
             &format!("multipart/form-data; boundary={}", boundary),
         )
         .send_bytes(&body)
-        .map_err(|e| PerlError::runtime(format!("ai_file_upload: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_file_upload: {}", e), line))?;
     let json: serde_json::Value = resp
         .into_json()
-        .map_err(|e| PerlError::runtime(format!("ai_file_upload: decode: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_file_upload: decode: {}", e), line))?;
     Ok(json_to_perl_hash(&json))
 }
 
@@ -6050,7 +6050,7 @@ pub(crate) fn ai_file_list(args: &[StrykeValue], line: usize) -> Result<StrykeVa
         ))));
     }
     let key = std::env::var("OPENAI_API_KEY")
-        .map_err(|_| PerlError::runtime("ai_file_list: $OPENAI_API_KEY not set", line))?;
+        .map_err(|_| StrykeError::runtime("ai_file_list: $OPENAI_API_KEY not set", line))?;
     let mut url = "https://api.openai.com/v1/files".to_string();
     if !purpose.is_empty() {
         url.push_str(&format!("?purpose={}", purpose));
@@ -6062,10 +6062,10 @@ pub(crate) fn ai_file_list(args: &[StrykeValue], line: usize) -> Result<StrykeVa
         .get(&url)
         .set("authorization", &format!("Bearer {}", key))
         .call()
-        .map_err(|e| PerlError::runtime(format!("ai_file_list: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_file_list: {}", e), line))?;
     let json: serde_json::Value = resp
         .into_json()
-        .map_err(|e| PerlError::runtime(format!("ai_file_list: decode: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_file_list: decode: {}", e), line))?;
     let data = json["data"].as_array().cloned().unwrap_or_default();
     let arr: Vec<StrykeValue> = data.iter().map(json_to_perl_hash).collect();
     Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
@@ -6078,7 +6078,7 @@ pub(crate) fn ai_file_delete(args: &[StrykeValue], line: usize) -> Result<Stryke
     let id = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_file_delete: file_id required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_file_delete: file_id required", line))?;
     let opts = parse_opts(&args[1..]);
     let timeout = opt_int(&opts, "timeout", 30);
 
@@ -6086,7 +6086,7 @@ pub(crate) fn ai_file_delete(args: &[StrykeValue], line: usize) -> Result<Stryke
         return Ok(StrykeValue::integer(1));
     }
     let key = std::env::var("OPENAI_API_KEY")
-        .map_err(|_| PerlError::runtime("ai_file_delete: $OPENAI_API_KEY not set", line))?;
+        .map_err(|_| StrykeError::runtime("ai_file_delete: $OPENAI_API_KEY not set", line))?;
     let agent = ureq::AgentBuilder::new()
         .timeout(Duration::from_secs(timeout.max(1) as u64))
         .build();
@@ -6094,10 +6094,10 @@ pub(crate) fn ai_file_delete(args: &[StrykeValue], line: usize) -> Result<Stryke
         .delete(&format!("https://api.openai.com/v1/files/{}", id))
         .set("authorization", &format!("Bearer {}", key))
         .call()
-        .map_err(|e| PerlError::runtime(format!("ai_file_delete: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_file_delete: {}", e), line))?;
     let json: serde_json::Value = resp
         .into_json()
-        .map_err(|e| PerlError::runtime(format!("ai_file_delete: decode: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_file_delete: decode: {}", e), line))?;
     Ok(StrykeValue::integer(
         if json["deleted"].as_bool().unwrap_or(false) {
             1
@@ -6112,7 +6112,7 @@ pub(crate) fn ai_file_get(args: &[StrykeValue], line: usize) -> Result<StrykeVal
     let id = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_file_get: file_id required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_file_get: file_id required", line))?;
     let opts = parse_opts(&args[1..]);
     let timeout = opt_int(&opts, "timeout", 30);
 
@@ -6122,7 +6122,7 @@ pub(crate) fn ai_file_get(args: &[StrykeValue], line: usize) -> Result<StrykeVal
         return Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
     }
     let key = std::env::var("OPENAI_API_KEY")
-        .map_err(|_| PerlError::runtime("ai_file_get: $OPENAI_API_KEY not set", line))?;
+        .map_err(|_| StrykeError::runtime("ai_file_get: $OPENAI_API_KEY not set", line))?;
     let agent = ureq::AgentBuilder::new()
         .timeout(Duration::from_secs(timeout.max(1) as u64))
         .build();
@@ -6130,10 +6130,10 @@ pub(crate) fn ai_file_get(args: &[StrykeValue], line: usize) -> Result<StrykeVal
         .get(&format!("https://api.openai.com/v1/files/{}", id))
         .set("authorization", &format!("Bearer {}", key))
         .call()
-        .map_err(|e| PerlError::runtime(format!("ai_file_get: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_file_get: {}", e), line))?;
     let json: serde_json::Value = resp
         .into_json()
-        .map_err(|e| PerlError::runtime(format!("ai_file_get: decode: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_file_get: decode: {}", e), line))?;
     Ok(json_to_perl_hash(&json))
 }
 
@@ -6151,7 +6151,7 @@ pub(crate) fn ai_file_anthropic_upload(args: &[StrykeValue], line: usize) -> Res
     let path = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_file_anthropic_upload: path required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_file_anthropic_upload: path required", line))?;
     let opts = parse_opts(&args[1..]);
     let timeout = opt_int(&opts, "timeout", 120);
 
@@ -6165,10 +6165,10 @@ pub(crate) fn ai_file_anthropic_upload(args: &[StrykeValue], line: usize) -> Res
         return Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
     }
     let key = std::env::var("ANTHROPIC_API_KEY").map_err(|_| {
-        PerlError::runtime("ai_file_anthropic_upload: $ANTHROPIC_API_KEY not set", line)
+        StrykeError::runtime("ai_file_anthropic_upload: $ANTHROPIC_API_KEY not set", line)
     })?;
     let bytes = std::fs::read(&path).map_err(|e| {
-        PerlError::runtime(
+        StrykeError::runtime(
             format!("ai_file_anthropic_upload: read {}: {}", path, e),
             line,
         )
@@ -6196,9 +6196,9 @@ pub(crate) fn ai_file_anthropic_upload(args: &[StrykeValue], line: usize) -> Res
             &format!("multipart/form-data; boundary={}", boundary),
         )
         .send_bytes(&body)
-        .map_err(|e| PerlError::runtime(format!("ai_file_anthropic_upload: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_file_anthropic_upload: {}", e), line))?;
     let json: serde_json::Value = resp.into_json().map_err(|e| {
-        PerlError::runtime(format!("ai_file_anthropic_upload: decode: {}", e), line)
+        StrykeError::runtime(format!("ai_file_anthropic_upload: decode: {}", e), line)
     })?;
     Ok(json_to_perl_hash(&json))
 }
@@ -6213,7 +6213,7 @@ pub(crate) fn ai_file_anthropic_list(args: &[StrykeValue], line: usize) -> Resul
         ))));
     }
     let key = std::env::var("ANTHROPIC_API_KEY").map_err(|_| {
-        PerlError::runtime("ai_file_anthropic_list: $ANTHROPIC_API_KEY not set", line)
+        StrykeError::runtime("ai_file_anthropic_list: $ANTHROPIC_API_KEY not set", line)
     })?;
     let agent = ureq::AgentBuilder::new()
         .timeout(Duration::from_secs(timeout.max(1) as u64))
@@ -6224,10 +6224,10 @@ pub(crate) fn ai_file_anthropic_list(args: &[StrykeValue], line: usize) -> Resul
         .set("anthropic-version", "2023-06-01")
         .set("anthropic-beta", ANTHROPIC_FILES_BETA)
         .call()
-        .map_err(|e| PerlError::runtime(format!("ai_file_anthropic_list: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_file_anthropic_list: {}", e), line))?;
     let json: serde_json::Value = resp
         .into_json()
-        .map_err(|e| PerlError::runtime(format!("ai_file_anthropic_list: decode: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_file_anthropic_list: decode: {}", e), line))?;
     let data = json["data"].as_array().cloned().unwrap_or_default();
     let arr: Vec<StrykeValue> = data.iter().map(json_to_perl_hash).collect();
     Ok(StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(
@@ -6240,14 +6240,14 @@ pub(crate) fn ai_file_anthropic_delete(args: &[StrykeValue], line: usize) -> Res
     let id = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_file_anthropic_delete: file_id required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_file_anthropic_delete: file_id required", line))?;
     let opts = parse_opts(&args[1..]);
     let timeout = opt_int(&opts, "timeout", 30);
     if mock_only_mode() {
         return Ok(StrykeValue::integer(1));
     }
     let key = std::env::var("ANTHROPIC_API_KEY").map_err(|_| {
-        PerlError::runtime("ai_file_anthropic_delete: $ANTHROPIC_API_KEY not set", line)
+        StrykeError::runtime("ai_file_anthropic_delete: $ANTHROPIC_API_KEY not set", line)
     })?;
     let agent = ureq::AgentBuilder::new()
         .timeout(Duration::from_secs(timeout.max(1) as u64))
@@ -6274,7 +6274,7 @@ pub(crate) fn ai_moderate(args: &[StrykeValue], line: usize) -> Result<StrykeVal
     let input = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_moderate: input required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_moderate: input required", line))?;
     let opts = parse_opts(&args[1..]);
     let model = opt_str(&opts, "model", "omni-moderation-latest");
     let timeout = opt_int(&opts, "timeout", 30);
@@ -6293,7 +6293,7 @@ pub(crate) fn ai_moderate(args: &[StrykeValue], line: usize) -> Result<StrykeVal
         return Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
     }
     let key = std::env::var("OPENAI_API_KEY")
-        .map_err(|_| PerlError::runtime("ai_moderate: $OPENAI_API_KEY not set", line))?;
+        .map_err(|_| StrykeError::runtime("ai_moderate: $OPENAI_API_KEY not set", line))?;
     let body = serde_json::json!({
         "model": model,
         "input": input,
@@ -6306,10 +6306,10 @@ pub(crate) fn ai_moderate(args: &[StrykeValue], line: usize) -> Result<StrykeVal
         .set("authorization", &format!("Bearer {}", key))
         .set("content-type", "application/json")
         .send_json(body)
-        .map_err(|e| PerlError::runtime(format!("ai_moderate: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_moderate: {}", e), line))?;
     let json: serde_json::Value = resp
         .into_json()
-        .map_err(|e| PerlError::runtime(format!("ai_moderate: decode: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("ai_moderate: decode: {}", e), line))?;
     let result = json["results"]
         .get(0)
         .cloned()
@@ -6344,7 +6344,7 @@ pub(crate) fn ai_chunk(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
     let text = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_chunk: text required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_chunk: text required", line))?;
     let opts = parse_opts(&args[1..]);
     let max_tokens = opt_int(&opts, "max_tokens", 500).max(1) as usize;
     let overlap = opt_int(&opts, "overlap", 50).max(0) as usize;
@@ -6486,11 +6486,11 @@ pub(crate) fn ai_compare(args: &[StrykeValue], line: usize) -> Result<StrykeValu
     let a = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_compare: first input required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_compare: first input required", line))?;
     let b = args
         .get(1)
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("ai_compare: second input required", line))?;
+        .ok_or_else(|| StrykeError::runtime("ai_compare: second input required", line))?;
     let opts = parse_opts(&args[2.min(args.len())..]);
     let criteria = opt_str(&opts, "criteria", "overall quality");
     let scale = opt_int(&opts, "scale", 5).clamp(2, 100);

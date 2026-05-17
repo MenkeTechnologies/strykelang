@@ -6,7 +6,7 @@ use std::sync::Arc;
 use parking_lot::Mutex;
 
 use crate::ast::Expr;
-use crate::error::{PerlError, PerlResult};
+use crate::error::{StrykeError, PerlResult};
 use crate::scope::{AtomicArray, AtomicHash};
 use crate::value::{PerlIterator, PerlSub, PipelineOp, StrykeValue};
 use crate::vm_helper::{FlowOrError, VMHelper, WantarrayCtx};
@@ -113,7 +113,7 @@ impl MapStreamIterator {
         }
     }
 
-    fn refill_one_batch(&self) -> Result<bool, PerlError> {
+    fn refill_one_batch(&self) -> Result<bool, StrykeError> {
         {
             let q = self.pending.lock();
             if !q.is_empty() {
@@ -376,7 +376,7 @@ impl VMHelper {
                 .map(|a| a.len() == 1 && a[0].as_pipeline().is_some())
                 .unwrap_or(false)
         {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "filter EXPR onto a pipeline value is not supported — use a block or a pipeline ->filter stage",
                 line,
             ));
@@ -424,7 +424,7 @@ impl VMHelper {
                 .map(|a| a.len() == 1 && a[0].as_pipeline().is_some())
                 .unwrap_or(false)
         {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "flat_maps onto a pipeline value is not supported in this form — use a pipeline ->map stage",
                 line,
             ));
@@ -460,7 +460,7 @@ impl VMHelper {
                 .map(|a| a.len() == 1 && a[0].as_pipeline().is_some())
                 .unwrap_or(false)
         {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 if peel {
                     "flat_maps EXPR onto a pipeline value is not supported — use a block or a pipeline ->map stage"
                 } else {

@@ -677,7 +677,7 @@ fn builtin_characteristic_polynomial(args: &[StrykeValue]) -> PerlResult<StrykeV
     let a = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = a.len();
     if n == 0 || a[0].len() != n {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "characteristic_polynomial: square matrix required",
             0,
         ));
@@ -1358,7 +1358,7 @@ fn builtin_heun_g(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let delta = args.get(6).map(|v| v.to_number()).unwrap_or(1.0);
     let epsilon = alpha + beta + 1.0 - gamma_p - delta;
     if z.abs() >= a.abs().min(1.0) - 1e-9 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "heun_g: |z| must be < min(1, |a|)",
             0,
         ));
@@ -1417,7 +1417,7 @@ fn builtin_haar_inverse(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .map(|v| v.to_number())
         .collect();
     if x.is_empty() || x.len() & 1 == 1 {
-        return Err(PerlError::runtime("haar_inverse: even-length array required", 0));
+        return Err(StrykeError::runtime("haar_inverse: even-length array required", 0));
     }
     let half = x.len() / 2;
     let s = 1.0 / 2.0_f64.sqrt();
@@ -1444,7 +1444,7 @@ fn builtin_daubechies_db4(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .collect();
     let n = x.len();
     if n < 4 || n & 1 == 1 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "daubechies_db4: even length ≥ 4 required",
             0,
         ));
@@ -1478,7 +1478,7 @@ fn builtin_daubechies_db4_inverse(args: &[StrykeValue]) -> PerlResult<StrykeValu
         .collect();
     let n = x.len();
     if n < 4 || n & 1 == 1 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "daubechies_db4_inverse: even length ≥ 4 required",
             0,
         ));

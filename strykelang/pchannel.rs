@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use crossbeam::channel::{self, Receiver, Select};
 
-use crate::error::{PerlError, PerlResult};
+use crate::error::{StrykeError, PerlResult};
 use crate::value::StrykeValue;
 
 /// `pchannel()` — two-element list `(tx, rx)` for `my ($tx, $rx) = pchannel`.
@@ -30,7 +30,7 @@ pub fn create_bounded_pair(capacity: usize) -> StrykeValue {
 /// Returns `(value, index)` where `index` is **0-based** (first argument is `0`), like Go's `select`.
 pub fn pselect_recv(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "pselect() expects at least one pchannel receiver",
             line,
         ));
@@ -40,7 +40,7 @@ pub fn pselect_recv(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue
         if let Some(rx) = v.as_channel_rx() {
             rx_owned.push(rx);
         } else {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "pselect() arguments must be pchannel receivers",
                 line,
             ));
@@ -70,7 +70,7 @@ pub fn pselect_recv_with_optional_timeout(
     line: usize,
 ) -> PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "pselect() expects at least one pchannel receiver",
             line,
         ));
@@ -84,7 +84,7 @@ pub fn pselect_recv_with_optional_timeout(
         if let Some(rx) = v.as_channel_rx() {
             rx_owned.push(rx);
         } else {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "pselect() arguments must be pchannel receivers",
                 line,
             ));
@@ -123,7 +123,7 @@ pub fn dispatch_method(
     if method == "send" {
         if let Some(tx) = receiver.as_channel_tx() {
             if args.len() != 1 {
-                return Some(Err(PerlError::runtime(
+                return Some(Err(StrykeError::runtime(
                     "send() on pchannel tx expects exactly one value",
                     line,
                 )));
@@ -135,7 +135,7 @@ pub fn dispatch_method(
     if method == "recv" {
         if let Some(rx) = receiver.as_channel_rx() {
             if !args.is_empty() {
-                return Some(Err(PerlError::runtime(
+                return Some(Err(StrykeError::runtime(
                     "recv() on pchannel rx takes no arguments",
                     line,
                 )));

@@ -129,7 +129,7 @@ pub use vm_helper::{
     perl_bracket_version, FEAT_SAY, FEAT_STATE, FEAT_SWITCH, FEAT_UNICODE_STRINGS,
 };
 
-use error::{PerlError, PerlResult};
+use error::{StrykeError, PerlResult};
 use vm_helper::VMHelper;
 
 // ── Perl 5 strict-compat mode (`--compat`) ──────────────────────────────────
@@ -384,14 +384,14 @@ pub fn try_vm_execute(
         Ok(chunk) => chunk,
         Err(compiler::CompileError::Frozen { line, detail }) => {
             let err = if detail.starts_with("Global symbol") {
-                PerlError::syntax(detail, line)
+                StrykeError::syntax(detail, line)
             } else {
-                PerlError::runtime(detail, line)
+                StrykeError::runtime(detail, line)
             };
             return Some(Err(err));
         }
         Err(compiler::CompileError::Unsupported(reason)) => {
-            return Some(Err(PerlError::runtime(
+            return Some(Err(StrykeError::runtime(
                 format!("VM compile error (unsupported): {}", reason),
                 0,
             )));
@@ -437,7 +437,7 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut VMHelper) -> PerlResu
         for parent_name in &def.extends.clone() {
             if let Some(parent_def) = interp.class_defs.get(parent_name) {
                 if parent_def.is_final {
-                    return Err(crate::error::PerlError::runtime(
+                    return Err(crate::error::StrykeError::runtime(
                         format!("cannot extend final class `{}`", parent_name),
                         0,
                     ));
@@ -445,7 +445,7 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut VMHelper) -> PerlResu
                 for m in &def.methods {
                     if let Some(parent_method) = parent_def.method(&m.name) {
                         if parent_method.is_final {
-                            return Err(crate::error::PerlError::runtime(
+                            return Err(crate::error::StrykeError::runtime(
                                 format!(
                                     "cannot override final method `{}` from class `{}`",
                                     m.name, parent_name
@@ -463,7 +463,7 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut VMHelper) -> PerlResu
                 for required in trait_def.required_methods() {
                     let has_method = def.methods.iter().any(|m| m.name == required.name);
                     if !has_method {
-                        return Err(crate::error::PerlError::runtime(
+                        return Err(crate::error::StrykeError::runtime(
                             format!(
                                 "class `{}` implements trait `{}` but does not define required method `{}`",
                                 def.name, trait_name, required.name
@@ -488,7 +488,7 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut VMHelper) -> PerlResu
                     if parent_def.is_abstract {
                         for m in &parent_def.methods {
                             if m.body.is_none() && !def.methods.iter().any(|dm| dm.name == m.name) {
-                                return Err(crate::error::PerlError::runtime(
+                                return Err(crate::error::StrykeError::runtime(
                                     format!(
                                         "class `{}` must implement abstract method `{}` from `{}`",
                                         def.name, m.name, parent_name
@@ -560,7 +560,7 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut VMHelper) -> PerlResu
             if e.message.starts_with("VM: unimplemented op")
                 || e.message.starts_with("Unimplemented builtin") =>
         {
-            Err(PerlError::runtime(e.message, 0))
+            Err(StrykeError::runtime(e.message, 0))
         }
         Err(e) => Err(e),
     }
@@ -577,14 +577,14 @@ pub fn compile_and_run_prelude(program: &ast::Program, interp: &mut VMHelper) ->
         Ok(chunk) => chunk,
         Err(compiler::CompileError::Frozen { line, detail }) => {
             let err = if detail.starts_with("Global symbol") {
-                PerlError::syntax(detail, line)
+                StrykeError::syntax(detail, line)
             } else {
-                PerlError::runtime(detail, line)
+                StrykeError::runtime(detail, line)
             };
             return Err(err);
         }
         Err(compiler::CompileError::Unsupported(reason)) => {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("VM compile error (unsupported): {}", reason),
                 0,
             ));
@@ -710,10 +710,10 @@ pub fn lint_program(program: &ast::Program, interp: &mut VMHelper) -> PerlResult
     }
 }
 
-fn compile_error_to_perl(e: compiler::CompileError) -> PerlError {
+fn compile_error_to_perl(e: compiler::CompileError) -> StrykeError {
     match e {
         compiler::CompileError::Unsupported(msg) => {
-            PerlError::runtime(format!("compile: {}", msg), 0)
+            StrykeError::runtime(format!("compile: {}", msg), 0)
         }
         compiler::CompileError::Frozen { line, detail } => {
             // strict-vars violations (`Global symbol "$x" requires explicit
@@ -721,9 +721,9 @@ fn compile_error_to_perl(e: compiler::CompileError) -> PerlError {
             // as `Syntax` so the formatter appends `Execution of -e aborted
             // due to compilation errors.` for parity.
             if detail.starts_with("Global symbol") {
-                PerlError::syntax(detail, line)
+                StrykeError::syntax(detail, line)
             } else {
-                PerlError::runtime(detail, line)
+                StrykeError::runtime(detail, line)
             }
         }
     }

@@ -11,7 +11,7 @@ use std::sync::Arc;
 use crossbeam::channel::{bounded, Receiver, Sender};
 use parking_lot::Mutex;
 
-use crate::error::{PerlError, PerlResult};
+use crate::error::{StrykeError, PerlResult};
 use crate::scope::{AtomicArray, AtomicHash};
 use crate::value::{PerlSub, StrykeValue};
 use crate::vm_helper::{Flow, FlowOrError, VMHelper};
@@ -52,9 +52,9 @@ pub(crate) fn is_named_par_pipeline_args(args: &[StrykeValue]) -> bool {
     has_source && has_stages && has_workers
 }
 
-fn parse_args(args: &[StrykeValue]) -> Result<ParPipelineSpec, PerlError> {
+fn parse_args(args: &[StrykeValue]) -> Result<ParPipelineSpec, StrykeError> {
     if args.len() < 6 || !args.len().is_multiple_of(2) {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "par_pipeline: expected pairs source => CODE, stages => [...], workers => [...], optional buffer => N",
             0,
         ));
@@ -67,34 +67,34 @@ fn parse_args(args: &[StrykeValue]) -> Result<ParPipelineSpec, PerlError> {
     let source = map
         .get("source")
         .and_then(|v| v.as_code_ref())
-        .ok_or_else(|| PerlError::runtime("par_pipeline: source => CODE required", 0))?;
+        .ok_or_else(|| StrykeError::runtime("par_pipeline: source => CODE required", 0))?;
     let stages_val = map
         .get("stages")
-        .ok_or_else(|| PerlError::runtime("par_pipeline: stages => ARRAY required", 0))?;
+        .ok_or_else(|| StrykeError::runtime("par_pipeline: stages => ARRAY required", 0))?;
     let stages_items = list_from_value(stages_val);
     let mut stages: Vec<Arc<PerlSub>> = Vec::with_capacity(stages_items.len());
     for v in stages_items {
         let s = v
             .as_code_ref()
-            .ok_or_else(|| PerlError::runtime("par_pipeline: each stage must be a CODE ref", 0))?;
+            .ok_or_else(|| StrykeError::runtime("par_pipeline: each stage must be a CODE ref", 0))?;
         stages.push(s);
     }
     let workers_val = map
         .get("workers")
-        .ok_or_else(|| PerlError::runtime("par_pipeline: workers => ARRAY required", 0))?;
+        .ok_or_else(|| StrykeError::runtime("par_pipeline: workers => ARRAY required", 0))?;
     let workers_raw = list_from_value(workers_val);
     let workers: Vec<usize> = workers_raw
         .iter()
         .map(|v| v.to_int().max(1) as usize)
         .collect();
     if stages.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "par_pipeline: at least one stage required",
             0,
         ));
     }
     if workers.len() != stages.len() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "par_pipeline: workers list must have the same length as stages",
             0,
         ));
@@ -251,7 +251,7 @@ pub(crate) fn run_par_pipeline(
                 Ok(v) => v,
                 Err(FlowOrError::Flow(Flow::Return(v))) => v,
                 Err(e) => {
-                    return Err(PerlError::runtime(flow_err_msg(e), line));
+                    return Err(StrykeError::runtime(flow_err_msg(e), line));
                 }
             };
             if v.is_undef() {
@@ -312,7 +312,7 @@ pub(crate) fn run_par_pipeline(
     }
 
     if let Some(msg) = err_msg {
-        return Err(PerlError::runtime(msg, line));
+        return Err(StrykeError::runtime(msg, line));
     }
     Ok(StrykeValue::integer(items.len() as i64))
 }
@@ -416,7 +416,7 @@ pub(crate) fn run_thread_par(
     line: usize,
 ) -> PerlResult<StrykeValue> {
     if stage_closures.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "~s>: requires at least one stage after the source",
             line,
         ));
@@ -494,7 +494,7 @@ pub(crate) fn run_thread_par(
     });
 
     if let Some(msg) = err.lock().take() {
-        return Err(PerlError::runtime(msg, line));
+        return Err(StrykeError::runtime(msg, line));
     }
     let out = std::mem::take(&mut *collected.lock());
     Ok(StrykeValue::array(out))
@@ -577,7 +577,7 @@ pub(crate) fn run_par_pipeline_streaming(
     });
 
     if let Some(msg) = err.lock().take() {
-        return Err(PerlError::runtime(msg, line));
+        return Err(StrykeError::runtime(msg, line));
     }
     let n = processed.load(Ordering::SeqCst);
     Ok(StrykeValue::integer(n as i64))

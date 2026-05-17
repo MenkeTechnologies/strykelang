@@ -22,13 +22,13 @@
 //! * Cross-statement constant folding / dead-code elimination — that's a
 //!   compiler-level pass, not a textual minifier.
 
-use crate::error::PerlError;
+use crate::error::StrykeError;
 use crate::lexer::Lexer;
 use crate::token::Token;
 
 /// Minify a stryke source string. On parse / lex failure, returns the
 /// original error so the caller can surface it.
-pub fn minify_source(source: &str) -> Result<String, PerlError> {
+pub fn minify_source(source: &str) -> Result<String, StrykeError> {
     let mut lexer = Lexer::new(source);
     let tokens = lexer.tokenize()?;
     Ok(emit_minified(&tokens))

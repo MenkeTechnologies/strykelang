@@ -3,7 +3,7 @@
 use std::process::Command;
 use std::sync::Arc;
 
-use crate::error::{PerlError, PerlResult};
+use crate::error::{StrykeError, PerlResult};
 use crate::perl_decode::decode_utf8_or_latin1;
 use crate::value::{CaptureResult, StrykeValue};
 use crate::vm_helper::VMHelper;
@@ -16,7 +16,7 @@ pub fn run_readpipe(interp: &mut VMHelper, cmd: &str, line: usize) -> PerlResult
         Err(e) => {
             interp.errno = e.to_string();
             interp.child_exit_status = -1;
-            return Err(PerlError::runtime(format!("readpipe: {}", e), line));
+            return Err(StrykeError::runtime(format!("readpipe: {}", e), line));
         }
     };
     interp.record_child_exit_status(output.status);
@@ -31,7 +31,7 @@ pub fn run_capture(interp: &mut VMHelper, cmd: &str, line: usize) -> PerlResult<
         Err(e) => {
             interp.errno = e.to_string();
             interp.child_exit_status = -1;
-            return Err(PerlError::runtime(format!("capture: {}", e), line));
+            return Err(StrykeError::runtime(format!("capture: {}", e), line));
         }
     };
     interp.record_child_exit_status(output.status);

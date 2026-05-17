@@ -35,7 +35,7 @@ fn builtin_factor_quadratic(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 fn builtin_complete_square(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let (a, b, c) = f3(args);
     if a.abs() < 1e-15 {
-        return Err(PerlError::runtime("complete_square: a must be non-zero", 0));
+        return Err(StrykeError::runtime("complete_square: a must be non-zero", 0));
     }
     let h = -b / (2.0 * a);
     let k = c - b * b / (4.0 * a);
@@ -351,7 +351,7 @@ fn builtin_gauss_legendre_2d(
     let my = 0.5 * (ay + by);
     let sub = f
         .as_code_ref()
-        .ok_or_else(|| PerlError::runtime("gauss_legendre_2d: code ref", line))?;
+        .ok_or_else(|| StrykeError::runtime("gauss_legendre_2d: code ref", line))?;
     let mut sum = 0.0_f64;
     for (xi, wxi) in xs.iter().zip(ws.iter()) {
         for (yj, wyj) in xs.iter().zip(ws.iter()) {
@@ -388,7 +388,7 @@ fn builtin_monte_carlo_2d(
     let n = args.get(5).map(|v| v.to_number() as usize).unwrap_or(10_000);
     let sub = f
         .as_code_ref()
-        .ok_or_else(|| PerlError::runtime("monte_carlo_2d: code ref", line))?;
+        .ok_or_else(|| StrykeError::runtime("monte_carlo_2d: code ref", line))?;
     let mut sum = 0.0_f64;
     let mut rng = rand::thread_rng();
     for _ in 0..n {
@@ -2688,7 +2688,7 @@ fn builtin_crt_general(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .map(|v| v.to_number() as i64)
         .collect();
     if r.len() != m.len() || r.is_empty() {
-        return Err(PerlError::runtime("crt_general: mismatched arrays", 0));
+        return Err(StrykeError::runtime("crt_general: mismatched arrays", 0));
     }
     let mut rr = r[0];
     let mut mm = m[0];

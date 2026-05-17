@@ -17,7 +17,7 @@
 //!     `schema_migrations` table, runs each loaded `Migration` subclass's
 //!     `up` (or `down`) method in order.
 
-use crate::error::PerlError;
+use crate::error::StrykeError;
 use crate::native_data::{exec_sql, perl_to_sql_value, query_sql};
 use crate::value::StrykeValue;
 use crate::vm_helper::{FlowOrError, VMHelper};
@@ -28,7 +28,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::OnceLock;
 
-type Result<T> = std::result::Result<T, PerlError>;
+type Result<T> = std::result::Result<T, StrykeError>;
 
 // ── Global connection slot ──────────────────────────────────────────────
 //
@@ -50,7 +50,7 @@ where
     let guard = db_slot().lock();
     match guard.as_ref() {
         Some(c) => f(c),
-        None => Err(PerlError::runtime(
+        None => Err(StrykeError::runtime(
             "web orm: no database connection — call web_db_connect first",
             line,
         )),
@@ -62,7 +62,7 @@ fn parse_db_url(url: &str) -> Result<String> {
         return Ok(path.to_string());
     }
     if url.starts_with("postgres://") || url.starts_with("postgresql://") {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "web orm: postgres adapter not implemented (PASS 5)",
             0,
         ));
@@ -83,7 +83,7 @@ pub(crate) fn web_db_connect(args: &[StrykeValue], line: usize) -> Result<Stryke
         }
     }
     let conn = Connection::open(&path)
-        .map_err(|e| PerlError::runtime(format!("web_db_connect: open {}: {}", path, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("web_db_connect: open {}: {}", path, e), line))?;
     // Sensible defaults for SQLite — same set Rails ships in dev.
     let _ = conn.execute_batch(
         "PRAGMA journal_mode = WAL;\n\
@@ -104,7 +104,7 @@ pub(crate) fn web_db_execute(args: &[StrykeValue], line: usize) -> Result<Stryke
     let sql = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("web_db_execute: sql required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_db_execute: sql required", line))?;
     let bindings = bindings_from_arg(args.get(1));
     let bound = perl_args_as_sql(&bindings);
     let n = with_db(|c| exec_sql(c, &sql, &bound), line)?;
@@ -115,7 +115,7 @@ pub(crate) fn web_db_query(args: &[StrykeValue], line: usize) -> Result<StrykeVa
     let sql = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("web_db_query: sql required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_db_query: sql required", line))?;
     let bindings = bindings_from_arg(args.get(1));
     let bound = perl_args_as_sql(&bindings);
     let result = with_db(|c| query_sql(c, &sql, &bound, line), line)?;
@@ -153,7 +153,7 @@ pub(crate) fn web_model_find(args: &[StrykeValue], line: usize) -> Result<Stryke
     let table = require_table(args.first(), "web_model_find", line)?;
     let id = args
         .get(1)
-        .ok_or_else(|| PerlError::runtime("web_model_find: id required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_model_find: id required", line))?;
     let sql = format!(
         "SELECT * FROM {} WHERE id = ?1 LIMIT 1",
         quote_ident(&table)
@@ -171,7 +171,7 @@ pub(crate) fn web_model_where(args: &[StrykeValue], line: usize) -> Result<Stryk
             v.as_hash_map()
                 .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         })
-        .ok_or_else(|| PerlError::runtime("web_model_where: second arg must be a hashref", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_model_where: second arg must be a hashref", line))?;
     let mut sql = format!("SELECT * FROM {}", quote_ident(&table));
     let mut bindings: Vec<rusqlite::types::Value> = Vec::new();
     if !cond.is_empty() {
@@ -197,13 +197,13 @@ pub(crate) fn web_model_create(args: &[StrykeValue], line: usize) -> Result<Stry
                 .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         })
         .ok_or_else(|| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 "web_model_create: second arg must be a hashref of attrs",
                 line,
             )
         })?;
     if attrs.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "web_model_create: attrs hashref must not be empty",
             line,
         ));
@@ -221,7 +221,7 @@ pub(crate) fn web_model_create(args: &[StrykeValue], line: usize) -> Result<Stry
     working.retain(|k, _| cols.iter().any(|c| c == k));
 
     if working.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!(
                 "web_model_create: no matching columns on {} (cols: {})",
                 table,
@@ -265,7 +265,7 @@ pub(crate) fn web_model_update(args: &[StrykeValue], line: usize) -> Result<Stry
     let table = require_table(args.first(), "web_model_update", line)?;
     let id = args
         .get(1)
-        .ok_or_else(|| PerlError::runtime("web_model_update: id required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_model_update: id required", line))?;
     let attrs = args
         .get(2)
         .and_then(|v| {
@@ -273,7 +273,7 @@ pub(crate) fn web_model_update(args: &[StrykeValue], line: usize) -> Result<Stry
                 .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         })
         .ok_or_else(|| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 "web_model_update: third arg must be a hashref of attrs",
                 line,
             )
@@ -309,7 +309,7 @@ pub(crate) fn web_model_destroy(args: &[StrykeValue], line: usize) -> Result<Str
     let table = require_table(args.first(), "web_model_destroy", line)?;
     let id = args
         .get(1)
-        .ok_or_else(|| PerlError::runtime("web_model_destroy: id required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_model_destroy: id required", line))?;
     let sql = format!("DELETE FROM {} WHERE id = ?1", quote_ident(&table));
     let bound = perl_args_as_sql(std::slice::from_ref(id));
     let n = with_db(|c| exec_sql(c, &sql, &bound), line)?;
@@ -323,7 +323,7 @@ pub(crate) fn web_model_soft_destroy(args: &[StrykeValue], line: usize) -> Resul
     let table = require_table(args.first(), "web_model_soft_destroy", line)?;
     let id = args
         .get(1)
-        .ok_or_else(|| PerlError::runtime("web_model_soft_destroy: id required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_model_soft_destroy: id required", line))?;
     let cols = table_columns(&table, line)?;
     if !cols.iter().any(|c| c == "deleted_at") {
         // Add the column on the fly so soft-delete works on tables
@@ -410,7 +410,7 @@ pub(crate) fn web_model_search(args: &[StrykeValue], line: usize) -> Result<Stry
             v.clone().to_list().iter().map(|x| x.to_string()).collect()
         }
     } else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "web_model_search: pass cols => [\"col1\", \"col2\"]",
             line,
         ));
@@ -478,11 +478,11 @@ pub(crate) fn web_model_increment(args: &[StrykeValue], line: usize) -> Result<S
     let table = require_table(args.first(), "web_model_increment", line)?;
     let id = args
         .get(1)
-        .ok_or_else(|| PerlError::runtime("web_model_increment: id required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_model_increment: id required", line))?;
     let col = args
         .get(2)
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("web_model_increment: column required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_model_increment: column required", line))?;
     let by = args.get(3).map(|v| v.to_int()).unwrap_or(1);
     let sql = format!(
         "UPDATE {} SET {} = COALESCE({},0) + ?1 WHERE id = ?2",
@@ -503,7 +503,7 @@ pub(crate) fn web_model_with(args: &[StrykeValue], line: usize) -> Result<Stryke
     let assoc = args
         .get(1)
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("web_model_with: assoc name required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_model_with: assoc name required", line))?;
     let foreign_key = format!("{}_id", assoc);
     let assoc_table = pluralize_simple(&assoc);
     let sql = format!("SELECT * FROM {} ORDER BY id ASC", quote_ident(&table));
@@ -612,14 +612,14 @@ pub(crate) fn web_validate(args: &[StrykeValue], line: usize) -> Result<StrykeVa
             v.as_hash_map()
                 .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         })
-        .ok_or_else(|| PerlError::runtime("web_validate: first arg must be a hashref", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_validate: first arg must be a hashref", line))?;
     let rules = args
         .get(1)
         .and_then(|v| {
             v.as_hash_map()
                 .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         })
-        .ok_or_else(|| PerlError::runtime("web_validate: second arg must be a hashref", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_validate: second arg must be a hashref", line))?;
 
     let mut errors: IndexMap<String, StrykeValue> = IndexMap::new();
     for (field, spec_v) in &rules {
@@ -797,7 +797,7 @@ pub(crate) fn web_add_column(args: &[StrykeValue], line: usize) -> Result<Stryke
     let col = args
         .get(1)
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("web_add_column: column name required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_add_column: column name required", line))?;
     let ty = args
         .get(2)
         .map(|v| v.to_string())
@@ -817,7 +817,7 @@ pub(crate) fn web_remove_column(args: &[StrykeValue], line: usize) -> Result<Str
     let col = args
         .get(1)
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("web_remove_column: column name required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_remove_column: column name required", line))?;
     // SQLite 3.35+ supports `DROP COLUMN`.
     let sql = format!(
         "ALTER TABLE {} DROP COLUMN {}",
@@ -938,7 +938,7 @@ impl VMHelper {
         line: usize,
     ) -> Result<()> {
         let class_def = self.class_defs.get(class_name).cloned().ok_or_else(|| {
-            PerlError::runtime(format!("migrator: class not found: {}", class_name), line)
+            StrykeError::runtime(format!("migrator: class not found: {}", class_name), line)
         })?;
         let m = class_def
             .methods
@@ -946,13 +946,13 @@ impl VMHelper {
             .find(|m| m.name == method)
             .cloned()
             .ok_or_else(|| {
-                PerlError::runtime(
+                StrykeError::runtime(
                     format!("migrator: {}::{} not defined", class_name, method),
                     line,
                 )
             })?;
         let body = m.body.ok_or_else(|| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 format!("migrator: {}::{} has no body", class_name, method),
                 line,
             )
@@ -985,9 +985,9 @@ fn applied_versions(line: usize) -> Result<Vec<String>> {
 fn require_table(arg: Option<&StrykeValue>, what: &str, line: usize) -> Result<String> {
     let table = arg
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime(format!("{}: table name required", what), line))?;
+        .ok_or_else(|| StrykeError::runtime(format!("{}: table name required", what), line))?;
     if table.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("{}: table name must not be empty", what),
             line,
         ));
@@ -1108,7 +1108,7 @@ pub(crate) fn web_jobs_init(_args: &[StrykeValue], line: usize) -> Result<Stryke
     with_db(
         |c| {
             c.execute_batch(JOBS_DDL)
-                .map_err(|e| PerlError::runtime(format!("web_jobs_init: {}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("web_jobs_init: {}", e), line))?;
             Ok(())
         },
         line,
@@ -1120,7 +1120,7 @@ pub(crate) fn web_job_enqueue(args: &[StrykeValue], line: usize) -> Result<Stryk
     let name = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("web_job_enqueue: name required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_job_enqueue: name required", line))?;
     let args_json = args
         .get(1)
         .map(|v| crate::native_data::json_encode(v).unwrap_or_else(|_| "{}".to_string()))
@@ -1142,7 +1142,7 @@ pub(crate) fn web_job_enqueue(args: &[StrykeValue], line: usize) -> Result<Stryk
         |c| {
             // Upsert via raw INSERT to capture the rowid.
             let mut stmt = c.prepare("INSERT INTO jobs (name, args_json, status, queue, priority, max_attempts, created_at) VALUES (?, ?, 'pending', ?, ?, ?, ?)")
-                .map_err(|e| PerlError::runtime(format!("web_job_enqueue: {}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("web_job_enqueue: {}", e), line))?;
             stmt.execute(rusqlite::params![
                 &name,
                 &args_json,
@@ -1151,7 +1151,7 @@ pub(crate) fn web_job_enqueue(args: &[StrykeValue], line: usize) -> Result<Stryk
                 max_attempts,
                 &created_at,
             ])
-            .map_err(|e| PerlError::runtime(format!("web_job_enqueue: {}", e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("web_job_enqueue: {}", e), line))?;
             Ok(c.last_insert_rowid())
         },
         line,
@@ -1184,7 +1184,7 @@ pub(crate) fn web_job_dequeue(args: &[StrykeValue], line: usize) -> Result<Stryk
                     "UPDATE jobs SET status = 'running', locked_at = ?, attempts = attempts + 1 WHERE id = ? AND status = 'pending'",
                     rusqlite::params![&now, id],
                 )
-                .map_err(|e| PerlError::runtime(format!("web_job_dequeue: {}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("web_job_dequeue: {}", e), line))?;
             if updated == 0 {
                 return Ok(None);
             }
@@ -1202,7 +1202,7 @@ pub(crate) fn web_job_dequeue(args: &[StrykeValue], line: usize) -> Result<Stryk
                         ))
                     },
                 )
-                .map_err(|e| PerlError::runtime(format!("web_job_dequeue: {}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("web_job_dequeue: {}", e), line))?;
             Ok(Some(row))
         },
         line,
@@ -1234,7 +1234,7 @@ pub(crate) fn web_job_complete(args: &[StrykeValue], line: usize) -> Result<Stry
     let id = args
         .first()
         .map(|v| v.to_int())
-        .ok_or_else(|| PerlError::runtime("web_job_complete: id required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_job_complete: id required", line))?;
     let now = current_timestamp();
     with_db(
         |c| {
@@ -1242,7 +1242,7 @@ pub(crate) fn web_job_complete(args: &[StrykeValue], line: usize) -> Result<Stry
                 "UPDATE jobs SET status = 'done', ran_at = ?, error = NULL WHERE id = ?",
                 rusqlite::params![&now, id],
             )
-            .map_err(|e| PerlError::runtime(format!("web_job_complete: {}", e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("web_job_complete: {}", e), line))?;
             Ok(())
         },
         line,
@@ -1254,7 +1254,7 @@ pub(crate) fn web_job_fail(args: &[StrykeValue], line: usize) -> Result<StrykeVa
     let id = args
         .first()
         .map(|v| v.to_int())
-        .ok_or_else(|| PerlError::runtime("web_job_fail: id required", line))?;
+        .ok_or_else(|| StrykeError::runtime("web_job_fail: id required", line))?;
     let kv = parse_kv(&args[1.min(args.len())..]);
     let error = kv
         .get("error")
@@ -1270,7 +1270,7 @@ pub(crate) fn web_job_fail(args: &[StrykeValue], line: usize) -> Result<StrykeVa
                     rusqlite::params![id],
                     |r| Ok((r.get(0)?, r.get(1)?)),
                 )
-                .map_err(|e| PerlError::runtime(format!("web_job_fail: {}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("web_job_fail: {}", e), line))?;
             let next = if attempts < max_attempts {
                 "pending"
             } else {
@@ -1280,7 +1280,7 @@ pub(crate) fn web_job_fail(args: &[StrykeValue], line: usize) -> Result<StrykeVa
                 "UPDATE jobs SET status = ?, ran_at = ?, error = ? WHERE id = ?",
                 rusqlite::params![next, &now, &error, id],
             )
-            .map_err(|e| PerlError::runtime(format!("web_job_fail: {}", e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("web_job_fail: {}", e), line))?;
             Ok(next.to_string())
         },
         line,
@@ -1312,7 +1312,7 @@ pub(crate) fn web_jobs_list(args: &[StrykeValue], line: usize) -> Result<StrykeV
         |c| {
             let mut stmt = c
                 .prepare(&sql)
-                .map_err(|e| PerlError::runtime(format!("web_jobs_list: {}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("web_jobs_list: {}", e), line))?;
             let params = rusqlite::params_from_iter(binds.iter());
             let row_iter = stmt
                 .query_map(params, |r| {
@@ -1331,7 +1331,7 @@ pub(crate) fn web_jobs_list(args: &[StrykeValue], line: usize) -> Result<StrykeV
                         r.get::<_, Option<String>>(11)?,
                     ))
                 })
-                .map_err(|e| PerlError::runtime(format!("web_jobs_list: {}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("web_jobs_list: {}", e), line))?;
             let mut out: Vec<StrykeValue> = Vec::new();
             for r in row_iter {
                 let (
@@ -1347,7 +1347,7 @@ pub(crate) fn web_jobs_list(args: &[StrykeValue], line: usize) -> Result<StrykeV
                     locked_at,
                     ran_at,
                     error,
-                ) = r.map_err(|e| PerlError::runtime(format!("web_jobs_list: {}", e), line))?;
+                ) = r.map_err(|e| StrykeError::runtime(format!("web_jobs_list: {}", e), line))?;
                 let mut h = IndexMap::new();
                 h.insert("id".to_string(), StrykeValue::integer(id));
                 h.insert("name".to_string(), StrykeValue::string(name));
@@ -1426,7 +1426,7 @@ pub(crate) fn web_job_purge(args: &[StrykeValue], line: usize) -> Result<StrykeV
                 rusqlite::params![&status],
             )
             .map(|n| n as i64)
-            .map_err(|e| PerlError::runtime(format!("web_job_purge: {}", e), line))
+            .map_err(|e| StrykeError::runtime(format!("web_job_purge: {}", e), line))
         },
         line,
     )?;

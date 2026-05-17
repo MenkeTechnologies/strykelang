@@ -92,10 +92,10 @@ fn builtin_euler_maruyama(
     let dt = (t_end - t0) / n as f64;
     let sub_mu = mu
         .as_code_ref()
-        .ok_or_else(|| PerlError::runtime("euler_maruyama: μ code ref", line))?;
+        .ok_or_else(|| StrykeError::runtime("euler_maruyama: μ code ref", line))?;
     let sub_sig = sigma
         .as_code_ref()
-        .ok_or_else(|| PerlError::runtime("euler_maruyama: σ code ref", line))?;
+        .ok_or_else(|| StrykeError::runtime("euler_maruyama: σ code ref", line))?;
     let mut path = Vec::with_capacity(n + 1);
     path.push(StrykeValue::float(x));
     let mut rng = rand::thread_rng();
@@ -145,13 +145,13 @@ fn builtin_milstein(
     let dt = (t_end - t0) / n as f64;
     let sub_mu = mu
         .as_code_ref()
-        .ok_or_else(|| PerlError::runtime("milstein: μ code ref", line))?;
+        .ok_or_else(|| StrykeError::runtime("milstein: μ code ref", line))?;
     let sub_sig = sigma
         .as_code_ref()
-        .ok_or_else(|| PerlError::runtime("milstein: σ code ref", line))?;
+        .ok_or_else(|| StrykeError::runtime("milstein: σ code ref", line))?;
     let sub_sig_x = sigma_x
         .as_code_ref()
-        .ok_or_else(|| PerlError::runtime("milstein: σ' code ref", line))?;
+        .ok_or_else(|| StrykeError::runtime("milstein: σ' code ref", line))?;
     let call = |interp: &mut VMHelper, sub: &_, x: f64, t: f64| -> PerlResult<f64> {
         let r = exec_to_perl_result(
             interp.call_sub(
@@ -612,7 +612,7 @@ fn builtin_lqr_2x2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let q = matrix_from_value(&args.get(2).cloned().unwrap_or(StrykeValue::UNDEF));
     let r = matrix_from_value(&args.get(3).cloned().unwrap_or(StrykeValue::UNDEF));
     if a.len() != 2 || b.len() != 2 || q.len() != 2 || r.len() != 1 {
-        return Err(PerlError::runtime("lqr_2x2: 2×2 A/Q, 2×1 B, 1×1 R required", 0));
+        return Err(StrykeError::runtime("lqr_2x2: 2×2 A/Q, 2×1 B, 1×1 R required", 0));
     }
     // Iteratively solve via Newton-Kleinman: K_{k+1} chosen to stabilise A − B K.
     let r_inv = 1.0 / r[0][0];

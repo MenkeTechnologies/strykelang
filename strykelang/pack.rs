@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use crate::error::{PerlError, PerlResult};
+use crate::error::{StrykeError, PerlResult};
 use crate::value::StrykeValue;
 
 #[derive(Clone, Copy, Debug)]
@@ -98,13 +98,13 @@ fn take_arg<'a>(args: &mut &'a [StrykeValue]) -> Result<&'a StrykeValue, String>
 /// `pack TEMPLATE, LIST`
 pub fn perl_pack(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Err(PerlError::runtime("pack: not enough arguments", line));
+        return Err(StrykeError::runtime("pack: not enough arguments", line));
     }
     let template = args[0].to_string();
     let mut rest = &args[1..];
     match pack_impl(&template, &mut rest) {
         Ok(bytes) => Ok(StrykeValue::bytes(Arc::new(bytes))),
-        Err(msg) => Err(PerlError::runtime(format!("pack: {}", msg), line)),
+        Err(msg) => Err(StrykeError::runtime(format!("pack: {}", msg), line)),
     }
 }
 
@@ -372,10 +372,10 @@ fn pack_impl(template: &str, args: &mut &[StrykeValue]) -> Result<Vec<u8>, Strin
 /// `unpack TEMPLATE, SCALAR`
 pub fn perl_unpack(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.len() < 2 {
-        return Err(PerlError::runtime("unpack: not enough arguments", line));
+        return Err(StrykeError::runtime("unpack: not enough arguments", line));
     }
     let template = args[0].to_string();
-    let data = value_to_bytes(&args[1]).map_err(|m| PerlError::runtime(m, line))?;
+    let data = value_to_bytes(&args[1]).map_err(|m| StrykeError::runtime(m, line))?;
     match unpack_impl(&template, &data) {
         Ok(vals) => {
             if vals.len() == 1 {
@@ -384,7 +384,7 @@ pub fn perl_unpack(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue>
                 Ok(StrykeValue::array(vals))
             }
         }
-        Err(msg) => Err(PerlError::runtime(format!("unpack: {}", msg), line)),
+        Err(msg) => Err(StrykeError::runtime(format!("unpack: {}", msg), line)),
     }
 }
 

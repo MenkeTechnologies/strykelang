@@ -22,7 +22,7 @@ fn call_user_n(
 ) -> PerlResult<f64> {
     let sub = f
         .as_code_ref()
-        .ok_or_else(|| PerlError::runtime("expected code ref", line))?;
+        .ok_or_else(|| StrykeError::runtime("expected code ref", line))?;
     // Multi-D: pass a single arrayref so the callback receives one reference
     // (`fn($pt) { my @x = @$pt }`) instead of a flattened arg list.
     let arr = Arc::new(RwLock::new(
@@ -47,7 +47,7 @@ fn call_user_1(
 ) -> PerlResult<f64> {
     let sub = f
         .as_code_ref()
-        .ok_or_else(|| PerlError::runtime("expected code ref", line))?;
+        .ok_or_else(|| StrykeError::runtime("expected code ref", line))?;
     let r = exec_to_perl_result(
         interp.call_sub(&sub, vec![StrykeValue::float(x)], WantarrayCtx::Scalar, line),
         "callback",
@@ -64,7 +64,7 @@ fn call_user_vec(
 ) -> PerlResult<Vec<f64>> {
     let sub = f
         .as_code_ref()
-        .ok_or_else(|| PerlError::runtime("expected code ref", line))?;
+        .ok_or_else(|| StrykeError::runtime("expected code ref", line))?;
     let arr = Arc::new(RwLock::new(
         xs.iter().copied().map(StrykeValue::float).collect::<Vec<_>>(),
     ));
@@ -235,7 +235,7 @@ fn builtin_numerical_curl(
         .map(|v| v.to_number())
         .collect();
     if p.len() != 3 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "numerical_curl: requires 3-D point",
             line,
         ));
@@ -308,7 +308,7 @@ fn builtin_nelder_mead(
     let tol = args.get(3).map(|v| v.to_number()).unwrap_or(1e-10);
     let n = x0.len();
     if n == 0 {
-        return Err(PerlError::runtime("nelder_mead: empty start", line));
+        return Err(StrykeError::runtime("nelder_mead: empty start", line));
     }
     // Build initial simplex via Spendley/Pearson scheme.
     let mut simplex: Vec<Vec<f64>> = Vec::with_capacity(n + 1);
@@ -1099,7 +1099,7 @@ fn builtin_pade_approximant(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let m = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
     let n = args.get(2).map(|v| v.to_number() as usize).unwrap_or(0);
     if c.len() < m + n + 1 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "pade_approximant: need at least m+n+1 Taylor coefficients",
             0,
         ));
@@ -1181,7 +1181,7 @@ fn builtin_quat_inv(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let q = quat_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n2 = q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3];
     if n2 < 1e-30 {
-        return Err(PerlError::runtime("quat_inv: zero quaternion", 0));
+        return Err(StrykeError::runtime("quat_inv: zero quaternion", 0));
     }
     Ok(quat_to_value([q[0] / n2, -q[1] / n2, -q[2] / n2, -q[3] / n2]))
 }
@@ -1243,7 +1243,7 @@ fn builtin_quat_to_matrix(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 fn builtin_quat_from_matrix(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let m = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     if m.len() < 3 || m[0].len() < 3 {
-        return Err(PerlError::runtime("quat_from_matrix: 3×3 matrix required", 0));
+        return Err(StrykeError::runtime("quat_from_matrix: 3×3 matrix required", 0));
     }
     let tr = m[0][0] + m[1][1] + m[2][2];
     let (w, x, y, z);
@@ -1330,7 +1330,7 @@ fn builtin_euler_zyx_to_matrix(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 fn builtin_matrix_to_euler_zyx(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let m = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     if m.len() < 3 || m[0].len() < 3 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "matrix_to_euler_zyx: 3×3 matrix required",
             0,
         ));
@@ -1356,7 +1356,7 @@ fn builtin_rotate_3d_vec(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .map(|x| x.to_number())
         .collect();
     if v.len() < 3 {
-        return Err(PerlError::runtime("rotate_3d_vec: 3-vector required", 0));
+        return Err(StrykeError::runtime("rotate_3d_vec: 3-vector required", 0));
     }
     let qv = [0.0, v[0], v[1], v[2]];
     // r = q * qv * q*
@@ -1623,7 +1623,7 @@ fn builtin_partial_trace(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
             .collect();
     let total: usize = dims.iter().product();
     if rho.len() != total {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "partial_trace: ρ size doesn't match Π dims",
             0,
         ));
@@ -1806,7 +1806,7 @@ fn builtin_fresnel_transmission_tm(args: &[StrykeValue]) -> PerlResult<StrykeVal
 fn builtin_abcd_thin_lens(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let f = f1(args);
     if f.abs() < 1e-15 {
-        return Err(PerlError::runtime("abcd_thin_lens: zero focal length", 0));
+        return Err(StrykeError::runtime("abcd_thin_lens: zero focal length", 0));
     }
     Ok(matrix_to_value(&[vec![1.0, 0.0], vec![-1.0 / f, 1.0]]))
 }
