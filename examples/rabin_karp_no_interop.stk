@@ -1,0 +1,127 @@
+#!/usr/bin/env stryke
+
+# Rabin-Karp substring search — find every occurrence of `pat` in
+# `text` via rolling polynomial hash. Average O(n + m), worst O(nm)
+# (only when hash collisions cascade). Used by grep-like tools and
+# plagiarism detection. Parses clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * implicit return on tail (rule 7)
+#   * `#{…}` interpolation (rule 1a)
+#   * `:` ranges, `len` (rules 4, 5)
+#   * `[N:M]` slice instead of `substr` for codepoint-safe extraction
+#
+# Namespaced UDFs `RK::*`.
+#
+# Run: stryke --no-interop examples/rabin_karp_no_interop.stk
+
+# Hash a string with base/mod polynomial: h = c0*b^(n-1) + c1*b^(n-2) + ...
+fn RK::hash($s, $base, $mod) {
+    my $h = 0
+    for my $i (0:len($s) - 1) {
+        $h = ($h * $base + ord($s[$i])) % $mod
+    }
+    $h
+}
+
+# Find every occurrence of `pat` in `text`. Returns 0-indexed positions.
+fn RK::find_all($text, $pat) {
+    my $m = len $pat
+    my $n = len $text
+    return [] if $m == 0 || $m > $n
+
+    my $base = 257
+    my $mod  = 1000000007
+    my $pat_h = RK::hash($pat, $base, $mod)
+
+    # Compute b^(m-1) % mod for the rolling-window subtraction step.
+    my $high = 1
+    for (1:$m - 1) { $high = ($high * $base) % $mod }
+
+    # Initial window hash.
+    my $win_h = RK::hash($text[0:$m - 1], $base, $mod)
+    my @hits
+    if ($win_h == $pat_h && $text[0:$m - 1] eq $pat) {
+        push @hits, 0
+    }
+
+    for my $i (1:$n - $m) {
+        # Roll: drop char at i-1, add char at i+m-1.
+        my $drop = ord($text[$i - 1])
+        my $add  = ord($text[$i + $m - 1])
+        $win_h = (($win_h - $drop * $high) * $base + $add) % $mod
+        # Modular arithmetic may go negative — normalize.
+        $win_h = ($win_h + $mod) % $mod
+        if ($win_h == $pat_h && $text[$i:$i + $m - 1] eq $pat) {
+            push @hits, $i
+        }
+    }
+    \@hits
+}
+
+# Brute-force reference impl for cross-checking — O(n·m).
+fn RK::find_brute($text, $pat) {
+    my $m = len $pat
+    my $n = len $text
+    return [] if $m == 0 || $m > $n
+    my @hits
+    for my $i (0:$n - $m) {
+        push @hits, $i if $text[$i:$i + $m - 1] eq $pat
+    }
+    \@hits
+}
+
+p "── Rabin-Karp demo ──"
+
+my @cases = (
+    +{ text => "abracadabra",     pat => "abra",   hits => [0, 7]    },
+    +{ text => "abracadabra",     pat => "cad",    hits => [4]       },
+    +{ text => "abracadabra",     pat => "z",      hits => []        },
+    +{ text => "abracadabra",     pat => "a",      hits => [0, 3, 5, 7, 10] },
+    +{ text => "aaaa",            pat => "aa",     hits => [0, 1, 2] },  # overlapping
+    +{ text => "",                pat => "x",      hits => []        },
+    +{ text => "x",               pat => "x",      hits => [0]       },
+    +{ text => "x",               pat => "xx",     hits => []        },
+    +{ text => "the the the",     pat => "the",    hits => [0, 4, 8] },
+    +{ text => "the the the",     pat => "th",     hits => [0, 4, 8] },
+)
+
+my $fail = 0
+for my $c (@cases) {
+    my $rk    = RK::find_all($c->{text}, $c->{pat})
+    my $brute = RK::find_brute($c->{text}, $c->{pat})
+    my $rk_s    = join(",", @$rk)
+    my $brute_s = join(",", @$brute)
+    my $want    = join(",", @{$c->{hits}})
+    my $ok      = $rk_s eq $want && $brute_s eq $want
+    $fail++ unless $ok
+    p "  RK(\"$c->{text}\", \"$c->{pat}\") = [$rk_s]  expect [$want]  #{$ok ? \"\" : \"FAIL\"}"
+}
+die "$fail / #{len @cases} RK cases failed" if $fail > 0
+
+# Universal invariants:
+#   * RK results == brute-force results (full cross-check)
+#   * Every hit position `i` actually has the pattern at text[i:i+m-1]
+#   * No hits when pattern longer than text
+for my $c (@cases) {
+    my $hits = RK::find_all($c->{text}, $c->{pat})
+    my $m    = len $c->{pat}
+    my $tx   = $c->{text}
+    for my $i (@$hits) {
+        die "false hit at $i" unless $tx[$i:$i + $m - 1] eq $c->{pat}
+    }
+}
+
+# Stress: random text of length 1000, pattern "abc" → verify against brute.
+srand(42)
+my $alphabet = "abcde"
+my @text_chars
+push @text_chars, $alphabet[int(rand 5)] for 1:1000
+my $rand_text = join("", @text_chars)
+my $rk_hits    = RK::find_all($rand_text, "abc")
+my $brute_hits = RK::find_brute($rand_text, "abc")
+die "stress disagreement" unless join(",", @$rk_hits) eq join(",", @$brute_hits)
+p "  1000-char stress: RK and brute-force agree on #{len(@$rk_hits)} hits  OK"
+
+p ""
+p "  ALL PASS (10 cases + position-correctness + 1000-char stress vs brute)"

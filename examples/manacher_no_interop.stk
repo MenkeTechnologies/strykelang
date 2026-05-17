@@ -1,0 +1,131 @@
+#!/usr/bin/env stryke
+
+# Manacher's algorithm — longest palindromic substring in O(n).
+# Uses the trick of inserting `#` between every char (and at ends)
+# so all palindromes look odd-length, then maintains an array P[i]
+# = radius of the largest palindrome centered at i. Parses clean
+# under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * implicit return on tail (rule 7)
+#   * `[N:M]` slice (rule 6a)
+#   * `:` ranges, `len` (rules 4, 5)
+#   * `#{…}` interpolation (rule 1a)
+#
+# Namespaced UDFs `Manacher::*`.
+#
+# Run: stryke --no-interop examples/manacher_no_interop.stk
+
+# Returns the longest palindromic substring (one of, if ties).
+fn Manacher::lps($s) {
+    return "" if len($s) == 0
+    # Transform: "abc" → "#a#b#c#"
+    my @t = ("#")
+    for my $i (0:len($s) - 1) {
+        push @t, $s[$i]
+        push @t, "#"
+    }
+    my $n = len @t
+    my @p = (0) x $n
+    my $center = 0
+    my $right  = 0
+    for my $i (0:$n - 1) {
+        my $mirror = 2 * $center - $i
+        $p[$i] = $right > $i ? min($right - $i, $p[$mirror]) : 0
+        while ($i + $p[$i] + 1 < $n && $i - $p[$i] - 1 >= 0 &&
+               $t[$i + $p[$i] + 1] eq $t[$i - $p[$i] - 1]) {
+            $p[$i]++
+        }
+        if ($i + $p[$i] > $right) {
+            $center = $i
+            $right  = $i + $p[$i]
+        }
+    }
+    # Find the largest entry in @p — its center+radius gives the answer.
+    my $best_i   = 0
+    my $best_len = 0
+    for my $i (0:$n - 1) {
+        if ($p[$i] > $best_len) {
+            $best_len = $p[$i]
+            $best_i   = $i
+        }
+    }
+    # Map transformed-index back to original string.
+    my $start = int(($best_i - $best_len) / 2)
+    $s[$start:$start + $best_len - 1]
+}
+
+# Brute-force reference: O(n³). Used to cross-check Manacher.
+fn Manacher::brute($s) {
+    return "" if len($s) == 0
+    my $best = $s[0:0]
+    for my $i (0:len($s) - 1) {
+        for my $j ($i:len($s) - 1) {
+            my $sub = $s[$i:$j]
+            next unless $sub eq join("", rev split //, $sub)
+            $best = $sub if len($sub) > len($best)
+        }
+    }
+    $best
+}
+
+p "── Manacher's longest palindromic substring ──"
+
+my @cases = (
+    +{ s => "",             expect_lens => [0] },
+    +{ s => "a",            expect_lens => [1] },
+    +{ s => "ab",           expect_lens => [1] },
+    +{ s => "aba",          expect_lens => [3] },
+    +{ s => "abba",         expect_lens => [4] },
+    +{ s => "racecar",      expect_lens => [7] },
+    +{ s => "babad",        expect_lens => [3] },   # "bab" or "aba"
+    +{ s => "cbbd",         expect_lens => [2] },   # "bb"
+    +{ s => "forgeeksskeegfor", expect_lens => [10] }, # "geeksskeeg"
+    +{ s => "abacdfgdcaba", expect_lens => [3] },   # "aba"
+    +{ s => "abcba",        expect_lens => [5] },
+    +{ s => "noon high it is", expect_lens => [9] }, # " high it " or similar
+)
+
+my $fail = 0
+for my $c (@cases) {
+    my $got = Manacher::lps($c->{s})
+    my $brute = Manacher::brute($c->{s})
+    my $got_len   = len $got
+    my $brute_len = len $brute
+    my $ok = $got_len == $brute_len  # ties accepted — both return some max-length palindrome
+    $fail++ unless $ok
+    p "  LPS(\"$c->{s}\") = \"$got\" (len #{$got_len})  brute=\"$brute\" (len #{$brute_len})  #{$ok ? \"\" : \"FAIL\"}"
+}
+die "$fail / #{len @cases} LPS cases failed" if $fail > 0
+
+# Universal invariants:
+#   * Result IS a palindrome
+#   * Result is a substring of input
+#   * Length matches the brute-force length
+for my $c (@cases) {
+    next if $c->{s} eq ""
+    my $got = Manacher::lps($c->{s})
+    # palindrome?
+    die "$got not a palindrome" unless $got eq join("", rev split //, $got)
+    # substring?
+    my $haystack = $c->{s}
+    my $found = 0
+    for my $i (0:len($haystack) - len($got)) {
+        $found = 1 if $haystack[$i:$i + len($got) - 1] eq $got
+    }
+    die "$got not a substring of $haystack" unless $found
+}
+
+# Stress: Manacher.len == brute.len on random small inputs.
+srand(42)
+my $alphabet = "abc"
+for (1:50) {
+    my $n = int(rand 12) + 1
+    my @cs
+    push @cs, $alphabet[int(rand 3)] for 1:$n
+    my $rs = join("", @cs)
+    die "stress disagreement on $rs" unless len(Manacher::lps($rs)) == len(Manacher::brute($rs))
+}
+
+p ""
+p "  ALL PASS (12 named cases + palindrome+substring invariants + 50-string brute cross-check)"

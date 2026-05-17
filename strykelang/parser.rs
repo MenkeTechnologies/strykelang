@@ -21653,4 +21653,58 @@ mod tests {
         parse_ok("my @r = par { _ * 2 } (1, 2, 3, 4)");
         parse_ok("par { p _ } @big");
     }
+
+    /// 2-D DP table with `max()` step — LCS / Levenshtein / Damerau /
+    /// general edit-distance pattern. Validates that 3-way max +
+    /// nested arrayref subscript chain parses cleanly.
+    #[test]
+    fn dp_max_step_chained_subscript_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my @d; for my $i (0:3) { $d[$i] = [(0) x 4] } \
+             $d[1][1] = max($d[0][1], $d[1][0]); \
+             my $r = $d[1][1]",
+        );
+    }
+
+    /// Rolling polynomial hash arithmetic — Rabin-Karp's window update.
+    #[test]
+    fn rolling_hash_arithmetic_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my $h = 0; my $base = 257; my $mod = 1000000007; my $high = 256; \
+             my $drop = 65; my $add = 90; \
+             $h = (($h - $drop * $high) * $base + $add) % $mod; \
+             $h = ($h + $mod) % $mod",
+        );
+    }
+
+    /// Triple-nested loop with index expressions on a 2-D arrayref —
+    /// Floyd-Warshall's k/i/j signature.
+    #[test]
+    fn triple_nested_2d_via_k_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my @d; for my $i (0:3) { $d[$i] = [(0) x 4] } \
+             for my $k (0:3) { for my $i (0:3) { for my $j (0:3) { \
+                $d[$i][$j] = $d[$i][$k] + $d[$k][$j] \
+                    if $d[$i][$k] + $d[$k][$j] < $d[$i][$j] \
+             } } }",
+        );
+    }
+
+    /// DP fill with `@dp = ($INF) x ($amount + 1)` repeat-init.
+    /// Coin-change shape.
+    #[test]
+    fn dp_array_repeat_init_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $amount = 11; my $INF = 1e18; my @dp = ($INF) x ($amount + 1); $dp[0] = 0");
+    }
+
+    /// `join("", rev split //, $s)` — palindrome check pipeline.
+    #[test]
+    fn rev_split_join_chain_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $s = \"abc\"; my $r = join(\"\", rev split //, $s)");
+    }
 }
