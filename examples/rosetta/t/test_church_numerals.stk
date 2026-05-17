@@ -2,13 +2,13 @@
 # Rosetta Code: Church numerals
 # Number n is encoded as: λf. λx. f(f(...f(x))) — applies f n times.
 
-fn Rosetta::Church::zero() { fn { my $f = $_; fn { $_ } } }
+fn Rosetta::Church::zero() { fn { my $f = _; fn { _ } } }
 
 fn Rosetta::Church::succ($n) {
     fn {
-        my $f = $_
+        my $f = _
         fn {
-            my $x = $_
+            my $x = _
             $f->($n->($f)->($x))
         }
     }
@@ -16,9 +16,9 @@ fn Rosetta::Church::succ($n) {
 
 fn Rosetta::Church::add($m, $n) {
     fn {
-        my $f = $_
+        my $f = _
         fn {
-            my $x = $_
+            my $x = _
             $m->($f)->($n->($f)->($x))
         }
     }
@@ -26,7 +26,7 @@ fn Rosetta::Church::add($m, $n) {
 
 fn Rosetta::Church::mul($m, $n) {
     fn {
-        my $f = $_
+        my $f = _
         $m->($n->($f))
     }
 }
@@ -36,7 +36,7 @@ fn Rosetta::Church::pow($m, $n) {
 }
 
 fn Rosetta::Church::to_int($n) {
-    $n->(fn { my $x = $_; $x + 1 })->(0)
+    $n->(fn { my $x = _; $x + 1 })->(0)
 }
 
 fn Rosetta::Church::from_int($k) {

@@ -35,7 +35,7 @@ fn Project::ListOps::map_empty {
 
 fn Project::ListOps::map_to_hash_key {
     my @a = qw(a b c)
-    my @r = map { $_ => 1 } @a
+    my @r = map { _ => 1 } @a
     scalar @r}
 
 fn Project::ListOps::map_conditional {

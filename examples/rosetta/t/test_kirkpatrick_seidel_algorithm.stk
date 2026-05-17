@@ -11,6 +11,6 @@ my @points = ([0, 0], [0, 2], [1, 1], [2, 2], [2, 0])
 my $hull = Rosetta::Hull::hull(\@points)
 
 assert_eq len(@$hull), 4, "convex hull has four corner points"
-assert_eq join(";", map { join(",", @$_) } @$hull), "0,0;0,2;2,2;2,0", "hull corners ordered around square"
+assert_eq join(";", map { join(",", @{_}) } @$hull), "0,0;0,2;2,2;2,0", "hull corners ordered around square"
 
 test_run

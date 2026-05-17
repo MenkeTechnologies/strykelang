@@ -19,9 +19,9 @@ fn Rosetta::NatSort::tokens($s) {
     \@parts
 }
 
-fn Rosetta::NatSort::compare($_0, $_1) {
-    my $ta = Rosetta::NatSort::tokens($_0)
-    my $tb = Rosetta::NatSort::tokens($_1)
+fn Rosetta::NatSort::compare(_0, _1) {
+    my $ta = Rosetta::NatSort::tokens(_0)
+    my $tb = Rosetta::NatSort::tokens(_1)
     my $len = len(@$ta) < len(@$tb) ? len(@$ta) : len(@$tb)
     for my $i (0:$len - 1) {
         my ($va, $ka) = ($ta->[$i][0], $ta->[$i][1])
@@ -38,7 +38,7 @@ fn Rosetta::NatSort::compare($_0, $_1) {
 }
 
 fn Rosetta::NatSort::sort(@xs) {
-    sort { Rosetta::NatSort::compare($_0, $_1) } @xs
+    sort { Rosetta::NatSort::compare(_0, _1) } @xs
 }
 
 # Canonical Rosetta example: ["img12", "img10", "img2", "img1"] → img1, img2, img10, img12.

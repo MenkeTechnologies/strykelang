@@ -103,25 +103,25 @@ assert_eq $add5(0), 5, "adder closure zero"
 my $mul3 = Project::Subs::get_multiplier(3)
 assert_eq $mul3(4), 12, "multiplier closure"
 
-assert_eq Project::Subs::apply_twice(fn { $_0 * 2 }, 3), 12, "apply twice"
+assert_eq Project::Subs::apply_twice(fn { _0 * 2 }, 3), 12, "apply twice"
 
-my $composed = compose(fn { $_0 + 1 }, fn { $_0 * 2 })
+my $composed = compose(fn { _0 + 1 }, fn { _0 * 2 })
 assert_eq $composed(5), 11, "compose"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HIGHER ORDER FUNCTIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
-my @doubled = Project::Subs::apply_to_each(fn { $_0 * 2 }, 1, 2, 3)
+my @doubled = Project::Subs::apply_to_each(fn { _0 * 2 }, 1, 2, 3)
 assert_eq join(",", @doubled), "2,4,6", "apply to each"
 
-my @evens = Project::Subs::filter_with(fn { $_0 % 2 == 0 }, 1, 2, 3, 4, 5)
+my @evens = Project::Subs::filter_with(fn { _0 % 2 == 0 }, 1, 2, 3, 4, 5)
 assert_eq join(",", @evens), "2,4", "filter with"
 
-my $sum = Project::Subs::reduce_with(fn { $_0 + $_1 }, 0, 1, 2, 3, 4, 5)
+my $sum = Project::Subs::reduce_with(fn { _0 + _1 }, 0, 1, 2, 3, 4, 5)
 assert_eq $sum, 15, "reduce with"
 
-my $product = Project::Subs::reduce_with(fn { $_0 * $_1 }, 1, 1, 2, 3, 4, 5)
+my $product = Project::Subs::reduce_with(fn { _0 * _1 }, 1, 1, 2, 3, 4, 5)
 assert_eq $product, 120, "reduce product"
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -157,7 +157,7 @@ assert_eq Project::Subs::one_arg(1) + Project::Subs::one_arg(2) + Project::Subs:
 # Function returning function
 my $factory_fn = fn {
     my $n = shift;
-    fn { $n * $_0 }
+    fn { $n * _0 }
 };
 my $times5 = $factory_fn(5);
 assert_eq $times5(3), 15, "factory function"

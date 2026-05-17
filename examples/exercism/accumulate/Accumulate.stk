@@ -1,2 +1,2 @@
 #!/usr/bin/env stryke
-fn Exercism::Accumulate::accumulate = [map _1, @$_]
+fn Exercism::Accumulate::accumulate = [map _1, @{_}]

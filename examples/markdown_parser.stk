@@ -139,7 +139,7 @@ for my $line (@$html) {
         $tags{$1}++
     }
 }
-for my $tag (sort { $tags{$_1} <=> $tags{$_0} } keys %tags) {
+for my $tag (sort { $tags{_1} <=> $tags{_0} } keys %tags) {
     printf "  <%s> : %d\n", $tag, $tags{$tag}
 }
 

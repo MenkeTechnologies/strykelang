@@ -103,6 +103,6 @@ my $g3 = [
     [1, 0],
     [0, 0],
 ]
-$g3 |> Rosetta::Hidato::solve |> fn { defined $_ ? 1 : 0 } |> assert_eq(1, "pipe 2×2 solved")
+$g3 |> Rosetta::Hidato::solve |> fn { defined _ ? 1 : 0 } |> assert_eq(1, "pipe 2×2 solved")
 
 test_run

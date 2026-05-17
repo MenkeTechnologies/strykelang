@@ -94,7 +94,7 @@ die "N=8 solution count" unless len(@$sols) == 92
 for my $s (@$sols) {
     die "wrong length" unless len(@$s) == 8
     my %seen
-    $seen{$_} = 1 for @$s
+    $seen{_} = 1 for @$s
     die "not a permutation of 0:7" unless len(keys %seen) == 8
     for my $i (0:6) {
         for my $j ($i + 1:7) {

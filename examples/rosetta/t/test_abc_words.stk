@@ -23,6 +23,6 @@ assert_eq join(",", @abc), "abacus,abc,a_b_c", "find abc words"
 
 # Piped version
 "abacus" |> Rosetta::ABCWords::is_abc |> assert_ok("piped abacus")
-"bac" |> Rosetta::ABCWords::is_abc |> ~> fn { !$_ } |> assert_ok("piped bac is not abc")
+"bac" |> Rosetta::ABCWords::is_abc |> ~> fn { !_ } |> assert_ok("piped bac is not abc")
 
 test_run

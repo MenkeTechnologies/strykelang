@@ -70,6 +70,6 @@ assert_ok abs($third_sum - 1) < 1e-15 || abs($third_sum - 1) > 0,
     "1/3 + 1/3 + 1/3 may or may not equal 1"
 
 # Pipe form
-30 |> Rosetta::FpPath::muller_recurrence |> fn { abs($_->[-1] - 100) } |> fn { $_ < 1 } |> assert_eq(1, "pipe Muller → ~100")
+30 |> Rosetta::FpPath::muller_recurrence |> fn { abs($_->[-1] - 100) } |> fn { _ < 1 } |> assert_eq(1, "pipe Muller → ~100")
 
 test_run

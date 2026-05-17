@@ -57,7 +57,7 @@ for my $s (@sessions) {
 p ""
 p "── all-time top 10 (by total score) ─────────────────"
 printf "  %-8s %6s %6s %6s\n", "player", "total", "best", "n"
-my @top = sort { $total{$_1} <=> $total{$_0} } keys %total
+my @top = sort { $total{_1} <=> $total{_0} } keys %total
 my $shown = 0
 for my $p (@top) {
     last if $shown >= 10
@@ -70,7 +70,7 @@ for my $p (@top) {
 
 p ""
 p "── recent-bias top 5 (decay half-life: 3 days) ──────"
-my @recent_top = sort { $recent_weighted{$_1} <=> $recent_weighted{$_0} } keys %recent_weighted
+my @recent_top = sort { $recent_weighted{_1} <=> $recent_weighted{_0} } keys %recent_weighted
 $shown = 0
 for my $p (@recent_top) {
     last if $shown >= 5
@@ -136,7 +136,7 @@ for my $p (keys %total) {
 for my $tier (@tiers) {
     my $players = $by_tier{$tier->[1]} // []
     next if len(@$players) == 0
-    my @sorted = sort { $total{$_1} <=> $total{$_0} } @$players
+    my @sorted = sort { $total{_1} <=> $total{_0} } @$players
     printf "  %-8s (%d) : %s\n",
         $tier->[1], len(@sorted), join(", ", @sorted)
 }

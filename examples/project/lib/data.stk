@@ -2,7 +2,7 @@
 
 fn Project::Data::word_freq_map {
     my $freq = {}
-    $freq->{$_}++ for @_
+    $freq->{_}++ for @_
     $freq
 }
 

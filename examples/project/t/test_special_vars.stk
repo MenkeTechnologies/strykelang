@@ -3,7 +3,7 @@
 require "./lib/special_vars.stk"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# $_ DEFAULT VARIABLE
+# _ DEFAULT VARIABLE
 # ══════════════════════════════════════════════════════════════════════════════
 
 assert_eq Project::SpecialVars::default_in_for(), "1,2,3", "default in for"

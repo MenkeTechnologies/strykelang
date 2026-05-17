@@ -106,8 +106,8 @@ my @words = ("apple", "ant", "banana", "berry", "cherry")
 my @letters = pflat_maps { split //, _ } @words
 my $by_letter = freq(@letters)
 printf("  most common letter: %s (%d times)\n",
-    (sort { $by_letter->{$_1} <=> $by_letter->{$_0} } keys %$by_letter)[0],
-    (sort { $by_letter->{$_1} <=> $by_letter->{$_0} } values %$by_letter)[0])
+    (sort { $by_letter->{_1} <=> $by_letter->{_0} } keys %$by_letter)[0],
+    (sort { $by_letter->{_1} <=> $by_letter->{_0} } values %$by_letter)[0])
 die "letter count (got " . len(@letters) . ")" unless len(@letters) == 25
     # apple(5) + ant(3) + banana(6) + berry(5) + cherry(6) = 25
 

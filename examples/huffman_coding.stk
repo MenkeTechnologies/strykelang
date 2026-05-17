@@ -56,7 +56,7 @@ fn Demo::HC::build_tree($fref) {
     }
     return undef if len(@heap) == 0
     while (len(@heap) > 1) {
-        @heap = sort { $_0->{w} <=> $_1->{w} } @heap
+        @heap = sort { _0->{w} <=> _1->{w} } @heap
         my $first = shift @heap
         my $second = shift @heap
         my $merged = { w => $first->{w} + $second->{w}, l => $first, r => $second }
@@ -163,7 +163,7 @@ my %big_codes
 Demo::HC::assign_codes($btree, "", \%big_codes)
 
 p "\ncorpus-wide code table (top 12 by frequency):"
-my @by_freq = sort { $bfreq->{$_1} <=> $bfreq->{$_0} } keys %$bfreq
+my @by_freq = sort { $bfreq->{_1} <=> $bfreq->{_0} } keys %$bfreq
 for my $sym (@by_freq[0:11]) {
     my $shown = $sym eq " " ? "(space)" : $sym
     printf("  %-7s freq=%4d  code=%s\n",

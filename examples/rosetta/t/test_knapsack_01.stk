@@ -73,7 +73,7 @@ assert_eq $res->{total_value}, 1030, "Knapsack total value"
 
 my @names = sort map { _->{name} } @{$res->{items}}
 # Verify some key items are present
-my %has = map { $_ => 1 } @names
+my %has = map { _ => 1 } @names
 assert_ok $has{"map"}, "has map"
 assert_ok $has{"suntan cream"}, "has suntan cream"
 assert_ok $has{"note-case"}, "has note-case"

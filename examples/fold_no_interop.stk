@@ -6,7 +6,7 @@
 # and read tighter than any sigil-and-name spelling.
 #
 # Strict-mode style rule: bareword `_`, `_0`, `_1` are the canonical
-# names in code contexts. Sigil-prefixed `$_`, `$_0`, `$_1` belong in
+# names in code contexts. Sigil-prefixed `_`, `_0`, `_1` belong in
 # string interpolation only (where the bareword would just be text).
 #
 # Run: stryke --no-interop examples/fold_no_interop.stk

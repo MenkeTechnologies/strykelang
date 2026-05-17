@@ -69,7 +69,7 @@ p "  bridged across, count=2 (expected 2)  OK"
 # Stress: chain N elements then check all-equivalent.
 my $N = 1000
 my $big = UF::new($N)
-UF::union($big, $_, $_ + 1) for 0:$N - 2
+UF::union($big, _, _ + 1) for 0:$N - 2
 die "chain should collapse to 1 component" unless $big->{count} == 1
 die "first and last should be same" unless UF::same($big, 0, $N - 1)
 p "  chain of #{$N}: all in 1 component  OK"

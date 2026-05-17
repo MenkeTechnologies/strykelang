@@ -50,14 +50,14 @@ fn Bloom::contains($bf, $item) {
 }
 
 # Set-bit count — useful for verifying load.
-fn Bloom::popcount = sum(@{$_0->{bits}})
+fn Bloom::popcount = sum(@{_0->{bits}})
 
 p "── Bloom filter demo ──"
 
 # Insert a small word set; every inserted word must be reported present.
 my $bf = Bloom::new(1024, 4)
 my @words = ("apple", "banana", "cherry", "date", "elderberry", "fig", "grape")
-Bloom::add($bf, $_) for @words
+Bloom::add($bf, _) for @words
 
 for my $w (@words) {
     die "false negative on $w" unless Bloom::contains($bf, $w)

@@ -7,11 +7,11 @@
 fn Rosetta::Hist::make() {
     my $h = []
     {
-        set      => fn { my $v = $_; push @$h, $v; $v },
+        set      => fn { my $v = _; push @$h, $v; $v },
         get      => fn { len(@$h) > 0 ? $h->[len(@$h)-1] : undef },
         all      => fn { [@$h] },
         len      => fn { len(@$h) },
-        at       => fn { $h->[$_] },
+        at       => fn { $h->[_] },
         rollback => fn {
             return if len(@$h) == 0
             pop @$h

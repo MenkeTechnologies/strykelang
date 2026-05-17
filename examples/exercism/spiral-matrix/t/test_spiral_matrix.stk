@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./SpiralMatrix.stk"
 
-fn fmt { join("|", map { join(",", @$_) } @{_}) }
+fn fmt { join("|", map { join(",", @{_}) } @{_}) }
 
 assert_eq fmt(Exercism::SpiralMatrix::spiral_matrix(0)),  "",                                              "0x0"
 assert_eq fmt(Exercism::SpiralMatrix::spiral_matrix(1)),  "1",                                             "1x1"

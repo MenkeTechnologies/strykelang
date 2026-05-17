@@ -8,7 +8,7 @@ fn Rosetta::Munchausen::is_munchausen($n) {
 
     my $sum = ~> "$n" chars 
               |> map { Rosetta::Munchausen::pow(int(_)) } 
-              |> reduce { $_0 + $_1 }
+              |> reduce { _0 + _1 }
     
     $sum == $n
 }

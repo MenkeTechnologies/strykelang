@@ -64,6 +64,6 @@ my $one = Rosetta::License::max_in_use([["OUT", "now"]])
 assert_eq $one->[0], 1, "single OUT peak = 1"
 
 # Pipe form
-\@lines |> Rosetta::License::parse |> fn { len(@$_) } |> assert_eq(7, "pipe count")
+\@lines |> Rosetta::License::parse |> fn { len(@{_}) } |> assert_eq(7, "pipe count")
 
 test_run

@@ -27,7 +27,7 @@ assert_ok !defined(Rosetta::Pick::one()), "empty array → undef"
 
 # Picks come from input set only
 my @set = (10, 20, 30, 40, 50)
-my %allowed = map { $_ => 1 } @set
+my %allowed = map { _ => 1 } @set
 my @samples = Rosetta::Pick::n(\@set, 200)
 my $all_in = 1
 for my $s (@samples) { $all_in = 0 if !exists $allowed{$s} }

@@ -8,7 +8,7 @@ fn Rosetta::Semord::reverse_str($s) {
 }
 
 fn Rosetta::Semord::pairs($words) {
-    my %set = map { $_ => 1 } @$words
+    my %set = map { _ => 1 } @$words
     my %seen
     my @out
     for my $w (@$words) {

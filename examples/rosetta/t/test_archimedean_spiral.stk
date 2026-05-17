@@ -34,6 +34,6 @@ my $expected_y = $expected_r * sin($t)
 assert_ok Rosetta::Spiral::approx_eq($p_pi2->[1], $expected_y), "y at theta~pi/2"
 
 # Piped version
-100 |> ~> fn { Rosetta::Spiral::generate(0, 5, $_, 0.1) } |> len |> assert_eq(100, "piped spiral length")
+100 |> ~> fn { Rosetta::Spiral::generate(0, 5, _, 0.1) } |> len |> assert_eq(100, "piped spiral length")
 
 test_run

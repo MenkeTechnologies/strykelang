@@ -27,7 +27,7 @@ fn Rosetta::Music::scale_major($root) {
     my @intervals = (0, 2, 4, 5, 7, 9, 11, 12)
     my $root_midi = Rosetta::Music::note_to_midi($root)
     return undef unless defined $root_midi
-    [map { Rosetta::Music::midi_to_pitch($root_midi + $_) } @intervals]
+    [map { Rosetta::Music::midi_to_pitch($root_midi + _) } @intervals]
 }
 
 # Round-trip: midi(name) → freq(midi) → midi-back
@@ -58,7 +58,7 @@ assert_near Rosetta::Music::frequency("G4") / Rosetta::Music::frequency("C4"),
 # C major scale relative ratios
 my $cmaj = Rosetta::Music::scale_major("C4")
 my $root = $cmaj->[0]
-my @ratios = map { $_ / $root } @$cmaj
+my @ratios = map { _ / $root } @$cmaj
 # Expected (12-TET): 1, 9/8≈1.122, 5/4≈1.260, 4/3≈1.335, 3/2≈1.498, 5/3≈1.682, 15/8≈1.888, 2
 assert_near $ratios[0], 1,           1e-9, "scale[0] = 1"
 assert_near $ratios[2], 2 ** (4/12), 1e-9, "M3 = 2^(4/12)"

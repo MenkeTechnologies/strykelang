@@ -35,11 +35,11 @@ fn Rosetta::Prisoners::play($optimal) {
 my $num_trials = 1000
 
 # Random strategy: extremely low probability (2^-100)
-my $random_wins = ~> 1:$num_trials map { Rosetta::Prisoners::play(0) } |> reduce { $_0 + $_1 }
+my $random_wins = ~> 1:$num_trials map { Rosetta::Prisoners::play(0) } |> reduce { _0 + _1 }
 assert_eq $random_wins, 0, "Random strategy wins 0 times"
 
 # Optimal strategy: ~31%
-my $optimal_wins = ~> 1:$num_trials map { Rosetta::Prisoners::play(1) } |> reduce { $_0 + $_1 }
+my $optimal_wins = ~> 1:$num_trials map { Rosetta::Prisoners::play(1) } |> reduce { _0 + _1 }
 assert_ok $optimal_wins > 250 && $optimal_wins < 380, "Optimal strategy wins around 31%"
 
 test_run

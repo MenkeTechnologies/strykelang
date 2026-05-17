@@ -3,7 +3,7 @@
 # Each step from row i to row i+1 must move to an adjacent number.
 
 fn Rosetta::TrianglePath::max_sum($triangle) {
-    my @rows = map { [@$_] } @$triangle
+    my @rows = map { [@{_}] } @$triangle
     my $n = len(@rows)
     for (my $i = $n - 2; $i >= 0; $i -= 1) {
         my $rlen = len(@{$rows[$i]})

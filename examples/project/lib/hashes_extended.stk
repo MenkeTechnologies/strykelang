@@ -119,7 +119,7 @@ fn Project::HashesExtended::hash_slice_assign {
 fn Project::HashesExtended::hash_slice_mixed {
     my %h = (a => 1, b => 2, c => 3)
     my @vals = @h{qw(a z c)}
-    join(",", map { defined($_) ? $_ : "U" } @vals)
+    join(",", map { defined(_) ? _ : "U" } @vals)
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -242,7 +242,7 @@ fn Project::HashesExtended::hash_grep_keys {
 
 fn Project::HashesExtended::hash_grep_values {
     my %h = (a => 1, b => 2, c => 3, d => 4)
-    my @big = grep { $h{$_} > 2 } keys %h
+    my @big = grep { $h{_} > 2 } keys %h
     scalar @big}
 
 fn Project::HashesExtended::hash_vals_map {

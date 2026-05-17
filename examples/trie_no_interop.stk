@@ -47,7 +47,7 @@ fn Trie::has_prefix($t, $prefix) {
 # Build a populated trie from a word list.
 fn Trie::from_words($words) {
     my $t = Trie::new()
-    Trie::insert($t, $_) for @$words
+    Trie::insert($t, _) for @$words
     $t
 }
 

@@ -13,7 +13,7 @@ fn Rosetta::CountLetters::tally($text) {
 
 fn Rosetta::CountLetters::most_common($text) {
     my $h = Rosetta::CountLetters::tally($text)
-    my @entries = sort { $h->{$_1} <=> $h->{$_0} || $_0 cmp $_1 } keys %$h
+    my @entries = sort { $h->{_1} <=> $h->{_0} || _0 cmp _1 } keys %$h
     $entries[0]
 }
 

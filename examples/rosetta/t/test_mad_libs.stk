@@ -53,7 +53,7 @@ assert_eq $story, "Alice the fox sat on a log.", "all placeholders filled"
 # Missing placeholders surface
 my @miss = Rosetta::MadLibs::missing($tpl, { NAME => "X" })
 assert_eq len(@miss), 2, "two missing"
-my %miss_set = map { $_ => 1 } @miss
+my %miss_set = map { _ => 1 } @miss
 assert_eq exists($miss_set{ANIMAL}), 1, "ANIMAL missing"
 assert_eq exists($miss_set{OBJECT}), 1, "OBJECT missing"
 

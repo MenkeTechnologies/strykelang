@@ -86,7 +86,7 @@ my @pcounts = ~> @rhythms |> map { my $r = _; ~> @$r |> grep { _ == 1 } |> len }
 assert_eq join(",", @pcounts), "1,2,3,4,5,6,7,8", "pulse counts preserved"
 
 # All resulting rhythms have length 16
-my @lengths = ~> @rhythms |> map { len(@$_) }
+my @lengths = ~> @rhythms |> map { len(@{_}) }
 assert_eq join(",", @lengths), "16,16,16,16,16,16,16,16", "lengths preserved"
 
 # Pipe form

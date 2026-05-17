@@ -118,7 +118,7 @@ for my $r (@plan) {
 
 p ""
 p "── aggregated shopping list ─────────────────────────"
-for my $ing (sort { $shopping{$_1} <=> $shopping{$_0} } keys %shopping) {
+for my $ing (sort { $shopping{_1} <=> $shopping{_0} } keys %shopping) {
     printf "  %-12s %4d g\n", $ing, $shopping{$ing}
 }
 
@@ -179,6 +179,6 @@ for my $r (@recipes) {
         $by_tag{$t}++
     }
 }
-for my $t (sort { $by_tag{$_1} <=> $by_tag{$_0} } keys %by_tag) {
+for my $t (sort { $by_tag{_1} <=> $by_tag{_0} } keys %by_tag) {
     printf "  %-15s : %d recipes\n", $t, $by_tag{$t}
 }

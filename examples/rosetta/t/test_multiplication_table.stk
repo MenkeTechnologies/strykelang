@@ -12,7 +12,7 @@ fn Rosetta::MultiplicationTable::generate($n) {
 }
 
 fn Rosetta::MultiplicationTable::to_str($m) {
-    my @lines = ~> @$m map { join(",", @$_) }
+    my @lines = ~> @$m map { join(",", @{_}) }
     join(";", @lines)
 }
 

@@ -30,7 +30,7 @@ fn Markov::train($words) {
 # Weighted pick: given { word => count } hashref, choose proportionally.
 fn Markov::pick($dist) {
     my $total = 0
-    $total += $_ for values %$dist
+    $total += _ for values %$dist
     my $r = rand $total
     my $acc = 0
     for my $k (keys %$dist) {
@@ -58,7 +58,7 @@ fn Markov::generate($table, $seed, $n) {
 fn Markov::sums_to_one($table) {
     for my $prev (keys %$table) {
         my $sum = 0
-        $sum += $_ for values %{$table->{$prev}}
+        $sum += _ for values %{$table->{$prev}}
         return 0 if $sum == 0
     }
     1
@@ -88,7 +88,7 @@ p "  transitions from 'the': quick=#{$the_dist->{quick}}, lazy=#{$the_dist->{laz
 # Generate a fixed-seed sample and verify it stays inside the vocabulary.
 srand(42)
 my $vocab = +{}
-$vocab->{$_} = 1 for @words
+$vocab->{_} = 1 for @words
 my $gen = Markov::generate($table, "the", 20)
 die "generated text must start with seed" unless $gen->[0] eq "the"
 for my $w (@$gen) {

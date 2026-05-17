@@ -2,7 +2,7 @@
 # Rosetta Code: Random sentence from book
 
 fn Rosetta::BookSentence::sentences($text) {
-    my @parts = grep { $_ ne "" } map { s/^\s+|\s+$//gr } split /[.!?]+/, $text
+    my @parts = grep { _ ne "" } map { s/^\s+|\s+$//gr } split /[.!?]+/, $text
     \@parts
 }
 

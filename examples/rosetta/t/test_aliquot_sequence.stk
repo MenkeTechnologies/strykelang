@@ -47,6 +47,6 @@ assert_eq join(",", @$res11), "11,1,0", "aliquot 11"
 my $res6 = Rosetta::AliquotSequence::generate(6, 10)
 assert_eq join(",", @$res6), "6,6", "aliquot 6 (perfect)"
 
-10 |> Rosetta::AliquotSequence::generate(5) |> map { join(",", @$_) } |> assert_eq("10,8,7,1,0", "pipe aliquot")
+10 |> Rosetta::AliquotSequence::generate(5) |> map { join(",", @{_}) } |> assert_eq("10,8,7,1,0", "pipe aliquot")
 
 test_run

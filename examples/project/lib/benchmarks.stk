@@ -63,7 +63,7 @@ fn Project::Benchmarks::bench_sort_small {
 }
 
 fn Project::Benchmarks::bench_hash_lookup {
-    my %data = map { $_ => _ * 2 } (1:100)
+    my %data = map { _ => _ * 2 } (1:100)
     bench { $data{50} } 1000
 }
 
@@ -146,7 +146,7 @@ fn Project::Benchmarks::compare_loop_vs_map {
 }
 
 fn Project::Benchmarks::compare_hash_vs_array {
-    my %hash = map { $_ => 1 } (1:100)
+    my %hash = map { _ => 1 } (1:100)
     my @array = (1:100)
     
     bench { exists $hash{50} } 500

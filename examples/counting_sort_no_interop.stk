@@ -49,10 +49,10 @@ fn CSort::sort($xs) {
     }
     my $offset = -$min
     my @shifted
-    push @shifted, $_ + $offset for @$xs
+    push @shifted, _ + $offset for @$xs
     my $sorted = CSort::sort_nonneg(\@shifted, $max + $offset)
     my @out
-    push @out, $_ - $offset for @$sorted
+    push @out, _ - $offset for @$sorted
     \@out
 }
 

@@ -49,7 +49,7 @@ Rosetta::Walk::touch("$base/sub/deep/d.txt")
 
 # Non-recursive listing
 my $top = Rosetta::Walk::list_immediate($base)
-my %top_set = map { $_ => 1 } @$top
+my %top_set = map { _ => 1 } @$top
 assert_eq exists($top_set{"a.txt"}), 1, "a.txt at top"
 assert_eq exists($top_set{"b.txt"}), 1, "b.txt at top"
 assert_eq exists($top_set{"sub"}),   1, "sub at top"
@@ -57,13 +57,13 @@ assert_eq len(@$top), 3, "exactly 3 entries at top"
 
 # Sub directory listing
 my $sub = Rosetta::Walk::list_immediate("$base/sub")
-my %sub_set = map { $_ => 1 } @$sub
+my %sub_set = map { _ => 1 } @$sub
 assert_eq exists($sub_set{"c.txt"}),  1, "c.txt in sub"
 assert_eq exists($sub_set{"deep"}),   1, "deep in sub"
 
 # Recursive walk
 my @all = Rosetta::Walk::recursive($base, "")
-my %all_set = map { $_ => 1 } @all
+my %all_set = map { _ => 1 } @all
 assert_eq exists($all_set{"a.txt"}),               1, "a.txt"
 assert_eq exists($all_set{"b.txt"}),               1, "b.txt"
 assert_eq exists($all_set{"sub"}),                 1, "sub"

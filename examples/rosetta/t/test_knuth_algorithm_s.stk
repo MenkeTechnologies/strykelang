@@ -31,7 +31,7 @@ fn Rosetta::ReservoirS::frequency($stream, $k, $trials) {
 # Sample size > stream length: returns whole stream
 my $small = Rosetta::ReservoirS::sample([1, 2, 3], 10)
 assert_eq len(@$small), 3, "k > N → returns N items"
-my %got = map { $_ => 1 } @$small
+my %got = map { _ => 1 } @$small
 assert_eq exists($got{1}), 1, "1 in sample"
 assert_eq exists($got{2}), 1, "2 in sample"
 assert_eq exists($got{3}), 1, "3 in sample"
@@ -66,6 +66,6 @@ for my $i (1:10) {
 assert_ok $balanced, "every element appears ~900 ± 200 times"
 
 # Pipe form
-[1, 2, 3, 4, 5] |> fn { Rosetta::ReservoirS::sample(_, 2) } |> fn { len(@$_) } |> assert_eq(2, "pipe size 2")
+[1, 2, 3, 4, 5] |> fn { Rosetta::ReservoirS::sample(_, 2) } |> fn { len(@{_}) } |> assert_eq(2, "pipe size 2")
 
 test_run

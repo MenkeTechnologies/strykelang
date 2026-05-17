@@ -53,7 +53,7 @@ my $groups = Rosetta::Friendly::groups(200)
 my $found = 0
 for my $key (keys %$groups) {
     my @members = @{$groups->{$key}}
-    my %m = map { $_ => 1 } @members
+    my %m = map { _ => 1 } @members
     if (exists $m{30} && exists $m{140}) {
         $found = 1
     }

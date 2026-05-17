@@ -4,7 +4,7 @@
 #
 # `_0`, `_1`, `_N`     — positional block parameters (0-indexed).
 #                        Replaces Perl's `$a`/`$b` magic in sort/reduce.
-# `_`  (bareword)      — current topic, sigil-free (same as `$_`).
+# `_`  (bareword)      — current topic, sigil-free (same as `_`).
 # `_<`, `_<<`, ...      — outer-topic chain. Each `<` climbs one nesting
 #                        level. **No other language has this.**
 

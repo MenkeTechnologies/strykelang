@@ -36,7 +36,7 @@ fn Demo::Sched::tick($delta) {
     # Find all tasks ready now.
     my @ready = grep { _->{next_run} <= $now_virtual } @tasks
     # Sort by next_run for stable order.
-    @ready = sort { $_0->{next_run} <=> $_1->{next_run} } @ready
+    @ready = sort { _0->{next_run} <=> _1->{next_run} } @ready
     for my $task (@ready) {
         my $t0 = now_ns()
         $task->{callback}->($task, $now_virtual)
@@ -95,7 +95,7 @@ for my $entry (@log) { p "  $entry" }
 
 p ""
 p "── per-task rollup ──────────────────────────────────"
-for my $t (sort { $_1->{fires} <=> $_0->{fires} } @tasks) {
+for my $t (sort { _1->{fires} <=> _0->{fires} } @tasks) {
     printf "  %-12s fires=%2d  next_run=%ds\n",
         $t->{name}, $t->{fires}, $t->{next_run}
 }
@@ -105,7 +105,7 @@ printf "  total fires : %d\n", $total_fires
 
 p ""
 p "── expected vs actual fire counts ───────────────────"
-for my $t (sort { $_0->{name} cmp $_1->{name} } @tasks) {
+for my $t (sort { _0->{name} cmp _1->{name} } @tasks) {
     # 60s / cadence + 1 for t=0 firing.
     my $expected = int($simulated_seconds / $t->{cadence}) + 1
     my $match = $t->{fires} == $expected ? "ok" : "diff"
@@ -117,7 +117,7 @@ for my $t (sort { $_0->{name} cmp $_1->{name} } @tasks) {
 
 p ""
 p "── per-task callback latency (t-digest) ─────────────"
-for my $t (sort { $_0->{name} cmp $_1->{name} } @tasks) {
+for my $t (sort { _0->{name} cmp _1->{name} } @tasks) {
     my $p50 = td_quantile($t->{td}, 0.5)
     my $p99 = td_quantile($t->{td}, 0.99)
     printf "  %-12s p50=%.1f µs p99=%.1f µs\n", $t->{name}, $p50, $p99

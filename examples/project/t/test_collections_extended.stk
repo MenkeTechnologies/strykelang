@@ -34,13 +34,13 @@ assert_ok Project::CollectionsExtended::ext_is_empty_hash({}), "Project::Collect
 assert_false Project::CollectionsExtended::ext_is_empty_hash({a => 1}), "Project::CollectionsExtended::ext_is_empty_hash false"
 
 # ── Project::CollectionsExtended::ext_first_where ─────
-my $f = Project::CollectionsExtended::ext_first_where(fn { $_0 > 5 }, 1, 10, 2, 20)
+my $f = Project::CollectionsExtended::ext_first_where(fn { _0 > 5 }, 1, 10, 2, 20)
 assert_eq $f, 10, "Project::CollectionsExtended::ext_first_where"
-my $f2 = Project::CollectionsExtended::ext_first_where(fn { $_0 > 100 }, 1, 10, 2, 20)
+my $f2 = Project::CollectionsExtended::ext_first_where(fn { _0 > 100 }, 1, 10, 2, 20)
 assert_false defined($f2), "Project::CollectionsExtended::ext_first_where not found"
 
 # ── Project::CollectionsExtended::ext_last_where ─────
-my $l = Project::CollectionsExtended::ext_last_where(fn { $_0 > 5 }, 1, 10, 2, 20)
+my $l = Project::CollectionsExtended::ext_last_where(fn { _0 > 5 }, 1, 10, 2, 20)
 assert_eq $l, 20, "Project::CollectionsExtended::ext_last_where"
 
 test_run

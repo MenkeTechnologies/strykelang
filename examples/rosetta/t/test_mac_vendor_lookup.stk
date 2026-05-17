@@ -2,7 +2,7 @@
 # Rosetta Code: MAC vendor lookup
 
 fn Rosetta::MAC::normalize($mac) {
-    my @chars = grep { $_ ne ":" && $_ ne "-" } split //, uc($mac)
+    my @chars = grep { _ ne ":" && _ ne "-" } split //, uc($mac)
     join("", @chars)
 }
 

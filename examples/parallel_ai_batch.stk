@@ -1,6 +1,6 @@
 #!/usr/bin/env stryke
 
-# Parallel AI batch — `pmap { ai $_ }` pattern.
+# Parallel AI batch — `pmap { ai _ }` pattern.
 #
 # Runs entirely in mock mode so it executes offline. Each prompt is
 # answered by a deterministic mock; the only "AI" cost is the simulated

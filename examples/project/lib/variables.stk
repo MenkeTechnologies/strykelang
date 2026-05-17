@@ -277,13 +277,13 @@ fn Project::Variables::ref_type_anon_hash {
 }
 
 fn Project::Variables::code_ref {
-    my $add = fn { $_0 + $_1 }
+    my $add = fn { _0 + _1 }
     $add(3, 4)
 }
 
 fn Project::Variables::code_ref_closure {
     my $x = 10
-    my $add_x = fn { $_0 + $x }
+    my $add_x = fn { _0 + $x }
     $add_x(5)
 }
 

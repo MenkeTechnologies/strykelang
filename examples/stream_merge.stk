@@ -78,7 +78,7 @@ p ""
 p "── pipe-forward composition ───────────────────────────"
 # `psort` + `uniq` flatten through the pipe; then we take the first 5
 # explicitly via array slice. (Pipe-forward into `>{ ... }` passes a
-# single value as `$_`, not the array — easier to materialise into a
+# single value as `_`, not the array — easier to materialise into a
 # scalar first.)
 my @desc_uniq = (@s1, @s2, @s3) |> psort { _1 <=> _0 } |> uniq
 my @top5 = @desc_uniq[0:4]

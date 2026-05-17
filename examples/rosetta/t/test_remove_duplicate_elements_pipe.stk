@@ -3,7 +3,7 @@
 
 fn Rosetta::RemoveDuplicates::solve(@arr) {
     my %seen
-    ~> @arr grep { !$seen{$_}++ }
+    ~> @arr grep { !$seen{_}++ }
 }
 
 my @input = (1, 2, 3, 2, 3, 4, 5, 1, 6)

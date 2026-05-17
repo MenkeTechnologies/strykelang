@@ -3,7 +3,7 @@
 
 fn Math::Funcs::cube($x)        { $x ** 3 }
 fn Math::Funcs::cube_root($x)   { $x ** (1/3) }
-fn Math::Funcs::compose($f, $g) { fn { my $x = $_; $f->($g->($x)) } }
+fn Math::Funcs::compose($f, $g) { fn { my $x = _; $f->($g->($x)) } }
 
 # Functions as values: assign, store in arrays, pass around.
 my $f = \&Math::Funcs::cube

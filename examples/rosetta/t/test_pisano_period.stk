@@ -6,10 +6,10 @@
 fn Rosetta::Pisano::period($m) {
     return 0 if $m < 1
     return 1 if $m == 1
-    my ($_0, $_1) = (0, 1)
+    my (_0, _1) = (0, 1)
     for my $i (1:$m * 6) {
-        ($_0, $_1) = ($_1, ($_0 + $_1) % $m)
-        return $i if $_0 == 0 && $_1 == 1
+        (_0, _1) = (_1, (_0 + _1) % $m)
+        return $i if _0 == 0 && _1 == 1
     }
     -1
 }

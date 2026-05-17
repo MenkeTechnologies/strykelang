@@ -58,7 +58,7 @@ assert_ok abs($beth  - 0.4) < 0.03, sprintf("P(beth)  ≈ 0.4 (got %.3f)", $beth
 assert_ok abs($gimel - 0.4) < 0.03, sprintf("P(gimel) ≈ 0.4 (got %.3f)", $gimel)
 
 # Picks always come from the input domain
-my %allowed = map { $_ => 1 } ("aleph", "beth", "gimel")
+my %allowed = map { _ => 1 } ("aleph", "beth", "gimel")
 my $coverage = 1
 for my $i (~> 1:500) {
     my $x = Rosetta::ProbChoice::pick($dist)

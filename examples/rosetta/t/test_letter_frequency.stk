@@ -12,7 +12,7 @@ fn Rosetta::LetterFrequency::compute($s) {
 
 fn Rosetta::LetterFrequency::to_str($h) {
     my @ks = sort(keys %$h)
-    my @res = @ks |> map { "$_:" . $h->{$_} }
+    my @res = @ks |> map { "$_:" . $h->{_} }
     join(",", @res)
 }
 

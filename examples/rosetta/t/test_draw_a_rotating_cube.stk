@@ -89,7 +89,7 @@ fn Rosetta::RotCube::frame($angle) {
 }
 
 fn Rosetta::RotCube::rendered_frame($angle) {
-    Rosetta::RotCube::frame($angle) |> fn { join("\n", @$_) }
+    Rosetta::RotCube::frame($angle) |> fn { join("\n", @{_}) }
 }
 
 fn Rosetta::RotCube::count_pixels($text) {

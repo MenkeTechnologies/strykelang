@@ -20,7 +20,7 @@ fn Rosetta::PopCount::is_odious($n) { Rosetta::PopCount::count($n) % 2 == 1 }
 fn Rosetta::PopCount::three_pow_seq($k) {
     1:$k |> map {
         my $p = 1
-        for my $j (~> 1:$_ - 1) { $p *= 3 }
+        for my $j (~> 1:_ - 1) { $p *= 3 }
         Rosetta::PopCount::count($p)
     }
 }
@@ -48,7 +48,7 @@ assert_eq join(",", @odious[0:9]),
 # Popcount of 3^n for n=0..29 (rosetta task: first 30)
 my @pop3 = ~> 1:30 |> map {
     my $p = 1
-    for my $j (~> 1:$_ - 1) { $p *= 3 }
+    for my $j (~> 1:_ - 1) { $p *= 3 }
     Rosetta::PopCount::count($p)
 }
 # 3^0=1 → 1; 3^1=3 → 2; 3^2=9 → 2; 3^3=27 → 4; 3^4=81 → 3; …

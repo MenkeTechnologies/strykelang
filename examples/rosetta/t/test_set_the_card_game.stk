@@ -56,9 +56,9 @@ fn Rosetta::SetGame::find_sets($cards) {
 }
 
 my $deck = Rosetta::SetGame::deck()
-my %seen = map { join(",", @$_) => 1 } @$deck
+my %seen = map { join(",", @{_}) => 1 } @$deck
 my $hand = Rosetta::SetGame::deal(12345, 12)
-my %hand_seen = map { join(",", @$_) => 1 } @$hand
+my %hand_seen = map { join(",", @{_}) => 1 } @$hand
 
 assert_eq len(@$deck), 81, "full deck has 81 cards"
 assert_eq len(keys %seen), 81, "all deck cards unique"

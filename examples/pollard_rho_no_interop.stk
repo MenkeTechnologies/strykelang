@@ -119,7 +119,7 @@ die "#{$fail} / #{len @cases} factorization cases failed" if $fail > 0
 for my $c (@cases) {
     my $f = Rho::factorize($c->{n})
     my $prod = 1
-    $prod *= $_ for @$f
+    $prod *= _ for @$f
     die "product mismatch for #{$c->{n}}: got $prod" unless $prod == $c->{n}
     for my $p (@$f) {
         die "factor <= 1 for #{$c->{n}}" if $p <= 1

@@ -20,5 +20,5 @@ fn Exercism::Minesweeper::annotate($input) {
             $grid[$r][$c] = $n > 0 ? "$n" : " "
         }
     }
-    [map { join("", @$_) } @grid]
+    [map { join("", @{_}) } @grid]
 }

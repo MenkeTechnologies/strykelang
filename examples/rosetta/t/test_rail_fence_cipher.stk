@@ -15,7 +15,7 @@ fn Rosetta::RailFence::encode($text, $rails) {
         }
     }
     
-    @fence |> map { join("", @$_) } |> join("")
+    @fence |> map { join("", @{_}) } |> join("")
 }
 
 fn Rosetta::RailFence::decode($text, $rails) {

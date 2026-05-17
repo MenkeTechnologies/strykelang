@@ -35,14 +35,14 @@ fn Rosetta::Peano::to_int($n) {
     $count
 }
 
-fn Rosetta::Peano::add($_0, $_1) {
-    return $_1 if Rosetta::Peano::is_zero($_0)
-    Rosetta::Peano::succ(Rosetta::Peano::add(Rosetta::Peano::pred($_0), $_1))
+fn Rosetta::Peano::add(_0, _1) {
+    return _1 if Rosetta::Peano::is_zero(_0)
+    Rosetta::Peano::succ(Rosetta::Peano::add(Rosetta::Peano::pred(_0), _1))
 }
 
-fn Rosetta::Peano::mul($_0, $_1) {
-    return Rosetta::Peano::zero() if Rosetta::Peano::is_zero($_0)
-    Rosetta::Peano::add($_1, Rosetta::Peano::mul(Rosetta::Peano::pred($_0), $_1))
+fn Rosetta::Peano::mul(_0, _1) {
+    return Rosetta::Peano::zero() if Rosetta::Peano::is_zero(_0)
+    Rosetta::Peano::add(_1, Rosetta::Peano::mul(Rosetta::Peano::pred(_0), _1))
 }
 
 assert_eq Rosetta::Peano::to_int(Rosetta::Peano::zero()), 0, "zero → 0"

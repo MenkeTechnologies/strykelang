@@ -16,6 +16,6 @@ my $fib = fn ($n) {
 assert_eq $fib->(10), 55, "fibonacci(10) anonymously"
 
 # Piped version
-5 |> ~> fn { $fac->($_) } |> assert_eq(120, "piped anonymous factorial")
+5 |> ~> fn { $fac->(_) } |> assert_eq(120, "piped anonymous factorial")
 
 test_run

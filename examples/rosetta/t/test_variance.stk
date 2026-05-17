@@ -4,19 +4,19 @@
 # Sample variance:     sum((x - mean)^2) / (n - 1) (Bessel-corrected).
 
 fn Rosetta::Variance::mean(@xs) {
-    my $sum = ~> @xs reduce { $_0 + $_1 }
+    my $sum = ~> @xs reduce { _0 + _1 }
     $sum / len(@xs)
 }
 
 fn Rosetta::Variance::population(@xs) {
     my $m = Rosetta::Variance::mean(@xs)
-    my $ss = ~> @xs map { (_ - $m) ** 2 } reduce { $_0 + $_1 }
+    my $ss = ~> @xs map { (_ - $m) ** 2 } reduce { _0 + _1 }
     $ss / len(@xs)
 }
 
 fn Rosetta::Variance::sample(@xs) {
     my $m = Rosetta::Variance::mean(@xs)
-    my $ss = ~> @xs map { (_ - $m) ** 2 } reduce { $_0 + $_1 }
+    my $ss = ~> @xs map { (_ - $m) ** 2 } reduce { _0 + _1 }
     $ss / (len(@xs) - 1)
 }
 

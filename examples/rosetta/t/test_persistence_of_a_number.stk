@@ -8,7 +8,7 @@ fn Rosetta::Persistence::digits_of($n) {
 }
 
 fn Rosetta::Persistence::digit_product($n) {
-    ~> Rosetta::Persistence::digits_of($n) reduce { $_0 * ($_1 + 0) }
+    ~> Rosetta::Persistence::digits_of($n) reduce { _0 * (_1 + 0) }
 }
 
 fn Rosetta::Persistence::multiplicative($n) {
@@ -25,7 +25,7 @@ fn Rosetta::Persistence::additive($n) {
     my $count = 0
     my $cur = $n
     while ($cur >= 10) {
-        $cur = ~> Rosetta::Persistence::digits_of($cur) reduce { $_0 + ($_1 + 0) }
+        $cur = ~> Rosetta::Persistence::digits_of($cur) reduce { _0 + (_1 + 0) }
         $count += 1
     }
     $count

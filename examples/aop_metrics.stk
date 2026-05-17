@@ -59,7 +59,7 @@ printf "  %d total calls, %.0f ms wall\n", len(@workload), $wall_ms
 
 p ""
 p "── metrics report (sorted by total time desc) ─────────"
-my @names = sort { $metrics{$_1}->{total_ns} <=> $metrics{$_0}->{total_ns} } keys %metrics
+my @names = sort { $metrics{_1}->{total_ns} <=> $metrics{_0}->{total_ns} } keys %metrics
 
 printf "  %-15s %8s  %10s  %10s  %10s\n",
     "function", "count", "total_ms", "avg_us", "% wall"

@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 
 # Demo: `_<` — reach the topic (`_`) of the enclosing closure without a
-# `my $outer = $_` capture line. Chain `<`s for deeper levels:
+# `my $outer = _` capture line. Chain `<`s for deeper levels:
 #
 #     _      — current closure's topic
 #     _<     — one level out
@@ -60,7 +60,7 @@ p "── grep inside outer map: threshold drawn from _< ──"
 my @thresholds = (10, 50, 100)
 my @data = (5, 15, 60, 99, 200, 300)
 my @hits = map {
-    my $threshold = $_
+    my $threshold = _
     [$threshold, [grep { _ > _< } @data]]
 } @thresholds
 
@@ -95,7 +95,7 @@ die "expected 11111" unless $deep[0] == 11111
 p ""
 p "── outer product of two vectors (4×3 matrix) ──"
 my @rows = ([10, 20, 30], [40, 50, 60, 70])
-my @outer_prod = map { my @v = @{_}; map { _ * _< } @v } map { $_ } (3, 7)
+my @outer_prod = map { my @v = @{_}; map { _ * _< } @v } map { _ } (3, 7)
 # Above is contrived; do the simpler outer-product form instead.
 my @v1 = (1, 2, 3, 4)
 my @v2 = (10, 100, 1000)

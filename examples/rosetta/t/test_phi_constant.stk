@@ -13,9 +13,9 @@ fn Rosetta::Phi::continued_fraction($depth) {
 }
 
 fn Rosetta::Phi::fibonacci_ratio($n) {
-    my ($_0, $_1) = (1, 1)
-    for (1:$n) { ($_0, $_1) = ($_1, $_0 + $_1) }
-    $_1 / $_0
+    my (_0, _1) = (1, 1)
+    for (1:$n) { (_0, _1) = (_1, _0 + _1) }
+    _1 / _0
 }
 
 my $phi = Rosetta::Phi::sqrt_form()

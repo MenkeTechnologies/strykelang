@@ -54,6 +54,6 @@ assert_eq join(",", @anaprimes), "13,17,31,37,71,73,79,97", "anaprimes under 100
 
 # Piped version
 13 |> Rosetta::Anaprimes::is_anaprime |> assert_ok("13 is anaprime")
-19 |> Rosetta::Anaprimes::is_anaprime |> ~> fn { !$_ } |> assert_ok("19 is not anaprime")
+19 |> Rosetta::Anaprimes::is_anaprime |> ~> fn { !_ } |> assert_ok("19 is not anaprime")
 
 test_run

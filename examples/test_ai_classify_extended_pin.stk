@@ -51,7 +51,7 @@ my @unclassifiable_labels = ("fruit", "vegetable");
 
 my $classified_unclassifiable = ai_classify(\@unclassifiable_items, "Classify these items", into => \@unclassifiable_labels);
 
-join(",", map { $_ // "null" } @{$classified_unclassifiable}) |> aeq "fruit,vegetable,null", "ai_classify unclassifiable items";
+join(",", map { _ // "null" } @{$classified_unclassifiable}) |> aeq "fruit,vegetable,null", "ai_classify unclassifiable items";
 
 
 test_run

@@ -2,11 +2,11 @@
 # Rosetta Code: Currying
 
 fn Rosetta::Currying::curry2($f) {
-    fn { my $a = $_; fn { $f->($a, $_) } }
+    fn { my $a = _; fn { $f->($a, _) } }
 }
 
 fn Rosetta::Currying::curry3($f) {
-    fn { my $a = $_; fn { my $b = $_; fn { $f->($a, $b, $_) } } }
+    fn { my $a = _; fn { my $b = _; fn { $f->($a, $b, _) } } }
 }
 
 fn Math::add($a, $b) { $a + $b }

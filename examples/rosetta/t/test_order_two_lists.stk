@@ -35,7 +35,7 @@ assert_eq Rosetta::OrderLists::compare([0, -1],  [0, 0]), -1, "second neg loses"
 # Sort a list-of-lists
 my @lists = ([1,2,3], [1,2], [2], [1,2,3,4], [1,1])
 my @sorted = Rosetta::OrderLists::sort_lists(\@lists)
-my @keys = map { join(",", @$_) } @sorted
+my @keys = map { join(",", @{_}) } @sorted
 assert_eq join("|", @keys),
     "1,1|1,2|1,2,3|1,2,3,4|2",
     "lex sort"

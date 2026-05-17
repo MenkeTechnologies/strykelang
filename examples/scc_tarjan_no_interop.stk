@@ -98,12 +98,12 @@ my $sccs = SCC::find(8, \@edges)
 die "expected 4 SCCs, got #{len @$sccs}" unless len(@$sccs) == 4
 
 my @canon = SCC::canonical($sccs)
-my $rendered = join(" | ", map { "{" . join(",", @$_) . "}" } @canon)
+my $rendered = join(" | ", map { "{" . join(",", @{_}) . "}" } @canon)
 p "  CLRS 8-vertex graph: SCCs = $rendered"
-die "SCC {0,1,2,3} expected" unless grep { join(",", @$_) eq "0,1,2,3" } @canon
-die "SCC {4} expected"       unless grep { join(",", @$_) eq "4" } @canon
-die "SCC {5,6} expected"     unless grep { join(",", @$_) eq "5,6" } @canon
-die "SCC {7} expected"       unless grep { join(",", @$_) eq "7" } @canon
+die "SCC {0,1,2,3} expected" unless grep { join(",", @{_}) eq "0,1,2,3" } @canon
+die "SCC {4} expected"       unless grep { join(",", @{_}) eq "4" } @canon
+die "SCC {5,6} expected"     unless grep { join(",", @{_}) eq "5,6" } @canon
+die "SCC {7} expected"       unless grep { join(",", @{_}) eq "7" } @canon
 p "  4 SCCs match expected {0,1,2,3}/{4}/{5,6}/{7}  OK"
 
 # DAG (no cycles) — every vertex its own SCC.

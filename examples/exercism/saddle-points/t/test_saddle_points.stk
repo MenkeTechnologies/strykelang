@@ -2,7 +2,7 @@
 require "./SaddlePoints.stk"
 
 fn fmt {
-    join("|", map { join(",", @$_) } @{_})
+    join("|", map { join(",", @{_}) } @{_})
 }
 
 assert_eq fmt(Exercism::SaddlePoints::saddle_points([[9,8,7],[5,3,2],[6,6,7]])), "2,1", "single saddle"

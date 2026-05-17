@@ -18,6 +18,6 @@ assert_eq Rosetta::GoldbachConjecture::solve(10)->[0], "3 + 7", "Goldbach(10) fi
 my $res10 = Rosetta::GoldbachConjecture::solve(10)
 assert_eq join(",", @$res10), "3 + 7,5 + 5", "Goldbach(10) all"
 
-10 |> Rosetta::GoldbachConjecture::solve |> map { join(",", @$_) } |> assert_eq("3 + 7,5 + 5", "pipe goldbach")
+10 |> Rosetta::GoldbachConjecture::solve |> map { join(",", @{_}) } |> assert_eq("3 + 7,5 + 5", "pipe goldbach")
 
 test_run

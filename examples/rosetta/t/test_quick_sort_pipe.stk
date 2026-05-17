@@ -6,8 +6,8 @@ fn Rosetta::QuickSort::sort(@arr) {
         return @arr
     }
     my $pivot = shift(@arr)
-    my @less = @arr |> grep { $_ <= $pivot }
-    my @greater = @arr |> grep { $_ > $pivot }
+    my @less = @arr |> grep { _ <= $pivot }
+    my @greater = @arr |> grep { _ > $pivot }
     
     (Rosetta::QuickSort::sort(@less), $pivot, Rosetta::QuickSort::sort(@greater))
 }

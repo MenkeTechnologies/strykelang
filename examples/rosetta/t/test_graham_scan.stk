@@ -24,10 +24,10 @@ fn Rosetta::Graham::hull($points) {
     # Sort remaining by polar angle around pivot, ties broken by distance
     my @rest = grep { _->[0] != $px || _->[1] != $py } @$points
     my @sorted = sort {
-        my $cx = ($_0->[0] - $px) * ($_1->[1] - $py) - ($_0->[1] - $py) * ($_1->[0] - $px)
+        my $cx = (_0->[0] - $px) * (_1->[1] - $py) - (_0->[1] - $py) * (_1->[0] - $px)
         if ($cx == 0) {
-            (($_0->[0]-$px)**2 + ($_0->[1]-$py)**2)
-                <=> (($_1->[0]-$px)**2 + ($_1->[1]-$py)**2)
+            ((_0->[0]-$px)**2 + (_0->[1]-$py)**2)
+                <=> ((_1->[0]-$px)**2 + (_1->[1]-$py)**2)
         } else {
             $cx > 0 ? -1 : 1
         }

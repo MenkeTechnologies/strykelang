@@ -57,13 +57,13 @@ assert_eq $n0->id, $back->id, "Stable circular references"
 # Extract all moon names from the entire galaxy using nested map
 my $seclist = $galaxy->sectors;
 my @all_moon_names = map {
-    my $sec = $_;
+    my $sec = _;
     my $smap = $sec->systems;
     map {
-        my $sys = $_;
+        my $sys = _;
         my $plist = $sys->planets;
         map {
-            my $plan = $_;
+            my $plan = _;
             my $mlist = $plan->moons;
             map { $_->name } @$mlist
         } @$plist

@@ -126,7 +126,7 @@ my @per_code = pmap {
     [$code, $r->{owed}, $r->{effective_pct}]
 } @codes
 
-@per_code = sort { $_0->[1] <=> $_1->[1] } @per_code
+@per_code = sort { _0->[1] <=> _1->[1] } @per_code
 for my $row (@per_code) {
     printf("  %-12s  owed=\$%10.2f  eff=%.2f%%\n",
            $row->[0], $row->[1], $row->[2])

@@ -169,7 +169,7 @@ for my $slot (sort keys %inv) {
 # ── slot popularity (CMS) ──────────────────────────────────────────
 
 p "\nslot demand (CMS estimated):"
-my @ranked = sort { cms_count($cms_pop, $_1) <=> cms_count($cms_pop, $_0) } keys %inv
+my @ranked = sort { cms_count($cms_pop, _1) <=> cms_count($cms_pop, _0) } keys %inv
 for my $slot (@ranked[0:4]) {
     my $est = cms_count($cms_pop, $slot)
     printf("  %-3s  est_purchases=%d\n", $slot, $est)

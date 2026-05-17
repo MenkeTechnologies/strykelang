@@ -25,6 +25,6 @@ my $tri = Rosetta::Nbonacci::generate(3, 10)
 assert_eq join(",", @$tri), "0,0,1,1,2,4,7,13,24,44", "tribonacci (3-bonacci)"
 
 # Pipe
-2 |> Rosetta::Nbonacci::generate(10) |> { join(",", @$_) } |> assert_eq("0,1,1,2,3,5,8,13,21,34", "pipe nbonacci")
+2 |> Rosetta::Nbonacci::generate(10) |> { join(",", @{_}) } |> assert_eq("0,1,1,2,3,5,8,13,21,34", "pipe nbonacci")
 
 test_run

@@ -5,12 +5,12 @@ fn Rosetta::Zipf::solve($text, $n) {
     my %counts
     $text |> lc() |> split(/\W+/) |> map {
         if (_ ne "") {
-            $counts{$_}++
+            $counts{_}++
         }
     }
     
     # Sort keys by their frequency in %counts (descending)
-    my @sorted = keys %counts |> sort { $counts{$_1} <=> $counts{$_0} }
+    my @sorted = keys %counts |> sort { $counts{_1} <=> $counts{_0} }
     
     my @results
     # Zipf's Law: Frequency * Rank approx constant

@@ -53,7 +53,7 @@ printf "── corpus: %d total words, %d distinct ─────────�
 p ""
 p "── top words by frequency ───────────────────────────"
 my @sorted = sort {
-    ($counts{$_1} <=> $counts{$_0}) || ($_0 cmp $_1)
+    ($counts{_1} <=> $counts{_0}) || (_0 cmp _1)
 } keys %counts
 for my $i (0:9) {
     last if $i >= len @sorted

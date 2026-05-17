@@ -45,7 +45,7 @@ assert_eq join(",", @{Rosetta::Circle::sort([2, 2, 2])}), "2,2,2", "all equal"
 
 # Stress
 my @big = (50, 17, 23, 5, 88, 32, 11, 99, 3, 67, 41, 8, 76, 29, 14)
-my @sorted = sort { $_0 <=> $_1 } @big
+my @sorted = sort { _0 <=> _1 } @big
 my $r = Rosetta::Circle::sort(\@big)
 assert_eq join(",", @$r), join(",", @sorted), "15-element stress"
 

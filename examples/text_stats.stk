@@ -138,7 +138,7 @@ printf "  type-token ratio (vocab diversity) : %.2f\n",
 p ""
 p "── longest words (top 5) ────────────────────────────"
 my @uniq_words = keys %distinct
-my @longest = sort { len($_1) <=> len($_0) } @uniq_words
+my @longest = sort { len(_1) <=> len(_0) } @uniq_words
 for my $i (0:4) {
     last if $i >= len @longest
     my $w = $longest[$i]

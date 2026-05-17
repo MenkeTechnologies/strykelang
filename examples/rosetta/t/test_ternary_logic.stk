@@ -3,24 +3,24 @@
 # Values: T (true=1), F (false=0), M (maybe=-1).
 # Operators: NOT, AND, OR, IFF, IMPL.
 
-fn Rosetta::Ternary::neg($_0) {
-    -$_0
+fn Rosetta::Ternary::neg(_0) {
+    -_0
 }
 
-fn Rosetta::Ternary::conj($_0, $_1) {
-    $_0 < $_1 ? $_0 : $_1
+fn Rosetta::Ternary::conj(_0, _1) {
+    _0 < _1 ? _0 : _1
 }
 
-fn Rosetta::Ternary::disj($_0, $_1) {
-    $_0 > $_1 ? $_0 : $_1
+fn Rosetta::Ternary::disj(_0, _1) {
+    _0 > _1 ? _0 : _1
 }
 
-fn Rosetta::Ternary::iff($_0, $_1) {
-    $_0 * $_1
+fn Rosetta::Ternary::iff(_0, _1) {
+    _0 * _1
 }
 
-fn Rosetta::Ternary::imp($_0, $_1) {
-    Rosetta::Ternary::disj(Rosetta::Ternary::neg($_0), $_1)
+fn Rosetta::Ternary::imp(_0, _1) {
+    Rosetta::Ternary::disj(Rosetta::Ternary::neg(_0), _1)
 }
 
 # Truth-table sanity for NEG.

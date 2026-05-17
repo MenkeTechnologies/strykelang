@@ -21,7 +21,7 @@ fn Rosetta::BinPacking::first_fit($items, $cap) {
 }
 
 fn Rosetta::BinPacking::first_fit_decreasing($items, $cap) {
-    my @sorted = sort { $_1 <=> $_0 } @$items
+    my @sorted = sort { _1 <=> _0 } @$items
     Rosetta::BinPacking::first_fit(\@sorted, $cap)
 }
 

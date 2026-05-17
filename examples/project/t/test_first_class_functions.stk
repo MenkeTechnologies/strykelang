@@ -135,7 +135,7 @@ assert_eq apply_fn_n_times(fn($x) { $x * 2 }, 1, 10), 1024, "fn as arg: Project:
 
 # map with custom function
 my @nums = (1, 2, 3, 4, 5)
-my @squared = map { $_ * $_ } @nums
+my @squared = map { _ * _ } @nums
 assert_eq join(",", @squared), "1,4,9,16,25", "map with block"
 
 fn List::transform($fn, @list) {

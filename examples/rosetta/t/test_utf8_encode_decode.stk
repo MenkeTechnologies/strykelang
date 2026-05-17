@@ -45,7 +45,7 @@ fn Rosetta::Utf8::decode($bytes) {
 }
 
 fn Rosetta::Utf8::format_hex($bytes) {
-    join(" ", map { sprintf("%02X", $_) } @$bytes)
+    join(" ", map { sprintf("%02X", _) } @$bytes)
 }
 
 # Encoding (rosetta canonical samples)

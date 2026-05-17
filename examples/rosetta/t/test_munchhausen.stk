@@ -12,7 +12,7 @@ fn Rosetta::Munchausen::digit_self_power($d) {
 
 fn Rosetta::Munchausen::is($n) {
     my @digits = "$n" |> chars
-    my $sum = ~> @digits map { Rosetta::Munchausen::digit_self_power(_ + 0) } reduce { $_0 + $_1 }
+    my $sum = ~> @digits map { Rosetta::Munchausen::digit_self_power(_ + 0) } reduce { _0 + _1 }
     $sum == $n
 }
 
