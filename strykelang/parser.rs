@@ -1,5 +1,5 @@
 use crate::ast::*;
-use crate::error::{ErrorKind, PerlError, PerlResult};
+use crate::error::{ErrorKind, StrykeError, PerlResult};
 use crate::lexer::{Lexer, LITERAL_AT_IN_DQUOTE, LITERAL_DOLLAR_IN_DQUOTE};
 use crate::token::Token;
 use crate::vm_helper::VMHelper;
@@ -113,7 +113,7 @@ pub struct Parser {
     suppress_scalar_hash_brace: u32,
     /// Counter for `while let` / similar desugar temps (`$__while_let_0`, …).
     next_desugar_tmp: u32,
-    /// Source path for [`PerlError`] (matches lexer / `parse_with_file`).
+    /// Source path for [`StrykeError`] (matches lexer / `parse_with_file`).
     error_file: String,
     /// User-declared sub names (for allowing UDF to shadow stryke extensions in compat mode).
     declared_subs: std::collections::HashSet<String>,
@@ -342,8 +342,8 @@ impl Parser {
         r
     }
 
-    fn syntax_err(&self, message: impl Into<String>, line: usize) -> PerlError {
-        PerlError::new(ErrorKind::Syntax, message, line, self.error_file.clone())
+    fn syntax_err(&self, message: impl Into<String>, line: usize) -> StrykeError {
+        StrykeError::new(ErrorKind::Syntax, message, line, self.error_file.clone())
     }
 
     /// Coderef-in-block-position helper for tier-2 list builtins (`any`,
@@ -22048,5 +22048,33 @@ mod tests {
     fn format_as_namespaced_tail_parses() {
         parse_ok("fn Foo::format($x) = $x . \"!\"");
         parse_ok("fn Foo::format($x) = $x . \"!\"; my $r = Foo::format(\"hi\")");
+    }
+
+    /// Compound-assign on hash arrow-deref leaves the new value on the
+    /// stack (uses `SetArrowHashKeep`, not `SetArrowHash`). Previously
+    /// the no-keep variant left nothing for the statement-level Pop,
+    /// which then ate a slot from the CALLER's stack frame — corrupting
+    /// `dec($h) + dec($h) + dec($h)`-style multi-call expressions.
+    /// See tests/suite/hashref_assignment_pin.rs for runtime pins.
+    #[test]
+    fn arrow_hash_compound_assign_parses_all_ops() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $h = +{n=>10}; $h->{n} -= 1");
+        parse_ok("my $h = +{n=>10}; $h->{n} += 1");
+        parse_ok("my $h = +{n=>10}; $h->{n} *= 2");
+        parse_ok("my $h = +{n=>10}; $h->{n} /= 2");
+        parse_ok("my $h = +{n=>10}; $h->{n} %= 3");
+        parse_ok("my $h = +{n=>\"x\"}; $h->{n} .= \"y\"");
+    }
+
+    /// The compound-assign yields the NEW value as its expression
+    /// result, same as plain `$h->{k} = v` does. Validated at parse
+    /// time by accepting the use-as-rvalue shape `my $v = $h->{n} -= 1`.
+    #[test]
+    fn arrow_hash_compound_assign_value_chains_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $h = +{n=>10}; my $v = $h->{n} -= 1");
+        parse_ok("my $h = +{n=>10}; my @list = ($h->{n} += 5, $h->{n} += 5)");
+        parse_ok("my $h = +{n=>10}; my $double = ($h->{n} -= 1) * 2");
     }
 }

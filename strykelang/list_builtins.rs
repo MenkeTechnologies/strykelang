@@ -662,7 +662,7 @@ fn chunked_with_want(
     want: WantarrayCtx,
 ) -> crate::error::PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Err(crate::error::PerlError::runtime(
+        return Err(crate::error::StrykeError::runtime(
             "chunked: expected LIST, N",
             0,
         ));
@@ -702,7 +702,7 @@ fn windowed_with_want(
     want: WantarrayCtx,
 ) -> crate::error::PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Err(crate::error::PerlError::runtime(
+        return Err(crate::error::StrykeError::runtime(
             "windowed: expected LIST, N",
             0,
         ));
@@ -927,7 +927,7 @@ fn reduce_like(
     let code = match args.first().and_then(|x| x.as_code_ref()) {
         Some(s) => s,
         _ => {
-            return Err(crate::error::PerlError::runtime(
+            return Err(crate::error::StrykeError::runtime(
                 "reduce: first argument must be a CODE reference",
                 0,
             )
@@ -985,7 +985,7 @@ fn any_all_none(
     let code = match args.first().and_then(|x| x.as_code_ref()) {
         Some(s) => s,
         _ => {
-            return Err(crate::error::PerlError::runtime(
+            return Err(crate::error::StrykeError::runtime(
                 "any/all/none/notall: first argument must be a CODE reference",
                 0,
             )
@@ -1023,7 +1023,7 @@ fn first_native(interp: &mut VMHelper, args: &[StrykeValue], _want: WantarrayCtx
     let code = match args.first().and_then(|x| x.as_code_ref()) {
         Some(s) => s,
         _ => {
-            return Err(crate::error::PerlError::runtime(
+            return Err(crate::error::StrykeError::runtime(
                 "first: first argument must be a CODE reference",
                 0,
             )
@@ -1110,7 +1110,7 @@ fn pairgrep_map(
     let code = match args.first().and_then(|x| x.as_code_ref()) {
         Some(s) => s,
         _ => {
-            return Err(crate::error::PerlError::runtime(
+            return Err(crate::error::StrykeError::runtime(
                 "pairgrep/pairmap/pairfirst: first argument must be a CODE reference",
                 0,
             )
@@ -1184,16 +1184,16 @@ fn pairgrep_map(
 fn pair_accessor(args: &[StrykeValue], idx: usize) -> crate::error::PerlResult<StrykeValue> {
     let obj = args
         .first()
-        .ok_or_else(|| crate::error::PerlError::runtime("Pair::key/value: missing invocant", 0))?;
+        .ok_or_else(|| crate::error::StrykeError::runtime("Pair::key/value: missing invocant", 0))?;
     pair_field(obj, idx)
 }
 
 fn pair_field(obj: &StrykeValue, idx: usize) -> crate::error::PerlResult<StrykeValue> {
     let b = obj
         .as_blessed_ref()
-        .ok_or_else(|| crate::error::PerlError::runtime("Pair::method: not a pair object", 0))?;
+        .ok_or_else(|| crate::error::StrykeError::runtime("Pair::method: not a pair object", 0))?;
     if b.class != "Pair" {
-        return Err(crate::error::PerlError::runtime(
+        return Err(crate::error::StrykeError::runtime(
             "Pair::method: not a pair object",
             0,
         ));
@@ -1203,7 +1203,7 @@ fn pair_field(obj: &StrykeValue, idx: usize) -> crate::error::PerlResult<StrykeV
         let g = r.read();
         return Ok(g.get(idx).cloned().unwrap_or(StrykeValue::UNDEF));
     }
-    Err(crate::error::PerlError::runtime(
+    Err(crate::error::StrykeError::runtime(
         "Pair: internal data is not an ARRAY reference",
         0,
     ))
@@ -1212,7 +1212,7 @@ fn pair_field(obj: &StrykeValue, idx: usize) -> crate::error::PerlResult<StrykeV
 fn pair_to_json(args: &[StrykeValue]) -> crate::error::PerlResult<StrykeValue> {
     let obj = args
         .first()
-        .ok_or_else(|| crate::error::PerlError::runtime("Pair::TO_JSON: missing invocant", 0))?;
+        .ok_or_else(|| crate::error::StrykeError::runtime("Pair::TO_JSON: missing invocant", 0))?;
     let k = pair_field(obj, 0)?;
     let v = pair_field(obj, 1)?;
     Ok(StrykeValue::array(vec![k, v]))

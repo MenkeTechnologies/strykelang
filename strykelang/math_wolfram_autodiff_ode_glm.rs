@@ -46,7 +46,7 @@ fn builtin_bartlett_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .collect();
     let k = parsed.len();
     if k < 2 {
-        return Err(PerlError::runtime("bartlett_test: need ≥ 2 groups", 0));
+        return Err(StrykeError::runtime("bartlett_test: need ≥ 2 groups", 0));
     }
     let mut s_pooled_num = 0.0_f64;
     let mut s_pooled_den = 0.0_f64;
@@ -90,7 +90,7 @@ fn builtin_levene_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let k = parsed.len();
     let n_total: usize = parsed.iter().map(|g| g.len()).sum();
     if k < 2 || n_total < k + 1 {
-        return Err(PerlError::runtime("levene_test: need ≥ 2 groups", 0));
+        return Err(StrykeError::runtime("levene_test: need ≥ 2 groups", 0));
     }
     // Z_ij = |Y_ij − mean(Y_i.)|.
     let mut z_groups: Vec<Vec<f64>> = Vec::with_capacity(k);
@@ -139,7 +139,7 @@ fn builtin_levene_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 fn builtin_fishers_exact_test_2x2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let m = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     if m.len() != 2 || m[0].len() != 2 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "fishers_exact_test_2x2: need 2×2 matrix",
             0,
         ));
@@ -180,7 +180,7 @@ fn builtin_fishers_exact_test_2x2(args: &[StrykeValue]) -> PerlResult<StrykeValu
 fn builtin_mcnemar_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let m = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     if m.len() != 2 || m[0].len() != 2 {
-        return Err(PerlError::runtime("mcnemar_test: need 2×2 matrix", 0));
+        return Err(StrykeError::runtime("mcnemar_test: need 2×2 matrix", 0));
     }
     let b = m[0][1];
     let c = m[1][0];
@@ -207,7 +207,7 @@ fn builtin_runs_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .collect();
     let n = seq.len();
     if n < 2 {
-        return Err(PerlError::runtime("runs_test: need ≥ 2 elements", 0));
+        return Err(StrykeError::runtime("runs_test: need ≥ 2 elements", 0));
     }
     let n1 = seq.iter().filter(|&&v| v == 1).count() as f64;
     let n0 = seq.len() as f64 - n1;
@@ -236,11 +236,11 @@ fn builtin_friedman_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let m = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = m.len();
     if n == 0 {
-        return Err(PerlError::runtime("friedman_test: empty matrix", 0));
+        return Err(StrykeError::runtime("friedman_test: empty matrix", 0));
     }
     let k = m[0].len();
     if k < 2 {
-        return Err(PerlError::runtime("friedman_test: need ≥ 2 treatments", 0));
+        return Err(StrykeError::runtime("friedman_test: need ≥ 2 treatments", 0));
     }
     let mut r = vec![0.0_f64; k];
     for row in &m {
@@ -286,7 +286,7 @@ fn builtin_kruskal_wallis_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
         .collect();
     let k = parsed.len();
     if k < 2 {
-        return Err(PerlError::runtime("kruskal_wallis_test: need ≥ 2 groups", 0));
+        return Err(StrykeError::runtime("kruskal_wallis_test: need ≥ 2 groups", 0));
     }
     let mut all: Vec<(f64, usize)> = Vec::new();
     for (gi, g) in parsed.iter().enumerate() {
@@ -374,7 +374,7 @@ fn builtin_anderson_darling_normality(args: &[StrykeValue]) -> PerlResult<Stryke
         .collect();
     let n = xs.len();
     if n < 8 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "anderson_darling_normality: need n ≥ 8",
             0,
         ));
@@ -404,7 +404,7 @@ fn builtin_jarque_bera_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .collect();
     let n = xs.len();
     if n < 3 {
-        return Err(PerlError::runtime("jarque_bera_test: need n ≥ 3", 0));
+        return Err(StrykeError::runtime("jarque_bera_test: need n ≥ 3", 0));
     }
     let mean: f64 = xs.iter().sum::<f64>() / n as f64;
     let m2: f64 = xs.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / n as f64;
@@ -427,7 +427,7 @@ fn builtin_ljung_box_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let h = args.get(1).map(|v| v.to_number() as usize).unwrap_or(10).max(1);
     let n = xs.len();
     if n < h + 2 {
-        return Err(PerlError::runtime("ljung_box_test: series too short", 0));
+        return Err(StrykeError::runtime("ljung_box_test: series too short", 0));
     }
     let mean: f64 = xs.iter().sum::<f64>() / n as f64;
     let centered: Vec<f64> = xs.iter().map(|x| x - mean).collect();
@@ -602,7 +602,7 @@ fn builtin_multivariate_normal_sample(args: &[StrykeValue]) -> PerlResult<Stryke
             }
             if i == j {
                 if s < 0.0 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "multivariate_normal_sample: Σ not positive-definite",
                         0,
                     ));
@@ -1107,7 +1107,7 @@ fn builtin_rk45_dormand_prince(
     ];
     let sub = f
         .as_code_ref()
-        .ok_or_else(|| PerlError::runtime("rk45_dormand_prince: expected code ref", line))?;
+        .ok_or_else(|| StrykeError::runtime("rk45_dormand_prince: expected code ref", line))?;
     let call_f = |interp: &mut VMHelper, t: f64, y: &[f64]| -> PerlResult<Vec<f64>> {
         let mut payload = vec![StrykeValue::float(t)];
         for v in y {
@@ -1183,7 +1183,7 @@ fn builtin_midpoint_step(
     let h = args.get(3).map(|v| v.to_number()).unwrap_or(0.01);
     let sub = f
         .as_code_ref()
-        .ok_or_else(|| PerlError::runtime("midpoint_step: code ref", line))?;
+        .ok_or_else(|| StrykeError::runtime("midpoint_step: code ref", line))?;
     let call_f = |interp: &mut VMHelper, t: f64, y: &[f64]| -> PerlResult<Vec<f64>> {
         let mut payload = vec![StrykeValue::float(t)];
         for v in y {
@@ -1222,7 +1222,7 @@ fn builtin_heun_step(
     let h = args.get(3).map(|v| v.to_number()).unwrap_or(0.01);
     let sub = f
         .as_code_ref()
-        .ok_or_else(|| PerlError::runtime("heun_step: code ref", line))?;
+        .ok_or_else(|| StrykeError::runtime("heun_step: code ref", line))?;
     let call_f = |interp: &mut VMHelper, t: f64, y: &[f64]| -> PerlResult<Vec<f64>> {
         let mut payload = vec![StrykeValue::float(t)];
         for v in y {
@@ -1270,7 +1270,7 @@ fn builtin_verlet_step(
     let h = args.get(4).map(|v| v.to_number()).unwrap_or(0.01);
     let sub = accel
         .as_code_ref()
-        .ok_or_else(|| PerlError::runtime("verlet_step: code ref", line))?;
+        .ok_or_else(|| StrykeError::runtime("verlet_step: code ref", line))?;
     let call_a = |interp: &mut VMHelper, q: &[f64], t: f64| -> PerlResult<Vec<f64>> {
         let mut payload: Vec<StrykeValue> = q.iter().map(|v| StrykeValue::float(*v)).collect();
         payload.push(StrykeValue::float(t));
@@ -1647,7 +1647,7 @@ fn builtin_decompose_classical(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
     let period = args.get(1).map(|v| v.to_number() as usize).unwrap_or(12).max(2);
     let n = xs.len();
     if n < 2 * period {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "decompose_classical: series shorter than 2 periods",
             0,
         ));

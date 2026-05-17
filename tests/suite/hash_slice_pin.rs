@@ -274,3 +274,75 @@ fn collect_subset_via_explicit_arrow_lookup() {
     "#;
     assert_eq!(eval_int(code), 1);
 }
+
+// ── `format` keyword in non-FORMAT-declaration positions ──────────
+//
+// Regression: the lexer used to greedily enter format-declaration
+// mode whenever it saw the `format` identifier, breaking
+// `$h{format}`, `Foo::format`, `$obj->format()`, and `{format => …}`.
+// Fixed in c07ea38848 by checking for `->`, `::`, hash-subscript and
+// hash-literal contexts before falling into the format-decl path.
+
+#[test]
+fn format_keyword_as_hash_subscript() {
+    let code = r#"
+        my %h;
+        $h{format} = "csv";
+        $h{level}  = 9;
+        $h{format} eq "csv" && $h{level} == 9 ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn format_keyword_in_hash_literal() {
+    let code = r#"
+        my %h = (format => "csv", level => 9);
+        my $r = +{ format => "json" };
+        $h{format} eq "csv" && $r->{format} eq "json" ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn format_keyword_as_arrow_hash_key() {
+    let code = r#"
+        my $r = +{ format => "csv", level => 9 };
+        $r->{format} eq "csv" && $r->{level} == 9 ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn format_keyword_as_namespaced_fn() {
+    let code = r#"
+        fn Render::format($x) { "fmt:" . $x }
+        Render::format("hello") eq "fmt:hello" ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+// String-interpolation context: `"$h{format}"` should expand the
+// hash subscript rather than triggering FORMAT-decl mode mid-string.
+#[test]
+fn format_keyword_in_string_interpolation() {
+    let code = r#"
+        my %h = (format => "csv");
+        "got=$h{format}" eq "got=csv" ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+// Trailing-key contexts: `delete $h{format}` and `exists $h{format}`.
+#[test]
+fn format_keyword_in_delete_and_exists() {
+    let code = r#"
+        my %h = (format => "csv", level => 9);
+        my $had = exists $h{format} ? 1 : 0;
+        delete $h{format};
+        my $gone = exists $h{format} ? 0 : 1;
+        my $kept = exists $h{level}  ? 1 : 0;
+        ($had && $gone && $kept) ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}

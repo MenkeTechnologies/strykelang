@@ -29,7 +29,7 @@ use std::ffi::{CStr, CString};
 #[cfg(unix)]
 use std::os::unix::io::AsRawFd;
 
-use crate::error::{PerlError, PerlResult};
+use crate::error::{StrykeError, PerlResult};
 use crate::perl_decode::decode_utf8_or_latin1;
 use crate::perl_regex::perl_quotemeta;
 use crate::value::{PerlAsyncTask, PerlSub, StrykeValue};
@@ -670,7 +670,7 @@ fn perl_scalar_as_bytes(v: &StrykeValue) -> Vec<u8> {
 /// `spurt` — Spurt. Returns an integer.
 fn builtin_spurt(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.len() < 2 {
-        return Err(PerlError::runtime("spurt needs PATH and CONTENT", line));
+        return Err(StrykeError::runtime("spurt needs PATH and CONTENT", line));
     }
     let path = interp.resolve_stryke_path_string(&args[0].to_string());
     let data = perl_scalar_as_bytes(&args[1]);
@@ -678,7 +678,7 @@ fn builtin_spurt(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlRe
     let mkdir = opts.is_some_and(|o| opt_hash_bool(o, "mkdir") || opt_hash_bool(o, "mkpath"));
     let atomic = opts.is_some_and(|o| opt_hash_bool(o, "atomic"));
     crate::perl_fs::spurt_path(&path, &data, mkdir, atomic)
-        .map_err(|e| PerlError::runtime(format!("spurt: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("spurt: {}", e), line))?;
     Ok(StrykeValue::integer(data.len() as i64))
 }
 
@@ -798,7 +798,7 @@ fn builtin_test_no_interop(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// `copy` — Copy.
 fn builtin_copy(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.len() < 2 {
-        return Err(PerlError::runtime("copy needs FROM and TO paths", line));
+        return Err(StrykeError::runtime("copy needs FROM and TO paths", line));
     }
     let from = interp.resolve_stryke_path_string(&args[0].to_string());
     let to = interp.resolve_stryke_path_string(&args[1].to_string());
@@ -818,11 +818,11 @@ fn builtin_file(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlRes
 
     let path = interp.resolve_stryke_path_string(&first_arg_or_topic(interp, args).to_string());
     if path.is_empty() {
-        return Err(PerlError::runtime("file: need path", line));
+        return Err(StrykeError::runtime("file: need path", line));
     }
     let p = Path::new(&path);
     let lm = std::fs::symlink_metadata(p).map_err(|e| {
-        PerlError::runtime(format!("file: {}: {e}", p.display()), line)
+        StrykeError::runtime(format!("file: {}: {e}", p.display()), line)
     })?;
     if lm.file_type().is_symlink() {
         let tgt = std::fs::read_link(p).unwrap_or_else(|_| std::path::PathBuf::new());
@@ -854,11 +854,11 @@ fn builtin_file(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlRes
     }
     if lm.is_file() {
         let mut f = File::open(p).map_err(|e| {
-            PerlError::runtime(format!("file: {}: {e}", p.display()), line)
+            StrykeError::runtime(format!("file: {}: {e}", p.display()), line)
         })?;
         let mut buf = [0u8; 4096];
         let n = f.read(&mut buf).map_err(|e| {
-            PerlError::runtime(format!("file: {}: {e}", p.display()), line)
+            StrykeError::runtime(format!("file: {}: {e}", p.display()), line)
         })?;
         let desc = sniff_file_description(&buf[..n]);
         return Ok(StrykeValue::string(format!("{path}: {desc}")));
@@ -955,7 +955,7 @@ fn builtin_xxd(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResu
         Some(_) => interp.scope.get_scalar("_").to_string(),
     };
     if path_raw.is_empty() {
-        return Err(PerlError::runtime("xxd: need path", line));
+        return Err(StrykeError::runtime("xxd: need path", line));
     }
     let path = interp.resolve_stryke_path_string(&path_raw);
     if head.len() >= 2 {
@@ -963,13 +963,13 @@ fn builtin_xxd(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResu
     }
 
     let mut f = std::fs::File::open(&path).map_err(|e| {
-        PerlError::runtime(format!("xxd: {}: {e}", path), line)
+        StrykeError::runtime(format!("xxd: {}: {e}", path), line)
     })?;
     let mut buf = Vec::new();
     (&mut f)
         .take(max_bytes as u64)
         .read_to_end(&mut buf)
-        .map_err(|e| PerlError::runtime(format!("xxd: {}: {e}", path), line))?;
+        .map_err(|e| StrykeError::runtime(format!("xxd: {}: {e}", path), line))?;
 
     Ok(StrykeValue::string(format_xxd(&buf, cols)))
 }
@@ -1053,7 +1053,7 @@ fn builtin_fileparse(
 ) -> PerlResult<StrykeValue> {
     let path = args
         .first()
-        .ok_or_else(|| PerlError::runtime("fileparse needs a path", line))?;
+        .ok_or_else(|| StrykeError::runtime("fileparse needs a path", line))?;
     let suf = args.get(1).filter(|v| !v.is_undef()).map(|v| v.to_string());
     let (base, dir, sfx) = crate::perl_fs::fileparse_path(&path.to_string(), suf.as_deref());
     match interp.wantarray_kind {
@@ -1072,7 +1072,7 @@ fn builtin_gethostname() -> PerlResult<StrykeValue> {
     let mut buf = vec![0u8; 512];
     let r = unsafe { libc::gethostname(buf.as_mut_ptr() as *mut libc::c_char, buf.len()) };
     if r != 0 {
-        return Err(PerlError::runtime("gethostname failed", 0));
+        return Err(StrykeError::runtime("gethostname failed", 0));
     }
     let len = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
     Ok(StrykeValue::string(
@@ -1096,7 +1096,7 @@ fn builtin_uname() -> PerlResult<StrykeValue> {
     }
     let mut uts: libc::utsname = unsafe { std::mem::zeroed() };
     if unsafe { libc::uname(&mut uts) } != 0 {
-        return Err(PerlError::runtime("uname failed", 0));
+        return Err(StrykeError::runtime("uname failed", 0));
     }
     let mut m = indexmap::IndexMap::new();
     m.insert(
@@ -1125,7 +1125,7 @@ fn builtin_uname() -> PerlResult<StrykeValue> {
 #[cfg(not(unix))]
 /// `uname` — Uname.
 fn builtin_uname() -> PerlResult<StrykeValue> {
-    Err(PerlError::runtime(
+    Err(StrykeError::runtime(
         "uname is not available on this platform",
         0,
     ))
@@ -5305,7 +5305,7 @@ pub(crate) fn try_builtin(
         // collected as a single list value.
         "_thread_par_run" => {
             if args.len() < 2 {
-                return Some(Err(crate::error::PerlError::runtime(
+                return Some(Err(crate::error::StrykeError::runtime(
                     "_thread_par_run: expected at least 2 args (stages, thread_last, source...)",
                     line,
                 )));
@@ -5317,7 +5317,7 @@ pub(crate) fn try_builtin(
                 match v.as_code_ref() {
                     Some(s) => subs.push(s),
                     None => {
-                        return Some(Err(crate::error::PerlError::runtime(
+                        return Some(Err(crate::error::StrykeError::runtime(
                             "_thread_par_run: each stage must be a CODE ref",
                             line,
                         )));
@@ -11560,7 +11560,7 @@ fn jwt_hash_alg_opt(h: &StrykeValue, line: usize) -> PerlResult<Option<String>> 
         let e = g.get("alg").filter(|x| !x.is_undef());
         return Ok(e.map(|x| x.to_string()));
     }
-    Err(PerlError::runtime(
+    Err(StrykeError::runtime(
         "jwt_encode: options must be a hash or hashref",
         line,
     ))
@@ -11570,10 +11570,10 @@ fn jwt_hash_alg_opt(h: &StrykeValue, line: usize) -> PerlResult<Option<String>> 
 fn builtin_jwt_encode(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     let payload = args
         .first()
-        .ok_or_else(|| PerlError::runtime("jwt_encode: need PAYLOAD, SECRET [, alg => …]", line))?;
+        .ok_or_else(|| StrykeError::runtime("jwt_encode: need PAYLOAD, SECRET [, alg => …]", line))?;
     let secret = args
         .get(1)
-        .ok_or_else(|| PerlError::runtime("jwt_encode: need SECRET", line))?;
+        .ok_or_else(|| StrykeError::runtime("jwt_encode: need SECRET", line))?;
     let mut alg = "HS256".to_string();
     if let Some(t) = args.get(2) {
         if is_http_opts_hash(t) {
@@ -11597,11 +11597,11 @@ fn builtin_jwt_encode(args: &[StrykeValue], line: usize) -> PerlResult<StrykeVal
 fn builtin_jwt_decode(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     let token = args
         .first()
-        .ok_or_else(|| PerlError::runtime("jwt_decode: need TOKEN, SECRET", line))?
+        .ok_or_else(|| StrykeError::runtime("jwt_decode: need TOKEN, SECRET", line))?
         .to_string();
     let secret = args
         .get(1)
-        .ok_or_else(|| PerlError::runtime("jwt_decode: need SECRET", line))?;
+        .ok_or_else(|| StrykeError::runtime("jwt_decode: need SECRET", line))?;
     crate::jwt::jwt_decode(&token, secret, line)
 }
 
@@ -11609,7 +11609,7 @@ fn builtin_jwt_decode(args: &[StrykeValue], line: usize) -> PerlResult<StrykeVal
 fn builtin_jwt_decode_unsafe(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     let token = args
         .first()
-        .ok_or_else(|| PerlError::runtime("jwt_decode_unsafe: need TOKEN", line))?
+        .ok_or_else(|| StrykeError::runtime("jwt_decode_unsafe: need TOKEN", line))?
         .to_string();
     crate::jwt::jwt_decode_unsafe(&token, line)
 }
@@ -11645,7 +11645,7 @@ fn format_log_hash_kv(v: &StrykeValue, line: usize) -> PerlResult<String> {
             parts.push(format!("{k}={s}"));
         }
     } else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "log_* optional second argument must be a hash or hashref",
             line,
         ));
@@ -11665,7 +11665,7 @@ fn builtin_log_line(
     }
     let msg = args
         .first()
-        .ok_or_else(|| PerlError::runtime("log_* needs a message", line))?
+        .ok_or_else(|| StrykeError::runtime("log_* needs a message", line))?
         .to_string();
     let extra = if let Some(h) = args.get(1) {
         if h.is_undef() {
@@ -11697,16 +11697,16 @@ fn builtin_log_json(
 ) -> PerlResult<StrykeValue> {
     let level_s = args
         .first()
-        .ok_or_else(|| PerlError::runtime("log_json: need LEVEL, MSG [, \\%fields]", line))?
+        .ok_or_else(|| StrykeError::runtime("log_json: need LEVEL, MSG [, \\%fields]", line))?
         .to_string();
     let level_f = LogLevelFilter::parse(&level_s)
-        .ok_or_else(|| PerlError::runtime(format!("log_json: unknown level {level_s}"), line))?;
+        .ok_or_else(|| StrykeError::runtime(format!("log_json: unknown level {level_s}"), line))?;
     if !log_should_emit(level_f, interp.log_filter_effective()) {
         return Ok(StrykeValue::integer(0));
     }
     let msg = args
         .get(1)
-        .ok_or_else(|| PerlError::runtime("log_json: need MSG", line))?
+        .ok_or_else(|| StrykeError::runtime("log_json: need MSG", line))?
         .to_string();
     let mut obj = serde_json::Map::new();
     if let Some(h) = args.get(2) {
@@ -11719,7 +11719,7 @@ fn builtin_log_json(
                     }
                 }
                 _ => {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "log_json: third arg must be a hash or hashref",
                         line,
                     ));
@@ -11735,7 +11735,7 @@ fn builtin_log_json(
     );
     obj.insert("msg".into(), serde_json::Value::String(msg));
     let line_s = serde_json::to_string(&serde_json::Value::Object(obj))
-        .map_err(|e| PerlError::runtime(format!("log_json: {e}"), line))?;
+        .map_err(|e| StrykeError::runtime(format!("log_json: {e}"), line))?;
     let _ = writeln!(stderr(), "{line_s}");
     Ok(StrykeValue::integer(1))
 }
@@ -11760,7 +11760,7 @@ fn builtin_log_level(
     }
     let name = a.to_string();
     let filt = LogLevelFilter::parse(&name)
-        .ok_or_else(|| PerlError::runtime(format!("log_level: unknown level {name}"), line))?;
+        .ok_or_else(|| StrykeError::runtime(format!("log_level: unknown level {name}"), line))?;
     interp.log_level_override = Some(filt);
     Ok(StrykeValue::string(filt.as_str().to_string()))
 }
@@ -11768,7 +11768,7 @@ fn builtin_log_level(
 /// `dataframe` — Dataframe.
 fn builtin_dataframe(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "dataframe needs a file path or a list",
             0,
         ));
@@ -11779,7 +11779,7 @@ fn builtin_dataframe(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     }
     let path = a.to_string();
     if path.is_empty() {
-        return Err(PerlError::runtime("dataframe needs a file path", 0));
+        return Err(StrykeError::runtime("dataframe needs a file path", 0));
     }
     crate::native_data::dataframe_from_path(&path)
 }
@@ -11793,7 +11793,7 @@ fn builtin_csv_read(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// `csv_write` — Csv write.
 fn builtin_csv_write(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Err(PerlError::runtime("csv_write needs path and row list", 0));
+        return Err(StrykeError::runtime("csv_write needs path and row list", 0));
     }
     let path = args[0].to_string();
     if args.len() == 2 {
@@ -12091,7 +12091,7 @@ fn builtin_stress_test(args: &[StrykeValue], line: usize) -> PerlResult<StrykeVa
 
     let (cpu_hashes, mem_bytes, io_bytes, workers) = if let Some(cluster_pv) = cluster_opt {
         let cluster = cluster_pv.as_remote_cluster().ok_or_else(|| {
-            crate::error::PerlError::runtime("stress_test: invalid cluster", line)
+            crate::error::StrykeError::runtime("stress_test: invalid cluster", line)
         })?;
         let num_workers = cluster.slots.len();
 
@@ -12105,7 +12105,7 @@ fn builtin_stress_test(args: &[StrykeValue], line: usize) -> PerlResult<StrykeVa
         let results =
             crate::cluster::run_cluster(&cluster, subs_prelude, block_src, capture, items)
                 .map_err(|e| {
-                    crate::error::PerlError::runtime(format!("stress_test: {}", e), line)
+                    crate::error::StrykeError::runtime(format!("stress_test: {}", e), line)
                 })?;
 
         let mut total_cpu: i64 = 0;
@@ -12270,7 +12270,7 @@ fn builtin_fetch(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
             if is_http_opts_hash(opt) {
                 return crate::native_data::http_request(&url, Some(opt));
             }
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "fetch: second argument must be a hash or hashref (method, headers, body, …)",
                 line,
             ));
@@ -12288,7 +12288,7 @@ fn builtin_fetch_json(args: &[StrykeValue], line: usize) -> PerlResult<StrykeVal
                 let res = crate::native_data::http_request(&url, Some(opt))?;
                 return crate::native_data::http_response_json_body(&res);
             }
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "fetch_json: second argument must be a hash or hashref (method, headers, json, …)",
                 line,
             ));
@@ -12303,7 +12303,7 @@ fn builtin_http_request(args: &[StrykeValue], line: usize) -> PerlResult<StrykeV
         .first()
         .filter(|v| !v.to_string().is_empty())
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("http_request needs a URL", line))?;
+        .ok_or_else(|| StrykeError::runtime("http_request needs a URL", line))?;
     crate::native_data::http_request(&url, args.get(1).filter(|v| !v.is_undef()))
 }
 
@@ -12316,14 +12316,14 @@ fn builtin_read_bytes(interp: &VMHelper, args: &[StrykeValue], line: usize) -> P
             .unwrap_or_default(),
     );
     let b = crate::perl_fs::read_file_bytes(&path)
-        .map_err(|e| PerlError::runtime(format!("read_bytes: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("read_bytes: {}", e), line))?;
     Ok(StrykeValue::bytes(b))
 }
 
 /// `move` — Move.
 fn builtin_move(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.len() < 2 {
-        return Err(PerlError::runtime("move needs FROM and TO paths", line));
+        return Err(StrykeError::runtime("move needs FROM and TO paths", line));
     }
     let from = interp.resolve_stryke_path_string(&args[0].to_string());
     let to = interp.resolve_stryke_path_string(&args[1].to_string());
@@ -12459,7 +12459,7 @@ fn builtin_ls(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResul
             .collect()
     };
     if dirs.is_empty() {
-        return Err(PerlError::runtime("ls: need directory path", line));
+        return Err(StrykeError::runtime("ls: need directory path", line));
     }
 
     let mut out = String::new();
@@ -12472,10 +12472,10 @@ fn builtin_ls(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResul
             let _ = writeln!(&mut out, "{}:", dir.display());
         }
         let meta = std::fs::metadata(dir).map_err(|e| {
-            PerlError::runtime(format!("ls: {}: {e}", dir.display()), line)
+            StrykeError::runtime(format!("ls: {}: {e}", dir.display()), line)
         })?;
         if !meta.is_dir() {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("ls: not a directory: {}", dir.display()),
                 line,
             ));
@@ -12619,7 +12619,7 @@ fn ls_l_one_line_windows(name: &str, meta: &std::fs::Metadata) -> PerlResult<Str
 
 fn format_ls_long_dir(dir: &std::path::Path, line: usize) -> PerlResult<String> {
     let mut entries: Vec<std::fs::DirEntry> = std::fs::read_dir(dir)
-        .map_err(|e| PerlError::runtime(format!("ls: {}: {e}", dir.display()), line))?
+        .map_err(|e| StrykeError::runtime(format!("ls: {}: {e}", dir.display()), line))?
         .filter_map(|e| e.ok())
         .collect();
     entries.sort_by(|a, b| {
@@ -12639,7 +12639,7 @@ fn format_ls_long_dir(dir: &std::path::Path, line: usize) -> PerlResult<String> 
             let name = entry.file_name().to_string_lossy().into_owned();
             let full = dir.join(&name);
             let sm = std::fs::symlink_metadata(&full).map_err(|e| {
-                PerlError::runtime(format!("ls: {}: {e}", full.display()), line)
+                StrykeError::runtime(format!("ls: {}: {e}", full.display()), line)
             })?;
             sum_blocks = sum_blocks.saturating_add(sm.blocks());
             rows.push((sm, name));
@@ -12657,7 +12657,7 @@ fn format_ls_long_dir(dir: &std::path::Path, line: usize) -> PerlResult<String> 
             let name = entry.file_name().to_string_lossy().into_owned();
             let full = dir.join(&name);
             let sm = std::fs::symlink_metadata(&full).map_err(|e| {
-                PerlError::runtime(format!("ls: {}: {e}", full.display()), line)
+                StrykeError::runtime(format!("ls: {}: {e}", full.display()), line)
             })?;
             out_lines.push(ls_l_one_line_windows(&name, &sm)?);
         }
@@ -12705,7 +12705,7 @@ fn builtin_which(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
         .first()
         .filter(|v| !v.to_string().is_empty())
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("which needs a program name", line))?;
+        .ok_or_else(|| StrykeError::runtime("which needs a program name", line))?;
     let dot = args
         .get(1)
         .is_some_and(|o| opt_hash_bool(o, "dot") || opt_hash_bool(o, "cwd"));
@@ -12720,7 +12720,7 @@ fn builtin_which_all(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValu
         .first()
         .filter(|v| !v.to_string().is_empty())
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("which_all needs a program name", line))?;
+        .ok_or_else(|| StrykeError::runtime("which_all needs a program name", line))?;
     let mut results = Vec::new();
     if let Some(path_os) = std::env::var_os("PATH") {
         for dir in std::env::split_paths(&path_os) {
@@ -13316,12 +13316,12 @@ fn builtin_input(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlRe
         let mut f = slot.lock();
         let mut buf = String::new();
         f.read_to_string(&mut buf)
-            .map_err(|e| PerlError::runtime(format!("input: {}: {}", name, e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("input: {}: {}", name, e), line))?;
         return Ok(StrykeValue::string(buf));
     }
     // Fall back to treating it as a file path
     let content = std::fs::read_to_string(&name)
-        .map_err(|e| PerlError::runtime(format!("input: {}: {}", name, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("input: {}: {}", name, e), line))?;
     Ok(StrykeValue::string(content))
 }
 
@@ -13768,7 +13768,7 @@ fn builtin_xopen(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlRe
     Command::new(cmd)
         .arg(&path)
         .spawn()
-        .map_err(|e| PerlError::runtime(format!("xopen: {}: {}", path, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("xopen: {}: {}", path, e), line))?;
     Ok(StrykeValue::string(path))
 }
 
@@ -13878,7 +13878,7 @@ body::before {
     tmp.push(format!("stryke_preview_{}.html", std::process::id()));
     std::fs::File::create(&tmp)
         .and_then(|mut f| f.write_all(html.as_bytes()))
-        .map_err(|e| PerlError::runtime(format!("preview: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("preview: {}", e), line))?;
     let path_str = tmp.to_string_lossy().to_string();
     builtin_xopen(interp, &[StrykeValue::string(path_str.clone())], line)?;
     Ok(StrykeValue::string(path_str))
@@ -13906,7 +13906,7 @@ fn builtin_clip(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlRes
         .args(extra)
         .stdin(Stdio::piped())
         .spawn()
-        .map_err(|e| PerlError::runtime(format!("clip: {}: {}", cmd, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("clip: {}: {}", cmd, e), line))?;
     if let Some(mut stdin) = child.stdin.take() {
         let _ = stdin.write_all(text.as_bytes());
     }
@@ -13932,7 +13932,7 @@ fn builtin_paste(line: usize) -> PerlResult<StrykeValue> {
     let output = Command::new(cmd)
         .args(extra)
         .output()
-        .map_err(|e| PerlError::runtime(format!("paste: {}: {}", cmd, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("paste: {}: {}", cmd, e), line))?;
     Ok(StrykeValue::string(
         String::from_utf8_lossy(&output.stdout).into_owned(),
     ))
@@ -14630,7 +14630,7 @@ fn builtin_top(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// `to_file PATH, STRING` — write string to file, returns the string for further piping.
 fn builtin_to_file(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.len() < 2 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "to_file: need PATH and content".to_string(),
             line,
         ));
@@ -14644,7 +14644,7 @@ fn builtin_to_file(interp: &VMHelper, args: &[StrykeValue], line: usize) -> Perl
     };
     let path = interp.resolve_stryke_path_string(&path);
     std::fs::write(&path, &content)
-        .map_err(|e| PerlError::runtime(format!("to_file: {}: {}", path, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("to_file: {}: {}", path, e), line))?;
     Ok(StrykeValue::string(path))
 }
 
@@ -14860,7 +14860,7 @@ fn builtin_grep_v(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> 
     }
     let pattern = args[0].to_string();
     let re = regex::Regex::new(&pattern)
-        .map_err(|e| PerlError::runtime(format!("grep_v: bad pattern: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("grep_v: bad pattern: {}", e), line))?;
     if args.len() == 2 {
         let v = &args[1];
         if v.is_iterator() {
@@ -15033,7 +15033,7 @@ fn builtin_range(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// In pipeline: `ITERATOR |> tee FILE`
 fn builtin_tee(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.len() < 2 {
-        return Err(PerlError::runtime("tee: expected FILE, ITERATOR", line));
+        return Err(StrykeError::runtime("tee: expected FILE, ITERATOR", line));
     }
     let path = args[0].to_string();
     let v = &args[1];
@@ -15043,7 +15043,7 @@ fn builtin_tee(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
         crate::map_stream::into_pull_iter(v.clone())
     };
     let iter = crate::map_stream::TeeIterator::new(source, &path)
-        .map_err(|e| PerlError::runtime(format!("tee: {}: {}", path, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("tee: {}: {}", path, e), line))?;
     Ok(StrykeValue::iterator(Arc::new(iter)))
 }
 
@@ -17849,7 +17849,7 @@ fn open_git_repo(
         args[0].to_string()
     };
     git2::Repository::discover(&path)
-        .map_err(|e| PerlError::runtime(format!("git: {}: {}", path, e), line))
+        .map_err(|e| StrykeError::runtime(format!("git: {}: {}", path, e), line))
 }
 
 /// `git_log [PATH] [, N]` — last N commits as array of hashrefs.
@@ -17862,7 +17862,7 @@ fn builtin_git_log(
     let limit = args.first().map(|v| v.to_int() as usize).unwrap_or(20);
     let mut revwalk = repo
         .revwalk()
-        .map_err(|e| PerlError::runtime(format!("git_log: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("git_log: {}", e), line))?;
     revwalk.push_head().ok();
     revwalk.set_sorting(git2::Sort::TIME).ok();
     let mut result = Vec::new();
@@ -17902,7 +17902,7 @@ fn builtin_git_status(
     let repo = open_git_repo(interp, args, line)?;
     let statuses = repo
         .statuses(None)
-        .map_err(|e| PerlError::runtime(format!("git_status: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("git_status: {}", e), line))?;
     let mut result = Vec::new();
     for entry in statuses.iter() {
         let path = entry.path().unwrap_or("").to_string();
@@ -17941,7 +17941,7 @@ fn builtin_git_diff(
     let repo = open_git_repo(interp, args, line)?;
     let diff = repo
         .diff_index_to_workdir(None, None)
-        .map_err(|e| PerlError::runtime(format!("git_diff: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("git_diff: {}", e), line))?;
     let mut buf = String::new();
     diff.print(git2::DiffFormat::Patch, |_delta, _hunk, line| {
         let origin = line.origin();
@@ -17964,7 +17964,7 @@ fn builtin_git_branches(
     let repo = open_git_repo(interp, args, line)?;
     let branches = repo
         .branches(Some(git2::BranchType::Local))
-        .map_err(|e| PerlError::runtime(format!("git_branches: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("git_branches: {}", e), line))?;
     let mut result = Vec::new();
     for branch in branches.flatten() {
         let (b, _) = branch;
@@ -17990,7 +17990,7 @@ fn builtin_git_tags(
     let repo = open_git_repo(interp, args, line)?;
     let tags = repo
         .tag_names(None)
-        .map_err(|e| PerlError::runtime(format!("git_tags: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("git_tags: {}", e), line))?;
     let result: Vec<StrykeValue> = tags
         .iter()
         .flatten()
@@ -18003,10 +18003,10 @@ fn builtin_git_tags(
 fn builtin_git_blame(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     let file_path = args.first().map(|v| v.to_string()).unwrap_or_default();
     let repo = git2::Repository::discover(".")
-        .map_err(|e| PerlError::runtime(format!("git_blame: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("git_blame: {}", e), line))?;
     let blame = repo
         .blame_file(std::path::Path::new(&file_path), None)
-        .map_err(|e| PerlError::runtime(format!("git_blame: {}: {}", file_path, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("git_blame: {}: {}", file_path, e), line))?;
     let file_content = std::fs::read_to_string(&file_path).unwrap_or_default();
     let lines: Vec<&str> = file_content.lines().collect();
     let mut result = Vec::new();
@@ -18040,7 +18040,7 @@ fn builtin_git_authors(
     let repo = open_git_repo(interp, args, line)?;
     let mut revwalk = repo
         .revwalk()
-        .map_err(|e| PerlError::runtime(format!("git_authors: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("git_authors: {}", e), line))?;
     revwalk.push_head().ok();
     let mut counts: indexmap::IndexMap<String, (String, i64)> = indexmap::IndexMap::new();
     for oid in revwalk.flatten() {
@@ -18085,7 +18085,7 @@ fn builtin_git_files(
     let head = repo
         .head()
         .and_then(|r| r.peel_to_tree())
-        .map_err(|e| PerlError::runtime(format!("git_files: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("git_files: {}", e), line))?;
     let mut files = Vec::new();
     head.walk(git2::TreeWalkMode::PreOrder, |dir, entry| {
         if entry.kind() == Some(git2::ObjectType::Blob) {
@@ -18106,19 +18106,19 @@ fn builtin_git_files(
 fn builtin_git_show(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     let sha = args.first().map(|v| v.to_string()).unwrap_or_default();
     let repo = git2::Repository::discover(".")
-        .map_err(|e| PerlError::runtime(format!("git_show: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("git_show: {}", e), line))?;
     let oid = git2::Oid::from_str(&sha)
         .or_else(|_| {
             // Try as short SHA
             let obj = repo
                 .revparse_single(&sha)
-                .map_err(|e| PerlError::runtime(format!("git_show: {}: {}", sha, e), line))?;
-            Ok::<git2::Oid, PerlError>(obj.id())
+                .map_err(|e| StrykeError::runtime(format!("git_show: {}: {}", sha, e), line))?;
+            Ok::<git2::Oid, StrykeError>(obj.id())
         })
-        .map_err(|e| PerlError::runtime(format!("git_show: {}: {}", sha, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("git_show: {}: {}", sha, e), line))?;
     let commit = repo
         .find_commit(oid)
-        .map_err(|e| PerlError::runtime(format!("git_show: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("git_show: {}", e), line))?;
     let mut h = indexmap::IndexMap::new();
     h.insert("sha".into(), StrykeValue::string(oid.to_string()));
     h.insert(
@@ -18778,7 +18778,7 @@ fn builtin_assert_match(
         .map(|v| v.to_string())
         .unwrap_or_else(|| "assert_match".into());
     let re = regex::Regex::new(&pattern)
-        .map_err(|e| PerlError::runtime(format!("assert_match: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("assert_match: {}", e), line))?;
     if re.is_match(&string) {
         test_pass(interp, &msg);
         Ok(StrykeValue::integer(1))
@@ -18954,7 +18954,7 @@ fn builtin_net_interfaces() -> PerlResult<StrykeValue> {
 
     let mut ifap: *mut libc::ifaddrs = std::ptr::null_mut();
     if unsafe { libc::getifaddrs(&mut ifap) } != 0 {
-        return Err(PerlError::runtime("getifaddrs failed", 0));
+        return Err(StrykeError::runtime("getifaddrs failed", 0));
     }
 
     struct IfInfo {
@@ -19148,7 +19148,7 @@ fn builtin_net_public_ip(line: usize) -> PerlResult<StrykeValue> {
             let body = resp.into_string().unwrap_or_default();
             Ok(StrykeValue::string(body.trim().to_string()))
         }
-        Err(e) => Err(PerlError::runtime(format!("net_public_ip: {}", e), line)),
+        Err(e) => Err(StrykeError::runtime(format!("net_public_ip: {}", e), line)),
     }
 }
 
@@ -19164,7 +19164,7 @@ fn builtin_net_dns(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue>
                 .collect();
             Ok(StrykeValue::array(ips))
         }
-        Err(e) => Err(PerlError::runtime(
+        Err(e) => Err(StrykeError::runtime(
             format!("net_dns: {}: {}", host, e),
             line,
         )),
@@ -19176,7 +19176,7 @@ fn builtin_net_reverse_dns(args: &[StrykeValue], line: usize) -> PerlResult<Stry
     use std::net::{Ipv4Addr, UdpSocket};
     let ip_str = args.first().map(|v| v.to_string()).unwrap_or_default();
     let ip: Ipv4Addr = ip_str.parse().map_err(|_| {
-        PerlError::runtime(format!("net_reverse_dns: invalid IP: {}", ip_str), line)
+        StrykeError::runtime(format!("net_reverse_dns: invalid IP: {}", ip_str), line)
     })?;
     let octets = ip.octets();
     let qname = format!(
@@ -19199,7 +19199,7 @@ fn builtin_net_reverse_dns(args: &[StrykeValue], line: usize) -> PerlResult<Stry
     pkt.extend_from_slice(&[0x00, 0x01]); // class IN
 
     let sock = UdpSocket::bind("0.0.0.0:0")
-        .map_err(|e| PerlError::runtime(format!("net_reverse_dns: bind: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("net_reverse_dns: bind: {}", e), line))?;
     sock.set_read_timeout(Some(std::time::Duration::from_secs(3)))
         .ok();
     // Use system resolver (first nameserver from resolv.conf or 8.8.8.8)
@@ -19208,11 +19208,11 @@ fn builtin_net_reverse_dns(args: &[StrykeValue], line: usize) -> PerlResult<Stry
         .and_then(|v| v.to_list().first().map(|s| s.to_string()))
         .unwrap_or_else(|| "8.8.8.8".to_string());
     sock.send_to(&pkt, format!("{}:53", resolver))
-        .map_err(|e| PerlError::runtime(format!("net_reverse_dns: send: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("net_reverse_dns: send: {}", e), line))?;
     let mut buf = [0u8; 512];
     let n = sock
         .recv(&mut buf)
-        .map_err(|e| PerlError::runtime(format!("net_reverse_dns: recv: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("net_reverse_dns: recv: {}", e), line))?;
     // Parse response: skip header (12) + question, find answer with PTR
     let resp = &buf[..n];
     if n < 12 {
@@ -19288,9 +19288,9 @@ fn builtin_net_ping(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue
     let addr = format!("{}:{}", host, port);
     let resolved = addr
         .to_socket_addrs()
-        .map_err(|e| PerlError::runtime(format!("net_ping: {}: {}", host, e), line))?
+        .map_err(|e| StrykeError::runtime(format!("net_ping: {}: {}", host, e), line))?
         .next()
-        .ok_or_else(|| PerlError::runtime(format!("net_ping: no address for {}", host), line))?;
+        .ok_or_else(|| StrykeError::runtime(format!("net_ping: no address for {}", host), line))?;
     let mut rtts = Vec::with_capacity(count);
     for _ in 0..count {
         let start = Instant::now();
@@ -19331,7 +19331,7 @@ fn builtin_net_ports_scan(args: &[StrykeValue], line: usize) -> PerlResult<Stryk
     let start = args.get(1).map(|v| v.to_int()).unwrap_or(1) as u16;
     let end = args.get(2).map(|v| v.to_int()).unwrap_or(1024) as u16;
     if end < start {
-        return Err(PerlError::runtime("net_ports_scan: end < start", line));
+        return Err(StrykeError::runtime("net_ports_scan: end < start", line));
     }
     let timeout = Duration::from_millis(200);
     let mut open = Vec::new();
@@ -19355,13 +19355,13 @@ fn builtin_net_download(args: &[StrykeValue], line: usize) -> PerlResult<StrykeV
     let path = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let resp = ureq::get(&url)
         .call()
-        .map_err(|e| PerlError::runtime(format!("net_download: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("net_download: {}", e), line))?;
     let mut bytes = Vec::new();
     resp.into_reader()
         .read_to_end(&mut bytes)
-        .map_err(|e| PerlError::runtime(format!("net_download: read: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("net_download: read: {}", e), line))?;
     std::fs::write(&path, &bytes)
-        .map_err(|e| PerlError::runtime(format!("net_download: write: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("net_download: write: {}", e), line))?;
     Ok(StrykeValue::string(path))
 }
 
@@ -19370,7 +19370,7 @@ fn builtin_net_headers(args: &[StrykeValue], line: usize) -> PerlResult<StrykeVa
     let url = args.first().map(|v| v.to_string()).unwrap_or_default();
     let resp = ureq::get(&url)
         .call()
-        .map_err(|e| PerlError::runtime(format!("net_headers: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("net_headers: {}", e), line))?;
     let mut h = indexmap::IndexMap::new();
     for name in resp.headers_names() {
         if let Some(val) = resp.header(&name) {
@@ -19500,16 +19500,16 @@ fn builtin_net_whois(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValu
         "whois.iana.org"
     };
     let mut stream = TcpStream::connect(format!("{}:43", whois_server)).map_err(|e| {
-        PerlError::runtime(format!("net_whois: connect {}: {}", whois_server, e), line)
+        StrykeError::runtime(format!("net_whois: connect {}: {}", whois_server, e), line)
     })?;
     stream.set_read_timeout(Some(Duration::from_secs(10))).ok();
     stream.set_write_timeout(Some(Duration::from_secs(5))).ok();
     write!(stream, "{}\r\n", domain)
-        .map_err(|e| PerlError::runtime(format!("net_whois: write: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("net_whois: write: {}", e), line))?;
     let mut result = String::new();
     stream
         .read_to_string(&mut result)
-        .map_err(|e| PerlError::runtime(format!("net_whois: read: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("net_whois: read: {}", e), line))?;
     Ok(StrykeValue::string(result))
 }
 
@@ -20932,7 +20932,7 @@ fn builtin_pushd(interp: &mut VMHelper, args: &[StrykeValue], line: usize) -> Pe
                 drop(s);
                 return swap_to_dir(interp, &swap, line);
             }
-            return Err(PerlError::runtime("pushd: directory stack empty", line));
+            return Err(StrykeError::runtime("pushd: directory stack empty", line));
         }
     };
     dir_stack().lock().push(cur);
@@ -20945,7 +20945,7 @@ fn builtin_popd(interp: &mut VMHelper, _args: &[StrykeValue], line: usize) -> Pe
     let top = dir_stack().lock().pop();
     match top {
         Some(path) => swap_to_dir(interp, &path, line),
-        None => Err(PerlError::runtime("popd: directory stack empty", line)),
+        None => Err(StrykeError::runtime("popd: directory stack empty", line)),
     }
 }
 
@@ -20975,7 +20975,7 @@ fn swap_to_dir(
                 interp.stryke_pwd.to_string_lossy().into_owned(),
             ))
         }
-        Err(e) => Err(PerlError::runtime(
+        Err(e) => Err(StrykeError::runtime(
             format!("chdir({}): {}", target.display(), e),
             line,
         )),
@@ -21225,7 +21225,7 @@ fn builtin_source(
     let path = match args.first() {
         Some(v) => v.to_string(),
         None => {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "source: missing path argument".to_string(),
                 line,
             ));
@@ -21238,7 +21238,7 @@ fn builtin_source(
             crate::parse_and_run_string_in_file(code, interp, &resolved)
                 .or(Ok(StrykeValue::UNDEF))
         }
-        Err(e) => Err(PerlError::runtime(
+        Err(e) => Err(StrykeError::runtime(
             format!("source: cannot read {}: {}", resolved, e),
             line,
         )),
@@ -21276,11 +21276,11 @@ fn builtin_mktemp(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> 
     builder.prefix(pf.as_str());
     let file = builder
         .tempfile()
-        .map_err(|e| PerlError::runtime(format!("mktemp: {e}"), line))?;
+        .map_err(|e| StrykeError::runtime(format!("mktemp: {e}"), line))?;
     // Persist so the file stays after the NamedTempFile drops.
     let (_f, persisted) = file
         .keep()
-        .map_err(|e| PerlError::runtime(format!("mktemp: persist: {e}"), line))?;
+        .map_err(|e| StrykeError::runtime(format!("mktemp: persist: {e}"), line))?;
     Ok(StrykeValue::string(persisted.to_string_lossy().into_owned()))
 }
 
@@ -21297,7 +21297,7 @@ fn builtin_mktempdir(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValu
     builder.prefix(pf.as_str());
     let dir = builder
         .tempdir()
-        .map_err(|e| PerlError::runtime(format!("mktempdir: {e}"), line))?;
+        .map_err(|e| StrykeError::runtime(format!("mktempdir: {e}"), line))?;
     let path = dir.keep();
     Ok(StrykeValue::string(path.to_string_lossy().into_owned()))
 }
@@ -21555,7 +21555,7 @@ fn builtin_xargs(
 ) -> PerlResult<StrykeValue> {
     let callable = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = callable.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "xargs: first arg must be a callable / coderef",
             line,
         ));
@@ -22321,7 +22321,7 @@ fn exec_to_perl_result(
         Ok(v) => Ok(v),
         Err(FlowOrError::Error(e)) => Err(e),
         Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),
-        Err(FlowOrError::Flow(_)) => Err(PerlError::runtime(
+        Err(FlowOrError::Flow(_)) => Err(StrykeError::runtime(
             format!("{name}: unsupported control flow in block"),
             line,
         )),
@@ -22460,7 +22460,7 @@ fn builtin_some(
     }
     let pred = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = pred.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "some: first argument must be a code reference",
             line,
         ));
@@ -22490,7 +22490,7 @@ fn builtin_every(
     }
     let pred = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = pred.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "every: first argument must be a code reference",
             line,
         ));
@@ -22520,7 +22520,7 @@ fn builtin_not_any(
     }
     let pred = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = pred.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "not_any: first argument must be a code reference",
             line,
         ));
@@ -22550,7 +22550,7 @@ fn builtin_not_every(
     }
     let pred = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = pred.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "not_every: first argument must be a code reference",
             line,
         ));
@@ -22573,13 +22573,13 @@ fn builtin_not_every(
 /// `compose(\&f, \&g)->(x)` == `f(g(x))`.
 fn builtin_comp(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "compose: requires at least one function",
             line,
         ));
     }
     if args.iter().any(|v| v.as_code_ref().is_none()) {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "compose: all arguments must be code references",
             line,
         ));
@@ -22601,14 +22601,14 @@ fn builtin_comp(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
 /// `partial \&f, @bound` — partial application: `partial(\&add, 1)->(2)` == `add(1, 2)`.
 fn builtin_partial(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "partial: requires at least one function",
             line,
         ));
     }
     let f = args[0].clone();
     if f.as_code_ref().is_none() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "partial: first argument must be a code reference",
             line,
         ));
@@ -22648,11 +22648,11 @@ fn builtin_constantly(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// `complement \&f` — returns a function that negates the boolean result of `f`.
 fn builtin_complement(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Err(PerlError::runtime("complement: requires a function", line));
+        return Err(StrykeError::runtime("complement: requires a function", line));
     }
     let f = args[0].clone();
     if f.as_code_ref().is_none() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "complement: argument must be a code reference",
             line,
         ));
@@ -22671,14 +22671,14 @@ fn builtin_complement(args: &[StrykeValue], line: usize) -> PerlResult<StrykeVal
 /// `fnil \&f, @defaults` — returns a function that replaces undef args with defaults.
 fn builtin_fnil(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "fnil: requires at least one function",
             line,
         ));
     }
     let f = args[0].clone();
     if f.as_code_ref().is_none() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "fnil: first argument must be a code reference",
             line,
         ));
@@ -22704,14 +22704,14 @@ fn builtin_fnil(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
 /// `juxt FN1, FN2, ...` — returns a function that applies all fns and returns array of results.
 fn builtin_juxt(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "juxt: requires at least one function",
             line,
         ));
     }
     for (i, a) in args.iter().enumerate() {
         if a.as_code_ref().is_none() {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("juxt: argument {} must be a code reference", i),
                 line,
             ));
@@ -22735,7 +22735,7 @@ fn builtin_juxt(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
 fn builtin_iterate(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "iterate: first argument must be a code reference",
             line,
         ));
@@ -22790,7 +22790,7 @@ impl PerlIterator for IterateIterator {
 fn builtin_repeatedly(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "repeatedly: first argument must be a code reference",
             line,
         ));
@@ -22909,7 +22909,7 @@ fn builtin_mapcat(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "mapcat: first argument must be a code reference",
             line,
         ));
@@ -22938,7 +22938,7 @@ fn builtin_keep(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "keep: first argument must be a code reference",
             line,
         ));
@@ -22969,7 +22969,7 @@ fn builtin_remove_clj(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "remove: first argument must be a code reference",
             line,
         ));
@@ -23000,7 +23000,7 @@ fn builtin_reductions(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "reductions: first argument must be a code reference",
             line,
         ));
@@ -23038,7 +23038,7 @@ fn builtin_partition_by(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "partition_by: first argument must be a code reference",
             line,
         ));
@@ -23117,7 +23117,7 @@ fn builtin_split_with(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "split_with: first argument must be a code reference",
             line,
         ));
@@ -23237,7 +23237,7 @@ fn builtin_update_in(
     let keys = args.get(1).map(|v| v.to_list()).unwrap_or_default();
     let f = args.get(2).cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "update_in: third argument must be a code reference",
             line,
         ));
@@ -23362,7 +23362,7 @@ fn builtin_apply(
     }
     let f = args[0].clone();
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "apply: first argument must be a code reference",
             line,
         ));
@@ -23453,7 +23453,7 @@ fn builtin_starmap(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "starmap: first argument must be a code reference",
             line,
         ));
@@ -23643,7 +23643,7 @@ fn builtin_filterfalse(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "filterfalse: first argument must be a code reference",
             line,
         ));
@@ -23896,7 +23896,7 @@ fn builtin_find_index_fn(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "find_index: first argument must be a code reference",
             line,
         ));
@@ -23926,7 +23926,7 @@ fn builtin_rindex_fn(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "rindex_fn: first argument must be a code reference",
             line,
         ));
@@ -23981,7 +23981,7 @@ fn builtin_minmax_by(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "minmax_by: first argument must be a code reference",
             line,
         ));
@@ -24137,7 +24137,7 @@ fn builtin_transform_keys(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "transform_keys: first argument must be a code reference",
             line,
         ));
@@ -24184,7 +24184,7 @@ fn builtin_transform_values(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "transform_values: first argument must be a code reference",
             line,
         ));
@@ -24223,7 +24223,7 @@ fn builtin_sum_by(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "sum_by: first argument must be a code reference",
             line,
         ));
@@ -24252,7 +24252,7 @@ fn builtin_uniq_by(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "uniq_by: first argument must be a code reference",
             line,
         ));
@@ -24294,7 +24294,7 @@ fn builtin_then_fn(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "then_fn: first argument must be a code reference",
             line,
         ));
@@ -24316,7 +24316,7 @@ fn builtin_times_fn(
     let n = args.first().map(|v| v.to_int().max(0)).unwrap_or(0);
     let f = args.get(1).cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "times_fn: second argument must be a code reference",
             line,
         ));
@@ -24396,7 +24396,7 @@ fn builtin_find_last(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "find_last: first argument must be a code reference",
             line,
         ));
@@ -24426,7 +24426,7 @@ fn builtin_find_last_index(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "find_last_index: first argument must be a code reference",
             line,
         ));
@@ -24670,7 +24670,7 @@ fn builtin_span_fn(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "span: first argument must be a code reference",
             line,
         ));
@@ -24711,7 +24711,7 @@ fn builtin_break_fn(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "break_fn: first argument must be a code reference",
             line,
         ));
@@ -24790,7 +24790,7 @@ fn builtin_sort_on(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "sort_on: first argument must be a code reference",
             line,
         ));
@@ -24906,7 +24906,7 @@ fn builtin_scanl(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "scanl: first argument must be a code reference",
             line,
         ));
@@ -24937,7 +24937,7 @@ fn builtin_scanr(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "scanr: first argument must be a code reference",
             line,
         ));
@@ -24969,7 +24969,7 @@ fn builtin_unfoldr(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "unfoldr: first argument must be a code reference",
             line,
         ));
@@ -25014,7 +25014,7 @@ fn builtin_find_map(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "find_map: first argument must be a code reference",
             line,
         ));
@@ -25044,7 +25044,7 @@ fn builtin_filter_map(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "filter_map: first argument must be a code reference",
             line,
         ));
@@ -25075,7 +25075,7 @@ fn builtin_fold_right(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "fold_right: first argument must be a code reference",
             line,
         ));
@@ -25106,7 +25106,7 @@ fn builtin_partition_either(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "partition_either: first argument must be a code reference",
             line,
         ));
@@ -25148,7 +25148,7 @@ fn builtin_try_fold(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "try_fold: first argument must be a code reference",
             line,
         ));
@@ -25179,7 +25179,7 @@ fn builtin_map_while(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "map_while: first argument must be a code reference",
             line,
         ));
@@ -25211,7 +25211,7 @@ fn builtin_inspect(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "inspect: first argument must be a code reference",
             line,
         ));
@@ -25240,7 +25240,7 @@ fn builtin_tally_by(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "tally_by: first argument must be a code reference",
             line,
         ));
@@ -25267,7 +25267,7 @@ fn builtin_tally_by(
 fn builtin_sole(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     let xs = flatten_args(args);
     if xs.len() != 1 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("sole: expected exactly one element, got {}", xs.len()),
             line,
         ));
@@ -25286,7 +25286,7 @@ fn builtin_chunk_while(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "chunk_while: first argument must be a code reference",
             line,
         ));
@@ -25337,7 +25337,7 @@ fn builtin_count_while(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "count_while: first argument must be a code reference",
             line,
         ));
@@ -25403,7 +25403,7 @@ fn builtin_update_at(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "update_at: first argument must be a code reference",
             line,
         ));
@@ -25597,13 +25597,13 @@ fn builtin_map_indexed(
             flatten_args(&args[1..]),
         )
     } else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "map_indexed: expected LIST..., CODE (or CODE, LIST for thread-last `->>`)",
             line,
         ));
     };
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "map_indexed: code reference missing",
             line,
         ));
@@ -25636,7 +25636,7 @@ fn builtin_reduce_indexed(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "reduce_indexed: first argument must be a code reference",
             line,
         ));
@@ -25669,7 +25669,7 @@ fn builtin_filter_indexed(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "filter_indexed: first argument must be a code reference",
             line,
         ));
@@ -25708,7 +25708,7 @@ fn builtin_group_by_fn(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "group_by_fn: first argument must be a code reference",
             line,
         ));
@@ -25744,7 +25744,7 @@ fn builtin_index_by(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "index_by: first argument must be a code reference",
             line,
         ));
@@ -25776,7 +25776,7 @@ fn builtin_associate(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "associate: first argument must be a code reference",
             line,
         ));
@@ -25862,7 +25862,7 @@ fn builtin_subsequences(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let xs = flatten_args(args);
     let n = xs.len();
     if n > 20 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "subsequences: list too long (max 20 elements)",
             0,
         ));
@@ -25891,7 +25891,7 @@ fn builtin_nub_by(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "nub_by: first argument must be a code reference",
             line,
         ));
@@ -25931,7 +25931,7 @@ fn builtin_slice_when(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "slice_when: first argument must be a code reference",
             line,
         ));
@@ -25980,7 +25980,7 @@ fn builtin_slice_before(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "slice_before: first argument must be a code reference",
             line,
         ));
@@ -26022,7 +26022,7 @@ fn builtin_slice_after(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "slice_after: first argument must be a code reference",
             line,
         ));
@@ -26065,7 +26065,7 @@ fn builtin_each_with_object(
     let obj = args[0].clone();
     let f = args.get(1).cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "each_with_object: second argument must be a code reference",
             line,
         ));
@@ -26101,7 +26101,7 @@ fn builtin_is_sorted_by(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "is_sorted_by: first argument must be a code reference",
             line,
         ));
@@ -26140,7 +26140,7 @@ fn builtin_intersperse_with(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "intersperse_with: first argument must be a code reference",
             line,
         ));
@@ -26175,7 +26175,7 @@ fn builtin_running_reduce(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "running_reduce: first argument must be a code reference",
             line,
         ));
@@ -26340,7 +26340,7 @@ fn builtin_find_indices(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "find_indices: first argument must be a code reference",
             line,
         ));
@@ -26388,7 +26388,7 @@ fn builtin_delete_by(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "delete_by: first argument must be a code reference",
             line,
         ));
@@ -26484,7 +26484,7 @@ fn builtin_maximum_by(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "maximum_by: first argument must be a code reference",
             line,
         ));
@@ -26524,7 +26524,7 @@ fn builtin_minimum_by(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "minimum_by: first argument must be a code reference",
             line,
         ));
@@ -26579,7 +26579,7 @@ fn builtin_match_all(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let pattern = args.first().map(|v| v.to_string()).unwrap_or_default();
     let text = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let re = regex::Regex::new(&pattern)
-        .map_err(|e| PerlError::runtime(format!("match_all: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("match_all: {}", e), 0))?;
     let matches: Vec<StrykeValue> = re
         .find_iter(&text)
         .map(|m| StrykeValue::string(m.as_str().to_string()))
@@ -26592,7 +26592,7 @@ fn builtin_capture_groups(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let pattern = args.first().map(|v| v.to_string()).unwrap_or_default();
     let text = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let re = regex::Regex::new(&pattern)
-        .map_err(|e| PerlError::runtime(format!("capture_groups: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("capture_groups: {}", e), 0))?;
     let mut result = Vec::new();
     for caps in re.captures_iter(&text) {
         let groups: Vec<StrykeValue> = caps
@@ -26612,7 +26612,7 @@ fn builtin_is_match(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let pattern = args.first().map(|v| v.to_string()).unwrap_or_default();
     let text = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let re = regex::Regex::new(&pattern)
-        .map_err(|e| PerlError::runtime(format!("is_match: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("is_match: {}", e), 0))?;
     Ok(bool_iv(re.is_match(&text)))
 }
 
@@ -26622,7 +26622,7 @@ fn builtin_split_regex(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let text = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let limit = args.get(2).map(|v| v.to_int() as usize).unwrap_or(0);
     let re = regex::Regex::new(&pattern)
-        .map_err(|e| PerlError::runtime(format!("split_regex: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("split_regex: {}", e), 0))?;
     let parts: Vec<StrykeValue> = if limit > 0 {
         re.splitn(&text, limit)
             .map(|s| StrykeValue::string(s.to_string()))
@@ -26641,7 +26641,7 @@ fn builtin_replace_regex(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let replacement = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let text = args.get(2).map(|v| v.to_string()).unwrap_or_default();
     let re = regex::Regex::new(&pattern)
-        .map_err(|e| PerlError::runtime(format!("replace_regex: {}", e), 0))?;
+        .map_err(|e| StrykeError::runtime(format!("replace_regex: {}", e), 0))?;
     Ok(StrykeValue::string(
         re.replace_all(&text, replacement.as_str()).to_string(),
     ))
@@ -27055,7 +27055,7 @@ fn builtin_cross_product(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let v1 = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let v2 = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     if v1.len() < 3 || v2.len() < 3 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "cross_product: vectors must have at least 3 elements",
             0,
         ));
@@ -28109,19 +28109,19 @@ fn builtin_dateseq(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue>
         .map(|v| v.to_string())
         .unwrap_or_else(|| "1d".to_string());
     let start = parse_date_flexible(&start_str).ok_or_else(|| {
-        PerlError::runtime(
+        StrykeError::runtime(
             format!("dateseq: cannot parse start date: {}", start_str),
             line,
         )
     })?;
     let end = parse_date_flexible(&end_str).ok_or_else(|| {
-        PerlError::runtime(format!("dateseq: cannot parse end date: {}", end_str), line)
+        StrykeError::runtime(format!("dateseq: cannot parse end date: {}", end_str), line)
     })?;
     let step = parse_duration_str(&step_str).ok_or_else(|| {
-        PerlError::runtime(format!("dateseq: cannot parse step: {}", step_str), line)
+        StrykeError::runtime(format!("dateseq: cannot parse step: {}", step_str), line)
     })?;
     if step.num_seconds() == 0 {
-        return Err(PerlError::runtime("dateseq: step cannot be zero", line));
+        return Err(StrykeError::runtime("dateseq: step cannot be zero", line));
     }
     let mut result = Vec::new();
     let mut cur = start;
@@ -28187,7 +28187,7 @@ fn builtin_dateround(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValu
         .map(|v| v.to_string())
         .unwrap_or_else(|| "day".to_string());
     let dt = parse_date_flexible(&date_str).ok_or_else(|| {
-        PerlError::runtime(format!("dateround: cannot parse: {}", date_str), line)
+        StrykeError::runtime(format!("dateround: cannot parse: {}", date_str), line)
     })?;
     let rounded = match unit.as_str() {
         "second" | "sec" | "s" => dt.with_nanosecond(0).unwrap_or(dt),
@@ -28269,7 +28269,7 @@ fn builtin_dateround(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValu
             }
         }
         _ => {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("dateround: unknown unit: {}", unit),
                 line,
             ))
@@ -28790,7 +28790,7 @@ fn builtin_partition_point(
     }
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let Some(sub) = f.as_code_ref() else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "partition_point: first argument must be a code reference",
             line,
         ));
@@ -29096,7 +29096,7 @@ fn builtin_matrix_det(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
             + mat[0][2] * (mat[1][0] * mat[2][1] - mat[1][1] * mat[2][0]);
         return Ok(StrykeValue::float(det));
     }
-    Err(PerlError::runtime(
+    Err(StrykeError::runtime(
         "matrix_det: only 1x1, 2x2, 3x3 matrices supported",
         0,
     ))
@@ -29147,7 +29147,7 @@ fn builtin_topological_sort(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         }
     }
     if result.len() != all_nodes.len() {
-        return Err(PerlError::runtime("topological_sort: cycle detected", 0));
+        return Err(StrykeError::runtime("topological_sort: cycle detected", 0));
     }
     Ok(StrykeValue::array(result))
 }
@@ -30069,7 +30069,7 @@ fn builtin_power_set(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let xs = flatten_args(args);
     let n = xs.len();
     if n > 20 {
-        return Err(PerlError::runtime("power_set: array too large (max 20)", 0));
+        return Err(StrykeError::runtime("power_set: array too large (max 20)", 0));
     }
     let count = 1usize << n;
     let mut result = Vec::with_capacity(count);
@@ -30098,7 +30098,7 @@ fn builtin_cartesian_power(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .map(|x| x > 10000)
         .unwrap_or(true)
     {
-        return Err(PerlError::runtime("cartesian_power: result too large", 0));
+        return Err(StrykeError::runtime("cartesian_power: result too large", 0));
     }
     fn generate(
         xs: &[StrykeValue],
@@ -30149,7 +30149,7 @@ fn builtin_hamming_distance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         let v1 = a.map(arg_to_vec).unwrap_or_default();
         let v2 = b.map(arg_to_vec).unwrap_or_default();
         if v1.len() != v2.len() {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "hamming_distance: vectors must be equal length",
                 0,
             ));
@@ -30166,7 +30166,7 @@ fn builtin_hamming_distance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let c1: Vec<char> = s1.chars().collect();
     let c2: Vec<char> = s2.chars().collect();
     if c1.len() != c2.len() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "hamming_distance: strings must be equal length",
             0,
         ));
@@ -32067,13 +32067,13 @@ fn builtin_hash_map_values(
 ) -> PerlResult<StrykeValue> {
     use indexmap::IndexMap;
     let Some(hr) = args.first().and_then(|v| v.as_hash_ref()) else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "hash_map_values: first argument must be a hash reference",
             line,
         ));
     };
     let Some(sub) = args.get(1).and_then(|v| v.as_code_ref()) else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "hash_map_values: second argument must be a code reference",
             line,
         ));
@@ -32101,13 +32101,13 @@ fn builtin_hash_filter_keys(
 ) -> PerlResult<StrykeValue> {
     use indexmap::IndexMap;
     let Some(hr) = args.first().and_then(|v| v.as_hash_ref()) else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "hash_filter_keys: first argument must be a hash reference",
             line,
         ));
     };
     let Some(sub) = args.get(1).and_then(|v| v.as_code_ref()) else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "hash_filter_keys: second argument must be a code reference",
             line,
         ));
@@ -32142,13 +32142,13 @@ fn builtin_hash_filter_values(
 ) -> PerlResult<StrykeValue> {
     use indexmap::IndexMap;
     let Some(hr) = args.first().and_then(|v| v.as_hash_ref()) else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "hash_filter_values: first argument must be a hash reference",
             line,
         ));
     };
     let Some(sub) = args.get(1).and_then(|v| v.as_code_ref()) else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "hash_filter_values: second argument must be a code reference",
             line,
         ));
@@ -32543,7 +32543,7 @@ fn builtin_die_if(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
             .get(1)
             .map(|v| v.to_string())
             .unwrap_or("condition was true".into());
-        return Err(PerlError::runtime(msg, 0));
+        return Err(StrykeError::runtime(msg, 0));
     }
     Ok(StrykeValue::UNDEF)
 }
@@ -32554,7 +32554,7 @@ fn builtin_die_unless(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
             .get(1)
             .map(|v| v.to_string())
             .unwrap_or("condition was false".into());
-        return Err(PerlError::runtime(msg, 0));
+        return Err(StrykeError::runtime(msg, 0));
     }
     Ok(StrykeValue::UNDEF)
 }
@@ -32576,7 +32576,7 @@ fn builtin_assert_type(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         "string"
     };
     if actual != expected {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("expected {}, got {}", expected, actual),
             0,
         ));
@@ -34793,7 +34793,7 @@ fn parse_json_kv(
     let kv = kv.trim();
     let colon = kv
         .find(':')
-        .ok_or_else(|| PerlError::runtime("Invalid JSON: missing colon", 0))?;
+        .ok_or_else(|| StrykeError::runtime("Invalid JSON: missing colon", 0))?;
     let key = kv[..colon].trim();
     let key = if key.starts_with('"') && key.ends_with('"') {
         &key[1..key.len() - 1]
@@ -35062,7 +35062,7 @@ fn parse_xml_element(s: &str) -> PerlResult<(StrykeValue, &str)> {
     }
     let tag_end = s
         .find('>')
-        .ok_or_else(|| PerlError::runtime("Invalid XML: unclosed tag", 0))?;
+        .ok_or_else(|| StrykeError::runtime("Invalid XML: unclosed tag", 0))?;
     let tag_content = &s[1..tag_end];
     if let Some(stripped) = tag_content.strip_suffix('/') {
         let tag_name = stripped.split_whitespace().next().unwrap_or("");
@@ -35077,7 +35077,7 @@ fn parse_xml_element(s: &str) -> PerlResult<(StrykeValue, &str)> {
     let close_tag = format!("</{}>", tag_name);
     let content_start = tag_end + 1;
     let close_pos = find_matching_close_tag(&s[content_start..], &open_tag, &close_tag)
-        .ok_or_else(|| PerlError::runtime(format!("Invalid XML: unclosed tag {}", tag_name), 0))?;
+        .ok_or_else(|| StrykeError::runtime(format!("Invalid XML: unclosed tag {}", tag_name), 0))?;
     let content = &s[content_start..content_start + close_pos];
     let rest = &s[content_start + close_pos + close_tag.len()..];
     let content = content.trim();
@@ -35498,14 +35498,14 @@ fn builtin_to_pdf(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlR
 
     if let Some(p) = path {
         std::fs::write(&p, &pdf_bytes)
-            .map_err(|e| PerlError::runtime(format!("to_pdf: {}: {}", p, e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("to_pdf: {}: {}", p, e), line))?;
         Ok(StrykeValue::string(p))
     } else {
         // Write to temp file and return path (raw bytes aren't useful in a pipeline)
         let mut tmp = std::env::temp_dir();
         tmp.push(format!("stryke_{}.pdf", std::process::id()));
         std::fs::write(&tmp, &pdf_bytes)
-            .map_err(|e| PerlError::runtime(format!("to_pdf: {}", e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("to_pdf: {}", e), line))?;
         Ok(StrykeValue::string(tmp.to_string_lossy().to_string()))
     }
 }
@@ -35569,7 +35569,7 @@ fn builtin_css_select(
     };
     let doc = scraper::Html::parse_document(&html_str);
     let selector = scraper::Selector::parse(&selector_str).map_err(|_| {
-        PerlError::runtime(
+        StrykeError::runtime(
             format!("css_select: invalid selector: {}", selector_str),
             line,
         )
@@ -35606,7 +35606,7 @@ fn builtin_css_select(
 fn builtin_xml_parse(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     let xml_str = args.first().map(|v| v.to_string()).unwrap_or_default();
     let doc = roxmltree::Document::parse(&xml_str)
-        .map_err(|e| PerlError::runtime(format!("xml_parse: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("xml_parse: {}", e), line))?;
     fn node_to_perl(node: roxmltree::Node) -> StrykeValue {
         if node.is_text() {
             return StrykeValue::string(node.text().unwrap_or("").to_string());
@@ -35670,7 +35670,7 @@ fn builtin_xpath(interp: &VMHelper, args: &[StrykeValue], line: usize) -> PerlRe
         first_arg_or_topic(interp, &[]).to_string()
     };
     let doc = roxmltree::Document::parse(&xml_str)
-        .map_err(|e| PerlError::runtime(format!("xpath: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("xpath: {}", e), line))?;
 
     // Simple xpath: extract tag name and optional attr filter
     let _search_all = xpath_str.starts_with("//");
@@ -35753,7 +35753,7 @@ fn builtin_smtp_send(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValu
     use lettre::{Message, SmtpTransport, Transport};
 
     let opts = args.first().and_then(|v| v.as_hash_ref()).ok_or_else(|| {
-        PerlError::runtime(
+        StrykeError::runtime(
             "smtp_send: argument must be a hashref with {to, from, subject, body, ...}",
             line,
         )
@@ -35763,11 +35763,11 @@ fn builtin_smtp_send(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValu
     let to = opts
         .get("to")
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("smtp_send: missing 'to'", line))?;
+        .ok_or_else(|| StrykeError::runtime("smtp_send: missing 'to'", line))?;
     let from = opts
         .get("from")
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("smtp_send: missing 'from'", line))?;
+        .ok_or_else(|| StrykeError::runtime("smtp_send: missing 'from'", line))?;
     let subject = opts
         .get("subject")
         .map(|v| v.to_string())
@@ -35784,29 +35784,29 @@ fn builtin_smtp_send(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValu
     let pass = opts
         .get("smtp_pass")
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("smtp_send: missing 'smtp_pass'", line))?;
+        .ok_or_else(|| StrykeError::runtime("smtp_send: missing 'smtp_pass'", line))?;
 
     let email = Message::builder()
         .from(
             from.parse()
-                .map_err(|e| PerlError::runtime(format!("smtp_send: invalid from: {}", e), line))?,
+                .map_err(|e| StrykeError::runtime(format!("smtp_send: invalid from: {}", e), line))?,
         )
         .to(to
             .parse()
-            .map_err(|e| PerlError::runtime(format!("smtp_send: invalid to: {}", e), line))?)
+            .map_err(|e| StrykeError::runtime(format!("smtp_send: invalid to: {}", e), line))?)
         .subject(subject)
         .body(body)
-        .map_err(|e| PerlError::runtime(format!("smtp_send: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("smtp_send: {}", e), line))?;
 
     let creds = Credentials::new(user, pass);
     let mailer = SmtpTransport::starttls_relay(&host)
-        .map_err(|e| PerlError::runtime(format!("smtp_send: {}", e), line))?
+        .map_err(|e| StrykeError::runtime(format!("smtp_send: {}", e), line))?
         .credentials(creds)
         .build();
 
     mailer
         .send(&email)
-        .map_err(|e| PerlError::runtime(format!("smtp_send: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("smtp_send: {}", e), line))?;
 
     Ok(StrykeValue::integer(1))
 }
@@ -35814,9 +35814,9 @@ fn builtin_smtp_send(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValu
 fn builtin_pdf_text(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     let path = args.first().map(|v| v.to_string()).unwrap_or_default();
     let bytes = std::fs::read(&path)
-        .map_err(|e| PerlError::runtime(format!("pdf_text: {}: {}", path, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("pdf_text: {}: {}", path, e), line))?;
     let text = pdf_extract::extract_text_from_mem(&bytes)
-        .map_err(|e| PerlError::runtime(format!("pdf_text: {}: {}", path, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("pdf_text: {}: {}", path, e), line))?;
     Ok(StrykeValue::string(text))
 }
 
@@ -35824,9 +35824,9 @@ fn builtin_pdf_text(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue
 fn builtin_pdf_pages(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     let path = args.first().map(|v| v.to_string()).unwrap_or_default();
     let bytes = std::fs::read(&path)
-        .map_err(|e| PerlError::runtime(format!("pdf_pages: {}: {}", path, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("pdf_pages: {}: {}", path, e), line))?;
     let text = pdf_extract::extract_text_from_mem(&bytes)
-        .map_err(|e| PerlError::runtime(format!("pdf_pages: {}: {}", path, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("pdf_pages: {}: {}", path, e), line))?;
     // pdf-extract inserts form-feed (\x0c) between pages
     let pages = text.matches('\x0c').count() + 1;
     Ok(StrykeValue::integer(pages as i64))
@@ -35835,13 +35835,13 @@ fn builtin_pdf_pages(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValu
 fn svg_to_pdf(svg_str: &str, line: usize) -> PerlResult<Vec<u8>> {
     let opts = svg2pdf::usvg::Options::default();
     let tree = svg2pdf::usvg::Tree::from_str(svg_str, &opts)
-        .map_err(|e| PerlError::runtime(format!("to_pdf: SVG parse error: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("to_pdf: SVG parse error: {}", e), line))?;
     let pdf = svg2pdf::to_pdf(
         &tree,
         svg2pdf::ConversionOptions::default(),
         svg2pdf::PageOptions::default(),
     )
-    .map_err(|e| PerlError::runtime(format!("to_pdf: SVG conversion error: {}", e), line))?;
+    .map_err(|e| StrykeError::runtime(format!("to_pdf: SVG conversion error: {}", e), line))?;
     Ok(pdf)
 }
 
@@ -35858,7 +35858,7 @@ fn builtin_audio_convert(args: &[StrykeValue], line: usize) -> PerlResult<Stryke
     let input_path = args.first().map(|v| v.to_string()).unwrap_or_default();
     let output_path = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     if input_path.is_empty() || output_path.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "audio_convert: need INPUT and OUTPUT paths",
             line,
         ));
@@ -35866,7 +35866,7 @@ fn builtin_audio_convert(args: &[StrykeValue], line: usize) -> PerlResult<Stryke
 
     // Open input
     let file = std::fs::File::open(&input_path)
-        .map_err(|e| PerlError::runtime(format!("audio_convert: {}: {}", input_path, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("audio_convert: {}: {}", input_path, e), line))?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
     let mut hint = Hint::new();
     if let Some(ext) = std::path::Path::new(&input_path)
@@ -35882,19 +35882,19 @@ fn builtin_audio_convert(args: &[StrykeValue], line: usize) -> PerlResult<Stryke
             &FormatOptions::default(),
             &MetadataOptions::default(),
         )
-        .map_err(|e| PerlError::runtime(format!("audio_convert: probe: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("audio_convert: probe: {}", e), line))?;
 
     let mut format = probed.format;
     let track = format
         .default_track()
-        .ok_or_else(|| PerlError::runtime("audio_convert: no audio track found", line))?;
+        .ok_or_else(|| StrykeError::runtime("audio_convert: no audio track found", line))?;
     let track_id = track.id;
     let channels = track.codec_params.channels.map(|c| c.count()).unwrap_or(2) as u32;
     let sample_rate = track.codec_params.sample_rate.unwrap_or(44100);
 
     let mut decoder = symphonia::default::get_codecs()
         .make(&track.codec_params, &DecoderOptions::default())
-        .map_err(|e| PerlError::runtime(format!("audio_convert: decoder: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("audio_convert: decoder: {}", e), line))?;
 
     // Decode all samples to interleaved i16
     let mut all_samples: Vec<i16> = Vec::new();
@@ -35923,7 +35923,7 @@ fn builtin_audio_convert(args: &[StrykeValue], line: usize) -> PerlResult<Stryke
     }
 
     if all_samples.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "audio_convert: no audio data decoded",
             line,
         ));
@@ -35939,33 +35939,33 @@ fn builtin_audio_convert(args: &[StrykeValue], line: usize) -> PerlResult<Stryke
         "mp3" => {
             use mp3lame_encoder::{Builder, FlushNoGap, InterleavedPcm};
             let mut builder = Builder::new().ok_or_else(|| {
-                PerlError::runtime("audio_convert: mp3 encoder init failed", line)
+                StrykeError::runtime("audio_convert: mp3 encoder init failed", line)
             })?;
             builder
                 .set_num_channels(channels as u8)
-                .map_err(|e| PerlError::runtime(format!("audio_convert: mp3: {:?}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("audio_convert: mp3: {:?}", e), line))?;
             builder
                 .set_sample_rate(sample_rate)
-                .map_err(|e| PerlError::runtime(format!("audio_convert: mp3: {:?}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("audio_convert: mp3: {:?}", e), line))?;
             builder
                 .set_brate(mp3lame_encoder::Bitrate::Kbps192)
-                .map_err(|e| PerlError::runtime(format!("audio_convert: mp3: {:?}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("audio_convert: mp3: {:?}", e), line))?;
             builder
                 .set_quality(mp3lame_encoder::Quality::Best)
-                .map_err(|e| PerlError::runtime(format!("audio_convert: mp3: {:?}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("audio_convert: mp3: {:?}", e), line))?;
             let mut encoder = builder.build().map_err(|e| {
-                PerlError::runtime(format!("audio_convert: mp3 build: {:?}", e), line)
+                StrykeError::runtime(format!("audio_convert: mp3 build: {:?}", e), line)
             })?;
             let input = InterleavedPcm(&all_samples);
             let mut mp3_out = Vec::with_capacity(all_samples.len());
             encoder
                 .encode_to_vec(input, &mut mp3_out)
-                .map_err(|e| PerlError::runtime(format!("audio_convert: encode: {:?}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("audio_convert: encode: {:?}", e), line))?;
             encoder
                 .flush_to_vec::<FlushNoGap>(&mut mp3_out)
-                .map_err(|e| PerlError::runtime(format!("audio_convert: flush: {:?}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("audio_convert: flush: {:?}", e), line))?;
             std::fs::write(&output_path, &mp3_out)
-                .map_err(|e| PerlError::runtime(format!("audio_convert: write: {}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("audio_convert: write: {}", e), line))?;
         }
         "wav" => {
             // Write raw WAV using simple header
@@ -35990,10 +35990,10 @@ fn builtin_audio_convert(args: &[StrykeValue], line: usize) -> PerlResult<Stryke
                 wav.extend_from_slice(&s.to_le_bytes());
             }
             std::fs::write(&output_path, &wav)
-                .map_err(|e| PerlError::runtime(format!("audio_convert: write: {}", e), line))?;
+                .map_err(|e| StrykeError::runtime(format!("audio_convert: write: {}", e), line))?;
         }
         _ => {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!(
                     "audio_convert: unsupported output format '.{}' (use .mp3 or .wav)",
                     out_ext
@@ -36015,7 +36015,7 @@ fn builtin_audio_info(args: &[StrykeValue], line: usize) -> PerlResult<StrykeVal
 
     let path = args.first().map(|v| v.to_string()).unwrap_or_default();
     let file = std::fs::File::open(&path)
-        .map_err(|e| PerlError::runtime(format!("audio_info: {}: {}", path, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("audio_info: {}: {}", path, e), line))?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
     let mut hint = Hint::new();
     if let Some(ext) = std::path::Path::new(&path)
@@ -36031,7 +36031,7 @@ fn builtin_audio_info(args: &[StrykeValue], line: usize) -> PerlResult<StrykeVal
             &FormatOptions::default(),
             &MetadataOptions::default(),
         )
-        .map_err(|e| PerlError::runtime(format!("audio_info: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("audio_info: {}", e), line))?;
 
     let format = probed.format;
     let mut h = indexmap::IndexMap::new();
@@ -36071,7 +36071,7 @@ fn builtin_id3_read(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue
     use id3::TagLike;
     let path = args.first().map(|v| v.to_string()).unwrap_or_default();
     let tag = id3::Tag::read_from_path(&path)
-        .map_err(|e| PerlError::runtime(format!("id3_read: {}: {}", path, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("id3_read: {}: {}", path, e), line))?;
     let mut h = indexmap::IndexMap::new();
     if let Some(v) = tag.title() {
         h.insert("title".into(), StrykeValue::string(v.to_string()));
@@ -36119,7 +36119,7 @@ fn builtin_id3_write(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValu
     let tags_val = args.get(1).cloned().unwrap_or(StrykeValue::UNDEF);
     let tags_hr = tags_val
         .as_hash_ref()
-        .ok_or_else(|| PerlError::runtime("id3_write: second arg must be a hashref", line))?;
+        .ok_or_else(|| StrykeError::runtime("id3_write: second arg must be a hashref", line))?;
     let tags = tags_hr.read();
     let mut tag = id3::Tag::read_from_path(&path).unwrap_or_else(|_| id3::Tag::new());
     if let Some(v) = tags.get("title") {
@@ -36148,7 +36148,7 @@ fn builtin_id3_write(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValu
     }
     drop(tags);
     tag.write_to_path(&path, id3::Version::Id3v24)
-        .map_err(|e| PerlError::runtime(format!("id3_write: {}: {}", path, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("id3_write: {}: {}", path, e), line))?;
     Ok(StrykeValue::string(path))
 }
 
@@ -36531,7 +36531,7 @@ fn builtin_read_lines(
 ) -> PerlResult<StrykeValue> {
     let path = args.first().map(|v| v.to_string()).unwrap_or_default();
     let content = std::fs::read_to_string(&path)
-        .map_err(|e| PerlError::runtime(format!("read_lines: {}: {}", path, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("read_lines: {}: {}", path, e), line))?;
     let lines: Vec<StrykeValue> = content
         .lines()
         .map(|l| StrykeValue::string(l.to_string()))
@@ -36546,7 +36546,7 @@ fn builtin_read_lines(
 /// `append_file PATH, DATA` — append content to a file.
 fn builtin_append_file(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.len() < 2 {
-        return Err(PerlError::runtime("append_file needs PATH and DATA", line));
+        return Err(StrykeError::runtime("append_file needs PATH and DATA", line));
     }
     let path = args[0].to_string();
     let data = perl_scalar_as_bytes(&args[1]);
@@ -36555,9 +36555,9 @@ fn builtin_append_file(args: &[StrykeValue], line: usize) -> PerlResult<StrykeVa
         .create(true)
         .append(true)
         .open(&path)
-        .map_err(|e| PerlError::runtime(format!("append_file: {}: {}", path, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("append_file: {}: {}", path, e), line))?;
     f.write_all(&data)
-        .map_err(|e| PerlError::runtime(format!("append_file: {}: {}", path, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("append_file: {}: {}", path, e), line))?;
     Ok(StrykeValue::integer(data.len() as i64))
 }
 
@@ -36576,7 +36576,7 @@ fn builtin_tempfile(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue
     };
     let path = dir.join(name);
     std::fs::File::create(&path)
-        .map_err(|e| PerlError::runtime(format!("tempfile: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("tempfile: {}", e), line))?;
     Ok(StrykeValue::string(path.to_string_lossy().to_string()))
 }
 
@@ -36595,7 +36595,7 @@ fn builtin_tempdir(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue>
     };
     let path = dir.join(name);
     std::fs::create_dir_all(&path)
-        .map_err(|e| PerlError::runtime(format!("tempdir: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("tempdir: {}", e), line))?;
     Ok(StrykeValue::string(path.to_string_lossy().to_string()))
 }
 
@@ -36603,28 +36603,28 @@ fn builtin_tempdir(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue>
 fn builtin_read_json(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     let path = args.first().map(|v| v.to_string()).unwrap_or_default();
     let content = std::fs::read_to_string(&path)
-        .map_err(|e| PerlError::runtime(format!("read_json: {}: {}", path, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("read_json: {}: {}", path, e), line))?;
     crate::native_data::json_decode(&content)
 }
 
 /// `write_json PATH, VALUE` — encode value as JSON and write to file.
 fn builtin_write_json(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.len() < 2 {
-        return Err(PerlError::runtime("write_json needs PATH and VALUE", line));
+        return Err(StrykeError::runtime("write_json needs PATH and VALUE", line));
     }
     let path = args[0].to_string();
     let val = &args[1];
     let json = crate::native_data::json_encode(val)?;
     let s = json.to_string();
     std::fs::write(&path, s.as_bytes())
-        .map_err(|e| PerlError::runtime(format!("write_json: {}: {}", path, e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("write_json: {}: {}", path, e), line))?;
     Ok(StrykeValue::integer(s.len() as i64))
 }
 
 /// `glob_match PATTERN, STRING` — test if STRING matches a glob pattern.
 fn builtin_glob_match(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.len() < 2 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "glob_match needs PATTERN and STRING",
             line,
         ));
@@ -36669,7 +36669,7 @@ fn glob_pattern_to_regex(pattern: &str) -> String {
 fn builtin_json_encode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let v = args
         .first()
-        .ok_or_else(|| PerlError::runtime("json_encode needs a value", 0))?;
+        .ok_or_else(|| StrykeError::runtime("json_encode needs a value", 0))?;
     let s = crate::native_data::json_encode(v)?;
     Ok(StrykeValue::string(s))
 }
@@ -36684,12 +36684,12 @@ fn builtin_json_decode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 fn builtin_json_jq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let data = args
         .first()
-        .ok_or_else(|| PerlError::runtime("json_jq needs (data, jq_filter)", 0))?;
+        .ok_or_else(|| StrykeError::runtime("json_jq needs (data, jq_filter)", 0))?;
     let filter = args
         .get(1)
         .map(|v| v.to_string())
         .filter(|s| !s.is_empty())
-        .ok_or_else(|| PerlError::runtime("json_jq needs a jq filter string", 0))?;
+        .ok_or_else(|| StrykeError::runtime("json_jq needs a jq filter string", 0))?;
     crate::native_data::json_jq(data, filter.trim())
 }
 
@@ -36709,7 +36709,7 @@ fn builtin_xml_decode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 fn builtin_xml_encode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let v = args
         .first()
-        .ok_or_else(|| PerlError::runtime("xml_encode needs a value", 0))?;
+        .ok_or_else(|| StrykeError::runtime("xml_encode needs a value", 0))?;
     crate::native_codec::xml_encode(v)
 }
 
@@ -36717,7 +36717,7 @@ fn builtin_xml_encode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 fn builtin_toml_encode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let v = args
         .first()
-        .ok_or_else(|| PerlError::runtime("toml_encode needs a value", 0))?;
+        .ok_or_else(|| StrykeError::runtime("toml_encode needs a value", 0))?;
     crate::native_codec::toml_encode(v)
 }
 
@@ -36731,7 +36731,7 @@ fn builtin_yaml_decode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 fn builtin_yaml_encode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let v = args
         .first()
-        .ok_or_else(|| PerlError::runtime("yaml_encode needs a value", 0))?;
+        .ok_or_else(|| StrykeError::runtime("yaml_encode needs a value", 0))?;
     crate::native_codec::yaml_encode(v)
 }
 
@@ -36802,7 +36802,7 @@ fn builtin_elapsed() -> PerlResult<StrykeValue> {
 fn builtin_crc32(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     let data = args
         .first()
-        .ok_or_else(|| PerlError::runtime("crc32: need DATA argument", line))?;
+        .ok_or_else(|| StrykeError::runtime("crc32: need DATA argument", line))?;
     let bytes = perl_scalar_as_bytes(data);
     Ok(StrykeValue::integer(crc32fast::hash(&bytes) as i64))
 }
@@ -36815,14 +36815,14 @@ fn builtin_par_find_files(args: &[StrykeValue], line: usize) -> PerlResult<Stryk
 
     let root = args
         .first()
-        .ok_or_else(|| PerlError::runtime("par_find_files: need PATH, PATTERN", line))?
+        .ok_or_else(|| StrykeError::runtime("par_find_files: need PATH, PATTERN", line))?
         .to_string();
     let pattern = args
         .get(1)
-        .ok_or_else(|| PerlError::runtime("par_find_files: need PATTERN", line))?
+        .ok_or_else(|| StrykeError::runtime("par_find_files: need PATTERN", line))?
         .to_string();
     let pat = glob::Pattern::new(&pattern)
-        .map_err(|e| PerlError::runtime(format!("par_find_files: bad pattern: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("par_find_files: bad pattern: {}", e), line))?;
 
     let root_path = PathBuf::from(&root);
     if !root_path.is_dir() {
@@ -36846,7 +36846,7 @@ fn builtin_par_find_files(args: &[StrykeValue], line: usize) -> PerlResult<Stryk
 /// scalar context, or a list of per-file counts in list context.
 fn builtin_par_line_count(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "par_line_count: need at least one file path",
             line,
         ));
@@ -36895,7 +36895,7 @@ fn builtin_chroot(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue>
     #[cfg(not(unix))]
     {
         let _ = args;
-        Err(PerlError::runtime(
+        Err(StrykeError::runtime(
             "chroot: not implemented on this platform",
             line,
         ))
@@ -36906,7 +36906,7 @@ fn builtin_chroot(args: &[StrykeValue], _line: usize) -> PerlResult<StrykeValue>
 /// `vec` — Vec. Returns an integer.
 fn builtin_vec(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.len() < 3 {
-        return Err(PerlError::runtime("vec: not enough arguments", line));
+        return Err(StrykeError::runtime("vec: not enough arguments", line));
     }
     // Prefer raw byte representation so previous vec() lvalue writes (which
     // may have produced non-UTF-8 sequences) round-trip correctly.
@@ -36919,7 +36919,7 @@ fn builtin_vec(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     let offset = args[1].to_int() as usize;
     let bits = args[2].to_int() as usize;
     if !matches!(bits, 1 | 2 | 4 | 8 | 16 | 32) {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("vec: illegal number of bits ({})", bits),
             line,
         ));
@@ -36959,7 +36959,7 @@ fn builtin_vec(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
 // compiler arranges for it to be assigned back to the original lvalue.
 fn builtin_vec_set_value(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.len() != 4 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("vec_set_value: expected 4 args, got {}", args.len()),
             line,
         ));
@@ -36968,13 +36968,13 @@ fn builtin_vec_set_value(args: &[StrykeValue], line: usize) -> PerlResult<Stryke
     let bits = args[2].to_int();
     let value = args[3].to_int() as u64;
     if !matches!(bits, 1 | 2 | 4 | 8 | 16 | 32) {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("Illegal number of bits in vec ({})", bits),
             line,
         ));
     }
     if offset < 0 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "Negative offset to vec in lvalue context",
             line,
         ));
@@ -37040,7 +37040,7 @@ fn builtin_stub_ok(_name: &str) -> PerlResult<StrykeValue> {
 // ── SysV IPC stubs ─────────────────────────────────────────────────
 /// `sysv_ipc_stub` — Sysv ipc stub.
 fn builtin_sysv_ipc_stub(name: &str, line: usize) -> PerlResult<StrykeValue> {
-    Err(PerlError::runtime(
+    Err(StrykeError::runtime(
         format!("{}: System V IPC not implemented", name),
         line,
     ))
@@ -37187,7 +37187,7 @@ fn builtin_fork() -> PerlResult<StrykeValue> {
 #[cfg(not(unix))]
 /// `fork` — Fork.
 fn builtin_fork() -> PerlResult<StrykeValue> {
-    Err(PerlError::runtime(
+    Err(StrykeError::runtime(
         "fork is not available on this platform",
         0,
     ))
@@ -37204,7 +37204,7 @@ fn builtin_wait() -> PerlResult<StrykeValue> {
 #[cfg(not(unix))]
 /// `wait` — Wait.
 fn builtin_wait() -> PerlResult<StrykeValue> {
-    Err(PerlError::runtime(
+    Err(StrykeError::runtime(
         "wait is not available on this platform",
         0,
     ))
@@ -37223,7 +37223,7 @@ fn builtin_waitpid(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 #[cfg(not(unix))]
 /// `waitpid` — Waitpid.
 fn builtin_waitpid(_args: &[StrykeValue]) -> PerlResult<StrykeValue> {
-    Err(PerlError::runtime(
+    Err(StrykeError::runtime(
         "waitpid is not available on this platform",
         0,
     ))
@@ -37323,7 +37323,7 @@ fn builtin_proceed(interp: &mut VMHelper, line: usize) -> PerlResult<StrykeValue
         .len()
         .checked_sub(1)
         .ok_or_else(|| {
-            crate::error::PerlError::runtime(
+            crate::error::StrykeError::runtime(
                 "proceed() called outside of an `around` advice block",
                 line,
             )
@@ -37344,7 +37344,7 @@ fn builtin_proceed(interp: &mut VMHelper, line: usize) -> PerlResult<StrykeValue
         match crate::builtins::try_builtin(interp, &name, &args, line) {
             Some(Ok(v)) => Ok(v),
             Some(Err(e)) => Err(e.at_line(line)),
-            None => Err(crate::error::PerlError::runtime(
+            None => Err(crate::error::StrykeError::runtime(
                 format!("proceed: undefined sub `{}`", name),
                 line,
             )),
@@ -37529,7 +37529,7 @@ fn builtin_setpgrp(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue>
                 )
             },
             _ => {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     "setpgrp: expected 0 or 2 arguments",
                     line,
                 ));
@@ -37543,7 +37543,7 @@ fn builtin_setpgrp(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue>
     #[cfg(not(unix))]
     {
         let _ = (args, line);
-        Err(PerlError::runtime(
+        Err(StrykeError::runtime(
             "setpgrp: not available on this platform",
             line,
         ))
@@ -37581,7 +37581,7 @@ unsafe fn errno_ptr() -> *mut libc::c_int {
 /// `getpriority` — Getpriority. Returns an integer.
 fn builtin_getpriority(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.len() < 2 {
-        return Err(PerlError::runtime("getpriority: need WHICH and WHO", line));
+        return Err(StrykeError::runtime("getpriority: need WHICH and WHO", line));
     }
     #[cfg(unix)]
     {
@@ -37606,7 +37606,7 @@ fn builtin_getpriority(args: &[StrykeValue], line: usize) -> PerlResult<StrykeVa
 /// `setpriority` — Setpriority. Returns an integer.
 fn builtin_setpriority(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.len() < 3 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "setpriority: need WHICH, WHO, and PRIORITY",
             line,
         ));
@@ -37900,7 +37900,7 @@ impl VMHelper {
         {
             let uid = args
                 .first()
-                .ok_or_else(|| PerlError::runtime("getpwuid: need UID", line))?
+                .ok_or_else(|| StrykeError::runtime("getpwuid: need UID", line))?
                 .to_int() as libc::uid_t;
             let Some(pw) = fetch_passwd_by_uid(uid) else {
                 return Ok(StrykeValue::UNDEF);
@@ -37926,7 +37926,7 @@ impl VMHelper {
         {
             let name = args
                 .first()
-                .ok_or_else(|| PerlError::runtime("getpwnam: need NAME", line))?
+                .ok_or_else(|| StrykeError::runtime("getpwnam: need NAME", line))?
                 .to_string();
             let Some(pw) = fetch_passwd_by_name(&name) else {
                 return Ok(StrykeValue::UNDEF);
@@ -37952,7 +37952,7 @@ impl VMHelper {
         {
             let gid = args
                 .first()
-                .ok_or_else(|| PerlError::runtime("getgrgid: need GID", line))?
+                .ok_or_else(|| StrykeError::runtime("getgrgid: need GID", line))?
                 .to_int() as libc::gid_t;
             let Some(gr) = fetch_group_by_gid(gid) else {
                 return Ok(StrykeValue::UNDEF);
@@ -37978,7 +37978,7 @@ impl VMHelper {
         {
             let name = args
                 .first()
-                .ok_or_else(|| PerlError::runtime("getgrnam: need NAME", line))?
+                .ok_or_else(|| StrykeError::runtime("getgrnam: need NAME", line))?
                 .to_string();
             let Some(gr) = fetch_group_by_name(&name) else {
                 return Ok(StrykeValue::UNDEF);
@@ -37997,7 +37997,7 @@ impl VMHelper {
     ) -> PerlResult<StrykeValue> {
         let host = args
             .first()
-            .ok_or_else(|| PerlError::runtime("gethostbyname: need NAME", line))?
+            .ok_or_else(|| StrykeError::runtime("gethostbyname: need NAME", line))?
             .to_string();
         let mut addrs: Vec<SocketAddr> = match format!("{}:0", host.trim()).to_socket_addrs() {
             Ok(i) => i.collect(),
@@ -38062,10 +38062,10 @@ impl VMHelper {
         {
             let name = args
                 .first()
-                .ok_or_else(|| PerlError::runtime("getprotobyname: need NAME", line))?
+                .ok_or_else(|| StrykeError::runtime("getprotobyname: need NAME", line))?
                 .to_string();
             let cname = CString::new(name.as_bytes())
-                .map_err(|_| PerlError::runtime("getprotobyname: invalid name", line))?;
+                .map_err(|_| StrykeError::runtime("getprotobyname: invalid name", line))?;
             let p = unsafe { libc::getprotobyname(cname.as_ptr()) };
             if p.is_null() {
                 return Ok(StrykeValue::UNDEF);
@@ -38106,16 +38106,16 @@ impl VMHelper {
         {
             let serv = args
                 .first()
-                .ok_or_else(|| PerlError::runtime("getservbyname: need SERVICE", line))?
+                .ok_or_else(|| StrykeError::runtime("getservbyname: need SERVICE", line))?
                 .to_string();
             let proto = args
                 .get(1)
-                .ok_or_else(|| PerlError::runtime("getservbyname: need PROTOCOL", line))?
+                .ok_or_else(|| StrykeError::runtime("getservbyname: need PROTOCOL", line))?
                 .to_string();
             let cs = CString::new(serv.as_bytes())
-                .map_err(|_| PerlError::runtime("getservbyname: invalid service name", line))?;
+                .map_err(|_| StrykeError::runtime("getservbyname: invalid service name", line))?;
             let cp = CString::new(proto.as_bytes())
-                .map_err(|_| PerlError::runtime("getservbyname: invalid protocol", line))?;
+                .map_err(|_| StrykeError::runtime("getservbyname: invalid protocol", line))?;
             let se = unsafe { libc::getservbyname(cs.as_ptr(), cp.as_ptr()) };
             if se.is_null() {
                 return Ok(StrykeValue::UNDEF);
@@ -38166,7 +38166,7 @@ impl VMHelper {
         #[cfg(not(unix))]
         {
             let _ = (args, line, self);
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "setsockopt: not available on this platform",
                 line,
             ));
@@ -38174,7 +38174,7 @@ impl VMHelper {
         #[cfg(unix)]
         {
             if args.len() < 4 {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     "setsockopt: need SOCK, LEVEL, OPTNAME, OPTVAL",
                     line,
                 ));
@@ -38184,7 +38184,7 @@ impl VMHelper {
             let optname = args[2].to_int() as libc::c_int;
             let payload = sockopt_payload(&args[3]);
             let fd = self.socket_raw_fd(&fh).ok_or_else(|| {
-                PerlError::runtime(format!("setsockopt: not a socket {}", fh), line)
+                StrykeError::runtime(format!("setsockopt: not a socket {}", fh), line)
             })?;
             let r = unsafe {
                 libc::setsockopt(
@@ -38210,7 +38210,7 @@ impl VMHelper {
         #[cfg(not(unix))]
         {
             let _ = (args, line, self);
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "getsockopt: not available on this platform",
                 line,
             ));
@@ -38218,7 +38218,7 @@ impl VMHelper {
         #[cfg(unix)]
         {
             if args.len() < 3 {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     "getsockopt: need SOCK, LEVEL, OPTNAME",
                     line,
                 ));
@@ -38227,7 +38227,7 @@ impl VMHelper {
             let level = args[1].to_int() as libc::c_int;
             let optname = args[2].to_int() as libc::c_int;
             let fd = self.socket_raw_fd(&fh).ok_or_else(|| {
-                PerlError::runtime(format!("getsockopt: not a socket {}", fh), line)
+                StrykeError::runtime(format!("getsockopt: not a socket {}", fh), line)
             })?;
             let mut buf = vec![0u8; 256];
             let mut len = buf.len() as libc::socklen_t;
@@ -38249,7 +38249,7 @@ impl VMHelper {
         #[cfg(not(unix))]
         {
             let _ = (args, line, self);
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "getpeername: not available on this platform",
                 line,
             ));
@@ -38258,10 +38258,10 @@ impl VMHelper {
         {
             let fh = args
                 .first()
-                .ok_or_else(|| PerlError::runtime("getpeername: need SOCK", line))?
+                .ok_or_else(|| StrykeError::runtime("getpeername: need SOCK", line))?
                 .to_string();
             let fd = self.socket_raw_fd(&fh).ok_or_else(|| {
-                PerlError::runtime(format!("getpeername: not a socket {}", fh), line)
+                StrykeError::runtime(format!("getpeername: not a socket {}", fh), line)
             })?;
             let mut storage: libc::sockaddr_storage = unsafe { std::mem::zeroed() };
             let mut len = std::mem::size_of::<libc::sockaddr_storage>() as libc::socklen_t;
@@ -38293,7 +38293,7 @@ impl VMHelper {
         #[cfg(not(unix))]
         {
             let _ = (args, line, self);
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "getsockname: not available on this platform",
                 line,
             ));
@@ -38302,10 +38302,10 @@ impl VMHelper {
         {
             let fh = args
                 .first()
-                .ok_or_else(|| PerlError::runtime("getsockname: need SOCK", line))?
+                .ok_or_else(|| StrykeError::runtime("getsockname: need SOCK", line))?
                 .to_string();
             let fd = self.socket_raw_fd(&fh).ok_or_else(|| {
-                PerlError::runtime(format!("getsockname: not a socket {}", fh), line)
+                StrykeError::runtime(format!("getsockname: not a socket {}", fh), line)
             })?;
             let mut storage: libc::sockaddr_storage = unsafe { std::mem::zeroed() };
             let mut len = std::mem::size_of::<libc::sockaddr_storage>() as libc::socklen_t;
@@ -38374,7 +38374,7 @@ impl VMHelper {
             1 => args[0]
                 .as_io_handle_name()
                 .unwrap_or_else(|| args[0].to_string()),
-            _ => return Err(PerlError::runtime("tell: too many arguments", line)),
+            _ => return Err(StrykeError::runtime("tell: too many arguments", line)),
         };
         if let Some(slot) = self.io_file_slots.get(&name).cloned() {
             match slot.lock().seek(SeekFrom::Current(0)) {
@@ -38441,7 +38441,7 @@ impl VMHelper {
                 }
             }
         } else {
-            Err(PerlError::runtime(
+            Err(StrykeError::runtime(
                 format!("getc: unopened handle {}", name),
                 line,
             ))
@@ -38451,7 +38451,7 @@ impl VMHelper {
     /// `sysread` — Sysread. Returns an integer.
     fn builtin_sysread(&mut self, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
         if args.len() < 3 {
-            return Err(PerlError::runtime("sysread: not enough arguments", line));
+            return Err(StrykeError::runtime("sysread: not enough arguments", line));
         }
         let fh = args[0].to_string();
         let len = args[2].to_int().max(0) as usize;
@@ -38464,7 +38464,7 @@ impl VMHelper {
             }
             f.read(&mut buf).unwrap_or(0)
         } else {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("sysread: unopened handle {}", fh),
                 line,
             ));
@@ -38475,7 +38475,7 @@ impl VMHelper {
     /// `syswrite` — Syswrite. Returns an integer.
     fn builtin_syswrite(&mut self, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
         if args.len() < 3 {
-            return Err(PerlError::runtime("syswrite: not enough arguments", line));
+            return Err(StrykeError::runtime("syswrite: not enough arguments", line));
         }
         let fh = args[0].to_string();
         let data = args[1].to_string();
@@ -38487,7 +38487,7 @@ impl VMHelper {
             let _ = f.flush();
             return Ok(StrykeValue::integer(n as i64));
         }
-        Err(PerlError::runtime(
+        Err(StrykeError::runtime(
             format!("syswrite: unopened handle {}", fh),
             line,
         ))
@@ -38496,7 +38496,7 @@ impl VMHelper {
     /// `sysseek` — Sysseek. Returns an integer.
     fn builtin_sysseek(&mut self, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
         if args.len() < 3 {
-            return Err(PerlError::runtime("sysseek: not enough arguments", line));
+            return Err(StrykeError::runtime("sysseek: not enough arguments", line));
         }
         let fh = args[0].to_string();
         let pos = args[1].to_int();
@@ -38516,7 +38516,7 @@ impl VMHelper {
                 }
             }
         } else {
-            Err(PerlError::runtime(
+            Err(StrykeError::runtime(
                 format!("sysseek: unopened handle {}", fh),
                 line,
             ))
@@ -38526,7 +38526,7 @@ impl VMHelper {
     /// `truncate` — Truncate. Returns an integer.
     fn builtin_truncate(&mut self, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
         if args.len() < 2 {
-            return Err(PerlError::runtime("truncate: not enough arguments", line));
+            return Err(StrykeError::runtime("truncate: not enough arguments", line));
         }
         let path = args[0].to_string();
         let len = args[1].to_int().max(0) as u64;
@@ -38565,7 +38565,7 @@ impl VMHelper {
     /// `socket` — Socket. Returns an integer.
     fn builtin_socket(&mut self, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
         if args.len() < 4 {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "socket: need handle, domain, type, protocol",
                 line,
             ));
@@ -38598,7 +38598,7 @@ impl VMHelper {
     /// `bind` — Bind. Returns an integer.
     fn builtin_bind(&mut self, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
         if args.len() < 2 {
-            return Err(PerlError::runtime("bind: not enough arguments", line));
+            return Err(StrykeError::runtime("bind: not enough arguments", line));
         }
         let fh = args[0].to_string();
         let addr = args[1].to_string();
@@ -38619,7 +38619,7 @@ impl VMHelper {
     /// `listen` — Listen. Returns an integer.
     fn builtin_listen(&mut self, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
         if args.len() < 2 {
-            return Err(PerlError::runtime("listen: not enough arguments", line));
+            return Err(StrykeError::runtime("listen: not enough arguments", line));
         }
         let fh = args[0].to_string();
         let _backlog = args[1].to_int().max(1) as i32;
@@ -38627,13 +38627,13 @@ impl VMHelper {
             // `std::net::TcpListener` is already listening after bind.
             return Ok(StrykeValue::integer(1));
         }
-        Err(PerlError::runtime("listen: not a listener socket", line))
+        Err(StrykeError::runtime("listen: not a listener socket", line))
     }
 
     /// `accept` — Accept. Returns an integer.
     fn builtin_accept(&mut self, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
         if args.len() < 2 {
-            return Err(PerlError::runtime("accept: not enough arguments", line));
+            return Err(StrykeError::runtime("accept: not enough arguments", line));
         }
         let new_fh = args[0].to_string();
         let srv = args[1].to_string();
@@ -38650,14 +38650,14 @@ impl VMHelper {
                 }
             }
         } else {
-            Err(PerlError::runtime("accept: bad listener", line))
+            Err(StrykeError::runtime("accept: bad listener", line))
         }
     }
 
     /// `connect` — Connect. Returns an integer.
     fn builtin_connect(&mut self, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
         if args.len() < 2 {
-            return Err(PerlError::runtime("connect: not enough arguments", line));
+            return Err(StrykeError::runtime("connect: not enough arguments", line));
         }
         let fh = args[0].to_string();
         let addr = args[1].to_string();
@@ -38676,7 +38676,7 @@ impl VMHelper {
     /// `send` — Send. Returns an integer.
     fn builtin_send(&mut self, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
         if args.len() < 2 {
-            return Err(PerlError::runtime("send: not enough arguments", line));
+            return Err(StrykeError::runtime("send: not enough arguments", line));
         }
         let fh = args[0].to_string();
         let data = args[1].to_string();
@@ -38684,13 +38684,13 @@ impl VMHelper {
             let n = s.write(data.as_bytes()).unwrap_or(0);
             return Ok(StrykeValue::integer(n as i64));
         }
-        Err(PerlError::runtime("send: not a connected socket", line))
+        Err(StrykeError::runtime("send: not a connected socket", line))
     }
 
     /// `recv` — Recv. Returns a string.
     fn builtin_recv(&mut self, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
         if args.len() < 2 {
-            return Err(PerlError::runtime("recv: not enough arguments", line));
+            return Err(StrykeError::runtime("recv: not enough arguments", line));
         }
         let fh = args[0].to_string();
         let len = args[1].to_int().max(0) as usize;
@@ -38699,13 +38699,13 @@ impl VMHelper {
             let n = s.read(&mut buf).unwrap_or(0);
             return Ok(StrykeValue::string(decode_utf8_or_latin1(&buf[..n])));
         }
-        Err(PerlError::runtime("recv: not a connected socket", line))
+        Err(StrykeError::runtime("recv: not a connected socket", line))
     }
 
     /// `shutdown` — Shutdown. Returns an integer.
     fn builtin_shutdown(&mut self, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
         if args.len() < 2 {
-            return Err(PerlError::runtime("shutdown: not enough arguments", line));
+            return Err(StrykeError::runtime("shutdown: not enough arguments", line));
         }
         let fh = args[0].to_string();
         let how = args[1].to_int();
@@ -38718,14 +38718,14 @@ impl VMHelper {
             let _ = s.shutdown(sh);
             return Ok(StrykeValue::integer(1));
         }
-        Err(PerlError::runtime("shutdown: not a stream socket", line))
+        Err(StrykeError::runtime("shutdown: not a stream socket", line))
     }
 
     // ── seek(FH, POS, WHENCE) ──────────────────────────────────────────
     /// `seek` — Seek. Returns an integer.
     fn builtin_seek(&mut self, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
         if args.len() < 3 {
-            return Err(PerlError::runtime("seek: not enough arguments", line));
+            return Err(StrykeError::runtime("seek: not enough arguments", line));
         }
         let fh = args[0]
             .as_io_handle_name()
@@ -38755,7 +38755,7 @@ impl VMHelper {
     /// `read` — Read. Returns an integer.
     fn builtin_read(&mut self, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
         if args.len() < 3 {
-            return Err(PerlError::runtime("read: not enough arguments", line));
+            return Err(StrykeError::runtime("read: not enough arguments", line));
         }
         let fh = args[0]
             .as_io_handle_name()
@@ -38779,7 +38779,7 @@ impl VMHelper {
             let _ = self.scope.set_scalar(&var_name, data);
             Ok(StrykeValue::integer(n as i64))
         } else {
-            Err(PerlError::runtime(
+            Err(StrykeError::runtime(
                 format!("read: unopened handle {}", fh),
                 line,
             ))
@@ -38790,7 +38790,7 @@ impl VMHelper {
     /// `sysopen` — Sysopen.
     fn builtin_sysopen(&mut self, args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
         if args.len() < 3 {
-            return Err(PerlError::runtime("sysopen: not enough arguments", line));
+            return Err(StrykeError::runtime("sysopen: not enough arguments", line));
         }
         let fh = args[0].to_string();
         let filename = args[1].to_string();
@@ -38875,7 +38875,7 @@ impl VMHelper {
         #[cfg(unix)]
         {
             if args.len() < 5 {
-                return Err(PerlError::runtime("socketpair: not enough arguments", line));
+                return Err(StrykeError::runtime("socketpair: not enough arguments", line));
             }
             let _fh1 = args[0].to_string();
             let _fh2 = args[1].to_string();
@@ -39011,7 +39011,7 @@ impl VMHelper {
         line: usize,
     ) -> PerlResult<StrykeValue> {
         if args.len() < 2 {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "gethostbyaddr: not enough arguments",
                 line,
             ));
@@ -39036,21 +39036,21 @@ impl VMHelper {
         line: usize,
     ) -> PerlResult<StrykeValue> {
         if args.len() < 2 {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "serve: need PORT, HANDLER (code ref)",
                 line,
             ));
         }
         let port = args[0].to_int();
         if !(1..=65535).contains(&port) {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("serve: invalid port {}", port),
                 line,
             ));
         }
         let handler = args[1].clone();
         if handler.as_code_ref().is_none() && handler.as_str().is_none() {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "serve: second argument must be a code ref or sub name",
                 line,
             ));
@@ -39069,7 +39069,7 @@ impl VMHelper {
 
         let addr = format!("0.0.0.0:{}", port);
         let listener = std::net::TcpListener::bind(&addr)
-            .map_err(|e| PerlError::runtime(format!("serve: bind {}: {}", addr, e), line))?;
+            .map_err(|e| StrykeError::runtime(format!("serve: bind {}: {}", addr, e), line))?;
         eprintln!(
             "stryke: serving on http://0.0.0.0:{} (workers: {})",
             port, worker_count
@@ -39326,11 +39326,11 @@ fn serve_format_response(val: StrykeValue) -> (u16, Vec<(String, String)>, Strin
 /// `memoize \&f` — returns a memoized version: results cached by stringified args.
 fn builtin_memoize(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Err(PerlError::runtime("memoize: requires a function", line));
+        return Err(StrykeError::runtime("memoize: requires a function", line));
     }
     let f = args[0].clone();
     if f.as_code_ref().is_none() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "memoize: argument must be a code reference",
             line,
         ));
@@ -39354,11 +39354,11 @@ fn builtin_memoize(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue>
 /// If arity is omitted, uses the sub's parameter count.
 fn builtin_curry(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Err(PerlError::runtime("curry: requires a function", line));
+        return Err(StrykeError::runtime("curry: requires a function", line));
     }
     let f = args[0].clone();
     let sub = f.as_code_ref().ok_or_else(|| {
-        PerlError::runtime("curry: first argument must be a code reference", line)
+        StrykeError::runtime("curry: first argument must be a code reference", line)
     })?;
     let arity = if args.len() > 1 {
         args[1].to_int() as usize
@@ -39386,11 +39386,11 @@ fn builtin_curry(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
 /// `once \&f` — returns a function that calls `f` once and caches the result forever.
 fn builtin_once(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Err(PerlError::runtime("once: requires a function", line));
+        return Err(StrykeError::runtime("once: requires a function", line));
     }
     let f = args[0].clone();
     if f.as_code_ref().is_none() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "once: argument must be a code reference",
             line,
         ));
@@ -39423,17 +39423,17 @@ fn builtin_deep_clone(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// Nested hashes are merged recursively; non-hash values from `%b` override `%a`.
 fn builtin_deep_merge(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
     if args.len() < 2 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "deep_merge: requires two hash references",
             line,
         ));
     }
     let a = args[0]
         .as_hash_ref()
-        .ok_or_else(|| PerlError::runtime("deep_merge: first argument must be a hashref", line))?;
+        .ok_or_else(|| StrykeError::runtime("deep_merge: first argument must be a hashref", line))?;
     let b = args[1]
         .as_hash_ref()
-        .ok_or_else(|| PerlError::runtime("deep_merge: second argument must be a hashref", line))?;
+        .ok_or_else(|| StrykeError::runtime("deep_merge: second argument must be a hashref", line))?;
     let merged = deep_merge_maps(&a.read(), &b.read());
     Ok(StrykeValue::hash_ref(Arc::new(RwLock::new(merged))))
 }

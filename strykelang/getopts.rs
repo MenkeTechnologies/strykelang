@@ -68,7 +68,7 @@
 //! `--help`/`-h`, `getopts` intercepts `--help`/`-h`, prints a formatted
 //! usage block, and `exit(0)`s.
 
-use crate::error::{PerlError, PerlResult};
+use crate::error::{StrykeError, PerlResult};
 use crate::value::StrykeValue;
 use crate::vm_helper::VMHelper;
 use indexmap::IndexMap;
@@ -122,7 +122,7 @@ fn parse_spec_string(spec: &str, line: usize) -> PerlResult<OptSpec> {
     let bytes = spec.as_bytes();
     let len = bytes.len();
     if len == 0 {
-        return Err(PerlError::runtime("getopts: empty spec string", line));
+        return Err(StrykeError::runtime("getopts: empty spec string", line));
     }
 
     // Find where the type suffix begins. Type starts at the first `=`, `:`, `!`, or `+`.
@@ -138,7 +138,7 @@ fn parse_spec_string(spec: &str, line: usize) -> PerlResult<OptSpec> {
 
     let mut names: Vec<String> = names_part.split('|').map(|s| s.to_string()).collect();
     if names.is_empty() || names.iter().any(|n| n.is_empty()) {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("getopts: invalid spec '{}': empty option name", spec),
             line,
         ));
@@ -157,14 +157,14 @@ fn parse_spec_string(spec: &str, line: usize) -> PerlResult<OptSpec> {
                 '=' => true,
                 ':' => false,
                 _ => {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("getopts: invalid spec '{}': bad type marker", spec),
                         line,
                     ));
                 }
             };
             let ty_char = chars.next().ok_or_else(|| {
-                PerlError::runtime(
+                StrykeError::runtime(
                     format!("getopts: invalid spec '{}': missing type", spec),
                     line,
                 )
@@ -174,7 +174,7 @@ fn parse_spec_string(spec: &str, line: usize) -> PerlResult<OptSpec> {
                 'i' => ScalarType::Int,
                 'f' => ScalarType::Float,
                 other => {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("getopts: invalid spec '{}': unknown type '{}'", spec, other),
                         line,
                     ));
@@ -191,7 +191,7 @@ fn parse_spec_string(spec: &str, line: usize) -> PerlResult<OptSpec> {
                 }
                 "@" => {
                     if !required {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             format!(
                                 "getopts: invalid spec '{}': `:T@` not supported (use `=T@`)",
                                 spec
@@ -203,7 +203,7 @@ fn parse_spec_string(spec: &str, line: usize) -> PerlResult<OptSpec> {
                 }
                 "%" => {
                     if !required {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             format!(
                                 "getopts: invalid spec '{}': `:T%` not supported (use `=T%`)",
                                 spec
@@ -214,7 +214,7 @@ fn parse_spec_string(spec: &str, line: usize) -> PerlResult<OptSpec> {
                     ArgKind::Hash(ty)
                 }
                 other => {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("getopts: invalid spec '{}': trailing '{}'", spec, other),
                         line,
                     ));
@@ -238,13 +238,13 @@ fn coerce_scalar(raw: &str, ty: ScalarType, opt: &str, line: usize) -> PerlResul
     match ty {
         ScalarType::Str => Ok(StrykeValue::string(raw.to_string())),
         ScalarType::Int => raw.parse::<i64>().map(StrykeValue::integer).map_err(|_| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 format!("getopts: option '{}' expects integer, got '{}'", opt, raw),
                 line,
             )
         }),
         ScalarType::Float => raw.parse::<f64>().map(StrykeValue::float).map_err(|_| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 format!("getopts: option '{}' expects float, got '{}'", opt, raw),
                 line,
             )
@@ -291,7 +291,7 @@ fn find_spec<'a>(specs: &'a [OptSpec], name: &str) -> Option<(usize, &'a OptSpec
 
 fn split_hash_kv(raw: &str, opt: &str, line: usize) -> PerlResult<(String, String)> {
     let eq = raw.find('=').ok_or_else(|| {
-        PerlError::runtime(
+        StrykeError::runtime(
             format!("getopts: option '{}' expects key=value, got '{}'", opt, raw),
             line,
         )
@@ -312,7 +312,7 @@ fn store_value(
                 .entry(spec.canonical.clone())
                 .or_insert_with(|| StrykeValue::array_ref(Arc::new(RwLock::new(Vec::new()))));
             let arc = entry.as_array_ref().ok_or_else(|| {
-                PerlError::runtime(
+                StrykeError::runtime(
                     format!("getopts: option '{}' internal: not an array ref", opt),
                     line,
                 )
@@ -324,7 +324,7 @@ fn store_value(
                 .entry(spec.canonical.clone())
                 .or_insert_with(|| StrykeValue::hash_ref(Arc::new(RwLock::new(IndexMap::new()))));
             let arc = entry.as_hash_ref().ok_or_else(|| {
-                PerlError::runtime(
+                StrykeError::runtime(
                     format!("getopts: option '{}' internal: not a hash ref", opt),
                     line,
                 )
@@ -338,7 +338,7 @@ fn store_value(
                     return Ok(());
                 }
             }
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("getopts: option '{}' internal: malformed hash kv", opt),
                 line,
             ));
@@ -423,7 +423,7 @@ fn parse_argv(
                 None => (rest, None),
             };
             let (_, spec, negated) = find_spec(specs, name).ok_or_else(|| {
-                PerlError::runtime(format!("getopts: unknown option --{}", name), line)
+                StrykeError::runtime(format!("getopts: unknown option --{}", name), line)
             })?;
             let display = render_opt(name);
             i = consume_option(
@@ -452,7 +452,7 @@ fn parse_argv(
                 let name = rest[..eq].to_string();
                 let inline_val = Some(rest[eq + 1..].to_string());
                 let (_, spec, negated) = find_spec(specs, &name).ok_or_else(|| {
-                    PerlError::runtime(format!("getopts: unknown option -{}", name), line)
+                    StrykeError::runtime(format!("getopts: unknown option -{}", name), line)
                 })?;
                 let display = render_opt(&name);
                 i = consume_option(
@@ -472,7 +472,7 @@ fn parse_argv(
             while idx < chars.len() {
                 let key = chars[idx].to_string();
                 let (_, spec, negated) = find_spec(specs, &key).ok_or_else(|| {
-                    PerlError::runtime(format!("getopts: unknown option -{}", key), line)
+                    StrykeError::runtime(format!("getopts: unknown option -{}", key), line)
                 })?;
                 let display = render_opt(&key);
                 match spec.kind {
@@ -542,7 +542,7 @@ fn consume_option(
     match spec.kind {
         ArgKind::Bool => {
             if inline_val.is_some() {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!("getopts: option {} takes no argument", display),
                     line,
                 ));
@@ -551,7 +551,7 @@ fn consume_option(
         }
         ArgKind::NegBool => {
             if inline_val.is_some() {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!("getopts: option {} takes no argument", display),
                     line,
                 ));
@@ -563,7 +563,7 @@ fn consume_option(
         }
         ArgKind::Counter => {
             if inline_val.is_some() {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!("getopts: option {} takes no argument", display),
                     line,
                 ));
@@ -575,7 +575,7 @@ fn consume_option(
                 Some(v) => v,
                 None => {
                     if i >= input.len() {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             format!("getopts: option {} requires a value", display),
                             line,
                         ));
@@ -614,7 +614,7 @@ fn consume_option(
                 Some(v) => v,
                 None => {
                     if i >= input.len() {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             format!("getopts: option {} requires key=value", display),
                             line,
                         ));
@@ -645,7 +645,7 @@ struct HelpMeta {
 
 fn parse_help_meta(v: &StrykeValue, line: usize) -> PerlResult<HelpMeta> {
     let h = v.as_hash_ref().ok_or_else(|| {
-        PerlError::runtime(
+        StrykeError::runtime(
             "getopts: third argument must be a hash ref { prog => ..., desc => ..., epilog => ... }",
             line,
         )
@@ -657,7 +657,7 @@ fn parse_help_meta(v: &StrykeValue, line: usize) -> PerlResult<HelpMeta> {
             "desc" | "description" => meta.desc = Some(val.to_string()),
             "epilog" => meta.epilog = Some(val.to_string()),
             other => {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "getopts: unknown meta key '{}' (expected prog/desc/epilog)",
                         other
@@ -683,7 +683,7 @@ fn apply_metadata(
             "required" => spec.required = v.to_int() != 0,
             "metavar" => spec.metavar = Some(v.to_string()),
             other => {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "getopts: unknown metadata key '{}' for spec '{}' (expected help/default/required/metavar)",
                         other, spec.canonical
@@ -857,7 +857,7 @@ fn parse_specs_value(specs_val: &StrykeValue, line: usize) -> PerlResult<Vec<Opt
             specs.push(parse_spec_string(&s, line)?);
         }
     } else {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "getopts: SPECS must be an array ref of spec strings or a hash ref",
             line,
         ));
@@ -921,7 +921,7 @@ pub fn builtin_getopts(
     line: usize,
 ) -> PerlResult<StrykeValue> {
     if args.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "getopts: usage: getopts(SPECS) | getopts(SPECS, META) | getopts(\\@ARGV, SPECS [, META])",
             line,
         ));
@@ -951,7 +951,7 @@ pub fn builtin_getopts(
 
     let mut argv_sink: ArgvSink<'_> = if argv_is_explicit {
         let r = args[0].as_array_ref().ok_or_else(|| {
-            PerlError::runtime(
+            StrykeError::runtime(
                 "getopts: first argument (when 2+ args supplied) must be an array reference (\\@ARGV)",
                 line,
             )
@@ -972,7 +972,7 @@ pub fn builtin_getopts(
         let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
         for s in &specs {
             if !seen.insert(&s.canonical) {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!("getopts: duplicate option name '{}' in specs", s.canonical),
                     line,
                 ));
@@ -1018,7 +1018,7 @@ pub fn builtin_getopts(
             None => false,
         };
         if !present {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("getopts: option '--{}' is required", s.canonical),
                 line,
             ));

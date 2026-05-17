@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
 
 use crate::ast::PerlTypeName;
-use crate::error::PerlError;
+use crate::error::StrykeError;
 use crate::value::StrykeValue;
 
 /// Thread-safe shared array for `mysync @a`.
@@ -501,7 +501,7 @@ impl Scope {
         matches!(name, "+" | "-" | "ENV" | "INC")
     }
 
-    fn check_parallel_scalar_write(&self, name: &str) -> Result<(), PerlError> {
+    fn check_parallel_scalar_write(&self, name: &str) -> Result<(), StrykeError> {
         if !self.parallel_guard || Self::parallel_skip_special_name(name) {
             return Ok(());
         }
@@ -531,7 +531,7 @@ impl Scope {
                     } else {
                         "declare `mysync` for shared lexical state"
                     };
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!(
                             "cannot assign to captured non-atomic variable `${}` in a parallel block — {}",
                             name, directive
@@ -542,7 +542,7 @@ impl Scope {
                 return Ok(());
             }
         }
-        Err(PerlError::runtime(
+        Err(StrykeError::runtime(
             format!(
                 "cannot assign to undeclared variable `${}` in a parallel block",
                 name
@@ -631,7 +631,7 @@ impl Scope {
         slot: u8,
         val: StrykeValue,
         slot_name: Option<&str>,
-    ) -> Result<(), PerlError> {
+    ) -> Result<(), StrykeError> {
         if self.parallel_guard {
             let idx = slot as usize;
             let len = self.frames.len();
@@ -661,7 +661,7 @@ impl Scope {
                             || (idx < frame.scalar_slots.len() && frame.owns_scalar_slot_index(idx))
                         {
                             if fi < baseline {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     format!(
                                         "cannot assign to captured outer lexical `${}` inside a parallel block (use `mysync`)",
                                         name
@@ -837,7 +837,7 @@ impl Scope {
     }
 
     /// `local $name` — save current value, assign `val`; restore on `pop_frame`.
-    pub fn local_set_scalar(&mut self, name: &str, val: StrykeValue) -> Result<(), PerlError> {
+    pub fn local_set_scalar(&mut self, name: &str, val: StrykeValue) -> Result<(), StrykeError> {
         let old = self.get_scalar(name);
         if let Some(frame) = self.frames.last_mut() {
             frame
@@ -848,9 +848,9 @@ impl Scope {
     }
 
     /// `local @name` — not valid for `mysync` arrays.
-    pub fn local_set_array(&mut self, name: &str, val: Vec<StrykeValue>) -> Result<(), PerlError> {
+    pub fn local_set_array(&mut self, name: &str, val: Vec<StrykeValue>) -> Result<(), StrykeError> {
         if self.find_atomic_array(name).is_some() {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "local cannot be used on mysync arrays",
                 0,
             ));
@@ -870,9 +870,9 @@ impl Scope {
         &mut self,
         name: &str,
         val: IndexMap<String, StrykeValue>,
-    ) -> Result<(), PerlError> {
+    ) -> Result<(), StrykeError> {
         if self.find_atomic_hash(name).is_some() {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "local cannot be used on mysync hashes",
                 0,
             ));
@@ -893,9 +893,9 @@ impl Scope {
         name: &str,
         key: &str,
         val: StrykeValue,
-    ) -> Result<(), PerlError> {
+    ) -> Result<(), StrykeError> {
         if self.find_atomic_hash(name).is_some() {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "local cannot be used on mysync hash elements",
                 0,
             ));
@@ -923,9 +923,9 @@ impl Scope {
         name: &str,
         index: i64,
         val: StrykeValue,
-    ) -> Result<(), PerlError> {
+    ) -> Result<(), StrykeError> {
         if self.find_atomic_array(name).is_some() {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "local cannot be used on mysync array elements",
                 0,
             ));
@@ -955,11 +955,11 @@ impl Scope {
         val: StrykeValue,
         frozen: bool,
         ty: Option<PerlTypeName>,
-    ) -> Result<(), PerlError> {
+    ) -> Result<(), StrykeError> {
         canon_main!(name);
         if let Some(ref t) = ty {
             t.check_value(&val)
-                .map_err(|msg| PerlError::type_error(format!("`${}`: {}", name, msg), 0))?;
+                .map_err(|msg| StrykeError::type_error(format!("`${}`: {}", name, msg), 0))?;
         }
         if let Some(frame) = self.frames.last_mut() {
             frame.set_scalar(name, val);
@@ -1216,7 +1216,7 @@ impl Scope {
         &mut self,
         name: &str,
         f: impl FnOnce(&StrykeValue) -> StrykeValue,
-    ) -> Result<StrykeValue, PerlError> {
+    ) -> Result<StrykeValue, StrykeError> {
         for frame in self.frames.iter().rev() {
             if let Some(v) = frame.get_scalar(name) {
                 if let Some(arc) = v.as_atomic_arc() {
@@ -1244,7 +1244,7 @@ impl Scope {
         &mut self,
         name: &str,
         f: impl FnOnce(&StrykeValue) -> StrykeValue,
-    ) -> Result<StrykeValue, PerlError> {
+    ) -> Result<StrykeValue, StrykeError> {
         for frame in self.frames.iter().rev() {
             if let Some(v) = frame.get_scalar(name) {
                 if let Some(arc) = v.as_atomic_arc() {
@@ -1274,7 +1274,7 @@ impl Scope {
         &mut self,
         name: &str,
         rhs: &StrykeValue,
-    ) -> Result<StrykeValue, PerlError> {
+    ) -> Result<StrykeValue, StrykeError> {
         canon_main!(name);
         self.check_parallel_scalar_write(name)?;
         for frame in self.frames.iter_mut().rev() {
@@ -1308,7 +1308,7 @@ impl Scope {
     }
 
     #[inline]
-    pub fn set_scalar(&mut self, name: &str, val: StrykeValue) -> Result<(), PerlError> {
+    pub fn set_scalar(&mut self, name: &str, val: StrykeValue) -> Result<(), StrykeError> {
         if let Some(rest) = strip_main_prefix(name) {
             return self.set_scalar(rest, val);
         }
@@ -1354,7 +1354,7 @@ impl Scope {
             if frame.has_scalar(name) {
                 if let Some(ty) = frame.typed_scalars.get(name) {
                     ty.check_value(&val)
-                        .map_err(|msg| PerlError::type_error(format!("`${}`: {}", name, msg), 0))?;
+                        .map_err(|msg| StrykeError::type_error(format!("`${}`: {}", name, msg), 0))?;
                 }
                 frame.set_scalar(name, val);
                 return Ok(());
@@ -1748,7 +1748,7 @@ impl Scope {
             .find(|&i| self.frames[i].has_array(name))
     }
 
-    fn check_parallel_array_write(&self, name: &str) -> Result<(), PerlError> {
+    fn check_parallel_array_write(&self, name: &str) -> Result<(), StrykeError> {
         if !self.parallel_guard
             || Self::parallel_skip_special_name(name)
             || Self::parallel_allowed_internal_array(name)
@@ -1758,14 +1758,14 @@ impl Scope {
         // Worker-local frames are at depth >= baseline.
         let baseline = self.parallel_guard_baseline;
         match self.resolve_array_frame_idx(name) {
-            None => Err(PerlError::runtime(
+            None => Err(StrykeError::runtime(
                 format!(
                     "cannot modify undeclared array `@{}` in a parallel block",
                     name
                 ),
                 0,
             )),
-            Some(idx) if idx < baseline => Err(PerlError::runtime(
+            Some(idx) if idx < baseline => Err(StrykeError::runtime(
                 format!(
                     "cannot modify captured non-mysync array `@{}` in a parallel block",
                     name
@@ -1882,11 +1882,11 @@ impl Scope {
         None
     }
 
-    pub fn get_array_mut(&mut self, name: &str) -> Result<&mut Vec<StrykeValue>, PerlError> {
+    pub fn get_array_mut(&mut self, name: &str) -> Result<&mut Vec<StrykeValue>, StrykeError> {
         // Note: can't return &mut into a Mutex. Callers needing atomic array
         // mutation should use atomic_array_mutate instead. For non-atomic arrays:
         if self.find_atomic_array(name).is_some() {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "get_array_mut: use atomic path for mysync arrays",
                 0,
             ));
@@ -1901,7 +1901,7 @@ impl Scope {
     }
 
     /// Push to array — works for both regular and atomic arrays.
-    pub fn push_to_array(&mut self, name: &str, val: StrykeValue) -> Result<(), PerlError> {
+    pub fn push_to_array(&mut self, name: &str, val: StrykeValue) -> Result<(), StrykeError> {
         let val = self.resolve_container_binding_ref(val);
         if let Some(aa) = self.find_atomic_array(name) {
             aa.0.lock().push(val);
@@ -1923,7 +1923,7 @@ impl Scope {
         name: &str,
         start: i64,
         end: i64,
-    ) -> Result<(), PerlError> {
+    ) -> Result<(), StrykeError> {
         if end <= start {
             return Ok(());
         }
@@ -1945,7 +1945,7 @@ impl Scope {
     }
 
     /// Pop from array — works for regular, shared, and atomic arrays.
-    pub fn pop_from_array(&mut self, name: &str) -> Result<StrykeValue, PerlError> {
+    pub fn pop_from_array(&mut self, name: &str) -> Result<StrykeValue, StrykeError> {
         if let Some(aa) = self.find_atomic_array(name) {
             return Ok(aa.0.lock().pop().unwrap_or(StrykeValue::UNDEF));
         }
@@ -1959,7 +1959,7 @@ impl Scope {
     }
 
     /// Shift from array — works for regular, shared, and atomic arrays.
-    pub fn shift_from_array(&mut self, name: &str) -> Result<StrykeValue, PerlError> {
+    pub fn shift_from_array(&mut self, name: &str) -> Result<StrykeValue, StrykeError> {
         if let Some(aa) = self.find_atomic_array(name) {
             let mut guard = aa.0.lock();
             return Ok(if guard.is_empty() {
@@ -1993,7 +1993,7 @@ impl Scope {
         off: usize,
         end: usize,
         rep_vals: Vec<StrykeValue>,
-    ) -> Result<Vec<StrykeValue>, PerlError> {
+    ) -> Result<Vec<StrykeValue>, StrykeError> {
         if let Some(aa) = self.find_atomic_array(name) {
             let mut g = aa.0.lock();
             let removed: Vec<StrykeValue> = g.drain(off..end).collect();
@@ -2043,7 +2043,7 @@ impl Scope {
         0
     }
 
-    pub fn set_array(&mut self, name: &str, val: Vec<StrykeValue>) -> Result<(), PerlError> {
+    pub fn set_array(&mut self, name: &str, val: Vec<StrykeValue>) -> Result<(), StrykeError> {
         if let Some(aa) = self.find_atomic_array(name) {
             *aa.0.lock() = val;
             return Ok(());
@@ -2103,7 +2103,7 @@ impl Scope {
         name: &str,
         index: i64,
         val: StrykeValue,
-    ) -> Result<(), PerlError> {
+    ) -> Result<(), StrykeError> {
         let val = self.resolve_container_binding_ref(val);
         if let Some(aa) = self.find_atomic_array(name) {
             let mut arr = aa.0.lock();
@@ -2175,7 +2175,7 @@ impl Scope {
         &mut self,
         name: &str,
         index: i64,
-    ) -> Result<StrykeValue, PerlError> {
+    ) -> Result<StrykeValue, StrykeError> {
         if let Some(aa) = self.find_atomic_array(name) {
             let mut arr = aa.0.lock();
             let idx = if index < 0 {
@@ -2285,7 +2285,7 @@ impl Scope {
             .find(|&i| self.frames[i].has_hash(name))
     }
 
-    fn check_parallel_hash_write(&self, name: &str) -> Result<(), PerlError> {
+    fn check_parallel_hash_write(&self, name: &str) -> Result<(), StrykeError> {
         if !self.parallel_guard
             || Self::parallel_skip_special_name(name)
             || Self::parallel_allowed_internal_hash(name)
@@ -2295,14 +2295,14 @@ impl Scope {
         // Worker-local frames are at depth >= baseline.
         let baseline = self.parallel_guard_baseline;
         match self.resolve_hash_frame_idx(name) {
-            None => Err(PerlError::runtime(
+            None => Err(StrykeError::runtime(
                 format!(
                     "cannot modify undeclared hash `%{}` in a parallel block",
                     name
                 ),
                 0,
             )),
-            Some(idx) if idx < baseline => Err(PerlError::runtime(
+            Some(idx) if idx < baseline => Err(StrykeError::runtime(
                 format!(
                     "cannot modify captured non-mysync hash `%{}` in a parallel block",
                     name
@@ -2316,9 +2316,9 @@ impl Scope {
     pub fn get_hash_mut(
         &mut self,
         name: &str,
-    ) -> Result<&mut IndexMap<String, StrykeValue>, PerlError> {
+    ) -> Result<&mut IndexMap<String, StrykeValue>, StrykeError> {
         if self.find_atomic_hash(name).is_some() {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "get_hash_mut: use atomic path for mysync hashes",
                 0,
             ));
@@ -2336,7 +2336,7 @@ impl Scope {
         &mut self,
         name: &str,
         val: IndexMap<String, StrykeValue>,
-    ) -> Result<(), PerlError> {
+    ) -> Result<(), StrykeError> {
         if let Some(ah) = self.find_atomic_hash(name) {
             *ah.0.lock() = val;
             return Ok(());
@@ -2376,7 +2376,7 @@ impl Scope {
         name: &str,
         key: &str,
         f: impl FnOnce(&StrykeValue) -> StrykeValue,
-    ) -> Result<StrykeValue, PerlError> {
+    ) -> Result<StrykeValue, StrykeError> {
         if let Some(ah) = self.find_atomic_hash(name) {
             let mut guard = ah.0.lock();
             let old = guard.get(key).cloned().unwrap_or(StrykeValue::UNDEF);
@@ -2397,7 +2397,7 @@ impl Scope {
         name: &str,
         index: i64,
         f: impl FnOnce(&StrykeValue) -> StrykeValue,
-    ) -> Result<StrykeValue, PerlError> {
+    ) -> Result<StrykeValue, StrykeError> {
         if let Some(aa) = self.find_atomic_array(name) {
             let mut guard = aa.0.lock();
             let idx = if index < 0 {
@@ -2425,7 +2425,7 @@ impl Scope {
         name: &str,
         key: &str,
         val: StrykeValue,
-    ) -> Result<(), PerlError> {
+    ) -> Result<(), StrykeError> {
         let val = self.resolve_container_binding_ref(val);
         // `$SIG{INT} = \&h` — lazily install the matching signal hook. Until Perl code touches
         // `%SIG`, the POSIX default stays in place so Ctrl-C terminates immediately.
@@ -2454,7 +2454,7 @@ impl Scope {
         start: i64,
         end: i64,
         k: i64,
-    ) -> Result<(), PerlError> {
+    ) -> Result<(), StrykeError> {
         if end <= start {
             return Ok(());
         }
@@ -2479,7 +2479,7 @@ impl Scope {
         Ok(())
     }
 
-    pub fn delete_hash_element(&mut self, name: &str, key: &str) -> Result<StrykeValue, PerlError> {
+    pub fn delete_hash_element(&mut self, name: &str, key: &str) -> Result<StrykeValue, StrykeError> {
         canon_main!(name);
         if let Some(ah) = self.find_atomic_hash(name) {
             return Ok(ah.0.lock().shift_remove(key).unwrap_or(StrykeValue::UNDEF));

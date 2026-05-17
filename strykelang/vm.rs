@@ -11,7 +11,7 @@ use caseless::default_case_fold_str;
 use crate::ast::{BinOp, Block, Expr, MatchArm, PerlTypeName, Sigil, SubSigParam};
 use crate::bytecode::{BuiltinId, Chunk, Op, RuntimeSubDecl, SpliceExprEntry};
 use crate::compiler::scalar_compound_op_from_byte;
-use crate::error::{ErrorKind, PerlError, PerlResult};
+use crate::error::{ErrorKind, StrykeError, PerlResult};
 use crate::perl_fs::read_file_text_perl_compat;
 use crate::pmap_progress::{FanProgress, PmapProgress};
 use crate::sort_fast::{sort_magic_cmp, SortBlockFast};
@@ -228,7 +228,7 @@ fn vm_interp_result(r: Result<StrykeValue, FlowOrError>, line: usize) -> PerlRes
     match r {
         Ok(v) => Ok(v),
         Err(FlowOrError::Error(e)) => Err(e),
-        Err(FlowOrError::Flow(_)) => Err(PerlError::runtime(
+        Err(FlowOrError::Flow(_)) => Err(StrykeError::runtime(
             "unexpected control flow in tree-assisted opcode",
             line,
         )),
@@ -520,7 +520,7 @@ impl<'a> VM<'a> {
                     Ok(val)
                 } else {
                     self.unwind_stale_block_region_frame();
-                    Err(PerlError::runtime(
+                    Err(StrykeError::runtime(
                         "block bytecode region did not finish with BlockReturnValue",
                         self.line(),
                     ))
@@ -548,7 +548,7 @@ impl<'a> VM<'a> {
         if list.len() == 1 {
             if let Some(p) = list[0].as_pipeline() {
                 if peel_array_ref {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "flat_map onto a pipeline value is not supported in this form — use a pipeline ->map stage",
                         self.line(),
                     ));
@@ -942,7 +942,7 @@ impl<'a> VM<'a> {
     fn flatten_array_slice_specs_ordered_values(
         &self,
         specs: &[StrykeValue],
-    ) -> Result<Vec<i64>, PerlError> {
+    ) -> Result<Vec<i64>, StrykeError> {
         let mut out = Vec::new();
         for spec in specs {
             if let Some(av) = spec.as_array_vec() {
@@ -988,7 +988,7 @@ impl<'a> VM<'a> {
 
     /// Cranelift linear JIT for a subroutine body when `ip` is a compiled sub entry (see `Chunk::sub_entries`).
     /// Returns `Ok(true)` when the sub was executed natively and the VM should continue at `return_ip`.
-    fn try_jit_subroutine_linear(&mut self) -> Result<bool, PerlError> {
+    fn try_jit_subroutine_linear(&mut self) -> Result<bool, StrykeError> {
         let ip = self.ip;
         debug_assert!(self.sub_entry_at_ip.get(ip).copied().unwrap_or(false));
         if self.sub_jit_skip_linear_test(ip) {
@@ -1125,7 +1125,7 @@ impl<'a> VM<'a> {
     }
 
     /// Cranelift block JIT for a subroutine with control flow (see [`crate::jit::block_jit_validate_sub`]).
-    fn try_jit_subroutine_block(&mut self) -> Result<bool, PerlError> {
+    fn try_jit_subroutine_block(&mut self) -> Result<bool, StrykeError> {
         let ip = self.ip;
         debug_assert!(self.sub_entry_at_ip.get(ip).copied().unwrap_or(false));
         if self.sub_jit_skip_block_test(ip) {
@@ -1334,7 +1334,7 @@ impl<'a> VM<'a> {
         } else if let Some(s) = obj.as_str() {
             s
         } else {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 "Can't call method on non-object",
                 self.line(),
             ));
@@ -1396,7 +1396,7 @@ impl<'a> VM<'a> {
         {
             Some(f) => f,
             None => {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     format!(
                         "Can't locate method \"{}\" via inheritance (invocant \"{}\")",
                         method, class
@@ -1450,7 +1450,7 @@ impl<'a> VM<'a> {
                     if let Some(ref expr) = field.default {
                         let val = self.interp.eval_expr(expr).map_err(|e| match e {
                             crate::vm_helper::FlowOrError::Error(stryke) => stryke,
-                            _ => PerlError::runtime("default evaluation flow", line),
+                            _ => StrykeError::runtime("default evaluation flow", line),
                         })?;
                         defaults.push(Some(val));
                     } else {
@@ -1476,7 +1476,7 @@ impl<'a> VM<'a> {
                         .class_construct(&def, user_args, line)
                         .map_err(|e| match e {
                             crate::vm_helper::FlowOrError::Error(stryke) => stryke,
-                            _ => PerlError::runtime("class_construct flow", line),
+                            _ => StrykeError::runtime("class_construct flow", line),
                         })?;
                 self.push(v);
             } else {
@@ -1503,7 +1503,7 @@ impl<'a> VM<'a> {
                 Err(_) => self.push(StrykeValue::UNDEF),
             }
         } else {
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!(
                     "Can't locate method \"{}\" in package \"{}\"",
                     method, class
@@ -1532,7 +1532,7 @@ impl<'a> VM<'a> {
         let lex_scalars = self.interp.english_lexical_scalars_clone();
         let our_scalars = self.interp.our_lexical_scalars_clone();
         let fan_progress = FanProgress::new(progress, n);
-        let first_err: Arc<Mutex<Option<PerlError>>> = Arc::new(Mutex::new(None));
+        let first_err: Arc<Mutex<Option<StrykeError>>> = Arc::new(Mutex::new(None));
         (0..n).into_par_iter().for_each(|i| {
             if first_err.lock().is_some() {
                 return;
@@ -1556,7 +1556,7 @@ impl<'a> VM<'a> {
                 Err(e) => {
                     let stryke = match e {
                         FlowOrError::Error(stryke) => stryke,
-                        FlowOrError::Flow(_) => PerlError::runtime(
+                        FlowOrError::Flow(_) => StrykeError::runtime(
                             "return/last/next/redo not supported inside fan block",
                             line,
                         ),
@@ -1628,7 +1628,7 @@ impl<'a> VM<'a> {
                 Err(e) => {
                     let stryke = match e {
                         FlowOrError::Error(stryke) => stryke,
-                        FlowOrError::Flow(_) => PerlError::runtime(
+                        FlowOrError::Flow(_) => StrykeError::runtime(
                             "return/last/next/redo not supported inside fan_cap block",
                             line,
                         ),
@@ -1643,7 +1643,7 @@ impl<'a> VM<'a> {
 
     fn require_scalar_mutable(&self, name: &str) -> PerlResult<()> {
         if self.interp.scope.is_scalar_frozen(name) {
-            return Err(PerlError::syntax(
+            return Err(StrykeError::syntax(
                 format!("cannot assign to frozen variable `${}`", name),
                 self.line(),
             ));
@@ -1653,7 +1653,7 @@ impl<'a> VM<'a> {
 
     fn require_array_mutable(&self, name: &str) -> PerlResult<()> {
         if self.interp.scope.is_array_frozen(name) {
-            return Err(PerlError::syntax(
+            return Err(StrykeError::syntax(
                 format!("cannot modify frozen array `@{}`", name),
                 self.line(),
             ));
@@ -1663,7 +1663,7 @@ impl<'a> VM<'a> {
 
     fn require_hash_mutable(&self, name: &str) -> PerlResult<()> {
         if self.interp.scope.is_hash_frozen(name) || Self::is_reflection_hash(name) {
-            return Err(PerlError::syntax(
+            return Err(StrykeError::syntax(
                 format!("cannot modify frozen hash `%{}`", name),
                 self.line(),
             ));
@@ -1949,7 +1949,7 @@ impl<'a> VM<'a> {
     }
 
     /// `die` / runtime errors inside `try` jump to `catch_ip` unless the error is [`ErrorKind::Exit`].
-    fn try_recover_from_exception(&mut self, e: &PerlError) -> PerlResult<bool> {
+    fn try_recover_from_exception(&mut self, e: &StrykeError) -> PerlResult<bool> {
         if matches!(e.kind, ErrorKind::Exit(_)) {
             return Ok(false);
         }
@@ -2078,7 +2078,7 @@ impl<'a> VM<'a> {
                 }
                 None => {
                     self.interp.intercept_active_names.pop();
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         format!("undefined sub `{}` (advice fallback)", name),
                         line,
                     ));
@@ -2136,7 +2136,7 @@ impl<'a> VM<'a> {
             .copied()
             .flatten()
             .ok_or_else(|| {
-                PerlError::runtime(
+                StrykeError::runtime(
                     format!(
                         "AOP {} advice body for `{}` could not be lowered to bytecode \
                          (likely contains a construct unsupported by block lowering, \
@@ -2524,7 +2524,7 @@ impl<'a> VM<'a> {
                                     self.push(StrykeValue::UNDEF);
                                 }
                             } else {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     format!("method `{}` is not static", suffix),
                                     self.line(),
                                 ));
@@ -2542,7 +2542,7 @@ impl<'a> VM<'a> {
                                     self.push(args[0].clone());
                                 }
                                 _ => {
-                                    return Err(PerlError::runtime(
+                                    return Err(StrykeError::runtime(
                                         format!(
                                             "static field `{}::{}` takes 0 or 1 arguments",
                                             prefix, suffix
@@ -2552,19 +2552,19 @@ impl<'a> VM<'a> {
                                 }
                             }
                         } else {
-                            return Err(PerlError::runtime(
+                            return Err(StrykeError::runtime(
                                 self.interp.undefined_subroutine_call_message(name),
                                 self.line(),
                             ));
                         }
                     } else {
-                        return Err(PerlError::runtime(
+                        return Err(StrykeError::runtime(
                             self.interp.undefined_subroutine_call_message(name),
                             self.line(),
                         ));
                     }
                 } else {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         self.interp.undefined_subroutine_call_message(name),
                         self.line(),
                     ));
@@ -2607,14 +2607,14 @@ impl<'a> VM<'a> {
                 Ok(s) => s,
                 Err(FlowOrError::Error(e)) => return Err(e),
                 Err(FlowOrError::Flow(_)) => {
-                    return Err(PerlError::runtime("concat: unexpected control flow", line));
+                    return Err(StrykeError::runtime("concat: unexpected control flow", line));
                 }
             };
             let sb = match self.interp.stringify_value(b, line) {
                 Ok(s) => s,
                 Err(FlowOrError::Error(e)) => return Err(e),
                 Err(FlowOrError::Flow(_)) => {
-                    return Err(PerlError::runtime("concat: unexpected control flow", line));
+                    return Err(StrykeError::runtime("concat: unexpected control flow", line));
                 }
             };
             let mut s = sa;
@@ -2653,7 +2653,7 @@ impl<'a> VM<'a> {
                 break;
             }
             if self.block_region_mode && self.ip >= self.block_region_end {
-                return Err(PerlError::runtime(
+                return Err(StrykeError::runtime(
                     "block bytecode region fell through without BlockReturnValue",
                     self.line(),
                 ));
@@ -2693,7 +2693,7 @@ impl<'a> VM<'a> {
             if (*op_count & 0x3FF) == 0 {
                 crate::perl_signal::poll(self.interp)?;
                 if *op_count > MAX_OPS {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "VM execution limit exceeded (possible infinite loop)",
                         self.line(),
                     ));
@@ -2711,7 +2711,7 @@ impl<'a> VM<'a> {
                     let call_stack = self.interp.debug_call_stack.clone();
                     match dbg.prompt(line, &self.interp.scope, &call_stack) {
                         crate::debugger::DebugAction::Quit => {
-                            return Err(PerlError::runtime("debugger: quit", line));
+                            return Err(StrykeError::runtime("debugger: quit", line));
                         }
                         crate::debugger::DebugAction::Continue => {}
                         crate::debugger::DebugAction::Prompt => {}
@@ -2746,7 +2746,7 @@ impl<'a> VM<'a> {
                     Op::RuntimeErrorConst(idx) => {
                         let msg = self.constant(*idx).to_string();
                         let line = self.line();
-                        Err(crate::error::PerlError::runtime(msg, line))
+                        Err(crate::error::StrykeError::runtime(msg, line))
                     }
                     Op::BarewordRvalue(name_idx) => {
                         let name = names[*name_idx as usize].clone();
@@ -2896,7 +2896,7 @@ impl<'a> VM<'a> {
                         let val = self.pop();
                         let n = names[*idx as usize].as_str();
                         let ty = PerlTypeName::from_byte(*tyb).ok_or_else(|| {
-                            PerlError::runtime(
+                            StrykeError::runtime(
                                 format!("invalid typed scalar type byte {}", tyb),
                                 self.line(),
                             )
@@ -2911,7 +2911,7 @@ impl<'a> VM<'a> {
                         let val = self.pop();
                         let n = names[*idx as usize].as_str();
                         let ty = PerlTypeName::from_byte(*tyb).ok_or_else(|| {
-                            PerlError::runtime(
+                            StrykeError::runtime(
                                 format!("invalid typed scalar type byte {}", tyb),
                                 self.line(),
                             )
@@ -3198,7 +3198,7 @@ impl<'a> VM<'a> {
                             Ok(n) => n,
                             Err(FlowOrError::Error(e)) => return Err(e),
                             Err(FlowOrError::Flow(_)) => {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     "unexpected flow in tree-assisted opcode",
                                     line,
                                 ));
@@ -3234,7 +3234,7 @@ impl<'a> VM<'a> {
                             Ok(n) => n,
                             Err(FlowOrError::Error(e)) => return Err(e),
                             Err(FlowOrError::Flow(_)) => {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     "unexpected flow in tree-assisted opcode",
                                     line,
                                 ));
@@ -3705,7 +3705,7 @@ impl<'a> VM<'a> {
                         self.push_binop_with_overload(BinOp::Div, a, b, |a, b| {
                             if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
                                 if y == 0 {
-                                    return Err(PerlError::division_by_zero(
+                                    return Err(StrykeError::division_by_zero(
                                         "Illegal division by zero",
                                         line,
                                     ));
@@ -3718,7 +3718,7 @@ impl<'a> VM<'a> {
                             } else {
                                 let d = b.to_number();
                                 if d == 0.0 {
-                                    return Err(PerlError::division_by_zero(
+                                    return Err(StrykeError::division_by_zero(
                                         "Illegal division by zero",
                                         line,
                                     ));
@@ -3735,7 +3735,7 @@ impl<'a> VM<'a> {
                             let b = b.to_int();
                             let a = a.to_int();
                             if b == 0 {
-                                return Err(PerlError::division_by_zero(
+                                return Err(StrykeError::division_by_zero(
                                     "Illegal modulus zero",
                                     line,
                                 ));
@@ -4265,7 +4265,7 @@ impl<'a> VM<'a> {
                     }
                     Op::CallStaticSubId(sid, name_idx, argc, wa) => {
                         let t = self.static_sub_calls.get(*sid as usize).ok_or_else(|| {
-                            PerlError::runtime("VM: invalid CallStaticSubId", self.line())
+                            StrykeError::runtime("VM: invalid CallStaticSubId", self.line())
                         })?;
                         debug_assert_eq!(t.2, *name_idx);
                         let closure_sub = self
@@ -4284,7 +4284,7 @@ impl<'a> VM<'a> {
                     Op::Return => {
                         if let Some(frame) = self.call_stack.pop() {
                             if frame.block_region {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     "Return in map/grep/sort block bytecode",
                                     self.line(),
                                 ));
@@ -4335,7 +4335,7 @@ impl<'a> VM<'a> {
                         };
                         if let Some(frame) = self.call_stack.pop() {
                             if frame.block_region {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     "Return in map/grep/sort block bytecode",
                                     self.line(),
                                 ));
@@ -4367,7 +4367,7 @@ impl<'a> VM<'a> {
                         let val = self.resolve_binding_ref(val);
                         if let Some(frame) = self.call_stack.pop() {
                             if !frame.block_region {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     "BlockReturnValue without map/grep/sort block frame",
                                     self.line(),
                                 ));
@@ -4378,7 +4378,7 @@ impl<'a> VM<'a> {
                             self.block_region_return = Some(val);
                             Ok(())
                         } else {
-                            Err(PerlError::runtime(
+                            Err(StrykeError::runtime(
                                 "BlockReturnValue with empty call stack",
                                 self.line(),
                             ))
@@ -4414,7 +4414,7 @@ impl<'a> VM<'a> {
                                 Ok(s) => s,
                                 Err(FlowOrError::Error(e)) => return Err(e),
                                 Err(FlowOrError::Flow(_)) => {
-                                    return Err(PerlError::runtime(
+                                    return Err(StrykeError::runtime(
                                         "print: unexpected control flow",
                                         self.line(),
                                     ));
@@ -4431,7 +4431,7 @@ impl<'a> VM<'a> {
                                         Ok(s) => s,
                                         Err(FlowOrError::Error(e)) => return Err(e),
                                         Err(FlowOrError::Flow(_)) => {
-                                            return Err(PerlError::runtime(
+                                            return Err(StrykeError::runtime(
                                                 "print: unexpected control flow",
                                                 self.line(),
                                             ));
@@ -4462,7 +4462,7 @@ impl<'a> VM<'a> {
                     }
                     Op::Say(handle_idx, argc) => {
                         if (self.interp.feature_bits & crate::vm_helper::FEAT_SAY) == 0 {
-                            return Err(PerlError::runtime(
+                            return Err(StrykeError::runtime(
                             "say() is disabled (enable with use feature 'say' or use feature ':5.10')",
                             self.line(),
                         ));
@@ -4480,7 +4480,7 @@ impl<'a> VM<'a> {
                                 Ok(s) => s,
                                 Err(FlowOrError::Error(e)) => return Err(e),
                                 Err(FlowOrError::Flow(_)) => {
-                                    return Err(PerlError::runtime(
+                                    return Err(StrykeError::runtime(
                                         "say: unexpected control flow",
                                         self.line(),
                                     ));
@@ -4497,7 +4497,7 @@ impl<'a> VM<'a> {
                                         Ok(s) => s,
                                         Err(FlowOrError::Error(e)) => return Err(e),
                                         Err(FlowOrError::Flow(_)) => {
-                                            return Err(PerlError::runtime(
+                                            return Err(StrykeError::runtime(
                                                 "say: unexpected control flow",
                                                 self.line(),
                                             ));
@@ -4680,7 +4680,7 @@ impl<'a> VM<'a> {
                         let line = self.line();
                         let op = crate::compiler::scalar_compound_op_from_byte(*op_byte)
                             .ok_or_else(|| {
-                                crate::error::PerlError::runtime(
+                                crate::error::StrykeError::runtime(
                                     "VM: HashSliceDerefCompound: bad op byte",
                                     line,
                                 )
@@ -4724,7 +4724,7 @@ impl<'a> VM<'a> {
                         let line = self.line();
                         let op = crate::compiler::scalar_compound_op_from_byte(*op_byte)
                             .ok_or_else(|| {
-                                crate::error::PerlError::runtime(
+                                crate::error::StrykeError::runtime(
                                     "VM: NamedHashSliceCompound: bad op byte",
                                     line,
                                 )
@@ -4762,7 +4762,7 @@ impl<'a> VM<'a> {
                         self.require_hash_mutable(name)?;
                         let len = self.stack.len();
                         if len < n {
-                            return Err(PerlError::runtime(
+                            return Err(StrykeError::runtime(
                                 "VM: NamedHashSlicePeekLast: stack underflow",
                                 line,
                             ));
@@ -4771,7 +4771,7 @@ impl<'a> VM<'a> {
                         let key_vals: Vec<StrykeValue> = self.stack[base..base + n].to_vec();
                         let ks = Self::flatten_hash_slice_key_slots(&key_vals);
                         let last_k = ks.last().ok_or_else(|| {
-                            PerlError::runtime("VM: NamedHashSlicePeekLast: empty key list", line)
+                            StrykeError::runtime("VM: NamedHashSlicePeekLast: empty key list", line)
                         })?;
                         self.interp.touch_env_hash(name);
                         let cur = self.interp.scope.get_hash_element(name, last_k.as_str());
@@ -4803,7 +4803,7 @@ impl<'a> VM<'a> {
                         }
                         let ks = Self::flatten_hash_slice_key_slots(&key_vals_rev);
                         let last_k = ks.last().ok_or_else(|| {
-                            PerlError::runtime(
+                            StrykeError::runtime(
                                 "VM: SetNamedHashSliceLastKeep: empty key list",
                                 line,
                             )
@@ -4826,7 +4826,7 @@ impl<'a> VM<'a> {
                         let line = self.line();
                         let len = self.stack.len();
                         if len < n + 1 {
-                            return Err(PerlError::runtime(
+                            return Err(StrykeError::runtime(
                                 "VM: HashSliceDerefPeekLast: stack underflow",
                                 line,
                             ));
@@ -4875,7 +4875,7 @@ impl<'a> VM<'a> {
                         }
                         let ks = Self::flatten_hash_slice_key_slots(&key_vals_rev);
                         let last_k = ks.last().ok_or_else(|| {
-                            PerlError::runtime(
+                            StrykeError::runtime(
                                 "VM: HashSliceDerefSetLastKeep: empty key list",
                                 line,
                             )
@@ -4923,7 +4923,7 @@ impl<'a> VM<'a> {
                         let line = self.line();
                         let op = crate::compiler::scalar_compound_op_from_byte(*op_byte)
                             .ok_or_else(|| {
-                                crate::error::PerlError::runtime(
+                                crate::error::StrykeError::runtime(
                                     "VM: ArrowArraySliceCompound: bad op byte",
                                     line,
                                 )
@@ -4954,7 +4954,7 @@ impl<'a> VM<'a> {
                         let line = self.line();
                         let len = self.stack.len();
                         if len < n + 1 {
-                            return Err(PerlError::runtime(
+                            return Err(StrykeError::runtime(
                                 "VM: ArrowArraySlicePeekLast: stack underflow",
                                 line,
                             ));
@@ -4964,7 +4964,7 @@ impl<'a> VM<'a> {
                         let idxs =
                             self.flatten_array_slice_specs_ordered_values(&self.stack[base + 1..])?;
                         let last = *idxs.last().ok_or_else(|| {
-                            PerlError::runtime(
+                            StrykeError::runtime(
                                 "VM: ArrowArraySlicePeekLast: empty index list",
                                 line,
                             )
@@ -5011,7 +5011,7 @@ impl<'a> VM<'a> {
                             val = av.last().cloned().unwrap_or(StrykeValue::UNDEF);
                         }
                         let last = *idxs.last().ok_or_else(|| {
-                            PerlError::runtime(
+                            StrykeError::runtime(
                                 "VM: SetArrowArraySliceLastKeep: empty index list",
                                 line,
                             )
@@ -5047,7 +5047,7 @@ impl<'a> VM<'a> {
                         let line = self.line();
                         let op = crate::compiler::scalar_compound_op_from_byte(*op_byte)
                             .ok_or_else(|| {
-                                crate::error::PerlError::runtime(
+                                crate::error::StrykeError::runtime(
                                     "VM: NamedArraySliceCompound: bad op byte",
                                     line,
                                 )
@@ -5067,7 +5067,7 @@ impl<'a> VM<'a> {
                         self.require_array_mutable(name)?;
                         let len = self.stack.len();
                         if len < n {
-                            return Err(PerlError::runtime(
+                            return Err(StrykeError::runtime(
                                 "VM: NamedArraySlicePeekLast: stack underflow",
                                 line,
                             ));
@@ -5076,7 +5076,7 @@ impl<'a> VM<'a> {
                         let idxs =
                             self.flatten_array_slice_specs_ordered_values(&self.stack[base..])?;
                         let last = *idxs.last().ok_or_else(|| {
-                            PerlError::runtime(
+                            StrykeError::runtime(
                                 "VM: NamedArraySlicePeekLast: empty index list",
                                 line,
                             )
@@ -5116,7 +5116,7 @@ impl<'a> VM<'a> {
                             val = av.last().cloned().unwrap_or(StrykeValue::UNDEF);
                         }
                         let last = *idxs.last().ok_or_else(|| {
-                            PerlError::runtime(
+                            StrykeError::runtime(
                                 "VM: SetNamedArraySliceLastKeep: empty index list",
                                 line,
                             )
@@ -5306,7 +5306,7 @@ impl<'a> VM<'a> {
                         ) {
                             Ok(v) => v,
                             Err(msg) => {
-                                return Err(PerlError::runtime(msg, line));
+                                return Err(StrykeError::runtime(msg, line));
                             }
                         };
                         let mut out = Vec::with_capacity(indices.len());
@@ -5325,7 +5325,7 @@ impl<'a> VM<'a> {
                         let keys = match crate::value::compute_hash_slice_keys(&from, &to, &step) {
                             Ok(v) => v,
                             Err(msg) => {
-                                return Err(PerlError::runtime(msg, line));
+                                return Err(StrykeError::runtime(msg, line));
                             }
                         };
                         let h = self.interp.scope.get_hash(name);
@@ -5407,7 +5407,7 @@ impl<'a> VM<'a> {
                                 Ok(b) => b,
                                 Err(FlowOrError::Error(err)) => return Err(err),
                                 Err(FlowOrError::Flow(_)) => {
-                                    return Err(PerlError::runtime(
+                                    return Err(StrykeError::runtime(
                                         "unexpected flow in regex flip-flop RHS",
                                         line,
                                     ))
@@ -5466,7 +5466,7 @@ impl<'a> VM<'a> {
                                 Ok(r) => r,
                                 Err(FlowOrError::Error(e)) => return Err(e),
                                 Err(FlowOrError::Flow(_)) => {
-                                    return Err(PerlError::runtime(
+                                    return Err(StrykeError::runtime(
                                         "unexpected flow in regex compile",
                                         line,
                                     ));
@@ -5501,7 +5501,7 @@ impl<'a> VM<'a> {
                             }
                             Err(FlowOrError::Error(e)) => Err(e),
                             Err(FlowOrError::Flow(_)) => {
-                                Err(PerlError::runtime("unexpected flow in regex match", line))
+                                Err(StrykeError::runtime("unexpected flow in regex match", line))
                             }
                         }
                     }
@@ -5517,7 +5517,7 @@ impl<'a> VM<'a> {
                                 Ok(r) => r,
                                 Err(FlowOrError::Error(e)) => return Err(e),
                                 Err(FlowOrError::Flow(_)) => {
-                                    return Err(PerlError::runtime(
+                                    return Err(StrykeError::runtime(
                                         "unexpected flow in regex compile",
                                         line,
                                     ));
@@ -5550,7 +5550,7 @@ impl<'a> VM<'a> {
                             }
                             Err(FlowOrError::Error(e)) => Err(e),
                             Err(FlowOrError::Flow(_)) => {
-                                Err(PerlError::runtime("unexpected flow in s///", line))
+                                Err(StrykeError::runtime("unexpected flow in s///", line))
                             }
                         }
                     }
@@ -5581,7 +5581,7 @@ impl<'a> VM<'a> {
                             }
                             Err(FlowOrError::Error(e)) => Err(e),
                             Err(FlowOrError::Flow(_)) => {
-                                Err(PerlError::runtime("unexpected flow in tr///", line))
+                                Err(StrykeError::runtime("unexpected flow in tr///", line))
                             }
                         }
                     }
@@ -5605,7 +5605,7 @@ impl<'a> VM<'a> {
                             }
                             Err(FlowOrError::Error(e)) => return Err(e),
                             Err(FlowOrError::Flow(_)) => {
-                                return Err(PerlError::runtime("unexpected flow in =~", line));
+                                return Err(StrykeError::runtime("unexpected flow in =~", line));
                             }
                         }
                         Ok(())
@@ -5639,7 +5639,7 @@ impl<'a> VM<'a> {
                             Ok(r) => r,
                             Err(FlowOrError::Error(e)) => return Err(e),
                             Err(FlowOrError::Flow(_)) => {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     "unexpected flow in qr// compile",
                                     line,
                                 ));
@@ -5967,7 +5967,7 @@ impl<'a> VM<'a> {
                             Ok(v) => self.push(v),
                             Err(FlowOrError::Error(e)) => return Err(e),
                             Err(FlowOrError::Flow(_)) => {
-                                return Err(PerlError::runtime("unexpected flow in chomp", line));
+                                return Err(StrykeError::runtime("unexpected flow in chomp", line));
                             }
                         }
                         Ok(())
@@ -5980,7 +5980,7 @@ impl<'a> VM<'a> {
                             Ok(v) => self.push(v),
                             Err(FlowOrError::Error(e)) => return Err(e),
                             Err(FlowOrError::Flow(_)) => {
-                                return Err(PerlError::runtime("unexpected flow in chop", line));
+                                return Err(StrykeError::runtime("unexpected flow in chop", line));
                             }
                         }
                         Ok(())
@@ -6237,7 +6237,7 @@ impl<'a> VM<'a> {
                         let name = names[*name_idx as usize].as_str();
                         let line = self.line();
                         let sub = self.interp.resolve_sub_by_name(name).ok_or_else(|| {
-                            PerlError::runtime(
+                            StrykeError::runtime(
                                 self.interp.undefined_subroutine_resolve_message(name),
                                 line,
                             )
@@ -6249,7 +6249,7 @@ impl<'a> VM<'a> {
                         let name = self.pop().to_string();
                         let line = self.line();
                         let sub = self.interp.resolve_sub_by_name(&name).ok_or_else(|| {
-                            PerlError::runtime(
+                            StrykeError::runtime(
                                 self.interp.undefined_subroutine_resolve_message(&name),
                                 line,
                             )
@@ -6311,7 +6311,7 @@ impl<'a> VM<'a> {
                             2 => Sigil::Hash,
                             3 => Sigil::Typeglob,
                             _ => {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     "VM: bad SymbolicDeref kind byte",
                                     self.line(),
                                 ));
@@ -6525,7 +6525,7 @@ impl<'a> VM<'a> {
                                 Err(_) => self.push(StrykeValue::UNDEF),
                             }
                         } else {
-                            return Err(PerlError::runtime("Not a code reference", self.line()));
+                            return Err(StrykeError::runtime("Not a code reference", self.line()));
                         }
                         Ok(())
                     }
@@ -6969,7 +6969,7 @@ impl<'a> VM<'a> {
                         if let Some(&(start, end)) =
                             self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
                         {
-                            let mut sort_err: Option<PerlError> = None;
+                            let mut sort_err: Option<StrykeError> = None;
                             items.sort_by(|a, b| {
                                 if sort_err.is_some() {
                                     return std::cmp::Ordering::Equal;
@@ -7046,7 +7046,7 @@ impl<'a> VM<'a> {
                         let mut items = self.pop().to_list();
                         let line = self.line();
                         let Some(sub) = cmp_val.as_code_ref() else {
-                            return Err(PerlError::runtime(
+                            return Err(StrykeError::runtime(
                                 "sort: comparator must be a code reference",
                                 line,
                             ));
@@ -7247,7 +7247,7 @@ impl<'a> VM<'a> {
                     Op::BenchBlock(block_idx) => {
                         let n_i = self.pop().to_int();
                         if n_i < 0 {
-                            return Err(PerlError::runtime(
+                            return Err(StrykeError::runtime(
                                 "bench: iteration count must be non-negative",
                                 self.line(),
                             ));
@@ -8232,7 +8232,7 @@ impl<'a> VM<'a> {
                         let subs = self.interp.subs.clone();
                         let (scope_capture, atomic_arrays, atomic_hashes) =
                             self.interp.scope.capture_with_atomics();
-                        let first_err: Arc<Mutex<Option<PerlError>>> = Arc::new(Mutex::new(None));
+                        let first_err: Arc<Mutex<Option<StrykeError>>> = Arc::new(Mutex::new(None));
                         let n_workers = rayon::current_num_threads();
                         let pool: Vec<Mutex<VMHelper>> = (0..n_workers)
                             .map(|_| {
@@ -8283,7 +8283,7 @@ impl<'a> VM<'a> {
                                     Err(e) => {
                                         let stryke = match e {
                                             FlowOrError::Error(stryke) => stryke,
-                                            FlowOrError::Flow(_) => PerlError::runtime(
+                                            FlowOrError::Flow(_) => StrykeError::runtime(
                                                 "return/last/next/redo not supported inside pfor block",
                                                 line,
                                             ),
@@ -8513,7 +8513,7 @@ impl<'a> VM<'a> {
                     }
                     Op::TryContinueNormal => {
                         let frame = self.try_stack.last().ok_or_else(|| {
-                            PerlError::runtime("TryContinueNormal without active try", self.line())
+                            StrykeError::runtime("TryContinueNormal without active try", self.line())
                         })?;
                         let Op::TryPush {
                             finally_ip,
@@ -8521,7 +8521,7 @@ impl<'a> VM<'a> {
                             ..
                         } = &self.ops[frame.try_push_op_idx]
                         else {
-                            return Err(PerlError::runtime(
+                            return Err(StrykeError::runtime(
                                 "TryContinueNormal: corrupt try frame",
                                 self.line(),
                             ));
@@ -8537,10 +8537,10 @@ impl<'a> VM<'a> {
                     }
                     Op::TryFinallyEnd => {
                         let frame = self.try_stack.pop().ok_or_else(|| {
-                            PerlError::runtime("TryFinallyEnd without active try", self.line())
+                            StrykeError::runtime("TryFinallyEnd without active try", self.line())
                         })?;
                         let Op::TryPush { after_ip, .. } = &self.ops[frame.try_push_op_idx] else {
-                            return Err(PerlError::runtime(
+                            return Err(StrykeError::runtime(
                                 "TryFinallyEnd: corrupt try frame",
                                 self.line(),
                             ));
@@ -8550,7 +8550,7 @@ impl<'a> VM<'a> {
                     }
                     Op::CatchReceive(idx) => {
                         let msg = self.pending_catch_error.take().ok_or_else(|| {
-                            PerlError::runtime(
+                            StrykeError::runtime(
                                 "CatchReceive without pending exception",
                                 self.line(),
                             )
@@ -8707,7 +8707,7 @@ impl<'a> VM<'a> {
                         let rhs = self.pop();
                         let n = names[*name_idx as usize].as_str();
                         let op = scalar_compound_op_from_byte(*op_b).ok_or_else(|| {
-                            PerlError::runtime("ScalarCompoundAssign: invalid op byte", self.line())
+                            StrykeError::runtime("ScalarCompoundAssign: invalid op byte", self.line())
                         })?;
                         let en = self.interp.english_scalar_name(n);
                         let val = self
@@ -8727,7 +8727,7 @@ impl<'a> VM<'a> {
                             crate::bytecode::GP_RUN => "RUN",
                             crate::bytecode::GP_END => "END",
                             _ => {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     format!("SetGlobalPhase: invalid phase byte {}", phase),
                                     self.line(),
                                 ));
@@ -8749,7 +8749,7 @@ impl<'a> VM<'a> {
                             Ok(v) => v,
                             Err(crate::vm_helper::FlowOrError::Error(e)) => return Err(e),
                             Err(crate::vm_helper::FlowOrError::Flow(f)) => {
-                                return Err(PerlError::runtime(
+                                return Err(StrykeError::runtime(
                                     format!("unexpected flow control in EvalAstExpr: {:?}", f),
                                     self.line(),
                                 ));
@@ -8848,7 +8848,7 @@ impl<'a> VM<'a> {
         self.jit_trampoline_depth = self.jit_trampoline_depth.saturating_sub(1);
         r?;
         self.jit_trampoline_out.take().ok_or_else(|| {
-            PerlError::runtime("JIT trampoline: subroutine did not return", self.line())
+            StrykeError::runtime("JIT trampoline: subroutine did not return", self.line())
         })
     }
 
@@ -9056,7 +9056,7 @@ impl<'a> VM<'a> {
                         Ok(s) => s,
                         Err(FlowOrError::Error(e)) => return Err(e),
                         Err(FlowOrError::Flow(_)) => {
-                            return Err(PerlError::runtime("join: unexpected control flow", line));
+                            return Err(StrykeError::runtime("join: unexpected control flow", line));
                         }
                     };
                     strs.push(s);
@@ -9171,7 +9171,7 @@ impl<'a> VM<'a> {
                     Ok(s) => Ok(StrykeValue::string(s)),
                     Err(FlowOrError::Error(e)) => Err(e),
                     Err(FlowOrError::Flow(_)) => {
-                        Err(PerlError::runtime("sprintf: unexpected control flow", line))
+                        Err(StrykeError::runtime("sprintf: unexpected control flow", line))
                     }
                 }
             }
@@ -9199,7 +9199,7 @@ impl<'a> VM<'a> {
                     msg.push('\n');
                 }
                 self.interp.fire_pseudosig_die(&msg, line)?;
-                Err(PerlError::die(msg, line))
+                Err(StrykeError::die(msg, line))
             }
             Some(BuiltinId::Warn) => {
                 let mut msg = String::new();
@@ -9222,7 +9222,7 @@ impl<'a> VM<'a> {
                     .next()
                     .map(|v| v.to_int() as i32)
                     .unwrap_or(0);
-                Err(PerlError::new(
+                Err(StrykeError::new(
                     ErrorKind::Exit(code),
                     "",
                     line,
@@ -9358,7 +9358,7 @@ impl<'a> VM<'a> {
                         Ok(s) => s,
                         Err(FlowOrError::Error(e)) => return Err(e),
                         Err(FlowOrError::Flow(_)) => {
-                            return Err(PerlError::runtime(
+                            return Err(StrykeError::runtime(
                                 "printf: unexpected control flow",
                                 line,
                             ));
@@ -9372,7 +9372,7 @@ impl<'a> VM<'a> {
                     Ok(s) => s,
                     Err(FlowOrError::Error(e)) => return Err(e),
                     Err(FlowOrError::Flow(_)) => {
-                        return Err(PerlError::runtime("printf: unexpected control flow", line));
+                        return Err(StrykeError::runtime("printf: unexpected control flow", line));
                     }
                 };
                 print!("{}", out);
@@ -9383,7 +9383,7 @@ impl<'a> VM<'a> {
             }
             Some(BuiltinId::Open) => {
                 if args.len() < 2 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "open requires at least 2 arguments",
                         line,
                     ));
@@ -9704,7 +9704,7 @@ impl<'a> VM<'a> {
                 let path = self.interp.resolve_stryke_path_string(&path);
                 crate::perl_fs::read_file_text_or_glob(&path)
                     .map(StrykeValue::string)
-                    .map_err(|e| PerlError::runtime(format!("slurp: {}", e), line))
+                    .map_err(|e| StrykeError::runtime(format!("slurp: {}", e), line))
             }
             Some(BuiltinId::Capture) => {
                 let cmd = args
@@ -9734,11 +9734,11 @@ impl<'a> VM<'a> {
                     .to_string();
                 ureq::get(&url)
                     .call()
-                    .map_err(|e| PerlError::runtime(format!("fetch_url: {}", e), line))
+                    .map_err(|e| StrykeError::runtime(format!("fetch_url: {}", e), line))
                     .and_then(|r| {
                         r.into_string()
                             .map(StrykeValue::string)
-                            .map_err(|e| PerlError::runtime(format!("fetch_url: {}", e), line))
+                            .map_err(|e| StrykeError::runtime(format!("fetch_url: {}", e), line))
                     })
             }
             Some(BuiltinId::Pchannel) => {
@@ -9748,7 +9748,7 @@ impl<'a> VM<'a> {
                     let n = args[0].to_int().max(1) as usize;
                     Ok(crate::pchannel::create_bounded_pair(n))
                 } else {
-                    Err(PerlError::runtime(
+                    Err(StrykeError::runtime(
                         "pchannel() takes 0 or 1 arguments (capacity)",
                         line,
                     ))
@@ -9757,13 +9757,13 @@ impl<'a> VM<'a> {
             Some(BuiltinId::Pselect) => crate::pchannel::pselect_recv(&args, line),
             Some(BuiltinId::DequeNew) => {
                 if !args.is_empty() {
-                    return Err(PerlError::runtime("deque() takes no arguments", line));
+                    return Err(StrykeError::runtime("deque() takes no arguments", line));
                 }
                 Ok(StrykeValue::deque(Arc::new(Mutex::new(VecDeque::new()))))
             }
             Some(BuiltinId::HeapNew) => {
                 if args.len() != 1 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "heap() expects one comparator sub",
                         line,
                     ));
@@ -9775,7 +9775,7 @@ impl<'a> VM<'a> {
                         cmp: Arc::clone(&sub),
                     }))))
                 } else {
-                    Err(PerlError::runtime("heap() requires a code reference", line))
+                    Err(StrykeError::runtime("heap() requires a code reference", line))
                 }
             }
             Some(BuiltinId::BarrierNew) => {
@@ -9797,7 +9797,7 @@ impl<'a> VM<'a> {
                     args.clone()
                 };
                 let c = crate::value::RemoteCluster::from_list_args(&items)
-                    .map_err(|msg| PerlError::runtime(msg, line))?;
+                    .map_err(|msg| StrykeError::runtime(msg, line))?;
                 Ok(StrykeValue::remote_cluster(std::sync::Arc::new(c)))
             }
             Some(BuiltinId::Pipeline) => {
@@ -9945,7 +9945,7 @@ impl<'a> VM<'a> {
             | Some(BuiltinId::GrepBlock)
             | Some(BuiltinId::SortBlock)
             | Some(BuiltinId::Sort) => Ok(StrykeValue::UNDEF),
-            _ => Err(PerlError::runtime(
+            _ => Err(StrykeError::runtime(
                 format!("Unimplemented builtin {:?}", bid),
                 line,
             )),

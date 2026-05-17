@@ -1,7 +1,7 @@
 //! Perl `format` / `write` — picture lines and field padding (subset of Perl 5 `perlform`).
 
 use crate::ast::Expr;
-use crate::error::{PerlError, PerlResult};
+use crate::error::{StrykeError, PerlResult};
 use crate::parser::parse_format_value_line;
 
 /// Parsed `format NAME = ... .` body (after registration).
@@ -65,14 +65,14 @@ pub fn parse_format_template(lines: &[String]) -> PerlResult<FormatTemplate> {
             .count();
         i += 1;
         if i >= lines.len() {
-            return Err(PerlError::syntax(
+            return Err(StrykeError::syntax(
                 "picture line with @ fields must be followed by a value line",
                 0,
             ));
         }
         let exprs = parse_format_value_line(&lines[i])?;
         if exprs.len() != n_fields {
-            return Err(PerlError::syntax(
+            return Err(StrykeError::syntax(
                 format!(
                     "format: {} picture field(s) but {} value expression(s)",
                     n_fields,

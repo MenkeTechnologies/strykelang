@@ -18,7 +18,7 @@
 //! Cross-platform: Unix only for v0. Windows would need ConPTY which is
 //! its own ~5-day project.
 
-use crate::error::PerlError;
+use crate::error::StrykeError;
 use crate::value::StrykeValue;
 use indexmap::IndexMap;
 use parking_lot::Mutex;
@@ -28,7 +28,7 @@ use std::sync::Arc;
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
-type Result<T> = std::result::Result<T, PerlError>;
+type Result<T> = std::result::Result<T, StrykeError>;
 
 // ── Registry ──────────────────────────────────────────────────────────
 //
@@ -61,13 +61,13 @@ fn lookup(handle: &StrykeValue, line: usize) -> Result<Arc<Mutex<PtyHandle>>> {
     let map = handle
         .as_hash_map()
         .or_else(|| handle.as_hash_ref().map(|h| h.read().clone()))
-        .ok_or_else(|| PerlError::runtime("pty: handle must be a hashref", line))?;
+        .ok_or_else(|| StrykeError::runtime("pty: handle must be a hashref", line))?;
     let id = map
         .get("__pty_id__")
         .map(|v| v.to_int() as u64)
-        .ok_or_else(|| PerlError::runtime("pty: hashref missing `__pty_id__`", line))?;
+        .ok_or_else(|| StrykeError::runtime("pty: hashref missing `__pty_id__`", line))?;
     registry().lock().get(&id).cloned().ok_or_else(|| {
-        PerlError::runtime(format!("pty: handle id {} not found (closed?)", id), line)
+        StrykeError::runtime(format!("pty: handle id {} not found (closed?)", id), line)
     })
 }
 
@@ -84,7 +84,7 @@ fn make_handle_value(id: u64, cmd: &str, pid: i32) -> StrykeValue {
 
 pub(crate) fn pty_spawn(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     if args.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "pty_spawn: usage: pty_spawn(\"cmd ...\") or pty_spawn(\"cmd\", arg, arg, ...)",
             line,
         ));
@@ -97,7 +97,7 @@ pub(crate) fn pty_spawn(args: &[StrykeValue], line: usize) -> Result<StrykeValue
         let line_str = args[0].to_string();
         let parts: Vec<String> = shell_split(&line_str);
         if parts.is_empty() {
-            return Err(PerlError::runtime("pty_spawn: empty command", line));
+            return Err(StrykeError::runtime("pty_spawn: empty command", line));
         }
         let cmd = parts[0].clone();
         (cmd, parts)
@@ -108,14 +108,14 @@ pub(crate) fn pty_spawn(args: &[StrykeValue], line: usize) -> Result<StrykeValue
     };
 
     let openpty = nix::pty::openpty(None, None)
-        .map_err(|e| PerlError::runtime(format!("pty_spawn: openpty: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("pty_spawn: openpty: {}", e), line))?;
 
     // SAFETY: fork() in Rust must be careful — between fork and execvp
     // we must not call any function that takes a lock or allocates
     // beyond what we pre-built. `setsid`, `ioctl(TIOCSCTTY)`, `dup2`
     // and `execvp` are all signal-safe.
     let result = unsafe { nix::unistd::fork() }
-        .map_err(|e| PerlError::runtime(format!("pty_spawn: fork: {}", e), line))?;
+        .map_err(|e| StrykeError::runtime(format!("pty_spawn: fork: {}", e), line))?;
 
     match result {
         nix::unistd::ForkResult::Child => {
@@ -180,14 +180,14 @@ fn set_nonblocking(fd: RawFd) -> Result<()> {
     // through libc directly to avoid borrowing semantics.
     let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
     if flags < 0 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("pty_spawn: fcntl get: {}", std::io::Error::last_os_error()),
             0,
         ));
     }
     let r = unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) };
     if r < 0 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             format!("pty_spawn: fcntl set: {}", std::io::Error::last_os_error()),
             0,
         ));
@@ -242,13 +242,13 @@ fn shell_split(s: &str) -> Vec<String> {
 pub(crate) fn pty_send(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h = lookup(
         args.first()
-            .ok_or_else(|| PerlError::runtime("pty_send: handle required", line))?,
+            .ok_or_else(|| StrykeError::runtime("pty_send: handle required", line))?,
         line,
     )?;
     let payload = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let g = h.lock();
     if g.closed {
-        return Err(PerlError::runtime("pty_send: handle is closed", line));
+        return Err(StrykeError::runtime("pty_send: handle is closed", line));
     }
     let fd = g.master_fd.as_raw_fd();
     let mut written = 0;
@@ -272,7 +272,7 @@ pub(crate) fn pty_send(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
             if err.raw_os_error() == Some(libc::EINTR) {
                 continue;
             }
-            return Err(PerlError::runtime(
+            return Err(StrykeError::runtime(
                 format!("pty_send: write: {}", err),
                 line,
             ));
@@ -294,7 +294,7 @@ pub(crate) fn pty_send(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
 pub(crate) fn pty_read(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h = lookup(
         args.first()
-            .ok_or_else(|| PerlError::runtime("pty_read: handle required", line))?,
+            .ok_or_else(|| StrykeError::runtime("pty_read: handle required", line))?,
         line,
     )?;
     let timeout_secs = args.get(1).map(|v| v.to_int()).unwrap_or(5);
@@ -405,11 +405,11 @@ fn drain_into_buffer(fd: RawFd, buffer: &mut Vec<u8>) -> bool {
 pub(crate) fn pty_expect(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h_v = args
         .first()
-        .ok_or_else(|| PerlError::runtime("pty_expect: handle required", line))?;
+        .ok_or_else(|| StrykeError::runtime("pty_expect: handle required", line))?;
     let h = lookup(h_v, line)?;
     let pattern_v = args
         .get(1)
-        .ok_or_else(|| PerlError::runtime("pty_expect: pattern required", line))?;
+        .ok_or_else(|| StrykeError::runtime("pty_expect: pattern required", line))?;
     let timeout_secs = args.get(2).map(|v| v.to_int()).unwrap_or(30);
     let re = compile_pattern(pattern_v, line)?;
 
@@ -425,12 +425,12 @@ pub(crate) fn pty_expect_table(args: &[StrykeValue], line: usize) -> Result<Stry
     // args = ($h, [+{re => qr/.../, do => sub{}}, ...], $timeout?)
     let h = lookup(
         args.first()
-            .ok_or_else(|| PerlError::runtime("pty_expect_table: handle required", line))?,
+            .ok_or_else(|| StrykeError::runtime("pty_expect_table: handle required", line))?,
         line,
     )?;
     let table_v = args
         .get(1)
-        .ok_or_else(|| PerlError::runtime("pty_expect_table: branch list required", line))?;
+        .ok_or_else(|| StrykeError::runtime("pty_expect_table: branch list required", line))?;
     let timeout_secs = args.get(2).map(|v| v.to_int()).unwrap_or(30);
     let timeout = Duration::from_millis((timeout_secs.max(0) as u64) * 1000);
 
@@ -445,7 +445,7 @@ pub(crate) fn pty_expect_table(args: &[StrykeValue], line: usize) -> Result<Stry
             .as_hash_map()
             .or_else(|| entry.as_hash_ref().map(|h| h.read().clone()))
             .ok_or_else(|| {
-                PerlError::runtime(
+                StrykeError::runtime(
                     "pty_expect_table: each branch must be a hashref { re => qr/../, do => sub{} }",
                     line,
                 )
@@ -583,7 +583,7 @@ fn compile_pattern(v: &StrykeValue, line: usize) -> Result<regex::bytes::Regex> 
         pat
     };
     regex::bytes::Regex::new(&stripped)
-        .map_err(|e| PerlError::runtime(format!("pty: bad regex `{}`: {}", stripped, e), line))
+        .map_err(|e| StrykeError::runtime(format!("pty: bad regex `{}`: {}", stripped, e), line))
 }
 
 // ── pty_buffer / pty_alive / pty_eof ─────────────────────────────────
@@ -591,7 +591,7 @@ fn compile_pattern(v: &StrykeValue, line: usize) -> Result<regex::bytes::Regex> 
 pub(crate) fn pty_buffer(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h = lookup(
         args.first()
-            .ok_or_else(|| PerlError::runtime("pty_buffer: handle required", line))?,
+            .ok_or_else(|| StrykeError::runtime("pty_buffer: handle required", line))?,
         line,
     )?;
     let g = h.lock();
@@ -603,7 +603,7 @@ pub(crate) fn pty_buffer(args: &[StrykeValue], line: usize) -> Result<StrykeValu
 pub(crate) fn pty_alive(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h = lookup(
         args.first()
-            .ok_or_else(|| PerlError::runtime("pty_alive: handle required", line))?,
+            .ok_or_else(|| StrykeError::runtime("pty_alive: handle required", line))?,
         line,
     )?;
     let g = h.lock();
@@ -622,7 +622,7 @@ pub(crate) fn pty_alive(args: &[StrykeValue], line: usize) -> Result<StrykeValue
 pub(crate) fn pty_eof(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h = lookup(
         args.first()
-            .ok_or_else(|| PerlError::runtime("pty_eof: handle required", line))?,
+            .ok_or_else(|| StrykeError::runtime("pty_eof: handle required", line))?,
         line,
     )?;
     let g = h.lock();
@@ -638,7 +638,7 @@ pub(crate) fn pty_eof(args: &[StrykeValue], line: usize) -> Result<StrykeValue> 
 pub(crate) fn pty_close(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h_v = args
         .first()
-        .ok_or_else(|| PerlError::runtime("pty_close: handle required", line))?;
+        .ok_or_else(|| StrykeError::runtime("pty_close: handle required", line))?;
     let h = lookup(h_v, line)?;
     let id = handle_id(h_v).unwrap_or(0);
 
@@ -692,7 +692,7 @@ fn handle_id(v: &StrykeValue) -> Option<u64> {
 pub(crate) fn pty_interact(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h = lookup(
         args.first()
-            .ok_or_else(|| PerlError::runtime("pty_interact: handle required", line))?,
+            .ok_or_else(|| StrykeError::runtime("pty_interact: handle required", line))?,
         line,
     )?;
 
@@ -805,7 +805,7 @@ pub(crate) fn pty_strip_ansi(args: &[StrykeValue], line: usize) -> Result<Stryke
     let s = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| PerlError::runtime("pty_strip_ansi: text required", line))?;
+        .ok_or_else(|| StrykeError::runtime("pty_strip_ansi: text required", line))?;
     Ok(StrykeValue::string(strip_ansi(&s)))
 }
 
@@ -910,9 +910,9 @@ fn eof_events() -> &'static parking_lot::Mutex<Vec<EofEvent>> {
 pub(crate) fn pty_after_eof(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
     let h_v = args
         .first()
-        .ok_or_else(|| PerlError::runtime("pty_after_eof: handle required", line))?;
+        .ok_or_else(|| StrykeError::runtime("pty_after_eof: handle required", line))?;
     let id = handle_id(h_v)
-        .ok_or_else(|| PerlError::runtime("pty_after_eof: hashref missing __pty_id__", line))?;
+        .ok_or_else(|| StrykeError::runtime("pty_after_eof: hashref missing __pty_id__", line))?;
     let callback = args
         .get(1)
         .map(|v| v.to_string())

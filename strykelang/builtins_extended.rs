@@ -5739,7 +5739,7 @@ fn builtin_matrix_solve(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let b: Vec<f64> = bv.iter().map(|v| v.to_number()).collect();
     let n = a.len();
     if n == 0 || b.len() != n {
-        return Err(PerlError::runtime("matrix_solve: dimension mismatch", 0));
+        return Err(StrykeError::runtime("matrix_solve: dimension mismatch", 0));
     }
     // Augmented matrix
     let mut aug: Vec<Vec<f64>> = a
@@ -5762,7 +5762,7 @@ fn builtin_matrix_solve(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
             }
         }
         if max_val < 1e-12 {
-            return Err(PerlError::runtime("matrix_solve: singular matrix", 0));
+            return Err(StrykeError::runtime("matrix_solve: singular matrix", 0));
         }
         aug.swap(col, max_row);
         let pivot = aug[col][col];
@@ -5791,7 +5791,7 @@ fn builtin_matrix_lu(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let a = args_to_matrix(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = a.len();
     if n == 0 {
-        return Err(PerlError::runtime("matrix_lu: empty matrix", 0));
+        return Err(StrykeError::runtime("matrix_lu: empty matrix", 0));
     }
     let mut u = a.clone();
     let mut l = vec![vec![0.0; n]; n];
@@ -5849,7 +5849,7 @@ fn builtin_matrix_qr(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let a = args_to_matrix(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let m = a.len();
     if m == 0 {
-        return Err(PerlError::runtime("matrix_qr: empty matrix", 0));
+        return Err(StrykeError::runtime("matrix_qr: empty matrix", 0));
     }
     let n = a[0].len();
     // Columns of A
@@ -6067,7 +6067,7 @@ fn builtin_matrix_cholesky(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
             if i == j {
                 let val = a[i][i] - s;
                 if val < 0.0 {
-                    return Err(PerlError::runtime(
+                    return Err(StrykeError::runtime(
                         "matrix_cholesky: not positive definite",
                         0,
                     ));
@@ -6141,7 +6141,7 @@ fn builtin_welch_ttest(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n1 = s1.len() as f64;
     let n2 = s2.len() as f64;
     if n1 < 2.0 || n2 < 2.0 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "welch_ttest: need at least 2 samples each",
             0,
         ));
@@ -6173,7 +6173,7 @@ fn builtin_paired_ttest(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .collect();
     let n = s1.len();
     if n != s2.len() || n < 2 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "paired_ttest: samples must be same length >= 2",
             0,
         ));
@@ -6218,7 +6218,7 @@ fn builtin_anova_oneway(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .collect();
     let k = groups.len() as f64;
     if k < 2.0 {
-        return Err(PerlError::runtime("anova: need at least 2 groups", 0));
+        return Err(StrykeError::runtime("anova: need at least 2 groups", 0));
     }
     let n_total: f64 = groups.iter().map(|g| g.len() as f64).sum();
     let grand_mean: f64 = groups.iter().flat_map(|g| g.iter()).sum::<f64>() / n_total;
@@ -6259,7 +6259,7 @@ fn builtin_spearman(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .collect();
     let n = s1.len();
     if n != s2.len() || n < 2 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "spearman: samples must be same length >= 2",
             0,
         ));
@@ -6310,7 +6310,7 @@ fn builtin_kendall_tau(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .collect();
     let n = s1.len();
     if n != s2.len() || n < 2 {
-        return Err(PerlError::runtime("kendall_tau: same length >= 2", 0));
+        return Err(StrykeError::runtime("kendall_tau: same length >= 2", 0));
     }
     let mut concordant = 0i64;
     let mut discordant = 0i64;
@@ -6340,7 +6340,7 @@ fn builtin_confidence_interval(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
     let conf = args.get(1).map(|v| v.to_number()).unwrap_or(0.95);
     let n = s.len() as f64;
     if n < 2.0 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "confidence_interval: need >= 2 samples",
             0,
         ));
@@ -6547,7 +6547,7 @@ fn builtin_cubic_spline(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let x = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
     let n = xs.len();
     if n < 2 || ys.len() != n {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "cubic_spline: need >= 2 matched points",
             0,
         ));
@@ -6730,7 +6730,7 @@ fn call_f(
 ) -> PerlResult<f64> {
     let sub = f
         .as_code_ref()
-        .ok_or_else(|| PerlError::runtime("expected code ref", line))?;
+        .ok_or_else(|| StrykeError::runtime("expected code ref", line))?;
     let r = exec_to_perl_result(
         interp.call_sub(&sub, vec![StrykeValue::float(x)], WantarrayCtx::Scalar, line),
         "callback",
@@ -6748,7 +6748,7 @@ fn call_f2(
 ) -> PerlResult<f64> {
     let sub = f
         .as_code_ref()
-        .ok_or_else(|| PerlError::runtime("expected code ref", line))?;
+        .ok_or_else(|| StrykeError::runtime("expected code ref", line))?;
     let r = exec_to_perl_result(
         interp.call_sub(
             &sub,
@@ -6917,7 +6917,7 @@ fn builtin_dijkstra(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let graph_map = graph_val
         .as_hash_map()
         .or_else(|| graph_val.as_hash_ref().map(|r| r.read().clone()))
-        .ok_or_else(|| PerlError::runtime("dijkstra: first arg must be a hash", 0))?;
+        .ok_or_else(|| StrykeError::runtime("dijkstra: first arg must be a hash", 0))?;
     let mut dist: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
     let mut visited: std::collections::HashSet<String> = std::collections::HashSet::new();
     dist.insert(source.clone(), 0.0);
@@ -7238,7 +7238,7 @@ fn builtin_bessel_j1(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 fn builtin_lambert_w(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     if x < -1.0 / std::f64::consts::E {
-        return Err(PerlError::runtime("lambert_w: x must be >= -1/e", 0));
+        return Err(StrykeError::runtime("lambert_w: x must be >= -1/e", 0));
     }
     let mut w = if x < 1.0 { 0.0 } else { x.ln() };
     for _ in 0..50 {
@@ -7297,7 +7297,7 @@ fn builtin_mod_inv(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         old_s = tmp;
     }
     if old_r != 1 {
-        return Err(PerlError::runtime("mod_inv: no inverse exists", 0));
+        return Err(StrykeError::runtime("mod_inv: no inverse exists", 0));
     }
     Ok(StrykeValue::integer(((old_s % m) + m) % m))
 }
@@ -7313,7 +7313,7 @@ fn builtin_chinese_remainder(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .map(|v| v.to_number() as i64)
         .collect();
     if rems.len() != mods.len() || rems.is_empty() {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "chinese_remainder: mismatched arrays",
             0,
         ));
@@ -8114,7 +8114,7 @@ fn builtin_which_val(
     let pred = args.get(1).cloned().unwrap_or(StrykeValue::UNDEF);
     let sub = pred
         .as_code_ref()
-        .ok_or_else(|| PerlError::runtime("which: expected code ref", line))?;
+        .ok_or_else(|| StrykeError::runtime("which: expected code ref", line))?;
     let mut indices = Vec::new();
     for (i, x) in v.iter().enumerate() {
         let r = exec_to_perl_result(
@@ -8275,7 +8275,7 @@ fn builtin_density(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n_pts = args.get(1).map(|v| v.to_number() as usize).unwrap_or(512);
     let n = data.len() as f64;
     if n < 2.0 {
-        return Err(PerlError::runtime("density: need >= 2 data points", 0));
+        return Err(StrykeError::runtime("density: need >= 2 data points", 0));
     }
     let mean: f64 = data.iter().sum::<f64>() / n;
     let sd: f64 = (data.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1.0)).sqrt();
@@ -8312,7 +8312,7 @@ fn builtin_shapiro_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .collect();
     let n = x.len();
     if n < 3 {
-        return Err(PerlError::runtime("shapiro_test: need >= 3 samples", 0));
+        return Err(StrykeError::runtime("shapiro_test: need >= 3 samples", 0));
     }
     x.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let mean: f64 = x.iter().sum::<f64>() / n as f64;
@@ -8451,7 +8451,7 @@ fn builtin_sapply(
     let f = args.get(1).cloned().unwrap_or(StrykeValue::UNDEF);
     let sub = f
         .as_code_ref()
-        .ok_or_else(|| PerlError::runtime("sapply: expected code ref", line))?;
+        .ok_or_else(|| StrykeError::runtime("sapply: expected code ref", line))?;
     let mut result = Vec::with_capacity(v.len());
     for x in v {
         let r = exec_to_perl_result(
@@ -8475,7 +8475,7 @@ fn builtin_tapply(
     let f = args.get(2).cloned().unwrap_or(StrykeValue::UNDEF);
     let sub = f
         .as_code_ref()
-        .ok_or_else(|| PerlError::runtime("tapply: expected code ref", line))?;
+        .ok_or_else(|| StrykeError::runtime("tapply: expected code ref", line))?;
     let mut grouped: indexmap::IndexMap<String, Vec<StrykeValue>> = indexmap::IndexMap::new();
     for (i, x) in v.iter().enumerate() {
         let key = if i < groups.len() {
@@ -8512,7 +8512,7 @@ fn builtin_do_call(
     let call_args = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     let sub = f
         .as_code_ref()
-        .ok_or_else(|| PerlError::runtime("do_call: expected code ref", line))?;
+        .ok_or_else(|| StrykeError::runtime("do_call: expected code ref", line))?;
     exec_to_perl_result(
         interp.call_sub(&sub, call_args, WantarrayCtx::Scalar, line),
         "do_call",
@@ -8630,7 +8630,7 @@ fn builtin_prcomp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .collect();
     let n = data.len();
     if n < 2 {
-        return Err(PerlError::runtime("prcomp: need >= 2 observations", 0));
+        return Err(StrykeError::runtime("prcomp: need >= 2 observations", 0));
     }
     let p = data[0].len();
     let nf = n as f64;
@@ -9193,7 +9193,7 @@ fn builtin_lowess(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let f = args.get(2).map(|v| v.to_number()).unwrap_or(0.6667);
     let n = xs.len();
     if n < 3 || ys.len() != n {
-        return Err(PerlError::runtime("lowess: need >= 3 matched points", 0));
+        return Err(StrykeError::runtime("lowess: need >= 3 matched points", 0));
     }
     let span = (f * n as f64).ceil() as usize;
     let span = span.max(2).min(n);
@@ -9613,7 +9613,7 @@ fn builtin_predict_lm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .collect();
     let map = model
         .as_hash_map()
-        .ok_or_else(|| PerlError::runtime("predict_lm: expected model hash from lm_fit", 0))?;
+        .ok_or_else(|| StrykeError::runtime("predict_lm: expected model hash from lm_fit", 0))?;
     let intercept = map.get("intercept").map(|v| v.to_number()).unwrap_or(0.0);
     let slope = map.get("slope").map(|v| v.to_number()).unwrap_or(0.0);
     let result: Vec<StrykeValue> = x_new
@@ -9629,7 +9629,7 @@ fn builtin_confint_lm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let level = args.get(1).map(|v| v.to_number()).unwrap_or(0.95);
     let map = model
         .as_hash_map()
-        .ok_or_else(|| PerlError::runtime("confint_lm: expected model hash", 0))?;
+        .ok_or_else(|| StrykeError::runtime("confint_lm: expected model hash", 0))?;
     let intercept = map.get("intercept").map(|v| v.to_number()).unwrap_or(0.0);
     let slope = map.get("slope").map(|v| v.to_number()).unwrap_or(0.0);
     let residuals = map
@@ -9652,7 +9652,7 @@ fn builtin_confint_lm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .unwrap_or_default();
     let n = residuals.len() as f64;
     if n < 3.0 {
-        return Err(PerlError::runtime("confint_lm: need >= 3 observations", 0));
+        return Err(StrykeError::runtime("confint_lm: need >= 3 observations", 0));
     }
     let se_resid = (residuals.iter().map(|r| r * r).sum::<f64>() / (n - 2.0)).sqrt();
     // Reconstruct xs from fitted and model
@@ -9702,7 +9702,7 @@ fn builtin_cor_matrix(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .collect();
     let n = data.len();
     if n < 2 {
-        return Err(PerlError::runtime("cor_matrix: need >= 2 observations", 0));
+        return Err(StrykeError::runtime("cor_matrix: need >= 2 observations", 0));
     }
     let p = data[0].len();
     let nf = n as f64;
@@ -9736,7 +9736,7 @@ fn builtin_cov_matrix(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         .collect();
     let n = data.len();
     if n < 2 {
-        return Err(PerlError::runtime("cov_matrix: need >= 2 observations", 0));
+        return Err(StrykeError::runtime("cov_matrix: need >= 2 observations", 0));
     }
     let p = data[0].len();
     let nf = n as f64;

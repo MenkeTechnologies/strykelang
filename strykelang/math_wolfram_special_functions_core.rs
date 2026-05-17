@@ -273,7 +273,7 @@ fn builtin_bessel_j_zero(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let n = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let k = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1).max(1);
     if (n - n.round()).abs() > 1e-9 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "bessel_j_zero: n must be an integer",
             0,
         ));
@@ -1392,7 +1392,7 @@ fn builtin_hurwitz_zeta(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 fn builtin_polylog(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let (n, z) = f2(args);
     if z.abs() > 1.0 + 1e-12 {
-        return Err(PerlError::runtime("polylog: |z| must be ≤ 1", 0));
+        return Err(StrykeError::runtime("polylog: |z| must be ≤ 1", 0));
     }
     if n == 1.0 {
         return Ok(StrykeValue::float(-(1.0 - z).ln()));
@@ -1415,7 +1415,7 @@ fn builtin_dilog(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let z = f1(args);
     if !(-1.0..=1.0).contains(&z) {
         // Reflection Li_2(z) + Li_2(1-z) = π²/6 - ln(z) ln(1-z) — only for 0<z<1.
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "dilog: argument out of [-1,1] range",
             0,
         ));
@@ -1437,7 +1437,7 @@ fn builtin_dilog(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 fn builtin_lerch_phi(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let (z, s, a) = f3(args);
     if z.abs() > 1.0 {
-        return Err(PerlError::runtime("lerch_phi: |z| must be ≤ 1", 0));
+        return Err(StrykeError::runtime("lerch_phi: |z| must be ≤ 1", 0));
     }
     let mut sum = 0.0_f64;
     let mut zp = 1.0_f64;
@@ -1518,7 +1518,7 @@ fn builtin_dirichlet_beta(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 fn builtin_hypergeometric_2f1(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let (a, b, c, z) = f4(args);
     if z.abs() >= 1.0 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "hypergeometric_2f1: |z| must be < 1 (use reflection identities outside the disk)",
             0,
         ));
@@ -1605,7 +1605,7 @@ fn builtin_hypergeometric_pfq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 fn builtin_hypergeometric_u(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     let (a, b, z) = f3(args);
     if z <= 0.0 {
-        return Err(PerlError::runtime(
+        return Err(StrykeError::runtime(
             "hypergeometric_u: z must be > 0",
             0,
         ));
@@ -2591,7 +2591,7 @@ fn builtin_three_j_symbol(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// Six-j {j1 j2 j3; j4 j5 j6}. Racah W form via 3j sum (Edmonds 6.2.6).
 fn builtin_six_j_symbol(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     if args.len() < 6 {
-        return Err(PerlError::runtime("six_j_symbol: need 6 args", 0));
+        return Err(StrykeError::runtime("six_j_symbol: need 6 args", 0));
     }
     let j: Vec<f64> = args[..6].iter().map(|v| v.to_number()).collect();
     // Sum over m's:
@@ -2640,7 +2640,7 @@ fn builtin_six_j_symbol(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// Nine-j via single 6j sum (Edmonds 6.4.3).
 fn builtin_nine_j_symbol(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     if args.len() < 9 {
-        return Err(PerlError::runtime("nine_j_symbol: need 9 args", 0));
+        return Err(StrykeError::runtime("nine_j_symbol: need 9 args", 0));
     }
     let j: Vec<f64> = args[..9].iter().map(|v| v.to_number()).collect();
     let kmin = ((j[0] - j[8]).abs())
