@@ -98,7 +98,7 @@ fn Demo::Bank::transfer($from, $to, $amount) {
         amt   => $amount,
     }
     td_add($td_lat, (now_ns() - $t0) / 1000.0)
-    return +{ ok => 1, debit => $w->{balance}, credit => $d->{balance} }
+    +{ ok => 1, debit => $w->{balance}, credit => $d->{balance} }
 }
 
 # ── create accounts + simulate workload ─────────────────────────────

@@ -44,7 +44,7 @@ fn Demo::Expr::tokenize($src) {
         }
         die "Unexpected char: '$c' at position $i\n"
     }
-    return \@tokens
+    \@tokens
 }
 
 # ── parser state ─────────────────────────────────────────────────────
@@ -54,13 +54,13 @@ mysync $pos
 
 fn Demo::Expr::peek() {
     return undef if $pos >= len(@$tokens)
-    return $tokens->[$pos]
+    $tokens->[$pos]
 }
 
 fn Demo::Expr::advance() {
     my $t = Demo::Expr::peek()
     $pos++
-    return $t
+    $t
 }
 
 # ── recursive-descent ────────────────────────────────────────────────
@@ -102,7 +102,7 @@ fn Demo::Expr::parse_term() {
         my $right = Demo::Expr::parse_factor()
         $left = +{ kind => "bin", op => $t->{value}, left => $left, right => $right }
     }
-    return $left
+    $left
 }
 
 fn Demo::Expr::parse_expr() {
@@ -116,7 +116,7 @@ fn Demo::Expr::parse_expr() {
         my $right = Demo::Expr::parse_term()
         $left = +{ kind => "bin", op => $t->{value}, left => $left, right => $right }
     }
-    return $left
+    $left
 }
 
 fn Demo::Expr::parse($src) {
@@ -124,7 +124,7 @@ fn Demo::Expr::parse($src) {
     $pos = 0
     my $ast = Demo::Expr::parse_expr()
     die "Trailing tokens after parse\n" if $pos < len(@$tokens)
-    return $ast
+    $ast
 }
 
 # ── tree-walking evaluator ───────────────────────────────────────────

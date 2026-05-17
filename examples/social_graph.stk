@@ -79,7 +79,7 @@ fn Demo::SG::shared($u1, $u2) {
             $shared{$f} = 1
         }
     }
-    return \%shared
+    \%shared
 }
 
 p ""

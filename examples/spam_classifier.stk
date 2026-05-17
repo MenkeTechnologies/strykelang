@@ -82,7 +82,7 @@ fn Demo::NB::classify($text) {
         $log_score{$cls} = $log_prior + $log_likelihood
     }
     td_add($td_lat, (now_ns() - $t0) / 1000.0)
-    return $log_score{spam} > $log_score{ham} ? "spam" : "ham"
+    $log_score{spam} > $log_score{ham} ? "spam" : "ham"
 }
 
 # ── test corpus ─────────────────────────────────────────────────────

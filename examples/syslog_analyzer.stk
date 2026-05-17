@@ -36,7 +36,7 @@ fn Demo::Syslog::severity($line) {
     return "error"    if $line =~ /\berror:|\bcrashed\b/i
     return "warn"     if $line =~ /\bfailed\b|\b500\b/i
     return "info"     if $line =~ /\b200\b|started|completed/i
-    return "debug"
+    "debug"
 }
 
 # ── parser + stats ─────────────────────────────────────────────────

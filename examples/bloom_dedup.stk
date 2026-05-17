@@ -50,7 +50,7 @@ fn Demo::Dedup::is_seen($item) {
     bloom_add($bloom, $item)
     $exact{$item} = 1
     td_add($td_check, (now_ns() - $t0) / 1000.0)
-    return 0
+    0
 }
 
 # ── generate workload: 5000 records, mostly duplicates ──────────────

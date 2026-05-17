@@ -39,11 +39,11 @@ p ""
 p "── extends — single inheritance + super-call ──────────"
 class Animal {
     name: Str
-    fn speak { p "  generic animal noise from ", $self->name }
+    fn speak = p "  generic animal noise from ", $self->name
 }
 class Dog extends Animal {
     breed: Str
-    fn speak { p "  ", $self->name, " (a ", $self->breed, ") barks!" }
+    fn speak = p "  ", $self->name, " (a ", $self->breed, ") barks!"
 }
 my $d = Dog(name => "rex", breed => "shepherd")
 $d->speak
@@ -52,10 +52,10 @@ p ""
 p "── Method dispatch — multiple methods on one class ────"
 class Counter {
     n: Int = 0
-    fn inc      { $self->n($self->n + 1) }
-    fn dec      { $self->n($self->n - 1) }
-    fn value    { $self->n }
-    fn reset    { $self->n(0) }
+    fn inc      = $self->n($self->n + 1)
+    fn dec      = $self->n($self->n - 1)
+    fn value    = $self->n
+    fn reset    = $self->n(0)
 }
 my $c = Counter()
 $c->inc for 1:5
@@ -71,9 +71,9 @@ class UserCache {
     bloom:    Any
     capacity: Int = 1000
 
-    fn BUILD { $self->bloom(bloom_filter($self->capacity, 0.01)) }
-    fn add($name)  { bloom_add($self->bloom, $name) }
-    fn seen($name) { bloom_contains($self->bloom, $name) }
+    fn BUILD = $self->bloom(bloom_filter($self->capacity, 0.01))
+    fn add($name)  = bloom_add($self->bloom, $name)
+    fn seen($name) = bloom_contains($self->bloom, $name)
 }
 my $cache = UserCache(capacity => 5000)
 $cache->add(_) for ("alice", "bob", "carol")

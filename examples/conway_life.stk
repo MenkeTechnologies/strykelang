@@ -22,7 +22,7 @@ fn Demo::Life::empty_grid() {
             $g[$r]->[$c] = 0
         }
     }
-    return \@g
+    \@g
 }
 
 fn Demo::Life::seed($g, $row, $col) {
@@ -70,7 +70,7 @@ fn Demo::Life::count_neighbors($g, $r, $c) {
             $n += $g->[$nr]->[$nc]
         }
     }
-    return $n
+    $n
 }
 
 # ── one generation step ────────────────────────────────────────────
@@ -88,7 +88,7 @@ fn Demo::Life::step($g) {
             }
         }
     }
-    return $ng
+    $ng
 }
 
 # ── render ─────────────────────────────────────────────────────────
@@ -102,7 +102,7 @@ fn Demo::Life::render($g) {
         }
         push @lines, $line
     }
-    return \@lines
+    \@lines
 }
 
 fn Demo::Life::live_count($g) {
@@ -112,7 +112,7 @@ fn Demo::Life::live_count($g) {
             $n += $g->[$r]->[$c]
         }
     }
-    return $n
+    $n
 }
 
 # ── simulate ───────────────────────────────────────────────────────

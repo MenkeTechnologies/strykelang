@@ -48,7 +48,7 @@ fn Demo::Bus::emit($topic, $payload) {
             }
         }
     }
-    return \@matched
+    \@matched
 }
 
 # ── instrumentation: AOP around-advice for latency ──────────────────

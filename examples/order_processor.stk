@@ -140,7 +140,7 @@ fn Demo::Order::render_invoice($result) {
     push @lines, sprintf("  %-30s  %10.2f", "Shipping", $result->{shipping})
     push @lines, "  -" x 50
     push @lines, sprintf("  %-30s  %10.2f", "TOTAL", $result->{total})
-    return \@lines
+    \@lines
 }
 
 # ── sample orders ──────────────────────────────────────────────────

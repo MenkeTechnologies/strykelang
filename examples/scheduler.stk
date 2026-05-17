@@ -46,7 +46,7 @@ fn Demo::Sched::tick($delta) {
         $total_fires      = $total_fires + 1
         $fired++
     }
-    return $fired
+    $fired
 }
 
 # ── register a few tasks ───────────────────────────────────────────

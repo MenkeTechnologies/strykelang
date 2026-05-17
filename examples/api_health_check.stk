@@ -58,7 +58,7 @@ fn Demo::API::ping($ep) {
     } else {
         $code = 200 + int(rand() * 5)
     }
-    return +{ code => $code, latency_ms => $latency_ms }
+    +{ code => $code, latency_ms => $latency_ms }
 }
 
 # ── classify response ──────────────────────────────────────────────
