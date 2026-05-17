@@ -370,5 +370,5 @@ fn Project::Numeric::average_array {
     my @a = (2, 4, 6, 8, 10)
     my $sum = 0
     $sum += _ for @a
-    $sum / scalar(@a)
+    $sum / len(@a)
 }

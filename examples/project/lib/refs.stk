@@ -38,7 +38,7 @@ fn Project::Refs::array_ref_pop($aref) {
 }
 
 fn Project::Refs::array_ref_slice($aref, $start, $end) {
-    my @result = @{$aref}[$start..$end]
+    my @result = @{$aref}[$start:$end]
     \@result
 }
 

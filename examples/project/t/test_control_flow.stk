@@ -37,7 +37,7 @@ assert_eq Project::ControlFlow::postfix_unless_false(), 42, "postfix unless fals
 
 # ── For loops ──────────────────────────────────────────────────────
 
-assert_eq Project::ControlFlow::sum_range(1, 10), 55, "sum 1..10"
+assert_eq Project::ControlFlow::sum_range(1, 10), 55, "sum 1:10"
 assert_eq Project::ControlFlow::sum_range(5, 5), 5, "sum single"
 assert_eq Project::ControlFlow::count_evens(1, 2, 3, 4, 5, 6), 3, "count evens"
 assert_eq Project::ControlFlow::for_c_style_sum(10), 55, "c-style for"
@@ -47,7 +47,7 @@ assert_eq Project::ControlFlow::for_with_last(), 55, "for with last"
 # ── While loops ────────────────────────────────────────────────────
 
 my @countdown = Project::ControlFlow::while_countdown(5)
-assert_eq scalar(@countdown), 5, "countdown length"
+assert_eq len(@countdown), 5, "countdown length"
 assert_eq $countdown[0], 5, "countdown first"
 assert_eq $countdown[4], 1, "countdown last"
 
@@ -60,7 +60,7 @@ assert_eq Project::ControlFlow::until_example(10), 10, "until example"
 assert_eq Project::ControlFlow::postfix_for_sum(), 15, "postfix for sum"
 
 my @post_count = Project::ControlFlow::postfix_while_countdown()
-assert_eq scalar(@post_count), 5, "postfix while length"
+assert_eq len(@post_count), 5, "postfix while length"
 assert_eq $post_count[0], 5, "postfix while first"
 
 # ── Given/when (Perl 5.10+ switch) ─────────────────────────────────
@@ -111,7 +111,7 @@ my ($a, $b) = Project::ControlFlow::find_pair_sum(10, 1, 2, 3, 7, 8)
 assert_eq $a + $b, 10, "find pair sum"
 
 my @no_pair = Project::ControlFlow::find_pair_sum(100, 1, 2, 3)
-assert_eq scalar(@no_pair), 0, "find pair no match"
+assert_eq len(@no_pair), 0, "find pair no match"
 
 # ── Return in various contexts ─────────────────────────────────────
 
@@ -124,13 +124,13 @@ assert_eq Project::ControlFlow::return_from_loop(50, 75, 150, 200), 150, "return
 assert_eq Project::ControlFlow::return_from_loop(1, 2, 3), -1, "return from loop not found"
 
 my @limited = Project::ControlFlow::return_list_from_loop(10)
-assert_eq scalar(@limited), 5, "return list limited"
+assert_eq len(@limited), 5, "return list limited"
 assert_eq $limited[0], 2, "return list first"
 
 # ── Complex control flow ───────────────────────────────────────────
 
 my @fb = fizzbuzz(15)
-assert_eq scalar(@fb), 15, "fizzbuzz length"
+assert_eq len(@fb), 15, "fizzbuzz length"
 assert_eq $fb[0], 1, "fizzbuzz 1"
 assert_eq $fb[2], "Fizz", "fizzbuzz 3"
 assert_eq $fb[4], "Buzz", "fizzbuzz 5"
@@ -141,7 +141,7 @@ assert_eq Project::ControlFlow::collatz_steps(2), 1, "collatz 2"
 assert_eq Project::ControlFlow::collatz_steps(6), 8, "collatz 6"
 
 my @primes = Project::ControlFlow::find_primes(20)
-assert_eq scalar(@primes), 8, "primes up to 20 count"
+assert_eq len(@primes), 8, "primes up to 20 count"
 assert_eq $primes[0], 2, "first prime"
 assert_eq $primes[7], 19, "eighth prime"
 

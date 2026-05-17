@@ -10,12 +10,12 @@ fn Project::Math::fib_n ($n) {
 
 fn Project::Math::factorial_n ($n) {
     my $r = 1
-    $r *= _ for 1..$n
+    $r *= _ for 1:$n
     $r
 }
 
 fn Project::Math::primes_under ($max) {
-    my @result = grep { is_prime(_) } 2..$max
+    my @result = grep { is_prime(_) } 2:$max
     @result
 }
 
@@ -39,7 +39,7 @@ fn Project::Math::make_adder ($n) {
 
 # Higher-order: apply a function N times to a value
 fn Project::Math::apply_n ($f, $n, $val) {
-    $val = $f($val) for 1..$n
+    $val = $f($val) for 1:$n
     $val
 }
 

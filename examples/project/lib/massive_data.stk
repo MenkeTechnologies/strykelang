@@ -14,7 +14,7 @@ fn Project::MassiveData::ss_total_moons($self) {
     my $plist = $self->planets;
     for my $p (@$plist) {
         my $mlist = $p->moons;
-        $count += scalar(@$mlist);
+        $count += len(@$mlist);
     }
     return $count;
 }
@@ -30,7 +30,7 @@ fn Project::MassiveData::sector_total_planets($self) {
     my $smap = $self->systems;
     for my $s (values %$smap) {
         my $plist = $s->planets;
-        $count += scalar(@$plist);
+        $count += len(@$plist);
     }
     return $count;
 }
@@ -42,14 +42,14 @@ class Galaxy {
 
 fn Project::MassiveData::galaxy_stats($self) {
     my $seclist = $self->sectors;
-    my $s_count = scalar(@$seclist);
+    my $s_count = len(@$seclist);
     my $sys_count = 0;
     my $p_count = 0;
     my $m_count = 0;
     
     for my $sec (@$seclist) {
         my $smap = $sec->{systems};
-        $sys_count += scalar(keys %$smap);
+        $sys_count += len(keys %$smap);
         $p_count += Project::MassiveData::sector_total_planets($sec);
         for my $sys (values %$smap) {
             $m_count += Project::MassiveData::ss_total_moons($sys);

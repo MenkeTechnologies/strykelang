@@ -7,7 +7,7 @@ fn Project::GraphAlgorithms::adv_bfs($graph, $start_node) {
     my @queue = ($start_node)
     $seen{$start_node} = 1
     
-    while (scalar(@queue) > 0) {
+    while (len(@queue) > 0) {
         my $curr = shift @queue
         push @visited, $curr
         
@@ -28,7 +28,7 @@ fn Project::GraphAlgorithms::adv_dfs($graph, $start_node) {
     my %seen = ()
     my @stack = ($start_node)
     
-    while (scalar(@stack) > 0) {
+    while (len(@stack) > 0) {
         my $curr = pop @stack
         unless (exists $seen{$curr}) {
             $seen{$curr} = 1
@@ -36,7 +36,7 @@ fn Project::GraphAlgorithms::adv_dfs($graph, $start_node) {
             
             my $neighbors = $graph->{$curr} // []
             # Push in reversed to maintain same order as recursive DFS if desired
-            for my $i (rev 0..scalar(@$neighbors)-1) {
+            for my $i (rev 0..len(@$neighbors)-1) {
                 my $neighbor = $neighbors->[$i]
                 unless (exists $seen{$neighbor}) {
                     push @stack, $neighbor
@@ -91,7 +91,7 @@ fn Project::GraphAlgorithms::adv_has_cycle($graph) {
         my %in_stack = ()
         my @stack = ([$start_node, 0])
         
-        while (scalar(@stack) > 0) {
+        while (len(@stack) > 0) {
             my $top_ref = $stack[-1]
             my $curr = $top_ref->[0]
             my $edge_idx = $top_ref->[1]
@@ -102,7 +102,7 @@ fn Project::GraphAlgorithms::adv_has_cycle($graph) {
             }
             
             my $neighbors = $graph->{$curr} // []
-            if ($edge_idx < scalar(@$neighbors)) {
+            if ($edge_idx < len(@$neighbors)) {
                 # Update current node's edge index for next time we see it
                 $top_ref->[1]++
                 

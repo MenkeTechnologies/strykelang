@@ -6,13 +6,13 @@ class Matrix {
     cols = 0
 
     fn Self.new($rows, $cols) {
-        my $data = [map { [(0) x $cols] } 1..$rows]
+        my $data = [map { [(0) x $cols] } 1:$rows]
         Matrix(data => $data, rows => $rows, cols => $cols)
     }
 
     fn Self.from_array($arr) {
-        my $rows = scalar(@$arr)
-        my $cols = $rows > 0 ? scalar(@{$arr->[0]}) : 0
+        my $rows = len(@$arr)
+        my $cols = $rows > 0 ? len(@{$arr->[0]}) : 0
         Matrix(data => $arr, rows => $rows, cols => $cols)
     }
 
@@ -36,8 +36,8 @@ class Matrix {
     }
 
     fn randomize {
-        for my $r (0..$self->rows - 1) {
-            ~> 0..$self->cols - 1 ep {
+        for my $r (0:$self->rows - 1) {
+            ~> 0:$self->cols - 1 ep {
                 $self->set($r, _, rand() * 2 - 1)
             }
         }

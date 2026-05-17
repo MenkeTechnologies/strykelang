@@ -116,7 +116,7 @@ fn Project::QuantumSim::universe_initialize($num_particles) {
     
     # Entangle random pairs
     my @keys = keys %$p_map;
-    my $k_len = scalar(@keys);
+    my $k_len = len(@keys);
     for (my $i = 0; $i < $num_particles / 2; $i++) {
         my $p1 = $p_map->{$keys[int(rand($k_len))]};
         my $p2 = $p_map->{$keys[int(rand($k_len))]};
@@ -154,7 +154,7 @@ fn Project::QuantumSim::universe_simulate_epoch($u) {
     
     return {
         epoch => $next_epoch,
-        survivors => scalar(@processed),
+        survivors => len(@processed),
         raw_results => $results
     };
 }

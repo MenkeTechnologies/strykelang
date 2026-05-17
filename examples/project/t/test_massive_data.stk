@@ -38,8 +38,8 @@ assert_true $m1->mass < 100, "Moon mass check"
 my $mesh_size = 20
 my @nodes = Project::MassiveData::create_linked_mesh($mesh_size)
 
-assert_eq scalar(@nodes), 20, "Mesh size"
-assert_eq scalar(@{$nodes[0]->edges}), 3, "Node degree"
+assert_eq len(@nodes), 20, "Mesh size"
+assert_eq len(@{$nodes[0]->edges}), 3, "Node degree"
 
 # Test traversal (depth-limited to avoid infinite recursion in cycles)
 my $sum = Project::MassiveData::traverse_mesh($nodes[0], 3)
@@ -70,21 +70,21 @@ my @all_moon_names = map {
     } values %$smap
 } @$seclist
 
-assert_eq scalar(@all_moon_names), 300, "Extracted all moon names"
+assert_eq len(@all_moon_names), 300, "Extracted all moon names"
 assert_true $all_moon_names[0] =~ /^Moon-/, "Moon naming pattern"
 
 # ── 5. Stressing Hash of Hashes ───────────────────────────────────
 
 my %big_map
-for (1..1000) {
+for (1:1000) {
     my $inner = {}
-    for my $j (1..10) {
+    for my $j (1:10) {
         $inner->{"k$j"} = "val-$_-$j"
     }
     $big_map{"key-$_"} = $inner
 }
 
-assert_eq scalar(keys %big_map), 1000, "Large hash count"
+assert_eq len(keys %big_map), 1000, "Large hash count"
 assert_eq $big_map{"key-500"}->{"k5"}, "val-500-5", "Large hash deep lookup"
 
 test_run

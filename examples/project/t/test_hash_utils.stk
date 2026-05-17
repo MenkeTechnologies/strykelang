@@ -3,7 +3,7 @@
 
 # Basic hash operations
 my %h = (a => 1, b => 2, c => 3)
-assert_eq scalar(keys %h), 3, "hash keys count"
+assert_eq len(keys %h), 3, "hash keys count"
 assert_ok exists $h{a}, "key exists"
 assert_false exists $h{z}, "key doesn't exist"
 
@@ -28,14 +28,14 @@ assert_eq $merged->{c}, 3, "merge adds c"
 
 # Select keys (returns hashref)
 my $selected = select_keys({a => 1, b => 2, c => 3}, "a", "c")
-assert_eq scalar(keys %$selected), 2, "select_keys count"
+assert_eq len(keys %$selected), 2, "select_keys count"
 assert_ok exists $selected->{a}, "select_keys has a"
 assert_ok exists $selected->{c}, "select_keys has c"
 assert_false exists $selected->{b}, "select_keys excludes b"
 
 # Hash in list context
 my @kv = %h
-assert_eq scalar(@kv), 6, "hash to list has 6 elements"
+assert_eq len(@kv), 6, "hash to list has 6 elements"
 
 # Delete and return
 my %del = (x => 10, y => 20)

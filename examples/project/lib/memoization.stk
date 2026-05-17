@@ -60,7 +60,7 @@ fn Project::Memoization::make_lru_cache($max_size) {
     my $set = fn($key, $val) {
         if (exists $cache{$key}) {
             @keys_order = grep { _ ne $key } @keys_order
-        } elsif (scalar(@keys_order) >= $max_size) {
+        } elsif (len(@keys_order) >= $max_size) {
             my $oldest = shift @keys_order
             delete $cache{$oldest}
         }
@@ -68,7 +68,7 @@ fn Project::Memoization::make_lru_cache($max_size) {
         push @keys_order, $key
     }
 
-    my $size = fn { scalar(keys %cache) }
+    my $size = fn { len(keys %cache) }
     my $keys = fn { [@keys_order] }
 
     { get => $get, set => $set, size => $size, keys => $keys }
@@ -96,7 +96,7 @@ fn Project::Memoization::make_ttl_cache($ttl_seconds) {
         $timestamps{$key} = $now()
     }
 
-    my $size = fn { scalar(keys %cache) }
+    my $size = fn { len(keys %cache) }
 
     { get => $get, set => $set, size => $size }
 }
@@ -107,7 +107,7 @@ fn Project::Memoization::is_prime_memo($n) {
     return $_prime_cache{$n} if exists $_prime_cache{$n}
 
     my $sqrt = int(sqrt($n))
-    for my $i (2..$sqrt) {
+    for my $i (2:$sqrt) {
         if ($n % $i == 0) {
             $_prime_cache{$n} = 0
             return 0
@@ -159,7 +159,7 @@ fn Project::Memoization::nth_fibonacci_memo($n) {
 
 fn Project::Memoization::sum_fibs_memo($n) {
     my $sum = 0
-    for my $i (1..$n) {
+    for my $i (1:$n) {
         $sum += Project::Memoization::fib_memo($i)
     }
     $sum
@@ -167,7 +167,7 @@ fn Project::Memoization::sum_fibs_memo($n) {
 
 fn Project::Memoization::count_primes_memo($max) {
     my $count = 0
-    ~> 2..$max ep {
+    ~> 2:$max ep {
         $count++ if Project::Memoization::is_prime_memo(_)
     }
     $count

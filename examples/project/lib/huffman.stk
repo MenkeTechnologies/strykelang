@@ -16,12 +16,12 @@ class HuffmanNode {
 # ── Project::Huffman::adv_huffman_encode: compresses string using Huffman coding ─────
 # Returns [encoded_binary_string, tree_root_node]
 fn Project::Huffman::adv_huffman_encode($text) {
-    return ["", undef] if length($text) == 0
+    return ["", undef] if len($text) == 0
     
     # 1. Count frequencies
     my %freq = ()
-    my $len = length($text)
-    for my $i (0..$len-1) {
+    my $len = len($text)
+    for my $i (0:$len-1) {
         my $char = substr($text, $i, 1)
         $freq{$char} = ($freq{$char} // 0) + 1
     }
@@ -70,7 +70,7 @@ fn Project::Huffman::adv_huffman_encode($text) {
 }
 
 fn _generate_codes($node, $code, $codes_ref) {
-    if (defined($node->char()) && length($node->char()) > 0) {
+    if (defined($node->char()) && len($node->char()) > 0) {
         $codes_ref->{$node->char()} = $code
         return
     }
@@ -84,8 +84,8 @@ fn _generate_codes($node, $code, $codes_ref) {
 
 fn _build_binary($text, $codes_ref) {
     my $res = ""
-    my $len = length($text)
-    for my $i (0..$len-1) {
+    my $len = len($text)
+    for my $i (0:$len-1) {
         my $char = substr($text, $i, 1)
         $res .= $codes_ref->{$char}
     }
@@ -94,13 +94,13 @@ fn _build_binary($text, $codes_ref) {
 
 # ── Project::Huffman::adv_huffman_decode: decompresses binary string using Huffman tree ─────
 fn Project::Huffman::adv_huffman_decode($binary, $root) {
-    return "" if !defined($root) || length($binary) == 0
+    return "" if !defined($root) || len($binary) == 0
     
     my $res = ""
     my $curr = $root
-    my $len = length($binary)
+    my $len = len($binary)
     
-    for my $i (0..$len-1) {
+    for my $i (0:$len-1) {
         my $bit = substr($binary, $i, 1)
         if ($bit eq "0") {
             $curr = $curr->left()
@@ -108,7 +108,7 @@ fn Project::Huffman::adv_huffman_decode($binary, $root) {
             $curr = $curr->right()
         }
         
-        if (defined($curr->char()) && length($curr->char()) > 0) {
+        if (defined($curr->char()) && len($curr->char()) > 0) {
             $res .= $curr->char()
             $curr = $root
         }

@@ -11,7 +11,7 @@ assert_eq join(",", @flat), "1,2,3,4,5", "Project::CollectionsExtended::ext_flat
 my @a = (1, 2, 3)
 my @b = ("a", "b", "c")
 my @zipped = Project::CollectionsExtended::ext_zip(\@a, \@b)
-assert_eq scalar(@zipped), 3, "zip count"
+assert_eq len(@zipped), 3, "zip count"
 assert_eq $zipped[0][0], 1, "zip 0 a"
 assert_eq $zipped[0][1], "a", "zip 0 b"
 assert_eq $zipped[2][0], 3, "zip 2 a"

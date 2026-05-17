@@ -7,42 +7,42 @@ require "./lib/arrays_extended.stk"
 # ══════════════════════════════════════════════════════════════════════════════
 
 my @list = Project::ArraysExtended::arr_from_list()
-assert_eq scalar(@list), 5, "from list count"
+assert_eq len(@list), 5, "from list count"
 assert_eq $list[0], 1, "from list first"
 assert_eq $list[4], 5, "from list last"
 
 my @range = Project::ArraysExtended::arr_from_range()
-assert_eq scalar(@range), 10, "from range count"
+assert_eq len(@range), 10, "from range count"
 assert_eq $range[0], 1, "from range first"
 assert_eq $range[9], 10, "from range last"
 
 my @qw = Project::ArraysExtended::arr_from_qw()
-assert_eq scalar(@qw), 3, "from qw count"
+assert_eq len(@qw), 3, "from qw count"
 assert_eq $qw[0], "one", "from qw first"
 
 my @empty = Project::ArraysExtended::arr_empty()
-assert_eq scalar(@empty), 0, "empty count"
+assert_eq len(@empty), 0, "empty count"
 
 my @single = Project::ArraysExtended::arr_single()
-assert_eq scalar(@single), 1, "single count"
+assert_eq len(@single), 1, "single count"
 assert_eq $single[0], 42, "single value"
 
 my @flat = Project::ArraysExtended::arr_nested_flatten()
-assert_eq scalar(@flat), 4, "nested flatten count"
+assert_eq len(@flat), 4, "nested flatten count"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PUSH AND POP
 # ══════════════════════════════════════════════════════════════════════════════
 
 my @push1 = Project::ArraysExtended::arr_push_one()
-assert_eq scalar(@push1), 4, "push one count"
+assert_eq len(@push1), 4, "push one count"
 assert_eq $push1[3], 4, "push one value"
 
 my @push_many = Project::ArraysExtended::arr_push_many()
-assert_eq scalar(@push_many), 5, "push many count"
+assert_eq len(@push_many), 5, "push many count"
 
 my @push_arr = Project::ArraysExtended::arr_push_array()
-assert_eq scalar(@push_arr), 4, "push array count"
+assert_eq len(@push_arr), 4, "push array count"
 
 my @pop_res = Project::ArraysExtended::arr_pop()
 assert_eq $pop_res[0], 3, "pop value"
@@ -61,11 +61,11 @@ assert_eq $shift_res[1], 2, "shift remaining"
 assert_eq Project::ArraysExtended::arr_shift_empty(), 0, "shift empty undef"
 
 my @unshift1 = Project::ArraysExtended::arr_unshift_one()
-assert_eq scalar(@unshift1), 3, "unshift one count"
+assert_eq len(@unshift1), 3, "unshift one count"
 assert_eq $unshift1[0], 1, "unshift one first"
 
 my @unshift_many = Project::ArraysExtended::arr_unshift_many()
-assert_eq scalar(@unshift_many), 5, "unshift many count"
+assert_eq len(@unshift_many), 5, "unshift many count"
 assert_eq $unshift_many[0], 1, "unshift many first"
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -77,7 +77,7 @@ assert_eq $Project::ListOps::splice_remove[0], "2,3", "splice remove removed"
 assert_eq $Project::ListOps::splice_remove[1], "1,4,5", "splice remove remaining"
 
 my @Project::ListOps::splice_insert = Project::ArraysExtended::arr_splice_insert()
-assert_eq scalar(@Project::ListOps::splice_insert), 5, "splice insert count"
+assert_eq len(@Project::ListOps::splice_insert), 5, "splice insert count"
 assert_eq join(",", @Project::ListOps::splice_insert), "1,2,3,4,5", "splice insert result"
 
 my @Project::ListOps::splice_replace = Project::ArraysExtended::arr_splice_replace()
@@ -155,10 +155,10 @@ my @Project::ListOps::grep_even = Project::ArraysExtended::arr_grep_even()
 assert_eq join(",", @Project::ListOps::grep_even), "2,4,6", "grep even"
 
 my @grep_def = Project::ArraysExtended::arr_grep_defined()
-assert_eq scalar(@grep_def), 3, "grep defined count"
+assert_eq len(@grep_def), 3, "grep defined count"
 
 my @grep_re = Project::ArraysExtended::arr_grep_regex()
-assert_eq scalar(@grep_re), 2, "grep regex count"
+assert_eq len(@grep_re), 2, "grep regex count"
 
 assert_eq Project::ArraysExtended::arr_first_match(), 4, "first match"
 
@@ -171,13 +171,13 @@ assert_eq Project::ArraysExtended::arr_join_empty(), "abc", "join empty"
 assert_eq Project::ArraysExtended::arr_join_newline(), "line1\nline2\nline3", "join newline"
 
 my @Project::ListOps::split_comma = Project::ArraysExtended::arr_split_comma()
-assert_eq scalar(@Project::ListOps::split_comma), 3, "split comma count"
+assert_eq len(@Project::ListOps::split_comma), 3, "split comma count"
 
 my @split_ws = Project::ArraysExtended::arr_split_ws()
-assert_eq scalar(@split_ws), 3, "split ws count"
+assert_eq len(@split_ws), 3, "split ws count"
 
 my @split_lim = Project::ArraysExtended::arr_split_limit()
-assert_eq scalar(@split_lim), 2, "split limit count"
+assert_eq len(@split_lim), 2, "split limit count"
 assert_eq $split_lim[1], "b,c,d", "split limit rest"
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -195,11 +195,11 @@ assert_eq $ctx[0], 3, "wantarray scalar"
 # ══════════════════════════════════════════════════════════════════════════════
 
 my @uniq = Project::ArraysExtended::arr_unique()
-assert_eq scalar(@uniq), 4, "unique count"
+assert_eq len(@uniq), 4, "unique count"
 assert_eq join(",", @uniq), "1,2,3,4", "unique values"
 
 my @uniq_str = Project::ArraysExtended::arr_unique_strings()
-assert_eq scalar(@uniq_str), 4, "unique strings count"
+assert_eq len(@uniq_str), 4, "unique strings count"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ARRAY UTILITIES
@@ -213,11 +213,11 @@ assert_eq Project::ArraysExtended::arr_all_match(), 1, "all match"
 assert_eq Project::ArraysExtended::arr_index_of(), 2, "index of"
 
 my @flatten = Project::ArraysExtended::arr_flatten()
-assert_eq scalar(@flatten), 6, "flatten count"
+assert_eq len(@flatten), 6, "flatten count"
 assert_eq join(",", @flatten), "1,2,3,4,5,6", "flatten values"
 
 my @zipped = Project::ArraysExtended::arr_zip()
-assert_eq scalar(@zipped), 6, "zip count"
+assert_eq len(@zipped), 6, "zip count"
 assert_eq join(",", @zipped), "1,a,2,b,3,c", "zip values"
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -226,7 +226,7 @@ assert_eq join(",", @zipped), "1,a,2,b,3,c", "zip values"
 
 # Empty array operations
 my @e = ()
-assert_eq scalar(@e), 0, "empty scalar"
+assert_eq len(@e), 0, "empty scalar"
 assert_eq join(",", @e), "", "empty join"
 
 # Single element
@@ -240,12 +240,12 @@ assert_eq @s ? 1 : 0, 1, "nonempty array true"
 
 # Array assignment from scalar
 my @from_scalar = (5)
-assert_eq scalar(@from_scalar), 1, "from scalar count"
+assert_eq len(@from_scalar), 1, "from scalar count"
 
 # Nested array flattening
 my @n1 = (1, 2)
 my @n2 = (@n1, 3, 4)
-assert_eq scalar(@n2), 4, "nested flatten 2"
+assert_eq len(@n2), 4, "nested flatten 2"
 
 # Array copy
 my @orig = (1, 2, 3)
@@ -254,7 +254,7 @@ $copy[0] = 10
 assert_eq $orig[0], 1, "copy independent"
 
 # Range in array context
-my @r = (1..5)
-assert_eq scalar(@r), 5, "range context count"
+my @r = (1:5)
+assert_eq len(@r), 5, "range context count"
 
 test_run

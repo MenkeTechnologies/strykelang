@@ -11,11 +11,11 @@ fn Project::Geometry::adv_dist_2d($x1, $y1, $x2, $y2) {
 # Expects array ref of point array refs: [[x1, y1], [x2, y2], ...]
 fn Project::Geometry::adv_area_polygon($pts_ref) {
     my @pts = @$pts_ref
-    my $n = scalar(@pts)
+    my $n = len(@pts)
     return 0 if $n < 3
     
     my $area = 0
-    for my $i (0..$n-1) {
+    for my $i (0:$n-1) {
         my $j = ($i + 1) % $n
         $area += $pts[$i][0] * $pts[$j][1]
         $area -= $pts[$j][0] * $pts[$i][1]

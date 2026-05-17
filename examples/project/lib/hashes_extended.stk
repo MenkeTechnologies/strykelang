@@ -25,7 +25,7 @@ fn Project::HashesExtended::hash_values {
 
 fn Project::HashesExtended::hash_keys_count {
     my %h = (a => 1, b => 2, c => 3, d => 4)
-    scalar(keys %h)
+    len(keys %h)
 }
 
 fn Project::HashesExtended::hash_values_sum {
@@ -97,7 +97,7 @@ fn Project::HashesExtended::hash_delete_multiple {
     my %h = (a => 1, b => 2, c => 3, d => 4)
     delete $h{a}
     delete $h{c}
-    scalar(keys %h)
+    len(keys %h)
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -113,7 +113,7 @@ fn Project::HashesExtended::hash_slice_values {
 fn Project::HashesExtended::hash_slice_assign {
     my %h = (a => 1, b => 2)
     @h{qw(c d)} = (3, 4)
-    scalar(keys %h)
+    len(keys %h)
 }
 
 fn Project::HashesExtended::hash_slice_mixed {
@@ -219,7 +219,7 @@ fn Project::HashesExtended::hash_merge {
     my %merged
     for my $k (keys %h1) { $merged{$k} = $h1{$k} }
     for my $k (keys %h2) { $merged{$k} = $h2{$k} }
-    scalar(keys %merged)
+    len(keys %merged)
 }
 
 fn Project::HashesExtended::hash_merge_override {
@@ -312,7 +312,7 @@ fn Project::HashesExtended::hash_complex_key {
 
 fn Project::HashesExtended::hash_is_empty {
     my %h = ()
-    scalar(keys %h) == 0 ? 1 : 0
+    len(keys %h) == 0 ? 1 : 0
 }
 
 fn Project::HashesExtended::hash_has_key {
@@ -342,5 +342,5 @@ fn Project::HashesExtended::hash_group_by {
         my $key = $n % 2 == 0 ? "even" : "odd"
         push @{$groups{$key}}, $n
     }
-    scalar(@{$groups{even}})
+    len(@{$groups{even}})
 }

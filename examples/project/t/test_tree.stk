@@ -14,4 +14,4 @@ fn build($d) {
 }
 
 my $tree = build(2)
-print "Done: " . $tree->id . "\n"
+p "Done: " . $tree->id . ""

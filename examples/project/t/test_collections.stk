@@ -9,17 +9,17 @@ my @a = (1, 2, 3, 4)
 my @b = (3, 4, 5, 6)
 
 my @union = Project::Collections::union_sets(\@a, \@b)
-assert_eq scalar(@union), 6, "set union size"
+assert_eq len(@union), 6, "set union size"
 
 my @inter = Project::Collections::intersect_sets(\@a, \@b)
-assert_eq scalar(@inter), 2, "set intersect size"
+assert_eq len(@inter), 2, "set intersect size"
 
 my @diff = Project::Collections::diff_sets(\@a, \@b)
-assert_eq scalar(@diff), 2, "set diff size"
+assert_eq len(@diff), 2, "set diff size"
 
 # Built-in set()
 my @s = set(1, 1, 2, 2, 3, 3)
-assert_eq scalar(@s), 3, "set dedup"
+assert_eq len(@s), 3, "set dedup"
 
 # ── Hash utilities ───────────────────────────────────────────────────
 
@@ -54,7 +54,7 @@ assert_eq $result, 19, "Project::Collections::apply_pipeline (2+3)*4-1=19"
 
 # Count occurrences
 my $tallied = Project::Collections::count_occurrences(qw(a b a c a b))
-assert_eq scalar(@$tallied), 3, "tally pair count"
+assert_eq len(@$tallied), 3, "tally pair count"
 # Find the 'a' entry
 my $found_a = 0
 for my $pair (@$tallied) {
@@ -66,8 +66,8 @@ assert_eq $found_a, 3, "tally a=3"
 
 # Split chunks
 my @chunks = Project::Collections::split_chunks(3, 1, 2, 3, 4, 5, 6, 7)
-assert_eq scalar(@chunks), 3, "chunk count"
-assert_eq scalar(@{$chunks[0]}), 3, "chunk first size"
-assert_eq scalar(@{$chunks[2]}), 1, "chunk last size (remainder)"
+assert_eq len(@chunks), 3, "chunk count"
+assert_eq len(@{$chunks[0]}), 3, "chunk first size"
+assert_eq len(@{$chunks[2]}), 1, "chunk last size (remainder)"
 
 test_run

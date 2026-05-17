@@ -11,7 +11,7 @@ fn Project::FileOps::slurp_self {
 
 fn Project::FileOps::slurp_has_content {
     my $content = slurp "./lib/file_ops.stk"
-    length($content) > 100 ? 1 : 0
+    len($content) > 100 ? 1 : 0
 }
 
 fn Project::FileOps::slurp_missing {
@@ -65,7 +65,7 @@ fn Project::FileOps::file_is_writable { -w "/tmp" ? 1 : 0 }
 
 fn Project::FileOps::test_file_has_size {
     my @s = stat("./lib/file_ops.stk")
-    scalar(@s) > 0 && $s[7] > 0 ? 1 : 0
+    len(@s) > 0 && $s[7] > 0 ? 1 : 0
 }
 
 fn Project::FileOps::dir_not_file { -f "./lib" ? 0 : 1 }
@@ -77,12 +77,12 @@ fn Project::FileOps::file_not_dir { -d "./lib/file_ops.stk" ? 0 : 1 }
 
 fn Project::FileOps::glob_lib_files {
     my @files = glob("./lib/*.stk")
-    scalar(@files) > 5 ? 1 : 0
+    len(@files) > 5 ? 1 : 0
 }
 
 fn Project::FileOps::glob_test_files {
     my @files = glob("./t/test_*.stk")
-    scalar(@files) > 10 ? 1 : 0
+    len(@files) > 10 ? 1 : 0
 }
 
 fn Project::FileOps::glob_no_match {
@@ -99,7 +99,7 @@ fn Project::FileOps::glob_single {
 
 fn Project::FileOps::stat_file {
     my @s = stat("./lib/file_ops.stk")
-    scalar(@s) > 0 ? 1 : 0
+    len(@s) > 0 ? 1 : 0
 }
 
 fn Project::FileOps::stat_size {
@@ -156,7 +156,7 @@ fn Project::FileOps::cwd_defined {
 
 fn Project::FileOps::cwd_not_empty {
     my $d = cwd()
-    length($d) > 0 ? 1 : 0
+    len($d) > 0 ? 1 : 0
 }
 
 fn Project::FileOps::cwd_contains_project {
@@ -200,7 +200,7 @@ fn Project::FileOps::open_append {
     my $tmpfile = "/tmp/stryke_append_test_$$.txt"
     spurt($tmpfile, "first\n")
     open(my $fh, ">>", $tmpfile)
-    print $fh "second\n"
+    p $fh "second"
     close $fh    my $content = slurp $tmpfile
     unlink $tmpfile    $content =~ /first/ && $content =~ /second/ ? 1 : 0
 }
@@ -246,7 +246,7 @@ fn Project::FileOps::temp_binary_like {
     my $data = "ABCD"
     spurt($tmpfile, $data)
     my $back = slurp $tmpfile
-    unlink $tmpfile    length($back) == 4 ? 1 : 0
+    unlink $tmpfile    len($back) == 4 ? 1 : 0
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -300,10 +300,10 @@ fn Project::FileOps::copy_file {
 
 fn Project::FileOps::find_lib_via_glob {
     my @files = glob("./lib/*.stk")
-    scalar(@files) > 5 ? 1 : 0
+    len(@files) > 5 ? 1 : 0
 }
 
 fn Project::FileOps::find_test_via_glob {
     my @files = glob("./t/*.stk")
-    scalar(@files) > 20 ? 1 : 0
+    len(@files) > 20 ? 1 : 0
 }
