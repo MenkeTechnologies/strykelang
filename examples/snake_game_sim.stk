@@ -19,8 +19,8 @@ fn Demo::Snake::manhattan($p1, $p2) {
 
 fn Demo::Snake::random_empty_cell($snake_set) {
     while (1) {
-        my $r = int(rand() * $H)
-        my $c = int(rand() * $W)
+        my $r = int(rand $H)
+        my $c = int(rand $W)
         my $key = "$r,$c"
         return [$r, $c] unless exists $snake_set->{$key}
     }

@@ -57,22 +57,22 @@ fn Demo::PS::probe($host, $port) {
     my $banner
 
     if (bloom_contains($bf_closed, "p:$port")) {
-        $latency_us = int(rand(500)) + 100
+        $latency_us = int(rand 500) + 100
         $status = "filtered"
         $banner = ""
     } elsif (exists $hosts{$host}) {
         my $ports = $hosts{$host}
         if (exists $ports->{$port}) {
-            $latency_us = int(rand(3000)) + 200
+            $latency_us = int(rand 3000) + 200
             $status = "open"
             $banner = $ports->{$port}
         } else {
-            $latency_us = int(rand(800)) + 100
+            $latency_us = int(rand 800) + 100
             $status = "closed"
             $banner = ""
         }
     } else {
-        $latency_us = int(rand(15000)) + 5000
+        $latency_us = int(rand 15000) + 5000
         $status = "timeout"
         $banner = ""
     }
