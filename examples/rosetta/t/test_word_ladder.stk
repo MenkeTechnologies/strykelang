@@ -2,9 +2,9 @@
 # Rosetta Code: Word ladder
 
 fn Rosetta::WordLadder::is_adjacent($w1, $w2) {
-    return 0 if len($w1) != len($w2)
+    return 0 if length($w1) != length($w2)
     my $diff = 0
-    for my $i (0:len($w1)-1) {
+    for my $i (0:length($w1)-1) {
         if (substr($w1, $i, 1) ne substr($w2, $i, 1)) {
             $diff++
             return 0 if $diff > 1

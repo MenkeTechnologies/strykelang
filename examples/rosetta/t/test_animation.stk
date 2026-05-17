@@ -4,7 +4,7 @@
 fn Rosetta::Animation::marquee($text, $width, $frames) {
     my $pad = " " x $width
     my $full = $pad . $text . $pad
-    my $len = len($full)
+    my $len = length($full)
     my @rendered
     
     for my $i (0:($frames - 1)) {
@@ -24,7 +24,7 @@ fn Rosetta::Animation::demo() {
     
     # Assertions
     assert_eq len(@$out), 10, "10 frames rendered"
-    assert_eq len($out->[0]), 15, "Frame 1 width is correct"
+    assert_eq length($out->[0]), 15, "Frame 1 width is correct"
     assert_ok $out->[0] =~ /^ +$/, "First frame is all spaces"
     assert_ok $out->[-1] =~ /^ +Hello Ros$/, "10th frame shifted characters in"
 }

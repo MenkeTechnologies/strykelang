@@ -10,7 +10,7 @@ fn Rosetta::Truth::eval($expr, $env) {
 fn Rosetta::Truth::tokenize($s) {
     my @out
     my $i = 0
-    my $n = len($s)
+    my $n = length($s)
     while ($i < $n) {
         my $c = substr($s, $i, 1)
         if ($c eq " " || $c eq "\t") { $i += 1; next }

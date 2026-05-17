@@ -5,14 +5,14 @@
 
 fn Rosetta::Multisplit::split($s, $seps) {
     my @parts
-    my @sep_sorted = sort { len($b) <=> len($a) } @$seps
+    my @sep_sorted = sort { length($b) <=> length($a) } @$seps
     my $i = 0
     my $start = 0
-    my $n = len($s)
+    my $n = length($s)
     while ($i < $n) {
         my $matched = 0
         for my $sep (@sep_sorted) {
-            my $sl = len($sep)
+            my $sl = length($sep)
             if ($sl > 0 && $i + $sl <= $n && substr($s, $i, $sl) eq $sep) {
                 push @parts, substr($s, $start, $i - $start)
                 $i += $sl

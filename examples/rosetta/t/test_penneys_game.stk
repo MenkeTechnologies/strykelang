@@ -7,7 +7,7 @@
 # of P1's sequence and prepend it.
 
 fn Rosetta::Penney::counter($pattern) {
-    return undef if len($pattern) != 3
+    return undef if length($pattern) != 3
     my @b = split //, $pattern
     my $flipped = $b[1] eq "H" ? "T" : "H"
     $flipped . $b[0] . $b[1]
@@ -23,7 +23,7 @@ fn Rosetta::Penney::flip_seq($n) {
 
 fn Rosetta::Penney::wins($p1, $p2, $stream) {
     my $i = 0
-    while ($i + 2 < len($stream)) {
+    while ($i + 2 < length($stream)) {
         my $window = substr($stream, $i, 3)
         return "P1" if $window eq $p1
         return "P2" if $window eq $p2

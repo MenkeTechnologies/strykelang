@@ -37,7 +37,7 @@ my $graph = Rosetta::Plot::plot(@p)
 #  * * 
 # *   *
 
-assert_ok len($graph) > 0, "Graph generated"
+assert_ok length($graph) > 0, "Graph generated"
 assert_ok index($graph, "*") != -1, "Graph contains plot points"
 
 test_run

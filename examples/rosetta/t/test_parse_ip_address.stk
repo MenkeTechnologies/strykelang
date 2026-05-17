@@ -10,7 +10,7 @@ fn Rosetta::IP::parse_ipv4($s) {
     my @oct = ($1, $2, $3, $4)
     for my $o (@oct) {
         return undef if $o > 255
-        return undef if len("$o") > 1 && substr("$o", 0, 1) eq "0"
+        return undef if length("$o") > 1 && substr("$o", 0, 1) eq "0"
     }
     join(".", @oct)
 }
@@ -29,14 +29,14 @@ fn Rosetta::IP::parse_ipv6($s) {
         # split returns leading or trailing empty strings around "::"
         # Count non-empty groups; the rest are zero-filled.
         my @real
-        for my $p (@parts) { push @real, $p if len($p) > 0 }
+        for my $p (@parts) { push @real, $p if length($p) > 0 }
         return undef if len(@real) > 7
     } else {
         return undef if len(@parts) != 8
     }
     for my $p (@parts) {
         next if $p eq ""
-        return undef if len($p) > 4
+        return undef if length($p) > 4
         return undef unless $p =~ /^[0-9a-fA-F]+$/
     }
     lc($s)
@@ -50,7 +50,7 @@ fn Rosetta::IP::parse($s) {
         my $addr = substr($s, 1, $close - 1)
         my $rest = substr($s, $close + 1)
         my $port
-        if (len($rest) > 0) {
+        if (length($rest) > 0) {
             return undef unless $rest =~ /^:(\d+)$/
             $port = $1 + 0
             return undef if $port > 65535

@@ -19,7 +19,7 @@ fn Rosetta::Polybius::encode($plain) {
     my $alpha = "ABCDEFGHIKLMNOPQRSTUVWXYZ"
     my $out = ""
     my $up = uc($plain)
-    for my $i (0..len($up)-1) {
+    for my $i (0..length($up)-1) {
         my $ch = substr($up, $i, 1)
         $ch = "I" if $ch eq "J"
         my $idx = index($alpha, $ch)
@@ -35,7 +35,7 @@ fn Rosetta::Polybius::decode($cipher) {
     my $grid = Rosetta::Polybius::build()
     my $out = ""
     my $i = 0
-    while ($i + 1 < len($cipher)) {
+    while ($i + 1 < length($cipher)) {
         my $r = int(substr($cipher, $i, 1)) - 1
         my $c = int(substr($cipher, $i + 1, 1)) - 1
         $out .= $grid->[$r][$c]

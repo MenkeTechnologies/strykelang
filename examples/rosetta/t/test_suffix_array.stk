@@ -2,7 +2,7 @@
 # Rosetta Code: Suffix array
 
 fn Rosetta::SuffixArray::solve($s) {
-    my $n = len($s)
+    my $n = length($s)
     my @indices = (0:$n-1)
     
     # Sort indices based on the suffix starting at that index

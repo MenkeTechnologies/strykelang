@@ -5,8 +5,8 @@
 # the triangle inequality lets us prune subtrees during search.
 
 fn Rosetta::BK::levenshtein($a, $b) {
-    my $la = len($a)
-    my $lb = len($b)
+    my $la = length($a)
+    my $lb = length($b)
     return $lb if $la == 0
     return $la if $lb == 0
     my @prev = ~> 0:$lb

@@ -4,7 +4,7 @@
 # Case is preserved; non-alphabetic characters pass through.
 
 fn Rosetta::Subst::build_table($key) {
-    return undef if len($key) != 26
+    return undef if length($key) != 26
     my %enc
     my %dec
     my @upper_in  = ("A".."Z")

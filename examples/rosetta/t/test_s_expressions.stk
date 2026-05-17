@@ -6,7 +6,7 @@
 fn Rosetta::SExpr::tokenize($s) {
     my @tokens
     my $i = 0
-    my $n = len($s)
+    my $n = length($s)
     while ($i < $n) {
         my $c = substr($s, $i, 1)
         if ($c =~ /\s/) { $i++; next }
@@ -52,7 +52,7 @@ fn Rosetta::SExpr::parse_tokens($tokens, $pos) {
 }
 
 fn Rosetta::SExpr::coerce($t) {
-    return { type => "string", value => substr($t, 1, len($t) - 2) }
+    return { type => "string", value => substr($t, 1, length($t) - 2) }
         if substr($t, 0, 1) eq '"'
     return { type => "int",    value => $t + 0 }    if $t =~ /^-?\d+$/
     return { type => "float",  value => $t + 0 }    if $t =~ /^-?\d+\.\d+$/

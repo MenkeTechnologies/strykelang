@@ -24,7 +24,7 @@ fn Rosetta::Rpn::eval($expr) {
     my @stack
     my @tokens = split /\s+/, $expr
     for my $t (@tokens) {
-        next if len($t) == 0
+        next if length($t) == 0
         return undef unless Rosetta::Rpn::eval_token(\@stack, $t)
     }
     return undef if len(@stack) != 1
@@ -36,7 +36,7 @@ fn Rosetta::Rpn::trace($expr) {
     my @lines
     my @tokens = split /\s+/, $expr
     for my $t (@tokens) {
-        next if len($t) == 0
+        next if length($t) == 0
         Rosetta::Rpn::eval_token(\@stack, $t)
         push @lines, sprintf("%-3s -> %s", $t, join(" ", @stack))
     }

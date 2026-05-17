@@ -4,7 +4,7 @@
 fn Rosetta::Bitcoin::validate($addr) {
     # 1. Decode base58
     my $decoded = base58_decode($addr)
-    return 0 if len($decoded) != 25
+    return 0 if length($decoded) != 25
     
     # 2. Extract parts
     my $prefix = substr($decoded, 0, 1)
@@ -22,7 +22,7 @@ fn Rosetta::Bitcoin::validate($addr) {
 
 # Check sha256 output format
 my $h = sha256("abc")
-p "SHA256 LEN: " . len($h)
+p "SHA256 LEN: " . length($h)
 p "SHA256: $h"
 
 test_run

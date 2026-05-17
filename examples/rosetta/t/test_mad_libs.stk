@@ -22,7 +22,7 @@ fn Rosetta::MadLibs::fill($template, $values) {
         my $val = $values->{$key}
         my $idx
         while (($idx = index($out, $tag)) >= 0) {
-            $out = substr($out, 0, $idx) . $val . substr($out, $idx + len($tag))
+            $out = substr($out, 0, $idx) . $val . substr($out, $idx + length($tag))
         }
     }
     $out

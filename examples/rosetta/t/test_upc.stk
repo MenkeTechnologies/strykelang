@@ -4,7 +4,7 @@
 # weighted-sum check.
 
 fn Rosetta::Upc::checksum($digits11) {
-    return -1 if len($digits11) != 11
+    return -1 if length($digits11) != 11
     my $sum = 0
     for my $i (0:10) {
         my $d = ord(substr($digits11, $i, 1)) - ord("0")
@@ -16,7 +16,7 @@ fn Rosetta::Upc::checksum($digits11) {
 }
 
 fn Rosetta::Upc::is_valid($s) {
-    return 0 if len($s) != 12
+    return 0 if length($s) != 12
     my $cd = Rosetta::Upc::checksum(substr($s, 0, 11))
     return 0 if $cd < 0
     substr($s, 11, 1) eq "$cd"

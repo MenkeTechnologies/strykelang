@@ -14,7 +14,7 @@ fn Rosetta::RollingHash::pow_mod($b, $e, $m) {
 
 fn Rosetta::RollingHash::hash($s, $base, $mod) {
     my $h = 0
-    for my $i (0..len($s) - 1) {
+    for my $i (0..length($s) - 1) {
         $h = ($h * $base + ord(substr($s, $i, 1))) % $mod
     }
     $h
@@ -41,7 +41,7 @@ assert_eq $rolled, $b, "rolling 'HELLO' -> 'ELLOW' matches recompute"
 my $text = "ABCDEFGHIJ"
 my $win = 3
 my $h = Rosetta::RollingHash::hash(substr($text, 0, $win), $base, $mod)
-for my $i (1..len($text) - $win) {
+for my $i (1..length($text) - $win) {
     my $drop = substr($text, $i - 1, 1)
     my $add = substr($text, $i + $win - 1, 1)
     $h = Rosetta::RollingHash::roll($h, $drop, $add, $base, $mod, $win)
