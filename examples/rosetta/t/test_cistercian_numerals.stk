@@ -52,6 +52,6 @@ for my $n (0:99) {
 assert_ok $all_round, "0:99 round-trip exact"
 
 # Pipe form
-1234 |> Rosetta::Cistercian::quadrants |> fn { join(",", @$_) } |> assert_eq("4,3,2,1", "pipe quadrants(1234)")
+1234 |> Rosetta::Cistercian::quadrants |> fn { join(",", @{_}) } |> assert_eq("4,3,2,1", "pipe quadrants(1234)")
 
 test_run

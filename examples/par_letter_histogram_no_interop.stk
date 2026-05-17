@@ -44,7 +44,7 @@ Hist::assert_same("seq vs pmacro", $seq, $pmacro)
 
 # ── 5. Print top-5 letters ──────────────────────────────────────────────────
 p "── all three approaches converge — top-5 letters ──"
-my @top = (sort { $seq->{$_1} <=> $seq->{$_0} } keys %$seq)[0:4]
+my @top = (sort { $seq->{_1} <=> $seq->{_0} } keys %$seq)[0:4]
 for my $k (@top) {
     printf("  %s  %3d\n", $k, $seq->{$k})
 }

@@ -13,8 +13,8 @@ fn Rosetta::Vogel::solve($costs, $supply, $demand) {
         for my $j (0:$num_cols-1) { $res[$i]->[$j] = 0 }
     }
     
-    my %row_active; $row_active{$_} = 1 for 0:$num_rows-1
-    my %col_active; $col_active{$_} = 1 for 0:$num_cols-1
+    my %row_active; $row_active{_} = 1 for 0:$num_rows-1
+    my %col_active; $col_active{_} = 1 for 0:$num_cols-1
     
     while (cnt(keys %row_active) > 0 && cnt(keys %col_active) > 0) {
         my %row_penalties

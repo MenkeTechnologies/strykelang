@@ -37,6 +37,6 @@ my $res = Rosetta::EquilibriumIndex::solve(@data)
 assert_eq join(",", @$res), "3,6", "equilibrium indices of -7,1,5,2,-4,3,0"
 
 # Pipe example
-@data |> Rosetta::EquilibriumIndex::solve |> { join(",", @$_) } |> assert_eq("3,6", "pipe equilibrium")
+@data |> Rosetta::EquilibriumIndex::solve |> { join(",", @{_}) } |> assert_eq("3,6", "pipe equilibrium")
 
 test_run

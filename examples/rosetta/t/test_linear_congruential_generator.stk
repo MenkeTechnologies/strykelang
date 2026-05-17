@@ -42,7 +42,7 @@ assert_eq $msvc[3], 159719620, "MSVC step 4"
 assert_eq $msvc[4], 580340855, "MSVC step 5"
 
 # Using pipeline to sum the first 10 numbers of MSVC LCG
-my $sum = Rosetta::LCG::sequence(0, $msvc_a, $msvc_c, $msvc_m, 10) |> reduce { $_0 + $_1 }
+my $sum = Rosetta::LCG::sequence(0, $msvc_a, $msvc_c, $msvc_m, 10) |> reduce { _0 + _1 }
 assert_eq $sum, 8768759433, "Sum of first 10 MSVC numbers"
 
 test_run

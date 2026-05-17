@@ -16,7 +16,7 @@ fn Rosetta::BondPerc::percolates($n, $edges) {
         push @{$adj{Rosetta::BondPerc::key($r2, $c2)}}, [$r1, $c1]
     }
 
-    my @queue = map { [0, $_] } (0:$n - 1)
+    my @queue = map { [0, _] } (0:$n - 1)
     my %seen
     while (len(@queue) > 0) {
         my $cur = shift @queue

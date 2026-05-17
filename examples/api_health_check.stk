@@ -126,7 +126,7 @@ for my $ep (@endpoints) {
 if (len(@alerts) == 0) {
     p "  (no service exceeds threshold)"
 } else {
-    for my $alert (sort { $_1->{rate} <=> $_0->{rate} } @alerts) {
+    for my $alert (sort { _1->{rate} <=> _0->{rate} } @alerts) {
         printf "  ALERT %-15s : %.1f%% errors\n", $alert->{ep}, $alert->{rate}
     }
 }

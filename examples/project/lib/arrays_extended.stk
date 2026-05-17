@@ -192,7 +192,7 @@ fn Project::ArraysExtended::arr_map_transform {
 
 fn Project::ArraysExtended::arr_map_to_hash_values {
     my @a = (1, 2, 3)
-    map { $_ => _ * _ } @a
+    map { _ => _ * _ } @a
 }
 
 fn Project::ArraysExtended::arr_grep_even {
@@ -273,13 +273,13 @@ fn Project::ArraysExtended::arr_wantarray_context {
 fn Project::ArraysExtended::arr_unique {
     my @a = (1, 2, 2, 3, 3, 3, 4)
     my %seen
-    grep { !$seen{$_}++ } @a
+    grep { !$seen{_}++ } @a
 }
 
 fn Project::ArraysExtended::arr_unique_strings {
     my @a = qw(a b a c b d)
     my %seen
-    grep { !$seen{$_}++ } @a
+    grep { !$seen{_}++ } @a
 }
 
 # ══════════════════════════════════════════════════════════════════════════════

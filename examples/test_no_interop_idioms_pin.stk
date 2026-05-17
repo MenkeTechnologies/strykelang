@@ -16,7 +16,7 @@ eval {
 }
 
 # In this script, we pin that we MUST use 'fn', 'len', 'p', 'rev'
-# and that '$_0' / '$_1' are required for psort.
+# and that '_0' / '_1' are required for psort.
 
 fn Pin::NoInteropIdioms::idiom_test = 1
 Pin::NoInteropIdioms::idiom_test() |> aeq 1, "fn works (sub is rejected)"

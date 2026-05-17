@@ -22,6 +22,6 @@ fn Rosetta::Recaman::generate($n) {
 my $res10 = Rosetta::Recaman::generate(10)
 assert_eq join(",", @$res10), "0,1,3,6,2,7,13,20,12,21,11", "recaman 10"
 
-10 |> Rosetta::Recaman::generate |> map { join(",", @$_) } |> assert_eq("0,1,3,6,2,7,13,20,12,21,11", "pipe recaman")
+10 |> Rosetta::Recaman::generate |> map { join(",", @{_}) } |> assert_eq("0,1,3,6,2,7,13,20,12,21,11", "pipe recaman")
 
 test_run

@@ -56,7 +56,7 @@ p "  sum of squares 1:100 (pmap_reduce) = $sum_sq"
 
 p ""
 p "── fan — N parallel block invocations ────────────────"
-# fan [N] {BLOCK} executes BLOCK N times with `$_` = index.
+# fan [N] {BLOCK} executes BLOCK N times with `_` = index.
 # Useful for stress tests, fanout queries, repeated trials.
 my $t2 = now_ns()
 fan 8 { sleep 0.05 }

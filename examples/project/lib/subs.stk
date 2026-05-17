@@ -106,11 +106,11 @@ fn Project::Subs::sum_to($n) {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::Subs::get_adder($n) {
-    fn { $_0 + $n }
+    fn { _0 + $n }
 }
 
 fn Project::Subs::get_multiplier($n) {
-    fn { $_0 * $n }
+    fn { _0 * $n }
 }
 
 fn Project::Subs::apply_twice($fn, $x) {
@@ -118,7 +118,7 @@ fn Project::Subs::apply_twice($fn, $x) {
 }
 
 fn Project::Subs::compose_fn($f, $g) {
-    fn { $f($g($_0)) }
+    fn { $f($g(_0)) }
 }
 
 # ══════════════════════════════════════════════════════════════════════════════

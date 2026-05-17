@@ -5,18 +5,18 @@
 fn Rosetta::Pell::nth($n) {
     return 0 if $n == 0
     return 1 if $n == 1
-    my ($_0, $_1) = (0, 1)
-    for (2:$n) { ($_0, $_1) = ($_1, 2 * $_1 + $_0) }
-    $_1
+    my (_0, _1) = (0, 1)
+    for (2:$n) { (_0, _1) = (_1, 2 * _1 + _0) }
+    _1
 }
 
 # Companion Pell-Lucas numbers: Q(0)=Q(1)=2, Q(n)=2*Q(n-1)+Q(n-2).
 fn Rosetta::Pell::companion($n) {
     return 2 if $n == 0
     return 2 if $n == 1
-    my ($_0, $_1) = (2, 2)
-    for (2:$n) { ($_0, $_1) = ($_1, 2 * $_1 + $_0) }
-    $_1
+    my (_0, _1) = (2, 2)
+    for (2:$n) { (_0, _1) = (_1, 2 * _1 + _0) }
+    _1
 }
 
 # OEIS A000129 first 12.

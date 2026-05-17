@@ -12,7 +12,7 @@ fn Rosetta::Combinations::generate($k, @arr) {
     } else {
         my $first = shift @arr
         my @with_first = Rosetta::Combinations::generate($k - 1, @arr)
-        @with_first = map { [$first, @$_] } @with_first
+        @with_first = map { [$first, @{_}] } @with_first
         
         my @without_first = Rosetta::Combinations::generate($k, @arr)
         

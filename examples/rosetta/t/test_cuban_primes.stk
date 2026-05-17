@@ -20,6 +20,6 @@ fn Rosetta::CubanPrimes::generate($count) {
 
 assert_eq join(",", @{ Rosetta::CubanPrimes::generate(5) }), "7,19,37,61,127", "first 5 cuban primes"
 
-5 |> Rosetta::CubanPrimes::generate |> map { join(",", @$_) } |> assert_eq("7,19,37,61,127", "pipe cuban")
+5 |> Rosetta::CubanPrimes::generate |> map { join(",", @{_}) } |> assert_eq("7,19,37,61,127", "pipe cuban")
 
 test_run

@@ -18,7 +18,7 @@ fn Rosetta::Fibonacci::nth($n) {
     # Using the closed-form Binet's formula via pipeline for fun
     my $phi = (1 + sqrt(5)) / 2
     my $psi = (1 - sqrt(5)) / 2
-    $n |> { ($phi**$_ - $psi**$_) / sqrt(5) } |> round()
+    $n |> { ($phi**_ - $psi**_) / sqrt(5) } |> round()
 }
 
 assert_eq join(",", Rosetta::Fibonacci::sequence(10)), "0,1,1,2,3,5,8,13,21,34,55", "fib sequence to 10"

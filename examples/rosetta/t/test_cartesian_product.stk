@@ -18,7 +18,7 @@ assert_eq $p->[0][1], "a", "first element y"
 assert_eq $p->[3][1], "b", "last element y"
 
 # Verify all combinations
-my $joined = ~> @$p map { join("-", @$_) } |> join(",")
+my $joined = ~> @$p map { join("-", @{_}) } |> join(",")
 assert_eq $joined, "1-a,1-b,2-a,2-b", "all combinations"
 
 test_run

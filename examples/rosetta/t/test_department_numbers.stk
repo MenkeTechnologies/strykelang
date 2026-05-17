@@ -33,7 +33,7 @@ for my $s (@sols) {
 
 # Pipeline form: format each solution
 my @fmt = ~> @sols map {
-    my $s = $_
+    my $s = _
     "P=" . $s->[0] . ",S=" . $s->[1] . ",F=" . $s->[2]
 }
 assert_eq len(@fmt), 14, "14 formatted"

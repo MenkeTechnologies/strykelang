@@ -92,7 +92,7 @@ fn Rosetta::Truth::table($expr, $vars) {
             $env{$vars->[$i]} = ($mask >> ($n - 1 - $i)) & 1
         }
         my $r = Rosetta::Truth::eval($expr, \%env)
-        push @rows, [@{[map { $env{$_} } @$vars]}, $r]
+        push @rows, [@{[map { $env{_} } @$vars]}, $r]
     }
     \@rows
 }

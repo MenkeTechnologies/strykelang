@@ -1,7 +1,7 @@
 # lib/special_vars.stk — special variable tests
 
 # ══════════════════════════════════════════════════════════════════════════════
-# $_ DEFAULT VARIABLE
+# _ DEFAULT VARIABLE
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::SpecialVars::default_in_for {
@@ -49,7 +49,7 @@ fn Project::SpecialVars::args_count {
 }
 
 fn Project::SpecialVars::args_first {
-    my $inner = fn { $_0 }
+    my $inner = fn { _0 }
     $inner("first", "second")
 }
 
@@ -68,7 +68,7 @@ fn Project::SpecialVars::args_shift_style {
 }
 
 fn Project::SpecialVars::args_modify {
-    my $inner = fn { $_0 = 999; 1 }
+    my $inner = fn { _0 = 999; 1 }
     my $x = 1
     $inner($x)
     # Note: whether $x is modified depends on aliasing semantics

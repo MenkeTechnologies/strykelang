@@ -12,7 +12,7 @@ fn Rosetta::LongMul::strip_leading_zeros($s) {
     $s =~ s/^0+(\d)/$1/r
 }
 
-fn Rosetta::LongMul::multiply($_0, $_1) {
+fn Rosetta::LongMul::multiply(_0, _1) {
     my $sa = "$_0"
     my $sb = "$_1"
     my $da = Rosetta::LongMul::digits($sa)

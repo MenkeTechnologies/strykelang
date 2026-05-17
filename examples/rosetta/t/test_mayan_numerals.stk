@@ -68,6 +68,6 @@ assert_eq Rosetta::Mayan::render(20),
 assert_eq Rosetta::Mayan::render(0), "∅", "0 renders as a single shell"
 
 # Pipe form
-4732 |> Rosetta::Mayan::digits_of |> fn { join(",", @$_) } |> assert_eq("11,16,12", "pipe digits(4732)")
+4732 |> Rosetta::Mayan::digits_of |> fn { join(",", @{_}) } |> assert_eq("11,16,12", "pipe digits(4732)")
 
 test_run

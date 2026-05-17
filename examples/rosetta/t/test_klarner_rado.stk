@@ -27,13 +27,13 @@ assert_eq join(",", @s),
 
 # 11 is *not* reachable from these productions
 my @s32 = Rosetta::KlarnerRado::up_to(32)
-my %h = map { $_ => 1 } @s32
+my %h = map { _ => 1 } @s32
 assert_eq exists($h{11}), 0, "11 not reachable from 1 by 2x or 3x+2"
 assert_eq exists($h{32}), 1, "32 = 2·16 present"
 
 # Closure properties on the generated set
 my @big = Rosetta::KlarnerRado::up_to(500)
-my %bset = map { $_ => 1 } @big
+my %bset = map { _ => 1 } @big
 my $closure_ok = 1
 for my $x (@big) {
     if (2 * $x <= 500) {

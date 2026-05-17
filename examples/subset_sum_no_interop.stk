@@ -87,7 +87,7 @@ for my $c (@cases) {
     if ($c->{ok}) {
         die "find_subset returned undef" unless defined $witness
         my $sum = 0
-        $sum += $_ for @$witness
+        $sum += _ for @$witness
         $ok = $ok && $sum == $c->{target}
     } else {
         $ok = $ok && !defined $witness

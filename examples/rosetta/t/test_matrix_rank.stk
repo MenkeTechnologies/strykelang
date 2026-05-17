@@ -2,7 +2,7 @@
 # Rosetta Code: Matrix rank
 
 fn Rosetta::Matrix::rank($m) {
-    my @mat = map { [ @$_ ] } @$m
+    my @mat = map { [ @{_} ] } @$m
     my $rows = cnt(@mat)
     return 0 if $rows == 0
     my $cols = cnt(@{$mat[0]})

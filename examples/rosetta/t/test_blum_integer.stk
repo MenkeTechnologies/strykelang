@@ -42,6 +42,6 @@ assert_eq join(",", @blum), "21,33,57,69,77,93", "blum integers under 100"
 
 # Piped version
 21 |> Rosetta::Blum::check |> assert_ok("21 is Blum")
-9 |> Rosetta::Blum::check |> ~> fn { !$_ } |> assert_ok("9 is not Blum (3*3, not distinct)")
+9 |> Rosetta::Blum::check |> ~> fn { !_ } |> assert_ok("9 is not Blum (3*3, not distinct)")
 
 test_run

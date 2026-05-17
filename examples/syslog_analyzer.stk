@@ -78,7 +78,7 @@ printf "── parsed %d log lines ───────────────
 
 p ""
 p "── severity rollup ──────────────────────────────────"
-for my $sev (sort { $per_severity{$_1} <=> $per_severity{$_0} } keys %per_severity) {
+for my $sev (sort { $per_severity{_1} <=> $per_severity{_0} } keys %per_severity) {
     printf "  %-10s : %d\n", $sev, $per_severity{$sev}
 }
 
@@ -86,7 +86,7 @@ for my $sev (sort { $per_severity{$_1} <=> $per_severity{$_0} } keys %per_severi
 
 p ""
 p "── per-host activity ────────────────────────────────"
-for my $host (sort { len(@{$per_host{$_1}}) <=> len(@{$per_host{$_0}}) } keys %per_host) {
+for my $host (sort { len(@{$per_host{_1}}) <=> len(@{$per_host{_0}}) } keys %per_host) {
     my $entries = $per_host{$host}
     my %sev_breakdown
     $sev_breakdown{_->{sev}}++ for @$entries

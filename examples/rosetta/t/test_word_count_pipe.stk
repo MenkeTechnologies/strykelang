@@ -5,7 +5,7 @@ fn Rosetta::WordCount::solve($text) {
     my %counts
     $text |> lc() |> split(/\W+/) |> map { 
         if (_ ne "") {
-            $counts{$_}++
+            $counts{_}++
         }
     }
     %counts

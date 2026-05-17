@@ -2,14 +2,14 @@
 # Rosetta Code: Geometric series — closed form a*(1 - r^n)/(1 - r) for r != 1.
 # Includes the |r| < 1 limit a/(1 - r) and the divergent r >= 1 case.
 
-fn Rosetta::Geom::partial_sum($_0, $r, $n) {
-    return $_0 * $n if $r == 1
-    $_0 * (1 - $r ** $n) / (1 - $r)
+fn Rosetta::Geom::partial_sum(_0, $r, $n) {
+    return _0 * $n if $r == 1
+    _0 * (1 - $r ** $n) / (1 - $r)
 }
 
-fn Rosetta::Geom::limit($_0, $r) {
+fn Rosetta::Geom::limit(_0, $r) {
     die "diverges (|r| >= 1)" if abs($r) >= 1
-    $_0 / (1 - $r)
+    _0 / (1 - $r)
 }
 
 # 1 + 1/2 + 1/4 + 1/8 + ... → 2. Partial of n=10 → 2 - 1/512 ~ 1.998046875.

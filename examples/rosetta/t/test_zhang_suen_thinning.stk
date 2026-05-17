@@ -32,7 +32,7 @@ fn Rosetta::ZhangSuen::black_neighbors($ns) {
 }
 
 fn Rosetta::ZhangSuen::thin($img) {
-    my @grid = map { [@$_] } @$img
+    my @grid = map { [@{_}] } @$img
     my $rows = len(@grid)
     my $cols = len(@{$grid[0]})
     my $changed = 1
