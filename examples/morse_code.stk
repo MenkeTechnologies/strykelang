@@ -44,7 +44,7 @@ my $hll_ch = hll(12)
 # ── encode helper: split sentence into Morse groups separated by `   ` ─
 
 fn Demo::Morse::encode($text) {
-    my $low = lc($text)
+    my $low = lc $text
     my @words = split / +/, $low
     my @encoded_words
     for my $w (@words) {
@@ -98,7 +98,7 @@ for my $msg (@messages) {
     td_add($td_enc, (now_ns() - $t0) / 1000.0)
 
     my $back = Demo::Morse::decode($code)
-    my $expect = lc($msg)
+    my $expect = lc $msg
     $expect =~ s/[^a-z0-9 ]//g
     $expect =~ s/ +/ /g
     $expect =~ s/^ +//

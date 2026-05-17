@@ -70,7 +70,7 @@ fn Demo::Email::parse($raw) {
                 next
             }
             if ($line =~ /^([A-Za-z\-]+):\s*(.*)$/) {
-                my $name = lc($1)
+                my $name = lc $1
                 my $value = $2
                 $headers{$name} = $value
             }
@@ -131,7 +131,7 @@ for my $raw (@raw_emails) {
 # ── report ──────────────────────────────────────────────────────────
 
 printf "── parsed %d emails ───────────────────────────────────\n",
-    len(@processed)
+    len @processed
 
 p ""
 p "── classification summary ───────────────────────────"
@@ -180,7 +180,7 @@ my $spam = grep { _->{spam}->{score} >= 4 } @processed
 my $ham  = len(@processed) - $spam
 printf "  ham  : %d\n", $ham
 printf "  spam : %d\n", $spam
-printf "  spam rate : %.1f%%\n", 100.0 * $spam / len(@processed)
+printf "  spam rate : %.1f%%\n", 100.0 * $spam / len @processed
 
 # ── per-email parse latency ────────────────────────────────────────
 

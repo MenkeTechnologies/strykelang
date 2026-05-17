@@ -28,7 +28,7 @@ my %catalog = (
 fn Demo::Dep::version_lt($v1, $v2) {
     my @ap = split /\./, $v1
     my @bp = split /\./, $v2
-    my $n = len(@ap) > len(@bp) ? len(@ap) : len(@bp)
+    my $n = len(@ap) > len(@bp) ? len(@ap) : len @bp
     for my $i (0:$n - 1) {
         my $av = ($ap[$i] // 0) + 0
         my $bv = ($bp[$i] // 0) + 0
@@ -127,7 +127,7 @@ $installed{_} = 1 for @order
 my @unused = grep { !exists $installed{_} } keys %catalog
 p ""
 printf "── unused packages: %d ────────────────────────────────\n",
-    len(@unused)
+    len @unused
 for my $u (sort { _0 cmp _1 } @unused) {
     printf "  %s\n", $u
 }
@@ -173,4 +173,4 @@ p "── HLL distinct installed packages ────────────�
 my $hll = hll(14)
 hll_add($hll, _) for @order
 printf "  HLL   : %d\n", hll_count($hll)
-printf "  exact : %d\n", len(@order)
+printf "  exact : %d\n", len @order

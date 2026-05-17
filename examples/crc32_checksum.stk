@@ -40,7 +40,7 @@ my $TABLE = Demo::CRC::build_table()
 fn Demo::CRC::crc32($s) {
     my $crc = 0xFFFFFFFF
     for my $byte (split //, $s) {
-        my $bv = ord($byte)
+        my $bv = ord $byte
         $crc = ($TABLE->[($crc ^ $bv) & 0xFF]) ^ (($crc >> 8) & 0x00FFFFFF)
     }
     ($crc ^ 0xFFFFFFFF) & 0xFFFFFFFF
@@ -145,7 +145,7 @@ for my $p (@tiers) {
 # ── distinct CRCs ─────────────────────────────────────────────────
 
 my $hll_n = hll_count($hll_crc)
-my $total_inputs = len(@known) + len(@workload)
+my $total_inputs = len(@known) + len @workload
 printf("\ndistinct CRC values: HLL=%.1f vs total=%d (low collision rate expected)\n",
        $hll_n, $total_inputs)
 

@@ -12,8 +12,8 @@
 mysync @diffs
 
 fn Demo::JD::diff($lhs, $rhs, $path) {
-    my $rl = ref($lhs)
-    my $rr = ref($rhs)
+    my $rl = ref $lhs
+    my $rr = ref $rhs
     if ($rl eq "" && $rr eq "") {
         if (!defined($lhs) && !defined($rhs)) {
             return
@@ -52,8 +52,8 @@ fn Demo::JD::diff($lhs, $rhs, $path) {
         return
     }
     if ($rl =~ /ARRAY/) {
-        my $ll = len(@$lhs)
-        my $lr = len(@$rhs)
+        my $ll = len @$lhs
+        my $lr = len @$rhs
         my $maxlen = $ll > $lr ? $ll : $lr
         for my $i (0:$maxlen - 1) {
             my $ip = "$path\[$i\]"
@@ -130,7 +130,7 @@ my $diffs = Demo::JD::diff_root($old_doc, $new_doc)
 
 p ""
 printf "── %d differences found ───────────────────────────────\n",
-    len(@$diffs)
+    len @$diffs
 for my $d (@$diffs) {
     my $op = $d->{op}
     if    ($op eq "add") {
@@ -176,9 +176,9 @@ for my $h (@hits) {
 p ""
 p "── determinism check ────────────────────────────────"
 my $r1 = Demo::JD::diff_root($old_doc, $new_doc)
-my $n1 = len(@$r1)
+my $n1 = len @$r1
 my $r2 = Demo::JD::diff_root($old_doc, $new_doc)
-my $n2 = len(@$r2)
+my $n2 = len @$r2
 printf "  diff(old, new) call 1 : %d changes\n", $n1
 printf "  diff(old, new) call 2 : %d changes\n", $n2
 printf "  deterministic         : %s\n", ($n1 == $n2) ? "YES" : "no"
@@ -189,7 +189,7 @@ p ""
 p "── no-op: diff(old, old) ────────────────────────────"
 my $self_diff = Demo::JD::diff_root($old_doc, $old_doc)
 printf "  changes when comparing identical docs : %d (expected 0)\n",
-    len(@$self_diff)
+    len @$self_diff
 
 # ── per-comparison latency ─────────────────────────────────────────
 

@@ -105,7 +105,7 @@ p "── clustering coefficient per user ────────────�
 for my $u (sort { _0 cmp _1 } keys %all_users) {
     next unless exists $follows{$u}
     my @neighbors = keys %{$follows{$u}}
-    my $n = len(@neighbors)
+    my $n = len @neighbors
     if ($n < 2) {
         printf "  %-8s : n/a (degree < 2)\n", $u
         next

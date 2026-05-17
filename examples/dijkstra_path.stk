@@ -28,7 +28,7 @@ for my $u (sort { _0 cmp _1 } keys %graph) {
 
 fn Demo::PQ::new() = []
 fn Demo::PQ::push($pq, $prio, $item) {
-    my $n = len(@$pq)
+    my $n = len @$pq
     my $i = 0
     while ($i < $n && $pq->[$i]->[0] <= $prio) { $i++ }
     splice(@$pq, $i, 0, [$prio, $item])

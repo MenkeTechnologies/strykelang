@@ -110,7 +110,7 @@ for my $i (1:30) {
 }
 
 printf "── %d queries against %d-key upstream ────────────────\n",
-    len(@queries), len(@known)
+    len(@queries), len @known
 
 # ── execute workload ────────────────────────────────────────────────
 
@@ -138,7 +138,7 @@ printf "  missing : %d\n", $miss
 
 p ""
 p "── cache layer hit rates ────────────────────────────"
-my $total = len(@queries)
+my $total = len @queries
 printf "  L0 (memo)         hits=%-3d  misses=%-3d  hitrate=%.0f%%\n",
     $l0_hits, $l0_misses, 100.0 * $l0_hits / $total
 printf "  L1 (Bloom-)       skips=%-3d  (negatives short-circuited)\n",

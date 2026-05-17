@@ -16,7 +16,7 @@
 fn Demo::Expr::tokenize($src) {
     my @tokens
     my $i = 0
-    my $n = len($src)
+    my $n = len $src
     while ($i < $n) {
         my $c = substr($src, $i, 1)
         if ($c eq " " || $c eq "\t" || $c eq "\n") {
@@ -53,7 +53,7 @@ mysync $tokens
 mysync $pos
 
 fn Demo::Expr::peek() {
-    return undef if $pos >= len(@$tokens)
+    return undef if $pos >= len @$tokens
     $tokens->[$pos]
 }
 
@@ -123,7 +123,7 @@ fn Demo::Expr::parse($src) {
     $tokens = Demo::Expr::tokenize($src)
     $pos = 0
     my $ast = Demo::Expr::parse_expr()
-    die "Trailing tokens after parse\n" if $pos < len(@$tokens)
+    die "Trailing tokens after parse\n" if $pos < len @$tokens
     $ast
 }
 
@@ -197,7 +197,7 @@ for my $c (@cases) {
 
 p ""
 printf "── %d / %d cases passed ─────────────────────────────\n",
-    $passed, len(@cases)
+    $passed, len @cases
 
 # ── eval instrumentation ────────────────────────────────────────────
 

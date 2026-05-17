@@ -103,7 +103,7 @@ my @log = (
     "2026-05-15 12:02:00 INFO heartbeat ok",
 )
 
-printf "── %d log lines, scanning for PII ─────────────────────\n", len(@log)
+printf "── %d log lines, scanning for PII ─────────────────────\n", len @log
 
 # ── process each line ──────────────────────────────────────────────
 
@@ -158,4 +158,4 @@ for my $line (@log) {
     my $second_pass = Demo::Redact::scan($redacted)
     $verified++ if $second_pass eq $redacted
 }
-printf "  %d / %d lines clean on re-scan (idempotent)\n", $verified, len(@log)
+printf "  %d / %d lines clean on re-scan (idempotent)\n", $verified, len @log

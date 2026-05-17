@@ -133,7 +133,7 @@ for my $msg (@messages) {
     if ($ok) { $rt_ok++ } else { $rt_fail++ }
 
     my $in_bits  = len($msg) * 8
-    my $out_bits = len($bits)
+    my $out_bits = len $bits
     $total_in_bits  += $in_bits
     $total_out_bits += $out_bits
 

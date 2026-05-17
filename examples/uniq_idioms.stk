@@ -28,7 +28,7 @@ p "    → ", join(",", @r4)
 p ""
 p "── empty arrayref → empty result ──────────────────────"
 my @r5 = uniq([])
-p "  uniq([])            → (", join(",", @r5), ") len=", len(@r5)
+p "  uniq([])            → (", join(",", @r5), ") len=", len @r5
 
 p ""
 p "── chained with sort (sort + uniq for canonical form) ─"
@@ -50,7 +50,7 @@ my @unique_words = uniq(@words)
 p "  unique tokens       : ", join(",", @unique_words)
 for my $w (@unique_words) {
     my @hits = grep { _ eq $w } @words
-    printf "    %-7s × %d\n", $w, len(@hits)
+    printf "    %-7s × %d\n", $w, len @hits
 }
 
 p ""
@@ -61,6 +61,6 @@ p "── nested arrayrefs collapse via ref-stringification ──"
 # value-aware dedup of nested data use:
 #   uniq(map { to_json($_) } @nested)
 my @r6 = uniq([[1, 2], [1, 2], [3, 4]])
-printf "  uniq([[1,2],[1,2],[3,4]]) → %d atom (all refs stringify to ARRAY(0x...))\n", len(@r6)
+printf "  uniq([[1,2],[1,2],[3,4]]) → %d atom (all refs stringify to ARRAY(0x...))\n", len @r6
 my @r7 = uniq(map { to_json(_) } [1, 2], [1, 2], [3, 4])
 p "  value-aware via to_json:    ", join("  |  ", @r7)

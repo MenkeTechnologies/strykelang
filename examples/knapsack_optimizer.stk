@@ -15,7 +15,7 @@
 # ── one solver ────────────────────────────────────────────────────
 
 fn Demo::KS::solve($items_ref, $capacity) {
-    my $n = len(@$items_ref)
+    my $n = len @$items_ref
     my @dp
     for my $i (0:$n) {
         push @dp, [(0) x ($capacity + 1)]
