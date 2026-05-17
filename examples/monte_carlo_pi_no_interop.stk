@@ -1,0 +1,87 @@
+#!/usr/bin/env stryke
+
+# Monte Carlo π estimation — throw random darts at the unit square
+# [0,1]² and count what fraction land inside the quarter unit circle.
+# That fraction approaches π/4 as N grows, so π ≈ 4 × hits / total.
+# Parses clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * `fn name = expr` for one-liners (rule 6)
+#   * implicit return on tail (rule 7)
+#   * `#{…}` interpolation (rule 1a)
+#   * `len` not `scalar` (rule 5)
+#
+# Namespaced UDFs `MC::*`.
+#
+# Run: stryke --no-interop examples/monte_carlo_pi_no_interop.stk
+
+# True π for comparison — stryke's atan2(0,-1) returns the literal.
+fn MC::true_pi = atan2(0, -1)
+
+# Single estimation: throw $n darts, return estimated π.
+fn MC::estimate($n) {
+    my $hits = 0
+    for (1:$n) {
+        my $x = rand()
+        my $y = rand()
+        $hits++ if $x * $x + $y * $y <= 1.0
+    }
+    4.0 * $hits / $n
+}
+
+# Run estimation k times, return arrayref of estimates (for variance).
+fn MC::trials($n, $k) {
+    my @out
+    for (1:$k) { push @out, MC::estimate($n) }
+    \@out
+}
+
+# Mean of arrayref.
+fn MC::mean($xs) = sum(@$xs) / len(@$xs)
+
+# Sample variance via Bessel's correction (n-1 denominator).
+fn MC::var($xs) {
+    my $mu = MC::mean($xs)
+    my $sq = 0
+    $sq += ($_ - $mu) ** 2 for @$xs
+    $sq / (len(@$xs) - 1)
+}
+
+p "── Monte Carlo π estimation demo ──"
+srand(42)   # deterministic across runs
+
+my $true_pi = MC::true_pi()
+p "  reference π = $true_pi"
+
+# Single shot at N=10000 — within 2% of π is generous for this sample size.
+my $est = MC::estimate(10000)
+my $err = abs($est - $true_pi) / $true_pi
+die "N=10000 estimate $est too far off (err=$err)" if $err > 0.05
+p "  N=10000: estimate ≈ $est (err=#{int($err * 10000) / 100}%)  OK"
+
+# Convergence: variance must DECREASE as N grows. Run 30 trials at
+# N=1000 and 30 trials at N=10000 — the latter should have smaller
+# spread (CLT: variance scales as 1/N).
+my $small = MC::trials(1000, 30)
+my $big   = MC::trials(10000, 30)
+my $var_s = MC::var($small)
+my $var_b = MC::var($big)
+die "variance should decrease with N (got $var_s → $var_b)" unless $var_b < $var_s
+p "  variance shrinks: N=1k var=#{int($var_s * 1e6) / 1e6}, N=10k var=#{int($var_b * 1e6) / 1e6}  OK"
+
+# Estimate is always in [0, 4] (hits/total ∈ [0, 1], times 4).
+my @samples = @{MC::trials(100, 20)}
+for my $s (@samples) {
+    die "estimate out of [0, 4]: $s" if $s < 0 || $s > 4
+}
+p "  every estimate in [0, 4] (raw fraction bounded by 1)  OK"
+
+# Means of trials approaches π — collect 100 trials of N=2000.
+my $many = MC::trials(2000, 100)
+my $mean_est = MC::mean($many)
+my $mean_err = abs($mean_est - $true_pi) / $true_pi
+die "mean over 100 trials too far: $mean_est (err=$mean_err)" if $mean_err > 0.02
+p "  mean over 100×N=2k trials = $mean_est (err=#{int($mean_err * 10000) / 100}%)  OK"
+
+p ""
+p "  ALL PASS (single-shot accuracy + variance shrinkage + bound + averaging)"

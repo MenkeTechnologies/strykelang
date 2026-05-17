@@ -1114,7 +1114,7 @@ impl Parser {
                     ));
                 }
                 // `{ } pmap @a` / `{ } pflat_map @a` / `{ } pfor @a` / `do { } …` — same shapes as prefix forms.
-                "pmap" | "pflat_map" | "pgrep" | "pfor" | "preduce" | "pcache" => {
+                "pmap" | "pflat_map" | "pgrep" | "pfor" | "preduce" | "pcache" | "par" => {
                     let line = stmt.line;
                     let block = self.stmt_into_parallel_block(stmt)?;
                     let which = kw.as_str();
@@ -1162,6 +1162,7 @@ impl Parser {
                             list,
                             progress,
                         },
+                        "par" => ExprKind::ParExpr { block, list },
                         _ => unreachable!(),
                     };
                     return Ok(Statement {
@@ -1698,6 +1699,7 @@ impl Parser {
                 | "p"
                 | "opendir"
                 | "ord"
+                | "par"
                 | "par_lines"
                 | "par_walk"
                 | "pipe"
@@ -11071,6 +11073,21 @@ impl Parser {
                         line,
                     })
                 }
+            }
+            // `par { BLOCK } LIST` — generic parallel-chunk evaluator.
+            // Splits LIST into chunks (UTF-8-aligned for strings,
+            // element-aligned for arrays), runs BLOCK on each chunk in
+            // parallel with `_` bound to the chunk, flattens results.
+            // Available as a top-level expression, not just an `~>` stage.
+            "par" => {
+                let (block, list, _progress) = self.parse_block_then_list_optional_progress()?;
+                Ok(Expr {
+                    kind: ExprKind::ParExpr {
+                        block,
+                        list: Box::new(list),
+                    },
+                    line,
+                })
             }
             "par_lines" | "par_walk" => {
                 let args = self.parse_builtin_args()?;
@@ -21544,5 +21561,79 @@ mod tests {
     fn scalar_ref_postincrement_parses() {
         let _g = NoInteropGuard::on();
         parse_ok("my $n = 0; my $ref = \\$n; $$ref++; p $n");
+    }
+
+    /// `$h{$k}` autoviv chain — Markov bigram table builds a
+    /// hash-of-hash where the inner is created on first access.
+    #[test]
+    fn hash_of_hash_autoviv_increment_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my %table; \
+             my $prev = \"the\"; my $next = \"quick\"; \
+             $table{$prev} //= +{}; \
+             $table{$prev}{$next}++",
+        );
+    }
+
+    /// `for (... ; ...) { ... }` C-style with literal counter — Knuth
+    /// shuffle's high-to-low walk and similar.
+    #[test]
+    fn cstyle_for_with_literal_bounds_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my $sum = 0; for (my $i = 0; $i < 10; $i++) { $sum += $i }");
+    }
+
+    /// Recursive expression-bodied `fn` with ternary base case —
+    /// Josephus closed-form. Note: bare single-letter names like
+    /// `s` clash with the `s/.../.../` regex substitution token, so
+    /// always use multi-char or namespaced names (`J::surv`, not `J::s`).
+    #[test]
+    fn recursive_expression_body_with_ternary_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "fn J::surv($n, $k) = $n == 1 ? 0 : (J::surv($n - 1, $k) + $k) % $n",
+        );
+    }
+
+    /// `splice @arr, $i, 1` — remove a single element from middle of
+    /// an array. Josephus simulate uses this.
+    #[test]
+    fn splice_single_remove_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my @circle = 0:5; splice @circle, 2, 1");
+    }
+
+    /// `atan2(0, -1)` for π — Monte Carlo's true-reference value.
+    #[test]
+    fn atan2_call_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("fn MC::true_pi = atan2(0, -1)");
+        parse_ok("my $pi = atan2(0, -1)");
+    }
+
+    /// Flat 1-D array indexed as 2-D via `r * COLS + c` — Sudoku
+    /// board layout. Arithmetic inside subscripts.
+    #[test]
+    fn flat_2d_array_indexing_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my @board = (0) x 81; \
+             my $r = 3; my $c = 5; \
+             $board[$r * 9 + $c] = 7; \
+             my $v = $board[$r * 9 + $c]",
+        );
+    }
+
+    /// `par` is callable as a top-level expression, not just an
+    /// `~>` thread-macro stage. Prefix form: `par { BLOCK } LIST`.
+    /// (Previously parser only accepted `par` inside thread macros,
+    /// emitting "Undefined subroutine &par" at runtime for any other
+    /// call site.)
+    #[test]
+    fn par_top_level_prefix_form_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok("my @r = par { _ * 2 } (1, 2, 3, 4)");
+        parse_ok("par { p _ } @big");
     }
 }
