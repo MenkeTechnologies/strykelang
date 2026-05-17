@@ -7,14 +7,14 @@ fn b56_to_floats(v: &StrykeValue) -> Vec<f64> {
 }
 
 /// Elo expected score: E = 1 / (1 + 10^((Rb − Ra) / 400)).
-fn builtin_elo_expected(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_elo_expected(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r_a = f1(args);
     let r_b = args.get(1).map(|v| v.to_number()).unwrap_or(r_a);
     Ok(StrykeValue::float(1.0 / (1.0 + 10f64.powf((r_b - r_a) / 400.0))))
 }
 
 /// Elo update: Ra' = Ra + K (S − E), where S ∈ {0, 0.5, 1}.
-fn builtin_elo_update(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_elo_update(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r_a = f1(args);
     let r_b = args.get(1).map(|v| v.to_number()).unwrap_or(r_a);
     let s = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
@@ -25,7 +25,7 @@ fn builtin_elo_update(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Glicko-1 rating step. RD' = sqrt((1/RD² + 1/d²)⁻¹), where d² is the variance
 /// estimate from opponents. Args: rating, RD, opp_rating, opp_RD, score.
-fn builtin_glicko_rating(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_glicko_rating(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = f1(args);
     let rd = args.get(1).map(|v| v.to_number()).unwrap_or(350.0);
     let r_op = args.get(2).map(|v| v.to_number()).unwrap_or(r);
@@ -40,7 +40,7 @@ fn builtin_glicko_rating(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// TrueSkill rating update (1v1, no draw). μ' = μ + σ²/c · v(t, ε).
-fn builtin_trueskill_update(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_trueskill_update(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mu = f1(args);
     let sigma = args.get(1).map(|v| v.to_number()).unwrap_or(8.333);
     let mu_op = args.get(2).map(|v| v.to_number()).unwrap_or(mu);
@@ -55,7 +55,7 @@ fn builtin_trueskill_update(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// TrueSkill match quality q ≈ 2β / sqrt(c²) · exp(−(μ_a − μ_b)² / (2c²)).
-fn builtin_trueskill_match_quality(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_trueskill_match_quality(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mu_a = f1(args);
     let sigma_a = args.get(1).map(|v| v.to_number()).unwrap_or(8.333);
     let mu_b = args.get(2).map(|v| v.to_number()).unwrap_or(mu_a);
@@ -68,7 +68,7 @@ fn builtin_trueskill_match_quality(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Pythagorean expectation: W% = R^x / (R^x + RA^x). x = 1.83 for MLB.
-fn builtin_pythagorean_expectation(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pythagorean_expectation(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let runs_for = f1(args).max(0.0);
     let runs_against = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-9);
     let exponent = args.get(2).map(|v| v.to_number()).unwrap_or(1.83);
@@ -78,7 +78,7 @@ fn builtin_pythagorean_expectation(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// WAR scaffold: WAR = (player_runs - replacement_runs) / runs_per_win.
-fn builtin_war_above_replacement(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_war_above_replacement(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let player_runs = f1(args);
     let repl_runs = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let runs_per_win = args.get(2).map(|v| v.to_number()).unwrap_or(10.0).max(1e-9);
@@ -88,7 +88,7 @@ fn builtin_war_above_replacement(args: &[StrykeValue]) -> PerlResult<StrykeValue
 /// wOBA (weighted on-base average): linear weight per offensive event.
 /// Standard 2020 weights: BB=0.69, HBP=0.72, 1B=0.88, 2B=1.247, 3B=1.578, HR=2.031.
 /// Args: array [BB, HBP, 1B, 2B, 3B, HR], plate appearances (PA).
-fn builtin_woba_weight(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_woba_weight(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = b56_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let pa = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).max(1.0);
     let weights = [0.69, 0.72, 0.88, 1.247, 1.578, 2.031];
@@ -98,7 +98,7 @@ fn builtin_woba_weight(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// wRC+ = ((wRAA / PA + lgR/PA) + (lgR/PA - parkFactor·lgR/PA)) / lgwRC/PA · 100.
 /// Simplified: 100·(wOBA / leagueWOBA) adjusted by park factor.
-fn builtin_wrc_plus(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_wrc_plus(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let woba = f1(args);
     let lg_woba = args.get(1).map(|v| v.to_number()).unwrap_or(0.32).max(1e-6);
     let park_factor = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -106,7 +106,7 @@ fn builtin_wrc_plus(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// OPS+ = 100·(OBP/lgOBP + SLG/lgSLG − 1) / parkFactor.
-fn builtin_ops_plus(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ops_plus(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let obp = f1(args);
     let slg = args.get(1).map(|v| v.to_number()).unwrap_or(0.4);
     let lg_obp = args.get(2).map(|v| v.to_number()).unwrap_or(0.32).max(1e-6);
@@ -116,7 +116,7 @@ fn builtin_ops_plus(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// ERA+ = 100·lgERA / (ERA · parkFactor).
-fn builtin_era_plus(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_era_plus(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let era = f1(args).max(1e-6);
     let lg_era = args.get(1).map(|v| v.to_number()).unwrap_or(4.0);
     let pf = args.get(2).map(|v| v.to_number()).unwrap_or(1.0).max(1e-6);
@@ -124,7 +124,7 @@ fn builtin_era_plus(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// FIP = ((13·HR + 3·(BB+HBP) − 2·K) / IP) + lgFIPconst. Constants per FanGraphs.
-fn builtin_fip(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_fip(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let hr = f1(args);
     let bb = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let hbp = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -136,7 +136,7 @@ fn builtin_fip(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// xFIP: same as FIP but normalises HR rate to league-average HR/FB ratio.
 /// Args: FB, BB, HBP, K, IP, lgHR/FB, fipConst.
-fn builtin_xfip(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_xfip(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let fb = f1(args);
     let bb = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let hbp = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -149,7 +149,7 @@ fn builtin_xfip(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// SIERA (Skill-Interactive ERA): SIERA = a + b1 (SO/PA) + b2 (BB/PA)
 /// + b3 (GB/(GB+FB)) + b4 cross-terms (Swartz). Coefficients for 2010+.
-fn builtin_siera(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_siera(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let so_pa = f1(args);
     let bb_pa = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let gb_rate = args.get(2).map(|v| v.to_number()).unwrap_or(0.4);
@@ -159,7 +159,7 @@ fn builtin_siera(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// BABIP = (H − HR) / (AB − K − HR + SF).
-fn builtin_babip(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_babip(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let h = f1(args);
     let hr = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let ab = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -171,14 +171,14 @@ fn builtin_babip(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// WPA (Win Probability Added) = WP_after - WP_before.
-fn builtin_wpa(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_wpa(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let wp_after = f1(args);
     let wp_before = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
     Ok(StrykeValue::float(wp_after - wp_before))
 }
 
 /// Win probability via run-differential logistic model (simple).
-fn builtin_win_probability(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_win_probability(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lead = f1(args);
     let outs_remaining = args.get(1).map(|v| v.to_number()).unwrap_or(27.0);
     let scale = (outs_remaining / 27.0).sqrt() * 1.5;
@@ -187,14 +187,14 @@ fn builtin_win_probability(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Leverage Index per Tango: standard deviation of WPA in current state, divided
 /// by average game-state σ. We compute the ratio given (sigma_state, sigma_avg).
-fn builtin_leverage_index(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_leverage_index(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let sigma_state = f1(args);
     let sigma_avg = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-9);
     Ok(StrykeValue::float(sigma_state / sigma_avg))
 }
 
 /// Clutch score (FanGraphs): WPA/LI − WPA. Higher = clutch performer.
-fn builtin_clutch_score(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_clutch_score(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let wpa = f1(args);
     let li_avg = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-9);
     let wpa_per_li = args.get(2).map(|v| v.to_number()).unwrap_or(wpa);
@@ -202,14 +202,14 @@ fn builtin_clutch_score(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Shooting percentage (basketball/hockey): made / attempted.
-fn builtin_shooting_pct(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_shooting_pct(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let made = f1(args);
     let att = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-9);
     Ok(StrykeValue::float(made / att))
 }
 
 /// Save percentage (hockey): saves / shots.
-fn builtin_save_pct(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_save_pct(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let saves = f1(args);
     let shots = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-9);
     Ok(StrykeValue::float(saves / shots))
@@ -217,7 +217,7 @@ fn builtin_save_pct(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Corsi-For: shot attempts (SOG + missed + blocked) per team. Args: sog, miss,
 /// blocked.
-fn builtin_corsi_for(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_corsi_for(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let sog = f1(args);
     let miss = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let blocked = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -225,14 +225,14 @@ fn builtin_corsi_for(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Fenwick-For: shots-on-goal + missed (excludes blocked).
-fn builtin_fenwick_for(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_fenwick_for(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let sog = f1(args);
     let miss = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(sog + miss))
 }
 
 /// Goals above average: skater goal-share above 50% of team's even-strength goals.
-fn builtin_goals_above_avg(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_goals_above_avg(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let player_goals = f1(args);
     let team_goals = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-9);
     let exp_share = args.get(2).map(|v| v.to_number()).unwrap_or(0.05);
@@ -240,21 +240,21 @@ fn builtin_goals_above_avg(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Tackle efficiency: tackles / total_tackle_attempts.
-fn builtin_tackle_efficiency(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_tackle_efficiency(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let made = f1(args);
     let att = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-9);
     Ok(StrykeValue::float(made / att))
 }
 
 /// Yards per attempt (NFL passing): yards / attempts.
-fn builtin_yards_per_attempt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_yards_per_attempt(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let yards = f1(args);
     let att = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-9);
     Ok(StrykeValue::float(yards / att))
 }
 
 /// QBR (ESPN composite, simplified). 0–100 scale.
-fn builtin_qbr_metric(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_qbr_metric(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let comp_pct = f1(args);
     let ypa = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let td_rate = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -268,7 +268,7 @@ fn builtin_qbr_metric(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// EPA per play: average expected points added across an array of EPA values.
-fn builtin_epa_per_play(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_epa_per_play(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = b56_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     if v.is_empty() { return Ok(StrykeValue::float(0.0)); }
     Ok(StrykeValue::float(v.iter().sum::<f64>() / v.len() as f64))

@@ -1,7 +1,7 @@
 // geometry / topology / mesh / spatial.
 
 // Triangle area (Heron)
-fn builtin_triangle_area_heron(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_triangle_area_heron(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -12,7 +12,7 @@ fn builtin_triangle_area_heron(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 // Triangle area from 3 points (2D)
-fn builtin_triangle_area_pts(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_triangle_area_pts(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pts = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     if pts.len() < 3 { return Ok(StrykeValue::float(0.0)); }
     let p0 = arg_to_vec(&pts[0]);
@@ -27,7 +27,7 @@ fn builtin_triangle_area_pts(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Centroid of polygon (2D)
 
 // Triangle inradius
-fn builtin_triangle_inradius(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_triangle_inradius(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -37,7 +37,7 @@ fn builtin_triangle_inradius(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::float(area_sq.sqrt() / s))
 }
 // Triangle circumradius
-fn builtin_triangle_circumradius(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_triangle_circumradius(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -48,7 +48,7 @@ fn builtin_triangle_circumradius(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 // Regular n-gon area
-fn builtin_regular_ngon_area(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_regular_ngon_area(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     let side = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let pi = std::f64::consts::PI;
@@ -56,7 +56,7 @@ fn builtin_regular_ngon_area(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::float(0.25 * n * side * side / (pi / n).tan()))
 }
 // Regular n-gon inradius
-fn builtin_regular_ngon_inradius(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_regular_ngon_inradius(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     let side = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let pi = std::f64::consts::PI;
@@ -64,7 +64,7 @@ fn builtin_regular_ngon_inradius(args: &[StrykeValue]) -> PerlResult<StrykeValue
     Ok(StrykeValue::float(side / (2.0 * (pi / n).tan())))
 }
 // Regular n-gon circumradius
-fn builtin_regular_ngon_circumradius(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_regular_ngon_circumradius(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     let side = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let pi = std::f64::consts::PI;
@@ -75,7 +75,7 @@ fn builtin_regular_ngon_circumradius(args: &[StrykeValue]) -> PerlResult<StrykeV
 // Sphere volume
 // Sphere surface area
 // n-ball volume (general)
-fn builtin_n_ball_volume(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_n_ball_volume(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args) as usize;
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let pi = std::f64::consts::PI;
@@ -92,14 +92,14 @@ fn builtin_n_ball_volume(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 // Cylinder volume
 // Cylinder surface
-fn builtin_cylinder_surface(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cylinder_surface(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = f1(args);
     let h = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(2.0 * std::f64::consts::PI * r * (r + h)))
 }
 // Cone volume
 // Cone surface
-fn builtin_cone_surface(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cone_surface(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = f1(args);
     let h = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let l = (r * r + h * h).sqrt();
@@ -108,14 +108,14 @@ fn builtin_cone_surface(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Torus volume
 // Torus surface
 // Ellipsoid volume
-fn builtin_ellipsoid_volume(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ellipsoid_volume(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(4.0 / 3.0 * std::f64::consts::PI * a * b * c))
 }
 // Ellipsoid surface (Knud Thomsen approximation, p=1.6075)
-fn builtin_ellipsoid_surface_approx(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ellipsoid_surface_approx(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -127,7 +127,7 @@ fn builtin_ellipsoid_surface_approx(args: &[StrykeValue]) -> PerlResult<StrykeVa
 // Tetrahedron volume from 4 points
 
 // Distance point to line (2D)
-fn builtin_dist_point_line_2d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_dist_point_line_2d(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let px = f1(args);
     let py = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let a = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -139,7 +139,7 @@ fn builtin_dist_point_line_2d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Distance point to plane (3D)
-fn builtin_dist_point_plane_3d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_dist_point_plane_3d(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let px = f1(args);
     let py = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let pz = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -153,7 +153,7 @@ fn builtin_dist_point_plane_3d(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 // Closest point on segment (2D) — returns [x, y]
-fn builtin_closest_pt_segment_2d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_closest_pt_segment_2d(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let px = f1(args);
     let py = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let ax = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -171,7 +171,7 @@ fn builtin_closest_pt_segment_2d(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 // Bounding box from points
-fn builtin_bbox_from_points(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bbox_from_points(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pts = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     if pts.is_empty() { return Ok(StrykeValue::array(vec![])); }
     let mut mnx = f64::INFINITY; let mut mny = f64::INFINITY;
@@ -194,7 +194,7 @@ fn builtin_bbox_from_points(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Manhattan distance
 
 // Euclidean distance N-dim
-fn builtin_euclidean_distance_nd(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_euclidean_distance_nd(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let q = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     let mut sum = 0.0;
@@ -212,7 +212,7 @@ fn builtin_euclidean_distance_nd(args: &[StrykeValue]) -> PerlResult<StrykeValue
 // Cosine distance
 
 // Hamming distance for strings
-fn builtin_hamming_distance_str(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hamming_distance_str(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = args.first().map(|v| v.to_string()).unwrap_or_default();
     let b = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let count: i64 = a.chars().zip(b.chars()).filter(|(x, y)| x != y).count() as i64;
@@ -223,7 +223,7 @@ fn builtin_hamming_distance_str(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 // Sphere surface from circle great-circle distance (haversine)
 
 // Vincenty distance simplified (great circle using law of cosines)
-fn builtin_great_circle_law_of_cos(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_great_circle_law_of_cos(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lat1 = f1(args).to_radians();
     let lon1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
     let lat2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
@@ -234,7 +234,7 @@ fn builtin_great_circle_law_of_cos(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 // Bearing (initial)
-fn builtin_initial_bearing(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_initial_bearing(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lat1 = f1(args).to_radians();
     let lon1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
     let lat2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
@@ -246,7 +246,7 @@ fn builtin_initial_bearing(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Midpoint great circle
-fn builtin_midpoint_great_circle(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_midpoint_great_circle(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lat1 = f1(args).to_radians();
     let lon1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
     let lat2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
@@ -262,7 +262,7 @@ fn builtin_midpoint_great_circle(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 // Polygon shoelace area (signed)
-fn builtin_shoelace_area(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_shoelace_area(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pts = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = pts.len();
     if n < 3 { return Ok(StrykeValue::float(0.0)); }
@@ -276,7 +276,7 @@ fn builtin_shoelace_area(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Polygon is convex (assumes ccw)
-fn builtin_polygon_is_convex(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_polygon_is_convex(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pts = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = pts.len();
     if n < 4 { return Ok(StrykeValue::integer(if n >= 3 { 1 } else { 0 })); }
@@ -297,7 +297,7 @@ fn builtin_polygon_is_convex(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Convex hull jarvis march (gift wrapping, simplified — returns indices)
-fn builtin_convex_hull_jarvis(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_convex_hull_jarvis(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pts: Vec<(f64, f64)> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| {
             let pp = arg_to_vec(v);
@@ -326,7 +326,7 @@ fn builtin_convex_hull_jarvis(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Euler characteristic V - E + F
-fn builtin_euler_characteristic(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_euler_characteristic(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = i1(args);
     let e = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     let f = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -334,13 +334,13 @@ fn builtin_euler_characteristic(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 // Genus from Euler char (orientable): g = (2 - χ) / 2
-fn builtin_genus_from_euler(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_genus_from_euler(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let chi = i1(args);
     Ok(StrykeValue::integer((2 - chi) / 2))
 }
 
 // Spherical triangle area (excess formula)
-fn builtin_spherical_triangle_area(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_spherical_triangle_area(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -350,7 +350,7 @@ fn builtin_spherical_triangle_area(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 // Polygon with holes area (Sum outer - Sum inner)
-fn builtin_polygon_with_holes_area(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_polygon_with_holes_area(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let outer_v = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let holes_v = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     fn shoelace(pts: &[StrykeValue]) -> f64 {
@@ -370,14 +370,14 @@ fn builtin_polygon_with_holes_area(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 // Pick's theorem: A = I + B/2 - 1
-fn builtin_picks_theorem(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_picks_theorem(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let interior = f1(args);
     let boundary = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(interior + boundary / 2.0 - 1.0))
 }
 
 // Centroid of N-D points
-fn builtin_centroid_nd(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_centroid_nd(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pts = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     if pts.is_empty() { return Ok(StrykeValue::array(vec![])); }
     let dim = arg_to_vec(&pts[0]).len();
@@ -393,7 +393,7 @@ fn builtin_centroid_nd(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Variance-covariance via centered points (returns flat row-major n×n)
-fn builtin_covariance_matrix_pts(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_covariance_matrix_pts(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pts = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     if pts.is_empty() { return Ok(StrykeValue::array(vec![])); }
     let dim = arg_to_vec(&pts[0]).len();
@@ -425,6 +425,6 @@ fn builtin_covariance_matrix_pts(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 // Simplex volume (n+1 points in n-D, using Cayley-Menger determinant approximation for n=3)
-fn builtin_simplex_volume_3d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_simplex_volume_3d(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_tetrahedron_volume(args)
 }

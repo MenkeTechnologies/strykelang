@@ -8,7 +8,7 @@
 //! the process outright — this is the guarantee the user needs when a parallel primitive (e.g.
 //! `pfor { sleep N }`) leaves the main thread stuck inside a rayon call that cannot poll.
 
-use crate::error::PerlResult;
+use crate::error::StrykeResult;
 use crate::vm_helper::VMHelper;
 
 /// Ask the signal runtime to install a hook for `name` (Perl signal name without `SIG` prefix).
@@ -39,7 +39,7 @@ pub fn pending(name: &str) -> bool {
 }
 
 /// Call between statements to run pending `%SIG` hooks.
-pub fn poll(interp: &mut VMHelper) -> PerlResult<()> {
+pub fn poll(interp: &mut VMHelper) -> StrykeResult<()> {
     #[cfg(unix)]
     {
         unix::poll(interp)
@@ -141,7 +141,7 @@ mod unix {
         }
     }
 
-    pub(super) fn poll(interp: &mut VMHelper) -> PerlResult<()> {
+    pub(super) fn poll(interp: &mut VMHelper) -> StrykeResult<()> {
         if SIGINT_INSTALLED.load(Ordering::Relaxed) && SIGINT_P.swap(false, Ordering::SeqCst) {
             interp.sigint_pending_caret.set(true);
             interp.invoke_sig_handler("INT")?;

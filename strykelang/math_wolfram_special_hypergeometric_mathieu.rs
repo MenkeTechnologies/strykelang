@@ -1,7 +1,7 @@
 // special functions extra: hypergeometric, Mathieu, Whittaker, Kelvin, etc.
 
 // 2F1 hypergeometric series ₂F₁(a,b;c;z) for |z|<1
-fn builtin_hyper2f1(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hyper2f1(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -20,7 +20,7 @@ fn builtin_hyper2f1(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // 1F1 confluent hypergeometric (Kummer) series M(a;b;z)
-fn builtin_hyper1f1(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hyper1f1(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let z = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -37,7 +37,7 @@ fn builtin_hyper1f1(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // 0F1 (limit confluent hypergeometric) — useful for Bessel-related
-fn builtin_hyper0f1(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hyper0f1(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let b = f1(args);
     let z = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let mut sum = 1.0_f64;
@@ -53,7 +53,7 @@ fn builtin_hyper0f1(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Pochhammer (rising factorial) (a)_n
-fn builtin_pochhammer(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pochhammer(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let n = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
     let mut p = 1.0_f64;
@@ -66,29 +66,29 @@ fn builtin_pochhammer(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Falling factorial
 
 // Mathieu (Floquet) cosine ce_n(z, q) — first-order series approximation
-fn builtin_mathieu_ce0(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mathieu_ce0(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     let q = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(1.0 + 0.5 * q * (2.0 * z).cos()))
 }
-fn builtin_mathieu_se1(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mathieu_se1(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     let q = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(z.sin() + (q / 8.0) * (3.0 * z).sin()))
 }
 
 // Parabolic cylinder D_n(x) for n=0,1
-fn builtin_parabolic_d0(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_parabolic_d0(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     Ok(StrykeValue::float((-x * x / 4.0).exp()))
 }
-fn builtin_parabolic_d1(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_parabolic_d1(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     Ok(StrykeValue::float(x * (-x * x / 4.0).exp()))
 }
 
 // Whittaker M(a, b, z) (in terms of 1F1): M_{k,μ}(z) = z^{μ+1/2} e^{-z/2} M(μ-k+1/2, 2μ+1, z)
-fn builtin_whittaker_m(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_whittaker_m(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let k = f1(args);
     let mu = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let z = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -111,7 +111,7 @@ fn builtin_whittaker_m(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Struve function H₀(x) — series form
-fn builtin_struve_h0(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_struve_h0(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let pi = std::f64::consts::PI;
     let mut sum = 0.0;
@@ -124,7 +124,7 @@ fn builtin_struve_h0(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     }
     Ok(StrykeValue::float(sum))
 }
-fn builtin_struve_h1(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_struve_h1(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let pi = std::f64::consts::PI;
     let mut sum = 0.0;
@@ -142,7 +142,7 @@ fn builtin_struve_h1(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // so the iteration converges for the full [-1/e, ∞) domain — the previous
 // `x.ln() - x.ln().ln()` seed produced ln(0) = −∞ at x = 1 and diverged to
 // NaN at the Omega constant.
-fn builtin_lambert_w0(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lambert_w0(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let e = std::f64::consts::E;
     if x < -1.0 / e { return Ok(StrykeValue::float(f64::NAN)); }
@@ -181,26 +181,26 @@ fn builtin_lambert_w0(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Wright omega ω(z) = W(e^z) (principal)
-fn builtin_wright_omega(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_wright_omega(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     builtin_lambert_w0(&[StrykeValue::float(z.exp())])
 }
 
 // Sinhc(x) = sinh(x)/x
-fn builtin_sinhc(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sinhc(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     if x.abs() < 1e-9 { return Ok(StrykeValue::float(1.0)); }
     Ok(StrykeValue::float(x.sinh() / x))
 }
 // Coshc(x) = cosh(x)/x for x≠0 (only defined as scaled cosh / use cosh-1/x²)
-fn builtin_cosh_minus1_over_x2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cosh_minus1_over_x2(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     if x.abs() < 1e-9 { return Ok(StrykeValue::float(0.5)); }
     Ok(StrykeValue::float((x.cosh() - 1.0) / (x * x)))
 }
 
 // Sici (sine integral) Si(x) — series for moderate |x|
-fn builtin_sine_integral_si(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sine_integral_si(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     if x == 0.0 { return Ok(StrykeValue::float(0.0)); }
     let mut sum = 0.0;
@@ -214,7 +214,7 @@ fn builtin_sine_integral_si(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Cosine integral Ci(x) — for x>0
-fn builtin_cosine_integral_ci(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cosine_integral_ci(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     if x <= 0.0 { return Ok(StrykeValue::float(f64::NAN)); }
     let euler_gamma = 0.5772156649015329;
@@ -232,7 +232,7 @@ fn builtin_cosine_integral_ci(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Exponential integral E1(x) for x>0 (series for small, asymptotic for large)
-fn builtin_exp_integral_e1(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_exp_integral_e1(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     if x <= 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
     let euler_gamma = 0.5772156649015329;
@@ -265,7 +265,7 @@ fn builtin_exp_integral_e1(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Fresnel C(x)
 
 // Dawson function D(x) = e^{-x²} ∫₀ˣ e^{t²} dt — series for small x
-fn builtin_dawson_function(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_dawson_function(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     if x.abs() < 4.0 {
         let mut sum = 0.0;
@@ -290,7 +290,7 @@ fn builtin_dawson_function(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Owen's T function approximation (4-term Patefield-Tandy)
-fn builtin_owen_t(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_owen_t(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let h = f1(args);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if a == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -307,42 +307,42 @@ fn builtin_owen_t(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Spherical Bessel j₀
-fn builtin_spherical_bessel_j0(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_spherical_bessel_j0(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     if x.abs() < 1e-9 { return Ok(StrykeValue::float(1.0)); }
     Ok(StrykeValue::float(x.sin() / x))
 }
 // Spherical Bessel j₁
-fn builtin_spherical_bessel_j1(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_spherical_bessel_j1(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     if x.abs() < 1e-9 { return Ok(StrykeValue::float(0.0)); }
     Ok(StrykeValue::float((x.sin() - x * x.cos()) / (x * x)))
 }
 // Spherical Bessel y₀
-fn builtin_spherical_bessel_y0(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_spherical_bessel_y0(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     if x == 0.0 { return Ok(StrykeValue::float(f64::NEG_INFINITY)); }
     Ok(StrykeValue::float(-x.cos() / x))
 }
 // Spherical Bessel y₁
-fn builtin_spherical_bessel_y1(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_spherical_bessel_y1(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     if x == 0.0 { return Ok(StrykeValue::float(f64::NEG_INFINITY)); }
     Ok(StrykeValue::float(-(x.cos() / (x * x) + x.sin() / x)))
 }
 
 // Modified spherical Bessel i₀
-fn builtin_mod_sph_bessel_i0(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mod_sph_bessel_i0(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     if x.abs() < 1e-9 { return Ok(StrykeValue::float(1.0)); }
     Ok(StrykeValue::float(x.sinh() / x))
 }
-fn builtin_mod_sph_bessel_i1(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mod_sph_bessel_i1(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     if x.abs() < 1e-9 { return Ok(StrykeValue::float(0.0)); }
     Ok(StrykeValue::float((x.cosh() - x.sinh() / x) / x))
 }
-fn builtin_mod_sph_bessel_k0(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mod_sph_bessel_k0(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     if x <= 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
     let pi = std::f64::consts::PI;
@@ -350,7 +350,7 @@ fn builtin_mod_sph_bessel_k0(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Coulomb wave function F_L (L=0, simplified)
-fn builtin_coulomb_f0(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_coulomb_f0(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let eta = f1(args);
     let rho = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if rho == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -360,7 +360,7 @@ fn builtin_coulomb_f0(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Polylogarithm Li₂ (dilogarithm) — series
-fn builtin_polylog_li2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_polylog_li2(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     if z.abs() >= 1.0 { return Ok(StrykeValue::float(f64::NAN)); }
     let mut sum = 0.0;
@@ -373,7 +373,7 @@ fn builtin_polylog_li2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::float(sum))
 }
 // Polylog Li_n (general)
-fn builtin_polylog_n(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_polylog_n(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args) as i32;
     let z = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if z.abs() >= 1.0 { return Ok(StrykeValue::float(f64::NAN)); }
@@ -398,7 +398,7 @@ fn builtin_polylog_n(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Apéry's constant ζ(3) numerical
 
 // Inverse tangent integral Ti₂(x) = sum (-1)^k x^{2k+1}/(2k+1)^2
-fn builtin_ti2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ti2(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let mut sum = 0.0;
     let mut term = x;
@@ -412,7 +412,7 @@ fn builtin_ti2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Clausen Cl₂(θ) = sum sin(nθ)/n²
-fn builtin_clausen_cl2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_clausen_cl2(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let theta = f1(args);
     let mut sum = 0.0;
     for n in 1..1000 {
@@ -424,12 +424,12 @@ fn builtin_clausen_cl2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Bose-Einstein integral g_s(x) = sum x^k/k^s (alias for polylog)
-fn builtin_bose_einstein_g(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bose_einstein_g(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_polylog_n(args)
 }
 
 // Fermi-Dirac integral F_n(x) — numerical via simpson approx
-fn builtin_fermi_dirac_int(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_fermi_dirac_int(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     let x = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let upper = (x + 30.0).max(50.0);
@@ -444,7 +444,7 @@ fn builtin_fermi_dirac_int(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Theta function ϑ_3(z, q) — first 10 terms
-fn builtin_theta3(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_theta3(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     let q = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let mut sum = 1.0;
@@ -455,7 +455,7 @@ fn builtin_theta3(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     }
     Ok(StrykeValue::float(sum))
 }
-fn builtin_theta2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_theta2(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     let q = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let mut sum = 0.0;
@@ -468,24 +468,24 @@ fn builtin_theta2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Jacobi sn (small q expansion, simplified)
-fn builtin_jacobi_sn_small_q(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_jacobi_sn_small_q(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let u = f1(args);
     let q = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(u.sin() + q * u.sin().powi(3)))
 }
-fn builtin_jacobi_cn_small_q(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_jacobi_cn_small_q(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let u = f1(args);
     let q = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(u.cos() - q * u.cos() * u.sin().powi(2)))
 }
-fn builtin_jacobi_dn_small_q(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_jacobi_dn_small_q(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let u = f1(args);
     let q = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(1.0 - 0.5 * q * (1.0 - (2.0 * u).cos())))
 }
 
 // Riemann ξ(s) (with completed gamma factor — simplified)
-fn builtin_riemann_xi(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_riemann_xi(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = f1(args);
     if s <= 1.0 { return Ok(StrykeValue::float(f64::NAN)); }
     let pi = std::f64::consts::PI;
@@ -497,7 +497,7 @@ fn builtin_riemann_xi(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Bessel J of arbitrary integer order n via series
-fn builtin_bessel_jn_general(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bessel_jn_general(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = args.first().map(|v| v.to_number() as i32).unwrap_or(0);
     let x = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if n < 0 { return Ok(StrykeValue::float(f64::NAN)); }
@@ -515,7 +515,7 @@ fn builtin_bessel_jn_general(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Modified Bessel I_n via series
-fn builtin_bessel_in_general(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bessel_in_general(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = args.first().map(|v| v.to_number() as i32).unwrap_or(0);
     let x = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if n < 0 { return Ok(StrykeValue::float(f64::NAN)); }

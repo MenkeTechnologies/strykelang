@@ -5,7 +5,7 @@ fn b47_to_floats(v: &StrykeValue) -> Vec<f64> {
 }
 
 /// Perspective projection x: x' = x / (w · tan(fov/2) · aspect)
-fn builtin_gfx_perspective_proj_x(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_perspective_proj_x(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let w = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let fov = args.get(2).map(|v| v.to_number()).unwrap_or(std::f64::consts::FRAC_PI_4);
@@ -16,7 +16,7 @@ fn builtin_gfx_perspective_proj_x(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Perspective projection y
-fn builtin_gfx_perspective_proj_y(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_perspective_proj_y(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let w = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let fov = args.get(2).map(|v| v.to_number()).unwrap_or(std::f64::consts::FRAC_PI_4);
@@ -26,7 +26,7 @@ fn builtin_gfx_perspective_proj_y(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Orthographic projection (linear scaling)
-fn builtin_gfx_orthographic_proj(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_orthographic_proj(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let lo = args.get(1).map(|v| v.to_number()).unwrap_or(-1.0);
     let hi = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -35,14 +35,14 @@ fn builtin_gfx_orthographic_proj(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 /// View matrix step (single component of M = R^T · T)
-fn builtin_gfx_view_matrix_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_view_matrix_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = f1(args);
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(r * t))
 }
 
 /// LookAt forward = normalize(target - eye)_x
-fn builtin_gfx_lookat_forward(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_lookat_forward(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dx = f1(args);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if n == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -50,7 +50,7 @@ fn builtin_gfx_lookat_forward(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// LookAt right = normalize(forward × up)
-fn builtin_gfx_lookat_right(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_lookat_right(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let f = f1(args);
     let u = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(f * u))
@@ -60,7 +60,7 @@ fn builtin_gfx_lookat_right(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// world-up, since the canonical right-handed view-matrix orthonormalizes).
 /// Returns the requested component of (right × forward). Args: comp (0=x, 1=y,
 /// 2=z), right_x, right_y, right_z, fwd_x, fwd_y, fwd_z.
-fn builtin_gfx_lookat_up(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_lookat_up(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let comp = i1(args);
     let rx = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let ry = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -77,19 +77,19 @@ fn builtin_gfx_lookat_up(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Quaternion to axis-angle (returns angle from w)
-fn builtin_gfx_quat_to_axis_angle(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_quat_to_axis_angle(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let w = f1(args);
     Ok(StrykeValue::float(2.0 * w.clamp(-1.0, 1.0).acos()))
 }
 
 /// Axis-angle to quaternion w = cos(θ/2)
-fn builtin_gfx_axis_angle_to_quat(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_axis_angle_to_quat(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let theta = f1(args);
     Ok(StrykeValue::float((theta / 2.0).cos()))
 }
 
 /// Quaternion slerp step at t
-fn builtin_gfx_quat_slerp_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_quat_slerp_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let q0 = f1(args);
     let q1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let t = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
@@ -101,7 +101,7 @@ fn builtin_gfx_quat_slerp_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Quaternion nlerp (normalized lerp)
-fn builtin_gfx_quat_nlerp_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_quat_nlerp_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let q0 = f1(args);
     let q1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let t = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
@@ -109,7 +109,7 @@ fn builtin_gfx_quat_nlerp_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Quaternion dot product
-fn builtin_gfx_quat_dot_two(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_quat_dot_two(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = b47_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let b = b47_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let n = a.len().min(b.len());
@@ -117,12 +117,12 @@ fn builtin_gfx_quat_dot_two(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Quaternion inverse: -q (for unit quaternion conjugate)
-fn builtin_gfx_quat_inverse_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_quat_inverse_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     Ok(StrykeValue::float(-f1(args)))
 }
 
 /// Quaternion to Euler pitch
-fn builtin_gfx_quat_to_euler_pitch(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_quat_to_euler_pitch(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let qw = f1(args);
     let qx = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let qy = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -131,7 +131,7 @@ fn builtin_gfx_quat_to_euler_pitch(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Quat to Euler yaw
-fn builtin_gfx_quat_to_euler_yaw(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_quat_to_euler_yaw(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let qw = f1(args);
     let qx = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let qy = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -140,7 +140,7 @@ fn builtin_gfx_quat_to_euler_yaw(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 /// Quat to Euler roll
-fn builtin_gfx_quat_to_euler_roll(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_quat_to_euler_roll(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let qw = f1(args);
     let qx = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let qy = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -150,7 +150,7 @@ fn builtin_gfx_quat_to_euler_roll(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Euler to quat x = sin(roll/2)cos(pitch/2)cos(yaw/2) - cos(roll/2)sin(pitch/2)sin(yaw/2)
-fn builtin_gfx_euler_to_quat_x(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_euler_to_quat_x(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let roll = f1(args);
     let pitch = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let yaw = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -158,7 +158,7 @@ fn builtin_gfx_euler_to_quat_x(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
         - (roll / 2.0).cos() * (pitch / 2.0).sin() * (yaw / 2.0).sin()))
 }
 
-fn builtin_gfx_euler_to_quat_y(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_euler_to_quat_y(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let roll = f1(args);
     let pitch = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let yaw = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -166,7 +166,7 @@ fn builtin_gfx_euler_to_quat_y(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
         + (roll / 2.0).sin() * (pitch / 2.0).cos() * (yaw / 2.0).sin()))
 }
 
-fn builtin_gfx_euler_to_quat_z(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_euler_to_quat_z(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let roll = f1(args);
     let pitch = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let yaw = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -174,7 +174,7 @@ fn builtin_gfx_euler_to_quat_z(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
         - (roll / 2.0).sin() * (pitch / 2.0).sin() * (yaw / 2.0).cos()))
 }
 
-fn builtin_gfx_euler_to_quat_w(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_euler_to_quat_w(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let roll = f1(args);
     let pitch = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let yaw = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -183,24 +183,24 @@ fn builtin_gfx_euler_to_quat_w(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Rotation matrix XX entry
-fn builtin_gfx_rotation_matrix_xx(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_rotation_matrix_xx(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let theta = f1(args);
     Ok(StrykeValue::float(theta.cos()))
 }
 
-fn builtin_gfx_rotation_matrix_yy(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_rotation_matrix_yy(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let theta = f1(args);
     Ok(StrykeValue::float(theta.cos()))
 }
 
-fn builtin_gfx_rotation_matrix_zz(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_rotation_matrix_zz(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let theta = f1(args);
     Ok(StrykeValue::float(theta.cos()))
 }
 
 /// Translation matrix entry T(i, j): identity except T(i, 3) = t_i for i ∈ {0,1,2}.
 /// Args: row, col, t_x, t_y, t_z. Returns the matrix element at (row, col).
-fn builtin_gfx_translation_matrix_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_translation_matrix_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let row = i1(args);
     let col = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     let tx = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -217,7 +217,7 @@ fn builtin_gfx_translation_matrix_step(args: &[StrykeValue]) -> PerlResult<Stryk
 }
 
 /// Scale matrix entry S(i, j): diag(s_x, s_y, s_z, 1).
-fn builtin_gfx_scale_matrix_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_scale_matrix_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let row = i1(args);
     let col = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     let s = [args.get(2).map(|v| v.to_number()).unwrap_or(1.0),
@@ -230,7 +230,7 @@ fn builtin_gfx_scale_matrix_step(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 /// Shear matrix XY entry: identity + shear factor h at (0, 1).
-fn builtin_gfx_shear_matrix_xy(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_shear_matrix_xy(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let row = i1(args);
     let col = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     let h = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -240,7 +240,7 @@ fn builtin_gfx_shear_matrix_xy(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Homogeneous divide: x/w
-fn builtin_gfx_homogeneous_divide(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_homogeneous_divide(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let w = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if w == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
@@ -248,36 +248,36 @@ fn builtin_gfx_homogeneous_divide(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// NDC to screen X: (x + 1) / 2 · width
-fn builtin_gfx_screen_space_x(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_screen_space_x(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let w = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float((x + 1.0) * 0.5 * w))
 }
 
 /// NDC to screen Y: (1 - y) / 2 · height
-fn builtin_gfx_screen_space_y(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_screen_space_y(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let h = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float((1.0 - y) * 0.5 * h))
 }
 
-fn builtin_gfx_ndc_to_screen_x(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_ndc_to_screen_x(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_gfx_screen_space_x(args)
 }
 
-fn builtin_gfx_ndc_to_screen_y(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_ndc_to_screen_y(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_gfx_screen_space_y(args)
 }
 
 /// Screen to NDC X: 2 · x / W - 1
-fn builtin_gfx_screen_to_ndc_x(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_screen_to_ndc_x(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let w = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if w == 0.0 { return Ok(StrykeValue::float(0.0)); }
     Ok(StrykeValue::float(2.0 * x / w - 1.0))
 }
 
-fn builtin_gfx_screen_to_ndc_y(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_screen_to_ndc_y(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let h = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if h == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -285,14 +285,14 @@ fn builtin_gfx_screen_to_ndc_y(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Polygon clip step (in vs out vertex)
-fn builtin_gfx_clip_polygon_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_clip_polygon_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v_in = i1(args);
     let v_out = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     Ok(StrykeValue::integer(v_in - v_out))
 }
 
 /// Sutherland-Hodgman intersect parameter t
-fn builtin_gfx_sutherland_hodgman(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_sutherland_hodgman(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dot1 = f1(args);
     let dot2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let denom = dot1 - dot2;
@@ -301,7 +301,7 @@ fn builtin_gfx_sutherland_hodgman(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Cohen-Sutherland code: 4-bit outcode for a point
-fn builtin_gfx_cohen_sutherland_code(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_cohen_sutherland_code(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let xmin = args.get(2).map(|v| v.to_number()).unwrap_or(-1.0);
@@ -315,7 +315,7 @@ fn builtin_gfx_cohen_sutherland_code(args: &[StrykeValue]) -> PerlResult<StrykeV
 }
 
 /// Liang-Barsky t-value
-fn builtin_gfx_liang_barsky_t(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_liang_barsky_t(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let q = f1(args);
     let p = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if p == 0.0 { return Ok(StrykeValue::float(if q < 0.0 { -1.0 } else { 1.0 })); }
@@ -323,27 +323,27 @@ fn builtin_gfx_liang_barsky_t(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Bresenham step X (slope < 1)
-fn builtin_gfx_bresenham_step_x(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_bresenham_step_x(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let err = f1(args);
     let dx = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(err - dx))
 }
 
 /// Bresenham step Y
-fn builtin_gfx_bresenham_step_y(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_bresenham_step_y(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let err = f1(args);
     let dy = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(err + dy))
 }
 
 /// Xiaolin Wu intensity
-fn builtin_gfx_xiaolin_wu_intensity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_xiaolin_wu_intensity(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let frac = f1(args);
     Ok(StrykeValue::float(1.0 - frac.fract().abs()))
 }
 
 /// AABB intersect check
-fn builtin_gfx_aabb_intersect_check(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_aabb_intersect_check(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a_min = f1(args);
     let a_max = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let b_min = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -352,7 +352,7 @@ fn builtin_gfx_aabb_intersect_check(args: &[StrykeValue]) -> PerlResult<StrykeVa
 }
 
 /// OBB overlap step (SAT axis)
-fn builtin_gfx_obb_overlap_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_obb_overlap_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let proj_a = f1(args);
     let proj_b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let dist = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -360,7 +360,7 @@ fn builtin_gfx_obb_overlap_step(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Sphere intersect t-distance
-fn builtin_gfx_sphere_intersect_t(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_sphere_intersect_t(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let b = f1(args);
     let c = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let disc = b * b - c;
@@ -369,7 +369,7 @@ fn builtin_gfx_sphere_intersect_t(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Ray-triangle intersection t (Möller-Trumbore)
-fn builtin_gfx_ray_triangle_t(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_ray_triangle_t(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dot_n_d = f1(args);
     let dot_n_p = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if dot_n_d == 0.0 { return Ok(StrykeValue::float(-1.0)); }
@@ -379,7 +379,7 @@ fn builtin_gfx_ray_triangle_t(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// Ray-plane intersection: plane (N, d) where N·X + d = 0, ray O + tD.
 /// t = −(N·O + d) / (N·D). Returns −1 if parallel or behind.
 /// Args: N·O+d, N·D.
-fn builtin_gfx_ray_plane_t(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_ray_plane_t(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n_o_plus_d = f1(args);
     let n_d = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if n_d.abs() < 1e-12 { return Ok(StrykeValue::float(-1.0)); }
@@ -388,7 +388,7 @@ fn builtin_gfx_ray_plane_t(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Ray-box slab method t
-fn builtin_gfx_ray_box_t(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_ray_box_t(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let t_min = f1(args);
     let t_max = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if t_min > t_max { return Ok(StrykeValue::float(-1.0)); }
@@ -396,12 +396,12 @@ fn builtin_gfx_ray_box_t(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Ray-sphere t
-fn builtin_gfx_ray_sphere_t(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_ray_sphere_t(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_gfx_sphere_intersect_t(args)
 }
 
 /// Ray-disk t (planar disk + radius check)
-fn builtin_gfx_ray_disk_t(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_ray_disk_t(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let t = f1(args);
     let dist_sq = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let r_sq = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -409,7 +409,7 @@ fn builtin_gfx_ray_disk_t(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Ray-cylinder t (infinite cylinder)
-fn builtin_gfx_ray_cylinder_t(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_ray_cylinder_t(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -425,7 +425,7 @@ fn builtin_gfx_ray_cylinder_t(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 ///   b = 2(O_x D_x + O_y D_y − k²·O_z D_z),
 ///   c = O_x² + O_y² − k²·O_z²,    k = tan θ.
 /// Args: a, b, c. Returns nearest non-negative root or −1.
-fn builtin_gfx_ray_cone_t(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_ray_cone_t(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -448,7 +448,7 @@ fn builtin_gfx_ray_cone_t(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// problem reduces to sphere of radius 1 at origin: |O' + tD'|² = 1.
 /// at² + 2bt + c = 0 with a = |D'|², b = O'·D', c = |O'|² − 1.
 /// Args: |D'|², O'·D', |O'|² (caller scales by axes first).
-fn builtin_gfx_ray_ellipsoid_t(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_ray_ellipsoid_t(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let c_sq = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -467,7 +467,7 @@ fn builtin_gfx_ray_ellipsoid_t(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 /// major radius R, minor radius r intersected by a ray. Args: 4 quartic coefs.
 /// Use Ferrari resolvent's discriminant sign as a step: returns smallest real
 /// root within [0, ∞) via Bairstow-style approximate factorization fallback.
-fn builtin_gfx_ray_torus_t_approx(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_ray_torus_t_approx(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -484,30 +484,30 @@ fn builtin_gfx_ray_torus_t_approx(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Barycentric α
-fn builtin_gfx_barycentric_alpha(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_barycentric_alpha(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let area_a = f1(args);
     let total = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if total == 0.0 { return Ok(StrykeValue::float(0.0)); }
     Ok(StrykeValue::float(area_a / total))
 }
 
-fn builtin_gfx_barycentric_beta(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_barycentric_beta(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_gfx_barycentric_alpha(args)
 }
 
-fn builtin_gfx_barycentric_gamma(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_barycentric_gamma(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let alpha = f1(args);
     let beta = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(1.0 - alpha - beta))
 }
 
 /// Phong diffuse: max(0, N·L)
-fn builtin_gfx_phong_diffuse_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_phong_diffuse_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     Ok(StrykeValue::float(f1(args).max(0.0)))
 }
 
 /// Phong specular: max(0, R·V)^n
-fn builtin_gfx_phong_specular_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_phong_specular_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r_v = f1(args);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(32.0);
     Ok(StrykeValue::float(r_v.max(0.0).powf(n)))
@@ -515,7 +515,7 @@ fn builtin_gfx_phong_specular_step(args: &[StrykeValue]) -> PerlResult<StrykeVal
 
 /// Phong ambient term: k_a · I_a (intensity of ambient light scaled by ambient
 /// reflectance coefficient). Args: k_a, I_a.
-fn builtin_gfx_phong_ambient_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_phong_ambient_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let k_a = f1(args);
     let i_a = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(k_a * i_a))
@@ -525,19 +525,19 @@ fn builtin_gfx_phong_ambient_step(args: &[StrykeValue]) -> PerlResult<StrykeValu
 /// vector). Derives the Phong shape using the half vector instead of reflection
 /// vector, giving smoother elongated highlights at grazing angles. Caller passes
 /// N·H, exponent n_blinn ≈ 4·n_phong empirically. Args: N·H, n_blinn.
-fn builtin_gfx_blinn_specular_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_blinn_specular_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n_dot_h = f1(args);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(128.0);
     Ok(StrykeValue::float(n_dot_h.max(0.0).powf(n)))
 }
 
 /// Lambert term: max(0, N·L)
-fn builtin_gfx_lambert_term(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_lambert_term(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     Ok(StrykeValue::float(f1(args).max(0.0)))
 }
 
 /// Oren-Nayar term (approximation)
-fn builtin_gfx_oren_nayar_term(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_oren_nayar_term(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n_l = f1(args);
     let sigma2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let a = 1.0 - 0.5 * sigma2 / (sigma2 + 0.33);
@@ -545,7 +545,7 @@ fn builtin_gfx_oren_nayar_term(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Cook-Torrance D (GGX)
-fn builtin_gfx_cook_torrance_d_ggx(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_cook_torrance_d_ggx(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n_h = f1(args);
     let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
     let alpha2 = alpha * alpha;
@@ -555,7 +555,7 @@ fn builtin_gfx_cook_torrance_d_ggx(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Cook-Torrance G (Smith)
-fn builtin_gfx_cook_torrance_g_smith(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_cook_torrance_g_smith(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n_v = f1(args);
     let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
     let k = (alpha + 1.0).powi(2) / 8.0;
@@ -564,19 +564,19 @@ fn builtin_gfx_cook_torrance_g_smith(args: &[StrykeValue]) -> PerlResult<StrykeV
 }
 
 /// Cook-Torrance F (Schlick): f0 + (1 - f0)(1 - cosθ)^5
-fn builtin_gfx_cook_torrance_f_schlick(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_cook_torrance_f_schlick(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let f0 = f1(args);
     let cos_theta = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(f0 + (1.0 - f0) * (1.0 - cos_theta).powi(5)))
 }
 
 /// Disney principled D
-fn builtin_gfx_disney_principled_d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_disney_principled_d(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_gfx_cook_torrance_d_ggx(args)
 }
 
 /// Microfacet BRDF combined: D·F·G / (4·N·V·N·L)
-fn builtin_gfx_microfacet_brdf_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_microfacet_brdf_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let d = f1(args);
     let f = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
     let g = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
@@ -587,13 +587,13 @@ fn builtin_gfx_microfacet_brdf_step(args: &[StrykeValue]) -> PerlResult<StrykeVa
 }
 
 /// Subsurface scattering term (Burley diffuse)
-fn builtin_gfx_subsurface_scattering_term(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_subsurface_scattering_term(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n_l = f1(args);
     Ok(StrykeValue::float(n_l.max(0.0).powf(0.5)))
 }
 
 /// Translucent falloff: exp(-d/τ)
-fn builtin_gfx_translucent_falloff(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_translucent_falloff(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let d = f1(args);
     let tau = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if tau <= 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -601,17 +601,17 @@ fn builtin_gfx_translucent_falloff(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Normal distribution function GGX (alias)
-fn builtin_gfx_normal_distribution_ggx(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_normal_distribution_ggx(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_gfx_cook_torrance_d_ggx(args)
 }
 
 /// Geometric attenuation Smith
-fn builtin_gfx_geometric_attenuation_smith(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_geometric_attenuation_smith(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_gfx_cook_torrance_g_smith(args)
 }
 
 /// Fresnel dielectric (full)
-fn builtin_gfx_fresnel_dielectric_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_fresnel_dielectric_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let cos_i = f1(args);
     let n1 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let n2 = args.get(2).map(|v| v.to_number()).unwrap_or(1.5);
@@ -631,7 +631,7 @@ fn builtin_gfx_fresnel_dielectric_step(args: &[StrykeValue]) -> PerlResult<Stryk
 ///   r_⊥² = ((n² + κ²) − t₂ + cos²θ) / ((n² + κ²) + t₂ + cos²θ)
 ///   F_conductor = (r_∥² + r_⊥²) / 2.
 /// Distinct from Schlick (real-IOR approximation). Args: cos_i, n, κ.
-fn builtin_gfx_fresnel_conductor_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_fresnel_conductor_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let cos_i = f1(args).clamp(0.0, 1.0);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let k = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -645,7 +645,7 @@ fn builtin_gfx_fresnel_conductor_step(args: &[StrykeValue]) -> PerlResult<Stryke
 }
 
 /// Index of refraction sin θ_i / sin θ_t
-fn builtin_gfx_index_of_refraction(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_index_of_refraction(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let sin_i = f1(args);
     let sin_t = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if sin_t == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
@@ -653,7 +653,7 @@ fn builtin_gfx_index_of_refraction(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Snell's law angle: θ_t = asin((n1/n2) sin θ_i)
-fn builtin_gfx_snells_law_angle(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_snells_law_angle(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let theta_i = f1(args);
     let n1 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let n2 = args.get(2).map(|v| v.to_number()).unwrap_or(1.5);
@@ -664,7 +664,7 @@ fn builtin_gfx_snells_law_angle(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Total internal reflection check
-fn builtin_gfx_total_internal_reflection(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_total_internal_reflection(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let theta_i = f1(args);
     let n1 = args.get(1).map(|v| v.to_number()).unwrap_or(1.5);
     let n2 = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -674,7 +674,7 @@ fn builtin_gfx_total_internal_reflection(args: &[StrykeValue]) -> PerlResult<Str
 }
 
 /// Refract direction X (Snell)
-fn builtin_gfx_refract_direction_x(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_refract_direction_x(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let i_x = f1(args);
     let n_x = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let eta = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -686,7 +686,7 @@ fn builtin_gfx_refract_direction_x(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Reflect direction X: I - 2 (N·I) N
-fn builtin_gfx_reflect_direction_x(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_reflect_direction_x(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let i_x = f1(args);
     let n_x = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let n_dot_i = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -694,20 +694,20 @@ fn builtin_gfx_reflect_direction_x(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Environment map U (longitude)
-fn builtin_gfx_environment_map_uv_u(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_environment_map_uv_u(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dx = f1(args);
     let dz = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(0.5 + dz.atan2(dx) / (2.0 * std::f64::consts::PI)))
 }
 
 /// Environment map V (latitude)
-fn builtin_gfx_environment_map_uv_v(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_environment_map_uv_v(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dy = f1(args);
     Ok(StrykeValue::float(0.5 - dy.asin() / std::f64::consts::PI))
 }
 
 /// Cube map face index from direction (max abs component)
-fn builtin_gfx_cube_map_face_index(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_cube_map_face_index(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dx = f1(args);
     let dy = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let dz = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -720,7 +720,7 @@ fn builtin_gfx_cube_map_face_index(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Octahedral encode X
-fn builtin_gfx_octahedral_encode_x(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_octahedral_encode_x(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dx = f1(args);
     let dy = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let dz = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -730,7 +730,7 @@ fn builtin_gfx_octahedral_encode_x(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Octahedral encode Y
-fn builtin_gfx_octahedral_encode_y(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_octahedral_encode_y(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dx = f1(args);
     let dy = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let dz = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -740,30 +740,30 @@ fn builtin_gfx_octahedral_encode_y(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Spherical harmonic Y_0^0 = 1/(2√π)
-fn builtin_gfx_spherical_harmonic_y00(_args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_spherical_harmonic_y00(_args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     Ok(StrykeValue::float(0.5 / std::f64::consts::PI.sqrt()))
 }
 
 /// Y_1^0 = √(3/(4π)) z
-fn builtin_gfx_spherical_harmonic_y10(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_spherical_harmonic_y10(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     Ok(StrykeValue::float((3.0 / (4.0 * std::f64::consts::PI)).sqrt() * z))
 }
 
 /// Y_1^1 = √(3/(4π)) x
-fn builtin_gfx_spherical_harmonic_y11(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_spherical_harmonic_y11(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     Ok(StrykeValue::float((3.0 / (4.0 * std::f64::consts::PI)).sqrt() * x))
 }
 
 /// Y_2^0 = √(5/(16π)) (3z² - 1)
-fn builtin_gfx_spherical_harmonic_y20(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_spherical_harmonic_y20(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     Ok(StrykeValue::float((5.0 / (16.0 * std::f64::consts::PI)).sqrt() * (3.0 * z * z - 1.0)))
 }
 
 /// Zonal harmonic Z_l(θ) = √((2l+1)/(4π)) P_l(cos θ): zonal slice of Y_l^0.
-fn builtin_gfx_zonal_harmonic_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_zonal_harmonic_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let theta = f1(args);
     let l = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0).max(0);
     let x = theta.cos();
@@ -779,34 +779,34 @@ fn builtin_gfx_zonal_harmonic_step(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Irradiance SH evaluation (3-band)
-fn builtin_gfx_irradiance_sh_eval(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_irradiance_sh_eval(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let l = b47_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     Ok(StrykeValue::float(l.iter().sum()))
 }
 
 /// Radiance SH evaluation (point)
-fn builtin_gfx_radiance_sh_eval(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_radiance_sh_eval(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_gfx_irradiance_sh_eval(args)
 }
 
 /// Skybox UV U
-fn builtin_gfx_skybox_uv_u(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_skybox_uv_u(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_gfx_environment_map_uv_u(args)
 }
 
 /// Skybox UV V
-fn builtin_gfx_skybox_uv_v(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_skybox_uv_v(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_gfx_environment_map_uv_v(args)
 }
 
 /// Reinhard tonemap: x / (1 + x)
-fn builtin_gfx_tonemap_reinhard(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_tonemap_reinhard(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     Ok(StrykeValue::float(x / (1.0 + x)))
 }
 
 /// ACES filmic tone mapping
-fn builtin_gfx_tonemap_aces(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_tonemap_aces(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let a = 2.51;
     let b = 0.03;
@@ -817,7 +817,7 @@ fn builtin_gfx_tonemap_aces(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Uncharted2 tone mapping
-fn builtin_gfx_tonemap_uncharted2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_tonemap_uncharted2(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let a = 0.15;
     let b = 0.50;
@@ -829,12 +829,12 @@ fn builtin_gfx_tonemap_uncharted2(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Filmic tonemap (alias)
-fn builtin_gfx_tonemap_filmic(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_tonemap_filmic(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_gfx_tonemap_aces(args)
 }
 
 /// Gamma correction: x^(1/γ)
-fn builtin_gfx_gamma_correct_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_gamma_correct_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let gamma = args.get(1).map(|v| v.to_number()).unwrap_or(2.2);
     if gamma == 0.0 { return Ok(StrykeValue::float(x)); }
@@ -842,19 +842,19 @@ fn builtin_gfx_gamma_correct_step(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// sRGB → linear
-fn builtin_gfx_srgb_to_linear(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_srgb_to_linear(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     Ok(StrykeValue::float(if x <= 0.04045 { x / 12.92 } else { ((x + 0.055) / 1.055).powf(2.4) }))
 }
 
 /// Linear → sRGB
-fn builtin_gfx_linear_to_srgb(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_linear_to_srgb(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     Ok(StrykeValue::float(if x <= 0.0031308 { 12.92 * x } else { 1.055 * x.powf(1.0 / 2.4) - 0.055 }))
 }
 
 /// Bayer 4×4 matrix value
-fn builtin_gfx_dither_bayer_4x4(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_dither_bayer_4x4(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let i = i1(args).clamp(0, 3) as usize;
     let j = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0).clamp(0, 3) as usize;
     let m: [[f64; 4]; 4] = [
@@ -867,43 +867,43 @@ fn builtin_gfx_dither_bayer_4x4(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Floyd-Steinberg error diffusion (single coefficient — bottom-right)
-fn builtin_gfx_dither_floyd_steinberg(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_dither_floyd_steinberg(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let err = f1(args);
     Ok(StrykeValue::float(err * 7.0 / 16.0))
 }
 
 /// OKLab L = (l)^(1/3)
-fn builtin_gfx_oklab_l_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_oklab_l_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let l = f1(args);
     Ok(StrykeValue::float(l.cbrt()))
 }
 
-fn builtin_gfx_oklab_a_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_oklab_a_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m = f1(args);
     Ok(StrykeValue::float(m.cbrt()))
 }
 
-fn builtin_gfx_oklab_b_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_oklab_b_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = f1(args);
     Ok(StrykeValue::float(s.cbrt()))
 }
 
 /// OKLCh chroma = √(a² + b²)
-fn builtin_gfx_oklch_chroma(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_oklch_chroma(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float((a * a + b * b).sqrt()))
 }
 
 /// OKLCh hue = atan2(b, a)
-fn builtin_gfx_oklch_hue(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_oklch_hue(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(b.atan2(a)))
 }
 
 /// PCG hash step
-fn builtin_gfx_pcg_hash_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_pcg_hash_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = i1(args) as u64;
     let state = s.wrapping_mul(747_796_405).wrapping_add(2_891_336_453);
     let word = ((state >> ((state >> 28).wrapping_add(4))) ^ state).wrapping_mul(277_803_737);
@@ -912,7 +912,7 @@ fn builtin_gfx_pcg_hash_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// XOR-shift step (32-bit)
-fn builtin_gfx_xorshift_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_xorshift_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut s = i1(args) as u32;
     s ^= s << 13;
     s ^= s >> 17;
@@ -921,7 +921,7 @@ fn builtin_gfx_xorshift_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Halton sequence step base b
-fn builtin_gfx_halton_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_halton_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut i = i1(args).max(1) as u64;
     let b = args.get(1).map(|v| v.to_number() as u64).unwrap_or(2).max(2);
     let mut f = 1.0_f64;
@@ -938,7 +938,7 @@ fn builtin_gfx_halton_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// x+1, direction numbers V_k = 2^(B−k) for k=1..B). Gray-code update:
 ///   x_{i+1} = x_i ⊕ V_{c_i+1}, where c_i = trailing-zero count of (i+1).
 /// Returns x_i / 2^B as f64. Args: index i (≥0).
-fn builtin_gfx_sobol_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_sobol_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     const B: u32 = 32;
     let n = i1(args).max(0) as u64;
     let mut x: u64 = 0;
@@ -954,7 +954,7 @@ fn builtin_gfx_sobol_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// as Σ a_k b^k; then φ_b(n) = Σ a_k b^(−k−1). Default base 2 (the original
 /// Van der Corput sequence). Bit-reversal in base 2 implemented directly with
 /// 32-bit reverse for speed; general-base falls back to digit-by-digit.
-fn builtin_gfx_van_der_corput(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_van_der_corput(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(0) as u64;
     let b = args.get(1).map(|v| v.to_number() as u64).unwrap_or(2).max(2);
     if b == 2 {
@@ -977,7 +977,7 @@ fn builtin_gfx_van_der_corput(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// (t, d)-sequences (Halton, Sobol, Faure). Returns the asymptotic upper bound
 /// for given algorithm choice. Args: N (samples), d (dimensions), algo
 /// (0 = Halton, 1 = Sobol with C ≈ 1, 2 = Faure with smaller C).
-fn builtin_gfx_low_discrepancy_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_low_discrepancy_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args).max(2.0);
     let d = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1.0);
     let algo = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -986,7 +986,7 @@ fn builtin_gfx_low_discrepancy_step(args: &[StrykeValue]) -> PerlResult<StrykeVa
 }
 
 /// Blue noise value (Bayer-like simulated)
-fn builtin_gfx_blue_noise_value(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_blue_noise_value(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let i = i1(args);
     let j = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     let h = (i.wrapping_mul(73_856_093) ^ j.wrapping_mul(19_349_663)) as u32;
@@ -994,7 +994,7 @@ fn builtin_gfx_blue_noise_value(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Perlin noise (1-D simplified gradient noise)
-fn builtin_gfx_perlin_noise_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_perlin_noise_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let xi = x.floor();
     let xf = x - xi;
@@ -1006,7 +1006,7 @@ fn builtin_gfx_perlin_noise_step(args: &[StrykeValue]) -> PerlResult<StrykeValue
 /// each of three corners compute attenuation t² and contribute t⁴·(g·d) where
 /// g is a unit pseudo-gradient picked from a 12-vector palette by hashed corner
 /// coords. Sum of three corners gives the noise. Real algorithm.
-fn builtin_gfx_simplex_noise_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_simplex_noise_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let f2 = 0.5 * (3.0_f64.sqrt() - 1.0);
@@ -1046,7 +1046,7 @@ fn builtin_gfx_simplex_noise_step(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// fBm: sum of octaves with persistence
-fn builtin_gfx_fbm_noise_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_fbm_noise_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     let oct = args.get(1).map(|v| v.to_number()).unwrap_or(4.0);
     let persistence = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
@@ -1054,13 +1054,13 @@ fn builtin_gfx_fbm_noise_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Worley noise (cell distance)
-fn builtin_gfx_worley_noise_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_worley_noise_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = b47_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     Ok(StrykeValue::float(v.iter().cloned().fold(f64::INFINITY, f64::min)))
 }
 
 /// Voronoi distance (alias)
-fn builtin_gfx_voronoi_distance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_voronoi_distance(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_gfx_worley_noise_step(args)
 }
 
@@ -1069,7 +1069,7 @@ fn builtin_gfx_voronoi_distance(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 /// Approximate the partial via central differences on noise samples ψ at
 /// offsets ±h. Returns the requested component (0=Vx, 1=Vy).
 /// Args: comp (0/1), psi_xp, psi_xm, psi_yp, psi_ym, h.
-fn builtin_gfx_curl_noise_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_curl_noise_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let comp = i1(args);
     let psi_xp = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let psi_xm = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -1085,7 +1085,7 @@ fn builtin_gfx_curl_noise_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 /// each integer lattice node, dot-product with the offset to that node, and
 /// quintic-interpolate (Perlin's improved fade). Distinct from value noise
 /// (which interpolates lattice values, not gradients). Args: x.
-fn builtin_gfx_gradient_noise_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_gradient_noise_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let xi = x.floor() as i64;
     let xf = x - x.floor();
@@ -1102,7 +1102,7 @@ fn builtin_gfx_gradient_noise_step(args: &[StrykeValue]) -> PerlResult<StrykeVal
 /// Value noise: assign a random value v(i, j) ∈ [0, 1) to each integer lattice
 /// node and bilinearly smooth-step interpolate. Differs from Perlin (which
 /// dot-products against a gradient at each corner). Args: x, y.
-fn builtin_gfx_value_noise_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_value_noise_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let xi = x.floor() as i64;
@@ -1125,21 +1125,21 @@ fn builtin_gfx_value_noise_step(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Signed distance to box: max(|p| - b)
-fn builtin_gfx_signed_distance_box(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_signed_distance_box(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(p.abs() - b))
 }
 
 /// SDF sphere: |p| - r
-fn builtin_gfx_signed_distance_sphere(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_signed_distance_sphere(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(p.abs() - r))
 }
 
 /// SDF capsule: |p - a + (b-a)·t| - r where t = clamp(...)
-fn builtin_gfx_signed_distance_capsule(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gfx_signed_distance_capsule(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dist = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(dist - r))

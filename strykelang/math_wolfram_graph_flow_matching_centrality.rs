@@ -26,7 +26,7 @@ fn parse_weighted_edges_b24(v: &StrykeValue) -> Vec<(usize, usize, f64)> {
 
 // Tarjan's SCC algorithm
 #[allow(dead_code)]
-fn builtin_tarjan_scc(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_tarjan_scc(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = adj.len();
     let mut index_counter = 0_usize;
@@ -79,7 +79,7 @@ fn builtin_tarjan_scc(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Kosaraju's SCC
-fn builtin_kosaraju_scc(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_kosaraju_scc(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = adj.len();
     let mut radj = vec![vec![]; n];
@@ -129,7 +129,7 @@ fn builtin_kosaraju_scc(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Find articulation points (cut vertices)
 
 // Find bridges (cut edges)
-fn builtin_bridges(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bridges(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = adj.len();
     let mut visited = vec![false; n];
@@ -170,7 +170,7 @@ fn builtin_bridges(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Edmonds-Karp BFS-based max flow
-fn builtin_max_flow_ek(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_max_flow_ek(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let edges = parse_weighted_edges_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let s = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
     let t = args.get(2).map(|v| v.to_number() as usize).unwrap_or(1);
@@ -217,7 +217,7 @@ fn builtin_max_flow_ek(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Min-cut value (== max-flow value)
-fn builtin_min_cut_value(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_min_cut_value(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_max_flow_ek(args)
 }
 
@@ -351,7 +351,7 @@ fn hopcroft_karp_first_phase_augmentations(
     aug
 }
 
-fn builtin_hopcroft_karp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hopcroft_karp(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let edges = parse_edges_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n_left = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
     let n_right = args.get(2).map(|v| v.to_number() as usize).unwrap_or(0);
@@ -366,7 +366,7 @@ fn builtin_hopcroft_karp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Eigenvector centrality (power iteration)
 
 // Katz centrality
-fn builtin_katz_centrality(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_katz_centrality(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(0.1);
     let beta = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -386,7 +386,7 @@ fn builtin_katz_centrality(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // HITS hubs/authorities (returns [hubs, authorities])
-fn builtin_hits_simple(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hits_simple(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let iters = args.get(1).map(|v| v.to_number() as usize).unwrap_or(50);
     let n = adj.len();
@@ -419,7 +419,7 @@ fn builtin_hits_simple(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // PageRank with damping
-fn builtin_pagerank_damped(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pagerank_damped(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let damping = args.get(1).map(|v| v.to_number()).unwrap_or(0.85);
     let iters = args.get(2).map(|v| v.to_number() as usize).unwrap_or(100);
@@ -443,7 +443,7 @@ fn builtin_pagerank_damped(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Connected components count (undirected)
-fn builtin_cc_count(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cc_count(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = adj.len();
     let mut visited = vec![false; n];
@@ -467,7 +467,7 @@ fn builtin_cc_count(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Connected components (returns label per node)
-fn builtin_cc_labels(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cc_labels(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = adj.len();
     let mut label = vec![usize::MAX; n];
@@ -491,7 +491,7 @@ fn builtin_cc_labels(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Topological sort (Kahn's)
-fn builtin_topological_sort_kahn(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_topological_sort_kahn(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = adj.len();
     let mut indeg = vec![0_usize; n];
@@ -518,7 +518,7 @@ fn builtin_topological_sort_kahn(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 // Has cycle (directed)
-fn builtin_has_cycle_directed(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_has_cycle_directed(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = adj.len();
     let mut color = vec![0_u8; n];
@@ -539,7 +539,7 @@ fn builtin_has_cycle_directed(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Has cycle (undirected) via DFS
-fn builtin_has_cycle_undirected(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_has_cycle_undirected(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = adj.len();
     let mut visited = vec![false; n];
@@ -564,7 +564,7 @@ fn builtin_has_cycle_undirected(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 // BFS distances from source
 
 // Diameter (BFS from each)
-fn builtin_diameter_bfs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_diameter_bfs(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = adj.len();
     let mut max_d = 0_i64;
@@ -589,7 +589,7 @@ fn builtin_diameter_bfs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Eccentricity per node
 
 // Radius = min eccentricity
-fn builtin_radius_bfs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_radius_bfs(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = adj.len();
     if n == 0 { return Ok(StrykeValue::integer(0)); }
@@ -615,7 +615,7 @@ fn builtin_radius_bfs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Number of edges
-fn builtin_num_edges(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_num_edges(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let total: usize = adj.iter().map(|n| n.len()).sum();
     Ok(StrykeValue::integer((total / 2) as i64))
@@ -624,7 +624,7 @@ fn builtin_num_edges(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Density = 2E / (N(N-1))
 
 // k-core decomposition (returns coreness)
-fn builtin_k_coreness(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_k_coreness(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = adj.len();
     let mut deg: Vec<usize> = adj.iter().map(|n| n.len()).collect();
@@ -655,7 +655,7 @@ fn builtin_k_coreness(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Graph coloring greedy (welsh-powell)
-fn builtin_greedy_coloring(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_greedy_coloring(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = adj.len();
     let mut order: Vec<usize> = (0..n).collect();
@@ -673,7 +673,7 @@ fn builtin_greedy_coloring(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Chromatic number greedy estimate (max color + 1)
-fn builtin_chromatic_number_greedy(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_chromatic_number_greedy(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = builtin_greedy_coloring(args)?;
     let colors = arg_to_vec(&r);
     let max_c = colors.iter().map(|v| v.to_number() as i64).max().unwrap_or(-1);
@@ -681,14 +681,14 @@ fn builtin_chromatic_number_greedy(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 // Sum of degrees (= 2 * edges)
-fn builtin_sum_degrees(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sum_degrees(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let total: usize = adj.iter().map(|n| n.len()).sum();
     Ok(StrykeValue::integer(total as i64))
 }
 
 // Average degree
-fn builtin_avg_degree(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_avg_degree(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = adj.len();
     if n == 0 { return Ok(StrykeValue::float(0.0)); }
@@ -697,14 +697,14 @@ fn builtin_avg_degree(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Max degree
-fn builtin_max_degree(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_max_degree(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let m = adj.iter().map(|n| n.len()).max().unwrap_or(0);
     Ok(StrykeValue::integer(m as i64))
 }
 
 // Graph is tree?
-fn builtin_is_tree(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_is_tree(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = adj.len();
     let total: usize = adj.iter().map(|n| n.len()).sum();
@@ -724,7 +724,7 @@ fn builtin_is_tree(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Girth (shortest cycle, BFS-based)
-fn builtin_girth(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_girth(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let adj = parse_adj_b24(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = adj.len();
     let mut min_girth = i64::MAX;

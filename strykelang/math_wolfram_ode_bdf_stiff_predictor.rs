@@ -1,7 +1,7 @@
 // ODE advanced: BDF, Gear, Rosenbrock, IMEX, stiff solvers, predictor-corrector.
 
 // BDF1 (implicit Euler) step (1 Newton iteration approximation)
-fn builtin_bdf1_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bdf1_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let f_y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let dt = args.get(2).map(|v| v.to_number()).unwrap_or(0.01);
@@ -9,7 +9,7 @@ fn builtin_bdf1_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // BDF2 step (2-step backward differentiation formula, explicit form approx)
-fn builtin_bdf2_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bdf2_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y_n = f1(args);
     let y_nm1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let f_np1 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -18,7 +18,7 @@ fn builtin_bdf2_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // BDF3 step
-fn builtin_bdf3_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bdf3_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y_n = f1(args);
     let y_nm1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let y_nm2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -29,7 +29,7 @@ fn builtin_bdf3_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // BDF4 step
-fn builtin_bdf4_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bdf4_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y_n = f1(args);
     let y_nm1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let y_nm2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -41,7 +41,7 @@ fn builtin_bdf4_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // BDF5 step
-fn builtin_bdf5_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bdf5_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y_n = f1(args);
     let y_nm1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let y_nm2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -55,7 +55,7 @@ fn builtin_bdf5_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // BDF6 step
-fn builtin_bdf6_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bdf6_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y_n = f1(args);
     let y_nm1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let y_nm2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -70,7 +70,7 @@ fn builtin_bdf6_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Adams-Bashforth 1 (explicit Euler)
-fn builtin_ab1_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ab1_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let f_n = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let dt = args.get(2).map(|v| v.to_number()).unwrap_or(0.01);
@@ -78,7 +78,7 @@ fn builtin_ab1_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Adams-Bashforth 2
-fn builtin_ab2_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ab2_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let f_n = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let f_nm1 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -87,7 +87,7 @@ fn builtin_ab2_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Adams-Bashforth 3
-fn builtin_ab3_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ab3_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let f_n = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let f_nm1 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -97,7 +97,7 @@ fn builtin_ab3_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Adams-Moulton 2 (implicit trapezoidal)
-fn builtin_am2_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_am2_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let f_n = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let f_np1 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -106,7 +106,7 @@ fn builtin_am2_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Adams-Moulton 3
-fn builtin_am3_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_am3_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let f_np1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let f_n = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -116,7 +116,7 @@ fn builtin_am3_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Adams-Moulton 4
-fn builtin_am4_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_am4_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let f_np1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let f_n = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -128,7 +128,7 @@ fn builtin_am4_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Rosenbrock-Wanner ROS2 stage (linearly implicit, single stage approx)
-fn builtin_ros2_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ros2_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let f_y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let j = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -141,7 +141,7 @@ fn builtin_ros2_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // IMEX Euler (split f = f_E + f_I, explicit + implicit)
-fn builtin_imex_euler_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_imex_euler_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let f_e = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let f_i = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -150,7 +150,7 @@ fn builtin_imex_euler_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Symplectic Euler (Hamiltonian systems)
-fn builtin_symplectic_euler_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_symplectic_euler_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = f1(args);
     let q = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let dh_dq = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -162,7 +162,7 @@ fn builtin_symplectic_euler_step(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 // Leapfrog (Verlet) step for second-order ODE q'' = a(q,t)
-fn builtin_leapfrog_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_leapfrog_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let q = f1(args);
     let v = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let a = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -174,7 +174,7 @@ fn builtin_leapfrog_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Stormer-Verlet position update (q_n+1 = 2q_n - q_n-1 + a dt²)
-fn builtin_stormer_verlet_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_stormer_verlet_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let q_n = f1(args);
     let q_nm1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let a = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -183,7 +183,7 @@ fn builtin_stormer_verlet_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 // RK4 ODE step (single sample)
-fn builtin_rk4_single(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rk4_single(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let k1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let k2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -194,7 +194,7 @@ fn builtin_rk4_single(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Dormand-Prince RK45 simple update from k1..k7
-fn builtin_dopri5_combine(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_dopri5_combine(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let ks: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
@@ -207,7 +207,7 @@ fn builtin_dopri5_combine(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Fehlberg RK45 (Cash-Karp) error estimate from k1..k6
-fn builtin_rkf45_error(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rkf45_error(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ks: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let dt = args.get(1).map(|v| v.to_number()).unwrap_or(0.01);
@@ -219,12 +219,12 @@ fn builtin_rkf45_error(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Lobatto IIIA s=2 (trapezoidal — already implemented as am2_step)
-fn builtin_lobatto_iiia_2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lobatto_iiia_2(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_am2_step(args)
 }
 
 // Lobatto IIIC s=3 update (1 stage approximation)
-fn builtin_lobatto_iiic_3(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lobatto_iiic_3(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let f_a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let f_b = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -234,7 +234,7 @@ fn builtin_lobatto_iiic_3(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Gauss-Legendre 2-stage IRK update
-fn builtin_gauss_irk_2_stage(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gauss_irk_2_stage(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let f_a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let f_b = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -243,28 +243,28 @@ fn builtin_gauss_irk_2_stage(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Magnus expansion 1st order
-fn builtin_magnus_1st(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_magnus_1st(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a_t0 = f1(args);
     let dt = args.get(1).map(|v| v.to_number()).unwrap_or(0.01);
     Ok(StrykeValue::float((dt * a_t0).exp()))
 }
 
 // Local truncation error estimate for explicit Euler
-fn builtin_euler_lte(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_euler_lte(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let f_prime = f1(args);
     let dt = args.get(1).map(|v| v.to_number()).unwrap_or(0.01);
     Ok(StrykeValue::float(0.5 * f_prime * dt * dt))
 }
 
 // LTE for trapezoidal rule
-fn builtin_trapezoidal_lte(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_trapezoidal_lte(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let f_double_prime = f1(args);
     let dt = args.get(1).map(|v| v.to_number()).unwrap_or(0.01);
     Ok(StrykeValue::float(-(dt.powi(3)) / 12.0 * f_double_prime))
 }
 
 // Step-size adaptation factor (PI controller)
-fn builtin_pi_step_size(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pi_step_size(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let err = f1(args).max(1e-12);
     let err_prev = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-12);
     let order = args.get(2).map(|v| v.to_number()).unwrap_or(4.0);
@@ -276,21 +276,21 @@ fn builtin_pi_step_size(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Stiffness ratio estimate from eigenvalues
-fn builtin_stiffness_ratio(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_stiffness_ratio(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lam_max = f1(args).abs();
     let lam_min = args.get(1).map(|v| v.to_number().abs()).unwrap_or(1.0).max(1e-12);
     Ok(StrykeValue::float(lam_max / lam_min))
 }
 
 // Spectral radius from eigenvalues
-fn builtin_spectral_radius(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_spectral_radius(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let eigs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number().abs()).collect();
     Ok(StrykeValue::float(eigs.iter().cloned().fold(0.0_f64, f64::max)))
 }
 
 // Heun-Euler embedded pair (RK12)
-fn builtin_heun_euler_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_heun_euler_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let k1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let k2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -299,7 +299,7 @@ fn builtin_heun_euler_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Bogacki-Shampine RK23 update from k1..k4
-fn builtin_bogacki_shampine_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bogacki_shampine_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let k1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let k2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -309,7 +309,7 @@ fn builtin_bogacki_shampine_step(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 // 4th order Verner update from 8 stages (b coefficients only, simplified)
-fn builtin_verner_8_combine(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_verner_8_combine(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let ks: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
@@ -322,7 +322,7 @@ fn builtin_verner_8_combine(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Generic Runge-Kutta combine: y + dt * (sum b_i k_i)
-fn builtin_rk_combine(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rk_combine(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let bs: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
@@ -336,14 +336,14 @@ fn builtin_rk_combine(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Linear multistep coefficient — Adams-Bashforth k-step coefficients (sum b_j)
-fn builtin_ab_coeff_sum(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ab_coeff_sum(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let coeffs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     Ok(StrykeValue::float(coeffs.iter().sum::<f64>()))
 }
 
 // Newmark-beta β=1/4, γ=1/2 step (constant acceleration)
-fn builtin_newmark_beta_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_newmark_beta_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let u = f1(args);
     let v = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let a_n = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -357,7 +357,7 @@ fn builtin_newmark_beta_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Wilson-θ step (θ=1.4 default)
-fn builtin_wilson_theta_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_wilson_theta_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let u = f1(args);
     let v = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let a_n = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -371,7 +371,7 @@ fn builtin_wilson_theta_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Operator splitting Strang (2nd order)
-fn builtin_strang_split(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_strang_split(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let f_a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let f_b = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -380,7 +380,7 @@ fn builtin_strang_split(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Operator splitting Lie (1st order)
-fn builtin_lie_split(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lie_split(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let f_a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let f_b = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -389,7 +389,7 @@ fn builtin_lie_split(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Exponential Euler step y_{n+1} = e^(λdt) y_n + (e^(λdt)-1)/λ · g(y_n,t_n)
-fn builtin_exp_euler_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_exp_euler_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let lambda = args.get(1).map(|v| v.to_number()).unwrap_or(-1.0);
     let g = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -400,7 +400,7 @@ fn builtin_exp_euler_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Lawson-Hatch ETD (exponential time differencing) RK2
-fn builtin_etd_rk2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_etd_rk2(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let lambda = args.get(1).map(|v| v.to_number()).unwrap_or(-1.0);
     let n_y = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -414,7 +414,7 @@ fn builtin_etd_rk2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Krogh DDE (delay) Euler step
-fn builtin_dde_euler_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_dde_euler_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y_now = f1(args);
     let y_delayed = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let f = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -424,7 +424,7 @@ fn builtin_dde_euler_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Stochastic Euler-Maruyama step
-fn builtin_em_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_em_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let drift = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let diff = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -434,7 +434,7 @@ fn builtin_em_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Milstein step (single Itô SDE)
-fn builtin_milstein_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_milstein_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let drift = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let diff = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -445,7 +445,7 @@ fn builtin_milstein_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Heun-Maruyama (predictor-corrector SDE)
-fn builtin_heun_sde_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_heun_sde_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let drift_y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let drift_pred = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -457,14 +457,14 @@ fn builtin_heun_sde_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Stratonovich correction term ½σσ'
-fn builtin_stratonovich_correction(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_stratonovich_correction(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let sigma = f1(args);
     let sigma_prime = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(0.5 * sigma * sigma_prime))
 }
 
 // Predictor-corrector single iteration
-fn builtin_predictor_corrector(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_predictor_corrector(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y_pred = f1(args);
     let f_pred = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let f_old = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -473,7 +473,7 @@ fn builtin_predictor_corrector(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 // Numerical Jacobian column (finite difference)
-fn builtin_numerical_jacobian_col(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_numerical_jacobian_col(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let f_x = f1(args);
     let f_x_plus = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let h = args.get(2).map(|v| v.to_number()).unwrap_or(1e-6);
@@ -482,12 +482,12 @@ fn builtin_numerical_jacobian_col(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 // Crank-Nicolson coefficient half
-fn builtin_cn_coefficient() -> PerlResult<StrykeValue> {
+fn builtin_cn_coefficient() -> StrykeResult<StrykeValue> {
     Ok(StrykeValue::float(0.5))
 }
 
 // Implicit-explicit splitting weight ϑ
-fn builtin_imex_theta_split(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_imex_theta_split(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let theta = f1(args);
     let f_e = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let f_i = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -495,7 +495,7 @@ fn builtin_imex_theta_split(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Bulirsch-Stoer Richardson extrapolation single step
-fn builtin_bulirsch_stoer_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bulirsch_stoer_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let t1 = f1(args);
     let t2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let n1 = args.get(2).map(|v| v.to_number()).unwrap_or(2.0);
@@ -505,7 +505,7 @@ fn builtin_bulirsch_stoer_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 // CFL number (Courant) c·Δt/Δx
-fn builtin_cfl_number(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cfl_number(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let c = f1(args);
     let dt = args.get(1).map(|v| v.to_number()).unwrap_or(0.01);
     let dx = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -514,7 +514,7 @@ fn builtin_cfl_number(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Von Neumann stability factor for explicit diffusion
-fn builtin_diffusion_stability(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_diffusion_stability(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let alpha = f1(args);
     let dt = args.get(1).map(|v| v.to_number()).unwrap_or(0.01);
     let dx = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -523,7 +523,7 @@ fn builtin_diffusion_stability(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 // Lax-Friedrichs flux (1D conservation law)
-fn builtin_lax_friedrichs_flux(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lax_friedrichs_flux(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let f_l = f1(args);
     let f_r = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let u_l = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -533,7 +533,7 @@ fn builtin_lax_friedrichs_flux(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 // Lax-Wendroff flux (linear advection)
-fn builtin_lax_wendroff_flux(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lax_wendroff_flux(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let u_l = f1(args);
     let u_r = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -545,27 +545,27 @@ fn builtin_lax_wendroff_flux(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // MUSCL slope limiter (van Leer)
-fn builtin_van_leer_limiter(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_van_leer_limiter(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = f1(args);
     if r <= 0.0 { return Ok(StrykeValue::float(0.0)); }
     Ok(StrykeValue::float(2.0 * r / (1.0 + r)))
 }
 
 // Minmod slope limiter
-fn builtin_minmod_limiter(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_minmod_limiter(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = f1(args);
     Ok(StrykeValue::float(0.0_f64.max(1.0_f64.min(r))))
 }
 
 // Superbee limiter
-fn builtin_superbee_limiter(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_superbee_limiter(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = f1(args);
     if r <= 0.0 { return Ok(StrykeValue::float(0.0)); }
     Ok(StrykeValue::float((2.0_f64.min(r)).max(1.0_f64.min(2.0 * r))))
 }
 
 // MC limiter
-fn builtin_mc_limiter(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mc_limiter(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = f1(args);
     if r <= 0.0 { return Ok(StrykeValue::float(0.0)); }
     let bound = (2.0_f64).min(2.0 * r).min((1.0 + r) / 2.0);

@@ -1,4 +1,4 @@
-use crate::error::{ErrorKind, StrykeError, PerlResult};
+use crate::error::{ErrorKind, StrykeError, StrykeResult};
 use crate::token::{keyword_or_ident, Token};
 
 /// Private-use character for a literal `$` inside double-quoted / `qq` strings (from `\$` in source).
@@ -477,7 +477,7 @@ impl Lexer {
         Some(octets.join("."))
     }
 
-    fn read_number(&mut self) -> PerlResult<Token> {
+    fn read_number(&mut self) -> StrykeResult<Token> {
         let start = self.pos;
         let mut is_float = false;
         let mut is_hex = false;
@@ -610,7 +610,7 @@ impl Lexer {
         }
     }
 
-    fn read_single_quoted_string(&mut self) -> PerlResult<Token> {
+    fn read_single_quoted_string(&mut self) -> StrykeResult<Token> {
         self.advance(); // consume opening '
         let mut s = String::new();
         loop {
@@ -634,7 +634,7 @@ impl Lexer {
         Ok(Token::SingleString(s))
     }
 
-    fn read_double_quoted_string(&mut self) -> PerlResult<Token> {
+    fn read_double_quoted_string(&mut self) -> StrykeResult<Token> {
         self.advance(); // consume opening "
                         // Triple-quoted form: `"""..."""` — multi-line interpolating string.
                         // The opening `"` was just consumed; if the next two chars are also
@@ -662,7 +662,7 @@ impl Lexer {
     ///
     /// Newlines are preserved verbatim — no indent stripping. The user
     /// chose the indentation; we don't second-guess it.
-    fn read_triple_quoted_body(&mut self, interpolate: bool) -> PerlResult<String> {
+    fn read_triple_quoted_body(&mut self, interpolate: bool) -> StrykeResult<String> {
         let mut s = String::new();
         loop {
             // Check for closing `"""` at the current position.
@@ -724,7 +724,7 @@ impl Lexer {
         }
     }
 
-    fn read_escaped_until(&mut self, term: char) -> PerlResult<String> {
+    fn read_escaped_until(&mut self, term: char) -> StrykeResult<String> {
         let mut s = String::new();
         loop {
             match self.advance() {
@@ -892,7 +892,7 @@ impl Lexer {
         open: char,
         close: char,
         is_qq: bool,
-    ) -> PerlResult<String> {
+    ) -> StrykeResult<String> {
         let mut s = String::new();
         let mut depth: usize = 1;
         loop {
@@ -1110,7 +1110,7 @@ impl Lexer {
         Ok(s)
     }
 
-    fn read_regex(&mut self) -> PerlResult<Token> {
+    fn read_regex(&mut self) -> StrykeResult<Token> {
         self.advance(); // consume opening /
         let mut pattern = String::new();
         loop {
@@ -1130,7 +1130,7 @@ impl Lexer {
         Ok(Token::Regex(pattern, flags, '/'))
     }
 
-    fn read_qw(&mut self) -> PerlResult<Token> {
+    fn read_qw(&mut self) -> StrykeResult<Token> {
         // Already consumed 'qw', now expect delimiter
         self.skip_whitespace_only();
         let open = self
@@ -1212,11 +1212,11 @@ impl Lexer {
         Ok(Token::QW(words))
     }
 
-    fn read_heredoc_tag(&mut self) -> PerlResult<(String, bool, bool)> {
+    fn read_heredoc_tag(&mut self) -> StrykeResult<(String, bool, bool)> {
         self.read_heredoc_tag_inner(false)
     }
 
-    fn read_heredoc_tag_inner(&mut self, indented: bool) -> PerlResult<(String, bool, bool)> {
+    fn read_heredoc_tag_inner(&mut self, indented: bool) -> StrykeResult<(String, bool, bool)> {
         // We've consumed '<<'. Now figure out the tag.
         // Returns (tag, interpolate, indented).
         let quoted;
@@ -1246,7 +1246,7 @@ impl Lexer {
         Ok((tag, quoted, indented))
     }
 
-    fn read_heredoc_body(&mut self, tag: &str, indented: bool) -> PerlResult<String> {
+    fn read_heredoc_body(&mut self, tag: &str, indented: bool) -> StrykeResult<String> {
         // Read until we find a line that is exactly the tag (or, for indented heredocs,
         // a line whose trimmed content equals the tag).
         let mut lines: Vec<String> = Vec::new();
@@ -1322,7 +1322,7 @@ impl Lexer {
     }
 
     /// Body lines for `format N =` … `.` (excluding the closing `.` line).
-    fn read_format_body(&mut self) -> PerlResult<Vec<String>> {
+    fn read_format_body(&mut self) -> StrykeResult<Vec<String>> {
         while self.peek().is_some_and(|c| c == ' ' || c == '\t') {
             self.advance();
         }
@@ -1503,7 +1503,7 @@ impl Lexer {
         Some(rest)
     }
 
-    pub fn next_token(&mut self) -> PerlResult<Token> {
+    pub fn next_token(&mut self) -> StrykeResult<Token> {
         self.skip_whitespace_and_comments();
         // Stamp the start line for [`Self::tokenize`]. Recursive calls
         // through POD / heredoc skip will overwrite this with the post-
@@ -3135,7 +3135,7 @@ impl Lexer {
     }
 
     /// Tokenize entire input.
-    pub fn tokenize(&mut self) -> PerlResult<Vec<(Token, usize)>> {
+    pub fn tokenize(&mut self) -> StrykeResult<Vec<(Token, usize)>> {
         let mut tokens = Vec::new();
         loop {
             // `next_token` internally skips whitespace + POD / heredoc and

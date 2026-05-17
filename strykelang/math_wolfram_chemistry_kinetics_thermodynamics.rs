@@ -5,23 +5,23 @@ const F_FARADAY: f64 = 96485.33212;  // C/mol
 const N_AVOGADRO: f64 = 6.02214076e23;
 
 // pH from H+ concentration
-fn builtin_ph_from_h(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ph_from_h(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let h = f1(args).max(1e-30);
     Ok(StrykeValue::float(-h.log10()))
 }
 // pOH from OH-
-fn builtin_poh_from_oh(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_poh_from_oh(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let oh = f1(args).max(1e-30);
     Ok(StrykeValue::float(-oh.log10()))
 }
 // pKa
-fn builtin_pka_from_ka(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pka_from_ka(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ka = f1(args).max(1e-30);
     Ok(StrykeValue::float(-ka.log10()))
 }
 // Henderson-Hasselbalch: pH = pKa + log([A-]/[HA])
 // Henderson base form (pOH from pKb)
-fn builtin_henderson_base(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_henderson_base(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pkb = f1(args);
     let bh_plus = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -30,14 +30,14 @@ fn builtin_henderson_base(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Arrhenius rate constant k = A * exp(-Ea/RT)
-fn builtin_arrhenius_k(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_arrhenius_k(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let ea = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let t = args.get(2).map(|v| v.to_number()).unwrap_or(298.15);
     Ok(StrykeValue::float(a * (-ea / (R_GAS * t)).exp()))
 }
 // Eyring equation k = (k_B*T/h) * exp(-ΔG‡/RT)
-fn builtin_eyring_k(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_eyring_k(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dg = f1(args);
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(298.15);
     let kb = 1.380649e-23;
@@ -46,19 +46,19 @@ fn builtin_eyring_k(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // First order rate: ln([A]/[A0]) = -kt
-fn builtin_first_order_concentration(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_first_order_concentration(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a0 = f1(args);
     let k = args.get(1).map(|v| v.to_number()).unwrap_or(0.1);
     let t = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(a0 * (-k * t).exp()))
 }
 // First order half-life
-fn builtin_first_order_half_life(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_first_order_half_life(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let k = f1(args).max(1e-30);
     Ok(StrykeValue::float(2.0_f64.ln() / k))
 }
 // Second order: 1/[A] - 1/[A0] = kt
-fn builtin_second_order_concentration(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_second_order_concentration(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a0 = f1(args);
     let k = args.get(1).map(|v| v.to_number()).unwrap_or(0.1);
     let t = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -67,14 +67,14 @@ fn builtin_second_order_concentration(args: &[StrykeValue]) -> PerlResult<Stryke
     Ok(StrykeValue::float(1.0 / inv))
 }
 // Second order half-life: 1/(k*A0)
-fn builtin_second_order_half_life(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_second_order_half_life(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let k = f1(args);
     let a0 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if k * a0 == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
     Ok(StrykeValue::float(1.0 / (k * a0)))
 }
 // Zero order: [A] = [A0] - kt
-fn builtin_zero_order_concentration(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_zero_order_concentration(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a0 = f1(args);
     let k = args.get(1).map(|v| v.to_number()).unwrap_or(0.1);
     let t = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -85,7 +85,7 @@ fn builtin_zero_order_concentration(args: &[StrykeValue]) -> PerlResult<StrykeVa
 // Lineweaver-Burk inverse
 
 // Ideal gas n = PV/RT
-fn builtin_ideal_gas_n(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ideal_gas_n(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = f1(args);
     let v = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let t = args.get(2).map(|v| v.to_number()).unwrap_or(298.15);
@@ -93,7 +93,7 @@ fn builtin_ideal_gas_n(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 // Van der Waals (P+a*n^2/V^2)(V-nb) = nRT — return predicted pressure
 // Redlich-Kwong P
-fn builtin_redlich_kwong_p(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_redlich_kwong_p(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     let v = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let t = args.get(2).map(|v| v.to_number()).unwrap_or(298.15);
@@ -104,7 +104,7 @@ fn builtin_redlich_kwong_p(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
         - a / (t.sqrt() * v * (v + n * b))))
 }
 // Compressibility factor Z = PV/(nRT)
-fn builtin_compressibility_z(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_compressibility_z(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = f1(args);
     let v = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let n = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -117,21 +117,21 @@ fn builtin_compressibility_z(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Mole fraction n_i / sum(n)
 
 // Equilibrium Kc from rates
-fn builtin_kc_from_rates(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_kc_from_rates(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let kf = f1(args);
     let kr = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if kr == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
     Ok(StrykeValue::float(kf / kr))
 }
 // Kp from Kc: Kp = Kc * (RT)^Δn
-fn builtin_kp_from_kc(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_kp_from_kc(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let kc = f1(args);
     let dn = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let t = args.get(2).map(|v| v.to_number()).unwrap_or(298.15);
     Ok(StrykeValue::float(kc * (R_GAS * t).powf(dn)))
 }
 // Reaction quotient Q (same form as Kc, calculated from current concs)
-fn builtin_reaction_quotient(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_reaction_quotient(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let prods = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let reacts = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     let prod_nu = arg_to_vec(&args.get(2).cloned().unwrap_or(StrykeValue::UNDEF));
@@ -150,7 +150,7 @@ fn builtin_reaction_quotient(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::float(num / den))
 }
 // Le Chatelier shift direction (+1 forward, -1 reverse, 0 at eq)
-fn builtin_le_chatelier_dir(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_le_chatelier_dir(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let q = f1(args);
     let k = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let dir = if (q - k).abs() < 1e-12 { 0 } else if q < k { 1 } else { -1 };
@@ -159,19 +159,19 @@ fn builtin_le_chatelier_dir(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 // Gibbs free energy change: ΔG = ΔH - TΔS
 // ΔG° = -RT ln K
-fn builtin_dg_from_k(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_dg_from_k(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let k = f1(args).max(1e-30);
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(298.15);
     Ok(StrykeValue::float(-R_GAS * t * k.ln()))
 }
 // K from ΔG°: K = exp(-ΔG°/RT)
-fn builtin_k_from_dg(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_k_from_dg(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dg = f1(args);
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(298.15);
     Ok(StrykeValue::float((-dg / (R_GAS * t)).exp()))
 }
 // Van't Hoff: ln(K2/K1) = -ΔH/R * (1/T2 - 1/T1)
-fn builtin_vant_hoff(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_vant_hoff(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let k1 = f1(args);
     let dh = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let t1 = args.get(2).map(|v| v.to_number()).unwrap_or(298.15);
@@ -179,7 +179,7 @@ fn builtin_vant_hoff(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::float(k1 * (-dh / R_GAS * (1.0 / t2 - 1.0 / t1)).exp()))
 }
 // Clausius-Clapeyron
-fn builtin_clausius_clapeyron(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_clausius_clapeyron(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p1 = f1(args);
     let dh_vap = args.get(1).map(|v| v.to_number()).unwrap_or(40000.0);
     let t1 = args.get(2).map(|v| v.to_number()).unwrap_or(373.15);
@@ -187,7 +187,7 @@ fn builtin_clausius_clapeyron(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::float(p1 * (-dh_vap / R_GAS * (1.0 / t2 - 1.0 / t1)).exp()))
 }
 // Antoine equation log10(P) = A - B/(C+T)
-fn builtin_antoine_p(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_antoine_p(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -198,13 +198,13 @@ fn builtin_antoine_p(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 // Nernst equation E = E° - (RT/nF) ln Q
 // EMF from half-cell potentials
-fn builtin_emf_from_half_cells(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_emf_from_half_cells(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let cathode = f1(args);
     let anode = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(cathode - anode))
 }
 // Faraday: m = (Q*M)/(n*F)
-fn builtin_faraday_mass_deposited(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_faraday_mass_deposited(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let q = f1(args);
     let m = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let n = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -214,12 +214,12 @@ fn builtin_faraday_mass_deposited(args: &[StrykeValue]) -> PerlResult<StrykeValu
 
 // Beer-Lambert law A = ε * c * l
 // Transmittance T = 10^(-A)
-fn builtin_transmittance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_transmittance(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     Ok(StrykeValue::float(10_f64.powf(-a)))
 }
 // Solubility product Ksp from concentrations
-fn builtin_ksp_from_concs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ksp_from_concs(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let cs = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let nus = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     let mut prod = 1.0;
@@ -231,7 +231,7 @@ fn builtin_ksp_from_concs(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 // Ionic strength I = 0.5 * sum(c_i * z_i^2)
 // Debye-Hückel limiting law log γ = -A z^2 sqrt(I)
-fn builtin_debye_huckel(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_debye_huckel(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     let ionic = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).max(0.0);
     let a = args.get(2).map(|v| v.to_number()).unwrap_or(0.509);
@@ -239,22 +239,22 @@ fn builtin_debye_huckel(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Heat capacity at constant pressure for ideal monatomic Cp = (5/2)R
-fn builtin_cp_monatomic_ideal() -> PerlResult<StrykeValue> {
+fn builtin_cp_monatomic_ideal() -> StrykeResult<StrykeValue> {
     Ok(StrykeValue::float(2.5 * R_GAS))
 }
 // Cv monatomic Cv = (3/2)R
-fn builtin_cv_monatomic_ideal() -> PerlResult<StrykeValue> {
+fn builtin_cv_monatomic_ideal() -> StrykeResult<StrykeValue> {
     Ok(StrykeValue::float(1.5 * R_GAS))
 }
 // Heat q = mcΔT
-fn builtin_heat_capacity_q(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_heat_capacity_q(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m = f1(args);
     let c = args.get(1).map(|v| v.to_number()).unwrap_or(4184.0);
     let dt = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(m * c * dt))
 }
 // Calorimeter ΔT
-fn builtin_calorimeter_dt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_calorimeter_dt(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let q = f1(args);
     let m = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(4184.0);
@@ -262,7 +262,7 @@ fn builtin_calorimeter_dt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::float(q / (m * c)))
 }
 // Enthalpy of formation sum
-fn builtin_enthalpy_reaction(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_enthalpy_reaction(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let products = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let reactants = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     let p_sum: f64 = products.iter().map(|v| v.to_number()).sum();
@@ -271,12 +271,12 @@ fn builtin_enthalpy_reaction(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Avogadro: number of particles N = n * NA
-fn builtin_avogadro_count(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_avogadro_count(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     Ok(StrykeValue::float(n * N_AVOGADRO))
 }
 // Mole from mass and molar mass
-fn builtin_moles_from_mass(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_moles_from_mass(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m = f1(args);
     let mm = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if mm == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -285,7 +285,7 @@ fn builtin_moles_from_mass(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Molarity = moles/volume
 // Molality = moles/kg solvent
 // Dilution: c1*v1 = c2*v2 — solve for v2
-fn builtin_dilution_v2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_dilution_v2(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let c1 = f1(args);
     let v1 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let c2 = args.get(2).map(|v| v.to_number()).unwrap_or(c1);
@@ -294,27 +294,27 @@ fn builtin_dilution_v2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Raoult's law: P_solution = x_solvent * P°_solvent
-fn builtin_raoult_law(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_raoult_law(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let p_pure = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(x * p_pure))
 }
 // Boiling point elevation ΔTb = Kb * m
-fn builtin_bp_elevation(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bp_elevation(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let kb = f1(args);
     let m = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let i = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(i * kb * m))
 }
 // Freezing point depression ΔTf = -Kf * m
-fn builtin_fp_depression(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_fp_depression(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let kf = f1(args);
     let m = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let i = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(-i * kf * m))
 }
 // Osmotic pressure π = MRT
-fn builtin_osmotic_pressure(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_osmotic_pressure(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let molarity = f1(args);
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(298.15);
     let i = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -322,7 +322,7 @@ fn builtin_osmotic_pressure(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Rydberg wavelength: 1/λ = R_∞ * Z² * (1/n1² - 1/n2²)
-fn builtin_rydberg_lambda(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rydberg_lambda(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     let n1 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let n2 = args.get(2).map(|v| v.to_number()).unwrap_or(2.0);
@@ -332,29 +332,29 @@ fn builtin_rydberg_lambda(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::float(1.0 / inv_lambda))
 }
 // Bohr radius for level n = n²·a₀
-fn builtin_bohr_radius_n(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bohr_radius_n(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     Ok(StrykeValue::float(n * n * 5.29177210903e-11))
 }
 // Bohr energy: E_n = -13.6/n² eV
-fn builtin_bohr_energy_ev(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bohr_energy_ev(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     if n == 0.0 { return Ok(StrykeValue::float(f64::NEG_INFINITY)); }
     Ok(StrykeValue::float(-13.605693122994 / (n * n)))
 }
 // Photon energy E = hf
-fn builtin_photon_energy_freq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_photon_energy_freq(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let f = f1(args);
     Ok(StrykeValue::float(6.62607015e-34 * f))
 }
 // Photon wavelength to energy: E = hc/λ
-fn builtin_photon_energy_lambda(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_photon_energy_lambda(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lambda = f1(args);
     if lambda == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
     Ok(StrykeValue::float(6.62607015e-34 * 2.998e8 / lambda))
 }
 // de Broglie wavelength λ = h/p
-fn builtin_de_broglie(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_de_broglie(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = f1(args);
     if p == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
     Ok(StrykeValue::float(6.62607015e-34 / p))

@@ -6,7 +6,7 @@ fn b44_to_floats(v: &StrykeValue) -> Vec<f64> {
 
 /// Simplify polynomial term: combine repeated factors x^a · x^b → x^(a+b), constant
 /// folding c1 · c2 → c1·c2. Args: coefficient, exponent_array; returns folded coef.
-fn builtin_cas_simplify_term(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_simplify_term(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let coef = f1(args);
     let exps = b44_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let total_exp: f64 = exps.iter().sum();
@@ -15,7 +15,7 @@ fn builtin_cas_simplify_term(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Expand two terms (a + b)·(c + d) → ac + ad + bc + bd, return scalar product
-fn builtin_cas_expand_two_terms(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_expand_two_terms(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -24,7 +24,7 @@ fn builtin_cas_expand_two_terms(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Factor quadratic ax² + bx + c → discriminant
-fn builtin_cas_factor_quadratic(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_factor_quadratic(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -32,7 +32,7 @@ fn builtin_cas_factor_quadratic(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Partial fraction simple step: P(x)/Q(x) → A/(x - r)
-fn builtin_cas_partial_fraction_simple(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_partial_fraction_simple(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p_at_r = f1(args);
     let q_prime_at_r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if q_prime_at_r == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
@@ -40,7 +40,7 @@ fn builtin_cas_partial_fraction_simple(args: &[StrykeValue]) -> PerlResult<Stryk
 }
 
 /// Polynomial GCD step (subresultant)
-fn builtin_cas_polynomial_gcd_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_polynomial_gcd_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if b == 0.0 { return Ok(StrykeValue::float(a.abs())); }
@@ -48,7 +48,7 @@ fn builtin_cas_polynomial_gcd_step(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Polynomial division step: leading coefficient of remainder
-fn builtin_cas_polynomial_div_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_polynomial_div_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p_lead = f1(args);
     let q_lead = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if q_lead == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -56,7 +56,7 @@ fn builtin_cas_polynomial_div_step(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Lagrange interpolate at x given (xᵢ, yᵢ)
-fn builtin_cas_lagrange_interpolate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_lagrange_interpolate(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs = b44_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let ys = b44_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let x = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -77,7 +77,7 @@ fn builtin_cas_lagrange_interpolate(args: &[StrykeValue]) -> PerlResult<StrykeVa
 }
 
 /// Chebyshev T_n(x)
-fn builtin_cas_chebyshev_eval(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_chebyshev_eval(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     let x = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if n == 0 { return Ok(StrykeValue::float(1.0)); }
@@ -93,7 +93,7 @@ fn builtin_cas_chebyshev_eval(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Legendre P_n(x)
-fn builtin_cas_legendre_eval(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_legendre_eval(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     let x = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if n == 0 { return Ok(StrykeValue::float(1.0)); }
@@ -109,7 +109,7 @@ fn builtin_cas_legendre_eval(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Hermite H_n(x) physicist's
-fn builtin_cas_hermite_eval(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_hermite_eval(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     let x = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if n == 0 { return Ok(StrykeValue::float(1.0)); }
@@ -125,7 +125,7 @@ fn builtin_cas_hermite_eval(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Laguerre L_n(x)
-fn builtin_cas_laguerre_eval(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_laguerre_eval(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     let x = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if n == 0 { return Ok(StrykeValue::float(1.0)); }
@@ -141,7 +141,7 @@ fn builtin_cas_laguerre_eval(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Jacobi P_n^{α,β}(x) — α=β=0 reduces to Legendre
-fn builtin_cas_jacobi_eval(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_jacobi_eval(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let beta = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -163,7 +163,7 @@ fn builtin_cas_jacobi_eval(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Gegenbauer C_n^α(x): satisfies (1-x²)y'' - (2α+1)xy' + n(n+2α)y = 0
-fn builtin_cas_gegenbauer_eval(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_gegenbauer_eval(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
     let x = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -180,7 +180,7 @@ fn builtin_cas_gegenbauer_eval(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Taylor coefficient a_n = f^(n)(0) / n!
-fn builtin_cas_taylor_coefficient(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_taylor_coefficient(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let f_n = f1(args);
     let n = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0).max(0);
     let mut fact = 1_i64;
@@ -190,7 +190,7 @@ fn builtin_cas_taylor_coefficient(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Diagonal Padé approximant value at x: (1 + a₁x + ...)/(1 + b₁x + ...)
-fn builtin_cas_padé_diagonal(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_padé_diagonal(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let num = f1(args);
     let den = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if den == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
@@ -198,7 +198,7 @@ fn builtin_cas_padé_diagonal(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Continued fraction step a_n + 1/(a_{n-1} + 1/...)
-fn builtin_cas_continued_fraction_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_continued_fraction_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a_n = f1(args);
     let inner = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if inner == 0.0 { return Ok(StrykeValue::float(a_n)); }
@@ -206,7 +206,7 @@ fn builtin_cas_continued_fraction_step(args: &[StrykeValue]) -> PerlResult<Stryk
 }
 
 /// Resultant of two polynomials (Sylvester determinant) for degree-1 × degree-1: a₁b₀ - a₀b₁
-fn builtin_cas_resultant_two(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_resultant_two(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a0 = f1(args);
     let a1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let b0 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -215,18 +215,18 @@ fn builtin_cas_resultant_two(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Subresultant scalar
-fn builtin_cas_subresultant_two(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_subresultant_two(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_cas_resultant_two(args)
 }
 
 /// Gröbner leading-term step (lex order)
-fn builtin_cas_groebner_lt_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_groebner_lt_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = b44_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     Ok(StrykeValue::float(v.iter().cloned().fold(f64::NEG_INFINITY, f64::max)))
 }
 
 /// Buchberger S-poly step: lcm/lt(f) · g - lcm/lt(g) · f
-fn builtin_cas_buchberger_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_buchberger_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lt_f = f1(args);
     let lt_g = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if lt_f == 0.0 || lt_g == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -234,7 +234,7 @@ fn builtin_cas_buchberger_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Macaulay matrix step: monomial multiplied count
-fn builtin_cas_macaulay_matrix_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_macaulay_matrix_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let d = i1(args);
     let n = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
     let mut bin = 1_i64;
@@ -243,7 +243,7 @@ fn builtin_cas_macaulay_matrix_step(args: &[StrykeValue]) -> PerlResult<StrykeVa
 }
 
 /// Modular inverse via extended Euclidean
-fn builtin_cas_modular_inverse(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_modular_inverse(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = i1(args);
     let m = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
     let mut t = 0_i64;
@@ -262,7 +262,7 @@ fn builtin_cas_modular_inverse(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Extended Euclidean step: (g, x, y) such that ax + by = g
-fn builtin_cas_extended_euclid_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_extended_euclid_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = i1(args);
     let b = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     let mut x0 = 1_i64;
@@ -282,7 +282,7 @@ fn builtin_cas_extended_euclid_step(args: &[StrykeValue]) -> PerlResult<StrykeVa
 }
 
 /// Smith normal form step (2x2 only): swap minor + invariant factors
-fn builtin_cas_smith_normal_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_smith_normal_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = i1(args);
     let d = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
     let mut x = a.abs();
@@ -298,7 +298,7 @@ fn builtin_cas_smith_normal_step(args: &[StrykeValue]) -> PerlResult<StrykeValue
 ///   2. apply column op so column 1 becomes (g, 0)ᵀ; reduce above-diagonal entry.
 ///
 /// Returns the upper-left HNF entry g. Args: a, c.
-fn builtin_cas_hermite_normal_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_hermite_normal_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = i1(args);
     let c = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     let mut x = a.abs();
@@ -310,7 +310,7 @@ fn builtin_cas_hermite_normal_step(args: &[StrykeValue]) -> PerlResult<StrykeVal
 /// Radical simplification of √n: factor out the largest perfect square so that
 /// √n = a · √b with b square-free. Returns the front coefficient a (so b = n / a²).
 /// Args: positive integer n.
-fn builtin_cas_radical_simplify(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_radical_simplify(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut n = i1(args).max(0);
     if n < 2 { return Ok(StrykeValue::integer(if n == 0 { 0 } else { 1 })); }
     let mut a = 1_i64;
@@ -326,7 +326,7 @@ fn builtin_cas_radical_simplify(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Minimal polynomial value at x
-fn builtin_cas_minimal_polynomial(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_minimal_polynomial(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let coefs = b44_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let s: f64 = coefs.iter().enumerate().map(|(i, c)| c * x.powi(i as i32)).sum();
@@ -334,17 +334,17 @@ fn builtin_cas_minimal_polynomial(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// GCD of polynomial step (Euclidean recursion on coefficient arrays)
-fn builtin_cas_gcd_polynomial_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_gcd_polynomial_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_cas_polynomial_gcd_step(args)
 }
 
 /// Bivariate resultant Res_y(f, g)
-fn builtin_cas_resultant_x_y(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_resultant_x_y(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_cas_resultant_two(args)
 }
 
 /// Solve linear ax + b = 0
-fn builtin_cas_solve_linear(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_solve_linear(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if a == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
@@ -352,7 +352,7 @@ fn builtin_cas_solve_linear(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Solve quadratic ax² + bx + c (returns positive root)
-fn builtin_cas_solve_quadratic(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_solve_quadratic(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -363,7 +363,7 @@ fn builtin_cas_solve_quadratic(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Solve cubic ax³ + bx² + cx + d (Cardano, real root)
-fn builtin_cas_solve_cubic(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_solve_cubic(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -382,7 +382,7 @@ fn builtin_cas_solve_cubic(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Solve quartic (Ferrari, real root or NaN)
-fn builtin_cas_solve_quartic(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_solve_quartic(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if a == 0.0 { return Ok(StrykeValue::float(f64::NAN)); }
@@ -390,7 +390,7 @@ fn builtin_cas_solve_quartic(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Solve polynomial degree n via Aberth-Newton (single iteration)
-fn builtin_cas_solve_polynomial_n(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_solve_polynomial_n(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p_x = f1(args);
     let pp_x = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let x = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -399,20 +399,20 @@ fn builtin_cas_solve_polynomial_n(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Root isolation step (bisection halving)
-fn builtin_cas_root_isolate_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_root_isolate_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lo = f1(args);
     let hi = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float((lo + hi) / 2.0))
 }
 
 /// Sturm sequence step: -rem(p, q)
-fn builtin_cas_sturm_sequence_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_sturm_sequence_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = f1(args);
     Ok(StrykeValue::float(-r))
 }
 
 /// Descartes' rule of signs count
-fn builtin_cas_descartes_rule_count(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_descartes_rule_count(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let coefs = b44_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let mut sign_changes = 0_i64;
     let mut prev: Option<f64> = None;
@@ -426,7 +426,7 @@ fn builtin_cas_descartes_rule_count(args: &[StrykeValue]) -> PerlResult<StrykeVa
 }
 
 /// Companion matrix root (return abs of leading coefficient ratio)
-fn builtin_cas_companion_matrix_root(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_companion_matrix_root(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let last = f1(args);
     let lead = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if lead == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -439,7 +439,7 @@ fn builtin_cas_companion_matrix_root(args: &[StrykeValue]) -> PerlResult<StrykeV
 ///   x_{k+1} = x_k − p(x_k) / [p'(x_k) − p''(x_k)·p(x_k) / (2·p'(x_k))]
 /// (Halley's third-order step; Kahan recommends this when p' is small).
 /// Distinct from naive Newton (solve_polynomial_n). Args: p_x, pp_x, ppp_x, x.
-fn builtin_cas_polynomial_roots_kahan(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_polynomial_roots_kahan(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = f1(args);
     let pp = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let ppp = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -450,7 +450,7 @@ fn builtin_cas_polynomial_roots_kahan(args: &[StrykeValue]) -> PerlResult<Stryke
 }
 
 /// Inverse iteration for eigenvalue
-fn builtin_cas_eigenvalue_inverse_iteration(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_eigenvalue_inverse_iteration(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mu_old = f1(args);
     let r_norm = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let q_norm = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -459,14 +459,14 @@ fn builtin_cas_eigenvalue_inverse_iteration(args: &[StrykeValue]) -> PerlResult<
 }
 
 /// QR iteration step for eigenvalues
-fn builtin_cas_qr_iteration_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_qr_iteration_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r_kk = f1(args);
     let q_kk = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(r_kk * q_kk))
 }
 
 /// Jacobi eigen step (rotation angle)
-fn builtin_cas_jacobi_eigen_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_jacobi_eigen_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a_pp = f1(args);
     let a_qq = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let a_pq = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -476,19 +476,19 @@ fn builtin_cas_jacobi_eigen_step(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 /// Lanczos iteration step
-fn builtin_cas_lanczos_iteration_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_lanczos_iteration_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let alpha = f1(args);
     let beta = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(alpha + beta))
 }
 
 /// Arnoldi iteration step
-fn builtin_cas_arnoldi_iteration_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_arnoldi_iteration_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_cas_lanczos_iteration_step(args)
 }
 
 /// Givens rotation apply: c·a + s·b, -s·a + c·b
-fn builtin_cas_givens_rotation_apply(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_givens_rotation_apply(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -497,7 +497,7 @@ fn builtin_cas_givens_rotation_apply(args: &[StrykeValue]) -> PerlResult<StrykeV
 }
 
 /// Householder reflection: H = I - 2vv^T/(v^Tv); return scalar a' = a - 2(v^Ta)/v^Tv · v_first
-fn builtin_cas_householder_reflection(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_householder_reflection(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let v = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let v_dot_a = args.get(2).map(|v| v.to_number()).unwrap_or(a * v);
@@ -507,7 +507,7 @@ fn builtin_cas_householder_reflection(args: &[StrykeValue]) -> PerlResult<Stryke
 }
 
 /// Modified Gram-Schmidt step
-fn builtin_cas_modified_gram_schmidt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_modified_gram_schmidt(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = f1(args);
     let q_dot_v = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let q = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -519,7 +519,7 @@ fn builtin_cas_modified_gram_schmidt(args: &[StrykeValue]) -> PerlResult<StrykeV
 /// (which subtracts sequentially after each q_i). The step coefficient is
 ///   c_i = q_iᵀ · a_k_original (NOT against the running update).
 /// Args: a_k_original, q_i, prev_dot_already_subtracted (running residual).
-fn builtin_cas_classical_gram_schmidt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_classical_gram_schmidt(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a_orig = f1(args);
     let q_i = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let running = args.get(2).map(|v| v.to_number()).unwrap_or(a_orig);
@@ -532,7 +532,7 @@ fn builtin_cas_classical_gram_schmidt(args: &[StrykeValue]) -> PerlResult<Stryke
 /// entries with |R_ii| > τ · |R_11|, where τ is a tolerance. Returns the
 /// estimated numerical rank. Args: array of |R_ii| values (any order),
 /// tolerance τ (default machine eps · n).
-fn builtin_cas_rank_revealing_qr(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_rank_revealing_qr(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut diag: Vec<f64> = arg_to_vec(args.first().unwrap_or(&StrykeValue::array(vec![])))
         .iter().map(|x| x.to_number().abs()).collect();
     if diag.is_empty() { return Ok(StrykeValue::integer(0)); }
@@ -544,7 +544,7 @@ fn builtin_cas_rank_revealing_qr(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 /// Pivoted LU step (return pivot)
-fn builtin_cas_pivoted_lu_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_pivoted_lu_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = b44_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let mut best = 0.0_f64;
     for &x in &v { if x.abs() > best.abs() { best = x; } }
@@ -552,13 +552,13 @@ fn builtin_cas_pivoted_lu_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Block LU step: largest block determinant
-fn builtin_cas_block_lu_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_block_lu_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let det = f1(args);
     Ok(StrykeValue::float(det))
 }
 
 /// Cholesky step: L_ii = √(A_ii - Σ L_ik²)
-fn builtin_cas_cholesky_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_cholesky_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a_ii = f1(args);
     let sum_sq = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let val = a_ii - sum_sq;
@@ -571,7 +571,7 @@ fn builtin_cas_cholesky_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 ///   d_jj = max( |a_jj − Σ L_jk² · d_kk|, max_off² / β², δ ),
 /// with β = (max_diag/n)¹ᐟ², δ small. Distinct from plain Cholesky (which fails
 /// on indefinite A). Args: a_jj, sum_lk_sq_d, max_off, β, δ.
-fn builtin_cas_modified_cholesky(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_modified_cholesky(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a_jj = f1(args);
     let sum_lk_sq_d = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let max_off = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -583,7 +583,7 @@ fn builtin_cas_modified_cholesky(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 /// LDL^T step: D_ii = A_ii - Σ L_ik² D_kk
-fn builtin_cas_ldlt_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_ldlt_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a_ii = f1(args);
     let sum_sq_d = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(a_ii - sum_sq_d))
@@ -598,7 +598,7 @@ fn builtin_cas_ldlt_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 ///   else: 2×2 pivot
 /// Distinct from pivoted LU (asymmetric, simpler max-abs). Returns pivot type
 /// (1 = 1×1, 2 = 2×2). Args: a_jj, λ_j, σ_j, a_{j+1,j+1}.
-fn builtin_cas_bunch_kaufman_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_bunch_kaufman_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a_jj = f1(args).abs();
     let lam = args.get(1).map(|v| v.to_number().abs()).unwrap_or(0.0);
     let sig = args.get(2).map(|v| v.to_number().abs()).unwrap_or(0.0);
@@ -611,7 +611,7 @@ fn builtin_cas_bunch_kaufman_step(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Woodbury identity: (A + UCV)⁻¹ = A⁻¹ - A⁻¹U(C⁻¹ + VA⁻¹U)⁻¹VA⁻¹
-fn builtin_cas_woodbury_identity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_woodbury_identity(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a_inv = f1(args);
     let u = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let c = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -622,7 +622,7 @@ fn builtin_cas_woodbury_identity(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 /// Matrix pencil step (A - λB)
-fn builtin_cas_matrix_pencil_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_matrix_pencil_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let lambda = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -630,7 +630,7 @@ fn builtin_cas_matrix_pencil_step(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Generalized eigenvalue step: λ = (Ax)/(Bx)
-fn builtin_cas_generalized_eigen(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_generalized_eigen(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a_x = f1(args);
     let b_x = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if b_x == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
@@ -638,13 +638,13 @@ fn builtin_cas_generalized_eigen(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 /// Singular value step from Bidiagonal: σ = √(λ(B^T B))
-fn builtin_cas_singular_value_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_singular_value_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lambda = f1(args);
     Ok(StrykeValue::float(lambda.max(0.0).sqrt()))
 }
 
 /// Truncated SVD value: keep top-k σ
-fn builtin_cas_truncated_svd_value(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_truncated_svd_value(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut sigmas = b44_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let k = args.get(1).map(|v| v.to_number() as usize).unwrap_or(1);
     sigmas.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
@@ -652,7 +652,7 @@ fn builtin_cas_truncated_svd_value(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Pseudoinverse step: A⁺ = V Σ⁺ U^T → return scaling
-fn builtin_cas_pseudoinverse_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_pseudoinverse_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let sigma = f1(args);
     let tol = args.get(1).map(|v| v.to_number()).unwrap_or(1e-10);
     if sigma.abs() <= tol { return Ok(StrykeValue::float(0.0)); }
@@ -660,24 +660,24 @@ fn builtin_cas_pseudoinverse_step(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Polar decomposition: A = UP, return P_value
-fn builtin_cas_polar_decomposition(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_polar_decomposition(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     Ok(StrykeValue::float(a.abs()))
 }
 
 /// Schur decomposition step
-fn builtin_cas_schur_decomposition_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_schur_decomposition_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lambda = f1(args);
     Ok(StrykeValue::float(lambda))
 }
 
 /// Quasi-triangular form (real Schur)
-fn builtin_cas_quasi_triangular(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_quasi_triangular(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_cas_schur_decomposition_step(args)
 }
 
 /// Riccati (continuous): A^TX + XA - XBR⁻¹B^TX + Q = 0 → solve scalar form
-fn builtin_cas_riccati_continuous_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_riccati_continuous_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let q = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -693,7 +693,7 @@ fn builtin_cas_riccati_continuous_step(args: &[StrykeValue]) -> PerlResult<Stryk
 /// fixed-point iteration: solve the quadratic in X.
 ///   X = (AᵀXA − A²X²B²/(R + B²X) + Q).
 /// One Newton-style update on the residual. Args: A, B, Q, R, X_prev.
-fn builtin_cas_riccati_discrete_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_riccati_discrete_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let q = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -705,7 +705,7 @@ fn builtin_cas_riccati_discrete_step(args: &[StrykeValue]) -> PerlResult<StrykeV
 }
 
 /// Lyapunov continuous: AX + XA^T + Q = 0 → X = -Q/(2A)
-fn builtin_cas_lyapunov_continuous_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_lyapunov_continuous_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let q = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if a == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
@@ -713,7 +713,7 @@ fn builtin_cas_lyapunov_continuous_step(args: &[StrykeValue]) -> PerlResult<Stry
 }
 
 /// Lyapunov discrete: AX A^T - X + Q = 0 → X = Q/(1 - A²)
-fn builtin_cas_lyapunov_discrete_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_lyapunov_discrete_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let q = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if (1.0 - a * a).abs() < 1e-12 { return Ok(StrykeValue::float(f64::INFINITY)); }
@@ -721,7 +721,7 @@ fn builtin_cas_lyapunov_discrete_step(args: &[StrykeValue]) -> PerlResult<Stryke
 }
 
 /// Sylvester equation: AX + XB + Q = 0 → X = -Q/(A + B)
-fn builtin_cas_sylvester_equation_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_sylvester_equation_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let q = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -730,7 +730,7 @@ fn builtin_cas_sylvester_equation_step(args: &[StrykeValue]) -> PerlResult<Stryk
 }
 
 /// Kronecker product step: (A ⊗ B)_{(i,j),(k,l)} = A_ik B_jl
-fn builtin_cas_kronecker_product_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_kronecker_product_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(a * b))
@@ -738,7 +738,7 @@ fn builtin_cas_kronecker_product_step(args: &[StrykeValue]) -> PerlResult<Stryke
 
 /// vec(A): column-stacking of an n×m matrix into an nm-vector. Args: row-major
 /// flat matrix, n_rows. Return value at requested vec-index.
-fn builtin_cas_vec_operator_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_vec_operator_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m = b44_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let rows = args.get(1).map(|v| v.to_number() as usize).unwrap_or(1).max(1);
     let idx = args.get(2).map(|v| v.to_number() as usize).unwrap_or(0);
@@ -750,14 +750,14 @@ fn builtin_cas_vec_operator_step(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 /// Matrix function step f(A) via spectral decomposition
-fn builtin_cas_matrix_function_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_matrix_function_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lambda = f1(args);
     let f_lambda = args.get(1).map(|v| v.to_number()).unwrap_or(lambda);
     Ok(StrykeValue::float(f_lambda))
 }
 
 /// Matrix log step: log(A) → log(λ_i)
-fn builtin_cas_matrix_log_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_matrix_log_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lambda = f1(args);
     if lambda <= 0.0 { return Ok(StrykeValue::float(f64::NAN)); }
     Ok(StrykeValue::float(lambda.ln()))
@@ -770,7 +770,7 @@ fn builtin_cas_matrix_log_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 ///   b = [1, 1/2, 5/44, 1/66, 1/792, 1/15840, 1/665280].
 /// Distinct from naive .exp() — works on a matrix (here scalar) and is the
 /// inner kernel of scaling-and-squaring. Args: x.
-fn builtin_cas_matrix_exp_pade(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_matrix_exp_pade(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let b = [1.0_f64, 1.0/2.0, 5.0/44.0, 1.0/66.0, 1.0/792.0, 1.0/15840.0, 1.0/665280.0];
     let mut p = 0.0_f64;
@@ -786,26 +786,26 @@ fn builtin_cas_matrix_exp_pade(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Matrix sqrt step: √λ
-fn builtin_cas_matrix_sqrt_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_matrix_sqrt_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lambda = f1(args);
     if lambda < 0.0 { return Ok(StrykeValue::float(f64::NAN)); }
     Ok(StrykeValue::float(lambda.sqrt()))
 }
 
 /// Drazin inverse step (for singular matrix index 1): A^D = A⁻¹ except null space
-fn builtin_cas_drazin_inverse_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_drazin_inverse_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lambda = f1(args);
     if lambda.abs() < 1e-12 { return Ok(StrykeValue::float(0.0)); }
     Ok(StrykeValue::float(1.0 / lambda))
 }
 
 /// Moore-Penrose step (1/σ for nonzero σ)
-fn builtin_cas_moore_penrose_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_moore_penrose_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_cas_pseudoinverse_step(args)
 }
 
 /// Least squares solve: x = (A^TA)⁻¹A^Tb scalar form
-fn builtin_cas_least_squares_solve(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_least_squares_solve(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ata = f1(args);
     let atb = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if ata == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
@@ -813,7 +813,7 @@ fn builtin_cas_least_squares_solve(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Total least squares (errors-in-variables) step
-fn builtin_cas_total_least_squares(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_total_least_squares(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xy = f1(args);
     let xx_yy = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if xx_yy == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -821,21 +821,21 @@ fn builtin_cas_total_least_squares(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Constrained least squares (KKT scalar)
-fn builtin_cas_constrained_ls_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_constrained_ls_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lambda = f1(args);
     let g = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(lambda * g))
 }
 
 /// Truncated LSQ (regularization by truncation)
-fn builtin_cas_truncated_lsq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_truncated_lsq(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let sigma = f1(args);
     let tol = args.get(1).map(|v| v.to_number()).unwrap_or(1e-10);
     Ok(StrykeValue::float(if sigma.abs() > tol { sigma } else { 0.0 }))
 }
 
 /// Tikhonov regularized LSQ: x = (A^TA + λI)⁻¹A^Tb
-fn builtin_cas_regularized_lsq_tikhonov(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_regularized_lsq_tikhonov(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ata = f1(args);
     let atb = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let lambda = args.get(2).map(|v| v.to_number()).unwrap_or(1e-3);
@@ -849,14 +849,14 @@ fn builtin_cas_regularized_lsq_tikhonov(args: &[StrykeValue]) -> PerlResult<Stry
 ///   s.t. A(x⁺ − x⁻) = b,  x⁺, x⁻ ≥ 0.
 /// Returns the ℓ₁ objective value Σ |x_i| of the current iterate. Args: array
 /// of x components.
-fn builtin_cas_basis_pursuit_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_basis_pursuit_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = arg_to_vec(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let s: f64 = v.iter().map(|x| x.to_number().abs()).sum();
     Ok(StrykeValue::float(s))
 }
 
 /// Lasso soft threshold: sign(x)·max(|x| - λ, 0)
-fn builtin_cas_lasso_soft_threshold(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_lasso_soft_threshold(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let lambda = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let mag = (x.abs() - lambda).max(0.0);
@@ -864,7 +864,7 @@ fn builtin_cas_lasso_soft_threshold(args: &[StrykeValue]) -> PerlResult<StrykeVa
 }
 
 /// Elastic net step: λ₁ |x| + λ₂ x²/2
-fn builtin_cas_elastic_net_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_elastic_net_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let lambda1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let lambda2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -872,7 +872,7 @@ fn builtin_cas_elastic_net_step(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Orthogonal Matching Pursuit step (greedy correlation)
-fn builtin_cas_omp_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_omp_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = b44_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let mut best = (0_usize, f64::NEG_INFINITY);
     for (i, &x) in v.iter().enumerate() {
@@ -882,7 +882,7 @@ fn builtin_cas_omp_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Iterative Hard Thresholding step
-fn builtin_cas_iht_iteration(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_iht_iteration(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let threshold = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(if x.abs() > threshold { x } else { 0.0 }))
@@ -894,7 +894,7 @@ fn builtin_cas_iht_iteration(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// Distinct from IHT (which merely thresholds the gradient step). Returns the
 /// pruned-support coefficient given correlations and current K. Args:
 /// correlations (|Aᵀr| values sorted desc), K (sparsity).
-fn builtin_cas_cosamp_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_cosamp_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let cors = arg_to_vec(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let k = args.get(1).map(|v| v.to_number() as usize).unwrap_or(1).max(1);
     if cors.is_empty() { return Ok(StrykeValue::float(0.0)); }
@@ -911,7 +911,7 @@ fn builtin_cas_cosamp_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 ///   u ← u + (x − z)
 /// Returns the new x, given pre-computed (AᵀA + ρI)⁻¹·(Aᵀb + ρ(z−u)) input.
 /// Args: ρ_inv_term, prev_z, prev_u, λ_over_rho.
-fn builtin_cas_admm_lasso_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_admm_lasso_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let rho_inv = f1(args);
     let z = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let u = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -924,26 +924,26 @@ fn builtin_cas_admm_lasso_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Proximal ℓ₁: soft threshold
-fn builtin_cas_proximal_l1_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_proximal_l1_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_cas_lasso_soft_threshold(args)
 }
 
 /// Proximal ℓ₂²: x / (1 + λ)
-fn builtin_cas_proximal_l2_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_proximal_l2_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let lambda = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(x / (1.0 + lambda)))
 }
 
 /// Proximal ℓ_∞: clip
-fn builtin_cas_proximal_l_inf_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_proximal_l_inf_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(x.clamp(-r, r)))
 }
 
 /// Project onto simplex
-fn builtin_cas_indicator_simplex_proj(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_indicator_simplex_proj(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = b44_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let n = v.len();
     if n == 0 { return Ok(StrykeValue::float(0.0)); }
@@ -952,14 +952,14 @@ fn builtin_cas_indicator_simplex_proj(args: &[StrykeValue]) -> PerlResult<Stryke
 }
 
 /// Project onto ℓ₁ ball of radius r
-fn builtin_cas_proj_l1_ball(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_proj_l1_ball(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(if x.abs() <= r { x } else { x.signum() * r }))
 }
 
 /// Project onto ℓ₂ ball
-fn builtin_cas_proj_l2_ball(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_proj_l2_ball(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = b44_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let norm = v.iter().map(|x| x * x).sum::<f64>().sqrt();
@@ -968,7 +968,7 @@ fn builtin_cas_proj_l2_ball(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Project onto box [l, u]
-fn builtin_cas_proj_box(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_proj_box(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let l = args.get(1).map(|v| v.to_number()).unwrap_or(f64::NEG_INFINITY);
     let u = args.get(2).map(|v| v.to_number()).unwrap_or(f64::INFINITY);
@@ -976,13 +976,13 @@ fn builtin_cas_proj_box(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Project onto PSD cone (truncate negative eigenvalues)
-fn builtin_cas_proj_psd_cone(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_proj_psd_cone(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lambda = f1(args);
     Ok(StrykeValue::float(lambda.max(0.0)))
 }
 
 /// Project onto SOC (second-order cone): Σx_i² ≤ t²
-fn builtin_cas_proj_soc_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_proj_soc_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x_norm = f1(args);
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if x_norm <= t { return Ok(StrykeValue::float(t)); }
@@ -992,7 +992,7 @@ fn builtin_cas_proj_soc_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Project (x, y, z) onto K_exp = closure{(x, y, z) : y > 0, y·exp(x/y) ≤ z}.
 /// 4 cases: in cone (return z), in dual {-ln-cone}, origin region, boundary one-step.
-fn builtin_cas_proj_exp_cone(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_proj_exp_cone(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let z = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -1006,25 +1006,25 @@ fn builtin_cas_proj_exp_cone(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Dykstra's projection step
-fn builtin_cas_dykstra_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_dykstra_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let p = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(x + p))
 }
 
 /// Alternating projection step
-fn builtin_cas_alternating_projection(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_alternating_projection(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_cas_dykstra_step(args)
 }
 
 /// Pólya enumeration: 1/|G| Σ |Fix(g)|
-fn builtin_cas_polya_enumeration_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_polya_enumeration_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = b44_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     if v.is_empty() { return Ok(StrykeValue::float(0.0)); }
     Ok(StrykeValue::float(v.iter().sum::<f64>() / v.len() as f64))
 }
 
 /// Burnside lemma: |X/G| = (1/|G|) Σ |Fix(g)|
-fn builtin_cas_burnside_count_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cas_burnside_count_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_cas_polya_enumeration_step(args)
 }

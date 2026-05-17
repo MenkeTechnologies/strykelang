@@ -5,7 +5,7 @@ fn builtin_boole_rule(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -30,7 +30,7 @@ fn builtin_gauss_legendre_5(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(-1.0);
     let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -63,7 +63,7 @@ fn builtin_gauss_kronrod_15(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(-1.0);
     let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -147,7 +147,7 @@ fn builtin_midpoint_rule(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -166,7 +166,7 @@ fn builtin_adams_bashforth_4(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let y0 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let t0 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -175,7 +175,7 @@ fn builtin_adams_bashforth_4(
     let h = (t_end - t0) / n as f64;
     let mut ts = vec![t0];
     let mut ys = vec![y0];
-    let f_call = |interp: &mut VMHelper, t: f64, y: f64| -> PerlResult<f64> {
+    let f_call = |interp: &mut VMHelper, t: f64, y: f64| -> StrykeResult<f64> {
         let sub = f
             .as_code_ref()
             .ok_or_else(|| StrykeError::runtime("expected code ref", line))?;
@@ -222,7 +222,7 @@ fn builtin_heun_method(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let y0 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let t0 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -232,7 +232,7 @@ fn builtin_heun_method(
     let mut ys = vec![y0];
     let mut t = t0;
     let mut y = y0;
-    let f_call = |interp: &mut VMHelper, t: f64, y: f64| -> PerlResult<f64> {
+    let f_call = |interp: &mut VMHelper, t: f64, y: f64| -> StrykeResult<f64> {
         let sub = f
             .as_code_ref()
             .ok_or_else(|| StrykeError::runtime("expected code ref", line))?;
@@ -264,14 +264,14 @@ fn builtin_rk45_cash_karp(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let mut y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let mut t = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
     let t_end = args.get(3).map(|v| v.to_number()).unwrap_or(1.0);
     let mut h = args.get(4).map(|v| v.to_number()).unwrap_or(0.01);
     let tol = args.get(5).map(|v| v.to_number()).unwrap_or(1e-6);
-    let f_call = |interp: &mut VMHelper, t: f64, y: f64| -> PerlResult<f64> {
+    let f_call = |interp: &mut VMHelper, t: f64, y: f64| -> StrykeResult<f64> {
         let sub = f
             .as_code_ref()
             .ok_or_else(|| StrykeError::runtime("expected code ref", line))?;
@@ -337,14 +337,14 @@ fn builtin_milne_pc(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let y0 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let t0 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
     let t_end = args.get(3).map(|v| v.to_number()).unwrap_or(1.0);
     let n = args.get(4).map(|v| v.to_number() as usize).unwrap_or(100).max(4);
     let h = (t_end - t0) / n as f64;
-    let f_call = |interp: &mut VMHelper, t: f64, y: f64| -> PerlResult<f64> {
+    let f_call = |interp: &mut VMHelper, t: f64, y: f64| -> StrykeResult<f64> {
         let sub = f
             .as_code_ref()
             .ok_or_else(|| StrykeError::runtime("expected code ref", line))?;
@@ -392,13 +392,13 @@ fn builtin_modified_midpoint_ode(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let y0 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let t0 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
     let h_total = args.get(3).map(|v| v.to_number()).unwrap_or(0.1);
     let n = args.get(4).map(|v| v.to_number() as usize).unwrap_or(20).max(2);
-    let f_call = |interp: &mut VMHelper, t: f64, y: f64| -> PerlResult<f64> {
+    let f_call = |interp: &mut VMHelper, t: f64, y: f64| -> StrykeResult<f64> {
         let sub = f
             .as_code_ref()
             .ok_or_else(|| StrykeError::runtime("expected code ref", line))?;
@@ -433,14 +433,14 @@ fn builtin_backward_euler(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let y0 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let t0 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
     let t_end = args.get(3).map(|v| v.to_number()).unwrap_or(1.0);
     let n = args.get(4).map(|v| v.to_number() as usize).unwrap_or(100).max(1);
     let h = (t_end - t0) / n as f64;
-    let f_call = |interp: &mut VMHelper, t: f64, y: f64| -> PerlResult<f64> {
+    let f_call = |interp: &mut VMHelper, t: f64, y: f64| -> StrykeResult<f64> {
         let sub = f
             .as_code_ref()
             .ok_or_else(|| StrykeError::runtime("expected code ref", line))?;
@@ -479,14 +479,14 @@ fn builtin_crank_nicolson_ode(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let y0 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let t0 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
     let t_end = args.get(3).map(|v| v.to_number()).unwrap_or(1.0);
     let n = args.get(4).map(|v| v.to_number() as usize).unwrap_or(100).max(1);
     let h = (t_end - t0) / n as f64;
-    let f_call = |interp: &mut VMHelper, t: f64, y: f64| -> PerlResult<f64> {
+    let f_call = |interp: &mut VMHelper, t: f64, y: f64| -> StrykeResult<f64> {
         let sub = f
             .as_code_ref()
             .ok_or_else(|| StrykeError::runtime("expected code ref", line))?;
@@ -524,7 +524,7 @@ fn builtin_brent_root(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let mut a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let mut b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -586,7 +586,7 @@ fn builtin_ridders_root(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let mut a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let mut b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -629,7 +629,7 @@ fn builtin_ridders_root(
 }
 
 // Anderson acceleration step (1-D Aitken-like)
-fn builtin_anderson_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_anderson_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let (x0, x1, x2) = f3(args);
     let denom = x2 - 2.0 * x1 + x0;
     if denom.abs() < 1e-15 {
@@ -643,7 +643,7 @@ fn builtin_steffensen_root(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let mut x = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let tol = args.get(2).map(|v| v.to_number()).unwrap_or(1e-10);
@@ -667,7 +667,7 @@ fn builtin_halley_root(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let df = args.get(1).cloned().unwrap_or(StrykeValue::UNDEF);
     let ddf = args.get(2).cloned().unwrap_or(StrykeValue::UNDEF);
@@ -694,12 +694,12 @@ fn builtin_householder_root(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     builtin_halley_root(interp, args, line)
 }
 
 // Aberth-Ehrlich step (single root iteration for poly)
-fn builtin_aberth_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_aberth_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let fs: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
@@ -730,7 +730,7 @@ fn builtin_muller_root(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let mut x0 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let mut x1 = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
@@ -764,7 +764,7 @@ fn builtin_regula_falsi(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let mut a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let mut b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -788,7 +788,7 @@ fn builtin_secant_root(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let f = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let mut x0 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let mut x1 = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -806,7 +806,7 @@ fn builtin_secant_root(
 }
 
 // Inverse quadratic interpolation step
-fn builtin_inverse_quad_interp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_inverse_quad_interp(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let (x0, x1, x2) = f3(args);
     let f0 = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
     let f1 = args.get(4).map(|v| v.to_number()).unwrap_or(0.0);
@@ -820,7 +820,7 @@ fn builtin_inverse_quad_interp(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 // Levenberg-Marquardt step (1-D)
-fn builtin_lm_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lm_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = f1(args);
     let j = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let lambda = args.get(2).map(|v| v.to_number()).unwrap_or(0.001);
@@ -830,7 +830,7 @@ fn builtin_lm_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Gradient descent step (1-D)
-fn builtin_gradient_descent_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gradient_descent_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let grad = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let lr = args.get(2).map(|v| v.to_number()).unwrap_or(0.01);
@@ -842,7 +842,7 @@ fn builtin_gradient_descent_step(args: &[StrykeValue]) -> PerlResult<StrykeValue
 // RMSprop step
 
 // Nesterov momentum step
-fn builtin_nesterov_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_nesterov_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let g = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let v = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -854,7 +854,7 @@ fn builtin_nesterov_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Adagrad step
-fn builtin_adagrad_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_adagrad_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let g = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let g_acc = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -866,7 +866,7 @@ fn builtin_adagrad_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Conjugate gradient β (Polak-Ribière)
-fn builtin_cg_beta_pr(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cg_beta_pr(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let g_new = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let g_old = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     if g_old.is_empty() { return Ok(StrykeValue::float(0.0)); }
@@ -883,7 +883,7 @@ fn builtin_cg_beta_pr(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Conjugate gradient β (Fletcher-Reeves)
-fn builtin_cg_beta_fr(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cg_beta_fr(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let g_new = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let g_old = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     if g_old.is_empty() { return Ok(StrykeValue::float(0.0)); }
@@ -894,7 +894,7 @@ fn builtin_cg_beta_fr(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // BFGS approximation update step (1-D Hessian update)
-fn builtin_bfgs_h_update_1d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bfgs_h_update_1d(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let h = f1(args);
     let s = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let y = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -904,7 +904,7 @@ fn builtin_bfgs_h_update_1d(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Wolfe condition strong check
-fn builtin_wolfe_strong_q(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_wolfe_strong_q(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let f0 = f1(args);
     let f_new = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let g0 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -919,7 +919,7 @@ fn builtin_wolfe_strong_q(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Trust region step (1-D dogleg)
-fn builtin_dogleg_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_dogleg_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let g = f1(args);
     let h = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let delta = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -935,7 +935,7 @@ fn builtin_dogleg_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Nelder-Mead reflection simplex 1-D
-fn builtin_nelder_mead_reflect(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_nelder_mead_reflect(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let centroid = f1(args);
     let worst = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let alpha = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -943,7 +943,7 @@ fn builtin_nelder_mead_reflect(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 // Nelder-Mead expansion
-fn builtin_nelder_mead_expand(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_nelder_mead_expand(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let centroid = f1(args);
     let reflected = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let gamma = args.get(2).map(|v| v.to_number()).unwrap_or(2.0);
@@ -951,7 +951,7 @@ fn builtin_nelder_mead_expand(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Nelder-Mead contraction
-fn builtin_nelder_mead_contract(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_nelder_mead_contract(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let centroid = f1(args);
     let worst = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let beta = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
@@ -959,7 +959,7 @@ fn builtin_nelder_mead_contract(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 // Simulated annealing accept probability
-fn builtin_sa_accept_prob(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sa_accept_prob(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let de = f1(args);
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if de < 0.0 { return Ok(StrykeValue::float(1.0)); }
@@ -968,7 +968,7 @@ fn builtin_sa_accept_prob(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Boltzmann temperature schedule
-fn builtin_sa_boltzmann_temp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sa_boltzmann_temp(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let t0 = f1(args);
     let k = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if k <= 0.0 { return Ok(StrykeValue::float(t0)); }
@@ -976,14 +976,14 @@ fn builtin_sa_boltzmann_temp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Cauchy temperature schedule
-fn builtin_sa_cauchy_temp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sa_cauchy_temp(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let t0 = f1(args);
     let k = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(t0 / (1.0 + k)))
 }
 
 // Geometric schedule
-fn builtin_sa_geometric_temp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sa_geometric_temp(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let t0 = f1(args);
     let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(0.95);
     let k = args.get(2).map(|v| v.to_number() as i32).unwrap_or(1);
@@ -991,7 +991,7 @@ fn builtin_sa_geometric_temp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Acceptance ratio target adapter
-fn builtin_acceptance_target(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_acceptance_target(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let actual = f1(args);
     let target = args.get(1).map(|v| v.to_number()).unwrap_or(0.234);
     let step = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);

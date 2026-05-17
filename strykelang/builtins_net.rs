@@ -6,7 +6,7 @@
 //! MAC ops, port helpers, DNS resolution, and the rest of the 251 names.
 //!
 //! Naming follows the audited proposal at `/tmp/proposed_final.txt`. Every
-//! function returns a `StrykeValue` directly (no `PerlResult` wrapper) so
+//! function returns a `StrykeValue` directly (no `StrykeResult` wrapper) so
 //! the dispatch arms stay one line.
 
 use crate::value::StrykeValue;

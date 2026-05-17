@@ -1,7 +1,7 @@
 // quantum mechanics deep: density matrices, channels, entanglement, decoherence.
 
 // Pure state |ψ⟩⟨ψ| from amplitudes
-fn builtin_pure_state_density(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pure_state_density(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let amps: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let n = amps.len();
@@ -14,7 +14,7 @@ fn builtin_pure_state_density(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Trace of square matrix
 
 // Purity Tr(ρ²)
-fn builtin_purity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_purity(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let rho = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = rho.len();
     let mut sum = 0.0;
@@ -29,7 +29,7 @@ fn builtin_purity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Von Neumann entropy from eigenvalues
 
 // Linear entropy = 1 - Tr(ρ²)
-fn builtin_linear_entropy(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_linear_entropy(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let purity = builtin_purity(args)?.to_number();
     Ok(StrykeValue::float(1.0 - purity))
 }
@@ -37,7 +37,7 @@ fn builtin_linear_entropy(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Renyi entropy of order α from eigenvalues
 
 // Quantum mutual information I = S(A) + S(B) - S(AB)
-fn builtin_quantum_mutual_info(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_quantum_mutual_info(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s_a = f1(args);
     let s_b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let s_ab = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -47,7 +47,7 @@ fn builtin_quantum_mutual_info(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 // Concurrence (2-qubit pure state amplitudes a, b, c, d)
 
 // Entanglement entropy from concurrence (Wootters)
-fn builtin_eof_from_concurrence(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_eof_from_concurrence(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let c = f1(args).clamp(0.0, 1.0);
     let h = (1.0 + (1.0 - c * c).max(0.0).sqrt()) / 2.0;
     let h = h.clamp(1e-15, 1.0 - 1e-15);
@@ -56,7 +56,7 @@ fn builtin_eof_from_concurrence(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 // Bell state amplitude pattern (ψ+, ψ-, φ+, φ-) by index
-fn builtin_bell_state_index(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bell_state_index(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let idx = i1(args).rem_euclid(4);
     let s = (0.5_f64).sqrt();
     let amps = match idx {
@@ -69,7 +69,7 @@ fn builtin_bell_state_index(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // CHSH operator expectation (a, a', b, b' all in [-1,1])
-fn builtin_chsh_expectation(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_chsh_expectation(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let e_ab = f1(args);
     let e_abp = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let e_apb = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -78,12 +78,12 @@ fn builtin_chsh_expectation(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Tsirelson bound 2√2
-fn builtin_tsirelson_bound() -> PerlResult<StrykeValue> {
+fn builtin_tsirelson_bound() -> StrykeResult<StrykeValue> {
     Ok(StrykeValue::float(2.0 * (2.0_f64).sqrt()))
 }
 
 // Pauli matrix elements σ_X, σ_Y, σ_Z (one per index 1..4 = I, X, Y, Z; Y returns real-imag interleaved)
-fn builtin_pauli_real_part(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pauli_real_part(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let idx = i1(args);
     let m = match idx {
         1 => vec![vec![0.0, 1.0], vec![1.0, 0.0]],     // X
@@ -97,7 +97,7 @@ fn builtin_pauli_real_part(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Pauli σ_Y imaginary part
-fn builtin_pauli_y_imag() -> PerlResult<StrykeValue> {
+fn builtin_pauli_y_imag() -> StrykeResult<StrykeValue> {
     let m = vec![vec![0.0, -1.0], vec![1.0, 0.0]];
     Ok(StrykeValue::array(m.into_iter().map(|r|
         StrykeValue::array(r.into_iter().map(StrykeValue::float).collect())
@@ -105,7 +105,7 @@ fn builtin_pauli_y_imag() -> PerlResult<StrykeValue> {
 }
 
 // Bloch vector → density matrix (real part only since Y component imag)
-fn builtin_bloch_to_density_real(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bloch_to_density_real(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let rx = f1(args);
     let _ry = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let rz = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -119,7 +119,7 @@ fn builtin_bloch_to_density_real(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 // Bloch vector magnitude r = sqrt(rx²+ry²+rz²); pure state iff r=1
-fn builtin_bloch_purity_check(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bloch_purity_check(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let rx = f1(args);
     let ry = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let rz = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -127,7 +127,7 @@ fn builtin_bloch_purity_check(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Fidelity for pure states |⟨ψ|φ⟩|² (real amplitudes)
-fn builtin_fidelity_pure_real(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_fidelity_pure_real(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let psi: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let phi: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
@@ -137,7 +137,7 @@ fn builtin_fidelity_pure_real(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Quantum coherence (l1 norm) for diagonal-real density matrix
-fn builtin_l1_coherence(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_l1_coherence(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let rho = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let n = rho.len();
     let mut sum = 0.0;
@@ -150,14 +150,14 @@ fn builtin_l1_coherence(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Relative entropy of coherence S(ρ_diag) - S(ρ)
-fn builtin_relative_entropy_coherence(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_relative_entropy_coherence(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s_diag = f1(args);
     let s_rho = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(s_diag - s_rho))
 }
 
 // Kraus operator action on state vector — single Kraus op K|ψ⟩
-fn builtin_kraus_apply(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_kraus_apply(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let k = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let psi: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
@@ -172,7 +172,7 @@ fn builtin_kraus_apply(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Bit-flip channel probability
-fn builtin_bit_flip_prob(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bit_flip_prob(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = f1(args).clamp(0.0, 1.0);
     Ok(StrykeValue::array(vec![StrykeValue::float(1.0 - p), StrykeValue::float(p)]))
 }
@@ -181,14 +181,14 @@ fn builtin_bit_flip_prob(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // this damps the off-diagonal coherences but leaves Z invariant:
 // r' = ((1−2p)·x, (1−2p)·y, z). Returns the new Bloch components for input p.
 // Distinct from bit-flip (which preserves X and damps Y, Z).
-fn builtin_phase_flip_prob(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_phase_flip_prob(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = f1(args).clamp(0.0, 1.0);
     let f = 1.0 - 2.0 * p;
     Ok(StrykeValue::array(vec![StrykeValue::float(f), StrykeValue::float(f), StrykeValue::float(1.0)]))
 }
 
 // Depolarizing channel ρ → (1-p)ρ + p I/2
-fn builtin_depolarizing_density_2x2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_depolarizing_density_2x2(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let rho = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let p = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).clamp(0.0, 1.0);
     if rho.len() < 2 || rho[0].len() < 2 { return Ok(StrykeValue::array(vec![])); }
@@ -202,13 +202,13 @@ fn builtin_depolarizing_density_2x2(args: &[StrykeValue]) -> PerlResult<StrykeVa
 }
 
 // Amplitude damping action on |1⟩ → (1-γ)|1⟩
-fn builtin_amplitude_damping_excited(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_amplitude_damping_excited(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let gamma = f1(args).clamp(0.0, 1.0);
     Ok(StrykeValue::float(1.0 - gamma))
 }
 
 // Quantum Fisher information for parameter θ from |ψ_θ⟩, |ψ'_θ⟩ (dot products)
-fn builtin_quantum_fisher_info(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_quantum_fisher_info(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let psi_dot_psi = f1(args);
     let dpsi_dot_dpsi = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let psi_dot_dpsi = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -217,7 +217,7 @@ fn builtin_quantum_fisher_info(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 // Cramer-Rao bound from QFI
-fn builtin_cramer_rao_bound(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cramer_rao_bound(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let qfi = f1(args);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if qfi * n == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
@@ -225,27 +225,27 @@ fn builtin_cramer_rao_bound(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Squeezing parameter dB from variance ratio
-fn builtin_squeezing_db(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_squeezing_db(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let var_ratio = f1(args);
     if var_ratio <= 0.0 { return Ok(StrykeValue::float(f64::NEG_INFINITY)); }
     Ok(StrykeValue::float(10.0 * var_ratio.log10()))
 }
 
 // Heisenberg uncertainty product Δx Δp ≥ ℏ/2
-fn builtin_heisenberg_min(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_heisenberg_min(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let hbar = args.first().map(|v| v.to_number()).unwrap_or(1.054571817e-34);
     Ok(StrykeValue::float(hbar / 2.0))
 }
 
 // Coherent state |α|² mean photon number
-fn builtin_coherent_mean_photons(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_coherent_mean_photons(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let alpha_re = f1(args);
     let alpha_im = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(alpha_re * alpha_re + alpha_im * alpha_im))
 }
 
 // Thermal state mean photons n̄ = 1/(exp(βħω)-1)
-fn builtin_thermal_mean_photons(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_thermal_mean_photons(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let omega = f1(args);
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(300.0);
     let hbar = 1.054571817e-34;
@@ -259,7 +259,7 @@ fn builtin_thermal_mean_photons(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 // Photon distribution Poisson (coherent) P(n)
-fn builtin_poisson_photon_pmf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_poisson_photon_pmf(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n_bar = f1(args);
     let n = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0).max(0);
     let mut fact = 1.0_f64;
@@ -268,14 +268,14 @@ fn builtin_poisson_photon_pmf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Bose-Einstein photon dist P(n) = n̄ⁿ/(1+n̄)^(n+1)
-fn builtin_bose_einstein_pmf(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bose_einstein_pmf(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n_bar = f1(args);
     let n = args.get(1).map(|v| v.to_number() as i32).unwrap_or(0).max(0);
     Ok(StrykeValue::float(n_bar.powi(n) / (1.0 + n_bar).powi(n + 1)))
 }
 
 // Mandel Q parameter Q = (Var(n) - n̄)/n̄
-fn builtin_mandel_q(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mandel_q(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let var_n = f1(args);
     let n_bar = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if n_bar == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -283,7 +283,7 @@ fn builtin_mandel_q(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // g²(0) second-order correlation
-fn builtin_g2_zero(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_g2_zero(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mean_n2 = f1(args);
     let mean_n = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if mean_n == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -291,7 +291,7 @@ fn builtin_g2_zero(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Free-particle dispersion E = ℏ²k²/(2m)
-fn builtin_free_particle_energy(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_free_particle_energy(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let k = f1(args);
     let m = args.get(1).map(|v| v.to_number()).unwrap_or(9.10938356e-31);
     let hbar = 1.054571817e-34;
@@ -300,7 +300,7 @@ fn builtin_free_particle_energy(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 // Square-well bound state E_n = n²ℏ²π²/(2mL²)
-fn builtin_infinite_well_energy(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_infinite_well_energy(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     let m = args.get(1).map(|v| v.to_number()).unwrap_or(9.10938356e-31);
     let l = args.get(2).map(|v| v.to_number()).unwrap_or(1e-10);
@@ -311,7 +311,7 @@ fn builtin_infinite_well_energy(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 // Harmonic oscillator energy E_n = ℏω(n+1/2)
-fn builtin_harmonic_oscillator_energy(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_harmonic_oscillator_energy(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     let omega = args.get(1).map(|v| v.to_number()).unwrap_or(1e15);
     let hbar = 1.054571817e-34;
@@ -319,7 +319,7 @@ fn builtin_harmonic_oscillator_energy(args: &[StrykeValue]) -> PerlResult<Stryke
 }
 
 // Hydrogen atom energy E_n = -13.6 eV / n²
-fn builtin_hydrogen_energy_n(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hydrogen_energy_n(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     if n == 0.0 { return Ok(StrykeValue::float(f64::NEG_INFINITY)); }
     Ok(StrykeValue::float(-13.605693122994 / (n * n)))
@@ -328,7 +328,7 @@ fn builtin_hydrogen_energy_n(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Reduced mass m_red = m1·m2/(m1+m2)
 
 // Stark shift first order ΔE = -e·E·z (linear)
-fn builtin_stark_shift_linear(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_stark_shift_linear(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let e_field = f1(args);
     let z_expectation = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let e_charge = 1.602176634e-19;
@@ -336,7 +336,7 @@ fn builtin_stark_shift_linear(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Zeeman energy ΔE = μ_B g_J m_J B
-fn builtin_zeeman_energy(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_zeeman_energy(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let g_j = f1(args);
     let m_j = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let b = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -345,14 +345,14 @@ fn builtin_zeeman_energy(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Larmor frequency ω_L = γ B
-fn builtin_larmor_frequency(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_larmor_frequency(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let gamma = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(gamma * b))
 }
 
 // Rabi frequency Ω = μ·E/ℏ
-fn builtin_rabi_frequency(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rabi_frequency(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mu = f1(args);
     let e = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let hbar = 1.054571817e-34;
@@ -360,7 +360,7 @@ fn builtin_rabi_frequency(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // 1-d Schrödinger numerical step (Crank-Nicolson, explicit kinetic)
-fn builtin_schrodinger_step_real(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_schrodinger_step_real(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let psi: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let v: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
@@ -379,21 +379,21 @@ fn builtin_schrodinger_step_real(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 // Probability density |ψ|² (real ψ)
-fn builtin_probability_density(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_probability_density(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let psi: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     Ok(StrykeValue::array(psi.iter().map(|&p| StrykeValue::float(p * p)).collect()))
 }
 
 // Norm of state ⟨ψ|ψ⟩ (real amps)
-fn builtin_state_norm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_state_norm(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let psi: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     Ok(StrykeValue::float(psi.iter().map(|&p| p * p).sum::<f64>().sqrt()))
 }
 
 // Normalize state vector
-fn builtin_state_normalize(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_state_normalize(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let psi: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let n: f64 = psi.iter().map(|&p| p * p).sum::<f64>().sqrt().max(1e-15);
@@ -403,14 +403,14 @@ fn builtin_state_normalize(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Expectation value ⟨ψ|A|ψ⟩ (real)
 
 // Variance ⟨A²⟩ - ⟨A⟩²
-fn builtin_quantum_variance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_quantum_variance(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mean_a = f1(args);
     let mean_a2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(mean_a2 - mean_a * mean_a))
 }
 
 // Spin-J Casimir ⟨J²⟩ = ℏ² j(j+1)
-fn builtin_spin_casimir(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_spin_casimir(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let j = f1(args);
     let hbar = 1.054571817e-34;
     Ok(StrykeValue::float(hbar * hbar * j * (j + 1.0)))
@@ -423,7 +423,7 @@ fn builtin_spin_casimir(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 //   (j₁−m₁−k)! (j₂+m₂−k)! (j−j₂+m₁+k)! (j−j₁−m₂+k)!]
 // Args: j1, m1, j2, m2, j, m (all in half-integer units doubled to integers
 // by the caller, i.e. pass 2j₁ etc. — convention: integer doubled values).
-fn builtin_cg_simple(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cg_simple(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let two_j1 = i1(args);
     let two_m1 = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     let two_j2 = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -465,13 +465,13 @@ fn builtin_cg_simple(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Wigner 3-j upper bound (rough sanity)
-fn builtin_wigner_3j_bound(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_wigner_3j_bound(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let j = f1(args);
     Ok(StrykeValue::float(1.0 / (2.0 * j + 1.0).max(1.0).sqrt()))
 }
 
 // Quantum harmonic oscillator wavefunction at x for n=0 (Gaussian)
-fn builtin_qho_ground_state(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_qho_ground_state(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let m = args.get(1).map(|v| v.to_number()).unwrap_or(9.10938356e-31);
     let omega = args.get(2).map(|v| v.to_number()).unwrap_or(1e15);
@@ -482,7 +482,7 @@ fn builtin_qho_ground_state(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Tunneling probability (rectangular barrier) T ≈ exp(-2 κ a)
-fn builtin_tunneling_prob(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_tunneling_prob(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v0 = f1(args);
     let e = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let a = args.get(2).map(|v| v.to_number()).unwrap_or(1e-10);
@@ -494,7 +494,7 @@ fn builtin_tunneling_prob(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Gamow factor for Coulomb barrier penetration
-fn builtin_gamow_factor(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gamow_factor(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z1 = f1(args);
     let z2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let e = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -510,7 +510,7 @@ fn builtin_gamow_factor(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Compton wavelength λ_C = h/(mc)
-fn builtin_compton_wavelength(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_compton_wavelength(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m = f1(args);
     let h = 6.62607015e-34;
     let c = 2.99792458e8;
@@ -519,7 +519,7 @@ fn builtin_compton_wavelength(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Uncertainty in position from momentum spread
-fn builtin_uncertainty_position(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_uncertainty_position(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dp = f1(args);
     let hbar = 1.054571817e-34;
     if dp == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
@@ -527,13 +527,13 @@ fn builtin_uncertainty_position(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 // Berry phase γ from solid angle Ω: γ = -Ω/2 (spin-1/2)
-fn builtin_berry_phase_spin_half(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_berry_phase_spin_half(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let omega = f1(args);
     Ok(StrykeValue::float(-omega / 2.0))
 }
 
 // Quantum Zeno effect survival probability after N measurements
-fn builtin_zeno_survival(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_zeno_survival(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dt = f1(args);
     let n = args.get(1).map(|v| v.to_number() as i32).unwrap_or(10);
     let h = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -542,14 +542,14 @@ fn builtin_zeno_survival(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Decoherence time T2 ≈ 1/Γ
-fn builtin_decoherence_time(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_decoherence_time(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let gamma = f1(args);
     if gamma == 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
     Ok(StrykeValue::float(1.0 / gamma))
 }
 
 // Ramsey fringe visibility V e^(-t/T2)
-fn builtin_ramsey_visibility(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ramsey_visibility(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v0 = f1(args);
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let t2 = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -558,7 +558,7 @@ fn builtin_ramsey_visibility(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Fermi golden rule transition rate
-fn builtin_fermi_golden_rule(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_fermi_golden_rule(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let matrix_elem_sq = f1(args);
     let dos = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let pi = std::f64::consts::PI;

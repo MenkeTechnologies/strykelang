@@ -31,7 +31,7 @@ fn b53_lgamma(z: f64) -> f64 {
 }
 
 /// Standard normal pdf φ(x) = (2π)^(-1/2) exp(-x²/2).
-fn builtin_dnorm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_dnorm(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let mu = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let sigma = args.get(2).map(|v| v.to_number()).unwrap_or(1.0).max(1e-300);
@@ -40,7 +40,7 @@ fn builtin_dnorm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Student t pdf with ν degrees of freedom.
-fn builtin_dt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_dt(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let nu = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-9);
     let log_norm = b53_lgamma((nu + 1.0) / 2.0) - b53_lgamma(nu / 2.0)
@@ -50,7 +50,7 @@ fn builtin_dt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// F distribution pdf with d1, d2 degrees of freedom.
-fn builtin_df_dist(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_df_dist(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let d1 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-9);
     let d2 = args.get(2).map(|v| v.to_number()).unwrap_or(1.0).max(1e-9);
@@ -62,7 +62,7 @@ fn builtin_df_dist(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// χ² pdf with k degrees of freedom.
-fn builtin_dchisq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_dchisq(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = f1(args);
     let k = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-9);
     if x <= 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -73,7 +73,7 @@ fn builtin_dchisq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Generalized linear model log-likelihood for Normal: Σ log φ((y_i - μ_i)/σ).
 /// Args: y, mu, sigma — equal-length arrays (or sigma scalar).
-fn builtin_glm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_glm(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = b53_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let mu = b53_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let sigma = args.get(2).map(|v| v.to_number()).unwrap_or(1.0).max(1e-300);
@@ -88,7 +88,7 @@ fn builtin_glm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// One-way ANOVA F statistic. Args: array of group sums of squares, group sizes,
 /// total mean, group means flat.
-fn builtin_aov(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_aov(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let group_means = b53_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let group_sizes = b53_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let group_ss = b53_to_floats(args.get(2).unwrap_or(&StrykeValue::array(vec![])));
@@ -108,7 +108,7 @@ fn builtin_aov(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Shapiro-Wilk W statistic (small-n approximation, n ≤ 50). Uses Royston's
 /// formula for a-coefficients. Args: sorted sample.
-fn builtin_shapiro_wilk(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_shapiro_wilk(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = b53_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let n = x.len();
     if n < 3 { return Ok(StrykeValue::float(1.0)); }
@@ -162,7 +162,7 @@ fn b53_norm_inv(p: f64) -> f64 {
 
 /// Anderson-Darling A² (sorted sample of n from F): −n − (1/n) Σ (2i−1)
 /// [ln F(x_i) + ln(1 − F(x_{n+1−i}))]. Works with normal F via z-scores.
-fn builtin_anderson_darling(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_anderson_darling(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = b53_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let n = x.len();
     if n < 2 { return Ok(StrykeValue::float(0.0)); }
@@ -183,7 +183,7 @@ fn builtin_anderson_darling(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Kolmogorov-Smirnov two-sample D = max |F1(x) − F2(x)| from sorted samples.
-fn builtin_kolmogorov_smirnov(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_kolmogorov_smirnov(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut a = b53_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let mut b = b53_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     if a.is_empty() || b.is_empty() { return Ok(StrykeValue::float(0.0)); }
@@ -202,7 +202,7 @@ fn builtin_kolmogorov_smirnov(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Spearman rank correlation: replace data with ranks, compute Pearson r.
-fn builtin_spearmanr(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_spearmanr(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = b53_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let y = b53_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let n = x.len().min(y.len());
@@ -239,7 +239,7 @@ fn b53_ranks(v: &[f64]) -> Vec<f64> {
 }
 
 /// Kendall τ (tau-b): (concordant - discordant) / sqrt((P-T_x)(P-T_y)).
-fn builtin_kendalltau(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_kendalltau(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = b53_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let y = b53_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let n = x.len().min(y.len());
@@ -264,7 +264,7 @@ fn builtin_kendalltau(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Pearson r, the canonical correlation.
-fn builtin_pearsonr(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pearsonr(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = b53_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let y = b53_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let n = x.len().min(y.len());
@@ -284,7 +284,7 @@ fn builtin_pearsonr(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Mann-Whitney U: U_x = sum_of_ranks_x − n_x(n_x+1)/2.
-fn builtin_mannwhitneyu(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mannwhitneyu(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = b53_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let y = b53_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let n_x = x.len();
@@ -306,7 +306,7 @@ fn builtin_mannwhitneyu(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Wilcoxon signed-rank statistic W = sum of positive signed ranks.
-fn builtin_wilcoxon(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_wilcoxon(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let d = b53_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let pairs: Vec<(f64, f64)> = d.iter().filter(|&&x| x != 0.0)
         .map(|&x| (x.abs(), x.signum())).collect();
@@ -328,7 +328,7 @@ fn builtin_wilcoxon(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Kruskal-Wallis H = (12 / N(N+1)) Σ T_g²/n_g − 3(N+1).
-fn builtin_kruskal_h(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_kruskal_h(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let groups = arg_to_vec(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let group_data: Vec<Vec<f64>> = groups.iter().map(b53_to_floats).collect();
     if group_data.len() < 2 { return Ok(StrykeValue::float(0.0)); }

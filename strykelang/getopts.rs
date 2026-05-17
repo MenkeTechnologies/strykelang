@@ -68,7 +68,7 @@
 //! `--help`/`-h`, `getopts` intercepts `--help`/`-h`, prints a formatted
 //! usage block, and `exit(0)`s.
 
-use crate::error::{StrykeError, PerlResult};
+use crate::error::{StrykeError, StrykeResult};
 use crate::value::StrykeValue;
 use crate::vm_helper::VMHelper;
 use indexmap::IndexMap;
@@ -118,7 +118,7 @@ impl OptSpec {
     }
 }
 
-fn parse_spec_string(spec: &str, line: usize) -> PerlResult<OptSpec> {
+fn parse_spec_string(spec: &str, line: usize) -> StrykeResult<OptSpec> {
     let bytes = spec.as_bytes();
     let len = bytes.len();
     if len == 0 {
@@ -234,7 +234,7 @@ fn parse_spec_string(spec: &str, line: usize) -> PerlResult<OptSpec> {
     })
 }
 
-fn coerce_scalar(raw: &str, ty: ScalarType, opt: &str, line: usize) -> PerlResult<StrykeValue> {
+fn coerce_scalar(raw: &str, ty: ScalarType, opt: &str, line: usize) -> StrykeResult<StrykeValue> {
     match ty {
         ScalarType::Str => Ok(StrykeValue::string(raw.to_string())),
         ScalarType::Int => raw.parse::<i64>().map(StrykeValue::integer).map_err(|_| {
@@ -289,7 +289,7 @@ fn find_spec<'a>(specs: &'a [OptSpec], name: &str) -> Option<(usize, &'a OptSpec
     None
 }
 
-fn split_hash_kv(raw: &str, opt: &str, line: usize) -> PerlResult<(String, String)> {
+fn split_hash_kv(raw: &str, opt: &str, line: usize) -> StrykeResult<(String, String)> {
     let eq = raw.find('=').ok_or_else(|| {
         StrykeError::runtime(
             format!("getopts: option '{}' expects key=value, got '{}'", opt, raw),
@@ -305,7 +305,7 @@ fn store_value(
     value: StrykeValue,
     opt: &str,
     line: usize,
-) -> PerlResult<()> {
+) -> StrykeResult<()> {
     match spec.kind {
         ArgKind::Array(_) => {
             let entry = out
@@ -363,7 +363,7 @@ fn parse_argv(
     argv: &mut Vec<StrykeValue>,
     specs: &[OptSpec],
     line: usize,
-) -> PerlResult<IndexMap<String, StrykeValue>> {
+) -> StrykeResult<IndexMap<String, StrykeValue>> {
     let mut out: IndexMap<String, StrykeValue> = IndexMap::new();
 
     // Seed defaults: counters → 0, arrays → [], hashes → {}, NegBool → undef (only set if seen).
@@ -536,7 +536,7 @@ fn consume_option(
     display: &str,
     out: &mut IndexMap<String, StrykeValue>,
     line: usize,
-) -> PerlResult<usize> {
+) -> StrykeResult<usize> {
     // i currently points at the option token; advance past it.
     i += 1;
     match spec.kind {
@@ -643,7 +643,7 @@ struct HelpMeta {
     epilog: Option<String>,
 }
 
-fn parse_help_meta(v: &StrykeValue, line: usize) -> PerlResult<HelpMeta> {
+fn parse_help_meta(v: &StrykeValue, line: usize) -> StrykeResult<HelpMeta> {
     let h = v.as_hash_ref().ok_or_else(|| {
         StrykeError::runtime(
             "getopts: third argument must be a hash ref { prog => ..., desc => ..., epilog => ... }",
@@ -675,7 +675,7 @@ fn apply_metadata(
     spec: &mut OptSpec,
     meta: &Arc<RwLock<IndexMap<String, StrykeValue>>>,
     line: usize,
-) -> PerlResult<()> {
+) -> StrykeResult<()> {
     for (k, v) in meta.read().iter() {
         match k.as_str() {
             "help" => spec.help = Some(v.to_string()),
@@ -834,7 +834,7 @@ fn hash_is_meta_shaped(h: &Arc<RwLock<IndexMap<String, StrykeValue>>>) -> bool {
         .all(|(k, _)| matches!(k.as_str(), "prog" | "desc" | "description" | "epilog"))
 }
 
-fn parse_specs_value(specs_val: &StrykeValue, line: usize) -> PerlResult<Vec<OptSpec>> {
+fn parse_specs_value(specs_val: &StrykeValue, line: usize) -> StrykeResult<Vec<OptSpec>> {
     let mut specs: Vec<OptSpec> = Vec::new();
     if let Some(arr) = specs_val.as_array_ref() {
         for item in arr.read().iter() {
@@ -879,7 +879,7 @@ impl<'a> ArgvSink<'a> {
             ArgvSink::Scope(interp) => interp.scope.get_array("ARGV"),
         }
     }
-    fn write(&mut self, val: Vec<StrykeValue>) -> PerlResult<()> {
+    fn write(&mut self, val: Vec<StrykeValue>) -> StrykeResult<()> {
         match self {
             ArgvSink::Ref(r) => {
                 *r.write() = val;
@@ -919,7 +919,7 @@ pub fn builtin_getopts(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     if args.is_empty() {
         return Err(StrykeError::runtime(
             "getopts: usage: getopts(SPECS) | getopts(SPECS, META) | getopts(\\@ARGV, SPECS [, META])",
@@ -1067,7 +1067,7 @@ mod tests {
     }
 
     /// Test wrapper: spin up a throwaway VMHelper and dispatch.
-    fn call(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+    fn call(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         let mut interp = VMHelper::new();
         builtin_getopts(&mut interp, args, 1)
     }
@@ -1077,7 +1077,7 @@ mod tests {
     fn call_with_argv(
         argv: &[&str],
         args: &[StrykeValue],
-    ) -> PerlResult<(StrykeValue, Vec<String>)> {
+    ) -> StrykeResult<(StrykeValue, Vec<String>)> {
         let mut interp = VMHelper::new();
         interp
             .scope

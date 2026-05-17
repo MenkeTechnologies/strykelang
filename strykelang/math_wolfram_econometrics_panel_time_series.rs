@@ -22,7 +22,7 @@ fn b36_cov(xs: &[f64], ys: &[f64]) -> f64 {
 }
 
 /// ARCH LM test statistic for residuals (squared resid AR(1) R² × n)
-fn builtin_arch_lm_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_arch_lm_test(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = args.first().map(b36_to_floats).unwrap_or_default();
     let n = r.len();
     if n < 3 { return Ok(StrykeValue::float(0.0)); }
@@ -38,7 +38,7 @@ fn builtin_arch_lm_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Breusch-Pagan test (resid² regressed on x; LM = n·R²)
-fn builtin_breusch_pagan_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_breusch_pagan_test(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = args.first().map(b36_to_floats).unwrap_or_default();
     let x = args.get(1).map(b36_to_floats).unwrap_or_default();
     let n = r.len().min(x.len());
@@ -53,7 +53,7 @@ fn builtin_breusch_pagan_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// White heteroskedasticity-robust SE: σ²_HC0 = (X'X)⁻¹ X' diag(e²) X (X'X)⁻¹ — scalar 1-D form
-fn builtin_white_robust_se(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_white_robust_se(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = args.first().map(b36_to_floats).unwrap_or_default();
     let e = args.get(1).map(b36_to_floats).unwrap_or_default();
     let n = x.len().min(e.len());
@@ -65,7 +65,7 @@ fn builtin_white_robust_se(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Newey-West HAC SE with given lag truncation L
-fn builtin_newey_west_se(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_newey_west_se(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = args.first().map(b36_to_floats).unwrap_or_default();
     let e = args.get(1).map(b36_to_floats).unwrap_or_default();
     let lag = args.get(2).map(|v| v.to_number() as usize).unwrap_or(1);
@@ -85,7 +85,7 @@ fn builtin_newey_west_se(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Hansen J statistic = N · g'·W·g (already-formed moment vector and weight)
-fn builtin_hansen_j_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hansen_j_test(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let g = args.first().map(b36_to_floats).unwrap_or_default();
     let w = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let n = args.get(2).map(|v| v.to_number()).unwrap_or(g.len() as f64);
@@ -94,7 +94,7 @@ fn builtin_hansen_j_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// GMM moment condition: E[Z'(y - Xβ)] sample mean
-fn builtin_gmm_moment_condition(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gmm_moment_condition(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = args.first().map(b36_to_floats).unwrap_or_default();
     let y = args.get(1).map(b36_to_floats).unwrap_or_default();
     let x = args.get(2).map(b36_to_floats).unwrap_or_default();
@@ -106,7 +106,7 @@ fn builtin_gmm_moment_condition(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Hausman test statistic |β_FE - β_RE|² / (Var_FE - Var_RE)
-fn builtin_hausman_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hausman_test(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let b_fe = f1(args);
     let b_re = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let v_fe = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -117,7 +117,7 @@ fn builtin_hausman_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Breusch-Godfrey LM test for serial correlation: n·R²(e on lagged e)
-fn builtin_breusch_godfrey_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_breusch_godfrey_test(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let e = args.first().map(b36_to_floats).unwrap_or_default();
     let n = e.len();
     if n < 3 { return Ok(StrykeValue::float(0.0)); }
@@ -132,7 +132,7 @@ fn builtin_breusch_godfrey_test(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Box-Pierce test Q = n·Σρₖ²
-fn builtin_box_pierce_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_box_pierce_test(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let acf = args.first().map(b36_to_floats).unwrap_or_default();
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(100.0);
     let q: f64 = acf.iter().map(|r| r * r).sum();
@@ -140,7 +140,7 @@ fn builtin_box_pierce_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Augmented Dickey-Fuller test statistic (γ̂ / SE(γ̂)) on Δyₜ = γyₜ₋₁ + ε
-fn builtin_adf_test_stat(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_adf_test_stat(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = args.first().map(b36_to_floats).unwrap_or_default();
     let n = y.len();
     if n < 3 { return Ok(StrykeValue::float(0.0)); }
@@ -158,7 +158,7 @@ fn builtin_adf_test_stat(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Phillips-Perron test stat (ADF stat with Newey-West correction approx)
-fn builtin_pp_test_stat(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pp_test_stat(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = args.first().map(b36_to_floats).unwrap_or_default();
     let lag = args.get(1).map(|v| v.to_number() as usize).unwrap_or(1);
     let n = y.len();
@@ -178,7 +178,7 @@ fn builtin_pp_test_stat(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// KPSS test statistic: η = (1/n²)·Σ Sₜ² / σ̂²
-fn builtin_kpss_test_stat(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_kpss_test_stat(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = args.first().map(b36_to_floats).unwrap_or_default();
     let n = y.len();
     if n < 2 { return Ok(StrykeValue::float(0.0)); }
@@ -194,13 +194,13 @@ fn builtin_kpss_test_stat(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Dickey-Fuller critical value at 5% level for sample size n
-fn builtin_dickey_fuller_critical(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_dickey_fuller_critical(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     Ok(StrykeValue::float(-2.86 - 2.738 / n - 8.36 / (n * n)))
 }
 
 /// Engle-Granger cointegration step: ADF on residuals of y ~ x
-fn builtin_engle_granger_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_engle_granger_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = args.first().map(b36_to_floats).unwrap_or_default();
     let x = args.get(1).map(b36_to_floats).unwrap_or_default();
     let n = y.len().min(x.len());
@@ -215,7 +215,7 @@ fn builtin_engle_granger_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Johansen trace step: λ_max from canonical correlation between Δy and y_lag
-fn builtin_johansen_trace_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_johansen_trace_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = args.first().map(b36_to_floats).unwrap_or_default();
     let n = y.len();
     if n < 3 { return Ok(StrykeValue::float(0.0)); }
@@ -230,7 +230,7 @@ fn builtin_johansen_trace_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// VECM α·β decomposition: π = αβ' approximation as scalar product
-fn builtin_vecm_alpha_beta(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_vecm_alpha_beta(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pi = f1(args);
     let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if alpha == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -238,7 +238,7 @@ fn builtin_vecm_alpha_beta(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Panel within-group estimator: demeaned OLS slope
-fn builtin_panel_within_estimator(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_panel_within_estimator(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = args.first().map(b36_to_floats).unwrap_or_default();
     let x = args.get(1).map(b36_to_floats).unwrap_or_default();
     let n = y.len().min(x.len());
@@ -254,7 +254,7 @@ fn builtin_panel_within_estimator(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Panel between-group estimator: group-mean OLS
-fn builtin_panel_between_estimator(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_panel_between_estimator(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = args.first().map(b36_to_floats).unwrap_or_default();
     let x = args.get(1).map(b36_to_floats).unwrap_or_default();
     let cv = b36_cov(&x, &y);
@@ -264,7 +264,7 @@ fn builtin_panel_between_estimator(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Panel random-effects θ-transform coefficient θ = 1 - σ_ε/√(σ_ε² + Tσ_u²)
-fn builtin_panel_random_effects(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_panel_random_effects(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s_eps = f1(args);
     let s_u = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let t = args.get(2).map(|v| v.to_number()).unwrap_or(2.0);
@@ -274,7 +274,7 @@ fn builtin_panel_random_effects(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Arellano-Bond GMM step: first-difference IV estimate
-fn builtin_arellano_bond_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_arellano_bond_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = args.first().map(b36_to_floats).unwrap_or_default();
     let n = y.len();
     if n < 3 { return Ok(StrykeValue::float(0.0)); }
@@ -289,7 +289,7 @@ fn builtin_arellano_bond_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// OLS estimator β̂ = Σxy / Σx²
-fn builtin_ols_estimator(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ols_estimator(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let x = args.first().map(b36_to_floats).unwrap_or_default();
     let y = args.get(1).map(b36_to_floats).unwrap_or_default();
     let n = x.len().min(y.len());
@@ -300,7 +300,7 @@ fn builtin_ols_estimator(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// OLS residual variance σ̂² = SSE / (n - k)
-fn builtin_ols_residual_variance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ols_residual_variance(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = args.first().map(b36_to_floats).unwrap_or_default();
     let k = args.get(1).map(|v| v.to_number() as usize).unwrap_or(1);
     let n = r.len();
@@ -310,7 +310,7 @@ fn builtin_ols_residual_variance(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 /// OLS R² = 1 - SSR/SST
-fn builtin_ols_r_squared(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ols_r_squared(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = args.first().map(b36_to_floats).unwrap_or_default();
     let yhat = args.get(1).map(b36_to_floats).unwrap_or_default();
     let n = y.len().min(yhat.len());
@@ -323,7 +323,7 @@ fn builtin_ols_r_squared(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// OLS adjusted R²
-fn builtin_ols_adjusted_r2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ols_adjusted_r2(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r2 = f1(args);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(100.0);
     let k = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -332,14 +332,14 @@ fn builtin_ols_adjusted_r2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Akaike Information Criterion AIC = 2k - 2ln L
-fn builtin_akaike_info_crit(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_akaike_info_crit(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ll = f1(args);
     let k = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(2.0 * k - 2.0 * ll))
 }
 
 /// Bayesian Information Criterion BIC = k·ln n - 2 ln L
-fn builtin_bayesian_info_crit(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bayesian_info_crit(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ll = f1(args);
     let k = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let n = args.get(2).map(|v| v.to_number()).unwrap_or(100.0);
@@ -347,7 +347,7 @@ fn builtin_bayesian_info_crit(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Hannan-Quinn IC = 2k·ln(ln n) - 2 ln L
-fn builtin_hannan_quinn_ic(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hannan_quinn_ic(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ll = f1(args);
     let k = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let n = args.get(2).map(|v| v.to_number()).unwrap_or(100.0);
@@ -355,7 +355,7 @@ fn builtin_hannan_quinn_ic(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// F statistic for pooled regression: ((SSR_R - SSR_U)/q) / (SSR_U/(n-k))
-fn builtin_f_statistic_pooled(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_f_statistic_pooled(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ssr_r = f1(args);
     let ssr_u = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let q = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -366,7 +366,7 @@ fn builtin_f_statistic_pooled(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Breusch-Pagan LM (alternative formula via auxiliary regression)
-fn builtin_breusch_pagan_lm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_breusch_pagan_lm(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ess = f1(args);
     let sigma2 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if sigma2 == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -374,7 +374,7 @@ fn builtin_breusch_pagan_lm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Ramsey RESET test (powers of fitted values added to model — F approx)
-fn builtin_ramsey_reset_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ramsey_reset_test(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r2_u = f1(args);
     let r2_r = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let n = args.get(2).map(|v| v.to_number()).unwrap_or(100.0);
@@ -385,7 +385,7 @@ fn builtin_ramsey_reset_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Chow test for structural break: F = ((SSR - SSR1 - SSR2)/k) / ((SSR1+SSR2)/(n-2k))
-fn builtin_chow_test_stat(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_chow_test_stat(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ssr = f1(args);
     let ssr1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let ssr2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -397,7 +397,7 @@ fn builtin_chow_test_stat(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// White general test: LM = n·R² of resid² on x, x²
-fn builtin_white_test_stat(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_white_test_stat(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = args.first().map(b36_to_floats).unwrap_or_default();
     let x = args.get(1).map(b36_to_floats).unwrap_or_default();
     let n = r.len().min(x.len());
@@ -413,7 +413,7 @@ fn builtin_white_test_stat(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Goldfeld-Quandt test: F = SSR2/SSR1 with central observations dropped
-fn builtin_goldfeld_quandt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_goldfeld_quandt(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ssr1 = f1(args);
     let ssr2 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if ssr1 == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -421,7 +421,7 @@ fn builtin_goldfeld_quandt(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Wald test statistic: (Rβ̂ - r)' [R V R']⁻¹ (Rβ̂ - r) — scalar form
-fn builtin_wald_test_stat(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_wald_test_stat(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let diff = f1(args);
     let var = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if var <= 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -429,7 +429,7 @@ fn builtin_wald_test_stat(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Score (Lagrange Multiplier) test statistic
-fn builtin_score_test_stat(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_score_test_stat(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = f1(args);
     let info = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     if info == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -437,14 +437,14 @@ fn builtin_score_test_stat(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Likelihood ratio test: LR = -2(ln L_R - ln L_U)
-fn builtin_likelihood_ratio_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_likelihood_ratio_test(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ll_r = f1(args);
     let ll_u = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(-2.0 * (ll_r - ll_u)))
 }
 
 /// Two-stage least squares (2SLS / IV) coefficient
-fn builtin_two_sls_iv(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_two_sls_iv(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = args.first().map(b36_to_floats).unwrap_or_default();
     let x = args.get(1).map(b36_to_floats).unwrap_or_default();
     let y = args.get(2).map(b36_to_floats).unwrap_or_default();
@@ -457,12 +457,12 @@ fn builtin_two_sls_iv(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// IV estimator: β̂ = (Z'X)⁻¹ Z'y — same as 2SLS for just-identified case
-fn builtin_iv_estimator(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_iv_estimator(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_two_sls_iv(args)
 }
 
 /// MLE log-likelihood for normal: -n/2 ln(2π σ²) - SSE/(2σ²)
-fn builtin_mle_normal_log_lik(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mle_normal_log_lik(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let sse = f1(args);
     let sigma2 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let n = args.get(2).map(|v| v.to_number()).unwrap_or(100.0);
@@ -471,7 +471,7 @@ fn builtin_mle_normal_log_lik(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// MLE log-likelihood for exponential: n·ln λ - λ·Σx
-fn builtin_mle_exponential_log_lik(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mle_exponential_log_lik(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lambda = f1(args);
     let sum = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let n = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -480,7 +480,7 @@ fn builtin_mle_exponential_log_lik(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// MLE log-likelihood for poisson: Σ(xᵢ ln λ - λ - ln xᵢ!)
-fn builtin_mle_poisson_log_lik(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mle_poisson_log_lik(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lambda = f1(args);
     let sum_x = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let n = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -490,14 +490,14 @@ fn builtin_mle_poisson_log_lik(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// GMM moment function g(θ) = E[m(x, θ)] — sample mean of m
-fn builtin_gmm_moment_function(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gmm_moment_function(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m = args.first().map(b36_to_floats).unwrap_or_default();
     if m.is_empty() { return Ok(StrykeValue::float(0.0)); }
     Ok(StrykeValue::float(m.iter().sum::<f64>() / m.len() as f64))
 }
 
 /// Pooling test (Pesaran CD or simple): F-style (SSR_R - SSR_U)/SSR_U·df
-fn builtin_pooling_test_stat(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pooling_test_stat(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ssr_r = f1(args);
     let ssr_u = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let df = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -506,26 +506,26 @@ fn builtin_pooling_test_stat(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Heteroskedasticity test (general n·R²)
-fn builtin_heteroskedasticity_test(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_heteroskedasticity_test(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r2 = f1(args);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(100.0);
     Ok(StrykeValue::float(n * r2))
 }
 
 /// Robust (Huber-White) standard error
-fn builtin_robust_se_huber_white(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_robust_se_huber_white(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_white_robust_se(args)
 }
 
 /// Bootstrap SE estimate from B replicates
-fn builtin_bootstrap_se_estimate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bootstrap_se_estimate(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let reps = args.first().map(b36_to_floats).unwrap_or_default();
     if reps.len() < 2 { return Ok(StrykeValue::float(0.0)); }
     Ok(StrykeValue::float(b36_var(&reps).sqrt()))
 }
 
 /// Heckman correction (inverse Mills ratio λ = φ(z)/Φ(z))
-fn builtin_heckman_correction(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_heckman_correction(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     let phi = (-0.5 * z * z).exp() / (2.0 * std::f64::consts::PI).sqrt();
     let big_phi = 0.5 * (1.0 + libm::erf(z / std::f64::consts::SQRT_2));
@@ -534,7 +534,7 @@ fn builtin_heckman_correction(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Tobit log-likelihood: censored regression at 0
-fn builtin_tobit_log_likelihood(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_tobit_log_likelihood(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xb = f1(args);
     let sigma = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let y = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -550,7 +550,7 @@ fn builtin_tobit_log_likelihood(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Probit log-likelihood for one observation
-fn builtin_probit_log_likelihood(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_probit_log_likelihood(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xb = f1(args);
     let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let big_phi = 0.5 * (1.0 + libm::erf(xb / std::f64::consts::SQRT_2));
@@ -559,7 +559,7 @@ fn builtin_probit_log_likelihood(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 /// Logit log-likelihood for one observation
-fn builtin_logit_log_likelihood(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_logit_log_likelihood(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xb = f1(args);
     let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let p = 1.0 / (1.0 + (-xb).exp());
@@ -568,7 +568,7 @@ fn builtin_logit_log_likelihood(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Multinomial logit probability for class j: exp(xβⱼ) / Σ exp(xβₖ)
-fn builtin_multinomial_logit_prob(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_multinomial_logit_prob(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xb = args.first().map(b36_to_floats).unwrap_or_default();
     let j = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
     if j >= xb.len() { return Ok(StrykeValue::float(0.0)); }
@@ -579,7 +579,7 @@ fn builtin_multinomial_logit_prob(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Ordered probit threshold μⱼ for category j (cumulative form)
-fn builtin_ordered_probit_threshold(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ordered_probit_threshold(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xb = f1(args);
     let mu = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let z = (mu - xb) / std::f64::consts::SQRT_2;
@@ -587,7 +587,7 @@ fn builtin_ordered_probit_threshold(args: &[StrykeValue]) -> PerlResult<StrykeVa
 }
 
 /// Panel VAR step: OLS on lagged y across panels
-fn builtin_panel_var_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_panel_var_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = args.first().map(b36_to_floats).unwrap_or_default();
     let n = y.len();
     if n < 2 { return Ok(StrykeValue::float(0.0)); }
@@ -600,14 +600,14 @@ fn builtin_panel_var_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Impulse response step: φₕ = ψ^h
-fn builtin_impulse_response_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_impulse_response_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let psi = f1(args);
     let h = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(psi.powf(h)))
 }
 
 /// Variance decomposition: share of variance from shock j at horizon h
-fn builtin_variance_decomposition(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_variance_decomposition(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let psi = args.first().map(b36_to_floats).unwrap_or_default();
     let total: f64 = psi.iter().map(|v| v * v).sum();
     if total == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -617,7 +617,7 @@ fn builtin_variance_decomposition(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Granger causality χ² statistic
-fn builtin_granger_causality_chi2(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_granger_causality_chi2(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ssr_r = f1(args);
     let ssr_u = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let n = args.get(2).map(|v| v.to_number()).unwrap_or(100.0);
@@ -626,7 +626,7 @@ fn builtin_granger_causality_chi2(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Cointegration residual: y - β·x
-fn builtin_cointegration_residual(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cointegration_residual(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let beta = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let x = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -634,7 +634,7 @@ fn builtin_cointegration_residual(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// Error-correction step Δyₜ = α(yₜ₋₁ - βxₜ₋₁) + ε
-fn builtin_error_correction_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_error_correction_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y_lag = f1(args);
     let beta = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let x_lag = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -643,14 +643,14 @@ fn builtin_error_correction_step(args: &[StrykeValue]) -> PerlResult<StrykeValue
 }
 
 /// Random walk innovation: εₜ = yₜ - yₜ₋₁
-fn builtin_random_walk_innovation(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_random_walk_innovation(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let y_lag = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(y - y_lag))
 }
 
 /// Random walk with drift step: yₜ = yₜ₋₁ + μ + ε
-fn builtin_random_walk_drift_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_random_walk_drift_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y_lag = f1(args);
     let mu = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let eps = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -658,7 +658,7 @@ fn builtin_random_walk_drift_step(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 /// AR(p) model log-likelihood (gaussian errors)
-fn builtin_ar_model_likelihood(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ar_model_likelihood(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = args.first().map(b36_to_floats).unwrap_or_default();
     let sigma2 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let n = r.len() as f64;
@@ -671,7 +671,7 @@ fn builtin_ar_model_likelihood(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 /// recursive backwards filter: ε_t = y_t − Σ_{i=1..q} θ_i · ε_{t−i} (with ε_t = 0
 /// for t < 1). Differs from AR (which uses past y, not past ε): the MA path
 /// requires running the inverse recursion. Args: y array, θ array (length q), σ².
-fn builtin_ma_model_likelihood(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ma_model_likelihood(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = args.first().map(b36_to_floats).unwrap_or_default();
     let theta = b36_to_floats(args.get(1).unwrap_or(&StrykeValue::array(vec![])));
     let sigma2 = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -693,7 +693,7 @@ fn builtin_ma_model_likelihood(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// ARMA innovation step: εₜ = yₜ - φyₜ₋₁ - θεₜ₋₁
-fn builtin_arma_model_innovation(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_arma_model_innovation(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = f1(args);
     let phi = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let y_lag = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);

@@ -3,44 +3,44 @@
 // Distance modulus: m - M = 5 log10(d/10pc)
 // Apparent magnitude from absolute and distance
 // Absolute magnitude from apparent and distance
-fn builtin_absolute_magnitude(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_absolute_magnitude(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let app_mag = f1(args);
     let d_pc = args.get(1).map(|v| v.to_number()).unwrap_or(10.0);
     if d_pc <= 0.0 { return Ok(StrykeValue::float(f64::NEG_INFINITY)); }
     Ok(StrykeValue::float(app_mag - 5.0 * (d_pc / 10.0).log10()))
 }
 // Parsec to light years
-fn builtin_pc_to_ly(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pc_to_ly(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pc = f1(args);
     Ok(StrykeValue::float(pc * 3.26156))
 }
 // Light years to parsecs
-fn builtin_ly_to_pc(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ly_to_pc(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ly = f1(args);
     Ok(StrykeValue::float(ly / 3.26156))
 }
 // Parsec to AU
-fn builtin_pc_to_au(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pc_to_au(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pc = f1(args);
     Ok(StrykeValue::float(pc * 206264.806))
 }
 // AU to meters
-fn builtin_au_to_m(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_au_to_m(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let au = f1(args);
     Ok(StrykeValue::float(au * 1.495978707e11))
 }
 // Solar mass to kg
-fn builtin_solar_mass_to_kg(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_solar_mass_to_kg(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m_sun = f1(args);
     Ok(StrykeValue::float(m_sun * 1.98892e30))
 }
 // Solar luminosity to watts
-fn builtin_solar_luminosity_to_w(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_solar_luminosity_to_w(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let l_sun = f1(args);
     Ok(StrykeValue::float(l_sun * 3.828e26))
 }
 // Hubble distance D = cz/H0 (z, H0 in km/s/Mpc → returns Mpc)
-fn builtin_hubble_distance_mpc(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hubble_distance_mpc(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     let h0 = args.get(1).map(|v| v.to_number()).unwrap_or(70.0);
     let c_kms = 299792.458;
@@ -48,7 +48,7 @@ fn builtin_hubble_distance_mpc(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
     Ok(StrykeValue::float(c_kms * z / h0))
 }
 // Comoving distance approx (small z)
-fn builtin_comoving_distance_approx(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_comoving_distance_approx(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let z = f1(args);
     let h0 = args.get(1).map(|v| v.to_number()).unwrap_or(70.0);
     let c_kms = 299792.458;
@@ -56,7 +56,7 @@ fn builtin_comoving_distance_approx(args: &[StrykeValue]) -> PerlResult<StrykeVa
     Ok(StrykeValue::float(c_kms / h0 * z * (1.0 - 0.5 * z)))
 }
 // Critical density of universe ρ_c = 3H₀² / (8πG)
-fn builtin_critical_density(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_critical_density(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let h0_si = f1(args);
     let g = 6.674e-11;
     let pi = std::f64::consts::PI;
@@ -64,31 +64,31 @@ fn builtin_critical_density(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Equal-temperament frequency ratio: r = 2^(1/12) for n=1
-fn builtin_et_freq_ratio(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_et_freq_ratio(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = f1(args);
     let edo = args.get(1).map(|v| v.to_number()).unwrap_or(12.0);
     Ok(StrykeValue::float(2_f64.powf(n / edo)))
 }
 // MIDI note to frequency
-fn builtin_midi_to_hz(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_midi_to_hz(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let midi = f1(args);
     Ok(StrykeValue::float(440.0 * 2_f64.powf((midi - 69.0) / 12.0)))
 }
 // Frequency to MIDI note
-fn builtin_hz_to_midi(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hz_to_midi(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let hz = f1(args);
     if hz <= 0.0 { return Ok(StrykeValue::float(f64::NEG_INFINITY)); }
     Ok(StrykeValue::float(69.0 + 12.0 * (hz / 440.0).log2()))
 }
 // Cents between two frequencies
-fn builtin_cents_between(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cents_between(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let f1_hz = f1(args);
     let f2_hz = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if f1_hz <= 0.0 || f2_hz <= 0.0 { return Ok(StrykeValue::float(0.0)); }
     Ok(StrykeValue::float(1200.0 * (f2_hz / f1_hz).log2()))
 }
 // Just intonation ratio for interval (semitones, returns float)
-fn builtin_just_intonation_ratio(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_just_intonation_ratio(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let semitones = i1(args);
     let ratios = [
         (1.0_f64, 1.0_f64), (16.0, 15.0), (9.0, 8.0), (6.0, 5.0),
@@ -100,24 +100,24 @@ fn builtin_just_intonation_ratio(args: &[StrykeValue]) -> PerlResult<StrykeValue
     Ok(StrykeValue::float(n / d))
 }
 // Pythagorean ratio (3:2 stack)
-fn builtin_pythagorean_ratio(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pythagorean_ratio(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
     Ok(StrykeValue::float((3.0_f64 / 2.0).powi(n as i32)))
 }
 // Beat frequency
-fn builtin_beat_frequency(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_beat_frequency(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let f1_hz = f1(args);
     let f2_hz = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float((f1_hz - f2_hz).abs()))
 }
 // BPM to seconds per beat
-fn builtin_bpm_to_spb(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bpm_to_spb(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let bpm = f1(args);
     if bpm <= 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
     Ok(StrykeValue::float(60.0 / bpm))
 }
 // Note name to MIDI (e.g. "C4" → 60)
-fn builtin_note_name_to_midi(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_note_name_to_midi(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     if s.is_empty() { return Ok(StrykeValue::integer(-1)); }
     let bytes = s.as_bytes();
@@ -141,7 +141,7 @@ fn builtin_note_name_to_midi(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // RGB to HSL
 // HSL to RGB
 // RGB to YIQ
-fn builtin_rgb_to_yiq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rgb_to_yiq(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = f1(args) / 255.0;
     let g = args.get(1).map(|v| v.to_number()).unwrap_or(0.0) / 255.0;
     let b = args.get(2).map(|v| v.to_number()).unwrap_or(0.0) / 255.0;
@@ -151,7 +151,7 @@ fn builtin_rgb_to_yiq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::array(vec![StrykeValue::float(y), StrykeValue::float(i), StrykeValue::float(q)]))
 }
 // RGB to YUV (BT.601)
-fn builtin_rgb_to_yuv601(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rgb_to_yuv601(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let r = f1(args) / 255.0;
     let g = args.get(1).map(|v| v.to_number()).unwrap_or(0.0) / 255.0;
     let b = args.get(2).map(|v| v.to_number()).unwrap_or(0.0) / 255.0;
@@ -161,7 +161,7 @@ fn builtin_rgb_to_yuv601(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::array(vec![StrykeValue::float(y), StrykeValue::float(u), StrykeValue::float(v)]))
 }
 // CIE XYZ from sRGB (D65)
-fn builtin_srgb_to_xyz(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_srgb_to_xyz(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lin = |c: f64| -> f64 {
         let c = c / 255.0;
         if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
@@ -175,7 +175,7 @@ fn builtin_srgb_to_xyz(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::array(vec![StrykeValue::float(x), StrykeValue::float(y), StrykeValue::float(z)]))
 }
 // XYZ to CIELAB (D65)
-fn builtin_xyz_to_lab(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_xyz_to_lab(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xn = 0.95047; let yn = 1.00000; let zn = 1.08883;
     let x = f1(args) / xn;
     let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0) / yn;
@@ -191,7 +191,7 @@ fn builtin_xyz_to_lab(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 // CIE76 ΔE
 // CIE94 ΔE (graphic arts default)
-fn builtin_delta_e_94(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_delta_e_94(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let l1 = f1(args);
     let a1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let b1 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -218,86 +218,86 @@ fn builtin_delta_e_94(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 // Celsius/Fahrenheit/Kelvin
 
 // Distance unit conversions
-fn builtin_feet_to_meters(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_feet_to_meters(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ft = f1(args);
     Ok(StrykeValue::float(ft * 0.3048))
 }
-fn builtin_meters_to_feet(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_meters_to_feet(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m = f1(args);
     Ok(StrykeValue::float(m / 0.3048))
 }
 
 // Mass conversions
-fn builtin_lb_to_kg(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lb_to_kg(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lb = f1(args);
     Ok(StrykeValue::float(lb * 0.45359237))
 }
-fn builtin_kg_to_lb(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_kg_to_lb(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let kg = f1(args);
     Ok(StrykeValue::float(kg / 0.45359237))
 }
 
 // Speed
-fn builtin_mph_to_kmh(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mph_to_kmh(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mph = f1(args);
     Ok(StrykeValue::float(mph * 1.609344))
 }
-fn builtin_kmh_to_mph(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_kmh_to_mph(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let kmh = f1(args);
     Ok(StrykeValue::float(kmh / 1.609344))
 }
-fn builtin_mps_to_kmh(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mps_to_kmh(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mps = f1(args);
     Ok(StrykeValue::float(mps * 3.6))
 }
-fn builtin_kmh_to_mps(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_kmh_to_mps(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let kmh = f1(args);
     Ok(StrykeValue::float(kmh / 3.6))
 }
-fn builtin_knots_to_kmh(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_knots_to_kmh(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let kn = f1(args);
     Ok(StrykeValue::float(kn * 1.852))
 }
 
 // Pressure
-fn builtin_atm_to_pa(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_atm_to_pa(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let atm = f1(args);
     Ok(StrykeValue::float(atm * 101325.0))
 }
-fn builtin_pa_to_atm(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pa_to_atm(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let pa = f1(args);
     Ok(StrykeValue::float(pa / 101325.0))
 }
-fn builtin_mmhg_to_pa(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_mmhg_to_pa(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mmhg = f1(args);
     Ok(StrykeValue::float(mmhg * 133.322))
 }
 
 // Energy
-fn builtin_ev_to_joules(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ev_to_joules(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ev = f1(args);
     Ok(StrykeValue::float(ev * 1.602176634e-19))
 }
-fn builtin_joules_to_ev(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_joules_to_ev(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let j = f1(args);
     Ok(StrykeValue::float(j / 1.602176634e-19))
 }
 #[allow(dead_code)]
-fn builtin_cal_to_joules(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cal_to_joules(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let cal = f1(args);
     Ok(StrykeValue::float(cal * 4.184))
 }
-fn builtin_btu_to_joules(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_btu_to_joules(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let btu = f1(args);
     Ok(StrykeValue::float(btu * 1055.06))
 }
-fn builtin_kwh_to_joules(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_kwh_to_joules(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let kwh = f1(args);
     Ok(StrykeValue::float(kwh * 3.6e6))
 }
 
 // Tempo to MIDI tick (pulses per quarter note)
-fn builtin_bpm_to_midi_tick_us(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bpm_to_midi_tick_us(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let bpm = f1(args);
     let ppqn = args.get(1).map(|v| v.to_number()).unwrap_or(480.0);
     if bpm <= 0.0 || ppqn <= 0.0 { return Ok(StrykeValue::float(f64::INFINITY)); }
@@ -309,7 +309,7 @@ fn builtin_bpm_to_midi_tick_us(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 //   A_f = 4.47e-3·(10^(0.025·Ln) − 1.15) + (0.4 · 10^((Tf + Lu)/10 − 9))^αf
 //   Lp  = (10/αf)·log₁₀(A_f) − Lu + 94
 // Arguments are interpolated (log-frequency, linear in tables) between adjacent bands.
-fn builtin_iso226_phon_adjustment(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_iso226_phon_adjustment(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let f = f1(args);
     let phon = args.get(1).map(|v| v.to_number()).unwrap_or(60.0);
     if f <= 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -356,18 +356,18 @@ fn builtin_iso226_phon_adjustment(args: &[StrykeValue]) -> PerlResult<StrykeValu
 }
 
 // dB to linear amplitude
-fn builtin_db_to_amp(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_db_to_amp(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let db = f1(args);
     Ok(StrykeValue::float(10_f64.powf(db / 20.0)))
 }
 // Linear amp to dB
-fn builtin_amp_to_db(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_amp_to_db(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let amp = f1(args).max(1e-30);
     Ok(StrykeValue::float(20.0 * amp.log10()))
 }
 
 // Roman numeral encode (1..3999)
-fn builtin_roman_encode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_roman_encode(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut n = i1(args);
     if !(1..=3999).contains(&n) { return Ok(StrykeValue::string(String::new())); }
     let pairs = [
@@ -382,7 +382,7 @@ fn builtin_roman_encode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::string(out))
 }
 // Roman numeral decode
-fn builtin_roman_decode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_roman_decode(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string().to_ascii_uppercase()).unwrap_or_default();
     let val = |c: char| -> i64 {
         match c {
@@ -404,7 +404,7 @@ fn builtin_roman_decode(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 // Number to English (simplified, 0..999)
-fn builtin_number_to_english(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_number_to_english(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut n = i1(args);
     if n == 0 { return Ok(StrykeValue::string("zero".into())); }
     let ones = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",

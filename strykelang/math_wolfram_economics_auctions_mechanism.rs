@@ -10,7 +10,7 @@ fn b73_to_ints(v: &StrykeValue) -> Vec<i64> {
 }
 
 /// Cobb-Douglas Y = A · K^α · L^β.
-fn builtin_cobb_douglas(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cobb_douglas(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let k = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let l = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -20,7 +20,7 @@ fn builtin_cobb_douglas(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// CES Y = A · (αK^ρ + (1-α)L^ρ)^(1/ρ).
-fn builtin_ces_production(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ces_production(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let k = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let l = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -31,7 +31,7 @@ fn builtin_ces_production(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Leontief input requirement: x_i = a_ij · y_j summed.
-fn builtin_leontief_input(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_leontief_input(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = b73_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let y = args.get(1).map(b73_to_floats).unwrap_or_default();
     let n = a.len().min(y.len());
@@ -40,14 +40,14 @@ fn builtin_leontief_input(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Leontief output: y = (I - A)⁻¹ d (1-D scalar form).
-fn builtin_leontief_output(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_leontief_output(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let d = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(d / (1.0 - a).max(1e-300)))
 }
 
 /// Slutsky decomposition: dq = SE + IE = ∂q/∂p|U + (-q · ∂q/∂I).
-fn builtin_slutsky_decompose(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_slutsky_decompose(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dq_dp_u = f1(args);
     let q = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let dq_di = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -55,7 +55,7 @@ fn builtin_slutsky_decompose(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Marshallian demand for Cobb-Douglas: q* = α·I/p.
-fn builtin_marshallian_demand(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_marshallian_demand(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let alpha = f1(args);
     let income = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let price = args.get(2).map(|v| v.to_number()).unwrap_or(1.0).max(1e-300);
@@ -64,35 +64,35 @@ fn builtin_marshallian_demand(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Hicksian demand for CES: h_i = α^σ · u · (p_j / Σ α^σ p_j^{1-σ})^σ. Simplified
 /// 1-good marshallian-equivalent at u.
-fn builtin_hicksian_demand(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hicksian_demand(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let utility = f1(args);
     let p = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-300);
     Ok(StrykeValue::float(utility / p))
 }
 
 /// Expenditure function E(p, u) = u · p (one-good).
-fn builtin_expenditure_function(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_expenditure_function(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let u = f1(args);
     let p = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(StrykeValue::float(u * p))
 }
 
 /// Indirect utility V(p, I) = I/p (one-good).
-fn builtin_indirect_utility(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_indirect_utility(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let income = f1(args);
     let p = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-300);
     Ok(StrykeValue::float(income / p))
 }
 
 /// Gale-Shapley single proposal step: returns 1 if accepted (better partner found).
-fn builtin_gale_shapley_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gale_shapley_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let proposer_rank = i1(args);
     let cur_rank = args.get(1).map(|v| v.to_number() as i64).unwrap_or(i64::MAX);
     Ok(StrykeValue::integer(if proposer_rank < cur_rank { 1 } else { 0 }))
 }
 
 /// Deferred acceptance round count: at most n rounds for n-by-n market.
-fn builtin_deferred_acceptance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_deferred_acceptance(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(0);
     Ok(StrykeValue::integer(n))
 }
@@ -100,7 +100,7 @@ fn builtin_deferred_acceptance(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 /// Top trading cycles: length of the directed cycle found from `start` in the
 /// functional graph `next[i]` (favourite-good pointers). Args: `next`, optional
 /// `start` (default `0`).
-fn builtin_top_trading_cycle(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_top_trading_cycle(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let nxt = b73_to_ints(args.first().unwrap_or(&StrykeValue::array(vec![])));
     if nxt.is_empty() {
         return Ok(StrykeValue::integer(0));
@@ -139,20 +139,20 @@ fn builtin_top_trading_cycle(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// VCG payment: bidder pays externality = max-without-i  -  total-without-i-portion.
-fn builtin_vcg_payment(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_vcg_payment(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let max_without_i = f1(args);
     let value_assigned = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float((max_without_i - value_assigned).max(0.0)))
 }
 
 /// Myerson optimal reservation price for uniform [0,1]: r = (1 - F(r))/f(r) → 1/2.
-fn builtin_myerson_optimal(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_myerson_optimal(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let cost = f1(args);
     Ok(StrykeValue::float(((1.0 + cost) / 2.0).clamp(0.0, 1.0)))
 }
 
 /// Gini for market shares.
-fn builtin_gini_market(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gini_market(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut shares = b73_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let n = shares.len() as f64;
     if n == 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -171,13 +171,13 @@ fn builtin_gini_market(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Herfindahl-Hirschman index Σ s_i².
-fn builtin_hhi_concentration(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hhi_concentration(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = b73_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     Ok(StrykeValue::float(s.iter().map(|x| x * x).sum::<f64>()))
 }
 
 /// Cournot equilibrium quantity per firm: q* = (a - c) / ((n+1) · b).
-fn builtin_cournot_eq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cournot_eq(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let c = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0).max(1e-300);
@@ -186,7 +186,7 @@ fn builtin_cournot_eq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Stackelberg leader q*_L = (a-c)/2b.
-fn builtin_stackelberg_eq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_stackelberg_eq(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let c = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0).max(1e-300);
@@ -194,13 +194,13 @@ fn builtin_stackelberg_eq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Bertrand: in symmetric homogeneous goods, p = MC.
-fn builtin_bertrand_eq(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_bertrand_eq(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mc = f1(args);
     Ok(StrykeValue::float(mc))
 }
 
 /// Monopoly Lerner index: L = (P - MC)/P = -1/ε.
-fn builtin_monopoly_lerner(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_monopoly_lerner(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = f1(args);
     let mc = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if p.abs() < 1e-300 { return Ok(StrykeValue::float(0.0)); }
@@ -208,7 +208,7 @@ fn builtin_monopoly_lerner(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Consumer surplus on linear demand: ½ · (a - p) · q.
-fn builtin_consumer_surplus(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_consumer_surplus(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let p = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let q = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -216,7 +216,7 @@ fn builtin_consumer_surplus(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Producer surplus: ½ · (p - mc_min) · q.
-fn builtin_producer_surplus(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_producer_surplus(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p = f1(args);
     let mc = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let q = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -224,14 +224,14 @@ fn builtin_producer_surplus(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Deadweight loss = ½ · (q* - q_t) · (p_t - p*).
-fn builtin_deadweight_loss(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_deadweight_loss(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dq = f1(args);
     let dp = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(0.5 * dq.abs() * dp.abs()))
 }
 
 /// Tax incidence on consumers: e_s / (e_s + |e_d|).
-fn builtin_tax_incidence(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_tax_incidence(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let es = f1(args);
     let ed = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).abs();
     let denom = (es + ed).max(1e-300);
@@ -239,7 +239,7 @@ fn builtin_tax_incidence(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Pareto efficiency check: is allocation a∈A weakly dominated by another?
-fn builtin_pareto_efficiency(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pareto_efficiency(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let utilities = b73_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let other = args.get(1).map(b73_to_floats).unwrap_or_default();
     let n = utilities.len().min(other.len());
@@ -248,26 +248,26 @@ fn builtin_pareto_efficiency(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Edgeworth box allocation: contract curve point with α-share.
-fn builtin_edgeworth_box_alloc(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_edgeworth_box_alloc(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let omega = f1(args);
     let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
     Ok(StrykeValue::float(alpha * omega))
 }
 
 /// Utilitarian SWF: Σ u_i.
-fn builtin_social_welfare_utilitarian(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_social_welfare_utilitarian(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let u = b73_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     Ok(StrykeValue::float(u.iter().sum()))
 }
 
 /// Rawlsian SWF: min u_i.
-fn builtin_social_welfare_rawls(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_social_welfare_rawls(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let u = b73_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     Ok(StrykeValue::float(u.iter().cloned().fold(f64::INFINITY, f64::min)))
 }
 
 /// Nash SWF: Π u_i.
-fn builtin_social_welfare_nash(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_social_welfare_nash(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let u = b73_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     Ok(StrykeValue::float(u.iter().product()))
 }
@@ -276,39 +276,39 @@ fn builtin_social_welfare_nash(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 /// comparison of `a` vs `b` (encoded as `−1` / `0` / `+1` or caller convention)
 /// is unchanged when alternative `c` is absent — pass full-set comparison then
 /// `{a,b}`-only comparison.
-fn builtin_arrow_independence(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_arrow_independence(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let cmp_with = i1(args);
     let cmp_without = args.get(1).map(|v| v.to_number() as i64).unwrap_or(cmp_with);
     Ok(StrykeValue::integer(if cmp_with == cmp_without { 1 } else { 0 }))
 }
 
 /// Vickrey (2nd-price) auction payment = 2nd-highest bid.
-fn builtin_vickrey_auction(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_vickrey_auction(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut bids = b73_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     bids.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
     Ok(StrykeValue::float(bids.get(1).copied().unwrap_or(0.0)))
 }
 
 /// First-price sealed bid: optimal bid (1 - 1/n)·v for uniform value distrib.
-fn builtin_first_price_seal(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_first_price_seal(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let v = f1(args);
     let n = args.get(1).map(|x| x.to_number()).unwrap_or(2.0).max(2.0);
     Ok(StrykeValue::float((1.0 - 1.0 / n) * v))
 }
 
 /// English (ascending) auction final price ≈ 2nd-highest valuation.
-fn builtin_english_auction(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_english_auction(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_vickrey_auction(args)
 }
 
 /// Dutch (descending) auction = first-price equivalent.
-fn builtin_dutch_auction(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_dutch_auction(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_first_price_seal(args)
 }
 
 /// ** Nonempty coalition count** for a set of `n` players: `2^n − 1` (subsets
 /// other than ∅). *Not* a cooperative-game **core** non-emptiness test.
-fn builtin_core_coalition(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_core_coalition(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(0) as u32;
     if n == 0 {
         return Ok(StrykeValue::integer(0));
@@ -321,7 +321,7 @@ fn builtin_core_coalition(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Loose **upper bound** on the number of distinct stable matchings in an
 /// `n×n` marriage market: `n!`.
-fn builtin_stable_matching_count(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_stable_matching_count(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(0);
     let mut acc = 1_i64;
     for k in 1..=n {
@@ -333,7 +333,7 @@ fn builtin_stable_matching_count(args: &[StrykeValue]) -> PerlResult<StrykeValue
 /// Gale–Shapley (**men-optimal** stable matching). Args: `n`, arrayref of `n`
 /// men's permutations (woman indices), arrayref of `n` women's ordered lists of
 /// men. Returns array: wife index for each man, or `−1` if alone.
-fn builtin_gale_optimal(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_gale_optimal(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args).max(0) as usize;
     if n == 0 {
         return Ok(StrykeValue::array(vec![]));
@@ -396,7 +396,7 @@ fn builtin_gale_optimal(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Pareto dominance: 1 if a dominates b component-wise.
-fn builtin_pareto_dominance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_pareto_dominance(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = b73_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     let b = args.get(1).map(b73_to_floats).unwrap_or_default();
     let n = a.len().min(b.len());
@@ -406,12 +406,12 @@ fn builtin_pareto_dominance(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Lerner index (alias of monopoly).
-fn builtin_lerner_index(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lerner_index(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_monopoly_lerner(args)
 }
 
 /// Price elasticity ε = (dQ/dP)·(P/Q).
-fn builtin_price_elasticity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_price_elasticity(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dq_dp = f1(args);
     let p = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let q = args.get(2).map(|v| v.to_number()).unwrap_or(1.0).max(1e-300);
@@ -419,12 +419,12 @@ fn builtin_price_elasticity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Supply elasticity (same form, different sign convention).
-fn builtin_supply_elasticity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_supply_elasticity(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_price_elasticity(args)
 }
 
 /// Income elasticity ε_I = (∂Q/∂I)·(I/Q).
-fn builtin_income_elasticity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_income_elasticity(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dq_di = f1(args);
     let income = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let q = args.get(2).map(|v| v.to_number()).unwrap_or(1.0).max(1e-300);
@@ -432,7 +432,7 @@ fn builtin_income_elasticity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Engel curve point Q(I): power form Q = A · I^β.
-fn builtin_engel_curve(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_engel_curve(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let income = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).max(0.0);
     let beta = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -440,7 +440,7 @@ fn builtin_engel_curve(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Cross-elasticity ε_{xy} = (∂Q_x/∂P_y)·(P_y/Q_x).
-fn builtin_cross_elasticity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_cross_elasticity(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let dqx_dpy = f1(args);
     let py = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let qx = args.get(2).map(|v| v.to_number()).unwrap_or(1.0).max(1e-300);
@@ -448,7 +448,7 @@ fn builtin_cross_elasticity(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Difference-in-differences estimator: (Y₁₁ - Y₁₀) - (Y₀₁ - Y₀₀).
-fn builtin_diff_in_diff(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_diff_in_diff(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y11 = f1(args);
     let y10 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let y01 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -457,12 +457,12 @@ fn builtin_diff_in_diff(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// DiD estimator alias.
-fn builtin_did_estimator(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_did_estimator(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_diff_in_diff(args)
 }
 
 /// RDD: difference of estimated outcomes at the cutoff.
-fn builtin_rdd_estimate(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rdd_estimate(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y_above = f1(args);
     let y_below = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(StrykeValue::float(y_above - y_below))

@@ -189,9 +189,9 @@ def main():
         doc = generate_doc(name, body, doc_override)
         impl_lines.append(f"/// `{name}` — {doc}")
         if needs_interp(body):
-            impl_lines.append(f"fn {fn_name}(interp: &Interpreter, args: &[StrykeValue]) -> PerlResult<StrykeValue> {{ {body} }}")
+            impl_lines.append(f"fn {fn_name}(interp: &Interpreter, args: &[StrykeValue]) -> StrykeResult<StrykeValue> {{ {body} }}")
         else:
-            impl_lines.append(f"fn {fn_name}(args: &[StrykeValue]) -> PerlResult<StrykeValue> {{ {body} }}")
+            impl_lines.append(f"fn {fn_name}(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {{ {body} }}")
     impl_block = "\n".join(impl_lines) + "\n"
 
     # Insert dispatch before "inc" line

@@ -1,5 +1,5 @@
 use crate::ast::*;
-use crate::error::{ErrorKind, StrykeError, PerlResult};
+use crate::error::{ErrorKind, StrykeError, StrykeResult};
 use crate::lexer::{Lexer, LITERAL_AT_IN_DQUOTE, LITERAL_DOLLAR_IN_DQUOTE};
 use crate::token::Token;
 use crate::vm_helper::VMHelper;
@@ -335,7 +335,7 @@ impl Parser {
     /// paren-less method args, …) so `@a |> head 2 |> join "-"` chains
     /// left-associatively instead of letting `head`'s first arg swallow the
     /// outer `|>`. The counter is restored on both success and error paths.
-    fn parse_assign_expr_stop_at_pipe(&mut self) -> PerlResult<Expr> {
+    fn parse_assign_expr_stop_at_pipe(&mut self) -> StrykeResult<Expr> {
         self.no_pipe_forward_depth = self.no_pipe_forward_depth.saturating_add(1);
         let r = self.parse_assign_expr();
         self.no_pipe_forward_depth = self.no_pipe_forward_depth.saturating_sub(1);
@@ -352,7 +352,7 @@ impl Parser {
     /// pipe-RHS); `None` when the caller should fall through to the block
     /// form. The first arg is any coderef-shaped expression — runtime
     /// checks `as_code_ref()` and dispatches.
-    fn try_parse_coderef_listop_args(&mut self, line: usize) -> PerlResult<Option<Vec<Expr>>> {
+    fn try_parse_coderef_listop_args(&mut self, line: usize) -> StrykeResult<Option<Vec<Expr>>> {
         if !matches!(self.peek(), Token::ScalarVar(_) | Token::Backslash) {
             return Ok(None);
         }
@@ -437,7 +437,7 @@ impl Parser {
         }
     }
 
-    fn expect(&mut self, expected: &Token) -> PerlResult<usize> {
+    fn expect(&mut self, expected: &Token) -> StrykeResult<usize> {
         let (tok, line) = self.advance();
         if std::mem::discriminant(&tok) == std::mem::discriminant(expected) {
             Ok(line)
@@ -526,7 +526,7 @@ impl Parser {
 
     // ── Top level ──
 
-    pub fn parse_program(&mut self) -> PerlResult<Program> {
+    pub fn parse_program(&mut self) -> StrykeResult<Program> {
         let mut statements = self.parse_statements()?;
         // Prepend any synthetic SubDecl stubs queued by anonymous overload
         // handlers so the package-qualified synthetic names resolve when the
@@ -542,7 +542,7 @@ impl Parser {
     }
 
     /// Parse statements until EOF. Used by parse_program and parse_block_from_str.
-    pub fn parse_statements(&mut self) -> PerlResult<Vec<Statement>> {
+    pub fn parse_statements(&mut self) -> StrykeResult<Vec<Statement>> {
         let mut statements = Vec::new();
         while !self.at_eof() {
             if matches!(self.peek(), Token::Semicolon) {
@@ -562,7 +562,7 @@ impl Parser {
 
     // ── Statements ──
 
-    fn parse_statement(&mut self) -> PerlResult<Statement> {
+    fn parse_statement(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
 
         // Statement label `FOO:` / `boot:` / `BAR_BAZ:` (not `Foo::` — that is `Ident` + `::`).
@@ -1057,7 +1057,7 @@ impl Parser {
     }
 
     /// Handle postfix if/unless on statement-level keywords like last/next.
-    fn parse_stmt_postfix_modifier(&mut self, stmt: Statement) -> PerlResult<Statement> {
+    fn parse_stmt_postfix_modifier(&mut self, stmt: Statement) -> StrykeResult<Statement> {
         let line = stmt.line;
         // Implicit semicolon: a modifier keyword on a new line is a new
         // statement, not a postfix modifier.  This prevents semicolon-less
@@ -1180,7 +1180,7 @@ impl Parser {
 
     /// Block body for postfix `pmap` / `pfor` / … — bare `{ }`, `do { }`, or any expression
     /// statement (wrapped as a one-line block, e.g. `` `cmd` pfor @a ``).
-    fn stmt_into_parallel_block(&self, stmt: Statement) -> PerlResult<Block> {
+    fn stmt_into_parallel_block(&self, stmt: Statement) -> StrykeResult<Block> {
         let line = stmt.line;
         match stmt.kind {
             StmtKind::Block(block) => Ok(block),
@@ -1298,7 +1298,7 @@ impl Parser {
         )
     }
 
-    fn maybe_postfix_modifier(&mut self, expr: Expr) -> PerlResult<Statement> {
+    fn maybe_postfix_modifier(&mut self, expr: Expr) -> StrykeResult<Statement> {
         let line = expr.line;
         // Implicit semicolon: modifier keyword on a new line starts a new statement.
         if self.peek_line() > self.prev_line() {
@@ -1798,7 +1798,7 @@ impl Parser {
         )
     }
 
-    fn parse_block(&mut self) -> PerlResult<Block> {
+    fn parse_block(&mut self) -> StrykeResult<Block> {
         self.expect(&Token::LBrace)?;
         // Statements inside a block are NOT pipe RHS - reset depth so nested `~>`
         // parses its own input instead of using `$_[0]` placeholder.
@@ -1829,7 +1829,7 @@ impl Parser {
     /// Returns `None` if the leading `|` is not block-param syntax.
     /// When successful, returns `my $var = <implicit>` assignment statements
     /// that alias the block's positional arguments.
-    fn try_parse_block_params(&mut self) -> PerlResult<Option<Vec<Statement>>> {
+    fn try_parse_block_params(&mut self) -> StrykeResult<Option<Vec<Statement>>> {
         if !matches!(self.peek(), Token::BitOr) {
             return Ok(None);
         }
@@ -1973,7 +1973,7 @@ impl Parser {
     /// `defer { BLOCK }` — register a block to run when the current scope exits.
     /// Desugars to a `defer__internal(fn { BLOCK })` function call that the compiler
     /// handles specially by emitting Op::DeferBlock.
-    fn parse_defer_stmt(&mut self) -> PerlResult<Statement> {
+    fn parse_defer_stmt(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance(); // defer
         let body = self.parse_block()?;
@@ -2000,7 +2000,7 @@ impl Parser {
     }
 
     /// `try { } catch ($err) { }` with optional `finally { }`
-    fn parse_try_catch(&mut self) -> PerlResult<Statement> {
+    fn parse_try_catch(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance(); // try
         let try_block = self.parse_block()?;
@@ -2049,7 +2049,7 @@ impl Parser {
     /// token through the stage loop, and wrap the resulting chain in a
     /// `CodeRef`. The outer `pipe_forward_apply` then calls it with `lhs` as
     /// `$_[0]`, giving `LHS |> t s1 s2 s3` == `LHS |> s1 |> s2 |> s3`.
-    fn parse_thread_macro(&mut self, _line: usize, thread_last: bool) -> PerlResult<Expr> {
+    fn parse_thread_macro(&mut self, _line: usize, thread_last: bool) -> StrykeResult<Expr> {
         self.parse_thread_macro_inner(_line, thread_last, None)
     }
 
@@ -2066,7 +2066,7 @@ impl Parser {
         _line: usize,
         thread_last: bool,
         mut parallel_collector: Option<&mut Vec<Expr>>,
-    ) -> PerlResult<Expr> {
+    ) -> StrykeResult<Expr> {
         // Set thread-last mode for pipe_forward_apply calls within this macro
         let saved_thread_last = self.thread_last_mode;
         self.thread_last_mode = thread_last;
@@ -2859,7 +2859,7 @@ impl Parser {
     }
 
     /// Apply a bare function name in thread context, handling unary builtins specially.
-    fn thread_apply_bare_func(&self, name: &str, arg: Expr, line: usize) -> PerlResult<Expr> {
+    fn thread_apply_bare_func(&self, name: &str, arg: Expr, line: usize) -> StrykeResult<Expr> {
         let kind = match name {
             // String functions
             "uc" => ExprKind::Uc(Box::new(arg)),
@@ -3270,7 +3270,7 @@ impl Parser {
 
     /// Parse a thread stage that has a block: `map { }`, `filter { }`, `sort { }`, etc.
     /// In thread context, we only parse the block - the list comes from the piped result.
-    fn parse_thread_stage_with_block(&mut self, name: &str, line: usize) -> PerlResult<Expr> {
+    fn parse_thread_stage_with_block(&mut self, name: &str, line: usize) -> StrykeResult<Expr> {
         let block = self.parse_block()?;
         // Use a placeholder for the list - pipe_forward_apply will replace it
         let placeholder = self.pipe_placeholder_list(line);
@@ -3417,7 +3417,7 @@ impl Parser {
     }
 
     /// `tie %hash | tie @arr | tie $x , 'Class', ...args`
-    fn parse_tie_stmt(&mut self) -> PerlResult<Statement> {
+    fn parse_tie_stmt(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance(); // tie
                         // `tie my $x, Class` and `tie our $x, Class` — common Perl idiom.
@@ -3520,7 +3520,7 @@ impl Parser {
     }
 
     /// `given (EXPR) { ... }`
-    fn parse_given(&mut self) -> PerlResult<Statement> {
+    fn parse_given(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance();
         self.expect(&Token::LParen)?;
@@ -3536,7 +3536,7 @@ impl Parser {
     }
 
     /// `when (COND) { ... }` — only meaningful inside `given`
-    fn parse_when_stmt(&mut self) -> PerlResult<Statement> {
+    fn parse_when_stmt(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance();
         self.expect(&Token::LParen)?;
@@ -3552,7 +3552,7 @@ impl Parser {
     }
 
     /// `default { ... }` — only meaningful inside `given`
-    fn parse_default_stmt(&mut self) -> PerlResult<Statement> {
+    fn parse_default_stmt(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance();
         let body = self.parse_block()?;
@@ -3569,7 +3569,7 @@ impl Parser {
     /// Desugars to an if/elsif/else chain at parse time.
     /// Each arm is `condition => { body }` or `condition => expr`.
     /// `default => ...` becomes the else branch.
-    fn parse_cond_expr(&mut self, line: usize) -> PerlResult<Expr> {
+    fn parse_cond_expr(&mut self, line: usize) -> StrykeResult<Expr> {
         self.expect(&Token::LBrace)?;
 
         let mut arms: Vec<(Expr, Block)> = Vec::new();
@@ -3654,7 +3654,7 @@ impl Parser {
     }
 
     /// `match (EXPR) { PATTERN => EXPR, ... }`
-    fn parse_algebraic_match_expr(&mut self, line: usize) -> PerlResult<Expr> {
+    fn parse_algebraic_match_expr(&mut self, line: usize) -> StrykeResult<Expr> {
         self.expect(&Token::LParen)?;
         let subject = self.parse_expression()?;
         self.expect(&Token::RParen)?;
@@ -3693,7 +3693,7 @@ impl Parser {
         })
     }
 
-    fn parse_match_pattern(&mut self) -> PerlResult<MatchPattern> {
+    fn parse_match_pattern(&mut self) -> StrykeResult<MatchPattern> {
         match self.peek().clone() {
             Token::Regex(pattern, flags, _delim) => {
                 self.advance();
@@ -3726,7 +3726,7 @@ impl Parser {
     }
 
     /// Contents of `[ ... ]` for algebraic array patterns and `sub ($a, [ ... ])` signatures.
-    fn parse_match_array_elems_until_rbracket(&mut self) -> PerlResult<Vec<MatchArrayElem>> {
+    fn parse_match_array_elems_until_rbracket(&mut self) -> StrykeResult<Vec<MatchArrayElem>> {
         let mut elems = Vec::new();
         if self.eat(&Token::RBracket) {
             return Ok(vec![]);
@@ -3783,13 +3783,13 @@ impl Parser {
         Ok(elems)
     }
 
-    fn parse_match_array_pattern(&mut self) -> PerlResult<MatchPattern> {
+    fn parse_match_array_pattern(&mut self) -> StrykeResult<MatchPattern> {
         self.expect(&Token::LBracket)?;
         let elems = self.parse_match_array_elems_until_rbracket()?;
         Ok(MatchPattern::Array(elems))
     }
 
-    fn parse_match_hash_pattern(&mut self) -> PerlResult<MatchPattern> {
+    fn parse_match_hash_pattern(&mut self) -> StrykeResult<MatchPattern> {
         self.expect(&Token::LBrace)?;
         let mut pairs = Vec::new();
         while !matches!(self.peek(), Token::RBrace | Token::Eof) {
@@ -3822,7 +3822,7 @@ impl Parser {
     }
 
     /// `eval_timeout SECS { ... }`
-    fn parse_eval_timeout(&mut self) -> PerlResult<Statement> {
+    fn parse_eval_timeout(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance();
         let timeout = self.parse_postfix()?;
@@ -3859,7 +3859,7 @@ impl Parser {
         }
     }
 
-    fn parse_if(&mut self) -> PerlResult<Statement> {
+    fn parse_if(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance(); // 'if'
         if matches!(self.peek(), Token::Ident(ref s) if s == "let") {
@@ -3913,7 +3913,7 @@ impl Parser {
     }
 
     /// `if let PAT = EXPR { ... } [ else { ... } ]` — desugars to [`ExprKind::AlgebraicMatch`].
-    fn parse_if_let(&mut self, line: usize) -> PerlResult<Statement> {
+    fn parse_if_let(&mut self, line: usize) -> StrykeResult<Statement> {
         self.advance(); // `let`
         let pattern = self.parse_match_pattern()?;
         self.expect(&Token::Assign)?;
@@ -3984,7 +3984,7 @@ impl Parser {
         }
     }
 
-    fn parse_unless(&mut self) -> PerlResult<Statement> {
+    fn parse_unless(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance(); // 'unless'
         self.expect(&Token::LParen)?;
@@ -4013,7 +4013,7 @@ impl Parser {
         })
     }
 
-    fn parse_while(&mut self) -> PerlResult<Statement> {
+    fn parse_while(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance(); // 'while'
         if matches!(self.peek(), Token::Ident(ref s) if s == "let") {
@@ -4045,7 +4045,7 @@ impl Parser {
 
     /// `while let PAT = EXPR { ... }` — desugars to a `match` that returns 0/1 plus `unless ($tmp) { last }`
     /// so bytecode does not run `last` inside a tree-assisted [`Op::AlgebraicMatch`] arm.
-    fn parse_while_let(&mut self, line: usize) -> PerlResult<Statement> {
+    fn parse_while_let(&mut self, line: usize) -> StrykeResult<Statement> {
         self.advance(); // `let`
         let pattern = self.parse_match_pattern()?;
         self.expect(&Token::Assign)?;
@@ -4120,7 +4120,7 @@ impl Parser {
         ))
     }
 
-    fn parse_until(&mut self) -> PerlResult<Statement> {
+    fn parse_until(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance(); // 'until'
         self.expect(&Token::LParen)?;
@@ -4142,7 +4142,7 @@ impl Parser {
     }
 
     /// `continue { ... }` after a loop body (optional).
-    fn parse_optional_continue_block(&mut self) -> PerlResult<Option<Block>> {
+    fn parse_optional_continue_block(&mut self) -> StrykeResult<Option<Block>> {
         if let Token::Ident(ref kw) = self.peek().clone() {
             if kw == "continue" {
                 self.advance();
@@ -4152,7 +4152,7 @@ impl Parser {
         Ok(None)
     }
 
-    fn parse_for_or_foreach(&mut self) -> PerlResult<Statement> {
+    fn parse_for_or_foreach(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance(); // 'for'
 
@@ -4255,7 +4255,7 @@ impl Parser {
         }
     }
 
-    fn parse_c_style_for(&mut self, line: usize) -> PerlResult<Statement> {
+    fn parse_c_style_for(&mut self, line: usize) -> StrykeResult<Statement> {
         self.expect(&Token::LParen)?;
         let init = if self.eat(&Token::Semicolon) {
             None
@@ -4295,7 +4295,7 @@ impl Parser {
         })
     }
 
-    fn parse_foreach(&mut self) -> PerlResult<Statement> {
+    fn parse_foreach(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance(); // 'foreach'
         let var = match self.peek() {
@@ -4324,7 +4324,7 @@ impl Parser {
         })
     }
 
-    fn parse_scalar_var_name(&mut self) -> PerlResult<String> {
+    fn parse_scalar_var_name(&mut self) -> StrykeResult<String> {
         match self.advance() {
             (Token::ScalarVar(name), _) => Ok(name),
             (tok, line) => {
@@ -4334,7 +4334,7 @@ impl Parser {
     }
 
     /// After `(` was consumed: Perl5 prototype characters until `)` (or `$)` + `{`).
-    fn parse_legacy_sub_prototype_tail(&mut self) -> PerlResult<String> {
+    fn parse_legacy_sub_prototype_tail(&mut self) -> StrykeResult<String> {
         let mut s = String::new();
         loop {
             match self.peek().clone() {
@@ -4445,7 +4445,7 @@ impl Parser {
         }
     }
 
-    fn parse_sub_signature_hash_key(&mut self) -> PerlResult<String> {
+    fn parse_sub_signature_hash_key(&mut self) -> StrykeResult<String> {
         let (tok, line) = self.advance();
         match tok {
             Token::Ident(i) => Ok(i),
@@ -4460,7 +4460,7 @@ impl Parser {
         }
     }
 
-    fn parse_sub_signature_param_list(&mut self) -> PerlResult<Vec<SubSigParam>> {
+    fn parse_sub_signature_param_list(&mut self) -> StrykeResult<Vec<SubSigParam>> {
         let mut params = Vec::new();
         loop {
             if matches!(self.peek(), Token::RParen) {
@@ -4590,7 +4590,7 @@ impl Parser {
     }
 
     /// Optional `sub` parens: either a Perl 5 prototype string or a stryke **`$name` / `{ k => $v }`** signature.
-    fn parse_sub_sig_or_prototype_opt(&mut self) -> PerlResult<(Vec<SubSigParam>, Option<String>)> {
+    fn parse_sub_sig_or_prototype_opt(&mut self) -> StrykeResult<(Vec<SubSigParam>, Option<String>)> {
         if !matches!(self.peek(), Token::LParen) {
             return Ok((vec![], None));
         }
@@ -4609,7 +4609,7 @@ impl Parser {
     }
 
     /// Optional subroutine attributes after name/prototype: `sub foo : lvalue { }`, `sub : ATTR(ARGS) { }`.
-    fn parse_sub_attributes(&mut self) -> PerlResult<()> {
+    fn parse_sub_attributes(&mut self) -> StrykeResult<()> {
         while self.eat(&Token::Colon) {
             match self.advance() {
                 (Token::Ident(_), _) => {}
@@ -4644,7 +4644,7 @@ impl Parser {
 
     /// After `fn` + optional `(SIG)` + attrs: stryke-only `= EXPR` (one assign-level expression;
     /// no top-level `,` after the expression). Returns `None` if the next token is not `=`.
-    fn try_parse_fn_assign_shorthand_body(&mut self) -> PerlResult<Option<Block>> {
+    fn try_parse_fn_assign_shorthand_body(&mut self) -> StrykeResult<Option<Block>> {
         if !self.eat(&Token::Assign) {
             return Ok(None);
         }
@@ -4668,7 +4668,7 @@ impl Parser {
 
     /// After `fn` + optional `(SIG)` + attrs: `{ ... }` or stryke-only `= EXPR` (see
     /// [`Self::try_parse_fn_assign_shorthand_body`]). `sub` always requires `{ ... }`.
-    fn parse_fn_eq_body_or_block(&mut self, is_sub_keyword: bool) -> PerlResult<Block> {
+    fn parse_fn_eq_body_or_block(&mut self, is_sub_keyword: bool) -> StrykeResult<Block> {
         if !is_sub_keyword {
             if let Some(block) = self.try_parse_fn_assign_shorthand_body()? {
                 return Ok(block);
@@ -4677,7 +4677,7 @@ impl Parser {
         self.parse_block()
     }
 
-    fn parse_sub_decl(&mut self, is_sub_keyword: bool) -> PerlResult<Statement> {
+    fn parse_sub_decl(&mut self, is_sub_keyword: bool) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance(); // 'sub' or 'fn'
         match self.peek().clone() {
@@ -4832,7 +4832,7 @@ impl Parser {
 
     /// `before|after|around "<glob>" { ... }` — register AOP advice.
     /// The pattern is a glob (`*`, `?`) matched against the called sub's bare name.
-    fn parse_advice_decl(&mut self, kind: crate::ast::AdviceKind) -> PerlResult<Statement> {
+    fn parse_advice_decl(&mut self, kind: crate::ast::AdviceKind) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance(); // before/after/around
         let pattern = match self.advance() {
@@ -4865,7 +4865,7 @@ impl Parser {
     }
 
     /// `struct Name { field => Type, ... ; fn method { } }`
-    fn parse_struct_decl(&mut self) -> PerlResult<Statement> {
+    fn parse_struct_decl(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance(); // struct
         let name = self.parse_package_qualified_identifier().map_err(|_| {
@@ -4963,7 +4963,7 @@ impl Parser {
     }
 
     /// `enum Name { Variant1, Variant2 => Type, ... }`
-    fn parse_enum_decl(&mut self) -> PerlResult<Statement> {
+    fn parse_enum_decl(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance(); // enum
         let name = self.parse_package_qualified_identifier().map_err(|_| {
@@ -5008,7 +5008,7 @@ impl Parser {
     }
 
     /// `[abstract|final] class Name extends Parent impl Trait { fields; methods }`
-    fn parse_class_decl(&mut self, is_abstract: bool, is_final: bool) -> PerlResult<Statement> {
+    fn parse_class_decl(&mut self, is_abstract: bool, is_final: bool) -> StrykeResult<Statement> {
         use crate::ast::{ClassDef, ClassField, ClassMethod, ClassStaticField, Visibility};
         let line = self.peek_line();
         self.advance(); // class
@@ -5246,7 +5246,7 @@ impl Parser {
     }
 
     /// `trait Name { fn required; fn with_default { } }`
-    fn parse_trait_decl(&mut self) -> PerlResult<Statement> {
+    fn parse_trait_decl(&mut self) -> StrykeResult<Statement> {
         use crate::ast::{ClassMethod, TraitDef, Visibility};
         let line = self.peek_line();
         self.advance(); // trait
@@ -5378,7 +5378,7 @@ impl Parser {
         &mut self,
         keyword: &str,
         line: usize,
-    ) -> PerlResult<Statement> {
+    ) -> StrykeResult<Statement> {
         self.expect(&Token::LBracket)?;
         let elems = self.parse_match_array_elems_until_rbracket()?;
         self.expect(&Token::Assign)?;
@@ -5389,7 +5389,7 @@ impl Parser {
         self.parse_stmt_postfix_modifier(stmt)
     }
 
-    fn parse_decl_hash_destructure(&mut self, keyword: &str, line: usize) -> PerlResult<Statement> {
+    fn parse_decl_hash_destructure(&mut self, keyword: &str, line: usize) -> StrykeResult<Statement> {
         let MatchPattern::Hash(pairs) = self.parse_match_hash_pattern()? else {
             unreachable!("parse_match_hash_pattern returns Hash");
         };
@@ -5407,7 +5407,7 @@ impl Parser {
         line: usize,
         elems: Vec<MatchArrayElem>,
         rhs: Expr,
-    ) -> PerlResult<Statement> {
+    ) -> StrykeResult<Statement> {
         let tmp = format!("__stryke_ds_{}", self.alloc_desugar_tmp());
         let mut stmts: Vec<Statement> = Vec::new();
         stmts.push(destructure_stmt_from_var_decls(
@@ -5601,7 +5601,7 @@ impl Parser {
         line: usize,
         pairs: Vec<MatchHashPair>,
         rhs: Expr,
-    ) -> PerlResult<Statement> {
+    ) -> StrykeResult<Statement> {
         let tmp = format!("__stryke_ds_{}", self.alloc_desugar_tmp());
         let mut stmts: Vec<Statement> = Vec::new();
         stmts.push(destructure_stmt_from_var_decls(
@@ -5673,7 +5673,7 @@ impl Parser {
         &mut self,
         keyword: &str,
         allow_type_annotation: bool,
-    ) -> PerlResult<Statement> {
+    ) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance(); // 'my'/'our'/'local'
 
@@ -5921,7 +5921,7 @@ impl Parser {
         self.parse_stmt_postfix_modifier(stmt)
     }
 
-    fn parse_var_decl(&mut self, allow_type_annotation: bool) -> PerlResult<VarDecl> {
+    fn parse_var_decl(&mut self, allow_type_annotation: bool) -> StrykeResult<VarDecl> {
         let mut decl = match self.advance() {
             (Token::ScalarVar(name), _) => VarDecl {
                 sigil: Sigil::Scalar,
@@ -6004,7 +6004,7 @@ impl Parser {
         Ok(decl)
     }
 
-    fn parse_type_name(&mut self) -> PerlResult<PerlTypeName> {
+    fn parse_type_name(&mut self) -> StrykeResult<PerlTypeName> {
         match self.advance() {
             (Token::Ident(name), _) => match name.as_str() {
                 "Int" => Ok(PerlTypeName::Int),
@@ -6024,7 +6024,7 @@ impl Parser {
         }
     }
 
-    fn parse_package(&mut self) -> PerlResult<Statement> {
+    fn parse_package(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance(); // 'package'
         let name = match self.advance() {
@@ -6048,7 +6048,7 @@ impl Parser {
         })
     }
 
-    fn parse_use(&mut self) -> PerlResult<Statement> {
+    fn parse_use(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance(); // 'use'
         let (tok, tok_line) = self.advance();
@@ -6085,7 +6085,7 @@ impl Parser {
                 }
                 if full_name == "overload" {
                     let mut pairs = Vec::new();
-                    let mut parse_overload_pairs = |this: &mut Self| -> PerlResult<()> {
+                    let mut parse_overload_pairs = |this: &mut Self| -> StrykeResult<()> {
                         loop {
                             if matches!(this.peek(), Token::RParen | Token::Semicolon | Token::Eof)
                             {
@@ -6148,7 +6148,7 @@ impl Parser {
         }
     }
 
-    fn parse_no(&mut self) -> PerlResult<Statement> {
+    fn parse_no(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance(); // 'no'
         let module = match self.advance() {
@@ -6192,7 +6192,7 @@ impl Parser {
         })
     }
 
-    fn parse_return(&mut self) -> PerlResult<Statement> {
+    fn parse_return(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance(); // 'return'
                         // No-value return: terminator tokens AND any postfix statement-modifier
@@ -6275,11 +6275,11 @@ impl Parser {
 
     // ── Expressions (Pratt / precedence climbing) ──
 
-    fn parse_expression(&mut self) -> PerlResult<Expr> {
+    fn parse_expression(&mut self) -> StrykeResult<Expr> {
         self.parse_comma_expr()
     }
 
-    fn parse_comma_expr(&mut self) -> PerlResult<Expr> {
+    fn parse_comma_expr(&mut self) -> StrykeResult<Expr> {
         // Word-op precedence (or/and/not) sits ABOVE assignment in Perl —
         // `EXPR or $err = $@` parses as `EXPR or ($err = $@)`, NOT
         // `(EXPR or $err) = $@`. Entering through `parse_or_word` here
@@ -6308,7 +6308,7 @@ impl Parser {
         })
     }
 
-    fn parse_assign_expr(&mut self) -> PerlResult<Expr> {
+    fn parse_assign_expr(&mut self) -> StrykeResult<Expr> {
         let expr = self.parse_ternary()?;
         let line = expr.line;
 
@@ -6533,7 +6533,7 @@ impl Parser {
         }
     }
 
-    fn parse_ternary(&mut self) -> PerlResult<Expr> {
+    fn parse_ternary(&mut self) -> StrykeResult<Expr> {
         let expr = self.parse_pipe_forward()?;
         if self.eat(&Token::Question) {
             let line = expr.line;
@@ -6560,7 +6560,7 @@ impl Parser {
     /// no runtime cost). `x |> f(a, b)` → `f(x, a, b)`; `x |> f` → `f(x)`; chain
     /// `x |> f |> g(2)` → `g(f(x), 2)`. Precedence sits between `?:` and `||`, so
     /// `x + 1 |> f || y` parses as `f(x + 1) || y`.
-    fn parse_pipe_forward(&mut self) -> PerlResult<Expr> {
+    fn parse_pipe_forward(&mut self) -> StrykeResult<Expr> {
         // After moving word-ops (or/and/not) above the assignment level,
         // pipe_forward must descend into `parse_range` (which itself
         // descends into `parse_log_or`) — calling `parse_or_word` here
@@ -6620,7 +6620,7 @@ impl Parser {
     ///   as the sole argument.
     /// - Ambiguous forms (binary ops, ternaries, literals, lists) — parse error,
     ///   since silently calling a non-callable at runtime would be worse.
-    fn pipe_forward_apply(&self, lhs: Expr, rhs: Expr, line: usize) -> PerlResult<Expr> {
+    fn pipe_forward_apply(&self, lhs: Expr, rhs: Expr, line: usize) -> StrykeResult<Expr> {
         let Expr { kind, line: rline } = rhs;
         let new_kind = match kind {
             // ── Generic / user-defined calls ───────────────────────────────────
@@ -7339,7 +7339,7 @@ impl Parser {
     }
 
     // or / not (lowest precedence word operators)
-    fn parse_or_word(&mut self) -> PerlResult<Expr> {
+    fn parse_or_word(&mut self) -> StrykeResult<Expr> {
         let mut left = self.parse_and_word()?;
         while matches!(self.peek(), Token::LogOrWord) {
             let line = left.line;
@@ -7357,7 +7357,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_and_word(&mut self) -> PerlResult<Expr> {
+    fn parse_and_word(&mut self) -> StrykeResult<Expr> {
         let mut left = self.parse_not_word()?;
         while matches!(self.peek(), Token::LogAndWord) {
             let line = left.line;
@@ -7375,7 +7375,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_not_word(&mut self) -> PerlResult<Expr> {
+    fn parse_not_word(&mut self) -> StrykeResult<Expr> {
         if matches!(self.peek(), Token::LogNotWord) {
             let line = self.peek_line();
             self.advance();
@@ -7393,7 +7393,7 @@ impl Parser {
         self.parse_assign_expr()
     }
 
-    fn parse_log_or(&mut self) -> PerlResult<Expr> {
+    fn parse_log_or(&mut self) -> StrykeResult<Expr> {
         let mut left = self.parse_log_and()?;
         loop {
             let op = match self.peek() {
@@ -7416,7 +7416,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_log_and(&mut self) -> PerlResult<Expr> {
+    fn parse_log_and(&mut self) -> StrykeResult<Expr> {
         let mut left = self.parse_bit_or()?;
         while matches!(self.peek(), Token::LogAnd) {
             let line = left.line;
@@ -7434,7 +7434,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_bit_or(&mut self) -> PerlResult<Expr> {
+    fn parse_bit_or(&mut self) -> StrykeResult<Expr> {
         let mut left = self.parse_bit_xor()?;
         while matches!(self.peek(), Token::BitOr) {
             let line = left.line;
@@ -7452,7 +7452,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_bit_xor(&mut self) -> PerlResult<Expr> {
+    fn parse_bit_xor(&mut self) -> StrykeResult<Expr> {
         let mut left = self.parse_bit_and()?;
         while matches!(self.peek(), Token::BitXor) {
             let line = left.line;
@@ -7470,7 +7470,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_bit_and(&mut self) -> PerlResult<Expr> {
+    fn parse_bit_and(&mut self) -> StrykeResult<Expr> {
         let mut left = self.parse_equality()?;
         while matches!(self.peek(), Token::BitAnd) {
             let line = left.line;
@@ -7488,7 +7488,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_equality(&mut self) -> PerlResult<Expr> {
+    fn parse_equality(&mut self) -> StrykeResult<Expr> {
         let mut left = self.parse_comparison()?;
         loop {
             let op = match self.peek() {
@@ -7515,7 +7515,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_comparison(&mut self) -> PerlResult<Expr> {
+    fn parse_comparison(&mut self) -> StrykeResult<Expr> {
         let left = self.parse_shift()?;
         let first_op = match self.peek() {
             Token::NumLt => BinOp::NumLt,
@@ -7609,7 +7609,7 @@ impl Parser {
         Ok(result)
     }
 
-    fn parse_shift(&mut self) -> PerlResult<Expr> {
+    fn parse_shift(&mut self) -> StrykeResult<Expr> {
         let mut left = self.parse_addition()?;
         loop {
             let op = match self.peek() {
@@ -7632,7 +7632,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_addition(&mut self) -> PerlResult<Expr> {
+    fn parse_addition(&mut self) -> StrykeResult<Expr> {
         let mut left = self.parse_multiplication()?;
         loop {
             // Implicit semicolon: `-` or `+` on a new line is a unary operator on
@@ -7658,7 +7658,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_multiplication(&mut self) -> PerlResult<Expr> {
+    fn parse_multiplication(&mut self) -> StrykeResult<Expr> {
         let mut left = self.parse_regex_bind()?;
         loop {
             let op = match self.peek() {
@@ -7705,7 +7705,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_regex_bind(&mut self) -> PerlResult<Expr> {
+    fn parse_regex_bind(&mut self) -> StrykeResult<Expr> {
         let left = self.parse_unary()?;
         match self.peek() {
             Token::BindMatch => {
@@ -7858,7 +7858,7 @@ impl Parser {
 
     /// Parse thread macro input. Like `parse_range` but suppresses `/` as division
     /// so that `/pattern/` is left for the thread stage parser to handle as regex filter.
-    fn parse_thread_input(&mut self) -> PerlResult<Expr> {
+    fn parse_thread_input(&mut self) -> StrykeResult<Expr> {
         self.suppress_slash_as_div = self.suppress_slash_as_div.saturating_add(1);
         let result = self.parse_range();
         self.suppress_slash_as_div = self.suppress_slash_as_div.saturating_sub(1);
@@ -7869,7 +7869,7 @@ impl Parser {
     /// `par_reduce { stage1 |> stage2 |> ... } SOURCE`, with optional
     /// `||>` or `|then|` mid-pipeline boundary that switches to a normal
     /// `~>` / `~>>` continuation operating on the auto-merged result.
-    fn parse_thread_macro_chunk_par(&mut self, line: usize, thread_last: bool) -> PerlResult<Expr> {
+    fn parse_thread_macro_chunk_par(&mut self, line: usize, thread_last: bool) -> StrykeResult<Expr> {
         // Source: same parsing rules as `~>`.
         self.suppress_parenless_call = self.suppress_parenless_call.saturating_add(1);
         let source_expr = self.parse_thread_input();
@@ -7924,7 +7924,7 @@ impl Parser {
     /// Syntax: `~d> on EXPR SOURCE stage1 stage2 ...`. The `on EXPR` slot
     /// is required; without it the operator falls through to a syntax
     /// error (no implicit default-cluster in v1).
-    fn parse_thread_macro_dist(&mut self, line: usize, thread_last: bool) -> PerlResult<Expr> {
+    fn parse_thread_macro_dist(&mut self, line: usize, thread_last: bool) -> StrykeResult<Expr> {
         // Required `on EXPR` — the cluster operand.
         let on_ok = matches!(self.peek(), Token::Ident(ref s) if s == "on");
         if !on_ok {
@@ -7998,7 +7998,7 @@ impl Parser {
         prior: Expr,
         line: usize,
         thread_last: bool,
-    ) -> PerlResult<Expr> {
+    ) -> StrykeResult<Expr> {
         self.pending_thread_input = Some(prior);
         let res = self.parse_thread_macro_inner(line, thread_last, None);
         self.pending_thread_input = None;
@@ -8035,7 +8035,7 @@ impl Parser {
     /// operators (additive, multiplicative, regex bind, unary). Non-associative: the right
     /// operand is a single `parse_log_or` so `1..5..10` is a parse error in Perl, but we accept
     /// it greedily (left-associated) because the lexer already forbids `..` after a range RHS.
-    fn parse_range(&mut self) -> PerlResult<Expr> {
+    fn parse_range(&mut self) -> StrykeResult<Expr> {
         let left = self.parse_log_or()?;
         let line = left.line;
         // `1..10` (traditional inclusive) / `1...10` (exclusive) / `1:10`
@@ -8080,7 +8080,7 @@ impl Parser {
     }
 
     /// `name` or `Foo::Bar::baz` — used after `sub`, unary `&`, etc.
-    fn parse_package_qualified_identifier(&mut self) -> PerlResult<String> {
+    fn parse_package_qualified_identifier(&mut self) -> StrykeResult<String> {
         let mut name = match self.advance() {
             (Token::Ident(n), _) => n,
             (tok, l) => {
@@ -8114,11 +8114,11 @@ impl Parser {
     }
 
     /// After consuming unary `&`: `name` or `Foo::Bar::baz` (Perl `&foo` / `&Foo::bar`).
-    fn parse_qualified_subroutine_name(&mut self) -> PerlResult<String> {
+    fn parse_qualified_subroutine_name(&mut self) -> StrykeResult<String> {
         self.parse_package_qualified_identifier()
     }
 
-    fn parse_unary(&mut self) -> PerlResult<Expr> {
+    fn parse_unary(&mut self) -> StrykeResult<Expr> {
         let line = self.peek_line();
         match self.peek().clone() {
             Token::Minus => {
@@ -8278,7 +8278,7 @@ impl Parser {
         }
     }
 
-    fn parse_power(&mut self) -> PerlResult<Expr> {
+    fn parse_power(&mut self) -> StrykeResult<Expr> {
         let left = self.parse_postfix()?;
         if matches!(self.peek(), Token::Power) {
             let line = left.line;
@@ -8296,7 +8296,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_postfix(&mut self) -> PerlResult<Expr> {
+    fn parse_postfix(&mut self) -> StrykeResult<Expr> {
         let mut expr = self.parse_primary()?;
         loop {
             match self.peek().clone() {
@@ -8763,7 +8763,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn parse_primary(&mut self) -> PerlResult<Expr> {
+    fn parse_primary(&mut self) -> StrykeResult<Expr> {
         let line = self.peek_line();
         // `my $x = …` (or `our` / `state` / `local`) used inside an expression —
         // typically `if (my $x = …)` / `while (my $line = <FH>)`.  Returns the
@@ -9420,7 +9420,7 @@ impl Parser {
         }
     }
 
-    fn parse_named_expr(&mut self, mut name: String) -> PerlResult<Expr> {
+    fn parse_named_expr(&mut self, mut name: String) -> StrykeResult<Expr> {
         let line = self.peek_line();
         self.advance(); // consume the ident
         while self.eat(&Token::PackageSep) {
@@ -12925,7 +12925,7 @@ impl Parser {
     fn parse_print_like(
         &mut self,
         make: impl FnOnce(Option<String>, Vec<Expr>) -> ExprKind,
-    ) -> PerlResult<Expr> {
+    ) -> StrykeResult<Expr> {
         let line = self.peek_line();
         // Check for filehandle: print STDERR "msg"  /  print $fh "msg"
         let handle = if let Token::Ident(ref h) = self.peek().clone() {
@@ -13027,7 +13027,7 @@ impl Parser {
         })
     }
 
-    fn parse_block_list(&mut self) -> PerlResult<(Block, Expr)> {
+    fn parse_block_list(&mut self) -> StrykeResult<(Block, Expr)> {
         let block = self.parse_block()?;
         let block_end_line = self.prev_line();
         self.eat(&Token::Comma);
@@ -13052,7 +13052,7 @@ impl Parser {
     fn parse_comma_expr_list_with_timeout_tail(
         &mut self,
         paren: bool,
-    ) -> PerlResult<(Vec<Expr>, Option<Expr>)> {
+    ) -> StrykeResult<(Vec<Expr>, Option<Expr>)> {
         let mut parts = vec![self.parse_assign_expr()?];
         loop {
             if !self.eat(&Token::Comma) && !self.eat(&Token::FatArrow) {
@@ -13086,7 +13086,7 @@ impl Parser {
     /// `preduce_init EXPR, BLOCK, LIST` with optional `, progress => EXPR`.
     fn parse_init_block_then_list_optional_progress(
         &mut self,
-    ) -> PerlResult<(Expr, Block, Expr, Option<Expr>)> {
+    ) -> StrykeResult<(Expr, Block, Expr, Option<Expr>)> {
         let init = self.parse_assign_expr()?;
         self.expect(&Token::Comma)?;
         let block = self.parse_block_or_bareword_block()?;
@@ -13152,7 +13152,7 @@ impl Parser {
     /// `pmap_on CLUSTER { BLOCK } LIST [, progress => EXPR]` — cluster expr, then same tail as [`Self::parse_block_then_list_optional_progress`].
     fn parse_cluster_block_then_list_optional_progress(
         &mut self,
-    ) -> PerlResult<(Expr, Block, Expr, Option<Expr>)> {
+    ) -> StrykeResult<(Expr, Block, Expr, Option<Expr>)> {
         // `pmap_on $c { BLOCK } @list` — suppress `$c { ... }` hash-subscript
         // auto-arrow so the brace opens the BLOCK, not a `$c->{...}` deref.
         self.suppress_scalar_hash_brace = self.suppress_scalar_hash_brace.saturating_add(1);
@@ -13234,7 +13234,7 @@ impl Parser {
     /// left-associative in `@a |> pmap { $_ * 2 }, progress => 0 |> join ','`.
     fn parse_block_then_list_optional_progress(
         &mut self,
-    ) -> PerlResult<(Block, Expr, Option<Expr>)> {
+    ) -> StrykeResult<(Block, Expr, Option<Expr>)> {
         let block = self.parse_block_or_bareword_block()?;
         let block_end_line = self.prev_line();
         self.eat(&Token::Comma);
@@ -13304,7 +13304,7 @@ impl Parser {
     }
 
     /// Parse fan/fan_cap arguments: optional count + block or blockless expression.
-    fn parse_fan_count_and_block(&mut self, line: usize) -> PerlResult<(Option<Box<Expr>>, Block)> {
+    fn parse_fan_count_and_block(&mut self, line: usize) -> StrykeResult<(Option<Box<Expr>>, Block)> {
         // `fan { BLOCK }` — no count
         if matches!(self.peek(), Token::LBrace) {
             let block = self.parse_block()?;
@@ -13339,7 +13339,7 @@ impl Parser {
     }
 
     /// Parse a blockless fan/fan_cap body as a full expression (not just postfix).
-    fn parse_fan_blockless_body(&mut self, line: usize) -> PerlResult<Block> {
+    fn parse_fan_blockless_body(&mut self, line: usize) -> StrykeResult<Block> {
         if matches!(self.peek(), Token::LBrace) {
             return self.parse_block();
         }
@@ -13388,7 +13388,7 @@ impl Parser {
     ///
     /// - Bareword `foo` → `{ foo($_) }`
     /// - Other expr     → `{ EXPR }`
-    fn parse_block_or_bareword_block(&mut self) -> PerlResult<Block> {
+    fn parse_block_or_bareword_block(&mut self) -> StrykeResult<Block> {
         if matches!(self.peek(), Token::LBrace) {
             return self.parse_block();
         }
@@ -13424,7 +13424,7 @@ impl Parser {
     /// bare function takes no args (body runs stand-alone, not per-element).
     /// Only consumes a single bareword identifier — does NOT let `parse_primary`
     /// greedily swallow subsequent tokens as function arguments.
-    fn parse_block_or_bareword_block_no_args(&mut self) -> PerlResult<Block> {
+    fn parse_block_or_bareword_block_no_args(&mut self) -> StrykeResult<Block> {
         if matches!(self.peek(), Token::LBrace) {
             return self.parse_block();
         }
@@ -13683,6 +13683,16 @@ impl Parser {
             | "git_log" | "git_status" | "git_diff" | "git_branches"
             | "git_tags" | "git_blame" | "git_authors" | "git_files"
             | "git_show" | "git_root"
+            // ── github / gh REST API ─────────────────────────────────────────
+            | "gh_get" | "gh_user" | "gh_org" | "gh_followers" | "gh_following"
+            | "gh_repo" | "gh_repos" | "gh_org_repos" | "gh_starred"
+            | "gh_gists" | "gh_gist"
+            | "gh_issues" | "gh_prs" | "gh_commits" | "gh_branches"
+            | "gh_tags" | "gh_releases" | "gh_contributors" | "gh_forks"
+            | "gh_stargazers" | "gh_topics" | "gh_languages"
+            | "gh_readme" | "gh_workflows" | "gh_runs"
+            | "gh_search_repos" | "gh_search_users" | "gh_search_code" | "gh_search_issues"
+            | "gh_rate_limit" | "gh_meta" | "gh_emojis" | "gh_zen"
             // ── audio / media ───────────────────────────────────────────────
             | "audio_convert" | "audio_info" | "id3_read" | "id3_write"
             // ── pdf ─────────────────────────────────────────────────────────
@@ -17777,7 +17787,7 @@ impl Parser {
         "cmp",
     ];
 
-    fn check_udf_shadows_builtin(&self, name: &str, line: usize) -> PerlResult<()> {
+    fn check_udf_shadows_builtin(&self, name: &str, line: usize) -> StrykeResult<()> {
         // Only check bare names, not namespaced ones (Foo::y is allowed)
         if !name.contains("::") {
             if Self::RESERVED_FUNCTION_NAMES.contains(&name) {
@@ -17803,7 +17813,7 @@ impl Parser {
 
     /// Check if a hash name shadows a reserved stryke hash and error if so.
     /// Called only in non-compat mode.
-    fn check_hash_shadows_reserved(&self, name: &str, line: usize) -> PerlResult<()> {
+    fn check_hash_shadows_reserved(&self, name: &str, line: usize) -> StrykeResult<()> {
         if Self::is_reserved_hash_name(name) {
             return Err(self.syntax_err(
                 format!(
@@ -17817,7 +17827,7 @@ impl Parser {
 
     /// Validate assignment to %hash in non-compat mode.
     /// Rejects: scalar, string, arrayref, hashref, coderef, undef, odd-length list.
-    fn validate_hash_assignment(&self, value: &Expr, line: usize) -> PerlResult<()> {
+    fn validate_hash_assignment(&self, value: &Expr, line: usize) -> StrykeResult<()> {
         match &value.kind {
             ExprKind::Integer(_) | ExprKind::Float(_) => {
                 return Err(self.syntax_err(
@@ -17895,7 +17905,7 @@ impl Parser {
     /// Rejects: undef (likely a mistake — use `@a = ()` to empty).
     /// Note: bare scalars like `@a = 2` are allowed since Perl coerces them to single-element lists.
     /// Note: `@a = {hashref}` is allowed as a common pattern for single-element arrays.
-    fn validate_array_assignment(&self, value: &Expr, line: usize) -> PerlResult<()> {
+    fn validate_array_assignment(&self, value: &Expr, line: usize) -> StrykeResult<()> {
         if let ExprKind::Undef = &value.kind {
             return Err(
                 self.syntax_err("cannot assign undef to array — use @a = () to empty", line)
@@ -17906,7 +17916,7 @@ impl Parser {
 
     /// Validate assignment to $scalar in non-compat mode.
     /// Rejects: list literals (Perl 5 silently returns last element — footgun).
-    fn validate_scalar_assignment(&self, value: &Expr, line: usize) -> PerlResult<()> {
+    fn validate_scalar_assignment(&self, value: &Expr, line: usize) -> StrykeResult<()> {
         if let ExprKind::List(items) = &value.kind {
             if items.len() > 1 {
                 return Err(self.syntax_err(
@@ -17922,7 +17932,7 @@ impl Parser {
     }
 
     /// Validate an assignment based on target type (in non-compat mode only).
-    fn validate_assignment(&self, target: &Expr, value: &Expr, line: usize) -> PerlResult<()> {
+    fn validate_assignment(&self, target: &Expr, value: &Expr, line: usize) -> StrykeResult<()> {
         if crate::compat_mode() {
             return Ok(());
         }
@@ -17937,7 +17947,7 @@ impl Parser {
     /// Parse a block OR a blockless comparison expression for sort/psort/heap.
     /// Blockless: `$a <=> $b` or `$a cmp $b` or any expression → wrapped as a Block.
     /// Also accepts a bare function name: `psort my_cmp, @list`.
-    fn parse_block_or_bareword_cmp_block(&mut self) -> PerlResult<Block> {
+    fn parse_block_or_bareword_cmp_block(&mut self) -> StrykeResult<Block> {
         if matches!(self.peek(), Token::LBrace) {
             return self.parse_block();
         }
@@ -17978,7 +17988,7 @@ impl Parser {
     fn parse_fan_optional_progress(
         &mut self,
         which: &'static str,
-    ) -> PerlResult<Option<Box<Expr>>> {
+    ) -> StrykeResult<Option<Box<Expr>>> {
         let line = self.peek_line();
         if self.eat(&Token::Comma) {
             match self.peek() {
@@ -18013,7 +18023,7 @@ impl Parser {
     /// Paren-less — individual parts parse through
     /// [`Self::parse_assign_expr_stop_at_pipe`] so a trailing `|>` is left for
     /// the enclosing pipe-forward loop (left-associative chaining).
-    fn parse_assign_expr_list_optional_progress(&mut self) -> PerlResult<(Expr, Option<Expr>)> {
+    fn parse_assign_expr_list_optional_progress(&mut self) -> StrykeResult<(Expr, Option<Expr>)> {
         // On the RHS of `|>`, list-taking builtins may be written bare with no
         // operand — `@a |> uniq`, `@a |> flatten`, `foo(bar, @a |> psort)`, etc.
         // When the next token is a list-terminator, yield an empty placeholder
@@ -18059,7 +18069,7 @@ impl Parser {
         Ok((merge_expr_list(parts), None))
     }
 
-    fn parse_one_arg(&mut self) -> PerlResult<Expr> {
+    fn parse_one_arg(&mut self) -> StrykeResult<Expr> {
         if matches!(self.peek(), Token::LParen) {
             self.advance();
             let expr = self.parse_expression()?;
@@ -18078,7 +18088,7 @@ impl Parser {
     /// Without this `defined $x && Y` mis-parsed as `defined($x && Y)` and
     /// silently returned true whenever `$x` was defined — see the skip-list
     /// debugging write-up. Same scope rule for `length` etc.
-    fn parse_named_unary_arg(&mut self) -> PerlResult<Expr> {
+    fn parse_named_unary_arg(&mut self) -> StrykeResult<Expr> {
         if matches!(self.peek(), Token::LParen) {
             self.advance();
             let expr = self.parse_expression()?;
@@ -18089,7 +18099,7 @@ impl Parser {
         }
     }
 
-    fn parse_one_arg_or_default(&mut self) -> PerlResult<Expr> {
+    fn parse_one_arg_or_default(&mut self) -> StrykeResult<Expr> {
         // Treat a line boundary as a hard arg terminator: if the next
         // token is on a *later* line than the named-unary keyword we
         // just consumed, default the operand to `$_` and stop. Without
@@ -18171,7 +18181,7 @@ impl Parser {
     }
 
     /// Array operand for `shift` / `pop`: default `@_`, or `shift(@a)` / `shift()` (empty parens = `@_`).
-    fn parse_one_arg_or_argv(&mut self) -> PerlResult<Expr> {
+    fn parse_one_arg_or_argv(&mut self) -> StrykeResult<Expr> {
         let line = self.prev_line(); // line where shift/pop keyword was
         if matches!(self.peek(), Token::LParen) {
             self.advance();
@@ -18206,7 +18216,7 @@ impl Parser {
         }
     }
 
-    fn parse_builtin_args(&mut self) -> PerlResult<Vec<Expr>> {
+    fn parse_builtin_args(&mut self) -> StrykeResult<Vec<Expr>> {
         if matches!(self.peek(), Token::LParen) {
             self.advance();
             let args = self.parse_arg_list()?;
@@ -18246,7 +18256,7 @@ impl Parser {
     /// but inside `{…}` followed by `}` they're plainly hash keys.
     /// Stryke exception: topic-slot barewords (`_`, `_<`, `_0`, `_0<`, …)
     /// resolve to the topic value, not the literal name — `$h{_<}` ≡ `$h{$_<}`.
-    fn parse_hash_subscript_key(&mut self) -> PerlResult<Expr> {
+    fn parse_hash_subscript_key(&mut self) -> StrykeResult<Expr> {
         let line = self.peek_line();
         if let Token::Ident(ref k) = self.peek().clone() {
             if matches!(self.peek_at(1), Token::RBrace) && !Self::is_underscore_topic_slot(k) {
@@ -18278,7 +18288,7 @@ impl Parser {
     }
 
     /// Pattern list for `glob_par` / `par_sed` inside `(...)`, stopping before `)` or `progress =>`.
-    fn parse_pattern_list_until_rparen_or_progress(&mut self) -> PerlResult<Vec<Expr>> {
+    fn parse_pattern_list_until_rparen_or_progress(&mut self) -> StrykeResult<Vec<Expr>> {
         let mut args = Vec::new();
         loop {
             if matches!(self.peek(), Token::RParen | Token::Eof) {
@@ -18311,7 +18321,7 @@ impl Parser {
     }
 
     /// Paren-less pattern list for `glob_par` / `par_sed`, stopping before stmt end or `progress =>`.
-    fn parse_pattern_list_glob_par_bare(&mut self) -> PerlResult<Vec<Expr>> {
+    fn parse_pattern_list_glob_par_bare(&mut self) -> StrykeResult<Vec<Expr>> {
         let mut args = Vec::new();
         loop {
             if matches!(
@@ -18338,7 +18348,7 @@ impl Parser {
     }
 
     /// `glob_pat EXPR, ...` or `glob_pat(...)` plus optional `, progress => EXPR` / inner `progress =>`.
-    fn parse_glob_par_or_par_sed_args(&mut self) -> PerlResult<(Vec<Expr>, Option<Box<Expr>>)> {
+    fn parse_glob_par_or_par_sed_args(&mut self) -> StrykeResult<(Vec<Expr>, Option<Box<Expr>>)> {
         if matches!(self.peek(), Token::LParen) {
             self.advance();
             let args = self.parse_pattern_list_until_rparen_or_progress()?;
@@ -18365,7 +18375,7 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_arg_list(&mut self) -> PerlResult<Vec<Expr>> {
+    pub(crate) fn parse_arg_list(&mut self) -> StrykeResult<Vec<Expr>> {
         let mut args = Vec::new();
         // Inside `(...)`, `|>` is a normal operator again (e.g. `f(2 |> g, 3)`),
         // so shadow any outer paren-less-arg suppression from
@@ -18400,7 +18410,7 @@ impl Parser {
     /// `is_hash` enables fat-comma-style bareword auto-quoting for endpoints — `{a:c:1}`
     /// treats `a` and `c` as string keys without quoting (cannot be a function call;
     /// use `func():other` if you actually want to invoke).
-    pub(crate) fn parse_slice_arg_list(&mut self, is_hash: bool) -> PerlResult<Vec<Expr>> {
+    pub(crate) fn parse_slice_arg_list(&mut self, is_hash: bool) -> StrykeResult<Vec<Expr>> {
         let mut args = Vec::new();
         let saved_no_pf = self.no_pipe_forward_depth;
         self.no_pipe_forward_depth = 0;
@@ -18425,7 +18435,7 @@ impl Parser {
     }
 
     /// Parse one slice subscript argument (see [`Self::parse_slice_arg_list`]).
-    fn parse_slice_arg(&mut self, is_hash: bool) -> PerlResult<Expr> {
+    fn parse_slice_arg(&mut self, is_hash: bool) -> StrykeResult<Expr> {
         let line = self.peek_line();
 
         // Open-start: `:` or `::` immediately
@@ -18470,7 +18480,7 @@ impl Parser {
         double: bool,
         is_hash: bool,
         line: usize,
-    ) -> PerlResult<Expr> {
+    ) -> StrykeResult<Expr> {
         let (to, step) = if double {
             // `::` so TO is implicit; STEP is whatever (if anything) follows.
             let step_v = self.parse_slice_optional_endpoint(is_hash)?;
@@ -18513,7 +18523,7 @@ impl Parser {
 
     /// Parse an optional slice endpoint: returns `None` if the next token closes the slice
     /// arg (`,`, `]`, `}`, or another `:`). Otherwise parses an endpoint expression.
-    fn parse_slice_optional_endpoint(&mut self, is_hash: bool) -> PerlResult<Option<Box<Expr>>> {
+    fn parse_slice_optional_endpoint(&mut self, is_hash: bool) -> StrykeResult<Option<Box<Expr>>> {
         if matches!(
             self.peek(),
             Token::Colon
@@ -18534,7 +18544,7 @@ impl Parser {
     /// Parse a single slice endpoint expression. For hash slices, a bareword `Ident`
     /// followed by `:`, `::`, `,`, `]`, or `}` auto-quotes (fat-comma style); otherwise
     /// fall through to standard expression parsing. For array slices, no auto-quote.
-    fn parse_slice_endpoint(&mut self, is_hash: bool) -> PerlResult<Expr> {
+    fn parse_slice_endpoint(&mut self, is_hash: bool) -> StrykeResult<Expr> {
         if is_hash {
             if let Token::Ident(name) = self.peek().clone() {
                 if matches!(
@@ -18560,7 +18570,7 @@ impl Parser {
     /// Arguments for `->name` / `->SUPER::name` **without** `(...)`. Unlike `die foo + 1`
     /// (unary `+` on `1` passed to `foo`), Perl treats `$o->meth + 5` as infix `+` after a
     /// no-arg method call; we must not consume that `+` as the start of a first argument.
-    fn parse_method_arg_list_no_paren(&mut self) -> PerlResult<Vec<Expr>> {
+    fn parse_method_arg_list_no_paren(&mut self) -> StrykeResult<Vec<Expr>> {
         let mut args = Vec::new();
         let call_line = self.prev_line();
         loop {
@@ -18668,7 +18678,7 @@ impl Parser {
         )
     }
 
-    fn parse_list_until_terminator(&mut self) -> PerlResult<Vec<Expr>> {
+    fn parse_list_until_terminator(&mut self) -> StrykeResult<Vec<Expr>> {
         self.parse_list_until_terminator_inner(false)
     }
 
@@ -18676,11 +18686,11 @@ impl Parser {
     /// Used by print-like statements (`p`, `say`, `print`, `printf`) so that
     /// `p @a |> sum` parses as `p(sum(@a))` rather than `sum(p(@a))`, matching
     /// the behavior of `~>` thread-first macro.
-    fn parse_list_until_terminator_allow_pipe(&mut self) -> PerlResult<Vec<Expr>> {
+    fn parse_list_until_terminator_allow_pipe(&mut self) -> StrykeResult<Vec<Expr>> {
         self.parse_list_until_terminator_inner(true)
     }
 
-    fn parse_list_until_terminator_inner(&mut self, allow_pipe: bool) -> PerlResult<Vec<Expr>> {
+    fn parse_list_until_terminator_inner(&mut self, allow_pipe: bool) -> StrykeResult<Vec<Expr>> {
         let mut args = Vec::new();
         // Line of the last consumed token (the keyword / function name that
         // triggered this arg parse).  Used for implicit-semicolon: if no args
@@ -18748,7 +18758,7 @@ impl Parser {
     /// failure falls back to "single list-yielding expression treated as a
     /// flat key/value spread" so `+{ map { (k, v) } LIST }` works without
     /// the user needing a temp `my %h = ...; \%h` shuffle.
-    fn parse_forced_hashref_body(&mut self, line: usize) -> PerlResult<Expr> {
+    fn parse_forced_hashref_body(&mut self, line: usize) -> StrykeResult<Expr> {
         let saved = self.pos;
         if let Ok(pairs) = self.try_parse_hash_ref() {
             return Ok(Expr {
@@ -18780,7 +18790,7 @@ impl Parser {
         })
     }
 
-    fn try_parse_hash_ref(&mut self) -> PerlResult<Vec<(Expr, Expr)>> {
+    fn try_parse_hash_ref(&mut self) -> StrykeResult<Vec<(Expr, Expr)>> {
         let mut pairs = Vec::new();
         while !matches!(self.peek(), Token::RBrace | Token::Eof) {
             // Perl autoquotes a bareword immediately before `=>` (hash key), even for keywords like
@@ -18844,7 +18854,7 @@ impl Parser {
     /// Used by the `%[…]` and `%{k=>v,…}` sugar to build an inline hashref
     /// AST node, sidestepping the block/hashref ambiguity that `try_parse_hash_ref`
     /// navigates. Caller expects and consumes `term` itself.
-    fn parse_hashref_pairs_until(&mut self, term: &Token) -> PerlResult<Vec<(Expr, Expr)>> {
+    fn parse_hashref_pairs_until(&mut self, term: &Token) -> StrykeResult<Vec<(Expr, Expr)>> {
         let mut pairs = Vec::new();
         while !matches!(&self.peek(), t if std::mem::discriminant(*t) == std::mem::discriminant(term))
             && !matches!(self.peek(), Token::Eof)
@@ -18988,7 +18998,7 @@ impl Parser {
     /// Reject `$a` / `$b` references in `--no-interop` mode (lexer catches them
     /// outside double-quoted strings; this catches the in-string interpolation
     /// path which has its own parser bypassing `Token::ScalarVar`).
-    fn no_interop_check_scalar_var_name(&self, name: &str, line: usize) -> PerlResult<()> {
+    fn no_interop_check_scalar_var_name(&self, name: &str, line: usize) -> StrykeResult<()> {
         if crate::no_interop_mode() && (name == "a" || name == "b") {
             return Err(self.syntax_err(
                 format!(
@@ -19003,7 +19013,7 @@ impl Parser {
         Ok(())
     }
 
-    fn parse_interpolated_string(&self, s: &str, line: usize) -> PerlResult<Expr> {
+    fn parse_interpolated_string(&self, s: &str, line: usize) -> StrykeResult<Expr> {
         // Parse $var and @var inside double-quoted strings
         let mut parts = Vec::new();
         let mut literal = String::new();
@@ -19724,7 +19734,7 @@ impl Parser {
         })
     }
 
-    fn expr_to_overload_key(&self, e: &Expr) -> PerlResult<String> {
+    fn expr_to_overload_key(&self, e: &Expr) -> StrykeResult<String> {
         match &e.kind {
             ExprKind::String(s) => Ok(s.clone()),
             _ => Err(self.syntax_err(
@@ -19734,7 +19744,7 @@ impl Parser {
         }
     }
 
-    fn expr_to_overload_sub(&mut self, e: &Expr) -> PerlResult<String> {
+    fn expr_to_overload_sub(&mut self, e: &Expr) -> StrykeResult<String> {
         match &e.kind {
             ExprKind::String(s) => Ok(s.clone()),
             ExprKind::Integer(n) => Ok(n.to_string()),
@@ -19779,7 +19789,7 @@ fn merge_expr_list(parts: Vec<Expr>) -> Expr {
 }
 
 /// Parse a single expression from `s` (e.g. contents of `@{ ... }` inside a double-quoted string).
-pub fn parse_expression_from_str(s: &str, file: &str) -> PerlResult<Expr> {
+pub fn parse_expression_from_str(s: &str, file: &str) -> StrykeResult<Expr> {
     let mut lexer = Lexer::new_with_file(s, file);
     let tokens = lexer.tokenize()?;
     let mut parser = Parser::new_with_file(tokens, file);
@@ -19794,7 +19804,7 @@ pub fn parse_expression_from_str(s: &str, file: &str) -> PerlResult<Expr> {
 }
 
 /// Parse a statement list from `s` and wrap as `do { ... }` (for `#{...}` interpolation).
-pub fn parse_block_from_str(s: &str, file: &str, line: usize) -> PerlResult<Expr> {
+pub fn parse_block_from_str(s: &str, file: &str, line: usize) -> StrykeResult<Expr> {
     let mut lexer = Lexer::new_with_file(s, file);
     let tokens = lexer.tokenize()?;
     let mut parser = Parser::new_with_file(tokens, file);
@@ -19815,14 +19825,14 @@ pub fn parse_block_from_str(s: &str, file: &str, line: usize) -> PerlResult<Expr
 
 /// Comma-separated expressions on a `format` value line (below a picture line).
 /// Parse `[ ... ]` contents for `@a[...]` (same rules as `parse_arg_list` / comma-separated indices).
-pub fn parse_slice_indices_from_str(s: &str, file: &str) -> PerlResult<Vec<Expr>> {
+pub fn parse_slice_indices_from_str(s: &str, file: &str) -> StrykeResult<Vec<Expr>> {
     let mut lexer = Lexer::new_with_file(s, file);
     let tokens = lexer.tokenize()?;
     let mut parser = Parser::new_with_file(tokens, file);
     parser.parse_arg_list()
 }
 
-pub fn parse_format_value_line(line: &str) -> PerlResult<Vec<Expr>> {
+pub fn parse_format_value_line(line: &str) -> StrykeResult<Vec<Expr>> {
     let trimmed = line.trim();
     if trimmed.is_empty() {
         return Ok(vec![]);

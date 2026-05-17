@@ -31,7 +31,7 @@ use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 
-use crate::error::{StrykeError, PerlResult};
+use crate::error::{StrykeError, StrykeResult};
 use crate::value::StrykeValue;
 
 /// Magic header bytes — fail-fast on wrong-format file.
@@ -197,7 +197,7 @@ impl KvStore {
     /// (no I/O until first commit). Existing file → mmap + check +
     /// deserialize into owned form (we eagerly own because mutation
     /// requires a `HashMap` we can grow).
-    pub fn open(path: impl Into<PathBuf>) -> PerlResult<Self> {
+    pub fn open(path: impl Into<PathBuf>) -> StrykeResult<Self> {
         let path = path.into();
         if !path.exists() {
             return Ok(Self {
@@ -292,7 +292,7 @@ impl KvStore {
     /// Atomic rewrite of the whole archive to disk. No-op if not dirty
     /// (cheap to call after every batch). Mirrors
     /// `script_cache::write_shard_atomic`.
-    pub fn commit(&mut self) -> PerlResult<()> {
+    pub fn commit(&mut self) -> StrykeResult<()> {
         if !self.dirty {
             return Ok(());
         }
@@ -357,7 +357,7 @@ fn now_secs() -> u64 {
 
 // ── Stryke builtin handlers ───────────────────────────────────────────
 
-fn store_arg(v: &StrykeValue, fn_name: &str, line: usize) -> PerlResult<Arc<Mutex<KvStore>>> {
+fn store_arg(v: &StrykeValue, fn_name: &str, line: usize) -> StrykeResult<Arc<Mutex<KvStore>>> {
     v.as_kv_store().ok_or_else(|| {
         StrykeError::runtime(
             format!("{}: first argument must be a KvStore handle", fn_name),
@@ -380,7 +380,7 @@ fn as_any_array(v: &StrykeValue) -> Option<Vec<StrykeValue>> {
 }
 
 /// `kv_open(path)` — open or create a rkyv-backed KV store.
-pub(crate) fn builtin_kv_open(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+pub(crate) fn builtin_kv_open(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     let path_v = args
         .first()
         .ok_or_else(|| StrykeError::runtime("kv_open: missing path argument", line))?;
@@ -392,7 +392,7 @@ pub(crate) fn builtin_kv_open(args: &[StrykeValue], line: usize) -> PerlResult<S
 
 /// `kv_put(store, key, value)` — write key→value. Returns the old value
 /// or undef.
-pub(crate) fn builtin_kv_put(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+pub(crate) fn builtin_kv_put(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     let s = store_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "kv_put", line)?;
     let k = key_arg(args.get(1).unwrap_or(&StrykeValue::UNDEF));
     let v = args.get(2).cloned().unwrap_or(StrykeValue::UNDEF);
@@ -407,7 +407,7 @@ pub(crate) fn builtin_kv_put(args: &[StrykeValue], line: usize) -> PerlResult<St
 }
 
 /// `kv_get(store, key)` — return the value or undef.
-pub(crate) fn builtin_kv_get(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+pub(crate) fn builtin_kv_get(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     let s = store_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "kv_get", line)?;
     let k = key_arg(args.get(1).unwrap_or(&StrykeValue::UNDEF));
     let g = s.lock();
@@ -418,7 +418,7 @@ pub(crate) fn builtin_kv_get(args: &[StrykeValue], line: usize) -> PerlResult<St
 }
 
 /// `kv_del(store, key)` — delete key; returns 1 if existed, 0 otherwise.
-pub(crate) fn builtin_kv_del(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+pub(crate) fn builtin_kv_del(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     let s = store_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "kv_del", line)?;
     let k = key_arg(args.get(1).unwrap_or(&StrykeValue::UNDEF));
     let existed = s.lock().del(&k);
@@ -426,7 +426,7 @@ pub(crate) fn builtin_kv_del(args: &[StrykeValue], line: usize) -> PerlResult<St
 }
 
 /// `kv_exists(store, key)` — 1 if key exists, 0 otherwise.
-pub(crate) fn builtin_kv_exists(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+pub(crate) fn builtin_kv_exists(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     let s = store_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "kv_exists", line)?;
     let k = key_arg(args.get(1).unwrap_or(&StrykeValue::UNDEF));
     let yes = s.lock().exists(&k);
@@ -434,7 +434,7 @@ pub(crate) fn builtin_kv_exists(args: &[StrykeValue], line: usize) -> PerlResult
 }
 
 /// `kv_keys(store [, prefix])` — sorted keys, optional prefix filter.
-pub(crate) fn builtin_kv_keys(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+pub(crate) fn builtin_kv_keys(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     let s = store_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "kv_keys", line)?;
     let prefix = args.get(1).map(|v| v.to_string());
     let keys = s.lock().keys(prefix.as_deref());
@@ -445,7 +445,7 @@ pub(crate) fn builtin_kv_keys(args: &[StrykeValue], line: usize) -> PerlResult<S
 /// `kv_scan(store, prefix)` — return an array of `[key, value]` pairs
 /// for every key starting with `prefix`. Lazy iterator form lands when
 /// the Phase 2 wire transport ships streaming chunks.
-pub(crate) fn builtin_kv_scan(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+pub(crate) fn builtin_kv_scan(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     let s = store_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "kv_scan", line)?;
     let prefix = args
         .get(1)
@@ -475,14 +475,14 @@ pub(crate) fn builtin_kv_scan(args: &[StrykeValue], line: usize) -> PerlResult<S
 }
 
 /// `kv_len(store)` — number of entries.
-pub(crate) fn builtin_kv_len(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+pub(crate) fn builtin_kv_len(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     let s = store_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "kv_len", line)?;
     let n = s.lock().len() as i64;
     Ok(StrykeValue::integer(n))
 }
 
 /// `kv_commit(store)` — flush in-memory state to disk atomically.
-pub(crate) fn builtin_kv_commit(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+pub(crate) fn builtin_kv_commit(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     let s = store_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "kv_commit", line)?;
     s.lock()
         .commit()
@@ -493,7 +493,7 @@ pub(crate) fn builtin_kv_commit(args: &[StrykeValue], line: usize) -> PerlResult
 /// `kv_batch(store, [["put",k,v],["del",k],...])` — apply ops in order,
 /// all-or-nothing on the in-memory state. Caller invokes `kv_commit`
 /// afterwards for durability.
-pub(crate) fn builtin_kv_batch(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+pub(crate) fn builtin_kv_batch(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     let s = store_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "kv_batch", line)?;
     let ops_v = args
         .get(1)
@@ -505,7 +505,7 @@ pub(crate) fn builtin_kv_batch(args: &[StrykeValue], line: usize) -> PerlResult<
     // Snapshot the entries map so we can roll back if any op rejects.
     let snapshot = s.lock().root.entries.clone();
     let mut applied: usize = 0;
-    let result: PerlResult<usize> = (|| {
+    let result: StrykeResult<usize> = (|| {
         for (i, op_v) in ops.iter().enumerate() {
             let op_arr = as_any_array(op_v).ok_or_else(|| {
                 StrykeError::runtime(format!("kv_batch: op {} is not an array", i), line)
@@ -560,7 +560,7 @@ pub(crate) fn builtin_kv_batch(args: &[StrykeValue], line: usize) -> PerlResult<
 
 /// `kv_close(store)` — auto-commits if dirty, then no-op (the Arc drops
 /// on the last reference). Returns 1 always.
-pub(crate) fn builtin_kv_close(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+pub(crate) fn builtin_kv_close(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     let s = store_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "kv_close", line)?;
     let mut g = s.lock();
     if g.dirty {
@@ -571,7 +571,7 @@ pub(crate) fn builtin_kv_close(args: &[StrykeValue], line: usize) -> PerlResult<
 }
 
 /// `kv_stats(store)` — return a hash of store metadata.
-pub(crate) fn builtin_kv_stats(args: &[StrykeValue], line: usize) -> PerlResult<StrykeValue> {
+pub(crate) fn builtin_kv_stats(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     let s = store_arg(args.first().unwrap_or(&StrykeValue::UNDEF), "kv_stats", line)?;
     let pairs = s.lock().stats();
     let mut m: IndexMap<String, StrykeValue> = IndexMap::with_capacity(pairs.len());

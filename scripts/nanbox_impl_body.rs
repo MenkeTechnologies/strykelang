@@ -71,7 +71,7 @@ impl StrykeValue {
     }
 
     #[inline]
-    pub fn code_ref(c: Arc<PerlSub>) -> Self {
+    pub fn code_ref(c: Arc<StrykeSub>) -> Self {
         Self::from_heap(Arc::new(HeapObject::CodeRef(c)))
     }
 
@@ -125,7 +125,7 @@ impl StrykeValue {
     }
 
     #[inline]
-    pub fn async_task(t: Arc<PerlAsyncTask>) -> Self {
+    pub fn async_task(t: Arc<StrykeAsyncTask>) -> Self {
         Self::from_heap(Arc::new(HeapObject::AsyncTask(t)))
     }
 

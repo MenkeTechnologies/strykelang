@@ -13,11 +13,11 @@ use rusqlite::{types::Value, Connection};
 use serde_json::Value as JsonValue;
 
 use crate::ast::StructDef;
-use crate::error::{StrykeError, PerlResult};
+use crate::error::{StrykeError, StrykeResult};
 use crate::value::{HeapObject, PerlDataFrame, StructInstance, StrykeValue};
 
 /// Parallel row→hashref conversion after a sequential CSV parse (good CPU parallelism on wide files).
-pub(crate) fn par_csv_read(path: &str) -> PerlResult<StrykeValue> {
+pub(crate) fn par_csv_read(path: &str) -> StrykeResult<StrykeValue> {
     let mut rdr = csv::Reader::from_path(path)
         .map_err(|e| StrykeError::runtime(format!("par_csv_read: {}: {}", path, e), 0))?;
     let headers: Vec<String> = rdr
@@ -45,7 +45,7 @@ pub(crate) fn par_csv_read(path: &str) -> PerlResult<StrykeValue> {
 }
 
 /// Columnar dataframe from a CSV path (header row + string cells; use `sum` etc. with numeric strings).
-pub(crate) fn dataframe_from_elements(val: &StrykeValue) -> PerlResult<StrykeValue> {
+pub(crate) fn dataframe_from_elements(val: &StrykeValue) -> StrykeResult<StrykeValue> {
     let rows = val.map_flatten_outputs(true);
     if rows.is_empty() {
         return Ok(StrykeValue::dataframe(Arc::new(Mutex::new(
@@ -106,7 +106,7 @@ pub(crate) fn dataframe_from_elements(val: &StrykeValue) -> PerlResult<StrykeVal
     ))
 }
 
-pub(crate) fn dataframe_from_path(path: &str) -> PerlResult<StrykeValue> {
+pub(crate) fn dataframe_from_path(path: &str) -> StrykeResult<StrykeValue> {
     let mut rdr = csv::Reader::from_path(path)
         .map_err(|e| StrykeError::runtime(format!("dataframe: {}: {}", path, e), 0))?;
     let headers: Vec<String> = rdr
@@ -132,7 +132,7 @@ pub(crate) fn dataframe_from_path(path: &str) -> PerlResult<StrykeValue> {
     Ok(StrykeValue::dataframe(Arc::new(Mutex::new(df))))
 }
 
-pub(crate) fn csv_read(path: &str) -> PerlResult<StrykeValue> {
+pub(crate) fn csv_read(path: &str) -> StrykeResult<StrykeValue> {
     let mut rdr = csv::Reader::from_path(path)
         .map_err(|e| StrykeError::runtime(format!("csv_read: {}: {}", path, e), 0))?;
     let headers: Vec<String> = rdr
@@ -156,7 +156,7 @@ pub(crate) fn csv_read(path: &str) -> PerlResult<StrykeValue> {
 
 /// Writes rows as CSV. Each row is a hash or hashref; header row is the union of keys
 /// (first-seen order, then keys from later rows in order).
-pub(crate) fn csv_write(path: &str, rows: &[StrykeValue]) -> PerlResult<StrykeValue> {
+pub(crate) fn csv_write(path: &str, rows: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut header: Vec<String> = Vec::new();
     let mut seen = std::collections::HashSet::<String>::new();
     let mut normalized: Vec<IndexMap<String, StrykeValue>> = Vec::new();
@@ -188,7 +188,7 @@ pub(crate) fn csv_write(path: &str, rows: &[StrykeValue]) -> PerlResult<StrykeVa
     Ok(StrykeValue::integer(normalized.len() as i64))
 }
 
-fn hash_like(v: &StrykeValue) -> PerlResult<IndexMap<String, StrykeValue>> {
+fn hash_like(v: &StrykeValue) -> StrykeResult<IndexMap<String, StrykeValue>> {
     if let Some(h) = v.as_hash_map() {
         return Ok(h);
     }
@@ -207,7 +207,7 @@ fn hash_like(v: &StrykeValue) -> PerlResult<IndexMap<String, StrykeValue>> {
     ))
 }
 
-pub(crate) fn sqlite_open(path: &str) -> PerlResult<StrykeValue> {
+pub(crate) fn sqlite_open(path: &str) -> StrykeResult<StrykeValue> {
     let conn = Connection::open(path)
         .map_err(|e| StrykeError::runtime(format!("sqlite: {}: {}", path, e), 0))?;
     Ok(StrykeValue::sqlite_conn(Arc::new(Mutex::new(conn))))
@@ -218,7 +218,7 @@ pub(crate) fn sqlite_dispatch(
     method: &str,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let c = conn.lock();
     match method {
         "exec" => {
@@ -254,7 +254,7 @@ pub(crate) fn sqlite_dispatch(
     }
 }
 
-pub(crate) fn exec_sql(conn: &Connection, sql: &str, params: &[Value]) -> PerlResult<usize> {
+pub(crate) fn exec_sql(conn: &Connection, sql: &str, params: &[Value]) -> StrykeResult<usize> {
     conn.execute(sql, rusqlite::params_from_iter(params.iter()))
         .map_err(|e| StrykeError::runtime(format!("sqlite exec: {}", e), 0))
 }
@@ -264,7 +264,7 @@ pub(crate) fn query_sql(
     sql: &str,
     params: &[Value],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let mut stmt = conn
         .prepare(sql)
         .map_err(|e| StrykeError::runtime(format!("sqlite query: {}", e), line))?;
@@ -333,7 +333,7 @@ pub(crate) fn struct_new_with_defaults(
     provided: &[(String, StrykeValue)],
     defaults: &[Option<StrykeValue>],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let mut values = vec![StrykeValue::UNDEF; def.fields.len()];
     for (k, v) in provided {
         let idx = def.field_index(k).ok_or_else(|| {
@@ -382,20 +382,20 @@ pub(crate) fn struct_new_with_defaults(
 }
 
 /// GET `url` and return the response body as a UTF-8 string (invalid UTF-8 is lossy).
-pub(crate) fn fetch(url: &str) -> PerlResult<StrykeValue> {
+pub(crate) fn fetch(url: &str) -> StrykeResult<StrykeValue> {
     let s = http_get_body(url)?;
     Ok(StrykeValue::string(s))
 }
 
 /// GET `url`, parse JSON, map to [`StrykeValue`] (objects → `HashRef`, arrays → `Array`, etc.).
-pub(crate) fn fetch_json(url: &str) -> PerlResult<StrykeValue> {
+pub(crate) fn fetch_json(url: &str) -> StrykeResult<StrykeValue> {
     let s = http_get_body(url)?;
     let v: JsonValue = serde_json::from_str(&s)
         .map_err(|e| StrykeError::runtime(format!("fetch_json: {}", e), 0))?;
     Ok(json_to_perl(v))
 }
 
-fn http_get_body(url: &str) -> PerlResult<String> {
+fn http_get_body(url: &str) -> StrykeResult<String> {
     ureq::get(url)
         .call()
         .map_err(|e| StrykeError::runtime(format!("fetch: {}", e), 0))?
@@ -444,7 +444,7 @@ fn headers_map_has_content_type(headers_val: &StrykeValue) -> bool {
 fn apply_request_headers(
     mut req: ureq::Request,
     headers_val: &StrykeValue,
-) -> PerlResult<ureq::Request> {
+) -> StrykeResult<ureq::Request> {
     let pairs: Vec<(String, String)> = if let Some(m) = headers_val.as_hash_map() {
         m.iter().map(|(k, v)| (k.clone(), v.to_string())).collect()
     } else if let Some(r) = headers_val.as_hash_ref() {
@@ -469,7 +469,7 @@ fn apply_request_headers(
 /// (omit for 30s; `0` disables client timeout), `binary_response` (body as `BYTES` instead of decoded string).
 ///
 /// Returns a hashref: `status`, `status_text`, `headers` (hashref, lowercased names), `body`.
-pub(crate) fn http_request(url: &str, opts: Option<&StrykeValue>) -> PerlResult<StrykeValue> {
+pub(crate) fn http_request(url: &str, opts: Option<&StrykeValue>) -> StrykeResult<StrykeValue> {
     let method = perl_opt_lookup(opts, "method")
         .map(|v| v.to_string())
         .filter(|s| !s.is_empty())
@@ -553,7 +553,7 @@ pub(crate) fn http_request(url: &str, opts: Option<&StrykeValue>) -> PerlResult<
 }
 
 /// Parse JSON from the `body` field of an [`http_request`] result hashref.
-pub(crate) fn http_response_json_body(res: &StrykeValue) -> PerlResult<StrykeValue> {
+pub(crate) fn http_response_json_body(res: &StrykeValue) -> StrykeResult<StrykeValue> {
     let body = perl_hash_lookup(res, "body")
         .ok_or_else(|| StrykeError::runtime("fetch_json: http response missing body", 0))?;
     let s = if let Some(b) = body.as_bytes_arc() {
@@ -565,13 +565,13 @@ pub(crate) fn http_response_json_body(res: &StrykeValue) -> PerlResult<StrykeVal
 }
 
 /// Serialize a [`StrykeValue`] to a JSON string (arrays, hashes, refs, structs, scalars; not code/refs/IO).
-pub(crate) fn json_encode(v: &StrykeValue) -> PerlResult<String> {
+pub(crate) fn json_encode(v: &StrykeValue) -> StrykeResult<String> {
     let j = perl_to_json_value(v)?;
     serde_json::to_string(&j).map_err(|e| StrykeError::runtime(format!("json_encode: {}", e), 0))
 }
 
 /// Parse a JSON string into [`StrykeValue`] (same mapping as [`fetch_json`]).
-pub(crate) fn json_decode(s: &str) -> PerlResult<StrykeValue> {
+pub(crate) fn json_decode(s: &str) -> StrykeResult<StrykeValue> {
     let v: JsonValue = serde_json::from_str(s.trim())
         .map_err(|e| StrykeError::runtime(format!("json_decode: {}", e), 0))?;
     Ok(json_to_perl(v))
@@ -582,7 +582,7 @@ pub(crate) fn json_decode(s: &str) -> PerlResult<StrykeValue> {
 ///
 /// Returns `undef` if the filter yields no values, a single Perl value if it yields one output,
 /// or an array of values if it yields more than one (e.g. `.items[]`).
-pub(crate) fn json_jq(data: &StrykeValue, filter_src: &str) -> PerlResult<StrykeValue> {
+pub(crate) fn json_jq(data: &StrykeValue, filter_src: &str) -> StrykeResult<StrykeValue> {
     let j = perl_to_json_value(data)?;
     let input: jaq_json::Val = serde_json::from_value(j)
         .map_err(|e| StrykeError::runtime(format!("json_jq: could not convert input: {}", e), 0))?;
@@ -628,7 +628,7 @@ pub(crate) fn json_jq(data: &StrykeValue, filter_src: &str) -> PerlResult<Stryke
     }
 }
 
-fn jaq_json_val_to_perl(v: jaq_json::Val) -> PerlResult<StrykeValue> {
+fn jaq_json_val_to_perl(v: jaq_json::Val) -> StrykeResult<StrykeValue> {
     use jaq_json::Val as Jv;
     match v {
         Jv::Null => Ok(StrykeValue::UNDEF),
@@ -658,7 +658,7 @@ fn jaq_json_val_to_perl(v: jaq_json::Val) -> PerlResult<StrykeValue> {
     }
 }
 
-fn jaq_num_to_perl(n: jaq_json::Num) -> PerlResult<StrykeValue> {
+fn jaq_num_to_perl(n: jaq_json::Num) -> StrykeResult<StrykeValue> {
     use jaq_json::Num as Jn;
     match n {
         Jn::Int(i) => Ok(StrykeValue::integer(i as i64)),
@@ -680,7 +680,7 @@ fn jaq_num_to_perl(n: jaq_json::Num) -> PerlResult<StrykeValue> {
     }
 }
 
-pub(crate) fn perl_to_json_value(v: &StrykeValue) -> PerlResult<JsonValue> {
+pub(crate) fn perl_to_json_value(v: &StrykeValue) -> StrykeResult<JsonValue> {
     if v.is_undef() {
         return Ok(JsonValue::Null);
     }

@@ -11,7 +11,7 @@ use std::sync::Arc;
 use crossbeam::channel::{bounded, Receiver, Sender};
 use parking_lot::Mutex;
 
-use crate::error::{StrykeError, PerlResult};
+use crate::error::{StrykeError, StrykeResult};
 use crate::scope::{AtomicArray, AtomicHash};
 use crate::value::{PerlSub, StrykeValue};
 use crate::vm_helper::{Flow, FlowOrError, VMHelper};
@@ -227,7 +227,7 @@ pub(crate) fn run_par_pipeline(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     use rayon::prelude::*;
 
     let spec = parse_args(args)?;
@@ -414,7 +414,7 @@ pub(crate) fn run_thread_par(
     stage_closures: Vec<Arc<PerlSub>>,
     _thread_last: bool,
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     if stage_closures.is_empty() {
         return Err(StrykeError::runtime(
             "~s>: requires at least one stage after the source",
@@ -507,7 +507,7 @@ pub(crate) fn run_par_pipeline_streaming(
     interp: &mut VMHelper,
     args: &[StrykeValue],
     line: usize,
-) -> PerlResult<StrykeValue> {
+) -> StrykeResult<StrykeValue> {
     let spec = parse_args(args)?;
     let k = spec.stages.len();
     let cap = spec.buffer;

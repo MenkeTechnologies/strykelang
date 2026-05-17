@@ -1,7 +1,7 @@
 //! Perl `format` / `write` — picture lines and field padding (subset of Perl 5 `perlform`).
 
 use crate::ast::Expr;
-use crate::error::{StrykeError, PerlResult};
+use crate::error::{StrykeError, StrykeResult};
 use crate::parser::parse_format_value_line;
 
 /// Parsed `format NAME = ... .` body (after registration).
@@ -48,7 +48,7 @@ pub enum PictureSegment {
 }
 
 /// Build a template from raw lines between `format N =` and `.`.
-pub fn parse_format_template(lines: &[String]) -> PerlResult<FormatTemplate> {
+pub fn parse_format_template(lines: &[String]) -> StrykeResult<FormatTemplate> {
     let mut records = Vec::new();
     let mut i = 0;
     while i < lines.len() {
@@ -87,7 +87,7 @@ pub fn parse_format_template(lines: &[String]) -> PerlResult<FormatTemplate> {
     Ok(FormatTemplate { records })
 }
 
-fn parse_picture_segments(pic: &str) -> PerlResult<Vec<PictureSegment>> {
+fn parse_picture_segments(pic: &str) -> StrykeResult<Vec<PictureSegment>> {
     let mut out = Vec::new();
     let mut lit = String::new();
     let mut chars = pic.chars().peekable();

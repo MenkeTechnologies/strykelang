@@ -9,7 +9,7 @@ fn b55_to_floats(v: &StrykeValue) -> Vec<f64> {
 }
 
 /// Julian Day from proleptic Gregorian (Y, M, D, hour). Meeus §7.
-fn builtin_julian_day(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_julian_day(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = i1(args);
     let m = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
     let d = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -25,7 +25,7 @@ fn builtin_julian_day(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Inverse: JD → (Y*10000 + M*100 + D, fractional day).
-fn builtin_jd_to_calendar(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_jd_to_calendar(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let jd = f1(args) + 0.5;
     let z = jd.floor() as i64;
     let f = jd - z as f64;
@@ -43,7 +43,7 @@ fn builtin_jd_to_calendar(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// TT → TDB: a tiny periodic correction. Approximate Fairhead-Bretagnon series,
 /// keeping the leading sinusoidal term at amplitude 1.658e-3 s.
-fn builtin_tt_to_tdb(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_tt_to_tdb(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let jd_tt = f1(args);
     let g = (357.53 + 0.985_600_28 * (jd_tt - B55_J2000)).to_radians();
     let tt_minus_tdb = 0.001_658 * g.sin() + 0.000_014 * (2.0 * g).sin();
@@ -52,7 +52,7 @@ fn builtin_tt_to_tdb(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Equatorial → horizontal: given (RA hours, Dec deg, latitude deg, LST hours),
 /// return azimuth deg, altitude deg packed as az*1000 + alt.
-fn builtin_ra_dec_to_alt_az(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_ra_dec_to_alt_az(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ra = f1(args);
     let dec = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let lat = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -69,7 +69,7 @@ fn builtin_ra_dec_to_alt_az(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Horizontal → equatorial inverse.
-fn builtin_alt_az_to_ra_dec(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_alt_az_to_ra_dec(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let az = f1(args).to_radians();
     let alt = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
     let lat = args.get(2).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
@@ -82,7 +82,7 @@ fn builtin_alt_az_to_ra_dec(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// IAU 2006 precession (Capitaine et al.) angle ξ_A for date as polynomial in T
 /// (centuries since J2000). Returns ξ_A in arcseconds.
-fn builtin_precession_iau2006(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_precession_iau2006(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let jd = f1(args);
     let t = (jd - B55_J2000) / 36525.0;
     let xi_a = 2.650545 + t * (2306.083227 + t * (0.298_849_9 + t *
@@ -92,7 +92,7 @@ fn builtin_precession_iau2006(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// IAU 2000A nutation in longitude (truncated to leading 5 terms). Returns Δψ
 /// in arcseconds. Full series has 1365 terms; this covers ≥99% of the amplitude.
-fn builtin_nutation_iau2000a(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_nutation_iau2000a(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let jd = f1(args);
     let t = (jd - B55_J2000) / 36525.0;
     let omega = (125.044_555 - 1_934.136_261 * t).to_radians();
@@ -112,7 +112,7 @@ fn builtin_nutation_iau2000a(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 /// Annual aberration: ⊿λ = -κ cos(O - λ) sec β + κ e cos(π - λ) sec β.
 /// Simplified with circular-orbit approximation (drops eccentricity term).
 /// κ = 20.49552 arcsec. Args: solar longitude O (deg), object ecliptic λ, β.
-fn builtin_aberration_annual(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_aberration_annual(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let sun_lon = f1(args).to_radians();
     let lambda = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
     let beta = args.get(2).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
@@ -121,7 +121,7 @@ fn builtin_aberration_annual(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Apply proper motion μ_α, μ_δ (mas/yr) over Δt years to (RA, Dec) in deg.
-fn builtin_proper_motion_apply(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_proper_motion_apply(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ra = f1(args);
     let dec = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let mu_alpha_mas = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -134,7 +134,7 @@ fn builtin_proper_motion_apply(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 
 /// Annual parallax shift: π·sin(λ_sun − λ) for object at distance d_pc.
 /// Returns offset in arcseconds.
-fn builtin_parallax_correction(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_parallax_correction(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let d_pc = f1(args);
     let lambda_diff_deg = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     if d_pc <= 0.0 { return Ok(StrykeValue::float(0.0)); }
@@ -143,7 +143,7 @@ fn builtin_parallax_correction(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Sun's geocentric ecliptic longitude (low precision, Meeus §25). Returns deg.
-fn builtin_sun_position_low(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sun_position_low(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let jd = f1(args);
     let n = jd - B55_J2000;
     let l0 = (280.460 + 0.985_647_4 * n).rem_euclid(360.0);
@@ -153,7 +153,7 @@ fn builtin_sun_position_low(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Earth-Sun distance in AU (Meeus §25 low precision).
-fn builtin_sun_distance_au(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sun_distance_au(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let jd = f1(args);
     let n = jd - B55_J2000;
     let g = (357.528 + 0.985_600_28 * n).to_radians();
@@ -163,7 +163,7 @@ fn builtin_sun_distance_au(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Moon's geocentric ecliptic longitude, low-precision (Meeus §47, leading
 /// 4 terms only). Returns deg.
-fn builtin_moon_position_low(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_moon_position_low(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let jd = f1(args);
     let t = (jd - B55_J2000) / 36525.0;
     let lp = 218.316 + 481_267.881_3 * t;
@@ -176,14 +176,14 @@ fn builtin_moon_position_low(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Moon phase age in days (since new moon). Synodic month = 29.530589 days.
-fn builtin_moon_phase_age(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_moon_phase_age(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let jd = f1(args);
     let known_new = 2_451_550.1; // 2000-01-06 New Moon
     Ok(StrykeValue::float(((jd - known_new) % 29.530_589 + 29.530_589) % 29.530_589))
 }
 
 /// Lunation index (count of new moons since 2000-01-06).
-fn builtin_lunation_index(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_lunation_index(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let jd = f1(args);
     let known_new = 2_451_550.1;
     Ok(StrykeValue::integer(((jd - known_new) / 29.530_589).floor() as i64))
@@ -191,7 +191,7 @@ fn builtin_lunation_index(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Eclipse magnitude estimate from sun/moon angular separation. Returns 0–1.
 /// Args: separation_arcsec, sun_radius_arcsec, moon_radius_arcsec.
-fn builtin_eclipse_magnitude(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_eclipse_magnitude(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let sep = f1(args).abs();
     let r_sun = args.get(1).map(|v| v.to_number()).unwrap_or(960.0);
     let r_moon = args.get(2).map(|v| v.to_number()).unwrap_or(933.0);
@@ -204,32 +204,32 @@ fn builtin_eclipse_magnitude(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Saros cycle: one saros = 18.031 years ≈ 6585.32 days.
-fn builtin_saros_cycle(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_saros_cycle(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let jd = f1(args);
     let saros_days = 6_585.321_347;
     Ok(StrykeValue::integer(((jd - 2_018_999.0) / saros_days).floor() as i64))
 }
 
 /// Metonic cycle: 19 tropical years ≈ 235 lunations.
-fn builtin_metonic_cycle(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_metonic_cycle(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let year = i1(args);
     Ok(StrykeValue::integer((year - 1).rem_euclid(19) + 1))
 }
 
 /// Kepler's 3rd law: T² = a³ / M_sun  → T_years = sqrt(a_AU³ / M_solar).
-fn builtin_orbit_kepler3(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_orbit_kepler3(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a_au = f1(args).max(0.0);
     let m_sun = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-12);
     Ok(StrykeValue::float((a_au.powi(3) / m_sun).sqrt()))
 }
 
 /// Orbital period in years given semi-major axis in AU.
-fn builtin_orbital_period_au(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_orbital_period_au(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_orbit_kepler3(args)
 }
 
 /// Eccentric anomaly E from M, e via Newton-Raphson on M = E - e sin E.
-fn builtin_orbit_eccentric_anomaly(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_orbit_eccentric_anomaly(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m = f1(args);
     let e = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).clamp(0.0, 0.999);
     let mut big_e = m;
@@ -243,7 +243,7 @@ fn builtin_orbit_eccentric_anomaly(args: &[StrykeValue]) -> PerlResult<StrykeVal
 }
 
 /// Escape velocity: v = sqrt(2 G M / r). Args: M_kg, r_m.
-fn builtin_escape_velocity_body(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_escape_velocity_body(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-9);
     let big_g = 6.674_30e-11;
@@ -251,7 +251,7 @@ fn builtin_escape_velocity_body(args: &[StrykeValue]) -> PerlResult<StrykeValue>
 }
 
 /// Hill sphere radius r_H = a(1-e)·(m/(3M))^(1/3). Args: a, e, m, M.
-fn builtin_hill_sphere_radius(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_hill_sphere_radius(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let e = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let m = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
@@ -260,7 +260,7 @@ fn builtin_hill_sphere_radius(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// Tisserand parameter T_J = a_J/a + 2·sqrt((a/a_J)(1-e²))·cos i.
-fn builtin_tisserand_param(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_tisserand_param(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = f1(args);
     let a_j = args.get(1).map(|v| v.to_number()).unwrap_or(5.2);
     let e = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -270,7 +270,7 @@ fn builtin_tisserand_param(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 }
 
 /// TLE mean motion (rev/day) → semi-major axis (km). a = (mu / (n·2π/86400)²)^(1/3).
-fn builtin_tle_mean_motion(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_tle_mean_motion(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n_rev_day = f1(args).max(1e-9);
     let mu_km3_s2 = 398_600.441_8_f64;
     let n_rad_s = n_rev_day * 2.0 * std::f64::consts::PI / 86400.0;
@@ -279,7 +279,7 @@ fn builtin_tle_mean_motion(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Single-step SGP4 mean-anomaly propagation: M(t) = M₀ + n·dt, where n is the
 /// kozai mean motion. Args: M₀, n_rad_per_min, dt_min.
-fn builtin_sgp4_propagate_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_sgp4_propagate_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let m0 = f1(args);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let dt = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
@@ -287,7 +287,7 @@ fn builtin_sgp4_propagate_step(args: &[StrykeValue]) -> PerlResult<StrykeValue> 
 }
 
 /// Airy disk radius for first dark ring: 1.22 λ / D in radians. Args: λ_m, D_m.
-fn builtin_airy_disk_radius(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_airy_disk_radius(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let lambda = f1(args);
     let d = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-12);
     Ok(StrykeValue::float(1.22 * lambda / d))
@@ -295,19 +295,19 @@ fn builtin_airy_disk_radius(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
 
 /// Rayleigh resolution criterion: same formula as Airy. Returns angular
 /// resolution in radians.
-fn builtin_rayleigh_criterion(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_rayleigh_criterion(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     builtin_airy_disk_radius(args)
 }
 
 /// Strehl ratio S ≈ exp(-σ²) for RMS wavefront error σ in waves.
-fn builtin_strehl_ratio(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_strehl_ratio(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let sigma_waves = f1(args);
     let sigma_rad = 2.0 * std::f64::consts::PI * sigma_waves;
     Ok(StrykeValue::float((-sigma_rad * sigma_rad).exp()))
 }
 
 /// AU → km conversion factor (used here once to ensure constant is alive).
-fn builtin_au_to_km(args: &[StrykeValue]) -> PerlResult<StrykeValue> {
+fn builtin_au_to_km(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let _ = b55_to_floats(args.first().unwrap_or(&StrykeValue::array(vec![])));
     Ok(StrykeValue::float(B55_AU_KM))
 }

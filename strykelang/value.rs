@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::sync::Barrier;
 
 use crate::ast::{Block, ClassDef, EnumDef, StructDef, SubSigParam};
-use crate::error::PerlResult;
+use crate::error::StrykeResult;
 use crate::nanbox;
 use crate::perl_decode::decode_utf8_or_latin1;
 use crate::perl_regex::PerlCompiledRegex;
@@ -18,7 +18,7 @@ use crate::perl_regex::PerlCompiledRegex;
 /// Handle returned by `async { ... }` / `spawn { ... }`; join with `await`.
 #[derive(Debug)]
 pub struct PerlAsyncTask {
-    pub(crate) result: Arc<Mutex<Option<PerlResult<StrykeValue>>>>,
+    pub(crate) result: Arc<Mutex<Option<StrykeResult<StrykeValue>>>>,
     pub(crate) join: Arc<Mutex<Option<std::thread::JoinHandle<()>>>>,
 }
 
@@ -33,7 +33,7 @@ impl Clone for PerlAsyncTask {
 
 impl PerlAsyncTask {
     /// Join the worker thread (once) and return the block's value or error.
-    pub fn await_result(&self) -> PerlResult<StrykeValue> {
+    pub fn await_result(&self) -> StrykeResult<StrykeValue> {
         if let Some(h) = self.join.lock().take() {
             let _ = h.join();
         }
