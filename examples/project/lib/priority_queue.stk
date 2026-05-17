@@ -11,17 +11,17 @@ class PriorityQueue {
     fn push($val) {
         my $h = $self->heap()
         push @$h, $val
-        $self->_bubble_up(scalar(@$h) - 1)
+        $self->_bubble_up(len(@$h) - 1)
     }
 
     fn pop() {
         my $h = $self->heap()
-        return undef if scalar(@$h) == 0
+        return undef if len(@$h) == 0
         
         my $top = $h->[0]
         my $last = pop @$h
         
-        if (scalar(@$h) > 0) {
+        if (len(@$h) > 0) {
             $h->[0] = $last
             $self->_bubble_down(0)
         }
@@ -31,11 +31,11 @@ class PriorityQueue {
 
     fn peek() {
         my $h = $self->heap()
-        return scalar(@$h) > 0 ? $h->[0] : undef
+        return len(@$h) > 0 ? $h->[0] : undef
     }
 
     fn size() {
-        return scalar(@{$self->heap()})
+        return len(@{$self->heap()})
     }
 
     fn is_empty() {
@@ -74,7 +74,7 @@ class PriorityQueue {
 
     fn _bubble_down($idx) {
         my $h = $self->heap()
-        my $len = scalar(@$h)
+        my $len = len(@$h)
         while (1) {
             my $left = 2 * $idx + 1
             my $right = 2 * $idx + 2
@@ -121,7 +121,7 @@ class MinPriorityQueue extends PriorityQueue {
 
     fn _bubble_down($idx) {
         my $h = $self->heap()
-        my $len = scalar(@$h)
+        my $len = len(@$h)
         while (1) {
             my $left = 2 * $idx + 1
             my $right = 2 * $idx + 2

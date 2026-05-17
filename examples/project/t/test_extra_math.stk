@@ -16,7 +16,7 @@ assert_eq factorial(5), 120, "fact 5"
 
 # Test Project::Math::primes_under
 my @p_list = Project::Math::primes_under(10)
-assert_eq scalar(@p_list), 4, "primes count under 10"
+assert_eq len(@p_list), 4, "primes count under 10"
 assert_eq join(",", @p_list), "2,3,5,7", "primes list"
 
 # Test gcd and lcm

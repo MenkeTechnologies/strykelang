@@ -267,7 +267,7 @@ class Polygon2D extends Shape2D {
         $self
     }
     
-    fn vertex_count { scalar(@{$self->vertices}) }
+    fn vertex_count { len(@{$self->vertices}) }
     
     fn draw {
         "Drawing polygon with " . $self->vertex_count() . " vertices"
@@ -277,7 +277,7 @@ class Polygon2D extends Shape2D {
 class Triangle2D extends Polygon2D {
     fn area {
         my @v = @{$self->vertices}
-        return 0 if scalar(@v) < 3
+        return 0 if len(@v) < 3
         my $x1 = $v[0]->x; my $y1 = $v[0]->y
         my $x2 = $v[1]->x; my $y2 = $v[1]->y
         my $x3 = $v[2]->x; my $y3 = $v[2]->y
@@ -408,7 +408,7 @@ class Employee extends Person {
         $self
     }
     
-    fn report_count { scalar(@{$self->direct_reports}) }
+    fn report_count { len(@{$self->direct_reports}) }
     
     fn total_reports {
         my $count = $self->report_count()
@@ -480,7 +480,7 @@ class Department extends NamedEntity {
         $self
     }
     
-    fn employee_count { scalar(@{$self->employees}) }
+    fn employee_count { len(@{$self->employees}) }
     
     fn add_sub_department($dept) {
         push @{$self->sub_departments}, $dept
@@ -528,7 +528,7 @@ class Company extends TaggedEntity {
         $self
     }
     
-    fn department_count { scalar(@{$self->departments}) }
+    fn department_count { len(@{$self->departments}) }
     
     fn total_employees {
         my $count = 0
@@ -571,7 +571,7 @@ class DocumentNode impl Visitor {
         $self
     }
     
-    fn child_count { scalar(@{$self->children}) }
+    fn child_count { len(@{$self->children}) }
     fn is_leaf { $self->child_count() == 0 ? 1 : 0 }
     fn is_root { !defined($self->parent) ? 1 : 0 }
     
@@ -609,7 +609,7 @@ class TextNode extends DocumentNode {
     text: Str
     
     fn render { $self->text }
-    fn length { length($self->text) }
+    fn length { len($self->text) }
 }
 
 class ElementNode extends DocumentNode {

@@ -50,7 +50,7 @@ assert_eq Project::BuiltinsCore::length_empty(), 0, "length empty"
 assert_eq Project::BuiltinsCore::length_one(), 1, "length one"
 assert_eq Project::BuiltinsCore::length_multi(), 5, "length multi"
 assert_eq Project::BuiltinsCore::length_spaces(), 2, "length spaces"
-# length("café") returns 5 bytes not 4 chars in stryke
+# len("café") returns 5 bytes not 4 chars in stryke
 assert_eq Project::BuiltinsCore::length_unicode(), 5, "length unicode"
 assert_eq Project::BuiltinsCore::length_newline(), 3, "length newline"
 assert_eq Project::BuiltinsCore::length_tab(), 3, "length tab"

@@ -47,7 +47,7 @@ my %simple_cache
 $simple_cache{a} = 1
 $simple_cache{b} = 2
 $simple_cache{c} = 3
-assert_eq scalar(keys %simple_cache), 3, "cache size 3"
+assert_eq len(keys %simple_cache), 3, "cache size 3"
 assert_eq $simple_cache{a}, 1, "cache get a"
 assert_eq $simple_cache{b}, 2, "cache get b"
 assert_eq $simple_cache{c}, 3, "cache get c"
@@ -101,7 +101,7 @@ assert_eq Project::Memoization::collatz_memo(6), 8, "collatz 6 cached"
 # ══════════════════════════════════════════════════════════════════════════════
 
 assert_eq Project::Memoization::nth_fibonacci_memo(15), 610, "nth fib memo 15"
-assert_eq Project::Memoization::sum_fibs_memo(10), 143, "sum fibs 1..10"
+assert_eq Project::Memoization::sum_fibs_memo(10), 143, "sum fibs 1:10"
 
 assert_eq Project::Memoization::count_primes_memo(20), 8, "count primes <= 20"
 assert_eq Project::Memoization::count_primes_memo(50), 15, "count primes <= 50"

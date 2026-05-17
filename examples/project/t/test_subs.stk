@@ -60,7 +60,7 @@ assert_eq Project::Subs::scalar_and_array("items", "a", "b", "c"), "items: a,b,c
 assert_eq Project::Subs::return_scalar(), 42, "return scalar"
 
 my @ret_arr = Project::Subs::return_array()
-assert_eq scalar(@ret_arr), 3, "return array count"
+assert_eq len(@ret_arr), 3, "return array count"
 assert_eq $ret_arr[0], 1, "return array first"
 
 my $ret_ref = Project::Subs::return_ref()
@@ -72,7 +72,7 @@ my $Project::Types::ret_href = Project::Subs::return_hash_ref()
 assert_eq defined($Project::Types::ret_href), 1, "return href defined"
 
 my @multi = Project::Subs::return_multiple()
-assert_eq scalar(@multi), 3, "return multi count"
+assert_eq len(@multi), 3, "return multi count"
 assert_eq $multi[1], "two", "return multi mid"
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -169,16 +169,16 @@ assert_eq $imm, 42, "immediate call"
 # Pass array by reference
 fn modify_arr($aref) {
     push @$aref, 4
-    scalar(@$aref)
+    len(@$aref)
 }
 my @test_arr = (1, 2, 3)
 assert_eq modify_arr(\@test_arr), 4, "pass array ref"
-assert_eq scalar(@test_arr), 4, "array modified"
+assert_eq len(@test_arr), 4, "array modified"
 
 # Pass hash by reference  
 fn modify_hash($href) {
     $href->{new} = "value"
-    scalar(keys %$href)
+    len(keys %$href)
 }
 my %test_hash = (a => 1)
 assert_eq modify_hash(\%test_hash), 2, "pass hash ref"

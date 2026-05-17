@@ -65,28 +65,28 @@ assert_eq clamp_int(0, 0, 10), 0, "clamp at min"
 assert_eq clamp_int(10, 0, 10), 10, "clamp at max"
 
 my @enum = enumerate(qw(a b c))
-assert_eq scalar(@enum), 3, "enumerate count"
+assert_eq len(@enum), 3, "enumerate count"
 assert_eq $enum[0][0], 0, "enumerate index 0"
 assert_eq $enum[0][1], "a", "enumerate value 0"
 assert_eq $enum[2][0], 2, "enumerate index 2"
 assert_eq $enum[2][1], "c", "enumerate value 2"
 
 my @wins = (1, 2, 3, 4) |> windowed(2)
-assert_eq scalar(@wins), 3, "windowed count"
+assert_eq len(@wins), 3, "windowed count"
 assert_eq $wins[0][0], 1, "windowed first pair 0"
 assert_eq $wins[0][1], 2, "windowed first pair 1"
 assert_eq $wins[2][0], 3, "windowed last pair 0"
 assert_eq $wins[2][1], 4, "windowed last pair 1"
 
 my @wins3 = (1, 2, 3, 4, 5) |> windowed(3)
-assert_eq scalar(@wins3), 3, "windowed(3) count"
+assert_eq len(@wins3), 3, "windowed(3) count"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PARALLEL - PMAP_CHUNKED
 # ══════════════════════════════════════════════════════════════════════════════
 
 my @chunked = pmap_chunked 2 { _ * 2 } (1, 2, 3, 4, 5, 6)
-assert_eq scalar(@chunked), 6, "pmap_chunked count"
+assert_eq len(@chunked), 6, "pmap_chunked count"
 assert_eq $chunked[0], 2, "pmap_chunked first"
 assert_eq $chunked[5], 12, "pmap_chunked last"
 
@@ -114,7 +114,7 @@ assert_ok defined($tfile), "tempfile returns path"
 
 my $spark = sparkline(1, 2, 3, 4, 5, 4, 3, 2, 1)
 assert_ok defined($spark), "sparkline returns string"
-assert_ok length($spark) > 0, "sparkline not empty"
+assert_ok len($spark) > 0, "sparkline not empty"
 
 my $bars = bar_chart({A => 10, B => 20})
 assert_ok defined($bars), "bar_chart returns string"
@@ -136,7 +136,7 @@ my @pipe_result = pipeline(1, 2, 3, 4, 5)
     ->filter(fn { _ > 2 })
     ->map(fn { _ * 10 })
     ->collect()
-assert_eq scalar(@pipe_result), 3, "pipeline filter+map count"
+assert_eq len(@pipe_result), 3, "pipeline filter+map count"
 assert_eq $pipe_result[0], 30, "pipeline first result"
 assert_eq $pipe_result[2], 50, "pipeline last result"
 
@@ -144,7 +144,7 @@ my @par_pipe = par_pipeline(1, 2, 3, 4)
     ->filter(fn { _ % 2 == 0 })
     ->map(fn { _ * 2 })
     ->collect()
-assert_eq scalar(@par_pipe), 2, "par_pipeline count"
+assert_eq len(@par_pipe), 2, "par_pipeline count"
 assert_eq $par_pipe[0], 4, "par_pipeline first"
 assert_eq $par_pipe[1], 8, "par_pipeline second"
 

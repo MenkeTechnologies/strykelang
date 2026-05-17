@@ -44,7 +44,7 @@ fn Project::Collections::flip_hash (%h) {
 # Select only certain keys from a hash
 fn Project::Collections::extract_keys ($href) {
     my @keys
-    ~> 1..scalar(@_) - 1 ep {
+    ~> 1..len(@_) - 1 ep {
         push @keys, $_[_]
     }
     my $result = {}
@@ -97,7 +97,7 @@ fn Project::Collections::split_chunks ($n, @items) {
     my @chunks
     while (scalar @items) {
         my @group
-        for my $i (1..$n) {
+        for my $i (1:$n) {
             last unless scalar @items
             push @group, shift @items
         }

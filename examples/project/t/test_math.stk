@@ -16,7 +16,7 @@ assert_eq factorial(8), 40320, "8!"
 
 # Primes
 my @p = Project::Math::primes_under(20)
-assert_eq scalar(@p), 8, "primes under 20 count"
+assert_eq len(@p), 8, "primes under 20 count"
 assert_eq $p[0], 2, "first prime"
 assert_eq $p[-1], 19, "last prime under 20"
 

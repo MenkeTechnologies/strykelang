@@ -57,14 +57,14 @@ fn Project::Recursion::binary_search_arr(@args) {
 }
 
 fn Project::Recursion::merge_sort_arr($arr) {
-    my $len = scalar(@$arr)
+    my $len = len(@$arr)
     return [@$arr] if $len <= 1
 
     my $mid = int($len / 2)
     my @left
-    ~> 0..$mid-1 ep { push @left, $arr->[_] }
+    ~> 0:$mid-1 ep { push @left, $arr->[_] }
     my @right
-    ~> $mid..$len-1 ep { push @right, $arr->[_] }
+    ~> $mid:$len-1 ep { push @right, $arr->[_] }
 
     my $sorted_left = Project::Recursion::merge_sort_arr(\@left)
     my $sorted_right = Project::Recursion::merge_sort_arr(\@right)
@@ -75,8 +75,8 @@ fn Project::Recursion::merge_arrs($left, $right) {
     my @result
     my $i = 0
     my $j = 0
-    my $llen = scalar(@$left)
-    my $rlen = scalar(@$right)
+    my $llen = len(@$left)
+    my $rlen = len(@$right)
 
     while ($i < $llen && $j < $rlen) {
         my $lv = $left->[$i]

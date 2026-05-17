@@ -3,7 +3,7 @@
 
 # Basic array operations
 my @arr = (1, 2, 3, 4, 5)
-assert_eq scalar(@arr), 5, "array length"
+assert_eq len(@arr), 5, "array length"
 assert_eq join(",", @arr), "1,2,3,4,5", "join array"
 
 # Flatten
@@ -16,9 +16,9 @@ my @riffled = riffle([1, 2, 3], 0)
 assert_eq join(",", @riffled), "1,0,2,0,3", "riffle"
 
 # Take and drop via pipeline
-my @taken = 1..10 |> take(3) |> collect
+my @taken = 1:10 |> take(3) |> collect
 assert_eq join(",", @taken), "1,2,3", "pipeline take"
-my @dropped = 1..10 |> drop(7) |> collect
+my @dropped = 1:10 |> drop(7) |> collect
 assert_eq join(",", @dropped), "8,9,10", "pipeline drop"
 
 # Swap pairs
@@ -49,7 +49,7 @@ assert_eq join(",", @chained), "1,2,3,4,5,6", "concat"
 # Uniq
 my @dupes = (1, 2, 2, 3, 3, 3, 1)
 my @unique = uniq(@dupes)
-assert_eq scalar(@unique), 3, "uniq count"
+assert_eq len(@unique), 3, "uniq count"
 
 # Count operations (TARGET, LIST)
 assert_eq count_eq(2, 1, 2, 2, 3, 2), 3, "count_eq"

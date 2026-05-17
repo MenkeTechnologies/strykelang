@@ -23,7 +23,7 @@ assert_eq Project::Variables::scalar_interpolate_expr(), "x is 5 and x+1 is 6", 
 # ══════════════════════════════════════════════════════════════════════════════
 
 my @lit = Project::Variables::array_literal()
-assert_eq scalar(@lit), 3, "array literal count"
+assert_eq len(@lit), 3, "array literal count"
 assert_eq $lit[0], 1, "array literal first"
 assert_eq $lit[2], 3, "array literal last"
 
@@ -174,8 +174,8 @@ my %nonempty_hash = (a => 1)
 
 assert_eq @empty_arr ? 1 : 0, 0, "empty array false"
 assert_eq @nonempty_arr ? 1 : 0, 1, "nonempty array true"
-assert_eq scalar(keys %empty_hash), 0, "empty hash keys"
-assert_eq scalar(keys %nonempty_hash), 1, "nonempty hash keys"
+assert_eq len(keys %empty_hash), 0, "empty hash keys"
+assert_eq len(keys %nonempty_hash), 1, "nonempty hash keys"
 
 # Numeric string coercion
 assert_eq "42" + 0, 42, "numeric string add"
@@ -189,8 +189,8 @@ assert_eq 3.14 . "", "3.14", "float to string"
 # Multiple array assignment
 my @a1 = (1, 2, 3)
 my @a2 = (4, 5, 6)
-assert_eq scalar(@a1), 3, "multi array a1"
-assert_eq scalar(@a2), 3, "multi array a2"
+assert_eq len(@a1), 3, "multi array a1"
+assert_eq len(@a2), 3, "multi array a2"
 
 # Hash key types
 my %mixed_keys = (

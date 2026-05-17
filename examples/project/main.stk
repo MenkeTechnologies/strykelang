@@ -11,7 +11,7 @@ require "./lib/reporter.stk"
 require "./lib/threats.stk"
 
 my $banner = cyber_banner("STRYKE RECON v1.0")
-print "$banner\n"
+p "$banner"
 
 p "\n\x1b[36m[PHASE 1] SYSTEM SCAN\x1b[0m"
 p "\x1b[36m" . ("─" x 50) . "\x1b[0m"
@@ -93,4 +93,4 @@ my $report = Project::Reporter::generate_report($sys, $net, \@disks, $git, \@thr
 p "  report: " . $report
 
 my $end_banner = cyber_banner("RECON COMPLETE")
-print "\n$end_banner\n"
+p "\n$end_banner"

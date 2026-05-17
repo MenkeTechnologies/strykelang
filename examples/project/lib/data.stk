@@ -33,7 +33,7 @@ fn Project::Data::summarize_list (@data) {
 # Build a hash from parallel key/value arrays
 fn Project::Data::zip_to_hash ($keys, $vals) {
     my $h = {}
-    ~> 0..scalar(@$keys) - 1 ep {
+    ~> 0..len(@$keys) - 1 ep {
         $h->{$keys->[_]} = $vals->[_]
     }
     $h

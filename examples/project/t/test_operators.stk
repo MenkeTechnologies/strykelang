@@ -251,12 +251,12 @@ assert_eq Project::Operators::ternary_with_ops(3, 10), 7, "ternary ops 3<10"
 # ══════════════════════════════════════════════════════════════════════════════
 
 my @r1 = range_inclusive(1, 5)
-assert_eq scalar(@r1), 5, "range 1..5 count"
+assert_eq len(@r1), 5, "range 1:5 count"
 assert_eq $r1[0], 1, "range first"
 assert_eq $r1[4], 5, "range last"
 
-assert_eq Project::Operators::range_sum(1, 10), 55, "range sum 1..10"
-assert_eq Project::Operators::range_sum(1, 100), 5050, "range sum 1..100"
+assert_eq Project::Operators::range_sum(1, 10), 55, "range sum 1:10"
+assert_eq Project::Operators::range_sum(1, 100), 5050, "range sum 1:100"
 
 assert_eq Project::Operators::range_char(), "abcde", "char range"
 

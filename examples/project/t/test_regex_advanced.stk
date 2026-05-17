@@ -82,7 +82,7 @@ assert_false ("password123" =~ /password(?!\d)/), "negative lookahead fail"
 
 my $numbers = "There are 5 cats and 3 dogs"
 my @matches = ($numbers =~ /\d+/g)
-assert_eq scalar(@matches), 2, "global match count"
+assert_eq len(@matches), 2, "global match count"
 assert_eq $matches[0], "5", "first global match"
 assert_eq $matches[1], "3", "second global match"
 
@@ -201,12 +201,12 @@ assert_false ("not-a-phone" =~ /$compiled/), "compiled regex no match"
 # ── Split with Regex ───────────────────────────────────────────────
 
 my @words = grep { _ ne "" } split /\s+/, "  hello    world   test  "
-assert_eq scalar(@words), 3, "split whitespace count"
+assert_eq len(@words), 3, "split whitespace count"
 assert_eq $words[0], "hello", "split word 1"
 assert_eq $words[2], "test", "split word 3"
 
 my @parts = split /[,;]/, "a,b;c,d"
-assert_eq scalar(@parts), 4, "split multiple delim count"
+assert_eq len(@parts), 4, "split multiple delim count"
 assert_eq join("|", @parts), "a|b|c|d", "split multiple delim"
 
 test_run

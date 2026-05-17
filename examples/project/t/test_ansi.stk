@@ -39,7 +39,7 @@ assert_eq strip_ansi("plain text"), "plain text", "strip_ansi plain unchanged"
 
 # RGB colors
 my $rgb_text = rgb(255, 0, 0, "red text")
-assert_ok length($rgb_text) > length("red text"), "rgb adds codes"
+assert_ok len($rgb_text) > len("red text"), "rgb adds codes"
 
 # Color conversion
 assert_eq rgb_to_hex(255, 0, 0), "#ff0000", "rgb_to_hex red"

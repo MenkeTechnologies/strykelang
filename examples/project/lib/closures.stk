@@ -109,7 +109,7 @@ fn Project::Closures::make_curried_multiply {
 
 fn Project::Closures::make_closures_in_loop {
     my @fns
-    ~> 1..5 ep {
+    ~> 1:5 ep {
         push @fns, fn { _ * 10 }
     }
     @fns
@@ -117,7 +117,7 @@ fn Project::Closures::make_closures_in_loop {
 
 fn Project::Closures::make_closures_with_explicit_capture {
     my @fns
-    for my $i (1..5) {
+    for my $i (1:5) {
         my $captured = $i
         push @fns, fn { $captured * 10 }
     }
@@ -151,7 +151,7 @@ fn Project::Closures::apply_twice($f) {
 fn Project::Closures::apply_n_times($f, $n) {
     fn ($x) {
         my $result = $x
-        for (1..$n) {
+        for (1:$n) {
             $result = $f($result)
         }
         $result

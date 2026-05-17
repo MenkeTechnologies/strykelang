@@ -41,8 +41,8 @@ fn Project::Subs::default_string($name) { $name //= "World"; "Hello, $name!" }
 # ARRAY AND HASH ARGUMENTS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn Project::Subs::array_arg(@arr) { scalar(@arr) }
-fn Project::Subs::hash_arg(%h) { scalar(keys %h) }
+fn Project::Subs::array_arg(@arr) { len(@arr) }
+fn Project::Subs::hash_arg(%h) { len(keys %h) }
 
 fn Project::Subs::mixed_args($x, @rest) {
     my $sum = $x

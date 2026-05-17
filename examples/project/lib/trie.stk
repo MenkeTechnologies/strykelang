@@ -15,8 +15,8 @@ class Trie {
 
     fn insert($word) {
         my $curr = $self->root()
-        my $len = length($word)
-        for my $i (0..$len-1) {
+        my $len = len($word)
+        for my $i (0:$len-1) {
             my $char = substr($word, $i, 1)
             my $children = $curr->children()
             unless (exists $children->{$char}) {
@@ -43,8 +43,8 @@ class Trie {
 
     fn _find_node($str) {
         my $curr = $self->root()
-        my $len = length($str)
-        for my $i (0..$len-1) {
+        my $len = len($str)
+        for my $i (0:$len-1) {
             my $char = substr($str, $i, 1)
             my $children = $curr->children()
             unless (exists $children->{$char}) {

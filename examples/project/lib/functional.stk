@@ -28,8 +28,8 @@ fn Fn::reduce($func, $initial, @list) {
 # ── Fn::zip: combines two lists into a list of pairs (as array refs) ─────
 fn Fn::zip(\@a, \@b) {
     my @result
-    my $len = scalar(@a) < scalar(@b) ? scalar(@a) : scalar(@b)
-    ~> 0..$len-1 ep {
+    my $len = len(@a) < len(@b) ? len(@a) : len(@b)
+    ~> 0:$len-1 ep {
         push @result, [$a[_], $b[_]]
     }
     @result

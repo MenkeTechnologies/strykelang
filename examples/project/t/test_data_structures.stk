@@ -12,7 +12,7 @@ assert_eq Project::Refs::list_length($list), 5, "list length"
 my @output = Project::Refs::list_to_array($list)
 assert_eq $output[0], 10, "list to array first"
 assert_eq $output[4], 50, "list to array last"
-assert_eq scalar(@output), 5, "list to array count"
+assert_eq len(@output), 5, "list to array count"
 
 # ── Tree Tests ──────────────────────────────────────────────────────
 

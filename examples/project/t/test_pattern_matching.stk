@@ -4,14 +4,14 @@
 # ── Basic Array Pattern Matching ───────────────────────────────────
 
 fn describe_array($arr) {
-    if (scalar(@$arr) == 0) {
+    if (len(@$arr) == 0) {
         "empty array"
-    } elsif (scalar(@$arr) == 1) {
+    } elsif (len(@$arr) == 1) {
         "single element: " . $arr->[0]
-    } elsif (scalar(@$arr) == 2) {
+    } elsif (len(@$arr) == 2) {
         "pair: " . $arr->[0] . ", " . $arr->[1]
     } else {
-        "array with " . scalar(@$arr) . " elements"
+        "array with " . len(@$arr) . " elements"
     }
 }
 
@@ -49,7 +49,7 @@ assert_eq Project::ControlFlow::classify_number(500), "large positive", "guard l
 fn classify_string($s) {
     if ($s eq "") {
         "empty"
-    } elsif (length($s) == 1) {
+    } elsif (len($s) == 1) {
         "single char: $s"
     } elsif ($s =~ /^\d+$/) {
         "all digits: $s"

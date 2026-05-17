@@ -41,11 +41,11 @@ assert_ok $choice eq "apple" || $choice eq "banana" || $choice eq "cherry", "ran
 
 # Random string
 my $rs = random_string(10)
-assert_eq length($rs), 10, "random_string length"
+assert_eq len($rs), 10, "random_string length"
 
 # Random alpha string
 my $ra = random_alpha(8)
-assert_eq length($ra), 8, "random_alpha length"
+assert_eq len($ra), 8, "random_alpha length"
 assert_ok $ra =~ /^[a-zA-Z]+$/, "random_alpha only letters"
 
 # Random digit
@@ -55,7 +55,7 @@ assert_le $rd, 9, "random_digit <= 9"
 
 # Multiple random calls should vary (statistical test)
 my %flips
-for (1..100) {
+for (1:100) {
     $flips{coin_flip()}++
 }
 assert_ok exists $flips{0} && exists $flips{1}, "coin_flip produces both 0 and 1"

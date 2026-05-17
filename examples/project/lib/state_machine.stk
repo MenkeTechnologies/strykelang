@@ -109,7 +109,7 @@ fn Project::StateMachine::make_parser_fsm {
             }
         } elsif ($state eq "number") {
             if ($char =~ /\d/) {
-                my $last_idx = scalar(@$tokens) - 1
+                my $last_idx = len(@$tokens) - 1
                 $tokens->[$last_idx] .= $char
             } else {
                 $state = "start"
@@ -117,7 +117,7 @@ fn Project::StateMachine::make_parser_fsm {
             }
         } elsif ($state eq "word") {
             if ($char =~ /[a-zA-Z0-9]/) {
-                my $last_idx = scalar(@$tokens) - 1
+                my $last_idx = len(@$tokens) - 1
                 $tokens->[$last_idx] .= $char
             } else {
                 $state = "start"

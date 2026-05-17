@@ -24,7 +24,7 @@ fn Project::ListOps::map_string {
 
 fn Project::ListOps::map_length {
     my @a = qw(one two three)
-    my @r = map { length(_) } @a
+    my @r = map { len(_) } @a
     join(",", @r)
 }
 
@@ -113,7 +113,7 @@ fn Project::ListOps::grep_all_match {
 
 fn Project::ListOps::grep_count {
     my @a = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
-    scalar(grep { _ % 2 == 0 } @a)
+    len(grep { _ % 2 == 0 } @a)
 }
 
 fn Project::ListOps::grep_chained {
@@ -164,7 +164,7 @@ fn Project::ListOps::sort_case_insensitive {
 
 fn Project::ListOps::sort_by_length {
     my @a = qw(a bb ccc dd e)
-    my @r = sort { length($a) <=> length($b) } @a
+    my @r = sort { len($a) <=> len($b) } @a
     join(",", @r)
 }
 
@@ -383,7 +383,7 @@ fn Project::ListOps::pop_empty {
 fn Project::ListOps::pop_single {
     my @a = (42)
     my $r = pop @a
-    $r == 42 && scalar(@a) == 0 ? 1 : 0
+    $r == 42 && len(@a) == 0 ? 1 : 0
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -410,7 +410,7 @@ fn Project::ListOps::shift_empty {
 fn Project::ListOps::shift_single {
     my @a = (42)
     my $r = shift @a
-    $r == 42 && scalar(@a) == 0 ? 1 : 0
+    $r == 42 && len(@a) == 0 ? 1 : 0
 }
 
 # ══════════════════════════════════════════════════════════════════════════════

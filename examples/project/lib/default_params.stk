@@ -30,12 +30,12 @@ fn Project::DefaultParams::array_default($prefix, @items = (1, 2, 3)) {
     "$prefix: " . join(",", @items)
 }
 
-fn Project::DefaultParams::array_default_range($n, @vals = (1..5)) {
+fn Project::DefaultParams::array_default_range($n, @vals = (1:5)) {
     $n + sum(@vals)
 }
 
 fn Project::DefaultParams::array_default_empty($x, @rest = ()) {
-    $x + scalar(@rest)
+    $x + len(@rest)
 }
 
 # ══════════════════════════════════════════════════════════════════════════════

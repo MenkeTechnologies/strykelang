@@ -62,7 +62,7 @@ assert_eq path_parent("/foo/bar/baz.txt"), "/foo/bar", "path_parent"
 assert_eq path_join("/foo", "bar", "baz.txt"), "/foo/bar/baz.txt", "path_join"
 
 my $parts = path_split("/foo/bar/baz")
-assert_eq scalar(@$parts), 4, "path_split count"
+assert_eq len(@$parts), 4, "path_split count"
 
 # Validation
 assert_ok is_valid_email('test@example.com'), "valid email"

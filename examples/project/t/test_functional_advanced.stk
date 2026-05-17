@@ -124,7 +124,7 @@ fn Fn::memoize($func) {
 
 fn Test::expensive_computation($n) {
     my $result = $n
-    for (1..10) {  # simplified
+    for (1:10) {  # simplified
         $result = $result * 1.001
     }
     int($result)

@@ -13,7 +13,7 @@ assert_ok $sys->{uptime}, "has uptime"
 
 # Disk scan
 my @disks = Project::Scanner::scan_disks()
-assert_gt scalar(@disks), 0, "has disks"
+assert_gt len(@disks), 0, "has disks"
 my $root = $disks[0]
 assert_ok $root->{mount}, "disk has mount"
 assert_gt $root->{total}, 0, "disk has total"
@@ -26,7 +26,7 @@ assert_ok $net->{mac}, "has mac"
 
 # Interfaces
 my @ifaces = Project::Scanner::scan_interfaces()
-assert_gt scalar(@ifaces), 0, "has interfaces"
+assert_gt len(@ifaces), 0, "has interfaces"
 
 # Usage bar
 my $bar = Project::Scanner::usage_bar(50, 10)
@@ -41,7 +41,7 @@ assert_contains $bar_empty, "░", "empty bar"
 
 # Process scan
 my @procs = process_list()
-assert_gt scalar(@procs), 0, "has processes"
+assert_gt len(@procs), 0, "has processes"
 assert_ok $procs[0]->{pid}, "process has pid"
 assert_ok $procs[0]->{name}, "process has name"
 

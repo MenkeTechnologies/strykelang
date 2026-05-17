@@ -3,11 +3,11 @@
 
 # OS info
 my $os = os_name()
-assert_ok length($os) > 0, "os_name not empty"
+assert_ok len($os) > 0, "os_name not empty"
 assert_ok $os =~ /^(macos|linux|windows|freebsd|openbsd|netbsd)$/i, "os_name recognized"
 
 my $arch = os_arch()
-assert_ok length($arch) > 0, "os_arch not empty"
+assert_ok len($arch) > 0, "os_arch not empty"
 assert_ok $arch =~ /^(x86_64|aarch64|arm|i686|x86)$/i, "os_arch recognized"
 
 # CPU count
@@ -30,15 +30,15 @@ assert_ge $gid_val, 0, "gid >= 0"
 
 # Directories
 my $home = home_dir()
-assert_ok length($home) > 0, "home_dir not empty"
+assert_ok len($home) > 0, "home_dir not empty"
 assert_ok -d $home, "home_dir exists"
 
 my $tmp = temp_dir()
-assert_ok length($tmp) > 0, "temp_dir not empty"
+assert_ok len($tmp) > 0, "temp_dir not empty"
 assert_ok -d $tmp, "temp_dir exists"
 
 my $cwd = cwd()
-assert_ok length($cwd) > 0, "cwd not empty"
+assert_ok len($cwd) > 0, "cwd not empty"
 assert_ok -d $cwd, "cwd exists"
 
 # Memory info
@@ -54,6 +54,6 @@ assert_gt $mem_used, 0, "mem_used > 0"
 
 # Hostname
 my $host = gethostname()
-assert_ok length($host) > 0, "hostname not empty"
+assert_ok len($host) > 0, "hostname not empty"
 
 test_run

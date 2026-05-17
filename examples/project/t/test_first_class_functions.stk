@@ -94,7 +94,7 @@ my $nested = {
         advanced => {
             pow => fn($base, $exp) {
                 my $result = 1
-                for (1..$exp) { $result *= $base }
+                for (1:$exp) { $result *= $base }
                 $result
             },
         },
@@ -124,7 +124,7 @@ fn apply_fn2($fn, $a, $b) { $fn($a, $b) }
 fn apply_fn_twice($fn, $x) { $fn($fn($x)) }
 fn apply_fn_n_times($fn, $x, $n) {
     my $result = $x
-    for (1..$n) { $result = $fn($result) }
+    for (1:$n) { $result = $fn($result) }
     $result
 }
 
@@ -183,7 +183,7 @@ fn Project::Closures::make_multiplier($n) {
 fn make_power($exp) {
     fn($base) {
         my $result = 1
-        for (1..$exp) { $result *= $base }
+        for (1:$exp) { $result *= $base }
         $result
     }
 }
@@ -282,7 +282,7 @@ fn make_stack {
         push_item => fn($v) { push @$items, $v },
         pop_item  => fn { pop @$items },
         peek => fn { $items->[-1] },
-        size => fn { scalar(@$items) },
+        size => fn { len(@$items) },
     }
 }
 

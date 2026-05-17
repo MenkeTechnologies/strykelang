@@ -14,14 +14,14 @@ assert_eq Project::Strings::get_initials("John Fitzgerald Kennedy"), "JFK", "thr
 
 # Truncate
 assert_eq Project::Strings::truncate_str("hello", 10), "hello", "no truncate needed"
-assert_eq length(Project::Strings::truncate_str("a" x 100, 20)), 20, "truncated length"
+assert_eq len(Project::Strings::truncate_str("a" x 100, 20)), 20, "truncated length"
 
 # Repeat
 assert_eq Project::Strings::repeat_str("ab", 3), "ababab", "repeat 3x"
 assert_eq Project::Strings::repeat_str("x", 1), "x", "repeat 1x"
 
 # Pad center
-assert_eq length(Project::Strings::pad_center("hi", 10)), 10, "pad center width"
+assert_eq len(Project::Strings::pad_center("hi", 10)), 10, "pad center width"
 assert_contains Project::Strings::pad_center("hi", 10), "hi", "pad center content"
 
 # Caesar cipher

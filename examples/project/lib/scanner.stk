@@ -87,10 +87,10 @@ fn Project::Scanner::scan_git {
         $result->{recent} = \@log
 
         my @all_log = git_log(10000)
-        $result->{total_commits} = scalar(@all_log)
+        $result->{total_commits} = len(@all_log)
 
         my @files = git_files()
-        $result->{total_files} = scalar(@files)
+        $result->{total_files} = len(@files)
 
         my @authors = git_authors()
         my @top3 = take(@authors, 3)

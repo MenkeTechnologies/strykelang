@@ -265,13 +265,13 @@ fn Project::Operators::ternary_with_ops($a, $b) {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::Operators::incl_range($a, $b) {
-    my @r = $a..$b
+    my @r = $a:$b
     @r
 }
 
 fn Project::Operators::range_sum($a, $b) {
     my $sum = 0
-    for my $i ($a..$b) {
+    for my $i ($a:$b) {
         $sum += $i
     }
     $sum
@@ -283,7 +283,7 @@ fn Project::Operators::range_char {
 }
 
 fn Project::Operators::range_reverse($a, $b) {
-    my @r = rev($a..$b)
+    my @r = rev($a:$b)
     @r
 }
 

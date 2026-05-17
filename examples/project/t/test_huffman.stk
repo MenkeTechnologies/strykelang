@@ -24,6 +24,6 @@ my $res = Project::Huffman::adv_huffman_encode($input)
 my $binary = $res->[0]
 # Original: 32 chars * 8 bits = 256 bits
 # Huffman should be significantly less
-assert_ok length($binary) < 256, "huffman binary length < original"
+assert_ok len($binary) < 256, "huffman binary length < original"
 
 test_run

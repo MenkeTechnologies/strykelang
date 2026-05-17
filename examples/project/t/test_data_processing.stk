@@ -22,9 +22,9 @@ my @logs = (
 )
 
 my $groups = Project::Data::group_records("level", @logs)
-assert_eq scalar(@{$groups->{INFO}}), 2, "group INFO count"
-assert_eq scalar(@{$groups->{ERROR}}), 2, "group ERROR count"
-assert_eq scalar(@{$groups->{WARN}}), 1, "group WARN count"
+assert_eq len(@{$groups->{INFO}}), 2, "group INFO count"
+assert_eq len(@{$groups->{ERROR}}), 2, "group ERROR count"
+assert_eq len(@{$groups->{WARN}}), 1, "group WARN count"
 
 # ── Summarization ────────────────────────────────────────────────────
 
@@ -47,11 +47,11 @@ assert_eq $meta->{author}, "menke", "zip author"
 
 # ── Split by Predicate (Partition) ───────────────────────────────────
 
-my $parts = Project::Data::split_by_pred(fn { $_0 % 2 == 0 }, 1..10)
+my $parts = Project::Data::split_by_pred(fn { $_0 % 2 == 0 }, 1:10)
 my @evens = @{$parts->[0]}
 my @odds = @{$parts->[1]}
-assert_eq scalar(@evens), 5, "partition evens count"
-assert_eq scalar(@odds), 5, "partition odds count"
+assert_eq len(@evens), 5, "partition evens count"
+assert_eq len(@odds), 5, "partition odds count"
 assert_eq $evens[0], 2, "first even"
 assert_eq $odds[0], 1, "first odd"
 

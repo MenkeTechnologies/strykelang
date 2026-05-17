@@ -65,14 +65,14 @@ assert_eq Project::Recursion::binary_search_arr(\@sorted, 0, 0, 9), -1, "bsearch
 # ══════════════════════════════════════════════════════════════════════════════
 
 my @empty_sorted = sort ()
-assert_eq scalar(@empty_sorted), 0, "sort empty"
+assert_eq len(@empty_sorted), 0, "sort empty"
 
 my @single_sorted = sort (42)
 assert_eq $single_sorted[0], 42, "sort single"
 
 my @unsorted = (5, 2, 8, 1, 9, 3, 7, 4, 6)
 my @sorted_nums = sort { $a <=> $b } @unsorted
-assert_eq scalar(@sorted_nums), 9, "sort count"
+assert_eq len(@sorted_nums), 9, "sort count"
 assert_eq $sorted_nums[0], 1, "sort first"
 assert_eq $sorted_nums[4], 5, "sort middle"
 assert_eq $sorted_nums[8], 9, "sort last"
@@ -141,17 +141,17 @@ assert_eq Project::Recursion::ackermann(3, 1), 13, "ack(3,1)"
 
 my $flat1 = [1, 2, 3]
 my $result1 = Project::Recursion::flatten_nested($flat1)
-assert_eq scalar(@$result1), 3, "flatten already flat"
+assert_eq len(@$result1), 3, "flatten already flat"
 assert_eq join(",", @$result1), "1,2,3", "flatten flat values"
 
 my $nested = [1, [2, 3], [4, [5, 6]], 7]
 my $result2 = Project::Recursion::flatten_nested($nested)
-assert_eq scalar(@$result2), 7, "flatten nested count"
+assert_eq len(@$result2), 7, "flatten nested count"
 assert_eq join(",", @$result2), "1,2,3,4,5,6,7", "flatten nested values"
 
 my $deep = [[[[1]]]]
 my $result3 = Project::Recursion::flatten_nested($deep)
-assert_eq scalar(@$result3), 1, "flatten deep count"
+assert_eq len(@$result3), 1, "flatten deep count"
 assert_eq $result3->[0], 1, "flatten deep value"
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -160,7 +160,7 @@ assert_eq $result3->[0], 1, "flatten deep value"
 
 my $orig_arr = [1, 2, [3, 4]]
 my $clone_arr = deep_clone($orig_arr)
-assert_eq scalar(@$clone_arr), 3, "clone arr count"
+assert_eq len(@$clone_arr), 3, "clone arr count"
 assert_eq $clone_arr->[0], 1, "clone arr 0"
 assert_eq $clone_arr->[2]->[0], 3, "clone nested 0"
 $clone_arr->[2]->[0] = 99
@@ -178,22 +178,22 @@ assert_eq $orig_hash->{b}->{c}, 2, "clone hash is independent"
 # ══════════════════════════════════════════════════════════════════════════════
 
 my $row0 = Project::Recursion::pascals_row(0)
-assert_eq scalar(@$row0), 1, "pascal row 0 count"
+assert_eq len(@$row0), 1, "pascal row 0 count"
 assert_eq $row0->[0], 1, "pascal row 0"
 
 my $row1 = Project::Recursion::pascals_row(1)
-assert_eq scalar(@$row1), 2, "pascal row 1 count"
+assert_eq len(@$row1), 2, "pascal row 1 count"
 my @r1 = @$row1
 assert_eq join(",", @r1), "1,1", "pascal row 1"
 
 my $row4 = Project::Recursion::pascals_row(4)
-assert_eq scalar(@$row4), 5, "pascal row 4 count"
+assert_eq len(@$row4), 5, "pascal row 4 count"
 assert_eq $row4->[0], 1, "pascal row 4 first"
 assert_eq $row4->[2], 6, "pascal row 4 middle"
 assert_eq $row4->[4], 1, "pascal row 4 last"
 
 my $row6 = Project::Recursion::pascals_row(6)
-assert_eq scalar(@$row6), 7, "pascal row 6 count"
+assert_eq len(@$row6), 7, "pascal row 6 count"
 assert_eq $row6->[3], 20, "pascal row 6 middle"
 
 # ══════════════════════════════════════════════════════════════════════════════

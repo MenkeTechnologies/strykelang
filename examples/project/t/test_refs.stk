@@ -32,7 +32,7 @@ assert_ok Project::Refs::hash_ref_exists($href, "name"), "href exists name"
 assert_false Project::Refs::hash_ref_exists($href, "missing"), "href not exists missing"
 
 my @hkeys = Project::Refs::hash_ref_keys($href)
-assert_eq scalar(@hkeys), 3, "href keys count"
+assert_eq len(@hkeys), 3, "href keys count"
 
 Project::Refs::hash_ref_delete($href, "active")
 assert_false Project::Refs::hash_ref_exists($href, "active"), "href after delete"
@@ -101,7 +101,7 @@ my $list = Project::Refs::make_linked_list(1, 2, 3, 4, 5)
 assert_eq Project::Refs::list_length($list), 5, "linked list length"
 
 my @list_arr = Project::Refs::list_to_array($list)
-assert_eq scalar(@list_arr), 5, "list to array length"
+assert_eq len(@list_arr), 5, "list to array length"
 assert_eq $list_arr[0], 1, "list to array first"
 assert_eq $list_arr[4], 5, "list to array last"
 

@@ -336,7 +336,7 @@ fn Project::NestedOop::team_structure {
 fn Project::NestedOop::count_team_members($structure) {
     my $total = 0
     for my $team (keys %$structure) {
-        $total += scalar(@{$structure->{$team}})
+        $total += len(@{$structure->{$team}})
     }
     $total
 }
@@ -365,7 +365,7 @@ class Team {
         $self
     }
 
-    fn size { scalar(@{$self->members}) }
+    fn size { len(@{$self->members}) }
 
     fn avg_age {
         my $sum = 0
@@ -399,7 +399,7 @@ class Graph {
         @{$e->{$id}}
     }
 
-    fn node_count { scalar(@{$self->nodes}) }
+    fn node_count { len(@{$self->nodes}) }
 }
 
 class TaskQueue {
@@ -419,10 +419,10 @@ class TaskQueue {
     }
 
     fn is_empty {
-        scalar(@{$self->items}) == 0 ? 1 : 0
+        len(@{$self->items}) == 0 ? 1 : 0
     }
 
-    fn size { scalar(@{$self->items}) }
+    fn size { len(@{$self->items}) }
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -549,9 +549,9 @@ fn Project::NestedOop::count_tasks_by_priority($board, $priority) {
 
 fn Project::NestedOop::matrix_of_points {
     my @matrix
-    for my $i (0..2) {
+    for my $i (0:2) {
         my @row
-        ~> 0..2 ep {
+        ~> 0:2 ep {
             push @row, Point($i, _)
         }
         push @matrix, [@row]
