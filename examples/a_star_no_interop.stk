@@ -1,0 +1,166 @@
+#!/usr/bin/env stryke
+
+# A* pathfinding on a 2-D grid — finds the lowest-cost path from
+# start to goal using f(n) = g(n) + h(n) where g is path cost so far
+# and h is the heuristic (Manhattan distance). A* is optimal when h
+# is admissible (never overestimates). Cells are "." (open) or "#"
+# (wall). Parses clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * implicit return on tail (rule 7)
+#   * `#{…}` interpolation (rule 1a)
+#   * `len`, `:` ranges (rules 4, 5)
+#
+# Namespaced UDFs `Star::*`.
+#
+# Run: stryke --no-interop examples/a_star_no_interop.stk
+
+# Manhattan-distance heuristic — admissible for 4-connected grids.
+fn Star::heur($r1, $c1, $r2, $c2) = abs($r1 - $r2) + abs($c1 - $c2)
+
+# Returns the lowest-cost path as a list of [r, c] cells, or undef
+# when unreachable. Grid is row-major arrayref of strings.
+fn Star::find_path($grid, $sr, $sc, $gr, $gc) {
+    my $rows = len @$grid
+    my $cols = len $grid->[0]
+    return [[$sr, $sc]] if $sr == $gr && $sc == $gc
+
+    # Open set is a flat array of nodes, scanned linearly for the
+    # lowest-f cell. Small for demo; a heap would be O(log n).
+    my @open
+    push @open, +{
+        r => $sr, c => $sc,
+        g => 0,
+        f => Star::heur($sr, $sc, $gr, $gc),
+        parent => undef,
+    }
+    my %closed   # "r,c" => 1
+    while (len(@open) > 0) {
+        # Pop lowest-f node.
+        my $best_i = 0
+        for my $i (1:len(@open) - 1) {
+            $best_i = $i if $open[$i]->{f} < $open[$best_i]->{f}
+        }
+        my $cur = $open[$best_i]
+        splice @open, $best_i, 1
+
+        if ($cur->{r} == $gr && $cur->{c} == $gc) {
+            # Reconstruct path by walking parent chain.
+            my @path
+            my $n = $cur
+            while (defined $n) {
+                unshift @path, [$n->{r}, $n->{c}]
+                $n = $n->{parent}
+            }
+            return \@path
+        }
+
+        $closed{"$cur->{r},$cur->{c}"} = 1
+        for my $d ([-1, 0], [1, 0], [0, -1], [0, 1]) {
+            my ($dr, $dc) = @$d
+            my $nr = $cur->{r} + $dr
+            my $nc = $cur->{c} + $dc
+            next if $nr < 0 || $nr >= $rows || $nc < 0 || $nc >= $cols
+            my $row = $grid->[$nr]
+            next if $row[$nc] eq "#"
+            next if exists $closed{"$nr,$nc"}
+            my $tentative_g = $cur->{g} + 1
+            # If already in open with better g, skip.
+            my $skip = 0
+            for my $o (@open) {
+                if ($o->{r} == $nr && $o->{c} == $nc && $o->{g} <= $tentative_g) {
+                    $skip = 1
+                    last
+                }
+            }
+            next if $skip
+            push @open, +{
+                r => $nr, c => $nc,
+                g => $tentative_g,
+                f => $tentative_g + Star::heur($nr, $nc, $gr, $gc),
+                parent => $cur,
+            }
+        }
+    }
+    undef
+}
+
+# Verify a path is contiguous + all cells are open + first matches
+# start + last matches goal.
+fn Star::valid_path($grid, $path, $sr, $sc, $gr, $gc) {
+    return 0 unless defined $path
+    return 0 if len(@$path) == 0
+    return 0 unless $path->[0][0] == $sr && $path->[0][1] == $sc
+    my $last = $path->[-1]
+    return 0 unless $last->[0] == $gr && $last->[1] == $gc
+    for my $i (1:len(@$path) - 1) {
+        my $p = $path->[$i - 1]
+        my $c = $path->[$i]
+        my $dr = abs($c->[0] - $p->[0])
+        my $dc = abs($c->[1] - $p->[1])
+        return 0 unless ($dr + $dc) == 1
+        my $row = $grid->[$c->[0]]
+        return 0 if $row[$c->[1]] eq "#"
+    }
+    1
+}
+
+p "── A* pathfinding demo ──"
+
+# Simple 5x5 grid with a wall column at column 2 except row 2.
+#   . . # . .
+#   . . # . .
+#   . . . . .       ← gap at (2,2)
+#   . . # . .
+#   . . # . .
+# Optimal start (0,0) → goal (0,4) detours through (2,2).
+my @grid1 = (
+    "..#..",
+    "..#..",
+    ".....",
+    "..#..",
+    "..#..",
+)
+my $path1 = Star::find_path(\@grid1, 0, 0, 0, 4)
+die "should find path" unless defined $path1
+die "path must be valid" unless Star::valid_path(\@grid1, $path1, 0, 0, 0, 4)
+# Optimal length: (0,0)→(1,0)→(2,0)→(2,1)→(2,2)→(2,3)→(2,4)→(1,4)→(0,4) = 9 cells
+die "path len 9 expected, got #{len @$path1}" unless len(@$path1) == 9
+p "  5x5 with wall: A* finds 9-cell optimal detour  OK"
+
+# Fully open 3x3 — straight diagonal-ish path (Manhattan).
+my @open_grid = (
+    "...",
+    "...",
+    "...",
+)
+my $path2 = Star::find_path(\@open_grid, 0, 0, 2, 2)
+die "open 3x3 path valid" unless Star::valid_path(\@open_grid, $path2, 0, 0, 2, 2)
+die "open 3x3 path len 5" unless len(@$path2) == 5
+p "  open 3x3: 5-cell shortest L-shaped path  OK"
+
+# Blocked: goal surrounded by walls.
+my @blocked = (
+    ".....",
+    "..#..",
+    ".#G#.",     # G is just a wall in the grid; goal coord still blocked
+    "..#..",
+    ".....",
+)
+my $path3 = Star::find_path(\@blocked, 0, 0, 2, 2)
+die "goal-is-G-wall should be unreachable" if defined $path3
+p "  goal in wall: unreachable (path = undef)  OK"
+
+# Trivial: start == goal.
+my $path4 = Star::find_path(\@grid1, 0, 0, 0, 0)
+die "start=goal path len 1" unless defined $path4 && len(@$path4) == 1
+
+# Universal invariants: every returned path is a valid path.
+for my $case ([\@grid1, 0, 0, 0, 4], [\@open_grid, 0, 0, 2, 2]) {
+    my ($g, $sr, $sc, $gr, $gc) = @$case
+    my $p = Star::find_path($g, $sr, $sc, $gr, $gc)
+    die "path not valid" unless Star::valid_path($g, $p, $sr, $sc, $gr, $gc)
+}
+
+p ""
+p "  ALL PASS (wall detour + open grid + unreachable + start=goal + validity invariant)"

@@ -1,0 +1,130 @@
+#!/usr/bin/env stryke
+
+# Pollard's rho — integer factorization in expected O(n^(1/4))
+# (vs trial division's O(√n)). Generates a pseudo-random sequence
+# mod n via f(x) = x² + c, and uses Floyd's cycle detection (tortoise
+# and hare) to find a collision; gcd(|x - y|, n) is then a non-trivial
+# factor with high probability. Parses clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * implicit return on tail (rule 7)
+#   * `#{…}` interpolation (rule 1a)
+#   * recursive expression-bodied gcd (rule 6)
+#
+# Namespaced UDFs `Rho::*`.
+#
+# Run: stryke --no-interop examples/pollard_rho_no_interop.stk
+
+fn Rho::gcd     = _1 == 0 ? _0 : Rho::gcd(_1, _0 % _1)
+
+# Pseudo-random step: f(x) = (x² + c) mod n.
+fn Rho::step($x, $c, $n) = ($x * $x + $c) % $n
+
+# Try to find a non-trivial factor of n with given seed/constant.
+# Returns the factor, or n itself if the run hit n's own period.
+fn Rho::try_factor($n, $seed, $c) {
+    return 2 if $n % 2 == 0
+    my $x = $seed
+    my $y = $seed
+    my $d = 1
+    while ($d == 1) {
+        $x = Rho::step($x, $c, $n)
+        $y = Rho::step(Rho::step($y, $c, $n), $c, $n)
+        my $diff = $x > $y ? $x - $y : $y - $x
+        $d = Rho::gcd($diff, $n)
+    }
+    $d
+}
+
+# Outer factor: retries with different (seed, c) pairs until success.
+# Returns a non-trivial factor of $n, or undef if $n is prime up to
+# our attempt budget (here: 16 retries).
+fn Rho::factor($n) {
+    return $n if $n < 4
+    return 2 if $n % 2 == 0
+    for my $c (1, 2, 3, 5, 7, 11, 13) {
+        for my $seed (2, 3, 5, 7, 11) {
+            my $f = Rho::try_factor($n, $seed, $c)
+            return $f if $f > 1 && $f < $n
+        }
+    }
+    undef
+}
+
+# Full prime factorization via recursive Pollard-rho + trial division
+# for the small remaining cofactors.
+fn Rho::factorize($n) {
+    my @out
+    Rho::collect($n, \@out)
+    \@out
+}
+
+fn Rho::collect($n, $out) {
+    return if $n <= 1
+    if ($n < 1000) {
+        # Trial division for small n is faster than rho's setup cost.
+        my $p = 2
+        while ($n > 1) {
+            if ($n % $p == 0) {
+                push @$out, $p
+                $n = int($n / $p)
+            } else {
+                $p++
+            }
+        }
+        return
+    }
+    my $f = Rho::factor($n)
+    if (defined $f && $f != $n) {
+        Rho::collect($f, $out)
+        Rho::collect(int($n / $f), $out)
+    } else {
+        # Couldn't split — treat as prime (n was below 1000 fallback already).
+        push @$out, $n
+    }
+}
+
+p "── Pollard's rho factorization demo ──"
+
+# Known semiprimes and composites with verifiable factors.
+my @cases = (
+    +{ n =>      15, factors => [3, 5]                     },
+    +{ n =>      77, factors => [7, 11]                    },
+    +{ n =>     143, factors => [11, 13]                   },
+    +{ n =>     323, factors => [17, 19]                   },
+    +{ n =>     899, factors => [29, 31]                   },
+    +{ n =>    8051, factors => [83, 97]                   },     # textbook example
+    +{ n =>   10403, factors => [101, 103]                 },
+    +{ n =>      24, factors => [2, 2, 2, 3]               },
+    +{ n =>     100, factors => [2, 2, 5, 5]               },
+    +{ n =>    1001, factors => [7, 11, 13]                },
+    +{ n => 1234567, factors => [127, 9721]                },
+)
+
+my $fail = 0
+for my $c (@cases) {
+    my $got      = Rho::factorize($c->{n})
+    my @sorted   = sort { _0 <=> _1 } @$got
+    my $got_s    = join(",", @sorted)
+    my $want_s   = join(",", @{$c->{factors}})
+    my $ok       = $got_s eq $want_s
+    $fail++ unless $ok
+    p "  factor(#{$c->{n}}) = [$got_s]  expect [$want_s]  #{$ok ? \"\" : \"FAIL\"}"
+}
+die "#{$fail} / #{len @cases} factorization cases failed" if $fail > 0
+
+# Universal invariants:
+#   * Product of returned factors equals n
+#   * Every returned factor is > 1
+for my $c (@cases) {
+    my $f = Rho::factorize($c->{n})
+    my $prod = 1
+    $prod *= $_ for @$f
+    die "product mismatch for #{$c->{n}}: got $prod" unless $prod == $c->{n}
+    for my $p (@$f) {
+        die "factor <= 1 for #{$c->{n}}" if $p <= 1
+    }
+}
+
+p ""
+p "  ALL PASS (#{len @cases} factorizations + product invariant)"
