@@ -21937,4 +21937,78 @@ mod tests {
              }",
         );
     }
+
+    /// Recursive ext_gcd returning a 3-tuple via arrayref destructure.
+    /// Modular-inverse pattern.
+    #[test]
+    fn ext_gcd_recursive_destructure_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "fn Mod::ext_gcd($va, $vb) { \
+                return [$va, 1, 0] if $vb == 0; \
+                my $r = Mod::ext_gcd($vb, $va % $vb); \
+                my ($g, $x1, $y1) = @$r; \
+                [$g, $y1, $x1 - int($va / $vb) * $y1] \
+             }",
+        );
+    }
+
+    /// Convolution-recurrence DP — Catalan number computation.
+    /// Inner accumulator with mult on each iteration.
+    #[test]
+    fn convolution_recurrence_dp_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "my @c = (1); my $n = 5; \
+             for my $i (1:$n) { \
+                my $sum = 0; \
+                for my $j (0:$i - 1) { $sum += $c[$j] * $c[$i - 1 - $j] } \
+                push @c, $sum \
+             }",
+        );
+    }
+
+    /// Tarjan SCC state: shared mutable hashref carries the entire
+    /// algorithm's bookkeeping (`index`, `idx_of`, `low_of`,
+    /// `on_stack`, `stack`, `sccs`) — passed by reference to the
+    /// recursive worker.
+    #[test]
+    fn tarjan_scc_shared_state_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "fn SCC::strong_connect($s, $v) { \
+                $s->{idx_of}{$v} = $s->{index}; \
+                $s->{low_of}{$v} = $s->{index}; \
+                $s->{index}++; \
+                push @{$s->{stack}}, $v; \
+                $s->{on_stack}{$v} = 1; \
+                for my $w (@{$s->{adj}{$v}}) { \
+                    if (!exists $s->{idx_of}{$w}) { \
+                        SCC::strong_connect($s, $w); \
+                        $s->{low_of}{$v} = $s->{low_of}{$w} if $s->{low_of}{$w} < $s->{low_of}{$v} \
+                    } \
+                } \
+             }",
+        );
+    }
+
+    /// Heap's algorithm permutation generator — recursive in-place
+    /// swap with parity-conditional pivot choice.
+    #[test]
+    fn heaps_algorithm_recursive_parses() {
+        let _g = NoInteropGuard::on();
+        parse_ok(
+            "fn Perm::heaps_inner($arr, $n, $out) { \
+                if ($n == 1) { my @snap = @$arr; push @$out, \\@snap; return } \
+                for my $i (0:$n - 1) { \
+                    Perm::heaps_inner($arr, $n - 1, $out); \
+                    if ($n % 2 == 0) { \
+                        ($arr->[$i], $arr->[$n - 1]) = ($arr->[$n - 1], $arr->[$i]) \
+                    } else { \
+                        ($arr->[0], $arr->[$n - 1]) = ($arr->[$n - 1], $arr->[0]) \
+                    } \
+                } \
+             }",
+        );
+    }
 }

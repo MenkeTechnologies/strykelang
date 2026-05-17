@@ -1,0 +1,143 @@
+#!/usr/bin/env stryke
+
+# Permutation generators — two classic algorithms:
+#   * Heap's algorithm: emit all N! permutations in O(N!) via in-place
+#     swaps. Each successive permutation differs from the previous by
+#     exactly one swap (gray-code-like)
+#   * Lexicographic next_permutation: given any permutation, produce
+#     the next one in lex order. Repeatedly applying from the sorted
+#     state walks every permutation once.
+# Parses clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * implicit return on tail (rule 7)
+#   * `#{…}` interpolation (rule 1a)
+#   * `:` ranges, `len` (rules 4, 5)
+#
+# Namespaced UDFs `Perm::*`.
+#
+# Run: stryke --no-interop examples/permutations_no_interop.stk
+
+# Heap's algorithm — append all permutations of $arr into $out.
+fn Perm::heaps($arr) {
+    my @copy = @$arr
+    my @out
+    Perm::heaps_inner(\@copy, len(@copy), \@out)
+    \@out
+}
+
+fn Perm::heaps_inner($arr, $n, $out) {
+    if ($n == 1) {
+        my @snap = @$arr
+        push @$out, \@snap
+        return
+    }
+    for my $i (0:$n - 1) {
+        Perm::heaps_inner($arr, $n - 1, $out)
+        if ($n % 2 == 0) {
+            ($arr->[$i], $arr->[$n - 1]) = ($arr->[$n - 1], $arr->[$i])
+        } else {
+            ($arr->[0], $arr->[$n - 1]) = ($arr->[$n - 1], $arr->[0])
+        }
+    }
+}
+
+# Lexicographic next-permutation. Mutates $arr in place. Returns 1 if
+# advanced, 0 if input was the last permutation (sorted descending).
+fn Perm::next($arr) {
+    my $n = len @$arr
+    return 0 if $n <= 1
+    # Step 1: find largest $i with arr[i] < arr[i+1].
+    my $i = $n - 2
+    while ($i >= 0 && $arr->[$i] >= $arr->[$i + 1]) { $i-- }
+    return 0 if $i < 0
+    # Step 2: find largest $j > $i with arr[j] > arr[i].
+    my $j = $n - 1
+    while ($arr->[$j] <= $arr->[$i]) { $j-- }
+    # Step 3: swap.
+    ($arr->[$i], $arr->[$j]) = ($arr->[$j], $arr->[$i])
+    # Step 4: reverse suffix from $i+1.
+    my $lo = $i + 1
+    my $hi = $n - 1
+    while ($lo < $hi) {
+        ($arr->[$lo], $arr->[$hi]) = ($arr->[$hi], $arr->[$lo])
+        $lo++
+        $hi--
+    }
+    1
+}
+
+# All permutations in lex order via repeated next_permutation.
+fn Perm::all_lex($arr) {
+    my @cur = sort { _0 <=> _1 } @$arr
+    my @out
+    push @out, [@cur]
+    while (Perm::next(\@cur)) {
+        push @out, [@cur]
+    }
+    \@out
+}
+
+p "── Permutation generators demo ──"
+
+# Factorial helper for expected counts.
+fn Perm::fact($n) {
+    my $f = 1
+    for my $i (1:$n) { $f *= $i }
+    $f
+}
+
+# For sizes 1..6, count Heap's output vs N!.
+for my $n (1:6) {
+    my @input = 1:$n
+    my $h = Perm::heaps(\@input)
+    my $expected = Perm::fact($n)
+    my $got = len(@$h)
+    die "Heap's N=$n: expected $expected perms, got $got" unless $got == $expected
+}
+p "  Heap's: N=1..6 generate exactly N! permutations  OK"
+
+# Lex-order: same count, plus first/last predictable.
+my $lex3 = Perm::all_lex([1, 2, 3])
+die "lex N=3 count = 6" unless len(@$lex3) == 6
+die "first = [1,2,3]" unless join(",", @{$lex3->[0]}) eq "1,2,3"
+die "last = [3,2,1]"  unless join(",", @{$lex3->[-1]}) eq "3,2,1"
+# Verify lex order: each row must be lex-greater than the previous.
+for my $i (1:5) {
+    my $prev = join(",", @{$lex3->[$i - 1]})
+    my $cur  = join(",", @{$lex3->[$i]})
+    die "lex order violated at $i: $prev → $cur" if $prev ge $cur
+}
+p "  lex: N=3 produces sorted [1,2,3]..[3,2,1] in strict ascending order  OK"
+
+# Heap's output should be the SAME SET as lex output (just different order).
+my $heap4 = Perm::heaps([1, 2, 3, 4])
+my $lex4  = Perm::all_lex([1, 2, 3, 4])
+my %heap_seen
+for my $p (@$heap4) { $heap_seen{join(",", @$p)} = 1 }
+my %lex_seen
+for my $p (@$lex4) { $lex_seen{join(",", @$p)} = 1 }
+die "set diff" unless join(",", sort keys %heap_seen) eq join(",", sort keys %lex_seen)
+p "  N=4: Heap's and lex generate identical 24-perm sets (different order)  OK"
+
+# Universal invariants:
+#   * Every generated permutation contains exactly the input multiset
+#   * No duplicates in output (since input has no duplicates)
+my $perms5 = Perm::all_lex([1, 2, 3, 4, 5])
+die "N=5 count = 120" unless len(@$perms5) == 120
+my %seen
+for my $p (@$perms5) {
+    my $key = join(",", @$p)
+    die "duplicate perm: $key" if exists $seen{$key}
+    $seen{$key} = 1
+    # Verify multiset matches.
+    my $sorted_p = join(",", sort { _0 <=> _1 } @$p)
+    die "wrong multiset" unless $sorted_p eq "1,2,3,4,5"
+}
+
+# next_permutation returns 0 when input is the last permutation.
+my @last = (3, 2, 1)
+die "next of [3,2,1] should return 0" if Perm::next(\@last)
+
+p ""
+p "  ALL PASS (Heap N=1..6 counts + lex order + set equality + 120-perm uniqueness)"
