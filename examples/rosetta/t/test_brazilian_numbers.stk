@@ -35,6 +35,6 @@ assert_eq $brazilian[19], 33, "20th Brazilian"
 
 # Piped version
 7 |> Rosetta::Brazilian::check |> assert_ok("7 is Brazilian")
-6 |> Rosetta::Brazilian::check |> ~> fn { !$_ } |> assert_ok("6 is not Brazilian")
+6 |> Rosetta::Brazilian::check |> ~> fn { !_ } |> assert_ok("6 is not Brazilian")
 
 test_run

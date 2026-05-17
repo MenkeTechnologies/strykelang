@@ -51,7 +51,7 @@ fn QS::median($arr) {
 }
 
 # Convenience: kth largest (1-indexed for human-friendly use).
-fn QS::kth_largest = QS::select(_0, len(@{$_0}) - _1)
+fn QS::kth_largest = QS::select(_0, len(@{_0}) - _1)
 
 # Brute reference for cross-checking.
 fn QS::brute_select($arr, $k) {

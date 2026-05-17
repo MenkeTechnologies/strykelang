@@ -55,6 +55,6 @@ assert_eq len(@achilles), 50, "Found 50 Achilles numbers"
 
 # Piped version
 72 |> Rosetta::Achilles::is_achilles |> assert_ok("72 is Achilles")
-36 |> Rosetta::Achilles::is_achilles |> ~> fn { !$_ } |> assert_ok("36 is not Achilles")
+36 |> Rosetta::Achilles::is_achilles |> ~> fn { !_ } |> assert_ok("36 is not Achilles")
 
 test_run

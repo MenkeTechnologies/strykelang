@@ -65,14 +65,14 @@ assert_ok len(@$coll) >= 1, "at least one collision group"
 # 4663 group has both "good" and "home"
 my $found_good_home = 0
 for my $g (@$coll) {
-    my %members = map { $_ => 1 } @$g
+    my %members = map { _ => 1 } @$g
     $found_good_home = 1 if exists $members{"good"} && exists $members{"home"}
 }
 assert_ok $found_good_home, "good ↔ home collide"
 
 # Words with non-letters are dropped
 my $g2 = Rosetta::Textonyms::groups(["foo", "f1o", "bar"])
-my %seen = map { $_ => 1 } map { @$_ } values %$g2
+my %seen = map { _ => 1 } map { @{_} } values %$g2
 my $f1o_present = exists($seen{f1o}) ? 1 : 0
 my $foo_present = exists($seen{foo}) ? 1 : 0
 assert_eq $f1o_present, 0, "non-letter word dropped"

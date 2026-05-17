@@ -45,6 +45,6 @@ assert_eq $b->[1]{value}, 99, "shared bug: slot 1 also 99"
 assert_eq $b->[2]{value}, 99, "shared bug: slot 2 also 99"
 
 # Pipe form
-3 |> Rosetta::DistinctObj::make_distinct |> fn { len(@$_) } |> assert_eq(3, "pipe count")
+3 |> Rosetta::DistinctObj::make_distinct |> fn { len(@{_}) } |> assert_eq(3, "pipe count")
 
 test_run

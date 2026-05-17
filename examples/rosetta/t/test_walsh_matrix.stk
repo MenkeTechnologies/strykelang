@@ -13,7 +13,7 @@ fn Rosetta::Walsh::build($n) {
             push @new, \@top
         }
         for my $r (0:$size - 1) {
-            my @bot = (@{$m[$r]}, map { -$_ } @{$m[$r]})
+            my @bot = (@{$m[$r]}, map { -_ } @{$m[$r]})
             push @new, \@bot
         }
         @m = @new

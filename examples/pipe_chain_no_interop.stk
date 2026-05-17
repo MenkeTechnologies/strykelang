@@ -5,7 +5,7 @@
 # bareword topic `_` is the implicit per-item value inside each block,
 # tight as the design intends.
 #
-# Strict-mode style rule: prefer bareword `_` over sigil `$_`. The
+# Strict-mode style rule: prefer bareword `_` over sigil `_`. The
 # sigil belongs in string interpolation only.
 #
 # Run: stryke --no-interop examples/pipe_chain_no_interop.stk

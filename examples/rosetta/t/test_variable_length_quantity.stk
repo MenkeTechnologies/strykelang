@@ -34,7 +34,7 @@ fn Rosetta::Vlq::decode($bytes) {
 }
 
 fn Rosetta::Vlq::hex($bytes) {
-    join(" ", map { sprintf("%02X", $_) } @$bytes)
+    join(" ", map { sprintf("%02X", _) } @$bytes)
 }
 
 # Canonical MIDI-spec sample table

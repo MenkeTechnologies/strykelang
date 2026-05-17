@@ -5,7 +5,7 @@ fn Rosetta::WordFrequency::compute($text) {
     my %freq
     $text |> lc() |> split(/\W+/) |> map {
         if (_ ne "") {
-            $freq{$_}++
+            $freq{_}++
         }
     }
     %freq

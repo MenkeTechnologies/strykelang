@@ -4,9 +4,9 @@
 
 fn Rosetta::ClimbStairs::count($n) {
     return 1 if $n <= 1
-    my ($_0, $_1) = (1, 2)
-    for (3:$n) { ($_0, $_1) = ($_1, $_0 + $_1) }
-    $_1
+    my (_0, _1) = (1, 2)
+    for (3:$n) { (_0, _1) = (_1, _0 + _1) }
+    _1
 }
 
 # Variant: 1, 2, or 3 steps at a time (tribonacci-like).
@@ -14,8 +14,8 @@ fn Rosetta::ClimbStairs::count_3($n) {
     return 1 if $n == 0
     return 1 if $n == 1
     return 2 if $n == 2
-    my ($_0, $_1, $c) = (1, 1, 2)
-    for (3:$n) { ($_0, $_1, $c) = ($_1, $c, $_0 + $_1 + $c) }
+    my (_0, _1, $c) = (1, 1, 2)
+    for (3:$n) { (_0, _1, $c) = (_1, $c, _0 + _1 + $c) }
     $c
 }
 

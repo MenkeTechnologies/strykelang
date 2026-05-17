@@ -40,7 +40,7 @@ my $p0 = Rosetta::Permutations::generate([])
 assert_eq len(@$p0), 1, "0! = 1 (one empty permutation)"
 
 # All p3 entries are distinct and sorted strings cover (123, 132, 213, 231, 312, 321)
-my @joined = sort map { join("", @$_) } @$p3
+my @joined = sort map { join("", @{_}) } @$p3
 assert_eq join(",", @joined), "123,132,213,231,312,321", "all 3! permutations of 1,2,3"
 
 assert_eq Rosetta::Permutations::factorial(0), 1, "0!"

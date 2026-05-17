@@ -43,7 +43,7 @@ my $c4 = Rosetta::Bin::counts([], [10])
 assert_eq join(",", @$c4), "0,0", "empty input → all zero"
 
 # Pipe form
-[1, 2, 3, 4, 5] |> fn { Rosetta::Bin::counts(_, [3]) } |> fn { join(",", @$_) } |> assert_eq("2,3", "pipe split")
+[1, 2, 3, 4, 5] |> fn { Rosetta::Bin::counts(_, [3]) } |> fn { join(",", @{_}) } |> assert_eq("2,3", "pipe split")
 
 # Index helper
 assert_eq Rosetta::Bin::index(7, [5, 10, 15]), 1, "7 in [5,10)"

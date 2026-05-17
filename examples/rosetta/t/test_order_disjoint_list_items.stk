@@ -5,7 +5,7 @@
 # stay in their original positions.
 
 fn Rosetta::OrderDisjoint::reorder($items, $order) {
-    my %tag = map { $_ => 1 } @$order
+    my %tag = map { _ => 1 } @$order
     # Indices in $items that hold tagged elements (in original order)
     my @slots
     for my $i (0..len(@$items) - 1) {

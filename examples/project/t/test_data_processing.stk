@@ -47,7 +47,7 @@ assert_eq $meta->{author}, "menke", "zip author"
 
 # ── Split by Predicate (Partition) ───────────────────────────────────
 
-my $parts = Project::Data::split_by_pred(fn { $_0 % 2 == 0 }, 1:10)
+my $parts = Project::Data::split_by_pred(fn { _0 % 2 == 0 }, 1:10)
 my @evens = @{$parts->[0]}
 my @odds = @{$parts->[1]}
 assert_eq len(@evens), 5, "partition evens count"

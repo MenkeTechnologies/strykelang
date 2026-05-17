@@ -14,7 +14,7 @@ fn Rosetta::Kahn::sort($edges, $nodes) {
         push @{$adj{$u}}, $v
         $in_deg{$v}++
     }
-    my @queue = grep { $in_deg{$_} == 0 } @$nodes
+    my @queue = grep { $in_deg{_} == 0 } @$nodes
     my @order
     while (len(@queue)) {
         my $u = shift @queue

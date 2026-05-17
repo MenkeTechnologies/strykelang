@@ -67,7 +67,7 @@ fn Project::Collections::apply_to_values ($href, $fn) {
 
 # Compose two functions: Project::Collections::compose_fns(f, g) returns fn { f(g(x)) }
 fn Project::Collections::compose_fns ($f, $g) {
-    fn { $f($g($_0)) }
+    fn { $f($g(_0)) }
 }
 
 # Apply a list of transforms to a value (left fold of functions)

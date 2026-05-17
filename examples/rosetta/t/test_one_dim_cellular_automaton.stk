@@ -26,7 +26,7 @@ fn Rosetta::Ca1d::evolve($cells, $rule, $steps) {
 }
 
 fn Rosetta::Ca1d::row_str($cells) {
-    join("", map { $_ == 1 ? "#" : "." } @$cells)
+    join("", map { _ == 1 ? "#" : "." } @$cells)
 }
 
 # Rule 90 (Sierpinski): each cell ← left XOR right

@@ -20,7 +20,7 @@ fn Rosetta::Mastermind::score($secret, $guess) {
     }
     
     my %s_counts
-    $s_counts{$_}++ for @s_remaining
+    $s_counts{_}++ for @s_remaining
     
     for my $char (@g_remaining) {
         if ($s_counts{$char} > 0) {

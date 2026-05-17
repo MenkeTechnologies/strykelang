@@ -40,6 +40,6 @@ assert_ok abs($res->{1} - 0.301) < 0.05, "Benford 1 freq"
 assert_ok abs($res->{2} - 0.176) < 0.05, "Benford 2 freq"
 
 # Piped version
-\@fibs |> ~> fn { Rosetta::Benford::analyze(@$_) } |> ~> fn { $_->{1} } |> ~> fn { abs($_ - 0.301) < 0.05 } |> assert_ok("piped Benford")
+\@fibs |> ~> fn { Rosetta::Benford::analyze(@{_}) } |> ~> fn { $_->{1} } |> ~> fn { abs(_ - 0.301) < 0.05 } |> assert_ok("piped Benford")
 
 test_run

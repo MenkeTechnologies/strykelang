@@ -20,6 +20,6 @@ my $res = Rosetta::VanEck::generate(10)
 assert_eq join(",", @$res), "0,0,1,0,2,0,2,2,1,6", "van eck first 10"
 
 # Using |> and ~>
-Rosetta::VanEck::generate(12) |> map { join(",", @$_) } |> assert_eq("0,0,1,0,2,0,2,2,1,6,0,5", "van eck first 12")
+Rosetta::VanEck::generate(12) |> map { join(",", @{_}) } |> assert_eq("0,0,1,0,2,0,2,2,1,6,0,5", "van eck first 12")
 
 test_run

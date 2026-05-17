@@ -62,7 +62,7 @@ fn Rosetta::Kosaraju::solve($graph) {
     }
     
     # Sort SCCs for deterministic testing
-    my @sorted_sccs = sort { join(",", @_0) cmp join(",", @$_1) } @sccs
+    my @sorted_sccs = sort { join(",", @_0) cmp join(",", @{_1}) } @sccs
     \@sorted_sccs
 }
 
@@ -76,7 +76,7 @@ my $graph = {
 }
 
 my $sccs = Rosetta::Kosaraju::solve($graph)
-my @scc_strs = ~> @$sccs map { join(",", @$_) }
+my @scc_strs = ~> @$sccs map { join(",", @{_}) }
 
 assert_eq len(@scc_strs), 2, "Found 2 SCCs"
 assert_eq $scc_strs[0], "A,B,C", "SCC 1 is A,B,C"

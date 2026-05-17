@@ -3,17 +3,17 @@
 # AM >= GM >= HM for any positive list, with equality iff all values equal.
 
 fn Rosetta::PythMean::arithmetic(@xs) {
-    my $sum = ~> @xs reduce { $_0 + $_1 }
+    my $sum = ~> @xs reduce { _0 + _1 }
     $sum / len(@xs)
 }
 
 fn Rosetta::PythMean::geometric(@xs) {
-    my $prod = ~> @xs reduce { $_0 * $_1 }
+    my $prod = ~> @xs reduce { _0 * _1 }
     $prod ** (1.0 / len(@xs))
 }
 
 fn Rosetta::PythMean::harmonic(@xs) {
-    my $recip_sum = ~> @xs map { 1.0 / _ } reduce { $_0 + $_1 }
+    my $recip_sum = ~> @xs map { 1.0 / _ } reduce { _0 + _1 }
     len(@xs) / $recip_sum
 }
 

@@ -52,6 +52,6 @@ assert_eq join(",", @primes50), "2,3,5,7,11,13,17,19,23,29,31,37,41,43,47", "pri
 
 # Piped version
 7 |> Rosetta::AKS::is_prime |> assert_ok("7 is prime via AKS")
-9 |> Rosetta::AKS::is_prime |> ~> fn { !$_ } |> assert_ok("9 is not prime via AKS")
+9 |> Rosetta::AKS::is_prime |> ~> fn { !_ } |> assert_ok("9 is not prime via AKS")
 
 test_run

@@ -50,7 +50,7 @@ for my $n (0:10) {
 # A few specific strict partitions
 my $p7 = Rosetta::StrictPart::enumerate(7, 7)
 # A000009(7) = 5: {7}, {6,1}, {5,2}, {4,3}, {4,2,1}
-my @joined = map { join("+", @$_) } @$p7
+my @joined = map { join("+", @{_}) } @$p7
 my @sorted = sort @joined
 assert_eq len(@sorted), 5, "5 strict partitions of 7"
 

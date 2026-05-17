@@ -20,7 +20,7 @@ fn Rosetta::Permutations::generate($arr) {
 
 fn Rosetta::MissingPermutation::solve(@perms) {
     my %given
-    $given{$_} = 1 for @perms
+    $given{_} = 1 for @perms
     
     my @chars = sort(chars($perms[0]))
     my $all = Rosetta::Permutations::generate(\@chars)

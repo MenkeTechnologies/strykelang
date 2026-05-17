@@ -37,7 +37,7 @@ my @dict = ("aided", "annoy", "danny", "deign", "denied", "denying", "engine",
             "eye", "any")
 
 my @hits = Rosetta::WordWheel::solve("ADGEYNNII", "N", 3, \@dict)
-my %h = map { $_ => 1 } @hits
+my %h = map { _ => 1 } @hits
 
 # These should be present (use only available letters and contain N):
 for my $w ("annoy", "denying", "denied", "ennui", "engine", "indy", "nanny", "needy") {

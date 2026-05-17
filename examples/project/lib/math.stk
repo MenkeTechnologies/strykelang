@@ -34,7 +34,7 @@ fn Project::Math::lcm_of ($a, $b) {
 
 # Returns a closure that adds $n to its argument
 fn Project::Math::make_adder ($n) {
-    fn { $_0 + $n }
+    fn { _0 + $n }
 }
 
 # Higher-order: apply a function N times to a value

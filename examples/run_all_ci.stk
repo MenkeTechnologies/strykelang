@@ -30,7 +30,7 @@ my $st     = $ENV{ST} // $^X
 my $jobs   = $opts{jobs} // $ENV{RUN_ALL_CI_JOBS} // $ENV{CI_JOBS} // 16
 $jobs = 16 if $jobs < 1
 
-my %META = map { ($_ => 1) } qw(
+my %META = map { (_ => 1) } qw(
     check_no_interop
     run_no_interop_demos
     exercism_run_all
@@ -48,13 +48,9 @@ fn Ci::basename($path) {
 
 fn Ci::is_meta($path) = exists $META{Ci::basename($path)}
 
-fn Ci::top_stk_files() {
-    ~> glob("$ex_dir/*.stk") grep { !Ci::is_meta } sort
-}
+fn Ci::top_stk_files = ~> glob("$ex_dir/*.stk") grep { !Ci::is_meta } sort
 
-fn Ci::demo_stk_files() {
-    ~> glob("$ex_dir/*_no_interop.stk") grep { _ =~ /_no_interop\.stk$/ && !Ci::is_meta } sort
-}
+fn Ci::demo_stk_files = ~> glob("$ex_dir/*_no_interop.stk") grep { _ =~ /_no_interop\.stk$/ && !Ci::is_meta } sort
 
 mysync @failures
 mysync $files_ok = 0
@@ -94,8 +90,7 @@ fn Ci::run_suite($path) {
 
 fn Ci::find_test_stk($root) {
     my $raw = `find "$root" -type f \\( -name 'test_*.stk' -o -name 't_*.stk' \\) 2>/dev/null`
-    return [] if $raw eq ""
-    ~> split /\n/, $raw grep { _ ne "" } sort
+    $raw eq "" ? [] : ~> split /\n/, $raw grep { _ ne "" } sort
 }
 
 fn Ci::count_asserts($path) {
@@ -118,8 +113,8 @@ fn Ci::count_tests_tree($root) = Ci::count_tests_paths(Ci::find_test_stk($root))
 fn Ci::report_run_results($phase, @files, @oks) {
     my $bad = 0
     for (0:len(@files) - 1) {
-        if (!@oks[$_]) {
-            Ci::fail($phase, @files[$_])
+        if (!@oks[_]) {
+            Ci::fail($phase, @files[_])
             $bad += 1
         } elsif (!$summary) {
             p "  OK   @files[$_]"
@@ -231,7 +226,7 @@ if (len(@only_specs)) {
     for (@only_specs) {
         for (split /,/, _) {
             if (_ !~ /^(?:parse|run|demos|project|rosetta|exercism|ruby|scheme)$/) {
-                die "unknown --only phase: " . $_
+                die "unknown --only phase: " . _
             }
             $want{_} = 1
         }

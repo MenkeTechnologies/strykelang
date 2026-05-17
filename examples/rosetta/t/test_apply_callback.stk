@@ -16,6 +16,6 @@ my @res2 = (10, 20) |> map { _ + 5 }
 assert_eq join(",", @res2), "15,25", "piped map"
 
 # Piped version
-\@vals |> ~> fn { Rosetta::Callback::apply($square, @$_) } |> join(",") |> assert_eq("1,4,9", "piped apply")
+\@vals |> ~> fn { Rosetta::Callback::apply($square, @{_}) } |> join(",") |> assert_eq("1,4,9", "piped apply")
 
 test_run

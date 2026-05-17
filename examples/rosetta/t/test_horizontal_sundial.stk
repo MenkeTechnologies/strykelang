@@ -55,6 +55,6 @@ my $lines = Rosetta::Sundial::hour_lines(45)
 assert_eq len(@$lines), 13, "13 hour lines"
 
 # Pipe form
-45 |> fn { Rosetta::Sundial::hour_angle(_, 6) } |> fn { abs($_ - 90) < 1e-9 || abs($_ + 90) < 1e-9 } |> assert_eq(1, "pipe 6h at lat 45 = ±90°")
+45 |> fn { Rosetta::Sundial::hour_angle(_, 6) } |> fn { abs(_ - 90) < 1e-9 || abs(_ + 90) < 1e-9 } |> assert_eq(1, "pipe 6h at lat 45 = ±90°")
 
 test_run
