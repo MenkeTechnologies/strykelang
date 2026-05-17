@@ -148,7 +148,7 @@ my $pushes = 0
 my $pops = 0
 for my $i (1:100) {
     if (rand() < 0.6 || Demo::PQ::is_empty($stress)) {
-        Demo::PQ::push($stress, int(rand() * 1000), "item$i")
+        Demo::PQ::push($stress, int(rand 1000), "item$i")
         $pushes++
     } else {
         Demo::PQ::pop($stress)

@@ -39,7 +39,7 @@ fn Demo::BG::play_one() {
     my $moves = 0
     my $hops_used = 0
     while ($pos < 100) {
-        my $roll = int(rand() * 6) + 1
+        my $roll = int(rand 6) + 1
         $moves = $moves + 1
         my $new_pos = $pos + $roll
         # Overshoot rule: stay put if overshoot 100.
@@ -91,7 +91,7 @@ p "── tracing one specific game for landings (TopK) ────"
 my $pos = 0
 my $moves = 0
 while ($pos < 100) {
-    my $roll = int(rand() * 6) + 1
+    my $roll = int(rand 6) + 1
     $moves++
     my $new_pos = $pos + $roll
     if ($new_pos > 100) { next }
@@ -140,7 +140,7 @@ p "── HLL distinct cells visited (1 sample game) ───────"
 my $hll = hll(14)
 $pos = 0
 while ($pos < 100) {
-    my $roll = int(rand() * 6) + 1
+    my $roll = int(rand 6) + 1
     my $new_pos = $pos + $roll
     if ($new_pos > 100) { next }
     $pos = $new_pos

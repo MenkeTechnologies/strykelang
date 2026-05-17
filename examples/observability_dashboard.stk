@@ -19,11 +19,11 @@ my @errors   = ("Timeout", "DBConnError", "RateLimit", "AuthFailed", "NotFound",
 
 my @events
 for my $i (1:500) {
-    my $svc   = $services[int(rand() * len(@services))]
-    my $level = $levels[int(rand() * len(@levels))]
-    my $lat   = int(rand() * 800) + 20    # 20:820 ms
-    my $user  = "user-" . int(rand() * 100)   # 100 distinct users
-    my $err   = $level eq "error" ? $errors[int(rand() * len(@errors))] : undef
+    my $svc   = $services[rand @services]
+    my $level = $levels[rand @levels]
+    my $lat   = int(rand 800) + 20    # 20:820 ms
+    my $user  = "user-" . int(rand 100)   # 100 distinct users
+    my $err   = $level eq "error" ? $errors[rand @errors] : undef
     push @events, +{
         service => $svc,
         level   => $level,

@@ -91,5 +91,5 @@ printf "  coldest by total time      : %s (%.2f ms)\n",
 
 p ""
 p "── intercept registry ─────────────────────────────────"
-printf "  active intercepts : %d\n", len(intercept_list())
+printf "  active intercepts : %d\n", intercept_list() |> len
 p "  (use intercept_clear() in tests to remove advice cleanly)"

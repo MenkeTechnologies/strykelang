@@ -33,7 +33,7 @@ fn Demo::FF::bucket($user, $flag) {
     my $key = "$user|$flag"
     my $h = 2166136261
     for my $i (0:len($key) - 1) {
-        my $c = ord(substr($key, $i, 1))
+        my $c = ord $key[$i]
         $h = ($h ^ $c) * 16777619
         $h = $h % 4294967296   # 32-bit wrap
     }

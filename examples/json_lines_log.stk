@@ -28,8 +28,8 @@ my @lines
 for my $i (1:100) {
     my $svc   = $services[$i % len(@services)]
     my $level = $levels[$i % len(@levels)]
-    my $global_lat   = int(rand() * 500) + 10            # 10:510 ms
-    my $trace = "trace-" . int(rand() * 30)       # 30 distinct traces
+    my $global_lat   = int(rand 500) + 10            # 10:510 ms
+    my $trace = "trace-" . int(rand 30)       # 30 distinct traces
     my $rec = +{
         ts      => sprintf("2026-05-15T12:%02d:%02d", int($i / 10), $i % 60),
         service => $svc,

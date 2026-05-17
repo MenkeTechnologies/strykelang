@@ -55,7 +55,7 @@ for my $w (@top[0:4]) {
 
 fn pick_random($arr) {
     my @items = @$arr
-    $items[int(rand() * len(@items))]
+    $items[rand @items]
 }
 
 fn generate_sentence($start, $max_len) {

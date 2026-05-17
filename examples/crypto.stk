@@ -6,19 +6,21 @@
 
 p "── Cryptographic hashes ───────────────────────────────"
 my $msg = "the quick brown fox"
-printf "  md5        : %s\n", md5($msg)
-printf "  sha256     : %s\n", sha256($msg)
-printf "  sha512     : %s  (truncated)\n", substr(sha512($msg), 0, 32) . "…"
-printf "  sha3_256   : %s\n", sha3_256($msg)
-printf "  blake3     : %s\n", blake3($msg)
+printf "  md5        : %s\n", md5 $msg
+printf "  sha256     : %s\n", sha256 $msg
+my $sha512_full = sha512 $msg
+printf "  sha512     : %s…  (truncated)\n", $sha512_full[0:31]
+printf "  sha3_256   : %s\n", sha3_256 $msg
+printf "  blake3     : %s\n", blake3 $msg
 
 p ""
 p "── HMAC — keyed authentication tag ────────────────────"
 my $secret = "shared-secret-32-bytes-or-bigger"
-printf "  hmac_sha256: %s\n", hmac_sha256($secret, $msg)
+my $tag    = hmac_sha256 $secret, $msg
+printf "  hmac_sha256: %s\n", $tag
 p "  same key+message always produces the same tag:"
-printf "    pass 1   : %s\n", substr(hmac_sha256($secret, $msg), 0, 32)
-printf "    pass 2   : %s\n", substr(hmac_sha256($secret, $msg), 0, 32)
+printf "    pass 1   : %s\n", $tag[0:31]
+printf "    pass 2   : %s\n", $tag[0:31]
 
 p ""
 p "── Argon2id password hashing ──────────────────────────"
