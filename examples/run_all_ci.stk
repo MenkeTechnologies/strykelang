@@ -7,7 +7,7 @@
 # parallel, capped by RUN_ALL_CI_JOBS (default 16) to avoid EMFILE.
 #
 # Phases (default: all):
-#   parse     — `check_no_interop` on every top-level examples/*.stk
+#   parse     — `stryke -c` on every top-level examples/*.stk
 #   run       — execute every top-level examples/*.stk under --no-interop
 #   demos     — execute every examples/*_no_interop.stk (built-in asserts)
 #   project   — `test examples/project/t`
@@ -16,19 +16,23 @@
 #   ruby      — examples/ruby/Ruby.stk embedded suite
 #   scheme    — examples/scheme/Scheme.stk embedded suite
 #
-# Usage:  stryke examples/run_all_ci.stk [--summary] [--only=parse,run,...]
+# Usage:  stryke examples/run_all_ci.stk [--summary] [--only PHASE]... [--jobs N]
 # Env:    ST=path/to/stryke (defaults to $^X)
-#         RUN_ALL_CI_JOBS / CI_JOBS — max parallel workers inside a phase (default 16)
+#         RUN_ALL_CI_JOBS / CI_JOBS — default for --jobs when omitted
 # Exit:   0 if every selected phase passes, 1 otherwise.
 
 $| = 1
 
-my %opts = %{ getopts([
-    "summary",
-    "only=s",
-]) }
+my %opts = %{ getopts({
+    "summary"   => { help => "one line per phase; suppress per-item OK lines" },
+    "only|o=s@" => { help => "phase(s) to run (repeatable; comma lists OK): parse run demos project rosetta exercism ruby scheme" },
+    "jobs|j=i"  => { help => "parallel workers for parse/run/demos (default: env or 16)", default => 0 },
+}, {
+    prog   => "run_all_ci",
+    desc   => "Validate the entire examples/ tree in one CI pass.",
+    epilog => "Env: ST, RUN_ALL_CI_JOBS, CI_JOBS",
+}) }
 my $summary = $opts{summary} // 0
-my $only    = $opts{only} // ""
 
 # Resolve examples/ dir regardless of cwd: `s run_all_ci.stk` from examples/ may
 # leave __FILE__ as `examples/run_all_ci.stk` while cwd is already examples/.
@@ -36,7 +40,7 @@ my $script = realpath(__FILE__)
 $script = realpath($0) if $script eq ""
 my $ex_dir = $script ne "" ? dirname($script) : realpath(".")
 my $st      = $ENV{ST} // $^X
-my $jobs    = $ENV{RUN_ALL_CI_JOBS} // $ENV{CI_JOBS} // 16
+my $jobs    = $opts{jobs} // $ENV{RUN_ALL_CI_JOBS} // $ENV{CI_JOBS} // 16
 $jobs = 16 if $jobs < 1
 
 my %META = map { ($_ => 1) } qw(
@@ -46,16 +50,20 @@ my %META = map { ($_ => 1) } qw(
     run_all_ci
 )
 
+my @all_phases = qw(parse run demos project rosetta exercism ruby scheme)
 my %want
-if ($only ne "") {
-    for (split /,/, $only) {
-        if (_ !~ /^(?:parse|run|demos|project|rosetta|exercism|ruby|scheme)$/) {
-            die "unknown --only phase: " . _
+my @only_specs = @{ $opts{only} // [] }
+if (len(@only_specs)) {
+    for (@only_specs) {
+        for (split /,/, $_) {
+            if (_ !~ /^(?:parse|run|demos|project|rosetta|exercism|ruby|scheme)$/) {
+                die "unknown --only phase: " . _
+            }
+            $want{_} = 1
         }
-        $want{_} = 1
     }
 } else {
-    %want = map { ($_ => 1) } qw(parse run demos project rosetta exercism ruby scheme)
+    %want = map { ($_ => 1) } @all_phases
 }
 
 fn Ci::basename($path) {
@@ -70,6 +78,20 @@ fn Ci::is_meta($path) {
 }
 
 mysync @failures
+mysync $files_ok = 0
+mysync $files_n  = 0
+mysync $tests_ok = 0
+mysync $tests_n  = 0
+
+fn Ci::add_files($ok, $n) {
+    $files_ok += $ok
+    $files_n  += $n
+}
+
+fn Ci::add_tests($ok, $n) {
+    $tests_ok += $ok
+    $tests_n  += $n
+}
 
 fn Ci::fail($phase, $detail) {
     push @failures, +{ phase => $phase, detail => $detail }
@@ -97,6 +119,32 @@ fn Ci::run_suite($path) {
     system($cmd) == 0
 }
 
+fn Ci::find_test_stk($root) {
+    my $out = `find "$root" -type f \\( -name 'test_*.stk' -o -name 't_*.stk' \\) 2>/dev/null`
+    return [] if $out eq ""
+    sort grep { $_ ne "" } split /\n/, $out
+}
+
+fn Ci::count_asserts($path) {
+    my $n = 0
+    open my $fh, "<", $path
+    while (my $line = <$fh>) {
+        if ($line =~ /^\s*(?:rb_test|assert_eq|assert_ok|assert_ne|assert_true|assert_false|assert_err|assert_dies)\b/) {
+            $n += 1
+        }
+    }
+    close $fh
+    $n
+}
+
+fn Ci::count_tests_tree($root) {
+    my $n = 0
+    for (Ci::find_test_stk($root)) {
+        $n += Ci::count_asserts(_)
+    }
+    $n
+}
+
 fn Ci::report_run_results($phase, @files, @oks) {
     my $bad = 0
     for (0 .. len(@files) - 1) {
@@ -107,8 +155,10 @@ fn Ci::report_run_results($phase, @files, @oks) {
             p "  OK   @files[$_]"
         }
     }
+    my $ok = len(@files) - $bad
+    Ci::add_files($ok, len(@files))
     my $label = $phase eq "parse" ? "--no-interop clean" : "passed"
-    p "$phase: #{len(@files) - $bad}/#{len(@files)} $label"
+    p "$phase: $ok/#{len(@files)} $label"
 }
 
 fn Ci::phase_parse {
@@ -140,22 +190,33 @@ fn Ci::phase_demos {
 
 fn Ci::phase_project {
     Ci::header("project")
-    my $rc = test("$ex_dir/project/t", { quiet => $summary })
-    Ci::fail("project", "test examples/project/t exit $rc") if $rc != 0
-    p "project: " . ($rc == 0 ? "pass" : "FAIL")
+    my $root = "$ex_dir/project/t"
+    my $tests_n = Ci::count_tests_tree($root)
+    my $rc = test($root, { quiet => $summary })
+    Ci::add_tests($rc == 0 ? $tests_n : 0, $tests_n)
+    if ($rc != 0) {
+        Ci::fail("project", "test examples/project/t exit $rc")
+    }
+    p "project: " . ($rc == 0 ? "pass ($tests_n tests)" : "FAIL")
 }
 
 fn Ci::phase_rosetta {
     Ci::header("rosetta")
-    my $rc = test("$ex_dir/rosetta/t", { quiet => $summary })
-    Ci::fail("rosetta", "test examples/rosetta/t exit $rc") if $rc != 0
-    p "rosetta: " . ($rc == 0 ? "pass" : "FAIL")
+    my $root = "$ex_dir/rosetta/t"
+    my $tests_n = Ci::count_tests_tree($root)
+    my $rc = test($root, { quiet => $summary })
+    Ci::add_tests($rc == 0 ? $tests_n : 0, $tests_n)
+    if ($rc != 0) {
+        Ci::fail("rosetta", "test examples/rosetta/t exit $rc")
+    }
+    p "rosetta: " . ($rc == 0 ? "pass ($tests_n tests)" : "FAIL")
 }
 
 fn Ci::exercism_one($d) {
     my @parts = split m{/}, $d
     my $name  = $parts[-1]
     my $err   = ""
+    my $tests_n = Ci::count_tests_tree("$d/t")
 
     for (glob("$d/*.stk")) {
         if (check_no_interop($_, { quiet => 1 }) != 0) {
@@ -170,8 +231,10 @@ fn Ci::exercism_one($d) {
 
     if ($err) {
         Ci::fail("exercism", "$name [$err]")
+        Ci::add_tests(0, $tests_n)
         return 0
     }
+    Ci::add_tests($tests_n, $tests_n)
     if (!$summary) { p "  OK   $name" }
     1
 }
@@ -182,11 +245,11 @@ fn Ci::phase_exercism {
     my @dirs = ~> "$ex_root/*/" glob sort
     die "no exercises in $ex_root" unless len(@dirs)
 
-    # Sequential: each exercise calls `test` (spawns a worker pool).
     my $pass = 0
     for (@dirs) {
         $pass += Ci::exercism_one(_)
     }
+    Ci::add_files($pass, len(@dirs))
 
     p "exercism: $pass/#{len(@dirs)} passed"
 }
@@ -194,19 +257,25 @@ fn Ci::phase_exercism {
 fn Ci::phase_ruby {
     Ci::header("ruby")
     my $path = "$ex_dir/ruby/Ruby.stk"
-    if (!Ci::run_suite($path)) {
+    my $tests_n = Ci::count_asserts($path)
+    my $ok = Ci::run_suite($path)
+    Ci::add_tests($ok ? $tests_n : 0, $tests_n)
+    if (!$ok) {
         Ci::fail("ruby", "exit")
     }
-    p "ruby: pass"
+    p "ruby: " . ($ok ? "pass ($tests_n tests)" : "FAIL")
 }
 
 fn Ci::phase_scheme {
     Ci::header("scheme")
     my $path = "$ex_dir/scheme/Scheme.stk"
-    if (!Ci::run_suite($path)) {
+    my $tests_n = Ci::count_asserts($path)
+    my $ok = Ci::run_suite($path)
+    Ci::add_tests($ok ? $tests_n : 0, $tests_n)
+    if (!$ok) {
         Ci::fail("scheme", "exit")
     }
-    p "scheme: pass"
+    p "scheme: " . ($ok ? "pass ($tests_n tests)" : "FAIL")
 }
 
 fn Ci::run_phase($name) {
@@ -219,6 +288,10 @@ fn Ci::run_phase($name) {
     elsif ($name eq "ruby")     { Ci::phase_ruby() }
     elsif ($name eq "scheme")   { Ci::phase_scheme() }
     else { die "internal: unknown phase $name" }
+}
+
+fn Ci::print_totals {
+    p "totals: files $files_ok/$files_n, tests $tests_ok/$tests_n"
 }
 
 my @phases = grep { $want{$_} } qw(parse run demos project rosetta exercism ruby scheme)
@@ -240,7 +313,9 @@ if (len(@failures)) {
     for (@failures) {
         p "  [$_->{phase}] $_->{detail}"
     }
+    Ci::print_totals()
     exit 1
 }
 
 p "run_all_ci: ALL PASS (#{len(@phases)} phase(s): @{[join ', ', @phases]})"
+Ci::print_totals()
