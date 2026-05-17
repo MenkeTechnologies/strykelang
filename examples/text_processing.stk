@@ -7,7 +7,7 @@ p "ucfirst: ",     $text |> ucfirst
 p "length: ",      $text |> len
 p "substr(0,9): ", substr($text, 0, 9)
 p "index(fox): ",  index($text, "fox")
-p "reverse: ",     ($text |> split "" |> rev |> join "")
+p "reverse: ",     (~> $text split("") rev join(""))
 
 my @words = split " ", $text
 p "word count: ", len @words
