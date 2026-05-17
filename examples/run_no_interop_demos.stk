@@ -1,49 +1,9 @@
 #!/usr/bin/env stryke
-
-# Run every `examples/*_no_interop.stk` under `stryke --no-interop` and
-# report pass / fail counts. Exits non-zero if any demo fails. Each
-# demo carries its own built-in `die`-on-regression self-tests, so a
-# clean exit code means every script's invariants held.
+# Run every examples/*_no_interop.stk end-to-end under --no-interop.
+# CI uses examples/run_all_ci.stk; this wrapper runs the demos phase only.
 #
-# Usage:  stryke examples/run_no_interop_demos.stk
-# Env:    ST=path/to/stryke (defaults to "stryke" on PATH)
+# Usage: stryke examples/run_no_interop_demos.stk [--summary]
 
-my $st  = $ENV{ST} // "stryke"
-my $dir = dirname(__FILE__)
-my @files = sort(glob("$dir/*_no_interop.stk"))
-
-# Skip the runner itself, plus `check_no_interop.stk` (a separate
-# meta-runner that parse-checks ALL examples, not just the
-# `_no_interop` demos — it's a sibling tool, not a demo).
-@files = grep {
-    _ !~ /(?:run_no_interop_demos|check_no_interop)\.stk$/
-} @files
-
-die "no *_no_interop.stk demos found in $dir" unless len(@files)
-
-# Run each in parallel. `system` returns 0 on clean exit.
-my @results = pmap {
-    my $f = _
-    my $exit = system("$st --no-interop \"$f\" </dev/null >/dev/null 2>&1")
-    +{ file => $f, ok => $exit == 0 }
-} @files
-
-my @failed = grep { !_->{ok} } @results
-my $total  = len(@results)
-my $pass   = $total - len(@failed)
-
-for (@results) {
-    printf "  %-6s %s\n", _->{ok} ? "OK" : "FAIL", _->{file}
-}
-
-p ""
-p "demos: $pass / $total passed"
-
-if (len(@failed) > 0) {
-    p ""
-    p "failed:"
-    for (@failed) {
-        p "  ", _->{file}
-    }
-    exit 1
-}
+my $runner = dirname(__FILE__) . "/run_all_ci.stk"
+my $flags  = len(@ARGV) ? " " . join(" ", @ARGV) : ""
+exit system("$^X \"$runner\" --only=demos$flags") >> 8

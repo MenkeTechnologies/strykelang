@@ -1,59 +1,9 @@
 #!/usr/bin/env stryke
-# Run `test t/` on every exercism exercise + a `--no-interop` syntax check
-# on each solution file. Uses the in-process `check_no_interop` and `test`
-# builtins instead of forking `stryke` subprocesses.
+# Run check + test on every examples/exercism/ exercise.
+# CI uses examples/run_all_ci.stk; this wrapper runs the exercism phase only.
 #
-# Each `pmaps` worker calls `check_no_interop` directly — the no-interop
-# flag is thread-local (`set_no_interop_mode_tls`), so workers don't race
-# on a shared atomic the way they would with `system "stryke --no-interop -c"`.
-#
-# Usage: stryke /path/to/examples/exercism_run_all.stk [--summary]   (any cwd)
-# Exit:  0 if every exercise tests-green AND --no-interop-clean, 1 otherwise.
+# Usage: stryke examples/exercism_run_all.stk [--summary]
 
-$| = 1
-
-my $summary = grep { _ eq "--summary" } @ARGV
-my $ex_dir  = dirname(__FILE__) . "/exercism"
-
-my @dirs = ~> "$ex_dir/*/" glob sort
-die "no exercises found in $ex_dir" unless len @dirs
-
-mysync $pass = 0
-mysync @failed
-
-# Parallel: each worker thread has its own no-interop TLS override, so
-# `check_no_interop` and `test` are safe siblings.
-pmaps {
-    my $d    = _
-    my $name = (split("/", $d))[-1]
-    my $err  = ""
-
-    for my $sol (glob("$d/*.stk")) {
-        if (check_no_interop($sol, { quiet => 1 }) != 0) {
-            $err = "--no-interop"
-            last
-        }
-    }
-
-    if (!$err && test("$d/t", { quiet => 1 }) != 0) {
-        $err = "test"
-    }
-
-    if ($err) {
-        push @failed, +{ name => $name, err => $err }
-        p "  FAIL $name [$err]"
-    } else {
-        $pass++
-        p "  OK   $name" unless $summary
-    }
-} @dirs
-
-my $total = $pass + len @failed
-p ""
-p "exercism: $pass/$total passed (#{len(@failed)} failed)"
-
-if (len @failed) {
-    p "failed:"
-    p "  $_->{name} [$_->{err}]" for @failed
-    exit 1
-}
+my $runner = dirname(__FILE__) . "/run_all_ci.stk"
+my $flags  = len(@ARGV) ? " " . join(" ", @ARGV) : ""
+exit system("$^X \"$runner\" --only=exercism$flags") >> 8
