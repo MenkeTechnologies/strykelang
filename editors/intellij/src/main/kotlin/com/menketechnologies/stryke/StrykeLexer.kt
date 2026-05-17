@@ -56,11 +56,27 @@ class StrykeLexer : LexerBase() {
             tokenEnd = pos
             return
         }
+        // Resume continuation of a `"..."` interpolation `#{EXPR}` block —
+        // the previous advance() chunk emitted the literal-prefix String,
+        // and now we either emit the `#{` opener (STATE_IN_DQ_INTERP_START)
+        // or walk the interior token-by-token until `}` (STATE_IN_DQ_INTERP),
+        // then return to string mode (STATE_IN_DQ_STRING).
+        if (state == STATE_IN_DQ_INTERP || state == STATE_IN_DQ_INTERP_START) {
+            lexInsideInterpolation()
+            return
+        }
+        // Resume scanning the suffix of an interrupted `"..."` (after an
+        // interpolation closes). Picks up exactly where consumeString left
+        // off — no missing `#`-as-comment misinterpretation.
+        if (state == STATE_IN_DQ_STRING) {
+            consumeDoubleStringContinuation()
+            return
+        }
         val c = buf[pos]
         when {
             c == '#' -> consumeLineComment()
             c == '\n' || c == '\r' || c == ' ' || c == '\t' -> consumeWhitespace()
-            c == '"' -> consumeString('"')
+            c == '"' -> consumeDoubleQuoteString()
             c == '\'' -> consumeString('\'')
             c == '`' -> consumeString('`')
             // Heredoc: <<EOT, <<'EOT', <<"EOT", <<~EOT
@@ -79,9 +95,12 @@ class StrykeLexer : LexerBase() {
             c == '/' -> consumeRegexOrSlash()
             isCompoundAssign(c) -> emit(2, StrykeTokenTypes.ASSIGN_OP)
             c == '=' && peek(1) != '=' -> emit(1, StrykeTokenTypes.ASSIGN_OP)
-            c == '(' || c == ')' -> emit(1, StrykeTokenTypes.PAREN)
-            c == '{' || c == '}' -> emit(1, StrykeTokenTypes.BRACE)
-            c == '[' || c == ']' -> emit(1, StrykeTokenTypes.BRACKET)
+            c == '(' -> emit(1, StrykeTokenTypes.LPAREN)
+            c == ')' -> emit(1, StrykeTokenTypes.RPAREN)
+            c == '{' -> emit(1, StrykeTokenTypes.LBRACE)
+            c == '}' -> emit(1, StrykeTokenTypes.RBRACE)
+            c == '[' -> emit(1, StrykeTokenTypes.LBRACKET)
+            c == ']' -> emit(1, StrykeTokenTypes.RBRACKET)
             c == ',' -> emit(1, StrykeTokenTypes.COMMA)
             c == ';' -> emit(1, StrykeTokenTypes.SEMICOLON)
             c == '.' -> emit(1, StrykeTokenTypes.DOT)
@@ -140,6 +159,167 @@ class StrykeLexer : LexerBase() {
         pos = p
         tokenType = StrykeTokenTypes.STRING
     }
+
+    /**
+     * Double-quoted string with stryke-style `#{EXPR}` interpolation. Emits
+     * one STRING token for the literal run from the opening `"` up to (but
+     * not including) any `#{`, then on the next `advance()` enters interp
+     * mode and emits real tokens for the expression inside the braces, then
+     * resumes string mode for the next literal run.
+     *
+     * Critically: `#` outside `#{` is NEVER a comment opener inside a
+     * string. This is the fix for the JetBrains plugin bug where naive
+     * `#` handling colored interpolations like comments.
+     */
+    private fun consumeDoubleQuoteString() {
+        // pos is at the opening `"`. Scan forward until we hit either the
+        // closing `"` or an interpolation start `#{`.
+        var p = pos + 1
+        while (p < endOffset) {
+            val c = buf[p]
+            if (c == '\\' && p + 1 < endOffset) { p += 2; continue }
+            if (c == '"') { p++; break }
+            if (c == '#' && p + 1 < endOffset && buf[p + 1] == '{') {
+                // Emit the literal run up to (NOT including) `#{`. Mark the
+                // lexer as in-string so on the next advance() we step into
+                // interpolation mode.
+                tokenEnd = p
+                pos = p
+                tokenType = StrykeTokenTypes.STRING
+                state = STATE_IN_DQ_INTERP_START
+                return
+            }
+            p++
+        }
+        tokenEnd = p
+        pos = p
+        state = STATE_NORMAL
+        tokenType = StrykeTokenTypes.STRING
+    }
+
+    /**
+     * Continuation of a double-quoted string after an interpolation `}`
+     * closes. Behaves like [consumeDoubleQuoteString] but doesn't skip the
+     * opening `"` (there isn't one — we're mid-string).
+     */
+    private fun consumeDoubleStringContinuation() {
+        var p = pos
+        while (p < endOffset) {
+            val c = buf[p]
+            if (c == '\\' && p + 1 < endOffset) { p += 2; continue }
+            if (c == '"') { p++; break }
+            if (c == '#' && p + 1 < endOffset && buf[p + 1] == '{') {
+                tokenEnd = p
+                pos = p
+                tokenType = StrykeTokenTypes.STRING
+                state = STATE_IN_DQ_INTERP_START
+                return
+            }
+            p++
+        }
+        tokenEnd = p
+        pos = p
+        state = STATE_NORMAL
+        tokenType = StrykeTokenTypes.STRING
+    }
+
+    /**
+     * One advance() inside the `#{EXPR}` interpolation block. Tracks a
+     * brace-nesting counter so braces inside the expression don't close
+     * the interpolation prematurely. On the closing `}` we flip back to
+     * STATE_IN_DQ_STRING so the next advance() resumes the string suffix.
+     */
+    private fun lexInsideInterpolation() {
+        // First call after entering interp mode: emit the `#{` opener.
+        if (state == STATE_IN_DQ_INTERP_START) {
+            tokenStart = pos
+            tokenEnd = pos + 2
+            pos = tokenEnd
+            tokenType = StrykeTokenTypes.OPERATOR
+            state = STATE_IN_DQ_INTERP
+            interpBraceDepth = 1
+            return
+        }
+        // Closing `}` returns us to string mode.
+        if (pos < endOffset && buf[pos] == '}' && interpBraceDepth == 1) {
+            tokenStart = pos
+            tokenEnd = pos + 1
+            pos = tokenEnd
+            tokenType = StrykeTokenTypes.OPERATOR
+            state = STATE_IN_DQ_STRING
+            interpBraceDepth = 0
+            return
+        }
+        // Otherwise lex one normal token (recursing into `advance` with a
+        // borrowed state so the normal dispatch runs); maintain brace depth
+        // so nested `{}` inside the expression don't end interp early.
+        val savedState = state
+        state = STATE_NORMAL
+        val saveStart = tokenStart
+        // Run the normal dispatcher exactly once.
+        runOneNormalAdvance()
+        // Track brace nesting on simple `{` / `}` tokens.
+        when (tokenType) {
+            StrykeTokenTypes.LBRACE -> interpBraceDepth++
+            StrykeTokenTypes.RBRACE -> interpBraceDepth--
+            else -> {}
+        }
+        // Stay in interp mode for the next advance().
+        state = if (interpBraceDepth > 0) STATE_IN_DQ_INTERP else STATE_IN_DQ_STRING
+        tokenStart = saveStart // preserve start offset for the token emitted
+        // savedState was the entry state we no longer need.
+        @Suppress("UNUSED_VARIABLE") val _unused = savedState
+    }
+
+    /**
+     * Run the normal top-level dispatch logic once, used while inside an
+     * interpolation block. Mirrors the body of [advance] minus the
+     * state-resume checks.
+     */
+    private fun runOneNormalAdvance() {
+        tokenStart = pos
+        if (pos >= endOffset) {
+            tokenType = null
+            tokenEnd = pos
+            return
+        }
+        val c = buf[pos]
+        when {
+            c == '#' -> consumeLineComment()
+            c == '\n' || c == '\r' || c == ' ' || c == '\t' -> consumeWhitespace()
+            c == '"' -> consumeDoubleQuoteString()
+            c == '\'' -> consumeString('\'')
+            c == '`' -> consumeString('`')
+            c == '<' && peek(1) == '<' && isHeredocStart(2) -> consumeHeredoc()
+            c == '-' && peek(1) == '>' -> emit(2, StrykeTokenTypes.ARROW_OP)
+            c == '=' && peek(1) == '>' -> emit(2, StrykeTokenTypes.FAT_COMMA)
+            c == '|' && peek(1) == '>' && peek(2) == '>' -> emit(3, StrykeTokenTypes.PIPE)
+            c == '|' && peek(1) == '>' -> emit(2, StrykeTokenTypes.PIPE)
+            c == '~' && peek(1) == '>' -> emit(2, StrykeTokenTypes.PIPE)
+            c == '=' && peek(1) == '~' -> emit(2, StrykeTokenTypes.REGEX_BIND)
+            c == '!' && peek(1) == '~' -> emit(2, StrykeTokenTypes.REGEX_BIND)
+            c == '.' && peek(1) == '.' -> emit(2, StrykeTokenTypes.RANGE)
+            c == '$' || c == '@' || c == '%' -> consumeSigilVar(c)
+            c.isDigit() -> consumeNumber()
+            c == '_' || c.isLetter() -> consumeWord()
+            c == '/' -> consumeRegexOrSlash()
+            isCompoundAssign(c) -> emit(2, StrykeTokenTypes.ASSIGN_OP)
+            c == '=' && peek(1) != '=' -> emit(1, StrykeTokenTypes.ASSIGN_OP)
+            c == '(' -> emit(1, StrykeTokenTypes.LPAREN)
+            c == ')' -> emit(1, StrykeTokenTypes.RPAREN)
+            c == '{' -> emit(1, StrykeTokenTypes.LBRACE)
+            c == '}' -> emit(1, StrykeTokenTypes.RBRACE)
+            c == '[' -> emit(1, StrykeTokenTypes.LBRACKET)
+            c == ']' -> emit(1, StrykeTokenTypes.RBRACKET)
+            c == ',' -> emit(1, StrykeTokenTypes.COMMA)
+            c == ';' -> emit(1, StrykeTokenTypes.SEMICOLON)
+            c == '.' -> emit(1, StrykeTokenTypes.DOT)
+            isOperatorChar(c) -> emit(1, StrykeTokenTypes.OPERATOR)
+            else -> emit(1, TokenType.BAD_CHARACTER)
+        }
+    }
+
+    private var interpBraceDepth: Int = 0
 
     private fun isHeredocStart(off: Int): Boolean {
         var p = pos + off
@@ -360,6 +540,14 @@ class StrykeLexer : LexerBase() {
     private fun isSpecialVarChar(c: Char): Boolean = c in SPECIAL_VAR_CHARS
 
     companion object {
+        // Lexer state machine for `"..."` interpolation. IntelliJ feeds the
+        // state back to the lexer on incremental relexing — without these,
+        // a restart mid-string would lose context and treat `#` as a comment.
+        const val STATE_NORMAL = 0
+        const val STATE_IN_DQ_STRING = 1          // resume scanning string literal
+        const val STATE_IN_DQ_INTERP_START = 2    // next token is the `#{` opener
+        const val STATE_IN_DQ_INTERP = 3          // inside the `#{EXPR}` expression
+
         private val DECL_KEYWORDS = setOf(
             "my", "our", "local", "state", "use", "no", "package", "require",
             "has", "pub", "priv", "in", "is", "as",

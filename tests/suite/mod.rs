@@ -289,6 +289,7 @@ mod sort_pin;
 mod splice_pin;
 mod sprintf_edge_pin;
 mod sprintf_format_pin;
+mod streaming_parallel_variants;
 mod string_concat_pin;
 mod string_coordinates_pin;
 mod string_ops_pin;

@@ -61,9 +61,19 @@ object StrykeTokenTypes {
     @JvmField val REGEX_BIND = StrykeTokenType("STRYKE_REGEX_BIND")        // =~ !~
 
     // ── Punctuation ──────────────────────────────────────────────────────
+    // Split L/R variants so the BraceMatcher can pair them; the original
+    // `PAREN`/`BRACE`/`BRACKET` umbrella names stay for syntax-highlighter
+    // compatibility (any of the four colors below land on the same scheme
+    // slot through StrykeSyntaxHighlighter).
     @JvmField val PAREN = StrykeTokenType("STRYKE_PAREN")
+    @JvmField val LPAREN = StrykeTokenType("STRYKE_LPAREN")
+    @JvmField val RPAREN = StrykeTokenType("STRYKE_RPAREN")
     @JvmField val BRACE = StrykeTokenType("STRYKE_BRACE")
+    @JvmField val LBRACE = StrykeTokenType("STRYKE_LBRACE")
+    @JvmField val RBRACE = StrykeTokenType("STRYKE_RBRACE")
     @JvmField val BRACKET = StrykeTokenType("STRYKE_BRACKET")
+    @JvmField val LBRACKET = StrykeTokenType("STRYKE_LBRACKET")
+    @JvmField val RBRACKET = StrykeTokenType("STRYKE_RBRACKET")
     @JvmField val COMMA = StrykeTokenType("STRYKE_COMMA")
     @JvmField val SEMICOLON = StrykeTokenType("STRYKE_SEMICOLON")
     @JvmField val DOT = StrykeTokenType("STRYKE_DOT")

@@ -20,7 +20,7 @@ my $total  = len(@results)
 my $pass   = $total - len(@failed)
 
 p ""
-p "examples: $pass/$total --no-interop clean (", len(@failed), " failed)"
+p "examples: $pass/$total --no-interop clean (#{len(@failed)} failed)"
 
 if (len(@failed)) {
     p "failed:"
