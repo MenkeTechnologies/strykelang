@@ -50,13 +50,13 @@ for my $ep (@endpoints) {
 # ── simulate a ping ────────────────────────────────────────────────
 
 fn Demo::API::ping($ep) {
-    my $latency_ms = int(rand() * 500) + 5    # 5:505 ms
+    my $latency_ms = int(rand 500) + 5    # 5:505 ms
     my $code
     if (rand() < $failure_rate{$ep}) {
         # 70% server, 30% client when failing.
-        $code = rand() < 0.7 ? 500 + int(rand() * 4) : 400 + int(rand() * 5)
+        $code = rand() < 0.7 ? 500 + int(rand 4) : 400 + int(rand 5)
     } else {
-        $code = 200 + int(rand() * 5)
+        $code = 200 + int(rand 5)
     }
     +{ code => $code, latency_ms => $latency_ms }
 }

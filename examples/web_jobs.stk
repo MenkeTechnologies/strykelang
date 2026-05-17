@@ -24,7 +24,7 @@ for my $i (1:10) {
         priority   => $i <= 3 ? "high" : "normal",
     })
 }
-printf "  enqueued, stats: %s\n", to_json(web_jobs_stats())
+printf "  enqueued, stats: %s\n", web_jobs_stats() |> to_json
 
 # ── consume jobs in a loop, measure per-job latency ───────────────────
 

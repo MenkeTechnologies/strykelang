@@ -14,7 +14,7 @@
 fn Demo::Short::fnv($s) {
     my $h = 2166136261
     for my $i (0:len($s) - 1) {
-        my $c = ord(substr($s, $i, 1))
+        my $c = ord $s[$i]
         $h = ($h ^ $c) * 16777619
         $h = $h % 4294967296
     }
@@ -115,7 +115,7 @@ p ""
 p "── simulating 100 clicks (weighted toward first URLs) ──"
 for my $i (1:100) {
     # Weighted: earlier URLs more popular.
-    my $idx = int(rand() * rand() * len(@urls))
+    my $idx = int(rand() * rand @urls)
     my $short = $short_ids{$urls[$idx]}
     Demo::Short::expand($short)
 }
