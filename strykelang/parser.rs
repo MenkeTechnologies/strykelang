@@ -2888,6 +2888,8 @@ impl Parser {
             "oct" => ExprKind::Oct(Box::new(arg)),
             "chr" => ExprKind::Chr(Box::new(arg)),
             "ord" => ExprKind::Ord(Box::new(arg)),
+            "rand" => ExprKind::Rand(Some(Box::new(arg))),
+            "srand" => ExprKind::Srand(Some(Box::new(arg))),
             // Type/ref functions
             "defined" | "def" => ExprKind::Defined(Box::new(arg)),
             "ref" => ExprKind::Ref(Box::new(arg)),
@@ -3019,6 +3021,7 @@ impl Parser {
             },
             // File functions
             "slurp" | "sl" => ExprKind::Slurp(Box::new(arg)),
+            "glob" => ExprKind::Glob(vec![arg]),
             "chdir" => ExprKind::Chdir(Box::new(arg)),
             "stat" => ExprKind::Stat(Box::new(arg)),
             "lstat" => ExprKind::Lstat(Box::new(arg)),
@@ -21384,5 +21387,16 @@ mod tests {
     fn array_deref_of_bareword_topic_parses() {
         let _g = NoInteropGuard::on();
         parse_ok("my @lists = ([1,2,3], [10,20,30]); p min(map { len(@{_}) } @lists)");
+    }
+
+    /// `~>` thread-macro stages for `glob`, `rand`, `srand` — these
+    /// builtins have their own `ExprKind` (Glob, Rand, Srand), not the
+    /// generic FuncCall path, so they previously fell through to the
+    /// default arm and produced "Undefined subroutine" at runtime.
+    #[test]
+    fn thread_macro_accepts_glob_rand_srand_stages() {
+        parse_ok("my @r = ~> \"/tmp/*\" glob sort");
+        parse_ok("my $i = ~> 100 rand int");
+        parse_ok("~> 42 srand");
     }
 }
