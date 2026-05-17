@@ -1,0 +1,116 @@
+#!/usr/bin/env stryke
+
+# Fenwick tree (Binary Indexed Tree) — O(log n) prefix-sum updates
+# and queries. Stores partial sums in a clever index scheme based on
+# the lowest set bit, so a single element update affects only O(log n)
+# tree nodes. Used by competitive programmers for range-sum-with-point-
+# update workloads. Parses clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * `fn name = expr` for one-liners
+#   * implicit return on tail (rule 7)
+#   * `#{…}` interpolation (rule 1a)
+#   * `:` ranges, `len` (rules 4, 5)
+#
+# Namespaced UDFs `Fenwick::*`.
+#
+# Run: stryke --no-interop examples/fenwick_tree_no_interop.stk
+
+# Internal: lowest-set-bit isolation. `x & -x` returns the bit value.
+fn Fenwick::lsb($x) = $x & -$x
+
+# Construct an empty Fenwick tree of size $n. 1-indexed internally,
+# we expose 0-indexed externally.
+fn Fenwick::new($n) = +{ size => $n, bit => [(0) x ($n + 1)] }
+
+# Point update: add $delta to position $i (0-indexed).
+fn Fenwick::add($f, $i, $delta) {
+    my $k = $i + 1
+    while ($k <= $f->{size}) {
+        $f->{bit}[$k] += $delta
+        $k += Fenwick::lsb($k)
+    }
+}
+
+# Prefix-sum query: sum of arr[0..i] (inclusive, 0-indexed).
+fn Fenwick::prefix_sum($f, $i) {
+    my $s = 0
+    my $k = $i + 1
+    while ($k > 0) {
+        $s += $f->{bit}[$k]
+        $k -= Fenwick::lsb($k)
+    }
+    $s
+}
+
+# Range-sum query: sum of arr[lo..hi] (both inclusive).
+fn Fenwick::range_sum($f, $lo, $hi) {
+    return Fenwick::prefix_sum($f, $hi) if $lo == 0
+    Fenwick::prefix_sum($f, $hi) - Fenwick::prefix_sum($f, $lo - 1)
+}
+
+# Build a Fenwick tree from a pre-existing array.
+fn Fenwick::from_array($xs) {
+    my $f = Fenwick::new(len @$xs)
+    for my $i (0:len(@$xs) - 1) {
+        Fenwick::add($f, $i, $xs->[$i])
+    }
+    $f
+}
+
+p "── Fenwick tree demo ──"
+
+# Build from [1, 2, 3, 4, 5, 6, 7, 8]. Sum 0..7 = 36.
+my @arr = (1, 2, 3, 4, 5, 6, 7, 8)
+my $f = Fenwick::from_array(\@arr)
+die "prefix(7) = 36"        unless Fenwick::prefix_sum($f, 7) == 36
+die "prefix(0) = 1"         unless Fenwick::prefix_sum($f, 0) == 1
+die "range(2,5) = 3+4+5+6"  unless Fenwick::range_sum($f, 2, 5) == 18
+die "range(0,0) = 1"        unless Fenwick::range_sum($f, 0, 0) == 1
+die "range(7,7) = 8"        unless Fenwick::range_sum($f, 7, 7) == 8
+p "  prefix/range sums on [1..8]: 4 queries correct  OK"
+
+# Point update: bump arr[3] from 4 to 10 (delta = +6). New prefix(7) = 42.
+Fenwick::add($f, 3, 6)
+die "after +6 update, prefix(7) = 42"      unless Fenwick::prefix_sum($f, 7) == 42
+die "range(0,2) unchanged = 6"             unless Fenwick::range_sum($f, 0, 2) == 6
+die "range(3,3) now 10"                    unless Fenwick::range_sum($f, 3, 3) == 10
+p "  point update propagates: prefix(7)=42, range(3,3)=10  OK"
+
+# Negative deltas — remove arr[7]: -8.
+Fenwick::add($f, 7, -8)
+die "after -8, prefix(7) = 34" unless Fenwick::prefix_sum($f, 7) == 34
+p "  negative delta: prefix(7) drops from 42 to 34  OK"
+
+# Cross-check against brute O(n) prefix-sum on a longer randomized array.
+srand(42)
+my @big
+push @big, int(rand 100) - 50 for 1:200
+my $big_f = Fenwick::from_array(\@big)
+for my $check (1:50) {
+    my $lo = int(rand 200)
+    my $hi = $lo + int(rand(200 - $lo))
+    my $brute = 0
+    for my $i ($lo:$hi) { $brute += $big[$i] }
+    my $fast = Fenwick::range_sum($big_f, $lo, $hi)
+    die "disagreement [$lo,$hi]: fast=$fast brute=$brute" unless $fast == $brute
+}
+p "  200-element random array: 50 range queries match brute O(n)  OK"
+
+# Universal invariants:
+#   * prefix_sum(n-1) == sum of all elements
+#   * range_sum(lo, hi) == prefix_sum(hi) - prefix_sum(lo-1) for lo>0
+my $f2 = Fenwick::from_array([10, 20, 30, 40])
+my $sum_all = 0
+$sum_all += $_ for (10, 20, 30, 40)
+die "prefix(3) = sum_all" unless Fenwick::prefix_sum($f2, 3) == $sum_all
+for my $lo (1:3) {
+    for my $hi ($lo:3) {
+        die "decomp invariant" unless
+            Fenwick::range_sum($f2, $lo, $hi) ==
+            Fenwick::prefix_sum($f2, $hi) - Fenwick::prefix_sum($f2, $lo - 1)
+    }
+}
+
+p ""
+p "  ALL PASS (basic + point update + negative delta + 200x50 stress + invariants)"
