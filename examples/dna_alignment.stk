@@ -29,8 +29,8 @@ fn Demo::DNA::max3($n1, $n2, $n3) {
 mysync $td_cell = t_digest(100)
 
 fn Demo::DNA::align($seq_a, $seq_b) {
-    my $m = len($seq_a)
-    my $n = len($seq_b)
+    my $m = len $seq_a
+    my $n = len $seq_b
     my @table
     my @trace   # back-pointer: "diag", "up", "left"
     # Initialize.
@@ -77,8 +77,8 @@ fn Demo::DNA::align($seq_a, $seq_b) {
 # ── traceback ──────────────────────────────────────────────────────
 
 fn Demo::DNA::traceback($seq_a, $seq_b, $trace) {
-    my $i = len($seq_a)
-    my $j = len($seq_b)
+    my $i = len $seq_a
+    my $j = len $seq_b
     my @a_aligned
     my @b_aligned
     while ($i > 0 || $j > 0) {
@@ -114,7 +114,7 @@ my @pairs = (
 )
 
 printf "── aligning %d sequence pairs ──────────────────────────\n",
-    len(@pairs)
+    len @pairs
 
 for my $pair (@pairs) {
     my $sa = $pair->[0]

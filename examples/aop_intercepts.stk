@@ -72,4 +72,4 @@ p "  [audit] saw $audit Acct::* calls (cumulative since first 'before')"
 p ""
 p "── Intercept list / housekeeping ──────────────────────"
 my @list = intercept_list()
-p "  active intercepts: ", len(@list)
+p "  active intercepts: ", len @list

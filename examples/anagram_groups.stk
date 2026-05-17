@@ -26,7 +26,7 @@ my @words = (
 )
 
 printf "── input: %d words ────────────────────────────────────\n",
-    len(@words)
+    len @words
 
 # ── canonical key: sorted characters ────────────────────────────────
 
@@ -34,7 +34,7 @@ my $td_lat = t_digest(100)
 
 fn Demo::Anagram::canonical($word) {
     my $t0 = now_ns()
-    my @chars = split //, lc($word)
+    my @chars = split //, lc $word
     my @sorted = sort { _0 cmp _1 } @chars
     my $r = join("", @sorted)
     td_add($td_lat, (now_ns() - $t0) / 1000.0)
@@ -116,7 +116,7 @@ p ""
 p "── pipe-forward composition ──────────────────────────"
 my @all_canonical = map { Demo::Anagram::canonical(_) } @words
 my @distinct_keys = sort { _0 cmp _1 } uniq(@all_canonical)
-printf "  distinct canonical forms (composed): %d\n", len(@distinct_keys)
+printf "  distinct canonical forms (composed): %d\n", len @distinct_keys
 printf "  alphabetically first: %s\n", $distinct_keys[0]
 printf "  alphabetically last : %s\n", $distinct_keys[-1]
 

@@ -24,7 +24,7 @@ printf "  s3: %s\n", join(" ", @s3)
 
 my @merged = (@s1, @s2, @s3) |> psort { _0 <=> _1 } |> uniq
 printf "\n  merged uniq sorted: %s\n", join(" ", @merged)
-printf "  count: %d (after dedup)\n", len(@merged)
+printf "  count: %d (after dedup)\n", len @merged
 
 # ── multi-source merge with provenance tracking via sketches ──────────
 
@@ -51,7 +51,7 @@ p "── distinct cardinality via HLL ─────────────�
 my $h = hll(14)
 hll_add($h, _) for (@s1, @s2, @s3)
 printf "  HLL distinct estimate : %d\n", hll_count($h)
-printf "  exact                  : %d\n", len(@merged)
+printf "  exact                  : %d\n", len @merged
 
 # ── streaming-flavored: chunk + merge-sort with t-digest latency ──────
 

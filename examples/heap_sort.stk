@@ -33,7 +33,7 @@ fn Demo::Heap::sift_down($arr, $start, $end) {
 }
 
 fn Demo::Heap::heapify($arr) {
-    my $n = len(@$arr)
+    my $n = len @$arr
     return if $n <= 1
     my $start = int($n / 2) - 1
     while ($start >= 0) {
@@ -44,7 +44,7 @@ fn Demo::Heap::heapify($arr) {
 
 fn Demo::Heap::sort($arr) {
     Demo::Heap::heapify($arr)
-    my $n = len(@$arr)
+    my $n = len @$arr
     my $end = $n - 1
     while ($end > 0) {
         my $tmp = $arr->[0]
@@ -59,7 +59,7 @@ fn Demo::Heap::sort($arr) {
 
 my @input = (3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3, 2, 3, 8)
 printf "── input: %d elements ─────────────────────────────────\n",
-    len(@input)
+    len @input
 printf "  %s\n", join(", ", @input)
 
 # ── HLL fingerprint pre-sort ───────────────────────────────────────
@@ -142,5 +142,5 @@ printf "  matches built-in sort : %s\n", $big_matches ? "YES" : "NO"
 
 p ""
 p "── min / max preservation ────────────────────────────"
-printf "  pre-sort  min=%d max=%d\n", min(@input), max(@input)
+printf "  pre-sort  min=%d max=%d\n", min(@input), max @input
 printf "  post-sort min=%d max=%d\n", $work[0], $work[len(@work) - 1]

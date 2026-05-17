@@ -26,7 +26,7 @@ my @sessions = (
 )
 
 printf "── %d score events from %d sessions ──────────────────\n",
-    len(@sessions), len(@sessions)
+    len(@sessions), len @sessions
 
 # ── per-player aggregates ──────────────────────────────────────────
 
@@ -148,6 +148,6 @@ p "── overall stats ──────────────────�
 my $total_score = 0
 $total_score += _ for values %total
 printf "  total points awarded : %d\n", $total_score
-printf "  avg score per session : %.1f\n", $total_score / len(@sessions)
+printf "  avg score per session : %.1f\n", $total_score / len @sessions
 printf "  highest individual    : %s @ %d points\n",
     $top[0], $total{$top[0]}

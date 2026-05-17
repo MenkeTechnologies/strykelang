@@ -10,7 +10,7 @@ p "index(fox): ",  index($text, "fox")
 p "reverse: ",     ($text |> split "" |> rev |> join "")
 
 my @words = split " ", $text
-p "word count: ", len(@words)
+p "word count: ", len @words
 p "words: ",      (@words |> join " | ")
 
 my $copy = $text

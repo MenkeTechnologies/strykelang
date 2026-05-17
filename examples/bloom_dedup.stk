@@ -63,7 +63,7 @@ for my $i (1:5000) {
     topk_add($tk_dups, "item-$bucket")
 }
 printf "── workload: %d records (target ~1000 distinct) ──────\n",
-    len(@records)
+    len @records
 
 # ── process workload ───────────────────────────────────────────────
 
@@ -75,7 +75,7 @@ for my $rec (@records) {
 
 p ""
 p "── dedup rollup ─────────────────────────────────────"
-printf "  records processed       : %d\n", len(@records)
+printf "  records processed       : %d\n", len @records
 printf "  distinct items seen      : %d\n", len(keys %exact)
 printf "  duplicates skipped       : %d\n", $duplicates_skipped
 printf "  Bloom true-positives     : %d\n", $true_positives

@@ -109,7 +109,7 @@ my @employees = (
 )
 
 printf "── processing %d paychecks (biweekly) ────────────────\n",
-    len(@employees)
+    len @employees
 
 my @results = map { Demo::PR::compute(_) } @employees
 
@@ -145,7 +145,7 @@ for my $r (@results) {
 
 p ""
 p "── batch rollup ─────────────────────────────────────"
-printf "  employees    : %d\n", len(@employees)
+printf "  employees    : %d\n", len @employees
 printf "  total gross  : \$%.2f\n", $total_gross
 printf "  total taxes  : \$%.2f (%.1f%%)\n",
     $total_taxes, 100.0 * $total_taxes / $total_gross
@@ -165,7 +165,7 @@ for my $h (@hits) {
 p ""
 p "── HLL distinct employees ───────────────────────────"
 printf "  HLL   : %d\n", hll_count($hll_employees)
-printf "  exact : %d\n", len(@employees)
+printf "  exact : %d\n", len @employees
 
 # ── net pay percentiles ────────────────────────────────────────────
 

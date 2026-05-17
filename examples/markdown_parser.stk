@@ -49,7 +49,7 @@ fn Demo::MD::parse($md) {
             }
             my $hashes = $1
             my $text = $2
-            my $level = len($hashes)
+            my $level = len $hashes
             push @html, "<h${level}>" . Demo::MD::inline($text) . "</h${level}>"
             next
         }
@@ -125,8 +125,8 @@ for my $line (@$html) { p "  $line" }
 p ""
 printf "── stats ───────────────────────────────────────────\n"
 my @input_lines = split /\n/, $md
-printf "  input lines  : %d\n", len(@input_lines)
-printf "  output lines : %d\n", len(@$html)
+printf "  input lines  : %d\n", len @input_lines
+printf "  output lines : %d\n", len @$html
 printf "  render time  : %.1f µs\n", $elapsed
 
 # ── tag-type rollup ───────────────────────────────────────────────

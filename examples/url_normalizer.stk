@@ -31,17 +31,17 @@ fn Demo::URL::parse($url) {
     my $query   = ""
     my $rest = $url
     if ($rest =~ /^([a-zA-Z][a-zA-Z0-9+.\-]*):\/\/(.*)$/) {
-        $scheme = lc($1)
+        $scheme = lc $1
         $rest = $2
     }
     if ($rest =~ /^([^\/?]+)(.*)$/) {
         my $authority = $1
         $rest = $2
         if ($authority =~ /^([^:]+):(\d+)$/) {
-            $host = lc($1)
+            $host = lc $1
             $port = $2
         } else {
-            $host = lc($authority)
+            $host = lc $authority
         }
     }
     if ($rest =~ /^([^?]*)(?:\?(.*))?$/) {
@@ -86,11 +86,11 @@ fn Demo::URL::normalize($url) {
     my $clean_q = Demo::URL::parse_query($parsed->{query})
     my $qs = Demo::URL::serialize_query($clean_q)
     my $out = ""
-    $out .= $parsed->{scheme} . "://" if len($parsed->{scheme})
+    $out .= $parsed->{scheme} . "://" if len $parsed->{scheme}
     $out .= $parsed->{host}
-    $out .= ":" . $parsed->{port} if len($parsed->{port})
+    $out .= ":" . $parsed->{port} if len $parsed->{port}
     $out .= $parsed->{path}
-    $out .= "?" . $qs if len($qs)
+    $out .= "?" . $qs if len $qs
     $out
 }
 
@@ -111,7 +111,7 @@ my @urls = (
     "https://search.example.com/q?page=1&q=hello",
 )
 
-printf "── input: %d URLs ─────────────────────────────────────\n", len(@urls)
+printf "── input: %d URLs ─────────────────────────────────────\n", len @urls
 
 # ── normalize each ──────────────────────────────────────────────────
 
@@ -128,7 +128,7 @@ for my $i (0:len(@urls) - 1) {
 
 my @distinct = sort { _0 cmp _1 } uniq(@normalized)
 p ""
-printf "── %d distinct normalized URLs ────────────────────────\n", len(@distinct)
+printf "── %d distinct normalized URLs ────────────────────────\n", len @distinct
 for my $u (@distinct) {
     p "  $u"
 }
@@ -141,7 +141,7 @@ my $tracked = 0
 my %tracked_kinds
 for my $url (@urls) {
     my $p = Demo::URL::parse($url)
-    next unless len($p->{query})
+    next unless len $p->{query}
     for my $part (split /&/, $p->{query}) {
         my @kv = split /=/, $part, 2
         my $k = lc($kv[0])
@@ -152,7 +152,7 @@ for my $url (@urls) {
     }
 }
 printf "  tracking params found : %d (across %d URLs)\n",
-    $tracked, len(@urls)
+    $tracked, len @urls
 for my $k (sort { $tracked_kinds{_1} <=> $tracked_kinds{_0} } keys %tracked_kinds) {
     printf "  %-15s : %d\n", $k, $tracked_kinds{$k}
 }
@@ -167,7 +167,7 @@ my $hll_norm = hll(14)
 hll_add($hll_norm, _) for @normalized
 printf "  HLL distinct (raw URLs)        : %d\n", hll_count($hll_raw)
 printf "  HLL distinct (normalized URLs) : %d\n", hll_count($hll_norm)
-printf "  exact distinct (normalized)    : %d\n", len(@distinct)
+printf "  exact distinct (normalized)    : %d\n", len @distinct
 
 # ── host frequency ──────────────────────────────────────────────────
 

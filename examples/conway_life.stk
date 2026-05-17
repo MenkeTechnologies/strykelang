@@ -159,7 +159,7 @@ for my $i (0:len(@population_history) - 1) {
 p ""
 p "── HLL distinct gen-pop signatures ──────────────────"
 printf "  HLL : %d\n", hll_count($hll_pop)
-printf "  exact (history length) : %d\n", len(@population_history)
+printf "  exact (history length) : %d\n", len @population_history
 
 p ""
 p "── most-common gen population (TopK) ────────────────"

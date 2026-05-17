@@ -130,7 +130,7 @@ for my $line (split /\n/, $zone_text) {
 }
 
 printf "── parsed %d records ────────────────────────────────\n",
-    len(@records)
+    len @records
 
 # ── detect duplicate records (same name + type + rdata) ────────────
 
@@ -186,7 +186,7 @@ for my $e (@errors) {
 }
 
 p ""
-printf "── %d errors found ──────────────────────────────────\n", len(@errors)
+printf "── %d errors found ──────────────────────────────────\n", len @errors
 
 # ── HLL distinct hostnames ──────────────────────────────────────────
 

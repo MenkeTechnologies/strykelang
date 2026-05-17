@@ -16,7 +16,7 @@ my $summary = grep { _ eq "--summary" } @ARGV
 my $ex_dir  = dirname(__FILE__) . "/exercism"
 
 my @dirs = sort(glob("$ex_dir/*/"))
-die "no exercises found in $ex_dir" unless len(@dirs)
+die "no exercises found in $ex_dir" unless len @dirs
 
 mysync $pass = 0
 mysync @failed
@@ -48,7 +48,7 @@ pmaps {
     }
 } @dirs
 
-my $total = $pass + len(@failed)
+my $total = $pass + len @failed
 p ""
 p "exercism: $pass/$total passed (#{len(@failed)} failed)"
 

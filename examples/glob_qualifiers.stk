@@ -10,7 +10,7 @@
 
 p "── Plain glob (no qualifiers) ─────────────────────────"
 my @stk = glob("examples/*.stk")
-printf "  examples/*.stk : %d files\n", len(@stk)
+printf "  examples/*.stk : %d files\n", len @stk
 
 p ""
 p "── (N) — null-glob: no match → empty list, no error ───"
@@ -20,7 +20,7 @@ p "  nonexistent/*.xyz(N) : ", len(@none), " (empty, no error)"
 p ""
 p "── (.) — plain files only (no dirs) ───────────────────"
 my @files = glob("examples/*(.)")
-printf "  examples/*(.) : %d files\n", len(@files)
+printf "  examples/*(.) : %d files\n", len @files
 
 p ""
 p "── (/) — directories only ─────────────────────────────"
@@ -33,8 +33,8 @@ p ""
 p "── (D) — include dotfiles (hidden) ────────────────────"
 my @vis = glob(".(N)")
 my @all = glob("*(DN)")
-printf "  visible       : %d\n", len(@vis)
-printf "  including .*  : %d\n", len(@all)
+printf "  visible       : %d\n", len @vis
+printf "  including .*  : %d\n", len @all
 
 p ""
 p "── Sort qualifiers — (oL) by Length ascending ─────────"
@@ -45,18 +45,18 @@ for my $f (@by_len[0:2]) { p "    $f  (", len($f) - len("examples/"), " chars af
 p ""
 p "── (Lk+1) — size > 1 KB ───────────────────────────────"
 my @big = glob("examples/*.stk(Lk+1)")
-printf "  examples/*.stk(Lk+1) : %d files > 1 KB\n", len(@big)
+printf "  examples/*.stk(Lk+1) : %d files > 1 KB\n", len @big
 
 p ""
 p "── Combine: (.N) — files only, null-glob ──────────────"
 my @safe = glob("nothing-matches*(.N)")
-p "  safe empty result : ", len(@safe)
+p "  safe empty result : ", len @safe
 
 p ""
 p "── (^...) — negation ──────────────────────────────────"
 # Everything in examples/ except the kvstore demos
 my @not_kv = glob("examples/^kvstore_*.stk(N)")
-printf "  examples/^kvstore_*.stk(N) : %d files\n", len(@not_kv)
+printf "  examples/^kvstore_*.stk(N) : %d files\n", len @not_kv
 
 p ""
 p "── Compose with pipe-forward ──────────────────────────"

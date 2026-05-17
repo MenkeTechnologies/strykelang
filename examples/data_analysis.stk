@@ -19,7 +19,7 @@ p "Analyzing ", len(@sensors), " data points in parallel..."
 my $total_temp = @sensors
     |> pmap { _->{temp} }
     |> preduce { _ + _1 }
-my $avg_temp = $total_temp / len(@sensors)
+my $avg_temp = $total_temp / len @sensors
 printf "Average Temperature: %.2f C\n", $avg_temp
 
 # 2. Maximum power.

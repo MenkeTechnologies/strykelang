@@ -25,7 +25,7 @@ printf "  invariant: %%b + %%a + %%k = %d %s %%all\n",
 p ""
 p "── %c — categories ─────────────────────────────────────"
 my @cats = sort keys %c
-printf "  total categories: %d\n", len(@cats)
+printf "  total categories: %d\n", len @cats
 p "  first 10:"
 p "    $_" for @cats[0:9]
 

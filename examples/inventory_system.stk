@@ -101,7 +101,7 @@ my @sales = (
 )
 
 p ""
-printf "── processing %d sales ────────────────────────────\n", len(@sales)
+printf "── processing %d sales ────────────────────────────\n", len @sales
 my $accepted = 0
 my $rejected = 0
 for my $s (@sales) {
@@ -139,7 +139,7 @@ for my $p (@by_rev) {
     }
 }
 printf "  → 80%% of revenue comes from %d / %d products (pareto)\n",
-    $eighty_at, len(@by_rev)
+    $eighty_at, len @by_rev
 
 # ── reorder list ────────────────────────────────────────────────────
 

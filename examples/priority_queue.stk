@@ -20,7 +20,7 @@ fn Demo::PQ::is_empty($pq) = len(@$pq) == 0
 
 fn Demo::PQ::push($pq, $prio, $item) {
     # Find insertion point via linear scan (small N).
-    my $n = len(@$pq)
+    my $n = len @$pq
     my $i = 0
     while ($i < $n && $pq->[$i]->[0] <= $prio) {
         $i++
@@ -156,7 +156,7 @@ for my $i (1:100) {
     }
 }
 printf "  100 ops: %d pushes, %d pops, %d remaining\n",
-    $pushes, $pops, len(@$stress)
+    $pushes, $pops, len @$stress
 
 # Verify PQ invariant: each pop is non-decreasing.
 my $prev = -1

@@ -27,7 +27,7 @@ fn Demo::LB::make_backends() {
 fn Demo::LB::strategy_round_robin($backends, $rr_state) {
     my $healthy = [ grep { _->{healthy} } @$backends ]
     return undef if len(@$healthy) == 0
-    my $idx = $rr_state->{counter} % len(@$healthy)
+    my $idx = $rr_state->{counter} % len @$healthy
     $rr_state->{counter} = $rr_state->{counter} + 1
     $healthy->[$idx]
 }

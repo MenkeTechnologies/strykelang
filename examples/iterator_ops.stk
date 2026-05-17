@@ -55,10 +55,10 @@ p "  sum of cubes of odd 1:20 : $sum_cubes_odd"
 p ""
 p "── min / max / sum on arrays ──────────────────────────"
 my @data = (3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5)
-p "  min : ", min(@data)
-p "  max : ", max(@data)
-p "  sum : ", sum(@data)
-p "  avg : ", sum(@data) / len(@data)
+p "  min : ", min @data
+p "  max : ", max @data
+p "  sum : ", sum @data
+p "  avg : ", sum(@data) / len @data
 
 p ""
 p "── flatten — nested arrayrefs to flat list ────────────"

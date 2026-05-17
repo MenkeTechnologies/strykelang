@@ -45,7 +45,7 @@ for my $cls ("spam", "ham") {
 for my $doc (@train) {
     my $cls = $doc->{label}
     $class_count{$cls}++
-    my @words = split /\s+/, lc($doc->{text})
+    my @words = split /\s+/, lc $doc->{text}
     for my $w (@words) {
         next if len($w) == 0
         $word_counts{$cls}->{$w} = ($word_counts{$cls}->{$w} // 0) + 1
@@ -64,7 +64,7 @@ my $td_lat = t_digest(100)
 
 fn Demo::NB::classify($text) {
     my $t0 = now_ns()
-    my @words = split /\s+/, lc($text)
+    my @words = split /\s+/, lc $text
     @words = grep { len(_) > 0 } @words
     my $vsize = len(keys %vocab)
     my $total = $class_count{spam} + $class_count{ham}
@@ -98,7 +98,7 @@ my @test = (
     +{ true_label => "ham",  text => "looking forward to the project review tomorrow" },
 )
 
-printf "\n── classification of %d test messages ─────────────\n", len(@test)
+printf "\n── classification of %d test messages ─────────────\n", len @test
 my $correct = 0
 my $tp = 0; my $fp = 0; my $tn = 0; my $fn = 0
 for my $msg (@test) {
@@ -125,7 +125,7 @@ printf "  FN (spam as ham)    : %d\n", $fn
 
 p ""
 p "── metrics ──────────────────────────────────────────"
-my $accuracy  = $correct / len(@test)
+my $accuracy  = $correct / len @test
 my $precision = ($tp + $fp) > 0 ? $tp / ($tp + $fp) : 0.0
 my $recall    = ($tp + $fn) > 0 ? $tp / ($tp + $fn) : 0.0
 my $f1        = ($precision + $recall) > 0

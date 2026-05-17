@@ -21,7 +21,7 @@ my @schema = (
 )
 
 printf "── schema: %d columns ─────────────────────────────────\n",
-    len(@schema)
+    len @schema
 for my $col (@schema) {
     my $extra = ""
     if (exists $col->{range}) {
@@ -162,7 +162,7 @@ my @lines = split /\n/, $csv_text
 my $header = shift @lines
 
 printf "\n── validating %d data rows ─────────────────────────────\n",
-    len(@lines)
+    len @lines
 
 my $valid = 0
 my $invalid = 0
@@ -187,7 +187,7 @@ for my $e (@errors) {
 
 p ""
 printf "── summary: %d valid, %d invalid (%d total errors) ──\n",
-    $valid, $invalid, len(@errors)
+    $valid, $invalid, len @errors
 
 # ── error-kind rollup ──────────────────────────────────────────────
 

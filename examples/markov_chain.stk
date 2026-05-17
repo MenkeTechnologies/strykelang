@@ -43,7 +43,7 @@ printf "  trained on %d sentences, %d distinct words\n",
 p ""
 p "── sample transitions for 'the' ───────────────────────"
 my @after_the = @{$next{"the"}}
-printf "  after 'the': %d follow-ups\n", len(@after_the)
+printf "  after 'the': %d follow-ups\n", len @after_the
 my %freq
 for my $w (@after_the) { $freq{$w}++ }
 my @top = sort { $freq{_1} <=> $freq{_0} } keys %freq

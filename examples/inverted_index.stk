@@ -43,7 +43,7 @@ my @docs = (
 my %index    # term -> hashref { doc_id -> term_freq }
 
 fn Demo::II::tokenize($s) {
-    my @toks = split /\W+/, lc($s)
+    my @toks = split /\W+/, lc $s
     @toks = grep { len(_) > 0 } @toks
     \@toks
 }
@@ -148,8 +148,8 @@ for my $q (@queries) {
 p ""
 p "── index statistics ─────────────────────────────────"
 my @term_postings_sizes = map { len(keys %{$index{_}}) } keys %index
-my $max_p = max(@term_postings_sizes)
-my $min_p = min(@term_postings_sizes)
+my $max_p = max @term_postings_sizes
+my $min_p = min @term_postings_sizes
 printf "  most-shared term : %d docs\n", $max_p
 printf "  rarest term      : %d docs (singletons)\n", $min_p
 

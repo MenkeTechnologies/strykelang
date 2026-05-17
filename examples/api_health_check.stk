@@ -79,7 +79,7 @@ my $hll_req = hll(14)
 my $tk_noisy = topk(3)
 
 printf "── simulating %d pings × %d endpoints = %d requests ──\n",
-    $pings_per_ep, len(@endpoints), $pings_per_ep * len(@endpoints)
+    $pings_per_ep, len(@endpoints), $pings_per_ep * len @endpoints
 
 for my $i (1:$pings_per_ep) {
     for my $ep (@endpoints) {
@@ -157,6 +157,6 @@ printf "  global p99 : %d ms\n", int(td_quantile($merged, 0.99))
 
 p ""
 p "── HLL distinct request signatures ──────────────────"
-my $expected = $pings_per_ep * len(@endpoints)
+my $expected = $pings_per_ep * len @endpoints
 printf "  HLL distinct (request#endpoint#class) : %d\n", hll_count($hll_req)
 printf "  total requests                         : %d\n", $expected

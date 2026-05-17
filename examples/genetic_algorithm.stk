@@ -17,7 +17,7 @@
 # ── target ─────────────────────────────────────────────────────────
 
 my $TARGET = "TO_BE_OR_NOT_TO_BE"
-my $TGT_LEN = len($TARGET)
+my $TGT_LEN = len $TARGET
 
 # ── parameters ─────────────────────────────────────────────────────
 

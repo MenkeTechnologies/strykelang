@@ -77,7 +77,7 @@ my @inputs = (
 )
 
 printf "── analyzing %d CIDR blocks ─────────────────────────────\n",
-    len(@inputs)
+    len @inputs
 
 for my $s (@inputs) {
     my $t0 = now_ns()

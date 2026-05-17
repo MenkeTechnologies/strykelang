@@ -46,7 +46,7 @@ fn Demo::Router::dispatch($method, $path) {
         my $segs    = $route->[2]
         my $handler = $route->[3]
 
-        next unless len(@$segs) == len(@path_segs)
+        next unless len(@$segs) == len @path_segs
 
         my %params
         my $ok = 1
@@ -94,7 +94,7 @@ Demo::Router::register("GET",  "/users/:id",                \&Demo::Handlers::sh
 Demo::Router::register("GET",  "/users/:id/posts/:slug",    \&Demo::Handlers::user_post)
 Demo::Router::register("POST", "/users",                    \&Demo::Handlers::create_user)
 
-printf "── %d routes registered ──────────────────────────────\n", len(@routes)
+printf "── %d routes registered ──────────────────────────────\n", len @routes
 for my $r (@routes) {
     printf "  %-5s %s\n", $r->[0], $r->[1]
 }
@@ -137,7 +137,7 @@ my @requests = (
 )
 
 p ""
-printf "── dispatching %d requests ────────────────────────────\n", len(@requests)
+printf "── dispatching %d requests ────────────────────────────\n", len @requests
 for my $req (@requests) {
     my $result = Demo::Router::dispatch($req->[0], $req->[1])
     if ($result->{ok}) {

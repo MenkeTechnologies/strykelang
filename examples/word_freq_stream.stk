@@ -84,7 +84,7 @@ p "  merged 8 per-chunk sketches via cms_a + cms_b and topk_a + topk_b"
 p ""
 p "── top 10 terms across stream (via merged TopK) ───────"
 my @top = topk_heavies($topk_total)
-my $cap = len(@top) > 10 ? 10 : len(@top)
+my $cap = len(@top) > 10 ? 10 : len @top
 for my $i (0:$cap-1) {
     printf "  %2d. %-14s × %d  (cms: %d)\n",
         $i + 1, $top[$i]->[0], $top[$i]->[1],

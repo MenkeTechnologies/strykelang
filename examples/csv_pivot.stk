@@ -27,7 +27,7 @@ my @rows = (
     +{ region => "ap",      month => "Mar", product => "gadget", amount =>  50.00 },
 )
 
-printf "── %d sales records ────────────────────────────────\n", len(@rows)
+printf "── %d sales records ────────────────────────────────\n", len @rows
 
 # ── round-trip through CSV codec (and a temp file) ──────────────────
 
@@ -152,4 +152,4 @@ p "── distinct cardinality (HLL) ──────────────�
 mysync $hll = hll(14)
 hll_add($hll, _->{product}) for @{$rows_back}
 printf "  HLL distinct products : %d\n", hll_count($hll)
-printf "  exact distinct        : %d\n", len(@products)
+printf "  exact distinct        : %d\n", len @products

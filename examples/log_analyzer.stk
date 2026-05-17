@@ -36,7 +36,7 @@ for my $line (split /\n/, $log) {
         }
     }
 }
-printf "  parsed %d log lines\n", len(@parsed)
+printf "  parsed %d log lines\n", len @parsed
 
 # ── per-IP aggregation via CMS + HLL ───────────────────────────────────
 
@@ -56,7 +56,7 @@ for my $rec (@parsed) {
 }
 
 my @ips = ("10.0.0.1", "10.0.0.5", "10.0.0.7")
-printf "  distinct IPs (HLL) : %d  (truth: %d)\n", hll_count($ip_distinct), len(@ips)
+printf "  distinct IPs (HLL) : %d  (truth: %d)\n", hll_count($ip_distinct), len @ips
 printf "  4xx errors         : %d\n", cms_count($errors, "4xx")
 printf "  5xx errors         : %d\n", cms_count($errors, "5xx")
 p "  per-IP stats:"

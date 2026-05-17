@@ -72,7 +72,7 @@ for my $line (split /\n/, $syslog) {
 }
 
 printf "── parsed %d log lines ─────────────────────────────────\n",
-    len(@parsed)
+    len @parsed
 
 # ── severity rollup ────────────────────────────────────────────────
 

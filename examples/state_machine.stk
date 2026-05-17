@@ -118,7 +118,7 @@ Demo::FSM::run_order(3, \@order3)
 
 p ""
 p "── audit log summary ────────────────────────────────"
-my $total      = len(@$audit_log)
+my $total      = len @$audit_log
 my $ok         = grep { _->{status} eq "ok" } @$audit_log
 my $rejected   = $total - $ok
 printf "  total transitions  : %d\n", $total

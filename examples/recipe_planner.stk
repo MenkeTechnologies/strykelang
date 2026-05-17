@@ -79,7 +79,7 @@ for my $r (@recipes) {
 
 my @veg = grep { Demo::Recipe::has_tag(_, "vegetarian") } @recipes
 p ""
-printf "── vegetarian recipes (%d) ───────────────────────────\n", len(@veg)
+printf "── vegetarian recipes (%d) ───────────────────────────\n", len @veg
 for my $r (@veg) {
     printf "  - %s\n", $r->{name}
 }
