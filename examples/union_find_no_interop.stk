@@ -1,0 +1,78 @@
+#!/usr/bin/env stryke
+
+# Union-Find (disjoint set) — Tarjan's classic with path compression
+# + union-by-rank, both near-O(α(n)) amortized. Used everywhere from
+# Kruskal's MST to Damerau's typo-correction. Parses clean under
+# `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * expression-bodied `fn name = expr` (rule 6) for the one-liners
+#   * implicit return on tail (rule 7)
+#   * `len(@$ref)`, `:` ranges (rules 4, 5)
+#   * `#{…}` interpolation (rule 1a)
+#
+# Namespaced UDFs `UF::*`.
+#
+# Run: stryke --no-interop examples/union_find_no_interop.stk
+
+fn UF::new($n) = +{ parent => [0:$n - 1], rank => [(0) x $n], count => $n }
+
+# Recursive find with path compression — sets parent pointer to root
+# on the way back up so future finds are O(α(n)).
+fn UF::find($uf, $x) {
+    return $x if $uf->{parent}[$x] == $x
+    $uf->{parent}[$x] = UF::find($uf, $uf->{parent}[$x])
+    $uf->{parent}[$x]
+}
+
+fn UF::same($uf, $x, $y) = UF::find($uf, $x) == UF::find($uf, $y)
+
+# Union-by-rank: attach the shorter tree under the taller. Returns 1
+# if union happened, 0 if already in same component.
+fn UF::union($uf, $x, $y) {
+    my $ra = UF::find($uf, $x)
+    my $rb = UF::find($uf, $y)
+    return 0 if $ra == $rb
+    if ($uf->{rank}[$ra] < $uf->{rank}[$rb]) { ($ra, $rb) = ($rb, $ra) }
+    $uf->{parent}[$rb] = $ra
+    $uf->{rank}[$ra]++ if $uf->{rank}[$ra] == $uf->{rank}[$rb]
+    $uf->{count}--
+    1
+}
+
+p "── Union-Find demo ──"
+
+# Build 8 disjoint singletons, then merge {0,1,2}, {3,4}, {5,6,7}.
+my $uf = UF::new(8)
+die "initial count off" unless $uf->{count} == 8
+
+UF::union($uf, 0, 1)
+UF::union($uf, 1, 2)
+UF::union($uf, 3, 4)
+UF::union($uf, 5, 6)
+UF::union($uf, 6, 7)
+
+die "after 5 unions count should be 3" unless $uf->{count} == 3
+die "0 and 2 should be same"           unless UF::same($uf, 0, 2)
+die "0 and 3 should differ"            if     UF::same($uf, 0, 3)
+die "5 and 7 should be same"           unless UF::same($uf, 5, 7)
+die "redundant union should be no-op"  if     UF::union($uf, 0, 2)
+
+p "  3 components after 5 unions (expected 3)  OK"
+
+# Bridge the {0,1,2} and {3,4} components — count drops to 2.
+UF::union($uf, 2, 3)
+die "bridge: count should be 2" unless $uf->{count} == 2
+die "0 and 4 should now be same" unless UF::same($uf, 0, 4)
+p "  bridged across, count=2 (expected 2)  OK"
+
+# Stress: chain N elements then check all-equivalent.
+my $N = 1000
+my $big = UF::new($N)
+UF::union($big, $_, $_ + 1) for 0:$N - 2
+die "chain should collapse to 1 component" unless $big->{count} == 1
+die "first and last should be same" unless UF::same($big, 0, $N - 1)
+p "  chain of #{$N}: all in 1 component  OK"
+
+p ""
+p "  ALL PASS (singletons, merges, bridge, chain-of-#{$N})"
