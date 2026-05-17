@@ -1,0 +1,72 @@
+#!/usr/bin/env stryke
+
+# Demo: every Perl quote-like operator name (`s`, `m`, `q`, `qq`, `qx`,
+# `qr`, `tr`, `y`) is callable as a NAMESPACED helper function — the
+# lexer recognizes the `::` prefix and treats anything after it as a
+# plain identifier, never a quote-body opener.
+#
+# Pre-fix this would have surfaced as a syntax error because the lexer
+# would try to consume a regex / transliteration body after `s` / `m` /
+# `tr` / `y`, and a string body after `q` / `qq` / `qx` / `qr`.
+#
+# Run: stryke --no-interop examples/namespaced_quote_helpers_no_interop.stk
+
+# Every quote-like operator name, defined as a namespaced UDF:
+fn QuoteOps::s($n)  { $n * 11 }
+fn QuoteOps::m($n)  { $n * 13 }
+fn QuoteOps::q($n)  { $n * 17 }
+fn QuoteOps::qq($n) { $n * 19 }
+fn QuoteOps::qx($n) { $n * 23 }
+fn QuoteOps::qr($n) { $n * 29 }
+fn QuoteOps::tr($n) { $n * 31 }
+fn QuoteOps::y($n)  { $n * 37 }
+
+# Multi-arg variants — the second `$k` arg can't trick the lexer into
+# reading a replacement body for `s` / `tr` / `y`.
+fn QuoteOps::s2($n, $k) { $n + $k * 100 }
+fn QuoteOps::m2($n, $k) { $n * $k }
+fn QuoteOps::tr2($n, $k) { $n - $k }
+
+# Deep-namespace: works at arbitrary nesting depth.
+fn A::B::C::s($n) { $n + 1000 }
+
+p "── single-arg quote-name UDFs ──"
+my @results = (
+    ["s",  QuoteOps::s(1)],
+    ["m",  QuoteOps::m(1)],
+    ["q",  QuoteOps::q(1)],
+    ["qq", QuoteOps::qq(1)],
+    ["qx", QuoteOps::qx(1)],
+    ["qr", QuoteOps::qr(1)],
+    ["tr", QuoteOps::tr(1)],
+    ["y",  QuoteOps::y(1)],
+)
+for my $r (@results) {
+    printf("  QuoteOps::%-2s(1) = %d\n", $r->[0], $r->[1])
+}
+
+# Total must be 11+13+17+19+23+29+31+37 = 180.
+my $sum = sum map { _->[1] } @results
+p "  sum = $sum"
+die "expected 180, got $sum" unless $sum == 180
+
+p ""
+p "── multi-arg variants (lexer must not eat `$k` as quote body) ──"
+my $s2 = QuoteOps::s2(7, 5)
+my $m2 = QuoteOps::m2(7, 5)
+my $tr2 = QuoteOps::tr2(7, 5)
+p "  QuoteOps::s2(7, 5)  = $s2"
+p "  QuoteOps::m2(7, 5)  = $m2"
+p "  QuoteOps::tr2(7, 5) = $tr2"
+die "expected 507" unless $s2 == 507
+die "expected 35"  unless $m2 == 35
+die "expected 2"   unless $tr2 == 2
+
+p ""
+p "── deep namespace ──"
+my $deep = A::B::C::s(5)
+p "  A::B::C::s(5) = $deep"
+die "expected 1005" unless $deep == 1005
+
+p ""
+p "  ALL PASS  (quote-op names work as namespaced UDFs at any depth)"

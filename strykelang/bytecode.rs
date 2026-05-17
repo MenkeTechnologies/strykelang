@@ -267,7 +267,7 @@ pub enum Op {
     /// block-local scope (`scope_push_hook` per iteration, like [`crate::vm_helper::VMHelper::exec_block`]);
     /// not subroutine `return` and not a closure capture.
     BlockReturnValue,
-    /// At runtime statement position: capture current lexicals into [`crate::value::PerlSub::closure_env`]
+    /// At runtime statement position: capture current lexicals into [`crate::value::StrykeSub::closure_env`]
     /// for a sub already registered in [`Interpreter::subs`] (see `prepare_program_top_level`).
     BindSubClosure(u16),
 

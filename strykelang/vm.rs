@@ -16,7 +16,7 @@ use crate::perl_fs::read_file_text_perl_compat;
 use crate::pmap_progress::{FanProgress, PmapProgress};
 use crate::sort_fast::{sort_magic_cmp, SortBlockFast};
 use crate::value::{
-    perl_list_range_expand, PerlAsyncTask, PerlBarrier, PerlHeap, PerlSub, PipelineInner,
+    perl_list_range_expand, StrykeAsyncTask, PerlBarrier, PerlHeap, StrykeSub, PipelineInner,
     PipelineOp, StrykeValue,
 };
 use crate::vm_helper::{
@@ -75,7 +75,7 @@ struct ParallelBlockVmShared {
     runtime_advice_decls: Arc<Vec<crate::bytecode::RuntimeAdviceDecl>>,
     jit_sub_invoke_threshold: u32,
     op_len_plus_one: usize,
-    static_sub_closure_subs: Vec<Option<Arc<PerlSub>>>,
+    static_sub_closure_subs: Vec<Option<Arc<StrykeSub>>>,
     sub_entry_by_name: HashMap<u16, (usize, bool)>,
 }
 
@@ -345,8 +345,8 @@ pub struct VM<'a> {
     exit_main_dispatch: bool,
     /// Top-level [`Op::ReturnValue`] with no frame: value for implicit return (was `last = val; break`).
     exit_main_dispatch_value: Option<StrykeValue>,
-    /// [`Chunk::static_sub_calls`] index → pre-resolved [`PerlSub`] for closure restore (stash key lookup once at VM build).
-    static_sub_closure_subs: Vec<Option<Arc<PerlSub>>>,
+    /// [`Chunk::static_sub_calls`] index → pre-resolved [`StrykeSub`] for closure restore (stash key lookup once at VM build).
+    static_sub_closure_subs: Vec<Option<Arc<StrykeSub>>>,
     /// O(1) [`Chunk::sub_entries`] lookup (same first-wins semantics as the old linear scan).
     sub_entry_by_name: HashMap<u16, (usize, bool)>,
     /// When executing [`Chunk::block_bytecode_ranges`] via [`Self::run_block_region`].
@@ -357,7 +357,7 @@ pub struct VM<'a> {
 
 impl<'a> VM<'a> {
     pub fn new(chunk: &Chunk, interp: &'a mut VMHelper) -> Self {
-        let static_sub_closure_subs: Vec<Option<Arc<PerlSub>>> = chunk
+        let static_sub_closure_subs: Vec<Option<Arc<StrykeSub>>> = chunk
             .static_sub_calls
             .iter()
             .map(|(_, _, name_idx)| {
@@ -1364,7 +1364,7 @@ impl<'a> VM<'a> {
                         .is_some();
                     if found {
                         self.push(StrykeValue::code_ref(std::sync::Arc::new(
-                            crate::value::PerlSub {
+                            crate::value::StrykeSub {
                                 name: target_method,
                                 params: vec![],
                                 body: vec![],
@@ -1966,7 +1966,7 @@ impl<'a> VM<'a> {
 
     /// Stash lookup only (qualified key from compiler); avoids `resolve_sub_by_name`'s package fallback on hot calls.
     #[inline]
-    fn sub_for_closure_restore(&self, name: &str) -> Option<Arc<PerlSub>> {
+    fn sub_for_closure_restore(&self, name: &str) -> Option<Arc<StrykeSub>> {
         self.interp.subs.get(name).cloned()
     }
 
@@ -1978,7 +1978,7 @@ impl<'a> VM<'a> {
     fn dispatch_with_advice(
         &mut self,
         name: &str,
-        closure_sub_hint: Option<Arc<PerlSub>>,
+        closure_sub_hint: Option<Arc<StrykeSub>>,
         argc: usize,
         want: WantarrayCtx,
         preserve_arrays: bool,
@@ -2162,7 +2162,7 @@ impl<'a> VM<'a> {
         argc_u8: u8,
         wa_byte: u8,
         // Pre-resolved sub for `Op::CallStaticSubId` (stash lookup once in `VM::new`).
-        closure_sub_hint: Option<Arc<PerlSub>>,
+        closure_sub_hint: Option<Arc<StrykeSub>>,
     ) -> StrykeResult<()> {
         let name_owned = self.names[name_idx as usize].clone();
         let name = name_owned.as_str();
@@ -2198,7 +2198,7 @@ impl<'a> VM<'a> {
             // cached in `static_sub_closure_subs`), skip frame setup entirely and
             // evaluate the closed-form-ish iterative version. `bench_fib` collapses from
             // ~2.7M recursive VM calls to a single `while` loop.
-            let fib_sub: Option<Arc<PerlSub>> = closure_sub_hint
+            let fib_sub: Option<Arc<StrykeSub>> = closure_sub_hint
                 .clone()
                 .or_else(|| self.sub_for_closure_restore(name));
             if let Some(ref sub_arc) = fib_sub {
@@ -6223,7 +6223,7 @@ impl<'a> VM<'a> {
                         let block = self.blocks[*block_idx as usize].clone();
                         let params = self.code_ref_sigs[*sig_idx as usize].clone();
                         let captured = self.interp.scope.capture();
-                        self.push(StrykeValue::code_ref(Arc::new(crate::value::PerlSub {
+                        self.push(StrykeValue::code_ref(Arc::new(crate::value::StrykeSub {
                             name: "__ANON__".to_string(),
                             params,
                             body: block,
@@ -8472,7 +8472,7 @@ impl<'a> VM<'a> {
                             *rs.lock() = Some(out);
                         });
                         *join_slot.lock() = Some(h);
-                        self.push(StrykeValue::async_task(Arc::new(PerlAsyncTask {
+                        self.push(StrykeValue::async_task(Arc::new(StrykeAsyncTask {
                             result: result_slot,
                             join: join_slot,
                         })));
@@ -8647,7 +8647,7 @@ impl<'a> VM<'a> {
                         } else {
                             Some(captured)
                         };
-                        let mut sub = PerlSub {
+                        let mut sub = StrykeSub {
                             name: rs.name.clone(),
                             params: rs.params.clone(),
                             body: rs.body.clone(),

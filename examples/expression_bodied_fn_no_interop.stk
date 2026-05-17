@@ -1,0 +1,122 @@
+#!/usr/bin/env stryke
+
+# Demo: stryke's expression-bodied `fn` form — `fn NAME(PARAMS) = EXPR`.
+# No braces, no semicolons, no explicit return. The body IS the
+# expression that gets evaluated. Ideal for one-liner helpers,
+# recursive math, pipe-forward chains, and tiny composable building
+# blocks.
+#
+# Run: stryke --no-interop examples/expression_bodied_fn_no_interop.stk
+
+# ── tiny one-liner helpers ──────────────────────────────────────────────────
+
+fn Math::sq($n)     = $n * $n
+fn Math::cube($n)   = $n * $n * $n
+fn Math::dbl($n)    = $n * 2
+fn Math::tpl($n)    = $n * 3
+fn Math::clamp($n, $lo, $hi) = $n < $lo ? $lo : ($n > $hi ? $hi : $n)
+
+p "── 5 one-liners ──"
+printf("  sq(7) = %d   cube(4) = %d   dbl(13) = %d   tpl(5) = %d\n",
+    Math::sq(7), Math::cube(4), Math::dbl(13), Math::tpl(5))
+printf("  clamp(150, 0, 100) = %d   clamp(-3, 0, 100) = %d   clamp(50, 0, 100) = %d\n",
+    Math::clamp(150, 0, 100), Math::clamp(-3, 0, 100), Math::clamp(50, 0, 100))
+
+die "sq" unless Math::sq(7) == 49
+die "cube" unless Math::cube(4) == 64
+die "clamp upper" unless Math::clamp(150, 0, 100) == 100
+die "clamp lower" unless Math::clamp(-3,  0, 100) == 0
+
+# ── recursive expression bodies ─────────────────────────────────────────────
+
+fn Math::fact($n) = $n <= 1 ? 1 : $n * Math::fact($n - 1)
+fn Math::fib($n)  = $n < 2 ? $n : Math::fib($n - 1) + Math::fib($n - 2)
+fn Math::gcd($x, $y) = $y == 0 ? $x : Math::gcd($y, $x % $y)
+fn Math::lcm($x, $y) = $x * $y / Math::gcd($x, $y)
+
+p ""
+p "── recursive one-liners ──"
+printf("  fact(10) = %d   fib(15) = %d   gcd(84, 30) = %d   lcm(6, 8) = %d\n",
+    Math::fact(10), Math::fib(15), Math::gcd(84, 30), Math::lcm(6, 8))
+
+die "fact"  unless Math::fact(10) == 3628800
+die "fib"   unless Math::fib(15) == 610
+die "gcd"   unless Math::gcd(84, 30) == 6
+die "lcm"   unless Math::lcm(6, 8) == 24
+
+# ── mutual recursion ────────────────────────────────────────────────────────
+
+fn Parity::is_even($n) = $n == 0 ? 1 : Parity::is_odd($n - 1)
+fn Parity::is_odd($n)  = $n == 0 ? 0 : Parity::is_even($n - 1)
+
+p ""
+p "── mutual recursion ──"
+printf("  is_even(10) = %d   is_odd(7) = %d   is_even(0) = %d\n",
+    Parity::is_even(10), Parity::is_odd(7), Parity::is_even(0))
+
+die "even10" unless Parity::is_even(10) == 1
+die "odd7"   unless Parity::is_odd(7)   == 1
+die "even0"  unless Parity::is_even(0)  == 1
+
+# ── pipe-forward inside expression body ─────────────────────────────────────
+
+fn Text::clean($s) = $s |> trim |> lc
+fn Text::nwords($s) = $s |> trim |> len
+fn Text::shout($s) = $s |> trim |> uc
+
+p ""
+p "── pipe-forward bodies ──"
+printf("  Text::clean('  HeLLo  ')  = [%s]\n", Text::clean("  HeLLo  "))
+printf("  Text::shout('  world  ')  = [%s]\n", Text::shout("  world  "))
+
+die "clean" unless Text::clean("  HeLLo  ") eq "hello"
+die "shout" unless Text::shout("  world  ") eq "WORLD"
+
+# ── thread-macro inside expression body ────────────────────────────────────
+
+fn Stat::int_sqrt($n) = int(~> $n sqrt)
+fn Stat::word_count($s) = ~> $s lines len
+
+p ""
+p "── thread-macro bodies ──"
+printf("  int_sqrt(81) = %d   int_sqrt(64) = %d\n",
+    Stat::int_sqrt(81), Stat::int_sqrt(64))
+printf("  word_count('a\\nb\\nc\\n') = %d\n", Stat::word_count("a\nb\nc\n"))
+
+die "isq81" unless Stat::int_sqrt(81) == 9
+die "isq64" unless Stat::int_sqrt(64) == 8
+die "wc"    unless Stat::word_count("a\nb\nc\n") == 3
+
+# ── closure capture of outer lexical ───────────────────────────────────────
+
+my $tax_rate = 0.08
+
+fn Money::with_tax($amount) = $amount * (1 + $tax_rate)
+fn Money::tip_15($amount) = $amount * 0.15
+
+p ""
+p "── closure-capture of outer lexical ──"
+printf("  with_tax(100.00) = %.2f\n", Money::with_tax(100.00))
+printf("  tip_15(50.00)    = %.2f\n", Money::tip_15(50.00))
+
+die "tax"  unless abs(Money::with_tax(100.00) - 108.00) < 0.001
+die "tip"  unless abs(Money::tip_15(50.00) - 7.50) < 0.001
+
+# ── compose: expression-bodied fns as building blocks of a pipeline ─────────
+
+fn Pipeline::normalize($s) = $s |> trim |> lc
+fn Pipeline::tokenize($s)  = $s |> Pipeline::normalize |> chars |> len
+
+p ""
+p "── compose multiple expr-bodied fns into a pipeline ──"
+my @inputs = ("  Hello, World!  ", "FOO BAR BAZ", "")
+for my $s (@inputs) {
+    printf("  [%-20s] → norm=[%s] chars=%d\n",
+        $s, Pipeline::normalize($s), Pipeline::tokenize($s))
+}
+
+die "normalize empty" unless Pipeline::normalize("") eq ""
+die "tokenize hello"  unless Pipeline::tokenize("  Hello, World!  ") == 13
+
+p ""
+p "  ALL PASS  (one-liners, recursive, mutual rec, pipe, thread macro, capture, compose)"

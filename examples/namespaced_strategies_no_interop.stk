@@ -1,0 +1,77 @@
+#!/usr/bin/env stryke
+
+# Demo: organize multiple algorithms as sibling NAMESPACED helpers, each
+# carrying the operator-glyph name (`s` for substitute, `m` for match,
+# `q` for quote, `qr` for regex) without the lexer treating them as
+# quote-like operators.
+#
+# Realistic use case: a tiny "text-rewriter" registry where each entry
+# is a stage function. Stages are looked up by name and threaded through
+# `~>` to transform an input string.
+#
+# Run: stryke --no-interop examples/namespaced_strategies_no_interop.stk
+
+# ── stage registry: every function name is a quote-op letter ────────────────
+
+fn Rewrite::s($text)  { $text =~ s/foo/FOO/gr  }   # substitute foo→FOO
+fn Rewrite::m($text)  { $text =~ s/bar/BAR/gr  }   # substitute bar→BAR (named `m`)
+fn Rewrite::q($text)  { join " | ", split /\s+/, $text }   # word-quote
+fn Rewrite::qq($text) { uc $text                }   # SHOUTING (named `qq`)
+fn Rewrite::qx($text) { rev $text           }   # reverse  (named `qx`)
+fn Rewrite::qr($text) { $text =~ s/[aeiou]//gr  }   # vowel-strip (named `qr`)
+fn Rewrite::tr($text) { $text =~ tr/a-z/A-Z/r   }   # transliterate
+fn Rewrite::y($text)  { join "", grep { /\d/ } split //, $text }   # keep only digits
+
+p "── stages ──"
+
+my $input = "the foo and the bar walked into a bar at 42 Foo Lane"
+
+# ── 1. Direct calls ──────────────────────────────────────────────────────────
+my $s_only  = Rewrite::s($input)
+my $m_only  = Rewrite::m($input)
+p "  Rewrite::s applied: $s_only"
+p "  Rewrite::m applied: $m_only"
+
+die "expected `foo` rewritten" unless $s_only =~ /FOO/
+die "expected `bar` rewritten" unless $m_only =~ /BAR/
+
+# ── 2. Compose two via `~>` thread macro ─────────────────────────────────────
+my $rewritten = ~> $input Rewrite::s Rewrite::m
+p "  ~> input Rewrite::s Rewrite::m → $rewritten"
+die "expected both rewrites applied" unless $rewritten =~ /FOO.*BAR.*BAR/
+
+# ── 3. Compose three more — uc, reverse, vowel-strip ────────────────────────
+my $shouted = ~> $input Rewrite::qq
+my $reverse = ~> $input Rewrite::qx
+my $devow   = ~> $input Rewrite::qr
+p "  qq (uc):     $shouted"
+p "  qx (rev):    $reverse"
+p "  qr (devow):  $devow"
+
+die "qq must be uppercase" unless $shouted eq uc $input
+die "qx must equal reverse" unless $reverse eq rev $input
+die "qr must strip vowels" unless $devow !~ /[aeiou]/
+
+# ── 4. tr / y as namespaced names (lexer must not eat `///` body) ───────────
+my $up   = Rewrite::tr($input)
+my $nums = Rewrite::y($input)
+p "  tr → $up"
+p "  y  → $nums"
+die "tr must produce uppercase" unless $up eq uc $input
+die "y must keep only digits"   unless $nums eq "42"
+
+# ── 5. Build a full pipeline via thread macro ────────────────────────────────
+my $pipeline = ~> $input Rewrite::s Rewrite::m Rewrite::qq Rewrite::qr
+p ""
+p "  pipeline: s → m → qq → qr"
+p "  result:   $pipeline"
+
+# Result is `s`/`m` applied, then uppercased, then vowels stripped:
+#  ~> input → "the FOO and the BAR walked into a BAR at 42 FOO Lane"
+#  → uppercased → "THE FOO AND THE BAR WALKED INTO A BAR AT 42 FOO LANE"
+#  → vowels stripped → "TH F ND TH BR WLKD NT  BR T 42 F LN"
+# vowels stripped only matches lowercase aeiou — uppercase survives.
+die "pipeline result must be all-uppercase" unless $pipeline eq uc $pipeline
+
+p ""
+p "  ALL PASS  (8 quote-op named stages, threaded via `~>`)"

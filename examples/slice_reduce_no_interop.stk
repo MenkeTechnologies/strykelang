@@ -1,0 +1,118 @@
+#!/usr/bin/env stryke
+
+# Demo: array-deref slicing `@{$arr}[$i:$j]` paired with `reduce` /
+# `fold` accumulator patterns — the building blocks for rolling-window
+# stats, frequency tables, group-by aggregation, and prefix-sum
+# transforms.
+#
+# Covers:
+#   * variable-bound slicing
+#   * min / max / sum over slice
+#   * rolling window via slice + loop
+#   * prefix-sum array via reduce + arrayref accumulator
+#   * frequency hashref via reduce + hashref accumulator
+#   * "group by" pattern: reduce into hash<key, arrayref>
+#
+# Run: stryke --no-interop examples/slice_reduce_no_interop.stk
+
+# ── 1. variable-bound slice ────────────────────────────────────────────────
+
+p "── 1. variable-bound slice ──"
+my $arr = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+my $i = 2
+my $j = 6
+my @slice = @{$arr}[$i:$j]
+p "  arr[$i:$j] = @slice"
+die "slice wrong" unless "@slice" eq "30 40 50 60 70"
+
+# ── 2. min / max / sum over slice ─────────────────────────────────────────
+
+p ""
+p "── 2. min / max / sum over slice ──"
+my $nums = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5]
+my $window_min = min(@{$nums}[2:7])
+my $window_max = max(@{$nums}[2:7])
+my $window_sum = sum(@{$nums}[2:7])
+printf("  arr[2:7] = (4 1 5 9 2 6)  min=%d max=%d sum=%d\n",
+    $window_min, $window_max, $window_sum)
+die "min" unless $window_min == 1
+die "max" unless $window_max == 9
+die "sum" unless $window_sum == 27
+
+# ── 3. rolling-window minimum ──────────────────────────────────────────────
+
+p ""
+p "── 3. rolling minimum (window = 3) ──"
+my $stream = [5, 3, 8, 2, 7, 9, 1, 6, 4]
+my $w = 3
+my @rolling
+for my $i (0:(len(@$stream) - $w)) {
+    push @rolling, min(@{$stream}[$i:$i + $w - 1])
+}
+printf("  stream:  %s\n", join(" ", @$stream))
+printf("  rolling: %s\n", join(" ", @rolling))
+die "rolling" unless "@rolling" eq "3 2 2 2 1 1 1"
+
+# ── 4. prefix-sum via reduce + arrayref accumulator ───────────────────────
+
+p ""
+p "── 4. prefix-sum array via reduce + arrayref accumulator ──"
+fn Stat::prefix_sums($xs) {
+    my $acc = reduce {
+        push @$_0, ($_0->[-1] // 0) + $_1
+        $_0
+    } [], @$xs
+    $acc
+}
+my $sums = Stat::prefix_sums([1, 2, 3, 4, 5])
+printf("  prefix_sums([1..5]) = [%s]\n", join(", ", @$sums))
+die "prefix-sums" unless "@$sums" eq "1 3 6 10 15"
+
+# ── 5. frequency hashref via reduce + hashref accumulator ─────────────────
+
+p ""
+p "── 5. frequency hashref via reduce + hashref accumulator ──"
+fn Stat::freq_via_reduce($xs) = reduce { $_0->{$_1}++; $_0 } +{}, @$xs
+my $freq = Stat::freq_via_reduce(["apple", "banana", "apple", "cherry", "banana", "apple"])
+for my $k (sort keys %$freq) {
+    printf("  %-10s %d\n", $k, $freq->{$k})
+}
+die "apple"  unless $freq->{apple}  == 3
+die "banana" unless $freq->{banana} == 2
+die "cherry" unless $freq->{cherry} == 1
+
+# ── 6. group-by via reduce + hash<key, arrayref> ──────────────────────────
+
+p ""
+p "── 6. group-by via reduce + hash<key, arrayref> ──"
+fn Stat::group_by($xs, $keyfn) = reduce {
+    my $k = $keyfn->($_1)
+    $_0->{$k} //= []
+    push @{$_0->{$k}}, $_1
+    $_0
+} +{}, @$xs
+
+my $words = ["apple", "anchor", "banana", "berry", "cherry", "cobalt"]
+my $by_first = Stat::group_by($words, fn { substr(_0, 0, 1) })
+for my $k (sort keys %$by_first) {
+    printf("  %s: [%s]\n", $k, join(", ", @{$by_first->{$k}}))
+}
+die "group a" unless len(@{$by_first->{a}}) == 2
+die "group b" unless len(@{$by_first->{b}}) == 2
+die "group c" unless len(@{$by_first->{c}}) == 2
+
+# ── 7. slice + reduce together: running max ──────────────────────────────
+
+p ""
+p "── 7. running max via slice + reduce ──"
+fn Stat::running_max($xs) = reduce {
+    push @$_0, max($_0->[-1] // $_1, $_1)
+    $_0
+} [], @$xs
+my $rmax = Stat::running_max([3, 1, 4, 1, 5, 9, 2, 6, 5, 9, 3])
+printf("  input:        %s\n", join(" ", 3, 1, 4, 1, 5, 9, 2, 6, 5, 9, 3))
+printf("  running max:  %s\n", join(" ", @$rmax))
+die "running max" unless "@$rmax" eq "3 3 4 4 5 9 9 9 9 9 9"
+
+p ""
+p "  ALL PASS  (7 slice + reduce idioms)"

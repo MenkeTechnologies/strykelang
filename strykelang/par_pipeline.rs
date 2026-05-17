@@ -13,12 +13,12 @@ use parking_lot::Mutex;
 
 use crate::error::{StrykeError, StrykeResult};
 use crate::scope::{AtomicArray, AtomicHash};
-use crate::value::{PerlSub, StrykeValue};
+use crate::value::{StrykeSub, StrykeValue};
 use crate::vm_helper::{Flow, FlowOrError, VMHelper};
 
 struct ParPipelineSpec {
-    source: Arc<PerlSub>,
-    stages: Vec<Arc<PerlSub>>,
+    source: Arc<StrykeSub>,
+    stages: Vec<Arc<StrykeSub>>,
     workers: Vec<usize>,
     buffer: usize,
 }
@@ -72,7 +72,7 @@ fn parse_args(args: &[StrykeValue]) -> Result<ParPipelineSpec, StrykeError> {
         .get("stages")
         .ok_or_else(|| StrykeError::runtime("par_pipeline: stages => ARRAY required", 0))?;
     let stages_items = list_from_value(stages_val);
-    let mut stages: Vec<Arc<PerlSub>> = Vec::with_capacity(stages_items.len());
+    let mut stages: Vec<Arc<StrykeSub>> = Vec::with_capacity(stages_items.len());
     for v in stages_items {
         let s = v
             .as_code_ref()
@@ -121,8 +121,8 @@ fn flow_err_msg(e: FlowOrError) -> String {
 
 #[allow(clippy::too_many_arguments)] // Thread entry: mirrors parallel stage wiring.
 fn run_worker(
-    sub: Arc<PerlSub>,
-    subs: HashMap<String, Arc<PerlSub>>,
+    sub: Arc<StrykeSub>,
+    subs: HashMap<String, Arc<StrykeSub>>,
     capture: Vec<(String, StrykeValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,
@@ -174,8 +174,8 @@ fn run_worker(
 }
 
 fn run_source(
-    source: Arc<PerlSub>,
-    subs: HashMap<String, Arc<PerlSub>>,
+    source: Arc<StrykeSub>,
+    subs: HashMap<String, Arc<StrykeSub>>,
     capture: Vec<(String, StrykeValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,
@@ -332,8 +332,8 @@ pub(crate) fn run_par_pipeline(
 /// order.
 #[allow(clippy::too_many_arguments)]
 fn run_thread_par_worker(
-    sub: Arc<PerlSub>,
-    subs: HashMap<String, Arc<PerlSub>>,
+    sub: Arc<StrykeSub>,
+    subs: HashMap<String, Arc<StrykeSub>>,
     capture: Vec<(String, StrykeValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,
@@ -411,7 +411,7 @@ fn run_thread_par_worker(
 pub(crate) fn run_thread_par(
     interp: &mut VMHelper,
     source_value: StrykeValue,
-    stage_closures: Vec<Arc<PerlSub>>,
+    stage_closures: Vec<Arc<StrykeSub>>,
     _thread_last: bool,
     line: usize,
 ) -> StrykeResult<StrykeValue> {

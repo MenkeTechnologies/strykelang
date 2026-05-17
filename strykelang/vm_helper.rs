@@ -33,8 +33,8 @@ use crate::profiler::Profiler;
 use crate::scope::Scope;
 use crate::sort_fast::{detect_sort_block_fast, sort_magic_cmp};
 use crate::value::{
-    perl_list_range_expand, CaptureResult, PerlAsyncTask, PerlBarrier, PerlDataFrame,
-    PerlGenerator, PerlHeap, PerlPpool, PerlSub, PipelineInner, PipelineOp, RemoteCluster,
+    perl_list_range_expand, CaptureResult, StrykeAsyncTask, PerlBarrier, PerlDataFrame,
+    PerlGenerator, PerlHeap, PerlPpool, StrykeSub, PipelineInner, PipelineOp, RemoteCluster,
     StrykeValue,
 };
 
@@ -86,7 +86,7 @@ pub(crate) fn merge_preduce_init_partials(
     a: StrykeValue,
     b: StrykeValue,
     block: &Block,
-    subs: &HashMap<String, Arc<PerlSub>>,
+    subs: &HashMap<String, Arc<StrykeSub>>,
     scope_capture: &[(String, StrykeValue)],
 ) -> StrykeValue {
     if let (Some(m1), Some(m2)) = (a.as_hash_map(), b.as_hash_map()) {
@@ -136,7 +136,7 @@ pub(crate) fn preduce_init_fold_identity(init: &StrykeValue) -> StrykeValue {
 }
 
 pub(crate) fn fold_preduce_init_step(
-    subs: &HashMap<String, Arc<PerlSub>>,
+    subs: &HashMap<String, Arc<StrykeSub>>,
     scope_capture: &[(String, StrykeValue)],
     block: &Block,
     acc: StrykeValue,
@@ -569,7 +569,7 @@ impl IoWrite for IoSharedFileWrite {
 /// There is no Tree walking Interpreter, this is Just a Virtual Machine helper struct
 pub struct VMHelper {
     pub scope: Scope,
-    pub(crate) subs: HashMap<String, Arc<PerlSub>>,
+    pub(crate) subs: HashMap<String, Arc<StrykeSub>>,
     /// AOP advice registry — populated by `Op::RegisterAdvice` from `before|after|around` decls.
     pub(crate) intercepts: Vec<crate::aop::Intercept>,
     /// Auto-incremented for the next registered intercept id (1-based; matches zshrs).
@@ -880,7 +880,7 @@ pub struct VMHelper {
     pub(crate) log_level_override: Option<LogLevelFilter>,
     /// Stack of currently-executing subroutines for `__SUB__` (anonymous recursion).
     /// Pushed on `call_sub` entry, popped on exit.
-    pub(crate) current_sub_stack: Vec<Arc<PerlSub>>,
+    pub(crate) current_sub_stack: Vec<Arc<StrykeSub>>,
     /// Interactive debugger state (`-d` flag).
     pub debugger: Option<crate::debugger::Debugger>,
     /// Call stack for debugger: (sub_name, call_line).
@@ -1836,7 +1836,7 @@ impl VMHelper {
             let name = key.to_string();
             self.subs.insert(
                 name.clone(),
-                Arc::new(PerlSub {
+                Arc::new(StrykeSub {
                     name,
                     params: vec![],
                     body: empty.clone(),
@@ -3289,7 +3289,7 @@ impl VMHelper {
     }
 
     /// Resolve `foo` or `Foo::bar` against the subroutine stash (package-aware).
-    /// Refresh [`PerlSub::closure_env`] for `name` from [`Scope::capture`] at the current stack
+    /// Refresh [`StrykeSub::closure_env`] for `name` from [`Scope::capture`] at the current stack
     /// (top-level `sub` at runtime and [`Op::BindSubClosure`] after preceding `my`/etc.).
     pub(crate) fn rebind_sub_closure(&mut self, name: &str) {
         let key = self.qualify_sub_key(name);
@@ -3308,7 +3308,7 @@ impl VMHelper {
         self.subs.insert(key, Arc::new(new_sub));
     }
 
-    pub(crate) fn resolve_sub_by_name(&self, name: &str) -> Option<Arc<PerlSub>> {
+    pub(crate) fn resolve_sub_by_name(&self, name: &str) -> Option<Arc<StrykeSub>> {
         if let Some(s) = self.subs.get(name) {
             return Some(s.clone());
         }
@@ -3951,7 +3951,7 @@ impl VMHelper {
         }];
         self.subs.insert(
             key.clone(),
-            Arc::new(PerlSub {
+            Arc::new(StrykeSub {
                 name: key,
                 params: vec![],
                 body,
@@ -4071,7 +4071,7 @@ impl VMHelper {
                     prototype,
                 } => {
                     let key = self.qualify_sub_key(name);
-                    let mut sub = PerlSub {
+                    let mut sub = StrykeSub {
                         name: name.clone(),
                         params: params.clone(),
                         body: body.clone(),
@@ -6402,7 +6402,7 @@ impl VMHelper {
             *result2.lock() = Some(r);
         });
         *join.lock() = Some(h);
-        StrykeValue::async_task(Arc::new(PerlAsyncTask { result, join }))
+        StrykeValue::async_task(Arc::new(StrykeAsyncTask { result, join }))
     }
 
     /// `eval_timeout SECS { ... }` — run block on another thread; this thread waits (no Unix signals).
@@ -7724,7 +7724,7 @@ impl VMHelper {
                 } else {
                     Some(captured)
                 };
-                let mut sub = PerlSub {
+                let mut sub = StrykeSub {
                     name: name.clone(),
                     params: params.clone(),
                     body: body.clone(),
@@ -7858,7 +7858,7 @@ impl VMHelper {
                 for m in &def.methods {
                     if let Some(ref body) = m.body {
                         let fq = format!("{}::{}", def.name, m.name);
-                        let sub = Arc::new(PerlSub {
+                        let sub = Arc::new(StrykeSub {
                             name: fq.clone(),
                             params: m.params.clone(),
                             body: body.clone(),
@@ -9552,7 +9552,7 @@ impl VMHelper {
             }
             ExprKind::CodeRef { params, body } => {
                 let captured = self.scope.capture();
-                Ok(StrykeValue::code_ref(Arc::new(PerlSub {
+                Ok(StrykeValue::code_ref(Arc::new(StrykeSub {
                     name: "__ANON__".to_string(),
                     params: params.clone(),
                     body: body.clone(),
@@ -10814,7 +10814,7 @@ impl VMHelper {
                                 .and_then(|fq| self.subs.get(&fq))
                                 .is_some();
                             if found {
-                                return Ok(StrykeValue::code_ref(Arc::new(PerlSub {
+                                return Ok(StrykeValue::code_ref(Arc::new(StrykeSub {
                                     name: target_method,
                                     params: vec![],
                                     body: vec![],
@@ -15697,7 +15697,7 @@ impl VMHelper {
     }
 
     /// Walk C3 MRO from `start_package` and return the first `Package::AUTOLOAD` (`AUTOLOAD` in `main`).
-    pub(crate) fn resolve_autoload_sub(&self, start_package: &str) -> Option<Arc<PerlSub>> {
+    pub(crate) fn resolve_autoload_sub(&self, start_package: &str) -> Option<Arc<StrykeSub>> {
         let root = if start_package.is_empty() {
             "main"
         } else {
@@ -15824,7 +15824,7 @@ impl VMHelper {
         if let Some(sub) = self.resolve_sub_by_name(name) {
             let args = self.with_topic_default_args(args);
             // The sub's home package is the qualifier from the resolved registry key.
-            // `PerlSub.name` itself may be bare; pass an explicit override so call_sub can
+            // `StrykeSub.name` itself may be bare; pass an explicit override so call_sub can
             // switch `__PACKAGE__` for cross-package `our`/`oursync` qualification.
             let pkg = name.rsplit_once("::").map(|(p, _)| p.to_string());
             return self.call_sub_with_package(&sub, args, want, line, pkg);
@@ -17564,7 +17564,7 @@ impl VMHelper {
     }
 
     /// `sub { $_ * k }` used when a map stage is lowered to [`crate::bytecode::Op::MapIntMul`].
-    pub(crate) fn pipeline_int_mul_sub(k: i64) -> Arc<PerlSub> {
+    pub(crate) fn pipeline_int_mul_sub(k: i64) -> Arc<StrykeSub> {
         let line = 1usize;
         let body = vec![Statement {
             label: None,
@@ -17584,7 +17584,7 @@ impl VMHelper {
             }),
             line,
         }];
-        Arc::new(PerlSub {
+        Arc::new(StrykeSub {
             name: "__pipeline_int_mul__".into(),
             params: vec![],
             body,
@@ -17594,9 +17594,9 @@ impl VMHelper {
         })
     }
 
-    pub(crate) fn anon_coderef_from_block(&mut self, block: &Block) -> Arc<PerlSub> {
+    pub(crate) fn anon_coderef_from_block(&mut self, block: &Block) -> Arc<StrykeSub> {
         let captured = self.scope.capture();
-        Arc::new(PerlSub {
+        Arc::new(StrykeSub {
             name: "__ANON__".into(),
             params: vec![],
             body: block.clone(),
@@ -17657,7 +17657,7 @@ impl VMHelper {
         args: &[StrykeValue],
         line: usize,
         name: &str,
-    ) -> StrykeResult<(Arc<PerlSub>, bool)> {
+    ) -> StrykeResult<(Arc<StrykeSub>, bool)> {
         if args.is_empty() {
             return Err(StrykeError::runtime(
                 format!("pipeline {}: expects at least 1 argument (code ref)", name),
@@ -17939,7 +17939,7 @@ impl VMHelper {
     fn pipeline_parallel_map(
         &mut self,
         items: Vec<StrykeValue>,
-        sub: &Arc<PerlSub>,
+        sub: &Arc<StrykeSub>,
         progress: bool,
     ) -> Vec<StrykeValue> {
         let subs = self.subs.clone();
@@ -17974,7 +17974,7 @@ impl VMHelper {
     fn pipeline_par_stream_filter(
         &mut self,
         items: Vec<StrykeValue>,
-        sub: &Arc<PerlSub>,
+        sub: &Arc<StrykeSub>,
     ) -> Vec<StrykeValue> {
         if items.is_empty() {
             return items;
@@ -18014,7 +18014,7 @@ impl VMHelper {
     fn pipeline_par_stream_map(
         &mut self,
         items: Vec<StrykeValue>,
-        sub: &Arc<PerlSub>,
+        sub: &Arc<StrykeSub>,
     ) -> Vec<StrykeValue> {
         if items.is_empty() {
             return items;
@@ -18780,7 +18780,7 @@ impl VMHelper {
         Ok(StrykeValue::array(results))
     }
 
-    fn heap_compare(&mut self, cmp: &Arc<PerlSub>, a: &StrykeValue, b: &StrykeValue) -> Ordering {
+    fn heap_compare(&mut self, cmp: &Arc<StrykeSub>, a: &StrykeValue, b: &StrykeValue) -> Ordering {
         self.scope_push_hook();
         if let Some(ref env) = cmp.closure_env {
             self.scope.restore_capture(env);
@@ -18803,7 +18803,7 @@ impl VMHelper {
         ord
     }
 
-    fn heap_sift_up(&mut self, items: &mut [StrykeValue], cmp: &Arc<PerlSub>, mut i: usize) {
+    fn heap_sift_up(&mut self, items: &mut [StrykeValue], cmp: &Arc<StrykeSub>, mut i: usize) {
         while i > 0 {
             let p = (i - 1) / 2;
             if self.heap_compare(cmp, &items[i], &items[p]) != Ordering::Less {
@@ -18814,7 +18814,7 @@ impl VMHelper {
         }
     }
 
-    fn heap_sift_down(&mut self, items: &mut [StrykeValue], cmp: &Arc<PerlSub>, mut i: usize) {
+    fn heap_sift_down(&mut self, items: &mut [StrykeValue], cmp: &Arc<StrykeSub>, mut i: usize) {
         let n = items.len();
         loop {
             let mut sm = i;
@@ -18854,7 +18854,7 @@ impl VMHelper {
     /// Bind stryke `sub name ($a, { k => $v })` parameters from `@_` before the body runs.
     pub(crate) fn apply_sub_signature(
         &mut self,
-        sub: &PerlSub,
+        sub: &StrykeSub,
         argv: &[StrykeValue],
         line: usize,
     ) -> StrykeResult<()> {
@@ -19000,10 +19000,10 @@ impl VMHelper {
 
     /// Dispatch higher-order function wrappers (`comp`, `partial`, `constantly`,
     /// `complement`, `fnil`, `juxt`, `memoize`, `curry`, `once`).
-    /// These are `PerlSub`s with empty bodies and magic keys in `closure_env`.
+    /// These are `StrykeSub`s with empty bodies and magic keys in `closure_env`.
     pub(crate) fn try_hof_dispatch(
         &mut self,
-        sub: &PerlSub,
+        sub: &StrykeSub,
         args: &[StrykeValue],
         want: WantarrayCtx,
         line: usize,
@@ -19106,7 +19106,7 @@ impl VMHelper {
                 if all.len() >= arity {
                     Some(self.dispatch_indirect_call(fn_val, all, want, line))
                 } else {
-                    let curry_sub = PerlSub {
+                    let curry_sub = StrykeSub {
                         name: "__curry__".to_string(),
                         params: vec![],
                         body: vec![],
@@ -19152,7 +19152,7 @@ impl VMHelper {
 
     pub(crate) fn call_sub(
         &mut self,
-        sub: &PerlSub,
+        sub: &StrykeSub,
         args: Vec<StrykeValue>,
         want: WantarrayCtx,
         line: usize,
@@ -19165,10 +19165,10 @@ impl VMHelper {
 
     /// Internal helper: like [`Self::call_sub`] but takes an explicit home-package override
     /// (used by [`Self::call_named_sub`], which knows the qualified registry key even when
-    /// the cached `PerlSub.name` is bare).
+    /// the cached `StrykeSub.name` is bare).
     fn call_sub_with_package(
         &mut self,
-        sub: &PerlSub,
+        sub: &StrykeSub,
         args: Vec<StrykeValue>,
         want: WantarrayCtx,
         _line: usize,
@@ -19388,7 +19388,7 @@ impl VMHelper {
         }
     }
 
-    /// Apply SubSigParam bindings without the full PerlSub machinery.
+    /// Apply SubSigParam bindings without the full StrykeSub machinery.
     fn apply_params_to_argv(
         &mut self,
         params: &[SubSigParam],
@@ -21000,8 +21000,8 @@ fn both_non_numeric_strings_iv(a: &StrykeValue, b: &StrykeValue) -> bool {
 
 fn par_walk_invoke_entry(
     path: &Path,
-    sub: &Arc<PerlSub>,
-    subs: &HashMap<String, Arc<PerlSub>>,
+    sub: &Arc<StrykeSub>,
+    subs: &HashMap<String, Arc<StrykeSub>>,
     scope_capture: &[(String, StrykeValue)],
     atomic_arrays: &[(String, crate::scope::AtomicArray)],
     atomic_hashes: &[(String, crate::scope::AtomicHash)],
@@ -21022,8 +21022,8 @@ fn par_walk_invoke_entry(
 
 fn par_walk_recursive(
     path: &Path,
-    sub: &Arc<PerlSub>,
-    subs: &HashMap<String, Arc<PerlSub>>,
+    sub: &Arc<StrykeSub>,
+    subs: &HashMap<String, Arc<StrykeSub>>,
     scope_capture: &[(String, StrykeValue)],
     atomic_arrays: &[(String, crate::scope::AtomicArray)],
     atomic_hashes: &[(String, crate::scope::AtomicHash)],

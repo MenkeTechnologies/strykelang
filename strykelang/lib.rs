@@ -520,7 +520,7 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut VMHelper) -> StrykeRe
         for m in &def.methods {
             if let Some(ref body) = m.body {
                 let fq = format!("{}::{}", def.name, m.name);
-                let sub = std::sync::Arc::new(crate::value::PerlSub {
+                let sub = std::sync::Arc::new(crate::value::StrykeSub {
                     name: fq.clone(),
                     params: m.params.clone(),
                     body: body.clone(),
@@ -623,7 +623,7 @@ pub fn compile_and_run_prelude(program: &ast::Program, interp: &mut VMHelper) ->
         for m in &def.methods {
             if let Some(ref body) = m.body {
                 let fq = format!("{}::{}", def.name, m.name);
-                let sub = std::sync::Arc::new(crate::value::PerlSub {
+                let sub = std::sync::Arc::new(crate::value::StrykeSub {
                     name: fq.clone(),
                     params: m.params.clone(),
                     body: body.clone(),

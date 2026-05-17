@@ -7,7 +7,7 @@
 //! - `return f($p - a) + f($p - b);` with integer `a`, `b` and matching [`FuncCall`] names.
 
 use crate::ast::{BinOp, Block, Expr, ExprKind, Sigil, StmtKind};
-use crate::value::{FibLikeRecAddPattern, PerlSub};
+use crate::value::{FibLikeRecAddPattern, StrykeSub};
 
 fn is_shift_argv(expr: &Expr) -> bool {
     matches!(
@@ -149,7 +149,7 @@ fn arg_as_param_minus(expr: &Expr, param: &str) -> Option<i64> {
 
 fn find_recursive_add_return<'a>(
     body: &'a Block,
-    sub: &PerlSub,
+    sub: &StrykeSub,
     param: &str,
 ) -> Option<(&'a Expr, i64, i64)> {
     for stmt in body {
@@ -193,7 +193,7 @@ fn find_base_k(body: &Block, param: &str) -> Option<i64> {
 }
 
 /// When the subroutine body matches a fib-like recursive add, return the pattern.
-pub(crate) fn detect_fib_like_recursive_add(sub: &PerlSub) -> Option<FibLikeRecAddPattern> {
+pub(crate) fn detect_fib_like_recursive_add(sub: &StrykeSub) -> Option<FibLikeRecAddPattern> {
     if sub.closure_env.is_some() || !sub.params.is_empty() {
         return None;
     }
@@ -264,7 +264,7 @@ mod tests {
             None
         });
         let body = sub_stmt.expect("fn fib_n");
-        let ps = PerlSub {
+        let ps = StrykeSub {
             name: "fib_n".into(),
             params: vec![],
             body,

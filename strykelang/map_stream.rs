@@ -1,4 +1,4 @@
-//! Streaming `maps` / `flat_maps` / `filter` — lazy [`PerlIterator`] output (stryke extension).
+//! Streaming `maps` / `flat_maps` / `filter` — lazy [`StrykeIterator`] output (stryke extension).
 
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -8,7 +8,7 @@ use parking_lot::Mutex;
 use crate::ast::Expr;
 use crate::error::{StrykeError, StrykeResult};
 use crate::scope::{AtomicArray, AtomicHash};
-use crate::value::{PerlIterator, PerlSub, PipelineOp, StrykeValue};
+use crate::value::{StrykeIterator, StrykeSub, PipelineOp, StrykeValue};
 use crate::vm_helper::{FlowOrError, VMHelper, WantarrayCtx};
 
 struct VecPullIter {
@@ -25,7 +25,7 @@ impl VecPullIter {
     }
 }
 
-impl PerlIterator for VecPullIter {
+impl StrykeIterator for VecPullIter {
     fn next_item(&self) -> Option<StrykeValue> {
         let mut i = self.i.lock();
         if *i < self.items.len() {
@@ -38,7 +38,7 @@ impl PerlIterator for VecPullIter {
     }
 }
 
-pub(crate) fn into_pull_iter(val: StrykeValue) -> Arc<dyn PerlIterator> {
+pub(crate) fn into_pull_iter(val: StrykeValue) -> Arc<dyn StrykeIterator> {
     if val.is_iterator() {
         val.into_iterator()
     } else {
@@ -47,12 +47,12 @@ pub(crate) fn into_pull_iter(val: StrykeValue) -> Arc<dyn PerlIterator> {
 }
 
 enum MapStreamMode {
-    Block(Arc<PerlSub>),
+    Block(Arc<StrykeSub>),
     Expr(Arc<Expr>),
 }
 
 pub(crate) struct MapStreamIterator {
-    source: Arc<dyn PerlIterator>,
+    source: Arc<dyn StrykeIterator>,
     pending: Mutex<VecDeque<StrykeValue>>,
     mode: MapStreamMode,
     interp: Mutex<VMHelper>,
@@ -64,9 +64,9 @@ pub(crate) struct MapStreamIterator {
 
 impl MapStreamIterator {
     pub(crate) fn new_block(
-        source: Arc<dyn PerlIterator>,
-        sub: Arc<PerlSub>,
-        subs: std::collections::HashMap<String, Arc<PerlSub>>,
+        source: Arc<dyn StrykeIterator>,
+        sub: Arc<StrykeSub>,
+        subs: std::collections::HashMap<String, Arc<StrykeSub>>,
         capture: Vec<(String, StrykeValue)>,
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
@@ -89,9 +89,9 @@ impl MapStreamIterator {
     }
 
     pub(crate) fn new_expr(
-        source: Arc<dyn PerlIterator>,
+        source: Arc<dyn StrykeIterator>,
         expr: Arc<Expr>,
-        subs: std::collections::HashMap<String, Arc<PerlSub>>,
+        subs: std::collections::HashMap<String, Arc<StrykeSub>>,
         capture: Vec<(String, StrykeValue)>,
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
@@ -188,7 +188,7 @@ impl MapStreamIterator {
     }
 }
 
-impl PerlIterator for MapStreamIterator {
+impl StrykeIterator for MapStreamIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         loop {
             {
@@ -207,12 +207,12 @@ impl PerlIterator for MapStreamIterator {
 }
 
 enum FilterStreamMode {
-    Block(Arc<PerlSub>),
+    Block(Arc<StrykeSub>),
     Expr(Arc<Expr>),
 }
 
 pub(crate) struct FilterStreamIterator {
-    source: Arc<dyn PerlIterator>,
+    source: Arc<dyn StrykeIterator>,
     mode: FilterStreamMode,
     interp: Mutex<VMHelper>,
     _capture: Vec<(String, StrykeValue)>,
@@ -222,9 +222,9 @@ pub(crate) struct FilterStreamIterator {
 
 impl FilterStreamIterator {
     fn new_block(
-        source: Arc<dyn PerlIterator>,
-        sub: Arc<PerlSub>,
-        subs: std::collections::HashMap<String, Arc<PerlSub>>,
+        source: Arc<dyn StrykeIterator>,
+        sub: Arc<StrykeSub>,
+        subs: std::collections::HashMap<String, Arc<StrykeSub>>,
         capture: Vec<(String, StrykeValue)>,
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
@@ -244,9 +244,9 @@ impl FilterStreamIterator {
     }
 
     fn new_expr(
-        source: Arc<dyn PerlIterator>,
+        source: Arc<dyn StrykeIterator>,
         expr: Arc<Expr>,
-        subs: std::collections::HashMap<String, Arc<PerlSub>>,
+        subs: std::collections::HashMap<String, Arc<StrykeSub>>,
         capture: Vec<(String, StrykeValue)>,
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
@@ -266,7 +266,7 @@ impl FilterStreamIterator {
     }
 }
 
-impl PerlIterator for FilterStreamIterator {
+impl StrykeIterator for FilterStreamIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         while let Some(item) = self.source.next_item() {
             let mut interp = self.interp.lock();
@@ -487,12 +487,12 @@ impl VMHelper {
 
 /// Streaming `take N` — yields up to N items from the source.
 pub(crate) struct TakeIterator {
-    source: Arc<dyn PerlIterator>,
+    source: Arc<dyn StrykeIterator>,
     remaining: Mutex<usize>,
 }
 
 impl TakeIterator {
-    pub(crate) fn new(source: Arc<dyn PerlIterator>, n: usize) -> Self {
+    pub(crate) fn new(source: Arc<dyn StrykeIterator>, n: usize) -> Self {
         Self {
             source,
             remaining: Mutex::new(n),
@@ -500,7 +500,7 @@ impl TakeIterator {
     }
 }
 
-impl PerlIterator for TakeIterator {
+impl StrykeIterator for TakeIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         let mut rem = self.remaining.lock();
         if *rem == 0 {
@@ -517,12 +517,12 @@ impl PerlIterator for TakeIterator {
 
 /// Streaming `skip N` — drops N items then yields the rest.
 pub(crate) struct SkipIterator {
-    source: Arc<dyn PerlIterator>,
+    source: Arc<dyn StrykeIterator>,
     to_skip: Mutex<usize>,
 }
 
 impl SkipIterator {
-    pub(crate) fn new(source: Arc<dyn PerlIterator>, n: usize) -> Self {
+    pub(crate) fn new(source: Arc<dyn StrykeIterator>, n: usize) -> Self {
         Self {
             source,
             to_skip: Mutex::new(n),
@@ -530,7 +530,7 @@ impl SkipIterator {
     }
 }
 
-impl PerlIterator for SkipIterator {
+impl StrykeIterator for SkipIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         {
             let mut skip = self.to_skip.lock();
@@ -545,12 +545,12 @@ impl PerlIterator for SkipIterator {
 
 /// Streaming `enumerate` — yields `[$index, $item]` pairs.
 pub(crate) struct EnumerateIterator {
-    source: Arc<dyn PerlIterator>,
+    source: Arc<dyn StrykeIterator>,
     idx: Mutex<usize>,
 }
 
 impl EnumerateIterator {
-    pub(crate) fn new(source: Arc<dyn PerlIterator>) -> Self {
+    pub(crate) fn new(source: Arc<dyn StrykeIterator>) -> Self {
         Self {
             source,
             idx: Mutex::new(0),
@@ -558,7 +558,7 @@ impl EnumerateIterator {
     }
 }
 
-impl PerlIterator for EnumerateIterator {
+impl StrykeIterator for EnumerateIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         let item = self.source.next_item()?;
         let mut i = self.idx.lock();
@@ -572,12 +572,12 @@ impl PerlIterator for EnumerateIterator {
 
 /// Streaming `chunk N` — yields N-element arrayrefs.
 pub(crate) struct ChunkIterator {
-    source: Arc<dyn PerlIterator>,
+    source: Arc<dyn StrykeIterator>,
     size: usize,
 }
 
 impl ChunkIterator {
-    pub(crate) fn new(source: Arc<dyn PerlIterator>, size: usize) -> Self {
+    pub(crate) fn new(source: Arc<dyn StrykeIterator>, size: usize) -> Self {
         Self {
             source,
             size: size.max(1),
@@ -585,7 +585,7 @@ impl ChunkIterator {
     }
 }
 
-impl PerlIterator for ChunkIterator {
+impl StrykeIterator for ChunkIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         let mut chunk = Vec::with_capacity(self.size);
         for _ in 0..self.size {
@@ -606,12 +606,12 @@ impl PerlIterator for ChunkIterator {
 
 /// Streaming `dedup` — drops consecutive duplicates.
 pub(crate) struct DedupIterator {
-    source: Arc<dyn PerlIterator>,
+    source: Arc<dyn StrykeIterator>,
     last: Mutex<Option<String>>,
 }
 
 impl DedupIterator {
-    pub(crate) fn new(source: Arc<dyn PerlIterator>) -> Self {
+    pub(crate) fn new(source: Arc<dyn StrykeIterator>) -> Self {
         Self {
             source,
             last: Mutex::new(None),
@@ -619,7 +619,7 @@ impl DedupIterator {
     }
 }
 
-impl PerlIterator for DedupIterator {
+impl StrykeIterator for DedupIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         loop {
             let item = self.source.next_item()?;
@@ -660,7 +660,7 @@ impl RangeIterator {
     }
 }
 
-impl PerlIterator for RangeIterator {
+impl StrykeIterator for RangeIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         let mut cur = self.current.lock();
         if (self.step > 0 && *cur > self.end) || (self.step < 0 && *cur < self.end) {
@@ -675,8 +675,8 @@ impl PerlIterator for RangeIterator {
 /// Streaming `take_while { BLOCK }` — yields items while predicate is true.
 #[allow(dead_code)]
 pub(crate) struct TakeWhileIterator {
-    source: Arc<dyn PerlIterator>,
-    sub: Arc<PerlSub>,
+    source: Arc<dyn StrykeIterator>,
+    sub: Arc<StrykeSub>,
     interp: Mutex<VMHelper>,
     capture: Vec<(String, StrykeValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
@@ -687,9 +687,9 @@ pub(crate) struct TakeWhileIterator {
 impl TakeWhileIterator {
     #[allow(dead_code)]
     pub(crate) fn new(
-        source: Arc<dyn PerlIterator>,
-        sub: Arc<PerlSub>,
-        subs: std::collections::HashMap<String, Arc<PerlSub>>,
+        source: Arc<dyn StrykeIterator>,
+        sub: Arc<StrykeSub>,
+        subs: std::collections::HashMap<String, Arc<StrykeSub>>,
         capture: Vec<(String, StrykeValue)>,
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
@@ -710,7 +710,7 @@ impl TakeWhileIterator {
     }
 }
 
-impl PerlIterator for TakeWhileIterator {
+impl StrykeIterator for TakeWhileIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         if *self.done.lock() {
             return None;
@@ -734,8 +734,8 @@ impl PerlIterator for TakeWhileIterator {
 /// Streaming `skip_while { BLOCK }` — drops items while predicate is true, then yields the rest.
 #[allow(dead_code)]
 pub(crate) struct SkipWhileIterator {
-    source: Arc<dyn PerlIterator>,
-    sub: Arc<PerlSub>,
+    source: Arc<dyn StrykeIterator>,
+    sub: Arc<StrykeSub>,
     interp: Mutex<VMHelper>,
     capture: Vec<(String, StrykeValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
@@ -746,9 +746,9 @@ pub(crate) struct SkipWhileIterator {
 impl SkipWhileIterator {
     #[allow(dead_code)]
     pub(crate) fn new(
-        source: Arc<dyn PerlIterator>,
-        sub: Arc<PerlSub>,
-        subs: std::collections::HashMap<String, Arc<PerlSub>>,
+        source: Arc<dyn StrykeIterator>,
+        sub: Arc<StrykeSub>,
+        subs: std::collections::HashMap<String, Arc<StrykeSub>>,
         capture: Vec<(String, StrykeValue)>,
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
@@ -769,7 +769,7 @@ impl SkipWhileIterator {
     }
 }
 
-impl PerlIterator for SkipWhileIterator {
+impl StrykeIterator for SkipWhileIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         loop {
             let item = self.source.next_item()?;
@@ -792,8 +792,8 @@ impl PerlIterator for SkipWhileIterator {
 
 /// Streaming `tap { BLOCK }` / `peek { BLOCK }` — execute side effect, pass through unchanged.
 pub(crate) struct TapIterator {
-    source: Arc<dyn PerlIterator>,
-    sub: Arc<PerlSub>,
+    source: Arc<dyn StrykeIterator>,
+    sub: Arc<StrykeSub>,
     interp: Mutex<VMHelper>,
     _capture: Vec<(String, StrykeValue)>,
     _atomic_arrays: Vec<(String, AtomicArray)>,
@@ -802,9 +802,9 @@ pub(crate) struct TapIterator {
 
 impl TapIterator {
     pub(crate) fn new(
-        source: Arc<dyn PerlIterator>,
-        sub: Arc<PerlSub>,
-        subs: std::collections::HashMap<String, Arc<PerlSub>>,
+        source: Arc<dyn StrykeIterator>,
+        sub: Arc<StrykeSub>,
+        subs: std::collections::HashMap<String, Arc<StrykeSub>>,
         capture: Vec<(String, StrykeValue)>,
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
@@ -824,7 +824,7 @@ impl TapIterator {
     }
 }
 
-impl PerlIterator for TapIterator {
+impl StrykeIterator for TapIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         let item = self.source.next_item()?;
         let mut interp = self.interp.lock();
@@ -836,12 +836,12 @@ impl PerlIterator for TapIterator {
 
 /// Streaming `tee FILE` — write each item to file while passing through.
 pub(crate) struct TeeIterator {
-    source: Arc<dyn PerlIterator>,
+    source: Arc<dyn StrykeIterator>,
     file: Mutex<std::io::BufWriter<std::fs::File>>,
 }
 
 impl TeeIterator {
-    pub(crate) fn new(source: Arc<dyn PerlIterator>, path: &str) -> std::io::Result<Self> {
+    pub(crate) fn new(source: Arc<dyn StrykeIterator>, path: &str) -> std::io::Result<Self> {
         let file = std::fs::File::create(path)?;
         Ok(Self {
             source,
@@ -850,7 +850,7 @@ impl TeeIterator {
     }
 }
 
-impl PerlIterator for TeeIterator {
+impl StrykeIterator for TeeIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         use std::io::Write;
         let item = self.source.next_item()?;
@@ -864,17 +864,17 @@ impl PerlIterator for TeeIterator {
 
 /// Streaming `grep_v PATTERN` — inverse filter (rejects matching items).
 pub(crate) struct GrepVIterator {
-    source: Arc<dyn PerlIterator>,
+    source: Arc<dyn StrykeIterator>,
     re: regex::Regex,
 }
 
 impl GrepVIterator {
-    pub(crate) fn new(source: Arc<dyn PerlIterator>, re: regex::Regex) -> Self {
+    pub(crate) fn new(source: Arc<dyn StrykeIterator>, re: regex::Regex) -> Self {
         Self { source, re }
     }
 }
 
-impl PerlIterator for GrepVIterator {
+impl StrykeIterator for GrepVIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         while let Some(item) = self.source.next_item() {
             if !self.re.is_match(&item.to_string()) {
@@ -887,16 +887,16 @@ impl PerlIterator for GrepVIterator {
 
 /// Streaming `trim` — trims whitespace from each string item.
 pub(crate) struct TrimIterator {
-    source: Arc<dyn PerlIterator>,
+    source: Arc<dyn StrykeIterator>,
 }
 
 impl TrimIterator {
-    pub(crate) fn new(source: Arc<dyn PerlIterator>) -> Self {
+    pub(crate) fn new(source: Arc<dyn StrykeIterator>) -> Self {
         Self { source }
     }
 }
 
-impl PerlIterator for TrimIterator {
+impl StrykeIterator for TrimIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         self.source
             .next_item()
@@ -906,17 +906,17 @@ impl PerlIterator for TrimIterator {
 
 /// Streaming `pluck KEY` — extracts a key from each hash ref.
 pub(crate) struct PluckIterator {
-    source: Arc<dyn PerlIterator>,
+    source: Arc<dyn StrykeIterator>,
     key: String,
 }
 
 impl PluckIterator {
-    pub(crate) fn new(source: Arc<dyn PerlIterator>, key: String) -> Self {
+    pub(crate) fn new(source: Arc<dyn StrykeIterator>, key: String) -> Self {
         Self { source, key }
     }
 }
 
-impl PerlIterator for PluckIterator {
+impl StrykeIterator for PluckIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         self.source.next_item().map(|v| {
             if let Some(hr) = v.as_hash_ref() {
@@ -950,7 +950,7 @@ impl LinesIterator {
     }
 }
 
-impl PerlIterator for LinesIterator {
+impl StrykeIterator for LinesIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         let mut i = self.idx.lock();
         if *i < self.lines.len() {
@@ -982,7 +982,7 @@ impl WordsIterator {
     }
 }
 
-impl PerlIterator for WordsIterator {
+impl StrykeIterator for WordsIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         let mut i = self.idx.lock();
         if *i < self.words.len() {
@@ -1014,7 +1014,7 @@ impl CharsIterator {
     }
 }
 
-impl PerlIterator for CharsIterator {
+impl StrykeIterator for CharsIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         let mut i = self.idx.lock();
         if *i < self.chars.len() {
@@ -1029,16 +1029,16 @@ impl PerlIterator for CharsIterator {
 
 /// Streaming `compact` — filters out undef and empty string values.
 pub(crate) struct CompactIterator {
-    source: Arc<dyn PerlIterator>,
+    source: Arc<dyn StrykeIterator>,
 }
 
 impl CompactIterator {
-    pub(crate) fn new(source: Arc<dyn PerlIterator>) -> Self {
+    pub(crate) fn new(source: Arc<dyn StrykeIterator>) -> Self {
         Self { source }
     }
 }
 
-impl PerlIterator for CompactIterator {
+impl StrykeIterator for CompactIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         while let Some(item) = self.source.next_item() {
             if !item.is_undef() && !item.to_string().is_empty() {
@@ -1052,8 +1052,8 @@ impl PerlIterator for CompactIterator {
 /// Streaming `reject { BLOCK }` — inverse of filter (keeps items where block returns false).
 #[allow(dead_code)]
 pub(crate) struct RejectIterator {
-    source: Arc<dyn PerlIterator>,
-    sub: Arc<PerlSub>,
+    source: Arc<dyn StrykeIterator>,
+    sub: Arc<StrykeSub>,
     interp: Mutex<VMHelper>,
     capture: Vec<(String, StrykeValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
@@ -1063,9 +1063,9 @@ pub(crate) struct RejectIterator {
 impl RejectIterator {
     #[allow(dead_code)]
     pub(crate) fn new(
-        source: Arc<dyn PerlIterator>,
-        sub: Arc<PerlSub>,
-        subs: std::collections::HashMap<String, Arc<PerlSub>>,
+        source: Arc<dyn StrykeIterator>,
+        sub: Arc<StrykeSub>,
+        subs: std::collections::HashMap<String, Arc<StrykeSub>>,
         capture: Vec<(String, StrykeValue)>,
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
@@ -1085,7 +1085,7 @@ impl RejectIterator {
     }
 }
 
-impl PerlIterator for RejectIterator {
+impl StrykeIterator for RejectIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         while let Some(item) = self.source.next_item() {
             let mut interp = self.interp.lock();
@@ -1103,12 +1103,12 @@ impl PerlIterator for RejectIterator {
 
 /// Streaming `concat` / `chain` — concatenates multiple iterators.
 pub(crate) struct ConcatIterator {
-    sources: Vec<Arc<dyn PerlIterator>>,
+    sources: Vec<Arc<dyn StrykeIterator>>,
     current_idx: Mutex<usize>,
 }
 
 impl ConcatIterator {
-    pub(crate) fn new(sources: Vec<Arc<dyn PerlIterator>>) -> Self {
+    pub(crate) fn new(sources: Vec<Arc<dyn StrykeIterator>>) -> Self {
         Self {
             sources,
             current_idx: Mutex::new(0),
@@ -1116,7 +1116,7 @@ impl ConcatIterator {
     }
 }
 
-impl PerlIterator for ConcatIterator {
+impl StrykeIterator for ConcatIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         loop {
             let idx = *self.current_idx.lock();
@@ -1144,7 +1144,7 @@ impl StdinIterator {
     }
 }
 
-impl PerlIterator for StdinIterator {
+impl StrykeIterator for StdinIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         use std::io::BufRead;
         let mut reader = self.reader.lock();
@@ -1170,7 +1170,7 @@ pub(crate) struct MapFnIterator<F>
 where
     F: Fn(String) -> String + Send + Sync,
 {
-    source: Arc<dyn PerlIterator>,
+    source: Arc<dyn StrykeIterator>,
     f: F,
 }
 
@@ -1178,12 +1178,12 @@ impl<F> MapFnIterator<F>
 where
     F: Fn(String) -> String + Send + Sync,
 {
-    pub(crate) fn new(source: Arc<dyn PerlIterator>, f: F) -> Self {
+    pub(crate) fn new(source: Arc<dyn StrykeIterator>, f: F) -> Self {
         Self { source, f }
     }
 }
 
-impl<F> PerlIterator for MapFnIterator<F>
+impl<F> StrykeIterator for MapFnIterator<F>
 where
     F: Fn(String) -> String + Send + Sync,
 {
@@ -1196,12 +1196,12 @@ where
 
 /// Streaming `lines` over an iterator — flat-maps each element's lines.
 pub(crate) struct LinesFlatMapIterator {
-    source: Arc<dyn PerlIterator>,
+    source: Arc<dyn StrykeIterator>,
     pending: Mutex<VecDeque<StrykeValue>>,
 }
 
 impl LinesFlatMapIterator {
-    pub(crate) fn new(source: Arc<dyn PerlIterator>) -> Self {
+    pub(crate) fn new(source: Arc<dyn StrykeIterator>) -> Self {
         Self {
             source,
             pending: Mutex::new(VecDeque::new()),
@@ -1209,7 +1209,7 @@ impl LinesFlatMapIterator {
     }
 }
 
-impl PerlIterator for LinesFlatMapIterator {
+impl StrykeIterator for LinesFlatMapIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         loop {
             {
@@ -1233,12 +1233,12 @@ impl PerlIterator for LinesFlatMapIterator {
 
 /// Streaming `words` over an iterator — flat-maps each element's words.
 pub(crate) struct WordsFlatMapIterator {
-    source: Arc<dyn PerlIterator>,
+    source: Arc<dyn StrykeIterator>,
     pending: Mutex<VecDeque<StrykeValue>>,
 }
 
 impl WordsFlatMapIterator {
-    pub(crate) fn new(source: Arc<dyn PerlIterator>) -> Self {
+    pub(crate) fn new(source: Arc<dyn StrykeIterator>) -> Self {
         Self {
             source,
             pending: Mutex::new(VecDeque::new()),
@@ -1246,7 +1246,7 @@ impl WordsFlatMapIterator {
     }
 }
 
-impl PerlIterator for WordsFlatMapIterator {
+impl StrykeIterator for WordsFlatMapIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         loop {
             {
@@ -1270,12 +1270,12 @@ impl PerlIterator for WordsFlatMapIterator {
 
 /// Streaming `chars` over an iterator — flat-maps each element's characters.
 pub(crate) struct CharsFlatMapIterator {
-    source: Arc<dyn PerlIterator>,
+    source: Arc<dyn StrykeIterator>,
     pending: Mutex<VecDeque<StrykeValue>>,
 }
 
 impl CharsFlatMapIterator {
-    pub(crate) fn new(source: Arc<dyn PerlIterator>) -> Self {
+    pub(crate) fn new(source: Arc<dyn StrykeIterator>) -> Self {
         Self {
             source,
             pending: Mutex::new(VecDeque::new()),
@@ -1283,7 +1283,7 @@ impl CharsFlatMapIterator {
     }
 }
 
-impl PerlIterator for CharsFlatMapIterator {
+impl StrykeIterator for CharsFlatMapIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         loop {
             {
@@ -1307,7 +1307,7 @@ impl PerlIterator for CharsFlatMapIterator {
 
 /// Streaming `|> s/pat/rep/flags` — applies substitution to each iterator element.
 pub(crate) struct SubstStreamIterator {
-    source: Arc<dyn PerlIterator>,
+    source: Arc<dyn StrykeIterator>,
     re: Arc<crate::perl_regex::PerlCompiledRegex>,
     replacement: String,
     global: bool,
@@ -1315,7 +1315,7 @@ pub(crate) struct SubstStreamIterator {
 
 impl SubstStreamIterator {
     pub(crate) fn new(
-        source: Arc<dyn PerlIterator>,
+        source: Arc<dyn StrykeIterator>,
         re: Arc<crate::perl_regex::PerlCompiledRegex>,
         replacement: String,
         global: bool,
@@ -1329,7 +1329,7 @@ impl SubstStreamIterator {
     }
 }
 
-impl PerlIterator for SubstStreamIterator {
+impl StrykeIterator for SubstStreamIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         self.source.next_item().map(|v| {
             let s = v.to_string();
@@ -1345,7 +1345,7 @@ impl PerlIterator for SubstStreamIterator {
 
 /// Streaming `|> tr/from/to/flags` — applies transliteration to each iterator element.
 pub(crate) struct TransliterateStreamIterator {
-    source: Arc<dyn PerlIterator>,
+    source: Arc<dyn StrykeIterator>,
     from_chars: Vec<char>,
     to_chars: Vec<char>,
     complement: bool,
@@ -1354,7 +1354,7 @@ pub(crate) struct TransliterateStreamIterator {
 }
 
 impl TransliterateStreamIterator {
-    pub(crate) fn new(source: Arc<dyn PerlIterator>, from: &str, to: &str, flags: &str) -> Self {
+    pub(crate) fn new(source: Arc<dyn StrykeIterator>, from: &str, to: &str, flags: &str) -> Self {
         let from_chars = VMHelper::tr_expand_ranges(from);
         let to_chars = VMHelper::tr_expand_ranges(to);
         Self {
@@ -1368,7 +1368,7 @@ impl TransliterateStreamIterator {
     }
 }
 
-impl PerlIterator for TransliterateStreamIterator {
+impl StrykeIterator for TransliterateStreamIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         self.source.next_item().map(|v| {
             let s = v.to_string();
@@ -1429,20 +1429,20 @@ pub(crate) fn transliterate_string(
 
 /// Streaming `|> /re/` (non-global) — maps each element to its first match/captures.
 pub(crate) struct MatchStreamIterator {
-    source: Arc<dyn PerlIterator>,
+    source: Arc<dyn StrykeIterator>,
     re: Arc<crate::perl_regex::PerlCompiledRegex>,
 }
 
 impl MatchStreamIterator {
     pub(crate) fn new(
-        source: Arc<dyn PerlIterator>,
+        source: Arc<dyn StrykeIterator>,
         re: Arc<crate::perl_regex::PerlCompiledRegex>,
     ) -> Self {
         Self { source, re }
     }
 }
 
-impl PerlIterator for MatchStreamIterator {
+impl StrykeIterator for MatchStreamIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         self.source.next_item().map(|v| {
             let s = v.to_string();
@@ -1470,14 +1470,14 @@ impl PerlIterator for MatchStreamIterator {
 
 /// Streaming `|> /re/g` (global) — flat_maps each element to all matches.
 pub(crate) struct MatchGlobalStreamIterator {
-    source: Arc<dyn PerlIterator>,
+    source: Arc<dyn StrykeIterator>,
     re: Arc<crate::perl_regex::PerlCompiledRegex>,
     pending: Mutex<VecDeque<StrykeValue>>,
 }
 
 impl MatchGlobalStreamIterator {
     pub(crate) fn new(
-        source: Arc<dyn PerlIterator>,
+        source: Arc<dyn StrykeIterator>,
         re: Arc<crate::perl_regex::PerlCompiledRegex>,
     ) -> Self {
         Self {
@@ -1488,7 +1488,7 @@ impl MatchGlobalStreamIterator {
     }
 }
 
-impl PerlIterator for MatchGlobalStreamIterator {
+impl StrykeIterator for MatchGlobalStreamIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         loop {
             {
@@ -1538,9 +1538,9 @@ pub(crate) struct PMapStreamIterator {
 
 impl PMapStreamIterator {
     pub(crate) fn new(
-        source: Arc<dyn PerlIterator>,
-        sub: Arc<PerlSub>,
-        subs: std::collections::HashMap<String, Arc<PerlSub>>,
+        source: Arc<dyn StrykeIterator>,
+        sub: Arc<StrykeSub>,
+        subs: std::collections::HashMap<String, Arc<StrykeSub>>,
         capture: Vec<(String, StrykeValue)>,
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
@@ -1605,7 +1605,7 @@ impl PMapStreamIterator {
     }
 }
 
-impl PerlIterator for PMapStreamIterator {
+impl StrykeIterator for PMapStreamIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         self.rx.recv().ok()
     }
@@ -1619,9 +1619,9 @@ pub(crate) struct PGrepStreamIterator {
 
 impl PGrepStreamIterator {
     pub(crate) fn new(
-        source: Arc<dyn PerlIterator>,
-        sub: Arc<PerlSub>,
-        subs: std::collections::HashMap<String, Arc<PerlSub>>,
+        source: Arc<dyn StrykeIterator>,
+        sub: Arc<StrykeSub>,
+        subs: std::collections::HashMap<String, Arc<StrykeSub>>,
         capture: Vec<(String, StrykeValue)>,
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
@@ -1677,7 +1677,7 @@ impl PGrepStreamIterator {
     }
 }
 
-impl PerlIterator for PGrepStreamIterator {
+impl StrykeIterator for PGrepStreamIterator {
     fn next_item(&self) -> Option<StrykeValue> {
         self.rx.recv().ok()
     }
