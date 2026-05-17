@@ -33,7 +33,7 @@ printf "── %d sales records ────────────────
 
 my $tmp = "/tmp/stryke_csv_pivot_demo.csv"
 spew($tmp, to_csv(\@rows))
-my $rows_back = from_csv(slurp($tmp))
+my $rows_back = ~> $tmp slurp from_csv
 printf "  CSV file size : %d bytes\n", -s $tmp
 printf "  rows on read  : %d\n", len(@{$rows_back})
 unlink $tmp
