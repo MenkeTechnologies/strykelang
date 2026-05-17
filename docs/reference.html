@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.14.7 · 10228 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.14.9 · 10228 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -703,13 +703,14 @@ fn first_n { @_[0..$_[-1]-1] }              # first_n(list, n)
       <article class="doc-entry" id="doc-par">
         <h3><a class="doc-anchor" href="#doc-par">#</a> <code>par</code></h3>
         <p>Generic parallel-chunk evaluator. Splits the input list into chunks, runs <code>BLOCK</code> on each chunk in parallel with the chunk bound to <code>_</code> / <code>_0</code>, and flattens chunk outputs into a single list. Callable in three shapes:</p>
-        <pre><code class="lang-perl"># 1. Top-level prefix form
+        <pre><code class="lang-perl"># 1. Top-level prefix form — yields a flat list
 par { BLOCK } LIST
 my @r = par { letters } &quot;Hello, World 123&quot;      # H e l l o W o r l d
 my @s = par { map { _ ** 2 } _ } @huge           # parallel squares
 
-# 2. Top-level postfix form
-my @r = { letters } par &quot;Hello, World 123&quot;
+# 2. Postfix-statement form — side-effecting, no return binding
+{ BLOCK } par LIST                               # runs BLOCK per chunk
+{ log_chunk(_) } par @huge
 
 # 3. As a `~&gt;` / `~&gt;&gt;` thread-macro stage
 ~&gt; &quot;abc def&quot; par { letters }                     # a b c d e f
