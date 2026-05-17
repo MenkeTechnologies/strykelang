@@ -2337,6 +2337,14 @@ impl Lexer {
                             self.last_was_term = true;
                             return Ok(Token::Ident(ident));
                         }
+                        // After `::`, treat as namespaced identifier (`Foo::q`, `Foo::qq`).
+                        if ident_start >= 2
+                            && self.input.get(ident_start.saturating_sub(2)) == Some(&':')
+                            && self.input.get(ident_start.saturating_sub(1)) == Some(&':')
+                        {
+                            self.last_was_term = true;
+                            return Ok(Token::Ident(ident));
+                        }
                         // `q` / `qq` followed by `=>` is an autoquoted hash key, not a quote operator.
                         // Also treat as identifier if followed by terminators like `;`, `,`, `)`, etc.
                         // Must check AFTER skipping whitespace to handle `q => 5`.
@@ -2386,6 +2394,14 @@ impl Lexer {
                             self.last_was_term = true;
                             return Ok(Token::Ident(ident));
                         }
+                        // After `::`, treat as namespaced identifier (`Foo::qx`).
+                        if ident_start >= 2
+                            && self.input.get(ident_start.saturating_sub(2)) == Some(&':')
+                            && self.input.get(ident_start.saturating_sub(1)) == Some(&':')
+                        {
+                            self.last_was_term = true;
+                            return Ok(Token::Ident(ident));
+                        }
                         // `qx` followed by `=>` is an autoquoted hash key.
                         let start_pos = self.pos;
                         let start_line = self.line;
@@ -2421,6 +2437,14 @@ impl Lexer {
                     "qr" => {
                         // After `->`, `qr` is a method name, not a quoted regex.
                         if self.prev_arrow {
+                            self.last_was_term = true;
+                            return Ok(Token::Ident(ident));
+                        }
+                        // After `::`, treat as namespaced identifier (`Foo::qr`).
+                        if ident_start >= 2
+                            && self.input.get(ident_start.saturating_sub(2)) == Some(&':')
+                            && self.input.get(ident_start.saturating_sub(1)) == Some(&':')
+                        {
                             self.last_was_term = true;
                             return Ok(Token::Ident(ident));
                         }
@@ -2481,6 +2505,15 @@ impl Lexer {
                     "m" => {
                         // After `->`, `m` is a method name, not a regex match.
                         if self.prev_arrow {
+                            self.last_was_term = true;
+                            return Ok(Token::Ident(ident));
+                        }
+                        // `Foo::m` — after `::`, `m` is the tail of a namespaced
+                        // identifier, never a regex-match operator.
+                        if ident_start >= 2
+                            && self.input.get(ident_start.saturating_sub(2)) == Some(&':')
+                            && self.input.get(ident_start.saturating_sub(1)) == Some(&':')
+                        {
                             self.last_was_term = true;
                             return Ok(Token::Ident(ident));
                         }
@@ -2565,6 +2598,17 @@ impl Lexer {
                     "s" => {
                         // `$obj->s` / `$obj->s(...)` — after `->`, `s` is a method name.
                         if self.prev_arrow {
+                            self.last_was_term = true;
+                            return Ok(Token::Ident(ident));
+                        }
+                        // `Foo::s` / `Foo::Bar::s` — after `::`, `s` is the tail
+                        // segment of a namespaced identifier, never substitution.
+                        // Same check shape as the IPv6 / `after_package_sep` guard
+                        // up at line ~2158: previous two chars are `::`.
+                        if ident_start >= 2
+                            && self.input.get(ident_start.saturating_sub(2)) == Some(&':')
+                            && self.input.get(ident_start.saturating_sub(1)) == Some(&':')
+                        {
                             self.last_was_term = true;
                             return Ok(Token::Ident(ident));
                         }

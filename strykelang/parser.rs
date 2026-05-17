@@ -21585,15 +21585,32 @@ mod tests {
     }
 
     /// Recursive expression-bodied `fn` with ternary base case —
-    /// Josephus closed-form. Note: bare single-letter names like
-    /// `s` clash with the `s/.../.../` regex substitution token, so
-    /// always use multi-char or namespaced names (`J::surv`, not `J::s`).
+    /// Josephus closed-form. Single-letter tail segments in namespaced
+    /// names (`J::s`, `Foo::m`, `Foo::q`, `Foo::qx`, `Foo::qr`) are
+    /// identifiers — the `::` prefix disambiguates from the
+    /// `s/.../.../`, `m//`, `q//`, etc. quote-like operators.
     #[test]
     fn recursive_expression_body_with_ternary_parses() {
         let _g = NoInteropGuard::on();
         parse_ok(
-            "fn J::surv($n, $k) = $n == 1 ? 0 : (J::surv($n - 1, $k) + $k) % $n",
+            "fn J::s($n, $k) = $n == 1 ? 0 : (J::s($n - 1, $k) + $k) % $n",
         );
+    }
+
+    /// All quote-like single/two-letter operators (`s`, `m`, `q`, `qq`,
+    /// `qx`, `qr`, `tr`, `y`) are valid namespaced identifier tails
+    /// after `::` — they're not lexed as their regex/quote forms.
+    #[test]
+    fn namespaced_quote_like_tail_segments_parse() {
+        let _g = NoInteropGuard::on();
+        parse_ok("fn Foo::s($x) = $x + 1");
+        parse_ok("fn Foo::m($x) = $x * 2");
+        parse_ok("fn Foo::q($x) = $x");
+        parse_ok("fn Foo::qq($x) = $x");
+        parse_ok("fn Foo::qx($x) = $x");
+        parse_ok("fn Foo::qr($x) = $x");
+        parse_ok("fn Foo::tr($x) = $x");
+        parse_ok("fn Foo::y($x) = $x");
     }
 
     /// `splice @arr, $i, 1` — remove a single element from middle of
