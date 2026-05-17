@@ -79,7 +79,7 @@ fn Demo::GA::tournament($pop_ref) {
 # ── crossover: one-point ──────────────────────────────────────────
 
 fn Demo::GA::crossover($parent_a, $parent_b) {
-    my $point = int(rand($TGT_LEN))
+    my $point = int(rand $TGT_LEN)
     substr($parent_a, 0, $point) . substr($parent_b, $point)
 }
 
