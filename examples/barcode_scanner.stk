@@ -152,7 +152,7 @@ my $bad_check = 0
 for my $i (1:200) {
     my $code
     if (rand() < 0.85) {
-        $code = $cat_codes[int(rand(len(@cat_codes)))]
+        $code = $cat_codes[@cat_codes |> len |> rand |> int]
     } else {
         # Garbage scan: random 12-digit string (likely fails check).
         my @digits
