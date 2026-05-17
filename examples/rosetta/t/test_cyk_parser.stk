@@ -28,10 +28,10 @@ fn Rosetta::CYK::parse($grammar, $tokens) {
         }
     }
     # Length L = 2..n.
-    for my $L (2..$n) {
-        for my $i (0..$n - $L) {
+    for my $L (2:$n) {
+        for my $i (0:$n - $L) {
             my $j = $i + $L - 1
-            for my $k ($i..$j - 1) {
+            for my $k ($i:$j - 1) {
                 for my $left (keys %{$dp[$i][$k]}) {
                     for my $right (keys %{$dp[$k + 1][$j]}) {
                         my $key = "$left $right"

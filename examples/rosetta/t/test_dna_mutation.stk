@@ -15,7 +15,7 @@ fn Rosetta::DNAMutation::mutate($dna, $prob) {
 
 my $dna = "AAAAA"
 my $mutated = Rosetta::DNAMutation::mutate($dna, 0.5)
-assert_eq length($mutated), 5, "Length preserved"
+assert_eq len($mutated), 5, "Length preserved"
 assert_ok $mutated =~ /^[ACGT]+$/, "Only valid bases"
 
 test_run

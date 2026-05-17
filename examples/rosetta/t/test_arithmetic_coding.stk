@@ -34,7 +34,7 @@ fn Rosetta::ArithmeticCoding::encode($text, $probs) {
 fn Rosetta::ArithmeticCoding::decode($val, $probs, $len) {
     my $res = ""
     my $v = $val
-    for my $i (1..$len) {
+    for my $i (1:$len) {
         for my $c (sort(keys %$probs)) {
             my $p = $probs->{$c}
             if ($v >= $p->{low} && $v < $p->{high}) {

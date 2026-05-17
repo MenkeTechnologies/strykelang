@@ -15,7 +15,7 @@ fn Rosetta::Markov::execute($input, @rules) {
             if ($pos != -1) {
                 # Apply rule
                 my $prefix = substr($text, 0, $pos)
-                my $suffix = substr($text, $pos + length($pattern))
+                my $suffix = substr($text, $pos + len($pattern))
                 $text = $prefix . $replacement . $suffix
                 
                 if ($terminating) {

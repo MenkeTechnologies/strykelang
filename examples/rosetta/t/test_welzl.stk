@@ -105,7 +105,7 @@ my @pts
 for my $i (~> 0:19) {
     push @pts, [(($i * 13 + 7) % 100), (($i * 17 + 5) % 100)]
 }
-for (1..3) {
+for (1:3) {
     srand(42 + $_)
     my $r = Rosetta::Welzl::solve(\@pts)
     assert_eq Rosetta::Welzl::all_inside($r, \@pts), 1, "random run all inside"

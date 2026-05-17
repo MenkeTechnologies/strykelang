@@ -54,7 +54,7 @@ fn Rosetta::AhoCorasick::search($trie, $text) {
             $curr = $trie->[$curr]->{next}->{$c}
         }
         for my $p (@{$trie->[$curr]->{output}}) {
-            my $pos = $i - length($p) + 1
+            my $pos = $i - len($p) + 1
             if (!exists($results{$p})) { $results{$p} = [] }
             push @{$results{$p}}, $pos
         }

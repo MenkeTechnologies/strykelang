@@ -52,8 +52,8 @@ fn Rosetta::Fenwick2D::range_sum($f, $r1, $c1, $r2, $c2) {
 # Naive 2D prefix sum for cross-checking.
 fn Rosetta::Fenwick2D::naive_range($g, $r1, $c1, $r2, $c2) {
     my $s = 0
-    for my $i ($r1..$r2) {
-        for my $j ($c1..$c2) { $s += $g->[$i][$j] }
+    for my $i ($r1:$r2) {
+        for my $j ($c1:$c2) { $s += $g->[$i][$j] }
     }
     $s
 }
@@ -79,8 +79,8 @@ for my $op (@ops) {
 
 # Spot-check key rectangles
 assert_eq Rosetta::Fenwick2D::prefix_sum($f, 3, 3), 36, "full prefix sum"
-assert_eq Rosetta::Fenwick2D::prefix_sum($f, 1, 1), 6, "[0..1]×[0..1]"
-assert_eq Rosetta::Fenwick2D::range_sum($f, 1, 1, 2, 2), 22, "[1..2]×[1..2] = 22"
+assert_eq Rosetta::Fenwick2D::prefix_sum($f, 1, 1), 6, "[0:1]×[0:1]"
+assert_eq Rosetta::Fenwick2D::range_sum($f, 1, 1, 2, 2), 22, "[1:2]×[1:2] = 22"
 assert_eq Rosetta::Fenwick2D::range_sum($f, 0, 0, 0, 3), 3,  "row 0"
 assert_eq Rosetta::Fenwick2D::range_sum($f, 3, 0, 3, 3), 11, "row 3"
 assert_eq Rosetta::Fenwick2D::range_sum($f, 0, 0, 3, 0), 5,  "col 0"
@@ -88,8 +88,8 @@ assert_eq Rosetta::Fenwick2D::range_sum($f, 0, 0, 3, 0), 5,  "col 0"
 # Cross-check every rectangle with naive.
 for my $r1 (~> 0:3) {
     for my $c1 (~> 0:3) {
-        for my $r2 ($r1..3) {
-            for my $c2 ($c1..3) {
+        for my $r2 ($r1:3) {
+            for my $c2 ($c1:3) {
                 my $bit = Rosetta::Fenwick2D::range_sum($f, $r1, $c1, $r2, $c2)
                 my $nv  = Rosetta::Fenwick2D::naive_range(\@grid, $r1, $c1, $r2, $c2)
                 assert_eq $bit, $nv, "[$r1,$c1]..[$r2,$c2]"

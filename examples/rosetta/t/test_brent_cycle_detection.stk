@@ -19,7 +19,7 @@ fn Rosetta::Brent::detect($f_seq, $x0) {
     # Find mu (start of cycle)
     $tort = $x0
     $hare = $x0
-    for my $i (1..$lam) { $hare = $f_seq->{$hare} }
+    for my $i (1:$lam) { $hare = $f_seq->{$hare} }
     my $mu = 0
     while ($tort ne $hare) {
         $tort = $f_seq->{$tort}

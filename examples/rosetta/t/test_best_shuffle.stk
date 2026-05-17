@@ -6,8 +6,8 @@ fn Rosetta::BestShuffle::shuffle($str) {
     my @b = $str |> chars
     my $len = len(@a)
     
-    for my $i (0..$len-1) {
-        for my $j (0..$len-1) {
+    for my $i (0:$len-1) {
+        for my $j (0:$len-1) {
             if ($a[$i] ne $b[$j] && $a[$j] ne $b[$i]) {
                 my $tmp = $b[$i]
                 $b[$i] = $b[$j]
@@ -34,7 +34,7 @@ for my $s (@inputs) {
     # The best shuffle match count is usually 0 if possible
     # For "seesaw", it's 0. For "abracadabra", it's 0.
     # We just check if length matches and we minimized matches (not easy to assert absolute best, but we can check if it's reasonable)
-    assert_eq length($shuf), length($s), "shuffle length match: $s"
+    assert_eq len($shuf), len($s), "shuffle length match: $s"
 }
 
 # Specific check for "seesaw"

@@ -3,7 +3,7 @@
 
 fn Rosetta::FindIndex::first($needle, @haystack) {
     my $found = -1
-    for my $i (0..$#haystack) {
+    for my $i (0:$#haystack) {
         if ($found == -1 && $haystack[$i] eq $needle) {
             $found = $i
         }
@@ -13,7 +13,7 @@ fn Rosetta::FindIndex::first($needle, @haystack) {
 
 fn Rosetta::FindIndex::last($needle, @haystack) {
     my $found = -1
-    for my $i (0..$#haystack) {
+    for my $i (0:$#haystack) {
         if ($haystack[$i] eq $needle) {
             $found = $i
         }
@@ -23,7 +23,7 @@ fn Rosetta::FindIndex::last($needle, @haystack) {
 
 fn Rosetta::FindIndex::all($needle, @haystack) {
     my @indices
-    for my $i (0..$#haystack) {
+    for my $i (0:$#haystack) {
         push @indices, $i if $haystack[$i] eq $needle
     }
     @indices

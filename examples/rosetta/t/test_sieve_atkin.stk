@@ -36,7 +36,7 @@ fn Rosetta::SieveAtkin::compute($limit) {
     }
     
     my @primes = (2, 3)
-    for my $n (5..$limit) {
+    for my $n (5:$limit) {
         if ($is_prime[$n]) {
             push @primes, $n
         }

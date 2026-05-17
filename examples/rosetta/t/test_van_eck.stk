@@ -4,7 +4,7 @@
 fn Rosetta::VanEck::generate($n) {
     my @seq = (0)
     my %last_seen
-    for my $i (0..$n-2) {
+    for my $i (0:$n-2) {
         my $val = $seq[$i]
         my $next_val = 0
         if (exists $last_seen{$val}) {

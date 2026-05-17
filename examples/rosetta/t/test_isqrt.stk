@@ -14,7 +14,7 @@ fn Rosetta::ISqrt::compute($n) {
 }
 
 # Perfect squares
-for my $i (0..50) {
+for my $i (0:50) {
     my $sq = $i * $i
     assert_eq Rosetta::ISqrt::compute($sq), $i, "isqrt($sq) = $i"
 }

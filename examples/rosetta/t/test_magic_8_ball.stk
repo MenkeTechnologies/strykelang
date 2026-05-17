@@ -33,9 +33,9 @@ fn Rosetta::Magic8::shake() {
 }
 
 fn Rosetta::Magic8::category($answer) {
-    my %positive = map { $_ => 1 } @{Rosetta::Magic8::answers()}[0..9]
-    my %neutral  = map { $_ => 1 } @{Rosetta::Magic8::answers()}[10..14]
-    my %negative = map { $_ => 1 } @{Rosetta::Magic8::answers()}[15..19]
+    my %positive = map { $_ => 1 } @{Rosetta::Magic8::answers()}[0:9]
+    my %neutral  = map { $_ => 1 } @{Rosetta::Magic8::answers()}[10:14]
+    my %negative = map { $_ => 1 } @{Rosetta::Magic8::answers()}[15:19]
     return "positive" if exists $positive{$answer}
     return "neutral"  if exists $neutral{$answer}
     return "negative" if exists $negative{$answer}
@@ -46,7 +46,7 @@ fn Rosetta::Magic8::category($answer) {
 my $a = Rosetta::Magic8::answers()
 assert_eq len(@$a), 20, "20 answers"
 my %unique = map { $_ => 1 } @$a
-assert_eq scalar(keys %unique), 20, "all answers distinct"
+assert_eq len(keys %unique), 20, "all answers distinct"
 
 # Shake produces an answer from the set
 for my $i (~> 1:50) {

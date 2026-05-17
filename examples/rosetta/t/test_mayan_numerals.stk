@@ -11,8 +11,8 @@ fn Rosetta::Mayan::digit($d) {
     my $bar_s  = "—" x $bars
     my $unit_s = "•" x $units
     my @parts
-    push @parts, $bar_s if length($bar_s) > 0
-    push @parts, $unit_s if length($unit_s) > 0
+    push @parts, $bar_s if len($bar_s) > 0
+    push @parts, $unit_s if len($unit_s) > 0
     join(",", @parts)
 }
 

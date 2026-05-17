@@ -56,7 +56,7 @@ my $filtered = Rosetta::GenExp::filter_gen($squares, $cubes)
 # Filtered should be: 4, 9, 16, 25, 36, 49, 81... (0, 1, 64 removed)
 
 my @res
-for (1..7) {
+for (1:7) {
     push @res, $filtered->()
 }
 

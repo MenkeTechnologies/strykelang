@@ -2,14 +2,14 @@
 # Rosetta Code: Boyer-Moore string search (Simplified)
 
 fn Rosetta::BoyerMoore::find($text, $pattern) {
-    my $n = length($text)
-    my $m = length($pattern)
+    my $n = len($text)
+    my $m = len($pattern)
     if ($m == 0) { return 0 }
     
     # Precompute bad character shift
     my %bad_char
     my @p_chars = ~> $pattern chars
-    for my $i (0..$m-1) {
+    for my $i (0:$m-1) {
         $bad_char{$p_chars[$i]} = $i
     }
     

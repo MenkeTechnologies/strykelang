@@ -33,7 +33,7 @@ assert_eq join(",", @s),
 12 |> Rosetta::Magic::constant |> assert_eq(870, "pipe M(12)")
 
 # Closed form is a polynomial — verify generation matches direct compute
-for my $n (1..50) {
+for my $n (1:50) {
     my $closed = $n * ($n * $n + 1) / 2
     assert_eq Rosetta::Magic::constant($n), $closed, sprintf("M(%d) closed form", $n)
 }

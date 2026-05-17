@@ -7,13 +7,13 @@ fn Rosetta::RandomChess::generate() {
     my @black = map { _ . "b" } @pieces
     
     # Add some pawns
-    for (1..8) { push @white, "Pw"; push @black, "Pb" }
+    for (1:8) { push @white, "Pw"; push @black, "Pb" }
     
     my @all = (@white, @black)
     shuffle(@all)
     
     my @board
-    for (0..63) { push @board, "." }
+    for (0:63) { push @board, "." }
     
     my @squares = 0:63
     shuffle(@squares)

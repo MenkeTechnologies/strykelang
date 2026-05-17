@@ -5,7 +5,7 @@ fn Rosetta::MonoStack::next_greater($arr) {
     my $n = len(@$arr)
     my @result = (-1) x $n
     my @stack
-    for my $i (0..$n - 1) {
+    for my $i (0:$n - 1) {
         while (len(@stack) > 0 && $arr->[$stack[-1]] < $arr->[$i]) {
             my $idx = pop @stack
             $result[$idx] = $arr->[$i]
@@ -19,7 +19,7 @@ fn Rosetta::MonoStack::previous_smaller($arr) {
     my $n = len(@$arr)
     my @result = (-1) x $n
     my @stack
-    for my $i (0..$n - 1) {
+    for my $i (0:$n - 1) {
         while (len(@stack) > 0 && $arr->[$stack[-1]] >= $arr->[$i]) {
             pop @stack
         }

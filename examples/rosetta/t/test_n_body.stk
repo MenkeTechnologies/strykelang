@@ -23,7 +23,7 @@ fn Rosetta::Step::step($b1, $b2, $dt) {
 my $b1 = { m => 1.0, px => 1.0, py => 0.0, vx => 0.0, vy => 31.622 }
 my $b2 = { m => 1000.0, px => 0.0, py => 0.0, vx => 0.0, vy => 0.0 }
 
-for my $i (1..1000) {
+for my $i (1:1000) {
     Rosetta::Step::step($b1, $b2, 0.0001)
 }
 

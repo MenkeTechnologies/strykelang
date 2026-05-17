@@ -3,7 +3,7 @@
 
 fn Rosetta::Factors::factors($n) {
     my @f
-    for my $i (1..$n) {
+    for my $i (1:$n) {
         if ($n % $i == 0) { push @f, $i }
     }
     \@f

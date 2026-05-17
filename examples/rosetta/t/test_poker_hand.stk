@@ -2,7 +2,7 @@
 # Rosetta Code: Poker hand analyser
 
 fn Rosetta::PokerHand::card_value($c) {
-    my $v = substr($c, 0, length($c)-1)
+    my $v = substr($c, 0, len($c)-1)
     if ($v eq "A") { 14 }
     elsif ($v eq "K") { 13 }
     elsif ($v eq "Q") { 12 }
@@ -12,7 +12,7 @@ fn Rosetta::PokerHand::card_value($c) {
 }
 
 fn Rosetta::PokerHand::card_suit($c) {
-    substr($c, length($c)-1, 1)
+    substr($c, len($c)-1, 1)
 }
 
 fn Rosetta::PokerHand::analyze_hand(@cards) {
@@ -28,7 +28,7 @@ fn Rosetta::PokerHand::analyze_hand(@cards) {
     }
     
     my $is_straight = 1
-    for my $i (1..4) { 
+    for my $i (1:4) { 
         my $v1 = int($vals[$i])
         my $v0 = int($vals[$i-1])
         if ($v1 - $v0 != 1) { $is_straight = 0 }

@@ -27,7 +27,7 @@ fn Rosetta::PairOrder::sort($items, $cmp) {
 my @items = qw(violet red green indigo blue yellow orange)
 my @rainbow = qw(red orange yellow green blue indigo violet)
 my %rank
-for my $i (0 .. $#rainbow) { $rank{$rainbow[$i]} = $i }
+for my $i (0:$#rainbow) { $rank{$rainbow[$i]} = $i }
 
 my ($sorted, $comparisons) = Rosetta::PairOrder::sort(\@items, fn ($a, $b) {
     $rank{$a} <=> $rank{$b}

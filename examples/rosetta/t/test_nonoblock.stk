@@ -30,7 +30,7 @@ fn Rosetta::Nonoblock::recurse($lengths, $cells, $idx) {
     for (my $start = 0; $start <= $cells - $l - $rem_sum; $start++) {
         my $prefix = ("0" x $start) . ("1" x $l)
         
-        my $next_cells = $cells - length($prefix)
+        my $next_cells = $cells - len($prefix)
         if ($idx < len(@$lengths) - 1) {
             $prefix .= "0"
             $next_cells--

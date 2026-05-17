@@ -19,7 +19,7 @@ for my $key (keys %other) {
     $h{$key} = $other{$key}
 }
 assert_eq $h{"cherry"}, 3, "merged cherry"
-assert_eq scalar(keys %h), 3, "hash size after merge"
+assert_eq len(keys %h), 3, "hash size after merge"
 
 # Piped version
 %h |> keys |> len |> assert_eq(3, "piped hash keys length")

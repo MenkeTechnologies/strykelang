@@ -2,8 +2,8 @@
 # Rosetta Code: Jaro-Winkler distance
 
 fn Rosetta::JaroWinkler::jaro($s1, $s2) {
-    my $len1 = length($s1)
-    my $len2 = length($s2)
+    my $len1 = len($s1)
+    my $len2 = len($s2)
     return 1.0 if $len1 == 0 && $len2 == 0
     return 0.0 if $len1 == 0 || $len2 == 0
     

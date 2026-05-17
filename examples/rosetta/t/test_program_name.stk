@@ -10,6 +10,6 @@ my $name = Rosetta::ProgramName::get()
 assert_ok defined($name), "Program name is defined"
 # When running via stryke test, $0 might be "-e" or a temp file path or the actual file path.
 # We just check that it's a string.
-assert_ok length($name) > 0, "Program name has length"
+assert_ok len($name) > 0, "Program name has length"
 
 test_run

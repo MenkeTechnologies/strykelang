@@ -8,7 +8,7 @@ fn Rosetta::Duffinian::gcd($a, $b) {
 
 fn Rosetta::Duffinian::sum_divisors($n) {
     my $sum = 0
-    for my $i (1..$n) {
+    for my $i (1:$n) {
         if ($n % $i == 0) { $sum += $i }
     }
     $sum

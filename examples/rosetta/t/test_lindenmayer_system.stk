@@ -3,7 +3,7 @@
 
 fn Rosetta::LSystem::solve($axiom, $rules, $iters) {
     my $curr = $axiom
-    for (1..$iters) {
+    for (1:$iters) {
         my $next = ""
         my @chars = chars($curr)
         for my $c (@chars) {

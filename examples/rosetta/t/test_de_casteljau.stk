@@ -7,7 +7,7 @@ fn Rosetta::DeCasteljau::eval($pts, $t) {
     my $n = len(@work)
     my $omt = 1 - $t
     while ($n > 1) {
-        for my $i (0..$n-2) {
+        for my $i (0:$n-2) {
             $work[$i][0] = $omt * $work[$i][0] + $t * $work[$i + 1][0]
             $work[$i][1] = $omt * $work[$i][1] + $t * $work[$i + 1][1]
         }

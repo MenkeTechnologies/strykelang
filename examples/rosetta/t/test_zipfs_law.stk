@@ -15,7 +15,7 @@ fn Rosetta::Zipf::solve($text, $n) {
     my @results
     # Zipf's Law: Frequency * Rank approx constant
     my $limit = min($n, len(@sorted))
-    for my $rank (1 .. $limit) {
+    for my $rank (1:$limit) {
         my $word = $sorted[$rank - 1]
         my $freq = $counts{$word}
         push @results, { word => $word, freq => $freq, rank => $rank, product => $freq * $rank }

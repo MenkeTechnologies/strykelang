@@ -4,16 +4,16 @@
 fn Rosetta::Cholesky::decompose($A) {
     my $n = len(@$A)
     my @L
-    for my $i (0..$n-1) {
+    for my $i (0:$n-1) {
         my @row
-        for my $j (0..$n-1) { push @row, 0.0 }
+        for my $j (0:$n-1) { push @row, 0.0 }
         push @L, \@row
     }
     
-    for my $i (0..$n-1) {
-        for my $j (0..$i) {
+    for my $i (0:$n-1) {
+        for my $j (0:$i) {
             my $sum = 0.0
-            for my $k (0..$j-1) {
+            for my $k (0:$j-1) {
                 $sum = $sum + $L[$i]->[$k] * $L[$j]->[$k]
             }
             if ($i == $j) {

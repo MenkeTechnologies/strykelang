@@ -65,6 +65,6 @@ assert_near Rosetta::Integrate::trapezoid($linear, 0, 5000, 5000),
 assert_ok !defined(Rosetta::Integrate::simpson($cubic, 0, 1, 5)), "odd n rejected by Simpson"
 
 # Pipe form: integrand expression to result
-$cubic |> fn { Rosetta::Integrate::trapezoid(_, 0, 2, 1000) } |> assert_near(4, 1e-3, "pipe trap of x³ over 0..2")
+$cubic |> fn { Rosetta::Integrate::trapezoid(_, 0, 2, 1000) } |> assert_near(4, 1e-3, "pipe trap of x³ over 0:2")
 
 test_run

@@ -23,12 +23,12 @@ fn Rosetta::MillerRabin::miller_rabin($n, $k) {
         $s++
     }
     
-    for my $i (1..$k) {
+    for my $i (1:$k) {
         my $a = 2 + int(rand($n - 4))
         my $x = MillerRabin::power($a, $d, $n)
         if ($x == 1 || $x == $n - 1) { next }
         my $composite = 1
-        for my $r (1..$s-1) {
+        for my $r (1:$s-1) {
             $x = ($x * $x) % $n
             if ($x == $n - 1) {
                 $composite = 0

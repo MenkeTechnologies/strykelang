@@ -33,12 +33,12 @@ assert_eq Rosetta::Wilson::is_prime(91), 0, "91 = 7×13"
 
 # Compare with stryke's builtin is_prime
 my $agree_count = 0
-for my $n (2..100) {
+for my $n (2:100) {
     my $builtin = is_prime($n) ? 1 : 0
     my $wilson  = Rosetta::Wilson::is_prime($n)
     $agree_count++ if $builtin == $wilson
 }
-assert_eq $agree_count, 99, "Wilson agrees with builtin on 2..100"
+assert_eq $agree_count, 99, "Wilson agrees with builtin on 2:100"
 
 # Edge cases
 assert_eq Rosetta::Wilson::is_prime(1), 0, "1 not prime"

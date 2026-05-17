@@ -14,7 +14,7 @@ fn Rosetta::Disco::day_of_year($y, $m, $d) {
     my @days = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
     $days[1] = 29 if Rosetta::Disco::is_leap($y)
     my $doy = $d
-    for my $i (0..$m - 2) { $doy += $days[$i] }
+    for my $i (0:$m - 2) { $doy += $days[$i] }
     $doy
 }
 

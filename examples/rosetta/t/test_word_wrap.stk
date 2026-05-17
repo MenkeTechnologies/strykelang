@@ -7,16 +7,16 @@ fn Rosetta::WordWrap::solve($text, $width) {
     my $line = ""
     
     for my $word (@words) {
-        if (length($line) == 0) {
+        if (len($line) == 0) {
             $line = $word
-        } elsif (length($line) + 1 + length($word) <= $width) {
+        } elsif (len($line) + 1 + len($word) <= $width) {
             $line = $line . " $word"
         } else {
             push @lines, $line
             $line = $word
         }
     }
-    if (length($line) > 0) { push @lines, $line }
+    if (len($line) > 0) { push @lines, $line }
     join("\n", @lines)
 }
 
@@ -24,11 +24,11 @@ my $text = "The quick brown fox jumps over the lazy dog"
 
 my $w10 = Rosetta::WordWrap::solve($text, 10)
 my @lines10 = $w10 |> split /\n/
-assert_ok (grep { length(_) <= 10 } @lines10) == len(@lines10), "all lines <= 10"
+assert_ok (grep { len(_) <= 10 } @lines10) == len(@lines10), "all lines <= 10"
 
 my $w20 = Rosetta::WordWrap::solve($text, 20)
 my @lines20 = $w20 |> split /\n/
-assert_ok (grep { length(_) <= 20 } @lines20) == len(@lines20), "all lines <= 20"
+assert_ok (grep { len(_) <= 20 } @lines20) == len(@lines20), "all lines <= 20"
 
 my $w80 = Rosetta::WordWrap::solve($text, 80)
 assert_eq $w80, $text, "width >= text keeps single line"

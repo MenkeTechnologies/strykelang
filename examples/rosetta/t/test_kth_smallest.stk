@@ -25,7 +25,7 @@ fn Rosetta::KthSmall::find($arr, $k) {
     }
     my $size = $n
     my $kth
-    for my $i (1..$k) {
+    for my $i (1:$k) {
         $kth = $h[0]
         $h[0] = $h[$size - 1]
         $size--
@@ -54,7 +54,7 @@ assert_eq Rosetta::KthSmall::find([42], 1), 42, "single -> 42"
 
 # Already sorted
 my @sorted = (1, 2, 3, 4, 5)
-for my $k (1..5) {
+for my $k (1:5) {
     assert_eq Rosetta::KthSmall::find(\@sorted, $k), $k, "sorted: kth = k"
 }
 

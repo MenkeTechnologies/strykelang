@@ -14,7 +14,7 @@ fn Rosetta::Bitonic::compare_swap($arr, $i, $j, $up) {
 fn Rosetta::Bitonic::merge($arr, $lo, $cnt, $up) {
     return if $cnt < 2
     my $k = int($cnt / 2)
-    for my $i ($lo..$lo + $k - 1) {
+    for my $i ($lo:$lo + $k - 1) {
         Rosetta::Bitonic::compare_swap($arr, $i, $i + $k, $up)
     }
     Rosetta::Bitonic::merge($arr, $lo,      $k, $up)

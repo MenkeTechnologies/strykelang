@@ -12,7 +12,7 @@ fn Rosetta::CombSort::sort($list) {
         if ($gap < 1) { $gap = 1 }
         
         $swapped = 0
-        for my $i (0..$len-$gap-1) {
+        for my $i (0:$len-$gap-1) {
             if ($arr[$i] > $arr[$i + $gap]) {
                 ($arr[$i], $arr[$i + $gap]) = ($arr[$i + $gap], $arr[$i])
                 $swapped = 1

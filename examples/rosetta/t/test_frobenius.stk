@@ -13,16 +13,16 @@ fn Rosetta::Frobenius::dp(@coins) {
     my $bound = 1
     ~> @coins ep { $bound *= _ }
     my @reach
-    for my $i (0..$bound) { $reach[$i] = 0 }
+    for my $i (0:$bound) { $reach[$i] = 0 }
     $reach[0] = 1
-    for my $i (0..$bound) {
+    for my $i (0:$bound) {
         next if !$reach[$i]
         for my $c (@coins) {
             if ($i + $c <= $bound) { $reach[$i + $c] = 1 }
         }
     }
     my $last = -1
-    for my $i (0..$bound) {
+    for my $i (0:$bound) {
         if (!$reach[$i]) { $last = $i }
     }
     $last

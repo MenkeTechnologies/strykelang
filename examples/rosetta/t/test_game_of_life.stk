@@ -3,8 +3,8 @@
 
 fn Rosetta::GameOfLife::count_neighbors($grid, $r, $c, $rows, $cols) {
     my $count = 0
-    for my $dr (-1..1) {
-        for my $dc (-1..1) {
+    for my $dr (-1:1) {
+        for my $dc (-1:1) {
             if ($dr == 0 && $dc == 0) { next }
             my $nr = $r + $dr
             my $nc = $c + $dc
@@ -20,9 +20,9 @@ fn Rosetta::GameOfLife::step($grid) {
     my $rows = len(@$grid)
     my $cols = len(@{$grid->[0]})
     my @next = ()
-    for my $r (0..$rows-1) {
+    for my $r (0:$rows-1) {
         $next[$r] = []
-        for my $c (0..$cols-1) {
+        for my $c (0:$cols-1) {
             my $n = Rosetta::GameOfLife::count_neighbors($grid, $r, $c, $rows, $cols)
             if ($grid->[$r][$c]) {
                 $next[$r][$c] = ($n == 2 || $n == 3 ? 1 : 0)

@@ -22,9 +22,9 @@ my $am = Rosetta::PythMean::arithmetic(@nums)
 my $gm = Rosetta::PythMean::geometric(@nums)
 my $hm = Rosetta::PythMean::harmonic(@nums)
 
-assert_ok abs($am - 5.5) < 1e-12, "AM(1..10) == 5.5"
-assert_ok abs($gm - 4.52872868812) < 1e-7, "GM(1..10) ~ 4.5287..."
-assert_ok abs($hm - 3.41417152198) < 1e-7, "HM(1..10) ~ 3.4141..."
+assert_ok abs($am - 5.5) < 1e-12, "AM(1:10) == 5.5"
+assert_ok abs($gm - 4.52872868812) < 1e-7, "GM(1:10) ~ 4.5287..."
+assert_ok abs($hm - 3.41417152198) < 1e-7, "HM(1:10) ~ 3.4141..."
 
 # Pythagorean inequality — strict for distinct positive numbers.
 assert_ok $am > $gm, "AM > GM"

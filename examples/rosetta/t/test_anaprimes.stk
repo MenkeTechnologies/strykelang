@@ -41,7 +41,7 @@ fn Rosetta::Anaprimes::is_anaprime($n) {
 }
 
 my @anaprimes
-for my $i (1..100) {
+for my $i (1:100) {
     if (Rosetta::Anaprimes::is_anaprime($i)) {
         push @anaprimes, $i
     }

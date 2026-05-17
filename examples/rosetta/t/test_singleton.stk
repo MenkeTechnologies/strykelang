@@ -50,7 +50,7 @@ assert_eq join(",", @{$i->{log}}), "hello,world,foo", "log preserved"
 Rosetta::Singleton::reset()
 my $fresh = Rosetta::Singleton::instance()
 assert_eq $fresh->{count}, 0, "after reset: count 0"
-assert_eq scalar(@{$fresh->{log}}), 0, "after reset: empty log"
+assert_eq len(@{$fresh->{log}}), 0, "after reset: empty log"
 
 # Pipe form
 () |> fn { Rosetta::Singleton::tick("piped") } |> assert_eq(1, "pipe tick #1")

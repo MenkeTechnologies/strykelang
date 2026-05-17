@@ -27,7 +27,7 @@ fn Rosetta::LongYear::is($y) {
 # Known long years from rosetta task — first ten years ≥ 2000:
 # 2004, 2009, 2015, 2020, 2026, 2032, 2037, 2043, 2048, 2054
 my @found = ~> 2000:2060 |> grep { Rosetta::LongYear::is(_) }
-assert_eq join(",", @found[0..9]),
+assert_eq join(",", @found[0:9]),
     "2004,2009,2015,2020,2026,2032,2037,2043,2048,2054",
     "first 10 long years from 2000"
 

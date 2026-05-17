@@ -19,13 +19,13 @@ fn Rosetta::HofstadterFM::M($n) {
 
 # F: 1, 1, 2, 2, 3, 3, 4, 5, 5, 6
 my @f_expected = (1, 1, 2, 2, 3, 3, 4, 5, 5, 6)
-for my $i (0..9) {
+for my $i (0:9) {
     assert_eq Rosetta::HofstadterFM::F($i), $f_expected[$i], "F($i)"
 }
 
 # M: 0, 0, 1, 2, 2, 3, 4, 4, 5, 6
 my @m_expected = (0, 0, 1, 2, 2, 3, 4, 4, 5, 6)
-for my $i (0..9) {
+for my $i (0:9) {
     assert_eq Rosetta::HofstadterFM::M($i), $m_expected[$i], "M($i)"
 }
 

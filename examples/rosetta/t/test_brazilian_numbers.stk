@@ -3,7 +3,7 @@
 
 fn Rosetta::Brazilian::check($n) {
     if ($n < 7) { return 0 }
-    for my $b (2..$n-2) {
+    for my $b (2:$n-2) {
         my $temp = $n
         my $digit = $temp % $b
         my $all_same = 1

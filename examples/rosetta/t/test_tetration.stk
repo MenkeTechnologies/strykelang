@@ -4,7 +4,7 @@
 fn Rosetta::Tetration::tower($base, $height) {
     return 1 if $height == 0
     my $result = $base
-    for my $i (2..$height) {
+    for my $i (2:$height) {
         $result = $base ** $result
     }
     $result

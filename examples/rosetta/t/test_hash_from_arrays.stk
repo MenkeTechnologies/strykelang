@@ -4,7 +4,7 @@
 fn Rosetta::HashFromArrays::build($keys, $vals) {
     my %h
     my $n = len(@$keys)
-    for my $i (0..$n-1) {
+    for my $i (0:$n-1) {
         $h{$keys->[$i]} = $vals->[$i]
     }
     \%h

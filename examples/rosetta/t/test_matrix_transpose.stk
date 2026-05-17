@@ -6,9 +6,9 @@ fn Rosetta::Transpose::transpose {
     my $rows = len(@$m)
     my $cols = len(@{$m->[0]})
     my @res
-    for my $j (0..$cols-1) {
+    for my $j (0:$cols-1) {
         my @new_row
-        for my $i (0..$rows-1) {
+        for my $i (0:$rows-1) {
             push @new_row, $m->[$i][$j]
         }
         push @res, [@new_row]

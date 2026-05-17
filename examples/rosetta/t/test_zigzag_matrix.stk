@@ -3,11 +3,11 @@
 
 fn Rosetta::ZigZagMatrix::generate($n) {
     my @matrix = ()
-    for my $i (0..$n-1) { $matrix[$i] = [] }
+    for my $i (0:$n-1) { $matrix[$i] = [] }
     
     my $x = 0
     my $y = 0
-    for my $i (0..$n*$n-1) {
+    for my $i (0:$n*$n-1) {
         $matrix[$y][$x] = $i
         if (($x + $y) % 2 == 0) {
             if ($x == $n - 1) {

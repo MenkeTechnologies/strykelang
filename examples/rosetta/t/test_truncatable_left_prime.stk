@@ -9,7 +9,7 @@ fn Rosetta::LargestLeftTrunc::is_prime_in_base($digits, $base) {
 
 fn Rosetta::LargestLeftTrunc::find($base) {
     my @prev
-    for my $d (1..$base-1) {
+    for my $d (1:$base-1) {
         push @prev, [$d] if is_prime($d)
     }
     my $best = 0
@@ -19,7 +19,7 @@ fn Rosetta::LargestLeftTrunc::find($base) {
             my $val = 0
             for my $d (@$cand) { $val = $val * $base + $d }
             $best = $val if $val > $best
-            for my $d (1..$base-1) {
+            for my $d (1:$base-1) {
                 my @new = ($d, @$cand)
                 if (Rosetta::LargestLeftTrunc::is_prime_in_base(\@new, $base)) {
                     push @next, \@new

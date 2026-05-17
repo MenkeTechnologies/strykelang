@@ -3,7 +3,7 @@
 
 fn Rosetta::Prufer::encode($edges, $n) {
     my %adj
-    for my $i (1..$n) { $adj{$i} = {} }
+    for my $i (1:$n) { $adj{$i} = {} }
     my %deg
     for my $e (@$edges) {
         my ($u, $v) = ($e->[0], $e->[1])
@@ -13,9 +13,9 @@ fn Rosetta::Prufer::encode($edges, $n) {
         $deg{$v}++
     }
     my @seq
-    for my $i (1..$n - 2) {
+    for my $i (1:$n - 2) {
         my $leaf
-        for my $k (1..$n) {
+        for my $k (1:$n) {
             if ($deg{$k} == 1) {
                 $leaf = $k
                 last
@@ -34,13 +34,13 @@ fn Rosetta::Prufer::encode($edges, $n) {
 
 fn Rosetta::Prufer::decode($seq, $n) {
     my %deg
-    for my $i (1..$n) { $deg{$i} = 1 }
+    for my $i (1:$n) { $deg{$i} = 1 }
     for my $x (@$seq) { $deg{$x}++ }
     my @edges
     my @work = @$seq
     for my $x (@work) {
         my $leaf
-        for my $k (1..$n) {
+        for my $k (1:$n) {
             if ($deg{$k} == 1) {
                 $leaf = $k
                 last
@@ -52,7 +52,7 @@ fn Rosetta::Prufer::decode($seq, $n) {
     }
     my $u
     my $v
-    for my $k (1..$n) {
+    for my $k (1:$n) {
         if ($deg{$k} == 1) {
             if (!defined $u) { $u = $k } else { $v = $k }
         }

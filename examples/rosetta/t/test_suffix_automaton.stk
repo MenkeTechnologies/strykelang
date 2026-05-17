@@ -102,7 +102,7 @@ assert_eq Rosetta::SAM::distinct_substrings($sam3), 10, "abcd distinct = 10"
 # Cross-check with naive substring enumeration
 fn Rosetta::SAM::naive_distinct($s) {
     my %seen
-    my $n = length($s)
+    my $n = len($s)
     for my $i (~> 0:$n - 1) {
         for my $L (~> 1:$n - $i) {
             $seen{substr($s, $i, $L)} = 1

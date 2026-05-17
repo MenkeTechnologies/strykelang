@@ -17,7 +17,7 @@ fn Rosetta::ZhangSuen::neighbors($img, $r, $c) {
 
 fn Rosetta::ZhangSuen::transitions($ns) {
     my $count = 0
-    for my $i (0..7) {
+    for my $i (0:7) {
         my $a = $ns->[$i]
         my $b = $ns->[($i + 1) % 8]
         $count += 1 if $a == 0 && $b == 1
@@ -40,8 +40,8 @@ fn Rosetta::ZhangSuen::thin($img) {
         $changed = 0
         # Step 1
         my @to_zero
-        for my $r (1..$rows-2) {
-            for my $c (1..$cols-2) {
+        for my $r (1:$rows-2) {
+            for my $c (1:$cols-2) {
                 next if $grid[$r][$c] == 0
                 my $ns = Rosetta::ZhangSuen::neighbors(\@grid, $r, $c)
                 my $b = Rosetta::ZhangSuen::black_neighbors($ns)
@@ -58,8 +58,8 @@ fn Rosetta::ZhangSuen::thin($img) {
         }
         # Step 2
         @to_zero = ()
-        for my $r (1..$rows-2) {
-            for my $c (1..$cols-2) {
+        for my $r (1:$rows-2) {
+            for my $c (1:$cols-2) {
                 next if $grid[$r][$c] == 0
                 my $ns = Rosetta::ZhangSuen::neighbors(\@grid, $r, $c)
                 my $b = Rosetta::ZhangSuen::black_neighbors($ns)
@@ -88,9 +88,9 @@ fn Rosetta::ZhangSuen::count_black($grid) {
 
 # Solid 5x5 block — thinning collapses it (typically to a small skeleton)
 my $block = []
-for my $r (0..6) {
+for my $r (0:6) {
     my @row
-    for my $c (0..6) {
+    for my $c (0:6) {
         push @row, ($r >= 1 && $r <= 5 && $c >= 1 && $c <= 5) ? 1 : 0
     }
     push @$block, \@row

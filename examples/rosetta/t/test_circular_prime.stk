@@ -28,9 +28,9 @@ fn Rosetta::CircularPrimes::rotate($s) {
 
 fn Rosetta::CircularPrimes::check($n) {
     my $s = "$n"
-    my $len = length($s)
+    my $len = len($s)
     my $all_prime = 1
-    for my $i (1..$len) {
+    for my $i (1:$len) {
         # Using the builtin is_prime for speed, or the custom one if requested
         if (!is_prime(int($s))) {
             $all_prime = 0

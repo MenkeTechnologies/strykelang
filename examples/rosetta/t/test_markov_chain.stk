@@ -16,7 +16,7 @@ fn Rosetta::MarkovChain::build($text) {
 fn Rosetta::MarkovChain::generate($chain, $start, $len) {
     my $curr = $start
     my @res = ($curr)
-    for my $i (1..$len-1) {
+    for my $i (1:$len-1) {
         if (!exists $chain->{$curr}) { last }
         my $opts = $chain->{$curr}
         $curr = $opts->[int(rand(len(@$opts)))]

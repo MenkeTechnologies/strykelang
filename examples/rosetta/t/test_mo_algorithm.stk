@@ -69,7 +69,7 @@ fn Rosetta::Mo::solve($arr, $queries) {
 # Naive count-distinct for cross-checking.
 fn Rosetta::Mo::naive_distinct($arr, $lo, $hi) {
     my %s
-    for my $i ($lo..$hi) { $s{$arr->[$i]} = 1 }
+    for my $i ($lo:$hi) { $s{$arr->[$i]} = 1 }
     len(keys %s)
 }
 
@@ -99,7 +99,7 @@ my $mo = Rosetta::Mo::solve(\@arr2, \@qs2)
 for my $i (~> 0:len(@qs2) - 1) {
     my ($lo, $hi) = @{$qs2[$i]}
     my $naive = Rosetta::Mo::naive_distinct(\@arr2, $lo, $hi)
-    assert_eq $mo->[$i], $naive, "Mo[$i] [$lo..$hi] = naive"
+    assert_eq $mo->[$i], $naive, "Mo[$i] [$lo:$hi] = naive"
 }
 
 # Single-element array

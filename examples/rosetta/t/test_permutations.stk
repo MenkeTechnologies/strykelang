@@ -5,9 +5,9 @@ fn Rosetta::Permutations::generate($arr) {
     my $n = len(@$arr)
     return [[@$arr]] if $n <= 1
     my @result
-    for my $i (0..$n-1) {
+    for my $i (0:$n-1) {
         my @rest
-        for my $j (0..$n-1) {
+        for my $j (0:$n-1) {
             push @rest, $arr->[$j] if $j != $i
         }
         my $sub = Rosetta::Permutations::generate(\@rest)
@@ -49,7 +49,7 @@ assert_eq Rosetta::Permutations::factorial(5), 120, "5!"
 
 # Cross-check: number of perms equals factorial
 for my $n (1, 2, 3, 4, 5) {
-    my @input = (1..$n)
+    my @input = (1:$n)
     my $perms = Rosetta::Permutations::generate(\@input)
     my $expected = Rosetta::Permutations::factorial($n)
     assert_eq len(@$perms), $expected, "n=$n: perm count = n!"

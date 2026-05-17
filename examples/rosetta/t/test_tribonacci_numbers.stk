@@ -9,7 +9,7 @@ fn Rosetta::Tribonacci::compute($n) {
         my $t0 = 0
         my $t1 = 0
         my $t2 = 1
-        for my $i (3..$n) {
+        for my $i (3:$n) {
             my $t3 = $t0 + $t1 + $t2
             ($t0, $t1, $t2) = ($t1, $t2, $t3)
         }
@@ -18,7 +18,7 @@ fn Rosetta::Tribonacci::compute($n) {
 }
 
 fn Rosetta::Tribonacci::list($max) {
-    ~> 0..$max map { Rosetta::Tribonacci::compute(_) }
+    ~> 0:$max map { Rosetta::Tribonacci::compute(_) }
 }
 
 assert_eq Rosetta::Tribonacci::compute(0), 0, "T0"

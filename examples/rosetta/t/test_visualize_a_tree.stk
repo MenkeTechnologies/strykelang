@@ -12,7 +12,7 @@ fn Rosetta::TreeViz::render($node) {
 fn Rosetta::TreeViz::render_children($lines, $children, $prefix) {
     return unless defined $children
     my $n = len(@$children)
-    for my $i (0..$n - 1) {
+    for my $i (0:$n - 1) {
         my $is_last = ($i == $n - 1)
         my $branch  = $is_last ? "└── " : "├── "
         my $next    = $is_last ? "    " : "│   "

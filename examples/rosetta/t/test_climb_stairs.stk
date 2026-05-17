@@ -5,7 +5,7 @@
 fn Rosetta::ClimbStairs::count($n) {
     return 1 if $n <= 1
     my ($_0, $_1) = (1, 2)
-    for (3 .. $n) { ($_0, $_1) = ($_1, $_0 + $_1) }
+    for (3:$n) { ($_0, $_1) = ($_1, $_0 + $_1) }
     $_1
 }
 
@@ -15,7 +15,7 @@ fn Rosetta::ClimbStairs::count_3($n) {
     return 1 if $n == 1
     return 2 if $n == 2
     my ($_0, $_1, $c) = (1, 1, 2)
-    for (3 .. $n) { ($_0, $_1, $c) = ($_1, $c, $_0 + $_1 + $c) }
+    for (3:$n) { ($_0, $_1, $c) = ($_1, $c, $_0 + $_1 + $c) }
     $c
 }
 
@@ -23,7 +23,7 @@ fn Rosetta::ClimbStairs::count_3($n) {
 my @ways = ~> 0:10 map { Rosetta::ClimbStairs::count(_) }
 assert_eq join(",", @ways),
     "1,1,2,3,5,8,13,21,34,55,89",
-    "ways(0..10)"
+    "ways(0:10)"
 
 assert_eq Rosetta::ClimbStairs::count(20), 10946, "ways(20)"
 
@@ -31,6 +31,6 @@ assert_eq Rosetta::ClimbStairs::count(20), 10946, "ways(20)"
 my @ways3 = ~> 0:6 map { Rosetta::ClimbStairs::count_3(_) }
 assert_eq join(",", @ways3),
     "1,1,2,4,7,13,24",
-    "ways_3(0..6)"
+    "ways_3(0:6)"
 
 test_run

@@ -2,17 +2,17 @@
 # Rosetta Code: Boyer-Moore-Horspool string search
 
 fn Rosetta::Horspool::shift_table($pat) {
-    my $m = length($pat)
+    my $m = len($pat)
     my %tbl
-    for my $i (0..$m-2) {
+    for my $i (0:$m-2) {
         $tbl{substr($pat, $i, 1)} = $m - 1 - $i
     }
     \%tbl
 }
 
 fn Rosetta::Horspool::find($text, $pat) {
-    my $n = length($text)
-    my $m = length($pat)
+    my $n = len($text)
+    my $m = len($pat)
     return 0 if $m == 0
     return -1 if $n < $m
     my $tbl = Rosetta::Horspool::shift_table($pat)

@@ -52,7 +52,7 @@ assert_eq Rosetta::OneZero::find(11), "11",       "n=11"
 assert_eq Rosetta::OneZero::find(12), "11100",    "n=12"
 
 # Property: every result is divisible by n
-for my $n (1..30) {
+for my $n (1:30) {
     my $s = Rosetta::OneZero::find($n)
     my $val = $s + 0
     assert_eq $val % $n, 0, sprintf("result for n=%d is divisible by n", $n)

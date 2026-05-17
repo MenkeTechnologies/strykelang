@@ -27,7 +27,7 @@ fn Rosetta::OldLady::full_song() {
     )
     my @verses
     for my $i (0..len(@creatures) - 1) {
-        my @sofar = @creatures[0..$i]
+        my @sofar = @creatures[0:$i]
         if ($creatures[$i] eq "horse") {
             push @verses, "There was an old lady who swallowed a horse...\nShe's dead, of course!"
             last

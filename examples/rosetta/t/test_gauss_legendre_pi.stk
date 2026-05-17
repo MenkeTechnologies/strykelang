@@ -6,7 +6,7 @@ fn Rosetta::GaussLegendre::pi($iters) {
     my $b = 1.0 / sqrt(2.0)
     my $t = 0.25
     my $p = 1.0
-    for my $i (1..$iters) {
+    for my $i (1:$iters) {
         my $a_next = ($a + $b) / 2.0
         my $b_next = sqrt($a * $b)
         my $t_next = $t - $p * (($a - $a_next) ** 2)
@@ -35,7 +35,7 @@ assert_ok abs($pi5 - $real_pi) < 1e-15, "5 iters at double-precision limit ($pi5
 
 # Convergence: each iter strictly reduces error (or stays at machine epsilon)
 my $err_prev = abs(Rosetta::GaussLegendre::pi(1) - $real_pi)
-for my $k (2..4) {
+for my $k (2:4) {
     my $err = abs(Rosetta::GaussLegendre::pi($k) - $real_pi)
     assert_ok($err <= $err_prev + 1e-16, "iter $k error not worse than iter " . ($k - 1))
     $err_prev = $err

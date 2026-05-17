@@ -7,7 +7,7 @@
 fn Rosetta::Riordan::sequence($n) {
     return [1] if $n == 0
     my @r = (1, 0)
-    for my $k (2..$n) {
+    for my $k (2:$n) {
         my $val = (($k - 1) * (2 * $r[$k - 1] + 3 * $r[$k - 2])) / ($k + 1)
         push @r, $val
     }
@@ -21,7 +21,7 @@ assert_eq join(",", @$r),
     "first 16 values from the recurrence"
 
 # Recurrence sanity check
-for my $k (2..14) {
+for my $k (2:14) {
     my $expected = (($k - 1) * (2 * $r->[$k - 1] + 3 * $r->[$k - 2])) / ($k + 1)
     assert_eq $r->[$k], $expected, sprintf("r(%d) recurrence", $k)
 }

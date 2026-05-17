@@ -6,8 +6,8 @@
 fn Rosetta::ListComp::pythagoras_triples($n) {
     # All (a, b, c) with a ≤ b ≤ c, a²+b² = c², 1 ≤ a, b, c ≤ n.
     my @out
-    for my $a (1..$n) {
-        for my $b ($a..$n) {
+    for my $a (1:$n) {
+        for my $b ($a:$n) {
             my $c2 = $a * $a + $b * $b
             my $c = int(sqrt($c2))
             push @out, [$a, $b, $c] if $c * $c == $c2 && $c <= $n && $b <= $c
@@ -26,8 +26,8 @@ fn Rosetta::ListComp::evens($n) {
 
 fn Rosetta::ListComp::pairs($a, $b) {
     my @out
-    for my $x (1..$a) {
-        for my $y (1..$b) {
+    for my $x (1:$a) {
+        for my $y (1:$b) {
             push @out, [$x, $y]
         }
     }
@@ -36,7 +36,7 @@ fn Rosetta::ListComp::pairs($a, $b) {
 
 # Squares
 my @sq = Rosetta::ListComp::squares(5)
-assert_eq join(",", @sq), "1,4,9,16,25", "squares 1..5"
+assert_eq join(",", @sq), "1,4,9,16,25", "squares 1:5"
 
 # Evens
 my @ev = Rosetta::ListComp::evens(10)
@@ -57,7 +57,7 @@ assert_eq join(" ", @str),
 
 # Threaded combination: even squares
 my @ev_sq = ~> 1:6 |> map { _ * _ } |> grep { _ % 2 == 0 }
-assert_eq join(",", @ev_sq), "4,16,36", "even squares of 1..6"
+assert_eq join(",", @ev_sq), "4,16,36", "even squares of 1:6"
 
 # Pipe form
 my @sq6 = Rosetta::ListComp::squares(6)

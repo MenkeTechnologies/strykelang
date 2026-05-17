@@ -88,19 +88,19 @@ assert_ok !defined $p3, "p=50 outside all intervals"
 # Expected matches: [15,20], [10,30], [17,19], [5,20], [12,15]
 my $r1 = Rosetta::IntervalTree::overlaps_range($t, 10, 18)
 my $expected_r1 = "5-20;10-30;12-15;15-20;17-19"
-assert_eq Rosetta::IntervalTree::format_intervals($r1), $expected_r1, "[10..18] overlaps"
+assert_eq Rosetta::IntervalTree::format_intervals($r1), $expected_r1, "[10:18] overlaps"
 
 # [25..28] overlaps only [10,30]
 my $r2 = Rosetta::IntervalTree::overlaps_range($t, 25, 28)
-assert_eq Rosetta::IntervalTree::format_intervals($r2), "10-30", "[25..28] overlaps"
+assert_eq Rosetta::IntervalTree::format_intervals($r2), "10-30", "[25:28] overlaps"
 
 # [35..38] overlaps only [30,40]
 my $r3 = Rosetta::IntervalTree::overlaps_range($t, 35, 38)
-assert_eq Rosetta::IntervalTree::format_intervals($r3), "30-40", "[35..38] overlaps"
+assert_eq Rosetta::IntervalTree::format_intervals($r3), "30-40", "[35:38] overlaps"
 
 # [50..60] overlaps nothing
 my $r4 = Rosetta::IntervalTree::overlaps_range($t, 50, 60)
-assert_eq len(@$r4), 0, "[50..60] no overlap"
+assert_eq len(@$r4), 0, "[50:60] no overlap"
 
 # Empty tree
 my $empty = Rosetta::IntervalTree::new()

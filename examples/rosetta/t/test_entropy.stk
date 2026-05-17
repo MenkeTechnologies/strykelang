@@ -3,12 +3,12 @@
 # H = -sum_i p_i * log2(p_i), summed over distinct chars.
 
 fn Rosetta::Entropy::shannon($s) {
-    return 0.0 if length($s) == 0
+    return 0.0 if len($s) == 0
     my %count
     for my $c ($s |> chars) {
         $count{$c} = ($count{$c} // 0) + 1
     }
-    my $n = length($s)
+    my $n = len($s)
     my $h = 0.0
     for my $c (keys %count) {
         my $p = $count{$c} / $n

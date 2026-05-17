@@ -27,14 +27,14 @@ fn Rosetta::FibCoding::encode($n) {
 
 fn Rosetta::FibCoding::decode($s) {
     return undef unless $s =~ /^[01]+1$/
-    my $core = substr($s, 0, length($s) - 1)
+    my $core = substr($s, 0, len($s) - 1)
     return undef if $core =~ /11/
     my @f = (1, 2)
-    while (len(@f) < length($core)) {
+    while (len(@f) < len($core)) {
         push @f, $f[-1] + $f[-2]
     }
     my $n = 0
-    for my $i (0..length($core) - 1) {
+    for my $i (0..len($core) - 1) {
         if (substr($core, $i, 1) eq "1") {
             $n += $f[$i]
         }

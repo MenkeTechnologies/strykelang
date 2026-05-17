@@ -20,14 +20,14 @@ fn Rosetta::PythagoreanMeans::harmonic(@nums) {
     $count / $sum_inv
 }
 
-my @data = (1..10)
+my @data = (1:10)
 my $am = Rosetta::PythagoreanMeans::arithmetic(@data)
 my $gm = Rosetta::PythagoreanMeans::geometric(@data)
 my $hm = Rosetta::PythagoreanMeans::harmonic(@data)
 
-assert_near $am, 5.5, 0.0001, "Arithmetic mean of 1..10"
-assert_near $gm, 4.5287, 0.0001, "Geometric mean of 1..10"
-assert_near $hm, 3.4141, 0.0001, "Harmonic mean of 1..10"
+assert_near $am, 5.5, 0.0001, "Arithmetic mean of 1:10"
+assert_near $gm, 4.5287, 0.0001, "Geometric mean of 1:10"
+assert_near $hm, 3.4141, 0.0001, "Harmonic mean of 1:10"
 
 assert_ok $am >= $gm, "AM >= GM"
 assert_ok $gm >= $hm, "GM >= HM"

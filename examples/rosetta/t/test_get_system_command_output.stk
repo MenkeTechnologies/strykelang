@@ -14,7 +14,7 @@ fn Rosetta::SysOut::get_echo($msg) {
 }
 
 my $u = Rosetta::SysOut::get_uptime()
-assert_ok length($u) > 0, "Uptime output is not empty"
+assert_ok len($u) > 0, "Uptime output is not empty"
 
 my $e = Rosetta::SysOut::get_echo("hello world")
 assert_eq $e, "hello world", "Echo output matches"

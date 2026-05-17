@@ -57,7 +57,7 @@ fn Rosetta::NM::minimize($f, $start, $iters) {
         my $best = $simplex[0]
         my $worst = $simplex[$n]
         my $second_worst = $simplex[$n - 1]
-        my @top = @simplex[0..$n - 1]
+        my @top = @simplex[0:$n - 1]
         my $cent = Rosetta::NM::centroid(\@top)
         my $reflected = Rosetta::NM::vec_add($cent,
             Rosetta::NM::vec_scale(Rosetta::NM::vec_sub($cent, $worst), $alpha))

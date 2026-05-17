@@ -2,9 +2,9 @@
 # Rosetta Code: Burrows-Wheeler transform
 
 fn Rosetta::BWT::compute($s) {
-    my $n = length($s)
+    my $n = len($s)
     my @rotations = ()
-    for my $i (0..$n-1) {
+    for my $i (0:$n-1) {
         push @rotations, substr($s, $i) . substr($s, 0, $i)
     }
     my @sorted = sort(@rotations)

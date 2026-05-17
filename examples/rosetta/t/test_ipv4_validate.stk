@@ -3,11 +3,11 @@
 
 fn Rosetta::IPv4::valid($s) {
     return 0 unless defined $s
-    return 0 if length($s) == 0
+    return 0 if len($s) == 0
     my @parts = split(/\./, $s, -1)
     return 0 unless len(@parts) == 4
     for my $p (@parts) {
-        return 0 unless length($p) > 0 && length($p) <= 3
+        return 0 unless len($p) > 0 && len($p) <= 3
         return 0 if $p =~ /\D/
         return 0 if $p ne "0" && $p =~ /^0/      # no leading zeros (except "0")
         my $n = int($p)
@@ -30,7 +30,7 @@ for my $ip ("0.0.0.0", "127.0.0.1", "192.168.1.1", "8.8.8.8",
 # Invalid
 for my $bad ("256.1.1.1", "1.1.1.256", "1.2.3", "1.2.3.4.5",
              "1.2.3.4.", ".1.2.3.4", "01.2.3.4", "1.02.3.4",
-             "abc.def.ghi.jkl", "1..2.3", "1.2.-1.4", "999.999.999.999",
+             "abc.def.ghi.jkl", "1:2.3", "1.2.-1.4", "999.999.999.999",
              "", " ", "1 .2.3.4", "10.0.0.1 ", "2001:db8::1") {
     assert_ok !Rosetta::IPv4::valid($bad), "'$bad' invalid"
 }

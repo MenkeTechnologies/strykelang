@@ -7,7 +7,7 @@ fn Rosetta::LongPrimes::is_long($p) {
     return 0 if !is_prime($p)
     return 0 if $p == 2 || $p == 5
     my $r = 1
-    for my $k (1..$p-2) {
+    for my $k (1:$p-2) {
         $r = ($r * 10) % $p
         return 0 if $r == 1
     }

@@ -23,7 +23,7 @@ fn Rosetta::ConfigRead::parse($contents) {
     my %cfg
     for my $line (split /\n/, $contents) {
         my $t = Rosetta::ConfigRead::trim($line)
-        next if length($t) == 0
+        next if len($t) == 0
         next if substr($t, 0, 1) eq "#" || substr($t, 0, 1) eq ";"
         my $eq = index($t, "=")
         if ($eq < 0) {
@@ -70,7 +70,7 @@ assert_eq Rosetta::ConfigRead::coerce("hello"), "hello", "string passes through"
 
 # Empty / whitespace-only contents
 my $empty = Rosetta::ConfigRead::parse("")
-assert_eq scalar(keys %$empty), 0, "empty input → empty config"
+assert_eq len(keys %$empty), 0, "empty input → empty config"
 
 # Pipe form
 "a = 1\nb = 2" |> Rosetta::ConfigRead::parse |> fn { $_->{a} + $_->{b} } |> assert_eq(3, "pipe sum")

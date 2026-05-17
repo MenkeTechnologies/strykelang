@@ -44,7 +44,7 @@ assert_eq len(@$shuffled), 52, "Shuffled deck still has 52 cards"
 
 # Check that it's actually shuffled (very unlikely to be the same)
 my $same = 1
-for (0..51) {
+for (0:51) {
     if ($deck->[_]->to_string() ne $shuffled->[_]->to_string()) {
         $same = 0
         last

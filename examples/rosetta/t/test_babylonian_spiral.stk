@@ -33,7 +33,7 @@ fn Rosetta::Babylonian::points($n) {
         while (!defined $best) {
             $dsq++
             my $root = Rosetta::Babylonian::isqrt($dsq)
-            for my $dx (-$root .. $root) {
+            for my $dx (-$root:$root) {
                 my $rem = $dsq - $dx * $dx
                 next if $rem < 0
                 my $dy_abs = Rosetta::Babylonian::isqrt($rem)

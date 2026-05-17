@@ -7,7 +7,7 @@ fn Rosetta::TrianglePath::max_sum($triangle) {
     my $n = len(@rows)
     for (my $i = $n - 2; $i >= 0; $i -= 1) {
         my $rlen = len(@{$rows[$i]})
-        for my $j (0..$rlen-1) {
+        for my $j (0:$rlen-1) {
             my $a = $rows[$i+1][$j]
             my $b = $rows[$i+1][$j+1]
             my $best = $a > $b ? $a : $b

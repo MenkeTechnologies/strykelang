@@ -15,7 +15,7 @@ fn Rosetta::SelfNumbers::check($n) {
     # A candidate m must be less than n
     my $start = $n - 100
     if ($start < 1) { $start = 1 }
-    for my $m ($start..$n-1) {
+    for my $m ($start:$n-1) {
         if ($m + Rosetta::SelfNumbers::sum_digits($m) == $n) {
             $found = 1
             return 0

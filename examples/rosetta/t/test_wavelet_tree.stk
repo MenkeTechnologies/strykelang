@@ -104,7 +104,7 @@ for my $k (~> 0:9) {
 my @sub_sorted = sort { _0 <=> _1 } (4, 1, 5, 9, 2)
 for my $k (~> 0:4) {
     my $q = Rosetta::Wavelet::quantile($tree, $k, 2, 7)
-    assert_eq $q, $sub_sorted[$k], "quantile $k in [2..7] = $sub_sorted[$k]"
+    assert_eq $q, $sub_sorted[$k], "quantile $k in [2:7] = $sub_sorted[$k]"
 }
 
 # Single-element sequence

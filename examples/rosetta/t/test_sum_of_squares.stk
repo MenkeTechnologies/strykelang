@@ -15,7 +15,7 @@ assert_eq Rosetta::SumOfSquares::sum_of_squares(4, 5), 41, "16 + 25 = 41"
 assert_eq Rosetta::SumOfSquares::sum_of_squares(0), 0, "zero"
 assert_eq Rosetta::SumOfSquares::sum_of_squares(), 0, "empty"
 
-my @data = 1..10
-assert_eq Rosetta::SumOfSquares::sum_of_squares(@data), 385, "sum of squares 1..10"
+my @data = 1:10
+assert_eq Rosetta::SumOfSquares::sum_of_squares(@data), 385, "sum of squares 1:10"
 
 test_run

@@ -6,7 +6,7 @@ fn Rosetta::GraphColoring::solve($adj) {
     my %colors
     
     # Iterate through nodes and assign the first available color
-    for my $i (0 .. $num_nodes - 1) {
+    for my $i (0:$num_nodes - 1) {
         my %used_neighbor_colors
         for my $neighbor (@{$adj->[$i]}) {
             if (exists $colors{$neighbor}) {

@@ -5,7 +5,7 @@ fn Rosetta::BetrothedNumbers::sum_divisors($n) {
     if ($n < 2) { return 0 }
     my $sum = 0
     my $limit = int($n / 2)
-    for my $i (1..$limit) {
+    for my $i (1:$limit) {
         if ($n % $i == 0) {
             $sum = $sum + $i
         }
@@ -15,7 +15,7 @@ fn Rosetta::BetrothedNumbers::sum_divisors($n) {
 
 fn Rosetta::BetrothedNumbers::solve($limit) {
     my @res
-    for my $a (1..$limit) {
+    for my $a (1:$limit) {
         my $s = Rosetta::BetrothedNumbers::sum_divisors($a)
         if ($s > 1) {
             my $b = $s - 1

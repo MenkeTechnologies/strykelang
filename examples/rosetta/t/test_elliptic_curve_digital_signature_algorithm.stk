@@ -4,7 +4,7 @@
 fn Rosetta::ECDSA::inv($a, $n) {
     my $x = $a % $n
     $x += $n if $x < 0
-    for my $i (1 .. $n - 1) {
+    for my $i (1:$n - 1) {
         return $i if (($x * $i) % $n) == 1
     }
     0

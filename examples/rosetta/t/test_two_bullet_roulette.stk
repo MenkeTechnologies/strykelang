@@ -17,7 +17,7 @@ fn Rosetta::Roulette::p_survive_no_spin() {
     my $n = len(@$cyl)
     my $first_safe = 0
     my $second_also_safe = 0
-    for my $start (0..$n - 1) {
+    for my $start (0:$n - 1) {
         if ($cyl->[$start] == 0) {
             $first_safe++
             my $next = ($start + 1) % $n
@@ -52,7 +52,7 @@ assert_eq len(@$cyl), 6, "six chambers"
 
 # Bullets are adjacent
 my $adjacent = 0
-for my $i (0..5) {
+for my $i (0:5) {
     my $j = ($i + 1) % 6
     $adjacent = 1 if $cyl->[$i] == 1 && $cyl->[$j] == 1
 }

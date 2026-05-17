@@ -7,7 +7,7 @@ fn Rosetta::FpPath::muller_recurrence($n) {
     # x_{n+1} = 111 - 1130/x_n + 3000/(x_n · x_{n-1})
     # Mathematically converges to 6, but floating point drifts to 100.
     my @x = (4.0, 4.25)
-    for my $i (2..$n) {
+    for my $i (2:$n) {
         my $next = 111 - 1130 / $x[-1] + 3000 / ($x[-1] * $x[-2])
         push @x, $next
     }

@@ -15,7 +15,7 @@ fn Rosetta::GoFish::init_deck() {
 
 fn Rosetta::GoFish::deal(@deck) {
     my @hand
-    for (1..7) {
+    for (1:7) {
         push @hand, shift @deck
     }
     \@hand

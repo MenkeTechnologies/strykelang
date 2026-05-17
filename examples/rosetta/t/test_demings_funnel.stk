@@ -6,7 +6,7 @@ fn Rosetta::Deming::simulate($rule, $num_drops) {
     my $funnel = 0.0
     my $sum_sq = 0.0
     
-    for (1..$num_drops) {
+    for (1:$num_drops) {
         # Drop marble with random error (normal distribution approximation)
         my $error = (rand() + rand() + rand() + rand() + rand() + rand() - 3.0) / 3.0
         my $landed = $funnel + $error

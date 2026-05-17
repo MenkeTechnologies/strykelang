@@ -6,8 +6,8 @@ fn Rosetta::ImgDiff::diff($img1, $img2) {
     my $cols = len(@{$img1->[0]})
     my $diff_sum = 0.0
     
-    for my $r (0 .. $rows - 1) {
-        for my $c (0 .. $cols - 1) {
+    for my $r (0:$rows - 1) {
+        for my $c (0:$cols - 1) {
             my $p1 = $img1->[$r][$c]
             my $p2 = $img2->[$r][$c]
             

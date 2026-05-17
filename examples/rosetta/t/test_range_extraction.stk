@@ -12,7 +12,7 @@ fn Rosetta::RangeExtraction::extract(@nums) {
         if ($j - $i >= 2) {
             push @groups, "$nums[$i]-$nums[$j]"
         } else {
-            for my $k ($i..$j) {
+            for my $k ($i:$j) {
                 push @groups, "$nums[$k]"
             }
         }

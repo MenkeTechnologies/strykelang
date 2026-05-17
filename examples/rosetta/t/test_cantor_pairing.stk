@@ -22,8 +22,8 @@ assert_eq Rosetta::Cantor::pair(5, 9),114, "pair(5,9)"
 
 # Round-trip every (x, y) with x + y <= 6.
 my $ok = 1
-for my $x (0..6) {
-    for my $y (0..6 - $x) {
+for my $x (0:6) {
+    for my $y (0:6 - $x) {
         my $z = Rosetta::Cantor::pair($x, $y)
         my $u = Rosetta::Cantor::unpair($z)
         $ok = 0 unless $u->[0] == $x && $u->[1] == $y

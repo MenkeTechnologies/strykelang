@@ -4,7 +4,7 @@
 fn Rosetta::Chess960::id_to_pos($id) {
     my $n = $id
     my @backline
-    for (0..7) { push @backline, undef }
+    for (0:7) { push @backline, undef }
     
     # 1. Light-square bishop
     my $b_light = $n % 4
@@ -20,7 +20,7 @@ fn Rosetta::Chess960::id_to_pos($id) {
     my $q_pos = $n % 6
     $n = int($n / 6)
     my $count = 0
-    for my $i (0..7) {
+    for my $i (0:7) {
         if (!defined $backline[$i]) {
             if ($count == $q_pos) {
                 $backline[$i] = "Q"
@@ -41,7 +41,7 @@ fn Rosetta::Chess960::id_to_pos($id) {
     )
     my $k_pair = $k_placements[$k_id]
     $count = 0
-    for my $i (0..7) {
+    for my $i (0:7) {
         if (!defined $backline[$i]) {
             if ($count == $k_pair->[0] || $count == $k_pair->[1]) {
                 $backline[$i] = "N"
@@ -51,15 +51,15 @@ fn Rosetta::Chess960::id_to_pos($id) {
     }
     
     # 5. Rooks and King: R-K-R
-    for my $i (0..7) {
+    for my $i (0:7) {
         if (!defined $backline[$i]) {
             $backline[$i] = "R"
             # find next
-            for my $j ($i+1 .. 7) {
+            for my $j ($i+1:7) {
                 if (!defined $backline[$j]) {
                     $backline[$j] = "K"
                     # find next
-                    for my $k ($j+1 .. 7) {
+                    for my $k ($j+1:7) {
                         if (!defined $backline[$k]) {
                             $backline[$k] = "R"
                             last

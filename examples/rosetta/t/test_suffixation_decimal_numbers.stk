@@ -20,7 +20,7 @@ fn Rosetta::Suffixation::apply($s) {
     return undef unless $s =~ /^\s*(-?\d+(?:\.\d+)?)\s*([KMGTPE]i?)?\s*$/
     my $val = $1 + 0
     my $suf = $2
-    return $val if !defined $suf || length($suf) == 0
+    return $val if !defined $suf || len($suf) == 0
     my $f = Rosetta::Suffixation::factor($suf)
     return undef unless defined $f
     $val * $f

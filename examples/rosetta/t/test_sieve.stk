@@ -3,7 +3,7 @@
 
 fn Rosetta::Sieve::compute($limit) {
     if ($limit < 2) { return [] }
-    my @is_prime = map { 1 } 0..$limit
+    my @is_prime = map { 1 } 0:$limit
     $is_prime[0] = 0
     $is_prime[1] = 0
     

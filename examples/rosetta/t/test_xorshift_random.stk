@@ -24,7 +24,7 @@ fn Rosetta::Xorshift::range($rng, $lo, $hi) {
 # Reproducibility: same seed -> same stream
 my $a = Rosetta::Xorshift::new(2463534242)
 my $b = Rosetta::Xorshift::new(2463534242)
-for my $i (1..20) {
+for my $i (1:20) {
     assert_eq Rosetta::Xorshift::next($a), Rosetta::Xorshift::next($b), "iter $i identical"
 }
 
@@ -32,16 +32,16 @@ for my $i (1..20) {
 my $c = Rosetta::Xorshift::new(1)
 my $d = Rosetta::Xorshift::new(2)
 my $diff = 0
-for (1..5) {
+for (1:5) {
     $diff++ if Rosetta::Xorshift::next($c) != Rosetta::Xorshift::next($d)
 }
 assert_eq $diff, 5, "different seeds diverge within 5 steps"
 
 # Range bounded
 my $rng = Rosetta::Xorshift::new(42)
-for (1..50) {
+for (1:50) {
     my $v = Rosetta::Xorshift::range($rng, 0, 9)
-    assert_ok($v >= 0 && $v <= 9, "range produces 0..9")
+    assert_ok($v >= 0 && $v <= 9, "range produces 0:9")
 }
 
 # Seed 0 normalised to 1 (xorshift is fixed-point at 0)
@@ -51,7 +51,7 @@ assert_eq $z->{state}, 1, "seed 0 normalised to 1"
 # Spread / uniformity sanity: 10000 samples in 0..9 should fill all buckets
 my $r2 = Rosetta::Xorshift::new(2024)
 my %hist
-for (1..10000) {
+for (1:10000) {
     my $v = Rosetta::Xorshift::range($r2, 0, 9)
     $hist{$v}++
 }

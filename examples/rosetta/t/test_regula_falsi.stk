@@ -6,7 +6,7 @@ fn Rosetta::RegulaFalsi::find($f, $a, $b, $eps, $max_iter) {
     my $fb = $f->($b)
     return undef if $fa * $fb > 0
     my $c = $a
-    for my $i (1..$max_iter) {
+    for my $i (1:$max_iter) {
         $c = ($a * $fb - $b * $fa) / ($fb - $fa)
         my $fc = $f->($c)
         return $c if abs($fc) < $eps

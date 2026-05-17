@@ -19,7 +19,7 @@ fn Rosetta::SmallestGreater::tau($n) {
 fn Rosetta::SmallestGreater::sequence($k) {
     return [] if $k < 1
     my @s = (1)
-    for my $n (2..$k) {
+    for my $n (2:$k) {
         my $cur = $s[-1] + 1
         while (Rosetta::SmallestGreater::tau($cur) != $n) { $cur++ }
         push @s, $cur
@@ -41,14 +41,14 @@ assert_eq $s->[5], 18, "a(6) = 18"
 assert_eq $s->[6], 64, "a(7) = 64"
 
 # Check τ matches
-for my $n (1..15) {
+for my $n (1:15) {
     next if $n == 1     # τ(1) = 1, the starting case
     assert_eq Rosetta::SmallestGreater::tau($s->[$n - 1]), $n,
         sprintf("τ(a(%d)) = %d", $n, $n)
 }
 
 # Strictly increasing
-for my $i (1..14) {
+for my $i (1:14) {
     assert_ok $s->[$i] > $s->[$i - 1], sprintf("strictly increasing at %d", $i)
 }
 

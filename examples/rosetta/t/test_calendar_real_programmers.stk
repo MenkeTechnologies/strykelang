@@ -57,14 +57,14 @@ fn Rosetta::RealCalendar::month_name($month) {
 
 fn Rosetta::RealCalendar::month_block($year, $month) {
     my @cells
-    for my $i (0..41) {
+    for my $i (0:41) {
         push @cells, "  "
     }
 
     my $first = Rosetta::RealCalendar::monday_column($year, $month, 1)
     my $days = Rosetta::RealCalendar::days_in_month($year, $month)
 
-    for my $day (1..$days) {
+    for my $day (1:$days) {
         $cells[$first + $day - 1] = sprintf("%2d", $day)
     }
 
@@ -73,9 +73,9 @@ fn Rosetta::RealCalendar::month_block($year, $month) {
         "MO TU WE TH FR SA SU" |> Rosetta::RealCalendar::pad_right(21),
     )
 
-    for my $week (0..5) {
+    for my $week (0:5) {
         my $line = ""
-        for my $col (0..6) {
+        for my $col (0:6) {
             $line .= $cells[$week * 7 + $col]
             $line .= " " if $col < 6
         }
@@ -87,12 +87,12 @@ fn Rosetta::RealCalendar::month_block($year, $month) {
 
 fn Rosetta::RealCalendar::render_half($year, $start_month) {
     my @blocks
-    for my $month ($start_month..$start_month + 5) {
+    for my $month ($start_month:$start_month + 5) {
         push @blocks, Rosetta::RealCalendar::month_block($year, $month)
     }
 
     my @lines
-    for my $row (0..7) {
+    for my $row (0:7) {
         my @parts = ~> @blocks map { $_->[$row] }
         push @lines, " " . (@parts |> join(" "))
     }

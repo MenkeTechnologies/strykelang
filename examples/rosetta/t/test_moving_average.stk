@@ -17,7 +17,7 @@ fn Rosetta::MovAvg::n($xs_ref, $n) {
     my @out
     for my $i ($n - 1 .. len(@$xs_ref) - 1) {
         my $sum = 0
-        for my $j (0 .. $n - 1) { $sum += $xs_ref->[$i - $j] }
+        for my $j (0:$n - 1) { $sum += $xs_ref->[$i - $j] }
         push @out, $sum / $n
     }
     @out
@@ -25,11 +25,11 @@ fn Rosetta::MovAvg::n($xs_ref, $n) {
 
 # 2-window moving average of (1,2,3,4,5): means of (1,2), (2,3), (3,4), (4,5) = 1.5, 2.5, 3.5, 4.5.
 my @r = Rosetta::MovAvg::two(1, 2, 3, 4, 5)
-assert_eq join(",", @r), "1.5,2.5,3.5,4.5", "2-window (1..5)"
+assert_eq join(",", @r), "1.5,2.5,3.5,4.5", "2-window (1:5)"
 
 # 3-window: means of (1,2,3), (2,3,4), (3,4,5) = 2, 3, 4.
 my @r3 = Rosetta::MovAvg::n([1, 2, 3, 4, 5], 3)
-assert_eq join(",", @r3), "2,3,4", "3-window (1..5)"
+assert_eq join(",", @r3), "2,3,4", "3-window (1:5)"
 
 # Constant series → constant means.
 my @c = Rosetta::MovAvg::two(7, 7, 7, 7)

@@ -8,12 +8,12 @@ fn Rosetta::Levenshtein::compute($s1, $s2) {
     my $len2 = len(@c2)
     
     my @d
-    for my $i (0..$len1) { $d[$i] = [] }
-    for my $i (0..$len1) { $d[$i][0] = $i }
-    for my $j (0..$len2) { $d[0][$j] = $j }
+    for my $i (0:$len1) { $d[$i] = [] }
+    for my $i (0:$len1) { $d[$i][0] = $i }
+    for my $j (0:$len2) { $d[0][$j] = $j }
     
-    for my $i (1..$len1) {
-        for my $j (1..$len2) {
+    for my $i (1:$len1) {
+        for my $j (1:$len2) {
             my $cost = ($c1[$i-1] eq $c2[$j-1]) ? 0 : 1
             my @v = ($d[$i-1][$j] + 1, $d[$i][$j-1] + 1, $d[$i-1][$j-1] + $cost)
             $d[$i][$j] = @v |> reduce { (_0 < _1) ? _0 : _1 }

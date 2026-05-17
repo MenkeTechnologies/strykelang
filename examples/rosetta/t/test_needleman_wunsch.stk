@@ -7,7 +7,7 @@ fn Rosetta::NeedlemanWunsch::solve($s1, $s2, $match, $mismatch, $gap) {
     my $n1 = len(@c1)
     my $n2 = len(@c2)
     
-    my @f = map { [ map { 0 } 0..$n2 ] } 0..$n1
+    my @f = map { [ map { 0 } 0:$n2 ] } 0:$n1
     
     for (my $i = 0; $i <= $n1; $i++) { $f[$i]->[0] = $i * $gap }
     for (my $j = 0; $j <= $n2; $j++) { $f[0]->[$j] = $j * $gap }
@@ -59,6 +59,6 @@ assert_eq $score, 0, "Needleman-Wunsch score"
 # G C A - T G C U
 # The actual alignment can vary but score should be 0.
 # Let's check score.
-assert_eq length($a1), length($a2), "alignment lengths match"
+assert_eq len($a1), len($a2), "alignment lengths match"
 
 test_run

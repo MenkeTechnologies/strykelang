@@ -9,8 +9,8 @@ fn Rosetta::Topswops::flip($perm) {
     my @p = @$perm
     while ($p[0] != 1) {
         my $first = $p[0]
-        my @rev = rev @p[0..$first-1]
-        for my $i (0..$first-1) { $p[$i] = $rev[$i] }
+        my @rev = rev @p[0:$first-1]
+        for my $i (0:$first-1) { $p[$i] = $rev[$i] }
         $count += 1
     }
     $count
@@ -20,9 +20,9 @@ fn Rosetta::Topswops::permutations($arr) {
     my $n = len(@$arr)
     return [[@$arr]] if $n <= 1
     my @result
-    for my $i (0..$n-1) {
+    for my $i (0:$n-1) {
         my @rest
-        for my $j (0..$n-1) {
+        for my $j (0:$n-1) {
             push @rest, $arr->[$j] if $j != $i
         }
         my $sub = Rosetta::Topswops::permutations(\@rest)
@@ -34,7 +34,7 @@ fn Rosetta::Topswops::permutations($arr) {
 }
 
 fn Rosetta::Topswops::max_swaps($n) {
-    my @initial = (1..$n)
+    my @initial = (1:$n)
     my $perms = Rosetta::Topswops::permutations(\@initial)
     my $max = 0
     for my $p (@$perms) {

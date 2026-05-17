@@ -4,7 +4,7 @@
 fn Rosetta::Benford::first_digit($n) {
     my $s = "$n"
     $s =~ s/^[0\W]+//; # remove leading zeros and non-digits
-    return -1 if length($s) == 0
+    return -1 if len($s) == 0
     substr($s, 0, 1) + 0
 }
 
@@ -20,7 +20,7 @@ fn Rosetta::Benford::analyze(@nums) {
     }
     
     my %freqs
-    for my $d (1..9) {
+    for my $d (1:9) {
         $freqs{$d} = ($counts{$d} || 0) / $total
     }
     \%freqs
@@ -28,7 +28,7 @@ fn Rosetta::Benford::analyze(@nums) {
 
 # First 100 Fibonacci numbers
 my @fibs = (1, 1)
-for my $i (2..99) {
+for my $i (2:99) {
     push @fibs, $fibs[$i-1] + $fibs[$i-2]
 }
 

@@ -30,7 +30,7 @@ assert_eq Rosetta::Variance::sample(7, 7, 7, 7),     0, "constant sample var"
 
 # Mean-zero symmetric → easy to verify.
 my @sym = (-2, -1, 0, 1, 2)
-assert_eq Rosetta::Variance::mean(@sym), 0, "mean(-2..2) = 0"
+assert_eq Rosetta::Variance::mean(@sym), 0, "mean(-2:2) = 0"
 assert_eq Rosetta::Variance::population(@sym), 2, "pop var"
 my $s = Rosetta::Variance::sample(@sym)
 assert_ok abs($s - 2.5) < 1e-12, "sample var = pop * n/(n-1)"

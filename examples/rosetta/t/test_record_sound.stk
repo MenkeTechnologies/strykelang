@@ -4,7 +4,7 @@
 fn Rosetta::RecordSound::capture($seconds, $rate) {
     my $count = $seconds * $rate
     my @samples
-    for my $i (0 .. $count - 1) {
+    for my $i (0:$count - 1) {
         push @samples, ($i % 4) - 2
     }
     \@samples

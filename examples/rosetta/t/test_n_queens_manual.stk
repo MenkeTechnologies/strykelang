@@ -2,7 +2,7 @@
 # Rosetta Code: N-Queens (Manual)
 
 fn Rosetta::NQueensManual::is_safe($queens, $r, $c) {
-    for my $i (0..$r-1) {
+    for my $i (0:$r-1) {
         my $qc = $queens->[$i]
         if ($qc == $c || abs($qc - $c) == abs($i - $r)) { return 0 }
     }
@@ -15,7 +15,7 @@ fn Rosetta::NQueensManual::solve($n, $r, $queens, $count) {
         return $count
     }
     
-    for my $c (0..$n-1) {
+    for my $c (0:$n-1) {
         if (Rosetta::NQueensManual::is_safe($queens, $r, $c)) {
             $queens->[$r] = $c
             $count = Rosetta::NQueensManual::solve($n, $r + 1, $queens, $count)

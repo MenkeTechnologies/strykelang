@@ -19,9 +19,9 @@ fn Rosetta::Voronoi::nearest($seeds, $x, $y) {
 
 fn Rosetta::Voronoi::raster($seeds, $w, $h) {
     my @grid
-    for my $y (0..$h - 1) {
+    for my $y (0:$h - 1) {
         my @row
-        for my $x (0..$w - 1) {
+        for my $x (0:$w - 1) {
             push @row, Rosetta::Voronoi::nearest($seeds, $x, $y)
         }
         push @grid, \@row
@@ -74,7 +74,7 @@ assert_ok $valid, "all cells map to a valid seed"
 
 # Cell counts sum to total pixels
 my $total = 0
-for my $i (0..3) { $total += Rosetta::Voronoi::cell_size($g3, $i) }
+for my $i (0:3) { $total += Rosetta::Voronoi::cell_size($g3, $i) }
 assert_eq $total, 100, "cell counts sum to 100"
 
 # Pipe form

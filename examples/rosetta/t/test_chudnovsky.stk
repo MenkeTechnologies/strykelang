@@ -7,14 +7,14 @@
 
 fn Rosetta::Chudnovsky::factorial($n) {
     my $r = 1.0
-    for (2 .. $n) { $r *= _ }
+    for (2:$n) { $r *= _ }
     $r
 }
 
 fn Rosetta::Chudnovsky::approx($terms) {
     my $sum = 0.0
     my $C = 426880 * sqrt(10005)
-    for my $k (0 .. $terms - 1) {
+    for my $k (0:$terms - 1) {
         my $num = (-1) ** $k * Rosetta::Chudnovsky::factorial(6 * $k)
                 * (545140134 * $k + 13591409)
         my $den = Rosetta::Chudnovsky::factorial(3 * $k)

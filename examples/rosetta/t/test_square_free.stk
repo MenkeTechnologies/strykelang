@@ -20,7 +20,7 @@ fn Rosetta::SquareFree::is_square_free($n) {
 }
 
 fn Rosetta::SquareFree::square_free_list($max) {
-    ~> 1..$max filter { Rosetta::SquareFree::is_square_free(_) }
+    ~> 1:$max filter { Rosetta::SquareFree::is_square_free(_) }
 }
 
 assert_ok Rosetta::SquareFree::is_square_free(1), "1 is square-free"

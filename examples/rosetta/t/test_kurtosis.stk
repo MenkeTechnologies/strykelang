@@ -25,6 +25,6 @@ assert_ok abs($kurt - (-1.00548)) < 0.001, "kurtosis of (2, 4, 6, 3, 1)"
 my @uniform = (1, 2, 3, 4, 5)
 # mu=3. m2=2. m4=6.8. kurtosis = 6.8 / 4 - 3 = 3.4 - 3 = -1.3
 my $u_kurt = Rosetta::Stats::kurtosis(@uniform)
-assert_ok abs($u_kurt - (-1.3)) < 1e-10, "kurtosis of (1..5)"
+assert_ok abs($u_kurt - (-1.3)) < 1e-10, "kurtosis of (1:5)"
 
 test_run

@@ -3,7 +3,7 @@
 
 fn Rosetta::SumOfSeries::sum_series {
     my $m = _
-    ~> (1..$m) map { 1 / (_ * _) } reduce { _0 + _1 }
+    ~> (1:$m) map { 1 / (_ * _) } reduce { _0 + _1 }
 }
 
 my $res = Rosetta::SumOfSeries::sum_series(1000)

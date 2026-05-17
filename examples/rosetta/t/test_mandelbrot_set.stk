@@ -32,8 +32,8 @@ fn Rosetta::Mandelbrot::render($width, $height, $max_iter) {
     my $y_scale = ($y_max - $y_min) / $height
     
     my $output = ""
-    for my $y (0..$height-1) {
-        for my $x (0..$width-1) {
+    for my $y (0:$height-1) {
+        for my $x (0:$width-1) {
             my $c_real = $x_min + $x * $x_scale
             my $c_imag = $y_min + $y * $y_scale
             

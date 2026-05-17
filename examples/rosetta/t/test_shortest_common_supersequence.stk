@@ -10,12 +10,12 @@ fn Rosetta::SCS::compute($s1, $s2) {
 
     # LCS table: lcs[i][j] = length of LCS of s1[0..i-1] and s2[0..j-1]
     my @lcs
-    for my $i (0..$n) {
+    for my $i (0:$n) {
         $lcs[$i] = []
-        for my $j (0..$m) { $lcs[$i][$j] = 0 }
+        for my $j (0:$m) { $lcs[$i][$j] = 0 }
     }
-    for my $i (1..$n) {
-        for my $j (1..$m) {
+    for my $i (1:$n) {
+        for my $j (1:$m) {
             if ($c1[$i-1] eq $c2[$j-1]) {
                 my $prev = $lcs[$i-1][$j-1]
                 $lcs[$i][$j] = $prev + 1
@@ -61,7 +61,7 @@ fn Rosetta::SCS::is_supersequence($scs, $sub) {
 
 # "abcbdab" + "bdcaba" -> common SCS length 9 (e.g. "abdcabdab")
 my $r = Rosetta::SCS::compute("abcbdab", "bdcaba")
-assert_eq length($r), 9, "SCS length is 9"
+assert_eq len($r), 9, "SCS length is 9"
 assert_ok Rosetta::SCS::is_supersequence($r, "abcbdab"), "SCS contains s1"
 assert_ok Rosetta::SCS::is_supersequence($r, "bdcaba"),  "SCS contains s2"
 
@@ -77,6 +77,6 @@ assert_eq $r4, "world", "SCS with empty s2"
 
 # Disjoint chars: SCS length is sum of lengths
 my $r5 = Rosetta::SCS::compute("abc", "xyz")
-assert_eq length($r5), 6, "SCS length for disjoint inputs"
+assert_eq len($r5), 6, "SCS length for disjoint inputs"
 
 test_run

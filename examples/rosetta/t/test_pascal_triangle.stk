@@ -13,7 +13,7 @@ fn Rosetta::PascalTriangle::next_row($prev) {
 
 fn Rosetta::PascalTriangle::generate($n) {
     my @rows = ([1])
-    for my $i (1..$n-1) {
+    for my $i (1:$n-1) {
         push @rows, Rosetta::PascalTriangle::next_row($rows[-1])
     }
     \@rows

@@ -31,7 +31,7 @@ fn Rosetta::CardTrick::locate($cards, $choice_sequence) {
     $cur->[10]
 }
 
-my @cards = (1 .. 21)
+my @cards = (1:21)
 
 assert_eq join(",", @{Rosetta::CardTrick::deal(\@cards)->[0]}), "1,4,7,10,13,16,19", "first pile dealt cyclically"
 assert_eq Rosetta::CardTrick::locate(\@cards, [1, 1, 1]), 11, "three middle gathers reveal center card"

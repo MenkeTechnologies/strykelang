@@ -16,7 +16,7 @@ fn Rosetta::Running::product(@xs) {
 
 # Cumulative sum 1..5: 1, 3, 6, 10, 15 (the triangular numbers).
 my @t = Rosetta::Running::total(1, 2, 3, 4, 5)
-assert_eq join(",", @t), "1,3,6,10,15", "cumulative 1..5 → triangular"
+assert_eq join(",", @t), "1,3,6,10,15", "cumulative 1:5 → triangular"
 
 # Empty input → empty.
 my @empty_input = ()

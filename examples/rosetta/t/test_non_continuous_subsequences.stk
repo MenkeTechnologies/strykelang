@@ -7,7 +7,7 @@ fn Rosetta::NonContig::get_subsequences(@items) {
     # Power set using bitmask
     for my $i (1 .. (2**$n - 1)) {
         my @sub
-        for my $j (0 .. $n - 1) {
+        for my $j (0:$n - 1) {
             if (($i >> $j) & 1) {
                 push @sub, $items[$j]
             }
@@ -18,11 +18,11 @@ fn Rosetta::NonContig::get_subsequences(@items) {
 }
 
 fn Rosetta::NonContig::get_indices_subsequences($n) {
-    my @indices = 0 .. $n - 1
+    my @indices = 0:$n - 1
     my @res
     for my $i (1 .. (2**$n - 1)) {
         my @idx_sub
-        for my $j (0 .. $n - 1) {
+        for my $j (0:$n - 1) {
             if (($i >> $j) & 1) {
                 push @idx_sub, $j
             }

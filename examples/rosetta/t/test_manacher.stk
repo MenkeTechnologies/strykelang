@@ -2,7 +2,7 @@
 # Rosetta Code: Manacher's algorithm
 
 fn Rosetta::Manacher::solve($s) {
-    my $len = length($s)
+    my $len = len($s)
     return $s if $len <= 1
     
     # Preprocess: "aba" -> "^#a#b#a#$"

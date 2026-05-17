@@ -4,7 +4,7 @@
 fn Rosetta::MultiplicativeDigitalRoot::multiplicative_digital_root_and_persistence($n) {
     my $persistence = 0
     my $curr = $n
-    while (length("$curr") > 1) {
+    while (len("$curr") > 1) {
         my @digits = ~> "$curr" chars map { int(_) }
         my $prod = 1
         for my $d (@digits) { $prod *= $d }

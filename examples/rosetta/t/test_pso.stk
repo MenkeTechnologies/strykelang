@@ -7,7 +7,7 @@ fn Rosetta::PSO::solve {
     my $g_best_pos = [100.0, 100.0]
     my $g_best_val = 20000.0
     
-    for my $i (1..$num_particles) {
+    for my $i (1:$num_particles) {
         my $px = rand(20) - 10
         my $py = rand(20) - 10
         my $p = {
@@ -24,9 +24,9 @@ fn Rosetta::PSO::solve {
     }
     
     my $w = 0.5; my $c1 = 1.0; my $c2 = 1.0
-    for my $iter (1..50) {
+    for my $iter (1:50) {
         for my $p (@particles) {
-            for my $d (0..1) {
+            for my $d (0:1) {
                 my $r1 = rand(); my $r2 = rand()
                 $p->{vel}->[$d] = $w * $p->{vel}->[$d] + $c1 * $r1 * ($p->{best_pos}->[$d] - $p->{pos}->[$d]) + $c2 * $r2 * ($g_best_pos->[$d] - $p->{pos}->[$d])
                 $p->{pos}->[$d] = $p->{pos}->[$d] + $p->{vel}->[$d]

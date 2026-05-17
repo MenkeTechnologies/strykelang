@@ -21,7 +21,7 @@ fn Rosetta::Peano::pred($n) {
 
 fn Rosetta::Peano::from_int($k) {
     my $n = Rosetta::Peano::zero()
-    for (1 .. $k) { $n = Rosetta::Peano::succ($n) }
+    for (1:$k) { $n = Rosetta::Peano::succ($n) }
     $n
 }
 

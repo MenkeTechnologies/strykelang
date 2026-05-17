@@ -72,7 +72,7 @@ fn Rosetta::ImagBase::decode($s) {
     my @powers_re = (1)
     my @powers_im = (0)
     my $k = 0
-    while ($k < length($integer_part) + length($frac_part) - 1) {
+    while ($k < len($integer_part) + len($frac_part) - 1) {
         # (re, im) * (2i) = (-2*im, 2*re)
         my $new_re = -2 * $powers_im[-1]
         my $new_im =  2 * $powers_re[-1]
@@ -80,7 +80,7 @@ fn Rosetta::ImagBase::decode($s) {
         push @powers_im, $new_im
         $k++
     }
-    my $exp = length($integer_part) - 1
+    my $exp = len($integer_part) - 1
     my $idx_pow = $exp
     for my $c (split //, $integer_part) {
         my $d = ord($c) - ord("0")

@@ -4,7 +4,7 @@
 fn Rosetta::Beaufort::codec($text, $key) {
     my $t = $text |> uc() |> { _ =~ s/[^A-Z]//gr }
     my $k = $key |> uc() |> { _ =~ s/[^A-Z]//gr }
-    return "" if length($k) == 0
+    return "" if len($k) == 0
     
     my @t_chars = $t |> chars()
     my @k_chars = $k |> chars()
@@ -29,6 +29,6 @@ my $enc = Rosetta::Beaufort::codec($t, $key)
 
 # We will just verify it's reciprocal
 assert_eq Rosetta::Beaufort::codec($enc, $key), $t, "decode with Beaufort is reciprocal"
-assert_eq length($enc), length($t), "same length"
+assert_eq len($enc), len($t), "same length"
 
 test_run

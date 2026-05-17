@@ -63,7 +63,7 @@ assert_ok((30 / 5 - 1) % 5 == 0, "(30/5-1) % 5 == 0")
 
 # Search up to 900: should find 30 and 858
 my @found
-for my $i (4..900) {
+for my $i (4:900) {
     push @found, $i if Rosetta::Giuga::is_giuga($i)
 }
 assert_eq join(",", @found), "30,858", "Giuga numbers up to 900"

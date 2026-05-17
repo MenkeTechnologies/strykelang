@@ -2,8 +2,8 @@
 # Rosetta Code: Rabin-Karp string search
 
 fn Rosetta::RabinKarp::solve($text, $pattern) {
-    my $n = length($text)
-    my $m = length($pattern)
+    my $n = len($text)
+    my $m = len($pattern)
     return () if $m > $n
     
     my $prime = 101

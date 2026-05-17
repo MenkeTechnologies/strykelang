@@ -9,7 +9,7 @@ fn Rosetta::Pigeonhole::sort($arr) {
     $holes[_ - $min]++ for @$arr
     my @out
     for my $i (0..len(@holes) - 1) {
-        push @out, $i + $min for 1..$holes[$i]
+        push @out, $i + $min for 1:$holes[$i]
     }
     \@out
 }

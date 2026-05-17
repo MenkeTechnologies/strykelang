@@ -3,7 +3,7 @@
 
 fn Rosetta::Ludic::generate($n) {
     my @ludics = (1)
-    my @nums = (2..$n)
+    my @nums = (2:$n)
     while (len(@nums) > 0) {
         my $skip = shift @nums
         push @ludics, $skip

@@ -4,12 +4,12 @@
 # Case is preserved; non-alphabetic characters pass through.
 
 fn Rosetta::Subst::build_table($key) {
-    return undef if length($key) != 26
+    return undef if len($key) != 26
     my %enc
     my %dec
     my @upper_in  = ("A".."Z")
     my @upper_key = split //, uc($key)
-    for my $i (0..25) {
+    for my $i (0:25) {
         $enc{$upper_in[$i]} = $upper_key[$i]
         $dec{$upper_key[$i]} = $upper_in[$i]
     }

@@ -8,7 +8,7 @@ fn Rosetta::ClosestPair::find(@pts) {
     my $best_d = abs($sorted[1] - $sorted[0])
     my $best_a = $sorted[0]
     my $best_b = $sorted[1]
-    for my $i (1..$n-2) {
+    for my $i (1:$n-2) {
         my $d = abs($sorted[$i+1] - $sorted[$i])
         if ($d < $best_d) {
             $best_d = $d

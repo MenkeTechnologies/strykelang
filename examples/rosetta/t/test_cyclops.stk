@@ -14,7 +14,7 @@ fn Rosetta::Cyclops::check($n) {
         return 0
     }
     
-    for my $i (0..$len-1) {
+    for my $i (0:$len-1) {
         if ($i != $mid && $c[$i] eq "0") {
             return 0
         }

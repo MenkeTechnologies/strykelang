@@ -13,8 +13,8 @@ fn Rosetta::StatePuzzle::canonical($s) {
 fn Rosetta::StatePuzzle::find_pairs($states) {
     my $n = len(@$states)
     my %by_key
-    for my $i (0..$n - 2) {
-        for my $j ($i + 1..$n - 1) {
+    for my $i (0:$n - 2) {
+        for my $j ($i + 1:$n - 1) {
             my $k = Rosetta::StatePuzzle::canonical($states->[$i] . $states->[$j])
             push @{$by_key{$k}}, [$i, $j]
         }

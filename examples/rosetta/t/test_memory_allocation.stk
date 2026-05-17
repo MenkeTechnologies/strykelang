@@ -3,7 +3,7 @@
 
 fn Rosetta::MemoryAlloc::alloc_array($n, $fill) {
     my @out
-    for my $i (1 .. $n) { push @out, $fill }
+    for my $i (1:$n) { push @out, $fill }
     \@out
 }
 

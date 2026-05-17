@@ -7,12 +7,12 @@ fn Rosetta::SieveSundaram::solve($n) {
     my @marked = ~> 0:$k map { 0 }
     
     # Nested iteration for marking
-    for my $i (1..$k) {
+    for my $i (1:$k) {
         my $start_j = $i
         my $max_j = int(($k - $i) / (1 + 2 * $i))
         last if $max_j < $start_j
         
-        for my $j ($start_j..$max_j) {
+        for my $j ($start_j:$max_j) {
             my $idx = $i + $j + 2 * $i * $j
             $marked[$idx] = 1
         }

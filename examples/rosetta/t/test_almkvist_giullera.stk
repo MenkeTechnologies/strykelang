@@ -5,13 +5,13 @@
 
 fn Rosetta::Almkvist::f($n) {
     my $res = 1.0
-    for (2..$n) { $res *= _ }
+    for (2:$n) { $res *= _ }
     $res
 }
 
 fn Rosetta::Almkvist::pi_approx($terms) {
     my $sum = 0.0
-    for my $n (0 .. $terms - 1) {
+    for my $n (0:$terms - 1) {
         my $f6n = Rosetta::Almkvist::f(6 * $n)
         my $fn  = Rosetta::Almkvist::f($n)
         

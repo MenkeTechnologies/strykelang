@@ -16,9 +16,9 @@ fn Rosetta::BitmapPPM::parse($str) {
     my $max = int(shift @tokens)
     
     my @pixels
-    for my $i (1..$h) {
+    for my $i (1:$h) {
         my @row
-        for my $j (1..$w) {
+        for my $j (1:$w) {
             my $r = shift @tokens
             my $g = shift @tokens
             my $b = shift @tokens

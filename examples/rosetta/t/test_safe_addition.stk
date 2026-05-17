@@ -20,7 +20,7 @@ fn Rosetta::SafeAdd::mul($a, $b) {
         $a->[1] * $b->[0], $a->[1] * $b->[1],
     )
     my $lo = $vals[0]; my $hi = $vals[0]
-    for my $v (@vals[1..3]) {
+    for my $v (@vals[1:3]) {
         $lo = $v if $v < $lo
         $hi = $v if $v > $hi
     }

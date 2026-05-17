@@ -12,7 +12,7 @@ fn Rosetta::GA::fitness($ind, $target) {
 }
 
 fn Rosetta::GA::solve($target) {
-    my $len = length($target)
+    my $len = len($target)
     my @alpha = "a".."z", " "
     
     my $best = ""

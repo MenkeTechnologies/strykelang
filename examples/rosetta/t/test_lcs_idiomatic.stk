@@ -7,7 +7,7 @@ fn Rosetta::LCS::solve($s1, $s2) {
     my $n1 = len(@c1)
     my $n2 = len(@c2)
     
-    my @dp = map { [ map { 0 } 0..$n2 ] } 0..$n1
+    my @dp = map { [ map { 0 } 0:$n2 ] } 0:$n1
     
     for (my $i = 1; $i <= $n1; $i++) {
         for (my $j = 1; $j <= $n2; $j++) {

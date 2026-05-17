@@ -5,8 +5,8 @@ fn Rosetta::Automorphic::check($n) {
     my $sq = $n * $n
     my $s_n = "$n"
     my $s_sq = "$sq"
-    my $len = length($s_n)
-    my $end = substr($s_sq, length($s_sq) - $len)
+    my $len = len($s_n)
+    my $end = substr($s_sq, len($s_sq) - $len)
     $end eq $s_n
 }
 

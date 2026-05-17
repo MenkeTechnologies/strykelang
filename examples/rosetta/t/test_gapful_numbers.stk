@@ -3,7 +3,7 @@
 
 fn Rosetta::Gapful::check($n) {
     my $s = "$n"
-    my $len = length($s)
+    my $len = len($s)
     if ($len < 3) {
         0
     } else {

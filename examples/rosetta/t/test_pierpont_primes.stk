@@ -33,7 +33,7 @@ fn Rosetta::Pierpont::generate($count) {
             $last = $p
         }
     }
-    [@uniq[0..$count-1]]
+    [@uniq[0:$count-1]]
 }
 
 my $first10 = Rosetta::Pierpont::generate(10)

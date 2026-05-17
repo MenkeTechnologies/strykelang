@@ -16,7 +16,7 @@ fn Rosetta::UrlDecode::hex_to_int($c) {
 fn Rosetta::UrlDecode::decode($s) {
     my $out = ""
     my $i = 0
-    my $n = length($s)
+    my $n = len($s)
     while ($i < $n) {
         my $c = substr($s, $i, 1)
         if ($c eq "%" && $i + 2 < $n) {

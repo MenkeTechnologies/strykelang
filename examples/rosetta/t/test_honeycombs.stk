@@ -4,8 +4,8 @@
 fn Rosetta::Honey::new_board() {
     my @letters = split //, "ABCDEFGHIJKLMNOPQRST"
     my @cells
-    for my $col (0 .. 4) {
-        for my $row (0 .. 3) {
+    for my $col (0:4) {
+        for my $row (0:3) {
             push @cells, {
                 letter => shift(@letters),
                 col => $col,
@@ -19,7 +19,7 @@ fn Rosetta::Honey::new_board() {
 
 fn Rosetta::Honey::render($cells) {
     my @lines
-    for my $display_row (0 .. 4) {
+    for my $display_row (0:4) {
         my @parts
         for my $cell (@$cells) {
             next if $cell->{row} + ($cell->{col} % 2) != $display_row
@@ -50,7 +50,7 @@ assert_eq len(@$board), 20, "20 hex cells"
 
 my %seen
 for my $cell (@$board) { $seen{$cell->{letter}} = 1 }
-assert_eq scalar(keys %seen), 20, "20 unique letters"
+assert_eq len(keys %seen), 20, "20 unique letters"
 
 my $lines = Rosetta::Honey::render($board)
 assert_eq len(@$lines), 5, "staggered layout uses 5 display rows"

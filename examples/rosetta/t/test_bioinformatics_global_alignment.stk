@@ -2,8 +2,8 @@
 # Rosetta Code: Bioinformatics/Global alignment
 
 fn Bio::needleman_wunsch($s1, $s2, $match, $mismatch, $gap) {
-    my $n = length($s1)
-    my $m = length($s2)
+    my $n = len($s1)
+    my $m = len($s2)
     
     # Initialize DP matrix
     my @score = 0:$n |> map { my @r = 0:$m |> map { 0 }; \@r }
@@ -65,7 +65,7 @@ fn Rosetta::GlobalAlignment::demo() {
     ("Score: " . $res->[2]) |> p
     
     assert_eq $res->[2], 1, "Alignment score should be 1"
-    assert_eq length($res->[0]), length($res->[1]), "Alignment lengths must match"
+    assert_eq len($res->[0]), len($res->[1]), "Alignment lengths must match"
     assert_eq $res->[0], "GAATTCAGTTA", "Alignment 1"
     assert_eq $res->[1], "GGA-TC-G--A", "Alignment 2"
 }

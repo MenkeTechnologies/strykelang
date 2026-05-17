@@ -4,7 +4,7 @@
 fn Rosetta::Leibniz::pi($n) {
     my $sum = 0.0
     my $sign = 1.0
-    for my $k (0..$n - 1) {
+    for my $k (0:$n - 1) {
         $sum += $sign / (2 * $k + 1)
         $sign = -$sign
     }

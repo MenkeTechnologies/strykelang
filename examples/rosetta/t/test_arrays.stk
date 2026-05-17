@@ -32,9 +32,9 @@ fn Rosetta::Arrays::demo() {
     ("   Strings (pop last): " . join(", ", @strings)) |> p
     
     # Array slicing
-    my @slice = @numbers[2..4]
+    my @slice = @numbers[2:4]
     "4. Array Slicing:" |> p
-    ("   Slice [2..4]: " . join(", ", @slice)) |> p
+    ("   Slice [2:4]: " . join(", ", @slice)) |> p
     
     # Array length/size
     my $length = len(@numbers)

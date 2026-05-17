@@ -8,8 +8,8 @@ fn Rosetta::PeaceQueens::attacks($q, $p) {
 fn Rosetta::PeaceQueens::place($m, $n, $black, $white, $placing_black) {
     return 1 if $m == 0
 
-    for my $r (0 .. $n - 1) {
-        for my $c (0 .. $n - 1) {
+    for my $r (0:$n - 1) {
+        for my $c (0:$n - 1) {
             my $pos = [$r, $c]
             my $ok = 1
 
@@ -55,9 +55,9 @@ fn Rosetta::PeaceQueens::solve($m, $n) {
 
 fn Rosetta::PeaceQueens::render($n, $black, $white) {
     my @rows
-    for my $r (0 .. $n - 1) {
+    for my $r (0:$n - 1) {
         my @row
-        for my $c (0 .. $n - 1) {
+        for my $c (0:$n - 1) {
             my $ch = "."
             for my $q (@$black) { $ch = "B" if $q->[0] == $r && $q->[1] == $c }
             for my $q (@$white) { $ch = "W" if $q->[0] == $r && $q->[1] == $c }

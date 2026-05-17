@@ -7,7 +7,7 @@
 fn Rosetta::Ca1d::step($cells, $rule) {
     my $n = len(@$cells)
     my @next
-    for my $i (0..$n - 1) {
+    for my $i (0:$n - 1) {
         my $left  = $cells->[($i - 1 + $n) % $n]
         my $cur   = $cells->[$i]
         my $right = $cells->[($i + 1) % $n]
@@ -40,7 +40,7 @@ assert_eq Rosetta::Ca1d::row_str($g90->[3]), "....#.#.#.#....",  "gen 3"
 # Rule 30 (chaotic) — just check evolution is deterministic
 my $g30 = Rosetta::Ca1d::evolve($start, 30, 10)
 my $g30b = Rosetta::Ca1d::evolve($start, 30, 10)
-for my $i (0..10) {
+for my $i (0:10) {
     assert_eq Rosetta::Ca1d::row_str($g30->[$i]),
         Rosetta::Ca1d::row_str($g30b->[$i]),
         sprintf("rule 30 deterministic gen %d", $i)

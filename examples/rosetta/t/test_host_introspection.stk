@@ -12,7 +12,7 @@ fn Rosetta::HostIntrospection::get_info() {
 }
 
 my $info = Rosetta::HostIntrospection::get_info()
-assert_ok length($info->{hostname}) > 0, "Hostname present"
+assert_ok len($info->{hostname}) > 0, "Hostname present"
 assert_ok len(@{$info->{interfaces}}) > 0, "Interfaces found"
 
 # Every interface entry has a name.
@@ -26,7 +26,7 @@ assert_ok exists $if0->{name}, "Interface has name"
 my @hw = grep { $_->{name} ne "lo" && $_->{name} !~ /^lo[0-9]/ } @{$info->{interfaces}}
 if (len(@hw) > 0) {
     my $hw0 = $hw[0]
-    assert_ok exists $hw0->{mac} && length($hw0->{mac}) > 0,
+    assert_ok exists $hw0->{mac} && len($hw0->{mac}) > 0,
               "Hardware interface has mac"
 }
 

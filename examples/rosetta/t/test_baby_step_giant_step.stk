@@ -25,7 +25,7 @@ fn Rosetta::BSGS::find($g, $h, $p) {
     # Baby steps: store g^j for j = 0..m-1 keyed by value -> j.
     my %tbl
     my $cur = 1
-    for my $j (0..$m - 1) {
+    for my $j (0:$m - 1) {
         $tbl{$cur} = $j unless exists $tbl{$cur}
         $cur = ($cur * $g) % $p
     }
@@ -33,7 +33,7 @@ fn Rosetta::BSGS::find($g, $h, $p) {
     my $g_to_m = Rosetta::BSGS::pow_mod($g, $m, $p)
     my $factor = Rosetta::BSGS::pow_mod($g_to_m, $p - 2, $p)
     my $gamma = $h % $p
-    for my $i (0..$m - 1) {
+    for my $i (0:$m - 1) {
         return $i * $m + $tbl{$gamma} if exists $tbl{$gamma}
         $gamma = ($gamma * $factor) % $p
     }

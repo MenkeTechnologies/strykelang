@@ -4,7 +4,7 @@
 
 fn Rosetta::Wilson::factorial_mod($n, $mod) {
     my $r = 1
-    for my $i (2..$n) {
+    for my $i (2:$n) {
         $r = ($r * $i) % $mod
     }
     $r

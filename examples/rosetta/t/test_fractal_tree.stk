@@ -67,7 +67,7 @@ Rosetta::FractalTree::draw(4, 20, 20, 0, 5, \%grid)
 my $tree = Rosetta::FractalTree::to_string(\%grid)
 # p $tree
 
-assert_ok length($tree) > 0, "Tree generated"
+assert_ok len($tree) > 0, "Tree generated"
 assert_ok index($tree, "*") != -1, "Tree has characters"
 
 test_run

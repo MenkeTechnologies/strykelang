@@ -4,7 +4,7 @@
 fn Math::Poly::edges($poly) {
     my @es
     my $n = len(@$poly)
-    for my $i (0..$n-1) {
+    for my $i (0:$n-1) {
         my $j = ($i + 1) % $n
         push @es, [$poly->[$j]->[0] - $poly->[$i]->[0],
                    $poly->[$j]->[1] - $poly->[$i]->[1]]

@@ -4,7 +4,7 @@
 fn Rosetta::AverageLoop::analytical($n) {
     my $sum = 0
     my $prod = 1
-    for my $i (1..$n) {
+    for my $i (1:$n) {
         $prod = $prod * ($n - $i + 1) / $n
         $sum = $sum + $prod
     }

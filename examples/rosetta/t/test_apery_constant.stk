@@ -3,7 +3,7 @@
 
 fn Rosetta::Apery::naive($N) {
     my $s = 0
-    for my $k (1..$N) { $s += 1.0 / ($k ** 3) }
+    for my $k (1:$N) { $s += 1.0 / ($k ** 3) }
     $s
 }
 
@@ -12,12 +12,12 @@ fn Rosetta::Apery::accelerated($N) {
     my $s = 0
     my $sign = 1
     my @binom = (1)   # C(0,0)
-    for my $k (1..$N) {
+    for my $k (1:$N) {
         # C(2k, k) — build incrementally
         my $cnk = 1
         my $top = 2 * $k
         my $bot = $k
-        for my $i (1..$bot) {
+        for my $i (1:$bot) {
             $cnk = $cnk * ($top - $i + 1) / $i
         }
         $s += $sign / ($k ** 3 * $cnk)

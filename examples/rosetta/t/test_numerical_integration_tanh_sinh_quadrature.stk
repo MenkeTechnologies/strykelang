@@ -16,12 +16,12 @@ fn Rosetta::TanhSinh::integrate($f, $lower, $upper, $steps, $acc) {
     my $rr = 0.0
     my $ro = $rr + 1 + 2 * $acc
 
-    for my $k (1 .. $steps) {
+    for my $k (1:$steps) {
         last if abs($rr - $ro) < $acc
         $ro = $rr
         my $n = (2 ** $k) - 1
         my $ss = 0.0
-        for my $i (-$n .. $n) {
+        for my $i (-$n:$n) {
             my $t = $i * $h
             my $sh = Rosetta::TanhSinh::sinh($t)
             my $ch = Rosetta::TanhSinh::cosh($t)

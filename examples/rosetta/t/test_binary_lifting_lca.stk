@@ -42,7 +42,7 @@ fn Rosetta::BLLCA::build($n, $edges, $root) {
         }
     }
     # Sparse table.
-    for my $k (1..$LOG - 1) {
+    for my $k (1:$LOG - 1) {
         for my $v (~> 0:$n - 1) {
             my $mid = $up[$k - 1][$v]
             $up[$k][$v] = $mid == -1 ? -1 : $up[$k - 1][$mid]

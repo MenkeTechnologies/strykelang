@@ -11,7 +11,7 @@ fn Rosetta::JumpSearch::find($arr, $target) {
         return -1 if $prev >= $n
     }
     my $hi = ($prev + $step - 1) < $n - 1 ? $prev + $step - 1 : $n - 1
-    for my $i ($prev..$hi) {
+    for my $i ($prev:$hi) {
         return $i if $arr->[$i] == $target
     }
     -1

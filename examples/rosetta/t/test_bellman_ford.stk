@@ -11,7 +11,7 @@ fn Rosetta::BellmanFord::solve($nodes, $edges, $source) {
     $distance{"$source"} = 0
     
     my $count = len(@$nodes)
-    for (1..$count-1) {
+    for (1:$count-1) {
         for my $edge (@$edges) {
             my ($u, $v, $w) = @$edge
             if ($distance{"$u"} != 1e9 && $distance{"$u"} + $w < $distance{"$v"}) {

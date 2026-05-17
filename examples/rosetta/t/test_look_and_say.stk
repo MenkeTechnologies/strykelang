@@ -2,14 +2,14 @@
 # Rosetta Code: Look-and-Say Sequence
 
 fn Rosetta::LookAndSay::next_step($s) {
-    if (length($s) == 0) { "" }
+    if (len($s) == 0) { "" }
     else {
         my @chars = ~> $s chars
         my $res = ""
         my $curr = $chars[0]
         my $count = 1
         
-        for my $i (1..$#chars) {
+        for my $i (1:$#chars) {
             if ($chars[$i] eq $curr) {
                 $count = $count + 1
             } else {
@@ -24,7 +24,7 @@ fn Rosetta::LookAndSay::next_step($s) {
 
 fn Rosetta::LookAndSay::generate($start, $n) {
     my @seq = ($start)
-    for my $i (1..$n-1) {
+    for my $i (1:$n-1) {
         my $prev = $seq[-1]
         my $next = Rosetta::LookAndSay::next_step($prev)
         push @seq, $next

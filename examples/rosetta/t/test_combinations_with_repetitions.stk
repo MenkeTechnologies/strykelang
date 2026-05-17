@@ -6,7 +6,7 @@ fn Rosetta::CombinationsWithRep::backtrack($n, $k, $start, $curr_ref, $res_ref) 
         push @$res_ref, [@$curr_ref]
         return
     }
-    for my $i ($start..$n-1) {
+    for my $i ($start:$n-1) {
         push @$curr_ref, $i
         Rosetta::CombinationsWithRep::backtrack($n, $k, $i, $curr_ref, $res_ref)
         pop @$curr_ref

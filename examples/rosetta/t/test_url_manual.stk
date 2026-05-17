@@ -17,7 +17,7 @@ fn Rosetta::UrlEncode::url_encode($str) {
 fn Rosetta::UrlDecode::url_decode($str) {
     my $res = ""
     my $i = 0
-    my $len = length($str)
+    my $len = len($str)
     while ($i < $len) {
         my $c = substr($str, $i, 1)
         if ($c eq "%") {

@@ -6,7 +6,7 @@ fn Rosetta::Evolve::charset() { "ABCDEFGHIJKLMNOPQRSTUVWXYZ " }
 
 fn Rosetta::Evolve::random_char() {
     my $cs = Rosetta::Evolve::charset()
-    substr($cs, int(rand() * length($cs)), 1)
+    substr($cs, int(rand() * len($cs)), 1)
 }
 
 fn Rosetta::Evolve::random_string($len) {
@@ -15,7 +15,7 @@ fn Rosetta::Evolve::random_string($len) {
 
 fn Rosetta::Evolve::fitness($str, $target) {
     my $score = 0
-    for my $i (0..length($target)-1) {
+    for my $i (0..len($target)-1) {
         $score += 1 if substr($str, $i, 1) eq substr($target, $i, 1)
     }
     $score
@@ -31,7 +31,7 @@ fn Rosetta::Evolve::mutate($str, $rate) {
 
 fn Rosetta::Evolve::evolve($target, $pop_size, $rate) {
     srand(42)
-    my $best = Rosetta::Evolve::random_string(length($target))
+    my $best = Rosetta::Evolve::random_string(len($target))
     my $gens = 0
     while ($best ne $target) {
         $gens += 1

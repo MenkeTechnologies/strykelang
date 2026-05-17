@@ -4,7 +4,7 @@
 fn Rosetta::PerfectNumbers::divisors($n) {
     my @divs = (1) # Proper divisors start with 1
     my $limit = int(sqrt($n))
-    for my $i (2..$limit) {
+    for my $i (2:$limit) {
         if ($n % $i == 0) {
             push @divs, $i
             my $j = $n / $i
@@ -30,7 +30,7 @@ fn Rosetta::PerfectNumbers::is_perfect($n) {
 
 fn Rosetta::PerfectNumbers::perfect_numbers($max) {
     my @perfects
-    for my $n (2..$max) {
+    for my $n (2:$max) {
         if (Rosetta::PerfectNumbers::is_perfect($n)) {
             push @perfects, $n
         }

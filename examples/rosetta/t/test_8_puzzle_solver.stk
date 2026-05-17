@@ -15,7 +15,7 @@ fn Rosetta::EightPuzzle::solve($start) {
         
         # Find empty
         my $zi = 0
-        for my $i (0..8) { if ($s->[$i] == 0) { $zi = $i; last } }
+        for my $i (0:8) { if ($s->[$i] == 0) { $zi = $i; last } }
         
         my $zr = int($zi / 3)
         my $zc = $zi % 3

@@ -4,7 +4,7 @@
 # on small partitions. Used by the C++ STL std::sort.
 
 fn Rosetta::Intro::insertion_range($arr, $lo, $hi) {
-    for my $i ($lo + 1..$hi) {
+    for my $i ($lo + 1:$hi) {
         my $x = $arr->[$i]
         my $j = $i - 1
         while ($j >= $lo && $arr->[$j] > $x) {
@@ -119,7 +119,7 @@ my $rb = Rosetta::Intro::sort(\@big)
 assert_eq join(",", @$rb), join(",", @native), "200-elem matches native"
 
 # Already-sorted (worst case for naive quicksort, exercises depth-limit fallback).
-my @sorted = (1..50)
+my @sorted = (1:50)
 my $rs = Rosetta::Intro::sort(\@sorted)
 assert_eq join(",", @$rs), join(",", @sorted), "already-sorted 50"
 

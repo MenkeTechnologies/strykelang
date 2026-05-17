@@ -8,8 +8,8 @@ fn Rosetta::TerminalColor::demo() {
     my $reset = "\e[0m"
     
     # We can also use builtins if available, but ANSI is standard
-    print "${red}Red Text${reset}\n"
-    print "${green}Green Text${reset}\n"
+    p "${red}Red Text${reset}"
+    p "${green}Green Text${reset}"
     
     "Coloured text printed"
 }

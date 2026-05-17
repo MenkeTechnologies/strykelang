@@ -26,7 +26,7 @@ fn Rosetta::SubUnit::split_subtract($n) {
     my $half = int($d / 2)
     # Try every split offset from 1..d-1 (left side has `i` digits).
     my @hits
-    for my $i (1..$d - 1) {
+    for my $i (1:$d - 1) {
         my $right_digits = $d - $i
         my $factor = 1
         for my $k (~> 1:$right_digits) { $factor *= 10 }

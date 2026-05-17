@@ -3,7 +3,7 @@
 
 fn Rosetta::BirthdayProblem::compute($n) {
     my $p = 1.0
-    for my $i (0..$n-1) {
+    for my $i (0:$n-1) {
         $p = $p * (365 - $i) / 365
     }
     1 - $p

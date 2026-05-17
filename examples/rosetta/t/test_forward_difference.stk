@@ -7,7 +7,7 @@ fn Rosetta::ForwardDifference::solve(@arr) {
         return []
     } else {
         my @res
-        for my $i (1..$len-1) {
+        for my $i (1:$len-1) {
             push @res, $arr[$i] - $arr[$i-1]
         }
         \@res
@@ -16,7 +16,7 @@ fn Rosetta::ForwardDifference::solve(@arr) {
 
 fn Rosetta::ForwardDifference::nth($n, @arr) {
     my $res = [@arr]
-    for my $i (1..$n) {
+    for my $i (1:$n) {
         $res = Rosetta::ForwardDifference::solve(@$res)
     }
     $res

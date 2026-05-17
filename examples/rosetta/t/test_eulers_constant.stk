@@ -4,14 +4,14 @@
 
 fn Rosetta::EulerC::approx($N) {
     my $h = 0
-    for my $k (1..$N) { $h += 1.0 / $k }
+    for my $k (1:$N) { $h += 1.0 / $k }
     $h - log($N)
 }
 
 # Asymptotic refinement: γ ≈ H_N - ln(N) - 1/(2N) + 1/(12 N^2) - 1/(120 N^4)
 fn Rosetta::EulerC::asymptotic($N) {
     my $h = 0
-    for my $k (1..$N) { $h += 1.0 / $k }
+    for my $k (1:$N) { $h += 1.0 / $k }
     my $g = $h - log($N) - 1.0/(2*$N) + 1.0/(12*$N*$N) - 1.0/(120*$N**4)
     $g
 }

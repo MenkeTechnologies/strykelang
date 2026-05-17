@@ -22,9 +22,9 @@ assert_eq Rosetta::Multifactorial::compute(10, 4), 120, "10!^(4) = 10*6*2 = 120"
 assert_eq Rosetta::Multifactorial::compute(1, 5), 1, "1!^(5) = 1"
 
 my @row1 = Rosetta::Multifactorial::row(1, 10)
-assert_eq join(",", @row1), "1,2,6,24,120,720,5040,40320,362880,3628800", "k=1: factorials 1..10"
+assert_eq join(",", @row1), "1,2,6,24,120,720,5040,40320,362880,3628800", "k=1: factorials 1:10"
 
 my @row2 = Rosetta::Multifactorial::row(2, 10)
-assert_eq join(",", @row2), "1,2,3,8,15,48,105,384,945,3840", "k=2: double factorials 1..10"
+assert_eq join(",", @row2), "1,2,3,8,15,48,105,384,945,3840", "k=2: double factorials 1:10"
 
 test_run

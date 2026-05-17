@@ -7,7 +7,7 @@
 fn Rosetta::Binom::C($n, $k) {
     return 0 if $k < 0 || $k > $n
     my $r = 1
-    for my $i (1..$k) {
+    for my $i (1:$k) {
         $r = $r * ($n - $i + 1) / $i
     }
     int($r)
@@ -19,7 +19,7 @@ fn Rosetta::Binom::transform(@a) {
     my @b
     for my $n (0..len(@a)-1) {
         my $s = 0
-        for my $k (0..$n) {
+        for my $k (0:$n) {
             my $sign = ($k % 2 == 0) ? 1 : -1
             $s += $sign * Rosetta::Binom::C($n, $k) * $a[$k]
         }

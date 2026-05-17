@@ -2,7 +2,7 @@
 # Rosetta Code: 100 prisoners
 
 fn Rosetta::Prisoners::play($optimal) {
-    my @boxes = 0..99
+    my @boxes = 0:99
     @boxes = shuffle(@boxes)
     
     for (my $p = 0; $p < 100; $p++) {
@@ -17,7 +17,7 @@ fn Rosetta::Prisoners::play($optimal) {
                 $curr = $boxes[$curr]
             }
         } else {
-            my @choices = 0..99
+            my @choices = 0:99
             @choices = shuffle(@choices)
             for (my $i = 0; $i < 50; $i++) {
                 if ($boxes[$choices[$i]] == $p) {

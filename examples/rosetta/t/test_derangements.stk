@@ -16,12 +16,12 @@ fn Rosetta::Derangements::perms(@list) {
 }
 
 fn Rosetta::Derangements::solve($n) {
-    my @items = (0..$n-1)
+    my @items = (0:$n-1)
     my $all = Rosetta::Derangements::perms(@items)
     my @res
     for my $p (@$all) {
         my $ok = 1
-        for my $i (0..$n-1) {
+        for my $i (0:$n-1) {
             if ($p->[$i] == $i) { $ok = 0; last }
         }
         if ($ok) { push @res, $p }

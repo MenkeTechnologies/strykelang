@@ -27,7 +27,7 @@ fn Rosetta::ZebraSmall::solve_logic {
                             
                             # Rule 2: The 10 year old plays Tennis
                             my $ok2 = 0
-                            for my $i (0..2) { if ($a[$i] == 10 && $s[$i] eq "Tennis") { $ok2 = 1 } }
+                            for my $i (0:2) { if ($a[$i] == 10 && $s[$i] eq "Tennis") { $ok2 = 1 } }
                             next unless $ok2
                             
                             # Rule 3: Beatrice doesn't play Soccer

@@ -21,7 +21,7 @@ fn Rosetta::GOST::rotl32($x, $bits) {
 fn Rosetta::GOST::main_step($left, $right, $key, $sbox) {
     my $sum = ($left + $key) & 0xFFFFFFFF
     my $sub = 0
-    for my $i (0 .. 7) {
+    for my $i (0:7) {
         my $nibble = ($sum >> ($i * 4)) & 0xF
         $sub |= $sbox->[$i][$nibble] << ($i * 4)
     }

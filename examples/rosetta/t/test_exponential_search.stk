@@ -39,7 +39,7 @@ assert_eq Rosetta::ExpSearch::find([42], 42), 0, "single match"
 assert_eq Rosetta::ExpSearch::find([42], 7), -1, "single miss"
 
 # Dense run
-my @dense = (10..30)
+my @dense = (10:30)
 assert_eq Rosetta::ExpSearch::find(\@dense, 25), 15, "dense find 25"
 assert_eq Rosetta::ExpSearch::find(\@dense, 30), 20, "dense last"
 

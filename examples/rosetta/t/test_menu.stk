@@ -11,7 +11,7 @@ fn Rosetta::Menu::select($items, $mock_inputs) {
         # 1. Print menu
         for my $i (0 .. len(@$items) - 1) {
             my $num = $i + 1
-            # print "$num. $items->[$i]\n"
+            # p "$num. $items->[$i]"
         }
         # print "Choice: "
         
@@ -29,7 +29,7 @@ fn Rosetta::Menu::select($items, $mock_inputs) {
                 return $items->[$idx]
             }
         }
-        # print "Invalid choice, please try again.\n"
+        # p "Invalid choice, please try again."
     }
 }
 

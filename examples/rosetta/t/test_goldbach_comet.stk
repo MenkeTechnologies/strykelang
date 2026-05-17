@@ -16,7 +16,7 @@ fn Math::Prime::is_prime($n) {
 
 fn Rosetta::Goldbach::primes_up_to($N) {
     my @res
-    for my $k (2..$N) { push @res, $k if Math::Prime::is_prime($k) }
+    for my $k (2:$N) { push @res, $k if Math::Prime::is_prime($k) }
     @res
 }
 
@@ -47,7 +47,7 @@ assert_eq Rosetta::Goldbach::g_of_n(10), 2, "G(10)=2"
 assert_eq Rosetta::Goldbach::g_of_n(15), 3, "G(15)=3 (30=7+23,11+19,13+17)"
 
 # Goldbach: G(n) > 0 for all n >= 2 (verified within reach).
-for my $n (2..40) {
+for my $n (2:40) {
     assert_ok Rosetta::Goldbach::g_of_n($n) >= 1, "G($n) > 0"
 }
 

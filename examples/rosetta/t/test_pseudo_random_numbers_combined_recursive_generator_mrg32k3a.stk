@@ -24,7 +24,7 @@ fn Rosetta::MRG::hist5($seed, $n) {
     my $m1 = (2 ** 32) - 209
     my $d  = $m1 + 1
     my @h = (0, 0, 0, 0, 0)
-    for my $i (1 .. $n) {
+    for my $i (1:$n) {
         my $x = Rosetta::MRG::next_int($rng)
         my $bucket = int(($x * 5) / $d)
         $h[$bucket]++
@@ -34,7 +34,7 @@ fn Rosetta::MRG::hist5($seed, $n) {
 
 my $rng = Rosetta::MRG::new(1234567)
 my @vals
-for my $i (1 .. 5) { push @vals, Rosetta::MRG::next_int($rng) }
+for my $i (1:5) { push @vals, Rosetta::MRG::next_int($rng) }
 
 assert_eq join(",", @vals), "1459213977,2827710106,4245671317,3877608661,2595287583", "first five integers"
 assert_eq join(",", @{Rosetta::MRG::hist5(987654321, 100000)}), "20002,20060,19948,20059,19931", "histogram counts"

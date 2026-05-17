@@ -4,9 +4,9 @@
 fn Rosetta::LUDecomposition::solve($A) {
     my $n = len(@$A)
     my @L; my @U
-    for my $i (0..$n-1) {
+    for my $i (0:$n-1) {
         my @l_row; my @u_row
-        for my $j (0..$n-1) {
+        for my $j (0:$n-1) {
             push @l_row, ($i == $j ? 1.0 : 0.0)
             push @u_row, 0.0
         }
@@ -14,15 +14,15 @@ fn Rosetta::LUDecomposition::solve($A) {
         push @U, \@u_row
     }
     
-    for my $j (0..$n-1) {
-        for my $i (0..$j) {
+    for my $j (0:$n-1) {
+        for my $i (0:$j) {
             my $sum = 0.0
-            for my $k (0..$i-1) { $sum = $sum + $L[$i]->[$k] * $U[$k]->[$j] }
+            for my $k (0:$i-1) { $sum = $sum + $L[$i]->[$k] * $U[$k]->[$j] }
             $U[$i]->[$j] = $A->[$i]->[$j] - $sum
         }
-        for my $i ($j+1..$n-1) {
+        for my $i ($j+1:$n-1) {
             my $sum = 0.0
-            for my $k (0..$j-1) { $sum = $sum + $L[$i]->[$k] * $U[$k]->[$j] }
+            for my $k (0:$j-1) { $sum = $sum + $L[$i]->[$k] * $U[$k]->[$j] }
             $L[$i]->[$j] = ($A->[$i]->[$j] - $sum) / $U[$j]->[$j]
         }
     }

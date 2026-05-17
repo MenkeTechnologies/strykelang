@@ -33,9 +33,9 @@ fn Rosetta::BTree::split_child($parent, $i, $order) {
     my $t = int(($order - 1) / 2)
     my $sibling = Rosetta::BTree::new_node($full->{leaf})
     # Sibling gets keys[t+1 .. order-2]
-    for my $j ($t + 1..$order - 2) { push @{$sibling->{keys}}, $full->{keys}[$j] }
+    for my $j ($t + 1:$order - 2) { push @{$sibling->{keys}}, $full->{keys}[$j] }
     if (!$full->{leaf}) {
-        for my $j ($t + 1..$order - 1) {
+        for my $j ($t + 1:$order - 1) {
             push @{$sibling->{children}}, $full->{children}[$j]
         }
         # Trim full's children
@@ -104,7 +104,7 @@ fn Rosetta::BTree::io($node, $out) {
 my $tree = Rosetta::BTree::new(4)
 for my $k (~> 1:20) { Rosetta::BTree::insert($tree, $k) }
 assert_eq join(",", @{Rosetta::BTree::inorder($tree)}),
-          join(",", (1..20)), "in-order = ascending"
+          join(",", (1:20)), "in-order = ascending"
 
 # Search
 for my $k (~> 1:20) {
@@ -118,7 +118,7 @@ assert_eq Rosetta::BTree::contains($tree, 100), 0, "missing 100"
 my $t5 = Rosetta::BTree::new(5)
 for (my $k = 30; $k >= 1; $k--) { Rosetta::BTree::insert($t5, $k) }
 assert_eq join(",", @{Rosetta::BTree::inorder($t5)}),
-          join(",", (1..30)), "order-5 descending insert"
+          join(",", (1:30)), "order-5 descending insert"
 
 # Random-ish input
 my $tr = Rosetta::BTree::new(4)

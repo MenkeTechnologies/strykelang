@@ -129,9 +129,9 @@ assert_eq join(",", @after), "42", "duplicate ignored"
 my $asc = Rosetta::Splay::new()
 for my $k (~> 1:20) { Rosetta::Splay::insert($asc, $k) }
 assert_eq join(",", @{Rosetta::Splay::inorder($asc)}),
-          join(",", (1..20)), "asc insert in-order"
+          join(",", (1:20)), "asc insert in-order"
 # Repeated access of 1 should bring it to root.
-for (1..5) { Rosetta::Splay::contains($asc, 1) }
+for (1:5) { Rosetta::Splay::contains($asc, 1) }
 assert_eq $asc->{root}{key}, 1, "repeated access of 1 → root"
 
 test_run

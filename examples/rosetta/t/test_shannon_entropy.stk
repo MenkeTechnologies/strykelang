@@ -2,7 +2,7 @@
 # Rosetta Code: Entropy
 
 fn Rosetta::Entropy::shannon($s) {
-    my $len = length($s)
+    my $len = len($s)
     if ($len == 0) { return 0 }
     my $counts = {}
     my @chars = ~> $s chars

@@ -7,7 +7,7 @@ fn Rosetta::Vampire::sort_digits($n) {
 
 fn Rosetta::Vampire::check($n) {
     my $s = sprintf("%d", $n)
-    my $len = length($s)
+    my $len = len($s)
     if ($len % 2 != 0) {
         0
     } else {
@@ -17,7 +17,7 @@ fn Rosetta::Vampire::check($n) {
         my $start = 10**($half - 1)
         my $end = 10**$half - 1
         
-        for my $a ($start..$end) {
+        for my $a ($start:$end) {
             if ($n % $a == 0) {
                 my $b = $n / $a
                 if ($b >= $start && $b <= $end) {

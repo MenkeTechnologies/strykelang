@@ -49,7 +49,7 @@ for my $n (0:99) {
     my $back = $q->[0] + 10 * $q->[1] + 100 * $q->[2] + 1000 * $q->[3]
     $all_round = 0 if $back != $n
 }
-assert_ok $all_round, "0..99 round-trip exact"
+assert_ok $all_round, "0:99 round-trip exact"
 
 # Pipe form
 1234 |> Rosetta::Cistercian::quadrants |> fn { join(",", @$_) } |> assert_eq("4,3,2,1", "pipe quadrants(1234)")

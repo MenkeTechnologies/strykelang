@@ -11,7 +11,7 @@ fn Rosetta::Fibonacci::compute($n) {
 
 fn Rosetta::Fibonacci::compute_iter($n) {
     my ($a, $b) = (0, 1)
-    for my $i (1..$n) {
+    for my $i (1:$n) {
         ($a, $b) = ($b, $a + $b)
     }
     $a

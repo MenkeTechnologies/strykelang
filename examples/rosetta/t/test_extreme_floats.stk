@@ -18,12 +18,12 @@ assert_ok Rosetta::ExtFloats::posinf() * 2 > 1e300, "Inf*2 still Inf"
 
 # Smallest positive subnormal (≈ 5e-324) and DBL_MIN (~2.225e-308)
 my $tiny = 1.0
-for (1..1100) { $tiny /= 2.0 }
+for (1:1100) { $tiny /= 2.0 }
 assert_ok $tiny == 0 || $tiny > 0, "underflow well-defined"
 
 # Largest finite (~1.7976931348623157e308)
 my $huge = 1.0
-for (1..1023) { $huge *= 2.0 }
+for (1:1023) { $huge *= 2.0 }
 $huge *= 1.999999
 assert_ok $huge < Rosetta::ExtFloats::posinf(), "near-max < Inf"
 assert_ok $huge > 1e300, "near-max enormous"

@@ -2,7 +2,7 @@
 # Rosetta Code: Multiplication Table
 
 fn Rosetta::MultiplicationTable::generate($n) {
-    my @indices = (1..$n)
+    my @indices = (1:$n)
     my @rows
     for my $i (@indices) {
         my @row = @indices |> map { $i * _ }

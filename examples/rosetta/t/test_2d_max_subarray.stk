@@ -35,7 +35,7 @@ fn Rosetta::Kadane2D::solve($matrix) {
     my $best_left = 0; my $best_right = 0
     for my $top (~> 0:$rows - 1) {
         my @col_sums = ~> 1:$cols |> map { 0 }
-        for my $bottom ($top..$rows - 1) {
+        for my $bottom ($top:$rows - 1) {
             for my $c (~> 0:$cols - 1) { $col_sums[$c] += $matrix->[$bottom][$c] }
             my $r = Rosetta::Kadane2D::max_subarray_1d(\@col_sums)
             if ($r->{sum} > $best) {
@@ -56,8 +56,8 @@ fn Rosetta::Kadane2D::solve($matrix) {
 
 fn Rosetta::Kadane2D::naive_sum($m, $top, $left, $bottom, $right) {
     my $s = 0
-    for my $i ($top..$bottom) {
-        for my $j ($left..$right) { $s += $m->[$i][$j] }
+    for my $i ($top:$bottom) {
+        for my $j ($left:$right) { $s += $m->[$i][$j] }
     }
     $s
 }

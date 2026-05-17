@@ -12,7 +12,7 @@ fn Rosetta::LCG::sequence($seed, $a, $c, $m, $n) {
     my $curr = $seed
     # Use serial map to generate a sequence of length $n
     # We use a serial pipeline to ensure the state update is correct.
-    1..$n |> map { $curr = ($a * $curr + $c) % $m }
+    1:$n |> map { $curr = ($a * $curr + $c) % $m }
 }
 
 # Parameters for BSD libc rand()

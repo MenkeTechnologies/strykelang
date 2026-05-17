@@ -15,9 +15,9 @@ fn Rosetta::Magnanimous::is_prime($n) {
 
 fn Rosetta::Magnanimous::is_magnanimous($n) {
     my $s = "$n"
-    my $len = length($s)
+    my $len = len($s)
     return 1 if $len == 1
-    for my $i (1..$len-1) {
+    for my $i (1:$len-1) {
         my $left  = int(substr($s, 0, $i))
         my $right = int(substr($s, $i))
         return 0 unless Rosetta::Magnanimous::is_prime($left + $right)

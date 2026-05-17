@@ -11,7 +11,7 @@ fn Rosetta::Wavelet::access($wm, $idx) {
 
 fn Rosetta::Wavelet::rank($wm, $value, $end) {
     my $count = 0
-    for my $i (0 .. $end - 1) {
+    for my $i (0:$end - 1) {
         $count++ if $wm->{data}->[$i] == $value
     }
     $count

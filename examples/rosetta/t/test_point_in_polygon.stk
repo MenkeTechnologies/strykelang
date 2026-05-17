@@ -5,7 +5,7 @@ fn Rosetta::PointInPolygon::contains($poly, $x, $y) {
     my $n = len(@$poly)
     my $inside = 0
     my $j = $n - 1
-    for my $i (0..$n-1) {
+    for my $i (0:$n-1) {
         my $xi = $poly->[$i]->[0]
         my $yi = $poly->[$i]->[1]
         my $xj = $poly->[$j]->[0]

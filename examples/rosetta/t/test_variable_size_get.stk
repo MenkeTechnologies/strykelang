@@ -4,7 +4,7 @@
 fn Rosetta::VarSizeGet::size_of($value) {
     return len(split //, $value) if ref($value) eq ""
     return len(@$value) if ref($value) eq "ARRAY"
-    return scalar(keys %$value) if ref($value) eq "HASH"
+    return len(keys %$value) if ref($value) eq "HASH"
     0
 }
 

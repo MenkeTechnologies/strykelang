@@ -14,7 +14,7 @@ fn Rosetta::Zsigmondy::gcd($x, $y) {
 fn Rosetta::Zsigmondy::value($a, $b, $n) {
     my $cur = $a ** $n - $b ** $n
     return undef if $cur <= 0
-    for my $k (1..$n - 1) {
+    for my $k (1:$n - 1) {
         my $earlier = $a ** $k - $b ** $k
         next if $earlier == 0
         my $g = Rosetta::Zsigmondy::gcd($cur, $earlier)
@@ -58,7 +58,7 @@ assert_eq join(",", @z32), "1,5,19,13,211", "Z(3,2) first 5"
 
 # Property: Z(a,b,n) divides a^n - b^n
 my $div_ok = 1
-for my $n (1..8) {
+for my $n (1:8) {
     my $z = Rosetta::Zsigmondy::value(2, 1, $n)
     my $f = 2 ** $n - 1
     $div_ok = 0 if $f % $z != 0

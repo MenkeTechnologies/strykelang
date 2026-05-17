@@ -26,7 +26,7 @@ fn Rosetta::ZAlgorithm::compute($s) {
 fn Rosetta::ZAlgorithm::search($text, $pattern) {
     my $concat = $pattern . "\$" . $text
     my $z = Rosetta::ZAlgorithm::compute($concat)
-    my $plen = length($pattern)
+    my $plen = len($pattern)
     my @indices
     for (my $i = 0; $i < len(@$z); $i++) {
         if ($z->[$i] == $plen) {

@@ -56,7 +56,7 @@ for my $s (sort { $a <=> $b } keys %$g) {
 # Counts add up
 my $total = 0
 for my $s (keys %$g) { $total += len(@{$g->{$s}}) }
-assert_eq $total, scalar(@data), "no values lost"
+assert_eq $total, len(@data), "no values lost"
 
 # Leaves within each stem are sorted
 my $sorted_ok = 1

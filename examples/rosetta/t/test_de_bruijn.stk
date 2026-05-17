@@ -20,7 +20,7 @@ fn Rosetta::DeBruijn::db($t, $p, $k, $n, $a_ref, $seq_ref) {
     } else {
         $a_ref->[$t] = $a_ref->[$t - $p]
         Rosetta::DeBruijn::db($t + 1, $p, $k, $n, $a_ref, $seq_ref)
-        for my $j ($a_ref->[$t - $p] + 1 .. $k - 1) {
+        for my $j ($a_ref->[$t - $p] + 1:$k - 1) {
             $a_ref->[$t] = $j
             Rosetta::DeBruijn::db($t + 1, $t, $k, $n, $a_ref, $seq_ref)
         }

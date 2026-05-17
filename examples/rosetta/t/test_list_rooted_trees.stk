@@ -7,7 +7,7 @@ fn Rosetta::RootedTrees::assemble($remaining, $parts, $last, $out) {
         return
     }
 
-    for my $size (1 .. $remaining) {
+    for my $size (1:$remaining) {
         my $subs = Rosetta::RootedTrees::trees($size)
         for my $sub (@$subs) {
             next if defined($last) && $last ne "" && $sub lt $last

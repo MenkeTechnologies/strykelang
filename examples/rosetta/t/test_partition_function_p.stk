@@ -7,8 +7,8 @@ fn Rosetta::Partition::p($n) {
     return 0 if $n < 0
     my @dp = (0) x ($n + 1)
     $dp[0] = 1
-    for my $i (1..$n) {
-        for my $j ($i..$n) {
+    for my $i (1:$n) {
+        for my $j ($i:$n) {
             $dp[$j] += $dp[$j - $i]
         }
     }
@@ -17,7 +17,7 @@ fn Rosetta::Partition::p($n) {
 
 # OEIS A000041
 my @expected = (1, 1, 2, 3, 5, 7, 11, 15, 22, 30, 42, 56, 77, 101, 135, 176, 231, 297, 385, 490, 627)
-for my $n (0..20) {
+for my $n (0:20) {
     assert_eq Rosetta::Partition::p($n), $expected[$n], "p($n) = " . $expected[$n]
 }
 

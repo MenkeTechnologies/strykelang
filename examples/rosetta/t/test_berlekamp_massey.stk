@@ -39,7 +39,7 @@ fn Rosetta::BM::find($seq, $p) {
             my $coef = Rosetta::BM::mod_pos($d * Rosetta::BM::mod_inverse($delta_prev, $p), $p)
             # ls(x) = ls(x) - coef · x^shift · prev(x)
             my @new_ls
-            for (1..$shift - 1) { push @new_ls, 0 }
+            for (1:$shift - 1) { push @new_ls, 0 }
             push @new_ls, $coef
             for my $c (@prev) { push @new_ls, Rosetta::BM::mod_pos(-$coef * $c, $p) }
             # Pad ls to match new_ls length, then add element-wise.
@@ -56,7 +56,7 @@ fn Rosetta::BM::find($seq, $p) {
         } else {
             my $coef = Rosetta::BM::mod_pos($d * Rosetta::BM::mod_inverse($delta_prev, $p), $p)
             my @new_ls
-            for (1..$shift - 1) { push @new_ls, 0 }
+            for (1:$shift - 1) { push @new_ls, 0 }
             push @new_ls, $coef
             for my $c (@prev) { push @new_ls, Rosetta::BM::mod_pos(-$coef * $c, $p) }
             my $max_len = len(@new_ls) > len(@ls) ? len(@new_ls) : len(@ls)
@@ -74,7 +74,7 @@ fn Rosetta::BM::find($seq, $p) {
 fn Rosetta::BM::extend($seq, $coefs, $p, $extra) {
     my @out = @$seq
     my $L = len(@$coefs)
-    for (1..$extra) {
+    for (1:$extra) {
         my $next = 0
         for my $j (~> 0:$L - 1) {
             $next = Rosetta::BM::mod_pos($next + $coefs->[$j] * $out[-1 - $j], $p)

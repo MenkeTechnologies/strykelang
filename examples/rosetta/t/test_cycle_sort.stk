@@ -5,10 +5,10 @@ fn Rosetta::CycleSort::sort($list) {
     my @arr = @$list
     my $n = len(@arr)
     
-    for my $cycle_start (0..$n-2) {
+    for my $cycle_start (0:$n-2) {
         my $item = $arr[$cycle_start]
         my $pos = $cycle_start
-        for my $i ($cycle_start+1..$n-1) {
+        for my $i ($cycle_start+1:$n-1) {
             if ($arr[$i] < $item) {
                 $pos++
             }
@@ -25,7 +25,7 @@ fn Rosetta::CycleSort::sort($list) {
         
         while ($pos != $cycle_start) {
             $pos = $cycle_start
-            for my $i ($cycle_start+1..$n-1) {
+            for my $i ($cycle_start+1:$n-1) {
                 if ($arr[$i] < $item) {
                     $pos++
                 }

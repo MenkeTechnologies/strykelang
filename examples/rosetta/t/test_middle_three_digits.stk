@@ -4,7 +4,7 @@
 fn Rosetta::MiddleThreeDigits::middle_three_digits {
     my $n = _
     my $s = ~> $n abs >{ sprintf("%d", _) }
-    my $len = length($s)
+    my $len = len($s)
     
     if ($len < 3 || $len % 2 == 0) {
         "invalid"

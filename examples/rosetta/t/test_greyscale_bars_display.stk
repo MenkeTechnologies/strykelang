@@ -10,7 +10,7 @@ fn Rosetta::Greyscale::shade($level) {
 fn Rosetta::Greyscale::row($width, $bars, $reverse) {
     my $bar_w = int($width / $bars)
     my $line = ""
-    for my $i (0 .. $bars - 1) {
+    for my $i (0:$bars - 1) {
         my $level = $i / ($bars - 1)
         $level = 1 - $level if $reverse
         $line .= Rosetta::Greyscale::shade($level) x $bar_w
@@ -30,7 +30,7 @@ fn Rosetta::Greyscale::render($width) {
 fn Rosetta::Greyscale::unique($text) {
     my %seen
     for my $ch (split //, $text) { $seen{$ch} = 1 if $ch !~ /\s/ }
-    scalar(keys %seen)
+    len(keys %seen)
 }
 
 my $rows = Rosetta::Greyscale::render(64)

@@ -8,7 +8,7 @@ fn Rosetta::SmithWaterman::solve($s1, $s2, $match, $mismatch, $gap) {
     my $n2 = len(@c2)
     
     # DP table
-    my @h = map { [ map { 0 } 0..$n2 ] } 0..$n1
+    my @h = map { [ map { 0 } 0:$n2 ] } 0:$n1
     
     my $max_score = 0
     my $max_i = 0

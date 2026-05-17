@@ -14,7 +14,7 @@ fn Rosetta::Inconsummate::digit_sum($n) {
 fn Rosetta::Inconsummate::is_inconsummate($n) {
     return 0 if $n < 1
     my $limit = $n * 81 + 10  # 81 ≈ digit_sum max for 9-digit, sufficient buffer
-    for my $x (1..$limit) {
+    for my $x (1:$limit) {
         my $ds = Rosetta::Inconsummate::digit_sum($x)
         return 0 if $ds > 0 && $x == $n * $ds
     }

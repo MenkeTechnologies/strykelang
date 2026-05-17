@@ -3,7 +3,7 @@
 
 fn Rosetta::Narcissistic::check($n) {
     my $s = "$n"
-    my $len = length($s)
+    my $len = len($s)
     my @digits = ~> $s chars
     my $sum = 0
     for my $d (@digits) {

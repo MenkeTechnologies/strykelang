@@ -5,7 +5,7 @@ fn Rosetta::AmicableTriples::sum_divisors($n) {
     if ($n < 2) { return 0 }
     my $sum = 0
     my $limit = int($n / 2)
-    for my $i (1..$limit) {
+    for my $i (1:$limit) {
         if ($n % $i == 0) {
             $sum = $sum + $i
         }
@@ -15,11 +15,11 @@ fn Rosetta::AmicableTriples::sum_divisors($n) {
 
 fn Rosetta::AmicableTriples::solve($limit) {
     my @res
-    for my $a (1..$limit) {
+    for my $a (1:$limit) {
         my $sa = Rosetta::AmicableTriples::sum_divisors($a)
         # Amicable triple (a,b,c) means s(a)=b+c, s(b)=a+c, s(c)=a+b
         # So b+c = s(a).
-        for my $b ($a+1..$limit) {
+        for my $b ($a+1:$limit) {
             my $c = $sa - $b
             if ($c > $b && $c <= $limit) {
                 my $sb = Rosetta::AmicableTriples::sum_divisors($b)

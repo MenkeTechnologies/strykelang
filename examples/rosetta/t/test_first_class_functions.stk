@@ -13,7 +13,7 @@ my @fns  = (\&Math::Funcs::cube, \&Math::Funcs::cube_root)
 my @inv  = (\&Math::Funcs::cube_root, \&Math::Funcs::cube)
 
 # composed[i] = f[i] ∘ inv[i] should be identity
-for my $i (0..1) {
+for my $i (0:1) {
     my $h = Math::Funcs::compose($fns[$i], $inv[$i])
     my $r = $h->(8.0)
     assert_ok abs($r - 8.0) < 1e-9, "composed[$i] is identity"

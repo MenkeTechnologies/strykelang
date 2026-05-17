@@ -7,7 +7,7 @@ fn Rosetta::ShellSort::sort($list) {
     my @gaps = (701, 301, 132, 57, 23, 10, 4, 1)
     
     for my $gap (@gaps) {
-        for my $i ($gap..$len-1) {
+        for my $i ($gap:$len-1) {
             my $temp = $arr[$i]
             my $j = $i
             while ($j >= $gap && $arr[$j - $gap] > $temp) {

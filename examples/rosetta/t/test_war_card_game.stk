@@ -3,7 +3,7 @@
 
 fn Rosetta::WarGame::play(@deck) {
     my $half = int(len(@deck) / 2)
-    my @p1 = @deck[0 .. $half - 1]
+    my @p1 = @deck[0:$half - 1]
     my @p2 = @deck[$half .. len(@deck) - 1]
     
     my $turns = 0
@@ -28,7 +28,7 @@ fn Rosetta::WarGame::play(@deck) {
                 last
             }
             # Each player puts 3 cards face down, and 1 face up
-            for (1..3) { push @pool, shift @p1, shift @p2 }
+            for (1:3) { push @pool, shift @p1, shift @p2 }
         }
     }
     

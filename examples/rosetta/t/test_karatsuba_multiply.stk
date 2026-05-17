@@ -12,7 +12,7 @@ fn Rosetta::Karatsuba::digits($n) {
 
 fn Rosetta::Karatsuba::pow10($k) {
     my $r = 1
-    for (1..$k) { $r *= 10 }
+    for (1:$k) { $r *= 10 }
     $r
 }
 

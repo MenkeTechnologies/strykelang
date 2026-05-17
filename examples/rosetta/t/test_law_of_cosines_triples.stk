@@ -13,9 +13,9 @@ fn Rosetta::LawCos::triples_with_angle($limit, $angle_deg) {
     my $pi = 4 * atan2(1, 1)
     my $target = cos($angle_deg * $pi / 180)
     my @out
-    for my $a (1..$limit) {
-        for my $b ($a..$limit) {
-            for my $c (1..$limit) {
+    for my $a (1:$limit) {
+        for my $b ($a:$limit) {
+            for my $c (1:$limit) {
                 next if $c < abs($a - $b) || $c > $a + $b - 1
                 next if $c <= 0
                 my $cos_c = Rosetta::LawCos::cos_angle($a, $b, $c)

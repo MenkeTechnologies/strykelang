@@ -40,7 +40,7 @@ fn Rosetta::Pig::strat_hold_at($threshold) {
 # Roll is in 1..6
 my %seen
 for my $i (~> 1:300) { $seen{Rosetta::Pig::roll()}++ }
-for my $f (1..6) {
+for my $f (1:6) {
     assert_ok exists($seen{$f}) && $seen{$f} > 0, "face $f appears in 300 rolls"
 }
 

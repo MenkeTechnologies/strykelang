@@ -9,9 +9,9 @@ fn Rosetta::MultiReg::transpose($m) {
     my $rows = len(@$m)
     my $cols = len(@{$m->[0]})
     my @t
-    for my $c (0..$cols - 1) {
+    for my $c (0:$cols - 1) {
         my @row
-        for my $r (0..$rows - 1) { push @row, $m->[$r][$c] }
+        for my $r (0:$rows - 1) { push @row, $m->[$r][$c] }
         push @t, \@row
     }
     \@t
@@ -21,11 +21,11 @@ fn Rosetta::MultiReg::matmul($a, $b) {
     my $ar = len(@$a); my $ac = len(@{$a->[0]})
     my $bc = len(@{$b->[0]})
     my @out
-    for my $i (0..$ar - 1) {
+    for my $i (0:$ar - 1) {
         my @row
-        for my $j (0..$bc - 1) {
+        for my $j (0:$bc - 1) {
             my $s = 0
-            for my $k (0..$ac - 1) { $s += $a->[$i][$k] * $b->[$k][$j] }
+            for my $k (0:$ac - 1) { $s += $a->[$i][$k] * $b->[$k][$j] }
             push @row, $s
         }
         push @out, \@row
@@ -47,25 +47,25 @@ fn Rosetta::MultiReg::solve_linear($a, $b) {
     # Solve square system $a * x = $b via Gauss-Jordan.
     my $n = len(@$a)
     my @aug
-    for my $i (0..$n - 1) {
+    for my $i (0:$n - 1) {
         push @aug, [@{$a->[$i]}, $b->[$i]]
     }
-    for my $r (0..$n - 1) {
+    for my $r (0:$n - 1) {
         my $pivot = $r
         while ($pivot < $n && abs($aug[$pivot][$r]) < 1e-12) { $pivot++ }
         return undef if $pivot == $n
         ($aug[$r], $aug[$pivot]) = ($aug[$pivot], $aug[$r]) if $pivot != $r
         my $div = $aug[$r][$r]
-        for my $c ($r..$n) { $aug[$r][$c] /= $div }
-        for my $i (0..$n - 1) {
+        for my $c ($r:$n) { $aug[$r][$c] /= $div }
+        for my $i (0:$n - 1) {
             next if $i == $r
             my $f = $aug[$i][$r]
             next if abs($f) < 1e-15
-            for my $c ($r..$n) { $aug[$i][$c] -= $f * $aug[$r][$c] }
+            for my $c ($r:$n) { $aug[$i][$c] -= $f * $aug[$r][$c] }
         }
     }
     my @x
-    for my $i (0..$n - 1) { push @x, $aug[$i][$n] }
+    for my $i (0:$n - 1) { push @x, $aug[$i][$n] }
     \@x
 }
 

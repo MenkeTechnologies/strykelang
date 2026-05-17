@@ -54,6 +54,6 @@ my $text = "ATTACK AT 1200"
 my $sq = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 my $enc = Rosetta::ADFGVX::encode("HELLO", $sq, "KEY")
 
-assert_ok length($enc) == 10, "encoded length is twice the text length"
+assert_ok len($enc) == 10, "encoded length is twice the text length"
 
 test_run

@@ -6,7 +6,7 @@ fn Rosetta::Sylvester::nth($n) {
         2
     } else {
         my $s = 2
-        for my $i (1..$n) {
+        for my $i (1:$n) {
             $s = $s * $s - $s + 1
         }
         $s

@@ -12,7 +12,7 @@ fn Rosetta::Snusp::run($grid_str) {
     my $dy = 0
     
     my @tape
-    for (0..100) { push @tape, 0 }
+    for (0:100) { push @tape, 0 }
     my $tp = 0
     
     my $out = ""

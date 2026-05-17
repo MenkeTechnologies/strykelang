@@ -24,8 +24,8 @@ fn Rosetta::FiveWeekends::has_five($y, $m) {
 
 fn Rosetta::FiveWeekends::scan($y_lo, $y_hi) {
     my @hits
-    for my $y ($y_lo..$y_hi) {
-        for my $m (1..12) {
+    for my $y ($y_lo:$y_hi) {
+        for my $m (1:12) {
             push @hits, sprintf("%04d-%02d", $y, $m) if Rosetta::FiveWeekends::has_five($y, $m)
         }
     }
@@ -34,7 +34,7 @@ fn Rosetta::FiveWeekends::scan($y_lo, $y_hi) {
 
 # Rosetta task: 1900-01-01 .. 2100-12-31 inclusive yields 201 months.
 my @full = Rosetta::FiveWeekends::scan(1900, 2100)
-assert_eq len(@full), 201, "201 five-weekend months in 1900..2100"
+assert_eq len(@full), 201, "201 five-weekend months in 1900:2100"
 assert_eq $full[0], "1901-03", "first hit is 1901-03"
 assert_eq $full[-1], "2100-10", "last hit is 2100-10"
 
@@ -53,6 +53,6 @@ assert_ok $every, "every hit starts on a Friday"
 
 # Threaded
 my @t = ~> [2000, 2010] fn { Rosetta::FiveWeekends::scan(_->[0], _->[1]) }
-assert_eq $t[0], "2000-12", "2000-12 is first in 2000..2010"
+assert_eq $t[0], "2000-12", "2000-12 is first in 2000:2010"
 
 test_run

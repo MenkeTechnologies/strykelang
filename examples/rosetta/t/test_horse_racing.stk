@@ -3,7 +3,7 @@
 
 fn Rosetta::HorseRacing::simulate($num_horses, $track_length) {
     my @horses
-    for (0 .. $num_horses - 1) {
+    for (0:$num_horses - 1) {
         push @horses, { id => _, pos => 0 }
     }
     

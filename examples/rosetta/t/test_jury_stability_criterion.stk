@@ -4,7 +4,7 @@
 fn Rosetta::Jury::poly_at($coeffs, $x) {
     my $sum = 0.0
     my $n = len(@$coeffs) - 1
-    for my $i (0 .. $n) {
+    for my $i (0:$n) {
         $sum += $coeffs->[$i] * ($x ** ($n - $i))
     }
     $sum
@@ -15,7 +15,7 @@ fn Rosetta::Jury::reduce_row($row) {
     my $a0 = $row->[0]
     my $an = $row->[-1]
     my @next
-    for my $i (0 .. $m - 2) {
+    for my $i (0:$m - 2) {
         push @next, $a0 * $row->[$i] - $an * $row->[$m - 1 - $i]
     }
     \@next

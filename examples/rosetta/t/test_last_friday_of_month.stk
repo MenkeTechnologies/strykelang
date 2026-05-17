@@ -43,7 +43,7 @@ assert_eq join(",", @y2012), "27,24,30,27,25,29,27,31,28,26,30,28", "Last Friday
 my @y2026 = Rosetta::LastFriday::for_year(2026)
 my $all_friday = 1
 my $all_within = 1
-for my $m (1..12) {
+for my $m (1:12) {
     my $d = $y2026[$m - 1]
     $all_friday = 0 if Rosetta::LastFriday::dow(2026, $m, $d) != 6
     my $last = Rosetta::LastFriday::days_in(2026, $m)

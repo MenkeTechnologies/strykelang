@@ -17,6 +17,6 @@ my $sum_sq = Rosetta::JensensDevice::sum(10, fn {
     $i * $i
 })
 
-assert_eq $sum_sq, 385, "Sum of squares 1..10"
+assert_eq $sum_sq, 385, "Sum of squares 1:10"
 
 test_run

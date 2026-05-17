@@ -2,11 +2,11 @@
 # Rosetta Code: Bitap algorithm
 
 fn Rosetta::Bitap::solve($text, $pattern) {
-    my $m = length($pattern)
+    my $m = len($pattern)
     return 0 if $m == 0
     
     my @p_chars = $pattern |> chars()
-    my @mask = map { ~0 } 0..255
+    my @mask = map { ~0 } 0:255
     
     for (my $i = 0; $i < $m; $i++) {
         my $char_code = ord($p_chars[$i])

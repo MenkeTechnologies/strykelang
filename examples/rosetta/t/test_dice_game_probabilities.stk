@@ -6,10 +6,10 @@ fn Rosetta::DiceProb::distribution($n_dice, $faces) {
     # Returns hash: total -> count of outcomes.
     my %dist
     $dist{0} = 1
-    for (1..$n_dice) {
+    for (1:$n_dice) {
         my %next
         for my $sum (keys %dist) {
-            for my $f (1..$faces) {
+            for my $f (1:$faces) {
                 my $key = $sum + $f
                 $next{$key} = ($next{$key} // 0) + $dist{$sum}
             }

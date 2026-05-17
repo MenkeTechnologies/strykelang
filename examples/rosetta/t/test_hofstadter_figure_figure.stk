@@ -6,7 +6,7 @@ fn Rosetta::HofstadterFF::compute($n) {
     my @s = (0, 2)
     my %in_r = (1 => 1)
     
-    for my $i (2..$n) {
+    for my $i (2:$n) {
         my $next_r = $r[$i-1] + $s[$i-1]
         push @r, $next_r
         $in_r{$next_r} = 1

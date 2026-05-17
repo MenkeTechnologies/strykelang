@@ -17,11 +17,11 @@ fn Rosetta::OTP::decrypt($cipher, $pad) {
 }
 
 my $t = "Rosetta Code"
-my $pad = Rosetta::OTP::generate_pad(length($t))
+my $pad = Rosetta::OTP::generate_pad(len($t))
 my $cipher = Rosetta::OTP::encrypt($t, $pad)
 my $back = Rosetta::OTP::decrypt($cipher, $pad)
 
 assert_eq $back, $t, "OTP round trip"
-assert_eq len(@$cipher), length($t), "cipher length matches"
+assert_eq len(@$cipher), len($t), "cipher length matches"
 
 test_run

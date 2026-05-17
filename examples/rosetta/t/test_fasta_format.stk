@@ -29,7 +29,7 @@ VGDGTQDNLSGAEKGVVVVKN
 
 my $res = Rosetta::Fasta::parse($data)
 assert_eq exists $res->{Rosetta_Code}, 1, "Found Rosetta_Code"
-assert_eq length($res->{Rosetta_Code}), 77, "Rosetta_Code length matches"
+assert_eq len($res->{Rosetta_Code}), 77, "Rosetta_Code length matches"
 assert_eq $res->{Another_Sequence}, "VGDGTQDNLSGAEKGVVVVKN", "Another_Sequence matches"
 
 test_run

@@ -48,7 +48,7 @@ assert_eq Rosetta::Ormiston::next_prime(13), 17, "next prime of 13"
 # verify the function shape. Below 2 million we expect ≥ 1 triple.
 # Our test runs only up to 10000 — likely zero triples.
 my @small = Rosetta::Ormiston::triples(10000)
-assert_eq scalar(@small), 0, "no Ormiston triple ≤ 10000"
+assert_eq len(@small), 0, "no Ormiston triple ≤ 10000"
 
 # Property: Ormiston pairs (consecutive primes) require shared digit
 # multiset. Verify that *every* triple (when found) satisfies this.

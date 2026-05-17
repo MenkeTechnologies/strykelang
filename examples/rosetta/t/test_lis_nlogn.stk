@@ -33,7 +33,7 @@ fn Rosetta::LisFast::sequence($arr) {
     my @tails
     my @tail_idx
     my @prev = (-1) x $n
-    for my $i (0..$n - 1) {
+    for my $i (0:$n - 1) {
         my $x = $arr->[$i]
         my $pos = Rosetta::LisFast::lower_bound(\@tails, $x)
         if ($pos == len(@tails)) {

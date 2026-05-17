@@ -6,7 +6,7 @@
 fn Rosetta::Munchausen::digit_self_power($d) {
     return 0 if $d == 0
     my $r = 1
-    for (1 .. $d) { $r *= $d }
+    for (1:$d) { $r *= $d }
     $r
 }
 

@@ -7,7 +7,7 @@ fn Rosetta::Leonardo::compute($n) {
     } else {
         my $a = 1
         my $b = 1
-        for my $i (2..$n) {
+        for my $i (2:$n) {
             my $c = $a + $b + 1
             ($a, $b) = ($b, $c)
         }

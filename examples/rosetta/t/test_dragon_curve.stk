@@ -9,7 +9,7 @@ fn Rosetta::DragonCurve::step($s) {
 
 fn Rosetta::DragonCurve::solve($n) {
     my $res = "R"
-    for (1..$n) {
+    for (1:$n) {
         $res = Rosetta::DragonCurve::step($res)
     }
     $res
@@ -21,6 +21,6 @@ assert_eq Rosetta::DragonCurve::solve(2), "RRLRRLL", "Dragon n=2"
 assert_eq Rosetta::DragonCurve::solve(3), "RRLRRLLRRRLLRLL", "Dragon n=3"
 
 # Length should be 2^(n+1) - 1
-assert_eq length(Rosetta::DragonCurve::solve(10)), 2047, "Dragon n=10 length"
+assert_eq len(Rosetta::DragonCurve::solve(10)), 2047, "Dragon n=10 length"
 
 test_run

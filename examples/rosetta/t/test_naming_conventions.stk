@@ -4,7 +4,7 @@
 # PascalCase, kebab-case, or SCREAMING_SNAKE.
 
 fn Rosetta::Naming::classify($s) {
-    return "empty" if length($s) == 0
+    return "empty" if len($s) == 0
     if ($s =~ /^[a-z][a-z0-9]*(_[a-z0-9]+)+$/) { return "snake_case" }
     if ($s =~ /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/) { return "SCREAMING_SNAKE" }
     if ($s =~ /^[a-z][a-z0-9]*(-[a-z0-9]+)+$/) { return "kebab-case" }
