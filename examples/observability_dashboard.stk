@@ -81,8 +81,8 @@ for my $svc (@services) {
     my $n    = $total{$svc}
     next if $n == 0
     my $u    = hll_count($hll{$svc})
-    my $p50  = int(td_quantile($td{$svc}, 0.50))
-    my $p99  = int(td_quantile($td{$svc}, 0.99))
+    my $p50  = ~> td_quantile($td{$svc}, 0.50) int
+    my $p99  = ~> td_quantile($td{$svc}, 0.99) int
     my $errs = $error_count{$svc}
     my $pct  = 100.0 * $errs / $n
     printf "  %-9s %5d %5d %5d %5d %6d %6d %6d %5.1f%%\n",
@@ -143,10 +143,10 @@ if (len(@alerts) == 0) {
 p ""
 p "── slowest service by p99 latency ───────────────────"
 my @ranked = sort {
-    int(td_quantile($td{_1}, 0.99)) <=> int(td_quantile($td{_0}, 0.99))
+    (~> td_quantile($td{_1}, 0.99) int) <=> (~> td_quantile($td{_0}, 0.99) int)
 } @services
 for my $i (0:2) {
     my $svc = $ranked[$i]
     next unless $total{$svc} > 0
-    printf "  %d. %-9s p99=%d ms\n", $i + 1, $svc, int(td_quantile($td{$svc}, 0.99))
+    printf "  %d. %-9s p99=%d ms\n", $i + 1, $svc, ~> td_quantile($td{$svc}, 0.99) int
 }

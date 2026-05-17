@@ -123,10 +123,10 @@ for my $i (1:$N) {
 
 p ""
 p "── per-game score distribution (t-digest) ───────────"
-printf "  p10  : %d\n", int(td_quantile($td_score, 0.10))
-printf "  p50  : %d\n", int(td_quantile($td_score, 0.50))
-printf "  p90  : %d\n", int(td_quantile($td_score, 0.90))
-printf "  p99  : %d\n", int(td_quantile($td_score, 0.99))
+printf "  p10  : %d\n", ~> td_quantile($td_score, 0.10) int
+printf "  p50  : %d\n", ~> td_quantile($td_score, 0.50) int
+printf "  p90  : %d\n", ~> td_quantile($td_score, 0.90) int
+printf "  p99  : %d\n", ~> td_quantile($td_score, 0.99) int
 printf "  max  : %d\n", $max_score
 printf "  mean : %.2f\n", $total_score / $N
 

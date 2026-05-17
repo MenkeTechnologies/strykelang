@@ -155,7 +155,7 @@ printf "  exact : %d\n", $total_edges
 
 p ""
 p "── in-degree percentiles (t-digest) ─────────────────"
-printf "  p10  : %d\n", int(td_quantile($td_degree, 0.10))
-printf "  p50  : %d\n", int(td_quantile($td_degree, 0.50))
-printf "  p90  : %d\n", int(td_quantile($td_degree, 0.90))
-printf "  p99  : %d\n", int(td_quantile($td_degree, 0.99))
+printf "  p10  : %d\n", ~> td_quantile($td_degree, 0.10) int
+printf "  p50  : %d\n", ~> td_quantile($td_degree, 0.50) int
+printf "  p90  : %d\n", ~> td_quantile($td_degree, 0.90) int
+printf "  p99  : %d\n", ~> td_quantile($td_degree, 0.99) int

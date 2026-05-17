@@ -191,6 +191,6 @@ for my $h (@top_kinds) {
 
 p ""
 p "── content-length distribution (t-digest) ───────────"
-printf "  p50  : %d chars\n", int(td_quantile($td_len, 0.50))
-printf "  p90  : %d chars\n", int(td_quantile($td_len, 0.90))
-printf "  p99  : %d chars\n", int(td_quantile($td_len, 0.99))
+printf "  p50  : %d chars\n", ~> td_quantile($td_len, 0.50) int
+printf "  p90  : %d chars\n", ~> td_quantile($td_len, 0.90) int
+printf "  p99  : %d chars\n", ~> td_quantile($td_len, 0.99) int

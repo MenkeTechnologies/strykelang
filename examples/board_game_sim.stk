@@ -74,10 +74,10 @@ for my $i (1:$N) {
 
 p ""
 p "── moves-per-game distribution ──────────────────────"
-printf "  p10 : %d\n", int(td_quantile($td_moves, 0.10))
-printf "  p50 : %d\n", int(td_quantile($td_moves, 0.50))
-printf "  p90 : %d\n", int(td_quantile($td_moves, 0.90))
-printf "  p99 : %d\n", int(td_quantile($td_moves, 0.99))
+printf "  p10 : %d\n", ~> td_quantile($td_moves, 0.10) int
+printf "  p50 : %d\n", ~> td_quantile($td_moves, 0.50) int
+printf "  p90 : %d\n", ~> td_quantile($td_moves, 0.90) int
+printf "  p99 : %d\n", ~> td_quantile($td_moves, 0.99) int
 
 p ""
 printf "── total snake/ladder hops across %d games : %d ──────\n",
@@ -158,6 +158,6 @@ p ""
 p "── theoretical minimum vs observed ──────────────────"
 printf "  theoretical min moves (perfect-luck path) : ~7\n"
 printf "  observed p10 moves                          : %d\n",
-    int(td_quantile($td_moves, 0.10))
+    ~> td_quantile($td_moves, 0.10) int
 printf "  observed median moves                       : %d\n",
-    int(td_quantile($td_moves, 0.50))
+    ~> td_quantile($td_moves, 0.50) int
