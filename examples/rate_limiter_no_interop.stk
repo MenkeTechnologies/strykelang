@@ -1,0 +1,124 @@
+#!/usr/bin/env stryke
+
+# Token-bucket rate limiter — tokens refill at a constant rate up to
+# a capacity; each `take` consumes 1 token if available, else returns
+# 0 (denied). The smoothest variant for "N requests per second with
+# burst tolerance B". Used by API gateways, CDN edge nodes, Slack
+# notification dampers. Parses clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * implicit return on tail (rule 7)
+#   * `#{…}` interpolation (rule 1a)
+#   * `:` ranges, `len` (rules 4, 5)
+#
+# Namespaced UDFs `Rate::*`.
+#
+# Run: stryke --no-interop examples/rate_limiter_no_interop.stk
+
+# Construct a bucket: capacity tokens, refill_rate tokens-per-time-unit.
+fn Rate::new($capacity, $refill_rate) = +{
+    capacity    => $capacity,
+    refill_rate => $refill_rate,
+    tokens      => $capacity,    # start full
+    last_t      => 0,
+}
+
+# Refill based on elapsed time since last_t, clamped to capacity.
+fn Rate::refill($bk, $now) {
+    my $elapsed = $now - $bk->{last_t}
+    return if $elapsed <= 0
+    my $add = $elapsed * $bk->{refill_rate}
+    $bk->{tokens} = $bk->{tokens} + $add > $bk->{capacity}
+                 ? $bk->{capacity}
+                 : $bk->{tokens} + $add
+    $bk->{last_t} = $now
+}
+
+# Attempt to take 1 token. Returns 1 (allowed) or 0 (rate-limited).
+fn Rate::take($bk, $now) {
+    Rate::refill($bk, $now)
+    if ($bk->{tokens} >= 1) {
+        $bk->{tokens} -= 1
+        return 1
+    }
+    0
+}
+
+# Bulk-take N tokens atomically: all-or-nothing.
+fn Rate::take_n($bk, $n, $now) {
+    Rate::refill($bk, $now)
+    if ($bk->{tokens} >= $n) {
+        $bk->{tokens} -= $n
+        return 1
+    }
+    0
+}
+
+p "── Token-bucket rate limiter demo ──"
+
+# Bucket of capacity 5, refill 1 token/second. Start at t=0.
+my $bk = Rate::new(5, 1)
+
+# Burst of 5 at t=0: all allowed.
+my $allowed = 0
+for (1:5) {
+    my $r = Rate::take($bk, 0)
+    $allowed += $r
+}
+die "burst of 5 should fit (capacity = 5)" unless $allowed == 5
+
+# 6th request at t=0: bucket empty → denied.
+die "6th request must be denied"           if Rate::take($bk, 0)
+
+# 1 second later: 1 token refilled, take consumes it.
+die "1 token at t=1 should be allowed" unless Rate::take($bk, 1)
+die "2nd token at t=1 should be denied" if Rate::take($bk, 1)
+p "  capacity-5 + 1tps: initial 5 allowed, 6th denied, t=1 allows 1  OK"
+
+# Long wait (10s) re-fills to cap (clamped).
+Rate::refill($bk, 11)
+die "after 10s, bucket should be full"    unless $bk->{tokens} == 5
+
+# Burst-after-wait should fit 5 again.
+my $burst_after = 0
+for (1:5) {
+    my $r = Rate::take($bk, 11)
+    $burst_after += $r
+}
+die "burst-after-wait should fit 5" unless $burst_after == 5
+p "  10s wait re-fills to cap (no overflow); 5-burst allowed again  OK"
+
+# Bulk take: take_n. Reset bucket, ask for 3 → ok, then 3 → denied.
+my $b2 = Rate::new(5, 1)
+die "bulk take(3) at t=0 should succeed" unless Rate::take_n($b2, 3, 0)
+die "bulk take(3) right after should fail (only 2 left)" if Rate::take_n($b2, 3, 0)
+die "bulk take(2) right after should succeed" unless Rate::take_n($b2, 2, 0)
+p "  bulk take_n: atomic all-or-nothing semantics  OK"
+
+# Steady-state: 1 req/sec for 20 seconds at exactly the refill rate.
+# All should succeed because we never out-pace the bucket.
+my $b3 = Rate::new(5, 1)
+my $passes = 0
+for my $t (0:19) {
+    my $r = Rate::take($b3, $t)
+    $passes += $r
+}
+die "steady-state 20 requests at refill rate" unless $passes == 20
+p "  steady state at refill rate: 20/20 allowed  OK"
+
+# Overage: 2 req/sec for 20 seconds. Only capacity + 20 * refill_rate = 5 + 20 = 25
+# tokens worth of requests can succeed. With 40 attempts, ~25 pass.
+my $b4 = Rate::new(5, 1)
+my $passes4 = 0
+my $tries4 = 40
+for my $i (0:$tries4 - 1) {
+    my $t = $i * 0.5    # 2 req/sec
+    my $r = Rate::take($b4, $t)
+    $passes4 += $r
+}
+# Allow ±1 for rounding.
+die "overage: ~25 expected, got $passes4" unless abs($passes4 - 25) <= 1
+p "  overage 2× refill rate over 20s: $passes4 passes (≈25 expected)  OK"
+
+p ""
+p "  ALL PASS (burst + deny + refill cap + bulk + steady + overage)"

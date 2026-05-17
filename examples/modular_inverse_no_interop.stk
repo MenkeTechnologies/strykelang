@@ -1,0 +1,92 @@
+#!/usr/bin/env stryke
+
+# Modular inverse via the extended Euclidean algorithm. Returns
+# integers (g, x, y) such that a·x + b·y = g = gcd(a, b). When
+# gcd(a, m) == 1, x mod m is the modular inverse of a (mod m).
+# Used in RSA, CRT, Diffie-Hellman, finite-field arithmetic.
+# Parses clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * implicit return on tail (rule 7)
+#   * `#{…}` interpolation (rule 1a)
+#   * recursive `fn` with destructure
+#
+# Namespaced UDFs `Mod::*`.
+#
+# Run: stryke --no-interop examples/modular_inverse_no_interop.stk
+
+# Returns [g, x, y] such that ax + by = g = gcd(a, b).
+fn Mod::ext_gcd($va, $vb) {
+    return [$va, 1, 0] if $vb == 0
+    my $r = Mod::ext_gcd($vb, $va % $vb)
+    my ($g, $x1, $y1) = @$r
+    [$g, $y1, $x1 - int($va / $vb) * $y1]
+}
+
+# Modular inverse of $a (mod $m). Returns undef if gcd(a, m) != 1.
+fn Mod::inverse($va, $m) {
+    my $r = Mod::ext_gcd($va, $m)
+    my ($g, $x, $y) = @$r
+    return undef if $g != 1
+    (($x % $m) + $m) % $m
+}
+
+# Modular exponentiation by squaring — handy companion for crypto demos.
+fn Mod::pow($base, $exp, $m) {
+    return 0 if $m == 1
+    my $result = 1
+    my $bs = $base % $m
+    my $e = $exp
+    while ($e > 0) {
+        $result = ($result * $bs) % $m if $e % 2 == 1
+        $e  = int($e / 2)
+        $bs = ($bs * $bs) % $m
+    }
+    $result
+}
+
+p "── Modular inverse demo ──"
+
+# Classic textbook pairs.
+my @cases = (
+    +{ a =>  3, m =>  11, inv =>  4   },  # 3·4 = 12 ≡ 1 (mod 11)
+    +{ a =>  7, m =>  26, inv => 15   },  # 7·15 = 105 ≡ 1 (mod 26)
+    +{ a => 17, m =>3120, inv =>2753  },  # RSA textbook (e=17, φ(n)=3120)
+    +{ a =>  1, m =>   7, inv =>  1   },  # identity
+    +{ a => 12, m =>  35, inv =>  3   },  # 12·3 = 36 ≡ 1 (mod 35)
+)
+for my $c (@cases) {
+    my $inv = Mod::inverse($c->{a}, $c->{m})
+    die "inv($c->{a}, $c->{m}) expected $c->{inv}" unless defined $inv && $inv == $c->{inv}
+    die "non-inverse on ($c->{a}, $c->{m})" unless ($c->{a} * $inv) % $c->{m} == 1
+}
+p "  #{len @cases} known pairs: every a·inv(a) ≡ 1 (mod m)  OK"
+
+# Non-coprime pair: gcd > 1 → no inverse.
+die "6 has no inverse mod 9 (gcd=3)" if defined Mod::inverse(6, 9)
+die "2 has no inverse mod 4 (gcd=2)" if defined Mod::inverse(2, 4)
+p "  non-coprime pairs (gcd > 1): inverse returns undef  OK"
+
+# Random stress: for every a coprime to m in 1..50, verify the inverse.
+my $m = 47    # prime — every 1..m-1 has an inverse
+my $hits = 0
+for my $va (1:$m - 1) {
+    my $inv = Mod::inverse($va, $m)
+    die "missing inverse for $va mod $m" unless defined $inv
+    die "wrong inverse $va·$inv != 1 mod $m" unless ($va * $inv) % $m == 1
+    $hits++
+}
+die "should be #{$m - 1} hits, got $hits" unless $hits == $m - 1
+p "  mod 47 (prime): all #{$m - 1} units invertible  OK"
+
+# Fermat's little theorem cross-check: for prime p and gcd(a, p) = 1,
+# a^(p-2) mod p ≡ inv(a, p). Verifies Mod::pow as well.
+for my $va (2:10) {
+    my $inv_ext = Mod::inverse($va, 47)
+    my $inv_fer = Mod::pow($va, 47 - 2, 47)
+    die "Fermat disagrees with ext_gcd for a=$va" unless $inv_ext == $inv_fer
+}
+p "  Fermat (a^(p-2)) agrees with extended GCD on 9 values  OK"
+
+p ""
+p "  ALL PASS (#{len @cases} pairs + non-coprime + mod-47 stress + Fermat cross-check)"

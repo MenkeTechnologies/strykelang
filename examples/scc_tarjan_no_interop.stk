@@ -1,0 +1,143 @@
+#!/usr/bin/env stryke
+
+# Tarjan's strongly-connected-components — single DFS pass over a
+# directed graph; each SCC pops off the stack when its root-node
+# (lowlink == index) finishes. O(V + E). Used in compiler dead-code
+# elimination, dependency analysis, 2-SAT solvers. Parses clean under
+# `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * implicit return on tail (rule 7)
+#   * `#{…}` interpolation (rule 1a)
+#   * `len`, `:` ranges (rules 4, 5)
+#
+# Namespaced UDFs `SCC::*`.
+#
+# Run: stryke --no-interop examples/scc_tarjan_no_interop.stk
+
+# Returns arrayref of SCCs, each SCC an arrayref of vertex ids.
+# adj is hashref: vertex → arrayref of neighbors.
+fn SCC::find($n, $edges) {
+    my %adj
+    for my $i (0:$n - 1) { $adj{$i} //= [] }
+    for my $e (@$edges) {
+        my ($u, $w) = @$e
+        push @{$adj{$u}}, $w
+    }
+    my $state = +{
+        adj      => \%adj,
+        index    => 0,
+        idx_of   => +{},
+        low_of   => +{},
+        on_stack => +{},
+        stack    => [],
+        sccs     => [],
+    }
+    for my $v (0:$n - 1) {
+        SCC::strong_connect($state, $v) unless exists $state->{idx_of}{$v}
+    }
+    $state->{sccs}
+}
+
+fn SCC::strong_connect($s, $v) {
+    $s->{idx_of}{$v}   = $s->{index}
+    $s->{low_of}{$v}   = $s->{index}
+    $s->{index}++
+    push @{$s->{stack}}, $v
+    $s->{on_stack}{$v} = 1
+
+    for my $w (@{$s->{adj}{$v}}) {
+        if (!exists $s->{idx_of}{$w}) {
+            SCC::strong_connect($s, $w)
+            $s->{low_of}{$v} = $s->{low_of}{$w} if $s->{low_of}{$w} < $s->{low_of}{$v}
+        } elsif ($s->{on_stack}{$w}) {
+            $s->{low_of}{$v} = $s->{idx_of}{$w} if $s->{idx_of}{$w} < $s->{low_of}{$v}
+        }
+    }
+
+    # Root: pop the current SCC off the stack.
+    if ($s->{low_of}{$v} == $s->{idx_of}{$v}) {
+        my @scc
+        my $popped = -1
+        while ($popped != $v) {
+            $popped = pop @{$s->{stack}}
+            delete $s->{on_stack}{$popped}
+            push @scc, $popped
+        }
+        push @{$s->{sccs}}, \@scc
+    }
+}
+
+# Sort each SCC then sort the list — gives a canonical representation
+# for cross-implementation comparison.
+fn SCC::canonical($sccs) {
+    my @rows
+    for my $s (@$sccs) {
+        push @rows, [sort { _0 <=> _1 } @$s]
+    }
+    sort {
+        # Lexicographic by stringified comma-join.
+        join(",", @{_0}) cmp join(",", @{_1})
+    } @rows
+}
+
+p "── Tarjan SCC demo ──"
+
+# CLRS Fig 22.9-style graph (8 vertices, 4 SCCs).
+# 0 → 1 → 2 → 3 → 0   (4-cycle)
+# 4 → 1, 4 → 5         (cross-edges)
+# 5 → 6 → 5            (2-cycle)
+# 6 → 7 → 7            (self-loop)
+my @edges = (
+    [0, 1], [1, 2], [2, 3], [3, 0],
+    [4, 1], [4, 5],
+    [5, 6], [6, 5],
+    [6, 7], [7, 7],
+)
+my $sccs = SCC::find(8, \@edges)
+die "expected 4 SCCs, got #{len @$sccs}" unless len(@$sccs) == 4
+
+my @canon = SCC::canonical($sccs)
+my $rendered = join(" | ", map { "{" . join(",", @$_) . "}" } @canon)
+p "  CLRS 8-vertex graph: SCCs = $rendered"
+die "SCC {0,1,2,3} expected" unless grep { join(",", @$_) eq "0,1,2,3" } @canon
+die "SCC {4} expected"       unless grep { join(",", @$_) eq "4" } @canon
+die "SCC {5,6} expected"     unless grep { join(",", @$_) eq "5,6" } @canon
+die "SCC {7} expected"       unless grep { join(",", @$_) eq "7" } @canon
+p "  4 SCCs match expected {0,1,2,3}/{4}/{5,6}/{7}  OK"
+
+# DAG (no cycles) — every vertex its own SCC.
+my @dag = ([0, 1], [1, 2], [2, 3])
+my $dag_sccs = SCC::find(4, \@dag)
+die "DAG → 4 singletons" unless len(@$dag_sccs) == 4
+for my $s (@$dag_sccs) {
+    die "DAG SCC singleton" unless len(@$s) == 1
+}
+p "  DAG 0→1→2→3: each vertex is its own SCC  OK"
+
+# Disconnected: two independent cycles.
+my @two_cyc = ([0, 1], [1, 0], [2, 3], [3, 2])
+my $tc_sccs = SCC::find(4, \@two_cyc)
+die "two-cycle: 2 SCCs" unless len(@$tc_sccs) == 2
+p "  two independent 2-cycles: 2 SCCs  OK"
+
+# Single vertex, no edges.
+my $solo_sccs = SCC::find(1, [])
+die "solo: 1 SCC of size 1" unless len(@$solo_sccs) == 1 && len(@{$solo_sccs->[0]}) == 1
+
+# Universal invariants:
+#   * Total vertex count across SCCs = N
+#   * SCCs partition the vertex set (no overlap)
+my $total = 0
+my %seen
+for my $s (@$sccs) {
+    for my $v (@$s) {
+        die "vertex $v in two SCCs" if exists $seen{$v}
+        $seen{$v} = 1
+        $total++
+    }
+}
+die "total != 8" unless $total == 8
+
+p ""
+p "  ALL PASS (CLRS 4-SCC + DAG + two-cycles + solo + partition invariant)"
