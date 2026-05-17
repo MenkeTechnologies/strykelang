@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.14.4 · 10194 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.14.5 · 10195 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -330,7 +330,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">8522</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">8523</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -11990,7 +11990,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">8522 topics</p>
+      <p class="chapter-meta">8523 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$!</code></h3>
         <p><code>$!</code> — the OS error from the most recent system call, in stringified form (e.g. <code>&quot;No such file or directory&quot;</code>) or as an <code>errno</code> integer in numeric context. Set by <code>open</code>, <code>close</code>, <code>chdir</code>, <code>read</code>, <code>write</code>, and other syscalls when they fail. The value persists until the next failing call, so always check it *immediately* after the failing operation — intermediate clean Perl code does not touch it, but any subsequent syscall will.</p>
@@ -26655,6 +26655,54 @@ p elu(-1)    # -0.632
         <p><code>entropy_bits</code> — operation <code>entropy bits</code>. Category: *ml extensions*.</p>
         <pre><code class="lang-perl">p entropy_bits $x
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-enum">
+        <h3><a class="doc-anchor" href="#doc-enum">#</a> <code>enum</code></h3>
+        <p><code>enum</code> declares a tagged-union / algebraic data type — a finite set of named variants, each optionally carrying a typed payload. Stryke enums pair with <code>match</code> for exhaustive pattern dispatch (the compiler errors on missing arms unless you write <code>_ =&gt;</code>).</p>
+        <p><strong>Declaration:</strong></p>
+        <pre><code class="lang-perl">enum Sig { Hup, Int, Term, Kill }                    # tag-only variants
+enum Color { Red, Green, Blue }
+enum ResultStatus { Ok =&gt; Int, Err =&gt; Str }          # variants with payload
+enum Shape {                                          # variants with payload + methods
+    Circle =&gt; Float,
+    Square =&gt; Float,
+    fn area($self) {
+        match ($self) {
+            Shape::Circle(\$r) =&gt; 3.14159 * \$r * \$r,
+            Shape::Square(\$s) =&gt; \$s * \$s,
+        }
+    }
+}
+</code></pre>
+        <p><strong>Constructing variants:</strong></p>
+        <pre><code class="lang-perl">my \$s = Sig::Term                                   # tag-only construction
+my \$ok = ResultStatus::Ok(42)                       # payload construction
+my \$err = ResultStatus::Err(&quot;boom&quot;)
+p \$ok                                               # ResultStatus::Ok(42)
+</code></pre>
+        <p><strong>Pattern matching:</strong></p>
+        <pre><code class="lang-perl">fn handle(\$sig) {
+    match (\$sig) {
+        Sig::Hup  =&gt; &quot;reload config&quot;,
+        Sig::Int  =&gt; &quot;graceful shutdown&quot;,
+        Sig::Term =&gt; &quot;drain + stop&quot;,
+        Sig::Kill =&gt; &quot;(no handler — kernel reaps)&quot;,
+    }
+}
+# Bind the payload in the arm:
+match (\$result) {
+    ResultStatus::Ok(\$value)  =&gt; p &quot;got \$value&quot;,
+    ResultStatus::Err(\$msg)   =&gt; die \$msg,
+}
+</code></pre>
+        <p><strong>Iteration / reflection:</strong></p>
+        <pre><code class="lang-perl">for my \$v (Sig::Hup, Sig::Int, Sig::Term, Sig::Kill) { p \$v }
+p Sig::values |&gt; ep                                  # every variant
+p ResultStatus::Ok(1)-&gt;variant                       # &quot;Ok&quot;
+p ResultStatus::Ok(1)-&gt;payload                       # 1
+</code></pre>
+        <p>Note: <code>EnumName::Variant</code> namespaces the variant tag; <code>EnumName::Variant(payload)</code> constructs one with data. The compiler tracks payload types per variant — <code>match</code> arms must bind a compatible pattern.</p>
+        <p>See also: <code>match</code>, <code>struct</code> (single-shape records), <code>class</code> (full OO).</p>
       </article>
       <article class="doc-entry" id="doc-env">
         <h3><a class="doc-anchor" href="#doc-env">#</a> <code>env</code></h3>
