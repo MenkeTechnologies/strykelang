@@ -125,7 +125,8 @@ my @ranked = map { _->[1] }
              (0:len(@elves) - 1)
 
 p "\ntop-3 elves by total calories:"
-p "─" x 40for my $rank (0:2) {
+p "─" x 40
+for my $rank (0:2) {
     my $idx = $ranked[$rank]
     my $items = $elves[$idx]
     printf("  #%d  elf %2d: %6d cal (%d items)\n",
