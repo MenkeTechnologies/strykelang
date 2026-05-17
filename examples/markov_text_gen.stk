@@ -60,7 +60,7 @@ fn Demo::Markov::next_token($prev) {
     }
     # Fallback: last key.
     my @keys = keys %$follow
-    return $keys[-1]
+    $keys[-1]
 }
 
 # ── generate sample sentences ───────────────────────────────────────
@@ -78,7 +78,7 @@ fn Demo::Markov::generate($seed, $max_len) {
         push @out, $nxt
         $current = $nxt
     }
-    return \@out
+    \@out
 }
 
 p ""

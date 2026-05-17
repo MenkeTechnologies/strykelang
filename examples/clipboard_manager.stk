@@ -30,7 +30,7 @@ fn Demo::CB::classify($content) {
     return "phone"     if $content =~ /\d{3}-\d{3}-\d{4}/
     return "code"      if $content =~ /[{}();]/
     return "longtext"  if len($content) > 100
-    return "shorttext"
+    "shorttext"
 }
 
 # ── copy: insert (with dedup + classification) ────────────────────
@@ -58,7 +58,7 @@ fn Demo::CB::copy($content) {
     if (len(@history) > $max_entries) {
         shift @history
     }
-    return +{ ok => 1, kind => $kind, len => len($content) }
+    +{ ok => 1, kind => $kind, len => len($content) }
 }
 
 # ── search by substring ───────────────────────────────────────────
@@ -70,7 +70,7 @@ fn Demo::CB::search($pattern) {
             push @hits, $entry
         }
     }
-    return \@hits
+    \@hits
 }
 
 # ── retrieve recent ───────────────────────────────────────────────
@@ -79,13 +79,13 @@ fn Demo::CB::recent($n) {
     my $start = len(@history) - $n
     $start = 0 if $start < 0
     my @slice = @history[$start : len(@history) - 1]
-    return \@slice
+    \@slice
 }
 
 # ── seen check (via Bloom) ────────────────────────────────────────
 
 fn Demo::CB::was_copied($content) {
-    return bloom_contains($bloom, $content) ? 1 : 0
+    bloom_contains($bloom, $content) ? 1 : 0
 }
 
 # ── sample workload ───────────────────────────────────────────────

@@ -81,7 +81,7 @@ fn Demo::Genome::reverse_complement($seq) {
         my $ch = substr($seq, $i, 1)
         $rc .= ($complement{$ch} // "N")
     }
-    return $rc
+    $rc
 }
 
 my $rc = Demo::Genome::reverse_complement($dna)

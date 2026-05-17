@@ -38,7 +38,7 @@ fn Demo::Cb::should_allow() {
     if ($bstate eq "half_open") {
         return 1
     }
-    return 1
+    1
 }
 
 fn Demo::Cb::record_outcome($ok) {
@@ -85,7 +85,7 @@ fn Demo::Cb::call_downstream($flake_rate) {
         return +{ ok => 0, error => "downstream_failure" }
     }
     td_add($succ_lat, (now_ns() - $t0) / 1000.0)
-    return +{ ok => 1, body => "response_data" }
+    +{ ok => 1, body => "response_data" }
 }
 
 # ── guarded call ────────────────────────────────────────────────────
@@ -119,7 +119,7 @@ fn Demo::Cb::call($flake_rate) {
         decision => "allowed",
         ok       => $r->{ok} ? 1 : 0,
     }
-    return $r
+    $r
 }
 
 # ── workload simulator ──────────────────────────────────────────────

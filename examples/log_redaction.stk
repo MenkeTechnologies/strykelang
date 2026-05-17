@@ -85,7 +85,7 @@ fn Demo::Redact::scan($line) {
         $out =~ s/\d{4}-\d{4}-\d{4}-\d{4}/<CC_REDACTED>/
     }
     td_add($td_lat, (now_ns() - $t0) / 1000.0)
-    return $out
+    $out
 }
 
 # ── sample log lines (with intentional PII) ────────────────────────

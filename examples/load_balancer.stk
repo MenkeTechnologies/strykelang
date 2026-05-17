@@ -29,7 +29,7 @@ fn Demo::LB::strategy_round_robin($backends, $rr_state) {
     return undef if len(@$healthy) == 0
     my $idx = $rr_state->{counter} % len(@$healthy)
     $rr_state->{counter} = $rr_state->{counter} + 1
-    return $healthy->[$idx]
+    $healthy->[$idx]
 }
 
 # ── strategy: weighted ─────────────────────────────────────────────
@@ -45,7 +45,7 @@ fn Demo::LB::strategy_weighted($backends, $_state) {
         $cum += $backend->{weight}
         return $backend if $r < $cum
     }
-    return $healthy->[-1]
+    $healthy->[-1]
 }
 
 # ── strategy: least-connections ────────────────────────────────────
@@ -59,7 +59,7 @@ fn Demo::LB::strategy_least_conn($backends, $_state) {
             $best = $backend
         }
     }
-    return $best
+    $best
 }
 
 # ── simulate workload ──────────────────────────────────────────────

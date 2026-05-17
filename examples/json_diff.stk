@@ -82,7 +82,7 @@ fn Demo::JD::diff_root($lhs, $rhs) {
     my $t0 = now_ns()
     Demo::JD::diff($lhs, $rhs, "")
     td_add($td_lat, (now_ns() - $t0) / 1000.0)
-    return \@diffs
+    \@diffs
 }
 
 # ── sample data ────────────────────────────────────────────────────

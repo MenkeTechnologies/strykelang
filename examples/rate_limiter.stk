@@ -39,7 +39,7 @@ fn Demo::RL::try_acquire($client) {
         $bucket->{tokens} = $bucket->{tokens} - 1.0
         return 1
     }
-    return 0
+    0
 }
 
 # ── AOP instrumentation: count allows/denies, latency ───────────────

@@ -37,7 +37,7 @@ fn Demo::Trie::walk_to($root, $prefix) {
         return undef unless exists $node->{children}->{$ch}
         $node = $node->{children}->{$ch}
     }
-    return $node
+    $node
 }
 
 # DFS from a node, accumulating (word, count) pairs.
@@ -60,7 +60,7 @@ fn Demo::Trie::complete($root, $prefix, $k) {
         ($_1->[1] <=> $_0->[1]) || ($_0->[0] cmp $_1->[0])
     } @results
     @results = @results[0:($k - 1)] if len(@results) > $k
-    return \@results
+    \@results
 }
 
 # ── build trie from corpus ──────────────────────────────────────────

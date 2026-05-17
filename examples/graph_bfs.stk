@@ -47,7 +47,7 @@ fn Demo::BFS::shortest_path($graph, $start, $goal) {
             push @queue, [$nbr, \@new_path]
         }
     }
-    return undef
+    undef
 }
 
 p ""
@@ -88,7 +88,7 @@ fn Demo::BFS::components($graph) {
         }
         push @components, [sort { _0 cmp _1 } @comp]
     }
-    return \@components
+    \@components
 }
 
 p ""
@@ -145,7 +145,7 @@ fn Demo::BFS::reachable($graph, $start) {
         push @seen, $node
         push @queue, @{$graph->{$node}}
     }
-    return \@seen
+    \@seen
 }
 
 my $reach = Demo::BFS::reachable(\%g, "SF")

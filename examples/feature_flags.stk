@@ -37,7 +37,7 @@ fn Demo::FF::bucket($user, $flag) {
         $h = ($h ^ $c) * 16777619
         $h = $h % 4294967296   # 32-bit wrap
     }
-    return $h % 100
+    $h % 100
 }
 
 # ── evaluation ─────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ fn Demo::FF::is_enabled($user, $flag) {
     $total_count{$flag}   = $total_count{$flag} + 1
     $enabled_count{$flag} = $enabled_count{$flag} + 1 if $enabled
     td_add($td_eval, (now_ns() - $t0) / 1000.0)
-    return $enabled
+    $enabled
 }
 
 # ── simulate 1000 users hitting all flags ──────────────────────────

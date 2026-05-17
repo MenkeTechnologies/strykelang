@@ -132,7 +132,7 @@ fn Demo::Bingo::play_one($cards_ref) {
             }
         }
     }
-    return { winner => -1, pattern => "", draws => 75, last_num => 0, sig => "" }
+    { winner => -1, pattern => "", draws => 75, last_num => 0, sig => "" }
 }
 
 # ── run N games ───────────────────────────────────────────────────

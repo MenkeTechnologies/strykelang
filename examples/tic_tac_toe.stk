@@ -27,7 +27,7 @@ fn Demo::TTT::render($board) {
         push @lines, $line
         push @lines, "   -----------" if $r < 2
     }
-    return \@lines
+    \@lines
 }
 
 fn Demo::TTT::find_winner($board) {
@@ -56,7 +56,7 @@ fn Demo::TTT::find_winner($board) {
     if ($tr ne "." && $tr eq $board->[1]->[1] && $tr eq $board->[2]->[0]) {
         return $tr
     }
-    return ""   # no winner yet
+    ""   # no winner yet
 }
 
 fn Demo::TTT::is_full($board) {
@@ -65,7 +65,7 @@ fn Demo::TTT::is_full($board) {
             return 0 if $board->[$r]->[$c] eq "."
         }
     }
-    return 1
+    1
 }
 
 fn Demo::TTT::available_moves($board) {
@@ -75,11 +75,11 @@ fn Demo::TTT::available_moves($board) {
             push @moves, [$r, $c] if $board->[$r]->[$c] eq "."
         }
     }
-    return \@moves
+    \@moves
 }
 
 fn Demo::TTT::opponent($player) {
-    return $player eq "X" ? "O" : "X"
+    $player eq "X" ? "O" : "X"
 }
 
 # ── minimax: returns the score for `player` from current board state.
@@ -133,7 +133,7 @@ fn Demo::TTT::best_move($board, $player) {
             }
         }
     }
-    return $best_move
+    $best_move
 }
 
 # ── play a full game ───────────────────────────────────────────────

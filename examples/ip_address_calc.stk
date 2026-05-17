@@ -14,7 +14,7 @@ fn Demo::IP::parse_dotted($s) {
         return undef if $o1 > 255 || $o2 > 255 || $o3 > 255 || $o4 > 255
         return ($o1 << 24) | ($o2 << 16) | ($o3 << 8) | $o4
     }
-    return undef
+    undef
 }
 
 fn Demo::IP::to_dotted($n) {
@@ -29,7 +29,7 @@ fn Demo::IP::mask_from_prefix($prefix) {
     return 0 if $prefix <= 0
     return 0xFFFFFFFF if $prefix >= 32
     # Top `prefix` bits set.
-    return (0xFFFFFFFF << (32 - $prefix)) & 0xFFFFFFFF
+    (0xFFFFFFFF << (32 - $prefix)) & 0xFFFFFFFF
 }
 
 fn Demo::IP::parse_cidr($s) {
@@ -42,23 +42,23 @@ fn Demo::IP::parse_cidr($s) {
         return undef unless defined $ip && $prefix >= 0 && $prefix <= 32
         return +{ ip => $ip, prefix => $prefix }
     }
-    return undef
+    undef
 }
 
 fn Demo::IP::network_address($cidr) {
     my $mask = Demo::IP::mask_from_prefix($cidr->{prefix})
-    return $cidr->{ip} & $mask
+    $cidr->{ip} & $mask
 }
 
 fn Demo::IP::broadcast_address($cidr) {
     my $mask = Demo::IP::mask_from_prefix($cidr->{prefix})
-    return $cidr->{ip} | (0xFFFFFFFF ^ $mask)
+    $cidr->{ip} | (0xFFFFFFFF ^ $mask)
 }
 
 fn Demo::IP::host_count($cidr) {
     return 0 if $cidr->{prefix} >= 31
     my $bits = 32 - $cidr->{prefix}
-    return (1 << $bits) - 2   # excluding network and broadcast
+    (1 << $bits) - 2   # excluding network and broadcast
 }
 
 # ── workload ───────────────────────────────────────────────────────
@@ -104,7 +104,7 @@ for my $s (@inputs) {
 
 fn Demo::IP::contains($cidr, $ip_n) {
     my $mask = Demo::IP::mask_from_prefix($cidr->{prefix})
-    return ($cidr->{ip} & $mask) == ($ip_n & $mask)
+    ($cidr->{ip} & $mask) == ($ip_n & $mask)
 }
 
 p ""

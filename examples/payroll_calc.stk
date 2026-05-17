@@ -42,12 +42,12 @@ fn Demo::PR::federal_tax($annual_gross) {
             return $tax
         }
     }
-    return $tax
+    $tax
 }
 
 fn Demo::PR::state_tax($annual_gross, $state) {
     my $rate = $state_rates{$state} // 0.05
-    return $annual_gross * $rate
+    $annual_gross * $rate
 }
 
 # ── process one paycheck ───────────────────────────────────────────

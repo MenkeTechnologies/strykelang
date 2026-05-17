@@ -121,7 +121,7 @@ fn Demo::VM::transact($payment, $slot, $cust_id) {
     }
 
     td_add($td_lat, (now_ns() - $t0) / 1000.0)
-    return { state => $state, change_cents => $change, change_coins => \@coins_out, log => \@log }
+    { state => $state, change_cents => $change, change_coins => \@coins_out, log => \@log }
 }
 
 # ── transaction script ────────────────────────────────────────────

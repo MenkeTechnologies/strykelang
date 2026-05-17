@@ -105,7 +105,7 @@ fn Demo::Email::is_spammy($parsed) {
             push @hits, $kw
         }
     }
-    return +{ score => $score, keywords => \@hits }
+    +{ score => $score, keywords => \@hits }
 }
 
 # ── process all emails ────────────────────────────────────────────

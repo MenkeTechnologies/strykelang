@@ -53,7 +53,7 @@ fn Demo::Grader::is_correct($q, $answer) {
     } elsif ($mode eq "regex") {
         return $answer =~ /$q->{answer}/i ? 1 : 0
     }
-    return 0
+    0
 }
 
 # ── grade everyone ─────────────────────────────────────────────────

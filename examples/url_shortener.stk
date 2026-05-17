@@ -18,7 +18,7 @@ fn Demo::Short::fnv($s) {
         $h = ($h ^ $c) * 16777619
         $h = $h % 4294967296
     }
-    return $h
+    $h
 }
 
 # Convert an integer to base36 (0-9 + a-z).
@@ -30,7 +30,7 @@ fn Demo::Short::to_base36($n) {
         $s = substr($alphabet, $d, 1) . $s
         $n = int($n / 36)
     }
-    return len($s) == 0 ? "0" : $s
+    len($s) == 0 ? "0" : $s
 }
 
 # ── shortener state ─────────────────────────────────────────────────
@@ -72,7 +72,7 @@ fn Demo::Short::shorten($long_url) {
     $click_count{$short} = 0
     kv_put($kv, $short, $long_url)
     td_add($td_shorten, (now_ns() - $t0) / 1000.0)
-    return $short
+    $short
 }
 
 fn Demo::Short::expand($short) {
@@ -82,7 +82,7 @@ fn Demo::Short::expand($short) {
         topk_add($tk_clicks, $short)
         return $r
     }
-    return undef
+    undef
 }
 
 # ── workload ───────────────────────────────────────────────────────

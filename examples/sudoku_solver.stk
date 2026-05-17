@@ -38,7 +38,7 @@ fn Demo::Sudoku::render($grid) {
             push @lines, "------+-------+------"
         }
     }
-    return \@lines
+    \@lines
 }
 
 # ── constraint checks ──────────────────────────────────────────────
@@ -62,7 +62,7 @@ fn Demo::Sudoku::is_valid($grid, $idx, $val) {
             return 0 if $grid->[$r * 9 + $c] == $val
         }
     }
-    return 1
+    1
 }
 
 # ── backtracking solver ────────────────────────────────────────────
@@ -91,7 +91,7 @@ fn Demo::Sudoku::solve($grid) {
             $grid->[$idx] = 0
         }
     }
-    return 0
+    0
 }
 
 # ── run ─────────────────────────────────────────────────────────────

@@ -14,7 +14,7 @@ my $W = 20
 # ── helpers ─────────────────────────────────────────────────────────
 
 fn Demo::Snake::manhattan($p1, $p2) {
-    return abs($p1->[0] - $p2->[0]) + abs($p1->[1] - $p2->[1])
+    abs($p1->[0] - $p2->[0]) + abs($p1->[1] - $p2->[1])
 }
 
 fn Demo::Snake::random_empty_cell($snake_set) {
@@ -71,7 +71,7 @@ fn Demo::Snake::play_one() {
             delete $snake_set{$tail->[0] . "," . $tail->[1]}
         }
     }
-    return +{ score => $score, steps => $steps, length => len(@snake) }
+    +{ score => $score, steps => $steps, length => len(@snake) }
 }
 
 # ── render snake on grid ───────────────────────────────────────────
@@ -97,7 +97,7 @@ fn Demo::Snake::render($snake, $fruit) {
     for my $r (0:$H - 1) {
         push @lines, join("", @{$grid[$r]})
     }
-    return \@lines
+    \@lines
 }
 
 # ── run N games ─────────────────────────────────────────────────────

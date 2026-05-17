@@ -14,9 +14,9 @@
 
 # ── priority queue: kept-sorted array of [prio, item] pairs ─────────
 
-fn Demo::PQ::new() { [] }
+fn Demo::PQ::new() = []
 
-fn Demo::PQ::is_empty($pq) { len(@$pq) == 0 }
+fn Demo::PQ::is_empty($pq) = len(@$pq) == 0
 
 fn Demo::PQ::push($pq, $prio, $item) {
     # Find insertion point via linear scan (small N).
@@ -30,7 +30,7 @@ fn Demo::PQ::push($pq, $prio, $item) {
 
 fn Demo::PQ::pop($pq) {
     return undef if len(@$pq) == 0
-    return shift @$pq
+    shift @$pq
 }
 
 # ── weighted-graph Dijkstra ─────────────────────────────────────────
@@ -62,7 +62,7 @@ fn Demo::Path::dijkstra($graph, $source) {
             }
         }
     }
-    return +{ dist => \%dist, prev => \%prev }
+    +{ dist => \%dist, prev => \%prev }
 }
 
 # Reconstruct path from source to target.
@@ -74,7 +74,7 @@ fn Demo::Path::reconstruct($prev, $source, $target) {
         $cur = $prev->{$cur}
         unshift @path, $cur
     }
-    return \@path
+    \@path
 }
 
 # ── sample graph (US-ish city distances in miles, approximate) ──────

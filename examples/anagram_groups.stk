@@ -38,7 +38,7 @@ fn Demo::Anagram::canonical($word) {
     my @sorted = sort { _0 cmp _1 } @chars
     my $r = join("", @sorted)
     td_add($td_lat, (now_ns() - $t0) / 1000.0)
-    return $r
+    $r
 }
 
 # ── group words by canonical key ────────────────────────────────────

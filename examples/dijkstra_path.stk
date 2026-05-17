@@ -26,7 +26,7 @@ for my $u (sort { _0 cmp _1 } keys %graph) {
 
 # ── min-priority queue (linear insert, small N) ────────────────────
 
-fn Demo::PQ::new() { [] }
+fn Demo::PQ::new() = []
 fn Demo::PQ::push($pq, $prio, $item) {
     my $n = len(@$pq)
     my $i = 0
@@ -35,7 +35,7 @@ fn Demo::PQ::push($pq, $prio, $item) {
 }
 fn Demo::PQ::pop($pq) {
     return undef if len(@$pq) == 0
-    return shift @$pq
+    shift @$pq
 }
 
 # ── Dijkstra ───────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ fn Demo::Path::dijkstra($g, $source) {
             }
         }
     }
-    return +{ dist => \%dist, prev => \%prev }
+    +{ dist => \%dist, prev => \%prev }
 }
 
 fn Demo::Path::reconstruct($prev, $source, $target) {
@@ -74,7 +74,7 @@ fn Demo::Path::reconstruct($prev, $source, $target) {
         $cur = $prev->{$cur}
         unshift @path, $cur
     }
-    return \@path
+    \@path
 }
 
 # ── run Dijkstra from A ────────────────────────────────────────────
@@ -125,7 +125,7 @@ fn Demo::Path::render_tree($node, $children_ref, $indent, $is_last) {
         my $sub_lines = Demo::Path::render_tree($kid, $children_ref, $child_indent, $kid_is_last)
         push @lines, @$sub_lines
     }
-    return \@lines
+    \@lines
 }
 
 my $tree_lines = Demo::Path::render_tree("A", \%children, "", 1)

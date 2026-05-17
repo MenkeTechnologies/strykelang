@@ -67,7 +67,7 @@ fn Demo::URL::parse_query($qs) {
         next if exists $TRACKING{lc($k)}
         $params{$k} = $v
     }
-    return \%params
+    \%params
 }
 
 fn Demo::URL::serialize_query($params) {
@@ -76,7 +76,7 @@ fn Demo::URL::serialize_query($params) {
     for my $k (@keys) {
         push @parts, "$k=" . $params->{$k}
     }
-    return join("&", @parts)
+    join("&", @parts)
 }
 
 # ── full normalize ──────────────────────────────────────────────────
@@ -91,7 +91,7 @@ fn Demo::URL::normalize($url) {
     $out .= ":" . $parsed->{port} if len($parsed->{port})
     $out .= $parsed->{path}
     $out .= "?" . $qs if len($qs)
-    return $out
+    $out
 }
 
 # ── sample URLs ─────────────────────────────────────────────────────

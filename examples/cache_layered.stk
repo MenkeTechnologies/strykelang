@@ -50,7 +50,7 @@ fn Demo::Cache::upstream_fetch($key) {
     # Simulate slow query: burn 200 µs.
     my $end = now_ns() + 200_000
     while (now_ns() < $end) { }
-    return $upstream{$key}   # undef for unknown keys
+    $upstream{$key}   # undef for unknown keys
 }
 
 # ── unified lookup with all layers ───────────────────────────────────
@@ -89,7 +89,7 @@ fn Demo::Cache::lookup($key) {
     # Negative result: remember via Bloom so we don't ask again.
     bloom_add($bloom, "neg:" . $key)
     $negatives_cached++
-    return undef
+    undef
 }
 
 # ── workload ────────────────────────────────────────────────────────

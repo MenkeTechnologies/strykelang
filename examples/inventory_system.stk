@@ -63,7 +63,7 @@ fn Demo::Inv::record_sale($sku, $qty) {
     td_add($td_lat, (now_ns() - $t0) / 1000.0)
     my $entry = +{ sku => $sku, qty => $qty, ok => $ok ? 1 : 0, ts => time() }
     push @txlog, $entry
-    return +{ ok => $ok, sku => $sku, qty => $qty }
+    +{ ok => $ok, sku => $sku, qty => $qty }
 }
 
 # ── seed catalogue ──────────────────────────────────────────────────

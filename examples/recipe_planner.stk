@@ -62,7 +62,7 @@ fn Demo::Recipe::has_tag($recipe, $tag) {
     for my $t (@{$recipe->{tags}}) {
         return 1 if $t eq $tag
     }
-    return 0
+    0
 }
 
 # ── plan: choose recipes for the week ──────────────────────────────
