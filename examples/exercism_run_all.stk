@@ -15,7 +15,7 @@ $| = 1
 my $summary = grep { _ eq "--summary" } @ARGV
 my $ex_dir  = dirname(__FILE__) . "/exercism"
 
-my @dirs = sort(glob("$ex_dir/*/"))
+my @dirs = "$ex_dir/*/" |> glob |> sort
 die "no exercises found in $ex_dir" unless len @dirs
 
 mysync $pass = 0
