@@ -1,0 +1,98 @@
+#!/usr/bin/env stryke
+
+# Damerau-Levenshtein edit distance — minimum number of single-char
+# insertions, deletions, substitutions, OR adjacent transpositions
+# to turn one string into another. Adds the transposition rule that
+# vanilla Levenshtein lacks, matching typo-correction intuition
+# ("teh" → "the" is distance 1, not 2). Parses clean under
+# `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * 2-D `$d[$i][$j]` matrix via autovivification
+#   * `min()` builtin for the four-way step
+#   * implicit return on tail (rule 7)
+#   * `#{…}` interpolation (rule 1a)
+#   * `len(@arr)` (rule 5)
+#
+# Namespaced UDFs `DL::*`.
+#
+# Run: stryke --no-interop examples/damerau_no_interop.stk
+
+fn DL::distance($s, $t) {
+    my @sa = split //, $s
+    my @ta = split //, $t
+    my $m = len @sa
+    my $n = len @ta
+    return $n if $m == 0
+    return $m if $n == 0
+
+    # d[i][j] = optimal-edit distance between sa[0..i-1] and ta[0..j-1].
+    # 2-D table explicitly initialized — stryke `--no-interop` doesn't
+    # autoviv nested arrayrefs.
+    my @d
+    for my $i (0:$m) { $d[$i] = [(0) x ($n + 1)] }
+    for my $i (0:$m) { $d[$i][0] = $i }
+    for my $j (0:$n) { $d[0][$j] = $j }
+
+    for my $i (1:$m) {
+        for my $j (1:$n) {
+            my $cost = $sa[$i - 1] eq $ta[$j - 1] ? 0 : 1
+            $d[$i][$j] = min(
+                $d[$i - 1][$j]     + 1,        # deletion
+                $d[$i][$j - 1]     + 1,        # insertion
+                $d[$i - 1][$j - 1] + $cost,    # substitution
+            )
+            if ($i >= 2 && $j >= 2 &&
+                $sa[$i - 1] eq $ta[$j - 2] &&
+                $sa[$i - 2] eq $ta[$j - 1]) {
+                $d[$i][$j] = min($d[$i][$j], $d[$i - 2][$j - 2] + 1)
+            }
+        }
+    }
+    $d[$m][$n]
+}
+
+my @cases = (
+    +{ s => "",         t => "",         d => 0, label => "both empty" },
+    +{ s => "a",        t => "",         d => 1, label => "one empty"  },
+    +{ s => "",         t => "abc",      d => 3, label => "other empty"},
+    +{ s => "abc",      t => "abc",      d => 0, label => "identical"  },
+    +{ s => "kitten",   t => "sitting",  d => 3, label => "classic Levenshtein" },
+    +{ s => "saturday", t => "sunday",   d => 3, label => "classic 2"  },
+    +{ s => "teh",      t => "the",      d => 1, label => "transposition saves a step" },  # ← key DL win
+    +{ s => "ca",       t => "ac",       d => 1, label => "swap = 1 (not 2 like Lev)" },   # ← key DL win
+    +{ s => "abcdef",   t => "abdcef",   d => 1, label => "internal swap" },
+    +{ s => "ab",       t => "ba",       d => 1, label => "two-char swap" },
+    +{ s => "hello",    t => "world",    d => 4, label => "very different" },
+)
+
+p "── Damerau-Levenshtein demo ──"
+my $fail = 0
+for my $c (@cases) {
+    my $got = DL::distance($c->{s}, $c->{t})
+    my $ok  = $got == $c->{d}
+    $fail++ unless $ok
+    p "  DL(\"$c->{s}\",\"$c->{t}\") = #{$got}  expect #{$c->{d}}  #{$ok ? \"\" : \"FAIL\"}  // $c->{label}"
+}
+die "#{$fail} / #{len @cases} DL cases failed" if $fail > 0
+
+# Universal invariants:
+#   * symmetric: DL(s,t) == DL(t,s)
+#   * triangle: DL(s,u) <= DL(s,t) + DL(t,u)
+#   * <= len_max: never more edits than the longer string
+for my $c (@cases) {
+    my $d_st  = DL::distance($c->{s}, $c->{t})
+    my $d_ts  = DL::distance($c->{t}, $c->{s})
+    die "asymmetry on $c->{label}" unless $d_st == $d_ts
+    my $longer = len($c->{s}) > len($c->{t}) ? len($c->{s}) : len($c->{t})
+    die "distance > longer length on $c->{label}" if $d_st > $longer
+}
+
+# Triangle inequality on a random triple.
+my $d1 = DL::distance("teh",  "the")
+my $d2 = DL::distance("the",  "thee")
+my $d3 = DL::distance("teh",  "thee")
+die "triangle violation: $d3 > $d1 + $d2" if $d3 > $d1 + $d2
+
+p ""
+p "  ALL PASS (11 cases + symmetry + bound + triangle invariants)"
