@@ -191,3 +191,137 @@ pub fn secrets_kdf(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
         base64::engine::general_purpose::STANDARD.encode(out),
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn s(x: &str) -> StrykeValue {
+        StrykeValue::string(x.to_string())
+    }
+
+    fn args_with_key(plain: &str, key: &StrykeValue) -> Vec<StrykeValue> {
+        vec![s(plain), s("key"), key.clone()]
+    }
+
+    #[test]
+    fn random_key_is_44_char_base64_for_32_raw_bytes() {
+        let k = secrets_random_key(&[], 0).expect("random key");
+        let kstr = k.to_string();
+        // 32 bytes base64 = 44 chars including '=' padding.
+        assert_eq!(kstr.len(), 44, "got {:?}", kstr);
+        let decoded = base64::engine::general_purpose::STANDARD
+            .decode(&kstr)
+            .expect("valid base64");
+        assert_eq!(decoded.len(), 32);
+    }
+
+    #[test]
+    fn random_key_is_random() {
+        let a = secrets_random_key(&[], 0).unwrap().to_string();
+        let b = secrets_random_key(&[], 0).unwrap().to_string();
+        assert_ne!(a, b, "two random keys should differ");
+    }
+
+    #[test]
+    fn encrypt_then_decrypt_roundtrip() {
+        let key = secrets_random_key(&[], 0).unwrap();
+        let env = secrets_encrypt(&args_with_key("hello world", &key), 0).expect("enc");
+        let pt = secrets_decrypt(&args_with_key(&env.to_string(), &key), 0).expect("dec");
+        assert_eq!(pt.to_string(), "hello world");
+    }
+
+    #[test]
+    fn encrypt_same_plaintext_twice_yields_different_envelopes() {
+        let key = secrets_random_key(&[], 0).unwrap();
+        let a = secrets_encrypt(&args_with_key("same", &key), 0).unwrap().to_string();
+        let b = secrets_encrypt(&args_with_key("same", &key), 0).unwrap().to_string();
+        assert_ne!(a, b, "AEAD nonce must randomize each call");
+    }
+
+    #[test]
+    fn decrypt_with_wrong_key_returns_undef_not_error() {
+        let k1 = secrets_random_key(&[], 0).unwrap();
+        let k2 = secrets_random_key(&[], 0).unwrap();
+        let env = secrets_encrypt(&args_with_key("topsecret", &k1), 0).unwrap();
+        let pt = secrets_decrypt(&args_with_key(&env.to_string(), &k2), 0).expect("no error");
+        assert!(pt.is_undef(), "wrong key must yield undef");
+    }
+
+    #[test]
+    fn decrypt_garbage_envelope_returns_undef() {
+        let key = secrets_random_key(&[], 0).unwrap();
+        let pt = secrets_decrypt(&args_with_key("not-base64-$$$", &key), 0).expect("no error");
+        assert!(pt.is_undef());
+        let pt = secrets_decrypt(&args_with_key("aGk=", &key), 0).expect("no error");
+        assert!(pt.is_undef(), "truncated envelope must be undef");
+    }
+
+    #[test]
+    fn encrypt_requires_key() {
+        let err = secrets_encrypt(&[s("plain")], 7).unwrap_err();
+        assert!(err.to_string().contains("key"));
+    }
+
+    #[test]
+    fn encrypt_rejects_bad_key_length() {
+        let bad_key = s("too-short");
+        let err = secrets_encrypt(&args_with_key("x", &bad_key), 0).unwrap_err();
+        assert!(err.to_string().contains("key"));
+    }
+
+    #[test]
+    fn kdf_is_deterministic_for_same_password_and_salt() {
+        let pw = s("hunter2");
+        let salt = s("salt");
+        let opts = vec![s("salt"), salt.clone(), s("iterations"), StrykeValue::integer(1000)];
+        let mut a_args = vec![pw.clone()];
+        a_args.extend(opts.iter().cloned());
+        let a = secrets_kdf(&a_args, 0).unwrap().to_string();
+        let b = secrets_kdf(&a_args, 0).unwrap().to_string();
+        assert_eq!(a, b, "PBKDF2 must be deterministic");
+    }
+
+    #[test]
+    fn kdf_differs_when_salt_differs() {
+        let pw = s("hunter2");
+        let mk = |salt: &str| {
+            let args = vec![
+                pw.clone(),
+                s("salt"),
+                s(salt),
+                s("iterations"),
+                StrykeValue::integer(1000),
+            ];
+            secrets_kdf(&args, 0).unwrap().to_string()
+        };
+        assert_ne!(mk("a"), mk("b"));
+    }
+
+    #[test]
+    fn kdf_output_is_44_char_base64() {
+        let args = vec![s("pw"), s("iterations"), StrykeValue::integer(1000)];
+        let k = secrets_kdf(&args, 0).unwrap().to_string();
+        assert_eq!(k.len(), 44);
+        let key = secrets_random_key(&[], 0).unwrap();
+        // Sanity: KDF output should be a usable AES key.
+        let env = secrets_encrypt(&args_with_key("ok", &StrykeValue::string(k.clone())), 0).unwrap();
+        let _ = key; // touch
+        let pt = secrets_decrypt(
+            &args_with_key(&env.to_string(), &StrykeValue::string(k)),
+            0,
+        )
+        .unwrap();
+        assert_eq!(pt.to_string(), "ok");
+    }
+
+    #[test]
+    fn encrypt_accepts_legacy_32_raw_byte_key() {
+        // decode_key short-circuits when input is exactly 32 bytes.
+        let raw = "0123456789abcdef0123456789abcdef";
+        assert_eq!(raw.len(), 32);
+        let env = secrets_encrypt(&args_with_key("payload", &s(raw)), 0).unwrap();
+        let pt = secrets_decrypt(&args_with_key(&env.to_string(), &s(raw)), 0).unwrap();
+        assert_eq!(pt.to_string(), "payload");
+    }
+}

@@ -12984,16 +12984,21 @@ impl Parser {
             // itself (`print $F[0]`, `print $h{k}`), not separate print arguments.
             // Exclude statement modifiers (`if`/`unless`/`while`/`until`/`for`/`foreach`)
             // — `print $_ if COND` prints `$_` to STDOUT, not to a handle named `$_`.
+            // Exclude tokens on a later line — a newline ends the print statement
+            // in stryke, so `p $j\nmy $k = …` must not absorb the following `my`.
             let v = v.clone();
             if v == "_" {
                 None
             } else {
                 let saved = self.pos;
+                let var_line = self.peek_line();
                 self.advance();
                 let next = self.peek().clone();
+                let next_line = self.peek_line();
                 let is_stmt_modifier = matches!(&next, Token::Ident(kw)
                     if matches!(kw.as_str(), "if" | "unless" | "while" | "until" | "for" | "foreach"));
                 if !is_stmt_modifier
+                    && next_line == var_line
                     && !matches!(next, Token::LBracket | Token::LBrace)
                     && (next.is_term_start()
                         || matches!(

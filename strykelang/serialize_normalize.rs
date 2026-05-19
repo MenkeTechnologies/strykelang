@@ -142,3 +142,98 @@ pub fn normalize_args_head(args: &[StrykeValue]) -> Vec<StrykeValue> {
     out.extend(args[1..].iter().cloned());
     out
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use indexmap::IndexMap;
+
+    fn aref(v: Vec<StrykeValue>) -> StrykeValue {
+        StrykeValue::array_ref(Arc::new(RwLock::new(v)))
+    }
+
+    fn href(pairs: &[(&str, StrykeValue)]) -> StrykeValue {
+        let mut m = IndexMap::new();
+        for (k, v) in pairs {
+            m.insert((*k).to_string(), v.clone());
+        }
+        StrykeValue::hash_ref(Arc::new(RwLock::new(m)))
+    }
+
+    #[test]
+    fn deep_normalize_scalars_roundtrip_unchanged() {
+        for v in [
+            StrykeValue::integer(42),
+            StrykeValue::float(3.5),
+            StrykeValue::string("hi".into()),
+            StrykeValue::UNDEF,
+        ] {
+            let out = deep_normalize(&v);
+            assert_eq!(out.to_string(), v.to_string());
+        }
+    }
+
+    #[test]
+    fn deep_normalize_walks_nested_arrayref_hashref() {
+        let inner = href(&[("x", StrykeValue::integer(1))]);
+        let outer = aref(vec![inner, StrykeValue::integer(2)]);
+        let out = deep_normalize(&outer);
+        let arr = out.as_array_ref().expect("array_ref outer survives");
+        let arr = arr.read();
+        assert_eq!(arr.len(), 2);
+        let h = arr[0].as_hash_ref().expect("nested hash_ref survives");
+        let h = h.read();
+        assert_eq!(h.get("x").unwrap().to_int(), 1);
+        assert_eq!(arr[1].to_int(), 2);
+    }
+
+    #[test]
+    fn deep_normalize_does_not_share_storage_with_input() {
+        let arr = Arc::new(RwLock::new(vec![StrykeValue::integer(1)]));
+        let v = StrykeValue::array_ref(arr.clone());
+        let out = deep_normalize(&v);
+        let out_arr = out.as_array_ref().expect("array_ref");
+        out_arr.write().push(StrykeValue::integer(2));
+        assert_eq!(
+            arr.read().len(),
+            1,
+            "deep_normalize must clone, not alias, ref storage"
+        );
+    }
+
+    #[test]
+    fn normalize_args_head_normalizes_first_only() {
+        let h = href(&[("k", StrykeValue::integer(7))]);
+        let tail = StrykeValue::string("opt".into());
+        let out = normalize_args_head(&[h, tail.clone()]);
+        assert_eq!(out.len(), 2);
+        assert!(out[0].as_hash_ref().is_some());
+        assert_eq!(out[1].to_string(), tail.to_string());
+    }
+
+    #[test]
+    fn normalize_args_head_empty_returns_empty() {
+        assert!(normalize_args_head(&[]).is_empty());
+    }
+
+    #[test]
+    fn register_class_def_appears_in_field_names() {
+        use crate::ast::ClassDef;
+        let prev = install_class_defs(HashMap::new());
+        let def = Arc::new(ClassDef {
+            name: "T".into(),
+            is_abstract: false,
+            is_final: false,
+            extends: vec![],
+            implements: vec![],
+            fields: vec![],
+            methods: vec![],
+            static_fields: vec![],
+        });
+        register_class_def(def);
+        let names = CLASS_DEFS_REGISTRY.with(|c| c.borrow().keys().cloned().collect::<Vec<_>>());
+        assert!(names.contains(&"T".to_string()));
+        // restore to keep registry isolated across tests
+        install_class_defs(prev);
+    }
+}
