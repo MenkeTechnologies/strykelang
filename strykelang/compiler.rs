@@ -120,6 +120,10 @@ struct ScopeLayer {
     declared_our_scalars: HashSet<String>,
     declared_arrays: HashSet<String>,
     declared_hashes: HashSet<String>,
+    /// Bare names from `our @x` — rvalue/lvalue ops must use the package stash key.
+    declared_our_arrays: HashSet<String>,
+    /// Bare names from `our %h` — rvalue/lvalue ops must use the package stash key.
+    declared_our_hashes: HashSet<String>,
     frozen_scalars: HashSet<String>,
     frozen_arrays: HashSet<String>,
     frozen_hashes: HashSet<String>,
@@ -455,6 +459,78 @@ impl Compiler {
         name.to_string()
     }
 
+    /// Package stash key for `our @arr` — matches
+    /// [`VMHelper::stash_array_full_name_for_package`].
+    fn qualify_stash_array_name_full(&self, name: &str) -> String {
+        if name.contains("::") {
+            return name.to_string();
+        }
+        let pkg = &self.current_package;
+        if pkg.is_empty() || pkg == "main" {
+            format!("main::{}", name)
+        } else {
+            format!("{}::{}", pkg, name)
+        }
+    }
+
+    /// Package stash key for `our %h` — companion to
+    /// [`Self::qualify_stash_array_name_full`].
+    fn qualify_stash_hash_name_full(&self, name: &str) -> String {
+        if name.contains("::") {
+            return name.to_string();
+        }
+        let pkg = &self.current_package;
+        if pkg.is_empty() || pkg == "main" {
+            format!("main::{}", name)
+        } else {
+            format!("{}::{}", pkg, name)
+        }
+    }
+
+    /// Runtime name for `@arr` reads after `my`/`our` resolution. Mirrors
+    /// [`Self::scalar_storage_name_for_ops`]. When no lexical match is found
+    /// and the current package is non-main, fall back to the package stash
+    /// — `our` decls outside the lazily-compiled sub-body scope chain still
+    /// route to `Pkg::name`, matching `qualify_sub_key`'s policy.
+    fn array_storage_name_for_ops(&self, bare: &str) -> String {
+        if bare.contains("::") {
+            return bare.to_string();
+        }
+        for layer in self.scope_stack.iter().rev() {
+            if layer.declared_arrays.contains(bare) {
+                if layer.declared_our_arrays.contains(bare) {
+                    return self.qualify_stash_array_name_full(bare);
+                }
+                return bare.to_string();
+            }
+        }
+        // Unbound bare name in a non-main package: assume package stash.
+        if !self.current_package.is_empty() && self.current_package != "main" {
+            return self.qualify_stash_array_name_full(bare);
+        }
+        bare.to_string()
+    }
+
+    /// Runtime name for `%hash` reads after `my`/`our` resolution. Same
+    /// fallback policy as [`Self::array_storage_name_for_ops`].
+    fn hash_storage_name_for_ops(&self, bare: &str) -> String {
+        if bare.contains("::") {
+            return bare.to_string();
+        }
+        for layer in self.scope_stack.iter().rev() {
+            if layer.declared_hashes.contains(bare) {
+                if layer.declared_our_hashes.contains(bare) {
+                    return self.qualify_stash_hash_name_full(bare);
+                }
+                return bare.to_string();
+            }
+        }
+        if !self.current_package.is_empty() && self.current_package != "main" {
+            return self.qualify_stash_hash_name_full(bare);
+        }
+        bare.to_string()
+    }
+
     /// Package stash key for `our $name` (matches [`VMHelper::stash_scalar_name_for_package`]).
     fn qualify_stash_scalar_name(&self, name: &str) -> String {
         if name.contains("::") {
@@ -519,8 +595,36 @@ impl Compiler {
         }
     }
 
-    /// Stash key for a subroutine name in the current package (matches [`VMHelper::qualify_sub_key`]).
+    /// Call-site stash key for a subroutine name in the current package.
+    ///
+    /// Rule: a bare call inside `package Foo` qualifies to `Foo::name` so user
+    /// subs in the package are reachable by their short spelling — **unless**
+    /// `name` is one of the 11k+ global callable spellings (`is_callable_spelling`).
+    /// Builtins are always reachable bare in any package; a user sub in a
+    /// non-main package that shares a name with a builtin must be called by
+    /// its fully-qualified `Pkg::name` spelling. `--compat` (Perl 5 mode)
+    /// restores classic UDF-wins semantics so unmodified Perl 5 modules
+    /// keep working.
     fn qualify_sub_key(&self, name: &str) -> String {
+        if name.contains("::") {
+            return name.to_string();
+        }
+        let pkg = &self.current_package;
+        if pkg.is_empty() || pkg == "main" {
+            return name.to_string();
+        }
+        if !crate::compat_mode() && crate::builtins::is_callable_spelling(name) {
+            return name.to_string();
+        }
+        format!("{}::{}", pkg, name)
+    }
+
+    /// Decl-site stash key — always qualifies to `Pkg::name` (or bare in
+    /// `main`). Mirrors [`Self::qualify_sub_decl_pass1`] so the storage
+    /// key used at pass-3 body compilation matches the entry recorded in
+    /// pass-1 sub registration even when the bare name collides with a
+    /// builtin spelling.
+    fn qualify_sub_decl_key(&self, name: &str) -> String {
         if name.contains("::") {
             return name.to_string();
         }
@@ -547,9 +651,22 @@ impl Compiler {
 
     /// After all `sub` bodies are lowered, replace [`Op::Call`] with [`Op::CallStaticSubId`] when the
     /// callee has a compiled entry (avoids linear `sub_entries` scan + extra stash work per call).
+    ///
+    /// Skip the peephole for bare callable spellings (`sum`, `set`, `count`, …) in default mode:
+    /// those calls must route to the global builtin at runtime even if a same-named user sub is
+    /// registered. `Op::CallStaticSubId` jumps straight into the resolved user-sub entry, which
+    /// would shadow the builtin and break the no-shadow invariant. `--compat` (Perl 5 mode)
+    /// restores UDF-wins semantics so this fast path applies to every named call.
     fn patch_static_sub_calls(chunk: &mut Chunk) {
+        let allow_shadow_builtins = crate::compat_mode();
         for i in 0..chunk.ops.len() {
             if let Op::Call(name_idx, argc, wa) = chunk.ops[i] {
+                if !allow_shadow_builtins {
+                    let name = &chunk.names[name_idx as usize];
+                    if !name.contains("::") && crate::builtins::is_callable_spelling(name) {
+                        continue;
+                    }
+                }
                 if let Some((entry_ip, stack_args)) = chunk.find_sub_entry(name_idx) {
                     if chunk.static_sub_calls.len() < u16::MAX as usize {
                         let sid = chunk.static_sub_calls.len() as u16;
@@ -1321,7 +1438,7 @@ impl Compiler {
                 self.register_sig_param(p);
             }
             let entry_ip = self.chunk.len();
-            let q = self.qualify_sub_key(name);
+            let q = self.qualify_sub_decl_key(name);
             let name_idx = self.chunk.intern_name(&q);
             // Patch the entry point
             for e in &mut self.chunk.sub_entries {
@@ -1494,7 +1611,8 @@ impl Compiler {
                     self.check_strict_array_access(name, subject.line)?;
                     let line = subject.line;
                     let start = self.chunk.len();
-                    let idx = self.chunk.intern_name(&self.qualify_stash_array_name(name));
+                    let stash = self.array_storage_name_for_ops(name);
+                    let idx = self.chunk.intern_name(&self.qualify_stash_array_name(&stash));
                     self.chunk.emit(Op::MakeArrayBindingRef(idx), line);
                     self.chunk.emit(Op::BlockReturnValue, line);
                     Some((start, self.chunk.len()))
@@ -1503,7 +1621,8 @@ impl Compiler {
                     self.check_strict_hash_access(name, subject.line)?;
                     let line = subject.line;
                     let start = self.chunk.len();
-                    let idx = self.chunk.intern_name(name);
+                    let stash = self.hash_storage_name_for_ops(name);
+                    let idx = self.chunk.intern_name(&stash);
                     self.chunk.emit(Op::MakeHashBindingRef(idx), line);
                     self.chunk.emit(Op::BlockReturnValue, line);
                     Some((start, self.chunk.len()))
@@ -1743,22 +1862,42 @@ impl Compiler {
                         }
                     }
                     Sigil::Array => {
-                        let name_idx = self
-                            .chunk
-                            .intern_name(&self.qualify_stash_array_name(&decl.name));
+                        let stash = if is_my {
+                            self.qualify_stash_array_name(&decl.name)
+                        } else {
+                            self.qualify_stash_array_name_full(&decl.name)
+                        };
+                        let name_idx = self.chunk.intern_name(&stash);
                         // Slurpy `@rest` at position `i` takes `tmp[i..]` (the
                         // tail), not the whole list. (BUG-090)
                         self.chunk
                             .emit(Op::GetArrayFromIndex(tmp_name, i as u16), line);
                         self.emit_declare_array(name_idx, line, frozen);
+                        if !is_my {
+                            if let Some(layer) = self.scope_stack.last_mut() {
+                                layer.declared_arrays.insert(decl.name.clone());
+                                layer.declared_our_arrays.insert(decl.name.clone());
+                            }
+                        }
                     }
                     Sigil::Hash => {
-                        let name_idx = self.chunk.intern_name(&decl.name);
+                        let stash = if is_my {
+                            decl.name.clone()
+                        } else {
+                            self.qualify_stash_hash_name_full(&decl.name)
+                        };
+                        let name_idx = self.chunk.intern_name(&stash);
                         // Slurpy `%rest` at position `i` takes `tmp[i..]`
                         // pairs, not the whole list. (BUG-090)
                         self.chunk
                             .emit(Op::GetArrayFromIndex(tmp_name, i as u16), line);
                         self.emit_declare_hash(name_idx, line, frozen);
+                        if !is_my {
+                            if let Some(layer) = self.scope_stack.last_mut() {
+                                layer.declared_hashes.insert(decl.name.clone());
+                                layer.declared_our_hashes.insert(decl.name.clone());
+                            }
+                        }
                     }
                     Sigil::Typeglob => {
                         return Err(CompileError::Unsupported(
@@ -1798,24 +1937,44 @@ impl Compiler {
                         }
                     }
                     Sigil::Array => {
-                        let name_idx = self
-                            .chunk
-                            .intern_name(&self.qualify_stash_array_name(&decl.name));
+                        let stash = if is_my {
+                            self.qualify_stash_array_name(&decl.name)
+                        } else {
+                            self.qualify_stash_array_name_full(&decl.name)
+                        };
+                        let name_idx = self.chunk.intern_name(&stash);
                         if let Some(init) = &decl.initializer {
                             self.compile_expr_ctx(init, WantarrayCtx::List)?;
                         } else {
                             self.chunk.emit(Op::LoadUndef, line);
                         }
                         self.emit_declare_array(name_idx, line, frozen);
+                        if !is_my {
+                            if let Some(layer) = self.scope_stack.last_mut() {
+                                layer.declared_arrays.insert(decl.name.clone());
+                                layer.declared_our_arrays.insert(decl.name.clone());
+                            }
+                        }
                     }
                     Sigil::Hash => {
-                        let name_idx = self.chunk.intern_name(&decl.name);
+                        let stash = if is_my {
+                            decl.name.clone()
+                        } else {
+                            self.qualify_stash_hash_name_full(&decl.name)
+                        };
+                        let name_idx = self.chunk.intern_name(&stash);
                         if let Some(init) = &decl.initializer {
                             self.compile_expr_ctx(init, WantarrayCtx::List)?;
                         } else {
                             self.chunk.emit(Op::LoadUndef, line);
                         }
                         self.emit_declare_hash(name_idx, line, frozen);
+                        if !is_my {
+                            if let Some(layer) = self.scope_stack.last_mut() {
+                                layer.declared_hashes.insert(decl.name.clone());
+                                layer.declared_our_hashes.insert(decl.name.clone());
+                            }
+                        }
                     }
                     Sigil::Typeglob => {
                         return Err(CompileError::Unsupported("my/our *GLOB".into()));
@@ -2194,7 +2353,8 @@ impl Compiler {
             }
             ExprKind::ArrayVar(name) => {
                 self.check_strict_array_access(name, line)?;
-                let q = self.qualify_stash_array_name(name);
+                let stash = self.array_storage_name_for_ops(name);
+                let q = self.qualify_stash_array_name(&stash);
                 let name_idx = self.chunk.intern_name(&q);
                 if let Some(init) = initializer {
                     self.compile_expr_ctx(init, WantarrayCtx::List)?;
@@ -2205,7 +2365,8 @@ impl Compiler {
                 Ok(())
             }
             ExprKind::HashVar(name) => {
-                let name_idx = self.chunk.intern_name(name);
+                let stash = self.hash_storage_name_for_ops(name);
+                let name_idx = self.chunk.intern_name(&stash);
                 if let Some(init) = initializer {
                     self.compile_expr_ctx(init, WantarrayCtx::List)?;
                 } else {
@@ -3257,7 +3418,8 @@ impl Compiler {
             }
             ExprKind::ArrayVar(name) => {
                 self.check_strict_array_access(name, line)?;
-                let idx = self.chunk.intern_name(&self.qualify_stash_array_name(name));
+                let stash = self.array_storage_name_for_ops(name);
+                let idx = self.chunk.intern_name(&self.qualify_stash_array_name(&stash));
                 if ctx == WantarrayCtx::List {
                     self.emit_op(Op::GetArray(idx), line, Some(root));
                 } else {
@@ -3266,7 +3428,8 @@ impl Compiler {
             }
             ExprKind::HashVar(name) => {
                 self.check_strict_hash_access(name, line)?;
-                let idx = self.chunk.intern_name(name);
+                let stash = self.hash_storage_name_for_ops(name);
+                let idx = self.chunk.intern_name(&stash);
                 self.emit_op(Op::GetHash(idx), line, Some(root));
                 if ctx != WantarrayCtx::List {
                     self.emit_op(Op::ValueScalarContext, line, Some(root));
@@ -3316,14 +3479,16 @@ impl Compiler {
             }
             ExprKind::HashElement { hash, key } => {
                 self.check_strict_hash_access(hash, line)?;
-                let idx = self.chunk.intern_name(hash);
+                let stash = self.hash_storage_name_for_ops(hash);
+                let idx = self.chunk.intern_name(&stash);
                 self.compile_expr(key)?;
                 self.emit_op(Op::GetHashElem(idx), line, Some(root));
             }
             ExprKind::ArraySlice { array, indices } => {
+                let stash = self.array_storage_name_for_ops(array);
                 let arr_idx = self
                     .chunk
-                    .intern_name(&self.qualify_stash_array_name(array));
+                    .intern_name(&self.qualify_stash_array_name(&stash));
                 if indices.is_empty() {
                     self.emit_op(Op::MakeArray(0), line, Some(root));
                 } else if indices.len() == 1 {
@@ -6017,7 +6182,8 @@ impl Compiler {
             // ── Array ops ──
             ExprKind::Push { array, values } => {
                 if let ExprKind::ArrayVar(name) = &array.kind {
-                    let idx = self.chunk.intern_name(&self.qualify_stash_array_name(name));
+                    let stash = self.array_storage_name_for_ops(name);
+                    let idx = self.chunk.intern_name(&self.qualify_stash_array_name(&stash));
                     for v in values {
                         self.compile_expr_ctx(v, WantarrayCtx::List)?;
                         self.emit_op(Op::PushArray(idx), line, Some(root));
@@ -6061,7 +6227,8 @@ impl Compiler {
             }
             ExprKind::Pop(array) => {
                 if let ExprKind::ArrayVar(name) = &array.kind {
-                    let idx = self.chunk.intern_name(&self.qualify_stash_array_name(name));
+                    let stash = self.array_storage_name_for_ops(name);
+                    let idx = self.chunk.intern_name(&self.qualify_stash_array_name(&stash));
                     self.emit_op(Op::PopArray(idx), line, Some(root));
                 } else if let ExprKind::Deref {
                     expr: aref_expr,
@@ -6088,7 +6255,8 @@ impl Compiler {
             }
             ExprKind::Shift(array) => {
                 if let ExprKind::ArrayVar(name) = &array.kind {
-                    let idx = self.chunk.intern_name(&self.qualify_stash_array_name(name));
+                    let stash = self.array_storage_name_for_ops(name);
+                    let idx = self.chunk.intern_name(&self.qualify_stash_array_name(&stash));
                     self.emit_op(Op::ShiftArray(idx), line, Some(root));
                 } else if let ExprKind::Deref {
                     expr: aref_expr,
@@ -6115,7 +6283,8 @@ impl Compiler {
             }
             ExprKind::Unshift { array, values } => {
                 if let ExprKind::ArrayVar(name) = &array.kind {
-                    let q = self.qualify_stash_array_name(name);
+                    let stash = self.array_storage_name_for_ops(name);
+                    let q = self.qualify_stash_array_name(&stash);
                     let name_const = self.chunk.add_constant(StrykeValue::string(q));
                     self.emit_op(Op::LoadConst(name_const), line, Some(root));
                     for v in values {
@@ -6165,7 +6334,8 @@ impl Compiler {
             } => {
                 self.emit_op(Op::WantarrayPush(ctx.as_byte()), line, Some(root));
                 if let ExprKind::ArrayVar(name) = &array.kind {
-                    let q = self.qualify_stash_array_name(name);
+                    let stash = self.array_storage_name_for_ops(name);
+                    let q = self.qualify_stash_array_name(&stash);
                     let name_const = self.chunk.add_constant(StrykeValue::string(q));
                     self.emit_op(Op::LoadConst(name_const), line, Some(root));
                     if let Some(o) = offset {
@@ -6336,7 +6506,8 @@ impl Compiler {
             }
             ExprKind::Keys(inner) => {
                 if let ExprKind::HashVar(name) = &inner.kind {
-                    let idx = self.chunk.intern_name(name);
+                    let stash = self.hash_storage_name_for_ops(name);
+                    let idx = self.chunk.intern_name(&stash);
                     if ctx == WantarrayCtx::List {
                         self.emit_op(Op::HashKeys(idx), line, Some(root));
                     } else {
@@ -6353,7 +6524,8 @@ impl Compiler {
             }
             ExprKind::Values(inner) => {
                 if let ExprKind::HashVar(name) = &inner.kind {
-                    let idx = self.chunk.intern_name(name);
+                    let stash = self.hash_storage_name_for_ops(name);
+                    let idx = self.chunk.intern_name(&stash);
                     if ctx == WantarrayCtx::List {
                         self.emit_op(Op::HashValues(idx), line, Some(root));
                     } else {
@@ -7171,12 +7343,14 @@ impl Compiler {
                 }
                 ExprKind::ArrayVar(name) => {
                     self.check_strict_array_access(name, line)?;
-                    let idx = self.chunk.intern_name(&self.qualify_stash_array_name(name));
+                    let stash = self.array_storage_name_for_ops(name);
+                    let idx = self.chunk.intern_name(&self.qualify_stash_array_name(&stash));
                     self.emit_op(Op::MakeArrayBindingRef(idx), line, Some(root));
                 }
                 ExprKind::HashVar(name) => {
                     self.check_strict_hash_access(name, line)?;
-                    let idx = self.chunk.intern_name(name);
+                    let stash = self.hash_storage_name_for_ops(name);
+                    let idx = self.chunk.intern_name(&stash);
                     self.emit_op(Op::MakeHashBindingRef(idx), line, Some(root));
                 }
                 ExprKind::Deref {
@@ -8133,7 +8307,8 @@ impl Compiler {
                 self.emit_get_scalar(idx, line, parent);
             }
             StringPart::ArrayVar(name) => {
-                let idx = self.chunk.intern_name(&self.qualify_stash_array_name(name));
+                let stash = self.array_storage_name_for_ops(name);
+                let idx = self.chunk.intern_name(&self.qualify_stash_array_name(&stash));
                 self.emit_op(Op::GetArray(idx), line, parent);
                 self.emit_op(Op::ArrayStringifyListSep, line, parent);
             }
@@ -8179,7 +8354,8 @@ impl Compiler {
             }
             ExprKind::ArrayVar(name) => {
                 self.check_strict_array_access(name, line)?;
-                let q = self.qualify_stash_array_name(name);
+                let stash = self.array_storage_name_for_ops(name);
+                let q = self.qualify_stash_array_name(&stash);
                 self.check_array_mutable(&q, line)?;
                 let idx = self.chunk.intern_name(&q);
                 self.emit_op(Op::SetArray(idx), line, ast);
@@ -8252,7 +8428,8 @@ impl Compiler {
             ExprKind::HashElement { hash, key } => {
                 self.check_strict_hash_access(hash, line)?;
                 self.check_hash_mutable(hash, line)?;
-                let idx = self.chunk.intern_name(hash);
+                let stash = self.hash_storage_name_for_ops(hash);
+                let idx = self.chunk.intern_name(&stash);
                 self.compile_expr(key)?;
                 if keep {
                     self.emit_op(Op::SetHashElemKeep(idx), line, ast);
