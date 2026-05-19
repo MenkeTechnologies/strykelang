@@ -170,6 +170,12 @@ pub struct Parser {
     /// into an implicit zero-arg coderef, so `my $f = _ * 2` ≡
     /// `my $f = fn { _ * 2 }`.
     pub bare_positional_indices: std::collections::HashSet<usize>,
+    /// Current package context — updated by `parse_package`. Defaults to
+    /// `"main"`. Used by [`Self::check_udf_shadows_builtin`] to allow
+    /// `fn name(...)` inside `package Foo` to shadow stryke builtins
+    /// (the bare `name` becomes `Foo::name`, so the builtin remains
+    /// reachable via the unqualified call from outside the package).
+    current_package: String,
 }
 
 impl Parser {
@@ -202,6 +208,7 @@ impl Parser {
             list_construct_close_pos: None,
             bare_positional_indices: std::collections::HashSet::new(),
             block_depth: 0,
+            current_package: "main".to_string(),
         }
     }
 
@@ -4870,12 +4877,17 @@ impl Parser {
     fn parse_struct_decl(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance(); // struct
-        let name = self.parse_package_qualified_identifier().map_err(|_| {
+        let raw_name = self.parse_package_qualified_identifier().map_err(|_| {
             self.syntax_err(
                 format!("Expected struct name, got {:?}", self.peek()),
                 self.peek_line(),
             )
         })?;
+        let name = if raw_name.contains("::") || self.current_package == "main" {
+            raw_name
+        } else {
+            format!("{}::{}", self.current_package, raw_name)
+        };
         self.expect(&Token::LBrace)?;
         let mut fields = Vec::new();
         let mut methods = Vec::new();
@@ -4968,12 +4980,17 @@ impl Parser {
     fn parse_enum_decl(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
         self.advance(); // enum
-        let name = self.parse_package_qualified_identifier().map_err(|_| {
+        let raw_name = self.parse_package_qualified_identifier().map_err(|_| {
             self.syntax_err(
                 format!("Expected enum name, got {:?}", self.peek()),
                 self.peek_line(),
             )
         })?;
+        let name = if raw_name.contains("::") || self.current_package == "main" {
+            raw_name
+        } else {
+            format!("{}::{}", self.current_package, raw_name)
+        };
         self.expect(&Token::LBrace)?;
         let mut variants = Vec::new();
         while !matches!(self.peek(), Token::RBrace | Token::Eof) {
@@ -5014,12 +5031,21 @@ impl Parser {
         use crate::ast::{ClassDef, ClassField, ClassMethod, ClassStaticField, Visibility};
         let line = self.peek_line();
         self.advance(); // class
-        let name = self.parse_package_qualified_identifier().map_err(|_| {
+        let raw_name = self.parse_package_qualified_identifier().map_err(|_| {
             self.syntax_err(
                 format!("Expected class name, got {:?}", self.peek()),
                 self.peek_line(),
             )
         })?;
+        // Bare `class Point` inside `package Geo` registers as `Geo::Point`,
+        // matching the unqualified-fn rule. Already-qualified names pass
+        // through unchanged, and `main` keeps the bare spelling so
+        // existing test code that calls `Point->new(...)` still resolves.
+        let name = if raw_name.contains("::") || self.current_package == "main" {
+            raw_name
+        } else {
+            format!("{}::{}", self.current_package, raw_name)
+        };
 
         // Parse `extends Parent1, Parent2` (each may be namespaced: `Foo::Base`)
         let mut extends = Vec::new();
@@ -5252,12 +5278,17 @@ impl Parser {
         use crate::ast::{ClassMethod, TraitDef, Visibility};
         let line = self.peek_line();
         self.advance(); // trait
-        let name = self.parse_package_qualified_identifier().map_err(|_| {
+        let raw_name = self.parse_package_qualified_identifier().map_err(|_| {
             self.syntax_err(
                 format!("Expected trait name, got {:?}", self.peek()),
                 self.peek_line(),
             )
         })?;
+        let name = if raw_name.contains("::") || self.current_package == "main" {
+            raw_name
+        } else {
+            format!("{}::{}", self.current_package, raw_name)
+        };
 
         self.expect(&Token::LBrace)?;
         let mut methods = Vec::new();
@@ -6047,6 +6078,9 @@ impl Parser {
             }
         }
         self.eat(&Token::Semicolon);
+        // Track the active package so subsequent `fn name(...)` decls can be
+        // recognised as `Pkg::name` for shadow-of-builtin checks.
+        self.current_package = full_name.clone();
         Ok(Statement {
             label: None,
             kind: StmtKind::Package { name: full_name },
@@ -17806,25 +17840,39 @@ impl Parser {
     ];
 
     fn check_udf_shadows_builtin(&self, name: &str, line: usize) -> StrykeResult<()> {
-        // Only check bare names, not namespaced ones (Foo::y is allowed)
-        if !name.contains("::") {
-            if Self::RESERVED_FUNCTION_NAMES.contains(&name) {
-                return Err(self.syntax_err(
-                    format!("`{name}` is a reserved word and cannot be used as a function name"),
-                    line,
-                ));
-            }
-            if Self::is_known_bareword(name)
-                || Self::is_try_builtin_name(name)
-                || crate::list_builtins::is_list_builtin_name(name)
-            {
-                return Err(self.syntax_err(
-                    format!(
-"`{name}` is a stryke builtin and cannot be redefined (this is not Perl 5; use `fn` not `sub`, or pass --compat)"
-                    ),
-                    line,
-                ));
-            }
+        // Already namespaced (e.g. `Foo::y`) — package context makes the
+        // name unambiguous, so it can never shadow a builtin.
+        if name.contains("::") {
+            return Ok(());
+        }
+        // Reserved syntactic words (`if`, `while`, `package`, …) break
+        // parsing as function names regardless of package.
+        if Self::RESERVED_FUNCTION_NAMES.contains(&name) {
+            return Err(self.syntax_err(
+                format!("`{name}` is a reserved word and cannot be used as a function name"),
+                line,
+            ));
+        }
+        // Bare `fn name(...)` inside a non-main `package Foo` registers
+        // under `Foo::name`. The user sub is callable only via the
+        // fully-qualified `Foo::name(...)` spelling — bare calls always
+        // dispatch to the global builtin. Allow the declaration.
+        if self.current_package != "main" {
+            return Ok(());
+        }
+        // In `package main` (the default), there's no qualified spelling
+        // to "escape" a builtin name. Reject `fn sum {}` here so callers
+        // never wonder why bare `sum(1,2,3)` ignored their definition.
+        if Self::is_known_bareword(name)
+            || Self::is_try_builtin_name(name)
+            || crate::list_builtins::is_list_builtin_name(name)
+        {
+            return Err(self.syntax_err(
+                format!(
+"`{name}` is a stryke builtin and cannot be redefined in `package main` (declare in a named package and call via `Pkg::{name}(...)`, or pass --compat)"
+                ),
+                line,
+            ));
         }
         Ok(())
     }

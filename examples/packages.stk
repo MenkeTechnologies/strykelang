@@ -1,0 +1,237 @@
+#!/usr/bin/env stryke
+
+# `package` in stryke — namespace declaration. A `package Foo` line
+# switches the *current package* until the next `package` (or end of
+# file). Affects three things:
+#
+#   1. Unqualified `fn` decls bind into the current package, so
+#      `fn parse {…}` inside `package URL` becomes `URL::parse`.
+#   2. Unqualified function calls resolve in the current package first,
+#      so a sibling helper can be called by its bare name.
+#   3. `our $x` / `oursync $x` install a package-global accessible
+#      from any package as `$Pkg::x`.
+#
+# Conventionally `package main` is the default starting context; setting
+# it back at the bottom returns the file's tail to global scope.
+
+# ── 1. Package as a function namespace ─────────────────────────────────
+# Everything between `package URL` and the next `package` line binds
+# under `URL::*`. Inside the package, sibling fns can be called by their
+# bare name (`_strip` resolves to `URL::_strip`).
+
+package URL
+
+fn _strip($s) {
+    $s =~ s{^\s+|\s+$}{}gr            # trim
+}
+
+fn scheme($u) {
+    return unless _strip($u) =~ m{^([a-z][a-z0-9+.-]*)://}i
+    lc($1)
+}
+
+fn host_of($u) {
+    return unless _strip($u) =~ m{^https?://([^/]+)}i
+    lc($1)
+}
+
+# ── 2. Re-opening a package later in the file is allowed ───────────────
+# A package context isn't a block — it stays open until another
+# `package` line. You can switch back and forth as many times as needed.
+
+package Format
+
+fn align_right($s, $w) {
+    my $extra = $w - length($s)
+    $extra > 0 ? $s . " " x $extra : $s
+}
+
+package URL                            # ← reopened
+fn pretty($u) {
+    my $h = host_of($u) // "?"
+    my $s = scheme($u)  // "?"
+    Format::align_right("$s://$h", 28)
+}
+
+# ── 3. Package globals via `our` (scalars, arrays, hashes) ─────────────
+# `our $x` / `our @xs` / `our %h` register `$Pkg::x` / `@Pkg::xs` /
+# `%Pkg::h` — readable and writable from any package by the
+# fully-qualified spelling. Bare reads inside the same package
+# resolve to the same slot, so `@servers` and `@Config::servers`
+# point at one storage location.
+
+package Config
+our $debug    = 0
+our $verbose  = 1
+our @tiers    = ("bronze", "silver", "gold")
+our %env      = (region => "us-west-2", stage => "prod")
+
+# ── 4. Nested namespaces (Foo::Bar::Baz) ──────────────────────────────
+# `package` accepts deep `::`-paths; the parser threads them through.
+
+package App::HTTP::Routes
+
+fn dispatch($method, $path) {
+    return "GET /healthz"     if $method eq "GET"  && $path eq "/healthz"
+    return "POST /jobs"       if $method eq "POST" && $path eq "/jobs"
+    return "404 $method $path"
+}
+
+# ── 5. Concurrency-safe globals via `oursync` ─────────────────────────
+# `oursync` is the atomic counterpart to `our` — concurrent updates
+# from `fan`/`par`/threads observe a consistent value.
+
+package Metric
+oursync $hits = 0
+oursync $errs = 0
+
+fn hit { $Metric::hits++ }
+fn err { $Metric::errs++ }
+fn snapshot { +{ hits => $Metric::hits, errs => $Metric::errs } }
+
+# ── 6. Classes / structs / enums declared inside a package ────────────
+# A bare `class Point` inside `package Geo` registers as `Geo::Point`,
+# matching the same rule as `fn`. Instances are created via the
+# qualified spelling and method / field dispatch resolves through
+# the package-qualified definition. `struct` and `enum` follow the
+# same rule.
+
+package Geo
+
+class Point2D {
+    x: Float
+    y: Float
+    fn show { sprintf("(%g, %g)", $self->x, $self->y) }
+}
+
+struct Vec3 { x => Float, y => Float, z => Float }
+
+enum Compass { N, E, S, W }
+
+# ── 7. `set(…)` for tag dedup inside a package ────────────────────────
+# `set()` is a builtin returning a hash-backed set value. It composes
+# with `|` (union), `&` (intersection), `-` (difference) and `^`
+# (symmetric difference), and `scalar` returns the cardinality. Use
+# it for any package-local "distinct values" computation.
+
+package Tags
+
+our %catalog = (
+    "post-1" => ["rust",  "perl",  "rust"],
+    "post-2" => ["perl",  "shell", "perl"],
+    "post-3" => ["rust",  "vm",    "perl"],
+)
+
+fn distinct_tags_for($post_id) {
+    my $tags = $catalog{$post_id} // []
+    set(@$tags)
+}
+
+fn all_distinct {
+    my $u = set()
+    for my $tags (values %catalog) {
+        $u = $u | set(@$tags)
+    }
+    $u
+}
+
+fn shared_between($a, $b) {
+    distinct_tags_for($a) & distinct_tags_for($b)
+}
+
+# ── 8. Functions declared via fully-qualified names ───────────────────
+# You can also bind into a package without ever using `package` — the
+# `Pkg::fn` form on the decl is sufficient.
+
+fn Mailer::Format::greeting($name) {
+    "Hello, " . ($name // "friend") . "!"
+}
+
+fn Mailer::Format::footer {
+    "— sent via Stryke v" . $Mailer::Format::VERSION
+}
+package Mailer::Format
+our $VERSION = "1.0.0"
+
+
+# ── 9. Driver code ────────────────────────────────────────────────────
+package main
+
+p "── URL namespace ──────────────────────────────────────"
+my @urls = (
+    "https://Example.COM/path",
+    "  HTTP://A.B.C/x  ",
+    "ftp://files.example.org/",
+)
+for my $u (@urls) {
+    printf "  %-32s  scheme=%-6s host=%s\n",
+        URL::pretty($u),
+        URL::scheme($u)  // "—",
+        URL::host_of($u) // "—"
+}
+
+p ""
+p "── Config package globals (scalar, array, hash) ──────"
+printf "  debug    : %d\n",   $Config::debug
+printf "  verbose  : %d\n",   $Config::verbose
+printf "  tiers    : %s\n",   join(", ", @Config::tiers)
+printf "  env      : %s / %s\n",
+    $Config::env{region},
+    $Config::env{stage}
+
+# Writes from main land in the same slot.
+$Config::debug = 1
+push @Config::tiers, "platinum"
+$Config::env{stage} = "canary"
+aeq $Config::debug, 1, "main can write Config::debug"
+aeq scalar @Config::tiers, 4, "main can push onto Config::tiers"
+aeq $Config::env{stage}, "canary", "main can mutate Config::env"
+
+p ""
+p "── Nested namespace dispatch ──────────────────────────"
+for my $req (["GET", "/healthz"], ["POST", "/jobs"], ["DELETE", "/x"]) {
+    printf "  %-6s %-10s -> %s\n",
+        $req->[0], $req->[1],
+        App::HTTP::Routes::dispatch(@$req)
+}
+
+p ""
+p "── oursync across `fan` workers ───────────────────────"
+fan 100 {
+    Metric::hit()
+    Metric::err() if _ % 7 == 0
+}
+my $snap = Metric::snapshot()
+printf "  hits=%d  errs=%d\n", $snap->{hits}, $snap->{errs}
+aeq $snap->{hits}, 100, "oursync hits matches fan count"
+
+p ""
+p "── Class / enum inside a package ──────────────────────"
+my $origin = Geo::Point2D->new(x => 0, y => 0)
+my $a      = Geo::Point2D->new(x => 3, y => 4)
+printf "  origin: %s\n", $origin->show
+printf "  a     : %s\n", $a->show
+printf "  enum  : %s\n", Geo::Compass::N
+aeq $a->x, 3, "field accessor on Geo::Point2D"
+
+p ""
+p "── Struct inside a package ────────────────────────────"
+my $v = Geo::Vec3(x => 1.0, y => 2.0, z => 3.0)
+printf "  Geo::Vec3 : (%g, %g, %g)\n", $v->{x}, $v->{y}, $v->{z}
+aeq $v->{y}, 2.0, "Geo::Vec3 field y"
+
+p ""
+p "── set() inside a package ─────────────────────────────"
+my $u = Tags::all_distinct()
+my $s12 = Tags::shared_between("post-1", "post-2")
+my @u_els  = sort($u->elements)
+my @s_els  = sort($s12->elements)
+printf "  all distinct : %d  (%s)\n",  scalar($u),   join(",", @u_els)
+printf "  shared (1,2) : %d  (%s)\n",  scalar($s12), join(",", @s_els)
+aeq scalar($u),   4, "union over Tags::catalog"
+aeq scalar($s12), 1, "post-1 ∩ post-2 == {perl}"
+
+p ""
+p "── Qualified-name fn decls (no `package` line needed) ─"
+p "  " . Mailer::Format::greeting("Alice")
+p "  " . Mailer::Format::footer()

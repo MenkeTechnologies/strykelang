@@ -228,9 +228,14 @@ fn clamp_direct_multi_value_list() {
     );
 }
 
-// ── Builtin shadowing rejection ───────────────────────────────────────────────
+// ── Builtin shadowing rejection (package main) ───────────────────────────────
 //
-// stryke refuses to redefine a builtin via `sub`/`fn` outside `--compat`.
+// stryke refuses to redefine a builtin via `sub`/`fn` at `package main`
+// scope: there is no qualified `main::name(...)` escape hatch the user
+// could use to disambiguate, so accepting the declaration would create a
+// silently-unreachable sub. To attach a builtin-named sub somewhere
+// callable, declare it in a non-main package and invoke via
+// `Pkg::name(...)`. `--compat` (full Perl 5 mode) lifts the restriction.
 
 #[test]
 fn redefining_builtin_id_is_rejected() {
@@ -250,6 +255,21 @@ fn redefining_builtin_squared_is_rejected() {
         res.is_err(),
         "redefining `squared` (a stryke builtin) must error"
     );
+}
+
+#[test]
+fn builtin_named_fn_allowed_in_non_main_package() {
+    // Same name in a non-main package: registers as `Custom::id`, bare
+    // `id(99)` from main still hits the builtin (returns 99).
+    let v = eval_int(
+        r#"
+            package Custom
+            fn id { 42 }
+            package main
+            id(99) + Custom::id() * 1000
+        "#,
+    );
+    assert_eq!(v, 99 + 42_000);
 }
 
 // ── `succ`/`pred`/`signum`/`abs` numeric semantics ────────────────────────────

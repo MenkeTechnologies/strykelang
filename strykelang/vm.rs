@@ -2300,12 +2300,24 @@ impl<'a> VM<'a> {
 
             let saved_wa_call = self.interp.wantarray_kind;
             self.interp.wantarray_kind = want;
+            // Bare callable spelling: builtins always win in default mode.
+            // Skip the user-sub resolve below so `fn sum {}` declared in a
+            // non-main package never shadows the global `sum` on a bare
+            // call. `--compat` (Perl 5 mode) restores UDF-wins semantics.
+            let is_bare_builtin = !crate::compat_mode()
+                && !name.contains("::")
+                && crate::builtins::is_callable_spelling(name);
             if let Some(r) = crate::builtins::try_builtin(self.interp, name, &args, self.line()) {
                 self.interp.wantarray_kind = saved_wa_call;
                 self.push(r?);
             } else {
                 self.interp.wantarray_kind = saved_wa_call;
-                if let Some(sub) = self.interp.resolve_sub_by_name(name) {
+                let maybe_sub = if is_bare_builtin {
+                    None
+                } else {
+                    self.interp.resolve_sub_by_name(name)
+                };
+                if let Some(sub) = maybe_sub {
                     let t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
                     if let Some(p) = &mut self.interp.profiler {
                         p.enter_sub(name);
@@ -4265,7 +4277,23 @@ impl<'a> VM<'a> {
 
                     // ── Functions ──
                     Op::Call(name_idx, argc, wa) => {
-                        let entry_opt = self.find_sub_entry(*name_idx);
+                        // A bare callable spelling (`sum`, `set`, `count`, …) routes
+                        // to the global builtin even when a same-named user sub is
+                        // registered. There is no shadowing of stryke builtins in
+                        // default mode: user code can declare `fn sum {}` inside a
+                        // non-main package, but the only way to reach that user sub
+                        // is the fully-qualified `Pkg::sum(...)` spelling.
+                        // `--compat` (full Perl 5 mode) restores classic UDF-wins
+                        // semantics so unmodified Perl 5 modules keep working.
+                        let name = &self.names[*name_idx as usize];
+                        let entry_opt = if !crate::compat_mode()
+                            && !name.contains("::")
+                            && crate::builtins::is_callable_spelling(name)
+                        {
+                            None
+                        } else {
+                            self.find_sub_entry(*name_idx)
+                        };
                         self.vm_dispatch_user_call(*name_idx, entry_opt, *argc, *wa, None)?;
                         Ok(())
                     }

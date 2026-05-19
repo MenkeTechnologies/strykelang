@@ -846,6 +846,13 @@ pub struct VMHelper {
     english_lexical_scalars: Vec<HashSet<String>>,
     /// Bare names from `our $x` per frame — same length as [`Self::english_lexical_scalars`].
     our_lexical_scalars: Vec<HashSet<String>>,
+    /// Bare names from `our @arr` per frame — drives package qualification in
+    /// [`Self::tree_array_storage_name`] so `our @x` reads route through the
+    /// package stash while `my @x` stays lexical.
+    our_lexical_arrays: Vec<HashSet<String>>,
+    /// Bare names from `our %h` per frame — companion to
+    /// [`Self::our_lexical_arrays`].
+    our_lexical_hashes: Vec<HashSet<String>>,
     /// When false, the bytecode VM runs without Cranelift (see [`crate::try_vm_execute`]). Disabled by
     /// `STRYKE_NO_JIT=1` / `true` / `yes`, or `stryke --no-jit` after [`Self::new`].
     pub vm_jit_enabled: bool,
@@ -1620,6 +1627,8 @@ impl VMHelper {
             english_match_vars_ever_enabled: false,
             english_lexical_scalars: vec![HashSet::new()],
             our_lexical_scalars: vec![HashSet::new()],
+            our_lexical_arrays: vec![HashSet::new()],
+            our_lexical_hashes: vec![HashSet::new()],
             vm_jit_enabled: !matches!(
                 std::env::var("STRYKE_NO_JIT"),
                 Ok(v)
@@ -1976,6 +1985,8 @@ impl VMHelper {
             english_match_vars_ever_enabled: self.english_match_vars_ever_enabled,
             english_lexical_scalars: self.english_lexical_scalars.clone(),
             our_lexical_scalars: self.our_lexical_scalars.clone(),
+            our_lexical_arrays: self.our_lexical_arrays.clone(),
+            our_lexical_hashes: self.our_lexical_hashes.clone(),
             vm_jit_enabled: self.vm_jit_enabled,
             disasm_bytecode: self.disasm_bytecode,
             // Sideband cache fields belong to the top-level driver, not line-mode workers.
@@ -2515,6 +2526,8 @@ impl VMHelper {
         self.special_var_restore_frames.push(Vec::new());
         self.english_lexical_scalars.push(HashSet::new());
         self.our_lexical_scalars.push(HashSet::new());
+        self.our_lexical_arrays.push(HashSet::new());
+        self.our_lexical_hashes.push(HashSet::new());
         self.state_bindings_stack.push(Vec::new());
     }
 
@@ -2556,6 +2569,79 @@ impl VMHelper {
         if let Some(s) = self.our_lexical_scalars.last_mut() {
             s.insert(bare_name.to_string());
         }
+    }
+
+    #[inline]
+    fn note_our_array(&mut self, bare_name: &str) {
+        if let Some(s) = self.our_lexical_arrays.last_mut() {
+            s.insert(bare_name.to_string());
+        }
+    }
+
+    #[inline]
+    fn note_our_hash(&mut self, bare_name: &str) {
+        if let Some(s) = self.our_lexical_hashes.last_mut() {
+            s.insert(bare_name.to_string());
+        }
+    }
+
+    /// Package stash key for `our @arr` — mirrors [`Self::stash_scalar_name_for_package`].
+    /// Used at the `our`-decl site to choose the storage key; bare-name reads go
+    /// through [`Self::tree_array_storage_name`] which only qualifies when the
+    /// surrounding scope actually has a matching `our` binding.
+    pub(crate) fn stash_array_full_name_for_package(&self, name: &str) -> String {
+        if name.contains("::") {
+            return name.to_string();
+        }
+        let pkg = self.current_package();
+        if pkg.is_empty() || pkg == "main" {
+            format!("main::{}", name)
+        } else {
+            format!("{}::{}", pkg, name)
+        }
+    }
+
+    /// Package stash key for `our %h` — companion to
+    /// [`Self::stash_array_full_name_for_package`].
+    pub(crate) fn stash_hash_full_name_for_package(&self, name: &str) -> String {
+        if name.contains("::") {
+            return name.to_string();
+        }
+        let pkg = self.current_package();
+        if pkg.is_empty() || pkg == "main" {
+            format!("main::{}", name)
+        } else {
+            format!("{}::{}", pkg, name)
+        }
+    }
+
+    /// Bare `@x` after `our @x` reads the package stash array. Walk the
+    /// lexical chain inside-out and qualify only when an enclosing scope
+    /// marked the name as `our`.
+    pub(crate) fn tree_array_storage_name(&self, name: &str) -> String {
+        if name.contains("::") {
+            return name.to_string();
+        }
+        for ours in self.our_lexical_arrays.iter().rev() {
+            if ours.contains(name) {
+                return self.stash_array_full_name_for_package(name);
+            }
+        }
+        name.to_string()
+    }
+
+    /// Bare `%h` after `our %h` reads the package stash hash. See
+    /// [`Self::tree_array_storage_name`] for the resolution policy.
+    pub(crate) fn tree_hash_storage_name(&self, name: &str) -> String {
+        if name.contains("::") {
+            return name.to_string();
+        }
+        for ours in self.our_lexical_hashes.iter().rev() {
+            if ours.contains(name) {
+                return self.stash_hash_full_name_for_package(name);
+            }
+        }
+        name.to_string()
     }
 
     /// Public wrapper for [`Self::english_note_lexical_scalar`] — used by bytecode
@@ -2620,6 +2706,8 @@ impl VMHelper {
         self.scope.pop_frame();
         let _ = self.english_lexical_scalars.pop();
         let _ = self.our_lexical_scalars.pop();
+        let _ = self.our_lexical_arrays.pop();
+        let _ = self.our_lexical_hashes.pop();
     }
 
     /// After [`Scope::restore_capture`] / [`Scope::restore_atomics`] on a parallel or async worker,
@@ -7942,8 +8030,15 @@ impl VMHelper {
                                 if is_our {
                                     self.record_exporter_our_array_name(&decl.name, &rest);
                                 }
-                                let aname = self.stash_array_name_for_package(&decl.name);
+                                let aname = if is_our {
+                                    self.stash_array_full_name_for_package(&decl.name)
+                                } else {
+                                    self.stash_array_name_for_package(&decl.name)
+                                };
                                 self.scope.declare_array(&aname, rest);
+                                if is_our {
+                                    self.note_our_array(&decl.name);
+                                }
                             }
                             Sigil::Hash => {
                                 let rest: Vec<StrykeValue> = items[idx..].to_vec();
@@ -7954,7 +8049,15 @@ impl VMHelper {
                                     map.insert(rest[i].to_string(), rest[i + 1].clone());
                                     i += 2;
                                 }
-                                self.scope.declare_hash(&decl.name, map);
+                                let hname = if is_our {
+                                    self.stash_hash_full_name_for_package(&decl.name)
+                                } else {
+                                    decl.name.clone()
+                                };
+                                self.scope.declare_hash(&hname, map);
+                                if is_our {
+                                    self.note_our_hash(&decl.name);
+                                }
                             }
                             Sigil::Typeglob => {
                                 return Err(StrykeError::runtime(
@@ -8005,8 +8108,15 @@ impl VMHelper {
                                     self.eval_expr_ctx(init, WantarrayCtx::Void)?;
                                 }
                                 Sigil::Array => {
-                                    let aname = self.stash_array_name_for_package(&decl.name);
+                                    let aname = if is_our {
+                                        self.stash_array_full_name_for_package(&decl.name)
+                                    } else {
+                                        self.stash_array_name_for_package(&decl.name)
+                                    };
                                     self.scope.declare_array_frozen(&aname, vec![], decl.frozen);
+                                    if is_our {
+                                        self.note_our_array(&decl.name);
+                                    }
                                     let init = decl.initializer.as_ref().unwrap();
                                     self.eval_expr_ctx(init, WantarrayCtx::Void)?;
                                     if is_our {
@@ -8015,11 +8125,19 @@ impl VMHelper {
                                     }
                                 }
                                 Sigil::Hash => {
+                                    let hname = if is_our {
+                                        self.stash_hash_full_name_for_package(&decl.name)
+                                    } else {
+                                        decl.name.clone()
+                                    };
                                     self.scope.declare_hash_frozen(
-                                        &decl.name,
+                                        &hname,
                                         IndexMap::new(),
                                         decl.frozen,
                                     );
+                                    if is_our {
+                                        self.note_our_hash(&decl.name);
+                                    }
                                     let init = decl.initializer.as_ref().unwrap();
                                     self.eval_expr_ctx(init, WantarrayCtx::Void)?;
                                 }
@@ -8073,8 +8191,15 @@ impl VMHelper {
                                 if is_our {
                                     self.record_exporter_our_array_name(&decl.name, &items);
                                 }
-                                let aname = self.stash_array_name_for_package(&decl.name);
+                                let aname = if is_our {
+                                    self.stash_array_full_name_for_package(&decl.name)
+                                } else {
+                                    self.stash_array_name_for_package(&decl.name)
+                                };
                                 self.scope.declare_array_frozen(&aname, items, decl.frozen);
+                                if is_our {
+                                    self.note_our_array(&decl.name);
+                                }
                             }
                             Sigil::Hash => {
                                 let items = val.to_list();
@@ -8086,7 +8211,15 @@ impl VMHelper {
                                     map.insert(k, v);
                                     i += 2;
                                 }
-                                self.scope.declare_hash_frozen(&decl.name, map, decl.frozen);
+                                let hname = if is_our {
+                                    self.stash_hash_full_name_for_package(&decl.name)
+                                } else {
+                                    decl.name.clone()
+                                };
+                                self.scope.declare_hash_frozen(&hname, map, decl.frozen);
+                                if is_our {
+                                    self.note_our_hash(&decl.name);
+                                }
                             }
                         }
                     }
@@ -9191,7 +9324,8 @@ impl VMHelper {
             }
             ExprKind::ArrayVar(name) => {
                 self.check_strict_array_var(name, line)?;
-                let aname = self.stash_array_name_for_package(name);
+                let qualified = self.tree_array_storage_name(name);
+                let aname = self.stash_array_name_for_package(&qualified);
                 let arr = self.scope.get_array(&aname);
                 if ctx == WantarrayCtx::List {
                     Ok(StrykeValue::array(arr))
@@ -9202,7 +9336,8 @@ impl VMHelper {
             ExprKind::HashVar(name) => {
                 self.check_strict_hash_var(name, line)?;
                 self.touch_env_hash(name);
-                let h = self.scope.get_hash(name);
+                let hname = self.tree_hash_storage_name(name);
+                let h = self.scope.get_hash(&hname);
                 let pv = StrykeValue::hash(h);
                 if ctx == WantarrayCtx::List {
                     Ok(pv)
@@ -9395,7 +9530,8 @@ impl VMHelper {
                         return self.call_sub(&sub, arg_vals, ctx, line);
                     }
                 }
-                Ok(self.scope.get_hash_element(hash, &k))
+                let hname = self.tree_hash_storage_name(hash);
+                Ok(self.scope.get_hash_element(&hname, &k))
             }
             ExprKind::ArraySlice { array, indices } => {
                 self.check_strict_array_var(array, line)?;
@@ -15081,7 +15217,8 @@ impl VMHelper {
                         };
                     }
                 }
-                self.scope.set_hash_element(hash, &k, val)?;
+                let hname = self.tree_hash_storage_name(hash);
+                self.scope.set_hash_element(&hname, &k, val)?;
                 Ok(StrykeValue::UNDEF)
             }
             ExprKind::HashSlice { hash, keys } => {
@@ -15623,7 +15760,10 @@ impl VMHelper {
 
     fn extract_array_name(&self, expr: &Expr) -> Result<String, FlowOrError> {
         match &expr.kind {
-            ExprKind::ArrayVar(name) => Ok(name.clone()),
+            // Route through `tree_array_storage_name` so bare `@servers` inside
+            // `package Config` resolves to the same `Config::servers` storage
+            // that the read path (and external `@Config::servers` mutations) see.
+            ExprKind::ArrayVar(name) => Ok(self.tree_array_storage_name(name)),
             ExprKind::ScalarVar(name) => Ok(name.clone()), // @_ written as shift of implicit
             _ => Err(StrykeError::runtime("Expected array", expr.line).into()),
         }
