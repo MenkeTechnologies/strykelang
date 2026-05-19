@@ -164,3 +164,68 @@ pub fn render_banner(colored: bool) -> String {
 pub fn print_banner(colored: bool) {
     print!("{}", render_banner(colored));
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn visible_width_ignores_csi_sequences() {
+        assert_eq!(visible_width("\x1b[31mabc\x1b[0m"), 3);
+        assert_eq!(visible_width("\x1b[1;38;5;202mok"), 2);
+    }
+
+    #[test]
+    fn visible_width_counts_each_char_once_for_multibyte() {
+        // 3 box-drawing glyphs, each 3 bytes UTF-8, but one column each.
+        assert_eq!(visible_width("─├┤"), 3);
+        assert_eq!(visible_width("aé你"), 3);
+    }
+
+    #[test]
+    fn visible_width_handles_empty_and_lone_escape() {
+        assert_eq!(visible_width(""), 0);
+        // Lone ESC with no `[` does not start a CSI; counts as 1 char.
+        assert_eq!(visible_width("\x1bz"), 2);
+    }
+
+    #[test]
+    fn render_banner_plain_has_no_ansi_escapes() {
+        let s = render_banner(false);
+        assert!(!s.contains('\x1b'), "plain banner must not contain ESC");
+        assert!(s.contains("PARALLEL PERL5 INTERPRETER"));
+        assert!(s.contains(env!("CARGO_PKG_VERSION")));
+    }
+
+    #[test]
+    fn render_banner_colored_contains_ansi_escapes() {
+        let s = render_banner(true);
+        assert!(s.contains("\x1b["));
+        assert!(s.contains("\x1b[0m"));
+    }
+
+    #[test]
+    fn render_banner_rows_all_match_inner_width_after_strip() {
+        // Anchor expected width to the top border, then prove every interior
+        // row matches it. Catches drift in `row()` padding even if the box
+        // size is retuned later.
+        let s = render_banner(false);
+        let top = s
+            .lines()
+            .find(|l| l.starts_with(" ┌"))
+            .expect("top border present");
+        let want = visible_width(top);
+        let mut box_rows = 0;
+        for line in s.lines() {
+            if line.starts_with(" │") && line.ends_with('│') {
+                box_rows += 1;
+                assert_eq!(
+                    visible_width(line),
+                    want,
+                    "box row width drift on line: {line}"
+                );
+            }
+        }
+        assert!(box_rows >= 4, "expected several rendered box rows");
+    }
+}

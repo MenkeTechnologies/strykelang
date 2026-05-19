@@ -1,0 +1,86 @@
+#!/usr/bin/env stryke
+
+# Stryke serializers (`to_json`, `to_yaml`, `to_toml`, `ddump`) flatten
+# class / struct / enum instances into plain hash/array trees before
+# emitting text, so any object graph round-trips through `from_json`
+# back into hashrefs without losing field names or nesting.
+
+class Address {
+    city:    Str
+    country: Str = "USA"
+}
+
+class Contact {
+    name:     Str
+    email:    Str
+    address:  Address
+    backup:   Any
+}
+
+class Org {
+    name:    Str
+    members: Any
+    open:    Any = 1
+}
+
+my $home = Address->new(city => "Portland", country => "USA")
+my $work = Address->new(city => "Seattle", country => "USA")
+my $alice = Contact->new(
+    name    => "Alice",
+    email   => "alice\@example.com",
+    address => $home,
+    backup  => $work,
+)
+my $bob = Contact->new(
+    name    => "Bob",
+    email   => "bob\@example.com",
+    address => $work,
+    backup  => undef,
+)
+
+my $org = Org->new(
+    name    => "Engineering",
+    members => [$alice, $bob],
+    open    => 1,
+)
+
+p "── 1. ddump on a class graph ──────────────────────────"
+p ddump($org)
+
+p ""
+p "── 2. to_json normalizes nested instances ─────────────"
+my $json = to_json($org)
+p $json
+
+p ""
+p "── 3. from_json round-trip → plain hashrefs ───────────"
+my $back = from_json($json)
+printf "  org name  : %s\n", $back->{name}
+printf "  open flag : %s\n", $back->{open}
+printf "  members   : %d\n", scalar @{$back->{members}}
+for my $m (@{$back->{members}}) {
+    printf "    - %-6s in %s  (backup: %s)\n",
+        $m->{name},
+        $m->{address}->{city},
+        defined($m->{backup}) ? $m->{backup}->{city} : "—"
+}
+
+p ""
+p "── 4. Array of instances also flattens cleanly ────────"
+my @addrs = (
+    Address->new(city => "Boston"),
+    Address->new(city => "Austin"),
+    Address->new(city => "Reno"),
+)
+p to_json(\@addrs)
+
+p ""
+p "── 5. Hashref with instance values flattens too ───────"
+my %by_city
+for my $a (@addrs) {
+    $by_city{$a->city} = $a
+}
+p to_json(\%by_city)
+
+aeq scalar @{$back->{members}}, 2, "member count survives round-trip"
+aeq $back->{members}->[0]->{address}->{city}, "Portland", "nested field intact"
