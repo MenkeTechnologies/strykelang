@@ -1030,3 +1030,48 @@ pub fn doc_for_domain_label(label: &str) -> Option<&'static str> {
     };
     Some(md)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::doc_for_domain_label;
+
+    #[test]
+    fn unknown_label_returns_none() {
+        assert!(doc_for_domain_label("definitely_not_a_builtin_xyz").is_none());
+        assert!(doc_for_domain_label("").is_none());
+    }
+
+    #[test]
+    fn known_labels_return_some_with_signature() {
+        for label in [
+            "sma",
+            "rsi",
+            "bollinger_upper",
+            "atr",
+            "obv",
+            "cosine_similarity",
+            "softmax",
+            "tokenize_subword",
+            "channel_unbounded",
+        ] {
+            let doc = doc_for_domain_label(label)
+                .unwrap_or_else(|| panic!("expected doc for {label}"));
+            assert!(
+                doc.contains('→') || doc.contains("->"),
+                "doc for {label} should declare a signature, got: {doc}"
+            );
+        }
+    }
+
+    #[test]
+    fn all_docs_open_with_backticked_signature() {
+        for label in ["ema", "macd", "vwap", "softmax", "sigmoid"] {
+            let doc = doc_for_domain_label(label).unwrap();
+            let first_line = doc.lines().next().unwrap();
+            assert!(
+                first_line.starts_with('`'),
+                "{label} should start with backticked signature, got: {first_line}"
+            );
+        }
+    }
+}

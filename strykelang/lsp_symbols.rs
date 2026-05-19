@@ -622,3 +622,97 @@ fn sigil_prefix(s: Sigil) -> String {
         _ => "*".to_string(), // Typeglob and any future sigils
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ast_line_to_lsp_zero_indexes() {
+        assert_eq!(ast_line_to_lsp(1), 0);
+        assert_eq!(ast_line_to_lsp(42), 41);
+        // `0` is impossible in well-formed AST but the helper must not
+        // wrap around — `saturating_sub` keeps us at zero.
+        assert_eq!(ast_line_to_lsp(0), 0);
+    }
+
+    #[test]
+    fn name_matches_exact_and_tail() {
+        assert!(name_matches("greet", "greet"));
+        assert!(name_matches("Util::greet", "greet"));
+        assert!(!name_matches("Util::greeter", "greet"));
+        assert!(!name_matches("greet", "Util::greet"));
+        assert!(!name_matches("", "greet"));
+    }
+
+    #[test]
+    fn sigil_prefix_maps_known_sigils() {
+        assert_eq!(sigil_prefix(Sigil::Scalar), "$");
+        assert_eq!(sigil_prefix(Sigil::Array), "@");
+        assert_eq!(sigil_prefix(Sigil::Hash), "%");
+    }
+
+    #[test]
+    fn is_ident_boundary_rejects_alnum_and_underscore() {
+        assert!(is_ident_boundary_before(None));
+        assert!(is_ident_boundary_before(Some(' ')));
+        assert!(is_ident_boundary_before(Some('(')));
+        assert!(!is_ident_boundary_before(Some('a')));
+        assert!(!is_ident_boundary_before(Some('_')));
+        assert!(!is_ident_boundary_before(Some(':')));
+    }
+
+    #[test]
+    fn is_ident_boundary_after_rejects_continuation() {
+        // bare name: trailing `::` would extend the path → rejected
+        assert!(!is_ident_boundary_after(Some(':'), "foo"));
+        // already-namespaced name: trailing punctuation OK
+        assert!(is_ident_boundary_after(Some('('), "Util::greet"));
+        // alphanumerics never form a boundary
+        assert!(!is_ident_boundary_after(Some('x'), "foo"));
+        // end-of-line/string is always a boundary
+        assert!(is_ident_boundary_after(None, "foo"));
+    }
+
+    fn build(src: &str) -> SymbolTable {
+        SymbolTable::build(src, "test.stk").expect("source parses")
+    }
+
+    #[test]
+    fn build_collects_simple_my_declaration() {
+        let t = build("my $x = 1\np $x\n");
+        // One Symbol for `$x`, at least one SymbolRef on use line.
+        let xs: Vec<_> = t.symbols.iter().filter(|s| s.name == "$x").collect();
+        assert_eq!(xs.len(), 1, "expected one symbol for $x, got {:?}", t.symbols.iter().map(|s| &s.name).collect::<Vec<_>>());
+        assert_eq!(xs[0].kind, SymbolKind::Local);
+    }
+
+    #[test]
+    fn occurrences_include_decl_and_refs_for_local() {
+        // Use an explicit expression form so $x is unambiguously a ScalarVar
+        // reference (not the first arg of a print-like statement, which the
+        // parser may consume specially).
+        let t = build("my $x = 1\nmy $y = $x + 1\nmy $z = $x * 2\n");
+        let id = t.symbols.iter().find(|s| s.name == "$x").unwrap().id;
+        let occ = t.occurrences(id);
+        let lines: Vec<u32> = occ.iter().map(|(l, _)| *l).collect();
+        // decl line 0, refs on lines 1 and 2 (0-indexed)
+        assert!(lines.contains(&0), "missing decl line 0 in {lines:?}");
+        assert!(lines.contains(&1), "missing ref on line 1 in {lines:?}");
+        assert!(lines.contains(&2), "missing ref on line 2 in {lines:?}");
+    }
+
+    #[test]
+    fn ranges_for_filters_substring_matches() {
+        // `$x` appears inside `$xy` — ranges_for must skip the substring hit.
+        let t = build("my $x = 1\nmy $xy = $x + 2\n");
+        let id = t.symbols.iter().find(|s| s.name == "$x").unwrap().id;
+        let ranges = t.ranges_for(id);
+        // Expect: decl on line 0, one ref on line 1 — not 2 ranges on line 1.
+        let line1 = ranges.iter().filter(|r| r.start.line == 1).count();
+        assert_eq!(
+            line1, 1,
+            "expected single $x range on line 1 (not the $xy substring), got {ranges:?}"
+        );
+    }
+}

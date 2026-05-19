@@ -250,6 +250,7 @@ mod parse_syntax_errors;
 mod parse_syntax_errors_more;
 mod phases;
 mod pipe_forward_pin;
+mod print_indirect_handle_newline_pin;
 mod pkg_cli;
 mod pkg_e2e;
 mod pragmas;
