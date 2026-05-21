@@ -5870,13 +5870,30 @@ impl VMHelper {
         } else if flags.contains('g') {
             let mut rows = Vec::new();
             let mut last_caps: Option<PerlCaptures<'_>> = None;
+            let mut has_groups = false;
+            // Flattened per-match captures so list-context `/g` returns
+            // `($1_a, $2_a, $1_b, $2_b, …)` instead of the joined overall
+            // match strings (Perl's documented behavior).
+            let mut flat_captures: Vec<StrykeValue> = Vec::new();
             for caps in re.captures_iter(&s) {
-                rows.push(StrykeValue::array(
-                    crate::perl_regex::numbered_capture_flat(&caps),
-                ));
+                if caps.len() > 1 {
+                    has_groups = true;
+                }
+                let cap_row = crate::perl_regex::numbered_capture_flat(&caps);
+                flat_captures.extend(cap_row.iter().cloned());
+                rows.push(StrykeValue::array(cap_row));
                 last_caps = Some(caps);
             }
             self.scope.set_array("^CAPTURE_ALL", rows)?;
+            if has_groups {
+                if flat_captures.is_empty() {
+                    return Ok(StrykeValue::integer(0));
+                }
+                if let Some(caps) = last_caps {
+                    self.apply_regex_captures(&s, 0, &re, &caps, CaptureAllMode::Skip)?;
+                }
+                return Ok(StrykeValue::array(flat_captures));
+            }
             let matches: Vec<StrykeValue> = match &*re {
                 PerlCompiledRegex::Rust(r) => r
                     .find_iter(&s)
@@ -20734,6 +20751,13 @@ impl VMHelper {
                 let idx = self.eval_expr(index)?.to_int();
                 let yes = self.exists_arrow_array_element(container, idx, line)?;
                 Ok(StrykeValue::integer(if yes { 1 } else { 0 }))
+            }
+            ExprKind::SubroutineRef(name) => {
+                // `exists &name` / `exists &Pkg::name` — true when the
+                // subroutine has been declared (whether or not it's
+                // defined, mirroring Perl's `exists &subname`).
+                let resolved = self.resolve_sub_by_name(name);
+                Ok(StrykeValue::integer(if resolved.is_some() { 1 } else { 0 }))
             }
             _ => Err(StrykeError::runtime("exists requires hash or array element", line).into()),
         }

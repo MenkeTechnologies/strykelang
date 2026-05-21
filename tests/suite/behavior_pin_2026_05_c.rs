@@ -222,17 +222,16 @@ fn regex_s_flag_dotall() {
 }
 
 #[test]
-fn regex_g_flag_returns_full_matches_today() {
-    // BUG-016: in list context, `m//g` should yield each capture separately
-    // (Perl returns ("a","1","b","2","c","3")). Stryke today returns the
-    // concatenation of captures per match: ("a1","b2","c3").
+fn regex_g_flag_returns_captures_when_groups_present() {
+    // `m//g` in list context with capture groups returns each capture as its
+    // own element across all matches: ("a","1","b","2","c","3").
     assert_eq!(
         eval_string(r#"my @m = "a1 b2 c3" =~ /(\w)(\d)/g; "@m""#),
-        "a1 b2 c3"
+        "a 1 b 2 c 3"
     );
     assert_eq!(
         eval_int(r#"my @m = "a1 b2 c3" =~ /(\w)(\d)/g; scalar @m"#),
-        3
+        6
     );
 }
 

@@ -100,16 +100,19 @@ fn global_match_iterates_all_captures() {
 }
 
 #[test]
-fn global_match_in_list_context_returns_full_match_strings() {
-    // Stryke divergence: list-context `/.../g` returns the full match
-    // strings, not the alternating per-capture values. Pin current
-    // behavior; BUG-213 tracks the parity gap.
+fn global_match_in_list_context_returns_per_capture_values() {
+    // List-context `/.../g` with capture groups returns each capture as its
+    // own element across every match, matching Perl: ("foo","1","bar","2",
+    // "baz","3").
     let code = r#"
         my @r = ("foo=1 bar=2 baz=3" =~ /(\w+)=(\d+)/g);
-        (scalar(@r) == 3
-            && $r[0] eq "foo=1"
-            && $r[1] eq "bar=2"
-            && $r[2] eq "baz=3") ? 1 : 0
+        (scalar(@r) == 6
+            && $r[0] eq "foo"
+            && $r[1] eq "1"
+            && $r[2] eq "bar"
+            && $r[3] eq "2"
+            && $r[4] eq "baz"
+            && $r[5] eq "3") ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }

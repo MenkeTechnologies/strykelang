@@ -227,16 +227,14 @@ fn prototype_of_user_sub_returns_proto_string() {
 // ── exists &subname is parse error today ─────────────────────────────────────
 
 #[test]
-fn exists_ampersand_subname_is_parse_error_today() {
-    // BUG-053: `exists &main::myf` → "Unexpected token BitAnd". Perl accepts
-    // `exists &name` for sub-existence checks.
-    use stryke::error::ErrorKind;
-    let kind = parse_err_kind(r#"sub myf { 1 } exists &main::myf"#);
-    assert!(
-        matches!(kind, ErrorKind::Syntax),
-        "expected syntax error, got {:?}",
-        kind
+fn exists_ampersand_subname_returns_truthy_for_declared_sub() {
+    // `exists &name` / `exists &Pkg::name` returns true for a declared sub
+    // and false for an unknown name, matching Perl's sub-existence check.
+    assert_eq!(
+        eval_int(r#"sub myf { 1 } exists &main::myf ? 1 : 0"#),
+        1
     );
+    assert_eq!(eval_int(r#"exists &nope_not_here ? 1 : 0"#), 0);
 }
 
 // ── defined &name works as a workaround ─────────────────────────────────────
