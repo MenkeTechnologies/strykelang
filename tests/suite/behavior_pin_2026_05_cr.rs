@@ -249,13 +249,15 @@ fn mean_squared_error_lists_cr() {
 }
 
 #[test]
-fn gcd_trailing_operands_ignored_two_arg_only_cr() {
-    assert_eq!(eval_string(r#"sprintf("%.0f", gcd(12, 18, 35))"#), "6");
+fn gcd_variadic_folds_over_all_operands_cr() {
+    // gcd(12, 18, 35) = gcd(gcd(12, 18), 35) = gcd(6, 35) = 1
+    assert_eq!(eval_string(r#"sprintf("%.0f", gcd(12, 18, 35))"#), "1");
 }
 
 #[test]
-fn lcm_trailing_operands_ignored_two_arg_only_cr() {
-    assert_eq!(eval_string(r#"sprintf("%.0f", lcm(4, 6, 10))"#), "12");
+fn lcm_variadic_folds_over_all_operands_cr() {
+    // lcm(4, 6, 10) = lcm(lcm(4, 6), 10) = lcm(12, 10) = 60
+    assert_eq!(eval_string(r#"sprintf("%.0f", lcm(4, 6, 10))"#), "60");
 }
 
 #[test]

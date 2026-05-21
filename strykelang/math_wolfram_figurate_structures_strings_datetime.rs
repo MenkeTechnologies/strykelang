@@ -130,24 +130,25 @@ fn builtin_cartesian_product_n(args: &[StrykeValue]) -> StrykeResult<StrykeValue
     ))
 }
 
-/// Multiset union (max counts).
+/// Multiset union (max counts). Output is sorted lexically so the result is
+/// deterministic regardless of input ordering or `HashMap` rehashing.
 fn builtin_multiset_union(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let b = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
-    let mut counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut counts: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
     for v in &a {
         *counts.entry(v.to_string()).or_insert(0) += 1;
     }
-    let mut counts_b: std::collections::HashMap<String, usize> =
-        std::collections::HashMap::new();
+    let mut counts_b: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
     for v in &b {
         *counts_b.entry(v.to_string()).or_insert(0) += 1;
     }
     let mut out = Vec::new();
-    let keys: std::collections::HashSet<String> =
-        counts.keys().chain(counts_b.keys()).cloned().collect();
+    let mut keys: Vec<&String> = counts.keys().chain(counts_b.keys()).collect();
+    keys.sort();
+    keys.dedup();
     for k in keys {
-        let mc = (*counts.get(&k).unwrap_or(&0)).max(*counts_b.get(&k).unwrap_or(&0));
+        let mc = (*counts.get(k).unwrap_or(&0)).max(*counts_b.get(k).unwrap_or(&0));
         for _ in 0..mc {
             out.push(StrykeValue::string(k.clone()));
         }
@@ -155,16 +156,15 @@ fn builtin_multiset_union(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     Ok(StrykeValue::array(out))
 }
 
-/// Multiset intersection (min counts).
+/// Multiset intersection (min counts). Output is sorted lexically.
 fn builtin_multiset_intersection(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let b = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
-    let mut counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut counts: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
     for v in &a {
         *counts.entry(v.to_string()).or_insert(0) += 1;
     }
-    let mut counts_b: std::collections::HashMap<String, usize> =
-        std::collections::HashMap::new();
+    let mut counts_b: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
     for v in &b {
         *counts_b.entry(v.to_string()).or_insert(0) += 1;
     }
@@ -178,11 +178,11 @@ fn builtin_multiset_intersection(args: &[StrykeValue]) -> StrykeResult<StrykeVal
     Ok(StrykeValue::array(out))
 }
 
-/// Multiset difference (subtract counts, floor 0).
+/// Multiset difference (subtract counts, floor 0). Output is sorted lexically.
 fn builtin_multiset_difference(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let b = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
-    let mut counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut counts: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
     for v in &a {
         *counts.entry(v.to_string()).or_insert(0) += 1;
     }

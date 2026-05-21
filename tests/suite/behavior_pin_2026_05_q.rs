@@ -359,16 +359,9 @@ fn reverse_of_empty_array_var_returns_empty() {
 }
 
 #[test]
-fn reverse_with_bare_empty_parens_is_parse_error_today() {
-    // BUG-099: `reverse()` should be valid (returns empty list). Stryke
-    // raises "Unexpected token RParen".
-    use stryke::error::ErrorKind;
-    let kind = parse_err_kind(r#"my @r = reverse(); scalar @r"#);
-    assert!(
-        matches!(kind, ErrorKind::Syntax),
-        "expected syntax error, got {:?}",
-        kind
-    );
+fn reverse_with_bare_empty_parens_returns_empty_list() {
+    // `reverse()` is a Perl-compatible empty-list call returning the empty list.
+    assert_eq!(eval_int(r#"my @r = reverse(); scalar @r"#), 0);
 }
 
 // ── Reading a missing array element returns undef ──────────────────────────

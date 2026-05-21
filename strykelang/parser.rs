@@ -10520,6 +10520,16 @@ impl Parser {
                             | Token::PipeForward
                     ) {
                     self.pipe_placeholder_list(line)
+                } else if matches!(self.peek(), Token::LParen)
+                    && matches!(self.peek_at(1), Token::RParen)
+                {
+                    // `reverse()` — Perl-style empty list call returns the empty list.
+                    self.advance();
+                    self.advance();
+                    Expr {
+                        kind: ExprKind::List(Vec::new()),
+                        line,
+                    }
                 } else {
                     self.parse_one_arg()?
                 };

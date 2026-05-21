@@ -508,17 +508,25 @@ impl TopKSketch {
     }
 
     pub fn add(&mut self, key: &[u8]) {
+        self.add_weighted(key, 1);
+    }
+
+    /// Weighted SpaceSaving update: increments the key's count by `weight`
+    /// instead of `1`. Non-positive weights are treated as `1` so callers
+    /// can't silently break the count invariant.
+    pub fn add_weighted(&mut self, key: &[u8], weight: u64) {
+        let w = weight.max(1);
         if let Some(entry) = self.entries.get_mut(key) {
-            entry.0 += 1;
+            entry.0 = entry.0.saturating_add(w);
             return;
         }
         if self.entries.len() < self.k {
-            self.entries.insert(key.to_vec(), (1, 0));
+            self.entries.insert(key.to_vec(), (w, 0));
             return;
         }
         // Find the entry with the smallest count; that slot gets evicted.
-        // The new key inherits `min_count + 1` and an error floor equal to
-        // the evicted slot's count.
+        // The new key inherits `min_count + weight` and an error floor equal
+        // to the evicted slot's count.
         let (evict_key, min_count) = self
             .entries
             .iter()
@@ -527,7 +535,7 @@ impl TopKSketch {
             .expect("entries non-empty at this point");
         self.entries.remove(&evict_key);
         self.entries
-            .insert(key.to_vec(), (min_count + 1, min_count));
+            .insert(key.to_vec(), (min_count.saturating_add(w), min_count));
     }
 
     /// Top-N entries, sorted by count descending. Each entry: `(key, count,
@@ -2099,12 +2107,20 @@ pub(crate) fn builtin_topk(args: &[StrykeValue], _line: usize) -> StrykeResult<S
     ))))
 }
 
-/// `topk_add(TOPK, KEY)` — observe one occurrence of `KEY`.
+/// `topk_add(TOPK, KEY [, WEIGHT])` — observe `KEY` with optional weight
+/// (default `1`). Non-positive weights are clamped up to `1`.
 pub(crate) fn builtin_topk_add(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     let topk_v = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let t = topk_lock_arg(&topk_v, "topk_add", line)?;
     let key = key_bytes(args.get(1).unwrap_or(&StrykeValue::UNDEF));
-    t.lock().add(&key);
+    let weight = args
+        .get(2)
+        .map(|v| {
+            let i = v.to_int();
+            if i < 1 { 1u64 } else { i as u64 }
+        })
+        .unwrap_or(1);
+    t.lock().add_weighted(&key, weight);
     Ok(topk_v)
 }
 

@@ -117,12 +117,15 @@ fn b75_biconnected_component_count(mut n: usize, raw: &[(usize, usize)]) -> i64 
 // ───── shortest paths ─────
 
 /// Dijkstra relaxation step: returns new tentative dist d[u] + w(u,v) if smaller.
+/// Negative weights are passed through unmodified — the caller is responsible
+/// for using Bellman–Ford instead when negative edges are possible. The earlier
+/// `w_uv.max(0.0)` clamp silently produced wrong candidate distances and
+/// diverged from `bellman_ford_relax` on the same input triple.
 fn builtin_dijkstra_relax(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let d_u = f1(args);
-    let w_uv = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).max(0.0);
+    let w_uv = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let d_v = args.get(2).map(|v| v.to_number()).unwrap_or(f64::INFINITY);
-    let cand = d_u + w_uv;
-    Ok(StrykeValue::float(cand.min(d_v)))
+    Ok(StrykeValue::float((d_u + w_uv).min(d_v)))
 }
 
 /// Bellman-Ford relaxation: same form as Dijkstra but allows negative weights.

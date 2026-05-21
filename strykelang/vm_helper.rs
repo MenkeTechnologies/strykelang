@@ -33,8 +33,9 @@ use crate::profiler::Profiler;
 use crate::scope::Scope;
 use crate::sort_fast::{detect_sort_block_fast, sort_magic_cmp};
 use crate::value::{
-    perl_list_range_expand, CaptureResult, PerlBarrier, PerlDataFrame, PerlGenerator, PerlHeap,
-    PerlPpool, PipelineInner, PipelineOp, RemoteCluster, StrykeAsyncTask, StrykeSub, StrykeValue,
+    perl_list_range_expand, perl_shl_i64, perl_shr_i64, CaptureResult, PerlBarrier, PerlDataFrame,
+    PerlGenerator, PerlHeap, PerlPpool, PipelineInner, PipelineOp, RemoteCluster, StrykeAsyncTask,
+    StrykeSub, StrykeValue,
 };
 
 /// Merge two counting-hash accumulators (parallel `preduce_init` partials).
@@ -8803,8 +8804,8 @@ impl VMHelper {
                 }
             }
             BinOp::BitXor => StrykeValue::integer(old.to_int() ^ rhs.to_int()),
-            BinOp::ShiftLeft => StrykeValue::integer(old.to_int() << rhs.to_int()),
-            BinOp::ShiftRight => StrykeValue::integer(old.to_int() >> rhs.to_int()),
+            BinOp::ShiftLeft => StrykeValue::integer(perl_shl_i64(old.to_int(), rhs.to_int())),
+            BinOp::ShiftRight => StrykeValue::integer(perl_shr_i64(old.to_int(), rhs.to_int())),
             BinOp::Div => StrykeValue::float(old.to_number() / rhs.to_number()),
             BinOp::Mod => {
                 // Return 0 on b==0 silently — this helper is the
@@ -10217,8 +10218,12 @@ impl VMHelper {
                         BinOp::BitAnd => StrykeValue::integer(old.to_int() & rhs.to_int()),
                         BinOp::BitOr => StrykeValue::integer(old.to_int() | rhs.to_int()),
                         BinOp::BitXor => StrykeValue::integer(old.to_int() ^ rhs.to_int()),
-                        BinOp::ShiftLeft => StrykeValue::integer(old.to_int() << rhs.to_int()),
-                        BinOp::ShiftRight => StrykeValue::integer(old.to_int() >> rhs.to_int()),
+                        BinOp::ShiftLeft => {
+                            StrykeValue::integer(perl_shl_i64(old.to_int(), rhs.to_int()))
+                        }
+                        BinOp::ShiftRight => {
+                            StrykeValue::integer(perl_shr_i64(old.to_int(), rhs.to_int()))
+                        }
                         _ => StrykeValue::float(old.to_number() + rhs.to_number()),
                     })?);
                 }
@@ -12730,8 +12735,15 @@ impl VMHelper {
             } => {
                 let s = self.eval_expr(string)?.to_string();
                 let sub = self.eval_expr(substr)?.to_string();
+                // Perl: negative POS clamps to 0; POS past end returns -1
+                // (or, for empty needle, returns POS clamped to len).
                 let pos = if let Some(p) = position {
-                    self.eval_expr(p)?.to_int() as usize
+                    let raw = self.eval_expr(p)?.to_int();
+                    if raw < 0 {
+                        0usize
+                    } else {
+                        (raw as usize).min(s.len())
+                    }
                 } else {
                     0
                 };
@@ -12745,13 +12757,21 @@ impl VMHelper {
             } => {
                 let s = self.eval_expr(string)?.to_string();
                 let sub = self.eval_expr(substr)?.to_string();
-                let end = if let Some(p) = position {
-                    self.eval_expr(p)?.to_int() as usize + sub.len()
+                // Perl: negative POS means "search must end at or before POS";
+                // any negative POS implies no possible match → -1.
+                let result = if let Some(p) = position {
+                    let raw = self.eval_expr(p)?.to_int();
+                    if raw < 0 {
+                        -1
+                    } else {
+                        let end = (raw as usize)
+                            .saturating_add(sub.len())
+                            .min(s.len());
+                        s[..end].rfind(&sub).map(|i| i as i64).unwrap_or(-1)
+                    }
                 } else {
-                    s.len()
+                    s.rfind(&sub).map(|i| i as i64).unwrap_or(-1)
                 };
-                let search = &s[..end.min(s.len())];
-                let result = search.rfind(&sub).map(|i| i as i64).unwrap_or(-1);
                 Ok(StrykeValue::integer(result))
             }
             ExprKind::Sprintf { format, args } => {
@@ -14291,8 +14311,8 @@ impl VMHelper {
                 }
             }
             BinOp::BitXor => StrykeValue::integer(lv.to_int() ^ rv.to_int()),
-            BinOp::ShiftLeft => StrykeValue::integer(lv.to_int() << rv.to_int()),
-            BinOp::ShiftRight => StrykeValue::integer(lv.to_int() >> rv.to_int()),
+            BinOp::ShiftLeft => StrykeValue::integer(perl_shl_i64(lv.to_int(), rv.to_int())),
+            BinOp::ShiftRight => StrykeValue::integer(perl_shr_i64(lv.to_int(), rv.to_int())),
             // These should have been handled by short-circuit above
             BinOp::LogAnd
             | BinOp::LogOr

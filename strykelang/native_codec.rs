@@ -21,7 +21,17 @@ use indexmap::IndexMap;
 use md5::{Digest as Md5Digest, Md5};
 use parking_lot::RwLock;
 use pbkdf2::pbkdf2_hmac_array;
-use percent_encoding::{percent_decode_str, utf8_percent_encode, NON_ALPHANUMERIC};
+use percent_encoding::{percent_decode_str, utf8_percent_encode, AsciiSet, CONTROLS};
+
+/// RFC 3986 percent-encoding set: encode everything that is NOT an unreserved
+/// character. Unreserved per §2.3 = `ALPHA / DIGIT / "-" / "." / "_" / "~"`.
+/// Start from the universal set (CONTROLS + everything above 0x7E) and add the
+/// printable-ASCII characters that are reserved or otherwise.
+const RFC3986_RESERVED: &AsciiSet = &CONTROLS
+    .add(b' ').add(b'!').add(b'"').add(b'#').add(b'$').add(b'%').add(b'&').add(b'\'')
+    .add(b'(').add(b')').add(b'*').add(b'+').add(b',').add(b'/').add(b':').add(b';')
+    .add(b'<').add(b'=').add(b'>').add(b'?').add(b'@').add(b'[').add(b'\\').add(b']')
+    .add(b'^').add(b'`').add(b'{').add(b'|').add(b'}').add(b'\x7f');
 use rand::RngCore;
 use ripemd::{Digest as RipemdDigest, Ripemd160};
 use rsa::pkcs1v15::{SigningKey as RsaSigningKey, VerifyingKey as RsaVerifyingKey};
@@ -3274,8 +3284,10 @@ pub(crate) fn yaml_encode(v: &StrykeValue) -> StrykeResult<StrykeValue> {
 /// Percent-encode for URI components (RFC 3986 unreserved kept; space → `%20`).
 pub(crate) fn url_encode(v: &StrykeValue) -> StrykeResult<StrykeValue> {
     let s = v.to_string();
+    // RFC 3986 §2.3: unreserved characters `-`, `_`, `.`, `~` MUST NOT be
+    // percent-encoded. Use a custom set that leaves them alone.
     Ok(StrykeValue::string(
-        utf8_percent_encode(s.as_str(), NON_ALPHANUMERIC).to_string(),
+        utf8_percent_encode(s.as_str(), RFC3986_RESERVED).to_string(),
     ))
 }
 

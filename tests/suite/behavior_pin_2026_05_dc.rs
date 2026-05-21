@@ -33,8 +33,9 @@ fn sign_round_floor_ceil_dc() {
 
 #[test]
 fn gcd_lcm_multi_arg_dc() {
+    // Both fold over every operand: gcd(12, 18, 24) = 6; lcm(4, 6, 8) = 24.
     assert_eq!(eval_int(r#"gcd(12, 18, 24)"#), 6);
-    assert_eq!(eval_int(r#"lcm(4, 6, 8)"#), 12);
+    assert_eq!(eval_int(r#"lcm(4, 6, 8)"#), 24);
 }
 
 #[test]
