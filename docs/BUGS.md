@@ -3521,31 +3521,6 @@ Severity: **bug** (P2; quietly produces wrong output on every
 record-mode parser written in Perl style; workaround exists).
 
 
-## BUG-256 — `__PACKAGE__` inside a sub returns "main"
-
-```sh
-$ s -e '
-package Demo::P1;
-sub here { __PACKAGE__ }
-package main;
-print Demo::P1::here(), "\n"'
-main
-```
-
-In Perl, `__PACKAGE__` is a compile-time constant set to the
-currently-active package at the point of compilation. A sub defined
-inside `package Demo::P1` should always return `"Demo::P1"`. Stryke
-always returns `"main"` regardless of the enclosing `package`
-declaration, mirroring the BUG-248 caller-package issue: stryke does
-not track the lexical package binding for sub bodies.
-
-Pin: `package_inside_sub_returns_main_per_bug_256` in
-`tests/suite/dunder_globals_pin.rs`.
-
-Severity: **bug** (P2; breaks any "self-identification" or
-log-tagging idiom that relies on `__PACKAGE__`).
-
-
 ## BUG-257 — `$\`` and `$'` regex pre/post-match vars not parseable
 
 ```sh

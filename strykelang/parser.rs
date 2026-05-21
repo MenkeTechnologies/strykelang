@@ -1538,6 +1538,8 @@ impl Parser {
             name,
             "__FILE__"
                 | "__LINE__"
+                | "__PACKAGE__"
+                | "__SUB__"
                 | "abs"
                 | "async"
                 | "spawn"
@@ -9560,6 +9562,14 @@ impl Parser {
             }),
             "__SUB__" => Ok(Expr {
                 kind: ExprKind::MagicConst(MagicConstKind::Sub),
+                line,
+            }),
+            // `__PACKAGE__` is a compile-time constant set to the currently
+            // active package, so a sub body in `package Demo::P1` keeps
+            // returning `"Demo::P1"` regardless of the caller's package
+            // (Perl 5 documented behavior).
+            "__PACKAGE__" => Ok(Expr {
+                kind: ExprKind::String(self.current_package.clone()),
                 line,
             }),
             "stdin" => Ok(Expr {
