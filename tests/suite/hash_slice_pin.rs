@@ -16,15 +16,14 @@ fn hash_value_slice_returns_values() {
 }
 
 #[test]
-fn hash_value_slice_with_array_keys_returns_empty_buggy() {
-    // BUG-235: `@h{@arrayvar}` returns a single empty element instead
-    // of the values at those keys. `@h{qw(...)}` and `@h{"a","b"}`
-    // both work; only the array-variable form is broken.
+fn hash_value_slice_with_array_keys_returns_values() {
+    // `@h{@arrayvar}` evaluates the key operand in list context so the elements
+    // of `@arrayvar` splat into the slice, returning the matched values.
     let code = r#"
         my %h = (a => 10, b => 20, c => 30);
         my @keys = ("a", "c");
         my @v = @h{@keys};
-        len(@v) == 1 ? 1 : 0
+        (len(@v) == 2 && $v[0] == 10 && $v[1] == 30) ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }
