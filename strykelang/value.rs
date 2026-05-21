@@ -2900,6 +2900,37 @@ pub fn perl_mod_i64(a: i64, b: i64) -> i64 {
     }
 }
 
+/// Perl-compatible `<<` on a 64-bit signed integer. Shift amounts of `>= 64`
+/// or `< 0` yield `0` instead of Rust's checked-shift panic. Bits shifted past
+/// position 63 wrap (matches Perl's two's-complement IV behavior).
+#[inline]
+pub fn perl_shl_i64(a: i64, b: i64) -> i64 {
+    if !(0..64).contains(&b) {
+        0
+    } else {
+        ((a as u64).wrapping_shl(b as u32)) as i64
+    }
+}
+
+/// Perl-compatible `>>` on a 64-bit signed integer. Shift amounts of `>= 64`
+/// fully shift out the value (returning `0` for non-negative inputs and `-1`
+/// for negative inputs under arithmetic shift); negative shift amounts yield
+/// `0` instead of Rust's checked-shift panic.
+#[inline]
+pub fn perl_shr_i64(a: i64, b: i64) -> i64 {
+    if b < 0 {
+        0
+    } else if b >= 64 {
+        if a < 0 {
+            -1
+        } else {
+            0
+        }
+    } else {
+        a >> b
+    }
+}
+
 /// `--compat`-aware integer multiply. In compat mode, promotes to `BigInt` on
 /// overflow. In native mode, wraps (preserves current behavior). Either side
 /// already being a `BigInt` forces the BigInt path.

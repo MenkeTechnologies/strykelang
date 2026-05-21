@@ -16,8 +16,8 @@ use crate::perl_fs::read_file_text_perl_compat;
 use crate::pmap_progress::{FanProgress, PmapProgress};
 use crate::sort_fast::{sort_magic_cmp, SortBlockFast};
 use crate::value::{
-    perl_list_range_expand, PerlBarrier, PerlHeap, PipelineInner, PipelineOp, StrykeAsyncTask,
-    StrykeSub, StrykeValue,
+    perl_list_range_expand, perl_shl_i64, perl_shr_i64, PerlBarrier, PerlHeap, PipelineInner,
+    PipelineOp, StrykeAsyncTask, StrykeSub, StrykeValue,
 };
 use crate::vm_helper::{
     fold_preduce_init_step, merge_preduce_init_partials, preduce_init_fold_identity, Flow,
@@ -4105,13 +4105,13 @@ impl<'a> VM<'a> {
                     Op::Shl => {
                         let b = self.pop().to_int();
                         let a = self.pop().to_int();
-                        self.push(StrykeValue::integer(a << b));
+                        self.push(StrykeValue::integer(perl_shl_i64(a, b)));
                         Ok(())
                     }
                     Op::Shr => {
                         let b = self.pop().to_int();
                         let a = self.pop().to_int();
-                        self.push(StrykeValue::integer(a >> b));
+                        self.push(StrykeValue::integer(perl_shr_i64(a, b)));
                         Ok(())
                     }
 
@@ -9335,7 +9335,14 @@ impl<'a> VM<'a> {
             Some(BuiltinId::Index) => {
                 let s = args.first().map(|v| v.to_string()).unwrap_or_default();
                 let sub = args.get(1).map(|v| v.to_string()).unwrap_or_default();
-                let pos = args.get(2).map(|v| v.to_int() as usize).unwrap_or(0);
+                // Perl: negative POS clamps to 0; POS past end returns -1
+                // (or, for empty needle, returns POS clamped to len).
+                let pos_raw = args.get(2).map(|v| v.to_int()).unwrap_or(0);
+                let pos = if pos_raw < 0 {
+                    0usize
+                } else {
+                    (pos_raw as usize).min(s.len())
+                };
                 Ok(StrykeValue::integer(
                     s[pos..].find(&sub).map(|i| (i + pos) as i64).unwrap_or(-1),
                 ))
@@ -9343,16 +9350,23 @@ impl<'a> VM<'a> {
             Some(BuiltinId::Rindex) => {
                 let s = args.first().map(|v| v.to_string()).unwrap_or_default();
                 let sub = args.get(1).map(|v| v.to_string()).unwrap_or_default();
-                let end = args
-                    .get(2)
-                    .map(|v| v.to_int() as usize + sub.len())
-                    .unwrap_or(s.len());
-                Ok(StrykeValue::integer(
-                    s[..end.min(s.len())]
-                        .rfind(&sub)
-                        .map(|i| i as i64)
-                        .unwrap_or(-1),
-                ))
+                // Perl: negative POS means "search must end at or before POS";
+                // any negative value past -1 implies no possible match.
+                let result = match args.get(2) {
+                    Some(v) => {
+                        let p = v.to_int();
+                        if p < 0 {
+                            -1
+                        } else {
+                            let end = (p as usize)
+                                .saturating_add(sub.len())
+                                .min(s.len());
+                            s[..end].rfind(&sub).map(|i| i as i64).unwrap_or(-1)
+                        }
+                    }
+                    None => s.rfind(&sub).map(|i| i as i64).unwrap_or(-1),
+                };
+                Ok(StrykeValue::integer(result))
             }
             Some(BuiltinId::Ucfirst) => {
                 let s = args

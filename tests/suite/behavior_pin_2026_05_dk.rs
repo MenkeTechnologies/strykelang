@@ -134,13 +134,15 @@ fn bellman_ford_relax_allows_negative_edge_dk() {
     );
 }
 
-/// **BUG-203**: `dijkstra_relax` clamps **`w` ≥ 0**; honoring **`-5`** would give **`3 + (-5) = -2`** (contrast
-/// **`bellman_ford_relax(3, -5, 10) -> -2`**).
+/// `dijkstra_relax` no longer clamps negative weights — the value passes through so
+/// the result matches `bellman_ford_relax` for the same triple. Dijkstra is still
+/// undefined for negative-weight graphs; callers must use Bellman–Ford when they
+/// could be present.
 #[test]
-fn dijkstra_relax_clamps_negative_weight_bug203_dk() {
+fn dijkstra_relax_honors_negative_weight_dk() {
     assert_eq!(
         eval_string(r#"sprintf("%.10g", dijkstra_relax(3, -5, 10))"#),
-        "3"
+        "-2"
     );
 }
 

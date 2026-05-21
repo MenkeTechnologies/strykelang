@@ -6,579 +6,16 @@ macOS aarch64; continuously updated since. Additional behavior pins live in
 Entries below pair each documented bug with the pinning tests that lock the
 *current* output.
 
-When a bug is fixed, update the corresponding test rather than deleting
-it — the test then becomes the regression guard. Bugs marked **FIXED**
-in the title kept their numeric ID so historical references in commits
-and other docs still resolve.
+When a bug is fixed, remove the entry from this file. The pinning test
+in `tests/suite/behavior_pin_2026_05*.rs` stays as the regression guard.
+Numeric IDs are not reused, so historical references in commits still
+resolve to git history.
 
 Severity legend:
 
 - `parity` — diverges from Perl 5; intentional or accidental TBD
 - `bug` — observably wrong vs documented intent
 - `polish` — non-critical UX/error-message issue
-
-## Recently fixed
-
-- **BUG-121** — `median_absolute_deviation` for even-sized samples
-  returned `sorted[len/2]` (upper-half element) as the median instead of
-  averaging the two middle values. **Fix:** real even-length median in
-  `builtin_median_absolute_deviation` (`builtins_extended.rs`). Affects
-  spread for any even-`n` input; `MAD(1, 2, 100, 101)` now correctly
-  returns `49.5` (was `98`).
-- **BUG-133** — `depreciation_double(cost, salvage, life)` ignored the
-  salvage operand entirely, returning unbounded `2·cost/life`. **Fix:**
-  bound the unbounded annual depreciation by `(cost − salvage)` so the
-  per-year amount never causes book value to drop below salvage
-  (`builtins_extended.rs`).
-- **BUG-134** — `weber_number(ρ, v, L, σ)` clamped a missing/zero σ to
-  `1e-30`, producing a spurious finite ~`10³²` number instead of
-  signalling overflow. **Fix:** return `Infinity` (or NaN if numerator is
-  also non-finite) when σ ≤ 0 (`math_wolfram13.rs`).
-- **BUG-135** — `dB_voltage(V)` / `dB_power(P)` with a missing reference
-  silently substituted `1e-30`, fabricating dB readings on the order of
-  `+600 dB`. **Fix:** return NaN when the reference operand is missing or
-  non-positive (`math_wolfram12.rs`).
-- **BUG-145** — `unzip_pairs(zip(...))` (pair rows already laid out as
-  variadic args) deep-flattened every inner pair's contents into the row
-  axis, shredding alignment. **Fix:** preserve pair-row layout when the
-  caller spreads zip output; only peel the outer container when a single
-  arrayref argument is passed (`builtin_unzip_pairs` in `builtins.rs`).
-- **BUG-146** — `take_n(N, cycle(LIST))` returned an empty list because
-  `flatten_args` calls `collect_all` on the cycle iterator, which by
-  design refuses to materialize an infinite sequence. **Fix:** pull
-  exactly `N` items directly from the iterator when `take_n` receives a
-  single iterator argument (`builtins.rs`).
-- **BUG-149** — `without([drop1, drop2, ...], LIST)` silently filtered
-  nothing because the filter compared the *arrayref display string* to
-  each element's string. **Fix:** when the first argument is an
-  array/arrayref, build a `HashSet<String>` of the drop members and
-  filter against set membership; otherwise keep the single-value drop
-  semantics (`builtins.rs`).
-- **BUG-163** — `running_reduce { $a + $b }` always saw `$a = first` and
-  `$b = undef`, collapsing the chain to zeros after the first slot.
-  **Fix:** call `scope.set_sort_pair(acc, next)` before each `call_sub`
-  so the reducer block resolves `$a` / `$b` to the package globals — the
-  same mechanism `reduce`, `reductions`, and `sort { … }` use
-  (`builtins.rs`). `running_reduce { $a + $b } 1..5` now yields
-  `1, 3, 6, 10, 15`.
-- **BUG-166** — `nth(N, ARRAYREF)` returned `undef` because `to_list` does
-  not unpack `ArrayRef` storage. **Fix:** unwrap via
-  `map_flatten_outputs(true)` (`builtin_nth`, `builtins.rs`).
-- **BUG-173** — `mode([…])` (single arrayref operand) echoed the bracket
-  list instead of computing the modal element because
-  `list_builtins::mode_with_want` iterated `args` directly without
-  peeling array/arrayref storage. **Fix:** add `flatten_to_values` helper
-  and use it in `mode_with_want`, `minmax` (`min`/`max`/`minstr`/`maxstr`),
-  `variance`, and `stddev` so all four shapes — `mode(1,2,3)`,
-  `mode(@list)`, `mode([1,2,3])`, `mode(\@list)` — drain into the same
-  flat value vector (`list_builtins.rs`).
-- **BUG-175** — `trimmed_mean(LIST, PCT)` interpreted the leading
-  arrayref's `to_number()` as the trim percentage (which is the array
-  *length*), so `trimmed_mean([1,2,3,4,100], 20)` trimmed 5% on each side
-  using only `[20]` as the sample. **Fix:** auto-detect call order — if
-  the first arg is array-shaped and the trailing scalar is a single
-  number, treat it as `(LIST, PCT)`; otherwise stick with the
-  `(PCT, LIST...)` Wolfram form (`builtins.rs`).
-- **BUG-194** — `hamming_distance([1,0,1], [1,1,0])` compared
-  `"ARRAY(0x…)"` against `"ARRAY(0x…)"` and reported `0` mismatches.
-  **Fix:** when either operand is array/arrayref, drain both into value
-  vectors and compare element-wise; string operands keep codepoint
-  comparison (`builtin_hamming`, `builtins.rs`). Same fix replicated in
-  `builtin_hamming_distance` for callers that hit the alternate dispatch
-  path.
-- **BUG-187** — `clamp_list(lo, hi, list...)` Rust-panicked (`f64::clamp`
-  requires `min ≤ max`). **Fix:** normalize raw `lo` / `hi` to ascending
-  order before clamping (`builtins.rs`).
-- **BUG-189** — `mahalanobis([0,0], [1,1], cov_inv)` Rust-panicked because
-  the first arg parsed as a single 1-D row, mis-matching `center`'s
-  dimension. **Fix:** auto-promote a flat p-dim arrayref into a single
-  p-dim observation; rows with wrong dimension return NaN rather than
-  panicking (`builtins_extended.rs`).
-- **BUG-198** — `derangements(n)` used a fixed `(n − 1)` multiplier on
-  every recurrence step, yielding `n!` (`derangements(4) = 36`) instead
-  of the subfactorial `!n = 9`. **Fix:** use `(k − 1)` from the loop
-  index, matching `D(k) = (k − 1)·(D(k − 1) + D(k − 2))`
-  (`builtins_extended.rs`).
-- **BUG-128** — `lambert_w0(1)` returned NaN because the initial guess for
-  `x ≥ 1` was `ln(x) − ln(ln(x))`, which evaluates to `−∞` at `x = 1`.
-  **Fix:** region-specific seed — series for `x < 0`, smooth fit
-  `x / (1 + x·(e − 1)/e)` for `x ∈ [0, e]`, asymptotic for `x > e` — then
-  Halley iterate (`math_wolfram29.rs`). `lambert_w0(1)` now returns the
-  Omega constant `Ω ≈ 0.5671432904`.
-- **BUG-131** — `medfilt_1d` returned the *global* median of the entire
-  input vector rather than a sliding-window median. **Fix:** real
-  `(2k + 1)` sliding-window median filter; boundary windows clamp to
-  available samples (`math_wolfram74.rs`). Signature: `medfilt_1d(signal, k=3)`.
-- **BUG-129** — `convolve_full`, `convolve_valid`, `correlate_full`, and
-  `kron_product` returned only the output *sizes* (integers). **Fix:**
-  implement the actual discrete convolution
-  (`c[k] = Σ a[i]·b[k − i]`, output length `m + n − 1`),
-  cross-correlation (no kernel flip), and Kronecker product of two
-  vectors (`math_wolfram72.rs`).
-- **BUG-202** — `prim_mst` conflated weight `0` with "no edge", silently
-  reporting finite totals on disconnected graphs (re-processing the
-  start vertex). **Fix:** auto-detect convention — if the matrix contains
-  any `+Infinity`, treat infinity as absent and `0` as a valid weight;
-  otherwise keep the classic `0 = no edge`. Skip self-loops; return
-  `Infinity` when no reachable vertex remains (`builtins_extended.rs`).
-- **BUG-138** — `clamp(VALUE, LO, HI)` silently inverted bounds when callers
-  passed the convention as `(value, min, max)` instead of the documented
-  `(min, max, list)`. `clamp(11, 0, 10)` returned `11` instead of `10`.
-  **Fix:** `builtin_clamp` (`builtins.rs`) now normalizes `(min, max)` so
-  the bounds are always in ascending order — both call conventions work.
-  Pin updates: `examples/test_bugs_exhaustive_pin.stk`,
-  `examples/test_more_kernel_and_list_bugs_pin.stk`.
-- **BUG-180** — `format_percent(0.125)` rendered `"0.1%"` instead of
-  `"12.5%"` because the implementation appended `%` to the raw value
-  without scaling. **Fix:** `builtin_format_percent` (`builtins.rs`)
-  multiplies the input by `100.0` before formatting. The convention is
-  now strictly "input is a fraction in `[0, 1]`". Pin updates:
-  `examples/test_bugs_exhaustive_pin.stk`,
-  `examples/test_math_stats_advanced_pin.stk`.
-- **BUG-169** — `hhi(0.3, 0.3, 0.4)` returned `0.09` (just `0.3²`) because
-  `builtin_herfindahl_hirschman` only read `args.first()`. **Fix:**
-  iterate every positional argument via `flat_map(arg_to_vec)`
-  (`math_wolfram8.rs`) so both `hhi(s1, s2, ...)` and `hhi([s1, s2, ...])`
-  give the correct Σ shares² = 0.34.
-- **BUG-170** — `moving_average([1,2,3], 5)` mis-coerced the leading
-  arrayref to `to_int() = 0` (forced to window `1`) and averaged the tail
-  scalar. **Fix:** `builtin_moving_average` (`builtins_extended.rs`)
-  detects whether the first arg is array-shaped: if yes, treats it as
-  `LIST` and reads `WINDOW` from `args[1]` (pandas convention);
-  otherwise sticks with the Wolfram `(WINDOW, LIST...)` form. `batch` /
-  `chunk_n` / `group_of_n` retain the original Wolfram convention.
-- **BUG-037** — Closure-wrapped coderef calls (`sub { $f->(@_) }`, `sub { $f->($first, @rest) }`)
-  passed `@_` / `@rest` as their scalar count instead of flattening into the
-  call list. Closure bodies run through the tree-walker (`vm_helper.rs`);
-  both `DerefKind::Call` and `ExprKind::IndirectCall` arms used
-  `eval_expr` (default `WantarrayCtx::Scalar`), which numifies an `ArrayVar`
-  to its element count. **Fix:** evaluate each argument in
-  `WantarrayCtx::List` and flatten array values via `as_array_vec()` into
-  the args vec, mirroring the existing `FuncCall` "Generic sub call" path
-  (`vm_helper.rs:10479-10491`). Top-level coderef calls already used the
-  bytecode `Op::ArrowCall` path, which always compiled args in list
-  context — only closure bodies were affected. Pins:
-  `closure_calling_coderef_with_at_underscore_flattens_to_count_today`,
-  `closure_calling_sigfn_via_coderef_with_array_arg_breaks_today`,
-  `closure_calling_sigfn_via_coderef_with_indexed_arg_works`,
-  `direct_call_inside_closure_works` in
-  `tests/suite/behavior_pin_2026_05_f.rs`.
-- **BUG-206** — **`sort { block }` corrupted the topic chain**, causing **`_<`**
-  in subsequent pipeline stages (e.g., `grep { ... _< ... }`) to resolve to the
-  **last sorted element** instead of the outer function's argument. Root cause:
-  `set_sort_pair(a, b)` writes to `$_` (slot 0), and when `grep` later calls
-  `set_topic(item)`, it shifts this corrupted `$_` into `_<`. **Fix:** save the
-  entire topic chain (`$_`, `$_<`, `$_<<`, ...) via `scope.save_topic_chain()`
-  before sort and restore it via `scope.restore_topic_chain()` after, in both
-  the VM's `Op::SortWithBlock` handler (`vm.rs`) and the tree-walker's sort
-  expression handlers for `SortComparator::Block` and `SortComparator::Code`
-  (`vm_helper.rs`). Discovered via `examples/exercism/allergies/` where
-  `[~> %h keys sort { $h{_0} <=> $h{_1} } grep { allergic_to(_, _<) }]`
-  returned empty when called from a `require`d file.
-- **BUG-108** — `par`/`par_reduce`/`~p>` over a real `@a` array now works
-  correctly. Previously read scalar count instead of array elements; now
-  `~p> @a sum` returns 60 (correct) instead of 3 (array length). Range
-  expressions like `~p> 1:5 sum` also work (returns 15 instead of 0).
-- **BUG-205** — **`kmeans_pp_init`** / **`kpp_init`** used **`rand::thread_rng()`**, so the same **`POINTS`** /
-  **`K`** could yield **different** centroid tuples across runs (and parallel **`cargo test`** workers),
-  flaking **`gini_theil_kmeans_pp_de`**. **Fix:** derive **`StdRng`** from **`seed_from_u64`** over a
-  **`DefaultHasher`** of **`K`**, **`n`**, and every coordinate’s **`f64::to_bits`** (**`math_wolfram7.rs`**).
-  Pin: **`gini_theil_kmeans_pp_de`** in **`tests/suite/behavior_pin_2026_05_de.rs`**.
-- **BUG-201** — **`dijkstra`** returned distances in a hash whose **`stringify` /
-  iteration order was nondeterministic** because **`builtin_dijkstra`**
-  (**`builtins_extended.rs`**) drained a **`HashMap`** into an **`IndexMap`**
-  via raw **`HashMap`** iteration. **Fix:** collect **`(node, dist)`** pairs,
-  **`sort_by` string keys**, then insert into the result **`IndexMap`** so
-  outputs and pins are stable.
-  Pin: **`dijkstra_hash_shortest_distances_di`** in
-  **`tests/suite/behavior_pin_2026_05_di.rs`**.
-- **BUG-119** — Serializers (`to_json`, `to_xml`, `to_yaml`, `to_toml`,
-  `to_html`, `ddump`) treated stryke `class` / `struct` / `enum`
-  instances as opaque scalars and emitted the receiver's `Display`
-  stringification (`"Outer(name => x, inner => Inner(v => 7))"`)
-  wrapped in the target format. Root cause: serializers worked off the
-  raw `StrykeValue` tree without any recursive flatten step. Fix: new
-  `strykelang/serialize_normalize.rs` module exposes `deep_normalize`
-  — recursively converts ClassInstance / StructInstance / EnumInstance
-  / nested HashRef / ArrayRef into plain hashref/arrayref shapes the
-  existing serializer logic already handles. Hooked at the root of
-  `normalize_serialize_root` so every serializer benefits at once,
-  plus `builtin_ddump`. Inheritance fields resolve via a thread-local
-  `CLASS_DEFS_REGISTRY` populated from `VMHelper::execute` and each
-  `ClassDecl` statement. Companion: `$obj->to_hash_rec` (alias
-  `to_hash_deep`) gives users an explicit entry point for the same
-  flatten on struct and class instances.
-  Pin tests:
-  `to_hash_rec_flattens_nested_class_instances`,
-  `to_hash_rec_alias_to_hash_deep_is_equivalent`,
-  `to_hash_shallow_keeps_nested_class_instance`,
-  `to_hash_rec_walks_arrayref_of_classes`,
-  `to_hash_rec_works_for_struct_too`,
-  `to_json_recursive_on_nested_class`,
-  `to_json_recursive_on_struct`,
-  `ddump_recursive_returns_normalized_string`,
-  `to_yaml_recursive_on_class`
-  in `tests/suite/behavior_pin_2026_05_at.rs`.
-- **BUG-118** — `%$obj` (and `keys %$obj` / `values %$obj`) on a stryke
-  `ClassInstance` regressed to "Can't dereference non-reference as hash"
-  after BUG-114's fix turned class instances into real `ClassInstance`
-  values instead of Perl-style blessed hashrefs. Broke
-  `examples/rosetta/t/test_reflection_list_properties.stk` and any
-  Perl-style introspection idiom (`for my $k (keys %$self) { ... }`).
-  Fix in `vm_helper::dereference` Hash arm: flatten `ClassInstance`
-  fields into a fresh `IndexMap` (using `collect_class_fields_full`'s
-  inheritance-resolved order), same for `StructInstance` fields, plus
-  an unbless step for `BlessedRef` whose payload is a hash so old-style
-  Perl OO patterns keep working too.
-  Pin tests:
-  `keys_percent_deref_on_class_instance_returns_field_names`,
-  `values_percent_deref_on_class_instance_returns_field_values`,
-  `percent_deref_on_struct_instance_returns_field_map`,
-  `percent_deref_on_blessed_hashref_unwraps_inner_hash`
-  in `tests/suite/behavior_pin_2026_05_at.rs`.
-- **BUG-117** — `(LIST) |> psort { ... }` followed by a newline silently
-  swallowed the next statement as the list operand. Root cause: the
-  bareword `psort` parser always called
-  `parse_assign_expr_list_optional_progress()` after the comparator
-  block, with no in-pipe-RHS / newline check — unlike `sort`'s
-  block-form which already had a `peek_line() > block_end_line`
-  early-out. Without this gate, `my @s = (1,2,3) |> psort { _0 <=>
-  _1 }\nmy $n = len(@s)` parsed the second `my $n = ...` as the
-  psort list operand and dropped the binding entirely. Fix in
-  `parser.rs::psort` arm: mirror sort's gating — record
-  `block_end_line` after the block, then if `in_pipe_rhs() &&
-  (terminator-token || peek_line > block_end_line)`, switch to
-  `pipe_placeholder_list`. Same-line continuations (`|> psort {
-  ... } |> rev`) keep working because the next token IS `|>`.
-  Pin tests:
-  `psort_block_in_pipe_rhs_terminates_at_newline`,
-  `psort_block_chain_with_pipe_forward_continues_on_same_line`,
-  `psort_block_followed_by_explicit_list_still_works`
-  in `tests/suite/behavior_pin_2026_05_at.rs`.
-- **BUG-116** — `psort { $_0 <=> $_1 } @list` (and the bareword `_0`/`_1`
-  form) silently returned the input unsorted when the comparator block
-  read the implicit-param slots. The worker invoked the block via
-  `run_block_region` directly (bytecode region) instead of `call_sub`,
-  and `set_sort_pair` only populated named scalars (`$a`, `$b`,
-  `$_0`, `$_1`) — *not* the slot-based positional args that the
-  bytecode reads through `Op::GetScalarSlot`. Fix in `vm.rs`:
-  `Op::PSortWithBlock` worker now also calls
-  `set_closure_args(&[a, b])` for both the bytecode-region and
-  tree-walker fallback paths so slot 0/1 hold the comparator pair.
-  Sequential `sort` was unaffected because it routes through
-  `call_sub` which sets up slots normally.
-  Pin tests: `psort_comparator_reads_implicit_slot_zero_and_one`,
-  `psort_comparator_reads_bareword_underscore_slots`,
-  `psort_dollar_a_b_form_still_works`
-  in `tests/suite/behavior_pin_2026_05_at.rs`.
-- **BUG-115** — `use strict; preduce { $_0 + $_1 } @list` (and any
-  reduce/sort block that read implicit-param slots) was rejected at
-  parse time with "Global symbol $_0 requires explicit package name".
-  Root cause: `VMHelper::strict_scalar_exempt` whitelisted `$a`/`$b`
-  and digit-only match groups (`$1`, `$2`, …) but missed stryke's
-  positional-slot spelling `$_0` / `$_1` / … `$_99`. Fix: added a
-  `name.starts_with('_') && rest.all_digits()` arm to the exempt
-  predicate. Critical under `--no-interop`, where `$a`/`$b` are
-  rejected and `$_0`/`$_1` are the only valid comparator-slot names.
-  Pin tests: `strict_vars_exempts_implicit_param_slots`,
-  `strict_vars_exempts_higher_implicit_param_slots`
-  in `tests/suite/behavior_pin_2026_05_at.rs`.
-- **BUG-114 / BUG-048 (FIXED)** — Stryke `class C { ... }` instances
-  weren't recognized as class instances by the rest of the runtime. The
-  bytecode method dispatcher (`vm.rs::run_method_op`) inlined a copy of
-  the default `Class->new` path that produced a `BlessedRef` instead of
-  a `ClassInstance`, which cascaded into three visible bugs:
-  (1) `$self->{field}` inside instance methods couldn't find class
-  fields; (2) `ref($self)` returned the empty string because
-  `StrykeValue::ref_type` had no `ClassInst` arm; (3) `typed my $b : C =
-  C->new` always failed the runtime type check. Fixes:
-  - `vm.rs::run_method_op` now checks `class_defs` before the
-    Perl-blessed-hashref fallback and routes through `class_construct`
-    (skipping `all_args[0]` which holds the class-name receiver).
-  - `vm_helper::builtin_new` got the same routing for the tree-walker
-    path (initial fix during BUG-111 work).
-  - `value::ref_type` learned a `HeapObject::ClassInst(c) =>
-    c.def.name` arm so `ref($obj)` returns the class name.
-  Pin tests:
-  `class_method_binds_self_to_receiver`,
-  `class_method_self_field_deref_returns_field_value`,
-  `class_method_self_works_through_inheritance`,
-  `class_new_with_named_args_assigns_fields`,
-  `ref_on_class_instance_returns_class_name`
-  in `tests/suite/behavior_pin_2026_05_at.rs`. The pre-existing
-  `behavior_pin_2026_05_h::ref_of_stryke_class_instance_returns_class_name`
-  flipped from documenting the bug to guarding the fix.
-- **BUG-113** — `const my $x : Int = 5` (and `frozen my $x : Type`)
-  was rejected at parse time with "Unexpected token Colon". The
-  `frozen`/`const` parser branch called `parse_my_our_local("my",
-  false)`, which suppressed the type-annotation accept inside
-  `parse_var_decl`. Const/frozen-ness is orthogonal to typing, so the
-  flag is now `true` for both spellings — `const my $b : Box =
-  Box->new`, `frozen my $n : Int = 9`, and the user-type variants all
-  work. Pin tests:
-  `const_my_with_int_type_annotation_works`,
-  `const_my_with_user_type_annotation_works`,
-  `const_my_with_class_type_annotation_works`,
-  `frozen_my_with_type_annotation_works`,
-  `const_my_typed_still_rejects_reassignment`,
-  `const_my_typed_str_rejects_int`
-  in `tests/suite/behavior_pin_2026_05_at.rs`.
-- **BUG-112** — `s docs <TOPIC>` entered the interactive TUI when a
-  caller named a specific topic (or when AI wrappers like Gemini's
-  exec invoked it with mixed-tty plumbing), blocking until the user
-  pressed `q`. Two compounding causes: (1) the TTY check only
-  inspected stdout, so wrappers that kept stdout as a tty while
-  piping stdin slipped through; (2) even with both ttys, naming a
-  topic should be a one-shot lookup (`man pmap` semantics), not a
-  book-browser entry point. Fix in `main.rs::run_doc_subcommand`:
-  the interactive loop now requires *no positional argument*, plus
-  both `stdin().is_terminal()` and `stdout().is_terminal()`, with
-  `STRYKE_NO_TTY=1` / `NO_TTY=1` as explicit overrides. Any
-  positional `TOPIC` or page number → dump the page and exit 0.
-  Bare `s docs` on a real terminal still launches the TUI.
-- **BUG-111** — `typed my $x : UserType = ...` where `UserType` is a
-  user-defined struct, class, or enum was rejected at compile time
-  with `VM compile error (unsupported): typed my with struct type
-  \`Foo\``. Root cause: `Op::DeclareScalarTyped` only carried a 1-byte
-  type tag and `PerlTypeName::as_byte()` returned None for `Struct(_)`
-  / `Enum(_)`. Fix: added `Op::DeclareScalarTypedUser(name_idx,
-  type_name_idx, flags)` that resolves the type name through the
-  chunk's name pool, plus a `compiler::emit_declare_scalar_typed`
-  helper that picks the right op. A second compounding bug —
-  `builtin_new` didn't check `class_defs`, so `Class->new` for a
-  registered class produced a default-OO blessed-hashref instead of
-  a `ClassInstance`, defeating the runtime `check_value` —
-  was fixed by routing class lookups through `class_construct`.
-  `check_value::Struct(name)` was also extended to accept
-  `BlessedRef` whose `class` matches, so old-style `bless {...},
-  "MyClass"` round-trips through typed-my. Pin tests:
-  `typed_my_with_struct_compiles_and_runs`,
-  `typed_my_with_struct_rejects_wrong_struct`,
-  `typed_my_with_class_compiles_and_runs`,
-  `typed_my_with_class_rejects_wrong_class`,
-  `typed_my_with_class_accepts_old_style_blessed_ref`,
-  `typed_my_with_class_rejects_blessed_ref_of_wrong_class`,
-  `typed_my_with_enum_compiles_and_runs`,
-  `typed_my_primitive_int_still_routes_through_byte_op`,
-  `typed_my_primitive_str_still_rejects_int`
-  in `tests/suite/behavior_pin_2026_05_at.rs`.
-- **BUG-110** — `use strict` / `use warnings` / `use VERSION` followed by
-  `fn foo { ... }` on the next line no longer swallows `foo` as an
-  import argument. The `next_is_new_stmt_keyword` detector in
-  `parser.rs` learned the stryke-specific declaration keywords (`fn`,
-  `class`, `abstract`, `final`, `trait`, `state`, `mysync`, `oursync`)
-  so a fresh-line keyword terminates the implicit import-list. Same-
-  line uses (`use strict fn foo { ... }`) stay rejected because the
-  detector only fires across line boundaries. Pin tests:
-  `use_strict_followed_by_fn_on_next_line_does_not_swallow_name`,
-  `use_warnings_followed_by_fn_on_next_line_does_not_swallow_name`,
-  `use_strict_followed_by_state_decl_does_not_swallow`,
-  `use_feature_with_string_arg_still_consumes_argument`,
-  `use_strict_followed_by_fn_on_same_line_still_consumes_name`
-  in `tests/suite/behavior_pin_2026_05_at.rs`.
-- **BUG-027** — `$#a = N` now resizes `@a` to length `N + 1` (truncates
-  if shrinking, pads with `undef` if growing). Routed `#name` writes
-  through `VMHelper::set_special_var`, which calls
-  `scope.set_array(name, vec_resized)`. Negative values empty the array.
-- **BUG-029** — `"$&"` inside double-quoted strings now interpolates the
-  match result instead of staying literal. The interpolation parser
-  (`parse_interpolated_string`) had explicit branches for the `'`
-  (postmatch) and `` ` `` (prematch) regex special vars but missed
-  `&` — added it. The `s///` replacement form (BUG-032) is a separate
-  interpolation path and remains broken.
-- **BUG-107** — `"$Pkg::Var"` interpolation now greedy-matches `::`
-  continuations, matching the bare-code path. Multi-segment chains
-  (`$A::B::C::x`) work too. Plus a separate fix in the lexer for the
-  IPv6-zero-compression trap that was misfiring on 3-or-more-segment
-  package paths like `package A::B::C` (the hex-digit-only ident `B`
-  followed by `::` looked like an IPv6 address). The trap now skips
-  when `ident_start` is preceded by `::`.
-- **`smartmatch` array / hash RHS** — `given (X) { when ([list]) }`,
-  `when (\@arr)`, and `when (\%hash)` now match Perl's smartmatch
-  semantics. `smartmatch_when` previously fell back to string equality;
-  extended to recurse over array elements and check hash-key existence.
-- **`tie my $x, Class`** — common Perl idiom now parses (was rejected
-  with "tie expects $scalar, @array, or %hash, got Ident(\"my\")").
-  Parser desugars to `my $x; tie $x, Class` via implicit `StmtGroup`.
-  Tied-hash `tie my %h, Class` works end-to-end. Tied-scalar runtime
-  FETCH is a separate pre-existing limitation.
-- **`or`/`and`/`not` precedence vs `=`** — `EXPR or $err = $@` now parses
-  as `EXPR or ($err = $@)` (Perl's documented lowest-precedence
-  operators). Stryke previously parsed this as
-  `(EXPR or $err) = $@`, surfacing as "Assign to complex lvalue".
-  Restructured the precedence chain to put word-ops at the top, with
-  `parse_assign_expr` between `parse_not_word` and `parse_ternary`,
-  and `parse_pipe_forward` descending into `parse_range` so `..`
-  remains reachable.
-- **Test framework isolation** — `test_run` no longer calls
-  `std::process::exit(1)` from inside the VM (was hostile to
-  embedding); it now sets a sticky flag (`interp.test_run_failed`) that
-  the CLI driver translates to exit code 1. Test counters
-  (`test_pass_count`, `test_fail_count`, `test_skip_count`) moved from
-  process-global `static AtomicUsize` to per-`VMHelper` fields so
-  runs in the same process don't contaminate each other. The
-  `test_pass`/`test_fail`/`test_skip` progress lines now respect
-  `interp.suppress_stdout`.
-- **`oursync`** — package-global counterpart of `mysync`. Same
-  `Arc<Mutex>` backing, but keyed by `Pkg::x` so all packages and
-  parallel workers share one cell. The classic Counter pattern
-  (`package C; oursync $total = 0; fn bump { $total++ }; fan_cap N
-  { C::bump() }`) lands at exactly N. Plain `our` mutated inside a
-  parallel block now errors strictly (DESIGN-001 parity with `my`).
-- **CaptureCell nesting leak** — closures used to surface
-  `SCALAR(0x...)` for outer-scope `$_` after a sequence of
-  `fn outer { my $cb = sub { ... }; $cb->(...) } outer()`. Root cause:
-  `Scope::capture()` walked all frames and pushed one entry per frame
-  for each scalar name, so a name that shadowed itself across frames
-  got declared twice during `restore_capture`, nesting a CaptureCell
-  inside another. Fix: dedup hash-stored scalars at capture time,
-  innermost-first; slot-stored scalars keep outer-first iteration so
-  the factory-closure pattern still wins via last-write-wins on slot
-  collisions.
-- **Topic-variant frame-locality** — user writes to `$_`/`$_<`/`$_N`
-  inside a closure used to leak through CaptureCells and clobber outer
-  topic state. New `Frame::set_scalar_raw` bypasses the cell write-
-  through; `Scope::set_scalar` recognises topic-variant names
-  (`is_topic_variant_name`, regex `^_[0-9]*<*$`) and routes them through
-  the raw path. Topic variants now follow the same frame-local rule as
-  `|param|` block params and `my $x` inside a block.
-- **BUG-082** — Lexer now recognises Perl 5.34+'s `0o777` / `0O777`
-  octal prefix alongside `0x`, `0b`, and bare-`0`. Underscore
-  separators (`0o7_7_7`) supported.
-- **BUG-010 / BUG-011** — `return (1, 2, 3)` and `return 1, 2, 3` (no
-  parens) both return the full list now — `return` is a list operator
-  per Perl semantics. The compiler evaluates the operand in list
-  context for list-shaped exprs, and `Op::ReturnValue` coerces to the
-  last element when the caller's wantarray context is `Scalar`. Fixes
-  every multi-value early-return idiom AND `my $x = sub_returning_
-  list()` taking the last element instead of stringifying the array.
-- **BUG-090** — `my ($head, @tail) = LIST` (and the canonical
-  `my ($self, @args) = @_` sub-arg idiom) now binds `@tail` to the
-  *tail* of the list, not the full list. New `Op::GetArrayFromIndex`
-  reads `tmp[start..]` for the slurpy decl. Hash variant
-  `my ($a, %h) = (...)` builds `%h` from the tail's alternating
-  key-value pairs.
-- **BUG-009** — `exists $h{x}{y}{z}` and `exists $a[5][0]` now soft-fail
-  to 0 at any missing or non-container intermediate level (was: erroring
-  with "exists argument is not a HASH/ARRAY reference"). Multi-level
-  chains route through `Op::ExistsExpr` + `eval_expr_exists_mode` which
-  propagates undef instead of erroring on intermediate derefs. Matches
-  Perl 5 across 13 differential cases.
-- **BUG-019** — `for (@arr) { $_ *= 10 }` now mutates `@arr` in place.
-  Bytecode compiler detects a bare-`@arr` source and emits an
-  `Op::SetArrayElem` write-back at the merged step target so both
-  normal-completion and `next` paths flush the loop variable's current
-  value back to the source array. Named loop vars (`for my $x (@a)`)
-  alias too. Non-lvalue sources (ranges, list literals, `keys`) keep
-  copy semantics — matching Perl 5 exactly.
-- **PARITY-012** — `use overload "+" => sub { ... }` now accepts
-  anonymous-sub handlers. Parser promotes the anon body to a synthetic
-  top-level `__overload_anon_N` SubDecl; install_use_overload_pairs
-  re-binds it under the current package so dispatch resolves
-  `Pkg::__overload_anon_N`. Named-sub form (`"+" => "add"`) keeps
-  working.
-- **PARITY-011** — `CORE::keyword(...)` now parses identically to bare
-  `keyword(...)`. Parser strips a leading `CORE::` prefix before the
-  keyword-dispatch match, so `CORE::length` produces `ExprKind::Length`,
-  `CORE::print` produces `ExprKind::Print`, etc. — same AST as the
-  unprefixed forms. Matches Perl 5's documented `CORE::` namespace.
-- **PARITY-010** — `vec($s, $offset, $bits) = N` lvalue now works.
-  Compiler rewrites the assignment to `$s = vec_set_value(...)`, where
-  `vec_set_value` is a new internal 4-arg builtin that returns the
-  modified bit-buffer. While fixing the lvalue, the existing 16/32-bit
-  `vec` *read* path was also corrected — Perl uses big-endian byte
-  order for multi-byte BITS, and zero-pads past-the-end reads (stryke
-  previously did neither).
-- **PARITY-013** — `length` now respects `use utf8;`. With the pragma
-  active, scalar args count Unicode codepoints; without it, UTF-8
-  bytes. Raw byte buffers always return byte count. Per-interpreter
-  flag (not a process-global static) so concurrent test workers don't
-  bleed pragma state.
-- **PARITY-016** — Named-unary precedence: `ref $@ eq "E"`,
-  `length $s == 3 ? "Y" : "N"`, and similar idioms now parse as
-  `(ref $@) eq "E"` / `(length $s) == 3 ? "Y" : "N"` — matching Perl.
-  `parse_one_arg_or_default` (every Perl named-unary builtin: `ref`,
-  `length`, `lc`, `uc`, `chr`, `ord`, `hex`, `oct`, `int`, `abs`,
-  `sqrt`, `sin`, `cos`, `exp`, `log`, etc.) parses the bare argument
-  at named-unary precedence (shift-level) instead of full assignment-
-  expression precedence. List-op `rev` got its own arg path so
-  `rev 1..3` still parses as `rev(1..3)`.
-- **PARITY-015** — `"Inf"` / `"Infinity"` / `"NaN"` strings (case-
-  insensitive, optional leading sign) now numify to actual float
-  specials. `format_float` also prints `Inf` / `-Inf` / `NaN` (Perl's
-  capitalization) instead of libc's lowercase default. Covers
-  `"Inf" + 1`, `9 ** 9 ** 9`, `sqrt(-1)`, `log(0)`, `log(-1)`, and
-  `0 ** -1`, all matching Perl 5.42 exactly.
-- **BUG-025, BUG-050** — `$SIG{__WARN__}` / `$SIG{__DIE__}` handlers now
-  fire (commit 3669fb30a3).
-- **BUG-017, BUG-034, BUG-049, PARITY-006, PARITY-007** — sprintf `+` /
-  `#` flags, `*` width and `.*` precision, `%g` shortest-form selection,
-  and `%e`/`%E` Perl-style exponent (`1.234568e+04` instead of
-  `1.234568e4`) are now all matching Perl exactly across 38 tested
-  format specifiers.
-- **PARITY-014** — `substr($s, $o, $l) = $rhs` lvalue assignment now
-  works. The bytecode compiler recognises an `Assign { target: Substr
-  { replacement: None }, value }` shape and rewrites it to the 4-arg
-  form `substr($s, $o, $l, $rhs)`. Two-arg, three-arg, negative-offset,
-  zero-length insert/append, and the explicit 4-arg form all match
-  Perl across 8 differential cases.
-- **PARITY-005** — `%` now uses Perl-style floored division so the
-  result has the sign of the divisor (or is zero). New helper
-  `value::perl_mod_i64` wraps the snap. Float operands are truncated
-  to int first, matching Perl. The compound `$x %= rhs` form picks up
-  the same fix; the previously-buggy `rem_euclid` site (always-non-
-  negative, neither Rust's nor Perl's) is gone.
-- **PARITY-004** — division-by-zero (and modulus-by-zero) now raise
-  `ErrorKind::DivisionByZero` instead of `ErrorKind::Runtime`. The
-  user-visible message ("Illegal division by zero" / "Illegal modulus
-  zero") is unchanged. Lets `try`/`catch` and lib-API consumers match
-  the kind specifically.
-- **PARITY-003** — `use bigint;` (and `use bignum;` / `use bigrat;`)
-  now activates BigInt promotion for `**`, `+`, `-`, `*`, and `*=`.
-  Same numeric-promotion path as `--compat` but gated by the source-
-  level pragma. Bare `2 ** 64` (without `use bigint;` and without
-  `--compat`) continues to fall back to `f64`, matching Perl's
-  default. Note: `use bigint; ... no bigint;` still cancels because
-  pragmas are processed at compile time globally; full lexical scoping
-  would require a separate effort.
-- **PARITY-002** — `(my $copy = $orig) =~ s///` and the matching
-  `tr///` form now bind the substitution to `$copy` (the freshly
-  declared variable inside the parens), leaving `$orig` untouched.
-  `assign_value` learned to recognize `MyExpr` as an lvalue and write
-  through to the declared variable's name slot without re-running the
-  initializer.
-- **PARITY-001** — magic string increment (`"b"++ → "c"`, `"Az"++ →
-  "Ba"`, `"zz"++ → "aaa"`, `""++ → "1"`, `"a9"++ → "b0"`). Decrement
-  has no magic counterpart in Perl 5 and stays numeric. Pure-digit
-  and mixed (e.g. `"9a"`) strings continue to fall back to numeric
-  increment. Wired through every VM increment op (`PostInc`,
-  `PostIncSlot`, `PreIncSlot`, `PreIncSlotVoid`) via a shared
-  `perl_inc` helper.
-- **BUG-057, BUG-079, BUG-080, PARITY-008, PARITY-009** — sprintf `%a` /
-  `%A` (C99 hex-float), `%n` (write byte-count through scalar ref),
-  `%p` (deterministic placeholder), `%v...` (vectorize per-byte through
-  inner conversion, `.`-joined), and `%N$X` positional args. All match
-  Perl modulo the `%p` design choice (stryke uses `0x...` placeholder
-  rather than live SV addresses).
-
-## High-impact bugs (worth fixing first)
-
-These break common Perl idioms across the codebase:
-
-| ID | Summary |
-|----|---------|
-| ~~BUG-037~~ | ~~Closure-captured coderefs called with `@_` flatten to scalar count~~ **FIXED** |
-| ~~BUG-089~~ | ~~Closures capture outer-scope `my` vars by value~~ **DESIGN-001** (intentional) |
-| ~~BUG-090~~ | ~~`my ($head, @tail) = LIST` slurps full LIST into `@tail`~~ **FIXED** |
-| ~~BUG-095~~ | ~~`my ($cb, @rest) = @_` slurps full `@_` into `@rest`~~ **FIXED** (same as BUG-090) |
-| ~~BUG-101~~ | ~~`my ($x) = @arr` returns scalar count instead of first element~~ **FIXED** |
-| ~~BUG-010~~ | ~~`return (1, 2, 3)` collapses to last comma operand~~ **FIXED** |
-| ~~BUG-011~~ | ~~`my $s = list_sub()` concatenates instead of taking last element~~ **FIXED** |
-| ~~BUG-018~~ | ~~`local $/; <$fh>` does not enable slurp mode~~ **FIXED** |
-| ~~BUG-019~~ | ~~`for (@a) { $_ *= 10 }` does not alias array element for mutation~~ **FIXED** |
-
-Every entry in this table is now resolved (BUG-089 is the only remaining
-intentional non-fix, tracked as DESIGN-001).
 
 ## BUG-120 — `cosine_distance` with a zero-length vector operand returns **1** — **`polish`**
 
@@ -588,20 +25,6 @@ Rust guard `na < 1e-15 || nb < 1e-15` but differs from ecosystems that propagate
 NaN instead of a finite sentinel.
 
 Pin test: `cosine_distance_zero_operand_is_unit_bx` in
-`tests/suite/behavior_pin_2026_05_bx.rs`.
-
-## ~~BUG-121 — `median_absolute_deviation` uses `sorted[len/2]` as the central value~~ — **FIXED**
-
-For even-sized samples the implementation takes `vals[vals.len() / 2]` after
-sorting rather than the mean of the two middle order statistics (the usual
-definition of the sample median). The subsequent median of absolute deviations
-is therefore skewed whenever the even-length middle pair straddles a wide gap.
-
-Example: `median_absolute_deviation(1, 2, 100, 101)` returns **98** because
-the code treats the “median” of the data as **100**; the conventional median
-would be **51**, yielding a much smaller MAD (~49.5).
-
-Pin test: `median_absolute_deviation_even_n_spread_bx` in
 `tests/suite/behavior_pin_2026_05_bx.rs`.
 
 ## BUG-122 — `js_divergence` / `js_div` vs `jensen_shannon_div` disagree (nats vs bits) — **`bug`**
@@ -684,7 +107,6 @@ Demonstrated builtins (non-exhaustive):
 | `squared` / `sq` | **`squared_three_ch`**, **`squared_variadic_second_operand_ignored_ch`**, **`sq_alias_matches_squared_ch`** |
 | `cubed` / `cb` | **`cubed_two_ch`**, **`cubed_variadic_second_operand_ignored_ch`**, **`cb_alias_matches_cubed_ch`** |
 | `uniq` | **`uniq_variadic_deduplicates_neighbors_ch`**, **`uniq_single_array_bucket_treated_as_atom_ch`** |
-| ~~`sum` / `sum0` / `product`~~ | ~~see **BUG-140**~~ **FIXED** |
 | `mutual_information`, `mi` | **`mutual_information_flat_list_joint_de`**, **`mutual_information_two_by_two_matrix_de`**, **`mutual_information_second_operand_silent_de`** (**`args[1]`** discarded — joint only from **`args[0]`**) |
 
 
@@ -699,14 +121,14 @@ Pins documenting **tail truncation** split across **`tests/suite/behavior_pin_20
 List / stats companion pins: **`tests/suite/behavior_pin_2026_05_ch.rs`** (also **`chain_from`**
 **`ARRAYREF`** pitfall — **BUG-142**), **`behavior_pin_2026_05_ci.rs`** (streaming / `to_list` traps — **BUG-143** … **BUG-146**),
 and **`behavior_pin_2026_05_cj.rs`** (list glue + **`permutations([...])`** — **BUG-147**, **`concat`** — **BUG-148**),
-**`behavior_pin_2026_05_ck.rs`** (**`without([...], LIST)`** — **BUG-149**; multiset order — **BUG-150**),
+**`behavior_pin_2026_05_ck.rs`** (**`without([...], LIST)`** — **BUG-149**),
 **`behavior_pin_2026_05_cl.rs`** (**BUG-151** … **BUG-155** — clamp / strings / `hamming` / `substr` / **`reverse([...])`**),
-**`behavior_pin_2026_05_cm.rs`** (**`seq`** / **`crc32`** multi-arg — **BUG-156**, **BUG-157**),
+**`behavior_pin_2026_05_cm.rs`** (**`seq`** multi-arg — **BUG-156**),
 **`behavior_pin_2026_05_cn.rs`** (**`parse_int("0xff")`** — **BUG-158**; **`transpose`** nested AoA — **BUG-159**; regex helper arg order — **BUG-160**),
 **`behavior_pin_2026_05_co.rs`** (**`percentile`** / **`quantile`** conventions — **BUG-161**; **`take`** / **`product`** **`ARRAYREF`** buckets cross-ref **BUG-143** / **BUG-140**),
 **`behavior_pin_2026_05_cp.rs`** (scalar planar **`chebyshev` / `slope` / `midpoint`** vs vector distances — **BUG-162**),
 **`behavior_pin_2026_05_cq.rs`** (**`running_reduce`** + **`$a`/`$b`** — **BUG-163**; **`uri_resolve` / `uri_normalize`** byte vectors — **BUG-164**),
-**`behavior_pin_2026_05_cr.rs`** (**`string_take_while` / `string_drop_while`** charset-prefix semantics — **BUG-165**; **`nth`** on **`ARRAYREF`** — **BUG-166**; **`gcd` / `lcm`** two-operand only — **BUG-167**),
+**`behavior_pin_2026_05_cr.rs`** (**`string_take_while` / `string_drop_while`** charset-prefix semantics — **BUG-165**; **`nth`** on **`ARRAYREF`** — **BUG-166**),
 **`behavior_pin_2026_05_cs.rs`** (**`hamming`** vs **`hamming_distance`** — **BUG-168**; **`matrix_transpose`** — cross-ref **BUG-159** / variadic transpose),
 **`behavior_pin_2026_05_ct.rs`** (**`hhi` / `herfindahl_hirschman`** share vector — **BUG-169**),
 **`behavior_pin_2026_05_cu.rs`** (**`moving_average` / `batch` / `chunk_n`** arity — **BUG-170**),
@@ -721,13 +143,13 @@ two-arg numeric — **BUG-176**),
 **`behavior_pin_2026_05_db.rs`**: **BUG-183** (search/bounds needle-first), **BUG-184** (`dice_coefficient` strings), **BUG-185** (`winsorize` percent-first),
 **`behavior_pin_2026_05_dc.rs`**: **BUG-186** (`unzip` vs row pairs), **BUG-187** (`clamp_list` inverted bounds panic),
 **`behavior_pin_2026_05_dd.rs`**: **BUG-188** (`datetime_strftime` arg order), **BUG-189** (`mahalanobis` malformed rows panic), **`product([…])`** tail of **BUG-140**.
-**`behavior_pin_2026_05_de.rs`**: **BUG-126** (`mutual_information` / `mi` ignores the second operand), **BUG-190** (`rbinom` two-arg **`prob` → `size`**), **BUG-191** (`numerical_gradient` **`my ($x)=@_`** vs coordinate **`ARRAY`**) — pins also cover **BB / hypergeom**, **windows**, **info divergences**, **graph** summaries, **moments**, **`hungarian_assignment`**, **`kmeans_pp_init`** (**BUG-205** **FIXED** — deterministic seed).
+**`behavior_pin_2026_05_de.rs`**: **BUG-126** (`mutual_information` / `mi` ignores the second operand), **BUG-190** (`rbinom` two-arg **`prob` → `size`**), **BUG-191** (`numerical_gradient` **`my ($x)=@_`** vs coordinate **`ARRAY`**) — pins also cover **BB / hypergeom**, **windows**, **info divergences**, **graph** summaries, **moments**, **`hungarian_assignment`**.
 **`behavior_pin_2026_05_df.rs`**: **BUG-192** (`lerp` is **`(A, B, T)`**, not shader-style **`(T, A, B)`**) plus pins for **gamma / polygamma**, **Jacobians & Hessians**, **Weibull / lognormal / survival**, **scores & distances**, **clustering indices**, **χ² & F**, **GL quadrature**, **`rk4` / `euler_ode`**, **`brent_root`**.
 **`behavior_pin_2026_05_dg.rs`**: **BUG-193** (Black–Scholes IDE **`S,K,r,T,σ`** vs runtime **`S,K,T,r,σ`**), **BUG-194** (`hamming_distance` **`ARRAY`** operands), **BUG-195** (`romberg_quad` combine step) — also **Greeks**, **special functions**, **geometry**, **EM / k-means**, **number theory**, **string metrics**.
 **`behavior_pin_2026_05_dh.rs`**: **BUG-196** (`crt` / `chinese_remainder` needs **two list buckets**), **BUG-197** (`simplex_volume_3d([[…]])` vs **`tetrahedron_volume`**), **BUG-198** (`derangements` ≠ subfactorial) — plus **ζ-series**, **splines / EWMA**, **special functions**, **bond analytics**, **graph & tests**, **CF / hash / NT**.
-**`behavior_pin_2026_05_di.rs`**: **BUG-199** (`graph_is_tree` / **`parse_adj_list`** — adjacency **lists** vs 0/1 **matrix** rows), **BUG-200** (`snowball_stem_english` needs **codepoint lists**), **BUG-201** (**FIXED** — **`dijkstra`** result key order) — plus **3D geo**, **paths & flows**, **ML loss slices**, **codec**, **tensor bits**.
+**`behavior_pin_2026_05_di.rs`**: **BUG-199** (`graph_is_tree` / **`parse_adj_list`** — adjacency **lists** vs 0/1 **matrix** rows), **BUG-200** (`snowball_stem_english` needs **codepoint lists**) — plus **3D geo**, **paths & flows**, **ML loss slices**, **codec**, **tensor bits**.
 **`behavior_pin_2026_05_dj.rs`**: **BUG-202** (**`prim_mst`** disconnected / **zero-weight** edges) — plus **interpolation**, **orthogonal polynomials**, **Gray / Conway**, **activations**, **range maps**.
-**`behavior_pin_2026_05_dk.rs`**: **BUG-203** (**`dijkstra_relax`** clamps **negative** edge weights) — **PDF** suite pins, **graph / search micro-ops**, **jump hash**, **SDF / noise**, **Chebyshev / Hermite**, **Mandelbrot / Hanoi**.
+**`behavior_pin_2026_05_dk.rs`**: **PDF** suite pins, **graph / search micro-ops**, **jump hash**, **SDF / noise**, **Chebyshev / Hermite**, **Mandelbrot / Hanoi**.
 **`behavior_pin_2026_05_dl.rs`**: **BUG-204** (**`db_simhash_bit`** name vs **sign** semantics) — **Wolfram48 DB/sketch/cost** pins, **quantiles**, **multiset / multinomial**, **elliptic / polylog / Zernike / spherical harmonic**.
 
 ## BUG-127 — `iota_range` ignores arguments after the first — **`polish`**
@@ -741,37 +163,6 @@ Pins: `iota_range_zero_until_n_exclusive_cb`,
 `iota_range_trailing_numeric_args_ignored_matches_five_only_cb` in
 `tests/suite/behavior_pin_2026_05_cb.rs`.
 
-## ~~BUG-128~~ — `lambert_w0` / `wright_omega(0)` now return the Omega constant at `W(1)` — **FIXED**
-
-`builtin_lambert_w0` selects the Halley initializer **`ln(x) - ln(ln(x))`** whenever
-\(x \ge 1\). Exactly at **`x == 1`**, \(\ln(\ln 1) = \ln 0\) is undefined in IEEE
-floating point, polluting **`w`** with **NaN** before the iterations can recover.
-Adjacent values (including **`exp(1)`**) still converge normally.
-
-Because **`wright_omega(z)`** is implemented as **`lambert_w0(exp(z))`**, plugging
-\(z = 0\) reduces to **`W(1)`** and hits the same NaN (**`Ω` absent** despite the
-literature \(\omega(0)=\Omega\) within branch conventions).
-
-Pins (contrast finite principal branch neighbors vs NaN sentinel):
-
-| Case | Pins |
-|------|------|
-| Working paths | `lambert_w_omega_constant_cc`, `lambert_w_at_exp_two_known_branch_cc`, `lambert_w0_at_e_equals_one_principal_cc`, `lambert_w0_above_one_finite_two_cc`, `wright_omega_exponential_branch_cc` |
-| NaN regressions | `lambert_w0_at_exactly_one_is_nan_bug_cc`, `wright_omega_zero_is_nan_bug_cc` |
-
-Batch: **`tests/suite/behavior_pin_2026_05_cc.rs`** (also aggregates many analytic/combinatorial pins unrelated to Lambert).
-
-## ~~BUG-129~~ — `convolve_*`/`correlate_full`/`kron_product` now compute actual values, not sizes — **FIXED**
-
-`math_wolfram72.rs` computes only scalar dimensions (`len(a)+len(b)-1`, valid overlap counts,
-Kronecker flat cardinality). Callers naming these after textbook convolution expect full
-summed outputs (like **`cross_correlation`** already emits).
-
-Pins: `convolve_full_reports_output_length_minus_one_stub_cd`,
-`convolve_valid_reports_overlap_extent_stub_cd`, `correlate_full_same_impl_as_conv_stub_cd`,
-`kron_product_cardinality_multiplier_stub_cd` in `tests/suite/behavior_pin_2026_05_cd.rs`,
-plus **`cross_correlation_sliding_sumdefinition_cd`** for the real sliding-sum variant.
-
 ## BUG-130 — `detrend_linear` returns **slope**, not **detrended samples** — **`polish`**
 
 Despite the noun-like name mirroring MATLAB's `detrend`, the builtin returns **`num/den`** from
@@ -779,14 +170,6 @@ the single least-squares line fit — a scalar slope estimate only. Users expect
 subtract the fit manually today.
 
 Pin: `detrend_linear_pure_ramp_slope_one_cd` in `tests/suite/behavior_pin_2026_05_cd.rs`.
-
-## ~~BUG-131~~ — `medfilt_1d` is now a proper `(2k+1)` sliding-window median filter — **FIXED**
-
-Implementation flattens the entire operand, globally sorts **all samples**, then returns **one**
-median of the multiset. There is **no positional windowing** contrary to Rustdoc ("1-D median filter:
-median of (**2k+1**)-sized window centred at i").
-
-Pin: `medfilt_one_d_global_sorted_median_cd` in `tests/suite/behavior_pin_2026_05_cd.rs`.
 
 ## BUG-132 — **`bs_*` greeks** (`bs_delta`, **`bs_theta`**, **`bs_rho`**) are **call** formulas — **`polish`**
 
@@ -798,35 +181,6 @@ stemming from \(\partial N(-d\*)/\partial T\) / \(\rho\)).
 Pins documenting current call-only Greeks: **`bs_delta_returns_call_delta_cdf_d1_ce`**,
 **`bs_put_delta_equals_call_delta_minus_one_ce`**, **`bs_theta_call_style_negative_ce`**, **`bs_rho_call_style_positive_ce`**
 in **`tests/suite/behavior_pin_2026_05_ce.rs`**.
-
-## ~~BUG-133 — **`depreciation_double`** ignores the **salvage**/middle operand~~ — **FIXED**
-
-`builtin_depreciation_double` reads **`cost`** (`args[0]`) and **`life`** from **`args[2]`**, skipping **`args[1]`**
-entirely. Callers threading **`double_declining(cost, salvage, life)`** like **`depreciation_linear`** silently drop
- **`salvage`**, overstating depreciation relative to accountants' double-declining convention that floor-values against
-scrap.
-
-Pins: **`depreciation_double_ignores_salvage_middle_arg_ce`**, **`depreciation_double_middle_arg_does_not_affect_rate_ce`**
-in **`tests/suite/behavior_pin_2026_05_ce.rs`**.
-
-## ~~BUG-134 — **`weber_number`** clamps a **missing** \(\sigma\) to **1e-30**~~ — **FIXED**
-
-`builtin_weber_number` computes **`ρ v² L / σ`** with **`σ = max(args[3].unwrap_or(0.0), 1e-30)`**. Omitting \(\sigma\)
-therefore divides by **\(10^{-30}\)** rather than returning an arity error — orders of magnitude larger than
-reasonable surface-tension values. The companion **`weber_number_step`** defaults **`σ = 0.072`** (`N/m`), which is
-the usual water–air ballpark.
-
-Pins: **`weber_number_requires_sigma_fourth_arg_cf`**, **`weber_number_step_matches_definition_with_default_sigma_cf`**,
-**`weber_number_omitting_sigma_explodes_via_tiny_denominator_cf`** in **`tests/suite/behavior_pin_2026_05_cf.rs`**.
-
-## ~~BUG-135 — **`dB_voltage`** / **`dB_power`** missing reference becomes **1e-30** → **spurious giant dB**~~ — **FIXED**
-
-Both helpers clamp the reference argument with **`.max(1e-30)`** (`math_wolfram12.rs`). Calling **`dB_voltage(V)`** with
-only the numerator sets **`V_in = 1e-30`**, yielding **`20·log10(V / 10⁻³⁰)` ≈ 606 dB** instead of a controlled default
-like **1 V** or **`undef`**.
-
-Pins: **`db_voltage_two_reference_cf`**, **`db_power_two_reference_cf`**, **`db_voltage_missing_reference_balloons_cf`**
-in **`tests/suite/behavior_pin_2026_05_cf.rs`**.
 
 ## BUG-136 — **`geohash_neighbor`** nudges \(\Delta\)lat/\(\Delta\)lon with **tiny isotropic **`2^{-(5·len/2)}`** (\(i32\)**) **step** → **effective no-op at common precisions** — **`bug`**
 
@@ -849,27 +203,6 @@ The entry value is **`1 / n²`** (uniform norm).
 
 Pin: **`box_blur_kernel_radius_three_is_seven_squared_weights_cg`** in **`tests/suite/behavior_pin_2026_05_cg.rs`**.
 
-## ~~BUG-138~~ — **`clamp` call-shape heuristic** vs **`clamp_list(LIST...)`** — **FIXED**
-
-**Fixed 2026-05-12**: `builtin_clamp` now normalizes its `(min, max)` pair so the bounds are
-always in ascending order. Callers passing `clamp(VALUE, LO, HI)` thinking the documented form
-was `clamp(MIN, MAX, LIST)` no longer get a silent mis-clamp — `clamp(11, 0, 10)` now returns
-`10` (was `11`).
-
-```sh
-$ stryke -e 'p clamp(11, 0, 10)'
-10                                # ✓ (was: 11)
-$ stryke -e 'p clamp(-5, 0, 10)'
-0                                 # ✓
-$ stryke -e 'p clamp(0, 100, 105, 50, -10)'
-(100, 50, 0)                      # ✓ documented (min, max, list) form still works
-```
-
-Pin updates: `examples/test_bugs_exhaustive_pin.stk`, `examples/test_more_kernel_and_list_bugs_pin.stk`,
-plus `clamp_wrong_shape_list_first_reads_min_from_first_element_ch`,
-`clamp_min_max_then_values_tuple_ch`, `clamp_list_explicit_vector_form_ch`
-in `tests/suite/behavior_pin_2026_05_ch.rs`.
-
 ## BUG-139 — **`normalize`** docs mention **`OUT_MIN, OUT_MAX, LIST`**; implementation always **`0..1`** — **`polish`**
 
 Rustdoc on **`builtin_normalize`** sketches a **`normalize OUT_MIN, OUT_MAX, LIST`** form. The body
@@ -878,19 +211,6 @@ the sample multiset, so leading “range” operands become ordinary data rows.
 
 Pin: **`normalize_extra_leading_scalars_folded_into_source_strip_ch`** in
 **`tests/suite/behavior_pin_2026_05_ch.rs`**.
-
-## ~~BUG-140~~ — **`sum` / `sum0` / `product`** skip **`ARRAYREF`** innards for a lone **`[...]`** operand — **FIXED**
-
-**Fixed 2026-05-10**: Added `as_array_ref()` handling in `sum`, `sum0`, `product`, `mean`,
-`median` to auto-dereference arrayrefs. Also added `flatten_to_numbers()` helper for consistent
-flattening across these functions.
-
-```sh
-$ stryke -e 'say sum([1,2,3])'
-6                              # ✓ (was: 0)
-$ stryke -e 'say product([2,3,4])'
-24                             # ✓ (was: 0)
-```
 
 ## BUG-141 — **`frequencies` / string operands** — one scalar ⇒ one hash key (**`polish`**)
 
@@ -931,30 +251,6 @@ Pins throughout **`tests/suite/behavior_pin_2026_05_ci.rs`** (file module doc en
 
 Pins: **`transpose_single_nested_outer_array_clusters_rows_bug_ci`**, **`transpose_two_row_arguments_column_major_ci`**.
 
-## ~~BUG-145 — **`unzip_pairs(zip(...))`** shreds pair rows because **`flatten_args` deep-merges** tuple innards~~ — **FIXED**
-
-`zip` already returns an array of pair rows, but **`builtin_unzip_pairs` calls `flatten_args`**, and each **dense inner array** expands to **raw scalars**, so the unzip walk pairs **`(1,9), (2), (8, undef)`** style garbage. Pass an explicit pair list (**`unzip_pairs([[1, 9], [2, 8]])`**) or rebuild pairs without an intermediate **`zip`** unless / until **`flatten_args` stops peeling pair innards**.
-
-Pins: **`unzip_pairs_explicit_pair_rows_ci`**, **`unzip_pairs_after_zip_over_flattens_to_scalars_bug_ci`**.
-
-## ~~BUG-146 — **`take_n(_, cycle(...))` is vacuous**: **`CycleIterator::collect_all` → `[]` under `flatten_args`**~~ — **FIXED**
-
-**`flatten_args`** expands iterators via **`map_flatten_outputs`**, which invokes **`PerlIterator::collect_all`**. **Infinite `cycle` iterators return an empty snapshot** (“do not eagerly loop forever”), leaving **`take_n`** with **no input elements**, so stringify is **`()`** today.
-
-Pin: **`take_n_cycle_iterator_yields_empty_today_bug_ci`**.
-
-## ~~BUG-147~~ — **`permutations([...])`** (one argument) vacates: first slot **`to_int` → 0** — **FIXED**
-
-**Fixed 2026-05-10**: `permutations([...])` now detects a single arrayref argument and
-returns all permutations of the array elements.
-
-```sh
-$ stryke -e 'say stringify(permutations([1,2,3]))'
-([1, 2, 3], [1, 3, 2], [2, 1, 3], [2, 3, 1], [3, 1, 2], [3, 2, 1])
-```
-
-Tests: **`permutations_single_arrayref_works_cj`** in **`tests/suite/behavior_pin_2026_05_cj.rs`**.
-
 ## BUG-148 — **`concat` / `chain`** on **`ARRAYREF` operands** streams **one cell per argument** — **`polish`**
 
 **`builtin_concat`** wraps each actual in **`into_pull_iter`**. A plain **`[...]`** value is an **`ARRAYREF`**
@@ -964,26 +260,6 @@ whereas **`chain_from([1, 2], [3], [4, 5])`** flattens top-level list slots toda
 
 Pins: **`concat_iterator_one_bucket_per_arrayref_arg_cj`**, **`chain_from_three_lists_eager_flat_cj`**
 in **`tests/suite/behavior_pin_2026_05_cj.rs`**.
-
-## ~~BUG-149 — **`without([...], LIST)`** does not subtract members: filter compares **ref display string**~~ — **FIXED**
-
-**`builtin_without`** takes **`drop = args.first()`** and drops list elements where **`v.to_string() ==
-drop.to_string()`**. When **`drop`** is an **`ARRAYREF`**, **`drop.to_string()`** is the opaque
-**`ARRAY(0x…)`** banner — no list element stringifies the same way, so **nothing is removed** and the
-tail list is returned intact. To drop values present in another collection, flatten to scalars /
-use a predicate loop / multiset helper instead of passing **`[…]`** as the selector.
-
-Pins: **`without_scalar_filters_by_string_equality_ck`**, **`without_arrayref_first_compare_ref_display_no_drops_bug_ck`**
-in **`tests/suite/behavior_pin_2026_05_ck.rs`**.
-
-## BUG-150 — **`multiset_intersection` / `multiset_difference` (and multiset union)** emit **HashMap iteration order** — **`polish`**
-
-**`math_wolfram10.rs`** multiset builtins walk **`HashMap`** / **`HashSet`** keys when building the result
-vector. **`stringify(...)`** order is therefore **non-deterministic** run-to-run. Sort explicitly when
-stable output matters (**`sort { $a cmp $b } multiset_intersection(...)`**).
-
-Pins: **`multiset_difference_sorted_join_counts_ck`**, **`multiset_intersection_sorted_join_counts_ck`**
-in **`tests/suite/behavior_pin_2026_05_ck.rs`** (sorted joins; unsorted shapes are intentionally not pinned).
 
 ## BUG-151 — **`clamp` three-scalar Perl order **`clamp($x,$min,$max)`** is mis-read as **`clamp($min,$max,@list)`** — **`polish`**
 
@@ -1010,14 +286,6 @@ Dispatch maps **`"hamming"`** to **`window_hamming`**. For **edit distance** on 
 
 Pins: **`hamming_distance_bit_flip_one_cl`** in **`tests/suite/behavior_pin_2026_05_cl.rs`**.
 
-## BUG-154 — **`substr` on UTF‑8 uses **byte** offsets (not grapheme indices)** — **`polish`**
-
-**`substr("αβγ", 1, 1)`** lands **inside** the first UTF-8 codepoint and returns **empty**; stepping
-**two** bytes from the start (**`substr(..., 0, 2)`**) yields **`α`**. Use **`char_at` /
-`graphemes` + indexing** when you mean **character** positions.
-
-Pins: **`substr_ascii_slice_cl`**, **`substr_utf8_byte_window_one_grapheme_cl`**, **`substr_utf8_one_byte_mid_codepoint_empty_bug_cl`**
-in **`tests/suite/behavior_pin_2026_05_cl.rs`**.
 
 ## BUG-155 — **`reverse([...])`** does not reverse **inner** elements (single **`ARRAYREF`** actual) — **`polish`**
 
@@ -1036,13 +304,6 @@ when empty). **`seq(2, 5)`** therefore only inspects **`2`** (stringifies as **`
 use **`range(2, 5)`** for inclusive integer steps.
 
 Pin: **`seq_two_args_only_first_used_bug_cm`** in **`tests/suite/behavior_pin_2026_05_cm.rs`**.
-
-## BUG-157 — **`crc32`** ignores **all bytes after `args.first()`** (extra operands silent) — **`polish`**
-
-Implementation hashes only **`perl_scalar_as_bytes(args[0])`**. **`crc32("a","b")`** is identical to
-**`crc32("a")`**, not **`crc32("ab")`**, so “split string” call sites silently diverge from intuition.
-
-Pin: **`crc32_separate_args_differs_from_concat_bug_cm`** in **`tests/suite/behavior_pin_2026_05_cm.rs`**.
 
 ## BUG-158 — **`parse_int("0xff")` without an explicit radix is not hex** — **`polish`**
 
@@ -1106,18 +367,6 @@ Pins: **`chebyshev_distance_four_scalars_cp`**, **`chebyshev_two_vectors_coerces
 **`slope_four_coordinates_cp`**, **`slope_with_two_vector_args_vertical_line_inf_bug_cp`**,
 **`midpoint_four_coordinates_cp`** in **`tests/suite/behavior_pin_2026_05_cp.rs`**.
 
-## ~~BUG-163 — **`running_reduce { $a + $b }`** does not see comparator scalars (zeros after first)~~ — **FIXED**
-
-**`builtin_running_reduce`** invokes the reducer via **`call_sub`** on successive prefix tails, but the
-block’s **`$a` / `$b`** (or implicit sort-style bindings) are not populated for that code path the way
-**`$_0` / `$_1`** slots are for **`preduce`**-family workers. With **`$a + $b`**, the second operand is
-**`undef`**, so the running output collapses to **`0`** after the first element.
-
-**`running_reduce { $_0 + $_1 }`** (or an explicit two-argument **`sub`**) matches the intended fold.
-
-Pins: **`running_reduce_implicit_slot_add_cq`**, **`running_reduce_dollar_ab_zeros_after_first_bug_cq`** in
-**`tests/suite/behavior_pin_2026_05_cq.rs`**.
-
 ## BUG-164 — **`uri_resolve` / `uri_normalize`** take **numeric byte vectors**, not **URI strings** — **`bug`**
 
 Both helpers feed **`b81_to_bytes`**, which expands the first argument with **`arg_to_vec`** and then casts
@@ -1141,24 +390,6 @@ behaviour will not work.
 Pins: **`string_take_while_charset_prefix_not_predicate_cr`**, **`string_drop_while_charset_prefix_not_predicate_cr`**
 in **`tests/suite/behavior_pin_2026_05_cr.rs`**.
 
-## ~~BUG-166 — **`nth(N, ARRAYREF)`** often returns **`undef`** because **`to_list`** does not unpack **`ArrayRef`**~~ — **FIXED**
-
-**`builtin_nth`** falls back to **`v.to_list()`** for non-iterators. **`StrykeValue::to_list`** expands
-**`HeapObject::Array`** but **`HeapObject::ArrayRef`** hits the default arm and becomes a **one-element list**
-containing the ref itself, so any positive index reads **`undef`**. **`nth(N, range(...))`** still works
-because **`range`** yields an iterator.
-
-Pins: **`nth_zero_indexed_from_range_iterator_cr`**, **`nth_inline_arrayref_undef_bug_cr`** in **`tests/suite/behavior_pin_2026_05_cr.rs`**.
-
-## BUG-167 — **`gcd`** and **`lcm`** use **only `args[0]`** and **`args[1]`**; further operands are ignored — **`polish`**
-
-**`builtin_gcd`** / **`builtin_lcm`** implement pairwise binary GCD/LCM on the first two arguments. Variadic tails
-silently drop. **`gcd(12, 18, 35)`** returns **`6`** ( **`gcd(12, 18)`** ) instead of **`1`**; **`lcm(4, 6, 10)`**
-returns **`12`** instead of **`60`**.
-
-Pins: **`gcd_trailing_operands_ignored_two_arg_only_cr`**, **`lcm_trailing_operands_ignored_two_arg_only_cr`** in
-**`tests/suite/behavior_pin_2026_05_cr.rs`**.
-
 ## BUG-168 — Bare **`hamming`** is the **DSP window**; **string Hamming distance** is **`hamming_distance`** — **`polish`**
 
 **`window_hamming`** is exported under the bare name **`hamming`** (`builtins.rs` dispatch shares the alias with
@@ -1172,55 +403,6 @@ vector.
 
 Pins: **`dsp_hamming_window_four_stringify_cs`**, **`string_hamming_distance_bitstrings_cs`** in
 **`tests/suite/behavior_pin_2026_05_cs.rs`**.
-
-## ~~BUG-169~~ — **`hhi` / `herfindahl_hirschman`** variadic now sums every share — **FIXED**
-
-**Fixed 2026-05-12**: `builtin_herfindahl_hirschman` now iterates every positional argument
-through `flat_map(arg_to_vec)`, so both `hhi(0.3, 0.3, 0.4)` and `hhi([0.3, 0.3, 0.4])` produce
-the correct Σ shares² = 0.34.
-
-```sh
-$ stryke -e 'p hhi(0.3, 0.3, 0.4)'
-0.34                              # ✓ (was: 0.09)
-```
-
-Pin updates: `examples/test_bugs_exhaustive_pin.stk`, `examples/test_math_stats_advanced_pin.stk`,
-plus `herfindahl_three_shares_array_ct`, `herfindahl_variadic_uses_first_share_only_bug_ct` in
-`tests/suite/behavior_pin_2026_05_ct.rs`.
-
-<!-- previous entry kept for archaeology:
-`builtin_herfindahl_hirschman` builds the share list exclusively from the **first** actual argument
-(**`math_wolfram8.rs`**). A natural call **`hhi(0.3, 0.3, 0.4)`** therefore uses **only** **`0.3`** (one firm with
-100 % share → **HHI = 0.09**), not three competing shares (**0.34** when passed as **`hhi([0.3, 0.3, 0.4])`**).
-
-Pass a **single** arrayref / list bucket for the full share vector.
-
-Pins: **`herfindahl_three_shares_array_ct`**, **`herfindahl_variadic_uses_first_share_only_bug_ct`** in
-**`tests/suite/behavior_pin_2026_05_ct.rs`**. -->
-
-## ~~BUG-170~~ — **`moving_average`** now accepts both `(WINDOW, LIST)` and `(LIST, WINDOW)` — **FIXED**
-
-**Fixed 2026-05-12**: `builtin_moving_average` (`builtins_extended.rs`) detects whether the
-first arg is array-shaped: if yes, treats it as `LIST` and reads `WINDOW` from `args[1]`;
-otherwise sticks with the Wolfram `(WINDOW, LIST...)` form. When `WINDOW > len`, returns an
-empty array.
-
-```sh
-$ stryke -e 'p moving_average([1,2,3,4,5], 3)'
-(2, 3, 4)                         # ✓ pandas-style (LIST, WINDOW)
-$ stryke -e 'p moving_average(3, 1, 2, 3, 4, 5)'
-(2, 3, 4)                         # ✓ Wolfram-style (WINDOW, LIST...) still works
-$ stryke -e 'my @r = moving_average([1,2,3], 5); p scalar @r'
-0                                 # ✓ empty when WINDOW > len (was: scalar 5)
-```
-
-Still TODO for **`batch` / `chunk_n` / `group_of_n`** — same `(SIZE, LIST...)` Wolfram
-convention; only `moving_average` got the pandas-style detection so far.
-
-Pin updates: `examples/test_bugs_exhaustive_pin.stk`, `examples/test_math_stats_advanced_pin.stk`,
-plus `moving_average_window_first_three_cu`, `moving_average_arrayref_first_tail_only_bug_cu`,
-`chunk_n_size_first_cu`, `chunk_n_list_first_yields_single_tail_chunk_bug_cu` in
-`tests/suite/behavior_pin_2026_05_cu.rs`.
 
 ## BUG-171 — **`ml_binary_cross_entropy(Y, P)`** returns **`inf`** when **`P ≤ 0`** or **`P ≥ 1`** — **`polish`**
 
@@ -1240,14 +422,6 @@ vectors (or build explicit count maps). **`jaccard_index`** follows the same str
 Pins: **`jaccard_similarity_binary_masks_collapse_to_unit_bug_cw`**, **`jaccard_similarity_unique_elements_matches_index_cw`** (contrast)
 in **`tests/suite/behavior_pin_2026_05_cw.rs`**.
 
-## ~~BUG-173 — **`mode([…])`** (single bracket list operand) does **not** return the element-wise mode~~ — **FIXED**
-
-**`builtin_mode`** (**`builtins.rs`**) uses **`flatten_args`**. **Observed:** **`mode([1, 2, 2, 3])`** **`stringify`** as **`[1, 2, 2, 3]`**
-(the bracket list echoed), while **`mode(1, 2, 2, 3)`** correctly yields **`2`**. Prefer variadic arguments or **`mode_val([1, 2,
-2, 3])`** when the population lives in one array.
-
-Pins: **`mode_variadic_vs_single_arrayref_bug_cw`**, **`mode_val_arrayref_finds_modal_cw`** in **`tests/suite/behavior_pin_2026_05_cw.rs`**.
-
 ## BUG-174 — **`windowed` / `chunked`** treat a **bracket list** **`[LIST], N`** as a **single** list cell — **`polish`**
 
 **`windowed_with_want`** / chunked sibling (**`list_builtins.rs`**) split **`args[..len−1]`** into raw **`StrykeValue`** cells without
@@ -1257,16 +431,6 @@ Pins: **`mode_variadic_vs_single_arrayref_bug_cw`**, **`mode_val_arrayref_finds_
 
 Pins: **`windowed_tuple_two_overlap_three_windows_cx`**, **`windowed_bracket_array_yields_empty_bug_cx`**, **`chunked_tuple_pairs_cx`**,
 **`chunked_bracket_array_single_outer_chunk_bug_cx`** in **`tests/suite/behavior_pin_2026_05_cx.rs`**.
-
-## ~~BUG-175 — **`trimmed_mean`** first operand **`ARRAY` → `to_number()`** is **length**, not an error~~ — **FIXED**
-
-**`builtin_trimmed_mean`** (**`builtins.rs`**) reads **`pct = args.first().to_number()`**. For an **`ARRAY`**, **`to_number`** is the
-element **count**. **`trimmed_mean([1, 2, 3, 4, 100], 20)`** therefore uses **`pct = 5`** (not **`20` %**) and **`collect_numbers([20])`**
-so the “sample” is **[20]** only — output **`20`** instead of a trimmed mean of the five originals. Correct surface: **`trimmed_mean(20,
-1, 2, 3, 4, 100)`** or **`trimmed_mean(20, [1, 2, 3, 4, 100])`** (percent **first**, **`0–100`** scale).
-
-Pins: **`trimmed_mean_twenty_percent_trim_cx`**, **`trimmed_mean_list_first_yields_mean_of_tail_only_bug_cx`** in
-**`tests/suite/behavior_pin_2026_05_cx.rs`**.
 
 ## BUG-176 — **`base_convert(N, FROM)`** (two-arg numeric) numifies to **`"…"`** then parses in **`FROM`** radix — **`polish`**
 
@@ -1303,27 +467,6 @@ Pins: **`matrix_transpose_two_by_two_cy`**, **`transpose_list_of_row_refs_not_ma
 
 Pins: **`pmt_monthly_loan_standard_order_cz`**, **`pmt_principal_first_slot_absurd_payment_bug_cz`** in
 **`tests/suite/behavior_pin_2026_05_cz.rs`**.
-
-## ~~BUG-180~~ — **`format_percent(x)`** now scales `(0, 1)` fractions to percent — **FIXED**
-
-**Fixed 2026-05-12**: `builtin_format_percent` (`builtins.rs`) now multiplies the input by
-`100.0` before formatting, so `format_percent(0.125)` renders as `"12.5%"`.
-
-```sh
-$ stryke -e 'p format_percent(0.125)'
-12.5%                             # ✓ (was: "0.1%")
-$ stryke -e 'p format_percent(0.5)'
-50.0%                             # ✓
-$ stryke -e 'p format_percent(0.999, 2)'
-99.90%                            # ✓ explicit decimal places still work
-```
-
-Note: callers that previously passed already-percent values (e.g. `format_percent(12.5)` expecting
-`"12.5%"`) now get `"1250.0%"`. The convention is now strictly "input is a fraction in [0, 1]".
-
-Pin updates: `examples/test_bugs_exhaustive_pin.stk`, `examples/test_math_stats_advanced_pin.stk`,
-plus `format_percent_appends_raw_value_cz`, `format_percent_unit_fraction_not_scaled_bug_cz` in
-`tests/suite/behavior_pin_2026_05_cz.rs`.
 
 ## BUG-181 — **`anova_oneway([[...],[...]])`** nests **one** group — **`polish`**
 
@@ -1376,23 +519,11 @@ Pins: **`winsorize_percent_first_bracket_list_db`**, **`winsorize_array_first_yi
 
 Pins: **`zip_interleave_unzip_flat_dc`**, **`unzip_nested_aof_pairs_mispairs_bug_dc`** in **`tests/suite/behavior_pin_2026_05_dc.rs`**.
 
-## ~~BUG-187~~ — `clamp_list` no longer panics when `lo > hi` (bounds auto-normalized) — **FIXED**
-
-**`builtin_clamp_list`** forwards to **`f64::clamp`**, which **`panic!`s** when **`min > max`**. Example: **`stryke -e 'clamp_list(5,0,1)'`** aborts the process instead of raising **`PerlError`**. Valid calls use **`lo ≤ hi`**.
-
-No stable integration pin (subprocess abort); reproduction is the one-liner above.
-
 ## BUG-188 — **`datetime_strftime`** is **`(EPOCH, FMT)`**, not strftime-first — **`polish`**
 
 **`native_codec::datetime_strftime(epoch, fmt)`** (**`builtins.rs`** dispatch **`datetime_strftime` / `dtf`**) takes **Unix epoch** as **`args[0]`** and the **chrono format string** as **`args[1]`**. Reversing the operands feeds **`"%Y"`** through **`to_number`** as the “epoch” and uses the integer epoch as the **format pattern**, yielding useless output (pinned string differs from a real strftime of that instant).
 
 Pins: **`datetime_strftime_epoch_then_fmt_dd`**, **`datetime_strftime_swapped_args_returns_epoch_dd`** in **`tests/suite/behavior_pin_2026_05_dd.rs`**.
-
-## ~~BUG-189~~ — `mahalanobis` no longer panics on row/center dimension mismatch — **FIXED**
-
-**`builtin_mahalanobis`** builds **`data`** rows from **`arg_to_vec`** on **`args[0]`**. A **flat** vector **`[0, 0]`** becomes a **single** \(\mathbb{R}^1\) row, but **`center = [1, 1]`** has **\(p=2\)** — **`diff[j]`** indexes past the row length and **panics**. **`mahalanobis([[0, 0]], …)`** is the safe shape (one **2-D** observation per row).
-
-Repro: **`stryke -e 'say mahalanobis([0,0],[1,1],[[1,0],[0,1]])'`** (process abort). Pin for the working path: **`mahalanobis_two_row_obs_dd`** in **`tests/suite/behavior_pin_2026_05_dd.rs`**.
 
 ## BUG-190 — **`rbinom(N, P)`** (two arguments) threads **`P`** into **`size`**, not **`prob`** — **`polish`**
 
@@ -1418,12 +549,6 @@ Pins: **`lerp_inv_lerp_smoothstep_remap_df`** (canonical **`lerp(10, 20, 0.5
 
 Pins: **`black_scholes_call_put_spot_strike_time_rate_vol_bug193_dg`**, **`bscall_doc_order_swaps_time_and_rate_bug193_dg`** in **`tests/suite/behavior_pin_2026_05_dg.rs`**.
 
-## ~~BUG-194 — **`hamming_distance`** stringifies **`ARRAY`** operands — often identical **`ARRAY(0x…)`** shells~~ — **FIXED**
-
-**`builtin_hamming_distance`** (**`builtins.rs`**) compares **`args[k].to_string()`** codepointwise. For **`ARRAY`** refs, **`Display`** collapses distinct buckets to the same **`ARRAY(0x…)`** pattern in common shells, so **`hamming_distance([1, 0, 1], [1, 1, 0])`** can report **`0`** mismatches even though the lists differ. Use **`string` / numeric character codes** / a list-aware metric when comparing vectors.
-
-Pins: **`hamming_distance_strings_vs_arrayrefs_bug194_dg`** in **`tests/suite/behavior_pin_2026_05_dg.rs`**. See also **BUG-168** (DSP **`hamming`** vs string **`hamming_distance`** names).
-
 ## BUG-195 — **`romberg_quad`** is a **Richardson / trapezoid combine step** `(4^m·T_{n,m-1} − T_{n-1,m-1})/(4^m − 1)`, **not** `romberg(f, a, b, …)` integration — **`polish`**
 
 **`builtin_romberg_quad`** (**`math_wolfram72.rs`**) ignores a callback and operates on **three scalars** already extracted from the Romberg table. Passing **`sub { … }`** as in **`romberg`** silently numifies to garbage / defaults. Use **`romberg`** for interval quadrature; use **`romberg_quad(t_n_mm1, t_nm1_mm1, m)`** only for the explicit extrapolation step.
@@ -1442,12 +567,6 @@ Pins: **`chinese_remainder_buckets_vs_flat_scalars_bug196_dh`** in **`tests/suit
 
 Pins: **`tetrahedron_volume_unit_simplex_dh`**, **`simplex_volume_3d_matrix_arg_yields_zero_bug197_dh`** in **`tests/suite/behavior_pin_2026_05_dh.rs`**.
 
-## ~~BUG-198~~ — `derangements(n)` now implements the subfactorial `!n` correctly — **FIXED**
-
-The closed form for derangement counts is **`!n = n! \sum_{k=0}^n (-1)^k / k!`**, with **`!4 = 9`**. **`builtin_derangements`** (**`builtins_extended.rs`**) uses a bespoke loop **`c = (a+b)*(n-1)`** on a sliding pair, which produces **`derangements(4) = 36`** (here **`4!`**) instead of **`9`**. IDE/docs examples that cite **`derangements(4) → 9`** therefore disagree with the VM.
-
-Pins: **`derangements_stirling_bernoulli_harmonic_bug198_dh`** (**`derangements(4) → 36`**) in **`tests/suite/behavior_pin_2026_05_dh.rs`**.
-
 ## BUG-199 — **`graph_is_tree`**, **`graph_density`, …** use **`parse_adj_list`** — treat operands as **neighbor-index lists**, not 0/1 **adjacency matrices** — **`polish`**
 
 **`parse_adj_list`** (**`math_wolfram2.rs`**) walks each top-level row with **`arg_to_vec`** and **`to_number`**, producing **lists of neighbor indices**. A “matrix” **`[[0, 1], [1, 0]]`** is **not** interpreted as “no self-loop, one cross-edge”: row **0** becomes neighbors **`{0, 1}`** (including a **self-loop**), so **`edges ≠ n−1`** and **`graph_is_tree`** returns **`0`**. **\(K_2\)** as a path must be **`[[1], [0]]`**.
@@ -1460,100 +579,11 @@ Pins: **`graph_tree_count_edges_max_degree_bug199_matrix_vs_list_di`** in **`tes
 
 Pins: **`snowball_stem_english_codepoints_not_string_bug200_di`** in **`tests/suite/behavior_pin_2026_05_di.rs`**.
 
-## ~~BUG-202~~ — `prim_mst` now signals disconnected graphs via `Infinity` total — **FIXED**
-
-**`builtin_prim_mst`** (**`builtins_extended.rs`**) relaxes only entries with **`w[u][v] > 0.0`**, so **weight `0` is indistinguishable from “no edge.”** On a **fully disconnected** positive-weight‑free matrix (e.g. **2×2 zeros**), later Prim iterations **re-process the start vertex** with key **`0`**, and the summed total is **`0`** instead of **non‑finite** or a **connectivity error**. The same **`> 0`** gate means an **isolated vertex** next to a positive‑weight component yields a **finite total matching only the spanned component**, with **no indication** that the graph is not connected end‑to‑end.
-
-Pins: **`prim_mst_disconnected_all_zero_matrix_bug202_dj`**, **`prim_mst_path_plus_isolated_vertex_silent_bug202_dj`**, plus positive **`prim_mst_triangle_unit_weights_dj`** / **`prim_mst_single_edge_k2_dj`** controls in **`tests/suite/behavior_pin_2026_05_dj.rs`**.
-
-## BUG-203 — **`dijkstra_relax`** clamps **negative edge weights to zero** — **`polish`**
-
-**`builtin_dijkstra_relax`** (**`math_wolfram75.rs`**) applies **`w_uv.max(0.0)`**, so **negative** tentative updates are **silently replaced with `d_u + 0`**. **`builtin_bellman_ford_relax`** in the same module **does not** clamp, so the pair diverges for the same triple **`(d_u, w, d_v)`** whenever **`w < 0`**. Call sites using **`dijkstra_relax`** for pedagogy or delta-stepping with signed edges can get **incorrect** candidate distances.
-
-Pins: **`dijkstra_relax_clamps_negative_weight_bug203_dk`** vs **`bellman_ford_relax_negative_weight_to_dist_dk`** in **`tests/suite/behavior_pin_2026_05_dk.rs`**.
-
 ## BUG-204 — **`db_simhash_bit`** reads like **bit index** but implements **scalar sign** — **`polish`**
 
 **`builtin_db_simhash_bit`** (**`math_wolfram48.rs`**) returns **`1`** when **`args[0] ≥ 0`** and **`0`** when negative — a **two-level sign quantization**, not a **bit position** extracted from a 64-bit hash word (as the name / inline doc “**bit index**” suggests). Real SimHash combines per-feature hashed bits; this helper is closer to **`signbit` / per-dimension thresholding**.
 
 Pins: **`db_simhash_positive_is_one_bug204_dl`**, **`db_simhash_negative_is_zero_bug204_dl`** in **`tests/suite/behavior_pin_2026_05_dl.rs`**.
-
-## PARITY-001 — Magic string increment is not implemented — **FIXED**
-
-`++` on a string operand numifies the operand to 0 then increments. Perl 5
-performs magic string increment (`"b"++ → "c"`, `"Az"++ → "Ba"`, `"zz"++ → "aaa"`).
-
-```sh
-$ stryke -e 'my $x = "b"; $x++; print $x'
-1                       # stryke
-# perl prints: c
-
-$ stryke -e 'my $x = "Az"; $x++; print $x'
-1                       # stryke
-# perl prints: Ba
-
-$ stryke --compat -e 'my $x = "b"; $x++; print $x'
-1                       # stryke (still numeric even with --compat)
-# perl prints: c
-```
-
-Tests: `postfix_inc_on_alpha_string_yields_one`,
-`postfix_inc_on_alphanumeric_string_yields_one`.
-
-Severity: **parity**. `--compat` is the obvious place for the magic form to
-work; today it does not. Fix would live near the postfix-inc lowering on
-strings in `interpreter.rs` / `vm.rs`.
-
-
-## PARITY-002 — `(my $copy = $orig) =~ s///` / `=~ tr///` does not bind to the copy — **FIXED**
-
-The classic Perl copy-and-substitute idiom is a no-op in stryke: both `s///`
-and `tr///` leave both vars equal to the original.
-
-```sh
-$ stryke -e 'my $s = "abc"; (my $t = $s) =~ s/a/X/; print "$s/$t"'
-abc/abc                 # stryke
-# perl prints: abc/Xbc
-
-$ stryke -e 'my $s = "abc"; (my $t = $s) =~ tr/a-z/A-Z/; print "$s/$t"'
-abc/abc                 # stryke
-# perl prints: abc/ABC
-```
-
-Tests: `copy_on_bind_substitute_does_not_mutate`,
-`copy_on_bind_tr_does_not_mutate`, plus the pair of `explicit_copy_then_*`
-sanity checks proving the explicit form works.
-
-Severity: **bug**. Affects readability of common idiomatic Perl. Likely
-parsing/lvalue-shaping in `parser.rs` for the parenthesized-decl-as-lvalue
-case feeding `=~`.
-
-
-## PARITY-003 — `2 ** 64` falls back to float instead of bigint — **FIXED** (`use bigint;`)
-
-```sh
-$ stryke -e 'print 2 ** 64'
-1.84467440737096e+19    # stryke
-# perl prints (with use bigint;): 18446744073709551616
-```
-
-Tests: `pow_2_64_uses_float_notation`.
-
-Severity: **parity**. The repo has a `bigint_compat.rs` test suite, so this
-is a known limitation rather than oversight. Worth pinning so the float
-formatter doesn't change shape silently.
-
-
-## PARITY-004 — Division by zero surfaces as `ErrorKind::Runtime`, not `DivisionByZero` — **FIXED**
-
-`ErrorKind::DivisionByZero` exists as a variant in `error.rs:17`, but the
-1/0 path raises a `Runtime` error with message `"Illegal division by zero"`.
-
-Tests: `division_by_zero_is_runtime_error_today`.
-
-Severity: **bug** (low-impact). The variant exists; routing the `/` and `%`
-ops to it would let users catch division specifically.
-
 
 ## BUG-001 — `clamp` direct-vs-piped heuristic misroutes single-value pipe
 
@@ -1613,148 +643,6 @@ accurate message would be "Can't modify constant string in postfix ++"
 (matches Perl 5 phrasing) or "postfix ++ requires an lvalue".
 
 Severity: **polish**.
-
-
-## PARITY-005 — Modulo follows sign-of-dividend, not sign-of-divisor — **FIXED**
-
-Stryke uses Rust/C semantics for `%`:
-
-```sh
-$ stryke -e 'print -7 % 3, " / ", 7 % -3'
--1 / 1
-$ perl   -e 'print -7 % 3, " / ", 7 % -3'
-2 / -2
-```
-
-Tests: `mod_negative_dividend_positive_divisor_returns_negative`,
-`mod_positive_dividend_negative_divisor_returns_positive`.
-
-Severity: **parity**. Worth deciding whether this is intentional (faster /
-matches Rust ergonomics) or a parity bug.
-
-
-## PARITY-006 — `sprintf "%g"` falls back to `%f` formatting — **FIXED**
-
-```sh
-$ stryke -e 'printf "%g\n", 0.0001; printf "%g\n", 1234567'
-0.000100
-1234567.000000
-$ perl   -e 'printf "%g\n", 0.0001; printf "%g\n", 1234567'
-0.0001
-1.23457e+06
-```
-
-Tests: `sprintf_g_format_uses_fixed_decimal_today`.
-
-Severity: **parity**. `%g`'s job is shortest-of-`%e`-or-`%f`; stryke just
-uses `%f`.
-
-
-## PARITY-007 — `sprintf "%e"` omits the `+` sign and zero-pad on the exponent — **FIXED**
-
-```sh
-$ stryke -e 'printf "%e\n", 12345.6789'
-1.234568e4
-$ perl   -e 'printf "%e\n", 12345.6789'
-1.234568e+04
-```
-
-Tests: `sprintf_e_format_omits_plus_and_zero_pad_today`.
-
-Severity: **parity**.
-
-
-## PARITY-008 — `sprintf "%v..."` not implemented — **FIXED**
-
-`%v` is supposed to interpret the argument as a version string (one byte
-per dot-separated component). Stryke emits the raw value followed by the
-literal letter that was supposed to be the format suffix:
-
-```sh
-$ stryke -e 'print sprintf("%vd", "1.2.3")'
-1.2.3d
-$ perl   -e 'print sprintf("%vd", "1.2.3")'
-49.46.50.46.51
-```
-
-Tests: `sprintf_v_format_emits_literal_today`.
-
-Severity: **parity** (rarely used).
-
-
-## PARITY-009 — `sprintf` positional `%N$s` not implemented — **FIXED**
-
-```sh
-$ stryke -e 'print sprintf("%2\$s %1\$s", "world", "hello")'
-worlds hellos
-$ perl   -e 'print sprintf("%2\$s %1\$s", "world", "hello")'
-hello world
-```
-
-Tests: `sprintf_positional_arg_emits_literal_today`.
-
-Severity: **parity** (i18n-relevant).
-
-
-## PARITY-010 — `vec($s, $offset, $bits) = N` rejected as complex lvalue — **FIXED**
-
-The bytecode compiler now rewrites `vec($s, $o, $b) = $rhs` into
-`$s = vec_set_value($s, $o, $b, $rhs)`, where `vec_set_value` is a new
-internal 4-arg builtin that returns the modified bit-buffer. The
-existing supported-lvalue paths (`$s` plain scalar, `$arr[i]`, `$h{k}`,
-etc.) handle the assignment from there.
-
-While fixing the lvalue, the existing `vec` *read* impl was also
-corrected: Perl uses **big-endian** byte order for multi-byte BITS (16 /
-32) and zero-pads past the end of the string. Stryke previously read
-little-endian and returned 0 on out-of-range reads.
-
-Tests: `vec_lvalue_byte_assignment`, `vec_read_8_bit`,
-`vec_lvalue_16_bit_big_endian`, `vec_lvalue_32_bit_round_trip`,
-`vec_read_zero_pads_past_end`.
-
-Known limitation: writes that produce non-UTF-8 bytes (e.g.,
-`vec($s, 7, 1) = 1` → byte 0x80) round-trip through `StrykeValue::bytes`,
-but downstream `substr` / `ord` on those byte values still apply
-UTF-8/Latin-1 decoding, which can corrupt single-byte indexing. This is
-the same string-vs-bytes interaction that affects `pack` output.
-
-Severity: **parity** (FIXED for the documented lvalue case).
-
-
-## PARITY-011 — `CORE::*` namespace not available — **FIXED**
-
-The parser now strips a leading `CORE::` prefix from any qualified
-identifier just before the keyword-dispatch match, so `CORE::length`,
-`CORE::print`, `CORE::abs`, `CORE::ord`, `CORE::chr`, `CORE::int`,
-`CORE::uc`, `CORE::lc`, `CORE::scalar`, `CORE::sort`, `CORE::printf`,
-etc. all parse identically to the bare keyword. Matches Perl 5's
-documented `CORE::` namespace, which routes through to the built-in
-implementation.
-
-Tests: `core_prefix_routes_to_builtin_keyword` (8 builtins),
-`core_prefix_works_inside_print_arg`.
-
-Severity: **parity** (FIXED).
-
-
-## PARITY-012 — `use overload "+" => sub { ... }` rejects anonymous-sub handlers — **FIXED**
-
-`expr_to_overload_sub` now recognises `ExprKind::CodeRef { params, body }`
-(an anonymous `sub { ... }` block) in the value position of a `use
-overload` pair. The parser promotes the anon body to a synthetic top-
-level `SubDecl` named `__overload_anon_N` (incrementing counter), and
-the overload-pair value records that synthetic name. At install time
-(`Interpreter::install_use_overload_pairs`), if the value starts with
-`__overload_anon_`, the synthetic sub is re-bound under the current
-package as `Pkg::__overload_anon_N` so the operator-dispatch lookup
-(`Pkg::sub_short`) at runtime resolves.
-
-Tests: `use_overload_accepts_anonymous_subroutine_for_op_plus`,
-`use_overload_accepts_anonymous_subroutine_for_stringify`,
-`use_overload_named_handler_still_works` (backward compat).
-
-Severity: **parity** (FIXED).
 
 
 ## BUG-002 — Blessed arrayrefs stringify with `HASH` tag
@@ -1876,50 +764,6 @@ Tests: `arrow_invoke_of_static_method_passes_class_as_first_arg_today`.
 Severity: **bug**.
 
 
-## BUG-008 — `%h{KEYS}` kv-slice returns the full hash — **FIXED**
-
-`%h{KEYS}` is Perl 5.20+'s key-value hash slice — returns a flat list
-of (key, value, key, value, …) pairs for just the requested keys, NOT
-the whole hash. New AST variant `ExprKind::HashKvSlice { hash, keys }`
-parses `%h{...}` (lexer feeds `Token::HashVar(h)` followed by
-`Token::LBrace`). The bytecode compiler emits `LoadConst(key) ;
-LoadConst(key) ; GetHashElem(h)` per key (or `compile_expr ; Dup ;
-GetHashElem` for non-literal keys), then `MakeArray(2 * total_pairs)`
-to build the flat key-value list.
-
-Tests: `kv_slice_returns_subset_with_key_value_pairs` (was
-`kv_slice_returns_full_hash_today`),
-`kv_slice_into_array_yields_alternating_key_value_pairs`.
-
-Severity: **bug** (FIXED — Perl 5.20+ syntax, common destructuring).
-
-
-
-## BUG-009 — `exists $h{x}{y}` errors when `$h{x}` is missing — **FIXED**
-
-The deepest exists test now soft-fails to false at any missing or
-non-container intermediate. `exists_arrow_hash_element` and
-`exists_arrow_array_element` both return `Ok(false)` when the container
-is undef or any non-ref scalar (instead of erroring). The bytecode
-compiler routes multi-level deref chains (`exists $h{x}{y}{z}`,
-`exists $a[5][0]`, etc.) through `Op::ExistsExpr` so the chain walk
-runs through `eval_exists_operand` + the new
-`eval_expr_exists_mode` helper, which propagates undef instead of
-erroring on intermediate `ArrowDeref` evaluations.
-
-Differential-tested against Perl 5.42 across 13 cases including
-two-level, three-level, hash-then-array, array-then-array,
-present-then-missing, scalar-as-intermediate.
-
-Tests: `exists_on_missing_intermediate_returns_false` (was
-`_errors_today`), `exists_on_present_chain_returns_true`,
-`exists_on_three_level_missing_returns_false`,
-`exists_through_array_chain_soft_fails`,
-`exists_through_non_ref_intermediate_returns_false`.
-
-Severity: **bug** (FIXED).
-
-
 ## POLISH-003 — `say BAREWORD()->method()` parses BAREWORD as a filehandle
 
 ```sh
@@ -1948,87 +792,6 @@ post-`fn` lookahead would resolve this. Workaround: name the method
 something other than `m` (or `s`, `tr`, `y`, `qr`, `q`, `qq`, `qw`).
 
 Severity: **polish**.
-
-
-## PARITY-013 — `length` ignores `use utf8` and always returns byte count — **FIXED**
-
-`length` now consults the per-interpreter `utf8_pragma` flag set by
-`use utf8;` / `no utf8;`. With the pragma on, scalar args count Unicode
-codepoints (`s.chars().count()`); without it, they count UTF-8 bytes
-(`s.len()`). Raw byte buffers (`as_bytes_arc`) always return byte count,
-matching Perl's `bytes::length` semantics. The VM `BuiltinId::Length`
-reads `self.interp.utf8_pragma`. The flag is per-interpreter (not a
-process-global static), so concurrent test workers don't bleed pragma
-state.
-
-Tests: `length_returns_byte_count_for_unicode_string`,
-`length_with_use_utf8_returns_char_count` (covers `héllo` → 5,
-`日本語` → 3, `café` → 4 with the pragma; bytes without it).
-
-Severity: **parity** (FIXED).
-
-
-## PARITY-014 — `substr($s, $off, $len) = $rep` lvalue not supported — **FIXED**
-
-```sh
-$ stryke -e 'my $s = "Hello"; substr($s, 0, 1) = "J"; print $s'
-VM compile error (unsupported): Assign to complex lvalue at -e line 0.
-```
-
-Workaround: 4-arg `substr($s, $off, $len, $rep)` is fully supported and
-returns the replaced segment. The lvalue form is a Perl idiom that needs
-VM lowering work.
-
-Tests: `substr_lvalue_assignment_not_supported_today`,
-`substr_four_arg_replaces_in_place_and_returns_old` (the workaround).
-
-Severity: **parity**.
-
-
-## BUG-010 — `return (LIST)` collapses to last comma operand — **FIXED**
-
-The bytecode compiler now compiles the operand of `return` in **list
-context** for any list-shaped expression (`ExprKind::List`,
-`ExprKind::Range`, `ExprKind::ArrayVar`, `ExprKind::HashVar`,
-`ExprKind::HashSlice` / `HashKvSlice` / `ArraySlice` / `SliceRange`),
-matching Perl's list-operator semantics for `return`. The previous
-"compile in scalar context to give last element" comment was the wrong
-shape — Perl's rule is "return propagates the caller's wantarray
-context", and the **caller** decides whether to coerce to scalar.
-
-Caller-side scalar coercion happens at `Op::ReturnValue`: if
-`self.interp.wantarray_kind` is `Scalar` and the returned value is a
-list/array, take the last element. That makes `my $x = sub_returning
-_list()` yield the last element (Perl wantarray semantics) — also fixes
-BUG-011 in the same dispatch.
-
-Parser: `parse_return` was extended to accept a comma-list operand —
-Perl's `return` is a list operator, so `return 1, 2, 3` (no parens)
-returns the full list (1, 2, 3). Stops at postfix-statement-modifier
-keywords (`if`, `unless`, etc.) so `return 1, 2, 3 if 1` still parses
-correctly.
-
-Tests: `explicit_return_paren_list_returns_full_list` (was
-`_collapses_to_last_today`), `explicit_return_with_bare_commas_returns_full_list`,
-`return_array_var_passes_through_full_list`,
-`sub_return_list_in_scalar_context_yields_last_element`.
-
-Severity: **bug** (FIXED — affected every multi-value early-return
-pattern).
-
-
-## BUG-011 — `my $s = list_returning_sub()` concatenates instead of taking last — **FIXED**
-
-Fixed alongside BUG-010. `Op::ReturnValue` now coerces the returned
-value to its last element when the caller's wantarray context is
-`Scalar`, matching Perl's wantarray semantics. `my $s = xs()` and
-`scalar xs()` now agree.
-
-Tests: `list_returning_sub_in_scalar_context_yields_last` (was
-`_concatenates_today`), `return_list_in_scalar_context_yields_last_element`
-(was `_stringifies`), `list_in_scalar_context_via_scalar_keyword_takes_last`.
-
-Severity: **bug** (FIXED).
 
 
 ## BUG-012 — `each %hash` always returns an empty list
@@ -2123,73 +886,6 @@ Tests: `regex_g_flag_returns_full_matches_today`.
 Severity: **bug**. Idiomatic capture extraction breaks.
 
 
-## BUG-017 — `sprintf "%+d"` ignores the `+` flag — **FIXED**
-
-```sh
-$ stryke -e 'print sprintf("%+5d", 3)'
-   3
-$ perl   -e 'print sprintf("%+5d", 3)'
-   +3
-```
-
-Tests: `printf_plus_flag_ignored_today`.
-
-Severity: **bug** (low impact). Affects readable signed output.
-
-
-## PARITY-015 — `"Inf"` and `"NaN"` strings numify to 0 — **FIXED**
-
-`parse_number` now recognises `Inf` / `Infinity` / `NaN` (case-insensitive,
-optional leading `+` / `-`) at the start of `value::parse_number` before the
-regular numeric tokenizer runs. `format_float` also short-circuits NaN /
-±Infinity to print `"NaN"` / `"Inf"` / `"-Inf"` instead of the libc lowercase
-default — matching Perl across `9 ** 9 ** 9`, `sqrt(-1)`, `log(0)`, `log(-1)`,
-and `0 ** -1`.
-
-Tests: `numeric_inf_string_becomes_infinity` (covering `"Inf"`, `"inf"`,
-`"Infinity"`, `"-Inf"`, `"+Inf"`, `"NaN"`, `"nan"`),
-`numeric_overflow_yields_inf`, `sqrt_negative_yields_nan`,
-`log_zero_is_negative_infinity`, `log_negative_one_is_nan`,
-`zero_to_negative_one_is_inf`.
-
-Severity: **parity** (FIXED).
-
-
-## ~~BUG-018~~ — `local $/` does not enable slurp mode — **FIXED**
-
-**Fixed 2026-05-10**: `readline_builtin_execute` now checks `self.irs`
-(the input record separator). When `None` (undef), it reads the entire
-remaining file content using `read_to_end()` instead of `read_until('\n')`.
-
-```sh
-$ stryke -e 'open my $fh, "<", "/etc/hosts"; local $/; my $x = <$fh>; print length($x)'
-357                     # ✓ whole file
-```
-
-Tests: `open_then_slurp_with_undef_separator_reads_whole_file`.
-
-
-## BUG-019 — `for (@arr) { $_ ... }` does not alias array elements — **FIXED**
-
-The bytecode compiler (`StmtKind::Foreach` in compiler.rs) now detects a
-bare-`@arr` source list and emits an `Op::SetArrayElem` write-back step
-at the end of each iteration. Mutations to `$_` (or a named loop var)
-through the body propagate back to the source array. Approach: at the
-merged `step_ip` target (where both normal-completion and `next` paths
-converge), push the loop var, push the counter, then emit
-`SetArrayElem(arr_name)` — using the cached counter and var slots so
-nested foreach loops don't poison the slot resolution. Aliasing only
-fires when the source is `ExprKind::ArrayVar(name)`; ranges, list
-literals, and `keys`/`values` keep copy semantics, matching Perl 5.
-
-Tests: `for_dollar_underscore_aliases_array_element` (was
-`_does_not_alias_..._today`), `for_named_loop_var_aliases_array_element`,
-`for_alias_respects_last_and_next`,
-`for_alias_only_for_simple_array_source`, `for_index_assignment_works`.
-
-Severity: **bug** (FIXED — affects every in-place mutation idiom).
-
-
 ## BUG-020 — `$\`` (pre-match) does not parse outside string interpolation
 
 ```sh
@@ -2281,25 +977,6 @@ Severity: **bug**. The sub-wrapped form is the way most code uses
 given/when.
 
 
-## BUG-025 — `$SIG{__WARN__}` handler is not invoked — **FIXED**
-
-**FIXED** in commit (pending) — the bytecode VM `warn` op now routes
-through `$SIG{__WARN__}` when a coderef is installed. Recursion guard:
-the slot is temporarily cleared during dispatch so a handler that itself
-calls `warn` falls back to stderr instead of looping.
-
-Original report: variable is assignable and reads back as a CODE ref,
-but `warn` did not route through it.
-
-Tests: `sig_warn_assignment_succeeds` (assignment side, unchanged),
-`sig_warn_handler_runs_on_warn`,
-`sig_warn_handler_receives_message_with_newline`,
-`sig_warn_handler_recursion_guard_prevents_loop`.
-
-Severity: **bug**. Affects logging libraries and test frameworks that
-intercept warnings.
-
-
 ## BUG-026 — `$s x= N` compound assignment is rejected
 
 ```sh
@@ -2313,28 +990,6 @@ Tests: `x_compound_assign_is_parse_error_today`,
 `x_compound_workaround_works`.
 
 Severity: **bug** (parse-time; small surface).
-
-
-## BUG-027 — `$#arr = N` does not change array length — **FIXED**
-
-```sh
-$ stryke -e 'my @a = (1..5); $#a = 2; print scalar @a, " / @a"'
-3 / 1 2 3
-$ perl   -e 'my @a = (1..5); $#a = 2; print scalar @a, " / @a"'
-3 / 1 2 3
-```
-
-Both truncation (`$#a = $smaller`) and extension (`$#a = $bigger`, fills
-with undef) now work. Routed `#name` writes through
-`VMHelper::set_special_var` which calls `scope.set_array(name, vec_resized)`.
-Negative values (`$#a = -1`) empty the array.
-
-Tests: `dollar_hash_array_truncates_when_assigned`,
-`dollar_hash_array_extends_with_undef_when_assigned`,
-`dollar_hash_array_negative_one_empties` in
-`tests/suite/behavior_pin_2026_05_aq.rs`.
-
-Severity: **parity** (FIXED).
 
 
 ## BUG-028 — `@hash{@array_var}` slice returns empty list
@@ -2354,50 +1009,6 @@ Tests: `hash_slice_with_literal_keys_returns_correct_values`,
 `hash_slice_with_array_var_keys_returns_empty_today`.
 
 Severity: **bug**.
-
-
-## BUG-029 — `$&` does not interpolate inside double-quoted strings — **FIXED**
-
-```sh
-$ stryke -e '"abXYZcd" =~ /XYZ/; print "[$&]"'
-[XYZ]
-$ perl   -e '"abXYZcd" =~ /XYZ/; print "[$&]"'
-[XYZ]
-```
-
-The double-quoted `$&` interpolation now matches the bare-expression read.
-`parse_interpolated_string` had explicit branches for `'` (postmatch) and
-`` ` `` (prematch) but missed `&` — added it to the same `matches!` arm.
-
-Tests: `match_dollar_amp_captures_whole_match`,
-`match_dollar_amp_interpolates_correctly` (formerly
-`..._does_not_interpolate_today`), plus
-`dollar_amp_interpolates_after_match` and
-`dollar_apostrophe_interpolates_postmatch` in
-`tests/suite/behavior_pin_2026_05_aq.rs`.
-
-Severity: **parity** (FIXED).
-
-
-## PARITY-016 — `ref $@ eq "Class"` parses with the wrong precedence — **FIXED**
-
-`parse_one_arg_or_default` (the helper used by every Perl named unary —
-`ref`, `length`, `lc`/`uc`, `chr`/`ord`, `hex`/`oct`, `int`/`abs`/`sqrt`,
-`sin`/`cos`/`exp`/`log`, etc.) now parses the bare argument at named-unary
-precedence (`parse_named_unary_arg`, which stops at shift level) instead
-of `parse_one_arg`'s wider assignment-expression precedence. `ref $@ eq
-"E"` now parses as `(ref $@) eq "E"`, matching Perl. Same fix lifts
-`length $s == 3 ? "Y" : "N"` and similar idioms.
-
-`rev` (a stryke list-operator alias) was migrated off
-`parse_one_arg_or_default` to its own list-op-precedence path with an
-inline implicit-`$_` default, so `rev 1..3` keeps parsing as
-`rev(1..3)`.
-
-Tests: `ref_dollar_at_eq_string_precedence` (was
-`_today`).
-
-Severity: **parity** (FIXED).
 
 
 ## BUG-030 — `system()` return value is exit code, not Perl's status word
@@ -2475,22 +1086,6 @@ Tests: `multiple_heredocs_on_same_line_not_supported_today`.
 Severity: **bug**.
 
 
-## BUG-034 — `sprintf "%#x"` / `"%#o"` ignore the `#` flag — **FIXED**
-
-```sh
-$ stryke -e 'printf "%#x %#o\n", 255, 8'
-ff 10
-$ perl   -e 'printf "%#x %#o\n", 255, 8'
-0xff 010
-```
-
-Tests: `sprintf_hash_flag_does_not_add_prefix_today`,
-`sprintf_capital_x_uppercase_hex` (the form that works).
-
-Severity: **bug** (low impact). `%X` and `%x` themselves work; only the
-`#` prefix flag is missing.
-
-
 ## BUG-035 — `open "-|", "cmd", "arg"` list form drops the extra args
 
 ```sh
@@ -2537,41 +1132,6 @@ Tests: `can_returns_coderef_but_invocation_returns_undef_today`,
 
 Severity: **bug**. Common idiom: `$obj->can($method) and $obj->$method(...)`
 relies on the returned ref actually calling through.
-
-
-## BUG-037 — Closures pass `@_` as scalar count when invoking a captured coderef — **FIXED**
-
-```sh
-$ stryke -e '
-sub mydbl { my $x = shift; $x * 2 }
-my $f = \&mydbl;
-my $h = sub { $f->(@_) };
-print $h->(5)'
-10                      # stryke (post-fix) — matches perl
-```
-
-Root cause: closure bodies execute through the tree-walker (`vm_helper.rs`),
-not the bytecode VM. The `DerefKind::Call` arm (`$cr->(args)`) and the
-`IndirectCall` arm (`$cr(args)`) evaluated each argument with `eval_expr`,
-which defaults to `WantarrayCtx::Scalar`. In scalar context an `ArrayVar`
-returns `arr.len()` (`vm_helper.rs:9039-9048`), so `@_` (and any `@array`)
-passed as a coderef argument numified to its element count instead of
-flattening into the call list. Top-level coderef calls already used the
-bytecode `Op::ArrowCall` path, which compiles args in list context and
-flattens via `to_list()`, so the bug only manifested inside closure bodies.
-
-Fix: both `DerefKind::Call` and `IndirectCall` arms in `vm_helper.rs` now
-evaluate each arg in `WantarrayCtx::List` and flatten array values via
-`as_array_vec()` into the args vec — mirrors the existing pattern in the
-`FuncCall` "Generic sub call" arm (`vm_helper.rs:10479-10491`).
-
-Pin tests in `tests/suite/behavior_pin_2026_05_f.rs` (kept at original
-names so historical references resolve; assertions updated to post-fix
-values):
-`closure_calling_coderef_with_at_underscore_flattens_to_count_today` (now 10),
-`closure_calling_sigfn_via_coderef_with_array_arg_breaks_today` (now 7),
-`closure_calling_sigfn_via_coderef_with_indexed_arg_works` (was 7, unchanged),
-`direct_call_inside_closure_works` (was 7, unchanged).
 
 
 ## BUG-038 — `pos($s)` returns undef outside the `while (//g)` form
@@ -2799,30 +1359,6 @@ Tests: `ref_of_stryke_class_instance_is_empty_today`,
 Severity: **bug**.
 
 
-## BUG-049 — `sprintf` star-width / dynamic-precision (`%*d`, `%.*f`) not implemented — **FIXED**
-
-```sh
-$ stryke -e 'print sprintf("%*d", 5, 42)'
-5d
-$ perl   -e 'print sprintf("%*d", 5, 42)'
-   42
-
-$ stryke -e 'print sprintf("%.*f", 3, 3.14159)'
-3f
-$ perl   -e 'print sprintf("%.*f", 3, 3.14159)'
-3.142
-```
-
-Stryke leaves the `*` literal in the format and consumes the next arg
-for the (now broken) format spec. Workaround: build the format string
-dynamically: `sprintf("%${w}d", $n)` works.
-
-Tests: `sprintf_star_width_emits_literal_today`,
-`sprintf_star_precision_emits_literal_today`.
-
-Severity: **bug** (low impact; common in column-formatted output).
-
-
 ## PARITY-018 — `printf "%d"` with float overflow saturates instead of wrapping
 
 ```sh
@@ -2839,33 +1375,6 @@ cast which wraps. Neither matches a useful "bigint" answer — the value
 Tests: `printf_d_with_large_float_saturates_to_i64_max_today`.
 
 Severity: **parity** (defined behavior; differs from Perl).
-
-
-## BUG-050 — `$SIG{__DIE__}` handler is not invoked — **FIXED**
-
-**FIXED** in commit (pending) — `die` now fires `$SIG{__DIE__}` before
-propagating the error. The handler can re-`die` to substitute a
-different exception (the swapped error reaches `$@` instead of the
-original). Recursion guard: the slot is temporarily cleared during
-dispatch so a handler's own `die` does not re-enter the handler.
-
-```sh
-# After fix:
-$ stryke -e '$SIG{__DIE__} = sub { print "trapped: $_[0]" }; eval { die "boom\n" }; print "after err=[$@]"'
-trapped: boom
-after err=[boom
-]
-$ stryke -e '$SIG{__DIE__} = sub { die "swap:" . $_[0] }; eval { die "orig\n" }; print "[$@]"'
-[swap:orig
-]
-```
-
-Tests: `sig_handler_assignment_returns_code_ref`,
-`sig_die_handler_runs_inside_eval`,
-`sig_die_handler_can_swap_error_by_redieing`,
-`sig_die_handler_recursion_guard_prevents_loop`.
-
-Severity: **bug**.
 
 
 ## BUG-051 — PerlIO layers in `open` mode strings are rejected
@@ -2990,24 +1499,6 @@ Tests: `percent_minus_multi_capture_returns_only_last_today`,
 `percent_plus_named_capture_works`.
 
 Severity: **bug**.
-
-
-## BUG-057 — `sprintf "%a"` (hex-float) not implemented — **FIXED**
-
-```sh
-$ stryke -e 'printf "%a", 1.5'
-1.5
-$ perl   -e 'printf "%a", 1.5'
-0x1.8p+0
-```
-
-Stryke ignores the `%a` specifier and prints the value with default
-formatting. Hex-float output is rare in scripting but used by some
-numerical-debugging tooling.
-
-Tests: `sprintf_a_hex_float_emits_decimal_today`.
-
-Severity: **bug** (low impact).
 
 
 ## BUG-058 — `chunk(N, LIST)` returns one arrayref instead of N-sized groups
@@ -3454,42 +1945,6 @@ Tests: `begin_block_mutations_to_package_vars_lost_today`,
 Severity: **bug**.
 
 
-## BUG-079 — `sprintf "%n"` is a no-op — **FIXED**
-
-```sh
-$ stryke -e 'my $n; sprintf("hello%n", $n); print defined($n) ? "set:$n" : "U"'
-U
-```
-
-Perl populates the referenced scalar with the count of bytes emitted so
-far. Stryke leaves the variable undef. `%n` is a known security hole in
-C-style printf and many languages omit it on purpose — pin the omission
-so the test catches accidental partial implementations.
-
-Tests: `sprintf_n_does_not_populate_count_today`.
-
-Severity: **bug** / parity (low impact).
-
-
-## BUG-080 — `sprintf "%p"` and `"%A"` not implemented — **FIXED**
-
-```sh
-$ stryke -e 'printf "%p", "hello"'
-hello                           # %p ignored
-$ stryke -e 'printf "%A", 1.5'
-1.5                             # %A ignored
-```
-
-Both specifiers fall through to the value's stringification. `%p`
-(pointer) is rarely used; `%A` is the uppercase form of `%a` (hex float)
-which BUG-057 already covers.
-
-Tests: `sprintf_p_prints_value_as_string_today`,
-`sprintf_capital_a_does_not_emit_hex_float_today`.
-
-Severity: **bug** (low impact).
-
-
 ## BUG-081 — `use integer` pragma is not honored
 
 ```sh
@@ -3507,21 +1962,6 @@ Tests: `use_integer_pragma_lib_path_tries_to_load_integer_pm_today`,
 `use_integer_pragma_at_least_parses`.
 
 Severity: **bug**.
-
-
-## BUG-082 — `0o` octal prefix not recognized — **FIXED**
-
-Lexer now recognises the Perl 5.34+ `0o` / `0O` prefix alongside `0x`
-(hex), `0b` (binary), and bare-`0` (legacy octal). After the prefix it
-reads the same digit pool as bare-`0` octals (decimal digits 0-7 plus
-`_` separators), and converts via `i64::from_str_radix(.., 8)`.
-Underscore separators (`0o7_7_7`) work, matching Perl.
-
-Tests: `octal_o_prefix_returns_511` (was `_returns_zero_today`),
-`classic_zero_prefix_octal_works`,
-`octal_literal_pattern_matches_perl`.
-
-Severity: **bug** (parity, FIXED).
 
 
 ## BUG-083 — Regex `/n` flag (no auto-capture) not supported
@@ -3705,17 +2145,6 @@ works).
 Severity: **bug**.
 
 
-## ~~BUG-095~~ — `my ($scalar, @rest) = @_` slurps the FULL @_ into @rest — **FIXED**
-
-Fixed alongside BUG-090. `Op::GetArrayFromIndex` now correctly slices the
-tail of the list for slurpy array declarations.
-
-```sh
-$ stryke -e 'sub myff { my ($cb, @rest) = @_; print scalar @rest } myff(sub { 1 }, 5, 7)'
-2                              # ✓ @rest has (5, 7)
-```
-
-
 ## ~~BUG-089~~ DESIGN-001 — Closures capture outer-scope vars by value, writes are a compile-time error
 
 **Not a bug — intentional language-design choice, strictly enforced.**
@@ -3800,29 +2229,6 @@ Status: **DESIGN** (not a bug). Documented behaviour, distinguishes
 stryke from Perl 5, motivated by parallel-safety.
 
 
-## BUG-090 — Slurpy `@rest` / `%rest` in destructure captures the FULL list — **FIXED**
-
-`compile_var_declarations` was emitting `Op::GetArray(tmp)` for every
-slurpy position regardless of where in the list it sat. New
-`Op::GetArrayFromIndex(name_idx, start)` pushes `tmp[start..]` and the
-compiler emits it for the slurpy `@rest` / `%rest` decl, with `start`
-set to the decl's index in the destructure pattern. Single-scalar leads
-(`my ($a, @rest) = …`) and multi-scalar leads (`my ($a, $b, $c, @rest)
-= …`) all read the correct tail now. Hash slurp gets the same treatment
-— `my ($a, %h) = (1, k1, v1, k2, v2)` builds `%h` from `tmp[1..]` as
-alternating key-value pairs.
-
-Tests: `slurpy_array_destructure_from_literal_list_takes_tail` (was
-`_captures_all_today`), `slurpy_array_destructure_from_at_underscore_takes_tail`,
-`slurpy_hash_destructure_takes_tail`,
-`destructuring_my_scalar_array_takes_at_underscore_tail`,
-`coderef_call_with_named_array_arg_passes_through` (the canonical
-`my ($cb, @args) = @_; $cb->(@args)` idiom now propagates args).
-
-Severity: **bug** (FIXED — affected every `($head, @tail) = @_`
-idiom across the codebase).
-
-
 ## BUG-097 — `print {$fh} ...` braces form does not honor the filehandle
 
 ```sh
@@ -3898,42 +2304,6 @@ Tests: `ternary_inside_interpolated_anon_array_is_rejected_today`,
 Severity: **bug** (parser).
 
 
-## BUG-099 — `reverse()` with bare empty parens is a parse error
-
-```sh
-$ stryke -e 'my @r = reverse(); print scalar @r'
-Unexpected token RParen at -e line 1.
-```
-
-Calling `reverse` on an empty list should yield the empty list. The
-empty-parens form is rejected; passing an empty array variable
-(`reverse @empty`) works.
-
-Tests: `reverse_with_bare_empty_parens_is_parse_error_today`,
-`reverse_of_empty_array_var_returns_empty`.
-
-Severity: **bug** (small surface).
-
-
-## ~~BUG-101~~ — `my ($x) = @arr` returns scalar count, not first element — **FIXED**
-
-**Fixed 2026-05-10**: Added `list_context` flag to `VarDecl` AST node.
-Parser sets it when declaration uses parens (`my ($x) = ...`). Compiler
-and tree-walker now compile/evaluate initializer in list context and
-extract first element for single-scalar list-context declarations.
-
-```sh
-$ stryke -e 'my @a = (10, 20, 30); my ($x) = @a; print $x'
-10                             # ✓ first element (was: 3)
-$ stryke -e 'sub t { my ($x) = @_; print $x } t("hello", "world")'
-hello                          # ✓ first element (was: 2)
-```
-
-Tests: `single_scalar_destructure_from_array_var_returns_first_element`,
-`single_scalar_destructure_from_at_underscore_returns_first_element`,
-`single_scalar_destructure_from_literal_list_works`.
-
-
 ## BUG-102 — `refaddr(\&fn)` differs between repeated evaluations
 
 ```sh
@@ -3997,31 +2367,6 @@ Tests: `print_scalar_minus_scalar_with_trailing_args_parses_as_filehandle_today`
 Severity: **bug** (parser ambiguity).
 
 
-## BUG-105 — `to_json` on a circular reference crashes the process
-
-```sh
-$ stryke -e '
-my $a = {};
-$a->{self} = $a;
-my $j = eval { to_json($a) };
-print defined($j) ? "ok" : "err: $@"'
-thread 'main' has overflowed its stack
-fatal runtime error: stack overflow, aborting
-```
-
-The `eval { }` cannot catch this — it's a Rust-level stack overflow,
-not a Perl-level die. Both direct cycles (`$a->{self} = $a`) and
-indirect ones (A points to B, B points to A) trigger the crash. Most
-JSON encoders detect cycles and either bail with a Perl-level error or
-emit a sentinel.
-
-Tests: `to_json_circular_at_least_parses`,
-`to_json_basic_round_trip_works`.
-
-Severity: **bug** (process-level crash; cannot be guarded against from
-user code).
-
-
 ## BUG-106 — `to_json($data, $opts_hashref)` serializes both args as an array
 
 ```sh
@@ -4042,83 +2387,6 @@ pretty-printing manually.
 Tests: `to_json_two_arg_pretty_form_serializes_as_array_today`.
 
 Severity: **bug** (low impact; rarely needed for machine-read JSON).
-
-
-## BUG-107 — `"$Pkg::Var"` interpolation drops the package prefix — **FIXED**
-
-```sh
-$ stryke -e 'package Foo; our $bar = "hello"; package main; print "[$Foo::bar]"'
-[hello]
-$ perl   -e 'package Foo; our $bar = "hello"; package main; print "[$Foo::bar]"'
-[hello]
-```
-
-`parse_interpolated_string` in parser.rs now greedy-matches `::` continuations
-after the bare ident is read, mirroring the `$#Foo::a` and bare-code paths.
-Multi-segment chains (`$A::B::C::x`) are also supported.
-
-A separate lexer issue (the IPv6-zero-compression trap) was misfiring for
-3-or-more-segment package paths like `package A::B::C` because the
-hex-digit-only ident `B` (1 char, ≤ 4) followed by `::` looked like an
-IPv6 address. Fixed by skipping the IPv6 trap when `ident_start` is
-preceded by `::`.
-
-Tests: `package_qualified_scalar_interpolates_correctly` (formerly
-`..._with_dropped_prefix_today`), `package_qualified_scalar_in_bare_code_works`,
-plus `package_decl_parses_three_segments`,
-`package_decl_parses_four_segments`,
-`package_qualified_scalar_interpolates_with_deeper_namespace`,
-`ipv6_literal_fe80_still_lexes_as_address` in
-`tests/suite/behavior_pin_2026_05_ap.rs`.
-
-Severity: **parity** (FIXED).
-
-
-## BUG-108 — **FIXED** — `par`/`par_reduce`/`~p>` over a real `@a` array reads scalar count
-
-**FIXED 2026-05-10.** The chunk-parallel macros now correctly handle
-bare `@a` arrays and range expressions. Tests updated to expect correct
-values (60, 15) instead of buggy values (3, 0).
-
-~~The chunk-parallel macros work correctly on string sources (chunked per
-char) and pass arrayrefs through as a single chunk, but a bare `@a`
-source is read in scalar context *before* chunking, so each worker
-sees `$_` = the array length and `@_` = `(length,)` instead of the
-intended array slice.~~
-
-```sh
-$ s -e 'my @a = (10, 20, 30); my $r = ~> @a par_reduce { sum(@_) }; print "$r\n"'
-60
-$ s -e 'my @a = (10, 20, 30); my $r = ~p> @a sum; print "$r\n"'
-60
-$ s -e 'my $r = ~p> 1:5 sum; print "$r\n"'
-15
-```
-
-Regression tests (updated from pinning buggy behavior to correct behavior):
-`par_reduce_array_source_currently_sees_scalar_count_not_elements`,
-`par_reduce_array_source_explicit_reducer_is_also_broken`,
-`p_arrow_array_source_sees_count_not_elements`,
-`p_arrow_range_source_returns_zero`
-in `tests/suite/behavior_pin_2026_05_at.rs`.
-
-Severity: ~~**bug**~~ **fixed**.
-
-
-## ~~BUG-109~~ — `sum(\@a)` and `sum([1,2,3])` return 0 instead of summing — **FIXED**
-
-**Fixed 2026-05-10**: `sum`, `sum0`, `product`, `mean`, `median` now auto-dereference
-arrayrefs. Same fix as BUG-140.
-
-```sh
-$ stryke -e 'say sum([1,2,3])'
-6                              # ✓ (was: 0)
-$ stryke -e 'my @a = (10,20,30); say sum(\@a)'
-60                             # ✓ (was: 0)
-```
-
-Tests: `sum_on_arrayref_returns_sum`, `sum_on_array_ref_via_backslash_works`
-in `tests/suite/behavior_pin_2026_05_at.rs`.
 
 
 ## PARITY-040 — Scalar-context `..` flip-flop operator is unimplemented
@@ -4234,27 +2502,6 @@ working depth-2 case; this entry tracks the deeper case as a known gap.
 Root cause not yet diagnosed — likely either in the YAML emitter
 (missing block-scalar indentation past two levels) or in the parser
 (eager flatten on nested mapping). JSON/TOML do not exhibit this.
-
-Severity: **bug**.
-
-
-## BUG-207 — `from_json("definitely not json")` returns the input string
-
-```sh
-$ s -e 'my $r = from_json("definitely not json"); print "type=", ref($r) // "scalar", " val=$r\n"'
-type=scalar val=definitely not json
-```
-
-`from_json` on a non-JSON string silently passes the input through as a
-scalar rather than raising an error or returning `undef`. This masks
-real data bugs: a script that parses HTTP response bodies will see a
-"successful parse" of an error page.
-
-The current behavior is pinned (`from_json_on_garbage_passes_through_unchanged`
-in `tests/suite/codec_roundtrip_pin.rs`) so a future strict-mode change
-is a visible decision rather than a silent regression. A reasonable fix
-direction: return `undef` on parse error and set `$!` to a parser
-diagnostic, the way Perl's `JSON::PP` does.
 
 Severity: **bug**.
 
@@ -4960,34 +3207,6 @@ Pin: `multiple_around_only_first_registered_fires` in
 Severity: **bug** (silent drop; composability gap).
 
 
-## BUG-231 — `topk_add($tk, $key, $weight)` silently ignores the weight argument
-
-```sh
-$ s -e '
-    my $tk = topk(3);
-    topk_add($tk, "x", 10);
-    topk_add($tk, "x", 5);
-    my @top = topk_top($tk);
-    print "count=", $top[0]->[1], "\n"
-'
-count=2
-```
-
-The 3-arg form `topk_add($tk, $key, $weight)` is accepted at parse
-time but the weight is silently dropped. Each call increments by 1
-regardless. Expected: weighted SpaceSaving where count grows by
-`$weight`.
-
-Workaround: call `topk_add($tk, $key)` repeatedly `$weight` times.
-Wastes cycles for sketch maintenance but produces the correct result.
-
-Pin: `topk_add_ignores_third_weight_arg` in
-`tests/suite/topk_semantics_pin.rs`.
-
-Severity: **bug** (silent arg drop; affects telemetry workloads that
-naturally count by weight).
-
-
 ## BUG-232 — `count { BLOCK } LIST` returns first matched element value, not the count
 
 ```sh
@@ -5314,61 +3533,6 @@ Pin: `from_csv_escaped_quote_partial_unescape` in
 Severity: **bug** (correctness; affects data import from spreadsheets).
 
 
-## BUG-241 — `url_encode` percent-encodes RFC 3986 unreserved characters `-_.~`
-
-```sh
-$ s -e 'print url_encode("ABCabc123-_.~"), "\n"'
-ABCabc123%2D%5F%2E%7E
-
-$ perl -MURI::Escape -e 'print uri_escape("ABCabc123-_.~"), "\n"'
-ABCabc123-_.~
-```
-
-RFC 3986 §2.3 designates `-` `_` `.` `~` as *unreserved* characters
-that MUST NOT be encoded. Stryke's `url_encode` percent-encodes them
-anyway. Round-tripping through `url_decode` still produces the
-original string, so behavior is conservative (over-encodes but never
-under-encodes), but the output is non-canonical and may cause
-mismatches when comparing URLs against external tools.
-
-Pin: `url_encode_aggressive_encodes_unreserved_chars` in
-`tests/suite/encoding_pin.rs`.
-
-Severity: **polish** (over-conservative encoding; round-trip safe).
-
-
-## BUG-242 — `index(STR, NEEDLE, START)` panics when `START >= length(STR)`
-
-```sh
-$ s -e 'my $r = index("hello", "h", 10); print "r=$r\n"'
-thread 'main' panicked at strykelang/vm_helper.rs:12561:31:
-start byte index 10 is out of bounds of `hello`
-```
-
-Perl's `index` returns `-1` cleanly when the start offset is past the
-string length. Stryke panics with a Rust-level "out of bounds" error
-that aborts the program — the panic is NOT catchable by `eval { ... }`
-since it's a Rust panic, not a Perl-level die.
-
-Affects: any code that uses `index(STR, NEEDLE, START)` in a loop
-without bounds-checking the start offset (common pattern for find-all
-occurrence iteration).
-
-Workaround: guard `index` with explicit length check:
-
-```stryke
-my $start = ...;
-my $r = $start >= length($s) ? -1 : index($s, $needle, $start);
-```
-
-Or use `=~ //g` for the same pattern; it manages position internally.
-
-Pin: `index_with_start_at_end_returns_minus_one` (boundary case at
-exact length is safe) in `tests/suite/string_search_pin.rs`.
-
-Severity: **bug** (P1; uncatchable Rust panic; common loop-pattern hazard).
-
-
 ## BUG-243 — Heredoc not accepted as function argument or in ternary
 
 ```sh
@@ -5667,56 +3831,6 @@ Severity: **bug** (P1; breaks the most common idiom for splicing one
 array into another; very surprising silent data loss).
 
 
-## BUG-254 — `index(STR, NEEDLE, NEG)` panics with overflow
-
-```sh
-$ s -e 'index("abc", "b", -1)'
-thread 'main' panicked at strykelang/vm.rs:9281:22:
-start byte index 18446744073709551615 is out of bounds of `abc`
-```
-
-In Perl, `index(STR, NEEDLE, POS)` treats a negative `POS` as `0`,
-so the search starts from the beginning. Stryke casts the negative
-to `u64` (giving an enormous value), then panics on the out-of-bounds
-slice — uncatchable by `eval { ... }` since it's a Rust panic.
-
-Workaround: clamp the offset before calling.
-
-```stryke
-my $start = $candidate < 0 ? 0 : $candidate;
-my $r = index($s, $needle, $start);
-```
-
-Related to BUG-242 (`index` panic on start past end). The unified
-fix would be to clamp `start` to `[0, length($str)]`.
-
-Severity: **bug** (P1; uncatchable panic on a common Perl idiom).
-
-
-## BUG-255 — `rindex(STR, NEEDLE, NEG)` panics or returns wrong result
-
-```sh
-$ s -e 'rindex("abc", "b", -1)'
-thread 'main' panicked at strykelang/vm.rs:9289:30:
-attempt to add with overflow
-
-$ s -e 'print rindex("abracadabra", "ab", -5), "\n"'
-7
-```
-
-In Perl, negative `POS` means "search must end at or before this
-position". A negative-of-haystack-length+1 effectively means "no
-match possible" → returns `-1`. Stryke either:
-  * Panics with `attempt to add with overflow` for `-1`, or
-  * Returns the unbounded last match for other negatives (e.g. `-5`
-    on `"abracadabra"` returns `7`, ignoring the constraint).
-
-Workaround: clamp before calling.
-
-Severity: **bug** (P1; both panic AND silent-wrong-answer
-modes).
-
-
 ## BUG-256 — `__PACKAGE__` inside a sub returns "main"
 
 ```sh
@@ -5802,31 +3916,6 @@ Pin: `list_context_match_returns_boolean_per_bug_258`,
 
 Severity: **bug** (P1; breaks one of the most common Perl regex
 idioms; silent destruct-to-undef makes failures very hard to spot).
-
-
-## BUG-259 — Bitwise shift by amount >= 64 panics
-
-```sh
-$ s -e 'print (0 << 100), "\n"'
-thread 'main' panicked at strykelang/vm.rs:4079:56:
-attempt to shift left with overflow
-```
-
-In Perl, shifting by any amount >= the width is defined (0 for left
-shift of any non-mega value past 64; sign-extended for negative
-right-shifted past width). Stryke's VM uses Rust's checked shift,
-which panics on `shift_amount >= 64` for i64.
-
-Workaround: clamp the shift amount before applying.
-
-```stryke
-my $shift = $candidate < 64 ? $candidate : 63;
-my $r = 1 << $shift;
-```
-
-Severity: **bug** (P2; uncatchable Rust panic on a defined Perl
-operation; mainly affects bit-manipulation code that loops over
-positions without bounds-checking).
 
 
 ## BUG-260 — Loop labels containing digits silently break loop control
@@ -5925,6 +4014,6 @@ When you find a new behavior worth tracking:
    dated successor, e.g. `behavior_pin_2026_06.rs` once this file fills).
 4. Cite the test name(s) in the BUGS.md entry so they stay linked.
 
-Do not delete entries when a bug is fixed — flip the test from "current
-buggy output" to "correct output" and mark the entry **FIXED** with the
-commit hash and date.
+When a bug is fixed, remove its entry from this file and flip the
+pinning test from "current buggy output" to "correct output" — the test
+is the regression guard going forward. Numeric IDs are not reused.
