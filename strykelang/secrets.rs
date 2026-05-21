@@ -234,8 +234,12 @@ mod tests {
     #[test]
     fn encrypt_same_plaintext_twice_yields_different_envelopes() {
         let key = secrets_random_key(&[], 0).unwrap();
-        let a = secrets_encrypt(&args_with_key("same", &key), 0).unwrap().to_string();
-        let b = secrets_encrypt(&args_with_key("same", &key), 0).unwrap().to_string();
+        let a = secrets_encrypt(&args_with_key("same", &key), 0)
+            .unwrap()
+            .to_string();
+        let b = secrets_encrypt(&args_with_key("same", &key), 0)
+            .unwrap()
+            .to_string();
         assert_ne!(a, b, "AEAD nonce must randomize each call");
     }
 
@@ -274,7 +278,12 @@ mod tests {
     fn kdf_is_deterministic_for_same_password_and_salt() {
         let pw = s("hunter2");
         let salt = s("salt");
-        let opts = vec![s("salt"), salt.clone(), s("iterations"), StrykeValue::integer(1000)];
+        let opts = [
+            s("salt"),
+            salt.clone(),
+            s("iterations"),
+            StrykeValue::integer(1000),
+        ];
         let mut a_args = vec![pw.clone()];
         a_args.extend(opts.iter().cloned());
         let a = secrets_kdf(&a_args, 0).unwrap().to_string();
@@ -305,13 +314,11 @@ mod tests {
         assert_eq!(k.len(), 44);
         let key = secrets_random_key(&[], 0).unwrap();
         // Sanity: KDF output should be a usable AES key.
-        let env = secrets_encrypt(&args_with_key("ok", &StrykeValue::string(k.clone())), 0).unwrap();
+        let env =
+            secrets_encrypt(&args_with_key("ok", &StrykeValue::string(k.clone())), 0).unwrap();
         let _ = key; // touch
-        let pt = secrets_decrypt(
-            &args_with_key(&env.to_string(), &StrykeValue::string(k)),
-            0,
-        )
-        .unwrap();
+        let pt =
+            secrets_decrypt(&args_with_key(&env.to_string(), &StrykeValue::string(k)), 0).unwrap();
         assert_eq!(pt.to_string(), "ok");
     }
 

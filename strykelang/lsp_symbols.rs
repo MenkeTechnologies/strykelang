@@ -683,7 +683,12 @@ mod tests {
         let t = build("my $x = 1\np $x\n");
         // One Symbol for `$x`, at least one SymbolRef on use line.
         let xs: Vec<_> = t.symbols.iter().filter(|s| s.name == "$x").collect();
-        assert_eq!(xs.len(), 1, "expected one symbol for $x, got {:?}", t.symbols.iter().map(|s| &s.name).collect::<Vec<_>>());
+        assert_eq!(
+            xs.len(),
+            1,
+            "expected one symbol for $x, got {:?}",
+            t.symbols.iter().map(|s| &s.name).collect::<Vec<_>>()
+        );
         assert_eq!(xs[0].kind, SymbolKind::Local);
     }
 

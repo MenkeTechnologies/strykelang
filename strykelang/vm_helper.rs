@@ -5924,20 +5924,28 @@ impl VMHelper {
         } else if let Some(caps) = re.captures(&s) {
             self.apply_regex_captures(&s, 0, &re, &caps, CaptureAllMode::Empty)?;
             // Perl list-context `m//` returns the captures as a list when the
-            // pattern has groups (so `my ($k, $v) = $s =~ /^(\w+)=(\d+)/` works),
-            // or `(1)` if the pattern has no groups. In scalar context it
-            // returns the bare `1`. Without this, destructuring assignments
-            // silently zeroed (BUG-258).
+            // pattern has groups (so `my ($k, $v) = $s =~ /^(\w+)=(\d+)/` works).
+            // When every capture is `undef` (e.g. only optional groups that
+            // never fired, like `/^-?\d+(\.\d+)?$/` on "123") fall back to a
+            // truthy `1`: returning `(undef,)` would silently flip every
+            // Perl `if ($s =~ /…/)` idiom called through a fn whose body
+            // happens to be in list context. Real captures still propagate.
             let list_context = self.wantarray_kind == WantarrayCtx::List;
             let has_groups = caps.len() > 1;
             let result = if list_context && has_groups {
-                StrykeValue::array(crate::perl_regex::numbered_capture_flat(&caps))
+                let cap_vec = crate::perl_regex::numbered_capture_flat(&caps);
+                let any_defined = cap_vec.iter().any(|v| !v.is_undef());
+                if any_defined {
+                    StrykeValue::array(cap_vec)
+                } else {
+                    StrykeValue::integer(1)
+                }
             } else {
                 StrykeValue::integer(1)
             };
-            // Only memoize the scalar result — list-context captures depend on
-            // wantarray_kind which the memo doesn't track.
-            if !(list_context && has_groups) {
+            // Only memoize when the result is the scalar form; otherwise the
+            // memo can't know about wantarray.
+            if matches!(result.as_integer(), Some(1)) {
                 self.regex_match_memo = Some(RegexMatchMemo {
                     pattern: pattern.to_string(),
                     flags: flags.to_string(),
@@ -12426,8 +12434,8 @@ impl VMHelper {
             }
             ExprKind::Qx(e) => {
                 let cmd = self.eval_expr(e)?.to_string();
-                let raw = crate::capture::run_readpipe(self, &cmd, line)
-                    .map_err(FlowOrError::Error)?;
+                let raw =
+                    crate::capture::run_readpipe(self, &cmd, line).map_err(FlowOrError::Error)?;
                 if ctx == WantarrayCtx::List {
                     // Perl `qx` in list context yields one element per line,
                     // each terminated by `$/` (default `\n`). The final line
@@ -12890,9 +12898,7 @@ impl VMHelper {
                     if raw < 0 {
                         -1
                     } else {
-                        let end = (raw as usize)
-                            .saturating_add(sub.len())
-                            .min(s.len());
+                        let end = (raw as usize).saturating_add(sub.len()).min(s.len());
                         s[..end].rfind(&sub).map(|i| i as i64).unwrap_or(-1)
                     }
                 } else {
@@ -16158,14 +16164,12 @@ impl VMHelper {
             | "sample" | "chunked" | "chk" | "windowed" | "win" | "zip" | "zp" | "zip_shortest"
             | "zip_longest" | "mesh" | "mesh_shortest" | "mesh_longest" | "any" | "all"
             | "none" | "notall" | "first" | "fst" | "find_index" | "firstidx" | "first_index"
-            | "reduce" | "rd" | "reductions" | "sum"
-            | "sum0" | "product" | "min" | "max" | "minstr" | "maxstr" | "mean" | "median"
-            | "med" | "mode" | "stddev" | "std" | "variance" | "var" | "pairs" | "unpairs"
-            | "pairkeys" | "pairvalues" | "pairgrep" | "pairmap" | "pairfirst" | "blessed"
-            | "refaddr" | "reftype" | "looks_like_number" | "weaken" | "unweaken" | "isweak"
-            | "set_subname" | "subname" | "unicode_to_native" => {
-                self.call_bare_list_builtin(name, args, line, want)
-            }
+            | "reduce" | "rd" | "reductions" | "sum" | "sum0" | "product" | "min" | "max"
+            | "minstr" | "maxstr" | "mean" | "median" | "med" | "mode" | "stddev" | "std"
+            | "variance" | "var" | "pairs" | "unpairs" | "pairkeys" | "pairvalues" | "pairgrep"
+            | "pairmap" | "pairfirst" | "blessed" | "refaddr" | "reftype" | "looks_like_number"
+            | "weaken" | "unweaken" | "isweak" | "set_subname" | "subname"
+            | "unicode_to_native" => self.call_bare_list_builtin(name, args, line, want),
             "deque" => {
                 if !args.is_empty() {
                     return Err(StrykeError::runtime("deque() takes no arguments", line).into());
@@ -20630,6 +20634,51 @@ impl VMHelper {
                 let idx = self.eval_expr(index)?.to_int();
                 self.delete_arrow_array_element(container, idx, line)
                     .map_err(Into::into)
+            }
+            // `delete @h{KEYS}` — Perl slice form. Drains every named key,
+            // returning the list of deleted values (undef when absent).
+            ExprKind::HashSlice { hash, keys } => {
+                self.touch_env_hash(hash);
+                let mut all_keys: Vec<String> = Vec::new();
+                for key_expr in keys {
+                    all_keys.extend(self.eval_hash_slice_key_components(key_expr)?);
+                }
+                let mut deleted = Vec::with_capacity(all_keys.len());
+                for k in &all_keys {
+                    let v = self
+                        .scope
+                        .delete_hash_element(hash, k)
+                        .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
+                    deleted.push(v);
+                }
+                Ok(StrykeValue::array(deleted))
+            }
+            // `delete @a[INDICES]` — Perl array-slice form.
+            ExprKind::ArraySlice { array, indices } => {
+                self.check_strict_array_var(array, line)?;
+                let aname = self.stash_array_name_for_package(array);
+                let mut all_idx: Vec<i64> = Vec::new();
+                for idx_expr in indices {
+                    let v = self.eval_expr_ctx(idx_expr, WantarrayCtx::List)?;
+                    if let Some(items) = v.as_array_vec() {
+                        all_idx.extend(items.iter().map(|x| x.to_int()));
+                    } else if let Some(r) = v.as_array_ref() {
+                        all_idx.extend(r.read().iter().map(|x| x.to_int()));
+                    } else if v.is_iterator() {
+                        all_idx.extend(v.into_iterator().collect_all().iter().map(|x| x.to_int()));
+                    } else {
+                        all_idx.push(v.to_int());
+                    }
+                }
+                let mut deleted = Vec::with_capacity(all_idx.len());
+                for idx in &all_idx {
+                    let v = self
+                        .scope
+                        .delete_array_element(&aname, *idx)
+                        .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
+                    deleted.push(v);
+                }
+                Ok(StrykeValue::array(deleted))
             }
             _ => Err(StrykeError::runtime("delete requires hash or array element", line).into()),
         }

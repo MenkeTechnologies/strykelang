@@ -28,10 +28,36 @@ use percent_encoding::{percent_decode_str, utf8_percent_encode, AsciiSet, CONTRO
 /// Start from the universal set (CONTROLS + everything above 0x7E) and add the
 /// printable-ASCII characters that are reserved or otherwise.
 const RFC3986_RESERVED: &AsciiSet = &CONTROLS
-    .add(b' ').add(b'!').add(b'"').add(b'#').add(b'$').add(b'%').add(b'&').add(b'\'')
-    .add(b'(').add(b')').add(b'*').add(b'+').add(b',').add(b'/').add(b':').add(b';')
-    .add(b'<').add(b'=').add(b'>').add(b'?').add(b'@').add(b'[').add(b'\\').add(b']')
-    .add(b'^').add(b'`').add(b'{').add(b'|').add(b'}').add(b'\x7f');
+    .add(b' ')
+    .add(b'!')
+    .add(b'"')
+    .add(b'#')
+    .add(b'$')
+    .add(b'%')
+    .add(b'&')
+    .add(b'\'')
+    .add(b'(')
+    .add(b')')
+    .add(b'*')
+    .add(b'+')
+    .add(b',')
+    .add(b'/')
+    .add(b':')
+    .add(b';')
+    .add(b'<')
+    .add(b'=')
+    .add(b'>')
+    .add(b'?')
+    .add(b'@')
+    .add(b'[')
+    .add(b'\\')
+    .add(b']')
+    .add(b'^')
+    .add(b'`')
+    .add(b'{')
+    .add(b'|')
+    .add(b'}')
+    .add(b'\x7f');
 use rand::RngCore;
 use ripemd::{Digest as RipemdDigest, Ripemd160};
 use rsa::pkcs1v15::{SigningKey as RsaSigningKey, VerifyingKey as RsaVerifyingKey};
@@ -3281,14 +3307,69 @@ pub(crate) fn yaml_encode(v: &StrykeValue) -> StrykeResult<StrykeValue> {
     Ok(StrykeValue::string(s))
 }
 
-/// Percent-encode for URI components (RFC 3986 unreserved kept; space → `%20`).
-pub(crate) fn url_encode(v: &StrykeValue) -> StrykeResult<StrykeValue> {
+/// Percent-encode for URI components. With one argument the default safe set
+/// is RFC 3986 §2.3 unreserved (`A-Za-z0-9`, `-`, `_`, `.`, `~`), matching
+/// Perl's `URI::Escape::uri_escape` default. A second-argument Perl character
+/// class string (`unsafe` set) overrides which bytes must be escaped — e.g.
+/// `uri_escape($s, "^A-Za-z0-9")` to escape everything that isn't strictly
+/// alphanumeric.
+pub(crate) fn url_encode_with_pattern(
+    v: &StrykeValue,
+    pattern: Option<&str>,
+) -> StrykeResult<StrykeValue> {
     let s = v.to_string();
-    // RFC 3986 §2.3: unreserved characters `-`, `_`, `.`, `~` MUST NOT be
-    // percent-encoded. Use a custom set that leaves them alone.
-    Ok(StrykeValue::string(
-        utf8_percent_encode(s.as_str(), RFC3986_RESERVED).to_string(),
-    ))
+    let encoded = match pattern {
+        None => utf8_percent_encode(s.as_str(), RFC3986_RESERVED).to_string(),
+        Some(spec) => encode_with_perl_char_class(s.as_str(), spec)?,
+    };
+    Ok(StrykeValue::string(encoded))
+}
+
+/// Encode `s` byte-by-byte; bytes matching the Perl-style character class
+/// `spec` are percent-encoded, others pass through. Supports `^` prefix
+/// (complement) and ASCII range `A-Z`. Mirrors `URI::Escape::uri_escape`'s
+/// second-argument behavior.
+fn encode_with_perl_char_class(s: &str, spec: &str) -> StrykeResult<String> {
+    let chars: Vec<char> = spec.chars().collect();
+    let mut complement = false;
+    let mut idx = 0;
+    if chars.first() == Some(&'^') {
+        complement = true;
+        idx = 1;
+    }
+    let mut in_class = [false; 256];
+    while idx < chars.len() {
+        let c = chars[idx];
+        let next = chars.get(idx + 1).copied();
+        let after = chars.get(idx + 2).copied();
+        if let (Some('-'), Some(end)) = (next, after) {
+            let a = c as u32;
+            let b = end as u32;
+            if a <= b && b < 256 {
+                for v in a..=b {
+                    in_class[v as usize] = true;
+                }
+                idx += 3;
+                continue;
+            }
+        }
+        if (c as u32) < 256 {
+            in_class[c as usize] = true;
+        }
+        idx += 1;
+    }
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        let in_set = in_class[b as usize];
+        let escape = if complement { !in_set } else { in_set };
+        if escape {
+            use std::fmt::Write;
+            let _ = write!(out, "%{:02X}", b);
+        } else {
+            out.push(b as char);
+        }
+    }
+    Ok(out)
 }
 
 /// Decode `%XX` plus unescaped bytes; UTF-8 is lossy-decoded.
