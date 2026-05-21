@@ -5923,26 +5923,49 @@ impl VMHelper {
             }
         } else if let Some(caps) = re.captures(&s) {
             self.apply_regex_captures(&s, 0, &re, &caps, CaptureAllMode::Empty)?;
-            let result = StrykeValue::integer(1);
-            self.regex_match_memo = Some(RegexMatchMemo {
-                pattern: pattern.to_string(),
-                flags: flags.to_string(),
-                multiline: self.multiline_match,
-                haystack: s,
-                result: result.clone(),
-            });
+            // Perl list-context `m//` returns the captures as a list when the
+            // pattern has groups (so `my ($k, $v) = $s =~ /^(\w+)=(\d+)/` works),
+            // or `(1)` if the pattern has no groups. In scalar context it
+            // returns the bare `1`. Without this, destructuring assignments
+            // silently zeroed (BUG-258).
+            let list_context = self.wantarray_kind == WantarrayCtx::List;
+            let has_groups = caps.len() > 1;
+            let result = if list_context && has_groups {
+                StrykeValue::array(crate::perl_regex::numbered_capture_flat(&caps))
+            } else {
+                StrykeValue::integer(1)
+            };
+            // Only memoize the scalar result — list-context captures depend on
+            // wantarray_kind which the memo doesn't track.
+            if !(list_context && has_groups) {
+                self.regex_match_memo = Some(RegexMatchMemo {
+                    pattern: pattern.to_string(),
+                    flags: flags.to_string(),
+                    multiline: self.multiline_match,
+                    haystack: s,
+                    result: result.clone(),
+                });
+            }
             self.regex_capture_scope_fresh = true;
             Ok(result)
         } else {
-            let result = StrykeValue::integer(0);
+            // No match: list context yields the empty list, scalar 0.
+            let list_context = self.wantarray_kind == WantarrayCtx::List;
+            let result = if list_context {
+                StrykeValue::array(Vec::new())
+            } else {
+                StrykeValue::integer(0)
+            };
             // Memoize negative results too — they don't set capture vars, so scope_fresh stays true.
-            self.regex_match_memo = Some(RegexMatchMemo {
-                pattern: pattern.to_string(),
-                flags: flags.to_string(),
-                multiline: self.multiline_match,
-                haystack: s,
-                result: result.clone(),
-            });
+            if !list_context {
+                self.regex_match_memo = Some(RegexMatchMemo {
+                    pattern: pattern.to_string(),
+                    flags: flags.to_string(),
+                    multiline: self.multiline_match,
+                    haystack: s,
+                    result: result.clone(),
+                });
+            }
             // A no-match leaves `$&` / `$1` as they were, which is still "fresh" from whatever
             // the last successful match (if any) set them to. Don't flip the flag.
             Ok(result)
