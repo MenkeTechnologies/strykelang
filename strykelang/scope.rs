@@ -2441,6 +2441,16 @@ impl Scope {
         if name == "SIG" {
             crate::perl_signal::install(key);
         }
+        // `$ENV{KEY} = VALUE` — Perl propagates writes through `%ENV` into the
+        // real process environment so child processes inherit them. Mirror
+        // that here; stringify the value the same way `system` reads other
+        // scalars.
+        if name == "ENV" {
+            // SAFETY: `set_var` is `unsafe` in newer Rust due to multi-thread
+            // env race concerns. Stryke writes `%ENV` from the main interpreter
+            // thread and matches Perl 5's documented semantics.
+            std::env::set_var(key, val.to_string());
+        }
         if let Some(ah) = self.find_atomic_hash(name) {
             ah.0.lock().insert(key.to_string(), val);
             return Ok(());
@@ -2494,6 +2504,10 @@ impl Scope {
         key: &str,
     ) -> Result<StrykeValue, StrykeError> {
         canon_main!(name);
+        // `delete $ENV{KEY}` — match Perl by unsetting the real process env.
+        if name == "ENV" {
+            std::env::remove_var(key);
+        }
         if let Some(ah) = self.find_atomic_hash(name) {
             return Ok(ah.0.lock().shift_remove(key).unwrap_or(StrykeValue::UNDEF));
         }

@@ -251,10 +251,9 @@ fn hash_slice_assign_updates_existing_keys() {
 // ── printf to STDOUT / STDERR / regular handles ────────────────────────────
 
 #[test]
-fn printf_to_filehandle_writes_to_stdout_today() {
-    // BUG-085: `printf $fh "fmt", ...` should write to `$fh`. Stryke
-    // ignores the filehandle and writes to STDOUT (the file ends up empty).
-    // Plain `print $fh "..."` does honor the filehandle correctly.
+fn printf_to_filehandle_writes_to_handle() {
+    // `printf $fh "fmt", ...` routes through the named filehandle the same as
+    // `print $fh "..."`, matching Perl. Both lines reach the file.
     let f = std::env::temp_dir().join(format!("stryke_pin_printf_{}", std::process::id()));
     let path = f.to_string_lossy().to_string();
     let _ = eval_string(&format!(
@@ -267,8 +266,7 @@ fn printf_to_filehandle_writes_to_stdout_today() {
     ));
     let body = std::fs::read_to_string(&f).unwrap_or_default();
     let _ = std::fs::remove_file(&f);
-    // Only the plain print made it through — printf to fh is lost.
-    assert_eq!(body, "plain\n");
+    assert_eq!(body, "plain\nn=42\n");
 }
 
 // ── `print STDOUT @list` concatenates with default $, ──────────────────────

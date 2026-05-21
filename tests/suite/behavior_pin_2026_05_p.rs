@@ -360,10 +360,10 @@ fn open_read_mode_reads_lines() {
 // ── `eof` builtin reports end of file correctly ────────────────────────────
 
 #[test]
-fn eof_always_returns_false_today() {
-    // BUG-098: `eof($fh)` should return true after the last line has been
-    // read. Stryke returns 0/false in both before-read and after-read
-    // states.
+fn eof_returns_true_after_last_line() {
+    // `eof($fh)` is true once the buffered reader has nothing left to hand
+    // out. Reading the only line in a single-line file leaves the handle
+    // at EOF.
     let f = std::env::temp_dir().join(format!("stryke_pin_eof_{}", std::process::id()));
     let path = f.to_string_lossy().to_string();
     std::fs::write(&f, "x\n").unwrap();
@@ -376,7 +376,7 @@ fn eof_always_returns_false_today() {
         path
     ));
     let _ = std::fs::remove_file(&f);
-    assert_eq!(n, 0);
+    assert_eq!(n, 1);
 }
 
 // ── chmod / `-x` test on a fresh file ──────────────────────────────────────

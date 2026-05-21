@@ -4498,6 +4498,64 @@ impl<'a> VM<'a> {
                         self.push(StrykeValue::integer(1));
                         Ok(())
                     }
+                    Op::Printf(handle_idx, argc) => {
+                        let argc = *argc as usize;
+                        let mut args = Vec::with_capacity(argc);
+                        for _ in 0..argc {
+                            args.push(self.pop());
+                        }
+                        args.reverse();
+                        let (fmt, rest) = match args.split_first() {
+                            Some((f, r)) => (f.to_string(), r),
+                            None => {
+                                return Err(StrykeError::runtime(
+                                    "printf requires a format string",
+                                    self.line(),
+                                ));
+                            }
+                        };
+                        // sprintf the args, then route through the handle the
+                        // same way Print does — fixes printf's silent
+                        // misdirection to STDOUT.
+                        let mut flat = Vec::new();
+                        for a in rest {
+                            if let Some(items) = a.as_array_vec() {
+                                flat.extend(items);
+                            } else {
+                                flat.push(a.clone());
+                            }
+                        }
+                        let s = match self
+                            .interp
+                            .perl_sprintf_stringify(&fmt, &flat, self.line())
+                        {
+                            Ok(s) => s,
+                            Err(FlowOrError::Error(e)) => return Err(e),
+                            Err(FlowOrError::Flow(_)) => {
+                                return Err(StrykeError::runtime(
+                                    "printf: unexpected control flow",
+                                    self.line(),
+                                ));
+                            }
+                        };
+                        let handle_name = match handle_idx {
+                            Some(idx) => self.interp.resolve_io_handle_name(
+                                self.names
+                                    .get(*idx as usize)
+                                    .map_or("STDOUT", |s| s.as_str()),
+                            ),
+                            None => self
+                                .interp
+                                .resolve_io_handle_name(self.interp.default_print_handle.as_str()),
+                        };
+                        self.interp.write_formatted_print(
+                            handle_name.as_str(),
+                            &s,
+                            self.line(),
+                        )?;
+                        self.push(StrykeValue::integer(1));
+                        Ok(())
+                    }
                     Op::Say(handle_idx, argc) => {
                         if (self.interp.feature_bits & crate::vm_helper::FEAT_SAY) == 0 {
                             return Err(StrykeError::runtime(
@@ -9938,6 +9996,30 @@ impl<'a> VM<'a> {
                     .unwrap_or(StrykeValue::UNDEF)
                     .to_string();
                 crate::capture::run_readpipe(self.interp, &cmd, line)
+            }
+            Some(BuiltinId::ReadpipeList) => {
+                let cmd = args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(StrykeValue::UNDEF)
+                    .to_string();
+                let v = crate::capture::run_readpipe(self.interp, &cmd, line)?;
+                let s = v.to_string();
+                if s.is_empty() {
+                    return Ok(StrykeValue::array(Vec::new()));
+                }
+                let mut lines = Vec::new();
+                let mut buf = String::new();
+                for c in s.chars() {
+                    buf.push(c);
+                    if c == '\n' {
+                        lines.push(StrykeValue::string(std::mem::take(&mut buf)));
+                    }
+                }
+                if !buf.is_empty() {
+                    lines.push(StrykeValue::string(buf));
+                }
+                Ok(StrykeValue::array(lines))
             }
             Some(BuiltinId::Eval) => {
                 let arg = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
