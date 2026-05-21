@@ -277,15 +277,13 @@ fn url_path_extract_via_captures() {
 // ── list-context match returns captures ──────────────────────────
 
 #[test]
-fn list_context_match_returns_boolean_per_bug_258() {
-    // Stryke surface: `m//` in list context returns just `(1)`
-    // (boolean match), not the capture groups. Use `$1, $2, ...`
-    // after the match instead. Documented as BUG-258.
+fn list_context_match_returns_captures() {
+    // `m//` in list context with capture groups returns the captures as a
+    // list, matching Perl's documented behavior.
     let code = r#"
         my $s = "alice=30,bob=25";
         my @captures = ($s =~ /^(\w+)=(\d+)/);
-        # Stryke: @captures is (1), len 1. Perl: ("alice", 30).
-        (len(@captures) == 1 && $captures[0] == 1) ? 1 : 0
+        (len(@captures) == 2 && $captures[0] eq "alice" && $captures[1] == 30) ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }
