@@ -274,17 +274,14 @@ fn splice_push_equivalent_via_offset_end() {
 // ── splice from a list source ────────────────────────────────────
 
 #[test]
-fn splice_inject_array_flattens_to_count_per_bug_253() {
-    // Stryke surface: when an array is passed as the LIST argument to
-    // splice(), it's evaluated in scalar context (its length) rather
-    // than flattened. Documented as BUG-253. Workaround: explicit
-    // splat via @{[@arr]} or list-literal construction.
+fn splice_inject_array_flattens_into_list() {
+    // splice's LIST argument is Perl list context — `@injection` flattens to
+    // its elements, matching `splice(@target, 2, 0, 3, 4)`.
     let code = r#"
         my @target = (1, 2, 5, 6);
         my @injection = (3, 4);
         splice(@target, 2, 0, @injection);
-        # Per BUG-253: only len(@injection) = 2 is inserted, not 3,4.
-        join(",", @target) eq "1,2,2,5,6" ? 1 : 0
+        join(",", @target) eq "1,2,3,4,5,6" ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }
@@ -315,13 +312,14 @@ fn splice_remove_middle_of_1k() {
 // ── splice undo via splice again ─────────────────────────────────
 
 #[test]
-fn splice_reinsert_via_array_only_inserts_count_per_bug_253() {
-    // Per BUG-253: the reinsert flattens to len(@gone) = 2 only.
+fn splice_reinsert_via_array_round_trips() {
+    // `splice` + `splice` reinsert puts the captured run back unchanged:
+    // gone = (2, 3); arr = (1, 4, 5) → arr = (1, 2, 3, 4, 5).
     let code = r#"
         my @arr = (1, 2, 3, 4, 5);
-        my @gone = splice(@arr, 1, 2);   # gone = (2, 3); arr = (1, 4, 5)
-        splice(@arr, 1, 0, @gone);       # inserts 2 (len(@gone)), not 2,3
-        join(",", @arr) eq "1,2,4,5" ? 1 : 0
+        my @gone = splice(@arr, 1, 2);
+        splice(@arr, 1, 0, @gone);
+        join(",", @arr) eq "1,2,3,4,5" ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }
