@@ -144,9 +144,7 @@ pub(crate) fn dispatch_by_name(
         "none" => Some(any_all_none(interp, args, want, AnyMode::None)),
         "notall" => Some(any_all_none(interp, args, want, AnyMode::NotAll)),
         "first" => Some(first_native(interp, args, want)),
-        "find_index" | "firstidx" | "first_index" => {
-            Some(find_index_native(interp, args, want))
-        }
+        "find_index" | "firstidx" | "first_index" => Some(find_index_native(interp, args, want)),
         "pairs" => Some(dispatch_ok(pairs_native(args))),
         "unpairs" => Some(dispatch_ok(unpairs_native(args))),
         "pairkeys" => Some(dispatch_ok(pairkeys_values(true, args))),

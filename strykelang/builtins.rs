@@ -5861,9 +5861,11 @@ pub(crate) fn try_builtin(
         "xml_encode" | "xe" => Some(builtin_xml_encode(args)),
         "yaml_decode" | "yd" => Some(builtin_yaml_decode(args)),
         "yaml_encode" | "ye" => Some(builtin_yaml_encode(args)),
-        "url_encode" | "uri_escape" | "ue" => Some(crate::native_codec::url_encode(
-            args.first().unwrap_or(&undef),
-        )),
+        "url_encode" | "uri_escape" | "ue" => Some({
+            let v = args.first().unwrap_or(&undef);
+            let pattern = args.get(1).map(|p| p.to_string());
+            crate::native_codec::url_encode_with_pattern(v, pattern.as_deref())
+        }),
         "url_decode" | "uri_unescape" | "ud" => Some(crate::native_codec::url_decode(
             args.first().unwrap_or(&undef),
         )),
@@ -6537,9 +6539,7 @@ pub(crate) fn try_builtin(
         "electron_mass" | "emass" => Some(Ok(StrykeValue::float(9.109_383_701_5e-31))),
         "proton_mass" | "pmass" => Some(Ok(StrykeValue::float(1.672_621_923_69e-27))),
         "phi" => Some(Ok(StrykeValue::float(1.618_033_988_749_895))),
-        "euler_number" | "euler_e" | "E" => {
-            Some(Ok(StrykeValue::float(std::f64::consts::E)))
-        }
+        "euler_number" | "euler_e" | "E" => Some(Ok(StrykeValue::float(std::f64::consts::E))),
         "pi" | "PI" => Some(Ok(StrykeValue::float(std::f64::consts::PI))),
         "tau" | "TAU" => Some(Ok(StrykeValue::float(std::f64::consts::TAU))),
         "epsilon" | "eps" => Some(Ok(StrykeValue::float(f64::EPSILON))),
@@ -15289,7 +15289,10 @@ fn normalize_serialize_root(args: &[StrykeValue]) -> StrykeValue {
 fn builtin_to_json(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let val = normalize_serialize_root(args);
     let mut visited: std::collections::HashSet<usize> = std::collections::HashSet::new();
-    Ok(StrykeValue::string(perl_value_to_json_string(&val, &mut visited)))
+    Ok(StrykeValue::string(perl_value_to_json_string(
+        &val,
+        &mut visited,
+    )))
 }
 
 fn perl_value_to_json_string(
@@ -20272,7 +20275,7 @@ fn builtin_sliding_window(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         return Ok(StrykeValue::array(Vec::new()));
     }
     let (n, list_args) = if args.len() == 1 {
-        (1usize, &args[..])
+        (1usize, args)
     } else {
         let last = args[args.len() - 1].to_int();
         let n = if last < 1 { 0 } else { last as usize };

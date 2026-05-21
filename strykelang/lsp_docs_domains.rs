@@ -1054,8 +1054,8 @@ mod tests {
             "tokenize_subword",
             "channel_unbounded",
         ] {
-            let doc = doc_for_domain_label(label)
-                .unwrap_or_else(|| panic!("expected doc for {label}"));
+            let doc =
+                doc_for_domain_label(label).unwrap_or_else(|| panic!("expected doc for {label}"));
             assert!(
                 doc.contains('→') || doc.contains("->"),
                 "doc for {label} should declare a signature, got: {doc}"

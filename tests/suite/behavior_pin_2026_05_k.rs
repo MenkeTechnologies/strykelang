@@ -24,7 +24,9 @@ fn tau_constant_is_two_pi() {
 #[test]
 fn pi_uppercase_is_a_constant_alias() {
     // Uppercase `PI` / `TAU` / `E` are constants alongside the lowercase
-    // `pi` / `tau` / `euler_e` aliases.
+    // `pi` / `tau` / `euler_e` aliases. The `open FH, ...` filehandle-slot
+    // path in the parser takes precedence so the Perl idiom `open E, …`
+    // keeps treating `E` as a literal handle name.
     let pi = eval_string("PI");
     assert!(pi.starts_with("3.14"), "expected pi, got {:?}", pi);
     let tau = eval_string("TAU");

@@ -2,7 +2,11 @@
 # Rosetta Code: URL encoding
 
 fn Rosetta::URL::encode($str) {
-    uri_escape($str)
+    # Rosetta Code task spec: percent-encode every non-alphanumeric byte
+    # (matches Perl's `uri_escape($s, "^A-Za-z0-9")`). The default
+    # one-arg form preserves RFC 3986 unreserved characters
+    # `-`, `_`, `.`, `~`, which is the modern URI::Escape default.
+    uri_escape($str, "^A-Za-z0-9")
 }
 
 fn Rosetta::URL::decode($str) {

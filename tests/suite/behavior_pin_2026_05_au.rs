@@ -70,32 +70,24 @@ fn angle_bracket_glob_shorthand_not_parsed() {
     );
 }
 
-// ── BUG-042: delete @array[indices] slice form is rejected ───────────────────
+// ── delete @array[indices] slice form removes each element ──────────────────
 
 #[test]
-fn delete_array_slice_is_rejected() {
-    // `delete @a[1, 2]` should delete multiple elements.
-    // Currently rejected by parser or compiler.
-    let err = eval_err_kind("my @a = (1,2,3); delete @a[0, 1];");
-    let msg = format!("{:?}", err);
-    assert!(
-        msg.contains("Runtime") || msg.contains("Syntax") || msg.contains("Compile"),
-        "expected runtime error for delete array slice, got {:?}",
-        err
+fn delete_array_slice_drains_elements() {
+    assert_eq!(
+        eval_string(
+            "my @a = (10,20,30); delete @a[0, 2]; join(',', map { defined($_) ? $_ : '_' } @a)"
+        ),
+        "_,20,_"
     );
 }
 
-// ── BUG-043: delete @hash{KEYS} slice form is rejected ───────────────────────
+// ── delete @hash{KEYS} slice form removes each named key ────────────────────
 
 #[test]
-fn delete_hash_slice_is_rejected() {
-    // `delete @h{'a', 'b'}` should delete multiple keys.
-    // Currently rejected.
-    let err = eval_err_kind("my %h = (a=>1, b=>2); delete @h{'a', 'b'};");
-    let msg = format!("{:?}", err);
-    assert!(
-        msg.contains("Runtime") || msg.contains("Syntax") || msg.contains("Compile"),
-        "expected runtime error for delete hash slice, got {:?}",
-        err
+fn delete_hash_slice_drains_keys() {
+    assert_eq!(
+        eval_string("my %h = (a=>1, b=>2, c=>3); delete @h{'a', 'b'}; join(',', sort keys %h)"),
+        "c"
     );
 }

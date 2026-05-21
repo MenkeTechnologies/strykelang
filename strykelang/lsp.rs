@@ -668,11 +668,7 @@ fn scan_stryke_workspace_root(root: &std::path::Path, out: &mut HashMap<String, 
     let mut stack: Vec<std::path::PathBuf> = vec![root.to_path_buf()];
     while let Some(dir) = stack.pop() {
         if out.len() >= STK_MAX_FILES {
-            crate::slog_warn!(
-                "lsp.workspace",
-                "scan capped at {} files",
-                STK_MAX_FILES
-            );
+            crate::slog_warn!("lsp.workspace", "scan capped at {} files", STK_MAX_FILES);
             return;
         }
         let entries = match std::fs::read_dir(&dir) {
@@ -9396,7 +9392,12 @@ mod rename_hover_tests {
 
         let mut out: std::collections::HashMap<String, String> = std::collections::HashMap::new();
         super::scan_stryke_workspace_root(&tmp, &mut out);
-        assert_eq!(out.len(), 2, "two .stk files picked up: {:?}", out.keys().collect::<Vec<_>>());
+        assert_eq!(
+            out.len(),
+            2,
+            "two .stk files picked up: {:?}",
+            out.keys().collect::<Vec<_>>()
+        );
         assert!(out.keys().any(|k| k.ends_with("/main.stk")));
         assert!(out.keys().any(|k| k.ends_with("/lib.stk")));
         // Excluded dirs must contribute nothing.

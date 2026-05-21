@@ -1076,41 +1076,6 @@ Tests: `backslash_at_prototype_does_not_auto_take_ref_today`.
 Severity: **bug**.
 
 
-## BUG-042 — `delete @array[indices]` (slice form) is rejected
-
-```sh
-$ stryke -e 'my @a = (10..15); delete @a[1..3]; print "@a"'
-delete requires hash or array element at -e line 1.
-$ perl ...
-10  14 15               # 11,12,13 → undef
-```
-
-Single-element `delete $a[2]` works correctly. The slice variant raises a
-runtime error. Workaround: `splice @a, $start, $count`.
-
-Tests: `delete_array_slice_is_rejected_today`,
-`splice_workaround_for_array_slice_delete_works`.
-
-Severity: **bug**.
-
-
-## BUG-043 — `delete @hash{KEYS}` (slice form) is rejected
-
-```sh
-$ stryke -e 'my %h = (a=>1, b=>2, c=>3); delete @h{qw(a b)}; print join(",", sort keys %h)'
-delete requires hash or array element at -e line 1.
-$ perl ...
-c
-```
-
-Same root cause as BUG-042: only single-element delete is implemented.
-Workaround: loop over keys with single-element delete.
-
-Tests: `delete_hash_slice_is_rejected_today`.
-
-Severity: **bug**.
-
-
 ## BUG-044 — AOP `after` block sees `$?` as 0, not the original return value
 
 ```sh

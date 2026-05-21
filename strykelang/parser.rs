@@ -12162,14 +12162,12 @@ impl Parser {
             }
             // Ruby `detect` / `find` — same as `first` (first element matching block).
             "first" | "detect" | "find" | "find_index" | "firstidx" | "first_index" => {
-                let canonical = if matches!(
-                    name.as_str(),
-                    "find_index" | "firstidx" | "first_index"
-                ) {
-                    "find_index"
-                } else {
-                    "first"
-                };
+                let canonical =
+                    if matches!(name.as_str(), "find_index" | "firstidx" | "first_index") {
+                        "find_index"
+                    } else {
+                        "first"
+                    };
                 // `first(CODEREF, LIST)` with parens — parse as normal call.
                 if matches!(self.peek(), Token::LParen) {
                     self.advance();
@@ -12369,6 +12367,19 @@ impl Parser {
                         line,
                     })
                 } else {
+                    // Perl convention: `open FH, "<", path` — an all-uppercase
+                    // (or `_`) bareword in the filehandle slot is a literal
+                    // handle name, never a constant / sub / bareword
+                    // expression. Without this special-case, registered
+                    // constants like `PI` / `TAU` / `E` would override the
+                    // documented Perl idiom and the handle would register
+                    // under the constant's numeric value.
+                    let handle_lit = self.take_bareword_filehandle();
+                    if handle_lit.is_some() {
+                        // Consume the comma after the bareword filehandle so
+                        // the arg parser starts at the mode expression.
+                        self.expect(&Token::Comma)?;
+                    }
                     let args = if paren {
                         self.parse_arg_list()?
                     } else {
@@ -12377,14 +12388,25 @@ impl Parser {
                     if paren {
                         self.expect(&Token::RParen)?;
                     }
-                    if args.len() < 2 {
+                    let total = handle_lit.is_some() as usize + args.len();
+                    if total < 2 {
                         return Err(self.syntax_err("open requires at least 2 arguments", line));
                     }
+                    let (handle_expr, mode_expr, file_expr) = match handle_lit {
+                        Some(name) => {
+                            let h = Expr {
+                                kind: ExprKind::String(name),
+                                line,
+                            };
+                            (h, args[0].clone(), args.get(1).cloned())
+                        }
+                        None => (args[0].clone(), args[1].clone(), args.get(2).cloned()),
+                    };
                     Ok(Expr {
                         kind: ExprKind::Open {
-                            handle: Box::new(args[0].clone()),
-                            mode: Box::new(args[1].clone()),
-                            file: args.get(2).cloned().map(Box::new),
+                            handle: Box::new(handle_expr),
+                            mode: Box::new(mode_expr),
+                            file: file_expr.map(Box::new),
                         },
                         line,
                     })
@@ -12394,7 +12416,11 @@ impl Parser {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
-                let a = self.parse_one_arg_or_default()?;
+                // `close FH` — bareword filehandle slot takes a literal name.
+                let a = self
+                    .take_bareword_filehandle_arg(line)
+                    .map(Ok)
+                    .unwrap_or_else(|| self.parse_one_arg_or_default())?;
                 Ok(Expr {
                     kind: ExprKind::Close(Box::new(a)),
                     line,
@@ -12476,6 +12502,15 @@ impl Parser {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
+                // `eof FH` — bareword filehandle slot (no parens) takes a
+                // literal name. `eof(FH)` / `eof($fh)` / `eof("FH")` keep
+                // their general-expression handling.
+                if let Some(a) = self.take_bareword_filehandle_arg(line) {
+                    return Ok(Expr {
+                        kind: ExprKind::Eof(Some(Box::new(a))),
+                        line,
+                    });
+                }
                 if matches!(self.peek(), Token::LParen) {
                     self.advance();
                     if matches!(self.peek(), Token::RParen) {
@@ -12485,7 +12520,11 @@ impl Parser {
                             line,
                         })
                     } else {
-                        let a = self.parse_expression()?;
+                        // Inside the parens, bareword still wins as a handle.
+                        let a = self
+                            .take_bareword_filehandle_arg(line)
+                            .map(Ok)
+                            .unwrap_or_else(|| self.parse_expression())?;
                         self.expect(&Token::RParen)?;
                         Ok(Expr {
                             kind: ExprKind::Eof(Some(Box::new(a))),
@@ -13065,6 +13104,70 @@ impl Parser {
                 }
             }
         }
+    }
+
+    /// `open FH, ...` / `close FH` / `eof FH` — Perl's convention is that an
+    /// all-uppercase (letters / digits / `_`, starting with a letter or `_`)
+    /// bareword in the filehandle slot is a literal handle name, never a
+    /// constant or sub call. This shadows registered constants like `PI`,
+    /// `TAU`, `E` and the rare uppercase-letter filehandles (`H`, `O`, …)
+    /// that would otherwise route through the bareword resolver.
+    ///
+    /// Returns `Some(name)` when the next token is such a bareword and the
+    /// token after it is one of the accepted terminators (any of `accept`,
+    /// or — when `accept` is empty — any of `,`, `;`, `)`, `}`, `|>`, Eof).
+    /// Otherwise returns `None` and leaves the cursor untouched.
+    fn take_bareword_filehandle_if(&mut self, accept: &[Token]) -> Option<String> {
+        let Token::Ident(h) = self.peek().clone() else {
+            return None;
+        };
+        let mut chars = h.chars();
+        let first = chars.next()?;
+        if !(first.is_ascii_uppercase() || first == '_') {
+            return None;
+        }
+        if !h
+            .chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+        {
+            return None;
+        }
+        let next = self.peek_at(1);
+        let ok = if accept.is_empty() {
+            matches!(
+                next,
+                Token::Comma
+                    | Token::Semicolon
+                    | Token::RParen
+                    | Token::RBrace
+                    | Token::Eof
+                    | Token::PipeForward
+            )
+        } else {
+            accept
+                .iter()
+                .any(|t| std::mem::discriminant(t) == std::mem::discriminant(next))
+        };
+        if !ok {
+            return None;
+        }
+        self.advance();
+        Some(h)
+    }
+
+    /// `open FH, …` — bareword filehandle followed by a comma.
+    fn take_bareword_filehandle(&mut self) -> Option<String> {
+        self.take_bareword_filehandle_if(&[Token::Comma])
+    }
+
+    /// `close FH` / `eof FH` — bareword filehandle followed by a statement
+    /// terminator. Returns a `String` expression to splice into the arg
+    /// slot, or `None` if the next token isn't a literal filehandle.
+    fn take_bareword_filehandle_arg(&mut self, line: usize) -> Option<Expr> {
+        self.take_bareword_filehandle_if(&[]).map(|name| Expr {
+            kind: ExprKind::String(name),
+            line,
+        })
     }
 
     fn parse_print_like(
