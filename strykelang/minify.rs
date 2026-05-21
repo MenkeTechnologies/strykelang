@@ -255,6 +255,7 @@ fn token_source(t: &Token) -> String {
         ModAssign => "%=".into(),
         PowAssign => "**=".into(),
         DotAssign => ".=".into(),
+        XAssign => " x= ".into(),
         AndAssign => "&&=".into(),
         OrAssign => "||=".into(),
         XorAssign => "^=".into(),

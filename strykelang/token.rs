@@ -87,6 +87,8 @@ pub enum Token {
     ModAssign,
     PowAssign,
     DotAssign,
+    /// `x=` — string-repetition compound assign (`$s x= 3`).
+    XAssign,
     AndAssign,
     OrAssign,
     XorAssign,
