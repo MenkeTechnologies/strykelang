@@ -285,15 +285,15 @@ fn debug_log_helper_via_dunder() {
 }
 
 #[test]
-fn package_inside_sub_returns_main_per_bug_256() {
-    // Stryke surface: `__PACKAGE__` inside a sub body returns "main"
-    // rather than the package the sub was defined in. Documented as
-    // BUG-256. Related to BUG-248 (caller package always main).
+fn package_inside_sub_returns_defining_package() {
+    // `__PACKAGE__` is a compile-time constant resolved at parse time to the
+    // package active where the sub body was compiled — the value sticks even
+    // when invoked from a different `package main` context.
     let code = r#"
         package Demo::Logger;
         sub make_tag { __PACKAGE__ . ".logger" }
         package main;
-        Demo::Logger::make_tag() eq "main.logger" ? 1 : 0
+        Demo::Logger::make_tag() eq "Demo::Logger.logger" ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }
