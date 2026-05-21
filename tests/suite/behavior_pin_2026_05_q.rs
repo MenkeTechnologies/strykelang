@@ -64,19 +64,16 @@ fn recursion_via_fn_with_sig_computes_fibonacci() {
 // ── Hash-slice via arrayref-deref `@{$ref}{KEYS}` is broken today ──────────
 
 #[test]
-fn hash_slice_through_hashref_via_at_brace_deref_fails_today() {
-    // BUG-091: `@{$h_ref}{qw(a c)}` should produce a hash slice through the
-    // hashref. Stryke errors with "Can't dereference non-reference as array".
-    use stryke::error::ErrorKind;
-    let kind = eval_err_kind(
-        r#"my %h = (a=>1, b=>2, c=>3); my $r = \%h;
-           my @v = @{$r}{qw(a c)};
-           "@v""#,
-    );
-    assert!(
-        matches!(kind, ErrorKind::Runtime | ErrorKind::Type),
-        "expected runtime error, got {:?}",
-        kind
+fn hash_slice_through_hashref_via_at_brace_deref_works() {
+    // `@{$h_ref}{KEYS}` produces a hash slice through the hashref, the same
+    // as `@$h_ref{KEYS}` and `$h_ref->@{KEYS}`.
+    assert_eq!(
+        eval_string(
+            r#"my %h = (a=>1, b=>2, c=>3); my $r = \%h;
+               my @v = @{$r}{qw(a c)};
+               "@v""#,
+        ),
+        "1 3"
     );
 }
 

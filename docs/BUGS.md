@@ -1999,24 +1999,6 @@ Tests: `print_braces_filehandle_form_does_not_write_to_handle_today`.
 Severity: **bug**.
 
 
-## BUG-091 — `@{$h_ref}{KEYS}` hash-slice through arrayref-deref errors
-
-```sh
-$ stryke -e 'my %h = (a=>1, b=>2, c=>3); my $r = \%h;
-            my @v = @{$r}{qw(a c)};
-            print "@v"'
-Can't dereference non-reference as array at -e line 1.
-```
-
-The arrow-form workaround is fine: `($r->{a}, $r->{c})` does what one
-would want.
-
-Tests: `hash_slice_through_hashref_via_at_brace_deref_fails_today`,
-`hash_slice_through_hashref_via_arrow_keys_works`.
-
-Severity: **bug**.
-
-
 ## BUG-092 — Ternary inside `"@{[ ... ]}"` interpolation rejected at parse time
 
 ```sh
@@ -2498,30 +2480,6 @@ Pin: `autoviv_requires_explicit_intermediate_construction` and
 `tests/suite/hashref_deep_pin.rs`.
 
 Severity: **bug** (large parity gap; major Perl idiom blocker).
-
-
-## BUG-217 — Hash slice through arrow-deref `@{$r}{KEYS}` errors
-
-```sh
-$ s -e 'my $r = +{ a => 1, b => 2 }; my @v = @{$r}{qw(a b)}; print join(",", @v), "\n"'
-Can't dereference non-reference as array at -e line 1.
-
-$ perl -e 'my $r = +{ a => 1, b => 2 }; my @v = @{$r}{qw(a b)}; print join(",", @v), "\n"'
-1,2
-```
-
-The `@{$r}{KEYS}` form — hash slice through a hashref via the explicit
-`@{...}{...}` deref-then-slice syntax — fails to parse as a hash slice.
-Stryke appears to interpret `@{$r}` as an array deref first, then
-gets confused by the `{KEYS}` block.
-
-Workaround: pluck keys explicitly, or use `@$r{KEYS}` (no braces around
-the variable) if supported.
-
-Pin: `hash_slice_through_arrow_via_explicit_keys` in
-`tests/suite/hashref_deep_pin.rs`.
-
-Severity: **bug** (parity gap).
 
 
 ## BUG-218 — Regex with interpolated variable `/^$re$/` caches result across calls in a loop
