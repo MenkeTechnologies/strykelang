@@ -22,12 +22,15 @@ fn tau_constant_is_two_pi() {
 }
 
 #[test]
-fn pi_uppercase_is_not_a_constant_today() {
-    // BUG-064: stryke recognizes lowercase `pi` and `tau` as built-in
-    // constants but `PI`, `TAU`, `E` are interpreted as bareword strings or
-    // syntax errors. Pin observed.
-    assert_eq!(eval_string("PI"), "PI");
-    assert_eq!(eval_string("TAU"), "TAU");
+fn pi_uppercase_is_a_constant_alias() {
+    // Uppercase `PI` / `TAU` / `E` are constants alongside the lowercase
+    // `pi` / `tau` / `euler_e` aliases.
+    let pi = eval_string("PI");
+    assert!(pi.starts_with("3.14"), "expected pi, got {:?}", pi);
+    let tau = eval_string("TAU");
+    assert!(tau.starts_with("6.28"), "expected tau, got {:?}", tau);
+    let e = eval_string("E");
+    assert!(e.starts_with("2.718"), "expected e, got {:?}", e);
 }
 
 #[test]

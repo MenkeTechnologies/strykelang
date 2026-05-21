@@ -402,12 +402,12 @@ fn hash_slice_with_literal_keys_returns_correct_values() {
 }
 
 #[test]
-fn hash_slice_with_array_var_keys_returns_empty_today() {
-    // BUG-028: passing keys via an array variable yields nothing. The literal
-    // form (above) works; the array-var form does not.
+fn hash_slice_with_array_var_keys_returns_elements() {
+    // `@h{@ks}` evaluates the key operand in list context so the elements of
+    // `@ks` splat into the slice, matching the literal-list form.
     assert_eq!(
         eval_string(r#"my %h = (a=>1, b=>2, c=>3); my @ks = ("a","c"); my @v = @h{@ks}; "@v""#),
-        ""
+        "1 3"
     );
 }
 
