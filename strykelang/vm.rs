@@ -4751,8 +4751,15 @@ impl<'a> VM<'a> {
                         let h = self.interp.scope.get_hash(name);
                         let mut result = Vec::new();
                         for kv in &key_vals {
+                            // Flatten arrays AND arrayrefs (e.g. `@h{@$kref}`)
+                            // — both shapes can carry the keys list.
                             if let Some(vv) = kv.as_array_vec() {
                                 for v in vv {
+                                    let k = v.to_string();
+                                    result.push(h.get(&k).cloned().unwrap_or(StrykeValue::UNDEF));
+                                }
+                            } else if let Some(r) = kv.as_array_ref() {
+                                for v in r.read().iter() {
                                     let k = v.to_string();
                                     result.push(h.get(&k).cloned().unwrap_or(StrykeValue::UNDEF));
                                 }

@@ -907,25 +907,6 @@ Severity: **bug**. The sub-wrapped form is the way most code uses
 given/when.
 
 
-## BUG-028 — `@hash{@array_var}` slice returns empty list
-
-```sh
-$ stryke -e 'my %h = (a=>1, b=>2, c=>3); my @v = @h{("a","c")};   print "@v"'
-1 3
-$ stryke -e 'my %h = (a=>1, b=>2, c=>3); my @ks = ("a","c");
-             my @v = @h{@ks}; print "@v"'
-                                    # (empty)
-```
-
-The literal-list form works; the array-var form does not. The arrayref
-deref form (`@h{@$kref}`) is also broken.
-
-Tests: `hash_slice_with_literal_keys_returns_correct_values`,
-`hash_slice_with_array_var_keys_returns_empty_today`.
-
-Severity: **bug**.
-
-
 ## BUG-032 — `$&` not interpolated in `s///` replacement string
 
 ```sh
@@ -1462,30 +1443,6 @@ Severity: **bug** (calling-convention surprise; existing tests show the
 list-first form is the contract).
 
 
-## BUG-064 — `PI` / `TAU` / `E` (uppercase) constants are barewords
-
-```sh
-$ stryke -e 'print pi'
-3.14159265358979
-$ stryke -e 'print PI'
-PI
-$ stryke -e 'print E'
-E
-$ stryke -e 'print e'
-Unexpected token Eof at -e line 1.
-```
-
-`pi` and `tau` work as built-in constants; uppercase aliases are missing
-and `e` is a parser-level token-fragment (since `eq`/`each` start with
-`e`). Workaround: `exp(1)` for Euler's number.
-
-Tests: `pi_constant_known_value`, `tau_constant_is_two_pi`,
-`pi_uppercase_is_not_a_constant_today`, `e_alone_is_parse_error_today`,
-`exp_one_yields_e`.
-
-Severity: **bug** (low impact; aliases would resolve it).
-
-
 ## BUG-065 — `head(N, LIST)` returns just `N` instead of first N elements
 
 ```sh
@@ -1718,24 +1675,6 @@ Tests: `refaddr_of_repeated_backslash_at_returns_different_addresses_today`,
 
 Severity: **bug**. Common idiom for ref-identity tests
 (`refaddr(\@a) == refaddr(\@b)`) gives wrong answers.
-
-
-## BUG-076 — `\N` (numeric backref) in `s///` replacement is interpreted as escape
-
-```sh
-$ stryke -e 'my $s = "ab123cd"; $s =~ s/(\d+)/[\1]/; print $s'
-ab[<SOH>]cd                 # `\1` → 0x01 control char
-$ stryke -e 'my $s = "ab123cd"; $s =~ s/(\d+)/[$1]/; print $s'
-ab[123]cd                   # `$1` works
-```
-
-Use `$1`/`$2`/… in replacements; the `\N` form is treated as a control
-character escape (`\1` → SOH, etc.).
-
-Tests: `backslash_one_in_substitution_inserts_soh_today`,
-`dollar_one_in_substitution_inserts_capture`.
-
-Severity: **bug** (compat).
 
 
 ## BUG-077 — Postfix `for` modifier rejected on `my @r = ...` form
@@ -3048,48 +2987,6 @@ Pin: `s_replacement_dollar_literal_via_chr` in
 
 Severity: **bug** (parity gap; silent corrupted output for any
 dollar-aware text — prices, shell-script generation, regex docs).
-
-
-## BUG-235 — `@h{@arrayvar}` hash-slice with array-variable keys returns one empty element
-
-```sh
-$ s -e '
-    my %h = (a => 1, b => 2, c => 3);
-    my @v1 = @h{qw(a c)};
-    print "qw:    n=", scalar(@v1), " ", join(",", @v1), "\n";
-
-    my @v2 = @h{"a","c"};
-    print "lit:   n=", scalar(@v2), " ", join(",", @v2), "\n";
-
-    my @keys = ("a", "c");
-    my @v3 = @h{@keys};
-    print "array: n=", scalar(@v3), "\n"
-'
-qw:    n=2 1,3
-lit:   n=2 1,3
-array: n=1
-```
-
-Three forms of hash slice are documented; in Perl all three return the
-same per-key values. In stryke, the `@h{@arrayvar}` form (array
-variable interpolated as the key list) returns a single empty element
-instead of the per-key values. The `qw(...)` and `"a","b"` literal-list
-forms work correctly.
-
-Workaround: replace `@h{@keys}` with per-key arrow lookups in a loop:
-
-```stryke
-my @v;
-for my $k (@keys) {
-    push @v, $h{$k};
-}
-```
-
-Pin: `hash_value_slice_with_array_keys_returns_empty_buggy` in
-`tests/suite/hash_slice_pin.rs`.
-
-Severity: **bug** (parity gap; affects every "subset extract" pattern
-where the key list is computed dynamically).
 
 
 ## BUG-236 — `delete @h{LIST}` slice form rejected with "delete requires hash or array element"

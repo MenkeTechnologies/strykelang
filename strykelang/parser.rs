@@ -14777,8 +14777,8 @@ impl Parser {
             | "vector_angle" | "vector_cross" | "vector_dot" | "vector_magnitude" | "vector_normalize"
             // ── constants ───────────────────────────────────────────────────────
             | "avogadro_number" | "boltzmann_constant" | "electron_mass" | "elementary_charge"
-            | "gravitational_constant" | "phi" | "pi" | "planck_constant" | "proton_mass"
-            | "sol" | "tau"
+            | "gravitational_constant" | "phi" | "pi" | "PI" | "planck_constant"
+            | "proton_mass" | "sol" | "tau" | "TAU" | "E"
             // ── finance ─────────────────────────────────────────────────────────
             | "bac_estimate" | "bmi" | "break_even" | "margin" | "markup" | "roi" | "tax" | "tip"
             // ── finance (extended) ────────────────────────────────────────────

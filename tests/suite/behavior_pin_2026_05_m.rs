@@ -210,12 +210,13 @@ fn refaddr_of_aliased_scalar_is_same() {
 // ── \1 vs $1 in s/// replacement ────────────────────────────────────────────
 
 #[test]
-fn backslash_one_in_substitution_inserts_soh_today() {
-    // BUG-076: `s/(\d+)/[\1]/` should treat `\1` as backref-1. Stryke
-    // interprets `\1` as the escape sequence for character 0x01 (SOH).
+fn backslash_one_in_substitution_inserts_capture() {
+    // `\1` (single-digit, no trailing octal digit) is a numbered backref in
+    // s/// replacement strings, matching Perl. Multi-digit forms like `\010`
+    // still resolve as octal escapes.
     assert_eq!(
         eval_string(r#"my $s = "ab123cd"; $s =~ s/(\d+)/[\1]/; $s"#),
-        "ab[\u{1}]cd"
+        "ab[123]cd"
     );
 }
 

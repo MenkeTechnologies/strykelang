@@ -8924,19 +8924,26 @@ impl VMHelper {
         &mut self,
         key_expr: &Expr,
     ) -> Result<Vec<String>, FlowOrError> {
-        let v = if matches!(
-            key_expr.kind,
-            ExprKind::Range { .. } | ExprKind::SliceRange { .. }
-        ) {
-            self.eval_expr_ctx(key_expr, WantarrayCtx::List)?
-        } else {
-            self.eval_expr(key_expr)?
-        };
+        // Keys for `@h{LIST}` are always evaluated in Perl list context — an
+        // `@ks` operand splats to its elements instead of scalarizing to its
+        // count, and an `\@ref` operand unwraps after deref. Without this the
+        // array-var form returned the empty list (BUG-028).
+        let v = self.eval_expr_ctx(key_expr, WantarrayCtx::List)?;
         if let Some(vv) = v.as_array_vec() {
-            Ok(vv.iter().map(|x| x.to_string()).collect())
-        } else {
-            Ok(vec![v.to_string()])
+            return Ok(vv.iter().map(|x| x.to_string()).collect());
         }
+        if let Some(r) = v.as_array_ref() {
+            return Ok(r.read().iter().map(|x| x.to_string()).collect());
+        }
+        if v.is_iterator() {
+            return Ok(v
+                .into_iterator()
+                .collect_all()
+                .iter()
+                .map(|x| x.to_string())
+                .collect());
+        }
+        Ok(vec![v.to_string()])
     }
 
     /// Symbolic ref deref (`$$r`, `@{...}`, `%{...}`, `*{...}`) — shared by [`Self::eval_expr_ctx`] and the VM.

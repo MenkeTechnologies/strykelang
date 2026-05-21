@@ -269,12 +269,23 @@ impl Compiler {
         self.compile_expr_ctx(index_expr, WantarrayCtx::List)
     }
 
-    /// Hash-slice key component: `'a'..'c'` inside `@h{...}` / `@$h{...}` is a list-context
-    /// range so the VM's hash-slice helpers receive an array to flatten into individual keys.
+    /// Hash-slice key component: anything that's syntactically a list-valued
+    /// operand (`'a'..'c'`, `@ks`, `@{$ref}`, `qw(a b)`, a list literal, an
+    /// array slice) is compiled in list context so the VM's hash-slice
+    /// helpers see all the elements instead of a scalarized count.
     fn compile_hash_slice_key_expr(&mut self, key_expr: &Expr) -> Result<(), CompileError> {
         if matches!(
             &key_expr.kind,
-            ExprKind::Range { .. } | ExprKind::SliceRange { .. }
+            ExprKind::Range { .. }
+                | ExprKind::SliceRange { .. }
+                | ExprKind::ArrayVar(_)
+                | ExprKind::Deref {
+                    kind: Sigil::Array,
+                    ..
+                }
+                | ExprKind::ArraySlice { .. }
+                | ExprKind::QW(_)
+                | ExprKind::List(_)
         ) {
             self.compile_expr_ctx(key_expr, WantarrayCtx::List)
         } else {
@@ -3551,10 +3562,23 @@ impl Compiler {
                         _ => {}
                     }
                 }
-                // If any key expression is a range, we need runtime flattening via GetHashSlice.
-                let has_dynamic_keys = keys
-                    .iter()
-                    .any(|k| matches!(&k.kind, ExprKind::Range { .. }));
+                // If any key expression yields more than one value at runtime
+                // (range, array variable, arrayref deref, slurpy function call),
+                // we need runtime flattening via `GetHashSlice` — the per-key
+                // `GetHashElem` path treats each operand as a single key and
+                // would scalarize `@arr` to its count (BUG-028).
+                let has_dynamic_keys = keys.iter().any(|k| {
+                    matches!(
+                        &k.kind,
+                        ExprKind::Range { .. }
+                            | ExprKind::ArrayVar(_)
+                            | ExprKind::Deref {
+                                kind: Sigil::Array,
+                                ..
+                            }
+                            | ExprKind::ArraySlice { .. }
+                    )
+                });
                 if has_dynamic_keys {
                     for key_expr in keys {
                         self.compile_hash_slice_key_expr(key_expr)?;

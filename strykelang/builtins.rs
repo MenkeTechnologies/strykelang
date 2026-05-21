@@ -6537,9 +6537,11 @@ pub(crate) fn try_builtin(
         "electron_mass" | "emass" => Some(Ok(StrykeValue::float(9.109_383_701_5e-31))),
         "proton_mass" | "pmass" => Some(Ok(StrykeValue::float(1.672_621_923_69e-27))),
         "phi" => Some(Ok(StrykeValue::float(1.618_033_988_749_895))),
-        "euler_number" | "euler_e" => Some(Ok(StrykeValue::float(std::f64::consts::E))),
-        "pi" => Some(Ok(StrykeValue::float(std::f64::consts::PI))),
-        "tau" => Some(Ok(StrykeValue::float(std::f64::consts::TAU))),
+        "euler_number" | "euler_e" | "E" => {
+            Some(Ok(StrykeValue::float(std::f64::consts::E)))
+        }
+        "pi" | "PI" => Some(Ok(StrykeValue::float(std::f64::consts::PI))),
+        "tau" | "TAU" => Some(Ok(StrykeValue::float(std::f64::consts::TAU))),
         "epsilon" | "eps" => Some(Ok(StrykeValue::float(f64::EPSILON))),
         "neg_inf" => Some(Ok(StrykeValue::float(f64::NEG_INFINITY))),
         "i64_max" => Some(Ok(StrykeValue::integer(i64::MAX))),
