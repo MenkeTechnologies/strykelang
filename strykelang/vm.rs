@@ -10088,11 +10088,24 @@ impl<'a> VM<'a> {
                     crate::value::BlessedRef::new_blessed(class, ref_val),
                 )))
             }
-            Some(BuiltinId::Caller) => Ok(StrykeValue::array(vec![
-                StrykeValue::string("main".into()),
-                StrykeValue::string(self.interp.file.clone()),
-                StrykeValue::integer(line as i64),
-            ])),
+            Some(BuiltinId::Caller) => {
+                // Simplified caller frame: (package, file, line, subname).
+                // The sub name is the fully-qualified name of the currently
+                // executing sub so logger / decorator patterns work.
+                let sub_name = self
+                    .interp
+                    .current_sub_stack
+                    .last()
+                    .map(|s| StrykeValue::string(s.name.clone()))
+                    .unwrap_or(StrykeValue::UNDEF);
+                let pkg = self.interp.current_package();
+                Ok(StrykeValue::array(vec![
+                    StrykeValue::string(pkg),
+                    StrykeValue::string(self.interp.file.clone()),
+                    StrykeValue::integer(line as i64),
+                    sub_name,
+                ]))
+            }
             // Parallel ops (shouldn't reach here — handled by block ops)
             Some(BuiltinId::PMap)
             | Some(BuiltinId::PGrep)

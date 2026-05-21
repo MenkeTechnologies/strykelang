@@ -92,7 +92,9 @@ fn drop_skips_first_n_pipe_and_lines() {
 
 #[test]
 fn caller_builtin() {
-    assert_eq!(eval_string(r#"caller() |> join ','"#), "main,-e,1");
+    // Top-level caller() — fields are (package, file, line, sub-name). At top
+    // level there's no sub on the stack, so the trailing field is empty.
+    assert_eq!(eval_string(r#"caller() |> join ','"#), "main,-e,1,");
 }
 
 /// `ssh LIST` runs the real `ssh` binary (argv only, no shell). No-op when `ssh` is missing.
