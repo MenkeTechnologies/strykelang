@@ -164,57 +164,54 @@ fn tr_r_count_via_assignment() {
     assert_eq!(eval_int(code), 1);
 }
 
-// ── /c (complement) flag — BROKEN per BUG-251 ────────────────────
+// ── /c (complement) flag ─────────────────────────────────────────
 
 #[test]
-fn tr_c_flag_ignored_per_bug_251() {
-    // Without /c, count of digits in "abc123" = 3.
-    // With /c, expected = 5 (non-digits).
-    // Stryke ignores /c and returns 3.
+fn tr_c_flag_complements_search_list() {
+    // `tr/0-9//c` counts the non-digit characters (5 in "abcde123").
     let code = r#"
         my $s = "abcde123";
         my $no_c = ($s =~ tr/0-9//);
         my $with_c = ($s =~ tr/0-9//c);
-        # Per BUG-251 both return 3.
-        ($no_c == 3 && $with_c == 3) ? 1 : 0
+        ($no_c == 3 && $with_c == 5) ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }
 
 #[test]
-fn tr_cd_combination_broken_per_bug_251() {
-    // tr/A-Za-z//cd should keep alphas, delete non-alphas =>
-    // "HelloWorld". Stryke produces ", !" (the opposite).
+fn tr_cd_combination_keeps_complement_and_deletes_others() {
+    // `tr/A-Za-z//cd` keeps alphabetic characters and deletes everything
+    // else, yielding "HelloWorld".
     let code = r#"
         my $s = "Hello, World!";
         $s =~ tr/A-Za-z//cd;
-        $s eq ", !" ? 1 : 0
+        $s eq "HelloWorld" ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }
 
-// ── /s (squeeze) flag — BROKEN per BUG-252 ───────────────────────
+// ── /s (squeeze) flag ────────────────────────────────────────────
 
 #[test]
-fn tr_s_flag_ignored_per_bug_252() {
-    // tr/abc//s should squeeze runs: "aaabbbccc" => "abc".
-    // Stryke ignores /s.
+fn tr_s_flag_squeezes_runs() {
+    // `tr/abc//s` collapses consecutive matched characters to one each:
+    // "aaabbbccc" → "abc".
     let code = r#"
         my $s = "aaabbbccc";
         $s =~ tr/abc//s;
-        $s eq "aaabbbccc" ? 1 : 0
+        $s eq "abc" ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }
 
 #[test]
-fn tr_translit_s_combo_broken_per_bug_252() {
-    // tr/abc/xyz/s should squeeze "xxx" -> "x" etc, giving "xyz".
-    // Stryke ignores /s, returns "xxxyyyzzz".
+fn tr_translit_s_combo_translates_then_squeezes() {
+    // `tr/abc/xyz/s` translates each character then squeezes the runs
+    // of the translated output: "aaabbbccc" → "xyz".
     let code = r#"
         my $s = "aaabbbccc";
         $s =~ tr/abc/xyz/s;
-        $s eq "xxxyyyzzz" ? 1 : 0
+        $s eq "xyz" ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }

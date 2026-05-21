@@ -213,10 +213,12 @@ fn join_leading_undef_empty_field() {
 }
 
 #[test]
-fn splice_replaces_span_with_single_insert_value() {
+fn splice_replaces_span_with_two_insert_values() {
+    // `(9,9)` is a Perl list — splice's LIST argument flattens it so both
+    // values are inserted in place of the removed span.
     assert_eq!(
         eval_string(r#"my @a = (1,2,3,4); splice @a, 1, 2, (9,9); join ",", @a"#),
-        "1,9,4"
+        "1,9,9,4"
     );
 }
 
