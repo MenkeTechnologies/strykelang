@@ -279,6 +279,9 @@ pub enum Op {
     /// `print [HANDLE] LIST` — `None` uses [`crate::vm_helper::VMHelper::default_print_handle`].
     Print(Option<u16>, u8),
     Say(Option<u16>, u8),
+    /// `printf [HANDLE] FMT, ARGS` — same shape as [`Op::Print`]; `None` uses
+    /// the default handle. Format is the first argument on the stack.
+    Printf(Option<u16>, u8),
 
     // ── Built-in function calls ──
     /// Calls a registered built-in: (builtin_id, arg_count)
@@ -1038,6 +1041,8 @@ pub enum BuiltinId {
     Each,
     /// `` `cmd` `` / `qx{...}` — stdout string via `sh -c` (Perl readpipe); sets `$?`.
     Readpipe,
+    /// `` `cmd` `` in **list context** — split stdout into one element per `\n`-terminated line.
+    ReadpipeList,
     /// `readline` / `<HANDLE>` in **list** context — all remaining lines until EOF (Perl `readline` list semantics).
     ReadLineList,
     /// `readdir` in **list** context — all names not yet returned (Perl drains the rest of the stream).
