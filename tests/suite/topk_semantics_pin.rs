@@ -117,17 +117,15 @@ fn topk_results_in_descending_count_order() {
 // ── Weighted add ────────────────────────────────────────────────────
 
 #[test]
-fn topk_add_ignores_third_weight_arg() {
-    // BUG-231: `topk_add($tk, $key, $weight)` silently ignores the
-    // weight argument. The count increments by 1 regardless. Pin
-    // observed behavior so a future weighted-add fix is deliberate.
+fn topk_add_third_arg_is_weight() {
+    // `topk_add($tk, $key, $weight)` increments by `$weight`. Non-positive
+    // weights are clamped up to 1. Two calls with weights 10 and 5 sum to 15.
     let code = r#"
         my $tk = topk(3);
         topk_add($tk, "x", 10);
         topk_add($tk, "x", 5);
         my @top = topk_top($tk);
-        # Got 2 (two calls), not 15 (sum of weights).
-        ($top[0]->[0] eq "x" && $top[0]->[1] == 2) ? 1 : 0
+        ($top[0]->[0] eq "x" && $top[0]->[1] == 15) ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }

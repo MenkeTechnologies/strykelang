@@ -224,16 +224,15 @@ fn data_survives_json_yaml_toml_chain() {
 }
 
 // ── Error handling: malformed JSON ───────────────────────────────────
-// Current behavior: `from_json` on a non-JSON string returns the input
-// string unchanged (no error, no undef). That's not ideal — silent
-// pass-through can mask data bugs — but pinning what stryke does
-// today so a future "strict mode" change is a visible decision.
+// Strings that don't look like JSON (no leading `{`, `[`, `"`, sign,
+// digit, or one of `null`/`true`/`false`) return `undef` so callers
+// can detect the parse failure with `defined`.
 
 #[test]
-fn from_json_on_garbage_passes_through_unchanged() {
+fn from_json_on_garbage_returns_undef() {
     let code = r#"
         my $r = from_json("definitely not json");
-        (defined($r) && $r eq "definitely not json") ? 1 : 0
+        defined($r) ? 0 : 1
     "#;
     assert_eq!(eval_int(code), 1);
 }

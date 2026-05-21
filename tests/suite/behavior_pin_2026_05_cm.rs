@@ -351,10 +351,12 @@ fn uri_escape_space_percent20_cm() {
 }
 
 #[test]
-fn crc32_separate_args_differs_from_concat_bug_cm() {
+fn crc32_separate_args_equals_concat_cm() {
+    // crc32 hashes every positional arg, so the per-arg digest matches the
+    // concatenated single-string digest.
     assert_eq!(
         eval_string(r#"(crc32("ab") == crc32("a", "b")) ? "1" : "0""#),
-        "0"
+        "1"
     );
 }
 

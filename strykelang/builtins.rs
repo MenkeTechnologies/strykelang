@@ -15285,10 +15285,14 @@ fn normalize_serialize_root(args: &[StrykeValue]) -> StrykeValue {
 /// coalesced into a single JSON array.
 fn builtin_to_json(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let val = normalize_serialize_root(args);
-    Ok(StrykeValue::string(perl_value_to_json_string(&val)))
+    let mut visited: std::collections::HashSet<usize> = std::collections::HashSet::new();
+    Ok(StrykeValue::string(perl_value_to_json_string(&val, &mut visited)))
 }
 
-fn perl_value_to_json_string(val: &StrykeValue) -> String {
+fn perl_value_to_json_string(
+    val: &StrykeValue,
+    visited: &mut std::collections::HashSet<usize>,
+) -> String {
     use std::fmt::Write;
     if val.is_undef() {
         return "null".to_string();
@@ -15300,8 +15304,18 @@ fn perl_value_to_json_string(val: &StrykeValue) -> String {
         return format!("{}", val.to_number());
     }
     if let Some(ar) = val.as_array_ref() {
+        // Cycle guard: emit `null` for back-edges so encoding terminates
+        // instead of overflowing the stack (BUG-105).
+        let addr = Arc::as_ptr(&ar) as usize;
+        if !visited.insert(addr) {
+            return "null".to_string();
+        }
         let guard = ar.read();
-        let parts: Vec<String> = guard.iter().map(perl_value_to_json_string).collect();
+        let parts: Vec<String> = guard
+            .iter()
+            .map(|v| perl_value_to_json_string(v, visited))
+            .collect();
+        visited.remove(&addr);
         return format!("[{}]", parts.join(","));
     }
     // Flat `StrykeValue::array` (no ref wrapper) — `read_json` returns JSON
@@ -15311,10 +15325,17 @@ fn perl_value_to_json_string(val: &StrykeValue) -> String {
     // with empty `$,`) and wrap that in quotes — `[1,2,3]` would become
     // `"123"` instead of `[1,2,3]`.
     if let Some(items) = val.as_array_vec() {
-        let parts: Vec<String> = items.iter().map(perl_value_to_json_string).collect();
+        let parts: Vec<String> = items
+            .iter()
+            .map(|v| perl_value_to_json_string(v, visited))
+            .collect();
         return format!("[{}]", parts.join(","));
     }
     if let Some(hr) = val.as_hash_ref() {
+        let addr = Arc::as_ptr(&hr) as usize;
+        if !visited.insert(addr) {
+            return "null".to_string();
+        }
         let guard = hr.read();
         let mut buf = String::from("{");
         for (i, (k, v)) in guard.iter().enumerate() {
@@ -15325,10 +15346,11 @@ fn perl_value_to_json_string(val: &StrykeValue) -> String {
                 buf,
                 "\"{}\":{}",
                 json_escape(k),
-                perl_value_to_json_string(v)
+                perl_value_to_json_string(v, visited)
             );
         }
         buf.push('}');
+        visited.remove(&addr);
         return buf;
     }
     format!("\"{}\"", json_escape(&val.to_string()))
@@ -15454,7 +15476,8 @@ fn csv_cell(s: &str) -> String {
 /// `to_csv` in that shape.
 fn csv_value_cell(v: &StrykeValue) -> String {
     if v.as_array_ref().is_some() || v.as_hash_ref().is_some() || v.as_array_vec().is_some() {
-        csv_cell(&perl_value_to_json_string(v))
+        let mut visited = std::collections::HashSet::new();
+        csv_cell(&perl_value_to_json_string(v, &mut visited))
     } else {
         csv_cell(&v.to_string())
     }
@@ -16297,13 +16320,9 @@ fn builtin_trunc(interp: &VMHelper, args: &[StrykeValue]) -> StrykeResult<Stryke
         first_arg_or_topic(interp, args).to_number().trunc() as i64,
     ))
 }
-/// `gcd` — Gcd. Returns an integer. Defaults to `$_` when called with no args.
-fn builtin_gcd(interp: &VMHelper, args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
-    let (mut a, mut b) = if args.len() >= 2 {
-        (args[0].to_int(), args[1].to_int())
-    } else {
-        (first_arg_or_topic(interp, args).to_int(), 0)
-    };
+/// Euclidean gcd on two non-negative integers.
+#[inline]
+fn gcd_pair_i64(mut a: i64, mut b: i64) -> i64 {
     a = a.abs();
     b = b.abs();
     while b != 0 {
@@ -16311,27 +16330,50 @@ fn builtin_gcd(interp: &VMHelper, args: &[StrykeValue]) -> StrykeResult<StrykeVa
         b = a % b;
         a = t;
     }
-    Ok(StrykeValue::integer(a))
+    a
 }
-/// `lcm` — Lcm. Returns an integer. Defaults to `$_` when called with no args.
+
+/// Drain every positional argument (variadic or a single arrayref) into a flat
+/// vector of `i64`. Falls back to the topic when called with no args.
+fn flatten_int_args(interp: &VMHelper, args: &[StrykeValue]) -> Vec<i64> {
+    if args.is_empty() {
+        return vec![first_arg_or_topic(interp, args).to_int()];
+    }
+    if args.len() == 1 {
+        if let Some(r) = args[0].as_array_ref() {
+            return r.read().iter().map(|v| v.to_int()).collect();
+        }
+        if let Some(arr) = args[0].as_array_vec() {
+            return arr.iter().map(|v| v.to_int()).collect();
+        }
+    }
+    args.iter().map(|v| v.to_int()).collect()
+}
+
+/// `gcd` — variadic gcd. `gcd(a)` returns `|a|`, `gcd()` falls back to `$_`.
+fn builtin_gcd(interp: &VMHelper, args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let nums = flatten_int_args(interp, args);
+    let result = nums.iter().copied().fold(0i64, gcd_pair_i64);
+    Ok(StrykeValue::integer(result))
+}
+
+/// `lcm` — variadic lcm. Any zero operand makes the result `0` (Perl/Math::BigInt convention).
 fn builtin_lcm(interp: &VMHelper, args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
-    let (a, b) = if args.len() >= 2 {
-        (args[0].to_int(), args[1].to_int())
-    } else {
-        (first_arg_or_topic(interp, args).to_int(), 1)
-    };
-    if a == 0 || b == 0 {
+    let nums = flatten_int_args(interp, args);
+    if nums.is_empty() {
         return Ok(StrykeValue::integer(0));
     }
-    let mut x = a.abs();
-    let mut y = b.abs();
-    let product = a.saturating_mul(b).abs();
-    while y != 0 {
-        let t = y;
-        y = x % y;
-        x = t;
+    let mut acc: i64 = nums[0].abs();
+    for &n in &nums[1..] {
+        if acc == 0 || n == 0 {
+            return Ok(StrykeValue::integer(0));
+        }
+        let g = gcd_pair_i64(acc, n);
+        // (acc / g) * |n| keeps intermediate values smaller; saturate on
+        // overflow rather than panicking.
+        acc = (acc / g).saturating_mul(n.abs());
     }
-    Ok(StrykeValue::integer(product / x))
+    Ok(StrykeValue::integer(acc))
 }
 /// `min2` — Min2. Returns a float.
 fn builtin_min2(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
@@ -35325,6 +35367,23 @@ fn xml_escape(s: &str) -> String {
 /// `from_json STRING` — parse a JSON string into a StrykeValue.
 fn builtin_from_json(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    // Reject obviously-non-JSON input at the top level instead of passing it
+    // through unchanged. Inside the parser, any leftover fallthrough indicates
+    // malformed input — surface that as `undef` so callers can detect it via
+    // `defined(from_json(...))`.
+    let trimmed = s.trim();
+    if trimmed.is_empty() {
+        return Ok(StrykeValue::UNDEF);
+    }
+    let first = trimmed.chars().next().unwrap();
+    let looks_json = matches!(first, '{' | '[' | '"' | '-' | '+')
+        || first.is_ascii_digit()
+        || trimmed == "null"
+        || trimmed == "true"
+        || trimmed == "false";
+    if !looks_json {
+        return Ok(StrykeValue::UNDEF);
+    }
     parse_json_value(&s)
 }
 
@@ -37472,11 +37531,16 @@ fn builtin_elapsed() -> StrykeResult<StrykeValue> {
 // ── crc32(DATA) ───────────────────────────────────────────────────
 /// CRC-32 checksum of the argument bytes; returns an unsigned 32-bit integer.
 fn builtin_crc32(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
-    let data = args
-        .first()
-        .ok_or_else(|| StrykeError::runtime("crc32: need DATA argument", line))?;
-    let bytes = perl_scalar_as_bytes(data);
-    Ok(StrykeValue::integer(crc32fast::hash(&bytes) as i64))
+    if args.is_empty() {
+        return Err(StrykeError::runtime("crc32: need DATA argument", line));
+    }
+    // Hash every positional argument so `crc32(@bytes)` and
+    // `crc32($a, $b, $c)` produce the same digest as `crc32($a.$b.$c)`.
+    let mut hasher = crc32fast::Hasher::new();
+    for a in args {
+        hasher.update(&perl_scalar_as_bytes(a));
+    }
+    Ok(StrykeValue::integer(hasher.finalize() as i64))
 }
 
 // ── par_find_files(PATH, PATTERN) ─────────────────────────────────

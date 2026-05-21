@@ -76,6 +76,14 @@ fn class_field_names(def: &ClassDef) -> Vec<String> {
 /// it once at the top of every serializer that doesn't already know
 /// about stryke-native OO instances.
 pub fn deep_normalize(v: &StrykeValue) -> StrykeValue {
+    let mut visited: std::collections::HashSet<usize> = std::collections::HashSet::new();
+    deep_normalize_inner(v, &mut visited)
+}
+
+fn deep_normalize_inner(
+    v: &StrykeValue,
+    visited: &mut std::collections::HashSet<usize>,
+) -> StrykeValue {
     if let Some(c) = v.as_class_inst() {
         let names = class_field_names(&c.def);
         let values = c.get_values();
@@ -85,7 +93,7 @@ pub fn deep_normalize(v: &StrykeValue) -> StrykeValue {
         // emit something useful instead of panicking.
         let n = names.len().min(values.len());
         for i in 0..n {
-            map.insert(names[i].clone(), deep_normalize(&values[i]));
+            map.insert(names[i].clone(), deep_normalize_inner(&values[i], visited));
         }
         return StrykeValue::hash_ref(Arc::new(RwLock::new(map)));
     }
@@ -94,7 +102,7 @@ pub fn deep_normalize(v: &StrykeValue) -> StrykeValue {
         let mut map = IndexMap::new();
         for (i, field) in s.def.fields.iter().enumerate() {
             if let Some(elem) = values.get(i) {
-                map.insert(field.name.clone(), deep_normalize(elem));
+                map.insert(field.name.clone(), deep_normalize_inner(elem, visited));
             }
         }
         return StrykeValue::hash_ref(Arc::new(RwLock::new(map)));
@@ -109,21 +117,37 @@ pub fn deep_normalize(v: &StrykeValue) -> StrykeValue {
             StrykeValue::string(e.variant_name().to_string()),
         );
         if !e.data.is_undef() {
-            map.insert("value".to_string(), deep_normalize(&e.data));
+            map.insert("value".to_string(), deep_normalize_inner(&e.data, visited));
         }
         return StrykeValue::hash_ref(Arc::new(RwLock::new(map)));
     }
     if let Some(r) = v.as_hash_ref() {
+        // Cycle guard: pass back-edges through as UNDEF so serializers can
+        // handle them (BUG-105 — was a stack overflow on self-referential
+        // hashes/arrays).
+        let addr = Arc::as_ptr(&r) as usize;
+        if !visited.insert(addr) {
+            return StrykeValue::UNDEF;
+        }
         let inner = r.read().clone();
         let mut map = IndexMap::new();
         for (k, val) in inner.into_iter() {
-            map.insert(k, deep_normalize(&val));
+            map.insert(k, deep_normalize_inner(&val, visited));
         }
+        visited.remove(&addr);
         return StrykeValue::hash_ref(Arc::new(RwLock::new(map)));
     }
     if let Some(r) = v.as_array_ref() {
+        let addr = Arc::as_ptr(&r) as usize;
+        if !visited.insert(addr) {
+            return StrykeValue::UNDEF;
+        }
         let inner = r.read().clone();
-        let out: Vec<StrykeValue> = inner.iter().map(deep_normalize).collect();
+        let out: Vec<StrykeValue> = inner
+            .iter()
+            .map(|elem| deep_normalize_inner(elem, visited))
+            .collect();
+        visited.remove(&addr);
         return StrykeValue::array_ref(Arc::new(RwLock::new(out)));
     }
     v.clone()
