@@ -10329,7 +10329,11 @@ impl Parser {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
-                let a = self.parse_postfix()?;
+                // `parse_postfix` starts at `parse_primary` which doesn't
+                // accept the leading `&` of `&subname` — call `parse_unary`
+                // instead so `exists &main::myf` parses the same as
+                // `defined &main::myf` already does.
+                let a = self.parse_unary()?;
                 Ok(Expr {
                     kind: ExprKind::Exists(Box::new(a)),
                     line,

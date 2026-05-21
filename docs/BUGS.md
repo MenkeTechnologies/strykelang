@@ -835,23 +835,6 @@ deterministic-output property) or to compare refs by identity for `==`
 without going through numification.
 
 
-## BUG-016 — `m//g` in list context concatenates captures per match
-
-```sh
-$ stryke -e 'my @m = "a1 b2 c3" =~ /(\w)(\d)/g; print scalar @m, " / @m"'
-3 / a1 b2 c3
-$ perl   -e 'my @m = "a1 b2 c3" =~ /(\w)(\d)/g; print scalar @m, " / @m"'
-6 / a 1 b 2 c 3
-```
-
-stryke returns 3 elements (one per match, with captures concatenated);
-Perl returns 6 (each capture as its own element).
-
-Tests: `regex_g_flag_returns_full_matches_today`.
-
-Severity: **bug**. Idiomatic capture extraction breaks.
-
-
 ## BUG-020 — `$\`` (pre-match) does not parse outside string interpolation
 
 ```sh
@@ -1332,24 +1315,6 @@ $
 Tests: `prototype_of_push_is_empty_today`,
 `prototype_of_scalar_is_empty_today`,
 `prototype_of_user_sub_returns_proto_string`.
-
-Severity: **bug**.
-
-
-## BUG-053 — `exists &name` (sub existence check) is a parse error
-
-```sh
-$ stryke -e 'sub myf { 1 } exists &main::myf'
-Unexpected token BitAnd at -e line 1.
-$ perl   -e 'sub myf { 1 } print exists &main::myf ? "Y" : "N"'
-Y
-```
-
-Workaround: `defined &name` works and is functionally equivalent for
-declared subs.
-
-Tests: `exists_ampersand_subname_is_parse_error_today`,
-`defined_ampersand_subname_works`.
 
 Severity: **bug**.
 
@@ -2531,26 +2496,6 @@ call count is several times higher. Either internal call-site bytecode
 short-circuits the AOP dispatch table, or AOP intentionally suppresses
 re-entrancy. Either way the surface is wrong for observability use
 cases.
-
-
-## BUG-213 — Global match in list context returns full match strings, not per-capture values
-
-```sh
-$ s -e 'my @r = ("foo=1 bar=2 baz=3" =~ /(\w+)=(\d+)/g); print scalar(@r), ":", join(",", @r), "\n"'
-3:foo=1,bar=2,baz=3
-$ perl -e 'my @r = ("foo=1 bar=2 baz=3" =~ /(\w+)=(\d+)/g); print scalar(@r), ":", join(",", @r), "\n"'
-6:foo,1,bar,2,baz,3
-```
-
-Perl's `=~ //g` in list context returns the captures **flattened across
-matches** — `(cap1_of_match1, cap2_of_match1, cap1_of_match2, ...)`.
-Stryke returns the full match strings (`$&` of each match) instead.
-
-Affects every Perl idiom of the form `my @pairs = $s =~ /(\w+)=(\d+)/g`,
-which expects 2N elements but gets N. Pin in
-`tests/suite/regex_capture_pin.rs::global_match_in_list_context_returns_full_match_strings`.
-
-Severity: **bug** (parity gap).
 
 
 ## BUG-214 — `$\`` and `$'` (pre-match / post-match) variables not supported
