@@ -266,6 +266,9 @@ impl Parser {
                 | "all"
                 | "none"
                 | "first"
+                | "find_index"
+                | "firstidx"
+                | "first_index"
                 | "take_while"
                 | "drop_while"
                 | "skip_while"
@@ -806,18 +809,7 @@ impl Parser {
                 "return" => self.parse_return()?,
                 "last" => {
                     self.advance();
-                    let lbl = if let Token::Ident(ref s) = self.peek() {
-                        if s.chars().all(|c| c.is_uppercase() || c == '_') {
-                            let (Token::Ident(l), _) = self.advance() else {
-                                unreachable!()
-                            };
-                            Some(l)
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    };
+                    let lbl = self.try_take_loop_label();
                     let stmt = Statement {
                         label: None,
                         kind: StmtKind::Last(lbl.or(label.clone())),
@@ -827,18 +819,7 @@ impl Parser {
                 }
                 "next" => {
                     self.advance();
-                    let lbl = if let Token::Ident(ref s) = self.peek() {
-                        if s.chars().all(|c| c.is_uppercase() || c == '_') {
-                            let (Token::Ident(l), _) = self.advance() else {
-                                unreachable!()
-                            };
-                            Some(l)
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    };
+                    let lbl = self.try_take_loop_label();
                     let stmt = Statement {
                         label: None,
                         kind: StmtKind::Next(lbl.or(label.clone())),
@@ -848,12 +829,13 @@ impl Parser {
                 }
                 "redo" => {
                     self.advance();
-                    self.eat(&Token::Semicolon);
-                    Statement {
+                    let lbl = self.try_take_loop_label();
+                    let stmt = Statement {
                         label: None,
-                        kind: StmtKind::Redo(label.clone()),
+                        kind: StmtKind::Redo(lbl.or(label.clone())),
                         line,
-                    }
+                    };
+                    self.parse_stmt_postfix_modifier(stmt)?
                 }
                 "BEGIN" => {
                     self.advance();
@@ -1061,6 +1043,32 @@ impl Parser {
 
         stmt.label = label;
         Ok(stmt)
+    }
+
+    /// Consume an immediately-following loop label after `next`/`last`/`redo`.
+    /// Matches identifiers that look like Perl loop labels — uppercase letters,
+    /// digits, or `_`, and must start with a non-digit. Anything else
+    /// (lowercase function names, `if`, `unless`, `(EXPR`, …) is left for the
+    /// `EXPR`-form / postfix-modifier paths.
+    fn try_take_loop_label(&mut self) -> Option<String> {
+        let Token::Ident(s) = self.peek() else {
+            return None;
+        };
+        let mut chars = s.chars();
+        let first = chars.next()?;
+        if !(first.is_ascii_uppercase() || first == '_') {
+            return None;
+        }
+        let ok = s
+            .chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_');
+        if !ok {
+            return None;
+        }
+        let (Token::Ident(l), _) = self.advance() else {
+            unreachable!()
+        };
+        Some(l)
     }
 
     /// Handle postfix if/unless on statement-level keywords like last/next.
@@ -1754,6 +1762,9 @@ impl Parser {
                 | "detect"
                 | "find"
                 | "find_all"
+                | "find_index"
+                | "firstidx"
+                | "first_index"
                 | "ref"
                 | "rename"
                 | "require"
@@ -6457,6 +6468,29 @@ impl Parser {
                         target: Box::new(expr),
                         op: BinOp::Pow,
                         value: Box::new(r),
+                    },
+                    line,
+                })
+            }
+            Token::XAssign => {
+                // `$s x= N` has no matching `BinOp::Repeat`; desugar to
+                // `$s = $s x N` so we can reuse the existing `ExprKind::Repeat`
+                // evaluator (scalar-repeat path; list-repeat fires only when
+                // the LHS is a syntactic list literal).
+                self.advance();
+                let r = self.parse_assign_expr()?;
+                let lhs_for_repeat = expr.clone();
+                Ok(Expr {
+                    kind: ExprKind::Assign {
+                        target: Box::new(expr),
+                        value: Box::new(Expr {
+                            kind: ExprKind::Repeat {
+                                expr: Box::new(lhs_for_repeat),
+                                count: Box::new(r),
+                                list_repeat: false,
+                            },
+                            line,
+                        }),
                     },
                     line,
                 })
@@ -12078,7 +12112,15 @@ impl Parser {
                 })
             }
             // Ruby `detect` / `find` — same as `first` (first element matching block).
-            "first" | "detect" | "find" => {
+            "first" | "detect" | "find" | "find_index" | "firstidx" | "first_index" => {
+                let canonical = if matches!(
+                    name.as_str(),
+                    "find_index" | "firstidx" | "first_index"
+                ) {
+                    "find_index"
+                } else {
+                    "first"
+                };
                 // `first(CODEREF, LIST)` with parens — parse as normal call.
                 if matches!(self.peek(), Token::LParen) {
                     self.advance();
@@ -12086,7 +12128,7 @@ impl Parser {
                     self.expect(&Token::RParen)?;
                     return Ok(Expr {
                         kind: ExprKind::FuncCall {
-                            name: "first".to_string(),
+                            name: canonical.to_string(),
                             args,
                         },
                         line,
@@ -12096,7 +12138,7 @@ impl Parser {
                 if let Some(args) = self.try_parse_coderef_listop_args(line)? {
                     return Ok(Expr {
                         kind: ExprKind::FuncCall {
-                            name: "first".to_string(),
+                            name: canonical.to_string(),
                             args,
                         },
                         line,
@@ -12106,7 +12148,7 @@ impl Parser {
                 let (block, list, progress) = self.parse_block_then_list_optional_progress()?;
                 if progress.is_some() {
                     return Err(self.syntax_err(
-                        "`progress =>` is not supported for first/detect/find (use pfirst for parallel + progress)",
+                        "`progress =>` is not supported for first/detect/find/find_index (use pfirst for parallel + progress)",
                         line,
                     ));
                 }
@@ -12119,7 +12161,7 @@ impl Parser {
                 };
                 Ok(Expr {
                     kind: ExprKind::FuncCall {
-                        name: "first".to_string(),
+                        name: canonical.to_string(),
                         args: vec![cr, list],
                     },
                     line,
@@ -13688,8 +13730,9 @@ impl Parser {
             // ── functional / iterator ───────────────────────────────────────
             | "fore" | "e" | "ep" | "flat_map" | "flat_maps" | "maps" | "filter" | "fi" | "find_all" | "reduce" | "fold"
             | "inject" | "collect" | "uniq" | "distinct" | "any" | "all" | "none"
-            | "first" | "detect" | "find" | "compact" | "concat" | "chain" | "reject" | "grepv" | "flatten" | "set"
-            | "min_by" | "max_by" | "sort_by" | "tally" | "find_index"
+            | "first" | "detect" | "find" | "find_index" | "firstidx" | "first_index"
+            | "compact" | "concat" | "chain" | "reject" | "grepv" | "flatten" | "set"
+            | "min_by" | "max_by" | "sort_by" | "tally"
             | "each_with_index" | "count" | "cnt" |"len" | "group_by" | "chunk_by"
             | "zip" | "chunk" | "chunked" | "sliding_window" | "windowed"
             | "enumerate" | "with_index" | "shuffle" | "shuffled"| "heap"

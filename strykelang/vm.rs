@@ -2390,6 +2390,9 @@ impl<'a> VM<'a> {
                             | "none"
                             | "notall"
                             | "first"
+                            | "find_index"
+                            | "firstidx"
+                            | "first_index"
                             | "reduce"
                             | "reductions"
                             | "sum"
@@ -2415,6 +2418,7 @@ impl<'a> VM<'a> {
                             | "blessed"
                             | "refaddr"
                             | "reftype"
+                            | "looks_like_number"
                             | "weaken"
                             | "unweaken"
                             | "isweak"
@@ -9274,19 +9278,28 @@ impl<'a> VM<'a> {
                 ))
             }
             Some(BuiltinId::System) => {
-                let cmd = args
-                    .iter()
-                    .map(|a| a.to_string())
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                let status = std::process::Command::new("sh")
-                    .arg("-c")
-                    .arg(&cmd)
-                    .status();
+                // Perl's `system`:
+                //   - `system "cmd args"` (single string)  → `sh -c "cmd args"`
+                //   - `system "cmd", "arg1", "arg2", ...`  → exec the program
+                //     directly with the trailing args as argv (no shell).
+                // Return value is the encoded `$?` status word (exit_code << 8
+                // on a clean exit; raw signal number for signals), not the bare
+                // exit code, so `$rc == 0` <=> clean success and bit-twiddles
+                // like `($? >> 8)` work on the return value too.
+                let strs: Vec<String> = args.iter().map(|a| a.to_string()).collect();
+                if strs.is_empty() {
+                    self.interp.child_exit_status = -1;
+                    return Ok(StrykeValue::integer(-1));
+                }
+                let status = if strs.len() == 1 {
+                    std::process::Command::new("sh").arg("-c").arg(&strs[0]).status()
+                } else {
+                    std::process::Command::new(&strs[0]).args(&strs[1..]).status()
+                };
                 match status {
                     Ok(s) => {
                         self.interp.record_child_exit_status(s);
-                        Ok(StrykeValue::integer(s.code().unwrap_or(-1) as i64))
+                        Ok(StrykeValue::integer(self.interp.child_exit_status))
                     }
                     Err(e) => {
                         self.interp.errno = e.to_string();

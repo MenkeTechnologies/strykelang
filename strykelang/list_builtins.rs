@@ -54,6 +54,10 @@ pub const LIST_BUILTIN_NAMES: &[&str] = &[
     "blessed",
     "refaddr",
     "reftype",
+    "looks_like_number",
+    "find_index",
+    "firstidx",
+    "first_index",
     "weaken",
     "unweaken",
     "isweak",
@@ -140,6 +144,9 @@ pub(crate) fn dispatch_by_name(
         "none" => Some(any_all_none(interp, args, want, AnyMode::None)),
         "notall" => Some(any_all_none(interp, args, want, AnyMode::NotAll)),
         "first" => Some(first_native(interp, args, want)),
+        "find_index" | "firstidx" | "first_index" => {
+            Some(find_index_native(interp, args, want))
+        }
         "pairs" => Some(dispatch_ok(pairs_native(args))),
         "unpairs" => Some(dispatch_ok(unpairs_native(args))),
         "pairkeys" => Some(dispatch_ok(pairkeys_values(true, args))),
@@ -159,6 +166,7 @@ pub(crate) fn dispatch_by_name(
         "blessed" => Some(dispatch_ok(scalar_util_blessed(args.first()))),
         "refaddr" => Some(dispatch_ok(scalar_util_refaddr(args.first()))),
         "reftype" => Some(dispatch_ok(scalar_util_reftype(args.first()))),
+        "looks_like_number" => Some(dispatch_ok(scalar_util_looks_like_number(args.first()))),
         "weaken" | "unweaken" => Some(dispatch_ok(Ok(StrykeValue::UNDEF))),
         "isweak" => Some(dispatch_ok(Ok(StrykeValue::integer(0)))),
         // Subname helpers — return the coderef unchanged.
@@ -229,6 +237,38 @@ fn scalar_util_reftype(arg: Option<&StrykeValue>) -> crate::error::StrykeResult<
     })
     .flatten()
     .unwrap_or(StrykeValue::UNDEF))
+}
+
+/// `Scalar::Util::looks_like_number` parity. Returns truthy when the scalar
+/// stringifies into something Perl's `numify` would accept: optional sign,
+/// integer/decimal digits with optional decimal point, optional `e/E` exponent.
+/// Inf/Inf/NaN literals (case-insensitive, optional sign) also match.
+/// `undef` returns 0; numeric IV/NV scalars short-circuit to 1.
+fn scalar_util_looks_like_number(
+    arg: Option<&StrykeValue>,
+) -> crate::error::StrykeResult<StrykeValue> {
+    let Some(v) = arg else {
+        return Ok(StrykeValue::integer(0));
+    };
+    if v.is_undef() {
+        return Ok(StrykeValue::integer(0));
+    }
+    if v.is_integer_like() || v.is_float_like() {
+        return Ok(StrykeValue::integer(1));
+    }
+    let s = v.to_string();
+    let s = s.trim();
+    if s.is_empty() {
+        return Ok(StrykeValue::integer(0));
+    }
+    // Allow inf / infinity / nan with optional sign.
+    let body = s.strip_prefix(['+', '-']).unwrap_or(s);
+    let body_lower = body.to_ascii_lowercase();
+    if matches!(body_lower.as_str(), "inf" | "infinity" | "nan") {
+        return Ok(StrykeValue::integer(1));
+    }
+    let ok = s.parse::<f64>().is_ok();
+    Ok(StrykeValue::integer(if ok { 1 } else { 0 }))
 }
 
 fn dispatch_ok(r: crate::error::StrykeResult<StrykeValue>) -> ExecResult {
@@ -1041,6 +1081,35 @@ fn first_native(interp: &mut VMHelper, args: &[StrykeValue], _want: WantarrayCtx
         }
     }
     Ok(StrykeValue::UNDEF)
+}
+
+/// `find_index { BLOCK } LIST` — index of the first item for which `BLOCK`
+/// returns truthy, or `-1` if no item matches. Alias of List::MoreUtils
+/// `firstidx`/`first_index`.
+fn find_index_native(
+    interp: &mut VMHelper,
+    args: &[StrykeValue],
+    _want: WantarrayCtx,
+) -> ExecResult {
+    let code = match args.first().and_then(|x| x.as_code_ref()) {
+        Some(s) => s,
+        _ => {
+            return Err(crate::error::StrykeError::runtime(
+                "find_index: first argument must be a CODE reference",
+                0,
+            )
+            .into());
+        }
+    };
+    let items: Vec<StrykeValue> = args[1..].to_vec();
+    for (i, it) in items.into_iter().enumerate() {
+        interp.scope.set_topic(it.clone());
+        let v = interp.call_sub(&code, vec![it.clone()], WantarrayCtx::Scalar, 0)?;
+        if v.is_true() {
+            return Ok(StrykeValue::integer(i as i64));
+        }
+    }
+    Ok(StrykeValue::integer(-1))
 }
 
 fn pairs_native(args: &[StrykeValue]) -> crate::error::StrykeResult<StrykeValue> {
