@@ -3386,39 +3386,6 @@ Severity: **polish** (modern named forms work; only legacy
 punctuation form is missing).
 
 
-## BUG-258 — `m//` in list context returns boolean, not captures
-
-```sh
-$ s -e 'my @c = ("alice=30" =~ /^(\w+)=(\d+)/); print join("|", @c), "\n"'
-1
-```
-
-In Perl, `m//` in list context returns the capture groups as a list
-(or empty list if no match). The classic idiom is:
-
-```perl
-my ($key, $val) = ($s =~ /^(\w+)=(\d+)/);
-```
-
-Stryke returns just `(1)` (the boolean match result wrapped in a
-list of length 1), breaking destructuring. The destructured `$val`
-becomes `undef`.
-
-Workaround: match first, then read `$1, $2, ...`:
-
-```stryke
-$s =~ /^(\w+)=(\d+)/;
-my ($key, $val) = ($1, $2);
-```
-
-Pin: `list_context_match_returns_boolean_per_bug_258`,
-`captures_via_numbered_vars_after_match` in
-`tests/suite/regex_match_vars_pin.rs`.
-
-Severity: **bug** (P1; breaks one of the most common Perl regex
-idioms; silent destruct-to-undef makes failures very hard to spot).
-
-
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't

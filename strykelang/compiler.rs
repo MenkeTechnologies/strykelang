@@ -7730,11 +7730,22 @@ impl Compiler {
                 } else {
                     u16::MAX
                 };
+                // The match runtime reads `wantarray_kind` to decide whether
+                // to return captures as a list (BUG-258). Push the outer
+                // context around the op so destructuring assignments like
+                // `my ($k, $v) = $s =~ /^(\w+)=(\d+)/` see the captures.
+                let push_wa = ctx == WantarrayCtx::List;
+                if push_wa {
+                    self.emit_op(Op::WantarrayPush(ctx.as_byte()), line, Some(root));
+                }
                 self.emit_op(
                     Op::RegexMatch(pat_idx, flags_idx, *scalar_g, pos_key_idx),
                     line,
                     Some(root),
                 );
+                if push_wa {
+                    self.emit_op(Op::WantarrayPop, line, Some(root));
+                }
             }
 
             ExprKind::Substitution {
