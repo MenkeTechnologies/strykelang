@@ -370,16 +370,9 @@ fn format_declaration_parses() {
 // ── `$s x= N` not parsed today ───────────────────────────────────────────────
 
 #[test]
-fn x_compound_assign_is_parse_error_today() {
-    // BUG-026: `$s x= 3` → "Unexpected token Assign". Workaround:
-    // `$s = $s x 3`.
-    use stryke::error::ErrorKind;
-    let kind = parse_err_kind(r#"my $s = "ab"; $s x= 3"#);
-    assert!(
-        matches!(kind, ErrorKind::Syntax),
-        "expected syntax error, got {:?}",
-        kind
-    );
+fn x_compound_assign_repeats_string_in_place() {
+    // `$s x= N` desugars to `$s = $s x N` and modifies in place.
+    assert_eq!(eval_string(r#"my $s = "ab"; $s x= 3; $s"#), "ababab");
 }
 
 #[test]

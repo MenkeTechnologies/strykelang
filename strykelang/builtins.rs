@@ -3965,6 +3965,7 @@ pub(crate) fn try_builtin(
         "run_length_encode" | "rle" => Some(builtin_rle(args)),
         "run_length_decode" | "rld" => Some(builtin_rld(args)),
         "sliding_pairs" => Some(builtin_sliding_pairs(args)),
+        "sliding_window" => Some(builtin_sliding_window(args)),
         "consecutive_eq" => Some(builtin_consecutive_eq(args)),
         "flatten_deep" => Some(builtin_flatten_deep(interp, args)),
         // ── More trig / math ──
@@ -20254,6 +20255,33 @@ fn builtin_sliding_pairs(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let xs = flatten_args(args);
     let mut out = Vec::new();
     for w in xs.windows(2) {
+        out.push(StrykeValue::array_ref(Arc::new(RwLock::new(w.to_vec()))));
+    }
+    Ok(StrykeValue::array(out))
+}
+
+/// `sliding_window(LIST, N)` — every consecutive window of size `N`.
+/// Returns an array of arrayrefs. Empty when `N == 0` or `N > len(LIST)`.
+/// Sibling of `sliding_pairs` (which is the `N=2` specialization).
+fn builtin_sliding_window(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    // `(LIST, N)` is the documented order. The last positional arg is the
+    // window size; everything before it is the list (variadic or arrayref).
+    if args.is_empty() {
+        return Ok(StrykeValue::array(Vec::new()));
+    }
+    let (n, list_args) = if args.len() == 1 {
+        (1usize, &args[..])
+    } else {
+        let last = args[args.len() - 1].to_int();
+        let n = if last < 1 { 0 } else { last as usize };
+        (n, &args[..args.len() - 1])
+    };
+    let xs = flatten_args(list_args);
+    if n == 0 || n > xs.len() {
+        return Ok(StrykeValue::array(Vec::new()));
+    }
+    let mut out = Vec::with_capacity(xs.len() - n + 1);
+    for w in xs.windows(n) {
         out.push(StrykeValue::array_ref(Arc::new(RwLock::new(w.to_vec()))));
     }
     Ok(StrykeValue::array(out))

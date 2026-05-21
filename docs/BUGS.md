@@ -977,21 +977,6 @@ Severity: **bug**. The sub-wrapped form is the way most code uses
 given/when.
 
 
-## BUG-026 — `$s x= N` compound assignment is rejected
-
-```sh
-$ stryke -e 'my $s = "ab"; $s x= 3'
-Unexpected token Assign at -e line 1.
-```
-
-Workaround: `$s = $s x N`.
-
-Tests: `x_compound_assign_is_parse_error_today`,
-`x_compound_workaround_works`.
-
-Severity: **bug** (parse-time; small surface).
-
-
 ## BUG-028 — `@hash{@array_var}` slice returns empty list
 
 ```sh
@@ -1007,42 +992,6 @@ deref form (`@h{@$kref}`) is also broken.
 
 Tests: `hash_slice_with_literal_keys_returns_correct_values`,
 `hash_slice_with_array_var_keys_returns_empty_today`.
-
-Severity: **bug**.
-
-
-## BUG-030 — `system()` return value is exit code, not Perl's status word
-
-```sh
-$ stryke -e 'my $r = system("false"); print "r=$r ?=$?"'
-r=1 ?=256
-$ perl   -e 'my $r = system("false"); print "r=$r ?=$?"'
-r=256 ?=256
-```
-
-`$?` is set correctly (exit-code << 8). Only the *return value* of
-`system()` is wrong — it returns the bare exit code instead of the same
-value as `$?`.
-
-Tests: `system_false_returns_exit_code_not_status_word_today`,
-`system_true_returns_zero_in_both` (where the values happen to coincide).
-
-Severity: **bug**.
-
-
-## BUG-031 — `system(LIST)` form drops exit code from `$?`
-
-```sh
-$ stryke -e 'system("sh", "-c", "exit 7"); print "?=", $?'
-?=0
-$ stryke -e 'system("sh -c \"exit 7\""); print "?=", $?'
-?=1792                  # single-string shell form: correct
-$ perl   -e 'system("sh", "-c", "exit 7"); print "?=", $?'
-?=1792
-```
-
-Tests: `system_list_form_loses_exit_code_today`,
-`system_string_form_propagates_exit_code`.
 
 Severity: **bug**.
 
@@ -1439,25 +1388,6 @@ Tests: `exists_ampersand_subname_is_parse_error_today`,
 Severity: **bug**.
 
 
-## BUG-054 — `looks_like_number` not a builtin
-
-Stryke ships many `Scalar::Util` functions as built-ins (`reftype`,
-`blessed`, `weaken`, `refaddr`) but `looks_like_number` is missing.
-
-```sh
-$ stryke -e 'print looks_like_number("3.14")'
-Undefined subroutine &looks_like_number at -e line 1.
-```
-
-Workaround: regex-based check, e.g. `m/^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/`.
-
-Tests: `looks_like_number_is_not_a_builtin_today`,
-`reftype_unblessed_arrayref_is_array`,
-`blessed_returns_class_for_blessed_ref`.
-
-Severity: **bug**.
-
-
 ## BUG-055 — `\U` / `\L` not honored in `s///` replacement
 
 ```sh
@@ -1680,16 +1610,6 @@ manual `map` over indices.
 Tests: `pairwise_block_form_returns_empty_today`.
 
 Severity: **bug**.
-
-
-## BUG-067 — `find_index` not built-in
-
-`find { ... } LIST` works (returns the matching value), but Perl's
-`find_index` (returns the index of the first match) is missing.
-
-Tests: `find_index_is_not_a_builtin_today`.
-
-Severity: **bug** (parity gap with `List::Util`).
 
 
 ## BUG-068 — AOP advice cannot mutate `@INTERCEPT_ARGS` or call `proceed(NEW_ARGS)`
@@ -3046,28 +2966,6 @@ Severity: **bug** (BUG-058 marked some chunk variants — this is the
 remaining set).
 
 
-## BUG-225 — `sliding_window` appears in `%b` keys but errors on call
-
-```sh
-$ s -e 'print grep { /^sliding/ } keys %b'
-sliding_average sliding_dot_product sliding_max sliding_min sliding_pairs sliding_sum sliding_window
-
-$ s -e 'my @w = sliding_window([1,2,3,4,5], 3); print scalar(@w), "\n"'
-Undefined subroutine &sliding_window at -e line 1.
-```
-
-`sliding_window` is listed as a builtin in the reflection hash `%b` but
-calling it errors as `Undefined subroutine`. Either the reflection
-table includes a stale name, or the dispatch table is missing the
-implementation.
-
-Workaround: use `sliding_pairs` for size=2; for larger sizes, roll
-your own using `chunked` and an offset.
-
-Severity: **bug** (reflection / implementation inconsistency; minor
-discoverability hazard).
-
-
 ## BUG-226 — `mysync $x = t_digest(N)` mid-script silently corrupts the sketch type tag
 
 ```stryke
@@ -3916,70 +3814,6 @@ Pin: `list_context_match_returns_boolean_per_bug_258`,
 
 Severity: **bug** (P1; breaks one of the most common Perl regex
 idioms; silent destruct-to-undef makes failures very hard to spot).
-
-
-## BUG-260 — Loop labels containing digits silently break loop control
-
-```sh
-$ s -e '
-my @seen;
-LOOP1: for my $i (1:3) {
-    for my $j (1:3) {
-        next LOOP1 if $j == 2;
-        push @seen, "$i-$j";
-    }
-}
-print "[", join(",", @seen), "]\n"'
-[]
-```
-
-In Perl, any identifier (letters, digits, underscores; starting with
-a non-digit) is a valid label. Stryke accepts the label syntactically
-but `next LABEL` / `last LABEL` / `redo LABEL` silently fail when the
-label contains digits — no error, no warning, the loop simply
-produces empty output.
-
-Working: letter-only labels (e.g. `OUTER`, `ALPHA`, `LOOP_OUTER`).
-Broken: `L1`, `LOOP1`, `A1`, `ABC1` (any digit anywhere).
-
-Workaround: use letter-only label names.
-
-Pin: `labels_containing_digits_silently_break_per_bug_260` in
-`tests/suite/loop_control_pin.rs`.
-
-Severity: **bug** (P2; silent loop-control failure on a valid Perl
-label naming convention; very common to use numbered labels).
-
-
-## BUG-261 — `redo if EXPR;` statement-modifier form fails to parse
-
-```sh
-$ s -e '
-my $i = 0;
-for my $x (1:3) {
-    $i++;
-    redo if $i < 5;
-}'
-Expected LParen, got ScalarVar("i") at -e line 5.
-```
-
-In Perl, all loop-control verbs (`next`, `last`, `redo`) accept
-the statement-modifier form: `next if EXPR`, `last unless COND`, etc.
-Stryke supports `next if` and `last if` but not `redo if` — the
-parser rejects the bare-`redo` form as an attempt to call `redo` as
-a function.
-
-Workaround: wrap in block form.
-
-```stryke
-if (EXPR) { redo; }
-```
-
-Pin: `redo_statement_modifier_fails_per_bug_261` in
-`tests/suite/loop_control_pin.rs`.
-
-Severity: **polish** (workaround is trivial; only affects one
-statement-modifier combo; `next if` / `last if` both work fine).
 
 
 ## NOT-A-BUG observations (pinned, but documented as deliberate)

@@ -13236,24 +13236,33 @@ impl VMHelper {
 
             // System
             ExprKind::System(args) => {
+                // Perl `system`:
+                //   - single string  → `sh -c "..."`
+                //   - 2+ args        → exec program directly with the rest as
+                //                     argv (skips the shell, so quoting bugs
+                //                     in user data don't matter).
+                // Return value is `$?` (status word), not the bare exit code.
                 let mut cmd_args = Vec::new();
                 for a in args {
                     cmd_args.push(self.eval_expr(a)?.to_string());
                 }
                 if cmd_args.is_empty() {
+                    self.child_exit_status = -1;
                     return Ok(StrykeValue::integer(-1));
                 }
-                let status = Command::new("sh")
-                    .arg("-c")
-                    .arg(cmd_args.join(" "))
-                    .status();
+                let status = if cmd_args.len() == 1 {
+                    Command::new("sh").arg("-c").arg(&cmd_args[0]).status()
+                } else {
+                    Command::new(&cmd_args[0]).args(&cmd_args[1..]).status()
+                };
                 match status {
                     Ok(s) => {
                         self.record_child_exit_status(s);
-                        Ok(StrykeValue::integer(s.code().unwrap_or(-1) as i64))
+                        Ok(StrykeValue::integer(self.child_exit_status))
                     }
                     Err(e) => {
                         self.apply_io_error_to_errno(&e);
+                        self.child_exit_status = -1;
                         Ok(StrykeValue::integer(-1))
                     }
                 }
@@ -16011,12 +16020,13 @@ impl VMHelper {
             "uniq" | "distinct" | "uq" | "uniqstr" | "uniqint" | "uniqnum" | "shuffle" | "shuf"
             | "sample" | "chunked" | "chk" | "windowed" | "win" | "zip" | "zp" | "zip_shortest"
             | "zip_longest" | "mesh" | "mesh_shortest" | "mesh_longest" | "any" | "all"
-            | "none" | "notall" | "first" | "fst" | "reduce" | "rd" | "reductions" | "sum"
+            | "none" | "notall" | "first" | "fst" | "find_index" | "firstidx" | "first_index"
+            | "reduce" | "rd" | "reductions" | "sum"
             | "sum0" | "product" | "min" | "max" | "minstr" | "maxstr" | "mean" | "median"
             | "med" | "mode" | "stddev" | "std" | "variance" | "var" | "pairs" | "unpairs"
             | "pairkeys" | "pairvalues" | "pairgrep" | "pairmap" | "pairfirst" | "blessed"
-            | "refaddr" | "reftype" | "weaken" | "unweaken" | "isweak" | "set_subname"
-            | "subname" | "unicode_to_native" => {
+            | "refaddr" | "reftype" | "looks_like_number" | "weaken" | "unweaken" | "isweak"
+            | "set_subname" | "subname" | "unicode_to_native" => {
                 self.call_bare_list_builtin(name, args, line, want)
             }
             "deque" => {

@@ -309,16 +309,14 @@ fn blessed_returns_undef_for_plain_string() {
 }
 
 #[test]
-fn looks_like_number_is_not_a_builtin_today() {
-    // BUG-054: `Scalar::Util::looks_like_number` is referenced by many Perl
-    // libraries but stryke doesn't expose it as a builtin.
-    use stryke::error::ErrorKind;
-    let kind = eval_err_kind(r#"looks_like_number("3.14")"#);
-    assert!(
-        matches!(kind, ErrorKind::Runtime | ErrorKind::UndefinedSubroutine),
-        "expected undefined-subroutine, got {:?}",
-        kind
-    );
+fn looks_like_number_recognizes_numeric_strings() {
+    // `Scalar::Util::looks_like_number` parity: real numbers (incl. exponent
+    // notation and signed inf) are truthy; non-numeric strings are 0.
+    assert_eq!(eval_int(r#"looks_like_number("3.14")"#), 1);
+    assert_eq!(eval_int(r#"looks_like_number("-1e5")"#), 1);
+    assert_eq!(eval_int(r#"looks_like_number("inf")"#), 1);
+    assert_eq!(eval_int(r#"looks_like_number("nope")"#), 0);
+    assert_eq!(eval_int(r#"looks_like_number("")"#), 0);
 }
 
 // ── Sub stringification: `CODE(__ANON__)` placeholder ───────────────────────

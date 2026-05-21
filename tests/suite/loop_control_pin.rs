@@ -158,10 +158,10 @@ fn labeled_next_with_three_levels() {
 }
 
 #[test]
-fn labels_containing_digits_silently_break_per_bug_260() {
-    // Stryke surface: `LABEL1: ...` then `next LABEL1` silently
-    // matches nothing — no error, no loop control. Documented as
-    // BUG-260.
+fn labels_containing_digits_route_loop_control() {
+    // Labels with digits (e.g. `LABEL1`) are accepted as targets for
+    // next/last/redo. `next LABEL1 if $j == 2` skips to the next outer
+    // iteration after the j==1 push only.
     let code = r#"
         my @seen;
         LABEL1: for my $i (1:3) {
@@ -170,8 +170,7 @@ fn labels_containing_digits_silently_break_per_bug_260() {
                 push @seen, "$i-$j";
             }
         }
-        # Per BUG-260: stryke produces empty array.
-        len(@seen) == 0 ? 1 : 0
+        join(",", @seen) eq "1-1,2-1,3-1" ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }

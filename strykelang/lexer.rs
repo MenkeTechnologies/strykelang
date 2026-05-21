@@ -2913,6 +2913,29 @@ impl Lexer {
                 } else {
                     keyword_or_ident(&ident)
                 };
+                // `x=` is the string-repetition compound assignment. The
+                // identifier `x` has already been consumed; peek for the
+                // trailing `=` and merge into `XAssign`. Skip whitespace
+                // between `x` and `=` to mirror how Perl's lexer treats
+                // `$s x= 3` and `$s x =3` identically.
+                let tok = if matches!(tok, Token::X) {
+                    let saved_pos = self.pos;
+                    let saved_line = self.line;
+                    while matches!(self.peek(), Some(' ') | Some('\t')) {
+                        self.advance();
+                    }
+                    if self.peek() == Some('=') && self.peek_at(1) != Some('=') {
+                        self.advance();
+                        self.last_was_term = false;
+                        Token::XAssign
+                    } else {
+                        self.pos = saved_pos;
+                        self.line = saved_line;
+                        tok
+                    }
+                } else {
+                    tok
+                };
                 if matches!(tok, Token::Ident(ref s) if s == "_") {
                     self.last_was_bare_positional = true;
                 }

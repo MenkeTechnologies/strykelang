@@ -279,16 +279,11 @@ fn at_prefix_undeclared_array_evaluates_to_empty_list() {
 // ── `find_index` not implemented ────────────────────────────────────────────
 
 #[test]
-fn find_index_is_not_a_builtin_today() {
-    // BUG-067: `find_index { ... } LIST` is missing. Workaround: iterate
-    // with a counter manually, or use grep+map+0..$#.
-    use stryke::error::ErrorKind;
-    let kind = eval_err_kind(r#"find_index { $_ > 5 } 1..10"#);
-    assert!(
-        matches!(kind, ErrorKind::Runtime | ErrorKind::UndefinedSubroutine),
-        "expected undefined-sub, got {:?}",
-        kind
-    );
+fn find_index_returns_first_matching_index() {
+    // `find_index { BLOCK } LIST` returns the zero-based index of the first
+    // match, or -1 if no element matches.
+    assert_eq!(eval_int(r#"find_index { $_ > 5 } 1..10"#), 5);
+    assert_eq!(eval_int(r#"find_index { $_ > 99 } 1..10"#), -1);
 }
 
 // ── Math sanity ─────────────────────────────────────────────────────────────

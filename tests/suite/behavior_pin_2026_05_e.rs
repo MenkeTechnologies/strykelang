@@ -13,10 +13,9 @@ fn system_true_returns_zero_in_both() {
 }
 
 #[test]
-fn system_false_returns_exit_code_not_status_word_today() {
-    // BUG-030: Perl's `system()` returns the same value as `$?` (exit code in
-    // the high byte). Stryke returns the bare exit code instead.
-    assert_eq!(eval_int(r#"system("false")"#), 1);
+fn system_false_returns_status_word() {
+    // `system()` returns the same value as `$?` (exit code in the high byte).
+    assert_eq!(eval_int(r#"system("false")"#), 256);
     assert_eq!(eval_int(r#"system("false"); $?"#), 256);
 }
 
@@ -29,11 +28,11 @@ fn system_list_form_runs_without_shell() {
 }
 
 #[test]
-fn system_list_form_loses_exit_code_today() {
-    // BUG-031: list-form `system("sh", "-c", "exit 7")` returns 0 and leaves
-    // `$?` at 0; the single-string shell-quoted form correctly returns
-    // 1792.
-    assert_eq!(eval_int(r#"system("sh", "-c", "exit 7"); $?"#), 0);
+fn system_list_form_propagates_exit_code() {
+    // List-form `system("sh", "-c", "exit 7")` runs the program directly with
+    // those argv and the exit code surfaces in `$?` the same as the single-
+    // string shell form.
+    assert_eq!(eval_int(r#"system("sh", "-c", "exit 7"); $?"#), 1792);
 }
 
 #[test]
