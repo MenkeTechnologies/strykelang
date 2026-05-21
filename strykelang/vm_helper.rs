@@ -4946,7 +4946,7 @@ impl VMHelper {
     /// [`crate::builtins::try_builtin`] (`CORE::eof`, `builtin::eof`, which parse as [`ExprKind::FuncCall`],
     /// not [`ExprKind::Eof`]).
     pub(crate) fn eof_builtin_execute(
-        &self,
+        &mut self,
         args: &[StrykeValue],
         line: usize,
     ) -> StrykeResult<StrykeValue> {
@@ -4958,7 +4958,17 @@ impl VMHelper {
             })),
             1 => {
                 let name = args[0].to_string();
-                let at_eof = !self.has_input_handle(&name);
+                // `eof FH` is true when the handle is closed *or* the next
+                // read would return no data. Peek the BufReader with
+                // `fill_buf` so we don't consume the byte.
+                use std::io::BufRead;
+                let at_eof = match self.input_handles.get_mut(&name) {
+                    None => true,
+                    Some(reader) => match reader.fill_buf() {
+                        Ok(buf) => buf.is_empty(),
+                        Err(_) => true,
+                    },
+                };
                 Ok(StrykeValue::integer(if at_eof { 1 } else { 0 }))
             }
             _ => Err(StrykeError::runtime("eof: too many arguments", line)),
@@ -12324,7 +12334,31 @@ impl VMHelper {
             }
             ExprKind::Qx(e) => {
                 let cmd = self.eval_expr(e)?.to_string();
-                crate::capture::run_readpipe(self, &cmd, line).map_err(FlowOrError::Error)
+                let raw = crate::capture::run_readpipe(self, &cmd, line)
+                    .map_err(FlowOrError::Error)?;
+                if ctx == WantarrayCtx::List {
+                    // Perl `qx` in list context yields one element per line,
+                    // each terminated by `$/` (default `\n`). The final line
+                    // keeps whatever termination the command produced.
+                    let s = raw.to_string();
+                    if s.is_empty() {
+                        return Ok(StrykeValue::array(Vec::new()));
+                    }
+                    let mut lines = Vec::new();
+                    let mut buf = String::new();
+                    for c in s.chars() {
+                        buf.push(c);
+                        if c == '\n' {
+                            lines.push(StrykeValue::string(std::mem::take(&mut buf)));
+                        }
+                    }
+                    if !buf.is_empty() {
+                        lines.push(StrykeValue::string(buf));
+                    }
+                    Ok(StrykeValue::array(lines))
+                } else {
+                    Ok(raw)
+                }
             }
             ExprKind::FetchUrl(e) => {
                 let url = self.eval_expr(e)?.to_string();

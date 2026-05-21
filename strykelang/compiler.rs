@@ -6133,17 +6133,14 @@ impl Compiler {
                 let h = handle.as_ref().map(|s| self.chunk.intern_name(s));
                 self.emit_op(Op::Say(h, args.len() as u8), line, Some(root));
             }
-            ExprKind::Printf { args, .. } => {
+            ExprKind::Printf { handle, args } => {
                 // printf's format + arg list is Perl list context — ranges, arrays, and
                 // `reverse`/`sort`/`grep` flatten into format argument positions.
                 for arg in args {
                     self.compile_expr_ctx(arg, WantarrayCtx::List)?;
                 }
-                self.emit_op(
-                    Op::CallBuiltin(BuiltinId::Printf as u16, args.len() as u8),
-                    line,
-                    Some(root),
-                );
+                let h = handle.as_ref().map(|s| self.chunk.intern_name(s));
+                self.emit_op(Op::Printf(h, args.len() as u8), line, Some(root));
             }
 
             // ── Die / Warn ──
@@ -8218,8 +8215,15 @@ impl Compiler {
             }
             ExprKind::Qx(e) => {
                 self.compile_expr(e)?;
+                // Perl `qx`/backticks in list context yield one element per
+                // line; the dedicated list-context op handles the split.
+                let id = if ctx == WantarrayCtx::List {
+                    BuiltinId::ReadpipeList
+                } else {
+                    BuiltinId::Readpipe
+                };
                 self.emit_op(
-                    Op::CallBuiltin(BuiltinId::Readpipe as u16, 1),
+                    Op::CallBuiltin(id as u16, 1),
                     line,
                     Some(root),
                 );

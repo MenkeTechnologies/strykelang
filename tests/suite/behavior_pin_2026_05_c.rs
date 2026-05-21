@@ -484,12 +484,16 @@ fn backticks_scalar_context_returns_full_string() {
 }
 
 #[test]
-fn backticks_list_context_returns_single_string_today() {
-    // BUG-013: Perl returns one element per line; stryke returns one element
-    // containing the whole output.
+fn backticks_list_context_returns_line_per_element() {
+    // `qx`/backticks in list context yield one element per `\n`-terminated
+    // line, matching Perl's `qx` and `readpipe` semantics.
     assert_eq!(
         eval_int(r#"my @lines = `printf "a\nb\nc\n"`; scalar @lines"#),
-        1
+        3
+    );
+    assert_eq!(
+        eval_string(r#"my @lines = `printf "a\nb\nc\n"`; join("|", @lines)"#),
+        "a\n|b\n|c\n"
     );
 }
 
@@ -504,16 +508,19 @@ fn env_set_visible_within_stryke() {
 }
 
 #[test]
-fn env_set_not_propagated_to_subprocess_today() {
-    // BUG-014: stryke's %ENV is decoupled from the host process environment,
-    // so child processes never see writes. Captured via a uniquely-named
-    // variable to avoid collisions.
+fn env_set_propagates_to_subprocess() {
+    // Writes to `%ENV` reach the real process environment so child processes
+    // inherit the variable. Uses a uniquely-named key to avoid collisions.
     let out = eval_string(
         r#"$ENV{STRYKE_PIN_PROBE_VAR} = "yes";
-           my $r = `env | grep STRYKE_PIN_PROBE_VAR`;
-           length($r)"#,
+           my $r = `env | grep '^STRYKE_PIN_PROBE_VAR='`;
+           $r"#,
     );
-    assert_eq!(out, "0", "expected child process not to see the var");
+    assert!(
+        out.contains("STRYKE_PIN_PROBE_VAR=yes"),
+        "expected child to inherit the var, got {:?}",
+        out
+    );
 }
 
 // ── Reference equality via `==` is broken (placeholder address) ─────────────

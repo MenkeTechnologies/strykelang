@@ -814,40 +814,6 @@ Tests: `each_returns_empty_list_today`,
 Severity: **bug**. Standard hash iterator; many libraries use it.
 
 
-## BUG-013 — Backticks in list context return one big string instead of one-string-per-line
-
-```sh
-$ stryke -e 'my @lines = `printf "a\nb\nc\n"`; print scalar @lines'
-1
-$ perl   -e 'my @lines = `printf "a\nb\nc\n"`; print scalar @lines'
-3
-```
-
-Tests: `backticks_list_context_returns_single_string_today`,
-`backticks_scalar_context_returns_full_string` (the form that works).
-
-Severity: **bug**. Most shell-glue idioms break.
-
-
-## BUG-014 — `$ENV{X} = ...` not propagated to subprocesses
-
-```sh
-$ stryke -e '$ENV{STRYKE_X} = "hi"; system "env | grep STRYKE_X"'
-                       # (no output)
-$ perl   -e '$ENV{STRYKE_X} = "hi"; system "env | grep STRYKE_X"'
-STRYKE_X=hi
-```
-
-The variable is visible from inside stryke (`$ENV{STRYKE_X}` reads
-`"hi"`), but child processes do not see it. Inherited environment
-variables (HOME, PATH, …) are passed through normally.
-
-Tests: `env_set_visible_within_stryke`,
-`env_set_not_propagated_to_subprocess_today`.
-
-Severity: **bug**. Commonly used to pass config to wrapped shell calls.
-
-
 ## BUG-015 — Reference `==` always returns true (placeholder address)
 
 Stryke deliberately stringifies refs as `KIND(0x...)` with a literal
@@ -1920,28 +1886,6 @@ Tests: `possessive_quantifier_does_not_prevent_backtrack_today`,
 Severity: **bug** (regex parity).
 
 
-## BUG-085 — `printf $fh "fmt", args` writes to STDOUT, ignoring the filehandle
-
-```sh
-$ stryke -e '
-open my $fh, ">", "/tmp/o" or die;
-print  $fh "plain\n";
-printf $fh "n=%d\n", 42;
-close $fh'
-n=42                            # printf went to terminal, not file
-$ cat /tmp/o
-plain                           # only the print made it to disk
-```
-
-`print $fh ...` honors the filehandle correctly; `printf $fh ...` does
-not. Workaround: use `print $fh sprintf("fmt", args)` until printf is
-fixed.
-
-Tests: `printf_to_filehandle_writes_to_stdout_today`.
-
-Severity: **bug** (surprising; affects CSV/log writers).
-
-
 ## BUG-086 — `use constant { ... }` hashref form rejected; list form collapses
 
 ```sh
@@ -2165,27 +2109,7 @@ introduce a hashref-or-block context, not as the filehandle-disambiguator
 form. Workaround: `print $fh "data\n"` (no braces) when `$fh` is a
 simple scalar.
 
-Tests: `print_braces_filehandle_form_does_not_write_to_handle_today`,
-`print_to_filehandle_writes_to_stdout_today` (BUG-085 cousin).
-
-Severity: **bug**.
-
-
-## BUG-098 — `eof($fh)` always returns false
-
-```sh
-$ stryke -e '
-open my $fh, "<", "/tmp/x";
-my $line = <$fh>;          # "x\n", file's only line
-print eof($fh) ? "Y" : "N"'
-N                              # should be Y
-```
-
-The `eof` builtin reports false even after all data has been consumed.
-Workaround: detect end via undef return from `<$fh>`.
-
-Tests: `eof_always_returns_false_today`,
-`readline_on_eof_filehandle_returns_undef`.
+Tests: `print_braces_filehandle_form_does_not_write_to_handle_today`.
 
 Severity: **bug**.
 
