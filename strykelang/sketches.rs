@@ -2117,7 +2117,11 @@ pub(crate) fn builtin_topk_add(args: &[StrykeValue], line: usize) -> StrykeResul
         .get(2)
         .map(|v| {
             let i = v.to_int();
-            if i < 1 { 1u64 } else { i as u64 }
+            if i < 1 {
+                1u64
+            } else {
+                i as u64
+            }
         })
         .unwrap_or(1);
     t.lock().add_weighted(&key, weight);

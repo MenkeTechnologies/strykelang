@@ -725,87 +725,27 @@ impl Lexer {
     }
 
     /// Same as [`Self::read_escaped_until`] but preserves `\1`..`\9` verbatim
-    /// so the substitution replacement layer can treat them as numbered
-    /// back-references (Perl's documented `s/(\d+)/\1/` behavior). Multi-digit
-    /// octals (`\012`, `\077`) still resolve here, matching Perl.
+    /// (Perl's `s/(\d+)/\1/` numbered back-reference). Multi-digit octals
+    /// (`\012`, `\077`) still resolve here, matching Perl's documented
+    /// "two-or-more digit escapes are octal" rule.
     fn read_substitution_replacement(&mut self, term: char) -> StrykeResult<String> {
-        let mut s = String::new();
-        loop {
-            match self.advance() {
-                Some('\\') => match self.peek() {
-                    Some(d @ '1'..='9') => {
-                        // Look ahead: if a second digit follows, this is an
-                        // octal escape (`\077`), not a backref — defer to the
-                        // general path. Otherwise emit `\d` verbatim so the
-                        // replacement normalizer expands it to `${d}`.
-                        let second = {
-                            let p = self.pos + 1;
-                            self.input.get(p).copied()
-                        };
-                        if matches!(second, Some('0'..='7')) {
-                            // Multi-digit form — fall through to the shared
-                            // escape handler.
-                        } else {
-                            self.advance();
-                            s.push('\\');
-                            s.push(d);
-                            continue;
-                        }
-                        // multi-digit octal — fall through
-                        s.push_str(&self.consume_escape_after_backslash()?);
-                    }
-                    _ => s.push_str(&self.consume_escape_after_backslash()?),
-                },
-                Some(c) if c == term => return Ok(s),
-                Some(c) => s.push(c),
-                None => return Err(self.syntax_err("Unterminated string", self.line)),
-            }
-        }
-    }
-
-    /// Shared implementation of the per-character escape table used by both
-    /// [`Self::read_escaped_until`] and [`Self::read_substitution_replacement`].
-    /// Consumes the character (or characters) after a `\` and returns the
-    /// produced text. Returns an empty string on `None` (end-of-input handled
-    /// by the caller).
-    fn consume_escape_after_backslash(&mut self) -> StrykeResult<String> {
-        let mut out = String::new();
-        match self.advance() {
-            Some('n') => out.push('\n'),
-            Some('t') => out.push('\t'),
-            Some('r') => out.push('\r'),
-            Some('\\') => out.push('\\'),
-            Some(c @ '0'..='7') => {
-                let mut oct = String::new();
-                oct.push(c);
-                for _ in 0..2 {
-                    match self.peek() {
-                        Some(d) if ('0'..='7').contains(&d) => {
-                            oct.push(self.advance().unwrap());
-                        }
-                        _ => break,
-                    }
-                }
-                let val = u32::from_str_radix(&oct, 8).unwrap();
-                let ch = char::from_u32(val)
-                    .ok_or_else(|| self.syntax_err("Invalid octal escape", self.line))?;
-                out.push(ch);
-            }
-            Some(c) => {
-                // Conservative fallback for any escape not specifically handled
-                // above — preserve the backslash and the literal char. Callers
-                // that need full Perl escape coverage use `read_escaped_until`.
-                out.push('\\');
-                out.push(c);
-            }
-            None => {
-                out.push('\\');
-            }
-        }
-        Ok(out)
+        self.read_escaped_until_inner(term, true)
     }
 
     fn read_escaped_until(&mut self, term: char) -> StrykeResult<String> {
+        self.read_escaped_until_inner(term, false)
+    }
+
+    /// Body parser for `q{…}`, `s/.../.../`, etc. When `defer_single_digit` is
+    /// `true`, `\1`..`\9` (followed by a non-octal-digit) are preserved
+    /// verbatim so the substitution layer can expand them as numbered
+    /// back-references (Perl's documented `s///` behavior). Multi-digit
+    /// octals (`\012`) still resolve numerically in both modes.
+    fn read_escaped_until_inner(
+        &mut self,
+        term: char,
+        defer_single_digit: bool,
+    ) -> StrykeResult<String> {
         let mut s = String::new();
         loop {
             match self.advance() {
@@ -815,6 +755,17 @@ impl Lexer {
                     Some('r') => s.push('\r'),
                     Some('\\') => s.push('\\'),
                     Some(c @ '0'..='7') => {
+                        // In substitution-replacement mode, defer `\1`..`\9`
+                        // (with no further octal digit) so the replacement
+                        // expander can read them as numbered back-refs.
+                        if defer_single_digit
+                            && c != '0'
+                            && !matches!(self.peek(), Some('0'..='7'))
+                        {
+                            s.push('\\');
+                            s.push(c);
+                            continue;
+                        }
                         let mut oct = String::new();
                         oct.push(c);
                         for _ in 0..2 {

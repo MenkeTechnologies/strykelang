@@ -230,10 +230,7 @@ fn prototype_of_user_sub_returns_proto_string() {
 fn exists_ampersand_subname_returns_truthy_for_declared_sub() {
     // `exists &name` / `exists &Pkg::name` returns true for a declared sub
     // and false for an unknown name, matching Perl's sub-existence check.
-    assert_eq!(
-        eval_int(r#"sub myf { 1 } exists &main::myf ? 1 : 0"#),
-        1
-    );
+    assert_eq!(eval_int(r#"sub myf { 1 } exists &main::myf ? 1 : 0"#), 1);
     assert_eq!(eval_int(r#"exists &nope_not_here ? 1 : 0"#), 0);
 }
 

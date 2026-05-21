@@ -1623,7 +1623,9 @@ impl Compiler {
                     let line = subject.line;
                     let start = self.chunk.len();
                     let stash = self.array_storage_name_for_ops(name);
-                    let idx = self.chunk.intern_name(&self.qualify_stash_array_name(&stash));
+                    let idx = self
+                        .chunk
+                        .intern_name(&self.qualify_stash_array_name(&stash));
                     self.chunk.emit(Op::MakeArrayBindingRef(idx), line);
                     self.chunk.emit(Op::BlockReturnValue, line);
                     Some((start, self.chunk.len()))
@@ -3430,7 +3432,9 @@ impl Compiler {
             ExprKind::ArrayVar(name) => {
                 self.check_strict_array_access(name, line)?;
                 let stash = self.array_storage_name_for_ops(name);
-                let idx = self.chunk.intern_name(&self.qualify_stash_array_name(&stash));
+                let idx = self
+                    .chunk
+                    .intern_name(&self.qualify_stash_array_name(&stash));
                 if ctx == WantarrayCtx::List {
                     self.emit_op(Op::GetArray(idx), line, Some(root));
                 } else {
@@ -6204,7 +6208,9 @@ impl Compiler {
             ExprKind::Push { array, values } => {
                 if let ExprKind::ArrayVar(name) = &array.kind {
                     let stash = self.array_storage_name_for_ops(name);
-                    let idx = self.chunk.intern_name(&self.qualify_stash_array_name(&stash));
+                    let idx = self
+                        .chunk
+                        .intern_name(&self.qualify_stash_array_name(&stash));
                     for v in values {
                         self.compile_expr_ctx(v, WantarrayCtx::List)?;
                         self.emit_op(Op::PushArray(idx), line, Some(root));
@@ -6249,7 +6255,9 @@ impl Compiler {
             ExprKind::Pop(array) => {
                 if let ExprKind::ArrayVar(name) = &array.kind {
                     let stash = self.array_storage_name_for_ops(name);
-                    let idx = self.chunk.intern_name(&self.qualify_stash_array_name(&stash));
+                    let idx = self
+                        .chunk
+                        .intern_name(&self.qualify_stash_array_name(&stash));
                     self.emit_op(Op::PopArray(idx), line, Some(root));
                 } else if let ExprKind::Deref {
                     expr: aref_expr,
@@ -6277,7 +6285,9 @@ impl Compiler {
             ExprKind::Shift(array) => {
                 if let ExprKind::ArrayVar(name) = &array.kind {
                     let stash = self.array_storage_name_for_ops(name);
-                    let idx = self.chunk.intern_name(&self.qualify_stash_array_name(&stash));
+                    let idx = self
+                        .chunk
+                        .intern_name(&self.qualify_stash_array_name(&stash));
                     self.emit_op(Op::ShiftArray(idx), line, Some(root));
                 } else if let ExprKind::Deref {
                     expr: aref_expr,
@@ -7367,7 +7377,9 @@ impl Compiler {
                 ExprKind::ArrayVar(name) => {
                     self.check_strict_array_access(name, line)?;
                     let stash = self.array_storage_name_for_ops(name);
-                    let idx = self.chunk.intern_name(&self.qualify_stash_array_name(&stash));
+                    let idx = self
+                        .chunk
+                        .intern_name(&self.qualify_stash_array_name(&stash));
                     self.emit_op(Op::MakeArrayBindingRef(idx), line, Some(root));
                 }
                 ExprKind::HashVar(name) => {
@@ -8259,11 +8271,7 @@ impl Compiler {
                 } else {
                     BuiltinId::Readpipe
                 };
-                self.emit_op(
-                    Op::CallBuiltin(id as u16, 1),
-                    line,
-                    Some(root),
-                );
+                self.emit_op(Op::CallBuiltin(id as u16, 1), line, Some(root));
             }
             ExprKind::FetchUrl(e) => {
                 self.compile_expr(e)?;
@@ -8349,7 +8357,9 @@ impl Compiler {
             }
             StringPart::ArrayVar(name) => {
                 let stash = self.array_storage_name_for_ops(name);
-                let idx = self.chunk.intern_name(&self.qualify_stash_array_name(&stash));
+                let idx = self
+                    .chunk
+                    .intern_name(&self.qualify_stash_array_name(&stash));
                 self.emit_op(Op::GetArray(idx), line, parent);
                 self.emit_op(Op::ArrayStringifyListSep, line, parent);
             }

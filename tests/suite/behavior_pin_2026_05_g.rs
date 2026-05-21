@@ -260,29 +260,23 @@ fn delete_single_array_index_undefs_element() {
 }
 
 #[test]
-fn delete_array_slice_is_rejected_today() {
-    // BUG-042: `delete @a[1..3]` should undef multiple elements and return
-    // the deleted values. Stryke rejects with "delete requires hash or
-    // array element".
-    use stryke::error::ErrorKind;
-    let kind = eval_err_kind(r#"my @a = (10..15); delete @a[1..3]; "@a""#);
-    assert!(
-        matches!(kind, ErrorKind::Runtime | ErrorKind::Type),
-        "expected runtime error, got {:?}",
-        kind
+fn delete_array_slice_undefs_multiple_elements() {
+    // `delete @a[1..3]` undefs the elements in the index range; trailing
+    // elements keep their positions.
+    assert_eq!(
+        eval_string(
+            r#"my @a = (10..15); delete @a[1..3]; join(",", map { defined($_) ? $_ : "_" } @a)"#
+        ),
+        "10,_,_,_,14,15"
     );
 }
 
 #[test]
-fn delete_hash_slice_is_rejected_today() {
-    // BUG-043: `delete @h{qw(a b)}` similarly rejected.
-    use stryke::error::ErrorKind;
-    let kind =
-        eval_err_kind(r#"my %h = (a=>1, b=>2, c=>3); delete @h{qw(a b)}; join(",", sort keys %h)"#);
-    assert!(
-        matches!(kind, ErrorKind::Runtime | ErrorKind::Type),
-        "expected runtime error, got {:?}",
-        kind
+fn delete_hash_slice_drains_named_keys() {
+    // `delete @h{qw(a b)}` removes both keys at once.
+    assert_eq!(
+        eval_string(r#"my %h = (a=>1, b=>2, c=>3); delete @h{qw(a b)}; join(",", sort keys %h)"#),
+        "c"
     );
 }
 

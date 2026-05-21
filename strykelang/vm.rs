@@ -4525,10 +4525,7 @@ impl<'a> VM<'a> {
                                 flat.push(a.clone());
                             }
                         }
-                        let s = match self
-                            .interp
-                            .perl_sprintf_stringify(&fmt, &flat, self.line())
-                        {
+                        let s = match self.interp.perl_sprintf_stringify(&fmt, &flat, self.line()) {
                             Ok(s) => s,
                             Err(FlowOrError::Error(e)) => return Err(e),
                             Err(FlowOrError::Flow(_)) => {
@@ -4548,11 +4545,8 @@ impl<'a> VM<'a> {
                                 .interp
                                 .resolve_io_handle_name(self.interp.default_print_handle.as_str()),
                         };
-                        self.interp.write_formatted_print(
-                            handle_name.as_str(),
-                            &s,
-                            self.line(),
-                        )?;
+                        self.interp
+                            .write_formatted_print(handle_name.as_str(), &s, self.line())?;
                         self.push(StrykeValue::integer(1));
                         Ok(())
                     }
@@ -9357,9 +9351,14 @@ impl<'a> VM<'a> {
                     return Ok(StrykeValue::integer(-1));
                 }
                 let status = if strs.len() == 1 {
-                    std::process::Command::new("sh").arg("-c").arg(&strs[0]).status()
+                    std::process::Command::new("sh")
+                        .arg("-c")
+                        .arg(&strs[0])
+                        .status()
                 } else {
-                    std::process::Command::new(&strs[0]).args(&strs[1..]).status()
+                    std::process::Command::new(&strs[0])
+                        .args(&strs[1..])
+                        .status()
                 };
                 match status {
                     Ok(s) => {
@@ -9436,9 +9435,7 @@ impl<'a> VM<'a> {
                         if p < 0 {
                             -1
                         } else {
-                            let end = (p as usize)
-                                .saturating_add(sub.len())
-                                .min(s.len());
+                            let end = (p as usize).saturating_add(sub.len()).min(s.len());
                             s[..end].rfind(&sub).map(|i| i as i64).unwrap_or(-1)
                         }
                     }
