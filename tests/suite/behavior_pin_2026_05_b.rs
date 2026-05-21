@@ -352,26 +352,19 @@ fn sprintf_undef_stringifies_to_empty() {
     assert_eq!(eval_string(r#"sprintf("[%s]", undef)"#), "[]");
 }
 
-// ── `caller(N)` returns subroutine name as undef today ────────────────────────
-//
-// BUG-005: `(caller(N))[3]` should be the fully-qualified subroutine name.
-// stryke leaves it undef (joins to empty in the output).
+// ── `caller(N)` returns the current sub's name in the 4th field ────────────
 
 #[test]
-fn caller_zero_omits_subroutine_name_today() {
+fn caller_zero_includes_subroutine_name() {
     let out = eval_string(
         r#"sub gx { my @c = caller(0); join(",", map { defined $_ ? $_ : "" } @c[0,1,3]) }
            sub fnx { gx() }
            fnx()"#,
     );
-    // First two are package + filename, both populated. Fourth (sub name) is
-    // currently empty — pin that.
+    // Fields 0,1,3 → package, filename, sub-name. Stryke stores the unqualified
+    // name in the registry today; the field is populated, no longer empty.
     assert!(out.starts_with("main,-e,"), "unexpected prefix: {:?}", out);
-    assert!(
-        out.ends_with(","),
-        "expected trailing empty subname, got {:?}",
-        out
-    );
+    assert!(out.ends_with(",gx"), "expected ',gx' suffix, got {:?}", out);
 }
 
 // ── `kv-slice` yields key-value pairs (BUG-008 FIXED) ────────────────────────

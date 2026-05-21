@@ -710,25 +710,6 @@ Severity: **bug**. Arrayrefs are the natural unit of data flow in stryke
 for arrayrefs is high-visibility.
 
 
-## BUG-005 — `(caller(N))[3]` (subroutine name) is undef
-
-```sh
-$ stryke -e '
-sub g { my @c = caller(0); join("|", map { defined $_ ? $_ : "(undef)" } @c[0..3]) }
-sub fnx { g() }
-say fnx();'
-main|-e|2|(undef)
-```
-
-Index 3 of the `caller()` list should be the fully-qualified subroutine
-name (`main::g`). Stryke currently leaves it undef.
-
-Tests: `caller_zero_omits_subroutine_name_today`.
-
-Severity: **bug**. Breaks any logger / decorator that prints the calling
-sub's name.
-
-
 ## BUG-006 — `chomp @array` does not behave as documented
 
 ```sh

@@ -10,13 +10,16 @@ use crate::common::*;
 // ── shape: always returns a 3-tuple ───────────────────────────────
 
 #[test]
-fn caller_zero_returns_three_elements() {
+fn caller_zero_returns_four_elements() {
+    // Stryke's caller returns (package, file, line, subname). Field 3 is the
+    // sub being executed (fully qualified when stored that way in the sub
+    // registry).
     let code = r#"
         fn Demo::CS::leaf() {
             my @c = caller(0);
             len(@c)
         }
-        Demo::CS::leaf() == 3 ? 1 : 0
+        Demo::CS::leaf() == 4 ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }
@@ -117,7 +120,7 @@ fn caller_at_top_level_returns_non_empty() {
         # In Perl, caller(0) at top-level returns empty list.
         # Stryke returns 3 elements with main/file/line.
         my @c = caller(0);
-        len(@c) == 3 ? 1 : 0
+        len(@c) == 4 ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }
@@ -129,8 +132,9 @@ fn caller_past_stack_depth_returns_non_empty() {
             my @c = caller(99);
             len(@c)
         }
-        # In Perl this would be 0 (empty list). Stryke returns 3.
-        Demo::CSP::probe() == 3 ? 1 : 0
+        # In Perl this would be 0 (empty list). Stryke returns the 4-tuple
+        # regardless of stack depth (BUG-249 still open).
+        Demo::CSP::probe() == 4 ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }
@@ -144,7 +148,7 @@ fn caller_n_increments_returns_same_shape() {
             my @c0 = caller(0);
             my @c1 = caller(1);
             my @c2 = caller(2);
-            (len(@c0) == 3 && len(@c1) == 3 && len(@c2) == 3) ? 1 : 0
+            (len(@c0) == 4 && len(@c1) == 4 && len(@c2) == 4) ? 1 : 0
         }
         fn Demo::CSD::mid() { Demo::CSD::leaf() }
         fn Demo::CSD::top() { Demo::CSD::mid() }
@@ -157,14 +161,14 @@ fn caller_n_increments_returns_same_shape() {
 
 #[test]
 fn caller_scalar_context_is_field_count_not_package() {
-    // Stryke surface: `scalar(caller(0))` returns the field count (3)
-    // rather than the package. Perl returns just the package in scalar
-    // context. Documented under BUG-248 / BUG-249.
+    // Stryke surface: `scalar(caller(0))` returns the field count (now 4
+    // since the sub-name field landed) rather than the package. Perl
+    // returns just the package in scalar context — tracked under BUG-248.
     let code = r#"
         fn Demo::CSC::leaf() {
             scalar(caller(0))
         }
-        Demo::CSC::leaf() == 3 ? 1 : 0
+        Demo::CSC::leaf() == 4 ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }
@@ -178,7 +182,7 @@ fn caller_inside_closure_returns_shape() {
             my @c = caller(0);
             len(@c)
         };
-        $c->() == 3 ? 1 : 0
+        $c->() == 4 ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }
@@ -233,8 +237,8 @@ fn caller_inside_recursive_fn_stable_per_frame() {
             len(@c) + Demo::CSR::rec($n - 1)
         }
         # rec(3) -> rec(2) -> rec(1) -> rec(0)=0. Three frames each
-        # return 3; 3+3+3+0 = 9.
-        Demo::CSR::rec(3) == 9 ? 1 : 0
+        # return 4 (caller returns a 4-tuple); 4+4+4+0 = 12.
+        Demo::CSR::rec(3) == 12 ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }
@@ -264,7 +268,9 @@ fn caller_fields_join_to_one_line() {
             $s
         }
         my $s = Demo::CSJ::leaf();
-        ($s =~ /^main\|/ && $s =~ /\|\d+$/) ? 1 : 0
+        # 4-tuple: package | file | line | sub-name. The sub stash records the
+        # fully qualified name (`Demo::CSJ::leaf`) for fn-decl'd subs.
+        ($s =~ /^main\|/ && $s =~ /\|Demo::CSJ::leaf$/) ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }
@@ -278,7 +284,7 @@ fn caller_negative_n_returns_shape() {
             my @c = caller(-1);
             len(@c)
         }
-        Demo::CSN::leaf() == 3 ? 1 : 0
+        Demo::CSN::leaf() == 4 ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }

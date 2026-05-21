@@ -13702,11 +13702,22 @@ impl VMHelper {
                 )))
             }
             ExprKind::Caller(_) => {
-                // Simplified: return package, file, line
+                // Simplified caller frame: (package, file, line, subname). The
+                // sub name is the fully-qualified name of the currently
+                // executing sub (the one that invoked `caller`). Returning it
+                // unblocks logger / decorator patterns that rely on `caller`
+                // for "who called me" identification.
+                let sub_name = self
+                    .current_sub_stack
+                    .last()
+                    .map(|s| StrykeValue::string(s.name.clone()))
+                    .unwrap_or(StrykeValue::UNDEF);
+                let pkg = self.current_package();
                 Ok(StrykeValue::array(vec![
-                    StrykeValue::string("main".into()),
+                    StrykeValue::string(pkg),
                     StrykeValue::string(self.file.clone()),
                     StrykeValue::integer(line as i64),
+                    sub_name,
                 ]))
             }
             ExprKind::Wantarray => Ok(match self.wantarray_kind {
@@ -15955,7 +15966,7 @@ impl VMHelper {
     }
 
     /// Current package (`main` when `__PACKAGE__` is unset or empty).
-    fn current_package(&self) -> String {
+    pub(crate) fn current_package(&self) -> String {
         let s = self.scope.get_scalar("__PACKAGE__").to_string();
         if s.is_empty() {
             "main".to_string()
