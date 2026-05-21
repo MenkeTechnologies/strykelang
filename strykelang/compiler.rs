@@ -6345,8 +6345,10 @@ impl Compiler {
                     } else {
                         self.emit_op(Op::LoadUndef, line, Some(root));
                     }
+                    // Replacement LIST is Perl list context — arrays splat
+                    // their elements instead of being scalarized to a count.
                     for r in replacement {
-                        self.compile_expr(r)?;
+                        self.compile_expr_ctx(r, WantarrayCtx::List)?;
                     }
                     let nargs = (3 + replacement.len()) as u8;
                     self.emit_op(

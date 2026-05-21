@@ -6114,28 +6114,63 @@ impl VMHelper {
         let from_chars = Self::tr_expand_ranges(from);
         let to_chars = Self::tr_expand_ranges(to);
         let delete_mode = flags.contains('d');
+        let complement = flags.contains('c');
+        let squash = flags.contains('s');
+
         let mut count = 0i64;
-        let new_s: String = s
-            .chars()
-            .filter_map(|c| {
-                if let Some(pos) = from_chars.iter().position(|&fc| fc == c) {
-                    count += 1;
-                    if delete_mode {
-                        // /d — delete characters that match but have no replacement
-                        if pos < to_chars.len() {
-                            Some(to_chars[pos])
-                        } else {
-                            None // delete this character
-                        }
-                    } else {
-                        // Normal mode: use last char in to_chars if pos exceeds, or keep original
-                        Some(to_chars.get(pos).or(to_chars.last()).copied().unwrap_or(c))
-                    }
+        let mut new_s = String::with_capacity(s.len());
+        let mut last_out: Option<char> = None;
+        for c in s.chars() {
+            let in_from = from_chars.iter().position(|&fc| fc == c);
+            let matched = if complement {
+                in_from.is_none()
+            } else {
+                in_from.is_some()
+            };
+            if !matched {
+                new_s.push(c);
+                last_out = Some(c);
+                continue;
+            }
+            count += 1;
+            // Pick the replacement character.
+            //   - complement: every matched char maps to the LAST char of `to`
+            //     (Perl behavior); `tr/0-9//c` with empty `to` falls through to
+            //     the keep/delete decision below.
+            //   - direct: matched chars map by position, with the last `to`
+            //     char duplicating if `from` is longer (unless `/d` is set).
+            let out_c = if complement {
+                to_chars.last().copied()
+            } else if let Some(pos) = in_from {
+                if pos < to_chars.len() {
+                    Some(to_chars[pos])
+                } else if delete_mode {
+                    None
                 } else {
-                    Some(c)
+                    to_chars.last().copied().or(Some(c))
                 }
-            })
-            .collect();
+            } else {
+                None
+            };
+            let out_c = match out_c {
+                Some(c) => c,
+                None => {
+                    // No replacement available — either `/d` deletes, or there
+                    // was no `to` char at all; keep the original character to
+                    // match Perl's "tr/X//" identity behavior.
+                    if delete_mode {
+                        continue;
+                    }
+                    c
+                }
+            };
+            if squash && last_out == Some(out_c) {
+                continue;
+            }
+            new_s.push(out_c);
+            last_out = Some(out_c);
+        }
+
         if flags.contains('r') {
             // /r — non-destructive: return the modified string, leave target unchanged
             Ok(StrykeValue::string(new_s))
@@ -6189,7 +6224,17 @@ impl VMHelper {
             Some(v) => v.clone(),
         };
         let (off, end) = splice_compute_range(arr_len, &offset_val, &length_val);
-        let rep_vals: Vec<StrykeValue> = args.iter().skip(3).cloned().collect();
+        // Perl's `splice LIST` is list context — `@arr` and other list-valued
+        // operands splat into the replacement, instead of being scalarized to
+        // their element count. Mirrors `push`/`unshift` flattening.
+        let mut rep_vals: Vec<StrykeValue> = Vec::new();
+        for a in args.iter().skip(3) {
+            if let Some(items) = a.as_array_vec() {
+                rep_vals.extend(items);
+            } else {
+                rep_vals.push(a.clone());
+            }
+        }
         let removed = self.scope.splice_in_place(&arr_name, off, end, rep_vals)?;
         Ok(match self.wantarray_kind {
             WantarrayCtx::Scalar => removed.last().cloned().unwrap_or(StrykeValue::UNDEF),
@@ -20334,6 +20379,31 @@ impl VMHelper {
         Err(StrykeError::runtime("splice argument is not an ARRAY reference", line).into())
     }
 
+    /// Splice's LIST argument is Perl list context — any `@arr` / range /
+    /// list-returning expression is flattened into the inserted values
+    /// instead of being scalarized to its element count. Mirrors how
+    /// `push`/`unshift` evaluate trailing args.
+    fn eval_splice_replacement(
+        &mut self,
+        replacement: &[Expr],
+    ) -> Result<Vec<StrykeValue>, FlowOrError> {
+        let saved = self.wantarray_kind;
+        self.wantarray_kind = WantarrayCtx::List;
+        let mut out = Vec::new();
+        for r in replacement {
+            let v = self.eval_expr_ctx(r, WantarrayCtx::List)?;
+            if let Some(items) = v.as_array_vec() {
+                out.extend(items);
+            } else if v.is_iterator() {
+                out.extend(v.into_iterator().collect_all());
+            } else {
+                out.push(v);
+            }
+        }
+        self.wantarray_kind = saved;
+        Ok(out)
+    }
+
     pub(crate) fn eval_splice_expr(
         &mut self,
         array: &Expr,
@@ -20354,10 +20424,7 @@ impl VMHelper {
             } else {
                 StrykeValue::UNDEF
             };
-            let mut rep_vals = Vec::new();
-            for r in replacement {
-                rep_vals.push(self.eval_expr(r)?);
-            }
+            let rep_vals = self.eval_splice_replacement(replacement)?;
             let saved = self.wantarray_kind;
             self.wantarray_kind = ctx;
             let out = self.splice_array_deref(aref, offset_val, length_val, rep_vals, line);
@@ -20377,10 +20444,7 @@ impl VMHelper {
             StrykeValue::UNDEF
         };
         let (off, end) = splice_compute_range(arr_len, &offset_val, &length_val);
-        let mut rep_vals = Vec::new();
-        for r in replacement {
-            rep_vals.push(self.eval_expr(r)?);
-        }
+        let rep_vals = self.eval_splice_replacement(replacement)?;
         let removed = self
             .scope
             .splice_in_place(&arr_name, off, end, rep_vals)
