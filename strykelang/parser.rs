@@ -9183,6 +9183,41 @@ impl Parser {
                     self.advance();
                     let inner = self.parse_expression()?;
                     self.expect(&Token::RBrace)?;
+                    // `@{$href}{k1,k2}` — hash slice through a hashref using
+                    // the curly-brace deref form. Mirrors the `@$href{KEYS}`
+                    // path (BUG-091/BUG-217). Likewise `@{$aref}[i,j]` is the
+                    // array-slice-through-arrayref form.
+                    if matches!(self.peek(), Token::LBrace) {
+                        self.advance();
+                        let keys = self.parse_slice_arg_list(true)?;
+                        self.expect(&Token::RBrace)?;
+                        return Ok(Expr {
+                            kind: ExprKind::HashSliceDeref {
+                                container: Box::new(inner),
+                                keys,
+                            },
+                            line,
+                        });
+                    }
+                    if matches!(self.peek(), Token::LBracket) {
+                        self.advance();
+                        let indices = self.parse_slice_arg_list(false)?;
+                        self.expect(&Token::RBracket)?;
+                        let source = Expr {
+                            kind: ExprKind::Deref {
+                                expr: Box::new(inner),
+                                kind: Sigil::Array,
+                            },
+                            line,
+                        };
+                        return Ok(Expr {
+                            kind: ExprKind::AnonymousListSlice {
+                                source: Box::new(source),
+                                indices,
+                            },
+                            line,
+                        });
+                    }
                     return Ok(Expr {
                         kind: ExprKind::Deref {
                             expr: Box::new(inner),
