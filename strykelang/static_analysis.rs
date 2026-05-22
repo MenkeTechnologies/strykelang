@@ -1,6 +1,7 @@
 //! Static analysis pass for detecting undefined variables and subroutines.
 
 use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use crate::ast::{
@@ -58,6 +59,10 @@ pub struct StaticAnalyzer {
     /// would. Topic vars (`$_0`, `@_1`, …) and special vars (`$_`,
     /// `@ARGV`, `%ENV`, …) stay exempt regardless.
     strict_vars: bool,
+    /// Canonicalized paths of files already walked for `require` so the
+    /// declaration sweep doesn't loop on `require A` / `require B` /
+    /// `require A` cycles.
+    seen_required_files: HashSet<PathBuf>,
 }
 
 impl StaticAnalyzer {
@@ -85,6 +90,7 @@ impl StaticAnalyzer {
             file: file.to_string(),
             current_package: "main".to_string(),
             strict_vars,
+            seen_required_files: HashSet::new(),
         }
     }
 
@@ -194,6 +200,13 @@ impl StaticAnalyzer {
             StmtKind::Use { module, .. } => {
                 self.declare_sub(module);
             }
+            // `require "./lib/foo.stk"` / `require Foo::Bar` — parse the
+            // pulled-in file and register its sub declarations so callers
+            // like `Project::Foo::bar()` are not flagged as undefined.
+            // Postfix-modifier `require … if COND;` lowers to a
+            // `PostfixIf`-wrapped expression inside an Expression statement,
+            // so this walker hits the inner Require either way.
+            StmtKind::Expression(e) => self.collect_required_subs_from_expr(e),
             StmtKind::Block(b)
             | StmtKind::StmtGroup(b)
             | StmtKind::Begin(b)
@@ -249,6 +262,133 @@ impl StaticAnalyzer {
             }
             _ => {}
         }
+    }
+
+    /// Pull sub declarations out of a `require "./path"` / `require Module`
+    /// inside an expression. The analyzer scans the required file's AST so
+    /// callers of imported subs aren't flagged as undefined.
+    ///
+    /// Only static string-literal paths (`require "./lib/foo.stk"`) and
+    /// bareword module specs (`require Foo::Bar`) are followed. Dynamic
+    /// `require $var` is skipped — the analyzer can't know the target.
+    fn collect_required_subs_from_expr(&mut self, expr: &Expr) {
+        match &expr.kind {
+            ExprKind::Require(inner) => {
+                let Some(spec) = static_string_value(inner) else {
+                    return;
+                };
+                self.follow_require(&spec);
+            }
+            ExprKind::PostfixIf { expr: inner, .. }
+            | ExprKind::PostfixUnless { expr: inner, .. } => {
+                self.collect_required_subs_from_expr(inner);
+            }
+            _ => {}
+        }
+    }
+
+    /// Parse the file named by `spec` (relative to the current analyzed
+    /// file when prefixed with `./` / `../`, otherwise treated as a Perl
+    /// module specifier `Foo::Bar` → `Foo/Bar.pm`) and merge every sub
+    /// declaration it contains into the analyzer's scope. Recurses into
+    /// chained `require`s. Silently skips any path that fails to resolve
+    /// or parse — the runtime will surface the same error if it matters.
+    fn follow_require(&mut self, spec: &str) {
+        let spec = spec.trim();
+        if spec.is_empty() {
+            return;
+        }
+        // Pragma-style requires (`require strict;`) install nothing
+        // user-visible; skip cheaply.
+        if matches!(
+            spec,
+            "strict" | "warnings" | "utf8" | "feature" | "v5"
+                | "threads" | "Thread::Pool" | "Parallel::ForkManager"
+        ) {
+            return;
+        }
+        let Some(target) = self.resolve_require_path(spec) else {
+            return;
+        };
+        let canon = target.canonicalize().unwrap_or(target.clone());
+        if !self.seen_required_files.insert(canon.clone()) {
+            return; // already walked
+        }
+        let Ok(src) = std::fs::read_to_string(&target) else {
+            return;
+        };
+        let file_str = target.to_string_lossy().into_owned();
+        let Ok(program) = crate::parse_module_with_file(&src, &file_str) else {
+            return;
+        };
+        // Save and restore the caller's package — required files routinely
+        // contain their own `package …;` declarations that shouldn't leak.
+        let saved_pkg = std::mem::replace(&mut self.current_package, "main".to_string());
+        for stmt in &program.statements {
+            self.collect_declarations_stmt(stmt);
+        }
+        self.current_package = saved_pkg;
+    }
+
+    /// Map a `require` spec to a filesystem path the analyzer can read.
+    /// `./path` and `../path` are resolved relative to the analyzed file's
+    /// directory. Bareword `Foo::Bar` becomes `Foo/Bar.pm` searched under
+    /// the analyzed file's directory and `lib/` next to it. Absolute paths
+    /// pass through unchanged.
+    fn resolve_require_path(&self, spec: &str) -> Option<PathBuf> {
+        let p = Path::new(spec);
+        if p.is_absolute() {
+            return p.exists().then(|| p.to_path_buf());
+        }
+        // `./foo` / `../foo` resolve relative to CWD (matches the runtime
+        // `require_relative_path` rule). Fall back to the analyzed file's
+        // directory when CWD doesn't yield a hit — IDE / LSP callers often
+        // pass absolute file paths without changing into the project root.
+        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let file_dir = Path::new(&self.file)
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| PathBuf::from("."));
+        if spec.starts_with("./") || spec.starts_with("../") {
+            for base in [cwd.clone(), file_dir.clone()] {
+                let candidate = base.join(spec);
+                if candidate.exists() {
+                    return Some(candidate);
+                }
+            }
+            return None;
+        }
+        // Bareword `Foo::Bar` form: walk a small @INC-like search list.
+        if spec.contains("::") || spec.ends_with(".pm") || spec.ends_with(".stk") {
+            let relpath: PathBuf = if spec.ends_with(".pm") || spec.ends_with(".stk") {
+                PathBuf::from(spec)
+            } else {
+                PathBuf::from(spec.replace("::", "/")).with_extension("pm")
+            };
+            let bases = [
+                cwd.clone(),
+                cwd.join("lib"),
+                file_dir.clone(),
+                file_dir.join("lib"),
+                PathBuf::from("lib"),
+            ];
+            for prefix in bases {
+                let candidate = prefix.join(&relpath);
+                if candidate.exists() {
+                    return Some(candidate);
+                }
+            }
+            return None;
+        }
+        // Plain filename without a directory prefix — try CWD then the
+        // analyzed file's directory.
+        for base in [cwd, file_dir] {
+            let candidate = base.join(spec);
+            if candidate.exists() {
+                return Some(candidate);
+            }
+        }
+        None
     }
 
     fn analyze_stmt(&mut self, stmt: &Statement) {
@@ -969,6 +1109,28 @@ fn is_special_var(name: &str) -> bool {
 /// `%_1{k}` are all legitimate topic-var spellings.
 fn is_topic_var(name: &str) -> bool {
     name.starts_with('_') && name.len() > 1 && name[1..].chars().all(|c| c.is_ascii_digit())
+}
+
+/// If `e` is a literal string / single-segment interpolated string / bareword,
+/// return its constant text. Used for `require "LITERAL"` / `require Mod::Name`.
+/// Returns `None` for any dynamic expression — the analyzer can't follow those.
+fn static_string_value(e: &Expr) -> Option<String> {
+    match &e.kind {
+        ExprKind::String(s) => Some(s.clone()),
+        ExprKind::Bareword(s) => Some(s.clone()),
+        ExprKind::InterpolatedString(parts) => {
+            // All parts must be literal text — no variable interpolation.
+            let mut out = String::new();
+            for part in parts {
+                match part {
+                    StringPart::Literal(s) => out.push_str(s),
+                    _ => return None,
+                }
+            }
+            Some(out)
+        }
+        _ => None,
+    }
 }
 
 pub fn analyze_program(program: &Program, file: &str) -> StrykeResult<()> {
