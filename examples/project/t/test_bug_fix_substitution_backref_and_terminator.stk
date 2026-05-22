@@ -1,0 +1,61 @@
+#!/usr/bin/env stryke
+# Demo + regression test for BUG-076 and the follow-up that preserved
+# the original `read_escaped_until` terminator-escape handling:
+#
+# - `\1`..`\9` inside `s/.../.../...` replacement now denote numbered
+#   back-references instead of literal octal escapes.
+# - `\<term>` (e.g. `\/` inside `s/.../.../...`) still drops the
+#   backslash so a literal terminator survives in the body.
+# - Multi-digit forms (`\010`, `\077`) still resolve as octal escapes.
+
+# BUG-076 numbered backref.
+my $s = "ab123cd"
+$s =~ s/(\d+)/[\1]/
+$s |> assert_eq("ab[123]cd", "\\1 expands to capture 1")
+
+# Two captures, swap with backrefs.
+my $swap = "ab"
+$swap =~ s/(a)(b)/\2\1/
+$swap |> assert_eq("ba", "\\2\\1 swap captures")
+
+# Three captures.
+my $t = "alice=30"
+$t =~ s/(\w+)=(\d+)/$1 is $2/
+$t |> assert_eq("alice is 30", "\$1/\$2 in same replacement")
+
+# Mix of \N and $N forms.
+my $mix = "abc"
+$mix =~ s/(.)(.)(.)/\3-$2-\1/
+$mix |> assert_eq("c-b-a", "interleaved \\N and \$N forms")
+
+# Terminator escape: \/ inside s/.../.../...
+my $path = "abc"
+$path =~ s/b/\//
+$path |> assert_eq("a/c", "\\/ produces literal slash")
+
+# Alternate delimiters drop their own terminator escape.
+my $bang = "abc"
+$bang =~ s!b!\!!
+$bang |> assert_eq("a!c", "\\! drops backslash inside s!...!...!")
+
+my $hash = "abc"
+$hash =~ s#b#\##
+$hash |> assert_eq("a#c", "\\# drops backslash inside s#...#...#")
+
+# Multi-digit form remains octal (Perl convention).
+my $octal = "x"
+$octal =~ s/x/\010/    # \010 = octal 0o10 = 0x08 = backspace
+ord($octal) |> assert_eq(8, "\\010 is octal 8 (backspace)")
+
+# `\1` followed by a non-digit stays a single-digit backref.
+my $a = "abc"
+$a =~ s/(.)/\1z/g
+$a |> assert_eq("azbzcz", "single-digit backref handles trailing letter")
+
+# `\N` form inside an interpolated qr// stays through to the replacement
+# layer (sanity: regex compile shouldn't barf).
+my $qr_test = "one two three"
+$qr_test =~ s/(\w+) (\w+)/\2 \1/
+$qr_test |> assert_eq("two one three", "two-word swap via backrefs")
+
+test_run

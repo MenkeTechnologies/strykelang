@@ -1,0 +1,68 @@
+#!/usr/bin/env stryke
+# Demo + regression test for BUG-086 — Perl's `use constant` now
+# accepts every documented form:
+#
+#   use constant NAME => VALUE                  (single, scalar)
+#   use constant NAME => (V1, V2, V3)           (single, list)
+#   use constant { NAME1 => V1, NAME2 => V2 }   (multi via hashref)
+#   use constant NAME => [V1, V2, V3]           (single, arrayref — already worked)
+
+# 1. Single scalar constant (the only form that already worked).
+use constant PI => 3.14
+PI |> assert_eq(3.14, "single scalar constant")
+
+# 2. Single list constant — used to collapse to last operand (`3`).
+use constant ARR => (1, 2, 3)
+my @a = ARR
+"@a" |> assert_eq("1 2 3", "list constant preserved")
+len(@a) |> assert_eq(3, "list constant has 3 elements")
+
+# Larger list with mixed types.
+use constant MIX => ("alpha", 42, 3.14, "omega")
+my @m = MIX
+len(@m)          |> assert_eq(4, "mixed list len")
+$m[0]            |> assert_eq("alpha", "mixed list head")
+$m[3]            |> assert_eq("omega", "mixed list tail")
+
+# 3. Hashref-block form — used to error "expected list of NAME => VALUE pairs".
+use constant {
+    STATUS_OK       => 200,
+    STATUS_REDIRECT => 301,
+    STATUS_NOTFOUND => 404,
+    STATUS_ERROR    => 500,
+}
+STATUS_OK        |> assert_eq(200, "hashref form: STATUS_OK")
+STATUS_REDIRECT  |> assert_eq(301, "hashref form: STATUS_REDIRECT")
+STATUS_NOTFOUND  |> assert_eq(404, "hashref form: STATUS_NOTFOUND")
+STATUS_ERROR     |> assert_eq(500, "hashref form: STATUS_ERROR")
+
+# 4. Arrayref-of-strings (the documented workaround — still works).
+use constant DAYS => [qw(mon tue wed thu fri sat sun)]
+@{ DAYS() } |> len |> assert_eq(7, "arrayref constant has 7 days")
+DAYS()->[0] |> assert_eq("mon", "arrayref constant first element")
+
+# 5. Hashref form + arithmetic in the constant body.
+use constant {
+    K  => 1024,
+    M  => 1024 * 1024,
+    G  => 1024 * 1024 * 1024,
+}
+K |> assert_eq(1024,       "K = 1024")
+M |> assert_eq(1048576,    "M = 1024 * 1024")
+G |> assert_eq(1073741824, "G = 1024 * 1024 * 1024")
+
+# 6. Constants visible inside fn bodies.
+package Demo::Limits
+use constant {
+    MAX_RETRIES => 5,
+    TIMEOUT_MS  => 1500,
+}
+fn budget = MAX_RETRIES() * TIMEOUT_MS()
+package main
+Demo::Limits::budget() |> assert_eq(7500, "constants usable inside fn body")
+
+# 7. Hashref form with single pair (degenerate case).
+use constant { SOLO => 99 }
+SOLO |> assert_eq(99, "hashref form with one entry")
+
+test_run
