@@ -435,6 +435,634 @@ fn lsp_stdio_hover_sub_decl_line() {
     );
 }
 
+// ── Rename audit ─────────────────────────────────────────────────
+//
+// Comprehensive coverage matrix: one test per SymbolKind, asserting
+// either same-file rename + cross-file rename, OR same-file only for
+// file-local kinds. If a kind is broken, this test set surfaces it.
+//
+// Same-file rename: open one document, rename, count edits.
+// Cross-file rename: open two documents, rename, assert edits in
+// both.
+
+fn rename_same_file(src: &str, line: u32, col: u32, new_name: &str) -> Vec<String> {
+    let mut h = LspHarness::new(src);
+    let r = h.rename(line, col, new_name);
+    h.finish();
+    r.pointer("/changes")
+        .and_then(Value::as_object)
+        .and_then(|m| m.values().next())
+        .and_then(Value::as_array)
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|e| e.get("newText").and_then(Value::as_str))
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+#[test]
+fn audit_rename_my_local_same_file() {
+    let edits = rename_same_file("my $x = 1\np $x\np $x + 1\n", 0, 4, "y");
+    assert!(
+        edits.len() >= 3,
+        "my-local must rename all 3 (decl + 2 refs): {edits:?}"
+    );
+    assert!(edits.iter().all(|n| *n == "$y"));
+}
+
+#[test]
+fn audit_rename_our_var_same_file() {
+    let edits = rename_same_file("our $level = 1\np $level\n", 0, 5, "intensity");
+    assert!(
+        edits.len() >= 2,
+        "our-var must rename decl + ref: {edits:?}"
+    );
+    assert!(edits.iter().all(|n| *n == "$intensity"));
+}
+
+#[test]
+fn audit_rename_state_var_same_file() {
+    let edits = rename_same_file(
+        "fn Demo::Counter::next { state $n = 0; $n += 1; $n }\nDemo::Counter::next()\n",
+        0,
+        32,
+        "tick",
+    );
+    assert!(
+        edits.len() >= 3,
+        "state-var must rename decl + 2 refs: {edits:?}"
+    );
+    assert!(edits.iter().all(|n| *n == "$tick"));
+}
+
+#[test]
+fn audit_rename_param_same_file() {
+    let edits = rename_same_file(
+        "fn Demo::Math::twice($n) { $n * 2 }\nDemo::Math::twice(5)\n",
+        0,
+        22,
+        "x",
+    );
+    assert!(
+        edits.len() >= 2,
+        "param must rename decl + body ref: {edits:?}"
+    );
+    assert!(edits.iter().all(|n| *n == "$x"));
+}
+
+#[test]
+fn audit_rename_sub_same_file() {
+    // Cursor on `s` of `say` (col 16) — avoid landing on a `:` of
+    // `::`, which makes identifier_span yield a half-segment span.
+    let edits = rename_same_file(
+        "fn Demo::Greet::say { p hi }\nDemo::Greet::say()\nDemo::Greet::say()\n",
+        0,
+        16,
+        "salute",
+    );
+    assert!(edits.len() >= 3, "sub must rename decl + 2 calls: {edits:?}");
+    assert!(edits.iter().all(|n| *n == "salute"));
+}
+
+#[test]
+fn audit_rename_struct_type_same_file() {
+    let edits = rename_same_file(
+        "struct Point { x, y }\nmy $p = Point->new(x => 1, y => 2)\n",
+        0,
+        7,
+        "Vertex",
+    );
+    assert!(
+        edits.len() >= 2,
+        "struct must rename decl + constructor: {edits:?}"
+    );
+    assert!(edits.iter().all(|n| *n == "Vertex"));
+}
+
+#[test]
+fn audit_rename_enum_type_same_file() {
+    let edits = rename_same_file("enum Op { Add, Sub }\nmy $r = Op::Add\n", 0, 5, "Operator");
+    assert!(
+        edits.len() >= 2,
+        "enum must rename decl + qualified usage: {edits:?}"
+    );
+    assert!(edits.iter().all(|n| *n == "Operator"));
+}
+
+#[test]
+fn audit_rename_class_type_same_file() {
+    let edits = rename_same_file(
+        "class Animal { name: Str }\nclass Dog extends Animal { breed: Str }\n",
+        0,
+        6,
+        "Creature",
+    );
+    assert!(
+        edits.len() >= 2,
+        "class must rename decl + extends-ref: {edits:?}"
+    );
+    assert!(edits.iter().all(|n| *n == "Creature"));
+}
+
+#[test]
+fn audit_rename_trait_type_same_file() {
+    let edits = rename_same_file(
+        "trait Walks { fn walk }\nclass Dog impl Walks { name: Str }\n",
+        0,
+        6,
+        "Runs",
+    );
+    assert!(edits.len() >= 2, "trait must rename decl + impl: {edits:?}");
+    assert!(edits.iter().all(|n| *n == "Runs"));
+}
+
+#[test]
+fn audit_rename_package_same_file() {
+    // Cursor on `L` of `Lib` (col 14) — avoid second `:` of `::`.
+    let edits = rename_same_file(
+        "package Demo::Lib\nfn hi { 1 }\npackage main\nmy $v = Demo::Lib::hi()\n",
+        0,
+        14,
+        "Demo::Util",
+    );
+    assert!(
+        edits.len() >= 2,
+        "package must rename decl + qualified-call prefix: {edits:?}"
+    );
+}
+
+#[test]
+fn audit_rename_format_same_file() {
+    let edits = rename_same_file(
+        "format REPORT =\n@<<<<<\n\"hi\"\n.\nwrite REPORT\n",
+        0,
+        8,
+        "SUMMARY",
+    );
+    assert!(
+        !edits.is_empty(),
+        "format rename must produce at least one edit: {edits:?}"
+    );
+    assert!(edits.iter().all(|n| *n == "SUMMARY"));
+}
+
+#[test]
+fn audit_rename_loop_label_same_file() {
+    let edits = rename_same_file(
+        "OUTER: for my $i (1..3) {\n    last OUTER\n}\n",
+        0,
+        2,
+        "TOP",
+    );
+    assert!(
+        edits.len() >= 2,
+        "loop label must rename decl + last-target: {edits:?}"
+    );
+    assert!(edits.iter().all(|n| *n == "TOP"));
+}
+
+#[test]
+fn audit_rename_struct_field_same_file() {
+    let edits = rename_same_file(
+        "struct Rectangle { width, height }\nmy $r = Rectangle(width => 1, height => 2)\n",
+        0,
+        19,
+        "w",
+    );
+    assert!(
+        edits.len() >= 2,
+        "struct field must rename decl + constructor arg: {edits:?}"
+    );
+    assert!(edits.iter().all(|n| *n == "w"));
+}
+
+#[test]
+fn audit_rename_enum_variant_same_file() {
+    // Cursor on `Add` of `Op::Add` — should be treated as the
+    // enum's variant. v1 lands on enum decl line for goto; rename
+    // should at minimum produce an edit for the variant occurrence.
+    let edits = rename_same_file("enum Op { Add, Sub }\nmy $r = Op::Add\n", 0, 11, "Plus");
+    assert!(
+        !edits.is_empty(),
+        "enum variant rename must produce an edit: {edits:?}"
+    );
+}
+
+#[test]
+fn audit_rename_use_constant_same_file() {
+    // `p LIMIT` with no other args parses as `Say { handle: "LIMIT" }`
+    // (Perl filehandle form) — use the value-context call form
+    // `(LIMIT)` to ensure the parser sees a Bareword ref instead.
+    let edits = rename_same_file(
+        "use constant LIMIT => 42\np(LIMIT)\np(LIMIT + 1)\n",
+        0,
+        14,
+        "MAX_LIMIT",
+    );
+    assert!(
+        edits.len() >= 3,
+        "use-constant must rename decl + 2 usages: {edits:?}"
+    );
+    assert!(edits.iter().all(|n| *n == "MAX_LIMIT"));
+}
+
+// ── Cross-file rename audit ──────────────────────────────────────
+//
+// One test per kind that crosses files (Sub, Type, Our, Format,
+// Field, use constant — file-local kinds Param/Local/State/Label
+// are excluded by design).
+
+fn rename_cross_file(
+    lib_basename: &str,
+    lib_src: &str,
+    test_src: &str,
+    line: u32,
+    character: u32,
+    new_name: &str,
+) -> (String, String, Vec<String>, Vec<String>) {
+    let (test_uri, lib_uri, changes) =
+        run_cross_file_rename(lib_basename, lib_src, test_src, line, character, new_name);
+    let collect = |key: &str| -> Vec<String> {
+        changes
+            .get(key)
+            .and_then(Value::as_array)
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|e| e.get("newText").and_then(Value::as_str))
+                    .map(str::to_string)
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    let test_edits = collect(&test_uri);
+    let lib_edits = collect(&lib_uri);
+    (test_uri, lib_uri, test_edits, lib_edits)
+}
+
+#[test]
+fn audit_rename_sub_cross_file() {
+    let (_t_uri, _l_uri, test_edits, lib_edits) = rename_cross_file(
+        "foo.stk",
+        "package Project::Foo;\nfn bar { 1 }\n1;\n",
+        "require \"./lib/foo.stk\"\nProject::Foo::bar();\nmy $r = Project::Foo::bar();\n",
+        1,
+        // Cursor on `b` of `bar` (col 15 of `Project::Foo::bar();`)
+        15,
+        "renamed",
+    );
+    assert!(
+        !test_edits.is_empty(),
+        "sub cross-file: test edits empty: {test_edits:?}"
+    );
+    assert!(
+        !lib_edits.is_empty(),
+        "sub cross-file: lib edits empty: {lib_edits:?}"
+    );
+}
+
+#[test]
+fn audit_rename_struct_cross_file() {
+    let (_t, _l, test_edits, lib_edits) = rename_cross_file(
+        "geom.stk",
+        "package Project::Geom;\nstruct Point { x, y }\n1;\n",
+        "require \"./lib/geom.stk\"\nmy $p = Project::Geom::Point->new(x => 1, y => 2);\n",
+        1,
+        // Cursor on `P` of `Point` (col 23 of qualified ref).
+        23,
+        "Vertex",
+    );
+    assert!(
+        !test_edits.is_empty(),
+        "struct cross-file: test edits empty: {test_edits:?}"
+    );
+    assert!(
+        !lib_edits.is_empty(),
+        "struct cross-file: lib edits empty: {lib_edits:?}"
+    );
+}
+
+#[test]
+fn audit_rename_our_var_cross_file() {
+    let (_t, _l, test_edits, lib_edits) = rename_cross_file(
+        "vars.stk",
+        "package Project::Vars;\nour $level = 7;\nfn bump { $level += 1 }\n1;\n",
+        "require \"./lib/vars.stk\"\nmy $x = $Project::Vars::level;\n",
+        1,
+        // Cursor on `l` of `level` — col 24 (first letter past the
+        // second `:` of `Vars::`). Avoids landing on a `::` colon
+        // which corrupts the identifier_span result.
+        24,
+        "intensity",
+    );
+    assert!(
+        !test_edits.is_empty(),
+        "our cross-file: test edits empty: {test_edits:?}"
+    );
+    assert!(
+        !lib_edits.is_empty(),
+        "our cross-file: lib edits empty: {lib_edits:?}"
+    );
+}
+
+#[test]
+fn audit_rename_struct_field_cross_file() {
+    let (_t, _l, test_edits, lib_edits) = rename_cross_file(
+        "geom2.stk",
+        "package Project::Geom;\nstruct Point { x, y }\n1;\n",
+        "require \"./lib/geom2.stk\"\nmy $p = Project::Geom::Point(x => 1, y => 2);\n",
+        1,
+        // Cursor on `x` of constructor arg (col 29).
+        29,
+        "xx",
+    );
+    assert!(
+        !test_edits.is_empty(),
+        "field cross-file: test edits empty: {test_edits:?}"
+    );
+    assert!(
+        !lib_edits.is_empty(),
+        "field cross-file: lib edits empty: {lib_edits:?}"
+    );
+}
+
+/// Enum cross-file rename via the variant form
+/// (`Project::Ops::Op::Add` cursor on `Add` — the Field/variant).
+/// Renaming the enum name itself (`Op`) across files is a known gap:
+/// the cursor lands on a middle `::`-segment which triggers the
+/// package-prefix rename path; that path can rewrite qualified
+/// callers but doesn't find the bare-form `enum Op` decl in the lib.
+/// Filed against future work.
+#[test]
+fn audit_rename_enum_variant_cross_file() {
+    let (_t, _l, test_edits, lib_edits) = rename_cross_file(
+        "ops.stk",
+        "package Project::Ops;\nenum Op { Add, Sub }\n1;\n",
+        "require \"./lib/ops.stk\"\nmy $r = Project::Ops::Op::Add\n",
+        1,
+        // Cursor on `A` of `Add` (col 27) — the variant (Field).
+        27,
+        "Plus",
+    );
+    assert!(
+        !test_edits.is_empty(),
+        "enum variant cross-file: test edits empty: {test_edits:?}"
+    );
+    assert!(
+        !lib_edits.is_empty(),
+        "enum variant cross-file: lib edits empty: {lib_edits:?}"
+    );
+}
+
+#[test]
+fn audit_rename_class_cross_file() {
+    let (_t, _l, test_edits, lib_edits) = rename_cross_file(
+        "animals.stk",
+        "package Project::Zoo;\nclass Animal { name: Str }\n1;\n",
+        "require \"./lib/animals.stk\"\nmy $a = Project::Zoo::Animal->new(name => \"x\");\n",
+        1,
+        // Cursor on `A` of `Animal` (col 23).
+        23,
+        "Creature",
+    );
+    assert!(
+        !test_edits.is_empty(),
+        "class cross-file: test edits empty: {test_edits:?}"
+    );
+    assert!(
+        !lib_edits.is_empty(),
+        "class cross-file: lib edits empty: {lib_edits:?}"
+    );
+}
+
+#[test]
+fn audit_rename_trait_cross_file() {
+    let (_t, _l, test_edits, lib_edits) = rename_cross_file(
+        "traits.stk",
+        "package Project::Traits;\ntrait Walks { fn walk }\n1;\n",
+        "require \"./lib/traits.stk\"\nmy $tt = Project::Traits::Walks;\n",
+        1,
+        // Cursor on `W` of `Walks` (col 26).
+        26,
+        "Strides",
+    );
+    assert!(
+        !test_edits.is_empty(),
+        "trait cross-file: test edits empty: {test_edits:?}"
+    );
+    assert!(
+        !lib_edits.is_empty(),
+        "trait cross-file: lib edits empty: {lib_edits:?}"
+    );
+}
+
+#[test]
+fn audit_rename_format_cross_file() {
+    let (_t, _l, test_edits, lib_edits) = rename_cross_file(
+        "report.stk",
+        "package Project::Report;\nformat REPORT =\n@<<<<<\n\"hi\"\n.\n1;\n",
+        "require \"./lib/report.stk\"\nwrite Project::Report::REPORT\n",
+        1,
+        // Cursor on `R` of `REPORT` (col 27).
+        27,
+        "SUMMARY",
+    );
+    assert!(
+        !test_edits.is_empty(),
+        "format cross-file: test edits empty: {test_edits:?}"
+    );
+    assert!(
+        !lib_edits.is_empty(),
+        "format cross-file: lib edits empty: {lib_edits:?}"
+    );
+}
+
+#[test]
+fn audit_rename_use_constant_cross_file() {
+    let (_t, _l, test_edits, lib_edits) = rename_cross_file(
+        "consts.stk",
+        "package Project::Consts;\nuse constant LIMIT => 42;\n1;\n",
+        "require \"./lib/consts.stk\"\nmy $x = Project::Consts::LIMIT();\n",
+        1,
+        // Cursor on `L` of `LIMIT` (col 25).
+        25,
+        "MAX_LIMIT",
+    );
+    assert!(
+        !test_edits.is_empty(),
+        "use-constant cross-file: test edits empty: {test_edits:?}"
+    );
+    assert!(
+        !lib_edits.is_empty(),
+        "use-constant cross-file: lib edits empty: {lib_edits:?}"
+    );
+}
+
+/// Rename on a trait name must update every `impl Trait` / type-bound
+/// occurrence in the file. Pin same-file behavior.
+#[test]
+fn lsp_stdio_rename_trait_same_file() {
+    let src = "trait Drawable { fn draw }\nclass Square impl Drawable { side: Int }\n";
+    let mut h = LspHarness::new(src);
+    // Cursor on `Drawable` decl line 0 col 7.
+    let r = h.rename(0, 7, "Renderable");
+    h.finish();
+    let edits: Vec<&str> = r
+        .pointer("/changes")
+        .and_then(Value::as_object)
+        .and_then(|m| m.values().next())
+        .and_then(Value::as_array)
+        .unwrap_or_else(|| panic!("rename returned no edits: {r}"))
+        .iter()
+        .filter_map(|e| e.get("newText").and_then(Value::as_str))
+        .collect();
+    // Decl + impl reference = 2 edits.
+    assert!(
+        edits.len() >= 2,
+        "expected ≥2 edits (decl + impl ref), got {edits:?}"
+    );
+    assert!(
+        edits.iter().all(|n| *n == "Renderable"),
+        "all edits should be `Renderable`: {edits:?}"
+    );
+}
+
+/// Goto Declaration on a struct used in the active file but declared
+/// in a `require`d lib must land on the struct's decl line in the
+/// lib file. Ported from the cross-file goto-def expansion that now
+/// includes Type symbols.
+#[test]
+fn lsp_stdio_goto_definition_struct_across_require() {
+    use std::fs;
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let project = tmp.path();
+    fs::create_dir(project.join("t")).expect("mkdir t");
+    fs::create_dir(project.join("lib")).expect("mkdir lib");
+    let lib_path = project.join("lib").join("geom.stk");
+    fs::write(
+        &lib_path,
+        "package Project::Geom;\nstruct Point { x, y }\n1;\n",
+    )
+    .expect("write lib");
+    let test_path = project.join("t").join("test.stk");
+    let test_src =
+        "require \"./lib/geom.stk\"\nmy $p = Project::Geom::Point->new(x => 1, y => 2);\n";
+    fs::write(&test_path, test_src).expect("write test");
+    let test_uri = format!("file://{}", test_path.display());
+
+    let mut child = Command::new(ST)
+        .arg("--lsp")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn stryke --lsp");
+    let mut stdin = child.stdin.take().expect("stdin");
+    let mut reader = BufReader::new(child.stdout.take().expect("stdout"));
+    let stderr_rx = drain_stderr(child.stderr.take().expect("stderr"));
+    write_msg(
+        &mut stdin,
+        &json!({
+            "jsonrpc": "2.0", "id": 1, "method": "initialize",
+            "params": { "processId": null, "rootUri": null, "capabilities": {} },
+        }),
+    );
+    let _ = recv_until_result(&mut reader, 1);
+    write_msg(
+        &mut stdin,
+        &json!({ "jsonrpc": "2.0", "method": "initialized", "params": {} }),
+    );
+    write_msg(
+        &mut stdin,
+        &json!({
+            "jsonrpc": "2.0", "method": "textDocument/didOpen",
+            "params": {
+                "textDocument": {
+                    "uri": test_uri, "languageId": "perl",
+                    "version": 1, "text": test_src,
+                },
+            },
+        }),
+    );
+    let start = Instant::now();
+    loop {
+        if start.elapsed() > READ_TIMEOUT {
+            let err = stderr_rx.recv().unwrap_or_default();
+            panic!("timeout: {err}");
+        }
+        let m = read_msg(&mut reader);
+        if m.get("method").and_then(Value::as_str)
+            == Some("textDocument/publishDiagnostics")
+        {
+            break;
+        }
+    }
+    // Cursor on `Point` of `Project::Geom::Point` at line 1, col 25.
+    // "my $p = Project::Geom::Point->new(...)" — `Point` at cols 23-28.
+    write_msg(
+        &mut stdin,
+        &json!({
+            "jsonrpc": "2.0", "id": 2,
+            "method": "textDocument/definition",
+            "params": {
+                "textDocument": { "uri": test_uri },
+                "position": { "line": 1, "character": 25 },
+            },
+        }),
+    );
+    let msg = recv_until_result(&mut reader, 2);
+    let result = msg.get("result").cloned().unwrap_or(Value::Null);
+    drop(stdin);
+    let _ = child.kill();
+    let _ = child.wait();
+
+    let uri = result
+        .get("uri")
+        .and_then(Value::as_str)
+        .unwrap_or_else(|| panic!("definition missing uri: {result}"));
+    assert!(
+        uri.ends_with("/lib/geom.stk"),
+        "expected lib/geom.stk uri, got {uri}: {result}"
+    );
+    let line = result
+        .pointer("/range/start/line")
+        .and_then(Value::as_u64)
+        .unwrap_or_else(|| panic!("definition missing line: {result}"));
+    assert_eq!(line, 1, "struct Point on line 1 of lib: {result}");
+}
+
+/// Rename on a struct field name must update every call site where the
+/// field is used (constructor `Rectangle(width => 1, …)`, fat-comma
+/// keys, etc.) — not just the declaration.
+#[test]
+fn lsp_stdio_rename_struct_field_updates_all_usages() {
+    let src = "struct Rectangle { width, height }\nmy $a = Rectangle(width => 1, height => 2)\nmy $b = Rectangle(width => 3, height => 4)\n";
+    let mut h = LspHarness::new(src);
+    // Cursor on `width` inside `Rectangle(width => 1, ...)` at line 1,
+    // col 18.
+    let r = h.rename(1, 18, "w");
+    h.finish();
+    let edits: Vec<&str> = r
+        .pointer("/changes")
+        .and_then(Value::as_object)
+        .and_then(|m| m.values().next())
+        .and_then(Value::as_array)
+        .unwrap_or_else(|| panic!("rename returned no edits: {r}"))
+        .iter()
+        .filter_map(|e| e.get("newText").and_then(Value::as_str))
+        .collect();
+    // Expected: decl line `width` + 2 call-site `width` = 3 edits.
+    assert!(
+        edits.len() >= 3,
+        "expected ≥3 edits (decl + 2 call sites), got {edits:?}"
+    );
+    assert!(
+        edits.iter().all(|n| *n == "w"),
+        "all edits should be `w`: {edits:?}"
+    );
+}
+
 /// Go to Declaration on a struct field name inside a constructor call
 /// `Rectangle(width => -1, height => 5)` must land on the struct's
 /// decl line. Fields registered as `SymbolKind::Field` with the

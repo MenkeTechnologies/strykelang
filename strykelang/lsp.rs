@@ -1696,6 +1696,8 @@ fn goto_definition(
 /// Walk `require` directives from `program`, parse the referenced files,
 /// and search them for `word`. Returns a Location pointing at the line
 /// where `word` is declared in the first required file that contains it.
+/// Looks up Sub (via sub_fqn_map), Type/Field/Our (via the lib's
+/// SymbolTable), and qualified-name fallback (`Pkg::Variant` → Type).
 fn cross_file_goto_definition(
     program: &crate::ast::Program,
     file: &str,
@@ -1706,6 +1708,7 @@ fn cross_file_goto_definition(
         if response.is_some() {
             return false;
         }
+        // Cheap path first: sub_fqn_map (covers fn / use constant).
         let child_map = collect_sub_fqn_map(child);
         if let Some(decl_line) = resolve_sub_decl_line(&child_map, word) {
             let uri = path_to_uri(target_path);
@@ -1714,6 +1717,48 @@ fn cross_file_goto_definition(
                 range: line_range_utf16(src, decl_line),
             }));
             return false;
+        }
+        // SymbolTable path: Type (struct/enum/class/trait), Field,
+        // Our variable. Matches both bare-tail (`Point`) and qualified
+        // (`Project::Geom::Point`) needles via name_matches_cross_file.
+        if let Some(table) = crate::lsp_symbols::SymbolTable::build(src, target_path) {
+            // Exact-name match (handles `Pkg::Type` qualified needles
+            // against stored qualified names).
+            if let Some(sym) = table.symbols.iter().find(|s| {
+                matches!(
+                    s.kind,
+                    crate::lsp_symbols::SymbolKind::Type
+                        | crate::lsp_symbols::SymbolKind::Field
+                        | crate::lsp_symbols::SymbolKind::Our
+                        | crate::lsp_symbols::SymbolKind::Format
+                ) && (s.name == word || name_matches_cross_file(&s.name, word))
+            }) {
+                let uri = path_to_uri(target_path);
+                response = Some(GotoDefinitionResponse::Scalar(Location {
+                    uri,
+                    range: line_range_utf16(src, sym.decl_line as usize + 1),
+                }));
+                return false;
+            }
+            // Qualified-name fallback: cursor on `Pkg::Variant` or
+            // `Pkg::method` — strip the last `::`-segment and look up
+            // the prefix as a Type in this required file.
+            if let Some(idx) = word.rfind("::") {
+                let prefix = &word[..idx];
+                if !prefix.is_empty() {
+                    if let Some(sym) = table.symbols.iter().find(|s| {
+                        s.name == prefix
+                            && matches!(s.kind, crate::lsp_symbols::SymbolKind::Type)
+                    }) {
+                        let uri = path_to_uri(target_path);
+                        response = Some(GotoDefinitionResponse::Scalar(Location {
+                            uri,
+                            range: line_range_utf16(src, sym.decl_line as usize + 1),
+                        }));
+                        return false;
+                    }
+                }
+            }
         }
         true
     });
@@ -2117,6 +2162,7 @@ fn collect_cross_file_references(
                     | crate::lsp_symbols::SymbolKind::Type
                     | crate::lsp_symbols::SymbolKind::Our
                     | crate::lsp_symbols::SymbolKind::Format
+                    | crate::lsp_symbols::SymbolKind::Field
             ) && (s.name == needle || name_matches_cross_file(&s.name, needle))
         });
         if let Some(s) = sym {
@@ -2327,6 +2373,7 @@ fn decl_in_required(text: &str, path: &str, word: &str) -> bool {
                     | crate::lsp_symbols::SymbolKind::Type
                     | crate::lsp_symbols::SymbolKind::Our
                     | crate::lsp_symbols::SymbolKind::Format
+                    | crate::lsp_symbols::SymbolKind::Field
             ) && (s.name == word || name_matches_cross_file(&s.name, word))
         }) {
             found = true;
@@ -2546,23 +2593,45 @@ fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option
     let active_symbol_id = match table.symbol_at(cursor_pos.line, Some(&needle)) {
         Some(id) => id,
         None => {
-            // Active file's SymbolTable doesn't know `needle`. It may be a
-            // sub declared in a `require`d lib — fall through to a cross-
-            // file rename that scans the active file, every open doc, and
-            // every reachable required file.
-            crate::slog_debug!(
-                "lsp.rename",
-                "needle={:?} not in active SymbolTable, trying cross-file via require",
-                needle,
-            );
-            return cross_file_rename_via_require(
-                docs,
-                &active_uri,
-                active_text,
-                &active_path,
-                &needle,
-                &effective_new,
-            );
+            // Fallback: search the active file's SymbolTable for ANY
+            // matching symbol — not just refs/decls on the cursor line.
+            // Cursor on a Field reference inside a constructor call
+            // (`Rectangle(width => 1)`) has its decl_line on the
+            // struct line, not the call-site line, so symbol_at
+            // misses it. Same for Type usage at a non-decl line.
+            let active_global_match = table.symbols.iter().find(|s| {
+                (s.name == needle || name_matches_cross_file(&s.name, &needle))
+                    && matches!(
+                        s.kind,
+                        crate::lsp_symbols::SymbolKind::Field
+                            | crate::lsp_symbols::SymbolKind::Type
+                            | crate::lsp_symbols::SymbolKind::Sub
+                            | crate::lsp_symbols::SymbolKind::Format
+                            | crate::lsp_symbols::SymbolKind::Our
+                    )
+            });
+            if let Some(s) = active_global_match {
+                s.id
+            } else {
+                // Active file's SymbolTable doesn't know `needle`. It
+                // may be a sub/type/field declared in a `require`d
+                // lib — fall through to a cross-file rename that
+                // scans the active file, every open doc, and every
+                // reachable required file.
+                crate::slog_debug!(
+                    "lsp.rename",
+                    "needle={:?} not in active SymbolTable, trying cross-file via require",
+                    needle,
+                );
+                return cross_file_rename_via_require(
+                    docs,
+                    &active_uri,
+                    active_text,
+                    &active_path,
+                    &needle,
+                    &effective_new,
+                );
+            }
         }
     };
     let active_sym = table
@@ -2691,6 +2760,72 @@ fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option
             &mut changes,
             &mut total,
         );
+    }
+
+    // Field / Type rename: the SymbolTable only indexes these at
+    // their decl line; references at `impl Trait`, `extends Class`,
+    // constructor `Rectangle(width => 1)` call sites, `Op::Variant`
+    // qualified uses, etc. aren't recorded by the AST walker. Use a
+    // workspace-wide textual scan with string/comment mask to catch
+    // every usage. Type uses `scan_package_ranges` (accepts trailing
+    // `::`); Field uses the standard `scan_all_lines_for_needle`.
+    if matches!(
+        active_sym.kind,
+        crate::lsp_symbols::SymbolKind::Field | crate::lsp_symbols::SymbolKind::Type
+    ) {
+        let is_type = matches!(active_sym.kind, crate::lsp_symbols::SymbolKind::Type);
+        let do_scan = |text: &str, name: &str| -> Vec<Range> {
+            if is_type {
+                scan_package_ranges(text, name)
+            } else {
+                scan_all_lines_for_needle(text, name)
+            }
+        };
+        let mut field_ranges = do_scan(active_text, &active_sym.name);
+        // Drop ranges already emitted by the SymbolTable pass.
+        let existing_ranges: Vec<Range> = changes
+            .get(&active_uri)
+            .map(|edits| edits.iter().map(|e| e.range).collect())
+            .unwrap_or_default();
+        field_ranges.retain(|r| !existing_ranges.contains(r));
+        push_edits(
+            active_uri.as_str(),
+            field_ranges,
+            &bare_new,
+            &mut changes,
+            &mut total,
+        );
+        // Same textual scan across every other open document + every
+        // reachable required file.
+        for (other_uri_str, other_text) in docs.iter() {
+            if other_uri_str == active_uri.as_str() {
+                continue;
+            }
+            let ranges = do_scan(other_text, &active_sym.name);
+            push_edits(
+                other_uri_str,
+                ranges,
+                &bare_new,
+                &mut changes,
+                &mut total,
+            );
+        }
+        if let Ok(program) = crate::parse_with_file(active_text, &active_path) {
+            for (path, src) in collect_required_files(&program, &active_path) {
+                let uri_str = path_to_uri(&path).as_str().to_string();
+                if uri_str == active_uri.as_str() || docs.contains_key(&uri_str) {
+                    continue;
+                }
+                let ranges = do_scan(&src, &active_sym.name);
+                push_edits(
+                    &uri_str,
+                    ranges,
+                    &bare_new,
+                    &mut changes,
+                    &mut total,
+                );
+            }
+        }
     }
 
     // Other open files — symbols cross-file only for package-scoped
@@ -2872,6 +3007,7 @@ fn cross_file_rename_via_require(
                     | crate::lsp_symbols::SymbolKind::Type
                     | crate::lsp_symbols::SymbolKind::Our
                     | crate::lsp_symbols::SymbolKind::Format
+                    | crate::lsp_symbols::SymbolKind::Field
             ) && (s.name == needle || name_matches_cross_file(&s.name, needle))
         });
         if let Some(s) = sym {
@@ -2981,8 +3117,11 @@ fn cross_file_rename_via_require(
     // 2. Active file: cross-file callers usually write `Package::name`,
     //    so the qualified scan is the load-bearing one. Bare-form scans
     //    in the active file would risk colliding with same-spelling
-    //    locals; skip them unless the package is `main` (where bare ==
-    //    qualified).
+    //    locals; skip them unless (a) the package is `main` (where
+    //    bare == qualified) or (b) the symbol is a Field, which is
+    //    only ever referenced bare (as a fat-comma key
+    //    `Struct(width => 1)` or `$obj->width`). Field bare-scan in
+    //    callers is the only way to catch constructor-call usages.
     let active_uri_str = active_uri.to_string();
     push(
         &active_uri_str,
@@ -2991,6 +3130,7 @@ fn cross_file_rename_via_require(
         &mut changes,
         &mut total,
     );
+    let is_field = matches!(decl_sym.kind, crate::lsp_symbols::SymbolKind::Field);
     if qualified_form == bare_form {
         push(
             &active_uri_str,
@@ -3000,8 +3140,24 @@ fn cross_file_rename_via_require(
             &mut total,
         );
     }
+    // Field bare-name scan: allow matches preceded by `::` (the
+    // qualified-access form `Pkg::Type::field`). The default scanner
+    // rejects a `:` prev boundary; the package scanner accepts a
+    // trailing `::` but ALSO rejects leading. Use a Field-tuned
+    // scanner that accepts `:` on either side so `Add` matches
+    // inside `Project::Ops::Op::Add`.
+    if is_field {
+        push(
+            &active_uri_str,
+            scan_field_ranges(active_text, &bare_form),
+            &bare_new,
+            &mut changes,
+            &mut total,
+        );
+    }
 
-    // 3. Other open documents: qualified-form scan only.
+    // 3. Other open documents: qualified-form scan + bare-form scan
+    //    for Field (callers reference fields by bare name only).
     for (other_uri_str, other_text) in docs.iter() {
         if other_uri_str == active_uri.as_str() || other_uri_str == &decl_uri_str {
             continue;
@@ -3013,6 +3169,15 @@ fn cross_file_rename_via_require(
             &mut changes,
             &mut total,
         );
+        if is_field {
+            push(
+                other_uri_str,
+                scan_all_lines_for_needle(other_text, &bare_form),
+                &bare_new,
+                &mut changes,
+                &mut total,
+            );
+        }
     }
 
     // 4. Every other file reachable from the active program via
@@ -3032,6 +3197,15 @@ fn cross_file_rename_via_require(
             &mut changes,
             &mut total,
         );
+        if is_field {
+            push(
+                &uri_str,
+                scan_all_lines_for_needle(&src, &bare_form),
+                &bare_new,
+                &mut changes,
+                &mut total,
+            );
+        }
     }
 
     if total == 0 {
@@ -3161,6 +3335,58 @@ fn rename_package(
         changes: Some(changes),
         ..Default::default()
     })
+}
+
+/// Field-tuned scanner: accepts `:` on either side as a valid
+/// boundary so the bare field name matches inside a qualified
+/// access form `Pkg::Type::field`. Used by Field cross-file rename
+/// to catch `Project::Ops::Op::Add` callers in addition to the
+/// bare `Add` decl in the lib.
+fn scan_field_ranges(text: &str, name: &str) -> Vec<Range> {
+    let mask = string_interior_mask(text);
+    let mut out: Vec<Range> = Vec::new();
+    let mut line0: u32 = 0;
+    let mut line_start_byte: usize = 0;
+    for (i, ch) in text.char_indices().chain(std::iter::once((text.len(), '\0'))) {
+        if i == text.len() || ch == '\n' {
+            let line_text = &text[line_start_byte..i];
+            for (start_byte, _) in line_text.match_indices(name) {
+                let global_byte = line_start_byte + start_byte;
+                if mask.get(global_byte).copied().unwrap_or(false) {
+                    continue;
+                }
+                let end_byte = start_byte + name.len();
+                let prev = line_text[..start_byte].chars().next_back();
+                let next = line_text[end_byte..].chars().next();
+                // Field name boundary: only reject ident-continuation
+                // (alphanumeric / `_`). Allow `:` so qualified access
+                // forms match.
+                let prev_ok = prev.is_none_or(|c| !c.is_alphanumeric() && c != '_');
+                let next_ok = next.is_none_or(|c| !c.is_alphanumeric() && c != '_');
+                if !prev_ok || !next_ok {
+                    continue;
+                }
+                let c0 = line_text[..start_byte].encode_utf16().count() as u32;
+                let c1 = line_text[..end_byte].encode_utf16().count() as u32;
+                out.push(Range {
+                    start: Position {
+                        line: line0,
+                        character: c0,
+                    },
+                    end: Position {
+                        line: line0,
+                        character: c1,
+                    },
+                });
+            }
+            line0 += 1;
+            line_start_byte = i + 1;
+            if i == text.len() {
+                break;
+            }
+        }
+    }
+    out
 }
 
 /// Like `scan_ranges_for_needle` but tuned for package names: accepts

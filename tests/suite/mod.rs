@@ -141,6 +141,7 @@ mod class_oop;
 mod cli_compat_mode;
 mod cli_docs_chapter_ordering;
 mod cli_docs_subcommand;
+mod cli_gen_docs;
 mod cli_inplace;
 mod cli_line_mode_eof;
 mod cli_line_mode_stdin_readline;

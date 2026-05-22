@@ -237,6 +237,74 @@ class StrykeLexerTest {
     }
 
     @Test
+    fun fn_declaration_name_is_function_decl_token() {
+        // `fn foo` — `foo` is a FUNCTION_DECL, not a plain IDENTIFIER.
+        val toks = lex("fn foo { 1 }")
+        assertTrue(
+            "expected FUNCTION_DECL `foo`: $toks",
+            has(toks, StrykeTokenTypes.FUNCTION_DECL, "foo"),
+        )
+    }
+
+    @Test
+    fun call_site_name_is_function_call_token() {
+        // `foo()` at call site — `foo` is a FUNCTION_CALL.
+        val toks = lex("foo()")
+        assertTrue(
+            "expected FUNCTION_CALL `foo`: $toks",
+            has(toks, StrykeTokenTypes.FUNCTION_CALL, "foo"),
+        )
+    }
+
+    @Test
+    fun loop_label_is_label_token() {
+        // `OUTER:` — `OUTER` followed by single `:` is a LABEL.
+        val toks = lex("OUTER: for my \$i (1..3) { last OUTER }")
+        assertTrue(
+            "expected LABEL `OUTER`: $toks",
+            has(toks, StrykeTokenTypes.LABEL, "OUTER"),
+        )
+    }
+
+    @Test
+    fun package_separator_is_distinct_from_package_name() {
+        // `Foo::Bar` — `Foo` PACKAGE_NAME, `::` PACKAGE_SEPARATOR,
+        // `Bar` PACKAGE_NAME. The separator must be its own token so
+        // the user can color it independently in Settings.
+        val toks = lex("my \$x = Foo::Bar")
+        assertTrue(
+            "expected PACKAGE_NAME `Foo`: $toks",
+            has(toks, StrykeTokenTypes.PACKAGE_NAME, "Foo"),
+        )
+        assertTrue(
+            "expected PACKAGE_SEPARATOR `::`: $toks",
+            has(toks, StrykeTokenTypes.PACKAGE_SEPARATOR, "::"),
+        )
+        assertTrue(
+            "expected PACKAGE_NAME / IDENTIFIER for `Bar`: $toks",
+            toks.any {
+                it.second == "Bar"
+                    && (it.first == StrykeTokenTypes.PACKAGE_NAME
+                        || it.first == StrykeTokenTypes.IDENTIFIER)
+            },
+        )
+    }
+
+    @Test
+    fun regex_flags_emitted_as_distinct_token() {
+        // `/abc/igs` — `/abc/` is REGEX, `igs` is REGEX_FLAGS.
+        val toks = lex("/abc/igs")
+        assertTrue(
+            "expected REGEX `/abc/`: $toks",
+            has(toks, StrykeTokenTypes.REGEX, "/abc/"),
+        )
+        assertTrue(
+            "expected REGEX_FLAGS `igs`: $toks",
+            has(toks, StrykeTokenTypes.REGEX_FLAGS, "igs"),
+        )
+    }
+
+    @Test
     fun arrow_fat_comma_and_pipe_classified() {
         val toks = lex("a -> b => c |> d ~> e |>> f")
         assertTrue("ARROW_OP ->: $toks", has(toks, StrykeTokenTypes.ARROW_OP, "->"))
