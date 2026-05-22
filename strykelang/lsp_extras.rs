@@ -1135,7 +1135,7 @@ pub fn compute_code_actions(
                         // the selection with the param name. Only
                         // offered when an enclosing fn is found.
                         if let Some(param_action) =
-                            extract_parameter_action(uri, text, range, selection)
+                            extract_parameter_action(uri, docs, text, range, selection)
                         {
                             out.push(param_action);
                         }
@@ -1523,6 +1523,7 @@ fn extract_variable_action(
 #[allow(clippy::mutable_key_type)]
 fn extract_parameter_action(
     uri: &Uri,
+    docs: &HashMap<String, String>,
     text: &str,
     range: Range,
     selection: &str,
@@ -1543,6 +1544,23 @@ fn extract_parameter_action(
     edits.push(sig_edit);
     edits.push(replace);
 
+    // Rename-all-in-body: if the selection is a single sigiled
+    // variable (`$foo` / `@foo` / `%foo`), extracting it to a param
+    // means EVERY usage of that var in the fn body should become the
+    // new param name — not just the selected occurrence. Without
+    // this, the result is partially renamed code that doesn't
+    // compile (e.g. an in-string `"$foo"` interpolation still
+    // referring to the now-undeclared local var).
+    if is_bare_sigiled_var(selection) {
+        edits.extend(rename_var_in_fn_body(
+            text,
+            &enclosing,
+            selection,
+            placeholder,
+            range,
+        ));
+    }
+
     // Thread the original selection through every call site of the
     // enclosing fn in the active file. Best-effort same-file: cross-
     // file call sites are not yet rewritten (would need to extend the
@@ -1552,6 +1570,7 @@ fn extract_parameter_action(
     // call site's scope. We pass it verbatim — if the user extracted
     // a name that only existed inside the fn body, call sites get a
     // reference error that must be resolved by hand.
+    // Same-file call sites (both bare-name and qualified-name forms).
     edits.extend(call_site_threading_edits(
         text,
         &enclosing,
@@ -1561,6 +1580,28 @@ fn extract_parameter_action(
 
     let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
     changes.insert(uri.clone(), edits);
+
+    // Cross-file: every other open document. Only the qualified form
+    // is scanned — bare-name calls in another file would resolve to
+    // a different fn in that file's package, not this one.
+    if !enclosing.fn_full_name.is_empty() && enclosing.fn_full_name.contains("::") {
+        for (other_uri_str, other_text) in docs.iter() {
+            if other_uri_str == uri.as_str() {
+                continue;
+            }
+            let other_edits = cross_file_call_site_edits(
+                other_text,
+                &enclosing.fn_full_name,
+                selection,
+            );
+            if other_edits.is_empty() {
+                continue;
+            }
+            if let Ok(other_uri) = other_uri_str.parse::<Uri>() {
+                changes.insert(other_uri, other_edits);
+            }
+        }
+    }
     Some(CodeActionOrCommand::CodeAction(CodeAction {
         title: "Extract to parameter (`fn name($extracted_param, …)`)".to_string(),
         kind: Some(CodeActionKind::REFACTOR_EXTRACT),
@@ -1589,8 +1630,14 @@ struct EnclosingFnSig {
     paren_open_byte: usize,
     /// Byte index of the `)` if `has_params`; else None.
     paren_close_byte: Option<usize>,
-    /// Bare fn name (no package prefix) — used to find call sites.
+    /// Bare fn name (no package prefix) — used to find same-package
+    /// call sites that omit the `Pkg::` prefix.
     fn_name: String,
+    /// Fully qualified fn name as it appears in the decl
+    /// (`Demo::handle` for `fn Demo::handle($sig) {`). Used to find
+    /// cross-file / external call sites that use the qualified form.
+    /// Equal to `fn_name` when the decl is bare.
+    fn_full_name: String,
 }
 
 /// Walk lines backward from `cursor_line` to find the nearest `fn`
@@ -1667,16 +1714,152 @@ fn enclosing_fn_signature(text: &str, cursor_line: usize) -> Option<EnclosingFnS
         {
             np += 1;
         }
-        let fn_name = line_text[after_fn..np].rsplit("::").next().unwrap_or("").to_string();
+        let fn_full_name = line_text[after_fn..np].to_string();
+        let fn_name = fn_full_name
+            .rsplit("::")
+            .next()
+            .unwrap_or("")
+            .to_string();
         return Some(EnclosingFnSig {
             fn_line: line_idx as u32,
             has_params,
             paren_open_byte,
             paren_close_byte,
             fn_name,
+            fn_full_name,
         });
     }
     None
+}
+
+/// True if `s` is a single sigiled variable name with no subscript,
+/// no `::` path, no whitespace. Used by Extract Parameter to decide
+/// when "rename all body occurrences" semantics apply.
+fn is_bare_sigiled_var(s: &str) -> bool {
+    let s = s.trim();
+    let mut chars = s.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !matches!(first, '$' | '@' | '%') {
+        return false;
+    }
+    let mut had_body = false;
+    for c in chars {
+        if c.is_ascii_alphanumeric() || c == '_' {
+            had_body = true;
+        } else {
+            return false;
+        }
+    }
+    had_body
+}
+
+/// When the selection is a bare sigiled var, emit replacement edits
+/// for EVERY occurrence of that var in the enclosing fn's body
+/// (including in-string interpolation sites). The original
+/// selection-range edit is already in `edits` — we skip duplicating
+/// it by checking start position.
+fn rename_var_in_fn_body(
+    text: &str,
+    enclosing: &EnclosingFnSig,
+    selection: &str,
+    placeholder: &str,
+    skip_range: Range,
+) -> Vec<TextEdit> {
+    let mut out: Vec<TextEdit> = Vec::new();
+    let var = selection.trim().to_string();
+    if var.is_empty() {
+        return out;
+    }
+    // Locate the fn body bytes: from the `{` opener on the fn line
+    // through the matching `}`. Replacements must stay inside this
+    // range so we don't accidentally edit code outside the fn.
+    let lines: Vec<&str> = text.lines().collect();
+    let fn_line_text = match lines.get(enclosing.fn_line as usize) {
+        Some(l) => l,
+        None => return out,
+    };
+    let body_open_col = match fn_line_text.find('{') {
+        Some(i) => i,
+        None => return out,
+    };
+    // Compute global byte offset of the `{` opener.
+    let mut line_start = 0usize;
+    for (i, l) in lines.iter().enumerate() {
+        if i == enclosing.fn_line as usize {
+            break;
+        }
+        line_start += l.len() + 1; // `+1` for the newline
+    }
+    let body_open_byte = line_start + body_open_col;
+    let close_line = match find_matching_brace_line(text, enclosing.fn_line as usize, body_open_col)
+    {
+        Some(l) => l,
+        None => return out,
+    };
+    // Compute global byte offset of the closing `}` line end.
+    let mut body_close_byte = 0usize;
+    for (i, l) in lines.iter().enumerate() {
+        if i > close_line {
+            break;
+        }
+        body_close_byte += l.len() + 1;
+    }
+
+    // Walk byte-by-byte in the body range, finding word-boundary
+    // matches of `var`. Don't skip string interiors — `$foo` inside
+    // `"$foo"` is a usage we want to rename.
+    let bytes = text.as_bytes();
+    let mut i = body_open_byte;
+    let needle = var.as_bytes();
+    while i + needle.len() <= body_close_byte.min(bytes.len()) {
+        if &bytes[i..i + needle.len()] != needle {
+            i += 1;
+            continue;
+        }
+        // Word boundary: char after must NOT be ident-continuation.
+        let after_idx = i + needle.len();
+        let after_ok = if after_idx >= bytes.len() {
+            true
+        } else {
+            let c = bytes[after_idx] as char;
+            !(c.is_ascii_alphanumeric() || c == '_')
+        };
+        if !after_ok {
+            i += 1;
+            continue;
+        }
+        // The sigil itself anchors the start; we don't need a
+        // pre-boundary check beyond ensuring the sigil is at `i`.
+        let (line, col) = byte_to_line_col(text, i);
+        let (end_line, end_col) = byte_to_line_col(text, i + needle.len());
+        let edit_range = Range {
+            start: Position {
+                line,
+                character: col,
+            },
+            end: Position {
+                line: end_line,
+                character: end_col,
+            },
+        };
+        // Skip the range covered by the original selection edit.
+        if edit_range.start.line == skip_range.start.line
+            && edit_range.start.character == skip_range.start.character
+            && edit_range.end.line == skip_range.end.line
+            && edit_range.end.character == skip_range.end.character
+        {
+            i = after_idx;
+            continue;
+        }
+        out.push(TextEdit {
+            range: edit_range,
+            new_text: format!("${placeholder}"),
+        });
+        i = after_idx;
+    }
+    out
 }
 
 /// Find every call site `fn_name(...)` in `text` and emit a TextEdit
@@ -1692,15 +1875,52 @@ fn call_site_threading_edits(
     selection_line: u32,
 ) -> Vec<TextEdit> {
     let mut out: Vec<TextEdit> = Vec::new();
-    if enclosing.fn_name.is_empty() {
+    let bare = &enclosing.fn_name;
+    let full = &enclosing.fn_full_name;
+    if bare.is_empty() {
+        return out;
+    }
+    // Scan the qualified form first (longer, more specific). Then
+    // scan the bare form, skipping byte ranges already covered by a
+    // qualified-form match (so `Demo::handle` doesn't also fire a
+    // bare-`handle` edit).
+    if !full.is_empty() && full != bare {
+        out.extend(scan_call_sites_for_name(
+            text,
+            full,
+            enclosing.fn_line,
+            selection,
+            selection_line,
+            &out,
+        ));
+    }
+    out.extend(scan_call_sites_for_name(
+        text,
+        bare,
+        enclosing.fn_line,
+        selection,
+        selection_line,
+        &out,
+    ));
+    out
+}
+
+fn scan_call_sites_for_name(
+    text: &str,
+    needle: &str,
+    body_line: u32,
+    selection: &str,
+    _selection_line: u32,
+    already_emitted: &[TextEdit],
+) -> Vec<TextEdit> {
+    let mut out: Vec<TextEdit> = Vec::new();
+    if needle.is_empty() {
         return out;
     }
     let mask = string_interior_mask_simple(text);
-    let needle = &enclosing.fn_name;
     let bytes = text.as_bytes();
     let mut search_from = 0usize;
-    let body_line = enclosing.fn_line;
-    while let Some(rel) = text[search_from..].find(needle.as_str()) {
+    while let Some(rel) = text[search_from..].find(needle) {
         let start = search_from + rel;
         search_from = start + needle.len();
         // Inside string/comment? Skip.
@@ -1739,19 +1959,9 @@ fn call_site_threading_edits(
         if call_line == body_line {
             continue;
         }
-        // Skip occurrences that fall inside the fn's own body — those
-        // are recursive calls. We'd want to thread those too, but
-        // they'd cascade infinitely; skip for v1.
-        // (Approximate: same-line scope check above already filters
-        // the header; for body-internal calls we'd need brace depth
-        // tracking. Pragmatic: skip if the selection line equals the
-        // call line — the user's extracted text matches and is on
-        // the same line as the call.)
-        let _ = selection_line;
         // Find matching `)` from p.
         let close = find_matching_paren(text, p);
         if let Some(close_byte) = close {
-            // Determine if existing args are empty.
             let inner = text[p + 1..close_byte].trim();
             let new_text = if inner.is_empty() {
                 selection.to_string()
@@ -1759,6 +1969,86 @@ fn call_site_threading_edits(
                 format!(", {selection}")
             };
             let (close_line, close_col) = byte_to_line_col(text, close_byte);
+            // Skip if a longer-form match (qualified) already covered
+            // this same position. Without this, `Demo::handle(...)`
+            // would get TWO edits — one for the qualified scan, one
+            // for the bare-`handle` substring within it.
+            let already = already_emitted.iter().chain(out.iter()).any(|e| {
+                e.range.start.line == close_line && e.range.start.character == close_col
+            });
+            if already {
+                continue;
+            }
+            out.push(TextEdit {
+                range: Range {
+                    start: Position {
+                        line: close_line,
+                        character: close_col,
+                    },
+                    end: Position {
+                        line: close_line,
+                        character: close_col,
+                    },
+                },
+                new_text,
+            });
+        }
+    }
+    out
+}
+
+/// Cross-file (other open documents) call-site threading: scan
+/// `other_text` for occurrences of `fn_full_name(...)` and append the
+/// selection at each call's close-paren position.
+fn cross_file_call_site_edits(
+    other_text: &str,
+    fn_full_name: &str,
+    selection: &str,
+) -> Vec<TextEdit> {
+    if fn_full_name.is_empty() {
+        return Vec::new();
+    }
+    let mask = string_interior_mask_simple(other_text);
+    let bytes = other_text.as_bytes();
+    let mut out: Vec<TextEdit> = Vec::new();
+    let mut search_from = 0usize;
+    while let Some(rel) = other_text[search_from..].find(fn_full_name) {
+        let start = search_from + rel;
+        search_from = start + fn_full_name.len();
+        if mask.get(start).copied().unwrap_or(false) {
+            continue;
+        }
+        let prev_ok = start == 0
+            || {
+                let c = bytes[start - 1] as char;
+                !(c.is_ascii_alphanumeric() || c == '_' || c == ':')
+            };
+        if !prev_ok {
+            continue;
+        }
+        let end_name = start + fn_full_name.len();
+        if let Some(&b) = bytes.get(end_name) {
+            let c = b as char;
+            if c.is_ascii_alphanumeric() || c == '_' || c == ':' {
+                continue;
+            }
+        }
+        let mut p = end_name;
+        while p < bytes.len() && (bytes[p] == b' ' || bytes[p] == b'\t') {
+            p += 1;
+        }
+        if p >= bytes.len() || bytes[p] != b'(' {
+            continue;
+        }
+        let close = find_matching_paren(other_text, p);
+        if let Some(close_byte) = close {
+            let inner = other_text[p + 1..close_byte].trim();
+            let new_text = if inner.is_empty() {
+                selection.to_string()
+            } else {
+                format!(", {selection}")
+            };
+            let (close_line, close_col) = byte_to_line_col(other_text, close_byte);
             out.push(TextEdit {
                 range: Range {
                     start: Position {
@@ -2783,6 +3073,110 @@ mod tests {
         assert!(
             edits.iter().any(|e| e.new_text == "($extracted_param)"),
             "expected new `(...)` insertion: {edits:#?}"
+        );
+    }
+
+    #[test]
+    fn extract_parameter_threads_call_sites_in_other_open_doc() {
+        // Active file declares `fn Demo::handle($sig) { … }`. A second
+        // open doc calls `Demo::handle("x")`. Extract Parameter on the
+        // active file's body expression must thread the new arg into
+        // the other doc's call site too.
+        let active_src = "package Demo\nfn Demo::handle($sig) {\n    my $x = 1\n    log(\"ok\")\n}\n";
+        let other_uri = "file:///other.stk";
+        let other_src = "Demo::handle(\"x\")\nDemo::handle(\"y\")\n";
+        let mut docs: HashMap<String, String> = HashMap::new();
+        let (active_docs, active_uri) = doc("file:///active.stk", active_src);
+        for (k, v) in active_docs.iter() {
+            docs.insert(k.clone(), v.clone());
+        }
+        docs.insert(other_uri.to_string(), other_src.to_string());
+        let params = CodeActionParams {
+            text_document: TextDocumentIdentifier { uri: active_uri.clone() },
+            range: range(3, 8, 3, 12), // `"ok"` on the `log("ok")` line
+            context: CodeActionContext::default(),
+            work_done_progress_params: Default::default(),
+            partial_result_params: Default::default(),
+        };
+        let actions = compute_code_actions(&docs, &params);
+        let param = actions
+            .iter()
+            .find_map(|a| match a {
+                CodeActionOrCommand::CodeAction(ca) if ca.title.contains("parameter") => {
+                    ca.edit.clone()
+                }
+                _ => None,
+            })
+            .expect("extract-parameter action present");
+        let changes = param.changes.expect("workspace edit");
+        // Expect edits in both the active doc AND the other doc.
+        assert_eq!(
+            changes.len(),
+            2,
+            "expected edits for both documents, got {:?}",
+            changes.keys().collect::<Vec<_>>()
+        );
+        let other_edits: &Vec<TextEdit> = changes
+            .iter()
+            .find(|(u, _)| u.as_str() == other_uri)
+            .map(|(_, e)| e)
+            .expect("expected edits for other doc");
+        // Two call sites in other_src → two append edits each `, "ok"`.
+        assert_eq!(
+            other_edits.len(),
+            2,
+            "expected 2 call-site appends in other doc: {other_edits:#?}"
+        );
+        assert!(
+            other_edits.iter().all(|e| e.new_text == ", \"ok\""),
+            "expected `, \"ok\"` appends: {other_edits:#?}"
+        );
+    }
+
+    #[test]
+    fn extract_parameter_on_bare_var_renames_all_body_occurrences() {
+        // User's exact case: cursor on `$extracted` of the
+        // `my $extracted = "drain"` decl. Extract Parameter must:
+        //   - add `$extracted_param` to the sig
+        //   - rename the decl-line `$extracted` to `$extracted_param`
+        //   - rename the in-string `$extracted` interpolation to
+        //     `$extracted_param` too
+        // Otherwise the body is half-renamed and `$extracted` refers
+        // to a now-undeclared name.
+        let src = "fn handle($sig) {\n    my $extracted = \"drain\"\n    p \"$extracted + stop\"\n}\n";
+        // `$extracted` on line 1, cols 7..17.
+        let actions = code_actions(src, range(1, 7, 1, 17));
+        let param = actions
+            .iter()
+            .find_map(|a| match a {
+                CodeActionOrCommand::CodeAction(ca) if ca.title.contains("parameter") => {
+                    ca.edit.clone()
+                }
+                _ => None,
+            })
+            .expect("extract-parameter action present");
+        let changes = param.changes.expect("workspace edit");
+        let (_uri, edits) = changes.iter().next().unwrap();
+        let new_texts: Vec<&str> = edits.iter().map(|e| e.new_text.as_str()).collect();
+        // Sig edit + 2 body occurrences renamed (decl line + in-string).
+        let body_renames = new_texts
+            .iter()
+            .filter(|n| **n == "$extracted_param")
+            .count();
+        assert!(
+            body_renames >= 2,
+            "expected ≥2 body `$extracted_param` rewrites (decl + in-string), got {new_texts:?}"
+        );
+        // The in-string `"$extracted + stop"` must become
+        // `"$extracted_param + stop"` — verify by checking that a
+        // replace edit covers the in-string `$extracted` position.
+        // Line 2 of `src` is `    p "$extracted + stop"`; the `$` of
+        // `$extracted` is at col 7.
+        assert!(
+            edits.iter().any(|e| e.range.start.line == 2
+                && e.range.start.character == 7
+                && e.new_text == "$extracted_param"),
+            "expected rewrite at line 2 col 7 (in-string $extracted): {edits:#?}"
         );
     }
 

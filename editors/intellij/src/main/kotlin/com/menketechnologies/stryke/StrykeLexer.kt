@@ -35,6 +35,14 @@ class StrykeLexer : LexerBase() {
     private var state = 0
     private var pendingFormatLen = 0
     private var interpBraceDepth = 0
+    /// Set true after emitting a `fn` / `sub` / `method` / `class` /
+    /// `struct` / `trait` / `enum` keyword so the NEXT identifier
+    /// gets colored as a declaration name (`FUNCTION_DECL`) rather
+    /// than a plain identifier or call. Cleared on the next emission.
+    /// Lossy on incremental relexing — IntelliJ may start re-lexing
+    /// mid-file with this flag reset, but the worst case is a flicker
+    /// of decl-name coloring; acceptable for a syntax-only highlight.
+    private var lastWasFnIntro = false
 
     override fun start(buffer: CharSequence, startOffset: Int, endOffset: Int, initialState: Int) {
         buf = buffer
@@ -83,6 +91,21 @@ class StrykeLexer : LexerBase() {
             state = STATE_IN_DQ_STRING
             return
         }
+        // Regex flags — the letter run immediately after `/pattern/`.
+        if (state == STATE_REGEX_FLAGS_PENDING) {
+            var p = pos
+            while (p < endOffset && buf[p].isLetter()) p++
+            if (p > pos) {
+                tokenStart = pos
+                tokenEnd = p
+                pos = p
+                tokenType = StrykeTokenTypes.REGEX_FLAGS
+                state = STATE_NORMAL
+                return
+            }
+            // No flags after all — fall through to normal lexing.
+            state = STATE_NORMAL
+        }
         // printf format spec — emit `%d` / `%10.2f` / `%-15s` etc. as
         // one STRING_FORMAT token, then return to string mode.
         if (state == STATE_IN_DQ_FORMAT) {
@@ -126,6 +149,10 @@ class StrykeLexer : LexerBase() {
             c == ',' -> emit(1, StrykeTokenTypes.COMMA)
             c == ';' -> emit(1, StrykeTokenTypes.SEMICOLON)
             c == '.' -> emit(1, StrykeTokenTypes.DOT)
+            // `::` between package segments — own color category so the
+            // user can pick a separate color for separators vs name
+            // segments.
+            c == ':' && peek(1) == ':' -> emit(2, StrykeTokenTypes.PACKAGE_SEPARATOR)
             isOperatorChar(c) -> emit(1, StrykeTokenTypes.OPERATOR)
             else -> emit(1, TokenType.BAD_CHARACTER)
         }
@@ -434,6 +461,10 @@ class StrykeLexer : LexerBase() {
             c == ',' -> emit(1, StrykeTokenTypes.COMMA)
             c == ';' -> emit(1, StrykeTokenTypes.SEMICOLON)
             c == '.' -> emit(1, StrykeTokenTypes.DOT)
+            // `::` between package segments — own color category so the
+            // user can pick a separate color for separators vs name
+            // segments.
+            c == ':' && peek(1) == ':' -> emit(2, StrykeTokenTypes.PACKAGE_SEPARATOR)
             isOperatorChar(c) -> emit(1, StrykeTokenTypes.OPERATOR)
             else -> emit(1, TokenType.BAD_CHARACTER)
         }
@@ -571,25 +602,59 @@ class StrykeLexer : LexerBase() {
     private fun consumeWord() {
         var p = pos
         while (p < endOffset && (buf[p] == '_' || buf[p].isLetterOrDigit())) p++
-        // Look ahead for `::` — package path
-        var pkgEnd = p
-        var hadPkg = false
-        while (pkgEnd + 1 < endOffset && buf[pkgEnd] == ':' && buf[pkgEnd + 1] == ':') {
-            hadPkg = true
-            pkgEnd += 2
-            while (pkgEnd < endOffset && (buf[pkgEnd] == '_' || buf[pkgEnd].isLetterOrDigit())) pkgEnd++
-        }
-        if (hadPkg) {
-            // Emit just the first segment now; the lexer will re-enter for the `::` next.
-            // To keep it simple, emit the *entire* package path as PACKAGE_NAME — the user
-            // can rebind that color separately and the `::` separators become part of it.
-            tokenEnd = pkgEnd; pos = pkgEnd
+        // `::` package separator immediately after the segment? Emit
+        // just this segment as PACKAGE_NAME and let the lexer's next
+        // advance() consume the `::` (which dispatches to the `:`
+        // case below and emits PACKAGE_SEPARATOR).
+        if (p + 1 < endOffset && buf[p] == ':' && buf[p + 1] == ':') {
+            tokenEnd = p; pos = p
             tokenType = StrykeTokenTypes.PACKAGE_NAME
+            // Don't propagate fn-intro state through package segments
+            // — the FUNCTION_DECL color applies to the LAST segment
+            // (the actual sub name), not earlier package qualifiers.
             return
         }
         val word = buf.subSequence(pos, p).toString()
         tokenEnd = p; pos = p
-        tokenType = classifyWord(word)
+
+        // Distinguish FUNCTION_DECL / FUNCTION_CALL / LABEL from
+        // generic IDENTIFIER via context:
+        //   - After `fn` / `sub` / `class` / `struct` / `trait` /
+        //     `enum` / `method` / `impl` → FUNCTION_DECL.
+        //   - Followed by `(` → FUNCTION_CALL.
+        //   - Followed by single `:` (not `::`) → LABEL.
+        // Bare unknown identifier falls through to IDENTIFIER.
+        val classified = classifyWord(word)
+        tokenType = when {
+            classified == StrykeTokenTypes.IDENTIFIER && lastWasFnIntro ->
+                StrykeTokenTypes.FUNCTION_DECL
+            classified == StrykeTokenTypes.IDENTIFIER && peekNextNonSpace(p) == '(' ->
+                StrykeTokenTypes.FUNCTION_CALL
+            classified == StrykeTokenTypes.IDENTIFIER && nextIsSingleColon(p) ->
+                StrykeTokenTypes.LABEL
+            else -> classified
+        }
+        // Update fn-intro state for the NEXT consumeWord call.
+        lastWasFnIntro = classified == StrykeTokenTypes.FN_KEYWORD
+    }
+
+    /** Peek the next non-whitespace char (newlines included as whitespace). */
+    private fun peekNextNonSpace(from: Int): Char? {
+        var i = from
+        while (i < endOffset) {
+            val c = buf[i]
+            if (c != ' ' && c != '\t') return c
+            i++
+        }
+        return null
+    }
+
+    /** True if the next non-whitespace char is `:` not followed by another `:`. */
+    private fun nextIsSingleColon(from: Int): Boolean {
+        var i = from
+        while (i < endOffset && (buf[i] == ' ' || buf[i] == '\t')) i++
+        if (i >= endOffset || buf[i] != ':') return false
+        return i + 1 >= endOffset || buf[i + 1] != ':'
     }
 
     private fun consumeRegexOrSlash() {
@@ -609,17 +674,14 @@ class StrykeLexer : LexerBase() {
             if (c == '\n') break
             p++
         }
-        val flagsStart = p
-        while (p < endOffset && buf[p].isLetter()) p++
-        if (p > flagsStart) {
-            tokenEnd = flagsStart; pos = flagsStart
-            tokenType = StrykeTokenTypes.REGEX
-            // Note: the flags get emitted on the next advance().
-            // Push the lexer to recognise them as REGEX_FLAGS.
-            return
-        }
+        // Emit just the `/pattern/` as REGEX. If letters follow (the
+        // flags), set state so the next advance() emits them as one
+        // REGEX_FLAGS token — distinct color category in the picker.
         tokenEnd = p; pos = p
         tokenType = StrykeTokenTypes.REGEX
+        if (p < endOffset && buf[p].isLetter()) {
+            state = STATE_REGEX_FLAGS_PENDING
+        }
     }
 
     private fun lastNonSpaceBefore(p: Int): Char? {
@@ -667,6 +729,7 @@ class StrykeLexer : LexerBase() {
         const val STATE_IN_DQ_INTERP = 3          // inside the `#{EXPR}` expression
         const val STATE_IN_DQ_SIGIL_VAR = 4       // next token is a `$var` / `@arr` / `%h` inside a string
         const val STATE_IN_DQ_FORMAT = 5          // next token is a `%d` / `%10.2f` printf format spec inside a string
+        const val STATE_REGEX_FLAGS_PENDING = 6   // next token is the letter run after `/pattern/` (e.g. `i`, `g`, `igs`)
 
         private val FORMAT_FLAGS = setOf('-', '+', '0', ' ', '#')
         private val FORMAT_LENGTH = setOf('l', 'h', 'L', 'q', 'z', 'j', 't')

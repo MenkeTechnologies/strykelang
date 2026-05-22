@@ -56,6 +56,14 @@ pub(crate) struct Cli {
     #[arg(long = "fmt")]
     format_source: bool,
 
+    /// Generate Markdown module documentation from `##` doc-comment
+    /// blocks above each top-level declaration (fn / struct / enum /
+    /// class / trait / package / use constant). Prints to stdout.
+    /// Named `--gen-docs` (not `--docs`) because `stryke docs` is
+    /// already a builtin.
+    #[arg(long = "gen-docs")]
+    dump_docs: bool,
+
     /// Wall-clock profile: per-line + per-sub timings on stderr (VM: opcode-level lines; JIT off)
     #[arg(long = "profile")]
     profile: bool,
@@ -378,6 +386,7 @@ fn print_cyberpunk_help() {
         "  --disasm / --disassemble {G}//{N} Print bytecode disassembly to stderr before VM run"
     );
     println!("  --ast                  {G}//{N} Dump parsed AST as JSON and exit (no execution)");
+    println!("  --gen-docs FILE        {G}//{N} Generate Markdown module docs from `## doc comments` and exit");
     println!("  --fmt                  {G}//{N} Pretty-print parsed Perl to stdout and exit");
     println!(
         "  --explain CODE         {G}//{N} Print expanded hint for an error code (e.g. E0001) and exit"
@@ -1559,6 +1568,15 @@ fn main() {
         process::exit(run_ast_subcommand(&args[2..]));
     }
 
+    // `stryke gen-docs [PATH]` — walk a directory tree (or .), find
+    // every `.stk` / `.pl` / `.pm` source file, and generate
+    // Markdown documentation per module. PATH defaults to `.`.
+    // Output mirrors the source layout under `docs/` (configurable
+    // via `--out DIR`).
+    if args.len() >= 2 && args[1] == "gen-docs" {
+        process::exit(run_gen_docs_subcommand(&args[2..]));
+    }
+
     // Hierarchy: subcommand → builtin → script
     // `stryke pin` calls `pin()` builtin, not a script named `pin`.
     // `stryke --script pin` forces script lookup when there's a conflict.
@@ -1848,6 +1866,21 @@ fn main() {
                 process::exit(1);
             }
         }
+        return;
+    }
+
+    if cli.dump_docs {
+        // Re-read the source so we have line text for `##` doc
+        // extraction. `program` already parsed it, but the source
+        // bytes aren't retained on the AST.
+        let source = match std::fs::read_to_string(&filename) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("stryke: cannot read {} for --gen-docs: {}", filename, e);
+                process::exit(1);
+            }
+        };
+        print!("{}", stryke::docs::generate_markdown(&filename, &source, &program));
         return;
     }
 
@@ -2617,6 +2650,190 @@ fn run_ast_subcommand(args: &[String]) -> i32 {
         Err(e) => {
             eprintln!("stryke ast: failed to serialize: {}", e);
             1
+        }
+    }
+}
+
+/// `stryke gen-docs [PATH] [--out DIR]` — walk a directory, find every
+/// `.stk` / `.pl` / `.pm` source file, generate Markdown module docs
+/// for each, and write them under `--out DIR` (default: `docs/`).
+/// Output layout mirrors the source layout: `lib/foo.stk` →
+/// `docs/lib/foo.md`. Also writes an `index.md` summarizing the
+/// modules processed.
+fn run_gen_docs_subcommand(args: &[String]) -> i32 {
+    if args.first().map(|s| s.as_str()) == Some("-h") || args.first().map(|s| s.as_str()) == Some("--help") {
+        println!("usage: stryke gen-docs [PATH] [--out DIR]");
+        println!();
+        println!("Walk PATH (default `.`) for `.stk`, `.pl`, `.pm` sources and");
+        println!("generate Markdown module docs for each. Output goes under");
+        println!("--out DIR (default `docs/`), mirroring the source layout.");
+        println!();
+        println!("Each output file contains the same content produced by");
+        println!("`stryke --gen-docs FILE` on a single source.");
+        return 0;
+    }
+
+    // Parse args: optional positional PATH, optional `--out DIR`.
+    let mut path: Option<String> = None;
+    let mut out_dir: String = "docs".to_string();
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--out" | "-o" => {
+                if i + 1 >= args.len() {
+                    eprintln!("stryke gen-docs: --out requires a directory argument");
+                    return 2;
+                }
+                out_dir = args[i + 1].clone();
+                i += 2;
+            }
+            other if !other.starts_with('-') && path.is_none() => {
+                path = Some(other.to_string());
+                i += 1;
+            }
+            other => {
+                eprintln!("stryke gen-docs: unexpected argument: {other}");
+                return 2;
+            }
+        }
+    }
+    let root = std::path::PathBuf::from(path.unwrap_or_else(|| ".".to_string()));
+
+    if !root.exists() {
+        eprintln!("stryke gen-docs: path does not exist: {}", root.display());
+        return 1;
+    }
+
+    let mut sources: Vec<std::path::PathBuf> = Vec::new();
+    collect_doc_sources(&root, &mut sources);
+    sources.sort();
+
+    if sources.is_empty() {
+        eprintln!(
+            "stryke gen-docs: no `.stk` / `.pl` / `.pm` files found under {}",
+            root.display()
+        );
+        return 1;
+    }
+
+    let out_root = std::path::PathBuf::from(&out_dir);
+    if let Err(e) = std::fs::create_dir_all(&out_root) {
+        eprintln!(
+            "stryke gen-docs: cannot create output dir {}: {}",
+            out_root.display(),
+            e
+        );
+        return 1;
+    }
+
+    let mut index: Vec<(String, String)> = Vec::new(); // (module title, relative md path)
+    let mut errors: Vec<String> = Vec::new();
+    for src in &sources {
+        let source = match std::fs::read_to_string(src) {
+            Ok(s) => s,
+            Err(e) => {
+                errors.push(format!("{}: {}", src.display(), e));
+                continue;
+            }
+        };
+        let program = match stryke::parse_with_file(&source, &src.to_string_lossy()) {
+            Ok(p) => p,
+            Err(e) => {
+                errors.push(format!("{}: parse error: {}", src.display(), e));
+                continue;
+            }
+        };
+        let md = stryke::docs::generate_markdown(&src.to_string_lossy(), &source, &program);
+
+        // Output path: out_root / (src relative to root, with .md suffix).
+        let rel = src.strip_prefix(&root).unwrap_or(src);
+        let mut out_path = out_root.join(rel);
+        out_path.set_extension("md");
+        if let Some(parent) = out_path.parent() {
+            if let Err(e) = std::fs::create_dir_all(parent) {
+                errors.push(format!("{}: mkdir failed: {}", parent.display(), e));
+                continue;
+            }
+        }
+        if let Err(e) = std::fs::write(&out_path, &md) {
+            errors.push(format!("{}: write failed: {}", out_path.display(), e));
+            continue;
+        }
+
+        // Pull the module title from the first line of the generated
+        // Markdown (`# Module: <title>`).
+        let title = md
+            .lines()
+            .next()
+            .and_then(|l| l.strip_prefix("# Module: "))
+            .unwrap_or_else(|| {
+                src.file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("(unknown)")
+            })
+            .to_string();
+        let rel_md = out_path
+            .strip_prefix(&out_root)
+            .unwrap_or(&out_path)
+            .to_string_lossy()
+            .into_owned();
+        index.push((title, rel_md));
+        println!("{}", out_path.display());
+    }
+
+    // index.md summarizing the generated docs.
+    let mut idx = String::new();
+    idx.push_str("# Module index\n\n");
+    for (title, rel) in &index {
+        idx.push_str(&format!("- [{title}]({rel})\n"));
+    }
+    let idx_path = out_root.join("index.md");
+    if let Err(e) = std::fs::write(&idx_path, idx) {
+        errors.push(format!("{}: write failed: {}", idx_path.display(), e));
+    } else {
+        println!("{}", idx_path.display());
+    }
+
+    if !errors.is_empty() {
+        eprintln!("stryke gen-docs: {} error(s):", errors.len());
+        for e in &errors {
+            eprintln!("  {e}");
+        }
+        return 1;
+    }
+    0
+}
+
+/// Recursively collect stryke source files under `dir`, skipping
+/// directories that are conventionally not source (`.git`, `target`,
+/// `node_modules`, `docs`, `.cargo`, etc.).
+fn collect_doc_sources(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+    const SKIP: &[&str] = &[
+        ".git",
+        "target",
+        "node_modules",
+        ".cargo",
+        ".idea",
+        ".vscode",
+        "build",
+        "dist",
+    ];
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
+                if SKIP.contains(&name) || name.starts_with('.') {
+                    continue;
+                }
+            }
+            collect_doc_sources(&path, out);
+        } else if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
+            if matches!(ext, "stk" | "pl" | "pm") {
+                out.push(path);
+            }
         }
     }
 }
