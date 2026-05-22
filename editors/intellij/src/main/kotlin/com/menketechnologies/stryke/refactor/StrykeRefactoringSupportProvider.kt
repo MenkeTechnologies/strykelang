@@ -58,6 +58,9 @@ class StrykeRefactoringSupportProvider : RefactoringSupportProvider() {
 
     override fun getIntroduceConstantHandler(): RefactoringActionHandler =
         LspExtractActionHandler("Extract Constant", { it.contains("constant") })
+
+    override fun getIntroduceParameterHandler(): RefactoringActionHandler =
+        LspExtractActionHandler("Extract Parameter", { it.contains("parameter") })
 }
 
 /**
@@ -108,10 +111,11 @@ private class LspExtractActionHandler(
         val selection = editor.selectionModel
         val (range, hasSelection) = selectionRange(editor.document, selection)
         dbg("selection: hasSelection=$hasSelection range=$range startOffset=${selection.selectionStart} endOffset=${selection.selectionEnd} text=${selection.selectedText?.take(80)?.replace('\n', '⏎')}")
-        if (!hasSelection) {
-            notifyUser(project, "$refactoringName: select an expression first, then invoke this action.")
-            return
-        }
+        // Caret-only invocation: don't block here. The LSP server snaps
+        // to the word at the cursor (identifier outside a string, or
+        // word-piece inside one). If it can't snap, it returns no
+        // actions and we fall through to the "no code actions" branch
+        // below with a clearer message.
 
         LOG.info("LspExtractActionHandler($refactoringName) sending textDocument/codeAction for range $range")
         val params = CodeActionParams(
