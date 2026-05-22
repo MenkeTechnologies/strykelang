@@ -3452,10 +3452,21 @@ mod tests {
     #[test]
     fn url_encode_decode_roundtrip() {
         let s = "a b+c?foo";
-        let e = url_encode(&StrykeValue::string(s.into())).unwrap();
+        let e = url_encode_with_pattern(&StrykeValue::string(s.into()), None).unwrap();
         assert_eq!(e.to_string(), "a%20b%2Bc%3Ffoo");
         let d = url_decode(&e).unwrap();
         assert_eq!(d.to_string(), s);
+    }
+
+    #[test]
+    fn url_encode_with_strict_pattern_matches_uri_escape_two_arg() {
+        let s = "hello-world.tar~gz";
+        let e = url_encode_with_pattern(
+            &StrykeValue::string(s.into()),
+            Some("^A-Za-z0-9"),
+        )
+        .unwrap();
+        assert_eq!(e.to_string(), "hello%2Dworld%2Etar%7Egz");
     }
 
     #[test]

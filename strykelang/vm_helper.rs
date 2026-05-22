@@ -3992,27 +3992,20 @@ impl VMHelper {
                     }
                     let mut i = 0;
                     while i < items.len() {
-                        let name = match &items[i].kind {
-                            ExprKind::String(s) => s.clone(),
-                            _ => {
-                                return Err(StrykeError::runtime(
-                                    "use constant: constant name must be a string literal",
-                                    line,
-                                ));
-                            }
-                        };
-                        let val = match self.eval_expr(&items[i + 1]) {
-                            Ok(v) => v,
-                            Err(FlowOrError::Error(e)) => return Err(e),
-                            Err(FlowOrError::Flow(_)) => {
-                                return Err(StrykeError::runtime(
-                                    "use constant: unexpected control flow in initializer",
-                                    line,
-                                ));
-                            }
-                        };
-                        self.install_constant_sub(&name, &val, line)?;
+                        let name = self.use_constant_name_from_expr(&items[i], line)?;
+                        self.install_constant_from_expr(&name, &items[i + 1], line)?;
                         i += 2;
+                    }
+                }
+                // `use constant { A => 1, B => 2 }` — hashref-block form
+                // (BUG-086). Each `(key_expr, value_expr)` pair installs a
+                // constant subroutine whose body returns the value expression
+                // verbatim, so list-valued constants like
+                // `MULTI => [1, 2, 3]` retain their original shape.
+                ExprKind::HashRef(pairs) => {
+                    for (key_expr, value_expr) in pairs {
+                        let name = self.use_constant_name_from_expr(key_expr, line)?;
+                        self.install_constant_from_expr(&name, value_expr, line)?;
                     }
                 }
                 _ => {
@@ -4024,6 +4017,77 @@ impl VMHelper {
             }
         }
         Ok(())
+    }
+
+    /// Pull the constant's name out of the `NAME =>` slot. The parser
+    /// usually delivers it as `String(...)` via fat-arrow auto-quoting,
+    /// but bare-identifier keys in a hashref-block come through as
+    /// `Bareword(...)` too.
+    fn use_constant_name_from_expr(&self, e: &Expr, line: usize) -> StrykeResult<String> {
+        match &e.kind {
+            ExprKind::String(s) => Ok(s.clone()),
+            ExprKind::Bareword(s) => Ok(s.clone()),
+            _ => Err(StrykeError::runtime(
+                "use constant: constant name must be a string literal",
+                line,
+            )),
+        }
+    }
+
+    /// Install a constant subroutine from the raw value expression.
+    ///
+    /// For multi-value parenthesized lists (`(1, 2, 3)`) the body keeps the
+    /// `List` shape so callers see the full list — fixing BUG-086 where
+    /// the value was eagerly evaluated and collapsed to its last comma
+    /// operand via scalar coercion. For every other shape we keep the
+    /// original eval-once-and-freeze semantics so non-pure initializers
+    /// like `use constant START_TIME => time()` only run once.
+    fn install_constant_from_expr(
+        &mut self,
+        name: &str,
+        value: &Expr,
+        line: usize,
+    ) -> StrykeResult<()> {
+        // Multi-value list form: install the `List` AST directly so the
+        // constant returns the full list (not just the last comma operand).
+        // The body is a bare `Expression(...)` statement — implicit return
+        // hands the value back in the caller's wantarray context, the same
+        // way `fn arr = (1, 2, 3)` does. Wrapping in a `Return(...)`
+        // statement instead would collapse to scalar context for
+        // bareword-call sites like `my @a = ARR`.
+        if matches!(value.kind, ExprKind::List(_)) {
+            let key = self.qualify_sub_key(name);
+            let body = vec![Statement {
+                label: None,
+                kind: StmtKind::Expression(value.clone()),
+                line,
+            }];
+            self.subs.insert(
+                key.clone(),
+                Arc::new(StrykeSub {
+                    name: key,
+                    params: vec![],
+                    body,
+                    prototype: None,
+                    closure_env: None,
+                    fib_like: None,
+                }),
+            );
+            return Ok(());
+        }
+        // Scalar / arrayref / hashref / etc.: eval once and freeze, the
+        // same path single-pair `use constant` has used since day one.
+        let val = match self.eval_expr(value) {
+            Ok(v) => v,
+            Err(FlowOrError::Error(e)) => return Err(e),
+            Err(FlowOrError::Flow(_)) => {
+                return Err(StrykeError::runtime(
+                    "use constant: unexpected control flow in initializer",
+                    line,
+                ));
+            }
+        };
+        self.install_constant_sub(name, &val, line)
     }
 
     fn install_constant_sub(

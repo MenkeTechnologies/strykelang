@@ -1736,32 +1736,6 @@ Tests: `possessive_quantifier_does_not_prevent_backtrack_today`,
 Severity: **bug** (regex parity).
 
 
-## BUG-086 — `use constant { ... }` hashref form rejected; list form collapses
-
-```sh
-$ stryke -e 'use constant ARR => (1, 2, 3); my @a = ARR; print "@a"'
-3                              # only last comma operand kept
-$ perl   -e 'use constant ARR => (1, 2, 3); my @a = ARR; print "@a"'
-1 2 3
-
-$ stryke -e 'use constant { ZERO => 0, ONE => 1 }; print ZERO'
-use constant: expected list of NAME => VALUE pairs at -e line 1.
-```
-
-Single-value `use constant NAME => VALUE` works. The hashref-block form
-and the multi-value `(LIST)` form both fail. Workaround: declare each
-constant separately, or wrap a list constant in an arrayref:
-`use constant DAYS => [qw(mon tue wed)]`.
-
-Tests: `use_constant_simple_scalar`, `use_constant_arithmetic`,
-`use_constant_arrayref_holds_list`,
-`use_constant_paren_list_collapses_to_last_today`,
-`use_constant_hashref_form_is_rejected_today`,
-`use_constant_qw_becomes_arrayref_string`.
-
-Severity: **bug** (parity with the canonical Perl idioms).
-
-
 ## BUG-087 — `use warnings` does not emit warnings
 
 ```sh

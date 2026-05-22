@@ -181,6 +181,7 @@ mod expressions;
 mod feature_cross;
 mod feature_integration_pin;
 mod file_io_pin;
+mod bug_fixes_2026_05_extra_pin;
 mod fix_regressions;
 mod fn_in_package_no_builtin_shadow_pin;
 mod fs_io;
