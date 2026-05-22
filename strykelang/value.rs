@@ -2614,7 +2614,15 @@ impl fmt::Display for StrykeValue {
             HeapObject::ScalarRef(_)
             | HeapObject::ScalarBindingRef(_)
             | HeapObject::CaptureCell(_) => f.write_str("SCALAR(0x...)"),
-            HeapObject::CodeRef(sub) => write!(f, "CODE({})", sub.name),
+            HeapObject::CodeRef(sub) => {
+                // Match Perl's `CODE(0x<hexaddr>)` so distinct closures
+                // stringify to distinct values and string comparison can
+                // tell them apart. The Arc pointer is stable for the
+                // lifetime of the closure instance and unique across
+                // simultaneous instances (BUG-245).
+                let addr = Arc::as_ptr(sub) as usize;
+                write!(f, "CODE(0x{:x})", addr)
+            }
             HeapObject::Regex(_, src, _) => write!(f, "(?:{src})"),
             HeapObject::Blessed(b) => write!(f, "{}=HASH(0x...)", b.class),
             HeapObject::IOHandle(name) => f.write_str(name),
@@ -4714,7 +4722,9 @@ mod tests {
     }
 
     #[test]
-    fn display_code_ref_includes_sub_name() {
+    fn display_code_ref_is_perl_style_hex_address() {
+        // Per BUG-245, coderefs stringify as `CODE(0x<hexaddr>)` so distinct
+        // closures produce distinct strings (matches Perl's documented form).
         use super::StrykeSub;
         let c = StrykeValue::code_ref(Arc::new(StrykeSub {
             name: "foo".into(),
@@ -4724,7 +4734,9 @@ mod tests {
             prototype: None,
             fib_like: None,
         }));
-        assert!(c.to_string().contains("foo"));
+        let s = c.to_string();
+        assert!(s.starts_with("CODE(0x"), "got {:?}", s);
+        assert!(s.ends_with(')'), "got {:?}", s);
     }
 
     #[test]

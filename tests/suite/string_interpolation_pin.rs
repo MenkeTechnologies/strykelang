@@ -276,13 +276,25 @@ fn hash_ref_string_form_in_interp() {
 }
 
 #[test]
-fn coderef_string_form_is_code_anon_not_hex_addr() {
-    // Stryke surface: coderefs stringify as `CODE(__ANON__)` instead
-    // of Perl's `CODE(0x<addr>)`. Documented as BUG-245.
+fn coderef_string_form_is_code_hex_addr() {
+    // Coderefs stringify as `CODE(0x<hex>)` so distinct closures
+    // produce distinct strings (Perl-compatible identity).
     let code = r#"
         my $c = sub { 1 };
         my $s = "$c";
-        $s eq "CODE(__ANON__)" ? 1 : 0
+        ($s =~ /^CODE\(0x[0-9a-f]+\)$/) ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn distinct_anon_coderefs_stringify_distinctly() {
+    // Two `sub { … }` literals are distinct closures; their string forms
+    // must differ so identity-by-string-form patterns work.
+    let code = r#"
+        my $c = sub { 1 };
+        my $d = sub { 1 };
+        ("$c" ne "$d") ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }

@@ -287,24 +287,6 @@ Dispatch maps **`"hamming"`** to **`window_hamming`**. For **edit distance** on 
 Pins: **`hamming_distance_bit_flip_one_cl`** in **`tests/suite/behavior_pin_2026_05_cl.rs`**.
 
 
-## BUG-155 — **`reverse([...])`** does not reverse **inner** elements (single **`ARRAYREF`** actual) — **`polish`**
-
-Like **`uniq([…])`** / iterator bucket pitfalls, a **single** bracket array passed to **`reverse`**
-is not **`map_flatten_outputs`**’d into a variadic list — **`stringify(reverse([1, 2, 3]))`** stays
-**`[1, 2, 3]`**. Use **`reverse_list`**, **`reverse(1,2,3)`**, or **`reverse @{ $aref }`**-style
-flattening when porting Perl.
-
-Pins: **`reverse_variadic_three_ints_cl`**, **`reverse_single_inline_arrayref_identity_shape_cl`**, **`reverse_list_drains_bracket_list_cl`**
-in **`tests/suite/behavior_pin_2026_05_cl.rs`**.
-
-## BUG-156 — **`seq` is not Bash/Raku numeric `seq FIRST LAST` — only first arg is used** — **`polish`**
-
-**`builtin_seq`** documents **`seq COLL`** — it turns one collection into a list (and **`UNDEF`**
-when empty). **`seq(2, 5)`** therefore only inspects **`2`** (stringifies as **`"2"`**), not a range;
-use **`range(2, 5)`** for inclusive integer steps.
-
-Pin: **`seq_two_args_only_first_used_bug_cm`** in **`tests/suite/behavior_pin_2026_05_cm.rs`**.
-
 ## BUG-158 — **`parse_int("0xff")` without an explicit radix is not hex** — **`polish`**
 
 **`parse_int`** only interprets a leading **`0x`** when the second-argument radix is **`16`**. A
@@ -3101,60 +3083,6 @@ Pin: `heredoc_in_var_then_passed_to_fn`,
 `heredoc_in_ternary_via_temp_var` in `tests/suite/heredoc_pin.rs`.
 
 Severity: **polish** (workaround is one extra line; no semantic loss).
-
-
-## BUG-244 — `mysync` inside `fn` body reinitialises on each call
-
-```sh
-$ s -e '
-fn counter() {
-    mysync $n = 0;
-    $n = $n + 1;
-    return $n
-}
-print counter(), " ", counter(), " ", counter(), "\n"'
-1 1 1
-```
-
-`mysync` was intended as cross-closure shared state; inside a top-level
-fn body it does not act as a "static" variable that persists across
-calls — each invocation reinitialises `$n` to `0`. The closest stryke
-idiom for static-like persistence is the closure-factory pattern:
-
-```stryke
-my $counter = do {
-    my $n = 0;
-    sub { $n = $n + 1 }
-};
-print $counter->(), " ", $counter->(), " ", $counter->(), "\n";
-# 1 2 3
-```
-
-Pin: `mysync_inside_fn_reinit_per_call_not_static` in
-`tests/suite/local_scope_pin.rs`.
-
-Severity: **polish** (clear closure-factory workaround; design decision
-on whether `mysync` should imply per-fn persistence is open).
-
-
-## BUG-245 — Coderefs stringify as `CODE(__ANON__)` instead of `CODE(0x<addr>)`
-
-```sh
-$ s -e 'my $c = sub { 1 }; print "$c\n"'
-CODE(__ANON__)
-```
-
-Perl stringifies anonymous coderefs as `CODE(0x<hexaddr>)`, with the
-hex address identifying that particular closure instance. Stryke
-returns the literal string `CODE(__ANON__)` for every anonymous
-coderef, which prevents using string comparison to distinguish two
-distinct closures.
-
-Pin: `coderef_string_form_is_code_anon_not_hex_addr` in
-`tests/suite/string_interpolation_pin.rs`.
-
-Severity: **polish** (no semantic loss; affects only debug-print
-output and identity-by-string-form patterns).
 
 
 ## BUG-246 — `$$ref` does not deref inside double-quoted string
