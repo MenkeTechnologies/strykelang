@@ -26,29 +26,23 @@ fn use_constant_arrayref_holds_list() {
 }
 
 #[test]
-fn use_constant_paren_list_collapses_to_last_today() {
-    // BUG-086: `use constant ARR => (1, 2, 3)` should bind ARR to the list
-    // (Perl does). Stryke binds it to the last comma operand only — same
-    // root issue as BUG-010.
+fn use_constant_paren_list_returns_full_list() {
+    // `use constant ARR => (1, 2, 3)` binds ARR to the list. The constant
+    // sub keeps the list AST as its body so callers see the full list
+    // through any `wantarray = List` site (`my @a = ARR`, `for ARR`, etc.).
     assert_eq!(
         eval_string(r#"use constant ARR => (1, 2, 3); my @a = ARR; "@a""#),
-        "3"
+        "1 2 3"
     );
 }
 
 #[test]
-fn use_constant_hashref_form_is_rejected_today() {
-    // BUG-086b: Perl supports `use constant { K1 => V1, K2 => V2, ... }`.
-    // Stryke parses it as expecting a paired list, not a hashref.
-    use stryke::error::ErrorKind;
-    let kind = eval_err_kind(r#"use constant { ZERO => 0, ONE => 1 }; ZERO"#);
-    assert!(
-        matches!(
-            kind,
-            ErrorKind::Runtime | ErrorKind::Type | ErrorKind::Syntax
-        ),
-        "expected error, got {:?}",
-        kind
+fn use_constant_hashref_form_installs_each_pair() {
+    // `use constant { K1 => V1, K2 => V2 }` installs one constant sub per
+    // pair, matching Perl's constant.pm hashref-block form.
+    assert_eq!(
+        eval_int(r#"use constant { ZERO => 0, ONE => 1, TWO => 2 }; ZERO + ONE + TWO"#),
+        3
     );
 }
 
