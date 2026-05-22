@@ -437,11 +437,10 @@ fn lsp_stdio_hover_sub_decl_line() {
 
 /// Go to Declaration on a struct field name inside a constructor call
 /// `Rectangle(width => -1, height => 5)` must land on the struct's
-/// field declaration. Currently the SymbolTable doesn't register
-/// individual fields — only the struct's name as a Type — so goto-def
-/// returns null. (Marked `ignore` until field indexing lands.)
+/// decl line. Fields registered as `SymbolKind::Field` with the
+/// parent struct's decl_line (per-field line tracking would need
+/// parser changes; v1 lands you on the struct).
 #[test]
-#[ignore]
 fn lsp_stdio_goto_definition_struct_field() {
     let src = "struct Rectangle { width, height }\nmy $r = Rectangle(width => -1, height => 5)\n";
     let mut h = LspHarness::new(src);

@@ -17,6 +17,7 @@ object StrykeColors {
     @JvmField val DOC_COMMENT = mk("STRYKE_DOC_COMMENT", Defaults.DOC_COMMENT)
     @JvmField val STRING = mk("STRYKE_STRING", Defaults.STRING)
     @JvmField val STRING_ESCAPE = mk("STRYKE_STRING_ESCAPE", Defaults.VALID_STRING_ESCAPE)
+    @JvmField val STRING_FORMAT = mk("STRYKE_STRING_FORMAT", Defaults.VALID_STRING_ESCAPE)
     @JvmField val HEREDOC = mk("STRYKE_HEREDOC", Defaults.STRING)
     @JvmField val NUMBER = mk("STRYKE_NUMBER", Defaults.NUMBER)
     @JvmField val FLOAT = mk("STRYKE_FLOAT", Defaults.NUMBER)

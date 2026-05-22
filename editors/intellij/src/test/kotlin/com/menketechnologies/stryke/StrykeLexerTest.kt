@@ -75,6 +75,49 @@ class StrykeLexerTest {
     }
 
     @Test
+    fun printf_format_specifiers_get_string_format_tokens() {
+        // `"%-15s %8d %10.2f\n"` — each `%...conv` chunk is one
+        // STRING_FORMAT token, distinct from the surrounding STRING.
+        val toks = lex("\"%-15s %8d %10.2f\\n\"")
+        val fmtTokens = toks.filter { it.first == StrykeTokenTypes.STRING_FORMAT }
+        assertTrue(
+            "expected ≥3 STRING_FORMAT tokens: $toks",
+            fmtTokens.size >= 3,
+        )
+        assertTrue(
+            "expected `%-15s` as STRING_FORMAT: $toks",
+            fmtTokens.any { it.second == "%-15s" },
+        )
+        assertTrue(
+            "expected `%8d` as STRING_FORMAT: $toks",
+            fmtTokens.any { it.second == "%8d" },
+        )
+        assertTrue(
+            "expected `%10.2f` as STRING_FORMAT: $toks",
+            fmtTokens.any { it.second == "%10.2f" },
+        )
+        // No fake HASH_VAR.
+        assertTrue(
+            "must NOT emit HASH_VAR for printf format: $toks",
+            toks.none { it.first == StrykeTokenTypes.HASH_VAR },
+        )
+    }
+
+    @Test
+    fun bare_percent_string_does_not_break_highlight() {
+        // `"%"` (modulo operator as a string key, e.g. `%PREC = ("%" => 3)`)
+        // — `%` followed by `"` is NOT a format spec; the whole string
+        // stays as ONE STRING token, no spurious break.
+        val toks = lex("\"%\"")
+        assertEquals(
+            "expected single STRING token for `\"%\"`: $toks",
+            1, toks.size,
+        )
+        assertEquals(StrykeTokenTypes.STRING, toks[0].first)
+        assertEquals("\"%\"", toks[0].second)
+    }
+
+    @Test
     fun printf_format_specifiers_do_not_get_fake_var_highlighting() {
         // `"%-15s %8s %10s\n"` — printf format specifiers. None of
         // these should emit a HASH_VAR token; the `%` followed by a

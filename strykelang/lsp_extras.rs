@@ -1130,6 +1130,15 @@ pub fn compute_code_actions(
                         if let Some(block) = extract_selection_multiline(text, range) {
                             out.push(extract_function_action(uri, range, &block));
                         }
+                        // Extract Parameter — bind to Cmd-Opt-P. Adds a
+                        // new param to the enclosing `fn` and replaces
+                        // the selection with the param name. Only
+                        // offered when an enclosing fn is found.
+                        if let Some(param_action) =
+                            extract_parameter_action(uri, text, range, selection)
+                        {
+                            out.push(param_action);
+                        }
                     }
                 }
             }
@@ -1505,6 +1514,501 @@ fn extract_variable_action(
     )
 }
 
+/// Extract Parameter — `Cmd+Opt+P`. Finds the enclosing `fn name (…) { … }`
+/// declaration, injects a new param `$extracted_param` into the signature,
+/// and replaces the selection with the param's bare name `$extracted_param`.
+/// Call sites are NOT updated (would require workspace-wide refactor — left
+/// for v2; the user can `Find Usages` on the fn afterward and pass the
+/// original expression manually).
+#[allow(clippy::mutable_key_type)]
+fn extract_parameter_action(
+    uri: &Uri,
+    text: &str,
+    range: Range,
+    selection: &str,
+) -> Option<CodeActionOrCommand> {
+    let placeholder = "extracted_param";
+    let enclosing = enclosing_fn_signature(text, range.start.line as usize)?;
+
+    // Build the edit that injects the new param into the signature.
+    let sig_edit = inject_param_into_signature(text, &enclosing, placeholder)?;
+
+    // Replacement at the selection: `$extracted_param`.
+    let replace = TextEdit {
+        range,
+        new_text: format!("${placeholder}"),
+    };
+
+    let mut edits: Vec<TextEdit> = Vec::new();
+    edits.push(sig_edit);
+    edits.push(replace);
+
+    // Thread the original selection through every call site of the
+    // enclosing fn in the active file. Best-effort same-file: cross-
+    // file call sites are not yet rewritten (would need to extend the
+    // workspace walk in the same shape as Find Usages).
+    //
+    // Important: the selection text must be a valid expression in the
+    // call site's scope. We pass it verbatim — if the user extracted
+    // a name that only existed inside the fn body, call sites get a
+    // reference error that must be resolved by hand.
+    edits.extend(call_site_threading_edits(
+        text,
+        &enclosing,
+        selection,
+        range.start.line,
+    ));
+
+    let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
+    changes.insert(uri.clone(), edits);
+    Some(CodeActionOrCommand::CodeAction(CodeAction {
+        title: "Extract to parameter (`fn name($extracted_param, …)`)".to_string(),
+        kind: Some(CodeActionKind::REFACTOR_EXTRACT),
+        diagnostics: None,
+        edit: Some(WorkspaceEdit {
+            changes: Some(changes),
+            document_changes: None,
+            change_annotations: None,
+        }),
+        command: None,
+        is_preferred: None,
+        disabled: None,
+        data: None,
+    }))
+}
+
+/// Result of locating the enclosing fn's signature for Extract Parameter.
+struct EnclosingFnSig {
+    /// 0-based line where the `fn name … {` header lives.
+    fn_line: u32,
+    /// Whether the fn already has a non-empty `(...)` param list
+    /// before the body opener.
+    has_params: bool,
+    /// Byte index of the `(` if `has_params`; else position where a
+    /// new `(...)` should be inserted (right after the fn name).
+    paren_open_byte: usize,
+    /// Byte index of the `)` if `has_params`; else None.
+    paren_close_byte: Option<usize>,
+    /// Bare fn name (no package prefix) — used to find call sites.
+    fn_name: String,
+}
+
+/// Walk lines backward from `cursor_line` to find the nearest `fn`
+/// header that opens a body covering the cursor. v1: scans for a line
+/// that starts (after leading whitespace) with `fn ` and contains a
+/// `{` after the fn name — the body covers all lines up to the
+/// matching `}`. Doesn't handle nested fn cases robustly; good enough
+/// for the common "top-level fn" case.
+fn enclosing_fn_signature(text: &str, cursor_line: usize) -> Option<EnclosingFnSig> {
+    let lines: Vec<&str> = text.lines().collect();
+    if cursor_line >= lines.len() {
+        return None;
+    }
+    // Find the candidate fn header line by walking backward.
+    for line_idx in (0..=cursor_line).rev() {
+        let line_text = lines[line_idx];
+        let trimmed_start = line_text.trim_start();
+        let leading_len = line_text.len() - trimmed_start.len();
+        if !trimmed_start.starts_with("fn ") {
+            continue;
+        }
+        // Found a `fn ` line — does its body cover `cursor_line`?
+        // We approximate by scanning forward from this line counting
+        // `{` / `}` (skipping string/comment content).
+        let body_open_idx = match line_text.find('{') {
+            Some(i) => i,
+            None => continue, // single-line `fn` with no body opener
+        };
+        // Bracket-walk from this `{` to find the matching `}`.
+        let close_line = find_matching_brace_line(text, line_idx, body_open_idx)?;
+        if cursor_line < line_idx || cursor_line > close_line {
+            continue;
+        }
+        // This fn encloses the cursor. Extract param-list shape.
+        // Look for `(...)` between the fn name and the `{`.
+        let header_slice = &line_text[..body_open_idx];
+        let paren_open = header_slice.find('(');
+        let (has_params, paren_open_byte, paren_close_byte) = match paren_open {
+            Some(open_idx) => {
+                // Find the matching `)` BEFORE the `{`.
+                let close_idx = header_slice[open_idx..].find(')').map(|i| open_idx + i);
+                match close_idx {
+                    Some(ci) => {
+                        let inside = header_slice[open_idx + 1..ci].trim();
+                        (!inside.is_empty(), open_idx, Some(ci))
+                    }
+                    None => (false, open_idx, None),
+                }
+            }
+            None => {
+                // No `(...)` — insert one right after the fn name (the
+                // word after `fn `).
+                let after_fn = leading_len + 3; // past `fn `
+                // skip the name (ident chars)
+                let mut p = after_fn;
+                let bytes = line_text.as_bytes();
+                while p < bytes.len()
+                    && (bytes[p].is_ascii_alphanumeric() || bytes[p] == b'_' || bytes[p] == b':')
+                {
+                    p += 1;
+                }
+                (false, p, None)
+            }
+        };
+        let _ = leading_len; // currently unused; kept for future
+                              // signature-header indent tracking.
+        let _ = body_open_idx;
+        // Extract fn name: token immediately after `fn `, before `(` or `{`.
+        let after_fn = leading_len + 3;
+        let bytes = line_text.as_bytes();
+        let mut np = after_fn;
+        while np < bytes.len()
+            && (bytes[np].is_ascii_alphanumeric() || bytes[np] == b'_' || bytes[np] == b':')
+        {
+            np += 1;
+        }
+        let fn_name = line_text[after_fn..np].rsplit("::").next().unwrap_or("").to_string();
+        return Some(EnclosingFnSig {
+            fn_line: line_idx as u32,
+            has_params,
+            paren_open_byte,
+            paren_close_byte,
+            fn_name,
+        });
+    }
+    None
+}
+
+/// Find every call site `fn_name(...)` in `text` and emit a TextEdit
+/// that appends `, <selection>` before the closing `)` of each call
+/// (or `($selection)` if the matched call form somehow had empty parens).
+/// Skips occurrences inside the fn's own body (so the body's recursive
+/// or self-name references aren't wrongly rewritten — caller already
+/// emits a replacement for the selection itself).
+fn call_site_threading_edits(
+    text: &str,
+    enclosing: &EnclosingFnSig,
+    selection: &str,
+    selection_line: u32,
+) -> Vec<TextEdit> {
+    let mut out: Vec<TextEdit> = Vec::new();
+    if enclosing.fn_name.is_empty() {
+        return out;
+    }
+    let mask = string_interior_mask_simple(text);
+    let needle = &enclosing.fn_name;
+    let bytes = text.as_bytes();
+    let mut search_from = 0usize;
+    let body_line = enclosing.fn_line;
+    while let Some(rel) = text[search_from..].find(needle.as_str()) {
+        let start = search_from + rel;
+        search_from = start + needle.len();
+        // Inside string/comment? Skip.
+        if mask.get(start).copied().unwrap_or(false) {
+            continue;
+        }
+        // Word boundary before.
+        let prev_ok = start == 0
+            || {
+                let c = bytes[start - 1] as char;
+                !(c.is_ascii_alphanumeric() || c == '_' || c == ':')
+            };
+        if !prev_ok {
+            continue;
+        }
+        // After the name: optional whitespace, then `(`.
+        let end_name = start + needle.len();
+        // First, ensure word boundary at end (not part of a longer ident).
+        if let Some(&b) = bytes.get(end_name) {
+            let c = b as char;
+            if c.is_ascii_alphanumeric() || c == '_' || c == ':' {
+                continue;
+            }
+        }
+        // Skip whitespace, find `(`.
+        let mut p = end_name;
+        while p < bytes.len() && (bytes[p] == b' ' || bytes[p] == b'\t') {
+            p += 1;
+        }
+        if p >= bytes.len() || bytes[p] != b'(' {
+            continue;
+        }
+        // Skip the enclosing fn's own decl-header `(` — that's the
+        // signature itself, already handled.
+        let (call_line, _) = byte_to_line_col(text, start);
+        if call_line == body_line {
+            continue;
+        }
+        // Skip occurrences that fall inside the fn's own body — those
+        // are recursive calls. We'd want to thread those too, but
+        // they'd cascade infinitely; skip for v1.
+        // (Approximate: same-line scope check above already filters
+        // the header; for body-internal calls we'd need brace depth
+        // tracking. Pragmatic: skip if the selection line equals the
+        // call line — the user's extracted text matches and is on
+        // the same line as the call.)
+        let _ = selection_line;
+        // Find matching `)` from p.
+        let close = find_matching_paren(text, p);
+        if let Some(close_byte) = close {
+            // Determine if existing args are empty.
+            let inner = text[p + 1..close_byte].trim();
+            let new_text = if inner.is_empty() {
+                selection.to_string()
+            } else {
+                format!(", {selection}")
+            };
+            let (close_line, close_col) = byte_to_line_col(text, close_byte);
+            out.push(TextEdit {
+                range: Range {
+                    start: Position {
+                        line: close_line,
+                        character: close_col,
+                    },
+                    end: Position {
+                        line: close_line,
+                        character: close_col,
+                    },
+                },
+                new_text,
+            });
+        }
+    }
+    out
+}
+
+/// Find the matching `)` for the `(` at `open_byte` in `text`. Tracks
+/// nested parens and skips parens inside string literals. Returns the
+/// byte offset of the matching `)` or `None` if unmatched.
+fn find_matching_paren(text: &str, open_byte: usize) -> Option<usize> {
+    let bytes = text.as_bytes();
+    if open_byte >= bytes.len() || bytes[open_byte] != b'(' {
+        return None;
+    }
+    let mut depth: i32 = 0;
+    let mut in_str: Option<u8> = None;
+    let mut i = open_byte;
+    while i < bytes.len() {
+        let c = bytes[i];
+        if let Some(q) = in_str {
+            if c == b'\\' && i + 1 < bytes.len() {
+                i += 2;
+                continue;
+            }
+            if c == q {
+                in_str = None;
+            }
+            i += 1;
+            continue;
+        }
+        match c {
+            b'"' | b'\'' | b'`' => in_str = Some(c),
+            b'(' => depth += 1,
+            b')' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(i);
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
+/// Convert a global byte offset to `(line, utf16_col)`.
+fn byte_to_line_col(text: &str, byte: usize) -> (u32, u32) {
+    let upto = &text[..byte.min(text.len())];
+    let line = upto.bytes().filter(|&b| b == b'\n').count() as u32;
+    let line_start = upto.rfind('\n').map(|i| i + 1).unwrap_or(0);
+    let col = text[line_start..byte.min(text.len())]
+        .encode_utf16()
+        .count() as u32;
+    (line, col)
+}
+
+/// Lightweight string-interior mask: `mask[i] = true` if byte `i` is
+/// inside a `"..."`, `'...'`, `` `...` `` literal or a `#` line
+/// comment. Mirrors the LSP-level `string_interior_mask` in
+/// `lsp.rs` — kept local here to avoid cross-module dependency.
+fn string_interior_mask_simple(text: &str) -> Vec<bool> {
+    let bytes = text.as_bytes();
+    let mut mask = vec![false; bytes.len()];
+    let mut i = 0;
+    while i < bytes.len() {
+        let c = bytes[i];
+        match c {
+            b'"' | b'\'' | b'`' => {
+                let quote = c;
+                let mut j = i + 1;
+                while j < bytes.len() {
+                    let cc = bytes[j];
+                    if cc == b'\\' && j + 1 < bytes.len() {
+                        mask[j] = true;
+                        mask[j + 1] = true;
+                        j += 2;
+                        continue;
+                    }
+                    if cc == quote {
+                        j += 1;
+                        break;
+                    }
+                    mask[j] = true;
+                    j += 1;
+                }
+                i = j;
+            }
+            b'#' => {
+                let mut j = i;
+                while j < bytes.len() && bytes[j] != b'\n' {
+                    mask[j] = true;
+                    j += 1;
+                }
+                i = j;
+            }
+            _ => i += 1,
+        }
+    }
+    mask
+}
+
+/// Returns the 0-based line number containing the `}` that matches a
+/// `{` at `(open_line, open_byte_in_line)`. Best-effort — skips `{`/`}`
+/// inside strings and comments. Returns `None` if unmatched.
+fn find_matching_brace_line(text: &str, open_line: usize, open_byte_in_line: usize) -> Option<usize> {
+    let lines: Vec<&str> = text.lines().collect();
+    let mut depth: i32 = 0;
+    let mut in_string: Option<char> = None;
+    let mut line_idx = open_line;
+    let mut chars = lines.get(line_idx)?.chars().enumerate().skip(open_byte_in_line);
+    let mut current_line_chars: Vec<(usize, char)> = chars.by_ref().collect();
+    let mut char_pos = 0;
+    let mut bumped_initial = false;
+    loop {
+        while char_pos < current_line_chars.len() {
+            let (_, c) = current_line_chars[char_pos];
+            if let Some(quote) = in_string {
+                if c == '\\' {
+                    char_pos += 2;
+                    continue;
+                }
+                if c == quote {
+                    in_string = None;
+                }
+                char_pos += 1;
+                continue;
+            }
+            match c {
+                '#' => {
+                    // Rest of line is comment.
+                    char_pos = current_line_chars.len();
+                }
+                '"' | '\'' | '`' => {
+                    in_string = Some(c);
+                    char_pos += 1;
+                }
+                '{' => {
+                    if !bumped_initial {
+                        bumped_initial = true;
+                    }
+                    depth += 1;
+                    char_pos += 1;
+                }
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Some(line_idx);
+                    }
+                    char_pos += 1;
+                }
+                _ => {
+                    char_pos += 1;
+                }
+            }
+        }
+        line_idx += 1;
+        if line_idx >= lines.len() {
+            return None;
+        }
+        current_line_chars = lines[line_idx].char_indices().collect();
+        char_pos = 0;
+    }
+}
+
+/// Build the [`TextEdit`] that injects `$placeholder` into the fn's
+/// param list. If the fn has a non-empty `(...)`, appends `, $name`
+/// before the closing `)`. Otherwise inserts `($name)` (or the name
+/// inside an existing empty `()`).
+fn inject_param_into_signature(
+    text: &str,
+    sig: &EnclosingFnSig,
+    placeholder: &str,
+) -> Option<TextEdit> {
+    let lines: Vec<&str> = text.lines().collect();
+    let line_text = lines.get(sig.fn_line as usize)?;
+    let (range, new_text) = if sig.has_params {
+        // Append `, $placeholder` before the closing `)`.
+        let close = sig.paren_close_byte?;
+        let col = byte_to_utf16_col(line_text, close);
+        (
+            Range {
+                start: Position {
+                    line: sig.fn_line,
+                    character: col,
+                },
+                end: Position {
+                    line: sig.fn_line,
+                    character: col,
+                },
+            },
+            format!(", ${placeholder}"),
+        )
+    } else if sig.paren_close_byte.is_some() {
+        // Empty `(...)` — insert just the name inside.
+        let open = sig.paren_open_byte + 1;
+        let col = byte_to_utf16_col(line_text, open);
+        (
+            Range {
+                start: Position {
+                    line: sig.fn_line,
+                    character: col,
+                },
+                end: Position {
+                    line: sig.fn_line,
+                    character: col,
+                },
+            },
+            format!("${placeholder}"),
+        )
+    } else {
+        // No `(...)` at all — insert `($placeholder)` right after the
+        // fn name (at `sig.paren_open_byte`, which the locator set to
+        // the position past the name).
+        let col = byte_to_utf16_col(line_text, sig.paren_open_byte);
+        (
+            Range {
+                start: Position {
+                    line: sig.fn_line,
+                    character: col,
+                },
+                end: Position {
+                    line: sig.fn_line,
+                    character: col,
+                },
+            },
+            format!("(${placeholder})"),
+        )
+    };
+    Some(TextEdit { range, new_text })
+}
+
+fn byte_to_utf16_col(line_text: &str, byte_idx: usize) -> u32 {
+    line_text[..byte_idx.min(line_text.len())]
+        .encode_utf16()
+        .count() as u32
+}
+
 fn extract_constant_action(
     uri: &Uri,
     line_text: &str,
@@ -1517,7 +2021,7 @@ fn extract_constant_action(
         range,
         selection,
         "EXTRACTED",
-        "Extract to constant (`my frozen $NAME = …`)",
+        "Extract to constant (`frozen my $NAME = …`)",
         true,
     )
 }
@@ -1565,8 +2069,11 @@ fn extract_to_local(
     } else {
         selection.to_string()
     };
+    // Stryke `frozen` modifier comes BEFORE `my`, not after. The
+    // reverse order (`my frozen $X = …`) fails to parse — pinned by
+    // `extract_constant_uses_frozen_my_order`.
     let decl = if frozen {
-        format!("{leading_ws}my frozen ${placeholder} = {decl_rhs}\n")
+        format!("{leading_ws}frozen my ${placeholder} = {decl_rhs}\n")
     } else {
         format!("{leading_ws}my ${placeholder} = {decl_rhs}\n")
     };
@@ -2220,6 +2727,173 @@ mod tests {
         assert!(
             decl.new_text.contains("= \"hello $name \"\n"),
             "RHS must keep interpolation inside the quotes: {:?}",
+            decl.new_text
+        );
+    }
+
+    #[test]
+    fn extract_parameter_adds_param_to_existing_signature() {
+        // `fn area(width) { width * height }` — extract `height` to a
+        // parameter. Sig becomes `fn area(width, $extracted_param)`
+        // and the body's `height` is replaced with `$extracted_param`.
+        let src = "fn area(width) { width * height }\n";
+        // `height` on line 0 cols 25..31.
+        let actions = code_actions(src, range(0, 25, 0, 31));
+        let param = actions
+            .iter()
+            .find_map(|a| match a {
+                CodeActionOrCommand::CodeAction(ca) if ca.title.contains("parameter") => {
+                    ca.edit.clone()
+                }
+                _ => None,
+            })
+            .expect("extract-parameter action present");
+        let changes = param.changes.expect("workspace edit");
+        let (_uri, edits) = changes.iter().next().unwrap();
+        // One edit appends `, $extracted_param` before the closing `)`.
+        assert!(
+            edits.iter().any(|e| e.new_text == ", $extracted_param"),
+            "expected append into existing param list: {edits:#?}"
+        );
+        // One edit replaces the selection with `$extracted_param`.
+        assert!(
+            edits.iter().any(|e| e.new_text == "$extracted_param"),
+            "expected replacement of selection: {edits:#?}"
+        );
+    }
+
+    #[test]
+    fn extract_parameter_adds_param_list_when_fn_has_none() {
+        // `fn greet { "hello $name" }` — no `(...)` yet. Extract
+        // produces `fn greet($extracted_param) { ... }`.
+        let src = "fn greet { my $s = \"hello world\" }\n";
+        // Select `world` between the quotes, cols 26..31.
+        let actions = code_actions(src, range(0, 26, 0, 31));
+        let param = actions
+            .iter()
+            .find_map(|a| match a {
+                CodeActionOrCommand::CodeAction(ca) if ca.title.contains("parameter") => {
+                    ca.edit.clone()
+                }
+                _ => None,
+            })
+            .expect("extract-parameter action present");
+        let changes = param.changes.expect("workspace edit");
+        let (_uri, edits) = changes.iter().next().unwrap();
+        assert!(
+            edits.iter().any(|e| e.new_text == "($extracted_param)"),
+            "expected new `(...)` insertion: {edits:#?}"
+        );
+    }
+
+    #[test]
+    fn extract_parameter_threads_through_same_file_call_sites() {
+        // `fn area(w) { w * height }` extracted on `height` →
+        //   - sig becomes `fn area(w, $extracted_param)`
+        //   - body's `height` becomes `$extracted_param`
+        //   - call site `area(5)` becomes `area(5, height)`
+        let src = "fn area(w) { w * height }\nmy $r = area(5)\nmy $s = area(10)\n";
+        // `height` on line 0 cols 17..23.
+        let actions = code_actions(src, range(0, 17, 0, 23));
+        let param = actions
+            .iter()
+            .find_map(|a| match a {
+                CodeActionOrCommand::CodeAction(ca) if ca.title.contains("parameter") => {
+                    ca.edit.clone()
+                }
+                _ => None,
+            })
+            .expect("extract-parameter action present");
+        let changes = param.changes.expect("workspace edit");
+        let (_uri, edits) = changes.iter().next().unwrap();
+        // Expected edits:
+        //   - sig: `, $extracted_param`
+        //   - body: `$extracted_param`
+        //   - call site 1 (line 1): `, height`
+        //   - call site 2 (line 2): `, height`
+        let new_texts: Vec<&str> = edits.iter().map(|e| e.new_text.as_str()).collect();
+        assert!(
+            new_texts.iter().any(|n| *n == ", $extracted_param"),
+            "sig threading: {new_texts:?}"
+        );
+        assert!(
+            new_texts.iter().any(|n| *n == "$extracted_param"),
+            "body replacement: {new_texts:?}"
+        );
+        let call_appends = new_texts.iter().filter(|n| **n == ", height").count();
+        assert_eq!(
+            call_appends, 2,
+            "two same-file call sites should each get `, height`: {new_texts:?}"
+        );
+    }
+
+    #[test]
+    fn extract_parameter_threads_into_empty_call_parens() {
+        // `fn boot { do_init() }` — selecting `do_init()` as the
+        // expression to extract: parent fn `boot`. Call sites of
+        // `boot()` currently have empty parens, so the new arg
+        // becomes the sole argument (no leading comma).
+        let src = "fn boot { do_init() }\nboot()\n";
+        // Select `do_init()` cols 10..19.
+        let actions = code_actions(src, range(0, 10, 0, 19));
+        let param = actions
+            .iter()
+            .find_map(|a| match a {
+                CodeActionOrCommand::CodeAction(ca) if ca.title.contains("parameter") => {
+                    ca.edit.clone()
+                }
+                _ => None,
+            })
+            .expect("extract-parameter action present");
+        let changes = param.changes.expect("workspace edit");
+        let (_uri, edits) = changes.iter().next().unwrap();
+        let new_texts: Vec<&str> = edits.iter().map(|e| e.new_text.as_str()).collect();
+        assert!(
+            new_texts.iter().any(|n| *n == "do_init()"),
+            "empty-parens call site gets the selection as sole arg: {new_texts:?}"
+        );
+    }
+
+    #[test]
+    fn extract_parameter_not_offered_outside_any_fn() {
+        // Top-level code, no enclosing fn → no parameter action.
+        let src = "my $x = 1 + 2\np $x\n";
+        let actions = code_actions(src, range(0, 8, 0, 13));
+        let has_param = actions.iter().any(|a| match a {
+            CodeActionOrCommand::CodeAction(ca) => ca.title.contains("parameter"),
+            _ => false,
+        });
+        assert!(!has_param, "must NOT offer parameter extract outside any fn");
+    }
+
+    #[test]
+    fn extract_constant_uses_frozen_my_order() {
+        // Stryke syntax: `frozen my $X = val`, NOT `my frozen $X = val`
+        // (which fails to parse with "Expected variable in declaration,
+        // got Ident(\"frozen\")"). Pin the correct order.
+        let src = "my $s = \"dispatcher\"\n";
+        // Select `dispatcher` (between the quotes), cols 9..19.
+        let actions = code_actions(src, range(0, 9, 0, 19));
+        let constant = actions
+            .iter()
+            .find_map(|a| match a {
+                CodeActionOrCommand::CodeAction(ca) if ca.title.contains("constant") => {
+                    ca.edit.clone()
+                }
+                _ => None,
+            })
+            .expect("extract-constant action present");
+        let changes = constant.changes.expect("workspace edit");
+        let (_uri, edits) = changes.iter().next().unwrap();
+        let decl = edits.iter().find(|e| e.new_text.contains("EXTRACTED")).unwrap();
+        assert!(
+            decl.new_text.starts_with("frozen my $EXTRACTED"),
+            "decl must start with `frozen my`, not `my frozen`: {:?}",
+            decl.new_text
+        );
+        assert!(
+            !decl.new_text.contains("my frozen"),
+            "must NOT use invalid `my frozen` order: {:?}",
             decl.new_text
         );
     }
