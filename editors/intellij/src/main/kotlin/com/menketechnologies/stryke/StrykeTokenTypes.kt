@@ -17,6 +17,7 @@ object StrykeTokenTypes {
     @JvmField val STRING = StrykeTokenType("STRYKE_STRING")
     @JvmField val HEREDOC = StrykeTokenType("STRYKE_HEREDOC")
     @JvmField val STRING_ESCAPE = StrykeTokenType("STRYKE_STRING_ESCAPE")
+    @JvmField val STRING_FORMAT = StrykeTokenType("STRYKE_STRING_FORMAT")  // printf-style %d %s %10.2f
     @JvmField val NUMBER = StrykeTokenType("STRYKE_NUMBER")
     @JvmField val FLOAT = StrykeTokenType("STRYKE_FLOAT")
     @JvmField val REGEX = StrykeTokenType("STRYKE_REGEX")

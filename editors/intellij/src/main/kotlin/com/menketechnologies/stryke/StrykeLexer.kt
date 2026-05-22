@@ -33,6 +33,8 @@ class StrykeLexer : LexerBase() {
     private var tokenEnd = 0
     private var tokenType: IElementType? = null
     private var state = 0
+    private var pendingFormatLen = 0
+    private var interpBraceDepth = 0
 
     override fun start(buffer: CharSequence, startOffset: Int, endOffset: Int, initialState: Int) {
         buf = buffer
@@ -78,6 +80,17 @@ class StrykeLexer : LexerBase() {
         if (state == STATE_IN_DQ_SIGIL_VAR) {
             val sigil = buf[pos]
             consumeSigilVar(sigil)
+            state = STATE_IN_DQ_STRING
+            return
+        }
+        // printf format spec — emit `%d` / `%10.2f` / `%-15s` etc. as
+        // one STRING_FORMAT token, then return to string mode.
+        if (state == STATE_IN_DQ_FORMAT) {
+            tokenStart = pos
+            tokenEnd = pos + pendingFormatLen
+            pos = tokenEnd
+            tokenType = StrykeTokenTypes.STRING_FORMAT
+            pendingFormatLen = 0
             state = STATE_IN_DQ_STRING
             return
         }
@@ -212,6 +225,21 @@ class StrykeLexer : LexerBase() {
                 state = STATE_IN_DQ_SIGIL_VAR
                 return
             }
+            // printf format specifier: `%d`, `%s`, `%10.2f`, `%-15s`, etc.
+            // Highlight distinctly so the user can see `%s` isn't a hash.
+            if (c == '%') {
+                val formatLen = printfFormatLen(p)
+                if (formatLen > 0) {
+                    // Emit literal prefix first; continuation handles the
+                    // format spec on the next advance().
+                    tokenEnd = p
+                    pos = p
+                    tokenType = StrykeTokenTypes.STRING
+                    state = STATE_IN_DQ_FORMAT
+                    pendingFormatLen = formatLen
+                    return
+                }
+            }
             p++
         }
         tokenEnd = p
@@ -248,12 +276,58 @@ class StrykeLexer : LexerBase() {
                 state = STATE_IN_DQ_SIGIL_VAR
                 return
             }
+            if (c == '%') {
+                val formatLen = printfFormatLen(p)
+                if (formatLen > 0) {
+                    tokenEnd = p
+                    pos = p
+                    tokenType = StrykeTokenTypes.STRING
+                    state = STATE_IN_DQ_FORMAT
+                    pendingFormatLen = formatLen
+                    return
+                }
+            }
             p++
         }
         tokenEnd = p
         pos = p
         state = STATE_NORMAL
         tokenType = StrykeTokenTypes.STRING
+    }
+
+    /**
+     * Return the length (in chars) of a printf-style format specifier
+     * starting at `start` (which must point at `%`), or 0 if the chars
+     * after `%` don't form a valid format spec. Recognized grammar:
+     *   `%` [flags `-+0 #`]* [width digits]? (`.` [precision digits]+)?
+     *       [length `l`/`h`/`L`/`q`/`z`/`j`/`t`]?
+     *       conversion char `diouxXeEfgGsScCpn%`
+     * Permissive on stryke specifics — covers Perl's printf/sprintf
+     * conversions plus the doubled `%%` for a literal percent.
+     */
+    private fun printfFormatLen(start: Int): Int {
+        if (start >= endOffset || buf[start] != '%') return 0
+        var p = start + 1
+        if (p >= endOffset) return 0
+        // Doubled `%%` — literal percent. Highlight as one format spec.
+        if (buf[p] == '%') return 2
+        // flags
+        while (p < endOffset && buf[p] in FORMAT_FLAGS) p++
+        // width
+        while (p < endOffset && buf[p].isDigit()) p++
+        // precision
+        if (p < endOffset && buf[p] == '.') {
+            p++
+            while (p < endOffset && buf[p].isDigit()) p++
+        }
+        // length modifier
+        while (p < endOffset && buf[p] in FORMAT_LENGTH) p++
+        // conversion
+        if (p < endOffset && buf[p] in FORMAT_CONV) {
+            return (p - start) + 1
+        }
+        // No conversion char found → not a format spec.
+        return 0
     }
 
     /**
@@ -364,8 +438,6 @@ class StrykeLexer : LexerBase() {
             else -> emit(1, TokenType.BAD_CHARACTER)
         }
     }
-
-    private var interpBraceDepth: Int = 0
 
     private fun isHeredocStart(off: Int): Boolean {
         var p = pos + off
@@ -594,6 +666,16 @@ class StrykeLexer : LexerBase() {
         const val STATE_IN_DQ_INTERP_START = 2    // next token is the `#{` opener
         const val STATE_IN_DQ_INTERP = 3          // inside the `#{EXPR}` expression
         const val STATE_IN_DQ_SIGIL_VAR = 4       // next token is a `$var` / `@arr` / `%h` inside a string
+        const val STATE_IN_DQ_FORMAT = 5          // next token is a `%d` / `%10.2f` printf format spec inside a string
+
+        private val FORMAT_FLAGS = setOf('-', '+', '0', ' ', '#')
+        private val FORMAT_LENGTH = setOf('l', 'h', 'L', 'q', 'z', 'j', 't')
+        private val FORMAT_CONV = setOf(
+            'd', 'i', 'o', 'u', 'x', 'X',
+            'e', 'E', 'f', 'F', 'g', 'G',
+            's', 'S', 'c', 'C', 'p', 'n',
+            'b', 'a', 'A', 'v',
+        )
 
         private val DECL_KEYWORDS = setOf(
             "my", "our", "local", "state", "use", "no", "package", "require",

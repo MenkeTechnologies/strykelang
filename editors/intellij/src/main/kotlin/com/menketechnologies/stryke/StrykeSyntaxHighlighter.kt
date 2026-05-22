@@ -19,6 +19,7 @@ class StrykeSyntaxHighlighter : SyntaxHighlighterBase() {
             StrykeTokenTypes.DOC_COMMENT -> StrykeColors.DOC_COMMENT
             StrykeTokenTypes.STRING -> StrykeColors.STRING
             StrykeTokenTypes.STRING_ESCAPE -> StrykeColors.STRING_ESCAPE
+            StrykeTokenTypes.STRING_FORMAT -> StrykeColors.STRING_FORMAT
             StrykeTokenTypes.HEREDOC -> StrykeColors.HEREDOC
             StrykeTokenTypes.NUMBER -> StrykeColors.NUMBER
             StrykeTokenTypes.FLOAT -> StrykeColors.FLOAT

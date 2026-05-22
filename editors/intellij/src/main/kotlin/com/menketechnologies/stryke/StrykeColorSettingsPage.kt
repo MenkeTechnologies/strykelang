@@ -15,6 +15,7 @@ class StrykeColorSettingsPage : ColorSettingsPage {
         AttributesDescriptor("Strings//String", StrykeColors.STRING),
         AttributesDescriptor("Strings//Heredoc", StrykeColors.HEREDOC),
         AttributesDescriptor("Strings//String escape", StrykeColors.STRING_ESCAPE),
+        AttributesDescriptor("Strings//printf format spec (%d %s %10.2f)", StrykeColors.STRING_FORMAT),
 
         // Numbers
         AttributesDescriptor("Numbers//Integer", StrykeColors.NUMBER),
@@ -95,6 +96,7 @@ class StrykeColorSettingsPage : ColorSettingsPage {
             # ── Strings: literal, escape, interpolation, heredoc, qx ──
             my ${D}greet  = "hello world"           # plain string
             my ${D}tabbed = "col1\tcol2\nrow2"      # \\t \\n string escapes
+            printf "%-15s %8d %10.2f\n", "row", 42, 3.14  # printf format specs
             my ${D}lit    = 'no ${D}interp here'    # single-quoted: literal
             my ${D}name   = "stryke"
             p "hi ${D}name, you have @items items"  # in-string ${D}var / @var
