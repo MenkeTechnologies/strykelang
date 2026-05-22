@@ -27,9 +27,9 @@ fn Bloom::hash($s, $seed) {
 }
 
 fn Bloom::new = +{
-    size => _0,
+    size => _,
     k    => _1,
-    bits => [(0) x _0],
+    bits => [(0) x _],
     n    => 0,
 }
 
@@ -50,7 +50,7 @@ fn Bloom::contains($bf, $item) {
 }
 
 # Set-bit count — useful for verifying load.
-fn Bloom::popcount = sum(@{_0->{bits}})
+fn Bloom::popcount = sum(@{_->{bits}})
 
 p "── Bloom filter demo ──"
 

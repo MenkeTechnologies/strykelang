@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Demo + regression test for BUG-245 — anonymous coderefs used to all
+# stringify as the literal `CODE(__ANON__)`, which made string-form
+# identity comparison useless. Now they stringify as `CODE(0x<hex>)`
+# with a distinct address per closure instance, matching Perl.
+
+# Single coderef stringifies to the hex form.
+my $c = fn { 1 }
+my $s = "$c"
+($s =~ /^CODE\(0x[0-9a-f]+\)$/) |> assert_ok("CODE(0x<hex>) shape")
+
+# Distinct closures get distinct addresses.
+my $a = fn { 1 }
+my $b = fn { 1 }
+("$a" ne "$b") |> assert_ok("two anon closures stringify distinctly")
+
+# Named-sub coderef via `\&name` also hex.
+fn named_one = 1
+my $named = \&named_one
+("$named" =~ /^CODE\(0x[0-9a-f]+\)$/) |> assert_ok("\\&name coderef hex form")
+
+# Stringification is stable for the same Arc — two refs to the same
+# closure share an address.
+my $h = fn { 42 }
+my $alias = $h
+("$h" eq "$alias") |> assert_ok("aliased coderef shares stringification")
+
+# Hex address contains real hex digits, not the placeholder `0x...`.
+my $q = fn { 99 }
+my $qs = "$q"
+($qs =~ /^CODE\(0x[0-9a-f]+\)$/ && $qs ne "CODE(0x...)" && $qs ne "CODE(__ANON__)")
+    |> assert_ok("real hex digits, no `0x...` / __ANON__ placeholder")
+
+# Identity-by-string-form pattern: build a hashmap keyed by coderef string.
+my @cbs = (fn { 1 }, fn { 2 }, fn { 3 })
+my %seen
+for my $cb (@cbs) {
+    $seen{"$cb"} = 1
+}
+len(keys %seen) |> assert_eq(3, "string-keyed set distinguishes three closures")
+
+test_run

@@ -14,8 +14,8 @@ $s_v |> aeq "A", "vec 8-bit lvalue"
 package Box
 # Use ->{ } for hashref access in strict mode
 # fn defined inside `package Box` are auto-namespaced as Box::as_string / Box::add.
-fn as_string = "Box(" . _0->{val} . ")"
-fn add = bless({ val => _0->{val} + _1->{val} }, "Box")
+fn as_string = "Box(" . _->{val} . ")"
+fn add = bless({ val => _->{val} + _1->{val} }, "Box")
 
 use overload
     '""' => "as_string",
@@ -30,7 +30,7 @@ my $bx3 = $bx1 + $bx2
 
 # Verify anonymous fn in overload behavior
 package BoxAnon
-use overload '""' => fn { "Anon(" . _0->{val} . ")" }
+use overload '""' => fn { "Anon(" . _->{val} . ")" }
 package main
 my $ba = bless({ val => 99 }, "BoxAnon")
 "$ba" |> aeq "Anon(99)", "overload anonymous fn"

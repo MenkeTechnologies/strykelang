@@ -47,7 +47,7 @@ die "expected at least 100 repos" unless len(@repos) >= 100
 # ── 3. parallel fetch of full repo details for top-N by star ────────────────
 p ""
 p "── top-10 repos by stars (parallel detail fetch) ──"
-my @top10 = (sort { _1->{stargazers_count} <=> _0->{stargazers_count} } @repos)[0:9]
+my @top10 = (sort { _1->{stargazers_count} <=> _->{stargazers_count} } @repos)[0:9]
 my @full = pmap { gh_repo($_->{full_name}) } @top10
 printf("  %-30s  %-12s  %5s\n", "repo", "lang", "★")
 printf("  %s\n", "─" x 55)
@@ -62,7 +62,7 @@ for my $r (@full) {
 p ""
 p "── language histogram (across all repos) ──"
 my $by_lang = freq(map { _->{language} || "unknown" } @repos)
-my @sorted = sort { $by_lang->{_1} <=> $by_lang->{_0} } keys %$by_lang
+my @sorted = sort { $by_lang->{_1} <=> $by_lang->{_} } keys %$by_lang
 for my $k (@sorted[0:9]) {
     printf("  %-16s  %4d\n", $k, $by_lang->{$k})
 }

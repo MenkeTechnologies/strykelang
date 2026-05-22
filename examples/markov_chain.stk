@@ -46,7 +46,7 @@ my @after_the = @{$next{"the"}}
 printf "  after 'the': %d follow-ups\n", len @after_the
 my %freq
 for my $w (@after_the) { $freq{$w}++ }
-my @top = sort { $freq{_1} <=> $freq{_0} } keys %freq
+my @top = sort { $freq{_1} <=> $freq{_} } keys %freq
 for my $w (@top[0:4]) {
     printf "    %-12s × %d\n", $w, $freq{$w}
 }

@@ -32,7 +32,7 @@ fn BSearch::idx($target, @xs) {
 if (len(@ARGV) >= 2) {
     my $needle  = 0 + $ARGV[0]
     my @hayargs = map { 0 + _ } @ARGV[1:]
-    my @sorted  = sort { _0 <=> _1 } @hayargs
+    my @sorted  = sort { _ <=> _1 } @hayargs
     my $idx     = BSearch::idx($needle, @sorted)
     if ($idx >= 0) {
         p "found $needle at sorted index $idx"

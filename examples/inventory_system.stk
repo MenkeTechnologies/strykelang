@@ -79,7 +79,7 @@ Demo::Inv::add_product("THINGY-B", "Basic Thingy",        9.99, 200, 40)
 
 p "── initial inventory ────────────────────────────────"
 printf "  %-10s %-18s %10s %5s %5s\n", "sku", "name", "price", "stock", "min"
-for my $sku (sort { _0 cmp _1 } keys %inventory) {
+for my $sku (sort { _ cmp _1 } keys %inventory) {
     my $p = $inventory{$sku}
     printf "  %-10s %-18s %10.2f %5d %5d\n",
         $p->sku, $p->name, $p->price, $p->stock, $p->reorder
@@ -121,7 +121,7 @@ printf "  rejected : %d\n", $rejected
 
 p ""
 p "── revenue ranking (TopK pareto) ────────────────────"
-my @by_rev = sort { _1->revenue <=> _0->revenue } values %inventory
+my @by_rev = sort { _1->revenue <=> _->revenue } values %inventory
 my $total_rev = 0
 $total_rev += _->revenue for @by_rev
 my $cum = 0
@@ -149,7 +149,7 @@ my @need_reorder = grep { _->needs_reorder } values %inventory
 if (len(@need_reorder) == 0) {
     p "  (none)"
 } else {
-    for my $p (sort { _0->sku cmp _1->sku } @need_reorder) {
+    for my $p (sort { _->sku cmp _1->sku } @need_reorder) {
         printf "  %-10s %-18s stock=%d min=%d\n",
             $p->sku, $p->name, $p->stock, $p->reorder
     }

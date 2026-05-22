@@ -3,7 +3,7 @@
 # Pinning batch Native-S (2026-05-10): AOP (Before/After/Around)
 # Compliance: docs/STYLE_GUIDE.md
 
-fn AOP_test::target(_0) { _0 * 2 }
+fn AOP_test::target(_) { _ * 2 }
 
 oursync $before_fired = 0
 before "AOP_test::target" { $before_fired++ }

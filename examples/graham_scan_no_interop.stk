@@ -20,12 +20,12 @@
 # < 0 → clockwise turn
 # = 0 → collinear
 fn Hull::cross =
-    (_1->[0] - _0->[0]) * (_2->[1] - _0->[1]) -
-    (_1->[1] - _0->[1]) * (_2->[0] - _0->[0])
+    (_1->[0] - _->[0]) * (_2->[1] - _->[1]) -
+    (_1->[1] - _->[1]) * (_2->[0] - _->[0])
 
 # Squared distance — used to break collinear ties.
 fn Hull::dist2 =
-    (_0->[0] - _1->[0]) ** 2 + (_0->[1] - _1->[1]) ** 2
+    (_->[0] - _1->[0]) ** 2 + (_->[1] - _1->[1]) ** 2
 
 # Compute convex hull. Returns arrayref of vertices in CCW order.
 # Degenerate cases (0, 1, 2 points): return the input as-is.
@@ -50,10 +50,10 @@ fn Hull::scan($points) {
     # Use cross product to compare angles without trig.
     my @rest = @pts[1:$n - 1]
     @rest = sort {
-        my $c = Hull::cross($pivot, _0, _1)
+        my $c = Hull::cross($pivot, _, _1)
         if ($c == 0) {
             # Collinear: nearer point first (it'll be skipped later).
-            Hull::dist2($pivot, _0) <=> Hull::dist2($pivot, _1)
+            Hull::dist2($pivot, _) <=> Hull::dist2($pivot, _1)
         } else {
             $c < 0 ? 1 : -1
         }

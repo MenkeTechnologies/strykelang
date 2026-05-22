@@ -33,7 +33,7 @@ p "  uniq([])            → (", join(",", @r5), ") len=", len @r5
 p ""
 p "── chained with sort (sort + uniq for canonical form) ─"
 my @noisy = (3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5)
-my @canonical = uniq(sort { _0 <=> _1 } @noisy)
+my @canonical = uniq(sort { _ <=> _1 } @noisy)
 p "  sort+uniq noisy     → ", join(",", @canonical)
 
 p ""

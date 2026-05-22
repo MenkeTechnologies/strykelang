@@ -20,9 +20,9 @@ fn Math::subtract($x, $y) { $x - $y }
 
 # ── 2. Topic Variants and Positional Arguments ──────────────────────────────
 
-# Positional arguments _0, _1
-my $add3 = fn { _0 + _1 + _2 }
-$add3->(1, 2, 3) |> aeq 6, "Positional _0, _1, _2"
+# Positional arguments _, _1
+my $add3 = fn { _ + _1 + _2 }
+$add3->(1, 2, 3) |> aeq 6, "Positional _, _1, _2"
 
 # Outer scope topic _<
 my @r = ~> (1:2) map { 

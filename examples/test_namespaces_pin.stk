@@ -5,7 +5,7 @@
 
 # ── Namespaced Functions ────────────────────────────────────────────────────
 
-fn Math::Utils::add_three = _0 + _1 + _2
+fn Math::Utils::add_three = _ + _1 + _2
 Math::Utils::add_three(1, 2, 3) |> aeq 6, "call namespaced function"
 
 fn MyProject::sum(@list) {

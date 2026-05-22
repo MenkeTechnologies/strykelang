@@ -58,7 +58,7 @@ p " well past n=10k)"
 
 # Built-in self-test against a known fib table.
 my %expected = (0 => 0, 1 => 1, 5 => 5, 10 => 55, 20 => 6765, 25 => 75025)
-for my $k (sort { _0 <=> _1 } keys %expected) {
+for my $k (sort { _ <=> _1 } keys %expected) {
     die "Fib::iter($k) != $expected{$k}" unless Fib::iter($k) == $expected{$k}
     die "Fib::memo($k) != $expected{$k}" unless Fib::memo($k) == $expected{$k}
     die "Fib::naive($k) != $expected{$k}" unless Fib::naive($k) == $expected{$k}

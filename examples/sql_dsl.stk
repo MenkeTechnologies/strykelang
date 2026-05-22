@@ -4,7 +4,7 @@
 # pattern you reach for when reading a CSV/JSON dataset and want to
 # extract WHERE/GROUP-BY/SUM-style summaries without dragging in
 # sqlite or polars. Showcases:
-#   * `_0` / `_1` in sort blocks (Ruby/Clojure style positional params)
+#   * `_` / `_1` in sort blocks (Ruby/Clojure style positional params)
 #   * pipe-forward `|>` for stage composition
 #   * grep / map / sort all as first-class chain stages
 #   * t-digest for percentile queries (SQL-like APPROX_PERCENTILE)
@@ -34,7 +34,7 @@ p ""
 p "── SELECT id,customer,amount WHERE amount > 100 ─────"
 my @big = @orders
     |> grep { _->{amount} > 100 }
-    |> sort { _1->{amount} <=> _0->{amount} }   # DESC
+    |> sort { _1->{amount} <=> _->{amount} }   # DESC
 for my $row (@big) {
     printf "  id=%-2d  %-7s  \$%-7.2f\n",
         $row->{id}, $row->{customer}, $row->{amount}
@@ -48,7 +48,7 @@ my %by_customer
 for my $row (@orders) {
     $by_customer{$row->{customer}} += $row->{amount}
 }
-for my $name (sort { $by_customer{_1} <=> $by_customer{_0} } keys %by_customer) {
+for my $name (sort { $by_customer{_1} <=> $by_customer{_} } keys %by_customer) {
     printf "  %-7s  \$%.2f\n", $name, $by_customer{$name}
 }
 
@@ -65,7 +65,7 @@ for my $row (@orders) {
     $by_region{$r}->{items} += $row->{items}
 }
 printf "  %-8s %5s %10s %10s %10s\n", "region", "n", "total", "avg", "items"
-for my $r (sort { _0 cmp _1 } keys %by_region) {
+for my $r (sort { _ cmp _1 } keys %by_region) {
     my $g = $by_region{$r}
     printf "  %-8s %5d %10.2f %10.2f %10d\n",
         $r, $g->{count}, $g->{total},
@@ -99,7 +99,7 @@ for my $hit (@top) {
 p ""
 p "── SELECT DISTINCT customer ─────────────────────────"
 my @customers = map { _->{customer} } @orders
-my @distinct = sort { _0 cmp _1 } uniq(@customers)
+my @distinct = sort { _ cmp _1 } uniq(@customers)
 printf "  distinct customers (%d): %s\n",
     len(@distinct), join(", ", @distinct)
 
@@ -108,7 +108,7 @@ printf "  distinct customers (%d): %s\n",
 p ""
 p "── HAVING SUM(amount) > 200 ─────────────────────────"
 my @big_customers = grep { $by_customer{_} > 200 } keys %by_customer
-for my $c (sort { $by_customer{_1} <=> $by_customer{_0} } @big_customers) {
+for my $c (sort { $by_customer{_1} <=> $by_customer{_} } @big_customers) {
     printf "  %-7s  \$%.2f\n", $c, $by_customer{$c}
 }
 
@@ -117,7 +117,7 @@ for my $c (sort { $by_customer{_1} <=> $by_customer{_0} } @big_customers) {
 p ""
 p "── window: cumulative total over id-asc ─────────────"
 my $running = 0
-for my $row (sort { _0->{id} <=> _1->{id} } @orders) {
+for my $row (sort { _->{id} <=> _1->{id} } @orders) {
     $running += $row->{amount}
     printf "  id=%-2d  %-7s  \$%-7.2f  running=\$%.2f\n",
         $row->{id}, $row->{customer}, $row->{amount}, $running

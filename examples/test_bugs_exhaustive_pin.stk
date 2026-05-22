@@ -52,7 +52,7 @@ class Person { name: Str = ""; age: Int = 0 }
 my $p_obj = Person->new(name => "Bob", age => 25)
 ref($p_obj) |> aeq "Person", "ref(class instance)"
 # Explicitly sort keys for stable comparison
-join(",", sort { _0 cmp _1 } keys %$p_obj) |> aeq "age,name", "keys percent_deref class_inst"
+join(",", sort { _ cmp _1 } keys %$p_obj) |> aeq "age,name", "keys percent_deref class_inst"
 
 # ── 6. Recursive Serialization (BUG FIXED) ──────────────────────────────────
 
@@ -64,8 +64,8 @@ to_json($o_obj) |> aeq '{"name":"x","inner":{"v":7}}', "to_json recursive class"
 
 # ── 7. psort implicit params (BUG FIXED) ────────────────────────────────────
 
-my @sorted = psort { _0 <=> _1 } (3, 1, 4, 1, 5)
-join(",", @sorted) |> aeq "1,1,3,4,5", "psort _0 <=> _1"
+my @sorted = psort { _ <=> _1 } (3, 1, 4, 1, 5)
+join(",", @sorted) |> aeq "1,1,3,4,5", "psort _ <=> _1"
 
 # ── 8. Hash Slices (BUG FIXED) ──────────────────────────────────────────────
 
@@ -92,7 +92,7 @@ depreciation_double(1000, 200, 5) |> { _ > 0 } |> aok "depreciation_double runs"
 without([1, 2], [1, 2, 3, 4]) |> join(",") |> aeq "3,4", "without arrayref filter"
 
 # BUG-163 FIXED: running_reduce { $a + $b }
-running_reduce({ _0 + _1 }, [1, 2, 3, 4, 5]) |> join(",") |> aeq "1,3,6,10,15", "running_reduce fixed"
+running_reduce({ _ + _1 }, [1, 2, 3, 4, 5]) |> join(",") |> aeq "1,3,6,10,15", "running_reduce fixed"
 
 # BUG-198 FIXED: derangements(4)
 derangements(4) |> aeq 9, "derangements(4) fixed"

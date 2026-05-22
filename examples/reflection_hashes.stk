@@ -69,7 +69,7 @@ p "  ", join(", ", @kv_names)
 
 p ""
 p "── Census by category (top 10 by member count) ────────"
-my @ranked = sort { len(@{$c{_1}}) <=> len(@{$c{_0}}) } keys %c
+my @ranked = sort { len(@{$c{_1}}) <=> len(@{$c{_}}) } keys %c
 for my $cat (@ranked[0:9]) {
     printf "    %-30s : %d\n", $cat, len(@{$c{$cat}})
 }

@@ -37,21 +37,21 @@ unlink($path)
 p ""
 p "── psort — parallel sort ─────────────────────────────"
 my @random = map { int(rand 1000) } (1:10)
-my @sorted = psort { _0 <=> _1 } @random
+my @sorted = psort { _ <=> _1 } @random
 p "  random : ", join(",", @random)
 p "  psort  : ", join(",", @sorted)
 
 p ""
 p "── preduce — parallel tree-fold (associative ops only) ─"
-my $sum = preduce { _0 + _1 } (1:1000)
-my $max = preduce { _0 > _1 ? _0 : _1 } (3, 1, 4, 1, 5, 9, 2, 6)
+my $sum = preduce { _ + _1 } (1:1000)
+my $max = preduce { _ > _1 ? _ : _1 } (3, 1, 4, 1, 5, 9, 2, 6)
 p "  preduce sum 1:1000 = $sum"
 p "  preduce max         = $max"
 
 p ""
 p "── pmap_reduce — fused map + reduce ──────────────────"
 # Replaces `pmap { ... } |> preduce { ... }` with no intermediate Vec.
-my $sum_sq = pmap_reduce { _ * _ } { _0 + _1 } (1:100)
+my $sum_sq = pmap_reduce { _ * _ } { _ + _1 } (1:100)
 p "  sum of squares 1:100 (pmap_reduce) = $sum_sq"
 
 p ""

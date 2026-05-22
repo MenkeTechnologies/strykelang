@@ -38,7 +38,7 @@ fn Demo::Cal::overlaps($e1, $e2) {
 
 # ── sort events ────────────────────────────────────────────────────
 
-my @sorted = sort { _0->{start} <=> _1->{start} } @events
+my @sorted = sort { _->{start} <=> _1->{start} } @events
 
 p "── events (chronological) ───────────────────────────"
 for my $e (@sorted) {

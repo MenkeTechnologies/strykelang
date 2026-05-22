@@ -179,7 +179,7 @@ p ""
 p "── audit summary ───────────────────────────────────"
 my %events
 $events{_->{event}}++ for @audit
-for my $e (sort { _0 cmp _1 } keys %events) {
+for my $e (sort { _ cmp _1 } keys %events) {
     printf "  %-25s : %d\n", $e, $events{$e}
 }
 

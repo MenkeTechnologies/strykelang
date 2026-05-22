@@ -38,11 +38,11 @@ p ""
 p "── Race-via-poll: fastest result wins ─────────────────"
 my @racers = map {
     my $delay = rand() * 0.1
-    async { sleep $delay; { id => _0, delay_ms => int($delay * 1000) } }
+    async { sleep $delay; { id => _, delay_ms => int($delay * 1000) } }
 } (1:5)
 my @done = map {await} @racers
 # Sort by recorded delay
-my @ranked = sort { _0->{delay_ms} <=> _1->{delay_ms} } @done
+my @ranked = sort { _->{delay_ms} <=> _1->{delay_ms} } @done
 p "  ranking by completion time:"
 for my $row (@ranked) {
     printf "    racer %d  delay=%dms\n", $row->{id}, $row->{delay_ms}

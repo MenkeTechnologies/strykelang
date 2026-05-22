@@ -125,7 +125,7 @@ for my $h (@top) {
 
 p ""
 p "── final per-client bucket state ────────────────────"
-for my $client (sort { _0 cmp _1 } keys %buckets) {
+for my $client (sort { _ cmp _1 } keys %buckets) {
     my $bucket = $buckets{$client}
     printf "  %-12s : tokens=%.2f\n", $client, $bucket->{tokens}
 }

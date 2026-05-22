@@ -16,7 +16,7 @@ eval {
 }
 
 # In this script, we pin that we MUST use 'fn', 'len', 'p', 'rev'
-# and that '_0' / '_1' are required for psort.
+# and that '_' / '_1' are required for psort.
 
 fn Pin::NoInteropIdioms::idiom_test = 1
 Pin::NoInteropIdioms::idiom_test() |> aeq 1, "fn works (sub is rejected)"
@@ -27,7 +27,7 @@ Pin::NoInteropIdioms::idiom_test() |> aeq 1, "fn works (sub is rejected)"
 
 # ── 2. Positional Sort ─────────────────────────────────────────────────────
 
-(3, 1, 2) |> sort { _0 <=> _1 } |> join("") |> aeq "123", "_0/_1 works (a/b rejected)"
+(3, 1, 2) |> sort { _ <=> _1 } |> join("") |> aeq "123", "_/_1 works (a/b rejected)"
 
 # ── 3. p vs say ────────────────────────────────────────────────────────────
 

@@ -8,7 +8,7 @@
 #   3. Thread-macro stage        — `~> SRC par { BLOCK }` inside `~>`/`~>>`
 #
 # All three feed the same `ExprKind::ParExpr` runtime path. Each chunk
-# runs on a fresh sub-VM with the chunk bound to `_` and `_0`. Below the
+# runs on a fresh sub-VM with the chunk bound to `_` and `_`. Below the
 # chunk threshold the runtime collapses to a single chunk — results are
 # identical to the serial spelling.
 #

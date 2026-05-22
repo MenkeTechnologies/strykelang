@@ -44,7 +44,7 @@ printf "  %-8s %5s %5s\n", "user", "out", "in"
 my %all_users
 $all_users{_} = 1 for keys %follows
 $all_users{_} = 1 for keys %followers
-for my $u (sort { _0 cmp _1 } keys %all_users) {
+for my $u (sort { _ cmp _1 } keys %all_users) {
     my $out = exists $follows{$u} ? len(keys %{$follows{$u}}) : 0
     my $in  = exists $followers{$u} ? len(keys %{$followers{$u}}) : 0
     td_add($td_degree, $in)
@@ -59,8 +59,8 @@ for my $u (sort { _0 cmp _1 } keys %all_users) {
 p ""
 p "── mutual follows (directed both ways) ──────────────"
 my %seen_pairs
-for my $u (sort { _0 cmp _1 } keys %follows) {
-    for my $v (sort { _0 cmp _1 } keys %{$follows{$u}}) {
+for my $u (sort { _ cmp _1 } keys %follows) {
+    for my $v (sort { _ cmp _1 } keys %{$follows{$u}}) {
         next unless exists $follows{$v} && exists $follows{$v}->{$u}
         my $key = $u lt $v ? "$u|$v" : "$v|$u"
         next if exists $seen_pairs{$key}
@@ -92,7 +92,7 @@ my @pairs = (
 )
 for my $pair (@pairs) {
     my $s = Demo::SG::shared($pair->[0], $pair->[1])
-    my @keys = sort { _0 cmp _1 } keys %$s
+    my @keys = sort { _ cmp _1 } keys %$s
     printf "  %s & %s share %d: %s\n",
         $pair->[0], $pair->[1], len(@keys),
         len(@keys) > 0 ? join(", ", @keys) : "(none)"
@@ -102,7 +102,7 @@ for my $pair (@pairs) {
 
 p ""
 p "── clustering coefficient per user ──────────────────"
-for my $u (sort { _0 cmp _1 } keys %all_users) {
+for my $u (sort { _ cmp _1 } keys %all_users) {
     next unless exists $follows{$u}
     my @neighbors = keys %{$follows{$u}}
     my $n = len @neighbors

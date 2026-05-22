@@ -82,7 +82,7 @@ printf "  total heap-sort time : %.1f µs\n", $elapsed_us
 
 # ── verify against built-in sort ────────────────────────────────────
 
-my @expected = sort { _0 <=> _1 } @input
+my @expected = sort { _ <=> _1 } @input
 my $matches = 1
 for my $i (0:len(@work) - 1) {
     $matches = 0 if $work[$i] != $expected[$i]
@@ -131,7 +131,7 @@ for my $i (1:len(@big_work) - 1) {
 printf "  monotone ascending : %s\n", $monotone ? "YES" : "NO"
 
 # Compare to built-in sort.
-my @big_expected = sort { _0 <=> _1 } @big_input
+my @big_expected = sort { _ <=> _1 } @big_input
 my $big_matches = 1
 for my $i (0:len(@big_work) - 1) {
     $big_matches = 0 if $big_work[$i] != $big_expected[$i]

@@ -39,7 +39,7 @@ $invention_depth |> aeq 6, "indexed depth topics _<N"
 # ── 4. Block Param Alignment (|p| -> _) ───────────────────────────────────
 
 (10, 20) |> map { |$x| _ } |> join(",") |> aeq "10,20", "named param $x maps to _"
-(10, 20) |> map { |$x| _0 } |> join(",") |> aeq "10,20", "named param $x maps to _0"
+(10, 20) |> map { |$x| _ } |> join(",") |> aeq "10,20", "named param $x maps to _"
 
 # ── 5. Multi-line Comma Regex (s,,) ───────────────────────────────────────
 

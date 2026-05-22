@@ -17,7 +17,7 @@
 # Run: stryke --no-interop examples/josephus_no_interop.stk
 
 # Recursive closed-form: position (0-indexed) of the survivor.
-fn Josephus::survivor = _0 == 1 ? 0 : (Josephus::survivor(_0 - 1, _1) + _1) % _0
+fn Josephus::survivor = _ == 1 ? 0 : (Josephus::survivor(_ - 1, _1) + _1) % _
 
 # Iterative variant — same answer but O(n) without recursion depth.
 fn Josephus::survivor_iter($n, $k) {

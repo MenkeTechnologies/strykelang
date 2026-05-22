@@ -97,7 +97,7 @@ printf "── leaderboard (max possible: %d points) ─────────
     $max_score
 printf "  %-10s %6s %6s %6s\n", "student", "score", "right", "%"
 my @ranked = sort {
-    $scores{_1}->{score} <=> $scores{_0}->{score}
+    $scores{_1}->{score} <=> $scores{_}->{score}
 } keys %scores
 for my $s (@ranked) {
     my $r = $scores{$s}
@@ -112,7 +112,7 @@ p "── per-question error rate (hardest questions first) ──"
 my @question_difficulty = sort {
     ($per_question_total{_1->{id}} - $per_question_correct{_1->{id}})
     <=>
-    ($per_question_total{_0->{id}} - $per_question_correct{_0->{id}})
+    ($per_question_total{_->{id}} - $per_question_correct{_->{id}})
 } @questions
 for my $q (@question_difficulty) {
     my $wrong = $per_question_total{$q->{id}} - $per_question_correct{$q->{id}}

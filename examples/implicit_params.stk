@@ -2,22 +2,22 @@
 
 # Stryke implicit closure params — world-first design.
 #
-# `_0`, `_1`, `_N`     — positional block parameters (0-indexed).
+# `_`, `_1`, `_N`     — positional block parameters (0-indexed).
 #                        Replaces Perl's `$a`/`$b` magic in sort/reduce.
 # `_`  (bareword)      — current topic, sigil-free (same as `_`).
 # `_<`, `_<<`, ...      — outer-topic chain. Each `<` climbs one nesting
 #                        level. **No other language has this.**
 
-p "── _0 / _1 replace \$a / \$b in sort ─────────────────"
+p "── _ / _1 replace \$a / \$b in sort ─────────────────"
 my @nums = (3, 1, 4, 1, 5, 9, 2, 6, 5)
-my @asc  = sort { _0 <=> _1 } @nums
-my @desc = sort { _1 <=> _0 } @nums
+my @asc  = sort { _ <=> _1 } @nums
+my @desc = sort { _1 <=> _ } @nums
 p "  asc  : ", join(",", @asc)
 p "  desc : ", join(",", @desc)
 
 p ""
-p "── _0 / _1 in reduce ─────────────────────────────────"
-my $product = reduce { _0 * _1 } 1, (1:6)
+p "── _ / _1 in reduce ─────────────────────────────────"
+my $product = reduce { _ * _1 } 1, (1:6)
 p "  6! = $product"
 
 p ""
@@ -28,9 +28,9 @@ p "  doubled : ", join(",", @doubled)
 p "  evens   : ", join(",", @evens)
 
 p ""
-p "── Multi-positional _0 / _1 / _2 in custom callbacks ──"
-fn Demo::compute = _0 + _1 * _2
-# A 3-arg block-form invocation uses _0, _1, _2:
+p "── Multi-positional _ / _1 / _2 in custom callbacks ──"
+fn Demo::compute = _ + _1 * _2
+# A 3-arg block-form invocation uses _, _1, _2:
 my $sum = Demo::compute(1, 2, 3)
 p "  Demo::compute(1,2,3) = $sum"
 
@@ -72,16 +72,16 @@ my @items = (
     { name => "alice", age => 25 },
     { name => "bob",   age => 28 },
 )
-my @by_age = sort { _0->{age} <=> _1->{age} } @items
+my @by_age = sort { _->{age} <=> _1->{age} } @items
 p "  by age:"
 p "    $_->{name} ($_->{age})" for @by_age
 
 p ""
-p "── Why _0/_1 wins over \$a/\$b ─────────────────────────"
+p "── Why _/_1 wins over \$a/\$b ─────────────────────────"
 my @vals = (1, 2, 3, 4, 5)
-my $sum  = reduce { _0 + _1 } 0, @vals
-my $prod = reduce { _0 * _1 } 1, @vals
-p "  reduce { _0 + _1 } = $sum"
-p "  reduce { _0 * _1 } = $prod"
-p "  Perl's \$a/\$b magic pollutes package globals; _0/_1 are"
+my $sum  = reduce { _ + _1 } 0, @vals
+my $prod = reduce { _ * _1 } 1, @vals
+p "  reduce { _ + _1 } = $sum"
+p "  reduce { _ * _1 } = $prod"
+p "  Perl's \$a/\$b magic pollutes package globals; _/_1 are"
 p "  lexical to the block and extend naturally to _2, _3, …"

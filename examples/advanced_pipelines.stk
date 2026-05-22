@@ -27,7 +27,7 @@ p "First 10 multiples of 3 times 10: ", join(", ", @results)
 
 p "\n--- Fused Map-Reduce ---"
 # Calculate sum of squares of numbers from 1 to 1000 in parallel.
-my $sum_squares = ((1:1000) |> pmap_reduce { _ * _ } { _0 + _1 })
+my $sum_squares = ((1:1000) |> pmap_reduce { _ * _ } { _ + _1 })
 
 p "Sum of squares (1:1000): $sum_squares"
 
@@ -35,6 +35,6 @@ p "\n--- Parallel Tree Reduce ---"
 # preduce uses a tree-based reduction for maximum parallelism.
 my $max_val = 1:1000
     |> pmap { rand(1000) }
-    |> preduce { _0 > _1 ? _0 : _1 }
+    |> preduce { _ > _1 ? _ : _1 }
 
 printf "Max of 1000 random numbers: %.2f\n", $max_val
