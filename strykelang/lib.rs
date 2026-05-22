@@ -13,6 +13,7 @@ pub mod aop;
 pub mod aot;
 pub mod ast;
 pub mod banner;
+pub mod docs;
 pub mod builtins;
 pub mod builtins_bio_geom_markov;
 pub mod builtins_bits_music_stats;
