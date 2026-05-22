@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# Demo + regression test for BUG-242 / BUG-254 / BUG-255 — `index` and
+# `rindex` never panic on out-of-bounds or negative POS arguments.
+
+# `index` with POS past the end of the haystack: -1.
+index("hello", "world", 100) |> assert_eq(-1, "index past end")
+index("hello", "h", 5)       |> assert_eq(-1, "index at exact end")
+index("hello", "h", 10)      |> assert_eq(-1, "index past end")
+
+# Negative POS: Perl clamps to 0 (i.e. searches from the start).
+index("abc", "b", -1)        |> assert_eq(1,  "index neg POS clamps to 0")
+index("abc", "b", -1000)     |> assert_eq(1,  "very negative POS still clamps")
+
+# `rindex` with negative POS: no match position is reachable, returns -1.
+rindex("abc", "b", -1)       |> assert_eq(-1, "rindex neg POS = -1")
+rindex("abracadabra", "ab", -5) |> assert_eq(-1, "rindex past neg = -1")
+
+# Sanity: positive POS forms still behave correctly.
+rindex("abcabc", "b")        |> assert_eq(4,  "rindex no-arg form")
+rindex("abcabc", "b", 3)     |> assert_eq(1,  "rindex with POS limit")
+
+# Loop-pattern: scan forward through a string without bounds-checking the
+# start offset (used to panic at the end of the string).
+fn Demo::IndexLoop::find_all($s, $needle) {
+    my @hits
+    my $pos = 0
+    while ((my $i = index($s, $needle, $pos)) != -1) {
+        push @hits, $i
+        $pos = $i + len($needle)
+    }
+    @hits
+}
+my @dots = Demo::IndexLoop::find_all("a.b.c.d", ".")
+join(",", @dots) |> assert_eq("1,3,5", "scan-loop never falls off the end")
+
+test_run

@@ -1,0 +1,63 @@
+#!/usr/bin/env stryke
+# Demo + regression test for BUG-005 / BUG-256 — `(caller(N))[3]` used
+# to be undef, and `__PACKAGE__` used to return "main" regardless of
+# the package the fn was defined in.
+
+# BUG-005: caller(0)[3] returns the running fn's name.
+package Demo::Caller
+fn leaf { my @c = caller(0); $c[3] }
+fn mid  = Demo::Caller::leaf()
+fn top  = Demo::Caller::mid()
+package main
+
+my $name = Demo::Caller::top()
+($name =~ /leaf/) |> assert_ok("caller field 3 names the running fn")
+
+# Sanity: 4-tuple shape with package + file + line + fn.
+# (Field 0 = package is still BUG-248: stryke reports "main" regardless;
+# only field 3 = fn name is what BUG-005 actually fixed.)
+package Demo::CallerShape
+fn probe = caller(0)
+package main
+my @frame = Demo::CallerShape::probe()
+len(@frame)        |> assert_eq(4, "caller frame is a 4-tuple")
+($frame[2] > 0)    |> assert_ok("field 2 = line > 0")
+defined($frame[3]) |> assert_ok("field 3 = fn name (no longer undef)")
+
+# BUG-256: __PACKAGE__ is the compile-time package of the fn body.
+package Demo::Tagger
+fn tag     = __PACKAGE__
+# Bind the bareword once outside the string so __PACKAGE__ resolves at
+# parse-time (the BUG-256 fix). Inside `#{}` it would defer to runtime
+# and read the caller's package instead.
+fn log_msg {
+    my $pkg = __PACKAGE__
+    "$pkg: #{_0}"
+}
+package main
+
+Demo::Tagger::tag()         |> assert_eq("Demo::Tagger",     "__PACKAGE__ bakes definition site")
+Demo::Tagger::log_msg("hi") |> assert_eq("Demo::Tagger: hi", "interp inside fn body")
+
+# Nested package switches: each fn keeps its own __PACKAGE__.
+package Demo::A
+fn who = __PACKAGE__
+package Demo::B
+fn who = __PACKAGE__
+package main
+
+Demo::A::who() |> assert_eq("Demo::A", "Demo::A keeps its name")
+Demo::B::who() |> assert_eq("Demo::B", "Demo::B keeps its name")
+
+# Closure body also captures the defining package.
+package Demo::Closure
+fn make_logger {
+    my $prefix = _
+    my $pkg    = __PACKAGE__
+    fn { "$pkg" . "[$prefix]: #{_}" }
+}
+package main
+my $log = Demo::Closure::make_logger("svc")
+$log->("hello") |> assert_eq("Demo::Closure[svc]: hello", "closure body __PACKAGE__")
+
+test_run

@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Demo + regression test for BUG-241 and the URI::Escape 2-arg compat
+# follow-up. Default `uri_escape($str)` preserves RFC 3986 unreserved
+# characters (`-`, `_`, `.`, `~`); the explicit 2-arg form
+# `uri_escape($str, $unsafe_set)` lets callers opt into stricter
+# encoding schemes (e.g. Rosetta-style "encode every non-alphanumeric").
+
+# Default form: RFC 3986 unreserved characters survive.
+uri_escape("hello-world.tar~gz")
+    |> assert_eq("hello-world.tar~gz", "RFC 3986 unreserved preserved")
+uri_escape("a b c")
+    |> assert_eq("a%20b%20c", "spaces still encoded")
+uri_escape("?key=val&n=1")
+    |> assert_eq("%3Fkey%3Dval%26n%3D1", "query metacharacters escaped")
+
+# Strict form: encode every non-alphanumeric. Matches Perl's
+# `uri_escape($s, "^A-Za-z0-9")` and the Rosetta Code task expectation.
+uri_escape("hello-world.tar~gz", "^A-Za-z0-9")
+    |> assert_eq("hello%2Dworld%2Etar%7Egz", "strict encodes -, ., ~")
+uri_escape("http://rosettacode.org/wiki/Main Page", "^A-Za-z0-9")
+    |> assert_eq("http%3A%2F%2Frosettacode%2Eorg%2Fwiki%2FMain%20Page",
+                 "rosetta task URL")
+
+# Explicit unsafe set: only the listed chars are encoded, alphanumerics
+# (and everything else not in the set) pass through.
+uri_escape("hi! ok?", "!?")
+    |> assert_eq("hi%21 ok%3F", "explicit unsafe set")
+
+# Range-with-complement in the spec.
+uri_escape("a1 b2 c3", "^a-c0-9")
+    |> assert_eq("a1%20b2%20c3", "complement of [a-c0-9] = space encoded")
+
+# Round-trip: default encode → decode is the identity.
+my $orig = "https://example.com/path?q=hello world&n=1#frag"
+my $enc = uri_escape($orig)
+uri_unescape($enc) |> assert_eq($orig, "round-trip via default form")
+
+# Round-trip via strict form too.
+my $enc2 = uri_escape($orig, "^A-Za-z0-9")
+uri_unescape($enc2) |> assert_eq($orig, "round-trip via strict form")
+
+test_run

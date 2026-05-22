@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Demo + regression test for BUG-157 / BUG-167 / BUG-225 — `crc32`,
+# `gcd`, `lcm`, and `sliding_window` are now properly variadic /
+# arrayref-aware (previously dropped everything past the first or
+# first-two args).
+
+# crc32 hashes every positional argument.
+(crc32("ab", "cd") == crc32("abcd"))   |> assert_ok("crc32 per-arg matches concat")
+(crc32("a", "b", "c") == crc32("abc")) |> assert_ok("crc32 three-arg form")
+
+# gcd: variadic + arrayref form.
+gcd(12, 18, 24)        |> assert_eq(6,  "gcd of three numbers")
+gcd(12, 18, 24, 30, 36)|> assert_eq(6,  "gcd of five numbers")
+gcd(7, 13)             |> assert_eq(1,  "coprime pair")
+gcd([12, 18, 24])      |> assert_eq(6,  "gcd of arrayref")
+gcd(42)                |> assert_eq(42, "single-arg = |n|")
+
+# lcm: variadic + arrayref form.
+lcm(4, 6, 8)           |> assert_eq(24, "lcm of three numbers")
+lcm(4, 6, 8, 10)       |> assert_eq(120,"lcm of four numbers")
+lcm(0, 6, 8)           |> assert_eq(0,  "any zero short-circuits to 0")
+lcm([2, 3, 5, 7])      |> assert_eq(210,"lcm of arrayref")
+
+# sliding_window registered + arrayref input.
+fn Demo::Win::stringify($wins) {
+    join(";", map { join(",", @$_) } @$wins)
+}
+
+my @w3 = sliding_window([1, 2, 3, 4, 5], 3)
+Demo::Win::stringify(\@w3) |> assert_eq("1,2,3;2,3,4;3,4,5", "size-3 windows")
+
+my @w2 = sliding_window([10, 20, 30, 40], 2)
+Demo::Win::stringify(\@w2) |> assert_eq("10,20;20,30;30,40", "size-2 windows")
+
+my @ww = sliding_window([1, 2], 5)
+len(@ww) |> assert_eq(0, "window > len returns empty")
+
+test_run

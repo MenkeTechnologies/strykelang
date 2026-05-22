@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Demo + regression test for BUG-259 — bitwise shifts by amounts >= 64 (or
+# negative) used to abort the program with a Rust-level panic. Perl
+# documents the behavior as zero / sign-extended, never a fatal error.
+
+# Left-shift past the i64 width.
+(1 << 64)         |> assert_eq(0, "1 << 64 = 0")
+(0 << 100)        |> assert_eq(0, "0 << anything = 0")
+(1 << 65)         |> assert_eq(0, "1 << 65 = 0")
+(1 << 63)         |> assert_eq(i64_min, "1 << 63 wraps into sign bit")
+
+# Right-shift past width: positives → 0, negatives → -1 (arithmetic).
+(123 >> 100)      |> assert_eq(0,  "positive >> width = 0")
+(-1 >> 100)       |> assert_eq(-1, "negative >> width keeps sign")
+(-256 >> 64)      |> assert_eq(-1, "any negative >> width = -1")
+
+# Negative shift amounts: defined as zero (no panic).
+(1 << -1)         |> assert_eq(0, "1 << -1 = 0")
+(1 >> -1)         |> assert_eq(0, "1 >> -1 = 0")
+
+# Compound assign forms route through the same helper.
+my $x = 1
+$x <<= 64
+$x |> assert_eq(0, "x <<= 64 = 0")
+
+my $y = -8
+$y >>= 100
+$y |> assert_eq(-1, "negative y >>= width = -1")
+
+# Loop-pattern: bit walk without clamping the shift amount manually.
+fn Demo::BitWalk::dump($n) {
+    my @bits
+    for my $i (0:65) {
+        push @bits, (($n >> $i) & 1) ? "1" : "0"
+    }
+    join("", @bits)
+}
+my $bits = Demo::BitWalk::dump(5)
+# bit 0 = 1, bit 2 = 1, the rest zeros up to position 65 (inclusive).
+$bits |> assert_eq("1" . "0" . "1" . ("0" x 63), "no panic walking past width")
+
+test_run
