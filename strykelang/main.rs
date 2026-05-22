@@ -56,13 +56,6 @@ pub(crate) struct Cli {
     #[arg(long = "fmt")]
     format_source: bool,
 
-    /// Generate Markdown module documentation from `##` doc-comment
-    /// blocks above each top-level declaration (fn / struct / enum /
-    /// class / trait / package / use constant). Prints to stdout.
-    /// Named `--gen-docs` (not `--docs`) because `stryke docs` is
-    /// already a builtin.
-    #[arg(long = "gen-docs")]
-    dump_docs: bool,
 
     /// Wall-clock profile: per-line + per-sub timings on stderr (VM: opcode-level lines; JIT off)
     #[arg(long = "profile")]
@@ -386,7 +379,6 @@ fn print_cyberpunk_help() {
         "  --disasm / --disassemble {G}//{N} Print bytecode disassembly to stderr before VM run"
     );
     println!("  --ast                  {G}//{N} Dump parsed AST as JSON and exit (no execution)");
-    println!("  --gen-docs FILE        {G}//{N} Generate Markdown module docs from `## doc comments` and exit");
     println!("  --fmt                  {G}//{N} Pretty-print parsed Perl to stdout and exit");
     println!(
         "  --explain CODE         {G}//{N} Print expanded hint for an error code (e.g. E0001) and exit"
@@ -1866,21 +1858,6 @@ fn main() {
                 process::exit(1);
             }
         }
-        return;
-    }
-
-    if cli.dump_docs {
-        // Re-read the source so we have line text for `##` doc
-        // extraction. `program` already parsed it, but the source
-        // bytes aren't retained on the AST.
-        let source = match std::fs::read_to_string(&filename) {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("stryke: cannot read {} for --gen-docs: {}", filename, e);
-                process::exit(1);
-            }
-        };
-        print!("{}", stryke::docs::generate_markdown(&filename, &source, &program));
         return;
     }
 
