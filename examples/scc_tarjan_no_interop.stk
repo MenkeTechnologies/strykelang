@@ -73,11 +73,11 @@ fn SCC::strong_connect($s, $v) {
 fn SCC::canonical($sccs) {
     my @rows
     for my $s (@$sccs) {
-        push @rows, [sort { _0 <=> _1 } @$s]
+        push @rows, [sort { _ <=> _1 } @$s]
     }
     sort {
         # Lexicographic by stringified comma-join.
-        join(",", @{_0}) cmp join(",", @{_1})
+        join(",", @{_}) cmp join(",", @{_1})
     } @rows
 }
 

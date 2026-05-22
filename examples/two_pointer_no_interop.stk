@@ -5,7 +5,7 @@
 # a problem in O(n). Demonstrates palindrome check, sorted two-sum,
 # and array-pair sum. Parses clean under `--no-interop`.
 #
-# Strict-mode style rule applied: bareword `_`, `_0`, `_1` in code
+# Strict-mode style rule applied: bareword `_`, `_`, `_1` in code
 # contexts. UDFs namespaced `TwoPtr::*`.
 #
 # Run: stryke --no-interop examples/two_pointer_no_interop.stk

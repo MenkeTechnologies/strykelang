@@ -134,7 +134,7 @@ for my $q (@queries) {
     if (len(keys %$scores) == 0) {
         p "  (no results)"
     } else {
-        my @ranked = sort { $scores->{_1} <=> $scores->{_0} } keys %$scores
+        my @ranked = sort { $scores->{_1} <=> $scores->{_} } keys %$scores
         for my $id (@ranked) {
             my $doc = Demo::II::doc_by_id($id + 0)
             printf "  doc %s  score=%d  %s\n",

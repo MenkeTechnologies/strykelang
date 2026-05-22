@@ -128,7 +128,7 @@ $cluster_count{_}++ for @$final_assn
 
 p ""
 p "── cluster sizes ───────────────────────────────────"
-for my $k (sort { _0 <=> _1 } keys %cluster_count) {
+for my $k (sort { _ <=> _1 } keys %cluster_count) {
     printf "  cluster %d : %d points (centroid %.1f, %.1f)\n",
         $k, $cluster_count{$k}, $centroids[$k]->[0], $centroids[$k]->[1]
 }

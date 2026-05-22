@@ -71,7 +71,7 @@ fn Demo::URL::parse_query($qs) {
 }
 
 fn Demo::URL::serialize_query($params) {
-    my @keys = sort { _0 cmp _1 } keys %$params
+    my @keys = sort { _ cmp _1 } keys %$params
     my @parts
     for my $k (@keys) {
         push @parts, "$k=" . $params->{$k}
@@ -126,7 +126,7 @@ for my $i (0:len(@urls) - 1) {
 
 # ── distinct via uniq ───────────────────────────────────────────────
 
-my @distinct = sort { _0 cmp _1 } uniq(@normalized)
+my @distinct = sort { _ cmp _1 } uniq(@normalized)
 p ""
 printf "── %d distinct normalized URLs ────────────────────────\n", len @distinct
 for my $u (@distinct) {
@@ -153,7 +153,7 @@ for my $url (@urls) {
 }
 printf "  tracking params found : %d (across %d URLs)\n",
     $tracked, len @urls
-for my $k (sort { $tracked_kinds{_1} <=> $tracked_kinds{_0} } keys %tracked_kinds) {
+for my $k (sort { $tracked_kinds{_1} <=> $tracked_kinds{_} } keys %tracked_kinds) {
     printf "  %-15s : %d\n", $k, $tracked_kinds{$k}
 }
 

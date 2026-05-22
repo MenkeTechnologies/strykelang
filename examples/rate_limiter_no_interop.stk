@@ -17,9 +17,9 @@
 
 # Construct a bucket: capacity tokens, refill_rate tokens-per-time-unit.
 fn Rate::new = +{
-    capacity    => _0,
+    capacity    => _,
     refill_rate => _1,
-    tokens      => _0,    # start full
+    tokens      => _,    # start full
     last_t      => 0,
 }
 

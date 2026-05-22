@@ -12,7 +12,7 @@ is_prime(10) |> { _ == 0 } |> aok "is_prime(10) false"
 
 prime_factors(60) |> join(",") |> aeq "2,2,3,5", "prime_factors(60)"
 
-divisors(12) |> sort { _0 <=> _1 } |> join(",") |> aeq "1,2,3,4,6,12", "divisors(12)"
+divisors(12) |> sort { _ <=> _1 } |> join(",") |> aeq "1,2,3,4,6,12", "divisors(12)"
 
 next_prime(10) |> aeq 11, "next_prime(10)"
 

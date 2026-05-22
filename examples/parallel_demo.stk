@@ -8,7 +8,7 @@ p "pmap: first 10 doubled = ", join(", ", @doubled[0:9])
 my @evens = @data |> pgrep _ % 2 == 0
 p "pgrep: ", len(@evens), " even numbers found"
 
-my @sorted = @data |> rev |> psort { _0 <=> _1 }
+my @sorted = @data |> rev |> psort { _ <=> _1 }
 p "psort: first 10 = ", join(", ", @sorted[0:9])
 
 p "pfor: processing..."

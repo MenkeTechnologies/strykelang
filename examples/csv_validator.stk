@@ -195,7 +195,7 @@ p ""
 p "── error-kind rollup ────────────────────────────────"
 my %kinds
 $kinds{_->{kind}}++ for @errors
-for my $k (sort { $kinds{_1} <=> $kinds{_0} } keys %kinds) {
+for my $k (sort { $kinds{_1} <=> $kinds{_} } keys %kinds) {
     printf "  %-20s : %d\n", $k, $kinds{$k}
 }
 

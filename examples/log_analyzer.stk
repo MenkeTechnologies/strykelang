@@ -81,7 +81,7 @@ p ""
 p "── status histogram via hash + pipe ───────────────────"
 my %status
 $status{_->{status}}++ for @parsed
-for my $s (sort { _0 <=> _1 } keys %status) {
+for my $s (sort { _ <=> _1 } keys %status) {
     printf "    %d  ×  %d\n", $s, $status{$s}
 }
 

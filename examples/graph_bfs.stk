@@ -4,7 +4,7 @@
 # small graph represented as a hash-of-arrayrefs (adjacency lists).
 # Showcases:
 #   * hashref-of-arrayref idioms
-#   * implicit _0/_1 in priority-style sort
+#   * implicit _/_1 in priority-style sort
 #   * pipe-forward / thread macro for grep-then-uniq
 #   * AOP `around` to count node visits without touching BFS body
 
@@ -25,7 +25,7 @@ my %g = (
 )
 
 p "── graph adjacency ──────────────────────────────────"
-for my $node (sort { _0 cmp _1 } keys %g) {
+for my $node (sort { _ cmp _1 } keys %g) {
     printf "  %-12s -> %s\n", $node, join(", ", @{$g{$node}})
 }
 
@@ -73,7 +73,7 @@ for my $q (@queries) {
 fn Demo::BFS::components($graph) {
     my %seen
     my @components
-    for my $start (sort { _0 cmp _1 } keys %$graph) {
+    for my $start (sort { _ cmp _1 } keys %$graph) {
         next if $seen{$start}
         my @queue = ($start)
         my @comp
@@ -86,7 +86,7 @@ fn Demo::BFS::components($graph) {
                 push @queue, $nbr unless $seen{$nbr}
             }
         }
-        push @components, [sort { _0 cmp _1 } @comp]
+        push @components, [sort { _ cmp _1 } @comp]
     }
     \@components
 }
@@ -105,8 +105,8 @@ for my $i (0:len(@$comps)-1) {
 p ""
 p "── degree distribution ──────────────────────────────"
 my @degs = map { len(@{$g{_}}) } keys %g
-my $max = reduce { _0 > _1 ? _0 : _1 } 0, @degs
-my $min = reduce { _0 < _1 ? _0 : _1 } 999, @degs
+my $max = reduce { _ > _1 ? _ : _1 } 0, @degs
+my $min = reduce { _ < _1 ? _ : _1 } 999, @degs
 my $avg = sum(@degs) / len @degs
 printf "  min degree : %d\n", $min
 printf "  max degree : %d\n", $max
@@ -149,6 +149,6 @@ fn Demo::BFS::reachable($graph, $start) {
 }
 
 my $reach = Demo::BFS::reachable(\%g, "SF")
-my @sorted = sort { _0 cmp _1 } @$reach
+my @sorted = sort { _ cmp _1 } @$reach
 printf "  reachable from SF: %s\n", join(", ", @sorted)
 printf "  reach count       : %d\n", len @sorted

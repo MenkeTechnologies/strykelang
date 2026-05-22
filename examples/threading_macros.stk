@@ -64,7 +64,7 @@ p "\n═══ ~p> chunk-parallel"
 
 # Letter-frequency histogram, fanned out across CPU cores.
 my $h = ~p> "the quick brown fox jumps over the lazy dog" letters freq
-my @top = (sort { $h->{_1} <=> $h->{_0} } keys %$h)[0:2]
+my @top = (sort { $h->{_1} <=> $h->{_} } keys %$h)[0:2]
 p "  top letters: ", join(", ", map { "$_=$h->{$_}" } @top)
 
 # Total alphabetic character count via the ||> mid-chain boundary
@@ -84,13 +84,13 @@ p "\n═══ par_reduce"
 my $tot_len = ~> "abcdefghij" par_reduce {len}
 p "  auto-sum: $tot_len"
 
-# Two-block form: explicit pairwise reducer with `_0` / `_1`.
-my $manual = ~> "abcdefghij" par_reduce {len} { _0 + _1 }
+# Two-block form: explicit pairwise reducer with `_` / `_1`.
+my $manual = ~> "abcdefghij" par_reduce {len} { _ + _1 }
 p "  explicit reducer: $manual"
 
 # Maximum word length via custom reducer.
 my $max_word = ~> "the quick brown fox jumps over the lazy dog" words \
-    par_reduce {len} { _0 > _1 ? _0 : _1 }
+    par_reduce {len} { _ > _1 ? _ : _1 }
 p "  max word length: $max_word"
 
 # ── 6. par { BLOCK } — generic parallel-chunk wrapper ───────────
@@ -104,7 +104,7 @@ p "\n═══ Parallel corpus workloads"
 
 # Letter-freq histogram across every .stk file in the project.
 my $corpus = ~p> c("**.stk") letters freq
-my @top5 = (sort { $corpus->{_1} <=> $corpus->{_0} } keys %$corpus)[0:4]
+my @top5 = (sort { $corpus->{_1} <=> $corpus->{_} } keys %$corpus)[0:4]
 p "  top 5 letters in .stk: ", join(", ", map { "$_=$corpus->{$_}" } @top5)
 
 # Word-count: unique words across the same corpus.
@@ -125,7 +125,7 @@ p "  /unsafe/ in .rs: $unsafe occurrences"
 
 # Most common 3-letter word prefix.
 my $prefix = ~p> c("**.stk") words map { lc } map { substr(_, 0, 3) } freq
-my @top_prefix = (sort { $prefix->{_1} <=> $prefix->{_0} } keys %$prefix)[0:2]
+my @top_prefix = (sort { $prefix->{_1} <=> $prefix->{_} } keys %$prefix)[0:2]
 p "  top 3-letter prefixes: ", join(", ", map { "$_=$prefix->{$_}" } @top_prefix)
 
 # Files containing a pattern (count of files with at least one match).

@@ -1074,11 +1074,41 @@ pub fn compute_code_actions(
         out.push(toggle_comment_action(uri, range.start.line, line_text));
     }
 
-    // ── Refactorings (need a real selection) ──
+    // ── Refactorings ──
     let same_line = range.start.line == range.end.line;
     let nonempty_range =
         range.start.line != range.end.line || range.start.character != range.end.character;
-    if nonempty_range {
+
+    // Empty range (caret-only): snap to the identifier or string literal
+    // at the cursor so Extract Variable / Extract Constant work without
+    // requiring the user to manually highlight first. Matches IntelliJ's
+    // "Extract Variable" UX where pressing Cmd-Opt-V on a word extracts
+    // that word.
+    let effective_range: Range = if !nonempty_range {
+        if let Some(line_text) = nth_line(text, range.start.line as usize) {
+            snap_to_word_at_cursor(line_text, range.start)
+                .map(|(s, e)| Range {
+                    start: Position {
+                        line: range.start.line,
+                        character: s,
+                    },
+                    end: Position {
+                        line: range.start.line,
+                        character: e,
+                    },
+                })
+                .unwrap_or(range)
+        } else {
+            range
+        }
+    } else {
+        range
+    };
+    let effective_nonempty = effective_range.start.line != effective_range.end.line
+        || effective_range.start.character != effective_range.end.character;
+
+    if effective_nonempty {
+        let range = effective_range;
         // Offer all three Extract refactorings whenever the user has any
         // non-empty selection. IntelliJ's keymap-driven Cmd-Opt-V / -C / -M
         // each filters down to the one that matches its title — if Variable
@@ -1154,6 +1184,270 @@ fn extract_selection_on_line(line_text: &str, start: u32, end: u32) -> Option<&s
     let s_byte = s_byte?;
     let e_byte = e_byte.unwrap_or(line_text.len());
     Some(&line_text[s_byte..e_byte])
+}
+
+/// Snap a caret-only cursor to a word-boundary span on the line. For
+/// cursors inside a string literal, the span extends within the
+/// string's interior up to the nearest whitespace or interpolation
+/// boundary (so `Cmd-Opt-V` on a word inside `"one two $var three"`
+/// extracts `two`, `$var`, etc.). For cursors on a bareword / sigiled
+/// identifier outside a string, the span is the identifier itself.
+/// Returns the `(start_utf16, end_utf16)` columns or `None` if there's
+/// no meaningful span at the cursor (e.g. inside whitespace or
+/// punctuation).
+fn snap_to_word_at_cursor(line_text: &str, cursor: Position) -> Option<(u32, u32)> {
+    // Convert UTF-16 col to a byte index.
+    let mut byte_cur = line_text.len();
+    let mut u16_seen = 0u32;
+    for (i, ch) in line_text.char_indices() {
+        if u16_seen >= cursor.character {
+            byte_cur = i;
+            break;
+        }
+        u16_seen += ch.len_utf16() as u32;
+    }
+    let in_string =
+        same_line_selection_inside_interpolating_string(line_text, cursor.character);
+
+    let is_word_char_for_ident = |c: char| c.is_ascii_alphanumeric() || c == '_';
+    let is_sigil = |c: char| c == '$' || c == '@' || c == '%';
+
+    // Inside a string: snap to a "word" — a maximal run of word chars,
+    // OR a complete `$var` / `@arr` / `%h` interpolation marker if the
+    // cursor sits on a sigil or its body.
+    if in_string {
+        // If cursor is on or right after a sigil, snap to the
+        // sigil-prefixed identifier.
+        let cur_char = line_text[byte_cur..].chars().next();
+        let prev_char = line_text[..byte_cur].chars().next_back();
+        if matches!(cur_char, Some(c) if is_sigil(c))
+            || matches!(prev_char, Some(c) if is_sigil(c))
+        {
+            // Find start: walk back to the sigil.
+            let mut start_byte = byte_cur;
+            for (i, c) in line_text[..byte_cur].char_indices().rev() {
+                if is_sigil(c) {
+                    start_byte = i;
+                    break;
+                }
+                if !is_word_char_for_ident(c) {
+                    break;
+                }
+                start_byte = i;
+            }
+            // If the cursor is exactly on a sigil, start_byte stays at byte_cur.
+            if matches!(cur_char, Some(c) if is_sigil(c)) {
+                start_byte = byte_cur;
+            }
+            // Walk forward through sigil + ident chars.
+            let mut end_byte = start_byte;
+            let mut iter = line_text[start_byte..].char_indices();
+            if let Some((_, first)) = iter.next() {
+                if is_sigil(first) {
+                    end_byte = start_byte + first.len_utf8();
+                    for (i, c) in iter {
+                        if !is_word_char_for_ident(c) {
+                            break;
+                        }
+                        end_byte = start_byte + i + c.len_utf8();
+                    }
+                }
+            }
+            if end_byte > start_byte {
+                return Some((
+                    byte_to_utf16(line_text, start_byte),
+                    byte_to_utf16(line_text, end_byte),
+                ));
+            }
+        }
+        // Otherwise: snap to a word inside the string body. Word
+        // boundaries: whitespace, quote chars, sigils, punctuation
+        // (anything not an ident char).
+        let is_string_word_char = |c: char| is_word_char_for_ident(c);
+        let mut start_byte = byte_cur;
+        for (i, c) in line_text[..byte_cur].char_indices().rev() {
+            if !is_string_word_char(c) {
+                break;
+            }
+            start_byte = i;
+        }
+        let mut end_byte = byte_cur;
+        for (i, c) in line_text[byte_cur..].char_indices() {
+            if !is_string_word_char(c) {
+                break;
+            }
+            end_byte = byte_cur + i + c.len_utf8();
+        }
+        if end_byte > start_byte {
+            return Some((
+                byte_to_utf16(line_text, start_byte),
+                byte_to_utf16(line_text, end_byte),
+            ));
+        }
+        return None;
+    }
+
+    // Outside a string: snap to an identifier, including a leading
+    // sigil if standalone.
+    let mut start_byte = byte_cur;
+    for (i, c) in line_text[..byte_cur].char_indices().rev() {
+        if !is_word_char_for_ident(c) {
+            break;
+        }
+        start_byte = i;
+    }
+    let mut end_byte = byte_cur;
+    for (i, c) in line_text[byte_cur..].char_indices() {
+        if !is_word_char_for_ident(c) {
+            break;
+        }
+        end_byte = byte_cur + i + c.len_utf8();
+    }
+    // Include a leading sigil (`$foo`, `@bar`, `%baz`) if present.
+    if start_byte > 0 {
+        let prev_char_start = line_text[..start_byte].char_indices().next_back();
+        if let Some((idx, c)) = prev_char_start {
+            if is_sigil(c) {
+                // Make sure the sigil is standalone (preceded by
+                // non-identifier).
+                let standalone = match line_text[..idx].chars().next_back() {
+                    None => true,
+                    Some(c) => !is_word_char_for_ident(c),
+                };
+                if standalone {
+                    start_byte = idx;
+                }
+            }
+        }
+    }
+    if end_byte > start_byte {
+        Some((
+            byte_to_utf16(line_text, start_byte),
+            byte_to_utf16(line_text, end_byte),
+        ))
+    } else {
+        None
+    }
+}
+
+/// Convert a byte index to a UTF-16 column on the same line.
+fn byte_to_utf16(line_text: &str, byte_idx: usize) -> u32 {
+    line_text[..byte_idx.min(line_text.len())]
+        .encode_utf16()
+        .count() as u32
+}
+
+/// True if the LSP character column `col` (UTF-16) on `line_text`
+/// falls inside an unclosed interpolating string — either `"..."` or
+/// `` `...` `` (backtick / qx command form). Best-effort line-local
+/// scan: tracks `"` / `'` / `` ` `` toggling and skips one char after
+/// `\\`. Doesn't try to model `qq//`, `q//`, or multi-line heredocs —
+/// for the common single-line case it's sufficient to fix the
+/// extract-variable / extract-constant breakage when the user
+/// highlights literal text inside an interpolating string.
+fn same_line_selection_inside_interpolating_string(line_text: &str, col_utf16: u32) -> bool {
+    // Convert UTF-16 col to byte index so we can walk char-by-char up
+    // to (not including) the selection start.
+    let mut byte_cutoff = line_text.len();
+    let mut u16_seen = 0u32;
+    for (i, ch) in line_text.char_indices() {
+        if u16_seen >= col_utf16 {
+            byte_cutoff = i;
+            break;
+        }
+        u16_seen += ch.len_utf16() as u32;
+    }
+    let mut in_dq = false;
+    let mut in_sq = false;
+    let mut in_bt = false;
+    let mut chars = line_text[..byte_cutoff].chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' => {
+                // Skip the next char (escape).
+                chars.next();
+            }
+            '"' if !in_sq && !in_bt => in_dq = !in_dq,
+            '\'' if !in_dq && !in_bt => in_sq = !in_sq,
+            '`' if !in_dq && !in_sq => in_bt = !in_bt,
+            _ => {}
+        }
+    }
+    in_dq || in_bt
+}
+
+/// Return true if the extracted text needs string-wrapping for the
+/// decl RHS to be a valid expression. False for selections that are
+/// already a complete expression — a single sigiled variable
+/// (`$foo`, `@arr`, `%h`), an array/hash element access (`$h{k}`,
+/// `$a[0]`), or a string literal already wrapped in quotes
+/// (`"hello"`).
+fn needs_string_wrap_for_extraction(selection: &str) -> bool {
+    let trimmed = selection.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    // Already-quoted literal: skip.
+    if (trimmed.starts_with('"') && trimmed.ends_with('"'))
+        || (trimmed.starts_with('\'') && trimmed.ends_with('\''))
+    {
+        return false;
+    }
+    // Bare sigiled variable, possibly with subscript: `$foo`, `$foo[0]`,
+    // `$h{k}`, `@arr`, `%h`. If the whole trimmed selection IS one of
+    // these forms (no embedded literal text), it stands as a valid
+    // expression for the decl. We approximate "no embedded literal
+    // text" by checking that the selection doesn't contain whitespace
+    // OR free-floating identifier chars outside a `{...}`/`[...]`
+    // subscript.
+    let starts_with_sigil = matches!(trimmed.chars().next(), Some('$' | '@' | '%'));
+    if starts_with_sigil && !trimmed.chars().any(char::is_whitespace) {
+        // Quick check: if every non-subscript char is identifier-ish,
+        // treat as a plain variable expression and don't wrap.
+        let mut depth = 0i32;
+        let mut bare_text_run = false;
+        for c in trimmed.chars() {
+            match c {
+                '{' | '[' | '(' => depth += 1,
+                '}' | ']' | ')' => depth = (depth - 1).max(0),
+                _ if depth == 0 => {
+                    if !(c.is_ascii_alphanumeric()
+                        || c == '_'
+                        || c == ':'
+                        || c == '$'
+                        || c == '@'
+                        || c == '%'
+                        || c == '-'
+                        || c == '>')
+                    {
+                        bare_text_run = true;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        if !bare_text_run {
+            return false;
+        }
+    }
+    true
+}
+
+/// Escape `\\` and `"` for embedding inside a stryke `"..."` literal.
+/// The other interpolation triggers (`$`, `@`) are left alone so a
+/// selection that originally interpolated a variable continues to do
+/// so from the new decl.
+fn escape_double_quoted(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            _ => out.push(c),
+        }
+    }
+    out
 }
 
 /// Span of selected text across multiple lines, plus its inferred indentation
@@ -1249,10 +1543,32 @@ fn extract_to_local(
         .chars()
         .take_while(|c| c.is_whitespace())
         .collect();
-    let decl = if frozen {
-        format!("{leading_ws}my frozen ${placeholder} = {selection}\n")
+    // If the selection sits inside an interpolating string on its own
+    // line — `"..."` or `` `...` `` (backtick / qx command form) — and
+    // isn't already a bare scalar var, the raw text (e.g. `hello world`
+    // highlighted from `"hello world"`, or `ls -la` from `` `ls -la` ``)
+    // is not a valid stryke expression on its own. Quote it for the
+    // decl, then let the in-string `$placeholder` interpolate the value
+    // back at the original site. For backticks we still use `"..."` (a
+    // plain string) for the decl — wrapping in `` `...` `` would MOVE
+    // command execution from the original site to the decl, changing
+    // semantics. The surrounding `` `...` `` re-runs the interpolated
+    // command at its original location.
+    let in_interp_string =
+        same_line_selection_inside_interpolating_string(line_text, range.start.character);
+    let decl_rhs: String = if in_interp_string && needs_string_wrap_for_extraction(selection) {
+        // Selection contains literal text or mixed text+interpolation;
+        // preserve interpolation by keeping the contents inside `"..."`
+        // and escape any embedded `"` so a partial selection like
+        // `say "ok"` selected with the inner `ok` doesn't break out.
+        format!("\"{}\"", escape_double_quoted(selection))
     } else {
-        format!("{leading_ws}my ${placeholder} = {selection}\n")
+        selection.to_string()
+    };
+    let decl = if frozen {
+        format!("{leading_ws}my frozen ${placeholder} = {decl_rhs}\n")
+    } else {
+        format!("{leading_ws}my ${placeholder} = {decl_rhs}\n")
     };
     let insert = TextEdit {
         range: Range {
@@ -1267,6 +1583,9 @@ fn extract_to_local(
         },
         new_text: decl,
     };
+    // Inside a string, `$placeholder` interpolates; outside, it's just
+    // a scalar reference. Both spellings work as a replacement for the
+    // selection in their respective contexts — no special-casing.
     let replace = TextEdit {
         range,
         new_text: format!("${placeholder}"),
@@ -1780,21 +2099,26 @@ mod tests {
     // ── compute_code_actions ─────────────────────────────────────────────
 
     #[test]
-    fn code_actions_for_empty_selection_are_line_local_only() {
+    fn code_actions_for_empty_selection_offer_line_local_and_caret_snap_extracts() {
+        // Empty range parked in the leading whitespace of the line (no
+        // identifier under cursor) → only the line-local quickfixes
+        // (wrap-in-p, toggle comment), no Extracts.
         let actions = code_actions("my $x = 1 + 2\np $x\n", range(0, 0, 0, 0));
         let t = titles(&actions);
         assert!(
             t.iter().any(|s| s.contains("Wrap line in")),
-            "wrap-in-p offered"
+            "wrap-in-p offered: got {t:?}"
         );
         assert!(
             t.iter().any(|s| s.contains("Comment line")),
-            "toggle comment offered"
+            "toggle comment offered: got {t:?}"
         );
-        // No refactorings on an empty range.
+        // Caret at col 0 sits on `m` of `my` — `my` is a keyword, but
+        // snap_to_word still returns its span, so Extracts SHOULD now
+        // be offered (caret-only Extract is a UX improvement).
         assert!(
-            !t.iter().any(|s| s.contains("Extract")),
-            "no Extract on empty range"
+            t.iter().any(|s| s.contains("Extract to variable")),
+            "caret-only Extract Variable is offered: got {t:?}"
         );
     }
 
@@ -1836,6 +2160,326 @@ mod tests {
         assert!(
             t.iter().any(|s| s.contains("Extract to constant")),
             "const: got {t:?}"
+        );
+    }
+
+    #[test]
+    fn extract_variable_inside_double_quoted_string_quotes_the_rhs() {
+        // Original source: `my $msg = "hello world"` — the user selects
+        // the inner literal `hello world` (between but not including
+        // the `"` chars). Without wrapping, the decl becomes
+        // `my $extracted = hello world` which is invalid syntax.
+        // The fix must produce `my $extracted = "hello world"`.
+        let src = "my $msg = \"hello world\"\n";
+        // `"` at col 10, `hello world` runs col 11..22.
+        let actions = code_actions(src, range(0, 11, 0, 22));
+        let var = actions
+            .iter()
+            .find_map(|a| match a {
+                CodeActionOrCommand::CodeAction(ca) if ca.title.contains("variable") => {
+                    ca.edit.clone()
+                }
+                _ => None,
+            })
+            .expect("extract-variable action present");
+        let changes = var.changes.expect("workspace edit");
+        let (_uri, edits) = changes.iter().next().unwrap();
+        let decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        assert!(
+            decl.new_text.contains("= \"hello world\"\n"),
+            "RHS must be string-wrapped: {:?}",
+            decl.new_text
+        );
+        // Replacement of the selection should remain bare `$extracted`
+        // — inside the surrounding `"..."` it interpolates.
+        let replace = edits.iter().find(|e| e.new_text == "$extracted").unwrap();
+        assert_eq!(replace.range.start.character, 11);
+        assert_eq!(replace.range.end.character, 22);
+    }
+
+    #[test]
+    fn extract_variable_inside_double_quoted_preserves_interpolation() {
+        // Selecting `hello $name ` from `"hello $name world"` should
+        // produce `my $extracted = "hello $name "` so the original
+        // interpolation continues to work via the new decl.
+        let src = "my $msg = \"hello $name world\"\n";
+        // `hello $name ` runs col 11..23.
+        let actions = code_actions(src, range(0, 11, 0, 23));
+        let var = actions
+            .iter()
+            .find_map(|a| match a {
+                CodeActionOrCommand::CodeAction(ca) if ca.title.contains("variable") => {
+                    ca.edit.clone()
+                }
+                _ => None,
+            })
+            .expect("extract-variable action present");
+        let changes = var.changes.expect("workspace edit");
+        let (_uri, edits) = changes.iter().next().unwrap();
+        let decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        assert!(
+            decl.new_text.contains("= \"hello $name \"\n"),
+            "RHS must keep interpolation inside the quotes: {:?}",
+            decl.new_text
+        );
+    }
+
+    #[test]
+    fn extract_variable_outside_string_does_not_quote_expression() {
+        // Regression-pin the existing arithmetic path — selecting
+        // `1 + 2` from `my $x = 1 + 2` MUST NOT quote the RHS.
+        let actions = code_actions("my $x = 1 + 2\n", range(0, 8, 0, 13));
+        let var = actions
+            .iter()
+            .find_map(|a| match a {
+                CodeActionOrCommand::CodeAction(ca) if ca.title.contains("variable") => {
+                    ca.edit.clone()
+                }
+                _ => None,
+            })
+            .expect("extract-variable action present");
+        let changes = var.changes.expect("workspace edit");
+        let (_uri, edits) = changes.iter().next().unwrap();
+        let decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        assert!(
+            decl.new_text.contains("= 1 + 2\n"),
+            "arithmetic RHS must remain unquoted: {:?}",
+            decl.new_text
+        );
+        assert!(
+            !decl.new_text.contains("\"1 + 2\""),
+            "must not accidentally string-wrap arithmetic: {:?}",
+            decl.new_text
+        );
+    }
+
+    #[test]
+    fn extract_variable_of_bare_scalar_inside_string_does_not_double_wrap() {
+        // Selecting JUST `$name` from `"$name is here"` is already a
+        // valid expression — the decl should be `my $extracted = $name`
+        // (NOT `my $extracted = "$name"` which would force scalar
+        // stringification on non-string values).
+        let src = "my $msg = \"$name is here\"\n";
+        // `$name` runs col 11..16.
+        let actions = code_actions(src, range(0, 11, 0, 16));
+        let var = actions
+            .iter()
+            .find_map(|a| match a {
+                CodeActionOrCommand::CodeAction(ca) if ca.title.contains("variable") => {
+                    ca.edit.clone()
+                }
+                _ => None,
+            })
+            .expect("extract-variable action present");
+        let changes = var.changes.expect("workspace edit");
+        let (_uri, edits) = changes.iter().next().unwrap();
+        let decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        assert!(
+            decl.new_text.contains("= $name\n"),
+            "pure-scalar selection should stay bare: {:?}",
+            decl.new_text
+        );
+    }
+
+    #[test]
+    fn extract_variable_inside_backtick_command_quotes_as_string_not_backtick() {
+        // `` my $out = `ls -la` `` — selecting `ls -la` from inside the
+        // backticks must produce a DOUBLE-QUOTED decl, not another
+        // backtick. Wrapping in backticks would move command execution
+        // from the original site to the decl, changing semantics
+        // (and side effects).
+        let src = "my $out = `ls -la`\n";
+        // `ls -la` runs col 11..17 (between the backticks).
+        let actions = code_actions(src, range(0, 11, 0, 17));
+        let var = actions
+            .iter()
+            .find_map(|a| match a {
+                CodeActionOrCommand::CodeAction(ca) if ca.title.contains("variable") => {
+                    ca.edit.clone()
+                }
+                _ => None,
+            })
+            .expect("extract-variable action present");
+        let changes = var.changes.expect("workspace edit");
+        let (_uri, edits) = changes.iter().next().unwrap();
+        let decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        assert!(
+            decl.new_text.contains("= \"ls -la\"\n"),
+            "RHS must be a plain string (not backticked): {:?}",
+            decl.new_text
+        );
+        assert!(
+            !decl.new_text.contains("= `"),
+            "must NOT wrap in backticks (would move command execution): {:?}",
+            decl.new_text
+        );
+    }
+
+    #[test]
+    fn extract_variable_on_caret_only_snaps_to_identifier() {
+        // No selection — caret parked inside the identifier `total`.
+        // The action must extract `total` as if the user had selected it.
+        let src = "my $x = total + 1\n";
+        // `total` runs cols 8..13; place caret at col 10 (middle).
+        let actions = code_actions(src, range(0, 10, 0, 10));
+        let var = actions
+            .iter()
+            .find_map(|a| match a {
+                CodeActionOrCommand::CodeAction(ca) if ca.title.contains("variable") => {
+                    ca.edit.clone()
+                }
+                _ => None,
+            })
+            .expect("extract-variable action present for caret-only");
+        let changes = var.changes.expect("workspace edit");
+        let (_uri, edits) = changes.iter().next().unwrap();
+        let decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        assert!(
+            decl.new_text.contains("= total\n"),
+            "RHS must be the snapped identifier: {:?}",
+            decl.new_text
+        );
+        let replace = edits.iter().find(|e| e.new_text == "$extracted").unwrap();
+        assert_eq!(replace.range.start.character, 8);
+        assert_eq!(replace.range.end.character, 13);
+    }
+
+    #[test]
+    fn extract_variable_on_caret_snaps_to_sigiled_var() {
+        // Caret on `$foo` (col 4 == 'f') extracts the whole `$foo`.
+        let src = "p $foo + 1\n";
+        let actions = code_actions(src, range(0, 4, 0, 4));
+        let var = actions
+            .iter()
+            .find_map(|a| match a {
+                CodeActionOrCommand::CodeAction(ca) if ca.title.contains("variable") => {
+                    ca.edit.clone()
+                }
+                _ => None,
+            })
+            .expect("extract-variable action present");
+        let changes = var.changes.expect("workspace edit");
+        let (_uri, edits) = changes.iter().next().unwrap();
+        let decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        assert!(
+            decl.new_text.contains("= $foo\n"),
+            "RHS must include the sigil: {:?}",
+            decl.new_text
+        );
+    }
+
+    #[test]
+    fn extract_variable_on_caret_inside_string_snaps_to_string_word() {
+        // Caret inside `"one two three"` on the word `two` — extract
+        // just `two` as `my $extracted = "two"`.
+        let src = "my $s = \"one two three\"\n";
+        // `two` runs cols 13..16; caret at col 14.
+        let actions = code_actions(src, range(0, 14, 0, 14));
+        let var = actions
+            .iter()
+            .find_map(|a| match a {
+                CodeActionOrCommand::CodeAction(ca) if ca.title.contains("variable") => {
+                    ca.edit.clone()
+                }
+                _ => None,
+            })
+            .expect("extract-variable action present");
+        let changes = var.changes.expect("workspace edit");
+        let (_uri, edits) = changes.iter().next().unwrap();
+        let decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        assert!(
+            decl.new_text.contains("= \"two\"\n"),
+            "RHS must be the snapped word, string-wrapped: {:?}",
+            decl.new_text
+        );
+    }
+
+    #[test]
+    fn extract_variable_on_caret_inside_string_on_interp_var_snaps_to_var() {
+        // Caret on `$var` inside `"one two $var three"` — snap to the
+        // full `$var` interpolation marker.
+        let src = "my $s = \"one two $var three\"\n";
+        // `$var` runs cols 17..21; caret at col 18.
+        let actions = code_actions(src, range(0, 18, 0, 18));
+        let var = actions
+            .iter()
+            .find_map(|a| match a {
+                CodeActionOrCommand::CodeAction(ca) if ca.title.contains("variable") => {
+                    ca.edit.clone()
+                }
+                _ => None,
+            })
+            .expect("extract-variable action present");
+        let changes = var.changes.expect("workspace edit");
+        let (_uri, edits) = changes.iter().next().unwrap();
+        let decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        assert!(
+            decl.new_text.contains("= $var\n"),
+            "RHS must be just `$var` (no double-stringify): {:?}",
+            decl.new_text
+        );
+    }
+
+    #[test]
+    fn extract_variable_extracts_word_from_backtick_command() {
+        // User's exact case: `` my $r = `ls file` ``, extract `file`.
+        // Result must be:
+        //   my $extracted = "file"
+        //   my $r = `ls $extracted`
+        let src = "my $r = `ls file`\n";
+        // `file` runs col 12..16 (between the backticks).
+        let actions = code_actions(src, range(0, 12, 0, 16));
+        let var = actions
+            .iter()
+            .find_map(|a| match a {
+                CodeActionOrCommand::CodeAction(ca) if ca.title.contains("variable") => {
+                    ca.edit.clone()
+                }
+                _ => None,
+            })
+            .expect("extract-variable action present");
+        let changes = var.changes.expect("workspace edit");
+        let (_uri, edits) = changes.iter().next().unwrap();
+        let decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        assert!(
+            decl.new_text.contains("= \"file\"\n"),
+            "RHS must be a quoted string `\"file\"`: {:?}",
+            decl.new_text
+        );
+        let replace = edits.iter().find(|e| e.new_text == "$extracted").unwrap();
+        // The replacement covers exactly the `file` selection — the
+        // surrounding `` `ls $extracted` `` keeps interpolation +
+        // command-execution semantics.
+        assert_eq!(replace.range.start.character, 12);
+        assert_eq!(replace.range.end.character, 16);
+    }
+
+    #[test]
+    fn extract_variable_inside_backtick_preserves_interpolation_via_string() {
+        // Selecting `ls $dir | wc -l` from `` `ls $dir | wc -l` `` ⇒
+        // `my $extracted = "ls $dir | wc -l"` — the string interpolates
+        // `$dir` at decl time, then the surrounding `` `$extracted` ``
+        // interpolates the resulting command string and runs it,
+        // preserving command-at-original-site behavior.
+        let src = "my $n = `ls $dir | wc -l`\n";
+        // `ls $dir | wc -l` runs col 9..24.
+        let actions = code_actions(src, range(0, 9, 0, 24));
+        let var = actions
+            .iter()
+            .find_map(|a| match a {
+                CodeActionOrCommand::CodeAction(ca) if ca.title.contains("variable") => {
+                    ca.edit.clone()
+                }
+                _ => None,
+            })
+            .expect("extract-variable action present");
+        let changes = var.changes.expect("workspace edit");
+        let (_uri, edits) = changes.iter().next().unwrap();
+        let decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        assert!(
+            decl.new_text.contains("= \"ls $dir | wc -l\"\n"),
+            "RHS keeps `$dir` interpolation inside double quotes: {:?}",
+            decl.new_text
         );
     }
 
@@ -2141,6 +2785,43 @@ mod tests {
         );
         // No comment leaks.
         assert!(!types.contains(&6), "no comment in string: {:?}", t.data);
+    }
+
+    #[test]
+    fn in_string_variable_token_emitted_inside_multiarg_call_with_regex() {
+        // Real-world fixture from the user's report:
+        // `split(/\s+/, "one two $var three")` — `$var` must come
+        // through as TY_VARIABLE even though it sits inside the second
+        // arg of a multi-arg call AFTER a regex literal. Pins that the
+        // regex scanner correctly restores `col`/`i` so the subsequent
+        // string scanner finds the interpolation site.
+        let text = "fn arr_split_ws {\n    my $var = 23;\n    split(/\\s+/, \"one two $var three\")\n}\n";
+        let t = compute_semantic_tokens(text);
+        // Walk deltas to compute absolute (line, col) for each token.
+        let mut abs: Vec<(u32, u32, u32, u32)> = Vec::new();
+        let (mut line, mut col) = (0u32, 0u32);
+        for tok in &t.data {
+            if tok.delta_line == 0 {
+                col += tok.delta_start;
+            } else {
+                line += tok.delta_line;
+                col = tok.delta_start;
+            }
+            abs.push((line, col, tok.length, tok.token_type));
+        }
+        // The in-string `$var` lives on line 2 of the source (0-based).
+        // It must be a length-4 TY_VARIABLE (token_type=2) token.
+        assert!(
+            abs.iter()
+                .any(|(l, _c, len, ty)| *l == 2 && *len == 4 && *ty == 2),
+            "expected in-string `$var` as TY_VARIABLE on line 2: abs={abs:?}",
+        );
+        // Cross-check the decl `$var` on line 1 is also TY_VARIABLE.
+        assert!(
+            abs.iter()
+                .any(|(l, _c, len, ty)| *l == 1 && *len == 4 && *ty == 2),
+            "expected decl `$var` as TY_VARIABLE on line 1: abs={abs:?}",
+        );
     }
 
     #[test]

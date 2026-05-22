@@ -16,7 +16,7 @@
 # Run: stryke --no-interop examples/a_star_no_interop.stk
 
 # Manhattan-distance heuristic — admissible for 4-connected grids.
-fn Star::heur = abs(_0 - _2) + abs(_1 - _3)
+fn Star::heur = abs(_ - _2) + abs(_1 - _3)
 
 # Returns the lowest-cost path as a list of [r, c] cells, or undef
 # when unreachable. Grid is row-major arrayref of strings.

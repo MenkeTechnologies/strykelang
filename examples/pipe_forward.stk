@@ -15,7 +15,7 @@ p "  'hello world' |> split(/ /) = (", join(",", $r2), ")"
 p ""
 p "── Real pipeline — top-5 longest words ───────────────"
 my $text = "The quick brown fox jumps over the lazy dog repeatedly"
-my @top = $text |> split(/\s+/) |> sort { len(_1) <=> len(_0) }
+my @top = $text |> split(/\s+/) |> sort { len(_1) <=> len(_) }
 my @top5 = @top[0:4]
 p "  top 5: ", join(", ", @top5)
 

@@ -130,7 +130,7 @@ printf "  rejection rate     : %.1f%%\n", 100.0 * $rejected / $total
 
 p ""
 p "── per-state visit counts ───────────────────────────"
-for my $s (sort { _0 cmp _1 } keys %state_visits) {
+for my $s (sort { _ cmp _1 } keys %state_visits) {
     printf "  %-12s : %d\n", $s, $state_visits{$s}
 }
 

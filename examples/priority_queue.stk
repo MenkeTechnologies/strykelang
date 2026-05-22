@@ -16,7 +16,7 @@
 
 fn Demo::PQ::new() = []
 
-fn Demo::PQ::is_empty = len(@{_0}) == 0
+fn Demo::PQ::is_empty = len(@{_}) == 0
 
 fn Demo::PQ::push($pq, $prio, $item) {
     # Find insertion point via linear scan (small N).
@@ -92,9 +92,9 @@ my %graph = (
 )
 
 p "── graph (weighted, undirected) ─────────────────────"
-for my $u (sort { _0 cmp _1 } keys %graph) {
+for my $u (sort { _ cmp _1 } keys %graph) {
     my @edges
-    for my $v (sort { _0 cmp _1 } keys %{$graph{$u}}) {
+    for my $v (sort { _ cmp _1 } keys %{$graph{$u}}) {
         push @edges, sprintf("%s=%d", $v, $graph{$u}->{$v})
     }
     printf "  %-12s : %s\n", $u, join(", ", @edges)
@@ -114,7 +114,7 @@ my $result = Demo::Path::dijkstra(\%graph, "SF")
 
 p ""
 p "── shortest distances from SF ───────────────────────"
-for my $city (sort { _0 cmp _1 } keys %{$result->{dist}}) {
+for my $city (sort { _ cmp _1 } keys %{$result->{dist}}) {
     printf "  %-12s : %d miles\n", $city, $result->{dist}->{$city}
 }
 

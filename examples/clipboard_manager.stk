@@ -165,7 +165,7 @@ p ""
 p "── by-kind breakdown ────────────────────────────────"
 my %by_kind
 $by_kind{_->{kind}}++ for @history
-for my $k (sort { _0 cmp _1 } keys %by_kind) {
+for my $k (sort { _ cmp _1 } keys %by_kind) {
     printf "  %-10s : %d\n", $k, $by_kind{$k}
 }
 

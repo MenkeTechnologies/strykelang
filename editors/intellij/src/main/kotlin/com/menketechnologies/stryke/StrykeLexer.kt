@@ -72,6 +72,15 @@ class StrykeLexer : LexerBase() {
             consumeDoubleStringContinuation()
             return
         }
+        // We're at a `$`/`@`/`%` interpolation marker inside a `"..."`.
+        // Emit the sigil-var as one token (SCALAR_VAR / ARRAY_VAR / HASH_VAR)
+        // then return to string mode so the suffix is consumed as STRING.
+        if (state == STATE_IN_DQ_SIGIL_VAR) {
+            val sigil = buf[pos]
+            consumeSigilVar(sigil)
+            state = STATE_IN_DQ_STRING
+            return
+        }
         val c = buf[pos]
         when {
             c == '#' -> consumeLineComment()
@@ -172,8 +181,9 @@ class StrykeLexer : LexerBase() {
      * `#` handling colored interpolations like comments.
      */
     private fun consumeDoubleQuoteString() {
-        // pos is at the opening `"`. Scan forward until we hit either the
-        // closing `"` or an interpolation start `#{`.
+        // pos is at the opening `"`. Scan forward until we hit the closing
+        // `"`, a `#{EXPR}` interpolation, or a sigil-var interpolation
+        // (`$var`, `@arr`, `%h`, `${name}`, `$1`, etc.).
         var p = pos + 1
         while (p < endOffset) {
             val c = buf[p]
@@ -189,6 +199,19 @@ class StrykeLexer : LexerBase() {
                 state = STATE_IN_DQ_INTERP_START
                 return
             }
+            if ((c == '$' || c == '@' || c == '%')
+                && p + 1 < endOffset
+                && isInStringSigilVarStart(buf[p + 1])
+            ) {
+                // Emit the literal prefix as STRING; next advance() emits
+                // the sigil-var via consumeSigilVar, then the continuation
+                // resumes scanning the rest of the string.
+                tokenEnd = p
+                pos = p
+                tokenType = StrykeTokenTypes.STRING
+                state = STATE_IN_DQ_SIGIL_VAR
+                return
+            }
             p++
         }
         tokenEnd = p
@@ -199,8 +222,8 @@ class StrykeLexer : LexerBase() {
 
     /**
      * Continuation of a double-quoted string after an interpolation `}`
-     * closes. Behaves like [consumeDoubleQuoteString] but doesn't skip the
-     * opening `"` (there isn't one — we're mid-string).
+     * (or after a sigil-var) closes. Behaves like [consumeDoubleQuoteString]
+     * but doesn't skip an opening `"` (there isn't one — we're mid-string).
      */
     private fun consumeDoubleStringContinuation() {
         var p = pos
@@ -215,12 +238,35 @@ class StrykeLexer : LexerBase() {
                 state = STATE_IN_DQ_INTERP_START
                 return
             }
+            if ((c == '$' || c == '@' || c == '%')
+                && p + 1 < endOffset
+                && isInStringSigilVarStart(buf[p + 1])
+            ) {
+                tokenEnd = p
+                pos = p
+                tokenType = StrykeTokenTypes.STRING
+                state = STATE_IN_DQ_SIGIL_VAR
+                return
+            }
             p++
         }
         tokenEnd = p
         pos = p
         state = STATE_NORMAL
         tokenType = StrykeTokenTypes.STRING
+    }
+
+    /**
+     * True if the char immediately after a `$`/`@`/`%` would start a
+     * real var interpolation (rather than a literal sigil character in
+     * the string). Conservative on purpose — matches the LSP
+     * semantic-tokens rule: only letter / `_` / `{` qualify. Digit
+     * tails (`$1`, `%8s`, `@10`) are NOT treated as variables to
+     * avoid false-positive coloring of printf format specifiers like
+     * `"%-15s %8s %10s\n"` — these are string content, not refs.
+     */
+    private fun isInStringSigilVarStart(c: Char): Boolean {
+        return c == '_' || c.isLetter() || c == '{'
     }
 
     /**
@@ -547,6 +593,7 @@ class StrykeLexer : LexerBase() {
         const val STATE_IN_DQ_STRING = 1          // resume scanning string literal
         const val STATE_IN_DQ_INTERP_START = 2    // next token is the `#{` opener
         const val STATE_IN_DQ_INTERP = 3          // inside the `#{EXPR}` expression
+        const val STATE_IN_DQ_SIGIL_VAR = 4       // next token is a `$var` / `@arr` / `%h` inside a string
 
         private val DECL_KEYWORDS = setOf(
             "my", "our", "local", "state", "use", "no", "package", "require",

@@ -59,7 +59,7 @@ for my $row (@{$rows_back}) {
 
 # ── stable axis order ───────────────────────────────────────────────
 
-my @regions = sort { _0 cmp _1 } keys %pivot
+my @regions = sort { _ cmp _1 } keys %pivot
 # Months: explicit calendar order, not lexical.
 my @months  = ("Jan", "Feb", "Mar")
 @months = grep { exists $col_total{_} } @months
@@ -115,7 +115,7 @@ printf " %10.2f\n", $grand_total
 
 p ""
 p "── share of grand total (%) by region ───────────────"
-for my $r (sort { $row_total{_1} <=> $row_total{_0} } keys %row_total) {
+for my $r (sort { $row_total{_1} <=> $row_total{_} } keys %row_total) {
     my $share = 100.0 * $row_total{$r} / $grand_total
     printf "  %-10s : %5.1f%%\n", $r, $share
 }
@@ -128,7 +128,7 @@ my %by_product
 for my $row (@{$rows_back}) {
     $by_product{$row->{product}} = ($by_product{$row->{product}} // 0) + ($row->{amount} + 0)
 }
-my @products = sort { $by_product{_1} <=> $by_product{_0} } keys %by_product
+my @products = sort { $by_product{_1} <=> $by_product{_} } keys %by_product
 for my $p (@products) {
     printf "  %-8s : %8.2f (%5.1f%%)\n",
         $p, $by_product{$p}, 100.0 * $by_product{$p} / $grand_total

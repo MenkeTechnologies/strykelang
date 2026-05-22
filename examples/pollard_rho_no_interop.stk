@@ -15,10 +15,10 @@
 #
 # Run: stryke --no-interop examples/pollard_rho_no_interop.stk
 
-fn Rho::gcd     = _1 == 0 ? _0 : Rho::gcd(_1, _0 % _1)
+fn Rho::gcd     = _1 == 0 ? _ : Rho::gcd(_1, _ % _1)
 
 # Pseudo-random step: f(x) = (x² + c) mod n.
-fn Rho::step = (_0 * _0 + _1) % _2
+fn Rho::step = (_ * _ + _1) % _2
 
 # Try to find a non-trivial factor of n with given seed/constant.
 # Returns the factor, or n itself if the run hit n's own period.
@@ -104,7 +104,7 @@ my @cases = (
 my $fail = 0
 for my $c (@cases) {
     my $got      = Rho::factorize($c->{n})
-    my @sorted   = sort { _0 <=> _1 } @$got
+    my @sorted   = sort { _ <=> _1 } @$got
     my $got_s    = join(",", @sorted)
     my $want_s   = join(",", @{$c->{factors}})
     my $ok       = $got_s eq $want_s

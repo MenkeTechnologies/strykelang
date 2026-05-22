@@ -6,7 +6,7 @@
 #
 # Idiomatic stryke per docs/STYLE_GUIDE.md:
 #   * expression-bodied `fn name = …` (rule 6)
-#   * implicit closure params `_0` / `_1` (rule 12)
+#   * implicit closure params `_` / `_1` (rule 12)
 #   * implicit return (rule 7)
 #   * `|> reduce` to fold over a list (rule 3)
 #
@@ -14,10 +14,10 @@
 #
 # Run: stryke --no-interop examples/gcd_lcm_no_interop.stk
 
-fn N::gcd      = _1 == 0 ? _0 : N::gcd(_1, _0 % _1)
-fn N::lcm      = _0 * _1 / N::gcd(_0, _1)
-fn N::gcd_list = @{_} |> reduce { N::gcd(_0, _1) }
-fn N::lcm_list = @{_} |> reduce { N::lcm(_0, _1) }
+fn N::gcd      = _1 == 0 ? _ : N::gcd(_1, _ % _1)
+fn N::lcm      = _ * _1 / N::gcd(_, _1)
+fn N::gcd_list = @{_} |> reduce { N::gcd(_, _1) }
+fn N::lcm_list = @{_} |> reduce { N::lcm(_, _1) }
 
 my @pair_cases = (
     +{ a => 48,  b => 18,  gcd =>  6,   lcm => 144  },

@@ -16,7 +16,7 @@
 
 p "── 1. pmaps: streaming square ──"
 my @squared = pmaps { _ * _ } 1:10
-my @sorted = sort { _0 <=> _1 } @squared
+my @sorted = sort { _ <=> _1 } @squared
 p "  set-equal to serial map:  @sorted"
 die "set differs" unless "@sorted" eq "1 4 9 16 25 36 49 64 81 100"
 
@@ -30,7 +30,7 @@ die "sum-squares" unless $sum_squares == 338350    # n(n+1)(2n+1)/6
 p ""
 p "── 2. pgreps: streaming filter ──"
 my @evens = pgreps { _ % 2 == 0 } 1:20
-my @evens_sorted = sort { _0 <=> _1 } @evens
+my @evens_sorted = sort { _ <=> _1 } @evens
 p "  evens 1..20:              @evens_sorted"
 die "evens" unless len(@evens_sorted) == 10
 
@@ -62,7 +62,7 @@ die "expand" unless $total_items == 30
 
 # Combine with downstream uniq — pflat_maps emits, uniq dedupes.
 my @u = uniq(pflat_maps { (_ % 3, _ % 5, _ % 7) } 1:50)
-my @uniq_sorted = sort { _0 <=> _1 } @u
+my @uniq_sorted = sort { _ <=> _1 } @u
 p "  uniq mod-3/5/7 residues:  @uniq_sorted"
 die "residues" unless len(@uniq_sorted) == 7    # {0..6}
 
@@ -106,8 +106,8 @@ my @words = ("apple", "ant", "banana", "berry", "cherry")
 my @letters = pflat_maps { split //, _ } @words
 my $by_letter = freq(@letters)
 printf("  most common letter: %s (%d times)\n",
-    (sort { $by_letter->{_1} <=> $by_letter->{_0} } keys %$by_letter)[0],
-    (sort { $by_letter->{_1} <=> $by_letter->{_0} } values %$by_letter)[0])
+    (sort { $by_letter->{_1} <=> $by_letter->{_} } keys %$by_letter)[0],
+    (sort { $by_letter->{_1} <=> $by_letter->{_} } values %$by_letter)[0])
 die "letter count (got " . len(@letters) . ")" unless len(@letters) == 25
     # apple(5) + ant(3) + banana(6) + berry(5) + cherry(6) = 25
 

@@ -53,7 +53,7 @@ printf "── corpus: %d total words, %d distinct ─────────�
 p ""
 p "── top words by frequency ───────────────────────────"
 my @sorted = sort {
-    ($counts{_1} <=> $counts{_0}) || (_0 cmp _1)
+    ($counts{_1} <=> $counts{_}) || (_ cmp _1)
 } keys %counts
 for my $i (0:9) {
     last if $i >= len @sorted
@@ -100,7 +100,7 @@ my %by_length
 for my $w (keys %counts) {
     $by_length{len($w)} = ($by_length{len($w)} // 0) + $counts{$w}
 }
-for my $l (sort { _0 <=> _1 } keys %by_length) {
+for my $l (sort { _ <=> _1 } keys %by_length) {
     my $bar = "#" x ($by_length{$l})
     printf "  %2d-char (%2d): %s\n", $l, $by_length{$l}, $bar
 }
@@ -109,7 +109,7 @@ for my $l (sort { _0 <=> _1 } keys %by_length) {
 
 p ""
 my @singletons = grep { $counts{_} == 1 } keys %counts
-@singletons = sort { _0 cmp _1 } @singletons
+@singletons = sort { _ cmp _1 } @singletons
 printf "── singletons (%d total) ──────────────────────────────\n",
     len @singletons
 my $cols = 4

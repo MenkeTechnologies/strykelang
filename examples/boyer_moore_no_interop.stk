@@ -9,7 +9,7 @@
 # Idiomatic stryke per docs/STYLE_GUIDE.md:
 #   * `|> reduce` fold for the candidate walk — no for-loop
 #   * `|> grep |> len` verify chain (rule 3)
-#   * implicit closure topic `_` / `_0` / `_1` (rule 12)
+#   * implicit closure topic `_` / `_` / `_1` (rule 12)
 #   * implicit return — no `return` on tail (rule 7)
 #   * `#{…}` interpolation (rule 1a)
 #   * paren-less list-operator calls (rule 8)
@@ -22,7 +22,7 @@
 # stryke's one-block reduce uses head-of-list as the accumulator.
 fn BM::candidate($xs_ref) {
     my $state = (+{cand => undef, count => 0}, @$xs_ref) |> reduce {
-        my ($cand, $count) = (_0->{cand}, _0->{count})
+        my ($cand, $count) = (_->{cand}, _->{count})
         +{
             cand  => $count == 0 ? _1 : $cand,
             count => $count == 0 ? 1

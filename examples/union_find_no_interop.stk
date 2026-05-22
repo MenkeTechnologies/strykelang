@@ -15,7 +15,7 @@
 #
 # Run: stryke --no-interop examples/union_find_no_interop.stk
 
-fn UF::new = +{ parent => [0:_0 - 1], rank => [(0) x _0], count => _0 }
+fn UF::new = +{ parent => [0:_ - 1], rank => [(0) x _], count => _ }
 
 # Recursive find with path compression — sets parent pointer to root
 # on the way back up so future finds are O(α(n)).
@@ -25,7 +25,7 @@ fn UF::find($uf, $x) {
     $uf->{parent}[$x]
 }
 
-fn UF::same = UF::find(_0, _1) == UF::find(_0, _2)
+fn UF::same = UF::find(_, _1) == UF::find(_, _2)
 
 # Union-by-rank: attach the shorter tree under the taller. Returns 1
 # if union happened, 0 if already in same component.

@@ -91,9 +91,10 @@ class StrykeRenameHandler : RenameHandler {
             dbg("ABORT: LSP returned null WorkspaceEdit — server refused the rename for this identifier")
             Messages.showWarningDialog(
                 project,
-                "LSP server returned no rename for '$identifier'. The server only renames named " +
-                    "function (sub/fn) declarations — local `my` variables and parameters aren't " +
-                    "yet supported by the rename provider.",
+                "Cannot rename '$identifier' at this position. The cursor may be on " +
+                    "punctuation, a keyword, or an identifier the server can't resolve " +
+                    "(common causes: parse error elsewhere in the file, or the symbol is " +
+                    "declared in a file that isn't open or `require`d from the current file).",
                 "Rename",
             )
             return

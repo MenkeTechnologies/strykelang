@@ -28,12 +28,12 @@ my %deps = (
 
 printf "── dependency graph: %d packages ───────────────────────\n",
     len(keys %deps)
-for my $pkg (sort { _0 cmp _1 } keys %deps) {
+for my $pkg (sort { _ cmp _1 } keys %deps) {
     my @d = @{$deps{$pkg}}
     if (len(@d) == 0) {
         printf "  %-18s (no deps)\n", $pkg
     } else {
-        printf "  %-18s -> %s\n", $pkg, join(", ", sort { _0 cmp _1 } @d)
+        printf "  %-18s -> %s\n", $pkg, join(", ", sort { _ cmp _1 } @d)
     }
 }
 
@@ -64,7 +64,7 @@ fn Demo::Topo::visit($node) {
 @order = ()
 $cycle_found = 0
 
-for my $pkg (sort { _0 cmp _1 } keys %deps) {
+for my $pkg (sort { _ cmp _1 } keys %deps) {
     Demo::Topo::visit($pkg)
 }
 
@@ -97,7 +97,7 @@ my $layer_idx = 0
 
 while (len(keys %remaining) > 0) {
     my @layer_pkgs
-    for my $pkg (sort { _0 cmp _1 } keys %remaining) {
+    for my $pkg (sort { _ cmp _1 } keys %remaining) {
         # Pkg is ready if all its deps are NOT in remaining.
         my $ready = 1
         for my $d (@{$deps{$pkg}}) {
@@ -144,11 +144,11 @@ for my $pkg (keys %deps) {
 }
 
 # Sort by dependent count, descending.
-my @by_pop = sort { len(@{$dependents{_1}}) <=> len(@{$dependents{_0}}) } keys %dependents
+my @by_pop = sort { len(@{$dependents{_1}}) <=> len(@{$dependents{_}}) } keys %dependents
 for my $pkg (@by_pop) {
     my $count = len(@{$dependents{$pkg}})
     next if $count == 0
-    my @sorted_deps = sort { _0 cmp _1 } @{$dependents{$pkg}}
+    my @sorted_deps = sort { _ cmp _1 } @{$dependents{$pkg}}
     printf "  %-18s used by %d: %s\n", $pkg, $count, join(", ", @sorted_deps)
 }
 

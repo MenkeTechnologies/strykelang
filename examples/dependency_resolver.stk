@@ -86,7 +86,7 @@ fn Demo::Dep::visit($pkg) {
 # ── resolve root package ───────────────────────────────────────────
 
 p "── catalog ──────────────────────────────────────────"
-for my $name (sort { _0 cmp _1 } keys %catalog) {
+for my $name (sort { _ cmp _1 } keys %catalog) {
     my $info = $catalog{$name}
     my $dep_str = len(keys %{$info->{deps}}) > 0
                 ? join(", ", map { "$_ >= " . $info->{deps}->{_} } sort keys %{$info->{deps}})
@@ -128,7 +128,7 @@ my @unused = grep { !exists $installed{_} } keys %catalog
 p ""
 printf "── unused packages: %d ────────────────────────────────\n",
     len @unused
-for my $u (sort { _0 cmp _1 } @unused) {
+for my $u (sort { _ cmp _1 } @unused) {
     printf "  %s\n", $u
 }
 

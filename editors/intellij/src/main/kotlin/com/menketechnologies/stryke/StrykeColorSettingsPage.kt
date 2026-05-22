@@ -88,29 +88,71 @@ class StrykeColorSettingsPage : ColorSettingsPage {
         private val DEMO = """
             #!/usr/bin/env st
             # Stryke demo — every token category for color tweaking.
+            ## doc-style comment, used for module documentation.
             use strict
             package Demo::Anagram
 
-            ## doc-style comment, used for module documentation
+            # ── Strings: literal, escape, interpolation, heredoc, qx ──
+            my ${D}greet  = "hello world"           # plain string
+            my ${D}tabbed = "col1\tcol2\nrow2"      # \\t \\n string escapes
+            my ${D}lit    = 'no ${D}interp here'    # single-quoted: literal
+            my ${D}name   = "stryke"
+            p "hi ${D}name, you have @items items"  # in-string ${D}var / @var
+            p "host=${D}h{host} regex_cap=${D}1"    # ${D}h{key} and ${D}1
+            p `ls -la ${D}HOME`                     # backtick command (qx)
+
+            my ${D}doc = <<~EOT                     # heredoc with interp
+                hello ${D}name
+                indented body
+            EOT
+
+            # ── Numbers, booleans, undef ──
+            my ${D}n   = 1_000_000                  # integer with separator
+            my ${D}pi  = 3.14e0                     # float with exponent
+            my ${D}ok  = true                       # boolean
+            my ${D}no  = false
+            my ${D}x   = undef                      # undef
+
+            # ── Regex pattern + flags ──
+            if (${D}_ =~ /^(\w+):(\d+)\$/i) {
+                p "matched ${D}1 on port ${D}2"
+            }
+
+            # ── Sub decl + params + block params + control flow ──
             fn canonical(${D}word) {
                 my ${D}t0    = now_ns()
                 my @chars   = split //, lc(${D}word)
                 my @sorted  = sort { _0 cmp _1 } @chars
                 my ${D}r     = join("", @sorted)
-                td_add(${D}td_lat, (now_ns() - ${D}t0) / 1000.0)
                 return ${D}r
             }
 
-            my @data    = 1:1_000_000
+            # ── Collections: array / hash / range / arrow / fat comma ──
+            my @data    = 1:1_000_000               # range `:`
+            my @perl    = 0..9                      # range `..`
             my @doubled = @data |> pmap { _ * 2 } |> grep { _ > 5 }
             my %h       = (host => "localhost", port => 5432, ttl => 3.14)
+            my ${D}ref  = \@data
+            my ${D}v    = ${D}ref->[0]              # arrow op
+            my ${D}obj  = Demo::Anagram->new(name => "x")  # arrow + class
 
+            # ── Loop labels, last/next/redo, special vars ──
+            OUTER: for my ${D}i (1..3) {
+                INNER: for my ${D}j (1..3) {
+                    last OUTER if ${D}i == 2 and ${D}j > 1
+                    next INNER unless defined ${D}!
+                }
+            }
+
+            # ── Phase blocks ──
             BEGIN { p "boot pid=${D}${D}" }
+            END   { p "exit" }
 
-            if (${D}_ =~ /^(\w+):(\d+)$/i) {
-                p "matched ${D}1 on port ${D}2"
-            } elsif (defined ${D}!) {
+            # ── if/elsif/else with word operators ──
+            if (${D}n > 0 and ${D}ok or not defined ${D}!) {
                 warn "errno: ${D}!"
+            } elsif (${D}greet eq "hello world") {
+                p "greeting matches"
             } else {
                 p undef
             }
