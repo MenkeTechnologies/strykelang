@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+# Demo + regression test for BUG-251 / BUG-252 — `tr///c` (complement)
+# and `tr///s` (squeeze) flags used to be silently dropped.
+
+# /c (complement): count of non-matched characters. The `tr///` return
+# value is the integer count; assign to a scalar to capture it.
+my $a = "abcde123"
+my $digit_cnt    = ($a =~ tr/0-9//)
+my $nondigit_cnt = ($a =~ tr/0-9//c)
+$digit_cnt    |> assert_eq(3, "count digits")
+$nondigit_cnt |> assert_eq(5, "count non-digits with /c")
+
+# /c with /d: keep complement, delete the rest.
+my $b = "Hello, World!"
+$b =~ tr/A-Za-z//cd
+$b |> assert_eq("HelloWorld", "tr/A-Za-z//cd keeps alphas")
+
+# /s (squeeze): collapse consecutive matched chars to one.
+my $c = "aaabbbccc"
+$c =~ tr/a-z//s
+$c |> assert_eq("abc", "tr/a-z//s squeezes runs")
+
+# /s without /c on a partial set.
+my $d = "xxxYYYxxx"
+$d =~ tr/x//s
+$d |> assert_eq("xYYYx", "/s on partial set only squeezes matched")
+
+# /c/s combination: complement-squeeze collapses repeats of the same
+# *output* character (Perl semantics). With identity-mapped complement
+# chars and distinct input letters there are no repeats to squeeze.
+my $e = "aaabbb123cccddd"
+$e =~ tr/0-9//cs
+$e |> assert_eq("ab123cd", "/cs squeezes runs of matched (complement) chars")
+
+# Translate + squeeze.
+my $f = "aabbccdd"
+$f =~ tr/a-d/x/s
+$f |> assert_eq("x", "tr/a-d/x/s translates then squeezes")
+
+# Translate + complement: only non-matched survive after translation.
+my $g = "abc123"
+$g =~ tr/a-z/X/c
+$g |> assert_eq("abcXXX", "tr/a-z/X/c translates non-alphas")
+
+# Common whitespace-normalization idiom: collapse runs of spaces/tabs.
+my $h = "hello   world\t\t\tfoo"
+$h =~ tr/ \t/ /s
+$h |> assert_eq("hello world foo", "whitespace squeeze idiom")
+
+# Count + complement on a hostname.
+my $name     = "example.com"
+my $non_a    = ($name =~ tr/a-zA-Z//c)
+$non_a |> assert_eq(1, "non-alpha count via /c")
+
+test_run

@@ -1,0 +1,45 @@
+#!/usr/bin/env stryke
+# Demo + regression test for BUG-030 / BUG-031 / BUG-014 — `system` now
+# returns Perl's encoded status word (exit code in the high byte), the
+# list-form `system(prog, arg, arg)` propagates the exit code to `$?`,
+# and writes to `%ENV` reach child processes.
+
+# BUG-030: scalar return value of system() == $?
+system("true")
+($? == 0)        |> assert_ok("true → \$? == 0")
+system("true")  |> assert_eq($?, "system() return == \$?")
+
+system("false")
+($? == 256)      |> assert_ok("false → \$? == 256 (1<<8)")
+($? >> 8 == 1)   |> assert_ok("exit code in high byte")
+
+# BUG-031: list-form `system(LIST)` propagates exit code.
+system("sh", "-c", "exit 7")
+($? >> 8) |> assert_eq(7, "list-form exit 7 propagates")
+
+system("sh", "-c", "exit 13")
+($? >> 8) |> assert_eq(13, "list-form exit 13 propagates")
+
+# Single-string shell form still propagates too (control).
+system("sh -c 'exit 4'")
+($? >> 8) |> assert_eq(4, "string-form exit 4 propagates")
+
+# BUG-014: %ENV writes propagate to subprocesses.
+$ENV{STRYKE_BUG_FIX_DEMO} = "hello from stryke"
+my $seen = `env | grep '^STRYKE_BUG_FIX_DEMO='`
+chomp $seen
+$seen |> assert_eq("STRYKE_BUG_FIX_DEMO=hello from stryke", "child inherits var")
+
+# Mutation visible to child.
+$ENV{STRYKE_BUG_FIX_DEMO} = "updated"
+my $updated = `echo "\$STRYKE_BUG_FIX_DEMO"`
+chomp $updated
+$updated |> assert_eq("updated", "child sees updated value")
+
+# `delete $ENV{...}` removes from child env too.
+delete $ENV{STRYKE_BUG_FIX_DEMO}
+my $gone = `echo "\${STRYKE_BUG_FIX_DEMO:-unset}"`
+chomp $gone
+$gone |> assert_eq("unset", "delete \$ENV unsets in child")
+
+test_run
