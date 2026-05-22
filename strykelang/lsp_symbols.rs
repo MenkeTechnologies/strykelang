@@ -323,6 +323,17 @@ struct Builder {
     package_stack: Vec<String>,
     /// Names → ids for declarations at package scope (functions, types, our-vars).
     package_namespace: HashMap<(String, String), SymbolId>,
+    /// Bare Type names (struct/class/enum/trait) gathered in a
+    /// pre-pass so the FuncCall walker can decide whether a call
+    /// like `Rectangle(width => 1)` is a struct constructor (and
+    /// therefore its fat-comma keys are Field refs) vs an arbitrary
+    /// function call.
+    known_type_names: std::collections::HashSet<String>,
+    /// Bare Field names (struct/class fields, enum variants) gathered
+    /// in the same pre-pass. Used to filter qualified-Bareword refs
+    /// like `TrafficLight::Red` in match arms — only treat the suffix
+    /// as a Field ref when it's actually declared as a Field.
+    known_field_names: std::collections::HashSet<String>,
 }
 
 impl Builder {
@@ -337,6 +348,8 @@ impl Builder {
             scope_bindings: Vec::new(),
             package_stack: vec!["main".to_string()],
             package_namespace: HashMap::new(),
+            known_type_names: std::collections::HashSet::new(),
+            known_field_names: std::collections::HashSet::new(),
         }
     }
 
@@ -461,6 +474,37 @@ impl Builder {
         }
     }
 
+    /// Resolve a bare name against Field symbols (struct/class fields
+    /// and enum variants). Used by the MethodCall + struct-constructor
+    /// walkers to record refs that the regular `resolve` misses —
+    /// Field symbols don't live in scope_bindings or
+    /// package_namespace because field names overlap freely with
+    /// other identifiers.
+    fn record_method_or_field_ref(&mut self, name: &str, line: u32) {
+        // Sub / Type / Our / Format / Local — go through resolve.
+        if let Some(id) = self.resolve(name) {
+            self.refs.push(SymbolRef {
+                symbol: id,
+                line,
+                name: name.to_string(),
+            });
+            return;
+        }
+        // Field fallback — scan declared Fields by bare name.
+        if let Some(id) = self
+            .symbols
+            .iter()
+            .find(|s| s.name == name && matches!(s.kind, SymbolKind::Field))
+            .map(|s| s.id)
+        {
+            self.refs.push(SymbolRef {
+                symbol: id,
+                line,
+                name: name.to_string(),
+            });
+        }
+    }
+
     /// Record a ref to the symbol resolved under `canonical` but tagged
     /// with the actually-appearing-in-source spelling `as_spelled`.
     /// Used for sigil-aliased access (`$h{k}` reads from `%h`, `@h{k1,k2}`
@@ -482,10 +526,59 @@ impl Builder {
 
     fn walk_program(&mut self, p: &Program) {
         let _root = self.push_scope();
+        // Pre-pass: collect Type + Field bare names so usage-before-
+        // decl ordering doesn't lose refs. Without this, a FuncCall
+        // on line 2 walking `Rectangle(width => 1)` wouldn't know
+        // that `Rectangle` is a Type and `width` is a Field if the
+        // struct decl is on line 10.
+        for stmt in &p.statements {
+            self.precollect_types_and_fields(stmt);
+        }
         for stmt in &p.statements {
             self.walk_stmt(stmt);
         }
         self.pop_scope();
+    }
+
+    fn precollect_types_and_fields(&mut self, stmt: &Statement) {
+        match &stmt.kind {
+            StmtKind::StructDecl { def } => {
+                self.known_type_names.insert(def.name.clone());
+                for f in &def.fields {
+                    self.known_field_names.insert(f.name.clone());
+                }
+            }
+            StmtKind::EnumDecl { def } => {
+                self.known_type_names.insert(def.name.clone());
+                for v in &def.variants {
+                    self.known_field_names.insert(v.name.clone());
+                }
+            }
+            StmtKind::ClassDecl { def, .. } => {
+                self.known_type_names.insert(def.name.clone());
+                for f in &def.fields {
+                    self.known_field_names.insert(f.name.clone());
+                }
+            }
+            StmtKind::TraitDecl { def } => {
+                self.known_type_names.insert(def.name.clone());
+            }
+            // Recurse into nested blocks so types declared inside
+            // BEGIN/END/INIT phasers + nested packages are visible.
+            StmtKind::Block(b)
+            | StmtKind::StmtGroup(b)
+            | StmtKind::Begin(b)
+            | StmtKind::End(b)
+            | StmtKind::UnitCheck(b)
+            | StmtKind::Check(b)
+            | StmtKind::Init(b)
+            | StmtKind::Continue(b) => {
+                for s in b {
+                    self.precollect_types_and_fields(s);
+                }
+            }
+            _ => {}
+        }
     }
 
     fn walk_block(&mut self, block: &Block) {
@@ -754,6 +847,19 @@ impl Builder {
             ExprKind::HashVar(n) => self.record_ref(&format!("%{n}"), line),
             ExprKind::FuncCall { name, args, .. } => {
                 self.record_ref(name, line);
+                // Struct-constructor sugar: `Rectangle(width => 1,
+                // height => 2)` parses as a FuncCall with args
+                // alternating [String/Bareword, value, ...]. ONLY
+                // treat the keys as Field refs when the function
+                // name is a known Type — otherwise we'd false-
+                // positive on arbitrary hash literals or function
+                // calls that happen to have a fat-comma arg list.
+                let bare_tail = name.rsplit("::").next().unwrap_or(name.as_str());
+                if self.known_type_names.contains(name.as_str())
+                    || self.known_type_names.contains(bare_tail)
+                {
+                    self.walk_fat_comma_args_for_fields(args, line);
+                }
                 for a in args {
                     self.walk_expr(a);
                 }
@@ -762,12 +868,73 @@ impl Builder {
             // `Bareword("Point")` in `Point->new(...)`, `Foo::bar(...)`, etc.
             // Treat each as a reference so renaming a struct / class / enum
             // / package picks up the usage sites, not just the declaration.
-            ExprKind::Bareword(n) => self.record_ref(n, line),
+            ExprKind::Bareword(n) => {
+                self.record_ref(n, line);
+                // Qualified path `Pkg::Variant` or `Type::field` —
+                // additionally record refs for the suffix if it's a
+                // known Field name (catches `TrafficLight::Red` in
+                // match arms, `Op::Add` as a value, etc.). The
+                // prefix is already covered by `record_ref(n)` which
+                // tries the Type by name fallback.
+                if let Some(idx) = n.rfind("::") {
+                    let suffix = &n[idx + 2..];
+                    if !suffix.is_empty() && self.known_field_names.contains(suffix) {
+                        self.record_method_or_field_ref(suffix, line);
+                    }
+                    // Also record a ref for the prefix as a Type if
+                    // it matches a known Type name.
+                    let prefix = &n[..idx];
+                    let bare = prefix.rsplit("::").next().unwrap_or(prefix);
+                    if !bare.is_empty()
+                        && (self.known_type_names.contains(prefix)
+                            || self.known_type_names.contains(bare))
+                    {
+                        // record_ref tries resolve first; for a Type
+                        // declared with package "main" the qualified
+                        // form is just the bare name, so this works.
+                        self.record_ref(prefix, line);
+                    }
+                }
+            }
             // `\&name` — coderef to a named sub. The name is a regular
             // sub identifier; rename / goto-def need to treat it as a
             // ref so the workspace edit catches every `\&named_one`
             // site when `named_one` is renamed.
             ExprKind::SubroutineCodeRef(n) => self.record_ref(n, line),
+            // `$obj->method(args)` / `$obj->field` — record a ref to
+            // the method name so rename on a Sub or Field declared
+            // inside a struct/class body finds every accessor call
+            // site. The MethodCall name is bare; resolve walks the
+            // package_namespace to attach it to the right symbol if
+            // one exists, otherwise the ref is dropped (no false
+            // positives).
+            ExprKind::MethodCall {
+                object,
+                method,
+                args,
+                ..
+            } => {
+                self.walk_expr(object);
+                self.record_method_or_field_ref(method, line);
+                // Only walk fat-comma keys as Field refs when the
+                // receiver is a known Type (`Rectangle->new(width
+                // => 1)`). Otherwise an arbitrary method call with
+                // hash-like args would false-positive.
+                let receiver_is_type = match &object.kind {
+                    ExprKind::Bareword(n) => {
+                        let tail = n.rsplit("::").next().unwrap_or(n.as_str());
+                        self.known_type_names.contains(n.as_str())
+                            || self.known_type_names.contains(tail)
+                    }
+                    _ => false,
+                };
+                if receiver_is_type {
+                    self.walk_fat_comma_args_for_fields(args, line);
+                }
+                for a in args {
+                    self.walk_expr(a);
+                }
+            }
             // Element / slice access: `$arr[i]`, `$h{k}`, `@arr[1,2]`,
             // `@h{k1,k2}`, `%h{k1,k2}` — the container name lives in a
             // bare `String` field, NOT a wrapping `ArrayVar`/`HashVar`,
@@ -810,6 +977,31 @@ impl Builder {
             }
             ExprKind::Do(inner) => self.walk_expr(inner),
             _ => self.walk_generic_expr(e),
+        }
+    }
+
+    /// Walk a FuncCall / MethodCall arg list looking for fat-comma
+    /// pairs: alternating String/Bareword keys followed by values.
+    /// Each key that matches a declared Field name is recorded as a
+    /// Field ref so rename catches `Rectangle(width => 1)` call sites.
+    fn walk_fat_comma_args_for_fields(&mut self, args: &[Expr], default_line: u32) {
+        let mut i = 0;
+        while i < args.len() {
+            let key_name = match &args[i].kind {
+                ExprKind::String(s) => Some(s.clone()),
+                ExprKind::Bareword(s) => Some(s.clone()),
+                _ => None,
+            };
+            if let Some(name) = key_name {
+                let line = ast_line_to_lsp(args[i].line);
+                // record_method_or_field_ref is the right entry —
+                // it'll fall through silently if `name` doesn't match
+                // any Field, so we don't create false refs for
+                // arbitrary hash keys.
+                let line = if line == 0 { default_line } else { line };
+                self.record_method_or_field_ref(&name, line);
+            }
+            i += 2;
         }
     }
 
@@ -883,6 +1075,17 @@ impl Builder {
                     // bareword calls — pick up the receiver as a ref so
                     // class/struct/enum/package rename catches usages.
                     self.record_ref(s, line);
+                    // Qualified `Type::Field` form — record the suffix
+                    // as a Field ref if it matches a known Field. Same
+                    // fix as the explicit Bareword arm; needed because
+                    // match-arm patterns reach walk_json via the generic
+                    // path.
+                    if let Some(idx) = s.rfind("::") {
+                        let suffix = &s[idx + 2..];
+                        if !suffix.is_empty() && self.known_field_names.contains(suffix) {
+                            self.record_method_or_field_ref(suffix, line);
+                        }
+                    }
                 }
                 if let Some(call) = map.get("FuncCall").and_then(|x| x.as_object()) {
                     if let Some(name) = call.get("name").and_then(|x| x.as_str()) {

@@ -249,6 +249,8 @@ stryke repl --load lib.stk                   # pre-load a library, then enter RE
 stryke lsp                                   # language server over stdio ([0x11])
 stryke completions zsh                       # emit zsh completions to stdout
 stryke ast script.stk                        # dump AST as JSON
+stryke gen-docs                              # walk `.`, write Markdown docs for every .stk/.pl/.pm to docs/
+stryke gen-docs lib --out site/api           # walk `lib/`, write to `site/api/` (mirrors source layout + index.md)
 stryke prun *.stk                            # run multiple files in parallel
 stryke -j 4 *.stk                             # run multiple files in parallel (4 threads)
 stryke convert app.pl                        # convert Perl to stryke syntax with |> pipes
