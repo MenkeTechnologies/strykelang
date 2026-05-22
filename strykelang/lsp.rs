@@ -2762,46 +2762,38 @@ fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option
         );
     }
 
-    // Field / Type rename: the SymbolTable only indexes these at
-    // their decl line; references at `impl Trait`, `extends Class`,
-    // constructor `Rectangle(width => 1)` call sites, `Op::Variant`
-    // qualified uses, etc. aren't recorded by the AST walker. Use a
-    // workspace-wide textual scan with string/comment mask to catch
-    // every usage. Type uses `scan_package_ranges` (accepts trailing
-    // `::`); Field uses the standard `scan_all_lines_for_needle`.
-    if matches!(
-        active_sym.kind,
-        crate::lsp_symbols::SymbolKind::Field | crate::lsp_symbols::SymbolKind::Type
-    ) {
-        let is_type = matches!(active_sym.kind, crate::lsp_symbols::SymbolKind::Type);
-        let do_scan = |text: &str, name: &str| -> Vec<Range> {
-            if is_type {
-                scan_package_ranges(text, name)
-            } else {
-                scan_all_lines_for_needle(text, name)
-            }
-        };
-        let mut field_ranges = do_scan(active_text, &active_sym.name);
-        // Drop ranges already emitted by the SymbolTable pass.
+    // Type rename: references at `impl Trait`, `extends Class`,
+    // `Type::Variant` qualified usages, etc. arrive via the
+    // walk_json reflection path AND the explicit Bareword qualified
+    // handler in walk_expr. Use a package-aware textual scan as a
+    // SAFETY NET — `class X impl Type` is buried in serde-walked
+    // metadata that the explicit walker doesn't catch.
+    //
+    // Field rename: NO textual fallback. The AST walker records refs
+    // at every legitimate field-access site (MethodCall, FuncCall
+    // constructor fat-comma keys, qualified Bareword tail). Adding a
+    // textual scan would false-positive on `my %h = (width => 1)`
+    // and any other hash literal that happens to share a key name
+    // with a field. SymbolTable ranges are the source of truth.
+    if matches!(active_sym.kind, crate::lsp_symbols::SymbolKind::Type) {
+        let mut type_ranges = scan_package_ranges(active_text, &active_sym.name);
         let existing_ranges: Vec<Range> = changes
             .get(&active_uri)
             .map(|edits| edits.iter().map(|e| e.range).collect())
             .unwrap_or_default();
-        field_ranges.retain(|r| !existing_ranges.contains(r));
+        type_ranges.retain(|r| !existing_ranges.contains(r));
         push_edits(
             active_uri.as_str(),
-            field_ranges,
+            type_ranges,
             &bare_new,
             &mut changes,
             &mut total,
         );
-        // Same textual scan across every other open document + every
-        // reachable required file.
         for (other_uri_str, other_text) in docs.iter() {
             if other_uri_str == active_uri.as_str() {
                 continue;
             }
-            let ranges = do_scan(other_text, &active_sym.name);
+            let ranges = scan_package_ranges(other_text, &active_sym.name);
             push_edits(
                 other_uri_str,
                 ranges,
@@ -2816,7 +2808,7 @@ fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option
                 if uri_str == active_uri.as_str() || docs.contains_key(&uri_str) {
                     continue;
                 }
-                let ranges = do_scan(&src, &active_sym.name);
+                let ranges = scan_package_ranges(&src, &active_sym.name);
                 push_edits(
                     &uri_str,
                     ranges,
@@ -3131,7 +3123,8 @@ fn cross_file_rename_via_require(
         &mut total,
     );
     let is_field = matches!(decl_sym.kind, crate::lsp_symbols::SymbolKind::Field);
-    if qualified_form == bare_form {
+    if qualified_form == bare_form && !is_field {
+        // Non-Field, no qualification difference — scan bare form once.
         push(
             &active_uri_str,
             scan_all_lines_for_needle(active_text, &bare_form),
@@ -3140,20 +3133,50 @@ fn cross_file_rename_via_require(
             &mut total,
         );
     }
-    // Field bare-name scan: allow matches preceded by `::` (the
-    // qualified-access form `Pkg::Type::field`). The default scanner
-    // rejects a `:` prev boundary; the package scanner accepts a
-    // trailing `::` but ALSO rejects leading. Use a Field-tuned
-    // scanner that accepts `:` on either side so `Add` matches
-    // inside `Project::Ops::Op::Add`.
+    // Field cross-file: AST-recorded refs in the active file already
+    // come via the SymbolTable build of the active file (see
+    // `collect_symbol_references`'s walking). The active-file refs to
+    // a Field-in-required-lib are NOT discoverable from the lib's
+    // SymbolTable alone — they live in the active file's AST. Build
+    // the active SymbolTable here and emit any Field refs that
+    // resolve to the SAME bare name.
     if is_field {
-        push(
-            &active_uri_str,
-            scan_field_ranges(active_text, &bare_form),
-            &bare_new,
-            &mut changes,
-            &mut total,
-        );
+        if let Some(active_table) = crate::lsp_symbols::SymbolTable::build(active_text, active_path) {
+            // Active file's Field refs are recorded by `walk_expr`'s
+            // MethodCall / FuncCall (gated on Type) / qualified-
+            // Bareword handlers. Find Field-kind refs (or refs whose
+            // resolved symbol is a Field) that match our bare_form.
+            for r in &active_table.refs {
+                if r.name == bare_form {
+                    let lt = active_text
+                        .lines()
+                        .nth(r.line as usize)
+                        .unwrap_or("");
+                    let c0_byte = match lt.find(bare_form.as_str()) {
+                        Some(b) => b,
+                        None => continue,
+                    };
+                    let c0 = lt[..c0_byte].encode_utf16().count() as u32;
+                    let c1 = lt[..c0_byte + bare_form.len()].encode_utf16().count() as u32;
+                    push(
+                        &active_uri_str,
+                        vec![Range {
+                            start: Position {
+                                line: r.line,
+                                character: c0,
+                            },
+                            end: Position {
+                                line: r.line,
+                                character: c1,
+                            },
+                        }],
+                        &bare_new,
+                        &mut changes,
+                        &mut total,
+                    );
+                }
+            }
+        }
     }
 
     // 3. Other open documents: qualified-form scan + bare-form scan

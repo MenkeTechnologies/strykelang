@@ -639,6 +639,58 @@ fn audit_rename_struct_field_same_file() {
 }
 
 #[test]
+fn audit_rename_enum_variant_with_qualified_match_arms() {
+    // User's exact fixture: enum + match-arm qualified usage. Rename
+    // `Red` to `Stop` must:
+    //   - rewrite `Red` in the enum decl body
+    //   - rewrite `TrafficLight::Red` in the match arm
+    // and NOT produce `TrafficLight::Stop` inside the enum decl body
+    // (that was the bug — qualified prefix was being added there).
+    let src = "enum TrafficLight { Red, Yellow, Green }\nfn TrafficLight::action($c) {\n    match ($c) {\n        TrafficLight::Red    => \"stop\",\n        TrafficLight::Yellow => \"caution\",\n        TrafficLight::Green  => \"go\",\n    }\n}\n";
+    let mut h = LspHarness::new(src);
+    // Cursor on `Red` of `enum TrafficLight { Red, ... }` line 0, col 20.
+    let r = h.rename(0, 20, "Stop");
+    h.finish();
+    let changes = r
+        .pointer("/changes")
+        .and_then(Value::as_object)
+        .unwrap_or_else(|| panic!("rename returned no changes: {r}"));
+    let edits = changes
+        .values()
+        .next()
+        .and_then(Value::as_array)
+        .unwrap_or_else(|| panic!("no edits: {r}"));
+    // Collect every new_text + range for inspection.
+    let collected: Vec<(u64, u64, String)> = edits
+        .iter()
+        .filter_map(|e| {
+            let l = e.pointer("/range/start/line")?.as_u64()?;
+            let c = e.pointer("/range/start/character")?.as_u64()?;
+            let t = e.get("newText")?.as_str()?.to_string();
+            Some((l, c, t))
+        })
+        .collect();
+    // None of the edits may produce `TrafficLight::Stop` inside the
+    // enum decl line (line 0) — that would be the bug.
+    for (line, _col, text) in &collected {
+        assert!(
+            !(*line == 0 && text.contains("TrafficLight::")),
+            "must NOT qualify the variant inside its own enum decl: {collected:?}"
+        );
+    }
+    // Must rewrite the enum-body `Red` (line 0, somewhere around col 20).
+    assert!(
+        collected.iter().any(|(l, _, t)| *l == 0 && t == "Stop"),
+        "expected `Stop` rewrite at line 0: {collected:?}"
+    );
+    // Must rewrite the match-arm qualified `TrafficLight::Red` (line 3).
+    assert!(
+        collected.iter().any(|(l, _, _)| *l == 3),
+        "expected an edit on line 3 (match arm): {collected:?}"
+    );
+}
+
+#[test]
 fn audit_rename_enum_variant_same_file() {
     // Cursor on `Add` of `Op::Add` — should be treated as the
     // enum's variant. v1 lands on enum decl line for goto; rename

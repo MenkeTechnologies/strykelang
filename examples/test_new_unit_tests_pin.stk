@@ -26,8 +26,7 @@ $add3->(1, 2, 3) |> aeq 6, "Positional _, _1, _2"
 
 # Outer scope topic _<
 my @r = ~> (1:2) map { 
-    my $outer = _
-    ~> (10:11) map { _ + _< } 
+    ~> (10:11) map { _ + _< }
 } |> flatten
 @r |> join(",") |> aeq "11,12,12,13", "Outer scope topic _<"
 

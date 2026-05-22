@@ -2,9 +2,9 @@
 //! parsed stryke source file by pairing `## doc comments` with the
 //! top-level declaration immediately below them.
 //!
-//! Invoked from the CLI as `stryke --docs FILE`. Public so other
-//! tooling (e.g. a future workspace-wide doc generator) can reuse the
-//! same logic.
+//! Driven by the project-wide CLI subcommand `stryke gen-docs
+//! [PATH] [--out DIR]`, which walks a directory tree and calls
+//! [`generate_markdown`] once per source file.
 
 use crate::ast::{Program, Statement, StmtKind, SubSigParam};
 
