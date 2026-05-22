@@ -120,7 +120,7 @@ for my $gen (1:$GENS) {
 
     # Sort by fitness desc.
     my @ranked = map { _->[1] }
-                 sort { _1->[0] <=> _0->[0] }
+                 sort { _1->[0] <=> _->[0] }
                  map { [$fits[_], $pop[_]] }
                  (0:len(@pop) - 1)
 

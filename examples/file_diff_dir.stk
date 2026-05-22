@@ -50,7 +50,7 @@ my @removed
 my @changed
 my @same
 
-for my $path (sort { _0 cmp _1 } keys %all_paths) {
+for my $path (sort { _ cmp _1 } keys %all_paths) {
     my $bsz = $before{$path}
     my $asz = $after{$path}
     if (defined $bsz && !defined $asz) {
@@ -87,7 +87,7 @@ for my $entry (@removed) {
 
 p ""
 printf "── changed (%d) ──────────────────────────────────────\n", len @changed
-for my $entry (sort { abs(_1->{delta}) <=> abs(_0->{delta}) } @changed) {
+for my $entry (sort { abs(_1->{delta}) <=> abs(_->{delta}) } @changed) {
     my $sign = $entry->{delta} > 0 ? "+" : ""
     printf "  ~ %-30s %5d → %5d  (delta %s%d)\n",
         $entry->{path}, $entry->{before}, $entry->{after}, $sign, $entry->{delta}

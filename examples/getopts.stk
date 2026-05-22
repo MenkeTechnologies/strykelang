@@ -42,5 +42,5 @@ p "tags    : [@tags]"
 p "define  : {$kv}"
 
 p "── leftover \@ARGV ───────────────────────────"
-@ARGV |> mapi { p "  [$_1] $_0" }
+@ARGV |> mapi { p "  [$_1] $_" }
 p "  (none)" unless @ARGV

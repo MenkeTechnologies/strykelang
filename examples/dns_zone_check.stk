@@ -171,7 +171,7 @@ p ""
 p "── records by type ──────────────────────────────────"
 my %by_type
 $by_type{_->{type}}++ for @records
-for my $t (sort { _0 cmp _1 } keys %by_type) {
+for my $t (sort { _ cmp _1 } keys %by_type) {
     printf "  %-8s : %d\n", $t, $by_type{$t}
 }
 

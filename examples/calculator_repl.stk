@@ -236,7 +236,7 @@ for my $i (0:len(@inputs) - 1) {
 
 p ""
 p "── final variables ──────────────────────────────────"
-for my $k (sort { _0 cmp _1 } keys %vars) {
+for my $k (sort { _ cmp _1 } keys %vars) {
     printf "  %s = %g\n", $k, $vars{$k}
 }
 

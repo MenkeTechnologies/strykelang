@@ -29,7 +29,7 @@ p "\nProcessing parallel data stream..."
 my @raw_data = 1:10
 my $total_processed_risk = @raw_data
     |> pmap { Demo::Typed::calculate_risk(_, 1.5) }
-    |> preduce { _0 + _1 }
+    |> preduce { _ + _1 }
 
 printf "Total Processed Risk: %.2f\n", $total_processed_risk
 

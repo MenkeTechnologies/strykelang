@@ -63,7 +63,7 @@ while ($i + 3 <= len($dna)) {
 p ""
 printf "── codon frequencies (top 10 of %d distinct) ──────────\n",
     len(keys %codon_count)
-my @sorted_codons = sort { $codon_count{_1} <=> $codon_count{_0} } keys %codon_count
+my @sorted_codons = sort { $codon_count{_1} <=> $codon_count{_} } keys %codon_count
 my $shown = 0
 for my $codon (@sorted_codons) {
     last if $shown >= 10
@@ -125,7 +125,7 @@ for my $frame (0:2) {
     }
 }
 
-@orfs = sort { _1->{length} <=> _0->{length} } @orfs
+@orfs = sort { _1->{length} <=> _->{length} } @orfs
 printf "  found %d ORFs (≥30 bases)\n", len @orfs
 my $orf_shown = 0
 for my $orf (@orfs) {

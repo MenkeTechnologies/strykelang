@@ -45,7 +45,7 @@ fn Demo::Trie::dfs($node, $prefix, $acc) {
     if ($node->{word_end}) {
         push @$acc, [$prefix, $node->{count}]
     }
-    for my $ch (sort { _0 cmp _1 } keys %{$node->{children}}) {
+    for my $ch (sort { _ cmp _1 } keys %{$node->{children}}) {
         Demo::Trie::dfs($node->{children}->{$ch}, $prefix . $ch, $acc)
     }
 }
@@ -57,7 +57,7 @@ fn Demo::Trie::complete($root, $prefix, $k) {
     my @results
     Demo::Trie::dfs($node, $prefix, \@results)
     @results = sort {
-        (_1->[1] <=> _0->[1]) || (_0->[0] cmp _1->[0])
+        (_1->[1] <=> _->[1]) || (_->[0] cmp _1->[0])
     } @results
     @results = @results[0:($k - 1)] if len(@results) > $k
     \@results

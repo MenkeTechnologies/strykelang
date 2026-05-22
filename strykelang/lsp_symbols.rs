@@ -55,6 +55,16 @@ pub enum SymbolKind {
     Sub,
     Type,
     Package,
+    /// `format Foo = ... .` — Perl report templates referenced by `write FOO`.
+    /// Package-scoped, behaves like Sub for rename / goto-def.
+    Format,
+    /// Loop label (`LOOP:`) referenced by `last LOOP` / `next LOOP` /
+    /// `redo LOOP` / `goto LOOP`. File-local (lexical).
+    Label,
+    /// Struct / class / enum-variant field. Indexed by bare name with
+    /// the struct's decl line; multiple structs sharing a field name
+    /// will all match — goto-def returns the first found.
+    Field,
 }
 
 #[derive(Clone, Debug)]
@@ -152,6 +162,56 @@ impl SymbolTable {
         out
     }
 
+    /// Like [`Self::ranges_for`] but also returns the matched spelling
+    /// for each range. Callers that need sigil-aware substitution
+    /// (rename for `%foo` referenced via `$foo{k}` element access) use
+    /// the matched name to compute the correct new spelling.
+    pub fn ranges_and_names_for(&self, id: SymbolId) -> Vec<(Range, String)> {
+        let mut out: Vec<(Range, String)> = Vec::new();
+        let mut per_line: HashMap<u32, Vec<&str>> = HashMap::new();
+        for (line, name) in self.occurrences(id) {
+            per_line
+                .entry(line)
+                .or_default()
+                .push(Box::leak(name.into_boxed_str()));
+        }
+        for (line, names) in per_line {
+            let Some(lt) = self.line_text.get(line as usize) else {
+                continue;
+            };
+            for name in names {
+                for (start_byte, _) in lt.match_indices(name) {
+                    let prev = lt[..start_byte].chars().next_back();
+                    let after_slice = &lt[start_byte + name.len()..];
+                    let next = after_slice.chars().next();
+                    let next_next = after_slice.chars().nth(1);
+                    if !is_ident_boundary_before(prev)
+                        || !is_ident_boundary_after_pair(next, next_next, name)
+                    {
+                        continue;
+                    }
+                    let end_byte = start_byte + name.len();
+                    let c0 = lt[..start_byte].encode_utf16().count() as u32;
+                    let c1 = lt[..end_byte].encode_utf16().count() as u32;
+                    out.push((
+                        Range {
+                            start: Position {
+                                line,
+                                character: c0,
+                            },
+                            end: Position {
+                                line,
+                                character: c1,
+                            },
+                        },
+                        name.to_string(),
+                    ));
+                }
+            }
+        }
+        out
+    }
+
     /// LSP-ready ranges for every occurrence of `id` in this file. Re-scans
     /// the line text for the name to produce exact UTF-16 columns.
     pub fn ranges_for(&self, id: SymbolId) -> Vec<Range> {
@@ -172,8 +232,12 @@ impl SymbolTable {
                     // Reject substring matches that aren't bounded by non-
                     // identifier chars (so `foo` doesn't match inside `foobar`).
                     let prev = lt[..start_byte].chars().next_back();
-                    let next = lt[start_byte + name.len()..].chars().next();
-                    if !is_ident_boundary_before(prev) || !is_ident_boundary_after(next, name) {
+                    let after_slice = &lt[start_byte + name.len()..];
+                    let next = after_slice.chars().next();
+                    let next_next = after_slice.chars().nth(1);
+                    if !is_ident_boundary_before(prev)
+                        || !is_ident_boundary_after_pair(next, next_next, name)
+                    {
                         continue;
                     }
                     let end_byte = start_byte + name.len();
@@ -196,6 +260,18 @@ impl SymbolTable {
     }
 }
 
+/// Pull the constant's name out of a `use constant NAME =>` slot. The
+/// parser usually delivers it as `String(_)` via fat-arrow auto-quoting,
+/// but bare-identifier keys in a hashref-block come through as
+/// `Bareword(_)`. Mirrors `vm_helper::use_constant_name_from_expr`.
+fn constant_name_from_expr(e: &Expr) -> Option<String> {
+    match &e.kind {
+        ExprKind::String(s) => Some(s.clone()),
+        ExprKind::Bareword(s) => Some(s.clone()),
+        _ => None,
+    }
+}
+
 fn is_ident_boundary_before(c: Option<char>) -> bool {
     match c {
         None => true,
@@ -203,9 +279,17 @@ fn is_ident_boundary_before(c: Option<char>) -> bool {
     }
 }
 
+#[cfg(test)]
 fn is_ident_boundary_after(c: Option<char>, name: &str) -> bool {
-    // For namespaced names ending in `::name`, allow trailing `(` etc.
-    // For bare names, reject if followed by `::` (would extend the path).
+    is_ident_boundary_after_pair(c, None, name)
+}
+
+/// Boundary check with one-char lookahead. The lookahead is required to
+/// distinguish a label-decl colon (`OUTER:` — single colon followed by
+/// space/newline) from a package-path separator (`Foo::Bar` — double
+/// colon extending the bareword). With single-char input we can't tell
+/// the two apart and would reject every label-decl span.
+fn is_ident_boundary_after_pair(c: Option<char>, c2: Option<char>, name: &str) -> bool {
     let trailing_pair_ok = !name.contains("::");
     match c {
         None => true,
@@ -214,7 +298,9 @@ fn is_ident_boundary_after(c: Option<char>, name: &str) -> bool {
                 return false;
             }
             if c == ':' && trailing_pair_ok {
-                return false;
+                // Single `:` (label-decl) is a boundary; `::` (path
+                // continuation) is not.
+                return c2 != Some(':');
             }
             true
         }
@@ -375,6 +461,23 @@ impl Builder {
         }
     }
 
+    /// Record a ref to the symbol resolved under `canonical` but tagged
+    /// with the actually-appearing-in-source spelling `as_spelled`.
+    /// Used for sigil-aliased access (`$h{k}` reads from `%h`, `@h{k1,k2}`
+    /// slices from `%h`): resolution must use the canonical sigil so the
+    /// SymbolTable's scope_bindings hit, but the recorded ref carries the
+    /// source spelling so [`Self::ranges_and_names_for`] can find it in
+    /// the line text and the renamer can substitute sigil-preserving.
+    fn record_aliased_ref(&mut self, canonical: &str, as_spelled: &str, line: u32) {
+        if let Some(id) = self.resolve(canonical) {
+            self.refs.push(SymbolRef {
+                symbol: id,
+                line,
+                name: as_spelled.to_string(),
+            });
+        }
+    }
+
     // ── Walker ───────────────────────────────────────────────────────────
 
     fn walk_program(&mut self, p: &Program) {
@@ -444,25 +547,194 @@ impl Builder {
             }
             StmtKind::StructDecl { def } => {
                 self.declare_package_symbol(&def.name, line0, SymbolKind::Type);
+                // Register each field so goto-def on a field name
+                // inside `Rectangle(width => -1, …)` lands on the
+                // struct decl line.
+                for f in &def.fields {
+                    self.declare_field(&f.name, line0);
+                }
                 self.walk_generic_stmt(stmt);
             }
             StmtKind::EnumDecl { def } => {
                 self.declare_package_symbol(&def.name, line0, SymbolKind::Type);
+                // Enum variants registered as Field symbols so
+                // goto-def on `Op::Add` (after the prefix-Type lookup
+                // also lands the user on the right line) AND on a
+                // bare variant reference both find the enum decl.
+                for v in &def.variants {
+                    self.declare_field(&v.name, line0);
+                }
                 self.walk_generic_stmt(stmt);
             }
             StmtKind::ClassDecl { def, .. } => {
                 self.declare_package_symbol(&def.name, line0, SymbolKind::Type);
+                for f in &def.fields {
+                    self.declare_field(&f.name, line0);
+                }
                 self.walk_generic_stmt(stmt);
             }
             StmtKind::TraitDecl { def } => {
                 self.declare_package_symbol(&def.name, line0, SymbolKind::Type);
                 self.walk_generic_stmt(stmt);
             }
+            // `use constant NAME => value` / `use constant { A => 1, B => 2 }` /
+            // `use constant (A => 1, B => 2)` — each constant name compiles
+            // to a `Sub` at runtime, so register it as such in the symbol
+            // table. Rename, hover, goto-def then work uniformly.
+            StmtKind::Use { module, imports } if module == "constant" => {
+                for imp in imports {
+                    self.declare_constants_from_import(imp, line0);
+                }
+            }
+            // `format NAME = ... .` — Perl report template. Referenced by
+            // `write NAME` / `select NAME`.
+            StmtKind::FormatDecl { name, .. } => {
+                self.declare_package_symbol(name, line0, SymbolKind::Format);
+            }
+            // Loop labels: `LOOP: while (...) { ... }`. Declared at the
+            // labeled-loop's line (file-local lexical scope), referenced
+            // by `last LOOP` / `next LOOP` / `redo LOOP`.
+            StmtKind::While { label, body, .. }
+            | StmtKind::Until { label, body, .. } => {
+                if let Some(lab) = label {
+                    self.declare_label(lab, line0);
+                }
+                self.walk_block(body);
+            }
+            StmtKind::For {
+                label,
+                init,
+                condition,
+                step,
+                body,
+                continue_block,
+            } => {
+                if let Some(lab) = label {
+                    self.declare_label(lab, line0);
+                }
+                if let Some(init) = init {
+                    self.walk_stmt(init);
+                }
+                if let Some(c) = condition {
+                    self.walk_expr(c);
+                }
+                if let Some(s) = step {
+                    self.walk_expr(s);
+                }
+                self.walk_block(body);
+                if let Some(b) = continue_block {
+                    self.walk_block(b);
+                }
+            }
+            StmtKind::Foreach {
+                var,
+                label,
+                list,
+                body,
+                ..
+            } => {
+                if let Some(lab) = label {
+                    self.declare_label(lab, line0);
+                }
+                self.walk_expr(list);
+                // Push a fresh scope for the loop var + body, then
+                // declare the loop var inside it. Without this,
+                // `for my $cb (@cbs) { … }` left `$cb` undeclared —
+                // rename / hover at `$cb` failed to find any symbol.
+                let _scope = self.push_scope();
+                // Foreach loop var is always scalar (`for my $cb (…)`)
+                // and the parser stores the bare name without the `$`
+                // sigil.
+                if !var.is_empty() {
+                    self.declare_local(Sigil::Scalar, var, line0, SymbolKind::Local);
+                }
+                for stmt in body {
+                    self.walk_stmt(stmt);
+                }
+                self.pop_scope();
+            }
+            StmtKind::Last(Some(lab))
+            | StmtKind::Next(Some(lab))
+            | StmtKind::Redo(Some(lab)) => {
+                self.record_ref(lab, line0);
+            }
+            StmtKind::Goto { target } => {
+                if let ExprKind::Bareword(n) = &target.kind {
+                    self.record_ref(n, line0);
+                } else {
+                    self.walk_expr(target);
+                }
+            }
             _ => {
                 // Fall through to a generic walk via serde reflection.
                 // Catches edge AST variants (try/catch, given/when, etc.)
                 // without enumerating all 123 up-front.
                 self.walk_generic_stmt(stmt);
+            }
+        }
+    }
+
+    /// Declare a struct / class field (or enum variant) at the parent
+    /// type's `line`. Stored bare-name so goto-def on a constructor
+    /// arg (`Rectangle(width => -1, …)`) lands on the struct decl.
+    fn declare_field(&mut self, name: &str, line: u32) -> SymbolId {
+        let id = self.fresh_sym();
+        self.symbols.push(Symbol {
+            id,
+            name: name.to_string(),
+            kind: SymbolKind::Field,
+            package: self.current_package(),
+            decl_line: line,
+        });
+        id
+    }
+
+    /// Declare a loop label at `line` in the current scope. Labels are
+    /// file-local (lexical), so we use [`declare_local`] with no sigil
+    /// to keep them out of the package namespace.
+    fn declare_label(&mut self, name: &str, line: u32) -> SymbolId {
+        let id = self.fresh_sym();
+        let scope = self.current_scope();
+        self.symbols.push(Symbol {
+            id,
+            name: name.to_string(),
+            kind: SymbolKind::Label,
+            package: self.current_package(),
+            decl_line: line,
+        });
+        self.scope_bindings[scope.0 as usize].insert(name.to_string(), id);
+        id
+    }
+
+    /// Walk one `use constant`-import argument and register each named
+    /// constant. Mirrors `vm_helper::apply_use_constant` for shape:
+    ///   - `List(items)`: even-length NAME, VALUE pairs.
+    ///   - `HashRef(pairs)`: `{ NAME => VALUE, ... }`.
+    /// Names arrive as `String(_)` (fat-arrow auto-quote) or `Bareword(_)`.
+    fn declare_constants_from_import(&mut self, imp: &Expr, line: u32) {
+        match &imp.kind {
+            ExprKind::List(items) => {
+                let mut i = 0;
+                while i + 1 < items.len() {
+                    if let Some(name) = constant_name_from_expr(&items[i]) {
+                        self.declare_package_symbol(&name, line, SymbolKind::Sub);
+                    }
+                    i += 2;
+                }
+            }
+            ExprKind::HashRef(pairs) => {
+                for (k, _v) in pairs {
+                    if let Some(name) = constant_name_from_expr(k) {
+                        self.declare_package_symbol(&name, line, SymbolKind::Sub);
+                    }
+                }
+            }
+            // Single bare `use constant FOO => 1` may also surface as a
+            // direct `String`/`Bareword` if the parser doesn't wrap it.
+            _ => {
+                if let Some(name) = constant_name_from_expr(imp) {
+                    self.declare_package_symbol(&name, line, SymbolKind::Sub);
+                }
             }
         }
     }
@@ -491,6 +763,51 @@ impl Builder {
             // Treat each as a reference so renaming a struct / class / enum
             // / package picks up the usage sites, not just the declaration.
             ExprKind::Bareword(n) => self.record_ref(n, line),
+            // `\&name` — coderef to a named sub. The name is a regular
+            // sub identifier; rename / goto-def need to treat it as a
+            // ref so the workspace edit catches every `\&named_one`
+            // site when `named_one` is renamed.
+            ExprKind::SubroutineCodeRef(n) => self.record_ref(n, line),
+            // Element / slice access: `$arr[i]`, `$h{k}`, `@arr[1,2]`,
+            // `@h{k1,k2}`, `%h{k1,k2}` — the container name lives in a
+            // bare `String` field, NOT a wrapping `ArrayVar`/`HashVar`,
+            // so the serde reflection fallback doesn't see it. Record
+            // the container as a ref explicitly so rename / goto-def
+            // catch every element-access site.
+            ExprKind::ArrayElement { array, index } => {
+                // `$arr[i]` reads a scalar from `@arr` — resolve under
+                // the canonical `@arr`, then also record the access-form
+                // spelling (`$arr`) so `ranges_and_names_for` finds it
+                // on the line for sigil-aware rename substitution.
+                self.record_aliased_ref(&format!("@{array}"), &format!("${array}"), line);
+                self.walk_expr(index);
+            }
+            ExprKind::HashElement { hash, key } => {
+                // `$h{k}` reads a scalar from `%h` — same pattern.
+                self.record_aliased_ref(&format!("%{hash}"), &format!("${hash}"), line);
+                self.walk_expr(key);
+            }
+            ExprKind::ArraySlice { array, indices } => {
+                // `@arr[i,j]` is still spelled with `@` — record canonical only.
+                self.record_ref(&format!("@{array}"), line);
+                for i in indices {
+                    self.walk_expr(i);
+                }
+            }
+            ExprKind::HashSlice { hash, keys } => {
+                // `@h{k1,k2}` slice on a hash uses `@` sigil in source.
+                self.record_aliased_ref(&format!("%{hash}"), &format!("@{hash}"), line);
+                for k in keys {
+                    self.walk_expr(k);
+                }
+            }
+            ExprKind::HashKvSlice { hash, keys } => {
+                // `%h{k1,k2}` keeps the `%` sigil — canonical alone.
+                self.record_ref(&format!("%{hash}"), line);
+                for k in keys {
+                    self.walk_expr(k);
+                }
+            }
             ExprKind::Do(inner) => self.walk_expr(inner),
             _ => self.walk_generic_expr(e),
         }
@@ -575,6 +892,50 @@ impl Builder {
                             .map(|n| ast_line_to_lsp(n as usize))
                             .unwrap_or(line);
                         self.record_ref(name, used_line);
+                    }
+                }
+                // Loop-label refs: `last LOOP`/`next LOOP`/`redo LOOP`
+                // serialize as `{"Last": "LOOP"}` etc. (None as `null`).
+                // Catches cases where the Last is wrapped in a postfix
+                // `if`/`unless` (`last LOOP if cond` → `If { body: [Last("LOOP")] }`),
+                // where the explicit walk_stmt arm never sees it.
+                for key in ["Last", "Next", "Redo"] {
+                    if let Some(name) = map.get(key).and_then(|x| x.as_str()) {
+                        self.record_ref(name, line);
+                    }
+                }
+                // `\&named_one` — coderef-of operator.
+                if let Some(s) = map.get("SubroutineCodeRef").and_then(|x| x.as_str()) {
+                    self.record_ref(s, line);
+                }
+                // Element / slice access where the container is in a
+                // bare `String` field (not a `HashVar`/`ArrayVar`):
+                // record refs sigil-aliased so the renamer can rewrite
+                // `$h{k}` / `@h{k1,k2}` / `$arr[i]` while still
+                // resolving to the canonical `%h` / `@arr` symbol.
+                if let Some(e) = map.get("HashElement").and_then(|x| x.as_object()) {
+                    if let Some(s) = e.get("hash").and_then(|x| x.as_str()) {
+                        self.record_aliased_ref(&format!("%{s}"), &format!("${s}"), line);
+                    }
+                }
+                if let Some(e) = map.get("ArrayElement").and_then(|x| x.as_object()) {
+                    if let Some(s) = e.get("array").and_then(|x| x.as_str()) {
+                        self.record_aliased_ref(&format!("@{s}"), &format!("${s}"), line);
+                    }
+                }
+                if let Some(e) = map.get("HashSlice").and_then(|x| x.as_object()) {
+                    if let Some(s) = e.get("hash").and_then(|x| x.as_str()) {
+                        self.record_aliased_ref(&format!("%{s}"), &format!("@{s}"), line);
+                    }
+                }
+                if let Some(e) = map.get("ArraySlice").and_then(|x| x.as_object()) {
+                    if let Some(s) = e.get("array").and_then(|x| x.as_str()) {
+                        self.record_ref(&format!("@{s}"), line);
+                    }
+                }
+                if let Some(e) = map.get("HashKvSlice").and_then(|x| x.as_object()) {
+                    if let Some(s) = e.get("hash").and_then(|x| x.as_str()) {
+                        self.record_ref(&format!("%{s}"), line);
                     }
                 }
                 let next_line = map
@@ -676,6 +1037,46 @@ mod tests {
 
     fn build(src: &str) -> SymbolTable {
         SymbolTable::build(src, "test.stk").expect("source parses")
+    }
+
+    #[test]
+    fn build_collects_loop_label_declaration_and_refs() {
+        let src = "OUTER: for my $i (1..3) {\n    last OUTER if $i == 2\n}\n";
+        let t = build(src);
+        let labels: Vec<_> = t
+            .symbols
+            .iter()
+            .filter(|s| s.kind == SymbolKind::Label)
+            .collect();
+        assert_eq!(
+            labels.len(),
+            1,
+            "expected 1 Label symbol, got {:?}",
+            t.symbols
+        );
+        let lbl = &labels[0];
+        assert_eq!(lbl.name, "OUTER");
+        assert_eq!(lbl.decl_line, 0);
+        let refs: Vec<_> = t.refs.iter().filter(|r| r.name == "OUTER").collect();
+        assert!(
+            !refs.is_empty(),
+            "expected at least one `last OUTER` ref, got refs={:?}",
+            t.refs
+        );
+    }
+
+    #[test]
+    fn build_collects_use_constant_declarations() {
+        let t = build("use constant FOO => 1\nuse constant { A => 2, B => 3 }\np FOO\np A\n");
+        let names: Vec<_> = t
+            .symbols
+            .iter()
+            .filter(|s| s.kind == SymbolKind::Sub)
+            .map(|s| s.name.as_str())
+            .collect();
+        assert!(names.iter().any(|n| n.ends_with("::FOO") || *n == "FOO"));
+        assert!(names.iter().any(|n| n.ends_with("::A") || *n == "A"));
+        assert!(names.iter().any(|n| n.ends_with("::B") || *n == "B"));
     }
 
     #[test]

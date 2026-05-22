@@ -13,7 +13,7 @@
 # Stryke choices:
 #   * `fn`, `p`, `printf`, `len`
 #   * Array-of-arrayref `[[a, b], [c, d], ...]`
-#   * `sort` block with bareword `_0 <=> _1` strict-mode comparator
+#   * `sort` block with bareword `_ <=> _1` strict-mode comparator
 #   * `max` builtin for the end-coalesce step
 #   * Built-in `die` invariants — output is sorted + non-overlapping
 #
@@ -24,7 +24,7 @@ fn Intervals::merge($intervals_ref) {
     # mutate the caller's input. Without this, the array of arrayrefs is
     # shared and the caller sees their input changed underneath them.
     my @clones = map { [_->[0], _->[1]] } @$intervals_ref
-    my @sorted = sort { _0->[0] <=> _1->[0] } @clones
+    my @sorted = sort { _->[0] <=> _1->[0] } @clones
     return [] if len(@sorted) == 0
     my @merged = ($sorted[0])
     for my $i (1:len(@sorted) - 1) {

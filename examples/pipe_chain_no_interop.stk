@@ -26,19 +26,19 @@ die "count off" unless $count == 500
 # Word stats on a sentence — pipe a list of words through several
 # stages. Topic `_` rebinds at every step.
 my @words = split(/\s+/, "the quick brown fox jumps over the lazy dog")
-my $total_letters = @words |> maps {len} |> reduce { _0 + _1 }
+my $total_letters = @words |> maps {len} |> reduce { _ + _1 }
 p "total letters in the pangram: $total_letters (expect 35)"
 die "letters off" unless $total_letters == 35
 
 # Longest word — pick-max fold via reduce.
-my $longest = @words |> reduce { len(_0) > len(_1) ? _0 : _1 }
+my $longest = @words |> reduce { len(_) > len(_1) ? _ : _1 }
 p "longest: $longest (expect \"quick\", \"brown\", or \"jumps\" — all 5 chars)"
 die "longest length off" unless len($longest) == 5
 
 # Most-frequent word — hash count + sort by count desc.
 my %freq
 $freq{_}++ for @words
-my $top = (keys %freq) |> reduce { $freq{_0} > $freq{_1} ? _0 : _1 }
+my $top = (keys %freq) |> reduce { $freq{_} > $freq{_1} ? _ : _1 }
 p "most common: \"$top\" (expect \"the\" with 2 occurrences)"
 die "top frequency word off" unless $top eq "the"
 
@@ -49,7 +49,7 @@ my @par = 1:20
     |> pmap  { _ * _ }
     |> pgrep { _ % 2 == 0 }
     |> pmap  { _ / 2 }
-    |> sort  { _0 <=> _1 }
+    |> sort  { _ <=> _1 }
 die "parallel chain disagrees with sequential" unless join(",", @par[0:4]) eq join(",", @r[0:4])
 
 p ""

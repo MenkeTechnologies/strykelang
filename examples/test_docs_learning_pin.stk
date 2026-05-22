@@ -4,7 +4,7 @@
 # Compliance: docs/STYLE_GUIDE.md
 
 # 1. Namespaced Functions
-fn TestNamespace::multiply { _0 * _1 }
+fn TestNamespace::multiply { _ * _1 }
 TestNamespace::multiply(4, 5) |> aeq 20, "namespaced function multiply"
 
 # 2. Structs

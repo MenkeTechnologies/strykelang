@@ -197,8 +197,15 @@ impl StaticAnalyzer {
                 self.declare_sub(name);
                 self.declare_sub(&fqn);
             }
-            StmtKind::Use { module, .. } => {
+            StmtKind::Use { module, imports } => {
                 self.declare_sub(module);
+                // `use constant NAME => …`, `use constant { A => 1, B => 2 }`,
+                // and `use constant NAME => (1, 2, 3)` install one sub per
+                // NAME. Recognize those name slots so the linter can resolve
+                // the constants the program references later.
+                if module == "constant" {
+                    self.collect_use_constant_names(imports);
+                }
             }
             // `require "./lib/foo.stk"` / `require Foo::Bar` — parse the
             // pulled-in file and register its sub declarations so callers
@@ -261,6 +268,40 @@ impl StaticAnalyzer {
                 }
             }
             _ => {}
+        }
+    }
+
+    /// Register every NAME slot from a `use constant ...` import list so
+    /// later references parse as defined subs. Handles all three documented
+    /// shapes:
+    ///   use constant NAME => VALUE
+    ///   use constant NAME => (V1, V2, ...)
+    ///   use constant { N1 => V1, N2 => V2, ... }
+    fn collect_use_constant_names(&mut self, imports: &[Expr]) {
+        for imp in imports {
+            match &imp.kind {
+                ExprKind::List(items) => {
+                    let mut i = 0;
+                    while i + 1 < items.len() {
+                        if let Some(name) = static_string_value(&items[i]) {
+                            let fqn = format!("{}::{}", self.current_package, name);
+                            self.declare_sub(&name);
+                            self.declare_sub(&fqn);
+                        }
+                        i += 2;
+                    }
+                }
+                ExprKind::HashRef(pairs) => {
+                    for (k, _) in pairs {
+                        if let Some(name) = static_string_value(k) {
+                            let fqn = format!("{}::{}", self.current_package, name);
+                            self.declare_sub(&name);
+                            self.declare_sub(&fqn);
+                        }
+                    }
+                }
+                _ => {}
+            }
         }
     }
 
@@ -330,65 +371,8 @@ impl StaticAnalyzer {
         self.current_package = saved_pkg;
     }
 
-    /// Map a `require` spec to a filesystem path the analyzer can read.
-    /// `./path` and `../path` are resolved relative to the analyzed file's
-    /// directory. Bareword `Foo::Bar` becomes `Foo/Bar.pm` searched under
-    /// the analyzed file's directory and `lib/` next to it. Absolute paths
-    /// pass through unchanged.
     fn resolve_require_path(&self, spec: &str) -> Option<PathBuf> {
-        let p = Path::new(spec);
-        if p.is_absolute() {
-            return p.exists().then(|| p.to_path_buf());
-        }
-        // `./foo` / `../foo` resolve relative to CWD (matches the runtime
-        // `require_relative_path` rule). Fall back to the analyzed file's
-        // directory when CWD doesn't yield a hit — IDE / LSP callers often
-        // pass absolute file paths without changing into the project root.
-        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        let file_dir = Path::new(&self.file)
-            .parent()
-            .map(Path::to_path_buf)
-            .unwrap_or_else(|| PathBuf::from("."));
-        if spec.starts_with("./") || spec.starts_with("../") {
-            for base in [cwd.clone(), file_dir.clone()] {
-                let candidate = base.join(spec);
-                if candidate.exists() {
-                    return Some(candidate);
-                }
-            }
-            return None;
-        }
-        // Bareword `Foo::Bar` form: walk a small @INC-like search list.
-        if spec.contains("::") || spec.ends_with(".pm") || spec.ends_with(".stk") {
-            let relpath: PathBuf = if spec.ends_with(".pm") || spec.ends_with(".stk") {
-                PathBuf::from(spec)
-            } else {
-                PathBuf::from(spec.replace("::", "/")).with_extension("pm")
-            };
-            let bases = [
-                cwd.clone(),
-                cwd.join("lib"),
-                file_dir.clone(),
-                file_dir.join("lib"),
-                PathBuf::from("lib"),
-            ];
-            for prefix in bases {
-                let candidate = prefix.join(&relpath);
-                if candidate.exists() {
-                    return Some(candidate);
-                }
-            }
-            return None;
-        }
-        // Plain filename without a directory prefix — try CWD then the
-        // analyzed file's directory.
-        for base in [cwd, file_dir] {
-            let candidate = base.join(spec);
-            if candidate.exists() {
-                return Some(candidate);
-            }
-        }
-        None
+        resolve_require_path_from_file(&self.file, spec)
     }
 
     fn analyze_stmt(&mut self, stmt: &Statement) {
@@ -1111,10 +1095,47 @@ fn is_topic_var(name: &str) -> bool {
     name.starts_with('_') && name.len() > 1 && name[1..].chars().all(|c| c.is_ascii_digit())
 }
 
+/// Map a `require` spec to a filesystem path. `./path` and `../path` resolve
+/// against the project root derived from the source file's location. Perl
+/// convention: scripts under `t/` / `tests/` / `test/` / `spec/` / `xt/`
+/// sit one level below the project root that holds `lib/`. Any other layout:
+/// the file's own directory IS the project root. One path computation, no
+/// walking. Bareword `Foo::Bar` becomes `<root>/lib/Foo/Bar.pm`. Absolute
+/// paths pass through. Shared by the static analyzer's require-follower
+/// and the LSP go-to-definition cross-file lookup.
+pub fn resolve_require_path_from_file(file: &str, spec: &str) -> Option<PathBuf> {
+    let p = Path::new(spec);
+    if p.is_absolute() {
+        return p.exists().then(|| p.to_path_buf());
+    }
+    let file_dir = Path::new(file)
+        .parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| PathBuf::from("."));
+    let project_root = match file_dir.file_name().and_then(|s| s.to_str()) {
+        Some("t") | Some("tests") | Some("test") | Some("spec") | Some("xt") => file_dir
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or(file_dir.clone()),
+        _ => file_dir.clone(),
+    };
+    let candidate = if spec.starts_with("./") || spec.starts_with("../") {
+        project_root.join(spec)
+    } else if spec.contains("::") {
+        // `Foo::Bar` → `<root>/lib/Foo/Bar.pm`.
+        let relpath: PathBuf = PathBuf::from(spec.replace("::", "/")).with_extension("pm");
+        project_root.join("lib").join(relpath)
+    } else {
+        // Bare filename — treat as project-root-relative.
+        project_root.join(spec)
+    };
+    candidate.exists().then_some(candidate)
+}
+
 /// If `e` is a literal string / single-segment interpolated string / bareword,
 /// return its constant text. Used for `require "LITERAL"` / `require Mod::Name`.
 /// Returns `None` for any dynamic expression — the analyzer can't follow those.
-fn static_string_value(e: &Expr) -> Option<String> {
+pub fn static_string_value(e: &Expr) -> Option<String> {
     match &e.kind {
         ExprKind::String(s) => Some(s.clone()),
         ExprKind::Bareword(s) => Some(s.clone()),

@@ -22,7 +22,7 @@ my %flags = (
 
 printf "── %d feature flags ──────────────────────────────────\n",
     len(keys %flags)
-for my $f (sort { _0 cmp _1 } keys %flags) {
+for my $f (sort { _ cmp _1 } keys %flags) {
     printf "  %-18s : %d%% rollout\n", $f, $flags{$f}
 }
 
@@ -80,7 +80,7 @@ for my $i (1:1000) {
 
 p ""
 p "── observed rollout vs target ───────────────────────"
-for my $f (sort { _0 cmp _1 } keys %flags) {
+for my $f (sort { _ cmp _1 } keys %flags) {
     my $target = $flags{$f}
     my $total  = $total_count{$f}
     my $on     = $enabled_count{$f}
@@ -116,7 +116,7 @@ printf "  flips              : %d (must be 0)\n", $flips
 
 p ""
 p "── distinct users per flag (HLL) ────────────────────"
-for my $f (sort { _0 cmp _1 } keys %flags) {
+for my $f (sort { _ cmp _1 } keys %flags) {
     my $est = hll_count($hll_per_flag{$f})
     printf "  %-18s : %d distinct users\n", $f, $est
 }

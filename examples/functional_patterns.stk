@@ -6,10 +6,10 @@
 # 1. Pattern Matching
 p "--- Pattern Matching ---"
 fn Demo::FuncPatterns::process_event {
-    match (_0->{type}) {
-        "LOGIN"  => "User " . _0->{user} . " logged in",
-        "LOGOUT" => "User " . _0->{user} . " logged out",
-        "ERROR"  => "Critical error: " . _0->{msg},
+    match (_->{type}) {
+        "LOGIN"  => "User " . _->{user} . " logged in",
+        "LOGOUT" => "User " . _->{user} . " logged out",
+        "ERROR"  => "Critical error: " . _->{msg},
         _        => "Unknown event type"
     }
 }
@@ -26,7 +26,7 @@ p "  ", Demo::FuncPatterns::process_event(_) for @events
 p "\n--- Memoization: Caching expensive lookups ---"
 # Simulate an expensive call. memoize wraps it so duplicate inputs hit
 # the cache instead of recomputing.
-fn Demo::FuncPatterns::slow_lookup { sleep 0.01; _0 * _0 + 7 }
+fn Demo::FuncPatterns::slow_lookup { sleep 0.01; _ * _ + 7 }
 
 memoize(\&Demo::FuncPatterns::slow_lookup)
 
@@ -39,7 +39,7 @@ printf "  10 calls (5 unique) -> @res in %.2f ms\n", ($end - $start) / 1_000_000
 
 # 3. Partial Application and Currying
 p "\n--- Functional Primitives ---"
-fn Demo::FuncPatterns::multiply = _0 * _1
+fn Demo::FuncPatterns::multiply = _ * _1
 
 # partial pre-fills arguments.
 my $triple = partial(\&Demo::FuncPatterns::multiply, 3)

@@ -132,11 +132,11 @@ printf "  exact distinct       : %d\n", len(keys %seen_bg)
 
 p ""
 p "── highest-entropy contexts (most successor choices) ─"
-my @ctx_sorted = sort { len(keys %{$trans{_1}}) <=> len(keys %{$trans{_0}}) } keys %trans
+my @ctx_sorted = sort { len(keys %{$trans{_1}}) <=> len(keys %{$trans{_}}) } keys %trans
 my $shown = 0
 for my $ctx (@ctx_sorted) {
     last if $shown >= 5
-    my @nexts = sort { _0 cmp _1 } keys %{$trans{$ctx}}
+    my @nexts = sort { _ cmp _1 } keys %{$trans{$ctx}}
     printf "  %-12s -> %d choices: %s\n",
         $ctx, len(@nexts), join(", ", @nexts)
     $shown++

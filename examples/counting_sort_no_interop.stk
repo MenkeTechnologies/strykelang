@@ -93,7 +93,7 @@ for my $c (@cases) {
         die "non-decreasing violated at $i" unless $r->[$i] >= $r->[$i - 1]
     }
     # multiset
-    my @sorted_brute = sort { _0 <=> _1 } @{$c->{input}}
+    my @sorted_brute = sort { _ <=> _1 } @{$c->{input}}
     die "multiset changed" unless join(",", @$r) eq join(",", @sorted_brute)
 }
 
@@ -102,7 +102,7 @@ srand(42)
 my @big
 push @big, int(rand 100) for 1:500
 my $cs    = CSort::sort_nonneg(\@big, 99)
-my @brute = sort { _0 <=> _1 } @big
+my @brute = sort { _ <=> _1 } @big
 die "500-stress disagreement" unless join(",", @$cs) eq join(",", @brute)
 p "  500-value random stress: counting-sort agrees with builtin sort  OK"
 

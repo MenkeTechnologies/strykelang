@@ -39,7 +39,7 @@ fn Huff::build_tree($freq) {
     }
     while (len(@nodes) > 1) {
         # Pull two lowest-freq nodes. Linear scan is fine for demo size.
-        @nodes = sort { _0->{freq} <=> _1->{freq} } @nodes
+        @nodes = sort { _->{freq} <=> _1->{freq} } @nodes
         my $l = shift @nodes
         my $r = shift @nodes
         push @nodes, +{ freq => $l->{freq} + $r->{freq}, left => $l, right => $r }

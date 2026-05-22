@@ -21,7 +21,7 @@ p "\n--- Performance: Benchmarking sort algorithms ---"
 my @large_data = map { rand(1000) } 1:5000
 
 my $report = bench {
-    my @sorted = sort { _0 <=> _1 } @large_data
+    my @sorted = sort { _ <=> _1 } @large_data
 } 10
 
 p "Sort Benchmark (10 iterations): $report"

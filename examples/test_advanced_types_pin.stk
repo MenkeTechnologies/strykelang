@@ -19,7 +19,7 @@ my $p = Point->new(x => 10, y => 20)
 ref($p) |> aeq "Point", "ref() on class instance"
 
 my %fields = %$p
-keys(%fields) |> sort { _0 cmp _1 } |> join(",") |> aeq "x,y", "deref class instance keys"
+keys(%fields) |> sort { _ cmp _1 } |> join(",") |> aeq "x,y", "deref class instance keys"
 $fields{x} |> aeq 10, "deref class instance value x"
 
 # ── Recursive Serialization ───────────────────────────────────────────────

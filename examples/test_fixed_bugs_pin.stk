@@ -31,16 +31,16 @@ $obj_114->set_val(42)
 $obj_114->get_val() |> aeq 42, "BUG-114: class method works"
 ref($obj_114) |> aeq "BUG_114_C", "BUG-114: ref() returns class name"
 
-# BUG-115: strict vars exempts _0, _1
+# BUG-115: strict vars exempts _, _1
 # We are already in 'use strict' from above
 fn BUG_115_test {
-    # This should not raise "Global symbol $_0 requires explicit package name"
-    return _0 + _1
+    # This should not raise "Global symbol $_ requires explicit package name"
+    return _ + _1
 }
-BUG_115_test(5, 7) |> aeq 12, 'BUG-115: strict vars exempts _0, _1'
+BUG_115_test(5, 7) |> aeq 12, 'BUG-115: strict vars exempts _, _1'
 
 # BUG-117: psort terminates at newline
-my @s_117 = (3, 1, 2) |> psort { _0 <=> _1 }
+my @s_117 = (3, 1, 2) |> psort { _ <=> _1 }
 my $n_117 = len(@s_117)
 $n_117 |> aeq 3, "BUG-117: psort block terminates at newline"
 @s_117[0] |> aeq 1, "BUG-117: psort actually sorts"

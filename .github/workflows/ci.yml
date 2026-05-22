@@ -105,12 +105,51 @@ jobs:
           ST: ${{ github.workspace }}/target/release/stryke
         run: ./target/release/stryke examples/run_all_ci.stk --summary
 
+  intellij-plugin:
+    name: IntelliJ plugin tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: editors/intellij
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: corretto
+          java-version: '17'
+      - name: Cache Gradle
+        # Caches ~/.gradle/caches AND ~/.gradle/wrapper so the IntelliJ
+        # platform JARs (~500MB) don't redownload every CI run.
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            editors/intellij/.intellijPlatform
+          key: ${{ runner.os }}-gradle-${{ hashFiles('editors/intellij/build.gradle.kts', 'editors/intellij/gradle.properties', 'editors/intellij/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+      - name: Run JUnit tests (lexer, ColorSettingsPage demo coverage)
+        # `--no-daemon` keeps the gradle process from sticking around
+        # for CI; `-x buildSearchableOptions` skips the heavy IDE
+        # indexing pass — we only need the test task.
+        run: ./gradlew test --no-daemon -x buildSearchableOptions
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: intellij-plugin-test-results
+          path: editors/intellij/build/test-results/test/
+          retention-days: 14
+
   release-build:
     name: Release Build
     # Only blocks on real-bug signals. fmt / clippy are advisory (see
     # their `continue-on-error`); listing them here would make the entire
     # release pipeline wait on cosmetic lints.
-    needs: [check, test, doc, parity, stryke-test]
+    needs: [check, test, doc, parity, stryke-test, intellij-plugin]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:

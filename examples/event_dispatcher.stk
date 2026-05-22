@@ -88,7 +88,7 @@ Demo::Bus::subscribe("*", fn($topic, $p) {
 
 printf "── %d subscriber patterns registered ─────────────────\n",
     len(keys %subs)
-for my $pat (sort { _0 cmp _1 } keys %subs) {
+for my $pat (sort { _ cmp _1 } keys %subs) {
     printf "  %-16s -> %d handler(s)\n",
         $pat, len(@{$subs{$pat}})
 }
@@ -117,7 +117,7 @@ for my $e (@events) {
 
 p ""
 p "── per-pattern hit counts ───────────────────────────"
-for my $pat (sort { _0 cmp _1 } keys %seen_by_topic) {
+for my $pat (sort { _ cmp _1 } keys %seen_by_topic) {
     printf "  %-16s : %d\n", $pat, $seen_by_topic{$pat}
 }
 

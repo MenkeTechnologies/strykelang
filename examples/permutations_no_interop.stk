@@ -69,7 +69,7 @@ fn Perm::next($arr) {
 
 # All permutations in lex order via repeated next_permutation.
 fn Perm::all_lex($arr) {
-    my @cur = sort { _0 <=> _1 } @$arr
+    my @cur = sort { _ <=> _1 } @$arr
     my @out
     push @out, [@cur]
     while (Perm::next(\@cur)) {
@@ -131,7 +131,7 @@ for my $p (@$perms5) {
     die "duplicate perm: $key" if exists $seen{$key}
     $seen{$key} = 1
     # Verify multiset matches.
-    my $sorted_p = join(",", sort { _0 <=> _1 } @$p)
+    my $sorted_p = join(",", sort { _ <=> _1 } @$p)
     die "wrong multiset" unless $sorted_p eq "1,2,3,4,5"
 }
 

@@ -161,7 +161,7 @@ for my $p (@processed) {
     my $f = $p->{parsed}->{headers}->{from} // "(unknown)"
     $by_sender{$f}++
 }
-for my $sender (sort { $by_sender{_1} <=> $by_sender{_0} } keys %by_sender) {
+for my $sender (sort { $by_sender{_1} <=> $by_sender{_} } keys %by_sender) {
     printf "  %-30s : %d messages\n", $sender, $by_sender{$sender}
 }
 

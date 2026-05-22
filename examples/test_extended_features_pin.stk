@@ -150,7 +150,7 @@ $merged->{c} |> aeq 2, "deep_merge c"
 
 # ── 5. Functional Builtins ──────────────────────────────────────────────────
 
-zip_with { _0 + _1 } [1, 2, 3], [10, 20, 30] |> join(",") |> aeq "11,22,33", "zip_with"
+zip_with { _ + _1 } [1, 2, 3], [10, 20, 30] |> join(",") |> aeq "11,22,33", "zip_with"
 
 my ($even, $odd) = partition { _ % 2 == 0 } 1:10
 $even |> len |> aeq 5, "partition even count"

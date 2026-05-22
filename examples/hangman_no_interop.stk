@@ -15,7 +15,7 @@
 # Run: stryke --no-interop examples/hangman_no_interop.stk
 
 fn Hangman::new = +{
-    word      => lc(_0),
+    word      => lc(_),
     guessed   => +{},
     wrong     => 0,
     max_wrong => _1,

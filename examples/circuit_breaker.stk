@@ -160,7 +160,7 @@ printf "  final breaker state      : %s\n", $bstate
 
 p ""
 p "── state transitions ───────────────────────────────"
-for my $k (sort { _0 cmp _1 } keys %state_transitions) {
+for my $k (sort { _ cmp _1 } keys %state_transitions) {
     printf "  %-30s : %d\n", $k, $state_transitions{$k}
 }
 

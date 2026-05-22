@@ -163,7 +163,7 @@ for my $r (@results) {
 }
 
 for my $h (sort keys %by_host) {
-    my @sorted_ports = sort { _0->{port} <=> _1->{port} } @{$by_host{$h}}
+    my @sorted_ports = sort { _->{port} <=> _1->{port} } @{$by_host{$h}}
     printf("  %-18s\n", $h)
     for my $r (@sorted_ports) {
         printf("      %5d  %s  (%d us)\n",

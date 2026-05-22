@@ -8,7 +8,7 @@
 # Idiomatic stryke per docs/STYLE_GUIDE.md:
 #   * expression-bodied `fn name = expr` (rule 6) for UF one-liners
 #   * implicit return on tail (rule 7)
-#   * `sort { _0->[2] <=> _1->[2] }` block uses bareword positional
+#   * `sort { _->[2] <=> _1->[2] }` block uses bareword positional
 #     params not `$a`/`$b` (rule 11)
 #   * `#{…}` interpolation (rule 1a)
 #
@@ -18,7 +18,7 @@
 
 # ── Mini union-find (inline) ─────────────────────────────────────────
 
-fn MST::UF::new = +{ parent => [0:_0 - 1], rank => [(0) x _0] }
+fn MST::UF::new = +{ parent => [0:_ - 1], rank => [(0) x _] }
 
 fn MST::UF::find($uf, $x) {
     return $x if $uf->{parent}[$x] == $x
@@ -40,7 +40,7 @@ fn MST::UF::union($uf, $x, $y) {
 
 # Edges are [u, v, weight]. Returns { tree => [edges...], cost => total }.
 fn MST::kruskal($n, $edges) {
-    my @sorted = sort { _0->[2] <=> _1->[2] } @$edges
+    my @sorted = sort { _->[2] <=> _1->[2] } @$edges
     my $uf     = MST::UF::new($n)
     my @tree
     my $cost   = 0

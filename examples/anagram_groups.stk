@@ -35,7 +35,7 @@ my $td_lat = t_digest(100)
 fn Demo::Anagram::canonical($word) {
     my $t0 = now_ns()
     my @chars = split //, lc $word
-    my @sorted = sort { _0 cmp _1 } @chars
+    my @sorted = sort { _ cmp _1 } @chars
     my $r = join("", @sorted)
     td_add($td_lat, (now_ns() - $t0) / 1000.0)
     $r
@@ -61,10 +61,10 @@ for my $k (keys %groups) {
     next if len(@{$groups{$k}}) < 2
     push @keep, $k
 }
-@keep = sort { len(@{$groups{_1}}) <=> len(@{$groups{_0}}) } @keep
+@keep = sort { len(@{$groups{_1}}) <=> len(@{$groups{_}}) } @keep
 for my $k (@keep) {
     my $members = $groups{$k}
-    my @uniq_mems = sort { _0 cmp _1 } uniq(@$members)
+    my @uniq_mems = sort { _ cmp _1 } uniq(@$members)
     printf "  '%s' (%d words): %s\n", $k, len(@uniq_mems), join(", ", @uniq_mems)
 }
 
@@ -76,19 +76,19 @@ my @singletons
 for my $k (keys %groups) {
     push @singletons, $groups{$k}->[0] if len(uniq(@{$groups{$k}})) == 1
 }
-@singletons = sort { _0 cmp _1 } @singletons
+@singletons = sort { _ cmp _1 } @singletons
 printf "  %d singletons: %s\n", len(@singletons), join(", ", @singletons)
 
 # ── largest group ───────────────────────────────────────────────────
 
 p ""
-my @sorted_groups = sort { len(@{$groups{_1}}) <=> len(@{$groups{_0}}) } keys %groups
+my @sorted_groups = sort { len(@{$groups{_1}}) <=> len(@{$groups{_}}) } keys %groups
 my $largest_key = $sorted_groups[0]
 printf "── largest anagram family ────────────────────────────\n"
 printf "  canonical: '%s' (%d occurrences)\n",
     $largest_key, len(@{$groups{$largest_key}})
 my @members = uniq(@{$groups{$largest_key}})
-printf "  distinct members: %s\n", join(", ", sort { _0 cmp _1 } @members)
+printf "  distinct members: %s\n", join(", ", sort { _ cmp _1 } @members)
 
 # ── sketch-based "hot keys" using TopK ──────────────────────────────
 
@@ -115,7 +115,7 @@ printf "  exact (hash keys) : %d\n", len(keys %groups)
 p ""
 p "── pipe-forward composition ──────────────────────────"
 my @all_canonical = map {Demo::Anagram::canonical} @words
-my @distinct_keys = sort { _0 cmp _1 } uniq(@all_canonical)
+my @distinct_keys = sort { _ cmp _1 } uniq(@all_canonical)
 printf "  distinct canonical forms (composed): %d\n", len @distinct_keys
 printf "  alphabetically first: %s\n", $distinct_keys[0]
 printf "  alphabetically last : %s\n", $distinct_keys[-1]

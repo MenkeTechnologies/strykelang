@@ -16,9 +16,9 @@ my %graph = (
 )
 
 p "── graph (weighted, undirected) ─────────────────────"
-for my $u (sort { _0 cmp _1 } keys %graph) {
+for my $u (sort { _ cmp _1 } keys %graph) {
     my @parts
-    for my $v (sort { _0 cmp _1 } keys %{$graph{$u}}) {
+    for my $v (sort { _ cmp _1 } keys %{$graph{$u}}) {
         push @parts, sprintf("%s(%d)", $v, $graph{$u}->{$v})
     }
     printf "  %s : %s\n", $u, join(", ", @parts)
@@ -83,7 +83,7 @@ my $result = Demo::Path::dijkstra(\%graph, "A")
 
 p ""
 p "── shortest distances from A ────────────────────────"
-for my $city (sort { _0 cmp _1 } keys %{$result->{dist}}) {
+for my $city (sort { _ cmp _1 } keys %{$result->{dist}}) {
     printf "  %s : %d\n", $city, $result->{dist}->{$city}
 }
 
@@ -91,7 +91,7 @@ for my $city (sort { _0 cmp _1 } keys %{$result->{dist}}) {
 
 p ""
 p "── reconstructed shortest paths ─────────────────────"
-for my $target (sort { _0 cmp _1 } keys %{$result->{dist}}) {
+for my $target (sort { _ cmp _1 } keys %{$result->{dist}}) {
     next if $target eq "A"
     my $path = Demo::Path::reconstruct($result->{prev}, "A", $target)
     if (defined $path) {
@@ -117,7 +117,7 @@ fn Demo::Path::render_tree($node, $children_ref, $indent, $is_last) {
     my @lines
     my $prefix = $indent . ($is_last ? "└─ " : "├─ ")
     push @lines, "$prefix$node"
-    my @kids = sort { _0 cmp _1 } @{$children_ref->{$node} // []}
+    my @kids = sort { _ cmp _1 } @{$children_ref->{$node} // []}
     for my $i (0:len(@kids) - 1) {
         my $kid = $kids[$i]
         my $kid_is_last = ($i == len(@kids) - 1)

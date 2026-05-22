@@ -66,7 +66,7 @@ p ""
 p "── breakdown by level ───────────────────────────────"
 my %by_level
 $by_level{_->{level}}++ for @records
-for my $lvl (sort { _0 cmp _1 } keys %by_level) {
+for my $lvl (sort { _ cmp _1 } keys %by_level) {
     printf "  %-6s : %d\n", $lvl, $by_level{$lvl}
 }
 
@@ -98,7 +98,7 @@ for my $r (@records) {
     $svc_lat_count{$s}++
 }
 printf "  %-14s %5s %10s %10s\n", "service", "n", "avg_ms", "total_ms"
-for my $s (sort { $svc_count{_1} <=> $svc_count{_0} } keys %svc_count) {
+for my $s (sort { $svc_count{_1} <=> $svc_count{_} } keys %svc_count) {
     my $avg = $svc_lat_sum{$s} / $svc_lat_count{$s}
     printf "  %-14s %5d %10.1f %10d\n", $s, $svc_count{$s}, $avg, $svc_lat_sum{$s}
 }
@@ -148,7 +148,7 @@ for my $r (@records) {
     $svc_td{$r->{service}} = t_digest(100) unless exists $svc_td{$r->{service}}
     td_add($svc_td{$r->{service}}, $r->{latency_ms})
 }
-for my $s (sort { _0 cmp _1 } keys %svc_td) {
+for my $s (sort { _ cmp _1 } keys %svc_td) {
     my $p99 = ~> td_quantile($svc_td{$s}, 0.99) int
     my $p50 = ~> td_quantile($svc_td{$s}, 0.50) int
     printf "  %-14s p50=%4d ms  p99=%4d ms\n", $s, $p50, $p99
@@ -162,7 +162,7 @@ my %svc_err
 for my $r (@records) {
     $svc_err{$r->{service}}++ if $r->{level} eq "ERROR"
 }
-for my $s (sort { _0 cmp _1 } keys %svc_count) {
+for my $s (sort { _ cmp _1 } keys %svc_count) {
     my $err = $svc_err{$s} // 0
     my $rate = 100.0 * $err / $svc_count{$s}
     printf "  %-14s : %d / %d  (%.1f%% errors)\n",

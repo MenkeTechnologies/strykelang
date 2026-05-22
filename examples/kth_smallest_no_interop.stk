@@ -51,11 +51,11 @@ fn QS::median($arr) {
 }
 
 # Convenience: kth largest (1-indexed for human-friendly use).
-fn QS::kth_largest = QS::select(_0, len(@{_0}) - _1)
+fn QS::kth_largest = QS::select(_, len(@{_}) - _1)
 
 # Brute reference for cross-checking.
 fn QS::brute_select($arr, $k) {
-    my @sorted = sort { _0 <=> _1 } @$arr
+    my @sorted = sort { _ <=> _1 } @$arr
     $sorted[$k]
 }
 
@@ -94,7 +94,7 @@ p "  median + kth_largest convenience fns  OK"
 srand(42)
 my @big
 push @big, int(rand 1000) for 1:500
-my @sorted = sort { _0 <=> _1 } @big
+my @sorted = sort { _ <=> _1 } @big
 for my $k (0:499) {
     my $qs    = QS::select(\@big, $k)
     my $brute = $sorted[$k]

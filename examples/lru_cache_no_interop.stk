@@ -21,14 +21,14 @@
 # head = most-recently-used; tail = least-recently-used (next eviction).
 
 fn LRU::new = +{
-    cap   => _0,
+    cap   => _,
     size  => 0,
     head  => undef,
     tail  => undef,
     nodes => +{},
 }
 
-fn LRU::has = exists _0->{nodes}{_1} ? 1 : 0
+fn LRU::has = exists _->{nodes}{_1} ? 1 : 0
 
 # Detach the node from its current position in the LL.
 fn LRU::detach($c, $k) {

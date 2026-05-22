@@ -180,7 +180,7 @@ for my $g (1:2) {
 
 p ""
 p "── outcome rollup ───────────────────────────────────"
-for my $outcome (sort { _0 cmp _1 } keys %outcomes) {
+for my $outcome (sort { _ cmp _1 } keys %outcomes) {
     printf "  %-6s : %d\n", $outcome, $outcomes{$outcome}
 }
 

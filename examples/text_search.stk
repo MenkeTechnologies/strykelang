@@ -90,7 +90,7 @@ fn Demo::IR::search($query, $k, $idx_ref, $lengths_ref, $avgdl, $N) {
         my $s = Demo::IR::bm25_score($qtoks, $doc_id, $idx_ref, $lengths_ref, $avgdl, $N)
         push @scored, [$doc_id, $s] if $s > 0
     }
-    @scored = sort { _1->[1] <=> _0->[1] } @scored
+    @scored = sort { _1->[1] <=> _->[1] } @scored
     @scored = @scored[0:($k - 1)] if len(@scored) > $k
     \@scored
 }

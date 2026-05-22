@@ -12,9 +12,9 @@ p "  uc, rev      : $r"
 
 p ""
 p "── Partial application — extra args after function ────"
-fn Demo::Tm::add    = _0 + _1
+fn Demo::Tm::add    = _ + _1
 fn Demo::Tm::double = _ * 2
-fn Demo::Tm::wrap   = "$_1$_0$_2"
+fn Demo::Tm::wrap   = "$_1$_$_2"
 
 my $n = ~> 5 Demo::Tm::add(10) Demo::Tm::double
 p "  5 -> +10 -> *2 = $n"
@@ -24,7 +24,7 @@ p "  hello -> wrap[] -> uc = $w"
 
 p ""
 p "── Block-form stages (map / fi / sort) ────────────────"
-my @r1 = ~> (1:10) map { _ * 3 } fi { _ > 10 } sort { _0 <=> _1 }
+my @r1 = ~> (1:10) map { _ * 3 } fi { _ > 10 } sort { _ <=> _1 }
 p "  (1:10) *3 keep>10 sorted : ", join(",", @r1)
 
 p ""

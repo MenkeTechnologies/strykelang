@@ -47,7 +47,7 @@ for my $w (@words) {
 # Filter groups of ≥ 2 words and order by size desc, then key asc.
 my @Anagram::sigs = grep { len(@{$groups{_}}) >= 2 } keys %groups
 my @ranked = sort {
-    len(@{$groups{_1}}) <=> len(@{$groups{_0}})
+    len(@{$groups{_1}}) <=> len(@{$groups{_}})
 } @Anagram::sigs
 
 p "── Anagram groups (n=", len(@words), " words, ", len(@ranked), " groups ≥ 2) ──"

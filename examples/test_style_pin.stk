@@ -5,7 +5,7 @@
 
 # ── Rule 1: fn not sub ─────────────────────────────────────────────────────
 
-fn style_test::add = _0 + _1
+fn style_test::add = _ + _1
 aeq style_test::add(10, 20), 30, "expression-bodied fn"
 
 # ── Rule 3: Pipeline everything ────────────────────────────────────────────

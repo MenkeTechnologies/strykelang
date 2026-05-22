@@ -19,20 +19,20 @@ my @rev_char_range = "z":"x":-1
 # 2. Implicit variables in functional operators
 my @nums = (1, 2, 3)
 @nums |> maps { _ * 2 } |> sum |> aeq 12, "implicit _ in maps"
-@nums |> maps { _0 * 2 } |> sum |> aeq 12, "implicit _0 in maps"
-@nums |> maps { _0 * 2 } |> sum |> aeq 12, "implicit $_0 in maps"
+@nums |> maps { _ * 2 } |> sum |> aeq 12, "implicit _ in maps"
+@nums |> maps { _ * 2 } |> sum |> aeq 12, "implicit $_ in maps"
 
 # 3. psort and preduce with implicit variables
 # (psort returns a list; pipe-forward spreads list args, so collect into a
 # named array before comparing to the expected arrayref.)
 my @unsorted = (3, 1, 2)
-my @sorted_a = @unsorted |> psort { _0 <=> _1 }
-aeq(\@sorted_a, [1, 2, 3], "psort with _0 and _1")
-my @sorted_b = @unsorted |> psort { _0 <=> _1 }
-aeq(\@sorted_b, [1, 2, 3], "psort with \$_0 and \$_1")
+my @sorted_a = @unsorted |> psort { _ <=> _1 }
+aeq(\@sorted_a, [1, 2, 3], "psort with _ and _1")
+my @sorted_b = @unsorted |> psort { _ <=> _1 }
+aeq(\@sorted_b, [1, 2, 3], "psort with \$_ and \$_1")
 
-my $reduced = @nums |> preduce { _0 + _1 }
-$reduced |> aeq 6, "preduce with _0 and _1"
+my $reduced = @nums |> preduce { _ + _1 }
+$reduced |> aeq 6, "preduce with _ and _1"
 
 # 4. Builtin aliases and parallel functions
 my @data = (1, 2, 3, 4, 5)

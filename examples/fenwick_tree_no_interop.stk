@@ -21,7 +21,7 @@ fn Fenwick::lsb = _ & -_
 
 # Construct an empty Fenwick tree of size $n. 1-indexed internally,
 # we expose 0-indexed externally.
-fn Fenwick::new = +{ size => _0, bit => [(0) x (_0 + 1)] }
+fn Fenwick::new = +{ size => _, bit => [(0) x (_ + 1)] }
 
 # Point update: add $delta to position $i (0-indexed).
 fn Fenwick::add($f, $i, $delta) {

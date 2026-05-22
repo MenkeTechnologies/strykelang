@@ -95,7 +95,7 @@ fn Demo::Cache::lookup($key) {
 # ── workload ────────────────────────────────────────────────────────
 
 my @queries
-my @known = sort { _0 cmp _1 } keys %upstream
+my @known = sort { _ cmp _1 } keys %upstream
 my @unknown = ("user_unknown_1", "user_unknown_2", "user_zzz", "user_xyz")
 
 # 30 queries: a mix of repeats, knowns, and unknowns.

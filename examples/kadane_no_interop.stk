@@ -21,8 +21,8 @@
 fn Kadane::max_sum($xs) {
     return undef if len(@$xs) == 0
     my $st = (+{cur => 0, best => -1e18}, @$xs) |> reduce {
-        my $c = max(_1, _0->{cur} + _1)
-        +{ cur => $c, best => max(_0->{best}, $c) }
+        my $c = max(_1, _->{cur} + _1)
+        +{ cur => $c, best => max(_->{best}, $c) }
     }
     $st->{best}
 }
@@ -34,12 +34,12 @@ fn Kadane::max_subarray($xs) {
     my $init = +{ cur => -1e18, c_lo => 0, best => -1e18, lo => 0, hi => 0 }
     my $st = ($init, @indexed) |> reduce {
         my ($v, $i) = (_1->{v}, _1->{i})
-        my ($new_cur, $new_c_lo) = (_0->{cur} + $v) > $v
-            ? (_0->{cur} + $v, _0->{c_lo})
+        my ($new_cur, $new_c_lo) = (_->{cur} + $v) > $v
+            ? (_->{cur} + $v, _->{c_lo})
             : ($v, $i)
-        my ($best, $lo, $hi) = $new_cur > _0->{best}
+        my ($best, $lo, $hi) = $new_cur > _->{best}
             ? ($new_cur, $new_c_lo, $i)
-            : (_0->{best}, _0->{lo}, _0->{hi})
+            : (_->{best}, _->{lo}, _->{hi})
         +{ cur => $new_cur, c_lo => $new_c_lo, best => $best, lo => $lo, hi => $hi }
     }
     +{ sum => $st->{best}, lo => $st->{lo}, hi => $st->{hi} }

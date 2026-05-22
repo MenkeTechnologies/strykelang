@@ -124,7 +124,7 @@ for my $i (1:100) {
 
 p ""
 p "── click counts (sorted) ────────────────────────────"
-my @sorted = sort { $click_count{_1} <=> $click_count{_0} } keys %click_count
+my @sorted = sort { $click_count{_1} <=> $click_count{_} } keys %click_count
 for my $s (@sorted) {
     next if $click_count{$s} == 0
     my $url = $short_to_long{$s}

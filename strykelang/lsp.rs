@@ -2,6 +2,7 @@
 
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap};
+use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use lsp_server::{
@@ -1232,11 +1233,28 @@ fn identifier_span_bytes(line: &str, byte_col: usize) -> Option<(usize, usize)> 
         }
     }
     let mut end = b;
-    for (i, c) in line[b..].char_indices() {
-        if is_ident_char(c) {
+    {
+        let mut iter = line[b..].char_indices().peekable();
+        while let Some((i, c)) = iter.next() {
+            if c == ':' {
+                // Single `:` (loop-label decl colon `LOOP:`, ternary,
+                // range `1:10`) is not part of the identifier; only the
+                // package-path separator `::` is. Look ahead one char
+                // to disambiguate. When `::` is seen, consume BOTH
+                // colons atomically so the span never ends mid-`::`.
+                if !matches!(iter.peek(), Some((_, ':'))) {
+                    break;
+                }
+                end = b + i + c.len_utf8();
+                if let Some((j, c2)) = iter.next() {
+                    end = b + j + c2.len_utf8();
+                }
+                continue;
+            }
+            if !is_ident_char(c) {
+                break;
+            }
             end = b + i + c.len_utf8();
-        } else {
-            break;
         }
     }
     // Cursor parked on the sigil itself (`$|foo`): no ident chars before
@@ -1329,6 +1347,9 @@ fn hover_markdown_for_word(word: &str, text: &str, path: &str) -> Option<String>
                         crate::lsp_symbols::SymbolKind::Sub => "subroutine",
                         crate::lsp_symbols::SymbolKind::Type => "type",
                         crate::lsp_symbols::SymbolKind::Package => "package",
+                        crate::lsp_symbols::SymbolKind::Format => "format",
+                        crate::lsp_symbols::SymbolKind::Label => "loop label",
+                        crate::lsp_symbols::SymbolKind::Field => "field",
                     };
                     return Some(format!(
                         "{kind_str} `{}` — declared at line {}.",
@@ -1618,14 +1639,210 @@ fn goto_definition(
                 }));
             }
         }
+        // Qualified-name fallback: `EnumName::Variant`,
+        // `Struct::method`, `Trait::default` — the variant /
+        // method name isn't tracked as its own symbol, but the
+        // owning Type IS. Strip the last `::`-segment and look up
+        // the prefix as a Type.
+        if let Some(idx) = word.rfind("::") {
+            let prefix = &word[..idx];
+            if !prefix.is_empty() {
+                if let Some(type_sym) = table.symbols.iter().find(|s| {
+                    s.name == prefix
+                        && matches!(s.kind, crate::lsp_symbols::SymbolKind::Type)
+                }) {
+                    return Some(GotoDefinitionResponse::Scalar(Location {
+                        uri: uri.clone(),
+                        range: line_range_utf16(text, type_sym.decl_line as usize + 1),
+                    }));
+                }
+            }
+        }
+        // Bare-field fallback: cursor on `width` inside
+        // `Rectangle(width => -1, …)` — the field decl lives inside
+        // the struct's body. We land the user on the parent struct's
+        // decl line. First Field symbol with the matching name wins
+        // (acceptable for v1; cross-struct field-name collisions are
+        // rare).
+        if !word.contains("::") {
+            if let Some(field_sym) = table.symbols.iter().find(|s| {
+                s.name == word
+                    && matches!(s.kind, crate::lsp_symbols::SymbolKind::Field)
+            }) {
+                return Some(GotoDefinitionResponse::Scalar(Location {
+                    uri: uri.clone(),
+                    range: line_range_utf16(text, field_sym.decl_line as usize + 1),
+                }));
+            }
+        }
     }
     let program = crate::parse_with_file(text, &path).ok()?;
     let sub_map = collect_sub_fqn_map(&program);
-    let decl_line = resolve_sub_decl_line(&sub_map, &word)?;
-    Some(GotoDefinitionResponse::Scalar(Location {
-        uri: uri.clone(),
-        range: line_range_utf16(text, decl_line),
-    }))
+    if let Some(decl_line) = resolve_sub_decl_line(&sub_map, &word) {
+        return Some(GotoDefinitionResponse::Scalar(Location {
+            uri: uri.clone(),
+            range: line_range_utf16(text, decl_line),
+        }));
+    }
+    // Cross-file: chase `require "./lib/foo.stk"` / `require Mod::Name`
+    // directives and search their sub maps. Required-file path resolution
+    // shares its rule with the static analyzer (`t/`-style test dirs →
+    // project root is the parent), so jump-to-definition on
+    // `Project::BinaryTree::bst_new()` in a test file lands on the lib
+    // file's `fn` declaration.
+    cross_file_goto_definition(&program, &path, &word)
+}
+
+/// Walk `require` directives from `program`, parse the referenced files,
+/// and search them for `word`. Returns a Location pointing at the line
+/// where `word` is declared in the first required file that contains it.
+fn cross_file_goto_definition(
+    program: &crate::ast::Program,
+    file: &str,
+    word: &str,
+) -> Option<GotoDefinitionResponse> {
+    let mut response: Option<GotoDefinitionResponse> = None;
+    walk_required_files(program, file, |target_path, src, child| {
+        if response.is_some() {
+            return false;
+        }
+        let child_map = collect_sub_fqn_map(child);
+        if let Some(decl_line) = resolve_sub_decl_line(&child_map, word) {
+            let uri = path_to_uri(target_path);
+            response = Some(GotoDefinitionResponse::Scalar(Location {
+                uri,
+                range: line_range_utf16(src, decl_line),
+            }));
+            return false;
+        }
+        true
+    });
+    response
+}
+
+/// BFS over the require graph rooted at `program` (whose source lives at
+/// `file`). For each reachable file, parses it and calls `visit(path,
+/// source, program)`. Visit returns `true` to keep walking, `false` to
+/// stop. Cycles are pruned by canonical path. Owner-of-spec is tracked
+/// per-entry so a relative `require "./helper.stk"` inside a lib file
+/// resolves relative to that lib file's directory, not the root file.
+fn walk_required_files<F>(program: &crate::ast::Program, file: &str, mut visit: F)
+where
+    F: FnMut(&str, &str, &crate::ast::Program) -> bool,
+{
+    use std::collections::HashSet;
+    let mut visited: HashSet<PathBuf> = HashSet::new();
+    let mut queue: Vec<(String, String)> = require_specs_from_program(program)
+        .into_iter()
+        .map(|spec| (file.to_string(), spec))
+        .collect();
+    while let Some((owner, spec)) = queue.pop() {
+        let Some(target) =
+            crate::static_analysis::resolve_require_path_from_file(&owner, &spec)
+        else {
+            continue;
+        };
+        let canon = target.canonicalize().unwrap_or(target.clone());
+        if !visited.insert(canon.clone()) {
+            continue;
+        }
+        let Ok(src) = std::fs::read_to_string(&target) else {
+            continue;
+        };
+        let target_path = target.to_string_lossy().into_owned();
+        let Ok(child) = crate::parse_module_with_file(&src, &target_path) else {
+            continue;
+        };
+        let keep_going = visit(&target_path, &src, &child);
+        if !keep_going {
+            return;
+        }
+        for spec in require_specs_from_program(&child) {
+            queue.push((target_path.clone(), spec));
+        }
+    }
+}
+
+/// Collect `(path, source)` for every file reachable from `program` via
+/// `require`. Used by cross-file rename to know which files to scan.
+fn collect_required_files(program: &crate::ast::Program, file: &str) -> Vec<(String, String)> {
+    let mut out: Vec<(String, String)> = Vec::new();
+    walk_required_files(program, file, |path, src, _child| {
+        out.push((path.to_string(), src.to_string()));
+        true
+    });
+    out
+}
+
+/// Collect every static-string-form `require` spec from a program's top-
+/// level statements (including postfix-`if`/`unless` wrappers).
+fn require_specs_from_program(program: &crate::ast::Program) -> Vec<String> {
+    let mut out = Vec::new();
+    for stmt in &program.statements {
+        if let StmtKind::Expression(e) = &stmt.kind {
+            collect_require_spec(e, &mut out);
+        }
+    }
+    out
+}
+
+fn collect_require_spec(expr: &crate::ast::Expr, out: &mut Vec<String>) {
+    use crate::ast::ExprKind;
+    match &expr.kind {
+        ExprKind::Require(inner) => {
+            if let Some(spec) = crate::static_analysis::static_string_value(inner) {
+                out.push(spec);
+            }
+        }
+        ExprKind::PostfixIf { expr: inner, .. }
+        | ExprKind::PostfixUnless { expr: inner, .. } => collect_require_spec(inner, out),
+        _ => {}
+    }
+}
+
+fn path_to_uri(path: &str) -> lsp_types::Uri {
+    let p = std::path::Path::new(path);
+    let raw_abs = if p.is_absolute() {
+        p.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .unwrap_or_default()
+            .join(p)
+    };
+    // Strip `.` / `..` components so the URI matches the canonical
+    // textual form the editor uses for the same file. We deliberately
+    // do NOT call `canonicalize()` here — it resolves symlinks (e.g.
+    // macOS `/var → /private/var`), but editors usually keep open-file
+    // URIs at the un-resolved spelling the user opened the file with,
+    // and a mismatched URI on a workspace edit makes IntelliJ silently
+    // drop the edit.
+    let abs = normalize_path_lexically(&raw_abs);
+    let formatted = format!("file://{}", abs.display());
+    formatted.parse().unwrap_or_else(|_| {
+        // Fallback: re-use the input as-is.
+        format!("file://{}", path).parse().expect("file uri")
+    })
+}
+
+/// Lexical normalization for paths that don't exist on disk (so
+/// `canonicalize` would error). Strips `.` components and collapses
+/// `..` against the preceding non-`..` component. Does not touch
+/// symlinks (the file isn't there to follow).
+fn normalize_path_lexically(p: &std::path::Path) -> PathBuf {
+    use std::path::Component;
+    let mut out = PathBuf::new();
+    for c in p.components() {
+        match c {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if !out.pop() {
+                    out.push("..");
+                }
+            }
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
 }
 
 fn highlights_for_identifier(source: &str, needle: &str) -> Vec<DocumentHighlight> {
@@ -1693,41 +1910,307 @@ fn references(docs: &HashMap<String, String>, params: ReferenceParams) -> Option
     let tdp = params.text_document_position;
     let uri = tdp.text_document.uri;
     let text = docs.get(uri.as_str())?;
-    let pos = tdp.position;
-    let lines: Vec<&str> = text.lines().collect();
-    let line_text = lines.get(pos.line as usize).copied()?;
-    let byte_col = utf16_col_to_byte_idx(line_text, pos.character);
-    let (start, end) = identifier_span_bytes(line_text, byte_col)?;
-    let needle = line_text.get(start..end)?;
-    if needle.is_empty() {
-        return None;
-    }
+    let cursor_pos = tdp.position;
     let path = uri_to_path(&uri);
-    let mut locs: Vec<Location> = highlights_for_identifier(text, needle)
-        .into_iter()
-        .map(|h| Location {
-            uri: uri.clone(),
-            range: h.range,
-        })
-        .collect();
+    let (needle, needle_range) = identifier_needle_at_position(text, cursor_pos)?;
+    let include_decl = params.context.include_declaration;
 
-    if params.context.include_declaration {
-        if let Ok(program) = crate::parse_with_file(text, &path) {
-            let sub_map = collect_sub_fqn_map(&program);
-            if let Some(decl_line) = resolve_sub_decl_line(&sub_map, needle) {
-                let decl_range = line_range_utf16(text, decl_line);
-                let has_same_line = locs
-                    .iter()
-                    .any(|l| l.range.start.line == decl_range.start.line);
-                if !has_same_line {
-                    locs.insert(
-                        0,
-                        Location {
-                            uri: uri.clone(),
-                            range: decl_range,
-                        },
-                    );
+    // Partial `::`-segment: cursor on `Demo` of `Demo::BitWalk::dump`
+    // → find every textual occurrence of the package prefix.
+    if let Some(prefix) = package_prefix_at_cursor(&needle, &needle_range, cursor_pos) {
+        return collect_package_references(docs, &uri, &prefix);
+    }
+
+    // Try the SymbolTable first so we can use exact ref tracking (with
+    // sigil aliasing) rather than blunt textual scans.
+    if let Some(table) = crate::lsp_symbols::SymbolTable::build(text, &path) {
+        if let Some(sym_id) = table.symbol_at(cursor_pos.line, Some(&needle)) {
+            if let Some(sym) = table.symbols.iter().find(|s| s.id == sym_id).cloned() {
+                // Package: textual prefix scan across the workspace.
+                if matches!(sym.kind, crate::lsp_symbols::SymbolKind::Package) {
+                    return collect_package_references(docs, &uri, &sym.name);
                 }
+                return Some(collect_symbol_references(
+                    docs,
+                    &uri,
+                    text,
+                    &path,
+                    &table,
+                    sym_id,
+                    &sym,
+                    include_decl,
+                ));
+            }
+        }
+    }
+
+    // Cursor word didn't resolve in the active file. Fall through to a
+    // cross-file lookup via `require` — covers `Project::Foo::bar` in a
+    // test file whose decl lives in `lib/foo.stk`.
+    collect_cross_file_references(docs, &uri, text, &path, &needle, include_decl)
+}
+
+/// Build the [`Location`] list for a symbol resolved in the active
+/// file. Includes (a) every range the active SymbolTable reports,
+/// (b) every textual occurrence across open docs / required files for
+/// package-scoped kinds, with sigil-aliased forms preserved.
+fn collect_symbol_references(
+    docs: &HashMap<String, String>,
+    active_uri: &Uri,
+    active_text: &str,
+    active_path: &str,
+    table: &crate::lsp_symbols::SymbolTable,
+    sym_id: crate::lsp_symbols::SymbolId,
+    sym: &crate::lsp_symbols::Symbol,
+    include_decl: bool,
+) -> Vec<Location> {
+    let mut locs: Vec<Location> = Vec::new();
+    for (range, _name) in table.ranges_and_names_for(sym_id) {
+        if !include_decl && range.start.line == sym.decl_line {
+            // Skip the decl line if the client didn't ask for it.
+            continue;
+        }
+        locs.push(Location {
+            uri: active_uri.clone(),
+            range,
+        });
+    }
+
+    // For Type symbols (struct/enum/class/trait), include `Type::Variant`
+    // / `Type::method` / `Type->new` occurrences as usages of the type.
+    // The default ranges scanner rejects a trailing `:`, so we layer
+    // on a package-style scan that accepts `::` trailers across the
+    // active file. This is the load-bearing rule for `enum Op { Add }`
+    // — Find Usages of `Op` must surface `Op::Add` call sites.
+    if matches!(sym.kind, crate::lsp_symbols::SymbolKind::Type) {
+        if let Some(active_text2) = docs.get(active_uri.as_str()) {
+            for r in scan_package_ranges(active_text2, &sym.name) {
+                locs.push(Location {
+                    uri: active_uri.clone(),
+                    range: r,
+                });
+            }
+        }
+    }
+
+    let crosses_files = matches!(
+        sym.kind,
+        crate::lsp_symbols::SymbolKind::Sub
+            | crate::lsp_symbols::SymbolKind::Type
+            | crate::lsp_symbols::SymbolKind::Our
+            | crate::lsp_symbols::SymbolKind::Format
+    );
+    if !crosses_files {
+        return dedup_locations(locs);
+    }
+
+    // Derive bare + qualified spellings (mirrors `rename_symbol`'s
+    // form derivation) so refs in other files using the qualified form
+    // are picked up too.
+    let (sym_sigil, sym_body) = split_sigil(&sym.name);
+    let body_tail = sym_body.rsplit("::").next().unwrap_or(sym_body);
+    let bare_form = match sym_sigil {
+        Some(c) => format!("{c}{body_tail}"),
+        None => body_tail.to_string(),
+    };
+    let qualified_form = if sym.package == "main" {
+        bare_form.clone()
+    } else if sym_body.contains("::") {
+        match sym_sigil {
+            Some(c) => format!("{c}{sym_body}"),
+            None => sym_body.to_string(),
+        }
+    } else {
+        match sym_sigil {
+            Some(c) => format!("{c}{}::{body_tail}", sym.package),
+            None => format!("{}::{body_tail}", sym.package),
+        }
+    };
+
+    // Open documents — qualified-form scan.
+    for (other_uri_str, other_text) in docs.iter() {
+        if other_uri_str == active_uri.as_str() {
+            continue;
+        }
+        if let Ok(other_uri) = other_uri_str.parse::<Uri>() {
+            for r in scan_all_lines_for_needle(other_text, &qualified_form) {
+                locs.push(Location {
+                    uri: other_uri.clone(),
+                    range: r,
+                });
+            }
+        }
+    }
+
+    // Files reachable via `require` — same scan.
+    if let Ok(program) = crate::parse_with_file(active_text, active_path) {
+        for (path, src) in collect_required_files(&program, active_path) {
+            let uri_str = path_to_uri(&path).as_str().to_string();
+            if uri_str == active_uri.as_str() || docs.contains_key(&uri_str) {
+                continue;
+            }
+            if let Ok(other_uri) = uri_str.parse::<Uri>() {
+                // For the decl file: use its SymbolTable to find both
+                // bare and qualified spellings + sigil-aliased refs.
+                let decl_file_match = (|| {
+                    let t = crate::lsp_symbols::SymbolTable::build(&src, &path)?;
+                    let id = t
+                        .symbols
+                        .iter()
+                        .find(|s| {
+                            s.kind == sym.kind
+                                && (s.name == sym.name
+                                    || name_matches_cross_file(&s.name, &sym.name))
+                        })
+                        .map(|s| s.id)?;
+                    Some((id, t))
+                })();
+                if let Some((decl_id, decl_table)) = decl_file_match {
+                    for (range, _name) in decl_table.ranges_and_names_for(decl_id) {
+                        locs.push(Location {
+                            uri: other_uri.clone(),
+                            range,
+                        });
+                    }
+                } else {
+                    // Required file doesn't declare the symbol — scan
+                    // for qualified-form callers only.
+                    for r in scan_all_lines_for_needle(&src, &qualified_form) {
+                        locs.push(Location {
+                            uri: other_uri.clone(),
+                            range: r,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    dedup_locations(locs)
+}
+
+/// References for a name that doesn't resolve in the active file —
+/// chase `require` directives, find the lib that declares it, and
+/// return every ref site (lib + active file + transitively reachable
+/// files) for it.
+fn collect_cross_file_references(
+    docs: &HashMap<String, String>,
+    active_uri: &Uri,
+    active_text: &str,
+    active_path: &str,
+    needle: &str,
+    include_decl: bool,
+) -> Option<Vec<Location>> {
+    let program = crate::parse_with_file(active_text, active_path).ok()?;
+    let mut decl_hit: Option<(String, String, crate::lsp_symbols::Symbol)> = None;
+    walk_required_files(&program, active_path, |path, src, _child| {
+        if decl_hit.is_some() {
+            return false;
+        }
+        let Some(table) = crate::lsp_symbols::SymbolTable::build(src, path) else {
+            return true;
+        };
+        let sym = table.symbols.iter().find(|s| {
+            matches!(
+                s.kind,
+                crate::lsp_symbols::SymbolKind::Sub
+                    | crate::lsp_symbols::SymbolKind::Type
+                    | crate::lsp_symbols::SymbolKind::Our
+                    | crate::lsp_symbols::SymbolKind::Format
+            ) && (s.name == needle || name_matches_cross_file(&s.name, needle))
+        });
+        if let Some(s) = sym {
+            decl_hit = Some((path.to_string(), src.to_string(), s.clone()));
+            return false;
+        }
+        true
+    });
+    let (decl_path, decl_text, decl_sym) = decl_hit?;
+
+    // Derive bare + qualified spellings from the lib's stored symbol.
+    let (sym_sigil, sym_body) = split_sigil(&decl_sym.name);
+    let body_tail = sym_body.rsplit("::").next().unwrap_or(sym_body);
+    let bare_form = match sym_sigil {
+        Some(c) => format!("{c}{body_tail}"),
+        None => body_tail.to_string(),
+    };
+    let qualified_form = if decl_sym.package == "main" {
+        bare_form.clone()
+    } else if sym_body.contains("::") {
+        match sym_sigil {
+            Some(c) => format!("{c}{sym_body}"),
+            None => sym_body.to_string(),
+        }
+    } else {
+        match sym_sigil {
+            Some(c) => format!("{c}{}::{body_tail}", decl_sym.package),
+            None => format!("{}::{body_tail}", decl_sym.package),
+        }
+    };
+
+    let mut locs: Vec<Location> = Vec::new();
+
+    // Lib file: SymbolTable ranges so we catch decl + same-package
+    // internal refs (both bare and qualified spellings).
+    if let Some(decl_table) = crate::lsp_symbols::SymbolTable::build(&decl_text, &decl_path) {
+        if let Some(decl_id) = decl_table
+            .symbols
+            .iter()
+            .find(|s| s.name == decl_sym.name && s.kind == decl_sym.kind)
+            .map(|s| s.id)
+        {
+            if let Ok(decl_uri) = path_to_uri(&decl_path).as_str().parse::<Uri>() {
+                for (range, _name) in decl_table.ranges_and_names_for(decl_id) {
+                    if !include_decl && range.start.line == decl_sym.decl_line {
+                        continue;
+                    }
+                    locs.push(Location {
+                        uri: decl_uri.clone(),
+                        range,
+                    });
+                }
+            }
+        }
+    }
+
+    // Active file: qualified-form textual scan.
+    for r in scan_all_lines_for_needle(active_text, &qualified_form) {
+        locs.push(Location {
+            uri: active_uri.clone(),
+            range: r,
+        });
+    }
+
+    // Other open docs + reachable required files (excluding the decl
+    // file we already handled).
+    let decl_uri_str = path_to_uri(&decl_path).as_str().to_string();
+    for (other_uri_str, other_text) in docs.iter() {
+        if other_uri_str == active_uri.as_str() || other_uri_str == &decl_uri_str {
+            continue;
+        }
+        if let Ok(other_uri) = other_uri_str.parse::<Uri>() {
+            for r in scan_all_lines_for_needle(other_text, &qualified_form) {
+                locs.push(Location {
+                    uri: other_uri.clone(),
+                    range: r,
+                });
+            }
+        }
+    }
+    for (path, src) in collect_required_files(&program, active_path) {
+        if path == decl_path {
+            continue;
+        }
+        let uri_str = path_to_uri(&path).as_str().to_string();
+        if docs.contains_key(&uri_str) {
+            continue;
+        }
+        if let Ok(other_uri) = uri_str.parse::<Uri>() {
+            for r in scan_all_lines_for_needle(&src, &qualified_form) {
+                locs.push(Location {
+                    uri: other_uri.clone(),
+                    range: r,
+                });
             }
         }
     }
@@ -1735,8 +2218,61 @@ fn references(docs: &HashMap<String, String>, params: ReferenceParams) -> Option
     if locs.is_empty() {
         None
     } else {
-        Some(locs)
+        Some(dedup_locations(locs))
     }
+}
+
+/// References for a package: textual prefix scan with `::`-trailer
+/// boundary across the active file + every open doc. Useful for both
+/// the `package Demo::Caller` case and the partial-segment case
+/// (cursor on `Demo` of `Demo::BitWalk::dump`).
+fn collect_package_references(
+    docs: &HashMap<String, String>,
+    active_uri: &Uri,
+    package_name: &str,
+) -> Option<Vec<Location>> {
+    let mut locs: Vec<Location> = Vec::new();
+    if let Some(active_text) = docs.get(active_uri.as_str()) {
+        for r in scan_package_ranges(active_text, package_name) {
+            locs.push(Location {
+                uri: active_uri.clone(),
+                range: r,
+            });
+        }
+    }
+    for (other_uri_str, other_text) in docs.iter() {
+        if other_uri_str == active_uri.as_str() {
+            continue;
+        }
+        if let Ok(other_uri) = other_uri_str.parse::<Uri>() {
+            for r in scan_package_ranges(other_text, package_name) {
+                locs.push(Location {
+                    uri: other_uri.clone(),
+                    range: r,
+                });
+            }
+        }
+    }
+    if locs.is_empty() {
+        None
+    } else {
+        Some(dedup_locations(locs))
+    }
+}
+
+/// Remove duplicate `(uri, range)` pairs while preserving order.
+fn dedup_locations(locs: Vec<Location>) -> Vec<Location> {
+    let mut seen: Vec<(String, Range)> = Vec::with_capacity(locs.len());
+    let mut out: Vec<Location> = Vec::with_capacity(locs.len());
+    for l in locs {
+        let key = (l.uri.as_str().to_string(), l.range);
+        if seen.iter().any(|s| s == &key) {
+            continue;
+        }
+        seen.push(key);
+        out.push(l);
+    }
+    out
 }
 
 fn identifier_needle_at_position(text: &str, pos: Position) -> Option<(String, Range)> {
@@ -1759,6 +2295,48 @@ fn sub_map_for_doc(text: &str, path: &str) -> Option<HashMap<String, usize>> {
     Some(collect_sub_fqn_map(&program))
 }
 
+/// True if `word` is declared (as a Sub, Type, or `our` variable) in
+/// any file reachable from `text`@`path` via `require`. Used by
+/// prepareRename / rename to accept cursors that sit on cross-file refs
+/// (e.g. `Project::Foo::bar()`, `Project::Foo::Point->new`,
+/// `$Project::Foo::level` in a test file that `require`s
+/// `lib/foo.stk`).
+fn decl_in_required(text: &str, path: &str, word: &str) -> bool {
+    let Ok(program) = crate::parse_with_file(text, path) else {
+        return false;
+    };
+    let mut found = false;
+    walk_required_files(&program, path, |p, src, _child| {
+        // Cheap path first: scan the sub_fqn_map.
+        let Ok(child_prog) = crate::parse_module_with_file(src, p) else {
+            return true;
+        };
+        let child_map = collect_sub_fqn_map(&child_prog);
+        if resolve_sub_decl_line(&child_map, word).is_some() {
+            found = true;
+            return false;
+        }
+        // Type / Our require the SymbolTable.
+        let Some(table) = crate::lsp_symbols::SymbolTable::build(src, p) else {
+            return true;
+        };
+        if table.symbols.iter().any(|s| {
+            matches!(
+                s.kind,
+                crate::lsp_symbols::SymbolKind::Sub
+                    | crate::lsp_symbols::SymbolKind::Type
+                    | crate::lsp_symbols::SymbolKind::Our
+                    | crate::lsp_symbols::SymbolKind::Format
+            ) && (s.name == word || name_matches_cross_file(&s.name, word))
+        }) {
+            found = true;
+            return false;
+        }
+        true
+    });
+    found
+}
+
 /// Split a `$foo` / `@bar` / `%baz` style identifier into its leading
 /// sigil (if any) and the rest. Returns `(None, name)` for bare names
 /// like `Util::greet` so callers can treat sigil-less inputs uniformly.
@@ -1766,6 +2344,27 @@ fn split_sigil(s: &str) -> (Option<char>, &str) {
     match s.chars().next() {
         Some(c @ ('$' | '@' | '%')) => (Some(c), &s[c.len_utf8()..]),
         _ => (None, s),
+    }
+}
+
+/// Strip a leading sigil if present, returning the bare-name body.
+/// `bare_form_body("%visited") == "visited"`, `bare_form_body("greet") == "greet"`.
+fn bare_form_body(s: &str) -> String {
+    match s.chars().next() {
+        Some('$') | Some('@') | Some('%') => s[1..].to_string(),
+        _ => s.to_string(),
+    }
+}
+
+/// Compute the replacement text for a single matched range so that the
+/// matched sigil (`$`/`@`/`%`) is preserved. For non-sigiled matches,
+/// fall back to the precomputed `bare_new`. Used by the active-file
+/// rename so element/slice access (`$h{k}` / `@h{k1,k2}`) gets the
+/// right access-form sigil after renaming the underlying `%h`.
+fn substitute_preserving_sigil(matched: &str, bare_new: &str, new_bare_body: &str) -> String {
+    match matched.chars().next() {
+        Some(c @ ('$' | '@' | '%')) => format!("{c}{new_bare_body}"),
+        _ => bare_new.to_string(),
     }
 }
 
@@ -1839,12 +2438,18 @@ fn prepare_rename(
             }
         };
         if resolve_sub_decl_line(&sub_map, needle.as_str()).is_none() {
-            crate::slog_debug!(
-                "lsp.prepareRename",
-                "needle={:?} not_in_symbol_table_or_sub_map (rejected)",
-                needle
-            );
-            return None;
+            // Cross-file fallback: the cursor may sit on a fn declared in
+            // a `require`d lib (e.g. `Project::Foo::bar()` in a test file).
+            // Walk the require graph; accept the placeholder if any
+            // reachable file declares this name.
+            if !decl_in_required(text, &path, needle.as_str()) {
+                crate::slog_debug!(
+                    "lsp.prepareRename",
+                    "needle={:?} not_in_symbol_table_or_sub_map_or_required (rejected)",
+                    needle
+                );
+                return None;
+            }
         }
     }
     crate::slog_debug!(
@@ -1880,19 +2485,29 @@ fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option
         }
     };
     let active_path = uri_to_path(&active_uri);
-    let (needle, _) =
-        match identifier_needle_at_position(active_text, params.text_document_position.position) {
+    let cursor_pos = params.text_document_position.position;
+    let (needle, needle_range) =
+        match identifier_needle_at_position(active_text, cursor_pos) {
             Some(p) => p,
             None => {
                 crate::slog_debug!(
                     "lsp.rename",
                     "pos={}:{} no identifier at cursor",
-                    params.text_document_position.position.line,
-                    params.text_document_position.position.character
+                    cursor_pos.line,
+                    cursor_pos.character
                 );
                 return None;
             }
         };
+    // Partial-segment rename: cursor on a non-last `::`-separated
+    // segment of a qualified name (e.g. cursor on `Demo` or `BitWalk`
+    // in `Demo::BitWalk::dump`). Treat as a package-prefix rename for
+    // the prefix up to and including that segment — matches IntelliJ's
+    // convention where "Rename" on `com.foo.Bar` renames the class but
+    // "Rename" on `foo` renames just the `foo` package.
+    if let Some(prefix) = package_prefix_at_cursor(&needle, &needle_range, cursor_pos) {
+        return rename_package(docs, &active_uri, active_text, &prefix, &params.new_name);
+    }
     // Sigil-aware new name: if the cursor identifier is `$foo` and the user
     // typed `bar`, splice on the same sigil so the replacement is `$bar`.
     // If the user typed `$bar` outright, accept it as-is. This matches what
@@ -1928,18 +2543,26 @@ fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option
             return None;
         }
     };
-    let cursor_pos = params.text_document_position.position;
     let active_symbol_id = match table.symbol_at(cursor_pos.line, Some(&needle)) {
         Some(id) => id,
         None => {
+            // Active file's SymbolTable doesn't know `needle`. It may be a
+            // sub declared in a `require`d lib — fall through to a cross-
+            // file rename that scans the active file, every open doc, and
+            // every reachable required file.
             crate::slog_debug!(
                 "lsp.rename",
-                "needle={:?} unresolved at {}:{}",
+                "needle={:?} not in active SymbolTable, trying cross-file via require",
                 needle,
-                cursor_pos.line,
-                cursor_pos.character
             );
-            return None;
+            return cross_file_rename_via_require(
+                docs,
+                &active_uri,
+                active_text,
+                &active_path,
+                &needle,
+                &effective_new,
+            );
         }
     };
     let active_sym = table
@@ -1956,6 +2579,23 @@ fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option
         active_sym.package,
         active_sym.decl_line
     );
+
+    // Package rename diverges from the bare/qualified-split model used
+    // for Sub/Type/Our. The package name IS its canonical form
+    // (`Demo::Caller`) and appears verbatim everywhere — `package
+    // Demo::Caller` at the decl and `Demo::Caller::method()` at every
+    // call site. Scan textually for the old name and rewrite, accepting
+    // a trailing `::` as a valid boundary (so `Demo::Caller::top` gets
+    // its `Demo::Caller` prefix swapped without disturbing `::top`).
+    if matches!(active_sym.kind, crate::lsp_symbols::SymbolKind::Package) {
+        return rename_package(
+            docs,
+            &active_uri,
+            active_text,
+            &active_sym.name,
+            &effective_new,
+        );
+    }
 
     // ── Form: bare vs. package-qualified ────────────────────────────────
     //
@@ -2035,17 +2675,23 @@ fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option
         }
     };
 
-    // Active file: every occurrence the SymbolTable knows about is a bare
-    // form (the declaration line uses `fn greet` / `our $level`, not the
-    // qualified spelling), so substitute with `bare_new`.
-    let active_ranges = table.ranges_for(active_symbol_id);
-    push_edits(
-        active_uri.as_str(),
-        active_ranges,
-        &bare_new,
-        &mut changes,
-        &mut total,
-    );
+    // Active file: emit per-range substitutions so sigil-aliased refs
+    // (`$h{k}` reading from `%h`, `@h{k1,k2}` slicing from `%h`) get
+    // the right sigil on their replacement. Renaming `%seen` to
+    // `%visited` must rewrite `$seen{k}` as `$visited{k}`, not
+    // `%visited{k}`.
+    let new_bare_body = bare_form_body(&bare_new);
+    let active_matches = table.ranges_and_names_for(active_symbol_id);
+    for (range, matched) in active_matches {
+        let new_text = substitute_preserving_sigil(&matched, &bare_new, &new_bare_body);
+        push_edits(
+            active_uri.as_str(),
+            vec![range],
+            &new_text,
+            &mut changes,
+            &mut total,
+        );
+    }
 
     // Other open files — symbols cross-file only for package-scoped
     // declarations (Sub / Type / Our / Package); a `Local`/`Param` is
@@ -2056,6 +2702,7 @@ fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option
             | crate::lsp_symbols::SymbolKind::Type
             | crate::lsp_symbols::SymbolKind::Our
             | crate::lsp_symbols::SymbolKind::Package
+            | crate::lsp_symbols::SymbolKind::Format
     );
     if crosses_files {
         for (other_uri_str, other_text) in docs.iter() {
@@ -2173,6 +2820,551 @@ fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option
         changes: Some(changes),
         ..Default::default()
     })
+}
+
+/// Rename a sub that is declared in a file reachable from the active
+/// file via `require`. The active file's SymbolTable has no entry for
+/// this name (only references that didn't resolve locally), so we:
+///   1. Walk the require graph to find the file that declares the sub.
+///   2. Build that lib file's SymbolTable to anchor the canonical
+///      package + qualified name.
+///   3. Emit edits across the active file, every other open document,
+///      AND every file reachable via require:
+///        - In the lib file (decl owner): rewrite the bare-form decl +
+///          any bare-form refs inside the same package.
+///        - In every other scanned file: rewrite qualified-form refs,
+///          preserving the package prefix.
+fn cross_file_rename_via_require(
+    docs: &HashMap<String, String>,
+    active_uri: &Uri,
+    active_text: &str,
+    active_path: &str,
+    needle: &str,
+    effective_new: &str,
+) -> Option<WorkspaceEdit> {
+    if needle == effective_new {
+        return Some(WorkspaceEdit::default());
+    }
+    let program = crate::parse_with_file(active_text, active_path).ok()?;
+
+    // Find the file that declares the symbol, capture (path, source,
+    // the matching `Symbol`). We only need the package + name from the
+    // SymbolTable; subsequent edits run via textual scans, so the table
+    // itself doesn't outlive this block. Supported decl kinds:
+    //   - Sub                          (`fn foo`)
+    //   - Type (struct/enum/class/trait)
+    //   - Our  (`our $level` — sigil-prefixed in storage)
+    // `Package` rename is intentionally out of scope here: it cascades
+    // through every sub/type in the package across the workspace and is
+    // not a clean LSP rename.
+    let mut decl_hit: Option<(String, String, crate::lsp_symbols::Symbol)> = None;
+    walk_required_files(&program, active_path, |path, src, _child| {
+        if decl_hit.is_some() {
+            return false;
+        }
+        let Some(table) = crate::lsp_symbols::SymbolTable::build(src, path) else {
+            return true;
+        };
+        let sym = table.symbols.iter().find(|s| {
+            matches!(
+                s.kind,
+                crate::lsp_symbols::SymbolKind::Sub
+                    | crate::lsp_symbols::SymbolKind::Type
+                    | crate::lsp_symbols::SymbolKind::Our
+                    | crate::lsp_symbols::SymbolKind::Format
+            ) && (s.name == needle || name_matches_cross_file(&s.name, needle))
+        });
+        if let Some(s) = sym {
+            decl_hit = Some((path.to_string(), src.to_string(), s.clone()));
+            return false;
+        }
+        true
+    });
+    let (decl_path, decl_text, decl_sym) = decl_hit?;
+
+    // Derive sigil + bare-tail from the SymbolTable's stored spelling.
+    // Sub/Type store qualified `Pkg::name` (no sigil). Our stores
+    // sigil-prefixed bare `$x` (qualification only happens when callers
+    // type `$Pkg::x` from outside).
+    let (sym_sigil, sym_body) = split_sigil(&decl_sym.name);
+    let body_tail = sym_body.rsplit("::").next().unwrap_or(sym_body);
+    let bare_form = match sym_sigil {
+        Some(c) => format!("{c}{body_tail}"),
+        None => body_tail.to_string(),
+    };
+    let qualified_form = if decl_sym.package == "main" {
+        bare_form.clone()
+    } else if sym_body.contains("::") {
+        // Stored already qualified (Sub/Type path).
+        match sym_sigil {
+            Some(c) => format!("{c}{sym_body}"),
+            None => sym_body.to_string(),
+        }
+    } else {
+        match sym_sigil {
+            Some(c) => format!("{c}{}::{body_tail}", decl_sym.package),
+            None => format!("{}::{body_tail}", decl_sym.package),
+        }
+    };
+
+    // NEW spellings — user may type bare tail, qualified, or with/without
+    // sigil. Normalize by stripping any sigil + package prefix.
+    let (_new_sigil_raw, new_body_raw) = split_sigil(effective_new);
+    let new_tail = new_body_raw
+        .rsplit("::")
+        .next()
+        .unwrap_or(new_body_raw)
+        .to_string();
+    let bare_new = match sym_sigil {
+        Some(c) => format!("{c}{new_tail}"),
+        None => new_tail.clone(),
+    };
+    let qualified_new = if decl_sym.package == "main" {
+        bare_new.clone()
+    } else {
+        match sym_sigil {
+            Some(c) => format!("{c}{}::{new_tail}", decl_sym.package),
+            None => format!("{}::{new_tail}", decl_sym.package),
+        }
+    };
+
+    #[allow(clippy::mutable_key_type)]
+    let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
+    let mut total = 0usize;
+    let push = |uri_str: &str,
+                ranges: Vec<Range>,
+                new_text: &str,
+                changes: &mut HashMap<Uri, Vec<TextEdit>>,
+                total: &mut usize| {
+        if ranges.is_empty() {
+            return;
+        }
+        let Ok(u) = uri_str.parse::<Uri>() else {
+            return;
+        };
+        let entry = changes.entry(u).or_default();
+        for r in ranges {
+            if entry.iter().any(|e| e.range == r) {
+                continue;
+            }
+            entry.push(TextEdit {
+                range: r,
+                new_text: new_text.to_string(),
+            });
+            *total += 1;
+        }
+        entry.sort_by(|a, b| cmp_range_start_desc(&a.range, &b.range));
+    };
+
+    // 1. Decl file: rewrite bare + qualified spellings. SymbolTable's
+    //    `ranges_for` already emits both at the decl line, plus every
+    //    in-file ref (bare or qualified, since the builder records both).
+    //    But the bare ↔ qualified substitution differs, so do two
+    //    separate textual scans instead.
+    let decl_uri = path_to_uri(&decl_path);
+    let decl_uri_str = decl_uri.as_str().to_string();
+    push(
+        &decl_uri_str,
+        scan_all_lines_for_needle(&decl_text, &qualified_form),
+        &qualified_new,
+        &mut changes,
+        &mut total,
+    );
+    push(
+        &decl_uri_str,
+        scan_all_lines_for_needle(&decl_text, &bare_form),
+        &bare_new,
+        &mut changes,
+        &mut total,
+    );
+
+    // 2. Active file: cross-file callers usually write `Package::name`,
+    //    so the qualified scan is the load-bearing one. Bare-form scans
+    //    in the active file would risk colliding with same-spelling
+    //    locals; skip them unless the package is `main` (where bare ==
+    //    qualified).
+    let active_uri_str = active_uri.to_string();
+    push(
+        &active_uri_str,
+        scan_all_lines_for_needle(active_text, &qualified_form),
+        &qualified_new,
+        &mut changes,
+        &mut total,
+    );
+    if qualified_form == bare_form {
+        push(
+            &active_uri_str,
+            scan_all_lines_for_needle(active_text, &bare_form),
+            &bare_new,
+            &mut changes,
+            &mut total,
+        );
+    }
+
+    // 3. Other open documents: qualified-form scan only.
+    for (other_uri_str, other_text) in docs.iter() {
+        if other_uri_str == active_uri.as_str() || other_uri_str == &decl_uri_str {
+            continue;
+        }
+        push(
+            other_uri_str,
+            scan_all_lines_for_needle(other_text, &qualified_form),
+            &qualified_new,
+            &mut changes,
+            &mut total,
+        );
+    }
+
+    // 4. Every other file reachable from the active program via
+    //    `require` (workspace files not currently open in the editor).
+    for (path, src) in collect_required_files(&program, active_path) {
+        if path == decl_path {
+            continue;
+        }
+        let uri_str = path_to_uri(&path).as_str().to_string();
+        if docs.contains_key(&uri_str) {
+            continue;
+        }
+        push(
+            &uri_str,
+            scan_all_lines_for_needle(&src, &qualified_form),
+            &qualified_new,
+            &mut changes,
+            &mut total,
+        );
+    }
+
+    if total == 0 {
+        return None;
+    }
+    Some(WorkspaceEdit {
+        changes: Some(changes),
+        ..Default::default()
+    })
+}
+
+/// If the cursor is sitting on a non-last `::`-separated segment of a
+/// qualified bareword (e.g. cursor inside `Demo` of
+/// `Demo::BitWalk::dump`), return the package prefix that should be
+/// renamed (everything up to and including the segment the cursor is
+/// on). Returns `None` for cursor on the last segment (normal rename
+/// applies) or for bare (non-`::`) names.
+fn package_prefix_at_cursor(
+    needle: &str,
+    needle_range: &Range,
+    cursor: Position,
+) -> Option<String> {
+    if !needle.contains("::") {
+        return None;
+    }
+    if cursor.line != needle_range.start.line {
+        return None;
+    }
+    // Compute the cursor's offset within the needle. UTF-16 columns
+    // match byte offsets for ASCII identifiers — Perl package names are
+    // ASCII so this is safe.
+    let start = needle_range.start.character as usize;
+    let cur = cursor.character as usize;
+    if cur < start {
+        return None;
+    }
+    let offset = (cur - start).min(needle.len());
+
+    // Find the end of the segment the cursor is on: the next `::` at or
+    // after `offset`, or end-of-needle.
+    let bytes = needle.as_bytes();
+    let mut seg_end = needle.len();
+    let mut i = offset;
+    while i + 1 < bytes.len() {
+        if bytes[i] == b':' && bytes[i + 1] == b':' {
+            seg_end = i;
+            break;
+        }
+        i += 1;
+    }
+    // If the segment runs to the end of the needle, the cursor is on
+    // the last segment — fall through to normal rename.
+    if seg_end == needle.len() {
+        return None;
+    }
+    Some(needle[..seg_end].to_string())
+}
+
+/// Package rename: scan every line of every relevant document for the
+/// old package name and rewrite. Boundary differs from sub/type
+/// rename — `Demo::Caller::method()` SHOULD match the `Demo::Caller`
+/// prefix (so the package is renamed without disturbing `::method`).
+fn rename_package(
+    docs: &HashMap<String, String>,
+    active_uri: &Uri,
+    active_text: &str,
+    old: &str,
+    new_name: &str,
+) -> Option<WorkspaceEdit> {
+    if old == new_name {
+        return Some(WorkspaceEdit::default());
+    }
+    if !is_valid_rename_ident(new_name) || new_name.starts_with(['$', '@', '%']) {
+        return None;
+    }
+
+    #[allow(clippy::mutable_key_type)]
+    let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
+    let mut total = 0usize;
+
+    let push = |uri_str: &str,
+                ranges: Vec<Range>,
+                changes: &mut HashMap<Uri, Vec<TextEdit>>,
+                total: &mut usize| {
+        if ranges.is_empty() {
+            return;
+        }
+        let Ok(u) = uri_str.parse::<Uri>() else {
+            return;
+        };
+        let entry = changes.entry(u).or_default();
+        for r in ranges {
+            if entry.iter().any(|e| e.range == r) {
+                continue;
+            }
+            entry.push(TextEdit {
+                range: r,
+                new_text: new_name.to_string(),
+            });
+            *total += 1;
+        }
+        entry.sort_by(|a, b| cmp_range_start_desc(&a.range, &b.range));
+    };
+
+    push(
+        active_uri.as_str(),
+        scan_package_ranges(active_text, old),
+        &mut changes,
+        &mut total,
+    );
+    for (other_uri_str, other_text) in docs.iter() {
+        if other_uri_str == active_uri.as_str() {
+            continue;
+        }
+        push(
+            other_uri_str,
+            scan_package_ranges(other_text, old),
+            &mut changes,
+            &mut total,
+        );
+    }
+
+    if total == 0 {
+        return None;
+    }
+    Some(WorkspaceEdit {
+        changes: Some(changes),
+        ..Default::default()
+    })
+}
+
+/// Like `scan_ranges_for_needle` but tuned for package names: accepts
+/// a trailing `::` as a valid boundary so `Demo::Caller` matches inside
+/// `Demo::Caller::method()`. Skips matches inside string literals and
+/// line comments via [`string_interior_mask`]. Used by
+/// [`rename_package`].
+fn scan_package_ranges(text: &str, name: &str) -> Vec<Range> {
+    let mask = string_interior_mask(text);
+    let mut out: Vec<Range> = Vec::new();
+    let mut line0: u32 = 0;
+    let mut line_start_byte: usize = 0;
+    for (i, ch) in text.char_indices().chain(std::iter::once((text.len(), '\0'))) {
+        if i == text.len() || ch == '\n' {
+            let line_text = &text[line_start_byte..i];
+            for (start_byte, _) in line_text.match_indices(name) {
+                let global_byte = line_start_byte + start_byte;
+                if mask.get(global_byte).copied().unwrap_or(false) {
+                    continue;
+                }
+                let end_byte = start_byte + name.len();
+                let prev = line_text[..start_byte].chars().next_back();
+                let mut after = line_text[end_byte..].chars();
+                let next = after.next();
+                let next_next = after.next();
+                let prev_ok = prev.is_none_or(|c| !c.is_alphanumeric() && c != '_' && c != ':');
+                let next_ok = match (next, next_next) {
+                    (None, _) => true,
+                    (Some(':'), Some(':')) => true,
+                    (Some(c), _) => !c.is_alphanumeric() && c != '_' && c != ':',
+                };
+                if !prev_ok || !next_ok {
+                    continue;
+                }
+                let c0 = line_text[..start_byte].encode_utf16().count() as u32;
+                let c1 = line_text[..end_byte].encode_utf16().count() as u32;
+                out.push(Range {
+                    start: Position {
+                        line: line0,
+                        character: c0,
+                    },
+                    end: Position {
+                        line: line0,
+                        character: c1,
+                    },
+                });
+            }
+            line0 += 1;
+            line_start_byte = i + 1;
+            if i == text.len() {
+                break;
+            }
+        }
+    }
+    out
+}
+
+/// Heuristic match used when locating a Sub/Type/Our by needle. Equal
+/// on full qualified spelling, OR same bare tail when either side is
+/// the bare form (cursor on `bar` of `Pkg::bar()`, or cursor on
+/// `$Pkg::level` against a stored bare `$level`). Sigil-aware so `$x`
+/// (stored Our form) matches a `$x` needle but never a Sub `x`. Caller
+/// constrains the search to a single require chain, which bounds false
+/// positives across packages.
+fn name_matches_cross_file(sym_name: &str, needle: &str) -> bool {
+    if sym_name == needle {
+        return true;
+    }
+    let (sym_sigil, sym_body) = split_sigil(sym_name);
+    let (needle_sigil, needle_body) = split_sigil(needle);
+    if sym_sigil != needle_sigil {
+        return false;
+    }
+    let sym_tail = sym_body.rsplit("::").next().unwrap_or(sym_body);
+    let needle_tail = needle_body.rsplit("::").next().unwrap_or(needle_body);
+    sym_tail == needle_tail
+}
+
+/// Scan every line of `text` for textual occurrences of `name`,
+/// skipping matches that fall inside a string literal (`"..."`,
+/// `'...'`, `` `...` ``). Find-Usages on identifier-like names
+/// (`Op`, `handle`, etc.) must not surface coincidental text
+/// matches inside string content the user typed.
+fn scan_all_lines_for_needle(text: &str, name: &str) -> Vec<Range> {
+    let mask = string_interior_mask(text);
+    let mut out: Vec<Range> = Vec::new();
+    let mut line0: u32 = 0;
+    let mut line_start_byte: usize = 0;
+    for (i, ch) in text.char_indices().chain(std::iter::once((text.len(), '\0'))) {
+        if i == text.len() || ch == '\n' {
+            let line_text = &text[line_start_byte..i];
+            for r in scan_ranges_for_needle_masked(line_text, line0, name, &mask, line_start_byte)
+            {
+                out.push(r);
+            }
+            line0 += 1;
+            line_start_byte = i + 1;
+            if i == text.len() {
+                break;
+            }
+        }
+    }
+    out
+}
+
+/// Single-line scan that consults a global `text`-wide string-interior
+/// mask to suppress matches whose start byte sits inside a string
+/// literal. `line_start_byte` is the byte offset of `line_text`'s
+/// first char within the full `text`.
+fn scan_ranges_for_needle_masked(
+    line_text: &str,
+    line0: u32,
+    name: &str,
+    mask: &[bool],
+    line_start_byte: usize,
+) -> Vec<Range> {
+    let mut out: Vec<Range> = Vec::new();
+    for (start_byte, _) in line_text.match_indices(name) {
+        let global_byte = line_start_byte + start_byte;
+        if mask.get(global_byte).copied().unwrap_or(false) {
+            continue;
+        }
+        let end_byte = start_byte + name.len();
+        let prev = line_text[..start_byte].chars().next_back();
+        let next = line_text[end_byte..].chars().next();
+        let prev_ok = prev.is_none_or(|c| !c.is_alphanumeric() && c != '_' && c != ':');
+        let next_ok = next.is_none_or(|c| !c.is_alphanumeric() && c != '_' && c != ':');
+        if !prev_ok || !next_ok {
+            continue;
+        }
+        let c0 = line_text[..start_byte].encode_utf16().count() as u32;
+        let c1 = line_text[..end_byte].encode_utf16().count() as u32;
+        out.push(Range {
+            start: Position {
+                line: line0,
+                character: c0,
+            },
+            end: Position {
+                line: line0,
+                character: c1,
+            },
+        });
+    }
+    out
+}
+
+/// Build a `Vec<bool>` the same length as `text` bytes, where
+/// `mask[i] = true` if byte `i` sits inside a string literal
+/// (`"..."`, `'...'`, `` `...` ``). Best-effort: handles `\\`
+/// escapes and cross-line strings, but doesn't model heredocs,
+/// `qq//`, `q//`, or regex literals. The mask is consulted before
+/// any cross-file textual search to suppress matches that the user
+/// clearly didn't intend as code references (e.g. `Op` inside
+/// `"Op is a type"`).
+fn string_interior_mask(text: &str) -> Vec<bool> {
+    let bytes = text.as_bytes();
+    let mut mask = vec![false; bytes.len()];
+    let mut i = 0;
+    while i < bytes.len() {
+        let c = bytes[i];
+        match c {
+            b'"' | b'\'' | b'`' => {
+                let quote = c;
+                let mut j = i + 1;
+                while j < bytes.len() {
+                    let cc = bytes[j];
+                    if cc == b'\\' && j + 1 < bytes.len() {
+                        // Mark both the backslash and the escaped char.
+                        mask[j] = true;
+                        mask[j + 1] = true;
+                        j += 2;
+                        continue;
+                    }
+                    if cc == quote {
+                        // Closing quote itself is not interior; stop.
+                        j += 1;
+                        break;
+                    }
+                    mask[j] = true;
+                    j += 1;
+                }
+                i = j;
+            }
+            b'#' => {
+                // Line comment — skip to newline so a `#` inside source
+                // doesn't accidentally start a string scan from later
+                // tokens, and so identifiers inside comments are also
+                // suppressed (Find Usages shouldn't show in-comment
+                // matches as code references).
+                let mut j = i + 1;
+                while j < bytes.len() && bytes[j] != b'\n' {
+                    mask[j] = true;
+                    j += 1;
+                }
+                // Also mask the `#` itself for completeness.
+                mask[i] = true;
+                i = j;
+            }
+            _ => {
+                i += 1;
+            }
+        }
+    }
+    mask
 }
 
 /// Scan a single line for textual occurrences of `name`, returning LSP
