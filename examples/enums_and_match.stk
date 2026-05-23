@@ -27,7 +27,7 @@ for my $v (TrafficLight::Red, TrafficLight::Yellow, TrafficLight::Green) {
 p ""
 p "── data-carrying variants ────────────────────────────────"
 enum Shape {
-    Shape::Circlegg   => Float,         # radius
+    Circle   => Float,         # radius
     Square   => Float,          # side
     Rect,                      # bare variant, no data
 }
@@ -36,13 +36,13 @@ enum Shape {
 # via `_` block params (`_0` etc.) inside the arm body where shown.
 fn Shape::area($s) {
     match ($s) {
-        Shape::Shape::Circlegg => 3.14 * 1.0 * 1.0,   # placeholder; replace with data slot
+        Shape::Circle => 3.14 * 1.0 * 1.0,   # placeholder; replace with data slot
         Shape::Square => 5.0 * 5.0,
         Shape::Rect   => 0.0,
     }
 }
 
-p "  Shape::Circlegg area = ", Shape::area(Shape::Circle)
+p "  Circle area = ", Shape::area(Shape::Circle)
 p "  Square area = ", Shape::area(Shape::Square)
 p "  Rect area   = ", Shape::area(Shape::Rect)
 

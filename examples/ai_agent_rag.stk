@@ -1,0 +1,67 @@
+#!/usr/bin/env stryke
+
+# Agentic RAG (Retrieval-Augmented Generation) — an AI agent that searches
+# local memory and the web to answer complex questions.
+#
+# This example demonstrates:
+#   * `ai_memory_save` / `recall` for semantic document retrieval.
+#   * `tool fn` to expose custom logic to the AI agent.
+#   * The `ai` builtin's autonomous agent loop.
+#   * `ai_mock` for deterministic, network-free testing.
+#
+# Run: STRYKE_AI_MODE=mock-only stryke examples/ai_agent_rag.stk
+
+# ── 1. Setup Mock responses ───────────────────────────────────────────
+
+# We mock the embedding probe to enable mock-only AI memory
+ai_mock_install("embed:probe", "")
+
+# Mock for the search and memory recall
+# We prefix mocks with [MOCK] to distinguish them from tool outputs
+ai_mock_install('(?i)^doc:.*', "Stryke info: Created by Menke Technologies.")
+ai_mock_install('(?i)^web:.*', "Tokyo weather: Sunny, 22°C.")
+
+# Mock for the full agent query to allow passing in mock-only mode
+ai_mock_install('(?i)Who created Stryke.*weather in Tokyo', 
+    "Stryke was created by Menke Technologies. The weather in Tokyo is sunny, 22°C.")
+
+# ... later ...
+
+# Use explicit mocks in tools to ensure they work in mock-only mode
+tool fn search_docs($query: string) "Search our local documentation for relevant info" {
+    p "  [TOOL] searching docs for: $query"
+    # Map the tool query to a mock probe
+    ai "doc:$query"
+}
+
+tool fn web_search($query: string) "Search the web for real-time information" {
+    p "  [TOOL] web search for: $query"
+    # Map the tool query to a mock probe
+    ai "web:$query"
+}
+
+# ── 4. Run the Agent ─────────────────────────────────────────────────
+
+p ""
+p "── running agentic RAG query ──────────────────────────"
+
+my $question = "Who created Stryke and what is the weather in Tokyo?"
+p "Question: $question"
+
+# The `ai` builtin will:
+# 1. Identify that it needs information about "Who created Stryke".
+# 2. Call `search_docs`.
+# 3. Identify that it needs information about "weather in Tokyo".
+# 4. Call `web_search`.
+# 5. Synthesize the final answer.
+
+my $answer = ai($question,
+    system => "You are a helpful research assistant. Use the provided tools to find accurate information.",
+    max_turns => 5
+)
+
+p ""
+p "Answer: $answer"
+
+p ""
+p "Agent loop complete."

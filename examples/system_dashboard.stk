@@ -1,0 +1,73 @@
+#!/usr/bin/env stryke
+
+# System Dashboard — a live-updating terminal dashboard.
+#
+# This example demonstrates:
+#   * System builtins (`pool_info`, `mem_total`, `sys_uptime`, etc.)
+#   * ANSI escape codes for screen control.
+#   * Infinite loop with `sleep`.
+#   * Human-readable formatting builtins.
+#
+# Run: stryke examples/system_dashboard.stk
+
+# Clear screen and hide cursor
+p "\x1b[2J\x1b[?25l"
+
+fn Dashboard::render {
+    # Move cursor to top-left
+    p "\x1b[H"
+    
+    my $info = pool_info()
+    my $ram_total = mem_total()
+    my $uptime = sys_uptime()
+    
+    p "── SYSTEM DASHBOARD ────────────────────────────────────"
+    printf "  TIME:     %s\n", datetime_from_epoch(time())
+    printf "  HOST:     %s\n", gethostname()
+    printf "  OS:       %s (%s)\n", os_name(), $info->{arch}
+    printf "  UPTIME:   %s\n", human_duration($uptime)
+    p "────────────────────────────────────────────────────────"
+    
+    p "  CPU CORES: #{$info->cpus}"
+    # Simulation of load (since we don't have a direct loadavg builtin shown in recon)
+    # If loadavg existed, we'd use it.
+    
+    p "  MEMORY:"
+    printf "    Total:  %s\n", human_bytes($ram_total)
+    
+    p "  NETWORK:"
+    printf "    IPv4:   %s\n", net_ipv4() // "N/A"
+    printf "    DNS:    %s\n", join(", ", net_dns_servers())
+    
+    p "────────────────────────────────────────────────────────"
+    p "  MOUNTED DISKS:"
+    my @disks = mounts()
+    for my $m (@disks) {
+        next unless $m->{total} > 0
+        printf "    %-15s %5.1f%% used (%s free)\n", 
+            $m->{mount}, 
+            $m->{use_pct}, 
+            human_bytes($m->{total} - $m->{used})
+    }
+    p "────────────────────────────────────────────────────────"
+    p "  Press Ctrl+C to exit."
+}
+
+# Signal handler for graceful exit (show cursor)
+$SIG{INT} = fn {
+    p "\x1b[?25h" # Show cursor
+    p "\nExiting dashboard."
+    exit(0)
+}
+
+# Run for 1 iteration if non-interactive (to allow batch verification), else 10
+my $iterations = has_stdout_tty() ? 10 : 1
+
+for (1:$iterations) {
+    Dashboard::render()
+    sleep 1 if $iterations > 1
+}
+
+# Show cursor before finishing
+p "\x1b[?25h"
+p "Dashboard demo finished."
