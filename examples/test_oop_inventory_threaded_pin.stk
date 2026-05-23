@@ -1,0 +1,193 @@
+#!/usr/bin/env stryke
+
+# Pinning batch: OOP + threading macros — Inventory, Products, Categories.
+# Demonstrates class collections piped through |>, maps, greps, sort, sum,
+# min, max, uniq, with method calls inside threading stages.
+
+trait Priced  { fn price }
+trait Stocked { fn qty }
+
+class Product impl Priced, Stocked {
+    sku:   Str   = "x"
+    name:  Str   = "x"
+    cat:   Str   = "x"
+    p:     Float = 0.0
+    qy:    Int   = 0
+
+    fn sku   = $self->sku
+    fn name  = $self->name
+    fn cat   = $self->cat
+    fn price = $self->p
+    fn qty   = $self->qy
+    fn value = $self->p * $self->qy
+    fn label = $self->sku . ":" . $self->name
+}
+
+fn mk($sku, $name, $cat, $p, $qy) {
+    Product->new(sku => $sku, name => $name, cat => $cat, p => $p, qy => $qy)
+}
+
+my @inv = (
+    mk("A1", "apple",   "fruit",  0.50, 100),
+    mk("A2", "banana",  "fruit",  0.25,  60),
+    mk("A3", "cherry",  "fruit",  2.00,  40),
+    mk("B1", "bread",   "bakery", 3.00,  20),
+    mk("B2", "bagel",   "bakery", 1.50,  30),
+    mk("C1", "cheddar", "dairy",  5.00,  15),
+    mk("C2", "milk",    "dairy",  2.50,  25),
+    mk("D1", "soap",    "house",  4.00,   8),
+    mk("D2", "broom",   "house", 12.00,   2),
+)
+
+# basic counts via threading
+@inv |> len |> aeq 9, "9 products"
+
+# total stock value: maps method-call → sum
+my $total = @inv |> maps { _->value() } |> sum
+$total |> aeq (0.50*100 + 0.25*60 + 2.00*40 + 3.00*20 + 1.50*30 + 5.00*15 + 2.50*25 + 4.00*8 + 12.00*2), "total value"
+
+# names of fruit, sorted
+my @fruit_names = @inv
+    |> greps { _->cat() eq "fruit" }
+    |> maps  { _->name() }
+    |> sort
+join(",", @fruit_names) |> aeq "apple,banana,cherry", "fruit names"
+
+# unique categories
+my @cats = @inv |> maps { _->cat() } |> uniq |> sort
+join(",", @cats) |> aeq "bakery,dairy,fruit,house", "uniq cats"
+
+# count per category via hash build
+my %by_cat = ()
+$by_cat{$_->cat()}++ for @inv
+$by_cat{"fruit"}  |> aeq 3, "3 fruit"
+$by_cat{"bakery"} |> aeq 2, "2 bakery"
+$by_cat{"dairy"}  |> aeq 2, "2 dairy"
+$by_cat{"house"}  |> aeq 2, "2 house"
+
+# most expensive product (sort desc by price, take first)
+my @desc = @inv |> sort { $_1->price() <=> $_->price() }
+$desc[0]->name() |> aeq "broom", "priciest broom"
+$desc[1]->name() |> aeq "cheddar", "second cheddar"
+
+# cheapest item under threading + min
+my $cheapest = @inv |> maps { _->price() } |> min
+$cheapest |> aeq 0.25, "cheapest 0.25"
+
+# expensive item via max
+my $priciest = @inv |> maps { _->price() } |> max
+$priciest |> aeq 12.00, "priciest 12"
+
+# total quantity
+@inv |> maps { _->qty() } |> sum |> aeq 300, "300 units"
+
+# bakery value
+my $bval = @inv
+    |> greps { _->cat() eq "bakery" }
+    |> maps  { _->value() }
+    |> sum
+$bval |> aeq (3.00*20 + 1.50*30), "bakery value"
+
+# top-3 by value
+my @top3 = @inv
+    |> sort { $_1->value() <=> $_->value() }
+my @top3_names = (@top3)[0:2] |> maps { _->name() }
+join(",", @top3_names) |> aeq "cherry,cheddar,milk", "top3 by value"
+
+# low-stock items (qty < 20), labels joined
+my @low = @inv
+    |> greps { _->qty() < 20 }
+    |> sort  { $_->qty() <=> $_1->qty() }
+    |> maps  { _->label() }
+join("|", @low) |> aeq "D2:broom|D1:soap|C1:cheddar", "low stock"
+
+# Inventory class with methods that return threading results
+class Inventory {
+    items: Array = []
+
+    fn add($p) { push @{$self->items}, $p; $self }
+
+    fn total_value {
+        @{$self->items} |> maps { _->value() } |> sum
+    }
+
+    fn total_qty {
+        @{$self->items} |> maps { _->qty() } |> sum
+    }
+
+    fn names_sorted {
+        my @n = ~> @{$self->items} map { _->name() } sort
+        \@n
+    }
+
+    fn by_cat($c) {
+        my @f = ~> @{$self->items} grep { _->cat() eq $c }
+        \@f
+    }
+
+    fn categories {
+        my @c = ~> @{$self->items} map { _->cat() } uniq sort
+        \@c
+    }
+
+    fn priciest {
+        my @s = ~> @{$self->items} sort { _1->price() <=> _->price() }
+        $s[0]
+    }
+
+    fn restock($sku, $n) {
+        for my $p (@{$self->items}) {
+            if ($p->sku() eq $sku) {
+                $p->qy = $p->qy + $n
+                return $p
+            }
+        }
+        undef
+    }
+}
+
+# Build inventory via threaded attach
+my $inv = Inventory->new(items => [])
+$inv->add($_) for @inv
+
+$inv->total_value() |> aeq $total, "Inventory.total_value"
+$inv->total_qty()   |> aeq 300,    "Inventory.total_qty"
+
+join(",", @{$inv->names_sorted()}) |> aeq "apple,bagel,banana,bread,broom,cheddar,cherry,milk,soap", "sorted names"
+join(",", @{$inv->categories()}) |> aeq "bakery,dairy,fruit,house", "Inventory cats"
+
+(len @{$inv->by_cat("fruit")}) |> aeq 3, "Inventory 3 fruit"
+$inv->priciest()->name() |> aeq "broom", "Inventory priciest"
+
+# Restock affects total
+my $b4 = $inv->total_qty()
+$inv->restock("A1", 50)
+($inv->total_qty() - $b4) |> aeq 50, "after restock +50"
+
+# Discounted prices via threading
+my @discounted_unsorted = @{$inv->by_cat("fruit")}
+    |> maps { _->price() * 0.9 }
+my @discounted = sort { $_ <=> $_1 } @discounted_unsorted
+$discounted[0] |> aeq 0.225, "fruit min discounted"
+
+# Aggregate label list per category, joined
+my @bakery_labels_a = ~> @{$inv->by_cat("bakery")} map { _->label() } sort
+my $bakery_labels = join("|", @bakery_labels_a)
+$bakery_labels |> aeq "B1:bread|B2:bagel", "bakery labels"
+
+# Mean price across all items
+my $mean = (@inv |> maps { _->price() } |> sum) / (len @inv)
+($mean > 3 && $mean < 4) |> aeq 1, "mean price in range"
+
+# How many distinct skus? (defensive — should equal 9)
+@inv |> maps { _->sku() } |> uniq |> len |> aeq 9, "9 distinct skus"
+
+# Items priced over 2 dollars ordered by name
+my @over2 = ~> @inv grep { _->price() >= 2 } sort { _->name() cmp _1->name() } map { _->name() }
+join(",", @over2) |> aeq "bread,broom,cheddar,cherry,milk,soap", "over two"
+
+# Sum of stock-values only for items priced over 2 dollars
+my $expensive_value = ~> @inv grep { _->price() >= 2 } map { _->value() } sum
+$expensive_value |> aeq (2.00*40 + 3.00*20 + 5.00*15 + 2.50*25 + 4.00*8 + 12.00*2), "expensive value"
+
+test_run
