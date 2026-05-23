@@ -404,9 +404,7 @@ impl StaticAnalyzer {
                 self.type_methods.insert(def.name.clone(), methods);
                 // Empty field set so the type_fields key exists (drives
                 // the constructor-key check + hierarchy walker entry).
-                self.type_fields
-                    .entry(def.name.clone())
-                    .or_insert_with(HashSet::new);
+                self.type_fields.entry(def.name.clone()).or_default();
             }
             _ => {}
         }
@@ -537,10 +535,8 @@ impl StaticAnalyzer {
                 // package-global. References from outside the package
                 // use the qualified form `$Pkg::name` — record both
                 // spellings so strict-vars accepts either.
-                let is_package_global = matches!(
-                    stmt.kind,
-                    StmtKind::Our(_) | StmtKind::OurSync(_)
-                );
+                let is_package_global =
+                    matches!(stmt.kind, StmtKind::Our(_) | StmtKind::OurSync(_));
                 for d in decls {
                     match d.sigil {
                         Sigil::Scalar => {
@@ -892,7 +888,7 @@ impl StaticAnalyzer {
             ExprKind::String(s) | ExprKind::Bareword(s) => all_fields.contains(s),
             _ => false,
         });
-        let looks_keyed = args.len() % 2 == 0
+        let looks_keyed = args.len().is_multiple_of(2)
             && first_arg_is_field
             && (0..args.len()).step_by(2).all(|i| {
                 matches!(&args[i].kind, ExprKind::String(_))
@@ -956,11 +952,23 @@ impl StaticAnalyzer {
         // - `fields` / `methods` / `superclass` — runtime introspection.
         if matches!(
             method,
-            "isa" | "can" | "DOES" | "does" | "VERSION"
-            | "new" | "BUILD" | "DESTROY" | "destroy"
-            | "clone" | "with"
-            | "to_hash" | "to_hash_rec" | "to_hash_deep"
-            | "fields" | "methods" | "superclass"
+            "isa"
+                | "can"
+                | "DOES"
+                | "does"
+                | "VERSION"
+                | "new"
+                | "BUILD"
+                | "DESTROY"
+                | "destroy"
+                | "clone"
+                | "with"
+                | "to_hash"
+                | "to_hash_rec"
+                | "to_hash_deep"
+                | "fields"
+                | "methods"
+                | "superclass"
         ) {
             return true;
         }
@@ -970,11 +978,7 @@ impl StaticAnalyzer {
             if !seen.insert(c.clone()) {
                 continue;
             }
-            if self
-                .type_fields
-                .get(&c)
-                .is_some_and(|s| s.contains(method))
-            {
+            if self.type_fields.get(&c).is_some_and(|s| s.contains(method)) {
                 return true;
             }
             if self
@@ -1292,7 +1296,7 @@ impl StaticAnalyzer {
             | ExprKind::Delete(e) => {
                 self.analyze_expr(e);
             }
-            ExprKind::Exists(e) => {
+            ExprKind::Exists(e)
                 // `exists &SUB` and `exists &Pkg::sub` are introspection
                 // calls — the point is to check whether the sub IS
                 // defined, so flagging an "undefined" sub here is the
@@ -1303,10 +1307,9 @@ impl StaticAnalyzer {
                 if !matches!(
                     e.kind,
                     ExprKind::SubroutineCodeRef(_) | ExprKind::SubroutineRef(_)
-                ) {
+                ) => {
                     self.analyze_expr(e);
                 }
-            }
             ExprKind::ArrowDeref { expr, index, kind } => {
                 self.analyze_expr(expr);
                 if *kind != DerefKind::Call {
@@ -2293,17 +2296,9 @@ mod tests {
         // `before/after/around` advice bodies see `$INTERCEPT_NAME`,
         // `@INTERCEPT_ARGS`, `$INTERCEPT_RESULT`, `$INTERCEPT_MS`,
         // `$INTERCEPT_US` as VM-injected always-defined vars.
+        assert!(lint("before \"fetch\" { p $INTERCEPT_NAME, @INTERCEPT_ARGS }").is_ok());
         assert!(
-            lint(
-                "before \"fetch\" { p $INTERCEPT_NAME, @INTERCEPT_ARGS }"
-            )
-            .is_ok()
-        );
-        assert!(
-            lint(
-                "after \"fetch\" { p $INTERCEPT_RESULT, $INTERCEPT_MS, $INTERCEPT_US }"
-            )
-            .is_ok()
+            lint("after \"fetch\" { p $INTERCEPT_RESULT, $INTERCEPT_MS, $INTERCEPT_US }").is_ok()
         );
     }
 
@@ -2351,9 +2346,7 @@ mod tests {
         // `our $x = ...` in default package `main` — `$main::x` must
         // resolve. Regression for test_bugs_phase3_pin.stk where
         // `BEGIN { $main::log_begin .= ... }` was flagged.
-        assert!(
-            lint("our $log_begin = \"\"\nBEGIN { $main::log_begin .= \"B:\" }").is_ok(),
-        );
+        assert!(lint("our $log_begin = \"\"\nBEGIN { $main::log_begin .= \"B:\" }").is_ok(),);
         assert!(lint("our @items = (1,2)\np @main::items").is_ok());
         assert!(lint("our %map = ()\np keys %main::map").is_ok());
     }
@@ -2366,9 +2359,7 @@ mod tests {
         let r = lint("use strict\np $#undefined_array");
         assert!(r.is_err(), "$#undefined_array must flag @undefined_array");
         assert!(
-            r.unwrap_err()
-                .message
-                .contains("@undefined_array"),
+            r.unwrap_err().message.contains("@undefined_array"),
             "error must name @undefined_array, not $#undefined_array",
         );
     }
@@ -2399,9 +2390,8 @@ mod tests {
     #[test]
     fn match_arm_known_enum_variant_passes() {
         // Symmetric guard: real variants must not be flagged.
-        assert!(
-            lint(
-                "enum Sig { Hup, Int, Term, Kill }\n\
+        assert!(lint(
+            "enum Sig { Hup, Int, Term, Kill }\n\
                  fn handle($s) {\n\
                      match ($s) {\n\
                          Sig::Hup => \"reload\",\n\
@@ -2410,9 +2400,8 @@ mod tests {
                          Sig::Kill => \"reap\",\n\
                      }\n\
                  }"
-            )
-            .is_ok()
-        );
+        )
+        .is_ok());
     }
 
     #[test]
@@ -2432,28 +2421,24 @@ mod tests {
         // `open(my $fh, ">", $path)` — `my $fh` inside the call
         // declares a lexical scalar. Later `print $fh ...` /
         // `close $fh` must see it as defined.
-        assert!(
-            lint(
-                "use strict\nmy $efile = \"/tmp/x\"\n\
+        assert!(lint(
+            "use strict\nmy $efile = \"/tmp/x\"\n\
                  open(my $wfh, \">\", $efile) or die\n\
                  print $wfh \"line1\\n\"\nclose $wfh"
-            )
-            .is_ok(),
-        );
+        )
+        .is_ok(),);
     }
 
     #[test]
     fn exists_subroutine_ref_does_not_flag_undefined() {
         // `exists &Pkg::sub` is introspection — flagging the sub as
         // undefined defeats the entire purpose.
-        assert!(
-            lint(
-                "package Foo\nfn greet = 1\npackage main\n\
+        assert!(lint(
+            "package Foo\nfn greet = 1\npackage main\n\
                  p exists(&Foo::greet) ? \"y\" : \"n\"\n\
                  p exists(&Foo::missing) ? \"y\" : \"n\""
-            )
-            .is_ok(),
-        );
+        )
+        .is_ok(),);
     }
 
     #[test]
@@ -2464,9 +2449,8 @@ mod tests {
         // `to_hash_deep`, `fields`, `methods`, `superclass`) are
         // always callable on any class instance — never flag them
         // via $obj->X or $self->X.
-        assert!(
-            lint(
-                "class Square { side: Float\n fn area { 1 } }\n\
+        assert!(lint(
+            "class Square { side: Float\n fn area { 1 } }\n\
                  my $sq = Square->new(side => 5)\n\
                  p $sq->isa(\"Square\")\n\
                  p $sq->can(\"area\")\n\
@@ -2475,57 +2459,50 @@ mod tests {
                  my $changed = $sq->with(side => 9)\n\
                  p $sq->to_hash()\n\
                  p $sq->fields()"
-            )
-            .is_ok(),
-        );
+        )
+        .is_ok(),);
     }
 
     #[test]
     fn builtin_struct_methods_resolve_on_any_struct() {
         // Same whitelist applies to structs: `clone`, `with`,
         // `to_hash`, `to_hash_rec`, `to_hash_deep`, `fields`.
-        assert!(
-            lint(
-                "struct Point { x: Float\n y: Float }\n\
+        assert!(lint(
+            "struct Point { x: Float\n y: Float }\n\
                  my $p = Point(x => 1.0, y => 2.0)\n\
                  my $c = $p->clone()\n\
                  my $u = $p->with(x => 9.0)\n\
                  p $p->to_hash()\n\
                  p $p->fields()"
-            )
-            .is_ok(),
-        );
+        )
+        .is_ok(),);
     }
 
     #[test]
     fn class_inheritance_resolves_parent_methods_on_self() {
         // `class Dog extends Animal` — `$self->trail` inside Dog's
         // body must walk up to Animal and find `trail` there.
-        assert!(
-            lint(
-                "class Animal { name: Str = \"\"\n fn trail { \"...\" } }\n\
+        assert!(lint(
+            "class Animal { name: Str = \"\"\n fn trail { \"...\" } }\n\
                  class Dog extends Animal {\n\
                      breed: Str = \"\"\n\
                      fn show { $self->trail }\n\
                  }"
-            )
-            .is_ok(),
-        );
+        )
+        .is_ok(),);
     }
 
     #[test]
     fn class_inheritance_resolves_parent_fields_in_constructor() {
         // `Dog(name => "Rex", breed => "Lab")` — `name` is on Animal,
         // `breed` on Dog. Constructor key check must accept both.
-        assert!(
-            lint(
-                "class Animal { name: Str = \"\" }\n\
+        assert!(lint(
+            "class Animal { name: Str = \"\" }\n\
                  class Dog extends Animal { breed: Str = \"\" }\n\
                  my $d = Dog(name => \"Rex\", breed => \"Lab\")\n\
                  p $d->name"
-            )
-            .is_ok(),
-        );
+        )
+        .is_ok(),);
     }
 
     #[test]
@@ -2536,28 +2513,20 @@ mod tests {
         // current file sits inside `lib/ai/`. Without walking up to
         // find the `lib/`-bearing ancestor, the resolver would land
         // in `lib/ai/lib/ai/matrix.stk` which doesn't exist.
-        let tmp = std::env::temp_dir().join(format!(
-            "stryke_resolve_test_{}",
-            std::process::id()
-        ));
+        let tmp = std::env::temp_dir().join(format!("stryke_resolve_test_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&tmp);
         std::fs::create_dir_all(tmp.join("lib").join("ai")).unwrap();
         let mat = tmp.join("lib").join("ai").join("matrix.stk");
         std::fs::write(&mat, "1\n").unwrap();
-        let nn = tmp
-            .join("lib")
-            .join("ai")
-            .join("neural_network.stk");
+        let nn = tmp.join("lib").join("ai").join("neural_network.stk");
         std::fs::write(&nn, "1\n").unwrap();
-        let resolved = super::resolve_require_path_from_file(
-            nn.to_str().unwrap(),
-            "./lib/ai/matrix.stk",
-        );
+        let resolved =
+            super::resolve_require_path_from_file(nn.to_str().unwrap(), "./lib/ai/matrix.stk");
         assert!(
             resolved.as_ref().is_some_and(|p| p == &mat)
-                || resolved.as_ref().is_some_and(|p| {
-                    p.canonicalize().ok() == mat.canonicalize().ok()
-                }),
+                || resolved
+                    .as_ref()
+                    .is_some_and(|p| { p.canonicalize().ok() == mat.canonicalize().ok() }),
             "expected to resolve to {mat:?}, got {resolved:?}",
         );
         let _ = std::fs::remove_dir_all(&tmp);
@@ -2567,18 +2536,15 @@ mod tests {
     fn resolve_require_path_sibling_in_same_dir() {
         // `require "./sibling.stk"` from same-directory script should
         // resolve regardless of `lib/` presence.
-        let tmp = std::env::temp_dir().join(format!(
-            "stryke_resolve_sibling_{}",
-            std::process::id()
-        ));
+        let tmp =
+            std::env::temp_dir().join(format!("stryke_resolve_sibling_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&tmp);
         std::fs::create_dir_all(&tmp).unwrap();
         let sib = tmp.join("sibling.stk");
         std::fs::write(&sib, "1\n").unwrap();
         let me = tmp.join("me.stk");
         std::fs::write(&me, "1\n").unwrap();
-        let resolved =
-            super::resolve_require_path_from_file(me.to_str().unwrap(), "./sibling.stk");
+        let resolved = super::resolve_require_path_from_file(me.to_str().unwrap(), "./sibling.stk");
         assert!(
             resolved.is_some(),
             "expected to resolve ./sibling.stk in same dir, got None",
@@ -2591,18 +2557,16 @@ mod tests {
         // `Task(1, "Setup", Priority::High)` is positional — none of
         // the args are field names. Must not flag the String /
         // Bareword args as "unknown field".
-        assert!(
-            lint(
-                "enum Priority { Low, Medium, High, Critical }\n\
+        assert!(lint(
+            "enum Priority { Low, Medium, High, Critical }\n\
                  class Task {\n\
                      id: Int\n\
                      title: Str = \"\"\n\
                      priority: Any = undef\n\
                  }\n\
                  my $t = Task(1, \"Setup\", Priority::High)"
-            )
-            .is_ok(),
-        );
+        )
+        .is_ok(),);
     }
 
     #[test]
@@ -2610,13 +2574,11 @@ mod tests {
         // `Person(\"Alice\", 30)` — String literal is the FIRST arg
         // (and would-be field name), but since "Alice" isn't a
         // declared field of Person, the call is positional.
-        assert!(
-            lint(
-                "class Person { name: Str = \"\"\n age: Int = 0 }\n\
+        assert!(lint(
+            "class Person { name: Str = \"\"\n age: Int = 0 }\n\
                  my $p = Person(\"Alice\", 30)"
-            )
-            .is_ok(),
-        );
+        )
+        .is_ok(),);
     }
 
     #[test]
@@ -2650,9 +2612,8 @@ mod tests {
         // impl Greetable { ... }` — `$p->greeting` must resolve via
         // the trait's default impl. Regression for
         // test_extended_features_pin.stk.
-        assert!(
-            lint(
-                "trait Greetable {\n\
+        assert!(lint(
+            "trait Greetable {\n\
                      fn greeting { \"Hello\" }\n\
                      fn name\n\
                  }\n\
@@ -2662,24 +2623,21 @@ mod tests {
                  }\n\
                  my $p = Person(n => \"Alice\")\n\
                  p $p->greeting()"
-            )
-            .is_ok(),
-        );
+        )
+        .is_ok(),);
     }
 
     #[test]
     fn class_impl_multiple_traits_resolves_methods_from_all() {
-        assert!(
-            lint(
-                "trait Greetable { fn greeting { \"hi\" } }\n\
+        assert!(lint(
+            "trait Greetable { fn greeting { \"hi\" } }\n\
                  trait Loggable  { fn log_it { 1 } }\n\
                  class Hybrid impl Greetable, Loggable {}\n\
                  my $h = Hybrid->new\n\
                  p $h->greeting()\n\
                  p $h->log_it()"
-            )
-            .is_ok(),
-        );
+        )
+        .is_ok(),);
     }
 
     #[test]

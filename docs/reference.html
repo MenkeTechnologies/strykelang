@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.14.15 · 10234 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.14.16 · 10234 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -10363,10 +10363,24 @@ for (@m) { p &quot;_-&gt;{mount}: _-&gt;{used}/_-&gt;{total}&quot; }
       </article>
       <article class="doc-entry" id="doc-pool-info">
         <h3><a class="doc-anchor" href="#doc-pool-info">#</a> <code>pool_info</code></h3>
-        <p><code>pool_info</code> (alias <code>par_info</code>) — return thread pool details as a hashref (threads, queued, active).</p>
-        <pre><code class="lang-perl">my $info = par_info()
-p $info-&gt;{threads}
+        <p><code>pool_info</code> (alias <code>par_info</code>) — thread-pool + host metadata as a hashref. Useful for sizing parallel work, gating on architecture, and reporting in benchmarks.</p>
+        <p><strong>Keys (always present):</strong></p>
+        <p>| key | type | meaning | |---|---|---| | <code>cpus</code> | Int | logical-CPU count from <code>available_parallelism</code> (hyperthreads counted) | | <code>rayon_threads</code> | Int | current rayon worker-pool size (what <code>pmap</code> / <code>pfor</code> / <code>pgrep</code> use) | | <code>arch</code> | Str | build target architecture: <code>aarch64</code>, <code>x86_64</code>, <code>riscv64</code>, … | | <code>os</code> | Str | build target OS: <code>macos</code>, <code>linux</code>, <code>freebsd</code>, <code>windows</code>, … |</p>
+        <p><strong>macOS-only keys</strong> (populated via <code>sysctlbyname</code> on Apple Silicon / Intel Macs):</p>
+        <p>| key | type | meaning | |---|---|---| | <code>perf_cores</code> | Int | performance-core count (<code>hw.perflevel0.physicalcpu</code>) | | <code>eff_cores</code>  | Int | efficiency-core count (<code>hw.perflevel1.physicalcpu</code>) |</p>
+        <pre><code class="lang-perl">my $info = pool_info()
+p $info-&gt;{cpus}            # 12 (e.g. M3 Pro)
+p $info-&gt;{rayon_threads}   # 12
+p $info-&gt;{arch}            # &quot;aarch64&quot;
+p $info-&gt;{os}              # &quot;macos&quot;
+p $info-&gt;{perf_cores}      # 6     (Apple Silicon only)
+p $info-&gt;{eff_cores}       # 4     (Apple Silicon only)
+
+# Sizing parallel work to perf cores when available:
+my $n = $info-&gt;{perf_cores} // $info-&gt;{rayon_threads}
+@inputs |&gt; pmap { heavy(_) }
 </code></pre>
+        <p>See also: <code>thread_count</code>, <code>par_bench</code>, <code>pmap</code>, <code>pfor</code>, <code>pgrep</code>, <code>set_pool_size</code>.</p>
       </article>
       <article class="doc-entry" id="doc-par-bench">
         <h3><a class="doc-anchor" href="#doc-par-bench">#</a> <code>par_bench</code></h3>
