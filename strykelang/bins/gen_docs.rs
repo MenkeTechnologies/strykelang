@@ -100,20 +100,210 @@ fn stamp_index_version() {
         };
 
     let replacement = format!("stryke v{version}{tail_with_counts}");
-    if current == replacement {
-        return;
+    let mut new_src = if current == replacement {
+        src.clone()
+    } else {
+        format!(
+            "{}{}{}{}",
+            &src[..after],
+            replacement,
+            needle_end,
+            &src[e + needle_end.len()..]
+        )
+    };
+
+    // Replace EVERY occurrence of the count phrase in the file
+    // (build line + tutorial-subtitle + any other prose mention).
+    // Two shapes accepted:
+    //   ` · N builtins (M keys in %all)`         — build-line form
+    //   `, N builtins in %b (M keys in %all)`    — subtitle form
+    let mut changed = false;
+    while let Some(rep) = regex_replace_count_segment(&new_src, &count_segment) {
+        if rep == new_src {
+            break;
+        }
+        new_src = rep;
+        changed = true;
     }
-    let new_src = format!(
-        "{}{}{}{}",
+    let subtitle_segment = format!(", {n_builtins_str} builtins in %b ({n_all_str} keys in %all)");
+    while let Some(rep) = regex_replace_subtitle_count(&new_src, &subtitle_segment) {
+        if rep == new_src {
+            break;
+        }
+        new_src = rep;
+        changed = true;
+    }
+
+    if changed || current != replacement {
+        fs::write(&path, &new_src).expect("write docs/index.html");
+        println!(
+            "stamped docs/index.html with v{version} ({n_builtins_str} builtins, {n_all_str} keys in %all)"
+        );
+    }
+
+    // LOC stats — prefer `tokei` (it strips comments + blanks, gives
+    // proper "code" lines). Fall back to a wc-style line counter if
+    // tokei isn't installed. Stryke `.stk` files aren't a recognized
+    // language in tokei yet, so they always use the wc fallback.
+    let n_rust_src = tokei_code_lines("strykelang", "Rust")
+        .unwrap_or_else(|| count_lines_under("strykelang", "rs"));
+    let n_tests = tokei_code_lines("tests", "Rust")
+        .unwrap_or_else(|| count_lines_under("tests", "rs"));
+    let n_examples = count_lines_under("examples", "stk");
+    let loc_segment = format!(
+        "{} Rust src · {} test src · {} example src",
+        fmt_count(n_rust_src),
+        fmt_count(n_tests),
+        fmt_count(n_examples),
+    );
+    match stamp_loc_span(&new_src, &loc_segment) {
+        LocStampOutcome::Rewritten(s) => {
+            fs::write(&path, &s).expect("write docs/index.html");
+            println!("stamped docs/index.html LOC: {loc_segment}");
+        }
+        LocStampOutcome::Unchanged => {
+            println!("LOC unchanged: {loc_segment}");
+        }
+        LocStampOutcome::NoPlaceholder => {
+            println!(
+                "LOC: {loc_segment} (no <span id=\"strykeLoc\"> placeholder in docs/index.html)"
+            );
+        }
+    }
+}
+
+/// Run `tokei -o json <root>` and return the `code` line count for
+/// the requested language (`"Rust"`, `"Perl"`, …). Returns `None` if
+/// tokei is missing, fails, or doesn't have the language section.
+fn tokei_code_lines(root: &str, lang: &str) -> Option<usize> {
+    let output = std::process::Command::new("tokei")
+        .arg("-o")
+        .arg("json")
+        .arg(root)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
+    let code = json.get(lang)?.get("code")?.as_u64()? as usize;
+    Some(code)
+}
+
+/// Replace the `, N,NNN builtins in %b (M,MMM keys in %all)` form
+/// used by the tutorial-subtitle paragraph. Comma-prefix, ` in %b `
+/// inside the count — different shape from the build-line form
+/// (` · N builtins (M keys in %all)`).
+fn regex_replace_subtitle_count(text: &str, new_seg: &str) -> Option<String> {
+    let bytes = text.as_bytes();
+    let mut i = 0;
+    while i + 2 < bytes.len() {
+        if bytes[i] == b',' && bytes[i + 1] == b' ' {
+            let segment_start = i;
+            let mut j = i + 2;
+            let n_start = j;
+            while j < bytes.len() && (bytes[j].is_ascii_digit() || bytes[j] == b',') {
+                j += 1;
+            }
+            if j == n_start {
+                i += 1;
+                continue;
+            }
+            let middle = " builtins in %b (";
+            if !text[j..].starts_with(middle) {
+                i += 1;
+                continue;
+            }
+            j += middle.len();
+            let m_start = j;
+            while j < bytes.len() && (bytes[j].is_ascii_digit() || bytes[j] == b',') {
+                j += 1;
+            }
+            if j == m_start {
+                i += 1;
+                continue;
+            }
+            let end = " keys in %all)";
+            if !text[j..].starts_with(end) {
+                i += 1;
+                continue;
+            }
+            j += end.len();
+            return Some(format!("{}{}{}", &text[..segment_start], new_seg, &text[j..]));
+        }
+        i += 1;
+    }
+    None
+}
+
+/// Result of attempting to stamp a `<span id="strykeLoc">` placeholder.
+enum LocStampOutcome {
+    /// Page didn't have the placeholder — caller should announce
+    /// the numbers as console-only.
+    NoPlaceholder,
+    /// Placeholder present but text already matches — no rewrite.
+    Unchanged,
+    /// Placeholder present, text rewritten — caller writes the page.
+    Rewritten(String),
+}
+
+fn stamp_loc_span(src: &str, new_text: &str) -> LocStampOutcome {
+    let open = r#"<span id="strykeLoc">"#;
+    let close = "</span>";
+    let Some(s) = src.find(open) else {
+        return LocStampOutcome::NoPlaceholder;
+    };
+    let after = s + open.len();
+    let Some(e_rel) = src[after..].find(close) else {
+        return LocStampOutcome::NoPlaceholder;
+    };
+    let e = after + e_rel;
+    if &src[after..e] == new_text {
+        return LocStampOutcome::Unchanged;
+    }
+    LocStampOutcome::Rewritten(format!(
+        "{}{}{}",
         &src[..after],
-        replacement,
-        needle_end,
-        &src[e + needle_end.len()..]
-    );
-    fs::write(&path, new_src).expect("write docs/index.html");
-    println!(
-        "stamped docs/index.html with v{version} ({n_builtins_str} builtins, {n_all_str} keys in %all)"
-    );
+        new_text,
+        &src[e..]
+    ))
+}
+
+/// Sum line counts of every `*.<ext>` file under `root`. Walks
+/// directories recursively; skips `target/` and any path containing
+/// `.git`. Returns 0 if `root` doesn't exist.
+fn count_lines_under(root: &str, ext: &str) -> usize {
+    let mut total = 0usize;
+    let root_path = PathBuf::from(root);
+    if !root_path.exists() {
+        return 0;
+    }
+    let mut stack: Vec<PathBuf> = vec![root_path];
+    while let Some(d) = stack.pop() {
+        let Ok(rd) = fs::read_dir(&d) else {
+            continue;
+        };
+        for entry in rd.flatten() {
+            let p = entry.path();
+            let name = p
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("");
+            if name == "target" || name == ".git" || name == "node_modules" {
+                continue;
+            }
+            if p.is_dir() {
+                stack.push(p);
+                continue;
+            }
+            if p.extension().and_then(|s| s.to_str()) == Some(ext) {
+                if let Ok(s) = fs::read_to_string(&p) {
+                    total += s.lines().count();
+                }
+            }
+        }
+    }
+    total
 }
 
 /// Replace the existing `· N,NNN builtins (M,MMM keys in %all)` segment
