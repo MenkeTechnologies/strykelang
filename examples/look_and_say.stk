@@ -1,0 +1,126 @@
+#!/usr/bin/env stryke
+
+# Conway's look-and-say sequence: each term describes the previous
+# term aloud. Starting from "1":
+#   1                  (one)
+#   11                 (one 1)
+#   21                 (two 1s)
+#   1211               (one 2, one 1)
+#   111221             (one 1, one 2, two 1s)
+#   312211             (three 1s, two 2s, one 1)
+#   ...
+#
+# John Conway proved that successive term lengths grow asymptotically
+# as λⁿ where λ ≈ 1.30357726903... is the unique real root of his
+# 71-degree "cosmological" polynomial.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * `fn name = …` expression body where it fits (§3)
+#   * `|>` pipelines, `:` ranges, `len` not `length` (§4, §5, §6b)
+#   * `#{ }` interpolation in headers (§1a)
+#   * `_0`/`_1` if sort/reduce blocks appear (§11)
+#   * no `return` on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/look_and_say.stk
+
+# ── one rewrite step using regex run-detection ────────────────────
+
+fn LAS::next($s) {
+    my $out = ""
+    while ($s =~ /((\d)\2*)/g) {
+        my $run = $1
+        my $d = $run[0:0]
+        $out .= len($run) . $d
+    }
+    $out
+}
+
+fn LAS::iterate($seed, $n) {
+    my @hist = ($seed)
+    my $cur = $seed
+    for my $i (1:$n) {
+        $cur = LAS::next($cur)
+        push @hist, $cur
+    }
+    \@hist
+}
+
+# ── run ────────────────────────────────────────────────────────────
+
+my $N = 14
+my $hist = LAS::iterate("1", $N)
+
+printf "── Conway look-and-say, %d iterations from \"1\" ───────\n\n", $N
+printf "  %3s   %8s   %s\n", "i", "len", "term"
+printf "  %3s   %8s   %s\n", "---", "--------", "----"
+
+for my $i (0:$N) {
+    my $term = $hist->[$i]
+    my $shown
+    if (len($term) > 40) {
+        my $head = $term[0:39]
+        $shown = $head . "…"
+    } else {
+        $shown = $term
+    }
+    printf "  %3d   %8d   %s\n", $i, len($term), $shown
+}
+
+# ── invariant 1: every term contains only the digits 1, 2, 3 ──────
+# (Conway's "cosmological" theorem: from the seed "1", no other
+# digit ever appears, regardless of iteration count.)
+
+for my $term (@$hist) {
+    die "term contains digit other than 1/2/3: $term" if $term =~ /[04-9]/
+}
+
+# ── invariant 2: term length is non-decreasing ────────────────────
+
+for my $i (1:$N) {
+    die "length shrank at i=#{$i}" unless len($hist->[$i]) >= len($hist->[$i - 1])
+}
+
+# ── invariant 3: round-trip parse-as-runs reconstructs the term ──
+# i.e., reading off pairs (count, digit) from term n+1 and emitting
+# `digit` × `count` chars reconstructs term n.
+
+for my $i (0:$N - 1) {
+    my $next_term = $hist->[$i + 1]
+    my @pairs = split //, $next_term
+    die "odd-length successor at i=#{$i}: $next_term" unless len(@pairs) % 2 == 0
+    my $rebuilt = ""
+    my $j = 0
+    while ($j < len(@pairs)) {
+        my $cnt = 0 + $pairs[$j]
+        my $d = $pairs[$j + 1]
+        for my $k (1:$cnt) { $rebuilt .= $d }
+        $j += 2
+    }
+    die "reverse-rebuild mismatch at i=#{$i}: got [$rebuilt] vs [$hist->[$i]]" unless $rebuilt eq $hist->[$i]
+}
+
+# ── invariant 4: known prefix — terms 0..6 must match the OEIS
+#                 A005150 sequence exactly. ────────────────────────
+
+my @canonical = ("1", "11", "21", "1211", "111221", "312211", "13112221")
+for my $i (0:6) {
+    die "term $i mismatch: got [$hist->[$i]] want [$canonical[$i]]" unless $hist->[$i] eq $canonical[$i]
+}
+
+# ── invariant 5: growth-rate is bounded above by 2× per step (each
+#                 run of length L produces at most 2 chars in the
+#                 successor when L < 10, so successor length ≤ 2·n).
+
+for my $i (1:$N) {
+    die "growth rate exceeds 2× at i=#{$i}" unless len($hist->[$i]) <= 2 * len($hist->[$i - 1])
+}
+
+p ""
+printf "── Conway's λ approximation from this run ──────────────\n"
+my $ratio = len($hist->[$N]) / len($hist->[$N - 1])
+printf "  len(L_%d) / len(L_%d) = %d / %d = %.5f\n",
+    $N, $N - 1, len($hist->[$N]), len($hist->[$N - 1]), $ratio
+printf "  (Conway's constant λ ≈ 1.30358)\n"
+
+p ""
+p "── all five invariants satisfied ───────────────────────"

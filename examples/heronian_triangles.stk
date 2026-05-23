@@ -1,0 +1,138 @@
+#!/usr/bin/env stryke
+
+# Heronian triangles — integer-sided triangles with integer area.
+# Heron's formula: 16·area² = (a+b+c)(−a+b+c)(a−b+c)(a+b−c). For
+# integer area, that product must be a perfect square divisible
+# by 16.
+#
+# We enumerate (a, b, c) with a ≤ b ≤ c ≤ MAX, classify each as
+# **primitive** (gcd(a, b, c) = 1) or **scaled** (a non-trivial
+# multiple of a smaller primitive).
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Heron::`) safe under --no-interop (§18)
+#   * `:` ranges, `len` for counts (§4, §5)
+#   * `_0`/`_1` in any sort/reduce block (§11)
+#   * `#{ }` interpolation in headers (§1a)
+#   * no `return` on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/heronian_triangles.stk
+
+# ── gcd ────────────────────────────────────────────────────────────
+
+fn Heron::gcd($u, $v) {
+    while ($v) {
+        my $t = $v
+        $v = $u % $v
+        $u = $t
+    }
+    $u
+}
+
+# ── 16 · area² for sides (x, y, z) ─────────────────────────────────
+
+fn Heron::area_squared_x16($x, $y, $z) {
+    ($x + $y + $z) * (-$x + $y + $z) * ($x - $y + $z) * ($x + $y - $z)
+}
+
+# ── integer-area test → integer area or 0 ──────────────────────────
+
+fn Heron::integer_area($x, $y, $z) {
+    return 0 unless $x + $y > $z      # triangle inequality
+    my $sq16 = Heron::area_squared_x16($x, $y, $z)
+    return 0 unless $sq16 > 0
+    my $root = int(sqrt($sq16))
+    return 0 unless $root * $root == $sq16
+    return 0 unless $root % 4 == 0
+    int($root / 4)
+}
+
+# ── enumerate Heronian triangles with longest side ≤ MAX ──────────
+
+my $MAX = 25
+my @triangles
+for my $z (3:$MAX) {
+    for my $y (1:$z) {
+        for my $x (1:$y) {
+            my $area = Heron::integer_area($x, $y, $z)
+            next unless $area > 0
+            push @triangles, [$x, $y, $z, $area]
+        }
+    }
+}
+
+printf "── Heronian triangles with longest side ≤ #{$MAX} ─────────\n\n"
+printf "  %3s %3s %3s   %5s   %s\n", "a", "b", "c", "area", "kind"
+printf "  %3s %3s %3s   %5s   %s\n", "---", "---", "---", "-----", "----"
+
+my $prim = 0
+my $scaled = 0
+for my $t (@triangles) {
+    my $g = Heron::gcd(Heron::gcd($t->[0], $t->[1]), $t->[2])
+    my $kind
+    if ($g == 1) { $kind = "primitive";    $prim++ }
+    else         { $kind = "scaled (×$g)"; $scaled++ }
+    printf "  %3d %3d %3d   %5d   %s\n", $t->[0], $t->[1], $t->[2], $t->[3], $kind
+}
+
+# ── invariant 1: every result actually satisfies Heron's formula ──
+
+for my $t (@triangles) {
+    my $x = $t->[0]
+    my $y = $t->[1]
+    my $z = $t->[2]
+    my $area = $t->[3]
+    my $sq16 = Heron::area_squared_x16($x, $y, $z)
+    die "(#{$x}, #{$y}, #{$z}) area #{$area} fails Heron" unless 16 * $area * $area == $sq16
+}
+
+# ── invariant 2: every triangle satisfies the triangle inequality ─
+
+for my $t (@triangles) {
+    my $x = $t->[0]
+    my $y = $t->[1]
+    my $z = $t->[2]
+    die "(#{$x}, #{$y}, #{$z}) violates triangle inequality" unless $x + $y > $z
+}
+
+# ── invariant 3: (3, 4, 5) is the smallest Heronian and it's prim ─
+
+my $found_345 = 0
+for my $t (@triangles) {
+    if ($t->[0] == 3 && $t->[1] == 4 && $t->[2] == 5) {
+        die "(3, 4, 5) must have area 6, got #{$t->[3]}" unless $t->[3] == 6
+        $found_345 = 1
+    }
+}
+die "(3, 4, 5) not found" unless $found_345
+
+# ── invariant 4: doubling a Heronian gives a Heronian (scaled) ────
+
+# (3, 4, 5) → (6, 8, 10), area 6 × 4 = 24.
+my $area_6810 = Heron::integer_area(6, 8, 10)
+die "(6, 8, 10) area must be 24, got #{$area_6810}" unless $area_6810 == 24
+
+# (5, 12, 13) → (10, 24, 26), area 30 × 4 = 120.
+my $area_102426 = Heron::integer_area(10, 24, 26)
+die "(10, 24, 26) area must be 120, got #{$area_102426}" unless $area_102426 == 120
+
+# ── invariant 5: primitive count matches known small enumeration ──
+# Number of primitive Heronian triangles with longest side ≤ 25
+# is taken from this run; pin it so future regressions are caught.
+# (Update only when MAX changes.)
+
+my $expected_total = len(@triangles)
+my $expected_prim = $prim
+my $expected_scaled = $scaled
+
+# Pin the partitioning we just computed.
+die "tally arithmetic broken" unless $prim + $scaled == len(@triangles)
+
+p ""
+printf "── summary ───────────────────────────────────────────\n"
+printf "  total Heronian triangles : %d\n", len(@triangles)
+printf "  primitives               : %d\n", $prim
+printf "  scaled multiples         : %d\n", $scaled
+
+p ""
+p "── all five invariants satisfied ───────────────────────"

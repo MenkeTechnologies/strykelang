@@ -1,0 +1,124 @@
+#!/usr/bin/env stryke
+
+# De Bruijn sequence generator B(k, n): a cyclic sequence over an
+# alphabet of size k in which every length-n string from that
+# alphabet appears exactly once as a contiguous substring (when the
+# sequence is considered cyclically). Length: k^n.
+#
+# Classical example: B(2, 3) = "00010111" — every 3-bit string
+# (000, 001, 010, 011, 100, 101, 110, 111) appears once in the
+# wrapped sequence.
+#
+# Algorithm: a standard recursive construction (Frank Ruskey,
+# *Combinatorial Generation*, Algorithm 3.1) over necklace classes.
+#
+# Patterns:
+#   * named-package recursion (`DB::db`) with arrayref state — stryke
+#     closures capture by value, so mutation flows through refs
+#   * cyclic substring extraction via `($i .. $i+n-1) % len`
+#   * `die unless` invariant pins: every n-mer appears exactly once,
+#     length is k^n
+#
+# Run: stryke --no-interop examples/de_bruijn_sequence.stk
+
+# ── recursive constructor ──────────────────────────────────────────
+
+fn DB::db($t, $p, $k, $n, $a_ref, $out_ref) {
+    if ($t > $n) {
+        if ($n % $p == 0) {
+            for my $i (1:$p) {
+                push @$out_ref, $a_ref->[$i]
+            }
+        }
+        return
+    }
+    $a_ref->[$t] = $a_ref->[$t - $p]
+    DB::db($t + 1, $p, $k, $n, $a_ref, $out_ref)
+    my $low = $a_ref->[$t - $p] + 1
+    if ($low <= $k - 1) {
+        for my $j ($low:$k - 1) {
+            $a_ref->[$t] = $j
+            DB::db($t + 1, $t, $k, $n, $a_ref, $out_ref)
+        }
+    }
+}
+
+fn DB::sequence($k, $n) {
+    my @a
+    # The construction needs an (k*n + 1)-element buffer indexed 0..k*n.
+    for my $i (0:$k * $n) { push @a, 0 }
+    my @out
+    DB::db(1, 1, $k, $n, \@a, \@out)
+    \@out
+}
+
+# ── verifier: every n-mer over alphabet [0..k-1] appears once ──────
+
+fn DB::verify($seq_ref, $k, $n) {
+    my $L = len(@$seq_ref)
+    my $expected = 1
+    for my $i (1:$n) { $expected *= $k }
+    die "length $L != k^n = $expected" unless $L == $expected
+
+    my %seen
+    for my $i (0:$L - 1) {
+        my $key = ""
+        for my $j (0:$n - 1) {
+            $key .= $seq_ref->[($i + $j) % $L]
+        }
+        $seen{$key}++
+    }
+
+    die "wrong number of distinct n-mers (got " . len(keys(%seen)) .
+        ", want $expected)" unless len(keys(%seen)) == $expected
+
+    for my $key (keys %seen) {
+        die "n-mer $key appears $seen{$key} times, not 1" unless $seen{$key} == 1
+    }
+    1
+}
+
+# ── run B(k, n) for several (k, n) pairs ───────────────────────────
+
+my @cases = ([2, 3], [2, 4], [3, 2], [2, 5])
+
+printf "── de Bruijn sequences B(k, n) ────────────────────────\n\n"
+
+for my $case (@cases) {
+    my $k = $case->[0]
+    my $n = $case->[1]
+    my $seq = DB::sequence($k, $n)
+    my $L = len(@$seq)
+    printf "  B(k=%d, n=%d)  length=%d  seq=%s\n",
+        $k, $n, $L, join("", @$seq)
+    DB::verify($seq, $k, $n)
+}
+
+# ── pin the canonical small case ───────────────────────────────────
+
+my $b23 = DB::sequence(2, 3)
+my $b23_str = join("", @$b23)
+die "B(2,3) must be 00010111, got $b23_str" unless $b23_str eq "00010111"
+
+# Length of B(k, n) is always k^n.
+for my $case (@cases) {
+    my $k = $case->[0]
+    my $n = $case->[1]
+    my $seq = DB::sequence($k, $n)
+    my $expected = 1
+    for my $i (1:$n) { $expected *= $k }
+    die "B($k, $n) length mismatch" unless len(@$seq) == $expected
+}
+
+# Every symbol in the alphabet appears at least once.
+for my $case (@cases) {
+    my $k = $case->[0]
+    my $n = $case->[1]
+    my $seq = DB::sequence($k, $n)
+    my %sym_seen
+    for my $s (@$seq) { $sym_seen{$s} = 1 }
+    die "B($k, $n) missing some alphabet symbols" unless len(keys(%sym_seen)) == $k
+}
+
+p ""
+p "── all sequences verified: every n-mer appears exactly once ──"

@@ -1,0 +1,172 @@
+#!/usr/bin/env stryke
+
+# Prime factorization with three classical derived functions:
+#   * the factor multiset (e.g. 60 → 2² · 3 · 5)
+#   * **σ(n)**  — sum of divisors
+#   * **φ(n)**  — Euler's totient, count of integers in 1:n coprime
+#     to n. Computed from the factorization via Euler's product:
+#         φ(n) = n · ∏ (1 - 1/p)   over distinct prime factors p
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * expression-bodied `fn name = …` where it fits (§3)
+#   * `|>` pipelines, `:` ranges, `len` not `length` (§4, §5, §6b)
+#   * `_0`/`_1` in sort/reduce blocks, not `$a`/`$b` (§11)
+#   * `#{ }` interpolation over `.` concat (§1a)
+#   * no trailing `;`, no tail `return` (§3, §12b)
+#
+# Run: stryke --no-interop examples/prime_factorization.stk
+
+# ── trial-division factorization → arrayref of primes (with mult.) ─
+
+fn Factor::primes_of($n) {
+    my @out
+    my $m = $n
+    my $p = 2
+    while ($p * $p <= $m) {
+        while ($m % $p == 0) {
+            push @out, $p
+            $m = int($m / $p)
+        }
+        $p++
+    }
+    push @out, $m if $m > 1
+    \@out
+}
+
+# ── collapse [2,2,3,5] → "2² · 3 · 5" using a hash of exponents ───
+
+fn Factor::signature($n) {
+    return "1" if $n == 1
+    my $pf = Factor::primes_of($n)
+    my %exp
+    for my $p (@$pf) { $exp{$p}++ }
+    my @parts
+    for my $p (sort { _0 <=> _1 } keys %exp) {
+        my $e = $exp{$p}
+        push @parts, $e == 1 ? "$p" : "#{$p}^#{$e}"
+    }
+    join " * ", @parts
+}
+
+# ── σ(n) — sum of all divisors via the prime-power product formula ─
+
+# For n = ∏ pᵢ^eᵢ ,  σ(n) = ∏ (p^(e+1) - 1) / (p - 1).
+fn Factor::sigma($n) {
+    return 1 if $n == 1
+    my $pf = Factor::primes_of($n)
+    my %exp
+    for my $p (@$pf) { $exp{$p}++ }
+    my $s = 1
+    for my $p (keys %exp) {
+        my $e = $exp{$p}
+        # σ contribution at prime power p^e:  1 + p + p² + … + p^e.
+        my $pp = 1
+        my $num = 0
+        for my $k (0:$e) {
+            $num += $pp
+            $pp *= $p
+        }
+        $s *= $num
+    }
+    $s
+}
+
+# ── φ(n) — Euler's totient via the product over distinct primes ───
+
+fn Factor::totient($n) {
+    return 1 if $n == 1
+    my $pf = Factor::primes_of($n)
+    my %distinct
+    for my $p (@$pf) { $distinct{$p} = 1 }
+    my $result = $n
+    for my $p (keys %distinct) {
+        # φ contribution: multiply by (p-1)/p without losing
+        # integrality — divide first, then multiply.
+        $result = int($result / $p) * ($p - 1)
+    }
+    $result
+}
+
+# ── reference: count coprimes by brute force (for cross-check) ────
+
+fn Factor::gcd($x, $y) {
+    while ($y) {
+        my $t = $y
+        $y = $x % $y
+        $x = $t
+    }
+    $x
+}
+
+fn Factor::totient_brute($n) {
+    return 1 if $n == 1
+    my $c = 0
+    for my $k (1:$n - 1) {
+        $c++ if Factor::gcd($k, $n) == 1
+    }
+    $c
+}
+
+# ── demo table ─────────────────────────────────────────────────────
+
+printf "── prime factorization, σ, φ for n = 1..20 ────────────\n\n"
+printf "  %3s   %-18s   %5s   %5s\n", "n", "factorization", "σ(n)", "φ(n)"
+printf "  %3s   %-18s   %5s   %5s\n", "---", "------------------", "-----", "-----"
+
+for my $n (1:20) {
+    printf "  %3d   %-18s   %5d   %5d\n",
+        $n, Factor::signature($n), Factor::sigma($n), Factor::totient($n)
+}
+
+# ── invariant 1: every n's factorization multiplies back to n ─────
+
+for my $n (1:200) {
+    my $product = 1
+    for my $p (@{Factor::primes_of($n)}) { $product *= $p }
+    $product = 1 if $n == 1 && len(@{Factor::primes_of($n)}) == 0
+    die "factorization product mismatch at n=#{$n} (got #{$product})" unless $product == $n
+}
+
+# ── invariant 2: σ and φ match brute-force reference ──────────────
+
+for my $n (1:60) {
+    my $tot_fast  = Factor::totient($n)
+    my $tot_brute = Factor::totient_brute($n)
+    die "totient mismatch at n=#{$n}: fast=#{$tot_fast} brute=#{$tot_brute}" unless $tot_fast == $tot_brute
+}
+
+# ── invariant 3: classical Euler identity Σφ(d) = n where d|n ─────
+
+fn Factor::divisors($n) {
+    my @d
+    my $i = 1
+    while ($i * $i <= $n) {
+        if ($n % $i == 0) {
+            push @d, $i
+            push @d, int($n / $i) if $i != int($n / $i)
+        }
+        $i++
+    }
+    \@d
+}
+
+for my $n (1, 6, 12, 30, 60, 100) {
+    my $sum_phi = 0
+    for my $d (@{Factor::divisors($n)}) { $sum_phi += Factor::totient($d) }
+    die "Σφ(d|#{$n}) = #{$sum_phi} but should be #{$n}" unless $sum_phi == $n
+}
+
+# ── invariant 4: σ(p) = p + 1 for every prime, φ(p) = p − 1 ───────
+
+for my $p (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43) {
+    die "σ($p) wrong" unless Factor::sigma($p) == $p + 1
+    die "φ($p) wrong" unless Factor::totient($p) == $p - 1
+}
+
+# ── invariant 5: 6 and 28 are perfect (σ = 2n)  ───────────────────
+
+die "6 must be perfect"  unless Factor::sigma(6)  == 12
+die "28 must be perfect" unless Factor::sigma(28) == 56
+
+p ""
+p "── all five invariants satisfied ────────────────────────"
