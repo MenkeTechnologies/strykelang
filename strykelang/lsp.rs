@@ -2763,9 +2763,21 @@ fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option
                 Some(l) => l,
                 None => continue,
             };
-            if let Some(byte) = lt.find(active_sym.name.as_str()) {
+            // Word-boundary scan — `lt.find("y")` matches the `y` in
+            // `my`, which is catastrophic for field rename. Walk every
+            // occurrence and require non-identifier boundary on both
+            // sides. Allow `:` as boundary so `Color::Red` matches.
+            for (byte, _) in lt.match_indices(active_sym.name.as_str()) {
+                let end_byte = byte + active_sym.name.len();
+                let prev = lt[..byte].chars().next_back();
+                let next = lt[end_byte..].chars().next();
+                let prev_ok = prev.is_none_or(|c| !c.is_alphanumeric() && c != '_');
+                let next_ok = next.is_none_or(|c| !c.is_alphanumeric() && c != '_');
+                if !prev_ok || !next_ok {
+                    continue;
+                }
                 let c0 = lt[..byte].encode_utf16().count() as u32;
-                let c1 = lt[..byte + active_sym.name.len()].encode_utf16().count() as u32;
+                let c1 = lt[..end_byte].encode_utf16().count() as u32;
                 push_edits(
                     active_uri.as_str(),
                     vec![Range {

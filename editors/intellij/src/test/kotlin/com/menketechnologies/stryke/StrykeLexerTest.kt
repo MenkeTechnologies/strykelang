@@ -305,8 +305,80 @@ class StrykeLexerTest {
     }
 
     @Test
+    fun block_param_outer_chain_chevrons_are_one_token() {
+        // `_<<<<<` — 5-deep outer chain bare form.
+        val toks = lex("_<<<<<")
+        assertTrue(
+            "expected `_<<<<<` as one BLOCK_PARAM token: $toks",
+            has(toks, StrykeTokenTypes.BLOCK_PARAM, "_<<<<<"),
+        )
+    }
+
+    @Test
+    fun block_param_indexed_ascent_is_one_token() {
+        // `_<5` — indexed-ascent shortcut.
+        val toks = lex("_<5")
+        assertTrue(
+            "expected `_<5` as one BLOCK_PARAM token: $toks",
+            has(toks, StrykeTokenTypes.BLOCK_PARAM, "_<5"),
+        )
+    }
+
+    @Test
+    fun block_param_positional_outer_chain_combined() {
+        // `_2<<<` — positional + outer chain.
+        val toks = lex("_2<<<")
+        assertTrue(
+            "expected `_2<<<` as one BLOCK_PARAM token: $toks",
+            has(toks, StrykeTokenTypes.BLOCK_PARAM, "_2<<<"),
+        )
+    }
+
+    @Test
+    fun block_param_sigiled_outer_chain() {
+        // `\$_<<<<<` — sigil-prefixed outer chain.
+        val toks = lex("\$_<<<<<")
+        assertTrue(
+            "expected `\$_<<<<<` as one BLOCK_PARAM token: $toks",
+            has(toks, StrykeTokenTypes.BLOCK_PARAM, "\$_<<<<<"),
+        )
+    }
+
+    @Test
+    fun block_param_sigiled_indexed_ascent() {
+        val toks = lex("\$_<3")
+        assertTrue(
+            "expected `\$_<3` as one BLOCK_PARAM token: $toks",
+            has(toks, StrykeTokenTypes.BLOCK_PARAM, "\$_<3"),
+        )
+    }
+
+    @Test
+    fun thread_arrow_variants_all_classified_as_pipe() {
+        // All thread-arrow forms must be single PIPE tokens.
+        for ((src, label) in listOf(
+            "~>" to "thread-first",
+            "~>>" to "thread-last",
+            "~s>" to "stream-first",
+            "~s>>" to "stream-last",
+            "~p>" to "parallel-first",
+            "~p>>" to "parallel-last",
+            "~d>" to "dist-first",
+            "~d>>" to "dist-last",
+        )) {
+            val toks = lex(src)
+            assertTrue(
+                "expected `$src` ($label) as one PIPE token: $toks",
+                has(toks, StrykeTokenTypes.PIPE, src),
+            )
+        }
+    }
+
+    @Test
     fun arrow_fat_comma_and_pipe_classified() {
-        val toks = lex("a -> b => c |> d ~> e |>> f")
+        // `|>>` is NOT a 3-char operator — the Rust lexer tokenizes
+        // it as `|>` followed by `>`. Test only the real forms.
+        val toks = lex("a -> b => c |> d ~> e ~>> f")
         assertTrue("ARROW_OP ->: $toks", has(toks, StrykeTokenTypes.ARROW_OP, "->"))
         assertTrue("FAT_COMMA =>: $toks", has(toks, StrykeTokenTypes.FAT_COMMA, "=>"))
         assertTrue(
@@ -318,8 +390,8 @@ class StrykeLexerTest {
             toks.any { it.first == StrykeTokenTypes.PIPE && it.second == "~>" },
         )
         assertTrue(
-            "PIPE |>>: $toks",
-            toks.any { it.first == StrykeTokenTypes.PIPE && it.second == "|>>" },
+            "PIPE ~>>: $toks",
+            toks.any { it.first == StrykeTokenTypes.PIPE && it.second == "~>>" },
         )
     }
 
