@@ -10884,6 +10884,158 @@ fn utf16_col_to_byte_idx(line: &str, col16: u32) -> usize {
 }
 
 #[cfg(test)]
+mod name_range_tests {
+    use super::name_range_on_decl_line;
+
+    #[test]
+    fn bare_name_range_points_at_function_name_after_qualifier() {
+        // `fn Algo::binary_search(...)` — cursor should land on
+        // `binary_search`, not col 0. `binary_search` starts at col 9
+        // (`fn Algo::` is 9 chars).
+        let src = "fn Algo::binary_search($target, @list) {\n    -1\n}\n";
+        let r = name_range_on_decl_line(src, 0, "Algo::binary_search");
+        assert_eq!(r.start.line, 0);
+        assert_eq!(r.start.character, 9, "expected col 9 (start of `binary_search`), got {r:?}");
+        assert_eq!(r.end.character, 22, "expected col 22 (end of `binary_search`)");
+    }
+
+    #[test]
+    fn bare_name_handles_nested_namespace_prefix() {
+        // `fn Project::Foo::Bar::deeply_nested(...)` — strip down to
+        // `deeply_nested`, ignore intermediate `::` segments.
+        let src = "fn Project::Foo::Bar::deeply_nested {\n    1\n}\n";
+        let r = name_range_on_decl_line(src, 0, "Project::Foo::Bar::deeply_nested");
+        assert_eq!(r.start.line, 0);
+        assert_eq!(r.start.character, 22, "expected col 22 (start of `deeply_nested`)");
+        assert_eq!(r.end.character, 35);
+    }
+
+    #[test]
+    fn bare_name_at_zero_for_unqualified_fn() {
+        // `fn double(...)` — name is at col 3 (after `fn `).
+        let src = "fn double { _ * 2 }\n";
+        let r = name_range_on_decl_line(src, 0, "double");
+        assert_eq!(r.start.character, 3);
+        assert_eq!(r.end.character, 9);
+    }
+
+    #[test]
+    fn bare_name_falls_back_to_line_range_when_not_found() {
+        // Name not present on the decl line — return whole-line range.
+        let src = "# comment only\n";
+        let r = name_range_on_decl_line(src, 0, "nonexistent");
+        assert_eq!(r.start.character, 0, "fallback returns line start");
+    }
+
+    #[test]
+    fn bare_name_respects_word_boundary() {
+        // `fn my_search { ... }` — looking up `search` must NOT match
+        // the suffix inside `my_search`. Falls back to line range.
+        let src = "fn my_search { 1 }\n";
+        let r = name_range_on_decl_line(src, 0, "search");
+        // Either the fallback (col 0..len) OR the leftmost real
+        // occurrence — for this source there's only the suffix-match
+        // (rejected by word boundary), so we get the fallback.
+        assert_eq!(r.start.character, 0, "must NOT match `search` inside `my_search`");
+    }
+
+    #[test]
+    fn bare_name_class_decl() {
+        let src = "class MyClass {\n    x: Int\n}\n";
+        let r = name_range_on_decl_line(src, 0, "MyClass");
+        assert_eq!(r.start.character, 6);
+        assert_eq!(r.end.character, 13);
+    }
+
+    #[test]
+    fn bare_name_struct_with_qualified_namespace() {
+        let src = "struct Geom::Point { x, y }\n";
+        let r = name_range_on_decl_line(src, 0, "Geom::Point");
+        assert_eq!(r.start.character, 13, "expected col 13 (start of `Point`)");
+        assert_eq!(r.end.character, 18);
+    }
+}
+
+#[cfg(test)]
+mod hash_subscript_receiver_tests {
+    use super::extract_hash_subscript_receiver;
+
+    #[test]
+    fn receiver_dollar_arrow_brace() {
+        // `$info->{` — brace at byte 7. Receiver is `info`.
+        assert_eq!(extract_hash_subscript_receiver("$info->{", 7), "info");
+    }
+
+    #[test]
+    fn receiver_dollar_brace_no_arrow() {
+        // `$h{` — brace at byte 2. Receiver is `h`.
+        assert_eq!(extract_hash_subscript_receiver("$h{", 2), "h");
+    }
+
+    #[test]
+    fn receiver_longer_name() {
+        // `$bakery_labels->{` — bare ident with underscores.
+        assert_eq!(
+            extract_hash_subscript_receiver("$bakery_labels->{", 16),
+            "bakery_labels",
+        );
+    }
+
+    #[test]
+    fn receiver_empty_when_no_sigil() {
+        // `bareword{` — no `$`, not a hash subscript on a scalar.
+        assert_eq!(extract_hash_subscript_receiver("bareword{", 8), "");
+    }
+
+    #[test]
+    fn receiver_empty_when_paren_close() {
+        // `(...)->{` — receiver is an expression, not a bare scalar.
+        assert_eq!(extract_hash_subscript_receiver("(...)->{", 7), "");
+    }
+
+    #[test]
+    fn receiver_handles_underscores_and_digits() {
+        // `$h2_b->{` — ident chars are alphanumeric + underscore.
+        assert_eq!(extract_hash_subscript_receiver("$h2_b->{", 7), "h2_b");
+    }
+}
+
+#[cfg(test)]
+mod location_link_tests {
+    use super::location_link_response;
+    use lsp_types::{GotoDefinitionResponse, Position, Range};
+
+    #[test]
+    fn location_link_response_carries_target_selection_range() {
+        let uri: lsp_types::Uri = "file:///tmp/x.stk".parse().unwrap();
+        let range = Range {
+            start: Position { line: 0, character: 9 },
+            end: Position { line: 0, character: 22 },
+        };
+        let resp = location_link_response(uri.clone(), range);
+        match resp {
+            GotoDefinitionResponse::Link(ref links) => {
+                assert_eq!(links.len(), 1);
+                assert_eq!(links[0].target_uri, uri);
+                assert_eq!(
+                    links[0].target_selection_range, range,
+                    "targetSelectionRange drives the IntelliJ caret position",
+                );
+                assert_eq!(
+                    links[0].target_range, range,
+                    "targetRange covers the same span by default",
+                );
+                assert!(
+                    links[0].origin_selection_range.is_none(),
+                    "no origin selection range required",
+                );
+            }
+            other => panic!("expected Link variant, got {other:?}"),
+        }
+    }
+}
+
+#[cfg(test)]
 mod completion_tests {
     use super::{
         highlights_for_identifier, identifier_span_bytes, line_completion_mode,

@@ -237,7 +237,16 @@ impl StaticAnalyzer {
         // in the user-facing `%b` builtin set but always valid. Keep
         // this list literal — every entry must correspond to a real
         // dispatch arm in `builtins.rs`.
-        if matches!(name, "_thread_par_run" | "__stryke_rust_compile") {
+        if matches!(
+            name,
+            "_thread_par_run"
+                | "__stryke_rust_compile"
+                | "defer__internal"
+                // Parser-level constructor specials — handled by
+                // compiler.rs / vm_helper.rs as if they were built-in,
+                // but don't register through the normal `%b` path.
+                | "deque",
+        ) {
             return true;
         }
         let base = name.rsplit("::").next().unwrap_or(name);
@@ -2233,6 +2242,144 @@ mod tests {
     }
 
     #[test]
+    fn is_topic_var_rejects_non_topic_underscore_names() {
+        // Anti-cases: names that START with `_` but aren't topic vars.
+        // The grammar is strict — only `_`, `_N`, `_<...`, `_<N`, `_N<<<`,
+        // `_N<M` patterns qualify. Anything with a letter after the
+        // optional digit/chevron run is NOT a topic var.
+        for bad in [
+            "_x",              // underscore + letter
+            "_foo",            // underscore + word
+            "_3abc",           // digits then letters
+            "_<bad",           // chevron then letters
+            "_2<xyz",          // positional + chevron + letters
+            "x_",              // doesn't start with underscore
+            "__",              // double underscore — not a topic form
+            "_<<<x",           // chevrons then letters
+        ] {
+            assert!(
+                !super::is_topic_var(bad),
+                "is_topic_var({bad:?}) must return false (not a topic form)",
+            );
+        }
+    }
+
+    #[test]
+    fn universal_methods_skip_hierarchy_lookup() {
+        // `isa` / `can` / `DOES` / `new` / `BUILD` / `DESTROY` short-
+        // circuit the BFS — they work on every class regardless of
+        // declared method set.
+        let mut a = super::StaticAnalyzer::new("test.stk");
+        // Empty class with no methods.
+        a.type_methods.insert("Empty".to_string(), HashSet::new());
+        a.type_fields.insert("Empty".to_string(), HashSet::new());
+        for method in ["isa", "can", "DOES", "does", "new", "BUILD", "DESTROY"] {
+            assert!(
+                a.method_resolves_in_hierarchy("Empty", method),
+                "method `{method}` must resolve on any class via the universal whitelist",
+            );
+        }
+        // A made-up name does NOT short-circuit.
+        assert!(
+            !a.method_resolves_in_hierarchy("Empty", "totally_made_up"),
+            "non-universal unknown method must still be flagged",
+        );
+    }
+
+    #[test]
+    fn method_resolves_walks_extends_chain() {
+        // Dog extends Animal; Animal has `trail`. `$self->trail` on
+        // Dog must resolve via the parent.
+        let mut a = super::StaticAnalyzer::new("test.stk");
+        let mut animal_methods = HashSet::new();
+        animal_methods.insert("trail".to_string());
+        a.type_methods.insert("Animal".to_string(), animal_methods);
+        a.type_fields.insert("Animal".to_string(), HashSet::new());
+        a.type_methods.insert("Dog".to_string(), HashSet::new());
+        a.type_fields.insert("Dog".to_string(), HashSet::new());
+        a.type_parents.insert("Dog".to_string(), vec!["Animal".to_string()]);
+        assert!(
+            a.method_resolves_in_hierarchy("Dog", "trail"),
+            "`trail` on Dog must resolve via Animal in extends chain",
+        );
+        // Method on neither class — still fails.
+        assert!(
+            !a.method_resolves_in_hierarchy("Dog", "fly"),
+            "`fly` on Dog must NOT resolve (absent from Dog AND Animal)",
+        );
+    }
+
+    #[test]
+    fn method_resolves_cycle_protected() {
+        // Pathological `A extends B; B extends A` mutual recursion
+        // must not infinite-loop.
+        let mut a = super::StaticAnalyzer::new("test.stk");
+        a.type_methods.insert("A".to_string(), HashSet::new());
+        a.type_fields.insert("A".to_string(), HashSet::new());
+        a.type_methods.insert("B".to_string(), HashSet::new());
+        a.type_fields.insert("B".to_string(), HashSet::new());
+        a.type_parents.insert("A".to_string(), vec!["B".to_string()]);
+        a.type_parents.insert("B".to_string(), vec!["A".to_string()]);
+        // Should return false (method nowhere) without hanging.
+        assert!(!a.method_resolves_in_hierarchy("A", "missing"));
+        assert!(!a.method_resolves_in_hierarchy("B", "missing"));
+    }
+
+    #[test]
+    fn dollar_obj_method_in_string_interp_not_flagged() {
+        // `"#{ $obj->method }"` inside a string — the interpolation
+        // is real code, but the method-call shape mustn't false-
+        // positive when the method name happens to look like a typo
+        // (since strict-vars-on-by-default skips simple sigil-vars
+        // in InterpolatedString but DOES walk `#{ EXPR }`).
+        assert!(
+            lint(
+                "class P { x: Int = 0\n fn show { $self->x } }\n\
+                 my $p = P(x => 5)\np \"got #{ $p->show }\""
+            )
+            .is_ok(),
+        );
+    }
+
+    #[test]
+    fn dollar_hash_with_complex_expression_in_string_interp() {
+        // `"#{ $hash->{key} + 1 }"` — full expression inside #{...}.
+        // The complex-expression branch DOES walk strict (per the
+        // current policy), so undefined refs inside still flag.
+        assert!(
+            lint(
+                "use strict\n\
+                 my %h = (n => 5)\n\
+                 p \"got #{ $h{n} + 1 }\""
+            )
+            .is_ok(),
+            "defined hash element inside #{{}} must not flag",
+        );
+        let r = lint("use strict\np \"got #{ $undef_typo + 1 }\"");
+        assert!(
+            r.is_err(),
+            "complex-expr #{{}} block must still strict-check unknown vars",
+        );
+    }
+
+    #[test]
+    fn is_topic_var_accepts_extra_grammar_variants() {
+        // Edge cases of the grammar not covered by the main test:
+        for good in [
+            "_99",                  // many positional digits
+            "_<<<<<<<<<<",          // very deep outer chain (10 chevrons)
+            "_<999",                // multi-digit indexed ascent
+            "_42<<<",               // 2-digit positional + chevrons
+            "_42<42",               // 2-digit positional + 2-digit index
+        ] {
+            assert!(
+                super::is_topic_var(good),
+                "is_topic_var({good:?}) must return true",
+            );
+        }
+    }
+
+    #[test]
     fn strict_never_flags_sigiled_topic_variants() {
         // Same set but with `$` sigil prefix — `is_topic_var` is called
         // with the bare name (sigil already stripped by the AST), so
@@ -2289,6 +2436,30 @@ mod tests {
             lint("my @xs = (1,2,3)\nmy @r = ~p> @xs map { _ * 2 }").is_ok(),
             "compiler-generated _thread_par_run must be whitelisted",
         );
+    }
+
+    #[test]
+    fn deque_constructor_not_flagged() {
+        // `deque(...)` is a parser-level constructor handled by
+        // compiler.rs / vm_helper.rs but not registered in `%all`,
+        // so it needs an explicit whitelist entry in is_sub_defined.
+        assert!(
+            lint("my $dq = deque(1, 2, 3)\np $dq->len").is_ok(),
+            "deque constructor must not be flagged as undefined sub",
+        );
+    }
+
+    #[test]
+    fn defer_block_compiler_generated_call_not_flagged() {
+        // `defer { BLOCK }` desugars to `defer__internal(fn { BLOCK })`.
+        // Same whitelist rule as `_thread_par_run`.
+        assert!(
+            lint("fn ff { defer { p \"cleanup\" }; 42 }").is_ok(),
+            "compiler-generated defer__internal must be whitelisted",
+        );
+        // Negative guard: an actual unknown `_foo` is still flagged.
+        let r = lint("use strict; _unknown_helper()");
+        assert!(r.is_err(), "arbitrary `_foo` must still flag");
     }
 
     #[test]

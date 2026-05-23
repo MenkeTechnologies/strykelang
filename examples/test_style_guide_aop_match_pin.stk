@@ -1,0 +1,122 @@
+#!/usr/bin/env stryke
+
+# Pinning batch (2026-05-23): AOP intercepts (before/after/around)
+# + algebraic match patterns (array / hash / capture) + Set / Deque
+# operations. Style-compliant per docs/STYLE_GUIDE.md.
+
+# ── AOP: `before` advice — observe call args without modifying ─────────────
+
+fn Svc::greet($name) { "hello, $name" }
+
+mysync @before_calls
+before "Svc::greet" {
+    push @before_calls, $INTERCEPT_ARGS[0]
+}
+Svc::greet("alice")
+Svc::greet("bob")
+$before_calls[0] |> aeq "alice", "before captured arg #0 = alice"
+$before_calls[1] |> aeq "bob",   "before captured arg #1 = bob"
+
+# ── AOP: `after` advice — observe return value ─────────────────────────────
+
+fn Svc::compute($n) { $n * $n }
+
+mysync @after_results
+after "Svc::compute" {
+    push @after_results, $INTERCEPT_RESULT
+}
+Svc::compute(3)
+Svc::compute(7)
+$after_results[0] |> aeq 9,  "after captured return 3² = 9"
+$after_results[1] |> aeq 49, "after captured return 7² = 49"
+
+# ── AOP: `around` advice — wrap and modify call ────────────────────────────
+# `proceed()` runs the original; the around-body can change args, the
+# return value, or short-circuit entirely.
+
+fn Svc::raw($x) { $x }
+
+around "Svc::raw" {
+    my $orig = proceed()
+    "[wrapped: $orig]"
+}
+Svc::raw("foo") |> aeq "[wrapped: foo]", "around wraps return value"
+Svc::raw("bar") |> aeq "[wrapped: bar]", "around wraps every call"
+
+# Cleanup so later tests don't see lingering advice.
+intercept_clear("Svc::*")
+
+# ── match: literal value patterns ──────────────────────────────────────────
+
+fn day_kind($d) {
+    match ($d) {
+        "Mon" => "weekday-start",
+        "Fri" => "weekday-end",
+        "Sat" => "weekend",
+        "Sun" => "weekend",
+        _     => "weekday",
+    }
+}
+day_kind("Mon") |> aeq "weekday-start", "match literal pattern"
+day_kind("Sat") |> aeq "weekend",       "match literal pattern (weekend)"
+day_kind("Wed") |> aeq "weekday",       "match _ default pattern"
+
+# ── match: regex pattern + capture ─────────────────────────────────────────
+
+fn parse_dim($s) {
+    match ($s) {
+        /^(\d+)x(\d+)$/ => "w=$1 h=$2",
+        _               => "?",
+    }
+}
+parse_dim("800x600") |> aeq "w=800 h=600", "match regex with capture groups"
+parse_dim("invalid") |> aeq "?", "match regex fallthrough"
+
+# ── Set — `set()` builtin + sigil ops (|=, &=) ─────────────────────────────
+
+my $s1 = set(1, 2, 3, 4)
+my $s2 = set(3, 4, 5, 6)
+$s1->size |> aeq 4, "set size after dedup"
+
+# Union via | operator overload on Set.
+my $u = $s1 | $s2
+$u->size |> aeq 6, "set union has 6 unique elements"
+
+# Intersection.
+my $i = $s1 & $s2
+$i->size |> aeq 2, "set intersection has 2 elements (3,4)"
+
+# Contains check.
+$s1->contains(3) |> aok "set contains 3"
+$s1->contains(99) |> aeq 0, "set does not contain 99"
+
+# ── Deque — fast head + tail operations ────────────────────────────────────
+
+my $dq = deque()
+$dq->push_back(1)
+$dq->push_back(2)
+$dq->push_back(3)
+$dq->push_front(0)
+$dq->len |> aeq 4, "deque len after 4 pushes"
+$dq->pop_front |> aeq 0, "pop_front returns the front (was just pushed)"
+$dq->pop_back  |> aeq 3, "pop_back returns the tail"
+$dq->len |> aeq 2, "deque len after 2 pops = 2"
+
+# ── Heap — priority queue via comparator block ─────────────────────────────
+
+my $pq = heap { _0 <=> _1 }      # min-heap (style-compliant _0/_1)
+$pq->push(5)
+$pq->push(1)
+$pq->push(3)
+$pq->push(2)
+$pq->pop |> aeq 1, "min-heap pops smallest first"
+$pq->pop |> aeq 2, "min-heap pops next smallest"
+
+# Max-heap by reversing comparator.
+my $max = heap { _1 <=> _0 }
+$max->push(5)
+$max->push(1)
+$max->push(3)
+$max->pop |> aeq 5, "max-heap pops largest first"
+
+test_run

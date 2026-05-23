@@ -316,8 +316,14 @@ fn build_uname_hash() -> IndexMap<String, StrykeValue> {
 #[cfg(unix)]
 fn build_limits_hash() -> IndexMap<String, StrykeValue> {
     use libc::{getrlimit, rlimit, RLIM_INFINITY};
-    #[cfg(target_os = "linux")]
+    // `__rlimit_resource_t` is a glibc-only enum; musl libc uses
+    // `c_int` for `getrlimit`'s resource parameter. Branch on `target_env`
+    // so musl builds (release CI's x86_64-unknown-linux-musl target)
+    // pick the c_int alias instead of failing to find the glibc type.
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
     type RlimitResource = libc::__rlimit_resource_t;
+    #[cfg(all(target_os = "linux", not(target_env = "gnu")))]
+    type RlimitResource = libc::c_int;
     #[cfg(not(target_os = "linux"))]
     type RlimitResource = libc::c_int;
     fn get_limit(resource: RlimitResource) -> (i64, i64) {

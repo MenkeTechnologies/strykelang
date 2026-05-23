@@ -1470,6 +1470,71 @@ fn lsp_stdio_goto_definition_struct_field() {
     assert_eq!(line, 0, "field `width` declared inside struct on line 0");
 }
 
+#[test]
+fn audit_goto_definition_lands_caret_on_bare_function_name() {
+    // Regression: Cmd+B on a usage of `Algo::binary_search` must
+    // navigate the caret to the FIRST CHAR of `binary_search`, not
+    // col 0 of the decl line. `fn Algo::binary_search` puts the bare
+    // name at col 9 (after `fn Algo::`).
+    let src = "fn Algo::binary_search($t, @l) { -1 }\nAlgo::binary_search(3, @sorted)\n";
+    let mut h = LspHarness::new(src);
+    // Cursor on `binary_search` of the USE site (line 1, somewhere
+    // inside the qualified call).
+    let r = h.definition(1, 12);
+    h.finish();
+    let line = r
+        .pointer("/range/start/line")
+        .and_then(Value::as_u64)
+        .unwrap_or_else(|| panic!("no goto definition line: {r}"));
+    let character = r
+        .pointer("/range/start/character")
+        .and_then(Value::as_u64)
+        .unwrap_or_else(|| panic!("no goto definition character: {r}"));
+    assert_eq!(line, 0, "decl is on line 0: {r}");
+    assert_eq!(
+        character, 9,
+        "caret must land at col 9 (start of bare name `binary_search`), not col 0: {r}",
+    );
+}
+
+#[test]
+fn audit_goto_definition_returns_none_when_cursor_on_decl_line() {
+    // When the cursor is already on the declaration line, the LSP
+    // server returns None so the platform doesn't self-jump. The
+    // plugin handler picks this up and shows ShowUsages instead.
+    let src = "fn myfunc($x) { $x + 1 }\nmyfunc(5)\n";
+    let mut h = LspHarness::new(src);
+    // Cursor on `myfunc` of the decl (line 0, col 5).
+    let r = h.definition(0, 5);
+    h.finish();
+    // Either Null (no result) OR an empty array — both express "no
+    // navigation target". The harness's normalization returns the raw
+    // value when neither object nor first-array-element shape matches.
+    let no_target = r.is_null()
+        || r.as_array().is_some_and(|a| a.is_empty())
+        || r.is_object() && r.get("range").is_none() && r.get("targetUri").is_none();
+    assert!(
+        no_target,
+        "expected null / empty when cursor is on decl line, got: {r}",
+    );
+}
+
+#[test]
+fn audit_goto_definition_struct_lands_on_struct_name() {
+    // `struct Geom::Point { ... }` — `Point` is the bare name at col
+    // 13 (after `struct Geom::`). Cmd+B on a `Geom::Point->new(...)`
+    // usage must land the caret there.
+    let src = "struct Geom::Point { x, y }\nmy $p = Geom::Point->new(x => 1, y => 2)\n";
+    let mut h = LspHarness::new(src);
+    let r = h.definition(1, 15); // cursor on `Point`
+    h.finish();
+    let character = r
+        .pointer("/range/start/character")
+        .and_then(Value::as_u64)
+        .unwrap_or_else(|| panic!("no struct goto definition: {r}"));
+    assert_eq!(character, 13, "expected col 13 (start of `Point`), got: {r}");
+}
+
 /// Go to Declaration on an enum variant (`Op::Add`) must land on the
 /// `enum Op { Add, Sub }` decl line. Currently the SymbolTable only
 /// registers the enum type itself; the variant lookup falls through.

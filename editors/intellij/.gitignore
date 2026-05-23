@@ -6,3 +6,7 @@ out/
 .kotlin/
 local.properties
 .intellijPlatform
+
+# Force-include the Gradle wrapper jar even when the user has a
+# global `*.jar` ignore — CI needs this to run `./gradlew`.
+!gradle/wrapper/gradle-wrapper.jar
