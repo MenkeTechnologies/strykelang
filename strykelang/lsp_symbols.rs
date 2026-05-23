@@ -95,9 +95,29 @@ pub struct SymbolTable {
 
 impl SymbolTable {
     pub fn build(text: &str, path: &str) -> Option<Self> {
+        Self::build_with_extra_types(text, path, &std::collections::HashSet::new(), &std::collections::HashSet::new())
+    }
+
+    /// Like [`Self::build`] but injects additional Type / Field names
+    /// the file should be aware of — typically gathered from a
+    /// `require`d lib so cross-file Field rename can detect that
+    /// `Project::Geom::Point(x => 1)` in the active file is a
+    /// constructor call (and therefore `x => 1` is a Field ref).
+    pub fn build_with_extra_types(
+        text: &str,
+        path: &str,
+        extra_types: &std::collections::HashSet<String>,
+        extra_fields: &std::collections::HashSet<String>,
+    ) -> Option<Self> {
         let program = crate::parse_with_file(text, path).ok()?;
         let line_text: Vec<String> = text.split('\n').map(|s| s.to_string()).collect();
         let mut builder = Builder::new(line_text);
+        for t in extra_types {
+            builder.known_type_names.insert(t.clone());
+        }
+        for f in extra_fields {
+            builder.known_field_names.insert(f.clone());
+        }
         builder.walk_program(&program);
         Some(builder.finish())
     }
@@ -1076,14 +1096,34 @@ impl Builder {
                     // class/struct/enum/package rename catches usages.
                     self.record_ref(s, line);
                     // Qualified `Type::Field` form — record the suffix
-                    // as a Field ref if it matches a known Field. Same
-                    // fix as the explicit Bareword arm; needed because
-                    // match-arm patterns reach walk_json via the generic
-                    // path.
+                    // as a Field ref if it matches a known Field.
                     if let Some(idx) = s.rfind("::") {
                         let suffix = &s[idx + 2..];
                         if !suffix.is_empty() && self.known_field_names.contains(suffix) {
                             self.record_method_or_field_ref(suffix, line);
+                        }
+                    }
+                }
+                // String values that LOOK like `Type::Field` —
+                // match-arm patterns auto-quote `TrafficLight::Red`
+                // into a String literal. Only treat as a ref when
+                // BOTH the prefix is a known Type AND the suffix is
+                // a known Field, otherwise a literal user-typed
+                // string like `"Foo::bar"` would false-positive.
+                if let Some(s) = map.get("String").and_then(|x| x.as_str()) {
+                    if let Some(idx) = s.rfind("::") {
+                        let suffix = &s[idx + 2..];
+                        let prefix = &s[..idx];
+                        if !suffix.is_empty() && !prefix.is_empty() {
+                            let prefix_tail =
+                                prefix.rsplit("::").next().unwrap_or(prefix);
+                            let prefix_is_type = self.known_type_names.contains(prefix)
+                                || self.known_type_names.contains(prefix_tail);
+                            let suffix_is_field =
+                                self.known_field_names.contains(suffix);
+                            if prefix_is_type && suffix_is_field {
+                                self.record_method_or_field_ref(suffix, line);
+                            }
                         }
                     }
                 }

@@ -4952,8 +4952,11 @@ impl Parser {
                     )
                 }
             };
-            // Support both `field => Type` and bare `field` (implies Any type)
-            let ty = if self.eat(&Token::FatArrow) {
+            // Support three forms:
+            //   - `field => Type`   (Perl-style fat-comma)
+            //   - `field: Type`     (Rust/class-style colon)
+            //   - bare `field`      (implies Any type)
+            let ty = if self.eat(&Token::FatArrow) || self.eat(&Token::Colon) {
                 self.parse_type_name()?
             } else {
                 crate::ast::PerlTypeName::Any
@@ -5239,8 +5242,10 @@ impl Parser {
                 }
             };
 
-            // Type after colon: `name: Type`
-            let ty = if self.eat(&Token::Colon) {
+            // Type via colon (`name: Type`) OR fat-comma (`name => Type`).
+            // The Perl-flavored struct-style fat-comma is accepted on
+            // classes for symmetry with struct fields.
+            let ty = if self.eat(&Token::Colon) || self.eat(&Token::FatArrow) {
                 self.parse_type_name()?
             } else {
                 crate::ast::PerlTypeName::Any
@@ -6171,7 +6176,16 @@ impl Parser {
                     });
                 }
                 let mut imports = Vec::new();
-                if !matches!(self.peek(), Token::Semicolon | Token::Eof)
+                // Imports must start on the SAME LINE as `use Module`.
+                // Without this, a bare `use K8s` followed by `p "…"`
+                // on the next line silently swallowed the `p` call as
+                // an import expression — failing later with the
+                // confusing "pragma import must be a compile-time
+                // string" error pointing at the next-line statement.
+                // The legitimate multi-line form uses `,` to continue.
+                let on_same_line = self.peek_line() == tok_line;
+                if on_same_line
+                    && !matches!(self.peek(), Token::Semicolon | Token::Eof)
                     && !self.next_is_new_statement_start(tok_line)
                 {
                     loop {

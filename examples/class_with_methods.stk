@@ -1,0 +1,63 @@
+#!/usr/bin/env stryke
+
+# Stryke class with mixed field syntax + methods using `$self->X`.
+# The `$self->field` and `$self->method()` forms are AST-checked by
+# the linter: typos like `$self->are` (when only `area` exists) get
+# flagged with the available-names list.
+
+p "── class with mixed field syntax + instance methods ──────"
+class Account {
+    holder:  Str
+    balance: Float = 0.0
+    overdraft_limit => Float = 100.0   # mixed: fat-comma + default
+
+    fn deposit($amount) {
+        $self->balance += $amount
+        $self->balance
+    }
+
+    fn withdraw($amount) {
+        if ($amount > $self->balance + $self->overdraft_limit) {
+            return undef
+        }
+        $self->balance -= $amount
+        $self->balance
+    }
+
+    fn statement {
+        sprintf(
+            "Account(%s) balance=%.2f overdraft=%.2f",
+            $self->holder, $self->balance, $self->overdraft_limit
+        )
+    }
+}
+
+my $acct = Account->new(holder => "alice", balance => 250.00)
+p "  initial: ", $acct->statement()
+
+$acct->deposit(50.00)
+p "  +50:     ", $acct->statement()
+
+$acct->withdraw(80.00)
+p "  -80:     ", $acct->statement()
+
+# Try a withdrawal beyond the overdraft limit.
+my $denied = $acct->withdraw(500.00)
+p "  denied?  ", defined($denied) ? "no" : "yes"
+p "  final:   ", $acct->statement()
+
+p ""
+p "── refactoring + linter playground ───────────────────────"
+# Rename `balance` (Cmd+Opt+Shift+R on the field decl) → every
+# `$self->balance` body ref + every `balance => ...` constructor key
+# gets rewritten. AST-walked, no false positives — a `my %h = (balance
+# => 1)` elsewhere in the file does NOT get touched.
+#
+# Linter catches:
+#   - Account->new(holdr => "x")           # → Unknown field `holdr`
+#   - inside a method, $self->blance       # → no field/method `blance`
+#
+# Try uncommenting:
+# my $typo = Account->new(holdr => "bob", balance => 0.0)
+
+p "── done ──────────────────────────────────────────────────"

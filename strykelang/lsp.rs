@@ -2750,16 +2750,72 @@ fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option
     // `%visited` must rewrite `$seen{k}` as `$visited{k}`, not
     // `%visited{k}`.
     let new_bare_body = bare_form_body(&bare_new);
-    let active_matches = table.ranges_and_names_for(active_symbol_id);
-    for (range, matched) in active_matches {
-        let new_text = substitute_preserving_sigil(&matched, &bare_new, &new_bare_body);
-        push_edits(
-            active_uri.as_str(),
-            vec![range],
-            &new_text,
-            &mut changes,
-            &mut total,
-        );
+    // For Field, use a Field-aware emission that accepts `:` on
+    // either side as a boundary (catches `TrafficLight::Red` in
+    // match arms). For other kinds, use the standard
+    // ranges_and_names_for which has stricter ident-only boundaries.
+    if matches!(active_sym.kind, crate::lsp_symbols::SymbolKind::Field) {
+        for r in &table.refs {
+            if r.symbol != active_symbol_id {
+                continue;
+            }
+            let lt = match active_text.lines().nth(r.line as usize) {
+                Some(l) => l,
+                None => continue,
+            };
+            if let Some(byte) = lt.find(active_sym.name.as_str()) {
+                let c0 = lt[..byte].encode_utf16().count() as u32;
+                let c1 = lt[..byte + active_sym.name.len()].encode_utf16().count() as u32;
+                push_edits(
+                    active_uri.as_str(),
+                    vec![Range {
+                        start: Position {
+                            line: r.line,
+                            character: c0,
+                        },
+                        end: Position {
+                            line: r.line,
+                            character: c1,
+                        },
+                    }],
+                    &bare_new,
+                    &mut changes,
+                    &mut total,
+                );
+            }
+        }
+        // Field decl — the AST stores the parent struct/class/enum's
+        // line, not the field's own line (StructField / ClassField /
+        // EnumVariant don't carry per-field source positions). Scan
+        // the parent type's body (between the opening `{` after the
+        // type keyword and the matching `}`) for the bare field name.
+        // This scan is BOUNDED to the parent's body — not the whole
+        // file — so it cannot false-positive on unrelated identifiers.
+        for r in find_field_decl_ranges_in_type_body(
+            active_text,
+            active_sym.decl_line,
+            &active_sym.name,
+        ) {
+            push_edits(
+                active_uri.as_str(),
+                vec![r],
+                &bare_new,
+                &mut changes,
+                &mut total,
+            );
+        }
+    } else {
+        let active_matches = table.ranges_and_names_for(active_symbol_id);
+        for (range, matched) in active_matches {
+            let new_text = substitute_preserving_sigil(&matched, &bare_new, &new_bare_body);
+            push_edits(
+                active_uri.as_str(),
+                vec![range],
+                &new_text,
+                &mut changes,
+                &mut total,
+            );
+        }
     }
 
     // Type rename: references at `impl Trait`, `extends Class`,
@@ -3133,70 +3189,67 @@ fn cross_file_rename_via_require(
             &mut total,
         );
     }
-    // Field cross-file: AST-recorded refs in the active file already
-    // come via the SymbolTable build of the active file (see
-    // `collect_symbol_references`'s walking). The active-file refs to
-    // a Field-in-required-lib are NOT discoverable from the lib's
-    // SymbolTable alone — they live in the active file's AST. Build
-    // the active SymbolTable here and emit any Field refs that
-    // resolve to the SAME bare name.
+    // Field cross-file: walk the active file's AST directly looking
+    // for FuncCall / MethodCall sites whose name matches the lib's
+    // Type (the parent struct/class/enum). For each such call,
+    // extract fat-comma key positions matching `bare_form`. Also
+    // catch qualified-Bareword/String forms like
+    // `TrafficLight::Red` for enum variants in patterns.
     if is_field {
-        if let Some(active_table) = crate::lsp_symbols::SymbolTable::build(active_text, active_path) {
-            // Active file's Field refs are recorded by `walk_expr`'s
-            // MethodCall / FuncCall (gated on Type) / qualified-
-            // Bareword handlers. Find Field-kind refs (or refs whose
-            // resolved symbol is a Field) that match our bare_form.
-            for r in &active_table.refs {
-                if r.name == bare_form {
-                    let lt = active_text
-                        .lines()
-                        .nth(r.line as usize)
-                        .unwrap_or("");
-                    let c0_byte = match lt.find(bare_form.as_str()) {
-                        Some(b) => b,
-                        None => continue,
-                    };
-                    let c0 = lt[..c0_byte].encode_utf16().count() as u32;
-                    let c1 = lt[..c0_byte + bare_form.len()].encode_utf16().count() as u32;
-                    push(
-                        &active_uri_str,
-                        vec![Range {
-                            start: Position {
-                                line: r.line,
-                                character: c0,
-                            },
-                            end: Position {
-                                line: r.line,
-                                character: c1,
-                            },
-                        }],
-                        &bare_new,
-                        &mut changes,
-                        &mut total,
-                    );
+        let lib_type_bare_names: std::collections::HashSet<String> = {
+            let mut s = std::collections::HashSet::new();
+            if let Some(t) = crate::lsp_symbols::SymbolTable::build(&decl_text, &decl_path)
+            {
+                for sym in &t.symbols {
+                    if matches!(sym.kind, crate::lsp_symbols::SymbolKind::Type) {
+                        let bare = sym.name.rsplit("::").next().unwrap_or(&sym.name);
+                        s.insert(bare.to_string());
+                        s.insert(sym.name.clone());
+                    }
                 }
             }
-        }
+            s
+        };
+        let ranges = scan_active_for_field_refs(
+            active_text,
+            active_path,
+            &bare_form,
+            &lib_type_bare_names,
+        );
+        push(
+            &active_uri_str,
+            ranges,
+            &bare_new,
+            &mut changes,
+            &mut total,
+        );
     }
 
-    // 3. Other open documents: qualified-form scan + bare-form scan
-    //    for Field (callers reference fields by bare name only).
+    // 3. Other open documents.
+    //    - Non-Field symbols: scan for qualified form.
+    //    - Field symbols: build each other doc's SymbolTable and
+    //      emit ranges for AST-recorded Field refs only. No textual
+    //      fallback — would false-positive on unrelated `name =>`
+    //      hash keys.
     for (other_uri_str, other_text) in docs.iter() {
         if other_uri_str == active_uri.as_str() || other_uri_str == &decl_uri_str {
             continue;
         }
-        push(
-            other_uri_str,
-            scan_all_lines_for_needle(other_text, &qualified_form),
-            &qualified_new,
-            &mut changes,
-            &mut total,
-        );
         if is_field {
+            field_refs_for_other_doc(
+                other_text,
+                &bare_form,
+                other_uri_str,
+                &bare_new,
+                &mut changes,
+                &mut total,
+                push,
+            );
+        } else {
             push(
                 other_uri_str,
-                scan_all_lines_for_needle(other_text, &bare_form),
-                &bare_new,
+                scan_all_lines_for_needle(other_text, &qualified_form),
+                &qualified_new,
                 &mut changes,
                 &mut total,
             );
@@ -3213,18 +3266,21 @@ fn cross_file_rename_via_require(
         if docs.contains_key(&uri_str) {
             continue;
         }
-        push(
-            &uri_str,
-            scan_all_lines_for_needle(&src, &qualified_form),
-            &qualified_new,
-            &mut changes,
-            &mut total,
-        );
         if is_field {
+            field_refs_for_other_doc(
+                &src,
+                &bare_form,
+                &uri_str,
+                &bare_new,
+                &mut changes,
+                &mut total,
+                push,
+            );
+        } else {
             push(
                 &uri_str,
-                scan_all_lines_for_needle(&src, &bare_form),
-                &bare_new,
+                scan_all_lines_for_needle(&src, &qualified_form),
+                &qualified_new,
                 &mut changes,
                 &mut total,
             );
@@ -3358,6 +3414,464 @@ fn rename_package(
         changes: Some(changes),
         ..Default::default()
     })
+}
+
+/// Walk `text`'s AST looking for Field references to `field_name`
+/// inside constructor calls (`Type(field => 1, …)` or
+/// `Type->new(field => 1, …)`) whose `Type` is in `lib_type_names`,
+/// AND inside qualified Bareword/String patterns (`Type::Variant`).
+/// AST-only — never falls back to textual scan.
+fn scan_active_for_field_refs(
+    text: &str,
+    path: &str,
+    field_name: &str,
+    lib_type_names: &std::collections::HashSet<String>,
+) -> Vec<Range> {
+    let mut out: Vec<Range> = Vec::new();
+    let Ok(program) = crate::parse_with_file(text, path) else {
+        return out;
+    };
+    fn walk_expr(
+        e: &crate::ast::Expr,
+        text: &str,
+        field_name: &str,
+        lib_type_names: &std::collections::HashSet<String>,
+        out: &mut Vec<Range>,
+    ) {
+        use crate::ast::ExprKind;
+        match &e.kind {
+            ExprKind::FuncCall { name, args, .. } => {
+                let bare_tail = name.rsplit("::").next().unwrap_or(name.as_str());
+                let is_constructor =
+                    lib_type_names.contains(name.as_str()) || lib_type_names.contains(bare_tail);
+                if is_constructor {
+                    emit_fat_comma_field_ranges(args, field_name, text, out);
+                }
+                for a in args {
+                    walk_expr(a, text, field_name, lib_type_names, out);
+                }
+            }
+            ExprKind::MethodCall {
+                object,
+                args,
+                ..
+            } => {
+                let receiver_is_type = match &object.kind {
+                    ExprKind::Bareword(n) => {
+                        let tail = n.rsplit("::").next().unwrap_or(n.as_str());
+                        lib_type_names.contains(n.as_str()) || lib_type_names.contains(tail)
+                    }
+                    _ => false,
+                };
+                if receiver_is_type {
+                    emit_fat_comma_field_ranges(args, field_name, text, out);
+                }
+                walk_expr(object, text, field_name, lib_type_names, out);
+                for a in args {
+                    walk_expr(a, text, field_name, lib_type_names, out);
+                }
+            }
+            ExprKind::Bareword(n) => {
+                // `Type::Field` qualified path — record the suffix
+                // position if it matches.
+                if let Some(idx) = n.rfind("::") {
+                    let suffix = &n[idx + 2..];
+                    let prefix = &n[..idx];
+                    let prefix_tail = prefix.rsplit("::").next().unwrap_or(prefix);
+                    if suffix == field_name
+                        && (lib_type_names.contains(prefix)
+                            || lib_type_names.contains(prefix_tail))
+                    {
+                        emit_bareword_field_range(e, n, suffix, text, out);
+                    }
+                }
+            }
+            ExprKind::String(s) => {
+                // Auto-quoted `Type::Field` from match-arm patterns.
+                if let Some(idx) = s.rfind("::") {
+                    let suffix = &s[idx + 2..];
+                    let prefix = &s[..idx];
+                    let prefix_tail = prefix.rsplit("::").next().unwrap_or(prefix);
+                    if suffix == field_name
+                        && (lib_type_names.contains(prefix)
+                            || lib_type_names.contains(prefix_tail))
+                    {
+                        emit_bareword_field_range(e, s, suffix, text, out);
+                    }
+                }
+            }
+            _ => {
+                walk_generic_expr_for_field(e, text, field_name, lib_type_names, out);
+            }
+        }
+    }
+    fn walk_generic_expr_for_field(
+        e: &crate::ast::Expr,
+        text: &str,
+        field_name: &str,
+        lib_type_names: &std::collections::HashSet<String>,
+        out: &mut Vec<Range>,
+    ) {
+        // Reflect on the JSON shape to recurse into child Exprs.
+        let Ok(v) = serde_json::to_value(e) else {
+            return;
+        };
+        walk_json_for_field(&v, text, field_name, lib_type_names, out);
+    }
+    fn walk_json_for_field(
+        v: &serde_json::Value,
+        text: &str,
+        field_name: &str,
+        lib_type_names: &std::collections::HashSet<String>,
+        out: &mut Vec<Range>,
+    ) {
+        walk_json_for_field_with_line(v, text, field_name, lib_type_names, out, 0);
+    }
+    fn walk_json_for_field_with_line(
+        v: &serde_json::Value,
+        text: &str,
+        field_name: &str,
+        lib_type_names: &std::collections::HashSet<String>,
+        out: &mut Vec<Range>,
+        parent_line: u32,
+    ) {
+        if let Some(o) = v.as_object() {
+            // Update line context if this object carries its own `line` field.
+            let line_here = o
+                .get("line")
+                .and_then(serde_json::Value::as_u64)
+                .map(|n| n.saturating_sub(1) as u32)
+                .unwrap_or(parent_line);
+            // FuncCall {name, args} — constructor-call detection.
+            if let Some(call) = o.get("FuncCall").and_then(|x| x.as_object()) {
+                if let Some(name) = call.get("name").and_then(serde_json::Value::as_str)
+                {
+                    let bare_tail = name.rsplit("::").next().unwrap_or(name);
+                    if lib_type_names.contains(name)
+                        || lib_type_names.contains(bare_tail)
+                    {
+                        if let Some(args) =
+                            call.get("args").and_then(|x| x.as_array())
+                        {
+                            let mut i = 0;
+                            while i < args.len() {
+                                let key = args[i]
+                                    .get("kind")
+                                    .and_then(|k| {
+                                        k.get("String")
+                                            .or_else(|| k.get("Bareword"))
+                                    })
+                                    .and_then(serde_json::Value::as_str);
+                                if key == Some(field_name) {
+                                    let line = args[i]
+                                        .get("line")
+                                        .and_then(|x| x.as_u64())
+                                        .map(|n| n.saturating_sub(1) as u32)
+                                        .unwrap_or(line_here);
+                                    emit_range_for_suffix_at_line(
+                                        field_name, field_name, line, text, out,
+                                    );
+                                }
+                                i += 2;
+                            }
+                        }
+                    }
+                }
+            }
+            if let Some(s) = o.get("Bareword").and_then(serde_json::Value::as_str) {
+                if let Some(idx) = s.rfind("::") {
+                    let suffix = &s[idx + 2..];
+                    let prefix = &s[..idx];
+                    let prefix_tail = prefix.rsplit("::").next().unwrap_or(prefix);
+                    if suffix == field_name
+                        && (lib_type_names.contains(prefix)
+                            || lib_type_names.contains(prefix_tail))
+                    {
+                        emit_range_for_suffix_at_line(s, suffix, line_here, text, out);
+                    }
+                }
+            }
+            if let Some(s) = o.get("String").and_then(serde_json::Value::as_str) {
+                if let Some(idx) = s.rfind("::") {
+                    let suffix = &s[idx + 2..];
+                    let prefix = &s[..idx];
+                    let prefix_tail = prefix.rsplit("::").next().unwrap_or(prefix);
+                    if suffix == field_name
+                        && (lib_type_names.contains(prefix)
+                            || lib_type_names.contains(prefix_tail))
+                    {
+                        emit_range_for_suffix_at_line(s, suffix, line_here, text, out);
+                    }
+                }
+            }
+            // Recurse into nested values, propagating the current line.
+            for (_, vv) in o {
+                walk_json_for_field_with_line(
+                    vv,
+                    text,
+                    field_name,
+                    lib_type_names,
+                    out,
+                    line_here,
+                );
+            }
+        } else if let Some(arr) = v.as_array() {
+            for vv in arr {
+                walk_json_for_field_with_line(
+                    vv,
+                    text,
+                    field_name,
+                    lib_type_names,
+                    out,
+                    parent_line,
+                );
+            }
+        }
+    }
+    fn emit_fat_comma_field_ranges(
+        args: &[crate::ast::Expr],
+        field_name: &str,
+        text: &str,
+        out: &mut Vec<Range>,
+    ) {
+        use crate::ast::ExprKind;
+        let mut i = 0;
+        while i < args.len() {
+            let key = match &args[i].kind {
+                ExprKind::String(s) | ExprKind::Bareword(s) => Some(s.as_str()),
+                _ => None,
+            };
+            if key == Some(field_name) {
+                let line = (args[i].line.saturating_sub(1)) as u32;
+                if let Some(lt) = text.lines().nth(line as usize) {
+                    if let Some(byte) = lt.find(field_name) {
+                        let c0 = lt[..byte].encode_utf16().count() as u32;
+                        let c1 = lt[..byte + field_name.len()].encode_utf16().count() as u32;
+                        out.push(Range {
+                            start: Position {
+                                line,
+                                character: c0,
+                            },
+                            end: Position {
+                                line,
+                                character: c1,
+                            },
+                        });
+                    }
+                }
+            }
+            i += 2;
+        }
+    }
+    fn emit_bareword_field_range(
+        e: &crate::ast::Expr,
+        full: &str,
+        suffix: &str,
+        text: &str,
+        out: &mut Vec<Range>,
+    ) {
+        let line = (e.line.saturating_sub(1)) as u32;
+        emit_range_for_suffix_at_line(full, suffix, line, text, out);
+    }
+    fn emit_range_for_suffix_at_line(
+        full: &str,
+        suffix: &str,
+        line: u32,
+        text: &str,
+        out: &mut Vec<Range>,
+    ) {
+        let Some(lt) = text.lines().nth(line as usize) else {
+            return;
+        };
+        // Find the full `Type::field` substring on the line, then
+        // locate the suffix's column within it.
+        let Some(start_byte) = lt.find(full) else {
+            return;
+        };
+        let suffix_byte = start_byte + full.len() - suffix.len();
+        let c0 = lt[..suffix_byte].encode_utf16().count() as u32;
+        let c1 = lt[..suffix_byte + suffix.len()].encode_utf16().count() as u32;
+        out.push(Range {
+            start: Position {
+                line,
+                character: c0,
+            },
+            end: Position {
+                line,
+                character: c1,
+            },
+        });
+    }
+    for stmt in &program.statements {
+        if let crate::ast::StmtKind::Expression(e) = &stmt.kind {
+            walk_expr(e, text, field_name, lib_type_names, &mut out);
+        } else {
+            // Walk the stmt's full JSON via the reflection path.
+            let Ok(v) = serde_json::to_value(stmt) else {
+                continue;
+            };
+            walk_json_for_field(&v, text, field_name, lib_type_names, &mut out);
+        }
+    }
+    // Dedup by (line, char).
+    out.sort_by(|a, b| {
+        a.start
+            .line
+            .cmp(&b.start.line)
+            .then(a.start.character.cmp(&b.start.character))
+    });
+    out.dedup_by(|a, b| a.start == b.start && a.end == b.end);
+    out
+}
+
+/// Scan a struct/class/enum body for the field name. `parent_line` is
+/// the LSP line of the `class Foo {` / `enum Foo {` / `struct Foo {`
+/// keyword. The scan starts at the first `{` after the type keyword
+/// and ends at the matching `}` — bounded to the parent type's body
+/// so it can't false-positive on identifiers in surrounding code.
+/// Returns one Range per word-boundary match of `field_name`.
+fn find_field_decl_ranges_in_type_body(
+    text: &str,
+    parent_line: u32,
+    field_name: &str,
+) -> Vec<Range> {
+    let mut out: Vec<Range> = Vec::new();
+    let lines: Vec<&str> = text.lines().collect();
+    let parent_idx = parent_line as usize;
+    if parent_idx >= lines.len() {
+        return out;
+    }
+    // Find the opening `{` of the type body — could be on the
+    // parent_line itself or on a later line (`class Foo\n{`).
+    let mut open_line = parent_idx;
+    let mut open_col_in_line: Option<usize> = None;
+    for (i, lt) in lines.iter().enumerate().skip(parent_idx) {
+        if let Some(b) = lt.find('{') {
+            open_line = i;
+            open_col_in_line = Some(b);
+            break;
+        }
+    }
+    let Some(open_col) = open_col_in_line else {
+        return out;
+    };
+    // Walk forward tracking brace depth to find the matching `}`.
+    let mut depth: i32 = 0;
+    let mut started = false;
+    let mut end_line = open_line;
+    'outer: for (i, lt) in lines.iter().enumerate().skip(open_line) {
+        let start_col = if i == open_line { open_col } else { 0 };
+        let mut in_string: Option<char> = None;
+        for (col, c) in lt.char_indices().skip(start_col) {
+            let _ = col;
+            if let Some(q) = in_string {
+                if c == '\\' {
+                    continue; // best-effort escape skip
+                }
+                if c == q {
+                    in_string = None;
+                }
+                continue;
+            }
+            match c {
+                '"' | '\'' | '`' => in_string = Some(c),
+                '#' => break, // rest of line is a comment
+                '{' => {
+                    depth += 1;
+                    started = true;
+                }
+                '}' => {
+                    depth -= 1;
+                    if started && depth == 0 {
+                        end_line = i;
+                        break 'outer;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    // Scan lines [open_line, end_line] for the field name. Skip
+    // matches inside strings / comments via string_interior_mask
+    // applied per line.
+    for i in open_line..=end_line {
+        let Some(lt) = lines.get(i) else {
+            continue;
+        };
+        let mask = string_interior_mask(lt);
+        for (start_byte, _) in lt.match_indices(field_name) {
+            if mask.get(start_byte).copied().unwrap_or(false) {
+                continue;
+            }
+            let end_byte = start_byte + field_name.len();
+            let prev = lt[..start_byte].chars().next_back();
+            let next = lt[end_byte..].chars().next();
+            let prev_ok = prev.is_none_or(|c| !c.is_alphanumeric() && c != '_');
+            let next_ok = next.is_none_or(|c| !c.is_alphanumeric() && c != '_');
+            if !prev_ok || !next_ok {
+                continue;
+            }
+            let c0 = lt[..start_byte].encode_utf16().count() as u32;
+            let c1 = lt[..end_byte].encode_utf16().count() as u32;
+            out.push(Range {
+                start: Position {
+                    line: i as u32,
+                    character: c0,
+                },
+                end: Position {
+                    line: i as u32,
+                    character: c1,
+                },
+            });
+        }
+    }
+    out
+}
+
+/// Build a SymbolTable for `other_text` and emit edits for every
+/// ref to a Field named `bare_form` (the AST-recorded refs from
+/// MethodCall / FuncCall-on-Type / qualified-Bareword handlers).
+/// No textual fallback — this is the AST-only path.
+#[allow(clippy::too_many_arguments)]
+fn field_refs_for_other_doc(
+    other_text: &str,
+    bare_form: &str,
+    other_uri_str: &str,
+    bare_new: &str,
+    changes: &mut HashMap<Uri, Vec<TextEdit>>,
+    total: &mut usize,
+    push: impl Fn(&str, Vec<Range>, &str, &mut HashMap<Uri, Vec<TextEdit>>, &mut usize),
+) {
+    // Path arg to SymbolTable::build is informational (used only for
+    // diagnostics in the parser), so an empty string is fine.
+    let Some(table) = crate::lsp_symbols::SymbolTable::build(other_text, "") else {
+        return;
+    };
+    let mut ranges: Vec<Range> = Vec::new();
+    for r in &table.refs {
+        if r.name != bare_form {
+            continue;
+        }
+        let lt = match other_text.lines().nth(r.line as usize) {
+            Some(l) => l,
+            None => continue,
+        };
+        if let Some(c0_byte) = lt.find(bare_form) {
+            let c0 = lt[..c0_byte].encode_utf16().count() as u32;
+            let c1 = lt[..c0_byte + bare_form.len()].encode_utf16().count() as u32;
+            ranges.push(Range {
+                start: Position {
+                    line: r.line,
+                    character: c0,
+                },
+                end: Position {
+                    line: r.line,
+                    character: c1,
+                },
+            });
+        }
+    }
+    push(other_uri_str, ranges, bare_new, changes, total);
 }
 
 /// Field-tuned scanner: accepts `:` on either side as a valid
