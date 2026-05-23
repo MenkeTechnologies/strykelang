@@ -1,0 +1,7 @@
+#!/usr/bin/env stryke
+require "./Chessboard.stk"
+
+assert_eq Exercism::Chessboard::ranks(), [1,2,3,4,5,6,7,8], "ranks 1..8"
+assert_eq Exercism::Chessboard::files(), ["A","B","C","D","E","F","G","H"], "files A..H"
+
+test_run

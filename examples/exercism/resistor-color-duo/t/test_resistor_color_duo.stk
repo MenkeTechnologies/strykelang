@@ -1,0 +1,11 @@
+#!/usr/bin/env stryke
+require "./ResistorColorDuo.stk"
+
+assert_eq Exercism::ResistorColorDuo::value(["brown","black"]),  10, "brown-black → 10"
+assert_eq Exercism::ResistorColorDuo::value(["blue","grey"]),    68, "blue-grey → 68"
+assert_eq Exercism::ResistorColorDuo::value(["yellow","violet"]),47, "yellow-violet → 47"
+assert_eq Exercism::ResistorColorDuo::value(["white","red"]),    92, "white-red → 92"
+assert_eq Exercism::ResistorColorDuo::value(["orange","orange"]),33, "orange-orange → 33"
+assert_eq Exercism::ResistorColorDuo::value(["green","brown","orange"]), 51, "ignores third"
+
+test_run

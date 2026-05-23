@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+require "./ResistorColorTrio.stk"
+
+assert_eq Exercism::ResistorColorTrio::label(["orange","orange","black"]),     "33 ohms",     "33 ohms"
+assert_eq Exercism::ResistorColorTrio::label(["blue","grey","brown"]),         "680 ohms",    "680 ohms"
+assert_eq Exercism::ResistorColorTrio::label(["red","black","red"]),           "2 kiloohms",  "2 kiloohms"
+assert_eq Exercism::ResistorColorTrio::label(["green","brown","orange"]),      "51 kiloohms", "51 kiloohms"
+assert_eq Exercism::ResistorColorTrio::label(["yellow","violet","yellow"]),    "470 kiloohms","470 kiloohms"
+assert_eq Exercism::ResistorColorTrio::label(["blue","violet","blue"]),        "67 megaohms", "67 megaohms"
+assert_eq Exercism::ResistorColorTrio::label(["black","brown","green"]),       "100 kiloohms","100 kiloohms"
+
+test_run

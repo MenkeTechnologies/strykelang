@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+require "./BasketballWebsite.stk"
+
+my $team = {
+    coach     => { first_name => "Jane", last_name => "Brown" },
+    team_name => "Hoop Masters",
+    players   => {
+        center    => { first_name => "Ashley", last_name => "Smith" },
+        guard     => { first_name => "Bob",    last_name => "Jones"  },
+    },
+}
+
+assert_eq Exercism::BasketballWebsite::extract_from_path($team, "team_name"),               "Hoop Masters", "first layer"
+assert_eq Exercism::BasketballWebsite::extract_from_path($team, "coach.first_name"),         "Jane",        "second layer"
+assert_eq Exercism::BasketballWebsite::extract_from_path($team, "players.center.last_name"), "Smith",       "third layer"
+assert_eq Exercism::BasketballWebsite::extract_from_path($team, "nonexistent.path"),         undef,         "missing top-level key"
+
+test_run

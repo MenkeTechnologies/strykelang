@@ -1,0 +1,13 @@
+#!/usr/bin/env stryke
+require "./FreelancerRates.stk"
+
+assert_eq Exercism::FreelancerRates::daily_rate(50),                  400.0,  "daily 50 → 400"
+assert_eq Exercism::FreelancerRates::daily_rate(60),                  480.0,  "daily 60 → 480"
+assert_eq Exercism::FreelancerRates::apply_discount(140.0, 10),       126.0,  "10% off 140 = 126"
+assert_eq Exercism::FreelancerRates::apply_discount(100, 10),         90.0,   "10% off 100 = 90"
+assert_eq Exercism::FreelancerRates::monthly_rate(62, 0.0),           10912,  "monthly 62"
+assert_eq Exercism::FreelancerRates::monthly_rate(70, 0.0),           12320,  "monthly 70"
+assert_eq Exercism::FreelancerRates::monthly_rate(67, 12.0),          10377,  "monthly 67 @12%"
+assert_eq Exercism::FreelancerRates::days_in_budget(20000, 80, 11.0), 35.1,   "days_in_budget basic (floor to 1dp)"
+
+test_run

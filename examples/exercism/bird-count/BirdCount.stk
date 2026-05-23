@@ -1,0 +1,11 @@
+#!/usr/bin/env stryke
+
+fn Exercism::BirdCount::today                 = _->[0]
+fn Exercism::BirdCount::has_day_without_birds = (~> @{_} greps { _ == 0 } len) > 0 ? 1 : 0
+fn Exercism::BirdCount::total                 = (~> @{_} sum) // 0
+fn Exercism::BirdCount::busy_days             = ~> @{_} greps { _ >= 5 } len
+
+fn Exercism::BirdCount::increment_day_count {
+    my @xs = @{_}
+    @xs ? [$xs[0] + 1, @xs[1..$#xs]] : [1]
+}

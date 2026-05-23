@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+
+# Transpose a multi-line text. Left-pad shorter rows so the transpose
+# stays rectangular up to the *earliest* row that's longer than the
+# current — see Elixir reference for exact padding behavior.
+fn Exercism::Transpose::transpose {
+    my $input = _0
+    my @rows = split(/\n/, $input, -1)
+    # Drop trailing empty line from final newline if present.
+    my @lines = @rows
+    # Compute width per column: a column exists iff at least one row
+    # has that index. Pad with spaces, but only on the LEFT — never
+    # to the right of the longest row.
+    my $maxlen = 0
+    for my $r (@lines) { $maxlen = len($r) if len($r) > $maxlen }
+    my @out
+    for my $col (0:$maxlen-1) {
+        my $line = ""
+        for my $i (0:$#lines) {
+            my $row = $lines[$i]
+            if ($col < len($row)) {
+                $line .= substr($row, $col, 1)
+            } else {
+                # Pad with space only if a LATER row has a char at this col.
+                my $later_has = 0
+                for my $j ($i+1:$#lines) {
+                    if ($col < len($lines[$j])) { $later_has = 1; last }
+                }
+                if ($later_has) {
+                    $line .= " "
+                } else {
+                    last
+                }
+            }
+        }
+        push @out, $line
+    }
+    join("\n", @out)
+}
