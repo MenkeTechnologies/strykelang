@@ -641,6 +641,78 @@ fn audit_rename_struct_field_same_file() {
 /// User's exact post-corruption fixture. Verify that a CLEAN rename
 /// from `Red` → `Redd` over the clean source does NOT produce the
 /// `TrafficLight::Redd` doubled-prefix shape the user reported.
+/// Rename a method declared inside a `class` body. Both at decl line
+/// and at the `$obj->method()` call site, the rename must produce a
+/// WorkspaceEdit that covers decl + every call site.
+/// Critical word-boundary regression: a Field named `y` must NOT
+/// match the `y` inside `my`. Without strict word-boundary checking,
+/// rename rewrites `my` to the new name everywhere.
+#[test]
+fn audit_rename_short_field_name_respects_word_boundary() {
+    let src = "struct Point { x, y }\nmy $p = Point->new(x => 3, y => 4)\n";
+    let mut h = LspHarness::new(src);
+    // Cursor on `y` of `struct Point { x, y }` at line 0, col 18.
+    let r = h.rename(0, 18, "yy");
+    h.finish();
+    let edits = r
+        .pointer("/changes")
+        .and_then(Value::as_object)
+        .and_then(|m| m.values().next())
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let positions: Vec<(u64, u64)> = edits
+        .iter()
+        .filter_map(|e| {
+            let l = e.pointer("/range/start/line")?.as_u64()?;
+            let c = e.pointer("/range/start/character")?.as_u64()?;
+            Some((l, c))
+        })
+        .collect();
+    // Line 1 has `my $p = Point->new(x => 3, y => 4)`.
+    // `m` of `my` is at col 0. `y` of `my` is at col 1.
+    // `y` of `y => 4` is at col 27.
+    // The `y` at col 1 (inside `my`) MUST NOT get an edit.
+    assert!(
+        !positions.contains(&(1, 1)),
+        "must NOT rewrite `y` inside `my` (col 1): {positions:?}"
+    );
+    // The legit field-key `y` at col 27 SHOULD be rewritten.
+    assert!(
+        positions.contains(&(1, 27)),
+        "expected rewrite at line 1 col 27 (`y => 4`): {positions:?}"
+    );
+}
+
+#[test]
+fn audit_rename_class_method_via_arrow_call() {
+    let src = "class Account {\n    holder: Str\n    fn statement {\n        sprintf(\"Account(%s)\", $self->holder)\n    }\n}\nmy $a = Account->new(holder => \"x\")\np $a->statement()\np $a->statement()\n";
+    let mut h = LspHarness::new(src);
+    // Cursor on `statement` of `fn statement` at line 2, col 7.
+    let r = h.rename(2, 7, "describe");
+    h.finish();
+    let edits = r
+        .pointer("/changes")
+        .and_then(Value::as_object)
+        .and_then(|m| m.values().next())
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let new_texts: Vec<&str> = edits
+        .iter()
+        .filter_map(|e| e.get("newText").and_then(Value::as_str))
+        .collect();
+    // Decl + 2 call sites = 3 edits, all `describe`.
+    assert!(
+        edits.len() >= 3,
+        "expected ≥3 edits (decl + 2 calls), got {edits:#?}"
+    );
+    assert!(
+        new_texts.iter().all(|n| *n == "describe"),
+        "every edit must be `describe`: {new_texts:?}"
+    );
+}
+
 #[test]
 fn audit_rename_class_field_via_constructor_call() {
     // User's exact fixture: `class Point { x: Int, y: Int }` + a
@@ -678,6 +750,50 @@ fn audit_rename_class_field_via_constructor_call() {
     assert!(
         new_texts.iter().all(|n| *n == "yy"),
         "every edit should be `yy`: {new_texts:?}"
+    );
+}
+
+/// Enum variant rename in a file with an UNRELATED string literal
+/// containing the variant name as a substring must NOT touch the
+/// string content. AST-only — strict.
+#[test]
+fn audit_rename_enum_variant_no_string_false_positives() {
+    let src = "enum Color { Red, Green, Blue }\nmy $msg = \"the Red color is loud\"\nmy $c = Color::Red\nmy %h = (Red => 1)\n";
+    let mut h = LspHarness::new(src);
+    // Cursor on `Red` in the enum decl, line 0 col 13.
+    let r = h.rename(0, 13, "Crimson");
+    h.finish();
+    let edits = r
+        .pointer("/changes")
+        .and_then(Value::as_object)
+        .and_then(|m| m.values().next())
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let lines: Vec<u64> = edits
+        .iter()
+        .filter_map(|e| e.pointer("/range/start/line").and_then(Value::as_u64))
+        .collect();
+    // Expected:
+    //   line 0: decl `Red` → `Crimson`
+    //   line 2: `Color::Red` → `Color::Crimson` (the variant suffix)
+    // Must NOT touch:
+    //   line 1: `"the Red color is loud"` (string content)
+    //   line 3: `my %h = (Red => 1)` — unrelated hash literal with
+    //           same key name. Not a struct/enum constructor, no
+    //           Type-gate → AST walker doesn't record this as a ref.
+    assert!(lines.contains(&0), "expected decl edit: {lines:?}");
+    assert!(
+        lines.contains(&2),
+        "expected `Color::Red` rewrite: {lines:?}"
+    );
+    assert!(
+        !lines.contains(&1),
+        "must NOT touch the string literal on line 1: {lines:?}"
+    );
+    assert!(
+        !lines.contains(&3),
+        "must NOT touch the unrelated `my %h = (Red => 1)` on line 3: {lines:?}"
     );
 }
 

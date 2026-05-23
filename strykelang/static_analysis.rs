@@ -864,6 +864,29 @@ impl StaticAnalyzer {
                 // Method-form constructor `Type->new(field => value)`.
                 if let ExprKind::Bareword(n) = &object.kind {
                     self.check_constructor_keys(n, args, expr.line);
+                    // Only flag the receiver when the file actually
+                    // declares some local Types — that's the "user
+                    // is doing OOP here" signal that justifies typo-
+                    // catching. Without local Types, every Bareword
+                    // receiver (`Foo->new`, `IO::Handle->open`, etc.)
+                    // would be false-positively flagged.
+                    if !self.type_fields.is_empty()
+                        && !self.type_fields.contains_key(n)
+                        && !self.is_sub_defined(n)
+                    {
+                        let bare = n.rsplit("::").next().unwrap_or(n);
+                        if !bare.is_empty()
+                            && bare.chars().next().is_some_and(|c| c.is_ascii_uppercase())
+                        {
+                            self.error(
+                                ErrorKind::UndefinedSubroutine,
+                                format!(
+                                    "Unknown class `{n}` — `{n}->{method}` calls a constructor on a type that isn't declared in this file or its `require`d libs"
+                                ),
+                                expr.line,
+                            );
+                        }
+                    }
                 }
                 // `$self->X` inside a class/struct body — `X` must
                 // be a field or method of the enclosing type.
