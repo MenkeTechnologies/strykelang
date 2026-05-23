@@ -1,0 +1,99 @@
+#!/usr/bin/env stryke
+
+# Pinning batch (2026-05-23): Synchronization primitives — mutex,
+# semaphore, flock. Compliance: docs/STYLE_GUIDE.md
+#
+# Eight-rule check on this file:
+#   1. fn over sub ✓
+#   2. p over print ✓
+#   3. pipeline over nested calls ✓
+#   4. no trailing semicolons ✓
+#   5. implicit closure params (_) ✓
+#   6. expression-bodied fn for one-liners ✓
+#   7. implicit return ✓
+#   8. paren-less calls except where precedence demands ✓
+
+# ── Mutex: introspection ───────────────────────────────────────────────────
+
+my $m = mutex()
+$m |> mutex_is_locked |> aeq 0, "fresh mutex is unlocked"
+
+mutex_lock($m)
+$m |> mutex_is_locked |> aeq 1, "after lock, held"
+
+mutex_unlock($m)
+$m |> mutex_is_locked |> aeq 0, "after unlock, free again"
+
+# ── Mutex: try_lock on a held mutex returns 0 ──────────────────────────────
+
+mutex_lock($m)
+mutex_try_lock($m) |> aeq 0, "try_lock on held mutex returns 0"
+mutex_unlock($m)
+mutex_try_lock($m) |> aeq 1, "try_lock on free mutex returns 1"
+mutex_unlock($m)
+
+# ── Mutex: protect a compound read-modify-write across parallel workers ────
+
+my $g = mutex()
+mysync $counter = 0
+fan 10000 {
+    mutex_lock($g)
+    defer { mutex_unlock($g) }
+    my $old = $counter
+    $counter = $old + 1
+}
+$counter |> aeq 10000, "mutex serializes RMW across 10k fan workers"
+
+# ── Semaphore: introspection ───────────────────────────────────────────────
+
+my $s = semaphore(3)
+$s |> sem_permits |> aeq 3, "fresh semaphore has N permits"
+$s |> sem_limit   |> aeq 3, "limit reflects initial N"
+
+sem_acquire($s)
+$s |> sem_permits |> aeq 2, "acquire decrements permits"
+sem_release($s)
+$s |> sem_permits |> aeq 3, "release restores permit"
+
+# ── Semaphore: try_acquire drains to zero, then refuses ────────────────────
+
+my $s2 = semaphore(2)
+sem_try_acquire($s2) |> aeq 1, "try_acquire #1 ok"
+sem_try_acquire($s2) |> aeq 1, "try_acquire #2 ok"
+sem_try_acquire($s2) |> aeq 0, "try_acquire #3 refused (0 permits left)"
+$s2 |> sem_permits |> aeq 0, "two acquires drain to zero"
+
+# ── Semaphore: bound concurrent workers ────────────────────────────────────
+
+my $gate = semaphore(4)
+mysync $in_flight = 0
+mysync $peak_in_flight = 0
+fan 40 {
+    sem_acquire($gate)
+    defer { sem_release($gate) }
+    $in_flight++
+    if ($in_flight > $peak_in_flight) { $peak_in_flight = $in_flight }
+    sleep 0.001
+    $in_flight--
+}
+($peak_in_flight <= 4) |> aok "semaphore(4) caps concurrency at 4"
+
+# ── flock: POSIX advisory locking (single-process round-trip) ──────────────
+# Op constants match Perl 5: LOCK_SH=1, LOCK_EX=2, LOCK_NB|LOCK_EX=4,
+# LOCK_UN=8. The lock auto-releases when the fd closes — process
+# crashes don't leak it.
+
+my $lockfile = tempfile()
+open(my $fh, ">", $lockfile) or die "open $lockfile: $!"
+flock($fh, 2) |> aeq 1, "flock LOCK_EX returns 1 on success"
+flock($fh, 8) |> aeq 1, "flock LOCK_UN returns 1 on success"
+close $fh
+
+# ── flock: non-blocking probe (LOCK_NB | LOCK_EX = 4) ──────────────────────
+
+open(my $fh2, ">", $lockfile) or die
+flock($fh2, 4) |> aeq 1, "non-blocking exclusive on free file = 1"
+flock($fh2, 8)
+close $fh2
+
+test_run
