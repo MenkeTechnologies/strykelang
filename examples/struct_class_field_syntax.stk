@@ -1,0 +1,106 @@
+#!/usr/bin/env stryke
+
+# Stryke struct + class field-syntax forms.
+#
+# Both `struct` and `class` accept three interchangeable field-type
+# separators, plus an optional default value via `= EXPR`.  Mix-and-
+# match within a single decl works — useful when porting from
+# Perl-style `=>` to Rust-style `:` (or vice versa) incrementally.
+#
+#   bare              → Any type
+#   `name => Type`    → fat-comma (Perl-style)
+#   `name: Type`      → colon (Rust-style)
+#   `name => T = D`   → fat-comma + default
+#   `name: T = D`     → colon + default
+
+p "── struct: bare fields (Any) ─────────────────────────────"
+struct Point2 { x, y }
+my $p2 = Point2->new(x => 1, y => 2)
+p "  x=", $p2->x, " y=", $p2->y
+
+p ""
+p "── struct: fat-comma `x => Type` ─────────────────────────"
+struct Point3 { x => Float, y => Float, z => Float }
+my $p3 = Point3->new(x => 1.0, y => 2.0, z => 3.0)
+p "  ", $p3->x, ", ", $p3->y, ", ", $p3->z
+
+p ""
+p "── struct: colon `x: Type` (Rust-style) ──────────────────"
+struct Vec3 { x: Float, y: Float, z: Float }
+my $v3 = Vec3->new(x => 4.0, y => 5.0, z => 6.0)
+p "  ", $v3->x, ", ", $v3->y, ", ", $v3->z
+
+p ""
+p "── struct: colon + default `x: T = D` ────────────────────"
+struct Vec3D { x: Float = 0.0, y: Float = 0.0, z: Float = 0.0 }
+my $origin = Vec3D->new()
+p "  origin = (", $origin->x, ", ", $origin->y, ", ", $origin->z, ")"
+my $shifted = Vec3D->new(z => 10.0)
+p "  shifted = (", $shifted->x, ", ", $shifted->y, ", ", $shifted->z, ")"
+
+p ""
+p "── struct: mixed syntaxes in one decl ────────────────────"
+struct Mixed { name: Str = "anon", count => Int, ratio => Float = 1.5 }
+my $m = Mixed->new(count => 7)
+p "  name=", $m->name, " count=", $m->count, " ratio=", $m->ratio
+
+p ""
+p "── class: colon `x: Type` (Rust-style) ───────────────────"
+class User {
+    name: Str
+    age:  Int = 0
+    role: Str = "guest"
+}
+my $u = User(name => "alice", age => 30)
+p "  ", $u->name, " ", $u->age, " ", $u->role
+
+p ""
+p "── class: fat-comma `x => Type` (Perl-style) ─────────────"
+class Color3 { r => Int = 0, g => Int = 0, b => Int = 0 }
+my $red = Color3->new(r => 255)
+p "  red = (", $red->r, ", ", $red->g, ", ", $red->b, ")"
+
+p ""
+p "── class: mixed colon + fat-comma + defaults ─────────────"
+class Window {
+    title: Str          = "untitled"
+    width  => Int       = 800
+    height => Int       = 600
+    fn show {
+        sprintf("%s (%dx%d)", $self->title, $self->width, $self->height)
+    }
+}
+my $w = Window->new(title => "main")
+p "  ", $w->show()
+
+p ""
+p "── struct method bodies + `$self->field` ────────────────"
+struct Box {
+    width  : Float
+    height : Float
+    fn area { $self->width * $self->height }
+}
+my $b = Box->new(width => 3.0, height => 4.0)
+p "  area = ", $b->area()
+
+p ""
+p "── linter catches typos in constructor keys ─────────────"
+# Uncomment to see the linter flag this — `widht` isn't a field:
+#   stryke --lint examples/struct_class_field_syntax.stk
+# emits:
+#   Unknown field `widht` in constructor call to `Box` — declared fields: height, width
+#
+# my $bad = Box->new(widht => 3.0, height => 4.0)
+
+p ""
+p "── linter catches `\$self->X` typos inside method bodies ─"
+# Uncomment to see the linter flag this — `$self->are` isn't valid:
+#   `$self->are` — no field or method `are` on `Box`; available: area, height, width
+#
+# class Buggy {
+#     w: Float
+#     fn show { $self->are }    # typo for `area` / a field
+# }
+
+p ""
+p "── done ─────────────────────────────────────────────────"

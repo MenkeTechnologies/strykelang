@@ -1,6 +1,6 @@
 //! Static analysis pass for detecting undefined variables and subroutines.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
@@ -63,6 +63,20 @@ pub struct StaticAnalyzer {
     /// declaration sweep doesn't loop on `require A` / `require B` /
     /// `require A` cycles.
     seen_required_files: HashSet<PathBuf>,
+    /// Per-type field-name sets. Populated during the declaration
+    /// sweep so that calls like `Point->new(x => 10, yyg => 20)` can
+    /// be checked against the known fields of `Point` — `yyg` is
+    /// not a field, so the linter emits a diagnostic.
+    type_fields: HashMap<String, HashSet<String>>,
+    /// Per-type method-name sets — used together with `type_fields`
+    /// for the `$self->X` check inside class/struct method bodies.
+    /// A `$self->method_or_field` access is valid only when the name
+    /// is either a field of the enclosing class or a method on it.
+    type_methods: HashMap<String, HashSet<String>>,
+    /// The class/struct being analyzed inside a method body. `None`
+    /// outside any type's body. Used to resolve `$self->X` against
+    /// the right type's fields + methods.
+    current_class: Option<String>,
 }
 
 impl StaticAnalyzer {
@@ -91,6 +105,9 @@ impl StaticAnalyzer {
             current_package: "main".to_string(),
             strict_vars,
             seen_required_files: HashSet::new(),
+            type_fields: HashMap::new(),
+            type_methods: HashMap::new(),
+            current_class: None,
         }
     }
 
@@ -246,9 +263,7 @@ impl StaticAnalyzer {
                 }
             }
             StmtKind::ClassDecl { def } => {
-                // Register class name as a callable (constructor)
                 self.declare_sub(&def.name);
-                // Register static methods and static fields as Class::name
                 for m in &def.methods {
                     if m.is_static {
                         self.declare_sub(&format!("{}::{}", def.name, m.name));
@@ -257,15 +272,44 @@ impl StaticAnalyzer {
                 for sf in &def.static_fields {
                     self.declare_sub(&format!("{}::{}", def.name, sf.name));
                 }
+                let mut fields: HashSet<String> = HashSet::new();
+                for f in &def.fields {
+                    fields.insert(f.name.clone());
+                }
+                self.type_fields.insert(def.name.clone(), fields);
+                // Instance + static methods for `$self->X` diagnostics.
+                let mut methods: HashSet<String> = HashSet::new();
+                for m in &def.methods {
+                    methods.insert(m.name.clone());
+                }
+                self.type_methods.insert(def.name.clone(), methods);
             }
             StmtKind::StructDecl { def } => {
                 self.declare_sub(&def.name);
+                let mut fields: HashSet<String> = HashSet::new();
+                for f in &def.fields {
+                    fields.insert(f.name.clone());
+                }
+                self.type_fields.insert(def.name.clone(), fields);
+                let mut methods: HashSet<String> = HashSet::new();
+                for m in &def.methods {
+                    methods.insert(m.name.clone());
+                }
+                self.type_methods.insert(def.name.clone(), methods);
             }
             StmtKind::EnumDecl { def } => {
                 self.declare_sub(&def.name);
                 for v in &def.variants {
                     self.declare_sub(&format!("{}::{}", def.name, v.name));
                 }
+                // Variants form the "field" set for diagnostic purposes
+                // (enums don't have fat-comma constructor calls, but
+                // record anyway for completeness).
+                let mut fields: HashSet<String> = HashSet::new();
+                for v in &def.variants {
+                    fields.insert(v.name.clone());
+                }
+                self.type_fields.insert(def.name.clone(), fields);
             }
             _ => {}
         }
@@ -597,9 +641,40 @@ impl StaticAnalyzer {
                     self.analyze_expr(e);
                 }
             }
-            StmtKind::StructDecl { .. }
-            | StmtKind::EnumDecl { .. }
-            | StmtKind::ClassDecl { .. }
+            StmtKind::StructDecl { def } => {
+                // Walk struct methods with `current_class` set so
+                // `$self->X` body references resolve against this
+                // struct's fields + methods.
+                let prev = self.current_class.take();
+                self.current_class = Some(def.name.clone());
+                for m in &def.methods {
+                    self.push_scope();
+                    self.declare_scalar("self");
+                    for p in &m.params {
+                        self.declare_param(p);
+                    }
+                    self.analyze_block(&m.body);
+                    self.pop_scope();
+                }
+                self.current_class = prev;
+            }
+            StmtKind::ClassDecl { def } => {
+                let prev = self.current_class.take();
+                self.current_class = Some(def.name.clone());
+                for m in &def.methods {
+                    if let Some(body) = &m.body {
+                        self.push_scope();
+                        self.declare_scalar("self");
+                        for p in &m.params {
+                            self.declare_param(p);
+                        }
+                        self.analyze_block(body);
+                        self.pop_scope();
+                    }
+                }
+                self.current_class = prev;
+            }
+            StmtKind::EnumDecl { .. }
             | StmtKind::TraitDecl { .. }
             | StmtKind::FormatDecl { .. }
             | StmtKind::AdviceDecl { .. }
@@ -637,6 +712,58 @@ impl StaticAnalyzer {
     fn analyze_block(&mut self, block: &Block) {
         for stmt in block {
             self.analyze_stmt(stmt);
+        }
+    }
+
+    /// Check `Type(field => value, …)` / `Type->new(field => value, …)`
+    /// constructor calls: emit a diagnostic for each fat-comma key
+    /// that doesn't match a declared field of `type_name`. No-op when
+    /// `type_name` isn't a known Type (lets ordinary FuncCalls
+    /// through untouched).
+    fn check_constructor_keys(&mut self, type_name: &str, args: &[Expr], call_line: usize) {
+        let bare_tail = type_name.rsplit("::").next().unwrap_or(type_name);
+        let fields = match self
+            .type_fields
+            .get(type_name)
+            .or_else(|| self.type_fields.get(bare_tail))
+        {
+            Some(f) => f.clone(),
+            None => return,
+        };
+        let mut i = 0;
+        while i < args.len() {
+            let key_name = match &args[i].kind {
+                ExprKind::String(s) => Some(s.clone()),
+                ExprKind::Bareword(s) => Some(s.clone()),
+                _ => None,
+            };
+            if let Some(name) = key_name {
+                if !fields.contains(&name) {
+                    let line = if args[i].line > 0 {
+                        args[i].line
+                    } else {
+                        call_line
+                    };
+                    let bare_for_msg = type_name.rsplit("::").next().unwrap_or(type_name);
+                    self.error(
+                        ErrorKind::UndefinedSubroutine,
+                        format!(
+                            "Unknown field `{name}` in constructor call to `{bare_for_msg}` — \
+                             declared fields: {}",
+                            {
+                                let mut v: Vec<&String> = fields.iter().collect();
+                                v.sort();
+                                v.into_iter()
+                                    .map(String::as_str)
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
+                            }
+                        ),
+                        line,
+                    );
+                }
+            }
+            i += 2;
         }
     }
 
@@ -725,12 +852,64 @@ impl StaticAnalyzer {
                         expr.line,
                     );
                 }
+                // Constructor-call form `Type(field => value)` — check
+                // each fat-comma key against the Type's known fields.
+                self.check_constructor_keys(name, args, expr.line);
                 for a in args {
                     self.analyze_expr(a);
                 }
             }
-            ExprKind::MethodCall { object, args, .. } => {
+            ExprKind::MethodCall { object, method, args, .. } => {
                 self.analyze_expr(object);
+                // Method-form constructor `Type->new(field => value)`.
+                if let ExprKind::Bareword(n) = &object.kind {
+                    self.check_constructor_keys(n, args, expr.line);
+                }
+                // `$self->X` inside a class/struct body — `X` must
+                // be a field or method of the enclosing type.
+                if let ExprKind::ScalarVar(name) = &object.kind {
+                    if name == "self" {
+                        if let Some(class_name) = self.current_class.clone() {
+                            let is_field = self
+                                .type_fields
+                                .get(&class_name)
+                                .map(|s| s.contains(method))
+                                .unwrap_or(false);
+                            let is_method = self
+                                .type_methods
+                                .get(&class_name)
+                                .map(|s| s.contains(method))
+                                .unwrap_or(false);
+                            if !is_field && !is_method {
+                                let mut suggestions: Vec<String> = self
+                                    .type_fields
+                                    .get(&class_name)
+                                    .into_iter()
+                                    .flat_map(|s| s.iter().cloned())
+                                    .collect();
+                                suggestions.extend(
+                                    self.type_methods
+                                        .get(&class_name)
+                                        .into_iter()
+                                        .flat_map(|s| s.iter().cloned()),
+                                );
+                                suggestions.sort();
+                                let avail = if suggestions.is_empty() {
+                                    "(no fields or methods declared)".to_string()
+                                } else {
+                                    suggestions.join(", ")
+                                };
+                                self.error(
+                                    ErrorKind::UndefinedSubroutine,
+                                    format!(
+                                        "`$self->{method}` — no field or method `{method}` on `{class_name}`; available: {avail}",
+                                    ),
+                                    expr.line,
+                                );
+                            }
+                        }
+                    }
+                }
                 for a in args {
                     self.analyze_expr(a);
                 }
