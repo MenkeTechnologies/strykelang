@@ -32,7 +32,7 @@ use lsp_types::{
     DidCloseTextDocumentParams, DidOpenTextDocumentParams, DocumentHighlight,
     DocumentHighlightKind, DocumentHighlightParams, DocumentSymbolParams, DocumentSymbolResponse,
     Documentation, GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams,
-    HoverProviderCapability, Location, OneOf, Position, PrepareRenameResponse,
+    HoverProviderCapability, Location, LocationLink, OneOf, Position, PrepareRenameResponse,
     PublishDiagnosticsParams, Range, ReferenceParams, RenameOptions, RenameParams,
     ServerCapabilities, SymbolInformation, SymbolKind, TextDocumentContentChangeEvent,
     TextDocumentPositionParams, TextDocumentSyncCapability, TextDocumentSyncKind,
@@ -838,6 +838,66 @@ fn line_range_utf16(source: &str, line_1based: usize) -> Range {
             character: end16,
         },
     }
+}
+
+/// Wrap a `(uri, range)` pair as a single-element `LocationLink`
+/// response so the IntelliJ LSP integration uses `targetSelectionRange`
+/// for caret positioning. A plain `Location` response collapses to
+/// `range.start = {line, character: 0}` in some IntelliJ navigation
+/// paths regardless of what the server sent — `LocationLink` forces
+/// the platform's `LspNavigatableSymbol(targetFile, targetSelectionRange)`
+/// path to honor the column we provide.
+fn location_link_response(uri: Uri, range: Range) -> GotoDefinitionResponse {
+    GotoDefinitionResponse::Link(vec![LocationLink {
+        origin_selection_range: None,
+        target_uri: uri,
+        target_range: range,
+        target_selection_range: range,
+    }])
+}
+
+/// Range covering the bare name `name` on `decl_line0` (0-based) of
+/// `source`. Strips any `Pkg::` qualifier so the returned range
+/// points at the LAST segment — `fn Algo::binary_search(...)` → range
+/// over `binary_search`, not `Algo::binary_search`. Falls back to
+/// [`line_range_utf16`] when the bare name can't be located on the
+/// decl line. Used by goto-definition so Cmd-B lands the caret on
+/// the function / type name instead of column 0 of the line.
+fn name_range_on_decl_line(source: &str, decl_line0: usize, name: &str) -> Range {
+    let lines: Vec<&str> = source.lines().collect();
+    let n = lines.len().max(1);
+    let idx = decl_line0.min(n.saturating_sub(1));
+    let line = lines.get(idx).copied().unwrap_or("");
+    let bare = name.rsplit("::").next().unwrap_or(name);
+    if bare.is_empty() {
+        return line_range_utf16(source, decl_line0 + 1);
+    }
+    // Find the FIRST word-boundary occurrence of `bare` on the decl
+    // line. Walk match_indices and check the prev/next byte to reject
+    // partial-identifier hits (e.g. `binary_search` inside
+    // `my_binary_search`).
+    for (byte, _) in line.match_indices(bare) {
+        let end_byte = byte + bare.len();
+        let prev = line[..byte].chars().next_back();
+        let next = line[end_byte..].chars().next();
+        let prev_ok = prev.is_none_or(|c| !c.is_alphanumeric() && c != '_');
+        let next_ok = next.is_none_or(|c| !c.is_alphanumeric() && c != '_');
+        if prev_ok && next_ok {
+            let c0 = line[..byte].encode_utf16().count() as u32;
+            let c1 = line[..end_byte].encode_utf16().count() as u32;
+            return Range {
+                start: Position {
+                    line: idx as u32,
+                    character: c0,
+                },
+                end: Position {
+                    line: idx as u32,
+                    character: c1,
+                },
+            };
+        }
+    }
+    line_range_utf16(source, decl_line0 + 1)
 }
 
 fn document_symbols(
@@ -1727,11 +1787,23 @@ fn goto_definition(
     if let Some(table) = crate::lsp_symbols::SymbolTable::build(text, &path) {
         if let Some(id) = table.symbol_at(pos.line, Some(&word)) {
             if let Some(sym) = table.symbols.iter().find(|s| s.id == id) {
-                // `decl_line` is 0-based (LSP); `line_range_utf16` expects 1-based.
-                return Some(GotoDefinitionResponse::Scalar(Location {
-                    uri: uri.clone(),
-                    range: line_range_utf16(text, sym.decl_line as usize + 1),
-                }));
+                // Cursor is already on the declaration line — return
+                // empty so the client's Cmd-B doesn't navigate to "self"
+                // (col 0 of the decl line). The plugin's GotoDeclaration
+                // handler interprets an empty result as "you're on the
+                // decl" and shows the ShowUsages popup instead. Without
+                // this, the cursor visibly jumps to line start before
+                // the popup appears.
+                if sym.decl_line as usize == pos.line as usize {
+                    return None;
+                }
+                // Land the caret on the bare name (last `::`-segment)
+                // of the declaration. Falls back to the whole-line
+                // range when the name can't be located.
+                return Some(location_link_response(
+                    uri.clone(),
+                    name_range_on_decl_line(text, sym.decl_line as usize, &sym.name),
+                ));
             }
         }
         // Qualified-name fallback: `EnumName::Variant`,
@@ -1745,10 +1817,14 @@ fn goto_definition(
                 if let Some(type_sym) = table.symbols.iter().find(|s| {
                     s.name == prefix && matches!(s.kind, crate::lsp_symbols::SymbolKind::Type)
                 }) {
-                    return Some(GotoDefinitionResponse::Scalar(Location {
-                        uri: uri.clone(),
-                        range: line_range_utf16(text, type_sym.decl_line as usize + 1),
-                    }));
+                    return Some(location_link_response(
+                        uri.clone(),
+                        name_range_on_decl_line(
+                            text,
+                            type_sym.decl_line as usize,
+                            &type_sym.name,
+                        ),
+                    ));
                 }
             }
         }
@@ -1764,20 +1840,24 @@ fn goto_definition(
                 .iter()
                 .find(|s| s.name == word && matches!(s.kind, crate::lsp_symbols::SymbolKind::Field))
             {
-                return Some(GotoDefinitionResponse::Scalar(Location {
-                    uri: uri.clone(),
-                    range: line_range_utf16(text, field_sym.decl_line as usize + 1),
-                }));
+                return Some(location_link_response(
+                    uri.clone(),
+                    name_range_on_decl_line(
+                        text,
+                        field_sym.decl_line as usize,
+                        &field_sym.name,
+                    ),
+                ));
             }
         }
     }
     let program = crate::parse_with_file(text, &path).ok()?;
     let sub_map = collect_sub_fqn_map(&program);
     if let Some(decl_line) = resolve_sub_decl_line(&sub_map, &word) {
-        return Some(GotoDefinitionResponse::Scalar(Location {
-            uri: uri.clone(),
-            range: line_range_utf16(text, decl_line),
-        }));
+        return Some(location_link_response(
+            uri.clone(),
+            line_range_utf16(text, decl_line),
+        ));
     }
     // Cross-file: chase `require "./lib/foo.stk"` / `require Mod::Name`
     // directives and search their sub maps. Required-file path resolution
@@ -1807,10 +1887,10 @@ fn cross_file_goto_definition(
         let child_map = collect_sub_fqn_map(child);
         if let Some(decl_line) = resolve_sub_decl_line(&child_map, word) {
             let uri = path_to_uri(target_path);
-            response = Some(GotoDefinitionResponse::Scalar(Location {
+            response = Some(location_link_response(
                 uri,
-                range: line_range_utf16(src, decl_line),
-            }));
+                line_range_utf16(src, decl_line),
+            ));
             return false;
         }
         // SymbolTable path: Type (struct/enum/class/trait), Field,
@@ -1829,10 +1909,10 @@ fn cross_file_goto_definition(
                 ) && (s.name == word || name_matches_cross_file(&s.name, word))
             }) {
                 let uri = path_to_uri(target_path);
-                response = Some(GotoDefinitionResponse::Scalar(Location {
+                response = Some(location_link_response(
                     uri,
-                    range: line_range_utf16(src, sym.decl_line as usize + 1),
-                }));
+                    name_range_on_decl_line(src, sym.decl_line as usize, &sym.name),
+                ));
                 return false;
             }
             // Qualified-name fallback: cursor on `Pkg::Variant` or
@@ -1845,10 +1925,10 @@ fn cross_file_goto_definition(
                         s.name == prefix && matches!(s.kind, crate::lsp_symbols::SymbolKind::Type)
                     }) {
                         let uri = path_to_uri(target_path);
-                        response = Some(GotoDefinitionResponse::Scalar(Location {
+                        response = Some(location_link_response(
                             uri,
-                            range: line_range_utf16(src, sym.decl_line as usize + 1),
-                        }));
+                            name_range_on_decl_line(src, sym.decl_line as usize, &sym.name),
+                        ));
                         return false;
                     }
                 }
@@ -2150,13 +2230,20 @@ fn collect_symbol_references(
         Some(c) => format!("{c}{body_tail}"),
         None => body_tail.to_string(),
     };
-    let qualified_form = if sym.package == "main" {
-        bare_form.clone()
-    } else if sym_body.contains("::") {
+    // Symbol name may ALREADY be qualified (e.g. `fn Algo::binary_search`
+    // declared at top level — sym.package="main", sym.name has `::` in
+    // it). Check that case FIRST so the cross-file scan uses the
+    // qualified spelling. Without this, bare `binary_search(...)` calls
+    // (which are the BUILTIN) get false-matched as usages of the user
+    // fn. The `sym.package == "main"` branch only applies when the
+    // sym name is itself bare.
+    let qualified_form = if sym_body.contains("::") {
         match sym_sigil {
             Some(c) => format!("{c}{sym_body}"),
             None => sym_body.to_string(),
         }
+    } else if sym.package == "main" {
+        bare_form.clone()
     } else {
         match sym_sigil {
             Some(c) => format!("{c}{}::{body_tail}", sym.package),
