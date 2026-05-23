@@ -1056,10 +1056,11 @@ my @r = reverse 1:5   # (5,4,3,2,1)
       </article>
       <article class="doc-entry" id="doc-reduce">
         <h3><a class="doc-anchor" href="#doc-reduce">#</a> <code>reduce</code></h3>
-        <p><code>reduce { _ OP _1 } @list</code> — performs a sequential left fold over the list. The first two elements are <code>_</code> and <code>_1</code>; each iteration&#39;s result becomes the next <code>_</code>. Use <code>{ |$acc, $val| body }</code> to name the two params. Returns <code>undef</code> for an empty list and the single element for a one-element list. For a fold with an explicit initial value, see <code>fold</code>.</p>
+        <p><code>reduce { _ OP _1 } @list</code> — performs a sequential left-to-right fold over the list. The first two elements are <code>_</code> and <code>_1</code>; each iteration&#39;s result becomes the next <code>_</code>. Perl-canonical <code>$a</code> / <code>$b</code> (as in <code>List::Util::reduce</code>) work too; use <code>{ |$acc, $val| body }</code> to name the two params. Returns <code>undef</code> for an empty list and the lone element for a one-element list (the block body never executes in that case). An optional explicit seed may be supplied as the first list element &mdash; <code>reduce { ... } SEED, @list</code> &mdash; in which case the seed becomes the initial accumulator. Input is not mutated. Fold direction is strictly left-to-right: <code>reduce { $a - $b } 1, 2, 3, 4, 5</code> = <code>((((1-2)-3)-4)-5)</code> = <code>-13</code>. For a guaranteed initial value (returned even on empty input), use <code>fold</code> instead.</p>
         <pre><code class="lang-perl">my $fac = reduce { _ * _1 } 1:6
 p $fac   # 720
-reduce { |$acc, $val| $acc + $val }, 1:10   # 55 (named params)
+reduce { $a + $b } 1..10                     # 55  (Perl-canonical names)
+reduce { |$acc, $val| $acc + $val }, 1:10   # 55  (named params)
 my $longest = reduce { length(_) &gt; length(_1) ? _ : _1 } @words
 </code></pre>
       </article>
@@ -7992,11 +7993,15 @@ p substr $path, $ext + 1      # gz
       <article class="doc-entry" id="doc-split">
         <h3><a class="doc-anchor" href="#doc-split">#</a> <code>split</code></h3>
         <p><code>split /PATTERN/, STRING [, LIMIT]</code> — divide STRING into a list of substrings by splitting on each occurrence of PATTERN.</p>
-        <p><code>split</code> is one of the most-used string functions. The PATTERN is a regex, so you can split on character classes, alternations, or lookaheads. A LIMIT caps the number of returned fields; the final field contains the unsplit remainder. The special pattern <code>&quot; &quot;</code> (a single space string, not regex) mimics <code>awk</code>-style splitting: it strips leading whitespace and splits on runs of whitespace. In stryke, <code>split</code> integrates with <code>|&gt;</code> pipelines, accepting piped-in strings for ergonomic one-liners. Trailing empty fields are removed by default; pass -1 as LIMIT to preserve them.</p>
+        <p><code>split</code> is one of the most-used string functions. The PATTERN is a regex, so you can split on character classes, alternations, or lookaheads. A LIMIT caps the number of returned fields; the final field contains the unsplit remainder. The special pattern <code>&quot; &quot;</code> (a single space string, not regex) mimics <code>awk</code>-style splitting: it strips leading whitespace and splits on runs of whitespace. In stryke, <code>split</code> integrates with <code>|&gt;</code> pipelines, accepting piped-in strings for ergonomic one-liners.</p>
+        <p>Pinned semantics: trailing empty fields are dropped by default; any negative LIMIT preserves them. LIMIT = 1 short-circuits (no splitting; the input is returned as the single field). Internal empties are preserved even without an explicit LIMIT. The empty pattern <code>//</code> yields one element per character. An empty input string yields an empty list; a pattern that never matches returns the whole string as one field. Splitting on <code>/\s+/</code> does <em>not</em> strip leading whitespace (a leading empty field is produced) &mdash; that&rsquo;s the documented difference from awk-mode <code>split &quot; &quot;</code>. Capture groups in PATTERN are <em>not</em> emitted as extra fields (diverges from Perl&rsquo;s capture-emission behavior); only the separated fields are returned.</p>
         <pre><code class="lang-perl">my @parts = split /,/, &quot;a,b,c&quot;
 &quot;one:two:three&quot; |&gt; split /:/ |&gt; e p   # one two three
 my ($user, $domain) = split /@/, $email, 2
 p &quot;$user at $domain&quot;
+split /,/, &quot;a,b,c,,&quot;                    # (&quot;a&quot;,&quot;b&quot;,&quot;c&quot;)        trailing empties dropped
+split /,/, &quot;a,b,c,,&quot;, -1                # (&quot;a&quot;,&quot;b&quot;,&quot;c&quot;,&quot;&quot;,&quot;&quot;)  negative limit keeps them
+split //, &quot;abc&quot;                         # (&quot;a&quot;,&quot;b&quot;,&quot;c&quot;)        empty pattern = chars
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-join">
