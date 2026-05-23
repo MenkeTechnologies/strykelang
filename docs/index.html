@@ -149,8 +149,8 @@
             <span class="sep">/</span>
             <a href="https://docs.rs/strykelang" target="_blank" rel="noopener noreferrer">docs.rs</a>
           </nav>
-          <p class="docs-build-line" id="strykeBuildLine">stryke v0.14.16 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 10,335 builtins (11,063 keys in %all) · LSP + DAP + JetBrains plugin</p>
-          <p class="docs-build-line"><span id="strykeLoc">290,208 Rust src · 79,923 test src · 149,536 example src</span></p>
+          <p class="docs-build-line" id="strykeBuildLine">stryke v0.14.17 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 10,352 builtins (11,080 keys in %all) · LSP + DAP + JetBrains plugin</p>
+          <p class="docs-build-line"><span id="strykeLoc">290,684 Rust src · 79,918 test src · 149,536 example src</span></p>
         </div>
         <div class="tutorial-toolbar">
           <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -172,7 +172,7 @@
 
     <main class="tutorial-main">
       <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>STRYKE — SERVER FARMS FIRST</h2>
-      <p class="tutorial-subtitle"><strong>The hottest language ever created. Literally.</strong> Pin millions of servers to 100% TDP from a single REPL. Distributed load testing with <code>stryke agent</code> + <code>stryke controller</code>. Also a blazing-fast Perl 5 interpreter: NaN-boxed values, Rayon work-stealing across every CPU, bytecode VM with Cranelift Block JIT, 10,335 builtins in %b (11,063 keys in %all), and pipe-forward syntax. <strong>100% TDP — beware.</strong></p>
+      <p class="tutorial-subtitle"><strong>The hottest language ever created. Literally.</strong> Pin millions of servers to 100% TDP from a single REPL. Distributed load testing with <code>stryke agent</code> + <code>stryke controller</code>. Also a blazing-fast Perl 5 interpreter: NaN-boxed values, Rayon work-stealing across every CPU, bytecode VM with Cranelift Block JIT, 10,352 builtins in %b (11,080 keys in %all), and pipe-forward syntax. <strong>100% TDP — beware.</strong></p>
 
       <section class="tutorial-section">
         <h2>Quickstart</h2>
@@ -979,6 +979,70 @@ pipeline(
 
 # streaming — bounded crossbeam channels, concurrent stages
 par_pipeline_stream([\&amp;stage1, \&amp;stage2, \&amp;stage3], \@input)</pre>
+
+        <h3>Mutex / semaphore — blocking sync primitives</h3>
+        <p>Backed by <code>parking_lot::Mutex</code> + <code>Condvar</code> — blocking <code>lock</code> / <code>acquire</code> wait on the condvar (no busy-wait, no spin). <code>Arc</code>-shared via <code>StrykeValue::Mutex</code> / <code>StrykeValue::Semaphore</code> so closure capture across <code>spawn</code> / <code>fan</code> shares the same primitive without needing <code>mysync</code> on the handle. Compose with <code>defer</code> for RAII — there's no <code>lock { BLOCK }</code> sugar because the basic shape already does the job.</p>
+
+        <table class="reflect-table">
+          <thead>
+            <tr><th>Function</th><th>Aliases</th><th>Returns</th><th>Behavior</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>mutex()</code></td><td>—</td><td>Mutex</td><td>fresh unlocked mutex</td></tr>
+            <tr><td><code>mutex_lock($m)</code></td><td>—</td><td>undef</td><td>blocks on Condvar until acquired; sets held=true</td></tr>
+            <tr><td><code>mutex_unlock($m)</code></td><td>—</td><td>undef</td><td>clears held, <code>notify_one</code>; no-op if already unlocked</td></tr>
+            <tr><td><code>mutex_try_lock($m)</code></td><td>—</td><td>1 \| 0</td><td>non-blocking; 1 if acquired this call, 0 if held by anyone</td></tr>
+            <tr><td><code>mutex_is_locked($m)</code></td><td>—</td><td>1 \| 0</td><td>introspection</td></tr>
+            <tr><td><code>semaphore($n)</code></td><td><code>sem</code></td><td>Semaphore</td><td>n permits (panics if n &lt; 0)</td></tr>
+            <tr><td><code>semaphore_acquire($s)</code></td><td><code>sem_acquire</code></td><td>undef</td><td>blocks until permits &gt; 0; decrements</td></tr>
+            <tr><td><code>semaphore_release($s)</code></td><td><code>sem_release</code></td><td>undef</td><td>+1 permit, <code>notify_one</code></td></tr>
+            <tr><td><code>semaphore_try_acquire($s)</code></td><td><code>sem_try_acquire</code></td><td>1 \| 0</td><td>non-blocking</td></tr>
+            <tr><td><code>semaphore_permits($s)</code></td><td><code>sem_permits</code></td><td>integer</td><td>current available count</td></tr>
+            <tr><td><code>semaphore_limit($s)</code></td><td><code>sem_limit</code></td><td>integer</td><td>initial N (immutable)</td></tr>
+          </tbody>
+        </table>
+
+<pre># Mutex — protect a shared counter across spawn / fan workers
+my $m = mutex()
+mysync $counter = 0
+fan 10000 {
+    mutex_lock($m)
+    defer { mutex_unlock($m) }
+    my $old = $counter; $counter = $old + 1   # genuine read-modify-write
+}
+p $counter   # exactly 10000
+
+# Semaphore — bound concurrent expensive workers to N
+my $s = semaphore(4)
+fan 100 {
+    sem_acquire($s)
+    defer { sem_release($s) }
+    do_expensive_work(_)   # at most 4 in flight at any moment
+}
+
+# try_lock / try_acquire — non-blocking probes
+if (mutex_try_lock($m)) {
+    defer { mutex_unlock($m) }
+    # critical section — only one worker runs this branch
+} else {
+    # fall through fast path
+}</pre>
+
+        <h3>flock — cross-process advisory locks</h3>
+        <p>For locks that survive a single stryke process (multi-process coordination via a lockfile), <code>flock</code> wraps the POSIX <code>flock(2)</code> syscall directly:</p>
+<pre>open(my $fh, "&gt;", "/tmp/job.lock") or die
+flock($fh, 2)             # LOCK_EX — blocking exclusive
+defer { flock($fh, 8) }   # LOCK_UN
+# critical section across processes
+
+# non-blocking probe
+if (flock($fh, 4)) {      # LOCK_NB | LOCK_EX
+    defer { flock($fh, 8) }
+    # got it
+} else {
+    # someone else holds the lock; bail or retry
+}</pre>
+        <p>Op constants match Perl 5: <code>LOCK_SH=1</code>, <code>LOCK_EX=2</code>, <code>LOCK_NB|LOCK_EX=4</code>, <code>LOCK_UN=8</code>. The lock is released automatically when the file descriptor closes — process crashes don't leak locks.</p>
       </section>
 
       <section class="tutorial-section">
@@ -1407,6 +1471,7 @@ p $d-&gt;isa("Cat")                      <span class="comment"># ""  (false)</sp
           <li><strong>Interactive REPL</strong> — reedline-based, line history at <code>~/.stryke/history</code>, columnar tab completion for keywords / lexicals / sub names / arrow methods on blessed objects. Edit mode (emacs/vi) configured via <code>~/.stryke/config.toml</code> <code>[repl] mode = "vi"</code> or per-session via <code>STRYKE_REPL_MODE=vi</code>. The config file is auto-seeded on first launch with all keys commented (documents the schema; default behavior unchanged until you uncomment).</li>
           <li><strong>Distributed compute</strong> — <code>cluster([...])</code> builds an SSH worker pool; <code>pmap_on $cluster { } @list</code> fans an element-wise map across persistent remote workers; <code>~d&gt; on $cluster SRC stages</code> ships chunks of <code>SRC</code> to remote slots and runs the full stage chain per chunk (the <code>~p&gt;</code> surface, distributed). Both share the same dispatcher: ssh-per-slot handshake once, JOB frames per item, per-job retry, order-preserving collect.</li>
           <li><strong>Shared state</strong> — <code>mysync</code> declares atomic variables safe to mutate from parallel workers.</li>
+          <li><strong>Mutex / semaphore primitives</strong> — <code>mutex()</code> and <code>semaphore($n)</code> return blocking sync primitives backed by <code>parking_lot::Mutex</code> + <code>Condvar</code> (no busy-wait). Pair with <code>defer { mutex_unlock($m) }</code> for RAII across <code>spawn</code> / <code>fan</code> / <code>~p&gt;</code> workers. Surface: <code>mutex_lock</code>, <code>mutex_unlock</code>, <code>mutex_try_lock</code>, <code>mutex_is_locked</code>; <code>semaphore_acquire</code>, <code>semaphore_release</code>, <code>semaphore_try_acquire</code>, <code>semaphore_permits</code>, <code>semaphore_limit</code> (all with <code>sem_*</code> aliases). For cross-process locking, <code>flock($fh, OP)</code> calls the POSIX advisory-lock syscall directly (<code>LOCK_SH=1</code>, <code>LOCK_EX=2</code>, <code>LOCK_NB|LOCK_EX=4</code>, <code>LOCK_UN=8</code>).</li>
           <li><strong>Language server</strong> — <code>s lsp</code> (or <code>s --lsp</code>) runs an LSP server over stdio with diagnostics, hover, completion. The nine reflection hashes above are part of the completion surface.</li>
         </ul>
       </section>
