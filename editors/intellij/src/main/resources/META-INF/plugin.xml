@@ -96,6 +96,14 @@
             implementationClass="com.menketechnologies.stryke.refactor.StrykeRefactoringSupportProvider"/>
         <renameHandler implementation="com.menketechnologies.stryke.refactor.StrykeRenameHandler"/>
 
+        <!-- Cmd-B (Go To → Declaration or Usages) on the declaration.
+             LSP returns no target there (server-side `goto_definition`
+             returns None when sym.decl_line == cursor line) so the
+             platform reports "Cannot find declaration to go to" by
+             default. This handler detects the no-target case and
+             invokes `ShowUsages` synchronously via ActionUtil. -->
+        <gotoDeclarationHandler implementation="com.menketechnologies.stryke.navigate.StrykeGotoDeclarationHandler"/>
+
         <!-- Balloon notifications surfaced by the refactoring bridge when an
              LSP call fails / returns no matching action. -->
         <notificationGroup id="Stryke Refactoring" displayType="BALLOON"/>

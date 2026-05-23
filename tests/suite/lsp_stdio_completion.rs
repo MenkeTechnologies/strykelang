@@ -253,7 +253,34 @@ impl LspHarness {
             }),
         );
         let msg = recv_until_result(&mut self.reader, id);
-        msg.get("result").cloned().unwrap_or(Value::Null)
+        // Normalize to a single Location-shaped object `{uri, range}`
+        // regardless of which LSP response variant the server picked:
+        //   - `Location` (object with `uri` + `range`)
+        //   - `Location[]` (array of Locations) — take first
+        //   - `LocationLink[]` (array of LocationLinks; `targetUri` +
+        //     `targetRange` + `targetSelectionRange`) — take first,
+        //     remap to Location shape via targetSelectionRange (the
+        //     range the IDE uses to position the caret).
+        let raw = msg.get("result").cloned().unwrap_or(Value::Null);
+        if raw.is_object() && raw.get("range").is_some() {
+            return raw;
+        }
+        if let Some(arr) = raw.as_array() {
+            if let Some(first) = arr.first() {
+                if let (Some(target_uri), Some(target_range)) = (
+                    first.get("targetUri"),
+                    first
+                        .get("targetSelectionRange")
+                        .or_else(|| first.get("targetRange")),
+                ) {
+                    return json!({ "uri": target_uri, "range": target_range });
+                }
+                if first.get("range").is_some() {
+                    return first.clone();
+                }
+            }
+        }
+        raw
     }
 
     fn document_symbols(&mut self) -> Value {
@@ -1355,10 +1382,28 @@ fn lsp_stdio_goto_definition_struct_across_require() {
         }),
     );
     let msg = recv_until_result(&mut reader, 2);
-    let result = msg.get("result").cloned().unwrap_or(Value::Null);
+    let raw = msg.get("result").cloned().unwrap_or(Value::Null);
     drop(stdin);
     let _ = child.kill();
     let _ = child.wait();
+
+    // Normalize Location | LocationLink[] → Location shape.
+    let result = if raw.is_object() && raw.get("range").is_some() {
+        raw
+    } else if let Some(first) = raw.as_array().and_then(|a| a.first()) {
+        if let (Some(u), Some(r)) = (
+            first.get("targetUri"),
+            first
+                .get("targetSelectionRange")
+                .or_else(|| first.get("targetRange")),
+        ) {
+            json!({ "uri": u, "range": r })
+        } else {
+            first.clone()
+        }
+    } else {
+        raw
+    };
 
     let uri = result
         .get("uri")
@@ -2052,6 +2097,40 @@ fn lsp_stdio_references_package_includes_qualified_call_sites() {
 
 /// Find Usages on a non-last `::`-segment of a qualified name must
 /// locate every package-prefix occurrence (the partial-segment rule
+#[test]
+fn audit_references_qualified_sub_does_not_match_builtin_calls() {
+    // Regression: `fn Algo::binary_search` declared at top level has
+    // sym.package="main" and sym.name="Algo::binary_search". The cross-
+    // file qualified_form derivation used to fall into the
+    // `sym.package == "main"` branch FIRST and emit bare "binary_search"
+    // as the cross-file scan needle — false-matching every call to the
+    // BUILTIN `binary_search` in unrelated files.
+    let src = "fn Algo::binary_search($t, @l) { -1 }\nmy @sorted = (1,3,5)\nAlgo::binary_search(3, @sorted)\nbinary_search(5, 1, 2, 3, 4, 5)\n";
+    let mut h = LspHarness::new(src);
+    // Cursor on `binary_search` of the decl (line 0).
+    let r = h.references(0, 15, false);
+    h.finish();
+    let arr = r
+        .as_array()
+        .unwrap_or_else(|| panic!("references returned non-array: {r}"));
+    let lines: Vec<u64> = arr
+        .iter()
+        .filter_map(|loc| loc.pointer("/range/start/line").and_then(Value::as_u64))
+        .collect();
+    // Line 2 is the qualified `Algo::binary_search(...)` call — MUST
+    // be included.
+    assert!(
+        lines.contains(&2),
+        "expected qualified call at line 2 in usages: {arr:?}",
+    );
+    // Line 3 is `binary_search(5, ...)` calling the builtin — MUST
+    // NOT be included.
+    assert!(
+        !lines.contains(&3),
+        "bare `binary_search` builtin call (line 3) leaked into usages of qualified `Algo::binary_search`: {arr:?}",
+    );
+}
+
 /// from rename also applies here).
 #[test]
 fn lsp_stdio_references_non_last_segment_treats_as_package_prefix() {
@@ -2479,11 +2558,29 @@ fn lsp_stdio_goto_definition_follows_require_into_lib() {
         }),
     );
     let msg = recv_until_result(&mut reader, 2);
-    let result = msg.get("result").cloned().unwrap_or(Value::Null);
+    let raw = msg.get("result").cloned().unwrap_or(Value::Null);
 
     drop(stdin);
     let _ = child.kill();
     let _ = child.wait();
+
+    // Normalize Location | Location[] | LocationLink[] → Location shape.
+    let result = if raw.is_object() && raw.get("range").is_some() {
+        raw
+    } else if let Some(first) = raw.as_array().and_then(|a| a.first()) {
+        if let (Some(uri), Some(range)) = (
+            first.get("targetUri"),
+            first
+                .get("targetSelectionRange")
+                .or_else(|| first.get("targetRange")),
+        ) {
+            json!({ "uri": uri, "range": range })
+        } else {
+            first.clone()
+        }
+    } else {
+        raw
+    };
 
     let returned_uri = result
         .get("uri")
