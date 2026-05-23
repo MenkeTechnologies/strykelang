@@ -1,0 +1,11 @@
+#!/usr/bin/env stryke
+require "./HighSchoolSweetheart.stk"
+
+assert_eq Exercism::HighSchoolSweetheart::first_letter("Madison"),     "M", "first letter"
+assert_eq Exercism::HighSchoolSweetheart::first_letter("  Robert "),    "R", "trim whitespace"
+assert_eq Exercism::HighSchoolSweetheart::initial("madison"),          "M.","initial uppercased"
+assert_eq Exercism::HighSchoolSweetheart::initial("robert"),           "R.","initial robert"
+assert_eq Exercism::HighSchoolSweetheart::initials("Madison Beer"),    "M. B.", "two-name initials"
+assert_eq Exercism::HighSchoolSweetheart::initials("robert downey"),   "R. D.", "lowercase two-name"
+
+test_run

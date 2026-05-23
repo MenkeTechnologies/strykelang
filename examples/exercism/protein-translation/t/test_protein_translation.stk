@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+require "./ProteinTranslation.stk"
+
+fn jcodon { join(":", @{_}) }
+fn jrna   { my @r = @{_0}; $r[0] eq "ok" ? "ok:" . join(",", @{$r[1]}) : "error:" . $r[1] }
+
+assert_eq jcodon(Exercism::ProteinTranslation::of_codon("AUG")), "ok:Methionine", "AUG → Methionine"
+assert_eq jcodon(Exercism::ProteinTranslation::of_codon("UGG")), "ok:Tryptophan", "UGG → Tryptophan"
+assert_eq jcodon(Exercism::ProteinTranslation::of_codon("UCG")), "ok:Serine",     "UCG → Serine"
+assert_eq jcodon(Exercism::ProteinTranslation::of_codon("UAG")), "ok:STOP",       "UAG → STOP"
+assert_eq jcodon(Exercism::ProteinTranslation::of_codon("XYZ")), "error:invalid codon", "invalid codon"
+
+assert_eq jrna(Exercism::ProteinTranslation::of_rna("AUG")),               "ok:Methionine",                "single codon"
+assert_eq jrna(Exercism::ProteinTranslation::of_rna("AUGUUUUGG")),         "ok:Methionine,Phenylalanine,Tryptophan", "three codons"
+assert_eq jrna(Exercism::ProteinTranslation::of_rna("AUGUUUUAA")),         "ok:Methionine,Phenylalanine",  "STOP halts"
+assert_eq jrna(Exercism::ProteinTranslation::of_rna("UAGUUU")),            "ok:",                          "leading STOP → empty"
+assert_eq jrna(Exercism::ProteinTranslation::of_rna("AUGXXX")),            "error:invalid RNA",            "invalid mid-RNA"
+
+test_run

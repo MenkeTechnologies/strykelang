@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+
+# Build a diamond shape that peaks at `letter`. The 'A' line is at the
+# top and bottom; each row is the same total width (2N+1) where N is
+# the letter's 0-based offset from 'A'.
+fn Exercism::Diamond::build_shape {
+    my $letter = _0
+    my $n      = ord($letter) - ord('A')
+    my @rows
+    for my $i (0:$n) {
+        my $c   = chr(ord('A') + $i)
+        my $pad = " " x ($n - $i)
+        my $row = $i == 0
+                ? "${pad}A${pad}"
+                : "${pad}${c}" . (" " x (2 * $i - 1)) . "${c}${pad}"
+        push @rows, $row
+    }
+    my @bottom = reverse @rows[0:$n-1]
+    join("\n", @rows, @bottom) . "\n"
+}

@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+require "./HighScore.stk"
+
+fn j { join(",", @{_}) }
+
+my $s0 = Exercism::HighScore::new()
+assert_eq scalar(keys %{$s0}), 0, "new is empty"
+
+my $s1 = Exercism::HighScore::add_player($s0, "Alice", 100)
+assert_eq $s1->{Alice}, 100, "add_player records score"
+
+my $s2 = Exercism::HighScore::add_player($s1, "Bob")
+assert_eq $s2->{Bob}, 0, "add_player default 0"
+
+my $s3 = Exercism::HighScore::update_score($s2, "Alice", 50)
+assert_eq $s3->{Alice}, 150, "update_score adds"
+
+my $s4 = Exercism::HighScore::reset_score($s3, "Alice")
+assert_eq $s4->{Alice}, 0, "reset_score → 0"
+
+my $s5 = Exercism::HighScore::remove_player($s4, "Bob")
+assert_eq exists($s5->{Bob}), 0, "remove_player drops key"
+
+my $s6 = Exercism::HighScore::add_player(Exercism::HighScore::add_player({}, "Bob", 5), "Alice", 10)
+assert_eq j(Exercism::HighScore::get_players($s6)), "Alice,Bob", "get_players sorted"
+
+test_run

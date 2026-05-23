@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+require "./Form.stk"
+
+fn j { join(",", @{_}) }
+fn jcheck { my $r = _0; ref($r) eq 'ARRAY' ? "error:" . $r->[1] : $r }
+
+assert_eq Exercism::CityOffice::blanks(0),                "",            "zero blanks"
+assert_eq Exercism::CityOffice::blanks(5),                "XXXXX",       "five blanks"
+assert_eq j(Exercism::CityOffice::letters("Anne")),       "A,N,N,E",     "letters Anne"
+assert_eq j(Exercism::CityOffice::letters("zoo")),        "Z,O,O",       "uppercased"
+
+assert_eq jcheck(Exercism::CityOffice::check_length("hello", 10)), "ok",     "fits"
+assert_eq jcheck(Exercism::CityOffice::check_length("hello", 5)),  "ok",     "exact"
+assert_eq jcheck(Exercism::CityOffice::check_length("hello", 3)),  "error:2", "overflow"
+
+assert_eq Exercism::CityOffice::format_address({street=>"main st", postal_code=>"12345", city=>"anytown"}), "MAIN ST\n12345 ANYTOWN\n", "hash form"
+assert_eq Exercism::CityOffice::format_address(["main st","12345","anytown"]),                              "MAIN ST\n12345 ANYTOWN\n", "tuple form"
+
+test_run

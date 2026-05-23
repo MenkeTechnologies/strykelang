@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+require "./IsbnVerifier.stk"
+
+assert_eq Exercism::IsbnVerifier::is_valid("3-598-21508-8"),   1, "valid with dashes"
+assert_eq Exercism::IsbnVerifier::is_valid("3-598-21508-9"),   0, "wrong check digit"
+assert_eq Exercism::IsbnVerifier::is_valid("3-598-21507-X"),   1, "X as check"
+assert_eq Exercism::IsbnVerifier::is_valid("3598215088"),      1, "valid no dashes"
+assert_eq Exercism::IsbnVerifier::is_valid("359821507X"),      1, "no dashes with X"
+assert_eq Exercism::IsbnVerifier::is_valid("3-598-2X507-9"),   0, "X in wrong slot"
+assert_eq Exercism::IsbnVerifier::is_valid("00"),              0, "too short"
+assert_eq Exercism::IsbnVerifier::is_valid(""),                0, "empty"
+assert_eq Exercism::IsbnVerifier::is_valid("0136091814"),      1, "another no-dashes valid"
+
+test_run

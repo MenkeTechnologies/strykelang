@@ -1,0 +1,5 @@
+#!/usr/bin/env stryke
+fn Exercism::PacmanRules::eat_ghost = _ && _1
+fn Exercism::PacmanRules::score     = _ || _1
+fn Exercism::PacmanRules::lose      = _1 && !_
+fn Exercism::PacmanRules::win       = _ && !Exercism::PacmanRules::lose(_1, _2)

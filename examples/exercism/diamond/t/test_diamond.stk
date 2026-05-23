@@ -1,0 +1,8 @@
+#!/usr/bin/env stryke
+require "./Diamond.stk"
+
+assert_eq Exercism::Diamond::build_shape("A"), "A\n", "A-only diamond"
+assert_eq Exercism::Diamond::build_shape("B"), " A \nB B\n A \n", "B diamond"
+assert_eq Exercism::Diamond::build_shape("C"), "  A  \n B B \nC   C\n B B \n  A  \n", "C diamond"
+
+test_run

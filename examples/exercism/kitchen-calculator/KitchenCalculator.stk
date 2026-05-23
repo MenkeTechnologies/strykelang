@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+
+const my %CONV = (
+    cup         => 240,
+    fluid_ounce => 30,
+    teaspoon    => 5,
+    tablespoon  => 15,
+    milliliter  => 1,
+)
+
+fn Exercism::KitchenCalculator::get_volume      = _->[1]
+fn Exercism::KitchenCalculator::to_milliliter   = ["milliliter", _->[1] * $CONV{_->[0]}]
+fn Exercism::KitchenCalculator::from_milliliter = [_1, _->[1] / $CONV{_1}]
+fn Exercism::KitchenCalculator::convert         = Exercism::KitchenCalculator::from_milliliter(Exercism::KitchenCalculator::to_milliliter(_), _1)

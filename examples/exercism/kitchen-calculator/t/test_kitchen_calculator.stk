@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+require "./KitchenCalculator.stk"
+
+fn j { join(",", @{_}) }
+
+assert_eq Exercism::KitchenCalculator::get_volume(["cup", 5]),                    5,                "get_volume scalar"
+assert_eq j(Exercism::KitchenCalculator::to_milliliter(["cup", 2.5])),            "milliliter,600", "2.5 cup → 600 ml"
+assert_eq j(Exercism::KitchenCalculator::to_milliliter(["teaspoon", 6])),         "milliliter,30",  "6 tsp → 30 ml"
+assert_eq j(Exercism::KitchenCalculator::from_milliliter(["milliliter", 240], "cup")), "cup,1", "240 ml → 1 cup"
+assert_eq j(Exercism::KitchenCalculator::convert(["teaspoon", 9], "tablespoon")), "tablespoon,3",   "9 tsp → 3 tbsp"
+
+test_run

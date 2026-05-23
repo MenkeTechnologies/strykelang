@@ -1,0 +1,10 @@
+#!/usr/bin/env stryke
+require "./NameBadge.stk"
+
+assert_eq Exercism::NameBadge::print(455, "Mary M. Brown", "MARKETING"), "[455] - Mary M. Brown - MARKETING", "full data"
+assert_eq Exercism::NameBadge::print(89,  "Jack McGregor", "Procurement"), "[89] - Jack McGregor - PROCUREMENT", "lowercase dept upcased"
+assert_eq Exercism::NameBadge::print(undef, "Barbara White", "Security"), "Barbara White - SECURITY", "no id"
+assert_eq Exercism::NameBadge::print(1,   "Anna Johnson", undef),         "[1] - Anna Johnson - OWNER", "no dept → OWNER"
+assert_eq Exercism::NameBadge::print(undef, "Stephen Dann", undef),       "Stephen Dann - OWNER",      "no id no dept"
+
+test_run

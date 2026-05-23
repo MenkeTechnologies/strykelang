@@ -1,0 +1,7 @@
+#!/usr/bin/env stryke
+fn Exercism::GuessingGame::compare =
+    !defined(_1)       ? "Make a guess" :
+    _ == _1            ? "Correct" :
+    abs(_ - _1) == 1   ? "So close" :
+    _ <  _1            ? "Too high" :
+                         "Too low"

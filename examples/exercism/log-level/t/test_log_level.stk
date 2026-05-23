@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+require "./LogLevel.stk"
+
+assert_eq Exercism::LogLevel::to_label(0, 0), "trace",   "0 → trace"
+assert_eq Exercism::LogLevel::to_label(0, 1), "unknown", "0 legacy → unknown"
+assert_eq Exercism::LogLevel::to_label(1, 0), "debug",   "1 → debug"
+assert_eq Exercism::LogLevel::to_label(2, 0), "info",    "2 → info"
+assert_eq Exercism::LogLevel::to_label(3, 0), "warning", "3 → warning"
+assert_eq Exercism::LogLevel::to_label(4, 0), "error",   "4 → error"
+assert_eq Exercism::LogLevel::to_label(5, 0), "fatal",   "5 → fatal"
+assert_eq Exercism::LogLevel::to_label(5, 1), "unknown", "5 legacy → unknown"
+assert_eq Exercism::LogLevel::to_label(6, 0), "unknown", "6 → unknown"
+
+assert_eq Exercism::LogLevel::alert_recipient(4, 0), "ops",  "error → ops"
+assert_eq Exercism::LogLevel::alert_recipient(5, 0), "ops",  "fatal → ops"
+assert_eq Exercism::LogLevel::alert_recipient(6, 1), "dev1", "unknown legacy → dev1"
+assert_eq Exercism::LogLevel::alert_recipient(6, 0), "dev2", "unknown new → dev2"
+assert_eq Exercism::LogLevel::alert_recipient(2, 0), 0,      "info → no alert"
+
+test_run

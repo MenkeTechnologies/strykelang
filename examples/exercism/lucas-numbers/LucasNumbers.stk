@@ -1,0 +1,9 @@
+#!/usr/bin/env stryke
+
+fn Exercism::LucasNumbers::generate {
+    !defined(_) || _ !~ /^\d+$/ || _ < 1 and die "count must be specified as an integer >= 1"
+    my @out
+    my ($a, $b) = (2, 1)
+    for (1:_) { push @out, $a; ($a, $b) = ($b, $a + $b) }
+    \@out
+}

@@ -1,0 +1,9 @@
+#!/usr/bin/env stryke
+require "./ResistorColor.stk"
+
+assert_eq Exercism::ResistorColor::code("black"), 0,  "black is 0"
+assert_eq Exercism::ResistorColor::code("white"), 9,  "white is 9"
+assert_eq Exercism::ResistorColor::code("orange"), 3, "orange is 3"
+assert_eq Exercism::ResistorColor::colors(), ["black","brown","red","orange","yellow","green","blue","violet","grey","white"], "color list"
+
+test_run

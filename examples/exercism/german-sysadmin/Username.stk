@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+
+const my %UMLAUTS = (
+    "ä" => "ae",
+    "ö" => "oe",
+    "ü" => "ue",
+    "ß" => "ss",
+)
+
+fn Exercism::Username::sanitize = join("", ~> _ chars maps {
+    exists $UMLAUTS{_} ? $UMLAUTS{_} :
+    _ eq '_'           ? '_' :
+    _ =~ /^[a-z]$/     ? _ : ""
+})

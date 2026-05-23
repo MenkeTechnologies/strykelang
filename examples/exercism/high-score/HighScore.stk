@@ -1,0 +1,8 @@
+#!/usr/bin/env stryke
+
+fn Exercism::HighScore::new            = {}
+fn Exercism::HighScore::add_player     { my %h = %{_}; $h{_1} = _2 // 0; \%h }
+fn Exercism::HighScore::remove_player  { my %h = %{_}; delete $h{_1};   \%h }
+fn Exercism::HighScore::reset_score    { my %h = %{_}; $h{_1} = 0;      \%h }
+fn Exercism::HighScore::update_score   { my %h = %{_}; $h{_1} = ($h{_1} // 0) + _2; \%h }
+fn Exercism::HighScore::get_players    = [sort keys %{_}]

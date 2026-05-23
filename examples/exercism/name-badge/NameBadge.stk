@@ -1,0 +1,3 @@
+#!/usr/bin/env stryke
+
+fn Exercism::NameBadge::print = (defined(_) ? "[#{_}] - " : "") . "#{_1} - #{uc(_2 // 'owner')}"

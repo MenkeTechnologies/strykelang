@@ -1,0 +1,11 @@
+#!/usr/bin/env stryke
+require "./GuessingGame.stk"
+
+assert_eq Exercism::GuessingGame::compare(5),        "Make a guess", "no guess"
+assert_eq Exercism::GuessingGame::compare(5, 5),     "Correct",      "exact match"
+assert_eq Exercism::GuessingGame::compare(5, 4),     "So close",     "off by one (low)"
+assert_eq Exercism::GuessingGame::compare(5, 6),     "So close",     "off by one (high)"
+assert_eq Exercism::GuessingGame::compare(5, 10),    "Too high",     "too high"
+assert_eq Exercism::GuessingGame::compare(5, 1),     "Too low",      "too low"
+
+test_run

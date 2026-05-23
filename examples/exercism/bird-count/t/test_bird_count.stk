@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+require "./BirdCount.stk"
+
+fn j { join(",", @{_}) }
+
+assert_eq Exercism::BirdCount::today([]),             undef, "today empty → undef"
+assert_eq Exercism::BirdCount::today([7]),            7,     "today [7] → 7"
+assert_eq Exercism::BirdCount::today([2,4,11,10,6,8]), 2,    "today head"
+
+assert_eq j(Exercism::BirdCount::increment_day_count([])),       "1",        "increment empty → [1]"
+assert_eq j(Exercism::BirdCount::increment_day_count([7])),      "8",        "increment [7] → [8]"
+assert_eq j(Exercism::BirdCount::increment_day_count([4,2,1,0,10])), "5,2,1,0,10", "increment head only"
+
+assert_eq Exercism::BirdCount::has_day_without_birds([]),       0, "empty: no zero day"
+assert_eq Exercism::BirdCount::has_day_without_birds([1,2,3]),  0, "no zeros"
+assert_eq Exercism::BirdCount::has_day_without_birds([1,0,3]),  1, "one zero"
+
+assert_eq Exercism::BirdCount::total([]),           0,  "total empty"
+assert_eq Exercism::BirdCount::total([2,5,1]),      8,  "total 2+5+1"
+
+assert_eq Exercism::BirdCount::busy_days([]),       0,  "busy empty"
+assert_eq Exercism::BirdCount::busy_days([1,2,3,4]),0,  "busy none"
+assert_eq Exercism::BirdCount::busy_days([5,7,5]),  3,  "busy all"
+assert_eq Exercism::BirdCount::busy_days([1,5,2,7,4,5]), 3, "busy mixed"
+
+test_run
