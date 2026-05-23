@@ -147,8 +147,8 @@ fn stamp_index_version() {
     // language in tokei yet, so they always use the wc fallback.
     let n_rust_src = tokei_code_lines("strykelang", "Rust")
         .unwrap_or_else(|| count_lines_under("strykelang", "rs"));
-    let n_tests = tokei_code_lines("tests", "Rust")
-        .unwrap_or_else(|| count_lines_under("tests", "rs"));
+    let n_tests =
+        tokei_code_lines("tests", "Rust").unwrap_or_else(|| count_lines_under("tests", "rs"));
     let n_examples = count_lines_under("examples", "stk");
     let loc_segment = format!(
         "{} Rust src · {} test src · {} example src",
@@ -229,7 +229,12 @@ fn regex_replace_subtitle_count(text: &str, new_seg: &str) -> Option<String> {
                 continue;
             }
             j += end.len();
-            return Some(format!("{}{}{}", &text[..segment_start], new_seg, &text[j..]));
+            return Some(format!(
+                "{}{}{}",
+                &text[..segment_start],
+                new_seg,
+                &text[j..]
+            ));
         }
         i += 1;
     }
@@ -261,12 +266,7 @@ fn stamp_loc_span(src: &str, new_text: &str) -> LocStampOutcome {
     if &src[after..e] == new_text {
         return LocStampOutcome::Unchanged;
     }
-    LocStampOutcome::Rewritten(format!(
-        "{}{}{}",
-        &src[..after],
-        new_text,
-        &src[e..]
-    ))
+    LocStampOutcome::Rewritten(format!("{}{}{}", &src[..after], new_text, &src[e..]))
 }
 
 /// Sum line counts of every `*.<ext>` file under `root`. Walks
@@ -285,10 +285,7 @@ fn count_lines_under(root: &str, ext: &str) -> usize {
         };
         for entry in rd.flatten() {
             let p = entry.path();
-            let name = p
-                .file_name()
-                .and_then(|s| s.to_str())
-                .unwrap_or("");
+            let name = p.file_name().and_then(|s| s.to_str()).unwrap_or("");
             if name == "target" || name == ".git" || name == "node_modules" {
                 continue;
             }
@@ -357,7 +354,12 @@ fn regex_replace_count_segment(tail: &str, new_seg: &str) -> Option<String> {
             }
             j += end.len();
             // Found the segment from `segment_start..j`; replace.
-            return Some(format!("{}{}{}", &tail[..segment_start], new_seg, &tail[j..]));
+            return Some(format!(
+                "{}{}{}",
+                &tail[..segment_start],
+                new_seg,
+                &tail[j..]
+            ));
         }
         i += 1;
     }

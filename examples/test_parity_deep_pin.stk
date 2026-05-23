@@ -53,7 +53,7 @@ my $o_bless = bless [1,2], "MyClass"
 # ── Chomp Array ────────────────────────────────────────────────────────────
 
 my @lines_chomp = ("a\n", "b\n")
-chomp(@lines_chomp) |> aeq 2, "chomp @array returns element count"
-join("|", @lines_chomp) |> aeq "a|b", "chomp @array mutates elements"
+chomp(@lines_chomp) |> aeq 2, 'chomp @array returns element count'
+join("|", @lines_chomp) |> aeq "a|b", 'chomp @array mutates elements'
 
 test_run

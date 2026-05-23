@@ -336,6 +336,50 @@ fn test_thread_macro_parallel_basic() {
 }
 
 #[test]
+fn par_reduce_map_then_sum_via_array_var() {
+    // Regression: par_reduce's extract_block was evaluated in
+    // WantarrayCtx::Void, so `map { ... } @_` returned its scalar-
+    // context count (the length) instead of the mapped list. Result:
+    // `~p> @xs map { _ * 10 }` yielded 5 (count) instead of
+    // [10,20,30,40,50], and `||> sum` produced 5 instead of 150.
+    assert_eq!(
+        run("my @xs = (1,2,3,4,5); ~p> @xs map { $_ * 10 } ||> sum")
+            .expect("run")
+            .to_int(),
+        150,
+    );
+    // Same shape with pipe-form consumer.
+    assert_eq!(
+        run("my @xs = (1,2,3,4,5); ~p> @xs |> sum")
+            .expect("run")
+            .to_int(),
+        15,
+    );
+    // Max / min of parallel chunks — same Void-vs-List bug previously
+    // collapsed the chunked output to a count.
+    assert_eq!(
+        run("my @xs = (5,3,9,1,7,2,8,4,6); ~p> @xs |> max")
+            .expect("run")
+            .to_int(),
+        9,
+    );
+    assert_eq!(
+        run("my @xs = (5,3,9,1,7,2,8,4,6); ~p> @xs |> min")
+            .expect("run")
+            .to_int(),
+        1,
+    );
+    // List-context capture: `my @r = ~p> @xs map { ... }` must yield
+    // the full mapped array, not a single-element [count].
+    assert_eq!(
+        run("my @xs = (1,2,3,4,5); my @r = ~p> @xs map { $_ * 10 }; join(',', @r)")
+            .expect("run")
+            .to_string(),
+        "10,20,30,40,50",
+    );
+}
+
+#[test]
 fn test_builtin_pmt() {
     // Basic loan payment: $100,000 at 5% for 30 years (360 payments), payment at end of period
     // Expected: approx -536.82 (from online calculators, e.g., Excel PMT function)

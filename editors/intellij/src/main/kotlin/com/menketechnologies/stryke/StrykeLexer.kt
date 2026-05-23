@@ -763,6 +763,22 @@ class StrykeLexer : LexerBase() {
         val wordStart = pos
         tokenEnd = p; pos = p
 
+        // Perl regex / substitution / transliteration prefixes —
+        // `m/PATTERN/`, `qr/PATTERN/`, `s/PATTERN/REPLACEMENT/`,
+        // `tr/SET1/SET2/`, `y/SET1/SET2/`. Without consuming the
+        // delimiter pair as part of this token, the next `/` and any
+        // embedded `"` inside the pattern derail the string-state
+        // machine — `$q =~ s/"/""/g` would unbalance the `"` quotes
+        // and render the rest of the file as string content. Detect
+        // the prefix immediately and pull the whole construct in.
+        if ((word == "s" || word == "tr" || word == "y" || word == "m" || word == "qr")
+            && p < endOffset
+            && isRegexDelimiterStart(buf[p])
+        ) {
+            consumeRegexOrSubstitution(wordStart, word)
+            return
+        }
+
         // Distinguish FUNCTION_DECL / FUNCTION_CALL / LABEL from
         // generic IDENTIFIER via context:
         //   - After `fn` / `sub` / `class` / `struct` / `trait` /
@@ -777,8 +793,14 @@ class StrykeLexer : LexerBase() {
         val inHashKey = isHashKeyContext(wordStart) || nextIsFatArrow(p)
         tokenType = when {
             inHashKey -> StrykeTokenTypes.IDENTIFIER
-            classified == StrykeTokenTypes.IDENTIFIER && lastWasFnIntro ->
-                StrykeTokenTypes.FUNCTION_DECL
+            // After `fn` / `sub` / `class` / `struct` / `trait` / `enum`
+            // / `method` / `impl`, the next word is always the
+            // declared name — even if its spelling collides with a
+            // keyword. `trait T { fn state; fn transition }` should
+            // mark `state` and `transition` as FUNCTION_DECL, not
+            // the `state` decl-keyword. Force the override regardless
+            // of `classified`.
+            lastWasFnIntro -> StrykeTokenTypes.FUNCTION_DECL
             classified == StrykeTokenTypes.IDENTIFIER && peekNextNonSpace(p) == '(' ->
                 StrykeTokenTypes.FUNCTION_CALL
             classified == StrykeTokenTypes.IDENTIFIER && nextIsSingleColon(p) ->
@@ -849,6 +871,100 @@ class StrykeLexer : LexerBase() {
         while (i < endOffset && (buf[i] == ' ' || buf[i] == '\t')) i++
         if (i >= endOffset || buf[i] != ':') return false
         return i + 1 >= endOffset || buf[i + 1] != ':'
+    }
+
+    /**
+     * Valid delimiter starts for `m/.../`, `qr/.../`, `s/.../.../`,
+     * `tr/.../.../`, `y/.../.../`. Perl accepts any non-alphanumeric;
+     * we cover the common ones plus paired-bracket forms.
+     */
+    private fun isRegexDelimiterStart(c: Char): Boolean =
+        c == '/' || c == '!' || c == '#' || c == '|' || c == '{' ||
+        c == '[' || c == '(' || c == '<' || c == '"' || c == '\''
+
+    /**
+     * Consume a `m`/`qr`/`s`/`tr`/`y` operator including its delimiter
+     * pair(s) and optional trailing flag letters, emitting one REGEX
+     * token that spans the whole construct. Critical for handling
+     * `s/"/""/g` — the embedded `"` characters are NOT string quotes
+     * here; the substitution is one atomic lexer unit.
+     *
+     * Two-segment ops (`s`, `tr`, `y`) take TWO pattern halves.
+     * Single-segment ops (`m`, `qr`) take ONE.
+     * Paired-bracket delimiters (`{...}`, `[...]`, `(...)`, `<...>`)
+     * use the matching close char as the segment terminator.
+     */
+    private fun consumeRegexOrSubstitution(wordStart: Int, op: String) {
+        val twoSegment = op == "s" || op == "tr" || op == "y"
+        val open = buf[pos]
+        val close = matchingDelimiterClose(open)
+        var p = pos + 1
+        var depth = if (open == close) 0 else 1
+        // First segment.
+        while (p < endOffset) {
+            val c = buf[p]
+            if (c == '\\' && p + 1 < endOffset) { p += 2; continue }
+            if (open != close && c == open) { depth++; p++; continue }
+            if (c == close) {
+                if (open == close) { p++; break }
+                depth--
+                if (depth == 0) { p++; break }
+            }
+            if (c == '\n' && open == '/') break // best-effort: don't run across lines
+            p++
+        }
+        // Second segment for `s`, `tr`, `y`.
+        if (twoSegment) {
+            // For paired-bracket delimiters, the second segment may have
+            // its own opener/closer (e.g. `s{foo}{bar}`); for symmetric
+            // delimiters (`/`, `!`, `|`), the same char re-opens.
+            if (open != close && p < endOffset) {
+                // Skip any whitespace between bracket-paired segments.
+                while (p < endOffset && (buf[p] == ' ' || buf[p] == '\t')) p++
+                if (p < endOffset && (isRegexDelimiterStart(buf[p]))) {
+                    val open2 = buf[p]
+                    val close2 = matchingDelimiterClose(open2)
+                    p++
+                    var d2 = if (open2 == close2) 0 else 1
+                    while (p < endOffset) {
+                        val c = buf[p]
+                        if (c == '\\' && p + 1 < endOffset) { p += 2; continue }
+                        if (open2 != close2 && c == open2) { d2++; p++; continue }
+                        if (c == close2) {
+                            if (open2 == close2) { p++; break }
+                            d2--
+                            if (d2 == 0) { p++; break }
+                        }
+                        if (c == '\n' && open2 == '/') break
+                        p++
+                    }
+                }
+            } else {
+                // Symmetric delimiter — second segment ends at the same char.
+                while (p < endOffset) {
+                    val c = buf[p]
+                    if (c == '\\' && p + 1 < endOffset) { p += 2; continue }
+                    if (c == close) { p++; break }
+                    if (c == '\n' && open == '/') break
+                    p++
+                }
+            }
+        }
+        // Optional trailing flag letters (g, i, m, s, x, e, r, …).
+        while (p < endOffset && buf[p].isLetter()) p++
+        tokenStart = wordStart
+        tokenEnd = p
+        pos = p
+        tokenType = StrykeTokenTypes.REGEX
+    }
+
+    /** Paired-bracket delimiter → matching close char; otherwise the same char. */
+    private fun matchingDelimiterClose(open: Char): Char = when (open) {
+        '{' -> '}'
+        '[' -> ']'
+        '(' -> ')'
+        '<' -> '>'
+        else -> open
     }
 
     private fun consumeRegexOrSlash() {

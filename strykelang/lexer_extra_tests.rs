@@ -58,6 +58,42 @@ fn test_heredoc_edge_cases() {
 }
 
 #[test]
+fn heredoc_after_closing_brace_is_heredoc_not_shift_left() {
+    // Regression: `}` sets last_was_term=true, then `<<TAG` on the
+    // next line used to tokenize as ShiftLeft + bareword TAG. With
+    // the peek-ahead disambiguation, uppercase-letter / `~` / `"` /
+    // `'` / `_` after `<<` flips to heredoc regardless.
+    let src = "my @r = ~> @data map { _ * 2 }\n<<EOT\nhi\nEOT\n";
+    let mut l = Lexer::new(src);
+    let t = l.tokenize().expect("tokenize");
+    let has_heredoc = t.iter().any(|(tok, _)| {
+        matches!(tok, Token::HereDoc(tag, body, _) if tag == "EOT" && body.contains("hi"))
+    });
+    assert!(
+        has_heredoc,
+        "expected HereDoc tag=EOT after block-close, got tokens: {:?}",
+        t.iter().map(|(tok, _)| format!("{:?}", tok)).collect::<Vec<_>>(),
+    );
+}
+
+#[test]
+fn shift_left_preserved_after_block_close_with_numeric_rhs() {
+    // Symmetric guard for the heredoc fix: `block << 4` (numeric RHS)
+    // must still tokenize as `ShiftLeft`, not heredoc. Same for sigils.
+    for src in ["my $x = (1 + 2) << 4", "my $r = $h->{a} << $shift"] {
+        let mut l = Lexer::new(src);
+        let t = l.tokenize().expect("tokenize");
+        let has_shift = t.iter().any(|(tok, _)| matches!(tok, Token::ShiftLeft));
+        let no_heredoc = !t.iter().any(|(tok, _)| matches!(tok, Token::HereDoc(_, _, _)));
+        assert!(
+            has_shift && no_heredoc,
+            "{src} — expected ShiftLeft (no heredoc), got: {:?}",
+            t.iter().map(|(tok, _)| format!("{:?}", tok)).collect::<Vec<_>>(),
+        );
+    }
+}
+
+#[test]
 fn test_complex_string_escapes() {
     // Octal and Hex
     let mut l = Lexer::new(r#""\012""#);
