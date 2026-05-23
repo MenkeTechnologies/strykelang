@@ -1,0 +1,67 @@
+#!/usr/bin/env stryke
+
+# Parallel Matrix Multiplication — computing C = A * B using chunk-parallelism.
+#
+# This example demonstrates:
+#   * Chunk-parallel pipeline `~p>` for multi-core computation.
+#   * Pipeline auto-merging (array concatenation).
+#   * Matrix transposition for cache-friendly dot products.
+#   * Namespaced mathematical functions (`Math::*`).
+#
+# Run: stryke --no-interop examples/matrix_parallel.stk
+
+# Dot product of two vectors
+fn Math::dot_product($v1, $v2) = sum(0:len($v1)-1 |> map { $v1->[_] * $v2->[_] })
+
+# Parallel matrix multiplication
+fn Math::matrix_mul_parallel($A, $B) {
+    my $rows_A = len($A)
+    my $cols_A = len($A->[0])
+    my $rows_B = len($B)
+    my $cols_B = len($B->[0])
+    
+    die "Incompatible dimensions" if $cols_A != $rows_B
+    
+    # Transpose B so we can dot product rows of A with "rows" of BT
+    # (which are columns of B). This is much faster in Stryke.
+    my $BT = matrix_transpose($B)
+    
+    p "Computing #{$rows_A}x#{$cols_B} matrix on #{pool_info()->{cpus}} cores..."
+    
+    # Use pmap to process rows of A in parallel.
+    my $C = [ pmap {
+        my $row_A = _
+        # For each column in B (row in BT), compute dot product
+        [ (@$BT |> map { Math::dot_product($row_A, _) }) ]
+    } @$A ]
+    
+    $C
+}
+
+p "── Parallel Matrix Multiplication ──────────────────────"
+
+# Create two 100x100 matrices with random values
+my $size = 100
+my $A = [ (1:$size |> map { [ (1:$size |> map { rand }) ] }) ]
+my $B = [ (1:$size |> map { [ (1:$size |> map { rand }) ] }) ]
+
+# Note: $A and $B are arrayrefs of arrayrefs because of `map { [ ... ] }`
+
+my $t0 = now_ns()
+my $C = Math::matrix_mul_parallel($A, $B)
+my $elapsed = (now_ns() - $t0) / 1_000_000
+
+printf "Matrix multiplication took %.2f ms\n", $elapsed
+printf "Result dimensions: %dx%d\n", len($C), len($C->[0])
+
+# Verify a random cell
+my $r = int(rand $size)
+my $c = int(rand $size)
+my $BT = matrix_transpose($B)
+my $expected = Math::dot_product($A->[$r], $BT->[$c])
+my $actual = $C->[$r]->[$c]
+
+printf "Verification at [%d,%d]: expected=%.6f, actual=%.6f\n", $r, $c, $expected, $actual
+die "Verification failed! diff=#{abs($expected - $actual)}" if abs($expected - $actual) > 1e-9
+
+p "SUCCESS. ALL TESTS PASS."

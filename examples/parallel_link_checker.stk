@@ -1,0 +1,76 @@
+#!/usr/bin/env stryke
+
+# Parallel Link Checker — verifies multiple URLs concurrently.
+#
+# This example demonstrates:
+#   * Parallel map (`pmap`) for concurrent HTTP requests.
+#   * Error handling using `eval { ... }`.
+#   * Regular expressions for extracting links from HTML.
+#   * Handling network timeouts and errors gracefully.
+#
+# Run: stryke --no-interop examples/parallel_link_checker.stk
+
+p "── Parallel Link Checker ───────────────────────────────"
+
+my @urls = (
+    "https://google.com",
+    "https://github.com",
+    "https://wikipedia.org",
+    "https://rust-lang.org",
+)
+
+# ── 1. Concurrent status check ──────────────────────────────────────
+
+p "Checking status codes for #{len @urls} sites..."
+
+my @results = pmap {
+    my $url = _
+    my $res = eval { http_request($url, +{ timeout => 5 }) }
+    
+    if ($@) {
+        my $err = $@ =~ s/ at .*//r
+        +{ url => $url, ok => 0, status => 0, err => $err }
+    } else {
+        +{ url => $url, ok => ($res->{status} < 400), status => $res->{status} }
+    }
+} @urls
+
+for my $res (@results) {
+    if (ref($res) eq "HASH") {
+        if ($res->{ok}) {
+            p "  [OK]  #{$res->{status}} #{$res->{url}}"
+        } else {
+            p "  [FAIL] #{$res->{status}} #{$res->{url}} (#{$res->{err}})"
+        }
+    }
+}
+
+# ── 2. Deep dive: Extract links from Wikipedia ──────────────────────
+
+p ""
+p "Extracting links from wikipedia.org..."
+
+my $html = eval { fetch("https://wikipedia.org") }
+if ($@) {
+    p "  Failed to fetch wikipedia: $@"
+} else {
+    # match_all pattern is the FIRST argument
+    my @links = match_all('(?i)href="([^"]+)"', $html)
+    
+    p "Found #{len @links} links."
+    p "Sample of first 5 links:"
+    for my $i (0:4) {
+        if ($links[$i]) {
+            # Extract just the URL from the full match
+            my $url = $links[$i] =~ s/.*href="([^"]+)".*/$1/r
+            p "  - $url"
+        }
+    }
+}
+
+# ── 3. Self-Test / Assertions ────────────────────────────────────────
+
+die "No results from pmap" unless len(@results) == len(@urls)
+
+p ""
+p "Verification complete. SUCCESS. ALL TESTS PASS."

@@ -567,6 +567,11 @@ impl Builder {
                 for f in &def.fields {
                     self.known_field_names.insert(f.name.clone());
                 }
+                // Methods participate in the `$self->X` / `$obj->X`
+                // rename + goto-def pipeline alongside fields.
+                for m in &def.methods {
+                    self.known_field_names.insert(m.name.clone());
+                }
             }
             StmtKind::EnumDecl { def } => {
                 self.known_type_names.insert(def.name.clone());
@@ -578,6 +583,9 @@ impl Builder {
                 self.known_type_names.insert(def.name.clone());
                 for f in &def.fields {
                     self.known_field_names.insert(f.name.clone());
+                }
+                for m in &def.methods {
+                    self.known_field_names.insert(m.name.clone());
                 }
             }
             StmtKind::TraitDecl { def } => {
@@ -660,20 +668,20 @@ impl Builder {
             }
             StmtKind::StructDecl { def } => {
                 self.declare_package_symbol(&def.name, line0, SymbolKind::Type);
-                // Register each field so goto-def on a field name
-                // inside `Rectangle(width => -1, …)` lands on the
-                // struct decl line.
                 for f in &def.fields {
                     self.declare_field(&f.name, line0);
+                }
+                // Methods registered as Field symbols too — they
+                // share the same access shape (`$self->method` /
+                // `$obj->method`) as fields, so rename / goto-def
+                // / find-usages all go through the same code path.
+                for m in &def.methods {
+                    self.declare_field(&m.name, line0);
                 }
                 self.walk_generic_stmt(stmt);
             }
             StmtKind::EnumDecl { def } => {
                 self.declare_package_symbol(&def.name, line0, SymbolKind::Type);
-                // Enum variants registered as Field symbols so
-                // goto-def on `Op::Add` (after the prefix-Type lookup
-                // also lands the user on the right line) AND on a
-                // bare variant reference both find the enum decl.
                 for v in &def.variants {
                     self.declare_field(&v.name, line0);
                 }
@@ -683,6 +691,9 @@ impl Builder {
                 self.declare_package_symbol(&def.name, line0, SymbolKind::Type);
                 for f in &def.fields {
                     self.declare_field(&f.name, line0);
+                }
+                for m in &def.methods {
+                    self.declare_field(&m.name, line0);
                 }
                 self.walk_generic_stmt(stmt);
             }
@@ -879,6 +890,24 @@ impl Builder {
                     || self.known_type_names.contains(bare_tail)
                 {
                     self.walk_fat_comma_args_for_fields(args, line);
+                }
+                // Qualified-name as a zero-arg call — `Color::Red`
+                // parses as FuncCall{name: "Color::Red", args:[]}
+                // when used as a value (enum-variant access without
+                // explicit constructor parens). Record the suffix as
+                // a Field ref if it's a known variant of a known
+                // Type. Same AST-only rule as the Bareword arm.
+                if let Some(idx) = name.rfind("::") {
+                    let suffix = &name[idx + 2..];
+                    let prefix = &name[..idx];
+                    let prefix_tail = prefix.rsplit("::").next().unwrap_or(prefix);
+                    if !suffix.is_empty()
+                        && self.known_field_names.contains(suffix)
+                        && (self.known_type_names.contains(prefix)
+                            || self.known_type_names.contains(prefix_tail))
+                    {
+                        self.record_method_or_field_ref(suffix, line);
+                    }
                 }
                 for a in args {
                     self.walk_expr(a);
@@ -1137,6 +1166,17 @@ impl Builder {
                         self.record_ref(name, used_line);
                     }
                 }
+                // MethodCall — `$obj->method(args)`. The method name
+                // is a Field/method symbol; record it so rename /
+                // goto-def on a class method works from any caller
+                // even when reached via a wrapping expression
+                // (Print, BinOp, etc.) that the generic walker
+                // dispatches through walk_json.
+                if let Some(mc) = map.get("MethodCall").and_then(|x| x.as_object()) {
+                    if let Some(method) = mc.get("method").and_then(|x| x.as_str()) {
+                        self.record_method_or_field_ref(method, line);
+                    }
+                }
                 // Loop-label refs: `last LOOP`/`next LOOP`/`redo LOOP`
                 // serialize as `{"Last": "LOOP"}` etc. (None as `null`).
                 // Catches cases where the Last is wrapped in a postfix
@@ -1268,8 +1308,14 @@ mod tests {
 
     #[test]
     fn is_ident_boundary_after_rejects_continuation() {
-        // bare name: trailing `::` would extend the path → rejected
-        assert!(!is_ident_boundary_after(Some(':'), "foo"));
+        // Single `:` with no lookahead → could be label-decl form
+        // (`LABEL:`) which IS a boundary. The pair-aware variant
+        // (`is_ident_boundary_after_pair`) is what callers actually
+        // use to distinguish `::` (rejected) from `:` (accepted).
+        assert!(is_ident_boundary_after(Some(':'), "foo"));
+        // `::` lookahead — rejected because the bare name would
+        // extend into a qualified path.
+        assert!(!is_ident_boundary_after_pair(Some(':'), Some(':'), "foo"));
         // already-namespaced name: trailing punctuation OK
         assert!(is_ident_boundary_after(Some('('), "Util::greet"));
         // alphanumerics never form a boundary
@@ -1280,6 +1326,30 @@ mod tests {
 
     fn build(src: &str) -> SymbolTable {
         SymbolTable::build(src, "test.stk").expect("source parses")
+    }
+
+    #[test]
+    fn build_collects_qualified_enum_variant_as_field_ref() {
+        // `enum Color { Red }; my $c = Color::Red` — `Color::Red`
+        // should record a Field-ref on "Red" at the `my $c` line.
+        let src = "enum Color { Red }\nmy $c = Color::Red\n";
+        let t = build(src);
+        let red_id = t
+            .symbols
+            .iter()
+            .find(|s| s.name == "Red" && s.kind == SymbolKind::Field)
+            .map(|s| s.id)
+            .expect("expected Field symbol `Red`");
+        let line2_refs: Vec<&SymbolRef> = t
+            .refs
+            .iter()
+            .filter(|r| r.line == 1 && r.symbol == red_id)
+            .collect();
+        assert!(
+            !line2_refs.is_empty(),
+            "expected ref to `Red` recorded at the `my $c = Color::Red` line — refs: {:#?}",
+            t.refs
+        );
     }
 
     #[test]

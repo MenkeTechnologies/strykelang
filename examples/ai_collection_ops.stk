@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+
+# AI Collection Processing — batch analysis of lists using LLM primitives.
+#
+# This example demonstrates:
+#   * `ai_classify` for sentiment or category analysis.
+#   * `ai_filter` for semantic filtering.
+#   * `ai_map` for text transformation or summarization.
+#   * `ai_sort` for semantic ordering.
+#   * Pipelining collection ops.
+#
+# Run: STRYKE_AI_MODE=mock-only stryke --no-interop examples/ai_collection_ops.stk
+
+# ── 1. Setup Mock responses ───────────────────────────────────────────
+
+ai_mock_install('(?i)Classify each item.*labels: Positive, Negative', 
+    '["Positive", "Negative", "Negative", "Positive"]')
+
+ai_mock_install('(?i)Decide whether.*criterion: constructive',
+    '[true, false, false, true]')
+
+ai_mock_install('(?i)Apply this instruction.*summarize',
+    '["Great tool!", "Buggy.", "Too slow.", "Amazing perf."]')
+
+# ── 2. Input Data ───────────────────────────────────────────────────
+
+my @reviews = (
+    "I love Stryke, it makes parallel programming so easy!",
+    "This is garbage, nothing works.",
+    "The syntax is confusing and the documentation is sparse.",
+    "Incredible performance, I am moving all my backend to it."
+)
+
+p "── AI Collection Processing ────────────────────────────"
+p "Processing #{len @reviews} reviews..."
+
+# ── 3. Processing Pipeline ──────────────────────────────────────────
+
+my $ref = \@reviews
+
+# Using pipe-forward for clarity with multi-arg calls
+$ref |> ai_classify("sentiment", into => ["Positive", "Negative"])
+    |> e { p "Sentiment: $_" }
+
+$ref |> ai_filter("constructive")
+    |> e { p "Constructive: $_" }
+
+$ref |> ai_map("summarize in 3 words")
+    |> e { p "Summary: $_" }
+
+# ── 4. Self-Test / Assertions ────────────────────────────────────────
+
+p ""
+ai_mock_install('(?i)Decide whether.*criterion: positive sentiment', '[true, false, false, true]')
+my $positives = ai_filter($ref, "positive sentiment")
+
+die "Filtering failed" unless len(@$positives) == 2
+die "First positive mismatch" unless $positives->[0] =~ /love Stryke/
+
+p "SUCCESS. ALL TESTS PASS."

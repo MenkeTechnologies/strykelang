@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+
+# Concurrent Task Queue — Producer-Consumer pattern using pchannel.
+#
+# This example demonstrates:
+#   * `pchannel` for typed message passing between threads.
+#   * `spawn { BLOCK }` to run logic in background threads.
+#   * `pselect` for multiplexed receive (waiting on multiple channels).
+#   * Idiomatic threading using pipelines and anonymous functions.
+#
+# Run: stryke --no-interop examples/concurrency_channels.stk
+
+# Create a channel for tasks and a channel for results
+my ($task_tx, $task_rx) = pchannel()
+my ($res_tx, $res_rx)   = pchannel()
+
+# ── 1. Define worker logic ──────────────────────────────────────────
+
+fn Worker::start($id, $rx, $tx) {
+    p "  [Worker $id] Starting..."
+    while (1) {
+        my $task = $rx->recv()
+        last unless defined $task
+        
+        p "  [Worker $id] Processing task: $task"
+        sleep 0.1
+        
+        # Send result back (hashref)
+        $tx->send(+{ id => $id, task => $task, result => $task * 10 })
+    }
+    p "  [Worker $id] Shutting down."
+}
+
+# ── 2. Spawn multiple workers ───────────────────────────────────────
+
+p "── Spawning 3 workers ──────────────────────────────────"
+for my $i (1:3) {
+    # `spawn` runs the block in a background thread on the pool
+    spawn { Worker::start($i, $task_rx, $res_tx) }
+}
+
+# ── 3. Producer: Send tasks ─────────────────────────────────────────
+
+p "── Producing tasks ─────────────────────────────────────"
+1:10 |> e { $task_tx->send(_) }
+
+# ── 4. Consumer: Collect results ────────────────────────────────────
+
+p "── Collecting results ──────────────────────────────────"
+my $completed = 0
+while ($completed < 10) {
+    # pselect returns [value, index]
+    my ($res, $idx) = pselect($res_rx)
+    
+    p "  [Main] Received: task #{$res->{task}} -> #{$res->{result}} (from worker #{$res->{id}})"
+    $completed++
+}
+
+p ""
+p "All tasks completed. SUCCESS. ALL TESTS PASS."

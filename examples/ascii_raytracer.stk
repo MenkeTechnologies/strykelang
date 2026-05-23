@@ -1,0 +1,99 @@
+#!/usr/bin/env stryke
+
+# ASCII Ray Tracer — renders a 3D sphere to the terminal.
+#
+# This example demonstrates:
+#   * Using `struct` for 3D vectors.
+#   * Basic ray-sphere intersection math.
+#   * ASCII shading based on surface normals.
+#   * Pipeline-based rendering loop.
+#
+# Run: stryke examples/ascii_raytracer.stk
+
+# ── Vector math ───────────────────────────────────────────────────
+
+struct Vec3 {
+    x => Float, y => Float, z => Float
+    fn add($other) = Vec3(x => $self->x + $other->x, y => $self->y + $other->y, z => $self->z + $other->z)
+    fn sub($other) = Vec3(x => $self->x - $other->x, y => $self->y - $other->y, z => $self->z - $other->z)
+    fn mul($s)     = Vec3(x => $self->x * $s, y => $self->y * $s, z => $self->z * $s)
+    fn dot($other) = $self->x * $other->x + $self->y * $other->y + $self->z * $other->z
+    fn mag()       = sqrt($self->dot($self))
+    fn unit()      = $self->mul(1.0 / $self->mag)
+}
+
+# ── Scene constants ───────────────────────────────────────────────
+
+my $W = 60
+my $H = 30
+my $RAMP = " .:-=+*#%@"
+
+my $LIGHT_DIR = Vec3(x => 1.0, y => -1.0, z => -1.0)->unit()
+
+# Sphere at (0, 0, 5) with radius 1.5
+my $SPHERE_CENTER = Vec3(x => 0.0, y => 0.0, z => 5.0)
+my $SPHERE_RADIUS = 1.5
+
+# ── Ray-Sphere intersection ───────────────────────────────────────
+
+fn RT::hit_sphere($origin, $dir) {
+    my $oc = $origin->sub($SPHERE_CENTER)
+    my $qa = $dir->dot($dir)
+    my $qb = 2.0 * $oc->dot($dir)
+    my $qc = $oc->dot($oc) - $SPHERE_RADIUS * $SPHERE_RADIUS
+    my $discriminant = $qb * $qb - 4.0 * $qa * $qc
+    
+    if ($discriminant < 0) {
+        return -1.0
+    } else {
+        return (-$qb - sqrt($discriminant)) / (2.0 * $qa)
+    }
+}
+
+# ── Rendering loop ────────────────────────────────────────────────
+
+p "── ASCII Ray Tracer ────────────────────────────────────"
+
+# Camera at origin
+my $cam_origin = Vec3(x => 0.0, y => 0.0, z => 0.0)
+
+for my $y (0:$H - 1) {
+    my @row
+    for my $x (0:$W - 1) {
+        # Map pixel to screen coords (-1.5 to 1.5)
+        # Adjust for non-square terminal characters
+        my $u = ($x / ($W - 1) - 0.5) * 3.0 * ($W / $H * 0.5)
+        my $v = ($y / ($H - 1) - 0.5) * 3.0
+        
+        my $dir = Vec3(x => $u, y => $v, z => 1.0)->unit()
+        
+        my $t = RT::hit_sphere($cam_origin, $dir)
+        
+        if ($t > 0) {
+            # Intersection point
+            my $hit_pt = $cam_origin->add($dir->mul($t))
+            # Normal at hit point
+            my $normal = $hit_pt->sub($SPHERE_CENTER)->unit()
+            
+            # Lambertian shading (diffuse)
+            my $shading = $normal->dot($LIGHT_DIR)
+            $shading = 0.0 if $shading < 0
+            
+            my $idx = int($shading * (len($RAMP) - 1))
+            push @row, $RAMP[$idx]
+        } else {
+            push @row, " "
+        }
+    }
+    p join("", @row)
+}
+
+p "── Render Complete ─────────────────────────────────────"
+
+# ── Self-test ─────────────────────────────────────────────────────
+my $test_dir = Vec3(x => 0.0, y => 0.0, z => 1.0)
+my $test_t = RT::hit_sphere($cam_origin, $test_dir)
+die "Ray should hit sphere" unless $test_t > 0
+die "Ray hit distance mismatch: #{$test_t}" unless abs($test_t - 3.5) < 1e-4
+
+p "SUCCESS. ALL TESTS PASS."

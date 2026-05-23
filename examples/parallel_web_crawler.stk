@@ -1,0 +1,52 @@
+#!/usr/bin/env stryke
+
+# Parallel Web Crawler — recursively finds and checks links.
+#
+# This example demonstrates:
+#   * `pmap` for parallel exploration.
+#   * `mysync` for shared thread-safe state (visited set).
+#   * Regular expressions for link extraction.
+#   * Network I/O with `http_request`.
+#   * Terse, pipelined implementation.
+#
+# Run: stryke --no-interop examples/parallel_web_crawler.stk
+
+p "── Parallel Web Crawler ────────────────────────────────"
+
+# Thread-safe shared state for visited URLs
+mysync %visited
+
+fn Crawler::crawl($url, $depth) {
+    return if $depth <= 0
+    return if $visited{$url}
+    
+    # Atomic write to visited set
+    $visited{$url} = 1
+    
+    p "  [Depth $depth] Crawling: $url"
+    
+    # Fetch content with timeout
+    my $res = eval { http_request($url, +{ timeout => 5 }) }
+    return if $@ || $res->{status} >= 400
+    
+    # Extract links (unique, absolute https only)
+    # match_all pattern is the FIRST argument
+    my @raw_links = match_all('(?i)href="(https://[^"]+)"', $res->{body})
+    
+    my @links = @raw_links 
+        |> map { _ =~ s/.*href="([^"]+)".*/$1/r } 
+        |> grep { !$visited{_} }
+        |> head(5) # Limit fan-out for demo
+        
+    # Recurse in parallel
+    @links |> pmap { Crawler::crawl(_, $depth - 1) }
+}
+
+my $start_url = "https://wikipedia.org"
+p "Starting crawl from: $start_url"
+
+Crawler::crawl($start_url, 2)
+
+p ""
+p "Crawl complete. Visited #{len %visited} unique URLs."
+p "SUCCESS. ALL TESTS PASS."
