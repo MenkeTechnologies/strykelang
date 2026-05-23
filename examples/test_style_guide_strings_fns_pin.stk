@@ -1,0 +1,117 @@
+#!/usr/bin/env stryke
+
+# Pinning batch (2026-05-23): docs/STYLE_GUIDE.md §1a (interpolation),
+# §3 (fn forms), §4 (ranges), §5 (len), §6 (rev), §10 (parallelism).
+# Every assertion checks an idiom the guide prescribes. The file is
+# style-compliant per the eight hard rules.
+
+# ── § 1a. String interpolation — `#{ EXPR }` over `.` concat ───────────────
+
+my $name = "world"
+"hello, $name!"            |> aeq "hello, world!", "bare-scalar interp"
+
+my $x = 7
+"x squared is #{$x * $x}"  |> aeq "x squared is 49", "#{EXPR} arithmetic"
+
+my @nums = (1, 2, 3, 4)
+"sum: #{sum @nums}"        |> aeq "sum: 10", "#{EXPR} function call"
+
+my $base = "file"
+"${base}_v2.txt"           |> aeq "file_v2.txt", "\${name} disambiguation"
+
+# Array interpolation auto-joins on $" (default space).
+"items: @nums"             |> aeq "items: 1 2 3 4", "@arr interp auto-joins"
+
+# Nested `#{}` — expression inside expression.
+my $n = 5
+my $fact = (1:$n) |> reduce { $a * $b }
+"factorial $n! = $fact" |> aeq "factorial 5! = 120", "factorial via reduce + interp"
+
+# ── § 3. Function definition forms ─────────────────────────────────────────
+# Expression-bodied form preferred for one-liners.
+
+fn twice = _ * 2
+twice(7) |> aeq 14, "fn name = expr — one-liner"
+
+fn add_two = _0 + _1
+add_two(3, 4) |> aeq 7, "fn name = expr with positional _N"
+
+fn shout = uc(_) . "!"
+shout("hi") |> aeq "HI!", "fn name = expr with explicit composition"
+
+# Block-bodied form — multi-statement.
+fn classify($n) {
+    return "zero" if $n == 0
+    return "negative" if $n < 0
+    $n < 10 ? "small" : "big"
+}
+classify(0)   |> aeq "zero",     "early return — zero"
+classify(-3)  |> aeq "negative", "early return — negative"
+classify(5)   |> aeq "small",    "tail-expression implicit return — small"
+classify(100) |> aeq "big",      "tail-expression implicit return — big"
+
+# Block form — needs multi-statement body w/ local var.
+fn pair_sum_min(@pairs) {
+    my $best = undef
+    for my $p (@pairs) {
+        my $s = $p->[0] + $p->[1]
+        if (!defined($best) || $s < $best) { $best = $s }
+    }
+    $best
+}
+pair_sum_min([1, 2], [3, 4], [0, 1])  |> aeq 1, "block fn — min pair-sum (0,1)=1"
+pair_sum_min([5, 5], [1, 2])          |> aeq 3, "block fn — min pair-sum (1,2)=3"
+
+# ── § 4. Ranges — `1:N` over `1..N` ────────────────────────────────────────
+
+(1:5) |> sum |> aeq 15, "1:5 sum"
+join(",", 1:5) |> aeq "1,2,3,4,5", "1:N inclusive both ends"
+
+# Range as iteration source — same as 1..N but shorter.
+my @evens
+for my $i (1:10) { push @evens, $i if $i % 2 == 0 }
+@evens |> sum |> aeq 30, "for my $i (1:10) — even sum 2+4+6+8+10 = 30"
+
+# ── § 5. len — universal length over `scalar` / `length` ───────────────────
+
+len("hello")         |> aeq 5, "len of string (codepoints)"
+len((1, 2, 3, 4))    |> aeq 4, "len of paren-list"
+len([1, 2, 3, 4, 5]) |> aeq 5, "len of arrayref"
+len(keys %{{a => 1, b => 2}}) |> aeq 2, "len of hash keys"
+
+# ── § 6. rev — over `reverse` ──────────────────────────────────────────────
+
+rev("hello") |> aeq "olleh", "rev string"
+join(",", rev 1:3) |> aeq "3,2,1", "rev range"
+join(",", rev (10, 20, 30)) |> aeq "30,20,10", "rev list"
+
+# ── § 10. Parallelism — `pmap` / `pfor` / `fan` ────────────────────────────
+
+# pmap: parallel work-stealing across rayon threads, order-preserving.
+my @twiced = pmap { _ * 2 } 1:100
+@twiced[0]   |> aeq 2,   "pmap order-preserving: first element"
+@twiced[-1]  |> aeq 200, "pmap order-preserving: last element"
+@twiced |> sum |> aeq 10100, "pmap 1:100 * 2 sum = 10100"
+
+# pgrep: parallel filter.
+my @evens_par = pgrep { _ % 2 == 0 } 1:100
+@evens_par |> sum |> aeq 2550, "pgrep evens 1:100 = 2+4+..+100 = 2550"
+
+# pfor: void parallel for, side-effects via mysync / atomic.
+mysync $counter = 0
+pfor { $counter++ } 1:5000
+$counter |> aeq 5000, "pfor + mysync counter"
+
+# ── Builtin-name shadowing — namespaced fn ok, bare not ────────────────────
+# `fn helper` is fine because nothing called `helper` exists in %b.
+# Verify by querying %b.
+exists($b{helper}) |> aeq 0, "no builtin named `helper` to shadow"
+
+fn helper = _ + 100
+helper(5) |> aeq 105, "user-defined `helper` callable when not a builtin"
+
+# Namespaced — always safe.
+fn MyApp::Util::close_fast = _ + 1
+MyApp::Util::close_fast(7) |> aeq 8, "namespaced fn never collides with builtins"
+
+test_run

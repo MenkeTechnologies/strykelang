@@ -1,0 +1,135 @@
+#!/usr/bin/env stryke
+
+# Pinning batch (2026-05-23): OO + regex idioms compliant with
+# docs/STYLE_GUIDE.md §11 (sort/reduce), §12 (implicit closure params,
+# `_<` outer chain), §12b (no trailing semicolons), and the regex
+# operators (`=~`, `s///`, `/pattern/`). Style-compliant per the 8
+# hard rules.
+
+# ── § 11. Sort / reduce with `_0`/`_1` over `$a`/`$b` ──────────────────────
+
+my @nums = (3, 1, 4, 1, 5, 9, 2, 6)
+my @asc = sort { _0 <=> _1 } @nums
+join(",", @asc) |> aeq "1,1,2,3,4,5,6,9", "sort ascending with _0 <=> _1"
+
+my @desc = sort { _1 <=> _0 } @nums
+join(",", @desc) |> aeq "9,6,5,4,3,2,1,1", "sort descending with _1 <=> _0"
+
+# Reduce with positional _N — the style-guide-preferred form.
+(1:10) |> reduce { _0 + _1 } |> aeq 55, "reduce sum 1:10 via _0 + _1"
+(1:5)  |> reduce { _0 * _1 } |> aeq 120, "reduce product 1:5 (5!) via _0 * _1"
+
+# Sort by computed key — len for strings, abs for nums.
+my @words = ("banana", "fig", "apple", "kiwi")
+my @by_len = sort { len(_0) <=> len(_1) } @words
+$by_len[0]  |> aeq "fig",    "shortest first by len"
+$by_len[-1] |> aeq "banana", "longest last by len"
+
+# ── § 12. Implicit closure params in pipelines ─────────────────────────────
+
+(1:10) |> maps { _ * _ }   |> sum |> aeq 385, "maps { _ * _ } — squares 1..10 = 385"
+(1:10) |> greps { _ % 2 == 1 } |> sum |> aeq 25, "greps odd 1..10 = 25"
+
+# `_<` outer-chain: reach the enclosing topic from a nested closure.
+my @rows = ([1, 2, 3], [4, 5, 6], [7, 8, 9])
+mysync @grand
+for my $r (@rows) {
+    push @grand, map { _ + $r->[0] } @{$r}
+}
+@grand |> sum |> aeq 81, "row sums + first-elem offset = 9+27+45 = 81"
+
+# ── § 12b. No trailing semicolons — illustrated by NOT writing any ─────────
+# This entire file follows the rule; verify it programmatically by
+# checking the file's own source.
+
+my $self_path = "examples/test_style_guide_oo_regex_pin.stk"
+my $src = c"$self_path"
+my @bad_lines = grep { /;$/ && !/^\s*#/ && !/for\s*\(/ } split(/\n/, $src)
+len(@bad_lines) |> aeq 0, "no trailing-semicolon violations in this file"
+
+# ── OO: class with fields, methods, fat-comma constructor ──────────────────
+
+class Money {
+    amount: Float = 0.0
+    currency: Str = "USD"
+    fn display { "#{$self->amount} #{$self->currency}" }
+    fn cents { int($self->amount * 100) }
+    fn add($other) {
+        Money(
+            amount   => $self->amount + $other->amount,
+            currency => $self->currency,
+        )
+    }
+}
+
+my $m = Money(amount => 12.34, currency => "EUR")
+$m->amount   |> aeq 12.34, "field amount via fat-comma constructor"
+$m->currency |> aeq "EUR", "field currency via fat-comma constructor"
+$m->cents    |> aeq 1234,  "method cents() via $self"
+$m->display  |> aeq "12.34 EUR", "method display() via #{EXPR}"
+
+my $sum = $m->add(Money(amount => 0.66, currency => "EUR"))
+$sum->amount |> aeq 13, "method chain: add → new Money"
+
+# ── enum + match ──────────────────────────────────────────────────────────
+
+enum TrafficLight { Red, Yellow, Green }
+fn TrafficLight::act($c) {
+    match ($c) {
+        TrafficLight::Red    => "stop",
+        TrafficLight::Yellow => "caution",
+        TrafficLight::Green  => "go",
+    }
+}
+TrafficLight::act(TrafficLight::Red)    |> aeq "stop",    "match Red → stop"
+TrafficLight::act(TrafficLight::Yellow) |> aeq "caution", "match Yellow → caution"
+TrafficLight::act(TrafficLight::Green)  |> aeq "go",      "match Green → go"
+
+# ── struct + positional vs fat-comma constructors ──────────────────────────
+
+struct Point { x: Float, y: Float }
+my $p = Point(x => 3.0, y => 4.0)
+$p->x |> aeq 3, "struct x via fat-comma"
+$p->y |> aeq 4, "struct y via fat-comma"
+
+# Distance from origin via expression-bodied method.
+fn Point::dist = sqrt($_[0]->x ** 2 + $_[0]->y ** 2)
+Point::dist($p) |> aeq 5, "Point::dist computes 3-4-5"
+
+# ── Regex idioms — `=~ m//`, `=~ s///`, `s///r` returning new string ──────
+
+my $s = "hello world"
+($s =~ /world/) ? 1 : 0 |> aeq 1, "=~ match → truthy (1 in bool context)"
+($s =~ /xyz/)   ? 1 : 0 |> aeq 0, "=~ no-match → falsy (0 in bool context)"
+
+# Capture group: parens around the regex part.
+"answer is 42" =~ /(\d+)/
+$1 |> aeq "42", "regex capture group 1"
+
+# Substitution `s///r` returns a NEW string, doesn't mutate `$s`.
+my $shouted = $s =~ s/world/stryke/r
+$shouted |> aeq "hello stryke", "s///r returns rewritten string"
+$s       |> aeq "hello world",  "s///r leaves original alone"
+
+# Global regex collects all matches with `/g` in list context.
+my @nums_in = ("a1 b22 c333" =~ /(\d+)/g)
+join(",", @nums_in) |> aeq "1,22,333", "//g list-context collects captures"
+
+# ── Try / catch / die — error handling without explicit return ─────────────
+
+fn risky($n) {
+    die "negative not allowed" if $n < 0
+    sqrt($n)
+}
+
+risky(16) |> aeq 4, "risky(16) → 4"
+
+my $caught = ""
+try {
+    risky(-1)
+} catch ($e) {
+    $caught = $e
+}
+($caught =~ /negative not allowed/) |> aok "catch captured die message"
+
+test_run

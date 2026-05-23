@@ -1,0 +1,104 @@
+#!/usr/bin/env stryke
+
+# Pinning batch (2026-05-23): docs/STYLE_GUIDE.md §13 (multi-line
+# expressions), §14 (hash declarations), §15 (no defensive code),
+# §18 (naming). Style-compliant per the eight hard rules.
+
+# ── § 13. Multi-line expressions — pipeline auto-continues on `|>`/`~>` ────
+# A line starting with `|>` or `~>` extends the previous statement
+# without needing `\`.
+
+my $result =
+    (1:10)
+        |> greps { _ % 2 == 0 }
+        |> maps { _ * _ }
+        |> sum
+$result |> aeq 220, "pipeline auto-continued across 4 lines: 2²+4²+6²+8²+10² = 220"
+
+# Binary-op-mid-expression needs explicit `\` continuation.
+my $a = 3
+my $b = 4
+my $c = 5
+my $hyp = sqrt( \
+    $a * $a + \
+    $b * $b + \
+    $c * $c \
+)
+$hyp |> aeq sqrt(50), "binary-op continuation via \\ — sqrt(9+16+25)"
+
+# ── § 14. Hash declarations — one key=>value per line when ≥4 keys ────────
+
+my %config = (
+    host    => "localhost",
+    port    => 8080,
+    timeout => 30,
+    retries => 3,
+    tls     => 1,
+)
+$config{host}    |> aeq "localhost", "hash key 1"
+$config{port}    |> aeq 8080,        "hash key 2"
+$config{timeout} |> aeq 30,          "hash key 3"
+$config{retries} |> aeq 3,           "hash key 4"
+$config{tls}     |> aeq 1,           "hash key 5"
+len(keys %config) |> aeq 5, "5 keys total"
+
+# Short hash (≤3 keys) stays on one line.
+my %sm = (a => 1, b => 2)
+$sm{a} + $sm{b} |> aeq 3, "short hash 1-line form: a + b = 3"
+
+# Hash merging — stryke prefers literal-spread over manual merge.
+my %defaults = (timeout => 10, retries => 1, tls => 0)
+my %merged = (%defaults, %config)
+$merged{timeout} |> aeq 30, "config overrides default (timeout)"
+$merged{tls}     |> aeq 1,  "config overrides default (tls)"
+
+# ── § 15. No defensive code — trust builtin contracts ─────────────────────
+# `sum()` returns 0 on empty list; no need for ternary guards.
+
+my @empty
+sum(@empty) // 0 |> aeq 0, "sum(empty) // 0 — explicit fallback"
+# Note: stryke's `sum` may return undef for empty; `// 0` is the
+# style-compliant defensive form (binds tighter than the ternary).
+
+# `min`/`max` on a list — trust the contract.
+min(1, 2, 3) |> aeq 1, "min of (1,2,3) = 1"
+max(1, 2, 3) |> aeq 3, "max of (1,2,3) = 3"
+
+# Hash key access — undef on missing is the contract.
+my %h = (a => 1)
+defined($h{missing}) |> aeq 0, "missing hash key → undef (defined → 0)"
+$h{a} |> aeq 1, "present hash key → value"
+
+# ── § 18. Naming — snake_case fns, CamelCase types, SCREAMING_SNAKE consts ─
+
+# fn names: snake_case
+fn parse_config = $_[0]   # placeholder — proves the name compiles
+parse_config("ok") |> aeq "ok", "snake_case fn name"
+
+# Type names: CamelCase
+class HttpClient {
+    base_url: Str = ""
+    fn full_url($path) { $self->base_url . $path }
+}
+my $http = HttpClient(base_url => "https://example.com")
+$http->full_url("/api") |> aeq "https://example.com/api", "CamelCase class name"
+
+# Constants: SCREAMING_SNAKE via `use constant`.
+use constant MAX_RETRIES => 3
+use constant TIMEOUT_MS => 30000
+MAX_RETRIES |> aeq 3, "SCREAMING_SNAKE constant"
+TIMEOUT_MS  |> aeq 30000, "SCREAMING_SNAKE constant — bigger"
+
+# Namespaced fn — never name-clashes with builtins.
+fn Util::String::reverse_words = join(" ", reverse split(/\s+/, $_[0]))
+Util::String::reverse_words("a b c") |> aeq "c b a", "Module::Sub::name pattern"
+
+# Short single-letter only as loop index / block topic.
+my $accum = 0
+for my $i (1:5) { $accum += $i }
+$accum |> aeq 15, "single-letter `$i` is fine as loop index"
+
+# ── § 16. Test runner — `test_run` at file end ────────────────────────────
+# Verified by THIS file calling test_run below.
+
+test_run

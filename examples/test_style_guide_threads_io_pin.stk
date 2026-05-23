@@ -1,0 +1,96 @@
+#!/usr/bin/env stryke
+
+# Pinning batch (2026-05-23): docs/STYLE_GUIDE.md §7.3 thread-last,
+# §7.4 streaming, §7.7 stage-notation forms, §8 iteration shorthand,
+# §9 file I/O. Style-compliant per the eight hard rules.
+
+# ── § 7.3 thread-last `->>` — value goes in as LAST arg ────────────────────
+# Useful when the callee's natural last arg is the data — saves
+# wrapping `_` placeholders everywhere.
+
+fn div_ll = _0 / _1
+->> 10 div_ll(2) |> aeq 0.2, "->> 10 div_ll(2) → div_ll(2, 10) = 0.2"
+
+# Same value, explicit placeholder overrides the implicit position.
+->> 10 div_ll(_, 2) |> aeq 5, "->> 10 div_ll(_, 2) → div_ll(10, 2) = 5"
+
+# Thread-last collection chain.
+~>> (1, 2, 3, 4, 5) head(3) |> aeq 3, "~>> ... head(3) returns count 3"
+
+# ── § 7.4 streaming `~s>` — uneven-latency pipeline parallelism ────────────
+# Each stage runs as an independent worker connected to the next via
+# a bounded channel. Items flow concurrently. Output order is non-
+# deterministic; the macro's value is item count.
+
+mysync @out
+~s> (1:5) map { _ * 10 } map { _ + 1 } ep { push @out, _ }
+my @sorted = sort { $a <=> $b } @out
+$sorted[0]  |> aeq 11, "~s> 1:5 map *10 map +1 ep → first sorted = 11"
+$sorted[-1] |> aeq 51, "~s> last sorted = 51"
+len(@out)   |> aeq 5, "~s> emitted 5 items total"
+
+# ── § 7.7 Stage notation forms — bare fn, placeholder, arrow-block ─────────
+
+fn add_one = _ + 1
+~> 7 add_one |> aeq 8, "bare-fn stage"
+
+fn div_xy = _0 / _1
+~> 20 div_xy(_, 4) |> aeq 5, "placeholder stage"
+
+~> 7 >{ _ * 2 + 1 } |> aeq 15, "arrow-block stage"
+
+~> (1:5) map { _ * _ } sum |> aeq 55, "block-arg form: map { } over range"
+
+# ── § 8. Iteration shorthand — `e p` / `ep` / streaming variants ───────────
+
+my @captured
+(1:5) |> e { push @captured, _ }
+@captured |> sum |> aeq 15, "e { push } captures all five"
+
+# pmaps — streaming parallel map, lazy iterator.
+mysync $sum = 0
+pmaps { _ * 2 } (1:100) |> e { $sum += _ }
+$sum |> aeq 10100, "pmaps + e accumulates 2*(1+..+100) = 10100"
+
+# pgreps — streaming parallel filter.
+mysync $kept = 0
+pgreps { _ % 3 == 0 } (1:100) |> e { $kept++ }
+$kept |> aeq 33, "pgreps multiples-of-3 in 1:100 = 33"
+
+# ── § 9. File I/O — `c"path"` slurp, `spurt $p, $data`, `lines("path")` ────
+
+my $tmp = tempfile()
+spurt $tmp, "line1\nline2\nline3\n"
+
+# Slurp via `c"…"` — quote-prefix variant.
+my $whole = c"$tmp"
+$whole |> aeq "line1\nline2\nline3\n", "c\"path\" slurp returns whole-file string"
+
+# Lines via `c"path"` + `lines` — slurp file then split by lines.
+my @ls = lines(c"$tmp")
+len(@ls) |> aeq 3, "c\"path\" + lines yields 3 records"
+$ls[0] |> aeq "line1", "first line preserved (no trailing newline)"
+
+# spurt overwrites — verify by writing different content.
+spurt $tmp, "replaced\n"
+c"$tmp" |> aeq "replaced\n", "spurt overwrites file content"
+
+# ── glob — explicit file-pattern expansion ─────────────────────────────────
+# Create a small fanout of files in a tempdir and verify glob picks
+# them up.
+
+my $td = tempdir()
+for my $n (1:3) { spurt "$td/f$n.txt", "$n" }
+glob("$td/*.txt") |> len |> aeq 3, "glob picks up all 3 .txt files"
+
+# ── Combined: sequential slurp + filter + count ───────────────────────────
+# Scan files, keep ones whose content matches a predicate, count.
+
+for my $n (1:10) { spurt "$td/data$n.log", "level=$n msg=hello" }
+my @hits
+for my $f (glob("$td/data*.log")) {
+    push @hits, $f if slurp($f) =~ /level=[1-3] /
+}
+len(@hits) |> aeq 3, "slurp+grep on 10 files keeps 3 (level 1,2,3)"
+
+test_run

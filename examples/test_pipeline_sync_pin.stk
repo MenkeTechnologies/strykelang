@@ -1,0 +1,103 @@
+#!/usr/bin/env stryke
+
+# Pinning batch (2026-05-23): Pipeline + sync primitive interplay —
+# `~>` / `~p>` / `|>` chains coordinating shared state through mutex
+# and semaphore. Compliance: docs/STYLE_GUIDE.md (eight hard rules
+# applied throughout).
+
+# ── Mutex inside a `fan` body protects a non-atomic compound update ────────
+# Pure `mysync $x++` is already serialized; the mutex matters when the
+# write depends on a read that must be paired (RMW, log-then-update,
+# multi-field state transitions).
+
+my $g = mutex()
+mysync $sum = 0
+mysync $count = 0
+fan 1000 {
+    mutex_lock($g)
+    defer { mutex_unlock($g) }
+    $sum += _ + 1
+    $count++
+}
+$count |> aeq 1000, "fan 1000 → count = 1000"
+$sum   |> aeq 500500, "fan 1000 → sum 1+2+...+1000 = 500500"
+
+# ── Semaphore throttles per-item work in a `fan` ───────────────────────────
+# Useful for bounded external-resource access (sockets, file handles,
+# downstream API rate limits) while letting the outer iteration fan
+# out freely.
+
+my $api_gate = semaphore(4)
+mysync $live = 0
+mysync $peak = 0
+fan 50 {
+    sem_acquire($api_gate)
+    defer { sem_release($api_gate) }
+    $live++
+    if ($live > $peak) { $peak = $live }
+    sleep 0.001
+    $live--
+}
+($peak <= 4) |> aok "semaphore(4) caps concurrent in-flight at 4 of 50 fanned"
+
+# ── try_lock / try_acquire as fast-path probes ─────────────────────────────
+# When a lock isn't critical (best-effort warmup, optional cache fill),
+# probe with try_lock and fall through if it'd block.
+
+my $cache_lock = mutex()
+mysync $populated = 0
+fn try_warmup_cache {
+    if (mutex_try_lock($cache_lock)) {
+        defer { mutex_unlock($cache_lock) }
+        $populated = 1
+        1
+    } else {
+        0
+    }
+}
+
+try_warmup_cache() |> aeq 1, "first try_warmup acquires + populates"
+mutex_lock($cache_lock)
+try_warmup_cache() |> aeq 0, "second try while held → fast-path skip"
+mutex_unlock($cache_lock)
+$populated |> aeq 1, "state set by the first warmup persists"
+
+# ── flock + defer round-trip survives a die in the critical section ────────
+# `defer` runs on scope exit including panic / die / return — verify
+# the lock releases even when the block exits abnormally.
+
+my $lockfile = tempfile()
+fn locked_op {
+    open(my $fh, ">", $lockfile) or die
+    flock($fh, 2) or die "flock failed"
+    defer { flock($fh, 8); close $fh }
+    die "simulated failure"
+}
+
+eval { locked_op() }
+# After the eval, the lockfile is unlocked — verify by re-acquiring
+# non-blocking. A leaked lock would make flock(LOCK_NB) return 0.
+open(my $reacquire, ">", $lockfile) or die
+flock($reacquire, 4) |> aeq 1, "defer released flock even though body died"
+flock($reacquire, 8)
+close $reacquire
+
+# ── Pipe-forward chains style-compliant per § 6b "No nested calls" ─────────
+
+(1:10)
+    |> maps { _ * _ }            # square each
+    |> greps { _ > 25 }          # keep > 25
+    |> sum                       # total
+    |> aeq 330, "1:10 → squares → >25 → sum = 36+49+64+81+100 = 330"
+
+# Streaming + mutex collaboration: per-item state into a shared sink.
+my $sink_lock = mutex()
+mysync @collected
+~s> (1:20) map { _ * 2 } grep { _ % 4 == 0 } ep {
+    mutex_lock($sink_lock)
+    defer { mutex_unlock($sink_lock) }
+    push @collected, _
+}
+@collected |> sum |> aeq 220, "streaming → mutex-protected sink (sum of evens-by-4 from 2:40)"
+
+test_run
