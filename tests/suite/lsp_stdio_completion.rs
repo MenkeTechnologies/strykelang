@@ -638,6 +638,80 @@ fn audit_rename_struct_field_same_file() {
     assert!(edits.iter().all(|n| *n == "w"));
 }
 
+/// User's exact post-corruption fixture. Verify that a CLEAN rename
+/// from `Red` → `Redd` over the clean source does NOT produce the
+/// `TrafficLight::Redd` doubled-prefix shape the user reported.
+#[test]
+fn audit_rename_class_field_via_constructor_call() {
+    // User's exact fixture: `class Point { x: Int, y: Int }` + a
+    // constructor call `Point->new(x => 10, y => 20)`. Renaming `y`
+    // must rewrite both the field decl AND the constructor key.
+    let src = "class Point {\n    x : Int\n    y : Int\n}\n\nmy $p = Point->new(x => 10, y => 20)\n";
+    let mut h = LspHarness::new(src);
+    // Cursor on `y` of `y : Int` decl at line 2, col 4.
+    let r = h.rename(2, 4, "yy");
+    h.finish();
+    let edits = r
+        .pointer("/changes")
+        .and_then(Value::as_object)
+        .and_then(|m| m.values().next())
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let by_line: Vec<u64> = edits
+        .iter()
+        .filter_map(|e| e.pointer("/range/start/line").and_then(Value::as_u64))
+        .collect();
+    let new_texts: Vec<&str> = edits
+        .iter()
+        .filter_map(|e| e.get("newText").and_then(Value::as_str))
+        .collect();
+    // Expect: decl line 2 + constructor call line 5 → 2 edits, both `yy`.
+    assert!(
+        by_line.contains(&2),
+        "expected decl line 2 rewrite: lines={by_line:?}"
+    );
+    assert!(
+        by_line.contains(&5),
+        "expected constructor line 5 rewrite: lines={by_line:?}"
+    );
+    assert!(
+        new_texts.iter().all(|n| *n == "yy"),
+        "every edit should be `yy`: {new_texts:?}"
+    );
+}
+
+#[test]
+fn audit_rename_enum_variant_does_not_add_type_prefix() {
+    let src = "enum TrafficLight { Red, Yellow, Green }\nfn TrafficLight::action($c) {\n    match ($c) {\n        TrafficLight::Red    => \"stop\",\n        TrafficLight::Yellow => \"caution\",\n        TrafficLight::Green  => \"go\",\n    }\n}\n";
+    let mut h = LspHarness::new(src);
+    // Cursor on `Red` of `enum TrafficLight { Red, … }` at col 20.
+    let r = h.rename(0, 20, "Redd");
+    h.finish();
+    let edits = r
+        .pointer("/changes")
+        .and_then(Value::as_object)
+        .and_then(|m| m.values().next())
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let new_texts: Vec<&str> = edits
+        .iter()
+        .filter_map(|e| e.get("newText").and_then(Value::as_str))
+        .collect();
+    // EVERY new_text should be exactly `Redd` — never `TrafficLight::Redd`
+    // or any other qualified form. The Field rename emits ranges over
+    // just the variant token, never the surrounding qualifier.
+    assert!(
+        new_texts.iter().all(|n| *n == "Redd"),
+        "expected every edit to be exactly `Redd`, got: {new_texts:?}"
+    );
+    assert!(
+        new_texts.iter().all(|n| !n.contains("::")),
+        "must NOT add `::` to any rewrite: {new_texts:?}"
+    );
+}
+
 #[test]
 fn audit_rename_enum_variant_with_qualified_match_arms() {
     // User's exact fixture: enum + match-arm qualified usage. Rename

@@ -1,0 +1,59 @@
+#!/usr/bin/env stryke
+
+# Stryke `trait` + `class impl` — required method contracts with
+# default-method inheritance. `impl Trait1, Trait2` on a class
+# declares membership; cross-file rename of a trait updates every
+# `impl Trait` site.
+
+p "── trait decl ────────────────────────────────────────────"
+trait Drawable { fn draw }
+trait Sized    { fn area }
+
+p ""
+p "── class implementing two traits + a method that uses fields ──"
+class Square impl Drawable, Sized {
+    side: Float
+
+    fn draw {
+        sprintf("□ side=%g", $self->side)
+    }
+    fn area {
+        $self->side * $self->side
+    }
+}
+
+my $sq = Square->new(side => 5.0)
+p "  ", $sq->draw()
+p "  area = ", $sq->area()
+
+p ""
+p "── another implementer to demonstrate trait dispatch ─────"
+class Circle impl Drawable, Sized {
+    radius: Float
+
+    fn draw {
+        sprintf("○ r=%g", $self->radius)
+    }
+    fn area {
+        3.14 * $self->radius * $self->radius
+    }
+}
+
+my $c = Circle->new(radius => 2.5)
+p "  ", $c->draw()
+p "  area = ", $c->area()
+
+p ""
+p "── refactoring notes ────────────────────────────────────"
+# Cmd+Opt+Shift+R (Rename) cases that work cross-file:
+#   - On `Drawable` (trait decl)        → updates `impl Drawable` on every class
+#   - On `Square` / `Circle`             → updates constructor calls + extends/impl sites
+#   - On `side` / `radius` (field)       → updates `$self->side` body refs + ctor keys
+#   - On `draw` / `area` (method)        → updates `$self->X` calls + external `$obj->X` calls
+#
+# Cmd+Opt+P (Extract Parameter) on any expression inside a method
+# body adds a new positional param, replaces every body reference
+# to the same expression, and threads the value through every call
+# site in the workspace.
+
+p "── done ──────────────────────────────────────────────────"

@@ -1,0 +1,62 @@
+#!/usr/bin/env stryke
+
+# Stryke `enum` + `match` — exhaustive pattern dispatch over named
+# variants. Variants are referenced as `EnumName::Variant` everywhere
+# (decl line is the only place the bare variant name appears).
+
+p "── enum decl + qualified variant access ──────────────────"
+enum TrafficLight { Red, Yellow, Green }
+
+my $sig = TrafficLight::Red
+p "  current = ", $sig
+
+p ""
+p "── exhaustive match dispatch ─────────────────────────────"
+fn TrafficLight::action($c) {
+    match ($c) {
+        TrafficLight::Red    => "stop",
+        TrafficLight::Yellow => "caution",
+        TrafficLight::Green  => "go",
+    }
+}
+
+for my $v (TrafficLight::Red, TrafficLight::Yellow, TrafficLight::Green) {
+    p "  ", $v, " → ", TrafficLight::action($v)
+}
+
+p ""
+p "── data-carrying variants ────────────────────────────────"
+enum Shape {
+    Shape::Circlegg   => Float,         # radius
+    Square   => Float,          # side
+    Rect,                      # bare variant, no data
+}
+
+# Match on data-carrying variants. v1 stryke binds the carried value
+# via `_` block params (`_0` etc.) inside the arm body where shown.
+fn Shape::area($s) {
+    match ($s) {
+        Shape::Shape::Circlegg => 3.14 * 1.0 * 1.0,   # placeholder; replace with data slot
+        Shape::Square => 5.0 * 5.0,
+        Shape::Rect   => 0.0,
+    }
+}
+
+p "  Shape::Circlegg area = ", Shape::area(Shape::Circle)
+p "  Square area = ", Shape::area(Shape::Square)
+p "  Rect area   = ", Shape::area(Shape::Rect)
+
+p ""
+p "── enum + rename-friendly: variants live as `Field` symbols ──"
+# Every variant is indexed as a `SymbolKind::Field` so Find Usages /
+# Rename on a variant updates:
+#   - the enum decl line
+#   - every `TrafficLight::Red`-style call site (incl. inside match arms)
+#   - both qualified-Bareword (`TrafficLight::Red`) and auto-quoted
+#     String forms (the LHS of `=>` in match arms is auto-quoted)
+#
+# Try in IntelliJ: cursor on `Red` of the enum decl above and
+# `Cmd+Opt+Shift+R` (or right-click → Refactor → Rename) → type
+# `Stop` → the rewrite touches the decl + all three match arms.
+
+p "── done ──────────────────────────────────────────────────"
