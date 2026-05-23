@@ -11041,15 +11041,19 @@ impl Parser {
                 } else {
                     // Bare `sort` with no comparator and no list: only allowed
                     // as the RHS of `|>`, where the list comes from the LHS.
+                    // Treat a newline as an implicit pipeline terminator —
+                    // `@a |> sort\nmy $x = ...` must NOT swallow the next
+                    // `my` stmt as sort's argument list.
                     let list = if self.in_pipe_rhs()
-                        && matches!(
+                        && (matches!(
                             self.peek(),
                             Token::Semicolon
                                 | Token::RBrace
                                 | Token::RParen
                                 | Token::Eof
                                 | Token::PipeForward
-                        ) {
+                        ) || self.peek_line() > line)
+                    {
                         self.pipe_placeholder_list(line)
                     } else {
                         self.parse_expression()?
