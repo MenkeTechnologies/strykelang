@@ -31,6 +31,7 @@ pub mod builtins_net;
 pub mod builtins_phonetic_geo_codec;
 pub mod builtins_quant;
 pub mod builtins_ratings_geom_units;
+pub mod builtins_sync;
 pub mod builtins_validate;
 pub mod builtins_vision_ir_algorithms;
 pub mod bytecode;
@@ -985,3 +986,6 @@ mod regex_extra_tests;
 
 #[cfg(test)]
 mod aot_extra_tests;
+
+#[cfg(test)]
+mod builtins_sync_tests;

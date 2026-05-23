@@ -228,6 +228,56 @@ pub struct PerlHeap {
     pub cmp: Arc<StrykeSub>,
 }
 
+/// Exclusive mutex backing `StrykeValue::Mutex`. Locks are advisory: the
+/// `mutex_lock` / `mutex_unlock` builtins toggle the `held` flag under the
+/// inner `parking_lot::Mutex`, and contention parks waiters on `condvar`
+/// (NOT a busy spin). This separation keeps any [`parking_lot::MutexGuard`]
+/// strictly inside the builtin function — guards never live in a
+/// [`StrykeValue`] across VM dispatch boundaries.
+#[derive(Debug)]
+pub struct MutexHandle {
+    pub held: parking_lot::Mutex<bool>,
+    pub condvar: parking_lot::Condvar,
+}
+
+impl MutexHandle {
+    pub fn new() -> Self {
+        Self {
+            held: parking_lot::Mutex::new(false),
+            condvar: parking_lot::Condvar::new(),
+        }
+    }
+}
+
+impl Default for MutexHandle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Counting semaphore backing `StrykeValue::Semaphore`. `permits` tracks the
+/// current available count (`permits >= 0` always); `limit` is the initial
+/// `semaphore(N)` capacity (kept for reporting via `semaphore_limit`).
+/// Acquire blocks on `condvar` until a permit becomes available; release
+/// notifies one waiter.
+#[derive(Debug)]
+pub struct SemaphoreHandle {
+    pub permits: parking_lot::Mutex<i64>,
+    pub limit: i64,
+    pub condvar: parking_lot::Condvar,
+}
+
+impl SemaphoreHandle {
+    /// `n` must be `>= 0`; callers ensure this before construction.
+    pub fn new(n: i64) -> Self {
+        Self {
+            permits: parking_lot::Mutex::new(n),
+            limit: n,
+            condvar: parking_lot::Condvar::new(),
+        }
+    }
+}
+
 /// One SSH worker lane: a single `ssh HOST PE_PATH --remote-worker` process. The persistent
 /// dispatcher in [`crate::cluster`] holds one of these per concurrent worker thread.
 ///
@@ -586,6 +636,15 @@ pub(crate) enum HeapObject {
     Generator(Arc<PerlGenerator>),
     Deque(Arc<Mutex<VecDeque<StrykeValue>>>),
     Heap(Arc<Mutex<PerlHeap>>),
+    /// Exclusive mutex — see [`MutexHandle`]. Created by the `mutex()` builtin
+    /// and used by `mutex_lock` / `mutex_unlock` / `mutex_try_lock` /
+    /// `mutex_is_locked`. Reference-shared via [`Arc`] across threads.
+    Mutex(Arc<MutexHandle>),
+    /// Counting semaphore — see [`SemaphoreHandle`]. Created by
+    /// `semaphore(N)` / `sem(N)`; manipulated by `semaphore_acquire` /
+    /// `semaphore_release` / `semaphore_try_acquire` / `semaphore_permits` /
+    /// `semaphore_limit`. Reference-shared via [`Arc`] across threads.
+    Semaphore(Arc<SemaphoreHandle>),
     /// Probabilistic-data-structure family — see `sketches.rs`.
     /// Bloom filter: capacity/FPR-parameterized set-membership sketch.
     BloomFilter(Arc<Mutex<crate::sketches::BloomFilter>>),
@@ -1704,6 +1763,42 @@ impl StrykeValue {
         Self::from_heap(Arc::new(HeapObject::Heap(h)))
     }
 
+    /// Construct a fresh, unlocked [`HeapObject::Mutex`].
+    #[inline]
+    pub fn mutex() -> Self {
+        Self::from_heap(Arc::new(HeapObject::Mutex(Arc::new(MutexHandle::new()))))
+    }
+
+    /// Construct a [`HeapObject::Semaphore`] with `n` permits (`n` is clamped
+    /// to `>= 0` by the caller — see `builtins_sync::semaphore_new`).
+    #[inline]
+    pub fn semaphore(n: i64) -> Self {
+        Self::from_heap(Arc::new(HeapObject::Semaphore(Arc::new(
+            SemaphoreHandle::new(n),
+        ))))
+    }
+
+    /// Borrow-the-inner-handle accessor for [`HeapObject::Mutex`] (returns
+    /// the [`Arc`] so the handle outlives the temporary `StrykeValue`).
+    #[inline]
+    pub fn as_mutex(&self) -> Option<Arc<MutexHandle>> {
+        self.with_heap(|h| match h {
+            HeapObject::Mutex(m) => Some(Arc::clone(m)),
+            _ => None,
+        })
+        .flatten()
+    }
+
+    /// Borrow-the-inner-handle accessor for [`HeapObject::Semaphore`].
+    #[inline]
+    pub fn as_semaphore(&self) -> Option<Arc<SemaphoreHandle>> {
+        self.with_heap(|h| match h {
+            HeapObject::Semaphore(s) => Some(Arc::clone(s)),
+            _ => None,
+        })
+        .flatten()
+    }
+
     #[inline]
     pub fn bloom_filter(b: Arc<Mutex<crate::sketches::BloomFilter>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::BloomFilter(b)))
@@ -2066,6 +2161,8 @@ impl StrykeValue {
             HeapObject::Set(s) => !s.is_empty(),
             HeapObject::Deque(d) => !d.lock().is_empty(),
             HeapObject::Heap(h) => !h.lock().items.is_empty(),
+            HeapObject::Mutex(m) => *m.held.lock(),
+            HeapObject::Semaphore(s) => *s.permits.lock() > 0,
             HeapObject::DataFrame(d) => d.lock().nrows() > 0,
             HeapObject::Pipeline(_) | HeapObject::Capture(_) => true,
             _ => true,
@@ -2231,6 +2328,8 @@ impl StrykeValue {
             | HeapObject::Generator(_) => 1.0,
             HeapObject::Deque(d) => d.lock().len() as f64,
             HeapObject::Heap(h) => h.lock().items.len() as f64,
+            HeapObject::Mutex(m) => i64::from(*m.held.lock()) as f64,
+            HeapObject::Semaphore(s) => *s.permits.lock() as f64,
             HeapObject::Pipeline(p) => p.lock().source.len() as f64,
             HeapObject::DataFrame(d) => d.lock().nrows() as f64,
             HeapObject::Capture(_)
@@ -2274,6 +2373,8 @@ impl StrykeValue {
             | HeapObject::Generator(_) => 1,
             HeapObject::Deque(d) => d.lock().len() as i64,
             HeapObject::Heap(h) => h.lock().items.len() as i64,
+            HeapObject::Mutex(m) => i64::from(*m.held.lock()),
+            HeapObject::Semaphore(s) => *s.permits.lock(),
             HeapObject::Pipeline(p) => p.lock().source.len() as i64,
             HeapObject::DataFrame(d) => d.lock().nrows() as i64,
             HeapObject::Capture(_)
@@ -2319,6 +2420,8 @@ impl StrykeValue {
             HeapObject::Generator(_) => "Generator".to_string(),
             HeapObject::Deque(_) => "Deque".to_string(),
             HeapObject::Heap(_) => "Heap".to_string(),
+            HeapObject::Mutex(_) => "Mutex".to_string(),
+            HeapObject::Semaphore(_) => "Semaphore".to_string(),
             HeapObject::BloomFilter(_) => "BloomFilter".to_string(),
             HeapObject::HllSketch(_) => "HllSketch".to_string(),
             HeapObject::CmsSketch(_) => "CmsSketch".to_string(),
@@ -2375,6 +2478,8 @@ impl StrykeValue {
             HeapObject::Generator(_) => StrykeValue::string("Generator".into()),
             HeapObject::Deque(_) => StrykeValue::string("Deque".into()),
             HeapObject::Heap(_) => StrykeValue::string("Heap".into()),
+            HeapObject::Mutex(_) => StrykeValue::string("Mutex".into()),
+            HeapObject::Semaphore(_) => StrykeValue::string("Semaphore".into()),
             HeapObject::BloomFilter(_) => StrykeValue::string("BloomFilter".into()),
             HeapObject::HllSketch(_) => StrykeValue::string("HllSketch".into()),
             HeapObject::CmsSketch(_) => StrykeValue::string("CmsSketch".into()),
@@ -2573,6 +2678,8 @@ impl StrykeValue {
             HeapObject::Set(s) => StrykeValue::integer(s.len() as i64),
             HeapObject::Deque(d) => StrykeValue::integer(d.lock().len() as i64),
             HeapObject::Heap(h) => StrykeValue::integer(h.lock().items.len() as i64),
+            HeapObject::Mutex(m) => StrykeValue::integer(i64::from(*m.held.lock())),
+            HeapObject::Semaphore(s) => StrykeValue::integer(*s.permits.lock()),
             HeapObject::Pipeline(p) => StrykeValue::integer(p.lock().source.len() as i64),
             HeapObject::Capture(_)
             | HeapObject::Ppool(_)
@@ -2646,6 +2753,10 @@ impl fmt::Display for StrykeValue {
             HeapObject::Generator(g) => write!(f, "Generator({} stmts)", g.block.len()),
             HeapObject::Deque(d) => write!(f, "Deque({})", d.lock().len()),
             HeapObject::Heap(h) => write!(f, "Heap({})", h.lock().items.len()),
+            HeapObject::Mutex(m) => write!(f, "Mutex({})", *m.held.lock()),
+            HeapObject::Semaphore(s) => {
+                write!(f, "Semaphore({}/{})", *s.permits.lock(), s.limit)
+            }
             HeapObject::BloomFilter(b) => {
                 let g = b.lock();
                 write!(
@@ -2851,6 +2962,8 @@ pub fn set_member_key(v: &StrykeValue) -> String {
         HeapObject::Generator(g) => format!("gen:{:p}", Arc::as_ptr(g)),
         HeapObject::Deque(d) => format!("dq:{:p}", Arc::as_ptr(d)),
         HeapObject::Heap(h) => format!("hp:{:p}", Arc::as_ptr(h)),
+        HeapObject::Mutex(m) => format!("mu:{:p}", Arc::as_ptr(m)),
+        HeapObject::Semaphore(s) => format!("se:{:p}", Arc::as_ptr(s)),
         HeapObject::BloomFilter(b) => format!("bf:{:p}", Arc::as_ptr(b)),
         HeapObject::HllSketch(s) => format!("hll:{:p}", Arc::as_ptr(s)),
         HeapObject::CmsSketch(s) => format!("cms:{:p}", Arc::as_ptr(s)),

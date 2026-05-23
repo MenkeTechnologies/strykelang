@@ -14379,6 +14379,14 @@ impl Parser {
             | "broadcast_channel_new" | "broadcast_channel_subscribe"
             | "broadcast_channel_publish"
             | "mpsc_new" | "mpmc_new" | "spmc_new" | "oneshot_new"
+            // ── mutex + counting semaphore ─────────────────────────────────
+            | "mutex" | "mutex_lock" | "mutex_unlock" | "mutex_try_lock" | "mutex_is_locked"
+            | "semaphore" | "sem"
+            | "semaphore_acquire" | "sem_acquire"
+            | "semaphore_release" | "sem_release"
+            | "semaphore_try_acquire" | "sem_try_acquire"
+            | "semaphore_permits" | "sem_permits"
+            | "semaphore_limit" | "sem_limit"
             // ── stress testing ──────────────────────────────────────────────
             | "stress_cpu" | "scpu" | "stress_mem" | "smem"
             | "stress_io" | "sio" | "stress_test" | "st"
