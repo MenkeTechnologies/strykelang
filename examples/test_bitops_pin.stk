@@ -1,0 +1,104 @@
+#!/usr/bin/env stryke
+
+# Bitwise / numeric encoding utilities.
+
+fn Bits::popcount($n) {
+    my $c = 0
+    while ($n > 0) {
+        $c += $n & 1
+        $n = $n >> 1
+    }
+    $c
+}
+
+fn Bits::to_binary($n) {
+    return "0" if $n == 0
+    my $s = ""
+    while ($n > 0) {
+        $s = ($n & 1) . $s
+        $n = $n >> 1
+    }
+    $s
+}
+
+fn Bits::from_binary($s) {
+    my $n = 0
+    for my $c (split(//, $s)) {
+        $n = ($n << 1) | ($c eq "1" ? 1 : 0)
+    }
+    $n
+}
+
+fn Bits::set_bit($n, $i)   { $n | (1 << $i) }
+fn Bits::clear_bit($n, $i) { $n & ~(1 << $i) }
+fn Bits::flip_bit($n, $i)  { $n ^ (1 << $i) }
+fn Bits::test_bit($n, $i)  { ($n & (1 << $i)) != 0 ? 1 : 0 }
+
+fn Bits::reverse_bits($n, $width) {
+    my $out = 0
+    for my $i (0:$width - 1) {
+        $out = ($out << 1) | (($n >> $i) & 1)
+    }
+    $out
+}
+
+fn Bits::is_power_of_two($n) {
+    $n > 0 && ($n & ($n - 1)) == 0 ? 1 : 0
+}
+
+Bits::popcount(0)    |> aeq 0, "popcount 0"
+Bits::popcount(1)    |> aeq 1, "popcount 1"
+Bits::popcount(255)  |> aeq 8, "popcount 255"
+Bits::popcount(1023) |> aeq 10, "popcount 1023"
+Bits::popcount(170)  |> aeq 4,  "popcount 0b10101010"
+
+Bits::to_binary(0)    |> aeq "0",        "to_binary 0"
+Bits::to_binary(5)    |> aeq "101",      "to_binary 5"
+Bits::to_binary(255)  |> aeq "11111111", "to_binary 255"
+Bits::to_binary(1024) |> aeq "10000000000", "to_binary 1024"
+
+Bits::from_binary("0")         |> aeq 0,   "from_binary 0"
+Bits::from_binary("101")       |> aeq 5,   "from_binary 5"
+Bits::from_binary("11111111")  |> aeq 255, "from_binary 255"
+
+# Roundtrip
+for my $n (0, 1, 7, 42, 255, 1000, 65535) {
+    Bits::from_binary(Bits::to_binary($n)) |> aeq $n, "roundtrip $n"
+}
+
+Bits::set_bit(0, 3)    |> aeq 8,  "set bit 3"
+Bits::set_bit(8, 0)    |> aeq 9,  "set bit 0 on 8"
+Bits::clear_bit(15, 1) |> aeq 13, "clear bit 1 of 15"
+Bits::flip_bit(5, 1)   |> aeq 7,  "flip bit 1 of 5"
+Bits::flip_bit(7, 1)   |> aeq 5,  "flip bit 1 of 7"
+
+Bits::test_bit(8, 3)  |> aok "bit3 of 8 set"
+!Bits::test_bit(8, 0) |> aok "bit0 of 8 unset"
+
+# Reverse 4-bit nibble: 0b0001 → 0b1000 = 8
+Bits::reverse_bits(1, 4) |> aeq 8, "reverse 0001 → 1000"
+# Reverse 8-bit: 0b00001111 → 0b11110000 = 240
+Bits::reverse_bits(15, 8) |> aeq 240, "reverse 00001111 → 11110000"
+
+Bits::is_power_of_two(1)    |> aok "pow2 1"
+Bits::is_power_of_two(1024) |> aok "pow2 1024"
+!Bits::is_power_of_two(0)   |> aok "pow2 0 false"
+!Bits::is_power_of_two(3)   |> aok "pow2 3 false"
+!Bits::is_power_of_two(100) |> aok "pow2 100 false"
+
+# Build a bitmask of letters seen in a word
+fn letter_mask($word) {
+    my $m = 0
+    for my $c (split(//, lc($word))) {
+        if ($c =~ /[a-z]/) {
+            my $i = ord($c) - ord("a")
+            $m = Bits::set_bit($m, $i)
+        }
+    }
+    $m
+}
+Bits::popcount(letter_mask("abc"))      |> aeq 3, "abc 3 letters"
+Bits::popcount(letter_mask("aaabbbccc")) |> aeq 3, "still 3 letters"
+Bits::popcount(letter_mask("the quick brown fox jumps over the lazy dog")) |> aeq 26, "pangram"
+
+test_run

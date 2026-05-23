@@ -44,7 +44,6 @@ use percent_encoding::percent_decode_str;
 use crate::ast::MatchArrayElem;
 use crate::ast::{Block, Sigil, Statement, StmtKind, SubSigParam, VarDecl};
 use crate::error::{ErrorKind, StrykeError};
-use crate::vm_helper::VMHelper;
 
 pub(crate) fn run_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     crate::slog_info!(
@@ -774,9 +773,15 @@ fn compute_diagnostics(text: &str, path: &str) -> Vec<Diagnostic> {
     match crate::parse_with_file(text, path) {
         Err(e) => out.push(perror_to_diagnostic(&e, text)),
         Ok(program) => {
-            let mut interp = VMHelper::new();
-            interp.file = path.to_string();
-            if let Err(e) = crate::lint_program(&program, &mut interp) {
+            // IDE diagnostics: always run with strict_vars on so the
+            // editor flags `$undef_scalar`, `@undef_array`, `%undef_hash`
+            // typo / scoping mistakes inline. `stryke check` from the
+            // CLI stays lenient (gated on `use strict;`) because scripts
+            // legitimately use globals without strict; the IDE is where
+            // typos should be caught at type-time, not run-time.
+            if let Err(e) = crate::static_analysis::analyze_program_with_strict(
+                &program, path, true,
+            ) {
                 out.push(perror_to_diagnostic(&e, text));
             }
         }
@@ -2555,15 +2560,38 @@ fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option
     if let Some(prefix) = package_prefix_at_cursor(&needle, &needle_range, cursor_pos) {
         return rename_package(docs, &active_uri, active_text, &prefix, &params.new_name);
     }
+    // Defensive: strip any `::`-qualifier the client may have included in
+    // newName. Earlier versions of the IntelliJ plugin prefilled the
+    // Rename dialog with the full qualified form (`TrafficLight::Red`);
+    // editing just the suffix produced `TrafficLight::Redgg`, which the
+    // server then spliced into every match site as the bare_new — the
+    // result was nonsense like `TrafficLight::TrafficLight::Redgg`. The
+    // SymbolTable resolves the target from the cursor POSITION; the new
+    // name only needs to carry the new bare segment. Stripping here is
+    // safe defense-in-depth across clients (other LSP frontends may make
+    // the same mistake), and a no-op for callers who already send bare.
+    let new_name_raw = &params.new_name;
+    let new_name_bare = match new_name_raw.rfind("::") {
+        Some(idx) => {
+            crate::slog_warn!(
+                "lsp.rename",
+                "stripping `::` qualifier from new_name={:?} → bare={:?}",
+                new_name_raw,
+                &new_name_raw[idx + 2..],
+            );
+            new_name_raw[idx + 2..].to_string()
+        }
+        None => new_name_raw.clone(),
+    };
     // Sigil-aware new name: if the cursor identifier is `$foo` and the user
     // typed `bar`, splice on the same sigil so the replacement is `$bar`.
     // If the user typed `$bar` outright, accept it as-is. This matches what
     // an editor would render in the rename popup either way.
     let effective_new = match needle.chars().next() {
-        Some(c @ ('$' | '@' | '%')) if !params.new_name.starts_with(['$', '@', '%']) => {
-            format!("{c}{}", params.new_name)
+        Some(c @ ('$' | '@' | '%')) if !new_name_bare.starts_with(['$', '@', '%']) => {
+            format!("{c}{}", new_name_bare)
         }
-        _ => params.new_name.clone(),
+        _ => new_name_bare.clone(),
     };
     if needle == effective_new {
         return Some(WorkspaceEdit::default());
@@ -3884,58 +3912,6 @@ fn field_refs_for_other_doc(
         }
     }
     push(other_uri_str, ranges, bare_new, changes, total);
-}
-
-/// Field-tuned scanner: accepts `:` on either side as a valid
-/// boundary so the bare field name matches inside a qualified
-/// access form `Pkg::Type::field`. Used by Field cross-file rename
-/// to catch `Project::Ops::Op::Add` callers in addition to the
-/// bare `Add` decl in the lib.
-fn scan_field_ranges(text: &str, name: &str) -> Vec<Range> {
-    let mask = string_interior_mask(text);
-    let mut out: Vec<Range> = Vec::new();
-    let mut line0: u32 = 0;
-    let mut line_start_byte: usize = 0;
-    for (i, ch) in text.char_indices().chain(std::iter::once((text.len(), '\0'))) {
-        if i == text.len() || ch == '\n' {
-            let line_text = &text[line_start_byte..i];
-            for (start_byte, _) in line_text.match_indices(name) {
-                let global_byte = line_start_byte + start_byte;
-                if mask.get(global_byte).copied().unwrap_or(false) {
-                    continue;
-                }
-                let end_byte = start_byte + name.len();
-                let prev = line_text[..start_byte].chars().next_back();
-                let next = line_text[end_byte..].chars().next();
-                // Field name boundary: only reject ident-continuation
-                // (alphanumeric / `_`). Allow `:` so qualified access
-                // forms match.
-                let prev_ok = prev.is_none_or(|c| !c.is_alphanumeric() && c != '_');
-                let next_ok = next.is_none_or(|c| !c.is_alphanumeric() && c != '_');
-                if !prev_ok || !next_ok {
-                    continue;
-                }
-                let c0 = line_text[..start_byte].encode_utf16().count() as u32;
-                let c1 = line_text[..end_byte].encode_utf16().count() as u32;
-                out.push(Range {
-                    start: Position {
-                        line: line0,
-                        character: c0,
-                    },
-                    end: Position {
-                        line: line0,
-                        character: c1,
-                    },
-                });
-            }
-            line0 += 1;
-            line_start_byte = i + 1;
-            if i == text.len() {
-                break;
-            }
-        }
-    }
-    out
 }
 
 /// Like `scan_ranges_for_needle` but tuned for package names: accepts

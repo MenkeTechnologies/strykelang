@@ -1,0 +1,63 @@
+#!/usr/bin/env stryke
+
+# Quantum Computing — building a Bell state (entanglement).
+#
+# This example demonstrates:
+#   * `qubit_h` (Hadamard gate) for superposition.
+#   * `qubit_cnot` for entanglement.
+#   * `qubit_measure` for state collapse.
+#   * Running quantum circuits on the built-in simulator.
+#
+# Run: stryke --no-interop examples/quantum_bell_state.stk
+
+p "── Quantum Bell State Demo ─────────────────────────────"
+
+# 1. Initialize two qubits in state |00>
+# Stryke manages qubits as resource handles.
+my $q0 = 0
+my $q1 = 1
+
+p "Circuit: H(q0), CNOT(q0, q1)"
+
+# 2. Put q0 in superposition: |0> -> (|0> + |1>) / sqrt(2)
+qubit_h($q0)
+
+# 3. Entangle q1 with q0
+# If q0 is 1, flip q1. Since q0 is in superposition, 
+# the resulting state is (|00> + |11>) / sqrt(2).
+qubit_cnot($q0, $q1)
+
+# 4. Measure many times to see the distribution
+p "Measuring 1000 times..."
+
+my %counts = ( "00" => 0, "11" => 0 )
+
+for (1:1000) {
+    # Reset for each "shot" (simulation loop)
+    # Note: In a real system, you'd reset or re-init.
+    # Stryke's simulator can reset via qubit_reset.
+    qubit_reset($q0)
+    qubit_reset($q1)
+    
+    qubit_h($q0)
+    qubit_cnot($q0, $q1)
+    
+    my $m0 = qubit_measure($q0)
+    my $m1 = qubit_measure($q1)
+    
+    $counts{"$m0$m1"}++
+}
+
+# 5. Display results
+p "Results:"
+for my $state (sort keys %counts) {
+    printf "  |%s> : %d shots\n", $state, $counts{$state}
+}
+
+# 6. Self-test
+# Entangled state means m0 and m1 should ALWAYS be the same.
+die "Entanglement failed" if $counts{"01"} > 0 || $counts{"10"} > 0
+die "Superposition failed" if $counts{"00"} < 400 || $counts{"11"} < 400
+
+p ""
+p "SUCCESS. ALL TESTS PASS."

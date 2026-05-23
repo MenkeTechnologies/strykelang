@@ -1,0 +1,78 @@
+#!/usr/bin/env stryke
+
+# LRU cache via OrderedHash semantics — manual doubly-linked-list approach.
+
+fn Lru::new($cap) {
+    +{ cap => $cap, map => +{}, order => [] }
+}
+
+fn Lru::_touch($c, $key) {
+    my @rest = grep { _ ne $key } @{$c->{order}}
+    push @rest, $key
+    $c->{order} = \@rest
+}
+
+fn Lru::get($c, $key) {
+    return undef unless exists $c->{map}{$key}
+    Lru::_touch($c, $key)
+    $c->{map}{$key}
+}
+
+fn Lru::put($c, $key, $val) {
+    if (exists $c->{map}{$key}) {
+        $c->{map}{$key} = $val
+        Lru::_touch($c, $key)
+        return
+    }
+    while (len(@{$c->{order}}) >= $c->{cap}) {
+        my $evict = shift @{$c->{order}}
+        delete $c->{map}{$evict}
+    }
+    $c->{map}{$key} = $val
+    push @{$c->{order}}, $key
+}
+
+fn Lru::size($c) { len(@{$c->{order}}) }
+
+fn Lru::keys_ordered($c) { [@{$c->{order}}] }
+
+my $c = Lru::new(3)
+
+Lru::put($c, "a", 1)
+Lru::put($c, "b", 2)
+Lru::put($c, "c", 3)
+Lru::size($c) |> aeq 3, "lru size 3"
+
+# Access "a" -> becomes most-recent
+Lru::get($c, "a") |> aeq 1, "get a"
+join(",", @{Lru::keys_ordered($c)}) |> aeq "b,c,a", "after access a"
+
+# Insert d -> evicts "b" (oldest)
+Lru::put($c, "d", 4)
+Lru::size($c) |> aeq 3, "still cap"
+join(",", @{Lru::keys_ordered($c)}) |> aeq "c,a,d", "evict b"
+
+!defined(Lru::get($c, "b")) |> aok "b evicted"
+Lru::get($c, "c") |> aeq 3, "c still there"
+
+# Update existing value
+Lru::put($c, "a", 100)
+Lru::get($c, "a") |> aeq 100, "a updated"
+Lru::size($c)     |> aeq 3,   "size unchanged on update"
+
+# Heavy churn
+my $c2 = Lru::new(2)
+Lru::put($c2, _, _ * 10) for 1:10
+Lru::size($c2) |> aeq 2, "stress cap 2"
+join(",", @{Lru::keys_ordered($c2)}) |> aeq "9,10", "last two keys"
+Lru::get($c2, 10) |> aeq 100, "key 10 = 100"
+!defined(Lru::get($c2, 1)) |> aok "key 1 evicted"
+
+# Cap=1 edge case
+my $c3 = Lru::new(1)
+Lru::put($c3, "x", 1)
+Lru::put($c3, "y", 2)
+!defined(Lru::get($c3, "x")) |> aok "cap1 evicts on insert"
+Lru::get($c3, "y") |> aeq 2, "cap1 only y"
+
+test_run

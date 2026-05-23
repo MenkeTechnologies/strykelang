@@ -354,6 +354,93 @@ class StrykeLexerTest {
     }
 
     @Test
+    fun block_param_single_chevron_outer() {
+        // `_<` — single-chevron outer-topic shortcut (one level up).
+        // Must lex as ONE BLOCK_PARAM token, not `_` + `<`.
+        val toks = lex("_<")
+        assertTrue(
+            "expected `_<` as one BLOCK_PARAM token: $toks",
+            has(toks, StrykeTokenTypes.BLOCK_PARAM, "_<"),
+        )
+    }
+
+    @Test
+    fun block_param_single_chevron_with_digit() {
+        // `_<2` — indexed-ascent shortcut, two levels up.
+        val toks = lex("_<2")
+        assertTrue(
+            "expected `_<2` as one BLOCK_PARAM token: $toks",
+            has(toks, StrykeTokenTypes.BLOCK_PARAM, "_<2"),
+        )
+    }
+
+    @Test
+    fun perl_style_array_ref_interpolation_lexes_interior_as_code() {
+        // `"foo @{[ bar() ]} baz"` — `@{[ EXPR ]}` is Perl-style array
+        // interpolation, common in heredocs and double-quoted strings.
+        // The IDE must color the interior as code, not as literal text.
+        val toks = lex("\"foo @{[ bar() ]} baz\"")
+        // The literal prefix `"foo ` is one STRING token.
+        assertTrue(
+            "expected STRING prefix `\"foo `: $toks",
+            has(toks, StrykeTokenTypes.STRING, "\"foo "),
+        )
+        // The `@{[` opener is its own OPERATOR token.
+        assertTrue(
+            "expected OPERATOR `@{[`: $toks",
+            has(toks, StrykeTokenTypes.OPERATOR, "@{["),
+        )
+        // Interior `bar` is a FUNCTION_CALL (followed by `(`), proving
+        // we're tokenizing as code, not as string text.
+        assertTrue(
+            "expected FUNCTION_CALL `bar` inside `@{[ ... ]}`: $toks",
+            has(toks, StrykeTokenTypes.FUNCTION_CALL, "bar"),
+        )
+        // Closing `]}` is one OPERATOR token.
+        assertTrue(
+            "expected OPERATOR `]}`: $toks",
+            has(toks, StrykeTokenTypes.OPERATOR, "]}"),
+        )
+        // The suffix ` baz"` resumes as STRING.
+        assertTrue(
+            "expected STRING suffix ` baz\"`: $toks",
+            has(toks, StrykeTokenTypes.STRING, " baz\""),
+        )
+        // The bare `@` of `@{[` must NOT have been tokenized as an
+        // ARRAY_VAR — that would let the user's eye misread it as
+        // `@var`.
+        assertTrue(
+            "no spurious ARRAY_VAR from `@{[`: $toks",
+            toks.none {
+                it.first == StrykeTokenTypes.ARRAY_VAR && it.second.startsWith("@{")
+            },
+        )
+    }
+
+    @Test
+    fun nested_thread_map_block_params_all_recognized() {
+        // Real-world fixture from user: triple-nested `~>` map with
+        // `_`, `_<`, `_<2` in the innermost block. Every block-param
+        // form must be its own BLOCK_PARAM token; the `+` operators
+        // between them stay as OPERATORs.
+        val src = "~>> (1:1) map { _ + _< + _<2 }"
+        val toks = lex(src)
+        assertTrue(
+            "expected `_` as BLOCK_PARAM: $toks",
+            has(toks, StrykeTokenTypes.TOPIC_VAR, "_") ||
+                has(toks, StrykeTokenTypes.BLOCK_PARAM, "_"),
+        )
+        assertTrue(
+            "expected `_<` as BLOCK_PARAM: $toks",
+            has(toks, StrykeTokenTypes.BLOCK_PARAM, "_<"),
+        )
+        assertTrue(
+            "expected `_<2` as BLOCK_PARAM: $toks",
+            has(toks, StrykeTokenTypes.BLOCK_PARAM, "_<2"),
+        )
+    }
+
+    @Test
     fun thread_arrow_variants_all_classified_as_pipe() {
         // All thread-arrow forms must be single PIPE tokens.
         for ((src, label) in listOf(

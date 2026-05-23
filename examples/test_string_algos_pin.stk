@@ -1,0 +1,76 @@
+#!/usr/bin/env stryke
+
+# String algorithms: classic operations exercised through stryke pipelines.
+
+fn Algos::Str::reverse_words($s) {
+    ~> split(/\s+/, $s) rev |> join(" ")
+}
+
+fn Algos::Str::is_anagram($x, $y) {
+    my $u = lc($x); $u =~ s/[^a-z]//g
+    my $v = lc($y); $v =~ s/[^a-z]//g
+    join("", sort split(//, $u)) eq join("", sort split(//, $v))
+}
+
+fn Algos::Str::char_freq($s) {
+    my %f
+    $f{_}++ for split(//, $s)
+    \%f
+}
+
+fn Algos::Str::most_common_char($s) {
+    my $f = Algos::Str::char_freq($s)
+    my @keys = sort { $f->{_1} <=> $f->{_} } keys %$f
+    $keys[0]
+}
+
+fn Algos::Str::run_length($s) {
+    my @out
+    my @chars = split(//, $s)
+    my $i = 0
+    while ($i < len(@chars)) {
+        my $c = $chars[$i]
+        my $k = 0
+        while ($i < len(@chars) && $chars[$i] eq $c) {
+            $k++
+            $i++
+        }
+        push @out, "$c$k"
+    }
+    join("", @out)
+}
+
+fn Algos::Str::longest_word($s) {
+    my @words = sort { len(_1) <=> len(_) } split(/\s+/, $s)
+    $words[0]
+}
+
+Algos::Str::reverse_words("hello world foo bar")
+    |> aeq "bar foo world hello", "reverse_words"
+
+Algos::Str::is_anagram("listen", "silent") |> aok "anagram listen/silent"
+Algos::Str::is_anagram("Astronomer", "Moon starer") |> aok "anagram ignoring case"
+!Algos::Str::is_anagram("hello", "world") |> aok "not anagram"
+
+Algos::Str::char_freq("mississippi")->{i} |> aeq 4, "char freq i"
+Algos::Str::char_freq("mississippi")->{s} |> aeq 4, "char freq s"
+Algos::Str::char_freq("mississippi")->{m} |> aeq 1, "char freq m"
+
+Algos::Str::most_common_char("aaaabbbccd") |> aeq "a", "most common char"
+
+Algos::Str::run_length("aaabbc") |> aeq "a3b2c1", "run length"
+Algos::Str::run_length("abcd")   |> aeq "a1b1c1d1", "rle no run"
+Algos::Str::run_length("xxxxx")  |> aeq "x5", "rle single"
+
+Algos::Str::longest_word("the quick brown fox jumped") |> aeq "jumped", "longest word"
+
+# Palindrome via builtin + manual
+is_palindrome("racecar") |> aok "palindrome racecar"
+!is_palindrome("hello")  |> aok "non-palindrome hello"
+
+# Levenshtein sanity
+levenshtein("kitten", "sitting") |> aeq 3, "leven kitten/sitting"
+levenshtein("", "abc")            |> aeq 3, "leven empty/abc"
+levenshtein("abc", "abc")         |> aeq 0, "leven equal"
+
+test_run

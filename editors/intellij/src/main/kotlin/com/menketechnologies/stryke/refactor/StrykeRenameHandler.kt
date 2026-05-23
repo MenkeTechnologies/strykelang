@@ -152,42 +152,26 @@ class StrykeRenameHandler : RenameHandler {
     }
 
     /**
-     * Identifier span at `offset`, INCLUDING `::` package separators.
-     * `Foo::bar` is one identifier; `Foo::Baz::qux` is one identifier. A
-     * single `:` is not part of an identifier — only paired `::`. Without
-     * the namespace tail the rename dialog prefills with `bar`, sends
-     * `bar` to the LSP, and the LSP can't resolve a sub declaration for
-     * the unqualified name.
+     * Bare identifier span at `offset` — DOES NOT walk through `::`
+     * package separators. Cursor on `Red` inside `TrafficLight::Red`
+     * returns just `"Red"`, not the qualified form.
+     *
+     * Earlier versions consumed `::` to produce qualified prefills like
+     * `"TrafficLight::Red"`. The bug: the user edits the suffix in the
+     * dialog (e.g. types `Redgg`), the dialog returns the WHOLE prefilled
+     * string with the new suffix (`"TrafficLight::Redgg"`), and the LSP
+     * server uses that whole string as the bare replacement — splicing
+     * the qualifier in at every match site and producing nonsense like
+     * `TrafficLight::TrafficLight::Redgg`. The LSP server resolves the
+     * target symbol from the cursor POSITION, not the dialog prefill,
+     * so the bare segment is always sufficient.
      */
     private fun identifierAt(chars: CharSequence, offset: Int): String {
         if (offset < 0 || offset > chars.length) return ""
         var s = offset
         var e = offset
-        // Walk left
-        while (s > 0) {
-            val c = chars[s - 1]
-            if (isIdentChar(c)) { s--; continue }
-            // `::` between two letter/digit/underscore runs
-            if (c == ':' && s >= 2 && chars[s - 2] == ':' &&
-                s >= 3 && isIdentChar(chars[s - 3])
-            ) {
-                s -= 2
-                continue
-            }
-            break
-        }
-        // Walk right
-        while (e < chars.length) {
-            val c = chars[e]
-            if (isIdentChar(c)) { e++; continue }
-            if (c == ':' && e + 1 < chars.length && chars[e + 1] == ':' &&
-                e + 2 < chars.length && isIdentChar(chars[e + 2])
-            ) {
-                e += 2
-                continue
-            }
-            break
-        }
+        while (s > 0 && isIdentChar(chars[s - 1])) s--
+        while (e < chars.length && isIdentChar(chars[e])) e++
         if (s == e) return ""
         return chars.subSequence(s, e).toString()
     }

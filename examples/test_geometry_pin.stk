@@ -1,0 +1,80 @@
+#!/usr/bin/env stryke
+
+# 2D geometry primitives.
+
+fn Geo::dist($x1, $y1, $x2, $y2) {
+    sqrt(($x2 - $x1) ** 2 + ($y2 - $y1) ** 2)
+}
+
+fn Geo::manhattan($x1, $y1, $x2, $y2) {
+    abs($x2 - $x1) + abs($y2 - $y1)
+}
+
+fn Geo::triangle_area($x1, $y1, $x2, $y2, $x3, $y3) {
+    abs(($x1 * ($y2 - $y3) + $x2 * ($y3 - $y1) + $x3 * ($y1 - $y2)) / 2)
+}
+
+fn Geo::polygon_area($pts) {
+    my $n = len(@$pts)
+    return 0 if $n < 3
+    my $sum = 0
+    for my $i (0:$n - 1) {
+        my $j = ($i + 1) % $n
+        $sum += $pts->[$i][0] * $pts->[$j][1]
+        $sum -= $pts->[$j][0] * $pts->[$i][1]
+    }
+    abs($sum) / 2
+}
+
+fn Geo::point_in_rect($px, $py, $x1, $y1, $x2, $y2) {
+    $px >= $x1 && $px <= $x2 && $py >= $y1 && $py <= $y2 ? 1 : 0
+}
+
+fn Geo::circle_contains($cx, $cy, $r, $px, $py) {
+    Geo::dist($cx, $cy, $px, $py) <= $r ? 1 : 0
+}
+
+fn Geo::deg2rad($d) { $d * 3.14159265358979 / 180 }
+
+fn Geo::near($x, $y) { abs($x - $y) < 0.0001 }
+
+Geo::dist(0, 0, 3, 4)      |> aeq 5,  "3-4-5 triangle hypot"
+Geo::dist(1, 1, 1, 1)      |> aeq 0,  "zero distance"
+Geo::manhattan(0, 0, 3, 4) |> aeq 7,  "manhattan 0,0 to 3,4"
+
+Geo::triangle_area(0, 0, 4, 0, 0, 3) |> aeq 6, "right triangle area"
+Geo::triangle_area(0, 0, 2, 0, 1, 2) |> aeq 2, "isoceles area"
+
+# Unit square
+Geo::polygon_area([[0, 0], [1, 0], [1, 1], [0, 1]]) |> aeq 1, "unit square"
+# 5x4 rectangle
+Geo::polygon_area([[0, 0], [5, 0], [5, 4], [0, 4]]) |> aeq 20, "rect 5x4"
+# Pentagon (irregular)
+my $pent = [[1, 1], [4, 1], [5, 3], [2.5, 5], [0, 3]]
+Geo::near(Geo::polygon_area($pent), 13) |> aok "pentagon area ~13"
+
+# Point-in-rect
+Geo::point_in_rect(2, 2, 0, 0, 5, 5)    |> aok "point inside"
+!Geo::point_in_rect(6, 2, 0, 0, 5, 5)   |> aok "point outside x"
+Geo::point_in_rect(0, 0, 0, 0, 5, 5)    |> aok "point on corner"
+
+# Circle
+Geo::circle_contains(0, 0, 5, 3, 4)  |> aok "(3,4) on circle r=5"
+Geo::circle_contains(0, 0, 5, 0, 0)  |> aok "center inside circle"
+!Geo::circle_contains(0, 0, 5, 6, 0) |> aok "outside circle"
+
+# Degrees to radians
+Geo::near(Geo::deg2rad(180), 3.14159265358979) |> aok "180deg = pi"
+Geo::near(Geo::deg2rad(90),  1.5707963267949)  |> aok "90deg = pi/2"
+
+# Trig sanity (uses builtin sin/cos)
+Geo::near(sin(0),  0) |> aok "sin 0"
+Geo::near(cos(0),  1) |> aok "cos 0"
+Geo::near(sin(Geo::deg2rad(90)), 1) |> aok "sin 90"
+
+# Pipeline: which of these points lie inside the unit circle?
+my @pts = ([0, 0], [0.5, 0.5], [1, 1], [0.7, 0.7])
+my $inside = grep { Geo::circle_contains(0, 0, 1, _->[0], _->[1]) } @pts
+$inside |> aeq 3, "3 points inside unit circle"
+
+test_run

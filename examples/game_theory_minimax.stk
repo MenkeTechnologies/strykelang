@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+
+# Game Theory — Minimax and Alpha-Beta pruning.
+#
+# This example demonstrates:
+#   * `minimax_value` for optimal decision making in zero-sum games.
+#   * `alphabeta_value` for optimized tree search.
+#   * Pipelining numeric arrays for game state evaluation.
+#
+# Run: stryke --no-interop examples/game_theory_minimax.stk
+
+p "── Game Theory Demo ────────────────────────────────────"
+
+# 1. Minimax
+# We have a game tree with leaf values (bottom-up):
+# [3, 5, 2, 9, 12, 5, 23, 23]
+my @leaves = (3, 5, 2, 9, 12, 5, 23, 23)
+my $depth = 3 # log2(len @leaves)
+
+p "Leaf values: #{join(', ', @leaves)}"
+
+# minimax_value(leaves, depth)
+my $opt_val = minimax_value(\@leaves, $depth)
+p "Optimal value (Minimax): $opt_val"
+
+# 2. Alpha-Beta Pruning
+# Same result, but potentially fewer nodes visited (internal optimization)
+my $ab_val = alphabeta_value(\@leaves, $depth)
+p "Optimal value (Alpha-Beta): $ab_val"
+
+# 3. Decision making simulation
+# Imagine we are at the root, trying to maximize.
+# Left branch leads to leaves [3, 5, 2, 9] -> minimax 3
+# Right branch leads to leaves [12, 5, 23, 23] -> minimax 12
+# Best move is Right.
+
+# 4. Self-test / Assertions
+die "Minimax mismatch" unless $opt_val == 12
+die "Alpha-Beta mismatch" unless $ab_val == 12
+
+p ""
+p "SUCCESS. ALL TESTS PASS."

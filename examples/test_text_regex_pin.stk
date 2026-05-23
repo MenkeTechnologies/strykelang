@@ -1,0 +1,99 @@
+#!/usr/bin/env stryke
+
+# Text processing: regex, splitting, tokenizing.
+
+fn Text::word_count($s) {
+    len([split(/\s+/, Val::trim($s))])
+}
+
+fn Val::trim($s) { my $t = $s; $t =~ s/^\s+|\s+$//g; $t }
+
+fn Text::extract_numbers($s) {
+    my @nums
+    while ($s =~ /(-?\d+(?:\.\d+)?)/g) {
+        push @nums, $1 + 0
+    }
+    \@nums
+}
+
+fn Text::sentences($s) {
+    [grep { _ ne "" } map { Val::trim(_) } split(/[.!?]+/, $s)]
+}
+
+fn Text::tokens_lower($s) {
+    my @t
+    while ($s =~ /([a-z]+)/gi) {
+        push @t, lc($1)
+    }
+    \@t
+}
+
+fn Text::word_freq($s) {
+    my %f
+    $f{_}++ for @{Text::tokens_lower($s)}
+    \%f
+}
+
+fn Text::top_n_words($s, $n) {
+    my $f = Text::word_freq($s)
+    my @ranked = sort { $f->{_1} <=> $f->{_} || _ cmp _1 } keys %$f
+    [@ranked[0..($n - 1 > $#ranked ? $#ranked : $n - 1)]]
+}
+
+fn Text::censor($s, @bad) {
+    my %h
+    $h{lc(_)} = 1 for @bad
+    my $out = $s
+    $out =~ s/(\w+)/exists $h{lc($1)} ? "*" x len($1) : $1/ge
+    $out
+}
+
+Text::word_count("hello world foo bar")          |> aeq 4, "word count 4"
+Text::word_count("   one   two   three  ")        |> aeq 3, "word count trimmed"
+Text::word_count("single")                        |> aeq 1, "single word"
+
+join(",", @{Text::extract_numbers("ab12cd-3.5ef0")}) |> aeq "12,-3.5,0", "extract numbers"
+join(",", @{Text::extract_numbers("no nums here")})  |> aeq "",          "extract empty"
+sum(@{Text::extract_numbers("1 2 3 4 5")})           |> aeq 15,          "extracted sum"
+
+my $sents = Text::sentences("Hello, world! How are you? I am fine.")
+len(@$sents)    |> aeq 3, "3 sentences"
+$sents->[0]     |> aeq "Hello, world", "sent 0"
+$sents->[1]     |> aeq "How are you",  "sent 1"
+$sents->[2]     |> aeq "I am fine",    "sent 2"
+
+my $toks = Text::tokens_lower("The Quick Brown Fox Jumps OVER the lazy dog")
+join(",", @$toks) |> aeq "the,quick,brown,fox,jumps,over,the,lazy,dog", "tokens"
+
+my $f = Text::word_freq("the cat sat on the mat with the cat")
+$f->{the} |> aeq 3, "freq the"
+$f->{cat} |> aeq 2, "freq cat"
+$f->{mat} |> aeq 1, "freq mat"
+
+my $top = Text::top_n_words("a a a b b c d d d d", 2)
+join(",", @$top) |> aeq "d,a", "top 2 words"
+
+Text::censor("I love bad words and another bad thing", "bad")
+    |> aeq "I love *** words and another *** thing", "censor bad"
+
+Text::censor("Hello World", "world", "hello")
+    |> aeq "***** *****", "censor case-insensitive"
+
+# Regex capture group
+my $log = "2024-01-15 INFO User logged in"
+if ($log =~ /^(\d{4}-\d{2}-\d{2})\s+(\w+)\s+(.+)$/) {
+    $1 |> aeq "2024-01-15", "log date"
+    $2 |> aeq "INFO",       "log level"
+    $3 |> aeq "User logged in", "log msg"
+}
+
+# Global match collection
+my @hex_ips = ()
+my $blob = "192.168.1.1 and 10.0.0.5 plus 172.16.0.1"
+while ($blob =~ /(\d+\.\d+\.\d+\.\d+)/g) {
+    push @hex_ips, $1
+}
+join(",", @hex_ips) |> aeq "192.168.1.1,10.0.0.5,172.16.0.1", "extract IPs"
+len(@hex_ips)       |> aeq 3, "3 IPs"
+
+test_run

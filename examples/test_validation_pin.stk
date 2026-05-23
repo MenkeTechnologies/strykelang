@@ -1,0 +1,88 @@
+#!/usr/bin/env stryke
+
+# Data validation & parsing utilities.
+
+fn Val::is_int_str($s) { $s =~ /^-?\d+$/ ? 1 : 0 }
+fn Val::is_float_str($s) { $s =~ /^-?\d+(?:\.\d+)?$/ ? 1 : 0 }
+fn Val::is_hex($s) { $s =~ /^(?:0[xX])?[0-9a-fA-F]+$/ ? 1 : 0 }
+
+fn Val::strip_ws($s) {
+    my $t = $s
+    $t =~ s/^\s+|\s+$//g
+    $t
+}
+
+fn Val::is_blank($s) { Val::strip_ws($s) eq "" ? 1 : 0 }
+
+fn Val::normalize_phone($s) {
+    my $t = $s
+    $t =~ s/[^\d]//g
+    $t
+}
+
+fn Val::parse_kv($s) {
+    my %out
+    for my $pair (split(/&/, $s)) {
+        my ($k, $v) = split(/=/, $pair, 2)
+        $out{$k} = $v if defined $k && $k ne ""
+    }
+    \%out
+}
+
+fn Val::format_csv_row(@cells) {
+    join(",", map {
+        my $c = _
+        if ($c =~ /[",\n]/) {
+            my $q = $c
+            $q =~ s/"/""/g
+            qq("$q")
+        } else {
+            $c
+        }
+    } @cells)
+}
+
+# Int / float / hex parsing
+Val::is_int_str("42")     |> aok "42 is int"
+Val::is_int_str("-7")     |> aok "-7 is int"
+!Val::is_int_str("3.14")  |> aok "3.14 not int"
+!Val::is_int_str("abc")   |> aok "abc not int"
+
+Val::is_float_str("3.14")  |> aok "3.14 is float"
+Val::is_float_str("-0.1")  |> aok "-0.1 is float"
+Val::is_float_str("42")    |> aok "42 is float"
+!Val::is_float_str("1.2.3") |> aok "1.2.3 not float"
+
+Val::is_hex("DEADBEEF") |> aok "DEADBEEF hex"
+Val::is_hex("0xff")     |> aok "0xff hex"
+!Val::is_hex("ghij")    |> aok "ghij not hex"
+
+# Whitespace
+Val::strip_ws("  hello  ") |> aeq "hello", "strip mid"
+Val::strip_ws("\t\nfoo\n") |> aeq "foo",   "strip controls"
+Val::is_blank("   ")        |> aok "blank spaces"
+Val::is_blank("\n\t")        |> aok "blank controls"
+!Val::is_blank(" x ")        |> aok "not blank with x"
+
+# Phone normalization
+Val::normalize_phone("(415) 555-1234") |> aeq "4155551234", "phone normalized"
+Val::normalize_phone("+1-800-FOO-BAR") |> aeq "1800",       "phone strips letters"
+
+# Query string
+my $kv = Val::parse_kv("a=1&b=2&c=hello")
+$kv->{a} |> aeq "1",     "kv a"
+$kv->{b} |> aeq "2",     "kv b"
+$kv->{c} |> aeq "hello", "kv c"
+
+# CSV escaping
+Val::format_csv_row("a", "b", "c")        |> aeq "a,b,c",       "csv plain"
+Val::format_csv_row("hello", "wo,rld")    |> aeq 'hello,"wo,rld"', "csv comma"
+Val::format_csv_row("a", q(say "hi"))     |> aeq q(a,"say ""hi"""), "csv quote escape"
+
+# Builtins
+"127.0.0.1"      |> is_ipv4_addr |> aok "ipv4"
+'{"a":1}'        |> is_json      |> aok "json hash"
+'[1,2,3]'        |> is_json      |> aok "json array"
+!'{a:1}'         |> is_json      |> aok "bad json"
+
+test_run

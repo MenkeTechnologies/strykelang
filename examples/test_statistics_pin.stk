@@ -1,0 +1,88 @@
+#!/usr/bin/env stryke
+
+# Statistics & probability primitives.
+
+fn Stats::mean(@xs) {
+    sum(@xs) / len(@xs)
+}
+
+fn Stats::variance(@xs) {
+    my $mu = Stats::mean(@xs)
+    sum(map { (_ - $mu) ** 2 } @xs) / len(@xs)
+}
+
+fn Stats::stddev(@xs) {
+    sqrt(Stats::variance(@xs))
+}
+
+fn Stats::range(@xs) {
+    max(@xs) - min(@xs)
+}
+
+fn Stats::mode(@xs) {
+    my %f
+    $f{_}++ for @xs
+    my @ranked = sort { $f{_1} <=> $f{_} } keys %f
+    $ranked[0]
+}
+
+fn Stats::near($x, $y) { abs($x - $y) < 0.0001 }
+
+fn Stats::percentile($p, @xs) {
+    my @s = sort { _ <=> _1 } @xs
+    my $idx = int(($p / 100) * (len(@s) - 1))
+    $s[$idx]
+}
+
+fn Stats::covariance($rx, $ry) {
+    my $mx = Stats::mean(@$rx)
+    my $my = Stats::mean(@$ry)
+    my $n = len(@$rx)
+    my $sum = 0
+    $sum += ($rx->[_] - $mx) * ($ry->[_] - $my) for 0:$n - 1
+    $sum / $n
+}
+
+fn Stats::pearson($rx, $ry) {
+    Stats::covariance($rx, $ry) / (Stats::stddev(@$rx) * Stats::stddev(@$ry))
+}
+
+Stats::mean(1, 2, 3, 4, 5)  |> aeq 3,   "mean 1..5"
+Stats::mean(10, 20, 30)     |> aeq 20,  "mean 10,20,30"
+
+Stats::near(Stats::variance(2, 4, 4, 4, 5, 5, 7, 9), 4) |> aok "variance pop=4"
+Stats::near(Stats::stddev(2, 4, 4, 4, 5, 5, 7, 9), 2)   |> aok "stddev pop=2"
+
+Stats::range(3, 7, 2, 9, 1, 5) |> aeq 8, "range"
+
+Stats::mode(1, 2, 2, 3, 2, 4) |> aeq 2, "mode 2"
+Stats::mode("a", "b", "a", "c", "a") |> aeq "a", "mode str"
+
+Stats::percentile(50, 1, 2, 3, 4, 5)  |> aeq 3, "p50"
+Stats::percentile(0,  1, 2, 3, 4, 5)  |> aeq 1, "p0"
+Stats::percentile(100, 1, 2, 3, 4, 5) |> aeq 5, "p100"
+
+# Perfect positive correlation
+my $x = [1, 2, 3, 4, 5]
+my $y = [2, 4, 6, 8, 10]
+Stats::near(Stats::pearson($x, $y), 1) |> aok "perfect +corr"
+
+# Perfect negative
+my $z = [10, 8, 6, 4, 2]
+Stats::near(Stats::pearson($x, $z), -1) |> aok "perfect -corr"
+
+# Builtin stats sanity
+median(1, 2, 3, 4, 5) |> aeq 3, "builtin median odd"
+median(1, 2, 3, 4)    |> aeq 2.5, "builtin median even"
+
+# Quartiles
+Stats::percentile(25, 1, 2, 3, 4, 5, 6, 7, 8) |> aeq 2, "p25"
+Stats::percentile(75, 1, 2, 3, 4, 5, 6, 7, 8) |> aeq 6, "p75"
+
+# Frequency table pipeline
+my $f = qw(apple banana apple cherry banana apple) |> freq
+$f->{apple}  |> aeq 3, "freq apple"
+$f->{banana} |> aeq 2, "freq banana"
+$f->{cherry} |> aeq 1, "freq cherry"
+
+test_run

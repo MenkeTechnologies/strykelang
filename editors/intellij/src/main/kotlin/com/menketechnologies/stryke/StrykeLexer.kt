@@ -35,6 +35,7 @@ class StrykeLexer : LexerBase() {
     private var state = 0
     private var pendingFormatLen = 0
     private var interpBraceDepth = 0
+    private var arrayInterpBracketDepth = 0
     /// Set true after emitting a `fn` / `sub` / `method` / `class` /
     /// `struct` / `trait` / `enum` keyword so the NEXT identifier
     /// gets colored as a declaration name (`FUNCTION_DECL`) rather
@@ -73,6 +74,14 @@ class StrykeLexer : LexerBase() {
         // then return to string mode (STATE_IN_DQ_STRING).
         if (state == STATE_IN_DQ_INTERP || state == STATE_IN_DQ_INTERP_START) {
             lexInsideInterpolation()
+            return
+        }
+        // Perl-style array-ref interpolation `@{[ EXPR ]}` — same idea
+        // as `#{EXPR}` but the closer is `]}` instead of `}`. Stryke
+        // accepts both spellings; the IDE must color the interior as
+        // code rather than as literal string text.
+        if (state == STATE_IN_DQ_ARRAY_INTERP || state == STATE_IN_DQ_ARRAY_INTERP_START) {
+            lexInsideArrayInterpolation()
             return
         }
         // Resume scanning the suffix of an interrupted `"..."` (after an
@@ -253,6 +262,16 @@ class StrykeLexer : LexerBase() {
                 state = STATE_IN_DQ_INTERP_START
                 return
             }
+            // Perl-style `@{[ EXPR ]}` array-ref interpolation — checked
+            // BEFORE the `@`-sigil-var branch below so the `@{[` form
+            // doesn't get mis-classified as a `@{name}` array variable.
+            if (c == '@' && p + 2 < endOffset && buf[p + 1] == '{' && buf[p + 2] == '[') {
+                tokenEnd = p
+                pos = p
+                tokenType = StrykeTokenTypes.STRING
+                state = STATE_IN_DQ_ARRAY_INTERP_START
+                return
+            }
             if ((c == '$' || c == '@' || c == '%')
                 && p + 1 < endOffset
                 && isInStringSigilVarStart(buf[p + 1])
@@ -305,6 +324,13 @@ class StrykeLexer : LexerBase() {
                 pos = p
                 tokenType = StrykeTokenTypes.STRING
                 state = STATE_IN_DQ_INTERP_START
+                return
+            }
+            if (c == '@' && p + 2 < endOffset && buf[p + 1] == '{' && buf[p + 2] == '[') {
+                tokenEnd = p
+                pos = p
+                tokenType = StrykeTokenTypes.STRING
+                state = STATE_IN_DQ_ARRAY_INTERP_START
                 return
             }
             if ((c == '$' || c == '@' || c == '%')
@@ -430,6 +456,54 @@ class StrykeLexer : LexerBase() {
         tokenStart = saveStart // preserve start offset for the token emitted
         // savedState was the entry state we no longer need.
         @Suppress("UNUSED_VARIABLE") val _unused = savedState
+    }
+
+    /**
+     * One advance() inside the Perl-style `@{[ EXPR ]}` interpolation
+     * block. Symmetric to [lexInsideInterpolation] but the closer is
+     * the 2-char sequence `]}` instead of a bare `}`. Tracks `[`/`]`
+     * depth so nested array literals inside the expression don't end
+     * the interp prematurely. On the closing `]}` we emit it as one
+     * OPERATOR token, then flip back to STATE_IN_DQ_STRING.
+     */
+    private fun lexInsideArrayInterpolation() {
+        // First call: emit the `@{[` opener (3 chars).
+        if (state == STATE_IN_DQ_ARRAY_INTERP_START) {
+            tokenStart = pos
+            tokenEnd = pos + 3
+            pos = tokenEnd
+            tokenType = StrykeTokenTypes.OPERATOR
+            state = STATE_IN_DQ_ARRAY_INTERP
+            arrayInterpBracketDepth = 1
+            return
+        }
+        // Closing `]}` at outer depth — emit as one OPERATOR and return
+        // to string mode.
+        if (pos + 1 < endOffset
+            && buf[pos] == ']'
+            && buf[pos + 1] == '}'
+            && arrayInterpBracketDepth == 1
+        ) {
+            tokenStart = pos
+            tokenEnd = pos + 2
+            pos = tokenEnd
+            tokenType = StrykeTokenTypes.OPERATOR
+            state = STATE_IN_DQ_STRING
+            arrayInterpBracketDepth = 0
+            return
+        }
+        // Otherwise lex one normal token. Maintain bracket depth so
+        // nested `[]` inside the expression don't end interp early.
+        state = STATE_NORMAL
+        val saveStart = tokenStart
+        runOneNormalAdvance()
+        when (tokenType) {
+            StrykeTokenTypes.LBRACKET -> arrayInterpBracketDepth++
+            StrykeTokenTypes.RBRACKET -> arrayInterpBracketDepth--
+            else -> {}
+        }
+        state = if (arrayInterpBracketDepth > 0) STATE_IN_DQ_ARRAY_INTERP else STATE_IN_DQ_STRING
+        tokenStart = saveStart
     }
 
     /**
@@ -801,6 +875,8 @@ class StrykeLexer : LexerBase() {
         const val STATE_IN_DQ_SIGIL_VAR = 4       // next token is a `$var` / `@arr` / `%h` inside a string
         const val STATE_IN_DQ_FORMAT = 5          // next token is a `%d` / `%10.2f` printf format spec inside a string
         const val STATE_REGEX_FLAGS_PENDING = 6   // next token is the letter run after `/pattern/` (e.g. `i`, `g`, `igs`)
+        const val STATE_IN_DQ_ARRAY_INTERP_START = 7  // next token is the `@{[` opener (Perl-style array-ref interp)
+        const val STATE_IN_DQ_ARRAY_INTERP = 8        // inside the `@{[ EXPR ]}` expression (close on `]}`)
 
         private val FORMAT_FLAGS = setOf('-', '+', '0', ' ', '#')
         private val FORMAT_LENGTH = setOf('l', 'h', 'L', 'q', 'z', 'j', 't')

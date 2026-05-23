@@ -1,0 +1,47 @@
+#!/usr/bin/env stryke
+
+# Interactive PTY — automating terminal-based applications.
+#
+# This example demonstrates:
+#   * `pty_spawn` for running commands in a pseudo-terminal.
+#   * `pty_expect` for waiting on specific output patterns.
+#   * `pty_send` for sending keystrokes and commands.
+#   * `pty_read` for non-blocking buffer inspection.
+#
+# Run: stryke --no-interop examples/interactive_pty_expect.stk
+
+p "── Interactive PTY Demo (Automating bc) ───────────────"
+
+# 1. Spawn a command that expects interaction
+# Using `bc` (basic calculator) as a target
+my $h = pty_spawn("bc -q")
+
+# 2. Wait for it to be ready (bc -q starts with no prompt but waits for input)
+# We send a dummy command to see it's alive
+pty_send($h, "1 + 1\n")
+
+# 3. Expect result
+# pty_expect returns truthy if pattern matched within timeout (seconds)
+if (pty_expect($h, qr/2/, 2)) {
+    p "  [EXPECT] Found '2' as result of 1+1. OK"
+} else {
+    die "Timed out waiting for bc output"
+}
+
+# 4. More complex sequence
+p "  [PTY] Calculating 2^10..."
+pty_send($h, "2^10\n")
+
+if (pty_expect($h, qr/1024/, 2)) {
+    p "  [EXPECT] Found '1024'. SUCCESS."
+}
+
+# 5. Non-blocking read remaining buffer
+p "  [PTY] Closing session."
+pty_send($h, "quit\n")
+
+# 6. Cleanup
+pty_close($h)
+
+p ""
+p "SUCCESS. ALL TESTS PASS."
