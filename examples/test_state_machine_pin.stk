@@ -1,0 +1,90 @@
+#!/usr/bin/env stryke
+
+# Simple finite state machine + transition table.
+
+fn Fsm::new($initial, $table) {
+    +{ state => $initial, table => $table, history => [$initial] }
+}
+
+fn Fsm::feed($m, $event) {
+    my $cur = $m->{state}
+    my $next = $m->{table}{$cur}{$event}
+    return 0 unless defined $next
+    $m->{state} = $next
+    push @{$m->{history}}, $next
+    1
+}
+
+fn Fsm::run($m, @events) {
+    my $ok = 1
+    for my $e (@events) {
+        $ok &&= Fsm::feed($m, $e)
+    }
+    $ok
+}
+
+# Traffic light: red -> green -> yellow -> red
+my $tl = Fsm::new("red", +{
+    red    => +{ tick => "green"  },
+    green  => +{ tick => "yellow" },
+    yellow => +{ tick => "red"    },
+})
+
+Fsm::feed($tl, "tick")
+$tl->{state} |> aeq "green", "red->green"
+Fsm::feed($tl, "tick")
+$tl->{state} |> aeq "yellow", "green->yellow"
+Fsm::feed($tl, "tick")
+$tl->{state} |> aeq "red", "yellow->red"
+
+# Invalid event
+Fsm::feed($tl, "explode") |> aeq 0, "invalid event rejected"
+$tl->{state} |> aeq "red", "state unchanged after invalid"
+
+# Run a sequence
+my $tl2 = Fsm::new("red", $tl->{table})
+Fsm::run($tl2, "tick", "tick", "tick", "tick") |> aok "full cycle + 1"
+$tl2->{state} |> aeq "green", "after 4 ticks: green"
+len(@{$tl2->{history}}) |> aeq 5, "history length"
+
+# Turnstile FSM: locked/unlocked with coin/push
+my $ts = Fsm::new("locked", +{
+    locked   => +{ coin => "unlocked", push => "locked"   },
+    unlocked => +{ coin => "unlocked", push => "locked"   },
+})
+
+Fsm::run($ts, "push", "push", "coin", "push", "coin", "coin", "push")
+$ts->{state} |> aeq "locked", "turnstile sequence"
+join(",", @{$ts->{history}})
+    |> aeq "locked,locked,locked,unlocked,locked,unlocked,unlocked,locked",
+       "turnstile history"
+
+# Vending machine — accumulate cents until >= 25, then dispense
+fn Vm::new() {
+    +{ state => "idle", balance => 0, dispensed => 0 }
+}
+fn Vm::insert($vm, $cents) {
+    $vm->{balance} += $cents
+    if ($vm->{balance} >= 25) {
+        $vm->{dispensed}++
+        $vm->{balance} -= 25
+        $vm->{state} = "vending"
+    } else {
+        $vm->{state} = "accepting"
+    }
+}
+
+my $vm = Vm::new()
+Vm::insert($vm, 10)
+$vm->{state}     |> aeq "accepting", "vm accepting"
+$vm->{dispensed} |> aeq 0, "vm not dispensed"
+Vm::insert($vm, 10)
+$vm->{dispensed} |> aeq 0, "still no dispense"
+Vm::insert($vm, 10)
+$vm->{dispensed} |> aeq 1, "dispensed once"
+$vm->{balance}   |> aeq 5, "5c remainder"
+Vm::insert($vm, 20)
+$vm->{dispensed} |> aeq 2, "dispensed twice"
+$vm->{balance}   |> aeq 0, "balance 0 after exact"
+
+test_run

@@ -1,0 +1,65 @@
+#!/usr/bin/env stryke
+
+# Error Handling — using modern try/catch syntax.
+#
+# This example demonstrates:
+#   * `try { ... } catch ($e) { ... }` for robust error handling.
+#   * `die` for throwing exceptions (strings or references).
+#   * `finally { ... }` for cleanup logic (resource management).
+#   * Rethrowing errors.
+#
+# Run: stryke --no-interop examples/error_handling_try_catch.stk
+
+p "── Error Handling Demo ────────────────────────────────"
+
+# 1. Simple try/catch
+try {
+    p "Attempting dangerous operation..."
+    die "Something went wrong!"
+} catch ($e) {
+    p "  [CATCH] Caught error: $e"
+}
+
+# 2. Finally block for cleanup
+p ""
+try {
+    p "Opening file (simulation)..."
+    die "Disk full!"
+} catch ($e) {
+    p "  [CATCH] Handled: $e"
+} finally {
+    p "  [FINALLY] Closing file handles and releasing locks."
+}
+
+# 3. Handling structured errors (hashrefs)
+p ""
+try {
+    p "Validation phase..."
+    die +{ code => 403, msg => "Access Denied" }
+} catch ($e) {
+    if (ref($e) eq "HASH") {
+        p "  [CATCH] Structured error #{ $e->{code} }: #{ $e->{msg} }"
+    } else {
+        p "  [CATCH] Generic error: $e"
+    }
+}
+
+# 4. Rethrowing
+p ""
+fn Level2 {
+    try {
+        die "Root cause"
+    } catch ($e) {
+        p "  [Level 2] Logged: $e. Rethrowing..."
+        die $e
+    }
+}
+
+try {
+    Level2()
+} catch ($e) {
+    p "  [Level 1] Final handler: $e"
+}
+
+p ""
+p "SUCCESS. ALL TESTS PASS."
