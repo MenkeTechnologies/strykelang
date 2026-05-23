@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+require "./PacmanRules.stk"
+
+# eat_ghost(power_pellet_active, touching_ghost) — both required
+assert_eq Exercism::PacmanRules::eat_ghost(1, 1), 1, "eat: both true"
+assert_eq Exercism::PacmanRules::eat_ghost(0, 1), 0, "eat: no pellet"
+assert_eq Exercism::PacmanRules::eat_ghost(1, 0), 0, "eat: no ghost"
+assert_eq Exercism::PacmanRules::eat_ghost(0, 0), 0, "eat: neither"
+
+# score(touching_power_pellet, touching_dot) — either
+assert_eq Exercism::PacmanRules::score(1, 0), 1, "score: pellet only"
+assert_eq Exercism::PacmanRules::score(0, 1), 1, "score: dot only"
+assert_eq Exercism::PacmanRules::score(0, 0), 0, "score: neither"
+
+# lose(power_pellet_active, touching_ghost) — ghost without pellet
+assert_eq Exercism::PacmanRules::lose(0, 1),  1, "lose: ghost no pellet"
+assert_eq Exercism::PacmanRules::lose(1, 1),  0, "lose: ghost with pellet"
+assert_eq Exercism::PacmanRules::lose(0, 0),  0, "lose: no ghost"
+
+# win(eaten_all_dots, power_pellet_active, touching_ghost) — done + not losing
+assert_eq Exercism::PacmanRules::win(1, 0, 0), 1, "win: dots done, no ghost"
+assert_eq Exercism::PacmanRules::win(1, 1, 1), 1, "win: dots done, ghost but pellet"
+assert_eq Exercism::PacmanRules::win(1, 0, 1), 0, "win: dots done but losing"
+assert_eq Exercism::PacmanRules::win(0, 1, 0), 0, "win: dots not done"
+
+test_run

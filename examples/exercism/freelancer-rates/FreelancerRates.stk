@@ -1,0 +1,8 @@
+#!/usr/bin/env stryke
+
+const my $BILLABLE_DAYS = 22
+
+fn Exercism::FreelancerRates::daily_rate     = _ * 8.0
+fn Exercism::FreelancerRates::apply_discount = _ * (100 - _1) / 100
+fn Exercism::FreelancerRates::monthly_rate   = ceil(Exercism::FreelancerRates::apply_discount(Exercism::FreelancerRates::daily_rate(_), _1) * $BILLABLE_DAYS)
+fn Exercism::FreelancerRates::days_in_budget = int(_ / Exercism::FreelancerRates::apply_discount(Exercism::FreelancerRates::daily_rate(_1), _2) * 10) / 10

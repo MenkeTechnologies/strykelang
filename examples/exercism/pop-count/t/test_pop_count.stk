@@ -1,0 +1,9 @@
+#!/usr/bin/env stryke
+require "./PopCount.stk"
+
+assert_eq Exercism::PopCount::egg_count(0),  0,  "0 eggs"
+assert_eq Exercism::PopCount::egg_count(16), 1,  "1 egg"
+assert_eq Exercism::PopCount::egg_count(89), 4,  "4 eggs"
+assert_eq Exercism::PopCount::egg_count(2000000000), 13, "13 eggs"
+
+test_run

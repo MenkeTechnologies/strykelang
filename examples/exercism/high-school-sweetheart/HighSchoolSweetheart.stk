@@ -1,0 +1,8 @@
+#!/usr/bin/env stryke
+
+fn Exercism::HighSchoolSweetheart::first_letter {
+    my $t = _ =~ s/^\s+|\s+$//rg
+    $t[0]
+}
+fn Exercism::HighSchoolSweetheart::initial  = uc(Exercism::HighSchoolSweetheart::first_letter(_)) . "."
+fn Exercism::HighSchoolSweetheart::initials = ~> split(/\s+/, _) maps { Exercism::HighSchoolSweetheart::initial(_) } join(" ")

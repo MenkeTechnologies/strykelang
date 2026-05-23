@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+require "./Username.stk"
+
+assert_eq Exercism::Username::sanitize("user_name"),    "user_name",   "lower + underscore unchanged"
+assert_eq Exercism::Username::sanitize("schnabeltier"), "schnabeltier","plain ascii"
+assert_eq Exercism::Username::sanitize("schnäbeltier"), "schnaebeltier", "ä → ae"
+assert_eq Exercism::Username::sanitize("ÜBERMENSCH"),   "",            "uppercase stripped"
+assert_eq Exercism::Username::sanitize("user_42"),      "user_",       "digits stripped"
+assert_eq Exercism::Username::sanitize("user!"),        "user",        "punctuation stripped"
+assert_eq Exercism::Username::sanitize("römann"),       "roemann",     "ö → oe"
+assert_eq Exercism::Username::sanitize("könig"),        "koenig",      "ö → oe in middle"
+assert_eq Exercism::Username::sanitize("grüße"),        "gruesse",     "ü + ß together"
+
+test_run

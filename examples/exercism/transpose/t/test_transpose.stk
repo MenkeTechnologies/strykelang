@@ -1,0 +1,11 @@
+#!/usr/bin/env stryke
+require "./Transpose.stk"
+
+assert_eq Exercism::Transpose::transpose(""),            "",            "empty"
+assert_eq Exercism::Transpose::transpose("ABC"),         "A\nB\nC",     "single row"
+assert_eq Exercism::Transpose::transpose("A\nB\nC"),     "ABC",         "single column"
+assert_eq Exercism::Transpose::transpose("ABC\nDEF"),    "AD\nBE\nCF",  "square 3x2"
+assert_eq Exercism::Transpose::transpose("ABC\nDE"),     "AD\nBE\nC",   "ragged short bottom (no right-pad)"
+assert_eq Exercism::Transpose::transpose("AB\nDEF"),     "AD\nBE\n F",  "ragged short top (left-pad)"
+
+test_run
