@@ -1,0 +1,112 @@
+#!/usr/bin/env stryke
+
+# Pinning batch (2026-05-23): docs/STYLE_GUIDE.md compliance —
+# every assertion exercises a specific style-guide rule. The file
+# itself is style-compliant per the eight hard rules so it doubles
+# as a worked example.
+
+# ── § 6a. String / array slicing — `[N:M]` not substr ──────────────────────
+
+my $s = "hello"
+$s[1]      |> aeq "e",   "single char index"
+$s[1:3]    |> aeq "ell", "inclusive both ends, 3 chars (1,2,3)"
+$s[-1]     |> aeq "o",   "negative index = last"
+$s[-3:-1]  |> aeq "llo", "negative-range = last three"
+$s[2:-1]   |> aeq "llo", "end-anchored via -1"
+$s[0:2]    |> aeq "hel", "start-anchored via 0"
+$s[1:99]   |> aeq "ello","right-clamp graceful (no Perl warning)"
+
+my @a = (10, 20, 30, 40, 50)
+join(",", @a[2:4]) |> aeq "30,40,50", "array tail via explicit end"
+join(",", @a[0:2]) |> aeq "10,20,30", "array start-anchored"
+join(",", @a[1:3]) |> aeq "20,30,40", "array inclusive range"
+
+# ── § 6b. No nested calls — pipeline everything ────────────────────────────
+# Every transformation reads left-to-right in execution order.
+
+"  hello  " |> trim |> uc |> rev |> aeq "OLLEH", "trim → uc → rev"
+
+# Chained transforms expressed as a pipeline of grep / map / sort.
+(1:10)
+    |> greps { _ > 5 }
+    |> maps { _ * 2 }
+    |> sort
+    |> head 3
+    |> sum
+    |> aeq 42, "first 3 of (6..10)*2 = 12+14+16 = 42"
+
+# ── § 7.1 `|>` pipe-forward ────────────────────────────────────────────────
+
+"hello world" |> s/world/stryke/r |> aeq "hello stryke", "s/// via |>"
+
+# ── § 7.2 `~>` thread-first (space-separated stages) ───────────────────────
+# Each stage takes the threaded value as its FIRST argument.
+
+~> "  hello  " tm uc rv |> aeq "OLLEH", "~> tm uc rv (trim-uc-reverse)"
+
+# Bare fn name as stage, with `_` placeholder for explicit slot.
+fn div_safe = _ == 0 ? undef : _<2 / _   # _ = denom, _<2 = numer wait — see _<
+fn halve = _ / 2
+~> 10 halve halve |> aeq 2.5, "~> 10 halve halve = 2.5"
+
+# ── § 7.5 `~p>` chunk-parallel — basic sum (regression: WantarrayCtx::List) ─
+
+mysync $expected = (1:1000) |> sum
+~p> (1:1000) sum |> aeq $expected, "~p> sum matches sequential sum"
+
+# Map then sum across chunks — the WantarrayCtx::List fix lives here.
+~p> (1:100) map { _ * 2 } ||> sum |> aeq 10100, "~p> map ||> sum = 2*(1+..+100) = 10100"
+
+# ── § 8. Iteration shorthand: `e` / `ep` / `maps` / `greps` ────────────────
+# `e` = foreach (void), `ep` = foreach with print, `maps` / `greps`
+# = streaming map / grep that compose under |>.
+
+my @squares
+(1:5) |> e { push @squares, _ * _ }
+@squares |> sum |> aeq 55, "e { push }: 1+4+9+16+25 = 55"
+
+(1:5)
+    |> maps { _ + 1 }
+    |> greps { _ % 2 == 0 }
+    |> sum
+    |> aeq 12, "maps → greps → sum: even of (2..6) = 2+4+6 = 12"
+
+# ── § 11. Sort / reduce blocks ─────────────────────────────────────────────
+# `$a` / `$b` are the magic comparison/reduction slots inside the block.
+
+my @words = ("apple", "fig", "banana", "kiwi")
+my @sorted = sort { len($a) <=> len($b) } @words
+$sorted[0] |> aeq "fig", "shortest sorted first"
+$sorted[-1] |> aeq "banana", "longest sorted last"
+
+# Reduce: rebuild the sum from raw elements.
+(1:5) |> reduce { $a + $b } |> aeq 15, "reduce sum 1:5 = 15"
+
+# Multi-arg reduce with an initializer in pipeline form.
+(1:4) |> reduce { $a * $b } |> aeq 24, "reduce product 1:4 = 24 (4!)"
+
+# ── § 12. Implicit closure params — `_`, `_N`, `_<` ────────────────────────
+# `_` = first arg (topic), `_1` = second, `_2` = third, etc.
+
+fn add3 = _ + _1 + _2
+add3(1, 2, 3) |> aeq 6, "positional _, _1, _2"
+
+# Outer-chain `_<` inside nested map — current scope's topic refers to
+# the inner block, `_<` reaches one scope outward.
+my @cross
+~> (1:3) e { my $outer = _; ~> (10:12) e { push @cross, $outer * 100 + _ } }
+@cross |> sum |> aeq 1*100*3 + 2*100*3 + 3*100*3 + (10+11+12)*3, "nested e: outer*100 + inner"
+
+# ── Stylistic check: implicit return on tail expression ────────────────────
+
+fn area = _ * _1                       # rectangle area, no `return`
+area(4, 5) |> aeq 20, "implicit return on tail expression"
+
+fn guarded_div($n, $d) {
+    return undef if $d == 0             # early-return guard — `return` allowed
+    $n / $d                             # tail expression — implicit return
+}
+guarded_div(10, 2) |> aeq 5,   "implicit return on tail"
+guarded_div(10, 0) |> aeq undef, "early-return guard works"
+
+test_run

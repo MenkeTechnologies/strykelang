@@ -154,6 +154,7 @@ mod closures_pin;
 mod cluster_dispatch;
 mod cmp_operators_pin;
 mod codec_roundtrip_pin;
+mod codecs_crypto_extra_pin;
 mod coderef_pin;
 mod collections;
 mod comments;
