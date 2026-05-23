@@ -1,0 +1,128 @@
+#!/usr/bin/env stryke
+
+# Wolfram elementary cellular automaton — render N generations of
+# any 8-bit rule (default rule 30) seeded with a single live cell
+# in the middle of a width-W row.
+#
+# Each cell's next state is determined by the 3-cell neighbourhood
+# (left, center, right) interpreted as a 3-bit index (0..7) into the
+# rule byte: `next = (rule >> idx) & 1`.
+#
+# Patterns:
+#   * named-package functions (`Rule::`) — no `package main`
+#     redefinition collisions under `--no-interop`
+#   * bitwise `<<`/`>>`/`&` for neighborhood encoding
+#   * fresh `my @next` array per generation; reassigned with `@row = @next`
+#   * `die unless` pins (boundary stability, symmetric rules)
+#
+# Run: stryke --no-interop examples/rule_30_automaton.stk
+
+# ── core stepper ───────────────────────────────────────────────────
+
+fn Rule::bit_at($byte, $i) {
+    ($byte >> $i) & 1
+}
+
+# Compute one generation, with cyclic boundary conditions toggled by
+# the $wrap flag.
+fn Rule::step($row_ref, $rule, $wrap) {
+    my $w = len(@$row_ref)
+    my @next
+    for my $i (0:$w - 1) {
+        my $l
+        my $r
+        if ($wrap) {
+            $l = $row_ref->[($i - 1 + $w) % $w]
+            $r = $row_ref->[($i + 1) % $w]
+        } else {
+            $l = $i == 0 ? 0 : $row_ref->[$i - 1]
+            $r = $i == $w - 1 ? 0 : $row_ref->[$i + 1]
+        }
+        my $c = $row_ref->[$i]
+        my $idx = ($l << 2) | ($c << 1) | $r
+        push @next, Rule::bit_at($rule, $idx)
+    }
+    \@next
+}
+
+# Render a row as `#`/` `.
+fn Rule::render($row_ref) {
+    my $s = ""
+    for my $c (@$row_ref) {
+        $s .= $c ? "#" : " "
+    }
+    $s
+}
+
+# Count live cells.
+fn Rule::weight($row_ref) {
+    my $w = 0
+    for my $c (@$row_ref) { $w += $c }
+    $w
+}
+
+# ── run rule 30 from a single seed ─────────────────────────────────
+
+my $rule = 30
+my $width = 61
+my $generations = 16
+
+my @row
+for my $i (0:$width - 1) { push @row, 0 }
+$row[int($width / 2)] = 1
+
+printf "── Wolfram rule %d, width %d, %d generations ─────\n",
+    $rule, $width, $generations
+p ""
+
+my @history
+for my $g (0:$generations - 1) {
+    push @history, [@row]
+    printf "  %s\n", Rule::render(\@row)
+    my $next = Rule::step(\@row, $rule, 0)
+    @row = @$next
+}
+
+# ── invariant 1: weights never go to zero (rule 30 keeps growing) ──
+
+for my $h (@history) {
+    die "rule 30 unexpectedly went extinct" unless Rule::weight($h) > 0
+}
+
+# ── invariant 2: with non-wrapping boundary, the live region cannot
+#                outgrow the light-cone (1 cell per generation). ────
+
+for my $g (0:$generations - 1) {
+    my $expected_max = 1 + 2 * $g
+    my $live = Rule::weight($history[$g])
+    die "rule 30 light-cone violated at g=$g: $live > $expected_max" unless $live <= $expected_max
+}
+
+# ── invariant 3: rule 90 (XOR of neighbours) produces a known
+#                pattern — alternating bits at row index = power of 2. ──
+
+my $width2 = 21
+my @row2
+for my $i (0:$width2 - 1) { push @row2, 0 }
+$row2[int($width2 / 2)] = 1
+my $cur = \@row2
+for my $g (1:8) {
+    $cur = Rule::step($cur, 90, 0)
+    # At generation g, weight(rule-90) = popcount(g) — a classic
+    # Sierpinski-triangle identity.
+    my $expected
+    my $tmp = $g
+    my $bits = 0
+    while ($tmp) {
+        $bits += $tmp & 1
+        $tmp = $tmp >> 1
+    }
+    $expected = 1 << $bits
+    my $got = Rule::weight($cur)
+    die "rule 90 weight at g=$g: expected $expected, got $got" unless $got == $expected
+}
+
+p ""
+p "── all three invariants satisfied ─────────────────────"
+printf "  rule 30: never extinct, never escapes light-cone\n"
+printf "  rule 90: weight(row_g) = 2^popcount(g) verified for g=1..8\n"

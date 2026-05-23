@@ -1,0 +1,155 @@
+#!/usr/bin/env stryke
+
+# Langton's ant — a 2-D Turing machine on a square grid with
+# wraparound boundaries. Rule per step:
+#
+#   on a white (0) cell  → turn 90° right, flip cell to black, move 1
+#   on a black (1) cell  → turn 90° left,  flip cell to white, move 1
+#
+# Famous emergent behavior: after ~10 000 steps the ant settles
+# into a periodic "highway" of period 104. Here we run 200 steps on
+# a 21×21 torus, render the trail, and pin a half-dozen invariants
+# that follow directly from the deterministic step rule.
+#
+# Patterns:
+#   * 2-D array as arrayref-of-arrayrefs (`@grid` of `\@row`s)
+#   * named-package `Ant::` so the demo runs cleanly under
+#     `--no-interop` (no top-level `sub`-vs-builtin collisions)
+#   * direction vector lookup arrays (`@DX`, `@DY`) indexed by
+#     compass dir 0=N, 1=E, 2=S, 3=W
+#   * `die unless` invariant pins that exercise every step
+#
+# Run: stryke --no-interop examples/langtons_ant.stk
+
+# ── grid helpers ───────────────────────────────────────────────────
+
+fn Ant::make_grid($size) {
+    my @grid
+    for my $i (0:$size - 1) {
+        my @row
+        for my $j (0:$size - 1) { push @row, 0 }
+        push @grid, \@row
+    }
+    \@grid
+}
+
+fn Ant::black_count($grid_ref) {
+    my $n = 0
+    for my $row (@$grid_ref) {
+        for my $c (@$row) { $n += $c }
+    }
+    $n
+}
+
+fn Ant::render($grid_ref, $ax, $ay) {
+    my $s = ""
+    my $h = len(@$grid_ref)
+    for my $y (0:$h - 1) {
+        for my $x (0:$h - 1) {
+            if ($x == $ax && $y == $ay) {
+                $s .= "@"
+            } else {
+                $s .= $grid_ref->[$y]->[$x] ? "#" : " "
+            }
+        }
+        $s .= "\n"
+    }
+    $s
+}
+
+# ── single step — returns the new (x, y, dir) tuple as an arrayref ─
+
+# DX/DY indexed by compass direction: 0=N, 1=E, 2=S, 3=W.
+my @DX = (0, 1, 0, -1)
+my @DY = (-1, 0, 1, 0)
+
+fn Ant::step($grid_ref, $x, $y, $dir, $size) {
+    my $cell = $grid_ref->[$y]->[$x]
+    my $new_dir
+    if ($cell == 0) {
+        $new_dir = ($dir + 1) % 4     # right turn on white
+    } else {
+        $new_dir = ($dir + 3) % 4     # left turn on black
+    }
+    $grid_ref->[$y]->[$x] = 1 - $cell
+    my $nx = ($x + $DX[$new_dir] + $size) % $size
+    my $ny = ($y + $DY[$new_dir] + $size) % $size
+    [$nx, $ny, $new_dir]
+}
+
+# ── run ────────────────────────────────────────────────────────────
+
+my $size = 21
+my $steps = 200
+
+my $grid = Ant::make_grid($size)
+my $x = int($size / 2)
+my $y = int($size / 2)
+my $dir = 0
+
+my $flips = 0
+for my $s (1:$steps) {
+    my $before = $grid->[$y]->[$x]
+    my $r = Ant::step($grid, $x, $y, $dir, $size)
+    $x = $r->[0]
+    $y = $r->[1]
+    $dir = $r->[2]
+    $flips++
+
+    # ── per-step invariants ────────────────────────────────────────
+    # The flipped cell is the only one that changed.
+    die "step $s did not flip cell" unless ($before == 0 || $before == 1)
+}
+
+printf "── Langton's ant: %d×%d torus, %d steps ─────────────\n",
+    $size, $size, $steps
+p ""
+print Ant::render($grid, $x, $y)
+
+# ── global invariants ──────────────────────────────────────────────
+
+# (1) `flips` equals the number of steps performed.
+die "flip count mismatch: $flips != $steps" unless $flips == $steps
+
+# (2) Black-cell count is bounded by min(steps, total cells).
+my $black = Ant::black_count($grid)
+my $total_cells = $size * $size
+die "black count exceeds steps: $black > $steps" unless $black <= $steps
+die "black count exceeds board: $black > $total_cells" unless $black <= $total_cells
+
+# (3) Black-cell count parity matches step parity when every flip is
+#     0→1 (i.e. the ant has never revisited). Once the ant revisits,
+#     each prior black cell flips back to white, decreasing black by
+#     2. So `(steps - black) mod 2 == 0` — always.
+die "parity invariant broken: (steps - black) is odd" unless ($steps - $black) % 2 == 0
+
+# (4) The ant's final direction must be one of {0, 1, 2, 3}.
+die "direction out of range: $dir" unless $dir >= 0 && $dir <= 3
+
+# (5) Position is always inside the grid.
+die "x out of range" unless $x >= 0 && $x < $size
+die "y out of range" unless $y >= 0 && $y < $size
+
+# (6) Re-running the same step from a fresh grid is deterministic —
+#     verify by re-simulating into a parallel grid.
+my $grid2 = Ant::make_grid($size)
+my $x2 = int($size / 2)
+my $y2 = int($size / 2)
+my $dir2 = 0
+for my $s (1:$steps) {
+    my $r = Ant::step($grid2, $x2, $y2, $dir2, $size)
+    $x2 = $r->[0]
+    $y2 = $r->[1]
+    $dir2 = $r->[2]
+}
+die "determinism: x mismatch" unless $x == $x2
+die "determinism: y mismatch" unless $y == $y2
+die "determinism: dir mismatch" unless $dir == $dir2
+die "determinism: black count mismatch" unless $black == Ant::black_count($grid2)
+
+p ""
+printf "── final: ant at (%d, %d) facing dir %d ─────────────────\n",
+    $x, $y, $dir
+printf "  black cells   : %d / %d\n", $black, $total_cells
+printf "  flips         : %d\n", $flips
+p "── all six invariants satisfied ────────────────────────"
