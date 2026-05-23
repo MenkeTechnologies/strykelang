@@ -1,0 +1,115 @@
+#!/usr/bin/env stryke
+
+# Floyd's cycle-detection (the "tortoise and hare") on iterated
+# functional sequences x_{n+1} = f(x_n).
+#
+# Three phases:
+#   1. **Detect** — tortoise advances by 1, hare by 2. When they
+#      meet, a cycle exists.
+#   2. **Find μ** (tail length) — restart tortoise from x_0, step
+#      both one at a time; they meet at the cycle entry.
+#   3. **Find λ** (cycle length) — fix tortoise, advance hare until
+#      they meet again; count the steps.
+#
+# Patterns:
+#   * named-package functions (`Cycle::step`)
+#   * `do { ... } while (cond)` post-test loop
+#   * `die` assertions to pin invariants
+#   * `printf` for aligned numeric output
+#
+# Run: stryke --no-interop examples/tortoise_hare_cycle.stk
+
+# ── the function under test ────────────────────────────────────────
+#
+# f(x) = (x² + 1) mod 255 — a classic Pollard-rho-style iterator
+# guaranteed to cycle because the codomain is finite.
+
+fn Cycle::step($x) {
+    ($x * $x + 1) % 255
+}
+
+# ── reference: brute-force build the trajectory for verification ──
+
+fn Cycle::trajectory($x0, $limit) {
+    my @seq = ($x0)
+    my $cur = $x0
+    for my $i (1:$limit) {
+        $cur = Cycle::step($cur)
+        push @seq, $cur
+    }
+    \@seq
+}
+
+# ── Floyd's algorithm proper ───────────────────────────────────────
+
+fn Cycle::floyd($x0) {
+    # Phase 1 — meet inside the cycle.
+    my $tortoise = Cycle::step($x0)
+    my $hare = Cycle::step(Cycle::step($x0))
+    while ($tortoise != $hare) {
+        $tortoise = Cycle::step($tortoise)
+        $hare = Cycle::step(Cycle::step($hare))
+    }
+
+    # Phase 2 — locate cycle entry (μ steps from x_0).
+    my $mu = 0
+    $tortoise = $x0
+    while ($tortoise != $hare) {
+        $tortoise = Cycle::step($tortoise)
+        $hare = Cycle::step($hare)
+        $mu++
+    }
+
+    # Phase 3 — measure cycle length λ.
+    my $lambda = 1
+    $hare = Cycle::step($tortoise)
+    while ($tortoise != $hare) {
+        $hare = Cycle::step($hare)
+        $lambda++
+    }
+
+    [$mu, $lambda]
+}
+
+# ── run on several seeds ───────────────────────────────────────────
+
+my @seeds = (0, 2, 7, 100, 200)
+printf "── Floyd cycle detection over f(x) = (x² + 1) mod 255 ──\n\n"
+printf "  %5s   %4s   %4s\n", "x_0", "μ", "λ"
+printf "  %5s   %4s   %4s\n", "─────", "────", "────"
+
+for my $x0 (@seeds) {
+    my $res = Cycle::floyd($x0)
+    my $mu = $res->[0]
+    my $lambda = $res->[1]
+    printf "  %5d   %4d   %4d\n", $x0, $mu, $lambda
+
+    # Verify against trajectory: seq[μ + λ] must equal seq[μ].
+    my $traj = Cycle::trajectory($x0, $mu + 2 * $lambda + 5)
+    die "verification failed for x0=$x0: seq[mu+lambda] != seq[mu]" unless $traj->[$mu + $lambda] == $traj->[$mu]
+
+    # And seq[μ] must NOT equal any earlier entry (μ is minimal).
+    if ($mu > 0) {
+        my $entry = $traj->[$mu]
+        for my $i (0:$mu - 1) {
+            die "mu not minimal for x0=$x0: seq[$i] == seq[mu]" if $traj->[$i] == $entry
+        }
+    }
+}
+
+# ── invariant pin: same f, every seed lands in the SAME cycle ─────
+#
+# Because f is a single map on a finite set, every trajectory that
+# enters the cycle does so at one of the cycle's λ states, and all
+# share the same λ.
+
+my $reference_lambda = Cycle::floyd($seeds[0])->[1]
+for my $x0 (@seeds) {
+    my $lam = Cycle::floyd($x0)->[1]
+    die "lambda mismatch: x0=$x0 saw lambda=$lam vs reference $reference_lambda" unless $lam == $reference_lambda
+}
+
+p ""
+printf "── invariant: all seeds share λ = %d ───────────────────\n",
+    $reference_lambda
+p "── all invariants satisfied ────────────────────────────"
