@@ -88,6 +88,11 @@ pub(crate) fn run_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync>
                     "%".to_string(),
                     ":".to_string(),
                     "_".to_string(),
+                    // `{` triggers HashKey completion when the user
+                    // types `$h->{` or `$h{`. Without this the IDE
+                    // doesn't fire completion automatically — user
+                    // would have to press Ctrl+Space inside the braces.
+                    "{".to_string(),
                 ];
                 for c in 'a'..='z' {
                     v.push(c.to_string());
@@ -4224,6 +4229,11 @@ struct CompletionIndex {
     hashes: BTreeSet<String>,
     subs_short: BTreeSet<String>,
     subs_qualified: BTreeSet<String>,
+    /// Scalar `$name` → builtin function it was bound to. Drives hash-
+    /// key completion: `my $info = pool_info()` records `info → pool_info`,
+    /// then `$info->{<tab>}` completes from `pool_info`'s key registry.
+    /// Innermost binding wins on shadow.
+    scalar_builtin_source: std::collections::BTreeMap<String, String>,
     // User-declared Types — separated by kind so the CompletionItemKind
     // can carry the right icon in the picker (Class/Struct/Enum/Trait).
     types_class: BTreeSet<String>,
@@ -4250,6 +4260,11 @@ enum LineCompletionMode {
     Scalar(String),
     Array(String),
     Hash(String),
+    /// `$h->{KEY}` / `$h{KEY}` — completing a hash key under receiver
+    /// `receiver` (the sigil-stripped scalar name; "" when the receiver
+    /// wasn't a sigil-var pattern). `partial` is the typed prefix
+    /// inside the braces.
+    HashKey { receiver: String, partial: String },
 }
 
 fn completion_words() -> &'static Vec<String> {
@@ -9710,6 +9725,98 @@ fn resolve_completion_item(mut item: CompletionItem) -> CompletionItem {
     item
 }
 
+/// Returns the keys a builtin's hashref result emits. Sourced from the
+/// implementation in `builtins.rs` — keep this table in lock-step with
+/// the actual `h.insert(...)` calls when adding/changing builtins.
+/// Drives `$var->{<tab>}` completion when `$var = builtin_name(...)`.
+fn builtin_return_keys(name: &str) -> Option<&'static [&'static str]> {
+    let keys: &[&str] = match name {
+        "pool_info" | "par_info" => &[
+            "cpus",
+            "rayon_threads",
+            "arch",
+            "os",
+            "perf_cores",
+            "eff_cores",
+        ],
+        "par_bench" | "pbench" => &[
+            "items",
+            "seq_ms",
+            "par_ms",
+            "speedup",
+            "threads",
+            "ops_per_sec",
+        ],
+        "stress_test" | "st" => &["cpu_hashes", "mem_bytes", "io_bytes", "workers", "duration"],
+        "cache_stats" => &["count", "bytes", "path", "enabled"],
+        "uname" => &["sysname", "nodename", "release", "version", "machine"],
+        // Per-row keys (mounts returns an array of these hashes).
+        "mounts" | "disk_mounts" | "filesystems" => &[
+            "mount", "device", "fs_type", "total", "free", "avail", "used", "use_pct",
+        ],
+        "git_log" | "glog" => &["sha", "short", "message", "author", "email", "time"],
+        "git_status" | "gst" => &["path", "status"],
+        "git_branches" | "gbr" => &["name", "is_head"],
+        "git_blame" | "gblame" => &["line", "sha", "author", "text"],
+        "git_authors" | "gauthors" => &["name", "email", "commits"],
+        "git_show" | "gshow" => &[
+            "sha",
+            "message",
+            "author",
+            "email",
+            "time",
+            "parents",
+            "insertions",
+            "deletions",
+            "files_changed",
+        ],
+        "du_tree" | "dir_sizes" => &["path", "size"],
+        "process_list" | "ps" | "procs" => &["pid", "ppid", "name", "cpu", "mem", "status"],
+        "net_interfaces" | "net_ifs" | "ifconfig" => {
+            &["name", "up", "ipv4", "ipv6", "mac", "netmask"]
+        }
+        "perfview" | "pfv" => &[
+            "id",
+            "path",
+            "argv",
+            "started_ns",
+            "duration_ns",
+            "duration_ms",
+            "exit_code",
+            "version",
+            "host",
+            "pid",
+            "parent_pid",
+        ],
+        "html_parse" | "parse_html" => &["tag", "text", "attrs"],
+        "css_select" | "css" | "qs" | "query_selector" => &["tag", "text", "attrs", "html"],
+        "xml_parse" | "parse_xml" => &["tag", "attrs", "text", "children"],
+        "xpath" | "xml_select" => &["tag", "text", "attrs"],
+        "audio_info" | "ainfo" => &[
+            "path",
+            "sample_rate",
+            "channels",
+            "frames",
+            "duration_secs",
+            "bits_per_sample",
+        ],
+        "id3_read" | "id3" => &[
+            "title",
+            "artist",
+            "album",
+            "year",
+            "track",
+            "genre",
+            "album_artist",
+            "disc",
+            "duration_secs",
+            "comments",
+        ],
+        _ => return None,
+    };
+    Some(keys)
+}
+
 fn completions(
     docs: &HashMap<String, String>,
     params: CompletionParams,
@@ -9754,6 +9861,9 @@ fn completions(
         LineCompletionMode::Scalar(f) => sigil_completions(f, '$', &idx.scalars, "scalar"),
         LineCompletionMode::Array(f) => sigil_completions(f, '@', &idx.arrays, "array"),
         LineCompletionMode::Hash(f) => sigil_completions(f, '%', &idx.hashes, "hash"),
+        LineCompletionMode::HashKey { receiver, partial } => {
+            hash_key_completions(receiver, partial, &idx)
+        }
         LineCompletionMode::Bare(f) => {
             if let Some((pkg_p, partial)) = split_qualified_prefix(f) {
                 qualified_sub_completions(&pkg_p, &partial, &idx)
@@ -9788,6 +9898,29 @@ fn line_completion_mode(line: &str, byte_col: usize) -> LineCompletionMode {
         }
     }
     let raw = before[start..b].to_string();
+    // `$h->{KEY}` / `$h{KEY}` / `$ref->{KEY}` — emit HashKey mode so
+    // completion can offer the receiver's known keys instead of a
+    // forest of builtin names. Detection: walk back from `start` over
+    // whitespace, find `{`, then determine the receiver shape (sigil-
+    // var or `->`-chain).
+    if start > 0 {
+        let bytes = line.as_bytes();
+        let mut i = start;
+        while i > 0 && (bytes[i - 1] == b' ' || bytes[i - 1] == b'\t') {
+            i -= 1;
+        }
+        if i > 0 && bytes[i - 1] == b'{' {
+            // Identify the receiver: scan further back for `$VAR` /
+            // `$VAR->` / `->` chain. Capture just the final scalar
+            // name as the receiver key — that's what binds to a
+            // declared builtin call.
+            let receiver = extract_hash_subscript_receiver(line, i - 1);
+            return LineCompletionMode::HashKey {
+                receiver,
+                partial: raw,
+            };
+        }
+    }
     if start > 0 {
         let prev = line[..start].chars().last();
         match prev {
@@ -9798,6 +9931,35 @@ fn line_completion_mode(line: &str, byte_col: usize) -> LineCompletionMode {
         }
     }
     LineCompletionMode::Bare(raw)
+}
+
+/// Walk backward from the `{` position to find the scalar receiver
+/// (`$NAME` or `$NAME->` chain). Returns the bare receiver name
+/// (without sigil). Empty string when the `{` is preceded by something
+/// other than a sigil-var (e.g. a literal hash deref expression).
+fn extract_hash_subscript_receiver(line: &str, brace_pos: usize) -> String {
+    let bytes = line.as_bytes();
+    let mut i = brace_pos;
+    // Optional `->` between `$NAME` and `{`.
+    if i >= 2 && &bytes[i - 2..i] == b"->" {
+        i -= 2;
+    }
+    // Now expect ident chars ending at `i`.
+    let end = i;
+    while i > 0 && (bytes[i - 1].is_ascii_alphanumeric() || bytes[i - 1] == b'_') {
+        i -= 1;
+    }
+    if i == end {
+        return String::new();
+    }
+    // Require a leading `$` for the receiver to be a scalar holding a
+    // hashref. `@NAME{KEYS}` slice has different semantics — punt.
+    if i > 0 && bytes[i - 1] == b'$' {
+        return std::str::from_utf8(&bytes[i..end])
+            .unwrap_or("")
+            .to_string();
+    }
+    String::new()
 }
 
 fn split_qualified_prefix(raw: &str) -> Option<(String, String)> {
@@ -9816,6 +9978,41 @@ fn fqn_matches(pkg_prefix: &str, partial: &str, fqn: &str) -> bool {
         return false;
     };
     partial.is_empty() || rest.starts_with(partial)
+}
+
+/// Complete `$h->{KEY}` / `$h{KEY}`. Looks up the receiver's bound
+/// builtin in [`CompletionIndex::scalar_builtin_source`] and emits the
+/// keys reported by [`builtin_return_keys`]. Falls back to empty when
+/// the receiver isn't bound to a key-known builtin — the IDE shows no
+/// suggestions rather than the full builtin list.
+fn hash_key_completions(
+    receiver: &str,
+    partial: &str,
+    idx: &CompletionIndex,
+) -> Vec<CompletionItem> {
+    if receiver.is_empty() {
+        return Vec::new();
+    }
+    let Some(builtin) = idx.scalar_builtin_source.get(receiver) else {
+        return Vec::new();
+    };
+    let Some(keys) = builtin_return_keys(builtin) else {
+        return Vec::new();
+    };
+    let mut items = Vec::new();
+    for k in keys {
+        if !partial.is_empty() && !k.starts_with(partial) {
+            continue;
+        }
+        items.push(CompletionItem {
+            label: k.to_string(),
+            kind: Some(CompletionItemKind::FIELD),
+            detail: Some(format!("key from {}()", builtin)),
+            documentation: None,
+            ..Default::default()
+        });
+    }
+    items
 }
 
 fn qualified_sub_completions(
@@ -10303,10 +10500,22 @@ fn push_snippet_completions(filter: &str, items: &mut Vec<CompletionItem>) {
 }
 
 fn collect_var_decls(decls: &[VarDecl], idx: &mut CompletionIndex) {
+    use crate::ast::ExprKind;
     for d in decls {
         match d.sigil {
             Sigil::Scalar => {
                 idx.scalars.insert(d.name.clone());
+                // `my $info = pool_info()` — bind scalar to the
+                // builtin so hash-key completion at `$info->{<tab>}`
+                // knows which key set to offer.
+                if let Some(init) = &d.initializer {
+                    if let ExprKind::FuncCall { name, .. } = &init.kind {
+                        if builtin_return_keys(name).is_some() {
+                            idx.scalar_builtin_source
+                                .insert(d.name.clone(), name.clone());
+                        }
+                    }
+                }
             }
             Sigil::Array => {
                 idx.arrays.insert(d.name.clone());
@@ -10479,14 +10688,25 @@ fn visit_stmt_for_index(stmt: &Statement, pkg: &mut String, idx: &mut Completion
         StmtKind::Foreach {
             label,
             var,
+            list,
             body,
             continue_block,
-            ..
         } => {
             if let Some(l) = label {
                 idx.loop_labels.insert(l.clone());
             }
             idx.scalars.insert(var.clone());
+            // `foreach my $row (git_log()) { $row->{<tab>} }` — when
+            // the loop's list expression is a direct call to a builtin
+            // that emits an array-of-hashref with known row keys, bind
+            // the loop var to that builtin's row schema for hash-key
+            // completion.
+            if let crate::ast::ExprKind::FuncCall { name, .. } = &list.kind {
+                if builtin_return_keys(name).is_some() {
+                    idx.scalar_builtin_source
+                        .insert(var.clone(), name.clone());
+                }
+            }
             visit_block_for_index(body, pkg, idx);
             if let Some(b) = continue_block {
                 visit_block_for_index(b, pkg, idx);
@@ -10610,6 +10830,7 @@ mod completion_tests {
             | LineCompletionMode::Scalar(x)
             | LineCompletionMode::Array(x)
             | LineCompletionMode::Hash(x) => x.clone(),
+            LineCompletionMode::HashKey { partial, .. } => partial.clone(),
         };
         (m, s)
     }

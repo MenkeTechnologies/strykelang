@@ -1,0 +1,169 @@
+#!/usr/bin/env stryke
+
+# Pinning batch: advanced threading-macro exercises.
+#   ~>   thread-first  (Clojure ->)
+#   ~>>  thread-last   (Clojure ->>)
+#   ~s>  streaming     (per-item, uneven latencies OK)
+#   ~p>  chunk-parallel (CPU-heavy collections)
+# Plus arrow-block stages, ||> mode switch, and mixed macro composition.
+
+# ─── 1. Thread-first ~> with chained stages ─────────────────────────────
+my @nums = (1..20)
+
+my @evens = ~> @nums grep { _ % 2 == 0 }
+join(",", @evens) |> aeq "2,4,6,8,10,12,14,16,18,20", "~> grep evens"
+
+my $sum_mysquare = ~> @nums map { _ * _ } sum
+$sum_mysquare |> aeq 2870, "~> sum of squares 1..20"
+
+my @sorted_desc = ~> @nums sort { _1 <=> _ }
+$sorted_desc[0] |> aeq 20, "~> sort desc head"
+$sorted_desc[-1] |> aeq 1, "~> sort desc tail"
+
+# arrow-block stage
+my @doubled_plus_one = ~> @nums map { >{ _ * 2 + 1 } }
+$doubled_plus_one[0] |> aeq 3,  "arrow-block first"
+$doubled_plus_one[9] |> aeq 21, "arrow-block 10th"
+
+# ─── 2. Thread-last ~>> for fn(args..., @xs) signatures ─────────────────
+fn add_to($base, @xs) {
+    my $s = $base
+    for my $x (@xs) { $s = $s + $x }
+    $s
+}
+my $with_base = ~>> @nums add_to(1000)
+$with_base |> aeq 1210, "~>> add_to with base"
+
+fn topn_desc($n, @xs) {
+    my @sorted = sort { _1 <=> _ } @xs
+    my @sub = @sorted[0..$n-1]
+    \@sub
+}
+my $top3 = ~>> @nums topn_desc(3)
+json_encode($top3) |> aeq "[20,19,18]", "~>> topn_desc 3"
+
+fn label_each($prefix, @xs) {
+    my @r = ()
+    for my $x (@xs) { push @r, $prefix . ":" . $x }
+    \@r
+}
+my $labeled = ~>> (1,2,3) label_each("v")
+json_encode($labeled) |> aeq '["v:1","v:2","v:3"]', "~>> label_each"
+
+# ~>> followed by join("-")
+my $joined = ~>> ("a","b","c","d") join("-")
+$joined |> aeq "a-b-c-d", "~>> join"
+
+# ─── 3. Streaming ~s> — per-item pipeline ──────────────────────────────
+my @squares = ~s> @nums map { _ * _ }
+(len @squares) |> aeq 20, "~s> map preserves count"
+$squares[4]    |> aeq 25, "~s> map element 5"
+
+# ~s> with filter + transform (uneven stage latencies in real code)
+my @big_squares = ~s> @nums grep { _ > 10 } map { _ * _ }
+(len @big_squares) |> aeq 10, "~s> 10 above-10"
+$big_squares[0]    |> aeq 121, "~s> first big mysquareuare"
+
+# ~s> chained map maps
+my @plus_then_times = ~s> (1,2,3,4,5) map { _ + 10 } map { _ * 2 }
+join(",", @plus_then_times) |> aeq "22,24,26,28,30", "~s> chained maps"
+
+# ─── 4. Chunk-parallel ~p> ─────────────────────────────────────────────
+my @big = (1..100)
+my $par_sum = ~p> @big sum
+$par_sum |> aeq 5050, "~p> sum 1..100"
+
+# ~p> with ||> switching back to sequential for the merged whole
+my $par_then_count = ~p> @big grep { _ > 50 } map { 1 } ||> sum
+$par_then_count |> aeq 50, "~p> ||> count above 50"
+
+# |then| English-spelled equivalent of ||>
+my $par_then_count2 = ~p> @big grep { _ > 90 } map { 1 } |then| sum
+$par_then_count2 |> aeq 10, "~p> |then| count above 90"
+
+# ~p> count of items (sum of 1s)
+my $par_count = ~p> @big map { 1 } ||> sum
+$par_count |> aeq 100, "~p> count via map-1"
+
+# ~p> sum of doubled (use ||> for proper merge)
+my @doubled_big = ~> @big map { _ * 2 }
+my $par_dbl_sum = ~p> @doubled_big sum
+$par_dbl_sum |> aeq 10100, "~p> sum of doubled"
+
+# ─── 5. Macros composing into / out of expressions ──────────────────────
+my $total = (~> (1,2,3,4,5) map { _ * _ } sum) + 100
+$total |> aeq 155, "~> embedded in expression"
+
+my $mean = (~> @big sum) / (len @big)
+$mean |> aeq 50.5, "~> mean via sum/len"
+
+# capture inside if-expression
+my @odds = ~> @nums grep { _ % 2 == 1 }
+(len @odds) |> aeq 10, "10 odds in 1..20"
+
+# ─── 6. ~> with method-style chaining of plain fns ──────────────────────
+fn mydouble($x)     { $x * 2 }
+fn add_seven($x)  { $x + 7 }
+fn mysquare($x)     { $x * $x }
+
+my $piped = ~> 3 mydouble add_seven mysquare
+$piped |> aeq 169, "3 *2 +7 ^2 = 169"
+
+my @applied = ~> (1,2,3,4) map { _ |> mydouble } map { _ |> add_seven }
+join(",", @applied) |> aeq "9,11,13,15", "nested pipe inside map"
+
+# ─── 7. ~>> with stage that needs the value as last positional ──────────
+fn my_between($lo, $hi, @xs) {
+    my @r = ()
+    for my $x (@xs) {
+        if ($x >= $lo && $x <= $hi) { push @r, $x }
+    }
+    \@r
+}
+my $win = ~>> (1..30) my_between(10, 15)
+json_encode($win) |> aeq "[10,11,12,13,14,15]", "~>> my_between 10..15"
+
+# ─── 8. Mixed: ~> into ~p> via intermediate array ───────────────────────
+my @prepped = ~> (1..50) map { _ * _ }
+my $par_sum_mysquare = ~p> @prepped sum
+$par_sum_mysquare |> aeq 42925, "~p> sum of squares 1..50"
+
+# ─── 9. ~> with uniq + sort + len ──────────────────────────────────────
+my @bag = (3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5)
+my $distinct = ~> @bag uniq len
+$distinct |> aeq 7, "7 distinct in pi-digits"
+
+my @uniq_sorted = ~> @bag uniq sort
+join(",", @uniq_sorted) |> aeq "1,2,3,4,5,6,9", "uniq+sort"
+
+# ─── 10. ~> with grep returning empty ──────────────────────────────────
+my @none = ~> (1..10) grep { _ > 100 }
+(len @none) |> aeq 0, "empty grep yields 0"
+
+# ─── 11. ~> with sort by custom key (length of string) ──────────────────
+my @words = ("hippopotamus", "cat", "elephant", "ox", "horse")
+my @by_len = ~> @words sort { length(_) <=> length(_1) }
+$by_len[0]  |> aeq "ox",            "shortest ox"
+$by_len[-1] |> aeq "hippopotamus", "longest hippopotamus"
+
+# ─── 12. ~>> with multi-arg builder fn ──────────────────────────────────
+fn my_frame($left, $right, @xs) {
+    my $body = join(",", @xs)
+    $left . $body . $right
+}
+my $my_framed = ~>> (1,2,3) my_frame("[", "]")
+$my_framed |> aeq "[1,2,3]", "~>> my_frame"
+
+# ─── 13. ~s> consumed eagerly into array ───────────────────────────────
+my @stream = ~s> (10,20,30,40,50) map { _ / 10 } map { _ + 1 }
+join(",", @stream) |> aeq "2,3,4,5,6", "~s> drained to array"
+
+# ─── 14. ~p> with grep collapsing to scalar count (documented quirk) ───
+# Use the ~> shape for proper array result, ~p> for the aggregate.
+my @gt5 = ~> (1..10) grep { _ > 5 }
+(len @gt5) |> aeq 5, "~> grep gives full array"
+my $cnt_gt5 = ~p> (1..10) grep { _ > 5 } map { 1 } ||> sum
+$cnt_gt5 |> aeq 5, "~p> count via map-1 + sum"
+
+# ─── 15. Closing aeq ───────────────────────────────────────────────────
+aeq 1, 1, "assert_eq"
