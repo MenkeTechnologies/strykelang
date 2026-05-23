@@ -149,8 +149,8 @@
             <span class="sep">/</span>
             <a href="https://docs.rs/strykelang" target="_blank" rel="noopener noreferrer">docs.rs</a>
           </nav>
-          <p class="docs-build-line" id="strykeBuildLine">stryke v0.14.15 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 10,335 builtins (11,063 keys in %all) · LSP + DAP + JetBrains plugin</p>
-          <p class="docs-build-line"><span id="strykeLoc">288,904 Rust src · 79,655 test src · 142,366 example src</span></p>
+          <p class="docs-build-line" id="strykeBuildLine">stryke v0.14.16 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 10,335 builtins (11,063 keys in %all) · LSP + DAP + JetBrains plugin</p>
+          <p class="docs-build-line"><span id="strykeLoc">290,208 Rust src · 79,923 test src · 149,536 example src</span></p>
         </div>
         <div class="tutorial-toolbar">
           <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -1409,6 +1409,69 @@ p $d-&gt;isa("Cat")                      <span class="comment"># ""  (false)</sp
           <li><strong>Shared state</strong> — <code>mysync</code> declares atomic variables safe to mutate from parallel workers.</li>
           <li><strong>Language server</strong> — <code>s lsp</code> (or <code>s --lsp</code>) runs an LSP server over stdio with diagnostics, hover, completion. The nine reflection hashes above are part of the completion surface.</li>
         </ul>
+      </section>
+
+      <section class="tutorial-section">
+        <h2>Language server (<code>stryke --lsp</code>)</h2>
+        <p>One binary, two roles: <code>stryke</code> runs scripts AND speaks LSP over stdio. Wire it into any LSP-aware editor — VS Code, JetBrains, Neovim, Helix — by pointing the client at <code>stryke --lsp</code>. No separate <code>stryke-lsp</code> binary to maintain.</p>
+
+        <h3>Diagnostics</h3>
+        <p>Strict-vars is <strong>on by default</strong> in the IDE (CLI <code>stryke check</code> stays lenient — gated on explicit <code>use strict;</code>), so undefined <code>$scalar</code> / <code>@array</code> / <code>%hash</code> typos surface inline without per-file opt-in. Sensible exemptions baked in:</p>
+        <ul>
+          <li>Bare sigil-vars inside double-quoted string interpolations (<code>"got $fh ..."</code> is template/description text — no false positives on test descriptions).</li>
+          <li>Perl <code>$^X</code> / <code>$^O</code> / <code>$^V</code> / <code>$^W</code> family special vars, plus bare <code>$$</code> (process id).</li>
+          <li>AOP advice-body context vars: <code>$INTERCEPT_NAME</code>, <code>@INTERCEPT_ARGS</code>, <code>$INTERCEPT_RESULT</code>, <code>$INTERCEPT_MS</code>, <code>$INTERCEPT_US</code>.</li>
+          <li>The full block-param grammar: <code>_</code>, <code>_N</code>, <code>_&lt;</code>, <code>_&lt;N</code>, <code>_&lt;&lt;&lt;&lt;&lt;</code>, <code>_N&lt;&lt;&lt;&lt;&lt;</code>, <code>_N&lt;M</code>, plus all sigiled forms (<code>$_</code>, <code>$_&lt;3</code>, <code>$_&lt;&lt;&lt;&lt;&lt;</code>, …).</li>
+          <li><code>$#arr</code> last-index references resolve via <code>@arr</code> (inside strings too — <code>"got $#arr items"</code> is OK).</li>
+          <li><code>open(my $fh, ...)</code> lexical filehandle declarations register <code>$fh</code> in scope.</li>
+          <li><code>exists(&amp;Pkg::sub)</code> introspection skips the sub-defined check — the point is to ask whether the sub exists.</li>
+          <li>Parser-internal <code>_thread_par_run</code> desugaring targets emitted by <code>~p&gt;</code> / <code>~s&gt;</code> thread macros.</li>
+        </ul>
+
+        <h3>OOP-aware checks</h3>
+        <ul>
+          <li><strong>Constructor key validation</strong>. <code>Class(field =&gt; v, ...)</code> and <code>Class-&gt;new(...)</code> validate keys against declared fields. Walks <code>extends</code> parents and <code>impl</code> traits — <code>Dog extends Animal</code> accepts <code>Dog(name =&gt; "Rex", breed =&gt; "Lab")</code> where <code>name</code> is on Animal.</li>
+          <li><strong>Positional vs keyed auto-detection</strong>. <code>Task(1, "title", Priority::High)</code> is recognized as positional (first arg isn't a field name) and skipped — only fat-comma-style calls get the key check.</li>
+          <li><strong>Method lookup walks the inheritance chain</strong>. <code>$self-&gt;method</code> / <code>$obj-&gt;method</code> resolve via the full <code>extends + impl</code> graph, BFS-style, cycle-guarded. <code>class Person impl Greetable</code> with <code>fn greeting</code> on the trait resolves <code>$p-&gt;greeting()</code> correctly.</li>
+          <li><strong>Universal-method whitelist</strong> — <code>isa</code>, <code>can</code>, <code>DOES</code>, <code>does</code>, <code>VERSION</code>, <code>new</code>, <code>BUILD</code>, <code>DESTROY</code>, <code>clone</code>, <code>with</code>, <code>to_hash</code>, <code>to_hash_rec</code>, <code>to_hash_deep</code>, <code>fields</code>, <code>methods</code>, <code>superclass</code> never flag (runtime provides them on every instance).</li>
+          <li><strong>Match-arm enum-variant typos flagged</strong>. <code>Sig::Term2 =&gt;</code> when <code>Sig</code> has variants <code>Hup, Int, Term, Kill</code> emits "<em>no variant Term2 on Sig; available: Hup, Int, Kill, Term</em>".</li>
+        </ul>
+
+        <h3>Cross-file <code>require</code></h3>
+        <p><code>require "./lib/Foo/Bar.stk"</code> walks up from the source file looking for the project root (any ancestor with a sibling <code>lib/</code> directory) — the classic Perl/CPAN layout. Subs, classes, traits, enums, constants declared in required files all join the active completion + diagnostics index. Falls back to the source file's own directory for simple sibling-script cases.</p>
+
+        <h3>Completion</h3>
+        <p>Every identifier category the editor expects:</p>
+        <ul>
+          <li><strong>Sigil variables</strong> — declared via <code>my</code> / <code>our</code> / <code>state</code> / <code>local</code> / <code>mysync</code> / <code>oursync</code>, <code>foreach my $x</code>, sub signature params, <code>open(my $fh, …)</code> filehandle decls.</li>
+          <li><strong>Subs</strong> — bare and qualified, with <strong>suffix-only <code>insertText</code></strong> for qualified completions (typing <code>Demo::│</code> produces <code>Demo::handle</code>, not <code>Demo::Demo::handle</code>).</li>
+          <li><strong>User-declared Types</strong> — classes (<code>CompletionItemKind::CLASS</code>), structs (STRUCT), enums (ENUM), traits (INTERFACE), plus every enum variant as a qualified <code>EnumName::Variant</code>.</li>
+          <li><strong>Constants</strong> from <code>use constant NAME =&gt; …</code> and the <code>use constant { A =&gt; 1, B =&gt; 2 }</code> hash form.</li>
+          <li><strong>Loop labels</strong> for <code>last LOOP</code> / <code>next LOOP</code> / <code>redo LOOP</code>.</li>
+          <li><strong>Hash-key completion driven by builtin return schemas</strong>. <code>my $info = pool_info(); $info-&gt;{<em>cursor</em>}</code> lists the actual keys <code>pool_info</code> returns (<code>cpus</code>, <code>rayon_threads</code>, <code>arch</code>, <code>os</code>, <code>perf_cores</code>, <code>eff_cores</code>). Same registry covers <code>par_bench</code>, <code>stress_test</code>, <code>cache_stats</code>, <code>uname</code>, <code>audio_info</code>, <code>id3_read</code>, <code>git_log</code>, <code>git_show</code>, <code>git_status</code>, <code>git_branches</code>, <code>git_blame</code>, <code>git_authors</code>, <code>du_tree</code>, <code>process_list</code>, <code>net_interfaces</code>, <code>perfview</code>, <code>mounts</code>, <code>html_parse</code>, <code>css_select</code>, <code>xml_parse</code>, <code>xpath</code>. <code>foreach my $row (git_log()) { $row-&gt;{<em>cursor</em>} }</code> also resolves through the loop-var binding.</li>
+          <li>Stryke keywords (<code>fn</code>, <code>class</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>match</code>, <code>mysync</code>, <code>frozen</code>, …) and ~10k builtins from <code>%all</code>.</li>
+          <li><strong>In-progress parse recovery</strong> — cursor inside a fragment that breaks the parse (<code>Demo::│</code>) retries with the cursor's line blanked so the rest of the file still indexes.</li>
+          <li>Trigger characters include <code>{</code> so <code>$h-&gt;{</code> / <code>$h{</code> auto-popup the relevant key set.</li>
+        </ul>
+
+        <h3>Hover</h3>
+        <p>Full markdown cards for every builtin, special variable, AOP keyword, phase block, and reflection-hash alias. Hash-returning builtins ship full key tables — <code>pool_info()</code>'s hover lists every key with type + meaning. Hover is <strong>suppressed inside string literals</strong> (<code>"length"</code> in a string doesn't pop the <code>length</code> builtin doc) but <strong>still fires inside <code>#{ EXPR }</code> interpolations</strong> (real code).</p>
+
+        <h3>Refactor</h3>
+        <p>Goto / References / Rename — package-aware. Rename of struct/class/enum/trait fields and methods is <strong>AST-based with no textual fallback</strong>, so <code>my %h = (width =&gt; 1)</code> is never mistaken for a field reference when renaming <code>width</code>. The server defensively strips a <code>::</code> qualifier from <code>newName</code> so clients that send the full prefilled identifier still produce the correct bare replacement. Cross-file rename walks the require graph BFS-style.</p>
+        <p>Extract Variable / Constant / Parameter / Function (Cmd-Opt-V / -C / -P / -M), Wrap-in-<code>p</code>, toggle line comment. Extract works on caret-only (no manual selection needed) and inside double-quoted strings / backticks.</p>
+
+        <h3>JetBrains plugin (<code>editors/intellij/</code>)</h3>
+        <p>First-class plugin for RustRover, IDEA Ultimate, GoLand, PyCharm Pro, WebStorm, RubyMine, PhpStorm, CLion, Rider, DataGrip, Aqua. <code>.stk</code> file association, <strong>44-slot color scheme</strong>, hand-rolled lexer with finer-grained token categories (declaration vs control keywords, sigil variants, topic / block-param / special-var splits, pipe / arrow / range / regex-bind operators). The lexer correctly handles:</p>
+        <ul>
+          <li>Every Perl regex-operator form as one atomic REGEX token — <code>s/PATTERN/REPL/FLAGS</code>, <code>tr/.../.../</code>, <code>y/.../.../</code>, <code>m/.../</code>, <code>qr/.../</code> — including embedded quote chars (<code>s/"/""/g</code>), paired-bracket delimiters (<code>s{foo}{bar}</code>), and mixed delimiters.</li>
+          <li>Keyword spellings used as method names (<code>fn state</code>, <code>fn transition</code>) tokenize as <code>FUNCTION_DECL</code>, not the matching control/decl keyword.</li>
+          <li>Keyword spellings used as hash keys (<code>$h-&gt;{state}</code>, <code>state =&gt; 1</code>) tokenize as <code>IDENTIFIER</code>.</li>
+          <li>Perl-style <code>@{[ EXPR ]}</code> array-ref interpolations inside double-quoted strings tokenize the interior as code.</li>
+          <li>The full block-param grammar (<code>_</code>, <code>_&lt;</code>, <code>_&lt;2</code>, <code>_&lt;&lt;&lt;&lt;&lt;</code>, <code>$_&lt;3</code>, <code>$_2&lt;&lt;&lt;</code>) lexes as single <code>BLOCK_PARAM</code> tokens.</li>
+          <li><code>&lt;&lt;TAG</code> heredocs after a closing <code>}</code> (block close) correctly tokenize as <code>HereDoc</code>, not <code>ShiftLeft</code>. Numeric/sigil RHS still hits <code>ShiftLeft</code> so <code>1 &lt;&lt; 4</code> and <code>$x &lt;&lt; $shift</code> still work.</li>
+        </ul>
+        <p>LSP client wired to <code>stryke --lsp</code> — completion, hover, goto / refs / rename, semantic tokens, signature help, code actions, folding ranges, document formatting (Cmd-Opt-L), diagnostics. Rename dialog prefills with the bare segment (no <code>::</code>-walking) so editing <code>Red → Redgg</code> doesn't accidentally qualify the result as <code>TrafficLight::Redgg</code>. Run configurations with <code>--no-interop</code> / <code>--disasm</code> / <code>--profile</code> / <code>--flame</code> / <code>-d</code> toggles. Debugger over DAP. Reflection tool window with searchable trees of every reflection hash. Build with <code>./gradlew buildPlugin</code> and install the zip from <code>editors/intellij/build/distributions/</code>.</p>
       </section>
 
       <section class="tutorial-section">

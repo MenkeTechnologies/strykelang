@@ -1417,19 +1417,18 @@ fn needs_string_wrap_for_extraction(selection: &str) -> bool {
             match c {
                 '{' | '[' | '(' => depth += 1,
                 '}' | ']' | ')' => depth = (depth - 1).max(0),
-                _ if depth == 0 => {
-                    if !(c.is_ascii_alphanumeric()
+                _ if depth == 0
+                    && !(c.is_ascii_alphanumeric()
                         || c == '_'
                         || c == ':'
                         || c == '$'
                         || c == '@'
                         || c == '%'
                         || c == '-'
-                        || c == '>')
-                    {
-                        bare_text_run = true;
-                        break;
-                    }
+                        || c == '>') =>
+                {
+                    bare_text_run = true;
+                    break;
                 }
                 _ => {}
             }
@@ -3215,11 +3214,11 @@ mod tests {
         //   - call site 2 (line 2): `, height`
         let new_texts: Vec<&str> = edits.iter().map(|e| e.new_text.as_str()).collect();
         assert!(
-            new_texts.iter().any(|n| *n == ", $extracted_param"),
+            new_texts.contains(&", $extracted_param"),
             "sig threading: {new_texts:?}"
         );
         assert!(
-            new_texts.iter().any(|n| *n == "$extracted_param"),
+            new_texts.contains(&"$extracted_param"),
             "body replacement: {new_texts:?}"
         );
         let call_appends = new_texts.iter().filter(|n| **n == ", height").count();
@@ -3251,7 +3250,7 @@ mod tests {
         let (_uri, edits) = changes.iter().next().unwrap();
         let new_texts: Vec<&str> = edits.iter().map(|e| e.new_text.as_str()).collect();
         assert!(
-            new_texts.iter().any(|n| *n == "do_init()"),
+            new_texts.contains(&"do_init()"),
             "empty-parens call site gets the selection as sole arg: {new_texts:?}"
         );
     }
