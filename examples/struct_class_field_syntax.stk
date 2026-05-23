@@ -74,7 +74,7 @@ my $w = Window->new(title => "main")
 p "  ", $w->show()
 
 p ""
-p "── struct method bodies + `$self->field` ────────────────"
+p '── struct method bodies + `$self->field` ────────────────'
 struct Box {
     width  : Float
     height : Float

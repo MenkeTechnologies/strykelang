@@ -758,9 +758,7 @@ impl Lexer {
                         // In substitution-replacement mode, defer `\1`..`\9`
                         // (with no further octal digit) so the replacement
                         // expander can read them as numbered back-refs.
-                        if defer_single_digit
-                            && c != '0'
-                            && !matches!(self.peek(), Some('0'..='7'))
+                        if defer_single_digit && c != '0' && !matches!(self.peek(), Some('0'..='7'))
                         {
                             s.push('\\');
                             s.push(c);
@@ -1937,7 +1935,21 @@ impl Lexer {
                     }
                     // `<<` — binary shift after a complete term (`1 << 4`, `"x" << 2`); heredoc when a
                     // term is expected (`print <<EOF`, `my $x = <<EOF`, after `.` / `,` / `(` …).
-                    if self.last_was_term {
+                    //
+                    // `}` always sets `last_was_term=true`, but a `}` ending
+                    // a block / fn body followed by a newline and `<<TAG` on
+                    // the next line is unambiguously heredoc, not shift —
+                    // `block << bareword` is meaningless. Disambiguate by
+                    // peeking after `<<`: if the next char looks like the
+                    // start of a heredoc tag (uppercase, `_`, `~`, `"`,
+                    // `'`), prefer heredoc even when last_was_term is set.
+                    // Numeric / sigil / lowercase still falls through to
+                    // ShiftLeft so `1 << 4` and `$x << $shift` still work.
+                    let looks_like_heredoc_tag = matches!(
+                        self.peek(),
+                        Some('~') | Some('"') | Some('\'') | Some('_'),
+                    ) || self.peek().is_some_and(|c| c.is_ascii_uppercase());
+                    if self.last_was_term && !looks_like_heredoc_tag {
                         self.last_was_term = false;
                         return Ok(Token::ShiftLeft);
                     }

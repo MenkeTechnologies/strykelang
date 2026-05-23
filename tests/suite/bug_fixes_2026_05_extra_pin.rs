@@ -161,10 +161,7 @@ fn uri_escape_default_preserves_rfc3986_unreserved() {
 
 #[test]
 fn uri_escape_default_encodes_space_and_slashes() {
-    assert_eq!(
-        eval_string(r#"uri_escape("a b/c")"#),
-        "a%20b%2Fc"
-    );
+    assert_eq!(eval_string(r#"uri_escape("a b/c")"#), "a%20b%2Fc");
 }
 
 #[test]
@@ -178,10 +175,7 @@ fn uri_escape_with_strict_pattern_encodes_everything_non_alpha() {
 #[test]
 fn uri_escape_with_explicit_unsafe_set_only_encodes_listed_chars() {
     // `[!?]` only — alphanumerics, spaces, dots all survive.
-    assert_eq!(
-        eval_string(r#"uri_escape("hi! ok?", "!?")"#),
-        "hi%21 ok%3F"
-    );
+    assert_eq!(eval_string(r#"uri_escape("hi! ok?", "!?")"#), "hi%21 ok%3F");
 }
 
 // ── BUG-105: to_json cycle detection ─────────────────────────────────────
@@ -224,10 +218,7 @@ fn from_json_on_whitespace_only_is_undef() {
 
 #[test]
 fn from_json_on_valid_object_decodes() {
-    assert_eq!(
-        eval_int(r#"from_json('{"x":42}')->{x}"#),
-        42
-    );
+    assert_eq!(eval_int(r#"from_json('{"x":42}')->{x}"#), 42);
 }
 
 // ── BUG-099: reverse() with empty parens ─────────────────────────────────
@@ -291,14 +282,19 @@ fn redo_if_postfix_runs_body_again() {
 fn sliding_window_default_n_one_returns_singletons() {
     // Without a window-size arg, behaves as N=1.
     assert_eq!(
-        eval_string(r#"my @w = sliding_window([1, 2, 3], 1); join(";", map { join(",", @$_) } @w)"#),
+        eval_string(
+            r#"my @w = sliding_window([1, 2, 3], 1); join(";", map { join(",", @$_) } @w)"#
+        ),
         "1;2;3"
     );
 }
 
 #[test]
 fn sliding_window_n_larger_than_list_yields_empty() {
-    assert_eq!(eval_int(r#"my @w = sliding_window([1, 2], 5); scalar @w"#), 0);
+    assert_eq!(
+        eval_int(r#"my @w = sliding_window([1, 2], 5); scalar @w"#),
+        0
+    );
 }
 
 #[test]
@@ -333,10 +329,7 @@ fn system_false_status_word_high_byte_is_one() {
 
 #[test]
 fn system_list_form_propagates_exit_code() {
-    assert_eq!(
-        eval_int(r#"system("sh", "-c", "exit 9"); $? >> 8"#),
-        9
-    );
+    assert_eq!(eval_int(r#"system("sh", "-c", "exit 9"); $? >> 8"#), 9);
 }
 
 // ── BUG-013: backticks in list context yields lines ──────────────────────
@@ -359,10 +352,7 @@ fn backticks_list_context_no_trailing_newline_keeps_final() {
 
 #[test]
 fn backticks_scalar_context_returns_full_string() {
-    assert_eq!(
-        eval_int(r#"my $s = `printf "a\nb\nc\n"`; length($s)"#),
-        6
-    );
+    assert_eq!(eval_int(r#"my $s = `printf "a\nb\nc\n"`; length($s)"#), 6);
 }
 
 // ── BUG-014: $ENV propagation reaches child processes ───────────────────
@@ -385,10 +375,8 @@ fn env_set_then_delete_clears_child_view() {
 
 #[test]
 fn printf_with_bareword_filehandle_writes_to_handle() {
-    let path: PathBuf = std::env::temp_dir().join(format!(
-        "stryke_pin_printf_E_{}",
-        std::process::id()
-    ));
+    let path: PathBuf =
+        std::env::temp_dir().join(format!("stryke_pin_printf_E_{}", std::process::id()));
     let p = path.to_string_lossy();
     // `open E, ">", PATH` — the `E` constant must NOT win over the
     // filehandle slot. `printf E "..."` routes through the named handle.
@@ -415,10 +403,8 @@ fn euler_constant_still_available_via_bareword_in_expression_position() {
 
 #[test]
 fn open_pi_as_filehandle_does_not_collide_with_constant() {
-    let path: PathBuf = std::env::temp_dir().join(format!(
-        "stryke_pin_open_pi_{}",
-        std::process::id()
-    ));
+    let path: PathBuf =
+        std::env::temp_dir().join(format!("stryke_pin_open_pi_{}", std::process::id()));
     let p = path.to_string_lossy();
     std::fs::write(&path, "hello\n").unwrap();
     let n = eval_int(&format!(
@@ -459,7 +445,9 @@ fn eof_false_before_read_true_after_drain() {
 #[test]
 fn splice_inserts_arrayref_flattened() {
     assert_eq!(
-        eval_string(r#"my @a = (1, 2, 5, 6); my $r = [3, 4]; splice(@a, 2, 0, @$r); join(",", @a)"#),
+        eval_string(
+            r#"my @a = (1, 2, 5, 6); my $r = [3, 4]; splice(@a, 2, 0, @$r); join(",", @a)"#
+        ),
         "1,2,3,4,5,6"
     );
 }
@@ -619,10 +607,7 @@ fn substitution_terminator_escape_preserves_slash() {
     // `\/` in `s/.../.../...` must drop the backslash so a literal `/`
     // appears in the body without ending the s/// — this is the
     // regression that the BUG-076 fix had to preserve.
-    assert_eq!(
-        eval_string(r#"my $s = "abc"; $s =~ s/b/\//; $s"#),
-        "a/c"
-    );
+    assert_eq!(eval_string(r#"my $s = "abc"; $s =~ s/b/\//; $s"#), "a/c");
 }
 
 #[test]

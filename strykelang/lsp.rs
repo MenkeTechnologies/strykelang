@@ -784,9 +784,9 @@ fn compute_diagnostics(text: &str, path: &str) -> Vec<Diagnostic> {
             // CLI stays lenient (gated on `use strict;`) because scripts
             // legitimately use globals without strict; the IDE is where
             // typos should be caught at type-time, not run-time.
-            if let Err(e) = crate::static_analysis::analyze_program_with_strict(
-                &program, path, true,
-            ) {
+            if let Err(e) =
+                crate::static_analysis::analyze_program_with_strict(&program, path, true)
+            {
                 out.push(perror_to_diagnostic(&e, text));
             }
         }
@@ -1408,20 +1408,39 @@ pub(crate) enum HoverGate {
 }
 
 /// True when the identifier at `[start, end)` falls inside a single-
-/// line string literal (`"..."`, `'...'`, or backtick). Walks the
-/// line from byte 0 tracking string-quote state with backslash escape
-/// awareness, stopping at the byte that opens a `#`-line comment.
-/// Heredocs and multi-line strings aren't detected here — they need
-/// document-level state which classify_hover_position doesn't carry.
+/// line string literal (`"..."`, `'...'`, or backtick) AND outside any
+/// `#{EXPR}` interpolation. Walks the line from byte 0 tracking
+/// string-quote state and interpolation depth so the interior of
+/// `"x = #{ FOO() }"` is treated as Code (hover should fire on FOO),
+/// while bare `"FOO"` keeps the StringLiteral classification (hover
+/// should NOT fire on the literal text).
 fn position_inside_string_literal(line_text: &str, start: usize, end: usize) -> bool {
     let bytes = line_text.as_bytes();
     let limit = start.min(bytes.len());
     let mut i = 0;
     let mut in_str: Option<u8> = None;
+    let mut interp_depth: i32 = 0;
     while i < limit {
         let c = bytes[i];
+        // Inside `#{...}` interpolation — track nested braces and exit
+        // when depth returns to 0.
+        if interp_depth > 0 {
+            match c {
+                b'{' => interp_depth += 1,
+                b'}' => interp_depth -= 1,
+                _ => {}
+            }
+            i += 1;
+            continue;
+        }
         if let Some(q) = in_str {
             if c == b'\\' && i + 1 < bytes.len() {
+                i += 2;
+                continue;
+            }
+            // `#{` opens a code-context interpolation inside any quote.
+            if q == b'"' && c == b'#' && i + 1 < bytes.len() && bytes[i + 1] == b'{' {
+                interp_depth = 1;
                 i += 2;
                 continue;
             }
@@ -1437,6 +1456,10 @@ fn position_inside_string_literal(line_text: &str, start: usize, end: usize) -> 
             _ => {}
         }
         i += 1;
+    }
+    // Cursor inside `#{...}` — that's real code, not string text.
+    if interp_depth > 0 {
+        return false;
     }
     if in_str.is_none() {
         return false;
@@ -1720,8 +1743,7 @@ fn goto_definition(
             let prefix = &word[..idx];
             if !prefix.is_empty() {
                 if let Some(type_sym) = table.symbols.iter().find(|s| {
-                    s.name == prefix
-                        && matches!(s.kind, crate::lsp_symbols::SymbolKind::Type)
+                    s.name == prefix && matches!(s.kind, crate::lsp_symbols::SymbolKind::Type)
                 }) {
                     return Some(GotoDefinitionResponse::Scalar(Location {
                         uri: uri.clone(),
@@ -1737,10 +1759,11 @@ fn goto_definition(
         // (acceptable for v1; cross-struct field-name collisions are
         // rare).
         if !word.contains("::") {
-            if let Some(field_sym) = table.symbols.iter().find(|s| {
-                s.name == word
-                    && matches!(s.kind, crate::lsp_symbols::SymbolKind::Field)
-            }) {
+            if let Some(field_sym) = table
+                .symbols
+                .iter()
+                .find(|s| s.name == word && matches!(s.kind, crate::lsp_symbols::SymbolKind::Field))
+            {
                 return Some(GotoDefinitionResponse::Scalar(Location {
                     uri: uri.clone(),
                     range: line_range_utf16(text, field_sym.decl_line as usize + 1),
@@ -1819,8 +1842,7 @@ fn cross_file_goto_definition(
                 let prefix = &word[..idx];
                 if !prefix.is_empty() {
                     if let Some(sym) = table.symbols.iter().find(|s| {
-                        s.name == prefix
-                            && matches!(s.kind, crate::lsp_symbols::SymbolKind::Type)
+                        s.name == prefix && matches!(s.kind, crate::lsp_symbols::SymbolKind::Type)
                     }) {
                         let uri = path_to_uri(target_path);
                         response = Some(GotoDefinitionResponse::Scalar(Location {
@@ -1854,8 +1876,7 @@ where
         .map(|spec| (file.to_string(), spec))
         .collect();
     while let Some((owner, spec)) = queue.pop() {
-        let Some(target) =
-            crate::static_analysis::resolve_require_path_from_file(&owner, &spec)
+        let Some(target) = crate::static_analysis::resolve_require_path_from_file(&owner, &spec)
         else {
             continue;
         };
@@ -1911,8 +1932,9 @@ fn collect_require_spec(expr: &crate::ast::Expr, out: &mut Vec<String>) {
                 out.push(spec);
             }
         }
-        ExprKind::PostfixIf { expr: inner, .. }
-        | ExprKind::PostfixUnless { expr: inner, .. } => collect_require_spec(inner, out),
+        ExprKind::PostfixIf { expr: inner, .. } | ExprKind::PostfixUnless { expr: inner, .. } => {
+            collect_require_spec(inner, out)
+        }
         _ => {}
     }
 }
@@ -1922,9 +1944,7 @@ fn path_to_uri(path: &str) -> lsp_types::Uri {
     let raw_abs = if p.is_absolute() {
         p.to_path_buf()
     } else {
-        std::env::current_dir()
-            .unwrap_or_default()
-            .join(p)
+        std::env::current_dir().unwrap_or_default().join(p)
     };
     // Strip `.` / `..` components so the URI matches the canonical
     // textual form the editor uses for the same file. We deliberately
@@ -2605,19 +2625,18 @@ fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option
     };
     let active_path = uri_to_path(&active_uri);
     let cursor_pos = params.text_document_position.position;
-    let (needle, needle_range) =
-        match identifier_needle_at_position(active_text, cursor_pos) {
-            Some(p) => p,
-            None => {
-                crate::slog_debug!(
-                    "lsp.rename",
-                    "pos={}:{} no identifier at cursor",
-                    cursor_pos.line,
-                    cursor_pos.character
-                );
-                return None;
-            }
-        };
+    let (needle, needle_range) = match identifier_needle_at_position(active_text, cursor_pos) {
+        Some(p) => p,
+        None => {
+            crate::slog_debug!(
+                "lsp.rename",
+                "pos={}:{} no identifier at cursor",
+                cursor_pos.line,
+                cursor_pos.character
+            );
+            return None;
+        }
+    };
     // Partial-segment rename: cursor on a non-last `::`-separated
     // segment of a qualified name (e.g. cursor on `Demo` or `BitWalk`
     // in `Demo::BitWalk::dump`). Treat as a package-prefix rename for
@@ -2752,12 +2771,14 @@ fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option
     // a trailing `::` as a valid boundary (so `Demo::Caller::top` gets
     // its `Demo::Caller` prefix swapped without disturbing `::top`).
     if matches!(active_sym.kind, crate::lsp_symbols::SymbolKind::Package) {
+        // Package names are fully qualified (`Demo::Caller`); do not
+        // strip `::` from newName the way we do for subs/types.
         return rename_package(
             docs,
             &active_uri,
             active_text,
             &active_sym.name,
-            &effective_new,
+            new_name_raw,
         );
     }
 
@@ -2898,11 +2919,9 @@ fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option
         // type keyword and the matching `}`) for the bare field name.
         // This scan is BOUNDED to the parent's body — not the whole
         // file — so it cannot false-positive on unrelated identifiers.
-        for r in find_field_decl_ranges_in_type_body(
-            active_text,
-            active_sym.decl_line,
-            &active_sym.name,
-        ) {
+        for r in
+            find_field_decl_ranges_in_type_body(active_text, active_sym.decl_line, &active_sym.name)
+        {
             push_edits(
                 active_uri.as_str(),
                 vec![r],
@@ -2957,13 +2976,7 @@ fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option
                 continue;
             }
             let ranges = scan_package_ranges(other_text, &active_sym.name);
-            push_edits(
-                other_uri_str,
-                ranges,
-                &bare_new,
-                &mut changes,
-                &mut total,
-            );
+            push_edits(other_uri_str, ranges, &bare_new, &mut changes, &mut total);
         }
         if let Ok(program) = crate::parse_with_file(active_text, &active_path) {
             for (path, src) in collect_required_files(&program, &active_path) {
@@ -2972,13 +2985,7 @@ fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option
                     continue;
                 }
                 let ranges = scan_package_ranges(&src, &active_sym.name);
-                push_edits(
-                    &uri_str,
-                    ranges,
-                    &bare_new,
-                    &mut changes,
-                    &mut total,
-                );
+                push_edits(&uri_str, ranges, &bare_new, &mut changes, &mut total);
             }
         }
     }
@@ -3305,8 +3312,7 @@ fn cross_file_rename_via_require(
     if is_field {
         let lib_type_bare_names: std::collections::HashSet<String> = {
             let mut s = std::collections::HashSet::new();
-            if let Some(t) = crate::lsp_symbols::SymbolTable::build(&decl_text, &decl_path)
-            {
+            if let Some(t) = crate::lsp_symbols::SymbolTable::build(&decl_text, &decl_path) {
                 for sym in &t.symbols {
                     if matches!(sym.kind, crate::lsp_symbols::SymbolKind::Type) {
                         let bare = sym.name.rsplit("::").next().unwrap_or(&sym.name);
@@ -3317,19 +3323,9 @@ fn cross_file_rename_via_require(
             }
             s
         };
-        let ranges = scan_active_for_field_refs(
-            active_text,
-            active_path,
-            &bare_form,
-            &lib_type_bare_names,
-        );
-        push(
-            &active_uri_str,
-            ranges,
-            &bare_new,
-            &mut changes,
-            &mut total,
-        );
+        let ranges =
+            scan_active_for_field_refs(active_text, active_path, &bare_form, &lib_type_bare_names);
+        push(&active_uri_str, ranges, &bare_new, &mut changes, &mut total);
     }
 
     // 3. Other open documents.
@@ -3558,11 +3554,7 @@ fn scan_active_for_field_refs(
                     walk_expr(a, text, field_name, lib_type_names, out);
                 }
             }
-            ExprKind::MethodCall {
-                object,
-                args,
-                ..
-            } => {
+            ExprKind::MethodCall { object, args, .. } => {
                 let receiver_is_type = match &object.kind {
                     ExprKind::Bareword(n) => {
                         let tail = n.rsplit("::").next().unwrap_or(n.as_str());
@@ -3586,8 +3578,7 @@ fn scan_active_for_field_refs(
                     let prefix = &n[..idx];
                     let prefix_tail = prefix.rsplit("::").next().unwrap_or(prefix);
                     if suffix == field_name
-                        && (lib_type_names.contains(prefix)
-                            || lib_type_names.contains(prefix_tail))
+                        && (lib_type_names.contains(prefix) || lib_type_names.contains(prefix_tail))
                     {
                         emit_bareword_field_range(e, n, suffix, text, out);
                     }
@@ -3600,8 +3591,7 @@ fn scan_active_for_field_refs(
                     let prefix = &s[..idx];
                     let prefix_tail = prefix.rsplit("::").next().unwrap_or(prefix);
                     if suffix == field_name
-                        && (lib_type_names.contains(prefix)
-                            || lib_type_names.contains(prefix_tail))
+                        && (lib_type_names.contains(prefix) || lib_type_names.contains(prefix_tail))
                     {
                         emit_bareword_field_range(e, s, suffix, text, out);
                     }
@@ -3651,23 +3641,15 @@ fn scan_active_for_field_refs(
                 .unwrap_or(parent_line);
             // FuncCall {name, args} — constructor-call detection.
             if let Some(call) = o.get("FuncCall").and_then(|x| x.as_object()) {
-                if let Some(name) = call.get("name").and_then(serde_json::Value::as_str)
-                {
+                if let Some(name) = call.get("name").and_then(serde_json::Value::as_str) {
                     let bare_tail = name.rsplit("::").next().unwrap_or(name);
-                    if lib_type_names.contains(name)
-                        || lib_type_names.contains(bare_tail)
-                    {
-                        if let Some(args) =
-                            call.get("args").and_then(|x| x.as_array())
-                        {
+                    if lib_type_names.contains(name) || lib_type_names.contains(bare_tail) {
+                        if let Some(args) = call.get("args").and_then(|x| x.as_array()) {
                             let mut i = 0;
                             while i < args.len() {
                                 let key = args[i]
                                     .get("kind")
-                                    .and_then(|k| {
-                                        k.get("String")
-                                            .or_else(|| k.get("Bareword"))
-                                    })
+                                    .and_then(|k| k.get("String").or_else(|| k.get("Bareword")))
                                     .and_then(serde_json::Value::as_str);
                                 if key == Some(field_name) {
                                     let line = args[i]
@@ -3691,8 +3673,7 @@ fn scan_active_for_field_refs(
                     let prefix = &s[..idx];
                     let prefix_tail = prefix.rsplit("::").next().unwrap_or(prefix);
                     if suffix == field_name
-                        && (lib_type_names.contains(prefix)
-                            || lib_type_names.contains(prefix_tail))
+                        && (lib_type_names.contains(prefix) || lib_type_names.contains(prefix_tail))
                     {
                         emit_range_for_suffix_at_line(s, suffix, line_here, text, out);
                     }
@@ -3704,8 +3685,7 @@ fn scan_active_for_field_refs(
                     let prefix = &s[..idx];
                     let prefix_tail = prefix.rsplit("::").next().unwrap_or(prefix);
                     if suffix == field_name
-                        && (lib_type_names.contains(prefix)
-                            || lib_type_names.contains(prefix_tail))
+                        && (lib_type_names.contains(prefix) || lib_type_names.contains(prefix_tail))
                     {
                         emit_range_for_suffix_at_line(s, suffix, line_here, text, out);
                     }
@@ -3713,14 +3693,7 @@ fn scan_active_for_field_refs(
             }
             // Recurse into nested values, propagating the current line.
             for (_, vv) in o {
-                walk_json_for_field_with_line(
-                    vv,
-                    text,
-                    field_name,
-                    lib_type_names,
-                    out,
-                    line_here,
-                );
+                walk_json_for_field_with_line(vv, text, field_name, lib_type_names, out, line_here);
             }
         } else if let Some(arr) = v.as_array() {
             for vv in arr {
@@ -3991,7 +3964,10 @@ fn scan_package_ranges(text: &str, name: &str) -> Vec<Range> {
     let mut out: Vec<Range> = Vec::new();
     let mut line0: u32 = 0;
     let mut line_start_byte: usize = 0;
-    for (i, ch) in text.char_indices().chain(std::iter::once((text.len(), '\0'))) {
+    for (i, ch) in text
+        .char_indices()
+        .chain(std::iter::once((text.len(), '\0')))
+    {
         if i == text.len() || ch == '\n' {
             let line_text = &text[line_start_byte..i];
             for (start_byte, _) in line_text.match_indices(name) {
@@ -4067,11 +4043,13 @@ fn scan_all_lines_for_needle(text: &str, name: &str) -> Vec<Range> {
     let mut out: Vec<Range> = Vec::new();
     let mut line0: u32 = 0;
     let mut line_start_byte: usize = 0;
-    for (i, ch) in text.char_indices().chain(std::iter::once((text.len(), '\0'))) {
+    for (i, ch) in text
+        .char_indices()
+        .chain(std::iter::once((text.len(), '\0')))
+    {
         if i == text.len() || ch == '\n' {
             let line_text = &text[line_start_byte..i];
-            for r in scan_ranges_for_needle_masked(line_text, line0, name, &mask, line_start_byte)
-            {
+            for r in scan_ranges_for_needle_masked(line_text, line0, name, &mask, line_start_byte) {
                 out.push(r);
             }
             line0 += 1;
@@ -4264,7 +4242,10 @@ enum LineCompletionMode {
     /// `receiver` (the sigil-stripped scalar name; "" when the receiver
     /// wasn't a sigil-var pattern). `partial` is the typed prefix
     /// inside the braces.
-    HashKey { receiver: String, partial: String },
+    HashKey {
+        receiver: String,
+        partial: String,
+    },
 }
 
 fn completion_words() -> &'static Vec<String> {
@@ -10077,8 +10058,10 @@ fn bare_completions(filter: &str, idx: &CompletionIndex) -> Vec<CompletionItem> 
     // generic `subs_short` loop so the type's CompletionItemKind isn't
     // overwritten by the FUNCTION fallback.
     let mut emitted_types: BTreeSet<String> = BTreeSet::new();
-    let mut push_type = |name: &str, kind: CompletionItemKind, detail: &'static str,
-                          items: &mut Vec<CompletionItem>| {
+    let mut push_type = |name: &str,
+                         kind: CompletionItemKind,
+                         detail: &'static str,
+                         items: &mut Vec<CompletionItem>| {
         if !filter.is_empty() && !name.starts_with(filter) {
             return;
         }
@@ -10703,8 +10686,7 @@ fn visit_stmt_for_index(stmt: &Statement, pkg: &mut String, idx: &mut Completion
             // completion.
             if let crate::ast::ExprKind::FuncCall { name, .. } = &list.kind {
                 if builtin_return_keys(name).is_some() {
-                    idx.scalar_builtin_source
-                        .insert(var.clone(), name.clone());
+                    idx.scalar_builtin_source.insert(var.clone(), name.clone());
                 }
             }
             visit_block_for_index(body, pkg, idx);

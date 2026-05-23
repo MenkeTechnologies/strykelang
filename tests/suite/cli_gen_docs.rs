@@ -204,9 +204,21 @@ fn gen_docs_subcommand_skips_target_and_dot_dirs() {
     std::fs::create_dir(project.join("lib")).unwrap();
     std::fs::create_dir(project.join("target")).unwrap();
     std::fs::create_dir(project.join(".git")).unwrap();
-    std::fs::write(project.join("lib/keep.stk"), "package Demo\nfn keep { 1 }\n").unwrap();
-    std::fs::write(project.join("target/skip.stk"), "package Skip\nfn no { 1 }\n").unwrap();
-    std::fs::write(project.join(".git/secret.stk"), "package Secret\nfn no { 1 }\n").unwrap();
+    std::fs::write(
+        project.join("lib/keep.stk"),
+        "package Demo\nfn keep { 1 }\n",
+    )
+    .unwrap();
+    std::fs::write(
+        project.join("target/skip.stk"),
+        "package Skip\nfn no { 1 }\n",
+    )
+    .unwrap();
+    std::fs::write(
+        project.join(".git/secret.stk"),
+        "package Secret\nfn no { 1 }\n",
+    )
+    .unwrap();
 
     let out_dir = project.join("out");
     let status = Command::new(stryke_binary())

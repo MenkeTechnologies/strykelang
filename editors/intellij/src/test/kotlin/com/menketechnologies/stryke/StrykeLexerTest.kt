@@ -442,6 +442,103 @@ class StrykeLexerTest {
     }
 
     @Test
+    fun keyword_spelling_after_fn_is_function_decl_not_keyword() {
+        // `trait Stateful { fn state; fn transition }` — `state` is a
+        // method name here, not the `state` decl keyword. After `fn`
+        // (FN_KEYWORD intro), the next word is always a FUNCTION_DECL
+        // regardless of its keyword classification.
+        val toks = lex("fn state { 1 }")
+        assertTrue(
+            "`state` after `fn` must be FUNCTION_DECL, not DECL_KEYWORD: $toks",
+            has(toks, StrykeTokenTypes.FUNCTION_DECL, "state"),
+        )
+        assertTrue(
+            "must NOT classify `state` as DECL_KEYWORD here: $toks",
+            toks.none { it.first == StrykeTokenTypes.DECL_KEYWORD && it.second == "state" },
+        )
+    }
+
+    @Test
+    fun keyword_spelling_after_sub_is_function_decl() {
+        val toks = lex("sub for {}")
+        assertTrue(
+            "`for` after `sub` must be FUNCTION_DECL: $toks",
+            has(toks, StrykeTokenTypes.FUNCTION_DECL, "for"),
+        )
+        assertTrue(
+            "must NOT classify `for` as CONTROL_KEYWORD here: $toks",
+            toks.none { it.first == StrykeTokenTypes.CONTROL_KEYWORD && it.second == "for" },
+        )
+    }
+
+    @Test
+    fun trait_method_with_keyword_spelling_classified_as_decl() {
+        // Full trait body — both methods named after keywords.
+        val toks = lex("trait Stateful {\n    fn state\n    fn transition\n}")
+        assertTrue(
+            "trait method `state` must be FUNCTION_DECL: $toks",
+            has(toks, StrykeTokenTypes.FUNCTION_DECL, "state"),
+        )
+        assertTrue(
+            "trait method `transition` must be FUNCTION_DECL: $toks",
+            has(toks, StrykeTokenTypes.FUNCTION_DECL, "transition"),
+        )
+    }
+
+    @Test
+    fun substitution_with_embedded_double_quote_lexes_as_one_regex() {
+        // `$q =~ s/"/""/g` — the embedded `"` chars are part of the
+        // substitution, NOT string-literal delimiters. The whole
+        // `s/"/""/g` must lex as ONE REGEX token so the lexer doesn't
+        // think there's an unbalanced `"` and render the rest of the
+        // file as STRING content.
+        val src = "\$q =~ s/\"/\"\"/g\np \"done\""
+        val toks = lex(src)
+        assertTrue(
+            "expected `s/\"/\"\"/g` as one REGEX token: $toks",
+            has(toks, StrykeTokenTypes.REGEX, "s/\"/\"\"/g"),
+        )
+        // The `"done"` AFTER the substitution must still tokenize as
+        // a normal STRING (the lexer state is back to NORMAL).
+        assertTrue(
+            "expected `\"done\"` as STRING after substitution: $toks",
+            toks.any { it.first == StrykeTokenTypes.STRING && it.second.contains("done") },
+        )
+    }
+
+    @Test
+    fun substitution_two_segment_forms() {
+        for (src in listOf(
+            "\$x =~ s/foo/bar/g",
+            "\$x =~ tr/a-z/A-Z/",
+            "\$x =~ y/aeiou//d",
+            "\$x =~ s{abc}{xyz}gi",
+            "\$x =~ s|http|https|g",
+        )) {
+            val toks = lex(src)
+            assertTrue(
+                "$src — expected exactly one REGEX token covering the op: $toks",
+                toks.count { it.first == StrykeTokenTypes.REGEX } == 1,
+            )
+        }
+    }
+
+    @Test
+    fun match_single_segment_forms() {
+        for ((src, expected) in listOf(
+            "\$x =~ m/foo/i" to "m/foo/i",
+            "\$x =~ qr/bar/" to "qr/bar/",
+            "\$x =~ m{baz}" to "m{baz}",
+        )) {
+            val toks = lex(src)
+            assertTrue(
+                "$src — expected REGEX token `$expected`: $toks",
+                has(toks, StrykeTokenTypes.REGEX, expected),
+            )
+        }
+    }
+
+    @Test
     fun perl_style_array_ref_interpolation_lexes_interior_as_code() {
         // `"foo @{[ bar() ]} baz"` — `@{[ EXPR ]}` is Perl-style array
         // interpolation, common in heredocs and double-quoted strings.

@@ -95,7 +95,12 @@ pub struct SymbolTable {
 
 impl SymbolTable {
     pub fn build(text: &str, path: &str) -> Option<Self> {
-        Self::build_with_extra_types(text, path, &std::collections::HashSet::new(), &std::collections::HashSet::new())
+        Self::build_with_extra_types(
+            text,
+            path,
+            &std::collections::HashSet::new(),
+            &std::collections::HashSet::new(),
+        )
     }
 
     /// Like [`Self::build`] but injects additional Type / Field names
@@ -590,6 +595,9 @@ impl Builder {
             }
             StmtKind::TraitDecl { def } => {
                 self.known_type_names.insert(def.name.clone());
+                for m in &def.methods {
+                    self.known_field_names.insert(m.name.clone());
+                }
             }
             // Recurse into nested blocks so types declared inside
             // BEGIN/END/INIT phasers + nested packages are visible.
@@ -699,6 +707,14 @@ impl Builder {
             }
             StmtKind::TraitDecl { def } => {
                 self.declare_package_symbol(&def.name, line0, SymbolKind::Type);
+                // Register trait method names as Field symbols so rename
+                // at the trait declaration site works. Without this,
+                // F2 on `state` / `transition` inside `trait Stateful
+                // { fn state; fn transition }` had nothing to rename
+                // at the decl — only the call sites got rewritten.
+                for m in &def.methods {
+                    self.declare_field(&m.name, line0);
+                }
                 self.walk_generic_stmt(stmt);
             }
             // `use constant NAME => value` / `use constant { A => 1, B => 2 }` /
@@ -718,8 +734,7 @@ impl Builder {
             // Loop labels: `LOOP: while (...) { ... }`. Declared at the
             // labeled-loop's line (file-local lexical scope), referenced
             // by `last LOOP` / `next LOOP` / `redo LOOP`.
-            StmtKind::While { label, body, .. }
-            | StmtKind::Until { label, body, .. } => {
+            StmtKind::While { label, body, .. } | StmtKind::Until { label, body, .. } => {
                 if let Some(lab) = label {
                     self.declare_label(lab, line0);
                 }
@@ -777,9 +792,7 @@ impl Builder {
                 }
                 self.pop_scope();
             }
-            StmtKind::Last(Some(lab))
-            | StmtKind::Next(Some(lab))
-            | StmtKind::Redo(Some(lab)) => {
+            StmtKind::Last(Some(lab)) | StmtKind::Next(Some(lab)) | StmtKind::Redo(Some(lab)) => {
                 self.record_ref(lab, line0);
             }
             StmtKind::Goto { target } => {
@@ -1144,12 +1157,10 @@ impl Builder {
                         let suffix = &s[idx + 2..];
                         let prefix = &s[..idx];
                         if !suffix.is_empty() && !prefix.is_empty() {
-                            let prefix_tail =
-                                prefix.rsplit("::").next().unwrap_or(prefix);
+                            let prefix_tail = prefix.rsplit("::").next().unwrap_or(prefix);
                             let prefix_is_type = self.known_type_names.contains(prefix)
                                 || self.known_type_names.contains(prefix_tail);
-                            let suffix_is_field =
-                                self.known_field_names.contains(suffix);
+                            let suffix_is_field = self.known_field_names.contains(suffix);
                             if prefix_is_type && suffix_is_field {
                                 self.record_method_or_field_ref(suffix, line);
                             }

@@ -1215,8 +1215,7 @@ fn snap_to_word_at_cursor(line_text: &str, cursor: Position) -> Option<(u32, u32
         }
         u16_seen += ch.len_utf16() as u32;
     }
-    let in_string =
-        same_line_selection_inside_interpolating_string(line_text, cursor.character);
+    let in_string = same_line_selection_inside_interpolating_string(line_text, cursor.character);
 
     let is_word_char_for_ident = |c: char| c.is_ascii_alphanumeric() || c == '_';
     let is_sigil = |c: char| c == '$' || c == '@' || c == '%';
@@ -1229,8 +1228,7 @@ fn snap_to_word_at_cursor(line_text: &str, cursor: Position) -> Option<(u32, u32
         // sigil-prefixed identifier.
         let cur_char = line_text[byte_cur..].chars().next();
         let prev_char = line_text[..byte_cur].chars().next_back();
-        if matches!(cur_char, Some(c) if is_sigil(c))
-            || matches!(prev_char, Some(c) if is_sigil(c))
+        if matches!(cur_char, Some(c) if is_sigil(c)) || matches!(prev_char, Some(c) if is_sigil(c))
         {
             // Find start: walk back to the sigil.
             let mut start_byte = byte_cur;
@@ -1589,11 +1587,8 @@ fn extract_parameter_action(
             if other_uri_str == uri.as_str() {
                 continue;
             }
-            let other_edits = cross_file_call_site_edits(
-                other_text,
-                &enclosing.fn_full_name,
-                selection,
-            );
+            let other_edits =
+                cross_file_call_site_edits(other_text, &enclosing.fn_full_name, selection);
             if other_edits.is_empty() {
                 continue;
             }
@@ -1691,7 +1686,7 @@ fn enclosing_fn_signature(text: &str, cursor_line: usize) -> Option<EnclosingFnS
                 // No `(...)` — insert one right after the fn name (the
                 // word after `fn `).
                 let after_fn = leading_len + 3; // past `fn `
-                // skip the name (ident chars)
+                                                // skip the name (ident chars)
                 let mut p = after_fn;
                 let bytes = line_text.as_bytes();
                 while p < bytes.len()
@@ -1703,7 +1698,7 @@ fn enclosing_fn_signature(text: &str, cursor_line: usize) -> Option<EnclosingFnS
             }
         };
         let _ = leading_len; // currently unused; kept for future
-                              // signature-header indent tracking.
+                             // signature-header indent tracking.
         let _ = body_open_idx;
         // Extract fn name: token immediately after `fn `, before `(` or `{`.
         let after_fn = leading_len + 3;
@@ -1715,11 +1710,7 @@ fn enclosing_fn_signature(text: &str, cursor_line: usize) -> Option<EnclosingFnS
             np += 1;
         }
         let fn_full_name = line_text[after_fn..np].to_string();
-        let fn_name = fn_full_name
-            .rsplit("::")
-            .next()
-            .unwrap_or("")
-            .to_string();
+        let fn_name = fn_full_name.rsplit("::").next().unwrap_or("").to_string();
         return Some(EnclosingFnSig {
             fn_line: line_idx as u32,
             has_params,
@@ -1928,11 +1919,10 @@ fn scan_call_sites_for_name(
             continue;
         }
         // Word boundary before.
-        let prev_ok = start == 0
-            || {
-                let c = bytes[start - 1] as char;
-                !(c.is_ascii_alphanumeric() || c == '_' || c == ':')
-            };
+        let prev_ok = start == 0 || {
+            let c = bytes[start - 1] as char;
+            !(c.is_ascii_alphanumeric() || c == '_' || c == ':')
+        };
         if !prev_ok {
             continue;
         }
@@ -1973,9 +1963,10 @@ fn scan_call_sites_for_name(
             // this same position. Without this, `Demo::handle(...)`
             // would get TWO edits — one for the qualified scan, one
             // for the bare-`handle` substring within it.
-            let already = already_emitted.iter().chain(out.iter()).any(|e| {
-                e.range.start.line == close_line && e.range.start.character == close_col
-            });
+            let already = already_emitted
+                .iter()
+                .chain(out.iter())
+                .any(|e| e.range.start.line == close_line && e.range.start.character == close_col);
             if already {
                 continue;
             }
@@ -2018,11 +2009,10 @@ fn cross_file_call_site_edits(
         if mask.get(start).copied().unwrap_or(false) {
             continue;
         }
-        let prev_ok = start == 0
-            || {
-                let c = bytes[start - 1] as char;
-                !(c.is_ascii_alphanumeric() || c == '_' || c == ':')
-            };
+        let prev_ok = start == 0 || {
+            let c = bytes[start - 1] as char;
+            !(c.is_ascii_alphanumeric() || c == '_' || c == ':')
+        };
         if !prev_ok {
             continue;
         }
@@ -2166,12 +2156,20 @@ fn string_interior_mask_simple(text: &str) -> Vec<bool> {
 /// Returns the 0-based line number containing the `}` that matches a
 /// `{` at `(open_line, open_byte_in_line)`. Best-effort — skips `{`/`}`
 /// inside strings and comments. Returns `None` if unmatched.
-fn find_matching_brace_line(text: &str, open_line: usize, open_byte_in_line: usize) -> Option<usize> {
+fn find_matching_brace_line(
+    text: &str,
+    open_line: usize,
+    open_byte_in_line: usize,
+) -> Option<usize> {
     let lines: Vec<&str> = text.lines().collect();
     let mut depth: i32 = 0;
     let mut in_string: Option<char> = None;
     let mut line_idx = open_line;
-    let mut chars = lines.get(line_idx)?.chars().enumerate().skip(open_byte_in_line);
+    let mut chars = lines
+        .get(line_idx)?
+        .chars()
+        .enumerate()
+        .skip(open_byte_in_line);
     let mut current_line_chars: Vec<(usize, char)> = chars.by_ref().collect();
     let mut char_pos = 0;
     let mut bumped_initial = false;
@@ -2981,7 +2979,10 @@ mod tests {
             .expect("extract-variable action present");
         let changes = var.changes.expect("workspace edit");
         let (_uri, edits) = changes.iter().next().unwrap();
-        let decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        let decl = edits
+            .iter()
+            .find(|e| e.new_text.starts_with("my "))
+            .unwrap();
         assert!(
             decl.new_text.contains("= \"hello world\"\n"),
             "RHS must be string-wrapped: {:?}",
@@ -3013,7 +3014,10 @@ mod tests {
             .expect("extract-variable action present");
         let changes = var.changes.expect("workspace edit");
         let (_uri, edits) = changes.iter().next().unwrap();
-        let decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        let decl = edits
+            .iter()
+            .find(|e| e.new_text.starts_with("my "))
+            .unwrap();
         assert!(
             decl.new_text.contains("= \"hello $name \"\n"),
             "RHS must keep interpolation inside the quotes: {:?}",
@@ -3082,7 +3086,8 @@ mod tests {
         // open doc calls `Demo::handle("x")`. Extract Parameter on the
         // active file's body expression must thread the new arg into
         // the other doc's call site too.
-        let active_src = "package Demo\nfn Demo::handle($sig) {\n    my $x = 1\n    log(\"ok\")\n}\n";
+        let active_src =
+            "package Demo\nfn Demo::handle($sig) {\n    my $x = 1\n    log(\"ok\")\n}\n";
         let other_uri = "file:///other.stk";
         let other_src = "Demo::handle(\"x\")\nDemo::handle(\"y\")\n";
         let mut docs: HashMap<String, String> = HashMap::new();
@@ -3092,7 +3097,9 @@ mod tests {
         }
         docs.insert(other_uri.to_string(), other_src.to_string());
         let params = CodeActionParams {
-            text_document: TextDocumentIdentifier { uri: active_uri.clone() },
+            text_document: TextDocumentIdentifier {
+                uri: active_uri.clone(),
+            },
             range: range(3, 8, 3, 12), // `"ok"` on the `log("ok")` line
             context: CodeActionContext::default(),
             work_done_progress_params: Default::default(),
@@ -3143,7 +3150,8 @@ mod tests {
         //     `$extracted_param` too
         // Otherwise the body is half-renamed and `$extracted` refers
         // to a now-undeclared name.
-        let src = "fn handle($sig) {\n    my $extracted = \"drain\"\n    p \"$extracted + stop\"\n}\n";
+        let src =
+            "fn handle($sig) {\n    my $extracted = \"drain\"\n    p \"$extracted + stop\"\n}\n";
         // `$extracted` on line 1, cols 7..17.
         let actions = code_actions(src, range(1, 7, 1, 17));
         let param = actions
@@ -3257,7 +3265,10 @@ mod tests {
             CodeActionOrCommand::CodeAction(ca) => ca.title.contains("parameter"),
             _ => false,
         });
-        assert!(!has_param, "must NOT offer parameter extract outside any fn");
+        assert!(
+            !has_param,
+            "must NOT offer parameter extract outside any fn"
+        );
     }
 
     #[test]
@@ -3279,7 +3290,10 @@ mod tests {
             .expect("extract-constant action present");
         let changes = constant.changes.expect("workspace edit");
         let (_uri, edits) = changes.iter().next().unwrap();
-        let decl = edits.iter().find(|e| e.new_text.contains("EXTRACTED")).unwrap();
+        let decl = edits
+            .iter()
+            .find(|e| e.new_text.contains("EXTRACTED"))
+            .unwrap();
         assert!(
             decl.new_text.starts_with("frozen my $EXTRACTED"),
             "decl must start with `frozen my`, not `my frozen`: {:?}",
@@ -3308,7 +3322,10 @@ mod tests {
             .expect("extract-variable action present");
         let changes = var.changes.expect("workspace edit");
         let (_uri, edits) = changes.iter().next().unwrap();
-        let decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        let decl = edits
+            .iter()
+            .find(|e| e.new_text.starts_with("my "))
+            .unwrap();
         assert!(
             decl.new_text.contains("= 1 + 2\n"),
             "arithmetic RHS must remain unquoted: {:?}",
@@ -3341,7 +3358,10 @@ mod tests {
             .expect("extract-variable action present");
         let changes = var.changes.expect("workspace edit");
         let (_uri, edits) = changes.iter().next().unwrap();
-        let decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        let decl = edits
+            .iter()
+            .find(|e| e.new_text.starts_with("my "))
+            .unwrap();
         assert!(
             decl.new_text.contains("= $name\n"),
             "pure-scalar selection should stay bare: {:?}",
@@ -3370,7 +3390,10 @@ mod tests {
             .expect("extract-variable action present");
         let changes = var.changes.expect("workspace edit");
         let (_uri, edits) = changes.iter().next().unwrap();
-        let decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        let decl = edits
+            .iter()
+            .find(|e| e.new_text.starts_with("my "))
+            .unwrap();
         assert!(
             decl.new_text.contains("= \"ls -la\"\n"),
             "RHS must be a plain string (not backticked): {:?}",
@@ -3401,7 +3424,10 @@ mod tests {
             .expect("extract-variable action present for caret-only");
         let changes = var.changes.expect("workspace edit");
         let (_uri, edits) = changes.iter().next().unwrap();
-        let decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        let decl = edits
+            .iter()
+            .find(|e| e.new_text.starts_with("my "))
+            .unwrap();
         assert!(
             decl.new_text.contains("= total\n"),
             "RHS must be the snapped identifier: {:?}",
@@ -3428,7 +3454,10 @@ mod tests {
             .expect("extract-variable action present");
         let changes = var.changes.expect("workspace edit");
         let (_uri, edits) = changes.iter().next().unwrap();
-        let decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        let decl = edits
+            .iter()
+            .find(|e| e.new_text.starts_with("my "))
+            .unwrap();
         assert!(
             decl.new_text.contains("= $foo\n"),
             "RHS must include the sigil: {:?}",
@@ -3454,7 +3483,10 @@ mod tests {
             .expect("extract-variable action present");
         let changes = var.changes.expect("workspace edit");
         let (_uri, edits) = changes.iter().next().unwrap();
-        let decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        let decl = edits
+            .iter()
+            .find(|e| e.new_text.starts_with("my "))
+            .unwrap();
         assert!(
             decl.new_text.contains("= \"two\"\n"),
             "RHS must be the snapped word, string-wrapped: {:?}",
@@ -3480,7 +3512,10 @@ mod tests {
             .expect("extract-variable action present");
         let changes = var.changes.expect("workspace edit");
         let (_uri, edits) = changes.iter().next().unwrap();
-        let decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        let decl = edits
+            .iter()
+            .find(|e| e.new_text.starts_with("my "))
+            .unwrap();
         assert!(
             decl.new_text.contains("= $var\n"),
             "RHS must be just `$var` (no double-stringify): {:?}",
@@ -3508,7 +3543,10 @@ mod tests {
             .expect("extract-variable action present");
         let changes = var.changes.expect("workspace edit");
         let (_uri, edits) = changes.iter().next().unwrap();
-        let decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        let decl = edits
+            .iter()
+            .find(|e| e.new_text.starts_with("my "))
+            .unwrap();
         assert!(
             decl.new_text.contains("= \"file\"\n"),
             "RHS must be a quoted string `\"file\"`: {:?}",
@@ -3543,7 +3581,10 @@ mod tests {
             .expect("extract-variable action present");
         let changes = var.changes.expect("workspace edit");
         let (_uri, edits) = changes.iter().next().unwrap();
-        let decl = edits.iter().find(|e| e.new_text.starts_with("my ")).unwrap();
+        let decl = edits
+            .iter()
+            .find(|e| e.new_text.starts_with("my "))
+            .unwrap();
         assert!(
             decl.new_text.contains("= \"ls $dir | wc -l\"\n"),
             "RHS keeps `$dir` interpolation inside double quotes: {:?}",
@@ -3863,7 +3904,8 @@ mod tests {
         // arg of a multi-arg call AFTER a regex literal. Pins that the
         // regex scanner correctly restores `col`/`i` so the subsequent
         // string scanner finds the interpolation site.
-        let text = "fn arr_split_ws {\n    my $var = 23;\n    split(/\\s+/, \"one two $var three\")\n}\n";
+        let text =
+            "fn arr_split_ws {\n    my $var = 23;\n    split(/\\s+/, \"one two $var three\")\n}\n";
         let t = compute_semantic_tokens(text);
         // Walk deltas to compute absolute (line, col) for each token.
         let mut abs: Vec<(u32, u32, u32, u32)> = Vec::new();

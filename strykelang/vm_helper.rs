@@ -12029,7 +12029,10 @@ impl VMHelper {
                     // Single-chunk fallback: bind the chunk elements to `@_`
                     // (not wrapped) so `~p> @a sum` correctly passes all elements
                     // to `sum(@_)`. Also set `$_` to the first element for
-                    // backwards compat with scalar-style blocks.
+                    // backwards compat with scalar-style blocks. Tail in LIST
+                    // context so `map { ... } @_` returns the mapped array,
+                    // not its scalar-context count — `~p> @xs map { _*10 }`
+                    // must yield `[10,20,30,40,50]`, not `5`.
                     let chunk_arr = match list_val.as_array_vec() {
                         Some(arr) => arr,
                         None => vec![list_val.clone()],
@@ -12037,7 +12040,7 @@ impl VMHelper {
                     let first = chunk_arr.first().cloned().unwrap_or(StrykeValue::UNDEF);
                     self.scope.declare_array("_", chunk_arr);
                     self.scope.set_topic(first);
-                    return self.exec_block(extract_block);
+                    return self.exec_block_with_tail(extract_block, WantarrayCtx::List);
                 }
                 let extract = extract_block.clone();
                 let subs = self.subs.clone();
@@ -12066,7 +12069,7 @@ impl VMHelper {
                         let first = chunk_arr.first().cloned().unwrap_or(StrykeValue::UNDEF);
                         local.scope.declare_array("_", chunk_arr);
                         local.scope.set_topic(first);
-                        match local.exec_block(&extract) {
+                        match local.exec_block_with_tail(&extract, WantarrayCtx::List) {
                             Ok(v) => v,
                             Err(e) => {
                                 let mut g = err_w.lock();

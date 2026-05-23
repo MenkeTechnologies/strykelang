@@ -56,7 +56,6 @@ pub(crate) struct Cli {
     #[arg(long = "fmt")]
     format_source: bool,
 
-
     /// Wall-clock profile: per-line + per-sub timings on stderr (VM: opcode-level lines; JIT off)
     #[arg(long = "profile")]
     profile: bool,
@@ -2638,7 +2637,9 @@ fn run_ast_subcommand(args: &[String]) -> i32 {
 /// `docs/lib/foo.md`. Also writes an `index.md` summarizing the
 /// modules processed.
 fn run_gen_docs_subcommand(args: &[String]) -> i32 {
-    if args.first().map(|s| s.as_str()) == Some("-h") || args.first().map(|s| s.as_str()) == Some("--help") {
+    if args.first().map(|s| s.as_str()) == Some("-h")
+        || args.first().map(|s| s.as_str()) == Some("--help")
+    {
         println!("usage: stryke gen-docs [PATH] [--out DIR]");
         println!();
         println!("Walk PATH (default `.`) for `.stk`, `.pl`, `.pm` sources and");
