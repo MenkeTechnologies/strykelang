@@ -83,7 +83,7 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - **New Parallel Subroutines and |> Pipeline Syntactic Sugar**
 - **Runtime values** — `StrykeValue` is a NaN-boxed `u64`: immediates (`undef`, `i32`, raw `f64` bits) and tagged `Arc<HeapObject>` pointers for big ints, strings, arrays, hashes, refs, regexes, atomics, channels.
 - **Three-tier regex** — Rust [`regex`](https://docs.rs/regex) → [`fancy-regex`](https://docs.rs/fancy-regex) (backrefs) → [`pcre2`](https://docs.rs/pcre2) (PCRE-only verbs).
-- **Bytecode VM + JIT** — match-dispatch interpreter with Cranelift block + linear-sub JIT (`src/vm.rs`, `src/jit.rs`).
+- **Bytecode VM + JIT** — match-dispatch interpreter with Cranelift block + linear-sub JIT (`strykelang/vm.rs`, `strykelang/jit.rs`).
 - **Rayon parallelism** — every parallel builtin uses work-stealing across all cores.
 - **10,296 standard library primaries** in `%b` (11,022 keys in `%all` including aliases and keywords) — largest bareword library of any language; clears Wolfram v14.3's high-band estimate (~7,300) by ~2,967
 - **40 MB single static binary** — `~/.cargo/bin/s` ships every builtin in one file, ~3.6 KB amortized per builtin, ~200&times; denser than Wolfram Engine per builtin/byte, sub-10 ms cold start
@@ -1961,11 +1961,11 @@ substr $s, 9, 5              # "world"  — byte substr
  └─────────────────────────────────────────────────────┘
 ```
 
-- **Lexer** ([`src/lexer.rs`](src/lexer.rs)) — context-sensitive tokenizer for Perl's ambiguous syntax (regex vs division, hash vs modulo, heredocs, interpolation).
-- **Parser** ([`src/parser.rs`](src/parser.rs)) — recursive descent + Pratt precedence climbing.
-- **Compiler / VM** ([`src/compiler.rs`](src/compiler.rs), [`src/vm.rs`](src/vm.rs)) — 100% lowered to bytecode. Compiled subs use slot ops for frame-local `my` scalars (O(1)). Lowering covers `BEGIN`/`UNITCHECK`/`CHECK`/`INIT`/`END` with `Op::SetGlobalPhase`, `mysync`, `tie`, scalar compound assigns via `Scope::atomic_mutate`, regex values, named-sub coderefs, folds, `pcache`, `pselect`, `par_lines`, `par_walk`, `par_sed`, `pwatch`, `each`, four-arg `substr`, dynamic `keys`/`values`/`delete`/`exists`, etc.
-- **Block JIT** ([`src/jit.rs`](src/jit.rs)) — Cranelift Block JIT with cached `OwnedTargetIsa`, tiered after `STRYKE_JIT_SUB_INVOKES` (default 50) VM invocations. Block JIT validates a CFG, joins typed `i64`/`f64` slots at merges, and compiles hot loops to native code. Disable with `--no-jit` / `STRYKE_NO_JIT=1`.
-- **Feature work policy** — prefer **new VM opcodes** in [`bytecode.rs`](src/bytecode.rs), lowering in [`compiler.rs`](src/compiler.rs), implementation in [`vm.rs`](src/vm.rs). Do **not** add new `ExprKind`/`StmtKind` variants for new behavior.
+- **Lexer** ([`strykelang/lexer.rs`](strykelang/lexer.rs)) — context-sensitive tokenizer for Perl's ambiguous syntax (regex vs division, hash vs modulo, heredocs, interpolation).
+- **Parser** ([`strykelang/parser.rs`](strykelang/parser.rs)) — recursive descent + Pratt precedence climbing.
+- **Compiler / VM** ([`strykelang/compiler.rs`](strykelang/compiler.rs), [`strykelang/vm.rs`](strykelang/vm.rs)) — 100% lowered to bytecode. Compiled subs use slot ops for frame-local `my` scalars (O(1)). Lowering covers `BEGIN`/`UNITCHECK`/`CHECK`/`INIT`/`END` with `Op::SetGlobalPhase`, `mysync`, `tie`, scalar compound assigns via `Scope::atomic_mutate`, regex values, named-sub coderefs, folds, `pcache`, `pselect`, `par_lines`, `par_walk`, `par_sed`, `pwatch`, `each`, four-arg `substr`, dynamic `keys`/`values`/`delete`/`exists`, etc.
+- **Block JIT** ([`strykelang/jit.rs`](strykelang/jit.rs)) — Cranelift Block JIT with cached `OwnedTargetIsa`, tiered after `STRYKE_JIT_SUB_INVOKES` (default 50) VM invocations. Block JIT validates a CFG, joins typed `i64`/`f64` slots at merges, and compiles hot loops to native code. Disable with `--no-jit` / `STRYKE_NO_JIT=1`.
+- **Feature work policy** — prefer **new VM opcodes** in [`bytecode.rs`](strykelang/bytecode.rs), lowering in [`compiler.rs`](strykelang/compiler.rs), implementation in [`vm.rs`](strykelang/vm.rs). Do **not** add new `ExprKind`/`StmtKind` variants for new behavior.
 - **Parallelism** — each parallel block spawns an isolated VM with captured scope; Rayon does work-stealing across all cores.
 
 ---
@@ -2145,7 +2145,7 @@ stryke build app.stk -o /usr/local/bin/app   # explicit output path
 - Unix: the output is marked `+x` automatically. macOS: unsigned — `codesign` before distribution if your environment requires it.
 - Current AOT runtime sets `@INC = (".")`; modules outside the embedded script have to be inlined. (`require` of a local `.pm` next to the running binary still works.)
 
-**Under the hood** ([`src/aot.rs`](src/aot.rs)): trailer layout is `[zstd payload][u64 compressed_len][u64 uncompressed_len][u32 version][u32 reserved][8B magic b"STRYKEAOT"]`. ELF / Mach-O loaders ignore bytes past the mapped segments so the embedded payload is invisible to the OS loader. The `b"STRYKEAOT"` magic plus version byte lets a future pre-compiled-bytecode payload ship alongside v1 without breaking already-shipped binaries.
+**Under the hood** ([`strykelang/aot.rs`](strykelang/aot.rs)): trailer layout is `[zstd payload][u64 compressed_len][u64 uncompressed_len][u32 version][u32 reserved][8B magic b"STRYKEAOT"]`. ELF / Mach-O loaders ignore bytes past the mapped segments so the embedded payload is invisible to the OS loader. The `b"STRYKEAOT"` magic plus version byte lets a future pre-compiled-bytecode payload ship alongside v1 without breaking already-shipped binaries.
 
 ```sh
 # 13 MB binary, no external runtime required:
@@ -2190,7 +2190,7 @@ p fib 50             # 12586269025
 
 **Requirements**: `rustc` must be on `PATH`. First-run compile costs ~1 second; subsequent runs hit the cache and pay only `dlopen` (~10 ms). `#[no_mangle]` is auto-inserted by the wrapper — you don't need to write it. The body is `#![crate_type = "cdylib"]` with `use std::os::raw::c_char; use std::ffi::{CStr, CString};` already in scope.
 
-**How it works** ([`src/rust_sugar.rs`](src/rust_sugar.rs), [`src/rust_ffi.rs`](src/rust_ffi.rs)): the source-level pre-pass desugars every top-level `rust { ... }` into a `BEGIN { __stryke_rust_compile("<base64 body>", $line); }` call. The `__stryke_rust_compile` builtin hashes the body, compiles via `rustc --edition=2021 -O` if the cache is cold, `libc::dlopen`s the result, `dlsym`s each detected signature, and stores the raw symbol + arity/type tag in a process-global registry. Calls from Perl flow through a fallback arm in [`crate::builtins::try_builtin`] that dispatches on the signature tag via direct function-pointer transmute — no libffi dep, no per-call alloc, no marshalling overhead beyond the `StrykeValue::to_int` / `to_number` / `to_string` calls you'd do for any builtin.
+**How it works** ([`strykelang/rust_sugar.rs`](strykelang/rust_sugar.rs), [`strykelang/rust_ffi.rs`](strykelang/rust_ffi.rs)): the source-level pre-pass desugars every top-level `rust { ... }` into a `BEGIN { __stryke_rust_compile("<base64 body>", $line); }` call. The `__stryke_rust_compile` builtin hashes the body, compiles via `rustc --edition=2021 -O` if the cache is cold, `libc::dlopen`s the result, `dlsym`s each detected signature, and stores the raw symbol + arity/type tag in a process-global registry. Calls from Perl flow through a fallback arm in [`crate::builtins::try_builtin`] that dispatches on the signature tag via direct function-pointer transmute — no libffi dep, no per-call alloc, no marshalling overhead beyond the `StrykeValue::to_int` / `to_number` / `to_string` calls you'd do for any builtin.
 
 **Combine with AOT for zero-friction deployment:** `stryke build script.stk -o prog` bakes the Perl source — which includes the `rust { ... }` block — into a standalone binary. The FFI compile still happens on first run of `./prog`, but the user only needs `rustc` once, then the `~/.cache/stryke/ffi/` entry is permanent.
 
@@ -2351,7 +2351,7 @@ Each slot runs in its own thread and pulls JOB messages from a shared crossbeam 
 
 #### Wire protocol (v2)
 
-Every message is `[u64 LE length][u8 kind][bincode payload]`. The single-byte `kind` discriminator lets future revisions extend the protocol without breaking older workers — an unknown kind is a hard error so version skew is loud. See [`src/remote_wire.rs`](src/remote_wire.rs).
+Every message is `[u64 LE length][u8 kind][bincode payload]`. The single-byte `kind` discriminator lets future revisions extend the protocol without breaking older workers — an unknown kind is a hard error so version skew is loud. See [`strykelang/remote_wire.rs`](strykelang/remote_wire.rs).
 
 ```text
 dispatcher                    worker

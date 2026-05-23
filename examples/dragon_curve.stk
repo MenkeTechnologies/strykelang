@@ -1,0 +1,172 @@
+#!/usr/bin/env stryke
+
+# Heighway dragon curve via Lindenmayer system. The classical L-system
+# productions are:
+#   axiom : FX
+#   X →   X+YF+
+#   Y →   -FX-Y
+# F, +, − pass through unchanged.
+#
+# Walk the resulting string as turtle commands:
+#   F  — move forward one step, draw
+#   +  — turn left 90°
+#   −  — turn right 90°
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Dragon::`) (§18, no builtin shadowing)
+#   * expression-bodied `fn name = …` where it fits (§3)
+#   * `:` ranges, `len` not `length` (§4, §5)
+#   * `#{ }` interpolation in headers (§1a)
+#   * no `return` on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/dragon_curve.stk
+
+# ── L-system rewrite step ──────────────────────────────────────────
+
+fn Dragon::rewrite($s) {
+    my $out = ""
+    for my $c (split //, $s) {
+        if    ($c eq "X") { $out .= "X+YF+" }
+        elsif ($c eq "Y") { $out .= "-FX-Y" }
+        else              { $out .= $c }
+    }
+    $out
+}
+
+fn Dragon::iterate($axiom, $n) {
+    my $s = $axiom
+    for my $i (1:$n) { $s = Dragon::rewrite($s) }
+    $s
+}
+
+# ── walk the turtle, return ([min_x, min_y, max_x, max_y], \@cells) ─
+
+fn Dragon::walk($prog) {
+    my @DX = (1, 0, -1, 0)
+    my @DY = (0, 1, 0, -1)
+    my $dir = 0
+    my $x = 0
+    my $y = 0
+    my %cells
+    $cells{"0,0"} = 1
+    my ($minx, $miny, $maxx, $maxy) = (0, 0, 0, 0)
+    for my $c (split //, $prog) {
+        if    ($c eq "+") { $dir = ($dir + 1) % 4 }
+        elsif ($c eq "-") { $dir = ($dir + 3) % 4 }
+        elsif ($c eq "F") {
+            $x = $x + $DX[$dir]
+            $y = $y + $DY[$dir]
+            $cells{"$x,$y"} = 1
+            $minx = $x if $x < $minx
+            $maxx = $x if $x > $maxx
+            $miny = $y if $y < $miny
+            $maxy = $y if $y > $maxy
+        }
+        # X, Y are non-drawing markers
+    }
+    { bbox => [$minx, $miny, $maxx, $maxy], cells => \%cells }
+}
+
+# ── render bounded grid ───────────────────────────────────────────
+
+fn Dragon::render($walk) {
+    my $box = $walk->{bbox}
+    my $cells = $walk->{cells}
+    my $minx = $box->[0]
+    my $miny = $box->[1]
+    my $maxx = $box->[2]
+    my $maxy = $box->[3]
+    my $out = ""
+    for my $y ($miny:$maxy) {
+        for my $x ($minx:$maxx) {
+            $out .= exists $cells->{"$x,$y"} ? "#" : " "
+        }
+        $out .= "\n"
+    }
+    $out
+}
+
+# ── run for several iteration counts ──────────────────────────────
+
+my $axiom = "FX"
+
+printf "── L-system iteration lengths ────────────────────────\n\n"
+printf "  %3s   %8s\n", "n", "len(s)"
+printf "  %3s   %8s\n", "---", "--------"
+my @lengths
+for my $n (0:8) {
+    my $s = Dragon::iterate($axiom, $n)
+    push @lengths, len($s)
+    printf "  %3d   %8d\n", $n, len($s)
+}
+
+# ── invariant 1: closed-form length: |s_n| = 4 + 5·(2^n − 1)·… ─────
+#  Actually for axiom "FX" with these productions, length sequence is
+#  L_0 = 2, L_{n+1} = 5·(count of X+Y in s_n)/?? — too painful in
+#  closed form. Instead pin: each step strictly grows the string.
+
+for my $i (1:len(@lengths) - 1) {
+    die "string length must be non-decreasing at n=#{$i}" unless $lengths[$i] > $lengths[$i - 1]
+}
+
+# ── invariant 2: F count after n iterations doubles each step ─────
+# Each X expands to 1 F (via the "F" in "X+YF+"), and each Y also
+# expands to 1 F (via "-FX-Y"). Plus the original F survives. So
+# F-count satisfies: F_{n+1} = F_n + (X_n + Y_n) where X_n + Y_n
+# doubles. Net effect: F count exactly doubles per iteration.
+
+fn Dragon::count_letter($s, $ch) {
+    my $c = 0
+    for my $k (split //, $s) { $c++ if $k eq $ch }
+    $c
+}
+
+my $prev_f = Dragon::count_letter($axiom, "F")
+for my $n (1:8) {
+    my $s = Dragon::iterate($axiom, $n)
+    my $cur_f = Dragon::count_letter($s, "F")
+    die "F-count didn't double at n=#{$n}: prev=#{$prev_f} cur=#{$cur_f}" unless $cur_f == 2 * $prev_f
+    $prev_f = $cur_f
+}
+
+# ── render n = 6 ──────────────────────────────────────────────────
+
+my $iter = 8
+my $s = Dragon::iterate($axiom, $iter)
+my $walk = Dragon::walk($s)
+p ""
+printf "── dragon curve, n=#{$iter}, F-count=%d ───────────────\n\n",
+    Dragon::count_letter($s, "F")
+print Dragon::render($walk)
+
+# ── invariant 3: turtle ends at a position whose Manhattan distance
+#                  matches the count of unique visited cells minus 1
+#                  (no — that's only true for simple paths). Better:
+#                  turtle visits ≥ 1 cell per F command (cells may
+#                  revisit, so |cells| ≤ |F|+1).
+
+my $f_count = Dragon::count_letter($s, "F")
+my $cell_count = len(%{$walk->{cells}})
+die "cell count exceeds F+1" unless $cell_count <= $f_count + 1
+die "must visit at least origin" unless $cell_count >= 1
+
+# ── invariant 4: bbox sides are finite and bounded ────────────────
+
+my $bx = $walk->{bbox}->[2] - $walk->{bbox}->[0] + 1
+my $by = $walk->{bbox}->[3] - $walk->{bbox}->[1] + 1
+die "bbox width must be positive" unless $bx > 0
+die "bbox height must be positive" unless $by > 0
+# Heuristic: width and height are each ≤ F_count (path can't extend
+# further than its segment count).
+die "bbox width exceeds F count" unless $bx <= $f_count + 1
+die "bbox height exceeds F count" unless $by <= $f_count + 1
+
+p ""
+printf "── stats ───────────────────────────────────────────────\n"
+printf "  iterations    : %d\n", $iter
+printf "  string length : %d\n", len($s)
+printf "  F commands    : %d\n", $f_count
+printf "  cells visited : %d\n", $cell_count
+printf "  bounding box  : %d × %d\n", $bx, $by
+p ""
+p "── all four invariants satisfied ───────────────────────"
