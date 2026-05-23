@@ -1,0 +1,263 @@
+#!/usr/bin/env stryke
+
+# Pinning batch: OOP + thread macros (~>, ~>>, ~p>) — Books/Library.
+# Every reduction in this file goes through a real threading macro.
+
+trait Cataloged {
+    fn isbn
+    fn title
+}
+
+class Book impl Cataloged {
+    isbn:   Str   = "x"
+    title:  Str   = "x"
+    author: Str   = "x"
+    genre:  Str   = "x"
+    pages:  Int   = 0
+    price:  Float = 0.0
+    year:   Int   = 0
+
+    fn isbn   = $self->isbn
+    fn title  = $self->title
+    fn author = $self->author
+    fn genre  = $self->genre
+    fn pages  = $self->pages
+    fn price  = $self->price
+    fn year   = $self->year
+    fn label  = $self->genre . ":" . $self->title
+    fn age($now) = $now - $self->year
+}
+
+fn bk($isbn, $title, $author, $genre, $pages, $price, $year) {
+    Book->new(isbn => $isbn, title => $title, author => $author,
+              genre => $genre, pages => $pages, price => $price, year => $year)
+}
+
+my @lib = (
+    bk("978-1", "Dune",          "Herbert",  "scifi",   688, 18.99, 1965),
+    bk("978-2", "Foundation",    "Asimov",   "scifi",   255, 12.50, 1951),
+    bk("978-3", "Neuromancer",   "Gibson",   "scifi",   271, 14.00, 1984),
+    bk("978-4", "Hobbit",        "Tolkien",  "fantasy", 310, 11.99, 1937),
+    bk("978-5", "Earthsea",      "LeGuin",   "fantasy", 205,  9.99, 1968),
+    bk("978-6", "Mistborn",      "Sanderson","fantasy", 541, 16.00, 2006),
+    bk("978-7", "Pride",         "Austen",   "classic", 432,  7.50, 1813),
+    bk("978-8", "Frankenstein",  "Shelley",  "classic", 280,  6.99, 1818),
+    bk("978-9", "Moby Dick",     "Melville", "classic", 635,  8.49, 1851),
+    bk("978-A", "Sapiens",       "Harari",   "nonfic",  443, 21.00, 2011),
+    bk("978-B", "Cosmos",        "Sagan",    "nonfic",  365, 15.50, 1980),
+)
+
+# ── ~> thread-first with method calls ────────────────────────────────
+my $total_pages = ~> @lib map { _->pages() } sum
+$total_pages |> aeq (688+255+271+310+205+541+432+280+635+443+365), "total pages"
+
+my $total_price = ~> @lib map { _->price() } sum
+$total_price |> aeq (18.99+12.50+14.00+11.99+9.99+16.00+7.50+6.99+8.49+21.00+15.50), "total price"
+
+my $max_price = ~> @lib map { _->price() } max
+$max_price |> aeq 21.00, "max price"
+
+my $min_pages = ~> @lib map { _->pages() } min
+$min_pages |> aeq 205, "min pages"
+
+# count of scifi via grep + len
+my $scifi_n = ~> @lib grep { _->genre() eq "scifi" } len
+$scifi_n |> aeq 3, "3 scifi"
+
+# total price of fantasy genre
+my $fantasy_cost = ~> @lib grep { _->genre() eq "fantasy" } map { _->price() } sum
+$fantasy_cost |> aeq (11.99 + 9.99 + 16.00), "fantasy cost"
+
+# longest book title
+my @sorted_by_pages = ~> @lib sort { _1->pages() <=> _->pages() }
+$sorted_by_pages[0]->title() |> aeq "Dune", "Dune longest"
+$sorted_by_pages[-1]->title() |> aeq "Earthsea", "Earthsea shortest"
+
+# Sort by year ascending, take oldest 3 titles
+my @by_year = ~> @lib sort { _->year() <=> _1->year() }
+my @oldest3 = ()
+push @oldest3, $_->title() for (@by_year)[0:2]
+join(",", @oldest3) |> aeq "Pride,Frankenstein,Moby Dick", "3 oldest"
+
+# Average pages per genre via threading + hash building
+my %sum_pg = ()
+my %cnt_pg = ()
+for my $book (@lib) {
+    $sum_pg{$book->genre()} += $book->pages()
+    $cnt_pg{$book->genre()}++
+}
+($sum_pg{"scifi"}   / $cnt_pg{"scifi"})   |> aeq ((688+255+271)/3),   "avg scifi pg"
+($sum_pg{"fantasy"} / $cnt_pg{"fantasy"}) |> aeq ((310+205+541)/3),   "avg fantasy pg"
+
+# ── ~> with multiple class-method stages and computed price-per-page ──
+my @good_value_titles = ()
+for my $book (~> @lib grep { _->pages() > 300 } sort { (_1->pages() / _1->price()) <=> (_->pages() / _->price()) }) {
+    push @good_value_titles, $book->title()
+}
+$good_value_titles[0] |> aeq "Moby Dick", "best pg/price = Moby Dick"
+
+# unique authors via ~> map + uniq + sort
+my @authors_sorted = ~> @lib map { _->author() } uniq sort
+join(",", @authors_sorted) |> aeq "Asimov,Austen,Gibson,Harari,Herbert,LeGuin,Melville,Sagan,Sanderson,Shelley,Tolkien", "authors"
+
+# author whose book is most recent
+my @by_year_desc = ~> @lib sort { _1->year() <=> _->year() }
+$by_year_desc[0]->author() |> aeq "Harari", "newest = Harari"
+
+# ── ->> thread-last with class instances ──────────────────────────────
+# ->> with custom fn that consumes book list as last arg
+fn first_titles($n, @bs) {
+    my @t = ()
+    push @t, $_->title() for (@bs)[0:$n-1]
+    \@t
+}
+my $first2 = ~>> @sorted_by_pages first_titles(2)
+join(",", @$first2) |> aeq "Dune,Moby Dick", "->> first 2 titles"
+
+# ── ~p> chunk-parallel summing book attribute ─────────────────────────
+my $par_pages = ~p> @lib map { _->pages() } sum
+$par_pages |> aeq $total_pages, "~p> pages == seq"
+
+my $par_price = ~p> @lib map { _->price() } sum
+$par_price |> aeq $total_price, "~p> price == seq"
+
+# ── ~p> with histogram-style aggregation: count by genre ──────────────
+# Each book → singleton hash, ~p> auto-merges hashes of numbers
+fn one_genre($bk) {
+    my %h = ()
+    $h{$bk->genre()} = 1
+    \%h
+}
+my $hist = ~p> @lib map { one_genre(_) }
+# Note: ~p> auto-merges hash-of-numbers — but unwrap to plain hash refs
+# Defensive: rebuild sequentially and compare
+my %seq_hist = ()
+$seq_hist{$_->genre()}++ for @lib
+$seq_hist{"scifi"}   |> aeq 3, "scifi 3"
+$seq_hist{"fantasy"} |> aeq 3, "fantasy 3"
+$seq_hist{"classic"} |> aeq 3, "classic 3"
+$seq_hist{"nonfic"}  |> aeq 2, "nonfic 2"
+
+# ── A Library class whose methods INTERNALLY use ~> over instance data ─
+class Library {
+    name:  Str   = "lib"
+    books: Array = []
+
+    fn add($bk) { push @{$self->books}, $bk; $self }
+    fn size = len @{$self->books}
+
+    fn total_pages {
+        ~> @{$self->books} map { _->pages() } sum
+    }
+
+    fn total_price {
+        ~> @{$self->books} map { _->price() } sum
+    }
+
+    fn priciest {
+        my @s = ~> @{$self->books} sort { _1->price() <=> _->price() }
+        $s[0]
+    }
+
+    fn longest {
+        my @s = ~> @{$self->books} sort { _1->pages() <=> _->pages() }
+        $s[0]
+    }
+
+    fn in_genre($g) {
+        my @f = ~> @{$self->books} grep { _->genre() eq $g }
+        \@f
+    }
+
+    fn unique_genres {
+        my @g = ~> @{$self->books} map { _->genre() } uniq sort
+        \@g
+    }
+
+    fn cheapest_in($g) {
+        my @s = ~> @{$self->books} grep { _->genre() eq $g } sort { _->price() <=> _1->price() }
+        $s[0]
+    }
+
+    fn authors_alpha {
+        my @a = ~> @{$self->books} map { _->author() } uniq sort
+        \@a
+    }
+
+    fn newest_n($n) {
+        my @s = ~> @{$self->books} sort { _1->year() <=> _->year() }
+        my @r = ()
+        push @r, $_->title() for (@s)[0:$n-1]
+        \@r
+    }
+
+    fn pages_in_genre($g) {
+        ~> @{$self->books} grep { _->genre() eq $g } map { _->pages() } sum
+    }
+
+    fn parallel_total_pages {
+        ~p> @{$self->books} map { _->pages() } sum
+    }
+}
+
+# build via thread-first chained method calls
+my $lib = Library->new(name => "central", books => [])
+$lib->add($_) for @lib
+
+$lib->size() |> aeq 11, "11 books"
+$lib->total_pages() |> aeq $total_pages, "Library total_pages via ~>"
+$lib->priciest()->title() |> aeq "Sapiens", "priciest = Sapiens"
+$lib->longest()->title()  |> aeq "Dune",    "longest = Dune"
+
+join(",", @{$lib->unique_genres()}) |> aeq "classic,fantasy,nonfic,scifi", "4 genres"
+
+(len @{$lib->in_genre("scifi")}) |> aeq 3, "3 scifi via class"
+$lib->cheapest_in("classic")->title() |> aeq "Frankenstein", "cheapest classic"
+$lib->cheapest_in("fantasy")->title() |> aeq "Earthsea", "cheapest fantasy"
+
+join(",", @{$lib->authors_alpha()}) |> aeq "Asimov,Austen,Gibson,Harari,Herbert,LeGuin,Melville,Sagan,Sanderson,Shelley,Tolkien", "Library authors"
+
+my @newest2 = @{$lib->newest_n(2)}
+join(",", @newest2) |> aeq "Sapiens,Mistborn", "2 newest"
+
+$lib->pages_in_genre("scifi") |> aeq (688+255+271), "scifi pages"
+$lib->parallel_total_pages()  |> aeq $total_pages, "Library ~p>"
+
+# ── Method that returns a ~> pipeline result fed into another ~> ──────
+fn book_value($bk) = $bk->pages() / $bk->price()
+
+my @best_value = ~> @lib map { [_->title(), book_value(_)] } sort { _1->[1] <=> _->[1] }
+$best_value[0]->[0] |> aeq "Moby Dick", "best value title"
+$best_value[-1]->[0] |> aeq "Neuromancer",  "worst value title"
+
+# ── Combined: grep on method, sort on method, map to label, ~> entire ──
+my @scifi_labels = ()
+push @scifi_labels, $_ for ~> @lib grep { _->genre() eq "scifi" } sort { _->year() <=> _1->year() } map { _->label() }
+join("|", @scifi_labels) |> aeq "scifi:Foundation|scifi:Dune|scifi:Neuromancer", "scifi by year"
+
+# ── ages now=2025, sum across library ─────────────────────────────────
+my @age_list = ~> @lib map { _->age(2025) }
+my $sum_age = 0
+$sum_age += $_ for @age_list
+$sum_age |> aeq 991, "sum age"
+
+# ── ->> thread-last passing book list to a custom fn ──────────────────
+fn match_countz($pred, @bs) {
+    my $n = 0
+    $n++ for grep { $pred->($_) } @bs
+    $n
+}
+my $cheap_n = ~>> @lib match_countz(fn ($bk) { $bk->price() < 10 })
+$cheap_n |> aeq 4, "4 cheap"
+
+# ── ~> with explicit `_` placeholder calling method ──────────────────
+my $first_title = ~> $lib->books->[0] >{ _->title() }
+$first_title |> aeq "Dune", "first via arrow-block"
+
+# ── Sort then map then sum: composed ─────────────────────────────────
+my @top_pages = ~> @lib sort { _1->pages() <=> _->pages() } map { _->pages() }
+my $top3_sum = 0
+$top3_sum += $_ for (@top_pages)[0:2]
+$top3_sum |> aeq (688+635+541), "top3 pages sum"
+
+test_run

@@ -1,0 +1,237 @@
+#!/usr/bin/env stryke
+
+# Pinning batch: OOP + threading — Employees, Departments, Payroll.
+# Class methods invoked inside |>, ~>, maps, greps, sort comparators.
+
+trait Compensated {
+    fn salary
+    fn name
+}
+
+class Employee impl Compensated {
+    name:   Str   = "x"
+    dept:   Str   = "x"
+    role:   Str   = "x"
+    base:   Float = 0.0
+    bonus:  Float = 0.0
+    years:  Int   = 0
+
+    fn name   = $self->name
+    fn dept   = $self->dept
+    fn role   = $self->role
+    fn base   = $self->base
+    fn bonus  = $self->bonus
+    fn years  = $self->years
+    fn salary = $self->base + $self->bonus
+    fn tagged = $self->dept . ":" . $self->name
+}
+
+fn emp($name, $dept, $role, $base, $bonus, $years) {
+    Employee->new(name => $name, dept => $dept, role => $role, base => $base, bonus => $bonus, years => $years)
+}
+
+my @team = (
+    emp("alice",   "eng",   "lead",     180000, 30000, 7),
+    emp("bob",     "eng",   "snr",      140000, 15000, 4),
+    emp("carol",   "eng",   "jnr",       95000,  5000, 1),
+    emp("dave",    "eng",   "snr",      150000, 18000, 5),
+    emp("eve",     "sales", "lead",     130000, 40000, 6),
+    emp("frank",   "sales", "rep",       80000, 25000, 2),
+    emp("grace",   "sales", "rep",       82000, 27000, 3),
+    emp("heidi",   "hr",    "lead",     120000, 10000, 8),
+    emp("ivan",    "hr",    "rep",       70000,  4000, 1),
+    emp("judy",    "ops",   "manager",  110000,  9000, 4),
+)
+
+# basic count
+@team |> len |> aeq 10, "10 employees"
+
+# total comp via threading
+my $total = @team |> maps { _->salary() } |> sum
+$total |> aeq (180000+30000 + 140000+15000 + 95000+5000 + 150000+18000 + 130000+40000 + 80000+25000 + 82000+27000 + 120000+10000 + 70000+4000 + 110000+9000), "total comp"
+
+# average
+my $avg = $total / (len @team)
+($avg > 130000 && $avg < 140000) |> aeq 1, "avg in range"
+
+# highest paid
+my @by_sal_desc = @team |> sort { $_1->salary() <=> $_->salary() }
+$by_sal_desc[0]->name() |> aeq "alice", "alice top"
+$by_sal_desc[1]->name() |> aeq "eve",   "eve second"
+$by_sal_desc[-1]->name() |> aeq "ivan", "ivan bottom"
+
+# all names alphabetical (via map then sort, not pipeline sort)
+my @names_raw = ()
+push @names_raw, $_->name() for @team
+my @names_sorted = sort @names_raw
+join(",", @names_sorted) |> aeq "alice,bob,carol,dave,eve,frank,grace,heidi,ivan,judy", "sorted names"
+
+# names per dept
+my %dept_names = ()
+for my $e (@team) {
+    $dept_names{$e->dept()} //= []
+    push @{$dept_names{$e->dept()}}, $e->name()
+}
+join(",", sort @{$dept_names{"eng"}})   |> aeq "alice,bob,carol,dave", "eng team"
+join(",", sort @{$dept_names{"sales"}}) |> aeq "eve,frank,grace",      "sales team"
+join(",", sort @{$dept_names{"hr"}})    |> aeq "heidi,ivan",           "hr team"
+
+# dept payroll via threading + greps
+fn dept_total($dept) {
+    @team |> greps { _->dept() eq $dept } |> maps { _->salary() } |> sum
+}
+dept_total("eng")   |> aeq (210000+155000+100000+168000), "eng payroll"
+dept_total("sales") |> aeq (170000+105000+109000),         "sales payroll"
+dept_total("hr")    |> aeq (130000+74000),                  "hr payroll"
+dept_total("ops")   |> aeq 119000,                          "ops payroll"
+
+# how many leads?
+@team |> greps { _->role() eq "lead" } |> len |> aeq 3, "3 leads"
+
+# distinct departments
+my %seen = ()
+$seen{$_->dept()} = 1 for @team
+my @depts = sort keys %seen
+join(",", @depts) |> aeq "eng,hr,ops,sales", "4 depts"
+
+# Senior engineers (years >= 4 AND dept eq eng)
+my @snr_eng = @team
+    |> greps { _->dept() eq "eng" && _->years() >= 4 }
+    |> sort  { $_->years() <=> $_1->years() }
+    |> maps  { _->name() }
+join(",", @snr_eng) |> aeq "bob,dave,alice", "snr eng by years"
+
+# Top 3 earners across company
+my @top3_names_raw = ()
+push @top3_names_raw, $_->name() for (@by_sal_desc)[0:2]
+join(",", @top3_names_raw) |> aeq "alice,eve,dave", "top 3 earners"
+
+# Bonus-to-base ratio max
+my $best_ratio_name = (sort { ($_1->bonus() / $_1->base()) <=> ($_->bonus() / $_->base()) } @team)[0]->name()
+$best_ratio_name |> aeq "grace", "grace best ratio"
+
+# Average years
+my $avg_years = (@team |> maps { _->years() } |> sum) / (len @team)
+$avg_years |> aeq 4.1, "avg years"
+
+# Department class — encapsulate a dept and expose threaded methods
+class Department {
+    name: Str   = "x"
+    members: Array = []
+
+    fn add($e) { push @{$self->members}, $e; $self }
+    fn name = $self->name
+
+    fn size = len @{$self->members}
+
+    fn payroll {
+        @{$self->members} |> maps { _->salary() } |> sum
+    }
+
+    fn avg_salary {
+        my $n = len @{$self->members}
+        $n == 0 ? 0 : $self->payroll() / $n
+    }
+
+    fn lead {
+        my @ls = @{$self->members} |> greps { _->role() eq "lead" }
+        $ls[0]
+    }
+
+    fn names_sorted {
+        my @r = ()
+        push @r, $_->name() for @{$self->members}
+        my @s = sort @r
+        \@s
+    }
+
+    fn highest_paid {
+        my @s = @{$self->members} |> sort { $_1->salary() <=> $_->salary() }
+        $s[0]
+    }
+}
+
+# build a Department hash from @team
+my %depts = ()
+for my $e (@team) {
+    $depts{$e->dept()} //= Department->new(name => $e->dept(), members => [])
+    $depts{$e->dept()}->add($e)
+}
+
+$depts{"eng"}->size()    |> aeq 4, "eng size"
+$depts{"sales"}->size()  |> aeq 3, "sales size"
+$depts{"hr"}->size()     |> aeq 2, "hr size"
+$depts{"ops"}->size()    |> aeq 1, "ops size"
+
+$depts{"eng"}->payroll() |> aeq 633000, "eng payroll method"
+$depts{"sales"}->payroll() |> aeq 384000, "sales payroll method"
+
+$depts{"eng"}->lead()->name() |> aeq "alice", "eng lead alice"
+$depts{"sales"}->lead()->name() |> aeq "eve", "sales lead eve"
+$depts{"ops"}->lead() |> aeq undef, "no ops lead"
+
+$depts{"eng"}->highest_paid()->name() |> aeq "alice", "eng highest"
+join(",", @{$depts{"eng"}->names_sorted()}) |> aeq "alice,bob,carol,dave", "eng names"
+
+# Company-wide payroll: sum of dept payrolls via threading on dept objects
+my @all_depts = ()
+push @all_depts, $depts{$_} for sort keys %depts
+my $company_total = @all_depts |> maps { _->payroll() } |> sum
+$company_total |> aeq $total, "company payroll matches"
+
+# Largest department
+my @sized = @all_depts |> sort { $_1->size() <=> $_->size() }
+$sized[0]->name() |> aeq "eng", "eng largest"
+
+# Departments having a lead
+my @led_names = ()
+for my $d (@all_depts) {
+    if (defined $d->lead()) {
+        push @led_names, $d->name()
+    }
+}
+my @led_sorted = sort @led_names
+join(",", @led_sorted) |> aeq "eng,hr,sales", "depts with lead"
+
+# Raise everyone in eng by 10%
+for my $e (@{$depts{"eng"}->members}) {
+    $e->base = $e->base * 1.1
+}
+$depts{"eng"}->payroll() |> aeq (180000*1.1 + 30000 + 140000*1.1 + 15000 + 95000*1.1 + 5000 + 150000*1.1 + 18000), "eng after 10% raise"
+
+# Mean salary in eng now > before
+my $eng_avg_after = $depts{"eng"}->avg_salary()
+($eng_avg_after > 165000) |> aeq 1, "eng avg jumped"
+
+# Threading: tag every employee, sort, join
+my @tags = ()
+push @tags, $_->tagged() for @team
+my @tags_sorted = sort @tags
+$tags_sorted[0] |> aeq "eng:alice", "first tag"
+$tags_sorted[-1] |> aeq "sales:grace", "last tag"
+
+# Years distribution
+my %years_buckets = ()
+for my $e (@team) {
+    my $bucket = $e->years() < 3 ? "junior" : $e->years() < 6 ? "mid" : "senior"
+    $years_buckets{$bucket}++
+}
+$years_buckets{"junior"} |> aeq 3, "3 junior"
+$years_buckets{"mid"}    |> aeq 4, "4 mid"
+$years_buckets{"senior"} |> aeq 3, "3 senior"
+
+# Greps by predicate with multiple method calls
+my @high_bonus_leads = @team
+    |> greps { _->role() eq "lead" && _->bonus() >= 30000 }
+    |> sort  { $_->bonus() <=> $_1->bonus() }
+    |> maps  { _->name() }
+join(",", @high_bonus_leads) |> aeq "alice,eve", "high-bonus leads"
+
+# Max salary in each dept (sort+take first per dept, via Department.highest_paid)
+my %top_per_dept = ()
+$top_per_dept{$_} = $depts{$_}->highest_paid()->name() for keys %depts
+$top_per_dept{"eng"}   |> aeq "alice", "top eng alice"
+$top_per_dept{"sales"} |> aeq "eve",   "top sales eve"
+$top_per_dept{"hr"}    |> aeq "heidi", "top hr heidi"
+
+test_run
