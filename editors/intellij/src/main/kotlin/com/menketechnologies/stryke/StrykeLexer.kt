@@ -128,8 +128,22 @@ class StrykeLexer : LexerBase() {
             c == '<' && peek(1) == '<' && isHeredocStart(2) -> consumeHeredoc()
             c == '-' && peek(1) == '>' -> emit(2, StrykeTokenTypes.ARROW_OP)
             c == '=' && peek(1) == '>' -> emit(2, StrykeTokenTypes.FAT_COMMA)
-            c == '|' && peek(1) == '>' && peek(2) == '>' -> emit(3, StrykeTokenTypes.PIPE)
+            // PipeForward `|>`. The Rust lexer doesn't have `|>>` —
+            // a `|>>` source byte sequence tokenizes as `|>` then `>`.
             c == '|' && peek(1) == '>' -> emit(2, StrykeTokenTypes.PIPE)
+            // Thread-arrows (`~>` family). Order matters: try 3-char
+            // forms first (`~s>>` / `~p>>` / `~d>>`), then 2-char
+            // `~s>` / `~p>` / `~d>`, then `~>>`, then bare `~>`.
+            c == '~' && peek(1) == 's' && peek(2) == '>' && peek(3) == '>' ->
+                emit(4, StrykeTokenTypes.PIPE)
+            c == '~' && peek(1) == 'p' && peek(2) == '>' && peek(3) == '>' ->
+                emit(4, StrykeTokenTypes.PIPE)
+            c == '~' && peek(1) == 'd' && peek(2) == '>' && peek(3) == '>' ->
+                emit(4, StrykeTokenTypes.PIPE)
+            c == '~' && peek(1) == 's' && peek(2) == '>' -> emit(3, StrykeTokenTypes.PIPE)
+            c == '~' && peek(1) == 'p' && peek(2) == '>' -> emit(3, StrykeTokenTypes.PIPE)
+            c == '~' && peek(1) == 'd' && peek(2) == '>' -> emit(3, StrykeTokenTypes.PIPE)
+            c == '~' && peek(1) == '>' && peek(2) == '>' -> emit(3, StrykeTokenTypes.PIPE)
             c == '~' && peek(1) == '>' -> emit(2, StrykeTokenTypes.PIPE)
             c == '=' && peek(1) == '~' -> emit(2, StrykeTokenTypes.REGEX_BIND)
             c == '!' && peek(1) == '~' -> emit(2, StrykeTokenTypes.REGEX_BIND)
@@ -440,8 +454,22 @@ class StrykeLexer : LexerBase() {
             c == '<' && peek(1) == '<' && isHeredocStart(2) -> consumeHeredoc()
             c == '-' && peek(1) == '>' -> emit(2, StrykeTokenTypes.ARROW_OP)
             c == '=' && peek(1) == '>' -> emit(2, StrykeTokenTypes.FAT_COMMA)
-            c == '|' && peek(1) == '>' && peek(2) == '>' -> emit(3, StrykeTokenTypes.PIPE)
+            // PipeForward `|>`. The Rust lexer doesn't have `|>>` —
+            // a `|>>` source byte sequence tokenizes as `|>` then `>`.
             c == '|' && peek(1) == '>' -> emit(2, StrykeTokenTypes.PIPE)
+            // Thread-arrows (`~>` family). Order matters: try 3-char
+            // forms first (`~s>>` / `~p>>` / `~d>>`), then 2-char
+            // `~s>` / `~p>` / `~d>`, then `~>>`, then bare `~>`.
+            c == '~' && peek(1) == 's' && peek(2) == '>' && peek(3) == '>' ->
+                emit(4, StrykeTokenTypes.PIPE)
+            c == '~' && peek(1) == 'p' && peek(2) == '>' && peek(3) == '>' ->
+                emit(4, StrykeTokenTypes.PIPE)
+            c == '~' && peek(1) == 'd' && peek(2) == '>' && peek(3) == '>' ->
+                emit(4, StrykeTokenTypes.PIPE)
+            c == '~' && peek(1) == 's' && peek(2) == '>' -> emit(3, StrykeTokenTypes.PIPE)
+            c == '~' && peek(1) == 'p' && peek(2) == '>' -> emit(3, StrykeTokenTypes.PIPE)
+            c == '~' && peek(1) == 'd' && peek(2) == '>' -> emit(3, StrykeTokenTypes.PIPE)
+            c == '~' && peek(1) == '>' && peek(2) == '>' -> emit(3, StrykeTokenTypes.PIPE)
             c == '~' && peek(1) == '>' -> emit(2, StrykeTokenTypes.PIPE)
             c == '=' && peek(1) == '~' -> emit(2, StrykeTokenTypes.REGEX_BIND)
             c == '!' && peek(1) == '~' -> emit(2, StrykeTokenTypes.REGEX_BIND)
@@ -541,16 +569,35 @@ class StrykeLexer : LexerBase() {
             }
             return
         }
-        // Underscore positional block params: `_0`, `_1`, ..., `$_0`, `@_0` (less common)
-        if (buf[p] == '_' && p + 1 < endOffset && buf[p + 1].isDigit()) {
-            p += 2
+        // Underscore positional block params with outer-chain ascent:
+        //   `_0`, `_1`, ..., `_N`              — positional
+        //   `_<<<<<`                           — outer-chain (any N of `<`)
+        //   `_<N`                              — indexed-ascent shortcut
+        //   `_N<<<<<` / `_N<M`                 — combined
+        //   Sigiled variants:                  `$_0`, `$_<<<<<`, `$_<3`, etc.
+        if (buf[p] == '_' && p + 1 < endOffset
+            && (buf[p + 1].isDigit() || buf[p + 1] == '<')) {
+            p++ // consume `_`
             while (p < endOffset && buf[p].isDigit()) p++
+            // Optional `<<<...` outer-chain.
+            while (p < endOffset && buf[p] == '<') {
+                p++
+                // After a SINGLE `<`, allow `<N` indexed-ascent
+                // shortcut: digit(s) instead of more `<`s. Continue
+                // consuming digits then exit the chevron loop.
+                if (p < endOffset && buf[p].isDigit()) {
+                    while (p < endOffset && buf[p].isDigit()) p++
+                    break
+                }
+            }
             tokenEnd = p; pos = p
             tokenType = StrykeTokenTypes.BLOCK_PARAM
             return
         }
-        // Bare `$_` / `@_` (no extra char) is the topic.
-        if (buf[p] == '_' && (p + 1 >= endOffset || !buf[p + 1].isLetterOrDigit() && buf[p + 1] != '_' && buf[p + 1] != ':')) {
+        // Bare `$_` / `@_` (no extra char) is the topic. Also allow
+        // `$_<<<<<` / `$_<3` to flow into the block-param branch
+        // above when `<` follows; this branch catches plain `$_`.
+        if (buf[p] == '_' && (p + 1 >= endOffset || !buf[p + 1].isLetterOrDigit() && buf[p + 1] != '_' && buf[p + 1] != ':' && buf[p + 1] != '<')) {
             p++
             tokenEnd = p; pos = p
             tokenType = StrykeTokenTypes.TOPIC_VAR
@@ -602,6 +649,30 @@ class StrykeLexer : LexerBase() {
     private fun consumeWord() {
         var p = pos
         while (p < endOffset && (buf[p] == '_' || buf[p].isLetterOrDigit())) p++
+        // Stryke implicit block params with outer-chain ascent.
+        // When the word starts with `_` and consists ONLY of `_` +
+        // optional digits (i.e. `_`, `_0`, `_1`, …, `_N`), extend
+        // it with trailing `<<<<<` chevrons or a `<N` indexed-
+        // ascent shortcut. Matches the Rust lexer's behavior for
+        // bare-form block params (`_<3` ≡ `_<<<`, `_<<<<<` ≡ 5-deep).
+        val wordBytes = buf.subSequence(pos, p)
+        val isUnderscoreBlockParam = wordBytes.length >= 1
+            && wordBytes[0] == '_'
+            && (1 until wordBytes.length).all { wordBytes[it].isDigit() }
+        if (isUnderscoreBlockParam && p < endOffset && buf[p] == '<') {
+            // Consume chevrons. After ONE `<`, if digit(s) follow,
+            // accept them as the indexed-ascent form `_<N` and stop.
+            while (p < endOffset && buf[p] == '<') {
+                p++
+                if (p < endOffset && buf[p].isDigit()) {
+                    while (p < endOffset && buf[p].isDigit()) p++
+                    break
+                }
+            }
+            tokenEnd = p; pos = p
+            tokenType = StrykeTokenTypes.BLOCK_PARAM
+            return
+        }
         // `::` package separator immediately after the segment? Emit
         // just this segment as PACKAGE_NAME and let the lexer's next
         // advance() consume the `::` (which dispatches to the `:`
