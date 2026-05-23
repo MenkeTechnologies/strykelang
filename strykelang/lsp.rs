@@ -1389,6 +1389,11 @@ pub(crate) enum HoverGate {
     Code,
     /// Inside a `#` line comment or `#!` shebang.
     Comment,
+    /// Inside a string literal (`"..."`, `'...'`, or backtick). Cursor
+    /// on a word that happens to spell a builtin must NOT pop the
+    /// builtin doc — `"length"` in a string is the literal text, not
+    /// the `length` builtin.
+    StringLiteral,
     /// `$obj->method` — the identifier is a method-call selector.
     MethodSelector,
     /// `$h{key}` — the identifier is a hash subscript key.
@@ -1397,12 +1402,69 @@ pub(crate) enum HoverGate {
     FatCommaKey,
 }
 
+/// True when the identifier at `[start, end)` falls inside a single-
+/// line string literal (`"..."`, `'...'`, or backtick). Walks the
+/// line from byte 0 tracking string-quote state with backslash escape
+/// awareness, stopping at the byte that opens a `#`-line comment.
+/// Heredocs and multi-line strings aren't detected here — they need
+/// document-level state which classify_hover_position doesn't carry.
+fn position_inside_string_literal(line_text: &str, start: usize, end: usize) -> bool {
+    let bytes = line_text.as_bytes();
+    let limit = start.min(bytes.len());
+    let mut i = 0;
+    let mut in_str: Option<u8> = None;
+    while i < limit {
+        let c = bytes[i];
+        if let Some(q) = in_str {
+            if c == b'\\' && i + 1 < bytes.len() {
+                i += 2;
+                continue;
+            }
+            if c == q {
+                in_str = None;
+            }
+            i += 1;
+            continue;
+        }
+        match c {
+            b'#' => return false,
+            b'"' | b'\'' | b'`' => in_str = Some(c),
+            _ => {}
+        }
+        i += 1;
+    }
+    if in_str.is_none() {
+        return false;
+    }
+    // Inside an open quote at `start`. The identifier is in-string
+    // unless the closing quote sits BEFORE `end` AND we walk back to
+    // out-of-string before `end`. Cheap approximation: the identifier
+    // is fully inside the string when the same quote doesn't reappear
+    // in `[start, end)`.
+    let q = in_str.unwrap();
+    let mut j = start;
+    while j < end.min(bytes.len()) {
+        if bytes[j] == b'\\' && j + 1 < bytes.len() {
+            j += 2;
+            continue;
+        }
+        if bytes[j] == q {
+            return false;
+        }
+        j += 1;
+    }
+    true
+}
+
 /// Classify the identifier at `[start, end)` of `line_text` for hover
 /// suppression. Exposed so [`hover`] can log the decision and tests can
 /// pin every case without faking up a whole document.
 pub(crate) fn classify_hover_position(line_text: &str, start: usize, end: usize) -> HoverGate {
     if line_starts_comment_before(line_text, start) {
         return HoverGate::Comment;
+    }
+    if position_inside_string_literal(line_text, start, end) {
+        return HoverGate::StringLiteral;
     }
     // `->method`: skip back across whitespace then look for `->`.
     {
@@ -4162,6 +4224,24 @@ struct CompletionIndex {
     hashes: BTreeSet<String>,
     subs_short: BTreeSet<String>,
     subs_qualified: BTreeSet<String>,
+    // User-declared Types — separated by kind so the CompletionItemKind
+    // can carry the right icon in the picker (Class/Struct/Enum/Trait).
+    types_class: BTreeSet<String>,
+    types_struct: BTreeSet<String>,
+    types_enum: BTreeSet<String>,
+    types_trait: BTreeSet<String>,
+    // Enum name → set of declared variant names. Drives qualified
+    // completion `EnumName::<tab>` listing every variant.
+    enum_variants: std::collections::BTreeMap<String, BTreeSet<String>>,
+    // `format NAME = ... .` declarations — referenced by `write NAME` /
+    // `select NAME`.
+    formats: BTreeSet<String>,
+    // `use constant NAME => value` / `use constant { A => 1 }` — each
+    // name binds to a callable that returns the value.
+    constants: BTreeSet<String>,
+    // Loop labels (`LOOP: while {...}`) — referenced by `last LOOP` /
+    // `next LOOP` / `redo LOOP`.
+    loop_labels: BTreeSet<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -6748,7 +6828,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         // ── System ──────────────────────────────────────────────────────
         "mounts" | "disk_mounts" | "filesystems" => "`mounts` (aliases `disk_mounts`, `filesystems`) — list mounted filesystems with usage (total, used, available).\n\n```perl\nmy @m = mounts()\nfor (@m) { p \"_->{mount}: _->{used}/_->{total}\" }\n```",
         "thread_count" | "nthreads" => "`thread_count` (alias `nthreads`) — return the rayon thread pool size.\n\n```perl\np nthreads()   # e.g. 8\n```",
-        "pool_info" | "par_info" => "`pool_info` (alias `par_info`) — return thread pool details as a hashref (threads, queued, active).\n\n```perl\nmy $info = par_info()\np $info->{threads}\n```",
+        "pool_info" | "par_info" => "`pool_info` (alias `par_info`) — thread-pool + host metadata as a hashref. Useful for sizing parallel work, gating on architecture, and reporting in benchmarks.\n\n**Keys (always present):**\n\n| key | type | meaning |\n|---|---|---|\n| `cpus` | Int | logical-CPU count from `available_parallelism` (hyperthreads counted) |\n| `rayon_threads` | Int | current rayon worker-pool size (what `pmap` / `pfor` / `pgrep` use) |\n| `arch` | Str | build target architecture: `aarch64`, `x86_64`, `riscv64`, … |\n| `os` | Str | build target OS: `macos`, `linux`, `freebsd`, `windows`, … |\n\n**macOS-only keys** (populated via `sysctlbyname` on Apple Silicon / Intel Macs):\n\n| key | type | meaning |\n|---|---|---|\n| `perf_cores` | Int | performance-core count (`hw.perflevel0.physicalcpu`) |\n| `eff_cores`  | Int | efficiency-core count (`hw.perflevel1.physicalcpu`) |\n\n```perl\nmy $info = pool_info()\np $info->{cpus}            # 12 (e.g. M3 Pro)\np $info->{rayon_threads}   # 12\np $info->{arch}            # \"aarch64\"\np $info->{os}              # \"macos\"\np $info->{perf_cores}      # 6     (Apple Silicon only)\np $info->{eff_cores}       # 4     (Apple Silicon only)\n\n# Sizing parallel work to perf cores when available:\nmy $n = $info->{perf_cores} // $info->{rayon_threads}\n@inputs |> pmap { heavy(_) }\n```\n\nSee also: `thread_count`, `par_bench`, `pmap`, `pfor`, `pgrep`, `set_pool_size`.",
         "par_bench" | "pbench" => "`par_bench` (alias `pbench`) — run a parallel throughput benchmark and return results.\n\n```perl\nmy $result = pbench(1000000)\np $result->{ops_per_sec}\n```",
 
         // ── Stress Testing ───────────────────────────────────────────────
@@ -9645,7 +9725,24 @@ fn completions(
     let mode = line_completion_mode(line_text, byte_col);
 
     let mut idx = CompletionIndex::default();
-    if let Ok(program) = crate::parse_with_file(text, &path) {
+    // Mid-typing falls into a recoverable parse error (`Demo::` waiting
+    // for a name). Try the live text first; if it doesn't parse, retry
+    // with the cursor's line blanked out so completion can still index
+    // the rest of the file. Without this, `Demo::<tab>` returns zero
+    // qualified subs because the whole file failed to parse.
+    let parsed = crate::parse_with_file(text, &path).or_else(|_| {
+        let mut buf = String::with_capacity(text.len());
+        for (i, l) in text.lines().enumerate() {
+            if i == pos.line as usize {
+                buf.push('\n');
+            } else {
+                buf.push_str(l);
+                buf.push('\n');
+            }
+        }
+        crate::parse_with_file(&buf, &path)
+    });
+    if let Ok(program) = parsed {
         let mut pkg = String::from("main");
         for stmt in &program.statements {
             visit_stmt_for_index(stmt, &mut pkg, &mut idx);
@@ -9731,11 +9828,20 @@ fn qualified_sub_completions(
         if !fqn_matches(pkg_prefix, partial, fqn) {
             continue;
         }
+        // The user already typed `pkg_prefix` (`Demo::`). If we hand
+        // the client a CompletionItem whose label/insert_text is the
+        // FQN (`Demo::handle`), IntelliJ appends it AFTER the typed
+        // `Demo::`, producing `Demo::Demo::handle`. Set `insert_text`
+        // to the SUFFIX-only form and `filter_text` so user-typed
+        // text still matches; keep the FQN as the visible label.
+        let suffix = fqn.strip_prefix(pkg_prefix).unwrap_or(fqn).to_string();
         let doc = doc_for_label(fqn.rsplit("::").next().unwrap_or(fqn.as_str()));
         items.push(CompletionItem {
             label: fqn.clone(),
             kind: Some(CompletionItemKind::FUNCTION),
             detail: Some("fn (qualified)".to_string()),
+            insert_text: Some(suffix.clone()),
+            filter_text: Some(suffix),
             documentation: doc,
             ..Default::default()
         });
@@ -9769,9 +9875,82 @@ fn sigil_completions(
 
 fn bare_completions(filter: &str, idx: &CompletionIndex) -> Vec<CompletionItem> {
     let mut items = Vec::new();
+    // User-declared Types: classify each kind so the IDE renders the
+    // proper icon (Class / Struct / Enum / Interface). Emit BEFORE the
+    // generic `subs_short` loop so the type's CompletionItemKind isn't
+    // overwritten by the FUNCTION fallback.
+    let mut emitted_types: BTreeSet<String> = BTreeSet::new();
+    let mut push_type = |name: &str, kind: CompletionItemKind, detail: &'static str,
+                          items: &mut Vec<CompletionItem>| {
+        if !filter.is_empty() && !name.starts_with(filter) {
+            return;
+        }
+        emitted_types.insert(name.to_string());
+        items.push(CompletionItem {
+            label: name.to_string(),
+            kind: Some(kind),
+            detail: Some(detail.to_string()),
+            documentation: doc_for_label(name),
+            ..Default::default()
+        });
+    };
+    for t in &idx.types_class {
+        push_type(t, CompletionItemKind::CLASS, "class", &mut items);
+    }
+    for t in &idx.types_struct {
+        push_type(t, CompletionItemKind::STRUCT, "struct", &mut items);
+    }
+    for t in &idx.types_enum {
+        push_type(t, CompletionItemKind::ENUM, "enum", &mut items);
+    }
+    for t in &idx.types_trait {
+        push_type(t, CompletionItemKind::INTERFACE, "trait", &mut items);
+    }
+    // `use constant NAME => value` — render as Constant items.
+    for c in &idx.constants {
+        if !filter.is_empty() && !c.starts_with(filter) {
+            continue;
+        }
+        items.push(CompletionItem {
+            label: c.clone(),
+            kind: Some(CompletionItemKind::CONSTANT),
+            detail: Some("use constant".to_string()),
+            documentation: doc_for_label(c),
+            ..Default::default()
+        });
+    }
+    // Format names — referenced by `write NAME` / `select NAME`.
+    for f in &idx.formats {
+        if !filter.is_empty() && !f.starts_with(filter) {
+            continue;
+        }
+        items.push(CompletionItem {
+            label: f.clone(),
+            kind: Some(CompletionItemKind::FILE),
+            detail: Some("format".to_string()),
+            documentation: None,
+            ..Default::default()
+        });
+    }
+    // Loop labels — for `last LOOP` / `next LOOP` / `redo LOOP`.
+    for l in &idx.loop_labels {
+        if !filter.is_empty() && !l.starts_with(filter) {
+            continue;
+        }
+        items.push(CompletionItem {
+            label: l.clone(),
+            kind: Some(CompletionItemKind::REFERENCE),
+            detail: Some("loop label".to_string()),
+            documentation: None,
+            ..Default::default()
+        });
+    }
     for s in &idx.subs_short {
         if !filter.is_empty() && !s.starts_with(filter) {
             continue;
+        }
+        if emitted_types.contains(s) {
+            continue; // already emitted as Class/Struct/Enum/Trait
         }
         let doc = doc_for_label(s.as_str());
         items.push(CompletionItem {
@@ -10154,6 +10333,43 @@ fn collect_array_pattern(elems: &[MatchArrayElem], idx: &mut CompletionIndex) {
     }
 }
 
+/// Walk `use constant NAME => value` / `use constant { A => 1, B => 2 }`
+/// imports, registering each bare-name key as a callable. Mirrors the
+/// shapes accepted by [`StaticAnalyzer::collect_use_constant_names`].
+fn collect_constant_imports(imports: &[crate::ast::Expr], idx: &mut CompletionIndex) {
+    use crate::ast::ExprKind;
+    fn record(idx: &mut CompletionIndex, e: &crate::ast::Expr) {
+        if let ExprKind::String(s) | ExprKind::Bareword(s) = &e.kind {
+            idx.constants.insert(s.clone());
+            idx.subs_short.insert(s.clone());
+        }
+    }
+    for imp in imports {
+        match &imp.kind {
+            // `use constant NAME => 42` parses as one List of
+            // [String("NAME"), Integer(42), …]. Treat even-indexed
+            // elements as keys.
+            ExprKind::List(items) => {
+                let mut j = 0;
+                while j < items.len() {
+                    record(idx, &items[j]);
+                    j += 2;
+                }
+            }
+            // `use constant { A => 1, B => 2 }` parses as a HashRef.
+            ExprKind::HashRef(entries) => {
+                for (k, _v) in entries {
+                    record(idx, k);
+                }
+            }
+            // `use constant NAME => VALUE` without list wrapping (some
+            // parser paths) — flat bareword/string at top level.
+            ExprKind::String(_) | ExprKind::Bareword(_) => record(idx, imp),
+            _ => {}
+        }
+    }
+}
+
 fn collect_sub_params(params: &[SubSigParam], idx: &mut CompletionIndex) {
     for p in params {
         match p {
@@ -10209,15 +10425,67 @@ fn visit_stmt_for_index(stmt: &Statement, pkg: &mut String, idx: &mut Completion
         StmtKind::My(decls)
         | StmtKind::Our(decls)
         | StmtKind::Local(decls)
-        | StmtKind::MySync(decls) => {
+        | StmtKind::State(decls)
+        | StmtKind::MySync(decls)
+        | StmtKind::OurSync(decls) => {
             collect_var_decls(decls, idx);
         }
+        // Type declarations — index the type name for bare completion
+        // AND register each variant of an enum so `EnumName::<tab>`
+        // lists every variant.
+        StmtKind::StructDecl { def } => {
+            idx.types_struct.insert(def.name.clone());
+            idx.subs_short.insert(def.name.clone());
+        }
+        StmtKind::ClassDecl { def, .. } => {
+            idx.types_class.insert(def.name.clone());
+            idx.subs_short.insert(def.name.clone());
+            for m in &def.methods {
+                if m.is_static {
+                    idx.subs_qualified
+                        .insert(format!("{}::{}", def.name, m.name));
+                }
+            }
+            for sf in &def.static_fields {
+                idx.subs_qualified
+                    .insert(format!("{}::{}", def.name, sf.name));
+            }
+        }
+        StmtKind::EnumDecl { def } => {
+            idx.types_enum.insert(def.name.clone());
+            idx.subs_short.insert(def.name.clone());
+            let entry = idx.enum_variants.entry(def.name.clone()).or_default();
+            for v in &def.variants {
+                entry.insert(v.name.clone());
+                // Variant as a zero-arg constructor — register the
+                // qualified spelling so it shows in `EnumName::<tab>`.
+                idx.subs_qualified
+                    .insert(format!("{}::{}", def.name, v.name));
+            }
+        }
+        StmtKind::TraitDecl { def } => {
+            idx.types_trait.insert(def.name.clone());
+            idx.subs_short.insert(def.name.clone());
+        }
+        // `format NAME = ... .` — referenced by `write NAME` / `select`.
+        StmtKind::FormatDecl { name, .. } => {
+            idx.formats.insert(name.clone());
+        }
+        // `use constant NAME => value` / `use constant { A => 1, ... }`
+        // — every key becomes a callable that returns the value.
+        StmtKind::Use { module, imports } if module == "constant" => {
+            collect_constant_imports(imports, idx);
+        }
         StmtKind::Foreach {
+            label,
             var,
             body,
             continue_block,
             ..
         } => {
+            if let Some(l) = label {
+                idx.loop_labels.insert(l.clone());
+            }
             idx.scalars.insert(var.clone());
             visit_block_for_index(body, pkg, idx);
             if let Some(b) = continue_block {
@@ -10255,15 +10523,20 @@ fn visit_stmt_for_index(stmt: &Statement, pkg: &mut String, idx: &mut Completion
             }
         }
         StmtKind::While {
+            label,
             body,
             continue_block,
             ..
         }
         | StmtKind::Until {
+            label,
             body,
             continue_block,
             ..
         } => {
+            if let Some(l) = label {
+                idx.loop_labels.insert(l.clone());
+            }
             visit_block_for_index(body, pkg, idx);
             if let Some(b) = continue_block {
                 visit_block_for_index(b, pkg, idx);
@@ -10273,9 +10546,13 @@ fn visit_stmt_for_index(stmt: &Statement, pkg: &mut String, idx: &mut Completion
         StmtKind::For {
             init,
             body,
+            label,
             continue_block,
             ..
         } => {
+            if let Some(l) = label {
+                idx.loop_labels.insert(l.clone());
+            }
             if let Some(init) = init {
                 visit_stmt_for_index(init, pkg, idx);
             }

@@ -1,0 +1,72 @@
+#!/usr/bin/env stryke
+
+# Pinning batch: Combinatorics — permutations, combinations, partitions, Catalan, Bell.
+# Compliance: docs/STYLE_GUIDE.md
+
+fn Cmb::nCr = fact(_) / (fact(_1) * fact(_ - _1))
+fn Cmb::nPr = fact(_) / fact(_ - _1)
+
+fact(0)  |> aeq 1,       "0!"
+fact(5)  |> aeq 120,     "5!"
+fact(10) |> aeq 3628800, "10!"
+
+Cmb::nCr(5, 2)  |> aeq 10,  "C(5,2)"
+Cmb::nCr(10, 3) |> aeq 120, "C(10,3)"
+Cmb::nCr(6, 0)  |> aeq 1,   "C(6,0)"
+Cmb::nCr(6, 6)  |> aeq 1,   "C(6,6)"
+
+Cmb::nPr(5, 2)  |> aeq 20,  "P(5,2)"
+Cmb::nPr(10, 3) |> aeq 720, "P(10,3)"
+Cmb::nPr(4, 4)  |> aeq 24,  "P(4,4)"
+
+# Catalan C_n = C(2n,n)/(n+1)
+fn Cmb::catalan = Cmb::nCr(2 * _, _) / (_ + 1)
+Cmb::catalan(0) |> aeq 1,   "Cat(0)"
+Cmb::catalan(1) |> aeq 1,   "Cat(1)"
+Cmb::catalan(4) |> aeq 14,  "Cat(4)"
+Cmb::catalan(6) |> aeq 132, "Cat(6)"
+
+# Stirling 2nd kind
+fn Cmb::stirling($n, $k) {
+    return 1 if $n == 0 && $k == 0
+    return 0 if $n == 0 || $k == 0
+    $k * Cmb::stirling($n - 1, $k) + Cmb::stirling($n - 1, $k - 1)
+}
+
+Cmb::stirling(4, 2) |> aeq 7,  "S(4,2)"
+Cmb::stirling(5, 3) |> aeq 25, "S(5,3)"
+
+# Bell B_n = sum stirling(n,k) for k=0..n
+fn Cmb::bell { (0:_) |> maps { Cmb::stirling(_<, _) } |> sum }
+Cmb::bell(0) |> aeq 1,  "B(0)"
+Cmb::bell(3) |> aeq 5,  "B(3)"
+Cmb::bell(4) |> aeq 15, "B(4)"
+
+# Integer partitions p(n)
+fn Cmb::part($n, $m) {
+    return 1 if $n == 0
+    return 0 if $n < 0 || $m == 0
+    Cmb::part($n - $m, $m) + Cmb::part($n, $m - 1)
+}
+fn Cmb::partitions = Cmb::part(_, _)
+
+Cmb::partitions(4) |> aeq 5,  "p(4)"
+Cmb::partitions(5) |> aeq 7,  "p(5)"
+Cmb::partitions(6) |> aeq 11, "p(6)"
+
+# Pascal's triangle row
+fn Cmb::pascal_row { my @r = (0:_) |> maps { Cmb::nCr(_<, _) }; \@r }
+join(" ", @{Cmb::pascal_row(4)}) |> aeq "1 4 6 4 1",        "pascal 4"
+join(" ", @{Cmb::pascal_row(6)}) |> aeq "1 6 15 20 15 6 1", "pascal 6"
+
+# Derangements !n = (n-1)*(!(n-1) + !(n-2))
+fn Cmb::der {
+    return 1 if _ == 0
+    return 0 if _ == 1
+    (_ - 1) * (Cmb::der(_ - 1) + Cmb::der(_ - 2))
+}
+Cmb::der(4) |> aeq 9,    "!4"
+Cmb::der(5) |> aeq 44,   "!5"
+Cmb::der(6) |> aeq 265,  "!6"
+
+test_run

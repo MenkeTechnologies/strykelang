@@ -1,0 +1,106 @@
+#!/usr/bin/env stryke
+
+# Caesar / Vigenère / atbash ciphers.
+
+fn Cipher::shift_char($c, $n) {
+    if ($c =~ /[A-Z]/) {
+        chr((ord($c) - ord('A') + $n) % 26 + ord('A'))
+    } elsif ($c =~ /[a-z]/) {
+        chr((ord($c) - ord('a') + $n) % 26 + ord('a'))
+    } else {
+        $c
+    }
+}
+
+fn Cipher::caesar($s, $n) {
+    my $shift = (($n % 26) + 26) % 26
+    join "", maps { Cipher::shift_char(_, $shift) } split //, $s
+}
+
+Cipher::caesar("ABC", 1)               |> aeq "BCD",                  "caesar +1"
+Cipher::caesar("XYZ", 3)               |> aeq "ABC",                  "caesar wrap"
+Cipher::caesar("Hello, World!", 13)    |> aeq "Uryyb, Jbeyq!",        "rot13"
+Cipher::caesar(Cipher::caesar("hi", 13), 13) |> aeq "hi",             "rot13 roundtrip"
+Cipher::caesar("abc", -1)              |> aeq "zab",                  "caesar -1"
+Cipher::caesar("abc", 26)              |> aeq "abc",                  "caesar 26 identity"
+Cipher::caesar("abc", 0)               |> aeq "abc",                  "caesar 0 identity"
+
+# Atbash (a↔z, b↔y, ...)
+fn Cipher::atbash($s) {
+    join "", maps {
+        if (/[A-Z]/) { chr(ord('Z') - (ord(_) - ord('A'))) }
+        elsif (/[a-z]/) { chr(ord('z') - (ord(_) - ord('a'))) }
+        else { _ }
+    } split //, $s
+}
+
+Cipher::atbash("a")                |> aeq "z",          "atbash a"
+Cipher::atbash("z")                |> aeq "a",          "atbash z"
+Cipher::atbash("abc")              |> aeq "zyx",        "atbash abc"
+Cipher::atbash("Hello, World!")    |> aeq "Svool, Dliow!", "atbash hello"
+Cipher::atbash(Cipher::atbash("stryke")) |> aeq "stryke",   "atbash roundtrip"
+
+# Vigenère
+fn Cipher::vigenere($s, $key, $sign) {
+    my @kchars = grep /[A-Za-z]/, split //, lc $key
+    return $s if len(@kchars) == 0
+    my $ki = 0
+    my $out = ""
+    for my $ch (split //, $s) {
+        if ($ch =~ /[A-Za-z]/) {
+            my $shift = ord($kchars[$ki % len(@kchars)]) - ord('a')
+            $out .= Cipher::shift_char($ch, $sign * $shift)
+            $ki++
+        } else {
+            $out .= $ch
+        }
+    }
+    $out
+}
+
+fn Cipher::vig_encode = Cipher::vigenere(_, _1, 1)
+fn Cipher::vig_decode = Cipher::vigenere(_, _1, -1)
+
+Cipher::vig_encode("attackatdawn", "lemon") |> aeq "lxfopvefrnhr", "vigenere classic"
+Cipher::vig_decode("lxfopvefrnhr", "lemon") |> aeq "attackatdawn", "vigenere decode"
+Cipher::vig_decode(Cipher::vig_encode("stryke is the power-user language", "key"), "key")
+  |> aeq "stryke is the power-user language", "vigenere roundtrip"
+
+# Empty key short-circuit
+Cipher::vig_encode("plaintext", "") |> aeq "plaintext", "vigenere empty key"
+
+# Letter frequency
+fn Letters::freq($s) {
+    my %f = ()
+    for my $ch (split //, lc $s) {
+        $f{$ch}++ if $ch =~ /[a-z]/
+    }
+    \%f
+}
+
+my $f = Letters::freq("Mississippi")
+$f->{s} |> aeq 4, "freq s in Mississippi"
+$f->{i} |> aeq 4, "freq i in Mississippi"
+$f->{p} |> aeq 2, "freq p in Mississippi"
+$f->{m} |> aeq 1, "freq m in Mississippi"
+
+# Most common letter
+fn Letters::most_common($s) {
+    my $f = Letters::freq($s)
+    return undef if len(keys %$f) == 0
+    (sort { $f->{_1} <=> $f->{_} } keys %$f)[0]
+}
+
+Letters::most_common("Mississippi") =~ /^[is]$/ |> aok "most common is/i or s"
+Letters::most_common("aaabbc") |> aeq "a", "most common a"
+Letters::most_common("") |> aeq undef, "most common empty"
+
+# Anagram check
+fn Cipher::is_anagram = join("", sort split //, lc(_ =~ s/\s+//gr)) eq
+                       join("", sort split //, lc(_1 =~ s/\s+//gr))
+
+Cipher::is_anagram("listen", "silent") |> aok "listen / silent"
+Cipher::is_anagram("Astronomer", "Moon starer") |> aok "astronomer / moon starer"
+Cipher::is_anagram("hello", "world") |> aeq 0, "hello / world"
+
+test_run

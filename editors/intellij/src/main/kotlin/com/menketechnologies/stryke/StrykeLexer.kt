@@ -760,6 +760,7 @@ class StrykeLexer : LexerBase() {
             return
         }
         val word = buf.subSequence(pos, p).toString()
+        val wordStart = pos
         tokenEnd = p; pos = p
 
         // Distinguish FUNCTION_DECL / FUNCTION_CALL / LABEL from
@@ -768,9 +769,14 @@ class StrykeLexer : LexerBase() {
         //     `enum` / `method` / `impl` → FUNCTION_DECL.
         //   - Followed by `(` → FUNCTION_CALL.
         //   - Followed by single `:` (not `::`) → LABEL.
-        // Bare unknown identifier falls through to IDENTIFIER.
+        //   - Inside `->{KEY}` or `$h{KEY}` hash subscript → IDENTIFIER
+        //     (force bareword; `state`/`my`/`for`/`if` etc. are valid
+        //     hash keys and must not render as keywords).
+        //   - Followed by `=>` (fat-comma autoquote) → IDENTIFIER.
         val classified = classifyWord(word)
+        val inHashKey = isHashKeyContext(wordStart) || nextIsFatArrow(p)
         tokenType = when {
+            inHashKey -> StrykeTokenTypes.IDENTIFIER
             classified == StrykeTokenTypes.IDENTIFIER && lastWasFnIntro ->
                 StrykeTokenTypes.FUNCTION_DECL
             classified == StrykeTokenTypes.IDENTIFIER && peekNextNonSpace(p) == '(' ->
@@ -779,8 +785,51 @@ class StrykeLexer : LexerBase() {
                 StrykeTokenTypes.LABEL
             else -> classified
         }
-        // Update fn-intro state for the NEXT consumeWord call.
-        lastWasFnIntro = classified == StrykeTokenTypes.FN_KEYWORD
+        // Update fn-intro state for the NEXT consumeWord call. Skip the
+        // update when this word is itself a hash-key bareword (it can't
+        // introduce a fn body).
+        lastWasFnIntro = !inHashKey && classified == StrykeTokenTypes.FN_KEYWORD
+    }
+
+    /**
+     * True when the word at `wordStart` sits inside a hash-subscript:
+     * `$h{KEY}`, `@h{K1,K2}`, `%h{KEY}`, `$ref->{KEY}`, `${expr}{KEY}`,
+     * etc. Used to keep Perl-keyword spellings (`state`, `my`, `for`,
+     * `if`, `last`, ...) classified as bareword IDENTIFIER inside hash
+     * keys, not as keyword tokens.
+     */
+    private fun isHashKeyContext(wordStart: Int): Boolean {
+        var i = wordStart - 1
+        while (i >= 0 && (buf[i] == ' ' || buf[i] == '\t')) i--
+        if (i < 0 || buf[i] != '{') return false
+        // Char immediately before the `{`.
+        if (i == 0) return false
+        val before = buf[i - 1]
+        if (before == '>' && i >= 2 && buf[i - 2] == '-') return true // `->{`
+        if (before == '}') return true // `${expr}{KEY}` chained
+        if (before.isLetterOrDigit() || before == '_') {
+            // Walk back to start of the ident run.
+            var j = i - 1
+            while (j > 0 && (buf[j - 1].isLetterOrDigit() || buf[j - 1] == '_')) j--
+            // If the char immediately before the run is `$`/`@`/`%`,
+            // this is a sigil-var hash subscript (`$h{`, `@h{`, `%h{`).
+            if (j > 0) {
+                val sigil = buf[j - 1]
+                if (sigil == '$' || sigil == '@' || sigil == '%') return true
+            }
+        }
+        return false
+    }
+
+    /**
+     * True when the next non-whitespace token starting at `from` is the
+     * `=>` fat-comma operator. Fat-comma autoquotes the preceding
+     * bareword, so `state => 1` makes `state` a key, not a keyword.
+     */
+    private fun nextIsFatArrow(from: Int): Boolean {
+        var i = from
+        while (i < endOffset && (buf[i] == ' ' || buf[i] == '\t')) i++
+        return i + 1 < endOffset && buf[i] == '=' && buf[i + 1] == '>'
     }
 
     /** Peek the next non-whitespace char (newlines included as whitespace). */

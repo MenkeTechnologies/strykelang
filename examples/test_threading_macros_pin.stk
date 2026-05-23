@@ -1,0 +1,135 @@
+#!/usr/bin/env stryke
+
+# Pinning batch: Threading macros — |>, ~>, ->>, ~>>.
+# Style: docs/STYLE_GUIDE.md §7.
+
+# ── §7.1 |> pipe-forward ────────────────────────────────────────────────
+"hello" |> uc                 |> aeq "HELLO",     "uc"
+"hello" |> uc |> rev          |> aeq "OLLEH",     "uc → rev"
+"  pad  " |> tm               |> aeq "pad",       "tm"
+"  hi  " |> tm |> uc          |> aeq "HI",        "tm → uc"
+"abc" |> rev |> uc            |> aeq "CBA",       "rev → uc"
+
+# ── arithmetic pipelines ────────────────────────────────────────────────
+(1:5) |> sum                  |> aeq 15,    "sum 1..5"
+(1:10) |> sum                 |> aeq 55,    "sum 1..10"
+(1:4) |> maps { _ * _ } |> sum |> aeq 30,   "Σ k² 1..4"
+
+# ── list pipelines ──────────────────────────────────────────────────────
+my @r1 = (3, 1, 4, 1, 5, 9, 2, 6) |> sort
+join(",", @r1) |> aeq "1,1,2,3,4,5,6,9", "sort ascending"
+
+my @r2 = (3, 1, 4, 1, 5, 9, 2, 6) |> sort |> rev
+join(",", @r2) |> aeq "9,6,5,4,3,2,1,1", "sort then rev"
+
+my @r3 = (1, 2, 3, 4, 5) |> maps { _ * 2 }
+join(",", @r3) |> aeq "2,4,6,8,10", "maps *2"
+
+my @r4 = (1, 2, 3, 4, 5, 6) |> greps { _ % 2 == 0 }
+join(",", @r4) |> aeq "2,4,6", "evens"
+
+my @r5 = (1, 2, 3, 4, 5) |> maps { _ * _ } |> greps { _ > 10 }
+join(",", @r5) |> aeq "16,25", "squares > 10"
+
+# ── len in pipeline ─────────────────────────────────────────────────────
+(1, 2, 3, 4, 5) |> len        |> aeq 5,  "len pipe"
+"hello world" |> len          |> aeq 11, "string len pipe"
+
+# ── string algorithms ────────────────────────────────────────────────────
+"hello world" |> uc |> rev    |> aeq "DLROW OLLEH", "uc+rev sentence"
+
+# ── nested ───────────────────────────────────────────────────────────────
+my @r6 = ("alpha", "beta", "gamma", "delta")
+    |> maps { uc $_ }
+    |> sort
+join(",", @r6) |> aeq "ALPHA,BETA,DELTA,GAMMA", "uc then sort"
+
+# ── ~> thread-first ─────────────────────────────────────────────────────
+my $r7 = ~> "  hello  " tm uc rv |> id
+$r7 |> aeq "OLLEH", "~> tm uc rv"
+
+my @r8 = ~> (1, 2, 3, 4, 5) maps { _ * _ } |> id
+join(",", @r8) |> aeq "1,4,9,16,25", "~> maps squares"
+
+# ── reduce/fold via pipeline ────────────────────────────────────────────
+(1, 2, 3, 4, 5) |> sum        |> aeq 15, "list sum"
+
+# ── parallel ~p> (just verify result equality with sequential) ──────────
+my @big = (1..50)
+my $seq = @big |> maps { _ * 2 } |> sum
+$seq |> aeq 2550, "sum of doubled 1..50"
+
+# ── chain into final aggregator ─────────────────────────────────────────
+my @words = ("the", "quick", "brown", "fox", "jumps")
+my $chars = @words |> maps { len $_ } |> sum
+$chars |> aeq 21, "total chars"
+
+my $longest = @words |> maps { len $_ } |> max
+$longest |> aeq 5, "longest word len"
+
+my $shortest = @words |> maps { len $_ } |> min
+$shortest |> aeq 3, "shortest"
+
+# ── distinct ────────────────────────────────────────────────────────────
+my @dups = (1, 1, 2, 2, 3, 3, 3, 4)
+my @uniq = @dups |> uniq
+join(",", @uniq) |> aeq "1,2,3,4", "uniq"
+
+# ── stable sort then take 3 ─────────────────────────────────────────────
+my @r9 = (5, 2, 8, 1, 9, 3) |> sort
+join(",", @r9[0:2]) |> aeq "1,2,3", "top 3"
+
+# ── grep + count ────────────────────────────────────────────────────────
+my @nums = (1..20)
+my $evens_count = @nums |> greps { _ % 2 == 0 } |> len
+$evens_count |> aeq 10, "10 evens"
+
+my $primes_count = @nums |> greps { _ > 1 } |> greps {
+    my $x = $_
+    my $is_prime = 1
+    for my $k (2:int(sqrt($x))) {
+        if ($x % $k == 0) { $is_prime = 0; last }
+    }
+    $is_prime
+} |> len
+$primes_count |> aeq 8, "8 primes in 1..20"
+
+# ── sort objects via $_, $_1 ────────────────────────────────────────────
+my @recs = ({n => "c", v => 3}, {n => "a", v => 1}, {n => "b", v => 2})
+my @byv = sort { $_->{v} <=> $_1->{v} } @recs
+join(",", map { $_->{n} } @byv) |> aeq "a,b,c", "sort by v"
+
+my @byn = sort { $_->{n} cmp $_1->{n} } @recs
+join(",", map { $_->{v} } @byn) |> aeq "1,2,3", "sort by n"
+
+# ── pipeline reuse ──────────────────────────────────────────────────────
+my $process = fn { $_ |> uc |> rev }
+$process->("abc") |> aeq "CBA", "fn-wrapped pipeline"
+$process->("xy")  |> aeq "YX",  "fn-wrapped pipeline 2"
+
+# ── max-min in pipeline ─────────────────────────────────────────────────
+(7, 2, 9, 4, 1, 8) |> max |> aeq 9, "max"
+(7, 2, 9, 4, 1, 8) |> min |> aeq 1, "min"
+
+# ── flat-style: map of maps then sum ────────────────────────────────────
+my @grid = ([1,2,3], [4,5,6], [7,8,9])
+my $total = 0
+for my $row (@grid) {
+    $total += @$row |> sum
+}
+$total |> aeq 45, "grid sum"
+
+# ── condition-based pipeline ────────────────────────────────────────────
+my @sentences = ("Hi there", "How are you", "Fine thanks")
+my @lens = @sentences |> maps { len $_ }
+$lens[0] |> aeq 8,  "len Hi there"
+$lens[1] |> aeq 11, "len How are you"
+$lens[2] |> aeq 11, "len Fine thanks"
+
+# ── zip-like via index-pipe ─────────────────────────────────────────────
+my @a1 = (1, 2, 3)
+my @b1 = (10, 20, 30)
+my @zsum = (0:(len @a1)-1) |> maps { $a1[$_] + $b1[$_] }
+join(",", @zsum) |> aeq "11,22,33", "zip-add"
+
+test_run

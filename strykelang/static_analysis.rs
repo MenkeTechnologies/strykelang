@@ -830,6 +830,31 @@ impl StaticAnalyzer {
 
     fn analyze_expr(&mut self, expr: &Expr) {
         match &expr.kind {
+            // `$#name` — the Perl last-index-of-array form. The parser
+            // surfaces it as `ScalarVar("#name")`; resolve to the
+            // underlying `@name` so a defined array satisfies the
+            // check. Bare `$#` (no name) is the magic "last index of
+            // $_" form — always defined.
+            ExprKind::ScalarVar(name)
+                if self.strict_vars
+                    && name.starts_with('#')
+                    && !self.is_array_defined(&name[1..])
+                    && !name.is_empty() =>
+            {
+                if name.len() > 1 {
+                    self.error(
+                        ErrorKind::UndefinedVariable,
+                        format!(
+                            "Global symbol \"@{}\" requires explicit package name",
+                            &name[1..]
+                        ),
+                        expr.line,
+                    );
+                }
+            }
+            ExprKind::ScalarVar(name) if name.starts_with('#') => {
+                // `$#name` with @name defined OR bare `$#` — no-op.
+            }
             ExprKind::ScalarVar(name) if self.strict_vars && !self.is_scalar_defined(name) => {
                 self.error(
                     ErrorKind::UndefinedVariable,
@@ -1369,8 +1394,92 @@ impl StaticAnalyzer {
                     self.analyze_expr(c);
                 }
             }
+            ExprKind::AlgebraicMatch { subject, arms } => {
+                self.analyze_expr(subject);
+                for arm in arms {
+                    self.check_match_pattern(&arm.pattern, expr.line);
+                    if let Some(g) = &arm.guard {
+                        self.analyze_expr(g);
+                    }
+                    self.analyze_expr(&arm.body);
+                }
+            }
             _ => {}
         }
+    }
+
+    /// Walk a match arm pattern. The only shape that gets a typo check
+    /// is `MatchPattern::Value(ExprKind::String("Type::Variant"))` —
+    /// the parser auto-quotes bareword enum patterns into String, so
+    /// `Sig::Hup => "..."` arrives here as a String literal, not a
+    /// FuncCall (which would have already been linted as undefined sub).
+    /// Other pattern shapes (Regex, Array, Hash, Any, OptionSome) walk
+    /// their inner exprs for ordinary var-defined-ness checks.
+    fn check_match_pattern(&mut self, pat: &crate::ast::MatchPattern, line: usize) {
+        use crate::ast::{MatchArrayElem, MatchHashPair, MatchPattern};
+        match pat {
+            MatchPattern::Value(e) => {
+                if let ExprKind::String(s) = &e.kind {
+                    self.check_qualified_variant_string(s, line);
+                }
+                self.analyze_expr(e);
+            }
+            MatchPattern::Array(elems) => {
+                for el in elems {
+                    if let MatchArrayElem::Expr(e) = el {
+                        self.analyze_expr(e);
+                    }
+                }
+            }
+            MatchPattern::Hash(pairs) => {
+                for p in pairs {
+                    match p {
+                        MatchHashPair::KeyOnly { key } => self.analyze_expr(key),
+                        MatchHashPair::Capture { key, .. } => self.analyze_expr(key),
+                    }
+                }
+            }
+            MatchPattern::Any
+            | MatchPattern::Regex { .. }
+            | MatchPattern::OptionSome(_) => {}
+        }
+    }
+
+    /// `Sig::Term2` arriving as an auto-quoted match-arm pattern. If
+    /// `Sig` is a known enum and `Term2` isn't one of its variants,
+    /// emit a typo-catching diagnostic with the available variants
+    /// listed. Same shape as the `$obj->method` / `Type->new(field => v)`
+    /// checks already in place.
+    fn check_qualified_variant_string(&mut self, s: &str, line: usize) {
+        let Some(idx) = s.rfind("::") else { return };
+        let type_name = &s[..idx];
+        let variant = &s[idx + 2..];
+        if type_name.is_empty() || variant.is_empty() {
+            return;
+        }
+        let type_bare = type_name.rsplit("::").next().unwrap_or(type_name);
+        let known = self
+            .type_fields
+            .get(type_name)
+            .or_else(|| self.type_fields.get(type_bare));
+        let Some(variants) = known else { return };
+        if variants.contains(variant) {
+            return;
+        }
+        let mut available: Vec<&str> = variants.iter().map(String::as_str).collect();
+        available.sort();
+        let avail = if available.is_empty() {
+            "(no variants declared)".to_string()
+        } else {
+            available.join(", ")
+        };
+        self.error(
+            ErrorKind::UndefinedSubroutine,
+            format!(
+                "`{type_name}::{variant}` — no variant `{variant}` on `{type_name}`; available: {avail}"
+            ),
+            line,
+        );
     }
 }
 
@@ -1394,6 +1503,18 @@ fn is_special_var(name: &str) -> bool {
             | "ISA"
             | "EXPORT"
             | "EXPORT_OK"
+            // AOP advice-body context vars — declared by the VM at the
+            // entry of every `before`/`after`/`around` body. Visible
+            // outside an advice block as ordinary globals (cheap, no
+            // pollution), so always-defined is the right model.
+            | "INTERCEPT_NAME"
+            | "INTERCEPT_ARGS"
+            | "INTERCEPT_RESULT"
+            | "INTERCEPT_MS"
+            | "INTERCEPT_US"
+            // stryke-VERSION qualifiers + meta-constants commonly
+            // referenced in module headers and never declared.
+            | "stryke::VERSION"
     )
 }
 
@@ -1405,7 +1526,45 @@ fn is_special_var(name: &str) -> bool {
 /// extended uniformly to scalar / array / hash sigils — `$_1`, `@_1[0]`,
 /// `%_1{k}` are all legitimate topic-var spellings.
 fn is_topic_var(name: &str) -> bool {
-    name.starts_with('_') && name.len() > 1 && name[1..].chars().all(|c| c.is_ascii_digit())
+    // Stryke block-param grammar (sigil already stripped):
+    //   `_`                — bare topic
+    //   `_N`               — Nth positional arg
+    //   `_<<<<<`           — outer-chain, any depth of `<`
+    //   `_<N`              — indexed-ascent shortcut
+    //   `_N<<<<<` / `_N<M` — positional + outer chain combined
+    // Pattern: `_` then (digits? then chevrons? then digits?), with at
+    // least one chevron OR digit after `_<` to disambiguate from a
+    // bare `_<` operator pair.
+    if !name.starts_with('_') {
+        return false;
+    }
+    let rest = &name[1..];
+    if rest.is_empty() {
+        return true; // bare `_`
+    }
+    let bytes = rest.as_bytes();
+    let mut i = 0;
+    // Optional positional digits.
+    while i < bytes.len() && bytes[i].is_ascii_digit() {
+        i += 1;
+    }
+    let digits_consumed = i;
+    if i == bytes.len() {
+        // `_N` — pure positional. Must have at least one digit.
+        return digits_consumed > 0;
+    }
+    // Optional `<...` outer-chain segment.
+    if bytes[i] != b'<' {
+        return false;
+    }
+    while i < bytes.len() && bytes[i] == b'<' {
+        i += 1;
+    }
+    // Optional trailing digits (indexed-ascent shortcut).
+    while i < bytes.len() && bytes[i].is_ascii_digit() {
+        i += 1;
+    }
+    i == bytes.len()
 }
 
 /// Map a `require` spec to a filesystem path. `./path` and `../path` resolve
@@ -1812,6 +1971,53 @@ mod tests {
             )
             .is_ok()
         );
+    }
+
+    #[test]
+    fn strict_never_flags_topic_variants() {
+        // Stryke topic / block-param family — strict-vars must never
+        // flag ANY of these as undefined, regardless of sigil or shape.
+        let cases = [
+            // Bare topic + positional.
+            "_", "_0", "_1", "_42",
+            // Outer-chain.
+            "_<", "_<<<<<",
+            // Indexed-ascent.
+            "_<3", "_<10",
+            // Positional + outer chain combined.
+            "_2<", "_2<<<", "_2<5",
+        ];
+        for name in cases {
+            assert!(
+                super::is_topic_var(name),
+                "is_topic_var({name:?}) must return true (topic/block-param form)",
+            );
+        }
+        // Run the analyzer on each form (sigiled + bare contexts) to
+        // ensure no UndefinedVariable error fires.
+        let src = "use strict\np _ + _1 + _< + _<2 + _<<<<< + _2<<< + _2<5\n";
+        let prog = crate::parse_with_file(src, "test.stk").expect("parse");
+        super::analyze_program_with_strict(&prog, "test.stk", true)
+            .expect("strict-vars must not flag topic-variant block params");
+    }
+
+    #[test]
+    fn strict_never_flags_sigiled_topic_variants() {
+        // Same set but with `$` sigil prefix — `is_topic_var` is called
+        // with the bare name (sigil already stripped by the AST), so
+        // the bare-name check is what matters.
+        let src = "use strict\nmy $tot = $_ + $_0 + $_1 + $_< + $_<2 + $_<<<<< + $_2<<< + $_2<5\np $tot\n";
+        let prog = crate::parse_with_file(src, "test.stk").expect("parse");
+        super::analyze_program_with_strict(&prog, "test.stk", true)
+            .expect("strict-vars must not flag sigiled topic-variant block params");
+    }
+
+    #[test]
+    fn strict_still_flags_undefined_underscore_prefixed_ident() {
+        // Guardrail: an identifier that merely *starts* with `_` (like
+        // `$_underscore_name`) is NOT a topic var and SHOULD be flagged.
+        let r = lint("p $_underscore_name");
+        assert!(r.is_err(), "expected $_underscore_name to be flagged");
     }
 
     #[test]

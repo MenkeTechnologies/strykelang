@@ -1,0 +1,113 @@
+#!/usr/bin/env stryke
+
+# Pinning batch: OOP — shapes with traits, polymorphism, and threading.
+# Style: docs/STYLE_GUIDE.md — `impl Trait`, `$self->field`, |> pipelines.
+
+trait Drawable { fn draw }
+trait Sized    { fn area }
+trait Bounded  { fn perimeter }
+
+class Square impl Drawable, Sized, Bounded {
+    name: Str  = "sq"
+    side: Float = 1.0
+    fn draw      = "□(" . $self->side . ")"
+    fn area      = $self->side * $self->side
+    fn perimeter = 4 * $self->side
+}
+
+class Rectangle impl Drawable, Sized, Bounded {
+    name: Str  = "rc"
+    w: Float = 1.0
+    h: Float = 1.0
+    fn draw      = "▭(" . $self->w . "x" . $self->h . ")"
+    fn area      = $self->w * $self->h
+    fn perimeter = 2 * ($self->w + $self->h)
+}
+
+class Circle impl Drawable, Sized, Bounded {
+    name: Str = "ci"
+    r: Float = 1.0
+    fn draw      = "○(" . $self->r . ")"
+    fn area      = 3.141592653589793 * $self->r * $self->r
+    fn perimeter = 2 * 3.141592653589793 * $self->r
+}
+
+class Triangle impl Drawable, Sized, Bounded {
+    name: Str = "tr"
+    a: Float = 1.0
+    b: Float = 1.0
+    c: Float = 1.0
+    fn draw      = "△(" . $self->a . "," . $self->b . "," . $self->c . ")"
+    fn perimeter = $self->a + $self->b + $self->c
+    fn area {
+        my $s = $self->perimeter() / 2
+        sqrt($s * ($s - $self->a) * ($s - $self->b) * ($s - $self->c))
+    }
+}
+
+my $sq = Square->new(side => 5.0)
+my $rc = Rectangle->new(w => 4.0, h => 3.0)
+my $ci = Circle->new(r => 2.0)
+my $tr = Triangle->new(a => 3.0, b => 4.0, c => 5.0)
+
+$sq->draw()       |> aeq "□(5)",       "draw sq"
+$rc->draw()       |> aeq "▭(4x3)",     "draw rc"
+$ci->draw()       |> aeq "○(2)",       "draw ci"
+$tr->draw()       |> aeq "△(3,4,5)",   "draw tr"
+
+$sq->area()       |> aeq 25,   "area sq"
+$rc->area()       |> aeq 12,   "area rc"
+abs($ci->area() - 12.566370614359172) < 1e-9 |> aeq 1, "area ci"
+abs($tr->area() - 6) < 1e-9                  |> aeq 1, "area tr (3-4-5)"
+
+$sq->perimeter()  |> aeq 20,   "peri sq"
+$rc->perimeter()  |> aeq 14,   "peri rc"
+abs($ci->perimeter() - 12.566370614359172) < 1e-9 |> aeq 1, "peri ci"
+$tr->perimeter()  |> aeq 12,   "peri tr"
+
+# Polymorphic dispatch via array + pipelines
+my @shapes = ($sq, $rc, $ci, $tr)
+
+my @drawn = @shapes |> maps { $_->draw() }
+join("|", @drawn) |> aeq "□(5)|▭(4x3)|○(2)|△(3,4,5)", "polymorphic draw"
+
+my @areas = @shapes |> maps { $_->area() }
+my $total = 0
+$total += $_ for @areas
+abs($total - (25 + 12 + 12.566370614359172 + 6)) < 1e-9 |> aeq 1, "Σ areas"
+
+# Filter: big shapes (area > 10)
+my @big_names = @shapes |> greps { $_->area() > 10 } |> maps { $_->name() }
+join(",", @big_names) |> aeq "sq,rc,ci", "big names"
+
+# Sort by area (ascending) and pick smallest/biggest
+my @sorted = sort { $_->area() <=> $_1->area() } @shapes
+$sorted[0]->name()  |> aeq "tr", "smallest area is tr (6)"
+$sorted[-1]->name() |> aeq "sq", "largest area is sq (25)"
+
+# isa / ref / can
+ref($sq)              |> aeq "Square",    "ref sq"
+$sq->isa("Square")    |> aok                "sq isa Square"
+$sq->isa("Rectangle") |> aeq "",             "sq NOT Rectangle"
+
+# All shapes can draw (verify by call, not `can`)
+my @ds = ()
+push @ds, $_->draw() for @shapes
+(len @ds) |> aeq 4, "4 drawables"
+
+# Aggregate stats
+my @ps = @shapes |> maps { $_->perimeter() }
+my $sum_p = 0
+$sum_p += $_ for @ps
+abs($sum_p - (20 + 14 + 12.566370614359172 + 12)) < 1e-9 |> aeq 1, "Σ perimeters"
+
+# Sort by name lex
+my @byname = sort { $_->name() cmp $_1->name() } @shapes
+join(",", map { $_->name() } @byname) |> aeq "ci,rc,sq,tr", "sorted names"
+
+# Count distinct classes
+my %distinct = ()
+$distinct{ref($_)} = 1 for @shapes
+(len keys %distinct) |> aeq 4, "4 distinct shape classes"
+
+test_run
