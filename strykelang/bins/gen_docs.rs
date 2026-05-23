@@ -51,11 +51,55 @@ fn stamp_index_version() {
         return;
     };
     let e = after + e_rel;
-    // Everything after the first ` · ` stays — that's the static tagline
-    // content ("Rust-powered · Rayon work-stealing …").
+
+    // Pull live reflection counts so the build line stays in sync with
+    // every release — `gen-docs` is the canonical regenerator, so the
+    // numbers reflect WHATEVER the current source tree exposes.
+    let n_builtins = stryke::builtins::builtins_hash_map().len();
+    let n_all = stryke::builtins::all_hash_map().len();
+    let fmt_count = |n: usize| -> String {
+        // ASCII thousand separators (`10,335`). Walk right-to-left
+        // so the comma cadence is independent of total length.
+        let s = n.to_string();
+        let mut rev = String::with_capacity(s.len() + s.len() / 3);
+        for (i, c) in s.chars().rev().enumerate() {
+            if i > 0 && i % 3 == 0 {
+                rev.push(',');
+            }
+            rev.push(c);
+        }
+        rev.chars().rev().collect()
+    };
+    let n_builtins_str = fmt_count(n_builtins);
+    let n_all_str = fmt_count(n_all);
+
+    // Build line shape: `stryke v{V} · {tagline segments…} · {N} builtins ({M} keys in %all) · {trailing}`.
+    // The `{tagline segments…}` and `{trailing}` parts stay verbatim;
+    // we splice the dynamic counts in by pattern. If the pattern
+    // isn't present (older index.html), append the count segment to
+    // the existing tail.
     let current = &src[after..e];
     let tail = current.find(" · ").map(|i| &current[i..]).unwrap_or("");
-    let replacement = format!("stryke v{version}{tail}");
+    let count_segment = format!(" · {n_builtins_str} builtins ({n_all_str} keys in %all)");
+    let tail_with_counts: String =
+        if let Some(re) = regex_replace_count_segment(tail, &count_segment) {
+            re
+        } else {
+            // No prior counts segment — insert one before the final ` · `
+            // trailing tagline (LSP + DAP + JetBrains plugin).
+            if let Some(last_sep) = tail.rfind(" · ") {
+                format!(
+                    "{}{}{}",
+                    &tail[..last_sep],
+                    count_segment,
+                    &tail[last_sep..]
+                )
+            } else {
+                format!("{tail}{count_segment}")
+            }
+        };
+
+    let replacement = format!("stryke v{version}{tail_with_counts}");
     if current == replacement {
         return;
     }
@@ -67,7 +111,67 @@ fn stamp_index_version() {
         &src[e + needle_end.len()..]
     );
     fs::write(&path, new_src).expect("write docs/index.html");
-    println!("stamped docs/index.html with v{version}");
+    println!(
+        "stamped docs/index.html with v{version} ({n_builtins_str} builtins, {n_all_str} keys in %all)"
+    );
+}
+
+/// Replace the existing `· N,NNN builtins (M,MMM keys in %all)` segment
+/// in `tail` (everything from the first ` · ` onward) with `new_seg`.
+/// Returns `Some(...)` on hit, `None` on miss (caller falls back to
+/// inserting a fresh segment).
+fn regex_replace_count_segment(tail: &str, new_seg: &str) -> Option<String> {
+    // Match ` · ` then digits + optional thousand-separator commas then
+    // ` builtins (` then digits + optional commas then ` keys in %all)`.
+    // Hand-rolled to avoid pulling in a regex crate for one-shot use.
+    let bytes = tail.as_bytes();
+    let mut i = 0;
+    while i + 4 < bytes.len() {
+        // Look for " · " (UTF-8 for ` · ` = " \xc2\xb7 ").
+        if bytes[i] == b' '
+            && i + 2 < bytes.len()
+            && bytes[i + 1] == 0xc2
+            && bytes[i + 2] == 0xb7
+            && i + 3 < bytes.len()
+            && bytes[i + 3] == b' '
+        {
+            let segment_start = i;
+            // After " · ", consume `[0-9,]+ builtins (`.
+            let mut j = i + 4;
+            let n_start = j;
+            while j < bytes.len() && (bytes[j].is_ascii_digit() || bytes[j] == b',') {
+                j += 1;
+            }
+            if j == n_start {
+                i += 1;
+                continue;
+            }
+            let middle = " builtins (";
+            if !tail[j..].starts_with(middle) {
+                i += 1;
+                continue;
+            }
+            j += middle.len();
+            let m_start = j;
+            while j < bytes.len() && (bytes[j].is_ascii_digit() || bytes[j] == b',') {
+                j += 1;
+            }
+            if j == m_start {
+                i += 1;
+                continue;
+            }
+            let end = " keys in %all)";
+            if !tail[j..].starts_with(end) {
+                i += 1;
+                continue;
+            }
+            j += end.len();
+            // Found the segment from `segment_start..j`; replace.
+            return Some(format!("{}{}{}", &tail[..segment_start], new_seg, &tail[j..]));
+        }
+        i += 1;
+    }
+    None
 }
 
 fn build_page() -> String {
