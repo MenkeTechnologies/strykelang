@@ -37,7 +37,7 @@ fn Pin::BugsPhase3::test_slurp {
     my ($first, @rest) = @_
     len(@rest)
 }
-Pin::BugsPhase3::test_slurp(1, 2, 3) |> aeq 2, "my ($s, @rest) = @_ correctly takes tail"
+Pin::BugsPhase3::test_slurp(1, 2, 3) |> aeq 2, 'my ($s, @rest) = @_ correctly takes tail'
 
 my @items = (10, 20, 30)
 my ($x_single) = @items

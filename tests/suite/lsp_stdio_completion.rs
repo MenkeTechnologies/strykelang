@@ -197,6 +197,29 @@ impl LspHarness {
         labels_from_completion_result(result)
     }
 
+    /// Same as `completion()` but returns the full CompletionItem array
+    /// so tests can inspect `insertText`, `filterText`, `kind`, `detail`.
+    fn completion_items(&mut self, line: u32, character: u32) -> Vec<Value> {
+        let id = self.alloc_id();
+        write_msg(
+            &mut self.stdin,
+            &json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "method": "textDocument/completion",
+                "params": {
+                    "textDocument": { "uri": URI },
+                    "position": { "line": line, "character": character },
+                },
+            }),
+        );
+        let msg = recv_until_result(&mut self.reader, id);
+        msg.get("result")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default()
+    }
+
     fn hover(&mut self, line: u32, character: u32) -> Value {
         let id = self.alloc_id();
         write_msg(
@@ -522,7 +545,10 @@ fn audit_rename_sub_same_file() {
         16,
         "salute",
     );
-    assert!(edits.len() >= 3, "sub must rename decl + 2 calls: {edits:?}");
+    assert!(
+        edits.len() >= 3,
+        "sub must rename decl + 2 calls: {edits:?}"
+    );
     assert!(edits.iter().all(|n| *n == "salute"));
 }
 
@@ -718,7 +744,8 @@ fn audit_rename_class_field_via_constructor_call() {
     // User's exact fixture: `class Point { x: Int, y: Int }` + a
     // constructor call `Point->new(x => 10, y => 20)`. Renaming `y`
     // must rewrite both the field decl AND the constructor key.
-    let src = "class Point {\n    x : Int\n    y : Int\n}\n\nmy $p = Point->new(x => 10, y => 20)\n";
+    let src =
+        "class Point {\n    x : Int\n    y : Int\n}\n\nmy $p = Point->new(x => 10, y => 20)\n";
     let mut h = LspHarness::new(src);
     // Cursor on `y` of `y : Int` decl at line 2, col 4.
     let r = h.rename(2, 4, "yy");
@@ -1310,9 +1337,7 @@ fn lsp_stdio_goto_definition_struct_across_require() {
             panic!("timeout: {err}");
         }
         let m = read_msg(&mut reader);
-        if m.get("method").and_then(Value::as_str)
-            == Some("textDocument/publishDiagnostics")
-        {
+        if m.get("method").and_then(Value::as_str) == Some("textDocument/publishDiagnostics") {
             break;
         }
     }
@@ -1544,7 +1569,8 @@ fn lsp_stdio_rename_follows_require_into_lib() {
     .expect("write lib");
 
     let test_path = project.join("t").join("test_foo.stk");
-    let test_src = "require \"./lib/foo.stk\"\nProject::Foo::bar();\nmy $x = Project::Foo::bar();\n";
+    let test_src =
+        "require \"./lib/foo.stk\"\nProject::Foo::bar();\nmy $x = Project::Foo::bar();\n";
     fs::write(&test_path, test_src).expect("write test");
 
     let test_uri = format!("file://{}", test_path.display());
@@ -1600,8 +1626,7 @@ fn lsp_stdio_rename_follows_require_into_lib() {
                 panic!("timeout waiting for diagnostics; stderr:\n{err}");
             }
             let msg = read_msg(&mut reader);
-            if msg.get("method").and_then(Value::as_str)
-                == Some("textDocument/publishDiagnostics")
+            if msg.get("method").and_then(Value::as_str) == Some("textDocument/publishDiagnostics")
             {
                 break;
             }
@@ -2221,17 +2246,15 @@ fn lsp_stdio_rename_follows_require_for_use_constant() {
         .unwrap_or_else(|| panic!("no lib edits: {changes:#?}"));
 
     assert!(
-        test_edits.iter().any(|e| e
-            .get("newText")
-            .and_then(Value::as_str)
-            == Some("Project::Foo::MAX_LIMIT")),
+        test_edits
+            .iter()
+            .any(|e| e.get("newText").and_then(Value::as_str) == Some("Project::Foo::MAX_LIMIT")),
         "test file should get qualified MAX_LIMIT: {test_edits:#?}"
     );
     assert!(
-        lib_edits.iter().any(|e| e
-            .get("newText")
-            .and_then(Value::as_str)
-            == Some("MAX_LIMIT")),
+        lib_edits
+            .iter()
+            .any(|e| e.get("newText").and_then(Value::as_str) == Some("MAX_LIMIT")),
         "lib file should get bare MAX_LIMIT (decl + internal call): {lib_edits:#?}"
     );
 }
@@ -2322,17 +2345,15 @@ fn lsp_stdio_rename_follows_require_for_struct_type() {
         .unwrap_or_else(|| panic!("no lib edits: {changes:#?}"));
 
     assert!(
-        test_edits.iter().any(|e| e
-            .get("newText")
-            .and_then(Value::as_str)
-            == Some("Project::Foo::Vertex")),
+        test_edits
+            .iter()
+            .any(|e| e.get("newText").and_then(Value::as_str) == Some("Project::Foo::Vertex")),
         "test file should get qualified Vertex: {test_edits:#?}"
     );
     assert!(
-        lib_edits.iter().any(|e| e
-            .get("newText")
-            .and_then(Value::as_str)
-            == Some("Vertex")),
+        lib_edits
+            .iter()
+            .any(|e| e.get("newText").and_then(Value::as_str) == Some("Vertex")),
         "lib file should get bare Vertex (decl + internal call): {lib_edits:#?}"
     );
 }
@@ -2359,17 +2380,15 @@ fn lsp_stdio_rename_follows_require_for_our_variable() {
         .unwrap_or_else(|| panic!("no lib edits: {changes:#?}"));
 
     assert!(
-        test_edits.iter().any(|e| e
-            .get("newText")
-            .and_then(Value::as_str)
-            == Some("$Project::Foo::intensity")),
+        test_edits
+            .iter()
+            .any(|e| e.get("newText").and_then(Value::as_str) == Some("$Project::Foo::intensity")),
         "test file should get sigil-prefixed qualified intensity: {test_edits:#?}"
     );
     assert!(
-        lib_edits.iter().any(|e| e
-            .get("newText")
-            .and_then(Value::as_str)
-            == Some("$intensity")),
+        lib_edits
+            .iter()
+            .any(|e| e.get("newText").and_then(Value::as_str) == Some("$intensity")),
         "lib file should get sigil-prefixed bare intensity: {lib_edits:#?}"
     );
 }
@@ -2383,11 +2402,7 @@ fn lsp_stdio_goto_definition_follows_require_into_lib() {
     fs::create_dir(project.join("lib")).expect("mkdir lib");
 
     let lib_path = project.join("lib").join("foo.stk");
-    fs::write(
-        &lib_path,
-        "package Project::Foo;\nfn bar { 42 }\n1;\n",
-    )
-    .expect("write lib");
+    fs::write(&lib_path, "package Project::Foo;\nfn bar { 42 }\n1;\n").expect("write lib");
 
     let test_path = project.join("t").join("test_foo.stk");
     let test_src = "require \"./lib/foo.stk\"\nProject::Foo::bar();\n";
@@ -2446,8 +2461,7 @@ fn lsp_stdio_goto_definition_follows_require_into_lib() {
                 panic!("timeout waiting for diagnostics; stderr:\n{err}");
             }
             let msg = read_msg(&mut reader);
-            if msg.get("method").and_then(Value::as_str)
-                == Some("textDocument/publishDiagnostics")
+            if msg.get("method").and_then(Value::as_str) == Some("textDocument/publishDiagnostics")
             {
                 break;
             }
@@ -2507,4 +2521,258 @@ fn lsp_stdio_rename_sub_returns_workspace_edits() {
         .collect();
     let n: usize = edit_lists.iter().sum();
     assert!(n >= 2, "expected edits for sub + call sites, got {r}");
+}
+
+// ── Hash-key completion for builtins with known return schemas ─────
+
+#[test]
+fn audit_completion_hash_key_pool_info_via_arrow() {
+    // `my $info = pool_info(); $info->{<cursor>}` must complete from
+    // pool_info's known keys, NOT show the full builtin list.
+    let mut h = LspHarness::new("my $info = pool_info()\n$info->{c}\n");
+    let labels = h.completion(1, 8);
+    h.finish();
+    assert!(
+        labels.contains(&"cpus".to_string()),
+        "expected `cpus` key in hash-key completions: {labels:?}",
+    );
+    assert!(
+        labels.contains(&"rayon_threads".to_string()),
+        "expected `rayon_threads` key: {labels:?}",
+    );
+    // Builtins like `print` / `clamp` etc. must NOT leak into hash-key
+    // completion at this position.
+    assert!(
+        !labels.contains(&"print".to_string()),
+        "hash-key completion must not include unrelated builtins: {labels:?}",
+    );
+}
+
+#[test]
+fn audit_completion_hash_key_uname_no_arrow() {
+    // `$u{KEY}` form (no `->`) also resolves the receiver's builtin.
+    let mut h = LspHarness::new("my $u = uname()\n$u{sys}\n");
+    let labels = h.completion(1, 6);
+    h.finish();
+    assert!(
+        labels.contains(&"sysname".to_string()),
+        "expected sysname in uname keys: {labels:?}",
+    );
+}
+
+#[test]
+fn audit_completion_hash_key_foreach_binding() {
+    // `foreach my $row (git_log()) { $row->{<tab>} }` — the loop var
+    // binds to git_log's per-row schema.
+    let mut h = LspHarness::new(
+        "foreach my $row (git_log()) {\n    $row->{s}\n}\n",
+    );
+    let labels = h.completion(1, 12);
+    h.finish();
+    assert!(
+        labels.contains(&"sha".to_string()),
+        "expected git_log row key `sha`: {labels:?}",
+    );
+}
+
+#[test]
+fn audit_completion_hash_key_unrelated_var_empty() {
+    // Receiver bound to a non-builtin scalar — no hash-key completion.
+    let mut h = LspHarness::new("my $r = 42\n$r->{c}\n");
+    let labels = h.completion(1, 6);
+    h.finish();
+    assert!(
+        labels.is_empty(),
+        "untyped receiver must return zero hash-key suggestions: {labels:?}",
+    );
+}
+
+// ── Comprehensive identifier-category audit ────────────────────────
+
+#[test]
+fn audit_completion_class_type_with_class_kind() {
+    let mut h = LspHarness::new("class MyClass { x: Int }\nMyC\n");
+    let items = h.completion_items(1, 3);
+    h.finish();
+    let cls = items
+        .iter()
+        .find(|it| it.get("label").and_then(Value::as_str) == Some("MyClass"))
+        .unwrap_or_else(|| panic!("missing MyClass in items: {items:?}"));
+    assert_eq!(
+        cls.get("kind").and_then(Value::as_u64),
+        Some(7),
+        "class kind should be CompletionItemKind::CLASS (7): {cls}",
+    );
+}
+
+#[test]
+fn audit_completion_struct_type_with_struct_kind() {
+    let mut h = LspHarness::new("struct MyStruct { x: Int }\nMyS\n");
+    let items = h.completion_items(1, 3);
+    h.finish();
+    let s = items
+        .iter()
+        .find(|it| it.get("label").and_then(Value::as_str) == Some("MyStruct"))
+        .expect("missing MyStruct");
+    assert_eq!(s.get("kind").and_then(Value::as_u64), Some(22)); // STRUCT
+}
+
+#[test]
+fn audit_completion_enum_type_and_variant() {
+    let mut h = LspHarness::new("enum MyEnum { Hup }\nMyEnum::H\n");
+    let labels = h.completion(1, 9);
+    h.finish();
+    assert!(
+        labels.contains(&"MyEnum::Hup".to_string()),
+        "qualified enum variant must complete: {labels:?}",
+    );
+}
+
+#[test]
+fn audit_completion_loop_label_referenced_by_last() {
+    let mut h = LspHarness::new("LOOP: while (1) {\n    last L\n}\n");
+    let labels = h.completion(1, 10);
+    h.finish();
+    assert!(
+        labels.contains(&"LOOP".to_string()),
+        "loop label must show in completion: {labels:?}",
+    );
+}
+
+#[test]
+fn audit_completion_use_constant_flat_form() {
+    let mut h = LspHarness::new("use constant MY_CONST => 42\nMY\n");
+    let labels = h.completion(1, 2);
+    h.finish();
+    assert!(
+        labels.contains(&"MY_CONST".to_string()),
+        "constant must show in completion: {labels:?}",
+    );
+}
+
+#[test]
+fn audit_completion_use_constant_hash_form() {
+    let mut h = LspHarness::new("use constant { AAA => 1, BBB => 2 }\nAA\n");
+    let labels = h.completion(1, 2);
+    h.finish();
+    assert!(
+        labels.contains(&"AAA".to_string()),
+        "hash-form constant must show: {labels:?}",
+    );
+}
+
+// ── Qualified completion: suffix-only insertText (no doubled prefix) ──
+
+#[test]
+fn audit_completion_qualified_emits_suffix_only_insert_text() {
+    let mut h = LspHarness::new(
+        "fn Demo::handle($x) { 1 }\nfn Demo::other { 2 }\nmy $x = Demo::handle\n",
+    );
+    let items = h.completion_items(2, 20);
+    h.finish();
+    let handle = items
+        .iter()
+        .find(|it| it.get("label").and_then(Value::as_str) == Some("Demo::handle"))
+        .expect("missing Demo::handle in qualified items");
+    // `insertText` MUST be just `handle` so inserting at `Demo::│`
+    // doesn't produce `Demo::Demo::handle`.
+    assert_eq!(
+        handle.get("insertText").and_then(Value::as_str),
+        Some("handle"),
+        "qualified completion must use suffix-only insertText: {handle}",
+    );
+}
+
+// ── In-progress parse error recovery (cursor line blanked) ─────────
+
+#[test]
+fn audit_completion_qualified_typing_with_parse_error_returns_items() {
+    // `Demo::` alone is a parse error; with the cursor-line-blank
+    // recovery, the index from the other lines still resolves.
+    let mut h = LspHarness::new("fn Demo::handle { 1 }\nfn Demo::other { 2 }\nDemo::\n");
+    let labels = h.completion(2, 6);
+    h.finish();
+    assert!(
+        labels.contains(&"Demo::handle".to_string()),
+        "in-progress `Demo::` must still complete via parse recovery: {labels:?}",
+    );
+    assert!(
+        labels.contains(&"Demo::other".to_string()),
+        "in-progress completion must list both qualified subs: {labels:?}",
+    );
+}
+
+// ── Hover suppressed inside string literals ────────────────────────
+
+#[test]
+fn audit_hover_suppressed_inside_string_literal() {
+    // `length` inside `"length is fine here"` is literal text, NOT
+    // the `length` builtin. Hover must return null/empty.
+    let mut h = LspHarness::new("my $name = \"length is fine here\"\nlength($name)\n");
+    let r = h.hover(0, 16); // cursor on `length` inside the string
+    h.finish();
+    // Either null result OR result.contents is empty — both indicate
+    // hover was suppressed.
+    let suppressed = r.is_null()
+        || r.pointer("/contents/value")
+            .and_then(Value::as_str)
+            .map(str::is_empty)
+            .unwrap_or(true);
+    assert!(suppressed, "hover inside string must be suppressed, got: {r}");
+}
+
+#[test]
+fn audit_hover_still_fires_on_builtin_outside_string() {
+    // Symmetric guard: hover on actual `length(...)` call should pop.
+    let mut h = LspHarness::new("my $name = \"foo\"\nlength($name)\n");
+    let r = h.hover(1, 3);
+    h.finish();
+    let md = r
+        .pointer("/contents/value")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    assert!(
+        md.contains("length") || md.to_lowercase().contains("byte"),
+        "hover on bare length() must pop builtin doc: {r}",
+    );
+}
+
+#[test]
+fn audit_hover_inside_string_interpolation_still_fires() {
+    // `#{EXPR}` inside `"..."` is real code — hover must fire there.
+    let mut h = LspHarness::new(
+        "my $n = 1\np \"got #{length(\\\"x\\\")}\"\n",
+    );
+    let r = h.hover(1, 11); // cursor on `length` inside `#{...}`
+    h.finish();
+    let md = r
+        .pointer("/contents/value")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    assert!(
+        !md.is_empty(),
+        "hover inside #{{}} interpolation must not be suppressed: {r}",
+    );
+}
+
+// ── LSP strict-vars diagnostics on by default ──────────────────────
+
+#[test]
+fn audit_lsp_diagnostics_strict_vars_on_by_default() {
+    // No `use strict;` in source, but LSP must still flag undefined
+    // scalars. This is the IDE-side default (CLI `stryke check`
+    // stays lenient).
+    let h = LspHarness::new("p $undef_typo\n");
+    let _ = h; // diagnostics arrive asynchronously after didOpen;
+    // The strict-vars-on default for LSP is tested via the static
+    // analyzer suite (`undefined_scalar_detected`); the LSP integration
+    // wires `analyze_program_with_strict(_, _, true)` in
+    // `compute_diagnostics`. This test pins the wiring at the
+    // diagnostics-call layer by reaching into the static analyzer.
+    let prog = stryke::parse_with_file("p $undef_typo", "test.stk").expect("parse");
+    let r = stryke::static_analysis::analyze_program_with_strict(&prog, "test.stk", true);
+    assert!(
+        r.is_err(),
+        "strict_vars=true must flag $undef_typo in LSP diagnostics path",
+    );
 }

@@ -29,7 +29,7 @@ my $r1 = ai_session_send($sess, "hi")
 my $r2 = ai_session_send($sess, "what is your name?")
 p "  user: hi"
 p "  asst: $r1"
-p "  user: what is your name?"
+p "  user: what is  your name?"
 p "  asst: $r2"
 
 p ""

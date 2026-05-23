@@ -1,0 +1,160 @@
+#!/usr/bin/env stryke
+
+# Pinning batch: streaming (~s>), thread-last (~>>), and parallel (~p>)
+# pipelines on numeric/text data — no OOP, just dense macro composition.
+
+# ─── ~s> long streaming pipeline ────────────────────────────────────────
+my @r1 = ~s> (1:30) map { _ + 1 } grep { _ % 2 == 0 } map { _ * _ }
+(len @r1) |> aeq 15, "~s> evens-of-+1 of 1:30 has 15"
+$r1[0]    |> aeq 4,  "~s> first = 2^2"
+$r1[-1]   |> aeq 900, "~s> last = 30^2"
+
+# ─── ~s> with multiple map stages ───────────────────────────────────────
+my @r2 = ~s> (1:5) map { _ * 10 } map { _ + 1 } map { _ - 5 }
+join(",", @r2) |> aeq "6,16,26,36,46", "~s> three maps"
+
+# ─── ~s> grep-only ──────────────────────────────────────────────────────
+my @r3 = ~s> (1:20) grep { _ % 3 == 0 }
+join(",", @r3) |> aeq "3,6,9,12,15,18", "~s> mod-3"
+
+# ─── ~p> sum on big range ───────────────────────────────────────────────
+my @big = (1:200)
+my $bp_sum = ~p> @big sum
+$bp_sum |> aeq 20100, "~p> sum 1:200"
+
+# ─── ~p> count via map-1 + ||> sum (use pre-built array to avoid map-collapse) ──
+my @flags = ~> @big map { _ > 100 ? 1 : 0 }
+my $cnt_gt100 = ~p> @flags sum
+$cnt_gt100 |> aeq 100, "~p> count >100"
+
+# ─── ~p> sum of doubled (intermediate to avoid the ~p>-map collapse) ────
+my @dbl_big = ~> @big map { _ * 2 }
+my $sum_dbl = ~p> @dbl_big sum
+$sum_dbl |> aeq 40200, "~p> sum of doubled 1:200"
+
+# ─── ~>> with reduce-style fn ───────────────────────────────────────────
+fn fold_sum($init, @xs) {
+    my $s = $init
+    for my $x (@xs) { $s = $s + $x }
+    $s
+}
+my $folded = ~>> (1:10) fold_sum(100)
+$folded |> aeq 155, "~>> fold_sum 100 + (1:10)"
+
+# ─── ~>> with key-tagged builder ────────────────────────────────────────
+fn tag_each($k, @xs) {
+    my @r = ()
+    for my $x (@xs) { push @r, $k . "=" . $x }
+    join(";", @r)
+}
+my $tagged = ~>> (1,2,3,4) tag_each("v")
+$tagged |> aeq "v=1;v=2;v=3;v=4", "~>> tag_each"
+
+# ─── ~>> wrapping ─ produces hash ───────────────────────────────────────
+fn my_histo(@xs) {
+    my %h = ()
+    for my $x (@xs) { $h{$x} = ($h{$x} || 0) + 1 }
+    \%h
+}
+my $h = ~>> ("a","b","a","c","a","b") my_histo
+$h->{"a"} |> aeq 3, "~>> my_histo a=3"
+$h->{"b"} |> aeq 2, "~>> my_histo b=2"
+$h->{"c"} |> aeq 1, "~>> my_histo c=1"
+
+# ─── ~> partition via two greps ─────────────────────────────────────────
+my @neg = ~> (-3,-2,-1,0,1,2,3) grep { _ < 0 }
+my @pos = ~> (-3,-2,-1,0,1,2,3) grep { _ > 0 }
+join(",", @neg) |> aeq "-3,-2,-1", "neg part"
+join(",", @pos) |> aeq "1,2,3",     "pos part"
+
+# ─── ~> nested-block: map-of-map ────────────────────────────────────────
+my @flat = ~> (1:5) map { _ * 2 } map { _ + 1 }
+join(",", @flat) |> aeq "3,5,7,9,11", "nested ~> 2x+1"
+
+# ─── ~> with uniq + sort + len composition ──────────────────────────────
+my @bag = (5,3,1,5,2,3,4,2,1)
+my $distinct = ~> @bag uniq len
+$distinct |> aeq 5, "5 distinct"
+my @uq = ~> @bag uniq sort
+join(",", @uq) |> aeq "1,2,3,4,5", "uniq sorted"
+
+# ─── ~s> string-tokenized counts ────────────────────────────────────────
+my @words = ("apple","banana","apple","cherry","banana","apple")
+my @upper = ~s> @words map { uc(_) }
+join(",", @upper) |> aeq "APPLE,BANANA,APPLE,CHERRY,BANANA,APPLE", "~s> upper"
+
+my @lens = ~s> @words map { length(_) }
+join(",", @lens) |> aeq "5,6,5,6,6,5", "~s> lens"
+
+# ─── ~> with grep over strings ─────────────────────────────────────────
+my @short = ~> @words grep { length(_) == 5 }
+(len @short) |> aeq 3, "3 5-letter words"
+
+# ─── ~p> on string-lengths array ────────────────────────────────────────
+my @all_lens = ~> @words map { length(_) }
+my $total_chars = ~p> @all_lens sum
+$total_chars |> aeq 33, "~p> total chars"
+
+# ─── ~>> sort + take pattern ────────────────────────────────────────────
+fn top_n($n, @xs) {
+    my @s = sort { _1 <=> _ } @xs
+    my $end = $n - 1
+    my @sub = @s[0:$end]
+    \@sub
+}
+my $t3 = ~>> (4,1,5,9,2,6,5,3,5,8,9) top_n(3)
+json_encode($t3) |> aeq "[9,9,8]", "~>> top_n 3"
+
+# ─── ~>> bottom_n ───────────────────────────────────────────────────────
+fn bot_n($n, @xs) {
+    my @s = sort { _ <=> _1 } @xs
+    my $end = $n - 1
+    my @sub = @s[0:$end]
+    \@sub
+}
+my $b3 = ~>> (4,1,5,9,2,6,5,3,5,8,9) bot_n(3)
+json_encode($b3) |> aeq "[1,2,3]", "~>> bot_n 3"
+
+# ─── ~p> sum-of-cubes ───────────────────────────────────────────────────
+my @cubes = ~> (1:10) map { _ * _ * _ }
+my $cube_sum = ~p> @cubes sum
+$cube_sum |> aeq 3025, "~p> sum cubes 1:10 = 55^2"
+
+# ─── ~> grep + map + sort all in one chain ──────────────────────────────
+my @grades = (72, 85, 90, 67, 88, 95, 70, 91, 80)
+my @pass_list_desc = ~> @grades grep { _ >= 80 } sort { _1 <=> _ }
+join(",", @pass_list_desc) |> aeq "95,91,90,88,85,80", "passing desc"
+
+my @pass_list_desc2 = ~> @grades grep { _ >= 80 } sort { _1 <=> _ }
+$pass_list_desc2[0] |> aeq 95, "top grade 95"
+
+# avg of passing
+my @hi = ~> @grades grep { _ >= 80 }
+my $hi_avg = (~p> @hi sum) / (len @hi)
+$hi_avg |> aeq ((95+91+90+88+85+80)/6), "passing avg"
+
+# ─── ~s> chain into freq builder ────────────────────────────────────────
+fn freq_of(@xs) {
+    my %h = ()
+    for my $x (@xs) { $h{$x} = ($h{$x} || 0) + 1 }
+    \%h
+}
+my @categories = ~s> (1:10) map { _ % 3 }
+my $f = freq_of(@categories)
+$f->{0} |> aeq 3, "freq 0 → 3"
+$f->{1} |> aeq 4, "freq 1 → 4"
+$f->{2} |> aeq 3, "freq 2 → 3"
+
+# ─── Mixed: ~s> emits, ~>> reduces ─────────────────────────────────────
+my @piped = ~s> (1:6) map { _ * _ }
+my $combined = ~>> @piped fold_sum(0)
+$combined |> aeq 91, "1²+...+6² = 91"
+
+# ─── ~p> count-by-predicate composition ─────────────────────────────────
+my @mod7_flags = ~> (1:100) map { _ % 7 == 0 ? 1 : 0 }
+my $pp = ~p> @mod7_flags sum
+$pp |> aeq 14, "~p> count mod-7 = 14"
+
+aeq 1, 1, "assert_eq"
+
+test_run

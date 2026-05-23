@@ -20672,6 +20672,35 @@ mod tests {
     }
 
     #[test]
+    fn pipe_sort_does_not_swallow_next_my_decl() {
+        // Regression: bare `|> sort` followed by `\n my $x = ...` used
+        // to eat the next stmt as sort's argument list. After the fix,
+        // both statements must appear in the AST.
+        let p = parse_ok("my @s = @data |> sort\nmy $j = join(\",\", @s)");
+        assert_eq!(
+            p.statements.len(),
+            2,
+            "expected 2 stmts (sort + join decl), got {}: {:?}",
+            p.statements.len(),
+            p.statements
+                .iter()
+                .map(|s| format!("{:?}", s.kind).chars().take(60).collect::<String>())
+                .collect::<Vec<_>>(),
+        );
+    }
+
+    #[test]
+    fn pipe_sort_multiline_pipeline_preserves_next_decl() {
+        // Same shape but with maps/grep stages between the source and
+        // `sort` — mirrors the original `test_oop_inventory_threaded_pin`
+        // bug fixture.
+        let p = parse_ok(
+            "my @bk = @{$inv->by_cat(\"bakery\")} |> maps { _->label() } |> sort\nmy $j = join(\"|\", @bk)",
+        );
+        assert_eq!(p.statements.len(), 2);
+    }
+
+    #[test]
     fn parse_pipe_forward() {
         let p = parse_ok("@a |> map { $_ * 2 }");
         assert_eq!(p.statements.len(), 1);

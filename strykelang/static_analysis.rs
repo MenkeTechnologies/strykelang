@@ -77,6 +77,11 @@ pub struct StaticAnalyzer {
     /// A `$self->method_or_field` access is valid only when the name
     /// is either a field of the enclosing class or a method on it.
     type_methods: HashMap<String, HashSet<String>>,
+    /// Per-type parent list — `class Dog extends Animal, Trainable`
+    /// records `Dog → [Animal, Trainable]`. Drives the inherited-
+    /// method lookup so `$self->trail` resolves to `Animal::trail`
+    /// instead of being flagged as unknown on `Dog`.
+    type_parents: HashMap<String, Vec<String>>,
     /// The class/struct being analyzed inside a method body. `None`
     /// outside any type's body. Used to resolve `$self->X` against
     /// the right type's fields + methods.
@@ -111,6 +116,7 @@ impl StaticAnalyzer {
             seen_required_files: HashSet::new(),
             type_fields: HashMap::new(),
             type_methods: HashMap::new(),
+            type_parents: HashMap::new(),
             current_class: None,
         }
     }
@@ -227,6 +233,13 @@ impl StaticAnalyzer {
         if name.starts_with("static::") {
             return true;
         }
+        // Compiler-generated calls emitted by parser desugaring — not
+        // in the user-facing `%b` builtin set but always valid. Keep
+        // this list literal — every entry must correspond to a real
+        // dispatch arm in `builtins.rs`.
+        if matches!(name, "_thread_par_run" | "__stryke_rust_compile") {
+            return true;
+        }
         let base = name.rsplit("::").next().unwrap_or(name);
         if builtins().contains(base) {
             return true;
@@ -339,6 +352,16 @@ impl StaticAnalyzer {
                     methods.insert(m.name.clone());
                 }
                 self.type_methods.insert(def.name.clone(), methods);
+                // Parent classes + implemented traits feed the
+                // inheritance/trait walker so `$self->X` resolves via
+                // any reachable type. `class Dog extends Animal impl
+                // Trainable` — both Animal AND Trainable contribute
+                // methods.
+                let mut parents = def.extends.clone();
+                parents.extend(def.implements.iter().cloned());
+                if !parents.is_empty() {
+                    self.type_parents.insert(def.name.clone(), parents);
+                }
             }
             StmtKind::StructDecl { def } => {
                 self.declare_sub(&def.name);
@@ -366,6 +389,24 @@ impl StaticAnalyzer {
                     fields.insert(v.name.clone());
                 }
                 self.type_fields.insert(def.name.clone(), fields);
+            }
+            // Trait declarations contribute their method set so classes
+            // that `impl Trait` can inherit them through the parent
+            // chain. Without this, `Person impl Greetable` with a
+            // default `fn greeting { ... }` on the trait wouldn't
+            // resolve `$p->greeting`.
+            StmtKind::TraitDecl { def } => {
+                self.declare_sub(&def.name);
+                let mut methods: HashSet<String> = HashSet::new();
+                for m in &def.methods {
+                    methods.insert(m.name.clone());
+                }
+                self.type_methods.insert(def.name.clone(), methods);
+                // Empty field set so the type_fields key exists (drives
+                // the constructor-key check + hierarchy walker entry).
+                self.type_fields
+                    .entry(def.name.clone())
+                    .or_insert_with(HashSet::new);
             }
             _ => {}
         }
@@ -443,8 +484,14 @@ impl StaticAnalyzer {
         // user-visible; skip cheaply.
         if matches!(
             spec,
-            "strict" | "warnings" | "utf8" | "feature" | "v5"
-                | "threads" | "Thread::Pool" | "Parallel::ForkManager"
+            "strict"
+                | "warnings"
+                | "utf8"
+                | "feature"
+                | "v5"
+                | "threads"
+                | "Thread::Pool"
+                | "Parallel::ForkManager"
         ) {
             return;
         }
@@ -486,11 +533,37 @@ impl StaticAnalyzer {
             | StmtKind::State(decls)
             | StmtKind::MySync(decls)
             | StmtKind::OurSync(decls) => {
+                // `our` / `oursync` inside `package Pkg` declare a
+                // package-global. References from outside the package
+                // use the qualified form `$Pkg::name` — record both
+                // spellings so strict-vars accepts either.
+                let is_package_global = matches!(
+                    stmt.kind,
+                    StmtKind::Our(_) | StmtKind::OurSync(_)
+                );
                 for d in decls {
                     match d.sigil {
-                        Sigil::Scalar => self.declare_scalar(&d.name),
-                        Sigil::Array => self.declare_array(&d.name),
-                        Sigil::Hash => self.declare_hash(&d.name),
+                        Sigil::Scalar => {
+                            self.declare_scalar(&d.name);
+                            if is_package_global {
+                                let q = format!("{}::{}", self.current_package, d.name);
+                                self.declare_scalar(&q);
+                            }
+                        }
+                        Sigil::Array => {
+                            self.declare_array(&d.name);
+                            if is_package_global {
+                                let q = format!("{}::{}", self.current_package, d.name);
+                                self.declare_array(&q);
+                            }
+                        }
+                        Sigil::Hash => {
+                            self.declare_hash(&d.name);
+                            if is_package_global {
+                                let q = format!("{}::{}", self.current_package, d.name);
+                                self.declare_hash(&q);
+                            }
+                        }
                         Sigil::Typeglob => {}
                     }
                     if let Some(init) = &d.initializer {
@@ -783,14 +856,51 @@ impl StaticAnalyzer {
     /// through untouched).
     fn check_constructor_keys(&mut self, type_name: &str, args: &[Expr], call_line: usize) {
         let bare_tail = type_name.rsplit("::").next().unwrap_or(type_name);
-        let fields = match self
-            .type_fields
-            .get(type_name)
-            .or_else(|| self.type_fields.get(bare_tail))
-        {
-            Some(f) => f.clone(),
-            None => return,
+        // Pick the resolved class name (qualified or bare). Bail if the
+        // file doesn't declare any Type by this name.
+        let resolved = if self.type_fields.contains_key(type_name) {
+            type_name.to_string()
+        } else if self.type_fields.contains_key(bare_tail) {
+            bare_tail.to_string()
+        } else {
+            return;
         };
+        // Walk class + parents via `extends`, unioning every declared
+        // field into one set. `Dog extends Animal { name }` + `Dog
+        // { breed }` accepts `Dog(name => ..., breed => ...)`.
+        let mut all_fields: HashSet<String> = HashSet::new();
+        let mut seen: HashSet<String> = HashSet::new();
+        let mut queue: Vec<String> = vec![resolved.clone()];
+        while let Some(c) = queue.pop() {
+            if !seen.insert(c.clone()) {
+                continue;
+            }
+            if let Some(fs) = self.type_fields.get(&c) {
+                all_fields.extend(fs.iter().cloned());
+            }
+            if let Some(parents) = self.type_parents.get(&c) {
+                queue.extend(parents.iter().cloned());
+            }
+        }
+        // Detect call style: fat-comma keyed (`Type(k => v, k => v)`)
+        // vs positional (`Type(1, "title", Priority::High)`). Stryke
+        // collapses fat-comma to plain args at parse time, so the AST
+        // shapes are identical. Disambiguate by checking whether the
+        // FIRST arg matches a declared field name — if not, the call
+        // is positional and the key check would only generate noise.
+        let first_arg_is_field = args.first().is_some_and(|a| match &a.kind {
+            ExprKind::String(s) | ExprKind::Bareword(s) => all_fields.contains(s),
+            _ => false,
+        });
+        let looks_keyed = args.len() % 2 == 0
+            && first_arg_is_field
+            && (0..args.len()).step_by(2).all(|i| {
+                matches!(&args[i].kind, ExprKind::String(_))
+                    || matches!(&args[i].kind, ExprKind::Bareword(s) if !s.contains("::"))
+            });
+        if !looks_keyed {
+            return;
+        }
         let mut i = 0;
         while i < args.len() {
             let key_name = match &args[i].kind {
@@ -799,7 +909,7 @@ impl StaticAnalyzer {
                 _ => None,
             };
             if let Some(name) = key_name {
-                if !fields.contains(&name) {
+                if !all_fields.contains(&name) {
                     let line = if args[i].line > 0 {
                         args[i].line
                     } else {
@@ -812,7 +922,7 @@ impl StaticAnalyzer {
                             "Unknown field `{name}` in constructor call to `{bare_for_msg}` — \
                              declared fields: {}",
                             {
-                                let mut v: Vec<&String> = fields.iter().collect();
+                                let mut v: Vec<&String> = all_fields.iter().collect();
                                 v.sort();
                                 v.into_iter()
                                     .map(String::as_str)
@@ -828,6 +938,85 @@ impl StaticAnalyzer {
         }
     }
 
+    /// True when `method` is a field OR method declared on `class_name`
+    /// OR any ancestor in the `extends` chain. Cycle-guarded so a
+    /// pathological `A extends B; B extends A` doesn't recur forever.
+    fn method_resolves_in_hierarchy(&self, class_name: &str, method: &str) -> bool {
+        // Universal methods inherited from `UNIVERSAL` (Perl) / every
+        // stryke object. Sourced from `vm_helper.rs` built-in class +
+        // struct method dispatch — keep in sync when new universal
+        // methods are added.
+        //
+        // - `isa` / `can` / `DOES` / `does` / `VERSION` — Perl UNIVERSAL.
+        // - `new` / `BUILD` / `DESTROY` / `destroy` — lifecycle hooks.
+        // - `clone` — deep copy via per-field deep_clone.
+        // - `with` — functional update returning a new instance with
+        //   the named fields changed.
+        // - `to_hash` / `to_hash_rec` / `to_hash_deep` — serialize.
+        // - `fields` / `methods` / `superclass` — runtime introspection.
+        if matches!(
+            method,
+            "isa" | "can" | "DOES" | "does" | "VERSION"
+            | "new" | "BUILD" | "DESTROY" | "destroy"
+            | "clone" | "with"
+            | "to_hash" | "to_hash_rec" | "to_hash_deep"
+            | "fields" | "methods" | "superclass"
+        ) {
+            return true;
+        }
+        let mut seen: HashSet<String> = HashSet::new();
+        let mut queue: Vec<String> = vec![class_name.to_string()];
+        while let Some(c) = queue.pop() {
+            if !seen.insert(c.clone()) {
+                continue;
+            }
+            if self
+                .type_fields
+                .get(&c)
+                .is_some_and(|s| s.contains(method))
+            {
+                return true;
+            }
+            if self
+                .type_methods
+                .get(&c)
+                .is_some_and(|s| s.contains(method))
+            {
+                return true;
+            }
+            if let Some(parents) = self.type_parents.get(&c) {
+                queue.extend(parents.iter().cloned());
+            }
+        }
+        false
+    }
+
+    /// Gather every field + method name visible on `class_name` and its
+    /// ancestors (BFS through `extends`). Used to render the "available:
+    /// …" suggestion list when a `$self->X` / `$obj->X` lookup fails.
+    fn collect_hierarchy_members(&self, class_name: &str) -> Vec<String> {
+        let mut seen: HashSet<String> = HashSet::new();
+        let mut out: HashSet<String> = HashSet::new();
+        let mut queue: Vec<String> = vec![class_name.to_string()];
+        while let Some(c) = queue.pop() {
+            if !seen.insert(c.clone()) {
+                continue;
+            }
+            if let Some(fs) = self.type_fields.get(&c) {
+                out.extend(fs.iter().cloned());
+            }
+            if let Some(ms) = self.type_methods.get(&c) {
+                out.extend(ms.iter().cloned());
+            }
+            if let Some(parents) = self.type_parents.get(&c) {
+                queue.extend(parents.iter().cloned());
+            }
+        }
+        let mut v: Vec<String> = out.into_iter().collect();
+        v.sort();
+        v
+    }
+
     fn analyze_expr(&mut self, expr: &Expr) {
         match &expr.kind {
             // `$#name` — the Perl last-index-of-array form. The parser
@@ -837,20 +1026,18 @@ impl StaticAnalyzer {
             // $_" form — always defined.
             ExprKind::ScalarVar(name)
                 if self.strict_vars
+                    && name.len() > 1
                     && name.starts_with('#')
-                    && !self.is_array_defined(&name[1..])
-                    && !name.is_empty() =>
+                    && !self.is_array_defined(&name[1..]) =>
             {
-                if name.len() > 1 {
-                    self.error(
-                        ErrorKind::UndefinedVariable,
-                        format!(
-                            "Global symbol \"@{}\" requires explicit package name",
-                            &name[1..]
-                        ),
-                        expr.line,
-                    );
-                }
+                self.error(
+                    ErrorKind::UndefinedVariable,
+                    format!(
+                        "Global symbol \"@{}\" requires explicit package name",
+                        &name[1..]
+                    ),
+                    expr.line,
+                );
             }
             ExprKind::ScalarVar(name) if name.starts_with('#') => {
                 // `$#name` with @name defined OR bare `$#` — no-op.
@@ -945,7 +1132,12 @@ impl StaticAnalyzer {
                     self.analyze_expr(a);
                 }
             }
-            ExprKind::MethodCall { object, method, args, .. } => {
+            ExprKind::MethodCall {
+                object,
+                method,
+                args,
+                ..
+            } => {
                 self.analyze_expr(object);
                 // Method-form constructor `Type->new(field => value)`.
                 if let ExprKind::Bareword(n) = &object.kind {
@@ -984,30 +1176,9 @@ impl StaticAnalyzer {
                         if let Some(class_name) =
                             self.resolve_scalar_type(name).map(|s| s.to_string())
                         {
-                            let is_field = self
-                                .type_fields
-                                .get(&class_name)
-                                .map(|s| s.contains(method))
-                                .unwrap_or(false);
-                            let is_method = self
-                                .type_methods
-                                .get(&class_name)
-                                .map(|s| s.contains(method))
-                                .unwrap_or(false);
-                            if !is_field && !is_method {
-                                let mut suggestions: Vec<String> = self
-                                    .type_fields
-                                    .get(&class_name)
-                                    .into_iter()
-                                    .flat_map(|s| s.iter().cloned())
-                                    .collect();
-                                suggestions.extend(
-                                    self.type_methods
-                                        .get(&class_name)
-                                        .into_iter()
-                                        .flat_map(|s| s.iter().cloned()),
-                                );
-                                suggestions.sort();
+                            if !self.method_resolves_in_hierarchy(&class_name, method) {
+                                let suggestions =
+                                    self.collect_hierarchy_members(&class_name);
                                 let avail = if suggestions.is_empty() {
                                     "(no fields or methods declared)".to_string()
                                 } else {
@@ -1029,30 +1200,12 @@ impl StaticAnalyzer {
                 if let ExprKind::ScalarVar(name) = &object.kind {
                     if name == "self" {
                         if let Some(class_name) = self.current_class.clone() {
-                            let is_field = self
-                                .type_fields
-                                .get(&class_name)
-                                .map(|s| s.contains(method))
-                                .unwrap_or(false);
-                            let is_method = self
-                                .type_methods
-                                .get(&class_name)
-                                .map(|s| s.contains(method))
-                                .unwrap_or(false);
-                            if !is_field && !is_method {
-                                let mut suggestions: Vec<String> = self
-                                    .type_fields
-                                    .get(&class_name)
-                                    .into_iter()
-                                    .flat_map(|s| s.iter().cloned())
-                                    .collect();
-                                suggestions.extend(
-                                    self.type_methods
-                                        .get(&class_name)
-                                        .into_iter()
-                                        .flat_map(|s| s.iter().cloned()),
-                                );
-                                suggestions.sort();
+                            // Walk class + parents via `extends`. Cycle-
+                            // guarded so a broken `extends A; A extends X`
+                            // loop can't infinite-loop the linter.
+                            if !self.method_resolves_in_hierarchy(&class_name, method) {
+                                let suggestions =
+                                    self.collect_hierarchy_members(&class_name);
                                 let avail = if suggestions.is_empty() {
                                     "(no fields or methods declared)".to_string()
                                 } else {
@@ -1136,9 +1289,23 @@ impl StaticAnalyzer {
             ExprKind::ScalarRef(e)
             | ExprKind::Deref { expr: e, .. }
             | ExprKind::Defined(e)
-            | ExprKind::Exists(e)
             | ExprKind::Delete(e) => {
                 self.analyze_expr(e);
+            }
+            ExprKind::Exists(e) => {
+                // `exists &SUB` and `exists &Pkg::sub` are introspection
+                // calls — the point is to check whether the sub IS
+                // defined, so flagging an "undefined" sub here is the
+                // opposite of helpful. Skip the sub-defined check for
+                // `SubroutineCodeRef` / `SubroutineRef` payloads;
+                // everything else (hash keys, array indices) still gets
+                // the normal analysis.
+                if !matches!(
+                    e.kind,
+                    ExprKind::SubroutineCodeRef(_) | ExprKind::SubroutineRef(_)
+                ) {
+                    self.analyze_expr(e);
+                }
             }
             ExprKind::ArrowDeref { expr, index, kind } => {
                 self.analyze_expr(expr);
@@ -1165,34 +1332,35 @@ impl StaticAnalyzer {
                 }
             }
             ExprKind::InterpolatedString(parts) => {
+                // Strict-vars policy inside double-quoted interpolations:
+                // DON'T flag bare `$undef` / `@undef` / `%undef`. Strings
+                // are commonly used as test descriptions / log messages
+                // with template-style placeholders that the user doesn't
+                // intend as hard variable references. Bare `$x + 1` in
+                // code-context still gets flagged; the string interior
+                // gets a free pass. Full `#{ EXPR }` blocks (complex
+                // expressions wrapped in Expr) DO get walked, since
+                // those are real code — unless the entire expression
+                // is just a single sigil-var, in which case the same
+                // pass-through policy applies.
                 for part in parts {
                     match part {
-                        StringPart::ScalarVar(name) => {
-                            if self.strict_vars && !self.is_scalar_defined(name) {
-                                self.error(
-                                    ErrorKind::UndefinedVariable,
-                                    format!(
-                                        "Global symbol \"${}\" requires explicit package name",
-                                        name
-                                    ),
-                                    expr.line,
-                                );
+                        StringPart::Expr(e) => {
+                            // Skip the strict-vars check for the simple
+                            // sigil-var-only shape (`$var` / `@var` / `%var`
+                            // wrapped in Expr by the parser). For richer
+                            // expressions (`$x + 1`, fn calls, etc.) walk
+                            // normally.
+                            match &e.kind {
+                                ExprKind::ScalarVar(_)
+                                | ExprKind::ArrayVar(_)
+                                | ExprKind::HashVar(_) => {}
+                                _ => self.analyze_expr(e),
                             }
                         }
-                        StringPart::ArrayVar(name) => {
-                            if self.strict_vars && !self.is_array_defined(name) {
-                                self.error(
-                                    ErrorKind::UndefinedVariable,
-                                    format!(
-                                        "Global symbol \"@{}\" requires explicit package name",
-                                        name
-                                    ),
-                                    expr.line,
-                                );
-                            }
-                        }
-                        StringPart::Expr(e) => self.analyze_expr(e),
-                        StringPart::Literal(_) => {}
+                        StringPart::ScalarVar(_)
+                        | StringPart::ArrayVar(_)
+                        | StringPart::Literal(_) => {}
                     }
                 }
             }
@@ -1292,7 +1460,14 @@ impl StaticAnalyzer {
                 self.analyze_expr(list);
             }
             ExprKind::Open { handle, mode, file } => {
-                self.analyze_expr(handle);
+                // `open(my $fh, ">", $path)` — `my $fh` is the lexical-
+                // filehandle declaration Perl idiom. Register the name
+                // so later `print $fh ...` / `close $fh` lookups pass.
+                if let ExprKind::OpenMyHandle { name } = &handle.kind {
+                    self.declare_scalar(name);
+                } else {
+                    self.analyze_expr(handle);
+                }
                 self.analyze_expr(mode);
                 if let Some(f) = file {
                     self.analyze_expr(f);
@@ -1439,9 +1614,7 @@ impl StaticAnalyzer {
                     }
                 }
             }
-            MatchPattern::Any
-            | MatchPattern::Regex { .. }
-            | MatchPattern::OptionSome(_) => {}
+            MatchPattern::Any | MatchPattern::Regex { .. } | MatchPattern::OptionSome(_) => {}
         }
     }
 
@@ -1485,6 +1658,21 @@ impl StaticAnalyzer {
 
 fn is_special_var(name: &str) -> bool {
     if name.len() == 1 {
+        return true;
+    }
+    // Perl `^X`-style special vars: `$^X` (interpreter path),
+    // `$^O` (OS), `$^V` (version), `$^W` (warnings), `$^T`, `$^R`,
+    // `$^N`, `$^H`, `$^I`, `$^L`, `$^A`, `$^C`, `$^B`, `$^D`,
+    // `$^E`, `$^F`, `$^G`, `$^M`, `$^P`, `$^S`, `$^U`, plus the
+    // `$^{NAME}` long forms (`$^{MATCH}`, `$^{POSTMATCH}`, etc.).
+    if name.starts_with('^') {
+        return true;
+    }
+    // `$$` — process id. Parser stores it with the sigil included
+    // (`ScalarVar("$$")`), so the strict-vars check sees a 2-char
+    // name. Same shape for `$)`, `$(`, `$/`, etc. when carried with
+    // their literal punctuation as the "name" part.
+    if name == "$$" {
         return true;
     }
     matches!(
@@ -1584,24 +1772,61 @@ pub fn resolve_require_path_from_file(file: &str, spec: &str) -> Option<PathBuf>
         .parent()
         .map(Path::to_path_buf)
         .unwrap_or_else(|| PathBuf::from("."));
-    let project_root = match file_dir.file_name().and_then(|s| s.to_str()) {
-        Some("t") | Some("tests") | Some("test") | Some("spec") | Some("xt") => file_dir
-            .parent()
-            .map(Path::to_path_buf)
-            .unwrap_or(file_dir.clone()),
-        _ => file_dir.clone(),
-    };
-    let candidate = if spec.starts_with("./") || spec.starts_with("../") {
+    // Detect project root by walking UP from the source file's
+    // directory looking for a sibling `lib/`. Typical Perl/CPAN
+    // layout: project/lib/Foo/Bar.pm with `require "./lib/Foo/Bar.stk"`
+    // anywhere in the tree resolving back to project/. Falls back to:
+    // (1) the file's own directory if no ancestor has `lib/`;
+    // (2) the parent directory when the file sits in `t/tests/test/
+    // spec/xt` (the classic test layout).
+    let project_root = find_project_root(&file_dir);
+    // Also try the file's own directory as a same-dir fallback (e.g.
+    // siblings in the same folder use `./sibling.stk`).
+    let candidate_via_root = if spec.starts_with("./") || spec.starts_with("../") {
         project_root.join(spec)
     } else if spec.contains("::") {
-        // `Foo::Bar` → `<root>/lib/Foo/Bar.pm`.
         let relpath: PathBuf = PathBuf::from(spec.replace("::", "/")).with_extension("pm");
         project_root.join("lib").join(relpath)
     } else {
-        // Bare filename — treat as project-root-relative.
         project_root.join(spec)
     };
-    candidate.exists().then_some(candidate)
+    if candidate_via_root.exists() {
+        return Some(candidate_via_root);
+    }
+    // Fallback: resolve `./foo.stk` against the file's own directory
+    // for the simple sibling-script case.
+    if spec.starts_with("./") || spec.starts_with("../") {
+        let direct = file_dir.join(spec);
+        if direct.exists() {
+            return Some(direct);
+        }
+    }
+    None
+}
+
+/// Walk UP from `start_dir` looking for an ancestor that has a `lib/`
+/// subdirectory (typical Perl/CPAN project layout). Returns the
+/// first such ancestor, falling back to the original directory
+/// (or its parent when it's `t`/`tests`/`test`/`spec`/`xt`).
+fn find_project_root(start_dir: &Path) -> PathBuf {
+    let mut cur = start_dir.to_path_buf();
+    for _ in 0..16 {
+        // capped depth — pathological infinite-symlink protection
+        if cur.join("lib").is_dir() {
+            return cur;
+        }
+        match cur.parent() {
+            Some(p) if p != cur => cur = p.to_path_buf(),
+            _ => break,
+        }
+    }
+    match start_dir.file_name().and_then(|s| s.to_str()) {
+        Some("t") | Some("tests") | Some("test") | Some("spec") | Some("xt") => start_dir
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| start_dir.to_path_buf()),
+        _ => start_dir.to_path_buf(),
+    }
 }
 
 /// If `e` is a literal string / single-segment interpolated string / bareword,
@@ -1753,8 +1978,18 @@ mod tests {
 
     #[test]
     fn interpolated_string_undefined_var() {
-        let r = lint(r#"p "hello $undefined""#);
-        assert!(r.is_err());
+        // Policy change (post-test_bugs_phase3_pin): bare `$undef`
+        // inside `"..."` is a free pass. String interpolation is used
+        // as template/description text in tests + log messages, and
+        // false positives on `"got $fh ..."` style test descriptions
+        // were the dominant noise source. Strict-vars on bare code-
+        // context references is unchanged.
+        assert!(
+            lint(r#"p "hello $undefined""#).is_ok(),
+            "undefined scalar inside string-interp must NOT flag",
+        );
+        // The check still fires in code context.
+        assert!(lint(r#"use strict; p $undefined"#).is_err());
     }
 
     #[test]
@@ -1950,27 +2185,23 @@ mod tests {
     #[test]
     fn instance_method_on_typed_var_known_method_ok() {
         // Same setup, but `$p->mag_sq` IS a declared method — must pass.
-        assert!(
-            lint(
-                "class Point { x : Float\n y : Float\n fn mag_sq { 1 } }\n\
+        assert!(lint(
+            "class Point { x : Float\n y : Float\n fn mag_sq { 1 } }\n\
                  my $p = Point(x => 3, y => 4)\n\
                  $p->mag_sq()"
-            )
-            .is_ok()
-        );
+        )
+        .is_ok());
     }
 
     #[test]
     fn instance_method_on_typed_var_field_ok() {
         // Field access via `->`: `$p->x` reads field `x` on Point.
-        assert!(
-            lint(
-                "class Point { x : Float\n y : Float }\n\
+        assert!(lint(
+            "class Point { x : Float\n y : Float }\n\
                  my $p = Point(x => 3, y => 4)\n\
                  p $p->x"
-            )
-            .is_ok()
-        );
+        )
+        .is_ok());
     }
 
     #[test]
@@ -1979,12 +2210,9 @@ mod tests {
         // flag ANY of these as undefined, regardless of sigil or shape.
         let cases = [
             // Bare topic + positional.
-            "_", "_0", "_1", "_42",
-            // Outer-chain.
-            "_<", "_<<<<<",
-            // Indexed-ascent.
-            "_<3", "_<10",
-            // Positional + outer chain combined.
+            "_", "_0", "_1", "_42", // Outer-chain.
+            "_<", "_<<<<<", // Indexed-ascent.
+            "_<3", "_<10", // Positional + outer chain combined.
             "_2<", "_2<<<", "_2<5",
         ];
         for name in cases {
@@ -2018,6 +2246,466 @@ mod tests {
         // `$_underscore_name`) is NOT a topic var and SHOULD be flagged.
         let r = lint("p $_underscore_name");
         assert!(r.is_err(), "expected $_underscore_name to be flagged");
+    }
+
+    #[test]
+    fn qualified_our_scalar_visible_across_packages() {
+        // `package Foo; our $x = 1; package main; p $Foo::x` — strict-
+        // vars must accept `$Foo::x` from main. Regression for the
+        // false-positive on `oursync $val` in `package Counter`.
+        assert!(
+            lint("package Foo\nour $x = 1\npackage main\np $Foo::x").is_ok(),
+            "qualified `$Foo::x` must resolve to `our $x` declared in package Foo",
+        );
+    }
+
+    #[test]
+    fn qualified_oursync_scalar_visible_across_packages() {
+        // The exact `oursync` form from examples/test_namespaces_pin.stk.
+        assert!(
+            lint("package Counter\noursync $val = 0\npackage main\np $Counter::val").is_ok(),
+            "qualified `$Counter::val` must resolve to `oursync $val` in package Counter",
+        );
+    }
+
+    #[test]
+    fn qualified_our_array_visible_across_packages() {
+        assert!(lint("package Foo\nour @xs = (1,2,3)\npackage main\np @Foo::xs").is_ok());
+    }
+
+    #[test]
+    fn qualified_our_hash_visible_across_packages() {
+        assert!(lint("package Foo\nour %h = (a=>1)\npackage main\np %Foo::h").is_ok());
+    }
+
+    #[test]
+    fn thread_par_run_compiler_generated_call_not_flagged() {
+        // `~p>` desugars to `_thread_par_run(...)` — the linter must
+        // not flag this synthetic name as an undefined sub.
+        assert!(
+            lint("my @xs = (1,2,3)\nmy @r = ~p> @xs map { _ * 2 }").is_ok(),
+            "compiler-generated _thread_par_run must be whitelisted",
+        );
+    }
+
+    #[test]
+    fn aop_intercept_context_vars_not_flagged() {
+        // `before/after/around` advice bodies see `$INTERCEPT_NAME`,
+        // `@INTERCEPT_ARGS`, `$INTERCEPT_RESULT`, `$INTERCEPT_MS`,
+        // `$INTERCEPT_US` as VM-injected always-defined vars.
+        assert!(
+            lint(
+                "before \"fetch\" { p $INTERCEPT_NAME, @INTERCEPT_ARGS }"
+            )
+            .is_ok()
+        );
+        assert!(
+            lint(
+                "after \"fetch\" { p $INTERCEPT_RESULT, $INTERCEPT_MS, $INTERCEPT_US }"
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn string_interpolation_never_flags_undefined_simple_var() {
+        // Bare `$undef` / `@undef` / `%undef` interpolated inside
+        // `"..."` is a free pass — strings are used as test
+        // descriptions / log messages with template placeholders that
+        // aren't intended as hard variable refs. Bare code-context
+        // references (`p $undef`) still get flagged.
+        assert!(
+            lint("p \"printf $fh writes to STDOUT\"").is_ok(),
+            "simple $var inside string-interp must not be flagged",
+        );
+        assert!(
+            lint("p \"got @items here\"").is_ok(),
+            "simple @var inside string-interp must not be flagged",
+        );
+        // $#arr-inside-string also gets the free pass.
+        assert!(
+            lint("p \"got $#missing_array items\"").is_ok(),
+            "$#arr-style inside string-interp must not be flagged",
+        );
+        // Negative guard: outside strings, the strict-vars check still
+        // fires.
+        assert!(
+            lint("use strict\np $fh").is_err(),
+            "bare $fh outside string must still flag",
+        );
+    }
+
+    #[test]
+    fn string_interp_complex_expr_still_walks_strict() {
+        // `"#{ $undef + 1 }"` — the `#{EXPR}` block is real code, so
+        // bare `$undef` reference inside the expression should flag.
+        let r = lint("use strict\np \"got #{ $undef + 1 }\"");
+        assert!(
+            r.is_err(),
+            "complex expr inside #{{}} must still strict-check vars",
+        );
+    }
+
+    #[test]
+    fn qualified_main_var_visible_in_default_package() {
+        // `our $x = ...` in default package `main` — `$main::x` must
+        // resolve. Regression for test_bugs_phase3_pin.stk where
+        // `BEGIN { $main::log_begin .= ... }` was flagged.
+        assert!(
+            lint("our $log_begin = \"\"\nBEGIN { $main::log_begin .= \"B:\" }").is_ok(),
+        );
+        assert!(lint("our @items = (1,2)\np @main::items").is_ok());
+        assert!(lint("our %map = ()\np keys %main::map").is_ok());
+    }
+
+    #[test]
+    fn dollar_hash_array_last_index_uses_underlying_array() {
+        // `$#name` is the last-index-of-@name shortcut. Strict-vars
+        // must check @name (the array), not $#name as a scalar.
+        assert!(lint("my @arr = (1,2,3); p $#arr").is_ok());
+        let r = lint("use strict\np $#undefined_array");
+        assert!(r.is_err(), "$#undefined_array must flag @undefined_array");
+        assert!(
+            r.unwrap_err()
+                .message
+                .contains("@undefined_array"),
+            "error must name @undefined_array, not $#undefined_array",
+        );
+    }
+
+    #[test]
+    fn match_arm_enum_variant_typo_flagged() {
+        // Auto-quoted enum patterns: `Sig::Term2 => "..."` arrives
+        // as MatchPattern::Value(String("Sig::Term2")). When Sig is
+        // a known enum and Term2 isn't a variant, must flag.
+        let r = lint(
+            "enum Sig { Hup, Int, Term, Kill }\n\
+             fn handle($s) {\n\
+                 match ($s) {\n\
+                     Sig::Hup => \"reload\",\n\
+                     Sig::Term2 => \"drain\",\n\
+                     Sig::Kill => \"reap\",\n\
+                 }\n\
+             }",
+        );
+        assert!(r.is_err(), "expected flag on Sig::Term2");
+        let msg = r.unwrap_err().message;
+        assert!(
+            msg.contains("Term2") && msg.contains("Sig"),
+            "message must name Term2 and Sig: {msg}",
+        );
+    }
+
+    #[test]
+    fn match_arm_known_enum_variant_passes() {
+        // Symmetric guard: real variants must not be flagged.
+        assert!(
+            lint(
+                "enum Sig { Hup, Int, Term, Kill }\n\
+                 fn handle($s) {\n\
+                     match ($s) {\n\
+                         Sig::Hup => \"reload\",\n\
+                         Sig::Int => \"shutdown\",\n\
+                         Sig::Term => \"drain\",\n\
+                         Sig::Kill => \"reap\",\n\
+                     }\n\
+                 }"
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn dollar_caret_perl_special_vars_not_flagged() {
+        // `$^X`, `$^O`, `$^V`, `$^W`, `$^T` etc. — Perl special vars
+        // prefixed with `^`. All must be treated as always-defined.
+        for name in ["$^X", "$^O", "$^V", "$^W", "$^T", "$^R", "$^N", "$^H"] {
+            assert!(
+                lint(&format!("use strict\np {name}")).is_ok(),
+                "{name} must not be flagged by strict-vars",
+            );
+        }
+    }
+
+    #[test]
+    fn lexical_filehandle_open_my_var_not_flagged() {
+        // `open(my $fh, ">", $path)` — `my $fh` inside the call
+        // declares a lexical scalar. Later `print $fh ...` /
+        // `close $fh` must see it as defined.
+        assert!(
+            lint(
+                "use strict\nmy $efile = \"/tmp/x\"\n\
+                 open(my $wfh, \">\", $efile) or die\n\
+                 print $wfh \"line1\\n\"\nclose $wfh"
+            )
+            .is_ok(),
+        );
+    }
+
+    #[test]
+    fn exists_subroutine_ref_does_not_flag_undefined() {
+        // `exists &Pkg::sub` is introspection — flagging the sub as
+        // undefined defeats the entire purpose.
+        assert!(
+            lint(
+                "package Foo\nfn greet = 1\npackage main\n\
+                 p exists(&Foo::greet) ? \"y\" : \"n\"\n\
+                 p exists(&Foo::missing) ? \"y\" : \"n\""
+            )
+            .is_ok(),
+        );
+    }
+
+    #[test]
+    fn universal_methods_resolve_on_any_class() {
+        // `isa`, `can`, `DOES`, `does`, `VERSION`, lifecycle hooks
+        // (`new`, `BUILD`, `DESTROY`, `destroy`), and built-in class
+        // methods (`clone`, `with`, `to_hash`, `to_hash_rec`,
+        // `to_hash_deep`, `fields`, `methods`, `superclass`) are
+        // always callable on any class instance — never flag them
+        // via $obj->X or $self->X.
+        assert!(
+            lint(
+                "class Square { side: Float\n fn area { 1 } }\n\
+                 my $sq = Square->new(side => 5)\n\
+                 p $sq->isa(\"Square\")\n\
+                 p $sq->can(\"area\")\n\
+                 p $sq->DOES(\"Shape\")\n\
+                 my $cloned = $sq->clone()\n\
+                 my $changed = $sq->with(side => 9)\n\
+                 p $sq->to_hash()\n\
+                 p $sq->fields()"
+            )
+            .is_ok(),
+        );
+    }
+
+    #[test]
+    fn builtin_struct_methods_resolve_on_any_struct() {
+        // Same whitelist applies to structs: `clone`, `with`,
+        // `to_hash`, `to_hash_rec`, `to_hash_deep`, `fields`.
+        assert!(
+            lint(
+                "struct Point { x: Float\n y: Float }\n\
+                 my $p = Point(x => 1.0, y => 2.0)\n\
+                 my $c = $p->clone()\n\
+                 my $u = $p->with(x => 9.0)\n\
+                 p $p->to_hash()\n\
+                 p $p->fields()"
+            )
+            .is_ok(),
+        );
+    }
+
+    #[test]
+    fn class_inheritance_resolves_parent_methods_on_self() {
+        // `class Dog extends Animal` — `$self->trail` inside Dog's
+        // body must walk up to Animal and find `trail` there.
+        assert!(
+            lint(
+                "class Animal { name: Str = \"\"\n fn trail { \"...\" } }\n\
+                 class Dog extends Animal {\n\
+                     breed: Str = \"\"\n\
+                     fn show { $self->trail }\n\
+                 }"
+            )
+            .is_ok(),
+        );
+    }
+
+    #[test]
+    fn class_inheritance_resolves_parent_fields_in_constructor() {
+        // `Dog(name => "Rex", breed => "Lab")` — `name` is on Animal,
+        // `breed` on Dog. Constructor key check must accept both.
+        assert!(
+            lint(
+                "class Animal { name: Str = \"\" }\n\
+                 class Dog extends Animal { breed: Str = \"\" }\n\
+                 my $d = Dog(name => \"Rex\", breed => \"Lab\")\n\
+                 p $d->name"
+            )
+            .is_ok(),
+        );
+    }
+
+    #[test]
+    fn resolve_require_path_finds_lib_root_from_nested_source() {
+        // Project layout: tmp_root/lib/ai/{matrix,neural_network}.stk.
+        // From neural_network.stk, `require "./lib/ai/matrix.stk"`
+        // must resolve to tmp_root/lib/ai/matrix.stk even though the
+        // current file sits inside `lib/ai/`. Without walking up to
+        // find the `lib/`-bearing ancestor, the resolver would land
+        // in `lib/ai/lib/ai/matrix.stk` which doesn't exist.
+        let tmp = std::env::temp_dir().join(format!(
+            "stryke_resolve_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(tmp.join("lib").join("ai")).unwrap();
+        let mat = tmp.join("lib").join("ai").join("matrix.stk");
+        std::fs::write(&mat, "1\n").unwrap();
+        let nn = tmp
+            .join("lib")
+            .join("ai")
+            .join("neural_network.stk");
+        std::fs::write(&nn, "1\n").unwrap();
+        let resolved = super::resolve_require_path_from_file(
+            nn.to_str().unwrap(),
+            "./lib/ai/matrix.stk",
+        );
+        assert!(
+            resolved.as_ref().is_some_and(|p| p == &mat)
+                || resolved.as_ref().is_some_and(|p| {
+                    p.canonicalize().ok() == mat.canonicalize().ok()
+                }),
+            "expected to resolve to {mat:?}, got {resolved:?}",
+        );
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn resolve_require_path_sibling_in_same_dir() {
+        // `require "./sibling.stk"` from same-directory script should
+        // resolve regardless of `lib/` presence.
+        let tmp = std::env::temp_dir().join(format!(
+            "stryke_resolve_sibling_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        let sib = tmp.join("sibling.stk");
+        std::fs::write(&sib, "1\n").unwrap();
+        let me = tmp.join("me.stk");
+        std::fs::write(&me, "1\n").unwrap();
+        let resolved =
+            super::resolve_require_path_from_file(me.to_str().unwrap(), "./sibling.stk");
+        assert!(
+            resolved.is_some(),
+            "expected to resolve ./sibling.stk in same dir, got None",
+        );
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn positional_constructor_args_not_checked_as_keys() {
+        // `Task(1, "Setup", Priority::High)` is positional — none of
+        // the args are field names. Must not flag the String /
+        // Bareword args as "unknown field".
+        assert!(
+            lint(
+                "enum Priority { Low, Medium, High, Critical }\n\
+                 class Task {\n\
+                     id: Int\n\
+                     title: Str = \"\"\n\
+                     priority: Any = undef\n\
+                 }\n\
+                 my $t = Task(1, \"Setup\", Priority::High)"
+            )
+            .is_ok(),
+        );
+    }
+
+    #[test]
+    fn positional_constructor_with_string_value_not_flagged() {
+        // `Person(\"Alice\", 30)` — String literal is the FIRST arg
+        // (and would-be field name), but since "Alice" isn't a
+        // declared field of Person, the call is positional.
+        assert!(
+            lint(
+                "class Person { name: Str = \"\"\n age: Int = 0 }\n\
+                 my $p = Person(\"Alice\", 30)"
+            )
+            .is_ok(),
+        );
+    }
+
+    #[test]
+    fn keyed_constructor_still_flags_typo() {
+        // Guardrail: `Point(x => 10, yyg => 20)` — `yyg` IS a typo.
+        // First arg matches a declared field (`x`), so the heuristic
+        // correctly classifies the call as keyed and the check fires.
+        let r = lint(
+            "class Point { x: Float\n y: Float }\n\
+             my $p = Point(x => 10, yyg => 20)",
+        );
+        assert!(r.is_err(), "expected `yyg` typo to be flagged");
+        assert!(
+            r.unwrap_err().message.contains("yyg"),
+            "error must name `yyg` field",
+        );
+    }
+
+    #[test]
+    fn dollar_dollar_pid_not_flagged() {
+        // `$$` is the process ID — always-defined special var.
+        // Parser stores it as `ScalarVar("$$")` so the strict-vars
+        // check sees a 2-char name; is_special_var must whitelist.
+        assert!(lint("use strict\np $$").is_ok());
+        assert!(lint("use strict\n$$ > 0 ? 1 : 0").is_ok());
+    }
+
+    #[test]
+    fn class_impl_trait_resolves_default_method() {
+        // `trait Greetable { fn greeting { "Hello" } }` + `class Person
+        // impl Greetable { ... }` — `$p->greeting` must resolve via
+        // the trait's default impl. Regression for
+        // test_extended_features_pin.stk.
+        assert!(
+            lint(
+                "trait Greetable {\n\
+                     fn greeting { \"Hello\" }\n\
+                     fn name\n\
+                 }\n\
+                 class Person impl Greetable {\n\
+                     n: Str = \"\"\n\
+                     fn name { $self->n }\n\
+                 }\n\
+                 my $p = Person(n => \"Alice\")\n\
+                 p $p->greeting()"
+            )
+            .is_ok(),
+        );
+    }
+
+    #[test]
+    fn class_impl_multiple_traits_resolves_methods_from_all() {
+        assert!(
+            lint(
+                "trait Greetable { fn greeting { \"hi\" } }\n\
+                 trait Loggable  { fn log_it { 1 } }\n\
+                 class Hybrid impl Greetable, Loggable {}\n\
+                 my $h = Hybrid->new\n\
+                 p $h->greeting()\n\
+                 p $h->log_it()"
+            )
+            .is_ok(),
+        );
+    }
+
+    #[test]
+    fn class_impl_trait_still_flags_unknown_method() {
+        // Guardrail: if the method exists on NEITHER the class NOR
+        // any implemented trait, still flag.
+        let r = lint(
+            "trait Greetable { fn greeting }\n\
+             class Person impl Greetable { n: Str = \"\" }\n\
+             my $p = Person->new\n\
+             p $p->fly()",
+        );
+        assert!(r.is_err(), "expected $p->fly to be flagged");
+    }
+
+    #[test]
+    fn class_inheritance_still_flags_unknown_method() {
+        // Symmetric guard: a method that exists on NEITHER child nor
+        // parent must still be flagged.
+        let r = lint(
+            "class Animal { fn trail { \"\" } }\n\
+             class Dog extends Animal {\n\
+                 fn show { $self->fly }\n\
+             }",
+        );
+        assert!(r.is_err(), "expected $self->fly to be flagged");
     }
 
     #[test]

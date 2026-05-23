@@ -3461,11 +3461,8 @@ mod tests {
     #[test]
     fn url_encode_with_strict_pattern_matches_uri_escape_two_arg() {
         let s = "hello-world.tar~gz";
-        let e = url_encode_with_pattern(
-            &StrykeValue::string(s.into()),
-            Some("^A-Za-z0-9"),
-        )
-        .unwrap();
+        let e =
+            url_encode_with_pattern(&StrykeValue::string(s.into()), Some("^A-Za-z0-9")).unwrap();
         assert_eq!(e.to_string(), "hello%2Dworld%2Etar%7Egz");
     }
 
