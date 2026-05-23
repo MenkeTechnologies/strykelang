@@ -1,0 +1,128 @@
+#!/usr/bin/env stryke
+
+# Stack & queue ADTs, balanced brackets, two-stack queue, min-stack.
+
+fn Stk::push  = push @{_}, _1
+fn Stk::pop   = pop @{_}
+fn Stk::peek  = _->[-1]
+fn Stk::size  = len(@{_})
+fn Stk::empty = len(@{_}) == 0
+
+my $s = []
+Stk::push($s, 1)
+Stk::push($s, 2)
+Stk::push($s, 3)
+Stk::size($s)  |> aeq 3, "stack size 3"
+Stk::peek($s)  |> aeq 3, "stack peek"
+Stk::pop($s)   |> aeq 3, "stack pop 3"
+Stk::pop($s)   |> aeq 2, "stack pop 2"
+Stk::size($s)  |> aeq 1, "stack size 1"
+Stk::empty($s) |> aeq 0, "stack not empty"
+Stk::pop($s)
+Stk::empty($s) |> aeq 1, "stack empty"
+
+# Queue (FIFO) on plain arrays
+fn Q::enq   = push @{_}, _1
+fn Q::deq   = shift @{_}
+fn Q::front = _->[0]
+fn Q::size  = len(@{_})
+
+my $q = []
+Q::enq($q, "a")
+Q::enq($q, "b")
+Q::enq($q, "c")
+Q::front($q) |> aeq "a", "queue front a"
+Q::deq($q)   |> aeq "a", "deq a"
+Q::deq($q)   |> aeq "b", "deq b"
+Q::size($q)  |> aeq 1, "queue size 1"
+
+# Deque
+fn Dq::push_front = unshift @{_}, _1
+fn Dq::push_back  = push @{_}, _1
+fn Dq::pop_front  = shift @{_}
+fn Dq::pop_back   = pop @{_}
+
+my $d = []
+Dq::push_back($d, 2)
+Dq::push_front($d, 1)
+Dq::push_back($d, 3)
+Dq::push_front($d, 0)
+"@$d"            |> aeq "0 1 2 3", "deque order"
+Dq::pop_front($d) |> aeq 0, "deque pop front"
+Dq::pop_back($d)  |> aeq 3, "deque pop back"
+"@$d"             |> aeq "1 2", "deque after pops"
+
+# Balanced brackets
+fn balanced($s) {
+    my @stk = ()
+    my %close = (')' => '(', ']' => '[', '}' => '{')
+    for my $ch (split //, $s) {
+        if ($ch eq '(' || $ch eq '[' || $ch eq '{') {
+            push @stk, $ch
+        } elsif (exists $close{$ch}) {
+            return 0 if len(@stk) == 0
+            return 0 if pop(@stk) ne $close{$ch}
+        }
+    }
+    len(@stk) == 0 ? 1 : 0
+}
+
+balanced("()")     |> aeq 1, "balanced ()"
+balanced("()[]{}") |> aeq 1, "balanced ()[]{}"
+balanced("([{}])") |> aeq 1, "balanced nested"
+balanced("(]")     |> aeq 0, "unbalanced (]"
+balanced("([)]")   |> aeq 0, "unbalanced ([)]"
+balanced("(((")    |> aeq 0, "unbalanced ((("
+balanced("")       |> aeq 1, "empty balanced"
+
+# Queue from two stacks
+fn TwoStkQ::new() { +{ in => [], out => [] } }
+fn TwoStkQ::enq = push @{_->{in}}, _1
+fn TwoStkQ::deq($tq) {
+    if (len(@{$tq->{out}}) == 0) {
+        while (len(@{$tq->{in}}) > 0) {
+            push @{$tq->{out}}, pop @{$tq->{in}}
+        }
+    }
+    pop @{$tq->{out}}
+}
+
+my $tq = TwoStkQ::new()
+TwoStkQ::enq($tq, 1)
+TwoStkQ::enq($tq, 2)
+TwoStkQ::enq($tq, 3)
+TwoStkQ::deq($tq) |> aeq 1, "two-stack deq 1"
+TwoStkQ::deq($tq) |> aeq 2, "two-stack deq 2"
+TwoStkQ::enq($tq, 4)
+TwoStkQ::deq($tq) |> aeq 3, "two-stack deq 3"
+TwoStkQ::deq($tq) |> aeq 4, "two-stack deq 4"
+
+# Min stack: track running min
+fn MinStk::new() { +{ s => [], m => [] } }
+fn MinStk::push($ms, $v) {
+    push @{$ms->{s}}, $v
+    my $cur = len(@{$ms->{m}}) == 0 ? $v : $ms->{m}[-1]
+    push @{$ms->{m}}, ($v < $cur ? $v : $cur)
+}
+fn MinStk::pop = (pop @{_->{m}}, pop @{_->{s}})[1]
+fn MinStk::min = _->{m}[-1]
+
+my $ms = MinStk::new()
+MinStk::push($ms, 3)
+MinStk::push($ms, 5)
+MinStk::push($ms, 2)
+MinStk::push($ms, 7)
+MinStk::min($ms) |> aeq 2, "min stack min 2"
+MinStk::pop($ms)
+MinStk::min($ms) |> aeq 2, "min stack min 2 still"
+MinStk::pop($ms)
+MinStk::min($ms) |> aeq 3, "min stack min 3"
+
+# Reverse a queue using a stack
+my @rq = (1, 2, 3, 4, 5)
+my @stk = ()
+while (len(@rq) > 0) { push @stk, shift @rq }
+while (len(@stk) > 0) { push @rq, pop @stk }
+"@rq" |> aeq "5 4 3 2 1", "reverse queue via stack"
+
+test_run

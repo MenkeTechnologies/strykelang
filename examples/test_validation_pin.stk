@@ -31,13 +31,12 @@ fn Val::parse_kv($s) {
 
 fn Val::format_csv_row(@cells) {
     join(",", map {
-        my $c = _
-        if ($c =~ /[",\n]/) {
-            my $q = $c
+        if (/[",\n]/) {
+            my $q = $_
             $q =~ s/"/""/g
             qq("$q")
         } else {
-            $c
+            $_
         }
     } @cells)
 }

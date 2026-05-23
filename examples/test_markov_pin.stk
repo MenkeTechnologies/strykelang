@@ -1,0 +1,115 @@
+#!/usr/bin/env stryke
+
+# Pinning batch: Markov chain text model.
+# Compliance: docs/STYLE_GUIDE.md
+
+# Build n-gram transition table from words.
+fn Mk::train(@words) {
+    my %model = ()
+    for my $i (0:(len @words) - 2) {
+        my $key = $words[$i]
+        push @{$model{$key}}, $words[$i + 1]
+    }
+    \%model
+}
+
+# Choose deterministically: pick the (idx % count) successor.
+fn Mk::choose($succ, $seed) = $succ->[$seed % (len $succ)]
+
+fn Mk::generate($model, $start, $n, $seed) {
+    my @out = ($start)
+    my $cur = $start
+    mysync $r = $seed
+    for (1:$n) {
+        my $succ = $model->{$cur}
+        last if !$succ
+        $r = ($r * 1103515245 + 12345) % 2147483648
+        my $next = Mk::choose($succ, $r)
+        push @out, $next
+        $cur = $next
+    }
+    \@out
+}
+
+# Count distinct successors per state
+fn Mk::successors($model, $key) {
+    return [] if !$model->{$key}
+    my %seen = ()
+    $seen{$_} = 1 for @{$model->{$key}}
+    my @r = sort keys %seen
+    \@r
+}
+
+my @corpus = ("the", "cat", "sat", "on", "the", "mat", "the", "cat", "ran", "the", "dog", "sat")
+my $m = Mk::train(@corpus)
+
+# After "the": cat, mat, cat, dog → distinct {cat, dog, mat}
+join(",", @{Mk::successors($m, "the")}) |> aeq "cat,dog,mat", "succ(the)"
+join(",", @{Mk::successors($m, "cat")}) |> aeq "ran,sat",      "succ(cat)"
+join(",", @{Mk::successors($m, "sat")}) |> aeq "on",           "succ(sat)"
+join(",", @{Mk::successors($m, "dog")}) |> aeq "sat",          "succ(dog)"
+join(",", @{Mk::successors($m, "mat")}) |> aeq "the",          "succ(mat)"
+
+# Total successor counts (with repetition)
+len $m->{"the"} |> aeq 4, "the has 4 transitions"
+len $m->{"cat"} |> aeq 2, "cat has 2 transitions"
+
+# Deterministic generation
+my $g1 = Mk::generate($m, "the", 5, 1)
+(len @$g1) >= 1 |> aeq 1, "gen returns at least start"
+$g1->[0] |> aeq "the", "starts with the"
+
+# Test that succ choices are always valid
+my $g2 = Mk::generate($m, "the", 10, 42)
+my $valid = 1
+for my $i (0:(len @$g2) - 2) {
+    my $w = $g2->[$i]
+    my $nx = $g2->[$i + 1]
+    my $ok = 0
+    if ($m->{$w}) {
+        for my $s (@{$m->{$w}}) {
+            $ok = 1 if $s eq $nx
+        }
+    }
+    $valid = 0 if !$ok
+}
+$valid |> aeq 1, "all transitions valid"
+
+# Character-level n-gram
+fn Mk::train_chars($s, $k) {
+    my %model = ()
+    my @c = split(//, $s)
+    for my $i (0:(len @c) - $k - 1) {
+        my $key = join("", @c[$i:$i + $k - 1])
+        push @{$model{$key}}, $c[$i + $k]
+    }
+    \%model
+}
+
+my $cm = Mk::train_chars("abracadabra", 2)
+
+# bigrams in "abracadabra":
+# ab→r, br→a, ra→c, ac→a, ca→d, ad→a, da→b, ab→r, br→a
+# so "ab"→[r,r], "br"→[a,a], "ra"→[c], "ac"→[a], "ca"→[d], "ad"→[a], "da"→[b]
+join(",", @{$cm->{"ab"}}) |> aeq "r,r",  "ab→r,r"
+join(",", @{$cm->{"br"}}) |> aeq "a,a",  "br→a,a"
+join(",", @{$cm->{"ra"}}) |> aeq "c",    "ra→c"
+join(",", @{$cm->{"da"}}) |> aeq "b",    "da→b"
+
+# Sentence-counting via bigram model (count_pairs)
+fn Mk::pair_count($model) {
+    my $sum = 0
+    for my $k (keys %$model) {
+        $sum += len $model->{$k}
+    }
+    $sum
+}
+
+Mk::pair_count($m)  |> aeq 11, "corpus has 11 transitions"
+Mk::pair_count($cm) |> aeq 9,  "abracadabra has 9 bigram transitions"
+
+# Distinct keys
+(len keys %$m)  |> aeq 7, "7 distinct starts"
+(len keys %$cm) |> aeq 7, "7 distinct bigram heads"
+
+test_run

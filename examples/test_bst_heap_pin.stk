@@ -1,0 +1,121 @@
+#!/usr/bin/env stryke
+
+# Pinning batch: BST + heap operations.
+# Compliance: docs/STYLE_GUIDE.md
+
+# ── BST via hashref nodes ──────────────────────────────────────────────────
+
+fn Bst::node = { v => _, l => undef, r => undef }
+
+fn Bst::ins($t, $v) {
+    return Bst::node($v) unless defined $t
+    if    ($v < $t->{v}) { $t->{l} = Bst::ins($t->{l}, $v) }
+    elsif ($v > $t->{v}) { $t->{r} = Bst::ins($t->{r}, $v) }
+    $t
+}
+
+fn Bst::has($t, $v) {
+    return 0 unless defined $t
+    return 1 if $t->{v} == $v
+    $v < $t->{v} ? Bst::has($t->{l}, $v) : Bst::has($t->{r}, $v)
+}
+
+fn Bst::inorder($t) {
+    return () unless defined $t
+    (Bst::inorder($t->{l}), $t->{v}, Bst::inorder($t->{r}))
+}
+
+my $t = undef
+for my $v (5, 3, 7, 1, 4, 6, 8, 2) { $t = Bst::ins($t, $v) }
+
+Bst::has($t, 4)  |> aok "has 4"
+Bst::has($t, 8)  |> aok "has 8"
+Bst::has($t, 9)  |> aeq 0, "missing 9"
+Bst::has($t, 0)  |> aeq 0, "missing 0"
+
+my @sorted = Bst::inorder($t)
+join(",", @sorted) |> aeq "1,2,3,4,5,6,7,8", "inorder sorted"
+len(@sorted)       |> aeq 8, "8 nodes"
+
+fn Bst::depth($t) {
+    return 0 unless defined $t
+    my $dl = Bst::depth($t->{l})
+    my $dr = Bst::depth($t->{r})
+    1 + ($dl > $dr ? $dl : $dr)
+}
+Bst::depth($t) >= 3 |> aok "depth >= 3"
+
+fn Bst::cnt($t) {
+    return 0 unless defined $t
+    1 + Bst::cnt($t->{l}) + Bst::cnt($t->{r})
+}
+Bst::cnt($t) |> aeq 8, "8 nodes via cnt"
+
+fn Bst::min($t) = defined $t->{l} ? Bst::min($t->{l}) : $t->{v}
+fn Bst::max($t) = defined $t->{r} ? Bst::max($t->{r}) : $t->{v}
+Bst::min($t) |> aeq 1, "min 1"
+Bst::max($t) |> aeq 8, "max 8"
+
+# ── Binary heap (min-heap) via array ───────────────────────────────────────
+
+fn Heap::push($h, $v) {
+    push @$h, $v
+    my $i = len(@$h) - 1
+    while ($i > 0) {
+        my $p = int(($i - 1) / 2)
+        last if $h->[$p] <= $h->[$i]
+        ($h->[$p], $h->[$i]) = ($h->[$i], $h->[$p])
+        $i = $p
+    }
+    $h
+}
+
+fn Heap::pop($h) {
+    return undef unless len(@$h)
+    my $top = $h->[0]
+    my $last = pop @$h
+    if (len(@$h)) {
+        $h->[0] = $last
+        my $i = 0
+        my $n = len(@$h)
+        while (1) {
+            my $l = 2 * $i + 1
+            my $r = 2 * $i + 2
+            my $s = $i
+            $s = $l if $l < $n && $h->[$l] < $h->[$s]
+            $s = $r if $r < $n && $h->[$r] < $h->[$s]
+            last if $s == $i
+            ($h->[$s], $h->[$i]) = ($h->[$i], $h->[$s])
+            $i = $s
+        }
+    }
+    $top
+}
+
+my @h = ()
+Heap::push(\@h, $_) for (5, 1, 9, 3, 7, 2, 8, 4, 6)
+len(@h) |> aeq 9, "heap size 9"
+
+my @out = ()
+while (len(@h)) { push @out, Heap::pop(\@h) }
+join(",", @out) |> aeq "1,2,3,4,5,6,7,8,9", "heap sort"
+
+my @mh = ()
+Heap::push(\@mh, -$_) for (3, 1, 4, 1, 5, 9, 2, 6, 5)
+my @desc = ()
+while (len(@mh)) { push @desc, -Heap::pop(\@mh) }
+join(",", @desc) |> aeq "9,6,5,5,4,3,2,1,1", "max-heap desc"
+
+fn Heap::topk($k, @xs) {
+    my @kh = ()
+    for my $v (@xs) {
+        if (len(@kh) < $k) { Heap::push(\@kh, $v) }
+        elsif ($v > $kh[0]) { Heap::pop(\@kh); Heap::push(\@kh, $v) }
+    }
+    sort { _1 <=> _ } @kh
+}
+
+my @top3 = Heap::topk(3, 5, 1, 9, 3, 7, 2, 8, 4, 6)
+join(",", @top3) |> aeq "9,8,7", "top 3"
+
+test_run

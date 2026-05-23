@@ -1,0 +1,160 @@
+#!/usr/bin/env stryke
+
+# Pinning batch: OOP state machine — order lifecycle, vending machine, traffic.
+# Style: docs/STYLE_GUIDE.md.
+
+trait Stateful {
+    fn state
+    fn transition
+}
+
+class Order impl Stateful {
+    id: Str   = "ord-0"
+    st: Str   = "draft"
+    log: Array = []
+
+    fn state = $self->st
+
+    fn transition($evt) {
+        my $cur = $self->st
+        my $next = undef
+        if    ($cur eq "draft"     && $evt eq "submit")  { $next = "pending" }
+        elsif ($cur eq "pending"   && $evt eq "approve") { $next = "approved" }
+        elsif ($cur eq "pending"   && $evt eq "reject")  { $next = "rejected" }
+        elsif ($cur eq "approved"  && $evt eq "ship")    { $next = "shipped" }
+        elsif ($cur eq "shipped"   && $evt eq "deliver") { $next = "delivered" }
+        elsif ($cur eq "delivered" && $evt eq "return")  { $next = "returned" }
+        return undef if !defined $next
+        push @{$self->log}, "$cur->$next on $evt"
+        $self->st = $next
+        $next
+    }
+
+    fn history = $self->log
+    fn is_terminal = $self->st eq "rejected" || $self->st eq "returned" || $self->st eq "delivered"
+}
+
+my $o = Order->new(id => "ord-1", st => "draft", log => [])
+$o->state() |> aeq "draft", "init draft"
+
+$o->transition("submit")  |> aeq "pending",  "draft → pending"
+$o->state()                |> aeq "pending",  "now pending"
+$o->transition("approve") |> aeq "approved", "→ approved"
+$o->transition("ship")    |> aeq "shipped",  "→ shipped"
+$o->transition("deliver") |> aeq "delivered","→ delivered"
+$o->is_terminal()          |> aeq 1,          "delivered is terminal"
+
+$o->transition("submit") |> aeq "", "invalid from delivered"
+$o->state() |> aeq "delivered", "state untouched"
+
+(len @{$o->history()}) |> aeq 4, "4 transitions logged"
+$o->history()->[0] |> aeq "draft->pending on submit", "log entry"
+$o->history()->[3] |> aeq "shipped->delivered on deliver", "last entry"
+
+# Rejection path
+my $o2 = Order->new(id => "ord-2", st => "draft", log => [])
+$o2->transition("submit")
+$o2->transition("reject") |> aeq "rejected", "rejected"
+$o2->is_terminal()         |> aeq 1, "rejected terminal"
+$o2->transition("approve") |> aeq "", "no-op from rejected"
+
+# Vending machine — coins → product
+class Vending impl Stateful {
+    st: Str    = "idle"
+    coins: Int = 0
+    price: Int = 5
+
+    fn state = $self->st
+
+    fn transition($evt) {
+        my $cur = $self->st
+        if ($evt eq "coin") {
+            $self->coins = $self->coins + 1
+            if ($self->coins >= $self->price) {
+                $self->st = "ready"
+            } else {
+                $self->st = "accepting"
+            }
+            return $self->st
+        }
+        if ($evt eq "dispense" && $cur eq "ready") {
+            $self->st = "idle"
+            $self->coins = 0
+            return "dispensed"
+        }
+        if ($evt eq "cancel") {
+            my $refund = $self->coins
+            $self->st = "idle"
+            $self->coins = 0
+            return "refund=$refund"
+        }
+        undef
+    }
+}
+
+my $v = Vending->new(st => "idle", coins => 0, price => 3)
+$v->state() |> aeq "idle", "v idle"
+
+$v->transition("coin") |> aeq "accepting", "v 1c"
+$v->transition("coin") |> aeq "accepting", "v 2c"
+$v->transition("coin") |> aeq "ready",     "v 3c ready"
+$v->transition("dispense") |> aeq "dispensed", "dispensed"
+$v->state() |> aeq "idle", "back to idle"
+
+$v->transition("coin")
+$v->transition("coin")
+$v->transition("cancel") |> aeq "refund=2", "refund 2"
+$v->state() |> aeq "idle", "v idle after refund"
+
+# Traffic light cycle
+class TrafficLight impl Stateful {
+    st: Str = "red"
+    fn state = $self->st
+    fn transition($evt) {
+        my $nx = $self->st eq "red"    ? "green"
+               : $self->st eq "green"  ? "yellow"
+               : $self->st eq "yellow" ? "red"
+               : undef
+        return undef if !defined $nx
+        $self->st = $nx
+        $nx
+    }
+}
+
+my $t = TrafficLight->new(st => "red")
+$t->transition() |> aeq "green",  "r→g"
+$t->transition() |> aeq "yellow", "g→y"
+$t->transition() |> aeq "red",    "y→r"
+$t->transition() |> aeq "green",  "cycle continues"
+
+# Cycle through 12 steps -- pattern repeats every 3
+my @seq = ()
+for (1:12) {
+    push @seq, $t->transition()
+}
+my %count = ()
+$count{$_}++ for @seq
+$count{"red"}    |> aeq 4, "4 reds in 12"
+$count{"green"}  |> aeq 4, "4 greens"
+$count{"yellow"} |> aeq 4, "4 yellows"
+
+# Compose: process a sequence of events through any FSM
+fn run_events($fsm, @events) {
+    my @out = ()
+    for my $e (@events) {
+        push @out, $fsm->transition($e)
+    }
+    \@out
+}
+
+my $o3 = Order->new(id => "ord-3", st => "draft", log => [])
+my $trace = run_events($o3, "submit", "approve", "ship", "deliver")
+join(",", @$trace) |> aeq "pending,approved,shipped,delivered", "FSM sequence"
+
+# Counts of all logged transitions
+my $o4 = Order->new(id => "ord-4", st => "draft", log => [])
+run_events($o4, "submit", "approve", "ship", "deliver", "return")
+$o4->state() |> aeq "returned", "return after delivery"
+(len @{$o4->history()}) |> aeq 5, "5 transitions"
+
+test_run

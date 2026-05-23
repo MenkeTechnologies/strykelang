@@ -1,0 +1,95 @@
+#!/usr/bin/env stryke
+
+# Union-Find (disjoint set) with path compression & rank.
+
+fn Uf::new($n) {
+    +{
+        parent => [0..$n - 1],
+        rank   => [(0) x $n],
+        count  => $n,
+    }
+}
+
+fn Uf::find($u, $x) {
+    my $p = $u->{parent}
+    while ($p->[$x] != $x) {
+        $p->[$x] = $p->[$p->[$x]]
+        $x = $p->[$x]
+    }
+    $x
+}
+
+fn Uf::union($u, $x, $y) {
+    my $rx = Uf::find($u, $x)
+    my $ry = Uf::find($u, $y)
+    return 0 if $rx == $ry
+    my $r = $u->{rank}
+    my $p = $u->{parent}
+    if ($r->[$rx] < $r->[$ry]) {
+        $p->[$rx] = $ry
+    } elsif ($r->[$rx] > $r->[$ry]) {
+        $p->[$ry] = $rx
+    } else {
+        $p->[$ry] = $rx
+        $r->[$rx]++
+    }
+    $u->{count}--
+    1
+}
+
+fn Uf::connected($u, $x, $y) {
+    Uf::find($u, $x) == Uf::find($u, $y) ? 1 : 0
+}
+
+fn Uf::component_count($u) { $u->{count} }
+
+my $u = Uf::new(10)
+Uf::component_count($u) |> aeq 10, "init 10 components"
+
+Uf::union($u, 0, 1)
+Uf::union($u, 2, 3)
+Uf::union($u, 4, 5)
+Uf::component_count($u) |> aeq 7, "after 3 merges = 7"
+
+Uf::connected($u, 0, 1) |> aok "0-1 connected"
+Uf::connected($u, 2, 3) |> aok "2-3 connected"
+!Uf::connected($u, 0, 2) |> aok "0-2 not connected"
+
+# Merge chains
+Uf::union($u, 1, 2)
+Uf::connected($u, 0, 3) |> aok "0-3 connected through chain"
+Uf::component_count($u) |> aeq 6, "after chain merge = 6"
+
+# Union already-connected: noop
+Uf::union($u, 0, 3) |> aeq 0, "already connected returns 0"
+Uf::component_count($u) |> aeq 6, "count unchanged"
+
+# Merge everything
+Uf::union($u, 0, 4)
+Uf::union($u, 0, 6)
+Uf::union($u, 0, 7)
+Uf::union($u, 0, 8)
+Uf::union($u, 0, 9)
+Uf::component_count($u) |> aeq 1, "all merged"
+
+# Find returns consistent root
+my $root0 = Uf::find($u, 0)
+for my $i (1:9) {
+    Uf::find($u, $i) |> aeq $root0, "all roots == root0 (i=$i)"
+}
+
+# Kruskal's MST with UF: weighted edge list → spanning weight
+my @edges = (
+    [1, 0, 1], [4, 0, 2], [2, 1, 2], [6, 1, 3], [3, 2, 3], [5, 2, 4], [7, 3, 4],
+)
+my $uf = Uf::new(5)
+my $mst_weight = 0
+for my $e (sort { _->[0] <=> _1->[0] } @edges) {
+    if (Uf::union($uf, $e->[1], $e->[2])) {
+        $mst_weight += $e->[0]
+    }
+}
+$mst_weight |> aeq 11, "MST weight = 11"
+Uf::component_count($uf) |> aeq 1, "MST connects all"
+
+test_run

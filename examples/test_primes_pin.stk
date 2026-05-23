@@ -1,0 +1,136 @@
+#!/usr/bin/env stryke
+
+# Pinning batch: Prime sieve, factorization, modular arithmetic.
+# Compliance: docs/STYLE_GUIDE.md
+
+fn Pr::sieve($n) {
+    my @p = (1) x ($n + 1)
+    $p[0] = $p[1] = 0
+    for my $i (2:int(sqrt($n))) {
+        next unless $p[$i]
+        my $j = $i * $i
+        while ($j <= $n) { $p[$j] = 0; $j += $i }
+    }
+    [grep { $p[$_] } 2:$n]
+}
+
+my $primes100 = Pr::sieve(100)
+len(@$primes100)        |> aeq 25, "π(100) = 25"
+$primes100->[0]         |> aeq 2,  "first prime"
+$primes100->[-1]        |> aeq 97, "last < 100"
+my $small = Pr::sieve(20)
+join(",", @$small) |> aeq "2,3,5,7,11,13,17,19", "primes ≤ 20"
+
+fn Pr::is($n) {
+    return 0 if $n < 2
+    return 1 if $n == 2
+    return 0 if $n % 2 == 0
+    my $i = 3
+    while ($i * $i <= $n) {
+        return 0 if $n % $i == 0
+        $i += 2
+    }
+    1
+}
+
+Pr::is(2)    |> aok    "2 prime"
+Pr::is(17)   |> aok    "17 prime"
+Pr::is(97)   |> aok    "97 prime"
+Pr::is(1)    |> aeq 0, "1 not prime"
+Pr::is(100)  |> aeq 0, "100 not prime"
+Pr::is(7919) |> aok    "7919 prime"
+
+fn Pr::factorize($n) {
+    my @out = ()
+    my $d = 2
+    while ($d * $d <= $n) {
+        while ($n % $d == 0) { push @out, $d; $n = int($n / $d) }
+        $d++
+    }
+    push @out, $n if $n > 1
+    \@out
+}
+
+join(",", @{Pr::factorize(60)})  |> aeq "2,2,3,5", "60 = 2²·3·5"
+join(",", @{Pr::factorize(97)})  |> aeq "97",      "97 prime"
+join(",", @{Pr::factorize(360)}) |> aeq "2,2,2,3,3,5", "360"
+len(@{Pr::factorize(1024)})      |> aeq 10, "1024 = 2¹⁰"
+
+fn Pr::divisors($n) {
+    my @out = ()
+    my $i = 1
+    while ($i * $i <= $n) {
+        if ($n % $i == 0) {
+            push @out, $i
+            push @out, int($n / $i) unless $i * $i == $n
+        }
+        $i++
+    }
+    [sort { _ <=> _1 } @out]
+}
+
+join(",", @{Pr::divisors(12)}) |> aeq "1,2,3,4,6,12",      "div(12)"
+join(",", @{Pr::divisors(28)}) |> aeq "1,2,4,7,14,28",     "div(28)"
+len(@{Pr::divisors(36)})        |> aeq 9,                   "9 divisors of 36"
+
+fn Pr::phi($n) {
+    my $r = $n
+    my $p = 2
+    while ($p * $p <= $n) {
+        if ($n % $p == 0) {
+            $r -= int($r / $p)
+            while ($n % $p == 0) { $n = int($n / $p) }
+        }
+        $p++
+    }
+    $r -= int($r / $n) if $n > 1
+    $r
+}
+
+Pr::phi(1)  |> aeq 1,  "φ(1)"
+Pr::phi(9)  |> aeq 6,  "φ(9)"
+Pr::phi(10) |> aeq 4,  "φ(10)"
+Pr::phi(36) |> aeq 12, "φ(36)"
+
+fn Pr::powmod($base, $exp, $m) {
+    my $r = 1
+    $base %= $m
+    while ($exp > 0) {
+        $r = ($r * $base) % $m if $exp & 1
+        $exp >>= 1
+        $base = ($base * $base) % $m
+    }
+    $r
+}
+
+Pr::powmod(2, 10, 1000)      |> aeq 24,  "2^10 mod 1000"
+Pr::powmod(3, 100, 7)        |> aeq 4,   "3^100 mod 7"
+Pr::powmod(5, 0, 13)         |> aeq 1,   "x^0 mod m"
+Pr::powmod(2, 20, 1_000_000) |> aeq 48576, "2^20 mod 1e6"
+
+# Modular inverse via Fermat (m prime)
+fn Pr::inv($x, $p) = Pr::powmod($x, $p - 2, $p)
+
+Pr::inv(3, 7)  |> aeq 5,  "3⁻¹ mod 7"
+(3 * Pr::inv(3, 7)) % 7    |> aeq 1, "3·3⁻¹ ≡ 1"
+(7 * Pr::inv(7, 11)) % 11  |> aeq 1, "7·7⁻¹ ≡ 1"
+
+fn Pr::gcd($u, $v) { while ($v) { ($u, $v) = ($v, $u % $v) } $u }
+
+Pr::gcd(48, 18) |> aeq 6, "gcd 48,18"
+Pr::gcd(17, 5)  |> aeq 1, "coprime"
+
+# Goldbach: every even n > 2 = p + q (test small cases)
+fn Pr::goldbach($n) {
+    for my $p (2:$n) {
+        return [$p, $n - $p] if Pr::is($p) && Pr::is($n - $p)
+    }
+    undef
+}
+
+my $gb = Pr::goldbach(10)
+join("+", @$gb) |> aeq "3+7", "10 = 3+7"
+my $gb2 = Pr::goldbach(28)
+$gb2->[0] + $gb2->[1] |> aeq 28, "goldbach 28 sums"
+
+test_run

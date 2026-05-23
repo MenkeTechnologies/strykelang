@@ -1,0 +1,102 @@
+#!/usr/bin/env stryke
+
+# Run-length encoding / decoding / variants.
+
+fn Rle::encode($s) {
+    return "" if $s eq ""
+    my @chars = split //, $s
+    my $out = ""
+    my $prev = $chars[0]
+    my $count = 1
+    for my $ch (@chars[1:$#chars]) {
+        if ($ch eq $prev) {
+            $count++
+        } else {
+            $out .= "#{$count}#{$prev}"
+            $prev = $ch
+            $count = 1
+        }
+    }
+    $out . "#{$count}#{$prev}"
+}
+
+fn Rle::decode($s) {
+    my $out = ""
+    while ($s =~ /(\d+)(.)/g) {
+        $out .= $2 x $1
+    }
+    $out
+}
+
+Rle::encode("")          |> aeq "",            "encode empty"
+Rle::encode("a")          |> aeq "1a",          "encode single"
+Rle::encode("aaa")         |> aeq "3a",          "encode 3a"
+Rle::encode("aaabbc")       |> aeq "3a2b1c",      "encode aaabbc"
+Rle::encode("aaaaaaaaaab") |> aeq "10a1b",       "encode 10a1b"
+Rle::encode("abcdef")      |> aeq "1a1b1c1d1e1f","encode no runs"
+
+Rle::decode("")            |> aeq "",            "decode empty"
+Rle::decode("1a")           |> aeq "a",            "decode 1a"
+Rle::decode("3a2b1c")        |> aeq "aaabbc",       "decode 3a2b1c"
+Rle::decode("10a1b")         |> aeq "aaaaaaaaaab", "decode 10a1b"
+
+# Roundtrip
+fn Rle::roundtrip = Rle::decode(Rle::encode(_))
+
+Rle::roundtrip("")              |> aeq "",              "rt empty"
+Rle::roundtrip("hello world")   |> aeq "hello world",   "rt hello"
+Rle::roundtrip("aaaabbbcc")      |> aeq "aaaabbbcc",     "rt aabb"
+Rle::roundtrip("WWWWWWWWWWWWBWWWWWWWWWWWWBBB") |> aeq "WWWWWWWWWWWWBWWWWWWWWWWWWBBB", "rt W12B"
+
+# Variant: only-runs (skip count=1)
+fn Rle::encode_terse($s) {
+    return "" if $s eq ""
+    my @chars = split //, $s
+    my $out = ""
+    my $prev = $chars[0]
+    my $count = 1
+    for my $ch (@chars[1:$#chars]) {
+        if ($ch eq $prev) {
+            $count++
+        } else {
+            $out .= $count == 1 ? $prev : "#{$count}#{$prev}"
+            $prev = $ch
+            $count = 1
+        }
+    }
+    $out . ($count == 1 ? $prev : "#{$count}#{$prev}")
+}
+
+Rle::encode_terse("aaabbc")    |> aeq "3a2bc",   "terse aaabbc"
+Rle::encode_terse("abcdef")    |> aeq "abcdef",  "terse no runs"
+Rle::encode_terse("aaaaaaab")   |> aeq "7ab",     "terse 7a"
+Rle::encode_terse("aabbcc")     |> aeq "2a2b2c",  "terse 2a2b2c"
+
+# Compression ratio
+fn Rle::ratio($s) {
+    return 1 if $s eq ""
+    len(Rle::encode($s)) / len($s)
+}
+
+Rle::ratio("aaaaaaaaaaaaaaaaaaaa") < 0.5 |> aok "highly compressible"
+Rle::ratio("abcdef") > 1                  |> aok "incompressible grows"
+
+# Count of distinct chars in encoded form
+fn Rle::run_count($s) {
+    return 0 if $s eq ""
+    my $count = 1
+    my @c = split //, $s
+    for my $i (1:$#c) {
+        $count++ if $c[$i] ne $c[$i-1]
+    }
+    $count
+}
+
+Rle::run_count("")        |> aeq 0, "runs of empty"
+Rle::run_count("a")        |> aeq 1, "runs of a"
+Rle::run_count("aaa")       |> aeq 1, "runs of aaa"
+Rle::run_count("aaabbc")    |> aeq 3, "runs of aaabbc"
+Rle::run_count("abcdef")    |> aeq 6, "runs of abcdef"
+Rle::run_count("aabbccdd")  |> aeq 4, "runs of aabbccdd"
+
+test_run

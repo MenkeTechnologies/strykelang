@@ -1,0 +1,126 @@
+#!/usr/bin/env stryke
+
+# Matrix operations.
+
+fn Mat::zeros($rows, $cols) {
+    [map { [(0) x $cols] } 1:$rows]
+}
+
+fn Mat::identity($n) {
+    my $m = Mat::zeros($n, $n)
+    $m->[$_][$_] = 1 for 0:$n - 1
+    $m
+}
+
+fn Mat::transpose($m) {
+    my $rows = len(@$m)
+    my $cols = len(@{$m->[0]})
+    my $t = Mat::zeros($cols, $rows)
+    for my $i (0:$rows - 1) {
+        for my $j (0:$cols - 1) {
+            $t->[$j][$i] = $m->[$i][$j]
+        }
+    }
+    $t
+}
+
+fn Mat::mul($x, $y) {
+    my $xr = len(@$x)
+    my $xc = len(@{$x->[0]})
+    my $yc = len(@{$y->[0]})
+    my $out = Mat::zeros($xr, $yc)
+    for my $i (0:$xr - 1) {
+        for my $j (0:$yc - 1) {
+            my $s = 0
+            $s += $x->[$i][$_] * $y->[$_][$j] for 0:$xc - 1
+            $out->[$i][$j] = $s
+        }
+    }
+    $out
+}
+
+fn Mat::add($x, $y) {
+    my $r = len(@$x)
+    my $c = len(@{$x->[0]})
+    my $out = Mat::zeros($r, $c)
+    for my $i (0:$r - 1) {
+        $out->[$i][$_] = $x->[$i][$_] + $y->[$i][$_] for 0:$c - 1
+    }
+    $out
+}
+
+fn Mat::scale($m, $k) {
+    my @out
+    for my $row (@$m) {
+        push @out, [map { _ * $k } @$row]
+    }
+    \@out
+}
+
+fn Mat::trace($m) {
+    my $s = 0
+    $s += $m->[$_][$_] for 0:len(@$m) - 1
+    $s
+}
+
+fn Mat::det2($m) {
+    $m->[0][0] * $m->[1][1] - $m->[0][1] * $m->[1][0]
+}
+
+fn Mat::det3($m) {
+    my ($p, $q, $r) = ($m->[0][0], $m->[0][1], $m->[0][2])
+    my ($s, $t, $u) = ($m->[1][0], $m->[1][1], $m->[1][2])
+    my ($v, $w, $z) = ($m->[2][0], $m->[2][1], $m->[2][2])
+    $p * ($t * $z - $u * $w) - $q * ($s * $z - $u * $v) + $r * ($s * $w - $t * $v)
+}
+
+fn Mat::equals($x, $y) {
+    return 0 if len(@$x) != len(@$y)
+    for my $i (0:len(@$x) - 1) {
+        return 0 if len(@{$x->[$i]}) != len(@{$y->[$i]})
+        for my $j (0:len(@{$x->[$i]}) - 1) {
+            return 0 if $x->[$i][$j] != $y->[$i][$j]
+        }
+    }
+    1
+}
+
+my $I = Mat::identity(3)
+Mat::trace($I) |> aeq 3, "trace I3 = 3"
+$I->[0][0]     |> aeq 1, "I3[0,0]"
+$I->[0][1]     |> aeq 0, "I3[0,1]"
+
+my $A = [[1, 2], [3, 4]]
+my $B = [[5, 6], [7, 8]]
+my $AB = Mat::mul($A, $B)
+$AB->[0][0] |> aeq 19, "AB[0,0]"
+$AB->[0][1] |> aeq 22, "AB[0,1]"
+$AB->[1][0] |> aeq 43, "AB[1,0]"
+$AB->[1][1] |> aeq 50, "AB[1,1]"
+
+my $T = Mat::transpose($A)
+$T->[0][1] |> aeq 3, "AT[0,1]"
+$T->[1][0] |> aeq 2, "AT[1,0]"
+
+my $C = Mat::add($A, $B)
+$C->[0][0] |> aeq 6,  "A+B[0,0]"
+$C->[1][1] |> aeq 12, "A+B[1,1]"
+
+my $S = Mat::scale($A, 3)
+$S->[0][0] |> aeq 3, "3A[0,0]"
+$S->[1][1] |> aeq 12, "3A[1,1]"
+
+Mat::det2($A) |> aeq -2, "det 2x2"
+Mat::det2([[1, 0], [0, 1]]) |> aeq 1, "det I2 = 1"
+Mat::det3([[1, 2, 3], [4, 5, 6], [7, 8, 10]]) |> aeq -3, "det 3x3"
+Mat::det3([[1, 0, 0], [0, 1, 0], [0, 0, 1]]) |> aeq 1, "det I3 = 1"
+
+# A * I = A
+Mat::equals(Mat::mul($A, Mat::identity(2)), $A) |> aok "A*I = A"
+# (A^T)^T = A
+Mat::equals(Mat::transpose(Mat::transpose($A)), $A) |> aok "(A^T)^T = A"
+
+# Trace = sum diagonal
+Mat::trace([[5, 9, 1], [2, 3, 8], [4, 6, 7]]) |> aeq 15, "trace 3x3"
+
+test_run

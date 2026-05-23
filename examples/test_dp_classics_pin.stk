@@ -1,0 +1,134 @@
+#!/usr/bin/env stryke
+
+# Dynamic programming classics.
+
+fn Dp::lcs($x, $y) {
+    my @xs = split(//, $x)
+    my @ys = split(//, $y)
+    my ($m, $n) = (len(@xs), len(@ys))
+    my @d = map { [(0) x ($n + 1)] } 0:$m
+    for my $i (1:$m) {
+        for my $j (1:$n) {
+            if ($xs[$i - 1] eq $ys[$j - 1]) {
+                $d[$i][$j] = $d[$i - 1][$j - 1] + 1
+            } else {
+                my $u = $d[$i - 1][$j]
+                my $v = $d[$i][$j - 1]
+                $d[$i][$j] = $u > $v ? $u : $v
+            }
+        }
+    }
+    $d[$m][$n]
+}
+
+fn Dp::edit_dist($x, $y) {
+    my @xs = split(//, $x)
+    my @ys = split(//, $y)
+    my ($m, $n) = (len(@xs), len(@ys))
+    my @d = map { [(0) x ($n + 1)] } 0:$m
+    $d[$_][0] = $_ for 0:$m
+    $d[0][$_] = $_ for 0:$n
+    for my $i (1:$m) {
+        for my $j (1:$n) {
+            if ($xs[$i - 1] eq $ys[$j - 1]) {
+                $d[$i][$j] = $d[$i - 1][$j - 1]
+            } else {
+                my $del = $d[$i - 1][$j]
+                my $ins = $d[$i][$j - 1]
+                my $sub = $d[$i - 1][$j - 1]
+                my $m1 = $del < $ins ? $del : $ins
+                my $m2 = $m1 < $sub ? $m1 : $sub
+                $d[$i][$j] = 1 + $m2
+            }
+        }
+    }
+    $d[$m][$n]
+}
+
+fn Dp::knapsack_01($weights, $values, $cap) {
+    my $n = len(@$weights)
+    my @d = map { [(0) x ($cap + 1)] } 0:$n
+    for my $i (1:$n) {
+        my $w = $weights->[$i - 1]
+        my $v = $values->[$i - 1]
+        for my $c (0:$cap) {
+            $d[$i][$c] = $d[$i - 1][$c]
+            if ($w <= $c) {
+                my $take = $d[$i - 1][$c - $w] + $v
+                $d[$i][$c] = $take if $take > $d[$i][$c]
+            }
+        }
+    }
+    $d[$n][$cap]
+}
+
+fn Dp::coin_change_count($amount, $coins) {
+    my @d = (0) x ($amount + 1)
+    $d[0] = 1
+    for my $coin (@$coins) {
+        for my $k ($coin:$amount) {
+            $d[$k] += $d[$k - $coin]
+        }
+    }
+    $d[$amount]
+}
+
+fn Dp::coin_change_min($amount, $coins) {
+    my $INF = $amount + 1
+    my @d = ($INF) x ($amount + 1)
+    $d[0] = 0
+    for my $k (1:$amount) {
+        for my $c (@$coins) {
+            if ($c <= $k) {
+                my $cand = $d[$k - $c] + 1
+                $d[$k] = $cand if $cand < $d[$k]
+            }
+        }
+    }
+    $d[$amount] >= $INF ? -1 : $d[$amount]
+}
+
+fn Dp::lis(@xs) {
+    my @d = (1) x len(@xs)
+    my $best = 1
+    for my $i (1:$#xs) {
+        for my $j (0:$i - 1) {
+            if ($xs[$j] < $xs[$i] && $d[$j] + 1 > $d[$i]) {
+                $d[$i] = $d[$j] + 1
+            }
+        }
+        $best = $d[$i] if $d[$i] > $best
+    }
+    $best
+}
+
+# LCS
+Dp::lcs("ABCBDAB", "BDCABA")     |> aeq 4, "LCS len 4"
+Dp::lcs("ABC", "ABC")            |> aeq 3, "LCS equal"
+Dp::lcs("ABC", "XYZ")            |> aeq 0, "LCS disjoint"
+Dp::lcs("AGGTAB", "GXTXAYB")     |> aeq 4, "LCS classic"
+
+# Edit distance
+Dp::edit_dist("kitten", "sitting")  |> aeq 3, "edit kitten->sitting"
+Dp::edit_dist("", "abc")            |> aeq 3, "edit empty->abc"
+Dp::edit_dist("abc", "abc")         |> aeq 0, "edit equal"
+Dp::edit_dist("flaw", "lawn")       |> aeq 2, "edit flaw->lawn"
+
+# Knapsack 0/1
+Dp::knapsack_01([1, 3, 4, 5], [1, 4, 5, 7], 7) |> aeq 9, "knapsack cap 7"
+Dp::knapsack_01([2, 3, 4, 5], [3, 4, 5, 6], 5) |> aeq 7, "knapsack cap 5"
+Dp::knapsack_01([10],         [60],          5) |> aeq 0, "knapsack too heavy"
+
+# Coin change
+Dp::coin_change_count(5, [1, 2, 5])  |> aeq 4,  "ways to make 5"
+Dp::coin_change_count(10, [2, 5, 10]) |> aeq 3, "ways to make 10"
+Dp::coin_change_min(11, [1, 2, 5])   |> aeq 3,  "min coins 11 = 3"
+Dp::coin_change_min(3, [2])          |> aeq -1, "no solution"
+
+# LIS
+Dp::lis(10, 22, 9, 33, 21, 50, 41, 60, 80) |> aeq 6, "LIS classic"
+Dp::lis(3, 10, 2, 1, 20)                    |> aeq 3, "LIS 3 1 2 20 -> 3"
+Dp::lis(50, 3, 10, 7, 40, 80)               |> aeq 4, "LIS another"
+Dp::lis(1)                                   |> aeq 1, "LIS single"
+
+test_run

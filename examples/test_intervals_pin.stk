@@ -1,0 +1,104 @@
+#!/usr/bin/env stryke
+
+# Intervals: overlap, contains, merge, intersect, meeting rooms.
+
+fn Iv::overlaps = _->[0] < _1->[1] && _1->[0] < _->[1] ? 1 : 0
+fn Iv::contains = _->[0] <= _1 && _1 < _->[1] ? 1 : 0
+fn Iv::length   = _->[1] - _->[0]
+
+fn Iv::intersect($x, $y) {
+    my $s = $x->[0] > $y->[0] ? $x->[0] : $y->[0]
+    my $e = $x->[1] < $y->[1] ? $x->[1] : $y->[1]
+    $s < $e ? [$s, $e] : undef
+}
+
+Iv::overlaps([1, 5], [4, 8]) |> aeq 1, "overlap yes"
+Iv::overlaps([1, 5], [5, 8]) |> aeq 0, "touching no overlap"
+Iv::overlaps([1, 5], [6, 8]) |> aeq 0, "no overlap"
+Iv::contains([2, 7], 2)       |> aeq 1, "contains start"
+Iv::contains([2, 7], 7)       |> aeq 0, "contains end exclusive"
+Iv::contains([2, 7], 4)       |> aeq 1, "contains mid"
+Iv::length([3, 10])           |> aeq 7, "length 7"
+
+my $ix = Iv::intersect([1, 10], [5, 15])
+"#{$ix->[0]},#{$ix->[1]}" |> aeq "5,10", "intersect 5..10"
+Iv::intersect([1, 3], [5, 7]) |> aeq undef, "no intersect"
+
+# Merge overlapping intervals
+fn merge_intervals($ivs) {
+    return [] if len(@$ivs) == 0
+    my @sorted = sort { _->[0] <=> _1->[0] } @$ivs
+    my @out = ([$sorted[0][0], $sorted[0][1]])
+    for my $iv (@sorted[1:$#sorted]) {
+        my $last = $out[-1]
+        if ($iv->[0] <= $last->[1]) {
+            $last->[1] = $iv->[1] > $last->[1] ? $iv->[1] : $last->[1]
+        } else {
+            push @out, [$iv->[0], $iv->[1]]
+        }
+    }
+    \@out
+}
+
+fn fmt_ivs = join(",", maps { "[#{_->[0]},#{_->[1]}]" } @{_})
+
+fmt_ivs(merge_intervals([[1,3],[2,6],[8,10],[15,18]])) |> aeq "[1,6],[8,10],[15,18]", "merge ex1"
+fmt_ivs(merge_intervals([[1,4],[4,5]]))                 |> aeq "[1,5]",                "merge touching"
+fmt_ivs(merge_intervals([[1,4],[0,4]]))                 |> aeq "[0,4]",                "merge same end"
+fmt_ivs(merge_intervals([]))                             |> aeq "",                    "merge empty"
+fmt_ivs(merge_intervals([[1,2]]))                        |> aeq "[1,2]",               "merge single"
+fmt_ivs(merge_intervals([[1,4],[2,3]]))                  |> aeq "[1,4]",               "merge nested"
+
+# Total covered length
+fn covered_length($ivs) {
+    my $merged = merge_intervals($ivs)
+    @$merged |> maps { _->[1] - _->[0] } |> sum
+}
+
+covered_length([[1,3],[2,6],[8,10]]) |> aeq 7, "covered length 7"
+covered_length([[1,5],[1,5],[1,5]])  |> aeq 4, "covered dupes"
+covered_length([[0,1],[2,3],[4,5]])  |> aeq 3, "covered disjoint"
+
+# Find an interval containing a point
+fn find_containing($ivs, $pt) {
+    for my $iv (@$ivs) {
+        return $iv if Iv::contains($iv, $pt)
+    }
+    undef
+}
+
+my $fc = find_containing([[1,5],[10,15],[20,25]], 12)
+"#{$fc->[0]},#{$fc->[1]}" |> aeq "10,15", "find contains 12"
+find_containing([[1,5],[10,15]], 7) |> aeq undef, "find not contains"
+
+# Insert interval and merge
+fn insert_interval = merge_intervals([@{_}, _1])
+
+fmt_ivs(insert_interval([[1,3],[6,9]], [2,5]))                       |> aeq "[1,5],[6,9]",          "insert overlap left"
+fmt_ivs(insert_interval([[1,2],[3,5],[6,7],[8,10],[12,16]], [4,8])) |> aeq "[1,2],[3,10],[12,16]", "insert engulfs"
+fmt_ivs(insert_interval([], [5,7]))                                   |> aeq "[5,7]",               "insert into empty"
+
+# Min meeting rooms: sweep starts vs ends
+fn min_meeting_rooms($ivs) {
+    my @starts = sort { _ <=> _1 } maps { _->[0] } @$ivs
+    my @ends   = sort { _ <=> _1 } maps { _->[1] } @$ivs
+    my $rooms = 0
+    my $best  = 0
+    my $j     = 0
+    for my $st (@starts) {
+        if ($st < $ends[$j]) {
+            $rooms++
+            $best = $rooms > $best ? $rooms : $best
+        } else {
+            $j++
+        }
+    }
+    $best
+}
+
+min_meeting_rooms([[0,30],[5,10],[15,20]]) |> aeq 2, "rooms 2"
+min_meeting_rooms([[7,10],[2,4]])          |> aeq 1, "rooms 1"
+min_meeting_rooms([[1,5],[2,6],[3,7]])     |> aeq 3, "rooms 3"
+min_meeting_rooms([])                      |> aeq 0, "rooms 0"
+
+test_run

@@ -1,0 +1,126 @@
+#!/usr/bin/env stryke
+
+# Linked list (cons-cell) implementation.
+
+fn Ll::nil() { undef }
+
+fn Ll::cons($h, $t) { +{ head => $h, tail => $t } }
+
+fn Ll::from_array($arr) {
+    my $list = undef
+    my @indices = rev 0:len(@$arr) - 1
+    for my $i (@indices) {
+        $list = Ll::cons($arr->[$i], $list)
+    }
+    $list
+}
+
+fn Ll::to_array($l) {
+    my @out
+    my $c = $l
+    while (defined $c) {
+        push @out, $c->{head}
+        $c = $c->{tail}
+    }
+    \@out
+}
+
+fn Ll::length($l) {
+    my $n = 0
+    my $c = $l
+    while (defined $c) { $n++; $c = $c->{tail} }
+    $n
+}
+
+fn Ll::reverse($l) {
+    my $r = undef
+    my $c = $l
+    while (defined $c) {
+        $r = Ll::cons($c->{head}, $r)
+        $c = $c->{tail}
+    }
+    $r
+}
+
+fn Ll::map($f, $l) {
+    return undef unless defined $l
+    Ll::cons($f->($l->{head}), Ll::map($f, $l->{tail}))
+}
+
+fn Ll::filter($p, $l) {
+    return undef unless defined $l
+    if ($p->($l->{head})) {
+        Ll::cons($l->{head}, Ll::filter($p, $l->{tail}))
+    } else {
+        Ll::filter($p, $l->{tail})
+    }
+}
+
+fn Ll::fold($f, $init, $l) {
+    my $acc = $init
+    my $c = $l
+    while (defined $c) {
+        $acc = $f->($acc, $c->{head})
+        $c = $c->{tail}
+    }
+    $acc
+}
+
+fn Ll::append($x, $y) {
+    return $y unless defined $x
+    Ll::cons($x->{head}, Ll::append($x->{tail}, $y))
+}
+
+fn Ll::take($n, $l) {
+    return undef if $n <= 0 || !defined $l
+    Ll::cons($l->{head}, Ll::take($n - 1, $l->{tail}))
+}
+
+my $l = Ll::from_array([1, 2, 3, 4, 5])
+Ll::length($l) |> aeq 5, "length 5"
+join(",", @{Ll::to_array($l)}) |> aeq "1,2,3,4,5", "to_array"
+
+my $r = Ll::reverse($l)
+join(",", @{Ll::to_array($r)}) |> aeq "5,4,3,2,1", "reverse"
+
+# Idempotent reverse
+join(",", @{Ll::to_array(Ll::reverse($r))}) |> aeq "1,2,3,4,5", "rev∘rev = id"
+
+my $m = Ll::map(fn ($x) { $x * 10 }, $l)
+join(",", @{Ll::to_array($m)}) |> aeq "10,20,30,40,50", "map *10"
+
+my $f = Ll::filter(fn ($x) { $x % 2 == 0 }, $l)
+join(",", @{Ll::to_array($f)}) |> aeq "2,4", "filter evens"
+
+# Fold = sum
+Ll::fold(fn ($acc, $x) { $acc + $x }, 0, $l) |> aeq 15, "fold sum"
+# Fold = product
+Ll::fold(fn ($acc, $x) { $acc * $x }, 1, $l) |> aeq 120, "fold product"
+
+# Empty list
+my $e = undef
+Ll::length($e) |> aeq 0, "empty length"
+join(",", @{Ll::to_array($e)}) |> aeq "", "empty to_array"
+join(",", @{Ll::to_array(Ll::reverse($e))}) |> aeq "", "empty reverse"
+Ll::fold(fn ($acc, $x) { $acc + $x }, 42, $e) |> aeq 42, "fold empty = init"
+
+# Append
+my $x = Ll::from_array([1, 2, 3])
+my $y = Ll::from_array([4, 5])
+my $xy = Ll::append($x, $y)
+join(",", @{Ll::to_array($xy)}) |> aeq "1,2,3,4,5", "append"
+Ll::length($xy) |> aeq 5, "append length"
+
+# Original unchanged (persistent)
+join(",", @{Ll::to_array($x)}) |> aeq "1,2,3", "x preserved"
+join(",", @{Ll::to_array($y)}) |> aeq "4,5",   "y preserved"
+
+# Take
+my $first3 = Ll::take(3, Ll::from_array([10, 20, 30, 40, 50]))
+join(",", @{Ll::to_array($first3)}) |> aeq "10,20,30", "take 3"
+
+# Take more than available
+my $first10 = Ll::take(10, Ll::from_array([1, 2]))
+join(",", @{Ll::to_array($first10)}) |> aeq "1,2", "take saturates"
+
+test_run

@@ -1,0 +1,141 @@
+#!/usr/bin/env stryke
+
+# Pinning batch: Recursive-descent arithmetic calculator.
+# Grammar: expr = term ([+-] term)*
+#          term = factor ([*/%] factor)*
+#          factor = number | "(" expr ")" | "-" factor
+# Compliance: docs/STYLE_GUIDE.md
+
+fn Cx::tokenize($src) {
+    my @toks = ()
+    my @chars = split(//, $src)
+    my $i = 0
+    my $n = len @chars
+    while ($i < $n) {
+        my $c = $chars[$i]
+        if ($c =~ /\s/) { $i++; next }
+        if ($c =~ /[0-9.]/) {
+            my $j = $i
+            while ($j < $n && $chars[$j] =~ /[0-9.]/) { $j++ }
+            push @toks, ["N", join("", @chars[$i:$j-1]) + 0]
+            $i = $j
+            next
+        }
+        if ($c =~ /[+\-*\/%()^]/) {
+            push @toks, ["O", $c]
+            $i++
+            next
+        }
+        $i++
+    }
+    \@toks
+}
+
+# Parser state held as a [tokens, pos] array
+fn Cx::peek($st) = $st->[0]->[$st->[1]]
+fn Cx::next($st) { my $t = Cx::peek($st); $st->[1]++; $t }
+fn Cx::done($st) = $st->[1] >= len $st->[0]
+
+fn Cx::factor($st) {
+    my $tk = Cx::peek($st)
+    if ($tk->[0] eq "N") {
+        Cx::next($st)
+        return $tk->[1]
+    }
+    if ($tk->[0] eq "O" && $tk->[1] eq "(") {
+        Cx::next($st)
+        my $v = Cx::expr($st)
+        Cx::next($st)  # consume ')'
+        return $v
+    }
+    if ($tk->[0] eq "O" && $tk->[1] eq "-") {
+        Cx::next($st)
+        return -Cx::factor($st)
+    }
+    if ($tk->[0] eq "O" && $tk->[1] eq "+") {
+        Cx::next($st)
+        return Cx::factor($st)
+    }
+    0
+}
+
+fn Cx::power($st) {
+    my $lhs = Cx::factor($st)
+    while (!Cx::done($st)) {
+        my $tk = Cx::peek($st)
+        last if $tk->[0] ne "O" || $tk->[1] ne "^"
+        Cx::next($st)
+        my $rhs = Cx::power($st)
+        $lhs = $lhs ** $rhs
+    }
+    $lhs
+}
+
+fn Cx::term($st) {
+    my $lhs = Cx::power($st)
+    while (!Cx::done($st)) {
+        my $tk = Cx::peek($st)
+        last if $tk->[0] ne "O" || ($tk->[1] ne "*" && $tk->[1] ne "/" && $tk->[1] ne "%")
+        Cx::next($st)
+        my $rhs = Cx::power($st)
+        if    ($tk->[1] eq "*") { $lhs = $lhs * $rhs }
+        elsif ($tk->[1] eq "/") { $lhs = $lhs / $rhs }
+        else                    { $lhs = $lhs % $rhs }
+    }
+    $lhs
+}
+
+fn Cx::expr($st) {
+    my $lhs = Cx::term($st)
+    while (!Cx::done($st)) {
+        my $tk = Cx::peek($st)
+        last if $tk->[0] ne "O" || ($tk->[1] ne "+" && $tk->[1] ne "-")
+        Cx::next($st)
+        my $rhs = Cx::term($st)
+        if ($tk->[1] eq "+") { $lhs = $lhs + $rhs }
+        else                 { $lhs = $lhs - $rhs }
+    }
+    $lhs
+}
+
+fn Cx::calc($src) {
+    my $toks = Cx::tokenize($src)
+    my $st   = [$toks, 0]
+    Cx::expr($st)
+}
+
+Cx::calc("1")             |> aeq 1,   "1"
+Cx::calc("1 + 2")         |> aeq 3,   "1+2"
+Cx::calc("1 + 2 + 3")     |> aeq 6,   "1+2+3"
+Cx::calc("10 - 4")        |> aeq 6,   "10-4"
+Cx::calc("10 - 4 - 3")    |> aeq 3,   "left assoc -"
+Cx::calc("2 * 3")         |> aeq 6,   "*"
+Cx::calc("12 / 4")        |> aeq 3,   "/"
+Cx::calc("13 % 5")        |> aeq 3,   "%"
+Cx::calc("2 + 3 * 4")     |> aeq 14,  "precedence"
+Cx::calc("(2 + 3) * 4")   |> aeq 20,  "paren"
+Cx::calc("2 * (3 + 4)")   |> aeq 14,  "paren 2"
+Cx::calc("-5 + 3")        |> aeq -2,  "unary -"
+Cx::calc("-(-5)")         |> aeq 5,   "double unary"
+Cx::calc("+7")            |> aeq 7,   "unary +"
+Cx::calc("2 ^ 10")        |> aeq 1024,"power"
+Cx::calc("2 ^ 3 ^ 2")     |> aeq 512, "right-assoc ^"
+Cx::calc("(2 ^ 3) ^ 2")   |> aeq 64,  "left-paren ^"
+Cx::calc("3 * 2 ^ 2")     |> aeq 12,  "^ binds tighter"
+
+Cx::calc("1 + 2 * 3 - 4 / 2") |> aeq 5, "mixed"
+Cx::calc("((1 + 2) * (3 + 4)) / 7") |> aeq 3, "nested parens"
+
+abs(Cx::calc("3.14 * 2") - 6.28) < 1e-9 |> aeq 1, "float mul"
+abs(Cx::calc("(1 + 0.5) * 4") - 6) < 1e-9 |> aeq 1, "float in expr"
+
+# Deeply nested
+Cx::calc("(((((1)))))") |> aeq 1, "5 nested parens"
+
+# Long sum
+Cx::calc("1+2+3+4+5+6+7+8+9+10") |> aeq 55, "1..10 sum"
+
+# Mix everything
+Cx::calc("2 + 3 * 4 - 5 + 6 / 3 + (7 - 2) * 2") |> aeq 21, "mixed long"
+
+test_run

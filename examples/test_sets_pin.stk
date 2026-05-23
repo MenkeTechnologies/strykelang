@@ -1,0 +1,86 @@
+#!/usr/bin/env stryke
+
+# Pinning batch: Sets — union, intersection, difference, symmetric diff, subset.
+# Compliance: docs/STYLE_GUIDE.md
+
+fn Set::from(@xs) { my %h = map { $_ => 1 } @xs; \%h }
+fn Set::has($s, $x)  = exists $s->{$x}
+fn Set::size($s)     = len(keys %$s)
+fn Set::add($s, $x)  { $s->{$x} = 1; $s }
+fn Set::del($s, $x)  { delete $s->{$x}; $s }
+
+fn Set::union($s1, $s2)    { my %u = (%$s1, %$s2); \%u }
+fn Set::inter($s1, $s2)    { my %r = map { $_ => 1 } grep { exists $s2->{$_} } keys %$s1; \%r }
+fn Set::diff($s1, $s2)     { my %r = map { $_ => 1 } grep { !exists $s2->{$_} } keys %$s1; \%r }
+fn Set::sym_diff($s1, $s2) { Set::union(Set::diff($s1, $s2), Set::diff($s2, $s1)) }
+fn Set::subset($s1, $s2)   { for my $k (keys %$s1) { return 0 unless exists $s2->{$k} } 1 }
+fn Set::equal($s1, $s2)    = Set::subset($s1, $s2) && Set::subset($s2, $s1)
+fn Set::list($s)           = join(",", sort keys %$s)
+
+my $A = Set::from(1, 2, 3, 4)
+my $B = Set::from(3, 4, 5, 6)
+
+Set::size($A)           |> aeq 4,  "size A"
+Set::has($A, 2)         |> aok     "A has 2"
+Set::has($A, 99)        |> aeq 0,  "A lacks 99"
+Set::list(Set::union($A, $B))    |> aeq "1,2,3,4,5,6", "A∪B"
+Set::list(Set::inter($A, $B))    |> aeq "3,4",         "A∩B"
+Set::list(Set::diff($A, $B))     |> aeq "1,2",         "A∖B"
+Set::list(Set::diff($B, $A))     |> aeq "5,6",         "B∖A"
+Set::list(Set::sym_diff($A, $B)) |> aeq "1,2,5,6",     "AΔB"
+
+Set::subset(Set::from(1, 2), $A)      |> aok       "{1,2} ⊆ A"
+Set::subset($A, Set::from(1, 2))      |> aeq 0,    "A ⊄ {1,2}"
+Set::equal(Set::from(1, 2, 3, 4), $A) |> aok       "A == {1..4}"
+Set::equal(Set::from(1, 2), $A)       |> aeq 0,    "A ≠ {1,2}"
+
+my $C = Set::from(1, 2, 3)
+Set::add($C, 4)
+Set::has($C, 4) |> aok "add"
+Set::del($C, 2)
+Set::has($C, 2) |> aeq 0, "del"
+Set::size($C)   |> aeq 3, "size after add+del"
+
+my $E = {}
+Set::size($E)                 |> aeq 0, "empty size 0"
+Set::size(Set::union($E, $A)) |> aeq 4, "∅∪A = A"
+Set::size(Set::inter($E, $A)) |> aeq 0, "∅∩A = ∅"
+Set::subset($E, $A)           |> aok    "∅ ⊆ A"
+
+fn Set::power($s) {
+    my @items = sort keys %$s
+    my @out = ([])
+    for my $x (@items) {
+        push @out, map { [@$_, $x] } @out
+    }
+    \@out
+}
+
+len(@{Set::power(Set::from('a', 'b', 'c'))}) |> aeq 8,  "|P({a,b,c})|"
+len(@{Set::power(Set::from(1:5))})           |> aeq 32, "|P(5-set)|"
+
+fn Set::cart($s1, $s2) {
+    my @out = ()
+    for my $x (sort keys %$s1) {
+        push @out, "$x,$_" for sort keys %$s2
+    }
+    \@out
+}
+
+my $cp = Set::cart(Set::from(1, 2), Set::from('x', 'y'))
+len(@$cp)        |> aeq 4,                 "|A×B|"
+join(";", @$cp)  |> aeq "1,x;1,y;2,x;2,y", "A×B pairs"
+
+fn MSet::from(@xs) {
+    my %h = ()
+    $h{$_}++ for @xs
+    \%h
+}
+fn MSet::count($m, $x) = $m->{$x} // 0
+
+my $m = MSet::from(qw(a b a c b a d))
+MSet::count($m, 'a') |> aeq 3, "multiset a×3"
+MSet::count($m, 'b') |> aeq 2, "multiset b×2"
+MSet::count($m, 'z') |> aeq 0, "multiset z×0"
+
+test_run

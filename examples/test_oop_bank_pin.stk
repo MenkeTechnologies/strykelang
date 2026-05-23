@@ -1,0 +1,182 @@
+#!/usr/bin/env stryke
+
+# Pinning batch: OOP banking — account types, transactions, ledger.
+# Style: docs/STYLE_GUIDE.md.
+
+trait Account {
+    fn balance
+    fn deposit
+    fn withdraw
+}
+
+trait Interest { fn accrue }
+
+class CheckingAccount impl Account {
+    id: Str       = "chk-0"
+    holder: Str   = "anon"
+    bal: Float    = 0.0
+    overdraft: Float = 0.0
+
+    fn balance = $self->bal
+
+    fn deposit($amt) {
+        $self->bal = $self->bal + $amt
+        $self->bal
+    }
+
+    fn withdraw($amt) {
+        return undef if $amt > $self->bal + $self->overdraft
+        $self->bal = $self->bal - $amt
+        $self->bal
+    }
+}
+
+class SavingsAccount impl Account, Interest {
+    id: Str     = "sav-0"
+    holder: Str = "anon"
+    bal: Float  = 0.0
+    rate: Float = 0.02
+
+    fn balance = $self->bal
+
+    fn deposit($amt) {
+        $self->bal = $self->bal + $amt
+        $self->bal
+    }
+
+    fn withdraw($amt) {
+        return undef if $amt > $self->bal
+        $self->bal = $self->bal - $amt
+        $self->bal
+    }
+
+    fn accrue {
+        $self->bal = $self->bal * (1 + $self->rate)
+        $self->bal
+    }
+}
+
+class CreditAccount impl Account {
+    id: Str     = "cred-0"
+    holder: Str = "anon"
+    bal: Float  = 0.0  # owed amount
+    limit: Float = 1000.0
+
+    fn balance = -$self->bal
+
+    fn deposit($amt) {
+        $self->bal = $self->bal - $amt   # pay down debt
+        $self->bal
+    }
+
+    fn withdraw($amt) {
+        return undef if $self->bal + $amt > $self->limit
+        $self->bal = $self->bal + $amt
+        $self->bal
+    }
+}
+
+class Ledger {
+    entries: Array = []
+
+    fn record($from, $to, $amt, $note) {
+        push @{$self->entries}, { from => $from, to => $to, amt => $amt, note => $note }
+        len @{$self->entries}
+    }
+
+    fn count = len @{$self->entries}
+
+    fn total {
+        my $s = 0
+        $s += $_->{amt} for @{$self->entries}
+        $s
+    }
+
+    fn by_note($note) {
+        [grep { $_->{note} eq $note } @{$self->entries}]
+    }
+}
+
+my $chk = CheckingAccount->new(id => "chk-1", holder => "alice", bal => 500.0, overdraft => 100.0)
+my $sav = SavingsAccount->new(id => "sav-1", holder => "alice", bal => 1000.0, rate => 0.05)
+my $crd = CreditAccount->new(id => "crd-1", holder => "alice", limit => 2000.0)
+
+$chk->balance() |> aeq 500,  "chk balance 500"
+$sav->balance() |> aeq 1000, "sav balance 1000"
+$crd->balance() |> aeq 0,    "crd balance 0"
+
+$chk->deposit(250) |> aeq 750, "chk +250"
+$chk->withdraw(100) |> aeq 650, "chk -100"
+$chk->balance() |> aeq 650, "chk after"
+
+# Overdraft tests
+$chk->withdraw(800) |> aeq "", "deny over overdraft"
+$chk->balance()     |> aeq 650, "balance untouched"
+$chk->withdraw(700) |> aeq -50, "ok within overdraft"
+
+# Savings interest
+$sav->accrue() |> aeq 1050, "sav 5% accrue"
+$sav->accrue() |> aeq 1102.5, "sav 5% twice"
+$sav->withdraw(2000) |> aeq "", "deny over balance"
+abs($sav->withdraw(100) - 1002.5) < 1e-9 |> aeq 1, "sav -100"
+
+# Credit
+$crd->withdraw(500) |> aeq 500, "crd charge 500"
+$crd->balance()     |> aeq -500, "crd balance -500"
+$crd->withdraw(1600) |> aeq "", "deny over limit"
+$crd->deposit(200)  |> aeq 300, "crd pay 200"
+$crd->balance()     |> aeq -300, "crd balance -300"
+
+# Polymorphic ledger walk
+my @accts = ($chk, $sav, $crd)
+my @ids = @accts |> maps { $_->id() }
+join(",", @ids) |> aeq "chk-1,sav-1,crd-1", "ids"
+
+# Sort by balance ascending
+my @by_bal = sort { $_->balance() <=> $_1->balance() } @accts
+$by_bal[0]->id()  |> aeq "crd-1", "lowest is crd"
+$by_bal[-1]->id() |> aeq "sav-1", "highest is sav"
+
+# Only interest-bearing
+my @int_accts = grep { $_->isa("SavingsAccount") } @accts
+(len @int_accts) |> aeq 1, "1 interest acct"
+
+# Ledger
+my $L = Ledger->new(entries => [])
+$L->record("chk-1", "sav-1", 100, "transfer")
+$L->record("chk-1", "crd-1", 50,  "payment")
+$L->record("chk-1", "sav-1", 200, "transfer")
+
+$L->count() |> aeq 3, "3 entries"
+$L->total() |> aeq 350, "total 350"
+(len @{$L->by_note("transfer")}) |> aeq 2, "2 transfers"
+(len @{$L->by_note("payment")})  |> aeq 1, "1 payment"
+
+# Pipeline: sum transfers only
+my @txs   = @{$L->by_note("transfer")}
+my $sum_t = 0
+$sum_t += $_->{amt} for @txs
+$sum_t |> aeq 300, "transfer sum 300"
+
+# Aggregate by from-account
+my %by_from = ()
+for my $e (@{$L->entries}) {
+    $by_from{$e->{from}} += $e->{amt}
+}
+$by_from{"chk-1"} |> aeq 350, "chk-1 outflow 350"
+
+# Class hierarchy reflection
+my %class_count = ()
+$class_count{ref($_)}++ for @accts
+$class_count{"CheckingAccount"} |> aeq 1, "1 checking"
+$class_count{"SavingsAccount"}  |> aeq 1, "1 savings"
+$class_count{"CreditAccount"}   |> aeq 1, "1 credit"
+
+# Total assets (excluding credit)
+my $total_assets = 0
+for my $acct (@accts) {
+    $total_assets += $acct->balance() unless $acct->isa("CreditAccount")
+}
+abs($total_assets - (-50 + 1002.5)) < 1e-9 |> aeq 1, "total assets"
+
+test_run

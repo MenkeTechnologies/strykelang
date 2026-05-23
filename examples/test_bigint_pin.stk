@@ -1,0 +1,103 @@
+#!/usr/bin/env stryke
+
+# Big integer arithmetic on digit arrays (least-significant-first).
+
+fn Bi::from_str($s) {
+    [rev maps { _ + 0 } split //, $s]
+}
+
+fn Bi::to_str($x) {
+    my @d = @$x
+    pop @d while len(@d) > 1 && $d[-1] == 0
+    join "", rev maps { "#{_}" } @d
+}
+
+Bi::to_str(Bi::from_str("0"))           |> aeq "0",          "rt 0"
+Bi::to_str(Bi::from_str("1"))           |> aeq "1",          "rt 1"
+Bi::to_str(Bi::from_str("12345"))        |> aeq "12345",      "rt 12345"
+Bi::to_str(Bi::from_str("1000000000000")) |> aeq "1000000000000", "rt 12 zeros"
+
+fn Bi::add($x, $y) {
+    my $n = len(@$x) > len(@$y) ? len(@$x) : len(@$y)
+    my @r = ()
+    my $carry = 0
+    for my $i (0:$n-1) {
+        my $u = $i < len(@$x) ? $x->[$i] : 0
+        my $v = $i < len(@$y) ? $y->[$i] : 0
+        my $s = $u + $v + $carry
+        push @r, $s % 10
+        $carry = int($s / 10)
+    }
+    push @r, $carry if $carry > 0
+    \@r
+}
+
+Bi::to_str(Bi::add(Bi::from_str("0"),       Bi::from_str("0")))       |> aeq "0",           "add 0+0"
+Bi::to_str(Bi::add(Bi::from_str("123"),     Bi::from_str("456")))     |> aeq "579",         "add 123+456"
+Bi::to_str(Bi::add(Bi::from_str("999"),     Bi::from_str("1")))       |> aeq "1000",        "add carry chain"
+Bi::to_str(Bi::add(Bi::from_str("99999999"), Bi::from_str("1")))      |> aeq "100000000",   "add 8-9 carry"
+Bi::to_str(Bi::add(Bi::from_str("123456789"), Bi::from_str("987654321"))) |> aeq "1111111110", "add big"
+
+fn Bi::mul($x, $y) {
+    my @r = (0) x (len(@$x) + len(@$y))
+    for my $i (0:len(@$x)-1) {
+        my $carry = 0
+        for my $j (0:len(@$y)-1) {
+            my $cur = $r[$i+$j] + $x->[$i] * $y->[$j] + $carry
+            $r[$i+$j] = $cur % 10
+            $carry = int($cur / 10)
+        }
+        $r[$i + len(@$y)] += $carry
+    }
+    pop @r while len(@r) > 1 && $r[-1] == 0
+    \@r
+}
+
+Bi::to_str(Bi::mul(Bi::from_str("0"),     Bi::from_str("12345"))) |> aeq "0",       "mul 0"
+Bi::to_str(Bi::mul(Bi::from_str("1"),     Bi::from_str("12345"))) |> aeq "12345",   "mul 1"
+Bi::to_str(Bi::mul(Bi::from_str("12"),    Bi::from_str("12")))    |> aeq "144",     "mul 12*12"
+Bi::to_str(Bi::mul(Bi::from_str("123"),   Bi::from_str("456")))   |> aeq "56088",   "mul 123*456"
+Bi::to_str(Bi::mul(Bi::from_str("9999"),  Bi::from_str("9999")))  |> aeq "99980001","mul 9999^2"
+Bi::to_str(Bi::mul(Bi::from_str("123456789"), Bi::from_str("987654321")))
+  |> aeq "121932631112635269", "mul big"
+
+# Factorial 30 = 265252859812191058636308480000000
+fn Bi::factorial($n) {
+    my $r = Bi::from_str("1")
+    for my $i (1:$n) { $r = Bi::mul($r, Bi::from_str("#{$i}")) }
+    $r
+}
+
+Bi::to_str(Bi::factorial(0))  |> aeq "1",                                "0! = 1"
+Bi::to_str(Bi::factorial(1))  |> aeq "1",                                "1!"
+Bi::to_str(Bi::factorial(5))  |> aeq "120",                              "5!"
+Bi::to_str(Bi::factorial(10)) |> aeq "3628800",                           "10!"
+Bi::to_str(Bi::factorial(20)) |> aeq "2432902008176640000",                "20!"
+Bi::to_str(Bi::factorial(30)) |> aeq "265252859812191058636308480000000", "30!"
+
+# Power: 2^100
+fn Bi::pow($base, $n) {
+    my $r = Bi::from_str("1")
+    for (1:$n) { $r = Bi::mul($r, $base) }
+    $r
+}
+
+Bi::to_str(Bi::pow(Bi::from_str("2"), 10))  |> aeq "1024",                                  "2^10"
+Bi::to_str(Bi::pow(Bi::from_str("2"), 32))  |> aeq "4294967296",                            "2^32"
+Bi::to_str(Bi::pow(Bi::from_str("2"), 64))  |> aeq "18446744073709551616",                  "2^64"
+Bi::to_str(Bi::pow(Bi::from_str("2"), 100)) |> aeq "1267650600228229401496703205376",       "2^100"
+
+# Compare
+fn Bi::compare($x, $y) {
+    return len(@$x) <=> len(@$y) if len(@$x) != len(@$y)
+    for my $i (rev 0:len(@$x)-1) {
+        return $x->[$i] <=> $y->[$i] if $x->[$i] != $y->[$i]
+    }
+    0
+}
+
+Bi::compare(Bi::from_str("100"), Bi::from_str("99"))    |> aeq 1,  "cmp 100 > 99"
+Bi::compare(Bi::from_str("99"),  Bi::from_str("100"))   |> aeq -1, "cmp 99 < 100"
+Bi::compare(Bi::from_str("123"), Bi::from_str("123"))   |> aeq 0,  "cmp equal"
+
+test_run
