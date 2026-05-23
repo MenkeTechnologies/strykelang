@@ -1,0 +1,88 @@
+#!/usr/bin/env stryke
+
+# Complex numbers: arithmetic, modulus, polar form.
+
+fn C::new   = [_, _1]
+fn C::re    = _->[0]
+fn C::im    = _->[1]
+fn C::add   = [_->[0] + _1->[0], _->[1] + _1->[1]]
+fn C::sub   = [_->[0] - _1->[0], _->[1] - _1->[1]]
+fn C::neg   = [-_->[0], -_->[1]]
+fn C::conj  = [_->[0], -_->[1]]
+fn C::scale = [_->[0] * _1, _->[1] * _1]
+
+fn C::mul($x, $y) {
+    [$x->[0]*$y->[0] - $x->[1]*$y->[1],
+     $x->[0]*$y->[1] + $x->[1]*$y->[0]]
+}
+
+fn C::abs2 = _->[0]*_->[0] + _->[1]*_->[1]
+fn C::abs  = sqrt(C::abs2(_))
+
+fn C::div($x, $y) {
+    my $d = C::abs2($y)
+    [($x->[0]*$y->[0] + $x->[1]*$y->[1]) / $d,
+     ($x->[1]*$y->[0] - $x->[0]*$y->[1]) / $d]
+}
+
+fn C::eqv = abs(_->[0] - _1->[0]) < 1e-9 && abs(_->[1] - _1->[1]) < 1e-9 ? 1 : 0
+
+my $z1 = C::new(3, 4)
+my $z2 = C::new(1, 2)
+
+C::re($z1)         |> aeq 3, "re"
+C::im($z1)         |> aeq 4, "im"
+C::abs($z1)        |> aeq 5, "|3+4i| = 5"
+C::abs2($z1)       |> aeq 25, "|3+4i|^2 = 25"
+
+C::eqv(C::add($z1, $z2), [4, 6])   |> aok "add"
+C::eqv(C::sub($z1, $z2), [2, 2])   |> aok "sub"
+C::eqv(C::neg($z1),     [-3, -4]) |> aok "neg"
+C::eqv(C::conj($z1),    [3, -4])  |> aok "conj"
+C::eqv(C::scale($z1, 2),[6, 8])   |> aok "scale"
+
+# (3+4i)(1+2i) = 3 + 6i + 4i + 8i^2 = -5 + 10i
+C::eqv(C::mul($z1, $z2), [-5, 10]) |> aok "mul (3+4i)(1+2i)"
+
+# (a/a) = 1
+C::eqv(C::div($z1, $z1), [1, 0]) |> aok "self-div = 1"
+
+# i^2 = -1
+my $i = C::new(0, 1)
+C::eqv(C::mul($i, $i), [-1, 0]) |> aok "i*i = -1"
+
+# i^4 = 1
+my $i2 = C::mul($i, $i)
+my $i4 = C::mul($i2, $i2)
+C::eqv($i4, [1, 0]) |> aok "i^4 = 1"
+
+# Distributivity: a*(b+c) = a*b + a*c
+my $c = C::new(2, -1)
+my $bc = C::add($z2, $c)
+C::eqv(C::mul($z1, $bc), C::add(C::mul($z1, $z2), C::mul($z1, $c))) |> aok "distributive"
+
+# Commutativity of mul
+C::eqv(C::mul($z1, $z2), C::mul($z2, $z1)) |> aok "commutative mul"
+
+# Polar
+fn C::arg = atan2(_->[1], _->[0])
+fn C::from_polar = [_ * cos(_1), _ * sin(_1)]
+
+C::abs(C::from_polar(5, 0.6))           |> aeq 5, "polar abs"
+abs(C::arg([1, 1]) - 3.14159265358979/4) < 1e-9 |> aok "arg(1+i) = π/4"
+
+# Powers via repeated multiplication
+fn C::pow($x, $n) {
+    my $r = [1, 0]
+    for (1:$n) { $r = C::mul($r, $x) }
+    $r
+}
+
+C::eqv(C::pow($i, 2), [-1, 0]) |> aok "i^2 pow"
+C::eqv(C::pow($i, 4), [1, 0])  |> aok "i^4 pow"
+
+# (1+i)^8 = 16
+my $one_i = C::new(1, 1)
+C::eqv(C::pow($one_i, 8), [16, 0]) |> aok "(1+i)^8 = 16"
+
+test_run

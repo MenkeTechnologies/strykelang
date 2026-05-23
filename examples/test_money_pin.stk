@@ -1,0 +1,93 @@
+#!/usr/bin/env stryke
+
+# Money / decimal arithmetic with cents (integer storage to avoid floats).
+
+fn Money::cents($dollars, $cents) {
+    int($dollars) * 100 + int($cents)
+}
+
+fn Money::from_str($s) {
+    my $t = $s
+    my $sign = 1
+    if ($t =~ s/^-//) { $sign = -1 }
+    $t =~ s/^\$//
+    $t =~ s/,//g
+    if ($t =~ /^(\d+)\.(\d{1,2})$/) {
+        my $d = $1 + 0
+        my $c = len($2) == 1 ? $2 * 10 : $2 + 0
+        $sign * ($d * 100 + $c)
+    } elsif ($t =~ /^(\d+)$/) {
+        $sign * (($1 + 0) * 100)
+    } else {
+        die "bad money: $s"
+    }
+}
+
+fn Money::format($c) {
+    my $sign = $c < 0 ? "-" : ""
+    my $abs = abs($c)
+    my $dollars = int($abs / 100)
+    my $cents = $abs % 100
+    sprintf "%s\$%d.%02d", $sign, $dollars, $cents
+}
+
+fn Money::add($x, $y) { $x + $y }
+fn Money::sub($x, $y) { $x - $y }
+fn Money::scale($c, $factor) { int($c * $factor + ($c * $factor >= 0 ? 0.5 : -0.5)) }
+fn Money::split_evenly($total, $n) {
+    my $per = int($total / $n)
+    my $rem = $total - $per * $n
+    my @out = ($per) x $n
+    $out[$_] += 1 for 0:$rem - 1
+    \@out
+}
+fn Money::pct($c, $p) { Money::scale($c, $p / 100) }
+
+# Construction
+Money::cents(10, 50) |> aeq 1050, "10.50 = 1050c"
+Money::cents(0, 5)   |> aeq 5,    "0.05 = 5c"
+Money::cents(100, 0) |> aeq 10000, "100.00 = 10000c"
+
+# Parsing
+Money::from_str("\$10.50")    |> aeq 1050,  "parse \$10.50"
+Money::from_str("10.50")      |> aeq 1050,  "parse no-\$"
+Money::from_str("\$1,234.56") |> aeq 123456, "parse with commas"
+Money::from_str("-25.00")     |> aeq -2500,  "parse negative"
+Money::from_str("42")         |> aeq 4200,   "parse integer dollars"
+
+# Formatting
+Money::format(1050)   |> aeq "\$10.50",    "fmt 1050"
+Money::format(5)      |> aeq "\$0.05",     "fmt 5c"
+Money::format(123456) |> aeq "\$1234.56",  "fmt big"
+Money::format(-2500)  |> aeq "-\$25.00",   "fmt neg"
+Money::format(0)      |> aeq "\$0.00",     "fmt zero"
+
+# Arithmetic
+Money::add(1050, 2525)         |> aeq 3575,  "add"
+Money::sub(5000, 1250)         |> aeq 3750,  "sub"
+Money::scale(1000, 1.5)        |> aeq 1500,  "scale 1.5"
+Money::scale(1000, 0.075)      |> aeq 75,    "scale tax"
+Money::pct(1000, 8.25)         |> aeq 83,    "pct 8.25%"
+
+# Splitting (handles uneven cents)
+my $s = Money::split_evenly(1000, 3)
+join(",", @$s) |> aeq "334,333,333",  "split 1000c by 3"
+sum(@$s)       |> aeq 1000,            "split sums to total"
+
+my $s2 = Money::split_evenly(100, 7)
+sum(@$s2) |> aeq 100, "split 100c by 7 sums"
+
+# Roundtrip parse → format
+for my $orig ("\$0.00", "\$1.23", "\$1234.56", "-\$0.99") {
+    my $cents = Money::from_str($orig)
+    my $back = Money::format($cents)
+    $back |> aeq $orig, "roundtrip $orig"
+}
+
+# Tax calc pipeline: 8.25% sales tax on $19.99
+my $price   = Money::from_str("19.99")
+my $tax     = Money::pct($price, 8.25)
+my $total   = Money::add($price, $tax)
+Money::format($total) |> aeq "\$21.64", "price + tax"
+
+test_run

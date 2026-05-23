@@ -375,6 +375,73 @@ class StrykeLexerTest {
     }
 
     @Test
+    fun keyword_inside_hash_subscript_becomes_bareword() {
+        // `$tl->{state}` — `state` is a hash key, NOT the `state` decl
+        // keyword. Must classify as IDENTIFIER so the IDE doesn't paint
+        // it as a keyword.
+        val toks = lex("\$tl->{state}")
+        assertTrue(
+            "`state` inside `->{...}` must be IDENTIFIER not DECL_KEYWORD: $toks",
+            has(toks, StrykeTokenTypes.IDENTIFIER, "state"),
+        )
+        assertTrue(
+            "must NOT classify `state` as DECL_KEYWORD here: $toks",
+            toks.none { it.first == StrykeTokenTypes.DECL_KEYWORD && it.second == "state" },
+        )
+    }
+
+    @Test
+    fun keyword_inside_sigil_hash_subscript_becomes_bareword() {
+        // `$h{state}` — same rule, no `->` needed.
+        val toks = lex("\$h{state}")
+        assertTrue(
+            "`state` inside `\$h{...}` must be IDENTIFIER: $toks",
+            has(toks, StrykeTokenTypes.IDENTIFIER, "state"),
+        )
+        assertTrue(
+            "must NOT classify `state` as DECL_KEYWORD here: $toks",
+            toks.none { it.first == StrykeTokenTypes.DECL_KEYWORD && it.second == "state" },
+        )
+    }
+
+    @Test
+    fun keyword_before_fat_comma_becomes_bareword() {
+        // `(state => 1)` — fat-comma autoquotes `state`, must be IDENTIFIER.
+        val toks = lex("(state => 1)")
+        assertTrue(
+            "`state` before `=>` must be IDENTIFIER: $toks",
+            has(toks, StrykeTokenTypes.IDENTIFIER, "state"),
+        )
+        assertTrue(
+            "must NOT classify `state` as DECL_KEYWORD here: $toks",
+            toks.none { it.first == StrykeTokenTypes.DECL_KEYWORD && it.second == "state" },
+        )
+    }
+
+    @Test
+    fun real_state_keyword_outside_hash_still_classified() {
+        // Top-level `state $x = 1` — `state` IS the decl keyword here.
+        val toks = lex("state \$x = 1")
+        assertTrue(
+            "top-level `state` must remain DECL_KEYWORD: $toks",
+            has(toks, StrykeTokenTypes.DECL_KEYWORD, "state"),
+        )
+    }
+
+    @Test
+    fun multiple_keyword_hash_keys_all_become_barewords() {
+        // `$tl->{state} + $tl->{my} + $tl->{for}` — every keyword that
+        // happens to be a hash key must classify as IDENTIFIER.
+        val toks = lex("\$tl->{state} + \$tl->{my} + \$tl->{for}")
+        for (key in listOf("state", "my", "for")) {
+            assertTrue(
+                "`$key` as hash key must be IDENTIFIER: $toks",
+                toks.any { it.first == StrykeTokenTypes.IDENTIFIER && it.second == key },
+            )
+        }
+    }
+
+    @Test
     fun perl_style_array_ref_interpolation_lexes_interior_as_code() {
         // `"foo @{[ bar() ]} baz"` — `@{[ EXPR ]}` is Perl-style array
         // interpolation, common in heredocs and double-quoted strings.

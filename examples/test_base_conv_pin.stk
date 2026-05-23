@@ -1,0 +1,159 @@
+#!/usr/bin/env stryke
+
+# Pinning batch: Base conversions — decimal ↔ binary / octal / hex / arbitrary base.
+# Compliance: docs/STYLE_GUIDE.md
+
+fn Bc::to_bin($n) {
+    return "0" if $n == 0
+    my $s = ""
+    my $x = $n
+    while ($x > 0) {
+        $s = ($x % 2) . $s
+        $x = int($x / 2)
+    }
+    $s
+}
+
+fn Bc::to_oct($n) {
+    return "0" if $n == 0
+    my $s = ""
+    my $x = $n
+    while ($x > 0) {
+        $s = ($x % 8) . $s
+        $x = int($x / 8)
+    }
+    $s
+}
+
+fn Bc::to_hex($n) {
+    return "0" if $n == 0
+    my @digits = ("0".."9", "a".."f")
+    my $s = ""
+    my $x = $n
+    while ($x > 0) {
+        $s = $digits[$x % 16] . $s
+        $x = int($x / 16)
+    }
+    $s
+}
+
+fn Bc::to_base($n, $base) {
+    return "0" if $n == 0
+    my @digits = ("0".."9", "a".."z")
+    my $s = ""
+    my $x = $n
+    while ($x > 0) {
+        $s = $digits[$x % $base] . $s
+        $x = int($x / $base)
+    }
+    $s
+}
+
+fn Bc::from_bin($s) {
+    my $acc = 0
+    for my $c (split(//, $s)) {
+        $acc = $acc * 2 + $c
+    }
+    $acc
+}
+
+fn Bc::from_base($s, $base) {
+    my %val = ()
+    my @digs = ("0".."9", "a".."z")
+    $val{$digs[$_]} = $_ for 0:35
+    my $acc = 0
+    for my $c (split(//, lc $s)) {
+        $acc = $acc * $base + $val{$c}
+    }
+    $acc
+}
+
+Bc::to_bin(0)   |> aeq "0",       "0 bin"
+Bc::to_bin(1)   |> aeq "1",       "1 bin"
+Bc::to_bin(2)   |> aeq "10",      "2 bin"
+Bc::to_bin(10)  |> aeq "1010",    "10 bin"
+Bc::to_bin(255) |> aeq "11111111","255 bin"
+Bc::to_bin(1024)|> aeq "10000000000","1024 bin"
+
+Bc::to_oct(8)   |> aeq "10",      "8 oct"
+Bc::to_oct(64)  |> aeq "100",     "64 oct"
+Bc::to_oct(511) |> aeq "777",     "511 oct"
+
+Bc::to_hex(15)    |> aeq "f",        "15 hex"
+Bc::to_hex(255)   |> aeq "ff",       "255 hex"
+Bc::to_hex(4096)  |> aeq "1000",     "4096 hex"
+Bc::to_hex(48879) |> aeq "beef",     "0xbeef"
+Bc::to_hex(3735928559) |> aeq "deadbeef", "deadbeef"
+
+Bc::to_base(100, 3)   |> aeq "10201",  "100 base3"
+Bc::to_base(100, 5)   |> aeq "400",    "100 base5"
+Bc::to_base(100, 7)   |> aeq "202",    "100 base7"
+Bc::to_base(1000, 36) |> aeq "rs",     "1000 base36"
+
+Bc::from_bin("1010")  |> aeq 10,  "1010 → 10"
+Bc::from_bin("11111111") |> aeq 255, "1xff → 255"
+Bc::from_base("ff", 16) |> aeq 255, "ff base16"
+Bc::from_base("beef", 16) |> aeq 48879, "beef"
+Bc::from_base("zz", 36) |> aeq 1295, "zz base36"
+Bc::from_base("10201", 3) |> aeq 100, "10201 base3"
+
+# Round-trip property
+for my $n (0, 1, 7, 100, 1024, 65535, 999999) {
+    Bc::from_bin(Bc::to_bin($n)) |> aeq $n, "bin round #{$n}"
+}
+
+for my $n (0, 1, 100, 1000, 99999) {
+    for my $base (2, 3, 8, 10, 16, 36) {
+        Bc::from_base(Bc::to_base($n, $base), $base) |> aeq $n, "round #{$n} base #{$base}"
+    }
+}
+
+# Roman numerals via lookup (small set)
+fn Bc::roman($n) {
+    my @pairs = (
+        [1000, "M"], [900, "CM"], [500, "D"], [400, "CD"],
+        [100, "C"], [90, "XC"], [50, "L"], [40, "XL"],
+        [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"],
+    )
+    my $s = ""
+    my $x = $n
+    for my $p (@pairs) {
+        while ($x >= $p->[0]) {
+            $s .= $p->[1]
+            $x -= $p->[0]
+        }
+    }
+    $s
+}
+
+Bc::roman(1)    |> aeq "I",    "1"
+Bc::roman(4)    |> aeq "IV",   "4"
+Bc::roman(9)    |> aeq "IX",   "9"
+Bc::roman(49)   |> aeq "XLIX", "49"
+Bc::roman(1994) |> aeq "MCMXCIV", "1994"
+Bc::roman(3999) |> aeq "MMMCMXCIX", "3999"
+
+# Gray code: n ^ (n>>1)
+fn Bc::gray($n) = $n ^ ($n >> 1)
+fn Bc::ungray($g) {
+    my $n = $g
+    my $s = $g >> 1
+    while ($s != 0) {
+        $n ^= $s
+        $s >>= 1
+    }
+    $n
+}
+
+Bc::gray(0) |> aeq 0, "gray 0"
+Bc::gray(1) |> aeq 1, "gray 1"
+Bc::gray(2) |> aeq 3, "gray 2"
+Bc::gray(3) |> aeq 2, "gray 3"
+Bc::gray(4) |> aeq 6, "gray 4"
+Bc::gray(7) |> aeq 4, "gray 7"
+
+for my $n (0..15) {
+    Bc::ungray(Bc::gray($n)) |> aeq $n, "gray round #{$n}"
+}
+
+test_run
