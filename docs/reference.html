@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.14.9 · 10228 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.14.15 · 10234 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -330,7 +330,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">8556</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">8562</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -12000,7 +12000,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">8556 topics</p>
+      <p class="chapter-meta">8562 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$!</code></h3>
         <p><code>$!</code> — the OS error from the most recent system call, in stringified form (e.g. <code>&quot;No such file or directory&quot;</code>) or as an <code>errno</code> integer in numeric context. Set by <code>open</code>, <code>close</code>, <code>chdir</code>, <code>read</code>, <code>write</code>, and other syscalls when they fail. The value persists until the next failing call, so always check it *immediately* after the failing operation — intermediate clean Perl code does not touch it, but any subsequent syscall will.</p>
@@ -12913,6 +12913,24 @@ p $msg   # hello from child
 </code></pre>
         <p>A pending-destroy queue (<code>pending_destroy.rs</code>) drains before the next VM op so destructors run in deterministic order.</p>
         <p>See also: <code>BUILD</code>, <code>bless</code>, <code>${^GLOBAL_PHASE}</code>, <code>class</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-e">
+        <h3><a class="doc-anchor" href="#doc-e">#</a> <code>E</code></h3>
+        <p><code>E</code> — operation <code>E</code>. Alias for <code>euler_number</code>. Category: *math / numeric extras*.</p>
+        <pre><code class="lang-perl">p E $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pi">
+        <h3><a class="doc-anchor" href="#doc-pi">#</a> <code>PI</code></h3>
+        <p><code>PI</code> — operation <code>PI</code>. Alias for <code>pi</code>. Category: *constants*.</p>
+        <pre><code class="lang-perl">p PI $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-tau">
+        <h3><a class="doc-anchor" href="#doc-tau">#</a> <code>TAU</code></h3>
+        <p><code>TAU</code> — operation <code>TAU</code>. Alias for <code>tau</code>. Category: *constants*.</p>
+        <pre><code class="lang-perl">p TAU $x
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-unitcheck">
         <h3><a class="doc-anchor" href="#doc-unitcheck">#</a> <code>UNITCHECK</code></h3>
@@ -28123,6 +28141,12 @@ p file(&quot;Cargo.toml&quot;)
         <pre><code class="lang-perl">p first_eq $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-first-index">
+        <h3><a class="doc-anchor" href="#doc-first-index">#</a> <code>first_index</code></h3>
+        <p><code>first_index</code> — index of <code>first</code>. Category: *functional / iterator*.</p>
+        <pre><code class="lang-perl">p first_index $x
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-first-of-month">
         <h3><a class="doc-anchor" href="#doc-first-of-month">#</a> <code>first_of_month</code></h3>
         <p><code>first_of_month</code> — operation <code>first of month</code>. Category: *misc*.</p>
@@ -28151,6 +28175,12 @@ p file(&quot;Cargo.toml&quot;)
         <h3><a class="doc-anchor" href="#doc-first-word">#</a> <code>first_word</code></h3>
         <p><code>first_word</code> — operation <code>first word</code>. Category: *string*.</p>
         <pre><code class="lang-perl">p first_word $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-firstidx">
+        <h3><a class="doc-anchor" href="#doc-firstidx">#</a> <code>firstidx</code></h3>
+        <p><code>firstidx</code> — operation <code>firstidx</code>. Category: *functional / iterator*.</p>
+        <pre><code class="lang-perl">p firstidx $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-firwin2-freq">
@@ -30337,8 +30367,8 @@ p $u-&gt;{public_repos}
 my @real = grep { !exists _-&gt;{pull_request} } @issues
 </code></pre>
       </article>
-      <article class="doc-entry" id="doc-gh-languages">
-        <h3><a class="doc-anchor" href="#doc-gh-languages">#</a> <code>gh_languages</code></h3>
+      <article class="doc-entry" id="doc-gh-langs">
+        <h3><a class="doc-anchor" href="#doc-gh-langs">#</a> <code>gh_langs</code></h3>
         <p><code>gh_languages(OWNER, REPO)</code> (alias <code>gh_langs</code>) — <code>{ language =&gt; bytes }</code> hashref of language breakdown.</p>
         <pre><code class="lang-perl">my $h = gh_languages(&quot;MenkeTechnologies&quot;, &quot;zpwr&quot;)
 for my $k (sort { $h-&gt;{_1} &lt;=&gt; $h-&gt;{_0} } keys %$h) { p &quot;#{$k}: #{$h-&gt;{$k}}&quot; }
@@ -39659,6 +39689,12 @@ load_avg |&gt; spark |&gt; p                   # sparkline of load
         <h3><a class="doc-anchor" href="#doc-lookback-time">#</a> <code>lookback_time</code></h3>
         <p><code>lookback_time</code> — operation <code>lookback time</code>. Category: *cosmology / gr / flrw*.</p>
         <pre><code class="lang-perl">p lookback_time $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-looks-like-number">
+        <h3><a class="doc-anchor" href="#doc-looks-like-number">#</a> <code>looks_like_number</code></h3>
+        <p><code>looks_like_number</code> — operation <code>looks like number</code>. Category: *list / aggregate*.</p>
+        <pre><code class="lang-perl">p looks_like_number $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-lookup-assoc">
