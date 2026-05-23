@@ -2136,6 +2136,27 @@ pub(crate) fn try_builtin(
             Some(Ok(crate::builtins_misc2::broadcast_channel_subscribe(args)))
         }
         "oneshot_new" => Some(Ok(crate::builtins_misc2::oneshot_new(args))),
+        // ── mutex (exclusive lock) ───────────────────────────────────────
+        "mutex" => Some(crate::builtins_sync::mutex_new(args, line)),
+        "mutex_lock" => Some(crate::builtins_sync::mutex_lock(args, line)),
+        "mutex_unlock" => Some(crate::builtins_sync::mutex_unlock(args, line)),
+        "mutex_try_lock" => Some(crate::builtins_sync::mutex_try_lock(args, line)),
+        "mutex_is_locked" => Some(crate::builtins_sync::mutex_is_locked(args, line)),
+        // ── semaphore (counting semaphore) ───────────────────────────────
+        "semaphore" | "sem" => Some(crate::builtins_sync::semaphore_new(args, line)),
+        "semaphore_acquire" | "sem_acquire" => {
+            Some(crate::builtins_sync::semaphore_acquire(args, line))
+        }
+        "semaphore_release" | "sem_release" => {
+            Some(crate::builtins_sync::semaphore_release(args, line))
+        }
+        "semaphore_try_acquire" | "sem_try_acquire" => {
+            Some(crate::builtins_sync::semaphore_try_acquire(args, line))
+        }
+        "semaphore_permits" | "sem_permits" => {
+            Some(crate::builtins_sync::semaphore_permits(args, line))
+        }
+        "semaphore_limit" | "sem_limit" => Some(crate::builtins_sync::semaphore_limit(args, line)),
         "trapezoidal_integrate" => Some(Ok(crate::builtins_quant::trapezoidal_integrate(args))),
         "simpson_integrate" => Some(Ok(crate::builtins_quant::simpson_integrate(args))),
         "ode_euler" => Some(Ok(crate::builtins_quant::ode_euler(args))),

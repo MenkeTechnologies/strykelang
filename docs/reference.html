@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.14.16 · 10234 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.14.17 · 10245 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -330,7 +330,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">8562</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">8573</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -12014,7 +12014,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">8562 topics</p>
+      <p class="chapter-meta">8573 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$!</code></h3>
         <p><code>$!</code> — the OS error from the most recent system call, in stringified form (e.g. <code>&quot;No such file or directory&quot;</code>) or as an <code>errno</code> integer in numeric context. Set by <code>open</code>, <code>close</code>, <code>chdir</code>, <code>read</code>, <code>write</code>, and other syscalls when they fail. The value persists until the next failing call, so always check it *immediately* after the failing operation — intermediate clean Perl code does not touch it, but any subsequent syscall will.</p>
@@ -43862,6 +43862,63 @@ p powmod(3, 13, 50)    # 7
         <pre><code class="lang-perl">p mutation_rate $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-mutex">
+        <h3><a class="doc-anchor" href="#doc-mutex">#</a> <code>mutex</code></h3>
+        <p><code>mutex() → mutex</code> — create a fresh, unlocked exclusive mutex. Pair with <code>mutex_lock</code> / <code>mutex_unlock</code> (or <code>mutex_try_lock</code>) to serialize access to shared state. Reference-shared across <code>async</code>/<code>spawn</code> blocks; safe under contention via <code>parking_lot::Condvar</code> (waiters park, no busy spin).</p>
+        <pre><code class="lang-perl">mysync $m = mutex()
+mysync $counter = 0
+my @t
+for (1:10) {
+    push @t, async {
+        mutex_lock($m)
+        defer { mutex_unlock($m) }
+        $counter++
+    }
+}
+await($_) for @t
+p $counter   # 10
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mutex-is-locked">
+        <h3><a class="doc-anchor" href="#doc-mutex-is-locked">#</a> <code>mutex_is_locked</code></h3>
+        <p><code>mutex_is_locked($m) → 1|0</code> — <code>1</code> when currently held, <code>0</code> when free. Inspection only; no acquire/release side effect.</p>
+        <pre><code class="lang-perl">p mutex_is_locked($m)   # 0
+mutex_lock($m)
+p mutex_is_locked($m)   # 1
+mutex_unlock($m)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mutex-lock">
+        <h3><a class="doc-anchor" href="#doc-mutex-lock">#</a> <code>mutex_lock</code></h3>
+        <p><code>mutex_lock($m) → undef</code> — block until the mutex is acquired, marking it held. Use with <code>defer { mutex_unlock($m) }</code> for RAII-style release on scope exit (covers early returns and exceptions).</p>
+        <pre><code class="lang-perl">mutex_lock($m)
+defer { mutex_unlock($m) }
+# critical section — exclusive access until block exit
+update_shared_state()
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mutex-try-lock">
+        <h3><a class="doc-anchor" href="#doc-mutex-try-lock">#</a> <code>mutex_try_lock</code></h3>
+        <p><code>mutex_try_lock($m) → 1|0</code> — non-blocking acquire. Returns <code>1</code> if the mutex was free (and is now held); <code>0</code> if it was already held. Useful for opportunistic work that should be skipped under contention.</p>
+        <pre><code class="lang-perl">if (mutex_try_lock($m)) {
+    defer { mutex_unlock($m) }
+    do_work()
+} else {
+    p &quot;someone else has it — skipping&quot;
+}
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mutex-unlock">
+        <h3><a class="doc-anchor" href="#doc-mutex-unlock">#</a> <code>mutex_unlock</code></h3>
+        <p><code>mutex_unlock($m) → undef</code> — release the lock and wake one waiter (if any). Unlocking a free mutex is a tolerated no-op.</p>
+        <pre><code class="lang-perl">mutex_lock($m)
+try {
+    work()
+} finally {
+    mutex_unlock($m)
+}
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-mutual-information-step">
         <h3><a class="doc-anchor" href="#doc-mutual-information-step">#</a> <code>mutual_information_step</code></h3>
         <p><code>mutual_information_step</code> — single-step update of <code>mutual information</code>. Category: *electrochemistry, batteries, fuel cells*.</p>
@@ -54802,6 +54859,64 @@ p sector_area(5, 1.57)       # ~19.6
         <p><code>selu</code> applies the Scaled ELU with fixed lambda=1.0507, alpha=1.6733 for self-normalizing networks.</p>
         <pre><code class="lang-perl">p selu(1)    # 1.0507
 p selu(-1)   # -1.1113
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sem">
+        <h3><a class="doc-anchor" href="#doc-sem">#</a> <code>sem</code></h3>
+        <p><code>semaphore(N) → semaphore</code> (alias <code>sem</code>) — counting semaphore with <code>N</code> permits (must be <code>&gt;= 0</code>). Use to bound concurrent access: <code>semaphore(K)</code> lets at most <code>K</code> threads pass <code>semaphore_acquire</code> at once.</p>
+        <pre><code class="lang-perl">mysync $s = semaphore(3)   # at most 3 concurrent workers
+my @t
+for (1:10) {
+    push @t, async {
+        semaphore_acquire($s)
+        defer { semaphore_release($s) }
+        do_work()   # at most 3 in flight at any moment
+    }
+}
+await($_) for @t
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sem-acquire">
+        <h3><a class="doc-anchor" href="#doc-sem-acquire">#</a> <code>sem_acquire</code></h3>
+        <p><code>semaphore_acquire($s) → undef</code> (alias <code>sem_acquire</code>) — block until a permit is available, then take one. Pair with <code>defer { semaphore_release($s) }</code>.</p>
+        <pre><code class="lang-perl">semaphore_acquire($s)
+defer { semaphore_release($s) }
+# bounded critical section
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sem-limit">
+        <h3><a class="doc-anchor" href="#doc-sem-limit">#</a> <code>sem_limit</code></h3>
+        <p><code>semaphore_limit($s) → integer</code> (alias <code>sem_limit</code>) — initial permit count from the original <code>semaphore(N)</code>.</p>
+        <pre><code class="lang-perl">my $s = semaphore(8)
+p semaphore_limit($s)     # 8 (constant for life of $s)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sem-permits">
+        <h3><a class="doc-anchor" href="#doc-sem-permits">#</a> <code>sem_permits</code></h3>
+        <p><code>semaphore_permits($s) → integer</code> (alias <code>sem_permits</code>) — currently available permits (race-free snapshot).</p>
+        <pre><code class="lang-perl">my $s = semaphore(5)
+p semaphore_permits($s)   # 5
+semaphore_acquire($s)
+p semaphore_permits($s)   # 4
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sem-release">
+        <h3><a class="doc-anchor" href="#doc-sem-release">#</a> <code>sem_release</code></h3>
+        <p><code>semaphore_release($s) → undef</code> (alias <code>sem_release</code>) — release one permit and wake one waiter.</p>
+        <pre><code class="lang-perl">semaphore_acquire($s)
+defer { semaphore_release($s) }
+work()
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sem-try-acquire">
+        <h3><a class="doc-anchor" href="#doc-sem-try-acquire">#</a> <code>sem_try_acquire</code></h3>
+        <p><code>semaphore_try_acquire($s) → 1|0</code> (alias <code>sem_try_acquire</code>) — non-blocking. Returns <code>1</code> if a permit was taken, <code>0</code> if none available.</p>
+        <pre><code class="lang-perl">if (semaphore_try_acquire($s)) {
+    defer { semaphore_release($s) }
+    burst_work()
+} else {
+    queue_for_later()
+}
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-semctl">
