@@ -1,0 +1,117 @@
+#!/usr/bin/env stryke
+
+# Number theory and math utilities.
+
+fn Nt::gcd($x, $y) {
+    while ($y != 0) {
+        my $t = $y
+        $y = $x % $y
+        $x = $t
+    }
+    $x
+}
+
+fn Nt::lcm($x, $y) {
+    int($x * $y / Nt::gcd($x, $y))
+}
+
+fn Nt::factorial($n) {
+    my $f = 1
+    $f *= _ for 1:$n
+    $f
+}
+
+fn Nt::is_prime($n) {
+    return 0 if $n < 2
+    return 1 if $n < 4
+    return 0 if $n % 2 == 0
+    my $i = 3
+    while ($i * $i <= $n) {
+        return 0 if $n % $i == 0
+        $i += 2
+    }
+    1
+}
+
+fn Nt::prime_factors($n) {
+    my @out
+    my $d = 2
+    while ($n > 1) {
+        while ($n % $d == 0) {
+            push @out, $d
+            $n = int($n / $d)
+        }
+        $d++
+    }
+    \@out
+}
+
+fn Nt::divisors($n) {
+    my @out
+    my $i = 1
+    while ($i * $i <= $n) {
+        if ($n % $i == 0) {
+            push @out, $i
+            push @out, int($n / $i) if $i != int($n / $i)
+        }
+        $i++
+    }
+    [sort { _ <=> _1 } @out]
+}
+
+fn Nt::sum_digits($n) {
+    my $s = 0
+    $s += _ for split(//, "$n")
+    $s
+}
+
+fn Nt::fib($n) {
+    return $n if $n < 2
+    my ($x, $y) = (0, 1)
+    for (2:$n) {
+        ($x, $y) = ($y, $x + $y)
+    }
+    $y
+}
+
+Nt::gcd(48, 18)   |> aeq 6,  "gcd 48,18"
+Nt::gcd(17, 5)    |> aeq 1,  "gcd coprime"
+Nt::gcd(100, 75)  |> aeq 25, "gcd 100,75"
+
+Nt::lcm(4, 6)     |> aeq 12, "lcm 4,6"
+Nt::lcm(21, 6)    |> aeq 42, "lcm 21,6"
+
+Nt::factorial(0)  |> aeq 1,    "0!"
+Nt::factorial(5)  |> aeq 120,  "5!"
+Nt::factorial(10) |> aeq 3628800, "10!"
+
+Nt::is_prime(2)   |> aok "is_prime 2"
+Nt::is_prime(97)  |> aok "is_prime 97"
+!Nt::is_prime(1)  |> aok "is_prime 1 false"
+!Nt::is_prime(100) |> aok "is_prime 100 false"
+Nt::is_prime(7919) |> aok "is_prime 7919"
+
+join(",", @{Nt::prime_factors(60)})   |> aeq "2,2,3,5", "factors 60"
+join(",", @{Nt::prime_factors(97)})   |> aeq "97",      "factors prime"
+join(",", @{Nt::prime_factors(1024)}) |> aeq "2,2,2,2,2,2,2,2,2,2", "factors 1024"
+
+join(",", @{Nt::divisors(12)}) |> aeq "1,2,3,4,6,12",  "divisors 12"
+join(",", @{Nt::divisors(28)}) |> aeq "1,2,4,7,14,28", "divisors 28"
+
+Nt::sum_digits(12345) |> aeq 15, "sum_digits 12345"
+Nt::sum_digits(0)     |> aeq 0,  "sum_digits 0"
+
+Nt::fib(0)  |> aeq 0,  "fib 0"
+Nt::fib(1)  |> aeq 1,  "fib 1"
+Nt::fib(10) |> aeq 55, "fib 10"
+Nt::fib(20) |> aeq 6765, "fib 20"
+
+# Pipeline: first 10 primes
+my @primes10 = grep { Nt::is_prime(_) } 2:50
+join(",", @primes10[0..9]) |> aeq "2,3,5,7,11,13,17,19,23,29", "first 10 primes"
+
+# Perfect numbers: 6 and 28 are perfect
+my @perfect = grep { sum(@{Nt::divisors(_)}) - _ == _ } 1:30
+join(",", @perfect) |> aeq "6,28", "perfect numbers under 30"
+
+test_run

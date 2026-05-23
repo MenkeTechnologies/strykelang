@@ -1,0 +1,64 @@
+#!/usr/bin/env stryke
+
+# Probabilistic Sketches — memory-efficient approximations for big data.
+#
+# This example demonstrates:
+#   * `bloom` for membership tests (no false negatives).
+#   * `hll` (HyperLogLog) for distinct count estimation.
+#   * `cms` (Count-Min Sketch) for frequency estimation.
+#   * `topk` (Heavy Hitters) for finding most frequent items.
+#   * `t_digest` for quantile and percentile estimation.
+#
+# Run: stryke --no-interop examples/probabilistic_sketches.stk
+
+p "── Probabilistic Sketches ──────────────────────────────"
+
+# 1. Bloom Filter (10k capacity, 1% false positive rate)
+my $bloom = bloom(10000, 0.01)
+bloom_add($bloom, "alice")
+bloom_add($bloom, "bob")
+
+p "Bloom Filter:"
+p "  contains 'alice' : #{bloom_has($bloom, 'alice')}"
+p "  contains 'eve'   : #{bloom_has($bloom, 'eve')} (probabilistic)"
+
+# 2. HyperLogLog (Distinct Count)
+my $hll_sketch = hll(14) 
+for my $i (1:1000) { hll_add($hll_sketch, "user_$i") }
+# Add some duplicates
+for my $i (1:500) { hll_add($hll_sketch, "user_$i") }
+
+printf "HLL Distinct Count: ~%.1f (exact is 1000)\n", hll_count($hll_sketch)
+
+# 3. Count-Min Sketch (Frequency)
+my $cms_sketch = cms(1000, 0.01) 
+cms_add($cms_sketch, "apple", 10)
+cms_add($cms_sketch, "banana", 5)
+
+printf "CMS Frequency: apple=%d, banana=%d, cherry=%d\n",
+    cms_query($cms_sketch, "apple"), cms_query($cms_sketch, "banana"), cms_query($cms_sketch, "cherry")
+
+# 4. Top-K (Heavy Hitters)
+my $tk = topk(3) 
+for my $word (qw(a a a b b c d e f)) { topk_add($tk, $word) }
+
+p "Top-3 Items:"
+# topk_heavies returns [ [item, count], ... ] as a plain array
+my $heavies = topk_heavies($tk)
+for my $hit ($heavies) {
+    p "  - #{$hit->[0]} (count: #{$hit->[1]})"
+}
+
+# 5. T-Digest (Quantiles)
+my $td = t_digest_new(100) 
+for my $i (1:1000) { td_add($td, rand 100) }
+
+printf "T-Digest: median=%.2f, p95=%.2f, p99=%.2f\n",
+    td_quantile($td, 0.5), td_quantile($td, 0.95), td_quantile($td, 0.99)
+
+# 6. Self-test / Assertions
+die "Bloom mismatch" unless bloom_has($bloom, "alice")
+die "HLL error too high" if abs(hll_count($hll_sketch) - 1000) > 50
+
+p ""
+p "SUCCESS. ALL TESTS PASS."

@@ -28,6 +28,10 @@ struct Scope {
     arrays: HashSet<String>,
     hashes: HashSet<String>,
     subs: HashSet<String>,
+    /// Scalar → Type name when the scalar's initializer is a known
+    /// constructor expression (`Point(x=>1)`, `Point->new(x=>1)`).
+    /// Drives the `$obj->method` typo-catch in MethodCall analysis.
+    scalar_types: HashMap<String, String>,
 }
 
 impl Scope {
@@ -142,6 +146,58 @@ impl StaticAnalyzer {
     fn declare_sub(&mut self, name: &str) {
         if let Some(scope) = self.scopes.first_mut() {
             scope.declare_sub(name);
+        }
+    }
+
+    /// Record that scalar `$name` was bound to an instance of `type`.
+    /// Stored on the innermost active scope so nested blocks shadow
+    /// outer bindings the same way variable scoping already works.
+    fn declare_scalar_type(&mut self, name: &str, ty: &str) {
+        if let Some(scope) = self.scopes.last_mut() {
+            scope.scalar_types.insert(name.to_string(), ty.to_string());
+        }
+    }
+
+    /// Walk scopes outer-to-inner. Returns the Type name `$name` was
+    /// last bound to via a known constructor, if any.
+    fn resolve_scalar_type(&self, name: &str) -> Option<&str> {
+        for s in self.scopes.iter().rev() {
+            if let Some(t) = s.scalar_types.get(name) {
+                return Some(t.as_str());
+            }
+        }
+        None
+    }
+
+    /// If `init` is `Type(...)` or `Type->new(...)` AND the bare tail
+    /// resolves to a declared Type, return that type name. The lint
+    /// only fires when the file declares the Type — same gating rule
+    /// already used by `check_constructor_keys` callers.
+    fn infer_constructor_type(&self, init: &Expr) -> Option<String> {
+        match &init.kind {
+            ExprKind::FuncCall { name, .. } => {
+                let bare = name.rsplit("::").next().unwrap_or(name);
+                if self.type_fields.contains_key(name) {
+                    return Some(name.clone());
+                }
+                if self.type_fields.contains_key(bare) {
+                    return Some(bare.to_string());
+                }
+                None
+            }
+            ExprKind::MethodCall { object, method, .. } if method == "new" => {
+                if let ExprKind::Bareword(n) = &object.kind {
+                    let bare = n.rsplit("::").next().unwrap_or(n);
+                    if self.type_fields.contains_key(n) {
+                        return Some(n.clone());
+                    }
+                    if self.type_fields.contains_key(bare) {
+                        return Some(bare.to_string());
+                    }
+                }
+                None
+            }
+            _ => None,
         }
     }
 
@@ -438,6 +494,11 @@ impl StaticAnalyzer {
                         Sigil::Typeglob => {}
                     }
                     if let Some(init) = &d.initializer {
+                        if matches!(d.sigil, Sigil::Scalar) {
+                            if let Some(ty) = self.infer_constructor_type(init) {
+                                self.declare_scalar_type(&d.name, &ty);
+                            }
+                        }
                         self.analyze_expr(init);
                     }
                 }
@@ -885,6 +946,56 @@ impl StaticAnalyzer {
                                 ),
                                 expr.line,
                             );
+                        }
+                    }
+                }
+                // `$obj->X` when `$obj` was bound to a known Type via
+                // a constructor expression (`my $p = Point(...)` or
+                // `my $p = Point->new(...)`). Symmetric to the
+                // `$self->X` check below — both walk the type's
+                // field+method sets and flag unknown names.
+                if let ExprKind::ScalarVar(name) = &object.kind {
+                    if name != "self" {
+                        if let Some(class_name) =
+                            self.resolve_scalar_type(name).map(|s| s.to_string())
+                        {
+                            let is_field = self
+                                .type_fields
+                                .get(&class_name)
+                                .map(|s| s.contains(method))
+                                .unwrap_or(false);
+                            let is_method = self
+                                .type_methods
+                                .get(&class_name)
+                                .map(|s| s.contains(method))
+                                .unwrap_or(false);
+                            if !is_field && !is_method {
+                                let mut suggestions: Vec<String> = self
+                                    .type_fields
+                                    .get(&class_name)
+                                    .into_iter()
+                                    .flat_map(|s| s.iter().cloned())
+                                    .collect();
+                                suggestions.extend(
+                                    self.type_methods
+                                        .get(&class_name)
+                                        .into_iter()
+                                        .flat_map(|s| s.iter().cloned()),
+                                );
+                                suggestions.sort();
+                                let avail = if suggestions.is_empty() {
+                                    "(no fields or methods declared)".to_string()
+                                } else {
+                                    suggestions.join(", ")
+                                };
+                                self.error(
+                                    ErrorKind::UndefinedSubroutine,
+                                    format!(
+                                        "`${name}->{method}` — no field or method `{method}` on `{class_name}`; available: {avail}",
+                                    ),
+                                    expr.line,
+                                );
+                            }
                         }
                     }
                 }
@@ -1655,5 +1766,62 @@ mod tests {
     #[test]
     fn array_slice_ok() {
         assert!(lint("my @a = (1, 2, 3, 4); my @b = @a[0, 2]").is_ok());
+    }
+
+    #[test]
+    fn instance_method_on_typed_var_flags_unknown_method() {
+        // `my $p = Point(...)` binds `$p` to Point. `$p->dgdd()` is an
+        // unknown method/field on Point and must be flagged the same
+        // way `Point->new(dgdd => ...)` and `$self->dgdd` already are.
+        let r = lint(
+            "class Point { x : Float\n y : Float\n fn mag_sq { 1 } }\n\
+             my $p = Point(x => 3, y => 4)\n\
+             $p->dgdd()",
+        );
+        assert!(r.is_err(), "expected error for `$$p->dgdd`");
+        let e = r.unwrap_err();
+        assert_eq!(e.kind, ErrorKind::UndefinedSubroutine);
+        assert!(
+            e.message.contains("dgdd") && e.message.contains("Point"),
+            "expected message to name `dgdd` and `Point`, got: {}",
+            e.message,
+        );
+    }
+
+    #[test]
+    fn instance_method_on_typed_var_known_method_ok() {
+        // Same setup, but `$p->mag_sq` IS a declared method — must pass.
+        assert!(
+            lint(
+                "class Point { x : Float\n y : Float\n fn mag_sq { 1 } }\n\
+                 my $p = Point(x => 3, y => 4)\n\
+                 $p->mag_sq()"
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn instance_method_on_typed_var_field_ok() {
+        // Field access via `->`: `$p->x` reads field `x` on Point.
+        assert!(
+            lint(
+                "class Point { x : Float\n y : Float }\n\
+                 my $p = Point(x => 3, y => 4)\n\
+                 p $p->x"
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn instance_method_on_arrow_new_form_typed_var_flags() {
+        // `my $p = Point->new(x => 3)` also binds `$p` to Point.
+        let r = lint(
+            "class Point { x : Float\n y : Float }\n\
+             my $p = Point->new(x => 3, y => 4)\n\
+             $p->whatever()",
+        );
+        assert!(r.is_err(), "expected error for `$$p->whatever`");
     }
 }

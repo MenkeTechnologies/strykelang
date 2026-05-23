@@ -881,6 +881,82 @@ fn audit_rename_enum_variant_with_qualified_match_arms() {
 }
 
 #[test]
+fn audit_rename_enum_variant_strips_qualifier_from_qualified_new_name() {
+    // Defense-in-depth: if any client sends `newName = "TrafficLight::Stop"`
+    // (the IntelliJ plugin used to prefill the dialog with the full
+    // qualified form and the user would just edit the suffix), the
+    // server must strip the qualifier and use only `Stop` as the bare
+    // replacement. Without this, the qualifier was spliced into every
+    // match site, producing `TrafficLight::TrafficLight::Stop`.
+    let src = "enum TrafficLight { Red, Yellow, Green }\nfn TrafficLight::action($c) {\n    match ($c) {\n        TrafficLight::Red    => \"stop\",\n        TrafficLight::Yellow => \"caution\",\n        TrafficLight::Green  => \"go\",\n    }\n}\nTrafficLight::action(TrafficLight::Red)\n";
+    let mut h = LspHarness::new(src);
+    // Cursor on `Red` in enum decl (line 0, col 20). NewName is
+    // QUALIFIED to mimic the old plugin behavior.
+    let r = h.rename(0, 20, "TrafficLight::Stop");
+    h.finish();
+    let edits = r
+        .pointer("/changes")
+        .and_then(Value::as_object)
+        .and_then(|m| m.values().next())
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let new_texts: Vec<&str> = edits
+        .iter()
+        .filter_map(|e| e.get("newText").and_then(Value::as_str))
+        .collect();
+    assert!(
+        !new_texts.is_empty(),
+        "expected rename edits even when new_name was qualified"
+    );
+    assert!(
+        new_texts.iter().all(|n| *n == "Stop"),
+        "every newText must be the BARE suffix `Stop`, never `TrafficLight::Stop`, got: {new_texts:?}"
+    );
+    assert!(
+        new_texts.iter().all(|n| !n.contains("::")),
+        "must NEVER emit `::` in a Field rewrite: {new_texts:?}"
+    );
+}
+
+#[test]
+fn audit_rename_enum_variant_cursor_on_callsite_no_prefix_added() {
+    // Same fixture as `audit_rename_enum_variant_does_not_add_type_prefix`
+    // but the cursor is on the `Red` INSIDE the qualified call-site
+    // `TrafficLight::Red` (line 3), not on the bare decl. Every edit
+    // must still be exactly `Stop` — never `TrafficLight::Stop`.
+    let src = "enum TrafficLight { Red, Yellow, Green }\nfn TrafficLight::action($c) {\n    match ($c) {\n        TrafficLight::Red    => \"stop\",\n        TrafficLight::Yellow => \"caution\",\n        TrafficLight::Green  => \"go\",\n    }\n}\nTrafficLight::action(TrafficLight::Red)\n";
+    let mut h = LspHarness::new(src);
+    // Line 3 `        TrafficLight::Red    => "stop",`
+    // `T` at col 8, `Red` starts at col 22. Park cursor at col 23 (on `e`).
+    let r = h.rename(3, 23, "Stop");
+    h.finish();
+    let edits = r
+        .pointer("/changes")
+        .and_then(Value::as_object)
+        .and_then(|m| m.values().next())
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let new_texts: Vec<&str> = edits
+        .iter()
+        .filter_map(|e| e.get("newText").and_then(Value::as_str))
+        .collect();
+    assert!(
+        !new_texts.is_empty(),
+        "expected at least one rename edit when cursor is on call-site variant"
+    );
+    assert!(
+        new_texts.iter().all(|n| *n == "Stop"),
+        "every edit must be exactly `Stop` — never qualified — got: {new_texts:?}"
+    );
+    assert!(
+        new_texts.iter().all(|n| !n.contains("::")),
+        "must NOT add `::` to any rewrite: {new_texts:?}"
+    );
+}
+
+#[test]
 fn audit_rename_enum_variant_same_file() {
     // Cursor on `Add` of `Op::Add` — should be treated as the
     // enum's variant. v1 lands on enum decl line for goto; rename
