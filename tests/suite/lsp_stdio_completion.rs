@@ -1928,20 +1928,17 @@ fn lsp_stdio_references_enum_does_not_match_inside_string_literal() {
         .iter()
         .filter_map(|loc| loc.pointer("/range/start/line").and_then(Value::as_u64))
         .collect();
+    assert!(lines.contains(&0), "expected decl line 0: lines={lines:?}");
     assert!(
-        lines.iter().any(|l| *l == 0),
-        "expected decl line 0: lines={lines:?}"
-    );
-    assert!(
-        lines.iter().any(|l| *l == 1),
+        lines.contains(&1),
         "expected reference at line 1 (Op::Add): lines={lines:?}"
     );
     assert!(
-        !lines.iter().any(|l| *l == 2),
+        !lines.contains(&2),
         "must NOT match `Op` inside the double-quoted string at line 2: lines={lines:?}"
     );
     assert!(
-        !lines.iter().any(|l| *l == 3),
+        !lines.contains(&3),
         "must NOT match `Op` inside the single-quoted string at line 3: lines={lines:?}"
     );
 }
@@ -1973,19 +1970,19 @@ fn lsp_stdio_references_qualified_sub_does_not_include_unrelated_bare_calls() {
         .filter_map(|loc| loc.pointer("/range/start/line").and_then(Value::as_u64))
         .collect();
     assert!(
-        lines.iter().any(|l| *l == 1),
+        lines.contains(&1),
         "expected ref at line 1 (Demo::handle decl): lines={lines:?}"
     );
     assert!(
-        lines.iter().any(|l| *l == 2),
+        lines.contains(&2),
         "expected ref at line 2 (Demo::handle qualified call): lines={lines:?}"
     );
     assert!(
-        !lines.iter().any(|l| *l == 4),
+        !lines.contains(&4),
         "must NOT include line 4 (main::handle decl): lines={lines:?}"
     );
     assert!(
-        !lines.iter().any(|l| *l == 5),
+        !lines.contains(&5),
         "must NOT include line 5 (bare main::handle call): lines={lines:?}"
     );
 }
@@ -2160,11 +2157,11 @@ fn lsp_stdio_rename_hash_via_element_access() {
     // but `$seen{k}` element access gets `$visited` to keep the scalar
     // access form valid.
     assert!(
-        edits.iter().any(|n| *n == "%visited"),
+        edits.contains(&"%visited"),
         "decl line should rewrite to %visited: {edits:?}"
     );
     assert!(
-        edits.iter().any(|n| *n == "$visited"),
+        edits.contains(&"$visited"),
         "$seen{{k}} element-access should rewrite to $visited (sigil-preserving): {edits:?}"
     );
     assert!(
@@ -2564,9 +2561,7 @@ fn audit_completion_hash_key_uname_no_arrow() {
 fn audit_completion_hash_key_foreach_binding() {
     // `foreach my $row (git_log()) { $row->{<tab>} }` — the loop var
     // binds to git_log's per-row schema.
-    let mut h = LspHarness::new(
-        "foreach my $row (git_log()) {\n    $row->{s}\n}\n",
-    );
+    let mut h = LspHarness::new("foreach my $row (git_log()) {\n    $row->{s}\n}\n");
     let labels = h.completion(1, 12);
     h.finish();
     assert!(
@@ -2665,9 +2660,8 @@ fn audit_completion_use_constant_hash_form() {
 
 #[test]
 fn audit_completion_qualified_emits_suffix_only_insert_text() {
-    let mut h = LspHarness::new(
-        "fn Demo::handle($x) { 1 }\nfn Demo::other { 2 }\nmy $x = Demo::handle\n",
-    );
+    let mut h =
+        LspHarness::new("fn Demo::handle($x) { 1 }\nfn Demo::other { 2 }\nmy $x = Demo::handle\n");
     let items = h.completion_items(2, 20);
     h.finish();
     let handle = items
@@ -2718,7 +2712,10 @@ fn audit_hover_suppressed_inside_string_literal() {
             .and_then(Value::as_str)
             .map(str::is_empty)
             .unwrap_or(true);
-    assert!(suppressed, "hover inside string must be suppressed, got: {r}");
+    assert!(
+        suppressed,
+        "hover inside string must be suppressed, got: {r}"
+    );
 }
 
 #[test]
@@ -2740,9 +2737,7 @@ fn audit_hover_still_fires_on_builtin_outside_string() {
 #[test]
 fn audit_hover_inside_string_interpolation_still_fires() {
     // `#{EXPR}` inside `"..."` is real code — hover must fire there.
-    let mut h = LspHarness::new(
-        "my $n = 1\np \"got #{length(\\\"x\\\")}\"\n",
-    );
+    let mut h = LspHarness::new("my $n = 1\np \"got #{length(\\\"x\\\")}\"\n");
     let r = h.hover(1, 11); // cursor on `length` inside `#{...}`
     h.finish();
     let md = r
@@ -2764,11 +2759,11 @@ fn audit_lsp_diagnostics_strict_vars_on_by_default() {
     // stays lenient).
     let h = LspHarness::new("p $undef_typo\n");
     let _ = h; // diagnostics arrive asynchronously after didOpen;
-    // The strict-vars-on default for LSP is tested via the static
-    // analyzer suite (`undefined_scalar_detected`); the LSP integration
-    // wires `analyze_program_with_strict(_, _, true)` in
-    // `compute_diagnostics`. This test pins the wiring at the
-    // diagnostics-call layer by reaching into the static analyzer.
+               // The strict-vars-on default for LSP is tested via the static
+               // analyzer suite (`undefined_scalar_detected`); the LSP integration
+               // wires `analyze_program_with_strict(_, _, true)` in
+               // `compute_diagnostics`. This test pins the wiring at the
+               // diagnostics-call layer by reaching into the static analyzer.
     let prog = stryke::parse_with_file("p $undef_typo", "test.stk").expect("parse");
     let r = stryke::static_analysis::analyze_program_with_strict(&prog, "test.stk", true);
     assert!(

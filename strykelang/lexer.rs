@@ -1945,10 +1945,9 @@ impl Lexer {
                     // `'`), prefer heredoc even when last_was_term is set.
                     // Numeric / sigil / lowercase still falls through to
                     // ShiftLeft so `1 << 4` and `$x << $shift` still work.
-                    let looks_like_heredoc_tag = matches!(
-                        self.peek(),
-                        Some('~') | Some('"') | Some('\'') | Some('_'),
-                    ) || self.peek().is_some_and(|c| c.is_ascii_uppercase());
+                    let looks_like_heredoc_tag =
+                        matches!(self.peek(), Some('~') | Some('"') | Some('\'') | Some('_'),)
+                            || self.peek().is_some_and(|c| c.is_ascii_uppercase());
                     if self.last_was_term && !looks_like_heredoc_tag {
                         self.last_was_term = false;
                         return Ok(Token::ShiftLeft);

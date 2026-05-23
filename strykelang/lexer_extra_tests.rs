@@ -72,7 +72,9 @@ fn heredoc_after_closing_brace_is_heredoc_not_shift_left() {
     assert!(
         has_heredoc,
         "expected HereDoc tag=EOT after block-close, got tokens: {:?}",
-        t.iter().map(|(tok, _)| format!("{:?}", tok)).collect::<Vec<_>>(),
+        t.iter()
+            .map(|(tok, _)| format!("{:?}", tok))
+            .collect::<Vec<_>>(),
     );
 }
 
@@ -84,11 +86,15 @@ fn shift_left_preserved_after_block_close_with_numeric_rhs() {
         let mut l = Lexer::new(src);
         let t = l.tokenize().expect("tokenize");
         let has_shift = t.iter().any(|(tok, _)| matches!(tok, Token::ShiftLeft));
-        let no_heredoc = !t.iter().any(|(tok, _)| matches!(tok, Token::HereDoc(_, _, _)));
+        let no_heredoc = !t
+            .iter()
+            .any(|(tok, _)| matches!(tok, Token::HereDoc(_, _, _)));
         assert!(
             has_shift && no_heredoc,
             "{src} — expected ShiftLeft (no heredoc), got: {:?}",
-            t.iter().map(|(tok, _)| format!("{:?}", tok)).collect::<Vec<_>>(),
+            t.iter()
+                .map(|(tok, _)| format!("{:?}", tok))
+                .collect::<Vec<_>>(),
         );
     }
 }
