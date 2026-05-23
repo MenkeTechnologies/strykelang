@@ -1,0 +1,157 @@
+#!/usr/bin/env stryke
+
+# Mini-Forth — a tiny postfix stack VM with the core Forth words:
+#   integers       push themselves
+#   + - * / mod    binary arithmetic (pop 2, push 1)
+#   dup            duplicate top of stack
+#   drop           discard top
+#   swap           swap top two
+#   over           copy second-from-top to top
+#   rot            rotate top three: ( a b c -- b c a )
+#   nip            drop second-from-top: ( a b -- b )
+#   .              pop and append to output buffer
+#
+# Patterns:
+#   * named-package functions (`Forth::`) safe under `--no-interop`
+#   * if/elsif dispatch on the operator token (the canonical stryke
+#     idiom — see also examples/rpn_calc_no_interop.stk)
+#   * regex `^-?\d+$` to recognize integer literals
+#   * structured return: `{ stack => [...], output => "..." }`
+#   * `die unless` invariant pins on every expected stack effect
+#
+# Run: stryke --no-interop examples/mini_forth.stk
+
+# ── interpreter core ───────────────────────────────────────────────
+
+fn Forth::run($prog) {
+    my @stack
+    my $output = ""
+    my @tokens = grep { len(_) > 0 } split(/\s+/, $prog)
+
+    for my $tok (@tokens) {
+        if ($tok =~ /^-?\d+$/) {
+            push @stack, 0 + $tok
+            next
+        }
+
+        my $is_binary = ($tok eq "+" || $tok eq "-" || $tok eq "*" || $tok eq "/" || $tok eq "mod" || $tok eq "swap" || $tok eq "nip")
+        die "stack underflow on `$tok` (need 2 operands)" if $is_binary && len(@stack) < 2
+
+        if ($tok eq "+") {
+            my $rhs = pop @stack
+            my $lhs = pop @stack
+            push @stack, $lhs + $rhs
+        } elsif ($tok eq "-") {
+            my $rhs = pop @stack
+            my $lhs = pop @stack
+            push @stack, $lhs - $rhs
+        } elsif ($tok eq "*") {
+            my $rhs = pop @stack
+            my $lhs = pop @stack
+            push @stack, $lhs * $rhs
+        } elsif ($tok eq "/") {
+            my $rhs = pop @stack
+            my $lhs = pop @stack
+            die "division by zero" if $rhs == 0
+            push @stack, int($lhs / $rhs)
+        } elsif ($tok eq "mod") {
+            my $rhs = pop @stack
+            my $lhs = pop @stack
+            die "modulo by zero" if $rhs == 0
+            push @stack, $lhs % $rhs
+        } elsif ($tok eq "dup") {
+            die "stack underflow on dup" if len(@stack) < 1
+            push @stack, $stack[-1]
+        } elsif ($tok eq "drop") {
+            die "stack underflow on drop" if len(@stack) < 1
+            pop @stack
+        } elsif ($tok eq "swap") {
+            my $top = pop @stack
+            my $bot = pop @stack
+            push @stack, $top
+            push @stack, $bot
+        } elsif ($tok eq "over") {
+            die "stack underflow on over" if len(@stack) < 2
+            push @stack, $stack[-2]
+        } elsif ($tok eq "rot") {
+            die "stack underflow on rot" if len(@stack) < 3
+            # ( a b c -- b c a )
+            my $c = pop @stack
+            my $b_val = pop @stack
+            my $a_val = pop @stack
+            push @stack, $b_val
+            push @stack, $c
+            push @stack, $a_val
+        } elsif ($tok eq "nip") {
+            # ( a b -- b )
+            my $top = pop @stack
+            pop @stack
+            push @stack, $top
+        } elsif ($tok eq ".") {
+            die "stack underflow on ." if len(@stack) < 1
+            my $top = pop @stack
+            $output .= "$top "
+        } else {
+            die "unknown word: $tok"
+        }
+    }
+
+    { stack => \@stack, output => $output }
+}
+
+# ── exercise the VM ────────────────────────────────────────────────
+
+printf "── Mini-Forth core word demo ──────────────────────────\n\n"
+
+my @cases = (
+    ["3 4 +",                "7",            "add"],
+    ["10 3 -",               "7",            "subtract"],
+    ["6 7 *",                "42",           "multiply"],
+    ["100 4 /",              "25",           "divide"],
+    ["17 5 mod",             "2",            "modulo"],
+    ["5 dup *",              "25",           "dup square"],
+    ["1 2 3 drop +",         "3",            "drop then add"],
+    ["1 2 swap",             "2 1",          "swap"],
+    ["1 2 over",             "1 2 1",        "over"],
+    ["1 2 3 rot",            "2 3 1",        "rot"],
+    ["1 2 nip",              "2",            "nip"],
+    ["3 4 + 2 *",            "14",           "(3+4)*2"],
+    ["10 dup * 5 5 * +",     "125",          "10*10 + 5*5"],
+)
+
+for my $case (@cases) {
+    my $prog = $case->[0]
+    my $want = $case->[1]
+    my $note = $case->[2]
+    my $r = Forth::run($prog)
+    my $got = join(" ", @{$r->{stack}})
+    printf "  %-30s -> [%s]  (%s)\n", $prog, $got, $note
+    die "case `$prog`: expected [$want], got [$got]" unless $got eq $want
+}
+
+# ── `.` (dot) output pin ───────────────────────────────────────────
+
+my $r = Forth::run("3 4 + . 5 6 * .")
+die "`.` output mismatch: got [$r->{output}]" unless $r->{output} eq "7 30 "
+die "`.` should leave stack empty" unless len(@{$r->{stack}}) == 0
+
+# ── error pins ─────────────────────────────────────────────────────
+
+# Division by zero must die.
+my $caught
+eval { Forth::run("5 0 /") }
+$caught = $@
+die "division by zero not caught" unless $caught =~ /division/
+
+# Unknown word must die.
+eval { Forth::run("1 2 nosuchword") }
+$caught = $@
+die "unknown word not caught" unless $caught =~ /unknown/
+
+# Stack underflow on binary op must die.
+eval { Forth::run("5 +") }
+$caught = $@
+die "stack underflow not caught" unless $caught =~ /underflow/
+
+p ""
+p "── all stack-effect, output and error invariants satisfied ──"

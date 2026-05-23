@@ -1,0 +1,150 @@
+#!/usr/bin/env stryke
+
+# Knight's tour on an N×N chessboard using **Warnsdorff's rule**:
+# at each step, move to the square with the fewest onward legal
+# moves. This greedy heuristic finds an open tour from any starting
+# square on N ≥ 5 boards (and from many squares on smaller boards),
+# never backtracking.
+#
+# After the tour completes, the board cells contain the step number
+# at which the knight visited them — a 1..N² permutation.
+#
+# Patterns:
+#   * named-package functions (`KT::`) safe under `--no-interop`
+#   * 2-D board as arrayref-of-arrayrefs
+#   * move-vector lookup arrays (`@DX`, `@DY`)
+#   * `die unless` pins: tour is complete, every step in 1..N²,
+#     every cell contains a unique step number, consecutive steps
+#     are knight-move-adjacent
+#
+# Run: stryke --no-interop examples/knights_tour.stk
+
+# ── knight move vectors (all 8 L-shaped moves) ────────────────────
+
+my @DX = (2, 1, -1, -2, -2, -1, 1, 2)
+my @DY = (1, 2, 2, 1, -1, -2, -2, -1)
+
+fn KT::in_bounds($x, $y, $n) {
+    $x >= 0 && $x < $n && $y >= 0 && $y < $n
+}
+
+# Count legal onward moves from ($x, $y) on a partially filled board.
+fn KT::degree($x, $y, $board_ref, $n, $dx_ref, $dy_ref) {
+    my $deg = 0
+    for my $i (0:7) {
+        my $nx = $x + $dx_ref->[$i]
+        my $ny = $y + $dy_ref->[$i]
+        next unless KT::in_bounds($nx, $ny, $n)
+        next if $board_ref->[$ny]->[$nx] > 0
+        $deg++
+    }
+    $deg
+}
+
+# Warnsdorff: choose the next move whose target has fewest onward
+# moves. Returns the index into @DX/@DY, or -1 if no move exists.
+fn KT::next_move($x, $y, $board_ref, $n, $dx_ref, $dy_ref) {
+    my $best = -1
+    my $best_deg = 999
+    for my $i (0:7) {
+        my $nx = $x + $dx_ref->[$i]
+        my $ny = $y + $dy_ref->[$i]
+        next unless KT::in_bounds($nx, $ny, $n)
+        next if $board_ref->[$ny]->[$nx] > 0
+        my $d = KT::degree($nx, $ny, $board_ref, $n, $dx_ref, $dy_ref)
+        if ($d < $best_deg) {
+            $best_deg = $d
+            $best = $i
+        }
+    }
+    $best
+}
+
+# Full tour from ($start_x, $start_y). Returns the filled board ref
+# on success, or undef on failure.
+fn KT::tour($n, $start_x, $start_y, $dx_ref, $dy_ref) {
+    my @board
+    for my $y (0:$n - 1) {
+        my @row
+        for my $x (0:$n - 1) { push @row, 0 }
+        push @board, \@row
+    }
+    my $x = $start_x
+    my $y = $start_y
+    $board[$y]->[$x] = 1
+    for my $step (2:$n * $n) {
+        my $idx = KT::next_move($x, $y, \@board, $n, $dx_ref, $dy_ref)
+        if ($idx < 0) { return undef }
+        $x = $x + $dx_ref->[$idx]
+        $y = $y + $dy_ref->[$idx]
+        $board[$y]->[$x] = $step
+    }
+    \@board
+}
+
+# ── run on 8×8 board starting from corner (0, 0) ───────────────────
+
+my $N = 8
+my $board = KT::tour($N, 0, 0, \@DX, \@DY)
+
+die "tour failed from (0, 0)" unless defined $board
+
+printf "── Warnsdorff knight's tour, %d×%d, start (0, 0) ─────\n\n", $N, $N
+for my $y (0:$N - 1) {
+    for my $x (0:$N - 1) {
+        printf " %3d", $board->[$y]->[$x]
+    }
+    p ""
+}
+
+# ── invariants ─────────────────────────────────────────────────────
+
+# (1) Every cell is visited exactly once → contains a unique
+#     value in 1..N².
+my %seen
+for my $row (@$board) {
+    for my $cell (@$row) {
+        die "cell unvisited" unless $cell > 0
+        die "step $cell out of range" unless $cell <= $N * $N
+        die "step $cell visited twice" if exists $seen{$cell}
+        $seen{$cell} = 1
+    }
+}
+die "wrong number of distinct steps" unless len(keys(%seen)) == $N * $N
+
+# (2) For every k in 1..N²-1, the squares holding k and k+1 must be
+#     a knight's-move apart.
+my %pos
+for my $y (0:$N - 1) {
+    for my $x (0:$N - 1) {
+        $pos{$board->[$y]->[$x]} = [$x, $y]
+    }
+}
+fn KT::is_knight_move($p, $q) {
+    my $dx = $p->[0] - $q->[0]
+    my $dy = $p->[1] - $q->[1]
+    $dx = -$dx if $dx < 0
+    $dy = -$dy if $dy < 0
+    ($dx == 1 && $dy == 2) || ($dx == 2 && $dy == 1)
+}
+for my $k (1:$N * $N - 1) {
+    my $cur = $pos{$k}
+    my $nxt = $pos{$k + 1}
+    die "step $k -> $k+1 is not a knight's move" unless KT::is_knight_move($cur, $nxt)
+}
+
+# (3) Warnsdorff must succeed from at least four common starting
+#     squares on an 8×8 board.
+my @sources = ([0, 0], [0, 7], [7, 0], [7, 7])
+my $successes = 0
+for my $s (@sources) {
+    my $brd = KT::tour($N, $s->[0], $s->[1], \@DX, \@DY)
+    $successes++ if defined $brd
+}
+die "Warnsdorff failed from too many corners" unless $successes == len(@sources)
+
+p ""
+printf "── all invariants satisfied ────────────────────────────\n"
+printf "  every cell visited once (1..%d)\n", $N * $N
+printf "  every consecutive pair is a knight's move apart\n"
+printf "  tours succeed from all 4 corner starts\n"

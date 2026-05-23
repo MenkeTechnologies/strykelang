@@ -1,0 +1,172 @@
+#!/usr/bin/env stryke
+
+# Skyline silhouette — given N axis-aligned rectangular buildings
+# (left, right, height), compute the **upper outline** of their
+# union as a sequence of (x, height) key-points where the outline
+# changes height.
+#
+# Classic sweep-line algorithm:
+#   1. Turn every building into two events: start (negative height
+#      marker) and end (positive height marker).
+#   2. Sort events by x; on ties, starts come before ends so a
+#      taller building's start dominates.
+#   3. Maintain an "active heights" multiset; the current outline
+#      height is its max.
+#   4. Whenever the running max changes, emit a key-point.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Sky::`) (§18)
+#   * `_0`/`_1` in sort comparator (§11)
+#   * `|>` pipelines, `:` ranges, `len` over `length` (§4, §5, §6b)
+#   * `#{ }` interpolation in headers (§1a)
+#   * no `return` on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/skyline_silhouette.stk
+
+# ── compute skyline ───────────────────────────────────────────────
+
+fn Sky::compute($buildings_ref) {
+    my @events
+    for my $bld (@$buildings_ref) {
+        # Start: negative height marker (sorts BEFORE ends at same x).
+        push @events, [$bld->[0], -$bld->[2]]
+        push @events, [$bld->[1],  $bld->[2]]
+    }
+    @events = sort {
+        _0->[0] != _1->[0]
+            ? _0->[0] <=> _1->[0]
+            : _0->[1] <=> _1->[1]
+    } @events
+
+    my @active = (0)
+    my $prev_max = 0
+    my @skyline
+    for my $e (@events) {
+        my $x = $e->[0]
+        my $h = $e->[1]
+        if ($h < 0) {
+            push @active, -$h
+        } else {
+            # Remove the first occurrence of $h from @active.
+            for my $i (0:len(@active) - 1) {
+                if ($active[$i] == $h) { splice(@active, $i, 1); last }
+            }
+        }
+        my $max = 0
+        for my $v (@active) { $max = $v if $v > $max }
+        if ($max != $prev_max) {
+            push @skyline, [$x, $max]
+            $prev_max = $max
+        }
+    }
+    \@skyline
+}
+
+# ── ASCII renderer ────────────────────────────────────────────────
+
+fn Sky::render($skyline_ref, $width_pad, $height) {
+    my $minx = 999999
+    my $maxx = -999999
+    for my $p (@$skyline_ref) {
+        $minx = $p->[0] if $p->[0] < $minx
+        $maxx = $p->[0] if $p->[0] > $maxx
+    }
+    my $W = ($maxx - $minx) + 1 + 2 * $width_pad
+    # Build the height map: at each x, the current height.
+    my @h
+    for my $col (0:$W - 1) { push @h, 0 }
+    my $cur = 0
+    my $idx = 0
+    for my $col (0:$W - 1) {
+        my $x = $col + $minx - $width_pad
+        # Update cur if we hit a skyline x.
+        while ($idx < len(@$skyline_ref) && $skyline_ref->[$idx]->[0] <= $x) {
+            $cur = $skyline_ref->[$idx]->[1]
+            $idx++
+        }
+        $h[$col] = $cur
+    }
+    my $out = ""
+    for my $y (rev 1:$height) {
+        for my $col (0:$W - 1) {
+            $out .= $h[$col] >= $y ? "#" : " "
+        }
+        $out .= "\n"
+    }
+    # Ground line.
+    for my $col (0:$W - 1) { $out .= "_" }
+    $out .= "\n"
+    $out
+}
+
+# ── run ───────────────────────────────────────────────────────────
+
+my @buildings = (
+    [2,  9,  10],
+    [3,  7,  15],
+    [5,  12, 12],
+    [15, 20, 10],
+    [19, 24, 8],
+)
+
+my $skyline = Sky::compute(\@buildings)
+
+printf "── skyline for %d buildings ────────────────────────────\n\n", len(@buildings)
+print Sky::render($skyline, 2, 16)
+p ""
+printf "── key-points (x, height) ─────────────────────────────\n"
+for my $p (@$skyline) {
+    printf "  (%d, %d)\n", $p->[0], $p->[1]
+}
+
+# ── invariant 1: known-good output for the canonical example ─────
+
+my @expected = (
+    [2,  10],
+    [3,  15],
+    [7,  12],
+    [12, 0],
+    [15, 10],
+    [20, 8],
+    [24, 0],
+)
+die "skyline length mismatch: got #{len(@$skyline)} want #{len(@expected)}" unless len(@$skyline) == len(@expected)
+for my $i (0:len(@expected) - 1) {
+    my $got = $skyline->[$i]
+    my $want = $expected[$i]
+    die "key-point #{$i}: got (#{$got->[0]}, #{$got->[1]}) want (#{$want->[0]}, #{$want->[1]})" unless $got->[0] == $want->[0] && $got->[1] == $want->[1]
+}
+
+# ── invariant 2: x coordinates strictly increase ──────────────────
+
+for my $i (1:len(@$skyline) - 1) {
+    die "x coords not strictly increasing at #{$i}" unless $skyline->[$i]->[0] > $skyline->[$i - 1]->[0]
+}
+
+# ── invariant 3: adjacent heights must differ (no redundant pts) ─
+
+for my $i (1:len(@$skyline) - 1) {
+    die "two consecutive points have same height at #{$i}" unless $skyline->[$i]->[1] != $skyline->[$i - 1]->[1]
+}
+
+# ── invariant 4: the skyline ends at height 0 ─────────────────────
+
+die "skyline must end at height 0" unless $skyline->[-1]->[1] == 0
+
+# ── invariant 5: peak height equals the tallest building ──────────
+
+my $peak = 0
+for my $p (@$skyline) { $peak = $p->[1] if $p->[1] > $peak }
+my $tallest = 0
+for my $bld (@buildings) { $tallest = $bld->[2] if $bld->[2] > $tallest }
+die "peak #{$peak} != tallest building #{$tallest}" unless $peak == $tallest
+
+# ── invariant 6: a single-building input gives exactly two pts ────
+
+my $single = Sky::compute([[5, 10, 7]])
+die "single building must produce 2 key-points" unless len(@$single) == 2
+die "single building first point" unless $single->[0]->[0] == 5 && $single->[0]->[1] == 7
+die "single building last point" unless $single->[1]->[0] == 10 && $single->[1]->[1] == 0
+
+p ""
+p "── all six invariants satisfied ────────────────────────"

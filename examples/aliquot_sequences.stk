@@ -1,0 +1,142 @@
+#!/usr/bin/env stryke
+
+# Aliquot sequences — starting from n, repeatedly apply
+#   s(n) = σ(n) − n  =  sum of proper divisors of n
+# Each n eventually either:
+#   • Hits 0  (sequence terminates — typical for primes and small n)
+#   • Hits a fixed point n → n (n is a **perfect** number; σ(n) = 2n)
+#   • Falls into a 2-cycle (n, m) with s(n) = m and s(m) = n
+#     (n and m are **amicable**)
+#   • Enters a longer cycle (**sociable** numbers — rare)
+#   • Grows without bound (open conjecture for some numbers)
+#
+# We classify each n ≤ N by simulating up to a step cap.
+#
+# Patterns:
+#   * named-package functions (`Aliquot::`) safe under `--no-interop`
+#   * O(√n) divisor-pair summation
+#   * hash-of-seen-values for cycle detection
+#   * `die unless` invariants for known perfect (6, 28, 496) and
+#     known amicable pair (220 ↔ 284)
+#
+# Run: stryke --no-interop examples/aliquot_sequences.stk
+
+# ── divisor-sum (aliquot sum) ──────────────────────────────────────
+
+fn Aliquot::aliquot_sum($n) {
+    return 0 if $n <= 1
+    my $s = 1   # 1 is always a proper divisor of n > 1
+    my $i = 2
+    while ($i * $i <= $n) {
+        if ($n % $i == 0) {
+            $s += $i
+            my $q = int($n / $i)
+            $s += $q if $q != $i
+        }
+        $i++
+    }
+    $s
+}
+
+# ── classify one n by simulating the sequence ─────────────────────
+
+# Returns a hashref: { kind => "terminate"/"perfect"/"amicable"/
+# "sociable"/"unbounded", period => <int>, peak => <int> }
+fn Aliquot::classify($n, $cap, $bound) {
+    my %seen
+    my $cur = $n
+    my @hist
+    my $peak = $n
+    for my $step (0:$cap) {
+        if ($cur == 0) {
+            return { kind => "terminate", period => 0, peak => $peak }
+        }
+        if ($cur > $bound) {
+            return { kind => "unbounded", period => 0, peak => $cur }
+        }
+        if (exists $seen{$cur}) {
+            my $entry_at = $seen{$cur}
+            my $period = $step - $entry_at
+            my $kind
+            # Only the *starting* n earns the perfect/amicable/sociable
+            # label — and only if n itself sits in the cycle (i.e., the
+            # cycle entry happens immediately at step 0). If we entered
+            # the cycle later, n is in the cycle's "tail" — terminate.
+            if ($entry_at != 0) {
+                return { kind => "terminate", period => 0, peak => $peak }
+            }
+            if ($period == 1) {
+                $kind = "perfect"
+            } elsif ($period == 2) {
+                $kind = "amicable"
+            } else {
+                $kind = "sociable"
+            }
+            return { kind => $kind, period => $period, peak => $peak }
+        }
+        $seen{$cur} = $step
+        push @hist, $cur
+        $cur = Aliquot::aliquot_sum($cur)
+        $peak = $cur if $cur > $peak
+    }
+    { kind => "unbounded", period => 0, peak => $peak }
+}
+
+# ── run classification for n = 1..30 ───────────────────────────────
+
+my $N = 30
+my $cap = 50
+my $bound = 1_000_000
+
+printf "── aliquot sequence classification for n = 1..%d ──────\n", $N
+printf "  %3s   %-10s   %6s   %6s\n", "n", "kind", "period", "peak"
+printf "  %3s   %-10s   %6s   %6s\n", "---", "----------", "------", "------"
+
+my %tally
+for my $n (1:$N) {
+    my $c = Aliquot::classify($n, $cap, $bound)
+    printf "  %3d   %-10s   %6d   %6d\n",
+        $n, $c->{kind}, $c->{period}, $c->{peak}
+    $tally{$c->{kind}}++
+}
+
+# ── pin known values from the OEIS / classical number theory ───────
+
+# Perfect numbers ≤ 1000: 6, 28, 496.
+die "6 must be perfect" unless Aliquot::aliquot_sum(6) == 6
+die "28 must be perfect" unless Aliquot::aliquot_sum(28) == 28
+die "496 must be perfect" unless Aliquot::aliquot_sum(496) == 496
+
+# Smallest amicable pair: 220 ↔ 284.
+die "s(220) must equal 284" unless Aliquot::aliquot_sum(220) == 284
+die "s(284) must equal 220" unless Aliquot::aliquot_sum(284) == 220
+
+# Every prime p has aliquot sum 1 (only proper divisor of a prime).
+for my $p (2, 3, 5, 7, 11, 13, 17, 19, 23, 29) {
+    die "prime $p must have aliquot sum 1" unless Aliquot::aliquot_sum($p) == 1
+}
+
+# 1 has aliquot sum 0 (no proper positive divisors).
+die "s(1) must be 0" unless Aliquot::aliquot_sum(1) == 0
+
+# Classifier must label 6, 28, 496 as perfect and 220/284 as amicable.
+my $c6   = Aliquot::classify(6,   $cap, $bound)
+my $c28  = Aliquot::classify(28,  $cap, $bound)
+my $c496 = Aliquot::classify(496, $cap, $bound)
+my $c220 = Aliquot::classify(220, $cap, $bound)
+my $c284 = Aliquot::classify(284, $cap, $bound)
+
+die "classifier: 6 must be perfect"   unless $c6->{kind}   eq "perfect"
+die "classifier: 28 must be perfect"  unless $c28->{kind}  eq "perfect"
+die "classifier: 496 must be perfect" unless $c496->{kind} eq "perfect"
+die "classifier: 220 must be amicable, got $c220->{kind} period $c220->{period}" unless $c220->{kind} eq "amicable" && $c220->{period} == 2
+die "classifier: 284 must be amicable, got $c284->{kind} period $c284->{period}" unless $c284->{kind} eq "amicable" && $c284->{period} == 2
+
+p ""
+printf "── tally ────────────────────────────────────────────────\n"
+for my $kind (sort keys %tally) {
+    printf "  %-10s : %d\n", $kind, $tally{$kind}
+}
+
+p ""
+p "── all known-value invariants satisfied ────────────────"
