@@ -19,6 +19,26 @@
      Loosening this requires a custom advice-body lowering pass (current path reuses the
      existing `try_compile_block_region`, which is shared with map/grep).
 
+  3. Dynamic regex `qr/$var/` / `/$var/` caches across iterations — when the
+     source pattern is interpolated from a variable that changes each iteration,
+     the first iteration's compiled regex is reused for all subsequent ones.
+     See `docs/BUGS.md` BUG-300. Workaround: walk segments by hand
+     (`examples/http_router_middleware.stk`) or use string ops like `index`
+     (`examples/pubsub_message_bus.stk`).
+
+  4. `pmap_reduce { } { }` silently absorbs the following statement as an
+     optional third block argument unless terminated with `;`. See BUG-301.
+     Three call sites in examples document the workaround in-line.
+
+  5. Array slice past the end fills with `undef` instead of clamping
+     (`@arr[0:N]` for N >= len gives `len` elements plus `(N+1 - len)`
+     undefs). See BUG-302. Clamp the upper bound at the caller.
+
+  6. AOP `after { ... $? ... }` advice sees the global `$?` (whatever the
+     last `system` left there) instead of the wrapped sub's return value.
+     See BUG-044. Use `around { proceed() }` and inspect the return value
+     directly when you need the actual value.
+
 
 
   ## What's still on the table
@@ -26,7 +46,7 @@
   stryke beat LuaJIT with:
 
   - Not all ops lowered yet
-  - No Cranelift JIT — still interpreting bytecodes
+  - Cranelift JIT lands hot bytecode regions but not every op is JIT-eligible
   - No profile-guided optimization of the fused superinstructions
   - No inline caching for method dispatch
   - No type specialization (everything goes through Value coercions)
@@ -40,8 +60,10 @@
   ┌─────────────────────────────┬─────────────────────────────────────────────┬──────────────────┐
   │        Optimization         │                   Impact                    │    Difficulty    │
   ├─────────────────────────────┼─────────────────────────────────────────────┼──────────────────┤
-  │ Cranelift JIT for hot loops │ 5-50x on tight computation — native machine │ Medium           │
-  │                             │  code, no dispatch                          │                  │
+  │ Cranelift JIT — full coverage│ 5-50x on tight computation — native machine│ Medium           │
+  │ (shipped, partial)          │  code, no dispatch. Hot-loop path live;     │                  │
+  │                             │  remaining bytecodes still go through       │                  │
+  │                             │  the interpreter dispatch.                  │                  │
   ├─────────────────────────────┼─────────────────────────────────────────────┼──────────────────┤
   │ Type specialization (int    │ 2-3x on arithmetic — skip Value::to_int()   │ Easy             │
   │ fast path)                  │ coercion entirely                           │                  │

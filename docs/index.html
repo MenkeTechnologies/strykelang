@@ -149,8 +149,8 @@
             <span class="sep">/</span>
             <a href="https://docs.rs/strykelang" target="_blank" rel="noopener noreferrer">docs.rs</a>
           </nav>
-          <p class="docs-build-line" id="strykeBuildLine">stryke v0.14.19 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 10,352 builtins (11,080 keys in %all) · LSP + DAP + JetBrains plugin</p>
-          <p class="docs-build-line"><span id="strykeLoc">291,026 Rust src · 83,223 test src · 156,657 example src</span></p>
+          <p class="docs-build-line" id="strykeBuildLine">stryke v0.14.20 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 10,352 builtins (11,080 keys in %all) · LSP + DAP + JetBrains plugin</p>
+          <p class="docs-build-line"><span id="strykeLoc">291,347 Rust src · 83,223 test src · 159,754 example src</span></p>
         </div>
         <div class="tutorial-toolbar">
           <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -646,7 +646,7 @@ scp load_test node{1:100}:/tmp/</pre>
  │ %pc perl5 core 185    %e  stryke ext 10167  %d   4291          │
  │ %c  categories 309    %p  primaries  8850                      │
  └────────────────────────────────────────────────────────────────┘
-  >> PARALLEL PERL5 INTERPRETER // RUST-POWERED v0.14.19 &lt;&lt;
+  >> PARALLEL PERL5 INTERPRETER // RUST-POWERED v0.14.20 &lt;&lt;
 </pre>
 
         <h3 style="color:#39ff14;">Shell-Like Builtins (no PATH walk, no fork)</h3>
@@ -2026,6 +2026,20 @@ STRYKE_CACHE=0 stryke app.stk  <span class="comment"># disable caching for this 
           <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/shell_repl.stk"><code>shell_repl.stk</code></a> — <code>whoami</code>, <code>pushd</code>/<code>popd</code>, <code>strftime</code>, <code>tac</code>, <code>tree</code>, <code>mktemp</code></li>
           <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/run_source.stk"><code>run_source.stk</code></a> — <code>run(target, ...args)</code> spawns isolated subprocess; <code>source(path)</code> loads stryke definitions into the current REPL</li>
           <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/reflection_hashes.stk"><code>reflection_hashes.stk</code></a> — <code>%b</code> / <code>%a</code> / <code>%k</code> / <code>%all</code> / <code>%c</code> / <code>%d</code> queries, alias inversion</li>
+        </ul>
+
+        <h3>Worked end-to-end programs</h3>
+        <p style="font-size:11px;color:var(--text-muted);">Full multi-stage programs (not snippets) that exercise stryke's parallel, AOP, parser, and AI primitives together. Each ships with embedded assertions and passes under <code>stryke --no-interop</code>.</p>
+        <ul>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/tfidf_search_engine.stk"><code>tfidf_search_engine.stk</code></a> — TF-IDF inverted index + cosine ranking; <code>~&gt;</code>-threaded tokenize and parallel scoring pipeline</li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/mini_sql_executor.stk"><code>mini_sql_executor.stk</code></a> — tokenizer + recursive-descent parser + executor for <code>SELECT cols FROM t [WHERE ...] [ORDER BY ...] [LIMIT N]</code></li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/kalman_filter_tracking.stk"><code>kalman_filter_tracking.stk</code></a> — 1D Kalman filter, hand-rolled 2×2 matrix algebra, Box-Muller Gaussian noise</li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/gradient_descent_linreg.stk"><code>gradient_descent_linreg.stk</code></a> — mini-batch SGD for linear regression with <code>pmap_reduce</code> parallel gradient sum</li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/webhook_signature_verifier.stk"><code>webhook_signature_verifier.stk</code></a> — HMAC-SHA256 webhook receiver with replay-set, max-age window, constant-time compare</li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/pubsub_message_bus.stk"><code>pubsub_message_bus.stk</code></a> — topic-filtered fan-out broker over <code>pchannel</code> + <code>spawn</code>, multiple subscriber workers</li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/csv_etl_parallel.stk"><code>csv_etl_parallel.stk</code></a> — full ETL: parse → enrich → chunk-parallel aggregate with <code>pmap_reduce</code>, region ranking</li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/raft_election_simulator.stk"><code>raft_election_simulator.stk</code></a> — discrete-time Raft leader election (timeouts, RequestVote, majority rule, heartbeats)</li>
+          <li><a href="https://github.com/MenkeTechnologies/strykelang/blob/main/examples/http_router_middleware.stk"><code>http_router_middleware.stk</code></a> — Express-style router with path params, composable middleware (logger / auth / rate-limit)</li>
         </ul>
       </section>
 

@@ -1972,18 +1972,80 @@ substr $s, 9, 5              # "world"  — byte substr
 
 ## [0x0A] EXAMPLES
 
+`examples/` ships **458 top-level .stk programs** plus **1648 Rosetta-Code tasks** and **173 Exercism solutions** — 2.6k working programs in all. Run any of them directly, run the CI sweep with `stryke examples/run_all_ci.stk`, or run all Exercism solutions with `stryke examples/exercism_run_all.stk`.
+
 ```sh
 stryke examples/fibonacci.stk
 stryke examples/text_processing.stk
 stryke examples/parallel_demo.stk
-stryke convert examples/fibonacci.pl > examples/fibonacci.stk
-stryke examples/fibonacci.stk
+stryke examples/run_all_ci.stk                # validate every example in one pass
 ```
 
+### Worked examples — long-form
+
+These are full programs (not snippets) that exercise stryke's parallel, AOP, parser, and AI primitives. Each ships with assertions that run on `stryke <file>` and pass under `--no-interop`.
+
 ```sh
-# sets: dedupe + union / intersection (`scalar` gives member count, like `scalar @array`)
-stryke 'my $a = set(1,2,2,3); my $b = set(2,3,4); p scalar($a | $b), " ", scalar($a & $b)'
+# Data + ML
+stryke examples/tfidf_search_engine.stk         # TF-IDF inverted index + cosine ranking
+stryke examples/gradient_descent_linreg.stk     # mini-batch SGD, pmap_reduce gradient sum
+stryke examples/kalman_filter_tracking.stk      # 1D Kalman filter, hand-rolled 2×2 matrix algebra
+stryke examples/markov_chain_analysis.stk       # transition matrix + stationary distribution
+
+# Parsers + interpreters
+stryke examples/mini_sql_executor.stk           # SELECT/WHERE/ORDER BY/LIMIT recursive-descent
+stryke examples/tiny_lisp_parser.stk            # S-expression tokenizer + recursive parser
+stryke examples/binary_parser_simulation.stk    # pack/unpack binary protocol with checksum
+
+# Concurrency
+stryke examples/pubsub_message_bus.stk          # topic-filtered fan-out over pchannel + spawn
+stryke examples/multi_threaded_channels.stk     # bounded pchannel producer/consumer
+stryke examples/parallel_pi_monte_carlo.stk     # chunk-parallel Monte Carlo with pmaps + sum
+stryke examples/parallel_prime_finder.stk       # pgreps + sort
+
+# Web + protocols
+stryke examples/http_router_middleware.stk      # Express-style router, path params, middleware chain
+stryke examples/webhook_signature_verifier.stk  # HMAC-SHA256 + replay set + max-age window
+stryke examples/network_utilities.stk           # IP sorting / CIDR matching / private-IP check
+stryke examples/raft_election_simulator.stk     # discrete-time Raft leader election
+
+# ETL + I/O
+stryke examples/csv_etl_parallel.stk            # parse → enrich → ~p> chunk-parallel aggregate
+stryke examples/parallel_file_hasher.stk        # ~> glob → head → pmaps sha256 → collect
+stryke examples/idiomatic_power_user.stk        # pmaps + hll_count + ai mocked summarize
+stryke examples/idiomatic_systems_ops.stk       # AOP `before` audit log + spurt
+
+# AI primitives (mock-mode, no API key required)
+STRYKE_AI_MODE=mock-only stryke examples/idiomatic_ai_workflow.stk
+STRYKE_AI_MODE=mock-only stryke examples/ai_rag_simple.stk
 ```
+
+### Idiomatic one-liners + quick demos
+
+```sh
+# Sets: dedupe + union / intersection
+stryke 'my $a = set(1,2,2,3); my $b = set(2,3,4); p len($a | $b), " ", len($a & $b)'
+
+# Threaded pipeline — count primes in 1..100 in parallel
+stryke '~> (1:100) pgreps { is_prime _ } collect sort { _ <=> _1 } |> ep'
+
+# File hashes in parallel
+stryke '~> glob("*.stk") pmaps { [ _ => sha256(c"#{_}") ] } collect |> ep'
+
+# Sketch algebra — Bloom union
+stryke 'my $a = bloom_new(1024); my $b = bloom_new(1024);
+        bloom_add($a, $_) for 1:50;
+        bloom_add($b, $_) for 30:80;
+        p bloom_count($a + $b)'
+```
+
+### Rosetta-Code coverage
+
+`examples/rosetta/` mirrors the [Rosetta Code](https://rosettacode.org) catalog as fully runnable stryke programs (one file per task) — 1648 tasks at last count. Run a single task with `stryke examples/rosetta/<task>.stk` or use the project-wide CI in `examples/run_all_ci.stk` to validate the entire corpus.
+
+### Exercism
+
+`examples/exercism/` carries 173 idiomatic stryke solutions to public Exercism problems. `stryke examples/exercism_run_all.stk` runs every solution against its embedded test suite and reports per-track pass counts.
 
 ---
 

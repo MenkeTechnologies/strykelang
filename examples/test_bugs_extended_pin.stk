@@ -31,13 +31,14 @@ my $f_37 = \&Pin::BugsExtended::my_dbl_37
 my $h_37 = fn { $f_37->(@_) }
 $h_37(5) |> aeq 10, "BUG-037 (FIXED): closure passes \@_ flattened, not as count"
 
-# BUG-044 (FIXED): AOP `after` advice now observes the current $? from the
-# preceding `system` call (1792 from BUG-031 above). Was clobbering to 0.
+# BUG-044: AOP `after` advice sees $? as the *current* shell-status $? (here
+# 1792, leaking from BUG-031's system() above), not the wrapped sub's
+# return value (42). Documented behavior says it should be the return value.
 fn Pin::BugsExtended::payload_44 { 42 }
 oursync $after_q = -1
 after "Pin::BugsExtended::payload_44" { $after_q = $? }
 Pin::BugsExtended::payload_44()
-$after_q |> aeq 1792, "BUG-044 (FIXED): AOP after preserves \$? from prior system"
+$after_q != 42 |> aok "BUG-044: AOP after \$? is not the sub return value"
 
 # BUG-063: take(N, LIST) returns empty
 my @r_63 = take(3, 1..10)
