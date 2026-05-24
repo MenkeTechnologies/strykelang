@@ -1,9 +1,9 @@
 #!/usr/bin/env stryke
 
-fn Exercism::RationalNumbers::_gcd($a, $b) {
-    $a = abs($a); $b = abs($b)
-    while ($b) { ($a, $b) = ($b, $a % $b) }
-    $a
+fn Exercism::RationalNumbers::_gcd($x, $y) {
+    $x = abs($x); $y = abs($y)
+    while ($y) { ($x, $y) = ($y, $x % $y) }
+    $x
 }
 
 fn Exercism::RationalNumbers::reduce($r) {

@@ -15,6 +15,6 @@ fn Exercism::Diamond::build_shape {
                 : "${pad}${c}" . (" " x (2 * $i - 1)) . "${c}${pad}"
         push @rows, $row
     }
-    my @bottom = reverse @rows[0:$n-1]
+    my @bottom = rev @rows[0:$n-1]
     join("\n", @rows, @bottom) . "\n"
 }

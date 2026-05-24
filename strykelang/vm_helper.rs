@@ -3738,16 +3738,45 @@ impl VMHelper {
     }
 
     fn require_relative_path(&mut self, path: &Path, line: usize) -> StrykeResult<StrykeValue> {
-        if !path.exists() {
-            return Err(StrykeError::runtime(
-                format!(
-                    "Can't locate {} (relative path does not exist)",
-                    path.display()
-                ),
-                line,
-            ));
+        // First try the path verbatim (cwd-relative — backward-compat
+        // for `stryke ./Foo.stk` where the user has chdir'd into the
+        // exercise dir).
+        if path.exists() {
+            return self.require_absolute_path(path, line);
         }
-        self.require_absolute_path(path, line)
+        // Fall back to resolving against the directory of the calling
+        // script (`self.file`). This makes `require "./Foo.stk"` work
+        // when the test is invoked via absolute path:
+        //   `stryke /abs/path/to/proj/t/test_foo.stk` ← cwd unrelated
+        //   `require "./Foo.stk"` resolves to `/abs/path/to/proj/Foo.stk`
+        //
+        // Walks up from `self.file`'s parent dir trying each ancestor —
+        // covers both same-dir requires AND the common `t/` test-subdir
+        // pattern where the test file is in `t/` and the source is one
+        // level up.
+        if !self.file.is_empty() {
+            let caller = Path::new(&self.file);
+            let mut anchor = caller.parent();
+            while let Some(dir) = anchor {
+                let candidate = dir.join(path);
+                if candidate.exists() {
+                    return self.require_absolute_path(&candidate, line);
+                }
+                anchor = dir.parent();
+                // Stop once we hit the filesystem root to avoid
+                // unbounded ascent. `parent()` on `/` returns None.
+                if anchor.map(|p| p.as_os_str().is_empty()).unwrap_or(false) {
+                    break;
+                }
+            }
+        }
+        Err(StrykeError::runtime(
+            format!(
+                "Can't locate {} (relative path does not exist)",
+                path.display()
+            ),
+            line,
+        ))
     }
 
     fn require_from_inc(&mut self, relpath: &str, line: usize) -> StrykeResult<StrykeValue> {

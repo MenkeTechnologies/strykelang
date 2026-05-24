@@ -660,4 +660,50 @@ class StrykeLexerTest {
             toks.any { it.first == StrykeTokenTypes.NUMBER && it.second == "1" },
         )
     }
+
+    // ── `$#var` is not a comment ──
+    //
+    // Regression pin (2026-05-23 user-reported): the line
+    //   `@xs ? [$xs[0] + 1, @xs[1..$#xs]] : [1]`
+    // had everything after `$#xs` painted as COMMENT. `#` is a
+    // comment opener UNLESS preceded by `$` (then it's `$#var` =
+    // last-index-of) or `${` (then it's `${#var}` = string length).
+
+    @Test
+    fun dollar_hash_var_is_scalar_var_not_comment() {
+        val toks = lex("\$#xs")
+        assertTrue("expected SCALAR_VAR `\$#xs`: $toks", has(toks, StrykeTokenTypes.SCALAR_VAR, "\$#xs"))
+        assertTrue("no COMMENT should appear: $toks", toks.none { it.first == StrykeTokenTypes.COMMENT })
+    }
+
+    @Test
+    fun dollar_hash_bare_is_scalar_var_not_comment() {
+        val toks = lex("\$#")
+        assertTrue("expected SCALAR_VAR `\$#`: $toks", has(toks, StrykeTokenTypes.SCALAR_VAR, "\$#"))
+    }
+
+    @Test
+    fun dollar_hash_var_in_expression_does_not_eat_rest_of_line() {
+        // The exact source from the user's screenshot.
+        val toks = lex("@xs ? [\$xs[0] + 1, @xs[1..\$#xs]] : [1]")
+        assertTrue("SCALAR_VAR \$#xs: $toks", has(toks, StrykeTokenTypes.SCALAR_VAR, "\$#xs"))
+        // The closing `]` `]` and ternary `:` must still be regular
+        // tokens, NOT swallowed by a comment.
+        assertTrue("no comment token: $toks", toks.none { it.first == StrykeTokenTypes.COMMENT })
+        // The `[1]` ternary-else branch must still tokenize.
+        assertTrue(
+            "trailing NUMBER 1: $toks",
+            toks.any { it.first == StrykeTokenTypes.NUMBER && it.second == "1" },
+        )
+    }
+
+    @Test
+    fun real_comment_still_works() {
+        // Sanity: a real comment (`#` after whitespace) is still a comment.
+        val toks = lex("foo  # actual comment\nbar")
+        assertTrue(
+            "expected COMMENT `# actual comment`: $toks",
+            toks.any { it.first == StrykeTokenTypes.COMMENT && it.second.startsWith("# actual") },
+        )
+    }
 }

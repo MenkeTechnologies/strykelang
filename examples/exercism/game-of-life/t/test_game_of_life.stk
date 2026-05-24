@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./GameOfLife.stk"
 
-fn j { join("|", map { join(",", @{$_}) } @{_}) }
+fn j($a) { join("|", map { join(",", @{$_}) } @{$a}) }
 
 # Empty/dead.
 assert_eq j(Exercism::GameOfLife::tick([[0,0],[0,0]])), "0,0|0,0", "all dead stays"

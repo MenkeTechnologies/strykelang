@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./Dominoes.stk"
 
-fn ok { _->[0] eq "ok" ? 1 : 0 }
+fn ok($a) { $a->[0] eq "ok" ? 1 : 0 }
 
 assert_eq ok(Exercism::Dominoes::chain([])),                      1, "empty chain"
 assert_eq ok(Exercism::Dominoes::chain([[1,1]])),                 1, "single double"

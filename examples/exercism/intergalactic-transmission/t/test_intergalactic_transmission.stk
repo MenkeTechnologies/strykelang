@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./Transmission.stk"
 
-fn jr { my $r = _; "$r->[0]:$r->[1]" }
+fn jr($a) { my $r = $a; "$r->[0]:$r->[1]" }
 
 my $enc = Exercism::Transmission::get_transmit_sequence("hi")
 # Verify round-trip.

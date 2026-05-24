@@ -16,10 +16,10 @@ fn Exercism::PaintByNumber::pow {
 # How many bits are needed to encode N distinct colors? (ceil(log2(N)).)
 fn Exercism::PaintByNumber::palette_bit_size {
     my $n  = _
-    my $b  = 0
+    my $bits = 0
     my $cap = 1
-    while ($cap < $n) { $cap *= 2; $b++ }
-    $b
+    while ($cap < $n) { $cap *= 2; $bits++ }
+    $bits
 }
 
 # How many pixels does that palette let us encode in `bytes` bytes?

@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./KillerSudokuHelper.stk"
 
-fn j { join("|", map { join(",", @{$_}) } @{_}) }
+fn j($a) { join("|", map { join(",", @{$_}) } @{$a}) }
 
 assert_eq j(Exercism::KillerSudokuHelper::combinations(2, 3)),  "1,2",                "size=2 sum=3"
 assert_eq j(Exercism::KillerSudokuHelper::combinations(2, 5)),  "1,4|2,3",            "size=2 sum=5"

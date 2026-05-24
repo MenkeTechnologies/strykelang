@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./PerfectNumbers.stk"
 
-fn j { join(":", @{_}) }
+fn j($a) { join(":", @{$a}) }
 
 assert_eq j(Exercism::PerfectNumbers::classify(6)),    "ok:perfect",   "6 perfect"
 assert_eq j(Exercism::PerfectNumbers::classify(28)),   "ok:perfect",   "28 perfect"

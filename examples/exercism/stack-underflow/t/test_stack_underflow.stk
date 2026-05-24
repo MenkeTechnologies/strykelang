@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./StackUnderflow.stk"
 
-fn j { join(",", @{_}) }
+fn j($a) { join(",", @{$a}) }
 
 assert_eq j(Exercism::StackUnderflow::add([1,2])),   "3", "add"
 assert_eq j(Exercism::StackUnderflow::sub([5,3])),   "2", "sub"

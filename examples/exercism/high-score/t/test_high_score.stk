@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./HighScore.stk"
 
-fn j { join(",", @{_}) }
+fn j($a) { join(",", @{$a}) }
 
 my $s0 = Exercism::HighScore::new()
 assert_eq scalar(keys %{$s0}), 0, "new is empty"

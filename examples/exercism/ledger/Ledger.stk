@@ -6,9 +6,9 @@ fn Exercism::Ledger::format_entries {
     my ($currency, $locale, $entries) = (_, _1, _2)
     my $hdr = Exercism::Ledger::_hdr($locale)
     my @sorted = sort {
-        $a->{date} cmp $b->{date} ||
-        $a->{desc} cmp $b->{desc} ||
-        $a->{change} <=> $b->{change}
+        _->{date} cmp _1->{date} ||
+        _->{desc} cmp _1->{desc} ||
+        _->{change} <=> _1->{change}
     } @{$entries}
     join "\n", $hdr, map { Exercism::Ledger::_row($currency, $locale, $_) } @sorted
 }
@@ -32,9 +32,9 @@ fn Exercism::Ledger::_amt {
     my ($curr, $loc, $cents) = (_, _1, _2)
     my $sym = $curr eq "USD" ? "$" : "€"
     my $neg = $cents < 0
-    my $a   = abs($cents) / 100
-    my $i   = int($a)
-    my $f   = int(($a - $i) * 100 + 0.5)
+    my $amt = abs($cents) / 100
+    my $i   = int($amt)
+    my $f   = int(($amt - $i) * 100 + 0.5)
     my @rev = split //, sprintf("%d", $i) =~ s/(\d)(?=(\d{3})+$)/$1,/gr  # us style
     my $base = sprintf("%d", $i) =~ s/(\d)(?=(\d{3})+$)/$1,/gr
     my $body = $loc eq "en-US"

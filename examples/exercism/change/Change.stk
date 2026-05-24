@@ -3,7 +3,7 @@
 fn Exercism::Change::generate($coins, $target) {
     return ["error", "cannot change"] if $target < 0
     return ["ok", []] if $target == 0
-    my @sorted = sort { $a <=> $b } @{$coins}
+    my @sorted = sort { _ <=> _1 } @{$coins}
     my @best
     $best[0] = []
     for my $amt (1..$target) {
@@ -16,5 +16,5 @@ fn Exercism::Change::generate($coins, $target) {
             }
         }
     }
-    defined $best[$target] ? ["ok", [sort { $a <=> $b } @{$best[$target]}]] : ["error", "cannot change"]
+    defined $best[$target] ? ["ok", [sort { _ <=> _1 } @{$best[$target]}]] : ["error", "cannot change"]
 }

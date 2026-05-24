@@ -1,9 +1,9 @@
 #!/usr/bin/env stryke
 require "./RpnCalculator.stk"
 
-fn add  = fn { my @s = @{_}; [@s[0..$#s-2], $s[-2] + $s[-1]] }
-fn idiv = fn { my @s = @{_}; $s[-1] == 0 and die "Cannot divide by 0"; [@s[0..$#s-2], int($s[-2] / $s[-1])] }
-fn jok  { my $r = _; ref($r) eq 'ARRAY' && $r->[0] eq 'ok' ? "ok:" . join(",", @{$r->[1]}) : ref($r) eq 'ARRAY' ? "error:" . $r->[1] : $r }
+fn add  = fn ($stack) { my @s = @{$stack}; [@s[0..$#s-2], $s[-2] + $s[-1]] }
+fn idiv = fn ($stack) { my @s = @{$stack}; $s[-1] == 0 and die "Cannot divide by 0"; [@s[0..$#s-2], int($s[-2] / $s[-1])] }
+fn jok($r) { ref($r) eq 'ARRAY' && $r->[0] eq 'ok' ? "ok:" . join(",", @{$r->[1]}) : ref($r) eq 'ARRAY' ? "error:" . $r->[1] : $r }
 
 assert_eq jok(Exercism::RpnCalculator::calculate([1,2], add())),     "ok:3",      "1+2=3"
 assert_eq jok(Exercism::RpnCalculator::calculate([6,0], idiv())),    "error",     "div0 returns error"

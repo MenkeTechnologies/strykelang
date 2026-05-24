@@ -6,15 +6,15 @@ fn Exercism::Tournament::tally {
     my %t
     for my $line (split /\n/, _) {
         next unless $line =~ /^([^;]+);([^;]+);(win|loss|draw)$/
-        my ($h, $a, $r) = ($1, $2, $3)
-        $t{$h} = { mp=>0, w=>0, d=>0, l=>0, p=>0 } unless exists $t{$h}
-        $t{$a} = { mp=>0, w=>0, d=>0, l=>0, p=>0 } unless exists $t{$a}
-        $t{$h}{mp}++; $t{$a}{mp}++
-        if    ($r eq "win")  { $t{$h}{w}++; $t{$a}{l}++; $t{$h}{p} += 3 }
-        elsif ($r eq "loss") { $t{$a}{w}++; $t{$h}{l}++; $t{$a}{p} += 3 }
-        else                  { $t{$h}{d}++; $t{$a}{d}++; $t{$h}{p}++; $t{$a}{p}++ }
+        my ($home, $away, $result) = ($1, $2, $3)
+        $t{$home} = { mp=>0, w=>0, d=>0, l=>0, p=>0 } unless exists $t{$home}
+        $t{$away} = { mp=>0, w=>0, d=>0, l=>0, p=>0 } unless exists $t{$away}
+        $t{$home}{mp}++; $t{$away}{mp}++
+        if    ($r eq "win")  { $t{$home}{w}++; $t{$away}{l}++; $t{$home}{p} += 3 }
+        elsif ($r eq "loss") { $t{$away}{w}++; $t{$home}{l}++; $t{$away}{p} += 3 }
+        else                  { $t{$home}{d}++; $t{$away}{d}++; $t{$home}{p}++; $t{$away}{p}++ }
     }
-    my @teams = sort { $t{$b}{p} <=> $t{$a}{p} || $a cmp $b } keys %t
+    my @teams = sort { $t{_1}{p} <=> $t{_}{p} || _ cmp _1 } keys %t
     my $hdr = sprintf("%-31s| MP |  W |  D |  L |  P", "Team")
     my @lines = ($hdr)
     for my $name (@teams) {

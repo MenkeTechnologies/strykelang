@@ -9,7 +9,7 @@ fn Exercism::BookStore::total($books) {
     # Count copies per title, then peel off groups by decreasing distinct-count.
     my %count
     $count{$_}++ for @{$books}
-    my @copies = sort { $b <=> $a } values %count
+    my @copies = sort { _1 <=> _ } values %count
     my @groups
     while ($copies[0] > 0) {
         my $size = 0
