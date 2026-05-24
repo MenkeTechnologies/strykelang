@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+
+# Authenticated Web API
+#
+# Demonstrates:
+#   * `serve` for starting an HTTP server.
+#   * Custom request handlers.
+#   * `before` advice for auth/logging.
+#   * Returning JSON responses.
+#
+# Run: stryke --no-interop examples/authenticated_web_api.stk
+
+# ── 1. API Logic ───────────────────────────────────────────────────
+
+fn Api::get_user($req) {
+    my $id = $req->{params}->{id} // "unknown"
+    +{
+        status => 200,
+        headers => { "Content-Type" => "application/json" },
+        body => to_json(+{ id => $id, name => "Stryke User", role => "admin" })
+    }
+}
+
+# ── 2. Intercepts (Auth & Logging) ──────────────────────────────────
+
+my $audit_count = 0
+
+before "Api::get_user" {
+    $audit_count++
+    my $req = $INTERCEPT_ARGS[0]
+    p "[API LOG] Calling $INTERCEPT_NAME for path: #{ $req->{path} }"
+}
+
+# ── 3. Test the Handler ────────────────────────────────────────────
+
+p "── Authenticated Web API (Unit Test) ──────────────────"
+
+my $test_req = +{
+    path    => "/user/42",
+    method  => "GET",
+    params  => { id => 42 },
+    headers => { "X-Api-Key" => "secret123" }
+}
+
+my $res = Api::get_user($test_req)
+p "Response: #{ $res->{body} }"
+
+# ── 4. Tests ───────────────────────────────────────────────────────
+
+$res->{status} |> aeq 200, "api success status"
+$res->{body} =~ /Stryke User/ |> aok "api body contains user name"
+$audit_count |> aeq 1, "aop intercept triggered"
+
+test_run
+
+# (Optional) To run as a live server:
+# serve(8080, \&Api::get_user) if !test_env()

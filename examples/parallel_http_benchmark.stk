@@ -1,0 +1,52 @@
+#!/usr/bin/env stryke
+
+# Parallel HTTP Benchmark
+#
+# Demonstrates:
+#   * `pmap` for parallel execution.
+#   * `http_get` for fetching content.
+#   * Measuring latency with `now_ns`.
+#
+# Run: stryke --no-interop examples/parallel_http_benchmark.stk
+
+p "── Parallel HTTP Benchmark ─────────────────────────────"
+
+# 1. Targets
+my @targets = (
+    "https://www.google.com",
+    "https://www.github.com",
+    "https://www.rust-lang.org",
+    "https://www.wikipedia.org",
+)
+
+# 2. Benchmark
+p "Checking #{len @targets} targets in parallel..."
+
+my @results = @targets |> pmap {
+    my $t1 = now_ns()
+    # http_request returns { status => ..., body => ..., headers => ... }
+    my $res = http_request(_, { timeout => 5 })
+    my $dt_ms = (now_ns() - $t1) / 1000000.0
+    
+    +{
+        url    => _,
+        status => $res->{status} // 0,
+        size   => len($res->{body} // ""),
+        time   => $dt_ms
+    }
+} |> collect
+
+# 3. Report
+p "\nBenchmark Results:"
+for my $r (@results) {
+    printf "  %-30s | Status: %3d | Size: %8d | Time: %6.1f ms\n",
+        $r->{url}, $r->{status}, $r->{size}, $r->{time}
+}
+
+# ── 4. Tests ───────────────────────────────────────────────────────
+
+len(@results) |> aeq len(@targets), "all targets processed"
+$results[0]->{url} |> aok "url captured"
+exists $results[0]->{status} |> aok "status field exists"
+
+test_run

@@ -1,0 +1,47 @@
+#!/usr/bin/env stryke
+
+# Secure Config Manager
+#
+# Demonstrates:
+#   * `secrets_random_key` for generating 256-bit keys.
+#   * `secrets_encrypt` / `secrets_decrypt` (AES-256-GCM).
+#   * JSON serialization of config objects.
+#
+# Run: stryke --no-interop examples/secure_config_manager.stk
+
+p "── Secure Config Manager ──────────────────────────────"
+
+# 1. Setup secret data
+my $config = +{
+    database_url => "postgres://admin:secret_pass@localhost:5432/prod",
+    api_token    => "stryke_master_key_998877",
+    environment  => "production",
+}
+
+# 2. Generate a key (usually stored in an env var or vault)
+my $key = secrets_random_key()
+p "Generated random 256-bit key (length: #{len $key} bytes)"
+
+# 3. Encrypt the configuration
+my $plaintext = to_json($config)
+my $ciphertext = secrets_encrypt($plaintext, key => $key)
+p "Encrypted config size: #{len $ciphertext} bytes"
+
+# 4. Decrypt to verify
+my $decrypted_json = secrets_decrypt($ciphertext, key => $key)
+my $loaded_config = from_json($decrypted_json)
+
+p "Decrypted environment: #{ $loaded_config->{environment} }"
+
+# ── 5. Tests ───────────────────────────────────────────────────────
+
+$loaded_config->{database_url} |> aeq $config->{database_url}, "db url match"
+$loaded_config->{api_token}    |> aeq $config->{api_token},    "api token match"
+$loaded_config->{environment}  |> aeq "production",            "env match"
+
+# Verify that decryption fails with a wrong key
+my $wrong_key = secrets_random_key()
+my $dec_fail = secrets_decrypt($ciphertext, key => $wrong_key)
+!defined($dec_fail) |> aok "decryption returns undef with wrong key"
+
+test_run

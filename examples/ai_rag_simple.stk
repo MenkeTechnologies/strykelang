@@ -1,0 +1,68 @@
+#!/usr/bin/env stryke
+
+# Simple AI RAG (Retrieval-Augmented Generation)
+#
+# Demonstrates:
+#   * `ai_memory_save` for storing documents in the vector store.
+#   * `ai_memory_recall` for semantic search.
+#   * Grounding LLM responses with retrieved context.
+#
+# Run: STRYKE_AI_MODE=mock-only stryke examples/ai_rag_simple.stk
+
+# ── 1. Setup Mocking ────────────────────────────────────────────────
+
+# Mock the recall behavior (in mock-only mode, recall uses hash-based matching)
+# We mock the final grounded response
+ai_mock_install('(?si)Answer based on context:.*What is the return policy.*', 
+    'The return policy is 30 days for most items, provided they are in original condition.')
+
+ai_mock_install('(?si)Answer based on context:.*shipping take.*', 
+    'Standard shipping takes 3-5 business days, while express shipping is overnight.')
+
+# ── 2. Populate Knowledge Base ─────────────────────────────────────
+
+p "── AI RAG Knowledge Base ───────────────────────────────"
+
+ai_memory_clear()
+
+my @docs = (
+    +{ id => "returns", content => "Our return policy is 30 days for most items. Items must be in original packaging." },
+    +{ id => "shipping", content => "Standard shipping takes 3-5 business days. Express shipping is overnight." },
+    +{ id => "contact", content => "Support can be reached at support@example.com or 1-800-555-0199." }
+)
+
+for my $doc (@docs) {
+    p "Saving doc: #{ $doc->{id} }"
+    ai_memory_save($doc->{id}, $doc->{content})
+}
+
+p "Knowledge base ready. Count: #{ ai_memory_count() }"
+
+# ── 3. Query with Context ──────────────────────────────────────────
+
+fn Rag::ask($query) {
+    p "\nQuery: $query"
+    
+    # Semantic search
+    my $matches = [ ai_memory_recall($query, top_k => 2) ]
+    
+    my $context = join("\n---\n", map { $_->{content} } @$matches)
+    p "Retrieved #{ len $matches } relevant context(s)."
+
+    my $prompt = "Answer based on context:\n$context\n\nQuestion: $query"
+    my $answer = ai($prompt, system => "You are a customer support agent. Use only provided context.")
+    
+    p "Answer: $answer"
+    return $answer
+}
+
+# ── 4. Run Examples ───────────────────────────────────────────────
+
+my $ans = Rag::ask("What is the return policy?")
+Rag::ask("How long does shipping take?")
+
+# ── 5. Tests ───────────────────────────────────────────────────────
+
+$ans =~ /30 days/ |> aok "rag answer contains policy"
+
+test_run
