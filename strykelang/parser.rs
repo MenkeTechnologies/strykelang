@@ -2883,10 +2883,27 @@ impl Parser {
     /// brace-depth 0 within the RHS). Any `_` inside `{ ... }` is
     /// considered bound by whatever defines that block (closure,
     /// hash literal, map/grep/sort/match arm) and doesn't count.
+    ///
+    /// Special case: when the RHS *starts* with a thread-macro intro
+    /// token (`~>`, `->>`, `~>>`, `~p>`, `~s>`, `~d>` and `-Last`
+    /// variants), the macro itself binds `_` for all stage expressions
+    /// — only the immediate input expression after the arrow can
+    /// trigger the wrap. `->> 10 div(_, 2)` is eager (input = `10`,
+    /// `_` is the threaded placeholder), but `~> _ uc` wraps (input
+    /// is the free bare `_`).
+    ///
     /// Drives the implicit-coderef sugar in `parse_my_our_local`.
     fn rhs_has_free_bare_topic_slot(&self, rhs_start: usize, rhs_end: usize) -> bool {
+        let end = rhs_end.min(self.tokens.len());
+        if rhs_start < end && Self::is_thread_arrow(&self.tokens[rhs_start].0) {
+            // Only the input expression (first token after the arrow)
+            // can trigger the wrap; everything else is a stage and
+            // its bare `_` is the threaded placeholder.
+            let input = rhs_start + 1;
+            return input < end && self.bare_positional_indices.contains(&input);
+        }
         let mut brace_depth = 0i32;
-        for i in rhs_start..rhs_end.min(self.tokens.len()) {
+        for i in rhs_start..end {
             if brace_depth == 0 && self.bare_positional_indices.contains(&i) {
                 return true;
             }
@@ -2897,6 +2914,20 @@ impl Parser {
             }
         }
         false
+    }
+
+    fn is_thread_arrow(tok: &Token) -> bool {
+        matches!(
+            tok,
+            Token::ThreadArrow
+                | Token::ThreadArrowLast
+                | Token::ThreadArrowStream
+                | Token::ThreadArrowStreamLast
+                | Token::ThreadArrowPar
+                | Token::ThreadArrowParLast
+                | Token::ThreadArrowDist
+                | Token::ThreadArrowDistLast
+        )
     }
 
     /// Apply a bare function name in thread context, handling unary builtins specially.
