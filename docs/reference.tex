@@ -222,9 +222,9 @@
   \apptocmd{\@title}{\par {\large #1 \par}}{}{}
 }
 \makeatother
-\subtitle{v0.14.2}
+\subtitle{v0.14.20}
 \author{MenkeTechnologies}
-\date{2026-05-15}
+\date{2026-05-24}
 
 \begin{document}
 \maketitle
@@ -956,24 +956,32 @@ See \texttt{cluster} for cluster construction,
 
 \section{\texorpdfstring{\texttt{par}}{par}}\label{par}
 
-Generic parallel-chunk thread-stage --- only valid inside
-\texttt{\textasciitilde{}\textgreater{}}/\texttt{\textasciitilde{}\textgreater{}\textgreater{}}.
-Splits the threaded value into chunks, runs \texttt{BLOCK} on each chunk
-in parallel, and flattens chunk outputs into a single list.
+Generic parallel-chunk evaluator. Splits the input list into chunks,
+runs \texttt{BLOCK} on each chunk in parallel with the chunk bound to
+\texttt{\_} / \texttt{\_0}, and flattens chunk outputs into a single
+list. Callable in three shapes:
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{my @a = \textasciitilde{}\textgreater{} "Hello, World 123" par \{ letters \}    \# H e l l o W o r l d}
-\NormalTok{\textasciitilde{}\textgreater{} @huge par \{ map \{ \_ ** 2 \} |\textgreater{} sum \} |\textgreater{} sum p   \# parallel sum{-}of{-}squares}
+\NormalTok{\# 1. Top{-}level prefix form — yields a flat list}
+\NormalTok{par \{ BLOCK \} LIST}
+\NormalTok{my @r = par \{ letters \} "Hello, World 123"      \# H e l l o W o r l d}
+\NormalTok{my @s = par \{ map \{ \_ ** 2 \} \_ \} @huge           \# parallel squares}
+
+\NormalTok{\# 2. Postfix{-}statement form — side{-}effecting, no return binding}
+\NormalTok{\{ BLOCK \} par LIST                               \# runs BLOCK per chunk}
+\NormalTok{\{ log\_chunk(\_) \} par @huge}
+
+\NormalTok{\# 3. As a \textasciigrave{}\textasciitilde{}\textgreater{}\textasciigrave{} / \textasciigrave{}\textasciitilde{}\textgreater{}\textgreater{}\textasciigrave{} thread{-}macro stage}
+\NormalTok{\textasciitilde{}\textgreater{} "abc def" par \{ letters \}                     \# a b c d e f}
+\NormalTok{\textasciitilde{}\textgreater{} @huge par \{ map \{ \_ ** 2 \} |\textgreater{} sum \} |\textgreater{} sum p  \# parallel sum{-}of{-}squares}
 \end{Highlighting}
 \end{Shaded}
 
 Each chunk gets a fresh sub-VM with the chunk bound to \texttt{\_} and
-\texttt{\$\_{[}0{]}}. List-returning ops keep their values; the runtime
-auto-flattens. Use \texttt{par\_reduce} when you need a final merge step
-rather than flat concat. \texttt{par\ \{\ …\ \}} is *only* a
-thread-stage; calling it as a top-level expression is an undefined-sub
-error.
+\texttt{\_0}. List-returning ops keep their values; the runtime
+auto-flattens. Use \texttt{par\_reduce} when you need an explicit merge
+step rather than flat concat.
 
 \section{\texorpdfstring{\texttt{par\_reduce}}{par\_reduce}}\label{par_reduce}
 
@@ -2541,15 +2549,15 @@ or used in pipelines.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{my $double = fn \{ $\_[0] * 2 \}}
-\NormalTok{my $inc    = fn \{ $\_[0] + 1 \}}
+\NormalTok{my $double = fn \{ \_0 * 2 \}}
+\NormalTok{my $inc    = fn \{ \_0 + 1 \}}
 \NormalTok{my $f = compose($inc, $double)}
 \NormalTok{p $f{-}\textgreater{}(5)   \# 11  (double 5 → 10, inc 10 → 11)}
 
 \NormalTok{my $pipeline = compose(}
-\NormalTok{    fn \{ join ",", @\{$\_[0]\} \},}
-\NormalTok{    fn \{ [sort @\{$\_[0]\}] \},}
-\NormalTok{    fn \{ [grep \{ \_ \textgreater{} 2 \} @\{$\_[0]\}] \},}
+\NormalTok{    fn \{ join ",", @\{\_0\} \},}
+\NormalTok{    fn \{ [sort @\{\_0\}] \},}
+\NormalTok{    fn \{ [grep \{ \_ \textgreater{} 2 \} @\{\_0\}] \},}
 \NormalTok{)}
 \NormalTok{p $pipeline{-}\textgreater{}([3,1,4,1,5])  \# 3,4,5}
 \end{Highlighting}
@@ -2566,11 +2574,11 @@ versions of general functions without closures.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{my $add = fn \{ $\_[0] + $\_[1] \}}
+\NormalTok{my $add = fn \{ \_0 + \_1 \}}
 \NormalTok{my $add5 = partial($add, 5)}
 \NormalTok{p $add5{-}\textgreater{}(3)   \# 8}
 
-\NormalTok{my $log = fn \{ p "[$\_[0]] $\_[1]" \}}
+\NormalTok{my $log = fn \{ p "[\#\{\_0\}] \#\{\_1\}" \}}
 \NormalTok{my $warn\_log = partial($log, "WARN")}
 \NormalTok{$warn\_log{-}\textgreater{}("disk full")   \# [WARN] disk full}
 \end{Highlighting}
@@ -2587,7 +2595,7 @@ it calls immediately.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{my $add = curry(fn \{ $\_[0] + $\_[1] \}, 2)}
+\NormalTok{my $add = curry(fn \{ \_0 + \_1 \}, 2)}
 \NormalTok{my $add5 = $add{-}\textgreater{}(5)}
 \NormalTok{p $add5{-}\textgreater{}(3)       \# 8}
 \NormalTok{p $add{-}\textgreater{}(10, 20)   \# 30  (enough args — calls immediately)}
@@ -2606,12 +2614,12 @@ the same inputs always produce the same output.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{my $fib = memoize(fn \{}
-\NormalTok{    my $n = $\_[0]}
+\NormalTok{    my $n = \_0}
 \NormalTok{    $n \textless{} 2 ? $n : $fib{-}\textgreater{}($n{-}1) + $fib{-}\textgreater{}($n{-}2)}
 \NormalTok{\})}
 \NormalTok{p $fib{-}\textgreater{}(30)   \# instant (without memoize: \textasciitilde{}1B calls)}
 
-\NormalTok{my $fetch\_user = memo(fn \{ fetch\_json("https://api/users/$\_[0]") \})}
+\NormalTok{my $fetch\_user = memo(fn \{ fetch\_json("https://api/users/\#\{\_0\}") \})}
 \NormalTok{$fetch\_user{-}\textgreater{}(42)   \# hits API}
 \NormalTok{$fetch\_user{-}\textgreater{}(42)   \# returns cached}
 \end{Highlighting}
@@ -2659,7 +2667,7 @@ creating a closure.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{my $even = fn \{ $\_[0] \% 2 == 0 \}}
+\NormalTok{my $even = fn \{ \_0 \% 2 == 0 \}}
 \NormalTok{my $odd = complement($even)}
 \NormalTok{p $odd{-}\textgreater{}(3)   \# 1}
 \NormalTok{p $odd{-}\textgreater{}(4)   \# 0}
@@ -2691,7 +2699,7 @@ bodies.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{my $greet = fnil(fn \{ "Hello, $\_[0]!" \}, "World")}
+\NormalTok{my $greet = fnil(fn \{ "Hello, \#\{\_0\}!" \}, "World")}
 \NormalTok{p $greet{-}\textgreater{}(undef)    \# Hello, World!}
 \NormalTok{p $greet{-}\textgreater{}("Alice")  \# Hello, Alice!}
 \end{Highlighting}
@@ -8788,12 +8796,11 @@ approximant (alias for \texttt{best\_rational\_approximation}).
 \section{\texorpdfstring{\texttt{numerical\_gradient}}{numerical\_gradient}}\label{numerical_gradient}
 
 \texttt{numerical\_gradient\ F,\ POINT\ {[},\ H{]}} ---
-central-difference ∇f. F receives a single arrayref
-\texttt{\$\_{[}0{]}}.
+central-difference ∇f. F receives a single arrayref \texttt{\_0}.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{fn quad \{ my @y = @\{$\_[0]\}; $y[0]**2 + 2*$y[1]**2 \}}
+\NormalTok{fn quad \{ my @y = @\{\_0\}; $y[0]**2 + 2*$y[1]**2 \}}
 \NormalTok{my @g = ngrad(\textbackslash{}\&quad, [3, 4])    \# (6, 16)}
 \end{Highlighting}
 \end{Shaded}
@@ -17250,15 +17257,52 @@ thread pool size.
 
 \section{\texorpdfstring{\texttt{pool\_info}}{pool\_info}}\label{pool_info}
 
-\texttt{pool\_info} (alias \texttt{par\_info}) --- return thread pool
-details as a hashref (threads, queued, active).
+\texttt{pool\_info} (alias \texttt{par\_info}) --- thread-pool + host
+metadata as a hashref. Useful for sizing parallel work, gating on
+architecture, and reporting in benchmarks.
+
+\textbf{Keys (always present):}
+
+\textbar{} key \textbar{} type \textbar{} meaning \textbar{}
+\textbar-\/-\/-\textbar-\/-\/-\textbar-\/-\/-\textbar{} \textbar{}
+\texttt{cpus} \textbar{} Int \textbar{} logical-CPU count from
+\texttt{available\_parallelism} (hyperthreads counted) \textbar{}
+\textbar{} \texttt{rayon\_threads} \textbar{} Int \textbar{} current
+rayon worker-pool size (what \texttt{pmap} / \texttt{pfor} /
+\texttt{pgrep} use) \textbar{} \textbar{} \texttt{arch} \textbar{} Str
+\textbar{} build target architecture: \texttt{aarch64},
+\texttt{x86\_64}, \texttt{riscv64}, \ldots{} \textbar{} \textbar{}
+\texttt{os} \textbar{} Str \textbar{} build target OS: \texttt{macos},
+\texttt{linux}, \texttt{freebsd}, \texttt{windows}, \ldots{} \textbar{}
+
+\textbf{macOS-only keys} (populated via \texttt{sysctlbyname} on Apple
+Silicon / Intel Macs):
+
+\textbar{} key \textbar{} type \textbar{} meaning \textbar{}
+\textbar-\/-\/-\textbar-\/-\/-\textbar-\/-\/-\textbar{} \textbar{}
+\texttt{perf\_cores} \textbar{} Int \textbar{} performance-core count
+(\texttt{hw.perflevel0.physicalcpu}) \textbar{} \textbar{}
+\texttt{eff\_cores} \textbar{} Int \textbar{} efficiency-core count
+(\texttt{hw.perflevel1.physicalcpu}) \textbar{}
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{my $info = par\_info()}
-\NormalTok{p $info{-}\textgreater{}\{threads\}}
+\NormalTok{my $info = pool\_info()}
+\NormalTok{p $info{-}\textgreater{}\{cpus\}            \# 12 (e.g. M3 Pro)}
+\NormalTok{p $info{-}\textgreater{}\{rayon\_threads\}   \# 12}
+\NormalTok{p $info{-}\textgreater{}\{arch\}            \# "aarch64"}
+\NormalTok{p $info{-}\textgreater{}\{os\}              \# "macos"}
+\NormalTok{p $info{-}\textgreater{}\{perf\_cores\}      \# 6     (Apple Silicon only)}
+\NormalTok{p $info{-}\textgreater{}\{eff\_cores\}       \# 4     (Apple Silicon only)}
+
+\NormalTok{\# Sizing parallel work to perf cores when available:}
+\NormalTok{my $n = $info{-}\textgreater{}\{perf\_cores\} // $info{-}\textgreater{}\{rayon\_threads\}}
+\NormalTok{@inputs |\textgreater{} pmap \{ heavy(\_) \}}
 \end{Highlighting}
 \end{Shaded}
+
+See also: \texttt{thread\_count}, \texttt{par\_bench}, \texttt{pmap},
+\texttt{pfor}, \texttt{pgrep}, \texttt{set\_pool\_size}.
 
 \section{\texorpdfstring{\texttt{par\_bench}}{par\_bench}}\label{par_bench}
 
@@ -17725,7 +17769,7 @@ text-delta. Without, returns a \texttt{PerlIterator}-backed handle:
 \begin{Highlighting}[]
 \NormalTok{my $state = +\{ buf =\textgreater{} "" \};}
 \NormalTok{stream\_prompt("write a haiku",}
-\NormalTok{    on\_chunk =\textgreater{} sub \{ $state{-}\textgreater{}\{buf\} .= $\_[0]; print $\_[0] \});}
+\NormalTok{    on\_chunk =\textgreater{} sub \{ $state{-}\textgreater{}\{buf\} .= \_0; print \_0 \});}
 \end{Highlighting}
 \end{Shaded}
 
@@ -17907,7 +17951,7 @@ auto-attaches to its agent loop. Idempotent re-register on same name.
 \begin{Highlighting}[]
 \NormalTok{ai\_register\_tool("weather", "Get weather",}
 \NormalTok{    +\{ city =\textgreater{} "string" \},}
-\NormalTok{    sub \{ fetch "https://api.weather.com/" . uri\_encode($\_[0]{-}\textgreater{}\{city\}) \});}
+\NormalTok{    sub \{ fetch "https://api.weather.com/" . uri\_encode(\_0{-}\textgreater{}\{city\}) \});}
 \NormalTok{ai\_clear\_tools();}
 \end{Highlighting}
 \end{Shaded}
@@ -20112,7 +20156,7 @@ list.
 \protect\phantomsection\label{ch-other}
 \chapter{Other}\label{other}
 
-8520 topics
+8573 topics
 
 \section{\texorpdfstring{\texttt{\$!}}{\$!}}\label{section-55}
 
@@ -21945,6 +21989,39 @@ next VM op so destructors run in deterministic order.
 
 See also: \texttt{BUILD}, \texttt{bless},
 \texttt{\$\{\^{}GLOBAL\_PHASE\}}, \texttt{class}.
+
+\section{\texorpdfstring{\texttt{E}}{E}}\label{e-1}
+
+\texttt{E} --- operation \texttt{E}. Alias for \texttt{euler\_number}.
+Category: *math / numeric extras*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p E $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{PI}}{PI}}\label{pi}
+
+\texttt{PI} --- operation \texttt{PI}. Alias for \texttt{pi}. Category:
+*constants*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p PI $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{TAU}}{TAU}}\label{tau}
+
+\texttt{TAU} --- operation \texttt{TAU}. Alias for \texttt{tau}.
+Category: *constants*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p TAU $x}
+\end{Highlighting}
+\end{Shaded}
 
 \section{\texorpdfstring{\texttt{UNITCHECK}}{UNITCHECK}}\label{unitcheck}
 
@@ -27863,7 +27940,7 @@ tolerance.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{my $root = bisect(fn \{ $\_[0]**2 {-} 2 \}, 1, 2)  \# √2 ≈ 1.4142}
+\NormalTok{my $root = bisect(fn \{ \_0**2 {-} 2 \}, 1, 2)  \# √2 ≈ 1.4142}
 \end{Highlighting}
 \end{Shaded}
 
@@ -44638,7 +44715,7 @@ R\textquotesingle s do.call().
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{my $result = docall(fn \{ $\_[0] + $\_[1] \}, [3, 4])  \# 7}
+\NormalTok{my $result = docall(fn \{ \_0 + \_1 \}, [3, 4])  \# 7}
 \end{Highlighting}
 \end{Shaded}
 
@@ -47043,6 +47120,84 @@ functions*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{enum}}{enum}}\label{enum}
+
+\texttt{enum} declares a tagged-union / algebraic data type --- a finite
+set of named variants, each optionally carrying a typed payload. Stryke
+enums pair with \texttt{match} for exhaustive pattern dispatch (the
+compiler errors on missing arms unless you write
+\texttt{\_\ =\textgreater{}}).
+
+\textbf{Declaration:}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{enum Sig \{ Hup, Int, Term, Kill \}                    \# tag{-}only variants}
+\NormalTok{enum Color \{ Red, Green, Blue \}}
+\NormalTok{enum ResultStatus \{ Ok =\textgreater{} Int, Err =\textgreater{} Str \}          \# variants with payload}
+\NormalTok{enum Shape \{                                          \# variants with payload + methods}
+\NormalTok{    Circle =\textgreater{} Float,}
+\NormalTok{    Square =\textgreater{} Float,}
+\NormalTok{    fn area($self) \{}
+\NormalTok{        match ($self) \{}
+\NormalTok{            Shape::Circle(\textbackslash{}$r) =\textgreater{} 3.14159 * \textbackslash{}$r * \textbackslash{}$r,}
+\NormalTok{            Shape::Square(\textbackslash{}$s) =\textgreater{} \textbackslash{}$s * \textbackslash{}$s,}
+\NormalTok{        \}}
+\NormalTok{    \}}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{Constructing variants:}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my \textbackslash{}$s = Sig::Term                                   \# tag{-}only construction}
+\NormalTok{my \textbackslash{}$ok = ResultStatus::Ok(42)                       \# payload construction}
+\NormalTok{my \textbackslash{}$err = ResultStatus::Err("boom")}
+\NormalTok{p \textbackslash{}$ok                                               \# ResultStatus::Ok(42)}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{Pattern matching:}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{fn handle(\textbackslash{}$sig) \{}
+\NormalTok{    match (\textbackslash{}$sig) \{}
+\NormalTok{        Sig::Hup  =\textgreater{} "reload config",}
+\NormalTok{        Sig::Int  =\textgreater{} "graceful shutdown",}
+\NormalTok{        Sig::Term =\textgreater{} "drain + stop",}
+\NormalTok{        Sig::Kill =\textgreater{} "(no handler — kernel reaps)",}
+\NormalTok{    \}}
+\NormalTok{\}}
+\NormalTok{\# Bind the payload in the arm:}
+\NormalTok{match (\textbackslash{}$result) \{}
+\NormalTok{    ResultStatus::Ok(\textbackslash{}$value)  =\textgreater{} p "got \textbackslash{}$value",}
+\NormalTok{    ResultStatus::Err(\textbackslash{}$msg)   =\textgreater{} die \textbackslash{}$msg,}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{Iteration / reflection:}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{for my \textbackslash{}$v (Sig::Hup, Sig::Int, Sig::Term, Sig::Kill) \{ p \textbackslash{}$v \}}
+\NormalTok{p Sig::values |\textgreater{} ep                                  \# every variant}
+\NormalTok{p ResultStatus::Ok(1){-}\textgreater{}variant                       \# "Ok"}
+\NormalTok{p ResultStatus::Ok(1){-}\textgreater{}payload                       \# 1}
+\end{Highlighting}
+\end{Shaded}
+
+Note: \texttt{EnumName::Variant} namespaces the variant tag;
+\texttt{EnumName::Variant(payload)} constructs one with data. The
+compiler tracks payload types per variant --- \texttt{match} arms must
+bind a compatible pattern.
+
+See also: \texttt{match}, \texttt{struct} (single-shape records),
+\texttt{class} (full OO).
+
 \section{\texorpdfstring{\texttt{env}}{env}}\label{env-2}
 
 \texttt{env} --- operation \texttt{env}. Alias for \texttt{envelope}.
@@ -47682,7 +47837,7 @@ f(t,y) using the Euler method. Returns {[}{[}t,y{]}, ...{]}.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{my $sol = euler\_ode(fn \{ $\_[1] \}, 0, 1, 0.01, 100)  \# exponential growth}
+\NormalTok{my $sol = euler\_ode(fn \{ \_1 \}, 0, 1, 0.01, 100)  \# exponential growth}
 \end{Highlighting}
 \end{Shaded}
 
@@ -47900,6 +48055,39 @@ extensions*.
 \NormalTok{p exe $x}
 \end{Highlighting}
 \end{Shaded}
+
+\section{\texorpdfstring{\texttt{exec\_script}}{exec\_script}}\label{exec_script}
+
+\texttt{run(TARGET,\ ...args)} → exit code. Spawn a stryke script or
+external binary as a subprocess. Inherits stdin/stdout/stderr so output
+streams to the parent. Returns the child\textquotesingle s exit code
+(\texttt{-1} on spawn failure).
+
+Routing:
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{TARGET} ending in \texttt{.stk} → spawned via the current
+  stryke binary (\texttt{\$STRYKE\_EXE\ script.stk\ ARGS…})
+\item
+  \texttt{TARGET} containing \texttt{/} → spawned as a direct path
+\item
+  bare name → resolved via \texttt{PATH}
+\end{itemize}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $rc = run("echo", "hello")             \# 0}
+\NormalTok{my $rc = run("./build.stk", "{-}{-}release")  \# spawns isolated stryke proc}
+\NormalTok{run("git", "status") == 0 or die "git failed"}
+\end{Highlighting}
+\end{Shaded}
+
+Isolation: state defined in a script run via \texttt{run} does NOT leak
+into the caller (subprocess). Use \texttt{source} if you want the
+script\textquotesingle s \texttt{our} vars / \texttt{fn} defs in your
+REPL.
 
 \section{\texorpdfstring{\texttt{executables}}{executables}}\label{executables}
 
@@ -49581,6 +49769,17 @@ helpers*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{first\_index}}{first\_index}}\label{first_index}
+
+\texttt{first\_index} --- index of \texttt{first}. Category: *functional
+/ iterator*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p first\_index $x}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{first\_of\_month}}{first\_of\_month}}\label{first_of_month}
 
 \texttt{first\_of\_month} --- operation \texttt{first\ of\ month}.
@@ -49633,6 +49832,17 @@ Category: *economics + game theory*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p first\_word $x}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{firstidx}}{firstidx}}\label{firstidx}
+
+\texttt{firstidx} --- operation \texttt{firstidx}. Category: *functional
+/ iterator*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p firstidx $x}
 \end{Highlighting}
 \end{Shaded}
 
@@ -53586,6 +53796,377 @@ atmospheric*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{gh\_branches}}{gh\_branches}}\label{gh_branches}
+
+\texttt{gh\_branches(OWNER,\ REPO)} --- paginated list of branches.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @br = gh\_branches("MenkeTechnologies", "zpwr")}
+\NormalTok{p pluck(\textbackslash{}@br, "name")}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_commits}}{gh\_commits}}\label{gh_commits}
+
+\texttt{gh\_commits(OWNER,\ REPO)} --- paginated list of commits.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @c = gh\_commits("MenkeTechnologies", "zpwr")}
+\NormalTok{p pluck(\textbackslash{}@c, "sha")}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_contributors}}{gh\_contributors}}\label{gh_contributors}
+
+\texttt{gh\_contributors(OWNER,\ REPO)} --- paginated list of
+contributors.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @c = gh\_contributors("MenkeTechnologies", "zpwr")}
+\NormalTok{p pluck(\textbackslash{}@c, "login")}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_emojis}}{gh\_emojis}}\label{gh_emojis}
+
+\texttt{gh\_emojis()} --- \texttt{\{\ name\ =\textgreater{}\ url\ \}}
+hashref of GitHub\textquotesingle s emoji set.
+
+\section{\texorpdfstring{\texttt{gh\_followers}}{gh\_followers}}\label{gh_followers}
+
+\texttt{gh\_followers(USER)} --- paginated list of a
+user\textquotesingle s followers (flat list of hashrefs).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @f = gh\_followers("MenkeTechnologies")}
+\NormalTok{p "followers: " . len(@f)}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_following}}{gh\_following}}\label{gh_following}
+
+\texttt{gh\_following(USER)} --- paginated list of users a user is
+following.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @f = gh\_following("MenkeTechnologies")}
+\NormalTok{p pluck(\textbackslash{}@f, "login")}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_forks}}{gh\_forks}}\label{gh_forks}
+
+\texttt{gh\_forks(OWNER,\ REPO)} --- paginated list of forks.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @f = gh\_forks("MenkeTechnologies", "zpwr")}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_get}}{gh\_get}}\label{gh_get}
+
+\texttt{gh\_get(PATH)} --- GET an arbitrary GitHub REST endpoint.
+\texttt{PATH} is a relative path (\texttt{/users/octocat}) or full URL.
+Returns parsed JSON as a stryke value (hashref/arrayref/scalar); 404 →
+\texttt{undef}. Authenticates via \texttt{GITHUB\_TOKEN} env var when
+present (5000 req/hour); otherwise unauthenticated (60 req/hour).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $u = gh\_get("/users/MenkeTechnologies")}
+\NormalTok{p $u{-}\textgreater{}\{public\_repos\}}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_gist}}{gh\_gist}}\label{gh_gist}
+
+\texttt{gh\_gist(ID)} --- fetch a single gist by ID.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $g = gh\_gist("aa5a315d61ae9438b18d")}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_gists}}{gh\_gists}}\label{gh_gists}
+
+\texttt{gh\_gists(USER)} --- paginated list of a user\textquotesingle s
+public gists.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @g = gh\_gists("MenkeTechnologies")}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_issues}}{gh\_issues}}\label{gh_issues}
+
+\texttt{gh\_issues(OWNER,\ REPO)} --- paginated list of issues for a
+repo (includes PRs by GitHub convention; filter
+\texttt{\_-\textgreater{}\{pull\_request\}} to separate).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @issues = gh\_issues("MenkeTechnologies", "zpwr")}
+\NormalTok{my @real = grep \{ !exists \_{-}\textgreater{}\{pull\_request\} \} @issues}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_langs}}{gh\_langs}}\label{gh_langs}
+
+\texttt{gh\_languages(OWNER,\ REPO)} (alias \texttt{gh\_langs}) ---
+\texttt{\{\ language\ =\textgreater{}\ bytes\ \}} hashref of language
+breakdown.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $h = gh\_languages("MenkeTechnologies", "zpwr")}
+\NormalTok{for my $k (sort \{ $h{-}\textgreater{}\{\_1\} \textless{}=\textgreater{} $h{-}\textgreater{}\{\_0\} \} keys \%$h) \{ p "\#\{$k\}: \#\{$h{-}\textgreater{}\{$k\}\}" \}}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_meta}}{gh\_meta}}\label{gh_meta}
+
+\texttt{gh\_meta()} --- GitHub service metadata hashref (IP ranges,
+hooks, importer).
+
+\section{\texorpdfstring{\texttt{gh\_org}}{gh\_org}}\label{gh_org}
+
+\texttt{gh\_org(ORG)} --- fetch an organization\textquotesingle s
+profile as a hashref.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $o = gh\_org("github")}
+\NormalTok{p "\#\{$o{-}\textgreater{}\{login\}\}: \#\{$o{-}\textgreater{}\{public\_repos\}\} repos"}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_org\_repos}}{gh\_org\_repos}}\label{gh_org_repos}
+
+\texttt{gh\_org\_repos(ORG)} --- paginated list of an
+org\textquotesingle s repos.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @r = gh\_org\_repos("github")}
+\NormalTok{p "\#\{len(@r)\} repos"}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_prs}}{gh\_prs}}\label{gh_prs}
+
+\texttt{gh\_prs(OWNER,\ REPO)} (alias \texttt{gh\_pulls}) --- paginated
+list of pull requests.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @prs = gh\_prs("MenkeTechnologies", "zpwr")}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_rate\_limit}}{gh\_rate\_limit}}\label{gh_rate_limit}
+
+\texttt{gh\_rate\_limit()} --- current rate-limit status as a hashref.
+Use to check budget before launching a \texttt{pmap}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $rl = gh\_rate\_limit()}
+\NormalTok{p $rl{-}\textgreater{}\{rate\}\{remaining\}}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_readme}}{gh\_readme}}\label{gh_readme}
+
+\texttt{gh\_readme(OWNER,\ REPO)} --- README content as a decoded UTF-8
+string (handles base64 transparently).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $md = gh\_readme("MenkeTechnologies", "zpwr")}
+\NormalTok{p "\#\{len($md)\} bytes"}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_releases}}{gh\_releases}}\label{gh_releases}
+
+\texttt{gh\_releases(OWNER,\ REPO)} --- paginated list of releases.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @r = gh\_releases("MenkeTechnologies", "zpwr")}
+\NormalTok{p pluck(\textbackslash{}@r, "tag\_name")}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_repo}}{gh\_repo}}\label{gh_repo}
+
+\texttt{gh\_repo(OWNER,\ REPO)} or \texttt{gh\_repo("OWNER/REPO")} ---
+fetch a single repo as a hashref. 404 → \texttt{undef}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $r = gh\_repo("MenkeTechnologies/zpwr")}
+\NormalTok{p "★ \#\{$r{-}\textgreater{}\{stargazers\_count\}\}  ⑂ \#\{$r{-}\textgreater{}\{forks\_count\}\}  lang \#\{$r{-}\textgreater{}\{language\}\}"}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_repos}}{gh\_repos}}\label{gh_repos}
+
+\texttt{gh\_repos(USER)} --- paginated list of a user\textquotesingle s
+public repos (flat list of hashrefs). Pairs naturally with \texttt{pmap}
+for parallel per-repo work.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @repos = gh\_repos("MenkeTechnologies")}
+\NormalTok{my @top = sort \{ \_1{-}\textgreater{}\{stargazers\_count\} \textless{}=\textgreater{} \_0{-}\textgreater{}\{stargazers\_count\} \} @repos}
+\NormalTok{p pluck(\textbackslash{}@top[0:9], "full\_name")}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_runs}}{gh\_runs}}\label{gh_runs}
+
+\texttt{gh\_runs(OWNER,\ REPO)} --- array of workflow-run hashrefs
+(auto-extracts \texttt{workflow\_runs}).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @r = gh\_runs("MenkeTechnologies", "zpwr")}
+\NormalTok{p pluck(\textbackslash{}@r[0:9], "status")}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_search\_code}}{gh\_search\_code}}\label{gh_search_code}
+
+\texttt{gh\_search\_code(QUERY)} --- paginated code search results
+(requires auth; pass \texttt{GITHUB\_TOKEN}).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @hits = gh\_search\_code("org:MenkeTechnologies fn main")}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_search\_issues}}{gh\_search\_issues}}\label{gh_search_issues}
+
+\texttt{gh\_search\_issues(QUERY)} --- paginated issue / PR search
+results.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @i = gh\_search\_issues("author:MenkeTechnologies is:pr is:merged")}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_search\_repos}}{gh\_search\_repos}}\label{gh_search_repos}
+
+\texttt{gh\_search\_repos(QUERY)} --- paginated repo search results.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @r = gh\_search\_repos("language:rust stars:\textgreater{}10000")}
+\NormalTok{p pluck(\textbackslash{}@r[0:9], "full\_name")}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_search\_users}}{gh\_search\_users}}\label{gh_search_users}
+
+\texttt{gh\_search\_users(QUERY)} --- paginated user search results.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @u = gh\_search\_users("location:berlin language:rust")}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_stargazers}}{gh\_stargazers}}\label{gh_stargazers}
+
+\texttt{gh\_stargazers(OWNER,\ REPO)} --- paginated list of users who
+starred a repo.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @s = gh\_stargazers("MenkeTechnologies", "zpwr")}
+\NormalTok{p pluck(\textbackslash{}@s, "login")}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_starred}}{gh\_starred}}\label{gh_starred}
+
+\texttt{gh\_starred(USER)} --- paginated list of repos starred by USER.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @s = gh\_starred("MenkeTechnologies")}
+\NormalTok{p pluck(\textbackslash{}@s, "full\_name")}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_tags}}{gh\_tags}}\label{gh_tags}
+
+\texttt{gh\_tags(OWNER,\ REPO)} --- paginated list of tags.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @t = gh\_tags("MenkeTechnologies", "zpwr")}
+\NormalTok{p pluck(\textbackslash{}@t, "name")}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_topics}}{gh\_topics}}\label{gh_topics}
+
+\texttt{gh\_topics(OWNER,\ REPO)} --- array of topic name strings
+(auto-extracts \texttt{names} key from the API response).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p gh\_topics("MenkeTechnologies", "zpwr")}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_user}}{gh\_user}}\label{gh_user}
+
+\texttt{gh\_user(USERNAME)} --- fetch a user\textquotesingle s profile
+as a hashref. 404 → \texttt{undef}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $u = gh\_user("MenkeTechnologies")}
+\NormalTok{p "\#\{$u{-}\textgreater{}\{login\}\}: \#\{$u{-}\textgreater{}\{public\_repos\}\} repos, \#\{$u{-}\textgreater{}\{followers\}\} followers"}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_workflows}}{gh\_workflows}}\label{gh_workflows}
+
+\texttt{gh\_workflows(OWNER,\ REPO)} --- array of workflow hashrefs
+(auto-extracts \texttt{workflows} key).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @w = gh\_workflows("MenkeTechnologies", "zpwr")}
+\NormalTok{p pluck(\textbackslash{}@w, "name")}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{gh\_zen}}{gh\_zen}}\label{gh_zen}
+
+\texttt{gh\_zen()} --- fetch GitHub\textquotesingle s design-philosophy
+random aphorism as a plain string.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p gh\_zen()}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{ghz\_state}}{ghz\_state}}\label{ghz_state}
 
 \texttt{ghz\_state} --- operation \texttt{ghz\ state}. Category:
@@ -53939,7 +54520,7 @@ the minimum of f on {[}a,b{]} via golden-section search.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{my $xmin = golden(fn \{ ($\_[0]{-}3)**2 \}, 0, 10)  \# 3.0}
+\NormalTok{my $xmin = golden(fn \{ (\_0{-}3)**2 \}, 0, 10)  \# 3.0}
 \end{Highlighting}
 \end{Shaded}
 
@@ -70358,6 +70939,17 @@ Category: *extended stdlib*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{looks\_like\_number}}{looks\_like\_number}}\label{looks_like_number}
+
+\texttt{looks\_like\_number} --- operation \texttt{looks\ like\ number}.
+Category: *list / aggregate*.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p looks\_like\_number $x}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{lookup\_assoc}}{lookup\_assoc}}\label{lookup_assoc}
 
 \texttt{lookup\_assoc} --- operation \texttt{lookup\ assoc}. Category:
@@ -77920,6 +78512,97 @@ optimization, scheduling*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{mutex}}{mutex}}\label{mutex}
+
+\texttt{mutex()\ →\ mutex} --- create a fresh, unlocked exclusive mutex.
+Pair with \texttt{mutex\_lock} / \texttt{mutex\_unlock} (or
+\texttt{mutex\_try\_lock}) to serialize access to shared state.
+Reference-shared across \texttt{async}/\texttt{spawn} blocks; safe under
+contention via \texttt{parking\_lot::Condvar} (waiters park, no busy
+spin).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{mysync $m = mutex()}
+\NormalTok{mysync $counter = 0}
+\NormalTok{my @t}
+\NormalTok{for (1:10) \{}
+\NormalTok{    push @t, async \{}
+\NormalTok{        mutex\_lock($m)}
+\NormalTok{        defer \{ mutex\_unlock($m) \}}
+\NormalTok{        $counter++}
+\NormalTok{    \}}
+\NormalTok{\}}
+\NormalTok{await($\_) for @t}
+\NormalTok{p $counter   \# 10}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{mutex\_is\_locked}}{mutex\_is\_locked}}\label{mutex_is_locked}
+
+\texttt{mutex\_is\_locked(\$m)\ →\ 1\textbar{}0} --- \texttt{1} when
+currently held, \texttt{0} when free. Inspection only; no
+acquire/release side effect.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p mutex\_is\_locked($m)   \# 0}
+\NormalTok{mutex\_lock($m)}
+\NormalTok{p mutex\_is\_locked($m)   \# 1}
+\NormalTok{mutex\_unlock($m)}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{mutex\_lock}}{mutex\_lock}}\label{mutex_lock}
+
+\texttt{mutex\_lock(\$m)\ →\ undef} --- block until the mutex is
+acquired, marking it held. Use with
+\texttt{defer\ \{\ mutex\_unlock(\$m)\ \}} for RAII-style release on
+scope exit (covers early returns and exceptions).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{mutex\_lock($m)}
+\NormalTok{defer \{ mutex\_unlock($m) \}}
+\NormalTok{\# critical section — exclusive access until block exit}
+\NormalTok{update\_shared\_state()}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{mutex\_try\_lock}}{mutex\_try\_lock}}\label{mutex_try_lock}
+
+\texttt{mutex\_try\_lock(\$m)\ →\ 1\textbar{}0} --- non-blocking
+acquire. Returns \texttt{1} if the mutex was free (and is now held);
+\texttt{0} if it was already held. Useful for opportunistic work that
+should be skipped under contention.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{if (mutex\_try\_lock($m)) \{}
+\NormalTok{    defer \{ mutex\_unlock($m) \}}
+\NormalTok{    do\_work()}
+\NormalTok{\} else \{}
+\NormalTok{    p "someone else has it — skipping"}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{mutex\_unlock}}{mutex\_unlock}}\label{mutex_unlock}
+
+\texttt{mutex\_unlock(\$m)\ →\ undef} --- release the lock and wake one
+waiter (if any). Unlocking a free mutex is a tolerated no-op.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{mutex\_lock($m)}
+\NormalTok{try \{}
+\NormalTok{    work()}
+\NormalTok{\} finally \{}
+\NormalTok{    mutex\_unlock($m)}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{mutual\_information\_step}}{mutual\_information\_step}}\label{mutual_information_step}
 
 \texttt{mutual\_information\_step} --- single-step update of
@@ -79726,7 +80409,7 @@ f\textquotesingle, x0, and optional tolerance.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{my $root = newton(fn \{ $\_[0]**2 {-} 2 \}, fn \{ 2*$\_[0] \}, 1.5)  \# √2}
+\NormalTok{my $root = newton(fn \{ \_0**2 {-} 2 \}, fn \{ 2*\_0 \}, 1.5)  \# √2}
 \end{Highlighting}
 \end{Shaded}
 
@@ -86743,7 +87426,7 @@ Category: *extras*.
 \end{Highlighting}
 \end{Shaded}
 
-\section{\texorpdfstring{\texttt{pi}}{pi}}\label{pi}
+\section{\texorpdfstring{\texttt{pi}}{pi}}\label{pi-1}
 
 \texttt{pi} --- operation \texttt{pi}. Category: *constants*.
 
@@ -95727,7 +96410,7 @@ Like R\textquotesingle s sapply().
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{my @sq = @\{sapply([1,2,3,4], fn \{ $\_[0] ** 2 \})\}  \# [1,4,9,16]}
+\NormalTok{my @sq = @\{sapply([1,2,3,4], fn \{ \_0 ** 2 \})\}  \# [1,4,9,16]}
 \end{Highlighting}
 \end{Shaded}
 
@@ -98131,6 +98814,99 @@ alpha=1.6733 for self-normalizing networks.
 \begin{Highlighting}[]
 \NormalTok{p selu(1)    \# 1.0507}
 \NormalTok{p selu({-}1)   \# {-}1.1113}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{sem}}{sem}}\label{sem}
+
+\texttt{semaphore(N)\ →\ semaphore} (alias \texttt{sem}) --- counting
+semaphore with \texttt{N} permits (must be \texttt{\textgreater{}=\ 0}).
+Use to bound concurrent access: \texttt{semaphore(K)} lets at most
+\texttt{K} threads pass \texttt{semaphore\_acquire} at once.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{mysync $s = semaphore(3)   \# at most 3 concurrent workers}
+\NormalTok{my @t}
+\NormalTok{for (1:10) \{}
+\NormalTok{    push @t, async \{}
+\NormalTok{        semaphore\_acquire($s)}
+\NormalTok{        defer \{ semaphore\_release($s) \}}
+\NormalTok{        do\_work()   \# at most 3 in flight at any moment}
+\NormalTok{    \}}
+\NormalTok{\}}
+\NormalTok{await($\_) for @t}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{sem\_acquire}}{sem\_acquire}}\label{sem_acquire}
+
+\texttt{semaphore\_acquire(\$s)\ →\ undef} (alias \texttt{sem\_acquire})
+--- block until a permit is available, then take one. Pair with
+\texttt{defer\ \{\ semaphore\_release(\$s)\ \}}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{semaphore\_acquire($s)}
+\NormalTok{defer \{ semaphore\_release($s) \}}
+\NormalTok{\# bounded critical section}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{sem\_limit}}{sem\_limit}}\label{sem_limit}
+
+\texttt{semaphore\_limit(\$s)\ →\ integer} (alias \texttt{sem\_limit})
+--- initial permit count from the original \texttt{semaphore(N)}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $s = semaphore(8)}
+\NormalTok{p semaphore\_limit($s)     \# 8 (constant for life of $s)}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{sem\_permits}}{sem\_permits}}\label{sem_permits}
+
+\texttt{semaphore\_permits(\$s)\ →\ integer} (alias
+\texttt{sem\_permits}) --- currently available permits (race-free
+snapshot).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $s = semaphore(5)}
+\NormalTok{p semaphore\_permits($s)   \# 5}
+\NormalTok{semaphore\_acquire($s)}
+\NormalTok{p semaphore\_permits($s)   \# 4}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{sem\_release}}{sem\_release}}\label{sem_release}
+
+\texttt{semaphore\_release(\$s)\ →\ undef} (alias \texttt{sem\_release})
+--- release one permit and wake one waiter.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{semaphore\_acquire($s)}
+\NormalTok{defer \{ semaphore\_release($s) \}}
+\NormalTok{work()}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{sem\_try\_acquire}}{sem\_try\_acquire}}\label{sem_try_acquire}
+
+\texttt{semaphore\_try\_acquire(\$s)\ →\ 1\textbar{}0} (alias
+\texttt{sem\_try\_acquire}) --- non-blocking. Returns \texttt{1} if a
+permit was taken, \texttt{0} if none available.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{if (semaphore\_try\_acquire($s)) \{}
+\NormalTok{    defer \{ semaphore\_release($s) \}}
+\NormalTok{    burst\_work()}
+\NormalTok{\} else \{}
+\NormalTok{    queue\_for\_later()}
+\NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
 
@@ -101351,6 +102127,28 @@ L, MN, R).
 \NormalTok{p soundex\_v2("Robert")}
 \end{Highlighting}
 \end{Shaded}
+
+\section{\texorpdfstring{\texttt{source}}{source}}\label{source}
+
+\texttt{source(PATH)} → last expression value. Read a stryke script from
+\texttt{PATH} and execute it in the *current* interpreter. Variables
+(\texttt{our}/\texttt{my}), subroutines, classes, enums, and pragmas
+defined in the file become visible in the calling scope --- same
+semantics as \texttt{do\ "file"} (Perl 5) or \texttt{source\ FILE}
+(POSIX shell).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{source("config.stk")}
+\NormalTok{p $LIB\_VERSION                  \# leaked from config.stk}
+\NormalTok{Demo::Lib::greet("alice")       \# leaked fn defined in config.stk}
+\end{Highlighting}
+\end{Shaded}
+
+Designed for REPL workflows: \texttt{source} a working environment
+without forking. Returns \texttt{undef} if the file
+can\textquotesingle t be parsed, dies on file-read failure. For isolated
+execution (no state-leak), use \texttt{run} instead.
 
 \section{\texorpdfstring{\texttt{spaceship}}{spaceship}}\label{spaceship}
 
@@ -104909,7 +105707,7 @@ and function. Returns hash. Like R\textquotesingle s tapply().
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{my \%means = \%\{tapply([1,2,3,4], ["a","a","b","b"], fn \{ avg(@\{$\_[0]\}) \})\}}
+\NormalTok{my \%means = \%\{tapply([1,2,3,4], ["a","a","b","b"], fn \{ avg(@\{\_0\}) \})\}}
 \NormalTok{p $means\{a\}  \# 1.5}
 \NormalTok{p $means\{b\}  \# 3.5}
 \end{Highlighting}
@@ -104976,7 +105774,7 @@ Category: *misc*.
 \end{Highlighting}
 \end{Shaded}
 
-\section{\texorpdfstring{\texttt{tau}}{tau}}\label{tau}
+\section{\texorpdfstring{\texttt{tau}}{tau}}\label{tau-1}
 
 \texttt{tau} --- operation \texttt{tau}. Category: *constants*.
 
@@ -111126,7 +111924,7 @@ R\textquotesingle s which().
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{my @idx = @\{which\_fn([1,5,3,8,2], fn \{ $\_[0] \textgreater{} 3 \})\}  \# [1, 3]}
+\NormalTok{my @idx = @\{which\_fn([1,5,3,8,2], fn \{ \_0 \textgreater{} 3 \})\}  \# [1, 3]}
 \end{Highlighting}
 \end{Shaded}
 
