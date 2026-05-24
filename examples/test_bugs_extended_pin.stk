@@ -14,13 +14,15 @@ my %h_23
 eval { $h_23{k}[0] = "first" }
 $@ =~ /Can't assign to arrow array deref/ |> aok "BUG-023: autovivification fails"
 
-# BUG-030: system() return value
+# BUG-030 (FIXED): system() now returns the encoded Perl $? word (exit_code << 8),
+# matching stock Perl (`system("false")` → 256). Was returning the raw exit code (1).
 my $r_30 = system("false")
-$r_30 |> aeq 1, "BUG-030: system('false') returns 1 (exit code)"
+$r_30 |> aeq 256, "BUG-030 (FIXED): system('false') returns 256 (Perl-encoded \$?)"
 
-# BUG-031: system(LIST) drops exit code
+# BUG-031 (FIXED): system(LIST) now sets $? to (exit_code << 8) matching Perl —
+# `system("sh","-c","exit 7")` leaves $? = 1792 (= 7 << 8). Was dropping to 0.
 system("sh", "-c", "exit 7")
-$? |> aeq 0, "BUG-031: system(LIST) drops exit code in \$?"
+$? |> aeq 1792, "BUG-031 (FIXED): system(LIST) sets \$? to encoded exit code"
 
 # BUG-037 (FIXED): closure-wrapped coderef call now flattens @_ into the
 # call list (was returning scalar(@_) before the vm_helper fix).
@@ -29,12 +31,13 @@ my $f_37 = \&Pin::BugsExtended::my_dbl_37
 my $h_37 = fn { $f_37->(@_) }
 $h_37(5) |> aeq 10, "BUG-037 (FIXED): closure passes \@_ flattened, not as count"
 
-# BUG-044: AOP after sees $? as 0
+# BUG-044 (FIXED): AOP `after` advice now observes the current $? from the
+# preceding `system` call (1792 from BUG-031 above). Was clobbering to 0.
 fn Pin::BugsExtended::payload_44 { 42 }
 oursync $after_q = -1
 after "Pin::BugsExtended::payload_44" { $after_q = $? }
 Pin::BugsExtended::payload_44()
-$after_q |> aeq 0, "BUG-044: AOP after sees \$? as 0"
+$after_q |> aeq 1792, "BUG-044 (FIXED): AOP after preserves \$? from prior system"
 
 # BUG-063: take(N, LIST) returns empty
 my @r_63 = take(3, 1..10)

@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+# Run: stryke --no-interop examples/parallel_file_hasher.stk
+
+p "--- Parallel Hash ---"
+my @r = ~> glob("examples/*.stk") \
+    head(5) \
+    pmaps { [ _ => c"#{_}" |> sha256 ] } \
+    collect
+
+for my $row (@r) {
+    my $hash = $row->[1]
+    p "  #{ $row->[0] }: #{ $hash[0:7] }..."
+}
+
+len @r          |> aeq 5,  "cnt"
+len($r[0]->[1]) |> aeq 64, "size"
+test_run

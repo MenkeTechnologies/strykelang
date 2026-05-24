@@ -54,12 +54,15 @@ depreciation_double(1000, 500, 10) |> aeq depreciation_double(1000, 0, 10), "BUG
 sum([10, 11]) |> aeq 21, "BUG-140 (FIXED): sum([10, 11]) = 21"
 product([6, 7]) |> aeq 42, "BUG-140 (FIXED): product([6, 7]) = 42"
 
-# BUG-157: crc32 ignores all bytes after first arg
-crc32("a", "b") |> aeq crc32("a"), "BUG-157: crc32 ignores second arg"
+# BUG-157 (FIXED): crc32 now hashes all args (effectively their concatenation).
+# `crc32("a","b") == crc32("ab")`. Was returning crc32 of the first arg only.
+crc32("a", "b") |> aeq crc32("ab"), "BUG-157 (FIXED): crc32 hashes all args"
 
-# BUG-167: gcd/lcm two-operand only
-gcd(12, 18, 35) |> aeq 6, "BUG-167: gcd ignores third arg"
-lcm(4, 6, 10) |> aeq 12, "BUG-167: lcm ignores third arg"
+# BUG-167 (FIXED): gcd/lcm now reduce across all args, not just the first two.
+#   gcd(12,18) = 6; gcd(6,35) = 1     →  gcd(12,18,35) = 1
+#   lcm(4,6)   = 12; lcm(12,10) = 60  →  lcm(4,6,10)   = 60
+gcd(12, 18, 35) |> aeq 1,  "BUG-167 (FIXED): gcd reduces across all args"
+lcm(4, 6, 10)   |> aeq 60, "BUG-167 (FIXED): lcm reduces across all args"
 
 # BUG-169 (FIXED): hhi now sums squares of every share argument, not just
 # the first. `hhi(0.3, 0.3, 0.4) = 0.09 + 0.09 + 0.16 = 0.34`.

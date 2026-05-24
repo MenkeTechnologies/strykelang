@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+
+# Idiomatic Systems
+# Run: stryke --no-interop examples/idiomatic_systems_ops.stk
+
+# 1. AOP Audit
+oursync @log = ()
+before "App::Sys::*" { push @log, $INTERCEPT_NAME }
+
+# 2. Namespaced logic
+fn App::Sys::ping = p "  [Ping] #{_}"
+
+p "--- Systems ---"
+"localhost" |> App::Sys::ping
+
+# 3. Slurp/Spurt
+my $f = "#{ temp_dir() }audit.log"
+spurt $f, to_json \@log
+my $bytes = len c"$f"
+p "Log written: $bytes bytes"
+
+# 4. Tests
+len @log |> aeq 1, "intercept count"
+unlink $f
+
+test_run

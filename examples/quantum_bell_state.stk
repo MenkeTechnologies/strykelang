@@ -1,63 +1,37 @@
 #!/usr/bin/env stryke
 
-# Quantum Computing — building a Bell state (entanglement).
+# Quantum Computing — Bell-pair amplitudes.
 #
-# This example demonstrates:
-#   * `qubit_h` (Hadamard gate) for superposition.
-#   * `qubit_cnot` for entanglement.
-#   * `qubit_measure` for state collapse.
-#   * Running quantum circuits on the built-in simulator.
+# Stryke ships quantum primitives as pure amplitude helpers, not a stateful
+# simulator. `bell_state(k, b0, b1)` returns the amplitude of basis |b0 b1>
+# in Bell pair k (0 = Φ⁺, 1 = Φ⁻, 2 = Ψ⁺, 3 = Ψ⁻). `qubit_h(alpha, beta, want_alpha)`
+# applies Hadamard to a single-qubit amplitude pair.
 #
 # Run: stryke --no-interop examples/quantum_bell_state.stk
 
 p "── Quantum Bell State Demo ─────────────────────────────"
 
-# 1. Initialize two qubits in state |00>
-# Stryke manages qubits as resource handles.
-my $q0 = 0
-my $q1 = 1
+# 1. Hadamard on |0> produces (|0>+|1>)/√2 — both amplitudes 1/√2 ≈ 0.7071
+my $h0 = qubit_h 1.0, 0.0, 0    # new α
+my $h1 = qubit_h 1.0, 0.0, 1    # new β
+p "H|0> amplitudes: α=#{ sprintf '%.4f', $h0 }, β=#{ sprintf '%.4f', $h1 }"
 
-p "Circuit: H(q0), CNOT(q0, q1)"
-
-# 2. Put q0 in superposition: |0> -> (|0> + |1>) / sqrt(2)
-qubit_h($q0)
-
-# 3. Entangle q1 with q0
-# If q0 is 1, flip q1. Since q0 is in superposition, 
-# the resulting state is (|00> + |11>) / sqrt(2).
-qubit_cnot($q0, $q1)
-
-# 4. Measure many times to see the distribution
-p "Measuring 1000 times..."
-
-my %counts = ( "00" => 0, "11" => 0 )
-
-for (1:1000) {
-    # Reset for each "shot" (simulation loop)
-    # Note: In a real system, you'd reset or re-init.
-    # Stryke's simulator can reset via qubit_reset.
-    qubit_reset($q0)
-    qubit_reset($q1)
-    
-    qubit_h($q0)
-    qubit_cnot($q0, $q1)
-    
-    my $m0 = qubit_measure($q0)
-    my $m1 = qubit_measure($q1)
-    
-    $counts{"$m0$m1"}++
+# 2. Φ⁺ Bell pair amplitudes: 1/√2 for |00> and |11>, 0 for |01> and |10>
+my @basis = ("00", "01", "10", "11")
+p "\nBell pair Φ⁺ amplitudes:"
+for my $b (@basis) {
+    my ($b0, $b1) = split //, $b
+    my $amp = bell_state 0, $b0+0, $b1+0
+    p "  |$b> = #{ sprintf '%.4f', $amp }"
 }
 
-# 5. Display results
-p "Results:"
-for my $state (sort keys %counts) {
-    printf "  |%s> : %d shots\n", $state, $counts{$state}
-}
+# 3. Tests
+my $inv = 1 / sqrt(2)
+abs($h0 - $inv) < 1e-9                  |> aok "H|0> α = 1/√2"
+abs($h1 - $inv) < 1e-9                  |> aok "H|0> β = 1/√2"
+abs(bell_state(0, 0, 0) - $inv) < 1e-9  |> aok "Φ⁺ |00> = 1/√2"
+abs(bell_state(0, 1, 1) - $inv) < 1e-9  |> aok "Φ⁺ |11> = 1/√2"
+bell_state(0, 0, 1)                     |> aeq 0, "Φ⁺ |01> = 0"
+bell_state(0, 1, 0)                     |> aeq 0, "Φ⁺ |10> = 0"
 
-# 6. Self-test
-# Entangled state means m0 and m1 should ALWAYS be the same.
-die "Entanglement failed" if $counts{"01"} > 0 || $counts{"10"} > 0
-die "Superposition failed" if $counts{"00"} < 400 || $counts{"11"} < 400
-
-p ""
-p "SUCCESS. ALL TESTS PASS."
+test_run

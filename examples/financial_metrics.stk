@@ -1,0 +1,10 @@
+#!/usr/bin/env stryke
+# Run: stryke --no-interop examples/financial_metrics.stk
+
+p "--- Finance ---"
+my $c = black_scholes_call(100, 100, 1, 0.05, 0.2)
+my $i = loan_interest_total(25e4, 0.04/12, 360)
+
+$c |> int |> aeq 10, "call"
+$i |> int |> aeq 179673, "loan"
+test_run

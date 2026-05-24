@@ -36,7 +36,9 @@ system("false")
 
 # ── Regex G Flag ───────────────────────────────────────────────────────────
 
-"a1 b2 c3" =~ /(\w)(\d)/g |> join(",") |> aeq "a1,b2,c3", "regex /g list context (pinned bug)"
+# regex /g (FIXED): list context now returns the flat list of all captures
+# from every match — matches stock Perl. Was grouping per-match.
+"a1 b2 c3" =~ /(\w)(\d)/g |> join(",") |> aeq "a,1,b,2,c,3", "regex /g (FIXED): flat list of captures across all matches"
 
 # ── PSelect (More) ─────────────────────────────────────────────────────────
 

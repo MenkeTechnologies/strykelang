@@ -37,9 +37,11 @@ my $ba = bless({ val => 99 }, "BoxAnon")
 
 # ── Caller ─────────────────────────────────────────────────────────────────
 
+# caller(0)[3] (FIXED): now returns the fully-qualified callee name —
+# matches stock Perl. Was returning undef.
 fn Pin::ParityDeep::call_inner = (caller(0))[3]
 fn Pin::ParityDeep::call_outer = Pin::ParityDeep::call_inner()
-!defined(Pin::ParityDeep::call_outer()) |> aok "caller(0)[3] is undef (pinned bug)"
+Pin::ParityDeep::call_outer() |> aeq "Pin::ParityDeep::call_inner", "caller(0)[3] (FIXED): returns callee sub name"
 
 # ── Bless Arrayref Tag ─────────────────────────────────────────────────────
 

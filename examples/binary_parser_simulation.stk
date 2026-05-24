@@ -1,0 +1,69 @@
+#!/usr/bin/env stryke
+
+# Binary Protocol Parser
+#
+# Demonstrates:
+#   * `pack` and `unpack` for binary data handling.
+#   * Bitwise operators (&, |, ^, <<, >>).
+#   * hex string conversion.
+#
+# Run: stryke --no-interop examples/binary_parser_simulation.stk
+
+p "--- Binary Protocol Parser ---"
+
+# 1. Define a simple packet structure:
+# [Magic: 2 bytes (0xST)] [Version: 1 byte] [Payload Len: 1 byte] [Payload: N bytes] [Checksum: 1 byte]
+
+fn Packet::build($payload) {
+    my $magic   = 0x5354                       # "ST"
+    my $version = 1
+    my $len     = len $payload
+
+    # Simple checksum (XOR sum of all bytes)
+    my $checksum = $version ^ $len
+    for (chars $payload) {
+        $checksum ^= ord _
+    }
+
+    # 'n' = 16-bit big-endian, 'C' = 8-bit unsigned
+    my $header = pack "n C C", $magic, $version, $len
+    my $footer = pack "C", $checksum
+
+    $header . $payload . $footer
+}
+
+fn Packet::parse($raw) {
+    my ($magic, $ver, $len) = unpack "n C C", $raw[0:3]
+
+    p "  Parsed Magic:   #{ sprintf '0x%04X', $magic }"
+    p "  Parsed Version: $ver"
+    p "  Parsed Len:     $len"
+
+    my $payload  = $raw[4 : 4 + $len - 1]
+    my $checksum = unpack "C", $raw[-1]
+
+    +{
+        magic    => $magic,
+        version  => $ver,
+        payload  => $payload,
+        checksum => $checksum,
+    }
+}
+
+# 2. Run Example
+my $msg    = "hello stryke"
+my $binary = Packet::build $msg
+my $hex    = unpack "H*", $binary
+p "Binary Packet (hex): $hex"
+
+my $parsed = Packet::parse $binary
+p "Parsed Payload: #{ $parsed->{payload} }"
+
+# ── 3. Tests ───────────────────────────────────────────────────────
+
+$parsed->{magic}   |> aeq 0x5354, "magic match"
+$parsed->{version} |> aeq 1,      "version match"
+$parsed->{payload} |> aeq $msg,   "payload match"
+
+
+test_run

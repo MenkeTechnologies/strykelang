@@ -11,6 +11,9 @@
 
 # ── 1. Setup Mocking ────────────────────────────────────────────────
 
+# Force mock-only mode so embed() doesn't try to hit the real API.
+$ENV{STRYKE_AI_MODE} //= "mock-only"
+
 # Mock the recall behavior (in mock-only mode, recall uses hash-based matching)
 # We mock the final grounded response
 ai_mock_install('(?si)Answer based on context:.*What is the return policy.*', 

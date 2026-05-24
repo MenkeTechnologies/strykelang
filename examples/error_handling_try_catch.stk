@@ -31,7 +31,7 @@ try {
     p "  [FINALLY] Closing file handles and releasing locks."
 }
 
-# 3. Handling structured errors (hashrefs)
+# 3. Handling structured errors (hashrefs) — try/catch preserves the original ref
 p ""
 try {
     p "Validation phase..."
@@ -44,7 +44,7 @@ try {
     }
 }
 
-# 4. Rethrowing
+# 4. Rethrowing — `die $e` inside catch propagates outward
 p ""
 fn Level2 {
     try {
