@@ -1,0 +1,217 @@
+#!/usr/bin/env stryke
+
+# Multi-stage CSV ETL — parses a sales feed, joins against a product catalog,
+# enriches each row, computes per-region aggregates, and writes a report.
+#
+# Pipeline:
+#   1. Generate (or load) raw sales rows.
+#   2. Validate + parse (drop malformed, type-coerce numerics).
+#   3. Join: row.product_id → catalog{...}.{name, category, unit_cost}.
+#   4. Derive: revenue, profit, margin.
+#   5. Aggregate by region and category (parallel chunk reduce).
+#   6. Rank top regions by profit.
+#   7. Emit text report.
+#
+# Demonstrates:
+#   * `pmaps` + `collect` for the per-row parse/enrich stage.
+#   * `pmap_reduce` for the parallel aggregation (chunk → hash → merge).
+#   * Hash-of-hash merges with `+=`.
+#   * `sort` + `head` for ranking.
+#
+# Run: stryke --no-interop examples/csv_etl_parallel.stk
+
+p "── CSV ETL Pipeline ──────────────────────────────────"
+
+# ── 1. Product catalog ─────────────────────────────────────────────
+
+my %catalog = (
+    "P-101" => +{ name => "Widget Pro",   category => "hardware", unit_cost => 12.50 },
+    "P-102" => +{ name => "Widget Lite",  category => "hardware", unit_cost =>  6.25 },
+    "P-201" => +{ name => "Cable 6ft",    category => "accessories", unit_cost =>  3.10 },
+    "P-202" => +{ name => "Adapter USBC", category => "accessories", unit_cost =>  7.40 },
+    "P-301" => +{ name => "Stryke Pro",   category => "software", unit_cost => 19.00 },
+    "P-302" => +{ name => "Stryke Lite",  category => "software", unit_cost =>  9.50 },
+)
+
+# ── 2. Generate synthetic CSV-like rows (header + 1000 records) ───
+
+my @regions = ("us-east", "us-west", "eu", "apac")
+my @pids    = keys %catalog
+
+srand 7
+
+fn ETL::rand_choice($arr) { $arr->[ int(rand() * len(@$arr)) ] }
+
+my @raw
+push @raw, "id,region,product_id,units,price"
+for my $i (1:1000) {
+    my $region = ETL::rand_choice \@regions
+    my $pid    = ETL::rand_choice \@pids
+    my $units  = 1 + int(rand() * 20)
+    my $cost   = $catalog{$pid}{unit_cost}
+    # Markup of 1.5–3.5x.
+    my $price  = sprintf("%.2f", $cost * (1.5 + rand() * 2.0))
+    push @raw, "$i,$region,$pid,$units,$price"
+}
+
+# Inject 5 malformed rows that the validator should drop.
+push @raw, "9000,us-east,P-999,5,9.99"           # unknown product
+push @raw, "9001,us-east,P-101,abc,9.99"         # non-numeric units
+push @raw, "9002,us-east,P-101,5,not-a-price"    # non-numeric price
+push @raw, "9003,unknown-region,P-101,5,9.99"    # bad region
+push @raw, "9004"                                # too few fields
+
+p "Generated #{ len(@raw) - 1 } raw rows (incl. 5 deliberately bad)."
+
+# ── 3. Parse + validate (parallel) ────────────────────────────────
+
+my %region_set = map { _ => 1 } @regions
+
+fn ETL::parse_row($line) {
+    my @f = split /,/, $line
+    return undef if len(@f) != 5
+    my ($id, $region, $pid, $units, $price) = @f
+    return undef unless $region_set{$region}
+    return undef unless $catalog{$pid}
+    return undef unless $units =~ /^\d+$/
+    return undef unless $price =~ /^\d+\.\d+$/
+    +{
+        id      => 0 + $id,
+        region  => $region,
+        pid     => $pid,
+        units   => 0 + $units,
+        price   => 0 + $price,
+    }
+}
+
+# Skip header (first row) and parse the rest in parallel.
+my @body = @raw[1:len(@raw) - 1]
+my @parsed = ~> @body pmaps { ETL::parse_row(_) } collect grep { defined _ }
+
+p "Parsed #{ len @parsed } valid rows; dropped #{ len(@body) - len(@parsed) } malformed."
+
+# ── 4. Enrich each row with category + profit ─────────────────────
+
+my $C = \%catalog
+for my $r (@parsed) {
+    my $c = $C->{ $r->{pid} }
+    $r->{name}     = $c->{name}
+    $r->{category} = $c->{category}
+    $r->{revenue}  = $r->{units} * $r->{price}
+    $r->{cost}     = $r->{units} * $c->{unit_cost}
+    $r->{profit}   = $r->{revenue} - $r->{cost}
+}
+
+# ── 5. Parallel aggregation: chunk → hash → merge ─────────────────
+#
+# Each worker collapses its chunk to a single hash
+#   { "region|category" => { rows => N, units => N, revenue => $, profit => $ } }
+# The reducer merges hashes key-wise.
+
+fn ETL::merge_into($acc, $other) {
+    for my $k (keys %$other) {
+        my $row = $other->{$k}
+        if (!exists $acc->{$k}) {
+            $acc->{$k} = +{ %$row }
+        } else {
+            $acc->{$k}{rows}    += $row->{rows}
+            $acc->{$k}{units}   += $row->{units}
+            $acc->{$k}{revenue} += $row->{revenue}
+            $acc->{$k}{profit}  += $row->{profit}
+        }
+    }
+    $acc
+}
+
+# Pre-chunk into ~CPU-count slices so each pmap_reduce worker reduces a
+# meaningful slab of rows rather than a single row.
+my $chunk_n = 8
+my $per     = int(len(@parsed) / $chunk_n) + 1
+my @chunks
+my $i = 0
+while ($i < len(@parsed)) {
+    my $end = $i + $per - 1
+    $end = len(@parsed) - 1 if $end > len(@parsed) - 1
+    push @chunks, [ @parsed[$i:$end] ]
+    $i += $per
+}
+
+my $agg = @chunks |> pmap_reduce {
+    my $rows = _
+    my %h
+    for my $r (@$rows) {
+        my $key = "$r->{region}|$r->{category}"
+        $h{$key} //= +{ rows => 0, units => 0, revenue => 0, profit => 0 }
+        $h{$key}{rows}    += 1
+        $h{$key}{units}   += $r->{units}
+        $h{$key}{revenue} += $r->{revenue}
+        $h{$key}{profit}  += $r->{profit}
+    }
+    \%h
+} {
+    ETL::merge_into _, _1
+};
+
+# ── 6. Region-only roll-up + ranking ─────────────────────────────
+
+my %by_region
+for my $key (keys %$agg) {
+    my ($region, $cat) = split /\|/, $key
+    my $r = $agg->{$key}
+    $by_region{$region} //= +{ rows => 0, units => 0, revenue => 0, profit => 0 }
+    $by_region{$region}{rows}    += $r->{rows}
+    $by_region{$region}{units}   += $r->{units}
+    $by_region{$region}{revenue} += $r->{revenue}
+    $by_region{$region}{profit}  += $r->{profit}
+}
+
+my @ranked = sort { $by_region{_1}{profit} <=> $by_region{_}{profit} } keys %by_region
+
+# ── 7. Report ─────────────────────────────────────────────────────
+
+p ""
+p "── Region × Category breakdown ────────────────────────"
+printf "%-9s %-12s %6s %7s %12s %12s\n", "region", "category", "rows", "units", "revenue", "profit"
+p "  " . ("-" x 65)
+
+for my $key (sort keys %$agg) {
+    my ($region, $cat) = split /\|/, $key
+    my $r = $agg->{$key}
+    printf "%-9s %-12s %6d %7d %12.2f %12.2f\n",
+        $region, $cat, $r->{rows}, $r->{units}, $r->{revenue}, $r->{profit}
+}
+
+p ""
+p "── Region ranking by profit ──────────────────────────"
+for my $i (0:len(@ranked) - 1) {
+    my $r = $by_region{ $ranked[$i] }
+    printf "  %d. %-9s rows=%d profit=%.2f\n", $i + 1, $ranked[$i], $r->{rows}, $r->{profit}
+}
+
+# ── 8. Tests ───────────────────────────────────────────────────────
+
+p ""
+
+len(@parsed)               |> aeq 1000, "1000 valid parsed rows"
+
+my $total_rows = 0
+$total_rows += $by_region{_}{rows} for keys %by_region
+$total_rows |> aeq 1000, "region rollup row-count matches parsed"
+
+(len(keys %$agg) > 0)                |> aok "non-empty region×category aggregate"
+(len(@ranked) == len(@regions))      |> aok "ranking includes every region"
+
+# Profit must equal revenue - cost across the rollup
+my $total_revenue = 0
+my $total_profit  = 0
+$total_revenue += $by_region{_}{revenue} for keys %by_region
+$total_profit  += $by_region{_}{profit}  for keys %by_region
+($total_revenue > $total_profit)     |> aok "revenue exceeds profit (positive cost)"
+($total_profit  > 0)                 |> aok "total profit positive"
+
+# Each ranked region should have non-zero rows
+my $all_have_rows = 1
+$all_have_rows &&= $by_region{_}{rows} > 0 for @ranked
+$all_have_rows |> aeq 1, "every region had at least one row"
+
+test_run

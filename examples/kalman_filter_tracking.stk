@@ -1,0 +1,188 @@
+#!/usr/bin/env stryke
+
+# 1D Kalman filter — tracking a constant-velocity target through noisy measurements.
+#
+# State vector: x = [position, velocity]
+# Measurement: z = position + Gaussian noise
+#
+# The filter:
+#   predict:  x  = F·x;  P = F·P·Fᵀ + Q
+#   update:   y  = z − H·x
+#             S  = H·P·Hᵀ + R
+#             K  = P·Hᵀ·S⁻¹
+#             x  = x + K·y
+#             P  = (I − K·H) · P
+#
+# We hand-roll the 2x2 matrix algebra because the demo's whole point is
+# walking the math; using a black-box `kalman` builtin would hide it.
+#
+# Demonstrates:
+#   * Hash-of-arrays / arrayref matrix storage.
+#   * Multi-line numerical update step with named intermediates.
+#   * Gaussian noise via Box-Muller (`rand`).
+#   * Convergence assertion (filtered estimate is closer to truth than raw).
+#
+# Run: stryke --no-interop examples/kalman_filter_tracking.stk
+
+p "── 1D Kalman Filter — constant-velocity tracker ───────"
+
+# ── 1. 2×2 matrix algebra helpers ──────────────────────────────────
+
+fn Mat::mul2($ma, $mb) {
+    [
+        [ $ma->[0][0]*$mb->[0][0] + $ma->[0][1]*$mb->[1][0],
+          $ma->[0][0]*$mb->[0][1] + $ma->[0][1]*$mb->[1][1] ],
+        [ $ma->[1][0]*$mb->[0][0] + $ma->[1][1]*$mb->[1][0],
+          $ma->[1][0]*$mb->[0][1] + $ma->[1][1]*$mb->[1][1] ],
+    ]
+}
+
+fn Mat::add2($ma, $mb) {
+    [
+        [ $ma->[0][0]+$mb->[0][0], $ma->[0][1]+$mb->[0][1] ],
+        [ $ma->[1][0]+$mb->[1][0], $ma->[1][1]+$mb->[1][1] ],
+    ]
+}
+
+fn Mat::sub2($ma, $mb) {
+    [
+        [ $ma->[0][0]-$mb->[0][0], $ma->[0][1]-$mb->[0][1] ],
+        [ $ma->[1][0]-$mb->[1][0], $ma->[1][1]-$mb->[1][1] ],
+    ]
+}
+
+fn Mat::transpose2($m) {
+    [
+        [ $m->[0][0], $m->[1][0] ],
+        [ $m->[0][1], $m->[1][1] ],
+    ]
+}
+
+fn Mat::mul_vec2($m, $v) {
+    [ $m->[0][0]*$v->[0] + $m->[0][1]*$v->[1],
+      $m->[1][0]*$v->[0] + $m->[1][1]*$v->[1] ]
+}
+
+fn Mat::add_vec2($ma, $mb) { [ $ma->[0]+$mb->[0], $ma->[1]+$mb->[1] ] }
+fn Mat::sub_vec2($ma, $mb) { [ $ma->[0]-$mb->[0], $ma->[1]-$mb->[1] ] }
+
+# ── 2. Box-Muller Gaussian noise generator ─────────────────────────
+
+fn Noise::gauss($sigma) {
+    my $u1 = rand()
+    my $u2 = rand()
+    # Avoid log(0); clamp.
+    $u1 = 1e-10 if $u1 < 1e-10
+    sqrt(-2.0 * log($u1)) * cos(2.0 * 3.14159265358979 * $u2) * $sigma
+}
+
+# ── 3. Simulate ground truth + noisy measurements ─────────────────
+
+my $dt        = 1.0
+my $true_x0   = 0.0
+my $true_v    = 2.0       # constant velocity, position units per step
+my $meas_sigma = 3.0      # measurement noise stdev
+my $n_steps   = 60
+
+my @truth
+my @measured
+my $pos = $true_x0
+for (1:$n_steps) {
+    $pos += $true_v * $dt
+    push @truth,    $pos
+    push @measured, $pos + Noise::gauss($meas_sigma)
+}
+
+# ── 4. Kalman setup ────────────────────────────────────────────────
+
+# State transition (constant velocity model)
+my $F = [
+    [1, $dt],
+    [0, 1  ],
+]
+
+# Observation matrix — we only observe position
+my $H = [ [1, 0] ]   # treated as 1×2
+
+# Process noise (uncertainty in the dynamics)
+my $q = 0.05
+my $Q = [
+    [ $q,   0   ],
+    [ 0,    $q  ],
+]
+
+# Measurement noise covariance
+my $R = $meas_sigma * $meas_sigma
+
+# Initial state — assume position 0, velocity 0; high covariance to start
+my $x = [0, 0]
+my $P = [
+    [100, 0  ],
+    [0,   100],
+]
+
+# ── 5. Run the filter ──────────────────────────────────────────────
+
+my @filtered
+for my $k (0:$n_steps - 1) {
+    my $z = $measured[$k]
+
+    # Predict
+    $x = Mat::mul_vec2 $F, $x
+    $P = Mat::add2 Mat::mul2($F, Mat::mul2($P, Mat::transpose2($F))), $Q
+
+    # Update — H is 1×2 so H·x is scalar, H·P·Hᵀ is scalar, K is 2×1.
+    my $hx     = $H->[0][0]*$x->[0] + $H->[0][1]*$x->[1]
+    my $y      = $z - $hx
+    # P·Hᵀ is 2×1 (only first column of P since H = [1,0]).
+    my $PHt    = [ $P->[0][0], $P->[1][0] ]
+    my $S      = $PHt->[0] + $R
+    my $K      = [ $PHt->[0] / $S, $PHt->[1] / $S ]
+    $x = [ $x->[0] + $K->[0]*$y, $x->[1] + $K->[1]*$y ]
+    # P = (I - K·H)·P. K·H is 2×2; K = [k0,k1]ᵀ, H = [1,0] → K·H = [[k0,0],[k1,0]].
+    my $KH = [
+        [ $K->[0], 0 ],
+        [ $K->[1], 0 ],
+    ]
+    my $I = [[1,0],[0,1]]
+    $P = Mat::mul2 Mat::sub2($I, $KH), $P
+
+    push @filtered, $x->[0]
+}
+
+# ── 6. Report and assert ───────────────────────────────────────────
+
+fn Kalman::rmse {
+    my $ma = _
+    my $mb = _1
+    my $n = len @$ma
+    my $s = 0
+    $s += ($ma->[_] - $mb->[_]) ** 2 for 0:$n - 1
+    sqrt($s / $n)
+}
+
+my $rmse_raw      = Kalman::rmse \@measured, \@truth
+my $rmse_filtered = Kalman::rmse \@filtered, \@truth
+
+printf "Steps:              %d\n",   $n_steps
+printf "Measurement σ:      %.2f\n", $meas_sigma
+printf "RMSE (raw):         %.3f\n", $rmse_raw
+printf "RMSE (Kalman):      %.3f\n", $rmse_filtered
+printf "Final est. position: %.2f  (truth %.2f)\n", $filtered[-1], $truth[-1]
+printf "Final est. velocity: %.4f  (truth %.4f)\n", $x->[1], $true_v
+
+# Sample console plot — first 10 steps
+p ""
+p "step  measurement  filtered   truth"
+for my $i (0:9) {
+    printf "  %2d  %10.2f  %8.2f  %6.2f\n", $i + 1, $measured[$i], $filtered[$i], $truth[$i]
+}
+
+# ── 7. Tests ───────────────────────────────────────────────────────
+
+($rmse_filtered < $rmse_raw)            |> aok "Kalman estimate is closer to truth than raw measurement"
+($rmse_filtered < $meas_sigma)          |> aok "filtered RMSE less than measurement σ"
+(abs($x->[1] - $true_v) < 0.5)          |> aok "velocity estimate converged to within 0.5 of true"
+(abs($filtered[-1] - $truth[-1]) < 6)   |> aok "final position estimate close to truth"
+
+test_run
