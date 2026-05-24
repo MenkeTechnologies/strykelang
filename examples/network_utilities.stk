@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+# Run: stryke --no-interop examples/network_utilities.stk
+
+p "--- Net ---"
+my $i = "192.168.1.1"
+p "IP: $i (Pri: #{ ip_is_private($i) })"
+
+my $net = "192.168.1.0/24"
+ip_in_cidr "192.168.1.50", $net |> aok "in"
+
+my @s = @{ ip_sort qw(10.0.0.5 8.8.8.8) }
+my $first = shift @s
+$first |> aeq "8.8.8.8", "sort"
+test_run

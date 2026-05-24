@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+
+# Idiomatic AI Workflow
+# Run: STRYKE_AI_MODE=mock-only stryke --no-interop examples/idiomatic_ai_workflow.stk
+
+# 1. Mocks
+ai_mock_install('(?si)Extract', '{"name": "Alice", "lvl": 10}')
+ai_mock_install('(?si)Check', '"Status: Green"')
+
+# 2. Agent Tools
+tool fn check_alice { _ =~ /Alice/ ? "Green" : "Red" }
+
+# 3. Workflow (Namespaced)
+fn App::extract = ai_extract("Extract from: $_", schema => +{ name => "Str", lvl => "Int" })
+fn App::audit   = ai("Check profile for #{ _->{name} }", system => "Use tools")
+
+p "--- AI Workflow ---"
+my $p = "User is Alice, L10" |> App::extract
+my $r = $p |> App::audit
+
+p "Profile: #{ $p->{name} } (L#{ $p->{lvl} })"
+p "Audit: $r"
+
+# 4. Tests
+$p->{name} |> aeq "Alice", "extract name"
+$r =~ /Green/ |> aok "audit match"
+
+test_run

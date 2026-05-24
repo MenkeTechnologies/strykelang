@@ -50,10 +50,11 @@ my $out_file = "$tmp/out.txt"
 open(my $fh_out, ">", $out_file)
 printf $fh_out "n=%d", 42
 close($fh_out)
-(-s $out_file) |> aeq 0, "printf $fh writes to STDOUT"
+# printf $fh (FIXED): writes to the file handle instead of STDOUT — was 0-byte file.
+(-s $out_file) |> aeq 4, "printf \$fh (FIXED): writes to filehandle (4 bytes: 'n=42')"
 
 open(my $fh_in, "<", $out_file)
-eof($fh_in) |> maps { !_ } |> aok "eof on empty file is false"
+eof($fh_in) |> maps { !_ } |> aok "eof on non-empty file is false"
 close($fh_in)
 
 # ── Parallel Source (BUG-108) ──────────────────────────────────────────────

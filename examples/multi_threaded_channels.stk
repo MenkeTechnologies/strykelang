@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+
+# Multi-threaded Channels
+#
+# Demonstrates:
+#   * `pchannel` for inter-thread communication.
+#   * `spawn` for detached background threads.
+#   * Producer-Consumer pattern with methods.
+#
+# Run: stryke --no-interop examples/multi_threaded_channels.stk
+
+p "--- Multi-threaded Channels ---"
+
+# 1. Create a bounded channel (capacity 2)
+my ($tx, $rx) = pchannel(2)
+
+# 2. Spawn Producer
+p "Spawning Producer..."
+spawn {
+    for (1:5) {
+        p "  [Producer] Sending: $_"
+        $tx->send(_)
+        sleep 0.01
+    }
+}
+
+# 3. Consume in Main Thread
+p "Consumer starting..."
+my @results = ()
+for (1:5) {
+    my $val = $rx->recv()
+    p "  [Consumer] Received: $val"
+    push @results, $val
+}
+
+p "\nAll messages received."
+
+# --- 4. Tests ---
+
+len @results |> aeq 5, "received all messages"
+@results[0]   |> aeq 1, "first message match"
+@results[4]   |> aeq 5, "last message match"
+
+test_run

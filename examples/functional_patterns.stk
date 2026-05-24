@@ -6,10 +6,11 @@
 # 1. Pattern Matching
 p "--- Pattern Matching ---"
 fn Demo::FuncPatterns::process_event {
-    match (_->{type}) {
-        "LOGIN"  => "User " . _->{user} . " logged in",
-        "LOGOUT" => "User " . _->{user} . " logged out",
-        "ERROR"  => "Critical error: " . _->{msg},
+    my $e = _
+    match ($e->{type}) {
+        "LOGIN"  => "User #{$e->{user}} logged in",
+        "LOGOUT" => "User #{$e->{user}} logged out",
+        "ERROR"  => "Critical error: #{$e->{msg}}",
         _        => "Unknown event type"
     }
 }

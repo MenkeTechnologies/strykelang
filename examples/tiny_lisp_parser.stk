@@ -1,0 +1,56 @@
+#!/usr/bin/env stryke
+
+# Tiny Lisp Parser & Interpreter
+#
+# Demonstrates:
+#   * String manipulation and regex.
+#   * Recursive data structures.
+#   * Functional programming patterns.
+#
+# Run: stryke --no-interop examples/tiny_lisp_parser.stk
+
+p "--- Tiny Lisp Parser ---"
+
+# ── 1. Tokenizer & Parser ─────────────────────────────────────────
+
+fn Lisp::tokenize($str) {
+    $str =~ s/\(/ ( /g
+    $str =~ s/\)/ ) /g
+    $str |> split /\s+/ |> grep { len _ }
+}
+
+fn Lisp::parse_tokens($tokens) {
+    my $token = shift @$tokens
+    return undef if !defined $token
+
+    if ($token eq "(") {
+        my @list = ()
+        while ($tokens->[0] ne ")") {
+            push @list, Lisp::parse_tokens $tokens
+        }
+        shift @$tokens   # pop ")"
+        \@list
+    } else {
+        # Atom: number or symbol
+        $token =~ /^-?\d+$/ ? 0 + $token : $token
+    }
+}
+
+# ── 2. Run Example ────────────────────────────────────────────────
+
+my $code = "(add 10 (mul 2 3) 5)"
+p "Lisp Code: $code"
+
+my @tokens = Lisp::tokenize $code
+my $ast = Lisp::parse_tokens \@tokens
+
+p "Parsed AST: #{ ddump $ast }"
+
+# ── 3. Tests ───────────────────────────────────────────────────────
+
+len(@$ast)     |> aeq 4,     "ast root level size"
+$ast->[0]      |> aeq "add", "ast root operator"
+$ast->[2]->[0] |> aeq "mul", "nested ast operator"
+$ast->[2]->[1] |> aeq 2,     "nested ast operand"
+
+test_run

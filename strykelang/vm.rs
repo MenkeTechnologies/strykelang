@@ -237,9 +237,23 @@ fn vm_interp_result(r: Result<StrykeValue, FlowOrError>, line: usize) -> StrykeR
 
 /// Saved state for `try { } catch (…) { } finally { }`.
 /// Jump targets live in [`Op::TryPush`] and are patched after emission; we only store the op index.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum TryState {
+    /// Executing the `try` body — die here jumps to `catch`.
+    Trying,
+    /// Executing the `catch` body — die here runs `finally` (if present) then propagates outward.
+    Catching,
+    /// Executing the `finally` body — die here overrides any deferred error and propagates outward.
+    Finalizing,
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct TryFrame {
     pub(crate) try_push_op_idx: usize,
+    pub(crate) state: TryState,
+    /// When `catch` itself throws and a `finally` exists, the new error is parked here so
+    /// `TryFinallyEnd` can re-raise it after `finally` runs.
+    pub(crate) deferred_error: Option<StrykeError>,
 }
 
 /// Saved state when entering a function call.
@@ -339,8 +353,10 @@ pub struct VM<'a> {
     halt: bool,
     /// Stack of active `try` regions (LIFO).
     try_stack: Vec<TryFrame>,
-    /// Error message for the next [`Op::CatchReceive`] (set before jumping to `catch_ip`).
-    pub(crate) pending_catch_error: Option<String>,
+    /// Value to bind in the next [`Op::CatchReceive`] (set before jumping to `catch_ip`).
+    /// Carries the original `die`-value when one was supplied (preserves hash/array refs);
+    /// otherwise a string copy of the formatted error message.
+    pub(crate) pending_catch_error: Option<StrykeValue>,
     /// [`Op::Return`] / [`Op::ReturnValue`] with no caller frame: exit the main dispatch loop (was `break`).
     exit_main_dispatch: bool,
     /// Top-level [`Op::ReturnValue`] with no frame: value for implicit return (was `last = val; break`).
@@ -1949,19 +1965,61 @@ impl<'a> VM<'a> {
     }
 
     /// `die` / runtime errors inside `try` jump to `catch_ip` unless the error is [`ErrorKind::Exit`].
+    ///
+    /// Walks the try stack top-down looking for a frame still in `Trying` state. Frames in
+    /// `Catching` / `Finalizing` are skipped (and possibly popped) so that re-raising from
+    /// inside `catch` or `finally` propagates outward instead of re-entering the same handler.
+    /// If a `Catching` frame has a `finally`, that finally still runs (with the new error
+    /// deferred) before the propagation continues.
     fn try_recover_from_exception(&mut self, e: &StrykeError) -> StrykeResult<bool> {
         if matches!(e.kind, ErrorKind::Exit(_)) {
             return Ok(false);
         }
-        let Some(frame) = self.try_stack.last() else {
-            return Ok(false);
-        };
-        let Op::TryPush { catch_ip, .. } = &self.ops[frame.try_push_op_idx] else {
-            return Ok(false);
-        };
-        self.pending_catch_error = Some(e.to_string());
-        self.ip = *catch_ip;
-        Ok(true)
+        loop {
+            let Some(frame) = self.try_stack.last() else {
+                return Ok(false);
+            };
+            let op_idx = frame.try_push_op_idx;
+            let Op::TryPush {
+                catch_ip,
+                finally_ip,
+                ..
+            } = &self.ops[op_idx]
+            else {
+                return Ok(false);
+            };
+            let catch_ip = *catch_ip;
+            let finally_ip = *finally_ip;
+            match frame.state {
+                TryState::Trying => {
+                    let val = e
+                        .die_value
+                        .clone()
+                        .unwrap_or_else(|| StrykeValue::string(e.to_string()));
+                    self.pending_catch_error = Some(val);
+                    if let Some(top) = self.try_stack.last_mut() {
+                        top.state = TryState::Catching;
+                    }
+                    self.ip = catch_ip;
+                    return Ok(true);
+                }
+                TryState::Catching => {
+                    if let Some(fin_ip) = finally_ip {
+                        if let Some(top) = self.try_stack.last_mut() {
+                            top.state = TryState::Finalizing;
+                            top.deferred_error = Some(e.clone());
+                        }
+                        self.ip = fin_ip;
+                        return Ok(true);
+                    }
+                    self.try_stack.pop();
+                }
+                TryState::Finalizing => {
+                    // Finally itself threw — drop deferred (if any) and keep propagating.
+                    self.try_stack.pop();
+                }
+            }
+        }
     }
 
     /// Stash lookup only (qualified key from compiler); avoids `resolve_sub_by_name`'s package fallback on hot calls.
@@ -8605,6 +8663,8 @@ impl<'a> VM<'a> {
                     Op::TryPush { .. } => {
                         self.try_stack.push(TryFrame {
                             try_push_op_idx: self.ip - 1,
+                            state: TryState::Trying,
+                            deferred_error: None,
                         });
                         Ok(())
                     }
@@ -8639,6 +8699,11 @@ impl<'a> VM<'a> {
                         let frame = self.try_stack.pop().ok_or_else(|| {
                             StrykeError::runtime("TryFinallyEnd without active try", self.line())
                         })?;
+                        // If `catch` threw and we ran `finally` to clean up, re-raise the
+                        // deferred error now that finally has completed.
+                        if let Some(deferred) = frame.deferred_error {
+                            return Err(deferred);
+                        }
                         let Op::TryPush { after_ip, .. } = &self.ops[frame.try_push_op_idx] else {
                             return Err(StrykeError::runtime(
                                 "TryFinallyEnd: corrupt try frame",
@@ -8649,7 +8714,7 @@ impl<'a> VM<'a> {
                         Ok(())
                     }
                     Op::CatchReceive(idx) => {
-                        let msg = self.pending_catch_error.take().ok_or_else(|| {
+                        let val = self.pending_catch_error.take().ok_or_else(|| {
                             StrykeError::runtime(
                                 "CatchReceive without pending exception",
                                 self.line(),
@@ -8658,9 +8723,7 @@ impl<'a> VM<'a> {
                         let n = names[*idx as usize].as_str();
                         self.interp.scope_pop_hook();
                         self.interp.scope_push_hook();
-                        self.interp
-                            .scope
-                            .declare_scalar(n, StrykeValue::string(msg));
+                        self.interp.scope.declare_scalar(n, val);
                         self.interp.english_note_lexical_scalar(n);
                         Ok(())
                     }
@@ -9294,6 +9357,20 @@ impl<'a> VM<'a> {
                 })
             }
             Some(BuiltinId::Die) => {
+                // Single-ref arg: preserve the original value (hash/array/code/blessed ref)
+                // so `$@` and `try/catch` see the ref, not a stringification.
+                if args.len() == 1 {
+                    let v = &args[0];
+                    if v.as_hash_ref().is_some()
+                        || v.as_blessed_ref().is_some()
+                        || v.as_array_ref().is_some()
+                        || v.as_code_ref().is_some()
+                    {
+                        let msg = v.to_string();
+                        self.interp.fire_pseudosig_die(&msg, line)?;
+                        return Err(StrykeError::die_with_value(v.clone(), msg, line));
+                    }
+                }
                 let mut msg = String::new();
                 for a in &args {
                     msg.push_str(&a.to_string());

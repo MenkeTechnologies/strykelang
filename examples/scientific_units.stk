@@ -1,0 +1,10 @@
+#!/usr/bin/env stryke
+# Run: stryke --no-interop examples/scientific_units.stk
+
+p "--- Units ---"
+my $f = unit_temperature(37, "c", "f") |> round
+my $j = unit_energy(1, "kwh", "j")
+
+$f |> aeq 99,      "tmp"
+$j |> aeq 3600000, "erg"
+test_run

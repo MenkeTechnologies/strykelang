@@ -1,0 +1,63 @@
+#!/usr/bin/env stryke
+
+# ASCII Game of Life
+#
+# Run: stryke --no-interop examples/game_of_life_cli.stk
+
+p "--- ASCII Game of Life ---"
+
+fn life_count($grid, $r, $c) {
+    my $count = 0
+    for my $dr (-1:1) {
+        for my $dc (-1:1) {
+            next if $dr == 0 && $dc == 0
+            my $nr = $r + $dr
+            my $nc = $c + $dc
+            $count++ if $nr >= 0 && $nr < 5 && $nc >= 0 && $nc < 5 && $grid->[$nr][$nc]
+        }
+    }
+    $count
+}
+
+fn life_step($grid) {
+    my @next
+    for my $r (0:4) {
+        my @row
+        for my $c (0:4) {
+            my $n   = life_count $grid, $r, $c
+            my $alive = $grid->[$r][$c]
+            push @row, $alive ? ($n == 2 || $n == 3 ? 1 : 0)
+                              : ($n == 3 ? 1 : 0)
+        }
+        push @next, \@row
+    }
+    \@next
+}
+
+my $grid = [
+    [0, 1, 0, 0, 0],
+    [0, 0, 1, 0, 0],
+    [1, 1, 1, 0, 0],
+    [0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0],
+]
+
+p "Initial Glider:"
+for my $row (@$grid) {
+    p join ' ', map { _ ? '#' : '.' } @$row
+}
+
+my $g2 = life_step $grid
+p "\nAfter 1 step:"
+for my $row (@$g2) {
+    p join ' ', map { _ ? '#' : '.' } @$row
+}
+
+# ── 3. Tests ───────────────────────────────────────────────────────
+
+$g2->[1][0] |> aeq 1, "glider left point check"
+$g2->[1][2] |> aeq 1, "glider right point check"
+$g2->[2][1] |> aeq 1, "glider bottom middle check"
+$g2->[3][1] |> aeq 1, "glider trailing point check"
+
+test_run
