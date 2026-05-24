@@ -14,7 +14,9 @@ jobs:
   build:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    # 60min isn't enough for cross+qemu aarch64-linux on a crate this size;
+    # use the per-target override below.
+    timeout-minutes: ${{ matrix.cross && 180 || 60 }}
     strategy:
       fail-fast: false
       matrix:
