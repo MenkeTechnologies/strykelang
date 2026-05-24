@@ -1168,20 +1168,38 @@ my @r = reject $is_big, @l                <span class="comment"># inverse of gre
 
       <section class="tutorial-section">
         <h2>Implicit zero-arg coderef from bare positional</h2>
-        <p>At <strong>module top level</strong>, a <code>my $f = …</code> declaration whose RHS <em>begins</em> with a bare positional alias (<code>_</code>, <code>_0</code>, <code>_1</code>, …; no <code>$</code> sigil) is auto-wrapped as a zero-arg coderef. Inside any block (<code>fn</code>, <code>map</code>, <code>grep</code>, <code>for</code>, …) bare <code>_</code> is the bound topic, so this sugar only fires where <code>_</code> would otherwise be unbound.</p>
-<pre><span class="comment"># at top level — these two forms are equivalent:</span>
-my $f = _ * 2
-my $f = fn { _ * 2 }
-$f-&gt;(5)                <span class="comment"># 10</span>
+        <p>At <strong>module top level</strong>, a <code>my $f = …</code> declaration whose RHS <em>contains a free bare positional alias</em> (<code>_</code>, <code>_0</code>, <code>_1</code>, <code>_&lt;</code>, …; <strong>no <code>$</code> sigil</strong>) is auto-wrapped as a zero-arg coderef. "Free" means <em>at brace-depth 0 inside the RHS</em>: a bare <code>_</code> inside a nested <code>fn { _ &lt; 4 }</code>, hash literal, map/grep/sort block, or match arm is bound by that block and doesn't trigger the wrap. Inside any block-bodied declaration site, bare <code>_</code> is the bound topic, so this sugar only fires where <code>_</code> would otherwise be unbound.</p>
+<pre><span class="comment"># at top level — all of these auto-wrap into `fn { … }`:</span>
+my $sq  = _ * _                  <span class="comment"># → fn { _ * _ }</span>
+my $up  = uc _                   <span class="comment"># → fn { uc _ }</span>
+my $rev = ~&gt; _ &gt;{split //, _} rev join ""
+my $add = _ + _1                 <span class="comment"># multi-arg via _1, _2, …</span>
+$sq-&gt;(5)                         <span class="comment"># 25</span>
+$add-&gt;(3, 4)                     <span class="comment"># 7</span>
 
-<span class="comment"># multi-arg coderefs via _1, _2, …:</span>
-my $g = _ + _1
-$g-&gt;(3, 4)             <span class="comment"># 7</span>
+<span class="comment"># nested fn { } binds inner _ → outer `my` stays eager:</span>
+fn call($f, $n) = $f-&gt;($n)
+my $r = call(fn { _ &lt; 4 }, 5)    <span class="comment"># 0  — call() runs eagerly</span>
 
 <span class="comment"># inside a block, _ is the topic — NOT auto-wrapped:</span>
-fn dbl { my $x = _; $x * 2 }      <span class="comment"># $x captures the first arg</span>
-map { my $i = _; $i * 2 } 1:3     <span class="comment"># $i captures each element</span></pre>
-        <p><strong>Heuristic</strong>: the wrap fires only when (a) we're at <code>block_depth == 0</code>, (b) the LHS is a single scalar, (c) the first RHS token is a bare positional alias (so <code>match (5) { _ =&gt; … }</code> stays a match expression), and (d) the RHS isn't already a coderef-shaped value. <strong>Disabled under <code>--compat</code></strong>.</p>
+fn dbl { my $x = _; $x * 2 }     <span class="comment"># $x captures the first arg</span>
+map { my $i = _; $i * 2 } 1:3    <span class="comment"># $i captures each element</span></pre>
+        <h3 style="margin-top:1em;">Forcing eager evaluation — use the <code>$_</code> sigil</h3>
+        <p>To opt out of the wrap and evaluate the RHS against the <em>current</em> topic, use the sigil-prefixed form <code>$_</code> / <code>$_0</code> / <code>$_1</code> / <code>$_&lt;</code>. Sigil-prefixed topic reads are eager by definition and never trigger the coderef sugar.</p>
+<pre><span class="comment"># bare _ → coderef (deferred)</span>
+my $sq = _ * _
+p $sq-&gt;(5)                       <span class="comment"># 25</span>
+
+<span class="comment"># $_ sigil → eager evaluation against the current topic</span>
+$_ = 7
+my $sq2 = $_ * $_
+p $sq2                           <span class="comment"># 49</span>
+
+<span class="comment"># mixed: free bare _ wins → the whole RHS wraps,</span>
+<span class="comment"># and $_ inside the closure reads the topic at call time:</span>
+my $mix = $_ + _                 <span class="comment"># → fn { $_ + _ }</span>
+$mix-&gt;(3)                        <span class="comment"># 6    (both $_ and _ are the arg)</span></pre>
+        <p><strong>Rule</strong>: the wrap fires only when (a) we're at <code>block_depth == 0</code>, (b) the LHS is a single scalar, (c) the RHS contains a free (depth-0 within the RHS) bare positional token — match wildcards inside <code>match { _ =&gt; … }</code> arms sit at depth ≥ 1 so they don't false-trigger — and (d) the RHS isn't already a coderef-shaped value (<code>fn { … }</code>, <code>\&amp;name</code>, <code>\&amp;{…}</code>). <strong>Disabled under <code>--compat</code></strong>.</p>
       </section>
 
       <section class="tutorial-section">

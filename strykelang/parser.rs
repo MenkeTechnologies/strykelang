@@ -2878,6 +2878,27 @@ impl Parser {
         format!("{:?}", e).contains("ScalarVar(\"_\")")
     }
 
+    /// Walk tokens in `[rhs_start, rhs_end)` looking for a *free* bare
+    /// topic-slot index (one in `self.bare_positional_indices` at
+    /// brace-depth 0 within the RHS). Any `_` inside `{ ... }` is
+    /// considered bound by whatever defines that block (closure,
+    /// hash literal, map/grep/sort/match arm) and doesn't count.
+    /// Drives the implicit-coderef sugar in `parse_my_our_local`.
+    fn rhs_has_free_bare_topic_slot(&self, rhs_start: usize, rhs_end: usize) -> bool {
+        let mut brace_depth = 0i32;
+        for i in rhs_start..rhs_end.min(self.tokens.len()) {
+            if brace_depth == 0 && self.bare_positional_indices.contains(&i) {
+                return true;
+            }
+            match &self.tokens[i].0 {
+                Token::LBrace | Token::ArrowBrace => brace_depth += 1,
+                Token::RBrace => brace_depth -= 1,
+                _ => {}
+            }
+        }
+        false
+    }
+
     /// Apply a bare function name in thread context, handling unary builtins specially.
     fn thread_apply_bare_func(&self, name: &str, arg: Expr, line: usize) -> StrykeResult<Expr> {
         let kind = match name {
@@ -5831,14 +5852,27 @@ impl Parser {
             }
             let rhs_start_pos = self.pos;
             let mut val = self.parse_expression()?;
-            // Stryke implicit-coderef sugar: `my $f = _ * 2;` ≡
-            // `my $f = fn { _ * 2 };`. Triggers only when (a) the LHS is a
-            // single scalar declaration, (b) the RHS contains at least one
-            // *bare* positional alias (`_`, `_0`, `_1`, …; no `$` sigil), and
-            // (c) the RHS isn't already a coderef-shaped value. Bare-positional
-            // tracking comes from the lexer (see `Lexer::bare_positional_indices`)
-            // so legitimate uses of `$_` inside e.g. `fn { my $x = $_; … }`
-            // closures keep their Perl semantics.
+            let rhs_end_pos = self.pos;
+            // Stryke implicit-coderef sugar: when the RHS contains a
+            // *free* bare topic-slot reference (`_`, `_0`, `_1`, `_<`,
+            // `_<<`, etc. — no `$` sigil), auto-wrap the RHS in
+            // `fn { ... }`. Forces consistent coderef semantics across
+            // every topic-using form:
+            //   `my $sq  = _ * _`                     → CODE ref
+            //   `my $up  = uc _`                      → CODE ref
+            //   `my $rev = ~> _ >{...} rev join("")`  → CODE ref
+            // To compute eagerly using the current topic, use the
+            // explicit `$_` / `$_N` / `$_<` sigil-prefixed forms —
+            // those keep Perl semantics and never auto-wrap.
+            //
+            // "Free" = at brace-depth 0 within the RHS token stream.
+            // Any `_` inside `{ ... }` (closure body, hash literal,
+            // map/grep/sort/match block) is bound to whatever defines
+            // that block and doesn't trigger the wrap, so
+            //   `my $r = call(fn { _ < 4 })`   — `_` is inner-fn's
+            //   `my $h = { k => _ }`           — `_` is hash value at depth 1
+            //   `my $kind = match { _ => x }`  — `_` is wildcard pattern
+            // all stay eager.
             if !crate::compat_mode()
                 && self.block_depth == 0
                 && decls.len() == 1
@@ -5850,30 +5884,20 @@ impl Parser {
                         | ExprKind::SubroutineCodeRef(_)
                         | ExprKind::DynamicSubCodeRef(_)
                 )
+                && self.rhs_has_free_bare_topic_slot(rhs_start_pos, rhs_end_pos)
             {
-                let rhs_end_pos = self.pos;
-                // Trigger only when the RHS *begins* with a bare positional
-                // alias (e.g. `_ * 2`, `_1 + _2`). Restricting to the leading
-                // token avoids false positives when bare `_` appears deeper in
-                // unrelated grammar (most notably `match { _ => ... }` arm
-                // patterns, which are wildcard patterns rather than topic
-                // references).
-                let rhs_has_bare_positional = self.bare_positional_indices.contains(&rhs_start_pos)
-                    && rhs_start_pos < rhs_end_pos;
-                if rhs_has_bare_positional {
-                    let val_line = val.line;
-                    val = Expr {
-                        kind: ExprKind::CodeRef {
-                            params: Vec::new(),
-                            body: vec![Statement {
-                                label: None,
-                                kind: StmtKind::Expression(val),
-                                line: val_line,
-                            }],
-                        },
-                        line: val_line,
-                    };
-                }
+                let val_line = val.line;
+                val = Expr {
+                    kind: ExprKind::CodeRef {
+                        params: Vec::new(),
+                        body: vec![Statement {
+                            label: None,
+                            kind: StmtKind::Expression(val),
+                            line: val_line,
+                        }],
+                    },
+                    line: val_line,
+                };
             }
             // Validate assignment for single variable declarations (not destructuring)
             // `my ($a, $b) = (1, 2)` is destructuring, not scalar-from-list

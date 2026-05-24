@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./GottaSnatchEmAll.stk"
 
-fn jkeys { join(",", sort keys %{_}) }
+fn jkeys($a) { join(",", sort keys %{$a}) }
 
 my $c = Exercism::GottaSnatchEmAll::new_collection("Pikachu")
 assert_eq jkeys($c), "Pikachu", "new with one card"

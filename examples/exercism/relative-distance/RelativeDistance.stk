@@ -3,8 +3,8 @@
 # Family tree maps name → [child names]. Degree of separation between
 # two people is the path length (edges) between them through the tree,
 # treating edges as bidirectional. Returns undef if unreachable.
-fn Exercism::RelativeDistance::degree_of_separation($tree, $a, $b) {
-    return 0 if $a eq $b
+fn Exercism::RelativeDistance::degree_of_separation($tree, $from, $to) {
+    return 0 if $from eq $to
     # Build bidirectional adjacency from parent → children.
     my %adj
     for my $parent (keys %{$tree}) {
@@ -14,14 +14,14 @@ fn Exercism::RelativeDistance::degree_of_separation($tree, $a, $b) {
         }
     }
     # BFS.
-    my %seen = ($a => 0)
-    my @q    = ($a)
+    my %seen = ($from => 0)
+    my @q    = ($from)
     while (@q) {
         my $cur = shift @q
         for my $n (@{$adj{$cur} // []}) {
             next if exists $seen{$n}
             $seen{$n} = $seen{$cur} + 1
-            return $seen{$n} if $n eq $b
+            return $seen{$n} if $n eq $to
             push @q, $n
         }
     }

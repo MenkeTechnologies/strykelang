@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./FlowerField.stk"
 
-fn j { join("\n", @{_}) }
+fn j($a) { join("\n", @{$a}) }
 
 assert_eq j(Exercism::FlowerField::annotate([])),                       "",       "empty"
 assert_eq j(Exercism::FlowerField::annotate(["   ","   ","   "])),      "   \n   \n   ", "no flowers"

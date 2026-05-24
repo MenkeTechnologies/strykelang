@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 
 fn Exercism::RpgCharacterSheet::roll_dice {
-    my @rolls = sort { $b <=> $a } map { 1 + int(rand() * 6) } 1:4
+    my @rolls = sort { _1 <=> _ } map { 1 + int(rand() * 6) } 1:4
     $rolls[0] + $rolls[1] + $rolls[2]
 }
 

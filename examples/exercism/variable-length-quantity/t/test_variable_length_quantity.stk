@@ -1,8 +1,8 @@
 #!/usr/bin/env stryke
 require "./VariableLengthQuantity.stk"
 
-fn j  { join(",", @{_}) }
-fn jr { my $r = _; ref($r) eq 'ARRAY' && $r->[0] eq 'ok' ? "ok:" . join(",", @{$r->[1]}) : "error:" . $r->[1] }
+fn j($a)  { join(",", @{$a}) }
+fn jr($a) { my $r = $a; ref($r) eq 'ARRAY' && $r->[0] eq 'ok' ? "ok:" . join(",", @{$r->[1]}) : "error:" . $r->[1] }
 
 assert_eq j(Exercism::VariableLengthQuantity::encode([0])),       "0",         "0 → 1 byte"
 assert_eq j(Exercism::VariableLengthQuantity::encode([127])),     "127",       "127 → 1 byte"

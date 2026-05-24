@@ -15,9 +15,9 @@ fn Exercism::LibraryFees::return_date {
 fn Exercism::LibraryFees::days_late {
     my ($expected, $actual) = (_, _1)
     my @e = split /-/, $expected
-    my @a = split /-/, (split /T/, $actual)[0]
+    my @av = split /-/, (split /T/, $actual)[0]
     my $ed = Exercism::LibraryFees::_days($e[0], $e[1], $e[2])
-    my $ad = Exercism::LibraryFees::_days($a[0], $a[1], $a[2])
+    my $ad = Exercism::LibraryFees::_days($av[0], $av[1], $av[2])
     my $d  = $ad - $ed
     $d > 0 ? $d : 0
 }

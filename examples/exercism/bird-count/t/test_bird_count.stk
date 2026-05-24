@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./BirdCount.stk"
 
-fn j { join(",", @{_}) }
+fn j($a) { join(",", @{$a}) }
 
 assert_eq Exercism::BirdCount::today([]),             undef, "today empty → undef"
 assert_eq Exercism::BirdCount::today([7]),            7,     "today [7] → 7"

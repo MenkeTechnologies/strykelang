@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./WineCellar.stk"
 
-fn j { join("|", map { join(",", @{$_}) } @{_}) }
+fn j($a) { join("|", map { join(",", @{$_}) } @{$a}) }
 
 my $cellar = [
     ["red",   2014, "France"],

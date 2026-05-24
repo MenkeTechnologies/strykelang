@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./Change.stk"
 
-fn jr { my $r = _; $r->[0] eq 'ok' ? "ok:" . join(",", @{$r->[1]}) : "error:" . $r->[1] }
+fn jr($a) { my $r = $a; $r->[0] eq 'ok' ? "ok:" . join(",", @{$r->[1]}) : "error:" . $r->[1] }
 
 assert_eq jr(Exercism::Change::generate([1,5,10,25,100], 25)),  "ok:25",        "exact denom"
 assert_eq jr(Exercism::Change::generate([1,5,10,25,100], 0)),   "ok:",          "zero"

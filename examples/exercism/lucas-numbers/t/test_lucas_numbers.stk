@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./LucasNumbers.stk"
 
-fn j { join(",", @{_}) }
+fn j($a) { join(",", @{$a}) }
 
 assert_eq j(Exercism::LucasNumbers::generate(1)), "2",                "length 1"
 assert_eq j(Exercism::LucasNumbers::generate(2)), "2,1",              "length 2"
