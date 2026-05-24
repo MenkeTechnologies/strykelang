@@ -175,7 +175,7 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          repository: MenkeTechnologies/homebrew-stryke
+          repository: MenkeTechnologies/homebrew-menketech
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: tap
 
