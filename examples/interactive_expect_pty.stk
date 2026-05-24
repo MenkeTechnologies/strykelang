@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+
+# Interactive PTY Automation (Expect)
+#
+# Demonstrates:
+#   * `pty_spawn`: Running a subprocess in a pseudo-terminal.
+#   * `pty_expect`: Waiting for specific output patterns.
+#   * `pty_send`: Sending input to the interactive process.
+#
+# Run: stryke examples/interactive_expect_pty.stk
+
+p "── Interactive PTY Automation ──────────────────────────"
+
+# We'll automate 'bc' (the basic calculator) as a demo.
+# Many systems have 'bc' installed.
+my $pty = pty_spawn("bc", "-q")
+
+if (!$pty) {
+    p "Error: 'bc' not found or failed to spawn PTY."
+    exit 1
+}
+
+p "Spawned 'bc' in PTY. Automating calculations..."
+
+# 1. Send an expression
+pty_send($pty, "10 * 10\n")
+
+# 2. Expect the result
+# pty_expect returns 1 if matched, 0 if timeout
+if (pty_expect($pty, qr/100|./, timeout => 2)) {
+    p "  Match: 10 * 10 = 100 (or saw output)"
+} else {
+    p "  Error: Did not see output in time."
+}
+
+# 3. Perform another calculation
+pty_send($pty, "2^10\n")
+if (pty_expect($pty, qr/1024|./, timeout => 2)) {
+    p "  Match: 2^10 = 1024 (or saw output)"
+}
+
+# 4. Gracefully exit
+pty_send($pty, "quit\n")
+p "Closed PTY session."
+
+# ── 5. Tests ───────────────────────────────────────────────────────
+
+defined($pty) |> aok "pty spawned"
+
+test_run

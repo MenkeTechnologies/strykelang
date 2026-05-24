@@ -1,0 +1,54 @@
+#!/usr/bin/env stryke
+
+# Parallel Log Scanner
+#
+# Demonstrates:
+#   * `pmap_reduce` for parallel data processing.
+#   * High-performance frequency aggregation.
+#
+# Run: stryke examples/parallel_log_scanner.stk
+
+p "── Parallel Log Scanner ────────────────────────────────"
+
+# ── 1. Generate Mock Log Data in Memory ───────────────────────────
+
+my @levels = ("INFO", "WARN", "ERROR", "DEBUG")
+p "Generating 10,000 lines of mock log data..."
+
+my @lines = map {
+    my $lvl = @levels[rand(4)]
+    "#{time()} [ $lvl ] User #{int(rand(100))} performed action #{int(rand(1000))}"
+} 1:10000
+
+# ── 2. Process in Parallel ──────────────────────────────────────────
+
+p "Scanning log data using parallel map-reduce..."
+
+# pmap_reduce runs map and reduce across cores.
+# Map: line -> hash with count
+# Reduce: merge hashes
+my $results = @lines |> pmap_reduce { 
+    _ =~ /\[\s*(\w+)\s*\]/;
+    my $lvl = $1 // "UNKNOWN";
+    +{ $lvl => 1 }
+} {
+    my ($h1, $h2) = (_0, _1);
+    for my $k (keys %$h2) { $h1->{$k} += $h2->{$k} }
+    $h1
+}
+
+# ── 3. Report ───────────────────────────────────────────────────────
+
+p "\nResults:"
+
+for my $lvl (sort keys %$results) {
+    p "  $lvl: #{ $results->{$lvl} }"
+}
+
+# ── 4. Tests ───────────────────────────────────────────────────────
+
+my $total = sum(values %$results)
+$total |> aeq 10000, "all lines processed"
+exists $results->{ERROR} |> aok "found ERROR logs"
+
+test_run

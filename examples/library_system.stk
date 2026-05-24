@@ -1,0 +1,76 @@
+#!/usr/bin/env stryke
+
+# Library Management System
+#
+# Demonstrates:
+#   * Namespacing functions (`Library::...`).
+#   * Basic classes and methods.
+#   * Slicing and functional filtering.
+#
+# Run: stryke examples/library_system.stk
+
+# ── 1. Define Classes ──────────────────────────────────────────────
+
+class Book {
+    title:       Str
+    author:      Str
+    checked_out: Bool = 0
+
+    fn checkout {
+        $self->checked_out = 1
+    }
+}
+
+# ── 2. Library Logic (Namespaced) ──────────────────────────────────
+
+my @inventory = ()
+
+fn Library::add_book($title, $author) {
+    push @inventory, Book->new(title => $title, author => $author)
+}
+
+fn Library::list_available() {
+    @inventory |> greps { !_->checked_out }
+}
+
+fn Library::find_by_author($author) {
+    @inventory |> greps { _->author =~ /$author/i }
+}
+
+# ── 3. Run System ──────────────────────────────────────────────────
+
+p "── Library Management System ───────────────────────────"
+
+Library::add_book("The Great Gatsby", "F. Scott Fitzgerald")
+Library::add_book("1984", "George Orwell")
+Library::add_book("Brave New World", "Aldous Huxley")
+Library::add_book("Animal Farm", "George Orwell")
+
+p "Total books: #{ len @inventory }"
+
+# Checkout one
+my $results_ref = Library::find_by_author("Orwell") |> collect
+my $book1984 = $results_ref->[0]
+$book1984->checkout()
+p "Checked out: #{ $book1984->title }"
+
+p "\nAvailable books:"
+for (Library::list_available() |> collect) {
+    p "  - #{ _->title } by #{ _->author }"
+}
+
+# ── 4. Slicing Demo ────────────────────────────────────────────────
+
+p "\nFirst two books in inventory:"
+my @subset = @inventory[0:1]
+for (@subset) {
+    p "  [#{ _->title }]"
+}
+
+# ── 5. Tests ───────────────────────────────────────────────────────
+
+len(@inventory) |> aeq 4, "correct inventory count"
+$book1984->{checked_out} |> aeq 1, "book marked checked out"
+len(@subset) |> aeq 2, "subset slice size"
+
+test_run
