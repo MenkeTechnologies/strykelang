@@ -192,6 +192,7 @@ Each tab is a tree grouped by category, with a per-tab search field filtering ac
 | **Context menu** | *Run with stryke* on any `.stk` file in the editor or project view; auto-creates a config |
 | **Producer** | `StrykeRunConfigurationProducer` materializes a run config from the active file |
 | **Output** | Standard `ConsoleView` — `p` / `print` / `printf` / `say` stream in real time |
+| **File → New → Stryke File** | Standard New-File dialog; pick *Script* (shebanged, `fn main` stub), *Library / module*, or *Empty*. Same entry surfaces in the Project-view right-click *New* submenu. |
 
 ### Debug
 
