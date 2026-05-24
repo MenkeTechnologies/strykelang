@@ -3,7 +3,7 @@ fn Exercism::SimpleCipher::new($key) {
     if (defined $key) {
         die "ArgumentError" if $key =~ /[A-Z0-9]/ || length($key) == 0
     } else {
-        $key = ~> 1:100 map { chr(97 + int(rand 26)) } |> join("")
+        $key = ~> 1:100 map { chr(97 + int(rand 26)) } join("")
     }
     { key => $key }
 }
