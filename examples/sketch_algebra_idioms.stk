@@ -1,0 +1,65 @@
+#!/usr/bin/env stryke
+
+# Sketch Algebra Idioms
+#
+# Demonstrates:
+#   * Bloom filters for membership testing.
+#   * HyperLogLog (HLL) for cardinality estimation.
+#   * Sketch operators: `+` for union/merge.
+#
+# Run: stryke --no-interop examples/sketch_algebra_idioms.stk
+
+p "── Sketch Algebra Idioms ───────────────────────────────"
+
+# ── 1. Bloom Filters ───────────────────────────────────────────────
+p "Bloom Filters (Membership):"
+
+my $bf1 = bloom_new(1000, 0.01)
+bloom_add($bf1, "apple")
+bloom_add($bf1, "banana")
+
+my $bf2 = bloom_new(1000, 0.01)
+bloom_add($bf2, "cherry")
+
+# Sketch Algebra: Union of two filters via `+`
+my $bf_combined = $bf1 + $bf2
+
+p "  'apple' in union?  ", bloom_contains($bf_combined, "apple")  ? "yes" : "no"
+p "  'cherry' in union? ", bloom_contains($bf_combined, "cherry") ? "yes" : "no"
+
+# ── 2. HyperLogLog (HLL) ──────────────────────────────────────────
+p "\nHyperLogLog (Cardinality):"
+
+my $hll1 = hll_new(14)
+hll_add($hll1, $_) for 1:1000
+
+my $hll2 = hll_new(14)
+hll_add($hll2, $_) for 501:1500
+
+# Sketch Algebra: Union via `+`
+my $hll_combined = $hll1 + $hll2
+
+printf "  HLL 1 count:        %d\n", hll_count($hll1)
+printf "  Combined HLL count: %d (approx 1500)\n", hll_count($hll_combined)
+
+# ── 3. Count-Min Sketch (CMS) ─────────────────────────────────────
+p "\nCount-Min Sketch (Frequency):"
+
+my $cms = cms_new(0.001, 0.99)
+cms_add($cms, "user_123", 5)
+cms_add($cms, "user_456", 2)
+
+printf "  'user_123' frequency: %d\n", cms_count($cms, "user_123")
+
+# ── 4. Tests ───────────────────────────────────────────────────────
+
+bloom_contains($bf_combined, "apple") |> aok "bloom contains apple"
+bloom_contains($bf_combined, "cherry") |> aok "bloom contains cherry"
+bloom_contains($bf_combined, "date") |> aeq 0, "bloom does not contain date"
+
+hll_count($hll_combined) |> aok "hll count > 0"
+(hll_count($hll_combined) > 1400) |> aok "hll combined approx 1500"
+
+cms_count($cms, "user_123") |> aeq 5, "cms count user_123"
+
+test_run

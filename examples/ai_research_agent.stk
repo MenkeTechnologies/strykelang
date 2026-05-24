@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+
+# AI Research Agent
+#
+# Demonstrates:
+#   * `tool fn` for defining agent-callable functions.
+#   * Built-in tools: web_search_tool, fetch_url_tool.
+#   * `ai` primitive with automatic tool attachment.
+#   * Mocking tool results and LLM calls for deterministic testing.
+#
+# Run: STRYKE_AI_MODE=mock-only stryke examples/ai_research_agent.stk
+
+# ── 1. Setup Mocking ────────────────────────────────────────────────
+
+# Mock the search tool response
+ai_mock_install('(?i)search for "latest rust features"', 
+    'Found: Generic associated types (GATs), let-else, and more.')
+
+# Mock the agent's research loop
+ai_mock_install('(?i)research the latest features of Rust.*', 
+    'The latest features of Rust include Generic Associated Types (GATs) for more flexible traits, and let-else statements for cleaner error handling in pattern matching. The current version of Rust is 1.85.0.')
+
+# ── 2. Define Custom Tools ─────────────────────────────────────────
+
+tool fn get_version($pkg: string) "Get the current version of a package" {
+    # In a real app, this might hit an API or shell out.
+    match ($pkg) {
+        "rust"   => "1.85.0",
+        "stryke" => "0.9.12",
+        _        => "unknown"
+    }
+}
+
+# ── 3. Run the Agent ───────────────────────────────────────────────
+
+p "── AI Research Agent ───────────────────────────────────"
+
+my $prompt = "Research the latest features of Rust and tell me the current version of rust."
+
+# The bare `ai` call auto-attaches every `tool fn` in scope
+# plus we can pass built-in tools explicitly.
+my $report = ai($prompt,
+    tools => [
+        web_search_tool(),
+        fetch_url_tool(),
+    ],
+    system => "You are a helpful research assistant. Use tools to verify facts.")
+
+p "Report:"
+p $report
+
+# ── 4. Tests ───────────────────────────────────────────────────────
+
+$report =~ /GATs/   |> aok "report contains GATs"
+$report =~ /1.85.0/ |> aok "report contains version"
+
+test_run

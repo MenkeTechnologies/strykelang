@@ -1,0 +1,51 @@
+#!/usr/bin/env stryke
+
+# AI Data Pipeline
+#
+# Demonstrates:
+#   * `ai_classify` for batch sentiment analysis.
+#   * `ai_filter` for semantic filtering of collections.
+#   * `ai_map` for batch transformation.
+#
+# Run: STRYKE_AI_MODE=mock-only stryke --no-interop examples/ai_data_pipeline.stk
+
+p "── AI Data Pipeline ───────────────────────────────────"
+
+# 1. Setup sample data
+my @data = (
+    "The product is amazing and I love it!",
+    "Worst experience ever, totally broken.",
+    "It's okay, nothing special.",
+    "Fantastic value for money.",
+)
+
+# 2. Batch classify sentiment
+# In mock mode, we provide the expected array response.
+ai_mock_install('(?si)Classify each item below.*labels: positive, negative, neutral', '["positive", "negative", "neutral", "positive"]')
+my $sentiments = ai_classify(\@data, "sentiment", into => ["positive", "negative", "neutral"])
+
+p "Sentiments:"
+for my $i (0:len(@data)-1) {
+    p "  [ #{ $sentiments->[$i] } ] #{ @data[$i] }"
+}
+
+# 3. Semantic Filter
+ai_mock_install('(?si)Decide whether each item below.*positive sentiment', '[true, false, false, true]')
+my $positives = ai_filter(\@data, "positive sentiment")
+
+p "\nFound #{ len $positives } positive items."
+
+# 4. Batch Map (Extract keywords)
+ai_mock_install('(?si)Apply this instruction to each item: extract 2 main keywords', '["amazing, love", "broken", "nothing", "value, money"]')
+my $keywords = ai_map(\@data, "extract 2 main keywords")
+
+p "Keywords extracted: #{ join(' | ', @$keywords) }"
+
+# ── 5. Tests ───────────────────────────────────────────────────────
+
+$sentiments->[0] |> aeq "positive", "first sentiment match"
+$sentiments->[1] |> aeq "negative", "second sentiment match"
+len($positives)  |> aeq 2,          "filter count match"
+$keywords->[0]   |> aok "keywords extracted"
+
+test_run

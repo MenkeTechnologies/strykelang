@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+
+# System Monitor and Custom Metrics
+#
+# Demonstrates:
+#   * `stress_metrics_record` for custom telemetry.
+#   * `stress_metrics_json` for retrieving recorded samples.
+#   * `sys_uptime` for basic system info.
+#
+# Run: stryke --no-interop examples/system_monitor.stk
+
+p "── System Monitor ─────────────────────────────────────"
+
+# 1. Basic Info
+p "Uptime: #{ sys_uptime() }s"
+
+# 2. Record some custom events
+p "Recording custom telemetry..."
+stress_metrics_record("api_call", 1, path => "/login", status => "200")
+stress_metrics_record("api_call", 1, path => "/home",  status => "200")
+stress_metrics_record("api_call", 1, path => "/login", status => "403")
+
+# 3. Analyze the metrics
+my $json = stress_metrics_json()
+my $samples = from_json($json)
+
+p "Total samples in buffer: #{ len @$samples }"
+
+# Filter and count using pipelines
+my @logins = @$samples |> greps { _->{labels}->{path} eq "/login" } |> collect
+p "Login attempts: #{ len @logins }"
+
+# ── 4. Tests ───────────────────────────────────────────────────────
+
+len(@$samples) |> aeq 3, "three samples recorded"
+len(@logins)   |> aeq 2, "two login attempts found"
+$logins[1]->{labels}->{status} |> aeq "403", "last login was 403"
+
+test_run

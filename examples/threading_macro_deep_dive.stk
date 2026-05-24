@@ -1,0 +1,54 @@
+#!/usr/bin/env stryke
+
+# Threading Macro Deep Dive
+#
+# Demonstrates:
+#   * `~>` (thread-first): Data as first arg.
+#   * `~>>` (thread-last): Data as last arg.
+#   * `~s>` (streaming): Parallel worker pipeline.
+#   * `>{}` (arrow-block) stages.
+#
+# Run: stryke --no-interop examples/threading_macro_deep_dive.stk
+
+p "── Threading Macro Deep Dive ───────────────────────────"
+
+# ── 1. Thread-First (~>) ───────────────────────────────────────────
+# Good for scalar transformations.
+p "Thread-First (~>):"
+my $res1 = ~> "  hello world  " trim uc rev
+p "  Result: $res1"
+
+# ── 2. Thread-Last (~>>) ──────────────────────────────────────────
+# Good for list operations where the collection is the last arg.
+p "\nThread-Last (~>>):"
+# maps and greps are thread-last friendly
+my @res2 = ~>> 1:10 \
+    greps { _ % 2 == 0 } \
+    maps { _ * 10 } \
+    |> collect
+p "  Result: @res2"
+
+# ── 3. Streaming Workers (~s>) ─────────────────────────────────────
+# Each stage is a separate thread.
+p "\nStreaming Pipeline (~s>):"
+my @stream_results = ~s> 1:5 \
+    >{ sleep 0.01; _ * 2 } \
+    >{ sleep 0.01; _ + 1 } \
+    |> collect
+p "  Processed #{len @stream_results} items concurrently."
+
+# ── 4. Arrow Blocks and Builtins ──────────────────────────────────
+p "\nMixed Stages:"
+# Use arrow blocks >{ } for builtins with arguments to avoid ambiguity
+~> 42 \
+    >{ _ + 8 } \
+    >{ sprintf("Value is %d", _) } \
+    |> p
+
+# ── 5. Tests ───────────────────────────────────────────────────────
+
+$res1 |> aeq "DLROW OLLEH", "thread-first string ops"
+@res2[0] |> aeq 20, "thread-last list ops"
+len(@stream_results) |> aeq 5, "streaming pipeline count"
+
+test_run

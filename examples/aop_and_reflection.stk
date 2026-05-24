@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+
+# AOP and Reflection
+#
+# Demonstrates:
+#   * `before` and `after` advice for function interception.
+#   * Reflection: Inspecting builtins via `%b` and all symbols via `%all`.
+#   * Dynamic function calling.
+#
+# Run: stryke examples/aop_and_reflection.stk
+
+p "── AOP and Reflection ──────────────────────────────────"
+
+# ── 1. AOP (Aspect-Oriented Programming) ──────────────────────────
+
+fn MyMath::add { _0 + _1 }
+
+# Intercept calls to MyMath::add
+before "MyMath::add" {
+    p "  [AOP] Calling $INTERCEPT_NAME with: #{join(', ', @INTERCEPT_ARGS)}"
+}
+
+after "MyMath::add" {
+    p "  [AOP] $INTERCEPT_NAME returned: $INTERCEPT_RV"
+}
+
+p "Calling MyMath::add(10, 20)..."
+my $res = MyMath::add(10, 20)
+p "Result: $res"
+
+# ── 2. Reflection ──────────────────────────────────────────────────
+p "\nReflection (Introspection):"
+
+# %all contains all symbols (builtins + user-defined).
+my @bloom_builtins = keys %all |> greps { _ =~ /bloom_/ } |> collect
+p "Found #{len @bloom_builtins} Bloom-related symbols."
+
+# ── 3. Symbol Inspection ───────────────────────────────────────────
+p "\nSymbol Inspection:"
+# Check for a known builtin
+my $has_bloom = keys %all |> greps { _ eq "bloom_add" } |> collect |> len
+p "Is bloom_add in %all? ", $has_bloom ? "yes" : "no"
+
+# ── 4. Tests ───────────────────────────────────────────────────────
+
+$res |> aeq 30, "AOP result match"
+$has_bloom |> aok "reflection found builtin"
+len(@bloom_builtins) > 0 |> aok "reflection found bloom symbols"
+
+test_run

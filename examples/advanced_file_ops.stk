@@ -1,0 +1,45 @@
+#!/usr/bin/env stryke
+
+# Advanced File Operations
+#
+# Demonstrates:
+#   * Slurp prefix: `c"path"`
+#   * Spurt: `spurt $path, $data`
+#   * Zsh-style glob qualifiers: `(.)`, `(D)`, etc.
+#   * Lazy line iteration: `lines($path)`
+#
+# Run: stryke examples/advanced_file_ops.stk
+
+p "── Advanced File Operations ────────────────────────────"
+
+my $tmp = "/tmp/stryke_adv_io.txt"
+
+# 1. Spurt: write data to file in one call.
+spurt $tmp, "line 1: hello\nline 2: world\nline 3: stryke\n"
+p "Wrote data to $tmp"
+
+# 2. Slurp prefix: `c"..."` is the shortest path to file contents.
+my $content = c"$tmp"
+p "Slurped content (length: #{len $content})"
+
+# 3. Lazy line iteration with filtering.
+p "Lines matching 'stryke':"
+c"$tmp" |> lines |> greps { /stryke/ } |> e p
+
+# 4. Zsh-style globbing with qualifiers.
+# `(.)` means files only (no directories).
+p "\nRecent .stk files in examples/ (files only):"
+my @files = glob("examples/*.stk(.)")
+for my $f (@files[0:2]) { # Slice: first 3
+    p "  - $f"
+}
+
+# Cleanup
+unlink $tmp
+
+# ── 5. Tests ───────────────────────────────────────────────────────
+
+$content =~ /line 2/ |> aok "content contains expected line"
+len(@files) > 0 |> aok "found .stk files"
+
+test_run
