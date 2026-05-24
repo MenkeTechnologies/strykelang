@@ -3274,6 +3274,112 @@ These are known design choices, listed here so a future contributor doesn't
   the appropriate dump helper.
 
 
+## BUG-300 — Dynamic regex `qr/$var/` / `/$var/` caches across iterations
+
+```sh
+$ stryke -e '
+for my $pat ("orders\\.[^.]*", "errors\\.[^.]*") {
+    my $re = qr/^$pat$/;
+    for my $t ("orders.created", "errors.payment") {
+        printf "%s vs %s -> %d\n", $pat, $t, ($t =~ $re ? 1 : 0);
+    }
+}'
+orders\.[^.]* vs orders.created -> 1
+orders\.[^.]* vs errors.payment -> 0
+errors\.[^.]* vs orders.created -> 1    # ← wrong; should be 0
+errors\.[^.]* vs errors.payment -> 0    # ← wrong; should be 1
+```
+
+Pattern compiled from an interpolated variable inside a loop is cached at
+the source-line site rather than recompiled per iteration. Subsequent
+iterations reuse the first iteration's compiled regex regardless of how
+`$var` changes. `qr//` returned from a function suffers the same fate at
+the caller's use site.
+
+**Workarounds:**
+
+- Avoid dynamic regexes when matching against varying patterns; use
+  segment-by-segment string compare (see `examples/http_router_middleware.stk`
+  for a routing matcher that walks `split m{/}` segments instead of
+  compiling per-route patterns).
+- Use plain string ops when sufficient: `index($haystack, $prefix) == 0`
+  in place of `^prefix.*` regexes (see `examples/pubsub_message_bus.stk`).
+- Literal `qr/^constant$/` patterns work fine; the issue is only with
+  interpolated patterns whose source string varies.
+
+Severity: **bug**. Surfaced while building 9 complex example programs
+(2026-05-24) — bit `pubsub_message_bus.stk` (glob-pattern routing) and
+`http_router_middleware.stk` (path-param compilation) until rewritten to
+non-regex matchers.
+
+
+## BUG-301 — `pmap_reduce { } { }` silently absorbs following statement
+
+```sh
+$ stryke -e '
+my $g = 1:10 |> pmap_reduce { 1 } { _ + _1 };
+p "after pmr"
+p "g = $g"'
+g = 10
+                        # ← "after pmr" was eaten
+```
+
+`pmap_reduce` accepts two blocks (mapper + reducer). The parser keeps
+looking for an *optional third block* after the second one, and at file
+scope it greedily absorbs the next statement — `p "after pmr"` here —
+silently dropping its execution. Behavior is invisible (no warning,
+correct numeric result), so it usually surfaces only when a follow-up
+print or variable update mysteriously fails to run.
+
+**Workaround:** terminate the `pmap_reduce` call with an explicit `;`:
+
+```sh
+my $g = 1:10 |> pmap_reduce { 1 } { _ + _1 };   # ← trailing semicolon
+p "after pmr"                                   # ← now runs
+```
+
+Pinned in `examples/parallel_pi_monte_carlo.stk`,
+`examples/gradient_descent_linreg.stk`, and `examples/csv_etl_parallel.stk`
+(each documents the workaround at the call site).
+
+Severity: **bug**. The same trap exists for any builtin that takes a
+variable number of block arguments. Style rule §0 #4 ("no trailing `;`")
+explicitly carves out this parser-mandated exception.
+
+
+## BUG-302 — Array slice past end fills with `undef` instead of clamping
+
+```sh
+$ stryke -e '
+my @a = (10, 20, 30);
+my @s = @a[0:5];
+printf "len=%d\n", len(@s);
+ep \@s'
+len=6
+[10, 20, 30, undef, undef, undef]
+```
+
+Slicing past the array end pads with `undef` to the requested length
+rather than clamping at the last valid index. Loops over the slice will
+hit autoviv / arrow-deref errors on the trailing `undef` entries.
+
+**Workaround:** clamp before slicing:
+
+```sh
+my $end = $n < len(@a) ? $n - 1 : len(@a) - 1;
+my @s   = $end >= 0 ? @a[0:$end] : ();
+```
+
+Pinned in `examples/tfidf_search_engine.stk` (top-K query result
+truncation) where `@scored[0:$top_k - 1]` previously produced trailing
+undefs when fewer than `$top_k` documents matched the query.
+
+Severity: **polish**. Perl 5 also produces `undef` for out-of-range
+slice indices, so this is arguably parity behavior — but it's surprising
+in stryke given its broader "graceful empty-list contract" elsewhere
+(`sum @empty == 0` etc.).
+
+
 ## How to add to this file
 
 When you find a new behavior worth tracking:
