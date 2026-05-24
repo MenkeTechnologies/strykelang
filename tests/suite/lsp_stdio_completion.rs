@@ -367,7 +367,29 @@ impl LspHarness {
             }),
         );
         let msg = recv_until_result(&mut self.reader, id);
-        msg.get("result").cloned().unwrap_or(Value::Null)
+        // Same normalization as `definition()` — server can return
+        // `Location` | `Location[]` | `LocationLink[]`, callers want
+        // a single `{uri, range}` shape to assert against.
+        let raw = msg.get("result").cloned().unwrap_or(Value::Null);
+        if raw.is_object() && raw.get("range").is_some() {
+            return raw;
+        }
+        if let Some(arr) = raw.as_array() {
+            if let Some(first) = arr.first() {
+                if let (Some(target_uri), Some(target_range)) = (
+                    first.get("targetUri"),
+                    first
+                        .get("targetSelectionRange")
+                        .or_else(|| first.get("targetRange")),
+                ) {
+                    return json!({ "uri": target_uri, "range": target_range });
+                }
+                if first.get("range").is_some() {
+                    return first.clone();
+                }
+            }
+        }
+        raw
     }
 
     fn prepare_rename(&mut self, line: u32, character: u32) -> Value {
