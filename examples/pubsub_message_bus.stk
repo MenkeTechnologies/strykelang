@@ -1,0 +1,141 @@
+#!/usr/bin/env stryke
+
+# Topic-based pub/sub message bus over `pchannel` + `spawn`.
+#
+# A broker thread routes published messages to a fan-out of per-subscriber
+# channels filtered by topic-pattern. Subscribers run in worker threads,
+# pulling messages from their personal channels until a sentinel arrives.
+#
+# Demonstrates:
+#   * `pchannel` for typed inter-thread message passing.
+#   * `spawn { … }` for detached worker threads.
+#   * `mysync` for race-free shared counters / collected output.
+#   * Topic-pattern routing (`orders.*` matches `orders.created`).
+#   * Graceful shutdown via sentinel-value broadcast.
+#
+# Run: stryke --no-interop examples/pubsub_message_bus.stk
+
+p "── Pub/Sub Message Bus ────────────────────────────────"
+
+# ── 1. Broker — owns the publish channel and a registry of subscribers ──
+
+my ($pub_tx, $pub_rx) = pchannel(1024)
+
+# Subscriber registry: each entry = { pattern => str, tx => sender, name => str }
+mysync @subs = ()
+
+# Patterns are tiny — match by prefix (`orders.*` → starts-with `orders.`)
+# or wildcard (`*` → match anything). Avoids the regex-caching quirks that
+# bite dynamic /$re/ interpolation in stryke.
+fn Bus::matches($pattern, $topic) {
+    return 1 if $pattern eq "*"
+    if ($pattern =~ /^([^*]+)\.\*$/) {
+        my $prefix = $1 . "."
+        return index($topic, $prefix) == 0
+    }
+    $topic eq $pattern
+}
+
+fn Bus::subscribe($name, $pattern) {
+    my ($tx, $rx) = pchannel(64)
+    push @subs, +{ name => $name, pattern => $pattern, tx => $tx }
+    $rx
+}
+
+# ── 2. Broker thread — fans messages out to matching subscribers ──
+
+mysync $delivered = 0
+
+spawn {
+    while (1) {
+        my $msg = $pub_rx->recv()
+        last unless defined $msg
+        # sentinel: undef closes the broker; tell all subscribers to drain too
+        if ($msg->{topic} eq "__shutdown__") {
+            _->{tx}->send(undef) for @subs
+            last
+        }
+        for my $s (@subs) {
+            if (Bus::matches $s->{pattern}, $msg->{topic}) {
+                $s->{tx}->send($msg)
+                $delivered++
+            }
+        }
+    }
+}
+
+# ── 3. Subscribers — each is its own worker thread ──
+
+mysync @log = ()
+
+fn Bus::run_subscriber($name, $rx) {
+    while (1) {
+        my $msg = $rx->recv()
+        last unless defined $msg
+        push @log, "$name: " . $msg->{topic} . " " . $msg->{body}
+    }
+}
+
+my $orders_rx = Bus::subscribe "orders-svc", "orders.*"
+my $audit_rx  = Bus::subscribe "audit-log",  "*"                # all topics
+my $errors_rx = Bus::subscribe "alerts",     "errors.*"
+
+spawn { Bus::run_subscriber "orders-svc", $orders_rx }
+spawn { Bus::run_subscriber "audit-log",  $audit_rx  }
+spawn { Bus::run_subscriber "alerts",     $errors_rx }
+
+# Give the workers a moment to attach
+sleep 0.05
+
+# ── 4. Publish a stream of events ─────────────────────────────────
+
+my @events = (
+    +{ topic => "orders.created", body => "ord#42 user=alice"  },
+    +{ topic => "orders.shipped", body => "ord#42 carrier=ups" },
+    +{ topic => "errors.payment", body => "ord#42 reason=card_declined" },
+    +{ topic => "orders.refunded",body => "ord#42 amount=42.00" },
+    +{ topic => "metrics.cpu",    body => "host=web01 pct=87" },
+    +{ topic => "errors.queue",   body => "queue=jobs depth=512" },
+    +{ topic => "orders.cancelled", body => "ord#42 actor=alice" },
+)
+
+p "Publishing #{ len @events } events…"
+$pub_tx->send(_) for @events
+
+# Send shutdown sentinel last
+$pub_tx->send(+{ topic => "__shutdown__", body => "" })
+
+# ── 5. Let workers drain, then summarize ──────────────────────────
+
+sleep 0.2
+
+p ""
+p "── Delivery log (newest last) ─────────────────────────"
+p "  $_" for sort @log
+
+p ""
+p "Total events published    : #{ len @events }"
+p "Total dispatch operations : $delivered"
+
+# ── 6. Tests ───────────────────────────────────────────────────────
+
+my $orders_count = grep { /^orders-svc:/ } @log
+my $audit_count  = grep { /^audit-log:/ } @log
+my $alert_count  = grep { /^alerts:/ } @log
+
+# orders.* matches: created, shipped, refunded, cancelled = 4
+$orders_count |> aeq 4, "orders-svc saw 4 events (orders.*)"
+# audit '*' should see ALL non-shutdown events = 7
+$audit_count  |> aeq 7, "audit-log saw all 7 events (*)"
+# errors.* matches: payment, queue = 2
+$alert_count  |> aeq 2, "alerts saw 2 events (errors.*)"
+
+# Broker counts every successful delivery — 4 + 7 + 2 = 13
+$delivered    |> aeq 13, "broker delivered 13 messages total"
+
+# Spot-check ordering: per-subscriber, messages preserve send order.
+my @order_msgs = grep { /^orders-svc:/ } @log
+$order_msgs[0] =~ /orders\.created/  |> aok "first to orders-svc is orders.created"
+$order_msgs[-1] =~ /orders\.cancelled/ |> aok "last to orders-svc is orders.cancelled"
+
+test_run

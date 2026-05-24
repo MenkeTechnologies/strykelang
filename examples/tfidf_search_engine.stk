@@ -1,0 +1,147 @@
+#!/usr/bin/env stryke
+
+# TF-IDF Search Engine
+#
+# Builds a TF-IDF inverted index across a small document corpus and ranks
+# query results by cosine similarity against query-vector.
+#
+# Demonstrates:
+#   * Tokenization + normalization pipeline (`~>` thread macro)
+#   * Hash-of-hash term frequency tables
+#   * Inverse-document-frequency computation across the corpus
+#   * Cosine similarity scoring for ranking
+#   * `pmaps` to parallelize per-document scoring
+#
+# Run: stryke --no-interop examples/tfidf_search_engine.stk
+
+p "── TF-IDF Search Engine ───────────────────────────────"
+
+# ── 1. Corpus ──────────────────────────────────────────────────────
+
+my %corpus = (
+    doc1 => "The quick brown fox jumps over the lazy dog",
+    doc2 => "A quick brown fox is fast and clever",
+    doc3 => "Lazy programmers write quick fixes",
+    doc4 => "The dog barks at the fox in the yard",
+    doc5 => "Clever foxes outsmart slow dogs every time",
+)
+
+# ── 2. Tokenize: lowercase, strip punctuation, drop stopwords ─────
+
+my %stop = map { _ => 1 } qw(the a an is at in of on and or to for but)
+
+fn Search::tokenize($text) {
+    ~> $text \
+        lc \
+        >{ _ =~ s/[^a-z0-9 ]/ /gr } \
+        split(/\s+/) \
+        grep { len _ && !$stop{_} }
+}
+
+# ── 3. Build per-doc term frequency ────────────────────────────────
+
+my %tf      # doc_id -> { term -> count }
+my %doc_len # doc_id -> total tokens
+
+for my $doc_id (keys %corpus) {
+    my @tokens = Search::tokenize $corpus{$doc_id}
+    $doc_len{$doc_id} = len @tokens
+    my %counts
+    $counts{_}++ for @tokens
+    $tf{$doc_id} = \%counts
+}
+
+p "Indexed #{ len keys %corpus } documents."
+
+# ── 4. Compute inverse document frequency (idf) ────────────────────
+
+my %df     # term -> number of docs containing it
+for my $doc_id (keys %tf) {
+    for my $term (keys %{ $tf{$doc_id} }) {
+        $df{$term}++
+    }
+}
+
+my $N = len keys %corpus
+my %idf = map { _ => log($N / $df{_}) } keys %df
+
+# ── 5. Build TF-IDF vectors (doc_id -> { term -> weight }) ─────────
+
+my %vec
+for my $doc_id (keys %tf) {
+    my %v
+    my $dl = $doc_len{$doc_id}
+    for my $term (keys %{ $tf{$doc_id} }) {
+        my $tf_norm = $tf{$doc_id}{$term} / $dl
+        $v{$term} = $tf_norm * $idf{$term}
+    }
+    $vec{$doc_id} = \%v
+}
+
+# ── 6. Cosine similarity helper ────────────────────────────────────
+
+fn Search::cosine($va, $vb) {
+    my $dot   = 0
+    my $na_sq = 0
+    my $nb_sq = 0
+    for my $t (keys %$va) {
+        $na_sq += $va->{$t} ** 2
+        $dot   += $va->{$t} * ($vb->{$t} // 0)
+    }
+    $nb_sq += _ ** 2 for values %$vb
+    my $denom = sqrt($na_sq) * sqrt($nb_sq)
+    $denom > 0 ? $dot / $denom : 0
+}
+
+# ── 7. Score query against every doc (parallel) ────────────────────
+
+fn Search::query($query_text, $top_k = 3) {
+    my @qtokens = Search::tokenize $query_text
+    my %qtf
+    $qtf{_}++ for @qtokens
+    my $ql = len @qtokens
+
+    my %qvec
+    for my $t (keys %qtf) {
+        next unless defined $idf{$t}
+        $qvec{$t} = ($qtf{$t} / $ql) * $idf{$t}
+    }
+
+    my @scored = ~> (keys %vec) \
+        pmaps { [ _ => Search::cosine \%qvec, $vec{_} ] } \
+        collect \
+        grep { _->[1] > 0 } \
+        sort { _1->[1] <=> _->[1] }
+
+    my $limit = $top_k < len(@scored) ? $top_k : len(@scored)
+    @scored[0:$limit - 1]
+}
+
+# ── 8. Run sample queries ──────────────────────────────────────────
+
+for my $q ("quick fox", "lazy dog", "clever programmers", "barks yard") {
+    p ""
+    p "Query: \"$q\""
+    my @results = Search::query $q
+    for my $r (@results) {
+        printf "  %.4f  %s — %s\n", $r->[1], $r->[0], $corpus{$r->[0]}
+    }
+}
+
+# ── 9. Tests ───────────────────────────────────────────────────────
+
+p ""
+my @r1 = Search::query "quick fox"
+my $top1 = $r1[0]->[0]
+($top1 eq "doc1" || $top1 eq "doc2") |> aok "top hit for 'quick fox' is doc1 or doc2"
+
+my @r2 = Search::query "lazy dog"
+$r2[0]->[0] |> aeq "doc1", "top hit for 'lazy dog' is doc1"
+
+my @r3 = Search::query "clever programmers"
+my $clever_top = $r3[0]->[0]
+($clever_top eq "doc3" || $clever_top eq "doc2") |> aok "'clever programmers' resolves to a doc mentioning either word"
+
+(len keys %idf) > 10 |> aok "idf populated for many distinct terms"
+
+test_run

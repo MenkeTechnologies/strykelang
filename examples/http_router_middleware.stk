@@ -1,0 +1,224 @@
+#!/usr/bin/env stryke
+
+# HTTP-like router with middleware chain and path parameters.
+#
+# Implements an Express/Sinatra-style router over a tiny in-memory request
+# model. Supports:
+#   * Methods (GET / POST / DELETE).
+#   * Path parameters (/users/:id, /orders/:id/items/:item).
+#   * A middleware chain that wraps every route (auth, logging, rate-limit).
+#   * Composition: middleware can short-circuit by returning a Response,
+#     or chain through to the wrapped handler.
+#
+# Demonstrates:
+#   * Compiling a route pattern into a regex with named captures.
+#   * `fn` values stored in a hash for handler dispatch.
+#   * Higher-order middleware composition (`mw1 → mw2 → handler`).
+#   * Realistic auth + rate-limit logic.
+#
+# Run: stryke --no-interop examples/http_router_middleware.stk
+
+p "── HTTP Router with Middleware ────────────────────────"
+
+# ── 1. Compile a path pattern (`/users/:id`) into a per-segment matcher ─
+#
+# Each segment is either a literal (`users`) or a `:name` capture. We
+# match by walking the segment list — no regex, sidestepping stryke's
+# dynamic-pattern caching quirks.
+
+fn Router::compile_pattern($pattern) {
+    my @segs = split m{/}, $pattern
+    shift @segs if @segs && $segs[0] eq ""        # leading `/` → empty seg
+    my @spec
+    for my $s (@segs) {
+        if ($s =~ /^:(.+)$/) {
+            push @spec, +{ kind => "param", name => $1 }
+        } else {
+            push @spec, +{ kind => "lit",   value => $s }
+        }
+    }
+    +{ spec => \@spec }
+}
+
+fn Router::match_pattern($compiled, $path) {
+    my @segs = split m{/}, $path
+    shift @segs if @segs && $segs[0] eq ""
+    my $spec = $compiled->{spec}
+    return undef if len(@segs) != len(@$spec)
+    my %params
+    for my $i (0:len(@$spec) - 1) {
+        my $s = $spec->[$i]
+        if ($s->{kind} eq "lit") {
+            return undef if $segs[$i] ne $s->{value}
+        } else {
+            $params{ $s->{name} } = $segs[$i]
+        }
+    }
+    \%params
+}
+
+# ── 2. Router registry ────────────────────────────────────────────
+
+my @routes      # list of { method, pattern, compiled, handler }
+mysync @middlewares = ()
+
+fn Router::register($method, $pattern, $handler) {
+    my $c = Router::compile_pattern $pattern
+    push @routes, +{ method => $method, pattern => $pattern, compiled => $c, handler => $handler }
+}
+
+fn Router::use($mw) { push @middlewares, $mw }
+
+# ── 3. Dispatch ───────────────────────────────────────────────────
+
+fn Router::match_route($req) {
+    for my $r (@routes) {
+        next unless $r->{method} eq $req->{method}
+        my $params = Router::match_pattern $r->{compiled}, $req->{path}
+        return +{ route => $r, params => $params } if defined $params
+    }
+    undef
+}
+
+# Compose middleware chain — last middleware wraps the handler innermost.
+fn Router::dispatch($req) {
+    my $hit = Router::match_route $req
+    return +{ status => 404, body => "not found: $req->{method} $req->{path}" } unless $hit
+    $req->{params} = $hit->{params}
+    my $route      = $hit->{route}
+
+    my $handler = $route->{handler}
+    # Wrap from innermost to outermost so the first registered middleware is
+    # the outermost (runs first).
+    for my $mw (rev @middlewares) {
+        my $next = $handler
+        $handler = fn { $mw->(_, $next) }
+    }
+    $handler->($req)
+}
+
+# ── 4. Middleware: logger, auth, rate-limit ─────────────────────
+
+mysync @access_log = ()
+
+Router::use fn {
+    my ($req, $next) = (_, _1)
+    push @access_log, "$req->{method} $req->{path}"
+    my $res = $next->($req)
+    $res
+}
+
+Router::use fn {
+    my ($req, $next) = (_, _1)
+    return +{ status => 401, body => "missing token" } unless $req->{headers}{authorization}
+    return +{ status => 403, body => "bad token"     } unless $req->{headers}{authorization} eq "Bearer secret-xyz"
+    $req->{user} = +{ id => 42, name => "alice" }
+    $next->($req)
+}
+
+mysync %rate
+Router::use fn {
+    my ($req, $next) = (_, _1)
+    my $ip = $req->{ip} // "unknown"
+    $rate{$ip} //= 0
+    $rate{$ip}++
+    return +{ status => 429, body => "rate limited" } if $rate{$ip} > 5
+    $next->($req)
+}
+
+# ── 5. Routes ─────────────────────────────────────────────────────
+
+Router::register "GET", "/", fn {
+    +{ status => 200, body => "welcome, #{ _->{user}{name} }" }
+}
+
+Router::register "GET", "/users/:id", fn {
+    my $req = _
+    +{ status => 200, body => "user #{ $req->{params}{id} } viewed by #{ $req->{user}{name} }" }
+}
+
+Router::register "GET", "/orders/:oid/items/:iid", fn {
+    my $req = _
+    +{ status => 200, body => "order=#{ $req->{params}{oid} } item=#{ $req->{params}{iid} }" }
+}
+
+Router::register "POST", "/users", fn {
+    my $req = _
+    +{ status => 201, body => "created user from " . $req->{body} }
+}
+
+Router::register "DELETE", "/users/:id", fn {
+    my $req = _
+    +{ status => 204, body => "deleted #{ $req->{params}{id} }" }
+}
+
+# ── 6. Drive a sequence of requests ───────────────────────────────
+
+fn Router::make_req($method, $path, %opts) {
+    +{
+        method  => $method,
+        path    => $path,
+        headers => $opts{headers} // +{ authorization => "Bearer secret-xyz" },
+        body    => $opts{body}    // "",
+        ip      => $opts{ip}      // "10.0.0.1",
+    }
+}
+
+my @cases = (
+    Router::make_req("GET",    "/"),
+    Router::make_req("GET",    "/users/7"),
+    Router::make_req("GET",    "/orders/A100/items/X1"),
+    Router::make_req("POST",   "/users", body => '{"name":"bob"}'),
+    Router::make_req("DELETE", "/users/7"),
+    Router::make_req("GET",    "/missing"),
+    Router::make_req("GET",    "/users/9", headers => +{}),                                    # no auth
+    Router::make_req("GET",    "/users/9", headers => +{ authorization => "Bearer wrong" }),   # bad auth
+)
+
+p "Dispatching #{ len @cases } requests…"
+my @responses
+for my $req (@cases) {
+    my $res = Router::dispatch $req
+    push @responses, $res
+    printf "  %-6s %-30s → %d  %s\n",
+        $req->{method}, $req->{path}, $res->{status}, $res->{body}
+}
+
+# Now hammer the rate-limiter from a different IP
+p ""
+p "── Rate-limit exhaustion (6 requests from 10.0.0.99) ──"
+my @rate_res
+for my $i (1:6) {
+    my $req = Router::make_req("GET", "/users/$i", ip => "10.0.0.99")
+    my $res = Router::dispatch $req
+    push @rate_res, $res
+    printf "  req #%d → %d  %s\n", $i, $res->{status}, $res->{body}
+}
+
+p ""
+p "── Access log (#{ len @access_log } entries) ──"
+p "  $_" for @access_log[0:9]
+
+# ── 7. Tests ───────────────────────────────────────────────────────
+
+p ""
+
+$responses[0]->{status} |> aeq 200, "GET / → 200"
+$responses[1]->{status} |> aeq 200, "GET /users/7 → 200"
+$responses[1]->{body} =~ /user 7/ |> aok "user id captured"
+$responses[2]->{status} |> aeq 200, "GET /orders/A100/items/X1 → 200"
+$responses[2]->{body} =~ /order=A100/ |> aok "order id captured"
+$responses[2]->{body} =~ /item=X1/    |> aok "item id captured"
+$responses[3]->{status} |> aeq 201, "POST /users → 201"
+$responses[4]->{status} |> aeq 204, "DELETE /users/7 → 204"
+$responses[5]->{status} |> aeq 404, "/missing → 404"
+$responses[6]->{status} |> aeq 401, "no auth → 401"
+$responses[7]->{status} |> aeq 403, "bad token → 403"
+
+# Rate-limit fires on the 6th request (limit is 5)
+$rate_res[4]->{status} |> aeq 200, "5th request to /users/N still OK"
+$rate_res[5]->{status} |> aeq 429, "6th request hits rate limit"
+
+(len @access_log >= 8) |> aok "access log captured all dispatched requests"
+
+test_run
