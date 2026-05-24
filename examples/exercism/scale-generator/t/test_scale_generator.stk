@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+require "./ScaleGenerator.stk"
+
+fn j { join(",", @{_}) }
+
+assert_eq j(Exercism::ScaleGenerator::chromatic_scale("C")), "C,C#,D,D#,E,F,F#,G,G#,A,A#,B", "C chromatic"
+assert_eq j(Exercism::ScaleGenerator::chromatic_scale("F")), "F,Gb,G,Ab,A,Bb,B,C,Db,D,Eb,E", "F chromatic (flats)"
+assert_eq j(Exercism::ScaleGenerator::scale("C", "MMmMMMm")), "C,D,E,F,G,A,B,C", "C major"
+assert_eq j(Exercism::ScaleGenerator::scale("G", "MMmMMMm")), "G,A,B,C,D,E,F#,G", "G major"
+assert_eq j(Exercism::ScaleGenerator::scale("D", "MMmMMMm")), "D,E,F#,G,A,B,C#,D", "D major"
+
+test_run

@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+require "./Bowling.stk"
+
+fn play {
+    my $g = Exercism::Bowling::new()
+    for my $r (@{_}) { $g = Exercism::Bowling::roll($g, $r) }
+    $g
+}
+
+assert_eq Exercism::Bowling::score(play([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])), 0,   "all zeros"
+assert_eq Exercism::Bowling::score(play([1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1])), 20,  "all 1s"
+assert_eq Exercism::Bowling::score(play([10,10,10,10,10,10,10,10,10,10,10,10])),     300, "perfect"
+assert_eq Exercism::Bowling::score(play([5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5])), 150, "all spares (21 rolls)"
+assert_eq Exercism::Bowling::score(play([5,5,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])), 16,  "spare with bonus"
+
+test_run

@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+
+fn Exercism::BoutiqueInventory::sort_by_price       = [sort { $a->{price} <=> $b->{price} } @{_}]
+fn Exercism::BoutiqueInventory::with_missing_price  = [grep { !defined $_->{price} } @{_}]
+
+fn Exercism::BoutiqueInventory::update_names {
+    my ($inv, $old, $new) = (_, _1, _2)
+    [map { my $n = $_; +{ %{$n}, name => ($n->{name} =~ s/\Q$old\E/$new/r) } } @{$inv}]
+}
+
+fn Exercism::BoutiqueInventory::increase_quantity {
+    my ($item, $by) = (_, _1)
+    my %new_sizes
+    for my $sz (keys %{$item->{quantity_by_size}}) {
+        $new_sizes{$sz} = $item->{quantity_by_size}{$sz} + $by
+    }
+    +{ %{$item}, quantity_by_size => \%new_sizes }
+}
+
+fn Exercism::BoutiqueInventory::total_quantity {
+    my $sizes = _->{quantity_by_size}
+    my $s     = 0
+    $s += $sizes->{$_} for keys %{$sizes}
+    $s
+}

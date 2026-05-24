@@ -1,0 +1,9 @@
+#!/usr/bin/env stryke
+require "./Prism.stk"
+
+assert_eq Exercism::Prism::surface_area(1,1,1), 6,   "unit cube"
+assert_eq Exercism::Prism::surface_area(2,3,4), 52,  "2x3x4"
+assert_eq Exercism::Prism::volume(1,1,1),       1,   "unit volume"
+assert_eq Exercism::Prism::volume(2,3,4),       24,  "2x3x4 vol"
+
+test_run

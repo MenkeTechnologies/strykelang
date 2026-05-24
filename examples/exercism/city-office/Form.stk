@@ -1,10 +1,10 @@
 #!/usr/bin/env stryke
 
-fn Exercism::CityOffice::blanks       = "X" x _
-fn Exercism::CityOffice::letters      = [split //, uc(_)]
-fn Exercism::CityOffice::check_length = len(_) - _1 <= 0 ? "ok" : ["error", len(_) - _1]
+fn Exercism::CityOffice::blanks($n)              = "X" x $n
+fn Exercism::CityOffice::letters($w)             = [split //, uc($w)]
+fn Exercism::CityOffice::check_length($w, $max)  = len($w) - $max <= 0 ? "ok" : ["error", len($w) - $max]
 
-fn Exercism::CityOffice::format_address {
-    my ($s, $p, $c) = ref(_) eq 'HASH' ? (_->{street}, _->{postal_code}, _->{city}) : @{_}
+fn Exercism::CityOffice::format_address($a) {
+    my ($s, $p, $c) = ref($a) eq 'HASH' ? ($a->{street}, $a->{postal_code}, $a->{city}) : @{$a}
     "#{uc($s)}\n#{uc($p)} #{uc($c)}\n"
 }

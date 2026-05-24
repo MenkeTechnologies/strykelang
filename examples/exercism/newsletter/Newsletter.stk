@@ -1,0 +1,13 @@
+#!/usr/bin/env stryke
+
+# `read_emails(text)` — split on newlines, trim, return as arrayref.
+fn Exercism::Newsletter::read_emails($text) = [grep { len($_) > 0 } map { $_ =~ s/^\s+|\s+$//rg } split /\n/, $text]
+
+# `send_newsletter(emails, log, send_fn)` — invoke `send_fn` on each
+# email; on `"ok"` return, append to `log` arrayref.
+fn Exercism::Newsletter::send_newsletter($emails, $log, $send_fn) {
+    for my $e (@{$emails}) {
+        push @{$log}, $e if $send_fn->($e) eq "ok"
+    }
+    $log
+}

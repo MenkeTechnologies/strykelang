@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+require "./GameOfLife.stk"
+
+fn j { join("|", map { join(",", @{$_}) } @{_}) }
+
+# Empty/dead.
+assert_eq j(Exercism::GameOfLife::tick([[0,0],[0,0]])), "0,0|0,0", "all dead stays"
+
+# Block (still life).
+my $block = [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]]
+assert_eq j(Exercism::GameOfLife::tick($block)), j($block), "block is stable"
+
+# Blinker (oscillator) — vertical → horizontal.
+my $bv = [[0,1,0],[0,1,0],[0,1,0]]
+my $bh = [[0,0,0],[1,1,1],[0,0,0]]
+assert_eq j(Exercism::GameOfLife::tick($bv)), j($bh), "blinker v → h"
+assert_eq j(Exercism::GameOfLife::tick($bh)), j($bv), "blinker h → v"
+
+test_run

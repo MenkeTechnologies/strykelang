@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+require "./StackUnderflow.stk"
+
+fn j { join(",", @{_}) }
+
+assert_eq j(Exercism::StackUnderflow::add([1,2])),   "3", "add"
+assert_eq j(Exercism::StackUnderflow::sub([5,3])),   "2", "sub"
+assert_eq j(Exercism::StackUnderflow::mul([4,3])),   "12", "mul"
+assert_eq j(Exercism::StackUnderflow::div([10,2])),  "5", "div"
+assert_eq j(Exercism::StackUnderflow::div([2,3,8,2])), "2,3,4", "div leaves rest"
+
+assert_eq Exercism::StackUnderflow::safe_div([1]),    "stack underflow",  "underflow"
+assert_eq Exercism::StackUnderflow::safe_div([5,0]),  "division by zero", "div0"
+
+test_run

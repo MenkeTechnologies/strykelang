@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+
+# Binary tree zipper. Node = { value, left, right }. Zipper = [tree, crumbs].
+fn Exercism::Zipper::from_tree = [_, []]
+fn Exercism::Zipper::to_tree   { my $z = _; my $z2 = $z; while (@{$z2->[1]}) { $z2 = Exercism::Zipper::up($z2) }; $z2->[0] }
+
+fn Exercism::Zipper::value     = _->[0]{value}
+fn Exercism::Zipper::left      { my $z = _; return undef unless $z->[0]{left}; [$z->[0]{left},  [@{$z->[1]}, ["left",  $z->[0]]]] }
+fn Exercism::Zipper::right     { my $z = _; return undef unless $z->[0]{right}; [$z->[0]{right}, [@{$z->[1]}, ["right", $z->[0]]]] }
+
+fn Exercism::Zipper::up {
+    my $z = _
+    return undef unless @{$z->[1]}
+    my @crumbs = @{$z->[1]}
+    my $top    = pop @crumbs
+    my ($dir, $parent) = @{$top}
+    my $rebuilt = +{ %{$parent}, $dir => $z->[0] }
+    [$rebuilt, \@crumbs]
+}
+
+fn Exercism::Zipper::set_value { my ($z, $v) = (_, _1); [+{ %{$z->[0]}, value => $v }, $z->[1]] }
+fn Exercism::Zipper::set_left  { my ($z, $t) = (_, _1); [+{ %{$z->[0]}, left  => $t }, $z->[1]] }
+fn Exercism::Zipper::set_right { my ($z, $t) = (_, _1); [+{ %{$z->[0]}, right => $t }, $z->[1]] }

@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+
+# Search `pattern` across given `files`. Flags:
+#   -n   prefix line number
+#   -l   only print file names with matches
+#   -i   case-insensitive
+#   -v   invert match
+#   -x   match whole line
+# Output always prefixes each match with `filename:` when len(files) > 1.
+fn Exercism::Grep::grep {
+    my ($pattern, $flags, $files) = (_, _1, _2)
+    my $iflag = $flags =~ /i/ ? 1 : 0
+    my $vflag = $flags =~ /v/ ? 1 : 0
+    my $xflag = $flags =~ /x/ ? 1 : 0
+    my $nflag = $flags =~ /n/ ? 1 : 0
+    my $lflag = $flags =~ /l/ ? 1 : 0
+    my $multi = @{$files} > 1
+
+    my $qp        = quotemeta($pattern)
+    my $regex_str = $xflag ? "^" . $qp . '$' : $qp
+    my $re = $iflag ? qr/(?i)$regex_str/ : qr/$regex_str/
+
+    my @out
+    for my $f (@{$files}) {
+        my $content = ref($f) eq 'HASH' ? $f->{content} : ""
+        my $name    = ref($f) eq 'HASH' ? $f->{name}    : $f
+        my @lines   = split /\n/, $content, -1
+        pop @lines if @lines && $lines[-1] eq ""
+        my $hit = 0
+        for my $i (0..$#lines) {
+            my $m = $lines[$i] =~ $re ? 1 : 0
+            $m = !$m if $vflag
+            next unless $m
+            $hit = 1
+            next if $lflag
+            my $line = $multi ? "$name:" : ""
+            $line .= ($i + 1) . ":" if $nflag
+            $line .= $lines[$i]
+            push @out, $line
+        }
+        push @out, $name if $lflag && $hit
+    }
+    join("\n", @out) . (@out ? "\n" : "")
+}

@@ -2,14 +2,7 @@
 
 const my @CLASSES = qw(D H J K L M N R T Y)
 
-# Pick a random planet class letter.
-fn Exercism::CaptainsLog::random_planet_class = $CLASSES[int(rand() * len(@CLASSES))]
-
-# Random ship registry number formatted as "NCC-NNNN" (1000..9999).
-fn Exercism::CaptainsLog::random_ship_registry_number = sprintf("NCC-%d", int(rand() * 9000) + 1000)
-
-# Random stardate in the range 41000.0..42000.0.
-fn Exercism::CaptainsLog::random_stardate = rand() * 1000.0 + 41000.0
-
-# Format a stardate to one decimal place.
-fn Exercism::CaptainsLog::format_stardate = sprintf("%.1f", _0)
+fn Exercism::CaptainsLog::random_planet_class           = $CLASSES[int(rand() * len(@CLASSES))]
+fn Exercism::CaptainsLog::random_ship_registry_number   = sprintf("NCC-%d", int(rand() * 9000) + 1000)
+fn Exercism::CaptainsLog::random_stardate               = rand() * 1000.0 + 41000.0
+fn Exercism::CaptainsLog::format_stardate($s)           = sprintf("%.1f", $s)

@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+require "./WordSearch.stk"
+
+my $grid = ["jefblpepre","camdcimgtc","oivokprjsm","pbwasqroua","rixilelhrs","wolcqlirpc","screeaumgr","alxhpburyi","jalaycalmp","clojurermt"]
+
+my $r = Exercism::WordSearch::search($grid, ["clojure"])
+assert_eq $r->{clojure}{start}[0], 9, "clojure starts row 9"
+assert_eq $r->{clojure}{start}[1], 0, "clojure starts col 0"
+assert_eq $r->{clojure}{end}[0],   9, "clojure ends row 9"
+
+my $r2 = Exercism::WordSearch::search($grid, ["NOTHING"])
+assert_eq $r2->{NOTHING}, undef, "missing word → undef"
+
+test_run

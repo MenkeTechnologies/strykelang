@@ -1,0 +1,13 @@
+#!/usr/bin/env stryke
+require "./Ledger.stk"
+
+my $h = Exercism::Ledger::format_entries("USD", "en-US", [])
+assert_eq $h, "Date       | Description               | Change       ", "header only"
+
+my $out = Exercism::Ledger::format_entries("USD", "en-US", [
+    { date => "2015-01-01", desc => "Buy present", change => -1000 },
+])
+assert_ok $out =~ /01\/01\/2015\s*\|/, "date formatted us"
+assert_ok $out =~ /Buy present/,        "desc shown"
+
+test_run

@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+
+fn Exercism::Change::generate($coins, $target) {
+    return ["error", "cannot change"] if $target < 0
+    return ["ok", []] if $target == 0
+    my @sorted = sort { $a <=> $b } @{$coins}
+    my @best
+    $best[0] = []
+    for my $amt (1..$target) {
+        for my $c (@sorted) {
+            last if $c > $amt
+            next unless defined $best[$amt - $c]
+            my @cand = (@{$best[$amt - $c]}, $c)
+            if (!defined $best[$amt] || @cand < @{$best[$amt]}) {
+                $best[$amt] = \@cand
+            }
+        }
+    }
+    defined $best[$target] ? ["ok", [sort { $a <=> $b } @{$best[$target]}]] : ["error", "cannot change"]
+}

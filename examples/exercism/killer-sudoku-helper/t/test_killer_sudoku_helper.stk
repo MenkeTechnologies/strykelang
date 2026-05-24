@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+require "./KillerSudokuHelper.stk"
+
+fn j { join("|", map { join(",", @{$_}) } @{_}) }
+
+assert_eq j(Exercism::KillerSudokuHelper::combinations(2, 3)),  "1,2",                "size=2 sum=3"
+assert_eq j(Exercism::KillerSudokuHelper::combinations(2, 5)),  "1,4|2,3",            "size=2 sum=5"
+assert_eq j(Exercism::KillerSudokuHelper::combinations(3, 6)),  "1,2,3",              "size=3 sum=6"
+assert_eq j(Exercism::KillerSudokuHelper::combinations(2, 17)), "8,9",                "size=2 sum=17"
+assert_eq j(Exercism::KillerSudokuHelper::combinations(2, 20)), "",                   "impossible"
+
+my $c = Exercism::KillerSudokuHelper::combinations(3, 12)
+my $filt = Exercism::KillerSudokuHelper::filter($c, [5])
+my $has_5 = 0
+for my $combo (@{$filt}) { for my $d (@{$combo}) { $has_5 = 1 if $d == 5 } }
+assert_eq $has_5, 0, "exclude 5 → no 5 in any combo"
+my $cnt = 0
+for (@{$filt}) { $cnt++ }
+assert_ok $cnt > 0, "still finds some combos"
+
+test_run

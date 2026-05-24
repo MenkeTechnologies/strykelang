@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+
+fn Exercism::Pov::from_pov($tree, $from) {
+    my $path = Exercism::Pov::_path_to($tree, $from)
+    return undef unless $path
+    Exercism::Pov::_reroot($path)
+}
+
+fn Exercism::Pov::_path_to($tree, $target) {
+    return [$tree] if $tree->{value} eq $target
+    for my $c (@{$tree->{children}}) {
+        my $p = Exercism::Pov::_path_to($c, $target)
+        return [$tree, @{$p}] if $p
+    }
+    undef
+}
+
+fn Exercism::Pov::_reroot($path) {
+    my $new = { value => $path->[-1]{value}, children => [@{$path->[-1]{children}}] }
+    my $cur = $new
+    for my $i (reverse 0..$#{$path} - 1) {
+        my $parent = $path->[$i]
+        my @sib = grep { $_->{value} ne $cur->{value} } @{$parent->{children}}
+        push @{$cur->{children}}, { value => $parent->{value}, children => \@sib }
+        $cur = $cur->{children}[-1]
+    }
+    $new
+}
+
+fn Exercism::Pov::path_between($tree, $from, $to) {
+    my $rerooted = Exercism::Pov::from_pov($tree, $from)
+    return undef unless $rerooted
+    my $p = Exercism::Pov::_path_to($rerooted, $to)
+    $p ? [map { $_->{value} } @{$p}] : undef
+}

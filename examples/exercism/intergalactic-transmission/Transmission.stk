@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+
+fn Exercism::Transmission::get_transmit_sequence($msg) {
+    my @out
+    for my $c (split //, $msg) {
+        my $bits = sprintf("%08b", ord($c))
+        my $par  = ($bits =~ tr/1/1/) % 2
+        push @out, "$par$c"
+    }
+    join "", @out
+}
+
+fn Exercism::Transmission::decode_message($received) {
+    my @chars = split //, $received
+    return ["error", "odd length"] if @chars % 2
+    my $out = ""
+    while (@chars) {
+        my ($p, $c) = (shift @chars, shift @chars)
+        my $expect = (sprintf("%08b", ord($c)) =~ tr/1/1/) % 2
+        return ["error", "parity mismatch"] unless $p == $expect
+        $out .= $c
+    }
+    ["ok", $out]
+}

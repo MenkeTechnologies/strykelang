@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+
+fn Exercism::VariableLengthQuantity::encode($ns) {
+    my @bytes
+    for my $n (@{$ns}) {
+        my @parts = ($n & 0x7f)
+        my $m = $n >> 7
+        while ($m > 0) { unshift @parts, ($m & 0x7f) | 0x80; $m >>= 7 }
+        push @bytes, @parts
+    }
+    \@bytes
+}
+
+fn Exercism::VariableLengthQuantity::decode($bytes) {
+    my @out
+    my $cur = 0
+    my $in  = 0
+    for my $b (@{$bytes}) {
+        $cur = ($cur << 7) | ($b & 0x7f)
+        if ($b & 0x80) { $in = 1 } else { push @out, $cur; $cur = 0; $in = 0 }
+    }
+    return ["error", "incomplete sequence"] if $in
+    ["ok", \@out]
+}

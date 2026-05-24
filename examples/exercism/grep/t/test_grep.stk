@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+require "./Grep.stk"
+
+my $f1 = { name => "a.txt", content => "Hello world\nLine two\nGoodbye world\n" }
+my $f2 = { name => "b.txt", content => "another\nworld here\n" }
+
+assert_eq Exercism::Grep::grep("world", "",  [$f1]),         "Hello world\nGoodbye world\n",                       "single file"
+assert_eq Exercism::Grep::grep("world", "n", [$f1]),         "1:Hello world\n3:Goodbye world\n",                    "-n"
+assert_eq Exercism::Grep::grep("WORLD", "i", [$f1]),         "Hello world\nGoodbye world\n",                       "-i"
+assert_eq Exercism::Grep::grep("world", "",  [$f1, $f2]),    "a.txt:Hello world\na.txt:Goodbye world\nb.txt:world here\n", "multi-file prefix"
+assert_eq Exercism::Grep::grep("Hello world", "x", [$f1]),   "Hello world\n",                                       "-x whole line"
+assert_eq Exercism::Grep::grep("world", "l", [$f1, $f2]),    "a.txt\nb.txt\n",                                      "-l file names"
+assert_eq Exercism::Grep::grep("XYZ", "",   [$f1]),          "",                                                    "no match"
+
+test_run

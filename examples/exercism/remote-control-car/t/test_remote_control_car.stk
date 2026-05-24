@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+require "./RemoteControlCar.stk"
+
+my $c = Exercism::RemoteControlCar::new()
+assert_eq $c->{nickname},                  "none", "default nickname"
+assert_eq $c->{battery_percentage},        100,    "initial battery"
+assert_eq $c->{distance_driven_in_meters}, 0,      "initial distance"
+
+my $c2 = Exercism::RemoteControlCar::new("Speedy")
+assert_eq $c2->{nickname}, "Speedy", "custom nickname"
+
+assert_eq Exercism::RemoteControlCar::display_distance($c2), "0 meters", "0 meters"
+assert_eq Exercism::RemoteControlCar::display_battery($c2),  "Battery at 100%", "100%"
+
+my $c3 = Exercism::RemoteControlCar::drive($c2)
+assert_eq $c3->{battery_percentage},        99, "after one drive: battery 99"
+assert_eq $c3->{distance_driven_in_meters}, 20, "after one drive: 20 m"
+
+my $dead = { nickname => "X", battery_percentage => 0, distance_driven_in_meters => 100 }
+assert_eq Exercism::RemoteControlCar::display_battery($dead), "Battery empty", "empty"
+my $dead2 = Exercism::RemoteControlCar::drive($dead)
+assert_eq $dead2->{distance_driven_in_meters}, 100, "dead doesn't move"
+
+test_run

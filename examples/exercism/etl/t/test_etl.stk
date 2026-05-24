@@ -1,8 +1,7 @@
 #!/usr/bin/env stryke
 require "./Etl.stk"
 
-fn sig {
-    my $h = _0
+fn sig($h) {
     join(",", map { "$_=$h->{$_}" } sort keys %$h)
 }
 

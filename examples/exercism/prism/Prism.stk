@@ -1,0 +1,5 @@
+#!/usr/bin/env stryke
+
+# Compute the surface area and volume of a rectangular prism.
+fn Exercism::Prism::surface_area = 2 * (_ * _1 + _ * _2 + _1 * _2)
+fn Exercism::Prism::volume       = _ * _1 * _2

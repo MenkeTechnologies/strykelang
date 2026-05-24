@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+
+const my %ENCODE = (' ' => 0, A => 1, C => 2, G => 4, T => 8)
+const my %DECODE = (0 => ' ', 1 => 'A', 2 => 'C', 4 => 'G', 8 => 'T')
+
+fn Exercism::DnaEncoding::encode_nucleotide = $ENCODE{chr(_)}
+fn Exercism::DnaEncoding::decode_nucleotide = ord($DECODE{_})
+
+# Encode a list of nucleotide chars (passed as codepoints) into a string
+# of single-char tokens. zsh-style strykelang doesn't have native
+# bitstrings, so we encode as a packed-string of digit chars.
+fn Exercism::DnaEncoding::encode = join("", map { Exercism::DnaEncoding::encode_nucleotide($_) } @{_})
+
+# Decode the packed digit-string back to a list of codepoints.
+fn Exercism::DnaEncoding::decode = [map { Exercism::DnaEncoding::decode_nucleotide($_ + 0) } split //, _]

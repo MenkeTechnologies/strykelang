@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+require "./BoutiqueSuggestions.stk"
+
+my $tops    = [ { base_color => "red",  price => 50 }, { base_color => "blue", price => 60 } ]
+my $bottoms = [ { base_color => "red",  price => 30 }, { base_color => "blue", price => 40 } ]
+
+my $r = Exercism::BoutiqueSuggestions::get_combinations($tops, $bottoms)
+assert_eq len(@{$r}), 2, "two unique-color combos under 100"
+
+my $r2 = Exercism::BoutiqueSuggestions::get_combinations($tops, $bottoms, { maximum_price => 200 })
+assert_eq len(@{$r2}), 2, "max=200 still 2 (color rule)"
+
+my $r3 = Exercism::BoutiqueSuggestions::get_combinations($tops, $bottoms, { maximum_price => 95 })
+assert_eq len(@{$r3}), 2, "budget=95 keeps both 90s"
+my $r4 = Exercism::BoutiqueSuggestions::get_combinations($tops, $bottoms, { maximum_price => 85 })
+assert_eq len(@{$r4}), 0, "budget=85 cuts both 90s"
+
+assert_eq len(@{Exercism::BoutiqueSuggestions::get_combinations([], $bottoms)}), 0, "empty tops"
+
+test_run

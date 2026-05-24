@@ -1,0 +1,10 @@
+#!/usr/bin/env stryke
+require "./NthPrime.stk"
+
+assert_eq Exercism::NthPrime::nth(1),    2,    "first prime"
+assert_eq Exercism::NthPrime::nth(2),    3,    "second"
+assert_eq Exercism::NthPrime::nth(6),    13,   "sixth"
+assert_eq Exercism::NthPrime::nth(100),  541,  "hundredth"
+assert_eq Exercism::NthPrime::nth(1000), 7919, "thousandth"
+
+test_run
