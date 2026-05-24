@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+
+fn Exercism::GoCounting::territory($board, $x, $y) {
+    my $h = @{$board}
+    my $w = $h > 0 ? len($board->[0]) : 0
+    return ["error", "Invalid coordinate"] if $x < 0 || $x >= $w || $y < 0 || $y >= $h
+    my @grid = map { [split //, $_] } @{$board}
+    return ["error", "Not empty"] if $grid[$y][$x] ne "_"
+
+    my %seen
+    my @borders
+    my @stack = ([$x, $y])
+    my @stones
+    while (@stack) {
+        my ($cx, $cy) = @{pop @stack}
+        my $k = "$cx,$cy"
+        next if $seen{$k}++
+        push @stones, [$cx, $cy]
+        for my $d ([0,-1],[0,1],[-1,0],[1,0]) {
+            my ($nx, $ny) = ($cx + $d->[0], $cy + $d->[1])
+            next if $nx < 0 || $nx >= $w || $ny < 0 || $ny >= $h
+            my $c = $grid[$ny][$nx]
+            if ($c eq "_") { push @stack, [$nx, $ny] } else { push @borders, $c }
+        }
+    }
+    my %bset
+    $bset{$_}++ for @borders
+    my $owner = keys %bset == 1 ? (keys %bset)[0] eq "B" ? "black" : "white" : ""
+    ["ok", { owner => $owner, stones => \@stones }]
+}

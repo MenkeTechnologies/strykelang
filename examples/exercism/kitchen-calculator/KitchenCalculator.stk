@@ -8,7 +8,7 @@ const my %CONV = (
     milliliter  => 1,
 )
 
-fn Exercism::KitchenCalculator::get_volume      = _->[1]
-fn Exercism::KitchenCalculator::to_milliliter   = ["milliliter", _->[1] * $CONV{_->[0]}]
-fn Exercism::KitchenCalculator::from_milliliter = [_1, _->[1] / $CONV{_1}]
-fn Exercism::KitchenCalculator::convert         = Exercism::KitchenCalculator::from_milliliter(Exercism::KitchenCalculator::to_milliliter(_), _1)
+fn Exercism::KitchenCalculator::get_volume($pair)              = $pair->[1]
+fn Exercism::KitchenCalculator::to_milliliter($pair)           = ["milliliter", $pair->[1] * $CONV{$pair->[0]}]
+fn Exercism::KitchenCalculator::from_milliliter($pair, $unit)  = [$unit, $pair->[1] / $CONV{$unit}]
+fn Exercism::KitchenCalculator::convert($pair, $unit)          = Exercism::KitchenCalculator::from_milliliter(Exercism::KitchenCalculator::to_milliliter($pair), $unit)

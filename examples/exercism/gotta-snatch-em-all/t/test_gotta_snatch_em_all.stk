@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+require "./GottaSnatchEmAll.stk"
+
+fn jkeys { join(",", sort keys %{_}) }
+
+my $c = Exercism::GottaSnatchEmAll::new_collection("Pikachu")
+assert_eq jkeys($c), "Pikachu", "new with one card"
+
+my $r = Exercism::GottaSnatchEmAll::add_card("Charmander", $c)
+assert_eq $r->[0],          0,                  "new card returns 0"
+assert_eq jkeys($r->[1]),  "Charmander,Pikachu","add updates collection"
+
+my $r2 = Exercism::GottaSnatchEmAll::add_card("Pikachu", $c)
+assert_eq $r2->[0], 1, "existing card returns 1"
+
+my $t = Exercism::GottaSnatchEmAll::trade_card("Pikachu", "Bulbasaur", $c)
+assert_eq $t->[0], 1, "valid trade"
+my $t2 = Exercism::GottaSnatchEmAll::trade_card("Bulbasaur", "Charmander", $c)
+assert_eq $t2->[0], 0, "no card to give"
+my $t3 = Exercism::GottaSnatchEmAll::trade_card("Pikachu", "Pikachu", $c)
+assert_eq $t3->[0], 0, "already own theirs"
+
+assert_eq join(",", sort @{Exercism::GottaSnatchEmAll::remove_duplicates(["A","B","A","C","B"])}), "A,B,C", "dedup"
+
+my $mine   = { A => 1, B => 1, C => 1 }
+my $theirs = { A => 1, D => 1 }
+assert_eq Exercism::GottaSnatchEmAll::extra_cards($mine, $theirs), 2, "extra = 2"
+
+assert_eq join(",", @{Exercism::GottaSnatchEmAll::boring_cards([])}), "", "boring of empty"
+assert_eq join(",", @{Exercism::GottaSnatchEmAll::boring_cards([{A=>1,B=>1},{A=>1,B=>1,C=>1}])}), "A,B", "boring = in all"
+
+assert_eq Exercism::GottaSnatchEmAll::total_cards([{A=>1,B=>1},{B=>1,C=>1}]), 4, "total counts duplicates"
+
+my $s = Exercism::GottaSnatchEmAll::split_shiny_cards({ "Shiny Mew" => 1, "Pikachu" => 1, "Shiny Eevee" => 1 })
+assert_eq join(",", @{$s->[0]}), "Shiny Eevee,Shiny Mew", "shiny"
+assert_eq join(",", @{$s->[1]}), "Pikachu",                "non-shiny"
+
+test_run

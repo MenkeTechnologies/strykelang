@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+require "./Connect.stk"
+
+assert_eq Exercism::Connect::result_for([
+    "X X X X",
+    " X X X X",
+    "  X X X X",
+    "   X X X X",
+]), "X", "X wins horizontally"
+
+assert_eq Exercism::Connect::result_for([
+    "O X X X",
+    " O X X X",
+    "  O X X X",
+    "   O X X X",
+]), "O", "O wins vertically"
+
+assert_eq Exercism::Connect::result_for([
+    ". . . .",
+    " . . . .",
+    "  . . . .",
+]), "none", "empty board"
+
+test_run

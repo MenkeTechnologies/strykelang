@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+
+# Hash-based registry (no real processes in stryke). Returns a state ref.
+fn Exercism::CommunityGarden::start = { next_id => 1, plots => {} }
+
+fn Exercism::CommunityGarden::list_registrations($g) {
+    [sort { $a->{plot_id} <=> $b->{plot_id} } values %{$g->{plots}}]
+}
+
+fn Exercism::CommunityGarden::register($g, $name) {
+    my $id = $g->{next_id}++
+    $g->{plots}{$id} = { plot_id => $id, registered_to => $name }
+    $g->{plots}{$id}
+}
+
+fn Exercism::CommunityGarden::release($g, $id) {
+    delete $g->{plots}{$id}
+    1
+}
+
+fn Exercism::CommunityGarden::get_registration($g, $id) = $g->{plots}{$id} // "not found"

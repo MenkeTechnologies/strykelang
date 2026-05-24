@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+require "./SquareRoot.stk"
+
+assert_eq Exercism::SquareRoot::sqrt(0),    0,  "0"
+assert_eq Exercism::SquareRoot::sqrt(1),    1,  "1"
+assert_eq Exercism::SquareRoot::sqrt(4),    2,  "4"
+assert_eq Exercism::SquareRoot::sqrt(25),   5,  "25"
+assert_eq Exercism::SquareRoot::sqrt(81),   9,  "81"
+assert_eq Exercism::SquareRoot::sqrt(196),  14, "196"
+assert_eq Exercism::SquareRoot::sqrt(65025), 255, "255^2"
+
+test_run

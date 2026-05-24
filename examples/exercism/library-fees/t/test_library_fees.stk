@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+require "./LibraryFees.stk"
+
+assert_eq Exercism::LibraryFees::before_noon("2024-03-15T09:30:00"), 1, "before noon"
+assert_eq Exercism::LibraryFees::before_noon("2024-03-15T15:00:00"), 0, "after noon"
+
+assert_eq Exercism::LibraryFees::return_date("2024-01-01"), "2024-01-29", "28 days later"
+assert_eq Exercism::LibraryFees::return_date("2024-02-01"), "2024-02-29", "across leap-feb"
+
+assert_eq Exercism::LibraryFees::days_late("2024-01-29", "2024-01-29T00:00:00"), 0, "on time"
+assert_eq Exercism::LibraryFees::days_late("2024-01-29", "2024-02-05T00:00:00"), 7, "7 days late"
+
+assert_eq Exercism::LibraryFees::monday("2024-03-04T08:00:00"), 1, "monday"
+assert_eq Exercism::LibraryFees::monday("2024-03-05T08:00:00"), 0, "tuesday"
+
+assert_eq Exercism::LibraryFees::calculate_late_fee("2024-01-01", "2024-02-05T08:00:00", 100), 350, "7 days * 100, Monday discount"
+assert_eq Exercism::LibraryFees::calculate_late_fee("2024-01-01", "2024-02-06T08:00:00", 100), 800, "8 days * 100, Tuesday"
+
+test_run

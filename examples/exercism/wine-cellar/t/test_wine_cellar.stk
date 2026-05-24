@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+require "./WineCellar.stk"
+
+fn j { join("|", map { join(",", @{$_}) } @{_}) }
+
+my $cellar = [
+    ["red",   2014, "France"],
+    ["white", 2017, "Germany"],
+    ["red",   2020, "Italy"],
+    ["red",   2020, "France"],
+    ["rose",  2015, "Italy"],
+]
+
+my $colors = Exercism::WineCellar::explain_colors()
+assert_eq $colors->{white}, "Fermented without skin contact.", "white desc"
+assert_eq $colors->{red},   "Fermented with skin contact using dark-colored grapes.", "red desc"
+
+assert_eq j(Exercism::WineCellar::filter($cellar, "white")), "white,2017,Germany", "filter color white"
+assert_eq j(Exercism::WineCellar::filter($cellar, "red")),   "red,2014,France|red,2020,Italy|red,2020,France", "filter color red"
+assert_eq j(Exercism::WineCellar::filter($cellar, "red", { year => 2020 })),       "red,2020,Italy|red,2020,France", "filter red+year"
+assert_eq j(Exercism::WineCellar::filter($cellar, "red", { country => "France" })), "red,2014,France|red,2020,France", "filter red+country"
+assert_eq j(Exercism::WineCellar::filter($cellar, "red", { year => 2020, country => "Italy" })), "red,2020,Italy", "filter red+year+country"
+
+test_run

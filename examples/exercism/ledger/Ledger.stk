@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+
+# Render a fixed-width ledger of entries. Each entry: { date, desc, change }.
+# date: "YYYY-MM-DD", change: cents (positive credit, negative debit).
+fn Exercism::Ledger::format_entries {
+    my ($currency, $locale, $entries) = (_, _1, _2)
+    my $hdr = Exercism::Ledger::_hdr($locale)
+    my @sorted = sort {
+        $a->{date} cmp $b->{date} ||
+        $a->{desc} cmp $b->{desc} ||
+        $a->{change} <=> $b->{change}
+    } @{$entries}
+    join "\n", $hdr, map { Exercism::Ledger::_row($currency, $locale, $_) } @sorted
+}
+
+fn Exercism::Ledger::_hdr {
+    _ eq "en-US" ? "Date       | Description               | Change       "
+                  : "Datum      | Beschrijving              | Verandering  "
+}
+
+fn Exercism::Ledger::_row {
+    my ($curr, $loc, $e) = (_, _1, _2)
+    my $d = $loc eq "en-US"
+          ? sprintf("%02d/%02d/%04d", (split /-/, $e->{date})[1], (split /-/, $e->{date})[2], (split /-/, $e->{date})[0])
+          : sprintf("%02d-%02d-%04d", (split /-/, $e->{date})[2], (split /-/, $e->{date})[1], (split /-/, $e->{date})[0])
+    my $desc = len($e->{desc}) > 25 ? substr($e->{desc}, 0, 22) . "..." : $e->{desc}
+    my $amt  = Exercism::Ledger::_amt($curr, $loc, $e->{change})
+    sprintf("%-11s| %-26s| %13s", $d, $desc, $amt)
+}
+
+fn Exercism::Ledger::_amt {
+    my ($curr, $loc, $cents) = (_, _1, _2)
+    my $sym = $curr eq "USD" ? "$" : "€"
+    my $neg = $cents < 0
+    my $a   = abs($cents) / 100
+    my $i   = int($a)
+    my $f   = int(($a - $i) * 100 + 0.5)
+    my @rev = split //, sprintf("%d", $i) =~ s/(\d)(?=(\d{3})+$)/$1,/gr  # us style
+    my $base = sprintf("%d", $i) =~ s/(\d)(?=(\d{3})+$)/$1,/gr
+    my $body = $loc eq "en-US"
+             ? "$sym$base." . sprintf("%02d", $f)
+             : "$sym " . ($base =~ s/,/./gr) . "," . sprintf("%02d", $f)
+    $neg ? ($loc eq "en-US" ? "($body)" : "$body-") : ($loc eq "en-US" ? " $body " : " $body  ")
+}

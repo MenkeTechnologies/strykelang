@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+require "./LogParser.stk"
+
+fn j { join("|", @{_}) }
+
+assert_eq Exercism::LogParser::valid_line("[ERROR] foo"),   1, "valid ERROR"
+assert_eq Exercism::LogParser::valid_line("[INFO] bar"),    1, "valid INFO"
+assert_eq Exercism::LogParser::valid_line("[FOO] baz"),     0, "invalid level"
+assert_eq Exercism::LogParser::valid_line("no bracket"),    0, "no bracket"
+
+assert_eq j(Exercism::LogParser::split_line("a<*>b<*>c")), "a|b|c", "split on <*>"
+assert_eq j(Exercism::LogParser::split_line("hello<~~>world<-->!")), "hello|world|!", "split mixed"
+
+assert_eq Exercism::LogParser::remove_artifacts("hello end-of-line42 world"), "hello  world", "remove artifact"
+assert_eq Exercism::LogParser::remove_artifacts("a END-OF-LINE99 b"),         "a  b",         "case-insensitive"
+
+assert_eq Exercism::LogParser::tag_with_user_name("Login by User alice"),  "[USER] alice Login by User alice", "tag user"
+assert_eq Exercism::LogParser::tag_with_user_name("no user here"),         "no user here",                     "no match"
+
+test_run

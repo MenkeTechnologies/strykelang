@@ -11,12 +11,12 @@ const my %CODON = (
     UGG => "Tryptophan",
 )
 
-fn Exercism::ProteinTranslation::of_codon = exists $CODON{_} ? ["ok", $CODON{_}] : ["error", "invalid codon"]
+fn Exercism::ProteinTranslation::of_codon($c) = exists $CODON{$c} ? ["ok", $CODON{$c}] : ["error", "invalid codon"]
 
-fn Exercism::ProteinTranslation::of_rna {
+fn Exercism::ProteinTranslation::of_rna($rna) {
     my @out
-    for (my $i = 0; $i < len(_); $i += 3) {
-        my $codon = _[$i:$i+2]
+    for (my $i = 0; $i < len($rna); $i += 3) {
+        my $codon = $rna[$i:$i+2]
         return ["error", "invalid RNA"] unless exists $CODON{$codon}
         last if $CODON{$codon} eq "STOP"
         push @out, $CODON{$codon}

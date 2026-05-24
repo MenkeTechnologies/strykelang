@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+require "./Change.stk"
+
+fn jr { my $r = _; $r->[0] eq 'ok' ? "ok:" . join(",", @{$r->[1]}) : "error:" . $r->[1] }
+
+assert_eq jr(Exercism::Change::generate([1,5,10,25,100], 25)),  "ok:25",        "exact denom"
+assert_eq jr(Exercism::Change::generate([1,5,10,25,100], 0)),   "ok:",          "zero"
+assert_eq jr(Exercism::Change::generate([1,5,10,25,100], 15)),  "ok:5,10",      "5+10=15"
+assert_eq jr(Exercism::Change::generate([1,5,10,25,100], 40)),  "ok:5,10,25",   "5+10+25=40"
+assert_eq jr(Exercism::Change::generate([4,5], 7)),             "error:cannot change", "no way"
+assert_eq jr(Exercism::Change::generate([1,5,10,25,100], -5)),  "error:cannot change", "negative"
+assert_eq jr(Exercism::Change::generate([2,5,10,20,50], 21)),   "ok:2,2,2,5,10","DP wins over greedy"
+
+test_run

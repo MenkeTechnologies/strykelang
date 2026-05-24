@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+require "./DiffieHellman.stk"
+
+# Private key in valid range.
+my $priv = Exercism::DiffieHellman::generate_private_key(23)
+assert_ok $priv >= 2 && $priv <= 21, "private in [2, p-2]"
+
+# Public/secret round-trip with known small primes.
+assert_eq Exercism::DiffieHellman::generate_public_key(23, 5, 6), 8, "5^6 mod 23 = 8"
+assert_eq Exercism::DiffieHellman::generate_public_key(23, 5, 15), 19, "5^15 mod 23 = 19"
+
+# Diffie-Hellman handshake: A and B compute the same secret.
+my ($p, $g, $a, $b) = (23, 5, 6, 15)
+my $pubA = Exercism::DiffieHellman::generate_public_key($p, $g, $a)
+my $pubB = Exercism::DiffieHellman::generate_public_key($p, $g, $b)
+my $secA = Exercism::DiffieHellman::generate_secret($p, $pubB, $a)
+my $secB = Exercism::DiffieHellman::generate_secret($p, $pubA, $b)
+assert_eq $secA, $secB, "both sides arrive at same secret"
+
+test_run

@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+require "./StateOfTicTacToe.stk"
+
+fn jr ($r){ "$r->[0]:$r->[1]" }
+
+assert_eq jr(Exercism::StateOfTicTacToe::game_state(["XXX","OO.","..."])),  "ok:win",      "X wins top row"
+assert_eq jr(Exercism::StateOfTicTacToe::game_state(["XOX","OOO","XX."])),  "ok:win",      "O wins middle row"
+assert_eq jr(Exercism::StateOfTicTacToe::game_state(["XOX","OXX","OXO"])),  "ok:draw",     "draw"
+assert_eq jr(Exercism::StateOfTicTacToe::game_state(["X..","...","..."])),  "ok:ongoing",  "ongoing"
+assert_eq jr(Exercism::StateOfTicTacToe::game_state(["XXX","XXX","OOO"])),  "error:Impossible board: game should have ended after the game was won", "both win"
+assert_eq jr(Exercism::StateOfTicTacToe::game_state(["XX.","...","..."])),  "error:Wrong turn order: X went twice", "X went twice"
+assert_eq jr(Exercism::StateOfTicTacToe::game_state([".O.","...","..."])),  "error:Wrong turn order: O started",    "O started"
+
+test_run

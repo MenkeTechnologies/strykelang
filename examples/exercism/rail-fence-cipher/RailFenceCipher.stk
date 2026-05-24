@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+
+# Zig-zag rail-fence cipher: distribute chars onto `rails` rows in a
+# triangle-wave pattern, then read row-by-row.
+fn Exercism::RailFenceCipher::encode($s, $rails) {
+    return $s if $rails <= 1 || len($s) == 0
+    my @rows = map { "" } 1:$rails
+    my ($r, $d) = (0, 1)
+    for my $i (0..len($s) - 1) {
+        $rows[$r] = $rows[$r] . substr($s, $i, 1)
+        $d = -$d if $r == 0 || $r == $rails - 1
+        $r += $d
+    }
+    join "", @rows
+}
+
+# Decode by computing the zigzag-position list, splitting the cipher
+# into per-row chunks, then weaving back.
+fn Exercism::RailFenceCipher::decode($cipher, $rails) {
+    return $cipher if $rails <= 1 || len($cipher) == 0
+    my $n = len($cipher)
+    my @order
+    my ($r, $d) = (0, 1)
+    for my $i (0..$n - 1) {
+        push @order, $r
+        $d = -$d if $r == 0 || $r == $rails - 1
+        $r += $d
+    }
+    my @counts = map { 0 } 1:$rails
+    $counts[$_]++ for @order
+    my @rows
+    my $pos = 0
+    for my $rr (0..$rails - 1) {
+        push @rows, substr($cipher, $pos, $counts[$rr])
+        $pos += $counts[$rr]
+    }
+    my @idx = map { 0 } 1:$rails
+    my $out = ""
+    for my $row (@order) {
+        $out .= substr($rows[$row], $idx[$row]++, 1)
+    }
+    $out
+}

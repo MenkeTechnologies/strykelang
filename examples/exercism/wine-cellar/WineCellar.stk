@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+
+fn Exercism::WineCellar::explain_colors = {
+    white => "Fermented without skin contact.",
+    red   => "Fermented with skin contact using dark-colored grapes.",
+    rose  => "Fermented with some skin contact, but not enough to qualify as a red wine.",
+}
+
+fn Exercism::WineCellar::filter($cellar, $color, $opts) {
+    $opts //= {}
+    [grep {
+        $_->[0] eq $color
+        && (!defined($opts->{year})    || $_->[1] == $opts->{year})
+        && (!defined($opts->{country}) || $_->[2] eq $opts->{country})
+    } @{$cellar}]
+}

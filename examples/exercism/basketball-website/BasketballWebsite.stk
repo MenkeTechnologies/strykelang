@@ -1,8 +1,8 @@
 #!/usr/bin/env stryke
 
-fn Exercism::BasketballWebsite::extract_from_path {
-    my $cur = _
-    for my $k (split /\./, _1) {
+fn Exercism::BasketballWebsite::extract_from_path($data, $path) {
+    my $cur = $data
+    for my $k (split /\./, $path) {
         return undef unless ref($cur) eq 'HASH'
         $cur = $cur->{$k}
     }

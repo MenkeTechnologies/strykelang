@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+require "./PaintByNumber.stk"
+
+assert_eq Exercism::PaintByNumber::pow(2, 0),  1,    "2^0"
+assert_eq Exercism::PaintByNumber::pow(2, 10), 1024, "2^10"
+assert_eq Exercism::PaintByNumber::pow(3, 4),  81,   "3^4"
+
+assert_eq Exercism::PaintByNumber::palette_bit_size(2),  1, "2 colors"
+assert_eq Exercism::PaintByNumber::palette_bit_size(4),  2, "4 colors"
+assert_eq Exercism::PaintByNumber::palette_bit_size(8),  3, "8 colors"
+assert_eq Exercism::PaintByNumber::palette_bit_size(9),  4, "9 → 4 bits"
+
+assert_eq Exercism::PaintByNumber::palette_pixel_count(1, 2),  8, "1 byte / 1 bit"
+assert_eq Exercism::PaintByNumber::palette_pixel_count(10, 4), 40, "10 bytes / 2 bits"
+
+test_run

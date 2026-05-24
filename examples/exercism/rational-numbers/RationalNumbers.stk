@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+
+fn Exercism::RationalNumbers::_gcd($a, $b) {
+    $a = abs($a); $b = abs($b)
+    while ($b) { ($a, $b) = ($b, $a % $b) }
+    $a
+}
+
+fn Exercism::RationalNumbers::reduce($r) {
+    my ($n, $d) = @{$r}
+    my $g = Exercism::RationalNumbers::_gcd($n, $d) || 1
+    $d < 0 and ($n, $d) = (-$n, -$d)
+    [int($n / $g), int($d / $g)]
+}
+
+fn Exercism::RationalNumbers::add($r, $s) = Exercism::RationalNumbers::reduce([$r->[0] * $s->[1] + $s->[0] * $r->[1], $r->[1] * $s->[1]])
+fn Exercism::RationalNumbers::sub($r, $s) = Exercism::RationalNumbers::reduce([$r->[0] * $s->[1] - $s->[0] * $r->[1], $r->[1] * $s->[1]])
+fn Exercism::RationalNumbers::mul($r, $s) = Exercism::RationalNumbers::reduce([$r->[0] * $s->[0], $r->[1] * $s->[1]])
+fn Exercism::RationalNumbers::div($r, $s) = Exercism::RationalNumbers::reduce([$r->[0] * $s->[1], $r->[1] * $s->[0]])
+
+fn Exercism::RationalNumbers::abs($r)     = Exercism::RationalNumbers::reduce([abs($r->[0]), abs($r->[1])])
+
+fn Exercism::RationalNumbers::pow_rational($r, $e) {
+    my ($n, $d) = @{$r}
+    $e >= 0 ? Exercism::RationalNumbers::reduce([$n ** $e, $d ** $e])
+            : Exercism::RationalNumbers::reduce([$d ** -$e, $n ** -$e])
+}
+
+fn Exercism::RationalNumbers::pow_real($base, $r) = $base ** ($r->[0] / $r->[1])

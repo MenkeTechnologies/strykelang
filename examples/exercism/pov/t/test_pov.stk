@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+require "./Pov.stk"
+
+my $tree = {
+    value    => "root",
+    children => [
+        { value => "a", children => [{ value => "x", children => [] }] },
+        { value => "b", children => [] },
+    ],
+}
+
+assert_eq Exercism::Pov::from_pov($tree, "nope"), undef, "missing → undef"
+
+my $p = Exercism::Pov::_path_to($tree, "x")
+assert_ok defined($p), "_path_to finds x"
+assert_eq scalar(@{$p}), 3, "x is at depth 3 in path"
+
+test_run

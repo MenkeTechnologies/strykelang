@@ -1,0 +1,9 @@
+#!/usr/bin/env stryke
+require "./RailFenceCipher.stk"
+
+assert_eq Exercism::RailFenceCipher::encode("a", 1),  "a", "1 rail identity"
+assert_eq Exercism::RailFenceCipher::decode("a", 1),  "a", "1 rail decode"
+assert_eq Exercism::RailFenceCipher::encode("",  3),  "",  "empty encode"
+assert_eq Exercism::RailFenceCipher::decode("",  3),  "",  "empty decode"
+
+test_run

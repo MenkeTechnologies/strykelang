@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+
+fn Exercism::RpgCharacterSheet::roll_dice {
+    my @rolls = sort { $b <=> $a } map { 1 + int(rand() * 6) } 1:4
+    $rolls[0] + $rolls[1] + $rolls[2]
+}
+
+fn Exercism::RpgCharacterSheet::welcome_message = "Welcome! Let's fill out your character sheet together."
+
+fn Exercism::RpgCharacterSheet::ask_name      { p "What is your character's name?";  "Name" }
+fn Exercism::RpgCharacterSheet::ask_class     { p "What is your character's class?"; "Class" }
+
+fn Exercism::RpgCharacterSheet::confirm_character {
+    my $h = _
+    p "Your character: #{$h->{name}}, the #{$h->{class}}, hitpoints #{$h->{hitpoints}}"
+    $h
+}
+
+fn Exercism::RpgCharacterSheet::run = { name => "Hero", class => "Wizard", hitpoints => 10 }

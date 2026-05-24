@@ -1,0 +1,6 @@
+#!/usr/bin/env stryke
+
+fn Exercism::LogParser::valid_line       = _ =~ /^\[(?:DEBUG|INFO|WARNING|ERROR)\]/ ? 1 : 0
+fn Exercism::LogParser::split_line       = [split /<[~*=-]*>/, _]
+fn Exercism::LogParser::remove_artifacts = _ =~ s/end-of-line(\d+)//rig
+fn Exercism::LogParser::tag_with_user_name = _ =~ /User\s+(\S+)/ ? "[USER] $1 #{_}" : _

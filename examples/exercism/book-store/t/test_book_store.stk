@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+require "./BookStore.stk"
+
+assert_eq Exercism::BookStore::total([]),              0,    "empty"
+assert_eq Exercism::BookStore::total([1]),             800,  "one book"
+assert_eq Exercism::BookStore::total([1,1]),           1600, "two of one kind"
+assert_eq Exercism::BookStore::total([1,2]),           1520, "two different = 5% off pair"
+assert_eq Exercism::BookStore::total([1,2,3,4,5]),     3000, "all 5 → 25% off"
+assert_eq Exercism::BookStore::total([1,2,3,4,5,5]),   3800, "5+1"
+assert_eq Exercism::BookStore::total([1,1,2,2,3,3,4,5]), 5120, "5+3 better than 4+4"
+
+test_run

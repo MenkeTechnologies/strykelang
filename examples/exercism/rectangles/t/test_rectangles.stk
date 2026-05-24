@@ -1,0 +1,10 @@
+#!/usr/bin/env stryke
+require "./Rectangles.stk"
+
+assert_eq Exercism::Rectangles::count(""),                                                       0, "empty"
+assert_eq Exercism::Rectangles::count("+-+\n| |\n+-+"),                                          1, "single 2x2"
+assert_eq Exercism::Rectangles::count("+--+\n|  |\n|  |\n+--+"),                                 1, "tall"
+assert_eq Exercism::Rectangles::count("+-+-+\n| | |\n+-+-+"),                                    3, "two cells horizontal"
+assert_eq Exercism::Rectangles::count("+--+\n+--+"),                                             0, "no sides"
+
+test_run

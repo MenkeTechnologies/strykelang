@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+
+# Game state: { rolls => [], finished => bool }.
+fn Exercism::Bowling::new = { rolls => [], finished => 0 }
+
+fn Exercism::Bowling::roll {
+    my ($g, $p) = (_, _1)
+    die "Game is already complete" if $g->{finished}
+    die "Negative roll" if $p < 0
+    die "Roll exceeds remaining pins" if $p > 10
+    my $rolls = [@{$g->{rolls}}, $p]
+    my $g2    = { rolls => $rolls, finished => 0 }
+    Exercism::Bowling::_check_complete($g2)
+    $g2
+}
+
+fn Exercism::Bowling::_check_complete {
+    my $g = _
+    my @r = @{$g->{rolls}}
+    my ($frame, $i) = (0, 0)
+    while ($frame < 9 && $i < @r) {
+        if ($r[$i] == 10) { $i++ } else { $i += 2 }
+        $frame++
+    }
+    return unless $frame == 9 && $i < @r
+    # 10th frame: 2 normal rolls, +1 bonus if strike/spare
+    my $remaining = @r - $i
+    if ($r[$i] == 10) {
+        $g->{finished} = 1 if $remaining >= 3
+    } elsif ($i + 1 < @r && $r[$i] + $r[$i + 1] == 10) {
+        $g->{finished} = 1 if $remaining >= 3
+    } else {
+        $g->{finished} = 1 if $remaining >= 2
+    }
+}
+
+fn Exercism::Bowling::score {
+    my $g = _
+    die "Game is incomplete" unless $g->{finished}
+    my @r = @{$g->{rolls}}
+    my $total = 0
+    my ($i, $frame) = (0, 0)
+    while ($frame < 10) {
+        if ($r[$i] == 10) {
+            $total += 10 + $r[$i + 1] + $r[$i + 2]
+            $i++
+        } elsif ($r[$i] + $r[$i + 1] == 10) {
+            $total += 10 + $r[$i + 2]
+            $i += 2
+        } else {
+            $total += $r[$i] + $r[$i + 1]
+            $i += 2
+        }
+        $frame++
+    }
+    $total
+}

@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+require "./DnaEncoding.stk"
+
+assert_eq Exercism::DnaEncoding::encode_nucleotide(ord(' ')), 0, "space → 0"
+assert_eq Exercism::DnaEncoding::encode_nucleotide(ord('A')), 1, "A → 1"
+assert_eq Exercism::DnaEncoding::encode_nucleotide(ord('T')), 8, "T → 8"
+
+assert_eq Exercism::DnaEncoding::decode_nucleotide(0), ord(' '), "0 → space"
+assert_eq Exercism::DnaEncoding::decode_nucleotide(8), ord('T'), "8 → T"
+
+assert_eq Exercism::DnaEncoding::encode([ord('A'), ord('C'), ord('G'), ord('T')]), "1248", "ACGT encoded"
+
+my $r = Exercism::DnaEncoding::decode("1248")
+assert_eq join(",", @{$r}), join(",", ord('A'), ord('C'), ord('G'), ord('T')), "1248 decoded"
+
+test_run

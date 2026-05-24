@@ -1,3 +1,7 @@
 #!/usr/bin/env stryke
 
-fn Exercism::NameBadge::print = (defined(_) ? "[#{_}] - " : "") . "#{_1} - #{uc(_2 // 'owner')}"
+fn Exercism::NameBadge::print($id, $name, $dept) {
+    my $prefix = defined($id) ? "[#{$id}] - " : ""
+    my $d      = uc($dept // 'owner')
+    "#{$prefix}#{$name} - #{$d}"
+}

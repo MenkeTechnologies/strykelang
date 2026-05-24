@@ -1,8 +1,8 @@
 #!/usr/bin/env stryke
 
-fn Exercism::HighScore::new            = {}
-fn Exercism::HighScore::add_player     { my %h = %{_}; $h{_1} = _2 // 0; \%h }
-fn Exercism::HighScore::remove_player  { my %h = %{_}; delete $h{_1};   \%h }
-fn Exercism::HighScore::reset_score    { my %h = %{_}; $h{_1} = 0;      \%h }
-fn Exercism::HighScore::update_score   { my %h = %{_}; $h{_1} = ($h{_1} // 0) + _2; \%h }
-fn Exercism::HighScore::get_players    = [sort keys %{_}]
+fn Exercism::HighScore::new                                    = {}
+fn Exercism::HighScore::add_player($scores, $name, $score)     { my %h = %{$scores}; $h{$name} = $score // 0; \%h }
+fn Exercism::HighScore::remove_player($scores, $name)          { my %h = %{$scores}; delete $h{$name};        \%h }
+fn Exercism::HighScore::reset_score($scores, $name)            { my %h = %{$scores}; $h{$name} = 0;            \%h }
+fn Exercism::HighScore::update_score($scores, $name, $score)   { my %h = %{$scores}; $h{$name} = ($h{$name} // 0) + $score; \%h }
+fn Exercism::HighScore::get_players($scores)                   = [sort keys %{$scores}]

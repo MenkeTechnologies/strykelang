@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+
+# `start_reliability_check(op, n)` — run `op` against random inputs
+# `n` times; return total + per-checker count. For tests we keep it
+# deterministic by feeding a fixed `op`.
+fn Exercism::RpnCalculatorInspection::start_reliability_check {
+    my ($op, $n) = (_, _1)
+    my @results
+    for my $i (1:$n) { push @results, $op->($i) }
+    \@results
+}
+
+# Tally pass/fail.
+fn Exercism::RpnCalculatorInspection::await_reliability_check_result {
+    my $results = _
+    my %tally = (pass => 0, fail => 0)
+    for my $r (@{$results}) {
+        if ($r) { $tally{pass}++ } else { $tally{fail}++ }
+    }
+    \%tally
+}
+
+# `reliability_check(op, n, retries)` — run with retries on failure.
+fn Exercism::RpnCalculatorInspection::reliability_check {
+    my ($op, $n, $retries) = (_, _1, _2 // 0)
+    my @results
+    for my $i (1:$n) {
+        my $r = $op->($i)
+        if (!$r) {
+            for my $t (1..$retries) {
+                $r = $op->($i)
+                last if $r
+            }
+        }
+        push @results, $r ? 1 : 0
+    }
+    \@results
+}

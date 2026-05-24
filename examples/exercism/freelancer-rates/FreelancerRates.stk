@@ -2,7 +2,7 @@
 
 const my $BILLABLE_DAYS = 22
 
-fn Exercism::FreelancerRates::daily_rate     = _ * 8.0
-fn Exercism::FreelancerRates::apply_discount = _ * (100 - _1) / 100
-fn Exercism::FreelancerRates::monthly_rate   = ceil(Exercism::FreelancerRates::apply_discount(Exercism::FreelancerRates::daily_rate(_), _1) * $BILLABLE_DAYS)
-fn Exercism::FreelancerRates::days_in_budget = int(_ / Exercism::FreelancerRates::apply_discount(Exercism::FreelancerRates::daily_rate(_1), _2) * 10) / 10
+fn Exercism::FreelancerRates::daily_rate($hourly)                          = $hourly * 8.0
+fn Exercism::FreelancerRates::apply_discount($before, $disc)               = $before * (100 - $disc) / 100
+fn Exercism::FreelancerRates::monthly_rate($hourly, $disc)                 = ceil(Exercism::FreelancerRates::apply_discount(Exercism::FreelancerRates::daily_rate($hourly), $disc) * $BILLABLE_DAYS)
+fn Exercism::FreelancerRates::days_in_budget($budget, $hourly, $disc)     = int($budget / Exercism::FreelancerRates::apply_discount(Exercism::FreelancerRates::daily_rate($hourly), $disc) * 10) / 10

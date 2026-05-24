@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+
+fn Exercism::ComplexNumbers::real($z)        = $z->[0]
+fn Exercism::ComplexNumbers::imaginary($z)   = $z->[1]
+
+fn Exercism::ComplexNumbers::add($z, $w)     = [$z->[0] + $w->[0], $z->[1] + $w->[1]]
+fn Exercism::ComplexNumbers::sub($z, $w)     = [$z->[0] - $w->[0], $z->[1] - $w->[1]]
+
+fn Exercism::ComplexNumbers::mul($z, $w) {
+    my ($a, $b, $c, $d) = ($z->[0], $z->[1], $w->[0], $w->[1])
+    [$a * $c - $b * $d, $b * $c + $a * $d]
+}
+
+fn Exercism::ComplexNumbers::div($z, $w) {
+    my ($a, $b, $c, $d) = ($z->[0], $z->[1], $w->[0], $w->[1])
+    my $denom = $c * $c + $d * $d
+    [($a * $c + $b * $d) / $denom, ($b * $c - $a * $d) / $denom]
+}
+
+fn Exercism::ComplexNumbers::abs($z)         = sqrt($z->[0] ** 2 + $z->[1] ** 2)
+fn Exercism::ComplexNumbers::conjugate($z)   = [$z->[0], -$z->[1]]
+fn Exercism::ComplexNumbers::exp($z)         { my $r = exp($z->[0]); [$r * cos($z->[1]), $r * sin($z->[1])] }

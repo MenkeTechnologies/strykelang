@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+require "./BoutiqueInventory.stk"
+
+my $inv = [
+    { name => "T-shirt", price => 10 },
+    { name => "Jeans",   price => 25 },
+    { name => "Hat",     price => 5 },
+    { name => "Mystery", price => undef },
+]
+
+my $s = Exercism::BoutiqueInventory::sort_by_price($inv)
+assert_eq $s->[1]{name}, "Hat",     "Hat first (undef sorts as 0)"
+assert_eq $s->[-1]{name}, "Jeans",   "Jeans last"
+
+assert_eq len(@{Exercism::BoutiqueInventory::with_missing_price($inv)}), 1, "1 missing"
+
+my $u = Exercism::BoutiqueInventory::update_names([{name => "blue shirt", price => 10}], "blue", "red")
+assert_eq $u->[0]{name}, "red shirt", "rename"
+
+my $item = { name => "X", quantity_by_size => { S => 1, M => 2, L => 3 } }
+my $up = Exercism::BoutiqueInventory::increase_quantity($item, 10)
+assert_eq $up->{quantity_by_size}{S}, 11, "S +10"
+assert_eq Exercism::BoutiqueInventory::total_quantity($up), 36, "total"
+
+test_run

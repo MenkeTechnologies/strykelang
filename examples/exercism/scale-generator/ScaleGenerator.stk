@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+
+const my @SHARP_KEYS = qw(C G D A E B F# a e b f# c# g# d#)
+const my @SHARPS = qw(C C# D D# E F F# G G# A A# B)
+const my @FLATS  = qw(C Db D Eb E F Gb G Ab A Bb B)
+const my %STEP   = (m => 1, M => 2, A => 3)
+
+fn Exercism::ScaleGenerator::chromatic_scale($tonic) {
+    my $t   = ucfirst($tonic)
+    my @ref = (grep { $_ eq $t || $_ eq lc($t) } @SHARP_KEYS) ? @SHARPS : @FLATS
+    my $i = 0
+    $i++ while $i < @ref && $ref[$i] ne $t
+    [@ref[$i..$#ref], @ref[0..$i-1]]
+}
+
+fn Exercism::ScaleGenerator::scale($tonic, $pattern) {
+    my $chrom = Exercism::ScaleGenerator::chromatic_scale($tonic)
+    my @out = ($chrom->[0])
+    my $i = 0
+    for my $s (split //, $pattern) {
+        $i += $STEP{$s}
+        push @out, $chrom->[$i % 12]
+    }
+    \@out
+}

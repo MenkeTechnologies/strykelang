@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+
+# All dates are ISO "YYYY-MM-DD" strings.
+fn Exercism::LibraryFees::datetime_from_string = _
+
+fn Exercism::LibraryFees::before_noon = (split /T/, _)[1] lt "12:00:00"
+
+fn Exercism::LibraryFees::return_date {
+    my $iso  = _
+    my @ymd  = split /-/, $iso
+    my $days = Exercism::LibraryFees::_days($ymd[0], $ymd[1], $ymd[2]) + 28
+    Exercism::LibraryFees::_from_days($days)
+}
+
+fn Exercism::LibraryFees::days_late {
+    my ($expected, $actual) = (_, _1)
+    my @e = split /-/, $expected
+    my @a = split /-/, (split /T/, $actual)[0]
+    my $ed = Exercism::LibraryFees::_days($e[0], $e[1], $e[2])
+    my $ad = Exercism::LibraryFees::_days($a[0], $a[1], $a[2])
+    my $d  = $ad - $ed
+    $d > 0 ? $d : 0
+}
+
+fn Exercism::LibraryFees::monday = (Exercism::LibraryFees::_dow(split /-/, (split /T/, _)[0]) == 1) ? 1 : 0
+
+fn Exercism::LibraryFees::calculate_late_fee {
+    my ($checkout, $actual, $rate) = (_, _1, _2)
+    my $expected = Exercism::LibraryFees::return_date($checkout)
+    my $d = Exercism::LibraryFees::days_late($expected, $actual)
+    my $fee = $d * $rate
+    Exercism::LibraryFees::monday($actual) ? int($fee / 2) : $fee
+}
+
+# Helpers — days since epoch + day-of-week (1=Monday..7=Sunday).
+fn Exercism::LibraryFees::_days {
+    my ($y, $m, $d) = (_, _1, _2)
+    my @cum = (0,31,59,90,120,151,181,212,243,273,304,334)
+    my $leap = (($y % 4 == 0 && $y % 100 != 0) || $y % 400 == 0) && $m > 2 ? 1 : 0
+    ($y - 1970) * 365 + int(($y - 1969) / 4) + $cum[$m - 1] + $leap + $d - 1
+}
+
+fn Exercism::LibraryFees::_from_days {
+    my $days = _
+    my $y = 1970
+    while ($days >= ((($y % 4 == 0 && $y % 100 != 0) || $y % 400 == 0) ? 366 : 365)) {
+        $days -= ((($y % 4 == 0 && $y % 100 != 0) || $y % 400 == 0) ? 366 : 365)
+        $y++
+    }
+    my @mlen = (31, ($y % 4 == 0 && $y % 100 != 0 || $y % 400 == 0) ? 29 : 28,
+                31,30,31,30,31,31,30,31,30,31)
+    my $m = 1
+    while ($days >= $mlen[$m - 1]) { $days -= $mlen[$m - 1]; $m++ }
+    sprintf("%04d-%02d-%02d", $y, $m, $days + 1)
+}
+
+fn Exercism::LibraryFees::_dow {
+    # Returns 1..7 with Monday=1. Jan 1 1970 was a Thursday (4).
+    (Exercism::LibraryFees::_days(_, _1, _2) + 3) % 7 + 1
+}

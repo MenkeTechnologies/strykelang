@@ -1,0 +1,75 @@
+#!/usr/bin/env stryke
+
+# Returns hash { drinks_water => nationality, owns_zebra => nationality }
+# by brute-force iterating all 5! permutations of each attribute and
+# applying every constraint.
+fn Exercism::ZebraPuzzle::solve {
+    my @colors  = qw(red green ivory yellow blue)
+    my @nats    = qw(English Spaniard Ukrainian Norwegian Japanese)
+    my @drinks  = qw(coffee tea milk orange_juice water)
+    my @smokes  = qw(Old_Gold Kools Chesterfields Lucky_Strike Parliaments)
+    my @pets    = qw(dog snails fox horse zebra)
+
+    my @colors_perms = Exercism::ZebraPuzzle::_perms(\@colors)
+    my @nats_perms   = Exercism::ZebraPuzzle::_perms(\@nats)
+    my @drinks_perms = Exercism::ZebraPuzzle::_perms(\@drinks)
+    my @smokes_perms = Exercism::ZebraPuzzle::_perms(\@smokes)
+    my @pets_perms   = Exercism::ZebraPuzzle::_perms(\@pets)
+
+    for my $c (@colors_perms) {
+        next unless Exercism::ZebraPuzzle::_right_of($c, "green", "ivory")
+        for my $n (@nats_perms) {
+            next unless Exercism::ZebraPuzzle::_same_index($n, "English",   $c, "red")
+            next unless $n->[0] eq "Norwegian"
+            next unless Exercism::ZebraPuzzle::_next_to($n, "Norwegian", $c, "blue")
+            for my $d (@drinks_perms) {
+                next unless $d->[2] eq "milk"
+                next unless Exercism::ZebraPuzzle::_same_index($n, "Ukrainian", $d, "tea")
+                next unless Exercism::ZebraPuzzle::_same_index($c, "green",     $d, "coffee")
+                for my $s (@smokes_perms) {
+                    next unless Exercism::ZebraPuzzle::_same_index($c, "yellow", $s, "Kools")
+                    next unless Exercism::ZebraPuzzle::_same_index($s, "Lucky_Strike", $d, "orange_juice")
+                    next unless Exercism::ZebraPuzzle::_same_index($n, "Japanese", $s, "Parliaments")
+                    for my $p (@pets_perms) {
+                        next unless Exercism::ZebraPuzzle::_same_index($n, "Spaniard", $p, "dog")
+                        next unless Exercism::ZebraPuzzle::_same_index($s, "Old_Gold", $p, "snails")
+                        next unless Exercism::ZebraPuzzle::_next_to($s, "Chesterfields", $p, "fox")
+                        next unless Exercism::ZebraPuzzle::_next_to($s, "Kools",         $p, "horse")
+                        # All constraints satisfied.
+                        my $water = $n->[Exercism::ZebraPuzzle::_idx($d, "water")]
+                        my $zebra = $n->[Exercism::ZebraPuzzle::_idx($p, "zebra")]
+                        return { drinks_water => $water, owns_zebra => $zebra }
+                    }
+                }
+            }
+        }
+    }
+    undef
+}
+
+fn Exercism::ZebraPuzzle::_idx($arr, $v) { for my $i (0..$#{$arr}) { return $i if $arr->[$i] eq $v } -1 }
+fn Exercism::ZebraPuzzle::_same_index($a, $av, $b, $bv) = Exercism::ZebraPuzzle::_idx($a, $av) == Exercism::ZebraPuzzle::_idx($b, $bv)
+fn Exercism::ZebraPuzzle::_right_of($arr, $a, $b) {
+    my $ai = Exercism::ZebraPuzzle::_idx($arr, $a)
+    my $bi = Exercism::ZebraPuzzle::_idx($arr, $b)
+    $ai == $bi + 1
+}
+fn Exercism::ZebraPuzzle::_next_to($a, $av, $b, $bv) {
+    my $ai = Exercism::ZebraPuzzle::_idx($a, $av)
+    my $bi = Exercism::ZebraPuzzle::_idx($b, $bv)
+    abs($ai - $bi) == 1
+}
+
+fn Exercism::ZebraPuzzle::_perms($arr) {
+    my @items = @{$arr}
+    return [[]] unless @items
+    return [[$items[0]]] if @items == 1
+    my @out
+    for my $i (0..$#items) {
+        my @rest = (@items[0..$i - 1], @items[$i + 1..$#items])
+        for my $sub (@{Exercism::ZebraPuzzle::_perms(\@rest)}) {
+            push @out, [$items[$i], @{$sub}]
+        }
+    }
+    \@out
+}

@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+
+# 2D grid of 0/1. Conway's Game of Life single tick.
+fn Exercism::GameOfLife::tick {
+    my @g = @{_}
+    my $h = @g
+    my $w = $h > 0 ? @{$g[0]} : 0
+    my @out
+    for my $r (0..$h - 1) {
+        my @row
+        for my $c (0..$w - 1) {
+            my $n = 0
+            for my $dr (-1, 0, 1) {
+                for my $dc (-1, 0, 1) {
+                    next if $dr == 0 && $dc == 0
+                    my ($nr, $nc) = ($r + $dr, $c + $dc)
+                    next if $nr < 0 || $nr >= $h || $nc < 0 || $nc >= $w
+                    $n += $g[$nr][$nc]
+                }
+            }
+            my $alive = $g[$r][$c]
+            push @row, ($alive ? ($n == 2 || $n == 3 ? 1 : 0) : ($n == 3 ? 1 : 0))
+        }
+        push @out, \@row
+    }
+    \@out
+}

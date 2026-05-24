@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+require "./RelativeDistance.stk"
+
+my $tree = {
+    Anna   => ["Bob", "Carla"],
+    Bob    => ["Dan"],
+    Carla  => ["Eve"],
+    Dan    => ["Frank"],
+}
+
+assert_eq Exercism::RelativeDistance::degree_of_separation($tree, "Anna", "Anna"),  0, "self"
+assert_eq Exercism::RelativeDistance::degree_of_separation($tree, "Anna", "Bob"),   1, "parent-child"
+assert_eq Exercism::RelativeDistance::degree_of_separation($tree, "Anna", "Frank"), 3, "deep"
+assert_eq Exercism::RelativeDistance::degree_of_separation($tree, "Bob",  "Carla"), 2, "siblings via parent"
+assert_eq Exercism::RelativeDistance::degree_of_separation($tree, "Dan",  "Eve"),   4, "cousins via root"
+assert_eq Exercism::RelativeDistance::degree_of_separation($tree, "Anna", "Mars"),  undef, "unknown"
+
+test_run

@@ -1,0 +1,8 @@
+#!/usr/bin/env stryke
+require "./ZebraPuzzle.stk"
+
+# Helper sanity (full solver is heavy).
+assert_eq len(@{Exercism::ZebraPuzzle::_perms(["a","b","c"])}), 6, "3! = 6 perms"
+assert_eq len(@{Exercism::ZebraPuzzle::_perms(["a","b"])}),     2, "2! = 2 perms"
+
+test_run

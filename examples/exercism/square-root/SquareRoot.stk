@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+
+# Newton's method for integer square root of a non-negative integer.
+fn Exercism::SquareRoot::sqrt {
+    return 0 if _ == 0
+    my $n = _
+    my $x = $n
+    while (1) {
+        my $nx = int(($x + int($n / $x)) / 2)
+        last if $nx >= $x
+        $x = $nx
+    }
+    $x
+}

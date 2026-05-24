@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+
+# Race state: { title, distance, status, cars: [{ nickname, color,
+# distance_driven_in_meters, battery_percentage }] }.
+fn Exercism::NeedForSpeed::new_race($title, $distance) =
+    { title => $title, distance => $distance, status => "upcoming", cars => [] }
+
+fn Exercism::NeedForSpeed::new_car($nickname, $color) =
+    { nickname => $nickname, color => $color, distance_driven_in_meters => 0, battery_percentage => 100 }
+
+fn Exercism::NeedForSpeed::add_car($race, $car) {
+    push @{$race->{cars}}, $car
+    $race
+}
+
+fn Exercism::NeedForSpeed::display_distance($car) = "#{$car->{distance_driven_in_meters}} meters"
+fn Exercism::NeedForSpeed::display_battery($car)  = $car->{battery_percentage} == 0 ? "Battery empty" : "Battery at #{$car->{battery_percentage}}%"
+
+fn Exercism::NeedForSpeed::drive($car) {
+    return $car if $car->{battery_percentage} == 0
+    +{ %{$car}, battery_percentage => $car->{battery_percentage} - 1,
+                distance_driven_in_meters => $car->{distance_driven_in_meters} + 20 }
+}

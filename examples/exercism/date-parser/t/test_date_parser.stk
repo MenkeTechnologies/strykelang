@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+require "./DateParser.stk"
+
+assert_eq Exercism::DateParser::day(),          '\d{1,2}', "day pattern"
+assert_eq Exercism::DateParser::year(),         '\d{4}',   "year pattern"
+assert_eq Exercism::DateParser::day_names(),    '(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)', "day names"
+assert_eq Exercism::DateParser::capture_year(), "(?<year>\\d{4})", "capture year"
+
+# Smoke-test the capture works in a real match.
+my $re = Exercism::DateParser::capture_day_name() . " " . Exercism::DateParser::capture_month_name() . " " .
+         Exercism::DateParser::capture_day() . ", " . Exercism::DateParser::capture_year()
+"Monday January 15, 2024" =~ /^$re$/
+assert_eq $+{day_name},   "Monday",  "Monday captured"
+assert_eq $+{month_name}, "January", "January captured"
+assert_eq $+{day},        "15",      "15 captured"
+assert_eq $+{year},       "2024",    "2024 captured"
+
+test_run

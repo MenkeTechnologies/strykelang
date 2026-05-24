@@ -1,18 +1,18 @@
 #!/usr/bin/env stryke
 
-fn Exercism::LogLevel::to_label =
-    _ == 0 && !_1 ? "trace" :
-    _ == 1        ? "debug" :
-    _ == 2        ? "info" :
-    _ == 3        ? "warning" :
-    _ == 4        ? "error" :
-    _ == 5 && !_1 ? "fatal" :
-                    "unknown"
+fn Exercism::LogLevel::to_label($level, $legacy) =
+    $level == 0 && !$legacy ? "trace" :
+    $level == 1             ? "debug" :
+    $level == 2             ? "info" :
+    $level == 3             ? "warning" :
+    $level == 4             ? "error" :
+    $level == 5 && !$legacy ? "fatal" :
+                              "unknown"
 
-fn Exercism::LogLevel::alert_recipient {
-    my $lbl = Exercism::LogLevel::to_label(_, _1)
+fn Exercism::LogLevel::alert_recipient($level, $legacy) {
+    my $lbl = Exercism::LogLevel::to_label($level, $legacy)
     $lbl eq "error" || $lbl eq "fatal" ? "ops" :
-    $lbl eq "unknown" && _1            ? "dev1" :
+    $lbl eq "unknown" && $legacy       ? "dev1" :
     $lbl eq "unknown"                  ? "dev2" :
                                           0
 }

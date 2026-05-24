@@ -1,0 +1,8 @@
+#!/usr/bin/env stryke
+require "./Satellite.stk"
+
+assert_eq Exercism::Satellite::tree_from_traversals([1,2], [1])->[0],     "error", "length mismatch"
+assert_eq Exercism::Satellite::tree_from_traversals([1,1,2], [1,1,2])->[0], "error", "non-unique"
+assert_eq Exercism::Satellite::tree_from_traversals([1,2,3], [4,5,6])->[0], "error", "different elements"
+
+test_run

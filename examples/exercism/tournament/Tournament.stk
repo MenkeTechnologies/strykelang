@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+
+# Each input line: "Home;Away;outcome" where outcome ∈ win|loss|draw.
+# Output a fixed-width leaderboard sorted by points (desc), name (asc).
+fn Exercism::Tournament::tally {
+    my %t
+    for my $line (split /\n/, _) {
+        next unless $line =~ /^([^;]+);([^;]+);(win|loss|draw)$/
+        my ($h, $a, $r) = ($1, $2, $3)
+        $t{$h} = { mp=>0, w=>0, d=>0, l=>0, p=>0 } unless exists $t{$h}
+        $t{$a} = { mp=>0, w=>0, d=>0, l=>0, p=>0 } unless exists $t{$a}
+        $t{$h}{mp}++; $t{$a}{mp}++
+        if    ($r eq "win")  { $t{$h}{w}++; $t{$a}{l}++; $t{$h}{p} += 3 }
+        elsif ($r eq "loss") { $t{$a}{w}++; $t{$h}{l}++; $t{$a}{p} += 3 }
+        else                  { $t{$h}{d}++; $t{$a}{d}++; $t{$h}{p}++; $t{$a}{p}++ }
+    }
+    my @teams = sort { $t{$b}{p} <=> $t{$a}{p} || $a cmp $b } keys %t
+    my $hdr = sprintf("%-31s| MP |  W |  D |  L |  P", "Team")
+    my @lines = ($hdr)
+    for my $name (@teams) {
+        push @lines, sprintf("%-31s| %2d | %2d | %2d | %2d | %2d",
+            $name, $t{$name}{mp}, $t{$name}{w}, $t{$name}{d}, $t{$name}{l}, $t{$name}{p})
+    }
+    join "\n", @lines
+}
