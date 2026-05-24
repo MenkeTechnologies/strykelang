@@ -1455,6 +1455,7 @@ CORE::cce
 CORE::ccf
 CORE::ccgraph
 CORE::cci
+CORE::ccomp
 CORE::ccompl
 CORE::ccount
 CORE::ccx_gate
@@ -1705,6 +1706,7 @@ CORE::cindex
 CORE::cinv
 CORE::cinvert
 CORE::cir_bond
+CORE::circ3
 CORE::circ3pt
 CORE::circle_3_points
 CORE::circle_area
@@ -2504,6 +2506,7 @@ CORE::dec_each
 CORE::decagonal_number
 CORE::deceleration_q
 CORE::decibel_ratio
+CORE::decimate
 CORE::decimate_step
 CORE::decode_base
 CORE::decoherence_time
@@ -3051,6 +3054,7 @@ CORE::elliptic_k
 CORE::elliptic_pi
 CORE::elliptic_pi_inc
 CORE::elliptic_theta
+CORE::ellper
 CORE::elo
 CORE::elo_expected
 CORE::elo_rating_update
@@ -4355,6 +4359,7 @@ CORE::hicksian_demand
 CORE::hidden
 CORE::highpass_filter
 CORE::highway_hash
+CORE::hilbert_env
 CORE::hilbert_envelope
 CORE::hilbert_signal
 CORE::hilbert_transform
@@ -4796,6 +4801,7 @@ CORE::internal_rate_of_return
 CORE::interp1d
 CORE::interp_lagrange
 CORE::interp_linear
+CORE::interpolate
 CORE::interpolation_search
 CORE::interpose
 CORE::intersect_list
@@ -6227,6 +6233,7 @@ CORE::mcp_server_start
 CORE::mcp_tools
 CORE::md4
 CORE::md5
+CORE::mdd
 CORE::mdet
 CORE::mdetg
 CORE::mdiag
@@ -6550,6 +6557,7 @@ CORE::mobius
 CORE::mobius_function_pair
 CORE::mobius_inversion_step
 CORE::mobius_poset_two
+CORE::mod_dur
 CORE::mod_exp
 CORE::mod_inv
 CORE::mod_op
@@ -7738,6 +7746,7 @@ CORE::pin
 CORE::ping
 CORE::pint
 CORE::pinv
+CORE::pip
 CORE::pipe
 CORE::pipe_pressure_drop
 CORE::pipeline
@@ -7862,6 +7871,7 @@ CORE::polynomial_remainder
 CORE::polynomial_resultant
 CORE::polynomial_roots
 CORE::polynomial_roots_dk
+CORE::polyper
 CORE::polyperim
 CORE::polyquot
 CORE::polyrem
@@ -8024,6 +8034,7 @@ CORE::prototype
 CORE::proximal_gradient_step
 CORE::prvp
 CORE::ps
+CORE::psd
 CORE::pselect
 CORE::pseudoprime_base2
 CORE::psi
@@ -9678,6 +9689,7 @@ CORE::step_2nd
 CORE::step_response_2nd_order
 CORE::stern_brocot
 CORE::stern_layer_capacitance
+CORE::stft
 CORE::stft_step
 CORE::sthread
 CORE::stieltjes
@@ -9914,6 +9926,7 @@ CORE::symplectic_euler_step
 CORE::synge_world_function
 CORE::synodic_period
 CORE::sys_uptime
+CORE::syscall
 CORE::sysopen
 CORE::sysread
 CORE::sysseek
@@ -12496,6 +12509,7 @@ cce
 ccf
 ccgraph
 cci
+ccomp
 ccompl
 ccount
 ccx_gate
@@ -12746,6 +12760,7 @@ cindex
 cinv
 cinvert
 cir_bond
+circ3
 circ3pt
 circle_3_points
 circle_area
@@ -13549,6 +13564,7 @@ dec_each
 decagonal_number
 deceleration_q
 decibel_ratio
+decimate
 decimate_step
 decode_base
 decoherence_time
@@ -14098,6 +14114,7 @@ elliptic_k
 elliptic_pi
 elliptic_pi_inc
 elliptic_theta
+ellper
 elo
 elo_expected
 elo_rating_update
@@ -15414,6 +15431,7 @@ hicksian_demand
 hidden
 highpass_filter
 highway_hash
+hilbert_env
 hilbert_envelope
 hilbert_signal
 hilbert_transform
@@ -15856,6 +15874,7 @@ internal_rate_of_return
 interp1d
 interp_lagrange
 interp_linear
+interpolate
 interpolation_search
 interpose
 intersect_list
@@ -17291,6 +17310,7 @@ mcp_server_start
 mcp_tools
 md4
 md5
+mdd
 mdet
 mdetg
 mdiag
@@ -17614,6 +17634,7 @@ mobius
 mobius_function_pair
 mobius_inversion_step
 mobius_poset_two
+mod_dur
 mod_exp
 mod_inv
 mod_op
@@ -18806,6 +18827,7 @@ pin
 ping
 pint
 pinv
+pip
 pipe
 pipe_pressure_drop
 pipeline
@@ -18930,6 +18952,7 @@ polynomial_remainder
 polynomial_resultant
 polynomial_roots
 polynomial_roots_dk
+polyper
 polyperim
 polyquot
 polyrem
@@ -19093,6 +19116,7 @@ prototype
 proximal_gradient_step
 prvp
 ps
+psd
 pselect
 pseudoprime_base2
 psi
@@ -20751,6 +20775,7 @@ step_2nd
 step_response_2nd_order
 stern_brocot
 stern_layer_capacitance
+stft
 stft_step
 sthread
 stieltjes
@@ -20988,6 +21013,7 @@ symplectic_euler_step
 synge_world_function
 synodic_period
 sys_uptime
+syscall
 sysopen
 sysread
 sysseek
