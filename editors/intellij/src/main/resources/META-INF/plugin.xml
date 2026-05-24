@@ -149,5 +149,18 @@
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
         </action>
+
+        <!-- File > New > Stryke File (and right-click in Project view → New).
+             `NewGroup` is the platform group ID for both the File menu
+             and the Project-view popup New submenu, so this single
+             registration surfaces in both. -->
+        <action
+            id="Stryke.NewFile"
+            class="com.menketechnologies.stryke.actions.CreateStrykeFileAction"
+            text="Stryke File"
+            description="Create a new stryke (.stk) script"
+            icon="com.menketechnologies.stryke.StrykeIcons.FILE">
+            <add-to-group group-id="NewGroup" anchor="before" relative-to-action="NewFile"/>
+        </action>
     </actions>
 </idea-plugin>
