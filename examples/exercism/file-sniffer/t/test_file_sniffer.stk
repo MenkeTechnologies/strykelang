@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./FileSniffer.stk"
 
-fn j { join(":", @{_}) }
+fn j($a) { join(":", @{$a}) }
 
 assert_eq Exercism::FileSniffer::type_from_extension("exe"), "application/octet-stream", "exe ext"
 assert_eq Exercism::FileSniffer::type_from_extension("bmp"), "image/bmp",                 "bmp ext"

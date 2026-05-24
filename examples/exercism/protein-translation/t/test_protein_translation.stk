@@ -1,8 +1,8 @@
 #!/usr/bin/env stryke
 require "./ProteinTranslation.stk"
 
-fn jcodon { join(":", @{_}) }
-fn jrna   { my @r = @{_0}; $r[0] eq "ok" ? "ok:" . join(",", @{$r[1]}) : "error:" . $r[1] }
+fn jcodon($a) { join(":", @{$a}) }
+fn jrna($pair) { my @r = @{$pair}; $r[0] eq "ok" ? "ok:" . join(",", @{$r[1]}) : "error:" . $r[1] }
 
 assert_eq jcodon(Exercism::ProteinTranslation::of_codon("AUG")), "ok:Methionine", "AUG → Methionine"
 assert_eq jcodon(Exercism::ProteinTranslation::of_codon("UGG")), "ok:Tryptophan", "UGG → Tryptophan"

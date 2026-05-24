@@ -2,7 +2,7 @@
 
 fn Exercism::BafflingBirthdays::shared_birthday($dates) {
     my %seen
-    for my $b (@{$dates}) { return 1 if $seen{$b}++ }
+    for my $d (@{$dates}) { return 1 if $seen{$d}++ }
     0
 }
 

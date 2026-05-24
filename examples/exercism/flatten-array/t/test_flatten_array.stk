@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./FlattenArray.stk"
 
-fn j { join(",", @{_}) }
+fn j($a) { join(",", @{$a}) }
 
 assert_eq j(Exercism::FlattenArray::flatten([])),                       "",          "empty"
 assert_eq j(Exercism::FlattenArray::flatten([1,2,3])),                  "1,2,3",     "flat"

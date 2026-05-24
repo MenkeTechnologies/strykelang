@@ -10,12 +10,12 @@ const my %MIME = (
 
 fn Exercism::FileSniffer::type_from_extension($ext) = $MIME{$ext}
 
-fn Exercism::FileSniffer::type_from_binary($b) =
-    $b =~ /^\x7FELF/                 ? $MIME{exe} :
-    $b =~ /^BM/                      ? $MIME{bmp} :
-    $b =~ /^\x89PNG\x0D\x0A\x1A\x0A/ ? $MIME{png} :
-    $b =~ /^\xFF\xD8\xFF/            ? $MIME{jpg} :
-    $b =~ /^GIF/                     ? $MIME{gif} :
+fn Exercism::FileSniffer::type_from_binary($bin) =
+    $bin =~ /^\x7FELF/                 ? $MIME{exe} :
+    $bin =~ /^BM/                      ? $MIME{bmp} :
+    $bin =~ /^\x89PNG\x0D\x0A\x1A\x0A/ ? $MIME{png} :
+    $bin =~ /^\xFF\xD8\xFF/            ? $MIME{jpg} :
+    $bin =~ /^GIF/                     ? $MIME{gif} :
                                        undef
 
 fn Exercism::FileSniffer::verify($binary, $ext) {

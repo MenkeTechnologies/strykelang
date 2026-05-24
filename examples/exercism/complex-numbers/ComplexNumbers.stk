@@ -7,14 +7,14 @@ fn Exercism::ComplexNumbers::add($z, $w)     = [$z->[0] + $w->[0], $z->[1] + $w-
 fn Exercism::ComplexNumbers::sub($z, $w)     = [$z->[0] - $w->[0], $z->[1] - $w->[1]]
 
 fn Exercism::ComplexNumbers::mul($z, $w) {
-    my ($a, $b, $c, $d) = ($z->[0], $z->[1], $w->[0], $w->[1])
-    [$a * $c - $b * $d, $b * $c + $a * $d]
+    my ($ar, $ai, $br, $bi) = ($z->[0], $z->[1], $w->[0], $w->[1])
+    [$ar * $br - $ai * $bi, $ai * $br + $ar * $bi]
 }
 
 fn Exercism::ComplexNumbers::div($z, $w) {
-    my ($a, $b, $c, $d) = ($z->[0], $z->[1], $w->[0], $w->[1])
-    my $denom = $c * $c + $d * $d
-    [($a * $c + $b * $d) / $denom, ($b * $c - $a * $d) / $denom]
+    my ($ar, $ai, $br, $bi) = ($z->[0], $z->[1], $w->[0], $w->[1])
+    my $denom = $br * $br + $bi * $bi
+    [($ar * $br + $ai * $bi) / $denom, ($ai * $br - $ar * $bi) / $denom]
 }
 
 fn Exercism::ComplexNumbers::abs($z)         = sqrt($z->[0] ** 2 + $z->[1] ** 2)

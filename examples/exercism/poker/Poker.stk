@@ -9,26 +9,26 @@ const my %RANK = (
 # arrayref of the highest-ranked hands.
 fn Exercism::Poker::best_hands($hands) {
     my @scored = map { [Exercism::Poker::_score($_), $_] } @{$hands}
-    @scored = sort { Exercism::Poker::_cmp($b->[0], $a->[0]) } @scored
+    @scored = sort { Exercism::Poker::_cmp(_1->[0], _->[0]) } @scored
     my $best = $scored[0][0]
     [map { $_->[1] } grep { Exercism::Poker::_cmp($_->[0], $best) == 0 } @scored]
 }
 
-fn Exercism::Poker::_cmp($a, $b) {
-    for my $i (0..$#{$a}) {
-        return $a->[$i] <=> $b->[$i] if $a->[$i] != $b->[$i]
+fn Exercism::Poker::_cmp($x, $y) {
+    for my $i (0..$#{$x}) {
+        return $x->[$i] <=> $y->[$i] if $x->[$i] != $y->[$i]
     }
     0
 }
 
 fn Exercism::Poker::_score($hand) {
     my @cards = split /\s+/, $hand
-    my @ranks = sort { $b <=> $a } map { my $r = $_; $r =~ s/[SHDC]$//; $RANK{$r} } @cards
+    my @ranks = sort { _1 <=> _ } map { my $r = $_; $r =~ s/[SHDC]$//; $RANK{$r} } @cards
     my @suits = map { substr($_, -1) } @cards
     my %count
     $count{$_}++ for @ranks
-    my @groups = sort { $count{$b} <=> $count{$a} || $b <=> $a } keys %count
-    my $is_flush    = (uniq(\@suits) == 1) ? 1 : 0
+    my @groups = sort { $count{_1} <=> $count{_} || _1 <=> _ } keys %count
+    my $is_flush    = (len(@{Exercism::Poker::_uniq(\@suits)}) == 1) ? 1 : 0
     my $is_straight = Exercism::Poker::_is_straight(\@ranks)
     # Cat: 8=straight flush, 7=four-of-a-kind, 6=full house, 5=flush, 4=straight, 3=three, 2=two-pair, 1=pair, 0=high
     my @ordered
@@ -39,7 +39,7 @@ fn Exercism::Poker::_score($hand) {
     elsif ($is_flush)                                               { $cat = 5; @ordered = @ranks }
     elsif ($is_straight)                                            { $cat = 4; @ordered = @ranks }
     elsif ($count{$groups[0]} == 3)                                { $cat = 3; @ordered = ($groups[0], $groups[1], $groups[2]) }
-    elsif ($count{$groups[0]} == 2 && $count{$groups[1]} == 2)     { $cat = 2; @ordered = ((sort { $b <=> $a } $groups[0], $groups[1]), $groups[2]) }
+    elsif ($count{$groups[0]} == 2 && $count{$groups[1]} == 2)     { $cat = 2; @ordered = ((sort { _1 <=> _ } $groups[0], $groups[1]), $groups[2]) }
     elsif ($count{$groups[0]} == 2)                                { $cat = 1; @ordered = ($groups[0], $groups[1], $groups[2], $groups[3]) }
     else                                                            { $cat = 0; @ordered = @ranks }
     [$cat, @ordered]
@@ -53,7 +53,7 @@ fn Exercism::Poker::_is_straight($ranks) {
     1
 }
 
-fn uniq($arr) {
+fn Exercism::Poker::_uniq($arr) {
     my %seen
     [grep { !$seen{$_}++ } @{$arr}]
 }

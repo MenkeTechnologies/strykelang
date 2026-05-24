@@ -5,10 +5,10 @@ fn Exercism::BoutiqueSuggestions::get_combinations($tops, $bottoms, $opts) {
     my $max = $opts->{maximum_price} // 100.0
     my @out
     for my $t (@{$tops}) {
-        for my $b (@{$bottoms}) {
-            next if $t->{base_color} eq $b->{base_color}
-            next unless $t->{price} + $b->{price} < $max
-            push @out, [$t, $b]
+        for my $bot (@{$bottoms}) {
+            next if $t->{base_color} eq $bot->{base_color}
+            next unless $t->{price} + $bot->{price} < $max
+            push @out, [$t, $bot]
         }
     }
     \@out

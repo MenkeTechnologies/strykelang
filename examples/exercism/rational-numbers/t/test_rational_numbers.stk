@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./RationalNumbers.stk"
 
-fn j { join("/", @{_}) }
+fn j($a) { join("/", @{$a}) }
 
 assert_eq j(Exercism::RationalNumbers::add([1,2], [2,3])),  "7/6",  "1/2 + 2/3 = 7/6"
 assert_eq j(Exercism::RationalNumbers::sub([1,2], [1,3])),  "1/6",  "1/2 - 1/3 = 1/6"

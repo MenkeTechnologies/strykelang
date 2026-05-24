@@ -128,7 +128,7 @@ class StrykeLexer : LexerBase() {
         }
         val c = buf[pos]
         when {
-            c == '#' -> consumeLineComment()
+            c == '#' && isCommentStart() -> consumeLineComment()
             c == '\n' || c == '\r' || c == ' ' || c == '\t' -> consumeWhitespace()
             c == '"' -> consumeDoubleQuoteString()
             c == '\'' -> consumeString('\'')
@@ -208,6 +208,24 @@ class StrykeLexer : LexerBase() {
         } else {
             StrykeTokenTypes.COMMENT
         }
+    }
+
+    /**
+     * `#` is a real comment opener UNLESS it's part of a parameter
+     * expansion:
+     *   `$#var`   — last-index of `@var`
+     *   `$#`      — special: last arg-index of current sub
+     *   `${#var}` — string length of `$var`
+     *
+     * Without this guard the lexer paints everything after `$#xs` as
+     * comment, including the matching `]]` and the next stage of a
+     * ternary. Same bug class as the zshrs LSP linter fix.
+     */
+    private fun isCommentStart(): Boolean {
+        if (buf[pos] != '#') return false
+        if (pos > 0 && buf[pos - 1] == '$') return false             // $# / $#var
+        if (pos >= 2 && buf[pos - 1] == '{' && buf[pos - 2] == '$') return false  // ${#var}
+        return true
     }
 
     private fun consumeWhitespace() {
@@ -520,7 +538,7 @@ class StrykeLexer : LexerBase() {
         }
         val c = buf[pos]
         when {
-            c == '#' -> consumeLineComment()
+            c == '#' && isCommentStart() -> consumeLineComment()
             c == '\n' || c == '\r' || c == ' ' || c == '\t' -> consumeWhitespace()
             c == '"' -> consumeDoubleQuoteString()
             c == '\'' -> consumeString('\'')
@@ -621,6 +639,17 @@ class StrykeLexer : LexerBase() {
         if (p >= endOffset) {
             tokenEnd = p; pos = p
             tokenType = StrykeTokenTypes.OPERATOR
+            return
+        }
+        // `$#var` (last index of @var) and bare `$#` (last arg index).
+        // Consume `#` plus any trailing identifier-name chars as one
+        // SCALAR_VAR token so the `#` doesn't trigger the comment
+        // path and the var name doesn't fragment.
+        if (sigil == '$' && buf[p] == '#') {
+            p++ // consume `#`
+            while (p < endOffset && (buf[p] == '_' || buf[p].isLetterOrDigit())) p++
+            tokenEnd = p; pos = p
+            tokenType = StrykeTokenTypes.SCALAR_VAR
             return
         }
         // ${...} / @{...} / %{...} block-deref — treat the whole thing as a variable.

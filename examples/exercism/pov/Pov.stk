@@ -18,7 +18,7 @@ fn Exercism::Pov::_path_to($tree, $target) {
 fn Exercism::Pov::_reroot($path) {
     my $new = { value => $path->[-1]{value}, children => [@{$path->[-1]{children}}] }
     my $cur = $new
-    for my $i (reverse 0..$#{$path} - 1) {
+    for my $i (rev 0..$#{$path} - 1) {
         my $parent = $path->[$i]
         my @sib = grep { $_->{value} ne $cur->{value} } @{$parent->{children}}
         push @{$cur->{children}}, { value => $parent->{value}, children => \@sib }

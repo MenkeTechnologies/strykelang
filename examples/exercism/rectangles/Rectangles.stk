@@ -17,8 +17,8 @@ fn Exercism::Rectangles::count {
                     next unless ($c1[$x2] // "") eq "+" && ($c2[$x2] // "") eq "+"
                     my $ok = 1
                     for my $x ($x1 + 1..$x2 - 1) {
-                        my ($t, $b) = ($c1[$x] // "", $c2[$x] // "")
-                        $t =~ /^[-+]$/ && $b =~ /^[-+]$/ or do { $ok = 0; last }
+                        my ($top, $bot) = ($c1[$x] // "", $c2[$x] // "")
+                        $top =~ /^[-+]$/ && $bot =~ /^[-+]$/ or do { $ok = 0; last }
                     }
                     next unless $ok
                     for my $y ($y1 + 1..$y2 - 1) {

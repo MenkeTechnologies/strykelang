@@ -1,4 +1,3 @@
-#!/usr/bin/env stryke
 require "./RpnCalculatorInspection.stk"
 
 my $r = Exercism::RpnCalculatorInspection::start_reliability_check(fn { _ < 4 ? 1 : 0 }, 5)
@@ -9,5 +8,4 @@ assert_eq $t->{fail}, 2, "2 fail"
 my $r2 = Exercism::RpnCalculatorInspection::reliability_check(fn { 1 }, 5, 0)
 my $t2 = Exercism::RpnCalculatorInspection::await_reliability_check_result($r2)
 assert_eq $t2->{pass}, 5, "all pass"
-
 test_run

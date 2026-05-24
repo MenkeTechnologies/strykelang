@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./LogParser.stk"
 
-fn j { join("|", @{_}) }
+fn j($a) { join("|", @{$a}) }
 
 assert_eq Exercism::LogParser::valid_line("[ERROR] foo"),   1, "valid ERROR"
 assert_eq Exercism::LogParser::valid_line("[INFO] bar"),    1, "valid INFO"

@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./ComplexNumbers.stk"
 
-fn j { join(",", @{_}) }
+fn j($a) { join(",", @{$a}) }
 
 assert_eq Exercism::ComplexNumbers::real([3, 4]),       3, "real"
 assert_eq Exercism::ComplexNumbers::imaginary([3, 4]),  4, "imaginary"

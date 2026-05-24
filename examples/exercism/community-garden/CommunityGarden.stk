@@ -4,7 +4,7 @@
 fn Exercism::CommunityGarden::start = { next_id => 1, plots => {} }
 
 fn Exercism::CommunityGarden::list_registrations($g) {
-    [sort { $a->{plot_id} <=> $b->{plot_id} } values %{$g->{plots}}]
+    [sort { _->{plot_id} <=> _1->{plot_id} } values %{$g->{plots}}]
 }
 
 fn Exercism::CommunityGarden::register($g, $name) {

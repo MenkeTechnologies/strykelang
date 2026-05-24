@@ -48,16 +48,16 @@ fn Exercism::ZebraPuzzle::solve {
 }
 
 fn Exercism::ZebraPuzzle::_idx($arr, $v) { for my $i (0..$#{$arr}) { return $i if $arr->[$i] eq $v } -1 }
-fn Exercism::ZebraPuzzle::_same_index($a, $av, $b, $bv) = Exercism::ZebraPuzzle::_idx($a, $av) == Exercism::ZebraPuzzle::_idx($b, $bv)
-fn Exercism::ZebraPuzzle::_right_of($arr, $a, $b) {
-    my $ai = Exercism::ZebraPuzzle::_idx($arr, $a)
-    my $bi = Exercism::ZebraPuzzle::_idx($arr, $b)
-    $ai == $bi + 1
+fn Exercism::ZebraPuzzle::_same_index($arr1, $v1, $arr2, $v2) = Exercism::ZebraPuzzle::_idx($arr1, $v1) == Exercism::ZebraPuzzle::_idx($arr2, $v2)
+fn Exercism::ZebraPuzzle::_right_of($arr, $x, $y) {
+    my $xi = Exercism::ZebraPuzzle::_idx($arr, $x)
+    my $yi = Exercism::ZebraPuzzle::_idx($arr, $y)
+    $xi == $yi + 1
 }
-fn Exercism::ZebraPuzzle::_next_to($a, $av, $b, $bv) {
-    my $ai = Exercism::ZebraPuzzle::_idx($a, $av)
-    my $bi = Exercism::ZebraPuzzle::_idx($b, $bv)
-    abs($ai - $bi) == 1
+fn Exercism::ZebraPuzzle::_next_to($arr1, $v1, $arr2, $v2) {
+    my $xi = Exercism::ZebraPuzzle::_idx($arr1, $v1)
+    my $yi = Exercism::ZebraPuzzle::_idx($arr2, $v2)
+    abs($xi - $yi) == 1
 }
 
 fn Exercism::ZebraPuzzle::_perms($arr) {

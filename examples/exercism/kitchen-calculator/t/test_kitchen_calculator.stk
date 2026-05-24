@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./KitchenCalculator.stk"
 
-fn j { join(",", @{_}) }
+fn j($a) { join(",", @{$a}) }
 
 assert_eq Exercism::KitchenCalculator::get_volume(["cup", 5]),                    5,                "get_volume scalar"
 assert_eq j(Exercism::KitchenCalculator::to_milliliter(["cup", 2.5])),            "milliliter,600", "2.5 cup → 600 ml"

@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./Accumulate.stk"
 
-my $sq  =  _ * _
+my $sq  = _ * _
 my $up  = uc _
 my $rev = ~> _ >{split //, _} rev join ("")
 

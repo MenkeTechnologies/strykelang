@@ -4,7 +4,7 @@ fn Exercism::CityOffice::blanks($n)              = "X" x $n
 fn Exercism::CityOffice::letters($w)             = [split //, uc($w)]
 fn Exercism::CityOffice::check_length($w, $max)  = len($w) - $max <= 0 ? "ok" : ["error", len($w) - $max]
 
-fn Exercism::CityOffice::format_address($a) {
-    my ($s, $p, $c) = ref($a) eq 'HASH' ? ($a->{street}, $a->{postal_code}, $a->{city}) : @{$a}
+fn Exercism::CityOffice::format_address($addr) {
+    my ($s, $p, $c) = ref($addr) eq 'HASH' ? ($addr->{street}, $addr->{postal_code}, $addr->{city}) : @{$addr}
     "#{uc($s)}\n#{uc($p)} #{uc($c)}\n"
 }

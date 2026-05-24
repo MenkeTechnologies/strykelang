@@ -22,7 +22,7 @@ fn Exercism::Alphametics::solve($puzzle) {
 fn Exercism::Alphametics::_search($letters, $map, $used, $leading, $addends, $sum) {
     if (!@{$letters}) {
         my $tot = 0
-        for my $a (@{$addends}) { $tot += Exercism::Alphametics::_value($a, $map) }
+        for my $w (@{$addends}) { $tot += Exercism::Alphametics::_value($w, $map) }
         return Exercism::Alphametics::_value($sum, $map) == $tot ? +{ %{$map} } : undef
     }
     my $l = $letters->[0]
