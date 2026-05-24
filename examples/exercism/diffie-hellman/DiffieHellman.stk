@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+
+fn Exercism::DiffieHellman::generate_private_key($p) = 2 + int(rand() * ($p - 3))
+
+fn Exercism::DiffieHellman::generate_public_key($p, $g, $private)
+    = Exercism::DiffieHellman::_modpow($g, $private, $p)
+
+fn Exercism::DiffieHellman::generate_secret($p, $their, $own)
+    = Exercism::DiffieHellman::_modpow($their, $own, $p)
+
+fn Exercism::DiffieHellman::_modpow($base, $exp, $mod) {
+    my $r = 1
+    $base %= $mod
+    while ($exp > 0) {
+        $r = ($r * $base) % $mod if $exp & 1
+        $exp >>= 1
+        $base = ($base * $base) % $mod
+    }
+    $r
+}

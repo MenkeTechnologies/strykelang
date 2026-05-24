@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+require "./LineUp.stk"
+
+assert_eq Exercism::LineUp::format("Alice", 1),   "Hello, Alice! You are the 1st in line.", "1st"
+assert_eq Exercism::LineUp::format("Bob",   2),   "Hello, Bob! You are the 2nd in line.",   "2nd"
+assert_eq Exercism::LineUp::format("Carol", 3),   "Hello, Carol! You are the 3rd in line.", "3rd"
+assert_eq Exercism::LineUp::format("Dan",   4),   "Hello, Dan! You are the 4th in line.",   "4th"
+assert_eq Exercism::LineUp::format("Eve",   11),  "Hello, Eve! You are the 11th in line.",  "11th"
+assert_eq Exercism::LineUp::format("Fay",   12),  "Hello, Fay! You are the 12th in line.",  "12th"
+assert_eq Exercism::LineUp::format("Gus",   13),  "Hello, Gus! You are the 13th in line.",  "13th"
+assert_eq Exercism::LineUp::format("Hal",   21),  "Hello, Hal! You are the 21st in line.",  "21st"
+assert_eq Exercism::LineUp::format("Ivy",   102), "Hello, Ivy! You are the 102nd in line.", "102nd"
+assert_eq Exercism::LineUp::format("Jim",   111), "Hello, Jim! You are the 111th in line.", "111th"
+
+test_run

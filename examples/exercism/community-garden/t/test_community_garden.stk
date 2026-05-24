@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+require "./CommunityGarden.stk"
+
+my $g = Exercism::CommunityGarden::start()
+assert_eq len(@{Exercism::CommunityGarden::list_registrations($g)}), 0, "fresh"
+
+my $p = Exercism::CommunityGarden::register($g, "Alice")
+assert_eq $p->{plot_id}, 1, "first plot id"
+Exercism::CommunityGarden::register($g, "Bob")
+Exercism::CommunityGarden::register($g, "Carol")
+
+assert_eq len(@{Exercism::CommunityGarden::list_registrations($g)}), 3, "three registered"
+
+Exercism::CommunityGarden::release($g, 2)
+assert_eq len(@{Exercism::CommunityGarden::list_registrations($g)}), 2, "released bob"
+assert_eq Exercism::CommunityGarden::get_registration($g, 2), "not found", "bob gone"
+
+assert_eq Exercism::CommunityGarden::get_registration($g, 1)->{registered_to}, "Alice", "alice still there"
+
+test_run

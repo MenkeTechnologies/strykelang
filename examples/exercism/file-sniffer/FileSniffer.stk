@@ -8,19 +8,19 @@ const my %MIME = (
     gif => "image/gif",
 )
 
-fn Exercism::FileSniffer::type_from_extension = $MIME{_}
+fn Exercism::FileSniffer::type_from_extension($ext) = $MIME{$ext}
 
-fn Exercism::FileSniffer::type_from_binary =
-    _ =~ /^\x7FELF/                 ? $MIME{exe} :
-    _ =~ /^BM/                      ? $MIME{bmp} :
-    _ =~ /^\x89PNG\x0D\x0A\x1A\x0A/ ? $MIME{png} :
-    _ =~ /^\xFF\xD8\xFF/            ? $MIME{jpg} :
-    _ =~ /^GIF/                     ? $MIME{gif} :
-                                      undef
+fn Exercism::FileSniffer::type_from_binary($b) =
+    $b =~ /^\x7FELF/                 ? $MIME{exe} :
+    $b =~ /^BM/                      ? $MIME{bmp} :
+    $b =~ /^\x89PNG\x0D\x0A\x1A\x0A/ ? $MIME{png} :
+    $b =~ /^\xFF\xD8\xFF/            ? $MIME{jpg} :
+    $b =~ /^GIF/                     ? $MIME{gif} :
+                                       undef
 
-fn Exercism::FileSniffer::verify {
-    my $t = Exercism::FileSniffer::type_from_binary(_)
-    defined($t) && $t eq Exercism::FileSniffer::type_from_extension(_1)
+fn Exercism::FileSniffer::verify($binary, $ext) {
+    my $t = Exercism::FileSniffer::type_from_binary($binary)
+    defined($t) && $t eq Exercism::FileSniffer::type_from_extension($ext)
         ? ["ok", $t]
         : ["error", "Warning, file format and file extension do not match."]
 }

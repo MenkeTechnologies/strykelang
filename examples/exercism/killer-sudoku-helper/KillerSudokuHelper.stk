@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+
+fn Exercism::KillerSudokuHelper::combinations($size, $sum) {
+    my @out
+    Exercism::KillerSudokuHelper::_pick($size, $sum, 1, [], \@out)
+    \@out
+}
+
+fn Exercism::KillerSudokuHelper::_pick($size, $sum, $next, $acc, $out) {
+    if ($size == 0) {
+        push @{$out}, [@{$acc}] if $sum == 0
+        return
+    }
+    for my $i ($next..9) {
+        last if $i > $sum
+        Exercism::KillerSudokuHelper::_pick($size - 1, $sum - $i, $i + 1, [@{$acc}, $i], $out)
+    }
+}
+
+fn Exercism::KillerSudokuHelper::filter($combos, $excluded) {
+    my %ex = map { $_ => 1 } @{$excluded}
+    my @out
+    for my $c (@{$combos}) {
+        my $bad = 0
+        for my $d (@{$c}) { if (exists $ex{$d}) { $bad = 1; last } }
+        push @out, $c unless $bad
+    }
+    \@out
+}

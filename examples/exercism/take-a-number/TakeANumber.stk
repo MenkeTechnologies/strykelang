@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+
+# Stryke port has no Erlang-style processes; use a hash as "state" with
+# the same message-style dispatch surface as the Elixir version.
+fn Exercism::TakeANumber::start = { state => 0 }
+
+fn Exercism::TakeANumber::report_state = _->{state}
+
+fn Exercism::TakeANumber::take_a_number {
+    my $s = _
+    $s->{state}++
+    $s->{state}
+}
+
+fn Exercism::TakeANumber::stop = "stopped"

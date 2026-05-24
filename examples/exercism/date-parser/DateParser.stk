@@ -1,0 +1,13 @@
+#!/usr/bin/env stryke
+
+fn Exercism::DateParser::day        = '\d{1,2}'
+fn Exercism::DateParser::month      = '\d{1,2}'
+fn Exercism::DateParser::year       = '\d{4}'
+fn Exercism::DateParser::day_names  = '(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)'
+fn Exercism::DateParser::month_names = '(January|February|March|April|May|June|July|August|September|October|November|December)'
+
+fn Exercism::DateParser::capture_day        = "(?<day>#{Exercism::DateParser::day()})"
+fn Exercism::DateParser::capture_month      = "(?<month>#{Exercism::DateParser::month()})"
+fn Exercism::DateParser::capture_year       = "(?<year>#{Exercism::DateParser::year()})"
+fn Exercism::DateParser::capture_day_name   = "(?<day_name>#{Exercism::DateParser::day_names()})"
+fn Exercism::DateParser::capture_month_name = "(?<month_name>#{Exercism::DateParser::month_names()})"

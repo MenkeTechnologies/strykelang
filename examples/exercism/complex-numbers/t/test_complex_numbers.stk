@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+require "./ComplexNumbers.stk"
+
+fn j { join(",", @{_}) }
+
+assert_eq Exercism::ComplexNumbers::real([3, 4]),       3, "real"
+assert_eq Exercism::ComplexNumbers::imaginary([3, 4]),  4, "imaginary"
+
+assert_eq j(Exercism::ComplexNumbers::add([1,2], [3,4])),  "4,6",   "add"
+assert_eq j(Exercism::ComplexNumbers::sub([5,7], [1,2])),  "4,5",   "sub"
+assert_eq j(Exercism::ComplexNumbers::mul([3,2], [1,4])),  "-5,14", "mul"
+assert_eq j(Exercism::ComplexNumbers::div([3,4], [1,2])),  "2.2,-0.4", "div"
+assert_eq Exercism::ComplexNumbers::abs([3, 4]),            5, "abs"
+assert_eq j(Exercism::ComplexNumbers::conjugate([3, 4])),  "3,-4", "conjugate"
+
+# e^(i*pi) ≈ -1
+my $r = Exercism::ComplexNumbers::exp([0, 3.141592653589793])
+assert_ok abs($r->[0] - -1) < 1e-9 && abs($r->[1]) < 1e-9, "e^(iπ) ≈ -1"
+
+test_run

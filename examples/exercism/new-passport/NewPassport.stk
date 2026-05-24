@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+
+# Issue a new-passport step list, given (current epoch, birthday epoch,
+# form name). Returns ["ok", passport-id-string] when both birthday is in
+# the past and a name is given; otherwise ["error", msg].
+fn Exercism::NewPassport::get_new_passport($now, $birthday, $form) {
+    return ["error", "no name"]               unless defined($form) && len($form) > 0
+    return ["error", "birthday in the future"] if $birthday >= $now
+    my $age_years = int(($now - $birthday) / (365 * 86400))
+    return ["error", "underage"]              if $age_years < 18
+    ["ok", "PASS-#{$form}-#{$age_years}"]
+}

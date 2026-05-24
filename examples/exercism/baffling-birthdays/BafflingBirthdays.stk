@@ -1,0 +1,32 @@
+#!/usr/bin/env stryke
+
+fn Exercism::BafflingBirthdays::shared_birthday($dates) {
+    my %seen
+    for my $b (@{$dates}) { return 1 if $seen{$b}++ }
+    0
+}
+
+fn Exercism::BafflingBirthdays::random_birthdates($n) {
+    my @out
+    for (1:$n) {
+        my $doy = 1 + int(rand() * 365)
+        push @out, Exercism::BafflingBirthdays::_doy_to_md($doy)
+    }
+    \@out
+}
+
+fn Exercism::BafflingBirthdays::_doy_to_md($d) {
+    my @mlen = (31,28,31,30,31,30,31,31,30,31,30,31)
+    my $m = 1
+    while ($d > $mlen[$m - 1]) { $d -= $mlen[$m - 1]; $m++ }
+    sprintf("%02d-%02d", $m, $d)
+}
+
+fn Exercism::BafflingBirthdays::estimated_probability_of_shared_birthday($size, $trials) {
+    $trials //= 1000
+    my $hits = 0
+    for (1:$trials) {
+        $hits++ if Exercism::BafflingBirthdays::shared_birthday(Exercism::BafflingBirthdays::random_birthdates($size))
+    }
+    $hits / $trials
+}

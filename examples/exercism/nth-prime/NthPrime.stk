@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+
+# Return the N-th prime (1-indexed); die on N <= 0.
+fn Exercism::NthPrime::nth {
+    die "there is no zeroth prime" if _ < 1
+    my $n      = _
+    my @primes = (2)
+    my $candidate = 3
+    while (@primes < $n) {
+        my $is_prime = 1
+        for my $p (@primes) {
+            last if $p * $p > $candidate
+            if ($candidate % $p == 0) { $is_prime = 0; last }
+        }
+        push @primes, $candidate if $is_prime
+        $candidate += 2
+    }
+    $primes[-1]
+}

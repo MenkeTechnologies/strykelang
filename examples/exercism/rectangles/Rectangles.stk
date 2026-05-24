@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+
+# Count ASCII rectangles: every pair of `+`-corners where both vertical
+# edges are unbroken `|` (or `+`) and both horizontal edges are
+# unbroken `-` (or `+`) defines one rectangle.
+fn Exercism::Rectangles::count {
+    my @rows  = split /\n/, _
+    my $count = 0
+    for my $y1 (0..$#rows) {
+        for my $y2 ($y1 + 2..$#rows) {
+            my @c1 = split //, $rows[$y1]
+            my @c2 = split //, $rows[$y2]
+            my $max_x = (len($rows[$y1]) < len($rows[$y2]) ? len($rows[$y1]) : len($rows[$y2])) - 1
+            for my $x1 (0..$max_x) {
+                next unless ($c1[$x1] // "") eq "+" && ($c2[$x1] // "") eq "+"
+                for my $x2 ($x1 + 2..$max_x) {
+                    next unless ($c1[$x2] // "") eq "+" && ($c2[$x2] // "") eq "+"
+                    my $ok = 1
+                    for my $x ($x1 + 1..$x2 - 1) {
+                        my ($t, $b) = ($c1[$x] // "", $c2[$x] // "")
+                        $t =~ /^[-+]$/ && $b =~ /^[-+]$/ or do { $ok = 0; last }
+                    }
+                    next unless $ok
+                    for my $y ($y1 + 1..$y2 - 1) {
+                        my @r = split //, $rows[$y]
+                        my ($l, $rr) = ($r[$x1] // "", $r[$x2] // "")
+                        $l =~ /^[|+]$/ && $rr =~ /^[|+]$/ or do { $ok = 0; last }
+                    }
+                    $count++ if $ok
+                }
+            }
+        }
+    }
+    $count
+}

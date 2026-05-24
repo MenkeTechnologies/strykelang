@@ -1,0 +1,31 @@
+#!/usr/bin/env stryke
+
+# Given a partial puzzle hash, fill in derivable fields.
+# Inputs may include: pieces, rows, columns, format, aspect_ratio, border, inside.
+fn Exercism::JigsawPuzzle::fill {
+    my %pz = %{_}
+    # pieces = rows * columns (or vice versa).
+    if (defined $pz{rows} && defined $pz{columns} && !defined $pz{pieces}) {
+        $pz{pieces} = $pz{rows} * $pz{columns}
+    }
+    # aspect_ratio = columns / rows.
+    if (defined $pz{rows} && defined $pz{columns} && !defined $pz{aspect_ratio}) {
+        $pz{aspect_ratio} = $pz{columns} / $pz{rows}
+    }
+    # format from aspect_ratio.
+    if (defined $pz{aspect_ratio} && !defined $pz{format}) {
+        $pz{format} = $pz{aspect_ratio} > 1 ? "landscape"
+                   : $pz{aspect_ratio} < 1 ? "portrait"
+                   :                        "square"
+    }
+    # border + inside split.
+    if (defined $pz{rows} && defined $pz{columns}) {
+        if (!defined $pz{border}) {
+            $pz{border} = 2 * $pz{rows} + 2 * $pz{columns} - 4
+        }
+        if (!defined $pz{inside}) {
+            $pz{inside} = ($pz{rows} - 2) * ($pz{columns} - 2)
+        }
+    }
+    \%pz
+}
