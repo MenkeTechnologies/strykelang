@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+# Run: stryke --no-interop examples/phonetic_algorithms.stk
+
+p "--- Phonetics ---"
+"Smith" |> soundex_v1 |> aeq soundex_v1("Smyth"), "sndx"
+
+my $m1 = metaphone "Stryke"
+my $m2 = metaphone "Strike"
+($m1 eq $m2) |> aok "metph"
+
+levenshtein("kitten", "sitting") |> aeq 3, "lev"
+test_run

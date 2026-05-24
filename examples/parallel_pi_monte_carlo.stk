@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+
+# Parallel Pi Estimation (Monte Carlo)
+#
+# Demonstrates:
+#   * `pmaps` for parallel chunked processing.
+#   * Random number generation with `rand()`.
+#   * Statistical approximation.
+#
+# Note: each thread runs a self-contained chunk so its RNG state diverges from
+# its siblings — calling `rand()` once per parallel task would produce
+# correlated outputs and a biased estimate.
+#
+# Run: stryke --no-interop examples/parallel_pi_monte_carlo.stk
+
+p "--- Parallel Pi Estimation ---"
+
+my $chunks = 8
+my $per    = 12500
+my $total_samples = $chunks * $per
+
+p "Estimating Pi using $total_samples samples ($chunks chunks of $per)..."
+
+# 1. Each chunk runs many samples in one thread, then we sum the chunk counts.
+my $inside_count = 1:$chunks |> pmaps {
+    my $c = 0
+    for (1:$per) {
+        my $x = rand()
+        my $y = rand()
+        $c++ if $x*$x + $y*$y <= 1.0
+    }
+    $c
+} |> sum
+
+# 2. Calculate Pi (Area = 4 * count / total)
+my $pi_est = 4.0 * $inside_count / $total_samples
+p "Estimated Pi: #{ sprintf '%.5f', $pi_est }"
+
+# ── 3. Tests ───────────────────────────────────────────────────────
+
+abs($pi_est - 3.14159) < 0.05 |> aok "Pi estimation within 0.05"
+
+test_run

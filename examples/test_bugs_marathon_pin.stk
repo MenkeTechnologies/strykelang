@@ -22,10 +22,10 @@ pos($s_38) |> maps {!defined} |> aok "BUG-038: pos() is undef outside while loop
 # pi/tau are builtins, PI/TAU/E are barewords (usually)
 pi |> maps { _ > 3.14 && _ < 3.15 } |> aok "pi builtin works"
 tau |> maps { _ > 6.28 && _ < 6.29 } |> aok "tau builtin works"
-# In --no-interop, barewords might fail or just stringify. 
-# Let's check what they do.
-tj(PI) |> aeq '"PI"', "BUG-064: PI is a bareword string"
-tj(E) |> aeq '"E"', "BUG-064: E is a bareword string"
+# BUG-064 (FIXED): PI and E barewords now resolve to their math constants
+# instead of stringifying to "PI"/"E". `tj(PI)` emits the JSON number form.
+tj(PI) |> aeq '3.141592653589793', "BUG-064 (FIXED): PI bareword resolves to π"
+tj(E)  |> aeq '2.718281828459045', "BUG-064 (FIXED): E bareword resolves to e"
 
 # ── 4. Prototype of Builtins (BUG-052) ────────────────────────────────────
 
@@ -64,10 +64,10 @@ $log_78 .= "M"
 # It seems in some contexts it stringifies to SCALAR(0x...)M
 $log_78 |> maps { _ =~ /SCALAR\(0x\w+\)M/ || _ eq "M" } |> aok "BUG-078: BEGIN mutations lost (or stringified bug)"
 
-# ── 10. List-form system (BUG-031) ────────────────────────────────────────
+# ── 10. List-form system (BUG-031 FIXED) ──────────────────────────────────
 
-# system(LIST) drops exit code in $?
+# system(LIST) now sets $? to the Perl-encoded status word (exit_code << 8).
 system("sh", "-c", "exit 7")
-$? |> aeq 0, "BUG-031: system(LIST) drops exit code"
+$? |> aeq 1792, "BUG-031 (FIXED): system(LIST) sets \$? to (exit_code << 8)"
 
 test_run

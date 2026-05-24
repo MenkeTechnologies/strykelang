@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+# Run: stryke --no-interop examples/data_visualization.stk
+
+p "--- Viz ---"
+my $s = 1:10 |> sparkline
+p "Spark: $s"
+
+my %f = (A => 10, B => 50, C => 30)
+p "Chart:\n#{ bar_chart \%f }"
+
+len $s |> aeq 10, "spark"
+test_run

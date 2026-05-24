@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+# Run: stryke --no-interop examples/custom_iterator_protocol.stk
+
+p "--- Iter ---"
+# iterate(fn, init) -> lazy seq
+my @p2 = ~> iterate({ _ * 2 }, 1) head(10) collect
+p "P2: @p2"
+
+my @s6 = ~> iterate({ _ * 2 }, 1) greps { _ % 10 == 6 } head(5) collect
+p "Ends in 6: @s6"
+
+@p2[0] |> aeq 1,  "start"
+@s6[0] |> aeq 16, "s6"
+test_run
