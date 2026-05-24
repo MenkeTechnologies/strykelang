@@ -1184,6 +1184,19 @@ my $r = call(fn { _ &lt; 4 }, 5)    <span class="comment"># 0  — call() runs e
 <span class="comment"># inside a block, _ is the topic — NOT auto-wrapped:</span>
 fn dbl { my $x = _; $x * 2 }     <span class="comment"># $x captures the first arg</span>
 map { my $i = _; $i * 2 } 1:3    <span class="comment"># $i captures each element</span></pre>
+        <h3 style="margin-top:1em;">Thread-macro RHS — only the input expression counts</h3>
+        <p>When the RHS <em>starts</em> with a thread-macro intro token (<code>~&gt;</code>, <code>-&gt;&gt;</code>, <code>~&gt;&gt;</code>, <code>~p&gt;</code>, <code>~s&gt;</code>, <code>~d&gt;</code>, and their <code>-Last</code> variants), the macro itself binds <code>_</code> for every stage expression. Only the <strong>input expression</strong> immediately after the arrow can trigger the wrap — bare <code>_</code> tokens inside stage call arguments are the threaded placeholder, not free topic reads.</p>
+<pre><span class="comment"># input is concrete (10) → eager; the `_` in div(_, 2) is the</span>
+<span class="comment"># thread-last placeholder, not a free topic:</span>
+fn Demo::div = _0 / _1
+my $r = -&gt;&gt; 10 Demo::div(_, 2)   <span class="comment"># 5     — eager call</span>
+
+<span class="comment"># input is a free bare `_` → wraps so the call site supplies it:</span>
+my $up = ~&gt; _ uc                 <span class="comment"># → fn { ~&gt; _ uc }</span>
+$up-&gt;("ya")                      <span class="comment"># "YA"</span>
+
+<span class="comment"># input is concrete (an array) → eager even with `_` in stages:</span>
+my @r = ~&gt; @nums map { _ * _ } grep { _ &gt; 10 }</pre>
         <h3 style="margin-top:1em;">Forcing eager evaluation — use the <code>$_</code> sigil</h3>
         <p>To opt out of the wrap and evaluate the RHS against the <em>current</em> topic, use the sigil-prefixed form <code>$_</code> / <code>$_0</code> / <code>$_1</code> / <code>$_&lt;</code>. Sigil-prefixed topic reads are eager by definition and never trigger the coderef sugar.</p>
 <pre><span class="comment"># bare _ → coderef (deferred)</span>
@@ -1199,7 +1212,7 @@ p $sq2                           <span class="comment"># 49</span>
 <span class="comment"># and $_ inside the closure reads the topic at call time:</span>
 my $mix = $_ + _                 <span class="comment"># → fn { $_ + _ }</span>
 $mix-&gt;(3)                        <span class="comment"># 6    (both $_ and _ are the arg)</span></pre>
-        <p><strong>Rule</strong>: the wrap fires only when (a) we're at <code>block_depth == 0</code>, (b) the LHS is a single scalar, (c) the RHS contains a free (depth-0 within the RHS) bare positional token — match wildcards inside <code>match { _ =&gt; … }</code> arms sit at depth ≥ 1 so they don't false-trigger — and (d) the RHS isn't already a coderef-shaped value (<code>fn { … }</code>, <code>\&amp;name</code>, <code>\&amp;{…}</code>). <strong>Disabled under <code>--compat</code></strong>.</p>
+        <p><strong>Rule</strong>: the wrap fires only when (a) we're at <code>block_depth == 0</code>, (b) the LHS is a single scalar, (c) the RHS contains a free (depth-0 within the RHS) bare positional token — match wildcards inside <code>match { _ =&gt; … }</code> arms sit at depth ≥ 1 so they don't false-trigger, and a thread-macro RHS only counts the input expression after the arrow — and (d) the RHS isn't already a coderef-shaped value (<code>fn { … }</code>, <code>\&amp;name</code>, <code>\&amp;{…}</code>). <strong>Disabled under <code>--compat</code></strong>.</p>
       </section>
 
       <section class="tutorial-section">
