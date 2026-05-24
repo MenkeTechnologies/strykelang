@@ -802,9 +802,9 @@ pub fn xattr_list(args: &[StrykeValue]) -> StrykeValue {
     };
     let mut buf = vec![0u8; 16384];
     #[cfg(target_os = "macos")]
-    let n = unsafe { libc::listxattr(path.as_ptr(), buf.as_mut_ptr() as *mut i8, buf.len(), 0) };
+    let n = unsafe { libc::listxattr(path.as_ptr(), buf.as_mut_ptr() as *mut libc::c_char, buf.len(), 0) };
     #[cfg(target_os = "linux")]
-    let n = unsafe { libc::listxattr(path.as_ptr(), buf.as_mut_ptr() as *mut i8, buf.len()) };
+    let n = unsafe { libc::listxattr(path.as_ptr(), buf.as_mut_ptr() as *mut libc::c_char, buf.len()) };
     if n <= 0 {
         return arr(vec![]);
     }
